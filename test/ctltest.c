@@ -1,62 +1,64 @@
 #define _GNU_SOURCE
+#include "ctl.h"
+#include "cfgutils.h"
+#include "circbuf.h"
+#include "dbg.h"
+#include "fn.h"
+#include "state.h"
+#include "test.h"
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include "ctl.h"
-#include "circbuf.h"
-#include "dbg.h"
-#include "cfgutils.h"
-#include "state.h"
-#include "fn.h"
-#include "test.h"
 
 #define BUFSIZE 500
 static char cbuf_data[BUFSIZE];
 static bool enable_cbuf_data;
 
-static
-void allow_copy_buf_data(bool enable)
+static void
+allow_copy_buf_data(bool enable)
 {
-  enable_cbuf_data = enable;
+    enable_cbuf_data = enable;
 }
 
-static
-char* get_cbuf_data(void)
+static char *
+get_cbuf_data(void)
 {
-  return cbuf_data;
+    return cbuf_data;
 }
 
-static
-void set_cbuf_data(char* val, unsigned long long new_size)
+static void
+set_cbuf_data(char *val, unsigned long long new_size)
 {
-  if (new_size > BUFSIZE) fail();
-  memcpy(cbuf_data, val, new_size);
+    if (new_size > BUFSIZE)
+        fail();
+    memcpy(cbuf_data, val, new_size);
 }
 
 // These signatures satisfy --wrap=cbufGet in the Makefile
 #ifdef __linux__
-int __real_cbufGet(cbuf_handle_t, uint64_t*);
-int __wrap_cbufGet(cbuf_handle_t cbuf, uint64_t *data)
+int __real_cbufGet(cbuf_handle_t, uint64_t *);
+int
+__wrap_cbufGet(cbuf_handle_t cbuf, uint64_t *data)
 #endif // __linux__
 #ifdef __APPLE__
-int cbufGet(cbuf_handle_t cbuf, uint64_t *data)
+    int cbufGet(cbuf_handle_t cbuf, uint64_t *data)
 #endif // __APPLE__
 {
     int res = __real_cbufGet(cbuf, data);
     if (enable_cbuf_data && res == 0) {
-      log_event_t *event = (log_event_t*) *data;
-      set_cbuf_data(event->data, event->datalen);
+        log_event_t *event = (log_event_t *)*data;
+        set_cbuf_data(event->data, event->datalen);
     }
 
     return res;
 }
 
 static void
-ctlParseRxMsgNullReturnsParseError(void** state)
+ctlParseRxMsgNullReturnsParseError(void **state)
 {
-    request_t* req = ctlParseRxMsg(NULL);
+    request_t *req = ctlParseRxMsg(NULL);
     assert_non_null(req);
 
     assert_int_equal(req->cmd, REQ_PARSE_ERR);
@@ -73,29 +75,18 @@ ctlParseRxMsgNullReturnsParseError(void** state)
 }
 
 static void
-ctlParseRxMsgUnparseableReturnsParseError(void** state)
+ctlParseRxMsgUnparseableReturnsParseError(void **state)
 {
     // We expect REQ_PARSE_ERR if any of the following are true:
-    const char* test[] = {
-    //  o) The json is truly unparsable
-        "{ \"type\": \"req\", \"re",
-        "dude, seriously?",
-        "",
-        "\n",
-    //  o) The root object is anything but an object
-        "\"hey\"",
-        "1",
-        "[ \"Clint\", \"Ledion\", \"Dritan\" ]",
-        "true",
-        "false",
-        "null",
-        NULL
-    };
+    const char *test[] = {//  o) The json is truly unparsable
+                          "{ \"type\": \"req\", \"re", "dude, seriously?", "", "\n",
+                          //  o) The root object is anything but an object
+                          "\"hey\"", "1", "[ \"Clint\", \"Ledion\", \"Dritan\" ]", "true", "false", "null", NULL};
 
-    const char** msg;
-    for (msg=test; *msg; msg++) {
-        //printf("%s\n", *msg);
-        request_t* req = ctlParseRxMsg(*msg);
+    const char **msg;
+    for (msg = test; *msg; msg++) {
+        // printf("%s\n", *msg);
+        request_t *req = ctlParseRxMsg(*msg);
         assert_non_null(req);
 
         assert_int_equal(req->cmd, REQ_PARSE_ERR);
@@ -108,32 +99,24 @@ ctlParseRxMsgUnparseableReturnsParseError(void** state)
 }
 
 static void
-ctlParseRxMsgRequiredFieldProblemsReturnsMalformed(void** state)
+ctlParseRxMsgRequiredFieldProblemsReturnsMalformed(void **state)
 {
     // We expect REQ_MALFORMED if any of the following are true:
-    const char* test[] = {
-    //  o)  value of type field is anything but "req"
-        "{ \"type\": \"info\", \"req\": \"GetCfg\", \"reqId\": 1 }",
-        "{ \"type\": \"resp\", \"req\": \"GetCfg\", \"reqId\": 1 }",
-        "{ \"type\": \"evt\",  \"req\": \"GetCfg\", \"reqId\": 1 }",
+    const char *test[] = {
+        //  o)  value of type field is anything but "req"
+        "{ \"type\": \"info\", \"req\": \"GetCfg\", \"reqId\": 1 }", "{ \"type\": \"resp\", \"req\": \"GetCfg\", \"reqId\": 1 }", "{ \"type\": \"evt\",  \"req\": \"GetCfg\", \"reqId\": 1 }",
 
-    //  o)  any of these fields are missing: type, req, reqId
-        "{ \"req\": \"GetCfg\", \"reqId\": 1 }",
-        "{ \"type\": \"req\", \"reqId\": 1 }",
-        "{ \"type\": \"req\", \"req\": \"GetCfg\" }",
+        //  o)  any of these fields are missing: type, req, reqId
+        "{ \"req\": \"GetCfg\", \"reqId\": 1 }", "{ \"type\": \"req\", \"reqId\": 1 }", "{ \"type\": \"req\", \"req\": \"GetCfg\" }",
 
-    //  o)  any of these fields are wrong types:
-    //      type (string), req (string), reqId (number)
-        "{ \"type\": 1, \"req\": \"GetCfg\", \"reqId\": 1 }",
-        "{ \"type\": \"req\", \"req\": 1, \"reqId\": 1 }",
-        "{ \"type\": \"req\", \"req\": \"GetCfg\", \"reqId\": \"hey\" }",
-        NULL
-    };
+        //  o)  any of these fields are wrong types:
+        //      type (string), req (string), reqId (number)
+        "{ \"type\": 1, \"req\": \"GetCfg\", \"reqId\": 1 }", "{ \"type\": \"req\", \"req\": 1, \"reqId\": 1 }", "{ \"type\": \"req\", \"req\": \"GetCfg\", \"reqId\": \"hey\" }", NULL};
 
-    const char** msg;
-    for (msg=test; *msg; msg++) {
-        //printf("%s\n", *msg);
-        request_t* req = ctlParseRxMsg(*msg);
+    const char **msg;
+    for (msg = test; *msg; msg++) {
+        // printf("%s\n", *msg);
+        request_t *req = ctlParseRxMsg(*msg);
         assert_non_null(req);
         assert_int_equal(req->cmd, REQ_MALFORMED);
         destroyReq(&req);
@@ -141,16 +124,15 @@ ctlParseRxMsgRequiredFieldProblemsReturnsMalformed(void** state)
 }
 
 static void
-ctlParseRxMsgBogusReqReturnsUnknown(void** state)
+ctlParseRxMsgBogusReqReturnsUnknown(void **state)
 {
-    const char buf[] =
-         "{"
-         "    \"type\": \"req\","
-         "    \"req\": \"huh?\","
-         "    \"reqId\": 3.5"
-         "}";
+    const char buf[] = "{"
+                       "    \"type\": \"req\","
+                       "    \"req\": \"huh?\","
+                       "    \"reqId\": 3.5"
+                       "}";
 
-    request_t* req = ctlParseRxMsg(buf);
+    request_t *req = ctlParseRxMsg(buf);
     assert_non_null(req);
 
     assert_int_equal(req->cmd, REQ_UNKNOWN);
@@ -162,36 +144,27 @@ ctlParseRxMsgBogusReqReturnsUnknown(void** state)
 }
 
 static void
-ctlParseRxMsgSetCfgWithoutDataObjectReturnsParamErr(void** state)
+ctlParseRxMsgSetCfgWithoutDataObjectReturnsParamErr(void **state)
 {
-    char* msg;
+    char *msg;
 
-    const char base[] =
-         "{"
-         "    \"type\": \"req\","
-         "    \"req\": \"SetCfg\","
-         "    \"reqId\": 987413948756391"
-         "    %s"
-         "}";
+    const char base[] = "{"
+                        "    \"type\": \"req\","
+                        "    \"req\": \"SetCfg\","
+                        "    \"reqId\": 987413948756391"
+                        "    %s"
+                        "}";
 
-    const char* body[] = {
-    //  o) body field absent
-        "",
-    //  o) body is not object
-        ",\"body\": \"hey\"",
-        ",\"body\": 1",
-        ",\"body\": [ \"Clint\", \"Ledion\", \"Dritan\" ]",
-        ",\"body\": true",
-        ",\"body\": false",
-        ",\"body\": null",
-        NULL
-    };
+    const char *body[] = {//  o) body field absent
+                          "",
+                          //  o) body is not object
+                          ",\"body\": \"hey\"", ",\"body\": 1", ",\"body\": [ \"Clint\", \"Ledion\", \"Dritan\" ]", ",\"body\": true", ",\"body\": false", ",\"body\": null", NULL};
 
-    const char** test;
-    for (test=body; *test; test++) {
+    const char **test;
+    for (test = body; *test; test++) {
         assert_return_code(asprintf(&msg, base, *test), errno);
-        //printf("%s\n", msg);
-        request_t* req = ctlParseRxMsg(msg);
+        // printf("%s\n", msg);
+        request_t *req = ctlParseRxMsg(msg);
         free(msg);
         assert_non_null(req);
 
@@ -205,75 +178,72 @@ ctlParseRxMsgSetCfgWithoutDataObjectReturnsParamErr(void** state)
 }
 
 static void
-ctlParseRxMsgSetCfg(void** state)
+ctlParseRxMsgSetCfg(void **state)
 {
-    char* msg;
+    char *msg;
 
-    const char base[] =
-         "{"
-         "    \"type\": \"req\","
-         "    \"req\": \"SetCfg\","
-         "    \"reqId\": 3,"
-         "    \"body\": %s"
-         "}";
+    const char base[] = "{"
+                        "    \"type\": \"req\","
+                        "    \"req\": \"SetCfg\","
+                        "    \"reqId\": 3,"
+                        "    \"body\": %s"
+                        "}";
 
-    const char* body[] = {
-    //  o) Any object will be accepted, this will return *all* defaults
-        "{}",
-    //  o) This should create a cfg object that is different than default
-        "\n"
-        "{\n"
-        "  \"metric\": {\n"
-        "    \"format\": {\n"
-        "      \"type\": \"metricjson\",\n"
-        "      \"statsdprefix\": \"cribl.scope\",\n"
-        "      \"statsdmaxlen\": \"42\",\n"
-        "      \"verbosity\": \"0\",\n"
-        "      \"tags\": [\n"
-        "        {\"tagA\": \"val1\"},\n"
-        "        {\"tagB\": \"val2\"},\n"
-        "        {\"tagC\": \"val3\"}\n"
-        "      ]\n"
-        "    },\n"
-        "    \"transport\": {\n"
-        "      \"type\": \"file\",\n"
-        "      \"path\": \"/var/log/scope.log\"\n"
-        "    }\n"
-        "  },\n"
-        "  \"event\": {\n"
-        "    \"format\": {\n"
-        "      \"type\": \"ndjson\"\n"
-        "    },\n"
-        "    \"watch\" : [\n"
-        "      {\"type\":\"file\", \"name\":\".*[.]log$\"},\n"
-        "      {\"type\":\"console\"},\n"
-        "      {\"type\":\"syslog\"},\n"
-        "      {\"type\":\"metric\"}\n"
-        "    ]\n"
-        "  },\n"
-        "  \"libscope\": {\n"
-        "    \"transport\": {\n"
-        "      \"type\": \"file\",\n"
-        "      \"path\": \"/var/log/event.log\"\n"
-        "    },\n"
-        "    \"summaryperiod\": \"13\",\n"
-        "    \"log\": {\n"
-        "      \"level\": \"debug\",\n"
-        "      \"transport\": {\n"
-        "        \"type\": \"shm\"\n"
-        "      }\n"
-        "    }\n"
-        "  }\n"
-        "}\n",
-        NULL
-    };
+    const char *body[] = {//  o) Any object will be accepted, this will return *all* defaults
+                          "{}",
+                          //  o) This should create a cfg object that is different than default
+                          "\n"
+                          "{\n"
+                          "  \"metric\": {\n"
+                          "    \"format\": {\n"
+                          "      \"type\": \"metricjson\",\n"
+                          "      \"statsdprefix\": \"cribl.scope\",\n"
+                          "      \"statsdmaxlen\": \"42\",\n"
+                          "      \"verbosity\": \"0\",\n"
+                          "      \"tags\": [\n"
+                          "        {\"tagA\": \"val1\"},\n"
+                          "        {\"tagB\": \"val2\"},\n"
+                          "        {\"tagC\": \"val3\"}\n"
+                          "      ]\n"
+                          "    },\n"
+                          "    \"transport\": {\n"
+                          "      \"type\": \"file\",\n"
+                          "      \"path\": \"/var/log/scope.log\"\n"
+                          "    }\n"
+                          "  },\n"
+                          "  \"event\": {\n"
+                          "    \"format\": {\n"
+                          "      \"type\": \"ndjson\"\n"
+                          "    },\n"
+                          "    \"watch\" : [\n"
+                          "      {\"type\":\"file\", \"name\":\".*[.]log$\"},\n"
+                          "      {\"type\":\"console\"},\n"
+                          "      {\"type\":\"syslog\"},\n"
+                          "      {\"type\":\"metric\"}\n"
+                          "    ]\n"
+                          "  },\n"
+                          "  \"libscope\": {\n"
+                          "    \"transport\": {\n"
+                          "      \"type\": \"file\",\n"
+                          "      \"path\": \"/var/log/event.log\"\n"
+                          "    },\n"
+                          "    \"summaryperiod\": \"13\",\n"
+                          "    \"log\": {\n"
+                          "      \"level\": \"debug\",\n"
+                          "      \"transport\": {\n"
+                          "        \"type\": \"shm\"\n"
+                          "      }\n"
+                          "    }\n"
+                          "  }\n"
+                          "}\n",
+                          NULL};
 
-    const char** test;
-    int run=1;
-    for (test=body; *test; test++) {
+    const char **test;
+    int run = 1;
+    for (test = body; *test; test++) {
         assert_return_code(asprintf(&msg, base, *test), errno);
-        //printf("%s\n", msg);
-        request_t* req = ctlParseRxMsg(msg);
+        // printf("%s\n", msg);
+        request_t *req = ctlParseRxMsg(msg);
         free(msg);
         assert_non_null(req);
 
@@ -304,16 +274,15 @@ ctlParseRxMsgSetCfg(void** state)
 }
 
 static void
-ctlParseRxMsgGetCfg(void** state)
+ctlParseRxMsgGetCfg(void **state)
 {
-    const char buf[] =
-         "{"
-         "    \"type\": \"req\","
-         "    \"req\": \"GetCfg\","
-         "    \"reqId\": 987413948756391"
-         "}";
+    const char buf[] = "{"
+                       "    \"type\": \"req\","
+                       "    \"req\": \"GetCfg\","
+                       "    \"reqId\": 987413948756391"
+                       "}";
 
-    request_t* req = ctlParseRxMsg(buf);
+    request_t *req = ctlParseRxMsg(buf);
     assert_non_null(req);
 
     assert_int_equal(req->cmd, REQ_GET_CFG);
@@ -325,16 +294,15 @@ ctlParseRxMsgGetCfg(void** state)
 }
 
 static void
-ctlParseRxMsgGetDiags(void** state)
+ctlParseRxMsgGetDiags(void **state)
 {
-    const char buf[] =
-         "{"
-         "    \"type\": \"req\","
-         "    \"req\": \"GetDiag\","
-         "    \"reqId\": 1983457849314789"
-         "}";
+    const char buf[] = "{"
+                       "    \"type\": \"req\","
+                       "    \"req\": \"GetDiag\","
+                       "    \"reqId\": 1983457849314789"
+                       "}";
 
-    request_t* req = ctlParseRxMsg(buf);
+    request_t *req = ctlParseRxMsg(buf);
     assert_non_null(req);
 
     assert_int_equal(req->cmd, REQ_GET_DIAG);
@@ -345,57 +313,43 @@ ctlParseRxMsgGetDiags(void** state)
     destroyReq(&req);
 }
 
-
 typedef struct {
-    const char*    req;
+    const char *req;
     unsigned short port;
 } test_port_t;
 
 static void
-ctlParseRxMsgBlockPort(void** state)
+ctlParseRxMsgBlockPort(void **state)
 {
     test_port_t test[] = {
         // if body isn't present, clear the port
-        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 0}",
-          .port = 0},
+        {.req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 0}", .port = 0},
         // body with one json number in range should set the port
-        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 1,\"body\":0}",
-          .port = 0},
-        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 2,\"body\":54321}",
-          .port = 54321},
-        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 3,\"body\":65535}",
-          .port = 65535},
+        {.req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 1,\"body\":0}", .port = 0},
+        {.req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 2,\"body\":54321}", .port = 54321},
+        {.req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 3,\"body\":65535}", .port = 65535},
         // body of other json types should clear the port
-        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 4,\"body\":{\"huh\":\"what\"}}",
-          .port = 0},
-        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 5,\"body\":[ 1, 2, 3 ]}",
-          .port = 0},
-        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 6,\"body\":\"hey\"}",
-          .port = 0},
-        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 7,\"body\":true}",
-          .port = 0},
-        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 8,\"body\":false}",
-          .port = 0},
-        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 9,\"body\":null}",
-          .port = 0},
+        {.req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 4,\"body\":{\"huh\":\"what\"}}", .port = 0},
+        {.req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 5,\"body\":[ 1, 2, 3 ]}", .port = 0},
+        {.req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 6,\"body\":\"hey\"}", .port = 0},
+        {.req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 7,\"body\":true}", .port = 0},
+        {.req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 8,\"body\":false}", .port = 0},
+        {.req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\": 9,\"body\":null}", .port = 0},
         // body with out of range json numbers should clear the port
-        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\":10,\"body\":65536}",
-          .port = 0},
-        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\":11,\"body\":-1}",
-          .port = 0},
+        {.req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\":10,\"body\":65536}", .port = 0},
+        {.req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\":11,\"body\":-1}", .port = 0},
         // fractional numbers are weird, but will work... (set the port)
-        { .req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\":12,\"body\":1.667}",
-          .port = 1},
+        {.req = "{ \"type\": \"req\", \"req\": \"BlockPort\",\"reqId\":12,\"body\":1.667}", .port = 1},
     };
 
     int i;
-    for (i=0; i<sizeof(test)/sizeof(test[0]); i++) {
-        test_port_t* test_case = &test[i];
+    for (i = 0; i < sizeof(test) / sizeof(test[0]); i++) {
+        test_port_t *test_case = &test[i];
 
-        request_t* req = ctlParseRxMsg(test_case->req);
+        request_t *req = ctlParseRxMsg(test_case->req);
         assert_non_null(req);
 
-        //printf("%s\n", test_case->req);
+        // printf("%s\n", test_case->req);
 
         assert_int_equal(req->cmd, REQ_BLOCK_PORT);
         assert_string_equal(req->cmd_str, "BlockPort");
@@ -408,51 +362,40 @@ ctlParseRxMsgBlockPort(void** state)
 }
 
 typedef struct {
-    const char*    req;
+    const char *req;
     cmd_t cmd;
     switch_action_t action;
 } test_switch_t;
 
 static void
-ctlParseRxMsgSwitch(void** state)
+ctlParseRxMsgSwitch(void **state)
 {
     test_switch_t test[] = {
         // if body isn't present, there's nothing to do
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 0}",
-          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        {.req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 0}", .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
         // body with these specific strings should work
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 1,\"body\":\"redirect-on\"}",
-          .cmd = REQ_SWITCH, .action = URL_REDIRECT_ON},
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 2,\"body\":\"redirect-off\"}",
-          .cmd = REQ_SWITCH, .action = URL_REDIRECT_OFF},
+        {.req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 1,\"body\":\"redirect-on\"}", .cmd = REQ_SWITCH, .action = URL_REDIRECT_ON},
+        {.req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 2,\"body\":\"redirect-off\"}", .cmd = REQ_SWITCH, .action = URL_REDIRECT_OFF},
         // body of other json types should do nothing
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 3,\"body\":0}",
-          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 4,\"body\":{\"huh\":\"what\"}}",
-          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 5,\"body\":[ 1, 2, 3 ]}",
-          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 6,\"body\":true}",
-          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 7,\"body\":false}",
-          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 8,\"body\":null}",
-          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        {.req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 3,\"body\":0}", .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        {.req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 4,\"body\":{\"huh\":\"what\"}}", .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        {.req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 5,\"body\":[ 1, 2, 3 ]}", .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        {.req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 6,\"body\":true}", .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        {.req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 7,\"body\":false}", .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        {.req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 8,\"body\":null}", .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
         // body with strings of the wrong case should do nothing
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 9,\"body\":\"Redirect-On\"}",
-          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\":10,\"body\":\"REDIRECT-ON\"}",
-          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        {.req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 9,\"body\":\"Redirect-On\"}", .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        {.req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\":10,\"body\":\"REDIRECT-ON\"}", .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
     };
 
     int i;
-    for (i=0; i<sizeof(test)/sizeof(test[0]); i++) {
-        test_switch_t* test_case = &test[i];
+    for (i = 0; i < sizeof(test) / sizeof(test[0]); i++) {
+        test_switch_t *test_case = &test[i];
 
-        request_t* req = ctlParseRxMsg(test_case->req);
+        request_t *req = ctlParseRxMsg(test_case->req);
         assert_non_null(req);
 
-        //printf("%s\n", test_case->req);
+        // printf("%s\n", test_case->req);
 
         assert_int_equal(req->cmd, test_case->cmd);
         assert_string_equal(req->cmd_str, "Switch");
@@ -465,20 +408,20 @@ ctlParseRxMsgSwitch(void** state)
     }
 }
 static void
-ctlCreateTxMsgReturnsNullForNullUpload(void** state)
+ctlCreateTxMsgReturnsNullForNullUpload(void **state)
 {
     assert_null(ctlCreateTxMsg(NULL));
 }
 
 static void
-ctlCreateTxMsgInfo(void** state)
+ctlCreateTxMsgInfo(void **state)
 {
     upload_t upload = {0};
     upload.type = UPLD_INFO;
 
     // If body is null, msg should be null
     assert_int_equal(dbgCountMatchingLines("src/ctl.c"), 0);
-    char* msg = ctlCreateTxMsg(&upload);
+    char *msg = ctlCreateTxMsg(&upload);
     assert_null(msg);
     assert_int_equal(dbgCountMatchingLines("src/ctl.c"), 1);
     dbgInit(); // reset dbg for the rest of the tests
@@ -488,78 +431,67 @@ ctlCreateTxMsgInfo(void** state)
     msg = ctlCreateTxMsg(&upload);
     assert_non_null(msg);
 
-    char expected_msg[] =
-        "{\"type\":\"info\",\"body\":\"yeah, dude\"}";
+    char expected_msg[] = "{\"type\":\"info\",\"body\":\"yeah, dude\"}";
     assert_string_equal(msg, expected_msg);
 
     free(msg);
 }
 
 typedef struct {
-    char*      in;
+    char *in;
     struct {
-        char* req;
+        char *req;
         int reqId;
         int status;
-        char* message;
+        char *message;
     } out;
 } test_t;
 
 static void
-ctlCreateTxMsgResp(void** state)
+ctlCreateTxMsgResp(void **state)
 {
     upload_t upload = {0};
     upload.type = UPLD_RESP;
 
     // If req is null, tx_msg should be null
     assert_int_equal(dbgCountMatchingLines("src/ctl.c"), 0);
-    char* tx_msg = ctlCreateTxMsg(&upload);
+    char *tx_msg = ctlCreateTxMsg(&upload);
     assert_null(tx_msg);
     assert_int_equal(dbgCountMatchingLines("src/ctl.c"), 1);
     dbgInit(); // reset dbg for the rest of the tests
 
     test_t test[] = {
         // REQ_PARSE_ERR
-        { .in = "{ \"type\": \"req\", \"re",
-          .out = {.req=NULL,      .reqId=0, .status=400,
-                  .message="Request could not be parsed as a json object"}},
+        {.in = "{ \"type\": \"req\", \"re", .out = {.req = NULL, .reqId = 0, .status = 400, .message = "Request could not be parsed as a json object"}},
         // REQ_MALFORMED
-        { .in = "{ \"type\": \"info\", \"req\": \"GetCfg\", \"reqId\": 1 }",
-          .out = {.req="GetCfg",  .reqId=1, .status=400,
-                  .message="Type was not request, required fields were missing or of wrong type"}},
+        {.in = "{ \"type\": \"info\", \"req\": \"GetCfg\", \"reqId\": 1 }",
+         .out = {.req = "GetCfg", .reqId = 1, .status = 400, .message = "Type was not request, required fields were missing or of wrong type"}},
         // REQ_UNKNOWN
-        { .in = "{ \"type\": \"req\", \"req\": \"huh?\",\"reqId\": 2}",
-          .out = {.req="huh?",    .reqId=2, .status=400,
-                  .message="Req field was not expected value"}},
+        {.in = "{ \"type\": \"req\", \"req\": \"huh?\",\"reqId\": 2}", .out = {.req = "huh?", .reqId = 2, .status = 400, .message = "Req field was not expected value"}},
         // REQ_PARAM_ERR (body field is required for SetCfg)
-        { .in = "{ \"type\": \"req\", \"req\": \"SetCfg\",\"reqId\": 3}",
-          .out = {.req="SetCfg",  .reqId=3, .status=400,
-                  .message="Based on the req field, expected fields were missing"}},
+        {.in = "{ \"type\": \"req\", \"req\": \"SetCfg\",\"reqId\": 3}", .out = {.req = "SetCfg", .reqId = 3, .status = 400, .message = "Based on the req field, expected fields were missing"}},
         // REQ_SET_CFG
-        { .in = "{ \"type\": \"req\", \"req\": \"SetCfg\",\"reqId\": 4, \"body\": {}}",
-          .out = {.req="SetCfg",  .reqId=4, .status=200, .message=NULL}},
+        {.in = "{ \"type\": \"req\", \"req\": \"SetCfg\",\"reqId\": 4, \"body\": {}}", .out = {.req = "SetCfg", .reqId = 4, .status = 200, .message = NULL}},
         // REQ_GET_CFG
-        { .in = "{ \"type\": \"req\", \"req\": \"GetCfg\",\"reqId\": 5}",
-          .out = {.req="GetCfg",  .reqId=5, .status=200, .message=NULL}},
+        {.in = "{ \"type\": \"req\", \"req\": \"GetCfg\",\"reqId\": 5}", .out = {.req = "GetCfg", .reqId = 5, .status = 200, .message = NULL}},
         // REQ_GET_DIAG
-        { .in = "{ \"type\": \"req\", \"req\": \"GetDiag\",\"reqId\": 6}",
-          .out = {.req="GetDiag", .reqId=6, .status=200, .message=NULL}},
+        {.in = "{ \"type\": \"req\", \"req\": \"GetDiag\",\"reqId\": 6}", .out = {.req = "GetDiag", .reqId = 6, .status = 200, .message = NULL}},
     };
 
     int i;
-    for (i=0; i<sizeof(test)/sizeof(test[0]); i++) {
-        test_t* test_case = &test[i];
+    for (i = 0; i < sizeof(test) / sizeof(test[0]); i++) {
+        test_t *test_case = &test[i];
         char expected[512];
 
         // ctlParseRxMsg is not under test here, but is used to create upload.req
-        //printf("%s\n", test_case->in);
+        // printf("%s\n", test_case->in);
         upload.req = ctlParseRxMsg(test_case->in);
         assert_non_null(upload.req);
 
         // If req is non-null, tx_msg should exist
         tx_msg = ctlCreateTxMsg(&upload);
         assert_non_null(tx_msg);
-        //printf("%s\n", tx_msg);
+        // printf("%s\n", tx_msg);
 
         // verify type field (constant value of resp)
         assert_non_null(strstr(tx_msg, "\"type\":\"resp\""));
@@ -599,7 +531,7 @@ ctlCreateTxMsgResp(void** state)
     upload.req = ctlParseRxMsg("{ \"type\": \"req\", \"req\": \"GetCfg\",\"reqId\": 7}");
     upload.body = cJSON_Parse("\"Gnarly\"");
     tx_msg = ctlCreateTxMsg(&upload);
-    //printf("%s\n", tx_msg);
+    // printf("%s\n", tx_msg);
     assert_non_null(tx_msg);
     assert_non_null(strstr(tx_msg, "\"body\":\"Gnarly\""));
     free(tx_msg);
@@ -607,13 +539,13 @@ ctlCreateTxMsgResp(void** state)
 }
 
 static void
-ctlCreateTxMsgEvt(void** state)
+ctlCreateTxMsgEvt(void **state)
 {
-    upload_t upload = { .type = UPLD_EVT, .body = NULL, .req = NULL, .uid = 0, .proc = NULL };
-    
+    upload_t upload = {.type = UPLD_EVT, .body = NULL, .req = NULL, .uid = 0, .proc = NULL};
+
     // If body is null, msg should be null
     assert_int_equal(dbgCountMatchingLines("src/ctl.c"), 0);
-    char* msg = ctlCreateTxMsg(&upload);
+    char *msg = ctlCreateTxMsg(&upload);
     assert_null(msg);
     assert_int_equal(dbgCountMatchingLines("src/ctl.c"), 1);
     dbgInit(); // reset dbg for the rest of the tests
@@ -623,27 +555,25 @@ ctlCreateTxMsgEvt(void** state)
     msg = ctlCreateTxMsg(&upload);
     assert_non_null(msg);
 
-    char expected_msg[] =
-        "{\"type\":\"evt\",\"body\":\"yeah, dude\"}";
+    char expected_msg[] = "{\"type\":\"evt\",\"body\":\"yeah, dude\"}";
     assert_string_equal(msg, expected_msg);
 
     free(msg);
 }
 
-
 static void
-ctlSendMsgForNullMtcDoesntCrash(void** state)
+ctlSendMsgForNullMtcDoesntCrash(void **state)
 {
-    char* msg = strdup("Hey, this is cool!\n");
+    char *msg = strdup("Hey, this is cool!\n");
     ctlSendMsg(NULL, msg);
 }
 
 static void
-ctlSendMsgForNullMessageDoesntCrash(void** state)
+ctlSendMsgForNullMessageDoesntCrash(void **state)
 {
-    ctl_t* ctl = ctlCreate();
+    ctl_t *ctl = ctlCreate();
     assert_non_null(ctl);
-    transport_t* t = transportCreateSyslog();
+    transport_t *t = transportCreateSyslog();
     assert_non_null(t);
     ctlTransportSet(ctl, t, CFG_CTL);
     ctlSendMsg(ctl, NULL);
@@ -651,16 +581,16 @@ ctlSendMsgForNullMessageDoesntCrash(void** state)
 }
 
 static void
-ctlTransportSetAndMtcSend(void** state)
+ctlTransportSetAndMtcSend(void **state)
 {
-    const char* file_path = "/tmp/my.path";
-    ctl_t* ctl = ctlCreate();
+    const char *file_path = "/tmp/my.path";
+    ctl_t *ctl = ctlCreate();
     assert_non_null(ctl);
-    transport_t* t1 = transportCreateUdp("127.0.0.1", "12345");
-    transport_t* t2 = transportCreateUnix("/var/run/scope.sock");
-    transport_t* t3 = transportCreateSyslog();
-    transport_t* t4 = transportCreateShm();
-    transport_t* t5 = transportCreateFile(file_path, CFG_BUFFER_FULLY);
+    transport_t *t1 = transportCreateUdp("127.0.0.1", "12345");
+    transport_t *t2 = transportCreateUnix("/var/run/scope.sock");
+    transport_t *t3 = transportCreateSyslog();
+    transport_t *t4 = transportCreateShm();
+    transport_t *t5 = transportCreateFile(file_path, CFG_BUFFER_FULLY);
     ctlTransportSet(ctl, t1, CFG_CTL);
     ctlTransportSet(ctl, t2, CFG_CTL);
     ctlTransportSet(ctl, t3, CFG_CTL);
@@ -670,7 +600,7 @@ ctlTransportSetAndMtcSend(void** state)
     // Test that transport is set by testing side effects of ctlSendMsg
     // affecting the file at file_path when connected to a file transport.
     long file_pos_before = fileEndPosition(file_path);
-    char* msg = strdup("Something to send\n");
+    char *msg = strdup("Something to send\n");
     ctlSendMsg(ctl, msg);
 
     // With CFG_BUFFER_FULLY, this output only happens with the flush
@@ -696,7 +626,7 @@ ctlTransportSetAndMtcSend(void** state)
 }
 
 static void
-ctlAddProtocol(void** state)
+ctlAddProtocol(void **state)
 {
     char dummy[] = "{\"type\": \"req\",\"req\": \"AddProto\",\"reqId\":6393,\"body\":{\"binary\":\"false\",\"regex\":\"^[*][[:digit:]]+\",\"pname\":\"Dummy\",\"len\":12}}";
 
@@ -712,7 +642,7 @@ ctlAddProtocol(void** state)
 }
 
 static void
-ctlDelProtocol(void** state)
+ctlDelProtocol(void **state)
 {
     char deldummy[] = "{\"type\": \"req\",\"req\": \"DelProto\",\"reqId\":6394,\"body\":{\"pname\":\"Dummy\"}}";
 
@@ -728,15 +658,10 @@ static void
 ctlSendLogConsoleAsciiData(void **state)
 {
     initState();
-    const char* console_path = "stdout";
-    const char* ascii_text = "hello world<>?% _";
-    proc_id_t proc = {.pid = 1,
-                      .ppid = 1,
-                      .hostname = "foo",
-                      .procname = "foo",
-                      .cmd = "foo",
-                      .id = "foo"};
-    ctl_t* ctl = ctlCreate();
+    const char *console_path = "stdout";
+    const char *ascii_text = "hello world<>?% _";
+    proc_id_t proc = {.pid = 1, .ppid = 1, .hostname = "foo", .procname = "foo", .cmd = "foo", .id = "foo"};
+    ctl_t *ctl = ctlCreate();
     assert_non_null(ctl);
     bool b_res = ctlEvtSourceEnabled(ctl, CFG_SRC_CONSOLE);
     assert_true(b_res);
@@ -754,22 +679,17 @@ static void
 ctlSendLogConsoleNoneAsciiData(void **state)
 {
     initState();
-    const char* console_path = "stdout";
-    char* non_basic_ascii_text = malloc(sizeof(char)*4);
+    const char *console_path = "stdout";
+    char *non_basic_ascii_text = malloc(sizeof(char) * 4);
     assert_true(non_basic_ascii_text);
     non_basic_ascii_text[0] = 128;
     non_basic_ascii_text[1] = 157;
     non_basic_ascii_text[2] = 234;
     non_basic_ascii_text[3] = '0';
 
-    const char* binary_data_event_msg = "Binary data detected--- message";
-    proc_id_t proc = {.pid = 1,
-                      .ppid = 1,
-                      .hostname = "foo",
-                      .procname = "foo",
-                      .cmd = "foo",
-                      .id = "foo"};
-    ctl_t* ctl = ctlCreate();
+    const char *binary_data_event_msg = "Binary data detected--- message";
+    proc_id_t proc = {.pid = 1, .ppid = 1, .hostname = "foo", .procname = "foo", .cmd = "foo", .id = "foo"};
+    ctl_t *ctl = ctlCreate();
     assert_non_null(ctl);
     bool b_res = ctlEvtSourceEnabled(ctl, CFG_SRC_CONSOLE);
     assert_true(b_res);
@@ -785,7 +705,7 @@ ctlSendLogConsoleNoneAsciiData(void **state)
 }
 
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("running %s\n", argv[0]);
     initFn();
@@ -817,4 +737,3 @@ main(int argc, char* argv[])
 
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }
-

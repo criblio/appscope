@@ -1,15 +1,15 @@
 #define _GNU_SOURCE
+#include "linklist.h"
+#include "dbg.h"
+#include "test.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "dbg.h"
-#include "linklist.h"
-#include "test.h"
 
 static void
 lstCreateReturnsNonNull(void **state)
 {
-    list_t* list = lstCreate(NULL);
+    list_t *list = lstCreate(NULL);
     assert_non_null(list);
     lstDestroy(&list);
 
@@ -18,27 +18,27 @@ lstCreateReturnsNonNull(void **state)
 }
 
 static void
-lstDestroyOfNullListDoesNotCrash(void** state)
+lstDestroyOfNullListDoesNotCrash(void **state)
 {
     lstDestroy(NULL);
 
-    list_t* list = NULL;
+    list_t *list = NULL;
     lstDestroy(&list);
 }
 
 static void
 lstInsertOnNullListReturnsFalse(void **state)
 {
-    assert_false(lstInsert(NULL, 23, (void*)23));
+    assert_false(lstInsert(NULL, 23, (void *)23));
 }
 
 static void
 lstInsertNewElementReturnsTrue(void **state)
 {
-    list_t* list = lstCreate(NULL);
+    list_t *list = lstCreate(NULL);
     assert_non_null(list);
 
-    assert_true(lstInsert(list, 23, (void*)23));
+    assert_true(lstInsert(list, 23, (void *)23));
 
     lstDestroy(&list);
 }
@@ -46,13 +46,13 @@ lstInsertNewElementReturnsTrue(void **state)
 static void
 lstInsertDupElementReturnsFalse(void **state)
 {
-    list_t* list = lstCreate(NULL);
+    list_t *list = lstCreate(NULL);
     assert_non_null(list);
 
-    assert_true(lstInsert(list, 23, (void*)23));
+    assert_true(lstInsert(list, 23, (void *)23));
 
     // Try to add 23 again.  It should return null.
-    assert_false(lstInsert(list, 23, (void*)23));
+    assert_false(lstInsert(list, 23, (void *)23));
 
     lstDestroy(&list);
 }
@@ -60,35 +60,35 @@ lstInsertDupElementReturnsFalse(void **state)
 static void
 lstFindOfNullListReturnsNull(void **state)
 {
-    list_t* result_of_find = lstFind(NULL, 23);
+    list_t *result_of_find = lstFind(NULL, 23);
     assert_null(result_of_find);
 }
 
 static void
 lstFindOfEmptyListReturnsNull(void **state)
 {
-    list_t* list = lstCreate(NULL);
+    list_t *list = lstCreate(NULL);
     assert_non_null(list);
 
-    list_t* result_of_find = lstFind(list, 23);
+    list_t *result_of_find = lstFind(list, 23);
     assert_null(result_of_find);
 
     lstDestroy(&list);
 }
 
 static void
-lstFindOfExistingElementReturnsTheElement(void** state)
+lstFindOfExistingElementReturnsTheElement(void **state)
 {
-    list_t* list = lstCreate(NULL);
+    list_t *list = lstCreate(NULL);
     assert_non_null(list);
 
-    assert_true(lstInsert(list, 23, (void*)23));
+    assert_true(lstInsert(list, 23, (void *)23));
 
     // Lookup the element with find, it should be there
-    void* result_of_find = lstFind(list, 23);
+    void *result_of_find = lstFind(list, 23);
 
     // Verify that they're the same
-    assert_ptr_equal(result_of_find, (void*)23);
+    assert_ptr_equal(result_of_find, (void *)23);
 
     lstDestroy(&list);
 }
@@ -96,10 +96,10 @@ lstFindOfExistingElementReturnsTheElement(void** state)
 static void
 lstFindOfNonExistingElementReturnsNull(void **state)
 {
-    list_t* list = lstCreate(NULL);
+    list_t *list = lstCreate(NULL);
     assert_non_null(list);
 
-    lstInsert(list, 23, (void*)23);
+    lstInsert(list, 23, (void *)23);
 
     assert_null(lstFind(list, 22));
     assert_null(lstFind(list, 24));
@@ -109,24 +109,24 @@ lstFindOfNonExistingElementReturnsNull(void **state)
 }
 
 static void
-lstDeleteOnNullListReturnsFalse (void **state)
+lstDeleteOnNullListReturnsFalse(void **state)
 {
     assert_int_equal(lstDelete(NULL, 23), 0);
 
-    list_t* list = NULL;
+    list_t *list = NULL;
     assert_int_equal(lstDelete(list, 23), 0);
 }
 
 static void
 lstDeleteExistingElementReturnsTrue(void **state)
 {
-    list_t* list = lstCreate(NULL);
+    list_t *list = lstCreate(NULL);
     assert_non_null(list);
 
     // Add some elements in arbitrary order
-    lstInsert(list, 23, (void*)23);
-    lstInsert(list, 22, (void*)22);
-    lstInsert(list, 24, (void*)24);
+    lstInsert(list, 23, (void *)23);
+    lstInsert(list, 22, (void *)22);
+    lstInsert(list, 24, (void *)24);
 
     // Verify that they're there
     assert_non_null(lstFind(list, 22));
@@ -151,7 +151,7 @@ lstDeleteExistingElementReturnsTrue(void **state)
 static void
 lstDeleteNonExistingElementReturnsFalse(void **state)
 {
-    list_t* list = lstCreate(NULL);
+    list_t *list = lstCreate(NULL);
     assert_non_null(list);
 
     assert_int_equal(lstDelete(list, 23), 0);
@@ -160,12 +160,12 @@ lstDeleteNonExistingElementReturnsFalse(void **state)
 }
 
 static void
-test_delete_fn(void* arg)
+test_delete_fn(void *arg)
 {
     // Completely contrived example.  Assume arg is a pointer to an uint64_t.
     // Increment the value at that location just so something can be
     // observed in the following test.
-    uint64_t* int_ptr = arg;
+    uint64_t *int_ptr = arg;
     *int_ptr = 24;
 }
 
@@ -174,23 +174,23 @@ lstDeleteCallsDeleteFn(void **state)
 {
     uint64_t value = 23;
 
-    list_t* list = lstCreate(test_delete_fn);
+    list_t *list = lstCreate(test_delete_fn);
     assert_non_null(list);
 
     // Insert a pointer to value
-    assert_true( lstInsert(list, 23, &value) );
+    assert_true(lstInsert(list, 23, &value));
 
     // Retrieve the pointer, verify nothing has modified value
-    void* data = lstFind(list, 23);
+    void *data = lstFind(list, 23);
     assert_int_equal(data, &value);
-    assert_int_equal(*(uint64_t*)data, 23);
+    assert_int_equal(*(uint64_t *)data, 23);
 
     // Delete it - this should call test_delete_fn()
-    assert_true (lstDelete(list, 23));
+    assert_true(lstDelete(list, 23));
 
     // See that test_delete_fn() modified the value of data.
     // The fact that value changed from 23 to 24 proves it was called.
-    assert_int_equal(*(uint64_t*)data, 24);
+    assert_int_equal(*(uint64_t *)data, 24);
 
     lstDestroy(&list);
 }
@@ -204,28 +204,26 @@ lstDeleteSimpleDeleteFnExample(void **state)
     // will show that the memory malloc'd by strdup is freed properly.
 
     // Pass stdlib.h free() as the delete_fn.
-    list_t* list = lstCreate(free);
+    list_t *list = lstCreate(free);
     assert_non_null(list);
 
     // strdup does dynamic memory allocation that needs to be free'd.
-    assert_true( lstInsert(list, 23, strdup("Hey!")) );
+    assert_true(lstInsert(list, 23, strdup("Hey!")));
 
     // free(data) is called during lstDelete()
-    assert_true( lstDelete(list, 23) );
+    assert_true(lstDelete(list, 23));
 
     lstDestroy(&list);
-
 
     // And the same thing again, but with lstDestroy() doing the
     // lstDelete of all the elements in the list.
     list = lstCreate(free);
-    assert_true( lstInsert(list, 23, strdup("You!")) );
+    assert_true(lstInsert(list, 23, strdup("You!")));
     lstDestroy(&list);
 }
 
-
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("running %s\n", argv[0]);
 

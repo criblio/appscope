@@ -3,7 +3,9 @@
 
 #include "test_utils.h"
 
-int do_test() {
+int
+do_test()
+{
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[NAME_MAX];
     struct statvfs vfs;
@@ -14,14 +16,14 @@ int do_test() {
 
     int f = open(tmp_file_name, O_CREAT | O_RDONLY);
 
-    if(f != EOF) {
-        if(fstatvfs(f, &vfs) < 0) {
+    if (f != EOF) {
+        if (fstatvfs(f, &vfs) < 0) {
             TEST_ERROR();
         }
 
-        FILE* fp = popen("stat / -c \"%s\"", "r");
+        FILE *fp = popen("stat / -c \"%s\"", "r");
 
-        if (fp == NULL)  {
+        if (fp == NULL) {
             TEST_ERROR();
         } else {
             char buf[BUFSIZ];
@@ -32,12 +34,12 @@ int do_test() {
 
             sscanf(buf, "%d", &f_bsize);
 
-            if(vfs.f_bsize != f_bsize) {
+            if (vfs.f_bsize != f_bsize) {
                 TEST_ERROR();
             }
         }
 
-        if(close(f) == EOF) {
+        if (close(f) == EOF) {
             TEST_ERROR();
         }
 

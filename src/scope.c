@@ -6,30 +6,30 @@
  */
 
 #define _GNU_SOURCE
+#include <dlfcn.h>
+#include <elf.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <getopt.h>
+#include <limits.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/stat.h>
 #include <string.h>
 #include <sys/mman.h>
-#include <elf.h>
-#include <stddef.h>
-#include <sys/wait.h>
-#include <dlfcn.h>
+#include <sys/stat.h>
 #include <sys/utsname.h>
-#include <limits.h>
-#include <errno.h>
-#include <getopt.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
-#include "fn.h"
 #include "dbg.h"
+#include "fn.h"
+#include "inject.h"
 #include "scopeelf.h"
 #include "scopetypes.h"
 #include "utils.h"
-#include "inject.h"
 
-#define GO_ENV_VAR "GODEBUG"
+#define GO_ENV_VAR          "GODEBUG"
 #define GO_ENV_SERVER_VALUE "http2server"
 #define GO_ENV_CLIENT_VALUE "http2client"
 
@@ -41,7 +41,8 @@
 static void
 setGoHttpEnvVariable(void)
 {
-    if (checkEnv("SCOPE_GO_HTTP1", "false") == TRUE) return;
+    if (checkEnv("SCOPE_GO_HTTP1", "false") == TRUE)
+        return;
 
     char *cur_val = getenv(GO_ENV_VAR);
 
@@ -64,7 +65,8 @@ setGoHttpEnvVariable(void)
         if (setenv(GO_ENV_VAR, new_val, 1)) {
             perror("setGoHttpEnvVariable:setenv");
         }
-        if (new_val) free(new_val);
+        if (new_val)
+            free(new_val);
     }
 
     cur_val = getenv(GO_ENV_VAR);
@@ -79,44 +81,38 @@ setGoHttpEnvVariable(void)
         if (setenv(GO_ENV_VAR, new_val, 1)) {
             perror("setGoHttpEnvVariable:setenv");
         }
-        if (new_val) free(new_val);
+        if (new_val)
+            free(new_val);
     }
 }
 
 static void
 showUsage(char *prog)
 {
-    printf(
-      "\n"
-      "Cribl AppScope Dynamic Loader %s\n"
-      "\n"
-      "AppScope is a general-purpose observable applciation telemetry system.\n"
-      "\n"
-      "usage: %s [OPTIONS] --lib LIBRARY [--] EXECUTABLE [ARGS...]\n"
-      "       %s [OPTIONS] --attach PID\n"
-      "\n"
-      "options:\n"
-      "  -u, -h, --usage, --help  display this info\n"
-      "  -a, --attach PID         attach to the specified process ID\n"
-      "\n"
-      "Unless you are an AppScope developer, you are likely in the wrong place.\n"
-      "See `scope` or `ldscope` instead.\n"
-      "\n"
-      "User docs are at https://appscope.dev/docs/. The project is hosted at\n"
-      "https://github.com/criblio/appscope. Please direct feature requests and\n"
-      "defect reports there.\n"
-      "\n",
-      SCOPE_VER, prog, prog
-    );
+    printf("\n"
+           "Cribl AppScope Dynamic Loader %s\n"
+           "\n"
+           "AppScope is a general-purpose observable applciation telemetry system.\n"
+           "\n"
+           "usage: %s [OPTIONS] --lib LIBRARY [--] EXECUTABLE [ARGS...]\n"
+           "       %s [OPTIONS] --attach PID\n"
+           "\n"
+           "options:\n"
+           "  -u, -h, --usage, --help  display this info\n"
+           "  -a, --attach PID         attach to the specified process ID\n"
+           "\n"
+           "Unless you are an AppScope developer, you are likely in the wrong place.\n"
+           "See `scope` or `ldscope` instead.\n"
+           "\n"
+           "User docs are at https://appscope.dev/docs/. The project is hosted at\n"
+           "https://github.com/criblio/appscope. Please direct feature requests and\n"
+           "defect reports there.\n"
+           "\n",
+           SCOPE_VER, prog, prog);
 }
 
 // long aliases for short options
-static struct option options[] = {
-    {"help",    no_argument,       0, 'h'},
-    {"usage",   no_argument,       0, 'u'},
-    {"attach",  required_argument, 0, 'a'},
-    {0, 0, 0, 0}
-};
+static struct option options[] = {{"help", no_argument, 0, 'h'}, {"usage", no_argument, 0, 'u'}, {"attach", required_argument, 0, 'a'}, {0, 0, 0, 0}};
 
 int
 main(int argc, char **argv, char **env)
@@ -167,12 +163,12 @@ main(int argc, char **argv, char **env)
     }
 
     // SCOPE_LIB_PATH environment variable is required
-    char* scopeLibPath = getenv("SCOPE_LIB_PATH");
+    char *scopeLibPath = getenv("SCOPE_LIB_PATH");
     if (!scopeLibPath) {
         fprintf(stderr, "error: SCOPE_LIB_PATH must be set to point to libscope.so\n");
         return EXIT_FAILURE;
     }
-    if (access(scopeLibPath, R_OK|X_OK)) {
+    if (access(scopeLibPath, R_OK | X_OK)) {
         fprintf(stderr, "error: library %s is missing, not readable, or not executable\n", scopeLibPath);
         return EXIT_FAILURE;
     }
@@ -207,7 +203,7 @@ main(int argc, char **argv, char **env)
 
     char *inferior_command = getpath(argv[optind]);
     if (!inferior_command) {
-        fprintf(stderr,"%s could not find or execute command `%s`.  Exiting.\n", argv[0], argv[optind]);
+        fprintf(stderr, "%s could not find or execute command `%s`.  Exiting.\n", argv[0], argv[optind]);
         exit(EXIT_FAILURE);
     }
 
@@ -230,7 +226,8 @@ main(int argc, char **argv, char **env)
 
     if ((ebuf == NULL) || (!is_static(ebuf->buf))) {
         // Dynamic executable path
-        if (ebuf) freeElf(ebuf->buf, ebuf->len);
+        if (ebuf)
+            freeElf(ebuf->buf, ebuf->len);
 
         if (setenv("LD_PRELOAD", scopeLibPath, 0) == -1) {
             perror("setenv");
@@ -241,7 +238,7 @@ main(int argc, char **argv, char **env)
             perror("setenv");
             goto err;
         }
-        
+
         pid = fork();
         if (pid == -1) {
             perror("fork");
@@ -253,7 +250,8 @@ main(int argc, char **argv, char **env)
                 ret = waitpid(pid, &status, 0);
             } while (ret == -1 && errno == EINTR);
 
-            if (WIFEXITED(status)) exit(WEXITSTATUS(status));
+            if (WIFEXITED(status))
+                exit(WEXITSTATUS(status));
             exit(EXIT_FAILURE);
         } else {
             execve(inferior_command, &argv[optind], environ);
@@ -292,10 +290,11 @@ main(int argc, char **argv, char **env)
         goto err;
     }
 
-    sys_exec(ebuf, inferior_command, argc-optind, &argv[optind], env);
+    sys_exec(ebuf, inferior_command, argc - optind, &argv[optind], env);
 
     return 0;
 err:
-    if (ebuf) free(ebuf);
+    if (ebuf)
+        free(ebuf);
     exit(EXIT_FAILURE);
 }

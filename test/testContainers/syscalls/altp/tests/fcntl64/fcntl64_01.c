@@ -1,12 +1,14 @@
+#include "test_utils.h"
+#include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <errno.h>
-#include "test_utils.h"
 
-int fcntl64 (int fd, int cmd, ...);
+int fcntl64(int fd, int cmd, ...);
 
-int do_test() {
+int
+do_test()
+{
     int test_result = EXIT_SUCCESS;
 
 #if (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 28)
@@ -43,7 +45,7 @@ int do_test() {
         TEST_ERROR();
     }
 
-    if(close(f) == EOF) {
+    if (close(f) == EOF) {
         TEST_ERROR();
     }
 

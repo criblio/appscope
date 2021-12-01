@@ -1,14 +1,14 @@
 #define _GNU_SOURCE
+#include "scopeelf.h"
+#include "dbg.h"
+#include "fn.h"
+#include "os.h"
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include "dbg.h"
-#include "os.h"
-#include "fn.h"
-#include "scopeelf.h"
 
 #define GOPCLNTAB_MAGIC_112 0xfffffffb
 #define GOPCLNTAB_MAGIC_116 0xfffffffa
@@ -16,7 +16,8 @@
 void
 freeElf(char *buf, size_t len)
 {
-    if (!buf) return;
+    if (!buf)
+        return;
 
     if (munmap(buf, len) == -1) {
         scopeLogError("freeElf: munmap failed");
@@ -41,8 +42,7 @@ setTextSizeAndLenFromElf(elf_buf_t *ebuf)
         if (!strcmp(sec_name, ".text")) {
             ebuf->text_addr = (unsigned char *)sections[i].sh_addr;
             ebuf->text_len = sections[i].sh_size;
-            scopeLog(CFG_LOG_DEBUG, "%s:%d %s addr %p - %p\n", __FUNCTION__, __LINE__,
-                        sec_name, ebuf->text_addr, ebuf->text_addr + ebuf->text_len);
+            scopeLog(CFG_LOG_DEBUG, "%s:%d %s addr %p - %p\n", __FUNCTION__, __LINE__, sec_name, ebuf->text_addr, ebuf->text_addr + ebuf->text_len);
         }
     }
 }
@@ -61,7 +61,7 @@ app_type(char *buf, const uint32_t sh_type, const char *sh_name)
 
     for (i = 0; i < ehdr->e_shnum; i++) {
         sec_name = section_strtab + sections[i].sh_name;
-        //printf("section %s type = %d \n", sec_name, sections[i].sh_type);
+        // printf("section %s type = %d \n", sec_name, sections[i].sh_type);
         if (sections[i].sh_type == sh_type && strcmp(sec_name, sh_name) == 0) {
             return TRUE;
         }
@@ -69,7 +69,7 @@ app_type(char *buf, const uint32_t sh_type, const char *sh_name)
     return FALSE;
 }
 
-Elf64_Shdr*
+Elf64_Shdr *
 getElfSection(char *buf, const char *sh_name)
 {
     int i = 0;
@@ -119,9 +119,7 @@ getElf(char *path)
         goto out;
     }
 
-
-    char * mmap_rv = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
-                          PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
+    char *mmap_rv = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)), PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
     if (mmap_rv == MAP_FAILED) {
         scopeLogError("fd:%d getElf: mmap failed", fd);
         goto out;
@@ -132,18 +130,13 @@ getElf(char *path)
     ebuf->len = sbuf.st_size;
 
     elf = (Elf64_Ehdr *)ebuf->buf;
-    if((elf->e_ident[EI_MAG0] != 0x7f) ||
-       strncmp((char *)&elf->e_ident[EI_MAG1], "ELF", 3) ||
-       (elf->e_ident[EI_CLASS] != ELFCLASS64) ||
-       (elf->e_ident[EI_DATA] != ELFDATA2LSB)) {
-        scopeLogError("fd:%d %s:%d ERROR: %s is not a viable ELF file\n",
-                    fd, __FUNCTION__, __LINE__, path);
+    if ((elf->e_ident[EI_MAG0] != 0x7f) || strncmp((char *)&elf->e_ident[EI_MAG1], "ELF", 3) || (elf->e_ident[EI_CLASS] != ELFCLASS64) || (elf->e_ident[EI_DATA] != ELFDATA2LSB)) {
+        scopeLogError("fd:%d %s:%d ERROR: %s is not a viable ELF file\n", fd, __FUNCTION__, __LINE__, path);
         goto out;
     }
 
     if ((elf->e_type != ET_EXEC) && (elf->e_type != ET_DYN)) {
-        scopeLogError("fd:%d %s:%d %s with type %d is not an executable\n",
-                    fd, __FUNCTION__, __LINE__, path, elf->e_type);
+        scopeLogError("fd:%d %s:%d %s with type %d is not an executable\n", fd, __FUNCTION__, __LINE__, path, elf->e_type);
         goto out;
     }
 
@@ -152,7 +145,8 @@ getElf(char *path)
     get_elf_successful = TRUE;
 
 out:
-    if (fd != -1) g_fn.close(fd);
+    if (fd != -1)
+        g_fn.close(fd);
     if (!get_elf_successful && ebuf) {
         freeElf(ebuf->buf, ebuf->len);
         free(ebuf);
@@ -219,11 +213,11 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
              * of the shared module as defined in the link map's l_addr + offset.
              * as in: rel[i].r_offset + lm->l_addr
              */
-            if (!attach) *gfn = *gaddr;
+            if (!attach)
+                *gfn = *gaddr;
             uint64_t prev = *gaddr;
             *gaddr = (uint64_t)hook->func;
-            scopeLog(CFG_LOG_DEBUG, "%s:%d sym=%s offset 0x%lx GOT entry %p saddr 0x%lx, prev=0x%lx, curr=%p",
-                        __FUNCTION__, __LINE__, hook->symbol, rel[i].r_offset, gaddr, saddr, prev, hook->func);
+            scopeLog(CFG_LOG_DEBUG, "%s:%d sym=%s offset 0x%lx GOT entry %p saddr 0x%lx, prev=0x%lx, curr=%p", __FUNCTION__, __LINE__, hook->symbol, rel[i].r_offset, gaddr, saddr, prev, hook->func);
 
             if ((prot & PROT_WRITE) == 0) {
                 // if we didn't mod above leave prot settings as is
@@ -279,8 +273,7 @@ getElfEntries(struct link_map *lm, Elf64_Rela **rel, Elf64_Sym **sym, char **str
         }
     }
 
-    scopeLog(CFG_LOG_TRACE, "%s:%d name: %s dyn %p sym %p rel %p str %p rsz %d got %p laddr 0x%lx\n",
-                __FUNCTION__, __LINE__, lm->l_name, dyn, *sym, *rel, *str, *rsz, got, lm->l_addr);
+    scopeLog(CFG_LOG_TRACE, "%s:%d name: %s dyn %p sym %p rel %p str %p rsz %d got %p laddr 0x%lx\n", __FUNCTION__, __LINE__, lm->l_name, dyn, *sym, *rel, *str, *rsz, got, lm->l_addr);
 
     if (*sym == NULL || *rel == NULL || (*rsz < sizeof(Elf64_Rela))) {
         return -1;
@@ -301,7 +294,8 @@ getSymbol(const char *buf, char *sname)
     const char *strtab = NULL;
     const char *sec_name = NULL;
 
-    if (!buf || !sname) return NULL;
+    if (!buf || !sname)
+        return NULL;
 
     ehdr = (Elf64_Ehdr *)buf;
     sections = (Elf64_Shdr *)((char *)buf + ehdr->e_shoff);
@@ -317,7 +311,8 @@ getSymbol(const char *buf, char *sname)
             strtab = (const char *)(buf + sections[i].sh_offset);
         }
 
-        if ((strtab != NULL) && (symtab != NULL)) break;
+        if ((strtab != NULL) && (symtab != NULL))
+            break;
         /*printf("section %s type = %d flags = 0x%lx addr = 0x%lx-0x%lx, size = 0x%lx off = 0x%lx\n",
                sec_name,
                sections[i].sh_type,
@@ -328,7 +323,7 @@ getSymbol(const char *buf, char *sname)
                sections[i].sh_offset);*/
     }
 
-    for (i=0; i < nsyms; i++) {
+    for (i = 0; i < nsyms; i++) {
         if (strcmp(sname, strtab + symtab[i].st_name) == 0) {
             symaddr = symtab[i].st_value;
             scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", strtab + symtab[i].st_name, symtab[i].st_value);
@@ -349,7 +344,8 @@ getGoSymbol(const char *buf, char *sname)
     const char *section_strtab = NULL;
     const char *sec_name = NULL;
 
-    if (!buf || !sname) return NULL;
+    if (!buf || !sname)
+        return NULL;
 
     ehdr = (Elf64_Ehdr *)buf;
     sections = (Elf64_Shdr *)((char *)buf + ehdr->e_shoff);
@@ -365,13 +361,13 @@ getGoSymbol(const char *buf, char *sname)
             */
             uint32_t magic = *((const uint32_t *)(pclntab_addr));
             if (magic == GOPCLNTAB_MAGIC_112) {
-                uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
+                uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
                 const void *symtab_addr = pclntab_addr + 16;
 
-                for(i=0; i<sym_count; i++) {
-                    uint64_t sym_addr     = *((const uint64_t *)(symtab_addr));
-                    uint64_t func_offset  = *((const uint64_t *)(symtab_addr + 8));
-                    uint32_t name_offset  = *((const uint32_t *)(pclntab_addr + func_offset + 8));
+                for (i = 0; i < sym_count; i++) {
+                    uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
+                    uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
+                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + func_offset + 8));
                     const char *func_name = (const char *)(pclntab_addr + name_offset);
 
                     if (strcmp(sname, func_name) == 0) {
@@ -382,7 +378,7 @@ getGoSymbol(const char *buf, char *sname)
                     symtab_addr += 16;
                 }
             } else if (magic == GOPCLNTAB_MAGIC_116) {
-                uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
+                uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
                 uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (3 * 8)));
                 uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (7 * 8)));
                 const void *symtab_addr = pclntab_addr + pclntab_offset;
@@ -410,7 +406,7 @@ getGoSymbol(const char *buf, char *sname)
 }
 
 void *
-getGoVersionAddr(const char* buf)
+getGoVersionAddr(const char *buf)
 {
     int i;
     Elf64_Ehdr *ehdr;
@@ -424,7 +420,7 @@ getGoVersionAddr(const char* buf)
     section_strtab = (char *)buf + sections[ehdr->e_shstrndx].sh_offset;
     const char magic[0xe] = "\xff Go buildinf:";
     void *go_build_ver_addr = NULL;
- 
+
     for (i = 0; i < ehdr->e_shnum; i++) {
         sec_name = section_strtab + sections[i].sh_name;
         sec_data = (const char *)buf + sections[i].sh_offset;
@@ -441,15 +437,12 @@ getGoVersionAddr(const char* buf)
         // 0x10 + ptrSize           pointer to runtime.modinfo
         // 0x10 + 2 * ptr size      pointer to build flags
 
-        if (!strcmp(sec_name, ".go.buildinfo") &&
-            (sections[i].sh_size >= 0x18) &&
-            (!memcmp(&sec_data[0], magic, sizeof(magic))) &&
-            (sec_data[0xe] == 0x08) &&  // 64 bit executables only
-            (sec_data[0xf] == 0x00)) {  // little-endian
+        if (!strcmp(sec_name, ".go.buildinfo") && (sections[i].sh_size >= 0x18) && (!memcmp(&sec_data[0], magic, sizeof(magic))) && (sec_data[0xe] == 0x08) && // 64 bit executables only
+            (sec_data[0xf] == 0x00)) {                                                                                                                         // little-endian
 
-            uint64_t *addressPtr = (uint64_t*)&sec_data[0x10];
+            uint64_t *addressPtr = (uint64_t *)&sec_data[0x10];
 
-            go_build_ver_addr = (void*)*addressPtr;
+            go_build_ver_addr = (void *)*addressPtr;
         }
     }
 
@@ -475,9 +468,7 @@ is_static(char *buf)
 bool
 is_go(char *buf)
 {
-    if (buf && (app_type(buf, SHT_PROGBITS, ".gosymtab") ||
-                app_type(buf, SHT_PROGBITS, ".gopclntab") ||
-                app_type(buf, SHT_NOTE, ".note.go.buildid"))) {
+    if (buf && (app_type(buf, SHT_PROGBITS, ".gosymtab") || app_type(buf, SHT_PROGBITS, ".gopclntab") || app_type(buf, SHT_NOTE, ".note.go.buildid"))) {
         return TRUE;
     }
 

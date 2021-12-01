@@ -4,7 +4,9 @@
 
 #include "test_utils.h"
 
-int do_test() {
+int
+do_test()
+{
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[NAME_MAX];
     struct stat64 fs;
@@ -15,16 +17,16 @@ int do_test() {
 
     int f = open64(tmp_file_name, O_CREAT | O_RDONLY);
 
-    if(f != EOF) {
-        if(__xstat64(1, tmp_file_name, &fs) < 0) {
+    if (f != EOF) {
+        if (__xstat64(1, tmp_file_name, &fs) < 0) {
             TEST_ERROR();
         }
 
-        if(fs.st_size != 0) {
+        if (fs.st_size != 0) {
             TEST_ERROR();
         }
 
-        if(close(f) == EOF) {
+        if (close(f) == EOF) {
             TEST_ERROR();
         }
 
@@ -36,20 +38,20 @@ int do_test() {
 
     f = open64(tmp_file_name, O_CREAT | O_WRONLY);
 
-    if(f != EOF) {
-        if(write(f, TEST_MSG, sizeof(TEST_MSG)) != sizeof(TEST_MSG)) {
+    if (f != EOF) {
+        if (write(f, TEST_MSG, sizeof(TEST_MSG)) != sizeof(TEST_MSG)) {
             TEST_ERROR();
         }
 
-        if(__xstat64(1, tmp_file_name, &fs) < 0) {
+        if (__xstat64(1, tmp_file_name, &fs) < 0) {
             TEST_ERROR();
         }
 
-        if(fs.st_size != sizeof(TEST_MSG)) {
+        if (fs.st_size != sizeof(TEST_MSG)) {
             TEST_ERROR();
         }
 
-        if(close(f) == EOF) {
+        if (close(f) == EOF) {
             TEST_ERROR();
         }
 

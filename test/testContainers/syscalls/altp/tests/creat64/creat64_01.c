@@ -2,7 +2,9 @@
 
 #include "test_utils.h"
 
-int do_test() {
+int
+do_test()
+{
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[NAME_MAX];
 
@@ -10,9 +12,9 @@ int do_test() {
 
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
-    int fd = creat64(tmp_file_name, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP );
-    if(fd != EOF ) {
-        if(close(fd) == EOF) {
+    int fd = creat64(tmp_file_name, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+    if (fd != EOF) {
+        if (close(fd) == EOF) {
             TEST_ERROR();
         }
         unlink(tmp_file_name);

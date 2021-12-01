@@ -1,13 +1,13 @@
 #ifndef __STATE_H__
 #define __STATE_H__
 
-#include <sys/socket.h>
 #include "pcre2posix.h"
+#include <sys/socket.h>
 
-#include "runtimecfg.h"
+#include "../contrib/tls/tls.h"
 #include "linklist.h"
 #include "report.h"
-#include "../contrib/tls/tls.h"
+#include "runtimecfg.h"
 
 #ifdef __APPLE__
 #ifndef AF_NETLINK
@@ -15,11 +15,11 @@
 #endif
 #endif // __APPLE__
 
-
 /**
  * Options for `do*()` indicating how to interpret the `buf` and `len` values.
  */
-typedef enum {
+typedef enum
+{
     BUF, // `buf` points to raw bytes, `len` is the number of bytes
     MSG, // `buf` points to a `struct msghdr`, `len` is unused
     IOV, // `buf` points to a `struct iovec` array, `len` is the array length
@@ -29,7 +29,8 @@ typedef enum {
 /**
  * File content type
  */
-typedef enum {
+typedef enum
+{
     FS_CONTENT_UNKNOWN, // File content type undetermined
     FS_CONTENT_BINARY,  // File content type binary
     FS_CONTENT_TEXT     // File content type text

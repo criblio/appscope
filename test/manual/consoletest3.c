@@ -10,12 +10,11 @@
 #include <wchar.h>
 
 // This test was created when we moved from instrumenting lots of individual string
-// functions to funchooking glibc's __write.  It tries to guarantee coverage and 
+// functions to funchooking glibc's __write.  It tries to guarantee coverage and
 // guard against "double capture" too.
 
-
-void 
-vprintf_func(char *format, ...) 
+void
+vprintf_func(char *format, ...)
 {
     va_list args;
     va_start(args, format);
@@ -66,16 +65,14 @@ main(void)
 {
     // just a reminder...  the stdout stream is *line buffered* by default.
 
-
     // These should appear in console events
     int i = 0;
-    printf("%d:printf\n", i++);                 // to stdout
+    printf("%d:printf\n", i++); // to stdout
     fprintf(stdout, "%d:fprintf\n", i++);
-    vprintf_func("%d:vprintf\n", i++);          // to stdout
+    vprintf_func("%d:vprintf\n", i++); // to stdout
     vfprintf_func(stdout, "%d:vfprintf\n", i++);
     dprintf(STDOUT_FILENO, "%d:dprintf\n", i++);
     vdprintf_func(STDOUT_FILENO, "%d:vdprintf\n", i++);
-
 
     // Not to stdout. These should *not* appear in console events
     char buf[256];
@@ -84,11 +81,10 @@ main(void)
     vsprintf_func(buf, "%d:vsprintf\n", i);
     vsnprintf_func(buf, sizeof(buf), "%d:vsnprintf\n", i);
 
-
     // These should appear in file events
-    int fd = open(LOG_FILE_NAME, O_CREAT|O_CLOEXEC|O_WRONLY|O_APPEND);
+    int fd = open(LOG_FILE_NAME, O_CREAT | O_CLOEXEC | O_WRONLY | O_APPEND);
     pwrite64(fd, "pwrite64\n", strlen("pwrite64\n"), 0); // pwrite64
-    { 
+    {
         struct iovec iov[2] = {{"p", 1}, {"writev\n", strlen("writev\n")}};
         pwritev(fd, iov, 2, 0);
     }
@@ -108,9 +104,9 @@ main(void)
     close(fd);
     unlink(LOG_FILE_NAME);
 
-/*
-    __overflow("
-*/
+    /*
+        __overflow("
+    */
 
     // These should appear in console events
     fwrite_unlocked("fwrite_unlocked\n", 1, strlen("fwrite_unlocked\n"), stdout);
@@ -129,13 +125,12 @@ main(void)
     fputc_unlocked('Z', stdout);
     fputc_unlocked('\n', stdout);
 
-
     // "... you must not mix byte and wide oriented operations on the same FILE
     // stream.  Failure to observe this rule is not a reportable error; it
     // simply results in undefined behavior."
 
     // These should appear in file events
-    FILE * f = fopen(LOG_FILE_NAME, "a");
+    FILE *f = fopen(LOG_FILE_NAME, "a");
     fwide(f, 1);
     putwc(L'M', f);
     fputwc(L'N', f);

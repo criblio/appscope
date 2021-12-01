@@ -5,38 +5,38 @@
 #include "state.h"
 #include "utils.h"
 
+#include "javabci.h"
 #include <jni.h>
 #include <jvmti.h>
-#include "javabci.h"
 
 typedef struct {
     jmethodID mid_Object_hashCode;
     jmethodID mid_SSLSocketImpl_getSession;
-    
+
     jmethodID mid_AppOutputStream___write;
     jmethodID mid_AppInputStream___read;
-    jfieldID  fid_AppOutputStream_socket;
-    jfieldID  fid_AppInputStream_socket;
-    
+    jfieldID fid_AppOutputStream_socket;
+    jfieldID fid_AppInputStream_socket;
+
     jmethodID mid_ByteBuffer_array;
     jmethodID mid_ByteBuffer_position;
     jmethodID mid_ByteBuffer_limit;
-    jfieldID  fid_ByteBuffer___fd;
-    
+    jfieldID fid_ByteBuffer___fd;
+
     jmethodID mid_SSLEngineImpl___wrap;
     jmethodID mid_SSLEngineImpl___unwrap;
     jmethodID mid_SSLEngineImpl_getSession;
-    
+
     jmethodID mid_Socket_getInetAddress;
     jmethodID mid_Socket_getPort;
     jmethodID mid_Socket_getImp;
 
     jmethodID mid_SocketImpl_getFileDescriptor;
 
-    jfieldID  fid_FileDescriptor_fd;
+    jfieldID fid_FileDescriptor_fd;
 
     jmethodID mid_InetAddress_getHostAddress;
-    
+
     jmethodID mid_SocketChannelImpl___read;
     jmethodID mid_SocketChannelImpl___write;
     jmethodID mid_SocketChannelImpl_getRemoteAddress;
@@ -49,22 +49,23 @@ typedef struct {
 
 static java_global_t g_java = {0};
 
-static void 
-logJvmtiError(jvmtiEnv *jvmti, jvmtiError errnum, const char *str) 
+static void
+logJvmtiError(jvmtiEnv *jvmti, jvmtiError errnum, const char *str)
 {
     char *errnum_str = NULL;
     (*jvmti)->GetErrorName(jvmti, errnum, &errnum_str);
-    scopeLogError("ERROR: JVMTI: [%d] %s - %s\n", errnum, (errnum_str == NULL ? "Unknown": errnum_str), (str == NULL? "" : str));
+    scopeLogError("ERROR: JVMTI: [%d] %s - %s\n", errnum, (errnum_str == NULL ? "Unknown" : errnum_str), (str == NULL ? "" : str));
 }
 
-static void 
+static void
 clearJniException(JNIEnv *jni)
 {
     jboolean flag = (*jni)->ExceptionCheck(jni);
-    if (flag) (*jni)->ExceptionClear(jni);
+    if (flag)
+        (*jni)->ExceptionClear(jni);
 }
 
-static int 
+static int
 getFdFromSocket(JNIEnv *jni, jobject socket)
 {
     int fd = -1;
@@ -76,14 +77,15 @@ getFdFromSocket(JNIEnv *jni, jobject socket)
     return fd;
 }
 
-static void 
-initJniGlobals(JNIEnv *jni) 
+static void
+initJniGlobals(JNIEnv *jni)
 {
-    if (g_java.mid_Object_hashCode != NULL) return;
-    jclass objectClass             = (*jni)->FindClass(jni, "java/lang/Object");
-    g_java.mid_Object_hashCode     = (*jni)->GetMethodID(jni, objectClass, "hashCode", "()I");
+    if (g_java.mid_Object_hashCode != NULL)
+        return;
+    jclass objectClass = (*jni)->FindClass(jni, "java/lang/Object");
+    g_java.mid_Object_hashCode = (*jni)->GetMethodID(jni, objectClass, "hashCode", "()I");
 
-    jclass sslSocketImplClass      = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl");
+    jclass sslSocketImplClass = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl");
     if (sslSocketImplClass == NULL) {
         // Oracle JDK 6
         sslSocketImplClass = (*jni)->FindClass(jni, "com/sun/net/ssl/internal/ssl/SSLSocketImpl");
@@ -91,25 +93,26 @@ initJniGlobals(JNIEnv *jni)
     }
     g_java.mid_SSLSocketImpl_getSession = (*jni)->GetMethodID(jni, sslSocketImplClass, "getSession", "()Ljavax/net/ssl/SSLSession;");
 
-    jclass socketClass         = (*jni)->FindClass(jni, "java/net/Socket");
+    jclass socketClass = (*jni)->FindClass(jni, "java/net/Socket");
     g_java.mid_Socket_getInetAddress = (*jni)->GetMethodID(jni, socketClass, "getInetAddress", "()Ljava/net/InetAddress;");
-    g_java.mid_Socket_getPort      = (*jni)->GetMethodID(jni, socketClass, "getPort", "()I");
-    g_java.mid_Socket_getImp       = (*jni)->GetMethodID(jni, socketClass, "getImpl", "()Ljava/net/SocketImpl;");
+    g_java.mid_Socket_getPort = (*jni)->GetMethodID(jni, socketClass, "getPort", "()I");
+    g_java.mid_Socket_getImp = (*jni)->GetMethodID(jni, socketClass, "getImpl", "()Ljava/net/SocketImpl;");
 
-    jclass socketImplClass         = (*jni)->FindClass(jni, "java/net/SocketImpl");
+    jclass socketImplClass = (*jni)->FindClass(jni, "java/net/SocketImpl");
     g_java.mid_SocketImpl_getFileDescriptor = (*jni)->GetMethodID(jni, socketImplClass, "getFileDescriptor", "()Ljava/io/FileDescriptor;");
 
-    jclass fdClass                 = (*jni)->FindClass(jni, "java/io/FileDescriptor");
-    g_java.fid_FileDescriptor_fd   = (*jni)->GetFieldID(jni, fdClass, "fd", "I");
+    jclass fdClass = (*jni)->FindClass(jni, "java/io/FileDescriptor");
+    g_java.fid_FileDescriptor_fd = (*jni)->GetFieldID(jni, fdClass, "fd", "I");
 
-    jclass inetAddressClass        = (*jni)->FindClass(jni, "java/net/InetAddress");
+    jclass inetAddressClass = (*jni)->FindClass(jni, "java/net/InetAddress");
     g_java.mid_InetAddress_getHostAddress = (*jni)->GetMethodID(jni, inetAddressClass, "getHostAddress", "()Ljava/lang/String;");
 }
 
-static void 
+static void
 initAppOutputStreamGlobals(JNIEnv *jni)
 {
-    if (g_java.mid_AppOutputStream___write != NULL) return;
+    if (g_java.mid_AppOutputStream___write != NULL)
+        return;
     jclass appOutputStreamClass = (*jni)->FindClass(jni, "sun/security/ssl/AppOutputStream");
     if (appOutputStreamClass == NULL) {
         // Oracle JDK 6
@@ -124,20 +127,20 @@ initAppOutputStreamGlobals(JNIEnv *jni)
     We are trying to find a private field of type SSLSocketImpl which holds a reference to the socket object.
     - in JDK 6-8 the field is called "c"
     - in JDK 9-10 the field is called "socket"
-    - in JDK 11-14 AppOutputStream is a nested private class inside the SSLSocketImpl class, 
+    - in JDK 11-14 AppOutputStream is a nested private class inside the SSLSocketImpl class,
       so we need to find a reference to the instance of its enclosing class which is an implicit field called "this$0"
     */
     g_java.fid_AppOutputStream_socket = (*jni)->GetFieldID(jni, appOutputStreamClass, "c", "Lsun/security/ssl/SSLSocketImpl;");
     if (g_java.fid_AppOutputStream_socket == NULL) {
-        //support for Oracle JDK 6
+        // support for Oracle JDK 6
         g_java.fid_AppOutputStream_socket = (*jni)->GetFieldID(jni, appOutputStreamClass, "c", "Lcom/sun/net/ssl/internal/ssl/SSLSocketImpl;");
     }
     if (g_java.fid_AppOutputStream_socket == NULL) {
-        //support for JDK 9, JDK 10
+        // support for JDK 9, JDK 10
         g_java.fid_AppOutputStream_socket = (*jni)->GetFieldID(jni, appOutputStreamClass, "socket", "Lsun/security/ssl/SSLSocketImpl;");
     }
     if (g_java.fid_AppOutputStream_socket == NULL) {
-        //support for JDK 11 - 14
+        // support for JDK 11 - 14
         g_java.fid_AppOutputStream_socket = (*jni)->GetFieldID(jni, appOutputStreamClass, "this$0", "Lsun/security/ssl/SSLSocketImpl;");
     }
     if (g_java.fid_AppOutputStream_socket == NULL) {
@@ -149,35 +152,36 @@ initAppOutputStreamGlobals(JNIEnv *jni)
 static void
 initAppInputStreamGlobals(JNIEnv *jni)
 {
-    if (g_java.mid_AppInputStream___read != NULL) return;
+    if (g_java.mid_AppInputStream___read != NULL)
+        return;
     jclass appInputStreamClass = (*jni)->FindClass(jni, "sun/security/ssl/AppInputStream");
     if (appInputStreamClass == NULL) {
         // Oracle JDK 6
-        appInputStreamClass  = (*jni)->FindClass(jni, "com/sun/net/ssl/internal/ssl/AppInputStream");
+        appInputStreamClass = (*jni)->FindClass(jni, "com/sun/net/ssl/internal/ssl/AppInputStream");
     }
     if (appInputStreamClass == NULL) {
         // JDK 11
-        appInputStreamClass  = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl$AppInputStream");
+        appInputStreamClass = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl$AppInputStream");
     }
     g_java.mid_AppInputStream___read = (*jni)->GetMethodID(jni, appInputStreamClass, "__read", "([BII)I");
     /*
     We are trying to find a private field of type SSLSocketImpl which holds a reference to the socket object.
     - in JDK 6-8 the field is called "c"
     - in JDK 9-10 the field is called "socket"
-    - in JDK 11-14 AppInputStream is a nested private class inside the SSLSocketImpl class, 
+    - in JDK 11-14 AppInputStream is a nested private class inside the SSLSocketImpl class,
       so we need to find a reference to the instance of its enclosing class which is an implicit field called "this$0"
     */
     g_java.fid_AppInputStream_socket = (*jni)->GetFieldID(jni, appInputStreamClass, "c", "Lsun/security/ssl/SSLSocketImpl;");
     if (g_java.fid_AppInputStream_socket == NULL) {
-        //support for Oracle JDK 6
+        // support for Oracle JDK 6
         g_java.fid_AppInputStream_socket = (*jni)->GetFieldID(jni, appInputStreamClass, "c", "Lcom/sun/net/ssl/internal/ssl/SSLSocketImpl;");
     }
     if (g_java.fid_AppInputStream_socket == NULL) {
-        //support for JDK 9, JDK 10
+        // support for JDK 9, JDK 10
         g_java.fid_AppInputStream_socket = (*jni)->GetFieldID(jni, appInputStreamClass, "socket", "Lsun/security/ssl/SSLSocketImpl;");
     }
     if (g_java.fid_AppInputStream_socket == NULL) {
-        //support for JDK 11 - 14
+        // support for JDK 11 - 14
         g_java.fid_AppInputStream_socket = (*jni)->GetFieldID(jni, appInputStreamClass, "this$0", "Lsun/security/ssl/SSLSocketImpl;");
     }
     if (g_java.fid_AppInputStream_socket == NULL) {
@@ -187,65 +191,58 @@ initAppInputStreamGlobals(JNIEnv *jni)
 }
 
 static void
-initSSLEngineImplGlobals(JNIEnv *jni) 
+initSSLEngineImplGlobals(JNIEnv *jni)
 {
-    if (g_java.mid_SSLEngineImpl___unwrap != NULL) return;
+    if (g_java.mid_SSLEngineImpl___unwrap != NULL)
+        return;
     jclass sslEngineImplClass = (*jni)->FindClass(jni, "sun/security/ssl/SSLEngineImpl");
     if (sslEngineImplClass == NULL) {
         // Oracle JDK 6
-        sslEngineImplClass  = (*jni)->FindClass(jni, "com/sun/net/ssl/internal/ssl/SSLEngineImpl");
+        sslEngineImplClass = (*jni)->FindClass(jni, "com/sun/net/ssl/internal/ssl/SSLEngineImpl");
         clearJniException(jni);
     }
-    g_java.mid_SSLEngineImpl___unwrap    = (*jni)->GetMethodID(jni, sslEngineImplClass, "__unwrap", "(Ljava/nio/ByteBuffer;[Ljava/nio/ByteBuffer;II)Ljavax/net/ssl/SSLEngineResult;");
-    g_java.mid_SSLEngineImpl___wrap      = (*jni)->GetMethodID(jni, sslEngineImplClass, "__wrap", "([Ljava/nio/ByteBuffer;IILjava/nio/ByteBuffer;)Ljavax/net/ssl/SSLEngineResult;");
-    g_java.mid_SSLEngineImpl_getSession  = (*jni)->GetMethodID(jni, sslEngineImplClass, "getSession", "()Ljavax/net/ssl/SSLSession;");
-    jclass sslEngineResultClass    = (*jni)->FindClass(jni, "javax/net/ssl/SSLEngineResult");
+    g_java.mid_SSLEngineImpl___unwrap = (*jni)->GetMethodID(jni, sslEngineImplClass, "__unwrap", "(Ljava/nio/ByteBuffer;[Ljava/nio/ByteBuffer;II)Ljavax/net/ssl/SSLEngineResult;");
+    g_java.mid_SSLEngineImpl___wrap = (*jni)->GetMethodID(jni, sslEngineImplClass, "__wrap", "([Ljava/nio/ByteBuffer;IILjava/nio/ByteBuffer;)Ljavax/net/ssl/SSLEngineResult;");
+    g_java.mid_SSLEngineImpl_getSession = (*jni)->GetMethodID(jni, sslEngineImplClass, "getSession", "()Ljavax/net/ssl/SSLSession;");
+    jclass sslEngineResultClass = (*jni)->FindClass(jni, "javax/net/ssl/SSLEngineResult");
     g_java.mid_SSLEngineResult_bytesConsumed = (*jni)->GetMethodID(jni, sslEngineResultClass, "bytesConsumed", "()I");
     g_java.mid_SSLEngineResult_bytesProduced = (*jni)->GetMethodID(jni, sslEngineResultClass, "bytesProduced", "()I");
 
     jclass socketChannelClass = (*jni)->FindClass(jni, "sun/nio/ch/SocketChannelImpl");
-    g_java.mid_SocketChannelImpl___read  = (*jni)->GetMethodID(jni, socketChannelClass, "__read", "(Ljava/nio/ByteBuffer;)I");
+    g_java.mid_SocketChannelImpl___read = (*jni)->GetMethodID(jni, socketChannelClass, "__read", "(Ljava/nio/ByteBuffer;)I");
     g_java.mid_SocketChannelImpl___write = (*jni)->GetMethodID(jni, socketChannelClass, "__write", "(Ljava/nio/ByteBuffer;)I");
-    g_java.mid_SocketChannelImpl_getRemoteAddress  = (*jni)->GetMethodID(jni, socketChannelClass, "getRemoteAddress", "()Ljava/net/SocketAddress;");
+    g_java.mid_SocketChannelImpl_getRemoteAddress = (*jni)->GetMethodID(jni, socketChannelClass, "getRemoteAddress", "()Ljava/net/SocketAddress;");
     if (g_java.mid_SocketChannelImpl_getRemoteAddress == NULL) {
         // Open JDK 6
-        g_java.mid_SocketChannelImpl_getRemoteAddress  = (*jni)->GetMethodID(jni, socketChannelClass, "remoteAddress", "()Ljava/net/SocketAddress;");
+        g_java.mid_SocketChannelImpl_getRemoteAddress = (*jni)->GetMethodID(jni, socketChannelClass, "remoteAddress", "()Ljava/net/SocketAddress;");
         clearJniException(jni);
     }
-    g_java.mid_SocketChannelImpl_getFDVal  = (*jni)->GetMethodID(jni, socketChannelClass, "getFDVal", "()I");
+    g_java.mid_SocketChannelImpl_getFDVal = (*jni)->GetMethodID(jni, socketChannelClass, "getFDVal", "()I");
 
-    jclass byteBufferClass         = (*jni)->FindClass(jni, "java/nio/ByteBuffer");
-    jclass bufferClass             = (*jni)->FindClass(jni, "java/nio/Buffer");
-    g_java.mid_ByteBuffer_array    = (*jni)->GetMethodID(jni, byteBufferClass, "array", "()[B");
+    jclass byteBufferClass = (*jni)->FindClass(jni, "java/nio/ByteBuffer");
+    jclass bufferClass = (*jni)->FindClass(jni, "java/nio/Buffer");
+    g_java.mid_ByteBuffer_array = (*jni)->GetMethodID(jni, byteBufferClass, "array", "()[B");
     g_java.mid_ByteBuffer_position = (*jni)->GetMethodID(jni, bufferClass, "position", "()I");
-    g_java.mid_ByteBuffer_limit    = (*jni)->GetMethodID(jni, bufferClass, "limit", "()I");
+    g_java.mid_ByteBuffer_limit = (*jni)->GetMethodID(jni, bufferClass, "limit", "()I");
 
-    jclass dbbClass                = (*jni)->FindClass(jni, "java/nio/DirectByteBuffer");
-    g_java.fid_ByteBuffer___fd     = (*jni)->GetFieldID(jni, dbbClass, "__fd", "I");
+    jclass dbbClass = (*jni)->FindClass(jni, "java/nio/DirectByteBuffer");
+    g_java.fid_ByteBuffer___fd = (*jni)->GetFieldID(jni, dbbClass, "__fd", "I");
     if (g_java.fid_ByteBuffer___fd == NULL) {
         // Open JDK 9
-        dbbClass                   = (*jni)->FindClass(jni, "java/nio/DirectByteBufferR");
+        dbbClass = (*jni)->FindClass(jni, "java/nio/DirectByteBufferR");
         g_java.fid_ByteBuffer___fd = (*jni)->GetFieldID(jni, dbbClass, "__fd", "I");
         clearJniException(jni);
     }
 }
 
-void JNICALL 
-ClassFileLoadHook(jvmtiEnv *jvmti_env,
-    JNIEnv* jni,
-    jclass class_being_redefined,
-    jobject loader,
-    const char* name,
-    jobject protection_domain,
-    jint class_data_len,
-    const unsigned char* class_data,
-    jint* new_class_data_len,
-    unsigned char** new_class_data) 
+void JNICALL
+ClassFileLoadHook(jvmtiEnv *jvmti_env, JNIEnv *jni, jclass class_being_redefined, jobject loader, const char *name, jobject protection_domain, jint class_data_len, const unsigned char *class_data,
+                  jint *new_class_data_len, unsigned char **new_class_data)
 {
-    if (name == NULL) return;
-    
-    if (strcmp(name, "sun/security/ssl/AppOutputStream") == 0 || 
-        strcmp(name, "com/sun/net/ssl/internal/ssl/AppOutputStream") == 0 ||
+    if (name == NULL)
+        return;
+
+    if (strcmp(name, "sun/security/ssl/AppOutputStream") == 0 || strcmp(name, "com/sun/net/ssl/internal/ssl/AppOutputStream") == 0 ||
         strcmp(name, "sun/security/ssl/SSLSocketImpl$AppOutputStream") == 0) {
 
         scopeLogInfo("installing Java SSL hooks for AppOutputStream class...");
@@ -270,8 +267,7 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         javaDestroy(&classInfo);
     }
 
-    if (strcmp(name, "sun/security/ssl/AppInputStream") == 0 ||
-        strcmp(name, "com/sun/net/ssl/internal/ssl/AppInputStream") == 0 ||
+    if (strcmp(name, "sun/security/ssl/AppInputStream") == 0 || strcmp(name, "com/sun/net/ssl/internal/ssl/AppInputStream") == 0 ||
         strcmp(name, "sun/security/ssl/SSLSocketImpl$AppInputStream") == 0) {
 
         scopeLogInfo("installing Java SSL hooks for AppInputStream class...");
@@ -296,9 +292,8 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         javaDestroy(&classInfo);
     }
 
-    if (strcmp(name, "sun/security/ssl/SSLEngineImpl") == 0 || 
-        strcmp(name, "com/sun/net/ssl/internal/ssl/SSLEngineImpl") == 0) {
-        
+    if (strcmp(name, "sun/security/ssl/SSLEngineImpl") == 0 || strcmp(name, "com/sun/net/ssl/internal/ssl/SSLEngineImpl") == 0) {
+
         scopeLogInfo("installing Java SSL hooks for SSLEngineImpl class...");
 
         java_class_t *classInfo = javaReadClass(class_data);
@@ -313,14 +308,14 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         javaConvertMethodToNative(classInfo, methodIndex);
 
         methodIndex = javaFindMethodIndex(classInfo, "unwrap", "(Ljava/nio/ByteBuffer;[Ljava/nio/ByteBuffer;II)Ljavax/net/ssl/SSLEngineResult;");
-         if (methodIndex == -1) {
+        if (methodIndex == -1) {
             javaDestroy(&classInfo);
             scopeLogError("ERROR: 'unwrap' method not found in SSLEngineImpl class\n");
             return;
         }
         javaCopyMethod(classInfo, classInfo->methods[methodIndex], "__unwrap");
         javaConvertMethodToNative(classInfo, methodIndex);
-        
+
         unsigned char *dest;
         (*jvmti_env)->Allocate(jvmti_env, classInfo->length, &dest);
         javaWriteClass(dest, classInfo);
@@ -362,8 +357,7 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         javaDestroy(&classInfo);
     }
 
-    if (strcmp(name, "java/nio/DirectByteBuffer") == 0 ||
-        strcmp(name, "java/nio/DirectByteBufferR") == 0) {
+    if (strcmp(name, "java/nio/DirectByteBuffer") == 0 || strcmp(name, "java/nio/DirectByteBufferR") == 0) {
 
         scopeLogInfo("installing Java SSL hooks for java.nio.DirectByteBuffer class...");
         java_class_t *classInfo = javaReadClass(class_data);
@@ -381,13 +375,13 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
     }
 }
 
-static void 
+static void
 doJavaProtocol(JNIEnv *jni, jobject session, jbyteArray buf, jint offset, jint len, metric_t src, int fd)
 {
-    jint  hash      = (*jni)->CallIntMethod(jni, session, g_java.mid_Object_hashCode);
-    jbyte *byteBuf  = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
+    jint hash = (*jni)->CallIntMethod(jni, session, g_java.mid_Object_hashCode);
+    jbyte *byteBuf = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
     doProtocol((uint64_t)hash, fd, &byteBuf[offset], (size_t)(len - offset), src, BUF);
-    //scopeLogHexError(&byteBuf[offset], (len - offset), "doJavaProtocol");
+    // scopeLogHexError(&byteBuf[offset], (len - offset), "doJavaProtocol");
     (*jni)->ReleasePrimitiveArrayCritical(jni, buf, buf, 0);
 }
 
@@ -395,7 +389,7 @@ static void
 saveSocketChannel(JNIEnv *jni, jobject socketChannel, jobject buf)
 {
     jint fd = (*jni)->CallIntMethod(jni, socketChannel, g_java.mid_SocketChannelImpl_getFDVal);
-    //store the file descriptor in the internal byte buffer's field
+    // store the file descriptor in the internal byte buffer's field
     (*jni)->SetIntField(jni, buf, g_java.fid_ByteBuffer___fd, fd);
 }
 
@@ -404,9 +398,9 @@ Java_sun_nio_ch_SocketChannelImpl_read(JNIEnv *jni, jobject obj, jobject buf)
 {
     initJniGlobals(jni);
     initSSLEngineImplGlobals(jni);
-    
+
     saveSocketChannel(jni, obj, buf);
-    
+
     jint res = (*jni)->CallIntMethod(jni, obj, g_java.mid_SocketChannelImpl___read, buf);
     return res;
 }
@@ -416,9 +410,9 @@ Java_sun_nio_ch_SocketChannelImpl_write(JNIEnv *jni, jobject obj, jobject buf)
 {
     initJniGlobals(jni);
     initSSLEngineImplGlobals(jni);
-    
+
     saveSocketChannel(jni, obj, buf);
-    
+
     jint res = (*jni)->CallIntMethod(jni, obj, g_java.mid_SocketChannelImpl___write, buf);
     return res;
 }
@@ -431,23 +425,23 @@ Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject src
     initJniGlobals(jni);
     initSSLEngineImplGlobals(jni);
 
-    jint fdVal = (uint64_t) (*jni)->GetIntField(jni, src, g_java.fid_ByteBuffer___fd);
+    jint fdVal = (uint64_t)(*jni)->GetIntField(jni, src, g_java.fid_ByteBuffer___fd);
     if (fdVal) {
         fd = fdVal;
     }
 
-    //call the original method
+    // call the original method
     jobject res = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl___unwrap, src, dsts, offset, len);
 
     jint bytesProduced = (*jni)->CallIntMethod(jni, res, g_java.mid_SSLEngineResult_bytesProduced);
     if (bytesProduced) {
         jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
         int i;
-        for(i=offset;i<len - offset;i++) {
-            jobject bufEl  = (*jni)->GetObjectArrayElement(jni, dsts, i);
-            jint pos       = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
+        for (i = offset; i < len - offset; i++) {
+            jobject bufEl = (*jni)->GetObjectArrayElement(jni, dsts, i);
+            jint pos = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
             jbyteArray buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
-            //scopeLogError("Java_sun_security_ssl_SSLEngineImpl_unwrap before");
+            // scopeLogError("Java_sun_security_ssl_SSLEngineImpl_unwrap before");
             doJavaProtocol(jni, session, buf, 0, pos, TLSRX, fd);
         }
     }
@@ -455,21 +449,21 @@ Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject src
     return res;
 }
 
-JNIEXPORT jobject JNICALL 
-Java_com_sun_net_ssl_internal_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject netData, jobjectArray appData, jint offset, jint len) 
+JNIEXPORT jobject JNICALL
+Java_com_sun_net_ssl_internal_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject netData, jobjectArray appData, jint offset, jint len)
 {
     return Java_sun_security_ssl_SSLEngineImpl_unwrap(jni, obj, netData, appData, offset, len);
 }
 
-JNIEXPORT jobject JNICALL 
-Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray srcs, jint offset, jint len, jobject dst) 
+JNIEXPORT jobject JNICALL
+Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray srcs, jint offset, jint len, jobject dst)
 {
     int fd = -1;
 
     initJniGlobals(jni);
     initSSLEngineImplGlobals(jni);
 
-    jint fdVal = (uint64_t) (*jni)->GetIntField(jni, dst, g_java.fid_ByteBuffer___fd);
+    jint fdVal = (uint64_t)(*jni)->GetIntField(jni, dst, g_java.fid_ByteBuffer___fd);
     if (fdVal) {
         fd = fdVal;
     }
@@ -478,24 +472,24 @@ Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray 
     // The original method can change it's value.
     jint initialpos[len];
     int i;
-    for (i=offset; i<len - offset; i++) {
-        jobject bufEl  = (*jni)->GetObjectArrayElement(jni, srcs, i);
-        jint pos       = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
+    for (i = offset; i < len - offset; i++) {
+        jobject bufEl = (*jni)->GetObjectArrayElement(jni, srcs, i);
+        jint pos = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
         initialpos[i] = pos;
     }
-    
-    //call the original method
+
+    // call the original method
     jobject res = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl___wrap, srcs, offset, len, dst);
 
     jint bytesConsumed = (*jni)->CallIntMethod(jni, res, g_java.mid_SSLEngineResult_bytesConsumed);
     if (bytesConsumed) {
         jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
-        for(i=offset;i<len - offset;i++) {
-            jobject bufEl  = (*jni)->GetObjectArrayElement(jni, srcs, i);
-            jint pos       = initialpos[i]; // initial position was saved above
-            jint limit     = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_limit);
+        for (i = offset; i < len - offset; i++) {
+            jobject bufEl = (*jni)->GetObjectArrayElement(jni, srcs, i);
+            jint pos = initialpos[i]; // initial position was saved above
+            jint limit = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_limit);
             jbyteArray buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
-            //scopeLogError("Java_sun_security_ssl_SSLEngineImpl_wrap before");
+            // scopeLogError("Java_sun_security_ssl_SSLEngineImpl_wrap before");
             doJavaProtocol(jni, session, buf, pos, limit, TLSTX, fd);
         }
     }
@@ -503,14 +497,14 @@ Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray 
     return res;
 }
 
-JNIEXPORT jobject JNICALL 
-Java_com_sun_net_ssl_internal_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray appData, jint offset, jint len, jobject netData) 
+JNIEXPORT jobject JNICALL
+Java_com_sun_net_ssl_internal_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray appData, jint offset, jint len, jobject netData)
 {
     return Java_sun_security_ssl_SSLEngineImpl_wrap(jni, obj, appData, offset, len, netData);
 }
 
-JNIEXPORT void JNICALL 
-Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
+JNIEXPORT void JNICALL
+Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len)
 {
     int fd = -1;
 
@@ -519,7 +513,7 @@ Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray
 
     jobject session;
     if (g_java.fid_AppOutputStream_socket != NULL) {
-        jobject socket  = (*jni)->GetObjectField(jni, obj, g_java.fid_AppOutputStream_socket);
+        jobject socket = (*jni)->GetObjectField(jni, obj, g_java.fid_AppOutputStream_socket);
         session = (*jni)->CallObjectMethod(jni, socket, g_java.mid_SSLSocketImpl_getSession);
         fd = getFdFromSocket(jni, socket);
     } else {
@@ -527,8 +521,8 @@ Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray
     }
 
     jboolean exception_before_call = (*jni)->ExceptionCheck(jni);
-    
-    //call the original method
+
+    // call the original method
     (*jni)->CallVoidMethod(jni, obj, g_java.mid_AppOutputStream___write, buf, offset, len);
 
     // This void method doesn't return status.  Using the exception
@@ -536,26 +530,26 @@ Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray
     jboolean exception_after_call = (*jni)->ExceptionCheck(jni);
     int original_method_caused_exception = !exception_before_call && exception_after_call;
     if (!original_method_caused_exception) {
-        //scopeLogError("Java_sun_security_ssl_AppOutputStream_write before");
+        // scopeLogError("Java_sun_security_ssl_AppOutputStream_write before");
         doJavaProtocol(jni, session, buf, offset, len, TLSTX, fd);
     }
 }
 
- //support for JDK 11 - 14 where AppOutputStream in a nested class defined inside SSLSocketImpl
-JNIEXPORT void JNICALL 
-Java_sun_security_ssl_SSLSocketImpl_00024AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
+// support for JDK 11 - 14 where AppOutputStream in a nested class defined inside SSLSocketImpl
+JNIEXPORT void JNICALL
+Java_sun_security_ssl_SSLSocketImpl_00024AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len)
 {
     Java_sun_security_ssl_AppOutputStream_write(jni, obj, buf, offset, len);
 }
 
-JNIEXPORT void JNICALL 
-Java_com_sun_net_ssl_internal_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
+JNIEXPORT void JNICALL
+Java_com_sun_net_ssl_internal_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len)
 {
     Java_sun_security_ssl_AppOutputStream_write(jni, obj, buf, offset, len);
 }
 
-JNIEXPORT jint JNICALL 
-Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
+JNIEXPORT jint JNICALL
+Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len)
 {
     int fd = -1;
 
@@ -564,53 +558,53 @@ Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray b
 
     jobject session;
     if (g_java.fid_AppInputStream_socket != NULL) {
-        jobject socket  = (*jni)->GetObjectField(jni, obj, g_java.fid_AppInputStream_socket);
+        jobject socket = (*jni)->GetObjectField(jni, obj, g_java.fid_AppInputStream_socket);
         session = (*jni)->CallObjectMethod(jni, socket, g_java.mid_SSLSocketImpl_getSession);
         fd = getFdFromSocket(jni, socket);
     } else {
         session = obj;
     }
 
-    //call the original method
+    // call the original method
     jint res = (*jni)->CallIntMethod(jni, obj, g_java.mid_AppInputStream___read, buf, offset, len);
 
     if (res != -1) {
-        //scopeLogError("Java_sun_security_ssl_AppInputStream_read before");
+        // scopeLogError("Java_sun_security_ssl_AppInputStream_read before");
         doJavaProtocol(jni, session, buf, offset, res, TLSRX, fd);
     }
 
     return res;
 }
 
-//support for JDK 11 - 14 where AppInputStream in a nested class defined inside SSLSocketImpl
-JNIEXPORT jint JNICALL 
-Java_sun_security_ssl_SSLSocketImpl_00024AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
+// support for JDK 11 - 14 where AppInputStream in a nested class defined inside SSLSocketImpl
+JNIEXPORT jint JNICALL
+Java_sun_security_ssl_SSLSocketImpl_00024AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len)
 {
     return Java_sun_security_ssl_AppInputStream_read(jni, obj, buf, offset, len);
 }
 
-JNIEXPORT jint JNICALL 
-Java_com_sun_net_ssl_internal_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
+JNIEXPORT jint JNICALL
+Java_com_sun_net_ssl_internal_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len)
 {
     return Java_sun_security_ssl_AppInputStream_read(jni, obj, buf, offset, len);
 }
 
-JNIEXPORT jint JNICALL 
-Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) 
+JNIEXPORT jint JNICALL
+Agent_OnLoad(JavaVM *jvm, char *options, void *reserved)
 {
     jvmtiError error;
     jvmtiEnv *env;
 
     scopeLogInfo("Initializing Java agent");
 
-    jint result = (*jvm)->GetEnv(jvm, (void **) &env, JVMTI_VERSION_1_0);
+    jint result = (*jvm)->GetEnv(jvm, (void **)&env, JVMTI_VERSION_1_0);
     if (result != 0) {
         scopeLogError("ERROR: GetEnv failed\n");
         return JNI_ERR;
     }
 
     jvmtiCapabilities capabilities;
-    memset(&capabilities,0, sizeof(capabilities));
+    memset(&capabilities, 0, sizeof(capabilities));
 
     capabilities.can_generate_all_class_hook_events = 1;
     error = (*env)->AddCapabilities(env, &capabilities);
@@ -624,7 +618,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved)
         logJvmtiError(env, error, "SetEventNotificationMode");
         return JNI_ERR;
     }
-   
+
     jvmtiEventCallbacks callbacks;
     memset(&callbacks, 0, sizeof(callbacks));
     callbacks.ClassFileLoadHook = &ClassFileLoadHook;
@@ -639,7 +633,8 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved)
 
 // This overrides a weak definition in src/linux/os.c
 void
-initJavaAgent() {
+initJavaAgent()
+{
     char *var = getenv("LD_PRELOAD");
     if (var != NULL) {
         /*
@@ -655,7 +650,7 @@ initJavaAgent() {
         char *env = getenv("JAVA_TOOL_OPTIONS");
         if (env != NULL) {
             if (strstr(env, opt) != NULL) {
-                //agentpath is already set, do nothing
+                // agentpath is already set, do nothing
                 return;
             }
             bufsize += strlen(env) + 1;

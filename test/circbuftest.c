@@ -1,8 +1,8 @@
 #define _GNU_SOURCE
-#include <stdio.h>
-#include "dbg.h"
 #include "circbuf.h"
+#include "dbg.h"
 #include "test.h"
+#include <stdio.h>
 
 static void
 circbufInitGetsBuf(void **state)
@@ -79,16 +79,13 @@ circbufPutGetTest(void **state)
 }
 
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("running %s\n", argv[0]);
 
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(circbufInitGetsBuf),
-        cmocka_unit_test(circbufResetTest),
-        cmocka_unit_test(circbufCapacityTest),
-        cmocka_unit_test(circbufPutGetTest),
-        cmocka_unit_test(dbgHasNoUnexpectedFailures),
+        cmocka_unit_test(circbufInitGetsBuf), cmocka_unit_test(circbufResetTest),           cmocka_unit_test(circbufCapacityTest),
+        cmocka_unit_test(circbufPutGetTest),  cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

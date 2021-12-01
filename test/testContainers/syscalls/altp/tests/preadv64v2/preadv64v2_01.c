@@ -3,9 +3,11 @@
 
 #include "test_utils.h"
 
-ssize_t preadv64v2 (int fd, const struct iovec *vector, int count, off64_t offset, int flags);
+ssize_t preadv64v2(int fd, const struct iovec *vector, int count, off64_t offset, int flags);
 
-int do_test() {
+int
+do_test()
+{
     int test_result = EXIT_SUCCESS;
 
 #if (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 28)
@@ -25,11 +27,11 @@ int do_test() {
 
     if (f != EOF) {
         if (write(f, buffer, sizeof(buffer) - 1) == -1) {
-           TEST_ERROR();
+            TEST_ERROR();
         }
 
         if (close(f) != 0) {
-           TEST_ERROR();
+            TEST_ERROR();
         }
     } else {
         TEST_ERROR();
@@ -40,16 +42,16 @@ int do_test() {
     if (f != EOF) {
         memset(buffer, 0, sizeof(buffer));
 
-        if(preadv64v2(f, iov, 1, offset, 0) == EOF) {
+        if (preadv64v2(f, iov, 1, offset, 0) == EOF) {
             TEST_ERROR();
         }
 
-        if(strcmp(buffer, TEST_MSG) != 0) {
+        if (strcmp(buffer, TEST_MSG) != 0) {
             TEST_ERROR();
         }
 
-        if (close(f)!= 0) {
-           TEST_ERROR();
+        if (close(f) != 0) {
+            TEST_ERROR();
         }
     } else {
         TEST_ERROR();

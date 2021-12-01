@@ -4,31 +4,33 @@
  * gcc -g test/manual/shmserver.c -lpthread -o shmserver
  */
 
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <poll.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <poll.h>
 #include <sys/file.h>
 #include <sys/inotify.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #define DEFAULT_PATH "/dev/shm/"
-#define MAXFDS 2
-#define INSIZE 4096
+#define MAXFDS       2
+#define INSIZE       4096
 
 void
-usage(char *prog) {
-  fprintf(stderr,"usage: %s [-v] -f pipe/file\n", prog);
-  exit(-1);
+usage(char *prog)
+{
+    fprintf(stderr, "usage: %s [-v] -f pipe/file\n", prog);
+    exit(-1);
 }
 
 int
-main(int argc, char **argv) {
+main(int argc, char **argv)
+{
     char *buf, *path = NULL;
     int optval, rc, fd, infd, opt, watchid, verbose = 0;
     DIR *dirp;
@@ -42,9 +44,16 @@ main(int argc, char **argv) {
 
     while ((opt = getopt(argc, argv, "vhf:")) > 0) {
         switch (opt) {
-        case 'v': verbose++; break;
-        case 'f': path = strdup(optarg); break;
-        case 'h': default: usage(argv[0]); break;
+            case 'v':
+                verbose++;
+                break;
+            case 'f':
+                path = strdup(optarg);
+                break;
+            case 'h':
+            default:
+                usage(argv[0]);
+                break;
         }
     }
 
@@ -82,16 +91,17 @@ main(int argc, char **argv) {
             exit(-1);
         }
 
-        while  ((dent = readdir(dirp)) != NULL) {
+        while ((dent = readdir(dirp)) != NULL) {
             char fpath[NAME_MAX];
 
-            if (dent->d_type == DT_DIR) continue;
+            if (dent->d_type == DT_DIR)
+                continue;
 
             strncpy(fpath, path, sizeof(fpath));
             strncat(fpath, "/", sizeof(fpath) - strlen(fpath));
             strncat(fpath, dent->d_name, sizeof(fpath) - strlen(fpath));
 
-            if ((fd = open(fpath,  O_RDWR)) < 0) {
+            if ((fd = open(fpath, O_RDWR)) < 0) {
                 perror("open-dent");
                 fprintf(stderr, "%s:%d fd:%d %s\n", __FUNCTION__, __LINE__, fd, dent->d_name);
                 exit(-1);
@@ -145,7 +155,8 @@ main(int argc, char **argv) {
 
             free(buf);
             // echo input to stdout
-            if (verbose > 1) write(1, buf, rc);
+            if (verbose > 1)
+                write(1, buf, rc);
         }
 
         if (closedir(dirp) == -1) {
@@ -159,4 +170,3 @@ main(int argc, char **argv) {
         }
     } while (1);
 }
-

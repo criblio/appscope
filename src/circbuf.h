@@ -36,7 +36,7 @@ typedef struct circbuf_t {
     int maxlen;
 } cbuf_t;
 
-typedef cbuf_t * cbuf_handle_t ;
+typedef cbuf_t *cbuf_handle_t;
 
 // Given number of entries in a circbuf, return a circular buffer handle
 cbuf_handle_t cbufInit(size_t size);

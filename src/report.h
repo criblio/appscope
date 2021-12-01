@@ -8,14 +8,16 @@
 #include "ctl.h"
 #include "mtc.h"
 
-typedef enum {
+typedef enum
+{
     LOCAL,
     REMOTE,
     PERIODIC,    // This means to always ignore summarization rules
     EVENT_BASED, // This means to follow summarization rules
 } control_type_t;
 
-typedef enum {
+typedef enum
+{
     OPEN_PORTS,
     NET_CONNECTIONS,
     CONNECTION_OPEN,
@@ -74,11 +76,11 @@ typedef enum {
 } metric_t;
 
 // File types: stream or fd
-typedef enum {
+typedef enum
+{
     FD,
     STREAM,
 } fs_type_t;
-
 
 // Interfaces
 extern mtc_t *g_mtc;

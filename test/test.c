@@ -1,18 +1,18 @@
+#include "test.h"
+#include "dbg.h"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include "dbg.h"
-#include "test.h"
 
 int
-groupSetup(void** state)
+groupSetup(void **state)
 {
     dbgInit();
     return 0;
 }
 
 int
-groupTeardown(void** state)
+groupTeardown(void **state)
 {
     // as a policy, we're saying all tests that call groupSetup and
     // groupTeardown should be aware of things that would cause dbg
@@ -27,7 +27,7 @@ groupTeardown(void** state)
 }
 
 void
-dbgHasNoUnexpectedFailures(void** state)
+dbgHasNoUnexpectedFailures(void **state)
 {
     unsigned long long failures = dbgCountAllLines();
     if (failures) {
@@ -37,22 +37,24 @@ dbgHasNoUnexpectedFailures(void** state)
 }
 
 void
-dbgDumpAllToBuffer(char* buf, int size)
+dbgDumpAllToBuffer(char *buf, int size)
 {
-    FILE* f = fmemopen(buf, size, "a+");
+    FILE *f = fmemopen(buf, size, "a+");
     assert_non_null(f);
     dbgDumpAll(f);
     if (ftell(f) >= size) {
         fail_msg("size of %d was inadequate for dbgDumpAllToBuffer, "
-                 "%ld was needed", size, ftell(f));
+                 "%ld was needed",
+                 size, ftell(f));
     }
-    if (fclose(f)) fail_msg("Couldn't close fmemopen'd file");
+    if (fclose(f))
+        fail_msg("Couldn't close fmemopen'd file");
 }
 
 int
-writeFile(const char* path, const char* text)
+writeFile(const char *path, const char *text)
 {
-    FILE* f = fopen(path, "w");
+    FILE *f = fopen(path, "w");
     if (!f)
         fail_msg("Couldn't open file");
 
@@ -66,15 +68,15 @@ writeFile(const char* path, const char* text)
 }
 
 int
-deleteFile(const char* path)
+deleteFile(const char *path)
 {
     return unlink(path);
 }
 
 long
-fileEndPosition(const char* path)
+fileEndPosition(const char *path)
 {
-    FILE* f;
+    FILE *f;
     if ((f = fopen(path, "r"))) {
         fseek(f, 0, SEEK_END);
         long pos = ftell(f);

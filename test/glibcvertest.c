@@ -30,42 +30,42 @@
 //
 
 #define LATEST_LIBC_VER_NEEDED "2.17"
-#define LIBC "GLIBC_"
+#define LIBC                   "GLIBC_"
 
 #define PRIVATE "PRIVATE"
-static const char* ok_private_funcs[] = {
-    "_dl_sym",
-    "_dl_argv",
-    "__ctype_init"
-};
+static const char *ok_private_funcs[] = {"_dl_sym", "_dl_argv", "__ctype_init"};
 
-static const char* funcs_to_avoid[] = {
+static const char *funcs_to_avoid[] = {
     "setenv",
 };
 
-static const char*
-getNextLine(FILE* input, char* line, int len)
+static const char *
+getNextLine(FILE *input, char *line, int len)
 {
-    if (!input || !line) return NULL;
+    if (!input || !line)
+        return NULL;
     return fgets(line, len, input);
 }
 
-static const char*
-removeNewline(char* line)
+static const char *
+removeNewline(char *line)
 {
-    if (!line) return NULL;
-    char* newline = strstr(line, "\n");
-    if (newline) *newline = '\0';
+    if (!line)
+        return NULL;
+    char *newline = strstr(line, "\n");
+    if (newline)
+        *newline = '\0';
     return line;
 }
 
-static const char*
-verFromLine(const char* line)
+static const char *
+verFromLine(const char *line)
 {
-    if (!line) return NULL;
+    if (!line)
+        return NULL;
 
     // find where LIBC starts
-    char* ptr=strstr(line, LIBC);
+    char *ptr = strstr(line, LIBC);
 
     //  move past LIBC to get to the version
     if (ptr) {
@@ -83,14 +83,15 @@ typedef struct {
 } results_t;
 
 static void
-testEachLineInStream(FILE* input, const char* libcVerThreshold, results_t* result, FILE* output)
+testEachLineInStream(FILE *input, const char *libcVerThreshold, results_t *result, FILE *output)
 {
     char line[1024];
     while (getNextLine(input, line, sizeof(line))) {
         removeNewline(line);
         result->lines_tested++;
-        const char* lineVer = verFromLine(line);
-        if (!lineVer) continue;
+        const char *lineVer = verFromLine(line);
+        if (!lineVer)
+            continue;
 
         // If we get here, GLIBC_ appears, but it might be GLIBC_PRIVATE.
         // If so, make sure the GLIBC_PRIVATE function is one we've seen before.
@@ -99,7 +100,7 @@ testEachLineInStream(FILE* input, const char* libcVerThreshold, results_t* resul
             result->lines_glibc_private++;
             int allowed = 0;
             int i;
-            for (i=0; i<sizeof(ok_private_funcs)/sizeof(ok_private_funcs[0]); i++) {
+            for (i = 0; i < sizeof(ok_private_funcs) / sizeof(ok_private_funcs[0]); i++) {
                 if (strstr(line, ok_private_funcs[i])) {
                     allowed = 1;
                     break;
@@ -113,7 +114,8 @@ testEachLineInStream(FILE* input, const char* libcVerThreshold, results_t* resul
         }
 
         // If we get here, there is a glibc version number on this line
-        if (strverscmp(lineVer, libcVerThreshold) <= 0) continue;
+        if (strverscmp(lineVer, libcVerThreshold) <= 0)
+            continue;
 
         // If we get here, the glibc version on this line is too new.
         fprintf(output, "glibc symbol:`%s` depends on newer version than agreed upon:'%s'\n", line, libcVerThreshold);
@@ -128,38 +130,36 @@ testEachLineInStream(FILE* input, const char* libcVerThreshold, results_t* resul
 }
 
 static void
-testEachLineInStreamWorksWithCannedData(void** state)
+testEachLineInStreamWorksWithCannedData(void **state)
 {
-    const char* path = "/tmp/nmStyleOutput.txt";
+    const char *path = "/tmp/nmStyleOutput.txt";
 
-    const char* sample_nm_output[] = {
-        "                 U __libc_dlsym@@GLIBC_PRIVATE\n",
-        "                 U time@@GLIBC_2.2.5\n",
-        "                 U realpath@@GLIBC_2.3\n",
-        "000000000000eed5 T cfgRead\n",
-        "                 U __sprintf_chk@@GLIBC_2.3.4\n",
-        "                 U __stack_chk_fail@@GLIBC_2.4\n",
+    const char *sample_nm_output[] = {
+        "                 U __libc_dlsym@@GLIBC_PRIVATE\n", "                 U time@@GLIBC_2.2.5\n",           "                 U realpath@@GLIBC_2.3\n", "000000000000eed5 T cfgRead\n",
+        "                 U __sprintf_chk@@GLIBC_2.3.4\n",  "                 U __stack_chk_fail@@GLIBC_2.4\n",
     };
 
     // Put canned data in file
-    FILE* f = fopen(path, "a");
-    if (!f) fail_msg("Couldn't create file");
+    FILE *f = fopen(path, "a");
+    if (!f)
+        fail_msg("Couldn't create file");
     int i;
-    for (i=0; i<sizeof(sample_nm_output)/sizeof(sample_nm_output[0]); i++) {
+    for (i = 0; i < sizeof(sample_nm_output) / sizeof(sample_nm_output[0]); i++) {
         if (!fwrite(sample_nm_output[i], strlen(sample_nm_output[i]), 1, f))
             fail_msg("Couldn't write file");
     }
-    if (fclose(f)) fail_msg("Couldn't close file");
+    if (fclose(f))
+        fail_msg("Couldn't close file");
 
     // Run the test with canned data
     results_t result = {0};
-    FILE* f_in = fopen(path, "r");
-    FILE* f_out = fopen("/dev/null", "a");
+    FILE *f_in = fopen(path, "r");
+    FILE *f_out = fopen("/dev/null", "a");
     testEachLineInStream(f_in, "2.3", &result, f_out);
     assert_int_equal(result.lines_tested, 6);
-    assert_int_equal(result.lines_glibc,  5);
-    assert_int_equal(result.lines_glibc_private,  1); // __libc_dlsym
-    assert_int_equal(result.lines_failed, 3); // __sprintf_chk, __stack_chk_fail, __libc_dlsym
+    assert_int_equal(result.lines_glibc, 5);
+    assert_int_equal(result.lines_glibc_private, 1); // __libc_dlsym
+    assert_int_equal(result.lines_failed, 3);        // __sprintf_chk, __stack_chk_fail, __libc_dlsym
     fclose(f_in);
     fclose(f_out);
 
@@ -169,26 +169,26 @@ testEachLineInStreamWorksWithCannedData(void** state)
 }
 
 static void
-testEachLineInStreamWithActualLibraryData(void** state)
+testEachLineInStreamWithActualLibraryData(void **state)
 {
 #if defined(__x86_64__)
-    FILE* f_in = popen("nm ./lib/linux/x86_64/libscope.so", "r");
+    FILE *f_in = popen("nm ./lib/linux/x86_64/libscope.so", "r");
 #elif defined(__aarch64__)
-    FILE* f_in = popen("nm ./lib/linux/aarch64/libscope.so", "r");
+    FILE *f_in = popen("nm ./lib/linux/aarch64/libscope.so", "r");
 #else
 #error Unknown architecture!
 #endif
     results_t result = {0};
-    //FILE* f_out = fopen("/dev/null", "a");
+    // FILE* f_out = fopen("/dev/null", "a");
     //                              replace f_out with stdout for debugging...
     testEachLineInStream(f_in, LATEST_LIBC_VER_NEEDED, &result, stdout);
-    assert_true(result.lines_tested > 350);            // 383 when written
-    assert_true(result.lines_glibc > 40);              // 54 when written
+    assert_true(result.lines_tested > 350); // 383 when written
+    assert_true(result.lines_glibc > 40);   // 54 when written
     // moving out of the library
-    //assert_int_equal(result.lines_glibc_private,  3);  // because of _dl_sym, _dl_argv
+    // assert_int_equal(result.lines_glibc_private,  3);  // because of _dl_sym, _dl_argv
     assert_int_equal(result.lines_failed, 0);
     pclose(f_in);
-    //fclose(f_out);
+    // fclose(f_out);
 }
 
 // This test was created after we found that setenv was overridden in bash.
@@ -210,9 +210,9 @@ static void
 testLibraryUsesFunctionsWeShouldNot(void **state)
 {
 #if defined(__x86_64__)
-    FILE* f_in = popen("nm ./lib/linux/x86_64/libscope.so", "r");
+    FILE *f_in = popen("nm ./lib/linux/x86_64/libscope.so", "r");
 #elif defined(__aarch64__)
-    FILE* f_in = popen("nm ./lib/linux/aarch64/libscope.so", "r");
+    FILE *f_in = popen("nm ./lib/linux/aarch64/libscope.so", "r");
 #else
 #error Unknown architecture!
 #endif
@@ -223,7 +223,7 @@ testLibraryUsesFunctionsWeShouldNot(void **state)
         removeNewline(line);
 
         int i, found = 0;
-        for (i=0; i<sizeof(funcs_to_avoid)/sizeof(funcs_to_avoid[0]); i++) {
+        for (i = 0; i < sizeof(funcs_to_avoid) / sizeof(funcs_to_avoid[0]); i++) {
             char pattern[1024];
             snprintf(pattern, sizeof(pattern), " U %s@", funcs_to_avoid[i]);
             if (strstr(line, pattern)) {
@@ -245,7 +245,7 @@ testLibraryUsesFunctionsWeShouldNot(void **state)
 }
 
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("running %s\n", argv[0]);
     const struct CMUnitTest tests[] = {

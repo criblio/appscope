@@ -1,15 +1,14 @@
 #define _GNU_SOURCE
+#include "search.h"
+#include "scopetypes.h"
 #include <stdlib.h>
 #include <string.h>
-#include "scopetypes.h"
-#include "search.h"
 
 #define ASIZE 256
 
-struct _search_t
-{
+struct _search_t {
     int nlen;
-    unsigned char* str;
+    unsigned char *str;
     int bmBc[ASIZE];
 };
 
@@ -20,17 +19,21 @@ struct _search_t
  *
  * Pre-compute the array from the input_str.
  */
-search_t*
+search_t *
 searchComp(const char *input_str)
 {
-    if (!input_str) return NULL;
+    if (!input_str)
+        return NULL;
 
-    search_t* handle = calloc(1, sizeof(search_t));
-    if (!handle) goto failed;
+    search_t *handle = calloc(1, sizeof(search_t));
+    if (!handle)
+        goto failed;
     handle->nlen = strlen(input_str);
-    if (!handle->nlen) goto failed;
-    handle->str = (unsigned char*)strdup(input_str);
-    if (!handle->str) goto failed;
+    if (!handle->nlen)
+        goto failed;
+    handle->str = (unsigned char *)strdup(input_str);
+    if (!handle->str)
+        goto failed;
 
     int i;
     for (i = 0; i < ASIZE; ++i)
@@ -48,17 +51,21 @@ failed:
 void
 searchFree(search_t **handle_ptr)
 {
-    if (!handle_ptr || !*handle_ptr) return;
+    if (!handle_ptr || !*handle_ptr)
+        return;
     search_t *handle = *handle_ptr;
-    if (handle && handle->str) free(handle->str);
-    if (handle) free(handle);
+    if (handle && handle->str)
+        free(handle->str);
+    if (handle)
+        free(handle);
     *handle_ptr = NULL;
 }
 
 int
 searchLen(search_t *handle)
 {
-    if (!handle) return 0;
+    if (!handle)
+        return 0;
     return handle->nlen;
 }
 
@@ -68,14 +75,14 @@ searchExec(search_t *handle, char *haystack, int hlen)
     int j;
     unsigned char c;
 
-    if (!handle || !haystack || hlen < 0) return -1;
+    if (!handle || !haystack || hlen < 0)
+        return -1;
 
     /* Searching */
     j = 0;
     while (j <= hlen - handle->nlen) {
         c = haystack[j + handle->nlen - 1];
-        if (handle->str[handle->nlen - 1] == c &&
-            memcmp(handle->str, haystack + j, handle->nlen - 1) == 0) {
+        if (handle->str[handle->nlen - 1] == c && memcmp(handle->str, haystack + j, handle->nlen - 1) == 0) {
             return j;
         }
 

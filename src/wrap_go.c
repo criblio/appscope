@@ -1,34 +1,34 @@
 #define _GNU_SOURCE
-#include <sys/mman.h>
 #include <asm/prctl.h>
-#include <sys/prctl.h>
-#include <signal.h>
 #include <pthread.h>
+#include <signal.h>
+#include <sys/mman.h>
+#include <sys/prctl.h>
 
+#include "capstone/capstone.h"
 #include "com.h"
 #include "dbg.h"
+#include "fn.h"
 #include "gocontext.h"
 #include "linklist.h"
 #include "os.h"
 #include "state.h"
 #include "utils.h"
-#include "fn.h"
-#include "capstone/capstone.h"
 
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 //#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
 #define ENABLE_CAS_IN_SYSEXEC 1
 
-#define SWITCH_ENV "SCOPE_SWITCH"
+#define SWITCH_ENV           "SCOPE_SWITCH"
 #define SWITCH_USE_NO_THREAD "no_thread"
-#define SWITCH_USE_THREAD "thread"
+#define SWITCH_USE_THREAD    "thread"
 
 #ifdef ENABLE_CAS_IN_SYSEXEC
 #include "atomic.h"
 #else
 // This disables the CAS spinlocks by default.  Aint nobody got time for that.
 bool
-atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
+atomicCasU64(uint64_t *ptr, uint64_t oldval, uint64_t newval)
 {
     return TRUE;
 }
@@ -36,41 +36,39 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 
 // compile-time control for debugging
 #define NEEDEVNULL 1
-#define funcprint sysprint
+#define funcprint  sysprint
 //#define funcprint devnull
 //#define patchprint sysprint
 #define patchprint devnull
 
 #define UNDEF_OFFSET (-1)
-go_offsets_t g_go = {.g_to_m=48,                   // 0x30
-                     .m_to_tls=136,                // 0x88
-                     .connReader_to_conn=0,        // 0x00
-                     .persistConn_to_conn=80,      // 0x50
-                     .persistConn_to_bufrd=104,    // 0x68
-                     .iface_data=8,                // 0x08
-                     .netfd_to_pd=0,               // 0x00
-                     .pd_to_fd=16,                 // 0x10
-                     .netfd_to_sysfd=UNDEF_OFFSET, // 0x10 (defined for go1.8)
-                     .bufrd_to_buf=0,              // 0x00
-                     .conn_to_rwc=16,              // 0x10
-                     .conn_to_tlsState=48,         // 0x30
-                     .persistConn_to_tlsState=96}; // 0x60
+go_offsets_t g_go = {.g_to_m = 48,                   // 0x30
+                     .m_to_tls = 136,                // 0x88
+                     .connReader_to_conn = 0,        // 0x00
+                     .persistConn_to_conn = 80,      // 0x50
+                     .persistConn_to_bufrd = 104,    // 0x68
+                     .iface_data = 8,                // 0x08
+                     .netfd_to_pd = 0,               // 0x00
+                     .pd_to_fd = 16,                 // 0x10
+                     .netfd_to_sysfd = UNDEF_OFFSET, // 0x10 (defined for go1.8)
+                     .bufrd_to_buf = 0,              // 0x00
+                     .conn_to_rwc = 16,              // 0x10
+                     .conn_to_tlsState = 48,         // 0x30
+                     .persistConn_to_tlsState = 96}; // 0x60
 
-tap_t g_go_tap[] = {
-    {"syscall.write",                        go_hook_write,        NULL, 0},
-    {"syscall.openat",                       go_hook_open,         NULL, 0},
-    {"syscall.socket",                       go_hook_socket,       NULL, 0},
-    {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
-    {"syscall.read",                         go_hook_read,         NULL, 0},
-    {"syscall.Close",                        go_hook_close,        NULL, 0},
-    {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
-    {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
-    {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0},
-    {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
-    {"runtime.exit",                         go_hook_exit,         NULL, 0},
-    {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
-    {"TAP_TABLE_END", NULL, NULL, 0}
-};
+tap_t g_go_tap[] = {{"syscall.write", go_hook_write, NULL, 0},
+                    {"syscall.openat", go_hook_open, NULL, 0},
+                    {"syscall.socket", go_hook_socket, NULL, 0},
+                    {"syscall.accept4", go_hook_accept4, NULL, 0},
+                    {"syscall.read", go_hook_read, NULL, 0},
+                    {"syscall.Close", go_hook_close, NULL, 0},
+                    {"net/http.(*connReader).Read", go_hook_tls_read, NULL, 0},
+                    {"net/http.checkConnErrorWriter.Write", go_hook_tls_write, NULL, 0},
+                    {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0},
+                    {"net/http.persistConnWriter.Write", go_hook_pc_write, NULL, 0},
+                    {"runtime.exit", go_hook_exit, NULL, 0},
+                    {"runtime.dieFromSignal", go_hook_die, NULL, 0},
+                    {"TAP_TABLE_END", NULL, NULL, 0}};
 
 uint64_t g_glibc_guard = 0LL;
 uint64_t g_go_static = 0LL;
@@ -82,7 +80,7 @@ void (*go_runtime_cgocall)(void);
 
 #if NEEDEVNULL > 0
 static void
-devnull(const char* fmt, ...)
+devnull(const char *fmt, ...)
 {
     return;
 }
@@ -94,10 +92,12 @@ devnull(const char* fmt, ...)
 static char *
 c_str(gostring_t *go_str)
 {
-    if (!go_str || go_str->len <= 0) return NULL;
+    if (!go_str || go_str->len <= 0)
+        return NULL;
 
     char *path;
-    if ((path = calloc(1, go_str->len+1)) == NULL) return NULL;
+    if ((path = calloc(1, go_str->len + 1)) == NULL)
+        return NULL;
     memmove(path, go_str->str, go_str->len);
     path[go_str->len] = '\0';
 
@@ -105,38 +105,33 @@ c_str(gostring_t *go_str)
 }
 
 static bool
-looks_like_first_inst_of_go_func(cs_insn* asm_inst)
+looks_like_first_inst_of_go_func(cs_insn *asm_inst)
 {
-    return (!strcmp((const char*)asm_inst->mnemonic, "mov") &&
-            !strcmp((const char*)asm_inst->op_str, "rcx, qword ptr fs:[0xfffffffffffffff8]"))
-           || // -buildmode=pie compiles to this:
-           (!strcmp((const char*)asm_inst->mnemonic, "mov") &&
-            !strcmp((const char*)asm_inst->op_str, "rcx, -8"));
+    return (!strcmp((const char *)asm_inst->mnemonic, "mov") && !strcmp((const char *)asm_inst->op_str, "rcx, qword ptr fs:[0xfffffffffffffff8]")) || // -buildmode=pie compiles to this:
+        (!strcmp((const char *)asm_inst->mnemonic, "mov") && !strcmp((const char *)asm_inst->op_str, "rcx, -8"));
 }
 
 static uint32_t
-add_argument(cs_insn* asm_inst)
+add_argument(cs_insn *asm_inst)
 {
-    if (!asm_inst) return 0;
+    if (!asm_inst)
+        return 0;
 
     // In this example, add_argument is 0x58:
     // 000000000063a083 (04) 4883c458                 ADD RSP, 0x58
     // 000000000063a087 (01) c3                       RET
     if (asm_inst->size == 4) {
-        unsigned char* inst_addr = (unsigned char*)asm_inst->address;
-        return ((unsigned char*)inst_addr)[3];
+        unsigned char *inst_addr = (unsigned char *)asm_inst->address;
+        return ((unsigned char *)inst_addr)[3];
     }
 
     // In this example, add_argument is 0x80:
     // 00000000004a9cc9 (07) 4881c480000000           ADD RSP, 0x80
     // 00000000004a9cd0 (01) c3                       RET
     if (asm_inst->size == 7) {
-        unsigned char* inst_addr = (unsigned char*)asm_inst->address;
+        unsigned char *inst_addr = (unsigned char *)asm_inst->address;
         // x86_64 is little-endian.
-        return inst_addr[3] +
-              (inst_addr[4] << 8 ) +
-              (inst_addr[5] << 16) +
-              (inst_addr[6] << 24);
+        return inst_addr[3] + (inst_addr[4] << 8) + (inst_addr[5] << 16) + (inst_addr[6] << 24);
     }
 
     return 0;
@@ -148,34 +143,25 @@ add_argument(cs_insn* asm_inst)
 // does, it can trigger a stackscan.  And you'll end up here trying
 // to understand what this comment is telling you.
 static void
-patch_first_instruction(funchook_t *funchook,
-               cs_insn* asm_inst, unsigned int asm_count, tap_t* tap)
+patch_first_instruction(funchook_t *funchook, cs_insn *asm_inst, unsigned int asm_count, tap_t *tap)
 {
     int i;
-    for (i=0; i<asm_count; i++) {
+    for (i = 0; i < asm_count; i++) {
 
         // Stop when it looks like we've hit another goroutine
-        if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
-                  (!strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
-                  asm_inst[i].size == 1 ))) {
+        if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) || (!strcmp((const char *)asm_inst[i].mnemonic, "int3") && asm_inst[i].size == 1))) {
             break;
         }
 
-        patchprint("%0*lx (%02d) %-24s %s%s\n",
-               16,
-               asm_inst[i].address,
-               asm_inst[i].size,
-               (char*)asm_inst[i].bytes,
-               (char*)asm_inst[i].mnemonic,
-               (char*)asm_inst[i].op_str);
+        patchprint("%0*lx (%02d) %-24s %s%s\n", 16, asm_inst[i].address, asm_inst[i].size, (char *)asm_inst[i].bytes, (char *)asm_inst[i].mnemonic, (char *)asm_inst[i].op_str);
 
-        uint32_t add_arg=8; // not used, but can't be zero because of go_switch
+        uint32_t add_arg = 8; // not used, but can't be zero because of go_switch
         if (i == 0) {
 
-            void *pre_patch_addr = (void*)asm_inst[i].address;
-            void *patch_addr = (void*)asm_inst[i].address;
+            void *pre_patch_addr = (void *)asm_inst[i].address;
+            void *patch_addr = (void *)asm_inst[i].address;
 
-            if (funchook_prepare(funchook, (void**)&patch_addr, tap->assembly_fn)) {
+            if (funchook_prepare(funchook, (void **)&patch_addr, tap->assembly_fn)) {
                 patchprint("failed to patch 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
                 continue;
             }
@@ -187,55 +173,43 @@ patch_first_instruction(funchook_t *funchook,
     patchprint("\n\n");
 }
 
-
 static void
-patch_return_addrs(funchook_t *funchook,
-                   cs_insn* asm_inst, unsigned int asm_count, tap_t* tap)
+patch_return_addrs(funchook_t *funchook, cs_insn *asm_inst, unsigned int asm_count, tap_t *tap)
 {
-    if (!funchook || !asm_inst || !asm_count || !tap) return;
+    if (!funchook || !asm_inst || !asm_count || !tap)
+        return;
 
     // special handling for runtime.exit, runtime.dieFromSignal
     // since the go folks wrote them in assembly, they don't follow
     // conventions that other go functions do.
-    if ((tap->assembly_fn == go_hook_exit) ||
-        (tap->assembly_fn == go_hook_die)) {
+    if ((tap->assembly_fn == go_hook_exit) || (tap->assembly_fn == go_hook_die)) {
         patch_first_instruction(funchook, asm_inst, asm_count, tap);
         return;
     }
 
     int i;
-    for (i=0; i<asm_count; i++) {
+    for (i = 0; i < asm_count; i++) {
 
         // We've observed that the first instruction in every goroutine
         // is the same (it retrieves a pointer to the goroutine.)
         // We're checking for it here to make sure things are coherent.
-        if (i == 0 && !looks_like_first_inst_of_go_func(&asm_inst[i])) break;
+        if (i == 0 && !looks_like_first_inst_of_go_func(&asm_inst[i]))
+            break;
 
         // Stop when it looks like we've hit another goroutine
-        if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
-                  (!strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
-                  asm_inst[i].size == 1 ))) {
+        if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) || (!strcmp((const char *)asm_inst[i].mnemonic, "int3") && asm_inst[i].size == 1))) {
             break;
         }
 
-        patchprint("%0*lx (%02d) %-24s %s%s\n",
-               16,
-               asm_inst[i].address,
-               asm_inst[i].size,
-               (char*)asm_inst[i].bytes,
-               (char*)asm_inst[i].mnemonic,
-               (char*)asm_inst[i].op_str);
+        patchprint("%0*lx (%02d) %-24s %s%s\n", 16, asm_inst[i].address, asm_inst[i].size, (char *)asm_inst[i].bytes, (char *)asm_inst[i].mnemonic, (char *)asm_inst[i].op_str);
 
         // If the current instruction is a RET
         // we want to patch the ADD immediately before it.
         uint32_t add_arg = 0;
-        if ((!strcmp((const char*)asm_inst[i].mnemonic, "ret") &&
-             asm_inst[i].size == 1) &&
-             !strcmp((const char*)asm_inst[i-1].mnemonic, "add") &&
-             (add_arg = add_argument(&asm_inst[i-1]))) {
+        if ((!strcmp((const char *)asm_inst[i].mnemonic, "ret") && asm_inst[i].size == 1) && !strcmp((const char *)asm_inst[i - 1].mnemonic, "add") && (add_arg = add_argument(&asm_inst[i - 1]))) {
 
-            void *pre_patch_addr = (void*)asm_inst[i-1].address;
-            void *patch_addr = (void*)asm_inst[i-1].address;
+            void *pre_patch_addr = (void *)asm_inst[i - 1].address;
+            void *patch_addr = (void *)asm_inst[i - 1].address;
 
             // all add_arg values within a function should be the same
             if (tap->frame_size && (tap->frame_size != add_arg)) {
@@ -243,7 +217,7 @@ patch_return_addrs(funchook_t *funchook,
                 break;
             }
 
-            if (funchook_prepare(funchook, (void**)&patch_addr, tap->assembly_fn)) {
+            if (funchook_prepare(funchook, (void **)&patch_addr, tap->assembly_fn)) {
                 patchprint("failed to patch 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
                 continue;
             }
@@ -261,7 +235,7 @@ patchClone()
     void *clone = dlsym(RTLD_DEFAULT, "__clone");
     if (clone) {
         size_t pageSize = getpagesize();
-        void *addr = (void *)((ptrdiff_t) clone & ~(pageSize - 1));
+        void *addr = (void *)((ptrdiff_t)clone & ~(pageSize - 1));
 
         // set write perms on the page
         if (mprotect(addr, pageSize, PROT_WRITE | PROT_READ | PROT_EXEC)) {
@@ -270,8 +244,8 @@ patchClone()
         }
 
         uint8_t ass[6] = {
-            0xb8, 0x00, 0x00, 0x00, 0x00,      // mov $0x0,%eax
-            0xc3                               // retq
+            0xb8, 0x00, 0x00, 0x00, 0x00, // mov $0x0,%eax
+            0xc3                          // retq
         };
         memcpy(clone, ass, sizeof(ass));
 
@@ -285,7 +259,7 @@ patchClone()
     }
 }
 
-#define UNKNOWN_GO_VER (-1)
+#define UNKNOWN_GO_VER       (-1)
 #define MIN_SUPPORTED_GO_VER (8)
 // Go change passing parameters from stack to register
 // Ref: https://golang.org/doc/go1.17#compile
@@ -294,10 +268,11 @@ patchClone()
 static int
 go_major_version(const char *go_runtime_version)
 {
-    if (!go_runtime_version) return UNKNOWN_GO_VER;
+    if (!go_runtime_version)
+        return UNKNOWN_GO_VER;
 
     char buf[256] = {0};
-    strncpy(buf, go_runtime_version, sizeof(buf)-1);
+    strncpy(buf, go_runtime_version, sizeof(buf) - 1);
 
     char *token = strtok(buf, ".");
     token = strtok(NULL, ".");
@@ -335,11 +310,10 @@ adjustGoStructOffsetsForVersion(int go_ver)
     // before go 1.12, persistConn_to_conn and persistConn_to_bufrd
     // have different values than 12 and after
     if (go_ver < 12) {
-        g_go.persistConn_to_conn = 72;  // 0x48
-        g_go.persistConn_to_bufrd = 96; // 0x60
-        g_go.persistConn_to_tlsState=88; // 0x58
+        g_go.persistConn_to_conn = 72;     // 0x48
+        g_go.persistConn_to_bufrd = 96;    // 0x60
+        g_go.persistConn_to_tlsState = 88; // 0x58
     }
-
 
     // This creates a file specified by test/testContainers/go/test_go.sh
     // and used by test/testContainers/go/test_go_struct.sh.
@@ -352,12 +326,12 @@ adjustGoStructOffsetsForVersion(int go_ver)
     // If an OptionalTag is provided, test_go_struct.sh will not process
     // the line unless it matches a TAG_FILTER which is provided as an
     // argument to the test_go_struct.sh.
-    if (!g_fn.open || !g_fn.close) return;
+    if (!g_fn.open || !g_fn.close)
+        return;
 
-    char* debug_file;
+    char *debug_file;
     int fd;
-    if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
-        ((fd = g_fn.open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
+    if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) && ((fd = g_fn.open(debug_file, O_CREAT | O_WRONLY | O_CLOEXEC, 0666)) != -1)) {
         dprintf(fd, "runtime.g|m=%d|\n", g_go.g_to_m);
         dprintf(fd, "runtime.m|tls=%d|\n", g_go.m_to_tls);
         dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go.connReader_to_conn);
@@ -377,11 +351,11 @@ adjustGoStructOffsetsForVersion(int go_ver)
         dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go.persistConn_to_tlsState);
         g_fn.close(fd);
     }
-
 }
 
 int
-getBaseAddress(uint64_t *addr) {
+getBaseAddress(uint64_t *addr)
+{
     uint64_t base_addr = 0;
     char perms[5];
     char offset[20];
@@ -389,9 +363,11 @@ getBaseAddress(uint64_t *addr) {
     char pname[1024];
     FILE *fp;
 
-    if (!g_fn.fopen || !g_fn.fgets || !g_fn.fclose) return -1;
+    if (!g_fn.fopen || !g_fn.fgets || !g_fn.fclose)
+        return -1;
 
-    if (osGetProcname(pname, sizeof(pname)) == -1) return -1;
+    if (osGetProcname(pname, sizeof(pname)) == -1)
+        return -1;
 
     if ((fp = g_fn.fopen("/proc/self/maps", "r")) == NULL) {
         return -1;
@@ -465,11 +441,11 @@ initGoHook(elf_buf_t *ebuf)
     int go_major_ver = UNKNOWN_GO_VER;
     go_ver = getSymbol(ebuf->buf, "runtime.buildVersion");
     if (!go_ver) {
-        //runtime.buildVersion symbol not found, probably dealing with a stripped binary
-        //try to retrieve the version symbol address from the .go.buildinfo section
+        // runtime.buildVersion symbol not found, probably dealing with a stripped binary
+        // try to retrieve the version symbol address from the .go.buildinfo section
         go_ver = getGoVersionAddr(ebuf->buf);
     }
-    //check ELF type
+    // check ELF type
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
     // if it's a position independent executable, get the base address from /proc/self/maps
     uint64_t base = 0LL;
@@ -478,13 +454,13 @@ initGoHook(elf_buf_t *ebuf)
             sysprint("ERROR: can't get the base address\n");
             return; // don't install our hooks
         }
-        Elf64_Shdr* textSec = getElfSection(ebuf->buf, ".text");
+        Elf64_Shdr *textSec = getElfSection(ebuf->buf, ".text");
         sysprint("base %lx %lx %lx\n", base, (uint64_t)ebuf->text_addr, textSec->sh_offset);
         base = base - (uint64_t)ebuf->text_addr + textSec->sh_offset;
     }
-    
-    go_ver = (void *) ((uint64_t)go_ver + base);
-    
+
+    go_ver = (void *)((uint64_t)go_ver + base);
+
     if (go_ver && (go_runtime_version = c_str(go_ver))) {
 
         sysprint("go_runtime_version = %s\n", go_runtime_version);
@@ -498,7 +474,9 @@ initGoHook(elf_buf_t *ebuf)
         } else if (go_runtime_version) {
             scopeLogWarn("%s was compiled with go version `%s`.  AppScope can only instrument go1.8 or newer.  Continuing without AppScope.", ebuf->cmd, go_runtime_version);
         } else {
-            scopeLogWarn("%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.8 or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd);
+            scopeLogWarn(
+                "%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.8 or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.",
+                ebuf->cmd);
         }
         return; // don't install our hooks
     } else if (go_major_ver >= PARAM_ON_REG_GO_VER) {
@@ -512,12 +490,11 @@ initGoHook(elf_buf_t *ebuf)
      * are entering the Go func past the runtime stack check?
      * Need to investigate later.
      */
-    if (((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) &&
-        ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0)) {
+    if (((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) && ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0)) {
         sysprint("ERROR: can't get the address for runtime.cgocall\n");
         return; // don't install our hooks
     }
-    go_runtime_cgocall = (void *) ((uint64_t)go_runtime_cgocall + base);
+    go_runtime_cgocall = (void *)((uint64_t)go_runtime_cgocall + base);
 
     csh disass_handle = 0;
     cs_arch arch;
@@ -531,13 +508,14 @@ initGoHook(elf_buf_t *ebuf)
 #else
     return;
 #endif
-    if (cs_open(arch, mode, &disass_handle) != CS_ERR_OK) return;
+    if (cs_open(arch, mode, &disass_handle) != CS_ERR_OK)
+        return;
 
     cs_insn *asm_inst = NULL;
     unsigned int asm_count = 0;
 
     adjustGoStructOffsetsForVersion(go_major_ver);
-    tap_t* tap = NULL;
+    tap_t *tap = NULL;
     for (tap = g_go_tap; tap->assembly_fn; tap++) {
 
         if (asm_inst) {
@@ -546,32 +524,29 @@ initGoHook(elf_buf_t *ebuf)
             asm_count = 0;
         }
 
-        void* orig_func;
-        if (((orig_func = getGoSymbol(ebuf->buf, tap->func_name)) == NULL) &&
-            ((orig_func = getSymbol(ebuf->buf, tap->func_name)) == NULL)) {
+        void *orig_func;
+        if (((orig_func = getGoSymbol(ebuf->buf, tap->func_name)) == NULL) && ((orig_func = getSymbol(ebuf->buf, tap->func_name)) == NULL)) {
             sysprint("ERROR: can't get the address for %s\n", tap->func_name);
             continue;
         }
 
         uint64_t offset_into_txt = (uint64_t)orig_func - (uint64_t)ebuf->text_addr;
         uint64_t text_len_left = ebuf->text_len - offset_into_txt;
-        uint64_t max_bytes = 4096;  // somewhat arbitrary limit.  Allows for
-                                  // >250 instructions @ 15 bytes/inst (x86_64)
+        uint64_t max_bytes = 4096;                     // somewhat arbitrary limit.  Allows for
+                                                       // >250 instructions @ 15 bytes/inst (x86_64)
         uint64_t size = MIN(text_len_left, max_bytes); // limit size
 
-        orig_func = (void *) ((uint64_t)orig_func + base);
-        asm_count = cs_disasm(disass_handle, orig_func, size,
-                                 (uint64_t)orig_func, 0, &asm_inst);
+        orig_func = (void *)((uint64_t)orig_func + base);
+        asm_count = cs_disasm(disass_handle, orig_func, size, (uint64_t)orig_func, 0, &asm_inst);
         if (asm_count <= 0) {
-            sysprint("ERROR: disassembler fails: %s\n\tlen %" PRIu64 " code %p result %lu\n\ttext addr %p text len %zu oinfotext 0x%" PRIx64 "\n",
-                     tap->func_name, size,
-                     orig_func, sizeof(asm_inst), ebuf->text_addr, ebuf->text_len, offset_into_txt);
+            sysprint("ERROR: disassembler fails: %s\n\tlen %" PRIu64 " code %p result %lu\n\ttext addr %p text len %zu oinfotext 0x%" PRIx64 "\n", tap->func_name, size, orig_func, sizeof(asm_inst),
+                     ebuf->text_addr, ebuf->text_len, offset_into_txt);
             continue;
         }
 
-        patchprint ("********************************\n");
-        patchprint ("** %s  %s 0x%lx **\n", go_runtime_version, tap->func_name, orig_func);
-        patchprint ("********************************\n");
+        patchprint("********************************\n");
+        patchprint("** %s  %s 0x%lx **\n", go_runtime_version, tap->func_name, orig_func);
+        patchprint("********************************\n");
 
         patch_return_addrs(funchook, asm_inst, asm_count, tap);
     }
@@ -584,8 +559,7 @@ initGoHook(elf_buf_t *ebuf)
     // hook a few Go funcs
     rc = funchook_install(funchook, 0);
     if (rc != 0) {
-        sysprint("ERROR: funchook_install failed.  (%s)\n",
-                funchook_error_message(funchook));
+        sysprint("ERROR: funchook_install failed.  (%s)\n", funchook_error_message(funchook));
         return;
     }
 }
@@ -593,9 +567,10 @@ initGoHook(elf_buf_t *ebuf)
 static void *
 return_addr(assembly_fn fn)
 {
-    tap_t* tap = NULL;
+    tap_t *tap = NULL;
     for (tap = g_go_tap; tap->assembly_fn; tap++) {
-        if (tap->assembly_fn == fn) return tap->return_addr;
+        if (tap->assembly_fn == fn)
+            return tap->return_addr;
     }
 
     scopeLogError("FATAL ERROR: no return addr");
@@ -605,9 +580,10 @@ return_addr(assembly_fn fn)
 static uint32_t
 frame_size(assembly_fn fn)
 {
-    tap_t* tap = NULL;
+    tap_t *tap = NULL;
     for (tap = g_go_tap; tap->assembly_fn; tap++) {
-        if (tap->assembly_fn == fn) return tap->frame_size;
+        if (tap->assembly_fn == fn)
+            return tap->frame_size;
     }
 
     scopeLogError("FATAL ERROR: no frame size");
@@ -624,7 +600,8 @@ dumb_thread(void *arg)
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
     void *dummy = calloc(1, 32);
-    if (dummy) free(dummy);
+    if (dummy)
+        free(dummy);
     pthread_barrier_wait(pbarrier);
     while (1) {
         sleep(0xffffffff);
@@ -634,9 +611,9 @@ dumb_thread(void *arg)
 
 /*
  * There are 2 go_switch() functions that accomplish the
- * same thing. They take different approaches. We want to 
+ * same thing. They take different approaches. We want to
  * see what effect an approach has on performance and reliability.
- * We'll likley get to one instance as we gain experience. 
+ * We'll likley get to one instance as we gain experience.
  *
  * These go_switch() functions are meant to support
  * static and dynamic apps at the same time. It depends
@@ -649,11 +626,11 @@ dumb_thread(void *arg)
  * In the dynamic case we do not switch TLS/TCB.
  */
 /*
-* go_switch_thread() creates a thread in glibc
-* for each 'm'. It then syncs with that thread
-* after the newly created thread inits memory
-* allocation.
-*/
+ * go_switch_thread() creates a thread in glibc
+ * for each 'm'. It then syncs with that thread
+ * after the newly created thread inits memory
+ * allocation.
+ */
 inline static void *
 go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
 {
@@ -667,12 +644,11 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
 
     if (g_go_static) {
         // Get the Go routine's struct g
-        __asm__ volatile (
-            "mov %%fs:-8, %0"
-            : "=r"(go_g)                      // output
-            :                                 // inputs
-            :                                 // clobbered register
-            );
+        __asm__ volatile("mov %%fs:-8, %0"
+                         : "=r"(go_g) // output
+                         :            // inputs
+                         :            // clobbered register
+        );
 
         if (go_g) {
             // get struct m from g and pull out the TLS from 'm'
@@ -680,13 +656,13 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
             go_v = (unsigned long *)go_m;
 
             // first entry in a valid m is a pointer to g
-            if (go_v && (*go_v == (unsigned long)go_g)) { //ok to continue;
+            if (go_v && (*go_v == (unsigned long)go_g)) { // ok to continue;
                 go_tls = (unsigned long)(go_m + g_go.m_to_tls);
                 go_v = (unsigned long *)go_tls;
 
                 // is tls set?
                 if (go_v && (*go_v != 0)) { // continue
-                    go_fs = go_tls + 8; //go compiler uses -8(FS)
+                    go_fs = go_tls + 8;     // go compiler uses -8(FS)
                     go_v = (unsigned long *)go_fs;
 
                     if (go_v && (*go_v != 0)) { // continue
@@ -702,7 +678,7 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
             // In this case we need to pull the TLS from the kernel
             // Also seen a case on libmusl where TLS is not set.
             // Therefore, get fs from the kernel.
-            if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
+            if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
                 scopeLogError("arch_prctl get go");
                 goto out;
             }
@@ -722,18 +698,17 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
                 goto out;
             }
 
-            if (!g_fn.pthread_create ||
-                (g_fn.pthread_create(&thread, NULL, dumb_thread, &barrier) != 0)) {
+            if (!g_fn.pthread_create || (g_fn.pthread_create(&thread, NULL, dumb_thread, &barrier) != 0)) {
                 scopeLogError("pthread_create failed");
                 goto out;
             }
 
-            //wait until the thread starts
+            // wait until the thread starts
             pthread_barrier_wait(&barrier);
 
             thread_fs = (void *)thread;
 
-            if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
+            if (arch_prctl(ARCH_SET_FS, (unsigned long)thread_fs) == -1) {
                 scopeLogError("arch_prctl set scope");
                 goto out;
             }
@@ -750,7 +725,7 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
 
             sysprint("New thread created for GO TLS = 0x%08lx\n", go_fs);
         } else {
-            if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
+            if (arch_prctl(ARCH_SET_FS, (unsigned long)thread_fs) == -1) {
                 scopeLogError("arch_prctl set scope");
                 goto out;
             }
@@ -758,17 +733,17 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
     }
 
     uint32_t frame_offset = frame_size(gfunc);
-    if (!frame_offset) goto out;
+    if (!frame_offset)
+        goto out;
     stackptr += frame_offset;
 
     // call the C handler
-    __asm__ volatile (
-        "mov %1, %%rdi  \n"
-        "callq *%2  \n"
-        : "=r"(rc)                    // output
-        : "r"(stackptr), "r"(cfunc)   // inputs
-        :                             // clobbered register
-        );
+    __asm__ volatile("mov %1, %%rdi  \n"
+                     "callq *%2  \n"
+                     : "=r"(rc)                  // output
+                     : "r"(stackptr), "r"(cfunc) // inputs
+                     :                           // clobbered register
+    );
 out:
     if (g_go_static && go_fs) {
         // Switch back to the 'm' TLS
@@ -780,22 +755,22 @@ out:
 }
 
 /*
-* go_switch_no_thread() creates a glibc TCB for
-* each 'm' and initializes TLS and memory allocation
-* in the newly created TCB. It uses pthread_create()
-* to create a TCB. However, __clone() has previously
-* been disabled in initGoHook(). Therefore, no thread
-* is actually created.
-*
-* Note: we found that this version of go_switch()
-* results in a malloc error when running with the
-* influxdb stress test. Making the thread version
-* the default resolves the issue. Have not found
-* the root cause. Reproduce by running a static
-* influxd, then run the old stress client
-* influx_stress_stat and write event files from
-* the server and client to the file system.
-*/
+ * go_switch_no_thread() creates a glibc TCB for
+ * each 'm' and initializes TLS and memory allocation
+ * in the newly created TCB. It uses pthread_create()
+ * to create a TCB. However, __clone() has previously
+ * been disabled in initGoHook(). Therefore, no thread
+ * is actually created.
+ *
+ * Note: we found that this version of go_switch()
+ * results in a malloc error when running with the
+ * influxdb stress test. Making the thread version
+ * the default resolves the issue. Have not found
+ * the root cause. Reproduce by running a static
+ * influxd, then run the old stress client
+ * influx_stress_stat and write event files from
+ * the server and client to the file system.
+ */
 inline static void *
 go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
 {
@@ -811,12 +786,11 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
 
     if (g_go_static) {
         // Get the Go routine's struct g
-        __asm__ volatile (
-            "mov %%fs:-8, %0"
-            : "=r"(go_g)                      // output
-            :                                 // inputs
-            :                                 // clobbered register
-            );
+        __asm__ volatile("mov %%fs:-8, %0"
+                         : "=r"(go_g) // output
+                         :            // inputs
+                         :            // clobbered register
+        );
 
         if (go_g) {
             // get struct m from g and pull out the TLS from 'm'
@@ -824,13 +798,13 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
             go_v = (unsigned long *)go_m;
 
             // first entry in a valid m is a pointer to g
-            if (go_v && (*go_v == (unsigned long)go_g)) { //ok to continue;
+            if (go_v && (*go_v == (unsigned long)go_g)) { // ok to continue;
                 go_tls = (unsigned long)(go_m + g_go.m_to_tls);
                 go_v = (unsigned long *)go_tls;
 
                 // is tls set?
                 if (go_v && (*go_v != 0)) { // continue
-                    go_fs = go_tls + 8; //go compiler uses -8(FS)
+                    go_fs = go_tls + 8;     // go compiler uses -8(FS)
                     go_v = (unsigned long *)go_fs;
 
                     if (go_v && (*go_v != 0)) { // continue
@@ -846,7 +820,7 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
             // In this case we need to pull the TLS from the kernel
             // Also seen a case on libmusl where TLS is not set.
             // Therefore, get fs from the kernel.
-            if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
+            if (arch_prctl(ARCH_GET_FS, (unsigned long)&go_fs) == -1) {
                 scopeLogError("arch_prctl get go");
                 goto out;
             }
@@ -860,16 +834,15 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
                 goto out;
             }
             pthread_t thread;
-            if (!g_fn.pthread_create ||
-                (g_fn.pthread_create(&thread, NULL, dumb_thread, NULL) != 0)) {
+            if (!g_fn.pthread_create || (g_fn.pthread_create(&thread, NULL, dumb_thread, NULL) != 0)) {
                 scopeLogError("pthread_create failed");
                 goto out;
             }
             thread_fs = (void *)thread;
-            newThread = TRUE;            
-        } 
+            newThread = TRUE;
+        }
 
-        if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
+        if (arch_prctl(ARCH_SET_FS, (unsigned long)thread_fs) == -1) {
             scopeLogError("arch_prctl set scope");
             goto out;
         }
@@ -877,30 +850,24 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
         if (newThread) {
             while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) {};
 
-            //Initialize pointers to locale data.
-            if (g_fn.__ctype_init) g_fn.__ctype_init();
+            // Initialize pointers to locale data.
+            if (g_fn.__ctype_init)
+                g_fn.__ctype_init();
 
-            //switch to a bigger stack
-            __asm__ volatile (
-                "mov %%rsp, %0 \n"
-                "mov %1, %%rsp \n"
-                : "=r"(rsp) 
-                : "m"(g_stack)
-                : 
-            );
+            // switch to a bigger stack
+            __asm__ volatile("mov %%rsp, %0 \n"
+                             "mov %1, %%rsp \n"
+                             : "=r"(rsp)
+                             : "m"(g_stack)
+                             :);
 
-            //initialize tcache
+            // initialize tcache
             void *buf = calloc(1, 0xff);
             free(buf);
 
-            //restore stack
-            __asm__ volatile (
-                "mov %0, %%rsp \n"
-                : 
-                : "r"(rsp)
-                : 
-            );
-             
+            // restore stack
+            __asm__ volatile("mov %0, %%rsp \n" : : "r"(rsp) :);
+
             atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
 
             if (lstInsert(g_threadlist, go_fs, thread_fs) == FALSE) {
@@ -909,19 +876,19 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
             }
         }
     }
-    
+
     uint32_t frame_offset = frame_size(gfunc);
-    if (!frame_offset) goto out;
+    if (!frame_offset)
+        goto out;
     stackptr += frame_offset;
 
     // call the C handler
-    __asm__ volatile (
-        "mov %1, %%rdi  \n"
-        "callq *%2  \n"
-        : "=r"(rc)                    // output
-        : "r"(stackptr), "r"(cfunc)   // inputs
-        :                             // clobbered register
-        );
+    __asm__ volatile("mov %1, %%rdi  \n"
+                     "callq *%2  \n"
+                     : "=r"(rc)                  // output
+                     : "r"(stackptr), "r"(cfunc) // inputs
+                     :                           // clobbered register
+    );
 out:
     if (g_go_static && go_fs) {
         // Switch back to the 'm' TLS
@@ -933,9 +900,9 @@ out:
 }
 
 /*
-* We want to be able to determine which go_switch
-* function to use at run time.
-*/
+ * We want to be able to determine which go_switch
+ * function to use at run time.
+ */
 inline static void *
 go_switch(char *stackptr, void *cfunc, void *gfunc)
 {
@@ -962,7 +929,7 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
  * handler is passed to go_swtich which calls the
  * handler when the appropriate switch has been
  * accopmlished.
- * 
+ *
  * Specific handlers are defined as the c_xxx functions.
  * Example, there is a c_write() that handles extracting
  * details for write operations. The address of c_write
@@ -979,9 +946,9 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
 static void
 c_write(char *stackaddr)
 {
-    uint64_t fd  = *(uint64_t *)(stackaddr + 0x8);
+    uint64_t fd = *(uint64_t *)(stackaddr + 0x8);
     uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
-    uint64_t rc =  *(uint64_t *)(stackaddr + 0x28);
+    uint64_t rc = *(uint64_t *)(stackaddr + 0x28);
     uint64_t initialTime = getTime();
 
     funcprint("Scope: write fd %ld rc %ld buf 0x%lx\n", fd, rc, buf);
@@ -997,9 +964,9 @@ go_write(char *stackptr)
 static void
 c_open(char *stackaddr)
 {
-    uint64_t fd  = *((uint64_t *)(stackaddr + 0x30));
+    uint64_t fd = *((uint64_t *)(stackaddr + 0x30));
     // The gostring_t* here has an implicit len field at stackaddr + 0x18
-    char *path = c_str((gostring_t*)(stackaddr + 0x10));
+    char *path = c_str((gostring_t *)(stackaddr + 0x10));
 
     if (!path) {
         scopeLogError("ERROR:go_open: null pathname");
@@ -1010,7 +977,8 @@ c_open(char *stackaddr)
     funcprint("Scope: open of %ld\n", fd);
     doOpen(fd, path, FD, "open");
 
-    if (path) free(path);
+    if (path)
+        free(path);
 }
 
 EXPORTON void *
@@ -1022,8 +990,8 @@ go_open(char *stackptr)
 static void
 c_close(char *stackaddr)
 {
-    uint64_t fd  = *(uint64_t*)(stackaddr + 0x8);
-    uint64_t rc  = *(uint64_t*)(stackaddr + 0x10);
+    uint64_t fd = *(uint64_t *)(stackaddr + 0x8);
+    uint64_t rc = *(uint64_t *)(stackaddr + 0x10);
 
     funcprint("Scope: close of %ld\n", fd);
     doCloseAndReportFailures(fd, (rc != -1), "go_close");
@@ -1038,15 +1006,16 @@ go_close(char *stackptr)
 static void
 c_read(char *stackaddr)
 {
-    uint64_t fd    = *(uint64_t*)(stackaddr + 0x8);
-    uint64_t buf   = *(uint64_t*)(stackaddr + 0x10);
-    uint64_t rc    = *(uint64_t*)(stackaddr + 0x28);
+    uint64_t fd = *(uint64_t *)(stackaddr + 0x8);
+    uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
+    uint64_t rc = *(uint64_t *)(stackaddr + 0x28);
     uint64_t initialTime = getTime();
 
-    if (rc == -1) return;
+    if (rc == -1)
+        return;
 
     funcprint("Scope: read of %ld\n", fd);
-    doRead(fd, initialTime, (rc != -1), (void*)buf, rc, "go_read", BUF, 0);
+    doRead(fd, initialTime, (rc != -1), (void *)buf, rc, "go_read", BUF, 0);
 }
 
 EXPORTON void *
@@ -1058,11 +1027,12 @@ go_read(char *stackptr)
 static void
 c_socket(char *stackaddr)
 {
-    uint64_t domain = *(uint64_t*)(stackaddr + 0x8);  // aka family
-    uint64_t type   = *(uint64_t*)(stackaddr + 0x10);
-    uint64_t sd     = *(uint64_t*)(stackaddr + 0x20);
+    uint64_t domain = *(uint64_t *)(stackaddr + 0x8); // aka family
+    uint64_t type = *(uint64_t *)(stackaddr + 0x10);
+    uint64_t sd = *(uint64_t *)(stackaddr + 0x20);
 
-    if (sd == -1) return;
+    if (sd == -1)
+        return;
 
     funcprint("Scope: socket of %ld\n", sd);
     addSock(sd, type, domain);
@@ -1077,9 +1047,9 @@ go_socket(char *stackptr)
 static void
 c_accept4(char *stackaddr)
 {
-    struct sockaddr *addr  = *(struct sockaddr **)(stackaddr + 0x10);
-    socklen_t *addrlen = *(socklen_t**)(stackaddr + 0x18);
-    uint64_t sd_out = *(uint64_t*)(stackaddr + 0x28);
+    struct sockaddr *addr = *(struct sockaddr **)(stackaddr + 0x10);
+    socklen_t *addrlen = *(socklen_t **)(stackaddr + 0x18);
+    uint64_t sd_out = *(uint64_t *)(stackaddr + 0x28);
 
     if (sd_out != -1) {
         funcprint("Scope: accept4 of %ld\n", sd_out);
@@ -1120,19 +1090,21 @@ static void
 c_http_server_read(char *stackaddr)
 {
     int fd = -1;
-    uint64_t connReader = *(uint64_t*)(stackaddr + 0x8);
-    if (!connReader) return;   // protect from dereferencing null
-    uint64_t buf        = *(uint64_t*)(stackaddr + 0x10);
+    uint64_t connReader = *(uint64_t *)(stackaddr + 0x8);
+    if (!connReader)
+        return; // protect from dereferencing null
+    uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
     // buf len 0x18
     // buf cap 0x20
-    uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
+    uint64_t rc = *(uint64_t *)(stackaddr + 0x28);
     uint64_t cr_conn_rwc_if, cr_conn_rwc, netFD, pfd;
 
-    uint64_t conn =  *(uint64_t*)(connReader + g_go.connReader_to_conn);
-    if (!conn) return;         // protect from dereferencing null
+    uint64_t conn = *(uint64_t *)(connReader + g_go.connReader_to_conn);
+    if (!conn)
+        return; // protect from dereferencing null
 
     cr_conn_rwc_if = conn + g_go.conn_to_rwc;
-    uint64_t tls =  *(uint64_t*)(conn + g_go.conn_to_tlsState);
+    uint64_t tls = *(uint64_t *)(conn + g_go.conn_to_tlsState);
 
     /*
      * The rwc net.Conn value can be wrapped as either a *net.TCPConn or
@@ -1150,7 +1122,7 @@ c_http_server_read(char *stackaddr)
         if (netFD) {
             pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
             if (pfd) {
-                //funcprint("Scope: %s:%d cr %p cr.conn %p cr.conn.rwc_if %p cr.conn.rwc %p netFD %p pfd %p fd %p\n",
+                // funcprint("Scope: %s:%d cr %p cr.conn %p cr.conn.rwc_if %p cr.conn.rwc %p netFD %p pfd %p fd %p\n",
                 //          __FUNCTION__, __LINE__, connReader, conn, cr_conn_rwc_if, cr_conn_rwc,
                 //          netFD, pfd, pfd + g_go.pd_to_fd);
                 fd = *(int *)(pfd + g_go.pd_to_fd);
@@ -1183,16 +1155,17 @@ static void
 c_http_server_write(char *stackaddr)
 {
     int fd = -1;
-    uint64_t conn = *(uint64_t*)(stackaddr + 0x8);
-    if (!conn) return;         // protect from dereferencing null
-    uint64_t buf  = *(uint64_t*)(stackaddr + 0x10);
+    uint64_t conn = *(uint64_t *)(stackaddr + 0x8);
+    if (!conn)
+        return; // protect from dereferencing null
+    uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
     // buf len 0x18
     // buf cap 0x20
-    uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
+    uint64_t rc = *(uint64_t *)(stackaddr + 0x28);
     uint64_t w_conn_rwc_if, w_conn_rwc, netFD, pfd;
 
     w_conn_rwc_if = (conn + g_go.conn_to_rwc);
-    uint64_t tls =  *(uint64_t*)(conn + g_go.conn_to_tlsState);
+    uint64_t tls = *(uint64_t *)(conn + g_go.conn_to_tlsState);
 
     // conn I/F checking. Ref the comment on c_http_server_read.
     if (w_conn_rwc_if && tls) {
@@ -1236,23 +1209,26 @@ c_http_client_write(char *stackaddr)
 {
     int fd = -1;
     uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
-    uint64_t w_pc  = *(uint64_t *)(stackaddr + 0x08);
-    uint64_t rc =  *(uint64_t *)(stackaddr + 0x28);
+    uint64_t w_pc = *(uint64_t *)(stackaddr + 0x08);
+    uint64_t rc = *(uint64_t *)(stackaddr + 0x28);
     uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
 
-    if (rc < 1) return;
+    if (rc < 1)
+        return;
 
     pc_conn_if = (w_pc + g_go.persistConn_to_conn);
-    uint64_t tls =  *(uint64_t*)(w_pc + g_go.persistConn_to_tlsState);
+    uint64_t tls = *(uint64_t *)(w_pc + g_go.persistConn_to_tlsState);
 
     // conn I/F checking. Ref the comment on c_http_server_read.
     if (pc_conn_if && tls) {
         w_pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
         netFD = *(uint64_t *)(w_pc_conn + g_go.iface_data);
-        if (!netFD) return;
+        if (!netFD)
+            return;
         if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
             pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
-            if (!pfd) return;
+            if (!pfd)
+                return;
             fd = *(int *)(pfd + g_go.pd_to_fd);
         } else {
             fd = *(int *)(netFD + g_go.netfd_to_sysfd);
@@ -1290,20 +1266,22 @@ static void
 c_http_client_read(char *stackaddr)
 {
     int fd = -1;
-    uint64_t pc  = *(uint64_t *)(stackaddr + 0x08);
+    uint64_t pc = *(uint64_t *)(stackaddr + 0x08);
     uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, buf = 0, len = 0;
 
     pc_conn_if = (pc + g_go.persistConn_to_conn);
-    uint64_t tls =  *(uint64_t*)(pc + g_go.persistConn_to_tlsState);
+    uint64_t tls = *(uint64_t *)(pc + g_go.persistConn_to_tlsState);
 
     // conn I/F checking. Ref the comment on c_http_server_read.
     if (pc_conn_if && tls) {
         pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
         netFD = *(uint64_t *)(pc_conn + g_go.iface_data);
-        if (!netFD) return;
+        if (!netFD)
+            return;
         if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
             pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
-            if (!pfd) return;
+            if (!pfd)
+                return;
             fd = *(int *)(pfd + g_go.pd_to_fd);
         } else {
             fd = *(int *)(netFD + g_go.netfd_to_sysfd);
@@ -1341,7 +1319,8 @@ c_exit(char *stackaddr)
 
     // ensure the circular buffer is empty
     for (i = 0; i < 100; i++) {
-        if (cmdCbufEmpty(g_ctl)) break;
+        if (cmdCbufEmpty(g_ctl))
+            break;
         sigSafeNanosleep(&ts);
     }
 

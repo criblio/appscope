@@ -1,35 +1,35 @@
 #define _GNU_SOURCE
 #include <arpa/inet.h>
+#include <dlfcn.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <netinet/in.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/param.h>
 #include <sys/stat.h>
-#include <dlfcn.h>
-#include <fcntl.h>
-#include <pthread.h>
 
 #include "atomic.h"
 #include "com.h"
 #include "dbg.h"
 #include "dns.h"
+#include "fn.h"
 #include "httpstate.h"
 #include "mtcformat.h"
+#include "os.h"
+#include "pcre2.h"
 #include "plattime.h"
 #include "search.h"
 #include "state.h"
 #include "state_private.h"
-#include "pcre2.h"
-#include "fn.h"
-#include "os.h"
 #include "utils.h"
 
-#define NET_ENTRIES 1024
-#define FS_ENTRIES 1024
+#define NET_ENTRIES  1024
+#define FS_ENTRIES   1024
 #define NUM_ATTEMPTS 100
-#define MAX_CONVERT (size_t)256
+#define MAX_CONVERT  (size_t)256
 
 extern rtconfig g_cfg;
 
@@ -46,7 +46,7 @@ net_info *g_netinfo;
 fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
 int g_mtc_addr_output = TRUE;
-static search_t* g_http_redirect = NULL;
+static search_t *g_http_redirect = NULL;
 static protocol_def_t *g_tls_protocol_def = NULL;
 static protocol_def_t *g_http_protocol_def = NULL;
 
@@ -55,34 +55,36 @@ static protocol_def_t *g_http_protocol_def = NULL;
 static list_t *g_extra_net_info_list = NULL;
 
 #define REDIRECTURL "fluentd"
-#define OVERURL "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"refresh\" content=\"3; URL='http://cribl.io'\" />\r\n</head>\r\n<body>\r\n<h1>Welcome to Cribl!</h1>\r\n</body>\r\n</html>\r\n\r\n"
+#define OVERURL \
+    "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"refresh\" content=\"3; URL='http://cribl.io'\" />\r\n</head>\r\n<body>\r\n<h1>Welcome to Cribl!</h1>\r\n</body>\r\n</html>\r\n\r\n"
 
-#define DATA_FIELD(val)         STRFIELD("data",           (val),        1)
-#define UNIT_FIELD(val)         STRFIELD("unit",           (val),        1)
-#define CLASS_FIELD(val)        STRFIELD("class",          (val),        2)
-#define PROTO_FIELD(val)        STRFIELD("proto",          (val),        2)
-#define OP_FIELD(val)           STRFIELD("op",             (val),        3)
-#define HOST_FIELD(val)         STRFIELD("host",           (val),        4)
-#define PROC_FIELD(val)         STRFIELD("proc",           (val),        4)
-#define DOMAIN_FIELD(val)       STRFIELD("domain",         (val),        5)
-#define FILE_FIELD(val)         STRFIELD("file",           (val),        5)
-#define LOCALIP_FIELD(val)      STRFIELD("localip",        (val),        6)
-#define REMOTEIP_FIELD(val)     STRFIELD("remoteip",       (val),        6)
-#define LOCALP_FIELD(val)       NUMFIELD("localp",         (val),        6)
-#define LOCALN_FIELD(val)       NUMFIELD("localn",         (val),        6)
-#define PORT_FIELD(val)         NUMFIELD("port",           (val),        6)
-#define REMOTEP_FIELD(val)      NUMFIELD("remotep",        (val),        6)
-#define REMOTEN_FIELD(val)      NUMFIELD("remoten",        (val),        6)
-#define FD_FIELD(val)           NUMFIELD("fd",             (val),        7)
-#define PID_FIELD(val)          NUMFIELD("pid",            (val),        7)
-#define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
-#define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
-#define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
+#define DATA_FIELD(val)     STRFIELD("data", (val), 1)
+#define UNIT_FIELD(val)     STRFIELD("unit", (val), 1)
+#define CLASS_FIELD(val)    STRFIELD("class", (val), 2)
+#define PROTO_FIELD(val)    STRFIELD("proto", (val), 2)
+#define OP_FIELD(val)       STRFIELD("op", (val), 3)
+#define HOST_FIELD(val)     STRFIELD("host", (val), 4)
+#define PROC_FIELD(val)     STRFIELD("proc", (val), 4)
+#define DOMAIN_FIELD(val)   STRFIELD("domain", (val), 5)
+#define FILE_FIELD(val)     STRFIELD("file", (val), 5)
+#define LOCALIP_FIELD(val)  STRFIELD("localip", (val), 6)
+#define REMOTEIP_FIELD(val) STRFIELD("remoteip", (val), 6)
+#define LOCALP_FIELD(val)   NUMFIELD("localp", (val), 6)
+#define LOCALN_FIELD(val)   NUMFIELD("localn", (val), 6)
+#define PORT_FIELD(val)     NUMFIELD("port", (val), 6)
+#define REMOTEP_FIELD(val)  NUMFIELD("remotep", (val), 6)
+#define REMOTEN_FIELD(val)  NUMFIELD("remoten", (val), 6)
+#define FD_FIELD(val)       NUMFIELD("fd", (val), 7)
+#define PID_FIELD(val)      NUMFIELD("pid", (val), 7)
+#define ARGS_FIELD(val)     STRFIELD("args", (val), 7)
+#define DURATION_FIELD(val) NUMFIELD("duration", (val), 8)
+#define NUMOPS_FIELD(val)   NUMFIELD("numops", (val), 8)
 
 static void
 destroyNetInfo(void *data)
 {
-    if (!data) return;
+    if (!data)
+        return;
     net_info *net = (net_info *)data;
 
     free(net->http.hdr);
@@ -93,51 +95,53 @@ destroyNetInfo(void *data)
 }
 
 int
-get_port(int fd, int type, control_type_t which) {
+get_port(int fd, int type, control_type_t which)
+{
     in_port_t port;
     switch (type) {
-    case AF_INET:
-        if (which == LOCAL) {
-            port = ((struct sockaddr_in *)&g_netinfo[fd].localConn)->sin_port;
-        } else {
-            port = ((struct sockaddr_in *)&g_netinfo[fd].remoteConn)->sin_port;
-        }
-        break;
-    case AF_INET6:
-        if (which == LOCAL) {
-            port = ((struct sockaddr_in6 *)&g_netinfo[fd].localConn)->sin6_port;
-        } else {
-            port = ((struct sockaddr_in6 *)&g_netinfo[fd].remoteConn)->sin6_port;
-        }
-        break;
-    default:
-        port = (in_port_t)0;
-        break;
+        case AF_INET:
+            if (which == LOCAL) {
+                port = ((struct sockaddr_in *)&g_netinfo[fd].localConn)->sin_port;
+            } else {
+                port = ((struct sockaddr_in *)&g_netinfo[fd].remoteConn)->sin_port;
+            }
+            break;
+        case AF_INET6:
+            if (which == LOCAL) {
+                port = ((struct sockaddr_in6 *)&g_netinfo[fd].localConn)->sin6_port;
+            } else {
+                port = ((struct sockaddr_in6 *)&g_netinfo[fd].remoteConn)->sin6_port;
+            }
+            break;
+        default:
+            port = (in_port_t)0;
+            break;
     }
     return htons(port);
 }
 
 int
-get_port_net(net_info *net, int type, control_type_t which) {
+get_port_net(net_info *net, int type, control_type_t which)
+{
     in_port_t port;
     switch (type) {
-    case AF_INET:
-        if (which == LOCAL) {
-            port = ((struct sockaddr_in *)&net->localConn)->sin_port;
-        } else {
-            port = ((struct sockaddr_in *)&net->remoteConn)->sin_port;
-        }
-        break;
-    case AF_INET6:
-        if (which == LOCAL) {
-            port = ((struct sockaddr_in6 *)&net->localConn)->sin6_port;
-        } else {
-            port = ((struct sockaddr_in6 *)&net->remoteConn)->sin6_port;
-        }
-        break;
-    default:
-        port = (in_port_t)0;
-        break;
+        case AF_INET:
+            if (which == LOCAL) {
+                port = ((struct sockaddr_in *)&net->localConn)->sin_port;
+            } else {
+                port = ((struct sockaddr_in *)&net->remoteConn)->sin_port;
+            }
+            break;
+        case AF_INET6:
+            if (which == LOCAL) {
+                port = ((struct sockaddr_in6 *)&net->localConn)->sin6_port;
+            } else {
+                port = ((struct sockaddr_in6 *)&net->remoteConn)->sin6_port;
+            }
+            break;
+        default:
+            port = (in_port_t)0;
+            break;
     }
     return htons(port);
 }
@@ -148,7 +152,8 @@ delProtocol(request_t *req)
     unsigned int ptype;
     protocol_def_t *protoreq, *protolist;
 
-    if (!req) return FALSE;
+    if (!req)
+        return FALSE;
 
     protoreq = req->protocol;
 
@@ -161,8 +166,10 @@ delProtocol(request_t *req)
         }
     }
 
-    if (protoreq && protoreq->protname) free(protoreq->protname);
-    if (protoreq) free(protoreq);
+    if (protoreq && protoreq->protname)
+        free(protoreq->protname);
+    if (protoreq)
+        free(protoreq);
     return TRUE;
 }
 
@@ -173,12 +180,12 @@ addProtocol(request_t *req)
     PCRE2_SIZE erroroffset;
     protocol_def_t *proto;
 
-    if (!req) return FALSE;
+    if (!req)
+        return FALSE;
 
     proto = req->protocol;
 
-    proto->re = pcre2_compile((PCRE2_SPTR)proto->regex, PCRE2_ZERO_TERMINATED,
-                              0, &errornumber, &erroroffset, NULL);
+    proto->re = pcre2_compile((PCRE2_SPTR)proto->regex, PCRE2_ZERO_TERMINATED, 0, &errornumber, &erroroffset, NULL);
 
     if (proto->re == NULL) {
         destroyProtEntry(proto);
@@ -205,14 +212,13 @@ initPayloadDetect()
     // Setup the TLS protocol-detect regex
     errornumber = 0;
     erroroffset = 0;
-    if ((g_tls_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) return;
+    if ((g_tls_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL)
+        return;
     g_tls_protocol_def->protname = "TLS";
     g_tls_protocol_def->binary = TRUE;
     g_tls_protocol_def->len = PAYLOAD_BYTESRC;
     g_tls_protocol_def->regex = PAYLOAD_REGEX;
-    g_tls_protocol_def->re = pcre2_compile((PCRE2_SPTR)g_tls_protocol_def->regex,
-                                           PCRE2_ZERO_TERMINATED, 0,
-                                           &errornumber, &erroroffset, NULL);
+    g_tls_protocol_def->re = pcre2_compile((PCRE2_SPTR)g_tls_protocol_def->regex, PCRE2_ZERO_TERMINATED, 0, &errornumber, &erroroffset, NULL);
     if (g_tls_protocol_def->re == NULL) {
         goto error;
     }
@@ -224,13 +230,12 @@ initPayloadDetect()
     // Setup the HTTP protocol-detect regex
     errornumber = 0;
     erroroffset = 0;
-    if ((g_http_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) return;
+    if ((g_http_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL)
+        return;
     g_http_protocol_def->protname = "HTTP";
     g_http_protocol_def->regex = "(?: HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n)";
     g_http_protocol_def->detect = TRUE;
-    g_http_protocol_def->re = pcre2_compile((PCRE2_SPTR)g_http_protocol_def->regex,
-                                            PCRE2_ZERO_TERMINATED, 0,
-                                            &errornumber, &erroroffset, NULL);
+    g_http_protocol_def->re = pcre2_compile((PCRE2_SPTR)g_http_protocol_def->regex, PCRE2_ZERO_TERMINATED, 0, &errornumber, &erroroffset, NULL);
     if (g_http_protocol_def->re == NULL) {
         goto error;
     }
@@ -320,10 +325,10 @@ doUnixEndpoint(int sd, net_info *net)
     ino_t rnode;
     struct stat sbuf;
 
-    if (!net) return;
+    if (!net)
+        return;
 
-    if ((fstat(sd, &sbuf) == -1) ||
-        ((sbuf.st_mode & S_IFMT) != S_IFSOCK)) {
+    if ((fstat(sd, &sbuf) == -1) || ((sbuf.st_mode & S_IFMT) != S_IFSOCK)) {
         net->lnode = 0;
         net->rnode = 0;
         return;
@@ -343,7 +348,8 @@ static int
 postStatErrState(metric_t stat_err, metric_t type, const char *funcop, const char *pathname)
 {
     // something passed in a param that is not a viable address; ltp does this
-    if ((stat_err == EVT_ERR) && (errno == EFAULT)) return FALSE;
+    if ((stat_err == EVT_ERR) && (errno == EFAULT))
+        return FALSE;
 
     int *summarize = NULL;
     switch (type) {
@@ -369,14 +375,14 @@ postStatErrState(metric_t stat_err, metric_t type, const char *funcop, const cha
 
     // Bail if we don't need to post
     int mtc_needs_reporting = summarize && !*summarize;
-    int need_to_post =
-        ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
-        (mtcEnabled(g_mtc) && mtc_needs_reporting);
-    if (!need_to_post) return FALSE;
+    int need_to_post = ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) || (mtcEnabled(g_mtc) && mtc_needs_reporting);
+    if (!need_to_post)
+        return FALSE;
 
     size_t len = sizeof(struct stat_err_info_t);
     stat_err_info *sep = calloc(1, len);
-    if (!sep) return FALSE;
+    if (!sep)
+        return FALSE;
 
     sep->evtype = stat_err;
     sep->data_type = type;
@@ -419,15 +425,14 @@ postFSState(int fd, metric_t type, fs_info *fs, const char *funcop, const char *
 
     // Bail if we don't need to post
     int mtc_needs_reporting = summarize && !*summarize;
-    int need_to_post =
-        ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
-        ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) ||
-        (mtcEnabled(g_mtc) && mtc_needs_reporting);
-    if (!need_to_post) return FALSE;
+    int need_to_post = ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) || ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) || (mtcEnabled(g_mtc) && mtc_needs_reporting);
+    if (!need_to_post)
+        return FALSE;
 
     size_t len = sizeof(struct fs_info_t);
     fs_info *fsp = calloc(1, len);
-    if (!fsp) return FALSE;
+    if (!fsp)
+        return FALSE;
 
     memmove(fsp, fs, len);
     fsp->fd = fd;
@@ -452,17 +457,17 @@ postDNSState(int fd, metric_t type, net_info *net, uint64_t duration, const char
 {
     // Bail if we don't need to post
     int mtc_needs_reporting = !g_summary.net.dns;
-    int need_to_post =
-        ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
-        ctlEvtSourceEnabled(g_ctl, CFG_SRC_DNS) ||
-        (mtcEnabled(g_mtc) && mtc_needs_reporting);
-    if (!need_to_post) return FALSE;
+    int need_to_post = ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) || ctlEvtSourceEnabled(g_ctl, CFG_SRC_DNS) || (mtcEnabled(g_mtc) && mtc_needs_reporting);
+    if (!need_to_post)
+        return FALSE;
 
     size_t len = sizeof(struct net_info_t);
     net_info *netp = calloc(1, len);
-    if (!netp) return FALSE;
+    if (!netp)
+        return FALSE;
 
-    if (net) memmove(netp, net, len);
+    if (net)
+        memmove(netp, net, len);
     netp->fd = fd;
     netp->evtype = EVT_DNS;
     netp->data_type = type;
@@ -508,14 +513,16 @@ postNetState(int fd, metric_t type, net_info *net)
         // if NET events are enabled
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) ||
         // if it's a closed HTTP channel (so we can cleanup)
-        (type==CONNECTION_DURATION && net && (net->http.version[0] || net->http.version[1])) ||
+        (type == CONNECTION_DURATION && net && (net->http.version[0] || net->http.version[1])) ||
         // if metrics are enabled and it's one we report
         (mtcEnabled(g_mtc) && mtc_needs_reporting);
-    if (!need_to_post) return FALSE;
+    if (!need_to_post)
+        return FALSE;
 
     size_t len = sizeof(struct net_info_t);
     net_info *netp = calloc(1, len);
-    if (!netp) return FALSE;
+    if (!netp)
+        return FALSE;
 
     memmove(netp, net, len);
     netp->fd = fd;
@@ -530,328 +537,338 @@ void
 doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const char *pathname)
 {
     switch (type) {
-    case OPEN_PORTS:
-    {
-        if (!checkNetEntry(fd)) break;
-        if (size < 0) {
-            subFromInterfaceCounts(&g_ctrs.openPorts, labs(size));
-        } else if (size > 0) {
-            addToInterfaceCounts(&g_ctrs.openPorts, size);
+        case OPEN_PORTS:
+        {
+            if (!checkNetEntry(fd))
+                break;
+            if (size < 0) {
+                subFromInterfaceCounts(&g_ctrs.openPorts, labs(size));
+            } else if (size > 0) {
+                addToInterfaceCounts(&g_ctrs.openPorts, size);
+            }
+
+            if (size && !g_netinfo[fd].startTime) {
+                g_netinfo[fd].startTime = getTime();
+            }
+            if (postNetState(fd, type, &g_netinfo[fd])) {
+                // Don't reset the info.  It's a gauge.
+            }
+            break;
         }
 
-        if (size && !g_netinfo[fd].startTime) {
-            g_netinfo[fd].startTime = getTime();
-        }
-        if (postNetState(fd, type, &g_netinfo[fd])) {
-            // Don't reset the info.  It's a gauge.
-        }
-        break;
-    }
+        case NET_CONNECTIONS:
+        {
+            if (!checkNetEntry(fd))
+                break;
+            counters_element_t *value = NULL;
 
-    case NET_CONNECTIONS:
-    {
-        if (!checkNetEntry(fd)) break;
-        counters_element_t* value = NULL;
+            if (g_netinfo[fd].type == SOCK_STREAM) {
+                value = &g_ctrs.netConnectionsTcp;
+            } else if (g_netinfo[fd].type == SOCK_DGRAM) {
+                value = &g_ctrs.netConnectionsUdp;
+            } else {
+                value = &g_ctrs.netConnectionsOther;
+            }
 
-        if (g_netinfo[fd].type == SOCK_STREAM) {
-            value = &g_ctrs.netConnectionsTcp;
-        } else if (g_netinfo[fd].type == SOCK_DGRAM) {
-            value = &g_ctrs.netConnectionsUdp;
-        } else {
-            value = &g_ctrs.netConnectionsOther;
-        }
+            if (size < 0) {
+                subFromInterfaceCounts(value, labs(size));
+            } else if (size > 0) {
+                addToInterfaceCounts(value, size);
+            }
 
-        if (size < 0) {
-            subFromInterfaceCounts(value, labs(size));
-        } else if (size > 0) {
-            addToInterfaceCounts(value, size);
-        }
-
-        if (size && !g_netinfo[fd].startTime) {
-            g_netinfo[fd].startTime = getTime();
-        }
-        if (postNetState(fd, type, &g_netinfo[fd])) {
-            // Don't reset the info.  It's a gauge.
-        }
-        break;
-    }
-
-    case CONNECTION_DURATION:
-    {
-        if (!checkNetEntry(fd)) break;
-        uint64_t new_duration = 0ULL;
-        if (g_netinfo[fd].startTime != 0ULL) {
-            new_duration = getDuration(g_netinfo[fd].startTime);
-            g_netinfo[fd].startTime = 0ULL;
+            if (size && !g_netinfo[fd].startTime) {
+                g_netinfo[fd].startTime = getTime();
+            }
+            if (postNetState(fd, type, &g_netinfo[fd])) {
+                // Don't reset the info.  It's a gauge.
+            }
+            break;
         }
 
-        if (new_duration) {
-            addToInterfaceCounts(&g_netinfo[fd].numDuration, 1);
-            addToInterfaceCounts(&g_netinfo[fd].totalDuration, new_duration);
-            addToInterfaceCounts(&g_ctrs.connDurationNum, 1);
-            addToInterfaceCounts(&g_ctrs.connDurationTotal, new_duration);
-        }
+        case CONNECTION_DURATION:
+        {
+            if (!checkNetEntry(fd))
+                break;
+            uint64_t new_duration = 0ULL;
+            if (g_netinfo[fd].startTime != 0ULL) {
+                new_duration = getDuration(g_netinfo[fd].startTime);
+                g_netinfo[fd].startTime = 0ULL;
+            }
 
-        if ((g_netinfo[fd].rxBytes.evt > 0) || (g_netinfo[fd].txBytes.evt > 0) ||
-            (g_netinfo[fd].rxBytes.mtc > 0) || (g_netinfo[fd].txBytes.mtc > 0)) {
-            postNetState(fd, type, &g_netinfo[fd]);
-            atomicSwapU64(&g_netinfo[fd].numDuration.mtc, 0);
-            atomicSwapU64(&g_netinfo[fd].totalDuration.mtc, 0);
-            //subFromInterfaceCounts(&g_ctrs.connDurationNum, 1);
-            //subFromInterfaceCounts(&g_ctrs.connDurationTotal, new_duration);
-        }
-        atomicSwapU64(&g_netinfo[fd].numDuration.evt, 0);
-        atomicSwapU64(&g_netinfo[fd].totalDuration.evt, 0);
-        break;
-    }
+            if (new_duration) {
+                addToInterfaceCounts(&g_netinfo[fd].numDuration, 1);
+                addToInterfaceCounts(&g_netinfo[fd].totalDuration, new_duration);
+                addToInterfaceCounts(&g_ctrs.connDurationNum, 1);
+                addToInterfaceCounts(&g_ctrs.connDurationTotal, new_duration);
+            }
 
-    case CONNECTION_OPEN:
-    {
-        if (checkNetEntry(fd) && ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) &&
-            (((g_netinfo[fd].addrSetRemote == TRUE) && (g_netinfo[fd].addrSetLocal == TRUE)) ||
-             (funcop && !strncmp(funcop, "dup", 3)))) {
+            if ((g_netinfo[fd].rxBytes.evt > 0) || (g_netinfo[fd].txBytes.evt > 0) || (g_netinfo[fd].rxBytes.mtc > 0) || (g_netinfo[fd].txBytes.mtc > 0)) {
                 postNetState(fd, type, &g_netinfo[fd]);
-        }
-        break;
-    }
-
-    case NETRX:
-    {
-        if (!checkNetEntry(fd)) break;
-        addToInterfaceCounts(&g_netinfo[fd].numRX, 1);
-        addToInterfaceCounts(&g_netinfo[fd].rxBytes, size);
-        sock_summary_bucket_t bucket = getNetRxTxBucket(&g_netinfo[fd]);
-        addToInterfaceCounts(&g_ctrs.netrxBytes[bucket], size);
-        if (postNetState(fd, type, &g_netinfo[fd])) {
-            atomicSwapU64(&g_netinfo[fd].numRX.mtc, 0);
-            atomicSwapU64(&g_netinfo[fd].rxBytes.mtc, 0);
-            //subFromInterfaceCounts(&g_ctrs.netrxBytes, size);
-        }
-        //atomicSwapU64(&g_netinfo[fd].numRX.evt, 0);
-        //atomicSwapU64(&g_netinfo[fd].rxBytes.evt, 0);
-        break;
-    }
-
-    case NETTX:
-    {
-        if (!checkNetEntry(fd)) break;
-        addToInterfaceCounts(&g_netinfo[fd].numTX, 1);
-        addToInterfaceCounts(&g_netinfo[fd].txBytes, size);
-        sock_summary_bucket_t bucket = getNetRxTxBucket(&g_netinfo[fd]);
-        addToInterfaceCounts(&g_ctrs.nettxBytes[bucket], size);
-        if (postNetState(fd, type, &g_netinfo[fd])) {
-            atomicSwapU64(&g_netinfo[fd].numTX.mtc, 0);
-            atomicSwapU64(&g_netinfo[fd].txBytes.mtc, 0);
-            //subFromInterfaceCounts(&g_ctrs.nettxBytes, size);
-        }
-        //atomicSwapU64(&g_netinfo[fd].numTX.evt, 0);
-        //atomicSwapU64(&g_netinfo[fd].txBytes.evt, 0);
-        break;
-    }
-
-    case DNS:
-    {
-        int rc;
-
-        // on DNS resp only inc events
-        if (size > 0) {
-            atomicAddU64(&g_ctrs.numDNS.evt, 1);
-        } else {
-            addToInterfaceCounts(&g_ctrs.numDNS, 1);
+                atomicSwapU64(&g_netinfo[fd].numDuration.mtc, 0);
+                atomicSwapU64(&g_netinfo[fd].totalDuration.mtc, 0);
+                // subFromInterfaceCounts(&g_ctrs.connDurationNum, 1);
+                // subFromInterfaceCounts(&g_ctrs.connDurationTotal, new_duration);
+            }
+            atomicSwapU64(&g_netinfo[fd].numDuration.evt, 0);
+            atomicSwapU64(&g_netinfo[fd].totalDuration.evt, 0);
+            break;
         }
 
-        if (checkNetEntry(fd)) {
-            rc = postDNSState(fd, type, &g_netinfo[fd], (uint64_t)size, pathname);
-        } else {
-            rc = postDNSState(fd, type, NULL, (uint64_t)size, pathname);
+        case CONNECTION_OPEN:
+        {
+            if (checkNetEntry(fd) && ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) &&
+                (((g_netinfo[fd].addrSetRemote == TRUE) && (g_netinfo[fd].addrSetLocal == TRUE)) || (funcop && !strncmp(funcop, "dup", 3)))) {
+                postNetState(fd, type, &g_netinfo[fd]);
+            }
+            break;
         }
 
-        if (rc && (size == 0)) atomicSubU64(&g_ctrs.numDNS.mtc, 1);
-        atomicSubU64(&g_ctrs.numDNS.evt, 1);
-        break;
-    }
-
-    case DNS_DURATION:
-    {
-        int rc;
-
-        addToInterfaceCounts(&g_ctrs.dnsDurationNum, 1);
-        addToInterfaceCounts(&g_ctrs.dnsDurationTotal, 0);
-
-        if (checkNetEntry(fd)) {
-            rc = postDNSState(fd, type, &g_netinfo[fd], size, pathname);
-        } else {
-            rc = postDNSState(fd, type, NULL, size, pathname);
+        case NETRX:
+        {
+            if (!checkNetEntry(fd))
+                break;
+            addToInterfaceCounts(&g_netinfo[fd].numRX, 1);
+            addToInterfaceCounts(&g_netinfo[fd].rxBytes, size);
+            sock_summary_bucket_t bucket = getNetRxTxBucket(&g_netinfo[fd]);
+            addToInterfaceCounts(&g_ctrs.netrxBytes[bucket], size);
+            if (postNetState(fd, type, &g_netinfo[fd])) {
+                atomicSwapU64(&g_netinfo[fd].numRX.mtc, 0);
+                atomicSwapU64(&g_netinfo[fd].rxBytes.mtc, 0);
+                // subFromInterfaceCounts(&g_ctrs.netrxBytes, size);
+            }
+            // atomicSwapU64(&g_netinfo[fd].numRX.evt, 0);
+            // atomicSwapU64(&g_netinfo[fd].rxBytes.evt, 0);
+            break;
         }
 
-        if (rc) {
-            atomicSwapU64(&g_ctrs.dnsDurationNum.mtc, 0);
-            atomicSwapU64(&g_ctrs.dnsDurationTotal.mtc, 0);
+        case NETTX:
+        {
+            if (!checkNetEntry(fd))
+                break;
+            addToInterfaceCounts(&g_netinfo[fd].numTX, 1);
+            addToInterfaceCounts(&g_netinfo[fd].txBytes, size);
+            sock_summary_bucket_t bucket = getNetRxTxBucket(&g_netinfo[fd]);
+            addToInterfaceCounts(&g_ctrs.nettxBytes[bucket], size);
+            if (postNetState(fd, type, &g_netinfo[fd])) {
+                atomicSwapU64(&g_netinfo[fd].numTX.mtc, 0);
+                atomicSwapU64(&g_netinfo[fd].txBytes.mtc, 0);
+                // subFromInterfaceCounts(&g_ctrs.nettxBytes, size);
+            }
+            // atomicSwapU64(&g_netinfo[fd].numTX.evt, 0);
+            // atomicSwapU64(&g_netinfo[fd].txBytes.evt, 0);
+            break;
         }
 
-        atomicSwapU64(&g_ctrs.dnsDurationNum.evt, 0);
-        atomicSwapU64(&g_ctrs.dnsDurationTotal.evt, 0);
-        break;
-    }
+        case DNS:
+        {
+            int rc;
 
-    case FS_DURATION:
-    {
-        if (!checkFSEntry(fd)) break;
-        addToInterfaceCounts(&g_fsinfo[fd].numDuration, 1);
-        addToInterfaceCounts(&g_fsinfo[fd].totalDuration, size);
-        addToInterfaceCounts(&g_ctrs.fsDurationNum, 1);
-        addToInterfaceCounts(&g_ctrs.fsDurationTotal, size);
-        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
-            atomicSwapU64(&g_fsinfo[fd].numDuration.mtc, 0);
-            atomicSwapU64(&g_fsinfo[fd].totalDuration.mtc, 0);
-        }
-        //atomicSwapU64(&g_fsinfo[fd].numDuration.evt, 0);
-        //atomicSwapU64(&g_fsinfo[fd].totalDuration.evt, 0);
-        break;
-    }
+            // on DNS resp only inc events
+            if (size > 0) {
+                atomicAddU64(&g_ctrs.numDNS.evt, 1);
+            } else {
+                addToInterfaceCounts(&g_ctrs.numDNS, 1);
+            }
 
-    case FS_READ:
-    {
-        if (!checkFSEntry(fd)) break;
-        addToInterfaceCounts(&g_fsinfo[fd].numRead, 1);
-        addToInterfaceCounts(&g_fsinfo[fd].readBytes, size);
-        addToInterfaceCounts(&g_ctrs.readBytes, size);
-        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
-            atomicSwapU64(&g_fsinfo[fd].numRead.mtc, 0);
-            atomicSwapU64(&g_fsinfo[fd].readBytes.mtc, 0);
-            //subFromInterfaceCounts(&g_ctrs.readBytes, size);
-        }
-        //atomicSwapU64(&g_fsinfo[fd].numRead.evt, 0);
-        //atomicSwapU64(&g_fsinfo[fd].readBytes.evt, 0);
-        break;
-    }
+            if (checkNetEntry(fd)) {
+                rc = postDNSState(fd, type, &g_netinfo[fd], (uint64_t)size, pathname);
+            } else {
+                rc = postDNSState(fd, type, NULL, (uint64_t)size, pathname);
+            }
 
-    case FS_WRITE:
-    {
-        if (!checkFSEntry(fd)) break;
-        addToInterfaceCounts(&g_fsinfo[fd].numWrite, 1);
-        addToInterfaceCounts(&g_fsinfo[fd].writeBytes, size);
-        addToInterfaceCounts(&g_ctrs.writeBytes, size);
-        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
-            atomicSwapU64(&g_fsinfo[fd].numWrite.mtc, 0);
-            atomicSwapU64(&g_fsinfo[fd].writeBytes.mtc, 0);
-            //subFromInterfaceCounts(&g_ctrs.writeBytes, size);
+            if (rc && (size == 0))
+                atomicSubU64(&g_ctrs.numDNS.mtc, 1);
+            atomicSubU64(&g_ctrs.numDNS.evt, 1);
+            break;
         }
-        //atomicSwapU64(&g_fsinfo[fd].numWrite.evt, 0);
-        //atomicSwapU64(&g_fsinfo[fd].writeBytes.evt, 0);
-        break;
-    }
 
-    case FS_OPEN:
-    {
-        if (!checkFSEntry(fd)) break;
-        addToInterfaceCounts(&g_fsinfo[fd].numOpen, 1);
-        addToInterfaceCounts(&g_ctrs.numOpen, 1);
-        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
-            atomicSwapU64(&g_fsinfo[fd].numOpen.mtc, 0);
-            //subFromInterfaceCounts(&g_ctrs.numOpen, 1);
-        }
-        atomicSwapU64(&g_fsinfo[fd].numOpen.evt, 0);
-        break;
-    }
+        case DNS_DURATION:
+        {
+            int rc;
 
-    case FS_CLOSE:
-    {
-        if (!checkFSEntry(fd)) break;
-        addToInterfaceCounts(&g_fsinfo[fd].numClose, 1);
-        addToInterfaceCounts(&g_ctrs.numClose, 1);
-        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
-            atomicSwapU64(&g_fsinfo[fd].numClose.mtc, 0);
-            //subFromInterfaceCounts(&g_ctrs.numClose, 1);
-        }
-        atomicSwapU64(&g_fsinfo[fd].numClose.evt, 0);
-        break;
-    }
+            addToInterfaceCounts(&g_ctrs.dnsDurationNum, 1);
+            addToInterfaceCounts(&g_ctrs.dnsDurationTotal, 0);
 
-    case FS_SEEK:
-    {
-        if (!checkFSEntry(fd)) break;
-        addToInterfaceCounts(&g_fsinfo[fd].numSeek, 1);
-        addToInterfaceCounts(&g_ctrs.numSeek, 1);
-        if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
-            atomicSwapU64(&g_fsinfo[fd].numSeek.mtc, 0);
-            //subFromInterfaceCounts(&g_ctrs.numSeek, 1);
-        }
-        atomicSwapU64(&g_fsinfo[fd].numSeek.evt, 0);
-        break;
-    }
+            if (checkNetEntry(fd)) {
+                rc = postDNSState(fd, type, &g_netinfo[fd], size, pathname);
+            } else {
+                rc = postDNSState(fd, type, NULL, size, pathname);
+            }
 
-    case NET_ERR_CONN:
-    {
-        addToInterfaceCounts(&g_ctrs.netConnectErrors, 1);
-        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
-            atomicSwapU64(&g_ctrs.netConnectErrors.mtc, 0);
-        }
-        atomicSwapU64(&g_ctrs.netConnectErrors.evt, 0);
-        break;
-    }
+            if (rc) {
+                atomicSwapU64(&g_ctrs.dnsDurationNum.mtc, 0);
+                atomicSwapU64(&g_ctrs.dnsDurationTotal.mtc, 0);
+            }
 
-    case NET_ERR_RX_TX:
-    {
-        addToInterfaceCounts(&g_ctrs.netTxRxErrors, 1);
-        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
-            atomicSwapU64(&g_ctrs.netTxRxErrors.mtc, 0);
+            atomicSwapU64(&g_ctrs.dnsDurationNum.evt, 0);
+            atomicSwapU64(&g_ctrs.dnsDurationTotal.evt, 0);
+            break;
         }
-        atomicSwapU64(&g_ctrs.netTxRxErrors.evt, 0);
-        break;
-    }
 
-    case FS_ERR_OPEN_CLOSE:
-    {
-        addToInterfaceCounts(&g_ctrs.fsOpenCloseErrors, 1);
-        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
-            atomicSwapU64(&g_ctrs.fsOpenCloseErrors.mtc, 0);
+        case FS_DURATION:
+        {
+            if (!checkFSEntry(fd))
+                break;
+            addToInterfaceCounts(&g_fsinfo[fd].numDuration, 1);
+            addToInterfaceCounts(&g_fsinfo[fd].totalDuration, size);
+            addToInterfaceCounts(&g_ctrs.fsDurationNum, 1);
+            addToInterfaceCounts(&g_ctrs.fsDurationTotal, size);
+            if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+                atomicSwapU64(&g_fsinfo[fd].numDuration.mtc, 0);
+                atomicSwapU64(&g_fsinfo[fd].totalDuration.mtc, 0);
+            }
+            // atomicSwapU64(&g_fsinfo[fd].numDuration.evt, 0);
+            // atomicSwapU64(&g_fsinfo[fd].totalDuration.evt, 0);
+            break;
         }
-        atomicSwapU64(&g_ctrs.fsOpenCloseErrors.evt, 0);
-        break;
-    }
 
-    case FS_ERR_READ_WRITE:
-    {
-        addToInterfaceCounts(&g_ctrs.fsRdWrErrors, 1);
-        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
-            atomicSwapU64(&g_ctrs.fsRdWrErrors.mtc, 0);
+        case FS_READ:
+        {
+            if (!checkFSEntry(fd))
+                break;
+            addToInterfaceCounts(&g_fsinfo[fd].numRead, 1);
+            addToInterfaceCounts(&g_fsinfo[fd].readBytes, size);
+            addToInterfaceCounts(&g_ctrs.readBytes, size);
+            if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+                atomicSwapU64(&g_fsinfo[fd].numRead.mtc, 0);
+                atomicSwapU64(&g_fsinfo[fd].readBytes.mtc, 0);
+                // subFromInterfaceCounts(&g_ctrs.readBytes, size);
+            }
+            // atomicSwapU64(&g_fsinfo[fd].numRead.evt, 0);
+            // atomicSwapU64(&g_fsinfo[fd].readBytes.evt, 0);
+            break;
         }
-        atomicSwapU64(&g_ctrs.fsRdWrErrors.evt, 0);
-        break;
-    }
 
-    case FS_ERR_STAT:
-    {
-        addToInterfaceCounts(&g_ctrs.fsStatErrors, 1);
-        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
-            atomicSwapU64(&g_ctrs.fsStatErrors.mtc, 0);
+        case FS_WRITE:
+        {
+            if (!checkFSEntry(fd))
+                break;
+            addToInterfaceCounts(&g_fsinfo[fd].numWrite, 1);
+            addToInterfaceCounts(&g_fsinfo[fd].writeBytes, size);
+            addToInterfaceCounts(&g_ctrs.writeBytes, size);
+            if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+                atomicSwapU64(&g_fsinfo[fd].numWrite.mtc, 0);
+                atomicSwapU64(&g_fsinfo[fd].writeBytes.mtc, 0);
+                // subFromInterfaceCounts(&g_ctrs.writeBytes, size);
+            }
+            // atomicSwapU64(&g_fsinfo[fd].numWrite.evt, 0);
+            // atomicSwapU64(&g_fsinfo[fd].writeBytes.evt, 0);
+            break;
         }
-        atomicSwapU64(&g_ctrs.fsStatErrors.evt, 0);
-        break;
-    }
 
-    case NET_ERR_DNS:
-    {
-        addToInterfaceCounts(&g_ctrs.netDNSErrors, 1);
-        if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
-            atomicSwapU64(&g_ctrs.netDNSErrors.mtc, 0);
+        case FS_OPEN:
+        {
+            if (!checkFSEntry(fd))
+                break;
+            addToInterfaceCounts(&g_fsinfo[fd].numOpen, 1);
+            addToInterfaceCounts(&g_ctrs.numOpen, 1);
+            if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+                atomicSwapU64(&g_fsinfo[fd].numOpen.mtc, 0);
+                // subFromInterfaceCounts(&g_ctrs.numOpen, 1);
+            }
+            atomicSwapU64(&g_fsinfo[fd].numOpen.evt, 0);
+            break;
         }
-        atomicSwapU64(&g_ctrs.netDNSErrors.evt, 0);
-        break;
-    }
 
-    case FS_STAT:
-    {
-        addToInterfaceCounts(&g_ctrs.numStat, 1);
-        if (postStatErrState(EVT_STAT, type, funcop, pathname)) {
-            atomicSwapU64(&g_ctrs.numStat.mtc, 0);
+        case FS_CLOSE:
+        {
+            if (!checkFSEntry(fd))
+                break;
+            addToInterfaceCounts(&g_fsinfo[fd].numClose, 1);
+            addToInterfaceCounts(&g_ctrs.numClose, 1);
+            if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+                atomicSwapU64(&g_fsinfo[fd].numClose.mtc, 0);
+                // subFromInterfaceCounts(&g_ctrs.numClose, 1);
+            }
+            atomicSwapU64(&g_fsinfo[fd].numClose.evt, 0);
+            break;
         }
-        atomicSwapU64(&g_ctrs.numStat.evt, 0);
-        break;
-    }
-    default:
-         return;
+
+        case FS_SEEK:
+        {
+            if (!checkFSEntry(fd))
+                break;
+            addToInterfaceCounts(&g_fsinfo[fd].numSeek, 1);
+            addToInterfaceCounts(&g_ctrs.numSeek, 1);
+            if (postFSState(fd, type, &g_fsinfo[fd], funcop, pathname)) {
+                atomicSwapU64(&g_fsinfo[fd].numSeek.mtc, 0);
+                // subFromInterfaceCounts(&g_ctrs.numSeek, 1);
+            }
+            atomicSwapU64(&g_fsinfo[fd].numSeek.evt, 0);
+            break;
+        }
+
+        case NET_ERR_CONN:
+        {
+            addToInterfaceCounts(&g_ctrs.netConnectErrors, 1);
+            if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+                atomicSwapU64(&g_ctrs.netConnectErrors.mtc, 0);
+            }
+            atomicSwapU64(&g_ctrs.netConnectErrors.evt, 0);
+            break;
+        }
+
+        case NET_ERR_RX_TX:
+        {
+            addToInterfaceCounts(&g_ctrs.netTxRxErrors, 1);
+            if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+                atomicSwapU64(&g_ctrs.netTxRxErrors.mtc, 0);
+            }
+            atomicSwapU64(&g_ctrs.netTxRxErrors.evt, 0);
+            break;
+        }
+
+        case FS_ERR_OPEN_CLOSE:
+        {
+            addToInterfaceCounts(&g_ctrs.fsOpenCloseErrors, 1);
+            if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+                atomicSwapU64(&g_ctrs.fsOpenCloseErrors.mtc, 0);
+            }
+            atomicSwapU64(&g_ctrs.fsOpenCloseErrors.evt, 0);
+            break;
+        }
+
+        case FS_ERR_READ_WRITE:
+        {
+            addToInterfaceCounts(&g_ctrs.fsRdWrErrors, 1);
+            if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+                atomicSwapU64(&g_ctrs.fsRdWrErrors.mtc, 0);
+            }
+            atomicSwapU64(&g_ctrs.fsRdWrErrors.evt, 0);
+            break;
+        }
+
+        case FS_ERR_STAT:
+        {
+            addToInterfaceCounts(&g_ctrs.fsStatErrors, 1);
+            if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+                atomicSwapU64(&g_ctrs.fsStatErrors.mtc, 0);
+            }
+            atomicSwapU64(&g_ctrs.fsStatErrors.evt, 0);
+            break;
+        }
+
+        case NET_ERR_DNS:
+        {
+            addToInterfaceCounts(&g_ctrs.netDNSErrors, 1);
+            if (postStatErrState(EVT_ERR, type, funcop, pathname)) {
+                atomicSwapU64(&g_ctrs.netDNSErrors.mtc, 0);
+            }
+            atomicSwapU64(&g_ctrs.netDNSErrors.evt, 0);
+            break;
+        }
+
+        case FS_STAT:
+        {
+            addToInterfaceCounts(&g_ctrs.numStat, 1);
+            if (postStatErrState(EVT_STAT, type, funcop, pathname)) {
+                atomicSwapU64(&g_ctrs.numStat.mtc, 0);
+            }
+            atomicSwapU64(&g_ctrs.numStat.evt, 0);
+            break;
+        }
+        default:
+            return;
     }
 }
 
@@ -865,10 +882,11 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
 
     // nothing we can do; don't risk reading past end of a buffer
     size_t cvlen = (len < MAX_CONVERT) ? len : MAX_CONVERT;
-    if (((len <= 0) && (protoDef->len <= 0)) ||   // no len
-        !protoDef->re ||                          // no regex
-        (protoDef->len > cvlen)) {                // not enough buf for protoDef->len
-        if (net) net->protoDetect = DETECT_FALSE;
+    if (((len <= 0) && (protoDef->len <= 0)) || // no len
+        !protoDef->re ||                        // no regex
+        (protoDef->len > cvlen)) {              // not enough buf for protoDef->len
+        if (net)
+            net->protoDetect = DETECT_FALSE;
         return FALSE;
     }
 
@@ -888,12 +906,13 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
         size_t alen = (cvlen * 2) + 1;
 
         if ((cpdata = calloc(1, alen)) == NULL) {
-            if (net) net->protoDetect = DETECT_FALSE;
+            if (net)
+                net->protoDetect = DETECT_FALSE;
             return FALSE;
         }
 
         for (i = 0; i < cvlen; i++) {
-            snprintf(&cpdata[i<<1], 3, "%02x", (unsigned char)buf[i]);
+            snprintf(&cpdata[i << 1], 3, "%02x", (unsigned char)buf[i]);
         }
 
         data = cpdata;
@@ -901,8 +920,7 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
     }
 
     match_data = pcre2_match_data_create_from_pattern(protoDef->re, NULL);
-    if (pcre2_match_wrapper(protoDef->re, (PCRE2_SPTR)data, (PCRE2_SIZE)cvlen, 0, 0,
-                            match_data, NULL) > 0) {
+    if (pcre2_match_wrapper(protoDef->re, (PCRE2_SPTR)data, (PCRE2_SIZE)cvlen, 0, 0, match_data, NULL) > 0) {
         scopeLog(CFG_LOG_DEBUG, "fd:%d detected %s", sockfd, protoDef->protname);
 
         if (net) {
@@ -911,8 +929,7 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
         }
 
         if (protoDef->detect && ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) {
-            if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL)
-            {
+            if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL) {
                 if (cpdata)
                     free(cpdata);
                 if (match_data)
@@ -923,7 +940,8 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
             proto->ptype = EVT_DETECT;
             proto->len = sizeof(protocol_def_t);
             proto->fd = sockfd;
-            if (net) proto->uid = net->uid;
+            if (net)
+                proto->uid = net->uid;
             proto->data = (char *)strdup(protoDef->protname);
             cmdPostEvent(g_ctl, (char *)proto);
         }
@@ -931,11 +949,14 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
         ret = TRUE; // matched
     } else {
         // the regex for protocol DID NOT match
-        if (net) net->protoDetect = DETECT_FALSE;
+        if (net)
+            net->protoDetect = DETECT_FALSE;
     }
 
-    if (match_data) pcre2_match_data_free(match_data);
-    if (cpdata) free(cpdata);
+    if (match_data)
+        pcre2_match_data_free(match_data);
+    if (cpdata)
+        free(cpdata);
 
     return ret;
 }
@@ -961,7 +982,7 @@ setProtocolByType(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf
                 ret = ret || setProtocol(sockfd, protoDef, net, iov->iov_base, iov->iov_len);
             }
         }
-    } else if ( dtype == IOV) {
+    } else if (dtype == IOV) {
         // buffer is an iovec, len is the iovcnt
         int i;
         struct iovec *iov = (struct iovec *)buf;
@@ -1008,7 +1029,8 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
             if (iov && iov->iov_base && (iov->iov_len > 0)) {
                 char *temp = realloc(pinfo->data, blen + iov->iov_len);
                 if (!temp) {
-                    if (pinfo->data) free(pinfo->data);
+                    if (pinfo->data)
+                        free(pinfo->data);
                     free(pinfo);
                     return -1;
                 }
@@ -1027,7 +1049,8 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
             if (iov[i].iov_base && (iov[i].iov_len > 0)) {
                 char *temp = realloc(pinfo->data, blen + iov[i].iov_len);
                 if (!temp) {
-                    if (pinfo->data) free(pinfo->data);
+                    if (pinfo->data)
+                        free(pinfo->data);
                     free(pinfo);
                     return -1;
                 }
@@ -1064,8 +1087,10 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     }
 
     if (cmdPostPayload(g_ctl, (char *)pinfo) == -1) {
-        if (pinfo->data) free(pinfo->data);
-        if (pinfo) free(pinfo);
+        if (pinfo->data)
+            free(pinfo->data);
+        if (pinfo)
+            free(pinfo);
         return -1;
     }
 
@@ -1074,7 +1099,7 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
 
 /**
  * Apply our TLS protocol-detector to a channel.
- * 
+ *
  * Sets net->tlsDetect and net->tlsProtoDef.
  */
 static void
@@ -1086,11 +1111,9 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
     protocol_def_t *tls_proto_def = g_tls_protocol_def; // use ours by default
 
     // Look for an overridden TLS entry from the protocol detector configs
-    for (ptype = 0; ptype <= g_prot_sequence; ptype++)
-    {
+    for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
         protocol_def_t *tmp_proto_def;
-        if ((tmp_proto_def = lstFind(g_protlist, ptype))
-            && (strcmp(tmp_proto_def->protname, "TLS") == 0)) {
+        if ((tmp_proto_def = lstFind(g_protlist, ptype)) && (strcmp(tmp_proto_def->protname, "TLS") == 0)) {
             // Use the user-provided one instead of ours
             tls_proto_def = tmp_proto_def;
             break;
@@ -1102,17 +1125,13 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
     size_t alen = (tls_proto_def->len * 2) + 1;
     char cpdata[alen];
     memset(cpdata, 0, alen);
-    for (i = 0; i < tls_proto_def->len; i++)
-    {
+    for (i = 0; i < tls_proto_def->len; i++) {
         snprintf(&cpdata[i << 1], 3, "%02x", data[i]);
     }
 
     // Apply the regex to the hex-string payload
     pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(tls_proto_def->re, NULL);
-    if ((rc = pcre2_match_wrapper(tls_proto_def->re, (PCRE2_SPTR)cpdata,
-                                  (PCRE2_SIZE)alen, 0, 0,
-                                  match_data, NULL)) > 0)
-    {
+    if ((rc = pcre2_match_wrapper(tls_proto_def->re, (PCRE2_SPTR)cpdata, (PCRE2_SIZE)alen, 0, 0, match_data, NULL)) > 0) {
         // matched, set the detect-state to TRUE
         net->tlsDetect = DETECT_TRUE;
         net->tlsProtoDef = tls_proto_def;
@@ -1120,13 +1139,10 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
         if (tls_proto_def->detect) {
             // TODO send TLS protocol-detect event
         }
-    }
-    else
-    {
+    } else {
         // didn't match, set the detect-state to FALSE
         net->tlsDetect = DETECT_FALSE;
-        if (rc != PCRE2_ERROR_NOMATCH)
-        {
+        if (rc != PCRE2_ERROR_NOMATCH) {
             DBG(NULL);
             scopeLog(CFG_LOG_DEBUG, "%s: fd:%d TLS regex failed", __FUNCTION__, sockfd);
         }
@@ -1142,8 +1158,8 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     bool sawHTTP = FALSE;
 
     // No need to try protocol detection in raw TLS data
-    if (net && net->tlsDetect == DETECT_TRUE     // TLS detected already
-        && (src == NETRX || src == NETTX)) {     // raw payload
+    if (net && net->tlsDetect == DETECT_TRUE // TLS detected already
+        && (src == NETRX || src == NETTX)) { // raw payload
         return;
     }
 
@@ -1161,7 +1177,7 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
         }
     }
 
-    // Try our HTTP detection if we've not seen one 
+    // Try our HTTP detection if we've not seen one
     if (!sawHTTP) {
         setProtocolByType(sockfd, g_http_protocol_def, net, buf, len, dtype);
     }
@@ -1189,7 +1205,7 @@ getChannelNetEntry(uint64_t id)
                 // populate the new net_info
                 net->active = TRUE;
                 net->type = SOCK_STREAM; // assumption needed for doHttp()
-                //net->localConn.ss_family = ???;
+                // net->localConn.ss_family = ???;
                 net->uid = id;
             }
         }
@@ -1201,29 +1217,32 @@ int
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
     // Find the net_info for the channel
-    net_info *net = getNetEntry(sockfd);    // first try by descriptor
-    if (!net) net = getChannelNetEntry(id); // fallback to using channel ID
+    net_info *net = getNetEntry(sockfd); // first try by descriptor
+    if (!net)
+        net = getChannelNetEntry(id); // fallback to using channel ID
 
     scopeLogHexDebug(buf, len > 64 ? 64 : len, // limit hexdump to 64
-            "DEBUG: doProtocol(id=%ld, fd=%d, len=%ld, src=%s, dtyp=%s) TLS=%s PROTO=%s",
-            id, sockfd, len,
-            src == NETRX ? "NETRX" :
-            src == NETTX ? "NETTX" :
-            src == TLSRX ? "TLSRX" :
-            src == TLSTX ? "TLSTX" : "?",
-            dtype == BUF  ? "BUF" :
-            dtype == MSG  ? "MSG" :
-            dtype == IOV  ? "IOV" :
-            dtype == NONE ? "NONE" : "?",
-            net == NULL ? "NULL" :
-            net->tlsDetect == DETECT_PENDING ? "PENDING" :
-            net->tlsDetect == DETECT_TRUE    ? "TRUE" :
-            net->tlsDetect == DETECT_FALSE   ? "FALSE" : "INVALID",
-            net == NULL ? "NULL" :
-            net->protoDetect == DETECT_PENDING ? "PENDING" :
-            net->protoDetect == DETECT_TRUE    ? "TRUE" :
-            net->protoDetect == DETECT_FALSE   ? "FALSE" : "INVALID"
-            );
+                     "DEBUG: doProtocol(id=%ld, fd=%d, len=%ld, src=%s, dtyp=%s) TLS=%s PROTO=%s", id, sockfd, len,
+                     src == NETRX       ? "NETRX"
+                         : src == NETTX ? "NETTX"
+                         : src == TLSRX ? "TLSRX"
+                         : src == TLSTX ? "TLSTX"
+                                        : "?",
+                     dtype == BUF        ? "BUF"
+                         : dtype == MSG  ? "MSG"
+                         : dtype == IOV  ? "IOV"
+                         : dtype == NONE ? "NONE"
+                                         : "?",
+                     net == NULL                            ? "NULL"
+                         : net->tlsDetect == DETECT_PENDING ? "PENDING"
+                         : net->tlsDetect == DETECT_TRUE    ? "TRUE"
+                         : net->tlsDetect == DETECT_FALSE   ? "FALSE"
+                                                            : "INVALID",
+                     net == NULL                              ? "NULL"
+                         : net->protoDetect == DETECT_PENDING ? "PENDING"
+                         : net->protoDetect == DETECT_TRUE    ? "TRUE"
+                         : net->protoDetect == DETECT_FALSE   ? "FALSE"
+                                                              : "INVALID");
 
     // Ignore empty payloads that should have been blocked by our interpositions
     if (!len) {
@@ -1245,15 +1264,12 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
         }
 
         // Send payloads if enabled globally or by the detected protocol
-        if (cfgPayEnable(g_cfg.staticfg)
-            || (net && net->protoProtoDef && net->protoProtoDef->payload)) {
+        if (cfgPayEnable(g_cfg.staticfg) || (net && net->protoProtoDef && net->protoProtoDef->payload)) {
             extractPayload(sockfd, net, buf, len, src, dtype);
         }
 
         // Process HTTP if detected and events are enabled
-        if (net && net->protoProtoDef
-                && !strcasecmp(net->protoProtoDef->protname, "HTTP")
-                && cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) {
+        if (net && net->protoProtoDef && !strcasecmp(net->protoProtoDef->protname, "HTTP") && cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) {
             doHttp(id, sockfd, net, buf, len, src, dtype);
         }
     }
@@ -1267,17 +1283,17 @@ setVerbosity(unsigned verbosity)
     summary_t *summarize = &g_summary;
     g_mtc_addr_output = verbosity >= DEFAULT_MTC_IPPORT_VERBOSITY;
 
-    summarize->fs.error =       (verbosity < 5);
-    summarize->fs.open_close =  (verbosity < 6);
-    summarize->fs.stat =        (verbosity < 7);
-    summarize->fs.seek =        (verbosity < 8);
-    summarize->fs.read_write =  (verbosity < 9);
+    summarize->fs.error = (verbosity < 5);
+    summarize->fs.open_close = (verbosity < 6);
+    summarize->fs.stat = (verbosity < 7);
+    summarize->fs.seek = (verbosity < 8);
+    summarize->fs.read_write = (verbosity < 9);
 
-    summarize->net.error =      (verbosity < 5);
-    summarize->net.dnserror =   (verbosity < 5);
-    summarize->net.dns =        (verbosity < 6);
+    summarize->net.error = (verbosity < 5);
+    summarize->net.dnserror = (verbosity < 5);
+    summarize->net.dns = (verbosity < 6);
     summarize->net.open_close = (verbosity < 7);
-    summarize->net.rx_tx =      (verbosity < 9);
+    summarize->net.rx_tx = (verbosity < 9);
 }
 
 bool
@@ -1303,8 +1319,7 @@ checkFSEntry(int fd)
 net_info *
 getNetEntry(int fd)
 {
-    if (g_netinfo && (fd >= 0) && (fd < g_numNinfo) &&
-        g_netinfo[fd].active) {
+    if (g_netinfo && (fd >= 0) && (fd < g_numNinfo) && g_netinfo[fd].active) {
         return &g_netinfo[fd];
     }
     return NULL;
@@ -1313,15 +1328,14 @@ getNetEntry(int fd)
 fs_info *
 getFSEntry(int fd)
 {
-    if (g_fsinfo && (fd >= 0) && (fd < g_numFSinfo) &&
-        g_fsinfo[fd].active) {
+    if (g_fsinfo && (fd >= 0) && (fd < g_numFSinfo) && g_fsinfo[fd].active) {
         return &g_fsinfo[fd];
     }
 
-    const char* name;
-    const char* description;
-    if (g_fsinfo && ((fd >= 0 ) && (fd <= 2))) {
-        switch(fd) {
+    const char *name;
+    const char *description;
+    if (g_fsinfo && ((fd >= 0) && (fd <= 2))) {
+        switch (fd) {
             case 0:
                 name = "stdin";
                 description = "console input";
@@ -1362,7 +1376,7 @@ getFSContentType(int fd)
 {
     struct fs_info_t *fs = getFSEntry(fd);
     if (fs) {
-       return fs->content_type;
+        return fs->content_type;
     }
     DBG(NULL);
     return FS_CONTENT_UNKNOWN;
@@ -1386,35 +1400,34 @@ addSock(int fd, int type, int family)
         if (g_netinfo[fd].active) {
 
             doClose(fd, "close: DuplicateSocket");
-
         }
-/*
- * We need to do this realloc.
- * However, it needs to be done in such a way as to not
- * free the previous object that may be in use by a thread.
- * Possibly not use realloc. Leaving the code in place and this
- * comment as a reminder.
-        if ((fd > g_numNinfo) && (fd < MAX_FDS))  {
-            int increase;
-            net_info *temp;
+        /*
+         * We need to do this realloc.
+         * However, it needs to be done in such a way as to not
+         * free the previous object that may be in use by a thread.
+         * Possibly not use realloc. Leaving the code in place and this
+         * comment as a reminder.
+                if ((fd > g_numNinfo) && (fd < MAX_FDS))  {
+                    int increase;
+                    net_info *temp;
 
-            if (fd < (MAX_FDS / 2)) {
-                increase = MAX_FDS / 2;
-            } else {
-                increase = MAX_FDS;
-            }
+                    if (fd < (MAX_FDS / 2)) {
+                        increase = MAX_FDS / 2;
+                    } else {
+                        increase = MAX_FDS;
+                    }
 
-            // Need to realloc
-            if ((temp = realloc(g_netinfo, sizeof(struct net_info_t) * increase)) == NULL) {
-                scopeLogError("fd:%d ERROR: addSock:realloc", fd);
-                DBG("re-alloc on Net table failed");
-            } else {
-                memset(&temp[g_numNinfo], 0, sizeof(struct net_info_t) * (increase - g_numNinfo));
-                g_numNinfo = increase;
-                g_netinfo = temp;
-            }
-        }
-*/
+                    // Need to realloc
+                    if ((temp = realloc(g_netinfo, sizeof(struct net_info_t) * increase)) == NULL) {
+                        scopeLogError("fd:%d ERROR: addSock:realloc", fd);
+                        DBG("re-alloc on Net table failed");
+                    } else {
+                        memset(&temp[g_numNinfo], 0, sizeof(struct net_info_t) * (increase - g_numNinfo));
+                        g_numNinfo = increase;
+                        g_netinfo = temp;
+                    }
+                }
+        */
 
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
         g_netinfo[fd].active = TRUE;
@@ -1434,17 +1447,18 @@ doBlockConnection(int fd, const struct sockaddr *addr_arg)
 {
     in_port_t port;
 
-    if (g_cfg.blockconn == DEFAULT_PORTBLOCK) return 0;
+    if (g_cfg.blockconn == DEFAULT_PORTBLOCK)
+        return 0;
 
     // We expect addr_arg to be supplied for connect() calls
     // and expect it to be NULL for accept() calls.  When it's
     // null, we will use addressing from the local side of the
     // accept fd.
-    const struct sockaddr* addr;
+    const struct sockaddr *addr;
     if (addr_arg) {
         addr = addr_arg;
     } else if (checkNetEntry(fd)) {
-        addr = (struct sockaddr*)&g_netinfo[fd].localConn;
+        addr = (struct sockaddr *)&g_netinfo[fd].localConn;
     } else {
         return 0;
     }
@@ -1477,13 +1491,17 @@ doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, control_type
     // Should we check for at least the size of sockaddr_in?
     if (((net = getNetEntry(sd)) != NULL) && addr && (len > 0)) {
         if (endp == LOCAL) {
-            if ((net->type == SOCK_STREAM) && (net->addrSetLocal == TRUE)) return;
+            if ((net->type == SOCK_STREAM) && (net->addrSetLocal == TRUE))
+                return;
             memmove(&g_netinfo[sd].localConn, addr, len);
-            if (net->type == SOCK_STREAM) net->addrSetLocal = TRUE;
+            if (net->type == SOCK_STREAM)
+                net->addrSetLocal = TRUE;
         } else {
-            if ((net->type == SOCK_STREAM) && (net->addrSetRemote == TRUE)) return;
+            if ((net->type == SOCK_STREAM) && (net->addrSetRemote == TRUE))
+                return;
             memmove(&g_netinfo[sd].remoteConn, addr, len);
-            if (net->type == SOCK_STREAM) net->addrSetRemote = TRUE;
+            if (net->type == SOCK_STREAM)
+                net->addrSetRemote = TRUE;
         }
 
         if (addrIsNetDomain(&g_netinfo[sd].localConn)) {
@@ -1500,13 +1518,10 @@ doSetAddrs(int sockfd)
     net_info *net;
 
     // Only do this if output is enabled
-    int need_to_track_addrs =
-        ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
-        ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) ||
-        ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP) ||
-        (mtcEnabled(g_mtc) && g_mtc_addr_output) ||
-        ctlPayEnable(g_ctl);
-    if (!need_to_track_addrs) return 0;
+    int need_to_track_addrs = ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) || ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) || ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP) ||
+        (mtcEnabled(g_mtc) && g_mtc_addr_output) || ctlPayEnable(g_ctl);
+    if (!need_to_track_addrs)
+        return 0;
 
     /*
      * Do this for TCP, UDP or UNIX sockets
@@ -1514,11 +1529,12 @@ doSetAddrs(int sockfd)
      * If a TCP socket only set the addrs once
      * It's possible for UDP sockets to change addrs as needed
      */
-    if ((net = getNetEntry(sockfd)) == NULL) return 0;
+    if ((net = getNetEntry(sockfd)) == NULL)
+        return 0;
 
-    if (addrIsUnixDomain(&net->remoteConn) ||
-        addrIsUnixDomain(&net->localConn)) {
-        if (net->addrSetUnix == TRUE) return 0;
+    if (addrIsUnixDomain(&net->remoteConn) || addrIsUnixDomain(&net->localConn)) {
+        if (net->addrSetUnix == TRUE)
+            return 0;
         doUnixEndpoint(sockfd, net);
         net->addrSetUnix = TRUE;
         doUpdateState(CONNECTION_OPEN, sockfd, 1, NULL, NULL);
@@ -1589,10 +1605,14 @@ isLegalLabelChar(char x)
     // a hyphen.  This is the check we can make if we don't care about position.
 
     // I'm not using isalnum because I don't want locale to affect it.
-    if (x >= 'a' && x <= 'z') return 1;
-    if (x >= 'A' && x <= 'Z') return 1;
-    if (x >= '0' && x <= '9') return 1;
-    if (x == '-') return 1;
+    if (x >= 'a' && x <= 'z')
+        return 1;
+    if (x >= 'A' && x <= 'Z')
+        return 1;
+    if (x >= '0' && x <= '9')
+        return 1;
+    if (x == '-')
+        return 1;
     return 0;
 }
 
@@ -1616,7 +1636,7 @@ getDNSName(int sd, void *pkt, int pktlen)
     dns_query *query;
     struct dns_header *header;
     char *dname;
-    char dnsName[MAX_HOSTNAME+1];
+    char dnsName[MAX_HOSTNAME + 1];
     int dnsNameBytesUsed = 0;
     struct net_info_t *net = getNetEntry(sd);
 
@@ -1697,19 +1717,23 @@ getDNSName(int sd, void *pkt, int pktlen)
         // handle one label
 
         int label_len = (int)*dname++;
-        if (label_len > 63) return -1; // labels must be 63 chars or less
-        if (&dname[label_len] >= pkt_end) return -1; // honor packet end
+        if (label_len > 63)
+            return -1; // labels must be 63 chars or less
+        if (&dname[label_len] >= pkt_end)
+            return -1; // honor packet end
         // Ensure we don't overrun the size of dnsName
-        if ((dnsNameBytesUsed + label_len) >= sizeof(dnsName)) return -1;
+        if ((dnsNameBytesUsed + label_len) >= sizeof(dnsName))
+            return -1;
 
-        for ( ; (label_len > 0); label_len--) {
-            if (!isLegalLabelChar(*dname)) return -1;
+        for (; (label_len > 0); label_len--) {
+            if (!isLegalLabelChar(*dname))
+                return -1;
             dnsName[dnsNameBytesUsed++] = *dname++;
         }
         dnsName[dnsNameBytesUsed++] = '.';
     }
 
-    dnsName[dnsNameBytesUsed-1] = '\0'; // overwrite the last period
+    dnsName[dnsNameBytesUsed - 1] = '\0'; // overwrite the last period
 
     if (strncmp(dnsName, g_netinfo[sd].dnsName, dnsNameBytesUsed) == 0) {
         // Already sent this from an interposed function
@@ -1742,29 +1766,37 @@ getDNSName(int sd, void *pkt, int pktlen)
 static bool
 getNSFuncs(void)
 {
-    if (!g_fn.dlopen) return FALSE;
+    if (!g_fn.dlopen)
+        return FALSE;
 
     void *handle = g_fn.dlopen("libresolv.so", RTLD_LAZY | RTLD_NODELETE);
     if (handle == NULL) {
-        scopeLogWarn(
-                    "WARNING: could not locate libresolv, DNS events will be affected");
+        scopeLogWarn("WARNING: could not locate libresolv, DNS events will be affected");
         return FALSE;
     }
 
-    if (!g_fn.ns_initparse) g_fn.ns_initparse = dlsym(handle, "ns_initparse");
-    if (!g_fn.ns_parserr) g_fn.ns_parserr = dlsym(handle, "ns_parserr");
+    if (!g_fn.ns_initparse)
+        g_fn.ns_initparse = dlsym(handle, "ns_initparse");
+    if (!g_fn.ns_parserr)
+        g_fn.ns_parserr = dlsym(handle, "ns_parserr");
     dlclose(handle);
 
     if (!g_fn.ns_initparse || !g_fn.ns_parserr) {
-        scopeLogWarn(
-                    "WARNING: could not locate name server functions, DNS events will be affected");
+        scopeLogWarn("WARNING: could not locate name server functions, DNS events will be affected");
         return FALSE;
     }
 
     return TRUE;
 }
 
-#define DNSDONE(var1, var2) {if (var1) cJSON_Delete(var1); if (var2) cJSON_Delete(var2); return FALSE;}
+#define DNSDONE(var1, var2)     \
+    {                           \
+        if (var1)               \
+            cJSON_Delete(var1); \
+        if (var2)               \
+            cJSON_Delete(var2); \
+        return FALSE;           \
+    }
 
 static bool
 parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
@@ -1774,7 +1806,8 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
     ns_msg handle;
 
     if (!g_fn.ns_initparse || !g_fn.ns_parserr) {
-        if (getNSFuncs() == FALSE) return FALSE;
+        if (getNSFuncs() == FALSE)
+            return FALSE;
     }
 
     // init ns lib
@@ -1788,7 +1821,7 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
     if (nmsg > 0) {
         for (i = 0; i < nmsg; i++) {
             char ipaddr[128];
-            //char dispbuf[4096];
+            // char dispbuf[4096];
 
             if (g_fn.ns_parserr(&handle, ns_s_an, i, &rr) == -1) {
                 scopeLogError("ERROR:parse rr");
@@ -1803,18 +1836,16 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
                 first = 1;
             }
 
-            //ns_sprintrr(&handle, &rr, NULL, NULL, dispbuf, sizeof (dispbuf));
-            //scopeLog(CFG_LOG_DEBUG, "%s", dispbuf);
+            // ns_sprintrr(&handle, &rr, NULL, NULL, dispbuf, sizeof (dispbuf));
+            // scopeLog(CFG_LOG_DEBUG, "%s", dispbuf);
 
             // type A is IPv4, AAA is IPv6
             if (ns_rr_type(rr) == ns_t_a) {
-                if (!inet_ntop(AF_INET, (struct sockaddr_in *)rr.rdata,
-                               ipaddr, sizeof(ipaddr))) {
+                if (!inet_ntop(AF_INET, (struct sockaddr_in *)rr.rdata, ipaddr, sizeof(ipaddr))) {
                     continue;
                 }
             } else if (ns_rr_type(rr) == ns_t_aaaa) {
-                if (!inet_ntop(AF_INET6, (struct sockaddr_in6 *)rr.rdata,
-                               ipaddr, sizeof(ipaddr))) {
+                if (!inet_ntop(AF_INET6, (struct sockaddr_in6 *)rr.rdata, ipaddr, sizeof(ipaddr))) {
                     continue;
                 }
             } else {
@@ -1822,8 +1853,8 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
                 continue;
             }
 
-            //snprintf(dispbuf, sizeof(dispbuf), "resolved addr is %s\n", ipaddr);
-            //scopeLog(CFG_LOG_DEBUG, "%s", dispbuf);
+            // snprintf(dispbuf, sizeof(dispbuf), "resolved addr is %s\n", ipaddr);
+            // scopeLog(CFG_LOG_DEBUG, "%s", dispbuf);
 
             if (!cJSON_AddStringToObjLN(addrs, "addr", ipaddr)) {
                 continue;
@@ -1841,70 +1872,72 @@ getDNSAnswer(int sockfd, char *buf, size_t len, src_data_t dtype)
     bool result;
     struct net_info_t *net = getNetEntry(sockfd);
 
-    if (!buf || !net || (len <= 0)) return FALSE;
+    if (!buf || !net || (len <= 0))
+        return FALSE;
 
     cJSON *json = cJSON_CreateObject();
-    if (!json) return FALSE;
+    if (!json)
+        return FALSE;
 
     cJSON *addrs = cJSON_CreateArray();
-    if (!addrs) DNSDONE(json, addrs);
+    if (!addrs)
+        DNSDONE(json, addrs);
 
     if (net->startTime == 0) {
         if (!cJSON_AddNumberToObjLN(json, "duration", 0)) {
             DNSDONE(json, addrs);
         }
     } else {
-        if (!cJSON_AddNumberToObjLN(json, "duration",
-                                    getDuration(net->startTime) / 1000000)) {
+        if (!cJSON_AddNumberToObjLN(json, "duration", getDuration(net->startTime) / 1000000)) {
             DNSDONE(json, addrs);
         }
     }
 
     switch (dtype) {
-    case BUF:
-        result = parseDNSAnswer(buf, len, json, addrs, 0);
-        break;
+        case BUF:
+            result = parseDNSAnswer(buf, len, json, addrs, 0);
+            break;
 
-    case MSG:
-    {
-        int i;
-        struct msghdr *msg = (struct msghdr *)buf;
-        struct iovec *iov;
+        case MSG:
+        {
+            int i;
+            struct msghdr *msg = (struct msghdr *)buf;
+            struct iovec *iov;
 
-        for (i = 0; i < msg->msg_iovlen; i++) {
-            iov = &msg->msg_iov[i];
-            if (iov && iov->iov_base && (iov->iov_len > 0)) {
-                // do we have at least one good pass?
-                if (parseDNSAnswer((char *)iov->iov_base, len, json, addrs, i) == TRUE) {
-                    result = TRUE;
-                } else {
-                    // should we stop if an iov doesn't parse? probably.
-                    break;
+            for (i = 0; i < msg->msg_iovlen; i++) {
+                iov = &msg->msg_iov[i];
+                if (iov && iov->iov_base && (iov->iov_len > 0)) {
+                    // do we have at least one good pass?
+                    if (parseDNSAnswer((char *)iov->iov_base, len, json, addrs, i) == TRUE) {
+                        result = TRUE;
+                    } else {
+                        // should we stop if an iov doesn't parse? probably.
+                        break;
+                    }
                 }
             }
+            break;
         }
-        break;
-    }
 
-    case IOV:
-    {
-        int i;
-        struct iovec *iov = (struct iovec *)buf;
+        case IOV:
+        {
+            int i;
+            struct iovec *iov = (struct iovec *)buf;
 
-        for (i = 0; i < len; i++) {
-            if (iov[i].iov_base && (iov[i].iov_len > 0)) {
-                if (parseDNSAnswer((char *)iov[i].iov_base, len, json, addrs, i)  == TRUE) {
-                    result = TRUE;
-                } else {
-                    break;
+            for (i = 0; i < len; i++) {
+                if (iov[i].iov_base && (iov[i].iov_len > 0)) {
+                    if (parseDNSAnswer((char *)iov[i].iov_base, len, json, addrs, i) == TRUE) {
+                        result = TRUE;
+                    } else {
+                        break;
+                    }
                 }
             }
+            break;
         }
-        break;
-    }
 
-    default:
-        DNSDONE(json, addrs);
+        default:
+            DNSDONE(json, addrs);
     }
 
     if (result == TRUE) {
@@ -1912,8 +1945,10 @@ getDNSAnswer(int sockfd, char *buf, size_t len, src_data_t dtype)
         net->dnsAnswer = json;
     } else {
         net->dnsAnswer = NULL;
-        if (json) cJSON_Delete(json);
-        if (addrs) cJSON_Delete(addrs);
+        if (json)
+            cJSON_Delete(json);
+        if (addrs)
+            cJSON_Delete(addrs);
     }
 
     return TRUE;
@@ -1922,7 +1957,8 @@ getDNSAnswer(int sockfd, char *buf, size_t len, src_data_t dtype)
 int
 doURL(int sockfd, const void *buf, size_t len, metric_t src)
 {
-    if (g_cfg.urls == 0) return 0;
+    if (g_cfg.urls == 0)
+        return 0;
 
     if (checkNetEntry(sockfd) == TRUE) {
         if (!g_netinfo[sockfd].active) {
@@ -1932,17 +1968,15 @@ doURL(int sockfd, const void *buf, size_t len, metric_t src)
         doSetAddrs(sockfd);
     }
 
-
     if ((src == NETTX) && (searchExec(g_http_redirect, (char *)buf, len) != -1)) {
         g_netinfo[sockfd].urlRedirect = TRUE;
         return 0;
     }
 
-    if ((src == NETRX) && (g_netinfo[sockfd].urlRedirect == TRUE) &&
-        (len >= strlen(OVERURL))) {
+    if ((src == NETRX) && (g_netinfo[sockfd].urlRedirect == TRUE) && (len >= strlen(OVERURL))) {
         g_netinfo[sockfd].urlRedirect = FALSE;
         // explicit vars as it's nice to have in the debugger
-        //char *sbuf = (char *)buf;
+        // char *sbuf = (char *)buf;
         char *url = OVERURL;
         int urllen = strlen(url);
         strncpy((char *)buf, url, urllen);
@@ -1974,9 +2008,7 @@ doRecv(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
 
         doUpdateState(NETRX, sockfd, rc, NULL, NULL);
 
-        if ((g_netinfo[sockfd].dnsRecv == FALSE) &&
-            remotePortIsDNS(sockfd) &&
-            (g_netinfo[sockfd].dnsName[0])) {
+        if ((g_netinfo[sockfd].dnsRecv == FALSE) && remotePortIsDNS(sockfd) && (g_netinfo[sockfd].dnsName[0])) {
             g_netinfo[sockfd].dnsRecv = TRUE;
             doUpdateState(DNS, sockfd, (ssize_t)1, NULL, g_netinfo[sockfd].dnsName);
         }
@@ -1999,9 +2031,7 @@ doSend(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
         doSetAddrs(sockfd);
         doUpdateState(NETTX, sockfd, rc, NULL, NULL);
 
-        if ((g_netinfo[sockfd].dnsSend == FALSE) &&
-            remotePortIsDNS(sockfd) &&
-            (g_netinfo[sockfd].dnsName[0])) {
+        if ((g_netinfo[sockfd].dnsSend == FALSE) && remotePortIsDNS(sockfd) && (g_netinfo[sockfd].dnsName[0])) {
             doUpdateState(DNS, sockfd, (ssize_t)0, NULL, NULL);
             g_netinfo[sockfd].dnsSend = TRUE;
         }
@@ -2023,14 +2053,13 @@ doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
         doAddNewSock(sd);
     }
 
-
     if (getNetEntry(sd) != NULL) {
-        if (addr && addrlen) doSetConnection(sd, addr, *addrlen, REMOTE);
+        if (addr && addrlen)
+            doSetConnection(sd, addr, *addrlen, REMOTE);
         doUpdateState(OPEN_PORTS, sd, 1, func, NULL);
         doUpdateState(NET_CONNECTIONS, sd, 1, func, NULL);
     }
 }
-
 
 //
 // reportFD is called in two cases:
@@ -2039,7 +2068,8 @@ doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
 void
 reportFD(int fd, control_type_t source)
 {
-    if (source == EVENT_BASED) return;
+    if (source == EVENT_BASED)
+        return;
 
     struct net_info_t *ninfo = getNetEntry(fd);
     if (ninfo) {
@@ -2079,8 +2109,7 @@ reportAllFds(control_type_t source)
 }
 
 void
-doRead(int fd, uint64_t initialTime, int success, const void *buf, ssize_t bytes,
-       const char *func, src_data_t src, size_t cnt)
+doRead(int fd, uint64_t initialTime, int success, const void *buf, ssize_t bytes, const char *func, src_data_t src, size_t cnt)
 {
     struct fs_info_t *fs = getFSEntry(fd);
     struct net_info_t *net = getNetEntry(fd);
@@ -2113,8 +2142,7 @@ doRead(int fd, uint64_t initialTime, int success, const void *buf, ssize_t bytes
 }
 
 void
-doWrite(int fd, uint64_t initialTime, int success, const void *buf, ssize_t bytes,
-        const char *func, src_data_t src, size_t cnt)
+doWrite(int fd, uint64_t initialTime, int success, const void *buf, ssize_t bytes, const char *func, src_data_t src, size_t cnt)
 {
     struct fs_info_t *fs = getFSEntry(fd);
     struct net_info_t *net = getNetEntry(fd);
@@ -2189,7 +2217,7 @@ doStatPath(const char *path, int rc, const char *func)
 }
 
 void
-doStatFd(int fd, int rc, const char* func)
+doStatFd(int fd, int rc, const char *func)
 {
     struct fs_info_t *fs = getFSEntry(fd);
 
@@ -2226,13 +2254,13 @@ doDupSock(int oldfd, int newfd)
 
     memmove(&g_netinfo[newfd], &g_netinfo[oldfd], sizeof(struct fs_info_t));
     g_netinfo[newfd].active = TRUE;
-    g_netinfo[newfd].numTX = (counters_element_t){.mtc=0, .evt=0};
-    g_netinfo[newfd].numRX = (counters_element_t){.mtc=0, .evt=0};
-    g_netinfo[newfd].txBytes = (counters_element_t){.mtc=0, .evt=0};
-    g_netinfo[newfd].rxBytes = (counters_element_t){.mtc=0, .evt=0};
+    g_netinfo[newfd].numTX = (counters_element_t){.mtc = 0, .evt = 0};
+    g_netinfo[newfd].numRX = (counters_element_t){.mtc = 0, .evt = 0};
+    g_netinfo[newfd].txBytes = (counters_element_t){.mtc = 0, .evt = 0};
+    g_netinfo[newfd].rxBytes = (counters_element_t){.mtc = 0, .evt = 0};
     g_netinfo[newfd].startTime = 0ULL;
-    g_netinfo[newfd].totalDuration = (counters_element_t){.mtc=0, .evt=0};
-    g_netinfo[newfd].numDuration = (counters_element_t){.mtc=0, .evt=0};
+    g_netinfo[newfd].totalDuration = (counters_element_t){.mtc = 0, .evt = 0};
+    g_netinfo[newfd].numDuration = (counters_element_t){.mtc = 0, .evt = 0};
 
     // don't dup the HTTP/2 frame stashes
     memset(&g_netinfo[newfd].http.http2Buf[0], 0, sizeof(http_buf_t));
@@ -2305,7 +2333,9 @@ doClose(int fd, const char *func)
     ninfo = getNetEntry(fd);
 
     int guard_enabled = g_http_guard_enabled && ninfo;
-    if (guard_enabled) while (!atomicCasU64(&g_http_guard[fd], 0ULL, 1ULL));
+    if (guard_enabled)
+        while (!atomicCasU64(&g_http_guard[fd], 0ULL, 1ULL))
+            ;
 
     if (ninfo != NULL) {
         doUpdateState(OPEN_PORTS, fd, -1, func, NULL);
@@ -2323,10 +2353,14 @@ doClose(int fd, const char *func)
     // report everything before the info is lost
     reportFD(fd, EVENT_BASED);
 
-    if (ninfo) memset(ninfo, 0, sizeof(struct net_info_t));
-    if (fsinfo) memset(fsinfo, 0, sizeof(struct fs_info_t));
+    if (ninfo)
+        memset(ninfo, 0, sizeof(struct net_info_t));
+    if (fsinfo)
+        memset(fsinfo, 0, sizeof(struct fs_info_t));
 
-    if (guard_enabled) while (!atomicCasU64(&g_http_guard[fd], 1ULL, 0ULL));
+    if (guard_enabled)
+        while (!atomicCasU64(&g_http_guard[fd], 1ULL, 0ULL))
+            ;
 }
 
 void
@@ -2338,34 +2372,34 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
             DBG(NULL);
             doClose(fd, func);
         }
-/*
- * We need to do this realloc.
- * However, it needs to be done in such a way as to not
- * free the previous object that may be in use by a thread.
- * Possibly not use realloc. Leaving the code in place and this
- * comment as a reminder.
+        /*
+         * We need to do this realloc.
+         * However, it needs to be done in such a way as to not
+         * free the previous object that may be in use by a thread.
+         * Possibly not use realloc. Leaving the code in place and this
+         * comment as a reminder.
 
-        if ((fd > g_numFSinfo) && (fd < MAX_FDS))  {
-            int increase;
-            fs_info *temp;
+                if ((fd > g_numFSinfo) && (fd < MAX_FDS))  {
+                    int increase;
+                    fs_info *temp;
 
-            if (fd < (MAX_FDS / 2)) {
-                increase = MAX_FDS / 2;
-            } else {
-                increase = MAX_FDS;
-            }
+                    if (fd < (MAX_FDS / 2)) {
+                        increase = MAX_FDS / 2;
+                    } else {
+                        increase = MAX_FDS;
+                    }
 
-            // Need to realloc
-            if ((temp = realloc(g_fsinfo, sizeof(struct fs_info_t) * increase)) == NULL) {
-                scopeLogError("fd:%d ERROR: doOpen:realloc", fd);
-                DBG("re-alloc on FS table failed");
-            } else {
-                memset(&temp[g_numFSinfo], 0, sizeof(struct fs_info_t) * (increase - g_numFSinfo));
-                g_fsinfo = temp;
-                g_numFSinfo = increase;
-            }
-        }
-*/
+                    // Need to realloc
+                    if ((temp = realloc(g_fsinfo, sizeof(struct fs_info_t) * increase)) == NULL) {
+                        scopeLogError("fd:%d ERROR: doOpen:realloc", fd);
+                        DBG("re-alloc on FS table failed");
+                    } else {
+                        memset(&temp[g_numFSinfo], 0, sizeof(struct fs_info_t) * (increase - g_numFSinfo));
+                        g_fsinfo = temp;
+                        g_numFSinfo = increase;
+                    }
+                }
+        */
         memset(&g_fsinfo[fd], 0, sizeof(struct fs_info_t));
         g_fsinfo[fd].active = TRUE;
         g_fsinfo[fd].type = type;
@@ -2439,11 +2473,11 @@ doCloseAndReportFailures(int fd, int success, const char *func)
 void
 doCloseAllStreams()
 {
-    if (!g_fsinfo) return;
+    if (!g_fsinfo)
+        return;
     int i;
     for (i = 0; i < g_numFSinfo; i++) {
-        if ((g_fsinfo[i].active) &&
-            (g_fsinfo[i].type == STREAM)) {
+        if ((g_fsinfo[i].active) && (g_fsinfo[i].type == STREAM)) {
             doClose(i, "fcloseall");
         }
     }
@@ -2453,7 +2487,8 @@ int
 remotePortIsDNS(int sockfd)
 {
     struct net_info_t *net = getNetEntry(sockfd);
-    if (!net) return FALSE;
+    if (!net)
+        return FALSE;
 
     return (get_port(sockfd, net->remoteConn.ss_family, REMOTE) == DNS_PORT);
 }
@@ -2462,37 +2497,38 @@ int
 sockIsTCP(int sockfd)
 {
     struct net_info_t *net = getNetEntry(sockfd);
-    if (!net) return FALSE;
+    if (!net)
+        return FALSE;
     return (net->type == SOCK_STREAM);
 }
 
 bool
 addrIsNetDomain(struct sockaddr_storage *sock)
 {
-    if (!sock) return FALSE;
+    if (!sock)
+        return FALSE;
 
-    return  ((sock->ss_family == AF_INET) ||
-             (sock->ss_family == AF_INET6));
+    return ((sock->ss_family == AF_INET) || (sock->ss_family == AF_INET6));
 }
 
 bool
 addrIsUnixDomain(struct sockaddr_storage *sock)
 {
-    if (!sock) return FALSE;
+    if (!sock)
+        return FALSE;
 
-    return  ((sock->ss_family == AF_UNIX) ||
-             (sock->ss_family == AF_LOCAL));
+    return ((sock->ss_family == AF_UNIX) || (sock->ss_family == AF_LOCAL));
 }
 
 sock_summary_bucket_t
 getNetRxTxBucket(net_info *net)
 {
-    if (!net) return SOCK_OTHER;
+    if (!net)
+        return SOCK_OTHER;
 
     sock_summary_bucket_t bucket = SOCK_OTHER;
 
-    if (addrIsNetDomain(&net->localConn) ||
-        addrIsNetDomain(&net->remoteConn)) {
+    if (addrIsNetDomain(&net->localConn) || addrIsNetDomain(&net->remoteConn)) {
 
         if (net->type == SOCK_STREAM) {
             bucket = INET_TCP;
@@ -2500,15 +2536,13 @@ getNetRxTxBucket(net_info *net)
             bucket = INET_UDP;
         }
 
-    } else if (addrIsUnixDomain(&net->localConn) ||
-               addrIsUnixDomain(&net->remoteConn)) {
+    } else if (addrIsUnixDomain(&net->localConn) || addrIsUnixDomain(&net->remoteConn)) {
 
         if (net->type == SOCK_STREAM) {
             bucket = UNIX_TCP;
         } else if (net->type == SOCK_DGRAM) {
             bucket = UNIX_UDP;
         }
-
     }
 
     return bucket;

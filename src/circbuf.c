@@ -1,10 +1,10 @@
 #define _GNU_SOURCE
 #define __STDC_FORMAT_MACROS
+#include "circbuf.h"
+#include "atomic.h"
+#include "dbg.h"
 #include <inttypes.h>
 #include <stdlib.h>
-#include "dbg.h"
-#include "atomic.h"
-#include "circbuf.h"
 
 cbuf_handle_t
 cbufInit(size_t size)
@@ -14,7 +14,7 @@ cbufInit(size_t size)
         DBG("Circbuf:calloc");
         return NULL;
     }
-    
+
     uint64_t *buffer = calloc(size + 1, sizeof(uint64_t));
     if (!buffer) {
         free(cbuf);
@@ -31,8 +31,10 @@ cbufInit(size_t size)
 void
 cbufFree(cbuf_handle_t cbuf)
 {
-    if (!cbuf) return;
-    if (cbuf->buffer) free(cbuf->buffer);
+    if (!cbuf)
+        return;
+    if (cbuf->buffer)
+        free(cbuf->buffer);
     free(cbuf);
     return;
 }
@@ -40,7 +42,8 @@ cbufFree(cbuf_handle_t cbuf)
 void
 cbufReset(cbuf_handle_t cbuf)
 {
-    if (!cbuf) return;
+    if (!cbuf)
+        return;
 
     cbuf->head = 0;
     cbuf->tail = 0;
@@ -52,7 +55,8 @@ cbufPut(cbuf_handle_t cbuf, uint64_t data)
 {
     int head, head_next, attempts, success;
 
-    if (!cbuf) return -1;
+    if (!cbuf)
+        return -1;
     attempts = success = 0;
 
     do {
@@ -62,7 +66,7 @@ cbufPut(cbuf_handle_t cbuf, uint64_t data)
             // Note: we commented this out as it caused a
             // double free error when running with 100,000
             // Go routines. We should determine why.
-            DBG("maxlen: %"PRIu64, cbuf->maxlen); // Full
+            DBG("maxlen: %" PRIu64, cbuf->maxlen); // Full
             break;
         }
         success = atomicCas32(&cbuf->head, head, head_next);
@@ -85,14 +89,16 @@ int
 cbufGet(cbuf_handle_t cbuf, uint64_t *data)
 {
     int tail, tail_next, attempts, success;
-    if (!cbuf || !data) return -1;
+    if (!cbuf || !data)
+        return -1;
 
     attempts = success = 0;
 
     do {
         tail = cbuf->tail;
         tail_next = (tail + 1) % cbuf->maxlen;
-        if (tail == cbuf->head) break; // Empty
+        if (tail == cbuf->head)
+            break; // Empty
         success = atomicCas32(&cbuf->tail, tail, tail_next);
     } while (!success && (attempts++ < cbuf->maxlen));
 
@@ -115,13 +121,15 @@ cbufGet(cbuf_handle_t cbuf, uint64_t *data)
 size_t
 cbufCapacity(cbuf_handle_t cbuf)
 {
-    if (!cbuf) return -1;
+    if (!cbuf)
+        return -1;
     return cbuf->maxlen - 1;
 }
 
 int
 cbufEmpty(cbuf_handle_t cbuf)
 {
-    if (!cbuf || (cbuf->tail == cbuf->head)) return TRUE;
+    if (!cbuf || (cbuf->tail == cbuf->head))
+        return TRUE;
     return FALSE;
 }

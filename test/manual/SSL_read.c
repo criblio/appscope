@@ -15,7 +15,6 @@
 // from nodejs.org is one like this.
 //
 
-
 // Our shared library, and app that depends on it.
 //
 // gcc -g -DSSL_LIB -shared -fPIC test/manual/SSL_read.c -o libmyssl.so
@@ -24,7 +23,6 @@
 // LD_LIBRARY_PATH=`pwd` ldd ./ssl_main_with_myssl_dep
 // objdump -T ./ssl_main_with_myssl_dep
 // LD_LIBRARY_PATH=`pwd` ./ssl_main_with_myssl_dep
-
 
 // Our statically linked library, built into app
 //
@@ -36,7 +34,6 @@
 // objdump -T ./ssl_main_dynamic ./ssl_main
 // ./ssl_main_dynamic
 
-
 // Real statically linked library, built into app
 //
 // apt-get -o Acquire::Check-Valid-Until=false update
@@ -44,12 +41,10 @@
 // gcc -g test/manual/SSL_read.c -L/usr/lib/x86_64-linux-gnu/ -lssl -rdynamic -o ssl_main_real_ssl
 // ./ssl_main_real_ssl
 
-
 // Common definitions
 struct ssl_session_def;
 typedef struct ssl_session_def SSL;
-int SSL_read(SSL *, void *, int );
-
+int SSL_read(SSL *, void *, int);
 
 #ifdef SSL_LIB
 int
@@ -58,7 +53,6 @@ SSL_read(SSL *ssl, void *ptr, int i)
     printf("SSL_read function was called!\n");
 }
 #endif // SSL_LIB
-
 
 #ifndef SSL_LIB
 int

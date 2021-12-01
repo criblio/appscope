@@ -1,13 +1,13 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
+#include <link.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <link.h>
 
 #include "dbg.h"
-#include "utils.h"
 #include "fn.h"
+#include "utils.h"
 
 static int g_ismusl = FALSE;
 
@@ -81,28 +81,27 @@ static int g_ismusl = FALSE;
  * symbol search to begin with the current object. When executed from the libscope
  * constructor, this results in symbols that we want to locate in libpthread or libc
  * to be resolved from libscope. That doesn't work.
-*/
-#define GETADDR(val, sym)                                \
-    ares.in_symbol = sym;                                \
-    if (checkEnv("SCOPE_EXEC_TYPE", "static") == TRUE) { \
-        val = dlsym(RTLD_DEFAULT, sym);                  \
-        /* GNU ld.so */                                  \
-    } else if (dl_iterate_phdr(getAddr, &ares)) {        \
-        val = ares.out_addr;                             \
-        /* musl ld.so when loading an app from exec */   \
-    } else if ((val = dlsym(RTLD_NEXT, sym))) {          \
-        DBG(NULL);                                       \
-        /* musl ld.so when attaching */                  \
-    } else if (g_ismusl && (val = dlsym(RTLD_DEFAULT, sym))) {       \
-        DBG(NULL);                                       \
-    } else {                                             \
-        val = NULL;                                      \
+ */
+#define GETADDR(val, sym)                                      \
+    ares.in_symbol = sym;                                      \
+    if (checkEnv("SCOPE_EXEC_TYPE", "static") == TRUE) {       \
+        val = dlsym(RTLD_DEFAULT, sym);                        \
+        /* GNU ld.so */                                        \
+    } else if (dl_iterate_phdr(getAddr, &ares)) {              \
+        val = ares.out_addr;                                   \
+        /* musl ld.so when loading an app from exec */         \
+    } else if ((val = dlsym(RTLD_NEXT, sym))) {                \
+        DBG(NULL);                                             \
+        /* musl ld.so when attaching */                        \
+    } else if (g_ismusl && (val = dlsym(RTLD_DEFAULT, sym))) { \
+        DBG(NULL);                                             \
+    } else {                                                   \
+        val = NULL;                                            \
     }
 
 interposed_funcs_t g_fn;
 
-typedef struct
-{
+typedef struct {
     char *in_symbol;
     void *out_addr;
 } addresult_t;
@@ -114,11 +113,13 @@ getAddr(struct dl_phdr_info *info, size_t size, void *data)
 
     ares->out_addr = NULL;
 
-    if (strstr(info->dlpi_name, "librt.so") == NULL) return 0;
+    if (strstr(info->dlpi_name, "librt.so") == NULL)
+        return 0;
 
     // can we find the symbol in this object
     void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
-    if (!handle) return 0;
+    if (!handle)
+        return 0;
 
     void *addr = dlsym(handle, ares->in_symbol);
     dlclose(handle);
@@ -148,7 +149,8 @@ initFn(void)
     addresult_t ares;
 
     g_fn.dlopen = dlsym(RTLD_NEXT, "dlopen");
-    if (!g_fn.dlopen) g_fn.dlopen = dlsym(RTLD_DEFAULT, "dlopen");
+    if (!g_fn.dlopen)
+        g_fn.dlopen = dlsym(RTLD_DEFAULT, "dlopen");
 
     g_fn.SSL_read = dlsym(RTLD_NEXT, "SSL_read");
     g_fn.SSL_write = dlsym(RTLD_NEXT, "SSL_write");

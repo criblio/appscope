@@ -1,15 +1,15 @@
-#include <stdio.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <dlfcn.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/sysctl.h>
-#include <libproc.h>
-#include <sys/resource.h>
 #include "../../src/plattime.h"
+#include <dlfcn.h>
+#include <errno.h>
+#include <libproc.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/resource.h>
+#include <sys/sysctl.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #ifndef CMSG_ALIGN
 #define CMSG_ALIGN(n) __DARWIN_ALIGN32(n)
@@ -36,7 +36,7 @@ extern int osInitTSC(platform_time_t *);
 extern int osGetProcMemory(pid_t);
 extern int osIsFilePresent(pid_t, const char *);
 extern int osGetCmdline(pid_t, char **);
-extern bool osThreadInit(void(*handler)(int), unsigned);
+extern bool osThreadInit(void (*handler)(int), unsigned);
 extern int osUnixSockPeer(ino_t);
 extern void osInitJavaAgent(void);
 extern int osGetPageProt(uint64_t);

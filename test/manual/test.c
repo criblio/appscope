@@ -7,17 +7,18 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <syslog.h>
+#include <unistd.h>
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
     va_list ap;
     char *buf;
-    
+
     printf("Starting interpose test\n");
 
-    syslog (LOG_INFO, "A tree falls in a forest");
+    syslog(LOG_INFO, "A tree falls in a forest");
     vsyslog(LOG_INFO, "Hello World", ap);
 
     if ((buf = malloc(1024)) == NULL) {
@@ -26,7 +27,7 @@ int main(int argc, char **argv)
     }
 
     while (1) {
-        //puts("..");
+        // puts("..");
         write(1, "..", 2);
         sleep(1);
     }

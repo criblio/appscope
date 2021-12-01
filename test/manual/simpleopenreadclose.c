@@ -18,7 +18,7 @@ sigHandler(int sig_num)
 }
 
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("Running simpleopenreadclose.c\n");
     printf("... Hit ctl-c when done...\n");
@@ -28,7 +28,8 @@ main(int argc, char* argv[])
     if (argc == 2) {
         errno = 0;
         unsigned long temp = strtoul(argv[1], NULL, 10);
-        if (temp && !errno) interval = temp;
+        if (temp && !errno)
+            interval = temp;
     }
 
     signal(SIGINT, sigHandler);

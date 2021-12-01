@@ -5,22 +5,25 @@
  * we can test setting them when we "attach".
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 #include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 extern char **environ;
 
 static volatile int running = 1;
 
-void intHandler(int dummy) {
+void
+intHandler(int dummy)
+{
     printf("info: exiting on ctrl-c\n");
     running = 0;
 }
 
-int main(int argc, char **argv, char **env)
+int
+main(int argc, char **argv, char **env)
 {
     signal(SIGINT, intHandler);
 
@@ -34,6 +37,6 @@ int main(int argc, char **argv, char **env)
         printf("--\n");
         sleep(3);
     }
-    
+
     return EXIT_SUCCESS;
 }

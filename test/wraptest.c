@@ -1,58 +1,58 @@
 #define _GNU_SOURCE
+#include <arpa/inet.h>
+#include <limits.h>
+#include <netinet/in.h>
+#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <limits.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sched.h>
 
-#include "test.h"
 #include "cfg.h"
 #include "cfgutils.h"
 #include "dbg.h"
 #include "scopetypes.h"
+#include "test.h"
 #include "wrap.h"
 
 extern uint64_t getDuration(uint64_t);
 extern int osInitTSC(struct rtconfig_t *);
 
 // A port that is not likely to be used
-#define PORT1 65430
-#define PORT2 65431
+#define PORT1            65430
+#define PORT2            65431
 #define LIKELY_FILE_SIZE 100000
-#define NET_DURATION 2000
-#define FS_DURATION 100
+#define NET_DURATION     2000
+#define FS_DURATION      100
 
 rtconfig g_cfg = {0};
 
 /*
  * The env var SCOPE_HOME is set in
- * the Makefile or script that runs 
+ * the Makefile or script that runs
  * this test. It points to a config
  * file in scope/test/conf/scope.yml.
  * Using a config file for test we ensure
- * we have debug logs enabled and that 
+ * we have debug logs enabled and that
  * we know the path to the log file
- * and to a file that contains metrics. 
+ * and to a file that contains metrics.
  */
 static void
-testFSDuration(void** state)
+testFSDuration(void **state)
 {
     int rc, fd;
     char *log, *last;
     FILE *fs;
     const char delim[] = ":";
     char buf[1024];
-    char* cpath = cfgPath();
-    config_t* cfg = cfgRead(cpath);
+    char *cpath = cfgPath();
+    config_t *cfg = cfgRead(cpath);
     const char *path = cfgTransportPath(cfg, CFG_MTC);
     assert_int_equal(cfgMtcVerbosity(cfg), CFG_MAX_VERBOSITY);
-   
+
     // Start the duration timer with a read
     fd = open("./scope_env.sh", O_RDONLY);
     assert_return_code(fd, errno);
@@ -66,10 +66,10 @@ testFSDuration(void** state)
     // Read the metrics file
     fs = fopen(path, "r");
     assert_non_null(fs);
-    
+
     fread(buf, sizeof(buf), (size_t)1, fs);
     assert_int_equal(ferror(fs), 0);
-    //printf("%s\n", buf);
+    // printf("%s\n", buf);
 
     rc = fclose(fs);
     assert_return_code(rc, errno);
@@ -89,26 +89,26 @@ testFSDuration(void** state)
 
 /*
  * The env var SCOPE_HOME is set in
- * the Makefile or script that runs 
+ * the Makefile or script that runs
  * this test. It points to a config
  * file in scope/test/conf/scope.yml.
  * Using a config file for test we ensure
- * we have debug logs enabled and that 
+ * we have debug logs enabled and that
  * we know the path to the log file
- * and a metrics file. 
+ * and a metrics file.
  */
 static void
-testConnDuration(void** state)
+testConnDuration(void **state)
 {
     int rc, sdl, sds;
     struct sockaddr_in saddr;
     char *log, *last;
     FILE *fs;
-    const char* hostname = "127.0.0.1";
+    const char *hostname = "127.0.0.1";
     const char delim[] = ":";
     char *buf;
-    char* cpath = cfgPath();
-    config_t* cfg = cfgRead(cpath);
+    char *cpath = cfgPath();
+    config_t *cfg = cfgRead(cpath);
     const char *path = cfgTransportPath(cfg, CFG_MTC);
     assert_int_equal(cfgMtcVerbosity(cfg), CFG_MAX_VERBOSITY);
 
@@ -122,7 +122,7 @@ testConnDuration(void** state)
 
     rc = bind(sdl, (const struct sockaddr *)&saddr, sizeof(saddr));
     assert_return_code(rc, errno);
-    
+
     rc = listen(sdl, 2);
     assert_return_code(rc, errno);
 
@@ -133,8 +133,7 @@ testConnDuration(void** state)
     saddr.sin_port = htons(PORT2);
     rc = bind(sds, (const struct sockaddr *)&saddr, sizeof(saddr));
     assert_return_code(rc, errno);
-    
-    
+
     // Start the duration timer
     saddr.sin_port = htons(PORT1);
     rc = connect(sds, (const struct sockaddr *)&saddr, sizeof(saddr));
@@ -160,7 +159,7 @@ testConnDuration(void** state)
 
     fread(buf, LIKELY_FILE_SIZE, (size_t)1, fs);
     assert_int_equal(ferror(fs), 0);
-    //printf("%s\n", buf);
+    // printf("%s\n", buf);
 
     rc = fclose(fs);
     assert_return_code(rc, errno);
@@ -187,24 +186,24 @@ testConnDuration(void** state)
 }
 
 static void
-testTSCInit(void** state)
+testTSCInit(void **state)
 {
     rtconfig cfg;
-    
+
     assert_int_equal(osInitTSC(&cfg), 0);
 }
 
 static void
-testTSCRollover(void** state)
+testTSCRollover(void **state)
 {
-    uint64_t elapsed, now = ULONG_MAX -2;
+    uint64_t elapsed, now = ULONG_MAX - 2;
     elapsed = getDuration(now);
     if (elapsed < 250000)
         fail_msg("Elapsed %" PRIu64 " is less than allowed 250000", elapsed);
 }
 
 static void
-testTSCValue(void** state)
+testTSCValue(void **state)
 {
     uint64_t now, elapsed;
 
@@ -217,7 +216,7 @@ testTSCValue(void** state)
 /*
 
 This applies to __linux__ only.  And isn't like other tests in this file.
-Think about whether this adds enough value to run in conditionally only 
+Think about whether this adds enough value to run in conditionally only
 for linux.
 
 static void
@@ -254,11 +253,10 @@ testSyscallDbg(void** state)
 // This is not a proper test, it just exists to make valgrind output
 // more readable when analyzing this test, by deallocating the compiled
 // regex in src/cfgutils.c.
-extern void envRegexFree(void** state);
-
+extern void envRegexFree(void **state);
 
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("running %s\n", argv[0]);
     const struct CMUnitTest tests[] = {
@@ -267,7 +265,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(testTSCInit),
         cmocka_unit_test(testTSCRollover),
         cmocka_unit_test(testTSCValue),
-        //cmocka_unit_test(testSyscallDbg),
+        // cmocka_unit_test(testSyscallDbg),
         cmocka_unit_test(envRegexFree),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };

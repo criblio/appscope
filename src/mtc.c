@@ -1,16 +1,15 @@
+#include "mtc.h"
+#include "circbuf.h"
+#include "dbg.h"
+#include "runtimecfg.h"
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include "dbg.h"
-#include "mtc.h"
-#include "circbuf.h"
-#include "runtimecfg.h"
 
-struct _mtc_t
-{
+struct _mtc_t {
     unsigned enable;
-    transport_t* transport;
-    mtc_fmt_t* format;
+    transport_t *transport;
+    mtc_fmt_t *format;
 };
 
 mtc_t *
@@ -29,7 +28,8 @@ mtcCreate()
 void
 mtcDestroy(mtc_t **mtc)
 {
-    if (!mtc || !*mtc) return;
+    if (!mtc || !*mtc)
+        return;
     mtc_t *mtcb = *mtc;
     transportDestroy(&mtcb->transport);
     mtcFormatDestroy(&mtcb->format);
@@ -40,14 +40,16 @@ mtcDestroy(mtc_t **mtc)
 unsigned
 mtcEnabled(mtc_t *mtc)
 {
-    if (!mtc) return DEFAULT_MTC_ENABLE;
+    if (!mtc)
+        return DEFAULT_MTC_ENABLE;
     return mtc->enable;
 }
 
 int
 mtcSend(mtc_t *mtc, const char *msg)
 {
-    if (!mtc || !msg) return -1;
+    if (!mtc || !msg)
+        return -1;
 
     return transportSend(mtc->transport, msg, strlen(msg));
 }
@@ -55,18 +57,21 @@ mtcSend(mtc_t *mtc, const char *msg)
 int
 mtcSendMetric(mtc_t *mtc, event_t *evt)
 {
-    if (!mtc || !evt) return -1;
+    if (!mtc || !evt)
+        return -1;
 
     char *msg = mtcFormatEventForOutput(mtc->format, evt, NULL);
     int rv = mtcSend(mtc, msg);
-    if (msg) free(msg);
+    if (msg)
+        free(msg);
     return rv;
 }
 
 void
 mtcFlush(mtc_t *mtc)
 {
-    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return;
+    if (!mtc || (cfgLogStream(g_cfg.staticfg)))
+        return;
 
     transportFlush(mtc->transport);
 }
@@ -75,49 +80,56 @@ int
 mtcNeedsConnection(mtc_t *mtc)
 {
     // mtc & ctl use the same transport when LS is connected
-    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return 0;
+    if (!mtc || (cfgLogStream(g_cfg.staticfg)))
+        return 0;
     return transportNeedsConnection(mtc->transport);
 }
 
 int
 mtcConnect(mtc_t *mtc)
 {
-    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return 0;
+    if (!mtc || (cfgLogStream(g_cfg.staticfg)))
+        return 0;
     return transportConnect(mtc->transport);
 }
 
 int
 mtcConnection(mtc_t *mtc)
 {
-    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return -1;
+    if (!mtc || (cfgLogStream(g_cfg.staticfg)))
+        return -1;
     return transportConnection(mtc->transport);
 }
 
 int
 mtcDisconnect(mtc_t *mtc)
 {
-    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return 0;
+    if (!mtc || (cfgLogStream(g_cfg.staticfg)))
+        return 0;
     return transportDisconnect(mtc->transport);
 }
 
 int
 mtcReconnect(mtc_t *mtc)
 {
-    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return 0;
+    if (!mtc || (cfgLogStream(g_cfg.staticfg)))
+        return 0;
     return transportReconnect(mtc->transport);
 }
 
 void
 mtcEnabledSet(mtc_t *mtc, unsigned val)
 {
-    if (!mtc || val > 1) return;
+    if (!mtc || val > 1)
+        return;
     mtc->enable = val;
 }
 
 void
 mtcTransportSet(mtc_t *mtc, transport_t *transport)
 {
-    if (!mtc) return;
+    if (!mtc)
+        return;
 
     // Don't leak if mtcTransportSet is called repeatedly
     transportDestroy(&mtc->transport);
@@ -127,10 +139,10 @@ mtcTransportSet(mtc_t *mtc, transport_t *transport)
 void
 mtcFormatSet(mtc_t *mtc, mtc_fmt_t *format)
 {
-    if (!mtc) return;
+    if (!mtc)
+        return;
 
     // Don't leak if mtcFormatSet is called repeatedly
     mtcFormatDestroy(&mtc->format);
     mtc->format = format;
 }
-

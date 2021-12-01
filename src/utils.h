@@ -8,8 +8,8 @@ typedef struct {
     unsigned val;
 } enum_map_t;
 
-unsigned int strToVal(enum_map_t[], const char*);
-const char* valToStr(enum_map_t[], unsigned int);
+unsigned int strToVal(enum_map_t[], const char *);
+const char *valToStr(enum_map_t[], unsigned int);
 
 int checkEnv(char *, char *);
 int fullSetenv(const char *, const char *, int);

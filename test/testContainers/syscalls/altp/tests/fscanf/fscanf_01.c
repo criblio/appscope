@@ -1,6 +1,8 @@
 #include "test_utils.h"
 
-int do_test() {
+int
+do_test()
+{
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[NAME_MAX];
     char buffer[] = TEST_MSG;
@@ -9,13 +11,13 @@ int do_test() {
 
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
-    FILE* pFile = fopen(tmp_file_name, "w");
+    FILE *pFile = fopen(tmp_file_name, "w");
 
-    if(pFile != NULL) {
-        if(fwrite(buffer, 1, strlen(buffer), pFile) != strlen(buffer)) {
+    if (pFile != NULL) {
+        if (fwrite(buffer, 1, strlen(buffer), pFile) != strlen(buffer)) {
             TEST_ERROR();
         }
-        if(fclose(pFile) == EOF) {
+        if (fclose(pFile) == EOF) {
             TEST_ERROR();
         }
     } else {
@@ -24,13 +26,13 @@ int do_test() {
 
     pFile = fopen(tmp_file_name, "r");
 
-    if(pFile != NULL) {
+    if (pFile != NULL) {
         memset(buffer, 0, sizeof(buffer));
-        if(fscanf(pFile, "%s", buffer) == EOF || strcmp(buffer, TEST_MSG) != 0) {
+        if (fscanf(pFile, "%s", buffer) == EOF || strcmp(buffer, TEST_MSG) != 0) {
             TEST_ERROR();
         }
 
-        if(fclose(pFile) == EOF) {
+        if (fclose(pFile) == EOF) {
             TEST_ERROR();
         }
     } else {

@@ -1,11 +1,13 @@
-#include <netdb.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <arpa/inet.h>
+#include <netdb.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 
 #include "test_utils.h"
 
-int do_test() {
+int
+do_test()
+{
     int test_result = EXIT_SUCCESS;
 
     struct addrinfo hints, *res;
@@ -20,10 +22,10 @@ int do_test() {
     }
 
     while (res) {
-        if(res->ai_family == AF_INET) {
+        if (res->ai_family == AF_INET) {
             inet_ntop(res->ai_family, &((struct sockaddr_in *)res->ai_addr)->sin_addr, addr, INET_ADDRSTRLEN);
 
-            if(strcmp("127.0.0.1", addr) != 0) {
+            if (strcmp("127.0.0.1", addr) != 0) {
                 TEST_ERROR();
             }
         }

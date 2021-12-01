@@ -1,36 +1,36 @@
 #define _GNU_SOURCE
 #include <stdio.h>
-#include <unistd.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "fn.h"
 #include "mtc.h"
 #include "test.h"
 
 static void
-mtcCreateReturnsValidPtr(void** state)
+mtcCreateReturnsValidPtr(void **state)
 {
-    mtc_t* mtc = mtcCreate();
+    mtc_t *mtc = mtcCreate();
     assert_non_null(mtc);
     mtcDestroy(&mtc);
     assert_null(mtc);
 }
 
 static void
-mtcDestroyNullMtcDoesntCrash(void** state)
+mtcDestroyNullMtcDoesntCrash(void **state)
 {
     mtcDestroy(NULL);
-    mtc_t* mtc = NULL;
+    mtc_t *mtc = NULL;
     mtcDestroy(&mtc);
     // Implicitly shows that calling mtcDestroy with NULL is harmless
 }
 
 static void
-mtcEnabledSetAndGet(void** state)
+mtcEnabledSetAndGet(void **state)
 {
     assert_int_equal(mtcEnabled(NULL), DEFAULT_MTC_ENABLE);
 
-    mtc_t* mtc = mtcCreate();
+    mtc_t *mtc = mtcCreate();
     assert_int_equal(mtcEnabled(mtc), DEFAULT_MTC_ENABLE);
 
     mtcEnabledSet(mtc, FALSE);
@@ -42,18 +42,18 @@ mtcEnabledSetAndGet(void** state)
 }
 
 static void
-mtcSendForNullMtcDoesntCrash(void** state)
+mtcSendForNullMtcDoesntCrash(void **state)
 {
-    const char* msg = "Hey, this is cool!\n";
+    const char *msg = "Hey, this is cool!\n";
     assert_int_equal(mtcSend(NULL, msg), -1);
 }
 
 static void
-mtcSendForNullMessageDoesntCrash(void** state)
+mtcSendForNullMessageDoesntCrash(void **state)
 {
-    mtc_t* mtc = mtcCreate();
+    mtc_t *mtc = mtcCreate();
     assert_non_null(mtc);
-    transport_t* t = transportCreateSyslog();
+    transport_t *t = transportCreateSyslog();
     assert_non_null(t);
     mtcTransportSet(mtc, t);
     assert_int_equal(mtcSend(mtc, NULL), -1);
@@ -61,16 +61,16 @@ mtcSendForNullMessageDoesntCrash(void** state)
 }
 
 static void
-mtcTransportSetAndMtcSend(void** state)
+mtcTransportSetAndMtcSend(void **state)
 {
-    const char* file_path = "/tmp/my.path";
-    mtc_t* mtc = mtcCreate();
+    const char *file_path = "/tmp/my.path";
+    mtc_t *mtc = mtcCreate();
     assert_non_null(mtc);
-    transport_t* t1 = transportCreateUdp("127.0.0.1", "12345");
-    transport_t* t2 = transportCreateUnix("/var/run/scope.sock");
-    transport_t* t3 = transportCreateSyslog();
-    transport_t* t4 = transportCreateShm();
-    transport_t* t5 = transportCreateFile(file_path, CFG_BUFFER_FULLY);
+    transport_t *t1 = transportCreateUdp("127.0.0.1", "12345");
+    transport_t *t2 = transportCreateUnix("/var/run/scope.sock");
+    transport_t *t3 = transportCreateSyslog();
+    transport_t *t4 = transportCreateShm();
+    transport_t *t5 = transportCreateFile(file_path, CFG_BUFFER_FULLY);
     mtcTransportSet(mtc, t1);
     mtcTransportSet(mtc, t2);
     mtcTransportSet(mtc, t3);
@@ -98,16 +98,16 @@ mtcTransportSetAndMtcSend(void** state)
 }
 
 static void
-mtcFormatSetAndMtcSendEvent(void** state)
+mtcFormatSetAndMtcSendEvent(void **state)
 {
-    const char* file_path = "/tmp/my.path";
-    mtc_t* mtc = mtcCreate();
+    const char *file_path = "/tmp/my.path";
+    mtc_t *mtc = mtcCreate();
     assert_non_null(mtc);
-    transport_t* t = transportCreateFile(file_path, CFG_BUFFER_LINE);
+    transport_t *t = transportCreateFile(file_path, CFG_BUFFER_LINE);
     mtcTransportSet(mtc, t);
 
     event_t e = INT_EVENT("A", 1, DELTA, NULL);
-    mtc_fmt_t* f = mtcFormatCreate(CFG_FMT_STATSD);
+    mtc_fmt_t *f = mtcFormatCreate(CFG_FMT_STATSD);
     mtcFormatSet(mtc, f);
 
     // Test that format is cleared by seeing no side effects.
@@ -123,22 +123,16 @@ mtcFormatSetAndMtcSendEvent(void** state)
     mtcDestroy(&mtc);
 }
 
-
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("running %s\n", argv[0]);
     initFn();
 
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(mtcCreateReturnsValidPtr),
-        cmocka_unit_test(mtcDestroyNullMtcDoesntCrash),
-        cmocka_unit_test(mtcEnabledSetAndGet),
-        cmocka_unit_test(mtcSendForNullMtcDoesntCrash),
-        cmocka_unit_test(mtcSendForNullMessageDoesntCrash),
-        cmocka_unit_test(mtcTransportSetAndMtcSend),
-        cmocka_unit_test(mtcFormatSetAndMtcSendEvent),
-        cmocka_unit_test(dbgHasNoUnexpectedFailures),
+        cmocka_unit_test(mtcCreateReturnsValidPtr),     cmocka_unit_test(mtcDestroyNullMtcDoesntCrash),     cmocka_unit_test(mtcEnabledSetAndGet),
+        cmocka_unit_test(mtcSendForNullMtcDoesntCrash), cmocka_unit_test(mtcSendForNullMessageDoesntCrash), cmocka_unit_test(mtcTransportSetAndMtcSend),
+        cmocka_unit_test(mtcFormatSetAndMtcSendEvent),  cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

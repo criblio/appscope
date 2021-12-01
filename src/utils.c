@@ -1,13 +1,13 @@
 #define _GNU_SOURCE
 #include <errno.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
-#include "utils.h"
-#include "fn.h"
 #include "dbg.h"
+#include "fn.h"
 #include "runtimecfg.h"
+#include "utils.h"
 
 rtconfig g_cfg = {0};
 
@@ -15,8 +15,9 @@ unsigned int
 strToVal(enum_map_t map[], const char *str)
 {
     enum_map_t *m;
-    for (m=map; m->str; m++) {
-        if (!strcmp(str, m->str)) return m->val;
+    for (m = map; m->str; m++) {
+        if (!strcmp(str, m->str))
+            return m->val;
     }
     return -1;
 }
@@ -25,8 +26,9 @@ const char *
 valToStr(enum_map_t map[], unsigned int val)
 {
     enum_map_t *m;
-    for (m=map; m->str; m++) {
-        if (val == m->val) return m->str;
+    for (m = map; m->str; m++) {
+        if (val == m->val)
+            return m->str;
     }
     return NULL;
 }
@@ -35,8 +37,7 @@ int
 checkEnv(char *env, char *val)
 {
     char *estr;
-    if (((estr = getenv(env)) != NULL) &&
-       (strncmp(estr, val, strlen(estr)) == 0)) {
+    if (((estr = getenv(env)) != NULL) && (strncmp(estr, val, strlen(estr)) == 0)) {
         return TRUE;
     }
     return FALSE;
@@ -52,8 +53,7 @@ fullSetenv(const char *key, const char *val, int overwrite)
     int lrc = 0, arc = 0;
 
     if (!g_fn.setenv || (g_fn.setenv(key, val, overwrite) == -1)) {
-        DBG("g_fn.setenv=%p, g_fn.app_setenv=%p key=%s, val=%s",
-            g_fn.setenv, g_fn.app_setenv, key, val);
+        DBG("g_fn.setenv=%p, g_fn.app_setenv=%p key=%s, val=%s", g_fn.setenv, g_fn.app_setenv, key, val);
         lrc = -1;
     }
 
@@ -61,7 +61,8 @@ fullSetenv(const char *key, const char *val, int overwrite)
         arc = g_fn.app_setenv(key, val, overwrite);
     }
 
-    if ((lrc == -1) || (arc == -1)) return -1;
+    if ((lrc == -1) || (arc == -1))
+        return -1;
     return 0;
 }
 
@@ -99,7 +100,8 @@ getpath(const char *cmd)
     char *ret_val = NULL;
     struct stat buf;
 
-    if (!cmd) goto out;
+    if (!cmd)
+        goto out;
 
     // an absolute path was specified for cmd.
     if (cmd[0] == '/') {
@@ -113,7 +115,8 @@ getpath(const char *cmd)
     // a relative path was specified for cmd.
     if (strchr(cmd, '/')) {
         char *cur_dir = get_current_dir_name();
-        if (!cur_dir) goto out;
+        if (!cur_dir)
+            goto out;
 
         char *path = NULL;
         if (asprintf(&path, "%s/%s", cur_dir, cmd) > 0) {
@@ -141,13 +144,16 @@ getpath(const char *cmd)
 
     // try to resolve the cmd from PATH env variable
     char *path_env_ptr = getenv("PATH");
-    if (!path_env_ptr) goto out;
+    if (!path_env_ptr)
+        goto out;
     path_env = strdup(path_env_ptr); // create a copy for strtok below
-    if (!path_env) goto out;
+    if (!path_env)
+        goto out;
 
     char *saveptr = NULL;
     char *strtok_path = strtok_r(path_env, ":", &saveptr);
-    if (!strtok_path) goto out;
+    if (!strtok_path)
+        goto out;
 
     do {
         char *path = NULL;
@@ -169,27 +175,28 @@ getpath(const char *cmd)
     } while ((strtok_path = strtok_r(NULL, ":", &saveptr)));
 
 out:
-    if (path_env) free(path_env);
+    if (path_env)
+        free(path_env);
     return ret_val;
 }
 #endif //__APPLE__
 
-
 int
 startsWith(const char *string, const char *substring)
 {
-    if (!string || !substring) return FALSE;
+    if (!string || !substring)
+        return FALSE;
     return (strncmp(string, substring, strlen(substring)) == 0);
 }
 
 int
 endsWith(const char *string, const char *substring)
 {
-    if (!string || !substring) return FALSE;
+    if (!string || !substring)
+        return FALSE;
     int stringlen = strlen(string);
     int sublen = strlen(substring);
-    return (sublen <= stringlen) &&
-       ((strncmp(&string[stringlen-sublen], substring, sublen)) == 0);
+    return (sublen <= stringlen) && ((strncmp(&string[stringlen - sublen], substring, sublen)) == 0);
 }
 
 int

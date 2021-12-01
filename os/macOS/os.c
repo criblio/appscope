@@ -26,9 +26,8 @@ int
 osGetNumThreads(pid_t pid)
 {
     struct proc_taskinfo task;
-    
-    if (proc_pidinfo(pid, PROC_PIDTASKINFO, (uint64_t)0,
-                     &task, sizeof(struct proc_taskinfo)) == -1) {
+
+    if (proc_pidinfo(pid, PROC_PIDTASKINFO, (uint64_t)0, &task, sizeof(struct proc_taskinfo)) == -1) {
         return -1;
     }
 
@@ -91,11 +90,13 @@ osIsFilePresent(pid_t pid, const char *path)
 int
 osGetCmdline(pid_t pid, char **cmd)
 {
-    if (!cmd) return 0;
-    char* buf = *cmd;
+    if (!cmd)
+        return 0;
+    char *buf = *cmd;
 
     // Free old value, if one exists
-    if (buf) free(buf);
+    if (buf)
+        free(buf);
     buf = NULL;
 
     // TBD: placeholder for mac development
@@ -114,7 +115,7 @@ osGetCmdline(pid_t pid, char **cmd)
  * for OSX.
  */
 bool
-osThreadInit(void(*handler)(int), unsigned interval)
+osThreadInit(void (*handler)(int), unsigned interval)
 {
     return TRUE;
 }
@@ -122,7 +123,7 @@ osThreadInit(void(*handler)(int), unsigned interval)
 /*
  * In Linux we use Netlink socket capabilities
  * in order to extract the peer inode for
- * a given socket inode. There is no 
+ * a given socket inode. There is no
  * Netlink in macOS. We will need to find
  * a way to do something similar.
  */

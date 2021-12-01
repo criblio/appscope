@@ -1,5 +1,5 @@
-/* 
- * tcpserver.c - A simple TCP server 
+/*
+ * tcpserver.c - A simple TCP server
  *
  * usage: tcpserver [OPTIONS] PORT
  * options: -t, --tls       use TLSv1.3
@@ -8,7 +8,8 @@
  * gcc -g test/manual/tcpserver.c -Icontrib/build/openssl/include -Icontrib/openssl/include -L contrib/build/openssl -Wl,-R$PWD/contrib/build/openssl -lpthread -lssl -lcrypto -o tcpserver
  *
  * Build Statically:
- * gcc -g -DSSL_read=SCOPE_SSL_read test/manual/tcpserver.c -Icontrib/openssl/include -Icontrib/build/openssl/include contrib/build/openssl/libssl.a contrib/build/openssl/libcrypto.a -lpthread -ldl -o tcpserver
+ * gcc -g -DSSL_read=SCOPE_SSL_read test/manual/tcpserver.c -Icontrib/openssl/include -Icontrib/build/openssl/include contrib/build/openssl/libssl.a contrib/build/openssl/libcrypto.a -lpthread -ldl -o
+ * tcpserver
  *
  * generate unencrypted TLS key and certificate:
  * openssl req -nodes -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem
@@ -17,29 +18,29 @@
  * SCOPE_CRIBL_TLS_VALIDATE_SERVER=false scope run -c tls://127.0.0.1:9000 -- top
  */
 
+#include <arpa/inet.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <getopt.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+#include <pthread.h>
+#include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <netdb.h>
-#include <sys/types.h> 
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <pthread.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 #include <sys/poll.h>
-#include <stdbool.h>
-#include <getopt.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/wait.h>
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-#include <signal.h>
+#include <unistd.h>
 
 #define BUFSIZE 4096
-#define MAXFDS 500
+#define MAXFDS  500
 #define CMDFILE "/tmp/cmdin"
 
 // Forward declarations
@@ -49,18 +50,16 @@ int tcp(int);
 int tcp_ssl(int);
 
 // Long aliases for short options
-static struct option options[] = {
-    {"tls", no_argument, 0, 't'}
-};
+static struct option options[] = {{"tls", no_argument, 0, 't'}};
 
 // Flag that tells the server to exit
 static volatile sig_atomic_t exit_request = 0;
- 
+
 // Signal handler
 void
 hdl(int sig)
 {
-	exit_request = 1;
+    exit_request = 1;
 }
 
 // Program helper
@@ -88,12 +87,12 @@ main(int argc, char *argv[])
             break;
         }
         switch (opt) {
-        case 't':
-            tls = true;
-            break;
-        default: /* '?' */
-            showUsage();
-            exit(EXIT_FAILURE);
+            case 't':
+                tls = true;
+                break;
+            default: /* '?' */
+                showUsage();
+                exit(EXIT_FAILURE);
         }
     }
 
@@ -108,7 +107,7 @@ main(int argc, char *argv[])
         showUsage();
         return EXIT_FAILURE;
     }
-    
+
     int socket;
     if ((socket = socket_setup(port)) < 0) {
         exit(EXIT_FAILURE);
@@ -144,31 +143,29 @@ socket_setup(int port)
         return -1;
     }
 
-    /* setsockopt: Handy debugging trick that lets 
-     * us rerun the server immediately after we kill it; 
-     * otherwise we have to wait about 20 secs. 
-     * Eliminates "ERROR on binding: Address already in use" error. 
+    /* setsockopt: Handy debugging trick that lets
+     * us rerun the server immediately after we kill it;
+     * otherwise we have to wait about 20 secs.
+     * Eliminates "ERROR on binding: Address already in use" error.
      */
     optval = 1;
-    setsockopt(parentfd, SOL_SOCKET, SO_REUSEADDR, 
-            (const void *)&optval , sizeof(optval));
+    setsockopt(parentfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval, sizeof(optval));
 
     // server properties
     struct sockaddr_in serveraddr; /* server's addr */
-    bzero((char *) &serveraddr, sizeof(serveraddr));
+    bzero((char *)&serveraddr, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
     serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
     serveraddr.sin_port = htons((unsigned short)port);
 
-    // bind: associate the parent socket with a port 
-    if (bind(parentfd, (struct sockaddr *) &serveraddr, 
-                sizeof(serveraddr)) < 0) {
+    // bind: associate the parent socket with a port
+    if (bind(parentfd, (struct sockaddr *)&serveraddr, sizeof(serveraddr)) < 0) {
         fprintf(stderr, "Error on binding\n");
         return -1;
     }
 
-    // listen: make this socket ready to accept connection requests 
-    if (listen(parentfd, 15) < 0) { /* allow 15 requests to queue up */ 
+    // listen: make this socket ready to accept connection requests
+    if (listen(parentfd, 15) < 0) { /* allow 15 requests to queue up */
         fprintf(stderr, "Error on listen\n");
         return -1;
     }
@@ -179,7 +176,7 @@ socket_setup(int port)
 }
 
 // Socket teardown
-int 
+int
 socket_teardown(int socket)
 {
     if (shutdown(socket, SHUT_RDWR)) {
@@ -197,15 +194,15 @@ int
 tcp(int socket)
 {
     struct sockaddr_in clientaddr; /* client addr */
-    int childfd; /* child socket */
+    int childfd;                   /* child socket */
     socklen_t clientlen;
     int timeout;
     int numfds;
     struct pollfd fds[MAXFDS];
     int rc, i, j, fd, arr;
     struct hostent *hostp; /* client host info */
-    char buf[BUFSIZE]; /* message buffer */
-    char *hostaddrp; /* dotted decimal host addr string */
+    char buf[BUFSIZE];     /* message buffer */
+    char *hostaddrp;       /* dotted decimal host addr string */
 
     clientlen = sizeof(clientaddr); /* byte size of client's address */
     timeout = 10 * 1000;
@@ -220,12 +217,13 @@ tcp(int socket)
         rc = poll(fds, numfds, -1);
 
         // Error or timeout from poll;
-        if (rc <= 0) continue;
+        if (rc <= 0)
+            continue;
 
         for (i = 0; i < numfds; ++i) {
-            //fprintf(stderr, "%s:%d fds[%d].fd = %d\n", __FUNCTION__, __LINE__, i, fds[i].fd);
+            // fprintf(stderr, "%s:%d fds[%d].fd = %d\n", __FUNCTION__, __LINE__, i, fds[i].fd);
             if (fds[i].revents == 0) {
-                //fprintf(stderr, "%s:%d No event\n", __FUNCTION__, __LINE__);
+                // fprintf(stderr, "%s:%d No event\n", __FUNCTION__, __LINE__);
                 continue;
             }
 
@@ -254,7 +252,7 @@ tcp(int socket)
             }
 
             if (fds[i].fd == socket) {
-                childfd = accept(socket, (struct sockaddr *) &clientaddr, &clientlen);
+                childfd = accept(socket, (struct sockaddr *)&clientaddr, &clientlen);
                 if (childfd < 0) {
                     perror("ERROR on accept");
                     continue;
@@ -266,7 +264,7 @@ tcp(int socket)
                 }
 
                 // try to re-use an entry
-                for (j=0; j < numfds; j++) {
+                for (j = 0; j < numfds; j++) {
                     if (fds[j].fd == -1) {
                         fds[j].fd = childfd;
                         fds[j].events = POLLIN;
@@ -283,25 +281,22 @@ tcp(int socket)
                     numfds++;
                 }
 
-                // who sent the message 
-                hostp = gethostbyaddr((const char *)&clientaddr.sin_addr.s_addr, 
-                        sizeof(clientaddr.sin_addr.s_addr), AF_INET);
+                // who sent the message
+                hostp = gethostbyaddr((const char *)&clientaddr.sin_addr.s_addr, sizeof(clientaddr.sin_addr.s_addr), AF_INET);
                 if (hostp == NULL) {
-                    //perror("ERROR on gethostbyaddr");
+                    // perror("ERROR on gethostbyaddr");
                     fprintf(stderr, "server established connection on [%d].%d\n", arr, childfd);
                     continue;
                 }
 
                 hostaddrp = inet_ntoa(clientaddr.sin_addr);
                 if (hostaddrp == NULL) {
-                    //perror("ERROR on inet_ntoa\n");
-                    fprintf(stderr, "server established connection on [%d].%d with %s\n",
-                            arr, childfd, hostp->h_name);
+                    // perror("ERROR on inet_ntoa\n");
+                    fprintf(stderr, "server established connection on [%d].%d with %s\n", arr, childfd, hostp->h_name);
                     continue;
                 }
 
-                fprintf(stderr, "server established connection on [%d].%d with %s (%s:%d)\n",
-                        arr, childfd, hostp->h_name, hostaddrp, htons(clientaddr.sin_port));
+                fprintf(stderr, "server established connection on [%d].%d with %s (%s:%d)\n", arr, childfd, hostp->h_name, hostaddrp, htons(clientaddr.sin_port));
                 break;
             } else if (fds[i].fd == 0) {
                 // command input from stdin
@@ -330,8 +325,7 @@ tcp(int socket)
 
                     for (j = 2; j < numfds; j++) {
                         if ((fds[j].fd != -1) && (fds[j].fd > 2)) {
-                            fprintf(stderr, "%s:%d fds[%d].fd=%d rc %d\n%s\n", __FUNCTION__, __LINE__,
-                                    j, fds[j].fd, rc, cmd);
+                            fprintf(stderr, "%s:%d fds[%d].fd=%d rc %d\n%s\n", __FUNCTION__, __LINE__, j, fds[j].fd, rc, cmd);
                             if (send(fds[j].fd, cmd, rc, 0) < 0) { // MSG_DONTWAIT
                                 perror("send");
                             }
@@ -368,7 +362,7 @@ tcp(int socket)
 }
 
 // Generate SSL context and load certificates
-SSL_CTX*
+SSL_CTX *
 ssl_ctx_new()
 {
     SSL_CTX *ssl_ctx;
@@ -393,10 +387,10 @@ ssl_ctx_new()
 }
 
 // Generate SSL from context
-SSL*
+SSL *
 ssl_new(int fd, SSL_CTX *ssl_ctx)
 {
-    SSL* ssl;
+    SSL *ssl;
     ssl = SSL_new(ssl_ctx);
     if (!ssl) {
         fprintf(stderr, "SSL_new failed\n");
@@ -411,7 +405,8 @@ ssl_new(int fd, SSL_CTX *ssl_ctx)
 
 // Bidirectional SSL shutdown
 int
-ssl_shutdown(SSL *ssl) {
+ssl_shutdown(SSL *ssl)
+{
     int ret;
     ret = SSL_shutdown(ssl);
     if (ret < 0) {
@@ -426,7 +421,8 @@ ssl_shutdown(SSL *ssl) {
             int ssl_err = SSL_get_error(ssl, ret);
             fprintf(stderr,
                     "Waiting for client shutdown using SSL_shutdown failed: "
-                    "ssl_err=%d\n", ssl_err);
+                    "ssl_err=%d\n",
+                    ssl_err);
             return -1;
         }
     }
@@ -450,8 +446,7 @@ ssl_read(SSL *ssl)
             printf("Server thinks a client closed a TLS session\n");
             return 0;
         }
-        if (ssl_error != SSL_ERROR_WANT_READ &&
-                ssl_error != SSL_ERROR_WANT_WRITE) {
+        if (ssl_error != SSL_ERROR_WANT_READ && ssl_error != SSL_ERROR_WANT_WRITE) {
             fprintf(stderr, "server read failed: ssl_error=%d:", ssl_error);
             ERR_print_errors_fp(stderr);
             fprintf(stderr, "\n");
@@ -468,12 +463,12 @@ int
 tcp_ssl(int socket)
 {
     struct sigaction sa;
-	sa.sa_flags = 0;
-	sa.sa_handler = &hdl;
-	sigfillset(&sa.sa_mask);
-	sigdelset(&sa.sa_mask, SIGINT);
-	sigaction(SIGINT, &sa, NULL);
- 
+    sa.sa_flags = 0;
+    sa.sa_handler = &hdl;
+    sigfillset(&sa.sa_mask);
+    sigdelset(&sa.sa_mask, SIGINT);
+    sigaction(SIGINT, &sa, NULL);
+
     int wstatus;
     int fd;
     int ret;
@@ -497,8 +492,7 @@ tcp_ssl(int socket)
     }
     ret = SSL_accept(ssl);
     if (ret <= 0) {
-        fprintf(stderr, "SSL_accept failed ssl_err=%d errno=%s: ",
-                SSL_get_error(ssl, ret), strerror(errno));
+        fprintf(stderr, "SSL_accept failed ssl_err=%d errno=%s: ", SSL_get_error(ssl, ret), strerror(errno));
         ERR_print_errors_fp(stderr);
         fprintf(stderr, "\n");
         return -1;
@@ -508,12 +502,12 @@ tcp_ssl(int socket)
     FD_ZERO(&read_set);
     FD_SET(fd, &read_set);
 
-    while(1) {
-        int r = pselect(fd+1, &read_set, NULL, NULL, NULL, &sa.sa_mask);
+    while (1) {
+        int r = pselect(fd + 1, &read_set, NULL, NULL, NULL, &sa.sa_mask);
         if (exit_request) {
             printf("\nReceived interrupt, exiting gracefully\n");
-			break;
-		}
+            break;
+        }
         if (r < 0) {
             fprintf(stderr, "error in select\n");
             return -1;
@@ -539,5 +533,3 @@ tcp_ssl(int socket)
     SSL_CTX_free(ssl_ctx);
     return 0;
 }
-
-

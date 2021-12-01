@@ -18,9 +18,8 @@
 //   executing mygrep
 //     compiling {HEY} ... failed.
 
-
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("executing mygrep\n");
 
@@ -40,8 +39,8 @@ main(int argc, char* argv[])
 
     printf("  reading from stdin...");
     char stdinbuf[4096];
-    int stdinbytes = read( STDIN_FILENO , stdinbuf, sizeof(stdinbuf)-1);
-    if (stdinbytes == sizeof(stdinbuf) -1) {
+    int stdinbytes = read(STDIN_FILENO, stdinbuf, sizeof(stdinbuf) - 1);
+    if (stdinbytes == sizeof(stdinbuf) - 1) {
         printf(" failed.  Too many bytes read\n");
         return -1;
     } else if (stdinbytes == -1) {
@@ -51,7 +50,6 @@ main(int argc, char* argv[])
         printf(" success.\n");
     }
     stdinbuf[stdinbytes] = '\0';
-   
 
     printf("  executing %s against input %s\n", argv[1], stdinbuf);
     if (regexec(&regex, stdinbuf, 0, NULL, 0)) {
@@ -60,6 +58,6 @@ main(int argc, char* argv[])
     } else {
         printf("Match!\n");
     }
-        
+
     return 0;
 }

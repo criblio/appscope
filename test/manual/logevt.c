@@ -5,26 +5,26 @@
 // gcc -g test/manual/logevt.c -o logevt && ./logevt
 
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("running logevt\n");
 
     // provide default path
-    char* path = "/var/log/input.log";
+    char *path = "/var/log/input.log";
     // provide way to override path
-    if (argc == 2) path = argv[1];
+    if (argc == 2)
+        path = argv[1];
 
     // Wait for >10s to allow the periodic thread to be created.
     sleep(11);
 
     printf("...opening %s\n", path);
 
-    FILE* f = fopen(path, "a");
+    FILE *f = fopen(path, "a");
     if (!f) {
         printf("fopen of %s failed\n", path);
         exit(-1);
     }
-
 
     printf("...writing to %s\n", path);
 

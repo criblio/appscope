@@ -58,15 +58,15 @@ extern unsigned char _binary_ldscopedyn_end;
 extern unsigned char _binary_libscope_so_start;
 extern unsigned char _binary_libscope_so_end;
 
-// Representation of the .note.gnu.build-id ELF segment 
+// Representation of the .note.gnu.build-id ELF segment
 typedef struct {
-    Elf64_Nhdr nhdr;         // Note section header
-    char       name[4];      // "GNU\0"
-    char       build_id[0];  // build-id bytes, length is nhdr.n_descsz
+    Elf64_Nhdr nhdr;  // Note section header
+    char name[4];     // "GNU\0"
+    char build_id[0]; // build-id bytes, length is nhdr.n_descsz
 } note_t;
 
 // from https://github.com/mattst88/build-id/blob/master/build-id.c
-#define ALIGN(val, align) (((val) + (align) - 1) & ~((align) - 1))
+#define ALIGN(val, align) (((val) + (align)-1) & ~((align)-1))
 
 // ----------------------------------------------------------------------------
 // Internal
@@ -110,8 +110,8 @@ libdirCreateIfMissing()
 {
     const char *libdir = libdirGet();
 
-    if (!libdirDirExists(libdir, R_OK|X_OK)) {
-        if (mkdir(libdir, S_IRWXU|S_IRWXG|S_IRWXO) == -1) {
+    if (!libdirDirExists(libdir, R_OK | X_OK)) {
+        if (mkdir(libdir, S_IRWXU | S_IRWXG | S_IRWXO) == -1) {
             perror("mkdir() failed");
             return -1;
         }
@@ -120,33 +120,28 @@ libdirCreateIfMissing()
     return 0;
 }
 
-static note_t*
-libdirGetNote(void* buf)
+static note_t *
+libdirGetNote(void *buf)
 {
-    Elf64_Ehdr* elf = (Elf64_Ehdr*) buf;
-    Elf64_Phdr* hdr = (Elf64_Phdr*) (buf + elf->e_phoff);
+    Elf64_Ehdr *elf = (Elf64_Ehdr *)buf;
+    Elf64_Phdr *hdr = (Elf64_Phdr *)(buf + elf->e_phoff);
 
     for (unsigned i = 0; i < elf->e_phnum; i++) {
         if (hdr[i].p_type != PT_NOTE) {
             continue;
         }
 
-        note_t*   note = (note_t *)(buf + hdr[i].p_offset);
+        note_t *note = (note_t *)(buf + hdr[i].p_offset);
         Elf64_Off len = hdr[i].p_filesz;
         while (len >= sizeof(note_t)) {
-            if (note->nhdr.n_type == NT_GNU_BUILD_ID &&
-                note->nhdr.n_descsz != 0 &&
-                note->nhdr.n_namesz == 4 &&
-                memcmp(note->name, "GNU", 4) == 0) {
+            if (note->nhdr.n_type == NT_GNU_BUILD_ID && note->nhdr.n_descsz != 0 && note->nhdr.n_namesz == 4 && memcmp(note->name, "GNU", 4) == 0) {
                 return note;
             }
 
             // TODO: This needs to be reviewed. It's from
             // https://github.com/mattst88/build-id/blob/master/build-id.c but
             // I'm not entirely sure what it's doing or why. --PDugas
-            size_t offset = sizeof(Elf64_Nhdr) +
-                            ALIGN(note->nhdr.n_namesz, 4) +
-                            ALIGN(note->nhdr.n_descsz, 4);
+            size_t offset = sizeof(Elf64_Nhdr) + ALIGN(note->nhdr.n_namesz, 4) + ALIGN(note->nhdr.n_descsz, 4);
             note = (note_t *)((char *)note + offset);
             len -= offset;
         }
@@ -155,20 +150,20 @@ libdirGetNote(void* buf)
     return 0;
 }
 
-static note_t*
+static note_t *
 libdirGetLoaderNote()
 {
     return libdirGetNote(&_binary_ldscopedyn_start);
 }
 
-static note_t*
+static note_t *
 libdirGetLibraryNote()
 {
     return libdirGetNote(&_binary_libscope_so_start);
 }
 
 static int
-libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t* note)
+libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t *note)
 {
     char temp[PATH_MAX];
     int fd;
@@ -177,7 +172,7 @@ libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t
         return -1;
     }
 
-    if (libdirFileExists(path, R_OK|X_OK)) {
+    if (libdirFileExists(path, R_OK | X_OK)) {
         // extracted file already exists
 
         if (!note) {
@@ -199,8 +194,7 @@ libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t
             return 0;
         }
 
-        void* buf = mmap(NULL, ROUND_UP(s.st_size, sysconf(_SC_PAGESIZE)),
-                PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
+        void *buf = mmap(NULL, ROUND_UP(s.st_size, sysconf(_SC_PAGESIZE)), PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
         if (buf == MAP_FAILED) {
             close(fd);
             perror("mmap() failed");
@@ -211,7 +205,7 @@ libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t
 
         // compare the notes
         int cmp = -1;
-        note_t* pathNote = libdirGetNote(buf);
+        note_t *pathNote = libdirGetNote(buf);
         if (pathNote) {
             if (note->nhdr.n_descsz == pathNote->nhdr.n_descsz) {
                 cmp = memcmp(note->build_id, pathNote->build_id, note->nhdr.n_descsz);
@@ -251,7 +245,7 @@ libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t
     }
 
     // 0755
-    if (fchmod(fd, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)) {
+    if (fchmod(fd, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH)) {
         close(fd);
         unlink(temp);
         perror("fchmod() failed");
@@ -269,7 +263,7 @@ libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t
 }
 
 static int
-libdirRemove(const char* name, const struct stat *s, int type, struct FTW *ftw)
+libdirRemove(const char *name, const struct stat *s, int type, struct FTW *ftw)
 {
     if (remove(name)) {
         perror("remove() failed");
@@ -300,15 +294,13 @@ libdirSetBase(const char *base)
     return 0;
 }
 
-const char*
+const char *
 libdirGetBase()
 {
-    return g_libdir_info.base[0]
-        ? g_libdir_info.base
-        : SCOPE_LIBDIR_BASE;
+    return g_libdir_info.base[0] ? g_libdir_info.base : SCOPE_LIBDIR_BASE;
 }
 
-const char*
+const char *
 libdirGetDir()
 {
     if (!g_libdir_info.dir[0]) {
@@ -338,7 +330,7 @@ libdirGetDir()
     return g_libdir_info.dir;
 }
 
-const char*
+const char *
 libdirGet()
 {
     if (!g_libdir_info.path[0]) {
@@ -359,7 +351,7 @@ libdirGet()
 int
 libdirClean()
 {
-    if (nftw(libdirGet(), libdirRemove, 10, FTW_DEPTH|FTW_MOUNT|FTW_PHYS)) {
+    if (nftw(libdirGet(), libdirRemove, 10, FTW_DEPTH | FTW_MOUNT | FTW_PHYS)) {
         perror("ntfw() failed");
         return -1;
     }
@@ -370,19 +362,13 @@ libdirClean()
 int
 libdirExtractLoader()
 {
-    return libdirExtract(libdirGetLoader(),
-            &_binary_ldscopedyn_start,
-            &_binary_ldscopedyn_end,
-            libdirGetLoaderNote());
+    return libdirExtract(libdirGetLoader(), &_binary_ldscopedyn_start, &_binary_ldscopedyn_end, libdirGetLoaderNote());
 }
 
 int
 libdirExtractLibrary()
 {
-    return libdirExtract(libdirGetLibrary(),
-            &_binary_libscope_so_start,
-            &_binary_libscope_so_end,
-            libdirGetLibraryNote());
+    return libdirExtract(libdirGetLibrary(), &_binary_libscope_so_start, &_binary_libscope_so_end, libdirGetLibraryNote());
 }
 
 const char *

@@ -3,8 +3,7 @@
 #include <time.h>
 #include <unistd.h>
 
-//gcc -g test/manual/closefd.c -o closefd && ./closefd
-
+// gcc -g test/manual/closefd.c -o closefd && ./closefd
 
 /* This test was written because we've observed processes (splunk maybe)
    that close all file descriptors during initialization, probably to
@@ -19,15 +18,14 @@
    didn't open.
 */
 
-
 int
-closeScopeFds() {
+closeScopeFds()
+{
     int fd;
-    for (fd=200; fd<1000; fd++) {
+    for (fd = 200; fd < 1000; fd++) {
         close(fd);
     }
 }
-
 
 int
 main()
@@ -36,17 +34,19 @@ main()
 
     int i;
     // Loop for at least 45s  (Took 1m20s on my machine.)
-    for (i=0; i<45000; i++) {
+    for (i = 0; i < 45000; i++) {
         // After at least 6s, close the file descriptors.
         // Repeat a while later...
-        if ((i % 15000) == 6000) closeScopeFds();
+        if ((i % 15000) == 6000)
+            closeScopeFds();
 
         // Create arbitrary ongoing "activity"
-        int fd=open("/tmp/scope.test.out", O_APPEND|O_CREAT, 0666);
-        if (fd != -1) close(fd);
+        int fd = open("/tmp/scope.test.out", O_APPEND | O_CREAT, 0666);
+        if (fd != -1)
+            close(fd);
 
         // sleep for 10 ms each loop (in addition to the time open/close takes)
-        struct timespec ts = {.tv_sec=0, .tv_nsec=010000000};
+        struct timespec ts = {.tv_sec = 0, .tv_nsec = 010000000};
         nanosleep(&ts, NULL);
     }
 

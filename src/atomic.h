@@ -8,13 +8,14 @@ typedef unsigned int bool;
 #endif
 
 static inline bool
-atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
+atomicCasU64(uint64_t *ptr, uint64_t oldval, uint64_t newval)
 {
     return __sync_bool_compare_and_swap(ptr, oldval, newval);
 }
 
 static inline void
-atomicAddU64(uint64_t *ptr, uint64_t val) {
+atomicAddU64(uint64_t *ptr, uint64_t val)
+{
     // Ensure that we don't "add past maxint"...
     uint64_t oldval;
     uint64_t newval;
@@ -28,7 +29,8 @@ atomicAddU64(uint64_t *ptr, uint64_t val) {
 }
 
 static inline void
-atomicSubU64(uint64_t* ptr, uint64_t val) {
+atomicSubU64(uint64_t *ptr, uint64_t val)
+{
     // Ensure that we don't "subtract past zero"...
     uint64_t oldval;
     uint64_t newval;
@@ -43,20 +45,20 @@ atomicSubU64(uint64_t* ptr, uint64_t val) {
 }
 
 static inline uint64_t
-atomicSwapU64(uint64_t *ptr, uint64_t val) {
+atomicSwapU64(uint64_t *ptr, uint64_t val)
+{
     return __sync_lock_test_and_set(ptr, val);
 }
-
-
 
 static inline bool
 atomicCas32(int *ptr, int oldval, int newval)
 {
-   return __sync_bool_compare_and_swap(ptr, oldval, newval);
+    return __sync_bool_compare_and_swap(ptr, oldval, newval);
 }
 
 static inline void
-atomicAdd32(int *ptr, int val) {
+atomicAdd32(int *ptr, int val)
+{
     (void)__sync_add_and_fetch(ptr, val);
 }
 

@@ -2,9 +2,11 @@
 
 #include "test_utils.h"
 
-ssize_t __pread_chk(int fd, void * buf, size_t nbytes, off_t offset, size_t buflen);
+ssize_t __pread_chk(int fd, void *buf, size_t nbytes, off_t offset, size_t buflen);
 
-int do_test() {
+int
+do_test()
+{
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[NAME_MAX];
     char buffer[] = TEST_MSG;
@@ -17,11 +19,11 @@ int do_test() {
 
     if (f != EOF) {
         if (write(f, buffer, sizeof(buffer) - 1) == -1) {
-           TEST_ERROR();
+            TEST_ERROR();
         }
 
         if (close(f) != 0) {
-           TEST_ERROR();
+            TEST_ERROR();
         }
     } else {
         TEST_ERROR();
@@ -32,16 +34,16 @@ int do_test() {
     if (f != EOF) {
         memset(buffer, 0, sizeof(buffer));
 
-        if(__pread_chk(f, buffer, sizeof(buffer), 0, sizeof(buffer)) == EOF) {
+        if (__pread_chk(f, buffer, sizeof(buffer), 0, sizeof(buffer)) == EOF) {
             TEST_ERROR();
         }
 
-        if(strcmp(buffer, TEST_MSG) != 0) {
+        if (strcmp(buffer, TEST_MSG) != 0) {
             TEST_ERROR();
         }
 
-        if (close(f)!= 0) {
-           TEST_ERROR();
+        if (close(f) != 0) {
+            TEST_ERROR();
         }
     } else {
         TEST_ERROR();

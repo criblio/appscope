@@ -4,13 +4,13 @@
 #include <string.h>
 
 #include "cfg.h"
+#include "com.h"
 #include "dbg.h"
 #include "fn.h"
 #include "plattime.h"
 #include "report.h"
 #include "runtimecfg.h"
 #include "state.h"
-#include "com.h"
 #include "test.h"
 
 #define BUFSIZE 500
@@ -22,55 +22,60 @@ int mtcBufNext = 0;
 
 // These signatures satisfy --wrap=cmdSendEvent in the Makefile
 #ifdef __linux__
-int __real_cmdSendEvent(ctl_t*, event_t*, uint64_t, proc_id_t*);
-int __wrap_cmdSendEvent(ctl_t* ctl, event_t* event, uint64_t uid, proc_id_t* proc)
+int __real_cmdSendEvent(ctl_t *, event_t *, uint64_t, proc_id_t *);
+int
+__wrap_cmdSendEvent(ctl_t *ctl, event_t *event, uint64_t uid, proc_id_t *proc)
 #endif // __linux__
 #ifdef __APPLE__
-int cmdSendEvent(ctl_t* ctl, event_t* event, uint64_t uit, proc_id_t* proc)
+    int cmdSendEvent(ctl_t *ctl, event_t *event, uint64_t uit, proc_id_t *proc)
 #endif // __APPLE__
 {
     // Store event for later inspection
     memcpy(&evtBuf[evtBufNext++], event, sizeof(*event));
-    if (evtBufNext >= BUFSIZE) fail();
+    if (evtBufNext >= BUFSIZE)
+        fail();
 
     return 0; //__real_cmdSendEvent(ctl, event, uid, proc);
 }
 
 // These signatures satisfy --wrap=cmdSendMetric in the Makefile
 #ifdef __linux__
-int __real_cmdSendMetric(mtc_t*, event_t*);
-int __wrap_cmdSendMetric(mtc_t* mtc, event_t* metric)
+int __real_cmdSendMetric(mtc_t *, event_t *);
+int
+__wrap_cmdSendMetric(mtc_t *mtc, event_t *metric)
 #endif // __linux__
 #ifdef __APPLE__
-int cmdSendMetric(mtc_t* mtc, event_t* metric)
+    int cmdSendMetric(mtc_t *mtc, event_t *metric)
 #endif // __APPLE__
 {
     // Store metric for later inspection
     memcpy(&mtcBuf[mtcBufNext++], metric, sizeof(*metric));
-    if (mtcBufNext >= BUFSIZE) fail();
+    if (mtcBufNext >= BUFSIZE)
+        fail();
 
     return 0; //__real_cmdSendMetric(mtc, metric);
 }
 
-
 int
-eventCalls(const char* str)
+eventCalls(const char *str)
 {
     doEvent();
     int i, returnVal = 0;
-    for (i=0; i<evtBufNext; i++) {
-        if (!str || !strcmp(evtBuf[i].name, str)) returnVal++;
+    for (i = 0; i < evtBufNext; i++) {
+        if (!str || !strcmp(evtBuf[i].name, str))
+            returnVal++;
     }
     return returnVal;
 }
 
 int
-metricCalls(const char* str)
+metricCalls(const char *str)
 {
     doEvent();
     int i, returnVal = 0;
-    for (i=0; i<mtcBufNext; i++) {
-        if (!str || !strcmp(mtcBuf[i].name, str)) returnVal++;
+    for (i = 0; i < mtcBufNext; i++) {
+        if (!str || !strcmp(mtcBuf[i].name, str))
+            returnVal++;
     }
     return returnVal;
 }
@@ -82,7 +87,7 @@ eventRdWrValues(const char *str)
 {
     doEvent();
     int i, returnVal = 0;
-    for (i=0; i < evtBufNext; i++) {
+    for (i = 0; i < evtBufNext; i++) {
         if (!str || !strcmp(evtBuf[i].name, str)) {
             if (evtBuf[i].value.integer > 0) {
                 returnVal = evtBuf[i].value.integer;
@@ -93,11 +98,11 @@ eventRdWrValues(const char *str)
 }
 
 int
-eventValues(const char* str)
+eventValues(const char *str)
 {
     doEvent();
     int i, returnVal = 0;
-    for (i=0; i < evtBufNext; i++) {
+    for (i = 0; i < evtBufNext; i++) {
         if (!str || !strcmp(evtBuf[i].name, str)) {
             returnVal += evtBuf[i].value.integer;
         }
@@ -106,11 +111,11 @@ eventValues(const char* str)
 }
 
 int
-metricValues(const char* str)
+metricValues(const char *str)
 {
     doEvent();
     int i, returnVal = 0;
-    for (i=0; i < mtcBufNext; i++) {
+    for (i = 0; i < mtcBufNext; i++) {
         if (!str || !strcmp(mtcBuf[i].name, str)) {
             returnVal += mtcBuf[i].value.integer;
         }
@@ -140,7 +145,7 @@ init_g_proc()
 }
 
 static int
-countTestSetup(void** state)
+countTestSetup(void **state)
 {
     // init objects unique to this test that are external to count
     initTime();
@@ -155,7 +160,7 @@ countTestSetup(void** state)
     initState();
 
     // Turn on metric events
-    evt_fmt_t * evt_fmt = evtFormatCreate();
+    evt_fmt_t *evt_fmt = evtFormatCreate();
     evtFormatSourceEnabledSet(evt_fmt, CFG_SRC_METRIC, TRUE);
     ctlEvtSet(g_ctl, evt_fmt);
 
@@ -164,7 +169,7 @@ countTestSetup(void** state)
 }
 
 static int
-countTestTeardown(void** state)
+countTestTeardown(void **state)
 {
     logDestroy(&g_log);
     mtcDestroy(&g_mtc);
@@ -175,7 +180,7 @@ countTestTeardown(void** state)
 }
 
 static void
-nothingCrashesBeforeAnyInit(void** state)
+nothingCrashesBeforeAnyInit(void **state)
 {
     resetState();
 
@@ -226,14 +231,14 @@ nothingCrashesBeforeAnyInit(void** state)
 }
 
 static void
-initStateDoesNotCrash(void** state)
+initStateDoesNotCrash(void **state)
 {
     initState();
     clearTestData();
 }
 
 static void
-doReadFileNoSummarization(void** state)
+doReadFileNoSummarization(void **state)
 {
     clearTestData();
     setVerbosity(9);
@@ -256,9 +261,9 @@ doReadFileNoSummarization(void** state)
     doRead(16, 987, 1, NULL, 13, "readFunc", BUF, 0);
     doRead(16, 987, 1, NULL, 13, "readFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.read"), 2);
-    assert_int_equal(metricValues("fs.read"), 2*13);
+    assert_int_equal(metricValues("fs.read"), 2 * 13);
     assert_int_equal(eventCalls("fs.read"), 2);
-    assert_int_equal(eventRdWrValues("fs.read"), 2*13);
+    assert_int_equal(eventRdWrValues("fs.read"), 2 * 13);
 
     // Without open/close summarization, every doClose is output
     clearTestData();
@@ -278,7 +283,7 @@ doReadFileNoSummarization(void** state)
 }
 
 static void
-doReadFileSummarizedOpenCloseNotSummarized(void** state)
+doReadFileSummarizedOpenCloseNotSummarized(void **state)
 {
     clearTestData();
     setVerbosity(6);
@@ -302,7 +307,7 @@ doReadFileSummarizedOpenCloseNotSummarized(void** state)
     doRead(16, 987, 1, NULL, 13, "readFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.read"), 0);
     assert_int_equal(eventCalls("fs.read"), 2);
-    assert_int_equal(eventRdWrValues("fs.read"), 2*13);
+    assert_int_equal(eventRdWrValues("fs.read"), 2 * 13);
 
     // Without open/close summarization, every doClose is output
     clearTestData();
@@ -318,13 +323,13 @@ doReadFileSummarizedOpenCloseNotSummarized(void** state)
     doTotal(TOT_READ);
     doTotal(TOT_CLOSE);
     assert_int_equal(metricCalls("fs.read"), 1);
-    assert_int_equal(metricValues("fs.read"), 2*13);
+    assert_int_equal(metricValues("fs.read"), 2 * 13);
     assert_int_equal(metricCalls("fs.op.close"), 0);
     assert_int_equal(eventCalls(NULL), 0);
 }
 
 static void
-doReadFileFullSummarization(void** state)
+doReadFileFullSummarization(void **state)
 {
     clearTestData();
     setVerbosity(5);
@@ -348,7 +353,7 @@ doReadFileFullSummarization(void** state)
     doRead(16, 987, 1, NULL, 13, "readFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.read"), 0);
     assert_int_equal(eventCalls("fs.read"), 2);
-    assert_int_equal(eventRdWrValues("fs.read"), 2*13);
+    assert_int_equal(eventRdWrValues("fs.read"), 2 * 13);
 
     // With open/close summarization, doClose does not output either
     clearTestData();
@@ -365,7 +370,7 @@ doReadFileFullSummarization(void** state)
     doTotal(TOT_CLOSE);
     assert_int_equal(metricCalls("fs.open"), 1);
     assert_int_equal(metricCalls("fs.read"), 1);
-    assert_int_equal(metricValues("fs.read"), 2*13);
+    assert_int_equal(metricValues("fs.read"), 2 * 13);
     assert_int_equal(metricCalls("fs.close"), 1);
     assert_int_equal(eventCalls("fs.op.open"), 0);
     assert_int_equal(eventCalls("fs.read"), 0);
@@ -373,9 +378,9 @@ doReadFileFullSummarization(void** state)
 }
 
 static void
-doWriteFileNoSummarization(void** state)
+doWriteFileNoSummarization(void **state)
 {
-    char* buf = "hey.\n";
+    char *buf = "hey.\n";
 
     clearTestData();
     setVerbosity(9);
@@ -398,9 +403,9 @@ doWriteFileNoSummarization(void** state)
     doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc", BUF, 0);
     doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.write"), 2);
-    assert_int_equal(metricValues("fs.write"), 2*sizeof(buf));
+    assert_int_equal(metricValues("fs.write"), 2 * sizeof(buf));
     assert_int_equal(eventCalls("fs.write"), 2);
-    assert_int_equal(eventRdWrValues("fs.write"), 2*sizeof(buf));
+    assert_int_equal(eventRdWrValues("fs.write"), 2 * sizeof(buf));
 
     // Without open/close summarization, every doClose is output
     clearTestData();
@@ -420,9 +425,9 @@ doWriteFileNoSummarization(void** state)
 }
 
 static void
-doWriteFileSummarizedOpenCloseNotSummarized(void** state)
+doWriteFileSummarizedOpenCloseNotSummarized(void **state)
 {
-    char* buf = "hey.\n";
+    char *buf = "hey.\n";
 
     clearTestData();
     setVerbosity(6);
@@ -446,7 +451,7 @@ doWriteFileSummarizedOpenCloseNotSummarized(void** state)
     doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.write"), 0);
     assert_int_equal(eventCalls("fs.write"), 2);
-    assert_int_equal(eventRdWrValues("fs.write"), 2*sizeof(buf));
+    assert_int_equal(eventRdWrValues("fs.write"), 2 * sizeof(buf));
 
     // Without open/close summarization, every doClose is output
     clearTestData();
@@ -462,15 +467,15 @@ doWriteFileSummarizedOpenCloseNotSummarized(void** state)
     doTotal(TOT_WRITE);
     doTotal(TOT_CLOSE);
     assert_int_equal(metricCalls("fs.write"), 1);
-    assert_int_equal(metricValues("fs.write"), 2*sizeof(buf));
+    assert_int_equal(metricValues("fs.write"), 2 * sizeof(buf));
     assert_int_equal(metricCalls("fs.op.close"), 0);
     assert_int_equal(eventCalls(NULL), 0);
 }
 
 static void
-doWriteFileFullSummarization(void** state)
+doWriteFileFullSummarization(void **state)
 {
-    char* buf = "hey.\n";
+    char *buf = "hey.\n";
 
     clearTestData();
     setVerbosity(5);
@@ -494,7 +499,7 @@ doWriteFileFullSummarization(void** state)
     doWrite(16, 987, 1, buf, sizeof(buf), "writeFunc", BUF, 0);
     assert_int_equal(metricCalls("fs.write"), 0);
     assert_int_equal(eventCalls("fs.write"), 2);
-    assert_int_equal(eventRdWrValues("fs.write"), 2*sizeof(buf));
+    assert_int_equal(eventRdWrValues("fs.write"), 2 * sizeof(buf));
 
     // With open/close summarization, doClose does not output either
     clearTestData();
@@ -511,7 +516,7 @@ doWriteFileFullSummarization(void** state)
     doTotal(TOT_CLOSE);
     assert_int_equal(metricCalls("fs.open"), 1);
     assert_int_equal(metricCalls("fs.write"), 1);
-    assert_int_equal(metricValues("fs.write"), 2*sizeof(buf));
+    assert_int_equal(metricValues("fs.write"), 2 * sizeof(buf));
     assert_int_equal(metricCalls("fs.close"), 1);
     assert_int_equal(eventCalls("fs.op.open"), 0);
     assert_int_equal(eventCalls("fs.write"), 0);
@@ -519,9 +524,9 @@ doWriteFileFullSummarization(void** state)
 }
 
 static void
-doRecvNoSummarization(void** state)
+doRecvNoSummarization(void **state)
 {
-    struct addrinfo* addr_list = NULL;
+    struct addrinfo *addr_list = NULL;
     struct addrinfo hints = {0};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -554,9 +559,9 @@ doRecvNoSummarization(void** state)
     doRecv(16, 13, NULL, 13, BUF);
     doRecv(16, 13, NULL, 13, BUF);
     assert_int_equal(metricCalls("net.rx"), 2);
-    assert_int_equal(metricValues("net.rx"), 2*13);
+    assert_int_equal(metricValues("net.rx"), 2 * 13);
     assert_int_equal(eventCalls("net.rx"), 2);
-    assert_int_equal(eventRdWrValues("net.rx"), 2*13);
+    assert_int_equal(eventRdWrValues("net.rx"), 2 * 13);
 
     // Without open/close summarization, every doClose it output
     clearTestData();
@@ -576,13 +581,14 @@ doRecvNoSummarization(void** state)
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
-    if(addr_list) freeaddrinfo(addr_list);
+    if (addr_list)
+        freeaddrinfo(addr_list);
 }
 
 static void
-doRecvSummarizedOpenCloseNotSummarized(void** state)
+doRecvSummarizedOpenCloseNotSummarized(void **state)
 {
-    struct addrinfo* addr_list = NULL;
+    struct addrinfo *addr_list = NULL;
     struct addrinfo hints = {0};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -616,7 +622,7 @@ doRecvSummarizedOpenCloseNotSummarized(void** state)
     doRecv(16, 13, NULL, 13, BUF);
     assert_int_equal(metricCalls("net.rx"), 0);
     assert_int_equal(eventCalls("net.rx"), 2);
-    assert_int_equal(eventRdWrValues("net.rx"), 2*13);
+    assert_int_equal(eventRdWrValues("net.rx"), 2 * 13);
 
     // Without open/close summarization, every doClose it output
     clearTestData();
@@ -634,18 +640,19 @@ doRecvSummarizedOpenCloseNotSummarized(void** state)
     doTotal(TOT_TCP_CONN);
     doTotal(TOT_RX);
     assert_int_equal(metricCalls("net.rx"), 1);
-    assert_int_equal(metricValues("net.rx"), 2*13);
+    assert_int_equal(metricValues("net.rx"), 2 * 13);
     assert_int_equal(metricCalls("net.tcp"), 0);
     assert_int_equal(metricCalls("net.port"), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
-    if(addr_list) freeaddrinfo(addr_list);
+    if (addr_list)
+        freeaddrinfo(addr_list);
 }
 
 static void
-doRecvFullSummarization(void** state)
+doRecvFullSummarization(void **state)
 {
-    struct addrinfo* addr_list = NULL;
+    struct addrinfo *addr_list = NULL;
     struct addrinfo hints = {0};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -679,7 +686,7 @@ doRecvFullSummarization(void** state)
     doRecv(16, 13, NULL, 13, BUF);
     assert_int_equal(metricCalls("net.rx"), 0);
     assert_int_equal(eventCalls("net.rx"), 2);
-    assert_int_equal(eventRdWrValues("net.rx"), 2*13);
+    assert_int_equal(eventRdWrValues("net.rx"), 2 * 13);
 
     // With open/close summarization, doClose does not output either
     clearTestData();
@@ -697,18 +704,19 @@ doRecvFullSummarization(void** state)
     doTotal(TOT_TCP_CONN);
     doTotal(TOT_RX);
     assert_int_equal(metricCalls("net.rx"), 1);
-    assert_int_equal(metricValues("net.rx"), 2*13);
-    assert_int_equal(metricCalls("net.tcp"), 0);     // Interesting...
-    assert_int_equal(metricCalls("net.port"), 0);    // need high water mark?
+    assert_int_equal(metricValues("net.rx"), 2 * 13);
+    assert_int_equal(metricCalls("net.tcp"), 0);  // Interesting...
+    assert_int_equal(metricCalls("net.port"), 0); // need high water mark?
     assert_int_equal(eventCalls(NULL), 0);
 
-    if(addr_list) freeaddrinfo(addr_list);
+    if (addr_list)
+        freeaddrinfo(addr_list);
 }
 
 static void
-doSendNoSummarization(void** state)
+doSendNoSummarization(void **state)
 {
-    struct addrinfo* addr_list = NULL;
+    struct addrinfo *addr_list = NULL;
     struct addrinfo hints = {0};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -741,9 +749,9 @@ doSendNoSummarization(void** state)
     doSend(16, 13, NULL, 0, BUF);
     doSend(16, 13, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.tx"), 2);
-    assert_int_equal(metricValues("net.tx"), 2*13);
+    assert_int_equal(metricValues("net.tx"), 2 * 13);
     assert_int_equal(eventCalls("net.tx"), 2);
-    assert_int_equal(eventRdWrValues("net.tx"), 2*13);
+    assert_int_equal(eventRdWrValues("net.tx"), 2 * 13);
 
     // Without open/close summarization, every doClose it output
     clearTestData();
@@ -763,13 +771,14 @@ doSendNoSummarization(void** state)
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
-    if(addr_list) freeaddrinfo(addr_list);
+    if (addr_list)
+        freeaddrinfo(addr_list);
 }
 
 static void
-doSendSummarizedOpenCloseNotSummarized(void** state)
+doSendSummarizedOpenCloseNotSummarized(void **state)
 {
-    struct addrinfo* addr_list = NULL;
+    struct addrinfo *addr_list = NULL;
     struct addrinfo hints = {0};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -803,7 +812,7 @@ doSendSummarizedOpenCloseNotSummarized(void** state)
     doSend(16, 13, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 2);
-    assert_int_equal(eventRdWrValues("net.tx"), 2*13);
+    assert_int_equal(eventRdWrValues("net.tx"), 2 * 13);
 
     // Without open/close summarization, every doClose it output
     clearTestData();
@@ -821,18 +830,19 @@ doSendSummarizedOpenCloseNotSummarized(void** state)
     doTotal(TOT_TCP_CONN);
     doTotal(TOT_TX);
     assert_int_equal(metricCalls("net.tx"), 1);
-    assert_int_equal(metricValues("net.tx"), 2*13);
+    assert_int_equal(metricValues("net.tx"), 2 * 13);
     assert_int_equal(metricCalls("net.tcp"), 0);
     assert_int_equal(metricCalls("net.port"), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
-    if(addr_list) freeaddrinfo(addr_list);
+    if (addr_list)
+        freeaddrinfo(addr_list);
 }
 
 static void
-doSendFullSummarization(void** state)
+doSendFullSummarization(void **state)
 {
-    struct addrinfo* addr_list = NULL;
+    struct addrinfo *addr_list = NULL;
     struct addrinfo hints = {0};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -866,7 +876,7 @@ doSendFullSummarization(void** state)
     doSend(16, 13, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 2);
-    assert_int_equal(eventRdWrValues("net.tx"), 2*13);
+    assert_int_equal(eventRdWrValues("net.tx"), 2 * 13);
 
     // With open/close summarization, doClose does not output either
     clearTestData();
@@ -884,16 +894,17 @@ doSendFullSummarization(void** state)
     doTotal(TOT_TCP_CONN);
     doTotal(TOT_TX);
     assert_int_equal(metricCalls("net.tx"), 1);
-    assert_int_equal(metricValues("net.tx"), 2*13);
-    assert_int_equal(metricCalls("net.tcp"), 0);     // Interesting...
-    assert_int_equal(metricCalls("net.port"), 0);    // need high water mark?
+    assert_int_equal(metricValues("net.tx"), 2 * 13);
+    assert_int_equal(metricCalls("net.tcp"), 0);  // Interesting...
+    assert_int_equal(metricCalls("net.port"), 0); // need high water mark?
     assert_int_equal(eventCalls(NULL), 0);
 
-    if(addr_list) freeaddrinfo(addr_list);
+    if (addr_list)
+        freeaddrinfo(addr_list);
 }
 
 static void
-doSeekNoSummarization(void** state)
+doSeekNoSummarization(void **state)
 {
     clearTestData();
     setVerbosity(8);
@@ -934,7 +945,7 @@ doSeekNoSummarization(void** state)
 }
 
 static void
-doSeekSummarization(void** state)
+doSeekSummarization(void **state)
 {
     clearTestData();
     setVerbosity(7);
@@ -977,7 +988,7 @@ doSeekSummarization(void** state)
 
 #ifdef __linux__
 static void
-doStatPathNoSummarization(void** state)
+doStatPathNoSummarization(void **state)
 {
     clearTestData();
     setVerbosity(7);
@@ -1004,7 +1015,7 @@ doStatPathNoSummarization(void** state)
 }
 
 static void
-doStatPathSummarization(void** state)
+doStatPathSummarization(void **state)
 {
     clearTestData();
     setVerbosity(6);
@@ -1032,91 +1043,91 @@ doStatPathSummarization(void** state)
 }
 
 static void
-doStatFdNoSummarization(void** state)
+doStatFdNoSummarization(void **state)
 {
-     clearTestData();
-     setVerbosity(7);
-     doOpen(16, "/the/file/path", FD, "openFunc");
-     assert_int_equal(metricCalls("fs.op.open"), 1);
-     assert_int_equal(eventCalls("fs.op.open"), 1);
+    clearTestData();
+    setVerbosity(7);
+    doOpen(16, "/the/file/path", FD, "openFunc");
+    assert_int_equal(metricCalls("fs.op.open"), 1);
+    assert_int_equal(eventCalls("fs.op.open"), 1);
 
-     // Totals should not be reported if zero
-     doTotal(TOT_STAT);
-     assert_int_equal(metricCalls("fs.op.stat"), 0);
-     assert_int_equal(eventCalls("fs.op.stat"), 0);
+    // Totals should not be reported if zero
+    doTotal(TOT_STAT);
+    assert_int_equal(metricCalls("fs.op.stat"), 0);
+    assert_int_equal(eventCalls("fs.op.stat"), 0);
 
-     // Without stat summarization, every doStatFd is output
-     clearTestData();
-     doStatFd(16, 0, "statFunc");
-     doStatFd(16, 0, "statFunc");
-     assert_int_equal(metricCalls("fs.op.stat"), 2);
-     assert_int_equal(metricValues("fs.op.stat"), 2);
-     assert_int_equal(eventCalls("fs.op.stat"), 2);
-     assert_int_equal(eventValues("fs.op.stat"), 2);
+    // Without stat summarization, every doStatFd is output
+    clearTestData();
+    doStatFd(16, 0, "statFunc");
+    doStatFd(16, 0, "statFunc");
+    assert_int_equal(metricCalls("fs.op.stat"), 2);
+    assert_int_equal(metricValues("fs.op.stat"), 2);
+    assert_int_equal(eventCalls("fs.op.stat"), 2);
+    assert_int_equal(eventValues("fs.op.stat"), 2);
 
-     // Without open/close summarization, every doClose is output
-     clearTestData();
-     doClose(16, "closeFunc");
-     assert_int_equal(metricCalls("fs.op.stat"), 0);
-     assert_int_equal(eventCalls("fs.op.stat"), 0);
-     assert_int_equal(metricCalls("fs.op.close"), 1);
-     assert_int_equal(eventCalls("fs.op.close"), 1);
+    // Without open/close summarization, every doClose is output
+    clearTestData();
+    doClose(16, "closeFunc");
+    assert_int_equal(metricCalls("fs.op.stat"), 0);
+    assert_int_equal(eventCalls("fs.op.stat"), 0);
+    assert_int_equal(metricCalls("fs.op.close"), 1);
+    assert_int_equal(eventCalls("fs.op.close"), 1);
 
-     // doTotal shouldn't output fs.op.stat or fs.op.close.  It's already reported
-     clearTestData();
-     doTotal(TOT_OPEN);
-     doTotal(TOT_STAT);
-     doTotal(TOT_CLOSE);
-     assert_int_equal(metricCalls(NULL), 0);
-     assert_int_equal(eventCalls(NULL), 0);
+    // doTotal shouldn't output fs.op.stat or fs.op.close.  It's already reported
+    clearTestData();
+    doTotal(TOT_OPEN);
+    doTotal(TOT_STAT);
+    doTotal(TOT_CLOSE);
+    assert_int_equal(metricCalls(NULL), 0);
+    assert_int_equal(eventCalls(NULL), 0);
 }
 
 static void
-doStatFdSummarization(void** state)
+doStatFdSummarization(void **state)
 {
-     clearTestData();
-     setVerbosity(6);
-     doOpen(16, "/the/file/path", FD, "openFunc");
-     assert_int_equal(metricCalls("fs.op.open"), 1);
-     assert_int_equal(eventCalls("fs.op.open"), 1);
+    clearTestData();
+    setVerbosity(6);
+    doOpen(16, "/the/file/path", FD, "openFunc");
+    assert_int_equal(metricCalls("fs.op.open"), 1);
+    assert_int_equal(eventCalls("fs.op.open"), 1);
 
-     // Totals should not be reported if zero
-     doTotal(TOT_STAT);
-     assert_int_equal(metricCalls("fs.op.stat"), 0);
-     assert_int_equal(eventCalls("fs.op.stat"), 0);
+    // Totals should not be reported if zero
+    doTotal(TOT_STAT);
+    assert_int_equal(metricCalls("fs.op.stat"), 0);
+    assert_int_equal(eventCalls("fs.op.stat"), 0);
 
-     // With stat summarization, doStatFd is is not output
-     clearTestData();
-     doStatFd(16, 0, "statFunc");
-     doStatFd(16, 0, "statFunc");
-     assert_int_equal(metricCalls("fs.op.stat"), 0);
-     assert_int_equal(metricValues("fs.op.stat"), 0);
-     assert_int_equal(eventCalls("fs.op.stat"), 2);
-     assert_int_equal(eventValues("fs.op.stat"), 2);
+    // With stat summarization, doStatFd is is not output
+    clearTestData();
+    doStatFd(16, 0, "statFunc");
+    doStatFd(16, 0, "statFunc");
+    assert_int_equal(metricCalls("fs.op.stat"), 0);
+    assert_int_equal(metricValues("fs.op.stat"), 0);
+    assert_int_equal(eventCalls("fs.op.stat"), 2);
+    assert_int_equal(eventValues("fs.op.stat"), 2);
 
-     // Without open/close summarization, every doClose is output
-     clearTestData();
-     doClose(16, "closeFunc");
-     assert_int_equal(metricCalls("fs.op.stat"), 0);
-     assert_int_equal(eventCalls("fs.op.stat"), 0);
-     assert_int_equal(metricCalls("fs.op.close"), 1);
-     assert_int_equal(eventCalls("fs.op.close"), 1);
+    // Without open/close summarization, every doClose is output
+    clearTestData();
+    doClose(16, "closeFunc");
+    assert_int_equal(metricCalls("fs.op.stat"), 0);
+    assert_int_equal(eventCalls("fs.op.stat"), 0);
+    assert_int_equal(metricCalls("fs.op.close"), 1);
+    assert_int_equal(eventCalls("fs.op.close"), 1);
 
-     // doTotal should output fs.stat.
-     clearTestData();
-     doTotal(TOT_OPEN);
-     doTotal(TOT_STAT);
-     doTotal(TOT_CLOSE);
-     assert_int_equal(metricCalls("fs.stat"), 1);
-     assert_int_equal(metricValues("fs.stat"), 2);
-     assert_int_equal(eventCalls(NULL), 0);
+    // doTotal should output fs.stat.
+    clearTestData();
+    doTotal(TOT_OPEN);
+    doTotal(TOT_STAT);
+    doTotal(TOT_CLOSE);
+    assert_int_equal(metricCalls("fs.stat"), 1);
+    assert_int_equal(metricValues("fs.stat"), 2);
+    assert_int_equal(eventCalls(NULL), 0);
 }
 #endif // __linux__
 
 static void
-doDNSSendNoDNSSummarization(void** state)
+doDNSSendNoDNSSummarization(void **state)
 {
-    struct addrinfo* addr_list = NULL;
+    struct addrinfo *addr_list = NULL;
     struct addrinfo hints = {0};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -1143,17 +1154,12 @@ doDNSSendNoDNSSummarization(void** state)
     assert_int_equal(metricCalls("net.dns"), 0);
     assert_int_equal(eventCalls("net.dns.req"), 0);
 
-
     // Without DNS summarization, every net.dns is output
     clearTestData();
 
     // A query to look up www.google.com
-    uint8_t pkt[] = {
-	0xde, 0xaf, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x01, 0x03, 0x77, 0x77, 0x77,
-	0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x03,
-	0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01
-    };
+    uint8_t pkt[] = {0xde, 0xaf, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x03, 0x77, 0x77,
+                     0x77, 0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01};
     getDNSName(16, pkt, sizeof(pkt));
     doSend(16, 13, NULL, 13, BUF);
     // Switch from www.google.com to www.reddit.com.
@@ -1163,14 +1169,13 @@ doDNSSendNoDNSSummarization(void** state)
     doSend(16, 13, NULL, 13, BUF);
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 2);
-    assert_int_equal(eventRdWrValues("net.tx"), 2*13);
+    assert_int_equal(eventRdWrValues("net.tx"), 2 * 13);
     assert_int_equal(metricCalls("net.dns"), 2);
     assert_int_equal(metricValues("net.dns"), 2);
     // the way this is done, there is now a raw event and a DNS event
     // for each doEvent()
     assert_int_equal(eventCalls("net.dns.req"), 4);
     assert_int_equal(eventValues("net.dns.req"), 4);
-
 
     // Without open/close summarization, every doClose is output
     clearTestData();
@@ -1191,16 +1196,17 @@ doDNSSendNoDNSSummarization(void** state)
     doTotal(TOT_DNS);
     doTotal(TOT_TX);
     assert_int_equal(metricCalls("net.tx"), 1);
-    assert_int_equal(metricValues("net.tx"), 2*13);
+    assert_int_equal(metricValues("net.tx"), 2 * 13);
     assert_int_equal(eventCalls(NULL), 0);
 
-    if(addr_list) freeaddrinfo(addr_list);
+    if (addr_list)
+        freeaddrinfo(addr_list);
 }
 
 static void
-doDNSSendDNSSummarization(void** state)
+doDNSSendDNSSummarization(void **state)
 {
-    struct addrinfo* addr_list = NULL;
+    struct addrinfo *addr_list = NULL;
     struct addrinfo hints = {0};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -1227,17 +1233,12 @@ doDNSSendDNSSummarization(void** state)
     assert_int_equal(metricCalls("net.dns"), 0);
     assert_int_equal(eventCalls("net.dns.req"), 0);
 
-
     // With DNS summarization, net.dns is not output
     clearTestData();
 
     // A query to look up www.google.com
-    uint8_t pkt[] = {
-	0xde, 0xaf, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x01, 0x03, 0x77, 0x77, 0x77,
-	0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x03,
-	0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01
-    };
+    uint8_t pkt[] = {0xde, 0xaf, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x03, 0x77, 0x77,
+                     0x77, 0x06, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x03, 0x63, 0x6f, 0x6d, 0x00, 0x00, 0x01};
     getDNSName(16, pkt, sizeof(pkt));
     doSend(16, 13, NULL, 0, BUF);
     // Switch from www.google.com to www.reddit.com.
@@ -1247,12 +1248,11 @@ doDNSSendDNSSummarization(void** state)
     doSend(16, 13, NULL, 0, BUF);
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 2);
-    assert_int_equal(eventRdWrValues("net.tx"), 2*13);
+    assert_int_equal(eventRdWrValues("net.tx"), 2 * 13);
     assert_int_equal(metricCalls("net.dns"), 0);
     assert_int_equal(metricValues("net.dns"), 0);
     assert_int_equal(eventCalls("net.dns.req"), 4);
     assert_int_equal(eventValues("net.dns.req"), 4);
-
 
     // Without open/close summarization, every doClose is output
     clearTestData();
@@ -1273,16 +1273,17 @@ doDNSSendDNSSummarization(void** state)
     doTotal(TOT_DNS);
     doTotal(TOT_TX);
     assert_int_equal(metricCalls("net.tx"), 1);
-    assert_int_equal(metricValues("net.tx"), 2*13);
+    assert_int_equal(metricValues("net.tx"), 2 * 13);
     assert_int_equal(metricCalls("net.dns"), 1);
     assert_int_equal(metricValues("net.dns"), 2);
     assert_int_equal(eventCalls(NULL), 0);
 
-    if(addr_list) freeaddrinfo(addr_list);
+    if (addr_list)
+        freeaddrinfo(addr_list);
 }
 
 static void
-doFSConnectionErrorNoSummarization(void** state)
+doFSConnectionErrorNoSummarization(void **state)
 {
     clearTestData();
     setVerbosity(5);
@@ -1312,7 +1313,7 @@ doFSConnectionErrorNoSummarization(void** state)
 }
 
 static void
-doFSConnectionErrorSummarization(void** state)
+doFSConnectionErrorSummarization(void **state)
 {
     clearTestData();
     setVerbosity(4);
@@ -1342,7 +1343,7 @@ doFSConnectionErrorSummarization(void** state)
 }
 
 static void
-doNetConnectionErrorNoSummarization(void** state)
+doNetConnectionErrorNoSummarization(void **state)
 {
     clearTestData();
     setVerbosity(5);
@@ -1372,7 +1373,7 @@ doNetConnectionErrorNoSummarization(void** state)
 }
 
 static void
-doNetConnectionErrorSummarization(void** state)
+doNetConnectionErrorSummarization(void **state)
 {
     clearTestData();
     setVerbosity(4);
@@ -1402,7 +1403,7 @@ doNetConnectionErrorSummarization(void** state)
 }
 
 static void
-doFSReadWriteErrorNoSummarization(void** state)
+doFSReadWriteErrorNoSummarization(void **state)
 {
     clearTestData();
     setVerbosity(5);
@@ -1432,7 +1433,7 @@ doFSReadWriteErrorNoSummarization(void** state)
 }
 
 static void
-doFSReadWriteErrorSummarization(void** state)
+doFSReadWriteErrorSummarization(void **state)
 {
     clearTestData();
     setVerbosity(4);
@@ -1462,7 +1463,7 @@ doFSReadWriteErrorSummarization(void** state)
 }
 
 static void
-doNetRxTxErrorNoSummarization(void** state)
+doNetRxTxErrorNoSummarization(void **state)
 {
     clearTestData();
     setVerbosity(5);
@@ -1492,7 +1493,7 @@ doNetRxTxErrorNoSummarization(void** state)
 }
 
 static void
-doNetRxTxErrorSummarization(void** state)
+doNetRxTxErrorSummarization(void **state)
 {
     clearTestData();
     setVerbosity(4);
@@ -1523,7 +1524,7 @@ doNetRxTxErrorSummarization(void** state)
 
 #ifdef __linux__
 static void
-doStatErrNoSummarization(void** state)
+doStatErrNoSummarization(void **state)
 {
     clearTestData();
     setVerbosity(5);
@@ -1550,7 +1551,7 @@ doStatErrNoSummarization(void** state)
 }
 
 static void
-doStatErrSummarization(void** state)
+doStatErrSummarization(void **state)
 {
     clearTestData();
     setVerbosity(4);
@@ -1578,7 +1579,7 @@ doStatErrSummarization(void** state)
 #endif // __linux__
 
 static void
-doDNSErrNoSummarization(void** state)
+doDNSErrNoSummarization(void **state)
 {
     clearTestData();
     setVerbosity(5);
@@ -1605,7 +1606,7 @@ doDNSErrNoSummarization(void** state)
 }
 
 static void
-doDNSErrSummarization(void** state)
+doDNSErrSummarization(void **state)
 {
     clearTestData();
     setVerbosity(4);
@@ -1632,7 +1633,7 @@ doDNSErrSummarization(void** state)
 }
 
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("running %s\n", argv[0]);
 
@@ -1687,4 +1688,3 @@ main(int argc, char* argv[])
     int test_errors = cmocka_run_group_tests(tests, countTestSetup, countTestTeardown);
     return pre_init_errors || test_errors;
 }
-

@@ -8,27 +8,26 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "fn.h"
-#include "com.h"
 #include "cfgutils.h"
-#include "test.h"
+#include "com.h"
 #include "dbg.h"
+#include "fn.h"
+#include "test.h"
 
 #define MAX_PATH 1024
 
-
 static void
-openFileAndExecuteCfgProcessCommands(const char* path, config_t* cfg)
+openFileAndExecuteCfgProcessCommands(const char *path, config_t *cfg)
 {
-    FILE* f = fopen(path, "r");
+    FILE *f = fopen(path, "r");
     cfgProcessCommands(cfg, f);
     fclose(f);
 }
 
 static void
-cfgPathHonorsEnvVar(void** state)
+cfgPathHonorsEnvVar(void **state)
 {
-    const char* file_path = "/tmp/myfile.yml";
+    const char *file_path = "/tmp/myfile.yml";
 
     // grab the current working directory
     char origdir[MAX_PATH];
@@ -40,7 +39,6 @@ cfgPathHonorsEnvVar(void** state)
     assert_int_equal(mkdir(newdir, 0777), 0);
     assert_int_equal(chdir(newdir), 0);
 
-
     // Verify that if there is no env variable, cfgPath is null
     assert_null(cfgPath());
 
@@ -51,7 +49,7 @@ cfgPathHonorsEnvVar(void** state)
     // Verify that if there is an env variable, and a file, cfgPath is defined
     int fd = open(file_path, O_RDWR | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
     assert_return_code(fd, errno);
-    char* path = cfgPath();
+    char *path = cfgPath();
     assert_non_null(path);
     assert_string_equal(path, file_path);
 
@@ -86,8 +84,8 @@ cfgPathHonorsPriorityOrder(void** state)
     assert_int_not_equal(rv, -1);
 
     // Create temp directories
-    const char* newdir[] = {"testtempdir1", "testtempdir2", 
-                      "testtempdir1/conf", "testtempdir2/conf", 
+    const char* newdir[] = {"testtempdir1", "testtempdir2",
+                      "testtempdir1/conf", "testtempdir2/conf",
                       homeConfDir};
     int i;
     for (i=0; i<sizeof(newdir)/sizeof(newdir[0]); i++) {
@@ -139,9 +137,9 @@ cfgPathHonorsPriorityOrder(void** state)
         assert_int_equal(close(fd), 0);
         char* result = cfgPath();
         assert_non_null(result);
-	if (strcmp(result, path[i])) {
+        if (strcmp(result, path[i])) {
             fail_msg("Expected %s but found %s for i=%d", path[i], result, i);
-	}
+        }
         if (result) free(result);
     }
 
@@ -161,9 +159,9 @@ cfgPathHonorsPriorityOrder(void** state)
 */
 
 static void
-cfgProcessEnvironmentMtcEnable(void** state)
+cfgProcessEnvironmentMtcEnable(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgMtcEnableSet(cfg, FALSE);
     assert_int_equal(cfgMtcEnable(cfg), FALSE);
 
@@ -192,9 +190,9 @@ cfgProcessEnvironmentMtcEnable(void** state)
 }
 
 static void
-cfgProcessEnvironmentMtcFormat(void** state)
+cfgProcessEnvironmentMtcFormat(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgMtcFormatSet(cfg, CFG_FMT_NDJSON);
     assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_NDJSON);
 
@@ -223,9 +221,9 @@ cfgProcessEnvironmentMtcFormat(void** state)
 }
 
 static void
-cfgProcessEnvironmentStatsDPrefix(void** state)
+cfgProcessEnvironmentStatsDPrefix(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgMtcStatsDPrefixSet(cfg, "something");
     assert_string_equal(cfgMtcStatsDPrefix(cfg), "something.");
 
@@ -254,9 +252,9 @@ cfgProcessEnvironmentStatsDPrefix(void** state)
 }
 
 static void
-cfgProcessEnvironmentStatsDMaxLen(void** state)
+cfgProcessEnvironmentStatsDMaxLen(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgMtcStatsDMaxLenSet(cfg, 0);
     assert_int_equal(cfgMtcStatsDMaxLen(cfg), 0);
 
@@ -285,9 +283,9 @@ cfgProcessEnvironmentStatsDMaxLen(void** state)
 }
 
 static void
-cfgProcessEnvironmentMtcPeriod(void** state)
+cfgProcessEnvironmentMtcPeriod(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgMtcPeriodSet(cfg, 0);
     assert_int_equal(cfgMtcPeriod(cfg), 0);
 
@@ -316,9 +314,9 @@ cfgProcessEnvironmentMtcPeriod(void** state)
 }
 
 static void
-cfgProcessEnvironmentCommandDir(void** state)
+cfgProcessEnvironmentCommandDir(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgCmdDirSet(cfg, "/my/favorite/directory");
     assert_string_equal(cfgCmdDir(cfg), "/my/favorite/directory");
 
@@ -347,9 +345,9 @@ cfgProcessEnvironmentCommandDir(void** state)
 }
 
 static void
-cfgProcessEnvironmentConfigEvent(void** state)
+cfgProcessEnvironmentConfigEvent(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgSendProcessStartMsgSet(cfg, FALSE);
     assert_int_equal(cfgSendProcessStartMsg(cfg), FALSE);
 
@@ -379,9 +377,9 @@ cfgProcessEnvironmentConfigEvent(void** state)
 }
 
 static void
-cfgProcessEnvironmentEvtEnable(void** state)
+cfgProcessEnvironmentEvtEnable(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgEvtEnableSet(cfg, FALSE);
     assert_int_equal(cfgEvtEnable(cfg), FALSE);
 
@@ -410,9 +408,9 @@ cfgProcessEnvironmentEvtEnable(void** state)
 }
 
 static void
-cfgProcessEnvironmentEventFormat(void** state)
+cfgProcessEnvironmentEventFormat(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgEventFormatSet(cfg, CFG_FMT_NDJSON);
     assert_int_equal(cfgEventFormat(cfg), CFG_FMT_NDJSON);
 
@@ -441,9 +439,9 @@ cfgProcessEnvironmentEventFormat(void** state)
 }
 
 static void
-cfgProcessEnvironmentMaxEps(void** state)
+cfgProcessEnvironmentMaxEps(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgEvtRateLimitSet(cfg, 0);
     assert_int_equal(cfgEvtRateLimit(cfg), 0);
 
@@ -472,9 +470,9 @@ cfgProcessEnvironmentMaxEps(void** state)
 }
 
 static void
-cfgProcessEnvironmentEnhanceFs(void** state)
+cfgProcessEnvironmentEnhanceFs(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgEnhanceFsSet(cfg, FALSE);
     assert_int_equal(cfgEnhanceFs(cfg), FALSE);
 
@@ -502,19 +500,18 @@ cfgProcessEnvironmentEnhanceFs(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-typedef struct
-{
-    const char* env_name;
-    watch_t   src;
-    unsigned    default_val;
+typedef struct {
+    const char *env_name;
+    watch_t src;
+    unsigned default_val;
 } source_state_t;
 
 static void
-cfgProcessEnvironmentEventSource(void** state)
+cfgProcessEnvironmentEventSource(void **state)
 {
-    source_state_t* data = (source_state_t*)state[0];
+    source_state_t *data = (source_state_t *)state[0];
 
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     assert_int_equal(cfgEvtFormatSourceEnabled(cfg, data->src), data->default_val);
 
     cfgEvtFormatSourceEnabledSet(cfg, data->src, 0);
@@ -544,11 +541,10 @@ cfgProcessEnvironmentEventSource(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-
 static void
-cfgProcessEnvironmentMtcVerbosity(void** state)
+cfgProcessEnvironmentMtcVerbosity(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgMtcVerbositySet(cfg, 0);
     assert_int_equal(cfgMtcVerbosity(cfg), 0);
 
@@ -577,9 +573,9 @@ cfgProcessEnvironmentMtcVerbosity(void** state)
 }
 
 static void
-cfgProcessEnvironmentLogLevel(void** state)
+cfgProcessEnvironmentLogLevel(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgLogLevelSet(cfg, CFG_LOG_DEBUG);
     assert_int_equal(cfgLogLevel(cfg), CFG_LOG_DEBUG);
 
@@ -607,18 +603,17 @@ cfgProcessEnvironmentLogLevel(void** state)
     cfgProcessEnvironment(cfg);
 }
 
-typedef struct
-{
-    const char* env_name;
+typedef struct {
+    const char *env_name;
     which_transport_t transport;
 } dest_state_t;
 
 static void
-cfgProcessEnvironmentTransport(void** state)
+cfgProcessEnvironmentTransport(void **state)
 {
-    dest_state_t* data = (dest_state_t*)state[0];
+    dest_state_t *data = (dest_state_t *)state[0];
 
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
 
     // should override current cfg
     assert_int_equal(setenv(data->env_name, "udp://host:234", 1), 0);
@@ -665,9 +660,9 @@ cfgProcessEnvironmentTransport(void** state)
 }
 
 static void
-cfgProcessEnvironmentStatsdTags(void** state)
+cfgProcessEnvironmentStatsdTags(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgCustomTagAdd(cfg, "NAME1", "val1");
     assert_non_null(cfgCustomTags(cfg));
     assert_string_equal(cfgCustomTagValue(cfg, "NAME1"), "val1");
@@ -706,7 +701,7 @@ cfgProcessEnvironmentStatsdTags(void** state)
 static void
 cfgProcessEnvironmentPayEnable(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgPayEnableSet(cfg, FALSE);
     assert_int_equal(cfgPayEnable(cfg), FALSE);
 
@@ -737,7 +732,7 @@ cfgProcessEnvironmentPayEnable(void **state)
 static void
 cfgProcessEnvironmentPayDir(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgPayDirSet(cfg, "/my/favorite/directory");
     assert_string_equal(cfgPayDir(cfg), "/my/favorite/directory");
 
@@ -766,14 +761,14 @@ cfgProcessEnvironmentPayDir(void **state)
 }
 
 static void
-cfgProcessEnvironmentCmdDebugIsIgnored(void** state)
+cfgProcessEnvironmentCmdDebugIsIgnored(void **state)
 {
-    const char* path = "/tmp/dbgoutfile.txt";
+    const char *path = "/tmp/dbgoutfile.txt";
     assert_int_equal(setenv("SCOPE_CMD_DBG_PATH", path, 1), 0);
 
     long file_pos_before = fileEndPosition(path);
 
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgProcessEnvironment(cfg);
     cfgDestroy(&cfg);
 
@@ -783,18 +778,19 @@ cfgProcessEnvironmentCmdDebugIsIgnored(void** state)
     assert_int_equal(file_pos_before, file_pos_after);
 
     unsetenv("SCOPE_CMD_DBG_PATH");
-    if (file_pos_after != -1) unlink(path);
+    if (file_pos_after != -1)
+        unlink(path);
 }
 
 static void
-cfgProcessCommandsCmdDebugIsProcessed(void** state)
+cfgProcessCommandsCmdDebugIsProcessed(void **state)
 {
-    const char* outpath = "/tmp/dbgoutfile.txt";
-    const char* inpath = "/tmp/dbginfile.txt";
+    const char *outpath = "/tmp/dbgoutfile.txt";
+    const char *inpath = "/tmp/dbginfile.txt";
 
     long file_pos_before = fileEndPosition(outpath);
 
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     writeFile(inpath, "SCOPE_CMD_DBG_PATH=/tmp/dbgoutfile.txt");
     openFileAndExecuteCfgProcessCommands(inpath, cfg);
     cfgDestroy(&cfg);
@@ -805,21 +801,21 @@ cfgProcessCommandsCmdDebugIsProcessed(void** state)
     assert_int_not_equal(file_pos_before, file_pos_after);
 
     unlink(inpath);
-    if (file_pos_after != -1) unlink(outpath);
+    if (file_pos_after != -1)
+        unlink(outpath);
 }
 
 static void
-cfgProcessCommandsFromFile(void** state)
+cfgProcessCommandsFromFile(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
-    const char* path = "/tmp/test.file";
+    const char *path = "/tmp/test.file";
 
     // Just making sure these don't crash us.
     cfgProcessCommands(NULL, NULL);
     cfgProcessCommands(cfg, NULL);
-
 
     // test the basics
     writeFile(path, "SCOPE_METRIC_FORMAT=ndjson");
@@ -835,71 +831,70 @@ cfgProcessCommandsFromFile(void** state)
     assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_NDJSON);
 
     // just demonstrating that the "last one wins"
-    writeFile(path, "SCOPE_METRIC_FORMAT=ndjson\n"
-                    "SCOPE_METRIC_FORMAT=statsd");
+    writeFile(path,
+              "SCOPE_METRIC_FORMAT=ndjson\n"
+              "SCOPE_METRIC_FORMAT=statsd");
     openFileAndExecuteCfgProcessCommands(path, cfg);
     assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_STATSD);
 
-
     // test everything else once
     writeFile(path,
-        "SCOPE_METRIC_ENABLE=false\n"
-        "SCOPE_STATSD_PREFIX=prefix\n"
-        "SCOPE_STATSD_MAXLEN=1024\n"
-        "SCOPE_SUMMARY_PERIOD=11\n"
-        "SCOPE_CMD_DIR=/the/path/\n"
-        "SCOPE_CONFIG_EVENT=false\n"
-        "SCOPE_METRIC_VERBOSITY=1\n"
-        "SCOPE_METRIC_VERBOSITY:prefix\n"     // ignored (no '=')
-        "SCOPE_METRIC_VERBOSITY=blah\n"       // processed, but 'blah' isn't int)
-        "\n"                               // ignored (no '=')
-        "ignored =  too.\n"                // ignored (not one of our env vars)
-        "SEE_THAT_THIS_IS_HARMLESS=True\n" // ignored (not one of our env vars)
-        "SCOPE_LOG_LEVEL=trace\n"
-        "SCOPE_METRIC_DEST=file:///tmp/file.tmp\n"
-        "SCOPE_LOG_DEST=file:///tmp/file.tmp2\n"
-        "SCOPE_TAG_CUSTOM1=val1\n"
-        "SCOPE_TAG_CUSTOM2=val2\n"
-        "SCOPE_EVENT_DEST=udp://host:1234\n"
-        "SCOPE_EVENT_ENABLE=false\n"
-        "SCOPE_EVENT_FORMAT=ndjson\n"
-        "SCOPE_EVENT_LOGFILE=true\n"
-        "SCOPE_EVENT_CONSOLE=false\n"
-        "SCOPE_EVENT_SYSLOG=true\n"
-        "SCOPE_EVENT_METRIC=false\n"
-        "SCOPE_EVENT_HTTP=false\n"
-        "SCOPE_EVENT_NET=true\n"
-        "SCOPE_EVENT_FS=false\n"
-        "SCOPE_EVENT_DNS=true\n"
-        "SCOPE_EVENT_LOGFILE_NAME=a\n"
-        "SCOPE_EVENT_CONSOLE_NAME=b\n"
-        "SCOPE_EVENT_SYSLOG_NAME=c\n"
-        "SCOPE_EVENT_METRIC_NAME=d\n"
-        "SCOPE_EVENT_HTTP_NAME=e\n"
-        "SCOPE_EVENT_NET_NAME=f\n"
-        "SCOPE_EVENT_FS_NAME=g\n"
-        "SCOPE_EVENT_DNS_NAME=h\n"
-        "SCOPE_EVENT_LOGFILE_FIELD=i\n"
-        "SCOPE_EVENT_CONSOLE_FIELD=j\n"
-        "SCOPE_EVENT_SYSLOG_FIELD=k\n"
-        "SCOPE_EVENT_METRIC_FIELD=l\n"
-        "SCOPE_EVENT_HTTP_FIELD=m\n"
-        "SCOPE_EVENT_NET_FIELD=n\n"
-        "SCOPE_EVENT_FS_FIELD=o\n"
-        "SCOPE_EVENT_DNS_FIELD=p\n"
-        "SCOPE_EVENT_LOGFILE_VALUE=q\n"
-        "SCOPE_EVENT_CONSOLE_VALUE=r\n"
-        "SCOPE_EVENT_SYSLOG_VALUE=s\n"
-        "SCOPE_EVENT_METRIC_VALUE=t\n"
-        "SCOPE_EVENT_HTTP_VALUE=u\n"
-        "SCOPE_EVENT_NET_VALUE=v\n"
-        "SCOPE_EVENT_FS_VALUE=w\n"
-        "SCOPE_EVENT_DNS_VALUE=x\n"
-        "SCOPE_EVENT_MAXEPS=123456789\n"
-        "SCOPE_ENHANCE_FS=false\n"
-        "SCOPE_PAYLOAD_ENABLE=false\n"
-        "SCOPE_PAYLOAD_DIR=/the/path\n"
-    );
+              "SCOPE_METRIC_ENABLE=false\n"
+              "SCOPE_STATSD_PREFIX=prefix\n"
+              "SCOPE_STATSD_MAXLEN=1024\n"
+              "SCOPE_SUMMARY_PERIOD=11\n"
+              "SCOPE_CMD_DIR=/the/path/\n"
+              "SCOPE_CONFIG_EVENT=false\n"
+              "SCOPE_METRIC_VERBOSITY=1\n"
+              "SCOPE_METRIC_VERBOSITY:prefix\n"  // ignored (no '=')
+              "SCOPE_METRIC_VERBOSITY=blah\n"    // processed, but 'blah' isn't int)
+              "\n"                               // ignored (no '=')
+              "ignored =  too.\n"                // ignored (not one of our env vars)
+              "SEE_THAT_THIS_IS_HARMLESS=True\n" // ignored (not one of our env vars)
+              "SCOPE_LOG_LEVEL=trace\n"
+              "SCOPE_METRIC_DEST=file:///tmp/file.tmp\n"
+              "SCOPE_LOG_DEST=file:///tmp/file.tmp2\n"
+              "SCOPE_TAG_CUSTOM1=val1\n"
+              "SCOPE_TAG_CUSTOM2=val2\n"
+              "SCOPE_EVENT_DEST=udp://host:1234\n"
+              "SCOPE_EVENT_ENABLE=false\n"
+              "SCOPE_EVENT_FORMAT=ndjson\n"
+              "SCOPE_EVENT_LOGFILE=true\n"
+              "SCOPE_EVENT_CONSOLE=false\n"
+              "SCOPE_EVENT_SYSLOG=true\n"
+              "SCOPE_EVENT_METRIC=false\n"
+              "SCOPE_EVENT_HTTP=false\n"
+              "SCOPE_EVENT_NET=true\n"
+              "SCOPE_EVENT_FS=false\n"
+              "SCOPE_EVENT_DNS=true\n"
+              "SCOPE_EVENT_LOGFILE_NAME=a\n"
+              "SCOPE_EVENT_CONSOLE_NAME=b\n"
+              "SCOPE_EVENT_SYSLOG_NAME=c\n"
+              "SCOPE_EVENT_METRIC_NAME=d\n"
+              "SCOPE_EVENT_HTTP_NAME=e\n"
+              "SCOPE_EVENT_NET_NAME=f\n"
+              "SCOPE_EVENT_FS_NAME=g\n"
+              "SCOPE_EVENT_DNS_NAME=h\n"
+              "SCOPE_EVENT_LOGFILE_FIELD=i\n"
+              "SCOPE_EVENT_CONSOLE_FIELD=j\n"
+              "SCOPE_EVENT_SYSLOG_FIELD=k\n"
+              "SCOPE_EVENT_METRIC_FIELD=l\n"
+              "SCOPE_EVENT_HTTP_FIELD=m\n"
+              "SCOPE_EVENT_NET_FIELD=n\n"
+              "SCOPE_EVENT_FS_FIELD=o\n"
+              "SCOPE_EVENT_DNS_FIELD=p\n"
+              "SCOPE_EVENT_LOGFILE_VALUE=q\n"
+              "SCOPE_EVENT_CONSOLE_VALUE=r\n"
+              "SCOPE_EVENT_SYSLOG_VALUE=s\n"
+              "SCOPE_EVENT_METRIC_VALUE=t\n"
+              "SCOPE_EVENT_HTTP_VALUE=u\n"
+              "SCOPE_EVENT_NET_VALUE=v\n"
+              "SCOPE_EVENT_FS_VALUE=w\n"
+              "SCOPE_EVENT_DNS_VALUE=x\n"
+              "SCOPE_EVENT_MAXEPS=123456789\n"
+              "SCOPE_ENHANCE_FS=false\n"
+              "SCOPE_PAYLOAD_ENABLE=false\n"
+              "SCOPE_PAYLOAD_DIR=/the/path\n");
 
     openFileAndExecuteCfgProcessCommands(path, cfg);
     assert_int_equal(cfgMtcEnable(cfg), FALSE);
@@ -961,41 +956,39 @@ cfgProcessCommandsFromFile(void** state)
 }
 
 static void
-cfgProcessCommandsEnvSubstitution(void** state)
+cfgProcessCommandsEnvSubstitution(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
-    const char* path = "/tmp/test.file";
+    const char *path = "/tmp/test.file";
 
     // test everything else once
     writeFile(path,
-        "SCOPE_METRIC_ENABLE=$MASTER_ENABLE\n"
-        "SCOPE_STATSD_PREFIX=$VAR1.$MY_ENV_VAR\n"
-        "SCOPE_STATSD_MAXLEN=$MAXLEN\n"
-        "SCOPE_SUMMARY_PERIOD=$PERIOD\n"
-        "SCOPE_CMD_DIR=/$MYHOME/scope/\n"
-        "SCOPE_CONFIG_EVENT=$MASTER_ENABLE\n"
-        "SCOPE_METRIC_VERBOSITY=$VERBOSITY\n"
-        "SCOPE_LOG_LEVEL=$LOGLEVEL\n"
-        "SCOPE_METRIC_DEST=file:///\\$VAR1/$MY_ENV_VAR/\n"
-        "SCOPE_LOG_DEST=$DEST\n"
-        "SCOPE_TAG_CUSTOM=$PERIOD\n"
-        "SCOPE_TAG_whyyoumadbro=Bill owes me $5.00\n"
-        "SCOPE_TAG_undefined=$UNDEFINEDENV\n"
-        "SCOPE_EVENT_DEST=udp://ho$st:1234\n"
-        "SCOPE_EVENT_ENABLE=$MASTER_ENABLE\n"
-        "SCOPE_EVENT_LOGFILE=$TRUTH\n"
-        "SCOPE_EVENT_CONSOLE=false\n"
-        "SCOPE_EVENT_SYSLOG=$TRUTH\n"
-        "SCOPE_EVENT_METRIC=false\n"
-        "SCOPE_EVENT_LOGFILE_NAME=$FILTER\n"
-        "SCOPE_EVENT_MAXEPS=$EPS\n"
-        "SCOPE_ENHANCE_FS=$TRUTH\n"
-        "SCOPE_PAYLOAD_ENABLE=$TRUTH\n"
-        "SCOPE_PAYLOAD_DIR=$MYHOME\n"
-    );
-
+              "SCOPE_METRIC_ENABLE=$MASTER_ENABLE\n"
+              "SCOPE_STATSD_PREFIX=$VAR1.$MY_ENV_VAR\n"
+              "SCOPE_STATSD_MAXLEN=$MAXLEN\n"
+              "SCOPE_SUMMARY_PERIOD=$PERIOD\n"
+              "SCOPE_CMD_DIR=/$MYHOME/scope/\n"
+              "SCOPE_CONFIG_EVENT=$MASTER_ENABLE\n"
+              "SCOPE_METRIC_VERBOSITY=$VERBOSITY\n"
+              "SCOPE_LOG_LEVEL=$LOGLEVEL\n"
+              "SCOPE_METRIC_DEST=file:///\\$VAR1/$MY_ENV_VAR/\n"
+              "SCOPE_LOG_DEST=$DEST\n"
+              "SCOPE_TAG_CUSTOM=$PERIOD\n"
+              "SCOPE_TAG_whyyoumadbro=Bill owes me $5.00\n"
+              "SCOPE_TAG_undefined=$UNDEFINEDENV\n"
+              "SCOPE_EVENT_DEST=udp://ho$st:1234\n"
+              "SCOPE_EVENT_ENABLE=$MASTER_ENABLE\n"
+              "SCOPE_EVENT_LOGFILE=$TRUTH\n"
+              "SCOPE_EVENT_CONSOLE=false\n"
+              "SCOPE_EVENT_SYSLOG=$TRUTH\n"
+              "SCOPE_EVENT_METRIC=false\n"
+              "SCOPE_EVENT_LOGFILE_NAME=$FILTER\n"
+              "SCOPE_EVENT_MAXEPS=$EPS\n"
+              "SCOPE_ENHANCE_FS=$TRUTH\n"
+              "SCOPE_PAYLOAD_ENABLE=$TRUTH\n"
+              "SCOPE_PAYLOAD_DIR=$MYHOME\n");
 
     // Set env variables to test indirect substitution
     assert_int_equal(setenv("MASTER_ENABLE", "false", 1), 0);
@@ -1060,140 +1053,139 @@ cfgProcessCommandsEnvSubstitution(void** state)
 }
 
 static void
-verifyDefaults(config_t* config)
+verifyDefaults(config_t *config)
 {
-    assert_int_equal       (cfgMtcEnable(config), DEFAULT_MTC_ENABLE);
-    assert_int_equal       (cfgMtcFormat(config), DEFAULT_MTC_FORMAT);
-    assert_string_equal    (cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
-    assert_int_equal       (cfgMtcStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
-    assert_int_equal       (cfgMtcVerbosity(config), DEFAULT_MTC_VERBOSITY);
-    assert_int_equal       (cfgMtcPeriod(config), DEFAULT_SUMMARY_PERIOD);
-    assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
-    assert_int_equal       (cfgSendProcessStartMsg(config), DEFAULT_PROCESS_START_MSG);
-    assert_int_equal       (cfgEvtEnable(config), DEFAULT_EVT_ENABLE);
-    assert_int_equal       (cfgEventFormat(config), DEFAULT_CTL_FORMAT);
-    assert_int_equal       (cfgEvtRateLimit(config), DEFAULT_MAXEVENTSPERSEC);
-    assert_int_equal       (cfgEnhanceFs(config), DEFAULT_ENHANCE_FS);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_VALUE);
-    assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_VALUE);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_FIELD);
-    assert_string_equal    (cfgEvtFormatFieldFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_FIELD);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_NAME);
-    assert_string_equal    (cfgEvtFormatNameFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_NAME);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FILE), DEFAULT_SRC_FILE);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), DEFAULT_SRC_NET);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), DEFAULT_SRC_FS);
-    assert_int_equal       (cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), DEFAULT_SRC_DNS);
-    assert_null            (cfgEvtFormatHeader(config, 0));
-    assert_int_equal       (cfgTransportType(config, CFG_MTC), DEFAULT_MTC_TYPE);
-    assert_string_equal    (cfgTransportHost(config, CFG_MTC), DEFAULT_MTC_HOST);
-    assert_string_equal    (cfgTransportPort(config, CFG_MTC), DEFAULT_MTC_PORT);
-    assert_null            (cfgTransportPath(config, CFG_MTC));
-    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), DEFAULT_MTC_BUF);
-    assert_int_equal       (cfgTransportType(config, CFG_CTL), DEFAULT_CTL_TYPE);
-    assert_string_equal    (cfgTransportHost(config, CFG_CTL), DEFAULT_CTL_HOST);
-    assert_string_equal    (cfgTransportPort(config, CFG_CTL), DEFAULT_CTL_PORT);
-    assert_null            (cfgTransportPath(config, CFG_CTL));
-    assert_int_equal       (cfgTransportBuf(config, CFG_CTL), DEFAULT_CTL_BUF);
-    assert_int_equal       (cfgTransportType(config, CFG_LOG), DEFAULT_LOG_TYPE);
-    assert_null            (cfgTransportHost(config, CFG_LOG));
-    assert_null            (cfgTransportPort(config, CFG_LOG));
-    assert_string_equal    (cfgTransportPath(config, CFG_LOG), DEFAULT_LOG_PATH);
-    assert_int_equal       (cfgTransportBuf(config, CFG_MTC), DEFAULT_LOG_BUF);
-    assert_null            (cfgCustomTags(config));
-    assert_null            (cfgCustomTagValue(config, "tagname"));
-    assert_int_equal       (cfgLogLevel(config), DEFAULT_LOG_LEVEL);
-    assert_int_equal       (cfgPayEnable(config), DEFAULT_PAYLOAD_ENABLE);
-    assert_string_equal    (cfgPayDir(config), DEFAULT_PAYLOAD_DIR);
+    assert_int_equal(cfgMtcEnable(config), DEFAULT_MTC_ENABLE);
+    assert_int_equal(cfgMtcFormat(config), DEFAULT_MTC_FORMAT);
+    assert_string_equal(cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
+    assert_int_equal(cfgMtcStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
+    assert_int_equal(cfgMtcVerbosity(config), DEFAULT_MTC_VERBOSITY);
+    assert_int_equal(cfgMtcPeriod(config), DEFAULT_SUMMARY_PERIOD);
+    assert_string_equal(cfgCmdDir(config), DEFAULT_COMMAND_DIR);
+    assert_int_equal(cfgSendProcessStartMsg(config), DEFAULT_PROCESS_START_MSG);
+    assert_int_equal(cfgEvtEnable(config), DEFAULT_EVT_ENABLE);
+    assert_int_equal(cfgEventFormat(config), DEFAULT_CTL_FORMAT);
+    assert_int_equal(cfgEvtRateLimit(config), DEFAULT_MAXEVENTSPERSEC);
+    assert_int_equal(cfgEnhanceFs(config), DEFAULT_ENHANCE_FS);
+    assert_string_equal(cfgEvtFormatValueFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_VALUE);
+    assert_string_equal(cfgEvtFormatValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
+    assert_string_equal(cfgEvtFormatValueFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_VALUE);
+    assert_string_equal(cfgEvtFormatValueFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_VALUE);
+    assert_string_equal(cfgEvtFormatValueFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_VALUE);
+    assert_string_equal(cfgEvtFormatValueFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_VALUE);
+    assert_string_equal(cfgEvtFormatValueFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_VALUE);
+    assert_string_equal(cfgEvtFormatValueFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_VALUE);
+    assert_string_equal(cfgEvtFormatFieldFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_FIELD);
+    assert_string_equal(cfgEvtFormatFieldFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_FIELD);
+    assert_string_equal(cfgEvtFormatFieldFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_FIELD);
+    assert_string_equal(cfgEvtFormatFieldFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_FIELD);
+    assert_string_equal(cfgEvtFormatFieldFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_FIELD);
+    assert_string_equal(cfgEvtFormatFieldFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_FIELD);
+    assert_string_equal(cfgEvtFormatFieldFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_FIELD);
+    assert_string_equal(cfgEvtFormatFieldFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_FIELD);
+    assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_NAME);
+    assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_NAME);
+    assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_NAME);
+    assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC_NAME);
+    assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP_NAME);
+    assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_NET), DEFAULT_SRC_NET_NAME);
+    assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_FS), DEFAULT_SRC_FS_NAME);
+    assert_string_equal(cfgEvtFormatNameFilter(config, CFG_SRC_DNS), DEFAULT_SRC_DNS_NAME);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_FILE), DEFAULT_SRC_FILE);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_METRIC), DEFAULT_SRC_METRIC);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_HTTP), DEFAULT_SRC_HTTP);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), DEFAULT_SRC_NET);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), DEFAULT_SRC_FS);
+    assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), DEFAULT_SRC_DNS);
+    assert_null(cfgEvtFormatHeader(config, 0));
+    assert_int_equal(cfgTransportType(config, CFG_MTC), DEFAULT_MTC_TYPE);
+    assert_string_equal(cfgTransportHost(config, CFG_MTC), DEFAULT_MTC_HOST);
+    assert_string_equal(cfgTransportPort(config, CFG_MTC), DEFAULT_MTC_PORT);
+    assert_null(cfgTransportPath(config, CFG_MTC));
+    assert_int_equal(cfgTransportBuf(config, CFG_MTC), DEFAULT_MTC_BUF);
+    assert_int_equal(cfgTransportType(config, CFG_CTL), DEFAULT_CTL_TYPE);
+    assert_string_equal(cfgTransportHost(config, CFG_CTL), DEFAULT_CTL_HOST);
+    assert_string_equal(cfgTransportPort(config, CFG_CTL), DEFAULT_CTL_PORT);
+    assert_null(cfgTransportPath(config, CFG_CTL));
+    assert_int_equal(cfgTransportBuf(config, CFG_CTL), DEFAULT_CTL_BUF);
+    assert_int_equal(cfgTransportType(config, CFG_LOG), DEFAULT_LOG_TYPE);
+    assert_null(cfgTransportHost(config, CFG_LOG));
+    assert_null(cfgTransportPort(config, CFG_LOG));
+    assert_string_equal(cfgTransportPath(config, CFG_LOG), DEFAULT_LOG_PATH);
+    assert_int_equal(cfgTransportBuf(config, CFG_MTC), DEFAULT_LOG_BUF);
+    assert_null(cfgCustomTags(config));
+    assert_null(cfgCustomTagValue(config, "tagname"));
+    assert_int_equal(cfgLogLevel(config), DEFAULT_LOG_LEVEL);
+    assert_int_equal(cfgPayEnable(config), DEFAULT_PAYLOAD_ENABLE);
+    assert_string_equal(cfgPayDir(config), DEFAULT_PAYLOAD_DIR);
 
     // the protocol list should be empty too
-    assert_non_null        (g_protlist);
-    assert_int_equal       (g_prot_sequence, 0);
+    assert_non_null(g_protlist);
+    assert_int_equal(g_prot_sequence, 0);
 }
 
 static void
-cfgReadGoodYaml(void** state)
+cfgReadGoodYaml(void **state)
 {
     // Test file config (yaml)
-    const char* yamlText =
-        "---\n"
-        "metric:\n"
-        "  enable: false\n"
-        "  format:\n"
-        "    type: ndjson                    # statsd, ndjson\n"
-        "    statsdprefix : 'cribl.scope'    # prepends each statsd metric\n"
-        "    statsdmaxlen : 1024             # max size of a formatted statsd string\n"
-        "    verbosity: 3                    # 0-9 (0 is least verbose, 9 is most)\n"
-        "  transport:                        # defines how scope output is sent\n"
-        "    type: file                      # udp, unix, file, syslog\n"
-        "    path: '/var/log/scope.log'\n"
-        "    buffering: line\n"
-        "event:\n"
-        "  enable: true\n"
-        "  transport:\n"
-        "    type: tcp                       # udp, unix, file, syslog\n"
-        "    host: 127.0.0.2\n"
-        "    port: 9009\n"
-        "    buffering: line\n"
-        "  format:\n"
-        "    type : ndjson                   # ndjson\n"
-        "    maxeventpersec : 989898         # max events per second.\n"
-        "    enhancefs : false               # true, false\n"
-        "  watch:\n"
-        "    - type: file                    # create events from file\n"
-        "      name: .*[.]log$\n"
-        "      field: .*host.*\n"
-        "      value: '[0-9]+'\n"
-        "    - type: console                 # create events from stdout and stderr\n"
-        "    - type: syslog                  # create events from syslog and vsyslog\n"
-        "    - type: metric\n"
-        "    - type: http\n"
-        "    - type: net\n"
-        "    - type: fs\n"
-        "    - type: dns\n"
-        "payload:\n"
-        "  enable: false\n"
-        "  dir: '/my/dir'\n"
-        "libscope:\n"
-        "  configevent: true\n"
-        "  summaryperiod: 11                 # in seconds\n"
-        "  commanddir: /tmp\n"
-        "  log:\n"
-        "    level: debug                      # debug, info, warning, error, none\n"
-        "    transport:\n"
-        "      buffering: full\n"
-        "      type: syslog\n"
-        "tags:\n"
-        "  name1 : value1\n"
-        "  name2 : value2\n"
-        "...\n";
-    const char* path = CFG_FILE_NAME;
+    const char *yamlText = "---\n"
+                           "metric:\n"
+                           "  enable: false\n"
+                           "  format:\n"
+                           "    type: ndjson                    # statsd, ndjson\n"
+                           "    statsdprefix : 'cribl.scope'    # prepends each statsd metric\n"
+                           "    statsdmaxlen : 1024             # max size of a formatted statsd string\n"
+                           "    verbosity: 3                    # 0-9 (0 is least verbose, 9 is most)\n"
+                           "  transport:                        # defines how scope output is sent\n"
+                           "    type: file                      # udp, unix, file, syslog\n"
+                           "    path: '/var/log/scope.log'\n"
+                           "    buffering: line\n"
+                           "event:\n"
+                           "  enable: true\n"
+                           "  transport:\n"
+                           "    type: tcp                       # udp, unix, file, syslog\n"
+                           "    host: 127.0.0.2\n"
+                           "    port: 9009\n"
+                           "    buffering: line\n"
+                           "  format:\n"
+                           "    type : ndjson                   # ndjson\n"
+                           "    maxeventpersec : 989898         # max events per second.\n"
+                           "    enhancefs : false               # true, false\n"
+                           "  watch:\n"
+                           "    - type: file                    # create events from file\n"
+                           "      name: .*[.]log$\n"
+                           "      field: .*host.*\n"
+                           "      value: '[0-9]+'\n"
+                           "    - type: console                 # create events from stdout and stderr\n"
+                           "    - type: syslog                  # create events from syslog and vsyslog\n"
+                           "    - type: metric\n"
+                           "    - type: http\n"
+                           "    - type: net\n"
+                           "    - type: fs\n"
+                           "    - type: dns\n"
+                           "payload:\n"
+                           "  enable: false\n"
+                           "  dir: '/my/dir'\n"
+                           "libscope:\n"
+                           "  configevent: true\n"
+                           "  summaryperiod: 11                 # in seconds\n"
+                           "  commanddir: /tmp\n"
+                           "  log:\n"
+                           "    level: debug                      # debug, info, warning, error, none\n"
+                           "    transport:\n"
+                           "      buffering: full\n"
+                           "      type: syslog\n"
+                           "tags:\n"
+                           "  name1 : value1\n"
+                           "  name2 : value2\n"
+                           "...\n";
+    const char *path = CFG_FILE_NAME;
     writeFile(path, yamlText);
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* config = cfgRead(path);
+    config_t *config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcEnable(config), FALSE);
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_NDJSON);
@@ -1246,12 +1238,12 @@ cfgReadGoodYaml(void** state)
 }
 
 static void
-cfgReadStockYaml(void** state)
+cfgReadStockYaml(void **state)
 {
     // The stock scope.yml file up in ../conf/ should parse to the defaults.
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* config = cfgRead("./conf/scope.yml");
+    config_t *config = cfgRead("./conf/scope.yml");
     verifyDefaults(config);
     cfgDestroy(&config);
     lstDestroy(&g_protlist);
@@ -1259,7 +1251,7 @@ cfgReadStockYaml(void** state)
 }
 
 static void
-writeFileWithSubstitution(const char* path, const char* base, const char* variable)
+writeFileWithSubstitution(const char *path, const char *base, const char *variable)
 {
     char buf[4096];
     int n = snprintf(buf, sizeof(buf), base, variable);
@@ -1272,84 +1264,76 @@ writeFileWithSubstitution(const char* path, const char* base, const char* variab
 }
 
 static void
-cfgReadEveryTransportType(void** state)
+cfgReadEveryTransportType(void **state)
 {
-    const char* yamlText =
-        "---\n"
-        "metric:\n"
-        "  transport:\n"
-        "%s"
-        "...\n";
+    const char *yamlText = "---\n"
+                           "metric:\n"
+                           "  transport:\n"
+                           "%s"
+                           "...\n";
 
-    const char* udp_str =
-        "    type: udp\n"
-        "    host: 'labmachine8235'\n"
-        "    port: 'ntp'\n";
-    const char* unix_str =
-        "    type: unix\n"
-        "    path: '@scope.sock'\n";
-    const char* file_str =
-        "    type: file\n"
-        "    path: '/var/log/scope.log'\n";
-    const char* syslog_str =
-        "    type: syslog\n";
-    const char* shm_str =
-        "    type: shm\n";
-    const char* transport_lines[] = {udp_str, unix_str, file_str, syslog_str, shm_str};
+    const char *udp_str = "    type: udp\n"
+                          "    host: 'labmachine8235'\n"
+                          "    port: 'ntp'\n";
+    const char *unix_str = "    type: unix\n"
+                           "    path: '@scope.sock'\n";
+    const char *file_str = "    type: file\n"
+                           "    path: '/var/log/scope.log'\n";
+    const char *syslog_str = "    type: syslog\n";
+    const char *shm_str = "    type: shm\n";
+    const char *transport_lines[] = {udp_str, unix_str, file_str, syslog_str, shm_str};
 
-    const char* path = CFG_FILE_NAME;
+    const char *path = CFG_FILE_NAME;
 
     int i;
-    for (i = 0; i<sizeof(transport_lines) / sizeof(transport_lines[0]); i++) {
+    for (i = 0; i < sizeof(transport_lines) / sizeof(transport_lines[0]); i++) {
 
         writeFileWithSubstitution(path, yamlText, transport_lines[i]);
         g_protlist = lstCreate(destroyProtEntry);
         assert_non_null(g_protlist);
-        config_t* config = cfgRead(path);
+        config_t *config = cfgRead(path);
 
         if (transport_lines[i] == udp_str) {
-                assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_UDP);
-                assert_string_equal(cfgTransportHost(config, CFG_MTC), "labmachine8235");
-                assert_string_equal(cfgTransportPort(config, CFG_MTC), "ntp");
+            assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_UDP);
+            assert_string_equal(cfgTransportHost(config, CFG_MTC), "labmachine8235");
+            assert_string_equal(cfgTransportPort(config, CFG_MTC), "ntp");
         } else if (transport_lines[i] == unix_str) {
-                assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_UNIX);
-                assert_string_equal(cfgTransportPath(config, CFG_MTC), "@scope.sock");
+            assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_UNIX);
+            assert_string_equal(cfgTransportPath(config, CFG_MTC), "@scope.sock");
         } else if (transport_lines[i] == file_str) {
-                assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_FILE);
-                assert_string_equal(cfgTransportPath(config, CFG_MTC), "/var/log/scope.log");
+            assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_FILE);
+            assert_string_equal(cfgTransportPath(config, CFG_MTC), "/var/log/scope.log");
         } else if (transport_lines[i] == syslog_str) {
-                assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_SYSLOG);
+            assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_SYSLOG);
         } else if (transport_lines[i] == shm_str) {
-                assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_SHM);
-         }
+            assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_SHM);
+        }
 
         deleteFile(path);
         cfgDestroy(&config);
         lstDestroy(&g_protlist);
         g_prot_sequence = 0;
     }
-
 }
 
 static void
-cfgReadEveryProcessLevel(void** state)
+cfgReadEveryProcessLevel(void **state)
 {
-    const char* yamlText =
-        "---\n"
-        "libscope:\n"
-        "  log:\n"
-        "    level: %s\n"
-        "...\n";
+    const char *yamlText = "---\n"
+                           "libscope:\n"
+                           "  log:\n"
+                           "    level: %s\n"
+                           "...\n";
 
-    const char* path = CFG_FILE_NAME;
-    const char* level[] = { "trace", "debug", "info", "warning", "error", "none"};
+    const char *path = CFG_FILE_NAME;
+    const char *level[] = {"trace", "debug", "info", "warning", "error", "none"};
     cfg_log_level_t value[] = {CFG_LOG_TRACE, CFG_LOG_DEBUG, CFG_LOG_INFO, CFG_LOG_WARN, CFG_LOG_ERROR, CFG_LOG_NONE};
     int i;
-    for (i = 0; i< sizeof(level)/sizeof(level[0]); i++) {
+    for (i = 0; i < sizeof(level) / sizeof(level[0]); i++) {
         writeFileWithSubstitution(path, yamlText, level[i]);
         g_protlist = lstCreate(destroyProtEntry);
         assert_non_null(g_protlist);
-        config_t* config = cfgRead(path);
+        config_t *config = cfgRead(path);
         assert_int_equal(cfgLogLevel(config), value[i]);
         deleteFile(path);
         cfgDestroy(&config);
@@ -1359,75 +1343,74 @@ cfgReadEveryProcessLevel(void** state)
 }
 
 // Test file config (json)
-const char* jsonText =
-    "{\n"
-    "  'metric': {\n"
-    "    'enable': 'true',\n"
-    "    'format': {\n"
-    "      'type': 'ndjson',\n"
-    "      'statsdprefix': 'cribl.scope',\n"
-    "      'statsdmaxlen': '42',\n"
-    "      'verbosity': '0'\n"
-    "    },\n"
-    "    'transport': {\n"
-    "      'type': 'file',\n"
-    "      'path': '/var/log/scope.log'\n"
-    "    }\n"
-    "  },\n"
-    "  'event': {\n"
-    "    'enable': 'false',\n"
-    "    'transport': {\n"
-    "      'type': 'file',\n"
-    "      'path': '/var/log/event.log'\n"
-    "    },\n"
-    "    'format': {\n"
-    "      'type': 'ndjson',\n"
-    "      'maxeventpersec': '42',\n"
-    "      'enhancefs': 'false'\n"
-    "    },\n"
-    "    'watch' : [\n"
-    "      {'type':'file', 'name':'.*[.]log$'},\n"
-    "      {'type':'console'},\n"
-    "      {'type':'syslog'},\n"
-    "      {'type':'metric'},\n"
-    "      {'type':'http', 'headers':['X-blah.*','My-goodness']},\n"
-    "      {'type':'net'},\n"
-    "      {'type':'fs'},\n"
-    "      {'type':'dns'}\n"
-    "    ]\n"
-    "  },\n"
-    "  'payload': {\n"
-    "    'enable': 'true',\n"
-    "    'dir': '/the/dir'\n"
-    "  },\n"
-    "  'libscope': {\n"
-    "    'configevent': 'true',\n"
-    "    'summaryperiod': '13',\n"
-    "    'log': {\n"
-    "      'level': 'debug',\n"
-    "      'transport': {\n"
-    "        'type': 'shm'\n"
-    "      }\n"
-    "    }\n"
-    "  },\n"
-    "  'tags': {\n"
-    "    'tagA': 'val1',\n"
-    "    'tagB': 'val2',\n"
-    "    'tagC': 'val3'\n"
-    "  },\n"
-    "  'protocol': [\n"
-    "    {'name':'eg1','regex':'.*'}\n"
-    "  ]\n"
-    "}\n";
+const char *jsonText = "{\n"
+                       "  'metric': {\n"
+                       "    'enable': 'true',\n"
+                       "    'format': {\n"
+                       "      'type': 'ndjson',\n"
+                       "      'statsdprefix': 'cribl.scope',\n"
+                       "      'statsdmaxlen': '42',\n"
+                       "      'verbosity': '0'\n"
+                       "    },\n"
+                       "    'transport': {\n"
+                       "      'type': 'file',\n"
+                       "      'path': '/var/log/scope.log'\n"
+                       "    }\n"
+                       "  },\n"
+                       "  'event': {\n"
+                       "    'enable': 'false',\n"
+                       "    'transport': {\n"
+                       "      'type': 'file',\n"
+                       "      'path': '/var/log/event.log'\n"
+                       "    },\n"
+                       "    'format': {\n"
+                       "      'type': 'ndjson',\n"
+                       "      'maxeventpersec': '42',\n"
+                       "      'enhancefs': 'false'\n"
+                       "    },\n"
+                       "    'watch' : [\n"
+                       "      {'type':'file', 'name':'.*[.]log$'},\n"
+                       "      {'type':'console'},\n"
+                       "      {'type':'syslog'},\n"
+                       "      {'type':'metric'},\n"
+                       "      {'type':'http', 'headers':['X-blah.*','My-goodness']},\n"
+                       "      {'type':'net'},\n"
+                       "      {'type':'fs'},\n"
+                       "      {'type':'dns'}\n"
+                       "    ]\n"
+                       "  },\n"
+                       "  'payload': {\n"
+                       "    'enable': 'true',\n"
+                       "    'dir': '/the/dir'\n"
+                       "  },\n"
+                       "  'libscope': {\n"
+                       "    'configevent': 'true',\n"
+                       "    'summaryperiod': '13',\n"
+                       "    'log': {\n"
+                       "      'level': 'debug',\n"
+                       "      'transport': {\n"
+                       "        'type': 'shm'\n"
+                       "      }\n"
+                       "    }\n"
+                       "  },\n"
+                       "  'tags': {\n"
+                       "    'tagA': 'val1',\n"
+                       "    'tagB': 'val2',\n"
+                       "    'tagC': 'val3'\n"
+                       "  },\n"
+                       "  'protocol': [\n"
+                       "    {'name':'eg1','regex':'.*'}\n"
+                       "  ]\n"
+                       "}\n";
 
 static void
-cfgReadGoodJson(void** state)
+cfgReadGoodJson(void **state)
 {
-    const char* path = CFG_FILE_NAME;
+    const char *path = CFG_FILE_NAME;
     writeFile(path, jsonText);
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* config = cfgRead(path);
+    config_t *config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcEnable(config), TRUE);
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_NDJSON);
@@ -1472,9 +1455,9 @@ cfgReadGoodJson(void** state)
     assert_string_equal(cfgPayDir(config), "/the/dir");
 
     protocol_def_t *prot;
-    assert_non_null    (g_protlist);
-    assert_int_equal   (g_prot_sequence, 1);
-    assert_non_null    (prot = lstFind(g_protlist, 1));
+    assert_non_null(g_protlist);
+    assert_int_equal(g_prot_sequence, 1);
+    assert_non_null(prot = lstFind(g_protlist, 1));
     assert_string_equal(prot->protname, "eg1");
 
     cfgDestroy(&config);
@@ -1484,11 +1467,11 @@ cfgReadGoodJson(void** state)
 }
 
 static void
-cfgReadNonExistentFileReturnsDefaults(void** state)
+cfgReadNonExistentFileReturnsDefaults(void **state)
 {
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* config = cfgRead("../thisFileNameWontBeFoundAnywhere.txt");
+    config_t *config = cfgRead("../thisFileNameWontBeFoundAnywhere.txt");
     verifyDefaults(config);
     cfgDestroy(&config);
     lstDestroy(&g_protlist);
@@ -1496,28 +1479,27 @@ cfgReadNonExistentFileReturnsDefaults(void** state)
 }
 
 static void
-cfgReadBadYamlReturnsDefaults(void** state)
+cfgReadBadYamlReturnsDefaults(void **state)
 {
-    const char* yamlText =
-        "---\n"
-        "metric:\n"
-        "  format: ndjson\n"
-        "  statsdprefix : 'cribl.scope'\n"
-        "  transport:\n"
-        "    type: file\n"
-        "    path: '/var/log/scope.log'\n"
-        "libscope:\n"
-        "  log:\n"
-        "      level: debug                  # <--- Extra indention!  bad!\n"
-        "    transport:\n"
-        "      type: syslog\n"
-        "...\n";
-    const char* path = CFG_FILE_NAME;
+    const char *yamlText = "---\n"
+                           "metric:\n"
+                           "  format: ndjson\n"
+                           "  statsdprefix : 'cribl.scope'\n"
+                           "  transport:\n"
+                           "    type: file\n"
+                           "    path: '/var/log/scope.log'\n"
+                           "libscope:\n"
+                           "  log:\n"
+                           "      level: debug                  # <--- Extra indention!  bad!\n"
+                           "    transport:\n"
+                           "      type: syslog\n"
+                           "...\n";
+    const char *path = CFG_FILE_NAME;
     writeFile(path, yamlText);
 
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* config = cfgRead(path);
+    config_t *config = cfgRead(path);
     verifyDefaults(config);
 
     cfgDestroy(&config);
@@ -1527,33 +1509,32 @@ cfgReadBadYamlReturnsDefaults(void** state)
 }
 
 static void
-cfgReadExtraFieldsAreHarmless(void** state)
+cfgReadExtraFieldsAreHarmless(void **state)
 {
-    const char* yamlText =
-        "---\n"
-        "momsApplePieRecipe:                # has possibilities...\n"
-        "  [apples,sugar,flour,dirt]        # dirt mom?  Really?\n"
-        "metric:\n"
-        "  format:\n"
-        "    type: statsd\n"
-        "    hey: yeahyou\n"
-        "  request: 'make it snappy'        # Extra.\n"
-        "  transport:\n"
-        "    type: unix\n"
-        "    path: '@scope.sock'\n"
-        "    color: 'puce'                  # Extra.\n"
-        "libscope:\n"
-        "  log:\n"
-        "    level: info\n"
-        "tags:\n"
-        "  brainfarts: 135\n"
-        "...\n";
-    const char* path = CFG_FILE_NAME;
+    const char *yamlText = "---\n"
+                           "momsApplePieRecipe:                # has possibilities...\n"
+                           "  [apples,sugar,flour,dirt]        # dirt mom?  Really?\n"
+                           "metric:\n"
+                           "  format:\n"
+                           "    type: statsd\n"
+                           "    hey: yeahyou\n"
+                           "  request: 'make it snappy'        # Extra.\n"
+                           "  transport:\n"
+                           "    type: unix\n"
+                           "    path: '@scope.sock'\n"
+                           "    color: 'puce'                  # Extra.\n"
+                           "libscope:\n"
+                           "  log:\n"
+                           "    level: info\n"
+                           "tags:\n"
+                           "  brainfarts: 135\n"
+                           "...\n";
+    const char *path = CFG_FILE_NAME;
     writeFile(path, yamlText);
 
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* config = cfgRead(path);
+    config_t *config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_STATSD);
     assert_string_equal(cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
@@ -1570,60 +1551,59 @@ cfgReadExtraFieldsAreHarmless(void** state)
 }
 
 static void
-cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
+cfgReadYamlOrderWithinStructureDoesntMatter(void **state)
 {
-    const char* yamlText =
-        "---\n"
-        "payload:\n"
-        "  dir: /favorite\n"
-        "  enable: false\n"
-        "event:\n"
-        "  watch:\n"
-        "    - name: .*[.]log$\n"
-        "      type: syslog\n"
-        "      field: .*host.*\n"
-        "      value: '[0-9]+'\n"
-        "    - type: file\n"
-        "    - type: syslog\n"
-        "    - type: metric\n"
-        "    - type: http\n"
-        "    - type: net\n"
-        "    - type: fs\n"
-        "    - type: dns\n"
-        "  format:\n"
-        "    enhancefs : true\n"
-        "    maxeventpersec : 13579\n"
-        "    type : ndjson\n"
-        "  enable : false\n"
-        "  transport:\n"
-        "    type: syslog                    # udp, unix, file, syslog\n"
-        "    host: 127.0.0.2\n"
-        "    port: 9009\n"
-        "    buffering: line\n"
-        "libscope:\n"
-        "  log:\n"
-        "    level: info\n"
-        "  summaryperiod: 42\n"
-        "  configevent: false\n"
-        "metric:\n"
-        "  transport:\n"
-        "    path: '@scope.sock'\n"
-        "    type: unix\n"
-        "  format:\n"
-        "    verbosity: 4294967295\n"
-        "    statsdmaxlen: 4294967295\n"
-        "    statsdprefix: 'cribl.scope'\n"
-        "    type:  statsd\n"
-        "  enable : false\n"
-        "tags:\n"
-        "  135: kittens\n"
-        "...\n";
-    const char* path = CFG_FILE_NAME;
+    const char *yamlText = "---\n"
+                           "payload:\n"
+                           "  dir: /favorite\n"
+                           "  enable: false\n"
+                           "event:\n"
+                           "  watch:\n"
+                           "    - name: .*[.]log$\n"
+                           "      type: syslog\n"
+                           "      field: .*host.*\n"
+                           "      value: '[0-9]+'\n"
+                           "    - type: file\n"
+                           "    - type: syslog\n"
+                           "    - type: metric\n"
+                           "    - type: http\n"
+                           "    - type: net\n"
+                           "    - type: fs\n"
+                           "    - type: dns\n"
+                           "  format:\n"
+                           "    enhancefs : true\n"
+                           "    maxeventpersec : 13579\n"
+                           "    type : ndjson\n"
+                           "  enable : false\n"
+                           "  transport:\n"
+                           "    type: syslog                    # udp, unix, file, syslog\n"
+                           "    host: 127.0.0.2\n"
+                           "    port: 9009\n"
+                           "    buffering: line\n"
+                           "libscope:\n"
+                           "  log:\n"
+                           "    level: info\n"
+                           "  summaryperiod: 42\n"
+                           "  configevent: false\n"
+                           "metric:\n"
+                           "  transport:\n"
+                           "    path: '@scope.sock'\n"
+                           "    type: unix\n"
+                           "  format:\n"
+                           "    verbosity: 4294967295\n"
+                           "    statsdmaxlen: 4294967295\n"
+                           "    statsdprefix: 'cribl.scope'\n"
+                           "    type:  statsd\n"
+                           "  enable : false\n"
+                           "tags:\n"
+                           "  135: kittens\n"
+                           "...\n";
+    const char *path = CFG_FILE_NAME;
     writeFile(path, yamlText);
 
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* config = cfgRead(path);
+    config_t *config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcEnable(config), FALSE);
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_STATSD);
@@ -1663,7 +1643,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
 }
 
 static void
-cfgReadEnvSubstitution(void** state)
+cfgReadEnvSubstitution(void **state)
 {
 
     // Set env variables to test indirect substitution
@@ -1681,59 +1661,58 @@ cfgReadEnvSubstitution(void** state)
     assert_int_equal(setenv("SOURCE", "syslog", 1), 0);
     assert_int_equal(setenv("EPS", "987654321", 1), 0);
 
-    const char* yamlText =
-        "---\n"
-        "metric:\n"
-        "  enable: $MASTER_ENABLE\n"
-        "  format:\n"
-        "    type: ndjson\n"
-        "    statsdprefix : $VAR1.$MY_ENV_VAR\n"
-        "    statsdmaxlen : $MAXLEN\n"
-        "    verbosity: $VERBOSITY\n"
-        "  transport:\n"
-        "    type: file\n"
-        "    path: /\\$VAR1/$MY_ENV_VAR/\n"
-        "    buffering: line\n"
-        "event:\n"
-        "  enable: $MASTER_ENABLE\n"
-        "  format:\n"
-        "    type : $FORMAT\n"
-        "    maxeventpersec : $EPS\n"
-        "    enhancefs : $MASTER_ENABLE\n"
-        "  watch:\n"
-        "    - type: file                    # create events from files\n"
-        "      name: $FILTER\n"
-        "    - type: console                 # create events from stdout and stderr\n"
-        "    - type: $SOURCE                 # create events from syslog and vsyslog\n"
-        "    - type: metric\n"
-        "payload:\n"
-        "  enable: $MASTER_ENABLE\n"
-        "  dir: $MYHOME\n"
-        "libscope:\n"
-        "  transport:\n"
-        "    type: syslog                    # udp, unix, file, syslog\n"
-        "    host: 127.0.0.2\n"
-        "    port: 9009\n"
-        "    buffering: line\n"
-        "  summaryperiod: $PERIOD\n"
-        "  configevent: $MASTER_ENABLE\n"
-        "  commanddir: /$MYHOME/scope/\n"
-        "  log:\n"
-        "    level: $LOGLEVEL\n"
-        "    transport:\n"
-        "      buffering: full\n"
-        "      type: file\n"
-        "      path: $DEST\n"
-        "tags:\n"
-        "  CUSTOM: $PERIOD\n"
-        "  whyyoumadbro: 'Bill owes me $5.00'\n"
-        "  undefined: $UNDEFINEDENV\n"
-        "...\n";
-    const char* path = CFG_FILE_NAME;
+    const char *yamlText = "---\n"
+                           "metric:\n"
+                           "  enable: $MASTER_ENABLE\n"
+                           "  format:\n"
+                           "    type: ndjson\n"
+                           "    statsdprefix : $VAR1.$MY_ENV_VAR\n"
+                           "    statsdmaxlen : $MAXLEN\n"
+                           "    verbosity: $VERBOSITY\n"
+                           "  transport:\n"
+                           "    type: file\n"
+                           "    path: /\\$VAR1/$MY_ENV_VAR/\n"
+                           "    buffering: line\n"
+                           "event:\n"
+                           "  enable: $MASTER_ENABLE\n"
+                           "  format:\n"
+                           "    type : $FORMAT\n"
+                           "    maxeventpersec : $EPS\n"
+                           "    enhancefs : $MASTER_ENABLE\n"
+                           "  watch:\n"
+                           "    - type: file                    # create events from files\n"
+                           "      name: $FILTER\n"
+                           "    - type: console                 # create events from stdout and stderr\n"
+                           "    - type: $SOURCE                 # create events from syslog and vsyslog\n"
+                           "    - type: metric\n"
+                           "payload:\n"
+                           "  enable: $MASTER_ENABLE\n"
+                           "  dir: $MYHOME\n"
+                           "libscope:\n"
+                           "  transport:\n"
+                           "    type: syslog                    # udp, unix, file, syslog\n"
+                           "    host: 127.0.0.2\n"
+                           "    port: 9009\n"
+                           "    buffering: line\n"
+                           "  summaryperiod: $PERIOD\n"
+                           "  configevent: $MASTER_ENABLE\n"
+                           "  commanddir: /$MYHOME/scope/\n"
+                           "  log:\n"
+                           "    level: $LOGLEVEL\n"
+                           "    transport:\n"
+                           "      buffering: full\n"
+                           "      type: file\n"
+                           "      path: $DEST\n"
+                           "tags:\n"
+                           "  CUSTOM: $PERIOD\n"
+                           "  whyyoumadbro: 'Bill owes me $5.00'\n"
+                           "  undefined: $UNDEFINEDENV\n"
+                           "...\n";
+    const char *path = CFG_FILE_NAME;
     writeFile(path, yamlText);
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* cfg = cfgRead(path);
+    config_t *cfg = cfgRead(path);
     assert_non_null(cfg);
 
     // test substitute env values that are longer and shorter than they env name
@@ -1784,19 +1763,19 @@ cfgReadEnvSubstitution(void** state)
 }
 
 static void
-jsonObjectFromCfgAndjsonStringFromCfgRoundTrip(void** state)
+jsonObjectFromCfgAndjsonStringFromCfgRoundTrip(void **state)
 {
     // Start with a string, just since it's already defined for another test
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* cfg = cfgFromString(jsonText);
+    config_t *cfg = cfgFromString(jsonText);
     assert_non_null(cfg);
 
     // Now from the cfg object above, we should be able to create a
     // new string and json object with the same content
-    char* stringified_json1 = jsonStringFromCfg(cfg);
+    char *stringified_json1 = jsonStringFromCfg(cfg);
     assert_non_null(stringified_json1);
-    cJSON* json1 = jsonObjectFromCfg(cfg);
+    cJSON *json1 = jsonObjectFromCfg(cfg);
     assert_non_null(json1);
 
     // Do this again with the new string we output this time
@@ -1808,16 +1787,16 @@ jsonObjectFromCfgAndjsonStringFromCfgRoundTrip(void** state)
     cfg = cfgFromString(stringified_json1);
     assert_non_null(cfg);
 
-    char* stringified_json2 = jsonStringFromCfg(cfg);
+    char *stringified_json2 = jsonStringFromCfg(cfg);
     assert_non_null(stringified_json2);
-    cJSON* json2 = jsonObjectFromCfg(cfg);
+    cJSON *json2 = jsonObjectFromCfg(cfg);
     assert_non_null(json2);
 
     // now the diff to make sure the strings and json object trees are identical
     assert_string_equal(stringified_json1, stringified_json2);
     assert_true(cJSON_Compare(json1, json2, 1)); // case-sensitive comparison
 
-    //printf("%s\n", stringified_json1);
+    // printf("%s\n", stringified_json1);
 
     cfgDestroy(&cfg);
     lstDestroy(&g_protlist);
@@ -1828,34 +1807,33 @@ jsonObjectFromCfgAndjsonStringFromCfgRoundTrip(void** state)
     free(stringified_json2);
 }
 
-
 static void
-initLogReturnsPtr(void** state)
+initLogReturnsPtr(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
     cfg_transport_t t;
-    for (t=CFG_UDP; t<=CFG_SHM; t++) {
-	    switch (t) {
+    for (t = CFG_UDP; t <= CFG_SHM; t++) {
+        switch (t) {
             case CFG_UDP:
                 cfgTransportTypeSet(cfg, CFG_LOG, t);
                 cfgTransportHostSet(cfg, CFG_LOG, "localhost");
                 cfgTransportPortSet(cfg, CFG_LOG, "4444");
                 break;
             case CFG_UNIX:
-				cfgTransportPathSet(cfg, CFG_LOG, "@scope.sock");
+                cfgTransportPathSet(cfg, CFG_LOG, "@scope.sock");
                 break;
             case CFG_FILE:
-				cfgTransportPathSet(cfg, CFG_LOG, "/tmp/scope.log");
+                cfgTransportPathSet(cfg, CFG_LOG, "/tmp/scope.log");
                 break;
             case CFG_SYSLOG:
             case CFG_SHM:
             case CFG_TCP:
                 break;
-	    }
+        }
         cfgTransportTypeSet(cfg, CFG_LOG, t);
-        log_t* log = initLog(cfg);
+        log_t *log = initLog(cfg);
         assert_non_null(log);
         logDestroy(&log);
     }
@@ -1863,20 +1841,20 @@ initLogReturnsPtr(void** state)
 }
 
 static void
-initMtcReturnsPtr(void** state)
+initMtcReturnsPtr(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
     cfg_transport_t t;
-    for (t=CFG_UDP; t<=CFG_SHM; t++) {
+    for (t = CFG_UDP; t <= CFG_SHM; t++) {
         cfgTransportTypeSet(cfg, CFG_MTC, t);
         if (t == CFG_UNIX) {
             cfgTransportPathSet(cfg, CFG_MTC, "@scope.sock");
         } else if (t == CFG_FILE) {
             cfgTransportPathSet(cfg, CFG_MTC, "/tmp/scope.log");
         }
-        mtc_t* mtc = initMtc(cfg);
+        mtc_t *mtc = initMtc(cfg);
         assert_non_null(mtc);
         mtcDestroy(&mtc);
     }
@@ -1884,12 +1862,12 @@ initMtcReturnsPtr(void** state)
 }
 
 static void
-initEvtFormatReturnsPtr(void** state)
+initEvtFormatReturnsPtr(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
-    evt_fmt_t* evt = initEvtFormat(cfg);
+    evt_fmt_t *evt = initEvtFormat(cfg);
     assert_non_null(evt);
     evtFormatDestroy(&evt);
 
@@ -1897,12 +1875,12 @@ initEvtFormatReturnsPtr(void** state)
 }
 
 static void
-initCtlReturnsPtr(void** state)
+initCtlReturnsPtr(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
-    ctl_t* ctl = initCtl(cfg);
+    ctl_t *ctl = initCtl(cfg);
     assert_non_null(ctl);
     ctlDestroy(&ctl);
 
@@ -1913,37 +1891,36 @@ static void
 cfgReadProtocol(void **state)
 {
     // protocol config in yaml format
-    const char *yamlText =
-        "protocol:\n"
-        // the 1st should load with non-default binary and len values
-        "  - name: test1\n"
-        "    binary: 'true'\n"
-        "    regex: 'sup?'\n"
-        "    len: 111\n"
-        "\n"
-        // the 2rd should load with defaults for non-required values
-        "  - name: test2\n"
-        "    regex: 'sup up?'\n"
-        "\n"
-        // the 3rd should load with all values specified
-        "  - name: test3\n"
-        "    binary: false\n"
-        "    regex: 'sup er?'\n"
-        "    len: 333\n"
-        "    detect: false\n"
-        "    payload: true\n"
-        "\n"
-        // the 4th should fail to load, missing regex
-        "  - name: test4\n"
-        "    #regex: 'sup er?'\n"
-        "\n"
-        // the 5th should fail to load, missing name
-        "  #- name: test5\n"
-        "  - regex: 'sup er?'\n"
-        "\n"
-        // the 6th should fail to load, bad regex, unmatched paren
-        "  - name: test6\n"
-        "    regex: 'sup(er?'\n";
+    const char *yamlText = "protocol:\n"
+                           // the 1st should load with non-default binary and len values
+                           "  - name: test1\n"
+                           "    binary: 'true'\n"
+                           "    regex: 'sup?'\n"
+                           "    len: 111\n"
+                           "\n"
+                           // the 2rd should load with defaults for non-required values
+                           "  - name: test2\n"
+                           "    regex: 'sup up?'\n"
+                           "\n"
+                           // the 3rd should load with all values specified
+                           "  - name: test3\n"
+                           "    binary: false\n"
+                           "    regex: 'sup er?'\n"
+                           "    len: 333\n"
+                           "    detect: false\n"
+                           "    payload: true\n"
+                           "\n"
+                           // the 4th should fail to load, missing regex
+                           "  - name: test4\n"
+                           "    #regex: 'sup er?'\n"
+                           "\n"
+                           // the 5th should fail to load, missing name
+                           "  #- name: test5\n"
+                           "  - regex: 'sup er?'\n"
+                           "\n"
+                           // the 6th should fail to load, bad regex, unmatched paren
+                           "  - name: test6\n"
+                           "    regex: 'sup(er?'\n";
 
     char *name[3] = {"test1", "test2", "test3"};
     char *regex[3] = {"sup?", "sup up?", "sup er?"};
@@ -1959,15 +1936,15 @@ cfgReadProtocol(void **state)
     assert_non_null(ppath);
 
     writeFile(ppath, yamlText);
-    
-    config_t* config = cfgRead(ppath);
+
+    config_t *config = cfgRead(ppath);
     assert_non_null(config);
     assert_int_equal(g_prot_sequence, 3);
 
     for (unsigned key = 0; key < 3; ++key) {
-        protocol_def_t *prot = lstFind(g_protlist, key+1);
+        protocol_def_t *prot = lstFind(g_protlist, key + 1);
         assert_non_null(prot);
-        assert_int_equal(prot->type, key+1);
+        assert_int_equal(prot->type, key + 1);
         assert_string_equal(prot->protname, name[key]);
         assert_string_equal(prot->regex, regex[key]);
         assert_non_null(prot->re);
@@ -1992,38 +1969,40 @@ initProc(const char *procname, const char *cmdline, const char *hostname)
     g_proc.uid = getuid();
     g_proc.gid = getgid();
 
-
     strncpy(g_proc.hostname, hostname, sizeof(g_proc.hostname));
     strncpy(g_proc.procname, procname, sizeof(g_proc.procname));
 
-    if (g_proc.cmd) { free(g_proc.cmd); g_proc.cmd = NULL; }
-    if (cmdline) g_proc.cmd = strdup(cmdline);
+    if (g_proc.cmd) {
+        free(g_proc.cmd);
+        g_proc.cmd = NULL;
+    }
+    if (cmdline)
+        g_proc.cmd = strdup(cmdline);
 }
 
 static void
 cfgReadCustomEmptyFilter(void **state)
 {
-    const char *yamlText =
-        "# use default configs to start then these overrides\n"
-        "custom:\n"
-        // an empty filter should not match anything
-        "  eg1:\n"
-        "    filter:\n"
-        "    config:\n"
-        "      metric:\n"
-        "        enable: false\n"
-        // an invalid filter should not match anything
-        "  eg2:\n"
-        "    filter:\n"
-        "      bogus: ...\n"
-        "    config:\n"
-        "      event:\n"
-        "        enable: false\n"
-        "# EOF\n";
+    const char *yamlText = "# use default configs to start then these overrides\n"
+                           "custom:\n"
+                           // an empty filter should not match anything
+                           "  eg1:\n"
+                           "    filter:\n"
+                           "    config:\n"
+                           "      metric:\n"
+                           "        enable: false\n"
+                           // an invalid filter should not match anything
+                           "  eg2:\n"
+                           "    filter:\n"
+                           "      bogus: ...\n"
+                           "    config:\n"
+                           "      event:\n"
+                           "        enable: false\n"
+                           "# EOF\n";
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2036,35 +2015,34 @@ cfgReadCustomEmptyFilter(void **state)
 static void
 cfgReadCustomProcnameFilter(void **state)
 {
-    const char *yamlText =
-        "# use default configs to start then these overrides\n"
-        "custom:\n"
-        // this should match and disable metrics
-        "  eg1:\n"
-        "    filter:\n"
-        "      procname: test\n"
-        "    config:\n"
-        "      metric:\n"
-        "        enable: false\n"
-        // this should NOT match and leave events enabled
-        "  eg2:\n"
-        "    filter:\n"
-        "      procname: not-test\n"
-        "    config:\n"
-        "      event:\n"
-        "        enable: false\n"
-        // this should match and enable payloads
-        "  eg2:\n"
-        "    filter:\n"
-        "      procname: test\n"
-        "    config:\n"
-        "      payload:\n"
-        "        enable: true\n"
-        "# EOF\n";
+    const char *yamlText = "# use default configs to start then these overrides\n"
+                           "custom:\n"
+                           // this should match and disable metrics
+                           "  eg1:\n"
+                           "    filter:\n"
+                           "      procname: test\n"
+                           "    config:\n"
+                           "      metric:\n"
+                           "        enable: false\n"
+                           // this should NOT match and leave events enabled
+                           "  eg2:\n"
+                           "    filter:\n"
+                           "      procname: not-test\n"
+                           "    config:\n"
+                           "      event:\n"
+                           "        enable: false\n"
+                           // this should match and enable payloads
+                           "  eg2:\n"
+                           "    filter:\n"
+                           "      procname: test\n"
+                           "    config:\n"
+                           "      payload:\n"
+                           "        enable: true\n"
+                           "# EOF\n";
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2078,35 +2056,34 @@ cfgReadCustomProcnameFilter(void **state)
 static void
 cfgReadCustomArgFilter(void **state)
 {
-    const char *yamlText =
-        "# use default configs to start then these overrides\n"
-        "custom:\n"
-        // this should match and disable metrics
-        "  eg1:\n"
-        "    filter:\n"
-        "      arg: with\n"
-        "    config:\n"
-        "      metric:\n"
-        "        enable: false\n"
-        // this should NOT match and leave events enabled
-        "  eg2:\n"
-        "    filter:\n"
-        "      arg: foo\n"
-        "    config:\n"
-        "      event:\n"
-        "        enable: false\n"
-        // this should match and enable payloads
-        "  eg2:\n"
-        "    filter:\n"
-        "      arg: args\n"
-        "    config:\n"
-        "      payload:\n"
-        "        enable: true\n"
-        "# EOF\n";
+    const char *yamlText = "# use default configs to start then these overrides\n"
+                           "custom:\n"
+                           // this should match and disable metrics
+                           "  eg1:\n"
+                           "    filter:\n"
+                           "      arg: with\n"
+                           "    config:\n"
+                           "      metric:\n"
+                           "        enable: false\n"
+                           // this should NOT match and leave events enabled
+                           "  eg2:\n"
+                           "    filter:\n"
+                           "      arg: foo\n"
+                           "    config:\n"
+                           "      event:\n"
+                           "        enable: false\n"
+                           // this should match and enable payloads
+                           "  eg2:\n"
+                           "    filter:\n"
+                           "      arg: args\n"
+                           "    config:\n"
+                           "      payload:\n"
+                           "        enable: true\n"
+                           "# EOF\n";
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2120,35 +2097,34 @@ cfgReadCustomArgFilter(void **state)
 static void
 cfgReadCustomHostnameFilter(void **state)
 {
-    const char *yamlText =
-        "# use default configs to start then these overrides\n"
-        "custom:\n"
-        // this should match and disable metrics
-        "  eg1:\n"
-        "    filter:\n"
-        "      hostname: myhost\n"
-        "    config:\n"
-        "      metric:\n"
-        "        enable: false\n"
-        // this should NOT match and leave events enabled
-        "  eg2:\n"
-        "    filter:\n"
-        "      hostname: not_myhost\n"
-        "    config:\n"
-        "      event:\n"
-        "        enable: false\n"
-        // this should match and enable payloads
-        "  eg2:\n"
-        "    filter:\n"
-        "      hostname: MyHost\n" // note case change
-        "    config:\n"
-        "      payload:\n"
-        "        enable: true\n"
-        "# EOF\n";
+    const char *yamlText = "# use default configs to start then these overrides\n"
+                           "custom:\n"
+                           // this should match and disable metrics
+                           "  eg1:\n"
+                           "    filter:\n"
+                           "      hostname: myhost\n"
+                           "    config:\n"
+                           "      metric:\n"
+                           "        enable: false\n"
+                           // this should NOT match and leave events enabled
+                           "  eg2:\n"
+                           "    filter:\n"
+                           "      hostname: not_myhost\n"
+                           "    config:\n"
+                           "      event:\n"
+                           "        enable: false\n"
+                           // this should match and enable payloads
+                           "  eg2:\n"
+                           "    filter:\n"
+                           "      hostname: MyHost\n" // note case change
+                           "    config:\n"
+                           "      payload:\n"
+                           "        enable: true\n"
+                           "# EOF\n";
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2162,35 +2138,34 @@ cfgReadCustomHostnameFilter(void **state)
 static void
 cfgReadCustomUsernameFilter(void **state)
 {
-    const char *yamlText =
-        "# use default configs to start then these overrides\n"
-        "custom:\n"
-        // this should match and disable metrics
-        "  eg1:\n"
-        "    filter:\n"
-        "      username: $USER\n"
-        "    config:\n"
-        "      metric:\n"
-        "        enable: false\n"
-        // this should NOT match and leave events enabled
-        "  eg2:\n"
-        "    filter:\n"
-        "      username: not_$USER\n"
-        "    config:\n"
-        "      event:\n"
-        "        enable: false\n"
-        // this should match and enable payloads
-        "  eg2:\n"
-        "    filter:\n"
-        "      username: $USER\n"
-        "    config:\n"
-        "      payload:\n"
-        "        enable: true\n"
-        "# EOF\n";
+    const char *yamlText = "# use default configs to start then these overrides\n"
+                           "custom:\n"
+                           // this should match and disable metrics
+                           "  eg1:\n"
+                           "    filter:\n"
+                           "      username: $USER\n"
+                           "    config:\n"
+                           "      metric:\n"
+                           "        enable: false\n"
+                           // this should NOT match and leave events enabled
+                           "  eg2:\n"
+                           "    filter:\n"
+                           "      username: not_$USER\n"
+                           "    config:\n"
+                           "      event:\n"
+                           "        enable: false\n"
+                           // this should match and enable payloads
+                           "  eg2:\n"
+                           "    filter:\n"
+                           "      username: $USER\n"
+                           "    config:\n"
+                           "      payload:\n"
+                           "        enable: true\n"
+                           "# EOF\n";
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2204,42 +2179,41 @@ cfgReadCustomUsernameFilter(void **state)
 static void
 cfgReadCustomEnvFilter(void **state)
 {
-    const char *yamlText =
-        "# use default configs to start then these overrides\n"
-        "custom:\n"
-        // this should match and disable metrics
-        "  eg1:\n"
-        "    filter:\n"
-        "      env: USER\n"
-        "    config:\n"
-        "      metric:\n"
-        "        enable: false\n"
-        // this should NOT match and leave events enabled
-        "  eg2:\n"
-        "    filter:\n"
-        "      env: ___BOGUS_ENV_VAR_WE_EXPECT_IS_NOT_SET___\n"
-        "    config:\n"
-        "      event:\n"
-        "        enable: false\n"
-        // this should NOT match and leave payloads disabled
-        "  eg2:\n"
-        "    filter:\n"
-        "      env: USER=not_$USER\n"
-        "    config:\n"
-        "      payload:\n"
-        "        enable: true\n"
-        // this should match and set the authToken
-        "  eg2:\n"
-        "    filter:\n"
-        "      env: USER=$USER\n"
-        "    config:\n"
-        "      cribl:\n"
-        "        authtoken: secret\n"
-        "# EOF\n";
+    const char *yamlText = "# use default configs to start then these overrides\n"
+                           "custom:\n"
+                           // this should match and disable metrics
+                           "  eg1:\n"
+                           "    filter:\n"
+                           "      env: USER\n"
+                           "    config:\n"
+                           "      metric:\n"
+                           "        enable: false\n"
+                           // this should NOT match and leave events enabled
+                           "  eg2:\n"
+                           "    filter:\n"
+                           "      env: ___BOGUS_ENV_VAR_WE_EXPECT_IS_NOT_SET___\n"
+                           "    config:\n"
+                           "      event:\n"
+                           "        enable: false\n"
+                           // this should NOT match and leave payloads disabled
+                           "  eg2:\n"
+                           "    filter:\n"
+                           "      env: USER=not_$USER\n"
+                           "    config:\n"
+                           "      payload:\n"
+                           "        enable: true\n"
+                           // this should match and set the authToken
+                           "  eg2:\n"
+                           "    filter:\n"
+                           "      env: USER=$USER\n"
+                           "    config:\n"
+                           "      cribl:\n"
+                           "        authtoken: secret\n"
+                           "# EOF\n";
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2255,28 +2229,27 @@ cfgReadCustomEnvFilter(void **state)
 static void
 cfgReadCustomAncestorFilter(void **state)
 {
-    const char *yamlText =
-        "# use default configs to start then these overrides\n"
-        "custom:\n"
-        // this should match and disable metrics
-        "  eg1:\n"
-        "    filter:\n"
-        "      ancestor: make\n"
-        "    config:\n"
-        "      metric:\n"
-        "        enable: false\n"
-        // this should NOT match and leave events enabled
-        "  eg2:\n"
-        "    filter:\n"
-        "      ancestor: bogus\n"
-        "    config:\n"
-        "      event:\n"
-        "        enable: false\n"
-        "# EOF\n";
+    const char *yamlText = "# use default configs to start then these overrides\n"
+                           "custom:\n"
+                           // this should match and disable metrics
+                           "  eg1:\n"
+                           "    filter:\n"
+                           "      ancestor: make\n"
+                           "    config:\n"
+                           "      metric:\n"
+                           "        enable: false\n"
+                           // this should NOT match and leave events enabled
+                           "  eg2:\n"
+                           "    filter:\n"
+                           "      ancestor: bogus\n"
+                           "    config:\n"
+                           "      event:\n"
+                           "        enable: false\n"
+                           "# EOF\n";
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2289,40 +2262,39 @@ cfgReadCustomAncestorFilter(void **state)
 static void
 cfgReadCustomMultipleFilters(void **state)
 {
-    const char *yamlText =
-        "# use default configs to start then these overrides\n"
-        "custom:\n"
-        // this should match and disable metrics
-        "  eg1:\n"
-        "    filter:\n"
-        "      procname: test\n"
-        "      arg: args\n"
-        "      hostname: myhost\n"
-        "      username: $USER\n"
-        "      env: USER\n"
-        "      env: USER=$USER\n"
-        "      ancestor: make\n"
-        "    config:\n"
-        "      metric:\n"
-        "        enable: false\n"
-        // this should NOT match and leave events enabled
-        "  eg2:\n"
-        "    filter:\n"
-        "      procname: not_test\n"  // only this changed from above
-        "      arg: args\n"
-        "      hostname: myhost\n"
-        "      username: $USER\n"
-        "      env: USER\n"
-        "      env: USER=$USER\n"
-        "      ancestor: make\n"
-        "    config:\n"
-        "      event:\n"
-        "        enable: false\n"
-        "# EOF\n";
+    const char *yamlText = "# use default configs to start then these overrides\n"
+                           "custom:\n"
+                           // this should match and disable metrics
+                           "  eg1:\n"
+                           "    filter:\n"
+                           "      procname: test\n"
+                           "      arg: args\n"
+                           "      hostname: myhost\n"
+                           "      username: $USER\n"
+                           "      env: USER\n"
+                           "      env: USER=$USER\n"
+                           "      ancestor: make\n"
+                           "    config:\n"
+                           "      metric:\n"
+                           "        enable: false\n"
+                           // this should NOT match and leave events enabled
+                           "  eg2:\n"
+                           "    filter:\n"
+                           "      procname: not_test\n" // only this changed from above
+                           "      arg: args\n"
+                           "      hostname: myhost\n"
+                           "      username: $USER\n"
+                           "      env: USER\n"
+                           "      env: USER=$USER\n"
+                           "      ancestor: make\n"
+                           "    config:\n"
+                           "      event:\n"
+                           "        enable: false\n"
+                           "# EOF\n";
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2335,35 +2307,34 @@ cfgReadCustomMultipleFilters(void **state)
 static void
 cfgReadCustomOverride(void **state)
 {
-    const char *yamlText =
-        "# use default configs to start then these overrides\n"
-        "custom:\n"
-        // this should match and disable metrics
-        "  eg1:\n"
-        "    filter:\n"
-        "      procname: test\n"
-        "    config:\n"
-        "      metric:\n"
-        "        enable: false\n"
-        // this should also match and disable events too
-        "  eg2:\n"
-        "    filter:\n"
-        "      procname: test\n"
-        "    config:\n"
-        "      event:\n"
-        "        enable: false\n"
-        // this should also match and re-enable events
-        "  eg3:\n"
-        "    filter:\n"
-        "      procname: test\n"
-        "    config:\n"
-        "      event:\n"
-        "        enable: true\n"
-        "# EOF\n";
+    const char *yamlText = "# use default configs to start then these overrides\n"
+                           "custom:\n"
+                           // this should match and disable metrics
+                           "  eg1:\n"
+                           "    filter:\n"
+                           "      procname: test\n"
+                           "    config:\n"
+                           "      metric:\n"
+                           "        enable: false\n"
+                           // this should also match and disable events too
+                           "  eg2:\n"
+                           "    filter:\n"
+                           "      procname: test\n"
+                           "    config:\n"
+                           "      event:\n"
+                           "        enable: false\n"
+                           // this should also match and re-enable events
+                           "  eg3:\n"
+                           "    filter:\n"
+                           "      procname: test\n"
+                           "    config:\n"
+                           "      event:\n"
+                           "        enable: true\n"
+                           "# EOF\n";
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2376,26 +2347,25 @@ cfgReadCustomOverride(void **state)
 static void
 cfgReadCustomOrder(void **state)
 {
-    const char *yamlText =
-        "custom:\n"
-        // this should match and re-enable metrics and
-        // it should work even though the filter isn't first
-        "  eg1:\n"
-        "    config:\n"
-        "      metric:\n"
-        "        enable: true\n"
-        "    filter:\n"
-        "      procname: test\n"
-        "\n"
-        // this should get processed first, before the custom entries
-        "# disable metrics\n"
-        "metric:\n"
-        "  enable: false\n"
-        "# EOF\n";
+    const char *yamlText = "custom:\n"
+                           // this should match and re-enable metrics and
+                           // it should work even though the filter isn't first
+                           "  eg1:\n"
+                           "    config:\n"
+                           "      metric:\n"
+                           "        enable: true\n"
+                           "    filter:\n"
+                           "      procname: test\n"
+                           "\n"
+                           // this should get processed first, before the custom entries
+                           "# disable metrics\n"
+                           "metric:\n"
+                           "  enable: false\n"
+                           "# EOF\n";
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2422,7 +2392,7 @@ cfgReadCustomAnchor(void **state)
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2456,7 +2426,7 @@ cfgReadCustomAnchorExtend(void **state)
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2470,23 +2440,22 @@ cfgReadCustomAnchorExtend(void **state)
 // This is not a proper test, it just exists to make valgrind output
 // more readable when analyzing this test, by deallocating the compiled
 // regex in src/cfgutils.c.
-extern void envRegexFree(void** state);
-
+extern void envRegexFree(void **state);
 
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("running %s\n", argv[0]);
     initFn();
 
     source_state_t log = {"SCOPE_EVENT_LOGFILE", CFG_SRC_FILE, DEFAULT_SRC_FILE};
     source_state_t con = {"SCOPE_EVENT_CONSOLE", CFG_SRC_CONSOLE, DEFAULT_SRC_CONSOLE};
-    source_state_t sys = {"SCOPE_EVENT_SYSLOG" , CFG_SRC_SYSLOG , DEFAULT_SRC_SYSLOG};
-    source_state_t met = {"SCOPE_EVENT_METRIC", CFG_SRC_METRIC , DEFAULT_SRC_METRIC};
-    source_state_t htt = {"SCOPE_EVENT_HTTP", CFG_SRC_HTTP , DEFAULT_SRC_HTTP};
-    source_state_t net = {"SCOPE_EVENT_NET", CFG_SRC_NET , DEFAULT_SRC_NET};
-    source_state_t fs =  {"SCOPE_EVENT_FS", CFG_SRC_FS , DEFAULT_SRC_FS};
-    source_state_t dns = {"SCOPE_EVENT_DNS", CFG_SRC_DNS , DEFAULT_SRC_DNS};
+    source_state_t sys = {"SCOPE_EVENT_SYSLOG", CFG_SRC_SYSLOG, DEFAULT_SRC_SYSLOG};
+    source_state_t met = {"SCOPE_EVENT_METRIC", CFG_SRC_METRIC, DEFAULT_SRC_METRIC};
+    source_state_t htt = {"SCOPE_EVENT_HTTP", CFG_SRC_HTTP, DEFAULT_SRC_HTTP};
+    source_state_t net = {"SCOPE_EVENT_NET", CFG_SRC_NET, DEFAULT_SRC_NET};
+    source_state_t fs = {"SCOPE_EVENT_FS", CFG_SRC_FS, DEFAULT_SRC_FS};
+    source_state_t dns = {"SCOPE_EVENT_DNS", CFG_SRC_DNS, DEFAULT_SRC_DNS};
 
     dest_state_t dest_mtc = {"SCOPE_METRIC_DEST", CFG_MTC};
     dest_state_t dest_evt = {"SCOPE_EVENT_DEST", CFG_CTL};
@@ -2496,7 +2465,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgPathHonorsEnvVar),
         // XXX This test is failing under CI at GitHub but passes locally?
         //     I'm being lazy and just disabling it for now. --pd
-        //cmocka_unit_test(cfgPathHonorsPriorityOrder),
+        // cmocka_unit_test(cfgPathHonorsPriorityOrder),
         cmocka_unit_test(cfgProcessEnvironmentMtcEnable),
         cmocka_unit_test(cfgProcessEnvironmentMtcFormat),
         cmocka_unit_test(cfgProcessEnvironmentStatsDPrefix),

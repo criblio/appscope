@@ -1,15 +1,15 @@
 #define _GNU_SOURCE
-#include <stdio.h>
 #include "com.h"
 #include "ctl.h"
 #include "dbg.h"
-#include "test.h"
 #include "runtimecfg.h"
+#include "test.h"
+#include <stdio.h>
 
 static void
-cmdPostInfoMsgDoesNotCrash(void** state)
+cmdPostInfoMsgDoesNotCrash(void **state)
 {
-    ctl_t* ctl = ctlCreate();
+    ctl_t *ctl = ctlCreate();
     assert_non_null(ctl);
 
     assert_int_equal(-1, cmdPostInfoMsg(NULL, NULL));
@@ -21,9 +21,9 @@ cmdPostInfoMsgDoesNotCrash(void** state)
 }
 
 static void
-cmdSendInfoStrDoesNotCrash(void** state)
+cmdSendInfoStrDoesNotCrash(void **state)
 {
-    ctl_t* ctl = ctlCreate();
+    ctl_t *ctl = ctlCreate();
     assert_non_null(ctl);
 
     assert_int_equal(-1, cmdSendInfoStr(NULL, NULL));
@@ -35,14 +35,13 @@ cmdSendInfoStrDoesNotCrash(void** state)
 }
 
 static void
-cmdSendResponseDoesNotCrash(void** state)
+cmdSendResponseDoesNotCrash(void **state)
 {
-    ctl_t* ctl = ctlCreate();
+    ctl_t *ctl = ctlCreate();
     assert_non_null(ctl);
-    const char buf[] =
-         "{\"type\": \"req\", \"req\": \"huh?\", \"reqId\": 3.5}";
+    const char buf[] = "{\"type\": \"req\", \"req\": \"huh?\", \"reqId\": 3.5}";
 
-    request_t* req = cmdParse(buf);
+    request_t *req = cmdParse(buf);
     assert_non_null(req);
 
     // First two arguments must be non-null.  The last arg can be null.
@@ -56,10 +55,10 @@ cmdSendResponseDoesNotCrash(void** state)
 }
 
 static void
-cmdParseDoesNotCrash(void** state)
+cmdParseDoesNotCrash(void **state)
 {
     assert_int_equal(dbgCountAllLines(), 0);
-    request_t* req = cmdParse(NULL);
+    request_t *req = cmdParse(NULL);
     assert_int_equal(dbgCountAllLines(), 1);
     dbgInit(); // reset dbg for the rest of the tests
     assert_non_null(req);
@@ -71,14 +70,9 @@ cmdParseDoesNotCrash(void** state)
 }
 
 static void
-msgStartHasExpectedSubNodes(void** state)
+msgStartHasExpectedSubNodes(void **state)
 {
-    proc_id_t proc = {.pid = 4848,
-                      .ppid = 4847,
-                      .hostname = "host",
-                      .procname = "comtest",
-                      .cmd = "cmd",
-                      .id = "host-comtest-cmd"};
+    proc_id_t proc = {.pid = 4848, .ppid = 4847, .hostname = "host", .procname = "comtest", .cmd = "cmd", .id = "host-comtest-cmd"};
     config_t *cfg = cfgCreateDefault();
     cJSON *json;
 
@@ -117,17 +111,13 @@ msgStartHasExpectedSubNodes(void** state)
 }
 
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("running %s\n", argv[0]);
 
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(cmdPostInfoMsgDoesNotCrash),
-        cmocka_unit_test(cmdSendInfoStrDoesNotCrash),
-        cmocka_unit_test(cmdSendResponseDoesNotCrash),
-        cmocka_unit_test(cmdParseDoesNotCrash),
-        cmocka_unit_test(msgStartHasExpectedSubNodes),
-        cmocka_unit_test(dbgHasNoUnexpectedFailures),
+        cmocka_unit_test(cmdPostInfoMsgDoesNotCrash), cmocka_unit_test(cmdSendInfoStrDoesNotCrash),  cmocka_unit_test(cmdSendResponseDoesNotCrash),
+        cmocka_unit_test(cmdParseDoesNotCrash),       cmocka_unit_test(msgStartHasExpectedSubNodes), cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

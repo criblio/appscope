@@ -1,8 +1,10 @@
 #include "test_utils.h"
 
-char * __fgets_chk(char * s, size_t size, int strsize, FILE * stream);
+char *__fgets_chk(char *s, size_t size, int strsize, FILE *stream);
 
-int do_test() {
+int
+do_test()
+{
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[NAME_MAX];
     int i = 0;
@@ -12,17 +14,17 @@ int do_test() {
 
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
-    FILE* pFile = fopen(tmp_file_name, "w");
+    FILE *pFile = fopen(tmp_file_name, "w");
 
-    if(pFile != NULL) {
-        for(i = 0; i < TEST_COUNT; i++) {
-            if(fputs(buffer, pFile) == EOF) {
+    if (pFile != NULL) {
+        for (i = 0; i < TEST_COUNT; i++) {
+            if (fputs(buffer, pFile) == EOF) {
                 TEST_ERROR();
                 break;
             }
         }
 
-        if(fclose(pFile) == EOF) {
+        if (fclose(pFile) == EOF) {
             TEST_ERROR();
         }
     } else {
@@ -31,22 +33,22 @@ int do_test() {
 
     pFile = fopen(tmp_file_name, "r");
 
-    if(pFile != NULL) {
-        for(i = 0; i < TEST_COUNT; i++) {
+    if (pFile != NULL) {
+        for (i = 0; i < TEST_COUNT; i++) {
             memset(buffer, 0, sizeof(buffer));
 
-            if(__fgets_chk(buffer, sizeof(buffer), sizeof(buffer), pFile) == NULL) {
+            if (__fgets_chk(buffer, sizeof(buffer), sizeof(buffer), pFile) == NULL) {
                 TEST_ERROR();
                 break;
             } else {
-                if(strcmp(buffer, TEST_MSG) != 0) {
+                if (strcmp(buffer, TEST_MSG) != 0) {
                     TEST_ERROR();
                     break;
                 }
             }
         }
 
-        if(fclose(pFile) == EOF) {
+        if (fclose(pFile) == EOF) {
             TEST_ERROR();
         }
     } else {

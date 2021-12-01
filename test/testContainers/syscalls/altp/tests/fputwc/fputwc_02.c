@@ -3,7 +3,9 @@
 
 #include "test_utils.h"
 
-int do_test() {
+int
+do_test()
+{
     setlocale(LC_ALL, "en_US.utf8");
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[NAME_MAX];
@@ -14,22 +16,22 @@ int do_test() {
 
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
-    FILE* pFile = fopen(tmp_file_name, "w");
+    FILE *pFile = fopen(tmp_file_name, "w");
 
-    if(pFile != NULL) {
-        for(i = 0; i < TEST_COUNT; i++) {
-            if(fputwc(c, pFile) == WEOF) {
+    if (pFile != NULL) {
+        for (i = 0; i < TEST_COUNT; i++) {
+            if (fputwc(c, pFile) == WEOF) {
                 TEST_ERROR();
                 break;
             }
         }
 
-        if(fclose(pFile) == EOF) {
+        if (fclose(pFile) == EOF) {
             TEST_ERROR();
         }
         unlink(tmp_file_name);
     } else {
-       TEST_ERROR();
+        TEST_ERROR();
     }
 
     REMOVE_TMP_DIR();

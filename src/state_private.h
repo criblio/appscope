@@ -5,8 +5,8 @@
 #include <sys/socket.h>
 
 #define PROTOCOL_STR 16
-#define FUNC_MAX 24
-#define HDRTYPE_MAX 16
+#define FUNC_MAX     24
+#define HDRTYPE_MAX  16
 
 //
 // This file contains implementation details for state.c and reporting.c.
@@ -37,31 +37,31 @@ typedef struct {
 } counters_element_t;
 
 typedef struct metric_counters_t {
-    counters_element_t  openPorts;
-    counters_element_t  netConnectionsUdp;
-    counters_element_t  netConnectionsTcp;
-    counters_element_t  netConnectionsOther;
-    counters_element_t  netrxBytes[SOCK_NUM_BUCKETS];
-    counters_element_t  nettxBytes[SOCK_NUM_BUCKETS];
-    counters_element_t  readBytes;
-    counters_element_t  writeBytes;
-    counters_element_t  numSeek;
-    counters_element_t  numStat;
-    counters_element_t  numOpen;
-    counters_element_t  numClose;
-    counters_element_t  numDNS;
-    counters_element_t  fsDurationNum;
-    counters_element_t  fsDurationTotal;
-    counters_element_t  connDurationNum;
-    counters_element_t  connDurationTotal;
-    counters_element_t  dnsDurationNum;
-    counters_element_t  dnsDurationTotal;
-    counters_element_t  netConnectErrors;
-    counters_element_t  netTxRxErrors;
-    counters_element_t  netDNSErrors;
-    counters_element_t  fsOpenCloseErrors;
-    counters_element_t  fsRdWrErrors;
-    counters_element_t  fsStatErrors;
+    counters_element_t openPorts;
+    counters_element_t netConnectionsUdp;
+    counters_element_t netConnectionsTcp;
+    counters_element_t netConnectionsOther;
+    counters_element_t netrxBytes[SOCK_NUM_BUCKETS];
+    counters_element_t nettxBytes[SOCK_NUM_BUCKETS];
+    counters_element_t readBytes;
+    counters_element_t writeBytes;
+    counters_element_t numSeek;
+    counters_element_t numStat;
+    counters_element_t numOpen;
+    counters_element_t numClose;
+    counters_element_t numDNS;
+    counters_element_t fsDurationNum;
+    counters_element_t fsDurationTotal;
+    counters_element_t connDurationNum;
+    counters_element_t connDurationTotal;
+    counters_element_t dnsDurationNum;
+    counters_element_t dnsDurationTotal;
+    counters_element_t netConnectErrors;
+    counters_element_t netTxRxErrors;
+    counters_element_t netDNSErrors;
+    counters_element_t fsOpenCloseErrors;
+    counters_element_t fsRdWrErrors;
+    counters_element_t fsStatErrors;
 } metric_counters;
 
 typedef struct {
@@ -97,12 +97,12 @@ typedef struct http_map_t {
     uint64_t start_time;
     uint64_t duration;
     uint64_t id;
-    char *req;          // The whole original request
+    char *req; // The whole original request
     size_t req_len;
-    char *method_str;   //   Method field from Request-Line
-    char *target_str;   //   Request-URI field from Request-Line
-    size_t clen;        //   Content-Length entity-header value from req
-    char *resp;         // The whole original response
+    char *method_str; //   Method field from Request-Line
+    char *target_str; //   Request-URI field from Request-Line
+    size_t clen;      //   Content-Length entity-header value from req
+    char *resp;       // The whole original response
 } http_map;
 
 typedef struct stat_err_info_t {
@@ -113,15 +113,15 @@ typedef struct stat_err_info_t {
     metric_counters counters;
 } stat_err_info;
 
-typedef enum {
+typedef enum
+{
     HTTP_NONE,
     HTTP_HDR,
     HTTP_HDREND,
     HTTP_DATA
 } http_enum_t;
 
-typedef struct
-{
+typedef struct {
     uint64_t uid;
     int sockfd;
     int isSsl;
@@ -130,9 +130,9 @@ typedef struct
 
 // storage for partial HTTP/2 frames
 typedef struct {
-    uint8_t *buf;  // bytes array pointer
-    size_t   len;  // num bytes used
-    size_t   size; // num bytes allocated
+    uint8_t *buf; // bytes array pointer
+    size_t len;   // num bytes used
+    size_t size;  // num bytes allocated
 } http_buf_t;
 
 typedef struct protocol_info_t {
@@ -150,10 +150,10 @@ typedef struct protocol_info_t {
 
 typedef struct {
     http_enum_t state;
-    char *hdr;          // Used if state == HDR
+    char *hdr; // Used if state == HDR
     size_t hdrlen;
     size_t hdralloc;
-    size_t clen;        // Used if state==HTTP_DATA
+    size_t clen; // Used if state==HTTP_DATA
     httpId_t id;
 
     // HTTP version detected (0=unknown, 1=HTTP/1.x, 2=HTTP/2.0)
@@ -199,10 +199,10 @@ typedef struct net_info_t {
     metric_counters counters;
 
     detect_type_t tlsDetect;     // state for TLS detection on this channel
-    protocol_def_t* tlsProtoDef; // the TLS protocol-detector used
+    protocol_def_t *tlsProtoDef; // the TLS protocol-detector used
 
     detect_type_t protoDetect;     // state for protocol detection on this channel
-    protocol_def_t* protoProtoDef; // The protocol-detector that matched
+    protocol_def_t *protoProtoDef; // The protocol-detector that matched
 
 } net_info;
 

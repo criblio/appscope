@@ -3,22 +3,23 @@ Utility for listing golang symbols from the .gopclntab section of an ELF file
 
 gcc -o gosym ./test/manual/gosym.c
 */
-#include <stdio.h>
-#include <string.h>
-#include <errno.h>
 #include <elf.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <sys/mman.h>
-#include <stdint.h>
-#include <sys/stat.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <linux/limits.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #define GOPCLNTAB_MAGIC_112 0xfffffffb
 #define GOPCLNTAB_MAGIC_116 0xfffffffa
 
-int printSymbols(const char *fname) 
+int
+printSymbols(const char *fname)
 {
     int fd;
     struct stat st;
@@ -41,7 +42,7 @@ int printSymbols(const char *fname)
         return -1;
     }
 
-    //check ELF magic
+    // check ELF magic
     if (buf[0] != 0x7f && strcmp(&buf[1], "ELF")) {
         fprintf(stderr, "%s is not an ELF file\n", fname);
         munmap(buf, st.st_size);
@@ -116,7 +117,7 @@ int printSymbols(const char *fname)
 
                 uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (3 * 8)));
                 uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (7 * 8)));
-                
+
                 const void *symtab_addr = pclntab_addr + pclntab_offset;
 
                 printf("Symbol count = %ld\n", sym_count);
@@ -145,8 +146,10 @@ int printSymbols(const char *fname)
     return 0;
 }
 
-int main(int argc, char **argv) {
-    if (argc<2) {
+int
+main(int argc, char **argv)
+{
+    if (argc < 2) {
         printf("Utility for listing golang symbols from the .gopclntab section of an ELF file\n");
         printf("Usage: gosym elf-file\n");
         exit(0);

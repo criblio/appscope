@@ -1,13 +1,13 @@
 #define _GNU_SOURCE
+#include "dbg.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include "dbg.h"
 
 #include "test.h"
 
 static void
-dbgInitSetsGlobal(void** state)
+dbgInitSetsGlobal(void **state)
 {
     assert_null(g_dbg);
     dbgInit();
@@ -18,7 +18,7 @@ dbgInitSetsGlobal(void** state)
 }
 
 static void
-dbgDestroyClearsGlobal(void** state)
+dbgDestroyClearsGlobal(void **state)
 {
     assert_non_null(g_dbg);
     dbgDestroy();
@@ -29,7 +29,7 @@ dbgDestroyClearsGlobal(void** state)
 }
 
 static void
-dbgAddLineSetsGlobalIfNotSet(void** state)
+dbgAddLineSetsGlobalIfNotSet(void **state)
 {
     assert_null(g_dbg);
     dbgInit();
@@ -39,7 +39,7 @@ dbgAddLineSetsGlobalIfNotSet(void** state)
 }
 
 static void
-dbgMacroIdentifiesFileAndLine(void** state)
+dbgMacroIdentifiesFileAndLine(void **state)
 {
     dbgInit();
     DBG(NULL);                        // test/dbgtest.c:45
@@ -58,12 +58,12 @@ dbgMacroIdentifiesFileAndLine(void** state)
 }
 
 static void
-dbgAddLineHasCorrectCount(void** state)
+dbgAddLineHasCorrectCount(void **state)
 {
     dbgInit();
     dbgAddLine("key1", NULL);
     int i;
-    for (i=0; i<5; i++) {
+    for (i = 0; i < 5; i++) {
         dbgAddLine("key2", NULL);
     }
 
@@ -79,7 +79,7 @@ dbgAddLineHasCorrectCount(void** state)
 }
 
 static void
-dbgAddLineCapturesTimeErrnoAndStr(void** state)
+dbgAddLineCapturesTimeErrnoAndStr(void **state)
 {
     dbgInit();
     errno = EINVAL;
@@ -99,9 +99,8 @@ dbgAddLineCapturesTimeErrnoAndStr(void** state)
     char str[64] = {0};
     int rv;
 
-    char* key1_line = strstr (buf, "1: key1");
-    rv = sscanf(key1_line, "%llu: %64s %64s %d(%64[^)]) %64s\n",
-                    &count, key, time, &err, err_str, str);
+    char *key1_line = strstr(buf, "1: key1");
+    rv = sscanf(key1_line, "%llu: %64s %64s %d(%64[^)]) %64s\n", &count, key, time, &err, err_str, str);
     assert_int_equal(rv, 6);
     assert_int_equal(count, 1);
     assert_string_equal(key, "key1");
@@ -109,9 +108,8 @@ dbgAddLineCapturesTimeErrnoAndStr(void** state)
     assert_string_equal(err_str, "Invalid argument");
     assert_string_equal(str, "str1");
 
-    char* key2_line = strstr (buf, "1: key2");
-    rv = sscanf(key2_line, "%llu: %64s %64s %d(%64[^)]) %64s\n",
-                    &count, key, time, &err, err_str, str);
+    char *key2_line = strstr(buf, "1: key2");
+    rv = sscanf(key2_line, "%llu: %64s %64s %d(%64[^)]) %64s\n", &count, key, time, &err, err_str, str);
     assert_int_equal(rv, 6);
     assert_int_equal(count, 1);
     assert_string_equal(key, "key2");
@@ -121,7 +119,7 @@ dbgAddLineCapturesTimeErrnoAndStr(void** state)
 }
 
 static void
-dbgAddLineCapturesFirstAndLastInstance(void** state)
+dbgAddLineCapturesFirstAndLastInstance(void **state)
 {
     dbgInit();
     errno = 1;
@@ -140,14 +138,14 @@ dbgAddLineCapturesFirstAndLastInstance(void** state)
 }
 
 static void
-dbgAddLineTestReallocWorks(void** state)
+dbgAddLineTestReallocWorks(void **state)
 {
     dbgInit();
     int i;
-    char* key = calloc(1, 128*8); // Create an array big enough for all
-    for (i=0; i<128; i++) {
-        assert_true(snprintf(&key[i*8], 8, "key%d", i) > 0);
-        dbgAddLine(&key[i*8], NULL);
+    char *key = calloc(1, 128 * 8); // Create an array big enough for all
+    for (i = 0; i < 128; i++) {
+        assert_true(snprintf(&key[i * 8], 8, "key%d", i) > 0);
+        dbgAddLine(&key[i * 8], NULL);
     }
     assert_int_equal(dbgCountAllLines(), 128);
     dbgDestroy();
@@ -155,7 +153,7 @@ dbgAddLineTestReallocWorks(void** state)
 }
 
 static void
-dbgDumpAllOutputsVersionAndTime(void** state)
+dbgDumpAllOutputsVersionAndTime(void **state)
 {
     char buf[4096] = {0};
     dbgDumpAllToBuffer(buf, sizeof(buf));
@@ -167,12 +165,10 @@ dbgDumpAllOutputsVersionAndTime(void** state)
     assert_int_equal(rv, 2);
     assert_string_equal(version, SCOPE_VER);
     assert_string_not_equal(date, "");
-
 }
 
-
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("running %s\n", argv[0]);
     const struct CMUnitTest tests[] = {

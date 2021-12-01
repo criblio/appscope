@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -9,11 +9,12 @@
 
 // We have our own implementation of cmdSendMetric, so the actual
 // value of this isn't really used, but it needs to be non-null.
-mtc_t *bogus_mtc_addr = (mtc_t*)0xDEADBEEF;
+mtc_t *bogus_mtc_addr = (mtc_t *)0xDEADBEEF;
 int g_send_metric_count = 0;
 
 // Needed for httpAggSendReport
-int cmdSendMetric(mtc_t *mtc, event_t *evt)
+int
+cmdSendMetric(mtc_t *mtc, event_t *evt)
 {
     g_send_metric_count++;
     return 0;
@@ -47,14 +48,10 @@ httpAggAddMetricHappyPath(void **state)
 {
     http_agg_t *http_agg = httpAggCreate();
 
-    event_field_t fields[] = {
-        STRFIELD("http_target", "/", 4, FALSE),
-        NUMFIELD("http_status_code", 200, 1, FALSE),
-        FIELDEND
-    };
+    event_field_t fields[] = {STRFIELD("http_target", "/", 4, FALSE), NUMFIELD("http_status_code", 200, 1, FALSE), FIELDEND};
     event_t event = INT_EVENT("http_server_duration", 2, DELTA_MS, fields);
 
-    // any report before we've received events should be empty 
+    // any report before we've received events should be empty
     assert_int_equal(g_send_metric_count, 0);
     httpAggSendReport(http_agg, bogus_mtc_addr);
     assert_int_equal(g_send_metric_count, 0);
@@ -95,17 +92,10 @@ httpAggAddMetricWithQueryStringsAreAggregatedTogether(void **state)
 
     int previous_metric_count = 0;
 
-    char *target[] = {"/hey/dude",
-                      "/hey/dude?like=what",
-                      "/hey/dude?like=where&did=my&car=go",
-                      "/hey/dude?leave_me=alone"};
+    char *target[] = {"/hey/dude", "/hey/dude?like=what", "/hey/dude?like=where&did=my&car=go", "/hey/dude?leave_me=alone"};
     int i;
-    for (i=0; i<(sizeof(target)/sizeof(target[0])); i++) {
-        event_field_t fields[] = {
-            STRFIELD("http_target", target[i], 4, FALSE),
-            NUMFIELD("http_status_code", 200, 1, FALSE),
-            FIELDEND
-        };
+    for (i = 0; i < (sizeof(target) / sizeof(target[0])); i++) {
+        event_field_t fields[] = {STRFIELD("http_target", target[i], 4, FALSE), NUMFIELD("http_status_code", 200, 1, FALSE), FIELDEND};
         event_t event = INT_EVENT("http_client_duration", 42, DELTA_MS, fields);
         httpAggAddMetric(http_agg, &event, -1, -1);
 
@@ -131,12 +121,8 @@ httpAggAddMetricWithManyStatusCodesDoesNotCrash(void **state)
     // When this was written, MAX_CODE_ENTRIES was set to 64 in src/httpreport.c
     // 100 here is chosen to make sure we tolerate more than this.
     int i;
-    for (i=1; i<=100; i++) {
-        event_field_t fields[] = {
-            STRFIELD("http_target", "/", 4, FALSE),
-            NUMFIELD("http_status_code", i, 1, FALSE),
-            FIELDEND
-        };
+    for (i = 1; i <= 100; i++) {
+        event_field_t fields[] = {STRFIELD("http_target", "/", 4, FALSE), NUMFIELD("http_status_code", i, 1, FALSE), FIELDEND};
         event_t event = INT_EVENT("http_client_duration", 2, DELTA_MS, fields);
         httpAggAddMetric(http_agg, &event, -1, -1);
     }
@@ -150,22 +136,18 @@ httpAggAddMetricWithManyHttpTargetsDoesNotCrash(void **state)
 {
     http_agg_t *http_agg = httpAggCreate();
 
-    // When this was written, DEFAULT_TARGET_LEN was set to 128 in 
+    // When this was written, DEFAULT_TARGET_LEN was set to 128 in
     // src/httpreport.c.  250 is used here to exercise a realloc case.
     int i;
-    for (i=0; i<250; i++) {
+    for (i = 0; i < 250; i++) {
         char http_target[128];
         snprintf(http_target, sizeof(http_target), "/%d", i);
-        event_field_t fields[] = {
-            STRFIELD("http_target", http_target, 4, FALSE),
-            NUMFIELD("http_status_code", 200, 1, FALSE),
-            FIELDEND
-        };
+        event_field_t fields[] = {STRFIELD("http_target", http_target, 4, FALSE), NUMFIELD("http_status_code", 200, 1, FALSE), FIELDEND};
         event_t event = INT_EVENT("http_client_duration", 2, DELTA_MS, fields);
         httpAggAddMetric(http_agg, &event, -1, -1);
     }
     httpAggSendReport(http_agg, bogus_mtc_addr);
-    
+
     httpAggDestroy(&http_agg);
 }
 
@@ -186,17 +168,14 @@ main(int argc, char *argv[])
 {
     printf("running %s\n", argv[0]);
 
-    const struct CMUnitTest tests[] = {
-        cmocka_unit_test(httpAggCreateReturnsNonNull),
-        cmocka_unit_test(httpAggDestroyForNullDoesNotCrash),
-        cmocka_unit_test(httpAggAddMetricForNullDoesNotCrash),
-        cmocka_unit_test(httpAggAddMetricHappyPath),
-        cmocka_unit_test(httpAggAddMetricWithQueryStringsAreAggregatedTogether),
-        cmocka_unit_test(httpAggAddMetricWithManyStatusCodesDoesNotCrash),
-        cmocka_unit_test(httpAggAddMetricWithManyHttpTargetsDoesNotCrash),
-        cmocka_unit_test(httpAggSendReportForNullDoesNotCrash),
-        cmocka_unit_test(httpAggResetForNullDoesNotCrash)
-    };
+    const struct CMUnitTest tests[] = {cmocka_unit_test(httpAggCreateReturnsNonNull),
+                                       cmocka_unit_test(httpAggDestroyForNullDoesNotCrash),
+                                       cmocka_unit_test(httpAggAddMetricForNullDoesNotCrash),
+                                       cmocka_unit_test(httpAggAddMetricHappyPath),
+                                       cmocka_unit_test(httpAggAddMetricWithQueryStringsAreAggregatedTogether),
+                                       cmocka_unit_test(httpAggAddMetricWithManyStatusCodesDoesNotCrash),
+                                       cmocka_unit_test(httpAggAddMetricWithManyHttpTargetsDoesNotCrash),
+                                       cmocka_unit_test(httpAggSendReportForNullDoesNotCrash),
+                                       cmocka_unit_test(httpAggResetForNullDoesNotCrash)};
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
-

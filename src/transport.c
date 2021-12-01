@@ -10,32 +10,27 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <sys/un.h>
+#include <unistd.h>
 
 #include "dbg.h"
-#include "scopetypes.h"
-#include "os.h"
 #include "fn.h"
+#include "os.h"
+#include "scopetypes.h"
 #include "transport.h"
 
 // Yuck.  Avoids naming conflict between our src/wrap.c and libssl.a
-#define SSL_read SCOPE_SSL_read
+#define SSL_read  SCOPE_SSL_read
 #define SSL_write SCOPE_SSL_write
-#include "openssl/ssl.h"
 #include "openssl/err.h"
+#include "openssl/ssl.h"
 #undef SSL_read
 #undef SSL_write
 
-struct _transport_t
-{
+struct _transport_t {
     cfg_transport_t type;
-    int (*getaddrinfo)(const char *, const char *,
-                       const struct addrinfo *,
-                       struct addrinfo **);
-    int (*origGetaddrinfo)(const char *, const char *,
-                           const struct addrinfo *,
-                           struct addrinfo **);
+    int (*getaddrinfo)(const char *, const char *, const struct addrinfo *, struct addrinfo **);
+    int (*origGetaddrinfo)(const char *, const char *, const struct addrinfo *, struct addrinfo **);
     union {
         struct {
             int sock;
@@ -67,8 +62,8 @@ struct _transport_t
         struct {
             char *path;
             FILE *stream;
-            int stdout;  // Flag to indicate that stream is stdout
-            int stderr;  // Flag to indicate that stream is stderr
+            int stdout; // Flag to indicate that stream is stdout
+            int stderr; // Flag to indicate that stream is stderr
             cfg_buffer_t buf_policy;
         } file;
     };
@@ -81,7 +76,7 @@ static struct addrinfo *g_cached_addr = NULL;
 
 static void (*handleExit_fn)(void) = NULL;
 
-static transport_t*
+static transport_t *
 newTransport()
 {
     transport_t *t;
@@ -94,22 +89,18 @@ newTransport()
 
     // been inconsistent as to when we check for func pointers.
     // do it here early on and we're good.
-    if (!g_fn.send || !g_fn.open || !g_fn.dup2 || !g_fn.close ||
-        !g_fn.fcntl || !g_fn.fwrite || !g_fn.socket || !g_fn.access ||
-        !g_fn.connect || !g_fn.getaddrinfo || !g_fn.fclose ||
-        !g_fn.select) goto out;
+    if (!g_fn.send || !g_fn.open || !g_fn.dup2 || !g_fn.close || !g_fn.fcntl || !g_fn.fwrite || !g_fn.socket || !g_fn.access || !g_fn.connect || !g_fn.getaddrinfo || !g_fn.fclose || !g_fn.select)
+        goto out;
 
     t->getaddrinfo = g_fn.getaddrinfo;
-    t->origGetaddrinfo = t->getaddrinfo;  // store a copy
+    t->origGetaddrinfo = t->getaddrinfo; // store a copy
     return t;
 
-  out:
+out:
     DBG("send=%p open=%p dup2=%p close=%p "
         "fcntl=%p fwrite=%p socket=%p access=%p connect=%p "
         "getaddrinfo=%p fclose=%p select=%p",
-        g_fn.send, g_fn.open, g_fn.dup2, g_fn.close,
-        g_fn.fcntl, g_fn.fwrite, g_fn.socket, g_fn.access, g_fn.connect,
-        g_fn.getaddrinfo, g_fn.fclose, g_fn.select);
+        g_fn.send, g_fn.open, g_fn.dup2, g_fn.close, g_fn.fcntl, g_fn.fwrite, g_fn.socket, g_fn.access, g_fn.connect, g_fn.getaddrinfo, g_fn.fclose, g_fn.select);
     free(t);
     return NULL;
 }
@@ -118,11 +109,11 @@ newTransport()
  * Some apps require that a set of fds, usually low numbers, 0-20,
  * must exist. Therefore, we don't want to allow the kernel to
  * give us the next available fd. We need to place the fd in a
- * range that is likely not to affect an app. 
+ * range that is likely not to affect an app.
  *
  * We look for an available fd starting at a relatively high
  * range and work our way down until we find one we can get.
- * Then, we force the use of the available fd. 
+ * Then, we force the use of the available fd.
  */
 static int
 placeDescriptor(int fd, transport_t *t)
@@ -142,7 +133,8 @@ placeDescriptor(int fd, transport_t *t)
         if ((g_fn.fcntl(i, F_GETFD) == -1) && (errno == EBADF)) {
 
             // This fd is available, try to dup it
-            if ((dupfd = g_fn.dup2(fd, i)) == -1) continue;
+            if ((dupfd = g_fn.dup2(fd, i)) == -1)
+                continue;
             g_fn.close(fd);
 
             // Set close on exec. (dup2 does not preserve FD_CLOEXEC)
@@ -163,7 +155,8 @@ placeDescriptor(int fd, transport_t *t)
 int
 transportSetFD(int fd, transport_t *trans)
 {
-    if (!trans) return -1;
+    if (!trans)
+        return -1;
 
     return placeDescriptor(fd, trans);
 }
@@ -171,7 +164,8 @@ transportSetFD(int fd, transport_t *trans)
 cfg_transport_t
 transportType(transport_t *trans)
 {
-    if (!trans) return (cfg_transport_t)-1;
+    if (!trans)
+        return (cfg_transport_t)-1;
 
     return trans->type;
 }
@@ -179,8 +173,9 @@ transportType(transport_t *trans)
 int
 transportConnection(transport_t *trans)
 {
-    if (!trans) return -1;
-    switch(trans->type) {
+    if (!trans)
+        return -1;
+    switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
             if (trans->net.sock != -1) {
@@ -208,12 +203,13 @@ transportConnection(transport_t *trans)
 int
 transportNeedsConnection(transport_t *trans)
 {
-    if (!trans) return 0;
+    if (!trans)
+        return 0;
     switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
-            if ((trans->net.sock == -1) ||
-                (trans->net.tls.enable && !trans->net.tls.ssl)) return TRUE;
+            if ((trans->net.sock == -1) || (trans->net.tls.enable && !trans->net.tls.ssl))
+                return TRUE;
             if (osNeedsConnect(trans->net.sock)) {
                 DBG("fd:%d, tls:%d", trans->net.sock, trans->net.tls.enable);
                 if (trans->net.tls.enable) {
@@ -229,14 +225,14 @@ transportNeedsConnection(transport_t *trans)
             // This checks to see if our file descriptor has been
             // closed by our process.  (errno == EBADF) Stream buffering
             // makes it harder to know when this has happened.
-            if ((trans->file.stream) &&
-                (g_fn.fcntl(fileno(trans->file.stream), F_GETFD) == -1)) {
+            if ((trans->file.stream) && (g_fn.fcntl(fileno(trans->file.stream), F_GETFD) == -1)) {
                 DBG(NULL);
                 transportDisconnect(trans);
             }
             return (trans->file.stream == NULL);
         case CFG_UNIX:
-            if (trans->local.sock == -1) return TRUE;
+            if (trans->local.sock == -1)
+                return TRUE;
             if (osNeedsConnect(trans->local.sock)) {
                 DBG("fd:%d %s", trans->local.sock, trans->local.path);
                 transportDisconnect(trans);
@@ -256,19 +252,17 @@ const char *
 rootCertFile(transport_t *trans)
 {
     // Based off of this: https://golang.org/src/crypto/x509/root_linux.go
-    const char* rootFileList[] = {
-        "/etc/ssl/certs/ca-certificates.crt",                // Debian/Ubuntu/Gentoo etc.
-        "/etc/pki/tls/certs/ca-bundle.crt",                  // Fedora/RHEL 6
-        "/etc/ssl/ca-bundle.pem",                            // OpenSUSE
-        "/etc/pki/tls/cacert.pem",                           // OpenELEC
-        "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem", // CentOS/RHEL 7
-        "/etc/ssl/cert.pem",                                 // Alpine Linux
-        NULL
-    };
+    const char *rootFileList[] = {"/etc/ssl/certs/ca-certificates.crt",                // Debian/Ubuntu/Gentoo etc.
+                                  "/etc/pki/tls/certs/ca-bundle.crt",                  // Fedora/RHEL 6
+                                  "/etc/ssl/ca-bundle.pem",                            // OpenSUSE
+                                  "/etc/pki/tls/cacert.pem",                           // OpenELEC
+                                  "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem", // CentOS/RHEL 7
+                                  "/etc/ssl/cert.pem",                                 // Alpine Linux
+                                  NULL};
 
     const char *file;
-    for (file=rootFileList[0]; file; file++) {
-        if (!g_fn.access (file, R_OK)) {
+    for (file = rootFileList[0]; file; file++) {
+        if (!g_fn.access(file, R_OK)) {
             return file;
         }
     }
@@ -289,11 +283,11 @@ shutdownTlsSession(transport_t *trans)
         } else if (ret == 0) {
             // shutdown not complete, call again
             char buf[4096];
-            while(1) {
-               ret = SCOPE_SSL_read(trans->net.tls.ssl, buf, sizeof(buf));
-               if (ret <= 0) {
-                   break;
-               }
+            while (1) {
+                ret = SCOPE_SSL_read(trans->net.tls.ssl, buf, sizeof(buf));
+                if (ret <= 0) {
+                    break;
+                }
             }
 
             ret = SSL_shutdown(trans->net.tls.ssl);
@@ -325,7 +319,8 @@ handle_tls_destroy(void)
 {
     scopeLogInfo("detected beginning of process exit sequence");
 
-    if (handleExit_fn) handleExit_fn();
+    if (handleExit_fn)
+        handleExit_fn();
 }
 
 void
@@ -347,7 +342,8 @@ transportRegisterForExitNotification(void (*fn)(void))
 static int
 establishTlsSession(transport_t *trans)
 {
-    if (!trans || trans->net.sock == -1) return FALSE;
+    if (!trans || trans->net.sock == -1)
+        return FALSE;
     scopeLogInfo("fd:%d establishing tls session", trans->net.sock);
 
     static int init_called = FALSE;
@@ -359,7 +355,7 @@ establishTlsSession(transport_t *trans)
     trans->net.tls.ctx = SSL_CTX_new(TLS_method());
     if (!trans->net.tls.ctx) {
         char err[256] = {0};
-        ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
+        ERR_error_string_n(ERR_peek_last_error(), err, sizeof(err));
         scopeLogInfo("fd:%d error creating tls context: %s", trans->net.sock, err);
         goto err;
     }
@@ -367,12 +363,13 @@ establishTlsSession(transport_t *trans)
     // If the configuration provides a cacertpath, use it.
     // Otherwise, find a distro-specific root cert file.
     const char *cafile = trans->net.tls.cacertpath;
-    if (!cafile) cafile = rootCertFile(trans);
+    if (!cafile)
+        cafile = rootCertFile(trans);
 
     long loc_rv = SSL_CTX_load_verify_locations(trans->net.tls.ctx, cafile, NULL);
     if (trans->net.tls.validateserver && !loc_rv) {
         char err[256] = {0};
-        ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
+        ERR_error_string_n(ERR_peek_last_error(), err, sizeof(err));
         scopeLogInfo("fd:%d error setting tls cacertpath: \"%s\" : %s", trans->net.sock, cafile, err);
         // We're not treating this as a hard error at this point.
         // Let the process proceed; validation below will likely fail
@@ -382,14 +379,14 @@ establishTlsSession(transport_t *trans)
     trans->net.tls.ssl = SSL_new(trans->net.tls.ctx);
     if (!trans->net.tls.ssl) {
         char err[256] = {0};
-        ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
+        ERR_error_string_n(ERR_peek_last_error(), err, sizeof(err));
         scopeLogInfo("fd:%d error creating tls session: %s", trans->net.sock, err);
         goto err;
     }
 
     if (!SSL_set_fd(trans->net.tls.ssl, trans->net.sock)) {
         char err[256] = {0};
-        ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
+        ERR_error_string_n(ERR_peek_last_error(), err, sizeof(err));
         scopeLogInfo("fd:%d error setting tls on socket: %d : %s", trans->net.sock, trans->net.sock, err);
         goto err;
     }
@@ -402,7 +399,7 @@ establishTlsSession(transport_t *trans)
         ERR_error_string_n(ssl_err, err, sizeof(err));
         scopeLogInfo("fd:%d error establishing tls connection: %s", trans->net.sock, err);
         if (ssl_err == SSL_ERROR_SSL || ssl_err == SSL_ERROR_SYSCALL) {
-            ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
+            ERR_error_string_n(ERR_peek_last_error(), err, sizeof(err));
             scopeLogInfo("fd:%d error establishing tls connection: %s %d", trans->net.sock, err, errno);
         }
         goto err;
@@ -410,12 +407,11 @@ establishTlsSession(transport_t *trans)
 
     if (trans->net.tls.validateserver) {
         // Just test that we received a server cert
-        X509* cert = SSL_get_peer_certificate(trans->net.tls.ssl);
+        X509 *cert = SSL_get_peer_certificate(trans->net.tls.ssl);
         if (cert) {
-            X509_free(cert);  // Looks good.  Free it immediately
+            X509_free(cert); // Looks good.  Free it immediately
         } else {
-            scopeLogInfo("fd:%d error accessing peer certificate for tls server validation",
-                                                  trans->net.sock);
+            scopeLogInfo("fd:%d error accessing peer certificate for tls server validation", trans->net.sock);
             goto err;
         }
 
@@ -437,7 +433,8 @@ err:
 int
 transportDisconnect(transport_t *trans)
 {
-    if (!trans) return 0;
+    if (!trans)
+        return 0;
     switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
@@ -450,7 +447,8 @@ transportDisconnect(transport_t *trans)
             break;
         case CFG_FILE:
             if (!trans->file.stdout && !trans->file.stderr) {
-                if (trans->file.stream) g_fn.fclose(trans->file.stream);
+                if (trans->file.stream)
+                    g_fn.fclose(trans->file.stream);
             }
             trans->file.stream = NULL;
             break;
@@ -468,7 +466,6 @@ transportDisconnect(transport_t *trans)
     }
     return 0;
 }
-
 
 // We've observed that node.js processes can hang from spinlocks
 // in glibc's getaddrinfo:
@@ -496,11 +493,10 @@ transportDisconnect(transport_t *trans)
 // successful connection.  Look ma, no spinlocks!  See transportReconnect()
 // below for more info.
 static int
-scopeGetaddrinfo(const char *node, const char *service,
-                  const struct addrinfo *hints,
-                  struct addrinfo **res)
+scopeGetaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res)
 {
-    if (!res) return 1;
+    if (!res)
+        return 1;
     *res = g_cached_addr;
     return (g_cached_addr) ? 0 : 1; // 0 is successful
 }
@@ -510,7 +506,8 @@ getExistingConnectionAddr(transport_t *trans)
 {
     struct addrinfo *ai = NULL;
 
-    if (transportNeedsConnection(trans) || trans->type != CFG_TCP) goto err;
+    if (transportNeedsConnection(trans) || trans->type != CFG_TCP)
+        goto err;
 
     // Allocate what we need to be compatible with freeaddrinfo()
     ai = calloc(1, sizeof(struct addrinfo));
@@ -521,7 +518,7 @@ getExistingConnectionAddr(transport_t *trans)
 
     // Clear the address value
     socklen_t addrsize = sizeof(trans->net.gai_addr);
-    struct sockaddr *addr = (struct sockaddr*)&trans->net.gai_addr;
+    struct sockaddr *addr = (struct sockaddr *)&trans->net.gai_addr;
     memset(addr, 0, addrsize);
 
     // lookup the address
@@ -531,22 +528,22 @@ getExistingConnectionAddr(transport_t *trans)
     }
 
     // Set all the fields
-    ai->ai_flags = 0;                  // Unused by us
+    ai->ai_flags = 0; // Unused by us
     ai->ai_family = addr->sa_family;
     ai->ai_socktype = SOCK_STREAM;
     ai->ai_protocol = IPPROTO_TCP;
     ai->ai_addrlen = addrsize;
     ai->ai_addr = addr;
-    ai->ai_canonname = NULL;           // Unused by us
+    ai->ai_canonname = NULL; // Unused by us
     ai->ai_next = NULL;
 
     return ai;
 
 err:
-    if (ai) free(ai);
+    if (ai)
+        free(ai);
     return NULL;
 }
-
 
 // This is expected to be called by child processes that
 // may have inherited connected transports from their parent
@@ -556,7 +553,8 @@ err:
 int
 transportReconnect(transport_t *trans)
 {
-    if (!trans) return 0;
+    if (!trans)
+        return 0;
 
     switch (trans->type) {
         case CFG_TCP:
@@ -578,10 +576,10 @@ transportReconnect(transport_t *trans)
                 SSL_set_quiet_shutdown(trans->net.tls.ssl, TRUE);
             }
 
-            transportDisconnect(trans);          // Never keep the parents connection.
+            transportDisconnect(trans); // Never keep the parents connection.
             if (g_cached_addr) {
                 trans->getaddrinfo = scopeGetaddrinfo;
-                transportConnect(trans);         // Will use g_cached_addr
+                transportConnect(trans); // Will use g_cached_addr
                 trans->getaddrinfo = trans->origGetaddrinfo;
             }
 
@@ -602,10 +600,12 @@ transportReconnect(transport_t *trans)
 static int
 setSocketBlocking(transport_t *trans, int sock, bool block)
 {
-    if (!trans) return 0;
+    if (!trans)
+        return 0;
 
     int current_flags = g_fn.fcntl(sock, F_GETFL, NULL);
-    if (current_flags < 0) return FALSE;
+    if (current_flags < 0)
+        return FALSE;
 
     int desired_flags;
     if (block) {
@@ -615,7 +615,8 @@ setSocketBlocking(transport_t *trans, int sock, bool block)
     }
 
     // We're successful; the flag is as desired
-    if (current_flags == desired_flags) return TRUE;
+    if (current_flags == desired_flags)
+        return TRUE;
 
     // fcntl returns 0 if successful
     return (g_fn.fcntl(sock, F_SETFL, desired_flags) == 0);
@@ -630,7 +631,8 @@ socketConnectIsPending(transport_t *trans)
 static int
 checkPendingSocketStatus(transport_t *trans)
 {
-    if (!trans || trans->net.pending_connect == -1) return 0;
+    if (!trans || trans->net.pending_connect == -1)
+        return 0;
     int rc;
     struct timeval tv = {0};
 
@@ -640,7 +642,7 @@ checkPendingSocketStatus(transport_t *trans)
     rc = g_fn.select(FD_SETSIZE, NULL, &pending_results, NULL, &tv);
     if (rc < 0) {
         if (errno == EINTR) {
-          return 0;
+            return 0;
         }
         DBG(NULL);
         transportDisconnect(trans);
@@ -654,8 +656,7 @@ checkPendingSocketStatus(transport_t *trans)
     // socket that failed to connect and remove it from the pending list.
     int opt;
     socklen_t optlen = sizeof(opt);
-    if ((getsockopt(trans->net.pending_connect, SOL_SOCKET, SO_ERROR, (void*)(&opt), &optlen) < 0)
-            || opt) {
+    if ((getsockopt(trans->net.pending_connect, SOL_SOCKET, SO_ERROR, (void *)(&opt), &optlen) < 0) || opt) {
         scopeLogInfo("fd:%d connect failed", trans->net.pending_connect);
 
         g_fn.close(trans->net.pending_connect);
@@ -673,7 +674,8 @@ checkPendingSocketStatus(transport_t *trans)
     trans->net.pending_connect = -1;
 
     // If the placeDescriptor call failed, we're done
-    if (trans->net.sock == -1) return 0;
+    if (trans->net.sock == -1)
+        return 0;
 
     // Set the TCP socket to blocking
     if ((trans->type == CFG_TCP) && !setSocketBlocking(trans, trans->net.sock, TRUE)) {
@@ -694,7 +696,8 @@ checkPendingSocketStatus(transport_t *trans)
 static void
 freeAddressList(transport_t *trans)
 {
-    if (!trans || !trans->net.addr.list) return;
+    if (!trans || !trans->net.addr.list)
+        return;
 
     freeaddrinfo(trans->net.addr.list);
     trans->net.addr.entries = 0;
@@ -708,9 +711,9 @@ getAddressList(transport_t *trans)
     // Don't leak; clean up any prior data
     freeAddressList(trans);
 
-    struct addrinfo* addr_list = NULL;
+    struct addrinfo *addr_list = NULL;
     struct addrinfo hints = {0};
-    hints.ai_family = AF_UNSPEC;     // IPv4 or IPv6
+    hints.ai_family = AF_UNSPEC; // IPv4 or IPv6
 
     switch (trans->type) {
         case CFG_UDP:
@@ -729,12 +732,11 @@ getAddressList(transport_t *trans)
     char *type = (trans->type == CFG_UDP) ? "udp" : "tcp";
     scopeLogInfo("getting DNS info for %s %s:%s", type, trans->net.host, trans->net.port);
 
-    if (trans->getaddrinfo(trans->net.host,
-                           trans->net.port,
-                           &hints, &addr_list)) return 0;
+    if (trans->getaddrinfo(trans->net.host, trans->net.port, &hints, &addr_list))
+        return 0;
 
     // Count how many addrs we got back
-    struct addrinfo* addr;
+    struct addrinfo *addr;
     for (addr = addr_list; addr; addr = addr->ai_next) {
         trans->net.addr.entries++;
     }
@@ -747,7 +749,8 @@ getAddressList(transport_t *trans)
 static struct addrinfo *
 getNextAddressListEntry(transport_t *trans)
 {
-    if (!trans || !trans->net.addr.list || !trans->net.addr.next) return NULL;
+    if (!trans || !trans->net.addr.list || !trans->net.addr.next)
+        return NULL;
 
     // record the next value to return, and advance it for subsequent calls
     struct addrinfo *next = trans->net.addr.next;
@@ -755,7 +758,6 @@ getNextAddressListEntry(transport_t *trans)
 
     return next;
 }
-
 
 static int
 socketConnectionStart(transport_t *trans)
@@ -767,14 +769,13 @@ socketConnectionStart(transport_t *trans)
     }
 
     // try the next address in the address list
-    struct addrinfo* addr;
+    struct addrinfo *addr;
     while ((addr = getNextAddressListEntry(trans))) {
         int sock;
-        sock = g_fn.socket(addr->ai_family,
-                           addr->ai_socktype,
-                           addr->ai_protocol);
+        sock = g_fn.socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
 
-        if (sock == -1) continue;
+        if (sock == -1)
+            continue;
 
         // Set the socket to close on exec
         int flags = g_fn.fcntl(sock, F_GETFD, 0);
@@ -811,9 +812,7 @@ socketConnectionStart(transport_t *trans)
         unsigned short port = ntohs(*portptr);
 
         errno = 0;
-        if (g_fn.connect(sock,
-                         addr->ai_addr,
-                         addr->ai_addrlen) == -1) {
+        if (g_fn.connect(sock, addr->ai_addr, addr->ai_addrlen) == -1) {
 
             if (errno != EINPROGRESS) {
                 scopeLogInfo("fd:%d connect to %s:%d failed", sock, addrstr, port);
@@ -826,16 +825,16 @@ socketConnectionStart(transport_t *trans)
             scopeLogInfo("fd:%d connect to %s:%d is pending", sock, addrstr, port);
 
             trans->net.pending_connect = sock;
-            break;  // replace w/continue for a shotgun start.
+            break; // replace w/continue for a shotgun start.
         }
-
 
         if (trans->type == CFG_UDP) {
             scopeLogInfo("fd:%d connect to %s:%d was successful", sock, addrstr, port);
 
             // connect on udp sockets normally succeeds immediately.
             trans->net.sock = placeDescriptor(sock, trans);
-            if (trans->net.sock != -1) break;
+            if (trans->net.sock != -1)
+                break;
         } else {
             DBG(NULL); // with non-blocking tcp sockets, we always expect -1
         }
@@ -857,7 +856,7 @@ transportConnectFile(transport_t *t)
     }
 
     int fd;
-    fd = g_fn.open(t->file.path, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666);
+    fd = g_fn.open(t->file.path, O_CREAT | O_WRONLY | O_APPEND | O_CLOEXEC, 0666);
     if (fd == -1) {
         DBG("%s", t->file.path);
         transportDisconnect(t);
@@ -906,10 +905,12 @@ transportConnectFile(transport_t *t)
 int
 transportConnect(transport_t *trans)
 {
-    if (!trans) return 1;
+    if (!trans)
+        return 1;
 
     // We're already connected.  Do nothing.
-    if (!transportNeedsConnection(trans)) return 1;
+    if (!transportNeedsConnection(trans))
+        return 1;
 
     switch (trans->type) {
         case CFG_UDP:
@@ -917,7 +918,8 @@ transportConnect(transport_t *trans)
             if (!socketConnectIsPending(trans)) {
                 // socketConnectionStart can directly connect (udp).
                 // If it does, we're done.
-                if (socketConnectionStart(trans)) return 1;
+                if (socketConnectionStart(trans))
+                    return 1;
             }
             // Check to see if the a pending connection has been successful.
             return checkPendingSocketStatus(trans);
@@ -935,8 +937,7 @@ transportConnect(transport_t *trans)
                 DBG("%d %s", trans->local.sock, trans->local.path);
             }
 
-            if (g_fn.connect(trans->local.sock, (const struct sockaddr *)&trans->local.addr,
-                             trans->local.addr_len) == -1) {
+            if (g_fn.connect(trans->local.sock, (const struct sockaddr *)&trans->local.addr, trans->local.addr_len) == -1) {
                 scopeLogInfo("fd:%d (%s) connect failed", trans->local.sock, trans->local.path);
                 g_fn.close(trans->local.sock);
                 trans->local.sock = -1;
@@ -957,15 +958,16 @@ transportConnect(transport_t *trans)
 }
 
 transport_t *
-transportCreateTCP(const char *host, const char *port, unsigned int enable,
-                      unsigned int validateserver, const char *cacertpath)
+transportCreateTCP(const char *host, const char *port, unsigned int enable, unsigned int validateserver, const char *cacertpath)
 {
-    transport_t* trans = NULL;
+    transport_t *trans = NULL;
 
-    if (!host || !port) return trans;
+    if (!host || !port)
+        return trans;
 
     trans = newTransport();
-    if (!trans) return trans;
+    if (!trans)
+        return trans;
 
     trans->type = CFG_TCP;
     trans->net.sock = -1;
@@ -987,15 +989,17 @@ transportCreateTCP(const char *host, const char *port, unsigned int enable,
     return trans;
 }
 
-transport_t*
-transportCreateUdp(const char* host, const char* port)
+transport_t *
+transportCreateUdp(const char *host, const char *port)
 {
-    transport_t* t = NULL;
+    transport_t *t = NULL;
 
-    if (!host || !port) return t;
+    if (!host || !port)
+        return t;
 
     t = newTransport();
-    if (!t) return t;
+    if (!t)
+        return t;
 
     t->type = CFG_UDP;
     t->net.sock = -1;
@@ -1014,14 +1018,16 @@ transportCreateUdp(const char* host, const char* port)
     return t;
 }
 
-transport_t*
-transportCreateFile(const char* path, cfg_buffer_t buf_policy)
+transport_t *
+transportCreateFile(const char *path, cfg_buffer_t buf_policy)
 {
     transport_t *t;
 
-    if (!path) return NULL;
+    if (!path)
+        return NULL;
     t = newTransport();
-    if (!t) return NULL; 
+    if (!t)
+        return NULL;
 
     t->type = CFG_FILE;
     t->file.path = strdup(path);
@@ -1046,16 +1052,20 @@ transportCreateUnix(const char *path)
 {
     transport_t *trans = NULL;
 
-    if (!path) goto err;
+    if (!path)
+        goto err;
 
     int pathlen = strlen(path);
-    if (pathlen >= sizeof(trans->local.addr.sun_path)) goto err;
+    if (pathlen >= sizeof(trans->local.addr.sun_path))
+        goto err;
 
-    if (!(trans = newTransport())) goto err;
+    if (!(trans = newTransport()))
+        goto err;
 
     trans->type = CFG_UNIX;
     trans->local.sock = -1;
-    if (!(trans->local.path = strdup(path))) goto err;
+    if (!(trans->local.path = strdup(path)))
+        goto err;
 
     memset(&trans->local.addr, 0, sizeof(trans->local.addr));
     trans->local.addr.sun_family = AF_UNIX;
@@ -1067,7 +1077,7 @@ transportCreateUnix(const char *path)
     } else {
         // Abstract socket addresses don't include a trailing null
         // delimiter but filesystem sockets do.
-        trans->local.addr_len += 1; 
+        trans->local.addr_len += 1;
     }
 
     transportConnect(trans);
@@ -1080,10 +1090,10 @@ err:
     return trans;
 }
 
-transport_t*
+transport_t *
 transportCreateSyslog(void)
 {
-    transport_t* t = calloc(1, sizeof(transport_t));
+    transport_t *t = calloc(1, sizeof(transport_t));
     if (!t) {
         DBG(NULL);
         return NULL;
@@ -1094,10 +1104,10 @@ transportCreateSyslog(void)
     return t;
 }
 
-transport_t*
+transport_t *
 transportCreateShm()
 {
-    transport_t* t = calloc(1, sizeof(transport_t));
+    transport_t *t = calloc(1, sizeof(transport_t));
     if (!t) {
         DBG(NULL);
         return NULL;
@@ -1111,27 +1121,34 @@ transportCreateShm()
 void
 transportDestroy(transport_t **transport)
 {
-    if (!transport || !*transport) return;
+    if (!transport || !*transport)
+        return;
 
     transport_t *trans = *transport;
     switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
             transportDisconnect(trans);
-            if (trans->net.host) free (trans->net.host);
-            if (trans->net.port) free (trans->net.port);
-            if (trans->net.tls.cacertpath) free(trans->net.tls.cacertpath);
+            if (trans->net.host)
+                free(trans->net.host);
+            if (trans->net.port)
+                free(trans->net.port);
+            if (trans->net.tls.cacertpath)
+                free(trans->net.tls.cacertpath);
             freeAddressList(trans);
             break;
         case CFG_UNIX:
-            if (trans->local.path) free(trans->local.path);
+            if (trans->local.path)
+                free(trans->local.path);
             transportDisconnect(trans);
             break;
         case CFG_FILE:
-            if (trans->file.path) free(trans->file.path);
+            if (trans->file.path)
+                free(trans->file.path);
             if (!trans->file.stdout && !trans->file.stderr) {
                 // if stdout/stderr, we didn't open stream, so don't close it
-                if (trans->file.stream) g_fn.fclose(trans->file.stream);
+                if (trans->file.stream)
+                    g_fn.fclose(trans->file.stream);
             }
             break;
         case CFG_SYSLOG:
@@ -1148,7 +1165,8 @@ transportDestroy(transport_t **transport)
 static int
 tcpSendPlain(transport_t *trans, const char *msg, size_t len)
 {
-    if (!trans || transportNeedsConnection(trans)) return -1;
+    if (!trans || transportNeedsConnection(trans))
+        return -1;
 
     int flags = 0;
 #ifdef __linux__
@@ -1161,7 +1179,8 @@ tcpSendPlain(transport_t *trans, const char *msg, size_t len)
 
     while (bytes_to_send > 0) {
         rc = g_fn.send(trans->net.sock, &msg[bytes_sent], bytes_to_send, flags);
-        if (rc <= 0) break;
+        if (rc <= 0)
+            break;
 
         if (rc != bytes_to_send) {
             DBG("rc = %d, bytes_to_send = %zu", rc, bytes_to_send);
@@ -1173,14 +1192,14 @@ tcpSendPlain(transport_t *trans, const char *msg, size_t len)
 
     if (rc < 0) {
         switch (errno) {
-        case EBADF:
-        case EPIPE:
-            DBG(NULL);
-            transportDisconnect(trans);
-            transportConnect(trans);
-            return -1;
-        default:
-            DBG(NULL);
+            case EBADF:
+            case EPIPE:
+                DBG(NULL);
+                transportDisconnect(trans);
+                transportConnect(trans);
+                return -1;
+            default:
+                DBG(NULL);
         }
     }
     return 0;
@@ -1189,7 +1208,8 @@ tcpSendPlain(transport_t *trans, const char *msg, size_t len)
 static int
 tcpSendTls(transport_t *trans, const char *msg, size_t len)
 {
-    if (!trans || transportNeedsConnection(trans)) return -1;
+    if (!trans || transportNeedsConnection(trans))
+        return -1;
 
     size_t bytes_to_send = len;
     size_t bytes_sent = 0;
@@ -1226,7 +1246,8 @@ tcpSendTls(transport_t *trans, const char *msg, size_t len)
 int
 transportSend(transport_t *trans, const char *msg, size_t len)
 {
-    if (!trans || !msg) return -1;
+    if (!trans || !msg)
+        return -1;
 
     switch (trans->type) {
         case CFG_UDP:
@@ -1235,16 +1256,16 @@ transportSend(transport_t *trans, const char *msg, size_t len)
 
                 if (rc < 0) {
                     switch (errno) {
-                    case EBADF:
-                        DBG(NULL);
-                        transportDisconnect(trans);
-                        transportConnect(trans);
-                        return -1;
-                    case EWOULDBLOCK:
-                        DBG(NULL);
-                        break;
-                    default:
-                        DBG(NULL);
+                        case EBADF:
+                            DBG(NULL);
+                            transportDisconnect(trans);
+                            transportConnect(trans);
+                            return -1;
+                        case EWOULDBLOCK:
+                            DBG(NULL);
+                            break;
+                        default:
+                            DBG(NULL);
                     }
                 }
             }
@@ -1282,17 +1303,17 @@ transportSend(transport_t *trans, const char *msg, size_t len)
 
                 if (rc < 0) {
                     switch (errno) {
-                    case EBADF:
-                    case EPIPE:
-                        DBG(NULL);
-                        transportDisconnect(trans);
-                        transportConnect(trans);
-                        return -1;
-                    case EWOULDBLOCK:
-                        DBG(NULL);
-                        break;
-                    default:
-                        DBG(NULL);
+                        case EBADF:
+                        case EPIPE:
+                            DBG(NULL);
+                            transportDisconnect(trans);
+                            transportConnect(trans);
+                            return -1;
+                        case EWOULDBLOCK:
+                            DBG(NULL);
+                            break;
+                        default:
+                            DBG(NULL);
                     }
                 }
             }
@@ -1304,13 +1325,14 @@ transportSend(transport_t *trans, const char *msg, size_t len)
             DBG("%d", trans->type);
             return -1;
     }
-     return 0;
+    return 0;
 }
 
 int
-transportFlush(transport_t* t)
+transportFlush(transport_t *t)
 {
-    if (!t) return -1;
+    if (!t)
+        return -1;
 
     switch (t->type) {
         case CFG_UDP:
@@ -1331,4 +1353,3 @@ transportFlush(transport_t* t)
     }
     return 0;
 }
-

@@ -1,22 +1,21 @@
 #define _GNU_SOURCE
-#include <stdlib.h>
-#include "atomic.h"
 #include "linklist.h"
+#include "atomic.h"
+#include <stdlib.h>
 
-#define TRUE 1
+#define TRUE  1
 #define FALSE 0
 
 typedef struct _list_element_t {
-    list_key_t               key;
-    void                    *data;
-    struct _list_element_t  *next;
+    list_key_t key;
+    void *data;
+    struct _list_element_t *next;
 } list_element_t;
 
 typedef struct _list_t {
-    delete_fn_t              delete_fn;
-    list_element_t          *head;
+    delete_fn_t delete_fn;
+    list_element_t *head;
 } list_t;
-
 
 // This realtime-safe linked list implementation is based on
 // the algorithm by Timothy L. Harris in
@@ -36,11 +35,10 @@ typedef struct _list_t {
 // threads.
 //
 
-
 static inline bool
-CAS(list_element_t **ptr, list_element_t *oldval, list_element_t* newval)
+CAS(list_element_t **ptr, list_element_t *oldval, list_element_t *newval)
 {
-    return atomicCasU64((uint64_t*)ptr, (uint64_t)oldval, (uint64_t)newval);
+    return atomicCasU64((uint64_t *)ptr, (uint64_t)oldval, (uint64_t)newval);
 }
 
 static int
@@ -49,27 +47,29 @@ is_marked_reference(list_element_t *ptr)
     return (uintptr_t)ptr & 0x1;
 }
 
-static list_element_t*
+static list_element_t *
 get_unmarked_reference(list_element_t *ptr)
 {
-    return (list_element_t*)((uintptr_t)ptr & ~0x1);
-}
-
-static list_element_t*
-get_marked_reference(list_element_t *ptr)
-{
-    return (list_element_t*)((uintptr_t)ptr | 0x1);
+    return (list_element_t *)((uintptr_t)ptr & ~0x1);
 }
 
 static list_element_t *
-search (list_t *list, list_key_t search_key, list_element_t **left_node)
+get_marked_reference(list_element_t *ptr)
 {
-    if (!list || !left_node) return NULL;
+    return (list_element_t *)((uintptr_t)ptr | 0x1);
+}
+
+static list_element_t *
+search(list_t *list, list_key_t search_key, list_element_t **left_node)
+{
+    if (!list || !left_node)
+        return NULL;
 
     list_element_t *left_node_next, *right_node;
 
     list_element_t *head = list->head;
-    if (!head) return NULL;
+    if (!head)
+        return NULL;
 
     *left_node = head;
     left_node_next = head->next;
@@ -86,9 +86,10 @@ search_again:
                 left_node_next = t_next;
             }
             t = get_unmarked_reference(t_next);
-            if (!t) break; // at the end
+            if (!t)
+                break; // at the end
             t_next = t->next;
-        } while (is_marked_reference(t_next) || (t->key<search_key)); /*B1*/
+        } while (is_marked_reference(t_next) || (t->key < search_key)); /*B1*/
         right_node = t;
 
         /* 2: Check nodes are adjacent */
@@ -101,7 +102,7 @@ search_again:
         }
 
         /* 3: Remove one or more marked nodes */
-        if (CAS (&(*left_node)->next, left_node_next, right_node)) { /*C1*/
+        if (CAS(&(*left_node)->next, left_node_next, right_node)) { /*C1*/
             if ((right_node) && is_marked_reference(right_node->next)) {
                 goto search_again; /*G2*/
             } else {
@@ -113,14 +114,16 @@ search_again:
     return NULL;
 }
 
-list_t*
+list_t *
 lstCreate(delete_fn_t delete_fn)
 {
     list_t *list = calloc(1, sizeof(list_t));
-    list_element_t* head = calloc(1, sizeof(list_element_t));
+    list_element_t *head = calloc(1, sizeof(list_element_t));
     if (!list || !head) {
-        if (list) free(list);
-        if (head) free(head);
+        if (list)
+            free(list);
+        if (head)
+            free(head);
         return NULL;
     }
     list->head = head;
@@ -129,25 +132,27 @@ lstCreate(delete_fn_t delete_fn)
 }
 
 int
-lstInsert (list_t *list, list_key_t key, void* data)
+lstInsert(list_t *list, list_key_t key, void *data)
 {
-    if (!list) return FALSE;
+    if (!list)
+        return FALSE;
 
     list_element_t *new_node = calloc(1, sizeof(list_element_t));
-    if (!new_node) return FALSE;
+    if (!new_node)
+        return FALSE;
     new_node->key = key;
     new_node->data = data;
 
     list_element_t *right_node, *left_node;
 
     do {
-        right_node = search (list, key, &left_node);
+        right_node = search(list, key, &left_node);
         if ((right_node) && (right_node->key == key)) { /*T1*/
             free(new_node);
             return FALSE;
         }
         new_node->next = right_node;
-        if (CAS (&(left_node->next), right_node, new_node)) { /*C2*/
+        if (CAS(&(left_node->next), right_node, new_node)) { /*C2*/
             return TRUE;
         }
     } while (TRUE); /*B3*/
@@ -156,27 +161,28 @@ lstInsert (list_t *list, list_key_t key, void* data)
 }
 
 int
-lstDelete (list_t *list, list_key_t search_key)
+lstDelete(list_t *list, list_key_t search_key)
 {
-    if (!list) return FALSE;
+    if (!list)
+        return FALSE;
 
     list_element_t *right_node, *right_node_next, *left_node;
 
     do {
-        right_node = search (list, search_key, &left_node);
+        right_node = search(list, search_key, &left_node);
         if ((!right_node) || (right_node->key != search_key)) { /*T1*/
             return FALSE;
         }
         right_node_next = right_node->next;
         if (!is_marked_reference(right_node_next)) {
-            if (CAS (&(right_node->next), /*C3*/
-                right_node_next, get_marked_reference (right_node_next))) {
+            if (CAS(&(right_node->next), /*C3*/
+                    right_node_next, get_marked_reference(right_node_next))) {
                 break;
             }
         }
-    } while (TRUE); /*B4*/
-    if (!CAS (&(left_node->next), right_node, right_node_next)) { /*C4*/
-        right_node = search (list, right_node->key, &left_node);
+    } while (TRUE);                                              /*B4*/
+    if (!CAS(&(left_node->next), right_node, right_node_next)) { /*C4*/
+        right_node = search(list, right_node->key, &left_node);
     }
 
     // Call delete_fn, if defined
@@ -184,19 +190,21 @@ lstDelete (list_t *list, list_key_t search_key)
         list->delete_fn(right_node->data);
     }
 
-    if (right_node) free(right_node);
+    if (right_node)
+        free(right_node);
 
     return TRUE;
 }
 
-void*
-lstFind (list_t *list, list_key_t search_key)
+void *
+lstFind(list_t *list, list_key_t search_key)
 {
-    if (!list) return NULL;
+    if (!list)
+        return NULL;
 
     list_element_t *right_node, *left_node;
 
-    right_node = search (list, search_key, &left_node);
+    right_node = search(list, search_key, &left_node);
     if ((!right_node) || (right_node->key != search_key)) {
         return NULL;
     } else {
@@ -205,9 +213,10 @@ lstFind (list_t *list, list_key_t search_key)
 }
 
 void
-lstDestroy(list_t** list)
+lstDestroy(list_t **list)
 {
-    if (!list || !*list) return;
+    if (!list || !*list)
+        return;
 
     list_element_t *head = (*list)->head;
 

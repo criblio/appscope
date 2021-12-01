@@ -1,56 +1,39 @@
 #define _GNU_SOURCE
-#include <sys/param.h>
-#include <time.h>
 #include "os.h"
 #include "../../src/dbg.h"
 #include "../../src/fn.h"
 #include "../../src/scopetypes.h"
+#include <sys/param.h>
+#include <time.h>
 
 // want to put this list in an obvious place
-//static char thread_delay_list[] = "chrome:nacl_helper";
+// static char thread_delay_list[] = "chrome:nacl_helper";
 static timer_t g_timerid = 0;
 
 static int
 sendNL(int sd, ino_t node)
 {
-    if (!g_fn.sendmsg) return -1;
+    if (!g_fn.sendmsg)
+        return -1;
 
-    struct sockaddr_nl nladdr = {
-        .nl_family = AF_NETLINK
-    };
+    struct sockaddr_nl nladdr = {.nl_family = AF_NETLINK};
 
     struct {
         struct nlmsghdr nlh;
         struct unix_diag_req udr;
-    } req = {
-        .nlh = {
-            .nlmsg_len = sizeof(req),
-            .nlmsg_type = SOCK_DIAG_BY_FAMILY,
-            .nlmsg_flags = NLM_F_REQUEST
-        },
-        .udr = {
-            .sdiag_family = AF_UNIX,
-            .sdiag_protocol = 0,
-            .pad = 0,
-            .udiag_states = -1,
-            .udiag_ino = node,
-            .udiag_cookie[0] = -1,
-            .udiag_cookie[1] = -1,
-            .udiag_show = UDIAG_SHOW_PEER
-        }
-    }; // reminder cookies must be -1 in order for a single request to work
+    } req = {.nlh = {.nlmsg_len = sizeof(req), .nlmsg_type = SOCK_DIAG_BY_FAMILY, .nlmsg_flags = NLM_F_REQUEST},
+             .udr = {.sdiag_family = AF_UNIX,
+                     .sdiag_protocol = 0,
+                     .pad = 0,
+                     .udiag_states = -1,
+                     .udiag_ino = node,
+                     .udiag_cookie[0] = -1,
+                     .udiag_cookie[1] = -1,
+                     .udiag_show = UDIAG_SHOW_PEER}}; // reminder cookies must be -1 in order for a single request to work
 
-    struct iovec iov = {
-        .iov_base = &req,
-        .iov_len = sizeof(req)
-    };
+    struct iovec iov = {.iov_base = &req, .iov_len = sizeof(req)};
 
-    struct msghdr msg = {
-        .msg_name = (void *) &nladdr,
-        .msg_namelen = sizeof(nladdr),
-        .msg_iov = &iov,
-        .msg_iovlen = 1
-    };
+    struct msghdr msg = {.msg_name = (void *)&nladdr, .msg_namelen = sizeof(nladdr), .msg_iov = &iov, .msg_iovlen = 1};
 
     // should we check for a partial send?
     if (g_fn.sendmsg(sd, &msg, 0) < 0) {
@@ -64,27 +47,18 @@ sendNL(int sd, ino_t node)
 static ino_t
 getNL(int sd)
 {
-    if (!g_fn.recvmsg) return -1;
+    if (!g_fn.recvmsg)
+        return -1;
 
     int rc;
     char buf[sizeof(struct nlmsghdr) + (sizeof(long) * 4)];
     struct unix_diag_msg *diag;
     struct rtattr *attr;
-    struct sockaddr_nl nladdr = {
-        .nl_family = AF_NETLINK
-    };
+    struct sockaddr_nl nladdr = {.nl_family = AF_NETLINK};
 
-    struct iovec iov = {
-        .iov_base = buf,
-        .iov_len = sizeof(buf)
-    };
+    struct iovec iov = {.iov_base = buf, .iov_len = sizeof(buf)};
 
-    struct msghdr msg = {
-        .msg_name = (void *) &nladdr,
-        .msg_namelen = sizeof(nladdr),
-        .msg_iov = &iov,
-        .msg_iovlen = 1
-    };
+    struct msghdr msg = {.msg_name = (void *)&nladdr, .msg_namelen = sizeof(nladdr), .msg_iov = &iov, .msg_iovlen = 1};
 
     if ((rc = g_fn.recvmsg(sd, &msg, 0)) <= 0) {
         scopeLog(LOG_LEVEL, "fd:%d ERROR:getNL:recvmsg", sd);
@@ -132,10 +106,10 @@ getNL(int sd)
                 return (ino_t)-1;
             }
 
-            attr = (struct rtattr *) (diag + 1);
+            attr = (struct rtattr *)(diag + 1);
             if (attr->rta_type == UNIX_DIAG_PEER) {
                 if (RTA_PAYLOAD(attr) >= sizeof(unsigned int)) {
-                    return (ino_t)*(unsigned int *) RTA_DATA(attr);
+                    return (ino_t) * (unsigned int *)RTA_DATA(attr);
                 }
             }
         }
@@ -150,7 +124,8 @@ getProcVal(char *srcbuf, const char *tag)
     uint64_t val = -1;
     const char delim[] = ":";
 
-    if (!srcbuf) return -1;
+    if (!srcbuf)
+        return -1;
     buf = strdup(srcbuf);
 
     entry = strtok_r(buf, delim, &last);
@@ -170,10 +145,10 @@ getProcVal(char *srcbuf, const char *tag)
         }
     }
 
-    if (buf) free(buf);
+    if (buf)
+        free(buf);
     return val;
 }
-
 
 int
 osUnixSockPeer(ino_t lnode)
@@ -181,9 +156,11 @@ osUnixSockPeer(ino_t lnode)
     int nsd;
     ino_t rnode;
 
-    if (!g_fn.socket || !g_fn.close) return -1;
+    if (!g_fn.socket || !g_fn.close)
+        return -1;
 
-    if ((nsd = g_fn.socket(AF_NETLINK, SOCK_RAW, NETLINK_SOCK_DIAG)) == -1) return -1;
+    if ((nsd = g_fn.socket(AF_NETLINK, SOCK_RAW, NETLINK_SOCK_DIAG)) == -1)
+        return -1;
 
     if (sendNL(nsd, lnode) == -1) {
         g_fn.close(nsd);
@@ -198,7 +175,8 @@ osUnixSockPeer(ino_t lnode)
 int
 osGetExePath(char **path)
 {
-    if (!path) return -1;
+    if (!path)
+        return -1;
     char *buf = *path;
 
     if (!(buf = calloc(1, PATH_MAX))) {
@@ -226,7 +204,8 @@ osGetProcname(char *pname, int len)
 
         if (osGetExePath(&ppath) != -1) {
             strncpy(pname, basename(ppath), len);
-            if (ppath) free(ppath);
+            if (ppath)
+                free(ppath);
         } else {
             return -1;
         }
@@ -262,23 +241,23 @@ osGetProcMemory(pid_t pid)
     if ((start = strstr(buf, "VmSize")) == NULL) {
         DBG(NULL);
         g_fn.close(fd);
-        return -1;        
+        return -1;
     }
-    
+
     entry = strtok_r(start, delim, &last);
     entry = strtok_r(NULL, delim, &last);
     if (entry == NULL) {
         DBG(NULL);
         g_fn.close(fd);
-        return -1;        
+        return -1;
     }
-    
+
     if ((result = strtol(entry, NULL, 0)) == (long)0) {
         DBG(NULL);
         g_fn.close(fd);
         return -1;
     }
-    
+
     g_fn.close(fd);
     return (int)result;
 }
@@ -326,8 +305,8 @@ int
 osGetNumFds(pid_t pid)
 {
     int nfile = 0;
-    DIR * dirp;
-    struct dirent * entry;
+    DIR *dirp;
+    struct dirent *entry;
     char buf[1024];
 
     snprintf(buf, sizeof(buf), "/proc/%d/fd", pid);
@@ -335,7 +314,7 @@ osGetNumFds(pid_t pid)
         DBG(NULL);
         return -1;
     }
-    
+
     while ((entry = readdir(dirp)) != NULL) {
         if (entry->d_type != DT_DIR) {
             nfile++;
@@ -350,8 +329,8 @@ int
 osGetNumChildProcs(pid_t pid)
 {
     int nchild = 0;
-    DIR * dirp;
-    struct dirent * entry;
+    DIR *dirp;
+    struct dirent *entry;
     char buf[1024];
 
     snprintf(buf, sizeof(buf), "/proc/%d/task", pid);
@@ -359,9 +338,9 @@ osGetNumChildProcs(pid_t pid)
         DBG(NULL);
         return -1;
     }
-    
+
     while ((entry = readdir(dirp)) != NULL) {
-            nchild++;
+        nchild++;
     }
 
     closedir(dirp);
@@ -384,17 +363,17 @@ osInitTimer(platform_time_t *cfg)
         DBG(NULL);
         return -1;
     }
-    
+
     /*
      * Anecdotal evidence that there is a max size to proc entrires.
      * In any case this should be big enough.
-     */    
+     */
     if ((buf = calloc(1, MAX_PROC)) == NULL) {
         DBG(NULL);
         g_fn.close(fd);
         return -1;
     }
-    
+
     if (g_fn.read(fd, buf, MAX_PROC) == -1) {
         DBG(NULL);
         g_fn.close(fd);
@@ -407,7 +386,7 @@ osInitTimer(platform_time_t *cfg)
     } else {
         cfg->tsc_rdtscp = TRUE;
     }
-    
+
     if (strstr(buf, "tsc_reliable") == NULL) {
         cfg->tsc_invariant = FALSE;
     } else {
@@ -418,8 +397,7 @@ osInitTimer(platform_time_t *cfg)
         cfg->freq = -1;
     }
 
-    if (((val = getProcVal(buf, "CPU architecture")) != -1) &&
-        (val >= 8)) {
+    if (((val = getProcVal(buf, "CPU architecture")) != -1) && (val >= 8)) {
         cfg->gptimer_avail = TRUE;
     } else {
         cfg->gptimer_avail = FALSE;
@@ -434,13 +412,12 @@ osInitTimer(platform_time_t *cfg)
     if (cfg->gptimer_avail == TRUE) {
         uint64_t freq;
 
-        __asm__ volatile (
-            "mrs x1, CNTFRQ_EL0 \n"
-            "mov %0, x1  \n"
-            : "=r" (freq)                // output
-            :                            // inputs
-            :                            // clobbered register
-            );
+        __asm__ volatile("mrs x1, CNTFRQ_EL0 \n"
+                         "mov %0, x1  \n"
+                         : "=r"(freq) // output
+                         :            // inputs
+                         :            // clobbered register
+        );
 
         freq &= 0x0000000ffffffff;
         freq /= 1000000;
@@ -488,7 +465,8 @@ osGetCmdline(pid_t pid, char **cmd)
     int bytesRead = 0;
     char path[64];
 
-    if (!cmd) return 0;
+    if (!cmd)
+        return 0;
     char *buf = *cmd;
     buf = NULL;
 
@@ -516,23 +494,26 @@ osGetCmdline(pid_t pid, char **cmd)
 
     // Replace all but the last null with spaces
     int i;
-    for (i=0; i < (bytesRead - 1); i++) {
-        if (buf[i] == '\0') buf[i] = ' ';
+    for (i = 0; i < (bytesRead - 1); i++) {
+        if (buf[i] == '\0')
+            buf[i] = ' ';
     }
 
 out:
     if (!buf || !buf[0]) {
-        if (buf) free(buf);
+        if (buf)
+            free(buf);
         buf = strdup("none");
     } else {
         // buf is big; try to strdup what we've used and free the rest
-        char* tmp = strdup(buf);
+        char *tmp = strdup(buf);
         if (tmp) {
             free(buf);
             buf = tmp;
         }
     }
-    if (fd != -1) g_fn.close(fd);
+    if (fd != -1)
+        g_fn.close(fd);
     *cmd = buf;
     return (*cmd != NULL);
 }
@@ -551,7 +532,7 @@ osTimerStop(void)
 }
 
 bool
-osThreadInit(void(*handler)(int), unsigned interval)
+osThreadInit(void (*handler)(int), unsigned interval)
 {
     struct sigaction sact;
     struct sigevent sevent = {0};
@@ -560,7 +541,8 @@ osThreadInit(void(*handler)(int), unsigned interval)
     sact.sa_handler = handler;
     sact.sa_flags = SA_RESTART;
 
-    if (!g_fn.sigaction) return FALSE;
+    if (!g_fn.sigaction)
+        return FALSE;
 
     if (g_fn.sigaction(SIGUSR2, &sact, NULL) == -1) {
         DBG("errno %d", errno);
@@ -590,8 +572,8 @@ osThreadInit(void(*handler)(int), unsigned interval)
 // definition in src/javaagent.c.  The scope library will do this.
 // This weak definition allows us to not have to define this symbol for
 // unit tests or for the scope executable.
-void __attribute__((weak))
-initJavaAgent() {
+void __attribute__((weak)) initJavaAgent()
+{
     return;
 }
 
@@ -600,7 +582,6 @@ osInitJavaAgent(void)
 {
     initJavaAgent();
 }
-
 
 /*
  * Example from /proc/self/maps:
@@ -622,21 +603,24 @@ osGetPageProt(uint64_t addr)
     }
 
     FILE *fstream = g_fn.fopen("/proc/self/maps", "r");
-    if (fstream == NULL) return -1;
+    if (fstream == NULL)
+        return -1;
 
     while (g_fn.getline(&buf, &len, fstream) != -1) {
         char *end = NULL;
         errno = 0;
         uint64_t addr1 = strtoull(buf, &end, 0x10);
         if ((addr1 == 0) || (errno != 0)) {
-            if (buf) free(buf);
+            if (buf)
+                free(buf);
             g_fn.fclose(fstream);
             return -1;
         }
 
         uint64_t addr2 = strtoull(end + 1, &end, 0x10);
         if ((addr2 == 0) || (errno != 0)) {
-            if (buf) free(buf);
+            if (buf)
+                free(buf);
             g_fn.fclose(fstream);
             return -1;
         }
@@ -650,7 +634,8 @@ osGetPageProt(uint64_t addr)
             prot |= perms[0] == 'r' ? PROT_READ : 0;
             prot |= perms[1] == 'w' ? PROT_WRITE : 0;
             prot |= perms[2] == 'x' ? PROT_EXEC : 0;
-            if (buf) free(buf);
+            if (buf)
+                free(buf);
             break;
         }
 
@@ -672,7 +657,8 @@ osNeedsConnect(int fd)
     int rc, timeout;
     struct pollfd fds;
 
-    if (!g_fn.poll) return 0;
+    if (!g_fn.poll)
+        return 0;
 
     timeout = 0;
     memset(&fds, 0x0, sizeof(fds));
@@ -682,7 +668,8 @@ osNeedsConnect(int fd)
 
     rc = g_fn.poll(&fds, 1, timeout);
 
-    if ((rc != 0) && (((fds.revents & POLLRDHUP) != 0) || ((fds.revents & POLLERR) != 0))) return 1;
+    if ((rc != 0) && (((fds.revents & POLLRDHUP) != 0) || ((fds.revents & POLLERR) != 0)))
+        return 1;
     return 0;
 }
 
@@ -713,23 +700,27 @@ osGetCgroup(pid_t pid, char *cgroup, size_t cglen)
         return FALSE;
     }
 
-    if (snprintf(path, sizeof(path), "/proc/%d/cgroup", pid) < 0) return FALSE;
+    if (snprintf(path, sizeof(path), "/proc/%d/cgroup", pid) < 0)
+        return FALSE;
 
     FILE *fstream = g_fn.fopen(path, "r");
-    if (fstream == NULL) return FALSE;
+    if (fstream == NULL)
+        return FALSE;
 
     while (g_fn.getline(&buf, &len, fstream) != -1) {
         if (buf && strstr(buf, "0::")) {
             strncpy(cgroup, buf, cglen);
             char *nonl = strchr(cgroup, '\n');
-            if (nonl) *nonl = '\0';
+            if (nonl)
+                *nonl = '\0';
 
             free(buf);
             g_fn.fclose(fstream);
             return TRUE;
         }
 
-        if (buf) free(buf);
+        if (buf)
+            free(buf);
         buf = NULL;
         len = 0;
     }
@@ -742,7 +733,8 @@ char *
 osGetFileMode(mode_t perm)
 {
     char *mode = malloc(MODE_STR);
-    if (!mode) return NULL;
+    if (!mode)
+        return NULL;
 
     mode[0] = (perm & S_IRUSR) ? 'r' : '-';
     mode[1] = (perm & S_IWUSR) ? 'w' : '-';
@@ -756,4 +748,3 @@ osGetFileMode(mode_t perm)
     mode[9] = '\0';
     return mode;
 }
-

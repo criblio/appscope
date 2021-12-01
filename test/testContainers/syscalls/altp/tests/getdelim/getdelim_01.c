@@ -1,6 +1,8 @@
 #include "test_utils.h"
 
-int do_test() {
+int
+do_test()
+{
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[NAME_MAX];
     char buffer[] = TEST_MSG;
@@ -12,13 +14,13 @@ int do_test() {
 
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
-    FILE* pFile = fopen(tmp_file_name, "w");
+    FILE *pFile = fopen(tmp_file_name, "w");
 
-    if(pFile != NULL) {
-        if(sizeof(buffer) != fwrite(buffer, 1, sizeof(buffer), pFile)) {
+    if (pFile != NULL) {
+        if (sizeof(buffer) != fwrite(buffer, 1, sizeof(buffer), pFile)) {
             TEST_ERROR();
         }
-        if(fclose(pFile) == EOF) {
+        if (fclose(pFile) == EOF) {
             TEST_ERROR();
         }
     } else {
@@ -27,10 +29,10 @@ int do_test() {
 
     pFile = fopen(tmp_file_name, "r");
 
-    if(pFile != NULL) {
+    if (pFile != NULL) {
         memset(buffer, 0, sizeof(buffer));
-        while((read = getdelim(&lineptr, &len, 101, pFile)) != EOF) {
-            if(strcmp(lineptr, "te") != 0) {
+        while ((read = getdelim(&lineptr, &len, 101, pFile)) != EOF) {
+            if (strcmp(lineptr, "te") != 0) {
                 TEST_ERROR();
             }
             break;
@@ -38,7 +40,7 @@ int do_test() {
 
         free(lineptr);
 
-        if(fclose(pFile) == EOF) {
+        if (fclose(pFile) == EOF) {
             TEST_ERROR();
         }
     } else {

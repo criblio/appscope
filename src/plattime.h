@@ -1,9 +1,9 @@
 #ifndef __PLATTIME_H__
 #define __PLATTIME_H__
 
+#include "scopetypes.h"
 #include <limits.h>
 #include <stdint.h>
-#include "scopetypes.h"
 #include <time.h>
 
 #define DEFAULT_HW_TIMER TRUE
@@ -15,8 +15,7 @@ typedef struct {
     uint64_t freq;
 } platform_time_t;
 
-platform_time_t* initTime(void);
-
+platform_time_t *initTime(void);
 
 // We haven't measured it, but there are concerns about performance
 // with calling getTime and getDuration as functions across modules.
@@ -28,7 +27,8 @@ platform_time_t* initTime(void);
 extern platform_time_t g_time;
 
 static inline uint64_t
-getTime(void) {
+getTime(void)
+{
 
     // If we do not have a h/w timer available or we default to not using a
     // h/w timer then use the kernel timer. Note that no checks for a gate
@@ -67,20 +67,19 @@ getTime(void) {
      * supposed to be more accurate.
      */
     if (g_time.tsc_rdtscp == TRUE) {
-        asm volatile("rdtscp" : "=a" (low), "=d" (high));
+        asm volatile("rdtscp" : "=a"(low), "=d"(high));
     } else {
-        asm volatile("rdtsc" : "=a" (low), "=d" (high));
+        asm volatile("rdtsc" : "=a"(low), "=d"(high));
     }
     return ((uint64_t)low) | (((uint64_t)high) << 32);
 #elif defined(__aarch64__)
     uint64_t cnt;
-    __asm__ volatile (
-        "mrs x1, CNTVCT_EL0 \n"
-        "mov %0, x1  \n"
-        : "=r" (cnt)                // output
-        :                           // inputs
-        :                           // clobbered register
-        );
+    __asm__ volatile("mrs x1, CNTVCT_EL0 \n"
+                     "mov %0, x1  \n"
+                     : "=r"(cnt) // output
+                     :           // inputs
+                     :           // clobbered register
+    );
 
     return cnt;
 #else
@@ -88,14 +87,14 @@ getTime(void) {
 #endif
 }
 
-
 // Return the time delta from start to now in nanoseconds
 static inline uint64_t
 getDuration(uint64_t start)
 {
     // before the constructor runs, g_time.freq is zero.
     // Avoid div by zero during this time.
-    if (!g_time.freq) return 0ULL;
+    if (!g_time.freq)
+        return 0ULL;
 
     /*
      * The clock frequency is in Mhz.
@@ -116,7 +115,6 @@ getDuration(uint64_t start)
     } else {
         return (((ULONG_MAX - start) + now) * 1000) / g_time.freq;
     }
-
 }
 
 // Return the time delta from start to now in nanoseconds
@@ -125,7 +123,8 @@ getDurationNow(uint64_t now, uint64_t start)
 {
     // before the constructor runs, g_time.freq is zero.
     // Avoid div by zero during this time.
-    if (!g_time.freq) return 0ULL;
+    if (!g_time.freq)
+        return 0ULL;
 
     /*
      * The clock frequency is in Mhz.

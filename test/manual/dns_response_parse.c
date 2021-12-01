@@ -1,26 +1,25 @@
-// gcc -g test/manual/dns_response_parse.c -lresolv -o ~/scope/utils/dp 
+// gcc -g test/manual/dns_response_parse.c -lresolv -o ~/scope/utils/dp
 
-#include <unistd.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <stdio.h>
-#include <errno.h>
-#include <arpa/nameser.h>
-#include <resolv.h>
 #include <arpa/inet.h>
+#include <arpa/nameser.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <resolv.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 // example arg for payload file: "/tmp/77698_127.0.0.53:53:0.in"
 // quotes are needed on the command line
 
 struct response {
     HEADER hdr;
-    u_char buf[NS_PACKETSZ];      /* defined in arpa/nameser.h */
+    u_char buf[NS_PACKETSZ]; /* defined in arpa/nameser.h */
 };
-
 
 int
 main(int argc, char **argv)
@@ -32,8 +31,8 @@ main(int argc, char **argv)
     char buf[1024];
 
     if (argc < 2) {
-        printf ("Usage: %s <path-to-a-DNS-payload-file>\n", argv[0]);
-        exit (1);
+        printf("Usage: %s <path-to-a-DNS-payload-file>\n", argv[0]);
+        exit(1);
     }
 
     printf("Using %s\n", argv[1]);
@@ -68,7 +67,7 @@ main(int argc, char **argv)
     for (i = 0; i < nmsg; i++) {
         char dispbuf[4096];
         ns_parserr(&handle, ns_s_an, i, &rr);
-        ns_sprintrr(&handle, &rr, NULL, NULL, dispbuf, sizeof (dispbuf));
+        ns_sprintrr(&handle, &rr, NULL, NULL, dispbuf, sizeof(dispbuf));
         printf("%s\n", dispbuf);
         inet_ntop(AF_INET, (struct sockaddr_in *)rr.rdata, dispbuf, sizeof(dispbuf));
         printf("resolved addr is %s\n", dispbuf);

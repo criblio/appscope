@@ -4,7 +4,9 @@
 
 #include "test_utils.h"
 
-int do_test() {
+int
+do_test()
+{
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[NAME_MAX];
     int i = 0;
@@ -13,16 +15,16 @@ int do_test() {
 
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
-    for(i = 0; i < TEST_COUNT; i++) {
+    for (i = 0; i < TEST_COUNT; i++) {
         int f = open64(tmp_file_name, O_CREAT | O_WRONLY);
 
-        if(f != EOF) {
-            if(write(f, TEST_MSG, sizeof(TEST_MSG)) != sizeof(TEST_MSG)) {
+        if (f != EOF) {
+            if (write(f, TEST_MSG, sizeof(TEST_MSG)) != sizeof(TEST_MSG)) {
                 TEST_ERROR();
                 break;
             }
 
-            if(close(f) == EOF) {
+            if (close(f) == EOF) {
                 TEST_ERROR();
             }
 

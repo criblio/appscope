@@ -1,4 +1,4 @@
-/* 
+/*
  * tcpclient.c - A simple TCP client
  *
  * usage: tcpclient [OPTIONS] PORT
@@ -9,21 +9,20 @@
  *
  */
 #define _POSIX_C_SOURCE 1
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/wait.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <signal.h>
 #include <errno.h>
-#include <openssl/ssl.h>
-#include <openssl/err.h>
-#include <signal.h>
-#include <strings.h>
 #include <getopt.h>
+#include <netinet/in.h>
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+#include <signal.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <strings.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 // Forward declarations
 int socket_setup(int);
@@ -31,9 +30,7 @@ int socket_teardown(int);
 int tcp_ssl(int);
 
 // Long aliases for short options
-static struct option options[] = {
-    {"tls", no_argument, 0, 't'}
-};
+static struct option options[] = {{"tls", no_argument, 0, 't'}};
 
 // Program helper
 void
@@ -57,12 +54,12 @@ main(int argc, char *argv[])
             break;
         }
         switch (opt) {
-        case 't':
-            tls = true;
-            break;
-        default: /* '?' */
-            showUsage();
-            exit(EXIT_FAILURE);
+            case 't':
+                tls = true;
+                break;
+            default: /* '?' */
+                showUsage();
+                exit(EXIT_FAILURE);
         }
     }
 
@@ -78,11 +75,11 @@ main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    if(!tls) {
+    if (!tls) {
         printf("Currently supports -t only\n");
         exit(EXIT_FAILURE);
     }
-    
+
     int socket;
     if ((socket = socket_setup(port)) < 0) {
         exit(EXIT_FAILURE);
@@ -109,8 +106,8 @@ socket_setup(int port)
 {
     // create socket
     int parent_fd;
-    parent_fd = socket(AF_INET , SOCK_STREAM , 0);
-    if (parent_fd < 0)	{
+    parent_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (parent_fd < 0) {
         fprintf(stderr, "Error opening socket\n");
         return -1;
     }
@@ -124,8 +121,7 @@ socket_setup(int port)
     printf("Client set up TCP socket.\n");
 
     // connect to remote server
-    if (connect(parent_fd , (struct sockaddr *)&server , sizeof(server)) < 0)
-    {
+    if (connect(parent_fd, (struct sockaddr *)&server, sizeof(server)) < 0) {
         fprintf(stderr, "Connection failed\n");
         return -1;
     }
@@ -135,7 +131,7 @@ socket_setup(int port)
 }
 
 // Socket teardown
-int 
+int
 socket_teardown(int socket)
 {
     if (shutdown(socket, SHUT_RDWR)) {
@@ -150,7 +146,8 @@ socket_teardown(int socket)
 
 // Bidirectional SSL shutdown
 int
-ssl_shutdown(SSL* ssl) {
+ssl_shutdown(SSL *ssl)
+{
     int ret;
     ret = SSL_shutdown(ssl);
     if (ret < 0) {
@@ -165,7 +162,8 @@ ssl_shutdown(SSL* ssl) {
             int ssl_err = SSL_get_error(ssl, ret);
             fprintf(stderr,
                     "Waiting for server shutdown using SSL_shutdown failed: "
-                    "ssl_err=%d\n", ssl_err);
+                    "ssl_err=%d\n",
+                    ssl_err);
             return -1;
         }
     }
@@ -173,7 +171,7 @@ ssl_shutdown(SSL* ssl) {
     return 0;
 }
 
-// Establish an SSL connection and send a TLS encrypted message 
+// Establish an SSL connection and send a TLS encrypted message
 // Then shutdown the SSL connection
 int
 tcp_ssl(int socket)
@@ -189,7 +187,7 @@ tcp_ssl(int socket)
         fprintf(stderr, "SSL_CTX_new failed\n");
         return -1;
     }
-	SSL_CTX_set_options(ssl_ctx, SSL_OP_SINGLE_DH_USE);
+    SSL_CTX_set_options(ssl_ctx, SSL_OP_SINGLE_DH_USE);
     ssl = SSL_new(ssl_ctx);
     if (!ssl) {
         fprintf(stderr, "SSL_new failed\n");
@@ -205,8 +203,7 @@ tcp_ssl(int socket)
     }
     printf("SSL connected.\n");
 
-    for (const char *start = message; start - message < sizeof(message);
-            start += processed) {
+    for (const char *start = message; start - message < sizeof(message); start += processed) {
         processed = SSL_write(ssl, start, sizeof(message) - (start - message));
         printf("Client SSL_write returned %d\n", processed);
         if (processed <= 0) {

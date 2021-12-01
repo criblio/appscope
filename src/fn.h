@@ -1,24 +1,24 @@
 #ifndef __FN_H__
 #define __FN_H__
 
-#include <wchar.h>
-#include <sys/statvfs.h>
 #include <netdb.h>
+#include <sys/statvfs.h>
+#include <wchar.h>
 #ifdef __linux__
-#include <sys/epoll.h>
-#include <poll.h>
-#include <sys/vfs.h>
 #include <linux/aio_abi.h>
+#include <poll.h>
+#include <sys/epoll.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
+#include <sys/vfs.h>
 #endif // __linux__
-#include <signal.h>
 #include "../contrib/tls/tls.h"
+#include <arpa/nameser.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <arpa/nameser.h>
 
 #ifdef __linux__
 #ifndef io_context_t
@@ -40,7 +40,6 @@ typedef uint64_t fpos64_t;
 typedef unsigned int nfds_t;
 #endif
 #endif // __APPLE__
-
 
 typedef struct {
     void (*vsyslog)(int, const char *, va_list);
@@ -106,21 +105,16 @@ typedef struct {
     int (*accept)(int, struct sockaddr *, socklen_t *);
     int (*accept4)(int, struct sockaddr *, socklen_t *, int);
     ssize_t (*send)(int, const void *, size_t, int);
-    ssize_t (*sendto)(int, const void *, size_t, int,
-                              const struct sockaddr *, socklen_t);
+    ssize_t (*sendto)(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
     ssize_t (*sendmsg)(int, const struct msghdr *, int);
     ssize_t (*recv)(int, void *, size_t, int);
-    ssize_t (*recvfrom)(int sockfd, void *buf, size_t len, int flags,
-                                struct sockaddr *src_addr, socklen_t *addrlen);
+    ssize_t (*recvfrom)(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen);
     ssize_t (*recvmsg)(int, struct msghdr *, int);
     struct hostent *(*gethostbyname)(const char *);
-    int (*gethostbyname_r)(const char *, struct hostent *, char *, size_t,
-                          struct hostent **, int *);
+    int (*gethostbyname_r)(const char *, struct hostent *, char *, size_t, struct hostent **, int *);
     struct hostent *(*gethostbyname2)(const char *, int);
-    int (*gethostbyname2_r)(const char *, int, struct hostent *, char *, size_t,
-                            struct hostent **, int *);
-    int (*getaddrinfo)(const char *, const char *, const struct addrinfo *,
-                       struct addrinfo **);
+    int (*gethostbyname2_r)(const char *, int, struct hostent *, char *, size_t, struct hostent **, int *);
+    int (*getaddrinfo)(const char *, const char *, const struct addrinfo *, struct addrinfo **);
     /*
      * We need to make these Linux only, but we're holding off until structiural changes are done.
      */
@@ -191,12 +185,12 @@ typedef struct {
     void *(*dlopen)(const char *, int);
     int (*PR_FileDesc2NativeHandle)(PRFileDesc *);
     void (*PR_SetError)(PRErrorCode, PRInt32);
-    int (*execve)(const char *, char * const *, char * const *);
+    int (*execve)(const char *, char *const *, char *const *);
     int (*poll)(struct pollfd *, nfds_t, int);
     int (*select)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
     int (*nanosleep)(const struct timespec *, struct timespec *);
-    int	(*ns_initparse)(const unsigned char *, int, ns_msg *);
-    int	(*ns_parserr)(ns_msg *, ns_sect, int, ns_rr *);
+    int (*ns_initparse)(const unsigned char *, int, ns_msg *);
+    int (*ns_parserr)(ns_msg *, ns_sect, int, ns_rr *);
     size_t (*__stdout_write)(FILE *, const unsigned char *, size_t);
     size_t (*__stderr_write)(FILE *, const unsigned char *, size_t);
     int (*__fprintf_chk)(FILE *, int, const char *, ...);
@@ -228,11 +222,10 @@ typedef struct {
     int (*io_getevents)(io_context_t, long, long, struct io_event *, struct timespec *);
     int (*sendmmsg)(int, struct mmsghdr *, unsigned int, int);
     int (*recvmmsg)(int, struct mmsghdr *, unsigned int, int, struct timespec *);
-    int (*pthread_create)(pthread_t *, const pthread_attr_t *,
-                          void *(*)(void *), void *);
+    int (*pthread_create)(pthread_t *, const pthread_attr_t *, void *(*)(void *), void *);
     int (*getentropy)(void *, size_t);
     void (*__ctype_init)(void);
-    int (*__register_atfork)(void (*) (void), void (*) (void), void (*) (void), void *);
+    int (*__register_atfork)(void (*)(void), void (*)(void), void (*)(void), void *);
     void (*uv__read)(void *);
     int (*uv_fileno)(const void *, int *);
 #endif // __linux__
@@ -246,10 +239,8 @@ typedef struct {
     int (*close$NOCANCEL)(int);
     int (*close_nocancel)(int);
     int (*guarded_close_np)(int, void *);
-    ssize_t (*__sendto_nocancel)(int, const void *, size_t, int,
-                                 const struct sockaddr *, socklen_t);
-    int32_t (*DNSServiceQueryRecord)(void *, uint32_t, uint32_t, const char *,
-                                      uint16_t, uint16_t, void *, void *);
+    ssize_t (*__sendto_nocancel)(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
+    int32_t (*DNSServiceQueryRecord)(void *, uint32_t, uint32_t, const char *, uint16_t, uint16_t, void *, void *);
 #endif // __APPLE__
 
     // These functions are not interposed.  They're here because

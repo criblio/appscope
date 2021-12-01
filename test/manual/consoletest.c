@@ -13,14 +13,14 @@ print_large_buf(int size)
 {
     char *buf = calloc(1, size);
     int i;
-    for (i=0; i<size-1; i++) {
-        snprintf(&buf[i], 2, "%c", filler[i%16]);
+    for (i = 0; i < size - 1; i++) {
+        snprintf(&buf[i], 2, "%c", filler[i % 16]);
     }
     memcpy(buf, start, sizeof(start));
-    memcpy(&buf[size-1-sizeof(end)], end, sizeof(end));
+    memcpy(&buf[size - 1 - sizeof(end)], end, sizeof(end));
     printf("\n");
 
-    //printf("%s", buf); // Seems like this should work, but doesn't.
+    // printf("%s", buf); // Seems like this should work, but doesn't.
     puts(buf);
     printf("\n");
 

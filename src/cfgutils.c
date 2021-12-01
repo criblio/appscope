@@ -1,173 +1,137 @@
 #define _GNU_SOURCE
+#include "pcre2posix.h"
 #include <dlfcn.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <pwd.h>
-#include "pcre2posix.h"
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <fcntl.h>
 
 #include "cfgutils.h"
+#include "com.h"
 #include "dbg.h"
+#include "fn.h"
 #include "mtcformat.h"
 #include "scopetypes.h"
-#include "com.h"
-#include "utils.h"
-#include "fn.h"
 #include "state.h"
+#include "utils.h"
 
 #ifndef NO_YAML
 #include "yaml.h"
 #endif
 
-#define METRIC_NODE          "metric"
-#define ENABLE_NODE              "enable"
-#define FORMAT_NODE              "format"
-#define TYPE_NODE                    "type"
-#define STATSDPREFIX_NODE            "statsdprefix"
-#define STATSDMAXLEN_NODE            "statsdmaxlen"
-#define VERBOSITY_NODE               "verbosity"
-#define TRANSPORT_NODE           "transport"
-#define TYPE_NODE                    "type"
-#define HOST_NODE                    "host"
-#define PORT_NODE                    "port"
-#define PATH_NODE                    "path"
-#define BUFFERING_NODE               "buffering"
-#define TLS_NODE                     "tls"
-#define ENABLE_NODE                      "enable"
-#define VALIDATE_NODE                    "validateserver"
-#define CACERT_NODE                      "cacertpath"
+#define METRIC_NODE       "metric"
+#define ENABLE_NODE       "enable"
+#define FORMAT_NODE       "format"
+#define TYPE_NODE         "type"
+#define STATSDPREFIX_NODE "statsdprefix"
+#define STATSDMAXLEN_NODE "statsdmaxlen"
+#define VERBOSITY_NODE    "verbosity"
+#define TRANSPORT_NODE    "transport"
+#define TYPE_NODE         "type"
+#define HOST_NODE         "host"
+#define PORT_NODE         "port"
+#define PATH_NODE         "path"
+#define BUFFERING_NODE    "buffering"
+#define TLS_NODE          "tls"
+#define ENABLE_NODE       "enable"
+#define VALIDATE_NODE     "validateserver"
+#define CACERT_NODE       "cacertpath"
 
-#define LIBSCOPE_NODE        "libscope"
-#define LOG_NODE                 "log"
-#define LEVEL_NODE                   "level"
-#define TRANSPORT_NODE               "transport"
-#define SUMMARYPERIOD_NODE       "summaryperiod"
-#define COMMANDDIR_NODE          "commanddir"
-#define CFGEVENT_NODE            "configevent"
+#define LIBSCOPE_NODE      "libscope"
+#define LOG_NODE           "log"
+#define LEVEL_NODE         "level"
+#define TRANSPORT_NODE     "transport"
+#define SUMMARYPERIOD_NODE "summaryperiod"
+#define COMMANDDIR_NODE    "commanddir"
+#define CFGEVENT_NODE      "configevent"
 
-#define EVENT_NODE           "event"
-#define TRANSPORT_NODE           "transport"
-#define FORMAT_NODE              "format"
-#define TYPE_NODE                    "type"
-#define MAXEPS_NODE                  "maxeventpersec"
-#define ENHANCEFS_NODE               "enhancefs"
-#define WATCH_NODE               "watch"
-#define TYPE_NODE                    "type"
-#define NAME_NODE                    "name"
-#define FIELD_NODE                   "field"
-#define VALUE_NODE                   "value"
-#define EX_HEADERS                   "headers"
+#define EVENT_NODE     "event"
+#define TRANSPORT_NODE "transport"
+#define FORMAT_NODE    "format"
+#define TYPE_NODE      "type"
+#define MAXEPS_NODE    "maxeventpersec"
+#define ENHANCEFS_NODE "enhancefs"
+#define WATCH_NODE     "watch"
+#define TYPE_NODE      "type"
+#define NAME_NODE      "name"
+#define FIELD_NODE     "field"
+#define VALUE_NODE     "value"
+#define EX_HEADERS     "headers"
 
-#define PAYLOAD_NODE         "payload"
-#define ENABLE_NODE              "enable"
-#define DIR_NODE                 "dir"
+#define PAYLOAD_NODE "payload"
+#define ENABLE_NODE  "enable"
+#define DIR_NODE     "dir"
 
-#define CRIBL_NODE           "cribl"
-#define ENABLE_NODE              "enable"
-#define TRANSPORT_NODE           "transport"
-#define AUTHTOKEN_NODE           "authtoken"
+#define CRIBL_NODE     "cribl"
+#define ENABLE_NODE    "enable"
+#define TRANSPORT_NODE "transport"
+#define AUTHTOKEN_NODE "authtoken"
 
-#define TAGS_NODE            "tags"
+#define TAGS_NODE "tags"
 
-#define PROTOCOL_NODE        "protocol"
-#define NAME_NODE                "name"
-#define REGEX_NODE               "regex"
-#define BINARY_NODE              "binary"
-#define LEN_NODE                 "len"
-#define DETECT_NODE              "detect"
-#define PAYLOAD_NODE             "payload"
+#define PROTOCOL_NODE "protocol"
+#define NAME_NODE     "name"
+#define REGEX_NODE    "regex"
+#define BINARY_NODE   "binary"
+#define LEN_NODE      "len"
+#define DETECT_NODE   "detect"
+#define PAYLOAD_NODE  "payload"
 
-#define CUSTOM_NODE          "custom"
-#define FILTER_NODE              "filter"
-#define PROCNAME_NODE                "procname"
-#define ARG_NODE                     "arg"
-#define HOSTNAME_NODE                "hostname"
-#define USERNAME_NODE                "username"
-#define ENV_NODE                     "env"
-#define ANCESTOR_NODE                "ancestor"
-#define CONFIG_NODE              "config"
+#define CUSTOM_NODE   "custom"
+#define FILTER_NODE   "filter"
+#define PROCNAME_NODE "procname"
+#define ARG_NODE      "arg"
+#define HOSTNAME_NODE "hostname"
+#define USERNAME_NODE "username"
+#define ENV_NODE      "env"
+#define ANCESTOR_NODE "ancestor"
+#define CONFIG_NODE   "config"
 
-enum_map_t formatMap[] = {
-    {"statsd",                CFG_FMT_STATSD},
-    {"ndjson",                CFG_FMT_NDJSON},
-    {NULL,                    -1}
-};
+enum_map_t formatMap[] = {{"statsd", CFG_FMT_STATSD}, {"ndjson", CFG_FMT_NDJSON}, {NULL, -1}};
 
-enum_map_t transportTypeMap[] = {
-    {"udp",                   CFG_UDP},
-    {"tcp",                   CFG_TCP},
-    {"unix",                  CFG_UNIX},
-    {"file",                  CFG_FILE},
-    {"syslog",                CFG_SYSLOG},
-    {"shm",                   CFG_SHM},
-    {NULL,                   -1}
-};
+enum_map_t transportTypeMap[] = {{"udp", CFG_UDP}, {"tcp", CFG_TCP}, {"unix", CFG_UNIX}, {"file", CFG_FILE}, {"syslog", CFG_SYSLOG}, {"shm", CFG_SHM}, {NULL, -1}};
 
-enum_map_t logLevelMap[] = {
-    {"debug",                 CFG_LOG_DEBUG},
-    {"info",                  CFG_LOG_INFO},
-    {"warning",               CFG_LOG_WARN},
-    {"error",                 CFG_LOG_ERROR},
-    {"none",                  CFG_LOG_NONE},
-    {"trace",                 CFG_LOG_TRACE},
-    {NULL,                    -1}
-};
+enum_map_t logLevelMap[] = {{"debug", CFG_LOG_DEBUG}, {"info", CFG_LOG_INFO}, {"warning", CFG_LOG_WARN}, {"error", CFG_LOG_ERROR}, {"none", CFG_LOG_NONE}, {"trace", CFG_LOG_TRACE}, {NULL, -1}};
 
-enum_map_t bufferMap[] = {
-    {"line",                  CFG_BUFFER_LINE},
-    {"full",                  CFG_BUFFER_FULLY},
-    {NULL,                    -1}
-};
+enum_map_t bufferMap[] = {{"line", CFG_BUFFER_LINE}, {"full", CFG_BUFFER_FULLY}, {NULL, -1}};
 
-enum_map_t watchTypeMap[] = {
-    {"file",                  CFG_SRC_FILE},
-    {"console",               CFG_SRC_CONSOLE},
-    {"syslog",                CFG_SRC_SYSLOG},
-    {"metric",                CFG_SRC_METRIC},
-    {"http",                  CFG_SRC_HTTP},
-    {"net",                   CFG_SRC_NET},
-    {"fs",                    CFG_SRC_FS},
-    {"dns",                   CFG_SRC_DNS},
-    {NULL,                    -1}
-};
+enum_map_t watchTypeMap[] = {{"file", CFG_SRC_FILE},     {"console", CFG_SRC_CONSOLE}, {"syslog", CFG_SRC_SYSLOG},
+                             {"metric", CFG_SRC_METRIC}, {"http", CFG_SRC_HTTP},       {"net", CFG_SRC_NET},
+                             {"fs", CFG_SRC_FS},         {"dns", CFG_SRC_DNS},         {NULL, -1}};
 
-enum_map_t boolMap[] = {
-    {"true",                  TRUE},
-    {"false",                 FALSE},
-    {NULL,                    -1}
-};
+enum_map_t boolMap[] = {{"true", TRUE}, {"false", FALSE}, {NULL, -1}};
 
 // forward declarations
-void cfgMtcEnableSetFromStr(config_t*, const char*);
-void cfgMtcFormatSetFromStr(config_t*, const char*);
-void cfgMtcStatsDPrefixSetFromStr(config_t*, const char*);
-void cfgMtcStatsDMaxLenSetFromStr(config_t*, const char*);
-void cfgMtcPeriodSetFromStr(config_t*, const char*);
-void cfgCmdDirSetFromStr(config_t*, const char*);
-void cfgConfigEventSetFromStr(config_t*, const char*);
-void cfgEvtEnableSetFromStr(config_t*, const char*);
-void cfgEventFormatSetFromStr(config_t*, const char*);
-void cfgEvtRateLimitSetFromStr(config_t*, const char*);
-void cfgEnhanceFsSetFromStr(config_t*, const char*);
-void cfgEvtFormatValueFilterSetFromStr(config_t*, watch_t, const char*);
-void cfgEvtFormatFieldFilterSetFromStr(config_t*, watch_t, const char*);
-void cfgEvtFormatNameFilterSetFromStr(config_t*, watch_t, const char*);
-void cfgEvtFormatSourceEnabledSetFromStr(config_t*, watch_t, const char*);
-void cfgMtcVerbositySetFromStr(config_t*, const char*);
-void cfgTransportSetFromStr(config_t*, which_transport_t, const char*);
+void cfgMtcEnableSetFromStr(config_t *, const char *);
+void cfgMtcFormatSetFromStr(config_t *, const char *);
+void cfgMtcStatsDPrefixSetFromStr(config_t *, const char *);
+void cfgMtcStatsDMaxLenSetFromStr(config_t *, const char *);
+void cfgMtcPeriodSetFromStr(config_t *, const char *);
+void cfgCmdDirSetFromStr(config_t *, const char *);
+void cfgConfigEventSetFromStr(config_t *, const char *);
+void cfgEvtEnableSetFromStr(config_t *, const char *);
+void cfgEventFormatSetFromStr(config_t *, const char *);
+void cfgEvtRateLimitSetFromStr(config_t *, const char *);
+void cfgEnhanceFsSetFromStr(config_t *, const char *);
+void cfgEvtFormatValueFilterSetFromStr(config_t *, watch_t, const char *);
+void cfgEvtFormatFieldFilterSetFromStr(config_t *, watch_t, const char *);
+void cfgEvtFormatNameFilterSetFromStr(config_t *, watch_t, const char *);
+void cfgEvtFormatSourceEnabledSetFromStr(config_t *, watch_t, const char *);
+void cfgMtcVerbositySetFromStr(config_t *, const char *);
+void cfgTransportSetFromStr(config_t *, which_transport_t, const char *);
 void cfgTransportTlsEnableSetFromStr(config_t *, which_transport_t, const char *);
 void cfgTransportTlsValidateServerSetFromStr(config_t *, which_transport_t, const char *);
 void cfgTransportTlsCACertPathSetFromStr(config_t *, which_transport_t, const char *);
-void cfgCustomTagAddFromStr(config_t*, const char*, const char*);
-void cfgLogLevelSetFromStr(config_t*, const char*);
-void cfgPayEnableSetFromStr(config_t*, const char*);
-void cfgPayDirSetFromStr(config_t*, const char*);
-void cfgAuthTokenSetFromStr(config_t*, const char*);
+void cfgCustomTagAddFromStr(config_t *, const char *, const char *);
+void cfgLogLevelSetFromStr(config_t *, const char *);
+void cfgPayEnableSetFromStr(config_t *, const char *);
+void cfgPayDirSetFromStr(config_t *, const char *);
+void cfgAuthTokenSetFromStr(config_t *, const char *);
 void cfgEvtFormatHeaderSetFromStr(config_t *, const char *);
 static void cfgSetFromFile(config_t *, const char *);
 static void cfgCriblEnableSetFromStrEnv(config_t *, cfg_logstream_t, const char *);
@@ -180,7 +144,7 @@ static void processRoot(config_t *, yaml_document_t *, yaml_node_t *);
 static which_transport_t transport_context;
 static watch_t watch_context;
 static protocol_def_t *protocol_context = NULL;
-static regex_t* g_regex = NULL;
+static regex_t *g_regex = NULL;
 static char g_logmsg[1024] = {};
 
 // needed for custom filtering
@@ -191,7 +155,7 @@ static unsigned custom_matched = FALSE;
 static unsigned custom_match_count = 0;
 
 static char *
-cfgPathSearch(const char* cfgname)
+cfgPathSearch(const char *cfgname)
 {
     // in priority order:
     //   1) $SCOPE_HOME/conf/scope.yml
@@ -203,40 +167,30 @@ cfgPathSearch(const char* cfgname)
     //   7) ./scope.yml
 
     char path[1024]; // Somewhat arbitrary choice for MAX_PATH
-    if (!g_fn.access) return NULL;
+    if (!g_fn.access)
+        return NULL;
 
     const char *homedir = getenv("HOME");
     const char *scope_home = getenv("SCOPE_HOME");
-    if (scope_home &&
-       (snprintf(path, sizeof(path), "%s/conf/%s", scope_home, cfgname) > 0) &&
-        !g_fn.access(path, R_OK)) {
+    if (scope_home && (snprintf(path, sizeof(path), "%s/conf/%s", scope_home, cfgname) > 0) && !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
-    if (scope_home &&
-       (snprintf(path, sizeof(path), "%s/%s", scope_home, cfgname) > 0) &&
-        !g_fn.access(path, R_OK)) {
+    if (scope_home && (snprintf(path, sizeof(path), "%s/%s", scope_home, cfgname) > 0) && !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
-    if ((snprintf(path, sizeof(path), "/etc/scope/%s", cfgname) > 0 ) &&
-        !g_fn.access(path, R_OK)) {
+    if ((snprintf(path, sizeof(path), "/etc/scope/%s", cfgname) > 0) && !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
-    if (homedir &&
-       (snprintf(path, sizeof(path), "%s/conf/%s", homedir, cfgname) > 0) &&
-        !g_fn.access(path, R_OK)) {
+    if (homedir && (snprintf(path, sizeof(path), "%s/conf/%s", homedir, cfgname) > 0) && !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
-    if (homedir &&
-       (snprintf(path, sizeof(path), "%s/%s", homedir, cfgname) > 0) &&
-        !g_fn.access(path, R_OK)) {
+    if (homedir && (snprintf(path, sizeof(path), "%s/%s", homedir, cfgname) > 0) && !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
-    if ((snprintf(path, sizeof(path), "./conf/%s", cfgname) > 0) &&
-        !g_fn.access(path, R_OK)) {
+    if ((snprintf(path, sizeof(path), "./conf/%s", cfgname) > 0) && !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
-    if ((snprintf(path, sizeof(path), "./%s", cfgname) > 0) &&
-        !g_fn.access(path, R_OK)) {
+    if ((snprintf(path, sizeof(path), "./%s", cfgname) > 0) && !g_fn.access(path, R_OK)) {
         return realpath(path, NULL);
     }
 
@@ -246,7 +200,7 @@ cfgPathSearch(const char* cfgname)
 char *
 cfgPath(void)
 {
-    const char* envPath = getenv("SCOPE_CONF_PATH");
+    const char *envPath = getenv("SCOPE_CONF_PATH");
 
     // If SCOPE_CONF_PATH is set, and the file can be opened, use it.
     char *path;
@@ -267,26 +221,26 @@ cfgPath(void)
 }
 
 static void
-processCustomTag(config_t* cfg, const char* e, const char* value)
+processCustomTag(config_t *cfg, const char *e, const char *value)
 {
     char name_buf[1024];
     strncpy(name_buf, e, sizeof(name_buf));
 
-    char* name = name_buf + (sizeof("SCOPE_TAG_") - 1);
+    char *name = name_buf + (sizeof("SCOPE_TAG_") - 1);
 
     // convert the "=" to a null delimiter for the name
-    char* end = strchr(name, '=');
+    char *end = strchr(name, '=');
     if (end) {
         *end = '\0';
         cfgCustomTagAddFromStr(cfg, name, value);
     }
-
 }
 
-static regex_t*
+static regex_t *
 envRegex()
 {
-    if (g_regex) return g_regex;
+    if (g_regex)
+        return g_regex;
 
     if (!(g_regex = calloc(1, sizeof(regex_t)))) {
         DBG(NULL);
@@ -305,37 +259,39 @@ envRegex()
 // For testing.  Never executed in the real deal.
 // Exists to make valgrind more readable when analyzing tests.
 void
-envRegexFree(void** state)
+envRegexFree(void **state)
 {
-    if (!g_regex) return;
+    if (!g_regex)
+        return;
     regfree(g_regex);
     free(g_regex);
 }
 
-static char*
-doEnvVariableSubstitution(const char* value)
+static char *
+doEnvVariableSubstitution(const char *value)
 {
-    if (!value) return NULL;
+    if (!value)
+        return NULL;
 
-    regex_t* re = envRegex();
+    regex_t *re = envRegex();
     regmatch_t match = {0};
 
     int out_size = strlen(value) + 1;
-    char* outval = calloc(1, out_size);
+    char *outval = calloc(1, out_size);
     if (!outval) {
         DBG("%s", value);
         return NULL;
     }
 
-    char* outptr = outval;       // "tail" pointer where text can be appended
-    char* inptr = (char*) value; // "current" pointer as we scan through value
+    char *outptr = outval;       // "tail" pointer where text can be appended
+    char *inptr = (char *)value; // "current" pointer as we scan through value
 
     while (re && !regexec_wrapper(re, inptr, 1, &match, 0)) {
 
         int match_size = match.rm_eo - match.rm_so;
 
         // if the character before the match is '\', don't do substitution
-        char* escape_indicator = &inptr[match.rm_so - 1];
+        char *escape_indicator = &inptr[match.rm_so - 1];
         int escaped = (escape_indicator >= value) && (*escape_indicator == '\\');
 
         if (escaped) {
@@ -352,12 +308,12 @@ doEnvVariableSubstitution(const char* value)
         char env_name[match_size + 1];
         strncpy(env_name, &inptr[match.rm_so], match_size);
         env_name[match_size] = '\0';
-        char* env_value = getenv(&env_name[1]); // offset of 1 skips the $
+        char *env_value = getenv(&env_name[1]); // offset of 1 skips the $
 
         // Grow outval buffer any time env_value is bigger than env_name
         int size_growth = (!env_value) ? 0 : strlen(env_value) - match_size;
         if (size_growth > 0) {
-            char* new_outval = realloc (outval, out_size + size_growth);
+            char *new_outval = realloc(outval, out_size + size_growth);
             if (new_outval) {
                 out_size += size_growth;
                 outptr = new_outval + (outptr - outval);
@@ -384,27 +340,30 @@ doEnvVariableSubstitution(const char* value)
 }
 
 static void
-processCmdDebug(const char* path)
+processCmdDebug(const char *path)
 {
-    if (!path || !path[0] ||
-        !g_fn.fopen || !g_fn.fclose) return;
+    if (!path || !path[0] || !g_fn.fopen || !g_fn.fclose)
+        return;
 
-    FILE* f;
-    if (!(f = g_fn.fopen(path, "a"))) return;
+    FILE *f;
+    if (!(f = g_fn.fopen(path, "a")))
+        return;
     dbgDumpAll(f);
     g_fn.fclose(f);
 }
 
 static void
-processReloadConfig(config_t *cfg, const char* value)
+processReloadConfig(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     unsigned int enable = strToVal(boolMap, value);
 
     if (enable == TRUE) {
         char *path = cfgPath();
         cfgSetFromFile(cfg, path);
-        if (path) free(path);
+        if (path)
+            free(path);
     } else {
         cfgSetFromFile(cfg, value);
     }
@@ -426,16 +385,20 @@ static void
 processEnvStyleInput(config_t *cfg, const char *env_line)
 {
 
-    if (!cfg || !env_line) return;
+    if (!cfg || !env_line)
+        return;
 
     char *env_name = NULL;
     char *value = NULL;
     char *env_ptr;
     env_name = strdup(env_line);
-    if (!env_name) goto cleanup;
-    if (!(env_ptr = strchr(env_name, '='))) goto cleanup;
+    if (!env_name)
+        goto cleanup;
+    if (!(env_ptr = strchr(env_name, '=')))
+        goto cleanup;
     *env_ptr = '\0'; // Delimiting env_name
-    if (!(value = doEnvVariableSubstitution(&env_ptr[1]))) goto cleanup;
+    if (!(value = doEnvVariableSubstitution(&env_ptr[1])))
+        goto cleanup;
 
     if (!strcmp(env_name, "SCOPE_METRIC_ENABLE")) {
         cfgMtcEnableSetFromStr(cfg, value);
@@ -578,28 +541,33 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
     }
 
 cleanup:
-    if (value) free(value);
-    if (env_name) free(env_name);
+    if (value)
+        free(value);
+    if (env_name)
+        free(env_name);
 }
 
-
-extern char** environ;
+extern char **environ;
 
 void
-cfgProcessEnvironment(config_t* cfg)
+cfgProcessEnvironment(config_t *cfg)
 {
-    if (!cfg) return;
-    char* e = NULL;
+    if (!cfg)
+        return;
+    char *e = NULL;
     int i = 0;
     while ((e = environ[i++])) {
-        // Everything we care about starts with a capital 'S'.  Skip 
+        // Everything we care about starts with a capital 'S'.  Skip
         // everything else for performance.
-        if (e[0] != 'S') continue;
+        if (e[0] != 'S')
+            continue;
 
         // Some things should only be processed as commands, not as
         // environment variables.  Skip them here.
-        if (startsWith(e, "SCOPE_CMD_DBG_PATH")) continue;
-        if (startsWith(e, "SCOPE_CONF_RELOAD")) continue;
+        if (startsWith(e, "SCOPE_CMD_DBG_PATH"))
+            continue;
+        if (startsWith(e, "SCOPE_CONF_RELOAD"))
+            continue;
 
         // Process everything else.
         processEnvStyleInput(cfg, e);
@@ -607,38 +575,42 @@ cfgProcessEnvironment(config_t* cfg)
 }
 
 void
-cfgProcessCommands(config_t* cfg, FILE* file)
+cfgProcessCommands(config_t *cfg, FILE *file)
 {
-    if (!cfg || !file || !g_fn.getline) return;
+    if (!cfg || !file || !g_fn.getline)
+        return;
 
     char *line = NULL;
     size_t len = 0;
 
     while (g_fn.getline(&line, &len, file) != -1) {
-        line[strcspn(line, "\r\n")] = '\0'; //overwrite first \r or \n with null
+        line[strcspn(line, "\r\n")] = '\0'; // overwrite first \r or \n with null
         processEnvStyleInput(cfg, line);
         line[0] = '\0';
     }
 
-    if (line) free(line);
+    if (line)
+        free(line);
 }
 
 void
-cfgMtcEnableSetFromStr(config_t* cfg, const char* value)
+cfgMtcEnableSetFromStr(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgMtcEnableSet(cfg, strToVal(boolMap, value));
 }
 
 void
-cfgMtcFormatSetFromStr(config_t* cfg, const char* value)
+cfgMtcFormatSetFromStr(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgMtcFormatSet(cfg, strToVal(formatMap, value));
 }
 
 void
-cfgMtcStatsDPrefixSetFromStr(config_t* cfg, const char* value)
+cfgMtcStatsDPrefixSetFromStr(config_t *cfg, const char *value)
 {
     // A little silly to define passthrough function
     // but this keeps the interface consistent.
@@ -646,121 +618,139 @@ cfgMtcStatsDPrefixSetFromStr(config_t* cfg, const char* value)
 }
 
 void
-cfgMtcStatsDMaxLenSetFromStr(config_t* cfg, const char* value)
+cfgMtcStatsDMaxLenSetFromStr(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     errno = 0;
-    char* endptr = NULL;
+    char *endptr = NULL;
     unsigned long x = strtoul(value, &endptr, 10);
-    if (errno || *endptr) return;
+    if (errno || *endptr)
+        return;
 
     cfgMtcStatsDMaxLenSet(cfg, x);
 }
 
 void
-cfgMtcPeriodSetFromStr(config_t* cfg, const char* value)
+cfgMtcPeriodSetFromStr(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     errno = 0;
-    char* endptr = NULL;
+    char *endptr = NULL;
     unsigned long x = strtoul(value, &endptr, 10);
-    if (errno || *endptr) return;
+    if (errno || *endptr)
+        return;
 
     cfgMtcPeriodSet(cfg, x);
 }
 
 void
-cfgCmdDirSetFromStr(config_t* cfg, const char* value)
+cfgCmdDirSetFromStr(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgCmdDirSet(cfg, value);
 }
 
 void
-cfgConfigEventSetFromStr(config_t* cfg, const char* value)
+cfgConfigEventSetFromStr(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgSendProcessStartMsgSet(cfg, strToVal(boolMap, value));
 }
 
 void
-cfgEvtEnableSetFromStr(config_t* cfg, const char* value)
+cfgEvtEnableSetFromStr(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgEvtEnableSet(cfg, strToVal(boolMap, value));
 }
 
 void
-cfgEventFormatSetFromStr(config_t* cfg, const char* value)
+cfgEventFormatSetFromStr(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     // only ndjson is valid
     cfgEventFormatSet(cfg, CFG_FMT_NDJSON);
-    //cfgEventFormatSet(cfg, strToVal(formatMap, value));
+    // cfgEventFormatSet(cfg, strToVal(formatMap, value));
 }
 
 void
-cfgEvtRateLimitSetFromStr(config_t* cfg, const char* value)
+cfgEvtRateLimitSetFromStr(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     errno = 0;
-    char* endptr = NULL;
+    char *endptr = NULL;
     unsigned long x = strtoul(value, &endptr, 10);
-    if (errno || *endptr) return;
+    if (errno || *endptr)
+        return;
 
     cfgEvtRateLimitSet(cfg, x);
 }
 
 void
-cfgEnhanceFsSetFromStr(config_t* cfg, const char* value)
+cfgEnhanceFsSetFromStr(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgEnhanceFsSet(cfg, strToVal(boolMap, value));
 }
 
 void
-cfgEvtFormatValueFilterSetFromStr(config_t* cfg, watch_t src, const char* value)
+cfgEvtFormatValueFilterSetFromStr(config_t *cfg, watch_t src, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgEvtFormatValueFilterSet(cfg, src, value);
 }
 
 void
-cfgEvtFormatFieldFilterSetFromStr(config_t* cfg, watch_t src, const char* value)
+cfgEvtFormatFieldFilterSetFromStr(config_t *cfg, watch_t src, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgEvtFormatFieldFilterSet(cfg, src, value);
 }
 
 void
-cfgEvtFormatNameFilterSetFromStr(config_t* cfg, watch_t src, const char* value)
+cfgEvtFormatNameFilterSetFromStr(config_t *cfg, watch_t src, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgEvtFormatNameFilterSet(cfg, src, value);
 }
 
 void
 cfgEvtFormatHeaderSetFromStr(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgEvtFormatHeaderSet(cfg, value);
 }
 
 void
-cfgEvtFormatSourceEnabledSetFromStr(config_t* cfg, watch_t src, const char* value)
+cfgEvtFormatSourceEnabledSetFromStr(config_t *cfg, watch_t src, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgEvtFormatSourceEnabledSet(cfg, src, strToVal(boolMap, value));
 }
 
 void
-cfgMtcVerbositySetFromStr(config_t* cfg, const char* value)
+cfgMtcVerbositySetFromStr(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     errno = 0;
-    char* endptr = NULL;
+    char *endptr = NULL;
     unsigned long x = strtoul(value, &endptr, 10);
-    if (errno || *endptr) return;
+    if (errno || *endptr)
+        return;
 
     cfgMtcVerbositySet(cfg, x);
 }
@@ -768,7 +758,8 @@ cfgMtcVerbositySetFromStr(config_t* cfg, const char* value)
 void
 cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
 
     // see if value starts with udp:// or file://
     if (value == strstr(value, "udp://")) {
@@ -782,7 +773,8 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         // convert the ':' to a null delimiter for the host
         // and move port past the null
         char *port = strrchr(host, ':');
-        if (!port) return;  // port is *required*
+        if (!port)
+            return; // port is *required*
         *port = '\0';
         port++;
 
@@ -801,7 +793,8 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         // convert the ':' to a null delimiter for the host
         // and move port past the null
         char *port = strrchr(host, ':');
-        if (!port) return;  // port is *required*
+        if (!port)
+            return; // port is *required*
         *port = '\0';
         port++;
 
@@ -823,14 +816,16 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
 void
 cfgTransportTlsEnableSetFromStr(config_t *cfg, which_transport_t t, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgTransportTlsEnableSet(cfg, t, strToVal(boolMap, value));
 }
 
 void
 cfgTransportTlsValidateServerSetFromStr(config_t *cfg, which_transport_t t, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgTransportTlsValidateServerSet(cfg, t, strToVal(boolMap, value));
 }
 void
@@ -838,12 +833,13 @@ cfgTransportTlsCACertPathSetFromStr(config_t *cfg, which_transport_t t, const ch
 {
     // A little silly to define passthrough function
     // but this keeps the interface consistent.
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgTransportTlsCACertPathSet(cfg, t, value);
 }
 
 void
-cfgCustomTagAddFromStr(config_t* cfg, const char* name, const char* value)
+cfgCustomTagAddFromStr(config_t *cfg, const char *name, const char *value)
 {
     // A little silly to define passthrough function
     // but this keeps the interface consistent.
@@ -851,30 +847,34 @@ cfgCustomTagAddFromStr(config_t* cfg, const char* name, const char* value)
 }
 
 void
-cfgLogLevelSetFromStr(config_t* cfg, const char* value)
+cfgLogLevelSetFromStr(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgLogLevelSet(cfg, strToVal(logLevelMap, value));
 }
 
 void
-cfgPayEnableSetFromStr(config_t* cfg, const char* value)
+cfgPayEnableSetFromStr(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgPayEnableSet(cfg, strToVal(boolMap, value));
 }
 
 void
 cfgPayDirSetFromStr(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgPayDirSet(cfg, value);
 }
 
 void
 cfgCriblEnableSetFromStrYaml(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     // Sets CFG_LOGSTREAM_NONE (0) or CFG_LOGSTREAM (1)
     cfgLogStreamSet(cfg, strToVal(boolMap, value));
 }
@@ -882,7 +882,8 @@ cfgCriblEnableSetFromStrYaml(config_t *cfg, const char *value)
 static void
 cfgCriblEnableSetFromStrEnv(config_t *cfg, cfg_logstream_t type, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     // Sets CFG_LOGSTREAM (1) or CFG_LOGSTREAM_CLOUD (2)
     cfgLogStreamSet(cfg, type);
     // Sets type, host, and port
@@ -892,37 +893,39 @@ cfgCriblEnableSetFromStrEnv(config_t *cfg, cfg_logstream_t type, const char *val
 void
 cfgAuthTokenSetFromStr(config_t *cfg, const char *value)
 {
-    if (!cfg || !value) return;
+    if (!cfg || !value)
+        return;
     cfgAuthTokenSet(cfg, value);
 }
 
 #ifndef NO_YAML
 
-#define foreach(pair, pairs) \
-    for (pair = pairs.start; pair != pairs.top; pair++)
+#define foreach(pair, pairs) for (pair = pairs.start; pair != pairs.top; pair++)
 
-typedef void (*node_fn)(config_t*, yaml_document_t*, yaml_node_t*);
+typedef void (*node_fn)(config_t *, yaml_document_t *, yaml_node_t *);
 
-static char*
-stringVal(yaml_node_t* node)
+static char *
+stringVal(yaml_node_t *node)
 {
-    if (!node || (node->type != YAML_SCALAR_NODE)) return NULL;
-    const char* nodeStr = (const char*) node->data.scalar.value;
+    if (!node || (node->type != YAML_SCALAR_NODE))
+        return NULL;
+    const char *nodeStr = (const char *)node->data.scalar.value;
     return doEnvVariableSubstitution(nodeStr);
 }
 
 typedef struct {
     yaml_node_type_t type;
-    char* key;
+    char *key;
     node_fn fn;
 } parse_table_t;
 
 static void
-processKeyValuePair(parse_table_t* t, yaml_node_pair_t* pair, config_t* config, yaml_document_t* doc)
+processKeyValuePair(parse_table_t *t, yaml_node_pair_t *pair, config_t *config, yaml_document_t *doc)
 {
-    yaml_node_t* key = yaml_document_get_node(doc, pair->key);
-    yaml_node_t* value = yaml_document_get_node(doc, pair->value);
-    if (key->type != YAML_SCALAR_NODE) return;
+    yaml_node_t *key = yaml_document_get_node(doc, pair->key);
+    yaml_node_t *value = yaml_document_get_node(doc, pair->value);
+    if (key->type != YAML_SCALAR_NODE)
+        return;
 
     // printf("key = %s, value = %s\n", key->data.scalar.value,
     //     (value->type == YAML_SCALAR_NODE) ? value->data.scalar.value : "X");
@@ -930,9 +933,8 @@ processKeyValuePair(parse_table_t* t, yaml_node_pair_t* pair, config_t* config, 
     // Scan through the parse_table_t for a matching type and key
     // If found, call the function that handles that.
     int i;
-    for (i=0; t[i].type != YAML_NO_NODE; i++) {
-        if ((value->type == t[i].type) &&
-            (!strcmp((char*)key->data.scalar.value, t[i].key))) {
+    for (i = 0; t[i].type != YAML_NO_NODE; i++) {
+        if ((value->type == t[i].type) && (!strcmp((char *)key->data.scalar.value, t[i].key))) {
             t[i].fn(config, doc, value);
             break;
         }
@@ -940,491 +942,507 @@ processKeyValuePair(parse_table_t* t, yaml_node_pair_t* pair, config_t* config, 
 }
 
 static void
-processLevel(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processLevel(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgLogLevelSetFromStr(config, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processTransportType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processTransportType(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     which_transport_t c = transport_context;
     cfgTransportTypeSet(config, c, strToVal(transportTypeMap, value));
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processHost(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processHost(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     which_transport_t c = transport_context;
     cfgTransportHostSet(config, c, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processPort(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processPort(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     which_transport_t c = transport_context;
     cfgTransportPortSet(config, c, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processPath(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processPath(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     which_transport_t c = transport_context;
     cfgTransportPathSet(config, c, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processBuf(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processBuf(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     which_transport_t c = transport_context;
     cfgTransportBufSet(config, c, strToVal(bufferMap, value));
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
 processTlsEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     which_transport_t c = transport_context;
     cfgTransportTlsEnableSetFromStr(config, c, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
 processTlsValidate(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     which_transport_t c = transport_context;
     cfgTransportTlsValidateServerSetFromStr(config, c, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
 processTlsCaCert(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     which_transport_t c = transport_context;
     cfgTransportTlsCACertPathSetFromStr(config, c, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processTls(config_t *config, yaml_document_t* doc, yaml_node_t* node)
+processTls(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_MAPPING_NODE) return;
+    if (node->type != YAML_MAPPING_NODE)
+        return;
 
     parse_table_t t[] = {
-        {YAML_SCALAR_NODE,    ENABLE_NODE,          processTlsEnable},
-        {YAML_SCALAR_NODE,    VALIDATE_NODE,        processTlsValidate},
-        {YAML_SCALAR_NODE,    CACERT_NODE,          processTlsCaCert},
-        {YAML_NO_NODE,        NULL,                 NULL}
-    };
+        {YAML_SCALAR_NODE, ENABLE_NODE, processTlsEnable}, {YAML_SCALAR_NODE, VALIDATE_NODE, processTlsValidate}, {YAML_SCALAR_NODE, CACERT_NODE, processTlsCaCert}, {YAML_NO_NODE, NULL, NULL}};
 
     yaml_node_pair_t *pair;
-    foreach(pair, node->data.mapping.pairs) {
+    foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
     }
 }
 
 static void
-processTransport(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processTransport(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_MAPPING_NODE) return;
+    if (node->type != YAML_MAPPING_NODE)
+        return;
 
-    parse_table_t t[] = {
-        {YAML_SCALAR_NODE,    TYPE_NODE,            processTransportType},
-        {YAML_SCALAR_NODE,    HOST_NODE,            processHost},
-        {YAML_SCALAR_NODE,    PORT_NODE,            processPort},
-        {YAML_SCALAR_NODE,    PATH_NODE,            processPath},
-        {YAML_SCALAR_NODE,    BUFFERING_NODE,       processBuf},
-        {YAML_MAPPING_NODE,   TLS_NODE,             processTls},
-        {YAML_NO_NODE,        NULL,                 NULL}
-    };
+    parse_table_t t[] = {{YAML_SCALAR_NODE, TYPE_NODE, processTransportType},
+                         {YAML_SCALAR_NODE, HOST_NODE, processHost},
+                         {YAML_SCALAR_NODE, PORT_NODE, processPort},
+                         {YAML_SCALAR_NODE, PATH_NODE, processPath},
+                         {YAML_SCALAR_NODE, BUFFERING_NODE, processBuf},
+                         {YAML_MAPPING_NODE, TLS_NODE, processTls},
+                         {YAML_NO_NODE, NULL, NULL}};
 
-    yaml_node_pair_t* pair;
-    foreach(pair, node->data.mapping.pairs) {
+    yaml_node_pair_t *pair;
+    foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
     }
 }
 
 static void
-processTransportMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processTransportMetric(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     transport_context = CFG_MTC;
     processTransport(config, doc, node);
 }
 
 static void
-processTransportLog(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processTransportLog(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     transport_context = CFG_LOG;
     processTransport(config, doc, node);
 }
 
 static void
-processTransportCtl(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processTransportCtl(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     transport_context = CFG_CTL;
     processTransport(config, doc, node);
 }
 
 static void
-processLogging(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processLogging(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_MAPPING_NODE) return;
+    if (node->type != YAML_MAPPING_NODE)
+        return;
 
-    parse_table_t t[] = {
-        {YAML_SCALAR_NODE,    LEVEL_NODE,           processLevel},
-        {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportLog},
-        {YAML_NO_NODE,        NULL,                 NULL}
-    };
+    parse_table_t t[] = {{YAML_SCALAR_NODE, LEVEL_NODE, processLevel}, {YAML_MAPPING_NODE, TRANSPORT_NODE, processTransportLog}, {YAML_NO_NODE, NULL, NULL}};
 
-    yaml_node_pair_t* pair;
-    foreach(pair, node->data.mapping.pairs) {
+    yaml_node_pair_t *pair;
+    foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
     }
 }
 
 static void
-processTags(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processTags(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_MAPPING_NODE) return;
+    if (node->type != YAML_MAPPING_NODE)
+        return;
 
-    yaml_node_pair_t* pair;
-    foreach(pair, node->data.mapping.pairs) {
-        yaml_node_t* key = yaml_document_get_node(doc, pair->key);
-        yaml_node_t* value = yaml_document_get_node(doc, pair->value);
-        if (key->type != YAML_SCALAR_NODE) continue;
-        if (value->type != YAML_SCALAR_NODE) continue;
+    yaml_node_pair_t *pair;
+    foreach (pair, node->data.mapping.pairs) {
+        yaml_node_t *key = yaml_document_get_node(doc, pair->key);
+        yaml_node_t *value = yaml_document_get_node(doc, pair->value);
+        if (key->type != YAML_SCALAR_NODE)
+            continue;
+        if (value->type != YAML_SCALAR_NODE)
+            continue;
 
-        char* key_str = stringVal(key);
-        char* value_str = stringVal(value);
+        char *key_str = stringVal(key);
+        char *value_str = stringVal(value);
 
         cfgCustomTagAddFromStr(config, key_str, value_str);
-        if (key_str) free(key_str);
-        if (value_str) free(value_str);
+        if (key_str)
+            free(key_str);
+        if (value_str)
+            free(value_str);
     }
 }
 
 static void
-processFormatTypeMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processFormatTypeMetric(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgMtcFormatSetFromStr(config, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processFormatTypeEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processFormatTypeEvent(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgEventFormatSetFromStr(config, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processFormatMaxEps(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processFormatMaxEps(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgEvtRateLimitSetFromStr(config, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processEnhanceFs(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processEnhanceFs(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgEnhanceFsSetFromStr(config, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processStatsDPrefix(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processStatsDPrefix(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgMtcStatsDPrefixSetFromStr(config, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processStatsDMaxLen(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processStatsDMaxLen(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgMtcStatsDMaxLenSetFromStr(config, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processVerbosity(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processVerbosity(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgMtcVerbositySetFromStr(config, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processMetricEnable(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processMetricEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgMtcEnableSetFromStr(config, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processFormat(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_MAPPING_NODE) return;
+    if (node->type != YAML_MAPPING_NODE)
+        return;
 
-    parse_table_t t[] = {
-        {YAML_SCALAR_NODE,    TYPE_NODE,            processFormatTypeMetric},
-        {YAML_SCALAR_NODE,    STATSDPREFIX_NODE,    processStatsDPrefix},
-        {YAML_SCALAR_NODE,    STATSDMAXLEN_NODE,    processStatsDMaxLen},
-        {YAML_SCALAR_NODE,    VERBOSITY_NODE,       processVerbosity},
-        {YAML_NO_NODE,        NULL,                 NULL}
-    };
+    parse_table_t t[] = {{YAML_SCALAR_NODE, TYPE_NODE, processFormatTypeMetric},
+                         {YAML_SCALAR_NODE, STATSDPREFIX_NODE, processStatsDPrefix},
+                         {YAML_SCALAR_NODE, STATSDMAXLEN_NODE, processStatsDMaxLen},
+                         {YAML_SCALAR_NODE, VERBOSITY_NODE, processVerbosity},
+                         {YAML_NO_NODE, NULL, NULL}};
 
-    yaml_node_pair_t* pair;
-    foreach(pair, node->data.mapping.pairs) {
+    yaml_node_pair_t *pair;
+    foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
     }
 }
 
 static void
-processSummaryPeriod(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processSummaryPeriod(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgMtcPeriodSetFromStr(config, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processCommandDir(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processCommandDir(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgCmdDirSetFromStr(config, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processConfigEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processConfigEvent(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgConfigEventSetFromStr(config, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processMetric(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_MAPPING_NODE) return;
+    if (node->type != YAML_MAPPING_NODE)
+        return;
 
     parse_table_t t[] = {
-        {YAML_SCALAR_NODE,    ENABLE_NODE,          processMetricEnable},
-        {YAML_MAPPING_NODE,   FORMAT_NODE,          processFormat},
-        {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportMetric},
-        {YAML_NO_NODE,        NULL,                 NULL}
-    };
+        {YAML_SCALAR_NODE, ENABLE_NODE, processMetricEnable}, {YAML_MAPPING_NODE, FORMAT_NODE, processFormat}, {YAML_MAPPING_NODE, TRANSPORT_NODE, processTransportMetric}, {YAML_NO_NODE, NULL, NULL}};
 
-    yaml_node_pair_t* pair;
-    foreach(pair, node->data.mapping.pairs) {
+    yaml_node_pair_t *pair;
+    foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
     }
 }
 
 static void
-processEvtEnable(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processEvtEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgEvtEnableSetFromStr(config, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processEvtFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processEvtFormat(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_MAPPING_NODE) return;
+    if (node->type != YAML_MAPPING_NODE)
+        return;
 
     parse_table_t t[] = {
-        {YAML_SCALAR_NODE,    TYPE_NODE,            processFormatTypeEvent},
-        {YAML_SCALAR_NODE,    MAXEPS_NODE,          processFormatMaxEps},
-        {YAML_SCALAR_NODE,    ENHANCEFS_NODE,       processEnhanceFs},
-        {YAML_NO_NODE,        NULL,                 NULL}
-    };
+        {YAML_SCALAR_NODE, TYPE_NODE, processFormatTypeEvent}, {YAML_SCALAR_NODE, MAXEPS_NODE, processFormatMaxEps}, {YAML_SCALAR_NODE, ENHANCEFS_NODE, processEnhanceFs}, {YAML_NO_NODE, NULL, NULL}};
 
-    yaml_node_pair_t* pair;
-    foreach(pair, node->data.mapping.pairs) {
+    yaml_node_pair_t *pair;
+    foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
     }
 }
 
 static void
-processWatchType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processWatchType(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_SCALAR_NODE) return;
+    if (node->type != YAML_SCALAR_NODE)
+        return;
 
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     watch_context = strToVal(watchTypeMap, value);
     cfgEvtFormatSourceEnabledSet(config, watch_context, 1);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processWatchName(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processWatchName(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_SCALAR_NODE) return;
+    if (node->type != YAML_SCALAR_NODE)
+        return;
 
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgEvtFormatNameFilterSetFromStr(config, watch_context, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processWatchField(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processWatchField(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_SCALAR_NODE) return;
+    if (node->type != YAML_SCALAR_NODE)
+        return;
 
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgEvtFormatFieldFilterSetFromStr(config, watch_context, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
-processWatchValue(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processWatchValue(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_SCALAR_NODE) return;
+    if (node->type != YAML_SCALAR_NODE)
+        return;
 
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgEvtFormatValueFilterSetFromStr(config, watch_context, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
 processWatchHeader(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_SEQUENCE_NODE) return;
+    if (node->type != YAML_SEQUENCE_NODE)
+        return;
 
     // watch header is only valid for http
-    if (watch_context != CFG_SRC_HTTP) return;
+    if (watch_context != CFG_SRC_HTTP)
+        return;
 
     yaml_node_item_t *item;
 
-    foreach(item, node->data.sequence.items) {
+    foreach (item, node->data.sequence.items) {
         yaml_node_t *node = yaml_document_get_node(doc, *item);
         char *value = stringVal(node);
         cfgEvtFormatHeaderSet(config, value);
-        if (value) free(value);
+        if (value)
+            free(value);
     }
 }
 
 static int
-isWatchType(yaml_document_t* doc, yaml_node_pair_t* pair)
+isWatchType(yaml_document_t *doc, yaml_node_pair_t *pair)
 {
-    yaml_node_t* key = yaml_document_get_node(doc, pair->key);
-    if (!key || (key->type != YAML_SCALAR_NODE)) return 0;
-    return !strcmp((char*)key->data.scalar.value, TYPE_NODE);
+    yaml_node_t *key = yaml_document_get_node(doc, pair->key);
+    if (!key || (key->type != YAML_SCALAR_NODE))
+        return 0;
+    return !strcmp((char *)key->data.scalar.value, TYPE_NODE);
 }
 
 static void
-processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processSource(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_MAPPING_NODE) return;
+    if (node->type != YAML_MAPPING_NODE)
+        return;
 
-    parse_table_t t[] = {
-        {YAML_SCALAR_NODE,    TYPE_NODE,            processWatchType},
-        {YAML_SCALAR_NODE,    NAME_NODE,            processWatchName},
-        {YAML_SCALAR_NODE,    FIELD_NODE,           processWatchField},
-        {YAML_SCALAR_NODE,    VALUE_NODE,           processWatchValue},
-        {YAML_SEQUENCE_NODE,  EX_HEADERS,           processWatchHeader},
-        {YAML_NO_NODE,        NULL,                 NULL}
-    };
+    parse_table_t t[] = {{YAML_SCALAR_NODE, TYPE_NODE, processWatchType},   {YAML_SCALAR_NODE, NAME_NODE, processWatchName},      {YAML_SCALAR_NODE, FIELD_NODE, processWatchField},
+                         {YAML_SCALAR_NODE, VALUE_NODE, processWatchValue}, {YAML_SEQUENCE_NODE, EX_HEADERS, processWatchHeader}, {YAML_NO_NODE, NULL, NULL}};
 
     watch_context = CFG_SRC_MAX;
 
-    yaml_node_pair_t* pair;
+    yaml_node_pair_t *pair;
     // process type first
-    foreach(pair, node->data.mapping.pairs) {
-        if (!isWatchType(doc, pair)) continue;
+    foreach (pair, node->data.mapping.pairs) {
+        if (!isWatchType(doc, pair))
+            continue;
         processKeyValuePair(t, pair, config, doc);
         break;
     }
     // Then process everything else
-    foreach(pair, node->data.mapping.pairs) {
-        if (isWatchType(doc, pair)) continue;
+    foreach (pair, node->data.mapping.pairs) {
+        if (isWatchType(doc, pair))
+            continue;
         processKeyValuePair(t, pair, config, doc);
     }
-
 }
 
 static void
-processWatch(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processWatch(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     // Type can be scalar or sequence.
     // It will be scalar there are zero entries, in which case we
     // clear all values and return.
-    if ((node->type != YAML_SEQUENCE_NODE) &&
-       (node->type != YAML_SCALAR_NODE)) return;
+    if ((node->type != YAML_SEQUENCE_NODE) && (node->type != YAML_SCALAR_NODE))
+        return;
 
     // absence of one of these values means to clear it.
     // clear them all, then set values for whatever we find.
     watch_t x;
-    for (x = CFG_SRC_FILE; x<CFG_SRC_MAX; x++) {
+    for (x = CFG_SRC_FILE; x < CFG_SRC_MAX; x++) {
         cfgEvtFormatSourceEnabledSet(config, x, 0);
     }
 
-    if (node->type != YAML_SEQUENCE_NODE) return;
-    yaml_node_item_t* item;
-    foreach(item, node->data.sequence.items) {
-        yaml_node_t* i = yaml_document_get_node(doc, *item);
+    if (node->type != YAML_SEQUENCE_NODE)
+        return;
+    yaml_node_item_t *item;
+    foreach (item, node->data.sequence.items) {
+        yaml_node_t *i = yaml_document_get_node(doc, *item);
         processSource(config, doc, i);
     }
 }
 
 static void
-processEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processEvent(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_MAPPING_NODE) return;
+    if (node->type != YAML_MAPPING_NODE)
+        return;
 
-    parse_table_t t[] = {
-        {YAML_SCALAR_NODE,    ENABLE_NODE,          processEvtEnable},
-        {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportCtl},
-        {YAML_MAPPING_NODE,   FORMAT_NODE,          processEvtFormat},
-        {YAML_SEQUENCE_NODE,  WATCH_NODE,           processWatch},
-        {YAML_SCALAR_NODE,    WATCH_NODE,           processWatch},
-        {YAML_NO_NODE,        NULL,                 NULL}
-    };
+    parse_table_t t[] = {{YAML_SCALAR_NODE, ENABLE_NODE, processEvtEnable},  {YAML_MAPPING_NODE, TRANSPORT_NODE, processTransportCtl},
+                         {YAML_MAPPING_NODE, FORMAT_NODE, processEvtFormat}, {YAML_SEQUENCE_NODE, WATCH_NODE, processWatch},
+                         {YAML_SCALAR_NODE, WATCH_NODE, processWatch},       {YAML_NO_NODE, NULL, NULL}};
 
-    yaml_node_pair_t* pair;
-    foreach(pair, node->data.mapping.pairs) {
+    yaml_node_pair_t *pair;
+    foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
     }
 }
 
 static void
-processLibscope(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processLibscope(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_MAPPING_NODE) return;
+    if (node->type != YAML_MAPPING_NODE)
+        return;
 
-    parse_table_t t[] = {
-        {YAML_MAPPING_NODE,   LOG_NODE,             processLogging},
-        {YAML_SCALAR_NODE,    SUMMARYPERIOD_NODE,   processSummaryPeriod},
-        {YAML_SCALAR_NODE,    COMMANDDIR_NODE,      processCommandDir},
-        {YAML_SCALAR_NODE,    CFGEVENT_NODE,        processConfigEvent},
-        {YAML_NO_NODE,        NULL,                 NULL}
-    };
+    parse_table_t t[] = {{YAML_MAPPING_NODE, LOG_NODE, processLogging},
+                         {YAML_SCALAR_NODE, SUMMARYPERIOD_NODE, processSummaryPeriod},
+                         {YAML_SCALAR_NODE, COMMANDDIR_NODE, processCommandDir},
+                         {YAML_SCALAR_NODE, CFGEVENT_NODE, processConfigEvent},
+                         {YAML_NO_NODE, NULL, NULL}};
 
-    yaml_node_pair_t* pair;
-    foreach(pair, node->data.mapping.pairs) {
+    yaml_node_pair_t *pair;
+    foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
     }
 }
@@ -1432,32 +1450,31 @@ processLibscope(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 static void
 processPayloadEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgPayEnableSetFromStr(config, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
 processPayloadDir(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgPayDirSetFromStr(config, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
 processPayload(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_MAPPING_NODE) return;
+    if (node->type != YAML_MAPPING_NODE)
+        return;
 
-    parse_table_t t[] = {
-        {YAML_SCALAR_NODE,    ENABLE_NODE,          processPayloadEnable},
-        {YAML_SCALAR_NODE,    DIR_NODE,             processPayloadDir},
-        {YAML_NO_NODE,        NULL,                 NULL}
-    };
+    parse_table_t t[] = {{YAML_SCALAR_NODE, ENABLE_NODE, processPayloadEnable}, {YAML_SCALAR_NODE, DIR_NODE, processPayloadDir}, {YAML_NO_NODE, NULL, NULL}};
 
-    yaml_node_pair_t* pair;
-    foreach(pair, node->data.mapping.pairs) {
+    yaml_node_pair_t *pair;
+    foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
     }
 }
@@ -1467,7 +1484,8 @@ processCriblEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     char *value = stringVal(node);
     cfgCriblEnableSetFromStrYaml(config, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
@@ -1480,89 +1498,105 @@ processCriblTransport(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 static void
 processAuthToken(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    char* value = stringVal(node);
+    char *value = stringVal(node);
     cfgAuthTokenSetFromStr(config, value);
-    if (value) free(value);
+    if (value)
+        free(value);
 }
 
 static void
 processCribl(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_MAPPING_NODE) return;
+    if (node->type != YAML_MAPPING_NODE)
+        return;
 
-    parse_table_t t[] = {
-        {YAML_SCALAR_NODE,    ENABLE_NODE,          processCriblEnable},
-        {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processCriblTransport},
-        {YAML_SCALAR_NODE,    AUTHTOKEN_NODE,       processAuthToken},
-        {YAML_NO_NODE,        NULL,                 NULL}
-    };
+    parse_table_t t[] = {{YAML_SCALAR_NODE, ENABLE_NODE, processCriblEnable},
+                         {YAML_MAPPING_NODE, TRANSPORT_NODE, processCriblTransport},
+                         {YAML_SCALAR_NODE, AUTHTOKEN_NODE, processAuthToken},
+                         {YAML_NO_NODE, NULL, NULL}};
 
     yaml_node_pair_t *pair;
-    foreach(pair, node->data.mapping.pairs) {
+    foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
     }
 }
 
 static void
-processProtocolName(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processProtocolName(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
-    if (protocol_context->protname) free(protocol_context->protname);
+    if (node->type != YAML_SCALAR_NODE || !protocol_context)
+        return;
+    if (protocol_context->protname)
+        free(protocol_context->protname);
     protocol_context->protname = stringVal(node);
 }
 
 static void
-processProtocolRegex(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processProtocolRegex(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
-    if (protocol_context->regex) free(protocol_context->regex);
+    if (node->type != YAML_SCALAR_NODE || !protocol_context)
+        return;
+    if (protocol_context->regex)
+        free(protocol_context->regex);
     protocol_context->regex = stringVal(node);
 }
 
 static void
-processProtocolBinary(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processProtocolBinary(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
-    char* sVal = stringVal(node);
+    if (node->type != YAML_SCALAR_NODE || !protocol_context)
+        return;
+    char *sVal = stringVal(node);
     unsigned iVal = strToVal(boolMap, sVal);
-    if (iVal <= 1) protocol_context->binary = iVal;
-    if (sVal) free(sVal);
+    if (iVal <= 1)
+        protocol_context->binary = iVal;
+    if (sVal)
+        free(sVal);
 }
 
 static void
-processProtocolLen(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processProtocolLen(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
+    if (node->type != YAML_SCALAR_NODE || !protocol_context)
+        return;
     char *sVal = stringVal(node);
     char *endInt = NULL;
     errno = 0;
     unsigned long iVal = strtoul(sVal, &endInt, 10);
-    if (!errno && !*endInt) protocol_context->len = iVal;
-    if (sVal) free(sVal);
+    if (!errno && !*endInt)
+        protocol_context->len = iVal;
+    if (sVal)
+        free(sVal);
 }
 
 static void
-processProtocolDetect(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processProtocolDetect(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
-    char* sVal = stringVal(node);
+    if (node->type != YAML_SCALAR_NODE || !protocol_context)
+        return;
+    char *sVal = stringVal(node);
     unsigned iVal = strToVal(boolMap, sVal);
-    if (iVal <= 1) protocol_context->detect = iVal;
-    if (sVal) free(sVal);
+    if (iVal <= 1)
+        protocol_context->detect = iVal;
+    if (sVal)
+        free(sVal);
 }
 
 static void
-processProtocolPayload(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processProtocolPayload(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
-    char* sVal = stringVal(node);
+    if (node->type != YAML_SCALAR_NODE || !protocol_context)
+        return;
+    char *sVal = stringVal(node);
     unsigned iVal = strToVal(boolMap, sVal);
-    if (iVal <= 1) protocol_context->payload = iVal;
-    if (sVal) free(sVal);
+    if (iVal <= 1)
+        protocol_context->payload = iVal;
+    if (sVal)
+        free(sVal);
 }
 
 static void
-processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processProtocolEntry(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     // protocol entries must be key/value maps
     if (node->type != YAML_MAPPING_NODE) {
@@ -1585,17 +1619,15 @@ processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     protocol_context->detect = TRUE; // non-zero default
 
     // process the entry
-    parse_table_t t[] = {
-        {YAML_SCALAR_NODE, NAME_NODE,    processProtocolName},
-        {YAML_SCALAR_NODE, REGEX_NODE,   processProtocolRegex},
-        {YAML_SCALAR_NODE, BINARY_NODE,  processProtocolBinary},
-        {YAML_SCALAR_NODE, LEN_NODE,     processProtocolLen},
-        {YAML_SCALAR_NODE, DETECT_NODE,  processProtocolDetect},
-        {YAML_SCALAR_NODE, PAYLOAD_NODE, processProtocolPayload},
-        {YAML_NO_NODE,     NULL,         NULL}
-    };
-    yaml_node_pair_t* pair;
-    foreach(pair, node->data.mapping.pairs) {
+    parse_table_t t[] = {{YAML_SCALAR_NODE, NAME_NODE, processProtocolName},
+                         {YAML_SCALAR_NODE, REGEX_NODE, processProtocolRegex},
+                         {YAML_SCALAR_NODE, BINARY_NODE, processProtocolBinary},
+                         {YAML_SCALAR_NODE, LEN_NODE, processProtocolLen},
+                         {YAML_SCALAR_NODE, DETECT_NODE, processProtocolDetect},
+                         {YAML_SCALAR_NODE, PAYLOAD_NODE, processProtocolPayload},
+                         {YAML_NO_NODE, NULL, NULL}};
+    yaml_node_pair_t *pair;
+    foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
     }
 
@@ -1610,13 +1642,9 @@ processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     // init the regex
     int errornumber;
     PCRE2_SIZE erroroffset;
-    protocol_context->re = pcre2_compile(
-            (PCRE2_SPTR)protocol_context->regex,
-            PCRE2_ZERO_TERMINATED, 0,
-            &errornumber, &erroroffset, NULL);
+    protocol_context->re = pcre2_compile((PCRE2_SPTR)protocol_context->regex, PCRE2_ZERO_TERMINATED, 0, &errornumber, &erroroffset, NULL);
     if (!protocol_context->re) {
-        scopeLogWarn("WARN: invalid regex for \"%s\" protocol entry; %s\n",
-                 protocol_context->protname, protocol_context->regex);
+        scopeLogWarn("WARN: invalid regex for \"%s\" protocol entry; %s\n", protocol_context->protname, protocol_context->regex);
         destroyProtEntry(protocol_context);
         protocol_context = NULL;
         return;
@@ -1654,17 +1682,18 @@ processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 static void
 processProtocol(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    if (node->type != YAML_SEQUENCE_NODE) return;
+    if (node->type != YAML_SEQUENCE_NODE)
+        return;
 
-    yaml_node_item_t* item;
-    foreach(item, node->data.sequence.items) {
-        yaml_node_t* node = yaml_document_get_node(doc, *item);
+    yaml_node_item_t *item;
+    foreach (item, node->data.sequence.items) {
+        yaml_node_t *node = yaml_document_get_node(doc, *item);
         processProtocolEntry(config, doc, node);
     }
 }
 
 static void
-processCustomFilterProcname(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processCustomFilterProcname(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     if (node->type != YAML_SCALAR_NODE) {
         scopeLogWarn("WARN: non-scalar procname value\n");
@@ -1679,13 +1708,13 @@ processCustomFilterProcname(config_t* config, yaml_document_t* doc, yaml_node_t*
         return;
     }
 
-
     custom_matched = FALSE;
-    if (valueStr) free(valueStr);
+    if (valueStr)
+        free(valueStr);
 }
 
 static void
-processCustomFilterArg(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processCustomFilterArg(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     if (node->type != YAML_SCALAR_NODE) {
         scopeLogWarn("WARN: non-scalar arg value\n");
@@ -1701,11 +1730,12 @@ processCustomFilterArg(config_t* config, yaml_document_t* doc, yaml_node_t* node
     }
 
     custom_matched = FALSE;
-    if (valueStr) free(valueStr);
+    if (valueStr)
+        free(valueStr);
 }
 
 static void
-processCustomFilterHostname(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processCustomFilterHostname(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     if (node->type != YAML_SCALAR_NODE) {
         scopeLogWarn("WARN: non-scalar hostname value\n");
@@ -1723,11 +1753,12 @@ processCustomFilterHostname(config_t* config, yaml_document_t* doc, yaml_node_t*
     }
 
     custom_matched = FALSE;
-    if (valueStr) free(valueStr);
+    if (valueStr)
+        free(valueStr);
 }
 
 static void
-processCustomFilterUsername(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processCustomFilterUsername(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     if (node->type != YAML_SCALAR_NODE) {
         scopeLogWarn("WARN: non-scalar username value\n");
@@ -1744,11 +1775,12 @@ processCustomFilterUsername(config_t* config, yaml_document_t* doc, yaml_node_t*
     }
 
     custom_matched = FALSE;
-    if (valueStr) free(valueStr);
+    if (valueStr)
+        free(valueStr);
 }
 
 static void
-processCustomFilterEnv(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processCustomFilterEnv(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     if (node->type != YAML_SCALAR_NODE) {
         scopeLogWarn("WARN: non-scalar env value\n");
@@ -1759,9 +1791,10 @@ processCustomFilterEnv(config_t* config, yaml_document_t* doc, yaml_node_t* node
     char *valueStr = stringVal(node);
     if (valueStr) {
         char *equal = strchr(valueStr, '=');
-        if (equal) *equal = '\0';
+        if (equal)
+            *equal = '\0';
         char *envName = valueStr;
-        char *envVal = equal ? equal+1 : NULL;
+        char *envVal = equal ? equal + 1 : NULL;
         char *env = getenv(envName);
         if (env) {
             if (envVal) {
@@ -1779,11 +1812,12 @@ processCustomFilterEnv(config_t* config, yaml_document_t* doc, yaml_node_t* node
     }
 
     custom_matched = FALSE;
-    if (valueStr) free(valueStr);
+    if (valueStr)
+        free(valueStr);
 }
 
 static void
-processCustomFilterAncestor(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processCustomFilterAncestor(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     if (node->type != YAML_SCALAR_NODE) {
         scopeLogWarn("WARN: non-scalar ancestor value\n");
@@ -1815,7 +1849,7 @@ processCustomFilterAncestor(config_t* config, yaml_document_t* doc, yaml_node_t*
             }
             exe[exeLen] = '\0';
 
-            char* name = exe;
+            char *name = exe;
             name = basename(exe);
             if (!strcmp(valueStr, name)) {
                 ++custom_match_count;
@@ -1832,12 +1866,12 @@ processCustomFilterAncestor(config_t* config, yaml_document_t* doc, yaml_node_t*
                 DBG(NULL);
                 break;
             }
-            if (g_fn.read(fd, buf, sizeof(buf)) <= 0) { 
+            if (g_fn.read(fd, buf, sizeof(buf)) <= 0) {
                 DBG(NULL);
                 g_fn.close(fd);
                 break;
             }
-            strtok(buf,  " ");              // (1) pid   %d
+            strtok(buf, " ");               // (1) pid   %d
             strtok(NULL, " ");              // (2) comm  %s
             strtok(NULL, " ");              // (3) state %s
             ppid = atoi(strtok(NULL, " ")); // (4) ppid  %d
@@ -1846,34 +1880,34 @@ processCustomFilterAncestor(config_t* config, yaml_document_t* doc, yaml_node_t*
     }
 
     custom_matched = FALSE;
-    if (valueStr) free(valueStr);
+    if (valueStr)
+        free(valueStr);
 }
 
 static void
-processCustomFilter(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processCustomFilter(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     custom_matched = TRUE;
     custom_match_count = 0;
 
-    parse_table_t t[] = {
-        {YAML_SCALAR_NODE, PROCNAME_NODE, processCustomFilterProcname},
-        {YAML_SCALAR_NODE, ARG_NODE,      processCustomFilterArg},
-        {YAML_SCALAR_NODE, HOSTNAME_NODE, processCustomFilterHostname},
-        {YAML_SCALAR_NODE, USERNAME_NODE, processCustomFilterUsername},
-        {YAML_SCALAR_NODE, ENV_NODE,      processCustomFilterEnv},
-        {YAML_SCALAR_NODE, ANCESTOR_NODE, processCustomFilterAncestor},
-        {YAML_NO_NODE,     NULL,          NULL}
-    };
+    parse_table_t t[] = {{YAML_SCALAR_NODE, PROCNAME_NODE, processCustomFilterProcname},
+                         {YAML_SCALAR_NODE, ARG_NODE, processCustomFilterArg},
+                         {YAML_SCALAR_NODE, HOSTNAME_NODE, processCustomFilterHostname},
+                         {YAML_SCALAR_NODE, USERNAME_NODE, processCustomFilterUsername},
+                         {YAML_SCALAR_NODE, ENV_NODE, processCustomFilterEnv},
+                         {YAML_SCALAR_NODE, ANCESTOR_NODE, processCustomFilterAncestor},
+                         {YAML_NO_NODE, NULL, NULL}};
 
     yaml_node_pair_t *pair;
     foreach (pair, node->data.mapping.pairs) {
         processKeyValuePair(t, pair, config, doc);
-        if (!custom_matched) break;
+        if (!custom_matched)
+            break;
     }
 }
 
 static void
-processCustomConfig(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processCustomConfig(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     // All filters have to match and there must be more than one filter
     if (!custom_matched || !custom_match_count) {
@@ -1885,30 +1919,24 @@ processCustomConfig(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processCustomEntry(config_t* config, yaml_document_t* doc, yaml_node_pair_t* pair)
+processCustomEntry(config_t *config, yaml_document_t *doc, yaml_node_pair_t *pair)
 {
-    //yaml_node_t* name = yaml_document_get_node(doc, pair->key);
-    yaml_node_t* node = yaml_document_get_node(doc, pair->value);
+    // yaml_node_t* name = yaml_document_get_node(doc, pair->key);
+    yaml_node_t *node = yaml_document_get_node(doc, pair->value);
 
     if (node->type != YAML_MAPPING_NODE) {
         scopeLogWarn("WARN: ignoring non-map custom entry\n");
         return;
     }
 
-    parse_table_t t[] = {
-        {YAML_MAPPING_NODE, FILTER_NODE, processCustomFilter},
-        {YAML_NO_NODE,      NULL,        NULL}
-    };
-    yaml_node_pair_t* nodePair;
-    foreach(nodePair, node->data.mapping.pairs) {
+    parse_table_t t[] = {{YAML_MAPPING_NODE, FILTER_NODE, processCustomFilter}, {YAML_NO_NODE, NULL, NULL}};
+    yaml_node_pair_t *nodePair;
+    foreach (nodePair, node->data.mapping.pairs) {
         processKeyValuePair(t, nodePair, config, doc);
     }
 
-    parse_table_t t2[] = {
-        {YAML_MAPPING_NODE, CONFIG_NODE, processCustomConfig},
-        {YAML_NO_NODE,      NULL,        NULL}
-    };
-    foreach(nodePair, node->data.mapping.pairs) {
+    parse_table_t t2[] = {{YAML_MAPPING_NODE, CONFIG_NODE, processCustomConfig}, {YAML_NO_NODE, NULL, NULL}};
+    foreach (nodePair, node->data.mapping.pairs) {
         processKeyValuePair(t2, nodePair, config, doc);
     }
 }
@@ -1916,8 +1944,8 @@ processCustomEntry(config_t* config, yaml_document_t* doc, yaml_node_pair_t* pai
 static void
 processCustom(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    yaml_node_pair_t* pair;
-    foreach(pair, node->data.mapping.pairs) {
+    yaml_node_pair_t *pair;
+    foreach (pair, node->data.mapping.pairs) {
         processCustomEntry(config, doc, pair);
     }
 }
@@ -1925,16 +1953,10 @@ processCustom(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 static void
 processRoot(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
-    parse_table_t t[] = {
-        {YAML_MAPPING_NODE,  METRIC_NODE,   processMetric},
-        {YAML_MAPPING_NODE,  LIBSCOPE_NODE, processLibscope},
-        {YAML_MAPPING_NODE,  PAYLOAD_NODE,  processPayload},
-        {YAML_MAPPING_NODE,  EVENT_NODE,    processEvent},
-        {YAML_MAPPING_NODE,  CRIBL_NODE,    processCribl},
-        {YAML_MAPPING_NODE,  TAGS_NODE,     processTags},
-        {YAML_SEQUENCE_NODE, PROTOCOL_NODE, processProtocol},
-        {YAML_NO_NODE,       NULL,          NULL}
-    };
+    parse_table_t t[] = {{YAML_MAPPING_NODE, METRIC_NODE, processMetric},      {YAML_MAPPING_NODE, LIBSCOPE_NODE, processLibscope},
+                         {YAML_MAPPING_NODE, PAYLOAD_NODE, processPayload},    {YAML_MAPPING_NODE, EVENT_NODE, processEvent},
+                         {YAML_MAPPING_NODE, CRIBL_NODE, processCribl},        {YAML_MAPPING_NODE, TAGS_NODE, processTags},
+                         {YAML_SEQUENCE_NODE, PROTOCOL_NODE, processProtocol}, {YAML_NO_NODE, NULL, NULL}};
 
     yaml_node_pair_t *pair;
     foreach (pair, node->data.mapping.pairs) {
@@ -1943,18 +1965,16 @@ processRoot(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 }
 
 static void
-setConfigFromDoc(config_t* config, yaml_document_t* doc)
+setConfigFromDoc(config_t *config, yaml_document_t *doc)
 {
     yaml_node_t *node = yaml_document_get_root_node(doc);
-    if (node->type != YAML_MAPPING_NODE) return;
+    if (node->type != YAML_MAPPING_NODE)
+        return;
 
     processRoot(config, doc, node);
 
     // process custom entries after the others
-    parse_table_t t2[] = {
-        {YAML_MAPPING_NODE, CUSTOM_NODE, processCustom},
-        {YAML_NO_NODE,      NULL,        NULL}
-    };
+    parse_table_t t2[] = {{YAML_MAPPING_NODE, CUSTOM_NODE, processCustom}, {YAML_NO_NODE, NULL, NULL}};
 
     yaml_node_pair_t *pair;
     foreach (pair, node->data.mapping.pairs) {
@@ -1963,7 +1983,7 @@ setConfigFromDoc(config_t* config, yaml_document_t* doc)
 }
 
 static void
-cfgSetFromFile(config_t *config, const char* path)
+cfgSetFromFile(config_t *config, const char *path)
 {
     FILE *fp = NULL;
     int parser_successful = 0;
@@ -1971,62 +1991,77 @@ cfgSetFromFile(config_t *config, const char* path)
     yaml_parser_t parser;
     yaml_document_t doc;
 
-    if (!g_fn.fopen || !g_fn.fclose) goto cleanup;
+    if (!g_fn.fopen || !g_fn.fclose)
+        goto cleanup;
 
-    if (!config) goto cleanup;
-    if (!path) goto cleanup;
+    if (!config)
+        goto cleanup;
+    if (!path)
+        goto cleanup;
     fp = g_fn.fopen(path, "rb");
-    if (!fp) goto cleanup;
+    if (!fp)
+        goto cleanup;
 
     parser_successful = yaml_parser_initialize(&parser);
-    if (!parser_successful) goto cleanup;
+    if (!parser_successful)
+        goto cleanup;
 
     yaml_parser_set_input_file(&parser, fp);
 
     doc_successful = yaml_parser_load(&parser, &doc);
-    if (!doc_successful) goto cleanup;
+    if (!doc_successful)
+        goto cleanup;
 
     // This is where the magic happens
     setConfigFromDoc(config, &doc);
 
 cleanup:
-    if (doc_successful) yaml_document_delete(&doc);
-    if (parser_successful) yaml_parser_delete(&parser);
-    if (fp) g_fn.fclose(fp);
+    if (doc_successful)
+        yaml_document_delete(&doc);
+    if (parser_successful)
+        yaml_parser_delete(&parser);
+    if (fp)
+        g_fn.fclose(fp);
 }
 
 config_t *
-cfgFromString(const char* string)
+cfgFromString(const char *string)
 {
-    config_t* config = NULL;
+    config_t *config = NULL;
     int parser_successful = 0;
     int doc_successful = 0;
     yaml_parser_t parser;
     yaml_document_t doc;
 
-    if (!string) goto cleanup;
+    if (!string)
+        goto cleanup;
 
     config = cfgCreateDefault();
-    if (!config) goto cleanup;
+    if (!config)
+        goto cleanup;
 
     parser_successful = yaml_parser_initialize(&parser);
-    if (!parser_successful) goto cleanup;
+    if (!parser_successful)
+        goto cleanup;
 
-    yaml_parser_set_input_string(&parser, (unsigned char*)string, strlen(string));
+    yaml_parser_set_input_string(&parser, (unsigned char *)string, strlen(string));
 
     doc_successful = yaml_parser_load(&parser, &doc);
-    if (!doc_successful) goto cleanup;
+    if (!doc_successful)
+        goto cleanup;
 
     // This is where the magic happens
     setConfigFromDoc(config, &doc);
 
 cleanup:
-    if (doc_successful) yaml_document_delete(&doc);
-    if (parser_successful) yaml_parser_delete(&parser);
+    if (doc_successful)
+        yaml_document_delete(&doc);
+    if (parser_successful)
+        yaml_parser_delete(&parser);
     return config;
 }
 
-config_t*
+config_t *
 cfgRead(const char *path)
 {
     config_t *config = cfgCreateDefault();
@@ -2035,13 +2070,13 @@ cfgRead(const char *path)
 }
 
 #else
-config_t*
-cfgRead(const char* path)
+config_t *
+cfgRead(const char *path)
 {
     return cfgCreateDefault();
 }
-config_t*
-cfgFromString(const char* string)
+config_t *
+cfgFromString(const char *string)
 {
     return cfgCreateDefault();
 }
@@ -2050,56 +2085,61 @@ cfgFromString(const char* string)
 static cJSON *
 createTlsJson(config_t *cfg, which_transport_t trans)
 {
-    cJSON* root = NULL;
-    if (!(root = cJSON_CreateObject())) goto err;
+    cJSON *root = NULL;
+    if (!(root = cJSON_CreateObject()))
+        goto err;
 
-    if (!cJSON_AddStringToObjLN(root, ENABLE_NODE,
-         valToStr(boolMap, cfgTransportTlsEnable(cfg, trans)))) goto err;
-    if (!cJSON_AddStringToObjLN(root, VALIDATE_NODE,
-         valToStr(boolMap, cfgTransportTlsValidateServer(cfg, trans)))) goto err;
+    if (!cJSON_AddStringToObjLN(root, ENABLE_NODE, valToStr(boolMap, cfgTransportTlsEnable(cfg, trans))))
+        goto err;
+    if (!cJSON_AddStringToObjLN(root, VALIDATE_NODE, valToStr(boolMap, cfgTransportTlsValidateServer(cfg, trans))))
+        goto err;
 
     // Represent NULL as an empty string
     const char *path = cfgTransportTlsCACertPath(cfg, trans);
     path = (path) ? path : "";
-    if (!cJSON_AddStringToObjLN(root, CACERT_NODE, path)) goto err;
+    if (!cJSON_AddStringToObjLN(root, CACERT_NODE, path))
+        goto err;
 
     return root;
 err:
-    if (root) cJSON_Delete(root);
+    if (root)
+        cJSON_Delete(root);
     return NULL;
 }
 
-static cJSON*
-createTransportJson(config_t* cfg, which_transport_t trans)
+static cJSON *
+createTransportJson(config_t *cfg, which_transport_t trans)
 {
-    cJSON* root = NULL;
-    cJSON* tls = NULL;
+    cJSON *root = NULL;
+    cJSON *tls = NULL;
 
-    if (!(root = cJSON_CreateObject())) goto err;
+    if (!(root = cJSON_CreateObject()))
+        goto err;
 
-    if (!cJSON_AddStringToObjLN(root, TYPE_NODE,
-         valToStr(transportTypeMap, cfgTransportType(cfg, trans)))) goto err;
+    if (!cJSON_AddStringToObjLN(root, TYPE_NODE, valToStr(transportTypeMap, cfgTransportType(cfg, trans))))
+        goto err;
 
     switch (cfgTransportType(cfg, trans)) {
         case CFG_TCP:
         case CFG_UDP:
-            if (!cJSON_AddStringToObjLN(root, HOST_NODE,
-                                     cfgTransportHost(cfg, trans))) goto err;
-            if (!cJSON_AddStringToObjLN(root, PORT_NODE,
-                                     cfgTransportPort(cfg, trans))) goto err;
+            if (!cJSON_AddStringToObjLN(root, HOST_NODE, cfgTransportHost(cfg, trans)))
+                goto err;
+            if (!cJSON_AddStringToObjLN(root, PORT_NODE, cfgTransportPort(cfg, trans)))
+                goto err;
 
-            if (!(tls = createTlsJson(cfg, trans))) goto err;
+            if (!(tls = createTlsJson(cfg, trans)))
+                goto err;
             cJSON_AddItemToObjectCS(root, TLS_NODE, tls);
             break;
         case CFG_UNIX:
-            if (!cJSON_AddStringToObjLN(root, PATH_NODE,
-                                     cfgTransportPath(cfg, trans))) goto err;
+            if (!cJSON_AddStringToObjLN(root, PATH_NODE, cfgTransportPath(cfg, trans)))
+                goto err;
             break;
         case CFG_FILE:
-            if (!cJSON_AddStringToObjLN(root, PATH_NODE,
-                                     cfgTransportPath(cfg, trans))) goto err;
-            if (!cJSON_AddStringToObjLN(root, BUFFERING_NODE,
-                 valToStr(bufferMap, cfgTransportBuf(cfg, trans)))) goto err;
+            if (!cJSON_AddStringToObjLN(root, PATH_NODE, cfgTransportPath(cfg, trans)))
+                goto err;
+            if (!cJSON_AddStringToObjLN(root, BUFFERING_NODE, valToStr(bufferMap, cfgTransportBuf(cfg, trans))))
+                goto err;
             break;
         case CFG_SYSLOG:
         case CFG_SHM:
@@ -2109,40 +2149,44 @@ createTransportJson(config_t* cfg, which_transport_t trans)
     }
     return root;
 err:
-    if (root) cJSON_Delete(root);
+    if (root)
+        cJSON_Delete(root);
     return NULL;
 }
 
-
-static cJSON*
-createLogJson(config_t* cfg)
+static cJSON *
+createLogJson(config_t *cfg)
 {
-    cJSON* root = NULL;
-    cJSON* transport;
+    cJSON *root = NULL;
+    cJSON *transport;
 
-    if (!(root = cJSON_CreateObject())) goto err;
-    if (!cJSON_AddStringToObjLN(root, LEVEL_NODE,
-                     valToStr(logLevelMap, cfgLogLevel(cfg)))) goto err;
+    if (!(root = cJSON_CreateObject()))
+        goto err;
+    if (!cJSON_AddStringToObjLN(root, LEVEL_NODE, valToStr(logLevelMap, cfgLogLevel(cfg))))
+        goto err;
 
-    if (!(transport = createTransportJson(cfg, CFG_LOG))) goto err;
+    if (!(transport = createTransportJson(cfg, CFG_LOG)))
+        goto err;
     cJSON_AddItemToObjectCS(root, TRANSPORT_NODE, transport);
 
     return root;
 err:
-    if (root) cJSON_Delete(root);
+    if (root)
+        cJSON_Delete(root);
     return NULL;
 }
 
-static cJSON*
-createTagsJson(config_t* cfg)
+static cJSON *
+createTagsJson(config_t *cfg)
 {
-    cJSON* root = NULL;
-    if (!(root = cJSON_CreateObject())) goto err;
+    cJSON *root = NULL;
+    if (!(root = cJSON_CreateObject()))
+        goto err;
 
     custom_tag_t **tags = cfgCustomTags(cfg);
     int i;
     if (tags) {
-        for (i=0; tags[i]; i++) {
+        for (i = 0; tags[i]; i++) {
             if (!(cJSON_AddStringToObject(root, tags[i]->name, tags[i]->value))) {
                 DBG("name:%s value:%s", tags[i]->name, tags[i]->value);
             }
@@ -2151,73 +2195,82 @@ createTagsJson(config_t* cfg)
 
     return root;
 err:
-    if (root) cJSON_Delete(root);
+    if (root)
+        cJSON_Delete(root);
     return NULL;
 }
 
-static cJSON*
-createMetricFormatJson(config_t* cfg)
+static cJSON *
+createMetricFormatJson(config_t *cfg)
 {
-    cJSON* root = NULL;
+    cJSON *root = NULL;
 
-    if (!(root = cJSON_CreateObject())) goto err;
+    if (!(root = cJSON_CreateObject()))
+        goto err;
 
-    if (!cJSON_AddStringToObjLN(root, TYPE_NODE,
-                     valToStr(formatMap, cfgMtcFormat(cfg)))) goto err;
-    if (!cJSON_AddStringToObjLN(root, STATSDPREFIX_NODE,
-                                    cfgMtcStatsDPrefix(cfg))) goto err;
-    if (!cJSON_AddNumberToObjLN(root, STATSDMAXLEN_NODE,
-                                    cfgMtcStatsDMaxLen(cfg))) goto err;
-    if (!cJSON_AddNumberToObjLN(root, VERBOSITY_NODE,
-                                       cfgMtcVerbosity(cfg))) goto err;
+    if (!cJSON_AddStringToObjLN(root, TYPE_NODE, valToStr(formatMap, cfgMtcFormat(cfg))))
+        goto err;
+    if (!cJSON_AddStringToObjLN(root, STATSDPREFIX_NODE, cfgMtcStatsDPrefix(cfg)))
+        goto err;
+    if (!cJSON_AddNumberToObjLN(root, STATSDMAXLEN_NODE, cfgMtcStatsDMaxLen(cfg)))
+        goto err;
+    if (!cJSON_AddNumberToObjLN(root, VERBOSITY_NODE, cfgMtcVerbosity(cfg)))
+        goto err;
 
     return root;
 err:
-    if (root) cJSON_Delete(root);
+    if (root)
+        cJSON_Delete(root);
     return NULL;
 }
 
-static cJSON*
-createMetricJson(config_t* cfg)
+static cJSON *
+createMetricJson(config_t *cfg)
 {
-    cJSON* root = NULL;
-    cJSON* transport, *format;
+    cJSON *root = NULL;
+    cJSON *transport, *format;
 
-    if (!(root = cJSON_CreateObject())) goto err;
+    if (!(root = cJSON_CreateObject()))
+        goto err;
 
-    if (!cJSON_AddStringToObjLN(root, ENABLE_NODE,
-                          valToStr(boolMap, cfgMtcEnable(cfg)))) goto err;
+    if (!cJSON_AddStringToObjLN(root, ENABLE_NODE, valToStr(boolMap, cfgMtcEnable(cfg))))
+        goto err;
 
-    if (!(transport = createTransportJson(cfg, CFG_MTC))) goto err;
+    if (!(transport = createTransportJson(cfg, CFG_MTC)))
+        goto err;
     cJSON_AddItemToObjectCS(root, TRANSPORT_NODE, transport);
 
-    if (!(format = createMetricFormatJson(cfg))) goto err;
+    if (!(format = createMetricFormatJson(cfg)))
+        goto err;
     cJSON_AddItemToObjectCS(root, FORMAT_NODE, format);
 
     return root;
 err:
-    if (root) cJSON_Delete(root);
+    if (root)
+        cJSON_Delete(root);
     return NULL;
 }
 
-static cJSON*
+static cJSON *
 createWatchObjectJson(config_t *cfg, watch_t src)
 {
     cJSON *root = NULL;
 
-    if (!(root = cJSON_CreateObject())) goto err;
+    if (!(root = cJSON_CreateObject()))
+        goto err;
 
-    if (!cJSON_AddStringToObjLN(root, TYPE_NODE,
-                                    valToStr(watchTypeMap, src))) goto err;
-    if (!cJSON_AddStringToObjLN(root, NAME_NODE,
-                                   cfgEvtFormatNameFilter(cfg, src))) goto err;
-    if (!cJSON_AddStringToObjLN(root, FIELD_NODE,
-                                  cfgEvtFormatFieldFilter(cfg, src))) goto err;
-    if (!cJSON_AddStringToObjLN(root, VALUE_NODE,
-                                  cfgEvtFormatValueFilter(cfg, src))) goto err;
+    if (!cJSON_AddStringToObjLN(root, TYPE_NODE, valToStr(watchTypeMap, src)))
+        goto err;
+    if (!cJSON_AddStringToObjLN(root, NAME_NODE, cfgEvtFormatNameFilter(cfg, src)))
+        goto err;
+    if (!cJSON_AddStringToObjLN(root, FIELD_NODE, cfgEvtFormatFieldFilter(cfg, src)))
+        goto err;
+    if (!cJSON_AddStringToObjLN(root, VALUE_NODE, cfgEvtFormatValueFilter(cfg, src)))
+        goto err;
     if (src == CFG_SRC_HTTP) {
         cJSON *headers = cJSON_CreateArray();
-        if (!headers) goto err;
+        if (!headers)
+            goto err;
 
         int numhead;
         if ((numhead = cfgEvtFormatNumHeaders(cfg)) > 0) {
@@ -2236,218 +2289,256 @@ createWatchObjectJson(config_t *cfg, watch_t src)
 
     return root;
 err:
-    if (root) cJSON_Delete(root);
+    if (root)
+        cJSON_Delete(root);
     return NULL;
 }
 
-static cJSON*
-createWatchArrayJson(config_t* cfg)
+static cJSON *
+createWatchArrayJson(config_t *cfg)
 {
-    cJSON* root = NULL;
+    cJSON *root = NULL;
 
-    if (!(root = cJSON_CreateArray())) goto err;
+    if (!(root = cJSON_CreateArray()))
+        goto err;
 
     watch_t src;
-    for (src = CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
-        cJSON* item;
-        if (!cfgEvtFormatSourceEnabled(cfg, src)) continue;
-        if (!(item = createWatchObjectJson(cfg, src))) continue;
+    for (src = CFG_SRC_FILE; src < CFG_SRC_MAX; src++) {
+        cJSON *item;
+        if (!cfgEvtFormatSourceEnabled(cfg, src))
+            continue;
+        if (!(item = createWatchObjectJson(cfg, src)))
+            continue;
         cJSON_AddItemToArray(root, item);
     }
 
     return root;
 err:
-    if (root) cJSON_Delete(root);
+    if (root)
+        cJSON_Delete(root);
     return NULL;
 }
 
-static cJSON*
-createEventFormatJson(config_t* cfg)
+static cJSON *
+createEventFormatJson(config_t *cfg)
 {
-    cJSON* root = NULL;
+    cJSON *root = NULL;
 
-    if (!(root = cJSON_CreateObject())) goto err;
-    if (!cJSON_AddStringToObjLN(root, TYPE_NODE,
-                      valToStr(formatMap, cfgEventFormat(cfg)))) goto err;
-    if (!cJSON_AddNumberToObjLN(root, MAXEPS_NODE,
-                      cfgEvtRateLimit(cfg))) goto err;
-    if (!cJSON_AddStringToObjLN(root, ENHANCEFS_NODE,
-                      valToStr(boolMap, cfgEnhanceFs(cfg)))) goto err;
+    if (!(root = cJSON_CreateObject()))
+        goto err;
+    if (!cJSON_AddStringToObjLN(root, TYPE_NODE, valToStr(formatMap, cfgEventFormat(cfg))))
+        goto err;
+    if (!cJSON_AddNumberToObjLN(root, MAXEPS_NODE, cfgEvtRateLimit(cfg)))
+        goto err;
+    if (!cJSON_AddStringToObjLN(root, ENHANCEFS_NODE, valToStr(boolMap, cfgEnhanceFs(cfg))))
+        goto err;
 
     return root;
 err:
-    if (root) cJSON_Delete(root);
+    if (root)
+        cJSON_Delete(root);
     return NULL;
 }
 
-static cJSON*
-createEventJson(config_t* cfg)
+static cJSON *
+createEventJson(config_t *cfg)
 {
-    cJSON* root = NULL;
-    cJSON* format, *watch, *transport;
+    cJSON *root = NULL;
+    cJSON *format, *watch, *transport;
 
-    if (!(root = cJSON_CreateObject())) goto err;
+    if (!(root = cJSON_CreateObject()))
+        goto err;
 
-    if (!cJSON_AddStringToObjLN(root, ENABLE_NODE,
-                          valToStr(boolMap, cfgEvtEnable(cfg)))) goto err;
+    if (!cJSON_AddStringToObjLN(root, ENABLE_NODE, valToStr(boolMap, cfgEvtEnable(cfg))))
+        goto err;
 
-    if (!(transport = createTransportJson(cfg, CFG_CTL))) goto err;
+    if (!(transport = createTransportJson(cfg, CFG_CTL)))
+        goto err;
     cJSON_AddItemToObjectCS(root, TRANSPORT_NODE, transport);
 
-    if (!(format = createEventFormatJson(cfg))) goto err;
+    if (!(format = createEventFormatJson(cfg)))
+        goto err;
     cJSON_AddItemToObjectCS(root, FORMAT_NODE, format);
 
-    if (!(watch = createWatchArrayJson(cfg))) goto err;
+    if (!(watch = createWatchArrayJson(cfg)))
+        goto err;
     cJSON_AddItemToObjectCS(root, WATCH_NODE, watch);
 
     return root;
 err:
-    if (root) cJSON_Delete(root);
+    if (root)
+        cJSON_Delete(root);
     return NULL;
 }
 
-static cJSON*
+static cJSON *
 createPayloadJson(config_t *cfg)
 {
     cJSON *root = NULL;
 
-    if (!(root = cJSON_CreateObject())) goto err;
+    if (!(root = cJSON_CreateObject()))
+        goto err;
 
-    if (!cJSON_AddStringToObjLN(root, ENABLE_NODE,
-                         valToStr(boolMap, cfgPayEnable(cfg)))) goto err;
-    if (!cJSON_AddStringToObjLN(root, DIR_NODE,
-                         cfgPayDir(cfg))) goto err;
+    if (!cJSON_AddStringToObjLN(root, ENABLE_NODE, valToStr(boolMap, cfgPayEnable(cfg))))
+        goto err;
+    if (!cJSON_AddStringToObjLN(root, DIR_NODE, cfgPayDir(cfg)))
+        goto err;
 
     return root;
 err:
-    if (root) cJSON_Delete(root);
+    if (root)
+        cJSON_Delete(root);
     return NULL;
 }
 
-static cJSON*
-createLibscopeJson(config_t* cfg)
+static cJSON *
+createLibscopeJson(config_t *cfg)
 {
-    cJSON* root = NULL;
+    cJSON *root = NULL;
     cJSON *log;
 
-    if (!(root = cJSON_CreateObject())) goto err;
+    if (!(root = cJSON_CreateObject()))
+        goto err;
 
-    if (!(log = createLogJson(cfg))) goto err;
+    if (!(log = createLogJson(cfg)))
+        goto err;
     cJSON_AddItemToObjectCS(root, LOG_NODE, log);
 
-    if (!cJSON_AddStringToObjLN(root, CFGEVENT_NODE,
-                 valToStr(boolMap, cfgSendProcessStartMsg(cfg)))) goto err;
+    if (!cJSON_AddStringToObjLN(root, CFGEVENT_NODE, valToStr(boolMap, cfgSendProcessStartMsg(cfg))))
+        goto err;
 
-    if (!cJSON_AddNumberToObjLN(root, SUMMARYPERIOD_NODE,
-                                      cfgMtcPeriod(cfg))) goto err;
+    if (!cJSON_AddNumberToObjLN(root, SUMMARYPERIOD_NODE, cfgMtcPeriod(cfg)))
+        goto err;
 
-    if (!cJSON_AddStringToObjLN(root, COMMANDDIR_NODE,
-                                         cfgCmdDir(cfg))) goto err;
+    if (!cJSON_AddStringToObjLN(root, COMMANDDIR_NODE, cfgCmdDir(cfg)))
+        goto err;
 
     return root;
 err:
-    if (root) cJSON_Delete(root);
+    if (root)
+        cJSON_Delete(root);
     return NULL;
 }
 
-static cJSON*
-createProtocolEntryJson(config_t* cfg, protocol_def_t* prot)
+static cJSON *
+createProtocolEntryJson(config_t *cfg, protocol_def_t *prot)
 {
     cJSON *root = NULL;
 
-    if (!prot) goto err;
+    if (!prot)
+        goto err;
 
-    if (!(root = cJSON_CreateObject())) goto err;
+    if (!(root = cJSON_CreateObject()))
+        goto err;
 
-    if (!cJSON_AddStringToObjLN(root, NAME_NODE, prot->protname)) goto err;
-    if (!cJSON_AddStringToObjLN(root, REGEX_NODE, prot->regex)) goto err;
-    if (!cJSON_AddStringToObjLN(root, BINARY_NODE, valToStr(boolMap, prot->binary))) goto err;
-    if (!cJSON_AddNumberToObjLN(root, LEN_NODE, prot->len)) goto err;
-    if (!cJSON_AddStringToObjLN(root, DETECT_NODE, valToStr(boolMap, prot->detect))) goto err;
-    if (!cJSON_AddStringToObjLN(root, PAYLOAD_NODE, valToStr(boolMap, prot->payload))) goto err;
+    if (!cJSON_AddStringToObjLN(root, NAME_NODE, prot->protname))
+        goto err;
+    if (!cJSON_AddStringToObjLN(root, REGEX_NODE, prot->regex))
+        goto err;
+    if (!cJSON_AddStringToObjLN(root, BINARY_NODE, valToStr(boolMap, prot->binary)))
+        goto err;
+    if (!cJSON_AddNumberToObjLN(root, LEN_NODE, prot->len))
+        goto err;
+    if (!cJSON_AddStringToObjLN(root, DETECT_NODE, valToStr(boolMap, prot->detect)))
+        goto err;
+    if (!cJSON_AddStringToObjLN(root, PAYLOAD_NODE, valToStr(boolMap, prot->payload)))
+        goto err;
 
     return root;
 err:
-    if (root) cJSON_Delete(root);
+    if (root)
+        cJSON_Delete(root);
     return NULL;
 }
 
-static cJSON*
-createProtocolJson(config_t* cfg)
+static cJSON *
+createProtocolJson(config_t *cfg)
 {
-    cJSON* root = NULL;
+    cJSON *root = NULL;
 
-    if (!(root = cJSON_CreateArray())) goto err;
+    if (!(root = cJSON_CreateArray()))
+        goto err;
 
     for (unsigned key = 1; key <= g_prot_sequence; ++key) {
         protocol_def_t *prot = lstFind(g_protlist, key);
         if (prot) {
             cJSON *item = createProtocolEntryJson(cfg, prot);
-            if (!item) goto err;
+            if (!item)
+                goto err;
             cJSON_AddItemToArray(root, item);
         }
     }
 
     return root;
 err:
-    if (root) cJSON_Delete(root);
+    if (root)
+        cJSON_Delete(root);
     return NULL;
 }
 
-cJSON*
-jsonObjectFromCfg(config_t* cfg)
+cJSON *
+jsonObjectFromCfg(config_t *cfg)
 {
-    cJSON* json_root = NULL;
-    cJSON* metric, *libscope, *event, *payload, *tags, *protocol;
+    cJSON *json_root = NULL;
+    cJSON *metric, *libscope, *event, *payload, *tags, *protocol;
 
-    if (!(json_root = cJSON_CreateObject())) goto err;
+    if (!(json_root = cJSON_CreateObject()))
+        goto err;
 
-    if (!(metric = createMetricJson(cfg))) goto err;
+    if (!(metric = createMetricJson(cfg)))
+        goto err;
     cJSON_AddItemToObjectCS(json_root, METRIC_NODE, metric);
 
-    if (!(libscope = createLibscopeJson(cfg))) goto err;
+    if (!(libscope = createLibscopeJson(cfg)))
+        goto err;
     cJSON_AddItemToObjectCS(json_root, LIBSCOPE_NODE, libscope);
 
-    if (!(event = createEventJson(cfg))) goto err;
+    if (!(event = createEventJson(cfg)))
+        goto err;
     cJSON_AddItemToObjectCS(json_root, EVENT_NODE, event);
 
-    if (!(payload = createPayloadJson(cfg))) goto err;
+    if (!(payload = createPayloadJson(cfg)))
+        goto err;
     cJSON_AddItemToObjectCS(json_root, PAYLOAD_NODE, payload);
 
-    if (!(tags = createTagsJson(cfg))) goto err;
+    if (!(tags = createTagsJson(cfg)))
+        goto err;
     cJSON_AddItemToObjectCS(json_root, TAGS_NODE, tags);
 
-    if (!(protocol = createProtocolJson(cfg))) goto err;
+    if (!(protocol = createProtocolJson(cfg)))
+        goto err;
     cJSON_AddItemToObjectCS(json_root, PROTOCOL_NODE, protocol);
 
     return json_root;
 err:
-    if (json_root) cJSON_Delete(json_root);
+    if (json_root)
+        cJSON_Delete(json_root);
     return NULL;
 }
 
-char*
-jsonStringFromCfg(config_t* cfg)
+char *
+jsonStringFromCfg(config_t *cfg)
 {
-    cJSON* json = jsonObjectFromCfg(cfg);
-    if (!json) return NULL;
+    cJSON *json = jsonObjectFromCfg(cfg);
+    if (!json)
+        return NULL;
 
-    char* string = cJSON_PrintUnformatted(json);
+    char *string = cJSON_PrintUnformatted(json);
     cJSON_Delete(json);
     return string;
 }
 
-static transport_t*
-initTransport(config_t* cfg, which_transport_t t)
+static transport_t *
+initTransport(config_t *cfg, which_transport_t t)
 {
-    transport_t* transport = NULL;
+    transport_t *transport = NULL;
 
     switch (cfgTransportType(cfg, t)) {
         case CFG_SYSLOG:
             transport = transportCreateSyslog();
             break;
         case CFG_FILE:
-            transport = transportCreateFile(cfgTransportPath(cfg, t), cfgTransportBuf(cfg,t));
+            transport = transportCreateFile(cfgTransportPath(cfg, t), cfgTransportBuf(cfg, t));
             break;
         case CFG_UNIX:
             transport = transportCreateUnix(cfgTransportPath(cfg, t));
@@ -2456,10 +2547,7 @@ initTransport(config_t* cfg, which_transport_t t)
             transport = transportCreateUdp(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t));
             break;
         case CFG_TCP:
-            transport = transportCreateTCP(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t),
-                                           cfgTransportTlsEnable(cfg, t),
-                                           cfgTransportTlsValidateServer(cfg, t),
-                                           cfgTransportTlsCACertPath(cfg, t));
+            transport = transportCreateTCP(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t), cfgTransportTlsEnable(cfg, t), cfgTransportTlsValidateServer(cfg, t), cfgTransportTlsCACertPath(cfg, t));
             break;
         case CFG_SHM:
             transport = transportCreateShm();
@@ -2470,11 +2558,12 @@ initTransport(config_t* cfg, which_transport_t t)
     return transport;
 }
 
-static mtc_fmt_t*
-initMtcFormat(config_t* cfg)
+static mtc_fmt_t *
+initMtcFormat(config_t *cfg)
 {
-    mtc_fmt_t* fmt = mtcFormatCreate(cfgMtcFormat(cfg));
-    if (!fmt) return NULL;
+    mtc_fmt_t *fmt = mtcFormatCreate(cfgMtcFormat(cfg));
+    if (!fmt)
+        return NULL;
 
     mtcFormatStatsDPrefixSet(fmt, cfgMtcStatsDPrefix(cfg));
     mtcFormatStatsDMaxLenSet(fmt, cfgMtcStatsDMaxLen(cfg));
@@ -2483,12 +2572,13 @@ initMtcFormat(config_t* cfg)
     return fmt;
 }
 
-log_t*
-initLog(config_t* cfg)
+log_t *
+initLog(config_t *cfg)
 {
-    log_t* log = logCreate();
-    if (!log) return log;
-    transport_t* t = initTransport(cfg, CFG_LOG);
+    log_t *log = logCreate();
+    if (!log)
+        return log;
+    transport_t *t = initTransport(cfg, CFG_LOG);
     if (!t) {
         logDestroy(&log);
         return log;
@@ -2499,22 +2589,23 @@ initLog(config_t* cfg)
     return log;
 }
 
-mtc_t*
-initMtc(config_t* cfg)
+mtc_t *
+initMtc(config_t *cfg)
 {
-    mtc_t* mtc = mtcCreate();
-    if (!mtc) return mtc;
+    mtc_t *mtc = mtcCreate();
+    if (!mtc)
+        return mtc;
 
     mtcEnabledSet(mtc, cfgMtcEnable(cfg));
 
-    transport_t* t = initTransport(cfg, CFG_MTC);
+    transport_t *t = initTransport(cfg, CFG_MTC);
     if (!t) {
         mtcDestroy(&mtc);
         return mtc;
     }
     mtcTransportSet(mtc, t);
 
-    mtc_fmt_t* f = initMtcFormat(cfg);
+    mtc_fmt_t *f = initMtcFormat(cfg);
     if (!f) {
         mtcDestroy(&mtc);
         return mtc;
@@ -2528,13 +2619,12 @@ evt_fmt_t *
 initEvtFormat(config_t *cfg)
 {
     evt_fmt_t *evt = evtFormatCreate();
-    if (!evt) return evt;
+    if (!evt)
+        return evt;
 
     watch_t src;
-    for (src = CFG_SRC_FILE; src<CFG_SRC_MAX; src++) {
-        evtFormatSourceEnabledSet(evt, src,
-                                  cfgEvtEnable(cfg) &&
-                                  cfgEvtFormatSourceEnabled(cfg, src));
+    for (src = CFG_SRC_FILE; src < CFG_SRC_MAX; src++) {
+        evtFormatSourceEnabledSet(evt, src, cfgEvtEnable(cfg) && cfgEvtFormatSourceEnabled(cfg, src));
         evtFormatNameFilterSet(evt, src, cfgEvtFormatNameFilter(cfg, src));
         evtFormatFieldFilterSet(evt, src, cfgEvtFormatFieldFilter(cfg, src));
         evtFormatValueFilterSet(evt, src, cfgEvtFormatValueFilter(cfg, src));
@@ -2550,7 +2640,8 @@ ctl_t *
 initCtl(config_t *cfg)
 {
     ctl_t *ctl = ctlCreate();
-    if (!ctl) return ctl;
+    if (!ctl)
+        return ctl;
 
     /*
      * If the transport is TCP, the transport may not connect
@@ -2576,7 +2667,7 @@ initCtl(config_t *cfg)
         ctlTransportSet(ctl, NULL, CFG_LS);
     }
 
-    evt_fmt_t* evt = initEvtFormat(cfg);
+    evt_fmt_t *evt = initEvtFormat(cfg);
     if (!evt) {
         ctlDestroy(&ctl);
         return ctl;
@@ -2585,14 +2676,14 @@ initCtl(config_t *cfg)
 
     ctlEnhanceFsSet(ctl, cfgEnhanceFs(cfg));
     ctlPayEnableSet(ctl, cfgPayEnable(cfg));
-    ctlPayDirSet(ctl,    cfgPayDir(cfg));
+    ctlPayDirSet(ctl, cfgPayDir(cfg));
 
     return ctl;
 }
 
 /*
  * When connected to LogStream
- * internal configuration, overriding default config, env vars 
+ * internal configuration, overriding default config, env vars
  * and the config file to:
  *
  * - use a single IP:port for events, metrics & remote commands
@@ -2606,7 +2697,8 @@ initCtl(config_t *cfg)
 int
 cfgLogStreamDefault(config_t *cfg)
 {
-    if (!cfg || (cfgLogStream(cfg) == CFG_LOGSTREAM_NONE)) return -1;
+    if (!cfg || (cfgLogStream(cfg) == CFG_LOGSTREAM_NONE))
+        return -1;
 
     snprintf(g_logmsg, sizeof(g_logmsg), DEFAULT_LOGSTREAM_LOGMSG);
 
@@ -2654,7 +2746,7 @@ cfgLogStreamDefault(config_t *cfg)
     }
     cfgEvtEnableSet(cfg, (unsigned)1);
 
-    if (cfgLogLevel(cfg) > CFG_LOG_WARN ) {
+    if (cfgLogLevel(cfg) > CFG_LOG_WARN) {
         strncat(g_logmsg, "Log level, ", 20);
         cfgLogLevelSet(cfg, CFG_LOG_WARN);
     }
@@ -2670,7 +2762,8 @@ cfgLogStreamDefault(config_t *cfg)
 int
 singleChannelSet(ctl_t *ctl, mtc_t *mtc)
 {
-    if (!ctl || !mtc) return -1;
+    if (!ctl || !mtc)
+        return -1;
 
     // if any logs created during cfg send now
     if (g_logmsg[0] != '\0') {
@@ -2689,11 +2782,15 @@ singleChannelSet(ctl_t *ctl, mtc_t *mtc)
 void
 destroyProtEntry(void *data)
 {
-    if (!data) return;
+    if (!data)
+        return;
 
     protocol_def_t *pre = data;
-    if (pre->re) pcre2_code_free(pre->re);
-    if (pre->regex) free(pre->regex);
-    if (pre->protname) free(pre->protname);
+    if (pre->re)
+        pcre2_code_free(pre->re);
+    if (pre->regex)
+        free(pre->regex);
+    if (pre->protname)
+        free(pre->protname);
     free(pre);
 }

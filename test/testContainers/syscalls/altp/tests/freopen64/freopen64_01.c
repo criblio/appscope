@@ -1,6 +1,8 @@
 #include "test_utils.h"
 
-int do_test() {
+int
+do_test()
+{
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[NAME_MAX];
     char buffer[] = TEST_MSG;
@@ -9,12 +11,12 @@ int do_test() {
 
     sprintf(tmp_file_name, "%s/file", tmp_dir_name);
 
-    FILE* pFile = freopen64(tmp_file_name, "w", stderr);
+    FILE *pFile = freopen64(tmp_file_name, "w", stderr);
 
-    if(pFile != NULL) {
+    if (pFile != NULL) {
         fprintf(stderr, TEST_MSG);
 
-        if(fclose(pFile) == EOF) {
+        if (fclose(pFile) == EOF) {
             TEST_ERROR();
         }
     } else {
@@ -23,17 +25,17 @@ int do_test() {
 
     pFile = fopen(tmp_file_name, "r");
 
-    if(pFile != NULL) {
+    if (pFile != NULL) {
         memset(buffer, 0, sizeof(buffer));
-        if(fread(buffer, 1, sizeof(buffer), pFile) == 0) {
+        if (fread(buffer, 1, sizeof(buffer), pFile) == 0) {
             TEST_ERROR();
         } else {
-            if(strcmp(buffer, TEST_MSG) != 0) {
+            if (strcmp(buffer, TEST_MSG) != 0) {
                 TEST_ERROR();
             }
         }
 
-        if(fclose(pFile) == EOF) {
+        if (fclose(pFile) == EOF) {
             TEST_ERROR();
         }
     } else {

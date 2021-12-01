@@ -11,13 +11,14 @@
 #include <asm/prctl.h>
 #endif
 #endif
-#include <sys/syscall.h>
-#include <sys/stat.h>
-#include <sys/time.h>
 #include <libgen.h>
-#include <sys/resource.h>
 #include <setjmp.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
+#include <sys/time.h>
 
+#include "../contrib/libmusl/musl.h"
 #include "atomic.h"
 #include "bashmem.h"
 #include "cfg.h"
@@ -26,20 +27,19 @@
 #include "dbg.h"
 #include "dns.h"
 #include "fn.h"
+#include "inject.h"
+#include "javaagent.h"
 #include "os.h"
 #include "plattime.h"
 #include "report.h"
+#include "runtimecfg.h"
 #include "scopeelf.h"
 #include "scopetypes.h"
 #include "state.h"
 #include "utils.h"
 #include "wrap.h"
-#include "runtimecfg.h"
-#include "javaagent.h"
-#include "inject.h"
-#include "../contrib/libmusl/musl.h"
 
-#define SSL_FUNC_READ "SSL_read"
+#define SSL_FUNC_READ  "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
 
 static thread_timing g_thread = {0};
@@ -70,167 +70,160 @@ static void uv__read_hook(void *);
 extern int arch_prctl(int, unsigned long);
 extern unsigned long scope_fs;
 
-extern void initGoHook(elf_buf_t*);
+extern void initGoHook(elf_buf_t *);
 
-static got_list_t hook_list[] = {
-    {"SSL_read", SSL_read, &g_fn.SSL_read},
-    {"SSL_write", SSL_write, &g_fn.SSL_write},
-    {NULL, NULL, NULL}
-};
+static got_list_t hook_list[] = {{"SSL_read", SSL_read, &g_fn.SSL_read}, {"SSL_write", SSL_write, &g_fn.SSL_write}, {NULL, NULL, NULL}};
 
-static got_list_t inject_hook_list[] = {
-    {"sigaction",   NULL, &g_fn.sigaction},
-    {"open",        NULL, &g_fn.open},
-    {"openat",      NULL, &g_fn.openat},
-    {"fopen",       NULL, &g_fn.fopen},
-    {"freopen",     NULL, &g_fn.freopen},
-    {"nanosleep",   NULL, &g_fn.nanosleep},
-    {"select",      NULL, &g_fn.select},
-    {"sigsuspend",  NULL, &g_fn.sigsuspend},
-    {"epoll_wait",  NULL, &g_fn.epoll_wait},
-    {"poll",        NULL, &g_fn.poll},
-    {"pause",       NULL, &g_fn.pause},
-    {"sigwaitinfo", NULL, &g_fn.sigwaitinfo},
-    {"sigtimedwait", NULL, &g_fn.sigtimedwait},
-    {"epoll_pwait", NULL, &g_fn.epoll_pwait},
-    {"ppoll",       NULL, &g_fn.ppoll},
-    {"pselect",     NULL, &g_fn.pselect},
-    {"msgsnd",      NULL, &g_fn.msgsnd},
-    {"msgrcv",      NULL, &g_fn.msgrcv},
-    {"semop",       NULL, &g_fn.semop},
-    {"semtimedop",  NULL, &g_fn.semtimedop},
-    {"clock_nanosleep", NULL, &g_fn.clock_nanosleep},
-    {"usleep", NULL, &g_fn.usleep},
-    {"io_getevents", NULL, &g_fn.io_getevents},
-    {"open64", NULL, &g_fn.open64},
-    {"openat64", NULL, &g_fn.openat64},
-    {"__open_2", NULL, &g_fn.__open_2},
-    {"__open64_2", NULL, &g_fn.__open64_2},
-    {"__openat_2", NULL, &g_fn.__openat_2},
-    {"creat64", NULL, &g_fn.creat64},
-    {"fopen64", NULL, &g_fn.fopen64},
-    {"freopen64", NULL, &g_fn.freopen64},
-    {"pread64", NULL, &g_fn.pread64},
-    {"preadv", NULL, &g_fn.preadv},
-    {"preadv2", NULL, &g_fn.preadv2},
-    {"preadv64v2", NULL, &g_fn.preadv64v2},
-    {"__pread_chk", NULL, &g_fn.__pread_chk},
-    {"__read_chk", NULL, &g_fn.__read_chk},
-    {"__fread_unlocked_chk", NULL, &g_fn.__fread_unlocked_chk},
-    {"pwrite64", NULL, &g_fn.pwrite64},
-    {"pwritev", NULL, &g_fn.pwritev},
-    {"pwritev64", NULL, &g_fn.pwritev64},
-    {"pwritev2", NULL, &g_fn.pwritev2},
-    {"pwritev64v2", NULL, &g_fn.pwritev64v2},
-    {"lseek64", NULL, &g_fn.lseek64},
-    {"fseeko64", NULL, &g_fn.fseeko64},
-    {"ftello64", NULL, &g_fn.ftello64},
-    {"statfs64", NULL, &g_fn.statfs64},
-    {"fstatfs64", NULL, &g_fn.fstatfs64},
-    {"fsetpos64", NULL, &g_fn.fsetpos64},
-    {"__xstat", NULL, &g_fn.__xstat},
-    {"__xstat64", NULL, &g_fn.__xstat64},
-    {"__lxstat", NULL, &g_fn.__lxstat},
-    {"__lxstat64", NULL, &g_fn.__lxstat64},
-    {"__fxstat", NULL, &g_fn.__fxstat},
-    {"__fxstatat", NULL, &g_fn.__fxstatat},
-    {"__fxstatat64", NULL, &g_fn.__fxstatat64},
-    {"statfs", NULL, &g_fn.statfs},
-    {"fstatfs", NULL, &g_fn.fstatfs},
-    {"statvfs", NULL, &g_fn.statvfs},
-    {"statvfs64", NULL, &g_fn.statvfs64},
-    {"fstatvfs", NULL, &g_fn.fstatvfs},
-    {"fstatvfs64", NULL, &g_fn.fstatvfs64},
-    {"access", NULL, &g_fn.access},
-    {"faccessat", NULL, &g_fn.faccessat},
-    {"gethostbyname_r", NULL, &g_fn.gethostbyname_r},
-    {"gethostbyname2_r", NULL, &g_fn.gethostbyname2_r},
-    {"fstatat", NULL, &g_fn.fstatat},
-    {"prctl", NULL, &g_fn.prctl},
-    {"execve", NULL, &g_fn.execve},
-    {"syscall", NULL, &g_fn.syscall},
-    {"sendfile", NULL, &g_fn.sendfile},
-    {"sendfile64", NULL, &g_fn.sendfile64},
-    {"SSL_read", NULL, &g_fn.SSL_read},
-    {"SSL_write", NULL, &g_fn.SSL_write},
-    {"gnutls_record_recv", NULL, &g_fn.gnutls_record_recv},
-    {"gnutls_record_recv_early_data", NULL, &g_fn.gnutls_record_recv_early_data},
-    {"gnutls_record_recv_packet", NULL, &g_fn.gnutls_record_recv_packet},
-    {"gnutls_record_recv_seq", NULL, &g_fn.gnutls_record_recv_seq},
-    {"gnutls_record_send", NULL, &g_fn.gnutls_record_send},
-    {"gnutls_record_send2", NULL, &g_fn.gnutls_record_send2},
-    {"gnutls_record_send_early_data", NULL, &g_fn.gnutls_record_send_early_data},
-    {"gnutls_record_send_range", NULL, &g_fn.gnutls_record_send_range},
-    {"dlopen", NULL, &g_fn.dlopen},
-    {"_exit", NULL, &g_fn._exit},
-    {"close", NULL, &g_fn.close},
-    {"fclose", NULL, &g_fn.fclose},
-    {"fcloseall", NULL, &g_fn.fcloseall},
-    {"lseek", NULL, &g_fn.lseek},
-    {"fseek", NULL, &g_fn.fseek},
-    {"fseeko", NULL, &g_fn.fseeko},
-    {"ftell", NULL, &g_fn.ftell},
-    {"ftello", NULL, &g_fn.ftello},
-    {"rewind", NULL, &g_fn.rewind},
-    {"fsetpos", NULL, &g_fn.fsetpos},
-    {"fgetpos", NULL, &g_fn.fgetpos},
-    {"fgetpos64", NULL, &g_fn.fgetpos64},
-    {"write", NULL, &g_fn.write},
-    {"pwrite", NULL, &g_fn.pwrite},
-    {"writev", NULL, &g_fn.writev},
-    {"fwrite", NULL, &g_fn.fwrite},
-    {"puts", NULL, &g_fn.puts},
-    {"putchar", NULL, &g_fn.putchar},
-    {"fputs", NULL, &g_fn.fputs},
-    {"fputs_unlocked", NULL, &g_fn.fputs_unlocked},
-    {"read", NULL, &g_fn.read},
-    {"readv", NULL, &g_fn.readv},
-    {"pread", NULL, &g_fn.pread},
-    {"fread", NULL, &g_fn.fread},
-    {"__fread_chk", NULL, &g_fn.__fread_chk},
-    {"fgets", NULL, &g_fn.fgets},
-    {"__fgets_chk", NULL, &g_fn.__fgets_chk},
-    {"fgets_unlocked", NULL, &g_fn.fgets_unlocked},
-    {"__fgetws_chk", NULL, &g_fn.__fgetws_chk},
-    {"fgetws", NULL, &g_fn.fgetws},
-    {"fgetwc", NULL, &g_fn.fgetwc},
-    {"fgetc", NULL, &g_fn.fgetc},
-    {"fputc", NULL, &g_fn.fputc},
-    {"fputc_unlocked", NULL, &g_fn.fputc_unlocked},
-    {"putwc", NULL, &g_fn.putwc},
-    {"fputwc", NULL, &g_fn.fputwc},
-    {"fscanf", NULL, &g_fn.fscanf},
-    {"getline", NULL, &g_fn.getline},
-    {"getdelim", NULL, &g_fn.getdelim},
-    {"__getdelim", NULL, &g_fn.__getdelim},
-    {"fcntl", NULL, &g_fn.fcntl},
-    {"fcntl64", NULL, &g_fn.fcntl64},
-    {"dup", NULL, &g_fn.dup},
-    {"dup2", NULL, &g_fn.dup2},
-    {"dup3", NULL, &g_fn.dup3},
-    {"vsyslog", NULL, &g_fn.vsyslog},
-    {"fork", NULL, &g_fn.fork},
-    {"socket", NULL, &g_fn.socket},
-    {"shutdown", NULL, &g_fn.shutdown},
-    {"listen", NULL, &g_fn.listen},
-    {"accept", NULL, &g_fn.accept},
-    {"accept4", NULL, &g_fn.accept4},
-    {"bind", NULL, &g_fn.bind},
-    {"connect", NULL, &g_fn.connect},
-    {"send", NULL, &g_fn.send},
-    {"sendto", NULL, &g_fn.sendto},
-    {"sendmsg", NULL, &g_fn.sendmsg},
-    {"recv", NULL, &g_fn.recv},
-    {"recvfrom", NULL, &g_fn.recvfrom},
-    {"recvmsg", NULL, &g_fn.recvmsg},
-    {NULL, NULL, NULL}
-};
+static got_list_t inject_hook_list[] = {{"sigaction", NULL, &g_fn.sigaction},
+                                        {"open", NULL, &g_fn.open},
+                                        {"openat", NULL, &g_fn.openat},
+                                        {"fopen", NULL, &g_fn.fopen},
+                                        {"freopen", NULL, &g_fn.freopen},
+                                        {"nanosleep", NULL, &g_fn.nanosleep},
+                                        {"select", NULL, &g_fn.select},
+                                        {"sigsuspend", NULL, &g_fn.sigsuspend},
+                                        {"epoll_wait", NULL, &g_fn.epoll_wait},
+                                        {"poll", NULL, &g_fn.poll},
+                                        {"pause", NULL, &g_fn.pause},
+                                        {"sigwaitinfo", NULL, &g_fn.sigwaitinfo},
+                                        {"sigtimedwait", NULL, &g_fn.sigtimedwait},
+                                        {"epoll_pwait", NULL, &g_fn.epoll_pwait},
+                                        {"ppoll", NULL, &g_fn.ppoll},
+                                        {"pselect", NULL, &g_fn.pselect},
+                                        {"msgsnd", NULL, &g_fn.msgsnd},
+                                        {"msgrcv", NULL, &g_fn.msgrcv},
+                                        {"semop", NULL, &g_fn.semop},
+                                        {"semtimedop", NULL, &g_fn.semtimedop},
+                                        {"clock_nanosleep", NULL, &g_fn.clock_nanosleep},
+                                        {"usleep", NULL, &g_fn.usleep},
+                                        {"io_getevents", NULL, &g_fn.io_getevents},
+                                        {"open64", NULL, &g_fn.open64},
+                                        {"openat64", NULL, &g_fn.openat64},
+                                        {"__open_2", NULL, &g_fn.__open_2},
+                                        {"__open64_2", NULL, &g_fn.__open64_2},
+                                        {"__openat_2", NULL, &g_fn.__openat_2},
+                                        {"creat64", NULL, &g_fn.creat64},
+                                        {"fopen64", NULL, &g_fn.fopen64},
+                                        {"freopen64", NULL, &g_fn.freopen64},
+                                        {"pread64", NULL, &g_fn.pread64},
+                                        {"preadv", NULL, &g_fn.preadv},
+                                        {"preadv2", NULL, &g_fn.preadv2},
+                                        {"preadv64v2", NULL, &g_fn.preadv64v2},
+                                        {"__pread_chk", NULL, &g_fn.__pread_chk},
+                                        {"__read_chk", NULL, &g_fn.__read_chk},
+                                        {"__fread_unlocked_chk", NULL, &g_fn.__fread_unlocked_chk},
+                                        {"pwrite64", NULL, &g_fn.pwrite64},
+                                        {"pwritev", NULL, &g_fn.pwritev},
+                                        {"pwritev64", NULL, &g_fn.pwritev64},
+                                        {"pwritev2", NULL, &g_fn.pwritev2},
+                                        {"pwritev64v2", NULL, &g_fn.pwritev64v2},
+                                        {"lseek64", NULL, &g_fn.lseek64},
+                                        {"fseeko64", NULL, &g_fn.fseeko64},
+                                        {"ftello64", NULL, &g_fn.ftello64},
+                                        {"statfs64", NULL, &g_fn.statfs64},
+                                        {"fstatfs64", NULL, &g_fn.fstatfs64},
+                                        {"fsetpos64", NULL, &g_fn.fsetpos64},
+                                        {"__xstat", NULL, &g_fn.__xstat},
+                                        {"__xstat64", NULL, &g_fn.__xstat64},
+                                        {"__lxstat", NULL, &g_fn.__lxstat},
+                                        {"__lxstat64", NULL, &g_fn.__lxstat64},
+                                        {"__fxstat", NULL, &g_fn.__fxstat},
+                                        {"__fxstatat", NULL, &g_fn.__fxstatat},
+                                        {"__fxstatat64", NULL, &g_fn.__fxstatat64},
+                                        {"statfs", NULL, &g_fn.statfs},
+                                        {"fstatfs", NULL, &g_fn.fstatfs},
+                                        {"statvfs", NULL, &g_fn.statvfs},
+                                        {"statvfs64", NULL, &g_fn.statvfs64},
+                                        {"fstatvfs", NULL, &g_fn.fstatvfs},
+                                        {"fstatvfs64", NULL, &g_fn.fstatvfs64},
+                                        {"access", NULL, &g_fn.access},
+                                        {"faccessat", NULL, &g_fn.faccessat},
+                                        {"gethostbyname_r", NULL, &g_fn.gethostbyname_r},
+                                        {"gethostbyname2_r", NULL, &g_fn.gethostbyname2_r},
+                                        {"fstatat", NULL, &g_fn.fstatat},
+                                        {"prctl", NULL, &g_fn.prctl},
+                                        {"execve", NULL, &g_fn.execve},
+                                        {"syscall", NULL, &g_fn.syscall},
+                                        {"sendfile", NULL, &g_fn.sendfile},
+                                        {"sendfile64", NULL, &g_fn.sendfile64},
+                                        {"SSL_read", NULL, &g_fn.SSL_read},
+                                        {"SSL_write", NULL, &g_fn.SSL_write},
+                                        {"gnutls_record_recv", NULL, &g_fn.gnutls_record_recv},
+                                        {"gnutls_record_recv_early_data", NULL, &g_fn.gnutls_record_recv_early_data},
+                                        {"gnutls_record_recv_packet", NULL, &g_fn.gnutls_record_recv_packet},
+                                        {"gnutls_record_recv_seq", NULL, &g_fn.gnutls_record_recv_seq},
+                                        {"gnutls_record_send", NULL, &g_fn.gnutls_record_send},
+                                        {"gnutls_record_send2", NULL, &g_fn.gnutls_record_send2},
+                                        {"gnutls_record_send_early_data", NULL, &g_fn.gnutls_record_send_early_data},
+                                        {"gnutls_record_send_range", NULL, &g_fn.gnutls_record_send_range},
+                                        {"dlopen", NULL, &g_fn.dlopen},
+                                        {"_exit", NULL, &g_fn._exit},
+                                        {"close", NULL, &g_fn.close},
+                                        {"fclose", NULL, &g_fn.fclose},
+                                        {"fcloseall", NULL, &g_fn.fcloseall},
+                                        {"lseek", NULL, &g_fn.lseek},
+                                        {"fseek", NULL, &g_fn.fseek},
+                                        {"fseeko", NULL, &g_fn.fseeko},
+                                        {"ftell", NULL, &g_fn.ftell},
+                                        {"ftello", NULL, &g_fn.ftello},
+                                        {"rewind", NULL, &g_fn.rewind},
+                                        {"fsetpos", NULL, &g_fn.fsetpos},
+                                        {"fgetpos", NULL, &g_fn.fgetpos},
+                                        {"fgetpos64", NULL, &g_fn.fgetpos64},
+                                        {"write", NULL, &g_fn.write},
+                                        {"pwrite", NULL, &g_fn.pwrite},
+                                        {"writev", NULL, &g_fn.writev},
+                                        {"fwrite", NULL, &g_fn.fwrite},
+                                        {"puts", NULL, &g_fn.puts},
+                                        {"putchar", NULL, &g_fn.putchar},
+                                        {"fputs", NULL, &g_fn.fputs},
+                                        {"fputs_unlocked", NULL, &g_fn.fputs_unlocked},
+                                        {"read", NULL, &g_fn.read},
+                                        {"readv", NULL, &g_fn.readv},
+                                        {"pread", NULL, &g_fn.pread},
+                                        {"fread", NULL, &g_fn.fread},
+                                        {"__fread_chk", NULL, &g_fn.__fread_chk},
+                                        {"fgets", NULL, &g_fn.fgets},
+                                        {"__fgets_chk", NULL, &g_fn.__fgets_chk},
+                                        {"fgets_unlocked", NULL, &g_fn.fgets_unlocked},
+                                        {"__fgetws_chk", NULL, &g_fn.__fgetws_chk},
+                                        {"fgetws", NULL, &g_fn.fgetws},
+                                        {"fgetwc", NULL, &g_fn.fgetwc},
+                                        {"fgetc", NULL, &g_fn.fgetc},
+                                        {"fputc", NULL, &g_fn.fputc},
+                                        {"fputc_unlocked", NULL, &g_fn.fputc_unlocked},
+                                        {"putwc", NULL, &g_fn.putwc},
+                                        {"fputwc", NULL, &g_fn.fputwc},
+                                        {"fscanf", NULL, &g_fn.fscanf},
+                                        {"getline", NULL, &g_fn.getline},
+                                        {"getdelim", NULL, &g_fn.getdelim},
+                                        {"__getdelim", NULL, &g_fn.__getdelim},
+                                        {"fcntl", NULL, &g_fn.fcntl},
+                                        {"fcntl64", NULL, &g_fn.fcntl64},
+                                        {"dup", NULL, &g_fn.dup},
+                                        {"dup2", NULL, &g_fn.dup2},
+                                        {"dup3", NULL, &g_fn.dup3},
+                                        {"vsyslog", NULL, &g_fn.vsyslog},
+                                        {"fork", NULL, &g_fn.fork},
+                                        {"socket", NULL, &g_fn.socket},
+                                        {"shutdown", NULL, &g_fn.shutdown},
+                                        {"listen", NULL, &g_fn.listen},
+                                        {"accept", NULL, &g_fn.accept},
+                                        {"accept4", NULL, &g_fn.accept4},
+                                        {"bind", NULL, &g_fn.bind},
+                                        {"connect", NULL, &g_fn.connect},
+                                        {"send", NULL, &g_fn.send},
+                                        {"sendto", NULL, &g_fn.sendto},
+                                        {"sendmsg", NULL, &g_fn.sendmsg},
+                                        {"recv", NULL, &g_fn.recv},
+                                        {"recvfrom", NULL, &g_fn.recvfrom},
+                                        {"recvmsg", NULL, &g_fn.recvmsg},
+                                        {NULL, NULL, NULL}};
 
-typedef struct
-{
+typedef struct {
     char *in_symbol;
     void *out_addr;
-    int   after_scope;
+    int after_scope;
 } param_t;
 
 // When used with dl_iterate_phdr(), this has a similar result to
@@ -245,121 +238,124 @@ static void *scope_dlsym(void *, const char *, void *);
 static int
 findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 {
-    param_t* param = (param_t*)data;
+    param_t *param = (param_t *)data;
 
     // Don't bother looking inside libraries until after we've seen our library.
     if (!param->after_scope) {
-        param->after_scope = (strstr(info->dlpi_name, "libscope") != NULL) ||
-            (strstr(info->dlpi_name, "/proc/") != NULL);
+        param->after_scope = (strstr(info->dlpi_name, "libscope") != NULL) || (strstr(info->dlpi_name, "/proc/") != NULL);
         return 0;
     }
 
     // Now start opening libraries and looking for param->in_symbol
     void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
-    if (!handle) return 0;
+    if (!handle)
+        return 0;
     void *addr = dlsym(handle, param->in_symbol);
     dlclose(handle);
 
     // if we don't find addr, keep going
-    if (!addr)  return 0;
+    if (!addr)
+        return 0;
 
     // We found an addr, and it's not in our library!  Return it!
     param->out_addr = addr;
     return 1;
 }
 
-#define WRAP_CHECK(func, rc)                                           \
-    if (g_fn.func == NULL ) {                                          \
-       if (!g_ctl) {                                                   \
-         if ((g_fn.func = scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {  \
-             scopeLogError("ERROR: "#func":NULL\n");         \
-             return rc;                                                \
-         }                                                             \
-       } else {                                                        \
-        param_t param = {.in_symbol = #func, .out_addr = NULL,         \
-                         .after_scope = FALSE};                        \
-        if (!dl_iterate_phdr(findSymbol, &param)) {                    \
-            scopeLogError("ERROR: "#func":NULL\n");          \
-            return rc;                                                 \
-        }                                                              \
-        g_fn.func = param.out_addr;                                    \
-       }                                                               \
-    }                                                                  \
+#define WRAP_CHECK(func, rc)                                                              \
+    if (g_fn.func == NULL) {                                                              \
+        if (!g_ctl) {                                                                     \
+            if ((g_fn.func = scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {              \
+                scopeLogError("ERROR: " #func ":NULL\n");                                 \
+                return rc;                                                                \
+            }                                                                             \
+        } else {                                                                          \
+            param_t param = {.in_symbol = #func, .out_addr = NULL, .after_scope = FALSE}; \
+            if (!dl_iterate_phdr(findSymbol, &param)) {                                   \
+                scopeLogError("ERROR: " #func ":NULL\n");                                 \
+                return rc;                                                                \
+            }                                                                             \
+            g_fn.func = param.out_addr;                                                   \
+        }                                                                                 \
+    }                                                                                     \
     doThread();
 
-#define WRAP_CHECK_VOID(func)                                          \
-    if (g_fn.func == NULL ) {                                          \
-       if (!g_ctl) {                                                   \
-         if ((g_fn.func = scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {  \
-             scopeLogError("ERROR: "#func":NULL\n");         \
-             return;                                                   \
-         }                                                             \
-       } else {                                                        \
-        param_t param = {.in_symbol = #func, .out_addr = NULL,         \
-                         .after_scope = FALSE};                        \
-        if (!dl_iterate_phdr(findSymbol, &param)) {                    \
-            scopeLogError("ERROR: "#func":NULL\n");          \
-            return;                                                    \
-        }                                                              \
-        g_fn.func = param.out_addr;                                    \
-      }                                                                \
-    }                                                                  \
+#define WRAP_CHECK_VOID(func)                                                             \
+    if (g_fn.func == NULL) {                                                              \
+        if (!g_ctl) {                                                                     \
+            if ((g_fn.func = scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {              \
+                scopeLogError("ERROR: " #func ":NULL\n");                                 \
+                return;                                                                   \
+            }                                                                             \
+        } else {                                                                          \
+            param_t param = {.in_symbol = #func, .out_addr = NULL, .after_scope = FALSE}; \
+            if (!dl_iterate_phdr(findSymbol, &param)) {                                   \
+                scopeLogError("ERROR: " #func ":NULL\n");                                 \
+                return;                                                                   \
+            }                                                                             \
+            g_fn.func = param.out_addr;                                                   \
+        }                                                                                 \
+    }                                                                                     \
     doThread();
 
-#define SYMBOL_LOADED(func) ({                                         \
-    int retval;                                                        \
-    if (g_fn.func == NULL) {                                           \
-        param_t param = {.in_symbol = #func, .out_addr = NULL,         \
-                         .after_scope = FALSE};                        \
-        if (dl_iterate_phdr(findSymbol, &param)) {                     \
-            g_fn.func = param.out_addr;                                \
-        }                                                              \
-    }                                                                  \
-    retval = (g_fn.func != NULL);                                      \
-    retval;                                                            \
-})
+#define SYMBOL_LOADED(func)                                                               \
+    ({                                                                                    \
+        int retval;                                                                       \
+        if (g_fn.func == NULL) {                                                          \
+            param_t param = {.in_symbol = #func, .out_addr = NULL, .after_scope = FALSE}; \
+            if (dl_iterate_phdr(findSymbol, &param)) {                                    \
+                g_fn.func = param.out_addr;                                               \
+            }                                                                             \
+        }                                                                                 \
+        retval = (g_fn.func != NULL);                                                     \
+        retval;                                                                           \
+    })
 
 #else
 
-#define WRAP_CHECK(func, rc)                                           \
-    if (g_fn.func == NULL ) {                                          \
-        if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {           \
-            scopeLogError("ERROR: "#func":NULL\n");          \
-            return rc;                                                 \
-       }                                                               \
-    }                                                                  \
+#define WRAP_CHECK(func, rc)                                 \
+    if (g_fn.func == NULL) {                                 \
+        if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) { \
+            scopeLogError("ERROR: " #func ":NULL\n");        \
+            return rc;                                       \
+        }                                                    \
+    }                                                        \
     doThread();
 
-#define WRAP_CHECK_VOID(func)                                          \
-    if (g_fn.func == NULL ) {                                          \
-        if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {           \
-            scopeLogError("ERROR: "#func":NULL\n");          \
-            return;                                                    \
-       }                                                               \
-    }                                                                  \
+#define WRAP_CHECK_VOID(func)                                \
+    if (g_fn.func == NULL) {                                 \
+        if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) { \
+            scopeLogError("ERROR: " #func ":NULL\n");        \
+            return;                                          \
+        }                                                    \
+    }                                                        \
     doThread();
 
-#define SYMBOL_LOADED(func) ({                                         \
-    int retval;                                                        \
-    if (g_fn.func == NULL) {                                           \
-        g_fn.func = dlsym(RTLD_NEXT, #func);                           \
-    }                                                                  \
-    retval = (g_fn.func != NULL);                                      \
-    retval;                                                            \
-})
+#define SYMBOL_LOADED(func)                      \
+    ({                                           \
+        int retval;                              \
+        if (g_fn.func == NULL) {                 \
+            g_fn.func = dlsym(RTLD_NEXT, #func); \
+        }                                        \
+        retval = (g_fn.func != NULL);            \
+        retval;                                  \
+    })
 
 #endif // __linux__
-
 
 static void
 freeNssEntry(void *data)
 {
-    if (!data) return;
+    if (!data)
+        return;
     nss_list *nssentry = data;
 
-    if (!nssentry) return;
-    if (nssentry->ssl_methods) free(nssentry->ssl_methods);
-    if (nssentry->ssl_int_methods) free(nssentry->ssl_int_methods);
+    if (!nssentry)
+        return;
+    if (nssentry->ssl_methods)
+        free(nssentry->ssl_methods);
+    if (nssentry->ssl_int_methods)
+        free(nssentry->ssl_int_methods);
     free(nssentry);
 }
 
@@ -369,14 +365,16 @@ fileModTime(const char *path)
     int fd;
     struct stat statbuf;
 
-    if (!path) return 0;
+    if (!path)
+        return 0;
 
     if (!g_fn.open || !g_fn.close) {
         return 0;
     }
 
-    if ((fd = g_fn.open(path, O_RDONLY)) == -1) return 0;
-    
+    if ((fd = g_fn.open(path, O_RDONLY)) == -1)
+        return 0;
+
     if (fstat(fd, &statbuf) < 0) {
         g_fn.close(fd);
         return 0;
@@ -396,23 +394,23 @@ remoteConfig()
     FILE *fs;
     char buf[1024];
     char path[PATH_MAX];
-    
+
     // to be clear; a 1ms timeout
     timeout = 1;
     memset(&fds, 0x0, sizeof(fds));
 
-/*
-    Setting fds.events = 0 to neuter ability to process remote
-    commands... until this is function is reworked to be TLS-friendly.
+    /*
+        Setting fds.events = 0 to neuter ability to process remote
+        commands... until this is function is reworked to be TLS-friendly.
 
-    cfg_transport_t ttype = ctlTransportType(g_ctl, CFG_CTL);
-    if ((ttype == (cfg_transport_t)-1) || (ttype == CFG_FILE) ||
-        (ttype ==  CFG_SYSLOG) || (ttype == CFG_SHM)) {
-        fds.events = 0;
-    } else {
-        fds.events = POLLIN;
-    }
-*/
+        cfg_transport_t ttype = ctlTransportType(g_ctl, CFG_CTL);
+        if ((ttype == (cfg_transport_t)-1) || (ttype == CFG_FILE) ||
+            (ttype ==  CFG_SYSLOG) || (ttype == CFG_SHM)) {
+            fds.events = 0;
+        } else {
+            fds.events = POLLIN;
+        }
+    */
 
     fds.events = 0;
     fds.fd = ctlConnection(g_ctl, CFG_CTL);
@@ -432,8 +430,8 @@ remoteConfig()
      * Timeout or no read data?
      * We can track exceptions where revents != POLLIN. Necessary?
      */
-    if ((rc == 0) || (fds.revents == 0) || ((fds.revents & POLLIN) == 0) ||
-        ((fds.revents & POLLHUP) != 0) || ((fds.revents & POLLNVAL) != 0)) return;
+    if ((rc == 0) || (fds.revents == 0) || ((fds.revents & POLLIN) == 0) || ((fds.revents & POLLHUP) != 0) || ((fds.revents & POLLNVAL) != 0))
+        return;
 
     snprintf(path, sizeof(path), "/tmp/cfg.%d", g_proc.pid);
     if ((fs = g_fn.fopen(path, "a+")) == NULL) {
@@ -457,7 +455,7 @@ remoteConfig()
             break;
         } else {
             /*
-             * We are done if we get end of msg (EOM) or if we've read more 
+             * We are done if we get end of msg (EOM) or if we've read more
              * than expected and never saw an EOM.
              * We are only successful if we've had no errors or disconnects
              * and we receive a viable EOM.
@@ -480,7 +478,8 @@ remoteConfig()
         struct stat sb;
         request_t *req;
 
-        if (fflush(fs) != 0) DBG(NULL);
+        if (fflush(fs) != 0)
+            DBG(NULL);
         rewind(fs);
         if (lstat(path, &sb) == -1) {
             sb.st_size = DEFAULT_CONFIG_SIZE;
@@ -493,7 +492,7 @@ remoteConfig()
             cmdSendInfoStr(g_ctl, "Error in receive from stream.  Memory error in scope receive.");
             return;
         }
-        
+
         if (g_fn.fread(cmd, sb.st_size, 1, fs) == 0) {
             g_fn.fclose(fs);
             unlink(path);
@@ -501,10 +500,10 @@ remoteConfig()
             cmdSendInfoStr(g_ctl, "Error in receive from stream.  Read error in scope.");
             return;
         }
-        
-        req = cmdParse((const char*)cmd);
+
+        req = cmdParse((const char *)cmd);
         if (req) {
-            cJSON* body = NULL;
+            cJSON *body = NULL;
             switch (req->cmd) {
                 case REQ_PARSE_ERR:
                 case REQ_MALFORMED:
@@ -538,7 +537,7 @@ remoteConfig()
                             g_cfg.urls = 1;
                             break;
                         case URL_REDIRECT_OFF:
-                             g_cfg.urls = 0;
+                            g_cfg.urls = 0;
                             break;
                         default:
                             DBG("%d", req->action);
@@ -552,10 +551,10 @@ remoteConfig()
                     // remove a protocol
                     delProtocol(req);
                     break;
-            default:
+                default:
                     DBG(NULL);
             }
-            
+
             cmdSendResponse(g_ctl, req, body);
             destroyReq(&req);
         } else {
@@ -630,7 +629,8 @@ dynConfig(void)
     snprintf(path, sizeof(path), "%s/%s.%d", g_cmddir, DYN_CONFIG_PREFIX, g_proc.pid);
 
     // Is there a command file for this pid
-    if (osIsFilePresent(g_proc.pid, path) == -1) return 0;
+    if (osIsFilePresent(g_proc.pid, path) == -1)
+        return 0;
 
     // Have we already processed this file?
     now = fileModTime(path);
@@ -643,7 +643,8 @@ dynConfig(void)
     modtime = now;
 
     // Open the command file
-    if ((fs = g_fn.fopen(path, "r")) == NULL) return -1;
+    if ((fs = g_fn.fopen(path, "r")) == NULL)
+        return -1;
 
     // Modify the static config from the command file
     cfgProcessCommands(g_staticfg, fs);
@@ -661,20 +662,22 @@ threadNow(int sig)
 {
     static uint64_t serialize;
 
-    if (!atomicCasU64(&serialize, 0ULL, 1ULL)) return;
+    if (!atomicCasU64(&serialize, 0ULL, 1ULL))
+        return;
 
     // Create one thread at most
     if (g_thread.once == TRUE) {
-        if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
+        if (!atomicCasU64(&serialize, 1ULL, 0ULL))
+            DBG(NULL);
         return;
     }
 
     osTimerStop();
 
-    if (g_fn.pthread_create &&
-        (g_fn.pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0)) {
+    if (g_fn.pthread_create && (g_fn.pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0)) {
         scopeLogError("ERROR: threadNow:pthread_create");
-        if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
+        if (!atomicCasU64(&serialize, 1ULL, 0ULL))
+            DBG(NULL);
         return;
     }
 
@@ -689,7 +692,8 @@ threadNow(int sig)
         }
     }
 
-    if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
+    if (!atomicCasU64(&serialize, 1ULL, 0ULL))
+        DBG(NULL);
 }
 
 /*
@@ -740,7 +744,8 @@ threadInit()
 {
     // for debugging... if SCOPE_NO_SIGNAL is defined, then don't create
     // a signal handler, nor a timer to send a signal.
-    if (getenv("SCOPE_NO_SIGNAL")) return;
+    if (getenv("SCOPE_NO_SIGNAL"))
+        return;
 
     if (osThreadInit(threadNow, g_thread.interval) == FALSE) {
         scopeLogError("ERROR: threadInit:osThreadInit");
@@ -758,10 +763,12 @@ doThread()
      * initialized. This check is intended to ensure that we don't
      * start the thread until after we have our config.
      */
-    if (!g_ctl) return;
+    if (!g_ctl)
+        return;
 
     // Create one thread at most
-    if (g_thread.once == TRUE) return;
+    if (g_thread.once == TRUE)
+        return;
 
     /*
      * g_thread.startTime is the start time, set in the constructor.
@@ -779,7 +786,8 @@ static void
 stopTimer(void)
 {
     // if we are in the constructor, do nothing
-    if (!g_ctl) return;
+    if (!g_ctl)
+        return;
 
     osTimerStop();
     threadNow(0);
@@ -787,22 +795,22 @@ stopTimer(void)
 
 // Return process specific CPU usage in microseconds
 static long long
-doGetProcCPU() {
+doGetProcCPU()
+{
     struct rusage ruse;
-    
+
     if (getrusage(RUSAGE_SELF, &ruse) != 0) {
         return (long long)-1;
     }
 
-    return
-        (((long long)ruse.ru_utime.tv_sec + (long long)ruse.ru_stime.tv_sec) * 1000 * 1000) +
-        ((long long)ruse.ru_utime.tv_usec + (long long)ruse.ru_stime.tv_usec);
+    return (((long long)ruse.ru_utime.tv_sec + (long long)ruse.ru_stime.tv_sec) * 1000 * 1000) + ((long long)ruse.ru_utime.tv_usec + (long long)ruse.ru_stime.tv_usec);
 }
 
 static void
 setProcId(proc_id_t *proc)
 {
-    if (!proc) return;
+    if (!proc)
+        return;
 
     proc->pid = getpid();
     proc->ppid = getppid();
@@ -812,14 +820,15 @@ setProcId(proc_id_t *proc)
     osGetProcname(proc->procname, sizeof(proc->procname));
 
     // free old value of cmd, if an old value exists
-    if (proc->cmd) free(proc->cmd);
+    if (proc->cmd)
+        free(proc->cmd);
     proc->cmd = NULL;
     osGetCmdline(proc->pid, &proc->cmd);
 
     if (proc->hostname && proc->procname && proc->cmd) {
         // limit amount of cmd used in id
         int cmdlen = strlen(proc->cmd);
-        char *ptr = (cmdlen < DEFAULT_CMD_SIZE) ? proc->cmd : &proc->cmd[cmdlen-DEFAULT_CMD_SIZE];
+        char *ptr = (cmdlen < DEFAULT_CMD_SIZE) ? proc->cmd : &proc->cmd[cmdlen - DEFAULT_CMD_SIZE];
         snprintf(proc->id, sizeof(proc->id), "%s-%s-%s", proc->hostname, proc->procname, ptr);
     } else {
         snprintf(proc->id, sizeof(proc->id), "badid");
@@ -876,13 +885,16 @@ reportPeriodicStuff(void)
     }
 
     mem = osGetProcMemory(g_proc.pid);
-    if (mem != -1) doProcMetric(PROC_MEM, mem);
+    if (mem != -1)
+        doProcMetric(PROC_MEM, mem);
 
     nthread = osGetNumThreads(g_proc.pid);
-    if (nthread != -1) doProcMetric(PROC_THREAD, nthread);
+    if (nthread != -1)
+        doProcMetric(PROC_THREAD, nthread);
 
     nfds = osGetNumFds(g_proc.pid);
-    if (nfds != -1) doProcMetric(PROC_FD, nfds);
+    if (nfds != -1)
+        doProcMetric(PROC_FD, nfds);
 
     children = osGetNumChildProcs(g_proc.pid);
     if (children < 0) {
@@ -927,7 +939,8 @@ reportPeriodicStuff(void)
 void
 handleExit(void)
 {
-    if (g_exitdone == TRUE) return;
+    if (g_exitdone == TRUE)
+        return;
     g_exitdone = TRUE;
 
     if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
@@ -943,14 +956,15 @@ handleExit(void)
 
     char *wait;
     if ((wait = getenv("SCOPE_CONNECT_TIMEOUT_SECS")) != NULL) {
-        // wait for a connection to be established 
+        // wait for a connection to be established
         // before we emit data
         int wait_time;
         errno = 0;
         wait_time = strtoul(wait, NULL, 10);
         if (!errno && wait_time) {
             for (int i = 0; i < wait_time; i++) {
-                if (doConnection() == TRUE) break;
+                if (doConnection() == TRUE)
+                    break;
                 sigSafeNanosleep(&ts);
             }
         }
@@ -972,10 +986,10 @@ static void *
 periodic(void *arg)
 {
     // Mask all the signals for this thread to avoid issues with go runtime.
-    // Go runtime installs their own signal handlers so the go signal handler 
-    // may get executed in the context of this thread, which will cause the app to 
+    // Go runtime installs their own signal handlers so the go signal handler
+    // may get executed in the context of this thread, which will cause the app to
     // crash because the go runtime won't be able to find a "g" in the TLS.
-    // Since we can’t predict the thread that will be chosen to run the signal handler, 
+    // Since we can’t predict the thread that will be chosen to run the signal handler,
     // the only reasonable solution seems to be masking the signals for this thread
 
     sigset_t mask;
@@ -998,15 +1012,17 @@ periodic(void *arg)
 
             // TODO: need to ensure that the previous object is no longer in use
             // Clean up previous objects if they exist.
-            //if (g_prevmtc) mtcDestroy(&g_prevmtc);
-            //if (g_prevlog) logDestroy(&g_prevlog);
+            // if (g_prevmtc) mtcDestroy(&g_prevmtc);
+            // if (g_prevlog) logDestroy(&g_prevlog);
 
             // Q: What does it mean to connect transports we expect to be
             // "connectionless"?  A: We've observed some processes close all
             // file/socket descriptors during their initialization.
             // If this happens, this the way we manage re-init.
-            if (mtcNeedsConnection(g_mtc)) mtcConnect(g_mtc);
-            if (logNeedsConnection(g_log)) logConnect(g_log);
+            if (mtcNeedsConnection(g_mtc))
+                mtcConnect(g_mtc);
+            if (logNeedsConnection(g_log))
+                logConnect(g_log);
 
             if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
                 reportPeriodicStuff();
@@ -1045,8 +1061,10 @@ ssl_read_hook(SSL *ssl, void *buf, int num)
     rc = g_fn.SSL_read(ssl, buf, num);
     if (rc > 0) {
         int fd = -1;
-        if (SYMBOL_LOADED(SSL_get_fd)) fd = g_fn.SSL_get_fd(ssl);
-        if ((fd == -1) && (g_ssl_fd != -1)) fd = g_ssl_fd;
+        if (SYMBOL_LOADED(SSL_get_fd))
+            fd = g_fn.SSL_get_fd(ssl);
+        if ((fd == -1) && (g_ssl_fd != -1))
+            fd = g_ssl_fd;
         doProtocol((uint64_t)ssl, fd, buf, (size_t)rc, TLSRX, BUF);
     }
 
@@ -1063,8 +1081,10 @@ ssl_write_hook(SSL *ssl, void *buf, int num)
     rc = g_fn.SSL_write(ssl, buf, num);
     if (rc > 0) {
         int fd = -1;
-        if (SYMBOL_LOADED(SSL_get_fd)) fd = g_fn.SSL_get_fd(ssl);
-        if ((fd == -1) && (g_ssl_fd != -1)) fd = g_ssl_fd;
+        if (SYMBOL_LOADED(SSL_get_fd))
+            fd = g_fn.SSL_get_fd(ssl);
+        if ((fd == -1) && (g_ssl_fd != -1))
+            fd = g_ssl_fd;
         doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)rc, TLSTX, BUF);
     }
 
@@ -1075,7 +1095,7 @@ static void *
 load_func(const char *module, const char *func)
 {
     void *addr;
-    
+
     void *handle = g_fn.dlopen(module, RTLD_LAZY | RTLD_NOLOAD);
     if (handle == NULL) {
         scopeLogError("ERROR: Could not open file %s.\n", module ? module : "(null)");
@@ -1094,11 +1114,10 @@ load_func(const char *module, const char *func)
     return addr;
 }
 
-typedef struct
-{
-    const char *library;    // Input:   e.g. libpthread.so
-    const char *symbol;     // Input:   e.g. __write
-    void **out_addr;        // Output:  e.g. 0x7fffff2523A23734
+typedef struct {
+    const char *library; // Input:   e.g. libpthread.so
+    const char *symbol;  // Input:   e.g. __write
+    void **out_addr;     // Output:  e.g. 0x7fffff2523A23734
 } find_sym_t;
 
 static int
@@ -1110,17 +1129,18 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
     if (strstr(info->dlpi_name, find->library)) {
 
         void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
-        if (!handle) return 0;
+        if (!handle)
+            return 0;
         void *addr = dlsym(handle, find->symbol);
         dlclose(handle);
 
         // if we don't find addr, keep going
-        if (!addr)  return 0;
+        if (!addr)
+            return 0;
 
         // We found symbol in library!  Return the address for it!
         *(find->out_addr) = addr;
         return 1;
-
     }
     return 0;
 }
@@ -1152,14 +1172,14 @@ static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, so
 static size_t __stdio_write(struct MUSL_IO_FILE *, const unsigned char *, size_t);
 static long scope_syscall(long, ...);
 
-static int 
+static int
 findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
 {
     int len = strlen(info->dlpi_name);
     int libscope_so_len = 11;
 
-    if(len > libscope_so_len && !strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
-        *(char **)data = (char *) info->dlpi_name;
+    if (len > libscope_so_len && !strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
+        *(char **)data = (char *)info->dlpi_name;
         return 1;
     }
     return 0;
@@ -1173,7 +1193,8 @@ findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
 static int
 hookSharedObjs(struct dl_phdr_info *info, size_t size, void *data)
 {
-    if (!info || !data || !info->dlpi_name) return FALSE;
+    if (!info || !data || !info->dlpi_name)
+        return FALSE;
 
     struct link_map *lm;
     void *addr = NULL;
@@ -1189,27 +1210,24 @@ hookSharedObjs(struct dl_phdr_info *info, size_t size, void *data)
     // where ld-*.so is for example ld-linux-x86-64.so.2 or ld-musl-x86_64.so.1
     // if opening the main exec, name is NULL, else use the full lib name
     if (strstr(info->dlpi_name, ".so")) {
-        if (strstr(info->dlpi_name, "libc") ||
-            strstr(info->dlpi_name, "ld-") ||
-            strstr(info->dlpi_name, "libscope")) {
+        if (strstr(info->dlpi_name, "libc") || strstr(info->dlpi_name, "ld-") || strstr(info->dlpi_name, "libscope")) {
             return FALSE;
         }
         libname = info->dlpi_name;
     }
 
     void *handle = g_fn.dlopen(libname, RTLD_LAZY);
-    if (handle == NULL) return FALSE;
+    if (handle == NULL)
+        return FALSE;
 
     // Get the link map and ELF sections in advance of something matching
     if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
-        for (int i=0; inject_hook_list[i].symbol; i++) {
+        for (int i = 0; inject_hook_list[i].symbol; i++) {
             addr = dlsym(libscopeHandle, inject_hook_list[i].symbol);
             inject_hook_list[i].func = addr;
 
-            if ((dlsym(handle, inject_hook_list[i].symbol)) &&
-                (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1)) {
-                    scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from shared obj %s",
-                             inject_hook_list[i].symbol, info->dlpi_name);
+            if ((dlsym(handle, inject_hook_list[i].symbol)) && (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1)) {
+                scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from shared obj %s", inject_hook_list[i].symbol, info->dlpi_name);
             }
         }
     }
@@ -1220,7 +1238,7 @@ hookSharedObjs(struct dl_phdr_info *info, size_t size, void *data)
 
 /*
  * Called when injected to perform GOT hooking.
- */ 
+ */
 static bool
 hookInject()
 {
@@ -1250,9 +1268,7 @@ initHook(int attachedFlag)
 
     // env vars are not always set as needed, be explicit here
     // this is duplicated if we were started from the scope exec
-    if ((osGetExePath(&full_path) != -1) &&
-        ((ebuf = getElf(full_path))) &&
-        (is_static(ebuf->buf) == FALSE) && (is_go(ebuf->buf) == TRUE)) {
+    if ((osGetExePath(&full_path) != -1) && ((ebuf = getElf(full_path))) && (is_static(ebuf->buf) == FALSE) && (is_go(ebuf->buf) == TRUE)) {
 #ifdef __GO__
         initGoHook(ebuf);
         threadNow(0);
@@ -1260,18 +1276,19 @@ initHook(int attachedFlag)
             scopeLogError("initHook:arch_prctl");
         }
 
-        __asm__ volatile (
-            "lea scope_stack(%%rip), %%r11 \n"
-            "mov %%rsp, (%%r11)  \n"
-            : "=r"(rc)                    //output
-            :
-            : "%r11"                      //clobbered register
-            );
+        __asm__ volatile("lea scope_stack(%%rip), %%r11 \n"
+                         "mov %%rsp, (%%r11)  \n"
+                         : "=r"(rc) // output
+                         :
+                         : "%r11" // clobbered register
+        );
 
-        if (full_path) free(full_path);
-        if (ebuf) freeElf(ebuf->buf, ebuf->len);
+        if (full_path)
+            free(full_path);
+        if (ebuf)
+            freeElf(ebuf->buf, ebuf->len);
         return;
-#endif  // __GO__
+#endif // __GO__
     }
 
     if (ebuf && ebuf->buf) {
@@ -1283,8 +1300,10 @@ initHook(int attachedFlag)
         scopeLog(CFG_LOG_TRACE, "%s:%d uv__read at %p", __FUNCTION__, __LINE__, g_fn.uv__read);
     }
 
-    if (full_path) free(full_path);
-    if (ebuf) freeElf(ebuf->buf, ebuf->len);
+    if (full_path)
+        free(full_path);
+    if (ebuf)
+        freeElf(ebuf->buf, ebuf->len);
 
     if (attachedFlag) {
         hookInject();
@@ -1307,14 +1326,10 @@ initHook(int attachedFlag)
     // We're funchooking __write in both libc.so and libpthread.so
     // curl didn't work unless we funchook'd libc.
     // test/linux/unixpeer didn't work unless we funchook'd pthread.
-    find_sym_t libc__write = {.library="libc.so",
-                              .symbol="__write",
-                              .out_addr = (void*)&g_fn.__write_libc};
+    find_sym_t libc__write = {.library = "libc.so", .symbol = "__write", .out_addr = (void *)&g_fn.__write_libc};
     dl_iterate_phdr(findLibSym, &libc__write);
 
-    find_sym_t pthread__write = {.library = "libpthread.so",
-                                 .symbol = "__write",
-                                 .out_addr = (void*)&g_fn.__write_pthread};
+    find_sym_t pthread__write = {.library = "libpthread.so", .symbol = "__write", .out_addr = (void *)&g_fn.__write_pthread};
     dl_iterate_phdr(findLibSym, &pthread__write);
 
     // for DNS:
@@ -1328,9 +1343,7 @@ initHook(int attachedFlag)
     // We use the fact that on a musl distro the ld lib env var is set to
     // a dir with a libscope-ver string. If that exists in the env var
     // then we assume musl.
-    if (should_we_patch || g_fn.__write_libc || g_fn.__write_pthread ||
-        ((g_ismusl == FALSE) && g_fn.sendmmsg) ||
-        ((g_ismusl == TRUE) && (g_fn.sendto || g_fn.recvfrom))) {
+    if (should_we_patch || g_fn.__write_libc || g_fn.__write_pthread || ((g_ismusl == FALSE) && g_fn.sendmmsg) || ((g_ismusl == TRUE) && (g_fn.sendto || g_fn.recvfrom))) {
         funchook = funchook_create();
 
         if (logLevel(g_log) <= CFG_LOG_TRACE) {
@@ -1340,34 +1353,36 @@ initHook(int attachedFlag)
 
         if (should_we_patch) {
             g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
-    
-            rc = funchook_prepare(funchook, (void**)&g_fn.SSL_read, ssl_read_hook);
+
+            rc = funchook_prepare(funchook, (void **)&g_fn.SSL_read, ssl_read_hook);
 
             g_fn.SSL_write = (ssl_wrfunc_t)load_func(NULL, SSL_FUNC_WRITE);
 
-            rc = funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
+            rc = funchook_prepare(funchook, (void **)&g_fn.SSL_write, ssl_write_hook);
         }
 
         // sendmmsg, sendto, recvfrom for internal libc use in DNS queries
         if ((g_ismusl == FALSE) && g_fn.sendmmsg) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, internal_sendmmsg);
+            rc = funchook_prepare(funchook, (void **)&g_fn.sendmmsg, internal_sendmmsg);
         }
 
         if (g_fn.syscall) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.syscall, scope_syscall);
+            rc = funchook_prepare(funchook, (void **)&g_fn.syscall, scope_syscall);
         }
 
         if ((g_ismusl == TRUE) && g_fn.sendto) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.sendto, internal_sendto);
+            rc = funchook_prepare(funchook, (void **)&g_fn.sendto, internal_sendto);
         }
 
         if ((g_ismusl == TRUE) && g_fn.recvfrom) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.recvfrom, internal_recvfrom);
+            rc = funchook_prepare(funchook, (void **)&g_fn.recvfrom, internal_recvfrom);
         }
 
         // Used for mapping SSL IDs to fds with libuv. Must be funchooked since it's internal to libuv
-        if (!g_fn.uv_fileno) g_fn.uv_fileno = load_func(NULL, "uv_fileno");
-        if (g_fn.uv__read) rc = funchook_prepare(funchook, (void**)&g_fn.uv__read, uv__read_hook);
+        if (!g_fn.uv_fileno)
+            g_fn.uv_fileno = load_func(NULL, "uv_fileno");
+        if (g_fn.uv__read)
+            rc = funchook_prepare(funchook, (void **)&g_fn.uv__read, uv__read_hook);
 
         // libmusl
         // Note that both stdout & stderr objects point to the same write function.
@@ -1379,28 +1394,28 @@ initHook(int attachedFlag)
             struct MUSL_IO_FILE *stdout_write = (struct MUSL_IO_FILE *)stdout;
 
             // Save the write pointer
-            g_fn.__stdout_write = (size_t (*)(FILE *, const unsigned char *, size_t))stdout_write->write;
+            g_fn.__stdout_write = (size_t(*)(FILE *, const unsigned char *, size_t))stdout_write->write;
 
             // Modify the write pointer to use our function
-            stdout_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+            stdout_write->write = (size_t(*)(FILE *, const unsigned char *, size_t))__stdio_write;
 
             // same for stderr
             struct MUSL_IO_FILE *stderr_write = (struct MUSL_IO_FILE *)stderr;
 
             // Save the write pointer
-            g_fn.__stderr_write = (size_t (*)(FILE *, const unsigned char *, size_t))stderr_write->write;
+            g_fn.__stderr_write = (size_t(*)(FILE *, const unsigned char *, size_t))stderr_write->write;
 
             // Modify the write pointer to use our function
-            stderr_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+            stderr_write->write = (size_t(*)(FILE *, const unsigned char *, size_t))__stdio_write;
         }
 
         if (g_ismusl == FALSE) {
             if (g_fn.__write_libc) {
-                rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
+                rc = funchook_prepare(funchook, (void **)&g_fn.__write_libc, __write_libc);
             }
 
             if (g_fn.__write_pthread) {
-                rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
+                rc = funchook_prepare(funchook, (void **)&g_fn.__write_pthread, __write_pthread);
             }
 
             // We want to be able to use g_fn.write without
@@ -1412,8 +1427,7 @@ initHook(int attachedFlag)
         // hook 'em
         rc = funchook_install(funchook, 0);
         if (rc != 0) {
-            scopeLogError("ERROR: failed to install SSL_read hook. (%s)\n",
-                        funchook_error_message(funchook));
+            scopeLogError("ERROR: failed to install SSL_read hook. (%s)\n", funchook_error_message(funchook));
             return;
         }
     }
@@ -1433,7 +1447,7 @@ initEnv(int *attachedFlag)
 
     // build the full path of the .env file
     char path[128];
-    int  pathLen = snprintf(path, sizeof(path), "/dev/shm/scope_attach_%d.env", getpid());
+    int pathLen = snprintf(path, sizeof(path), "/dev/shm/scope_attach_%d.env", getpid());
     if (pathLen < 0 || pathLen >= sizeof(path)) {
         scopeLog(CFG_LOG_DEBUG, "ERROR: snprintf(scope_attach_PID.env) failed");
         return;
@@ -1453,7 +1467,8 @@ initEnv(int *attachedFlag)
     char line[8192];
     while (g_fn.fgets(line, sizeof(line), fd)) {
         int len = strlen(line);
-        if (line[len-1] == '\n') line[len-1] = '\0';
+        if (line[len - 1] == '\n')
+            line[len - 1] = '\0';
         char *key = strtok(line, "=");
         if (key) {
             char *val = strtok(NULL, "=");
@@ -1483,20 +1498,18 @@ init(void)
 
         // Needed for getElf()
         g_fn.open = dlsym(RTLD_NEXT, "open");
-        if (!g_fn.open) g_fn.open = dlsym(RTLD_DEFAULT, "open");
+        if (!g_fn.open)
+            g_fn.open = dlsym(RTLD_DEFAULT, "open");
         g_fn.close = dlsym(RTLD_NEXT, "close");
-        if (!g_fn.close) g_fn.close = dlsym(RTLD_DEFAULT, "close");
+        if (!g_fn.close)
+            g_fn.close = dlsym(RTLD_DEFAULT, "close");
 
-        g_ismusl =
-            ((osGetExePath(&full_path) != -1) &&
-            !strstr(full_path, "ldscope") &&
-            ((ebuf = getElf(full_path))) &&
-            !is_static(ebuf->buf) &&
-            !is_go(ebuf->buf) &&
-            is_musl(ebuf->buf));
+        g_ismusl = ((osGetExePath(&full_path) != -1) && !strstr(full_path, "ldscope") && ((ebuf = getElf(full_path))) && !is_static(ebuf->buf) && !is_go(ebuf->buf) && is_musl(ebuf->buf));
 
-        if (full_path) free(full_path);
-        if (ebuf) freeElf(ebuf->buf, ebuf->len);
+        if (full_path)
+            free(full_path);
+        if (ebuf)
+            freeElf(ebuf->buf, ebuf->len);
     }
 
     // Use dlsym to get addresses for everything in g_fn
@@ -1540,8 +1553,10 @@ init(void)
 
     doConfig(cfg);
     g_staticfg = cfg;
-    if (path) free(path);
-    if (!g_dbg) dbgInit();
+    if (path)
+        free(path);
+    if (!g_dbg)
+        dbgInit();
     g_getdelim = 0;
 
     g_cfg.staticfg = g_staticfg;
@@ -1555,9 +1570,8 @@ init(void)
     transportRegisterForExitNotification(handleExit);
 
     initHook(attachedFlag);
-    
-    if (checkEnv("SCOPE_APP_TYPE", "go") &&
-        checkEnv("SCOPE_EXEC_TYPE", "static")) {
+
+    if (checkEnv("SCOPE_APP_TYPE", "go") && checkEnv("SCOPE_EXEC_TYPE", "static")) {
         threadNow(0);
     } else if (g_ismusl == FALSE) {
         // The check here is meant to be temporary.
@@ -1580,7 +1594,7 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
      * If no handler, they may just be checking for the current handler.
      */
     if ((signum == SIGUSR2) && (act != NULL)) {
-        g_thread.act = act; 
+        g_thread.act = act;
         return 0;
     }
 
@@ -1741,8 +1755,7 @@ sigwaitinfo(const sigset_t *set, siginfo_t *info)
 }
 
 EXPORTON int
-sigtimedwait(const sigset_t *set, siginfo_t *info,
-             const struct timespec *timeout)
+sigtimedwait(const sigset_t *set, siginfo_t *info, const struct timespec *timeout)
 {
     stopTimer();
     WRAP_CHECK(sigtimedwait, -1);
@@ -1750,9 +1763,7 @@ sigtimedwait(const sigset_t *set, siginfo_t *info,
 }
 
 EXPORTON int
-epoll_pwait(int epfd, struct epoll_event *events,
-            int maxevents, int timeout,
-            const sigset_t *sigmask)
+epoll_pwait(int epfd, struct epoll_event *events, int maxevents, int timeout, const sigset_t *sigmask)
 {
     stopTimer();
     WRAP_CHECK(epoll_pwait, -1);
@@ -1760,8 +1771,7 @@ epoll_pwait(int epfd, struct epoll_event *events,
 }
 
 EXPORTON int
-ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p,
-      const sigset_t *sigmask)
+ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p, const sigset_t *sigmask)
 {
     stopTimer();
     WRAP_CHECK(ppoll, -1);
@@ -1769,9 +1779,7 @@ ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p,
 }
 
 EXPORTON int
-pselect(int nfds, fd_set *readfds, fd_set *writefds,
-        fd_set *exceptfds, const struct timespec *timeout,
-        const sigset_t *sigmask)
+pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, const struct timespec *timeout, const sigset_t *sigmask)
 {
     stopTimer();
     WRAP_CHECK(pselect, -1);
@@ -1803,8 +1811,7 @@ semop(int semid, struct sembuf *sops, size_t nsops)
 }
 
 EXPORTON int
-semtimedop(int semid, struct sembuf *sops, size_t nsops,
-           const struct timespec *timeout)
+semtimedop(int semid, struct sembuf *sops, size_t nsops, const struct timespec *timeout)
 {
     stopTimer();
     WRAP_CHECK(semtimedop, -1);
@@ -1812,9 +1819,7 @@ semtimedop(int semid, struct sembuf *sops, size_t nsops,
 }
 
 EXPORTON int
-clock_nanosleep(clockid_t clockid, int flags,
-                const struct timespec *request,
-                struct timespec *remain)
+clock_nanosleep(clockid_t clockid, int flags, const struct timespec *request, struct timespec *remain)
 {
     stopTimer();
     WRAP_CHECK(clock_nanosleep, -1);
@@ -1830,8 +1835,7 @@ usleep(useconds_t usec)
 }
 
 EXPORTON int
-io_getevents(io_context_t ctx_id, long min_nr, long nr,
-             struct io_event *events, struct timespec *timeout)
+io_getevents(io_context_t ctx_id, long min_nr, long nr, struct io_event *events, struct timespec *timeout)
 {
     stopTimer();
     WRAP_CHECK(io_getevents, -1);
@@ -2021,7 +2025,7 @@ preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
     ssize_t rc = g_fn.preadv64v2(fd, iov, iovcnt, offset, flags);
 
     doRead(fd, initialTime, (rc != -1), iov, rc, "preadv64v2", IOV, iovcnt);
-    
+
     return rc;
 }
 
@@ -2062,7 +2066,7 @@ __fread_unlocked_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *
 
     size_t rc = g_fn.__fread_unlocked_chk(ptr, ptrlen, size, nmemb, stream);
 
-    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "__fread_unlocked_chk", NONE, 0);
+    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc * size, "__fread_unlocked_chk", NONE, 0);
 
     return rc;
 }
@@ -2209,7 +2213,7 @@ __xstat(int ver, const char *path, struct stat *stat_buf)
 
     doStatPath(path, rc, "__xstat");
 
-    return rc;    
+    return rc;
 }
 
 EXPORTON int
@@ -2220,7 +2224,7 @@ __xstat64(int ver, const char *path, struct stat64 *stat_buf)
 
     doStatPath(path, rc, "__xstat64");
 
-    return rc;    
+    return rc;
 }
 
 EXPORTON int
@@ -2257,7 +2261,7 @@ __fxstat(int ver, int fd, struct stat *stat_buf)
 }
 
 EXPORTON int
-__fxstat64(int ver, int fd, struct stat64 * stat_buf)
+__fxstat64(int ver, int fd, struct stat64 *stat_buf)
 {
     WRAP_CHECK(__fxstat64, -1);
     int rc = g_fn.__fxstat64(ver, fd, stat_buf);
@@ -2279,7 +2283,7 @@ __fxstatat(int ver, int dirfd, const char *path, struct stat *stat_buf, int flag
 }
 
 EXPORTON int
-__fxstatat64(int ver, int dirfd, const char * path, struct stat64 * stat_buf, int flags)
+__fxstatat64(int ver, int dirfd, const char *path, struct stat64 *stat_buf, int flags)
 {
     WRAP_CHECK(__fxstatat64, -1);
     int rc = g_fn.__fxstatat64(ver, dirfd, path, stat_buf, flags);
@@ -2291,8 +2295,7 @@ __fxstatat64(int ver, int dirfd, const char * path, struct stat64 * stat_buf, in
 
 #ifdef __STATX__
 EXPORTON int
-statx(int dirfd, const char *pathname, int flags,
-      unsigned int mask, struct statx *statxbuf)
+statx(int dirfd, const char *pathname, int flags, unsigned int mask, struct statx *statxbuf)
 {
     WRAP_CHECK(statx, -1);
     int rc = g_fn.statx(dirfd, pathname, flags, mask, statxbuf);
@@ -2392,12 +2395,11 @@ faccessat(int dirfd, const char *pathname, int mode, int flags)
 }
 
 EXPORTOFF int
-gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
-                struct hostent **result, int *h_errnop)
+gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen, struct hostent **result, int *h_errnop)
 {
     int rc;
     elapsed_t time = {0};
-    
+
     WRAP_CHECK(gethostbyname_r, -1);
     time.initial = getTime();
     rc = g_fn.gethostbyname_r(name, ret, buf, buflen, result, h_errnop);
@@ -2407,7 +2409,7 @@ gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
         scopeLog(CFG_LOG_DEBUG, "gethostbyname_r");
         doUpdateState(DNS, -1, time.duration, NULL, name);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
-    }  else {
+    } else {
         doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "gethostbyname_r", name);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     }
@@ -2416,12 +2418,11 @@ gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
 }
 
 EXPORTOFF int
-gethostbyname2_r(const char *name, int af, struct hostent *ret, char *buf,
-                 size_t buflen, struct hostent **result, int *h_errnop)
+gethostbyname2_r(const char *name, int af, struct hostent *ret, char *buf, size_t buflen, struct hostent **result, int *h_errnop)
 {
     int rc;
     elapsed_t time = {0};
-    
+
     WRAP_CHECK(gethostbyname2_r, -1);
     time.initial = getTime();
     rc = g_fn.gethostbyname2_r(name, af, ret, buf, buflen, result, h_errnop);
@@ -2431,7 +2432,7 @@ gethostbyname2_r(const char *name, int af, struct hostent *ret, char *buf,
         scopeLog(CFG_LOG_DEBUG, "gethostbyname2_r");
         doUpdateState(DNS, -1, time.duration, NULL, name);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
-    }  else {
+    } else {
         doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "gethostbyname2_r", name);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     }
@@ -2516,8 +2517,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 
     WRAP_CHECK(execve, -1);
 
-    if (strstr(g_proc.procname, "ldscope") ||
-        checkEnv("SCOPE_EXECVE", "false")) {
+    if (strstr(g_proc.procname, "ldscope") || checkEnv("SCOPE_EXECVE", "false")) {
         return g_fn.execve(pathname, argv, envp);
     }
 
@@ -2527,7 +2527,8 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     }
 
     // not really necessary since we're gonna exec
-    if (ebuf) freeElf(ebuf->buf, ebuf->len);
+    if (ebuf)
+        freeElf(ebuf->buf, ebuf->len);
 
     /*
      * Note: the isgo check is strictly for Go dynamic execs.
@@ -2538,8 +2539,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     }
 
     scopexec = getenv("SCOPE_EXEC_PATH");
-    if (((scopexec = getpath(scopexec)) == NULL) &&
-        ((scopexec = getpath("ldscope")) == NULL)) {
+    if (((scopexec = getpath(scopexec)) == NULL) && ((scopexec = getpath("ldscope")) == NULL)) {
 
         // can't find the scope executable
         scopeLogWarn("execve: can't find a scope executable for %s", pathname);
@@ -2547,7 +2547,8 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     }
 
     nargs = 0;
-    while ((argv[nargs] != NULL)) nargs++;
+    while ((argv[nargs] != NULL))
+        nargs++;
 
     size_t plen = sizeof(char *);
     if ((nargs == 0) || (nargv = calloc(1, ((nargs * plen) + (plen * 2)))) == NULL) {
@@ -2563,8 +2564,10 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 
     g_fn.execve(nargv[0], nargv, environ);
     saverr = errno;
-    if (nargv) free(nargv);
-    if (scopexec) free(scopexec);
+    if (nargv)
+        free(nargv);
+    if (scopexec)
+        free(scopexec);
     errno = saverr;
     return -1;
 }
@@ -2614,12 +2617,10 @@ __write_pthread(int fd, const void *buf, size_t size)
 static int
 isAnAppScopeConnection(int fd)
 {
-    if (fd == -1) return FALSE;
+    if (fd == -1)
+        return FALSE;
 
-    if ((fd == ctlConnection(g_ctl, CFG_CTL)) ||
-        (fd == ctlConnection(g_ctl, CFG_LS)) ||
-        (fd == mtcConnection(g_mtc)) ||
-        (fd == logConnection(g_log))) {
+    if ((fd == ctlConnection(g_ctl, CFG_CTL)) || (fd == ctlConnection(g_ctl, CFG_LS)) || (fd == mtcConnection(g_mtc)) || (fd == logConnection(g_log))) {
         return TRUE;
     }
 
@@ -2642,90 +2643,88 @@ scope_syscall(long number, ...)
     LOAD_FUNC_ARGS_VALIST(fArgs, number);
 
     switch (number) {
-    case SYS_close:
-    {
-        long rc;
-        rc = g_fn.syscall(number, fArgs.arg[0]);
-        doClose(fArgs.arg[0], "sysclose");
-        return rc;
-    }
-    case SYS_accept4:
-    {
-        long rc;
-        rc = g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1],
-                          fArgs.arg[2], fArgs.arg[3]);
+        case SYS_close:
+        {
+            long rc;
+            rc = g_fn.syscall(number, fArgs.arg[0]);
+            doClose(fArgs.arg[0], "sysclose");
+            return rc;
+        }
+        case SYS_accept4:
+        {
+            long rc;
+            rc = g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2], fArgs.arg[3]);
 
-        if ((rc != -1) && (doBlockConnection(fArgs.arg[0], NULL) == 1)) {
-            if (g_fn.close) g_fn.close(rc);
-            errno = ECONNABORTED;
-            return -1;
+            if ((rc != -1) && (doBlockConnection(fArgs.arg[0], NULL) == 1)) {
+                if (g_fn.close)
+                    g_fn.close(rc);
+                errno = ECONNABORTED;
+                return -1;
+            }
+
+            if (rc != -1) {
+                doAccept(rc, (struct sockaddr *)fArgs.arg[1], (socklen_t *)fArgs.arg[2], "accept4");
+            } else {
+                doUpdateState(NET_ERR_CONN, fArgs.arg[0], (ssize_t)0, "accept4", "nopath");
+            }
+            return rc;
         }
 
-        if (rc != -1) {
-            doAccept(rc, (struct sockaddr *)fArgs.arg[1],
-                     (socklen_t *)fArgs.arg[2], "accept4");
-        } else {
-            doUpdateState(NET_ERR_CONN, fArgs.arg[0], (ssize_t)0, "accept4", "nopath");
-        }
-        return rc;
-    }
+        /*
+         * These messages are in place as they represent
+         * functions that use syscall() in libuv, used with node.js.
+         * These are functions defined in libuv/src/unix/linux-syscalls.c
+         * that we are otherwise interposing. The DBG call allows us to
+         * check to see how many of these are called and therefore
+         * what we are missing. So far, we only see accept4 used.
+         */
+        case SYS_sendmmsg:
+            // DBG("syscall-sendmsg");
+            break;
 
-    /*
-     * These messages are in place as they represent
-     * functions that use syscall() in libuv, used with node.js.
-     * These are functions defined in libuv/src/unix/linux-syscalls.c
-     * that we are otherwise interposing. The DBG call allows us to
-     * check to see how many of these are called and therefore
-     * what we are missing. So far, we only see accept4 used.
-     */
-    case SYS_sendmmsg:
-        //DBG("syscall-sendmsg");
-        break;
+        case SYS_recvmmsg:
+            // DBG("syscall-recvmsg");
+            break;
 
-    case SYS_recvmmsg:
-        //DBG("syscall-recvmsg");
-        break;
+        case SYS_preadv:
+            // DBG("syscall-preadv");
+            break;
 
-    case SYS_preadv:
-        //DBG("syscall-preadv");
-        break;
+        case SYS_pwritev:
+            // DBG("syscall-pwritev");
+            break;
 
-    case SYS_pwritev:
-        //DBG("syscall-pwritev");
-        break;
-
-    case SYS_dup3:
-        //DBG("syscall-dup3");
-        break;
+        case SYS_dup3:
+            // DBG("syscall-dup3");
+            break;
 #ifdef __STATX__
-    case SYS_statx:
-        //DBG("syscall-statx");
-        break;
+        case SYS_statx:
+            // DBG("syscall-statx");
+            break;
 #endif // __STATX__
-    default:
-        // Supplying args is fine, but is a touch more work.
-        // On splunk, in a container on my laptop, I saw this statement being
-        // hit every 10-15 microseconds over a 15 minute duration.  Wow.
-        // DBG("syscall-number: %d", number);
-        //DBG(NULL);
-        break;
+        default:
+            // Supplying args is fine, but is a touch more work.
+            // On splunk, in a container on my laptop, I saw this statement being
+            // hit every 10-15 microseconds over a 15 minute duration.  Wow.
+            // DBG("syscall-number: %d", number);
+            // DBG(NULL);
+            break;
     }
 
-    return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],
-                        fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
+    return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2], fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
 }
 
 static ssize_t
-scope_write(int fd, const void* buf, size_t size)
+scope_write(int fd, const void *buf, size_t size)
 {
     return (ssize_t)syscall(SYS_write, fd, buf, size);
 }
 
 static int
-scope_open(const char* pathname)
+scope_open(const char *pathname)
 {
     // This implementation is largely based on transportConnectFile().
-    int fd = g_fn.open(pathname, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666);
+    int fd = g_fn.open(pathname, O_CREAT | O_WRONLY | O_APPEND | O_CLOEXEC, 0666);
     if (fd == -1) {
         DBG("%s", pathname);
         return fd;
@@ -2752,7 +2751,7 @@ fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
 
     size_t rc = g_fn.fwrite_unlocked(ptr, size, nitems, stream);
 
-    doWrite(fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite_unlocked", BUF, 0);
+    doWrite(fileno(stream), initialTime, (rc == nitems), ptr, rc * size, "fwrite_unlocked", BUF, 0);
 
     return rc;
 }
@@ -2796,15 +2795,17 @@ EXPORTON int
 SSL_read(SSL *ssl, void *buf, int num)
 {
     int rc;
-    
-    //scopeLogError("SSL_read");
+
+    // scopeLogError("SSL_read");
     WRAP_CHECK(SSL_read, -1);
     rc = g_fn.SSL_read(ssl, buf, num);
 
     if (rc > 0) {
         int fd = -1;
-        if (SYMBOL_LOADED(SSL_get_fd)) fd = g_fn.SSL_get_fd(ssl);
-        if ((fd == -1) && (g_ssl_fd != -1)) fd = g_ssl_fd;
+        if (SYMBOL_LOADED(SSL_get_fd))
+            fd = g_fn.SSL_get_fd(ssl);
+        if ((fd == -1) && (g_ssl_fd != -1))
+            fd = g_ssl_fd;
         doProtocol((uint64_t)ssl, fd, buf, (size_t)rc, TLSRX, BUF);
     }
     return rc;
@@ -2814,16 +2815,18 @@ EXPORTON int
 SSL_write(SSL *ssl, const void *buf, int num)
 {
     int rc;
-    
-    //scopeLogError("SSL_write");
+
+    // scopeLogError("SSL_write");
     WRAP_CHECK(SSL_write, -1);
 
     rc = g_fn.SSL_write(ssl, buf, num);
 
     if (rc > 0) {
         int fd = -1;
-        if (SYMBOL_LOADED(SSL_get_fd)) fd = g_fn.SSL_get_fd(ssl);
-        if ((fd == -1) && (g_ssl_fd != -1)) fd = g_ssl_fd;
+        if (SYMBOL_LOADED(SSL_get_fd))
+            fd = g_fn.SSL_get_fd(ssl);
+        if ((fd == -1) && (g_ssl_fd != -1))
+            fd = g_ssl_fd;
         doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)rc, TLSTX, BUF);
     }
     return rc;
@@ -2835,13 +2838,12 @@ gnutls_get_fd(gnutls_session_t session)
     int fd = -1;
     gnutls_transport_ptr_t fdp;
 
-    if (SYMBOL_LOADED(gnutls_transport_get_ptr) &&
-            ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
+    if (SYMBOL_LOADED(gnutls_transport_get_ptr) && ((fdp = g_fn.gnutls_transport_get_ptr(session)) != NULL)) {
         // In #279, we found that when the version of gnutls is 3.5.18, the
         // gnutls_transport_get_ptr() return value is the file-descriptor,
         // not a pointer to the file-descriptor. Using gnutls_check_version()
         // got messy as we may have found this behaviour switched on and off.
-        // So, we're testing here if the integer value of the pointer is 
+        // So, we're testing here if the integer value of the pointer is
         // below the number of file-descriptors.
         if (!g_max_fds) {
             // NB: race-condition where multiple threads get here at the same
@@ -2868,7 +2870,7 @@ gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
 {
     ssize_t rc;
 
-    //scopeLogError("gnutls_record_recv");
+    // scopeLogError("gnutls_record_recv");
     WRAP_CHECK(gnutls_record_recv, -1);
     rc = g_fn.gnutls_record_recv(session, data, data_size);
 
@@ -2884,7 +2886,7 @@ gnutls_record_recv_early_data(gnutls_session_t session, void *data, size_t data_
 {
     ssize_t rc;
 
-    //scopeLogError("gnutls_record_recv_early_data");
+    // scopeLogError("gnutls_record_recv_early_data");
     WRAP_CHECK(gnutls_record_recv_early_data, -1);
     rc = g_fn.gnutls_record_recv_early_data(session, data, data_size);
 
@@ -2900,12 +2902,12 @@ gnutls_record_recv_packet(gnutls_session_t session, gnutls_packet_t *packet)
 {
     ssize_t rc;
 
-    //scopeLogError("gnutls_record_recv_packet");
+    // scopeLogError("gnutls_record_recv_packet");
     WRAP_CHECK(gnutls_record_recv_packet, -1);
     rc = g_fn.gnutls_record_recv_packet(session, packet);
 
     if (rc > 0) {
-        //doProtocol((uint64_t)session, -1, data, rc, TLSRX, BUF);
+        // doProtocol((uint64_t)session, -1, data, rc, TLSRX, BUF);
     }
     return rc;
 }
@@ -2915,7 +2917,7 @@ gnutls_record_recv_seq(gnutls_session_t session, void *data, size_t data_size, u
 {
     ssize_t rc;
 
-    //scopeLogError("gnutls_record_recv_seq");
+    // scopeLogError("gnutls_record_recv_seq");
     WRAP_CHECK(gnutls_record_recv_seq, -1);
     rc = g_fn.gnutls_record_recv_seq(session, data, data_size, seq);
 
@@ -2931,7 +2933,7 @@ gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
 {
     ssize_t rc;
 
-    //scopeLogError("gnutls_record_send");
+    // scopeLogError("gnutls_record_send");
     WRAP_CHECK(gnutls_record_send, -1);
     rc = g_fn.gnutls_record_send(session, data, data_size);
 
@@ -2943,12 +2945,11 @@ gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
 }
 
 EXPORTON ssize_t
-gnutls_record_send2(gnutls_session_t session, const void *data, size_t data_size,
-                    size_t pad, unsigned flags)
+gnutls_record_send2(gnutls_session_t session, const void *data, size_t data_size, size_t pad, unsigned flags)
 {
     ssize_t rc;
 
-    //scopeLogError("gnutls_record_send2");
+    // scopeLogError("gnutls_record_send2");
     WRAP_CHECK(gnutls_record_send2, -1);
     rc = g_fn.gnutls_record_send2(session, data, data_size, pad, flags);
 
@@ -2964,7 +2965,7 @@ gnutls_record_send_early_data(gnutls_session_t session, const void *data, size_t
 {
     ssize_t rc;
 
-    //scopeLogError("gnutls_record_send_early_data");
+    // scopeLogError("gnutls_record_send_early_data");
     WRAP_CHECK(gnutls_record_send_early_data, -1);
     rc = g_fn.gnutls_record_send_early_data(session, data, data_size);
 
@@ -2976,12 +2977,11 @@ gnutls_record_send_early_data(gnutls_session_t session, const void *data, size_t
 }
 
 EXPORTON ssize_t
-gnutls_record_send_range(gnutls_session_t session, const void *data, size_t data_size,
-                         const gnutls_range_st *range)
+gnutls_record_send_range(gnutls_session_t session, const void *data, size_t data_size, const gnutls_range_st *range)
 {
     ssize_t rc;
 
-    //scopeLogError("gnutls_record_send_range");
+    // scopeLogError("gnutls_record_send_range");
     WRAP_CHECK(gnutls_record_send_range, -1);
     rc = g_fn.gnutls_record_send_range(session, data, data_size, range);
 
@@ -2999,9 +2999,10 @@ nss_close(PRFileDesc *fd)
     nss_list *nssentry;
 
     // Note: NSS docs don't define that PR_GetError should be called on failure
-    if (!fd) return PR_FAILURE;
+    if (!fd)
+        return PR_FAILURE;
 
-    //scopeLogError("fd:%d nss_close", (uint64_t)fd->methods);
+    // scopeLogError("fd:%d nss_close", (uint64_t)fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->close(fd);
     } else {
@@ -3011,7 +3012,8 @@ nss_close(PRFileDesc *fd)
         return rc;
     }
 
-    if (rc == PR_SUCCESS) lstDelete(g_nsslist, (uint64_t)fd->methods);
+    if (rc == PR_SUCCESS)
+        lstDelete(g_nsslist, (uint64_t)fd->methods);
 
     return rc;
 }
@@ -3036,7 +3038,7 @@ nss_send(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags, PRInterv
         return -1;
     }
 
-    //scopeLogError("fd:%d nss_send", (uint64_t)fd->methods);
+    // scopeLogError("fd:%d nss_send", (uint64_t)fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->send(fd, buf, amount, flags, timeout);
     } else {
@@ -3072,7 +3074,7 @@ nss_recv(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime
         return -1;
     }
 
-    //scopeLogError("fd:%d nss_recv", (uint64_t)fd->methods);
+    // scopeLogError("fd:%d nss_recv", (uint64_t)fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->recv(fd, buf, amount, flags, timeout);
     } else {
@@ -3108,7 +3110,7 @@ nss_read(PRFileDesc *fd, void *buf, PRInt32 amount)
         return -1;
     }
 
-    //scopeLogError("fd:%d nss_read", (uint64_t)fd->methods);
+    // scopeLogError("fd:%d nss_read", (uint64_t)fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->read(fd, buf, amount);
     } else {
@@ -3144,7 +3146,7 @@ nss_write(PRFileDesc *fd, const void *buf, PRInt32 amount)
         return -1;
     }
 
-    //scopeLogError("fd:%d nss_write", fd->methods);
+    // scopeLogError("fd:%d nss_write", fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->write(fd, buf, amount);
     } else {
@@ -3180,7 +3182,7 @@ nss_writev(PRFileDesc *fd, const PRIOVec *iov, PRInt32 iov_size, PRIntervalTime 
         return -1;
     }
 
-    //scopeLogError("fd:%d nss_writev", fd->methods);
+    // scopeLogError("fd:%d nss_writev", fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->writev(fd, iov, iov_size, timeout);
     } else {
@@ -3203,8 +3205,7 @@ nss_writev(PRFileDesc *fd, const PRIOVec *iov, PRInt32 iov_size, PRIntervalTime 
 }
 
 static PRInt32
-nss_sendto(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags,
-           const PRNetAddr *addr, PRIntervalTime timeout)
+nss_sendto(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags, const PRNetAddr *addr, PRIntervalTime timeout)
 {
     PRInt32 rc;
     nss_list *nssentry;
@@ -3217,7 +3218,7 @@ nss_sendto(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags,
         return -1;
     }
 
-    //scopeLogError("fd:%d nss_sendto", fd->methods);
+    // scopeLogError("fd:%d nss_sendto", fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->sendto(fd, (void *)buf, amount, flags, addr, timeout);
     } else {
@@ -3240,8 +3241,7 @@ nss_sendto(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags,
 }
 
 static PRInt32
-nss_recvfrom(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags,
-             PRNetAddr *addr, PRIntervalTime timeout)
+nss_recvfrom(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags, PRNetAddr *addr, PRIntervalTime timeout)
 {
     PRInt32 rc;
     nss_list *nssentry;
@@ -3254,7 +3254,7 @@ nss_recvfrom(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags,
         return -1;
     }
 
-    //scopeLogError("fd:%d nss_recvfrom", fd->methods);
+    // scopeLogError("fd:%d nss_recvfrom", fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->recvfrom(fd, buf, amount, flags, addr, timeout);
     } else {
@@ -3287,14 +3287,13 @@ SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
     if (result != NULL) {
         nss_list *nssentry;
 
-        if ((((nssentry = calloc(1, sizeof(nss_list))) != NULL)) &&
-            ((nssentry->ssl_methods = calloc(1, sizeof(PRIOMethods))) != NULL) &&
+        if ((((nssentry = calloc(1, sizeof(nss_list))) != NULL)) && ((nssentry->ssl_methods = calloc(1, sizeof(PRIOMethods))) != NULL) &&
             ((nssentry->ssl_int_methods = calloc(1, sizeof(PRIOMethods))) != NULL)) {
 
             memmove(nssentry->ssl_methods, result->methods, sizeof(PRIOMethods));
             memmove(nssentry->ssl_int_methods, result->methods, sizeof(PRIOMethods));
             nssentry->id = (uint64_t)nssentry->ssl_int_methods;
-            //scopeLogInfo("fd:%d SSL_ImportFD", (uint64_t)nssentry->id);
+            // scopeLogInfo("fd:%d SSL_ImportFD", (uint64_t)nssentry->id);
 
             // ref contrib/tls/nss/prio.h struct PRIOMethods
             // read ... todo? read, recvfrom, acceptread
@@ -3332,13 +3331,20 @@ dlopen(const char *filename, int flags)
     char fbuf[256];
 
     fbuf[0] = '\0';
-    if (flags & RTLD_LAZY) strcat(fbuf, "RTLD_LAZY|");
-    if (flags & RTLD_NOW) strcat(fbuf, "RTLD_NOW|");
-    if (flags & RTLD_GLOBAL) strcat(fbuf, "RTLD_GLOBAL|");
-    if (flags & RTLD_LOCAL) strcat(fbuf, "RTLD_LOCAL|");
-    if (flags & RTLD_NODELETE) strcat(fbuf, "RTLD_NODELETE|");
-    if (flags & RTLD_NOLOAD) strcat(fbuf, "RTLD_NOLOAD|");
-    if (flags & RTLD_DEEPBIND) strcat(fbuf, "RTLD_DEEPBIND|");
+    if (flags & RTLD_LAZY)
+        strcat(fbuf, "RTLD_LAZY|");
+    if (flags & RTLD_NOW)
+        strcat(fbuf, "RTLD_NOW|");
+    if (flags & RTLD_GLOBAL)
+        strcat(fbuf, "RTLD_GLOBAL|");
+    if (flags & RTLD_LOCAL)
+        strcat(fbuf, "RTLD_LOCAL|");
+    if (flags & RTLD_NODELETE)
+        strcat(fbuf, "RTLD_NODELETE|");
+    if (flags & RTLD_NOLOAD)
+        strcat(fbuf, "RTLD_NOLOAD|");
+    if (flags & RTLD_DEEPBIND)
+        strcat(fbuf, "RTLD_DEEPBIND|");
     scopeLog(CFG_LOG_DEBUG, "dlopen called for %s with %s", filename, fbuf);
 
     WRAP_CHECK(dlopen, NULL);
@@ -3357,14 +3363,12 @@ dlopen(const char *filename, int flags)
         int i, rsz = 0;
 
         // Get the link map and ELF sections in advance of something matching
-        if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) &&
-            (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+        if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
             scopeLog(CFG_LOG_DEBUG, "\tlibrary:  %s", lm->l_name);
 
             // for each symbol in the list try to hook
-            for (i=0; hook_list[i].symbol; i++) {
-                if ((dlsym(handle, hook_list[i].symbol)) &&
-                    (doGotcha(lm, (got_list_t *)&hook_list[i], rel, sym, str, rsz, 0) != -1)) {
+            for (i = 0; hook_list[i].symbol; i++) {
+                if ((dlsym(handle, hook_list[i].symbol)) && (doGotcha(lm, (got_list_t *)&hook_list[i], rel, sym, str, rsz, 0) != -1)) {
                     scopeLog(CFG_LOG_DEBUG, "\tdlopen interposed  %s", hook_list[i].symbol);
                 }
             }
@@ -3393,7 +3397,8 @@ close(int fd)
 {
     WRAP_CHECK(close, -1);
 
-    if (isAnAppScopeConnection(fd)) return 0;
+    if (isAnAppScopeConnection(fd))
+        return 0;
 
     int rc = g_fn.close(fd);
 
@@ -3408,7 +3413,8 @@ fclose(FILE *stream)
     WRAP_CHECK(fclose, EOF);
     int fd = fileno(stream);
 
-    if (isAnAppScopeConnection(fd)) return 0;
+    if (isAnAppScopeConnection(fd))
+        return 0;
 
     int rc = g_fn.fclose(stream);
 
@@ -3445,7 +3451,6 @@ close$NOCANCEL(int fd)
     return rc;
 }
 
-
 EXPORTON int
 guarded_close_np(int fd, void *guard)
 {
@@ -3477,7 +3482,8 @@ accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     sd = g_fn.accept$NOCANCEL(sockfd, addr, addrlen);
 
     if ((sd != -1) && (doBlockConnection(sockfd, NULL) == 1)) {
-        if (g_fn.close) g_fn.close(sd);
+        if (g_fn.close)
+            g_fn.close(sd);
         errno = ECONNABORTED;
         return -1;
     }
@@ -3492,8 +3498,7 @@ accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 }
 
 EXPORTON ssize_t
-__sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
-                  const struct sockaddr *dest_addr, socklen_t addrlen)
+__sendto_nocancel(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen)
 {
     ssize_t rc;
     WRAP_CHECK(__sendto_nocancel, -1);
@@ -3516,17 +3521,14 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
 }
 
 EXPORTOFF int32_t
-DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
-                      const char *fullname, uint16_t rrtype, uint16_t rrclass,
-                      void *callback, void *context)
+DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex, const char *fullname, uint16_t rrtype, uint16_t rrclass, void *callback, void *context)
 {
     int32_t rc;
     elapsed_t time = {0};
 
     WRAP_CHECK(DNSServiceQueryRecord, -1);
     time.initial = getTime();
-    rc = g_fn.DNSServiceQueryRecord(sdRef, flags, interfaceIndex, fullname,
-                                    rrtype, rrclass, callback, context);
+    rc = g_fn.DNSServiceQueryRecord(sdRef, flags, interfaceIndex, fullname, rrtype, rrclass, callback, context);
     time.duration = getDuration(time.initial);
 
     if (rc == 0) {
@@ -3593,7 +3595,7 @@ ftello(FILE *stream)
     WRAP_CHECK(ftello, -1);
     off_t rc = g_fn.ftello(stream);
 
-    doSeek(fileno(stream), (rc != -1), "ftello"); 
+    doSeek(fileno(stream), (rc != -1), "ftello");
 
     return rc;
 }
@@ -3621,7 +3623,7 @@ fsetpos(FILE *stream, const fpos_t *pos)
 }
 
 EXPORTON int
-fgetpos(FILE *stream,  fpos_t *pos)
+fgetpos(FILE *stream, fpos_t *pos)
 {
     WRAP_CHECK(fgetpos, -1);
     int rc = g_fn.fgetpos(stream, pos);
@@ -3632,7 +3634,7 @@ fgetpos(FILE *stream,  fpos_t *pos)
 }
 
 EXPORTON int
-fgetpos64(FILE *stream,  fpos64_t *pos)
+fgetpos64(FILE *stream, fpos64_t *pos)
 {
     WRAP_CHECK(fgetpos64, -1);
     int rc = g_fn.fgetpos64(stream, pos);
@@ -3653,10 +3655,7 @@ static size_t
 __stdio_write(struct MUSL_IO_FILE *stream, const unsigned char *buf, size_t len)
 {
     uint64_t initialTime = getTime();
-    struct iovec iovs[2] = {
-		{ .iov_base = stream->wbase, .iov_len = stream->wpos - stream->wbase },
-		{ .iov_base = (void *)buf, .iov_len = len }
-	};
+    struct iovec iovs[2] = {{.iov_base = stream->wbase, .iov_len = stream->wpos - stream->wbase}, {.iov_base = (void *)buf, .iov_len = len}};
 
     struct iovec *iov = iovs;
     int iovcnt = 2;
@@ -3671,12 +3670,12 @@ __stdio_write(struct MUSL_IO_FILE *stream, const unsigned char *buf, size_t len)
         dothis = 1;
 
         // has the stdout write pointer changed?
-        if (stream->write != (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write) {
+        if (stream->write != (size_t(*)(FILE *, const unsigned char *, size_t))__stdio_write) {
             // save the new pointer
-            g_fn.__stdout_write = (size_t (*)(FILE *, const unsigned char *, size_t))stream->write;
+            g_fn.__stdout_write = (size_t(*)(FILE *, const unsigned char *, size_t))stream->write;
 
             // modify the pointer to use this function
-            stream->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+            stream->write = (size_t(*)(FILE *, const unsigned char *, size_t))__stdio_write;
         }
     }
 
@@ -3686,17 +3685,17 @@ __stdio_write(struct MUSL_IO_FILE *stream, const unsigned char *buf, size_t len)
         dothis = 1;
 
         // has the stderr write pointer changed?
-        if (stream->write != (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write) {
+        if (stream->write != (size_t(*)(FILE *, const unsigned char *, size_t))__stdio_write) {
             // save the new pointer
-            g_fn.__stderr_write = (size_t (*)(FILE *, const unsigned char *, size_t))stream->write;
+            g_fn.__stderr_write = (size_t(*)(FILE *, const unsigned char *, size_t))stream->write;
 
             // modify the pointer to use this function
-            stream->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+            stream->write = (size_t(*)(FILE *, const unsigned char *, size_t))__stdio_write;
         }
     }
 
-    if (dothis == 1) doWrite(stream->fd, initialTime, (rc != -1),
-                             iov, rc, "__stdio_write", IOV, iovcnt);
+    if (dothis == 1)
+        doWrite(stream->fd, initialTime, (rc != -1), iov, rc, "__stdio_write", IOV, iovcnt);
     return rc;
 }
 
@@ -3743,7 +3742,7 @@ writev(int fd, const struct iovec *iov, int iovcnt)
 }
 
 EXPORTON size_t
-fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
+fwrite(const void *ptr, size_t size, size_t nitems, FILE *stream)
 {
     WRAP_CHECK(fwrite, 0);
     if (g_ismusl == FALSE) {
@@ -3753,7 +3752,7 @@ fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
 
     size_t rc = g_fn.fwrite(ptr, size, nitems, stream);
 
-    doWrite(fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite", BUF, 0);
+    doWrite(fileno(stream), initialTime, (rc == nitems), ptr, rc * size, "fwrite", BUF, 0);
 
     return rc;
 }
@@ -3874,7 +3873,7 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 
     size_t rc = g_fn.fread(ptr, size, nmemb, stream);
 
-    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "fread", NONE, 0);
+    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc * size, "fread", NONE, 0);
 
     return rc;
 }
@@ -3888,7 +3887,7 @@ __fread_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *stream)
 
     size_t rc = g_fn.__fread_chk(ptr, ptrlen, size, nmemb, stream);
 
-    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "__fread_chk", NONE, 0);
+    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc * size, "__fread_chk", NONE, 0);
 
     return rc;
 }
@@ -3901,7 +3900,7 @@ fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
 
     size_t rc = g_fn.fread_unlocked(ptr, size, nmemb, stream);
 
-    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "fread_unlocked", NONE, 0);
+    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc * size, "fread_unlocked", NONE, 0);
 
     return rc;
 }
@@ -3912,7 +3911,7 @@ fgets(char *s, int n, FILE *stream)
     WRAP_CHECK(fgets, NULL);
     uint64_t initialTime = getTime();
 
-    char* rc = g_fn.fgets(s, n, stream);
+    char *rc = g_fn.fgets(s, n, stream);
 
     doRead(fileno(stream), initialTime, (rc != NULL), NULL, n, "fgets", NONE, 0);
 
@@ -3926,7 +3925,7 @@ __fgets_chk(char *s, size_t size, int strsize, FILE *stream)
     WRAP_CHECK(__fgets_chk, NULL);
     uint64_t initialTime = getTime();
 
-    char* rc = g_fn.__fgets_chk(s, size, strsize, stream);
+    char *rc = g_fn.__fgets_chk(s, size, strsize, stream);
 
     doRead(fileno(stream), initialTime, (rc != NULL), NULL, size, "__fgets_chk", NONE, 0);
 
@@ -3939,7 +3938,7 @@ fgets_unlocked(char *s, int n, FILE *stream)
     WRAP_CHECK(fgets_unlocked, NULL);
     uint64_t initialTime = getTime();
 
-    char* rc = g_fn.fgets_unlocked(s, n, stream);
+    char *rc = g_fn.fgets_unlocked(s, n, stream);
 
     doRead(fileno(stream), initialTime, (rc != NULL), NULL, n, "fgets_unlocked", NONE, 0);
 
@@ -3953,9 +3952,9 @@ __fgetws_chk(wchar_t *ws, size_t size, int strsize, FILE *stream)
     WRAP_CHECK(__fgetws_chk, NULL);
     uint64_t initialTime = getTime();
 
-    wchar_t* rc = g_fn.__fgetws_chk(ws, size, strsize, stream);
+    wchar_t *rc = g_fn.__fgetws_chk(ws, size, strsize, stream);
 
-    doRead(fileno(stream), initialTime, (rc != NULL), NULL, size*sizeof(wchar_t), "__fgetws_chk", NONE, 0);
+    doRead(fileno(stream), initialTime, (rc != NULL), NULL, size * sizeof(wchar_t), "__fgetws_chk", NONE, 0);
 
     return rc;
 }
@@ -3966,9 +3965,9 @@ fgetws(wchar_t *ws, int n, FILE *stream)
     WRAP_CHECK(fgetws, NULL);
     uint64_t initialTime = getTime();
 
-    wchar_t* rc = g_fn.fgetws(ws, n, stream);
+    wchar_t *rc = g_fn.fgetws(ws, n, stream);
 
-    doRead(fileno(stream), initialTime, (rc != NULL), NULL, n*sizeof(wchar_t), "fgetws", NONE, 0);
+    doRead(fileno(stream), initialTime, (rc != NULL), NULL, n * sizeof(wchar_t), "fgetws", NONE, 0);
 
     return rc;
 }
@@ -4003,7 +4002,7 @@ EXPORTON int
 fputc(int c, FILE *stream)
 {
     WRAP_CHECK(fputc, EOF);
-    if(g_ismusl == FALSE) {
+    if (g_ismusl == FALSE) {
         return g_fn.fputc(c, stream);
     }
     uint64_t initialTime = getTime();
@@ -4071,18 +4070,15 @@ fscanf(FILE *stream, const char *format, ...)
     WRAP_CHECK(fscanf, EOF);
     uint64_t initialTime = getTime();
 
-    int rc = g_fn.fscanf(stream, format,
-                     fArgs.arg[0], fArgs.arg[1],
-                     fArgs.arg[2], fArgs.arg[3],
-                     fArgs.arg[4], fArgs.arg[5]);
+    int rc = g_fn.fscanf(stream, format, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2], fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
 
-    doRead(fileno(stream),initialTime, (rc != EOF), NULL, rc, "fscanf", NONE, 0);
+    doRead(fileno(stream), initialTime, (rc != EOF), NULL, rc, "fscanf", NONE, 0);
 
     return rc;
 }
 
 EXPORTON ssize_t
-getline (char **lineptr, size_t *n, FILE *stream)
+getline(char **lineptr, size_t *n, FILE *stream)
 {
     WRAP_CHECK(getline, -1);
     uint64_t initialTime = getTime();
@@ -4096,7 +4092,7 @@ getline (char **lineptr, size_t *n, FILE *stream)
 }
 
 EXPORTON ssize_t
-getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
+getdelim(char **lineptr, size_t *n, int delimiter, FILE *stream)
 {
     WRAP_CHECK(getdelim, -1);
     uint64_t initialTime = getTime();
@@ -4111,7 +4107,7 @@ getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
 }
 
 EXPORTON ssize_t
-__getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
+__getdelim(char **lineptr, size_t *n, int delimiter, FILE *stream)
 {
     WRAP_CHECK(__getdelim, -1);
     uint64_t initialTime = getTime();
@@ -4134,12 +4130,11 @@ fcntl(int fd, int cmd, ...)
 
     WRAP_CHECK(fcntl, -1);
     LOAD_FUNC_ARGS_VALIST(fArgs, cmd);
-    int rc = g_fn.fcntl(fd, cmd, fArgs.arg[0], fArgs.arg[1],
-                    fArgs.arg[2], fArgs.arg[3]);
+    int rc = g_fn.fcntl(fd, cmd, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2], fArgs.arg[3]);
     if (cmd == F_DUPFD) {
         doDup(fd, rc, "fcntl", FALSE);
     }
-    
+
     return rc;
 }
 
@@ -4150,8 +4145,7 @@ fcntl64(int fd, int cmd, ...)
 
     WRAP_CHECK(fcntl64, -1);
     LOAD_FUNC_ARGS_VALIST(fArgs, cmd);
-    int rc = g_fn.fcntl64(fd, cmd, fArgs.arg[0], fArgs.arg[1],
-                      fArgs.arg[2], fArgs.arg[3]);
+    int rc = g_fn.fcntl64(fd, cmd, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2], fArgs.arg[3]);
     if (cmd == F_DUPFD) {
         doDup(fd, rc, "fcntl64", FALSE);
     }
@@ -4211,7 +4205,7 @@ fork()
         // We are the child proc
         doReset();
     }
-    
+
     return rc;
 }
 
@@ -4230,7 +4224,7 @@ socket(int socket_family, int socket_type, int protocol)
 
             /*
              * State used in close()
-             * We define that a UDP socket represents an open 
+             * We define that a UDP socket represents an open
              * port when created and is open until the socket is closed
              *
              * a UDP socket is open we say the port is open
@@ -4288,7 +4282,8 @@ accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     sd = g_fn.accept(sockfd, addr, addrlen);
 
     if ((sd != -1) && (doBlockConnection(sockfd, NULL) == 1)) {
-        if (g_fn.close) g_fn.close(sd);
+        if (g_fn.close)
+            g_fn.close(sd);
         errno = ECONNABORTED;
         return -1;
     }
@@ -4311,7 +4306,8 @@ accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
     sd = g_fn.accept4(sockfd, addr, addrlen, flags);
 
     if ((sd != -1) && (doBlockConnection(sockfd, NULL) == 1)) {
-        if (g_fn.close) g_fn.close(sd);
+        if (g_fn.close)
+            g_fn.close(sd);
         errno = ECONNABORTED;
         return -1;
     }
@@ -4332,7 +4328,7 @@ bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
     WRAP_CHECK(bind, -1);
     rc = g_fn.bind(sockfd, addr, addrlen);
-    if (rc != -1) { 
+    if (rc != -1) {
         doSetConnection(sockfd, addr, addrlen, LOCAL);
         scopeLog(CFG_LOG_DEBUG, "fd:%d bind", sockfd);
     } else {
@@ -4340,7 +4336,6 @@ bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     }
 
     return rc;
-
 }
 
 EXPORTON int
@@ -4389,8 +4384,7 @@ send(int sockfd, const void *buf, size_t len, int flags)
 }
 
 static ssize_t
-internal_sendto(int sockfd, const void *buf, size_t len, int flags,
-                const struct sockaddr *dest_addr, socklen_t addrlen)
+internal_sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen)
 {
     ssize_t rc;
     WRAP_CHECK(sendto, -1);
@@ -4413,8 +4407,7 @@ internal_sendto(int sockfd, const void *buf, size_t len, int flags,
 }
 
 EXPORTON ssize_t
-sendto(int sockfd, const void *buf, size_t len, int flags,
-       const struct sockaddr *dest_addr, socklen_t addrlen)
+sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen)
 {
     return internal_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
 }
@@ -4423,7 +4416,7 @@ EXPORTON ssize_t
 sendmsg(int sockfd, const struct msghdr *msg, int flags)
 {
     ssize_t rc;
-    
+
     WRAP_CHECK(sendmsg, -1);
     rc = g_fn.sendmsg(sockfd, msg, flags);
     if (rc != -1) {
@@ -4432,11 +4425,9 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
         // For UDP connections the msg is a remote addr
         if (msg && !sockIsTCP(sockfd)) {
             if (msg->msg_namelen >= sizeof(struct sockaddr_in6)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
-                                sizeof(struct sockaddr_in6), REMOTE);
+                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name, sizeof(struct sockaddr_in6), REMOTE);
             } else if (msg->msg_namelen >= sizeof(struct sockaddr_in)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
-                                sizeof(struct sockaddr_in), REMOTE);
+                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name, sizeof(struct sockaddr_in), REMOTE);
             }
         }
 
@@ -4467,11 +4458,9 @@ internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int fla
         // For UDP connections the msg is a remote addr
         if (!sockIsTCP(sockfd)) {
             if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in6)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
-                                sizeof(struct sockaddr_in6), REMOTE);
+                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name, sizeof(struct sockaddr_in6), REMOTE);
             } else if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
-                                sizeof(struct sockaddr_in), REMOTE);
+                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name, sizeof(struct sockaddr_in), REMOTE);
             }
         }
 
@@ -4522,8 +4511,7 @@ recv(int sockfd, void *buf, size_t len, int flags)
 }
 
 static ssize_t
-internal_recvfrom(int sockfd, void *buf, size_t len, int flags,
-         struct sockaddr *src_addr, socklen_t *addrlen)
+internal_recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen)
 {
     ssize_t rc;
 
@@ -4544,8 +4532,7 @@ internal_recvfrom(int sockfd, void *buf, size_t len, int flags,
 }
 
 EXPORTON ssize_t
-recvfrom(int sockfd, void *buf, size_t len, int flags,
-         struct sockaddr *src_addr, socklen_t *addrlen)
+recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen)
 {
     return internal_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
 }
@@ -4557,18 +4544,17 @@ doAccessRights(struct msghdr *msg)
     struct cmsghdr *cmptr;
     struct stat sbuf;
 
-    if (!msg) return -1;
+    if (!msg)
+        return -1;
 
-    if (((cmptr = CMSG_FIRSTHDR(msg)) != NULL) &&
-        (cmptr->cmsg_len >= CMSG_LEN(sizeof(int))) &&
-        (cmptr->cmsg_level == SOL_SOCKET) &&
-        (cmptr->cmsg_type == SCM_RIGHTS)) {
+    if (((cmptr = CMSG_FIRSTHDR(msg)) != NULL) && (cmptr->cmsg_len >= CMSG_LEN(sizeof(int))) && (cmptr->cmsg_level == SOL_SOCKET) && (cmptr->cmsg_type == SCM_RIGHTS)) {
         // voila; we have a new fd
         int i, numfds;
 
         numfds = (cmptr->cmsg_len - CMSG_ALIGN(sizeof(struct cmsghdr))) / sizeof(int);
-        if (numfds <= 0) return -1;
-        recvfd = ((int *) CMSG_DATA(cmptr));
+        if (numfds <= 0)
+            return -1;
+        recvfd = ((int *)CMSG_DATA(cmptr));
 
         for (i = 0; i < numfds; i++) {
             // file or socket?
@@ -4592,7 +4578,7 @@ EXPORTON ssize_t
 recvmsg(int sockfd, struct msghdr *msg, int flags)
 {
     ssize_t rc;
-    
+
     WRAP_CHECK(recvmsg, -1);
     rc = g_fn.recvmsg(sockfd, msg, flags);
     if (rc != -1) {
@@ -4601,11 +4587,9 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
         // For UDP connections the msg is a remote addr
         if (msg) {
             if (msg->msg_namelen >= sizeof(struct sockaddr_in6)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
-                                sizeof(struct sockaddr_in6), REMOTE);
+                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name, sizeof(struct sockaddr_in6), REMOTE);
             } else if (msg->msg_namelen >= sizeof(struct sockaddr_in)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
-                                sizeof(struct sockaddr_in), REMOTE);
+                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name, sizeof(struct sockaddr_in), REMOTE);
             }
         }
 
@@ -4618,14 +4602,13 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvmsg", "nopath");
     }
-    
+
     return rc;
 }
 
 #ifdef __linux__
 EXPORTON int
-recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
-         int flags, struct timespec *timeout)
+recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags, struct timespec *timeout)
 {
     ssize_t rc;
 
@@ -4637,11 +4620,9 @@ recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
         // For UDP connections the msg is a remote addr
         if (msgvec) {
             if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in6)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
-                                sizeof(struct sockaddr_in6), REMOTE);
+                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name, sizeof(struct sockaddr_in6), REMOTE);
             } else if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
-                                sizeof(struct sockaddr_in), REMOTE);
+                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name, sizeof(struct sockaddr_in), REMOTE);
             }
         }
 
@@ -4664,7 +4645,7 @@ gethostbyname(const char *name)
 {
     struct hostent *rc;
     elapsed_t time = {0};
-    
+
     WRAP_CHECK(gethostbyname, NULL);
     doUpdateState(DNS, -1, 0, NULL, name);
     time.initial = getTime();
@@ -4688,7 +4669,7 @@ gethostbyname2(const char *name, int af)
 {
     struct hostent *rc;
     elapsed_t time = {0};
-    
+
     WRAP_CHECK(gethostbyname2, NULL);
     doUpdateState(DNS, -1, 0, NULL, name);
     time.initial = getTime();
@@ -4713,13 +4694,11 @@ gethostbyname2(const char *name, int af)
  * internal function to send the dns request.
  */
 EXPORTOFF int
-getaddrinfo(const char *node, const char *service,
-            const struct addrinfo *hints,
-            struct addrinfo **res)
+getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res)
 {
     int rc;
     elapsed_t time = {0};
-    
+
     WRAP_CHECK(getaddrinfo, -1);
 
     doUpdateState(DNS, -1, 0, NULL, node);
@@ -4783,7 +4762,7 @@ getentropy(void *buffer, size_t length)
 #endif
 }
 
-#define LOG_BUF_SIZE 4096
+#define LOG_BUF_SIZE  4096
 #define LOG_TIME_SIZE 23
 
 // This overrides a weak definition in src/dbg.c
@@ -4799,7 +4778,8 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
     struct timeval tv;
 
     if (!g_log) {
-        if (!g_constructor_debug_enabled) return;
+        if (!g_constructor_debug_enabled)
+            return;
         local_buf = scope_log_var_buf + snprintf(scope_log_var_buf, LOG_BUF_SIZE, "Constructor: (pid:%d): ", getpid());
         size_t local_buf_len = sizeof(scope_log_var_buf) + (scope_log_var_buf - local_buf) - 1;
 
@@ -4815,7 +4795,8 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
         sprintf(local_buf + msg_len, "\n");
         local_buf += msg_len + 1;
 
-        if (DEFAULT_LOG_LEVEL > level) return;
+        if (DEFAULT_LOG_LEVEL > level)
+            return;
 
         int fd = scope_open(DEFAULT_LOG_PATH);
         if (fd == -1) {
@@ -4834,10 +4815,11 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
     }
 
     cfg_log_level_t cfg_level = logLevel(g_log);
-    if ((cfg_level == CFG_LOG_NONE) || (cfg_level > level)) return;
+    if ((cfg_level == CFG_LOG_NONE) || (cfg_level > level))
+        return;
 
     gettimeofday(&tv, NULL);
-    msec = tv.tv_usec / 1000; 
+    msec = tv.tv_usec / 1000;
     if (msec > 999) {
         tv.tv_sec++;
         msec = 0;
@@ -4874,8 +4856,7 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
  * as a means to call the constructor before the go app runs.
  */
 EXPORTON int
-pthread_create(pthread_t *thread, const pthread_attr_t *attr,
-               void *(*start_routine)(void *), void *arg)
+pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine)(void *), void *arg)
 {
     int rc;
 
@@ -4900,9 +4881,9 @@ __fprintf_chk(FILE *stream, int flag, const char *format, ...)
     va_list ap;
     int rc;
 
-    va_start (ap, format);
+    va_start(ap, format);
     rc = vfprintf(stream, format, ap);
-    va_end (ap);
+    va_end(ap);
     return rc;
 }
 
@@ -4962,13 +4943,15 @@ __fdelt_chk(long int fdelt)
 static void
 uv__read_hook(void *stream)
 {
-    if (SYMBOL_LOADED(uv_fileno)) g_fn.uv_fileno(stream, &g_ssl_fd);
-    //scopeLog(CFG_LOG_TRACE, "%s: fd %d", __FUNCTION__, g_ssl_fd);
-    if (g_fn.uv__read) return g_fn.uv__read(stream);
+    if (SYMBOL_LOADED(uv_fileno))
+        g_fn.uv_fileno(stream, &g_ssl_fd);
+    // scopeLog(CFG_LOG_TRACE, "%s: fd %d", __FUNCTION__, g_ssl_fd);
+    if (g_fn.uv__read)
+        return g_fn.uv__read(stream);
 }
 
 EXPORTWEAK int
-__register_atfork(void (*prepare) (void), void (*parent) (void), void (*child) (void), void *__dso_handle)
+__register_atfork(void (*prepare)(void), void (*parent)(void), void (*child)(void), void *__dso_handle)
 {
     if (g_fn.__register_atfork) {
         return g_fn.__register_atfork(prepare, parent, child, __dso_handle);
@@ -5006,10 +4989,8 @@ __longjmp_chk(jmp_buf env, int val)
     longjmp(env, val);
 }
 
-
 static void *
 scope_dlsym(void *handle, const char *name, void *who)
 {
     return dlsym(handle, name);
 }
-

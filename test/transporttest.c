@@ -1,23 +1,23 @@
 #define _GNU_SOURCE
 #include <netdb.h>
-#include <sys/socket.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
 
-#include "fn.h"
 #include "dbg.h"
-#include "transport.h"
+#include "fn.h"
 #include "test.h"
+#include "transport.h"
 
 static void
-transportCreateTcpReturnsNullPtrForNullHostOrPath(void** state)
+transportCreateTcpReturnsNullPtrForNullHostOrPath(void **state)
 {
-    transport_t* t;
+    transport_t *t;
     t = transportCreateTCP(NULL, "54321", FALSE, FALSE, NULL);
     assert_null(t);
 
@@ -26,27 +26,27 @@ transportCreateTcpReturnsNullPtrForNullHostOrPath(void** state)
 }
 
 static void
-transportCreateTcpReturnsValidPtrInHappyPath(void** state)
+transportCreateTcpReturnsValidPtrInHappyPath(void **state)
 {
     assert_false(transportNeedsConnection(NULL));
-    transport_t* t = transportCreateTCP("127.0.0.1", "54321", FALSE, FALSE, NULL);
+    transport_t *t = transportCreateTCP("127.0.0.1", "54321", FALSE, FALSE, NULL);
     assert_non_null(t);
     assert_true(transportNeedsConnection(t));
     transportDestroy(&t);
 }
 
 static void
-transportCreateTcpReturnsValidPtrForUnresolvedHostPort(void** state)
+transportCreateTcpReturnsValidPtrForUnresolvedHostPort(void **state)
 {
-    transport_t* t;
+    transport_t *t;
     // This is a valid test, but it hangs for as long as 30s.
     // (It depends on dns more than a unit test should.)
-/*
-    t = transportCreateTCP("-tota11y bogus hostname", "666");
-    assert_non_null(t);
-    assert_true(transportNeedsConnection(t));
-    transportDestroy(&t);
-*/
+    /*
+        t = transportCreateTCP("-tota11y bogus hostname", "666");
+        assert_non_null(t);
+        assert_true(transportNeedsConnection(t));
+        transportDestroy(&t);
+    */
     t = transportCreateTCP("127.0.0.1", "mom's apple pie recipe", FALSE, FALSE, NULL);
     assert_non_null(t);
     assert_true(transportNeedsConnection(t));
@@ -54,7 +54,7 @@ transportCreateTcpReturnsValidPtrForUnresolvedHostPort(void** state)
 }
 
 static void
-transportConnectEstablishesConnection(void** state)
+transportConnectEstablishesConnection(void **state)
 {
     skip();
     // We need to verify that tcp connections can be established.
@@ -62,9 +62,9 @@ transportConnectEstablishesConnection(void** state)
 }
 
 static void
-transportCreateUdpReturnsNullPtrForNullHostOrPath(void** state)
+transportCreateUdpReturnsNullPtrForNullHostOrPath(void **state)
 {
-    transport_t* t;
+    transport_t *t;
     t = transportCreateUdp(NULL, "8128");
     assert_null(t);
 
@@ -73,26 +73,26 @@ transportCreateUdpReturnsNullPtrForNullHostOrPath(void** state)
 }
 
 static void
-transportCreateUdpReturnsValidPtrInHappyPath(void** state)
+transportCreateUdpReturnsValidPtrInHappyPath(void **state)
 {
-    transport_t* t = transportCreateUdp("127.0.0.1", "8126");
+    transport_t *t = transportCreateUdp("127.0.0.1", "8126");
     assert_non_null(t);
     assert_false(transportNeedsConnection(t));
     transportDestroy(&t);
 }
 
 static void
-transportCreateUdpReturnsValidPtrForUnresolvedHostPort(void** state)
+transportCreateUdpReturnsValidPtrForUnresolvedHostPort(void **state)
 {
-    transport_t* t;
+    transport_t *t;
     // This is a valid test, but it hangs for as long as 30s.
     // (It depends on dns more than a unit test should.)
-/*
-    t = transportCreateUdp("-tota11y bogus hostname", "666");
-    assert_non_null(t);
-    assert_true(transportNeedsConnection(t));
-    transportDestroy(&t);
-*/
+    /*
+        t = transportCreateUdp("-tota11y bogus hostname", "666");
+        assert_non_null(t);
+        assert_true(transportNeedsConnection(t));
+        transportDestroy(&t);
+    */
     t = transportCreateUdp("127.0.0.1", "mom's apple pie recipe");
     assert_non_null(t);
     assert_true(transportNeedsConnection(t));
@@ -100,30 +100,28 @@ transportCreateUdpReturnsValidPtrForUnresolvedHostPort(void** state)
 }
 
 static void
-transportCreateUdpHandlesGoodHostArguments(void** state)
+transportCreateUdpHandlesGoodHostArguments(void **state)
 {
-    const char* host_values[] = {
-           "localhost", "www.google.com",
-           "127.0.0.1", "0.0.0.0", "8.8.4.4",
-           "::1", "::ffff:127.0.0.1", "::", 
-           // These will work only if machine supports ipv6
-           //"2001:4860:4860::8844",
-           //"ipv6.google.com",
+    const char *host_values[] = {
+        "localhost", "www.google.com", "127.0.0.1", "0.0.0.0", "8.8.4.4", "::1", "::ffff:127.0.0.1", "::",
+        // These will work only if machine supports ipv6
+        //"2001:4860:4860::8844",
+        //"ipv6.google.com",
     };
 
     int i;
-    for (i=0; i<sizeof(host_values)/sizeof(host_values[0]); i++) {
-        transport_t* t = transportCreateUdp(host_values[i], "1234");
+    for (i = 0; i < sizeof(host_values) / sizeof(host_values[0]); i++) {
+        transport_t *t = transportCreateUdp(host_values[i], "1234");
         assert_non_null(t);
         transportDestroy(&t);
     }
 }
 
 static void
-transportCreateFileReturnsValidPtrInHappyPath(void** state)
+transportCreateFileReturnsValidPtrInHappyPath(void **state)
 {
-    const char* path = "/tmp/myscope.log";
-    transport_t* t = transportCreateFile(path, CFG_BUFFER_LINE);
+    const char *path = "/tmp/myscope.log";
+    transport_t *t = transportCreateFile(path, CFG_BUFFER_LINE);
     assert_non_null(t);
     assert_false(transportNeedsConnection(t));
     transportDestroy(&t);
@@ -133,10 +131,10 @@ transportCreateFileReturnsValidPtrInHappyPath(void** state)
 }
 
 static void
-transportCreateFileCreatesFileWithRWPermissionsForAll(void** state)
+transportCreateFileCreatesFileWithRWPermissionsForAll(void **state)
 {
-    const char* path = "/tmp/myscope.log";
-    transport_t* t = transportCreateFile(path, CFG_BUFFER_LINE);
+    const char *path = "/tmp/myscope.log";
+    transport_t *t = transportCreateFile(path, CFG_BUFFER_LINE);
     assert_non_null(t);
     transportDestroy(&t);
 
@@ -152,9 +150,9 @@ transportCreateFileCreatesFileWithRWPermissionsForAll(void** state)
 }
 
 static void
-transportCreateFileReturnsUnconnectedForInvalidPath(void** state)
+transportCreateFileReturnsUnconnectedForInvalidPath(void **state)
 {
-    transport_t* t;
+    transport_t *t;
     t = transportCreateFile(NULL, CFG_BUFFER_LINE);
     assert_null(t);
 
@@ -171,54 +169,41 @@ transportCreateFileReturnsUnconnectedForInvalidPath(void** state)
 }
 
 static void
-transportCreateFileCreatesDirectoriesAsNeeded(void** state)
+transportCreateFileCreatesDirectoriesAsNeeded(void **state)
 {
     // This should work in my opinion, but doesn't right now
     skip();
 
-    transport_t* t = transportCreateFile("/var/log/out/directory/path/here.log", CFG_BUFFER_LINE);
+    transport_t *t = transportCreateFile("/var/log/out/directory/path/here.log", CFG_BUFFER_LINE);
     assert_non_null(t);
 }
 
 static void
-transportCreateUnixReturnsValidPtrInHappyPath(void** state)
+transportCreateUnixReturnsValidPtrInHappyPath(void **state)
 {
-    transport_t* t = transportCreateUnix("/my/favorite/path");
+    transport_t *t = transportCreateUnix("/my/favorite/path");
     assert_non_null(t);
     assert_true(transportNeedsConnection(t));
     transportDestroy(&t);
     assert_null(t);
-
 }
 
 static void
-transportCreateUnixReturnsNullForInvalidPath(void** state)
+transportCreateUnixReturnsNullForInvalidPath(void **state)
 {
     assert_int_equal(dbgCountMatchingLines("src/transport.c"), 0);
 
-    transport_t* t = transportCreateUnix(NULL);
+    transport_t *t = transportCreateUnix(NULL);
     assert_null(t);
 
     assert_int_equal(dbgCountMatchingLines("src/transport.c"), 1);
     dbgInit(); // reset dbg for the rest of the tests
 }
 
-
 static void
-transportCreateSyslogReturnsValidPtrInHappyPath(void** state)
+transportCreateSyslogReturnsValidPtrInHappyPath(void **state)
 {
-    transport_t* t = transportCreateSyslog();
-    assert_non_null(t);
-    assert_false(transportNeedsConnection(t));
-    transportDestroy(&t);
-    assert_null(t);
-
-}
-
-static void
-transportCreateShmReturnsValidPtrInHappyPath(void** state)
-{
-    transport_t* t = transportCreateShm();
+    transport_t *t = transportCreateSyslog();
     assert_non_null(t);
     assert_false(transportNeedsConnection(t));
     transportDestroy(&t);
@@ -226,26 +211,36 @@ transportCreateShmReturnsValidPtrInHappyPath(void** state)
 }
 
 static void
-transportDestroyNullTransportDoesNothing(void** state)
+transportCreateShmReturnsValidPtrInHappyPath(void **state)
+{
+    transport_t *t = transportCreateShm();
+    assert_non_null(t);
+    assert_false(transportNeedsConnection(t));
+    transportDestroy(&t);
+    assert_null(t);
+}
+
+static void
+transportDestroyNullTransportDoesNothing(void **state)
 {
     transportDestroy(NULL);
-    transport_t* t = NULL;
+    transport_t *t = NULL;
     transportDestroy(&t);
     // Implicitly shows that calling transportDestroy with NULL is harmless
 }
 
 static void
-transportSendForNullTransportDoesNothing(void** state)
+transportSendForNullTransportDoesNothing(void **state)
 {
-    const char* msg = "Hey, this is cool!\n";
+    const char *msg = "Hey, this is cool!\n";
     assert_int_equal(transportSend(NULL, msg, strlen(msg)), -1);
 }
 
 static void
-transportSendForNullMessageDoesNothing(void** state)
+transportSendForNullMessageDoesNothing(void **state)
 {
-    const char* path = "/tmp/path";
-    transport_t* t = transportCreateFile(path, CFG_BUFFER_LINE);
+    const char *path = "/tmp/path";
+    transport_t *t = transportCreateFile(path, CFG_BUFFER_LINE);
     assert_non_null(t);
     assert_int_equal(transportSend(t, NULL, 0), -1);
     transportDestroy(&t);
@@ -254,9 +249,9 @@ transportSendForNullMessageDoesNothing(void** state)
 }
 
 static void
-transportSendForUnimplementedTransportTypesIsHarmless(void** state)
+transportSendForUnimplementedTransportTypesIsHarmless(void **state)
 {
-    transport_t* t;
+    transport_t *t;
     t = transportCreateUnix("/my/favorite/path");
     transportSend(t, "blah", strlen("blah"));
     transportDestroy(&t);
@@ -271,15 +266,15 @@ transportSendForUnimplementedTransportTypesIsHarmless(void** state)
 }
 
 static void
-transportSendForUdpTransmitsMsg(void** state)
+transportSendForUdpTransmitsMsg(void **state)
 {
-    const char* hostname = "127.0.0.1";
-    const char* portname = "8126";
+    const char *hostname = "127.0.0.1";
+    const char *portname = "8126";
     struct addrinfo hints = {0};
-    hints.ai_family=AF_UNSPEC;
-    hints.ai_socktype=SOCK_DGRAM;
-    hints.ai_flags=AI_PASSIVE|AI_ADDRCONFIG;
-    struct addrinfo* res = NULL;
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_DGRAM;
+    hints.ai_flags = AI_PASSIVE | AI_ADDRCONFIG;
+    struct addrinfo *res = NULL;
     if (getaddrinfo(hostname, portname, &hints, &res)) {
         fail_msg("Couldn't create address for socket");
     }
@@ -292,16 +287,16 @@ transportSendForUdpTransmitsMsg(void** state)
     }
     freeaddrinfo(res);
 
-    transport_t* t = transportCreateUdp(hostname, portname);
+    transport_t *t = transportCreateUdp(hostname, portname);
     assert_non_null(t);
     const char msg[] = "This is the payload message to transfer.\n";
-    char buf[sizeof(msg)] = {0};  // Has room for a null at the end
+    char buf[sizeof(msg)] = {0}; // Has room for a null at the end
     assert_int_equal(transportSend(t, msg, strlen(msg)), 0);
 
     struct sockaddr_storage from = {0};
     socklen_t len = sizeof(from);
-    int byteCount=0;
-    if ((byteCount = recvfrom(sd, buf, sizeof(buf), 0, (struct sockaddr*)&from, &len)) != strlen(msg)) {
+    int byteCount = 0;
+    if ((byteCount = recvfrom(sd, buf, sizeof(buf), 0, (struct sockaddr *)&from, &len)) != strlen(msg)) {
         fail_msg("Couldn't recvfrom");
     }
     assert_string_equal(msg, buf);
@@ -312,9 +307,9 @@ transportSendForUdpTransmitsMsg(void** state)
 }
 
 static void
-transportSendForAbstractUnixTransmitsMsg(void** state)
+transportSendForAbstractUnixTransmitsMsg(void **state)
 {
-    const char* path = "@mytestsockname";
+    const char *path = "@mytestsockname";
 
     // Create a unix address for a test socket
     struct sockaddr_un addr;
@@ -337,11 +332,11 @@ transportSendForAbstractUnixTransmitsMsg(void** state)
     }
 
     // Verify that the transport can be created, connected, and used for a tx
-    transport_t* t = transportCreateUnix(path);
+    transport_t *t = transportCreateUnix(path);
     assert_non_null(t);
     assert_false(transportNeedsConnection(t));
     const char msg[] = "This is the payload message to transfer.\n";
-    char buf[sizeof(msg)] = {0};  // Has room for a null at the end
+    char buf[sizeof(msg)] = {0}; // Has room for a null at the end
     assert_int_equal(transportSend(t, msg, strlen(msg)), 0);
 
     // Verify that our test sockets can rx the stuff sent with the transport
@@ -362,9 +357,9 @@ transportSendForAbstractUnixTransmitsMsg(void** state)
 }
 
 static void
-transportSendForFilepathUnixTransmitsMsg(void** state)
+transportSendForFilepathUnixTransmitsMsg(void **state)
 {
-    const char* path = "/tmp/mysocket_file";
+    const char *path = "/tmp/mysocket_file";
 
     // Create a unix address for a test socket
     struct sockaddr_un addr;
@@ -386,11 +381,11 @@ transportSendForFilepathUnixTransmitsMsg(void** state)
     }
 
     // Verify that the transport can be created, connected, and used for a tx
-    transport_t* t = transportCreateUnix(path);
+    transport_t *t = transportCreateUnix(path);
     assert_non_null(t);
     assert_false(transportNeedsConnection(t));
     const char msg[] = "This is the payload message to transfer.\n";
-    char buf[sizeof(msg)] = {0};  // Has room for a null at the end
+    char buf[sizeof(msg)] = {0}; // Has room for a null at the end
     assert_int_equal(transportSend(t, msg, strlen(msg)), 0);
 
     // Verify that our test sockets can rx the stuff sent with the transport
@@ -412,9 +407,9 @@ transportSendForFilepathUnixTransmitsMsg(void** state)
 }
 
 static void
-transportSendForFilepathUnixFailedTransmitsMsg(void** state)
+transportSendForFilepathUnixFailedTransmitsMsg(void **state)
 {
-    const char* path = "/tmp/mysocket_file";
+    const char *path = "/tmp/mysocket_file";
 
     // Create a unix address for a test socket
     struct sockaddr_un addr;
@@ -440,13 +435,13 @@ transportSendForFilepathUnixFailedTransmitsMsg(void** state)
         fail_msg("Couldn't stat socket");
     }
 
-    // Take the write permission 
-    if (chmod(path, socket_stat.st_mode & ~(S_IWUSR | S_IWGRP | S_IWOTH)) != 0 ){
+    // Take the write permission
+    if (chmod(path, socket_stat.st_mode & ~(S_IWUSR | S_IWGRP | S_IWOTH)) != 0) {
         fail_msg("Couldn't take the write permission");
     }
 
     // Verify that the transport can be created, but is not connected
-    transport_t* t = transportCreateUnix(path);
+    transport_t *t = transportCreateUnix(path);
     assert_non_null(t);
     assert_true(transportNeedsConnection(t));
     transportDestroy(&t);
@@ -456,12 +451,11 @@ transportSendForFilepathUnixFailedTransmitsMsg(void** state)
 }
 
 static void
-transportSendForFileWritesToFileAfterFlushWhenFullyBuffered(void** state)
+transportSendForFileWritesToFileAfterFlushWhenFullyBuffered(void **state)
 {
-    const char* path = "/tmp/mypath";
-    transport_t* t = transportCreateFile(path, CFG_BUFFER_FULLY);
+    const char *path = "/tmp/mypath";
+    transport_t *t = transportCreateFile(path, CFG_BUFFER_FULLY);
     assert_non_null(t);
-
 
     long file_pos_before = fileEndPosition(path);
     const char msg[] = "This is the payload message to transfer.\n";
@@ -476,11 +470,11 @@ transportSendForFileWritesToFileAfterFlushWhenFullyBuffered(void** state)
     assert_int_not_equal(file_pos_before, file_pos_after);
 
     // open the file
-    FILE* f = fopen(path, "r");
+    FILE *f = fopen(path, "r");
     if (!f)
         fail_msg("Couldn't open file %s", path);
     char buf[1024];
-    const int maxReadSize = sizeof(buf)-1;
+    const int maxReadSize = sizeof(buf) - 1;
     size_t bytesRead = fread(buf, 1, maxReadSize, f);
     // Provide the null ourselves.  Safe because of maxReadSize
     buf[bytesRead] = '\0';
@@ -490,7 +484,8 @@ transportSendForFileWritesToFileAfterFlushWhenFullyBuffered(void** state)
     assert_false(ferror(f));
     assert_string_equal(msg, buf);
 
-    if (fclose(f)) fail_msg("Couldn't close file %s", path);
+    if (fclose(f))
+        fail_msg("Couldn't close file %s", path);
 
     transportDestroy(&t);
 
@@ -499,14 +494,14 @@ transportSendForFileWritesToFileAfterFlushWhenFullyBuffered(void** state)
 }
 
 static void
-transportSendForFileWritesToFileImmediatelyWhenLineBuffered(void** state)
+transportSendForFileWritesToFileImmediatelyWhenLineBuffered(void **state)
 {
-    const char* path = "/tmp/mypath";
-    transport_t* t = transportCreateFile(path, CFG_BUFFER_LINE);
+    const char *path = "/tmp/mypath";
+    transport_t *t = transportCreateFile(path, CFG_BUFFER_LINE);
     assert_non_null(t);
 
     // open the file with the position at the end
-    FILE* f = fopen(path, "r+");
+    FILE *f = fopen(path, "r+");
     if (!f)
         fail_msg("Couldn't open file %s", path);
     if (fseek(f, 0, SEEK_END))
@@ -514,7 +509,7 @@ transportSendForFileWritesToFileImmediatelyWhenLineBuffered(void** state)
 
     // Since we're at the end, nothing should be there
     char buf[1024];
-    const int maxReadSize = sizeof(buf)-1;
+    const int maxReadSize = sizeof(buf) - 1;
     size_t bytesRead = fread(buf, 1, maxReadSize, f);
     assert_int_equal(bytesRead, 0);
     assert_true(feof(f));
@@ -534,7 +529,8 @@ transportSendForFileWritesToFileImmediatelyWhenLineBuffered(void** state)
     assert_false(ferror(f));
     assert_string_equal(msg, buf);
 
-    if (fclose(f)) fail_msg("Couldn't close file %s", path);
+    if (fclose(f))
+        fail_msg("Couldn't close file %s", path);
 
     transportDestroy(&t);
 
@@ -542,9 +538,8 @@ transportSendForFileWritesToFileImmediatelyWhenLineBuffered(void** state)
         fail_msg("Couldn't delete test file %s", path);
 }
 
-
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("running %s\n", argv[0]);
     initFn();

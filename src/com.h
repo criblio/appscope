@@ -1,20 +1,20 @@
 #ifndef __COM_H__
 #define __COM_H__
 
-#include <stdio.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <unistd.h>
-#include <sys/types.h>
 #include <ctype.h>
 #include <inttypes.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
 
-#include "ctl.h"
 #include "cfgutils.h"
-#include "scopetypes.h"
-#include "runtimecfg.h"
+#include "ctl.h"
 #include "pcre2.h"
+#include "runtimecfg.h"
+#include "scopetypes.h"
 
 #define PCRE_STACK_SIZE (32 * 1024)
 
@@ -27,7 +27,7 @@ extern unsigned int g_prot_sequence;
 
 // Post a message from report to the command buffer
 int cmdSendEvent(ctl_t *, event_t *, uint64_t, proc_id_t *);
-int cmdSendMetric(mtc_t *, event_t* );
+int cmdSendMetric(mtc_t *, event_t *);
 int cmdSendHttp(ctl_t *, event_t *, uint64_t, proc_id_t *);
 int cmdPostEvent(ctl_t *, char *);
 
@@ -55,8 +55,7 @@ cJSON *jsonConfigurationObject(config_t *);
 uint64_t msgEventGet(ctl_t *);
 
 // wrappers
-int pcre2_match_wrapper(pcre2_code *, PCRE2_SPTR, PCRE2_SIZE, PCRE2_SIZE,
-                        uint32_t, pcre2_match_data *, pcre2_match_context *);
+int pcre2_match_wrapper(pcre2_code *, PCRE2_SPTR, PCRE2_SIZE, PCRE2_SIZE, uint32_t, pcre2_match_data *, pcre2_match_context *);
 int regexec_wrapper(const regex_t *, const char *, size_t, regmatch_t *, int);
 
 bool cmdCbufEmpty(ctl_t *);

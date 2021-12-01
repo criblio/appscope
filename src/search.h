@@ -1,7 +1,6 @@
 #ifndef __SEARCH_H__
 #define __SEARCH_H__
 
-
 //
 // This provides a fast way to do string searches through data that may
 // or may not contain strings.
@@ -21,10 +20,10 @@
 
 typedef struct _search_t search_t;
 
-search_t*     searchComp(const char *);
-void          searchFree(search_t**);
-int           searchLen(search_t*);
+search_t *searchComp(const char *);
+void searchFree(search_t **);
+int searchLen(search_t *);
 
-int           searchExec(search_t*, char *, int);
+int searchExec(search_t *, char *, int);
 
 #endif // __SEARCH_H__

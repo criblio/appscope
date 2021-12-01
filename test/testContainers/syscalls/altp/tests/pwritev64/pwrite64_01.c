@@ -3,7 +3,9 @@
 
 #include "test_utils.h"
 
-int do_test() {
+int
+do_test()
+{
     int test_result = EXIT_SUCCESS;
     char tmp_file_name[NAME_MAX];
     char buffer[] = TEST_MSG;
@@ -20,11 +22,11 @@ int do_test() {
 
     if (f != EOF) {
         if (pwritev64(f, iov, 1, 0) == -1) {
-           TEST_ERROR();
+            TEST_ERROR();
         }
 
         if (close(f) != 0) {
-           TEST_ERROR();
+            TEST_ERROR();
         }
     } else {
         TEST_ERROR();
@@ -35,16 +37,16 @@ int do_test() {
     if (f != EOF) {
         memset(buffer, 0, sizeof(buffer));
 
-        if(pread64(f, buffer, sizeof(buffer), 0) == EOF) {
+        if (pread64(f, buffer, sizeof(buffer), 0) == EOF) {
             TEST_ERROR();
         }
 
-        if(strcmp(buffer, TEST_MSG) != 0) {
+        if (strcmp(buffer, TEST_MSG) != 0) {
             TEST_ERROR();
         }
 
-        if (close(f)!= 0) {
-           TEST_ERROR();
+        if (close(f) != 0) {
+            TEST_ERROR();
         }
     } else {
         TEST_ERROR();

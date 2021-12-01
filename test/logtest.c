@@ -1,42 +1,42 @@
 #define _GNU_SOURCE
+#include "log.h"
 #include <stdio.h>
 #include <unistd.h>
-#include "log.h"
 
 #include "fn.h"
 #include "test.h"
 
 static void
-logCreateReturnsValidPtr(void** state)
+logCreateReturnsValidPtr(void **state)
 {
-    log_t* log = logCreate();
+    log_t *log = logCreate();
     assert_non_null(log);
     logDestroy(&log);
     assert_null(log);
 }
 
 static void
-logDestroyNullLogDoesntCrash(void** state)
+logDestroyNullLogDoesntCrash(void **state)
 {
     logDestroy(NULL);
-    log_t* log = NULL;
+    log_t *log = NULL;
     logDestroy(&log);
     // Implicitly shows that calling logDestroy with NULL is harmless
 }
 
 static void
-logSendForNullLogDoesntCrash(void** state)
+logSendForNullLogDoesntCrash(void **state)
 {
-    const char* msg = "Hey, this is cool!\n";
+    const char *msg = "Hey, this is cool!\n";
     assert_int_equal(logSend(NULL, msg, DEFAULT_LOG_LEVEL), -1);
 }
 
 static void
-logSendForNullMessageDoesntCrash(void** state)
+logSendForNullMessageDoesntCrash(void **state)
 {
-    log_t* log = logCreate();
+    log_t *log = logCreate();
     assert_non_null(log);
-    transport_t* t = transportCreateSyslog();
+    transport_t *t = transportCreateSyslog();
     assert_non_null(t);
     logTransportSet(log, t);
     assert_int_equal(logSend(log, NULL, DEFAULT_LOG_LEVEL), -1);
@@ -44,17 +44,17 @@ logSendForNullMessageDoesntCrash(void** state)
 }
 
 static void
-logLevelVerifyDefaultLevel(void** state)
+logLevelVerifyDefaultLevel(void **state)
 {
-    log_t* log = logCreate();
+    log_t *log = logCreate();
     assert_int_equal(logLevel(log), DEFAULT_LOG_LEVEL);
     logDestroy(&log);
 }
 
 static void
-logLevelSetAndGet(void** state)
+logLevelSetAndGet(void **state)
 {
-    log_t* log = logCreate();
+    log_t *log = logCreate();
     logLevelSet(log, CFG_LOG_NONE);
     assert_int_equal(logLevel(log), CFG_LOG_NONE);
     logLevelSet(log, CFG_LOG_DEBUG);
@@ -63,16 +63,16 @@ logLevelSetAndGet(void** state)
 }
 
 static void
-logTranportSetAndLogSend(void** state)
+logTranportSetAndLogSend(void **state)
 {
-    const char* file_path = "/tmp/my.path";
-    log_t* log = logCreate();
+    const char *file_path = "/tmp/my.path";
+    log_t *log = logCreate();
     assert_non_null(log);
-    transport_t* t1 = transportCreateUdp("127.0.0.1", "12345");
-    transport_t* t2 = transportCreateUnix("/var/run/scope.sock");
-    transport_t* t3 = transportCreateSyslog();
-    transport_t* t4 = transportCreateShm();
-    transport_t* t5 = transportCreateFile(file_path, CFG_BUFFER_FULLY);
+    transport_t *t1 = transportCreateUdp("127.0.0.1", "12345");
+    transport_t *t2 = transportCreateUnix("/var/run/scope.sock");
+    transport_t *t3 = transportCreateSyslog();
+    transport_t *t4 = transportCreateShm();
+    transport_t *t5 = transportCreateFile(file_path, CFG_BUFFER_FULLY);
     logTransportSet(log, t1);
     logTransportSet(log, t2);
     logTransportSet(log, t3);
@@ -106,12 +106,12 @@ logTranportSetAndLogSend(void** state)
 }
 
 static void
-logSendWithLogLevelFilter(void** state)
+logSendWithLogLevelFilter(void **state)
 {
-    const char* file_path = "/tmp/my.path";
-    log_t* log = logCreate();
+    const char *file_path = "/tmp/my.path";
+    log_t *log = logCreate();
     assert_non_null(log);
-    transport_t* t = transportCreateFile(file_path, CFG_BUFFER_LINE);
+    transport_t *t = transportCreateFile(file_path, CFG_BUFFER_LINE);
     logTransportSet(log, t);
 
     // Test logLevel filtering by testing side effects of logSend
@@ -164,23 +164,16 @@ logSendWithLogLevelFilter(void** state)
     logDestroy(&log);
 }
 
-
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("running %s\n", argv[0]);
     initFn();
 
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(logCreateReturnsValidPtr),
-        cmocka_unit_test(logDestroyNullLogDoesntCrash),
-        cmocka_unit_test(logSendForNullLogDoesntCrash),
-        cmocka_unit_test(logSendForNullMessageDoesntCrash),
-        cmocka_unit_test(logLevelVerifyDefaultLevel),
-        cmocka_unit_test(logLevelSetAndGet),
-        cmocka_unit_test(logTranportSetAndLogSend),
-        cmocka_unit_test(logSendWithLogLevelFilter),
-        cmocka_unit_test(dbgHasNoUnexpectedFailures),
+        cmocka_unit_test(logCreateReturnsValidPtr),         cmocka_unit_test(logDestroyNullLogDoesntCrash), cmocka_unit_test(logSendForNullLogDoesntCrash),
+        cmocka_unit_test(logSendForNullMessageDoesntCrash), cmocka_unit_test(logLevelVerifyDefaultLevel),   cmocka_unit_test(logLevelSetAndGet),
+        cmocka_unit_test(logTranportSetAndLogSend),         cmocka_unit_test(logSendWithLogLevelFilter),    cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

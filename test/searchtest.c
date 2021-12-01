@@ -1,36 +1,36 @@
-#include <stdio.h>
-#include <string.h>
 #include "search.h"
 #include "test.h"
+#include <stdio.h>
+#include <string.h>
 
 static void
-searchCompReturnsNullForNullArg(void** state)
+searchCompReturnsNullForNullArg(void **state)
 {
     search_t *handle = searchComp(NULL);
     assert_null(handle);
 }
 
 static void
-searchCompReturnsNullForEmptyString(void** state)
+searchCompReturnsNullForEmptyString(void **state)
 {
     search_t *handle = searchComp("");
     assert_null(handle);
 }
 
 static void
-searchCompReturnsValidPtrInHappyPath(void** state)
+searchCompReturnsValidPtrInHappyPath(void **state)
 {
     search_t *handle = searchComp("hey");
-    assert_non_null (handle);
+    assert_non_null(handle);
 
     searchFree(&handle);
 }
 
 static void
-searchFreeHandlesNullArg(void** state)
+searchFreeHandlesNullArg(void **state)
 {
     search_t *handle = searchComp("hey");
-    assert_non_null (handle);
+    assert_non_null(handle);
 
     // test searchFree too
     searchFree(&handle);
@@ -40,13 +40,13 @@ searchFreeHandlesNullArg(void** state)
 }
 
 static void
-searchLenReturnsZeroForNullArg(void** state)
+searchLenReturnsZeroForNullArg(void **state)
 {
     assert_int_equal(searchLen(NULL), 0);
 }
 
 static void
-searchLenReturnsLengthOfOriginalStr(void** state)
+searchLenReturnsLengthOfOriginalStr(void **state)
 {
     search_t *handle = searchComp("hey");
     assert_int_equal(searchLen(handle), strlen("hey"));
@@ -54,7 +54,7 @@ searchLenReturnsLengthOfOriginalStr(void** state)
 }
 
 static void
-searchExecReturnsMinusOneForBadArgs(void** state)
+searchExecReturnsMinusOneForBadArgs(void **state)
 {
     char *buf = "hey";
     search_t *handle = searchComp("hey");
@@ -69,7 +69,7 @@ searchExecReturnsMinusOneForBadArgs(void** state)
 }
 
 static void
-searchExecReturnsExpectedResultsInHappyPath(void** state)
+searchExecReturnsExpectedResultsInHappyPath(void **state)
 {
     char *buf = "hey";
     search_t *handle = searchComp("hey");
@@ -78,7 +78,7 @@ searchExecReturnsExpectedResultsInHappyPath(void** state)
     assert_int_equal(searchExec(handle, buf, strlen(buf)), 0);
 
     // almost match; handle longer than buf size
-    assert_int_equal(searchExec(handle, buf, strlen(buf)-1), -1);
+    assert_int_equal(searchExec(handle, buf, strlen(buf) - 1), -1);
 
     // match at end of buf
     assert_int_equal(searchExec(handle, " hey", strlen(" hey")), 1);
@@ -103,21 +103,16 @@ searchExecReturnsExpectedResultsInHappyPath(void** state)
 }
 
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("running %s\n", argv[0]);
 
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(searchCompReturnsNullForNullArg),
-        cmocka_unit_test(searchCompReturnsNullForEmptyString),
-        cmocka_unit_test(searchCompReturnsValidPtrInHappyPath),
-        cmocka_unit_test(searchFreeHandlesNullArg),
-        cmocka_unit_test(searchLenReturnsZeroForNullArg),
-        cmocka_unit_test(searchLenReturnsLengthOfOriginalStr),
-        cmocka_unit_test(searchExecReturnsMinusOneForBadArgs),
-        cmocka_unit_test(searchExecReturnsExpectedResultsInHappyPath),
+        cmocka_unit_test(searchCompReturnsNullForNullArg),      cmocka_unit_test(searchCompReturnsNullForEmptyString),
+        cmocka_unit_test(searchCompReturnsValidPtrInHappyPath), cmocka_unit_test(searchFreeHandlesNullArg),
+        cmocka_unit_test(searchLenReturnsZeroForNullArg),       cmocka_unit_test(searchLenReturnsLengthOfOriginalStr),
+        cmocka_unit_test(searchExecReturnsMinusOneForBadArgs),  cmocka_unit_test(searchExecReturnsExpectedResultsInHappyPath),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }
-

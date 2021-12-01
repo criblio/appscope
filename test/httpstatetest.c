@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -11,36 +11,40 @@
 #include "plattime.h"
 #include "test.h"
 
-
 uint64_t g_http_guard[1024];
-struct protocol_info_t* g_msg = NULL;
-
+struct protocol_info_t *g_msg = NULL;
 
 void
-freeMsg(struct protocol_info_t** msg_ptr)
+freeMsg(struct protocol_info_t **msg_ptr)
 {
-    if (!msg_ptr || !*msg_ptr) return;
+    if (!msg_ptr || !*msg_ptr)
+        return;
 
     struct protocol_info_t *msg = *msg_ptr;
-    struct http_post_t *post = msg ? (struct http_post_t*) msg->data : NULL;
+    struct http_post_t *post = msg ? (struct http_post_t *)msg->data : NULL;
     char *header = post ? post->hdr : NULL;
 
-    if (header) free(header);
-    if (post) free(post);
-    if (msg) free(msg);
+    if (header)
+        free(header);
+    if (post)
+        free(post);
+    if (msg)
+        free(msg);
     *msg_ptr = NULL;
 }
 
 int __real_cmdPostEvent(ctl_t *ctl, char *event);
-int __wrap_cmdPostEvent(ctl_t *ctl, char *event)
+int
+__wrap_cmdPostEvent(ctl_t *ctl, char *event)
 {
-    if (g_msg) freeMsg(&g_msg); // Don't leak
-    g_msg = (struct protocol_info_t*)event;
+    if (g_msg)
+        freeMsg(&g_msg); // Don't leak
+    g_msg = (struct protocol_info_t *)event;
     return 0;
 }
 
 static int
-needleTestSetup(void** state)
+needleTestSetup(void **state)
 {
     initTime();
     initFn();
@@ -52,13 +56,12 @@ needleTestSetup(void** state)
 }
 
 static void
-doHttpWithSingleBufferWithNet(void** state)
+doHttpWithSingleBufferWithNet(void **state)
 {
-    char *buffer =
-        "GET / HTTP/1.0\r\n"
-        "Host: www.google.com\r\n"
-        "Connection: close\r\n"
-        "\r\n";
+    char *buffer = "GET / HTTP/1.0\r\n"
+                   "Host: www.google.com\r\n"
+                   "Connection: close\r\n"
+                   "\r\n";
     size_t buflen = strlen(buffer);
 
     net_info net = {0};
@@ -66,7 +69,7 @@ doHttpWithSingleBufferWithNet(void** state)
 
     assert_true(doHttp(13, 3, &net, buffer, buflen, NETRX, BUF));
     assert_non_null(g_msg);
-    struct http_post_t *post = (struct http_post_t*) g_msg->data;
+    struct http_post_t *post = (struct http_post_t *)g_msg->data;
     assert_non_null(post);
     char *header = post->hdr;
     assert_non_null(header);
@@ -75,18 +78,17 @@ doHttpWithSingleBufferWithNet(void** state)
 }
 
 static void
-doHttpWithSingleBufferWithoutNet(void** state)
+doHttpWithSingleBufferWithoutNet(void **state)
 {
-    char *buffer =
-        "GET / HTTP/1.0\r\n"
-        "Host: www.google.com\r\n"
-        "Connection: close\r\n"
-        "\r\n";
+    char *buffer = "GET / HTTP/1.0\r\n"
+                   "Host: www.google.com\r\n"
+                   "Connection: close\r\n"
+                   "\r\n";
     size_t buflen = strlen(buffer);
 
     assert_true(doHttp(13, 3, NULL, buffer, buflen, NETRX, BUF));
     assert_non_null(g_msg);
-    struct http_post_t *post = (struct http_post_t*) g_msg->data;
+    struct http_post_t *post = (struct http_post_t *)g_msg->data;
     assert_non_null(post);
     char *header = post->hdr;
     assert_non_null(header);
@@ -95,11 +97,10 @@ doHttpWithSingleBufferWithoutNet(void** state)
 }
 
 static void
-doHttpWithPartialHeaderBeforeClose(void** state)
+doHttpWithPartialHeaderBeforeClose(void **state)
 {
-    char *buffer =
-        "GET / HTTP/1.0\r\n"
-        "Host: www.google.com\r\n";
+    char *buffer = "GET / HTTP/1.0\r\n"
+                   "Host: www.google.com\r\n";
     size_t buflen = strlen(buffer);
 
     net_info net = {0};
@@ -117,13 +118,12 @@ doHttpWithPartialHeaderBeforeClose(void** state)
 }
 
 static void
-doHttpWithConsecutiveHeaders(void** state)
+doHttpWithConsecutiveHeaders(void **state)
 {
-    char *buffer =
-        "GET / HTTP/1.0\r\n"
-        "Host: www.google.com\r\n"
-        "Connection: close\r\n"
-        "\r\n";
+    char *buffer = "GET / HTTP/1.0\r\n"
+                   "Host: www.google.com\r\n"
+                   "Connection: close\r\n"
+                   "\r\n";
     size_t buflen = strlen(buffer);
 
     net_info net = {0};
@@ -132,7 +132,7 @@ doHttpWithConsecutiveHeaders(void** state)
     {
         assert_true(doHttp(13, 3, &net, buffer, buflen, NETRX, BUF));
         assert_non_null(g_msg);
-        struct http_post_t *post = (struct http_post_t*) g_msg->data;
+        struct http_post_t *post = (struct http_post_t *)g_msg->data;
         assert_non_null(post);
         char *header = post->hdr;
         assert_non_null(header);
@@ -143,7 +143,7 @@ doHttpWithConsecutiveHeaders(void** state)
     {
         assert_true(doHttp(13, 3, &net, buffer, buflen, NETRX, BUF));
         assert_non_null(g_msg);
-        struct http_post_t *post = (struct http_post_t*) g_msg->data;
+        struct http_post_t *post = (struct http_post_t *)g_msg->data;
         assert_non_null(post);
         char *header = post->hdr;
         assert_non_null(header);
@@ -153,25 +153,20 @@ doHttpWithConsecutiveHeaders(void** state)
 }
 
 static void
-doHttpWithSplitHeader(void** state)
+doHttpWithSplitHeader(void **state)
 {
-    char *buffers[] = {
-        "GET / HTTP/1.0\r\n",
-        "Host: www.google.com\r\n",
-        "Connection: close\r\n",
-        "\r\n",
-        NULL };
+    char *buffers[] = {"GET / HTTP/1.0\r\n", "Host: www.google.com\r\n", "Connection: close\r\n", "\r\n", NULL};
     net_info net = {0};
     net.type = SOCK_STREAM;
     int i;
 
-    for (i=0; buffers[i]; i++) {
+    for (i = 0; buffers[i]; i++) {
         size_t buflen = strlen(buffers[i]);
-        bool returnValue = doHttp(13, 3, &net, (void*)buffers[i], buflen, NETRX, BUF);
+        bool returnValue = doHttp(13, 3, &net, (void *)buffers[i], buflen, NETRX, BUF);
         if (i == 3) {
             assert_true(returnValue);
             assert_non_null(g_msg);
-            struct http_post_t *post = (struct http_post_t*) g_msg->data;
+            struct http_post_t *post = (struct http_post_t *)g_msg->data;
             assert_non_null(post);
             char *header = post->hdr;
             assert_non_null(header);
@@ -185,30 +180,21 @@ doHttpWithSplitHeader(void** state)
 }
 
 static void
-doHttpWithInterleavedEncryption(void** state)
+doHttpWithInterleavedEncryption(void **state)
 {
-    char *buffers[] = {
-        "GET / HTTP/1.0\r\n",
-        "\x17\x03\x03",
-        "Host: www.google.com\r\n",
-        "\x17\x03\x03",
-        "Connection: close\r\n",
-        "\x17\x03\x03",
-        "\r\n",
-        "\x17\x03\x03",
-        NULL };
+    char *buffers[] = {"GET / HTTP/1.0\r\n", "\x17\x03\x03", "Host: www.google.com\r\n", "\x17\x03\x03", "Connection: close\r\n", "\x17\x03\x03", "\r\n", "\x17\x03\x03", NULL};
     net_info net = {0};
     net.type = SOCK_STREAM;
     int i;
 
-    for (i=0; buffers[i]; i++) {
+    for (i = 0; buffers[i]; i++) {
         size_t buflen = strlen(buffers[i]);
         int encrypted = buffers[i][0] == '\x17';
-        bool returnValue = doHttp(13, 3, &net, (void*)buffers[i], buflen, (encrypted) ? TLSRX : NETRX, BUF);
+        bool returnValue = doHttp(13, 3, &net, (void *)buffers[i], buflen, (encrypted) ? TLSRX : NETRX, BUF);
         if (i == 6) {
             assert_true(returnValue);
             assert_non_null(g_msg);
-            struct http_post_t *post = (struct http_post_t*) g_msg->data;
+            struct http_post_t *post = (struct http_post_t *)g_msg->data;
             assert_non_null(post);
             char *header = post->hdr;
             assert_non_null(header);
@@ -222,13 +208,11 @@ doHttpWithInterleavedEncryption(void** state)
 }
 
 static void
-doHttpWhichRequiresRealloc(void** state)
+doHttpWhichRequiresRealloc(void **state)
 {
-    char *buffers[] = {
-        "GET / HTTP/1.0\r\n",
-        "0123456789ABCD\r\n", // <-- repeat this one a bunch, 16 bytes at a time
-        "X\r\n\r\n",
-        NULL };
+    char *buffers[] = {"GET / HTTP/1.0\r\n",
+                       "0123456789ABCD\r\n", // <-- repeat this one a bunch, 16 bytes at a time
+                       "X\r\n\r\n", NULL};
     net_info net = {0};
     net.type = SOCK_STREAM;
     int headersize = 0;
@@ -237,48 +221,44 @@ doHttpWhichRequiresRealloc(void** state)
         char *buffer = (!headersize) ? buffers[0] : buffers[1];
 
         size_t buflen = strlen(buffer);
-        bool returnValue = doHttp(13, 3, &net, (void*)buffer, buflen, NETRX, BUF);
+        bool returnValue = doHttp(13, 3, &net, (void *)buffer, buflen, NETRX, BUF);
         assert_false(returnValue);
         headersize += buflen;
     }
 
     // buffers[2] takes us 3 bytes past the original 4096 limit.
-    assert_true(doHttp(13, 3, &net, (void*)buffers[2], strlen(buffers[2]), NETRX, BUF));
+    assert_true(doHttp(13, 3, &net, (void *)buffers[2], strlen(buffers[2]), NETRX, BUF));
 }
 
 static void
-doHttpWhichExceedsReallocSize(void** state)
+doHttpWhichExceedsReallocSize(void **state)
 {
-    char *buffers[] = {
-        "GET / HTTP/1.0\r\n",
-        "0123456789ABCD\r\n", // <-- repeat this one a bunch, 16 bytes at a time
-        "X\r\n\r\n",
-        NULL };
+    char *buffers[] = {"GET / HTTP/1.0\r\n",
+                       "0123456789ABCD\r\n", // <-- repeat this one a bunch, 16 bytes at a time
+                       "X\r\n\r\n", NULL};
     net_info net = {0};
     net.type = SOCK_STREAM;
     int headersize = 0;
 
-    while (headersize < 4*4096) {
+    while (headersize < 4 * 4096) {
         char *buffer = (!headersize) ? buffers[0] : buffers[1];
 
         size_t buflen = strlen(buffer);
-        bool returnValue = doHttp(13, 3, &net, (void*)buffer, buflen, NETRX, BUF);
+        bool returnValue = doHttp(13, 3, &net, (void *)buffer, buflen, NETRX, BUF);
         assert_false(returnValue);
         headersize += buflen;
     }
 
     // buffers[2] takes us 3 bytes past the max (4*4096) limit.
-    assert_false(doHttp(13, 3, &net, (void*)buffers[2], strlen(buffers[2]), NETRX, BUF));
+    assert_false(doHttp(13, 3, &net, (void *)buffers[2], strlen(buffers[2]), NETRX, BUF));
 
     // exceeding the limit leaves a breadcrumb in dbg.
     assert_int_equal(dbgCountMatchingLines("src/httpstate.c"), 1);
     dbgInit(); // reset dbg for the rest of the tests
-
 }
 
-
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("running %s\n", argv[0]);
 
@@ -295,4 +275,3 @@ main(int argc, char* argv[])
     };
     return cmocka_run_group_tests(tests, needleTestSetup, groupTeardown);
 }
-

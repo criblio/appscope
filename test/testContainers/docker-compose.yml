@@ -28,6 +28,15 @@ services:
       dockerfile: ./syscalls/Dockerfile
     <<: *scope-common
 
+  syscalls-alpine:
+    image: ghcr.io/criblio/appscope-test-syscalls-alpine:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-syscalls-alpine:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./syscalls/Dockerfile.alpine
+    <<: *scope-common
+
   logstream:
     image: ghcr.io/criblio/appscope-test-logstream:${TAG:?Missing TAG environment variable}
     build:

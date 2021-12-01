@@ -102,12 +102,20 @@ def configure(runner: Runner, app_config):
         included_tests = location.get("include_tests", [])
         excluded_tests = location.get("exclude_tests", [])
         arch = subprocess.check_output(["uname","-m"])
+        loader = subprocess.run(["ldd","--version"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT).stdout
+
         if b'x86_64' in arch:
             logging.info("merging x86_64 excluded tests")
             excluded_tests = excluded_tests + location.get("exclude_x86_64_tests", [])
         elif b'aarch64' in arch:
             logging.info("merging aarch64 excluded tests")
             excluded_tests = excluded_tests + location.get("exclude_aarch64_tests", [])
+        if b'musl libc' in loader:
+            logging.info("merging musl loader excluded tests")
+            excluded_tests = excluded_tests + location.get("exclude_musl_tests", [])
+        elif b'GLIBC' in loader:
+            logging.info("merging glibc loader excluded tests")
+            excluded_tests = excluded_tests + location.get("exclude_glibc_tests", [])
 
         tests = locate_tests(home_dir, included_tests, excluded_tests)
 

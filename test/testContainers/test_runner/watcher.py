@@ -7,7 +7,7 @@ from common import TestSetResult, TestResult
 
 class TestWatcher:
 
-    def __init__(self, execution_id, scope_version):
+    def __init__(self, execution_id):
         self.execution_id = execution_id
         self.finish_date = None
         self.start_date = None

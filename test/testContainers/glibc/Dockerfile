@@ -1,10 +1,11 @@
-FROM alpine:latest
+FROM ubuntu:20.04
 
-RUN apk add bash binutils curl gcc gdb musl-dev
-
-RUN mkdir -p /opt/fwrite
-COPY ./musl/fwrite.c /opt/fwrite/fwrite.c
-RUN gcc -o /opt/fwrite/fwrite /opt/fwrite/fwrite.c
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt update \
+    && apt install -y \
+      binutils \
+      musl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /opt/extract_scope && \
     mkdir -p /opt/patch_libscope
@@ -16,10 +17,9 @@ ENV SCOPE_EVENT_CONSOLE=true
 ENV SCOPE_EVENT_METRIC=true
 ENV SCOPE_EVENT_HTTP=true
 ENV SCOPE_EVENT_NET=true
-ENV SCOPE_EVENT_FS=false
+ENV SCOPE_EVENT_FS=true
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
 ENV SCOPE_EVENT_DEST=file:///opt/test-runner/logs/events.log
-ENV SCOPE_ALLOW_MUSL_ATTACH=true
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 COPY scope-profile.sh /etc/profile.d/scope.sh
@@ -33,7 +33,7 @@ RUN  mkdir /usr/local/scope && \
      ln -s /opt/appscope/bin/linux/$(uname -m)/ldscope /usr/local/scope/bin/ldscope && \
      ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
-COPY musl/scope-test /usr/local/scope/scope-test
+COPY glibc/scope-test /usr/local/scope/scope-test
 
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]

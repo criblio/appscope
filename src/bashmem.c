@@ -167,14 +167,14 @@ bashMemFuncsFound()
         patch_info_t *func = &bash_mem_func[i];
         void *func_ptr = dlsym(exe_handle, func->name);
         if (!func_ptr) {
-            scopeLog(CFG_LOG_ERROR, "Couldn't find bash function %s", func->name);
+            scopeLogError("Couldn't find bash function %s", func->name);
             continue;
         }
 
         const int DECODE_BYTES = 50;
         asm_count = cs_disasm(disass_handle, func_ptr, DECODE_BYTES, (uint64_t)func_ptr, 0, &asm_inst);
         if (asm_count <= 0) {
-            scopeLog(CFG_LOG_ERROR, "Couldn't disassemble bash function %s", func->name);
+            scopeLogError("Couldn't disassemble bash function %s", func->name);
             continue;
         }
 
@@ -189,7 +189,7 @@ bashMemFuncsFound()
             }
         }
         if (j==asm_count) {
-            scopeLog(CFG_LOG_ERROR, "For bash function %s, couldn't find "
+            scopeLogError("For bash function %s, couldn't find "
                 "a jmp instruction in the first %d instructions from 0x%p",
                 func->name, asm_count, func_ptr);
             continue;
@@ -239,7 +239,7 @@ replaceBashMemFuncs()
 
     funchook_t *funchook = funchook_create();
     if (!funchook) {
-        scopeLog(CFG_LOG_ERROR, "funchook_create failed");
+        scopeLogError("funchook_create failed");
         return FALSE;
     }
 
@@ -258,7 +258,7 @@ replaceBashMemFuncs()
         void *addr_to_patch = func->internal_addr;
         rc = funchook_prepare(funchook, (void **)&addr_to_patch, (void *)func->fn_ptr);
         if (rc) {
-            scopeLog(CFG_LOG_ERROR,"funchook_prepare failed for %s at 0x%p", func->name, func->internal_addr);
+            scopeLogError("funchook_prepare failed for %s at 0x%p", func->name, func->internal_addr);
         } else {
             num_patched++;
         }
@@ -266,7 +266,7 @@ replaceBashMemFuncs()
 
     rc = funchook_install(funchook, 0);
     if (rc) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: failed to install run_bash_mem_fix. (%s)\n", funchook_error_message(funchook));
+        scopeLogError("ERROR: failed to install run_bash_mem_fix. (%s)\n", funchook_error_message(funchook));
     }
 
     return !rc && (num_patched == bash_mem_func_count);
@@ -306,7 +306,7 @@ run_bash_mem_fix(void)
     successful = TRUE;
 out:
     {
-        scopeLog(CFG_LOG_ERROR, "run_bash_mem_fix was run %s", (successful) ? "successfully" : "but failed");
+        scopeLogError("run_bash_mem_fix was run %s", (successful) ? "successfully" : "but failed");
     }
     return successful;
 }

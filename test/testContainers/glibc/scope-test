@@ -42,20 +42,20 @@ endtest(){
 }
 
 #
-# extract on musl
+# extract on glibc
 #
-starttest extract_musl
+starttest extract_glibc
 
 scope extract /opt/extract_scope
 ERR+=$?
 
 count=$(readelf -d /opt/extract_scope/libscope.so | grep 'Shared library:.*ld-linux' | wc -l)
-if [ $count -ne 0 ] ; then 
+if [ $count -ne 1 ] ; then 
     ERR+=1
 fi
 
 count=$(readelf -d /opt/extract_scope/libscope.so | grep 'Shared library:.*ld-musl' | wc -l)
-if [ $count -ne 1 ] ; then 
+if [ $count -ne 0 ] ; then 
     ERR+=1
 fi
 
@@ -64,69 +64,45 @@ endtest
 #
 # ldscope patch
 #
-starttest patch_on_musl
+starttest patch_on_glibc
+
 cp /usr/local/scope/lib/libscope.so /opt/patch_libscope
 cp /usr/local/scope/bin/ldscope /opt/patch_libscope
+
+md5_before_patch=$(md5sum /opt/patch_libscope/libscope.so)
 
 count=$(readelf -d /opt/patch_libscope/libscope.so | grep 'Shared library:.*ld-linux' | wc -l)
 if [ $count -ne 1 ] ; then
     ERR+=1
 fi
 
-/opt/patch_libscope/ldscope -p /opt/patch_libscope/libscope.so
-ERR+=$?
-
-md5_after_first_patch=$(md5sum /opt/patch_libscope/libscope.so)
-
-count=$(readelf -d /opt/patch_libscope/libscope.so | grep 'Shared library:.*ld-musl' | wc -l)
-if [ $count -ne 1 ] ; then
-    ERR+=1
-fi
-
-/opt/patch_libscope/ldscope -p /opt/patch_libscope/libscope.so
+/opt/patch_libscope/ldscope --patch /opt/patch_libscope/libscope.so
 if [ $? -eq 0 ]; then
     ERR+=1
 fi
 
-md5_after_second_patch=$(md5sum /opt/patch_libscope/libscope.so)
+md5_after_patch=$(md5sum /opt/patch_libscope/libscope.so)
 
-if [ "$md5_after_first_patch" != "$md5_after_second_patch" ]; then
+count=$(readelf -d /opt/patch_libscope/libscope.so | grep 'Shared library:.*ld-musl' | wc -l)
+if [ $count -ne 0 ] ; then
+    ERR+=1
+fi
+
+if [ "$md5_before_patch" != "$md5_after_patch" ]; then
     ERR+=1
 fi
 
 endtest
 
-#
-# fwrite binary
-#
-starttest fwrite
+starttest patch_on_glibc_dummy_file
 
-ldscope /opt/fwrite/fwrite
-ERR+=$?
-
-sleep 0.5
-count=$(grep '"source":"fs.op.open"' $EVT_FILE | wc -l)
-if [ $count -ne 1 ] ; then
-    ERR+=1
-fi
-
-count=$(grep '"source":"fs.duration"' $EVT_FILE | wc -l)
-if [ $count -ne 1 ] ; then
-    ERR+=1
-fi
-
-count=$(grep '"source":"fs.write"' $EVT_FILE | wc -l)
-if [ $count -ne 1 ] ; then
-    ERR+=1
-fi
-
-count=$(grep '"source":"fs.op.close"' $EVT_FILE | wc -l)
-if [ $count -ne 1 ] ; then
+echo "Lorem ipsum" >> /opt/patch_libscope/dummy_file
+/opt/patch_libscope/ldscope --patch /opt/patch_libscope/dummy_file
+if [ $? -eq 0 ]; then
     ERR+=1
 fi
 
 endtest
-
 
 if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""

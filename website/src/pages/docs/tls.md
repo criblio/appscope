@@ -19,7 +19,7 @@ ldscope --help configuration | grep TLS
 
 ## Using TLS in Cribl.Cloud
 
-AppScope uses TLS by default to communicate with LogStream in Cribl.Cloud. LogStream has an AppScope Source ready to use out-of-the-box.
+AppScope uses TLS by default to communicate with LogStream Cloud (that is, LogStream in Cribl.Cloud). LogStream has an AppScope Source ready to use out-of-the-box.
 
 Within Cribl.Cloud, a front-end load balancer (reverse proxy) handles the encrypted TLS traffic and relays it to the AppScope Source port in LogStream. The connection from the load balancer to LogStream does **not** use TLS, and you should not enable TLS on the [AppScope Source](https://docs.cribl.io/docs/sources-appscope) in LogStream. No changes in LogStream configuration are needed.
 
@@ -63,8 +63,6 @@ cribl:
 
 ## Scoping Without TLS
 
-If you prefer to communicate without encryption, connect to port 10091 instead of port 10090.
+If you prefer to connect to LogStream Cloud without encryption, connect to port 10091 instead of port 10090, and disable the `tls` element in `scope.yml`.
 
-If it is enabled, disable the `tls` element in `scope.yml`.
-
-If connecting to LogStream in Cribl.Cloud, no changes in LogStream configuration are needed.
+No changes in LogStream configuration are needed.

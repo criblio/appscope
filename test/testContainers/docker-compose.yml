@@ -10,6 +10,15 @@ services:
 
   # These tests run on all platforms; x86_64 and aarch64
 
+  alpine:
+    image: ghcr.io/criblio/appscope-test-alpine:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-alpine:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./alpine/Dockerfile
+    <<: *scope-common
+
   syscalls:
     image: ghcr.io/criblio/appscope-test-syscalls:${TAG:?Missing TAG environment variable}
     build:
@@ -17,6 +26,15 @@ services:
         - ghcr.io/criblio/appscope-test-syscalls:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./syscalls/Dockerfile
+    <<: *scope-common
+
+  syscalls-alpine:
+    image: ghcr.io/criblio/appscope-test-syscalls-alpine:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-syscalls-alpine:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./syscalls/Dockerfile.alpine
     <<: *scope-common
 
   logstream:
@@ -82,6 +100,8 @@ services:
     <<: *scope-common
   java9:
     image: ghcr.io/criblio/appscope-test-java9:${TAG:?Missing TAG environment variable}
+    environment:
+        SKIP_LDSCOPE_TEST: 'true'
     build:
       cache_from: 
         - ghcr.io/criblio/appscope-test-java9:${TAG:?Missing TAG environment variable}
@@ -161,6 +181,24 @@ services:
         - ghcr.io/criblio/appscope-test-console:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./console/Dockerfile
+    <<: *scope-common
+    
+  musl:
+    image: ghcr.io/criblio/appscope-test-musl:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from: 
+        - ghcr.io/criblio/appscope-test-musl:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./musl/Dockerfile
+    <<: *scope-common
+
+  glibc:
+    image: ghcr.io/criblio/appscope-test-glibc:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from: 
+        - ghcr.io/criblio/appscope-test-glibc:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./glibc/Dockerfile
     <<: *scope-common
 
 # vim: ts=2 sw=2 et :

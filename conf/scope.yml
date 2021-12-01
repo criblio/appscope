@@ -164,7 +164,7 @@ metric:
 
     # Connection port
     #   Type:     integer or string
-    #   Values:   IP port number or service name
+    #   Values:   Port number or service name
     #   Default:  8125
     #   Override: the port token in the $SCOPE_METRIC_DEST URL
     #
@@ -457,7 +457,7 @@ event:
 
     # Connection port
     #   Type:     integer or string
-    #   Values:   IP port number or service name
+    #   Values:   Port number or service name
     #   Default:  9109
     #   Override: the port token in the $SCOPE_EVENT_DEST URL
     #
@@ -650,7 +650,7 @@ libscope:
 
       # Connection port
       #   Type:     integer or string
-      #   Values:   IP port number or service name
+      #   Values:   Port number or service name
       #   Default:  (none)
       #   Override: the port token in the $SCOPE_LOG_DEST URL
       #
@@ -741,7 +741,7 @@ cribl:
 
     # Connection port
     #   Type:     integer or string
-    #   Values:   IP port number or service name
+    #   Values:   Port number or service name
     #   Default:  10090
     #   Override: the port token in the $SCOPE_CRIBL or $SCOPE_CRIBL_CLOUD URL
     #
@@ -928,7 +928,7 @@ custom:
   #   ancestor: string
   #
   #     Matches if given string matches the basename of the scoped process's
-  #     partent, parent's parent, etc.
+  #     parent, parent's parent, etc.
   #
   # The `config` section specifies the settings that should be overridden when
   # the filter matches. Entries under `config` use the same schema as the

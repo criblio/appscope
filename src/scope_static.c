@@ -55,8 +55,9 @@ get_dir(const char *path, char *fres, size_t len)
     DIR *dirp;
     struct dirent *entry;
     char *dcopy, *pcopy, *dname, *fname;
+    int res = -1;
 
-    if (!path || !fres || (len <= 0)) return -1;
+    if (!path || !fres || (len <= 0)) return res;
 
     pcopy = strdup(path);
     dname = dirname(pcopy);
@@ -64,7 +65,7 @@ get_dir(const char *path, char *fres, size_t len)
     if ((dirp = opendir(dname)) == NULL) {
         perror("get_dir:opendir");
         if (pcopy) free(pcopy);
-        return -1;
+        return res;
     }
 
     dcopy = strdup(path);
@@ -74,6 +75,7 @@ get_dir(const char *path, char *fres, size_t len)
         if ((entry->d_type != DT_DIR) &&
             (strstr(entry->d_name, fname))) {
             strncpy(fres, entry->d_name, len);
+            res = 0;
             break;
         }
     }
@@ -81,7 +83,7 @@ get_dir(const char *path, char *fres, size_t len)
     closedir(dirp);
     if (pcopy) free(pcopy);
     if (dcopy) free(dcopy);
-    return 0;
+    return res;
 }
 
 static void
@@ -114,11 +116,10 @@ setEnvVariable(char *env, char *value)
 
 // modify NEEDED entries in libscope.so to avoid dependencies
 static int
-set_library(void)
+set_library(const char *libpath)
 {
     int i, fd, found, name;
     struct stat sbuf;
-    const char *libpath;
     char *buf;
     Elf64_Ehdr *elf;
     Elf64_Shdr *sections;
@@ -127,7 +128,8 @@ set_library(void)
     const char *strtab = NULL;
     const char *sec_name = NULL;
 
-    if ((libpath = libdirGetLibrary()) == NULL) return -1;
+    if (libpath == NULL)
+        return -1;
 
     if ((fd = open(libpath, O_RDONLY)) == -1) {
         perror("set_library:open");
@@ -150,6 +152,18 @@ set_library(void)
 
     // get the elf header, section table and string table
     elf = (Elf64_Ehdr *)buf;
+
+    if (elf->e_ident[EI_MAG0] != ELFMAG0
+        || elf->e_ident[EI_MAG1] != ELFMAG1
+        || elf->e_ident[EI_MAG2] != ELFMAG2
+        || elf->e_ident[EI_MAG3] != ELFMAG3
+        || elf->e_ident[EI_VERSION] != EV_CURRENT) {
+        fprintf(stderr, "ERROR:%s: is not valid ELF file", libpath);
+        close(fd);
+        munmap(buf, sbuf.st_size);
+        return -1;
+    }
+
     sections = (Elf64_Shdr *)((char *)buf + elf->e_shoff);
     section_strtab = (char *)buf + sections[elf->e_shstrndx].sh_offset;
     found = name = 0;
@@ -172,14 +186,16 @@ set_library(void)
     // locate the .dynamic section
     for (i = 0; i < elf->e_shnum; i++) {
         if (sections[i].sh_type == SHT_DYNAMIC) {
-            for (dyn = (Elf64_Dyn *)((char *)buf + sections[i].sh_offset); dyn != DT_NULL; dyn++) {
+            for (dyn = (Elf64_Dyn *)((char *)buf + sections[i].sh_offset); dyn != NULL && dyn->d_tag != DT_NULL; dyn++) {
                 if (dyn->d_tag == DT_NEEDED) {
                     char *depstr = (char *)(strtab + dyn->d_un.d_val);
                     if (depstr && strstr(depstr, "ld-linux")) {
                         char newdep[PATH_MAX];
+                        size_t newdep_len;
                         if (get_dir("/lib/ld-musl", newdep, sizeof(newdep)) == -1) break;
-                        if (strlen(depstr) >= (strlen(newdep) + 1)) {
-                            strncpy(depstr, newdep, strlen(newdep) + 1);
+                        newdep_len = strlen(newdep);
+                        if (strlen(depstr) >= newdep_len) {
+                            strncpy(depstr, newdep, newdep_len + 1);
                             found = 1;
                             break;
                         }
@@ -206,8 +222,6 @@ set_library(void)
         if (rc < sbuf.st_size) {
             perror("set_library:write");
         }
-    } else {
-        fprintf(stderr, "WARNING: can't locate or set the loader string in %s\n", libpath);
     }
 
     close(fd);
@@ -256,6 +270,7 @@ set_loader(char *exe)
             DIR *dirp;
             struct dirent *entry;
             char dir[PATH_MAX];
+            size_t dir_len;
 
             if (strstr(exld, "ld-musl") != NULL) {
                 close(fd);
@@ -279,10 +294,10 @@ set_loader(char *exe)
             }
 
             closedir(dirp);
-
-            if (name && (strlen(exld) > (strlen(dir) + 1))) {
+            dir_len = strlen(dir);
+            if (name && (strlen(exld) >= dir_len)) {
                 if (g_debug) printf("%s:%d exe ld.so: %s to %s\n", __FUNCTION__, __LINE__, exld, dir);
-                strncpy(exld, dir, strlen(dir) + 1);
+                strncpy(exld, dir, dir_len + 1);
                 found = 1;
                 break;
             }
@@ -399,10 +414,8 @@ do_musl(char *exld, char *ldscope)
         return;
     }
 
-#ifdef __x86_64__
     set_loader(ldscope);
-    set_library();
-#endif
+    set_library(libdirGetLibrary());
 
     if (ldso) free(ldso);
     if (lpath) free(lpath);
@@ -414,13 +427,13 @@ do_musl(char *exld, char *ldscope)
  * Returns 0 if musl was not detected and 1 if it was.
  */
 static int
-setup_loader(char *exe, char *ldscope)
+setup_loader(char *ldscope)
 {
     int ret = 0; // not musl
 
     char *ldso = NULL;
 
-    if (((ldso = get_loader(exe)) != NULL) &&
+    if (((ldso = get_loader(EXE_TEST_FILE)) != NULL) &&
         (strstr(ldso, LIBMUSL) != NULL)) {
             // we are using the musl ld.so
             do_musl(ldso, ldscope);
@@ -430,6 +443,19 @@ setup_loader(char *exe, char *ldscope)
     if (ldso) free(ldso);
 
     return ret;
+}
+
+static int
+patch_library(const char *so_path) {
+    int result = EXIT_FAILURE;
+
+    char *ldso = get_loader(EXE_TEST_FILE);
+    if (ldso && strstr(ldso, LIBMUSL) != NULL) {
+        result = set_library(optarg);
+    }
+    free(ldso);
+
+    return result;
 }
 
 /* 
@@ -891,6 +917,7 @@ showUsage(char *prog)
       "  -l, --libbasedir DIR  specify parent for the library directory (default: /tmp)\n"
       "  -f DIR                alias for \"-l DIR\" for backward compatibility\n"
       "  -a, --attach PID      attach to the specified process ID\n"
+      "  -p, --patch SO_FILE   patch specified libscope.so \n"
       "\n"
       "Help sections are OVERVIEW, CONFIGURATION, METRICS, EVENTS, and PROTOCOLS.\n"
       "\n"
@@ -911,13 +938,13 @@ static struct option opts[] = {
     { "help",       optional_argument, 0, 'h' },
     { "attach",     required_argument, 0, 'a' },
     { "libbasedir", required_argument, 0, 'l' },
+    { "patch",      required_argument, 0, 'p' },
     { 0, 0, 0, 0 }
 };
 
 int
 main(int argc, char **argv, char **env)
 {
-    int is_musl;
     char *attachArg = 0;
     char path[PATH_MAX] = {0};
 
@@ -932,7 +959,7 @@ main(int argc, char **argv, char **env)
         // The initial `:` lets us handle options with optional values like
         // `-h` and `-h SECTION`.
         //
-        int opt = getopt_long(argc, argv, "+:uh:a:l:f:", opts, &index);
+        int opt = getopt_long(argc, argv, "+:uh:a:l:f:p:", opts, &index);
         if (opt == -1) {
             break;
         }
@@ -955,6 +982,8 @@ main(int argc, char **argv, char **env)
             case 'l':
                 libdirSetBase(optarg);
                 break;
+            case 'p':
+                return patch_library(optarg);
             case ':':
                 // options missing their value end up here
                 switch (optopt) {
@@ -1001,12 +1030,11 @@ main(int argc, char **argv, char **env)
 
     // setup for musl libc if detected
     char *loader = (char *)libdirGetLoader();
-    if (loader) {
-        is_musl = setup_loader(EXE_TEST_FILE, loader);
-    } else {
+    if (!loader) {
         fprintf(stderr, "error: failed to get a loader path\n");
         return EXIT_FAILURE;
     }
+    setup_loader(loader);
 
     // set SCOPE_EXEC_PATH to path to `ldscope` if not set already
     if (getenv("SCOPE_EXEC_PATH") == 0) {
@@ -1095,17 +1123,7 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
-    if (is_musl && ubuf.machine && (strstr(ubuf.machine, "aarch64") != NULL)) {
-        strncpy(path, "/lib/", 8);
-        if (get_dir("/lib/ld-", path + strlen(path), sizeof(path) - strlen(path)) == -1) {
-            fprintf(stderr, "ERROR: can't get the path for ld-musl");
-            return EXIT_FAILURE;
-        }
-
-        execve(path, execArgv, environ);
-    } else {
-        execve(libdirGetLoader(), execArgv, environ);
-    }
+    execve(libdirGetLoader(), execArgv, environ);
 
     free(execArgv);
     perror("execve failed");

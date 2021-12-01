@@ -58,11 +58,13 @@ typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
 
 __thread int g_getdelim = 0;
+__thread int g_ssl_fd = -1;
 
 // Forward declaration
 static void *periodic(void *);
 static void doConfig(config_t *);
 static void threadNow(int);
+static void uv__read_hook(void *);
 
 #ifdef __linux__
 extern int arch_prctl(int, unsigned long);
@@ -282,14 +284,14 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
     if (g_fn.func == NULL ) {                                          \
        if (!g_ctl) {                                                   \
          if ((g_fn.func = scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {  \
-             scopeLog(CFG_LOG_ERROR, "ERROR: "#func":NULL\n");         \
+             scopeLogError("ERROR: "#func":NULL\n");         \
              return rc;                                                \
          }                                                             \
        } else {                                                        \
         param_t param = {.in_symbol = #func, .out_addr = NULL,         \
                          .after_scope = FALSE};                        \
         if (!dl_iterate_phdr(findSymbol, &param)) {                    \
-            scopeLog(CFG_LOG_ERROR, "ERROR: "#func":NULL\n");          \
+            scopeLogError("ERROR: "#func":NULL\n");          \
             return rc;                                                 \
         }                                                              \
         g_fn.func = param.out_addr;                                    \
@@ -301,14 +303,14 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
     if (g_fn.func == NULL ) {                                          \
        if (!g_ctl) {                                                   \
          if ((g_fn.func = scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {  \
-             scopeLog(CFG_LOG_ERROR, "ERROR: "#func":NULL\n");         \
+             scopeLogError("ERROR: "#func":NULL\n");         \
              return;                                                   \
          }                                                             \
        } else {                                                        \
         param_t param = {.in_symbol = #func, .out_addr = NULL,         \
                          .after_scope = FALSE};                        \
         if (!dl_iterate_phdr(findSymbol, &param)) {                    \
-            scopeLog(CFG_LOG_ERROR, "ERROR: "#func":NULL\n");          \
+            scopeLogError("ERROR: "#func":NULL\n");          \
             return;                                                    \
         }                                                              \
         g_fn.func = param.out_addr;                                    \
@@ -334,7 +336,7 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 #define WRAP_CHECK(func, rc)                                           \
     if (g_fn.func == NULL ) {                                          \
         if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {           \
-            scopeLog(CFG_LOG_ERROR, "ERROR: "#func":NULL\n");          \
+            scopeLogError("ERROR: "#func":NULL\n");          \
             return rc;                                                 \
        }                                                               \
     }                                                                  \
@@ -343,7 +345,7 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 #define WRAP_CHECK_VOID(func)                                          \
     if (g_fn.func == NULL ) {                                          \
         if ((g_fn.func = dlsym(RTLD_NEXT, #func)) == NULL) {           \
-            scopeLog(CFG_LOG_ERROR, "ERROR: "#func":NULL\n");          \
+            scopeLogError("ERROR: "#func":NULL\n");          \
             return;                                                    \
        }                                                               \
     }                                                                  \
@@ -448,7 +450,7 @@ remoteConfig()
     snprintf(path, sizeof(path), "/tmp/cfg.%d", g_proc.pid);
     if ((fs = g_fn.fopen(path, "a+")) == NULL) {
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: remoteConfig:fopen");
+        scopeLogError("ERROR: remoteConfig:fopen");
         return;
     }
 
@@ -683,7 +685,7 @@ threadNow(int sig)
 
     if (g_fn.pthread_create &&
         (g_fn.pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0)) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: threadNow:pthread_create");
+        scopeLogError("ERROR: threadNow:pthread_create");
         if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
         return;
     }
@@ -753,7 +755,7 @@ threadInit()
     if (getenv("SCOPE_NO_SIGNAL")) return;
 
     if (osThreadInit(threadNow, g_thread.interval) == FALSE) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: threadInit:osThreadInit");
+        scopeLogError("ERROR: threadInit:osThreadInit");
     }
 }
 
@@ -817,7 +819,7 @@ setProcId(proc_id_t *proc)
     proc->pid = getpid();
     proc->ppid = getppid();
     if (gethostname(proc->hostname, sizeof(proc->hostname)) != 0) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: gethostname");
+        scopeLogError("ERROR: gethostname");
     }
     osGetProcname(proc->procname, sizeof(proc->procname));
 
@@ -1071,12 +1073,10 @@ ssl_read_hook(SSL *ssl, void *buf, int num)
     WRAP_CHECK(SSL_read, -1);
     rc = g_fn.SSL_read(ssl, buf, num);
     if (rc > 0) {
-        if (SYMBOL_LOADED(SSL_get_fd)) {
-            int fd = g_fn.SSL_get_fd(ssl);
-            doProtocol((uint64_t)ssl, fd, buf, (size_t)rc, TLSRX, BUF);
-        } else {
-            doProtocol((uint64_t)ssl, -1, buf, (size_t)rc, TLSRX, BUF);
-        }
+        int fd = -1;
+        if (SYMBOL_LOADED(SSL_get_fd)) fd = g_fn.SSL_get_fd(ssl);
+        if ((fd == -1) && (g_ssl_fd != -1)) fd = g_ssl_fd;
+        doProtocol((uint64_t)ssl, fd, buf, (size_t)rc, TLSRX, BUF);
     }
 
     return rc;
@@ -1091,12 +1091,10 @@ ssl_write_hook(SSL *ssl, void *buf, int num)
     WRAP_CHECK(SSL_write, -1);
     rc = g_fn.SSL_write(ssl, buf, num);
     if (rc > 0) {
-        if (SYMBOL_LOADED(SSL_get_fd)) {
-            int fd = g_fn.SSL_get_fd(ssl);
-            doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)rc, TLSTX, BUF);
-        } else {
-            doProtocol((uint64_t)ssl, -1, (void *)buf, (size_t)rc, TLSTX, BUF);
-        }
+        int fd = -1;
+        if (SYMBOL_LOADED(SSL_get_fd)) fd = g_fn.SSL_get_fd(ssl);
+        if ((fd == -1) && (g_ssl_fd != -1)) fd = g_ssl_fd;
+        doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)rc, TLSTX, BUF);
     }
 
     return rc;
@@ -1109,7 +1107,7 @@ load_func(const char *module, const char *func)
     
     void *handle = g_fn.dlopen(module, RTLD_LAZY | RTLD_NOLOAD);
     if (handle == NULL) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: Could not open file %s.\n", module ? module : "(null)");
+        scopeLogError("ERROR: Could not open file %s.\n", module ? module : "(null)");
         return NULL;
     }
 
@@ -1117,11 +1115,11 @@ load_func(const char *module, const char *func)
     dlclose(handle);
 
     if (addr == NULL) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: Could not get function address of %s.\n", func);
+        scopeLogError("ERROR: Could not get function address of %s.\n", func);
         return NULL;
     }
 
-    scopeLog(CFG_LOG_ERROR, "%s:%d %s found at %p\n", __FUNCTION__, __LINE__, func, addr);
+    scopeLogError("%s:%d %s found at %p\n", __FUNCTION__, __LINE__, func, addr);
     return addr;
 }
 
@@ -1288,7 +1286,7 @@ initHook(int attachedFlag)
         initGoHook(ebuf);
         threadNow(0);
         if (arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
-            scopeLog(CFG_LOG_ERROR, "initHook:arch_prctl");
+            scopeLogError("initHook:arch_prctl");
         }
 
         __asm__ volatile (
@@ -1305,8 +1303,13 @@ initHook(int attachedFlag)
 #endif  // __GO__
     }
 
-    if (ebuf && ebuf->buf && (strstr(full_path, "ldscope") == NULL)) {
-        g_ismusl = is_musl(ebuf->buf);
+    if (ebuf && ebuf->buf) {
+
+        // This is in support of a libuv specific extension to map an SSL ID to a fd.
+        // The symbol uv__read is not public. Therefore, we don't resolve it with dlsym.
+        // So, while we have the exec open, we look to see if we can dig it out.
+        g_fn.uv__read = getSymbol(ebuf->buf, "uv__read");
+        scopeLog(CFG_LOG_TRACE, "%s:%d uv__read at %p", __FUNCTION__, __LINE__, g_fn.uv__read);
     }
 
     if (full_path) free(full_path);
@@ -1391,6 +1394,10 @@ initHook(int attachedFlag)
             rc = funchook_prepare(funchook, (void**)&g_fn.recvfrom, internal_recvfrom);
         }
 
+        // Used for mapping SSL IDs to fds with libuv. Must be funchooked since it's internal to libuv
+        if (!g_fn.uv_fileno) g_fn.uv_fileno = load_func(NULL, "uv_fileno");
+        if (g_fn.uv__read) rc = funchook_prepare(funchook, (void**)&g_fn.uv__read, uv__read_hook);
+
         // libmusl
         // Note that both stdout & stderr objects point to the same write function.
         // They are init'd with a static object. After the first write the
@@ -1434,7 +1441,7 @@ initHook(int attachedFlag)
         // hook 'em
         rc = funchook_install(funchook, 0);
         if (rc != 0) {
-            scopeLog(CFG_LOG_ERROR, "ERROR: failed to install SSL_read hook. (%s)\n",
+            scopeLogError("ERROR: failed to install SSL_read hook. (%s)\n",
                         funchook_error_message(funchook));
             return;
         }
@@ -1496,8 +1503,37 @@ initEnv(int *attachedFlag)
 __attribute__((constructor)) void
 init(void)
 {
+
+    // Bootstrapping...  we need to know if we're in musl so we can
+    // call the right initFn function...
+    {
+        char *full_path = NULL;
+        elf_buf_t *ebuf = NULL;
+
+        // Needed for getElf()
+        g_fn.open = dlsym(RTLD_NEXT, "open");
+        if (!g_fn.open) g_fn.open = dlsym(RTLD_DEFAULT, "open");
+        g_fn.close = dlsym(RTLD_NEXT, "close");
+        if (!g_fn.close) g_fn.close = dlsym(RTLD_DEFAULT, "close");
+
+        g_ismusl =
+            ((osGetExePath(&full_path) != -1) &&
+            !strstr(full_path, "ldscope") &&
+            ((ebuf = getElf(full_path))) &&
+            !is_static(ebuf->buf) &&
+            !is_go(ebuf->buf) &&
+            is_musl(ebuf->buf));
+
+        if (full_path) free(full_path);
+        if (ebuf) freeElf(ebuf->buf, ebuf->len);
+    }
+
     // Use dlsym to get addresses for everything in g_fn
-    initFn();
+    if (g_ismusl) {
+        initFn_musl();
+    } else {
+        initFn();
+    }
 
 // TODO: will want to see if this is needed for bash built on ARM...
 #ifndef __aarch64__
@@ -2535,7 +2571,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
         ((scopexec = getpath("ldscope")) == NULL)) {
 
         // can't find the scope executable
-        scopeLog(CFG_LOG_WARN, "execve: can't find a scope executable for %s", pathname);
+        scopeLogWarn("execve: can't find a scope executable for %s", pathname);
         return g_fn.execve(pathname, argv, envp);
     }
 
@@ -2790,17 +2826,15 @@ SSL_read(SSL *ssl, void *buf, int num)
 {
     int rc;
     
-    //scopeLog(CFG_LOG_ERROR, "SSL_read");
+    //scopeLogError("SSL_read");
     WRAP_CHECK(SSL_read, -1);
     rc = g_fn.SSL_read(ssl, buf, num);
 
     if (rc > 0) {
-        if (SYMBOL_LOADED(SSL_get_fd)) {
-            int fd = g_fn.SSL_get_fd(ssl);
-            doProtocol((uint64_t)ssl, fd, buf, (size_t)rc, TLSRX, BUF);
-        } else {
-            doProtocol((uint64_t)ssl, -1, buf, (size_t)rc, TLSRX, BUF);
-        }
+        int fd = -1;
+        if (SYMBOL_LOADED(SSL_get_fd)) fd = g_fn.SSL_get_fd(ssl);
+        if ((fd == -1) && (g_ssl_fd != -1)) fd = g_ssl_fd;
+        doProtocol((uint64_t)ssl, fd, buf, (size_t)rc, TLSRX, BUF);
     }
     return rc;
 }
@@ -2810,18 +2844,16 @@ SSL_write(SSL *ssl, const void *buf, int num)
 {
     int rc;
     
-    //scopeLog(CFG_LOG_ERROR, "SSL_write");
+    //scopeLogError("SSL_write");
     WRAP_CHECK(SSL_write, -1);
 
     rc = g_fn.SSL_write(ssl, buf, num);
 
     if (rc > 0) {
-        if (SYMBOL_LOADED(SSL_get_fd)) {
-            int fd = g_fn.SSL_get_fd(ssl);
-            doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)rc, TLSTX, BUF);
-        } else {
-            doProtocol((uint64_t)ssl, -1, (void *)buf, (size_t)rc, TLSTX, BUF);
-        }
+        int fd = -1;
+        if (SYMBOL_LOADED(SSL_get_fd)) fd = g_fn.SSL_get_fd(ssl);
+        if ((fd == -1) && (g_ssl_fd != -1)) fd = g_ssl_fd;
+        doProtocol((uint64_t)ssl, fd, (void *)buf, (size_t)rc, TLSTX, BUF);
     }
     return rc;
 }
@@ -2865,7 +2897,7 @@ gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
 {
     ssize_t rc;
 
-    //scopeLog(CFG_LOG_ERROR, "gnutls_record_recv");
+    //scopeLogError("gnutls_record_recv");
     WRAP_CHECK(gnutls_record_recv, -1);
     rc = g_fn.gnutls_record_recv(session, data, data_size);
 
@@ -2881,7 +2913,7 @@ gnutls_record_recv_early_data(gnutls_session_t session, void *data, size_t data_
 {
     ssize_t rc;
 
-    //scopeLog(CFG_LOG_ERROR, "gnutls_record_recv_early_data");
+    //scopeLogError("gnutls_record_recv_early_data");
     WRAP_CHECK(gnutls_record_recv_early_data, -1);
     rc = g_fn.gnutls_record_recv_early_data(session, data, data_size);
 
@@ -2897,7 +2929,7 @@ gnutls_record_recv_packet(gnutls_session_t session, gnutls_packet_t *packet)
 {
     ssize_t rc;
 
-    //scopeLog(CFG_LOG_ERROR, "gnutls_record_recv_packet");
+    //scopeLogError("gnutls_record_recv_packet");
     WRAP_CHECK(gnutls_record_recv_packet, -1);
     rc = g_fn.gnutls_record_recv_packet(session, packet);
 
@@ -2912,7 +2944,7 @@ gnutls_record_recv_seq(gnutls_session_t session, void *data, size_t data_size, u
 {
     ssize_t rc;
 
-    //scopeLog(CFG_LOG_ERROR, "gnutls_record_recv_seq");
+    //scopeLogError("gnutls_record_recv_seq");
     WRAP_CHECK(gnutls_record_recv_seq, -1);
     rc = g_fn.gnutls_record_recv_seq(session, data, data_size, seq);
 
@@ -2928,7 +2960,7 @@ gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
 {
     ssize_t rc;
 
-    //scopeLog(CFG_LOG_ERROR, "gnutls_record_send");
+    //scopeLogError("gnutls_record_send");
     WRAP_CHECK(gnutls_record_send, -1);
     rc = g_fn.gnutls_record_send(session, data, data_size);
 
@@ -2945,7 +2977,7 @@ gnutls_record_send2(gnutls_session_t session, const void *data, size_t data_size
 {
     ssize_t rc;
 
-    //scopeLog(CFG_LOG_ERROR, "gnutls_record_send2");
+    //scopeLogError("gnutls_record_send2");
     WRAP_CHECK(gnutls_record_send2, -1);
     rc = g_fn.gnutls_record_send2(session, data, data_size, pad, flags);
 
@@ -2961,7 +2993,7 @@ gnutls_record_send_early_data(gnutls_session_t session, const void *data, size_t
 {
     ssize_t rc;
 
-    //scopeLog(CFG_LOG_ERROR, "gnutls_record_send_early_data");
+    //scopeLogError("gnutls_record_send_early_data");
     WRAP_CHECK(gnutls_record_send_early_data, -1);
     rc = g_fn.gnutls_record_send_early_data(session, data, data_size);
 
@@ -2978,7 +3010,7 @@ gnutls_record_send_range(gnutls_session_t session, const void *data, size_t data
 {
     ssize_t rc;
 
-    //scopeLog(CFG_LOG_ERROR, "gnutls_record_send_range");
+    //scopeLogError("gnutls_record_send_range");
     WRAP_CHECK(gnutls_record_send_range, -1);
     rc = g_fn.gnutls_record_send_range(session, data, data_size, range);
 
@@ -2998,13 +3030,13 @@ nss_close(PRFileDesc *fd)
     // Note: NSS docs don't define that PR_GetError should be called on failure
     if (!fd) return PR_FAILURE;
 
-    //scopeLog(CFG_LOG_ERROR, "fd:%d nss_close", (uint64_t)fd->methods);
+    //scopeLogError("fd:%d nss_close", (uint64_t)fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->close(fd);
     } else {
         rc = PR_FAILURE;
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: nss_close no list entry");
+        scopeLogError("ERROR: nss_close no list entry");
         return rc;
     }
 
@@ -3033,13 +3065,13 @@ nss_send(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags, PRInterv
         return -1;
     }
 
-    //scopeLog(CFG_LOG_ERROR, "fd:%d nss_send", (uint64_t)fd->methods);
+    //scopeLogError("fd:%d nss_send", (uint64_t)fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->send(fd, buf, amount, flags, timeout);
     } else {
         rc = -1;
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: nss_send no list entry");
+        scopeLogError("ERROR: nss_send no list entry");
     }
 
     if (rc > 0) {
@@ -3069,13 +3101,13 @@ nss_recv(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime
         return -1;
     }
 
-    //scopeLog(CFG_LOG_ERROR, "fd:%d nss_recv", (uint64_t)fd->methods);
+    //scopeLogError("fd:%d nss_recv", (uint64_t)fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->recv(fd, buf, amount, flags, timeout);
     } else {
         rc = -1;
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: nss_recv no list entry");
+        scopeLogError("ERROR: nss_recv no list entry");
     }
 
     if (rc > 0) {
@@ -3105,13 +3137,13 @@ nss_read(PRFileDesc *fd, void *buf, PRInt32 amount)
         return -1;
     }
 
-    //scopeLog(CFG_LOG_ERROR, "fd:%d nss_read", (uint64_t)fd->methods);
+    //scopeLogError("fd:%d nss_read", (uint64_t)fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->read(fd, buf, amount);
     } else {
         rc = -1;
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: nss_read no list entry");
+        scopeLogError("ERROR: nss_read no list entry");
     }
 
     if (rc > 0) {
@@ -3141,13 +3173,13 @@ nss_write(PRFileDesc *fd, const void *buf, PRInt32 amount)
         return -1;
     }
 
-    //scopeLog(CFG_LOG_ERROR, "fd:%d nss_write", fd->methods);
+    //scopeLogError("fd:%d nss_write", fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->write(fd, buf, amount);
     } else {
         rc = -1;
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: nss_write no list entry");
+        scopeLogError("ERROR: nss_write no list entry");
     }
 
     if (rc > 0) {
@@ -3177,13 +3209,13 @@ nss_writev(PRFileDesc *fd, const PRIOVec *iov, PRInt32 iov_size, PRIntervalTime 
         return -1;
     }
 
-    //scopeLog(CFG_LOG_ERROR, "fd:%d nss_writev", fd->methods);
+    //scopeLogError("fd:%d nss_writev", fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->writev(fd, iov, iov_size, timeout);
     } else {
         rc = -1;
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: nss_writev no list entry");
+        scopeLogError("ERROR: nss_writev no list entry");
     }
 
     if (rc > 0) {
@@ -3214,13 +3246,13 @@ nss_sendto(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flags,
         return -1;
     }
 
-    //scopeLog(CFG_LOG_ERROR, "fd:%d nss_sendto", fd->methods);
+    //scopeLogError("fd:%d nss_sendto", fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->sendto(fd, (void *)buf, amount, flags, addr, timeout);
     } else {
         rc = -1;
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: nss_sendto no list entry");
+        scopeLogError("ERROR: nss_sendto no list entry");
     }
 
     if (rc > 0) {
@@ -3251,13 +3283,13 @@ nss_recvfrom(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags,
         return -1;
     }
 
-    //scopeLog(CFG_LOG_ERROR, "fd:%d nss_recvfrom", fd->methods);
+    //scopeLogError("fd:%d nss_recvfrom", fd->methods);
     if ((nssentry = lstFind(g_nsslist, (uint64_t)fd->methods)) != NULL) {
         rc = nssentry->ssl_methods->recvfrom(fd, buf, amount, flags, addr, timeout);
     } else {
         rc = -1;
         DBG(NULL);
-        scopeLog(CFG_LOG_ERROR, "ERROR: nss_recvfrom no list entry");
+        scopeLogError("ERROR: nss_recvfrom no list entry");
     }
 
     if (rc > 0) {
@@ -3291,7 +3323,7 @@ SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
             memmove(nssentry->ssl_methods, result->methods, sizeof(PRIOMethods));
             memmove(nssentry->ssl_int_methods, result->methods, sizeof(PRIOMethods));
             nssentry->id = (uint64_t)nssentry->ssl_int_methods;
-            //scopeLog(CFG_LOG_INFO, "fd:%d SSL_ImportFD", (uint64_t)nssentry->id);
+            //scopeLogInfo("fd:%d SSL_ImportFD", (uint64_t)nssentry->id);
 
             // ref contrib/tls/nss/prio.h struct PRIOMethods
             // read ... todo? read, recvfrom, acceptread
@@ -4424,6 +4456,10 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
     WRAP_CHECK(sendmsg, -1);
     rc = g_fn.sendmsg(sockfd, msg, flags);
     if (rc != -1) {
+        size_t msg_iovlen_orig;
+        size_t msg_controllen_orig;
+        struct msghdr *msg_modify = (struct msghdr *)msg;
+
         scopeLog(CFG_LOG_TRACE, "fd:%d sendmsg", sockfd);
 
         // For UDP connections the msg is a remote addr
@@ -4437,11 +4473,23 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
             }
         }
 
+        if (g_ismusl == TRUE) {
+            msg_iovlen_orig = msg->msg_iovlen;
+            msg_modify->msg_iovlen &= 0xFFFFFFFF;
+            msg_controllen_orig = msg->msg_controllen;
+            msg_modify->msg_controllen &= 0xFFFFFFFF;
+        }
+
         if (remotePortIsDNS(sockfd)) {
             getDNSName(sockfd, msg->msg_iov->iov_base, msg->msg_iov->iov_len);
         }
 
         doSend(sockfd, rc, msg, rc, MSG);
+
+        if (g_ismusl == TRUE) {
+            msg_modify->msg_iovlen = msg_iovlen_orig;
+            msg_modify->msg_controllen = msg_controllen_orig;
+        }
     } else {
         setRemoteClose(sockfd, errno);
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "sendmsg", "nopath");
@@ -4593,6 +4641,8 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
     WRAP_CHECK(recvmsg, -1);
     rc = g_fn.recvmsg(sockfd, msg, flags);
     if (rc != -1) {
+        size_t msg_iovlen_orig;
+        size_t msg_controllen_orig;
         scopeLog(CFG_LOG_TRACE, "fd:%d recvmsg", sockfd);
 
         // For UDP connections the msg is a remote addr
@@ -4606,12 +4656,24 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
             }
         }
 
+        if (g_ismusl == TRUE) {
+            msg_iovlen_orig = msg->msg_iovlen;
+            msg->msg_iovlen &= 0xFFFFFFFF;
+            msg_controllen_orig = msg->msg_controllen;
+            msg->msg_controllen &= 0xFFFFFFFF;
+        }
+
         if (remotePortIsDNS(sockfd)) {
             getDNSAnswer(sockfd, (char *)msg, rc, MSG);
         }
 
         doRecv(sockfd, rc, msg, rc, MSG);
         doAccessRights(msg);
+
+        if (g_ismusl == TRUE) {
+            msg->msg_iovlen = msg_iovlen_orig;
+            msg->msg_controllen = msg_controllen_orig;
+        }
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvmsg", "nopath");
     }
@@ -4781,6 +4843,7 @@ getentropy(void *buffer, size_t length)
 }
 
 #define LOG_BUF_SIZE 4096
+#define LOG_TIME_SIZE 23
 
 // This overrides a weak definition in src/dbg.c
 void
@@ -4789,6 +4852,10 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
     char scope_log_var_buf[LOG_BUF_SIZE];
     const char overflow_msg[] = "WARN: scopeLog msg truncated.\n";
     char *local_buf;
+    char time_buf[LOG_TIME_SIZE];
+    int msec;
+    struct tm tm_info;
+    struct timeval tv;
 
     if (!g_log) {
         if (!g_constructor_debug_enabled) return;
@@ -4828,7 +4895,16 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
     cfg_log_level_t cfg_level = logLevel(g_log);
     if ((cfg_level == CFG_LOG_NONE) || (cfg_level > level)) return;
 
-    local_buf = scope_log_var_buf + snprintf(scope_log_var_buf, LOG_BUF_SIZE, "Scope: %s(pid:%d): ", g_proc.procname, g_proc.pid);
+    gettimeofday(&tv, NULL);
+    msec = tv.tv_usec / 1000; 
+    if (msec > 999) {
+        tv.tv_sec++;
+        msec = 0;
+    }
+    localtime_r(&tv.tv_sec, &tm_info);
+    strftime(time_buf, LOG_TIME_SIZE, "%Y-%m-%d %H:%M:%S", &tm_info);
+
+    local_buf = scope_log_var_buf + snprintf(scope_log_var_buf, LOG_BUF_SIZE, "Scope: %s(pid:%d): [%s.%03d] ", g_proc.procname, g_proc.pid, time_buf, msec);
     size_t local_buf_len = sizeof(scope_log_var_buf) + (scope_log_var_buf - local_buf) - 1;
 
     va_list args;
@@ -4935,6 +5011,19 @@ __fdelt_chk(long int fdelt)
     }
 
     return fdelt / __NFDBITS;
+}
+
+/*
+ * This is a libuv specific function intended to map an SSL ID to a fd.
+ * This libuv function is called in the same call stack as SSL_read.
+ * Therefore, we extract the fd here and use it in a subsequent SSL_read/write.
+ */
+static void
+uv__read_hook(void *stream)
+{
+    if (SYMBOL_LOADED(uv_fileno)) g_fn.uv_fileno(stream, &g_ssl_fd);
+    //scopeLog(CFG_LOG_TRACE, "%s: fd %d", __FUNCTION__, g_ssl_fd);
+    if (g_fn.uv__read) return g_fn.uv__read(stream);
 }
 
 EXPORTWEAK int

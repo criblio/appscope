@@ -3,10 +3,12 @@ FROM ubuntu:20.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update \
     && apt install -y \
+      bsdmainutils \
       curl \
+      xxd \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /opt/test/log
+RUN mkdir -p /opt/test/log && mkdir -p /opt/tar_test
 
 ENV SCOPE_LOG_LEVEL=error
 ENV SCOPE_METRIC_VERBOSITY=4

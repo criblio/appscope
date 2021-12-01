@@ -42,8 +42,9 @@ def main():
     format = "%(asctime)s %(levelname)s %(name)s - %(message)s"
     logging.basicConfig(level=log_level, format=format)
 
-    logging.info("Execution ID: " + execution_id)
-    logging.info("Logs path: " + logs_path)
+    logging.info(f"Execution ID: {execution_id}")
+    logging.info(f"Scope path: {args.scope_path}")
+    logging.info(f"Logs path: {logs_path}")
     logging.info(f"Metrics destination type: {args.metric_type}")
 
     scope_version = get_scope_version(args.scope_path)

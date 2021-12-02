@@ -4,6 +4,10 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 cd ${DIR}
 
+# for debugging...
+npm --version
+node --version
+
 npm ci
 npx gatsby build
 

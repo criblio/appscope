@@ -45,6 +45,22 @@ export SCOPE_PAYLOAD_ENABLE=true
 export SCOPE_PAYLOAD_HEADER=true
 
 #
+# test firefox
+#
+starttest firefox
+
+scope run -- firefox --headless &
+scope_pid=$!
+sleep 1
+
+kill -s 0 $scope_pid
+if [ $? -ne 0 ]; then
+    ERR+=1
+fi
+
+endtest
+
+#
 # cat html (negative test)
 #
 

@@ -53,6 +53,8 @@ func TestRunPassthrough(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "true\n", outb.String())
 	assert.Contains(t, errb.String(), "proc.start")
+	assert.Contains(t, errb.String(), "gid:")
+	assert.Contains(t, errb.String(), "uid:")
 }
 
 func TestRun(t *testing.T) {

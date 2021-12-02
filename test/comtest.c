@@ -75,6 +75,8 @@ msgStartHasExpectedSubNodes(void** state)
 {
     proc_id_t proc = {.pid = 4848,
                       .ppid = 4847,
+                      .gid = 4849,
+                      .uid = 4850,
                       .hostname = "host",
                       .procname = "comtest",
                       .cmd = "cmd",

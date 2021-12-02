@@ -1746,8 +1746,8 @@ getNSFuncs(void)
 
     void *handle = g_fn.dlopen("libresolv.so", RTLD_LAZY | RTLD_NODELETE);
     if (handle == NULL) {
-        scopeLogWarn(
-                    "WARNING: could not locate libresolv, DNS events will be affected");
+        scopeLog(CFG_LOG_DEBUG,
+                    "Could not locate libresolv, DNS events will be affected");
         return FALSE;
     }
 
@@ -1756,8 +1756,8 @@ getNSFuncs(void)
     dlclose(handle);
 
     if (!g_fn.ns_initparse || !g_fn.ns_parserr) {
-        scopeLogWarn(
-                    "WARNING: could not locate name server functions, DNS events will be affected");
+        scopeLog(CFG_LOG_DEBUG,
+                    "Could not locate name server functions, DNS events will be affected");
         return FALSE;
     }
 

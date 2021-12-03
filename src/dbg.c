@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include "atomic.h"
 #include "dbg.h"
+#include "utils.h"
 
 
 #define MAX_INSTANCES_PER_LINE 2
@@ -33,6 +34,7 @@ dbg_t *g_dbg = NULL;
 log_t *g_log = NULL;
 proc_id_t g_proc = {0};
 bool g_constructor_debug_enabled;
+uint64_t g_cbuf_drop_count = 0;
 
 void
 dbgInit()

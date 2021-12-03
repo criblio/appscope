@@ -233,6 +233,18 @@ typedef struct
     int   after_scope;
 } param_t;
 
+enum_map_t netFailMap[] = {
+    {"n/a",                                            NO_FAIL},
+    {"Connection failure",                             CONN_FAIL},
+    {"TLS Failure: error accessing peer certificate",  TLS_CERT_FAIL},
+    {"TLS Failure: error establishing connection",     TLS_CONN_FAIL},
+    {"TLS Failure: error creating context",            TLS_CONTEXT_FAIL},
+    {"TLS Failure: error creating session",            TLS_SESSION_FAIL},
+    {"TLS Failure: error setting tls on socket",       TLS_SOCKET_FAIL},
+    {"TLS Failure: server validation failed",          TLS_VERIFY_FAIL},
+    {NULL,                                             -1}
+};
+
 // When used with dl_iterate_phdr(), this has a similar result to
 // scope_dlsym(RTLD_NEXT, ).  But, unlike scope_dlsym(RTLD_NEXT, )
 // it will never return a symbol in our library.  This is
@@ -982,11 +994,11 @@ periodic(void *arg)
     sigfillset(&mask);
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
     bool perf;
-    static time_t summaryTime;
+    static time_t summaryTime, logReportTime;
 
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    summaryTime = tv.tv_sec + g_thread.interval;
+    logReportTime = summaryTime = tv.tv_sec + g_thread.interval;
 
     perf = checkEnv(PRESERVE_PERF_REPORTING, "true");
 
@@ -1015,6 +1027,23 @@ periodic(void *arg)
 
             gettimeofday(&tv, NULL);
             summaryTime = tv.tv_sec + g_thread.interval;
+
+            if (tv.tv_sec >= logReportTime) {
+                if (ctlNeedsConnection(g_ctl, CFG_CTL)) {
+                    scopeLog(CFG_LOG_WARN, "event destination not connected. messages dropped: "
+                            "%"PRIu64 " connection attempts: %"PRIu64 " reason for failure: %s", \
+                            g_cbuf_drop_count, ctlConnectAttempts(g_ctl, CFG_CTL), \
+                            valToStr(netFailMap, ctlTransportFailureReason(g_ctl, CFG_CTL)));
+                }
+                if (mtcNeedsConnection(g_mtc)) {
+                    scopeLog(CFG_LOG_WARN, "metric destination not connected. messages dropped: "
+                            "%"PRIu64 " connection attempts: %"PRIu64 " reason for failure: %s", \
+                            g_cbuf_drop_count, mtcConnectAttempts(g_mtc), \
+                            valToStr(netFailMap, mtcTransportFailureReason(g_mtc)));
+                }
+                logReportTime = tv.tv_sec + CONN_LOG_INTERVAL; 
+            }
+
         } else if (perf == FALSE) {
             if (atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
                 doEvent();

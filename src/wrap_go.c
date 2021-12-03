@@ -68,8 +68,8 @@ tap_t g_go_tap[] = {
     {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
     {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0},
     {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
-    {"runtime.exit",                         go_hook_exit,         NULL, 0},
-    {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
+//    {"runtime.exit",                         go_hook_exit,         NULL, 0},
+//    {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
     {"TAP_TABLE_END", NULL, NULL, 0}
 };
 
@@ -98,7 +98,7 @@ c_str(gostring_t *go_str)
     if (!go_str || go_str->len <= 0) return NULL;
 
     char *path;
-    if ((path = calloc(1, go_str->len+1)) == NULL) return NULL;
+    if ((path = scope_calloc(1, go_str->len+1)) == NULL) return NULL;
     memmove(path, go_str->str, go_str->len);
     path[go_str->len] = '\0';
 
@@ -991,13 +991,24 @@ c_write(char *stackaddr)
     doWrite(fd, initialTime, (rc != -1), (char *)buf, rc, "go_write", BUF, 0);
 }
 
+extern void scope___init_libc(char **, char *);
 EXPORTON void *
 go_write(char *stackptr)
 {
     //return go_switch(stackptr, c_write, go_hook_write);
+
+    //scope___init_libc(environ, NULL);
+    //void *tmem = scope_calloc(1, 1024);
+
     uint32_t frame_offset = frame_size(go_hook_write);
     if (!frame_offset) return NULL;
     stackptr += frame_offset;
+#if 0
+    if (tmem)  {
+        void *rmem = scope_realloc(tmem, 2048);
+        scope_free(rmem);
+    }
+#endif
     c_write(stackptr);
     return return_addr(go_hook_write);
 }
@@ -1393,7 +1404,7 @@ c_exit(char *stackaddr)
         sigSafeNanosleep(&ts);
     }
 
-    //handleExit();
+    handleExit();
     // flush the data
     sigSafeNanosleep(&ts);
 }
@@ -1401,11 +1412,27 @@ c_exit(char *stackaddr)
 EXPORTON void *
 go_exit(char *stackptr)
 {
-    return go_switch(stackptr, c_exit, go_hook_exit);
+#if 0
+     return go_switch(stackptr, c_exit, go_hook_exit);
+#else
+    uint32_t frame_offset = frame_size(go_hook_exit);
+    if (!frame_offset) return NULL;
+    stackptr += frame_offset;
+    c_exit(stackptr);
+    return return_addr(go_hook_exit);
+#endif
 }
 
 EXPORTON void *
 go_die(char *stackptr)
 {
+#if 0
     return go_switch(stackptr, c_exit, go_hook_die);
+#else
+    uint32_t frame_offset = frame_size(go_hook_die);
+    if (!frame_offset) return NULL;
+    stackptr += frame_offset;
+    c_exit(stackptr);
+    return return_addr(go_hook_die);
+#endif
 }

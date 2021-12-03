@@ -24,6 +24,11 @@
 #define BINARY_DATA_MSG "Binary data detected--- message"
 #define DEFAULT_BINARY_DATA_SAMPLE_SIZE (256U)
 
+//#define malloc scope_malloc
+//#define calloc scope_calloc
+//#define realloc scope_realloc
+//#define free scope_free
+
 typedef struct {
     char *buf;
     size_t bufsize;
@@ -954,7 +959,8 @@ sendBufferedMessages(ctl_t *ctl)
             // Add the newline delimiter to the msg.
             {
                 int strsize = strlen(msg);
-                char* temp = realloc(msg, strsize+2); // room for "\n\0"
+                //char* temp = realloc(msg, strsize+2); // room for "\n\0"
+                char* temp = scope_realloc(msg, strsize+2); // room for "\n\0"
                 if (!temp) {
                     DBG(NULL);
                     free(msg);
@@ -966,7 +972,7 @@ sendBufferedMessages(ctl_t *ctl)
                 msg[strsize+1] = '\0';
             }
             transportSend(ctl->transport, msg, strlen(msg));
-            free(msg);
+            scope_free(msg);
         }
     }
 }

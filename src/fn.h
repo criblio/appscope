@@ -260,6 +260,11 @@ typedef struct {
 
     // intended for shells and any app that has it's own setenv
     int (*app_setenv)(const char *name, const char *value, int overwrite);
+
+    void *(*malloc)(size_t);
+    void *(*calloc)(size_t, size_t);
+    void *(*realloc)(void *, size_t);
+    void (*free)(void *);
 } interposed_funcs_t;
 
 extern interposed_funcs_t g_fn;

@@ -5,6 +5,8 @@
 #include "../../src/dbg.h"
 #include "../../src/fn.h"
 #include "../../src/scopetypes.h"
+//#include "../../src/libc.h"
+//extern int scope___xstat(int, const char *, struct stat *);
 
 // want to put this list in an obvious place
 //static char thread_delay_list[] = "chrome:nacl_helper";
@@ -469,7 +471,9 @@ int
 osIsFilePresent(pid_t pid, const char *path)
 {
     struct stat sb = {0};
-
+#if 1
+    //DR
+    return -1;
     if (!g_fn.__xstat) {
         return -1;
     }
@@ -479,6 +483,13 @@ osIsFilePresent(pid_t pid, const char *path)
     } else {
         return sb.st_size;
     }
+#else
+    if (scope___xstat(_STAT_VER, path, &sb) != 0) {
+        return -1;
+    } else {
+        return sb.st_size;
+    }
+#endif
 }
 
 int

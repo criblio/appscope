@@ -378,8 +378,11 @@ fileModTime(const char *path)
     }
 
     if ((fd = g_fn.open(path, O_RDONLY)) == -1) return 0;
-    
+#if 0
     if (fstat(fd, &statbuf) < 0) {
+#else
+    if (scope_fstat(fd, &statbuf) < 0) {
+#endif
         g_fn.close(fd);
         return 0;
     }
@@ -484,7 +487,11 @@ remoteConfig()
 
         if (fflush(fs) != 0) DBG(NULL);
         rewind(fs);
+#if 0
         if (lstat(path, &sb) == -1) {
+#else
+        if (scope_lstat(path, &sb) == -1) {
+#endif
             sb.st_size = DEFAULT_CONFIG_SIZE;
         }
 
@@ -932,6 +939,7 @@ reportPeriodicStuff(void)
 void
 handleExit(void)
 {
+    return;
     if (g_exitdone == TRUE) return;
     g_exitdone = TRUE;
 
@@ -943,7 +951,7 @@ handleExit(void)
             sigSafeNanosleep(&ts);
         }
     }
-
+#if 0
     struct timespec ts = {.tv_sec = 1, .tv_nsec = 0}; // 1 s
 
     char *wait;
@@ -960,7 +968,8 @@ handleExit(void)
             }
         }
     }
-
+#endif
+#if 0
     reportPeriodicStuff();
 
     mtcFlush(g_mtc);
@@ -971,6 +980,7 @@ handleExit(void)
     ctlDisconnect(g_ctl, CFG_CTL);
     logFlush(g_log);
     logDisconnect(g_log);
+#endif
 }
 
 static void *
@@ -1476,14 +1486,53 @@ initEnv(int *attachedFlag)
     g_fn.fclose(fd);
 }
 
-//extern void *scope_malloc(size_t);
-//extern void scope_free(void *);
+void
+libscope_free(void *tofree)
+{
+    if (!tofree) return;
+    scope_free(tofree);
+    return;
+
+    const unsigned char *ptr = tofree;
+    if (((uintptr_t)ptr & 15) == 0) {
+        scopeLog(CFG_LOG_WARN, "%s:%d", __FUNCTION__, __LINE__);
+        int offset = *(const uint16_t *)(ptr - 2);
+
+        if (ptr[-4] != 0) {
+            scopeLog(CFG_LOG_WARN, "%s:%d", __FUNCTION__, __LINE__);
+            if (offset == 0) {
+                scopeLog(CFG_LOG_WARN, "%s:%d", __FUNCTION__, __LINE__);
+                offset = *(uint32_t *)(ptr - 8);
+                if (offset > 0xffff) {
+                    scopeLog(CFG_LOG_WARN, "%s:%d", __FUNCTION__, __LINE__);
+                    scope_free(tofree);
+                    return;
+                }
+            }
+        } else {
+            scopeLog(CFG_LOG_WARN, "%s:%d", __FUNCTION__, __LINE__);
+            if (offset > 0) {
+                scopeLog(CFG_LOG_WARN, "%s:%d", __FUNCTION__, __LINE__);
+                scope_free(tofree);
+                return;
+            }
+        }
+    }
+    scopeLog(CFG_LOG_WARN, "%s:%d", __FUNCTION__, __LINE__);
+    free(tofree);
+}
 
 __attribute__((constructor)) void
 init(void)
 {
 
     scope___init_libc(environ, NULL);
+
+    g_fn.malloc = scope_malloc;
+    g_fn.calloc = scope_calloc;
+    g_fn.realloc = scope_realloc;
+    g_fn.free = scope_free;
+
 #if 1
     // Bootstrapping...  we need to know if we're in musl so we can
     // call the right initFn function...

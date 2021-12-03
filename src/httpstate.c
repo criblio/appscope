@@ -11,6 +11,11 @@
 #include "atomic.h"
 #include "libc.h"
 
+#define malloc scope_malloc //g_fn.malloc
+#define calloc scope_calloc //g_fn.calloc
+#define realloc scope_realloc //g_fn.realloc
+#define free scope_free //g_fn.free
+
 #define MIN_HDR_ALLOC (4  * 1024)
 #define MAX_HDR_ALLOC (16 * 1024)
 
@@ -39,6 +44,7 @@ static bool parseHttp1(http_state_t *httpstate, char *buf, size_t len, httpId_t 
 
 extern int      g_http_guard_enabled;
 extern uint64_t g_http_guard[];
+extern void *state_realloc(void *, size_t, size_t);
 
 static void
 setHttpState(http_state_t *httpstate, http_enum_t toState)
@@ -95,7 +101,8 @@ appendHeader(http_state_t *httpstate, char* buf, size_t len)
 
     // If we need more space, realloc
     if (alloc_size != httpstate->hdralloc) {
-        char* temp = realloc(httpstate->hdr, alloc_size);
+        //char* temp = realloc(httpstate->hdr, alloc_size);
+        char *temp = state_realloc(httpstate->hdr, alloc_size, httpstate->hdralloc);
         if (!temp) {
             DBG(NULL);
             // Don't return partial headers...  All or nothing.
@@ -512,7 +519,8 @@ http2StashFrame(http_buf_t *stash, const uint8_t *buf, size_t len)
     if (need > stash->size) {
         // round up to the next 1k boundary and realloc
         need = ((need + 1023) / 1024) * 1024;
-        uint8_t *newBuf = realloc(stash->buf, need);
+        //uint8_t *newBuf = realloc(stash->buf, need);
+        uint8_t *newBuf = state_realloc(stash->buf, need, stash->size);
         if (!newBuf) {
             scopeLogError("ERROR: failed to (re)allocate frame buffer");
             DBG(NULL);

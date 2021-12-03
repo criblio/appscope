@@ -27,6 +27,11 @@
 #include "utils.h"
 #include "libc.h"
 
+#define malloc scope_malloc //g_fn.malloc
+#define calloc scope_calloc //g_fn.calloc
+#define realloc scope_realloc //g_fn.realloc
+#define free scope_free //g_fn.free
+
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
 #define NUM_ATTEMPTS 100
@@ -91,6 +96,16 @@ destroyNetInfo(void *data)
     free(net->http.http2Buf[1].buf);
 
     free(net);
+}
+
+void *state_realloc(void *ptr, size_t size, size_t orig_size)
+{
+	void *new = malloc(size);
+	if (!new) return 0;
+
+	memcpy(new, ptr, orig_size);
+	free(ptr);
+	return new;
 }
 
 int
@@ -322,8 +337,11 @@ doUnixEndpoint(int sd, net_info *net)
     struct stat sbuf;
 
     if (!net) return;
-
+#if 0
     if ((fstat(sd, &sbuf) == -1) ||
+#else
+    if ((scope_fstat(sd, &sbuf) == -1) ||
+#endif
         ((sbuf.st_mode & S_IFMT) != S_IFSOCK)) {
         net->lnode = 0;
         net->rnode = 0;
@@ -1007,7 +1025,8 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
         for (i = 0; i < msg->msg_iovlen; i++) {
             iov = &msg->msg_iov[i];
             if (iov && iov->iov_base && (iov->iov_len > 0)) {
-                char *temp = realloc(pinfo->data, blen + iov->iov_len);
+                //char *temp = realloc(pinfo->data, blen + iov->iov_len);
+                char *temp = state_realloc(pinfo->data, blen + iov->iov_len, iov->iov_len);
                 if (!temp) {
                     if (pinfo->data) free(pinfo->data);
                     free(pinfo);
@@ -1026,7 +1045,8 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
         struct iovec *iov = (struct iovec *)buf;
         for (i = 0; i < len; i++) {
             if (iov[i].iov_base && (iov[i].iov_len > 0)) {
-                char *temp = realloc(pinfo->data, blen + iov[i].iov_len);
+                //char *temp = realloc(pinfo->data, blen + iov[i].iov_len);
+                char *temp = state_realloc(pinfo->data, blen + iov[i].iov_len, iov[i].iov_len);
                 if (!temp) {
                     if (pinfo->data) free(pinfo->data);
                     free(pinfo);
@@ -2378,8 +2398,11 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
         if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) && ctlEnhanceFs(g_ctl)) {
             struct stat sbuf;
             int errsave = errno;
-
+#if 0
             if ((g_fn.__xstat) && (g_fn.__xstat(1, g_fsinfo[fd].path, &sbuf) == 0)) {
+#else
+                if (scope___xstat(1, g_fsinfo[fd].path, &sbuf) == 0) {
+#endif
                 g_fsinfo[fd].fuid = sbuf.st_uid;
                 g_fsinfo[fd].fgid = sbuf.st_gid;
                 g_fsinfo[fd].mode = sbuf.st_mode;

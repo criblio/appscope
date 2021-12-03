@@ -26,6 +26,12 @@
 #include "utils.h"
 #include "runtimecfg.h"
 #include "cfg.h"
+#include "libc.h"
+
+#define malloc scope_malloc //g_fn.malloc
+#define calloc scope_calloc //g_fn.calloc
+#define realloc scope_realloc //g_fn.realloc
+#define free scope_free //g_fn.free
 
 #ifndef AF_NETLINK
 #define AF_NETLINK 16
@@ -157,10 +163,15 @@ destroyHttpMap(void *data)
 {
     if (!data) return;
     http_map *map = (http_map *)data;
-
+#if 1
     if (map->req) free(map->req);
     if (map->resp) free(map->resp);
     if (map) free(map);
+#else
+    if (map->req) g_fn.free(map->req);
+    if (map->resp) g_fn.free(map->resp);
+    if (map) g_fn.free(map);
+#endif
 }
 
 static void
@@ -175,6 +186,7 @@ destroyHttp2Channel(void *data)
     }
 
     free(info);
+    //g_fn.free(info);
 }
 
 static void
@@ -188,6 +200,7 @@ destroyHttp2Stream(void *data)
     }
 
     free(info);
+    //g_fn.free(info);
 }
 
 void
@@ -233,8 +246,10 @@ destroyProto(protocol_info *proto)
         // comment above doesn't apply to HTTP/2 protocol events
         if (proto->ptype == EVT_H2FRAME) {
             http_post *post = (http_post *)proto->data;
+            //g_fn.free(post->hdr);
             free(post->hdr);
         }
+        //g_fn.free(proto->data);
         free(proto->data);
     }
 }
@@ -596,6 +611,7 @@ doHttp1Header(protocol_info *proto)
         char *headertok = strtok_r(header, "\r\n", &savea);
         if (!headertok) {
             free(hreport.hreq);
+            //g_fn.free(hreport.hreq);
             scopeLog(CFG_LOG_WARN, "fd:%d WARN: doHttp1Header: parse an http request header", proto->fd);
             return;
         }
@@ -763,9 +779,13 @@ doHttp1Header(protocol_info *proto)
         // Done; we remove the list entry; complete when reported
         if (lstDelete(g_maplist, post->id) == FALSE) DBG(NULL);
     }
-
+#if 1
     if (hreport.hreq) free(hreport.hreq);
     if (hreport.hres) free(hreport.hres);
+#else
+    if (hreport.hreq) g_fn.free(hreport.hreq);
+    if (hreport.hres) g_fn.free(hreport.hres);
+#endif
     destroyProto(proto);
 }
 
@@ -3154,21 +3174,27 @@ doEvent()
             protocol_info *proto;
 
             if (event->evtype == EVT_NET) {
+                scopeLog(CFG_LOG_WARN, "%s:%d NET", __FUNCTION__, __LINE__);
                 net = (net_info *)data;
                 doNetMetric(net->data_type, net, EVENT_BASED, 0);
             } else if (event->evtype == EVT_FS) {
+                scopeLog(CFG_LOG_WARN, "%s:%d FS", __FUNCTION__, __LINE__);
                 fs = (fs_info *)data;
                 doFSMetric(fs->data_type, fs, EVENT_BASED, fs->funcop, 0, fs->path);
             } else if (event->evtype == EVT_ERR) {
+                scopeLog(CFG_LOG_WARN, "%s:%d STAT ERR", __FUNCTION__, __LINE__);
                 staterr = (stat_err_info *)data;
                 doErrorMetric(staterr->data_type, EVENT_BASED, staterr->funcop, staterr->name, &staterr->counters);
             } else if (event->evtype == EVT_STAT) {
+                scopeLog(CFG_LOG_WARN, "%s:%d STAT", __FUNCTION__, __LINE__);
                 staterr = (stat_err_info *)data;
                 doStatMetric(staterr->funcop, staterr->name, &staterr->counters);
             } else if (event->evtype == EVT_DNS) {
+                scopeLog(CFG_LOG_WARN, "%s:%d DNS", __FUNCTION__, __LINE__);
                 net = (net_info *)data;
                 doDNSMetricName(net->data_type, net);
             } else if (event->evtype == EVT_PROTO) {
+                scopeLog(CFG_LOG_WARN, "%s:%d PROTO", __FUNCTION__, __LINE__);
                 proto = (protocol_info *)data;
                 doProtocolMetric(proto);
             } else {
@@ -3176,12 +3202,15 @@ doEvent()
                 return;
             }
 
+            scopeLog(CFG_LOG_WARN, "%s:%d event type: %d",
+                     __FUNCTION__, __LINE__, event->evtype);
+            //g_fn.free(event);
             free(event);
         }
     }
-    httpAggSendReport(g_http_agg, g_mtc);
-    httpAggReset(g_http_agg);
-    ctlFlushLog(g_ctl);
+    //httpAggSendReport(g_http_agg, g_mtc);
+    //httpAggReset(g_http_agg);
+    //ctlFlushLog(g_ctl);
     ctlFlush(g_ctl);
 }
 
@@ -3276,8 +3305,13 @@ doPayload()
                               g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport, protoName, timestamp);
             if (rc < 0) {
                 // unlikely
+#if 1
                 if (pinfo->data) free(pinfo->data);
                 if (pinfo) free(pinfo);
+#else
+                if (pinfo->data) g_fn.free(pinfo->data);
+                if (pinfo) g_fn.free(pinfo);
+#endif
                 DBG(NULL);
                 return;
             }
@@ -3346,10 +3380,15 @@ doPayload()
                     g_fn.close(fd);
                 }
             }
-
+#if 1
             if (bdata) free(bdata);
             if (pinfo->data) free(pinfo->data);
             if (pinfo) free(pinfo);
+#else
+            if (bdata) g_fn.free(bdata);
+            if (pinfo->data) g_fn.free(pinfo->data);
+            if (pinfo) g_fn.free(pinfo);
+#endif
         }
     }
 }

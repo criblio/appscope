@@ -202,7 +202,7 @@ transportConnection(transport_t *trans)
 int
 transportNeedsConnection(transport_t *trans)
 {
-    if (!trans) return 0;
+    if (!trans) return FALSE;
     switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
@@ -243,7 +243,7 @@ transportNeedsConnection(transport_t *trans)
         default:
             DBG(NULL);
     }
-    return 0;
+    return FALSE;
 }
 
 static const char *

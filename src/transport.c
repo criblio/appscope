@@ -162,14 +162,6 @@ placeDescriptor(int fd, transport_t *t)
     return -1;
 }
 
-int
-transportSetFD(int fd, transport_t *trans)
-{
-    if (!trans) return -1;
-
-    return placeDescriptor(fd, trans);
-}
-
 cfg_transport_t
 transportType(transport_t *trans)
 {

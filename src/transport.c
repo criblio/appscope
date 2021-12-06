@@ -254,8 +254,8 @@ transportNeedsConnection(transport_t *trans)
     return 0;
 }
 
-const char *
-rootCertFile(transport_t *trans)
+static const char *
+rootCertFile(void)
 {
     // Based off of this: https://golang.org/src/crypto/x509/root_linux.go
     const char* rootFileList[] = {
@@ -370,7 +370,7 @@ establishTlsSession(transport_t *trans)
     // If the configuration provides a cacertpath, use it.
     // Otherwise, find a distro-specific root cert file.
     const char *cafile = trans->net.tls.cacertpath;
-    if (!cafile) cafile = rootCertFile(trans);
+    if (!cafile) cafile = rootCertFile();
 
     long loc_rv = SSL_CTX_load_verify_locations(trans->net.tls.ctx, cafile, NULL);
     if (trans->net.tls.validateserver && !loc_rv) {

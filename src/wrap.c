@@ -1107,7 +1107,8 @@ load_func(const char *module, const char *func)
     
     void *handle = g_fn.dlopen(module, RTLD_LAZY | RTLD_NOLOAD);
     if (handle == NULL) {
-        scopeLogError("ERROR: Could not open file %s.\n", module ? module : "(null)");
+        scopeLog(CFG_LOG_DEBUG,"%s: Could not open file %s.\n",
+                               __FUNCTION__, module ? module : "(null)");
         return NULL;
     }
 
@@ -1115,11 +1116,11 @@ load_func(const char *module, const char *func)
     dlclose(handle);
 
     if (addr == NULL) {
-        scopeLogError("ERROR: Could not get function address of %s.\n", func);
+        scopeLog(CFG_LOG_DEBUG,"%s: Could not get function address of %s.\n", __FUNCTION__, func);
         return NULL;
     }
 
-    scopeLogError("%s:%d %s found at %p\n", __FUNCTION__, __LINE__, func, addr);
+    scopeLog(CFG_LOG_DEBUG,"%s: %s found at %p\n", __FUNCTION__, func, addr);
     return addr;
 }
 

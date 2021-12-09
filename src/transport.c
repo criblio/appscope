@@ -246,29 +246,42 @@ transportNeedsConnection(transport_t *trans)
     return FALSE;
 }
 
-static const char *
-rootCertFile(void)
+static void
+loadRootCertFile(transport_t *trans)
 {
-    // Based off of this: https://golang.org/src/crypto/x509/root_linux.go
-    const char* rootFileList[] = {
-        "/etc/ssl/certs/ca-certificates.crt",                // Debian/Ubuntu/Gentoo etc.
-        "/etc/pki/tls/certs/ca-bundle.crt",                  // Fedora/RHEL 6
-        "/etc/ssl/ca-bundle.pem",                            // OpenSUSE
-        "/etc/pki/tls/cacert.pem",                           // OpenELEC
-        "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem", // CentOS/RHEL 7
-        "/etc/ssl/cert.pem",                                 // Alpine Linux
-        NULL
-    };
+    char *cafile = trans->net.tls.cacertpath;
 
-    const char *file;
-    for (file=rootFileList[0]; file; file++) {
-        if (!g_fn.access (file, R_OK)) {
-            return file;
+    // If the configuration provides a cacertpath, use it.
+    // Otherwise, find a distro-specific root cert file.
+    if (!cafile) {
+        int i;
+        // Based off of this: https://golang.org/src/crypto/x509/root_linux.go
+        const char* const rootFileList[] = {
+            "/etc/ssl/certs/ca-certificates.crt",                // Debian/Ubuntu/Gentoo etc.
+            "/etc/pki/tls/certs/ca-bundle.crt",                  // Fedora/RHEL 6
+            "/etc/ssl/ca-bundle.pem",                            // OpenSUSE
+            "/etc/pki/tls/cacert.pem",                           // OpenELEC
+            "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem", // CentOS/RHEL 7
+            "/etc/ssl/cert.pem"                                  // Alpine Linux
+        };
+
+        for (i=0; i<sizeof(rootFileList)/sizeof(char*); ++i) {
+            if (!g_fn.access(rootFileList[i], R_OK)) {
+                cafile = (char*)rootFileList[i];
+                break;
+            }
         }
     }
 
-    // Didn't find it from the list above.
-    return NULL;
+    long loc_rv = SSL_CTX_load_verify_locations(trans->net.tls.ctx, cafile, NULL);
+    if (trans->net.tls.validateserver && !loc_rv) {
+        char err[256] = {0};
+        ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
+        scopeLogInfo("fd:%d error setting tls cacertpath: \"%s\" : %s", trans->net.sock, cafile, err);
+        // We're not treating this as a hard error at this point.
+        // Let the process proceed; validation below will likely fail
+        // and might provide more meaningful info.
+    }
 }
 
 static void
@@ -359,20 +372,7 @@ establishTlsSession(transport_t *trans)
         goto err;
     }
 
-    // If the configuration provides a cacertpath, use it.
-    // Otherwise, find a distro-specific root cert file.
-    const char *cafile = trans->net.tls.cacertpath;
-    if (!cafile) cafile = rootCertFile();
-
-    long loc_rv = SSL_CTX_load_verify_locations(trans->net.tls.ctx, cafile, NULL);
-    if (trans->net.tls.validateserver && !loc_rv) {
-        char err[256] = {0};
-        ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
-        scopeLogInfo("fd:%d error setting tls cacertpath: \"%s\" : %s", trans->net.sock, cafile, err);
-        // We're not treating this as a hard error at this point.
-        // Let the process proceed; validation below will likely fail
-        // and might provide more meaningful info.
-    }
+    loadRootCertFile(trans);
 
     trans->net.tls.ssl = SSL_new(trans->net.tls.ctx);
     if (!trans->net.tls.ssl) {

@@ -6,6 +6,14 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 0.8.1
+
+2021-12-21 - Maintenance Pre-Release
+
+- **Improvement**: [#](https://github.com/criblio/appscope/issues/)
+
+- **Fix**: [#](https://github.com/criblio/appscope/issues/)
+
 ## AppScope 0.8.0
 
 2021-10-26 - Maintenance Pre-Release

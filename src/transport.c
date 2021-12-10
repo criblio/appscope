@@ -293,29 +293,11 @@ shutdownTlsSession(transport_t *trans)
             // protocol error occurred
             int ssl_err = SSL_get_error(trans->net.tls.ssl, ret);
             scopeLogInfo("Client SSL_shutdown failed: ssl_err=%d\n", ssl_err);
-        } else if (ret == 0) {
-            // shutdown not complete, call again
-            char buf[4096];
-            while(1) {
-               ret = SCOPE_SSL_read(trans->net.tls.ssl, buf, sizeof(buf));
-               if (ret <= 0) {
-                   break;
-               }
-            }
-
-            ret = SSL_shutdown(trans->net.tls.ssl);
-            if (ret != 1) {
-                // second shutdown not successful
-                int ssl_err = SSL_get_error(trans->net.tls.ssl, ret);
-                scopeLogInfo("Waiting for server shutdown using SSL_shutdown failed: ssl_err=%d\n", ssl_err);
-            }
         }
-    }
-
-    if (trans->net.tls.ssl) {
         SSL_free(trans->net.tls.ssl);
         trans->net.tls.ssl = NULL;
     }
+
     if (trans->net.tls.ctx) {
         SSL_CTX_free(trans->net.tls.ctx);
         trans->net.tls.ctx = NULL;

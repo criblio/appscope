@@ -10,9 +10,13 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 
 2021-12-21 - Maintenance Pre-Release
 
-- **Improvement**: [#](https://github.com/criblio/appscope/issues/)
+- **Improvement**: [#533](https://github.com/criblio/appscope/issues/533) AppScope logs now include dropped message and connection failure indicators, which make it easier to diagnose TCP/TLS connection issues, or to see when no data is flowing from a scoped process.
 
-- **Fix**: [#](https://github.com/criblio/appscope/issues/)
+- **Improvement**: [#534](https://github.com/criblio/appscope/issues/534) AppScope log entries now include timestamps, e.g., `[2021-10-20 17:48:36.974]`. This timestamp format is ambiguous, and a fix is planned for AppScope 1.0.0. See [#678](https://github.com/criblio/appscope/issues/678). 
+
+- **Improvement**: [#229](https://github.com/criblio/appscope/issues/229) When a process starts, the User Identifier (UID) and Group Identifier (GID) now appear in AppScope's `proc.start` metric and process start event (also known as TCP JSON connection header).
+
+- **Fix**: [#650](https://github.com/criblio/appscope/issues/650) When scoping a process with TLS, and that process does not last long enough for AppScope to complete the TLS connection, AppScope no longer causes the scoped process to crash.
 
 ## AppScope 0.8.0
 

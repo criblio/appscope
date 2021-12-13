@@ -4202,6 +4202,14 @@ EXPORTON int
 dup2(int oldfd, int newfd)
 {
     WRAP_CHECK(dup2, -1);
+
+    if (isAnAppScopeConnection(newfd)) {
+        if (newfd == ctlConnection(g_ctl, CFG_CTL)) ctlDisconnect(g_ctl, CFG_CTL);
+        if (newfd == ctlConnection(g_ctl, CFG_LS)) ctlDisconnect(g_ctl, CFG_LS);
+        if (newfd == mtcConnection(g_mtc)) mtcDisconnect(g_mtc);
+        if (newfd == logConnection(g_log)) logDisconnect(g_log);
+    }
+
     int rc = g_fn.dup2(oldfd, newfd);
 
     doDup2(oldfd, newfd, rc, "dup2");
@@ -4213,6 +4221,14 @@ EXPORTON int
 dup3(int oldfd, int newfd, int flags)
 {
     WRAP_CHECK(dup3, -1);
+
+    if (isAnAppScopeConnection(newfd)) {
+        if (newfd == ctlConnection(g_ctl, CFG_CTL)) ctlDisconnect(g_ctl, CFG_CTL);
+        if (newfd == ctlConnection(g_ctl, CFG_LS)) ctlDisconnect(g_ctl, CFG_LS);
+        if (newfd == mtcConnection(g_mtc)) mtcDisconnect(g_mtc);
+        if (newfd == logConnection(g_log)) logDisconnect(g_log);
+    }
+
     int rc = g_fn.dup3(oldfd, newfd, flags);
     doDup2(oldfd, newfd, rc, "dup3");
 

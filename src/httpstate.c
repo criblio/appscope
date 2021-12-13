@@ -406,6 +406,9 @@ parseHttp1(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId)
 
     // Look for start of http header
     if (httpstate->state == HTTP_NONE) {
+
+        if (searchExec(g_http_start, buf, len) == -1) return FALSE;
+
         setHttpState(httpstate, HTTP_HDR);
         httpstate->id = *httpId;
     }
@@ -448,7 +451,7 @@ parseHttp1(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId)
 
         // check to see if there is a Content-Length in the header
         size_t clen = getContentLength(httpstate->hdr, httpstate->hdrlen);
-        size_t content_in_this_buf = len - header_end;
+        size_t content_in_this_buf = len - (header_start + header_end + searchLen(g_http_end));
 
         httpstate->isResponse =
             (searchExec(g_http_start, httpstate->hdr, searchLen(g_http_start)) != -1);

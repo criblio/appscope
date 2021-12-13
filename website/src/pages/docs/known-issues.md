@@ -10,7 +10,7 @@ title: Known Issues
 
 As of this AppScope pre-release, known issues include:
 
-- [#677](https://github.com/criblio/appscope/issues/677) HTTP/1.1 events are parsed incorrectly, populating http_method and http_target fields with junk.
+- [#677](https://github.com/criblio/appscope/issues/677) HTTP/1.1 events are parsed incorrectly, populating the `http_method` and `http_target` fields with junk.
 
 ## AppScope 0.7
 

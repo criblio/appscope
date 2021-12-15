@@ -170,3 +170,15 @@ osNeedsConnect(int fd)
 {
     return 0;
 }
+
+char *
+osGetUserName(unsigned uid)
+{
+    return NULL;
+}
+
+char *
+osGetGroupName(unsigned gid)
+{
+    return NULL;
+}

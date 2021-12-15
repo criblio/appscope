@@ -8,7 +8,9 @@ RUN apt update \
       xxd \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /opt/test/log && mkdir -p /opt/tar_test
+RUN mkdir -p /opt/test/log && \
+    chmod -R 777 /opt/test/log && \
+    mkdir -p /opt/tar_test
 
 ENV SCOPE_LOG_LEVEL=error
 ENV SCOPE_METRIC_VERBOSITY=4
@@ -17,6 +19,9 @@ ENV SCOPE_EVENT_CONSOLE=true
 ENV SCOPE_EVENT_METRIC=true
 ENV SCOPE_EVENT_HTTP=true
 ENV SCOPE_EVENT_DEST=file:///opt/test/log/events.log
+
+RUN addgroup --system --gid 1234 test_group
+RUN adduser --uid 3333 --system --gid 1234 --disabled-password test_user --shell /bin/bash
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 COPY scope-profile.sh /etc/profile.d/scope.sh

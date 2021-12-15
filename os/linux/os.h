@@ -61,5 +61,7 @@ extern bool osTimerStop(void);
 extern bool osGetCgroup(pid_t, char *, size_t);
 extern char *osGetFileMode(mode_t);
 extern int osNeedsConnect(int);
+extern char *osGetUserName(unsigned);
+extern char *osGetGroupName(unsigned);
 
 #endif  //__OS_H__

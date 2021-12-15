@@ -54,7 +54,9 @@ func TestRunPassthrough(t *testing.T) {
 	assert.Equal(t, "true\n", outb.String())
 	assert.Contains(t, errb.String(), "proc.start")
 	assert.Contains(t, errb.String(), "gid:")
+	assert.Contains(t, errb.String(), "groupname:")
 	assert.Contains(t, errb.String(), "uid:")
+	assert.Contains(t, errb.String(), "username:")
 }
 
 func TestRun(t *testing.T) {

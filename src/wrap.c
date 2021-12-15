@@ -838,7 +838,11 @@ setProcId(proc_id_t *proc)
     }
 
     proc->uid = getuid();
+    if (proc->username) free(proc->username);
+    proc->username = osGetUserName(proc->uid);
     proc->gid = getgid();
+    if (proc->groupname) free(proc->groupname);
+    proc->groupname = osGetGroupName(proc->gid);
     if (osGetCgroup(proc->pid, proc->cgroup, MAX_CGROUP) == FALSE) {
         proc->cgroup[0] = '\0';
     }

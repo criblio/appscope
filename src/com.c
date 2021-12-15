@@ -3,6 +3,7 @@
 
 #include "com.h"
 #include "dbg.h"
+#include "os.h"
 #include "utils.h"
 
 bool g_need_stack_expand = FALSE;
@@ -55,7 +56,9 @@ sendProcessStartMetric()
         STRFIELD("proc", (g_proc.procname), 4, TRUE),
         NUMFIELD("pid", (g_proc.pid), 4, TRUE),
         NUMFIELD("gid", (g_proc.gid), 4, TRUE),
+        STRFIELD("groupname", (g_proc.groupname), 4, TRUE),
         NUMFIELD("uid", (g_proc.uid), 4, TRUE),
+        STRFIELD("username", (g_proc.username), 4, TRUE),
         STRFIELD("host", (g_proc.hostname), 4, TRUE),
         STRFIELD("args", (command), 7, TRUE),
         STRFIELD("unit", ("process"), 1, TRUE),
@@ -190,7 +193,13 @@ jsonProcessObject(proc_id_t *proc)
     if (!(cJSON_AddNumberToObjLN(root, "pid", proc->pid))) goto err;
     if (!(cJSON_AddNumberToObjLN(root, "ppid", proc->ppid))) goto err;
     if (!(cJSON_AddNumberToObjLN(root, "gid", proc->gid))) goto err;
+    if (proc->groupname) {
+        if (!(cJSON_AddStringToObjLN(root, "groupname", proc->groupname))) goto err;
+    }
     if (!(cJSON_AddNumberToObjLN(root, "uid", proc->uid))) goto err;
+    if (proc->username) {
+        if (!(cJSON_AddStringToObjLN(root, "username", proc->username))) goto err;
+    }
     if (!(cJSON_AddStringToObjLN(root, "hostname", proc->hostname))) goto err;
     if (!(cJSON_AddStringToObjLN(root, "procname", proc->procname))) goto err;
     if (proc->cmd) {

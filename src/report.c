@@ -15,6 +15,7 @@
 #include "dbg.h"
 #include "fn.h"
 #include "httpagg.h"
+#include "metriccapture.h"
 #include "mtcformat.h"
 #include "plattime.h"
 #include "report.h"
@@ -403,12 +404,12 @@ getHttpStatus(char *header, size_t len, char **stext)
 }
 
 static void
-httpFieldEnd(event_field_t *fields, http_report *hreport)
+httpFieldEnd(event_field_t *fields, int ix)
 {
-    fields[hreport->ix].name = NULL;
-    fields[hreport->ix].value_type = FMT_END;
-    fields[hreport->ix].value.str = NULL;
-    fields[hreport->ix].cardinality = 0;
+    fields[ix].name = NULL;
+    fields[ix].value_type = FMT_END;
+    fields[ix].value.str = NULL;
+    fields[ix].cardinality = 0;
 }
 
 static bool
@@ -644,7 +645,7 @@ doHttp1Header(protocol_info *proto)
             }
             map->clen = hreport.clen;
 
-            httpFieldEnd(fields, &hreport);
+            httpFieldEnd(fields, hreport.ix);
 
             event_t sendEvent = INT_EVENT("http-req", proto->len, SET, fields);
             cmdSendHttp(g_ctl, &sendEvent, map->id, &g_proc);
@@ -733,7 +734,7 @@ doHttp1Header(protocol_info *proto)
             HTTP_NEXT_FLD(hreport.ix);
         }
 
-        httpFieldEnd(fields, &hreport);
+        httpFieldEnd(fields, hreport.ix);
 
         event_t hevent = INT_EVENT("http-resp", proto->len, SET, fields);
         cmdSendHttp(g_ctl, &hevent, map->id, &g_proc);
@@ -3110,6 +3111,116 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
     }
 }
 
+static data_type_t
+typeFromStr(const unsigned char *string)
+{
+    const char *str = (const char *)string;  // casting away unsigned
+    if (!strcmp(str, "c")) return DELTA;     // counter
+    if (!strcmp(str, "g")) return CURRENT;   // gauge
+    if (!strcmp(str, "ms")) return DELTA_MS; // timer
+    if (!strcmp(str, "s")) return SET;
+    if (!strcmp(str, "h")) return HISTOGRAM;
+
+    return CURRENT;  // Default to CURRENT aka "gauge"
+}
+
+static event_field_t *
+createFieldsForCapturedMetrics(const unsigned char *alldims)
+{
+    event_field_t *fields = calloc(HTTP_MAX_FIELDS, sizeof(event_field_t));
+    if (!fields) return NULL;
+    int ix = 0;
+
+    // Metric fields we always have...
+    H_VALUE(fields[ix], "pid", g_proc.pid, 4);
+    HTTP_NEXT_FLD(ix);
+    H_ATTRIB(fields[ix], "host", g_proc.hostname, 4);
+    HTTP_NEXT_FLD(ix);
+    H_ATTRIB(fields[ix], "proc", g_proc.procname, 4);
+    HTTP_NEXT_FLD(ix);
+
+
+    // Metric fields from what we intercepted
+    //  eg:   #ceo:clint,date_founded:2017
+    //        fieldname1->ceo           fieldval1->clint
+    //        fieldname2->date_founded  fieldval2->2017
+    char *dims = (char *)alldims;
+    while (dims) {
+
+        // dims starts with # and commas are overwritten to null below
+        if ((dims[0] != '#') && (dims[0] != '\0')) break;
+
+        // get pointers to the name and value pairs and
+        // make sure each is null delimited
+        char *fieldname = ++dims; // advance past the # or , char
+        char *fieldval = strchr(fieldname, ':');
+        if (!fieldval) break;
+        *fieldval = '\0';       // overwrite the : char to delimit fieldname
+        ++fieldval;             // advance past the null
+
+        // Set dims for next time through this loop
+        dims = strchr(fieldval, ',');
+        if (dims) *dims = '\0'; // overwrite the , char to delimit fieldval
+
+        // Add this name value pair
+        H_ATTRIB(fields[ix], fieldname, fieldval, 0);
+        HTTP_NEXT_FLD(ix);
+    }
+
+    httpFieldEnd(fields, ix);
+
+    return fields;
+}
+
+void
+reportCapturedMetric(const captured_metric_t *metric)
+{
+    if (!metric) return;
+
+    const char *value = (const char *)metric->value; // casting away unsigned
+    const char *name = (const char *)metric->name; // casting away unsigned
+
+    event_field_t *fields = createFieldsForCapturedMetrics(metric->dims);
+
+    // Look for a decimal point.  Comma allows for localization, even
+    // though the regex that creates value currently using does not.
+    event_t out_mtc;
+    char *endptr = NULL;
+    if (strpbrk(value, ".,")) {
+        // Value looks like a floating point value...
+        errno = 0;
+        double doubleval = strtod(value, &endptr);
+        if ((endptr == value) || (errno != 0)) {
+            if (errno == ERANGE) {
+                char *underover = (doubleval == 0.0) ? "underflow" : "overflow";
+                DBG("Couldn't be converted to float: %s (%s)", value, underover);
+            } else {
+                DBG("Couldn't be converted to float: %s", value);
+            }
+            goto out;
+        }
+        event_t flt_met = FLT_EVENT(name, doubleval, typeFromStr(metric->type), fields);
+        memmove(&out_mtc, &flt_met, sizeof(event_t));
+    } else {
+        // Value looks like an integer value...
+        errno = 0;
+        long long int intval = strtoll(value, &endptr, 10);
+        if ((endptr == value) || (errno != 0)) {
+            DBG("Couldn't be converted to long long: %s", value);
+            goto out;
+        }
+        event_t int_met = INT_EVENT(name, intval, typeFromStr(metric->type), fields);
+        memmove(&out_mtc, &int_met, sizeof(event_t));
+    }
+
+    if (cmdSendMetric(g_mtc, &out_mtc)) {
+        scopeLog(CFG_LOG_ERROR, "ERROR: reportCapturedMetric:cmdSendMetric");
+    }
+
+out:
+    if (fields) free(fields);
+}
+
 bool
 doConnection(void)
 {
@@ -3181,6 +3292,7 @@ doEvent()
     }
     httpAggSendReport(g_http_agg, g_mtc);
     httpAggReset(g_http_agg);
+    reportAllCapturedMetrics();
     ctlFlushLog(g_ctl);
     ctlFlush(g_ctl);
 }

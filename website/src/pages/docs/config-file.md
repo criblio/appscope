@@ -198,7 +198,7 @@ metric:
     #
     # Applies when connection type is file or unix.
     #
-    #path:
+    #path: ''
 
     # File buffering
     #   Type:     string
@@ -472,7 +472,7 @@ event:
     #
     # Applies when connection type is file or unix.
     #
-    #path:
+    #path: ''
 
     # File buffering
     #   Type:     string
@@ -770,7 +770,7 @@ cribl:
     #
     # Only applies when the connection type is unix.
     #
-    #path:
+    #path: ''
 
     # TLS connection settings
     tls:

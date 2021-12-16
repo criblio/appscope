@@ -710,10 +710,12 @@ cribl:
   #
   transport:
 
-    # Set $SCOPE_CRIBL to override the type, host, and port configs below. The
-    # environment variable should be set to a URL.
+    # Set $SCOPE_CRIBL to override the type, host, port and socket path configs below.
+    # The environment variable should be set to a URL.
     #
     #   tcp://host:port         send to a TCP server
+    #   unix://@abstractname    send to a unix domain server w/abstract addr
+    #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
     #
     # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
     # set the $SCOPE_CRIBL_TLS_* variables.
@@ -726,7 +728,7 @@ cribl:
 
     # Connection type
     #   Type:     string
-    #   Values:   tcp
+    #   Values:   tcp, unix
     #   Default:  tcp
     #   Override: the protocol token in the $SCOPE_CRIBL or $SCOPE_CRIBL_CLOUD URL
     #
@@ -737,6 +739,8 @@ cribl:
     #   Values:   (hostname or IP address)
     #   Default:  127.0.0.1
     #   Override: the host token in the $SCOPE_CRIBL or $SCOPE_CRIBL_CLOUD URL
+    #
+    # Only applies when the connection type is tcp.
     #
     host: 127.0.0.1
 
@@ -754,7 +758,19 @@ cribl:
     # Use 10091 here if you need to connect to Cribl Cloud without TLS and
     # are not making any changes in the AppScope Source.
     #
+    # Only applies when the connection type is tcp.
+    #
     port: 10090
+
+    # Unix domain socket path
+    #   Type:     string
+    #   Values:   socket path
+    #   Default:  (none)
+    #   Override: the socket_path token in the $SCOPE_CRIBL or $SCOPE_CRIBL_CLOUD URL
+    #
+    # Only applies when the connection type is unix.
+    #
+    #path:
 
     # TLS connection settings
     tls:

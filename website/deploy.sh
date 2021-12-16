@@ -8,7 +8,7 @@ cd ${DIR}
 echo "versions originally provided by the environment..."
 npm --version
 node --version
-nvm --version
+nvm --version || true
 echo "installing nvm"
 curl https://raw.githubusercontent.com/creationix/nvm/master/install.sh | bash
 source ~/.profile

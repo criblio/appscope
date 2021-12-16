@@ -5,6 +5,7 @@ RUN apt update \
     && apt install -y \
       bsdmainutils \
       curl \
+      firefox \
       xxd \
     && rm -rf /var/lib/apt/lists/*
 

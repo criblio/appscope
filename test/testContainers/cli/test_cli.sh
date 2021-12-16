@@ -1,4 +1,5 @@
 #! /bin/bash
+export SCOPE_EVENT_DEST=file:///opt/test/logs/events.log
 
 DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
 FAILED_TEST_LIST=""

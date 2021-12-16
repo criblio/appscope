@@ -5,14 +5,19 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd ${DIR}
 
 # manage the version of node used
-echo "versions of npm and node originally provided by the environment"
+echo "versions originally provided by the environment..."
 npm --version
 node --version
+nvm --version
+echo "installing nvm"
+curl https://raw.githubusercontent.com/creationix/nvm/master/install.sh | bash
+source ~/.profile
 nvm install 14.18.1
 nvm use 14.18.1
-echo "versions of npm and node we're going to use"
+echo "versions we're going to use..."
 npm --version
 node --version
+nvm --version
 
 npm ci
 npx gatsby build

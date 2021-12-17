@@ -18,25 +18,36 @@ To execute CLI commands, the basic syntax is:
 To see a list of available commands, enter `./scope` alone, or `./scope -h`, or `./scope --help`. This displays the basic help listing below.
 
 ```
-Command line interface for working with Cribl AppScope
+Cribl AppScope Command Line Interface
+
+AppScope is a general-purpose observable application telemetry system.
+
+Running `scope` with no subcommands will execute the `scope run` command.
 
 Usage:
   scope [command]
 
 Available Commands:
+  attach      Scope an existing PID
+  completion  Generate completion code for specified shell
   dash        Display scope dashboard
-  events      Output events for a session
-  extract     Output instrumenting library files to <dir>
+  events      Outputs events for a session
+  extract     Output instrumentary library files to <dir>
+  flows       Observed flows from the session, potentially including payloads
   help        Help about any command
   history     List scope session history
-  metrics     Output metrics for a session
-  prune       Delete scope history
-  run         Execute a scoped command
+  k8s         Install scope in kubernetes
+  logs        Display scope logs
+  metrics     Outputs metrics for a session
+  prune       Prune deletes session history
+  ps          List processes currently being scoped
+  run         Executes a scoped command
+  service     Configure a systemd service to be scoped
   version     Display scope version
+  watch       Executes a scoped command on an interval
 
 Flags:
-  -h, --help            Help for scope
-  -v, --verbose count   Set verbosity level
+  -h, --help   help for scope
 
 Use "scope [command] --help" for more information about a command.
 ```

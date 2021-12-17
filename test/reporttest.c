@@ -150,7 +150,7 @@ countTestSetup(void** state)
     init_g_proc();
     g_log = logCreate();
     g_mtc = mtcCreate();
-    g_ctl = ctlCreate();
+    g_ctl = ctlCreate(DEFAULT_LOG_MAX_AGG_BYTES);
 
     initState();
 

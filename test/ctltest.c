@@ -259,6 +259,7 @@ ctlParseRxMsgSetCfg(void** state)
         "    \"summaryperiod\": \"13\",\n"
         "    \"log\": {\n"
         "      \"level\": \"debug\",\n"
+        "      \"bufthreshold\": \"32768\",\n"
         "      \"transport\": {\n"
         "        \"type\": \"shm\"\n"
         "      }\n"
@@ -641,7 +642,7 @@ ctlSendMsgForNullMtcDoesntCrash(void** state)
 static void
 ctlSendMsgForNullMessageDoesntCrash(void** state)
 {
-    ctl_t* ctl = ctlCreate();
+    ctl_t* ctl = ctlCreate(DEFAULT_LOG_MAX_AGG_BYTES);
     assert_non_null(ctl);
     transport_t* t = transportCreateSyslog();
     assert_non_null(t);
@@ -654,7 +655,7 @@ static void
 ctlTransportSetAndMtcSend(void** state)
 {
     const char* file_path = "/tmp/my.path";
-    ctl_t* ctl = ctlCreate();
+    ctl_t* ctl = ctlCreate(DEFAULT_LOG_MAX_AGG_BYTES);
     assert_non_null(ctl);
     transport_t* t1 = transportCreateUdp("127.0.0.1", "12345");
     transport_t* t2 = transportCreateUnix("/var/run/scope.sock");
@@ -736,7 +737,7 @@ ctlSendLogConsoleAsciiData(void **state)
                       .procname = "foo",
                       .cmd = "foo",
                       .id = "foo"};
-    ctl_t* ctl = ctlCreate();
+    ctl_t* ctl = ctlCreate(DEFAULT_LOG_MAX_AGG_BYTES);
     assert_non_null(ctl);
     bool b_res = ctlEvtSourceEnabled(ctl, CFG_SRC_CONSOLE);
     assert_true(b_res);
@@ -769,7 +770,7 @@ ctlSendLogConsoleNoneAsciiData(void **state)
                       .procname = "foo",
                       .cmd = "foo",
                       .id = "foo"};
-    ctl_t* ctl = ctlCreate();
+    ctl_t* ctl = ctlCreate(DEFAULT_LOG_MAX_AGG_BYTES);
     assert_non_null(ctl);
     bool b_res = ctlEvtSourceEnabled(ctl, CFG_SRC_CONSOLE);
     assert_true(b_res);

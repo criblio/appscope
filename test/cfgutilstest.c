@@ -1125,6 +1125,7 @@ verifyDefaults(config_t* config)
     assert_null            (cfgCustomTags(config));
     assert_null            (cfgCustomTagValue(config, "tagname"));
     assert_int_equal       (cfgLogLevel(config), DEFAULT_LOG_LEVEL);
+    assert_int_equal       (cfgLogBufThreshold(config), DEFAULT_LOG_MAX_AGG_BYTES);
     assert_int_equal       (cfgPayEnable(config), DEFAULT_PAYLOAD_ENABLE);
     assert_string_equal    (cfgPayDir(config), DEFAULT_PAYLOAD_DIR);
 

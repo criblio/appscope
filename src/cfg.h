@@ -43,6 +43,7 @@ const char*         cfgTransportTlsCACertPath(config_t *, which_transport_t);
 custom_tag_t**      cfgCustomTags(config_t*);
 const char*         cfgCustomTagValue(config_t*, const char*);
 cfg_log_level_t     cfgLogLevel(config_t*);
+unsigned long       cfgLogBufThreshold(config_t*);
 unsigned int        cfgPayEnable(config_t*);
 const char *        cfgPayDir(config_t*);
 const char *        cfgEvtFormatHeader(config_t *, int);
@@ -78,6 +79,7 @@ void                cfgTransportTlsValidateServerSet(config_t *, which_transport
 void                cfgTransportTlsCACertPathSet(config_t *, which_transport_t, const char *);
 void                cfgCustomTagAdd(config_t*, const char*, const char*);
 void                cfgLogLevelSet(config_t*, cfg_log_level_t);
+void                cfgLogBufThresholdSet(config_t*, unsigned long);
 void                cfgPayEnableSet(config_t*, unsigned int);
 void                cfgPayDirSet(config_t*, const char *);
 void                cfgEvtFormatHeaderSet(config_t *, const char *);

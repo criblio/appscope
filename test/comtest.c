@@ -9,7 +9,7 @@
 static void
 cmdPostInfoMsgDoesNotCrash(void** state)
 {
-    ctl_t* ctl = ctlCreate();
+    ctl_t* ctl = ctlCreate(DEFAULT_LOG_MAX_AGG_BYTES);
     assert_non_null(ctl);
 
     assert_int_equal(-1, cmdPostInfoMsg(NULL, NULL));
@@ -23,7 +23,7 @@ cmdPostInfoMsgDoesNotCrash(void** state)
 static void
 cmdSendInfoStrDoesNotCrash(void** state)
 {
-    ctl_t* ctl = ctlCreate();
+    ctl_t* ctl = ctlCreate(DEFAULT_LOG_MAX_AGG_BYTES);
     assert_non_null(ctl);
 
     assert_int_equal(-1, cmdSendInfoStr(NULL, NULL));
@@ -37,7 +37,7 @@ cmdSendInfoStrDoesNotCrash(void** state)
 static void
 cmdSendResponseDoesNotCrash(void** state)
 {
-    ctl_t* ctl = ctlCreate();
+    ctl_t* ctl = ctlCreate(DEFAULT_LOG_MAX_AGG_BYTES);
     assert_non_null(ctl);
     const char buf[] =
          "{\"type\": \"req\", \"req\": \"huh?\", \"reqId\": 3.5}";

@@ -14,7 +14,6 @@
 #include "state.h"
 
 #define FS_ENTRIES 1024
-#define DEFAULT_LOG_MAX_AGG_BYTES 32768
 #define DEFAULT_LOG_FLUSH_PERIOD_IN_MS 2000
 
 #define CHANNEL "_channel"
@@ -570,7 +569,7 @@ out:
 }
 
 ctl_t *
-ctlCreate()
+ctlCreate(unsigned long agg_bytes_limit)
 {
     ctl_t *ctl = calloc(1, sizeof(ctl_t));
     if (!ctl) {
@@ -583,7 +582,7 @@ ctlCreate()
         DBG(NULL);
         goto err;
     }
-    ctl->log.max_agg_bytes = DEFAULT_LOG_MAX_AGG_BYTES;
+    ctl->log.max_agg_bytes = agg_bytes_limit;
     ctl->log.flush_period_in_ms = DEFAULT_LOG_FLUSH_PERIOD_IN_MS;
 
     ctl->events = cbufInit(DEFAULT_CBUF_SIZE);

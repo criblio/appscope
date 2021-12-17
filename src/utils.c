@@ -21,6 +21,16 @@ strToVal(enum_map_t map[], const char *str)
     return -1;
 }
 
+int
+strToUnsignedLong(const char* str, unsigned long* val)
+{
+    errno = 0;
+    char* endptr = NULL;
+    *val = strtoul(str, &endptr, 10);
+    if (errno || *endptr) return FALSE;
+    return TRUE;
+}
+
 const char *
 valToStr(enum_map_t map[], unsigned int val)
 {

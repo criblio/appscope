@@ -599,6 +599,16 @@ libscope:
     #
     level: warning
 
+    # Set buffer threshold of the in-memory queue
+    #   Type:     integer
+    #   Values:   (greater than zero) bytes
+    #   Default:  32768
+    #   Override: $SCOPE_LOG_BUFFER_THRESHOLD
+    #
+    # Threshold of raw data after reaching data will be flushed to log
+    #
+    buffer_threshold: 32768
+
     # Backend connection for logs
     #
     transport:

@@ -46,7 +46,7 @@ Send HTTP events from Slack to a Splunk server at `myHost.example.com`:
 scope run --passthrough -- slack
 ```
 
-Configuration file example, located at `/etc/scope` or `~/scope.yml`:
+Configuration file example, located at `/opt/scope/assets/scope.yml`:
 
 ```
 event:

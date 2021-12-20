@@ -11,7 +11,7 @@ To define a TLS-encrypted connection to LogStream Cloud, just set the `SCOPE_CRI
 For example:
 
 ```
-SCOPE_CRIBL_CLOUD=tcp://in.logstream.cribl.<cloud_instance>.cloud:10090
+SCOPE_CRIBL_CLOUD=tcp://in.logstream.<cloud_instance>.cribl.cloud:10090
 ```
 By default, LogStream Cloud instances have port `10090` configured to use [TLS](/docs/tls) over TCP, and a built-in [AppScope Source](https://docs.cribl.io/docs/sources-appscope) to receive data from AppScope. You can change the AppScope Source configuration, or create additional AppScope Sources, as needed.
 
@@ -40,7 +40,7 @@ To define an **unencrypted** connection to a LogStream Cloud instance, set the `
 For example:
 
 ```
-SCOPE_CRIBL=tcp://in.logstream.cribl.<cloud_instance>.cloud:10091
+SCOPE_CRIBL=tcp://in.logstream.<cloud_instance>.cribl.cloud:10091
 ```
 
 <span id="on-prem"> </span>

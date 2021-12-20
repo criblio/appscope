@@ -77,20 +77,6 @@ Send default metrics from the Go static application `hello` to the Datadog serve
 scope run -m udp://ddog:8125
 ```
 
-Configuration file example:
-
-```
-metric:
-  enable: true
-  format:
-    type : statsd
-...
-  transport:
-    type: udp
-    host: ddog
-    port: 5000
-```
-
 ### Next Steps
 
 Explore [Integrating with LogStream](/docs/logstream-integration).

@@ -13,7 +13,7 @@ For example:
 ```
 SCOPE_CRIBL_CLOUD=tcp://in.logstream.cribl.<cloud_instance>.cloud:10090
 ```
-By default, LogStream has port `10090` configured to use [TLS](/docs/tls) over TCP, and a built-in [AppScope Source](https://docs.cribl.io/docs/sources-appscope) to receive data from AppScope. You can change its configuration or create additional AppScope Sources as needed.
+By default, LogStream Cloud instances have port `10090` configured to use [TLS](/docs/tls) over TCP, and a built-in [AppScope Source](https://docs.cribl.io/docs/sources-appscope) to receive data from AppScope. You can change the AppScope Source configuration, or create additional AppScope Sources, as needed.
 
 This is the easiest way to integrate AppScope with LogStream. It is also possible to connect to LogStream Cloud [unencrypted](#cloud-unencrypted); or, to LogStream [on-prem](#on-prem), encrypted or not.
 

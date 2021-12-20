@@ -608,6 +608,16 @@ libscope:
     #
     buffer_threshold: 32768
 
+    # Set flush period in-memory queue
+    #   Type:     integer
+    #   Values:   (greater than zero) miliseconds
+    #   Default:  2000
+    #   Override: $SCOPE_LOG_FLUSH_PERIOD
+    #
+    # Period after data will be flushed to log
+    #
+    flush_period: 2000
+
     # Backend connection for logs
     #
     transport:

@@ -19,6 +19,7 @@ event_t evtBuf[BUFSIZE] = {{0}};
 int evtBufNext = 0;
 event_t mtcBuf[BUFSIZE] = {{0}};
 int mtcBufNext = 0;
+static config_t *test_config;
 
 // These signatures satisfy --wrap=cmdSendEvent in the Makefile
 #ifdef __linux__
@@ -148,9 +149,11 @@ countTestSetup(void** state)
 
     // init objects that count has
     init_g_proc();
+    test_config = cfgCreateDefault();
+
     g_log = logCreate();
     g_mtc = mtcCreate();
-    g_ctl = ctlCreate(DEFAULT_LOG_MAX_AGG_BYTES);
+    g_ctl = ctlCreate(test_config);
 
     initState();
 
@@ -169,6 +172,7 @@ countTestTeardown(void** state)
     logDestroy(&g_log);
     mtcDestroy(&g_mtc);
     ctlDestroy(&g_ctl);
+    cfgDestroy(&test_config);
 
     // Call the general groupTeardown() too.
     return groupTeardown(state);

@@ -14,7 +14,6 @@
 #include "state.h"
 
 #define FS_ENTRIES 1024
-#define DEFAULT_LOG_FLUSH_PERIOD_IN_MS 2000
 
 #define CHANNEL "_channel"
 #define ID "id"
@@ -569,7 +568,7 @@ out:
 }
 
 ctl_t *
-ctlCreate(unsigned long agg_bytes_limit)
+ctlCreate(config_t *cfg)
 {
     ctl_t *ctl = calloc(1, sizeof(ctl_t));
     if (!ctl) {
@@ -582,8 +581,8 @@ ctlCreate(unsigned long agg_bytes_limit)
         DBG(NULL);
         goto err;
     }
-    ctl->log.max_agg_bytes = agg_bytes_limit;
-    ctl->log.flush_period_in_ms = DEFAULT_LOG_FLUSH_PERIOD_IN_MS;
+    ctl->log.max_agg_bytes = cfgLogBufThreshold(cfg);
+    ctl->log.flush_period_in_ms = cfgLogFlushPeriod(cfg);
 
     ctl->events = cbufInit(DEFAULT_CBUF_SIZE);
     if (!ctl->events) {

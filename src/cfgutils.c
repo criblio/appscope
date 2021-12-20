@@ -45,6 +45,7 @@
 #define LIBSCOPE_NODE        "libscope"
 #define LOG_NODE                 "log"
 #define BUF_THRESHOLD_NODE           "bufthreshold"
+#define FLUSH_PERIOD_NODE            "flushperiod"
 #define LEVEL_NODE                   "level"
 #define TRANSPORT_NODE               "transport"
 #define SUMMARYPERIOD_NODE       "summaryperiod"
@@ -167,6 +168,7 @@ void cfgTransportTlsCACertPathSetFromStr(config_t *, which_transport_t, const ch
 void cfgCustomTagAddFromStr(config_t*, const char*, const char*);
 void cfgLogLevelSetFromStr(config_t*, const char*);
 void cfgLogBufThresholdSetFromStr(config_t*, const char*);
+void cfgLogFlushPeriodSetFromStr(config_t*, const char*);
 void cfgPayEnableSetFromStr(config_t*, const char*);
 void cfgPayDirSetFromStr(config_t*, const char*);
 void cfgAuthTokenSetFromStr(config_t*, const char*);
@@ -459,6 +461,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgLogLevelSetFromStr(cfg, value);
     } else if (!strcmp(env_name, "SCOPE_LOG_BUFFER_THRESHOLD")) {
         cfgLogBufThresholdSetFromStr(cfg, value);
+    } else if (!strcmp(env_name, "SCOPE_LOG_FLUSH_PERIOD")) {
+        cfgLogFlushPeriodSetFromStr(cfg, value);
     } else if (!strcmp(env_name, "SCOPE_METRIC_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_MTC, value);
     } else if (!strcmp(env_name, "SCOPE_METRIC_TLS_ENABLE")) {
@@ -863,6 +867,15 @@ cfgLogBufThresholdSetFromStr(config_t* cfg, const char* value)
 }
 
 void
+cfgLogFlushPeriodSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    unsigned long x;
+    if (!strToUnsignedLong(value, &x)) return;
+    cfgLogFlushPeriodSet(cfg, x);
+}
+
+void
 cfgPayEnableSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
@@ -957,6 +970,14 @@ processBufThreshold(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
     cfgLogBufThresholdSetFromStr(config, value);
+    if (value) free(value);
+}
+
+static void
+processFlushPeriod(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    char* value = stringVal(node);
+    cfgLogFlushPeriodSetFromStr(config, value);
     if (value) free(value);
 }
 
@@ -1100,6 +1121,7 @@ processLogging(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     parse_table_t t[] = {
         {YAML_SCALAR_NODE,    LEVEL_NODE,           processLevel},
         {YAML_SCALAR_NODE,    BUF_THRESHOLD_NODE,   processBufThreshold},
+        {YAML_SCALAR_NODE,    FLUSH_PERIOD_NODE,    processFlushPeriod},
         {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportLog},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
@@ -2137,6 +2159,8 @@ createLogJson(config_t* cfg)
     if (!(root = cJSON_CreateObject())) goto err;
     if (!cJSON_AddNumberToObjLN(root, BUF_THRESHOLD_NODE,
                       cfgLogBufThreshold(cfg))) goto err;
+    if (!cJSON_AddNumberToObjLN(root, FLUSH_PERIOD_NODE,
+                      cfgLogFlushPeriod(cfg))) goto err;
     if (!cJSON_AddStringToObjLN(root, LEVEL_NODE,
                      valToStr(logLevelMap, cfgLogLevel(cfg)))) goto err;
 
@@ -2565,7 +2589,7 @@ initEvtFormat(config_t *cfg)
 ctl_t *
 initCtl(config_t *cfg)
 {
-    ctl_t *ctl = ctlCreate(cfgLogBufThreshold(cfg));
+    ctl_t *ctl = ctlCreate(cfg);
     if (!ctl) return ctl;
 
     /*

@@ -20,7 +20,7 @@ a mutating admission webhook which adds an initContainer to each pod along with 
 all processes in that container.
 
 The --*dest flags accept file names like /tmp/scope.log or URLs like file:///tmp/scope.log. They may also
-be set to sockets with tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
+be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
 	Example: `scope k8s --metricdest tcp://some.host:8125 --eventdest tcp://other.host:10070 | kubectl apply -f -
 kubectl label namespace default scope=enabled`,
 	Args: cobra.NoArgs,

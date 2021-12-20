@@ -13,7 +13,7 @@ var attachCmd = &cobra.Command{
 verbosity. 
 
 The --*dest flags accept file names like /tmp/scope.log or URLs like file:///tmp/scope.log. They may also
-be set to sockets with tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
+be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
 	Example: `scope attach 1000
 scope attach --payloads 2000`,
 	Args: cobra.ExactArgs(1),

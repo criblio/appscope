@@ -6,13 +6,16 @@ RUN apt update \
       emacs \
       gdb \
       lsof \
+      netcat \
       vim \
     && rm -rf /var/lib/apt/lists/*
 
 # Tests
 COPY ./cli/test_cli.sh /opt/test/bin/test_cli.sh
-COPY ./cli/test_all.sh /opt/test/bin/test_all.sh
+COPY ./cli/test_cli_dest.sh /opt/test/bin/test_cli_dest.sh
 COPY ./cli/expected.yml /
+
+RUN mkdir /opt/test-runner
 
 ENV SCOPE_LOG_LEVEL=error
 ENV SCOPE_METRIC_VERBOSITY=4

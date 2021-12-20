@@ -21,7 +21,7 @@ to instrument any application and output the data to any existing tool using sim
 scope.yml can be preconfigured for outputting to specific destinations. 
 
 The --*dest flags accept file names like /tmp/scope.log or URLs like file:///tmp/scope.log. They may also
-be set to sockets with tcp://hostname:port, udp://hostname:port, or tls://hostname:port.
+be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.
 
 Libscope can easily be used with any dynamic or static application, regardless of the runtime.`,
 	Example: `scope extract /opt/libscope

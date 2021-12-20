@@ -6,50 +6,60 @@ title: Integrating with LogStream
 
 AppScope can easily connect to Cribl LogStream ([overview](https://cribl.io/product/) | [cloud](https://cribl.cloud/) | [download](https://cribl.io/download/) | [docs](https://docs.cribl.io/docs/welcome)).
 
-To define a LogStream connection, simply set the `SCOPE_CRIBL` environment variable specifying a transport type, IP address, and port. For example:
+To define a TLS-encrypted connection to LogStream Cloud, just set the `SCOPE_CRIBL_CLOUD` environment variable, specifying a transport type, host name or IPv4 address, and a port number. 
+
+For example:
 
 ```
-SCOPE_CRIBL=tcp://127.0.0.1:9109
+SCOPE_CRIBL_CLOUD=tcp://in.logstream.cribl.<cloud_instance>.cloud:10090
 ```
+By default, LogStream has port `10090` configured to use [TLS](/docs/tls) over TCP, and a built-in [AppScope Source](https://docs.cribl.io/docs/sources-appscope) to receive data from AppScope. You can change its configuration or create additional AppScope Sources as needed.
 
-### Requirements
-
-You must supply a host name or IPv4 address, along with an optional port number. If you omit the port number, AppScope will attempt to connect on the default port `10090`.
-
-On the LogStream side, a built-in [AppScope Source](https://docs.cribl.io/docs/sources-appscope) receives data from AppScope by default. You can change its configuration or create additional AppScope Sources as needed.
+This is the easiest way to integrate AppScope with LogStream. It is also possible to connect to LogStream Cloud [unencrypted](#cloud-unencrypted); or, to LogStream [on-prem](#on-prem), encrypted or not.
 
 ### Parameter Overrides
 
-When AppScope establishes a LogStream connection, this sets several AppScope configuration parameters, some of which override settings in any configuration file or environment variable. Any configuration override is logged to AppScope's default log file. 
+When AppScope establishes a LogStream connection, this sets several AppScope configuration parameters, some of which override settings in any configuration file or environment variable.
 
-Configuration settings that are potentially overridden include: 
+These overrides include: 
 
+- Events are enabled.
 - Metrics are enabled.
 - Metrics format is set to `ndjson`.
-- Events are enabled.
 - Transport for events, metrics, and payloads use the LogStream connection.
+- Log level, is set to `warning` if originally configured as `error` or `none`.
 
-The following configuration elements are event watch types which are enabled by default when a LogStream connection is defined:
+Any configuration override is logged to AppScope's default log file. 
 
-- `console`
-- `dns`      
-- `file`
-- `fs`
-- `http`
-- `net`
+<span id="cloud-unencrypted"> </span>
 
-These event watch types can be overridden by a configuration file or by environment variables.
+### Connecting to LogStream Cloud Unencrypted 
 
-Other configuration elements are not modified by a LogStream connection.
+To define an **unencrypted** connection to a LogStream Cloud instance, set the `SCOPE_CRIBL` environment variable (**not** `SCOPE_CRIBL_CLOUD`) and specify port `10091`.
 
-### HTTP Traffic
+For example:
 
-The AppScope Source streams HTTP payloads to LogStream, whether the payloads originate as HTTP/1.1 or HTTP/2 traffic. LogStream then converts the payloads to HTTP events.
+```
+SCOPE_CRIBL=tcp://in.logstream.cribl.<cloud_instance>.cloud:10091
+```
 
-Separately, the AppScope library can convert HTTP/1.1 (not HTTP/2) payloads to HTTP events. This is mainly useful for streaming HTTP events to destinations **other than** LogStream.
+<span id="on-prem"> </span>
 
-## Using TLS for Secure Connections
+### Connecting to LogStream On-Prem 
 
-AppScope supports TLS over TCP connections.
+An on-prem instance of LogStream has an AppScope Source built in. However, by default: 
 
-See [Using TLS for Secure Connections](/docs/tls).
+- The Source itself is disabled. 
+- The Source listens on port 10090.
+- On the Source, TLS is disabled by default.
+
+To connect from AppScope, you'll need to [configure](https://docs.cribl.io/logstream/sources-appscope) the AppScope Source in LogStream. This includes
+enabling the Source; configuring it to listen on the desired port; and, enabling and configuring TLS if desired.
+
+Then, to define a connection to the on-prem LogStream instance, set `SCOPE_CRIBL`.  
+
+For example:
+
+```
+SCOPE_CRIBL=tcp://127.0.0.1:10090
+```

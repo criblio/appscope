@@ -28,6 +28,7 @@
 #include "scopetypes.h"
 #include "utils.h"
 #include "inject.h"
+#include "os.h"
 
 #define GO_ENV_VAR "GODEBUG"
 #define GO_ENV_SERVER_VALUE "http2server"
@@ -187,11 +188,32 @@ main(int argc, char **argv, char **env)
     setPidEnv(getpid());
 
     if (attachArg) {
+        char *exe_path = NULL;
+        elf_buf_t *ebuf;
+
         int pid = atoi(attachArg);
         if (pid < 1) {
             fprintf(stderr, "error: invalid PID for --attach\n");
             return EXIT_FAILURE;
         }
+
+        if (osGetExePath(pid, &exe_path) == -1) {
+            fprintf(stderr, "error: can't get path to executable for pid %d\n", pid);
+            return EXIT_FAILURE;
+        }
+
+        if ((ebuf = getElf(exe_path)) == NULL) {
+            fprintf(stderr, "error: can't read the executable %s\n", exe_path);
+            return EXIT_FAILURE;
+        }
+
+        if (is_static(ebuf->buf) == TRUE) {
+            fprintf(stderr, "error: can't attach to the static executable: %s\nNote that the executable can be 'scoped' using the command 'scope run -- %s'\n", exe_path, exe_path);
+            return EXIT_FAILURE;
+        }
+
+        if (exe_path) free(exe_path);
+        if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
         printf("Attaching to process %d\n", pid);
         int ret = injectScope(pid, scopeLibPath);

@@ -1279,7 +1279,7 @@ initHook(int attachedFlag)
 
     // env vars are not always set as needed, be explicit here
     // this is duplicated if we were started from the scope exec
-    if ((osGetExePath(&full_path) != -1) &&
+    if ((osGetExePath(getpid(), &full_path) != -1) &&
         ((ebuf = getElf(full_path))) &&
         (is_static(ebuf->buf) == FALSE) && (is_go(ebuf->buf) == TRUE)) {
 #ifdef __GO__
@@ -1517,7 +1517,7 @@ init(void)
         if (!g_fn.close) g_fn.close = dlsym(RTLD_DEFAULT, "close");
 
         g_ismusl =
-            ((osGetExePath(&full_path) != -1) &&
+            ((osGetExePath(getpid(), &full_path) != -1) &&
             !strstr(full_path, "ldscope") &&
             ((ebuf = getElf(full_path))) &&
             !is_static(ebuf->buf) &&

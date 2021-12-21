@@ -40,7 +40,7 @@ How the library is loaded depends on the type of executable. A dynamic loader ca
 To see the full set of library environment variables, run the following command:
 
 ```
-/opt/scope/assets/ldscope --help | egrep "^[[:space:]]{2}SCOPE_"
+/opt/scope/assets/ldscope --help | egrep "^[[:space:]]{8}SCOPE_"
 ```
 
 For the default settings in the sample `scope.yml` configuration file, see [Config File](/docs/config-file), or inspect the most-recent file on [GitHub](https://github.com/criblio/appscope/blob/master/conf/scope.yml).

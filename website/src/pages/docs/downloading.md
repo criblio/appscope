@@ -55,7 +55,7 @@ Now you are ready to explore the CLI:
 
 Where AppScope lives on your system is up to you. To decide wisely, first consider which of the [two ways of working](/docs/working-with) with AppScope fit your situation: ad hoc or planned-out.
 
-For ad hoc exploration and investigation, one choice that follows [standard practice](https://en.wikipedia.org/wiki/Filesystem_Hierarchy_Standard) for an "add-on software package" is to locate AppScope in `/opt`. Cribl does not recommend running AppScope from any user's home directory, because if additional users try to run AppScope, file ownership and permissions issues will likely ensue.
+For ad hoc exploration and investigation, one choice that follows [standard practice](https://en.wikipedia.org/wiki/Filesystem_Hierarchy_Standard) for an "add-on software package" is to locate AppScope in `/opt`. Cribl does not recommend running AppScope from any user's home directory, because that leads to file ownership and permissions problems if additional users try to run AppScope.
 
 By default, the AppScope CLI will output data to the local filesystem where it's running. While this can work fine for "ad hoc" investigations, it can cause problems for longer-duration scenarios like application monitoring, where the local filesystem may not have room for the data being written. 
 

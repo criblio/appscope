@@ -8,17 +8,17 @@ To use the library for the first time in a given environment, complete this quic
 
 1. Download AppScope. 
 
-2. Choose an AppScope home directory (`SCOPE_HOME`), i.e., the directory from which AppScope should run in your environment.
+2. Choose a `SCOPE_HOME` directory, i.e., the directory from which AppScope should run in your environment.
 
-3. Extract (`scope extract`) the contents of the AppScope binary into the AppScope home directory.
+3. Extract (`scope extract`) the contents of the AppScope binary into the `SCOPE_HOME` directory.
 
 For example, you could create an AppScope home directory called `assets`:
 
 ```
-user@myhost:~/appscope$ mkdir assets
-user@myhost:~/appscope$ bin/linux/scope extract assets
-Successfully extracted to /home/user/appscope/assets.
-user@myhost:~/appscope$ ll assets
+user@myhost:/opt/scope$ mkdir assets
+user@myhost:/opt/scope$ bin/linux/scope extract assets
+Successfully extracted to /opt/scope/assets.
+user@myhost:/opt/scope$ ll assets
 total 17008
 drwxrwxr-x  2 user user    4096 Oct 26 14:47 .
 drwxrwxr-x 18 user user    4096 Oct 26 14:47 ..
@@ -37,11 +37,11 @@ How the library is loaded depends on the type of executable. A dynamic loader ca
 
 ### Env Vars and the Config File
 
-Use `ldscope` with the `--help` option to obtain the information you need:
+To see the full set of library environment variables, run the following command:
 
-- `ldscope --help` shows basic help.
-- `ldscope --help all` shows the full set of help content. 
-- `ldscope --help configuration` lists the full set of library environment variables.
+```
+/opt/scope/assets/ldscope --help | egrep "^[[:space:]]{2}SCOPE_"
+```
 
 For the default settings in the sample `scope.yml` configuration file, see [Config File](/docs/config-file), or inspect the most-recent file on [GitHub](https://github.com/criblio/appscope/blob/master/conf/scope.yml).
 
@@ -60,7 +60,7 @@ To use the library directly, you rely on the `LD_PRELOAD` environment variable.
 
 The following examples provide an overview of this way of working with the library. All the examples call the system-level `ps` command, just to show how the syntax works.
 
-**LD_PRELOAD with a Single Command**
+#### `LD_PRELOAD` with a Single Command
 
 Start with this basic example:
 
@@ -72,7 +72,7 @@ This executes the command `ps -ef`. But first, the OS's loader loads the AppScop
 
 Details of the `ps` application's execution are emitted to the configured transport, in the configured format. For configuration details, see [Env Vars and the Config File](#env-vars) above.
 
-**LD_PRELOAD with SCOPE_METRIC_VERBOSITY**
+#### `LD_PRELOAD` with Verbosity Specified
 
 ```
 LD_PRELOAD=./libscope.so SCOPE_METRIC_VERBOSITY=5 ps -ef
@@ -80,7 +80,7 @@ LD_PRELOAD=./libscope.so SCOPE_METRIC_VERBOSITY=5 ps -ef
 
 This again executes the `ps` command using the AppScope library. But it also defines the verbosity for metric extraction as level `5`. (This verbosity setting overrides any config-file setting, as well as the default value.)
 
-**LD_PRELOAD with a Config File**
+#### `LD_PRELOAD` with a Config File**
 
 ```
 LD_PRELOAD=./libscope.so SCOPE_HOME=/etc/scope ps -ef
@@ -88,7 +88,7 @@ LD_PRELOAD=./libscope.so SCOPE_HOME=/etc/scope ps -ef
 
 This again executes the `ps` command using the AppScope library. But it also directs the library to use the config file `/etc/scope/scope.yml`.
 
-**LD_PRELOAD with a TCP Connection**
+#### `LD_PRELOAD` with a TCP Connection**
 
 ```
 LD_PRELOAD=./libscope.so SCOPE_EVENT_DEST=tcp://localhost:9999 ps -ef
@@ -164,7 +164,7 @@ SCOPE_EXEC_PATH=/lib/ldscope
 
 You must also tell AppScope where to deliver events. This can be accomplished by setting any one of the following environment variables:
 
-- `SCOPE_CONF_PATH=lib/scope.yml`
+- `SCOPE_CONF_PATH=/opt/scope/assets/scope.yml`
 
 - `SCOPE_EVENT_DEST=tcp://host:port`
 

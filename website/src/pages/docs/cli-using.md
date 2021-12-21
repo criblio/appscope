@@ -21,7 +21,7 @@ scope top
 ```
 
 ```
-scope ps -ef
+scope ls -al
 ```
 
 ```
@@ -155,14 +155,6 @@ fs.duration  	83   	Count	microsecond	525	class: summary,host: 771f60292e26,proc
 fs.error     	7    	Count	operation  	525	class: stat,file: summary,host: 771f60292e26,op: summary,proc: ps
 ```
 
-- Use the `-v` flag to increase verbosity of the metrics displayed. Settomg verbosity to 7 disables aggregation of filesystem stat and network connect metrics:
-
-```
-scope metrics -v 7
-
-```
-
-
 - Plot a chart of last session's `proc.cpu` metric with `scope metrics -m proc.cpu -g`:
 
 ```
@@ -240,7 +232,6 @@ scope metrics -v 7
 Displaying last 20 sessions
 ID	COMMAND	CMDLINE                  	PID	AGE   	DURATION	TOTAL EVENTS
 1 	cribl  	/opt/cribl/bin/cribl sta…	50 	2h11m 	2h11m   	6275
-2 	dahs   	dahs                     	109	2h11m 	0ms     	0
-3 	curl   	curl https://google.com  	509	13m30s	206ms   	16
-4 	ps     	ps -ef                   	518	13m18s	22ms    	120
+2 	curl   	curl https://google.com  	509	13m30s	206ms   	16
+3 	ps     	ps -ef                   	518	13m18s	22ms    	120
 ```

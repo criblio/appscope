@@ -330,6 +330,9 @@ initFn(void)
     g_fn.app_setenv = dlsym(RTLD_DEFAULT, "setenv");
     GETADDR(g_fn.uv__read, "uv__read");
     GETADDR(g_fn.uv_fileno, "uv_fileno");
+    GETADDR(g_fn.opendir, "opendir");
+    GETADDR(g_fn.closedir, "closedir");
+    GETADDR(g_fn.readdir, "readdir");
 #ifdef __STATX__
     GETADDR(g_fn.statx, "statx");
 #endif

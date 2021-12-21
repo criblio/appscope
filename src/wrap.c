@@ -17,6 +17,7 @@
 #include <libgen.h>
 #include <sys/resource.h>
 #include <setjmp.h>
+#include <dirent.h>
 
 #include "atomic.h"
 #include "bashmem.h"
@@ -1652,6 +1653,49 @@ openat(int dirfd, const char *pathname, int flags, ...)
     }
 
     return fd;
+}
+
+EXPORTON DIR *
+opendir(const char *name)
+{
+    DIR *dirp;
+
+    WRAP_CHECK(opendir, NULL);
+    dirp = g_fn.opendir(name);
+    if (dirp != NULL) {
+        doOpen(dirfd(dirp), name, FD, "opendir");
+    } else {
+        doUpdateState(FS_ERR_OPEN_CLOSE, -1, (ssize_t)0, "opendir", name);
+    }
+
+    return dirp;
+}
+
+EXPORTON int
+closedir(DIR *dirp)
+{
+    WRAP_CHECK(closedir, -1);
+    int fd = dirfd(dirp);
+    int rc = g_fn.closedir(dirp);
+
+    if (fd != -1) doCloseAndReportFailures(fd, (rc != -1), "closedir");
+
+    return rc;
+}
+
+EXPORTON struct dirent *
+readdir(DIR *dirp)
+{
+    WRAP_CHECK(readdir, NULL);
+    uint64_t initialTime = getTime();
+    int fd = dirfd(dirp);
+    struct dirent *dep = g_fn.readdir(dirp);
+
+    if (fd != -1) {
+        doRead(fd, initialTime, (dep != NULL), NULL, sizeof(struct dirent), "readdir", BUF, 0);
+    }
+
+    return dep;
 }
 
 // Note: creat64 is defined to be obsolete

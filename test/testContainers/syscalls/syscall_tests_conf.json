@@ -35,6 +35,8 @@
         "readv",
         "readv",
         "recv",
+        "readdir",
+        "chdir",
         "recvfrom",
         "recvmsg",
         "send",
@@ -60,7 +62,8 @@
         "connect02 is kernel specific, works on ubuntu 19 not on 18",
         "sendto03 is a check for vulnerability in thekernel function tpacket_rcv()",
         "writev03: requires a specific file system: Filesystem ntfs is not supported",
-        "fcntl38 tests the kernel feature dnotify and requires access to a kernel config file."],
+        "fcntl38 tests the kernel feature dnotify and requires access to a kernel config file.",
+        "readdir21.c:122: syscall(-1) __NR_readdir not supported on your arch"],
       "exclude_tests": [
         "connect02",
         "sendmsg03",
@@ -124,7 +127,8 @@
         "sendto03",
         "writev03",
         "fcntl38",
-        "fcntl38_64"
+        "fcntl38_64",
+        "readdir21"
       ],
       "exclude_x86_64_tests": [],
       "exclude_aarch64_tests": [],

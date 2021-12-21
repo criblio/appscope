@@ -424,7 +424,7 @@ List all processes into which the libscope library is injected.
 
 Executes a scoped command. By default, calling `scope` with no subcommands will run the executables passed as arguments to 
 `scope`. However, `scope` allows for additional arguments to be passed to `run`, to capture payloads or to increase metrics' 
-verbosity. Must be called with the `--` flag, e.g., `scope watch -- <command>`, to prevent AppScope from attempting to parse flags passed to the executed command.
+verbosity. Must be called with the `--` flag, e.g., `scope run -- <command>`, to prevent AppScope from attempting to parse flags passed to the executed command.
 
 The `--*dest` flags accept file names like `/tmp/scope.log`; URLs like `file:///tmp/scope.log`; or sockets specified with the pattern `tcp://hostname:port`, `udp://hostname:port`, or `tls://hostname:port`.
 

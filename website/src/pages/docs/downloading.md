@@ -49,7 +49,7 @@ Now you are ready to explore the CLI:
 - Try some basic CLI commands in [Using the CLI](/docs/cli-using).
 - See the complete [CLI Reference](/docs/cli-reference).
 
-<span id="where-from"> </span>span>
+<span id="where-from"> </span>
 
 ### What's the Best Location to Run AppScope From?
 

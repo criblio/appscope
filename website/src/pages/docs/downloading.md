@@ -18,9 +18,9 @@ Or, you can use these CLI commands to directly download the binary and make it e
 
 ```
 LATEST=$(curl -Ls https://cdn.cribl.io/dl/scope/latest)
-curl -Lo /opt/scope https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope
+curl -Lo scope https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope
 curl -Ls https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope.md5 | md5sum -c 
-chmod +x /opt/scope
+chmod +x scope
 ```
 
 Congratulations! 

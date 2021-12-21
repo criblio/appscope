@@ -7,15 +7,15 @@ title: CLI Reference
 
 ### Command Syntax
 
-To execute CLI commands, the basic syntax is:
+To execute CLI subcommands, the basic syntax is:
 
 ```
-./scope <command> [flags] [options]
+./scope <subcommand> [flags] [options]
 ```
 
 ### Commands Available
 
-To see a list of available commands, enter `./scope` alone, or `./scope -h`, or `./scope --help`. This displays the basic help listing below.
+To see a list of available subcommands, enter `./scope` alone, or `./scope -h`, or `./scope --help`. This displays the basic help listing below.
 
 ```
 Cribl AppScope Command Line Interface
@@ -25,7 +25,7 @@ AppScope is a general-purpose observable application telemetry system.
 Running `scope` with no subcommands will execute the `scope run` command.
 
 Usage:
-  scope [command]
+  scope [subcommand]
 
 Available Commands:
   attach      Scope an existing PID
@@ -34,7 +34,7 @@ Available Commands:
   events      Outputs events for a session
   extract     Output instrumentary library files to <dir>
   flows       Observed flows from the session, potentially including payloads
-  help        Help about any command
+  help        Help about any subcommand
   history     List scope session history
   k8s         Install scope in kubernetes
   logs        Display scope logs
@@ -49,14 +49,14 @@ Available Commands:
 Flags:
   -h, --help   Help for scope
 
-Use "scope [command] --help" for more information about a command.
+Use "scope [subcommand] --help" for more information about a subcommand.
 ```
 
-As noted just above, to see a specific command's help or its required parameters, enter: 
-`./scope <command> -h` 
+As noted just above, to see a specific subcommand's help or its required parameters, enter: 
+`./scope <subcommand> -h` 
 
 …or: 
-`./scope help <command> [flags]`.
+`./scope help <subcommand> [flags]`.
 
 ---
 
@@ -246,11 +246,11 @@ scope flows --out 124x3c   # Displays the outbound payload of that flow
 ### help
 ---
 
-Displays help content for any AppScope command. Just type `scope help [path to command]` for full details.
+Displays help content for any AppScope subcommand. Just type `scope help [subcommand]` for full details.
 
 #### Usage
 
-`scope help [command]
+`scope help [subcommand]
 
 #### Examples
 

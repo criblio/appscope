@@ -250,7 +250,7 @@ Displays help content for any AppScope subcommand. Just type `scope help [subcom
 
 #### Usage
 
-`scope help [subcommand]
+`scope help [subcommand]`
 
 #### Examples
 

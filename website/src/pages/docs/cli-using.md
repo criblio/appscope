@@ -133,7 +133,7 @@ AppScope will not report any **new** activity on those file or socket descriptor
 
 ### Exploring Captured Data
 
-To see the monitoring and visualization features AppScope offers, exercise some of its subcommands and options. E.g.:
+To see the monitoring and visualization features AppScope offers, exercise some of its sub-commands and options. E.g.:
 
 - Show last session's captured metrics with `scope metrics`:
 

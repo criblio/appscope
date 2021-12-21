@@ -6,14 +6,14 @@ title: Integrating with LogStream
 
 AppScope can easily connect to Cribl LogStream ([overview](https://cribl.io/product/) | [cloud](https://cribl.cloud/) | [download](https://cribl.io/download/) | [docs](https://docs.cribl.io/docs/welcome)).
 
-To define a TLS-encrypted connection to LogStream Cloud, just set the `SCOPE_CRIBL_CLOUD` environment variable, specifying a transport type, host name or IPv4 address, and a port number. 
+To define a TLS-encrypted connection to LogStream Cloud, just set the `SCOPE_CRIBL_CLOUD` environment variable, specifying a transport type, a host name or IPv4 address, and a port number. 
 
 For example:
 
 ```
 SCOPE_CRIBL_CLOUD=tcp://in.logstream.<cloud_instance>.cribl.cloud:10090
 ```
-By default, LogStream Cloud instances have port `10090` configured to use [TLS](/docs/tls) over TCP, and a built-in [AppScope Source](https://docs.cribl.io/docs/sources-appscope) to receive data from AppScope. You can change the AppScope Source configuration, or create additional AppScope Sources, as needed.
+By default, LogStream Cloud instances have port `10090` configured to use [TLS](/docs/tls) over TCP, and a built-in AppScope Source to receive data from AppScope. You can change the [AppScope Source configuration](https://docs.cribl.io/docs/sources-appscope), or create additional AppScope Sources, as needed.
 
 This is the easiest way to integrate AppScope with LogStream. It is also possible to connect to LogStream Cloud [unencrypted](#cloud-unencrypted); or, to LogStream [on-prem](#on-prem), encrypted or not.
 

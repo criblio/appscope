@@ -25,7 +25,7 @@ chmod +x /opt/scope
 
 ### Download as Container
 
-From [Cribl's download page](https://cribl.io/download/#tab-1) you can also download AppScope's most recently tagged Ubuntu container.
+From [Cribl's download page](https://cribl.io/download/#tab-1), you can also download AppScope's most recently tagged Ubuntu container.
 
 This will link you to the [AppScope repo on Docker Hub](https://hub.docker.com/r/cribl/scope), which provides instructions and access to earlier builds.
 

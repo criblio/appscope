@@ -5,36 +5,42 @@ title: CLI Reference
 ## CLI Reference
 ---
 
-### Command Syntax
+In the AppScope CLI, the `scope` command takes a Linux command as an argument. That's called "scoping" the Linux command. For example, if you run `scope top`, we say you have "scoped" the `top` command.
 
-To execute CLI subcommands, the basic syntax is:
+The AppScope CLI also has sub-commands, which pair with `scope` to do many things. For example, if you run `scope dash`, AppScope displays its dashboard.
+
+This Reference explains how to use `scope` and its arsenal of sub-commands.
+
+### Sub-command Syntax
+
+To execute CLI sub-commands, the basic syntax is:
 
 ```
-./scope <subcommand> [flags] [options]
+./scope <sub-command> [flags] [options]
 ```
 
-### Commands Available
+### Sub-commands Available
 
-To see a list of available subcommands, enter `./scope` alone, or `./scope -h`, or `./scope --help`. This displays the basic help listing below.
+To see a list of available sub-commands, enter `./scope` alone, or `./scope -h`, or `./scope --help`. This displays the basic help listing below.
 
 ```
 Cribl AppScope Command Line Interface
 
 AppScope is a general-purpose observable application telemetry system.
 
-Running `scope` with no subcommands will execute the `scope run` command.
+Running `scope` with no sub-commands will execute the `scope run` command.
 
 Usage:
-  scope [subcommand]
+  scope [sub-command]
 
-Available Commands:
+Available Sub-commands:
   attach      Scope an existing PID
   completion  Generate completion code for specified shell
   dash        Display scope dashboard
   events      Outputs events for a session
   extract     Output instrumentary library files to <dir>
   flows       Observed flows from the session, potentially including payloads
-  help        Help about any subcommand
+  help        Help about any sub-command
   history     List scope session history
   k8s         Install scope in kubernetes
   logs        Display scope logs
@@ -49,14 +55,14 @@ Available Commands:
 Flags:
   -h, --help   Help for scope
 
-Use "scope [subcommand] --help" for more information about a subcommand.
+Use "scope [sub-command] --help" for more information about a sub-command.
 ```
 
-As noted just above, to see a specific subcommand's help or its required parameters, enter: 
-`./scope <subcommand> -h` 
+As noted just above, to see a specific sub-command's help or its required parameters, enter: 
+`./scope <sub-command> -h` 
 
 …or: 
-`./scope help <subcommand> [flags]`.
+`./scope help <sub-command> [flags]`.
 
 ---
 
@@ -246,11 +252,11 @@ scope flows --out 124x3c   # Displays the outbound payload of that flow
 ### help
 ---
 
-Displays help content for any AppScope subcommand. Just type `scope help [subcommand]` for full details.
+Displays help content for any AppScope sub-command. Just type `scope help [sub-command]` for full details.
 
 #### Usage
 
-`scope help [subcommand]`
+`scope help [sub-command]`
 
 #### Examples
 
@@ -259,7 +265,7 @@ Displays help content for any AppScope subcommand. Just type `scope help [subcom
 ### history
 ---
 
-The `history` subcommand lists and prints information about sessions. Every time you scope a command, that is called an AppScope session. Each session has a directory which is referenced by a session ID. By default, the AppScope CLI stores all the information it collects during a given session in that session's directory. When you run `history`, you see a listing of sessions, one session per scoped command, along with information about when the session started, how many events were output during the session, and so on. 
+The `history` sub-command lists and prints information about sessions. Every time you scope a command, that is called an AppScope session. Each session has a directory which is referenced by a session ID. By default, the AppScope CLI stores all the information it collects during a given session in that session's directory. When you run `history`, you see a listing of sessions, one session per scoped command, along with information about when the session started, how many events were output during the session, and so on. 
 
 #### Usage
 
@@ -422,7 +428,7 @@ List all processes into which the libscope library is injected.
 ### run
 ----
 
-Executes a scoped command. By default, calling `scope` with no subcommands will run the executables you pass as arguments to 
+Executes a scoped command. By default, calling `scope` with no sub-commands will run the executables you pass as arguments to 
 `scope`. However, `scope` allows for additional arguments to be passed to `run`, to capture payloads or to increase metrics' 
 verbosity. Must be called with the `--` flag, e.g., `scope run -- <command>`, to prevent AppScope from attempting to parse flags passed to the executed command.
 

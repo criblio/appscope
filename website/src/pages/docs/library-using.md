@@ -8,7 +8,7 @@ To use the library for the first time in a given environment, complete this quic
 
 1. Download AppScope. 
 
-2. Choose a `SCOPE_HOME` directory, i.e., the [directory from which AppScope should run](/docs/downloading.mdx#where-from) in your environment.
+2. Choose a `SCOPE_HOME` directory, i.e., the [directory from which AppScope should run](/docs/downloading#where-from) in your environment.
 
 3. Extract (`scope extract`) the contents of the AppScope binary into the `SCOPE_HOME` directory.
 
@@ -80,7 +80,7 @@ LD_PRELOAD=./libscope.so SCOPE_METRIC_VERBOSITY=5 ps -ef
 
 This again executes the `ps` command using the AppScope library. But it also defines the verbosity for metric extraction as level `5`. (This verbosity setting overrides any config-file setting, as well as the default value.)
 
-#### `LD_PRELOAD` with a Config File**
+#### `LD_PRELOAD` with a Config File
 
 ```
 LD_PRELOAD=./libscope.so SCOPE_HOME=/etc/scope ps -ef
@@ -88,7 +88,7 @@ LD_PRELOAD=./libscope.so SCOPE_HOME=/etc/scope ps -ef
 
 This again executes the `ps` command using the AppScope library. But it also directs the library to use the config file `/etc/scope/scope.yml`.
 
-#### `LD_PRELOAD` with a TCP Connection**
+#### `LD_PRELOAD` with a TCP Connection
 
 ```
 LD_PRELOAD=./libscope.so SCOPE_EVENT_DEST=tcp://localhost:9999 ps -ef

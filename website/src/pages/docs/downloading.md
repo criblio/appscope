@@ -6,7 +6,7 @@ title: Downloading AppScope
 
 From [Cribl's download page](https://cribl.io/download/#tab-1), you can download AppScope and then explore its CLI. Getting started is that easy.
 
-You can download AppScope as a binary to run on your Linux OS, or as a container.
+You can download AppScope as a binary to run from a [suitable location](#where-from) in your Linux OS, or as a container.
 
 ### Download as Binary
 
@@ -62,5 +62,3 @@ By default, the AppScope CLI will output data to the local filesystem where it's
 Also consider what level of logging you want from AppScope, and where those logs should go. In planned-out scenarios, where AppScope runs persistently (including as a service), configuring logging judiciously can prevent AppScope from using up too much disk space. 
 
 To customize AppScope's data-writing and logging, edit the [`scope.yml`](/docs/config-file) config file.
-
-

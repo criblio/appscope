@@ -79,18 +79,18 @@ scope attach --payloads 2000
 #### Flags
 
 ```
-  -a, --authtoken string      Set AuthToken for Cribl
-  -c, --cribldest string      Set Cribl destination for metrics & events (host:port defaults to tls://)
+  -a, --authtoken string      Set AuthToken for Cribl LogStream
+  -c, --cribldest string      Set Cribl LogStream destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
   -h, --help                  Help for attach
   -l, --librarypath string    Set path for dynamic libraries
       --loglevel string       Set ldscope log level (debug, warning, info, error, none)
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
-      --metricformat string   Set format of metrics output (statsd|ndjson) (default "ndjson")
-  -n, --nobreaker             Set Cribl to not break streams into events.
-      --passthrough           Runs ldscope with current environment & no config.
+      --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
+  -n, --nobreaker             Set Cribl LogStream to not break streams into events
+      --passthrough           Runs ldscope with current environment & no config
   -p, --payloads              Capture payloads of network transactions
-  -u, --userconfig string     Run ldscope with a user specified config file. Overrides all other settings.
+  -u, --userconfig string     Run ldscope with a user specified config file; overrides all other settings
   -v, --verbosity int         Set scope metric verbosity (default 4)
 
 ```
@@ -167,7 +167,7 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
   -f, --follow               Follow a file, like tail -f
   -h, --help                 Help for events
   -i, --id int               Display info from specific from session ID (default -1)
-  -j, --json                 Output as newline delimited JSON
+  -j, --json                 Output as newline-delimited JSON
   -n, --last int             Show last <n> events (default 20)
   -m, --match string         Display events containing supplied string
   -s, --source strings       Display events matching supplied sources
@@ -199,13 +199,13 @@ scope extract --metricdest tcp://some.host:8125 --eventdest tcp://other.host:100
 #### Flags:
  
 ```
-  -a, --authtoken string      Set AuthToken for Cribl
-  -c, --cribldest string      Set Cribl destination for metrics & events (host:port defaults to tls://)
+  -a, --authtoken string      Set AuthToken for Cribl LogStream
+  -c, --cribldest string      Set Cribl LogStream destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
   -h, --help                  Help for extract
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
-      --metricformat string   Set format of metrics output (statsd|ndjson) (default "ndjson")
-  -n, --nobreaker             Set Cribl to not break streams into events.
+      --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
+  -n, --nobreaker             Set Cribl LogStream to not break streams into events
 ```
 
 ### flows
@@ -234,7 +234,7 @@ scope flows --out 124x3c   # Displays the outbound payload of that flow
   -h, --help          Help for flows
   -i, --id int        Display flows from specific from session ID (default -1)
       --in            Output contents of the inbound payload. Requires flow ID specified.
-  -j, --json          Output as newline delimited JSON
+  -j, --json          Output as newline-delimited JSON
   -n, --last int      Show last <n> flows (default 20)
       --out           Output contents of the outbound payload. Requires flow ID specified.
   -p, --peer ipNet    Filter to peers in the given network
@@ -246,35 +246,20 @@ scope flows --out 124x3c   # Displays the outbound payload of that flow
 ### help
 ---
 
-Displays help content for any AppScope command. Just type scope help [path to command] for full details.
+Displays help content for any AppScope command. Just type `scope help [path to command]` for full details.
 
 #### Usage
 
-`scope help [command] [flags]`
-
-<!--
+`scope help [command]
 
 #### Examples
 
-`scope foo`
-
--->
-
-#### Flags
-
-```
-  -h, --help   Help for help
-  
-```
+`scope help run`
 
 ### history
 ---
 
-<!-- first sentence is bad, revisit -->
-
-Each scope execution maintains a directory full of information collected by scope. The `history` subcommand lists and 
-prints information about sessions. Session information includes what commands were executed, when they started, how many events they output, and so on.
-
+The `history` subcommand lists and prints information about sessions. Every time you scope a command, that is called an AppScope session. Each session has a directory which is referenced by a session ID. By default, the AppScope CLI stores all the information it collects during a given session in that session's directory. When you run `history`, you see a listing of sessions, one session per scoped command, along with information about when the session started, how many events were output during the session, and so on. 
 
 #### Usage
 
@@ -310,11 +295,7 @@ cat $(scope hist -d)/args.json   # Outputs contents of args.json in the scope hi
 ### k8s
 ---
 
-<!-- verify with John, original is not clear -->
-
-Prints configurations to pass to `kubectl` which then automatically instruments newly-launched containers. This installs
-a mutating admission webhook which adds an `initContainer` to each pod. The webhook also along sets environment variables which install AppScope for all
-processes in that container.
+Prints configurations to pass to `kubectl`, which then automatically instruments newly-launched containers. This installs a mutating admission webhook, which adds an `initContainer` to each pod. The webhook also sets environment variables that install AppScope for all processes in that container.
 
 The `--*dest` flags accept file names like `/tmp/scope.log`; URLs like `file:///tmp/scope.log`; or sockets specified with the pattern `tcp://hostname:port`, `udp://hostname:port`, or `tls://hostname:port`.
 
@@ -333,17 +314,17 @@ kubectl label namespace default scope=enabled
 
 ```
       --app string            Name of the app in Kubernetes (default "scope")
-  -a, --authtoken string      Set AuthToken for Cribl
+  -a, --authtoken string      Set AuthToken for Cribl LogStream
       --certfile string       Certificate file for TLS in the container (mounted secret) (default "/etc/certs/tls.crt")
-  -c, --cribldest string      Set Cribl destination for metrics & events (host:port defaults to tls://)
+  -c, --cribldest string      Set Cribl LogStream destination for metrics & events (host:port defaults to tls://)
       --debug                 Turn on debug logging in the scope webhook container
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
   -h, --help                  Help for k8s
       --keyfile string        Private key file for TLS in the container (mounted secret) (default "/etc/certs/tls.key")
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
-      --metricformat string   Set format of metrics output (statsd|ndjson) (default "ndjson")
-      --namespace string      Name of the namespace to install in (default "default")
-  -n, --nobreaker             Set Cribl to not break streams into events.
+      --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
+      --namespace string      Name of the namespace in which to install; default is "default"
+  -n, --nobreaker             Set Cribl LogStream to not break streams into events
       --port int              Port to listen on (default 4443)
       --server                Run Webhook server
       --version string        Version of scope to deploy
@@ -372,7 +353,7 @@ scope logs
   -i, --id int           Display logs from specific from session ID (default -1)
   -n, --last int         Show last <n> lines (default 20)
   -s, --scope            Show scope.log (from CLI) instead of ldscope.log (from library)
-  -S, --service string   Display logs from a Systemd service instead of a session)
+  -S, --service string   Display logs from a systemd service instead of a session)
  
 ```
 
@@ -436,32 +417,13 @@ List all processes into which the libscope library is injected.
 
 #### Usage
 
-`scope ps [flags]`
-
-<!-- 
-
-No examples, really?
-
-#### Examples
-
-```
-
-```
-
--->
-
-#### Flags
-
-```
-  -h, --help     Help for ps
-  
-```
+`scope ps`
 
 ### run
 ----
 
-Executes a scoped command. By default, calling scope with no subcommands will execute run for the args after 
-scope. However, scope allows for additional arguments to be passed to run to capture payloads or to increase metric 
+Executes a scoped command. By default, calling `scope` with no subcommands will run the executables passed as arguments to 
+`scope`. However, `scope` allows for additional arguments to be passed to `run`, to capture payloads or to increase metrics' 
 verbosity. Must be called with the `--` flag, e.g., `scope watch -- <command>`, to prevent AppScope from attempting to parse flags passed to the executed command.
 
 The `--*dest` flags accept file names like `/tmp/scope.log`; URLs like `file:///tmp/scope.log`; or sockets specified with the pattern `tcp://hostname:port`, `udp://hostname:port`, or `tls://hostname:port`.
@@ -484,18 +446,18 @@ scope run -c tcp://127.0.0.1:10091 -- curl https://wttr.in/94105
 #### Flags
 
 ```
-  -a, --authtoken string      Set AuthToken for Cribl
-  -c, --cribldest string      Set Cribl destination for metrics & events (host:port defaults to tls://)
+  -a, --authtoken string      Set AuthToken for Cribl LogStream
+  -c, --cribldest string      Set Cribl LogStream destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
   -h, --help                  Help for run
   -l, --librarypath string    Set path for dynamic libraries
       --loglevel string       Set ldscope log level (debug, warning, info, error, none)
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
-      --metricformat string   Set format of metrics output (statsd|ndjson) (default "ndjson")
-  -n, --nobreaker             Set Cribl to not break streams into events.
-      --passthrough           Runs ldscope with current environment & no config.
+      --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
+  -n, --nobreaker             Set Cribl LogStream to not break streams into events
+      --passthrough           Run ldscope with current environment & no config
   -p, --payloads              Capture payloads of network transactions
-  -u, --userconfig string     Run ldscope with a user specified config file. Overrides all other settings.
+  -u, --userconfig string     Run ldscope with a user specified config file; overrides all other settings.
   -v, --verbosity int         Set scope metric verbosity (default 4)
 
 ```
@@ -518,14 +480,14 @@ scope service  cribl -c tls://in.my-instance.cribl.cloud:10090
 #### Flags
 
 ```
-  -a, --authtoken string      Set AuthToken for Cribl
-  -c, --cribldest string      Set Cribl destination for metrics & events (host:port defaults to tls://)
+  -a, --authtoken string      Set AuthToken for Cribl LogStream
+  -c, --cribldest string      Set Cribl LogStream destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
       --force                 Bypass confirmation prompt
   -h, --help                  Help for service
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
-      --metricformat string   Set format of metrics output (statsd|ndjson) (default "ndjson")
-  -n, --nobreaker             Set Cribl to not break streams into events.
+      --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
+  -n, --nobreaker             Set Cribl LogStream to not break streams into events
   -u, --user string           Specify owner username
   
 ```
@@ -552,32 +514,12 @@ scope version --tag
 #### Flags
 
 ```
-      --date      output just the date
+      --date      Output just the date
   -h, --help      Help for version
-      --summary   output just the summary
-      --tag       output just the tag
+      --summary   Output just the summary
+      --tag       Output just the tag
 ```
 
-### --verbose
-----
-
-<!-- this is not a subcommand, what's going on? -->
-
-This flag sets the verbosity level. `0` is least verbose, `4` is the default, and `9` is most verbose. For descriptions of individual levels, see [Config File](/docs/config-file).
-
-#### Usage
-
-```
-scope --verbose <level>
-scope -v <level>
-```
-
-#### Examples
-
-```
-scope --verbose <level>
-scope -v <level>
-```
 ### watch
 ---
 
@@ -600,17 +542,17 @@ scope watch --interval=10s -- curl https://wttr.in/94105
 #### Flags
 
 ```
-  -a, --authtoken string      Set AuthToken for Cribl
-  -c, --cribldest string      Set Cribl destination for metrics & events (host:port defaults to tls://)
+  -a, --authtoken string      Set AuthToken for Cribl LogStream
+  -c, --cribldest string      Set Cribl LogStream destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
   -h, --help                  Help for watch
   -i, --interval string       Run every <x>(s|m|h)
   -l, --librarypath string    Set path for dynamic libraries
       --loglevel string       Set ldscope log level (debug, warning, info, error, none)
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
-      --metricformat string   Set format of metrics output (statsd|ndjson) (default "ndjson")
-  -n, --nobreaker             Set Cribl to not break streams into events.
-      --passthrough           Runs ldscope with current environment & no config.
+      --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
+  -n, --nobreaker             Set Cribl LogStream to not break streams into events
+      --passthrough           Run ldscope with current environment & no config
   -p, --payloads              Capture payloads of network transactions
   -u, --userconfig string     Run ldscope with a user specified config file. Overrides all other settings.
   -v, --verbosity int         Set scope metric verbosity (default 4)

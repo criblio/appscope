@@ -422,7 +422,7 @@ List all processes into which the libscope library is injected.
 ### run
 ----
 
-Executes a scoped command. By default, calling `scope` with no subcommands will run the executables passed as arguments to 
+Executes a scoped command. By default, calling `scope` with no subcommands will run the executables you pass as arguments to 
 `scope`. However, `scope` allows for additional arguments to be passed to `run`, to capture payloads or to increase metrics' 
 verbosity. Must be called with the `--` flag, e.g., `scope run -- <command>`, to prevent AppScope from attempting to parse flags passed to the executed command.
 
@@ -457,7 +457,7 @@ scope run -c tcp://127.0.0.1:10091 -- curl https://wttr.in/94105
   -n, --nobreaker             Set Cribl LogStream to not break streams into events
       --passthrough           Run ldscope with current environment & no config
   -p, --payloads              Capture payloads of network transactions
-  -u, --userconfig string     Run ldscope with a user specified config file; overrides all other settings.
+  -u, --userconfig string     Run ldscope with a user specified config file; overrides all other settings
   -v, --verbosity int         Set scope metric verbosity (default 4)
 
 ```

@@ -6,7 +6,7 @@ title: Downloading AppScope
 
 Download AppScope, then explore its CLI. Getting started is that easy.
 
-You can download AppScope as a binary to run from a [suitable location](#where-from) in your Linux OS, or as a container.
+You can download AppScope as a binary in your Linux OS, or as a container.
 
 ### Download as Binary
 
@@ -18,10 +18,16 @@ Or, you can use these CLI commands to directly download the binary and make it e
 
 ```
 LATEST=$(curl -Ls https://cdn.cribl.io/dl/scope/latest)
-curl -Lo /opt/scope https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope
+curl -Lo scope https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope
 curl -Ls https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope.md5 | md5sum -c 
-chmod +x /opt/scope
+chmod +x scope
 ```
+
+Congratulations! 
+
+You're ready to start working with AppScope.
+
+Before you start, though, you may want to consider [where](#where-from) to run AppScope from.
 
 ### Download as Container
 

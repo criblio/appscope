@@ -251,9 +251,6 @@ event:
   #
   enable: true
 
-  # Tags can be applied to events as with metrics. Settings are in
-  # the `metric > tags` section. See the notes there for details.
-
   # Settings for the format of event data
   format:
 

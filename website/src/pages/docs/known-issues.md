@@ -4,6 +4,14 @@ title: Known Issues
 
 # Known Issues
 
+## AppScope 0.8.1
+
+2021-12-21 - Maintenance Pre-Release
+
+As of this AppScope pre-release, known issues include:
+
+- [#677](https://github.com/criblio/appscope/issues/677) HTTP/1.1 events are parsed incorrectly, populating the `http_method` and `http_target` fields with junk.
+
 ## AppScope 0.7
 
 2021-07-02 - Maintenance Pre-Release

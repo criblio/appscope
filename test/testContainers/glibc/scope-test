@@ -6,6 +6,7 @@ FAILED_TEST_LIST=""
 FAILED_TEST_COUNT=0
 
 EVT_FILE="/opt/test-runner/logs/events.log"
+SCOPE_LOG_FILE="/opt/test-runner/logs/scope.log"
 
 starttest(){
     CURRENT_TEST=$1
@@ -39,6 +40,7 @@ endtest(){
     fi
 
     rm -f $EVT_FILE
+    rm -f $SCOPE_LOG_FILE
 }
 
 #
@@ -99,6 +101,22 @@ starttest patch_on_glibc_dummy_file
 echo "Lorem ipsum" >> /opt/patch_libscope/dummy_file
 /opt/patch_libscope/ldscope --patch /opt/patch_libscope/dummy_file
 if [ $? -eq 0 ]; then
+    ERR+=1
+fi
+
+endtest
+
+#
+# verify timestamp
+#
+starttest timestamp_verify
+
+SCOPE_LOG_LEVEL=debug ldscope ls >/dev/null
+
+timestamp=$(grep 'Constructor' $SCOPE_LOG_FILE | grep -Po "(?<=\[).*?(?=\])")
+if [[ $timestamp =~ [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{3}(Z|\+[0-9]{4})$ ]]; then
+    echo "Timeststamp $timestamp is in expect format"
+else
     ERR+=1
 fi
 

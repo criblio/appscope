@@ -4,17 +4,15 @@ title: Downloading AppScope
 
 ## Downloading AppScope
 
-Download AppScope, then explore its CLI. Getting started is that easy.
+From [Cribl's download page](https://cribl.io/download/#tab-1), you can download AppScope and then explore its CLI. Getting started is that easy.
 
 You can download AppScope as a binary to run on your Linux OS, or as a container.
 
 ### Download as Binary
 
-First, see [Requirements](/docs/requirements) to ensure that you’re on a supported system. 
+Review the AppScope [Requirements](/docs/requirements) to ensure that you’re completing these steps on a supported system. 
 
-Next, decide on the [best location](#where-from) to run AppScope from (the example commands below download to `/opt/scope`).
-
-Then you can download the most-recent binary from [Cribl's download page](https://cribl.io/download/#tab-1) and follow the instructions there.
+Then, from [Cribl's download page](https://cribl.io/download/#tab-1), download the binary and follow the instructions there.
 
 Or, you can use these CLI commands to directly download the binary and make it executable:
 
@@ -27,7 +25,11 @@ chmod +x /opt/scope
 
 ### Download as Container
 
-Visit the [AppScope repo on Docker Hub](https://hub.docker.com/r/cribl/scope) to download and run the most recently tagged container. The container provides the AppScope binary on Ubuntu 20.04.
+From [Cribl's download page](https://cribl.io/download/#tab-1) you can also download AppScope's most recently tagged Ubuntu container.
+
+This will link you to the [AppScope repo on Docker Hub](https://hub.docker.com/r/cribl/scope), which provides instructions and access to earlier builds.
+
+Each container provides the AppScope binary on Ubuntu 20.04.
 
 ### Verify AppScope
 

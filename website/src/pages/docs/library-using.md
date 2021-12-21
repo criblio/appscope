@@ -8,7 +8,7 @@ To use the library for the first time in a given environment, complete this quic
 
 1. Download AppScope. 
 
-2. Choose a `SCOPE_HOME` directory, i.e., the directory from which AppScope should run in your environment.
+2. Choose a `SCOPE_HOME` directory, i.e., the [directory from which AppScope should run](/docs/downloading.mdx#where-from) in your environment.
 
 3. Extract (`scope extract`) the contents of the AppScope binary into the `SCOPE_HOME` directory.
 

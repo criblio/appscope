@@ -4,7 +4,7 @@ title: Downloading AppScope
 
 ## Downloading AppScope
 
-From [Cribl's download page](https://cribl.io/download/#tab-1), you can download AppScope and then explore its CLI. Getting started is that easy.
+From Cribl's download page, you can download AppScope and then explore its CLI. Getting started is that easy.
 
 You can download AppScope as a binary to run from a [suitable location](#where-from) in your Linux OS, or as a container.
 

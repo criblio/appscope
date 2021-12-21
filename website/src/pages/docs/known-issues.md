@@ -28,7 +28,7 @@ As of this AppScope pre-release, known issues include:
 
 As of this AppScope pre-release, known issues include:
 
-- Java JRE 6 or earlier is not supported. AppScope supports all [currently supported releases](https://dev.java/download/releases/) of Java: 7, 8, 11, and 17.
+- AppScope supports all Java [currently supported runtimes](https://dev.java/download/releases/): versions 7, 8, 11, and 17. It does not support JRE 6 or earlier.
 
 - [#640](https://github.com/criblio/appscope/issues/640) On Alpine and other distributions based on musl libc, running `appscope attach` against a Go application fails with the error: `failed to find libc in target process`.
 

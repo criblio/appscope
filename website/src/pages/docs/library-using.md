@@ -60,7 +60,7 @@ To use the library directly, you rely on the `LD_PRELOAD` environment variable.
 
 The following examples provide an overview of this way of working with the library. All the examples call the system-level `ps` command, just to show how the syntax works.
 
-**LD_PRELOAD with a Single Command**
+#### `LD_PRELOAD` with a Single Command
 
 Start with this basic example:
 
@@ -72,7 +72,7 @@ This executes the command `ps -ef`. But first, the OS's loader loads the AppScop
 
 Details of the `ps` application's execution are emitted to the configured transport, in the configured format. For configuration details, see [Env Vars and the Config File](#env-vars) above.
 
-**LD_PRELOAD with Verbosity Specified**
+#### `LD_PRELOAD` with Verbosity Specified
 
 ```
 LD_PRELOAD=./libscope.so SCOPE_METRIC_VERBOSITY=5 ps -ef
@@ -80,7 +80,7 @@ LD_PRELOAD=./libscope.so SCOPE_METRIC_VERBOSITY=5 ps -ef
 
 This again executes the `ps` command using the AppScope library. But it also defines the verbosity for metric extraction as level `5`. (This verbosity setting overrides any config-file setting, as well as the default value.)
 
-**LD_PRELOAD with a Config File**
+#### `LD_PRELOAD` with a Config File**
 
 ```
 LD_PRELOAD=./libscope.so SCOPE_HOME=/etc/scope ps -ef
@@ -88,7 +88,7 @@ LD_PRELOAD=./libscope.so SCOPE_HOME=/etc/scope ps -ef
 
 This again executes the `ps` command using the AppScope library. But it also directs the library to use the config file `/etc/scope/scope.yml`.
 
-**LD_PRELOAD with a TCP Connection**
+#### `LD_PRELOAD` with a TCP Connection**
 
 ```
 LD_PRELOAD=./libscope.so SCOPE_EVENT_DEST=tcp://localhost:9999 ps -ef

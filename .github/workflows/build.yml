@@ -120,6 +120,14 @@ jobs:
         on: [[ubuntu-latest],[self-hosted,ARM64]]
     steps:
 
+      # Attempt to prune any orphaned docker resources on the EC2 ARM runners
+      - name: Prune Docker Resources
+        if: ${{ matrix.on == 'ARM64' }}
+        run: |
+            docker rm --force $(docker ps -a -q) || exit 0
+            docker network prune --force || exit 0
+            docker volume prune --force || exit 0
+
       # Some diagnostic info on the build environment. This also outputs `arch`
       # which we use elsewhere for architecture-specific things.
       - name: Dump Environment

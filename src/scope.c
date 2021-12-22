@@ -203,17 +203,20 @@ main(int argc, char **argv, char **env)
         }
 
         if ((ebuf = getElf(exe_path)) == NULL) {
+            free(exe_path);
             fprintf(stderr, "error: can't read the executable %s\n", exe_path);
             return EXIT_FAILURE;
         }
 
         if (is_static(ebuf->buf) == TRUE) {
             fprintf(stderr, "error: can't attach to the static executable: %s\nNote that the executable can be 'scoped' using the command 'scope run -- %s'\n", exe_path, exe_path);
+            free(exe_path);
+            freeElf(ebuf->buf, ebuf->len);
             return EXIT_FAILURE;
         }
 
-        if (exe_path) free(exe_path);
-        if (ebuf) freeElf(ebuf->buf, ebuf->len);
+        free(exe_path);
+        freeElf(ebuf->buf, ebuf->len);
 
         printf("Attaching to process %d\n", pid);
         int ret = injectScope(pid, scopeLibPath);

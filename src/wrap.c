@@ -1107,7 +1107,8 @@ load_func(const char *module, const char *func)
     
     void *handle = g_fn.dlopen(module, RTLD_LAZY | RTLD_NOLOAD);
     if (handle == NULL) {
-        scopeLogError("ERROR: Could not open file %s.\n", module ? module : "(null)");
+        scopeLog(CFG_LOG_DEBUG,"%s: Could not open file %s.\n",
+                               __FUNCTION__, module ? module : "(null)");
         return NULL;
     }
 
@@ -1115,11 +1116,11 @@ load_func(const char *module, const char *func)
     dlclose(handle);
 
     if (addr == NULL) {
-        scopeLogError("ERROR: Could not get function address of %s.\n", func);
+        scopeLog(CFG_LOG_DEBUG,"%s: Could not get function address of %s.\n", __FUNCTION__, func);
         return NULL;
     }
 
-    scopeLogError("%s:%d %s found at %p\n", __FUNCTION__, __LINE__, func, addr);
+    scopeLog(CFG_LOG_DEBUG,"%s: %s found at %p\n", __FUNCTION__, func, addr);
     return addr;
 }
 
@@ -4202,6 +4203,14 @@ EXPORTON int
 dup2(int oldfd, int newfd)
 {
     WRAP_CHECK(dup2, -1);
+
+    if (isAnAppScopeConnection(newfd)) {
+        if (newfd == ctlConnection(g_ctl, CFG_CTL)) ctlDisconnect(g_ctl, CFG_CTL);
+        if (newfd == ctlConnection(g_ctl, CFG_LS)) ctlDisconnect(g_ctl, CFG_LS);
+        if (newfd == mtcConnection(g_mtc)) mtcDisconnect(g_mtc);
+        if (newfd == logConnection(g_log)) logDisconnect(g_log);
+    }
+
     int rc = g_fn.dup2(oldfd, newfd);
 
     doDup2(oldfd, newfd, rc, "dup2");
@@ -4213,6 +4222,14 @@ EXPORTON int
 dup3(int oldfd, int newfd, int flags)
 {
     WRAP_CHECK(dup3, -1);
+
+    if (isAnAppScopeConnection(newfd)) {
+        if (newfd == ctlConnection(g_ctl, CFG_CTL)) ctlDisconnect(g_ctl, CFG_CTL);
+        if (newfd == ctlConnection(g_ctl, CFG_LS)) ctlDisconnect(g_ctl, CFG_LS);
+        if (newfd == mtcConnection(g_mtc)) mtcDisconnect(g_mtc);
+        if (newfd == logConnection(g_log)) logDisconnect(g_log);
+    }
+
     int rc = g_fn.dup3(oldfd, newfd, flags);
     doDup2(oldfd, newfd, rc, "dup3");
 
@@ -4844,6 +4861,7 @@ getentropy(void *buffer, size_t length)
 
 #define LOG_BUF_SIZE 4096
 #define LOG_TIME_SIZE 23
+#define LOG_TZ_BUF_SIZE 7
 
 // This overrides a weak definition in src/dbg.c
 void
@@ -4853,6 +4871,7 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
     const char overflow_msg[] = "WARN: scopeLog msg truncated.\n";
     char *local_buf;
     char time_buf[LOG_TIME_SIZE];
+    char tz_buf[LOG_TZ_BUF_SIZE];
     int msec;
     struct tm tm_info;
     struct timeval tv;
@@ -4902,9 +4921,10 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
         msec = 0;
     }
     localtime_r(&tv.tv_sec, &tm_info);
-    strftime(time_buf, LOG_TIME_SIZE, "%Y-%m-%d %H:%M:%S", &tm_info);
+    strftime(time_buf, LOG_TIME_SIZE, "%Y-%m-%dT%H:%M:%S", &tm_info); 
+    strftime(tz_buf, LOG_TZ_BUF_SIZE, "%z", &tm_info); 
 
-    local_buf = scope_log_var_buf + snprintf(scope_log_var_buf, LOG_BUF_SIZE, "Scope: %s(pid:%d): [%s.%03d] ", g_proc.procname, g_proc.pid, time_buf, msec);
+    local_buf = scope_log_var_buf + snprintf(scope_log_var_buf, LOG_BUF_SIZE, "Scope: %s(pid:%d): [%s.%03d%s] ", g_proc.procname, g_proc.pid, time_buf, msec, tz_buf);
     size_t local_buf_len = sizeof(scope_log_var_buf) + (scope_log_var_buf - local_buf) - 1;
 
     va_list args;

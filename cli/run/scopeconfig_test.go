@@ -172,6 +172,12 @@ func TestConfigFromRunOpts(t *testing.T) {
 	assert.Equal(t, "unix", c.sc.Metric.Transport.TransportType)
 	assert.Equal(t, "@abstract_socket", c.sc.Metric.Transport.Path)
 
+	// edge
+	c.MetricsDest = "edge"
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.Equal(t, "edge", c.sc.Metric.Transport.TransportType)
+
 	// tcp
 	c.MetricsDest = "tcp://foo:1234"
 	err = c.configFromRunOpts()

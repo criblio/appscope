@@ -5,4 +5,6 @@ ERR=0
 ERR+=$?
 /opt/test/bin/test_cli_dest.sh
 ERR+=$?
+/opt/test/bin/test_edge.sh
+ERR+=$?
 exit ${ERR}

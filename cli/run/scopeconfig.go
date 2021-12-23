@@ -233,6 +233,7 @@ func (c *Config) configFromRunOpts() error {
 		// ignored for files and UNIX domain sockets but required for network sockets.
 		//
 		//     "relative/path"
+		//     "edge"
 		//     "file://another/relative/path"
 		//     "/absolute/path"
 		//     "file:///another/absolute/path"
@@ -304,6 +305,8 @@ func (c *Config) configFromRunOpts() error {
 			t.Path = ""
 			t.Tls.Enable = true
 			t.Tls.ValidateServer = true
+		} else if m[0][0] == "edge" {
+			t.TransportType = m[0][0]
 		} else {
 			// got "something", assume file://
 			t.TransportType = "file"

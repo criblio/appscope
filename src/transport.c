@@ -182,6 +182,7 @@ transportConnection(transport_t *trans)
             }
             return trans->net.pending_connect;
         case CFG_UNIX:
+        case CFG_EDGE:
             return trans->local.sock;
         case CFG_FILE:
             if (trans->file.stream) {
@@ -230,6 +231,7 @@ transportNeedsConnection(transport_t *trans)
             }
             return (trans->file.stream == NULL);
         case CFG_UNIX:
+        case CFG_EDGE:
             if (trans->local.sock == -1) return TRUE;
             if (osNeedsConnect(trans->local.sock)) {
                 DBG("fd:%d %s", trans->local.sock, trans->local.path);
@@ -437,6 +439,7 @@ transportDisconnect(transport_t *trans)
             trans->file.stream = NULL;
             break;
         case CFG_UNIX:
+        case CFG_EDGE:
             if (trans->local.sock != -1) {
                 g_fn.close(trans->local.sock);
                 trans->local.sock = -1;
@@ -572,6 +575,7 @@ transportReconnect(transport_t *trans)
         case CFG_FILE:
         case CFG_SYSLOG:
         case CFG_SHM:
+        case CFG_EDGE:
             // Everything else is a no-op.  These can all share
             // the parent's transport.
             break;
@@ -913,6 +917,7 @@ transportConnect(transport_t *trans)
         case CFG_FILE:
             return transportConnectFile(trans);
         case CFG_UNIX:
+        case CFG_EDGE:
             if ((trans->local.sock = g_fn.socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
                 DBG("%d %s", trans->local.sock, trans->local.path);
                 return 0;
@@ -1070,6 +1075,38 @@ err:
 }
 
 transport_t*
+transportCreateEdge(const char *path)
+{
+    transport_t *trans = NULL;
+
+    if (!path) goto err;
+
+    int pathlen = strlen(path);
+    if (pathlen >= sizeof(trans->local.addr.sun_path)) goto err;
+
+    if (!(trans = newTransport())) goto err;
+
+    trans->type = CFG_EDGE;
+    trans->local.sock = -1;
+    if (!(trans->local.path = strdup(path))) goto err;
+
+    memset(&trans->local.addr, 0, sizeof(trans->local.addr));
+    trans->local.addr.sun_family = AF_UNIX;
+    strncpy(trans->local.addr.sun_path, path, pathlen);
+    trans->local.addr_len = pathlen + sizeof(sa_family_t) + 1;
+
+    transportConnect(trans);
+
+    return trans;
+
+err:
+    DBG("%s %p", path, trans);
+    transportDestroy(&trans);
+    return trans;
+
+}
+
+transport_t*
 transportCreateSyslog(void)
 {
     transport_t* t = calloc(1, sizeof(transport_t));
@@ -1113,6 +1150,7 @@ transportDestroy(transport_t **transport)
             freeAddressList(trans);
             break;
         case CFG_UNIX:
+        case CFG_EDGE:
             if (trans->local.path) free(trans->local.path);
             transportDisconnect(trans);
             break;
@@ -1262,6 +1300,7 @@ transportSend(transport_t *trans, const char *msg, size_t len)
             }
             break;
         case CFG_UNIX:
+        case CFG_EDGE:
             if (trans->local.sock != -1) {
                 int flags = 0;
 #ifdef __linux__
@@ -1311,6 +1350,7 @@ transportFlush(transport_t* t)
             }
             break;
         case CFG_UNIX:
+        case CFG_EDGE:
         case CFG_SYSLOG:
         case CFG_SHM:
             return -1;

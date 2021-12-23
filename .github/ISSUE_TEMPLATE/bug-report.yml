@@ -1,0 +1,67 @@
+name: Bug Report
+description: File a bug/issue report
+title: "[Bug]: <title>"
+labels: ["bug"]
+body:
+- type: markdown
+  attributes:
+    value: |
+      Thanks for taking the time to fill out this bug report!
+- type: textarea
+  attributes:
+    label: Steps To Reproduce
+    description: Steps to reproduce the behavior.
+    placeholder: |
+      1. In this environment...
+      2. With this config...
+      3. Run '...'
+      4. See error...
+  validations:
+    required: false
+- type: textarea
+  attributes:
+    label: Environment
+    description: |
+      Examples:
+        - **AppScope**: v0.8.0
+          To retrieve information about AppScope version:
+          ```
+          scope version
+          ```
+        - **OS**: Ubuntu 18.04/Alpine3.15
+          To retrieve information about Operating System:
+          ```
+          cat /etc/os-release
+          ```
+        - **Architecture**: x86_64/ARM
+          To retrieve information about architecture:
+          ```
+          uname -m
+          ```
+        - **Kernel**: 5.10.0
+          To retrieve information about kernel version:
+          ```
+          uname -r
+          ```
+    value: |
+        - AppScope:
+        - OS:
+        - Architecture:
+        - Kernel:
+    render: markdown
+  validations:
+    required: false
+- type: dropdown
+  id: Priority
+  attributes:
+    label: Requested priority
+    options:
+      - Low
+      - Medium
+      - High
+- type: textarea
+  id: logs
+  attributes:
+    label: Relevant log output
+    description: Please copy and paste any relevant log output. This will be automatically formatted into code, so no need for backticks.
+    render: shell

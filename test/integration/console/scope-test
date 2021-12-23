@@ -45,6 +45,22 @@ export SCOPE_PAYLOAD_ENABLE=true
 export SCOPE_PAYLOAD_HEADER=true
 
 #
+# test firefox
+#
+starttest firefox
+
+scope run -- firefox --headless &
+scope_pid=$!
+sleep 1
+
+kill -s 0 $scope_pid
+if [ $? -ne 0 ]; then
+    ERR+=1
+fi
+
+endtest
+
+#
 # cat html (negative test)
 #
 
@@ -74,7 +90,6 @@ ERR+=$?
 
 endtest
 
-
 #
 # curl png
 #
@@ -85,6 +100,96 @@ ldscope curl https://upload.wikimedia.org/wikipedia/commons/e/e9/Felis_silvestri
 evaltest
 
 grep "$BINARY_MSG" $EVT_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+#
+# trace log level
+#
+
+starttest trace_level_test
+
+SCOPE_LOG_LEVEL=trace ldscope ps -ef
+if [ $? -ne 0 ]; then
+    ERR+=1
+fi
+
+evaltest
+
+endtest
+
+#
+# ls with color - including ASCII ESC character (negative test)
+#
+
+starttest ls_with_color
+
+ldscope ls --color=always > /dev/null
+evaltest
+grep "$BINARY_MSG" $EVT_FILE > /dev/null
+if [ $? -eq 0 ]; then
+    ERR+=1
+fi
+
+endtest
+
+#
+# hexdump (negative test)
+#
+
+starttest hexdump
+
+ldscope hexdump /usr/local/scope/lib/libscope.so > /dev/null
+evaltest
+grep "$BINARY_MSG" $EVT_FILE > /dev/null
+if [ $? -eq 0 ]; then
+    ERR+=1
+fi
+
+endtest
+
+#
+# xxd (negative test)
+#
+
+starttest xxd
+
+ldscope xxd /usr/local/scope/lib/libscope.so > /dev/null
+evaltest
+grep "$BINARY_MSG" $EVT_FILE > /dev/null
+if [ $? -eq 0 ]; then
+    ERR+=1
+fi
+
+endtest
+
+#
+# tar
+#
+
+starttest tar_to_stdout
+
+cd /opt/tar_test
+tar -Pczvf test.tar.gz /usr/bin > /dev/null
+
+ldscope tar -PxOzf test.tar.gz > /dev/null
+evaltest
+
+grep "$BINARY_MSG" $EVT_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+#
+# change user and test group and user name
+#
+
+starttest group_user_name
+
+su --command="/usr/local/scope/bin/ldscope ls" test_user > /dev/null
+
+grep '"gid":1234,"groupname":"test_group","uid":3333,"username":"test_user"' $EVT_FILE > /dev/null
 ERR+=$?
 
 endtest

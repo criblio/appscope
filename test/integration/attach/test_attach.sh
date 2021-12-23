@@ -6,6 +6,7 @@ FAILED_TEST_LIST=""
 FAILED_TEST_COUNT=0
 
 EVT_FILE="/opt/test-runner/logs/events.log"
+touch $EVT_FILE
 
 starttest(){
     CURRENT_TEST=$1
@@ -44,9 +45,6 @@ endtest(){
 #
 # Top
 #
-# TODO: Ref: https://github.com/criblio/appscope/issues/586
-# After fixing issue above remove the if condition below
-if [[ $(grep Ubuntu /etc/os-release) ]]; then 
 starttest Top
 
 top -b -d 1 > /dev/null &
@@ -55,16 +53,15 @@ ldscope --attach `pidof top`
 sleep 1
 evaltest
 
-grep -q '"proc":"top"' $EVT_FILE || grep -q fs.close
+grep '"proc":"top"' $EVT_FILE | grep fs.open > /dev/null
 ERR+=$?
 
-grep -q '"proc":"top"' $EVT_FILE || grep -q fs.close
+grep '"proc":"top"' $EVT_FILE | grep fs.close > /dev/null
 ERR+=$?
 
 kill -9 `pidof top`
 
 endtest
-fi
 
 #
 # Python3 Web Server
@@ -86,16 +83,13 @@ ERR+=$?
 grep -q http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q http-metric $EVT_FILE > /dev/null
-ERR+=$?
-
 kill -9 `pidof python3` > /dev/null
 endtest
 
 #
 # Java HTTP Server
 #
-starttest java
+starttest java_http
 cd /opt/java_http
 java SimpleHttpServer 2> /dev/null &
 sleep 1
@@ -110,17 +104,8 @@ ERR+=$?
 grep -q http-req $EVT_FILE > /dev/null
 ERR+=$?
 
-# TODO check why these events are missed in musl
-# https://github.com/criblio/appscope/issues/575
-# After fixing issue above remove the if condition below
-if [[ $(grep Ubuntu /etc/os-release) ]]; then 
-
 grep -q http-resp $EVT_FILE > /dev/null
 ERR+=$?
-
-grep -q http-metric $EVT_FILE > /dev/null
-ERR+=$?
-fi
 
 grep -q fs.open $EVT_FILE > /dev/null
 ERR+=$?

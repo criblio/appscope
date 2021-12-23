@@ -1,0 +1,17 @@
+#
+# ~/.gdbinit for root in the containers
+#
+
+# The build environment's top level bin/linux/ folder is mounted at
+# /usr/local/scope/bin and lib/linux is at /usr/local/scope/lib. We are
+# preloading the library automatically here.
+set environment LD_PRELOAD=/usr/local/scope/lib/libscope.so
+
+handle SIGUSR2 pass nostop
+set print elements 0
+set follow-fork-mode child
+set detach-on-fork on
+set breakpoint pending on
+
+# The top-level directory if the build environment are mounted here.
+set directories /opt/appscope

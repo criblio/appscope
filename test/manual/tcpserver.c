@@ -4,8 +4,11 @@
  * usage: tcpserver [OPTIONS] PORT
  * options: -t, --tls       use TLSv1.3
  *
- * requires: libssl-dev
- * build: gcc -g test/manual/tcpserver.c -Icontrib/build/openssl/include -Icontrib/openssl/include -L contrib/build/openssl -Wl,-R$PWD/contrib/build/openssl -lpthread -lssl -lcrypto -o tcpserver
+ * Build Dynamically: (requires: libssl-dev)
+ * gcc -g test/manual/tcpserver.c -Icontrib/build/openssl/include -Icontrib/openssl/include -L contrib/build/openssl -Wl,-R$PWD/contrib/build/openssl -lpthread -lssl -lcrypto -o tcpserver
+ *
+ * Build Statically:
+ * gcc -g -DSSL_read=SCOPE_SSL_read test/manual/tcpserver.c -Icontrib/openssl/include -Icontrib/build/openssl/include contrib/build/openssl/libssl.a contrib/build/openssl/libcrypto.a -lpthread -ldl -o tcpserver
  *
  * generate unencrypted TLS key and certificate:
  * openssl req -nodes -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem

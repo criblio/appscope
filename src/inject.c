@@ -19,6 +19,9 @@
 
 #define __RTLD_DLOPEN	0x80000000
 
+// Size of injected code segment
+#define INJECTED_CODE_SIZE_LEN (512)
+
 /*
  * It turns out that PTRACE_GETREGS & PTRACE_SETREGS are arch specific.
  * From the man page: PTRACE_GETREGS and PTRACE_GETFPREGS are not present on all architectures.
@@ -79,7 +82,10 @@ freeSpaceAddr(pid_t pid)
 
     while(fgets(line, 850, fd) != NULL) {
         sscanf(line, "%lx-%*x %s %*s %s %*d", &addr, perms, str);
-        if (strstr(perms, "x") != NULL) break;
+        if ((strstr(perms, "x") != NULL) &&
+            (strstr(perms, "w") == NULL)) {
+            break;
+        }
     }
 
     fclose(fd);
@@ -163,7 +169,6 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     int status;
     uint64_t freeAddr, codeAddr;
     int libpathLen;
-    ptrdiff_t oldcodeSize;
 
     if (ptraceAttach(pid)) {
         return EXIT_FAILURE;
@@ -173,7 +178,7 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     ptrace(PTRACE_GETREGS, pid, NULL, &oldregs);
     memcpy(&regs, &oldregs, sizeof(struct user_regs_struct));
 
-    // find free space
+    // find free space in text section
     freeAddr = freeSpaceAddr(pid);
     if (!freeAddr) {
         return EXIT_FAILURE;
@@ -181,9 +186,8 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     
     // back up the code
     libpathLen = strlen(path) + 1;
-    oldcodeSize = (call_dlopen_end - call_dlopen) + libpathLen;
-    oldcode = (unsigned char *)malloc(oldcodeSize);
-    if (ptraceRead(pid, freeAddr, oldcode, oldcodeSize)) {
+    oldcode = (unsigned char *)malloc(INJECTED_CODE_SIZE_LEN);
+    if (ptraceRead(pid, freeAddr, oldcode, INJECTED_CODE_SIZE_LEN)) {
         return EXIT_FAILURE;
     }
 
@@ -235,7 +239,7 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
         }
 #endif
         //restore the app's state
-        ptraceWrite(pid, freeAddr, oldcode, oldcodeSize);
+        ptraceWrite(pid, freeAddr, oldcode, INJECTED_CODE_SIZE_LEN);
         ptrace(PTRACE_SETREGS, pid, NULL, &oldregs);
         ptrace(PTRACE_DETACH, pid, NULL, NULL);
 

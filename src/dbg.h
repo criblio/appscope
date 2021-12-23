@@ -1,6 +1,7 @@
 #ifndef __DBG_H__
 #define __DBG_H__
 
+#include <stdint.h>
 #include <stdio.h>
 #include "log.h"
 #include "scopetypes.h"
@@ -20,6 +21,9 @@ void                 dbgDumpAll(FILE*);
 
 // Setters
 void                 dbgAddLine(const char* key, const char* fmt, ...);
+
+// Variables
+extern uint64_t g_cbuf_drop_count;
 
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
@@ -66,5 +70,28 @@ extern proc_id_t g_proc;
 extern bool g_constructor_debug_enabled;
 
 void scopeLog(cfg_log_level_t, const char *, ...) PRINTF_FORMAT(2,3);
+void scopeLogHex(cfg_log_level_t, const void *, size_t, const char *, ...) PRINTF_FORMAT(4,5);
+
+#define scopeLogError(...) scopeLog(CFG_LOG_ERROR, __VA_ARGS__)
+#define scopeLogWarn(...)  scopeLog(CFG_LOG_WARN,  __VA_ARGS__)
+#define scopeLogInfo(...)  scopeLog(CFG_LOG_INFO,  __VA_ARGS__)
+#ifdef DEBUG
+#define scopeLogDebug(...) scopeLog(CFG_LOG_DEBUG, __VA_ARGS__)
+#define scopeLogTrace(...) scopeLog(CFG_LOG_TRACE, __VA_ARGS__)
+#else
+#define scopeLogDebug(...)
+#define scopeLogTrace(...)
+#endif
+
+#define scopeLogHexError(...) scopeLogHex(CFG_LOG_ERROR, __VA_ARGS__)
+#define scopeLogHexWarn(...)  scopeLogHex(CFG_LOG_WARN,  __VA_ARGS__)
+#define scopeLogHexInfo(...)  scopeLogHex(CFG_LOG_INFO,  __VA_ARGS__)
+#ifdef DEBUG
+#define scopeLogHexDebug(...) scopeLogHex(CFG_LOG_DEBUG, __VA_ARGS__)
+#define scopeLogHexTrace(...) scopeLogHex(CFG_LOG_TRACE, __VA_ARGS__)
+#else
+#define scopeLogHexDebug(...)
+#define scopeLogHexTrace(...)
+#endif
 
 #endif // __DBG_H__

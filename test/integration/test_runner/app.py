@@ -11,7 +11,7 @@ import splunk
 import syscalls
 from reporting import print_summary, store_results_to_file
 from runner import Runner
-from scope import ScopeDataCollector, ScopeUDPDataListener, get_scope_version
+from scope import ScopeDataCollector, get_scope_version, create_listener
 from validation import default_test_set_validators
 from watcher import TestWatcher
 
@@ -26,6 +26,9 @@ def main():
     parser.add_argument("-l", "--logs_path", help="path to store the execution results and logs", default="/tmp/")
     parser.add_argument("-s", "--scope_path", help="path to scope application executable",
                         default="/usr/lib/libscope.so")
+    parser.add_argument("-m", "--metric_type", help="metric destination type",
+                        choices=["udp", "tcp"],
+                        default="udp")
 
     parser.add_argument("--syscalls_tests_config", help="path to syscalls tests config")
 
@@ -39,16 +42,19 @@ def main():
     format = "%(asctime)s %(levelname)s %(name)s - %(message)s"
     logging.basicConfig(level=log_level, format=format)
 
-    logging.info("Execution ID: " + execution_id)
-    logging.info("Logs path: " + logs_path)
+    logging.info(f"Execution ID: {execution_id}")
+    logging.info(f"Scope path: {args.scope_path}")
+    logging.info(f"Logs path: {logs_path}")
+    logging.info(f"Metrics destination type: {args.metric_type}")
 
     scope_version = get_scope_version(args.scope_path)
     logging.info(f"Scope Version: {scope_version}")
-    test_watcher = TestWatcher(execution_id, scope_version)
+    test_watcher = TestWatcher(execution_id)
     test_watcher.start()
-    scope_data_collector = ScopeDataCollector()
+    scope_data_collector = ScopeDataCollector(args.metric_type)
+    data_listener = create_listener(args.metric_type, scope_data_collector)
 
-    with ScopeUDPDataListener(scope_data_collector, "localhost", 8125):
+    with data_listener:
         try:
             runner = Runner(test_watcher, scope_data_collector)
             runner.add_test_set_validators(default_test_set_validators)

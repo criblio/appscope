@@ -6,6 +6,36 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 0.8.1
+
+2021-12-21 - Maintenance Pre-Release
+
+- **Improvement**: [#533](https://github.com/criblio/appscope/issues/533) AppScope logs now include dropped message and connection failure indicators, which make it easier to diagnose TCP/TLS connection issues, or to see when no data is flowing from a scoped process.
+
+- **Improvement**: [#534](https://github.com/criblio/appscope/issues/534) AppScope log entries now include timestamps, e.g., `[2021-10-20 17:48:36.974]`. This timestamp format is ambiguous, and a fix is planned for AppScope 1.0.0. See [#678](https://github.com/criblio/appscope/issues/678). 
+
+- **Improvement**: [#229](https://github.com/criblio/appscope/issues/229) When a process starts, the User Identifier (UID) and Group Identifier (GID) now appear in AppScope's `proc.start` metric and process start event (also known as TCP JSON connection header).
+
+- **Fix**: [#650](https://github.com/criblio/appscope/issues/650) When scoping a process with TLS, and that process does not last long enough for AppScope to complete the TLS connection, AppScope no longer causes the scoped process to crash.
+
+## AppScope 0.8.0
+
+2021-10-26 - Maintenance Pre-Release
+
+- **Improvement**: [#543](https://github.com/criblio/appscope/issues/543) HTTP events are now all processed by the `libscope.so` library, not LogStream as was the case [previously](https://github.com/criblio/appscope/issues/311).
+
+- **Improvement**: [#572](https://github.com/criblio/appscope/issues/572) The CLI now supports invoking a configuration file, using the syntax `scope run -u scope.yml -- foo` where `scope.yml` is the configuration file and `foo` is the command being scoped.
+
+- **Improvement**: [#241](https://github.com/criblio/appscope/issues/241),[#271](https://github.com/criblio/appscope/issues/271),[#379](https://github.com/criblio/appscope/issues/379) The ARM64 limitations described in [#241](https://github.com/criblio/appscope/issues/241) are resolved and no longer apply, except that Go executables remain unsupported on ARM64.
+
+
+- **Fix**: [#598](https://github.com/criblio/appscope/issues/598) Attempting to scope an executable that is Go version 1.17 or newer no longer causes AppScope to crash. AppScope does not support Go 1.17 yet, but now recognizes these executables and displays an informative message. 
+
+- **Fix**: [#481](https://github.com/criblio/appscope/issues/481),[#575](https://github.com/criblio/appscope/issues/575) With musl libc-based distros, previous limitations on file system write events are now resolved, and no longer apply.
+
+- **Fix**: [#397](https://github.com/criblio/appscope/issues/397),[#403](https://github.com/criblio/appscope/issues/403),[#567](https://github.com/criblio/appscope/issues/567),[#586](https://github.com/criblio/appscope/issues/586) With musl libc-based distros and Java, previous limitations on `scope attach` are now resolved and no longer apply.
+
+
 ## AppScope 0.7.5
 
 2021-10-05 - Maintenance Pre-Release
@@ -16,7 +46,7 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 
 - **Improvement**: [#489](https://github.com/criblio/appscope/issues/489) Streamline configuration file structure by eliminating `scope_protocol.yml` and merging its content into `scope.yml`.
 
-- **Improvement**: [#503](https://github.com/criblio/appscope/issues/503) Promote the `tags` section of `config.yml` to top level, removing it from the `metric` > `format` section.  
+- **Improvement**: [#503](https://github.com/criblio/appscope/issues/503) Promote the `tags` section of `scope.yml` to top level, removing it from the `metric` > `format` section. This change is **not** backwards-compatible. 
 
 ## AppScope 0.7.4
 

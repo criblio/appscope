@@ -9,12 +9,14 @@
 #include <sys/stat.h>
 #include <dlfcn.h>
 #include <fcntl.h>
+#include <pthread.h>
 
 #include "atomic.h"
 #include "com.h"
 #include "dbg.h"
 #include "dns.h"
 #include "httpstate.h"
+#include "metriccapture.h"
 #include "mtcformat.h"
 #include "plattime.h"
 #include "search.h"
@@ -46,9 +48,13 @@ fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
 int g_mtc_addr_output = TRUE;
 static search_t* g_http_redirect = NULL;
-
 static protocol_def_t *g_tls_protocol_def = NULL;
 static protocol_def_t *g_http_protocol_def = NULL;
+static protocol_def_t *g_statsd_protocol_def = NULL;
+
+// Linked list, indexed by channel ID, of net_info pointers used in
+// doProtocol() when it's not provided with a valid file descriptor.
+static list_t *g_extra_net_info_list = NULL;
 
 #define REDIRECTURL "fluentd"
 #define OVERURL "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n<meta http-equiv=\"refresh\" content=\"3; URL='http://cribl.io'\" />\r\n</head>\r\n<body>\r\n<h1>Welcome to Cribl!</h1>\r\n</body>\r\n</html>\r\n\r\n"
@@ -74,6 +80,19 @@ static protocol_def_t *g_http_protocol_def = NULL;
 #define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
+
+static void
+destroyNetInfo(void *data)
+{
+    if (!data) return;
+    net_info *net = (net_info *)data;
+
+    free(net->http.hdr);
+    free(net->http.http2Buf[0].buf);
+    free(net->http.http2Buf[1].buf);
+
+    free(net);
+}
 
 int
 get_port(int fd, int type, control_type_t which) {
@@ -188,7 +207,7 @@ initPayloadDetect()
     // Setup the TLS protocol-detect regex
     errornumber = 0;
     erroroffset = 0;
-    if ((g_tls_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) return;
+    if ((g_tls_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) goto error;
     g_tls_protocol_def->protname = "TLS";
     g_tls_protocol_def->binary = TRUE;
     g_tls_protocol_def->len = PAYLOAD_BYTESRC;
@@ -207,11 +226,10 @@ initPayloadDetect()
     // Setup the HTTP protocol-detect regex
     errornumber = 0;
     erroroffset = 0;
-    if ((g_http_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) return;
+    if ((g_http_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) goto error;
     g_http_protocol_def->protname = "HTTP";
     g_http_protocol_def->regex = "(?: HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n)";
     g_http_protocol_def->detect = TRUE;
-    g_http_protocol_def->payload = TRUE;
     g_http_protocol_def->re = pcre2_compile((PCRE2_SPTR)g_http_protocol_def->regex,
                                             PCRE2_ZERO_TERMINATED, 0,
                                             &errornumber, &erroroffset, NULL);
@@ -223,13 +241,35 @@ initPayloadDetect()
         goto error;
     }
 
+    // Setup the StatsD protocol-detect regex
+    errornumber = 0;
+    erroroffset = 0;
+    if ((g_statsd_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) goto error;
+    g_statsd_protocol_def->protname = "STATSD";
+    g_statsd_protocol_def->regex = "^([^:]+):([\\d.]+)\\|(c|g|ms|s|h)";
+    g_statsd_protocol_def->detect = TRUE;
+    g_statsd_protocol_def->re = pcre2_compile((PCRE2_SPTR)g_statsd_protocol_def->regex,
+                                            PCRE2_ZERO_TERMINATED, 0,
+                                            &errornumber, &erroroffset, NULL);
+    if (g_statsd_protocol_def->re == NULL) {
+        goto error;
+    }
+    g_statsd_protocol_def->match_data = pcre2_match_data_create_from_pattern(g_statsd_protocol_def->re, NULL);
+    if (g_statsd_protocol_def->match_data == NULL) {
+        goto error;
+    }
+
     return;
 
 error:
+    DBG("g_tls_protocol_def = %p, g_http_protocol_def = %p, g_statsd_protocol_def = %p",
+         g_tls_protocol_def, g_http_protocol_def, g_statsd_protocol_def);
     destroyProtEntry(g_tls_protocol_def);
     g_tls_protocol_def = NULL;
     destroyProtEntry(g_http_protocol_def);
     g_http_protocol_def = NULL;
+    destroyProtEntry(g_statsd_protocol_def);
+    g_statsd_protocol_def = NULL;
 }
 
 void
@@ -237,15 +277,17 @@ initState()
 {
     // Per a Read Update & Change (RUC) model; now that the object is ready assign the global
     if ((g_netinfo = (net_info *)calloc(1, sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: Constructor:Calloc");
+        scopeLogError("ERROR: Constructor:Calloc");
     }
 
     // Per RUC...
     if ((g_fsinfo = (fs_info *)calloc(1, sizeof(struct fs_info_t) * FS_ENTRIES)) == NULL) {
-        scopeLog(CFG_LOG_ERROR, "ERROR: Constructor:Calloc");
+        scopeLogError("ERROR: Constructor:Calloc");
     }
 
     initHttpState();
+    initMetricCapture();
+
     // the http guard array is static while the net fs array is dynamically allocated
     // will need to change if we want to re-size at runtime
     memset(g_http_guard, 0, sizeof(g_http_guard));
@@ -260,6 +302,8 @@ initState()
 
     g_protlist = lstCreate(destroyProtEntry);
     initPayloadDetect();
+
+    g_extra_net_info_list = lstCreate(destroyNetInfo);
 
     initReporting();
 }
@@ -485,8 +529,13 @@ postNetState(int fd, metric_t type, net_info *net)
     // Bail if we don't need to post
     int mtc_needs_reporting = summarize && !*summarize;
     int need_to_post =
+        // if raw metrics are enabled
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) ||
+        // if NET events are enabled
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) ||
+        // if it's a closed HTTP channel (so we can cleanup)
+        (type==CONNECTION_DURATION && net && (net->http.version[0] || net->http.version[1])) ||
+        // if metrics are enabled and it's one we report
         (mtcEnabled(g_mtc) && mtc_needs_reporting);
     if (!need_to_post) return FALSE;
 
@@ -880,7 +929,7 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
     match_data = pcre2_match_data_create_from_pattern(protoDef->re, NULL);
     if (pcre2_match_wrapper(protoDef->re, (PCRE2_SPTR)data, (PCRE2_SIZE)cvlen, 0, 0,
                             match_data, NULL) > 0) {
-        scopeLog(CFG_LOG_DEBUG, "fd:%d protocol detected", sockfd);
+        scopeLog(CFG_LOG_DEBUG, "fd:%d detected %s", sockfd, protoDef->protname);
 
         if (net) {
             net->protoDetect = DETECT_TRUE;
@@ -925,7 +974,7 @@ setProtocolByType(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf
 
     if (dtype == BUF) {
         // simple buffer, pass it through
-        ret = ret || setProtocol(sockfd, protoDef, net, buf, len);
+        ret = setProtocol(sockfd, protoDef, net, buf, len);
     } else if (dtype == MSG) {
         // buffer is a msghdr for sendmsg/recvmsg
         int i;
@@ -1032,7 +1081,13 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     pinfo->sockfd = sockfd;
     pinfo->len = len;
 
-    scopeLog(CFG_LOG_DEBUG, "fd:%d posting payload", sockfd);
+    if (net && net->tlsDetect) {
+        scopeLog(CFG_LOG_DEBUG, "fd:%d posting TLS payload", sockfd);
+    } else if (net && net->protoProtoDef) {
+        scopeLog(CFG_LOG_DEBUG, "fd:%d posting %s payload", sockfd, net->protoProtoDef->protname);
+    } else {
+        scopeLog(CFG_LOG_DEBUG, "fd:%d posting payload", sockfd);
+    }
 
     if (cmdPostPayload(g_ctl, (char *)pinfo) == -1) {
         if (pinfo->data) free(pinfo->data);
@@ -1099,7 +1154,7 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
         if (rc != PCRE2_ERROR_NOMATCH)
         {
             DBG(NULL);
-            scopeLog(CFG_LOG_DEBUG, "fd:%d doProtocol: TLS regex failed", sockfd);
+            scopeLog(CFG_LOG_DEBUG, "%s: fd:%d TLS regex failed", __FUNCTION__, sockfd);
         }
     }
     pcre2_match_data_free(match_data);
@@ -1111,6 +1166,7 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     unsigned int ptype;
     protocol_def_t *protoDef;
     bool sawHTTP = FALSE;
+    bool sawSTATSD = FALSE;
 
     // No need to try protocol detection in raw TLS data
     if (net && net->tlsDetect == DETECT_TRUE     // TLS detected already
@@ -1121,10 +1177,9 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     // Check first against the protocol entries in the configs.
     for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
         if ((protoDef = lstFind(g_protlist, ptype)) != NULL) {
-            if (strcmp(protoDef->protname, "HTTP") == 0) {
-                // Remember we saw an HTTP entry in the configs.
-                sawHTTP = TRUE;
-            }
+            // Remember if we see a protocol definition we have a default for.
+            sawHTTP   |= !strcasecmp(protoDef->protname, "HTTP");
+            sawSTATSD |= !strcasecmp(protoDef->protname, "STATSD");
             if (setProtocolByType(sockfd, protoDef, net, buf, len, dtype)) {
                 // We're done since it matched.
                 return;
@@ -1132,57 +1187,109 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
         }
     }
 
-    // Try our HTTP detection if we've not seen one and LogStream is enabled
-    if (!sawHTTP && cfgLogStream(g_cfg.staticfg)) {
-        setProtocolByType(sockfd, g_http_protocol_def, net, buf, len, dtype);
+    // Try default protocol definitions if they haven't been overridden.
+    if (!sawHTTP && setProtocolByType(sockfd, g_http_protocol_def, net, buf, len, dtype)) {
+            return;
     }
+    if (!sawSTATSD && setProtocolByType(sockfd, g_statsd_protocol_def, net, buf, len, dtype)) {
+            return;
+    }
+}
+
+// Alternative to getNetEntry() that returns a net_info for the given channel
+// ID instead of for a socket descriptor. We fallback to using this when we
+// can't get the descriptor in TLS/SSL read/write operations.
+static net_info *
+getChannelNetEntry(uint64_t id)
+{
+    net_info *net = lstFind(g_extra_net_info_list, id);
+    if (!net) {
+        net = calloc(1, sizeof(net_info));
+        if (!net) {
+            scopeLogError("ERROR: failed to allocate channel's net_info");
+            DBG(NULL);
+        } else {
+            if (lstInsert(g_extra_net_info_list, id, net) != TRUE) {
+                free(net);
+                net = NULL;
+                scopeLogError("ERROR: failed to save channel's net_info");
+                DBG(NULL);
+            } else {
+                // populate the new net_info
+                net->active = TRUE;
+                net->type = SOCK_STREAM; // assumption needed for doHttp()
+                //net->localConn.ss_family = ???;
+                net->uid = id;
+            }
+        }
+    }
+    return net;
 }
 
 int
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
-    net_info *net = getNetEntry(sockfd);
+    // Find the net_info for the channel
+    net_info *net = getNetEntry(sockfd);    // first try by descriptor
+    if (!net) net = getChannelNetEntry(id); // fallback to using channel ID
+
+    scopeLogHexDebug(buf, len > 64 ? 64 : len, // limit hexdump to 64
+            "DEBUG: doProtocol(id=%ld, fd=%d, len=%ld, src=%s, dtyp=%s) TLS=%s PROTO=%s",
+            id, sockfd, len,
+            src == NETRX ? "NETRX" :
+            src == NETTX ? "NETTX" :
+            src == TLSRX ? "TLSRX" :
+            src == TLSTX ? "TLSTX" : "?",
+            dtype == BUF  ? "BUF" :
+            dtype == MSG  ? "MSG" :
+            dtype == IOV  ? "IOV" :
+            dtype == NONE ? "NONE" : "?",
+            net == NULL ? "NULL" :
+            net->tlsDetect == DETECT_PENDING ? "PENDING" :
+            net->tlsDetect == DETECT_TRUE    ? "TRUE" :
+            net->tlsDetect == DETECT_FALSE   ? "FALSE" : "INVALID",
+            net == NULL ? "NULL" :
+            net->protoDetect == DETECT_PENDING ? "PENDING" :
+            net->protoDetect == DETECT_TRUE    ? "TRUE" :
+            net->protoDetect == DETECT_FALSE   ? "FALSE" : "INVALID"
+            );
+
+    // Ignore empty payloads that should have been blocked by our interpositions
+    if (!len) {
+        scopeLogDebug("DEBUG: fd:%d ignoring empty payload", sockfd);
+        return 0;
+    }
 
     // Do TLS detection if not already done
     if (net && net->tlsDetect == DETECT_PENDING) {
         detectTLS(sockfd, net, buf, len, src, dtype);
     }
 
-    // Do protocol-detection if not already done on the channel
-    if (net && net->protoDetect == DETECT_PENDING) {
-        detectProtocol(sockfd, net, buf, len, src, dtype);
-    }
+    // Only process unencrypted payloads
+    if ((net && net->tlsDetect == DETECT_FALSE) || (src == TLSTX || src == TLSRX)) {
 
-    // Payload handling depends first on whether it's encrypted or not.
-    if (net && net->tlsDetect == DETECT_TRUE && (src == NETTX || src == NETRX)) {
-        // It's an encrypted TLS payload so we only want to process it if 
-        // LogStream is enabled and TLS negotiation is still in progress.
-        // 
-        // This addresses a couple requirements. First, never send encrypted
-        // payloads to disk. Second, only send encrypted payloads to LogStream
-        // during the TLS negotiation.
-        if (cfgLogStream(g_cfg.staticfg) && net->protoDetect == DETECT_PENDING) {
-            extractPayload(sockfd, net, buf, len, src, dtype);
+        // Do protocol-detection if not already done
+        if (net && net->protoDetect == DETECT_PENDING) {
+            detectProtocol(sockfd, net, buf, len, src, dtype);
         }
-    } else {
-        // This is NOT an encrypted TLS payload so we only process it if
-        // payloads are enabled globally, or for the detected protocol.
-        //
-        // We have a requirement that HTTP payloads be sent when LogStream is
-        // enabled but we don't need to explicitly check for that here. If this
-        // has been detected as HTTP then net->protoProtoDef will point either
-        // to our g_http_protocol_def (which has payload set) or to another one
-        // that came from the config file and the user will have set it as they
-        // wanted. Either way, we can just use that flag here.
+
+        // Send payloads if enabled globally or by the detected protocol
         if (cfgPayEnable(g_cfg.staticfg)
             || (net && net->protoProtoDef && net->protoProtoDef->payload)) {
             extractPayload(sockfd, net, buf, len, src, dtype);
         }
-    }
 
-    // Crack HTTP/1.x into events if HTTP source/watch is enabled
-    if (cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) {
-        doHttp(id, sockfd, net, buf, len, src, dtype);
+        if (net && net->protoProtoDef) {
+            // Process HTTP if detected and events are enabled
+            if (!strcasecmp(net->protoProtoDef->protname, "HTTP") &&
+                cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) {
+                doHttp(id, sockfd, net, buf, len, src, dtype);
+            }
+
+            if (!strcasecmp(net->protoProtoDef->protname, "STATSD")) {
+                doMetricCapture(id, sockfd, net, buf, len, src, dtype);
+            }
+        }
     }
 
     return 0;
@@ -1333,7 +1440,7 @@ addSock(int fd, int type, int family)
 
             // Need to realloc
             if ((temp = realloc(g_netinfo, sizeof(struct net_info_t) * increase)) == NULL) {
-                scopeLog(CFG_LOG_ERROR, "fd:%d ERROR: addSock:realloc", fd);
+                scopeLogError("fd:%d ERROR: addSock:realloc", fd);
                 DBG("re-alloc on Net table failed");
             } else {
                 memset(&temp[g_numNinfo], 0, sizeof(struct net_info_t) * (increase - g_numNinfo));
@@ -1342,6 +1449,7 @@ addSock(int fd, int type, int family)
             }
         }
 */
+
         memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
         g_netinfo[fd].active = TRUE;
         g_netinfo[fd].type = type;
@@ -1384,7 +1492,7 @@ doBlockConnection(int fd, const struct sockaddr *addr_arg)
     }
 
     if (g_cfg.blockconn == htons(port)) {
-        scopeLog(CFG_LOG_INFO, "fd:%d doBlockConnection: blocked connection", fd);
+        scopeLogInfo("fd:%d doBlockConnection: blocked connection", fd);
         return 1;
     }
 
@@ -1488,7 +1596,7 @@ doAddNewSock(int sockfd)
                 addSock(sockfd, type, addr.ss_family);
             } else {
                 // Really can't add the socket at this point
-                scopeLog(CFG_LOG_ERROR, "fd:%d ERROR: doAddNewSock:getsockopt", sockfd);
+                scopeLogError("fd:%d ERROR: doAddNewSock:getsockopt", sockfd);
             }
         } else {
             // is RAW a viable default?
@@ -1672,8 +1780,8 @@ getNSFuncs(void)
 
     void *handle = g_fn.dlopen("libresolv.so", RTLD_LAZY | RTLD_NODELETE);
     if (handle == NULL) {
-        scopeLog(CFG_LOG_WARN,
-                    "WARNING: could not locate libresolv, DNS events will be affected");
+        scopeLog(CFG_LOG_DEBUG,
+                    "Could not locate libresolv, DNS events will be affected");
         return FALSE;
     }
 
@@ -1682,8 +1790,8 @@ getNSFuncs(void)
     dlclose(handle);
 
     if (!g_fn.ns_initparse || !g_fn.ns_parserr) {
-        scopeLog(CFG_LOG_WARN,
-                    "WARNING: could not locate name server functions, DNS events will be affected");
+        scopeLog(CFG_LOG_DEBUG,
+                    "Could not locate name server functions, DNS events will be affected");
         return FALSE;
     }
 
@@ -1705,7 +1813,7 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
 
     // init ns lib
     if (g_fn.ns_initparse((const unsigned char *)buf, len, &handle) == -1) {
-        scopeLog(CFG_LOG_ERROR, "ERROR:init parse");
+        scopeLogError("ERROR:init parse");
         return FALSE;
     }
 
@@ -1717,7 +1825,7 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
             //char dispbuf[4096];
 
             if (g_fn.ns_parserr(&handle, ns_s_an, i, &rr) == -1) {
-                scopeLog(CFG_LOG_ERROR, "ERROR:parse rr");
+                scopeLogError("ERROR:parse rr");
                 return FALSE;
             }
 
@@ -2046,7 +2154,6 @@ doWrite(int fd, uint64_t initialTime, int success, const void *buf, ssize_t byte
     struct net_info_t *net = getNetEntry(fd);
 
     if (success) {
-        scopeLog(CFG_LOG_TRACE, "fd:%d %s", fd, func);
         if (net) {
             // This is a network descriptor
             doSetAddrs(fd);
@@ -2160,6 +2267,10 @@ doDupSock(int oldfd, int newfd)
     g_netinfo[newfd].startTime = 0ULL;
     g_netinfo[newfd].totalDuration = (counters_element_t){.mtc=0, .evt=0};
     g_netinfo[newfd].numDuration = (counters_element_t){.mtc=0, .evt=0};
+
+    // don't dup the HTTP/2 frame stashes
+    memset(&g_netinfo[newfd].http.http2Buf[0], 0, sizeof(http_buf_t));
+    memset(&g_netinfo[newfd].http.http2Buf[1], 0, sizeof(http_buf_t));
 
     doUpdateState(CONNECTION_OPEN, newfd, 1, "dup", NULL);
     return 0;
@@ -2280,7 +2391,7 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
 
             // Need to realloc
             if ((temp = realloc(g_fsinfo, sizeof(struct fs_info_t) * increase)) == NULL) {
-                scopeLog(CFG_LOG_ERROR, "fd:%d ERROR: doOpen:realloc", fd);
+                scopeLogError("fd:%d ERROR: doOpen:realloc", fd);
                 DBG("re-alloc on FS table failed");
             } else {
                 memset(&temp[g_numFSinfo], 0, sizeof(struct fs_info_t) * (increase - g_numFSinfo));

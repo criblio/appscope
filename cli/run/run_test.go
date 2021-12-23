@@ -26,7 +26,7 @@ func TestMain(m *testing.M) {
 	case "createWorkDir":
 		internal.InitConfig()
 		rc := Config{}
-		rc.createWorkDir("foo", false)
+		rc.createWorkDir([]string{"foo"}, false)
 	case "run":
 		internal.InitConfig()
 		rc := Config{}
@@ -53,6 +53,10 @@ func TestRunPassthrough(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "true\n", outb.String())
 	assert.Contains(t, errb.String(), "proc.start")
+	assert.Contains(t, errb.String(), "gid:")
+	assert.Contains(t, errb.String(), "groupname:")
+	assert.Contains(t, errb.String(), "uid:")
+	assert.Contains(t, errb.String(), "username:")
 }
 
 func TestRun(t *testing.T) {

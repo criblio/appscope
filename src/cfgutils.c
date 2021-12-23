@@ -1566,7 +1566,7 @@ processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     // protocol entries must be key/value maps
     if (node->type != YAML_MAPPING_NODE) {
-        scopeLog(CFG_LOG_WARN, "WARN: ignoring non-map protocol entry\n");
+        scopeLogWarn("WARN: ignoring non-map protocol entry\n");
         return;
     }
 
@@ -1603,7 +1603,7 @@ processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (!protocol_context->protname || !protocol_context->regex) {
         destroyProtEntry(protocol_context);
         protocol_context = NULL;
-        scopeLog(CFG_LOG_WARN, "WARN: ignoring protocol entry missing name or regex\n");
+        scopeLogWarn("WARN: ignoring protocol entry missing name or regex\n");
         return;
     }
 
@@ -1615,7 +1615,7 @@ processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
             PCRE2_ZERO_TERMINATED, 0,
             &errornumber, &erroroffset, NULL);
     if (!protocol_context->re) {
-        scopeLog(CFG_LOG_WARN, "WARN: invalid regex for \"%s\" protocol entry; %s\n",
+        scopeLogWarn("WARN: invalid regex for \"%s\" protocol entry; %s\n",
                  protocol_context->protname, protocol_context->regex);
         destroyProtEntry(protocol_context);
         protocol_context = NULL;
@@ -1667,7 +1667,7 @@ static void
 processCustomFilterProcname(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) {
-        scopeLog(CFG_LOG_WARN, "WARN: non-scalar procname value\n");
+        scopeLogWarn("WARN: non-scalar procname value\n");
         custom_matched = FALSE;
         return;
     }
@@ -1688,7 +1688,7 @@ static void
 processCustomFilterArg(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) {
-        scopeLog(CFG_LOG_WARN, "WARN: non-scalar arg value\n");
+        scopeLogWarn("WARN: non-scalar arg value\n");
         custom_matched = FALSE;
         return;
     }
@@ -1708,7 +1708,7 @@ static void
 processCustomFilterHostname(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) {
-        scopeLog(CFG_LOG_WARN, "WARN: non-scalar hostname value\n");
+        scopeLogWarn("WARN: non-scalar hostname value\n");
         custom_matched = FALSE;
         return;
     }
@@ -1730,7 +1730,7 @@ static void
 processCustomFilterUsername(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) {
-        scopeLog(CFG_LOG_WARN, "WARN: non-scalar username value\n");
+        scopeLogWarn("WARN: non-scalar username value\n");
         custom_matched = FALSE;
         return;
     }
@@ -1751,7 +1751,7 @@ static void
 processCustomFilterEnv(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) {
-        scopeLog(CFG_LOG_WARN, "WARN: non-scalar env value\n");
+        scopeLogWarn("WARN: non-scalar env value\n");
         custom_matched = FALSE;
         return;
     }
@@ -1786,7 +1786,7 @@ static void
 processCustomFilterAncestor(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) {
-        scopeLog(CFG_LOG_WARN, "WARN: non-scalar ancestor value\n");
+        scopeLogWarn("WARN: non-scalar ancestor value\n");
         custom_matched = FALSE;
         return;
     }
@@ -1877,7 +1877,7 @@ processCustomConfig(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     // All filters have to match and there must be more than one filter
     if (!custom_matched || !custom_match_count) {
-        scopeLog(CFG_LOG_INFO, "INFO: skipping custom config\n");
+        scopeLogInfo("INFO: skipping custom config\n");
         return;
     }
 
@@ -1891,7 +1891,7 @@ processCustomEntry(config_t* config, yaml_document_t* doc, yaml_node_pair_t* pai
     yaml_node_t* node = yaml_document_get_node(doc, pair->value);
 
     if (node->type != YAML_MAPPING_NODE) {
-        scopeLog(CFG_LOG_WARN, "WARN: ignoring non-map custom entry\n");
+        scopeLogWarn("WARN: ignoring non-map custom entry\n");
         return;
     }
 
@@ -2595,9 +2595,9 @@ initCtl(config_t *cfg)
  * internal configuration, overriding default config, env vars 
  * and the config file to:
  *
- * - use a single IP:port for events, metrics & remote commands
+ * - use a single IP:port/UNIX socket for events, metrics & remote commands
  * - set metrics to use ndjson
- * - use a separate connection over the single IP:port for payloads
+ * - use a separate connection over the single IP:port/UNIX socket for payloads
  * - include the abbreviated json header for payloads
  * - watch types enabled for files, console, net, fs, http, dns
  * - log level warning
@@ -2610,23 +2610,22 @@ cfgLogStreamDefault(config_t *cfg)
 
     snprintf(g_logmsg, sizeof(g_logmsg), DEFAULT_LOGSTREAM_LOGMSG);
 
-    // override the CFG_LS transport type to be TCP
-    cfgTransportTypeSet(cfg, CFG_LS, CFG_TCP);
-    // host is already set
-    // port is already set
+    if (cfgTransportType(cfg, CFG_LS) == CFG_UNIX) {
+        const char *path = cfgTransportPath(cfg, CFG_LS);
+        cfgTransportPathSet(cfg, CFG_CTL, path);
+    } else {
+        // override the CFG_LS transport type to be TCP for type different than UNIX
+        cfgTransportTypeSet(cfg, CFG_LS, CFG_TCP);
+        // host is already set
+        // port is already set
 
-    // if cloud, override tls settings too
-    if (cfgLogStream(cfg) == CFG_LOGSTREAM_CLOUD) {
-        // TLS enabled, with Server Validation, using root certs (payload)
-        cfgTransportTlsEnableSet(cfg, CFG_LS, TRUE);
-        cfgTransportTlsValidateServerSet(cfg, CFG_LS, TRUE);
-        cfgTransportTlsCACertPathSet(cfg, CFG_LS, NULL);
-    }
-
-    // copy the CFG_LS configuration to CFG_CTL
-    {
-        cfg_transport_t type = cfgTransportType(cfg, CFG_LS);
-        cfgTransportTypeSet(cfg, CFG_CTL, type);
+        // if cloud, override tls settings too
+        if (cfgLogStream(cfg) == CFG_LOGSTREAM_CLOUD) {
+            // TLS enabled, with Server Validation, using root certs (payload)
+            cfgTransportTlsEnableSet(cfg, CFG_LS, TRUE);
+            cfgTransportTlsValidateServerSet(cfg, CFG_LS, TRUE);
+            cfgTransportTlsCACertPathSet(cfg, CFG_LS, NULL);
+        }
         const char *host = cfgTransportHost(cfg, CFG_LS);
         cfgTransportHostSet(cfg, CFG_CTL, host);
         const char *port = cfgTransportPort(cfg, CFG_LS);
@@ -2639,10 +2638,13 @@ cfgLogStreamDefault(config_t *cfg)
         cfgTransportTlsCACertPathSet(cfg, CFG_CTL, cacertpath);
     }
 
+    cfg_transport_t type = cfgTransportType(cfg, CFG_LS);
+    cfgTransportTypeSet(cfg, CFG_CTL, type);
+
     if (cfgMtcEnable(cfg) != TRUE) {
         strncat(g_logmsg, "Metrics enable, ", 20);
     }
-    cfgMtcEnableSet(cfg, (unsigned)1);
+    cfgMtcEnableSet(cfg, 1U);
 
     if (cfgMtcFormat(cfg) != TRUE) {
         strncat(g_logmsg, "Metrics format, ", 20);
@@ -2652,7 +2654,7 @@ cfgLogStreamDefault(config_t *cfg)
     if (cfgEvtEnable(cfg) != TRUE) {
         strncat(g_logmsg, "Event enable, ", 20);
     }
-    cfgEvtEnableSet(cfg, (unsigned)1);
+    cfgEvtEnableSet(cfg, 1U);
 
     if (cfgLogLevel(cfg) > CFG_LOG_WARN ) {
         strncat(g_logmsg, "Log level, ", 20);
@@ -2664,11 +2666,6 @@ cfgLogStreamDefault(config_t *cfg)
         cfgSendProcessStartMsgSet(cfg, TRUE);
     }
 
-    if (cfgEvtFormatSourceEnabled(cfg, CFG_SRC_HTTP)) {
-        strncat(g_logmsg, "HTTP watch disable, ", 25);
-    }
-    cfgEvtFormatSourceEnabledSet(cfg, CFG_SRC_HTTP, FALSE);
-
     return 0;
 }
 
@@ -2679,7 +2676,7 @@ singleChannelSet(ctl_t *ctl, mtc_t *mtc)
 
     // if any logs created during cfg send now
     if (g_logmsg[0] != '\0') {
-        scopeLog(CFG_LOG_WARN, "%s", g_logmsg);
+        scopeLogWarn("%s", g_logmsg);
     }
 
     transport_t *trans = ctlTransport(ctl, CFG_CTL);

@@ -36,6 +36,10 @@ RUN chmod +x /opt/test-runner/bin/test-ssl.sh
 RUN mkdir -p /opt/javassl
 COPY ./java/SSLSocketClient.class /opt/javassl/SSLSocketClient.class
 
+RUN mkdir -p /opt/java_http
+COPY ./java/SimpleHttpServer.class /opt/java_http/SimpleHttpServer.class
+COPY ./java/'SimpleHttpServer$StatusHandler.class' /opt/java_http/'SimpleHttpServer$StatusHandler.class'
+
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_METRIC_VERBOSITY=4
 ENV SCOPE_EVENT_LOGFILE=false

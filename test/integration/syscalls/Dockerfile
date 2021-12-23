@@ -14,7 +14,7 @@ RUN cd /opt/test && \
       unzip 20210524.zip && \
       rm -f 20210524.zip && \
       mv ltp-20210524 ltp && \
-    cd /opt/test/ltp && \
+      cd /opt/test/ltp && \
       make autotools && \
       ./configure && \
       make -j
@@ -23,14 +23,12 @@ RUN source scl_source enable rh-python38 && \
     virtualenv -p $(which python) /opt/test-runner/
 
 ENV SCOPE_LOG_LEVEL=info
-ENV SCOPE_METRIC_DEST=udp://localhost:8125
+ENV SCOPE_METRIC_DEST=tcp://localhost:8125
 ENV SCOPE_METRIC_VERBOSITY=4
 ENV SCOPE_EVENT_LOGFILE=true
 ENV SCOPE_EVENT_CONSOLE=true
 ENV SCOPE_EVENT_METRIC=true
 ENV SCOPE_EVENT_HTTP=true
-#ENV SCOPE_EVENT_DEST=tcp://172.16.198.132:9109
-ENV SCOPE_THREAD_DELAY="dup205"
 
 COPY ./syscalls/altp /opt/test/altp
 RUN cd /opt/test/altp && make -j

@@ -25,7 +25,7 @@ endif
 
 # version number without the leading `v` from release tags
 # this is set in CI so don't overwrite
-VERSION ?= $(shell git describe --abbrev=0 --tags | tr -d v)
+VERSION ?= $(shell git describe --match "v*" --abbrev=0 --tags | tr -d v)
 
 # cli expects us to write this file
 $(shell echo -n $(VERSION) > cli/VERSION)

@@ -24,7 +24,7 @@ This restriction is imposed to make the resulting executable more portable.
 
 ### System
 
-- CPU: x86-64 architecture
+- CPU: x86-64 and ARM64 architectures
 - Memory: 1GB
 - Disk: 20MB (library + CLI)
 
@@ -34,9 +34,13 @@ The distros that AppScope supports all require the use of `/tmp`, `/dev/shm`, an
 
 ### Known Limitations
 
-These runtimes are **not** supported: Open JVM < v.6, Oracle JVM < v.6, Go < v.1.8.
+**Only** these runtimes are supported: 
+
+- Open JVM 7 and later, Oracle JVM 7 and later, go1.8 through g1.16 (support for go1.17 is [planned](https://github.com/criblio/appscope/issues/637)).
 
 AppScope cannot:
 
 - Unload the libscope library.
 - Unattach/detach from a running process, once attached.
+
+When an executable that's being scoped has been [stripped](https://en.wikipedia.org/wiki/Strip_(Unix)), it is not possible for `libscope.so` to obtain a file descriptor for an SSL session, and in turn, AppScope cannot include IP and port number fields in HTTP events.

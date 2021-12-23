@@ -6,7 +6,7 @@ RUN apk add bash curl gdb openjdk11 python3
 COPY ./attach/test_attach.sh /opt/test/bin/test_attach.sh
 
 RUN mkdir -p /opt/java_http
-COPY ./attach/SimpleHttpServer.java /opt/java_http/SimpleHttpServer.java
+COPY ./java/SimpleHttpServer.java /opt/java_http/SimpleHttpServer.java
 RUN javac -d /opt/java_http/ /opt/java_http/SimpleHttpServer.java
 
 ENV SCOPE_LOG_LEVEL=debug
@@ -19,7 +19,6 @@ ENV SCOPE_EVENT_NET=true
 ENV SCOPE_EVENT_FS=true
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
 ENV SCOPE_EVENT_DEST=file:///opt/test-runner/logs/events.log
-ENV SCOPE_ALLOW_MUSL_ATTACH=true
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 COPY scope-profile.sh /etc/profile.d/scope.sh

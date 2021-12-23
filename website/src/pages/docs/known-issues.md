@@ -4,6 +4,14 @@ title: Known Issues
 
 # Known Issues
 
+## AppScope 0.8.1
+
+2021-12-21 - Maintenance Pre-Release
+
+As of this AppScope pre-release, known issues include:
+
+- [#677](https://github.com/criblio/appscope/issues/677) HTTP/1.1 events are parsed incorrectly, populating the `http_method` and `http_target` fields with junk.
+
 ## AppScope 0.7
 
 2021-07-02 - Maintenance Pre-Release
@@ -20,7 +28,11 @@ As of this AppScope pre-release, known issues include:
 
 As of this AppScope pre-release, known issues include:
 
-- Java JRE < v.6 is not supported.
+- AppScope supports all Java [currently supported runtimes](https://dev.java/download/releases/): versions 7, 8, 11, and 17. It does not support JRE 6 or earlier.
+
+- [#640](https://github.com/criblio/appscope/issues/640) On Alpine and other distributions based on musl libc, running `appscope attach` against a Go application fails with the error: `failed to find libc in target process`.
+
+  - **Fix:** Planned for 1.0.0
 
 - [#35](https://github.com/criblio/appscope/issues/35) Go < v.1.8 is not supported.
 
@@ -34,6 +46,8 @@ As of this AppScope pre-release, known issues include:
   - **Fix:** 0.7
 
 - [#119](https://github.com/criblio/appscope/issues/119) HTTP 2 metrics and headers can be viewed only with [Cribl LogStream](https://cribl.io/product/).
+
+  - **Fix:** 0.8.0, in [#543](https://github.com/criblio/appscope/issues/543) 
 
 <hr>
 

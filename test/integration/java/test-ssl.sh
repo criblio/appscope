@@ -90,20 +90,24 @@ starttest Tomcat
 ldscope /opt/tomcat/bin/catalina.sh run &
 evaltest
 
-until [ "`curl $CURL_PARAMS  -k --silent --connect-timeout 1 -I https://localhost:8443 | grep 'Coyote'`" != "" ];
+CURL_MAX_RETRY=10
+until [[ "`curl $CURL_PARAMS -k --silent --connect-timeout 1 -I https://localhost:8443 | grep 'Coyote'`" != "" ]] || [[ "$CURL_MAX_RETRY" -lt 0 ]];
 do
     echo waiting for tomcat...
     sleep 1
+    let CURL_MAX_RETRY-=1
 done
+
+if [[ "$CURL_MAX_RETRY" -lt 0 ]]; then
+    echo "Error: timed out waiting for tomcat"
+    ERR+=$?
+fi
 
 sleep 2
 grep http-req $EVT_FILE > /dev/null
 ERR+=$?
 
 grep http-resp $EVT_FILE > /dev/null
-ERR+=$?
-
-grep http-metric $EVT_FILE > /dev/null
 ERR+=$?
 
 grep '"net_peer_ip":"127.0.0.1"' $EVT_FILE > /dev/null
@@ -128,9 +132,6 @@ ERR+=$?
 grep http-resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-metric $EVT_FILE > /dev/null
-ERR+=$?
-
 grep '"net_peer_ip":"127.0.0.1"' $EVT_FILE > /dev/null
 ERR+=$?
 
@@ -143,6 +144,130 @@ ERR+=$?
 endtest
 
 /opt/tomcat/bin/catalina.sh stop
+sleep 3
+
+
+if [ "x86_64" = "$(uname -m)" ]; then # x86_64 only
+#
+# Java HTTP Server
+#
+
+
+starttest java_http_attach_curl
+
+cd /opt/java_http
+java SimpleHttpServer 2> /dev/null &
+HTTP_SERVER_PID=$!
+sleep 1
+evaltest
+ldscope --attach ${HTTP_SERVER_PID}
+curl http://localhost:8000/status
+sleep 5
+
+grep -q '"proc":"java"' $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q http-req $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q http-resp $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q fs.open $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q fs.close $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q net.conn.open $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q net.conn.close $EVT_FILE > /dev/null
+ERR+=$?
+
+kill -9 ${HTTP_SERVER_PID}
+
+endtest
+
+starttest java_http_curl_attach_curl
+
+cd /opt/java_http
+java SimpleHttpServer 2> /dev/null &
+HTTP_SERVER_PID=$!
+sleep 1
+evaltest
+curl http://localhost:8000/status
+ldscope --attach ${HTTP_SERVER_PID}
+curl http://localhost:8000/status
+sleep 5
+
+grep -q '"proc":"java"' $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q http-req $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q http-resp $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q fs.open $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q fs.close $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q net.conn.open $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q net.conn.close $EVT_FILE > /dev/null
+ERR+=$?
+
+kill -9 ${HTTP_SERVER_PID}
+
+endtest
+
+# TODO: Java9 fails see issue #630
+# remove if condition below after fixing the issue
+if [[ -z "${SKIP_LDSCOPE_TEST}" ]]; then
+starttest java_http_ldscope
+
+cd /opt/java_http
+ldscope java SimpleHttpServer 2> /dev/null &
+HTTP_SERVER_PID=$!
+evaltest
+sleep 1
+curl http://localhost:8000/status
+sleep 5
+
+grep -q '"proc":"java"' $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q http-req $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q http-resp $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q fs.open $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q fs.close $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q net.conn.open $EVT_FILE > /dev/null
+ERR+=$?
+
+grep -q net.conn.close $EVT_FILE > /dev/null
+ERR+=$?
+
+kill -9 ${HTTP_SERVER_PID}
+sleep 1
+
+endtest
+
+fi
+
+fi # x86_64 only
 
 unset SCOPE_PAYLOAD_ENABLE
 unset SCOPE_PAYLOAD_HEADER

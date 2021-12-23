@@ -50,6 +50,8 @@ typedef struct
     char *cmd;
     char id[MAX_ID];
     char cgroup[MAX_CGROUP];
+    char *username;
+    char *groupname;
 } proc_id_t;
 
 #define TRUE 1
@@ -172,18 +174,55 @@ typedef unsigned int bool;
 //    SCOPE_SWITCH                   for internal go debugging
 //    SCOPE_PID                      provided by library
 //    SCOPE_PAYLOAD_HEADER           write payload headers to files
-//    SCOPE_ALLOW_MUSL_ATTACH        allows attach for musl processes
 //    SCOPE_ALLOW_CONSTRUCT_DBG      allows debug inside the constructor
 
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"
 
 // TLS protocol refs that have been useful:
-// https://tools.ietf.org/html/rfc5246
-// http://blog.fourthbit.com/2014/12/23/traffic-analysis-of-an-ssl-slash-tls-session/
-// https://tls13.ulfheim.net/
-#define PAYLOAD_BYTESRC 6
-#define PAYLOAD_REGEX "^16030[0-3].{4}0[12]"
+//   https://tools.ietf.org/html/rfc5246
+//   http://blog.fourthbit.com/2014/12/23/traffic-analysis-of-an-ssl-slash-tls-session/
+//   https://tls13.ulfheim.net/
+//
+// The definitions below were the original config we were using but during work
+// on #543, we found some cases where the first 6 bytes of the stream were
+// split across two different payloads and doProtocol() is not doing any
+// buffering. TLS detection wasn't working.
+//
+// A little background... The TLS record header is 5 bytes. The header for
+// handshake records starts with 0x16 and, after the remaining 4 bytes of the
+// record header, is followed by a handshake header. The "client hello" and
+// "server hello" handshake headers start with 0x01 and 0x02 respectively. The
+// original regex below is looking for the TLS record header followed by the
+// first byte of either the "client hello" or "server hello" handshake header.
+//
+//#define PAYLOAD_BYTESRC 6
+//#define PAYLOAD_REGEX "^16030[0-3].{4}0[12]"
+//
+// We found that we're only getting the first 5 bytes in one payload to
+// doProtocol() in some cases. It's because the read operation was only for 5
+// bytes or some network fragmentation happened or wonky stream buffering or
+// whatever. In any case, we're changing this to only look for the 5-byte
+// record header and not the handshake header that follows.
+//
+// If you end up here because you're tracking down a partial payload issue in
+// the future, consider adding some buffering of initial payload data on a
+// channel until you have enough to satisfy TLS and other protocol detection.
+//
+//#define PAYLOAD_BYTESRC 5
+//#define PAYLOAD_REGEX "^16030[0-3].{4}"
+//
+// Another iteration after finding the Java SSLSocketClient program in our
+// oracle-java integration tests was connecting to the server using SSL2
+// instead of SSL3. SSL3 is what we know as TLS. SSL2 appears to use the same
+// records except they can use a different header. The updated regex below
+// looks for either form though the "magic" for SSL2 is pretty weak.
+//
+// The updated regex is also now using non-capturing groups to improve
+// performance of TLS detection.
+//
+#define PAYLOAD_BYTESRC 5
+#define PAYLOAD_REGEX "^(?:(?:16030[0-3].{4})|(?:8[0-9a-fA-F]{3}01))"
 
 // libmusl requires LD_LIBRARY_PATH
 #define LD_LIB_ENV "LD_LIBRARY_PATH"

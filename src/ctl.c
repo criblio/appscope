@@ -22,6 +22,7 @@
 
 #define BINARY_DATA_MSG "Binary data detected--- message"
 #define DEFAULT_BINARY_DATA_SAMPLE_SIZE (256U)
+#define ESC_CHARACTER (0x1B)
 
 typedef struct {
     char *buf;
@@ -525,7 +526,7 @@ prepMessage(upload_t *upld)
     char *temp = realloc(streamMsg, strsize+2); // room for "\n\0"
     if (!temp) {
         DBG(NULL);
-        scopeLog(CFG_LOG_INFO, "CTL realloc error");
+        scopeLogInfo("CTL realloc error");
         free(streamMsg);
         return NULL;
     }
@@ -838,7 +839,7 @@ is_data_binary(const void *buf, size_t count)
     size_t min_len = (count < DEFAULT_BINARY_DATA_SAMPLE_SIZE) ? count : DEFAULT_BINARY_DATA_SAMPLE_SIZE;
     size_t i;
     for (i = 0; i < min_len; i++) {
-        if (!isprint(b_buf[i]) && (!isspace(b_buf[i]))) {
+        if (!isprint(b_buf[i]) && !isspace(b_buf[i]) && b_buf[i] != ESC_CHARACTER) {
             return TRUE;
         }
     }
@@ -1128,6 +1129,16 @@ ctlConnect(ctl_t *ctl, which_transport_t who)
         transportConnect(ctl->transport);
 }
 
+uint64_t
+ctlConnectAttempts(ctl_t *ctl, which_transport_t who)
+{
+    if (!ctl) return 0;
+
+    return ((who == CFG_LS) && (ctl->paytrans)) ?
+        transportConnectAttempts(ctl->paytrans) :
+        transportConnectAttempts(ctl->transport);
+}
+
 int
 ctlDisconnect(ctl_t *ctl, which_transport_t who)
 {
@@ -1146,6 +1157,16 @@ ctlReconnect(ctl_t *ctl, which_transport_t who)
     return ((who == CFG_LS) && (ctl->paytrans)) ?
         transportReconnect(ctl->paytrans) :
         transportReconnect(ctl->transport);
+}
+
+net_fail_t
+ctlTransportFailureReason(ctl_t *ctl, which_transport_t who)
+{
+    if (!ctl) return 0;
+
+    return ((who == CFG_LS) && (ctl->paytrans)) ?
+        transportFailureReason(ctl->paytrans) :
+        transportFailureReason(ctl->transport);
 }
 
 void
@@ -1189,6 +1210,12 @@ ctlEvtSet(ctl_t *ctl, evt_fmt_t *evt)
     // Don't leak if ctlEvtSet is called repeatedly
     evtFormatDestroy(&ctl->evt);
     ctl->evt = evt;
+}
+
+evt_fmt_t *
+ctlEvtGet(ctl_t *ctl)
+{
+    return ctl ? ctl->evt : NULL;
 }
 
 bool

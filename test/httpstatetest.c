@@ -12,9 +12,7 @@
 #include "test.h"
 
 
-int g_http_guard_enabled = TRUE;
 uint64_t g_http_guard[1024];
-ctl_t *g_ctl = NULL;
 struct protocol_info_t* g_msg = NULL;
 
 
@@ -33,28 +31,13 @@ freeMsg(struct protocol_info_t** msg_ptr)
     *msg_ptr = NULL;
 }
 
-// These have almost nothing to do with this test.
-// I'm defining them here to avoid more dependencies.
-int
-get_port_net(net_info *net, int type, control_type_t which) {
-    return 0;
-}
-
-net_info *
-getNetEntry(int fd)
-{
-    return NULL;
-}
-
-// This on the other hand is an important part of this test.
-int
-cmdPostEvent(ctl_t *ctl, char *event)
+int __real_cmdPostEvent(ctl_t *ctl, char *event);
+int __wrap_cmdPostEvent(ctl_t *ctl, char *event)
 {
     if (g_msg) freeMsg(&g_msg); // Don't leak
     g_msg = (struct protocol_info_t*)event;
     return 0;
 }
-
 
 static int
 needleTestSetup(void** state)

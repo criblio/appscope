@@ -1,0 +1,62 @@
+version: '3'
+
+networks:
+  fluentbit-net:
+
+volumes:
+  test_output:
+
+services:
+  fluentbit:
+    image: scopeci/scope-fluentbit
+    networks:
+      - fluentbit-net
+    build:
+      cache_from:
+        - scopeci/scope-fluentbit
+      context: .
+      dockerfile: ./Dockerfile
+    working_dir: /opt/test/fluentbit
+    volumes:
+      - ../../..:/opt/appscope
+      - /var/run/docker.sock:/var/run/docker.sock
+      - test_output:/test_output
+    privileged: true
+
+  _service-fluentbit:
+    build: services/fluentbit/
+    networks:
+      - fluentbit-net
+    volumes:
+      - test_output:/test_output
+    command: fluent-bit ${FLUENTBIT_ARGS}
+
+  _service-nginx:
+    build: services/nginx/
+    networks:
+      - fluentbit-net
+    volumes:
+      - test_output:/test_output
+    environment:
+      - SCOPE_HOME=/test_configs/scope/
+      - SCOPE_LOG_LEVEL=debug
+    ports:
+      - "8000:80"
+    entrypoint: ["/bin/sh","-c"]
+    command:
+      - |
+        chmod 666 /test_output/abstest
+        ldscope nginx ${NGINX_ARGS}
+  _service-logstream:
+    build: services/logstream/
+    networks:
+      - fluentbit-net
+    volumes:
+      - test_output:/test_output
+    ports:
+      - "9000:9000"
+      - "10070:10070"
+      - "10090:10090"
+      - "10091:10091"
+
+

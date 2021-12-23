@@ -56,10 +56,12 @@ extern bool osThreadInit(void(*handler)(int), unsigned);
 extern int osUnixSockPeer(ino_t);
 extern void osInitJavaAgent(void);
 extern int osGetPageProt(unsigned long);
-extern int osGetExePath(char **);
+extern int osGetExePath(pid_t, char **);
 extern bool osTimerStop(void);
 extern bool osGetCgroup(pid_t, char *, size_t);
 extern char *osGetFileMode(mode_t);
 extern int osNeedsConnect(int);
+extern char *osGetUserName(unsigned);
+extern char *osGetGroupName(unsigned);
 
 #endif  //__OS_H__

@@ -1,0 +1,274 @@
+#!/bin/bash
+
+
+###################### Definitions ######################
+
+FAILED_TEST_LIST=""
+FAILED_TEST_COUNT=0
+
+starttest(){
+    CURRENT_TEST=$1
+    echo "=============================================="
+    echo "         Testing $CURRENT_TEST"
+    echo "=============================================="
+    ERR=0
+}
+
+endtest(){
+    if [ $ERR -eq "0" ]; then
+        RESULT=PASSED
+    else
+        RESULT=FAILED
+        FAILED_TEST_LIST+=$CURRENT_TEST
+        FAILED_TEST_LIST+=" "
+        FAILED_TEST_COUNT=$(($FAILED_TEST_COUNT + 1))
+    fi
+
+    echo "******************* $RESULT *******************"
+    echo ""
+    echo ""
+}
+
+wait_for_files() {
+    TIMEOUT=${2:-30}
+    while ! compgen -G "${1}" > /dev/null; do
+        sleep 1
+        ((TIMEOUT=TIMEOUT-1))
+        if [ $TIMEOUT -le 0 ]; then
+            echo >&2 "warn: timed out waiting for ${1} files"
+            ls -lRa /test_output/ >&2
+            return
+        fi
+    done
+    echo 1
+}
+
+###################### Tests ######################
+
+# Scope nginx
+# Use custom scope configuration to send only http events to a Unix Domain socket
+# Use apache ab to send requests to nginx
+# Use fluentbit to relay events to a file
+# Assert on number of http events received
+nginx_fluentbit_file() {
+    starttest "Nginx->Fluentbit->File_$1_Requests"
+
+    # launch services
+    export NGINX_ARGS='-c /test_configs/nginx_1_worker.conf'
+    export FLUENTBIT_ARGS='-c /test_configs/fluent-bit_to_file.conf -v'
+    docker-compose up -d --force-recreate --no-deps --build _service-fluentbit
+    docker-compose up -d --force-recreate --no-deps --build _service-nginx
+    sleep 5
+
+    # run ab
+    ab -c 1 -n $1 http://_service-nginx:80/
+    sleep 5 
+
+    # validate output
+    if [ "$(wait_for_files "/test_output/fluent.out")" ]; then
+        found=$(grep '"source":"http-req"' /test_output/fluent.out | wc -l)
+        if [ $found -eq $1 ] ; then 
+            echo "PASS: No missing http request events"
+        else
+            echo "FAIL: Missing http request events: expected: $1, got: $found, dropped: $(($1-found))"
+            ERR+=1
+        fi
+        found=$(grep '"source":"http-resp"' /test_output/fluent.out | wc -l)
+        if [ $found -eq $1 ] ; then 
+            echo "PASS: No missing http response events"
+        else
+            echo "FAIL: Missing http response events: expected: $1, got: $found, dropped: $(($1-found))"
+            ERR+=1
+        fi
+    else
+        echo "FAIL: no output files"
+        ERR+=1
+    fi
+
+    # terminate services
+    docker-compose kill
+
+    # cleanup
+    rm -rf /test_output/*
+
+    endtest
+}
+
+# Scope nginx
+# Use custom scope configuration to send only http events to a Unix Domain socket
+# Use apache ab to send requests to nginx
+# Use fluentbit to relay events to logstream
+# Assert on number of http events received
+nginx_fluentbit_logstream() {
+    starttest "Nginx->Fluentbit->Logstream_$1_Requests"
+
+    # launch services
+    export NGINX_ARGS='-c /test_configs/nginx_1_worker.conf'
+    export FLUENTBIT_ARGS='-c /test_configs/fluent-bit.conf -v'
+    docker-compose up -d --force-recreate --no-deps --build _service-fluentbit
+    docker-compose up -d --force-recreate --no-deps --build _service-nginx
+    docker-compose up -d --force-recreate --no-deps --build _service-logstream
+    sleep 10
+
+    # run ab
+    ab -c 1 -n $1 http://_service-nginx:80/ 
+    sleep 20
+
+    # validate output
+    if [ "$(wait_for_files "/test_output/appscope:in_appscope/CriblOut-*.json")" ]; then
+        found=$(grep '"source":"http-req"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
+        if [ $found -eq $1 ] ; then 
+            echo "PASS: No missing http request events"
+        else
+            echo "FAIL: Missing http request events: expected: $1, got: $found, dropped: $(($1-found))"
+            ERR+=1
+        fi
+        found=$(grep '"source":"http-resp"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
+        if [ $found -eq $1 ] ; then 
+            echo "PASS: No missing http response events"
+        else
+            echo "FAIL: Missing http response events: expected: $1, got: $found, dropped: $(($1-found))"
+            ERR+=1
+        fi
+    else
+        echo "FAIL: no output files"
+        ERR+=1
+    fi
+
+    # terminate services
+    docker-compose kill
+
+    # cleanup
+    rm -rf /test_output/*
+
+    endtest
+}
+
+# Scope 10 nginx workers
+# Use custom scope configuration to send only http events to a Unix Domain socket
+# Use apache ab to send requests to nginx
+# Use fluentbit to relay events to logstream
+# Assert on number of http events received
+multiple_nginx_fluentbit_logstream() {
+    starttest "Multiple-Nginx->Fluentbit->Logstream_$1_Requests"
+
+    # launch services
+    export NGINX_ARGS='-c /test_configs/nginx.conf'
+    export FLUENTBIT_ARGS='-c /test_configs/fluent-bit.conf -v'
+    docker-compose up -d --force-recreate --no-deps --build _service-fluentbit
+    docker-compose up -d --force-recreate --no-deps --build _service-nginx
+    docker-compose up -d --force-recreate --no-deps --build _service-logstream
+    sleep 10
+
+    # run ab
+    ab -c 1 -n $1 http://_service-nginx:80/ 
+    sleep 20
+
+    # validate output
+    if [ "$(wait_for_files "/test_output/appscope:in_appscope/CriblOut-*.json")" ]; then
+        found=$(grep '"source":"http-req"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
+        if [ $found -eq $1 ] ; then 
+            echo "PASS: No missing http request events"
+        else
+            echo "FAIL: Missing http request events: expected: $1, got: $found, dropped: $(($1-found))"
+            ERR+=1
+        fi
+        found=$(grep '"source":"http-resp"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
+        if [ $found -eq $1 ] ; then 
+            echo "PASS: No missing http response events"
+        else
+            echo "FAIL: Missing http response events: expected: $1, got: $found, dropped: $(($1-found))"
+            ERR+=1
+        fi
+    else
+        echo "FAIL: no output files"
+        ERR+=1
+    fi
+
+    # terminate services
+    docker-compose kill
+
+    # cleanup
+    rm -rf /test_output/*
+
+    endtest
+}
+
+# Scope nginx
+# Use custom scope configuration to send only http events to a Unix Domain socket
+# Use apache ab to send requests to nginx
+# Use fluentbit to relay events to logstream (Multiple fluentbit inputs)
+# Assert on number of http events received
+nginx_multiple_fluentbit_logstream() {
+    starttest "Nginx->Multiple_Fluentbit->Logstream_$1_Requests"
+
+    # launch services
+    export NGINX_ARGS='-c /test_configs/nginx_1_worker.conf'
+    export FLUENTBIT_ARGS='-c /test_configs/fluent-bit_multiple_inputs.conf -v'
+    docker-compose up -d --force-recreate --no-deps --build _service-fluentbit
+    docker-compose up -d --force-recreate --no-deps --build _service-nginx
+    docker-compose up -d --force-recreate --no-deps --build _service-logstream
+    sleep 10
+
+    # run ab
+    ab -c 1 -n $1 http://_service-nginx:80/ 
+    sleep 20
+
+    # validate output
+    if [ "$(wait_for_files "/test_output/appscope:in_appscope/CriblOut-*.json")" ]; then
+        found=$(grep '"source":"http-req"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
+        if [ $found -eq $1 ] ; then 
+            echo "PASS: No missing http request events"
+        else
+            echo "FAIL: Missing http request events: expected: $1, got: $found, dropped: $(($1-found))"
+            ERR+=1
+        fi
+        found=$(grep '"source":"http-resp"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
+        if [ $found -eq $1 ] ; then 
+            echo "PASS: No missing http response events"
+        else
+            echo "FAIL: Missing http response events: expected: $1, got: $found, dropped: $(($1-found))"
+            ERR+=1
+        fi
+    else
+        echo "FAIL: no output files"
+        ERR+=1
+    fi
+
+    # terminate services
+    docker-compose kill
+
+    # cleanup
+    rm -rf /test_output/*
+
+    endtest
+}
+
+#nginx_fluentbit_file 100
+#nginx_fluentbit_file 1000
+#nginx_fluentbit_file 10000
+#nginx_fluentbit_logstream 100
+#nginx_fluentbit_logstream 1000
+#nginx_fluentbit_logstream 10000
+#multiple_nginx_fluentbit_logstream 100
+#multiple_nginx_fluentbit_logstream 1000
+#multiple_nginx_fluentbit_logstream 10000
+nginx_multiple_fluentbit_logstream 100
+#nginx_multiple_fluentbit_logstream 1000
+#nginx_multiple_fluentbit_logstream 10000
+
+
+###################### Summary ######################
+
+# Results
+echo ""
+if (( $FAILED_TEST_COUNT == 0 )); then
+    echo "************ ALL FLUENTBIT TESTS PASSED ************"
+else
+    echo "************ $FAILED_TEST_COUNT FLUENTBIT TESTS FAILED ************"
+    echo "Failed tests: $FAILED_TEST_LIST"
+fi
+echo ""
+
+exit ${FAILED_TEST_COUNT}
+

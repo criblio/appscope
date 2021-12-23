@@ -1,0 +1,138 @@
+#! /bin/bash
+
+DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
+
+FAILED_TEST_LIST=""
+FAILED_TEST_COUNT=0
+
+EVT_FILE="/opt/test-runner/logs/events.log"
+SCOPE_LOG_FILE="/opt/test-runner/logs/scope.log"
+
+starttest(){
+    CURRENT_TEST=$1
+    echo "==============================================="
+    echo "             Testing $CURRENT_TEST             "
+    echo "==============================================="
+    ERR=0
+}
+
+evaltest(){
+    echo "             Evaluating $CURRENT_TEST"
+}
+
+endtest(){
+    if [ $ERR -eq "0" ]; then
+        RESULT=PASSED
+    else
+        RESULT=FAILED
+        FAILED_TEST_LIST+=$CURRENT_TEST
+        FAILED_TEST_LIST+=" "
+        FAILED_TEST_COUNT=$(($FAILED_TEST_COUNT + 1))
+    fi
+
+    echo "*************** $CURRENT_TEST $RESULT ***************"
+    echo ""
+    echo ""
+
+    # copy the EVT_FILE to help with debugging
+    if (( $DEBUG )) || [ $RESULT == "FAILED" ]; then
+        cp -f $EVT_FILE $EVT_FILE.$CURRENT_TEST
+    fi
+
+    rm -f $EVT_FILE
+    rm -f $SCOPE_LOG_FILE
+}
+
+#
+# extract on glibc
+#
+starttest extract_glibc
+
+scope extract /opt/extract_scope
+ERR+=$?
+
+count=$(readelf -d /opt/extract_scope/libscope.so | grep 'Shared library:.*ld-linux' | wc -l)
+if [ $count -ne 1 ] ; then 
+    ERR+=1
+fi
+
+count=$(readelf -d /opt/extract_scope/libscope.so | grep 'Shared library:.*ld-musl' | wc -l)
+if [ $count -ne 0 ] ; then 
+    ERR+=1
+fi
+
+endtest
+
+#
+# ldscope patch
+#
+starttest patch_on_glibc
+
+cp /usr/local/scope/lib/libscope.so /opt/patch_libscope
+cp /usr/local/scope/bin/ldscope /opt/patch_libscope
+
+md5_before_patch=$(md5sum /opt/patch_libscope/libscope.so)
+
+count=$(readelf -d /opt/patch_libscope/libscope.so | grep 'Shared library:.*ld-linux' | wc -l)
+if [ $count -ne 1 ] ; then
+    ERR+=1
+fi
+
+/opt/patch_libscope/ldscope --patch /opt/patch_libscope/libscope.so
+if [ $? -eq 0 ]; then
+    ERR+=1
+fi
+
+md5_after_patch=$(md5sum /opt/patch_libscope/libscope.so)
+
+count=$(readelf -d /opt/patch_libscope/libscope.so | grep 'Shared library:.*ld-musl' | wc -l)
+if [ $count -ne 0 ] ; then
+    ERR+=1
+fi
+
+if [ "$md5_before_patch" != "$md5_after_patch" ]; then
+    ERR+=1
+fi
+
+endtest
+
+starttest patch_on_glibc_dummy_file
+
+echo "Lorem ipsum" >> /opt/patch_libscope/dummy_file
+/opt/patch_libscope/ldscope --patch /opt/patch_libscope/dummy_file
+if [ $? -eq 0 ]; then
+    ERR+=1
+fi
+
+endtest
+
+#
+# verify timestamp
+#
+starttest timestamp_verify
+
+SCOPE_LOG_LEVEL=debug ldscope ls >/dev/null
+
+timestamp=$(grep 'Constructor' $SCOPE_LOG_FILE | grep -Po "(?<=\[).*?(?=\])")
+if [[ $timestamp =~ [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{3}(Z|\+[0-9]{4})$ ]]; then
+    echo "Timeststamp $timestamp is in expect format"
+else
+    ERR+=1
+fi
+
+endtest
+
+if (( $FAILED_TEST_COUNT == 0 )); then
+    echo ""
+    echo ""
+    echo "*************** ALL TESTS PASSED ***************"
+else
+    echo "*************** SOME TESTS FAILED ***************"
+    echo "Failed tests: $FAILED_TEST_LIST"
+    echo "Refer to these files for more info:"
+    for FAILED_TEST in $FAILED_TEST_LIST; do
+        echo "  $EVT_FILE.$FAILED_TEST"
+    done
+fi
+
+exit ${FAILED_TEST_COUNT}

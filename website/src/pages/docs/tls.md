@@ -4,12 +4,15 @@ title: Using TLS for Secure Connections
 
 ## Using TLS for Secure Connections
 
-AppScope supports TLS over TCP connections: 
+AppScope supports TLS over TCP connections. Here's how that works:
 
-- AppScope can use TLS when connecting to LogStream or another application (including its events and metrics destinations).
-- LogStream can use TLS when connecting to AppScope over TCP.
+- AppScope can use TLS when connecting to LogStream or another application (including its events and metrics destinations). 
+- Once AppScope establishes the connection, data can flow over that connection **in both directions**. 
+- This means that when you tell AppScope to connect using TLS, the connection is secured by TLS in both directions.
 
-In the `scope.yml` config file, set the `transport : tls` element to `true` to enable TLS. See [Config File](/docs/config-file).
+For security's sake, AppScope never opens ports, nor does it listen for or allow incoming connections.
+
+To enable TLS: In the `scope.yml` [config file](/docs/config-file), set the `transport : tls` element to `true`.
 
 To see the TLS-related environment variables, run the command: 
 

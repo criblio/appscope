@@ -4,11 +4,10 @@ title: Updating
 
 ## Updating
 
-You can update AppScope in place. First, download a fresh version of the binary:
+You can update AppScope in place. First, download a fresh version of the binary. (This example assumes that you are running AppScope from `/opt/scope`, as described [here](/docs/downloading#where-from). If you're running AppScope from a different location, adapt the command accordingly.) 
 
 ```
-cd <your-appscope-directory>
-curl -Lo scope https://s3-us-west-2.amazonaws.com/io.cribl.cdn/dl/scope/cli/linux/scope && chmod 755 ./scope
+curl -Lo /opt/scope https://s3-us-west-2.amazonaws.com/io.cribl.cdn/dl/scope/cli/linux/scope && chmod 755 /opt/scope
 ```
 
 Then, to confirm the overwrite, verify AppScope's version and build date:

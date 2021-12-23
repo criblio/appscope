@@ -708,7 +708,9 @@ doHttp1Header(protocol_info *proto)
         // point past the status code
         char st[strlen(stext)];
         strncpy(st, stext, strlen(stext));
-        char *status_str = strtok_r(st, "\r", &savea);
+        char *status_str = strtok_r(st, "\r\n", &savea);
+        // if no Reason-Phrase is provided, st will not be equal to status_str
+        if (st != status_str) status_str = "";
         H_ATTRIB(fields[hreport.ix], "http_status_text", status_str, 1);
         HTTP_NEXT_FLD(hreport.ix);
 

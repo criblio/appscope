@@ -188,7 +188,6 @@ transportCreateUnixReturnsValidPtrInHappyPath(void** state)
     assert_true(transportNeedsConnection(t));
     transportDestroy(&t);
     assert_null(t);
-
 }
 
 static void
@@ -203,6 +202,32 @@ transportCreateUnixReturnsNullForInvalidPath(void** state)
     dbgInit(); // reset dbg for the rest of the tests
 }
 
+static void
+transportCreateEdgeReturnsValidPtrInHappyPath(void** state)
+{
+    transport_t* t = transportCreateEdge("/my/favorite/path");
+    assert_non_null(t);
+    assert_true(transportNeedsConnection(t));
+    transportDestroy(&t);
+    assert_null(t);
+}
+
+static void
+transportCreateEdgeReturnsNullForInvalidPath(void** state)
+{
+    assert_int_equal(dbgCountMatchingLines("src/transport.c"), 0);
+
+    char* too_long_path = calloc(1, sizeof(char) * 5001);
+    assert_non_null(too_long_path);
+    for (int i =0; i<1025; ++i) {
+        strncat(too_long_path, "/tmp", sizeof("/tmp"));
+    }
+    transport_t* t = transportCreateEdge(too_long_path);
+    assert_null(t);
+    free(too_long_path);
+    assert_int_equal(dbgCountMatchingLines("src/transport.c"), 1);
+    dbgInit(); // reset dbg for the rest of the tests
+}
 
 static void
 transportCreateSyslogReturnsValidPtrInHappyPath(void** state)
@@ -257,9 +282,6 @@ static void
 transportSendForUnimplementedTransportTypesIsHarmless(void** state)
 {
     transport_t* t;
-    t = transportCreateUnix("/my/favorite/path");
-    transportSend(t, "blah", strlen("blah"));
-    transportDestroy(&t);
 
     t = transportCreateSyslog();
     transportSend(t, "blah", strlen("blah"));
@@ -564,6 +586,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(transportCreateFileCreatesDirectoriesAsNeeded),
         cmocka_unit_test(transportCreateUnixReturnsValidPtrInHappyPath),
         cmocka_unit_test(transportCreateUnixReturnsNullForInvalidPath),
+        cmocka_unit_test(transportCreateEdgeReturnsValidPtrInHappyPath),
+        cmocka_unit_test(transportCreateEdgeReturnsNullForInvalidPath),
         cmocka_unit_test(transportCreateSyslogReturnsValidPtrInHappyPath),
         cmocka_unit_test(transportCreateShmReturnsValidPtrInHappyPath),
         cmocka_unit_test(transportDestroyNullTransportDoesNothing),

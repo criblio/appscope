@@ -779,7 +779,7 @@ void
 cfgTransportTypeSet(config_t* cfg, which_transport_t t, cfg_transport_t type)
 {
     if (!cfg || t < 0 || t >= CFG_WHICH_MAX) return;
-    if (type < 0 || type > CFG_TCP) return;
+    if (type < 0 || type > CFG_EDGE) return;
     cfg->transport[t].type = type;
 }
 

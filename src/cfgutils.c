@@ -105,6 +105,7 @@ enum_map_t transportTypeMap[] = {
     {"file",                  CFG_FILE},
     {"syslog",                CFG_SYSLOG},
     {"shm",                   CFG_SHM},
+    {"edge",                  CFG_EDGE},
     {NULL,                   -1}
 };
 
@@ -765,12 +766,25 @@ cfgMtcVerbositySetFromStr(config_t* cfg, const char* value)
     cfgMtcVerbositySet(cfg, x);
 }
 
+static char*
+cfgEdgePath(void){
+    const char *cribl_home = getenv("CRIBL_HOME");
+    if (cribl_home) {
+        char new_path[4096];
+        int cx = snprintf(new_path, sizeof(new_path), "%s/%s", cribl_home, "state/appscope.sock");
+        if (cx >= 0 && cx < sizeof(new_path)) {
+            return realpath(new_path, NULL);
+        }
+    }
+    return strdup("/opt/cribl/state/appscope.sock");
+}
+
 void
 cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
 {
     if (!cfg || !value) return;
 
-    // see if value starts with udp:// or file://
+    // see if value starts with udp://, tcp://, file://, unix:// or equals edge
     if (value == strstr(value, "udp://")) {
 
         // copied to avoid directly modifying the process's env variable
@@ -817,6 +831,11 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         const char *path = value + (sizeof("unix://") - 1);
         cfgTransportTypeSet(cfg, t, CFG_UNIX);
         cfgTransportPathSet(cfg, t, path);
+    } else if (strncmp(value, "edge", sizeof("edge") - 1) == 0) {
+        cfgTransportTypeSet(cfg, t, CFG_EDGE);
+        char* edge_path = cfgEdgePath();
+        cfgTransportPathSet(cfg, t, edge_path);
+        free(edge_path);
     }
 }
 
@@ -2103,6 +2122,7 @@ createTransportJson(config_t* cfg, which_transport_t trans)
             break;
         case CFG_SYSLOG:
         case CFG_SHM:
+        case CFG_EDGE:
             break;
         default:
             DBG(NULL);
@@ -2452,6 +2472,13 @@ initTransport(config_t* cfg, which_transport_t t)
         case CFG_UNIX:
             transport = transportCreateUnix(cfgTransportPath(cfg, t));
             break;
+        case CFG_EDGE:
+        {
+            char* edge_path = cfgEdgePath();
+            transport = transportCreateEdge(edge_path);
+            free(edge_path);
+            break;
+        }
         case CFG_UDP:
             transport = transportCreateUdp(cfgTransportHost(cfg, t), cfgTransportPort(cfg, t));
             break;

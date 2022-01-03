@@ -1295,7 +1295,9 @@ cfgReadEveryTransportType(void** state)
         "    type: syslog\n";
     const char* shm_str =
         "    type: shm\n";
-    const char* transport_lines[] = {udp_str, unix_str, file_str, syslog_str, shm_str};
+    const char* edge_str =
+        "    type: edge\n";
+    const char* transport_lines[] = {udp_str, unix_str, file_str, syslog_str, shm_str, edge_str};
 
     const char* path = CFG_FILE_NAME;
 
@@ -1321,7 +1323,9 @@ cfgReadEveryTransportType(void** state)
                 assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_SYSLOG);
         } else if (transport_lines[i] == shm_str) {
                 assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_SHM);
-         }
+        } else if (transport_lines[i] == edge_str) {
+                assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_EDGE);
+        }
 
         deleteFile(path);
         cfgDestroy(&config);
@@ -1852,6 +1856,7 @@ initLogReturnsPtr(void** state)
             case CFG_SYSLOG:
             case CFG_SHM:
             case CFG_TCP:
+            case CFG_EDGE:
                 break;
 	    }
         cfgTransportTypeSet(cfg, CFG_LOG, t);

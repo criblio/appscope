@@ -161,7 +161,7 @@ metric:
     #   unix://@abstractname    send to a unix domain server w/abstract addr
     #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
     #   edge                    send to a unix domain server `/opt/cribl/state/appscope.sock`
-    #                           or to `$CRIBL_HOME/state/appscope.sock` if $CRIBL_HOME
+    #                           or to `$CRIBL_HOME/state/appscope.sock`
     #                           if $CRIBL_HOME environment variable is set
     #
     # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
@@ -440,7 +440,7 @@ event:
     #   unix://@abstractname    send to a unix domain server w/abstract addr
     #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
     #   edge                    send to a unix domain server `/opt/cribl/state/appscope.sock`
-    #                           or to `$CRIBL_HOME/state/appscope.sock` if $CRIBL_HOME
+    #                           or to `$CRIBL_HOME/state/appscope.sock`
     #                           if $CRIBL_HOME environment variable is set
     #
     # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
@@ -636,7 +636,7 @@ libscope:
       #   unix://@abstractname    send to a unix domain server w/abstract addr
       #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
       #   edge                    send to a unix domain server `/opt/cribl/state/appscope.sock`
-      #                           or to `$CRIBL_HOME/state/appscope.sock` if $CRIBL_HOME
+      #                           or to `$CRIBL_HOME/state/appscope.sock`
       #                           if $CRIBL_HOME environment variable is set
       #
       # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
@@ -726,7 +726,7 @@ cribl:
     #   unix://@abstractname    send to a unix domain server w/abstract addr
     #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
     #   edge                    send to a unix domain server `/opt/cribl/state/appscope.sock`
-    #                           or to `$CRIBL_HOME/state/appscope.sock` if $CRIBL_HOME
+    #                           or to `$CRIBL_HOME/state/appscope.sock`
     #                           if $CRIBL_HOME environment variable is set
     #
     # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and

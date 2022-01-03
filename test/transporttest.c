@@ -222,7 +222,7 @@ transportCreateEdgeReturnsNullForInvalidPath(void** state)
     for (int i =0; i<1025; ++i) {
         strncat(too_long_path, "/tmp", sizeof("/tmp"));
     }
-    transport_t* t = transportCreateUnix(too_long_path);
+    transport_t* t = transportCreateEdge(too_long_path);
     assert_null(t);
     free(too_long_path);
     assert_int_equal(dbgCountMatchingLines("src/transport.c"), 1);
@@ -282,19 +282,12 @@ static void
 transportSendForUnimplementedTransportTypesIsHarmless(void** state)
 {
     transport_t* t;
-    t = transportCreateUnix("/my/favorite/path");
-    transportSend(t, "blah", strlen("blah"));
-    transportDestroy(&t);
 
     t = transportCreateSyslog();
     transportSend(t, "blah", strlen("blah"));
     transportDestroy(&t);
 
     t = transportCreateShm();
-    transportSend(t, "blah", strlen("blah"));
-    transportDestroy(&t);
-
-    t = transportCreateEdge("/my/favorite/path");
     transportSend(t, "blah", strlen("blah"));
     transportDestroy(&t);
 }

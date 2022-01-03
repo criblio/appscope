@@ -571,6 +571,7 @@ transportReconnect(transport_t *trans)
             }
 
             break;
+        case CFG_UNIX:
         case CFG_UDP:
         case CFG_FILE:
         case CFG_SYSLOG:

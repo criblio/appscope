@@ -737,10 +737,10 @@ cribl:
     # Connection type
     #   Type:     string
     #   Values:   tcp, unix, and edge
-    #   Default:  tcp
+    #   Default:  edge
     #   Override: the protocol token in the $SCOPE_CRIBL or $SCOPE_CRIBL_CLOUD URL
     #
-    type: tcp
+    type: edge
 
     # Connection host/address
     #   Type:     string

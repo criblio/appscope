@@ -189,8 +189,7 @@ returns 1
 
 export SCOPE_LIB_PATH=./lib/linux/${ARCH}/libscope.so
 run ./bin/linux/${ARCH}/ldscopedyn -a 999999999
-outputs "fopen(/proc/PID/maps) failed"
-outputs "failed to find libc in target process"
+outputs "error: can't get path to executable for pid 999999999"
 returns 1
 export -n SCOPE_LIB_PATH
 

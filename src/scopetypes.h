@@ -6,7 +6,7 @@
 typedef enum {CFG_FMT_STATSD,
               CFG_FMT_NDJSON,
               CFG_FORMAT_MAX} cfg_mtc_format_t;
-typedef enum {CFG_UDP, CFG_UNIX, CFG_FILE, CFG_SYSLOG, CFG_SHM, CFG_TCP} cfg_transport_t;
+typedef enum {CFG_UDP, CFG_UNIX, CFG_FILE, CFG_SYSLOG, CFG_SHM, CFG_TCP, CFG_EDGE} cfg_transport_t;
 typedef enum {CFG_MTC, CFG_CTL, CFG_LOG, CFG_LS, CFG_WHICH_MAX} which_transport_t;
 typedef enum {CFG_LOG_TRACE,
               CFG_LOG_DEBUG,
@@ -50,6 +50,8 @@ typedef struct
     char *cmd;
     char id[MAX_ID];
     char cgroup[MAX_CGROUP];
+    char *username;
+    char *groupname;
 } proc_id_t;
 
 #define TRUE 1

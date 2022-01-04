@@ -16,7 +16,7 @@ scope.log
 /venv
 /coverage/
 /test/selfinterpose/
-/test/testContainers/logs
+/test/integration/logs
 **/*.gcda
 **/*.gcov
 **/.test/
@@ -24,7 +24,7 @@ scope.log
 /testtempdir1/
 /testtempdir2/
 /certs/
-/test/testContainers/logs
+/test/integration/logs
 
 # Website Temps
 /website/.env

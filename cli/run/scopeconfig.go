@@ -229,13 +229,16 @@ func (c *Config) configFromRunOpts() error {
 		//
 		// The regexp matches "proto://something:port" where the leading
 		// "proto://" is optional. If given, "proto" must be "tcp", "udp",
-		// "tls" or "file". The ":port" suffix is optional and ignored
-		// for files but required for sockets.
+		// "tls", "file" or "unix". The ":port" suffix is optional and
+		// ignored for files and UNIX domain sockets but required for network sockets.
 		//
 		//     "relative/path"
+		//     "edge"
 		//     "file://another/relative/path"
 		//     "/absolute/path"
 		//     "file:///another/absolute/path"
+		//     "unix:///socketpath"
+		//     "unix://@abstractsocket"
 		//     "tcp://host:port"
 		//     "udp://host:port"
 		//     "tls://host:port"
@@ -246,7 +249,7 @@ func (c *Config) configFromRunOpts() error {
 		// m[0][2] is the "something" string
 		// m[0][3] is the "port" string or an empty string
 		//
-		m := regexp.MustCompile("^(?:(?i)(file|tcp|udp|tls)://)?([^:]+)(?::(\\d+))?$").FindAllStringSubmatch(dest, -1)
+		m := regexp.MustCompile("^(?:(?i)(file|unix|tcp|udp|tls)://)?([^:]+)(?::(\\d+))?$").FindAllStringSubmatch(dest, -1)
 		//fmt.Printf("debug: m=%+v\n", m)
 		if len(m) <= 0 {
 			// no match
@@ -284,7 +287,7 @@ func (c *Config) configFromRunOpts() error {
 				t.Path = ""
 				t.Tls.Enable = true
 				t.Tls.ValidateServer = true
-			} else if proto == "file" {
+			} else if proto == "file" || proto == "unix" {
 				t.TransportType = proto
 				t.Path = m[0][2]
 			} else {
@@ -302,6 +305,8 @@ func (c *Config) configFromRunOpts() error {
 			t.Path = ""
 			t.Tls.Enable = true
 			t.Tls.ValidateServer = true
+		} else if m[0][0] == "edge" {
+			t.TransportType = m[0][0]
 		} else {
 			// got "something", assume file://
 			t.TransportType = "file"

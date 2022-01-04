@@ -139,7 +139,7 @@ To see the monitoring and visualization features AppScope offers, exercise some 
 
 ```
 NAME         	VALUE	TYPE 	UNIT       	PID	TAGS
-proc.start   	1    	Count	process    	525	args: %2Fusr%2Fbin%2Fps%20-ef,gid: 0,host: 771f60292e26,proc: ps,uid: 0
+proc.start   	1    	Count	process    	525	args: %2Fusr%2Fbin%2Fps%20-ef,gid: 0,groupname: root,host: 771f60292e26,proc: ps,uid: 0,username: root
 proc.cpu     	10000	Count	microsecond	525	host: 771f60292e26,proc: ps
 proc.cpu_perc	0.1  	Gauge	percent    	525	host: 771f60292e26,proc: ps
 proc.mem     	16952	Gauge	kibibyte   	525	host: 771f60292e26,proc: ps

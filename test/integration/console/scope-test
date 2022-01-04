@@ -45,6 +45,22 @@ export SCOPE_PAYLOAD_ENABLE=true
 export SCOPE_PAYLOAD_HEADER=true
 
 #
+# test firefox
+#
+starttest firefox
+
+scope run -- firefox --headless &
+scope_pid=$!
+sleep 1
+
+kill -s 0 $scope_pid
+if [ $? -ne 0 ]; then
+    ERR+=1
+fi
+
+endtest
+
+#
 # cat html (negative test)
 #
 
@@ -161,6 +177,19 @@ ldscope tar -PxOzf test.tar.gz > /dev/null
 evaltest
 
 grep "$BINARY_MSG" $EVT_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+#
+# change user and test group and user name
+#
+
+starttest group_user_name
+
+su --command="/usr/local/scope/bin/ldscope ls" test_user > /dev/null
+
+grep '"gid":1234,"groupname":"test_group","uid":3333,"username":"test_user"' $EVT_FILE > /dev/null
 ERR+=$?
 
 endtest

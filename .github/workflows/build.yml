@@ -120,6 +120,14 @@ jobs:
         on: [[ubuntu-latest],[self-hosted,ARM64]]
     steps:
 
+      # Attempt to prune any orphaned docker resources on the EC2 ARM runners
+      - name: Prune Docker Resources
+        if: ${{ matrix.on == 'ARM64' }}
+        run: |
+            docker rm --force $(docker ps -a -q) || exit 0
+            docker network prune --force || exit 0
+            docker volume prune --force || exit 0
+
       # Some diagnostic info on the build environment. This also outputs `arch`
       # which we use elsewhere for architecture-specific things.
       - name: Dump Environment
@@ -273,7 +281,7 @@ jobs:
       # This is just being done to reduce the workflow time duration.
       - name: List Integration Tests
         id: tests
-        run: echo "::set-output name=tests-${{ steps.env.outputs.arch }}::$(make -s -C test/testContainers tests | egrep -v '.*java(9|1[023456])$' | sort -V | jq -ncR '[inputs]')"
+        run: echo "::set-output name=tests-${{ steps.env.outputs.arch }}::$(make -s -C test/integration tests | egrep -v '.*java(9|1[023456])$' | sort -V | jq -ncR '[inputs]')"
 
       # Upload the built binaries for use by later stages. We specify the same
       # artifact name for this job as well as the other job for ARM. The result
@@ -415,15 +423,15 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update Test Image
-        run: make -C test/testContainers ${{ matrix.test }}-build
+        run: make -C test/integration ${{ matrix.test }}-build
 
       - name: Run Test
-        run: make -C test/testContainers ${{ matrix.test }} NOBUILD=1
+        run: make -C test/integration ${{ matrix.test }} NOBUILD=1
 
       # We only save the resulting container image when testing the default branch
       - name: Upload Test Image
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-        run: make -C test/testContainers ${{ matrix.test }}-push NOBUILD=1
+        run: make -C test/integration ${{ matrix.test }}-push NOBUILD=1
 
   # Run the ARM Integration tests.
   test-arm64:
@@ -456,14 +464,14 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update Test Image
-        run: make -C test/testContainers ${{ matrix.test }}-build
+        run: make -C test/integration ${{ matrix.test }}-build
 
       - name: Run Test
-        run: make -C test/testContainers ${{ matrix.test }} NOBUILD=1
+        run: make -C test/integration ${{ matrix.test }} NOBUILD=1
 
       - name: Upload Test Image
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-        run: make -C test/testContainers ${{ matrix.test }}-push NOBUILD=1
+        run: make -C test/integration ${{ matrix.test }}-push NOBUILD=1
 
   # Build the container image
   image:

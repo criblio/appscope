@@ -159,6 +159,25 @@ func TestConfigFromRunOpts(t *testing.T) {
 	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
 	assert.Equal(t, "stderr", c.sc.Metric.Transport.Path)
 
+	// unix
+	c.MetricsDest = "unix:///tmp/file_socket"
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.Equal(t, "unix", c.sc.Metric.Transport.TransportType)
+	assert.Equal(t, "/tmp/file_socket", c.sc.Metric.Transport.Path)
+
+	c.MetricsDest = "unix://@abstract_socket"
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.Equal(t, "unix", c.sc.Metric.Transport.TransportType)
+	assert.Equal(t, "@abstract_socket", c.sc.Metric.Transport.Path)
+
+	// edge
+	c.MetricsDest = "edge"
+	err = c.configFromRunOpts()
+	assert.NoError(t, err)
+	assert.Equal(t, "edge", c.sc.Metric.Transport.TransportType)
+
 	// tcp
 	c.MetricsDest = "tcp://foo:1234"
 	err = c.configFromRunOpts()

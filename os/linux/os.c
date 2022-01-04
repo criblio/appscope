@@ -1,5 +1,8 @@
 #define _GNU_SOURCE
 #include <sys/param.h>
+#include <sys/types.h>
+#include <grp.h>
+#include <pwd.h>
 #include <time.h>
 #include "os.h"
 #include "../../src/dbg.h"
@@ -196,18 +199,21 @@ osUnixSockPeer(ino_t lnode)
 }
 
 int
-osGetExePath(char **path)
+osGetExePath(pid_t pid, char **path)
 {
     if (!path) return -1;
     char *buf = *path;
+    char pidpath[PATH_MAX];
 
     if (!(buf = calloc(1, PATH_MAX))) {
         scopeLogError("ERROR:calloc in osGetExePath");
         return -1;
     }
 
-    if (readlink("/proc/self/exe", buf, PATH_MAX - 1) == -1) {
-        scopeLogError("osGetPath: can't get path to self exe");
+    snprintf(pidpath, PATH_MAX, "/proc/%d/exe", pid);
+
+    if (readlink(pidpath, buf, PATH_MAX - 1) == -1) {
+        scopeLogError("osGetExePath: can't get path to pid %d exe", pid);
         free(buf);
         return -1;
     }
@@ -224,7 +230,7 @@ osGetProcname(char *pname, int len)
     } else {
         char *ppath = NULL;
 
-        if (osGetExePath(&ppath) != -1) {
+        if (osGetExePath(getpid(), &ppath) != -1) {
             strncpy(pname, basename(ppath), len);
             if (ppath) free(ppath);
         } else {
@@ -761,3 +767,28 @@ osGetFileMode(mode_t perm)
     return mode;
 }
 
+char *
+osGetUserName(unsigned uid)
+{
+    struct passwd pwd;
+    struct passwd *pwd_res = NULL;
+    char buf[4096];
+
+    int ret = getpwuid_r(uid, &pwd, buf, sizeof(buf), &pwd_res);
+    if (ret)
+        return NULL;
+    return strdup(pwd.pw_name);
+}
+
+char *
+osGetGroupName(unsigned gid)
+{
+    struct group grp;
+    struct group *grp_res = NULL;
+    char buf[4096];
+
+    int ret = getgrgid_r(gid, &grp, buf, sizeof(buf), &grp_res);
+    if (ret)
+        return NULL;
+    return strdup(grp.gr_name);
+}

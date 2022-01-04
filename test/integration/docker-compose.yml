@@ -87,6 +87,15 @@ services:
       - 27017:27017
     <<: *scope-common
 
+  metriccapture:
+    image: ghcr.io/criblio/appscope-test-metriccapture:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-metriccapture:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./metriccapture/Dockerfile
+    <<: *scope-common
+
   java8:
     image: ghcr.io/criblio/appscope-test-java8:${TAG:?Missing TAG environment variable}
     build:

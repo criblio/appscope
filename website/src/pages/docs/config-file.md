@@ -160,13 +160,16 @@ metric:
     #   tcp://host:port         send to a network server (TCP protocol)
     #   unix://@abstractname    send to a unix domain server w/abstract addr
     #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
+    #   edge                    send to a unix domain server `/opt/cribl/state/appscope.sock`
+    #                           or to `$CRIBL_HOME/state/appscope.sock`
+    #                           if $CRIBL_HOME environment variable is set
     #
     # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
     # set the $SCOPE_METRIC_TLS_* variables.
 
     # Connection type
     #   Type:     string
-    #   Values:   udp, tcp, unix, and file
+    #   Values:   udp, tcp, unix, file, and edge
     #   Default:  udp
     #   Override: the protocol token in the $SCOPE_METRIC_DEST URL
     #
@@ -198,7 +201,7 @@ metric:
     #
     # Applies when connection type is file or unix.
     #
-    #path:
+    #path: ''
 
     # File buffering
     #   Type:     string
@@ -436,13 +439,16 @@ event:
     #   tcp://host:port         send to a network server (TCP protocol)
     #   unix://@abstractname    send to a unix domain server w/abstract addr
     #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
+    #   edge                    send to a unix domain server `/opt/cribl/state/appscope.sock`
+    #                           or to `$CRIBL_HOME/state/appscope.sock`
+    #                           if $CRIBL_HOME environment variable is set
     #
     # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
     # set the $SCOPE_EVENT_TLS_* variables.
 
     # Connection type
     #   Type:     string
-    #   Values:   udp, tcp, unix, and file
+    #   Values:   udp, tcp, unix, file, and edge
     #   Default:  tcp
     #   Override: the protocol token in the $SCOPE_EVENT_DEST URL
     #
@@ -472,7 +478,7 @@ event:
     #
     # Applies when connection type is file or unix.
     #
-    #path:
+    #path: ''
 
     # File buffering
     #   Type:     string
@@ -629,13 +635,16 @@ libscope:
       #   tcp://host:port         send to a network server (TCP protocol)
       #   unix://@abstractname    send to a unix domain server w/abstract addr
       #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
+      #   edge                    send to a unix domain server `/opt/cribl/state/appscope.sock`
+      #                           or to `$CRIBL_HOME/state/appscope.sock`
+      #                           if $CRIBL_HOME environment variable is set
       #
       # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
       # set the $SCOPE_LOG_TLS_* variables.
   
       # Connection type
       #   Type:     string
-      #   Values:   udp, tcp, unix, and file
+      #   Values:   udp, tcp, unix, file, and edge
       #   Default:  file
       #   Override: the protocol token in the $SCOPE_LOG_DEST URL
       #
@@ -710,10 +719,15 @@ cribl:
   #
   transport:
 
-    # Set $SCOPE_CRIBL to override the type, host, and port configs below. The
-    # environment variable should be set to a URL.
+    # Set $SCOPE_CRIBL to override the type, host, port and socket path configs below.
+    # The environment variable should be set to a URL.
     #
     #   tcp://host:port         send to a TCP server
+    #   unix://@abstractname    send to a unix domain server w/abstract addr
+    #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
+    #   edge                    send to a unix domain server `/opt/cribl/state/appscope.sock`
+    #                           or to `$CRIBL_HOME/state/appscope.sock`
+    #                           if $CRIBL_HOME environment variable is set
     #
     # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
     # set the $SCOPE_CRIBL_TLS_* variables.
@@ -726,7 +740,7 @@ cribl:
 
     # Connection type
     #   Type:     string
-    #   Values:   tcp
+    #   Values:   tcp, unix, and edge
     #   Default:  tcp
     #   Override: the protocol token in the $SCOPE_CRIBL or $SCOPE_CRIBL_CLOUD URL
     #
@@ -737,6 +751,8 @@ cribl:
     #   Values:   (hostname or IP address)
     #   Default:  127.0.0.1
     #   Override: the host token in the $SCOPE_CRIBL or $SCOPE_CRIBL_CLOUD URL
+    #
+    # Only applies when the connection type is tcp.
     #
     host: 127.0.0.1
 
@@ -754,7 +770,19 @@ cribl:
     # Use 10091 here if you need to connect to Cribl Cloud without TLS and
     # are not making any changes in the AppScope Source.
     #
+    # Only applies when the connection type is tcp.
+    #
     port: 10090
+
+    # Unix domain socket path
+    #   Type:     string
+    #   Values:   socket path
+    #   Default:  (none)
+    #   Override: the socket_path token in the $SCOPE_CRIBL or $SCOPE_CRIBL_CLOUD URL
+    #
+    # Only applies when the connection type is unix.
+    #
+    #path: ''
 
     # TLS connection settings
     tls:

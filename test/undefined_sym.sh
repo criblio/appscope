@@ -7,7 +7,7 @@
 # like this because some environments set LD_BIND_NOW.
 export LD_BIND_NOW=1
 
-
+export SCOPE_CRIBL_ENABLE=false
 export SCOPE_EVENT_METRIC=true
 export SCOPE_EVENT_HTTP=true
 export SCOPE_EVENT_LOG=true

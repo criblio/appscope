@@ -102,8 +102,14 @@ starttest cribldest_file_socket
 nc -lU $FILE_SOCKET > $DEST_FILE &
 ERR+=$?
 
+PRE_SCOPE_CRIBL_ENABLE=$SCOPE_CRIBL_ENABLE
+unset SCOPE_CRIBL_ENABLE
+
 scope run --cribldest=unix://$FILE_SOCKET ls
 ERR+=$?
+
+export SCOPE_CRIBL_ENABLE=$PRE_SCOPE_CRIBL_ENABLE
+
 
 count=$(grep '"type":"metric"' $DEST_FILE | wc -l)
 if [ $count -eq 0 ] ; then

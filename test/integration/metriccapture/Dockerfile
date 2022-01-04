@@ -10,6 +10,8 @@ RUN npm install hot-shots && \
 COPY metriccapture/scope-test /usr/local/scope/
 COPY metriccapture/hotshot.ts /usr/local/scope/
 
+ENV SCOPE_CRIBL_ENABLE=false
+
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["test"]

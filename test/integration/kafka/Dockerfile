@@ -45,6 +45,7 @@ RUN groupadd kafka && \
 #ENV SCOPE_OUT_DEST=udp://localhost:8125
 #ENV SCOPE_OUT_VERBOSITY=4
 #ENV SCOPE_EVENT_DEST=tcp://172.16.198.132:9109
+ENV SCOPE_CRIBL_ENABLE=false
 ENV SCOPE_METRIC_DEST=udp://localhost:8125
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log

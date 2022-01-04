@@ -1,5 +1,6 @@
 #! /bin/bash
 
+export SCOPE_CRIBL_ENABLE=false
 export SCOPE_EVENT_METRIC=true
 export SCOPE_EVENT_DEST=file:///tmp/scope_peer.log
 export LD_PRELOAD=./lib/linux/$(uname -m)/libscope.so

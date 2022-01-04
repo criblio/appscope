@@ -22,6 +22,7 @@ RUN cd /opt/test && \
 RUN source scl_source enable rh-python38 && \
     virtualenv -p $(which python) /opt/test-runner/
 
+ENV SCOPE_CRIBL_ENABLE=false
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_METRIC_DEST=tcp://localhost:8125
 ENV SCOPE_METRIC_VERBOSITY=4

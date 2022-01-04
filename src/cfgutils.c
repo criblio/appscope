@@ -172,7 +172,7 @@ void cfgAuthTokenSetFromStr(config_t*, const char*);
 void cfgEvtFormatHeaderSetFromStr(config_t *, const char *);
 static void cfgSetFromFile(config_t *, const char *);
 static void cfgCriblEnableSetFromStrEnv(config_t *, cfg_logstream_t, const char *);
-static void cfgCriblEnableSetFromStrYaml(config_t *, const char *);
+static void cfgCriblEnableSetFromStr(config_t *, const char *);
 
 static void processRoot(config_t *, yaml_document_t *, yaml_node_t *);
 
@@ -562,6 +562,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FS, value);
     } else if (!strcmp(env_name, "SCOPE_EVENT_DNS")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_DNS, value);
+    } else if (!strcmp(env_name, "SCOPE_CRIBL_ENABLE")) {
+        cfgCriblEnableSetFromStr(cfg, value);
     } else if (!strcmp(env_name, "SCOPE_CRIBL_TLS_ENABLE")) {
         cfgTransportTlsEnableSetFromStr(cfg, CFG_LS, value);
     } else if (!strcmp(env_name, "SCOPE_CRIBL_TLS_VALIDATE_SERVER")) {
@@ -891,7 +893,7 @@ cfgPayDirSetFromStr(config_t *cfg, const char *value)
 }
 
 void
-cfgCriblEnableSetFromStrYaml(config_t *cfg, const char *value)
+cfgCriblEnableSetFromStr(config_t *cfg, const char *value)
 {
     if (!cfg || !value) return;
     // Sets CFG_LOGSTREAM_NONE (0) or CFG_LOGSTREAM (1)
@@ -1485,7 +1487,7 @@ static void
 processCriblEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     char *value = stringVal(node);
-    cfgCriblEnableSetFromStrYaml(config, value);
+    cfgCriblEnableSetFromStr(config, value);
     if (value) free(value);
 }
 

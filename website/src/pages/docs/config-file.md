@@ -69,7 +69,6 @@ metric:
   #   Default:  true
   #   Override: $SCOPE_METRIC_ENABLE
   #
-  # When the `cribl` backend is enabled, this is forced to true.
   #
   enable: true
 
@@ -268,7 +267,6 @@ event:
   #   Default:  true
   #   Override: $SCOPE_EVENT_ENABLE
   #
-  # When the `cribl` backend is enabled, this is forced to true.
   #
   enable: true
 
@@ -698,9 +696,7 @@ cribl:
   #   Type:     boolean
   #   Values:   true, false
   #   Default:  false
-  #
-  # This is set to true if $SCOPE_CRIBL or $SCOPE_CRIBL_CLOUD is set to a valid
-  # transport URL.
+  #   Override: $SCOPE_CRIBL_ENABLE
   #
   enable: false
 

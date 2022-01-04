@@ -709,7 +709,7 @@ static const char scope_help_configuration[] =
 "            Default is /tmp\n"
 "        SCOPE_CRIBL_ENABLE\n"
 "            Single flag to make it possible to disable cribl backend.\n"
-"            true,false  Default is false.\n"
+"            true,false  Default is true.\n"
 "        SCOPE_CRIBL_CLOUD\n"
 "            Intended as an alternative to SCOPE_CRIBL below. Identical\n"
 "            behavior, except that where SCOPE_CRIBL can have TLS settings\n"

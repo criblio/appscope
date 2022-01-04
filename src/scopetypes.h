@@ -142,7 +142,7 @@ typedef unsigned int bool;
 #define DEFAULT_TLS_VALIDATE_SERVER TRUE
 #define DEFAULT_TLS_CA_CERT NULL
 
-#define DEFAULT_LOGSTREAM_ENABLE FALSE
+#define DEFAULT_LOGSTREAM_ENABLE TRUE
 #define DEFAULT_LOGSTREAM_CLOUD  FALSE
 #define DEFAULT_LOGSTREAM_LOGMSG "The following settings have been overridden by a LogStream connection: event, metric and payload transport, "
 

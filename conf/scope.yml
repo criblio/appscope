@@ -691,10 +691,10 @@ cribl:
   # Enable the `cribl` backend
   #   Type:     boolean
   #   Values:   true, false
-  #   Default:  false
+  #   Default:  true
   #   Override: $SCOPE_CRIBL_ENABLE
   #
-  enable: false
+  enable: true
 
   # Authentication token
   #   Type:     string

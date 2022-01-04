@@ -1675,10 +1675,9 @@ EXPORTON int
 closedir(DIR *dirp)
 {
     WRAP_CHECK(closedir, -1);
-    int fd = dirfd(dirp);
     int rc = g_fn.closedir(dirp);
 
-    if (fd != -1) doCloseAndReportFailures(fd, (rc != -1), "closedir");
+    doCloseAndReportFailures(dirfd(dirp), (rc != -1), "closedir");
 
     return rc;
 }
@@ -1688,12 +1687,9 @@ readdir(DIR *dirp)
 {
     WRAP_CHECK(readdir, NULL);
     uint64_t initialTime = getTime();
-    int fd = dirfd(dirp);
     struct dirent *dep = g_fn.readdir(dirp);
 
-    if (fd != -1) {
-        doRead(fd, initialTime, (dep != NULL), NULL, sizeof(struct dirent), "readdir", BUF, 0);
-    }
+    doRead(dirfd(dirp), initialTime, (dep != NULL), NULL, sizeof(struct dirent), "readdir", BUF, 0);
 
     return dep;
 }

@@ -224,6 +224,9 @@ static got_list_t inject_hook_list[] = {
     {"recv", NULL, &g_fn.recv},
     {"recvfrom", NULL, &g_fn.recvfrom},
     {"recvmsg", NULL, &g_fn.recvmsg},
+    {"opendir", NULL, &g_fn.opendir},
+    {"closedir", NULL, &g_fn.closedir},
+    {"readdir", NULL, &g_fn.readdir},
     {NULL, NULL, NULL}
 };
 
@@ -363,6 +366,30 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 
 #endif // __linux__
 
+/*
+ * This would appear to be extraneous. However, the function closedir()
+ * is defined using the __nonnull function attribute, which results in
+ * a compiler warning when checking for a null dirp. This just avoids
+ * the warning.
+ */
+static int
+scope_dirfd(DIR *dirp)
+{
+    if (!dirp) return -1;
+    return dirfd(dirp);
+}
+
+/*
+ * Local helper function to ensure that we check for a null pointer
+ * when getting an fd from a stream. There is at least one libc
+ * implementation where stream is derefrenced without a check for null.
+ */
+static int
+scope_fileno(FILE *stream)
+{
+    if (!stream) return -1;
+    return fileno(stream);
+}
 
 static void
 freeNssEntry(void *data)
@@ -1679,9 +1706,10 @@ EXPORTON int
 closedir(DIR *dirp)
 {
     WRAP_CHECK(closedir, -1);
+    int fd = scope_dirfd(dirp);
     int rc = g_fn.closedir(dirp);
 
-    doCloseAndReportFailures(dirfd(dirp), (rc != -1), "closedir");
+    doCloseAndReportFailures(fd, (rc != -1), "closedir");
 
     return rc;
 }
@@ -1690,12 +1718,13 @@ EXPORTON struct dirent *
 readdir(DIR *dirp)
 {
     WRAP_CHECK(readdir, NULL);
+    int fd = scope_dirfd(dirp);
     uint64_t initialTime = getTime();
 
     errno = 0;
     struct dirent *dep = g_fn.readdir(dirp);
 
-    doRead(dirfd(dirp), initialTime, (errno != 0), NULL, sizeof(struct dirent), "readdir", BUF, 0);
+    doRead(fd, initialTime, (errno != 0), NULL, sizeof(struct dirent), "readdir", BUF, 0);
 
     return dep;
 }
@@ -2138,7 +2167,7 @@ __fread_unlocked_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *
 
     size_t rc = g_fn.__fread_unlocked_chk(ptr, ptrlen, size, nmemb, stream);
 
-    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "__fread_unlocked_chk", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "__fread_unlocked_chk", NONE, 0);
 
     return rc;
 }
@@ -2227,7 +2256,7 @@ fseeko64(FILE *stream, off64_t offset, int whence)
 
     int rc = g_fn.fseeko64(stream, offset, whence);
 
-    doSeek(fileno(stream), (rc != -1), "fseeko64");
+    doSeek(scope_fileno(stream), (rc != -1), "fseeko64");
 
     return rc;
 }
@@ -2239,7 +2268,7 @@ ftello64(FILE *stream)
 
     off64_t rc = g_fn.ftello64(stream);
 
-    doSeek(fileno(stream), (rc != -1), "ftello64");
+    doSeek(scope_fileno(stream), (rc != -1), "ftello64");
 
     return rc;
 }
@@ -2272,7 +2301,7 @@ fsetpos64(FILE *stream, const fpos64_t *pos)
     WRAP_CHECK(fsetpos64, -1);
     int rc = g_fn.fsetpos64(stream, pos);
 
-    doSeek(fileno(stream), (rc == 0), "fsetpos64");
+    doSeek(scope_fileno(stream), (rc == 0), "fsetpos64");
 
     return rc;
 }
@@ -2656,7 +2685,7 @@ __overflow(FILE *stream, int ch)
 
     int rc = g_fn.__overflow(stream, ch);
 
-    doWrite(fileno(stream), initialTime, (rc != EOF), &ch, 1, "__overflow", BUF, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc != EOF), &ch, 1, "__overflow", BUF, 0);
 
     return rc;
 }
@@ -2828,7 +2857,7 @@ fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
 
     size_t rc = g_fn.fwrite_unlocked(ptr, size, nitems, stream);
 
-    doWrite(fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite_unlocked", BUF, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite_unlocked", BUF, 0);
 
     return rc;
 }
@@ -3482,7 +3511,7 @@ EXPORTON int
 fclose(FILE *stream)
 {
     WRAP_CHECK(fclose, EOF);
-    int fd = fileno(stream);
+    int fd = scope_fileno(stream);
 
     if (isAnAppScopeConnection(fd)) return 0;
 
@@ -3636,7 +3665,7 @@ fseek(FILE *stream, long offset, int whence)
     WRAP_CHECK(fseek, -1);
     int rc = g_fn.fseek(stream, offset, whence);
 
-    doSeek(fileno(stream), (rc != -1), "fseek");
+    doSeek(scope_fileno(stream), (rc != -1), "fseek");
 
     return rc;
 }
@@ -3647,7 +3676,7 @@ fseeko(FILE *stream, off_t offset, int whence)
     WRAP_CHECK(fseeko, -1);
     int rc = g_fn.fseeko(stream, offset, whence);
 
-    doSeek(fileno(stream), (rc != -1), "fseeko");
+    doSeek(scope_fileno(stream), (rc != -1), "fseeko");
 
     return rc;
 }
@@ -3658,7 +3687,7 @@ ftell(FILE *stream)
     WRAP_CHECK(ftell, -1);
     long rc = g_fn.ftell(stream);
 
-    doSeek(fileno(stream), (rc != -1), "ftell");
+    doSeek(scope_fileno(stream), (rc != -1), "ftell");
 
     return rc;
 }
@@ -3669,7 +3698,7 @@ ftello(FILE *stream)
     WRAP_CHECK(ftello, -1);
     off_t rc = g_fn.ftello(stream);
 
-    doSeek(fileno(stream), (rc != -1), "ftello"); 
+    doSeek(scope_fileno(stream), (rc != -1), "ftello");
 
     return rc;
 }
@@ -3680,7 +3709,7 @@ rewind(FILE *stream)
     WRAP_CHECK_VOID(rewind);
     g_fn.rewind(stream);
 
-    doSeek(fileno(stream), TRUE, "rewind");
+    doSeek(scope_fileno(stream), TRUE, "rewind");
 
     return;
 }
@@ -3691,7 +3720,7 @@ fsetpos(FILE *stream, const fpos_t *pos)
     WRAP_CHECK(fsetpos, -1);
     int rc = g_fn.fsetpos(stream, pos);
 
-    doSeek(fileno(stream), (rc == 0), "fsetpos");
+    doSeek(scope_fileno(stream), (rc == 0), "fsetpos");
 
     return rc;
 }
@@ -3702,7 +3731,7 @@ fgetpos(FILE *stream,  fpos_t *pos)
     WRAP_CHECK(fgetpos, -1);
     int rc = g_fn.fgetpos(stream, pos);
 
-    doSeek(fileno(stream), (rc == 0), "fgetpos");
+    doSeek(scope_fileno(stream), (rc == 0), "fgetpos");
 
     return rc;
 }
@@ -3713,7 +3742,7 @@ fgetpos64(FILE *stream,  fpos64_t *pos)
     WRAP_CHECK(fgetpos64, -1);
     int rc = g_fn.fgetpos64(stream, pos);
 
-    doSeek(fileno(stream), (rc == 0), "fgetpos64");
+    doSeek(scope_fileno(stream), (rc == 0), "fgetpos64");
 
     return rc;
 }
@@ -3829,7 +3858,7 @@ fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
 
     size_t rc = g_fn.fwrite(ptr, size, nitems, stream);
 
-    doWrite(fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite", BUF, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite", BUF, 0);
 
     return rc;
 }
@@ -3845,11 +3874,11 @@ puts(const char *s)
 
     int rc = g_fn.puts(s);
 
-    doWrite(fileno(stdout), initialTime, (rc != EOF), s, strlen(s), "puts", BUF, 0);
+    doWrite(scope_fileno(stdout), initialTime, (rc != EOF), s, strlen(s), "puts", BUF, 0);
 
     if (rc != EOF) {
         // puts() "writes the string s and a trailing newline to stdout"
-        doWrite(fileno(stdout), initialTime, TRUE, "\n", 1, "puts", BUF, 0);
+        doWrite(scope_fileno(stdout), initialTime, TRUE, "\n", 1, "puts", BUF, 0);
     }
 
     return rc;
@@ -3866,7 +3895,7 @@ putchar(int c)
 
     int rc = g_fn.putchar(c);
 
-    doWrite(fileno(stdout), initialTime, (rc != EOF), &c, 1, "putchar", BUF, 0);
+    doWrite(scope_fileno(stdout), initialTime, (rc != EOF), &c, 1, "putchar", BUF, 0);
 
     return rc;
 }
@@ -3882,7 +3911,7 @@ fputs(const char *s, FILE *stream)
 
     int rc = g_fn.fputs(s, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != EOF), s, strlen(s), "fputs", BUF, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc != EOF), s, strlen(s), "fputs", BUF, 0);
 
     return rc;
 }
@@ -3898,7 +3927,7 @@ fputs_unlocked(const char *s, FILE *stream)
 
     int rc = g_fn.fputs_unlocked(s, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != EOF), s, strlen(s), "fputs_unlocked", BUF, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc != EOF), s, strlen(s), "fputs_unlocked", BUF, 0);
 
     return rc;
 }
@@ -3950,7 +3979,7 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 
     size_t rc = g_fn.fread(ptr, size, nmemb, stream);
 
-    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "fread", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "fread", NONE, 0);
 
     return rc;
 }
@@ -3964,7 +3993,7 @@ __fread_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *stream)
 
     size_t rc = g_fn.__fread_chk(ptr, ptrlen, size, nmemb, stream);
 
-    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "__fread_chk", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "__fread_chk", NONE, 0);
 
     return rc;
 }
@@ -3977,7 +4006,7 @@ fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
 
     size_t rc = g_fn.fread_unlocked(ptr, size, nmemb, stream);
 
-    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "fread_unlocked", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "fread_unlocked", NONE, 0);
 
     return rc;
 }
@@ -3990,7 +4019,7 @@ fgets(char *s, int n, FILE *stream)
 
     char* rc = g_fn.fgets(s, n, stream);
 
-    doRead(fileno(stream), initialTime, (rc != NULL), NULL, n, "fgets", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != NULL), NULL, n, "fgets", NONE, 0);
 
     return rc;
 }
@@ -4004,7 +4033,7 @@ __fgets_chk(char *s, size_t size, int strsize, FILE *stream)
 
     char* rc = g_fn.__fgets_chk(s, size, strsize, stream);
 
-    doRead(fileno(stream), initialTime, (rc != NULL), NULL, size, "__fgets_chk", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != NULL), NULL, size, "__fgets_chk", NONE, 0);
 
     return rc;
 }
@@ -4017,7 +4046,7 @@ fgets_unlocked(char *s, int n, FILE *stream)
 
     char* rc = g_fn.fgets_unlocked(s, n, stream);
 
-    doRead(fileno(stream), initialTime, (rc != NULL), NULL, n, "fgets_unlocked", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != NULL), NULL, n, "fgets_unlocked", NONE, 0);
 
     return rc;
 }
@@ -4031,7 +4060,7 @@ __fgetws_chk(wchar_t *ws, size_t size, int strsize, FILE *stream)
 
     wchar_t* rc = g_fn.__fgetws_chk(ws, size, strsize, stream);
 
-    doRead(fileno(stream), initialTime, (rc != NULL), NULL, size*sizeof(wchar_t), "__fgetws_chk", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != NULL), NULL, size*sizeof(wchar_t), "__fgetws_chk", NONE, 0);
 
     return rc;
 }
@@ -4044,7 +4073,7 @@ fgetws(wchar_t *ws, int n, FILE *stream)
 
     wchar_t* rc = g_fn.fgetws(ws, n, stream);
 
-    doRead(fileno(stream), initialTime, (rc != NULL), NULL, n*sizeof(wchar_t), "fgetws", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != NULL), NULL, n*sizeof(wchar_t), "fgetws", NONE, 0);
 
     return rc;
 }
@@ -4057,7 +4086,7 @@ fgetwc(FILE *stream)
 
     wint_t rc = g_fn.fgetwc(stream);
 
-    doRead(fileno(stream), initialTime, (rc != WEOF), NULL, sizeof(wint_t), "fgetwc", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != WEOF), NULL, sizeof(wint_t), "fgetwc", NONE, 0);
 
     return rc;
 }
@@ -4070,7 +4099,7 @@ fgetc(FILE *stream)
 
     int rc = g_fn.fgetc(stream);
 
-    doRead(fileno(stream), initialTime, (rc != EOF), NULL, 1, "fgetc", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != EOF), NULL, 1, "fgetc", NONE, 0);
 
     return rc;
 }
@@ -4086,7 +4115,7 @@ fputc(int c, FILE *stream)
 
     int rc = g_fn.fputc(c, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != EOF), &c, 1, "fputc", NONE, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc != EOF), &c, 1, "fputc", NONE, 0);
 
     return rc;
 }
@@ -4102,7 +4131,7 @@ fputc_unlocked(int c, FILE *stream)
 
     int rc = g_fn.fputc_unlocked(c, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != EOF), &c, 1, "fputc_unlocked", NONE, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc != EOF), &c, 1, "fputc_unlocked", NONE, 0);
 
     return rc;
 }
@@ -4118,7 +4147,7 @@ putwc(wchar_t wc, FILE *stream)
 
     wint_t rc = g_fn.putwc(wc, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != WEOF), &wc, sizeof(wchar_t), "putwc", NONE, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc != WEOF), &wc, sizeof(wchar_t), "putwc", NONE, 0);
 
     return rc;
 }
@@ -4134,7 +4163,7 @@ fputwc(wchar_t wc, FILE *stream)
 
     wint_t rc = g_fn.fputwc(wc, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != WEOF), &wc, sizeof(wchar_t), "fputwc", NONE, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc != WEOF), &wc, sizeof(wchar_t), "fputwc", NONE, 0);
 
     return rc;
 }
@@ -4152,7 +4181,7 @@ fscanf(FILE *stream, const char *format, ...)
                      fArgs.arg[2], fArgs.arg[3],
                      fArgs.arg[4], fArgs.arg[5]);
 
-    doRead(fileno(stream),initialTime, (rc != EOF), NULL, rc, "fscanf", NONE, 0);
+    doRead(scope_fileno(stream),initialTime, (rc != EOF), NULL, rc, "fscanf", NONE, 0);
 
     return rc;
 }
@@ -4166,7 +4195,7 @@ getline (char **lineptr, size_t *n, FILE *stream)
     ssize_t rc = g_fn.getline(lineptr, n, stream);
 
     size_t bytes = (n) ? *n : 0;
-    doRead(fileno(stream), initialTime, (rc != -1), NULL, bytes, "getline", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != -1), NULL, bytes, "getline", NONE, 0);
 
     return rc;
 }
@@ -4181,7 +4210,7 @@ getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
     ssize_t rc = g_fn.getdelim(lineptr, n, delimiter, stream);
 
     size_t bytes = (n) ? *n : 0;
-    doRead(fileno(stream), initialTime, (rc != -1), NULL, bytes, "getdelim", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != -1), NULL, bytes, "getdelim", NONE, 0);
 
     return rc;
 }
@@ -4199,7 +4228,7 @@ __getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
     }
 
     size_t bytes = (n) ? *n : 0;
-    doRead(fileno(stream), initialTime, (rc != -1), NULL, bytes, "__getdelim", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != -1), NULL, bytes, "__getdelim", NONE, 0);
     return rc;
 }
 

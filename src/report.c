@@ -3238,7 +3238,7 @@ doConnection(void)
         ready = TRUE;
     }
 
-    if ((cfgLogStream(g_cfg.staticfg) == FALSE) && (ready == FALSE)) {
+    if ((cfgLogStreamEnable(g_cfg.staticfg) == FALSE) && (ready == FALSE)) {
         if (mtcNeedsConnection(g_mtc)) {
             if (mtcConnect(g_mtc)) {
                 ready = TRUE;
@@ -3305,7 +3305,7 @@ doPayload()
     uint64_t data;
 
     // if LS enabled, then check for a connection
-    if (cfgLogStream(g_cfg.staticfg) && ctlNeedsConnection(g_ctl, CFG_LS)) {
+    if (cfgLogStreamEnable(g_cfg.staticfg) && ctlNeedsConnection(g_ctl, CFG_LS)) {
         if (ctlConnect(g_ctl, CFG_LS)) {
             reportProcessStart(g_ctl, FALSE, CFG_LS);
         } else {
@@ -3405,7 +3405,7 @@ doPayload()
 
             char *bdata = NULL;
 
-            if (cfgLogStream(g_cfg.staticfg)) {
+            if (cfgLogStreamEnable(g_cfg.staticfg)) {
                 bdata = calloc(1, hlen + pinfo->len);
                 if (bdata) {
                     memmove(bdata, pay, hlen);

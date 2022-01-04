@@ -1687,9 +1687,11 @@ readdir(DIR *dirp)
 {
     WRAP_CHECK(readdir, NULL);
     uint64_t initialTime = getTime();
+
+    errno = 0;
     struct dirent *dep = g_fn.readdir(dirp);
 
-    doRead(dirfd(dirp), initialTime, (dep != NULL), NULL, sizeof(struct dirent), "readdir", BUF, 0);
+    doRead(dirfd(dirp), initialTime, (errno != 0), NULL, sizeof(struct dirent), "readdir", BUF, 0);
 
     return dep;
 }

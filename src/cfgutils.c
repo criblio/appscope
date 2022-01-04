@@ -2674,20 +2674,10 @@ cfgLogStreamDefault(config_t *cfg)
     cfg_transport_t type = cfgTransportType(cfg, CFG_LS);
     cfgTransportTypeSet(cfg, CFG_CTL, type);
 
-    if (cfgMtcEnable(cfg) != TRUE) {
-        strncat(g_logmsg, "Metrics enable, ", 20);
-    }
-    cfgMtcEnableSet(cfg, 1U);
-
     if (cfgMtcFormat(cfg) != TRUE) {
         strncat(g_logmsg, "Metrics format, ", 20);
     }
     cfgMtcFormatSet(cfg, CFG_FMT_NDJSON);
-
-    if (cfgEvtEnable(cfg) != TRUE) {
-        strncat(g_logmsg, "Event enable, ", 20);
-    }
-    cfgEvtEnableSet(cfg, 1U);
 
     if (cfgLogLevel(cfg) > CFG_LOG_WARN ) {
         strncat(g_logmsg, "Log level, ", 20);

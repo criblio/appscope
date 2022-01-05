@@ -57,7 +57,7 @@ starttest event_edge
 nc -lU $CRIBL_SOCKET > $DEST_FILE &
 ERR+=$?
 
-SCOPE_EVENT_DEST=edge scope run ls
+scope run --eventdest=edge ls
 ERR+=$?
 
 count=$(grep '"type":"evt"' $DEST_FILE | wc -l)
@@ -76,10 +76,34 @@ starttest event_edge_cribl_home
 nc -lU $CRIBL_HOME_SOCKET > $DEST_FILE &
 ERR+=$?
 
-CRIBL_HOME=$CRIBL_HOME_PATH SCOPE_EVENT_DEST=edge scope run ls
+CRIBL_HOME=$CRIBL_HOME_PATH scope run --eventdest=edge ls
 ERR+=$?
 
 count=$(grep '"type":"evt"' $DEST_FILE | wc -l)
+if [ $count -eq 0 ] ; then
+    ERR+=1
+fi
+
+endtest
+
+#
+# scope cribl destination edge
+#
+
+starttest cribl_edge_cribl_home
+
+nc -lU $CRIBL_HOME_SOCKET > $DEST_FILE &
+ERR+=$?
+
+CRIBL_HOME=$CRIBL_HOME_PATH scope run --cribldest=edge ls
+ERR+=$?
+
+count=$(grep '"type":"evt"' $DEST_FILE | wc -l)
+if [ $count -eq 0 ] ; then
+    ERR+=1
+fi
+
+count=$(grep '"type":"metric"' $DEST_FILE | wc -l)
 if [ $count -eq 0 ] ; then
     ERR+=1
 fi

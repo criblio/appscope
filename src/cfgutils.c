@@ -2637,9 +2637,15 @@ cfgLogStreamDefault(config_t *cfg)
 
     snprintf(g_logmsg, sizeof(g_logmsg), DEFAULT_LOGSTREAM_LOGMSG);
 
-    if (cfgTransportType(cfg, CFG_LS) == CFG_UNIX) {
+    cfg_transport_t ls_type = cfgTransportType(cfg, CFG_LS);
+
+    if (ls_type == CFG_UNIX) {
         const char *path = cfgTransportPath(cfg, CFG_LS);
         cfgTransportPathSet(cfg, CFG_CTL, path);
+    } else if (ls_type == CFG_EDGE) {
+        char* edge_path = cfgEdgePath();
+        cfgTransportPathSet(cfg, CFG_CTL, edge_path);
+        free(edge_path);
     } else {
         // override the CFG_LS transport type to be TCP for type different than UNIX
         cfgTransportTypeSet(cfg, CFG_LS, CFG_TCP);

@@ -3252,6 +3252,13 @@ doConnection(void)
 }
 
 void
+doHttpAgg()
+{
+    httpAggSendReport(g_http_agg, g_mtc);
+    httpAggReset(g_http_agg);
+}
+
+void
 doEvent()
 {
     uint64_t data;
@@ -3292,8 +3299,6 @@ doEvent()
             free(event);
         }
     }
-    httpAggSendReport(g_http_agg, g_mtc);
-    httpAggReset(g_http_agg);
     reportAllCapturedMetrics();
     ctlFlushLog(g_ctl);
     ctlFlush(g_ctl);

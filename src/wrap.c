@@ -1727,7 +1727,9 @@ readdir(DIR *dirp)
 
     doRead(fd, initialTime, (errno != 0), NULL, sizeof(struct dirent), "readdir", BUF, 0);
 
-    errno = errsave;
+    // If readdir modified errno, leave the errno value alone.
+    // Otherwise, restore the saved errno value (before we set it to zero.)
+    errno = (errno) ? errno : errsave;
     return dep;
 }
 

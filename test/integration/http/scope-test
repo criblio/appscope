@@ -74,7 +74,7 @@ if [ ! "$(wait_for_port 10090)" ]; then
     exit 1
 fi
 
-# Each of these testst are running scoped curl connected to the local LogStream's
+# Each of these tests are running scoped curl connected to the local LogStream's
 # AppScope source. Logstream is setup to dump data sent to that source to NDJSON
 # files in ${DEST} named CriblOut-*.json.
 
@@ -272,6 +272,27 @@ else
     ERR+=1
 fi
 endtest
+
+# This test validates that http aggregation is working as expected
+# Scope should aggregate http events within the default summary period
+# even when we exit early (before the summary period elapses)
+starttest "HTTP aggregation"
+scope run -m out.txt -- nginx 
+sleep 2
+curl 127.0.0.1 >/dev/null 2>&1
+curl 127.0.0.1 >/dev/null 2>&1
+curl 127.0.0.1 >/dev/null 2>&1
+sleep 1
+nginx -s stop # kindly exit, to let handleExit() flush the http metrics
+sleep 1
+if grep '"_metric":"http.requests","_metric_type":"counter","_value":3,' out.txt >/dev/null; then
+    echo "PASS: aggregated http.requests found"
+else
+    echo "FAIL: aggregated http.requests not found"
+    ERR+=1
+fi
+endtest
+
 
 # Results
 echo ""

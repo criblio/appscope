@@ -37,6 +37,7 @@ RUN mkdir -p /opt/java_http
 COPY ./java/SimpleHttpServer.class /opt/java_http/SimpleHttpServer.class
 COPY ./java/'SimpleHttpServer$StatusHandler.class' /opt/java_http/'SimpleHttpServer$StatusHandler.class'
 
+ENV SCOPE_CRIBL_ENABLE=false
 ENV SCOPE_LOG_LEVEL=debug
 ENV SCOPE_METRIC_VERBOSITY=4
 ENV SCOPE_EVENT_LOGFILE=false

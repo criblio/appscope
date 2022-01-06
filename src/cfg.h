@@ -46,7 +46,8 @@ cfg_log_level_t     cfgLogLevel(config_t*);
 unsigned int        cfgPayEnable(config_t*);
 const char *        cfgPayDir(config_t*);
 const char *        cfgEvtFormatHeader(config_t *, int);
-cfg_logstream_t     cfgLogStream(config_t *);
+unsigned            cfgLogStreamEnable(config_t *);
+unsigned            cfgLogStreamCloud(config_t *);
 size_t              cfgEvtFormatNumHeaders(config_t *);
 regex_t *           cfgEvtFormatHeaderRe(config_t *, int);
 const char *        cfgAuthToken(config_t *);
@@ -81,7 +82,8 @@ void                cfgLogLevelSet(config_t*, cfg_log_level_t);
 void                cfgPayEnableSet(config_t*, unsigned int);
 void                cfgPayDirSet(config_t*, const char *);
 void                cfgEvtFormatHeaderSet(config_t *, const char *);
-void                cfgLogStreamSet(config_t *, cfg_logstream_t);
+void                cfgLogStreamEnableSet(config_t *, unsigned);
+void                cfgLogStreamCloudSet(config_t *, unsigned);
 void                cfgAuthTokenSet(config_t *, const char *);
 
 #endif // __CFG_H__

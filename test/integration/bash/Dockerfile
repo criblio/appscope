@@ -15,6 +15,8 @@ RUN git clone https://git.savannah.gnu.org/git/bash.git && \
 COPY ./bash/runbashmem.sh /mybin
 COPY ./bash/runbashnomem.sh /mybin
 
+ENV SCOPE_CRIBL_ENABLE=false
+
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 COPY scope-profile.sh /etc/profile.d/scope.sh
 COPY gdbinit /root/.gdbinit

@@ -64,6 +64,11 @@ struct _config_t
         char *dir;
     } pay;
 
+    struct {
+        unsigned int enable;
+        bool cloud;
+    } logstream;
+
     // CFG_MTC, CFG_CTL, or CFG_LOG
     transport_struct_t transport[CFG_WHICH_MAX]; 
 
@@ -73,7 +78,6 @@ struct _config_t
     char* commanddir;
     unsigned processstartmsg;
     unsigned enhancefs;
-    bool logstream;
     char *authtoken;
 };
 
@@ -219,7 +223,9 @@ cfgCreateDefault()
     c->processstartmsg = DEFAULT_PROCESS_START_MSG;
     c->enhancefs = DEFAULT_ENHANCE_FS;
 
-    c->logstream = DEFAULT_LOGSTREAM;
+    c->logstream.enable = DEFAULT_LOGSTREAM_ENABLE;
+    c->logstream.cloud = DEFAULT_LOGSTREAM_CLOUD;
+
     return c;
 }
 
@@ -573,10 +579,16 @@ cfgPayDir(config_t *cfg)
     return (cfg) ? cfg->pay.dir : DEFAULT_PAYLOAD_DIR;
 }
 
-cfg_logstream_t
-cfgLogStream(config_t *cfg)
+unsigned
+cfgLogStreamEnable(config_t *cfg)
 {
-    return (cfg) ? cfg->logstream : DEFAULT_LOGSTREAM;
+    return (cfg) ? cfg->logstream.enable : DEFAULT_LOGSTREAM_ENABLE;
+}
+
+unsigned
+cfgLogStreamCloud(config_t *cfg)
+{
+    return (cfg) ? cfg->logstream.cloud : DEFAULT_LOGSTREAM_CLOUD;
 }
 
 const char *
@@ -933,10 +945,17 @@ cfgPayDirSet(config_t *cfg, const char *dir)
 }
 
 void
-cfgLogStreamSet(config_t *cfg, cfg_logstream_t value)
+cfgLogStreamEnableSet(config_t *cfg, unsigned val)
 {
-    if (!cfg || value >= CFG_LOGSTREAM_MAX) return;
-    cfg->logstream = value;
+    if (!cfg || val > 1) return;
+    cfg->logstream.enable = val;
+}
+
+void
+cfgLogStreamCloudSet(config_t *cfg, unsigned val)
+{
+    if (!cfg || val > 1) return;
+    cfg->logstream.cloud = val;
 }
 
 void

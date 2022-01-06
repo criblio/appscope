@@ -25,7 +25,8 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 scope run -- perl -e 'print "foo\n"'
 scope run --payloads -- nc -lp 10001
 scope run -- curl https://wttr.in/94105
-scope run -c tcp://127.0.0.1:10091 -- curl https://wttr.in/94105`,
+scope run -c tcp://127.0.0.1:10091 -- curl https://wttr.in/94105
+scope run -c edge -- top`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()

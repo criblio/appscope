@@ -24,10 +24,6 @@ typedef enum {CFG_SRC_FILE,
               CFG_SRC_FS,
               CFG_SRC_DNS,
               CFG_SRC_MAX} watch_t;
-typedef enum {CFG_LOGSTREAM_NONE,
-              CFG_LOGSTREAM,
-              CFG_LOGSTREAM_CLOUD,
-              CFG_LOGSTREAM_MAX} cfg_logstream_t;
 
 #define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
@@ -133,7 +129,7 @@ typedef unsigned int bool;
 #define DEFAULT_CTL_PATH NULL
 #define DEFAULT_CTL_BUF CFG_BUFFER_LINE
 #define DEFAULT_LOG_TYPE CFG_FILE
-#define DEFAULT_LS_TYPE CFG_TCP
+#define DEFAULT_LS_TYPE CFG_EDGE
 #define DEFAULT_LS_HOST "127.0.0.1"
 #define DEFAULT_LS_PORT "10090"
 #define DEFAULT_LS_PATH NULL
@@ -146,7 +142,8 @@ typedef unsigned int bool;
 #define DEFAULT_TLS_VALIDATE_SERVER TRUE
 #define DEFAULT_TLS_CA_CERT NULL
 
-#define DEFAULT_LOGSTREAM CFG_LOGSTREAM_NONE
+#define DEFAULT_LOGSTREAM_ENABLE TRUE
+#define DEFAULT_LOGSTREAM_CLOUD  FALSE
 #define DEFAULT_LOGSTREAM_LOGMSG "The following settings have been overridden by a LogStream connection: event, metric and payload transport, "
 
 /*

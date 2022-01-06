@@ -9,6 +9,8 @@ RUN ARCH=$(uname -m | sed -e 's/x86_64/x64/' -e 's/aarch64/arm64/') \
  && /opt/cribl/bin/cribl boot-start enable -m initd \
  && rm -f /tmp/cribl.tgz
 
+ENV SCOPE_CRIBL_ENABLE=false
+
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 COPY scope-profile.sh /etc/profile.d/scope.sh
 COPY gdbinit /root/.gdbinit

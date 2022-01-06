@@ -14,6 +14,7 @@ RUN chmod 755 ./gogen
 # gcc -g test/manual/tcpserver.c -lpthread -o tcpserver
 COPY gogen/tcpserver /usr/bin/tcpserver
 
+ENV SCOPE_CRIBL_ENABLE=false
 ENV SCOPE_LOG_LEVEL=error
 ENV SCOPE_METRIC_VERBOSITY=4
 #ENV SCOPE_EVENT_LOGFILE=true

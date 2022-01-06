@@ -129,7 +129,16 @@ func TestCreateWorkDir(t *testing.T) {
 
 func testDefaultScopeConfigYaml(wd string, verbosity int) string {
 	wd, _ = filepath.Abs(wd)
-	expectedYaml := `metric:
+	expectedYaml := `cribl:
+  enable: false
+  transport:
+    type: ""
+    tls:
+      enable: false
+      validateserver: false
+      cacertpath: ""
+  authtoken: ""
+metric:
   enable: true
   format:
     type: ndjson

@@ -55,6 +55,7 @@ COPY ./tls/php/sslclient.php /opt/test-runner/php
 COPY ./tls/alias /root/.alias
 COPY ./tls/gdbinit /root/.gdbinit
 
+ENV SCOPE_CRIBL_ENABLE=false
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_METRIC_VERBOSITY=4
 ENV SCOPE_EVENT_LOGFILE=false

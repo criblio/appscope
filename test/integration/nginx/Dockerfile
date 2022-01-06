@@ -18,6 +18,7 @@ RUN mkdir /opt/test-runner/logs/
 
 #RUN source scl_source enable rh-python36 && virtualenv /opt/test-runner/
 
+ENV SCOPE_CRIBL_ENABLE=false
 ENV SCOPE_METRIC_DEST=udp://localhost:8125
 ENV SCOPE_EVENT_DEST=file:///dev/null
 ENV SCOPE_EVENT_ENABLE=false

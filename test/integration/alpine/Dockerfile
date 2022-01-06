@@ -90,6 +90,7 @@ COPY ./alpine/test_tls.sh /opt/test/bin/test_tls.sh
 COPY ./alpine/test_scope.sh /opt/test/bin/test_scope.sh
 COPY ./alpine/test_all.sh /opt/test/bin/test_all.sh
 
+ENV SCOPE_CRIBL_ENABLE=false
 ENV SCOPE_LOG_LEVEL=error
 ENV SCOPE_METRIC_VERBOSITY=4
 ENV SCOPE_EVENT_LOGFILE=true

@@ -171,7 +171,6 @@ void cfgPayDirSetFromStr(config_t*, const char*);
 void cfgAuthTokenSetFromStr(config_t*, const char*);
 void cfgEvtFormatHeaderSetFromStr(config_t *, const char *);
 void cfgCriblEnableSetFromStr(config_t *, const char *);
-void cfgCriblEnableSetFromStrEnv(config_t *, bool, const char *);
 static void cfgSetFromFile(config_t *, const char *);
 
 static void processRoot(config_t *, yaml_document_t *, yaml_node_t *);
@@ -571,11 +570,13 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
     } else if (!strcmp(env_name, "SCOPE_CRIBL_TLS_CA_CERT_PATH")) {
         cfgTransportTlsCACertPathSetFromStr(cfg, CFG_LS, value);
     } else if (!strcmp(env_name, "SCOPE_CRIBL_CLOUD")) {
-        cfgCriblEnableSetFromStrEnv(cfg, TRUE, value);
+        cfgLogStreamCloudSet(cfg, TRUE);
+        cfgTransportSetFromStr(cfg, CFG_LS, value);
+    } else if (!strcmp(env_name, "SCOPE_CRIBL")) {
+        cfgLogStreamCloudSet(cfg, FALSE);
+        cfgTransportSetFromStr(cfg, CFG_LS, value);
     } else if (!strcmp(env_name, "SCOPE_CRIBL_AUTHTOKEN")) {
         cfgAuthTokenSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_CRIBL")) {
-        cfgCriblEnableSetFromStrEnv(cfg, FALSE, value);
     } else if (startsWith(env_name, "SCOPE_TAG_")) {
         processCustomTag(cfg, env_line, value);
     }
@@ -772,7 +773,7 @@ static char*
 cfgEdgePath(void){
     const char *cribl_home = getenv("CRIBL_HOME");
     if (cribl_home) {
-        char new_path[4096];
+        char new_path[PATH_MAX];
         int cx = snprintf(new_path, sizeof(new_path), "%s/%s", cribl_home, "state/appscope.sock");
         if (cx >= 0 && cx < sizeof(new_path)) {
             return realpath(new_path, NULL);
@@ -897,15 +898,6 @@ cfgCriblEnableSetFromStr(config_t *cfg, const char *value)
 {
     if (!cfg || !value) return;
     cfgLogStreamEnableSet(cfg, strToVal(boolMap, value));
-}
-
-void
-cfgCriblEnableSetFromStrEnv(config_t *cfg, bool cloud, const char *value)
-{
-    if (!cfg || !value) return;
-    cfgLogStreamCloudSet(cfg, cloud);
-    // Sets type, host, and port
-    cfgTransportSetFromStr(cfg, CFG_LS, value);
 }
 
 void

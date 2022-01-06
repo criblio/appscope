@@ -5,6 +5,7 @@ RUN apt update && apt install -y \
   emacs \
   gdb \
   net-tools \
+  nginx \
   vim \
 && rm -rf /var/lib/apt/lists/*
 

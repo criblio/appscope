@@ -91,6 +91,7 @@ void doProcMetric(metric_t, long long);
 void doStatMetric(const char *, const char *, void *);
 void doTotal(metric_t);
 void doTotalDuration(metric_t);
+void doHttpAgg(void);
 void doEvent(void);
 void doPayload(void);
 bool doConnection(void);

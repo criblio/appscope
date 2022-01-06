@@ -27,6 +27,7 @@
 #include "dbg.h"
 #include "dns.h"
 #include "fn.h"
+#include "httpagg.h"
 #include "os.h"
 #include "plattime.h"
 #include "report.h"
@@ -907,6 +908,9 @@ reportPeriodicStuff(void)
     int nthread, nfds, children;
     long long cpu = 0;
     static long long cpuState = 0;
+
+    // aggregate and send http metrics
+    doHttpAgg();
 
     // empty the event queues
     doEvent();

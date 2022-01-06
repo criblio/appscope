@@ -56,6 +56,7 @@ ENV SPLUNK_BEFORE_START_CMD_3 "cmd /bin/bash /opt/splunk/etc/apps/cribl/bin/conf
 
 RUN mkdir -p /opt/test-runner/logs/
 
+ENV SCOPE_CRIBL_ENABLE=false
 ENV SCOPE_METRIC_DEST=udp://localhost:8125
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log

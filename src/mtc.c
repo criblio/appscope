@@ -66,7 +66,7 @@ mtcSendMetric(mtc_t *mtc, event_t *evt)
 void
 mtcFlush(mtc_t *mtc)
 {
-    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return;
+    if (!mtc || (cfgLogStreamEnable(g_cfg.staticfg))) return;
 
     transportFlush(mtc->transport);
 }
@@ -75,42 +75,42 @@ int
 mtcNeedsConnection(mtc_t *mtc)
 {
     // mtc & ctl use the same transport when LS is connected
-    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return 0;
+    if (!mtc || (cfgLogStreamEnable(g_cfg.staticfg))) return 0;
     return transportNeedsConnection(mtc->transport);
 }
 
 int
 mtcConnect(mtc_t *mtc)
 {
-    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return 0;
+    if (!mtc || (cfgLogStreamEnable(g_cfg.staticfg))) return 0;
     return transportConnect(mtc->transport);
 }
 
 int
 mtcConnection(mtc_t *mtc)
 {
-    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return -1;
+    if (!mtc || (cfgLogStreamEnable(g_cfg.staticfg))) return -1;
     return transportConnection(mtc->transport);
 }
 
 uint64_t
 mtcConnectAttempts(mtc_t *mtc)
 {
-    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return -1;
+    if (!mtc || (cfgLogStreamEnable(g_cfg.staticfg))) return -1;
     return transportConnectAttempts(mtc->transport);
 }
 
 int
 mtcDisconnect(mtc_t *mtc)
 {
-    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return 0;
+    if (!mtc || (cfgLogStreamEnable(g_cfg.staticfg))) return 0;
     return transportDisconnect(mtc->transport);
 }
 
 int
 mtcReconnect(mtc_t *mtc)
 {
-    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return 0;
+    if (!mtc || (cfgLogStreamEnable(g_cfg.staticfg))) return 0;
     return transportReconnect(mtc->transport);
 }
 
@@ -124,7 +124,7 @@ mtcEnabledSet(mtc_t *mtc, unsigned val)
 net_fail_t 
 mtcTransportFailureReason(mtc_t *mtc)
 {
-    if (!mtc || (cfgLogStream(g_cfg.staticfg))) return 0;
+    if (!mtc || (cfgLogStreamEnable(g_cfg.staticfg))) return 0;
     return transportConnectAttempts(mtc->transport);
 }
 

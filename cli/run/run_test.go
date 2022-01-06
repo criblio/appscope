@@ -45,7 +45,7 @@ func TestRunPassthrough(t *testing.T) {
 
 	// Test Passthrough, read from Stderr
 	cmd := exec.Command(os.Args[0])
-	cmd.Env = append(os.Environ(), "TEST_MAIN=runpassthrough", "SCOPE_HOME=.test", "SCOPE_METRIC_DEST=file://stderr")
+	cmd.Env = append(os.Environ(), "TEST_MAIN=runpassthrough", "SCOPE_HOME=.test", "SCOPE_CRIBL_ENABLE=false", "SCOPE_METRIC_DEST=file://stderr")
 	var outb, errb bytes.Buffer
 	cmd.Stdout = &outb
 	cmd.Stderr = &errb

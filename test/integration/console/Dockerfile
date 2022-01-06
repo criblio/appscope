@@ -13,6 +13,7 @@ RUN mkdir -p /opt/test/log && \
     chmod -R 777 /opt/test/log && \
     mkdir -p /opt/tar_test
 
+ENV SCOPE_CRIBL_ENABLE=false
 ENV SCOPE_LOG_LEVEL=error
 ENV SCOPE_METRIC_VERBOSITY=4
 ENV SCOPE_EVENT_LOGFILE=true

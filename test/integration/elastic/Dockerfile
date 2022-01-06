@@ -10,6 +10,7 @@ RUN mkdir /opt/test-runner/ /opt/test-runner/logs/
 RUN source scl_source enable rh-python38 && \
     virtualenv -p $(which python) /opt/test-runner/
 
+ENV SCOPE_CRIBL_ENABLE=false
 ENV SCOPE_OUT_DEST=udp://localhost:8125
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log

@@ -95,8 +95,13 @@ starttest cribl_edge_cribl_home
 nc -lU $CRIBL_HOME_SOCKET > $DEST_FILE &
 ERR+=$?
 
+PRE_SCOPE_CRIBL_ENABLE=$SCOPE_CRIBL_ENABLE
+unset SCOPE_CRIBL_ENABLE
+
 CRIBL_HOME=$CRIBL_HOME_PATH scope run --cribldest=edge ls
 ERR+=$?
+
+export SCOPE_CRIBL_ENABLE=$PRE_SCOPE_CRIBL_ENABLE
 
 count=$(grep '"type":"evt"' $DEST_FILE | wc -l)
 if [ $count -eq 0 ] ; then

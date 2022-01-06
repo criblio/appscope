@@ -23,6 +23,7 @@ ADD detect_proto/session.csv /data/session.csv
 RUN /usr/lib/systemd/systemd --system &
 CMD ["start"]
 
+ENV SCOPE_CRIBL_ENABLE=false
 ENV SCOPE_LOG_LEVEL=info
 ENV SCOPE_LOG_DEST=file:///tmp/scope.log
 ENV SCOPE_TAG_service=redis

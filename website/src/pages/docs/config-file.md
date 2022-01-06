@@ -69,7 +69,6 @@ metric:
   #   Default:  true
   #   Override: $SCOPE_METRIC_ENABLE
   #
-  # When the `cribl` backend is enabled, this is forced to true.
   #
   enable: true
 
@@ -268,7 +267,6 @@ event:
   #   Default:  true
   #   Override: $SCOPE_EVENT_ENABLE
   #
-  # When the `cribl` backend is enabled, this is forced to true.
   #
   enable: true
 
@@ -697,12 +695,10 @@ cribl:
   # Enable the `cribl` backend
   #   Type:     boolean
   #   Values:   true, false
-  #   Default:  false
+  #   Default:  true
+  #   Override: $SCOPE_CRIBL_ENABLE
   #
-  # This is set to true if $SCOPE_CRIBL or $SCOPE_CRIBL_CLOUD is set to a valid
-  # transport URL.
-  #
-  enable: false
+  enable: true
 
   # Authentication token
   #   Type:     string
@@ -741,10 +737,10 @@ cribl:
     # Connection type
     #   Type:     string
     #   Values:   tcp, unix, and edge
-    #   Default:  tcp
+    #   Default:  edge
     #   Override: the protocol token in the $SCOPE_CRIBL or $SCOPE_CRIBL_CLOUD URL
     #
-    type: tcp
+    type: edge
 
     # Connection host/address
     #   Type:     string

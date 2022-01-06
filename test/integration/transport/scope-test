@@ -106,7 +106,7 @@ echo ===========================================================================
 echo "Testing Event/TCP Transport"
 if [ "$(wait_for_port 10070)" ]; then
     rm -rf /tmp/out/tcpjson:in_tcp_json
-    scope run -e tcp://127.0.0.1:10070 -- curl -Lso /dev/null https://cribl.io
+    SCOPE_CRIBL_ENABLE=false scope run -e tcp://127.0.0.1:10070 -- curl -Lso /dev/null https://cribl.io
     if [ "$(wait_for_files "/tmp/out/tcpjson:in_tcp_json/CriblOut-*.json")" ]; then
         echo "  PASSED"
     else
@@ -126,7 +126,7 @@ echo ===========================================================================
 echo "Testing Metric/UDP Transport"
 if [ "$(wait_for_port 8125)" ]; then
     rm -rf /tmp/out/metrics:in_metrics:udp
-    scope run -m udp://127.0.0.1:8125 --metricformat statsd -- curl -Lso /dev/null https://cribl.io
+    SCOPE_CRIBL_ENABLE=false scope run -m udp://127.0.0.1:8125 --metricformat statsd -- curl -Lso /dev/null https://cribl.io
     if [ "$(wait_for_files "/tmp/out/metrics:in_metrics:udp/CriblOut-*.json")" ]; then
         echo "  PASSED"
     else

@@ -170,9 +170,8 @@ void cfgPayEnableSetFromStr(config_t*, const char*);
 void cfgPayDirSetFromStr(config_t*, const char*);
 void cfgAuthTokenSetFromStr(config_t*, const char*);
 void cfgEvtFormatHeaderSetFromStr(config_t *, const char *);
+void cfgCriblEnableSetFromStr(config_t *, const char *);
 static void cfgSetFromFile(config_t *, const char *);
-static void cfgCriblEnableSetFromStrEnv(config_t *, cfg_logstream_t, const char *);
-static void cfgCriblEnableSetFromStrYaml(config_t *, const char *);
 
 static void processRoot(config_t *, yaml_document_t *, yaml_node_t *);
 
@@ -412,7 +411,7 @@ processReloadConfig(config_t *cfg, const char* value)
 
     cfgProcessEnvironment(cfg);
 
-    if (cfgLogStream(cfg)) {
+    if (cfgLogStreamEnable(cfg)) {
         cfgLogStreamDefault(cfg);
     }
 }
@@ -562,6 +561,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FS, value);
     } else if (!strcmp(env_name, "SCOPE_EVENT_DNS")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_DNS, value);
+    } else if (!strcmp(env_name, "SCOPE_CRIBL_ENABLE")) {
+        cfgCriblEnableSetFromStr(cfg, value);
     } else if (!strcmp(env_name, "SCOPE_CRIBL_TLS_ENABLE")) {
         cfgTransportTlsEnableSetFromStr(cfg, CFG_LS, value);
     } else if (!strcmp(env_name, "SCOPE_CRIBL_TLS_VALIDATE_SERVER")) {
@@ -569,11 +570,13 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
     } else if (!strcmp(env_name, "SCOPE_CRIBL_TLS_CA_CERT_PATH")) {
         cfgTransportTlsCACertPathSetFromStr(cfg, CFG_LS, value);
     } else if (!strcmp(env_name, "SCOPE_CRIBL_CLOUD")) {
-        cfgCriblEnableSetFromStrEnv(cfg, CFG_LOGSTREAM_CLOUD, value);
+        cfgLogStreamCloudSet(cfg, TRUE);
+        cfgTransportSetFromStr(cfg, CFG_LS, value);
+    } else if (!strcmp(env_name, "SCOPE_CRIBL")) {
+        cfgLogStreamCloudSet(cfg, FALSE);
+        cfgTransportSetFromStr(cfg, CFG_LS, value);
     } else if (!strcmp(env_name, "SCOPE_CRIBL_AUTHTOKEN")) {
         cfgAuthTokenSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_CRIBL")) {
-        cfgCriblEnableSetFromStrEnv(cfg, CFG_LOGSTREAM, value);
     } else if (startsWith(env_name, "SCOPE_TAG_")) {
         processCustomTag(cfg, env_line, value);
     }
@@ -770,7 +773,7 @@ static char*
 cfgEdgePath(void){
     const char *cribl_home = getenv("CRIBL_HOME");
     if (cribl_home) {
-        char new_path[4096];
+        char new_path[PATH_MAX];
         int cx = snprintf(new_path, sizeof(new_path), "%s/%s", cribl_home, "state/appscope.sock");
         if (cx >= 0 && cx < sizeof(new_path)) {
             return realpath(new_path, NULL);
@@ -891,21 +894,10 @@ cfgPayDirSetFromStr(config_t *cfg, const char *value)
 }
 
 void
-cfgCriblEnableSetFromStrYaml(config_t *cfg, const char *value)
+cfgCriblEnableSetFromStr(config_t *cfg, const char *value)
 {
     if (!cfg || !value) return;
-    // Sets CFG_LOGSTREAM_NONE (0) or CFG_LOGSTREAM (1)
-    cfgLogStreamSet(cfg, strToVal(boolMap, value));
-}
-
-static void
-cfgCriblEnableSetFromStrEnv(config_t *cfg, cfg_logstream_t type, const char *value)
-{
-    if (!cfg || !value) return;
-    // Sets CFG_LOGSTREAM (1) or CFG_LOGSTREAM_CLOUD (2)
-    cfgLogStreamSet(cfg, type);
-    // Sets type, host, and port
-    cfgTransportSetFromStr(cfg, CFG_LS, value);
+    cfgLogStreamEnableSet(cfg, strToVal(boolMap, value));
 }
 
 void
@@ -1485,7 +1477,7 @@ static void
 processCriblEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     char *value = stringVal(node);
-    cfgCriblEnableSetFromStrYaml(config, value);
+    cfgCriblEnableSetFromStr(config, value);
     if (value) free(value);
 }
 
@@ -2591,7 +2583,7 @@ initCtl(config_t *cfg)
     }
     ctlTransportSet(ctl, trans, CFG_CTL);
 
-    if (cfgLogStream(cfg)) {
+    if (cfgLogStreamEnable(cfg)) {
         transport_t *trans = initTransport(cfg, CFG_LS);
         if (!trans) {
             ctlDestroy(&ctl);
@@ -2633,7 +2625,7 @@ initCtl(config_t *cfg)
 int
 cfgLogStreamDefault(config_t *cfg)
 {
-    if (!cfg || (cfgLogStream(cfg) == CFG_LOGSTREAM_NONE)) return -1;
+    if (!cfg || (cfgLogStreamEnable(cfg) == FALSE)) return -1;
 
     snprintf(g_logmsg, sizeof(g_logmsg), DEFAULT_LOGSTREAM_LOGMSG);
 
@@ -2653,7 +2645,7 @@ cfgLogStreamDefault(config_t *cfg)
         // port is already set
 
         // if cloud, override tls settings too
-        if (cfgLogStream(cfg) == CFG_LOGSTREAM_CLOUD) {
+        if (cfgLogStreamCloud(cfg) == TRUE) {
             // TLS enabled, with Server Validation, using root certs (payload)
             cfgTransportTlsEnableSet(cfg, CFG_LS, TRUE);
             cfgTransportTlsValidateServerSet(cfg, CFG_LS, TRUE);
@@ -2674,20 +2666,10 @@ cfgLogStreamDefault(config_t *cfg)
     cfg_transport_t type = cfgTransportType(cfg, CFG_LS);
     cfgTransportTypeSet(cfg, CFG_CTL, type);
 
-    if (cfgMtcEnable(cfg) != TRUE) {
-        strncat(g_logmsg, "Metrics enable, ", 20);
-    }
-    cfgMtcEnableSet(cfg, 1U);
-
     if (cfgMtcFormat(cfg) != TRUE) {
         strncat(g_logmsg, "Metrics format, ", 20);
     }
     cfgMtcFormatSet(cfg, CFG_FMT_NDJSON);
-
-    if (cfgEvtEnable(cfg) != TRUE) {
-        strncat(g_logmsg, "Event enable, ", 20);
-    }
-    cfgEvtEnableSet(cfg, 1U);
 
     if (cfgLogLevel(cfg) > CFG_LOG_WARN ) {
         strncat(g_logmsg, "Log level, ", 20);

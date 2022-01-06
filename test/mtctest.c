@@ -7,6 +7,19 @@
 #include "mtc.h"
 #include "test.h"
 
+// These signatures satisfy --wrap=cfgLogStreamEnable in the Makefile
+#ifdef __linux__
+unsigned __real_cfgLogStreamEnable(config_t *cfg);
+unsigned __wrap_cfgLogStreamEnable(config_t *cfg)
+#endif // __linux__
+#ifdef __APPLE__
+unsigned cfgLogStreamEnable(config_t *cfg)
+#endif // __APPLE__
+{
+    // always disable cribl backend
+    return FALSE;
+}
+
 static void
 mtcCreateReturnsValidPtr(void** state)
 {

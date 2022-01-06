@@ -591,7 +591,7 @@ doConfig(config_t *cfg)
     g_prevlog = g_log;
     g_prevctl = g_ctl;
 
-    if (cfgLogStream(cfg)) {
+    if (cfgLogStreamEnable(cfg)) {
         cfgLogStreamDefault(cfg);
     }
 
@@ -611,7 +611,7 @@ doConfig(config_t *cfg)
     g_mtc = initMtc(cfg);
     g_ctl = initCtl(cfg);
 
-    if (cfgLogStream(cfg)) {
+    if (cfgLogStreamEnable(cfg)) {
         singleChannelSet(g_ctl, g_mtc);
     }
 

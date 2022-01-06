@@ -17,6 +17,7 @@
 #include <libgen.h>
 #include <sys/resource.h>
 #include <setjmp.h>
+#include <dirent.h>
 
 #include "atomic.h"
 #include "bashmem.h"
@@ -223,6 +224,9 @@ static got_list_t inject_hook_list[] = {
     {"recv", NULL, &g_fn.recv},
     {"recvfrom", NULL, &g_fn.recvfrom},
     {"recvmsg", NULL, &g_fn.recvmsg},
+    {"opendir", NULL, &g_fn.opendir},
+    {"closedir", NULL, &g_fn.closedir},
+    {"readdir", NULL, &g_fn.readdir},
     {NULL, NULL, NULL}
 };
 
@@ -362,6 +366,30 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 
 #endif // __linux__
 
+/*
+ * This would appear to be extraneous. However, the function closedir()
+ * is defined using the __nonnull function attribute, which results in
+ * a compiler warning when checking for a null dirp. This just avoids
+ * the warning.
+ */
+static int
+scope_dirfd(DIR *dirp)
+{
+    if (!dirp) return -1;
+    return dirfd(dirp);
+}
+
+/*
+ * Local helper function to ensure that we check for a null pointer
+ * when getting an fd from a stream. There is at least one libc
+ * implementation where stream is derefrenced without a check for null.
+ */
+static int
+scope_fileno(FILE *stream)
+{
+    if (!stream) return -1;
+    return fileno(stream);
+}
 
 static void
 freeNssEntry(void *data)
@@ -1634,7 +1662,7 @@ open(const char *pathname, int flags, ...)
     if (fd != -1) {
         doOpen(fd, pathname, FD, "open");
     } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "open", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "open", pathname);
     }
 
     return fd;
@@ -1652,10 +1680,57 @@ openat(int dirfd, const char *pathname, int flags, ...)
     if (fd != -1) {
         doOpen(fd, pathname, FD, "openat");
     } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "openat", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "openat", pathname);
     }
 
     return fd;
+}
+
+EXPORTON DIR *
+opendir(const char *name)
+{
+    DIR *dirp;
+
+    WRAP_CHECK(opendir, NULL);
+    dirp = g_fn.opendir(name);
+    if (dirp != NULL) {
+        doOpen(dirfd(dirp), name, FD, "opendir");
+    } else {
+        doUpdateState(FS_ERR_OPEN_CLOSE, -1, 0, "opendir", name);
+    }
+
+    return dirp;
+}
+
+EXPORTON int
+closedir(DIR *dirp)
+{
+    WRAP_CHECK(closedir, -1);
+    int fd = scope_dirfd(dirp);
+    int rc = g_fn.closedir(dirp);
+
+    doCloseAndReportFailures(fd, (rc != -1), "closedir");
+
+    return rc;
+}
+
+EXPORTON struct dirent *
+readdir(DIR *dirp)
+{
+    WRAP_CHECK(readdir, NULL);
+    int fd = scope_dirfd(dirp);
+    int errsave = errno;
+    uint64_t initialTime = getTime();
+
+    errno = 0;
+    struct dirent *dep = g_fn.readdir(dirp);
+
+    doRead(fd, initialTime, (errno != 0), NULL, sizeof(struct dirent), "readdir", BUF, 0);
+
+    // If readdir modified errno, leave the errno value alone.
+    // Otherwise, restore the saved errno value (before we set it to zero.)
+    errno = (errno) ? errno : errsave;
+    return dep;
 }
 
 // Note: creat64 is defined to be obsolete
@@ -1669,7 +1744,7 @@ creat(const char *pathname, mode_t mode)
     if (fd != -1) {
         doOpen(fd, pathname, FD, "creat");
     } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "creat", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "creat", pathname);
     }
 
     return fd;
@@ -1691,7 +1766,7 @@ fopen(const char *pathname, const char *mode)
             doOpen(fileno(stream), pathname, STREAM, "fopen");
         }
     } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, -1, (ssize_t)0, "fopen", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, -1, 0, "fopen", pathname);
     }
 
     return stream;
@@ -1711,7 +1786,7 @@ freopen(const char *pathname, const char *mode, FILE *orig_stream)
             doClose(fileno(orig_stream), "freopen");
         }
     } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, -1, (ssize_t)0, "freopen", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, -1, 0, "freopen", pathname);
     }
 
     return stream;
@@ -1884,7 +1959,7 @@ open64(const char *pathname, int flags, ...)
     if (fd != -1) {
         doOpen(fd, pathname, FD, "open64");
     } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "open64", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "open64", pathname);
     }
 
     return fd;
@@ -1902,7 +1977,7 @@ openat64(int dirfd, const char *pathname, int flags, ...)
     if (fd != -1) {
         doOpen(fd, pathname, FD, "openat64");
     } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "openat64", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "openat64", pathname);
     }
 
     return fd;
@@ -1918,7 +1993,7 @@ __open_2(const char *file, int oflag)
     if (fd != -1) {
         doOpen(fd, file, FD, "__open_2");
     } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "__openat_2", file);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "__openat_2", file);
     }
 
     return fd;
@@ -1934,7 +2009,7 @@ __open64_2(const char *file, int oflag)
     if (fd != -1) {
         doOpen(fd, file, FD, "__open_2");
     } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "__open64_2", file);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "__open64_2", file);
     }
 
     return fd;
@@ -1948,7 +2023,7 @@ __openat_2(int fd, const char *file, int oflag)
     if (fd != -1) {
         doOpen(fd, file, FD, "__openat_2");
     } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "__openat_2", file);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "__openat_2", file);
     }
 
     return fd;
@@ -1965,7 +2040,7 @@ creat64(const char *pathname, mode_t mode)
     if (fd != -1) {
         doOpen(fd, pathname, FD, "creat64");
     } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, (ssize_t)0, "creat64", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "creat64", pathname);
     }
 
     return fd;
@@ -1981,7 +2056,7 @@ fopen64(const char *pathname, const char *mode)
     if (stream != NULL) {
         doOpen(fileno(stream), pathname, STREAM, "fopen64");
     } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, -1, (ssize_t)0, "fopen64", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, -1, 0, "fopen64", pathname);
     }
 
     return stream;
@@ -2001,7 +2076,7 @@ freopen64(const char *pathname, const char *mode, FILE *orig_stream)
             doClose(fileno(orig_stream), "freopen64");
         }
     } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, -1, (ssize_t)0, "freopen64", pathname);
+        doUpdateState(FS_ERR_OPEN_CLOSE, -1, 0, "freopen64", pathname);
     }
 
     return stream;
@@ -2096,7 +2171,7 @@ __fread_unlocked_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *
 
     size_t rc = g_fn.__fread_unlocked_chk(ptr, ptrlen, size, nmemb, stream);
 
-    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "__fread_unlocked_chk", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "__fread_unlocked_chk", NONE, 0);
 
     return rc;
 }
@@ -2185,7 +2260,7 @@ fseeko64(FILE *stream, off64_t offset, int whence)
 
     int rc = g_fn.fseeko64(stream, offset, whence);
 
-    doSeek(fileno(stream), (rc != -1), "fseeko64");
+    doSeek(scope_fileno(stream), (rc != -1), "fseeko64");
 
     return rc;
 }
@@ -2197,7 +2272,7 @@ ftello64(FILE *stream)
 
     off64_t rc = g_fn.ftello64(stream);
 
-    doSeek(fileno(stream), (rc != -1), "ftello64");
+    doSeek(scope_fileno(stream), (rc != -1), "ftello64");
 
     return rc;
 }
@@ -2230,7 +2305,7 @@ fsetpos64(FILE *stream, const fpos64_t *pos)
     WRAP_CHECK(fsetpos64, -1);
     int rc = g_fn.fsetpos64(stream, pos);
 
-    doSeek(fileno(stream), (rc == 0), "fsetpos64");
+    doSeek(scope_fileno(stream), (rc == 0), "fsetpos64");
 
     return rc;
 }
@@ -2442,7 +2517,7 @@ gethostbyname_r(const char *name, struct hostent *ret, char *buf, size_t buflen,
         doUpdateState(DNS, -1, time.duration, NULL, name);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     }  else {
-        doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "gethostbyname_r", name);
+        doUpdateState(NET_ERR_DNS, -1, 0, "gethostbyname_r", name);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     }
 
@@ -2466,7 +2541,7 @@ gethostbyname2_r(const char *name, int af, struct hostent *ret, char *buf,
         doUpdateState(DNS, -1, time.duration, NULL, name);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     }  else {
-        doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "gethostbyname2_r", name);
+        doUpdateState(NET_ERR_DNS, -1, 0, "gethostbyname2_r", name);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     }
 
@@ -2614,7 +2689,7 @@ __overflow(FILE *stream, int ch)
 
     int rc = g_fn.__overflow(stream, ch);
 
-    doWrite(fileno(stream), initialTime, (rc != EOF), &ch, 1, "__overflow", BUF, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc != EOF), &ch, 1, "__overflow", BUF, 0);
 
     return rc;
 }
@@ -2699,7 +2774,7 @@ scope_syscall(long number, ...)
             doAccept(rc, (struct sockaddr *)fArgs.arg[1],
                      (socklen_t *)fArgs.arg[2], "accept4");
         } else {
-            doUpdateState(NET_ERR_CONN, fArgs.arg[0], (ssize_t)0, "accept4", "nopath");
+            doUpdateState(NET_ERR_CONN, fArgs.arg[0], 0, "accept4", "nopath");
         }
         return rc;
     }
@@ -2786,7 +2861,7 @@ fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
 
     size_t rc = g_fn.fwrite_unlocked(ptr, size, nitems, stream);
 
-    doWrite(fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite_unlocked", BUF, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite_unlocked", BUF, 0);
 
     return rc;
 }
@@ -3440,7 +3515,7 @@ EXPORTON int
 fclose(FILE *stream)
 {
     WRAP_CHECK(fclose, EOF);
-    int fd = fileno(stream);
+    int fd = scope_fileno(stream);
 
     if (isAnAppScopeConnection(fd)) return 0;
 
@@ -3460,7 +3535,7 @@ fcloseall(void)
     if (rc != EOF) {
         doCloseAllStreams();
     } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, -1, (ssize_t)0, "fcloseall", "nopath");
+        doUpdateState(FS_ERR_OPEN_CLOSE, -1, 0, "fcloseall", "nopath");
     }
 
     return rc;
@@ -3519,7 +3594,7 @@ accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     if (sd != -1) {
         doAccept(sd, addr, addrlen, "accept$NOCANCEL");
     } else {
-        doUpdateState(NET_ERR_CONN, sockfd, (ssize_t)0, "accept$NOCANCEL", "nopath");
+        doUpdateState(NET_ERR_CONN, sockfd, 0, "accept$NOCANCEL", "nopath");
     }
 
     return sd;
@@ -3543,7 +3618,7 @@ __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
         doSend(sockfd, rc, buf, len, BUF);
     } else {
         setRemoteClose(sockfd, errno);
-        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "__sendto_nocancel", "nopath");
+        doUpdateState(NET_ERR_RX_TX, sockfd, 0, "__sendto_nocancel", "nopath");
     }
 
     return rc;
@@ -3568,7 +3643,7 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
         doUpdateState(DNS, -1, time.duration, NULL, fullname);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, fullname);
     } else {
-        doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "DNSServiceQueryRecord", fullname);
+        doUpdateState(NET_ERR_DNS, -1, 0, "DNSServiceQueryRecord", fullname);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, fullname);
     }
 
@@ -3594,7 +3669,7 @@ fseek(FILE *stream, long offset, int whence)
     WRAP_CHECK(fseek, -1);
     int rc = g_fn.fseek(stream, offset, whence);
 
-    doSeek(fileno(stream), (rc != -1), "fseek");
+    doSeek(scope_fileno(stream), (rc != -1), "fseek");
 
     return rc;
 }
@@ -3605,7 +3680,7 @@ fseeko(FILE *stream, off_t offset, int whence)
     WRAP_CHECK(fseeko, -1);
     int rc = g_fn.fseeko(stream, offset, whence);
 
-    doSeek(fileno(stream), (rc != -1), "fseeko");
+    doSeek(scope_fileno(stream), (rc != -1), "fseeko");
 
     return rc;
 }
@@ -3616,7 +3691,7 @@ ftell(FILE *stream)
     WRAP_CHECK(ftell, -1);
     long rc = g_fn.ftell(stream);
 
-    doSeek(fileno(stream), (rc != -1), "ftell");
+    doSeek(scope_fileno(stream), (rc != -1), "ftell");
 
     return rc;
 }
@@ -3627,7 +3702,7 @@ ftello(FILE *stream)
     WRAP_CHECK(ftello, -1);
     off_t rc = g_fn.ftello(stream);
 
-    doSeek(fileno(stream), (rc != -1), "ftello"); 
+    doSeek(scope_fileno(stream), (rc != -1), "ftello");
 
     return rc;
 }
@@ -3638,7 +3713,7 @@ rewind(FILE *stream)
     WRAP_CHECK_VOID(rewind);
     g_fn.rewind(stream);
 
-    doSeek(fileno(stream), TRUE, "rewind");
+    doSeek(scope_fileno(stream), TRUE, "rewind");
 
     return;
 }
@@ -3649,7 +3724,7 @@ fsetpos(FILE *stream, const fpos_t *pos)
     WRAP_CHECK(fsetpos, -1);
     int rc = g_fn.fsetpos(stream, pos);
 
-    doSeek(fileno(stream), (rc == 0), "fsetpos");
+    doSeek(scope_fileno(stream), (rc == 0), "fsetpos");
 
     return rc;
 }
@@ -3660,7 +3735,7 @@ fgetpos(FILE *stream,  fpos_t *pos)
     WRAP_CHECK(fgetpos, -1);
     int rc = g_fn.fgetpos(stream, pos);
 
-    doSeek(fileno(stream), (rc == 0), "fgetpos");
+    doSeek(scope_fileno(stream), (rc == 0), "fgetpos");
 
     return rc;
 }
@@ -3671,7 +3746,7 @@ fgetpos64(FILE *stream,  fpos64_t *pos)
     WRAP_CHECK(fgetpos64, -1);
     int rc = g_fn.fgetpos64(stream, pos);
 
-    doSeek(fileno(stream), (rc == 0), "fgetpos64");
+    doSeek(scope_fileno(stream), (rc == 0), "fgetpos64");
 
     return rc;
 }
@@ -3787,7 +3862,7 @@ fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
 
     size_t rc = g_fn.fwrite(ptr, size, nitems, stream);
 
-    doWrite(fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite", BUF, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite", BUF, 0);
 
     return rc;
 }
@@ -3803,11 +3878,11 @@ puts(const char *s)
 
     int rc = g_fn.puts(s);
 
-    doWrite(fileno(stdout), initialTime, (rc != EOF), s, strlen(s), "puts", BUF, 0);
+    doWrite(scope_fileno(stdout), initialTime, (rc != EOF), s, strlen(s), "puts", BUF, 0);
 
     if (rc != EOF) {
         // puts() "writes the string s and a trailing newline to stdout"
-        doWrite(fileno(stdout), initialTime, TRUE, "\n", 1, "puts", BUF, 0);
+        doWrite(scope_fileno(stdout), initialTime, TRUE, "\n", 1, "puts", BUF, 0);
     }
 
     return rc;
@@ -3824,7 +3899,7 @@ putchar(int c)
 
     int rc = g_fn.putchar(c);
 
-    doWrite(fileno(stdout), initialTime, (rc != EOF), &c, 1, "putchar", BUF, 0);
+    doWrite(scope_fileno(stdout), initialTime, (rc != EOF), &c, 1, "putchar", BUF, 0);
 
     return rc;
 }
@@ -3840,7 +3915,7 @@ fputs(const char *s, FILE *stream)
 
     int rc = g_fn.fputs(s, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != EOF), s, strlen(s), "fputs", BUF, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc != EOF), s, strlen(s), "fputs", BUF, 0);
 
     return rc;
 }
@@ -3856,7 +3931,7 @@ fputs_unlocked(const char *s, FILE *stream)
 
     int rc = g_fn.fputs_unlocked(s, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != EOF), s, strlen(s), "fputs_unlocked", BUF, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc != EOF), s, strlen(s), "fputs_unlocked", BUF, 0);
 
     return rc;
 }
@@ -3908,7 +3983,7 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 
     size_t rc = g_fn.fread(ptr, size, nmemb, stream);
 
-    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "fread", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "fread", NONE, 0);
 
     return rc;
 }
@@ -3922,7 +3997,7 @@ __fread_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *stream)
 
     size_t rc = g_fn.__fread_chk(ptr, ptrlen, size, nmemb, stream);
 
-    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "__fread_chk", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "__fread_chk", NONE, 0);
 
     return rc;
 }
@@ -3935,7 +4010,7 @@ fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
 
     size_t rc = g_fn.fread_unlocked(ptr, size, nmemb, stream);
 
-    doRead(fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "fread_unlocked", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "fread_unlocked", NONE, 0);
 
     return rc;
 }
@@ -3948,7 +4023,7 @@ fgets(char *s, int n, FILE *stream)
 
     char* rc = g_fn.fgets(s, n, stream);
 
-    doRead(fileno(stream), initialTime, (rc != NULL), NULL, n, "fgets", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != NULL), NULL, n, "fgets", NONE, 0);
 
     return rc;
 }
@@ -3962,7 +4037,7 @@ __fgets_chk(char *s, size_t size, int strsize, FILE *stream)
 
     char* rc = g_fn.__fgets_chk(s, size, strsize, stream);
 
-    doRead(fileno(stream), initialTime, (rc != NULL), NULL, size, "__fgets_chk", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != NULL), NULL, size, "__fgets_chk", NONE, 0);
 
     return rc;
 }
@@ -3975,7 +4050,7 @@ fgets_unlocked(char *s, int n, FILE *stream)
 
     char* rc = g_fn.fgets_unlocked(s, n, stream);
 
-    doRead(fileno(stream), initialTime, (rc != NULL), NULL, n, "fgets_unlocked", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != NULL), NULL, n, "fgets_unlocked", NONE, 0);
 
     return rc;
 }
@@ -3989,7 +4064,7 @@ __fgetws_chk(wchar_t *ws, size_t size, int strsize, FILE *stream)
 
     wchar_t* rc = g_fn.__fgetws_chk(ws, size, strsize, stream);
 
-    doRead(fileno(stream), initialTime, (rc != NULL), NULL, size*sizeof(wchar_t), "__fgetws_chk", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != NULL), NULL, size*sizeof(wchar_t), "__fgetws_chk", NONE, 0);
 
     return rc;
 }
@@ -4002,7 +4077,7 @@ fgetws(wchar_t *ws, int n, FILE *stream)
 
     wchar_t* rc = g_fn.fgetws(ws, n, stream);
 
-    doRead(fileno(stream), initialTime, (rc != NULL), NULL, n*sizeof(wchar_t), "fgetws", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != NULL), NULL, n*sizeof(wchar_t), "fgetws", NONE, 0);
 
     return rc;
 }
@@ -4015,7 +4090,7 @@ fgetwc(FILE *stream)
 
     wint_t rc = g_fn.fgetwc(stream);
 
-    doRead(fileno(stream), initialTime, (rc != WEOF), NULL, sizeof(wint_t), "fgetwc", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != WEOF), NULL, sizeof(wint_t), "fgetwc", NONE, 0);
 
     return rc;
 }
@@ -4028,7 +4103,7 @@ fgetc(FILE *stream)
 
     int rc = g_fn.fgetc(stream);
 
-    doRead(fileno(stream), initialTime, (rc != EOF), NULL, 1, "fgetc", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != EOF), NULL, 1, "fgetc", NONE, 0);
 
     return rc;
 }
@@ -4044,7 +4119,7 @@ fputc(int c, FILE *stream)
 
     int rc = g_fn.fputc(c, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != EOF), &c, 1, "fputc", NONE, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc != EOF), &c, 1, "fputc", NONE, 0);
 
     return rc;
 }
@@ -4060,7 +4135,7 @@ fputc_unlocked(int c, FILE *stream)
 
     int rc = g_fn.fputc_unlocked(c, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != EOF), &c, 1, "fputc_unlocked", NONE, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc != EOF), &c, 1, "fputc_unlocked", NONE, 0);
 
     return rc;
 }
@@ -4076,7 +4151,7 @@ putwc(wchar_t wc, FILE *stream)
 
     wint_t rc = g_fn.putwc(wc, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != WEOF), &wc, sizeof(wchar_t), "putwc", NONE, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc != WEOF), &wc, sizeof(wchar_t), "putwc", NONE, 0);
 
     return rc;
 }
@@ -4092,7 +4167,7 @@ fputwc(wchar_t wc, FILE *stream)
 
     wint_t rc = g_fn.fputwc(wc, stream);
 
-    doWrite(fileno(stream), initialTime, (rc != WEOF), &wc, sizeof(wchar_t), "fputwc", NONE, 0);
+    doWrite(scope_fileno(stream), initialTime, (rc != WEOF), &wc, sizeof(wchar_t), "fputwc", NONE, 0);
 
     return rc;
 }
@@ -4110,7 +4185,7 @@ fscanf(FILE *stream, const char *format, ...)
                      fArgs.arg[2], fArgs.arg[3],
                      fArgs.arg[4], fArgs.arg[5]);
 
-    doRead(fileno(stream),initialTime, (rc != EOF), NULL, rc, "fscanf", NONE, 0);
+    doRead(scope_fileno(stream),initialTime, (rc != EOF), NULL, rc, "fscanf", NONE, 0);
 
     return rc;
 }
@@ -4124,7 +4199,7 @@ getline (char **lineptr, size_t *n, FILE *stream)
     ssize_t rc = g_fn.getline(lineptr, n, stream);
 
     size_t bytes = (n) ? *n : 0;
-    doRead(fileno(stream), initialTime, (rc != -1), NULL, bytes, "getline", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != -1), NULL, bytes, "getline", NONE, 0);
 
     return rc;
 }
@@ -4139,7 +4214,7 @@ getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
     ssize_t rc = g_fn.getdelim(lineptr, n, delimiter, stream);
 
     size_t bytes = (n) ? *n : 0;
-    doRead(fileno(stream), initialTime, (rc != -1), NULL, bytes, "getdelim", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != -1), NULL, bytes, "getdelim", NONE, 0);
 
     return rc;
 }
@@ -4157,7 +4232,7 @@ __getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
     }
 
     size_t bytes = (n) ? *n : 0;
-    doRead(fileno(stream), initialTime, (rc != -1), NULL, bytes, "__getdelim", NONE, 0);
+    doRead(scope_fileno(stream), initialTime, (rc != -1), NULL, bytes, "__getdelim", NONE, 0);
     return rc;
 }
 
@@ -4289,7 +4364,7 @@ socket(int socket_family, int socket_type, int protocol)
             doUpdateState(OPEN_PORTS, sd, 1, "socket", NULL);
         }
     } else {
-        doUpdateState(NET_ERR_CONN, sd, (ssize_t)0, "socket", "nopath");
+        doUpdateState(NET_ERR_CONN, sd, 0, "socket", "nopath");
     }
 
     return sd;
@@ -4305,7 +4380,7 @@ shutdown(int sockfd, int how)
     if (rc != -1) {
         doClose(sockfd, "shutdown");
     } else {
-        doUpdateState(NET_ERR_CONN, sockfd, (ssize_t)0, "shutdown", "nopath");
+        doUpdateState(NET_ERR_CONN, sockfd, 0, "shutdown", "nopath");
     }
 
     return rc;
@@ -4323,7 +4398,7 @@ listen(int sockfd, int backlog)
         doUpdateState(OPEN_PORTS, sockfd, 1, "listen", NULL);
         doUpdateState(NET_CONNECTIONS, sockfd, 1, "listen", NULL);
     } else {
-        doUpdateState(NET_ERR_CONN, sockfd, (ssize_t)0, "listen", "nopath");
+        doUpdateState(NET_ERR_CONN, sockfd, 0, "listen", "nopath");
     }
 
     return rc;
@@ -4346,7 +4421,7 @@ accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     if (sd != -1) {
         doAccept(sd, addr, addrlen, "accept");
     } else {
-        doUpdateState(NET_ERR_CONN, sockfd, (ssize_t)0, "accept", "nopath");
+        doUpdateState(NET_ERR_CONN, sockfd, 0, "accept", "nopath");
     }
 
     return sd;
@@ -4369,7 +4444,7 @@ accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
     if (sd != -1) {
         doAccept(sd, addr, addrlen, "accept4");
     } else {
-        doUpdateState(NET_ERR_CONN, sockfd, (ssize_t)0, "accept4", "nopath");
+        doUpdateState(NET_ERR_CONN, sockfd, 0, "accept4", "nopath");
     }
 
     return sd;
@@ -4386,7 +4461,7 @@ bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
         doSetConnection(sockfd, addr, addrlen, LOCAL);
         scopeLog(CFG_LOG_DEBUG, "fd:%d bind", sockfd);
     } else {
-        doUpdateState(NET_ERR_CONN, sockfd, (ssize_t)0, "bind", "nopath");
+        doUpdateState(NET_ERR_CONN, sockfd, 0, "bind", "nopath");
     }
 
     return rc;
@@ -4410,7 +4485,7 @@ connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
         scopeLog(CFG_LOG_DEBUG, "fd:%d connect", sockfd);
     } else {
-        doUpdateState(NET_ERR_CONN, sockfd, (ssize_t)0, "connect", "nopath");
+        doUpdateState(NET_ERR_CONN, sockfd, 0, "connect", "nopath");
     }
 
     return rc;
@@ -4432,7 +4507,7 @@ send(int sockfd, const void *buf, size_t len, int flags)
         doSend(sockfd, rc, buf, rc, BUF);
     } else {
         setRemoteClose(sockfd, errno);
-        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "send", "nopath");
+        doUpdateState(NET_ERR_RX_TX, sockfd, 0, "send", "nopath");
     }
 
     return rc;
@@ -4456,7 +4531,7 @@ internal_sendto(int sockfd, const void *buf, size_t len, int flags,
         doSend(sockfd, rc, buf, rc, BUF);
     } else {
         setRemoteClose(sockfd, errno);
-        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "sendto", "nopath");
+        doUpdateState(NET_ERR_RX_TX, sockfd, 0, "sendto", "nopath");
     }
 
     return rc;
@@ -4513,7 +4588,7 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
         }
     } else {
         setRemoteClose(sockfd, errno);
-        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "sendmsg", "nopath");
+        doUpdateState(NET_ERR_RX_TX, sockfd, 0, "sendmsg", "nopath");
     }
 
     return rc;
@@ -4549,7 +4624,7 @@ internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int fla
 
     } else {
         setRemoteClose(sockfd, errno);
-        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "sendmmsg", "nopath");
+        doUpdateState(NET_ERR_RX_TX, sockfd, 0, "sendmmsg", "nopath");
     }
 
     return rc;
@@ -4581,7 +4656,7 @@ recv(int sockfd, void *buf, size_t len, int flags)
 
         doRecv(sockfd, rc, buf, rc, BUF);
     } else {
-        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recv", "nopath");
+        doUpdateState(NET_ERR_RX_TX, sockfd, 0, "recv", "nopath");
     }
 
     return rc;
@@ -4604,7 +4679,7 @@ internal_recvfrom(int sockfd, void *buf, size_t len, int flags,
 
         doRecv(sockfd, rc, buf, rc, BUF);
     } else {
-        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvfrom", "nopath");
+        doUpdateState(NET_ERR_RX_TX, sockfd, 0, "recvfrom", "nopath");
     }
     return rc;
 }
@@ -4696,7 +4771,7 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
             msg->msg_controllen = msg_controllen_orig;
         }
     } else {
-        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvmsg", "nopath");
+        doUpdateState(NET_ERR_RX_TX, sockfd, 0, "recvmsg", "nopath");
     }
     
     return rc;
@@ -4732,7 +4807,7 @@ recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
         doRecv(sockfd, rc, &msgvec->msg_hdr, rc, MSG);
         doAccessRights(&msgvec->msg_hdr);
     } else {
-        doUpdateState(NET_ERR_RX_TX, sockfd, (ssize_t)0, "recvmmsg", "nopath");
+        doUpdateState(NET_ERR_RX_TX, sockfd, 0, "recvmmsg", "nopath");
     }
 
     return rc;
@@ -4756,7 +4831,7 @@ gethostbyname(const char *name)
         doUpdateState(DNS, -1, time.duration, NULL, name);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     } else {
-        doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "gethostbyname", name);
+        doUpdateState(NET_ERR_DNS, -1, 0, "gethostbyname", name);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     }
 
@@ -4780,7 +4855,7 @@ gethostbyname2(const char *name, int af)
         doUpdateState(DNS, -1, time.duration, NULL, name);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     } else {
-        doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "gethostbyname2", name);
+        doUpdateState(NET_ERR_DNS, -1, 0, "gethostbyname2", name);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, name);
     }
 
@@ -4812,7 +4887,7 @@ getaddrinfo(const char *node, const char *service,
         doUpdateState(DNS, -1, time.duration, NULL, node);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, node);
     } else {
-        doUpdateState(NET_ERR_DNS, -1, (ssize_t)0, "getaddrinfo", node);
+        doUpdateState(NET_ERR_DNS, -1, 0, "getaddrinfo", node);
         doUpdateState(DNS_DURATION, -1, time.duration, NULL, node);
     }
 

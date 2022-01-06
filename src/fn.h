@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <arpa/nameser.h>
+#include <dirent.h>
 
 #ifdef __linux__
 #ifndef io_context_t
@@ -235,6 +236,9 @@ typedef struct {
     int (*__register_atfork)(void (*) (void), void (*) (void), void (*) (void), void *);
     void (*uv__read)(void *);
     int (*uv_fileno)(const void *, int *);
+    DIR *(*opendir)(const char *);
+    int (*closedir)(DIR *);
+    struct dirent *(*readdir)(DIR *);
 #endif // __linux__
 
 #if defined(__linux__) && defined(__STATX__)

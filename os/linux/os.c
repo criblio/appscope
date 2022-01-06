@@ -336,19 +336,21 @@ osGetNumFds(pid_t pid)
     struct dirent * entry;
     char buf[1024];
 
+    if (!g_fn.opendir || !g_fn.readdir || !g_fn.closedir) return -1;
+
     snprintf(buf, sizeof(buf), "/proc/%d/fd", pid);
-    if ((dirp = opendir(buf)) == NULL) {
+    if ((dirp = g_fn.opendir(buf)) == NULL) {
         DBG(NULL);
         return -1;
     }
     
-    while ((entry = readdir(dirp)) != NULL) {
+    while ((entry = g_fn.readdir(dirp)) != NULL) {
         if (entry->d_type != DT_DIR) {
             nfile++;
         }
     }
 
-    closedir(dirp);
+    g_fn.closedir(dirp);
     return nfile - 1; // we opened one fd to read /fd :)
 }
 
@@ -360,17 +362,19 @@ osGetNumChildProcs(pid_t pid)
     struct dirent * entry;
     char buf[1024];
 
+    if (!g_fn.opendir || !g_fn.readdir || !g_fn.closedir) return -1;
+
     snprintf(buf, sizeof(buf), "/proc/%d/task", pid);
-    if ((dirp = opendir(buf)) == NULL) {
+    if ((dirp = g_fn.opendir(buf)) == NULL) {
         DBG(NULL);
         return -1;
     }
     
-    while ((entry = readdir(dirp)) != NULL) {
+    while ((entry = g_fn.readdir(dirp)) != NULL) {
             nchild++;
     }
 
-    closedir(dirp);
+    g_fn.closedir(dirp);
     return nchild - 3; // Not including the parent proc itself and ., ..
 }
 

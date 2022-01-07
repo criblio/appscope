@@ -1280,7 +1280,7 @@ processEvtFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processWatchType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processEvtWatchType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
 
@@ -1291,7 +1291,7 @@ processWatchType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processWatchName(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processEvtWatchName(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
 
@@ -1301,7 +1301,7 @@ processWatchName(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processWatchField(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processEvtWatchField(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
 
@@ -1311,7 +1311,7 @@ processWatchField(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processWatchValue(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processEvtWatchValue(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
 
@@ -1321,7 +1321,7 @@ processWatchValue(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processWatchHeader(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+processEvtWatchHeader(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     if (node->type != YAML_SEQUENCE_NODE) return;
 
@@ -1352,11 +1352,11 @@ processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_SCALAR_NODE,    TYPE_NODE,            processWatchType},
-        {YAML_SCALAR_NODE,    NAME_NODE,            processWatchName},
-        {YAML_SCALAR_NODE,    FIELD_NODE,           processWatchField},
-        {YAML_SCALAR_NODE,    VALUE_NODE,           processWatchValue},
-        {YAML_SEQUENCE_NODE,  EX_HEADERS,           processWatchHeader},
+        {YAML_SCALAR_NODE,    TYPE_NODE,            processEvtWatchType},
+        {YAML_SCALAR_NODE,    NAME_NODE,            processEvtWatchName},
+        {YAML_SCALAR_NODE,    FIELD_NODE,           processEvtWatchField},
+        {YAML_SCALAR_NODE,    VALUE_NODE,           processEvtWatchValue},
+        {YAML_SEQUENCE_NODE,  EX_HEADERS,           processEvtWatchHeader},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1378,7 +1378,7 @@ processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processWatch(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processEvtWatch(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     // Type can be scalar or sequence.
     // It will be scalar there are zero entries, in which case we
@@ -1410,8 +1410,8 @@ processEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    ENABLE_NODE,          processEvtEnable},
         {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportCtl},
         {YAML_MAPPING_NODE,   FORMAT_NODE,          processEvtFormat},
-        {YAML_SEQUENCE_NODE,  WATCH_NODE,           processWatch},
-        {YAML_SCALAR_NODE,    WATCH_NODE,           processWatch},
+        {YAML_SEQUENCE_NODE,  WATCH_NODE,           processEvtWatch},
+        {YAML_SCALAR_NODE,    WATCH_NODE,           processEvtWatch},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 

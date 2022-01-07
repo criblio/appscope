@@ -2747,6 +2747,35 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
     case CONNECTION_OPEN:
     {
         doNetOpenEvent(net);
+
+        // Only report metric if enabled
+        if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
+            return;
+        }
+
+        // Report the net open metric
+        const char* metric = "net.open";
+        const char* units = "connection";
+        const char* err_str = "ERROR: doNetMetric:CONNECTION_OPEN:cmdSendMetric";
+        counters_element_t* value = &g_ctrs.netConnOpen;
+        event_field_t fields[] = {
+            PROC_FIELD(g_proc.procname),
+            PID_FIELD(g_proc.pid),
+            FD_FIELD(net->fd),
+            HOST_FIELD(g_proc.hostname),
+            PROTO_FIELD(proto),
+            PORT_FIELD(localPort),
+            UNIT_FIELD(units),
+            FIELDEND
+        };
+
+        event_t evt = INT_EVENT(metric, value->mtc, DELTA, fields);
+        if (cmdSendMetric(g_mtc, &evt)) {
+            scopeLogError("fd:%d %s", net->fd, err_str);
+        }
+        //subFromInterfaceCounts(global_counter, value->mtc);
+        atomicSwapU64(&value->mtc, 0);
+
         break;
     }
 
@@ -2798,7 +2827,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         // report the close
         doNetCloseEvent(net, dur);
 
-        // Only report metric if enabled
+        // Only report metrics if enabled
         if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
             return;
         }
@@ -2813,6 +2842,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         // Don't report zeros.
         if (dur == 0ULL) return;
 
+        // Report the net conn duration metric
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
@@ -2832,6 +2862,29 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         atomicSwapU64(&net->totalDuration.mtc, 0);
         //atomicSwapU64(&g_ctrs.connDurationNum, 0);
         //atomicSwapU64(&g_ctrs.connDurationTotal, 0);
+
+        // Report the net close metric
+        const char* metric = "net.close";
+        const char* units = "connection";
+        const char* err_str = "ERROR: doNetMetric:CONNECTION_DURATION:cmdSendMetric";
+        counters_element_t* value = &g_ctrs.netConnClose;
+        event_field_t mtc_fields[] = {
+            PROC_FIELD(g_proc.procname),
+            PID_FIELD(g_proc.pid),
+            FD_FIELD(net->fd),
+            HOST_FIELD(g_proc.hostname),
+            PROTO_FIELD(proto),
+            PORT_FIELD(localPort),
+            UNIT_FIELD(units),
+            FIELDEND
+        };
+        event_t mtc_evt = INT_EVENT(metric, value->mtc, DELTA, mtc_fields);
+        if (cmdSendMetric(g_mtc, &mtc_evt)) {
+            scopeLogError("fd:%d %s", net->fd, err_str);
+        }
+        //subFromInterfaceCounts(global_counter, value->mtc);
+        atomicSwapU64(&value->mtc, 0);
+
         break;
     }
 

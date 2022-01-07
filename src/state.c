@@ -616,6 +616,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
             addToInterfaceCounts(&g_netinfo[fd].totalDuration, new_duration);
             addToInterfaceCounts(&g_ctrs.connDurationNum, 1);
             addToInterfaceCounts(&g_ctrs.connDurationTotal, new_duration);
+            addToInterfaceCounts(&g_ctrs.netConnClose, 1);
         }
 
         if ((g_netinfo[fd].rxBytes.evt > 0) || (g_netinfo[fd].txBytes.evt > 0) ||
@@ -638,6 +639,8 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
              (funcop && !strncmp(funcop, "dup", 3)))) {
                 postNetState(fd, type, &g_netinfo[fd]);
         }
+
+        addToInterfaceCounts(&g_ctrs.netConnOpen, 1);
         break;
     }
 

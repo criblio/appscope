@@ -17,6 +17,7 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgMtcStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
     assert_int_equal       (cfgMtcVerbosity(config), DEFAULT_MTC_VERBOSITY);
     assert_int_equal       (cfgMtcPeriod(config), DEFAULT_SUMMARY_PERIOD);
+    assert_int_equal       (cfgMtcStatsdEnable(config), DEFAULT_MTC_STATSD_ENABLE);
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
     assert_int_equal       (cfgSendProcessStartMsg(config), DEFAULT_PROCESS_START_MSG);
     assert_int_equal       (cfgEvtEnable(config), DEFAULT_EVT_ENABLE);
@@ -188,6 +189,21 @@ cfgMtcPeriodSetAndGet(void** state)
     assert_int_equal(cfgMtcPeriod(config), 0);
     cfgMtcPeriodSet(config, UINT_MAX);
     assert_int_equal(cfgMtcPeriod(config), UINT_MAX);
+    cfgDestroy(&config);
+}
+
+static void
+cfgMtcStatsdEnableSetAndGet(void** state)
+{
+    config_t *config = cfgCreateDefault();
+    cfgMtcStatsdEnableSet(config, TRUE);
+    assert_int_equal(cfgMtcStatsdEnable(config), TRUE);
+    cfgMtcStatsdEnableSet(config, FALSE);
+    assert_int_equal(cfgMtcStatsdEnable(config), FALSE);
+
+    // 2 is outside of allowed range; should be ignored.
+    cfgMtcStatsdEnableSet(config, 2);
+    assert_int_equal(cfgMtcStatsdEnable(config), FALSE);
     cfgDestroy(&config);
 }
 
@@ -640,6 +656,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgMtcStatsDMaxLenSetAndGet),
         cmocka_unit_test(cfgMtcVerbositySetAndGet),
         cmocka_unit_test(cfgMtcPeriodSetAndGet),
+        cmocka_unit_test(cfgMtcStatsdEnableSetAndGet),
         cmocka_unit_test(cfgCmdDirSetAndGet),
         cmocka_unit_test(cfgSendProcessStartMsgSetAndGet),
         cmocka_unit_test(cfgEvtEnableSetAndGet),

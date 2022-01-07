@@ -38,6 +38,7 @@ struct _config_t
         struct {
             char* prefix;
             unsigned maxlen;
+            unsigned enable;
         } statsd;
         unsigned period;
         unsigned verbosity;
@@ -176,6 +177,7 @@ cfgCreateDefault()
     c->mtc.format = DEFAULT_MTC_FORMAT;
     c->mtc.statsd.prefix = (DEFAULT_STATSD_PREFIX) ? strdup(DEFAULT_STATSD_PREFIX) : NULL;
     c->mtc.statsd.maxlen = DEFAULT_STATSD_MAX_LEN;
+    c->mtc.statsd.enable = DEFAULT_MTC_STATSD_ENABLE;
     c->mtc.period = DEFAULT_SUMMARY_PERIOD;
     c->mtc.verbosity = DEFAULT_MTC_VERBOSITY;
     c->evt.enable = DEFAULT_EVT_ENABLE;
@@ -310,6 +312,12 @@ unsigned
 cfgMtcPeriod(config_t* cfg)
 {
     return (cfg) ? cfg->mtc.period : DEFAULT_SUMMARY_PERIOD;
+}
+
+unsigned
+cfgMtcStatsdEnable(config_t *cfg)
+{
+    return (cfg) ? cfg->mtc.statsd.enable : DEFAULT_MTC_STATSD_ENABLE;
 }
 
 const char *
@@ -653,6 +661,13 @@ cfgMtcPeriodSet(config_t* cfg, unsigned val)
 {
     if (!cfg) return;
     cfg->mtc.period = val;
+}
+
+void
+cfgMtcStatsdEnableSet(config_t *cfg, unsigned val)
+{
+    if (!cfg || val > 1) return;
+    cfg->mtc.statsd.enable = val;
 }
 
 void

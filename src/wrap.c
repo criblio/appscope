@@ -953,6 +953,8 @@ reportPeriodicStuff(void)
     doTotal(TOT_TCP_CONN);
     doTotal(TOT_UDP_CONN);
     doTotal(TOT_OTHER_CONN);
+    doTotal(TOT_NET_OPEN);
+    doTotal(TOT_NET_CLOSE);
 
     doTotalDuration(TOT_FS_DURATION);
     doTotalDuration(TOT_NET_DURATION);

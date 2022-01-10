@@ -453,21 +453,3 @@ services:
       args:
         JRE_TGZ: jdk/jdk-17.0.1_linux-x64_bin.tar.gz
     <<: *scope-common
-  # skipped on ARM - no attach support yet
-  attach-glibc:
-    image: ghcr.io/criblio/appscope-test-attach-glibc:${TAG:?Missing TAG environment variable}
-    build:
-      cache_from: 
-        - ghcr.io/criblio/appscope-test-attach-glibc:${TAG:?Missing TAG environment variable}
-      context: .
-      dockerfile: ./attach/Dockerfile.glibc
-    <<: *scope-common
-  # skipped on ARM - no attach support yet
-  attach-musl:
-    image: ghcr.io/criblio/appscope-test-attach-musl:${TAG:?Missing TAG environment variable}
-    build:
-      cache_from: 
-        - ghcr.io/criblio/appscope-test-attach-musl:${TAG:?Missing TAG environment variable}
-      context: .
-      dockerfile: ./attach/Dockerfile.musl
-    <<: *scope-common

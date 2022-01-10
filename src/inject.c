@@ -15,6 +15,7 @@
 #include <linux/limits.h>
 #include <dlfcn.h>
 #include <stddef.h>
+#include <inttypes.h>
 #include "dbg.h"
 #include "inject.h"
 
@@ -22,14 +23,34 @@
 
 // Size of injected code segment
 #define INJECTED_CODE_SIZE_LEN (512)
+// Offset between injected path code and injected code segment
+#define PATH_CODE_OFFSET (16)
+// Maximum size of injected path
+#define SCOPE_PATH_SIZE (256)
 
 typedef struct {
     char *path;
     uint64_t addr;
 } libdl_info_t;
 
-static uint64_t 
-findLibrary(const char *library, pid_t pid) 
+#ifdef __x86_64__
+    #define IP_REG regs.rip
+    #define FUNC_REG regs.rax
+    #define FIRST_ARG_REG regs.rdi
+    #define SECOND_ARG_REG regs.rsi
+    #define RET_REG regs.rax
+    #define DBG_TRAP "int $3 \n"
+#elif defined(__aarch64__)
+    #define IP_REG regs.pc
+    #define FUNC_REG regs.regs[2]
+    #define FIRST_ARG_REG regs.regs[0]
+    #define SECOND_ARG_REG regs.regs[1]
+    #define RET_REG regs.regs[0]
+    #define DBG_TRAP "brk #0 \n"
+#endif
+
+static uint64_t
+findLibrary(const char *library, pid_t pid)
 {
     char filename[PATH_MAX];
     char buffer[9076];
@@ -53,35 +74,36 @@ findLibrary(const char *library, pid_t pid)
     return addr;
 }
 
-static uint64_t 
-freeSpaceAddr(pid_t pid) 
+static int
+freeSpaceAddr(pid_t pid, uint64_t* addr_begin, uint64_t* free_size)
 {
     FILE *fd;
     char filename[PATH_MAX];
     char line[850];
-    uint64_t addr;
+    uint64_t addr_end;
     char str[20];
     char perms[5];
 
     sprintf(filename, "/proc/%d/maps", pid);
     if ((fd = fopen(filename, "r")) == NULL) {
         perror("fopen(/proc/PID/maps) failed");
-        return 0;
+        return EXIT_FAILURE;
     }
 
     while(fgets(line, 850, fd) != NULL) {
-        sscanf(line, "%lx-%*x %s %*s %s %*d", &addr, perms, str);
+        sscanf(line, "%lx-%lx %s %*s %s %*d", addr_begin, &addr_end, perms, str);
         if ((strstr(perms, "x") != NULL) &&
             (strstr(perms, "w") == NULL)) {
             break;
         }
     }
+    *free_size = addr_end - *addr_begin;
 
     fclose(fd);
-    return addr;
+    return EXIT_SUCCESS;
 }
 
-static int 
+static int
 ptraceRead(int pid, uint64_t addr, void *data, int len)
 {
     int numRead = 0;
@@ -102,8 +124,8 @@ ptraceRead(int pid, uint64_t addr, void *data, int len)
     return EXIT_SUCCESS;
 }
 
-static int 
-ptraceWrite(int pid, uint64_t addr, void *data, int len) 
+static int
+ptraceWrite(int pid, uint64_t addr, void *data, int len)
 {
     long word = 0;
     int i = 0;
@@ -136,30 +158,41 @@ ptraceAttach(pid_t target) {
     return EXIT_SUCCESS;
 }
 
-static void 
-call_dlopen(void) 
+static void
+call_dlopen(void)
 {
 #ifdef __x86_64__
     asm(
         "andq $0xfffffffffffffff0, %rsp \n" //align stack to 16-byte boundary
         "callq *%rax \n"
-        "int $3 \n"
+        DBG_TRAP
+    );
+#elif defined(__aarch64__)
+    __asm__ volatile(
+        "blr x2 \n"
+        DBG_TRAP
     );
 #endif
 }
 
 static void call_dlopen_end() {}
 
-static int 
+static int
 inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
 {
     struct iovec my_iovec;
-    my_iovec.iov_len = sizeof(struct user_regs_struct);
     struct user_regs_struct oldregs, regs;
+    my_iovec.iov_len = sizeof(regs);
     unsigned char *oldcode;
     int status;
-    uint64_t freeAddr, codeAddr;
-    int libpathLen;
+    uint64_t freeAddr, codeAddr, freeAddrSize;
+    char libpath[SCOPE_PATH_SIZE] = {0};
+    int libpathLen = strlen(path) + 1;
+    if (libpathLen > SCOPE_PATH_SIZE) {
+        fprintf(stderr, "library path %s is longer than %d, library could not be injected\n", path, SCOPE_PATH_SIZE);
+        return EXIT_FAILURE;
+    }
+    strncpy(libpath, path, libpathLen);
 
     if (ptraceAttach(pid)) {
         return EXIT_FAILURE;
@@ -174,41 +207,43 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     memcpy(&regs, &oldregs, sizeof(struct user_regs_struct));
 
     // find free space in text section
-    freeAddr = freeSpaceAddr(pid);
-    if (!freeAddr) {
+    if (freeSpaceAddr(pid, &freeAddr, &freeAddrSize)) {
+        return EXIT_FAILURE;
+    }
+
+    // sanity check for size condition
+    if (freeAddrSize < INJECTED_CODE_SIZE_LEN) {
+        fprintf(stderr, "Insufficient space in  0x%" PRIx64 " to inject, library could not be injected\n", freeAddr);
         return EXIT_FAILURE;
     }
     
     // back up the code
-    libpathLen = strlen(path) + 1;
     oldcode = (unsigned char *)malloc(INJECTED_CODE_SIZE_LEN);
     if (ptraceRead(pid, freeAddr, oldcode, INJECTED_CODE_SIZE_LEN)) {
         return EXIT_FAILURE;
     }
 
     // write the path to the library 
-    if (ptraceWrite(pid, freeAddr, path, libpathLen)) {
+    if (ptraceWrite(pid, freeAddr, &libpath, SCOPE_PATH_SIZE)) {
         return EXIT_FAILURE;
     }
 
-    // inject the code right after the library path
-    codeAddr = freeAddr + libpathLen + 1;
+    // inject the code after offset the library path
+    codeAddr = freeAddr + SCOPE_PATH_SIZE + PATH_CODE_OFFSET;
     if (ptraceWrite(pid, codeAddr, &call_dlopen, call_dlopen_end - call_dlopen)) {
         return EXIT_FAILURE;
     }
-#ifdef __x86_64__
-    // set RIP to point to the injected code
-    regs.rip = codeAddr;
-    regs.rax = dlopenAddr;               // address of dlopen
-    regs.rdi = freeAddr;                 // dlopen's first arg - path to the library
 
+    // set instruction pointer to point to the injected code
+    IP_REG = codeAddr;
+    FUNC_REG = dlopenAddr;               // address of dlopen
+    FIRST_ARG_REG = freeAddr;            // dlopen's first arg - path to the library
+    SECOND_ARG_REG = RTLD_NOW;
+    // GNU ld.so uses a custom flag
     if (glibc == TRUE) {
-         // GNU ld.so uses a custom flag
-        regs.rsi = RTLD_NOW | __RTLD_DLOPEN;
-    } else {
-        regs.rsi = RTLD_NOW;
+        SECOND_ARG_REG |= __RTLD_DLOPEN;
     }
-#endif
+
     my_iovec.iov_base = &regs;
     if (ptrace(PTRACE_SETREGSET, pid, (void *)NT_PRSTATUS, &my_iovec) == -1) {
         fprintf(stderr, "error: ptrace set register(), library could not be injected\n");
@@ -216,16 +251,22 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     }
 
     // continue execution and wait until the target process is stopped
-    ptrace(PTRACE_CONT, pid, NULL, NULL);
+    if (ptrace(PTRACE_CONT, pid, NULL, NULL) == -1) {
+        fprintf(stderr, "error: ptrace continue(), library could not be injected\n");
+        return EXIT_FAILURE;
+    }
     waitpid(pid, &status, WUNTRACED);
 
     // if process has been stopped by SIGSTOP send SIGCONT signal along with PTRACE_CONT call
     if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) {
-        ptrace(PTRACE_CONT, pid, SIGCONT, NULL);
+        if (ptrace(PTRACE_CONT, pid, SIGCONT, NULL) == -1) {
+            fprintf(stderr, "error: ptrace continue(), library could not be injected\n");
+            return EXIT_FAILURE;
+        }
         waitpid(pid, &status, WUNTRACED);
     }
 
-    // make sure the target process was stoppend by SIGTRAP triggered by int 0x3
+    // make sure the target process was stoppend by SIGTRAP triggered by DBG_TRAP
     if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) {
 
         my_iovec.iov_base = &regs;
@@ -234,13 +275,11 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
             fprintf(stderr, "error: ptrace get register(), library could not be injected\n");
             return EXIT_FAILURE;
         }
-#ifdef __x86_64__
-        if (regs.rax != 0x0) {
-            //printf("Appscope library injected at %p\n", (void*)regs.rax);
+        if (RET_REG != 0x0) {
+            //printf("Appscope library injected at %p\n", (void*)RET_REG);
         } else {
             fprintf(stderr, "error: dlopen() failed, library could not be injected\n");
         }
-#endif
         //restore the app's state
         ptraceWrite(pid, freeAddr, oldcode, INJECTED_CODE_SIZE_LEN);
         my_iovec.iov_base = &oldregs;
@@ -251,7 +290,7 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
         ptrace(PTRACE_DETACH, pid, NULL, NULL);
 
     } else {
-        fprintf(stderr, "error: target process stopped\n");
+        fprintf(stderr, "error: target process stopped with signal %d\n", WSTOPSIG(status));
         return EXIT_FAILURE;
     }
 
@@ -274,18 +313,18 @@ findLib(struct dl_phdr_info *info, size_t size, void *data)
 }
 
 int 
-injectScope(int pid, char* path) 
+injectScope(int pid, char* path)
 {
     uint64_t remoteLib, localLib;
     void *dlopenAddr = NULL;
     libdl_info_t info;
     int glibc = TRUE;
-   
+
     if (!dl_iterate_phdr(findLib, &info)) {
         fprintf(stderr, "error: failed to find local libc\n");
         return EXIT_FAILURE;
     }
- 
+
     localLib = info.addr;
     dlopenAddr = dlsym(RTLD_DEFAULT, "__libc_dlopen_mode");
     if (dlopenAddr == NULL) {
@@ -305,7 +344,7 @@ injectScope(int pid, char* path)
         return EXIT_FAILURE;
     }
 
-    // calculate the address of dlopen in the target process 
+    // calculate the address of dlopen in the target process
     dlopenAddr = remoteLib + (dlopenAddr - localLib);
 
     // inject libscope.so into the target process

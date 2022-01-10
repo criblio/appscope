@@ -175,7 +175,10 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     }
 
     // save registers
-    ptrace(PTRACE_GETREGS, pid, NULL, &oldregs);
+    if (ptrace(PTRACE_GETREGS, pid, NULL, &oldregs) == -1) {
+        fprintf(stderr, "error: ptrace get register(), library could not be injected\n");
+        return EXIT_FAILURE;
+    }
     memcpy(&regs, &oldregs, sizeof(struct user_regs_struct));
 
     // find free space in text section
@@ -214,7 +217,10 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
         regs.rsi = RTLD_NOW;
     }
 #endif
-    ptrace(PTRACE_SETREGS, pid, NULL, &regs);
+    if (ptrace(PTRACE_SETREGS, pid, NULL, &regs) == -1) {
+        fprintf(stderr, "error: ptrace set register(), library could not be injected\n");
+        return EXIT_FAILURE;
+    }
 
     // continue execution and wait until the target process is stopped
     ptrace(PTRACE_CONT, pid, NULL, NULL);
@@ -230,7 +236,10 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) {
 
         // check if the library has been successfully injected
-        ptrace(PTRACE_GETREGS, pid, NULL, &regs);
+        if (ptrace(PTRACE_GETREGS, pid, NULL, &regs) == -1) {
+            fprintf(stderr, "error: ptrace get register(), library could not be injected\n");
+            return EXIT_FAILURE;
+        }
 #ifdef __x86_64__
         if (regs.rax != 0x0) {
             //printf("Appscope library injected at %p\n", (void*)regs.rax);
@@ -240,7 +249,10 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
 #endif
         //restore the app's state
         ptraceWrite(pid, freeAddr, oldcode, INJECTED_CODE_SIZE_LEN);
-        ptrace(PTRACE_SETREGS, pid, NULL, &oldregs);
+        if (ptrace(PTRACE_SETREGS, pid, NULL, &oldregs) == -1) {
+            fprintf(stderr, "error: ptrace set register(), library could not be injected\n");
+            return EXIT_FAILURE;
+        }
         ptrace(PTRACE_DETACH, pid, NULL, NULL);
 
     } else {

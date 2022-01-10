@@ -5,6 +5,7 @@
 #include <sys/ptrace.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/uio.h>
 #include <sys/user.h>
 #include <unistd.h>
 #include <string.h>
@@ -21,18 +22,6 @@
 
 // Size of injected code segment
 #define INJECTED_CODE_SIZE_LEN (512)
-
-/*
- * It turns out that PTRACE_GETREGS & PTRACE_SETREGS are arch specific.
- * From the man page: PTRACE_GETREGS and PTRACE_GETFPREGS are not present on all architectures.
- * We will need to use PTRACE_GETREGSET and PTRACE_SETREGSET as these are defined to read
- * registers in an architecture-dependent way.
- * TODO: the code needs to be updated to handle this when we apply ARM64 specifics.
- */
-#ifdef __aarch64__
-#define PTRACE_GETREGS PTRACE_GETREGSET
-#define PTRACE_SETREGS PTRACE_SETREGSET
-#endif
 
 typedef struct {
     char *path;
@@ -164,6 +153,8 @@ static void call_dlopen_end() {}
 static int 
 inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
 {
+    struct iovec my_iovec;
+    my_iovec.iov_len = sizeof(struct user_regs_struct);
     struct user_regs_struct oldregs, regs;
     unsigned char *oldcode;
     int status;
@@ -175,7 +166,8 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     }
 
     // save registers
-    if (ptrace(PTRACE_GETREGS, pid, NULL, &oldregs) == -1) {
+    my_iovec.iov_base = &oldregs;
+    if (ptrace(PTRACE_GETREGSET, pid, (void*)NT_PRSTATUS, &my_iovec) == -1) {
         fprintf(stderr, "error: ptrace get register(), library could not be injected\n");
         return EXIT_FAILURE;
     }
@@ -217,7 +209,8 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
         regs.rsi = RTLD_NOW;
     }
 #endif
-    if (ptrace(PTRACE_SETREGS, pid, NULL, &regs) == -1) {
+    my_iovec.iov_base = &regs;
+    if (ptrace(PTRACE_SETREGSET, pid, (void *)NT_PRSTATUS, &my_iovec) == -1) {
         fprintf(stderr, "error: ptrace set register(), library could not be injected\n");
         return EXIT_FAILURE;
     }
@@ -235,8 +228,9 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     // make sure the target process was stoppend by SIGTRAP triggered by int 0x3
     if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) {
 
+        my_iovec.iov_base = &regs;
         // check if the library has been successfully injected
-        if (ptrace(PTRACE_GETREGS, pid, NULL, &regs) == -1) {
+        if (ptrace(PTRACE_GETREGSET, pid, (void*)NT_PRSTATUS, &my_iovec) == -1) {
             fprintf(stderr, "error: ptrace get register(), library could not be injected\n");
             return EXIT_FAILURE;
         }
@@ -249,7 +243,8 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
 #endif
         //restore the app's state
         ptraceWrite(pid, freeAddr, oldcode, INJECTED_CODE_SIZE_LEN);
-        if (ptrace(PTRACE_SETREGS, pid, NULL, &oldregs) == -1) {
+        my_iovec.iov_base = &oldregs;
+        if (ptrace(PTRACE_SETREGSET, pid, (void *)NT_PRSTATUS, &my_iovec) == -1) {
             fprintf(stderr, "error: ptrace set register(), library could not be injected\n");
             return EXIT_FAILURE;
         }

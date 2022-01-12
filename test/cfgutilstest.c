@@ -285,6 +285,39 @@ cfgProcessEnvironmentStatsDMaxLen(void** state)
 }
 
 static void
+cfgProcessEnvironmentWatchStatsdEnable(void **state)
+{
+    config_t *cfg = cfgCreateDefault();
+    cfgMtcStatsdEnableSet(cfg, TRUE);
+    assert_int_equal(cfgMtcStatsdEnable(cfg), TRUE);
+
+    // should override current cfg
+    assert_int_equal(setenv("SCOPE_METRIC_STATSD", "false", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgMtcStatsdEnable(cfg), FALSE);
+
+    // should override current cfg
+    assert_int_equal(setenv("SCOPE_METRIC_STATSD", "true", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgMtcStatsdEnable(cfg), TRUE);
+
+    // if env is not defined, cfg should not be affected
+    assert_int_equal(unsetenv("SCOPE_METRIC_STATSD"), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgMtcStatsdEnable(cfg), TRUE);
+
+    // unrecognised value should not affect cfg
+    assert_int_equal(setenv("SCOPE_METRIC_STATSD", "sure thing", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgMtcStatsdEnable(cfg), TRUE);
+
+    // Just don't crash on null cfg
+    cfgDestroy(&cfg);
+    cfgProcessEnvironment(cfg);
+}
+
+
+static void
 cfgProcessEnvironmentMtcPeriod(void** state)
 {
     config_t* cfg = cfgCreateDefault();
@@ -846,6 +879,7 @@ cfgProcessCommandsFromFile(void** state)
         "SCOPE_METRIC_ENABLE=false\n"
         "SCOPE_STATSD_PREFIX=prefix\n"
         "SCOPE_STATSD_MAXLEN=1024\n"
+        "SCOPE_METRIC_STATSD=false\n"
         "SCOPE_SUMMARY_PERIOD=11\n"
         "SCOPE_CMD_DIR=/the/path/\n"
         "SCOPE_CONFIG_EVENT=false\n"
@@ -905,6 +939,7 @@ cfgProcessCommandsFromFile(void** state)
     assert_int_equal(cfgMtcEnable(cfg), FALSE);
     assert_string_equal(cfgMtcStatsDPrefix(cfg), "prefix.");
     assert_int_equal(cfgMtcStatsDMaxLen(cfg), 1024);
+    assert_int_equal(cfgMtcStatsdEnable(cfg), FALSE);
     assert_int_equal(cfgMtcPeriod(cfg), 11);
     assert_string_equal(cfgCmdDir(cfg), "/the/path/");
     assert_int_equal(cfgSendProcessStartMsg(cfg), FALSE);
@@ -1066,6 +1101,7 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgMtcFormat(config), DEFAULT_MTC_FORMAT);
     assert_string_equal    (cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
     assert_int_equal       (cfgMtcStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
+    assert_int_equal       (cfgMtcStatsdEnable(config), DEFAULT_MTC_STATSD_ENABLE);
     assert_int_equal       (cfgMtcVerbosity(config), DEFAULT_MTC_VERBOSITY);
     assert_int_equal       (cfgMtcPeriod(config), DEFAULT_SUMMARY_PERIOD);
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
@@ -1146,6 +1182,7 @@ cfgReadGoodYaml(void** state)
         "    statsdprefix : 'cribl.scope'    # prepends each statsd metric\n"
         "    statsdmaxlen : 1024             # max size of a formatted statsd string\n"
         "    verbosity: 3                    # 0-9 (0 is least verbose, 9 is most)\n"
+        "  watch:\n"
         "  transport:                        # defines how scope output is sent\n"
         "    type: file                      # udp, unix, file, syslog\n"
         "    path: '/var/log/scope.log'\n"
@@ -1199,6 +1236,7 @@ cfgReadGoodYaml(void** state)
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_NDJSON);
     assert_string_equal(cfgMtcStatsDPrefix(config), "cribl.scope.");
     assert_int_equal(cfgMtcStatsDMaxLen(config), 1024);
+    assert_int_equal(cfgMtcStatsdEnable(config), FALSE);
     assert_int_equal(cfgMtcVerbosity(config), 3);
     assert_int_equal(cfgMtcPeriod(config), 11);
     assert_string_equal(cfgCmdDir(config), "/tmp");
@@ -1373,6 +1411,9 @@ const char* jsonText =
     "      'statsdmaxlen': '42',\n"
     "      'verbosity': '0'\n"
     "    },\n"
+    "    'watch': [\n"
+    "      {'type':'statsd'}\n"
+    "    ],\n"
     "    'transport': {\n"
     "      'type': 'file',\n"
     "      'path': '/var/log/scope.log'\n"
@@ -1438,6 +1479,7 @@ cfgReadGoodJson(void** state)
     assert_string_equal(cfgMtcStatsDPrefix(config), "cribl.scope.");
     assert_int_equal(cfgMtcStatsDMaxLen(config), 42);
     assert_int_equal(cfgMtcVerbosity(config), 0);
+    assert_int_equal(cfgMtcStatsdEnable(config), TRUE);
     assert_int_equal(cfgMtcPeriod(config), 13);
     assert_int_equal(cfgSendProcessStartMsg(config), TRUE);
     assert_int_equal(cfgEvtEnable(config), FALSE);
@@ -2506,6 +2548,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgProcessEnvironmentMtcFormat),
         cmocka_unit_test(cfgProcessEnvironmentStatsDPrefix),
         cmocka_unit_test(cfgProcessEnvironmentStatsDMaxLen),
+        cmocka_unit_test(cfgProcessEnvironmentWatchStatsdEnable),
         cmocka_unit_test(cfgProcessEnvironmentMtcPeriod),
         cmocka_unit_test(cfgProcessEnvironmentCommandDir),
         cmocka_unit_test(cfgProcessEnvironmentConfigEvent),

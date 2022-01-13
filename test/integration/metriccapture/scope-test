@@ -1,25 +1,110 @@
 #!/bin/bash
+DEBUG=0  # set this to 1 to capture the OUTFILE for each test
+
+FAILED_TEST_LIST=""
+FAILED_TEST_COUNT=0
+
+OUTFILE=/usr/local/scope/metric.out
+
+starttest(){
+    CURRENT_TEST=$1
+    echo "==================================="
+    echo "       Testing $CURRENT_TEST       "
+    echo "==================================="
+    ERR=0
+}
+
+evaltest(){
+    echo "       Evaluating $CURRENT_TEST"
+}
+
+endtest(){
+    if [ $ERR -eq "0" ]; then
+        RESULT=PASSED
+    else
+        RESULT=FAILED
+        FAILED_TEST_LIST+=$CURRENT_TEST
+        FAILED_TEST_LIST+=" "
+        FAILED_TEST_COUNT=$(($FAILED_TEST_COUNT + 1))
+    fi
+
+    echo "******* $CURRENT_TEST $RESULT *********"
+    echo ""
+    echo ""
+
+    #copy the OUTFILE to help with debugging
+    if (( $DEBUG )) || [ $RESULT == "FAILED" ]; then
+        cp -f $OUTFILE $OUTFILE.$CURRENT_TEST
+    fi
+
+    rm -f $OUTFILE
+}
 
 cd /usr/local/scope
 
 
-# Note that this is *not* an effective test at this point...
-# it only ensures that node isn't *crashing*.
-#
-# At a minimum, we also need to ensure that appscope's metric output
-# includes data intercepted from the execution of hotshot.ts.
 
-echo "Executing node hotshot.ts"
-LD_PRELOAD=/usr/local/scope/lib/libscope.so node hotshot.ts
-if [ $? -ne 0 ]; then
-    echo "node hotshot.ts failed"
-    exit 1
+starttest "on_by_default"
+LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
+evaltest
+COUNT=`grep -c "^my\." $OUTFILE`
+if [ $COUNT != "6" ]; then
+    echo "expected 6 captured metrics starting with 'my.' in $OUTFILE, but found $COUNT"
+    ERR+=1
+fi
+endtest
+
+starttest "builtin_dimensions_exist"
+LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
+evaltest
+# pick one metric to test
+METRIC=`grep "^my.histogram" $OUTFILE`
+for DIM in pid host proc; do
+    if echo $METRIC | grep $DIM; then
+        echo "as expected, found $DIM"
+    else
+        ERR+=1
+    fi
+done
+endtest
+
+starttest "captured_dimensions_exist"
+LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
+evaltest
+# pick one metric to test
+METRIC=`grep "^my.histogram" $OUTFILE`
+for DIM in "source:hot-shots"; do
+   if echo $METRIC | grep $DIM; then
+       echo "as expected, found $DIM"
+   else
+       ERR+=1
+   fi
+done
+endtest
+
+starttest "can_be_disabled"
+LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE SCOPE_METRIC_STATSD=false node hotshot.ts
+evaltest
+COUNT=`grep -c "^my\." $OUTFILE`
+if [ $COUNT != "0" ]; then
+    echo "expected 0 captured metrics starting with 'my.' in $OUTFILE, but found $COUNT"
+    ERR+=1
+fi
+endtest
+
+
+
+if (( $FAILED_TEST_COUNT == 0 )); then
+    echo ""
+    echo ""
+    echo "*************** ALL TESTS PASSED ***************"
+else
+    echo "*************** SOME TESTS FAILED ***************"
+    echo "Failed tests: $FAILED_TEST_LIST"
+    echo "Refer to these files for more info:"
+    for FAILED_TEST in $FAILED_TEST_LIST; do
+        echo "  $OUTFILE.$FAILED_TEST"
+    done
 fi
 
-echo "node hotshot.ts passed"
-echo ""
-
-
-
-echo "All metriccapture tests passed"
-exit 0
+exit ${FAILED_TEST_COUNT}

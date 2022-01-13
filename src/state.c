@@ -1281,12 +1281,15 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
 
         if (net && net->protoProtoDef) {
             // Process HTTP if detected and events are enabled
-            if (!strcasecmp(net->protoProtoDef->protname, "HTTP") &&
-                cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) {
+            if (cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP) &&
+               !strcasecmp(net->protoProtoDef->protname, "HTTP")) {
+
                 doHttp(id, sockfd, net, buf, len, src, dtype);
             }
 
-            if (!strcasecmp(net->protoProtoDef->protname, "STATSD")) {
+            if (cfgMtcStatsdEnable(g_cfg.staticfg) &&
+                !strcasecmp(net->protoProtoDef->protname, "STATSD")) {
+
                 doMetricCapture(id, sockfd, net, buf, len, src, dtype);
             }
         }

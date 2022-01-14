@@ -115,7 +115,7 @@ To attach AppScope to a running process:
 
 When you attach AppScope to a process, its child processes are not automatically scoped.
 
-You cannot attach to a musl libc process or a static executable's process.
+You cannot attach to a static executable's process.
 
 No HTTP/1.1 events and headers are emitted when AppScope attaches to a Go process that uses the `azure-sdk-for-go` package.
 

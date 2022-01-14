@@ -769,8 +769,15 @@ cfgMtcVerbositySetFromStr(config_t* cfg, const char* value)
     cfgMtcVerbositySet(cfg, x);
 }
 
+#define EDGE_PATH "/var/run/appscope/appscope.sock"
 static char*
 cfgEdgePath(void){
+    // 1) If EDGE_PATH can be accessed, return that.
+    if (g_fn.access(EDGE_PATH, R_OK|W_OK) == 0) {
+        return strdup(EDGE_PATH);
+    }
+
+    // 2) If CRIBL_HOME is defined, return $CRIBL_HOME/state/appscope.sock
     const char *cribl_home = getenv("CRIBL_HOME");
     if (cribl_home) {
         char new_path[PATH_MAX];
@@ -779,6 +786,7 @@ cfgEdgePath(void){
             return realpath(new_path, NULL);
         }
     }
+    // 3) Otherwise, return /opt/cribl/state/appscope.sock
     return strdup("/opt/cribl/state/appscope.sock");
 }
 

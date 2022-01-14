@@ -183,55 +183,57 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     struct iovec my_iovec;
     struct user_regs_struct oldregs, regs;
     my_iovec.iov_len = sizeof(regs);
-    unsigned char *oldcode;
+    unsigned char *oldcode = NULL;
     int status;
     uint64_t freeAddr, codeAddr, freeAddrSize;
     char libpath[SCOPE_PATH_SIZE] = {0};
     int libpathLen = strlen(path) + 1;
+    int ret = EXIT_FAILURE;
+
     if (libpathLen > SCOPE_PATH_SIZE) {
         fprintf(stderr, "library path %s is longer than %d, library could not be injected\n", path, SCOPE_PATH_SIZE);
-        return EXIT_FAILURE;
+        goto exit;
     }
     strncpy(libpath, path, libpathLen);
 
     if (ptraceAttach(pid)) {
-        return EXIT_FAILURE;
+        goto exit;
     }
 
     // save registers
     my_iovec.iov_base = &oldregs;
     if (ptrace(PTRACE_GETREGSET, pid, (void*)NT_PRSTATUS, &my_iovec) == -1) {
         fprintf(stderr, "error: ptrace get register(), library could not be injected\n");
-        return EXIT_FAILURE;
+        goto detach;
     }
     memcpy(&regs, &oldregs, sizeof(struct user_regs_struct));
 
     // find free space in text section
     if (freeSpaceAddr(pid, &freeAddr, &freeAddrSize)) {
-        return EXIT_FAILURE;
+        goto detach;
     }
 
     // sanity check for size condition
     if (freeAddrSize < INJECTED_CODE_SIZE_LEN) {
         fprintf(stderr, "Insufficient space in  0x%" PRIx64 " to inject, library could not be injected\n", freeAddr);
-        return EXIT_FAILURE;
+        goto detach;
     }
     
     // back up the code
     oldcode = (unsigned char *)malloc(INJECTED_CODE_SIZE_LEN);
     if (ptraceRead(pid, freeAddr, oldcode, INJECTED_CODE_SIZE_LEN)) {
-        return EXIT_FAILURE;
+        goto detach;
     }
 
     // write the path to the library 
     if (ptraceWrite(pid, freeAddr, &libpath, SCOPE_PATH_SIZE)) {
-        return EXIT_FAILURE;
+        goto restore_app;
     }
 
     // inject the code after offset the library path
     codeAddr = freeAddr + SCOPE_PATH_SIZE + PATH_CODE_OFFSET;
     if (ptraceWrite(pid, codeAddr, &call_dlopen, call_dlopen_end - call_dlopen)) {
-        return EXIT_FAILURE;
+        goto restore_app;
     }
 
     // set instruction pointer to point to the injected code
@@ -247,13 +249,13 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     my_iovec.iov_base = &regs;
     if (ptrace(PTRACE_SETREGSET, pid, (void *)NT_PRSTATUS, &my_iovec) == -1) {
         fprintf(stderr, "error: ptrace set register(), library could not be injected\n");
-        return EXIT_FAILURE;
+        goto restore_app;
     }
 
     // continue execution and wait until the target process is stopped
     if (ptrace(PTRACE_CONT, pid, NULL, NULL) == -1) {
         fprintf(stderr, "error: ptrace continue(), library could not be injected\n");
-        return EXIT_FAILURE;
+        goto restore_app;
     }
     waitpid(pid, &status, WUNTRACED);
 
@@ -261,7 +263,7 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) {
         if (ptrace(PTRACE_CONT, pid, SIGCONT, NULL) == -1) {
             fprintf(stderr, "error: ptrace continue(), library could not be injected\n");
-            return EXIT_FAILURE;
+            goto restore_app;
         }
         waitpid(pid, &status, WUNTRACED);
     }
@@ -273,28 +275,31 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
         // check if the library has been successfully injected
         if (ptrace(PTRACE_GETREGSET, pid, (void*)NT_PRSTATUS, &my_iovec) == -1) {
             fprintf(stderr, "error: ptrace get register(), library could not be injected\n");
-            return EXIT_FAILURE;
+            goto restore_app;
         }
         if (RET_REG != 0x0) {
+            ret = EXIT_SUCCESS;
             //printf("Appscope library injected at %p\n", (void*)RET_REG);
         } else {
             fprintf(stderr, "error: dlopen() failed, library could not be injected\n");
         }
-        //restore the app's state
-        ptraceWrite(pid, freeAddr, oldcode, INJECTED_CODE_SIZE_LEN);
-        my_iovec.iov_base = &oldregs;
-        if (ptrace(PTRACE_SETREGSET, pid, (void *)NT_PRSTATUS, &my_iovec) == -1) {
-            fprintf(stderr, "error: ptrace set register(), library could not be injected\n");
-            return EXIT_FAILURE;
-        }
-        ptrace(PTRACE_DETACH, pid, NULL, NULL);
 
     } else {
         fprintf(stderr, "error: target process stopped with signal %d\n", WSTOPSIG(status));
-        return EXIT_FAILURE;
     }
+restore_app:
+    //restore the app's state
+    ptraceWrite(pid, freeAddr, oldcode, INJECTED_CODE_SIZE_LEN);
+    my_iovec.iov_base = &oldregs;
+    if (ptrace(PTRACE_SETREGSET, pid, (void *)NT_PRSTATUS, &my_iovec) == -1) {
+        fprintf(stderr, "error: ptrace set register(), error during restore the application state\n");
+    }
+detach:
+    ptrace(PTRACE_DETACH, pid, NULL, NULL);
 
-    return EXIT_SUCCESS;
+exit:
+    free(oldcode);
+    return ret;
 }
 
 static int 

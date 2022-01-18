@@ -27,6 +27,7 @@
 #include "utils.h"
 #include "runtimecfg.h"
 #include "cfg.h"
+#include "scopestdlib.h"
 
 #ifndef AF_NETLINK
 #define AF_NETLINK 16
@@ -160,9 +161,9 @@ destroyHttpMap(void *data)
     if (!data) return;
     http_map *map = (http_map *)data;
 
-    if (map->req) free(map->req);
-    if (map->resp) free(map->resp);
-    if (map) free(map);
+    if (map->req) scope_free(map->req);
+    if (map->resp) scope_free(map->resp);
+    if (map) scope_free(map);
 }
 
 static void
@@ -176,7 +177,7 @@ destroyHttp2Channel(void *data)
         lstDestroy(&info->streams);
     }
 
-    free(info);
+    scope_free(info);
 }
 
 static void
@@ -189,7 +190,7 @@ destroyHttp2Stream(void *data)
         cJSON_Delete(info->jsonData);
     }
 
-    free(info);
+    scope_free(info);
 }
 
 void
@@ -235,9 +236,9 @@ destroyProto(protocol_info *proto)
         // comment above doesn't apply to HTTP/2 protocol events
         if (proto->ptype == EVT_H2FRAME) {
             http_post *post = (http_post *)proto->data;
-            free(post->hdr);
+            scope_free(post->hdr);
         }
-        free(proto->data);
+        scope_free(proto->data);
     }
 }
 
@@ -249,17 +250,17 @@ getProtocol(int type, char *proto, size_t len)
     }
 
     if (type == SOCK_STREAM) {
-        strncpy(proto, "TCP", len);
+        scope_strncpy(proto, "TCP", len);
     } else if (type == SOCK_DGRAM) {
-        strncpy(proto, "UDP", len);
+        scope_strncpy(proto, "UDP", len);
     } else if (type == SOCK_RAW) {
-        strncpy(proto, "RAW", len);
+        scope_strncpy(proto, "RAW", len);
     } else if (type == SOCK_RDM) {
-        strncpy(proto, "RDM", len);
+        scope_strncpy(proto, "RDM", len);
     } else if (type == SOCK_SEQPACKET) {
-        strncpy(proto, "SEQPACKET", len);
+        scope_strncpy(proto, "SEQPACKET", len);
     } else {
-        strncpy(proto, "OTHER", len);
+        scope_strncpy(proto, "OTHER", len);
     }
 
     return 0;
@@ -271,19 +272,19 @@ getConn(struct sockaddr_storage *conn, char *addr, size_t alen, char *port, size
     if (!conn || !addr || !port) return FALSE;
 
     if (conn->ss_family == AF_INET) {
-        if (inet_ntop(AF_INET, &((struct sockaddr_in *)conn)->sin_addr,
+        if (scope_inet_ntop(AF_INET, &((struct sockaddr_in *)conn)->sin_addr,
                       addr, alen) == NULL) {
                 return FALSE;
         }
 
-        snprintf(port, plen, "%d", ntohs(((struct sockaddr_in *)conn)->sin_port));
+        scope_snprintf(port, plen, "%d", scope_ntohs(((struct sockaddr_in *)conn)->sin_port));
     } else if (conn->ss_family == AF_INET6) {
-        if (inet_ntop(AF_INET6, &((struct sockaddr_in6 *)conn)->sin6_addr,
+        if (scope_inet_ntop(AF_INET6, &((struct sockaddr_in6 *)conn)->sin6_addr,
                       addr, alen) == NULL) {
                 return  FALSE;
         }
 
-        snprintf(port, plen, "%d", ntohs(((struct sockaddr_in6 *)conn)->sin6_port));
+        scope_snprintf(port, plen, "%d", scope_ntohs(((struct sockaddr_in6 *)conn)->sin6_port));
     } else {
         return FALSE;
     }
@@ -326,7 +327,7 @@ getNetInternals(net_info *net, int type,
         }
 
         if (getConn(rconn, raddr, alen, rport, plen) == TRUE) {
-            in_port_t pport = ntohs(((struct sockaddr_in *)rconn)->sin_port);
+            in_port_t pport = scope_ntohs(((struct sockaddr_in *)rconn)->sin_port);
             H_ATTRIB(fields[*ix], "net_peer_ip", raddr, 1);
             NEXT_FLD(*ix, maxfld);
             H_VALUE(fields[*ix], "net_peer_port", pport, 1);
@@ -334,7 +335,7 @@ getNetInternals(net_info *net, int type,
         }
 
         if (getConn(lconn, laddr, alen, lport, plen) == TRUE) {
-            in_port_t hport = ntohs(((struct sockaddr_in *)lconn)->sin_port);
+            in_port_t hport = scope_ntohs(((struct sockaddr_in *)lconn)->sin_port);
             H_ATTRIB(fields[*ix], "net_host_ip", laddr, 1);
             NEXT_FLD(*ix, maxfld);
             H_VALUE(fields[*ix], "net_host_port", hport, 1);
@@ -392,15 +393,15 @@ getHttpStatus(char *header, size_t len, char **stext)
     // ex: HTTP/1.1 200 OK\r\n
     if ((ix = searchExec(g_http_status, header, len)) == -1) return -1;
 
-    if ((ix < 0) || (ix > len) || ((ix + strlen(HTTP_STATUS) + 1) > len)) return -1;
+    if ((ix < 0) || (ix > len) || ((ix + scope_strlen(HTTP_STATUS) + 1) > len)) return -1;
 
-    val = &header[ix + strlen(HTTP_STATUS) + 1];
+    val = &header[ix + scope_strlen(HTTP_STATUS) + 1];
     // note that the spec defines the status code to be exactly 3 chars/digits
-    *stext = &header[ix + strlen(HTTP_STATUS) + 6];
+    *stext = &header[ix + scope_strlen(HTTP_STATUS) + 6];
 
-    errno = 0;
-    rc = strtoull(val, NULL, 0);
-    if ((errno != 0) || (rc == 0)) {
+    scope_errno = 0;
+    rc = scope_strtoull(val, NULL, 0);
+    if ((scope_errno != 0) || (rc == 0)) {
         return -1;
     }
     return rc;
@@ -438,40 +439,40 @@ httpFields(event_field_t *fields, http_report *hreport, char *hdr,
     hreport->clen = -1;
 
     if ((hreport->ptype == EVT_HREQ) && (hreport->hreq)) {
-        strncpy(hreport->hreq, hdr, hdr_len);
+        scope_strncpy(hreport->hreq, hdr, hdr_len);
         header = hreport->hreq;
     } else if ((hreport->ptype == EVT_HRES) && (hreport->hres)) {
-        strncpy(hreport->hres, hdr, hdr_len);
+        scope_strncpy(hreport->hres, hdr, hdr_len);
         header = hreport->hres;
     } else {
         scopeLogWarn("fd:%d WARN: httpFields: proto ptype is not req or resp", proto->fd);
         return FALSE;
     }
 
-    char *thishdr = strtok_r(header, "\r\n", &savea);
+    char *thishdr = scope_strtok_r(header, "\r\n", &savea);
     if (!thishdr) {
         scopeLogWarn("fd:%d WARN: httpFields: parse an http header", proto->fd);
         return FALSE;
     }
 
-    while ((thishdr = strtok_r(NULL, "\r\n", &savea)) != NULL) {
+    while ((thishdr = scope_strtok_r(NULL, "\r\n", &savea)) != NULL) {
         // From RFC 2616 Section 4.2 "Field names are case-insensitive."
-        if (strcasestr(thishdr, "Host:")) {
-            H_ATTRIB(fields[hreport->ix], "http_host", strchr(thishdr, ':') + 2, 1);
+        if (scope_strcasestr(thishdr, "Host:")) {
+            H_ATTRIB(fields[hreport->ix], "http_host", scope_strchr(thishdr, ':') + 2, 1);
             HTTP_NEXT_FLD(hreport->ix);
-        } else if (strcasestr(thishdr, "User-Agent:")) {
-            H_ATTRIB(fields[hreport->ix], "http_user_agent", strchr(thishdr, ':') + 2, 5);
+        } else if (scope_strcasestr(thishdr, "User-Agent:")) {
+            H_ATTRIB(fields[hreport->ix], "http_user_agent", scope_strchr(thishdr, ':') + 2, 5);
             HTTP_NEXT_FLD(hreport->ix);
-        } else if (strcasestr(thishdr, "X-Forwarded-For:")) {
-            H_ATTRIB(fields[hreport->ix], "http_client_ip", strchr(thishdr, ':') + 2, 5);
+        } else if (scope_strcasestr(thishdr, "X-Forwarded-For:")) {
+            H_ATTRIB(fields[hreport->ix], "http_client_ip", scope_strchr(thishdr, ':') + 2, 5);
             HTTP_NEXT_FLD(hreport->ix);
-        } else if (strcasestr(thishdr, "Content-Length:")) {
-            errno = 0;
-            if (((hreport->clen = strtoull(strchr(thishdr, ':') + 2, NULL, 0)) == 0) || (errno != 0)) {
+        } else if (scope_strcasestr(thishdr, "Content-Length:")) {
+            scope_errno = 0;
+            if (((hreport->clen = scope_strtoull(scope_strchr(thishdr, ':') + 2, NULL, 0)) == 0) || (scope_errno != 0)) {
                 hreport->clen = -1;
             }
-        } else if (strcasestr(thishdr, "x-appscope:")) {
-                H_ATTRIB(fields[hreport->ix], "x-appscope", strchr(thishdr, ':') + 2, 5);
+        } else if (scope_strcasestr(thishdr, "x-appscope:")) {
+                H_ATTRIB(fields[hreport->ix], "x-appscope", scope_strchr(thishdr, ':') + 2, 5);
                 HTTP_NEXT_FLD(hreport->ix);
         } else if ((numExtracts = cfgEvtFormatNumHeaders(cfg)) > 0) {
             int i;
@@ -481,7 +482,7 @@ httpFields(event_field_t *fields, http_report *hreport, char *hdr,
 
                 if (((re = cfgEvtFormatHeaderRe(cfg, i)) != NULL) &&
                     (headerMatch(re, thishdr) == TRUE)) {
-                    char *evsrc = strchr(thishdr, ':');
+                    char *evsrc = scope_strchr(thishdr, ':');
 
                     if (evsrc) {
                         *evsrc = '\0';
@@ -547,7 +548,7 @@ doHttp1Header(protocol_info *proto)
 
     if ((map = lstFind(g_maplist, post->id)) == NULL) {
         // lazy open
-        if ((map = calloc(1, sizeof(http_map))) == NULL) {
+        if ((map = scope_calloc(1, sizeof(http_map))) == NULL) {
             destroyProto(proto);
             return;
         }
@@ -559,7 +560,7 @@ doHttp1Header(protocol_info *proto)
         }
 
         struct timeval tv;
-        gettimeofday(&tv, NULL);
+        scope_gettimeofday(&tv, NULL);
 
         map->id = post->id;
         map->first_time = tv.tv_sec;
@@ -589,23 +590,23 @@ doHttp1Header(protocol_info *proto)
     char header[map->req_len];
     // we're either building a new req or we have a previous req
     if (map->req) {
-        if ((hreport.hreq = calloc(1, map->req_len)) == NULL) {
+        if ((hreport.hreq = scope_calloc(1, map->req_len)) == NULL) {
             scopeLogError("fd:%d ERROR: doHttp1Header: hreq memory allocation failure", proto->fd);
             return;
         }
 
         char *savea = NULL;
-        strncpy(header, map->req, map->req_len);
+        scope_strncpy(header, map->req, map->req_len);
 
-        char *headertok = strtok_r(header, "\r\n", &savea);
+        char *headertok = scope_strtok_r(header, "\r\n", &savea);
         if (!headertok) {
-            free(hreport.hreq);
+            scope_free(hreport.hreq);
             scopeLogWarn("fd:%d WARN: doHttp1Header: parse an http request header", proto->fd);
             return;
         }
 
         // The request specific values from Request-Line
-        char *method_str = strtok_r(headertok, " ", &savea);
+        char *method_str = scope_strtok_r(headertok, " ", &savea);
         if (method_str) {
             H_ATTRIB(fields[hreport.ix], "http_method", method_str, 1);
             HTTP_NEXT_FLD(hreport.ix);
@@ -613,7 +614,7 @@ doHttp1Header(protocol_info *proto)
             scopeLogWarn("fd:%d WARN: doHttp1Header: no method in an http request header", proto->fd);
         }
 
-        char *target_str = strtok_r(NULL, " ", &savea);
+        char *target_str = scope_strtok_r(NULL, " ", &savea);
         if (target_str) {
             H_ATTRIB(fields[hreport.ix], "http_target", target_str, 4);
             HTTP_NEXT_FLD(hreport.ix);
@@ -621,10 +622,10 @@ doHttp1Header(protocol_info *proto)
             scopeLogWarn("fd:%d WARN: doHttp1Header: no target in an http request header", proto->fd);
         }
 
-        char *flavor_str = strtok_r(NULL, " ", &savea);
+        char *flavor_str = scope_strtok_r(NULL, " ", &savea);
         if (flavor_str &&
-            ((flavor_str = strtok_r(flavor_str, "/", &savea))) &&
-            ((flavor_str = strtok_r(NULL, "\r", &savea)))) {
+            ((flavor_str = scope_strtok_r(flavor_str, "/", &savea))) &&
+            ((flavor_str = scope_strtok_r(NULL, "\r", &savea)))) {
             if (proto->ptype == EVT_HREQ) {
                 H_ATTRIB(fields[hreport.ix], "http_flavor", flavor_str, 1);
                 HTTP_NEXT_FLD(hreport.ix);
@@ -669,13 +670,13 @@ doHttp1Header(protocol_info *proto)
     * Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
     */
     if (proto->ptype == EVT_HRES) {
-        if ((hreport.hres = calloc(1, proto->len)) == NULL) {
+        if ((hreport.hres = scope_calloc(1, proto->len)) == NULL) {
             scopeLogError("fd:%d ERROR: doHttp1Header: hres memory allocation failure", proto->fd);
             return;
         }
 
         struct timeval tv;
-        gettimeofday(&tv, NULL);
+        scope_gettimeofday(&tv, NULL);
 
         map->resp = (char *)post->hdr;
 
@@ -692,13 +693,13 @@ doHttp1Header(protocol_info *proto)
         // The response specific values from Status-Line
         char *savea;
         char reqheader[proto->len];
-        strncpy(reqheader, map->resp, proto->len);
+        scope_strncpy(reqheader, map->resp, proto->len);
 
-        char *headertok = strtok_r(reqheader, "\r\n", &savea);
-        char *flavor_str = strtok_r(headertok, " ", &savea);
+        char *headertok = scope_strtok_r(reqheader, "\r\n", &savea);
+        char *flavor_str = scope_strtok_r(headertok, " ", &savea);
         if (flavor_str &&
-            ((flavor_str = strtok_r(flavor_str, "/", &savea))) &&
-            ((flavor_str = strtok_r(NULL, "", &savea)))) {
+            ((flavor_str = scope_strtok_r(flavor_str, "/", &savea))) &&
+            ((flavor_str = scope_strtok_r(NULL, "", &savea)))) {
             H_ATTRIB(fields[hreport.ix], "http_flavor", flavor_str, 1);
             HTTP_NEXT_FLD(hreport.ix);
         } else {
@@ -709,9 +710,9 @@ doHttp1Header(protocol_info *proto)
         HTTP_NEXT_FLD(hreport.ix);
 
         // point past the status code
-        char st[strlen(stext)];
-        strncpy(st, stext, strlen(stext));
-        char *status_str = strtok_r(st, "\r\n", &savea);
+        char st[scope_strlen(stext)];
+        scope_strncpy(st, stext, scope_strlen(stext));
+        char *status_str = scope_strtok_r(st, "\r\n", &savea);
         // if no Reason-Phrase is provided, st will not be equal to status_str
         if (st != status_str) status_str = "";
         H_ATTRIB(fields[hreport.ix], "http_status_text", status_str, 1);
@@ -770,8 +771,8 @@ doHttp1Header(protocol_info *proto)
         if (lstDelete(g_maplist, post->id) == FALSE) DBG(NULL);
     }
 
-    if (hreport.hreq) free(hreport.hreq);
-    if (hreport.hres) free(hreport.hres);
+    if (hreport.hreq) scope_free(hreport.hreq);
+    if (hreport.hres) scope_free(hreport.hres);
     destroyProto(proto);
 }
 
@@ -936,7 +937,7 @@ static void
 addHttp2NumField(cJSON *jsonData, const char* field, uint32_t value)
 {
     char buf[16];
-    if (snprintf(buf, sizeof(buf), "%d", value) >= sizeof(buf)) {
+    if (scope_snprintf(buf, sizeof(buf), "%d", value) >= sizeof(buf)) {
         scopeLogError("ERROR: failed to convert int to string");
         DBG("buf too small for uint32");
         return;
@@ -1047,7 +1048,7 @@ doHttp2Frame(protocol_info *proto)
         // get/create the channel info
         http2Channel_t *channel = lstFind(g_http2_channels, proto->uid);
         if (!channel) {
-            channel = calloc(1, sizeof(http2Channel_t));
+            channel = scope_calloc(1, sizeof(http2Channel_t));
             if (!channel) {
                 scopeLogError("ERROR: failed to create channel info");
                 DBG(NULL);
@@ -1069,7 +1070,7 @@ doHttp2Frame(protocol_info *proto)
         // get/create the stream info
         http2Stream_t *stream = lstFind(channel->streams, fStream);
         if (!stream) {
-            stream = calloc(1, sizeof(http2Stream_t));
+            stream = scope_calloc(1, sizeof(http2Stream_t));
             if (!stream) {
                 scopeLogError("ERROR: failed to create http2Stream");
                 DBG(NULL);
@@ -1155,14 +1156,14 @@ doHttp2Frame(protocol_info *proto)
             // of these become entries in the cJSON object that will eventually
             // become the body.data element in the JSON event. Some are stashed
             // into the state object for use later.
-            if (!strcasecmp(":method", name)) {
+            if (!scope_strcasecmp(":method", name)) {
                 // We use the presence of the :method header to indicate we're
                 // processing a request message.
                 stream->msgType = 1;
                 addHttp2NumField(stream->jsonData, "http_stream", fStream);
 
                 addHttp2StrField(stream->jsonData, "http_method", val);
-                strncpy(stream->lastMethod, val, sizeof(stream->lastMethod));
+                scope_strncpy(stream->lastMethod, val, sizeof(stream->lastMethod));
 
                 // record the start timestamp for duration calculations
                 stream->lastRequestAt = post->start_duration;
@@ -1173,36 +1174,36 @@ doHttp2Frame(protocol_info *proto)
                 } else if (fType == 0x05) {
                     addHttp2StrFieldLN(stream->jsonData, "http_frame", "PUSH_PROMISE");
                 }
-            } else if (!strcasecmp(":status", name)) {
+            } else if (!scope_strcasecmp(":status", name)) {
                 // We use the presence of the :status header to indicate we're
                 // processing a response message.
                 stream->msgType = 2; // response
                 addHttp2NumField(stream->jsonData, "http_stream", fStream);
 
-                stream->lastStatus = atoi(val);
+                stream->lastStatus = scope_atoi(val);
                 addHttp2NumField(stream->jsonData, "http_status_code", stream->lastStatus);
                 addHttp2StrField(stream->jsonData, "http_status_text", httpStatusCode2Text(stream->lastStatus));
-            } else if (!strcasecmp(":authority", name)) {
+            } else if (!scope_strcasecmp(":authority", name)) {
                 addHttp2StrField(stream->jsonData, "http_host", val);
-                strncpy(stream->lastHost, val, sizeof(stream->lastHost));
-            } else if (!strcasecmp(":path", name)) {
+                scope_strncpy(stream->lastHost, val, sizeof(stream->lastHost));
+            } else if (!scope_strcasecmp(":path", name)) {
                 addHttp2StrField(stream->jsonData, "http_target", val);
-                strncpy(stream->lastTarget, val, sizeof(stream->lastTarget));
-            } else if (!strcasecmp(":scheme", name)) {
+                scope_strncpy(stream->lastTarget, val, sizeof(stream->lastTarget));
+            } else if (!scope_strcasecmp(":scheme", name)) {
                 addHttp2StrField(stream->jsonData, "http_scheme", val);
-            } else if (!strcasecmp("user-agent", name)) {
+            } else if (!scope_strcasecmp("user-agent", name)) {
                 addHttp2StrField(stream->jsonData, "http_user_agent", val);
-                strncpy(stream->lastUserAgent, val, sizeof(stream->lastUserAgent));
-            } else if (!strcasecmp("x-appscope", name)) {
+                scope_strncpy(stream->lastUserAgent, val, sizeof(stream->lastUserAgent));
+            } else if (!scope_strcasecmp("x-appscope", name)) {
                 addHttp2StrField(stream->jsonData, "x-appscope", val);
-            } else if (!strcasecmp("x-forwarded-for", name)) {
+            } else if (!scope_strcasecmp("x-forwarded-for", name)) {
                 addHttp2StrField(stream->jsonData, "http_client_ip", val);
-            } else if (!strcasecmp("content-length", name)) {
+            } else if (!scope_strcasecmp("content-length", name)) {
                 if (stream->msgType == 1) {
-                    stream->lastReqLen = atoi(val);
+                    stream->lastReqLen = scope_atoi(val);
                     addHttp2NumField(stream->jsonData, "http_request_content_length", stream->lastReqLen);
                 } else if (stream->msgType == 2) {
-                    stream->lastRespLen = atoi(val);
+                    stream->lastRespLen = scope_atoi(val);
                     addHttp2NumField(stream->jsonData, "http_response_content_length", stream->lastRespLen);
                 } else {
                     scopeLogError("ERROR: invalid msgType; %d", stream->msgType);
@@ -1268,17 +1269,17 @@ doHttp2Frame(protocol_info *proto)
                 }
 
                 char addr[INET6_ADDRSTRLEN];
-                if (inet_ntop(proto->remoteConn.ss_family,
+                if (scope_inet_ntop(proto->remoteConn.ss_family,
                             &((struct sockaddr_in*)&proto->remoteConn)->sin_addr, addr, sizeof(addr))) {
                     addHttp2StrField(stream->jsonData, "net_peer_ip", addr);
                 }
-                if (inet_ntop(proto->localConn.ss_family,
+                if (scope_inet_ntop(proto->localConn.ss_family,
                             &((struct sockaddr_in*)&proto->localConn)->sin_addr, addr, sizeof(addr))) {
                     addHttp2StrField(stream->jsonData, "net_host_ip", addr);
                 }
 
-                addHttp2NumField(stream->jsonData, "net_peer_port", ntohs(((struct sockaddr_in*)&proto->remoteConn)->sin_port));
-                addHttp2NumField(stream->jsonData, "net_host_port", ntohs(((struct sockaddr_in*)&proto->localConn)->sin_port));
+                addHttp2NumField(stream->jsonData, "net_peer_port", scope_ntohs(((struct sockaddr_in*)&proto->remoteConn)->sin_port));
+                addHttp2NumField(stream->jsonData, "net_host_port", scope_ntohs(((struct sockaddr_in*)&proto->localConn)->sin_port));
             }
 
             // If it's a request message...
@@ -1452,7 +1453,7 @@ doErrorMetric(metric_t type, control_type_t source,
     metric_counters* ctrs = (ctr) ? (metric_counters*) ctr : &g_ctrs;
 
     const char err_name[] = "EFAULT";
-    if (errno == EFAULT) {
+    if (scope_errno == EFAULT) {
         name = err_name;
     }
 
@@ -2045,7 +2046,7 @@ doNetCloseEvent(net_info *net, uint64_t dur)
 
     if ((net->protoDetect == DETECT_TRUE) &&
         net->protoProtoDef &&
-        !strcasecmp(net->protoProtoDef->protname, "HTTP")) {
+        !scope_strcasecmp(net->protoProtoDef->protname, "HTTP")) {
         H_ATTRIB(nevent[nix], "net_protocol", "http", 1);
         NEXT_FLD(nix, NET_MAX_FIELDS);
     }
@@ -2129,7 +2130,7 @@ doFSOpenEvent(fs_info *fs, const char *op)
 {
     const char *metric = "fs.open";
 
-    if ((fs->fd > 2) && strncmp(fs->path, "std", 3)) {
+    if ((fs->fd > 2) && scope_strncmp(fs->path, "std", 3)) {
 
         event_field_t fevent[] = {
             PROC_FIELD(g_proc.procname),
@@ -2157,7 +2158,7 @@ doFSCloseEvent(fs_info *fs, const char *op)
 {
     const char *metric = "fs.close";
 
-    if ((fs->fd > 2) && strncmp(fs->path, "std", 3)) {
+    if ((fs->fd > 2) && scope_strncmp(fs->path, "std", 3)) {
 
         event_field_t fevent[] = {
             PROC_FIELD(g_proc.procname),
@@ -2978,9 +2979,9 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         if (net->rxBytes.evt == 0ULL) return;
 
         if ((localPort == 443) || (remotePort == 443)) {
-            strncpy(data, "ssl", sizeof(data));
+            scope_strncpy(data, "ssl", sizeof(data));
         } else {
-            strncpy(data, "clear", sizeof(data));
+            scope_strncpy(data, "clear", sizeof(data));
         }
 
         // Do we need to define domain=LOCAL or NETLINK?
@@ -2990,7 +2991,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
             remotePort = net->rnode;
 
             if (net->localConn.ss_family == AF_NETLINK) {
-                strncpy(proto, "NETLINK", sizeof(proto));
+                scope_strncpy(proto, "NETLINK", sizeof(proto));
             }
 
             event_field_t fields[] = {
@@ -3007,41 +3008,41 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
                 UNIT_FIELD("byte"),
                 FIELDEND
             };
-            memmove(&rxFields, &fields, sizeof(fields));
+            scope_memmove(&rxFields, &fields, sizeof(fields));
             event_t rxUnixMetric = INT_EVENT("net.rx", net->rxBytes.evt, DELTA, rxFields);
-            memmove(&rxMetric, &rxUnixMetric, sizeof(event_t));
+            scope_memmove(&rxMetric, &rxUnixMetric, sizeof(event_t));
         } else {
             if (net->localConn.ss_family == AF_INET) {
-                if (inet_ntop(AF_INET,
+                if (scope_inet_ntop(AF_INET,
                               &((struct sockaddr_in *)&net->localConn)->sin_addr,
                               lip, sizeof(lip)) == NULL) {
-                    strncpy(lip, " ", sizeof(lip));
+                    scope_strncpy(lip, " ", sizeof(lip));
                 }
             } else if (net->localConn.ss_family == AF_INET6) {
-                if (inet_ntop(AF_INET6,
+                if (scope_inet_ntop(AF_INET6,
                               &((struct sockaddr_in6 *)&net->localConn)->sin6_addr,
                               lip, sizeof(lip)) == NULL) {
-                    strncpy(lip, " ", sizeof(lip));
+                    scope_strncpy(lip, " ", sizeof(lip));
                 }
 
             } else {
-                strncpy(lip, " ", sizeof(lip));
+                scope_strncpy(lip, " ", sizeof(lip));
             }
 
             if (net->remoteConn.ss_family == AF_INET) {
-                if (inet_ntop(AF_INET,
+                if (scope_inet_ntop(AF_INET,
                               &((struct sockaddr_in *)&net->remoteConn)->sin_addr,
                               rip, sizeof(rip)) == NULL) {
-                    strncpy(rip, " ", sizeof(rip));
+                    scope_strncpy(rip, " ", sizeof(rip));
                 }
             } else if (net->remoteConn.ss_family == AF_INET6) {
-                if (inet_ntop(AF_INET6,
+                if (scope_inet_ntop(AF_INET6,
                               &((struct sockaddr_in6 *)&net->remoteConn)->sin6_addr,
                               rip, sizeof(rip)) == NULL) {
-                    strncpy(rip, " ", sizeof(rip));
+                    scope_strncpy(rip, " ", sizeof(rip));
                 }
             } else {
-                strncpy(rip, " ", sizeof(rip));
+                scope_strncpy(rip, " ", sizeof(rip));
             }
             event_field_t fields[] = {
                 PROC_FIELD(g_proc.procname),
@@ -3059,9 +3060,9 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
                 UNIT_FIELD("byte"),
                 FIELDEND
             };
-            memmove(&rxFields, &fields, sizeof(fields));
+            scope_memmove(&rxFields, &fields, sizeof(fields));
             event_t rxNetMetric = INT_EVENT("net.rx", net->rxBytes.evt, DELTA, rxFields);
-            memmove(&rxMetric, &rxNetMetric, sizeof(event_t));
+            scope_memmove(&rxMetric, &rxNetMetric, sizeof(event_t));
         }
 
         // Don't report zeros.
@@ -3084,7 +3085,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         }
 
         event_t rxNetMetric = INT_EVENT("net.rx", net->rxBytes.mtc, DELTA, rxFields);
-        memmove(&rxMetric, &rxNetMetric, sizeof(event_t));
+        scope_memmove(&rxMetric, &rxNetMetric, sizeof(event_t));
         if (cmdSendMetric(g_mtc, &rxMetric)) {
             scopeLogError("ERROR: doNetMetric:NETRX:cmdSendMetric");
         }
@@ -3109,9 +3110,9 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         if (net->txBytes.evt == 0ULL) return;
 
         if ((localPort == 443) || (remotePort == 443)) {
-            strncpy(data, "ssl", sizeof(data));
+            scope_strncpy(data, "ssl", sizeof(data));
         } else {
-            strncpy(data, "clear", sizeof(data));
+            scope_strncpy(data, "clear", sizeof(data));
         }
 
         if (addrIsUnixDomain(&net->remoteConn) ||
@@ -3120,7 +3121,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
             remotePort = net->rnode;
 
             if (net->localConn.ss_family == AF_NETLINK) {
-                strncpy(proto, "NETLINK", sizeof(proto));
+                scope_strncpy(proto, "NETLINK", sizeof(proto));
             }
 
             event_field_t fields[] = {
@@ -3137,41 +3138,41 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
                 UNIT_FIELD("byte"),
                 FIELDEND
             };
-            memmove(&txFields, &fields, sizeof(fields));
+            scope_memmove(&txFields, &fields, sizeof(fields));
             event_t txUnixMetric = INT_EVENT("net.tx", net->txBytes.evt, DELTA, txFields);
-            memmove(&txMetric, &txUnixMetric, sizeof(event_t));
+            scope_memmove(&txMetric, &txUnixMetric, sizeof(event_t));
         } else {
             if (net->localConn.ss_family == AF_INET) {
-                if (inet_ntop(AF_INET,
+                if (scope_inet_ntop(AF_INET,
                               &((struct sockaddr_in *)&net->localConn)->sin_addr,
                               lip, sizeof(lip)) == NULL) {
-                    strncpy(lip, " ", sizeof(lip));
+                    scope_strncpy(lip, " ", sizeof(lip));
                 }
             } else if (net->localConn.ss_family == AF_INET6) {
-                if (inet_ntop(AF_INET6,
+                if (scope_inet_ntop(AF_INET6,
                               &((struct sockaddr_in6 *)&net->localConn)->sin6_addr,
                               lip, sizeof(lip)) == NULL) {
-                    strncpy(lip, " ", sizeof(lip));
+                    scope_strncpy(lip, " ", sizeof(lip));
                 }
 
             } else {
-                strncpy(lip, " ", sizeof(lip));
+                scope_strncpy(lip, " ", sizeof(lip));
             }
 
             if (net->remoteConn.ss_family == AF_INET) {
-                if (inet_ntop(AF_INET,
+                if (scope_inet_ntop(AF_INET,
                               &((struct sockaddr_in *)&net->remoteConn)->sin_addr,
                               rip, sizeof(rip)) == NULL) {
-                    strncpy(rip, " ", sizeof(rip));
+                    scope_strncpy(rip, " ", sizeof(rip));
                 }
             } else if (net->remoteConn.ss_family == AF_INET6) {
-                if (inet_ntop(AF_INET6,
+                if (scope_inet_ntop(AF_INET6,
                               &((struct sockaddr_in6 *)&net->remoteConn)->sin6_addr,
                               rip, sizeof(rip)) == NULL) {
-                    strncpy(rip, " ", sizeof(rip));
+                    scope_strncpy(rip, " ", sizeof(rip));
                 }
             } else {
-                strncpy(rip, " ", sizeof(rip));
+                scope_strncpy(rip, " ", sizeof(rip));
             }
 
             event_field_t fields[] = {
@@ -3190,9 +3191,9 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
                 UNIT_FIELD("byte"),
                 FIELDEND
             };
-            memmove(&txFields, &fields, sizeof(fields));
+            scope_memmove(&txFields, &fields, sizeof(fields));
             event_t txNetMetric = INT_EVENT("net.tx", net->txBytes.evt, DELTA, txFields);
-            memmove(&txMetric, &txNetMetric, sizeof(event_t));
+            scope_memmove(&txMetric, &txNetMetric, sizeof(event_t));
         }
 
         // Don't report zeros.
@@ -3211,7 +3212,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         }
 
         event_t txNetMetric = INT_EVENT("net.tx", net->txBytes.mtc, DELTA, txFields);
-        memmove(&txMetric, &txNetMetric, sizeof(event_t));
+        scope_memmove(&txMetric, &txNetMetric, sizeof(event_t));
         if (cmdSendMetric(g_mtc, &txMetric)) {
             scopeLogError("ERROR: doNetMetric:NETTX:cmdSendMetric");
         }
@@ -3248,11 +3249,11 @@ static data_type_t
 typeFromStr(const unsigned char *string)
 {
     const char *str = (const char *)string;  // casting away unsigned
-    if (!strcmp(str, "c")) return DELTA;     // counter
-    if (!strcmp(str, "g")) return CURRENT;   // gauge
-    if (!strcmp(str, "ms")) return DELTA_MS; // timer
-    if (!strcmp(str, "s")) return SET;
-    if (!strcmp(str, "h")) return HISTOGRAM;
+    if (!scope_strcmp(str, "c")) return DELTA;     // counter
+    if (!scope_strcmp(str, "g")) return CURRENT;   // gauge
+    if (!scope_strcmp(str, "ms")) return DELTA_MS; // timer
+    if (!scope_strcmp(str, "s")) return SET;
+    if (!scope_strcmp(str, "h")) return HISTOGRAM;
 
     return CURRENT;  // Default to CURRENT aka "gauge"
 }
@@ -3260,7 +3261,7 @@ typeFromStr(const unsigned char *string)
 static event_field_t *
 createFieldsForCapturedMetrics(const unsigned char *alldims)
 {
-    event_field_t *fields = calloc(HTTP_MAX_FIELDS, sizeof(event_field_t));
+    event_field_t *fields = scope_calloc(HTTP_MAX_FIELDS, sizeof(event_field_t));
     if (!fields) return NULL;
     int ix = 0;
 
@@ -3277,13 +3278,13 @@ createFieldsForCapturedMetrics(const unsigned char *alldims)
         // get pointers to the name and value pairs and
         // make sure each is null delimited
         char *fieldname = ++dims; // advance past the # or , char
-        char *fieldval = strchr(fieldname, ':');
+        char *fieldval = scope_strchr(fieldname, ':');
         if (!fieldval) break;
         *fieldval = '\0';       // overwrite the : char to delimit fieldname
         ++fieldval;             // advance past the null
 
         // Set dims for next time through this loop
-        dims = strchr(fieldval, ',');
+        dims = scope_strchr(fieldval, ',');
         if (dims) *dims = '\0'; // overwrite the , char to delimit fieldval
 
         // Add this name value pair
@@ -3316,12 +3317,12 @@ reportCapturedMetric(const captured_metric_t *metric)
     // though the regex that creates value currently using does not.
     event_t out_mtc;
     char *endptr = NULL;
-    if (strpbrk(value, ".,")) {
+    if (scope_strpbrk(value, ".,")) {
         // Value looks like a floating point value...
-        errno = 0;
-        double doubleval = strtod(value, &endptr);
-        if ((endptr == value) || (errno != 0)) {
-            if (errno == ERANGE) {
+        scope_errno = 0;
+        double doubleval = scope_strtod(value, &endptr);
+        if ((endptr == value) || (scope_errno != 0)) {
+            if (scope_errno == ERANGE) {
                 char *underover = (doubleval == 0.0) ? "underflow" : "overflow";
                 DBG("Couldn't be converted to float: %s (%s)", value, underover);
             } else {
@@ -3330,17 +3331,17 @@ reportCapturedMetric(const captured_metric_t *metric)
             goto out;
         }
         event_t flt_met = FLT_EVENT(name, doubleval, typeFromStr(metric->type), builtInFields);
-        memmove(&out_mtc, &flt_met, sizeof(event_t));
+        scope_memmove(&out_mtc, &flt_met, sizeof(event_t));
     } else {
         // Value looks like an integer value...
-        errno = 0;
-        long long int intval = strtoll(value, &endptr, 10);
-        if ((endptr == value) || (errno != 0)) {
+        scope_errno = 0;
+        long long int intval = scope_strtoll(value, &endptr, 10);
+        if ((endptr == value) || (scope_errno != 0)) {
             DBG("Couldn't be converted to long long: %s", value);
             goto out;
         }
         event_t int_met = INT_EVENT(name, intval, typeFromStr(metric->type), builtInFields);
-        memmove(&out_mtc, &int_met, sizeof(event_t));
+        scope_memmove(&out_mtc, &int_met, sizeof(event_t));
     }
 
     out_mtc.capturedFields = capturedFields;
@@ -3349,7 +3350,7 @@ reportCapturedMetric(const captured_metric_t *metric)
     }
 
 out:
-    if (capturedFields) free(capturedFields);
+    if (capturedFields) scope_free(capturedFields);
 }
 
 bool
@@ -3425,7 +3426,7 @@ doEvent()
                 return;
             }
 
-            free(event);
+            scope_free(event);
         }
     }
     reportAllCapturedMetrics();
@@ -3486,28 +3487,28 @@ doPayload()
             if (net && net->active) {
                 if (getConn(&net->localConn, lip, sizeof(lip), lport, sizeof(lport)) == FALSE) {
                     if (net->localConn.ss_family == AF_UNIX) {
-                        strncpy(lip, "af_unix", sizeof(lip));
-                        snprintf(lport, sizeof(lport), "%ld", net->lnode);
+                        scope_strncpy(lip, "af_unix", sizeof(lip));
+                        scope_snprintf(lport, sizeof(lport), "%ld", net->lnode);
                     } else {
-                        strncpy(lip, srcstr, sizeof(lip));
-                        strncpy(lport, "0", sizeof(lport));
+                        scope_strncpy(lip, srcstr, sizeof(lip));
+                        scope_strncpy(lport, "0", sizeof(lport));
                     }
                 }
 
                 if (getConn(&net->remoteConn, rip, sizeof(rip), rport, sizeof(rport)) == FALSE) {
                     if (net->remoteConn.ss_family == AF_UNIX) {
-                        strncpy(rip, "af_unix", sizeof(rip));
-                        snprintf(rport, sizeof(rport), "%ld", net->rnode);
+                        scope_strncpy(rip, "af_unix", sizeof(rip));
+                        scope_snprintf(rport, sizeof(rport), "%ld", net->rnode);
                     } else {
-                        strncpy(rip, srcstr, sizeof(rip));
-                        strncpy(rport, "0", sizeof(rport));
+                        scope_strncpy(rip, srcstr, sizeof(rip));
+                        scope_strncpy(rport, "0", sizeof(rport));
                     }
                 }
             } else {
-                strncpy(lip, srcstr, sizeof(lip));
-                strncpy(lport, "0", sizeof(lport));
-                strncpy(rip, srcstr, sizeof(rip));
-                strncpy(rport, "0", sizeof(rport));
+                scope_strncpy(lip, srcstr, sizeof(lip));
+                scope_strncpy(lport, "0", sizeof(lport));
+                scope_strncpy(rip, srcstr, sizeof(rip));
+                scope_strncpy(rport, "0", sizeof(rport));
             }
 
             uint64_t netid = (net != NULL) ? net->uid : 0;
@@ -3517,15 +3518,15 @@ doPayload()
                    ? pinfo->net.tlsProtoDef->protname 
                    : "");
             struct timeval tv;
-            gettimeofday(&tv, NULL);
+            scope_gettimeofday(&tv, NULL);
             double timestamp = tv.tv_sec + tv.tv_usec/1e6;
-            int rc = snprintf(pay, hlen,
+            int rc = scope_snprintf(pay, hlen,
                               "{\"type\":\"payload\",\"id\":\"%s\",\"pid\":%d,\"ppid\":%d,\"fd\":%d,\"src\":\"%s\",\"_channel\":%ld,\"len\":%ld,\"localip\":\"%s\",\"localp\":%s,\"remoteip\":\"%s\",\"remotep\":%s,\"protocol\":\"%s\",\"_time\":%.3f}",
                               g_proc.id, g_proc.pid, g_proc.ppid, pinfo->sockfd, srcstr, netid, pinfo->len, lip, lport, rip, rport, protoName, timestamp);
             if (rc < 0) {
                 // unlikely
-                if (pinfo->data) free(pinfo->data);
-                if (pinfo) free(pinfo);
+                if (pinfo->data) scope_free(pinfo->data);
+                if (pinfo) scope_free(pinfo);
                 DBG(NULL);
                 return;
             }
@@ -3540,11 +3541,11 @@ doPayload()
             char *bdata = NULL;
 
             if (cfgLogStreamEnable(g_cfg.staticfg)) {
-                bdata = calloc(1, hlen + pinfo->len);
+                bdata = scope_calloc(1, hlen + pinfo->len);
                 if (bdata) {
-                    memmove(bdata, pay, hlen);
-                    strncat(bdata, "\n", hlen);
-                    memmove(&bdata[hlen], pinfo->data, pinfo->len);
+                    scope_memmove(bdata, pay, hlen);
+                    scope_strncat(bdata, "\n", hlen);
+                    scope_memmove(&bdata[hlen], pinfo->data, pinfo->len);
                     cmdSendPayload(g_ctl, bdata, hlen + pinfo->len);
                 }
             } else if (ctlPayDir(g_ctl)) {
@@ -3555,25 +3556,25 @@ doPayload()
                 switch (pinfo->src) {
                 case NETTX:
                 case TLSTX:
-                    snprintf(path, PATH_MAX, "%s/%d_%s:%s_%s:%s.out",
+                    scope_snprintf(path, PATH_MAX, "%s/%d_%s:%s_%s:%s.out",
                              ctlPayDir(g_ctl), g_proc.pid, rip, rport, lip, lport);
                     break;
 
                 case NETRX:
                 case TLSRX:
-                    snprintf(path, PATH_MAX, "%s/%d_%s:%s_%s:%s.in",
+                    scope_snprintf(path, PATH_MAX, "%s/%d_%s:%s_%s:%s.in",
                              ctlPayDir(g_ctl), g_proc.pid, rip, rport, lip, lport);
                     break;
 
                 default:
-                    snprintf(path, PATH_MAX, "%s/%d.na",
+                    scope_snprintf(path, PATH_MAX, "%s/%d.na",
                              ctlPayDir(g_ctl), g_proc.pid);
                     break;
                 }
 
-                if ((fd = g_fn.open(path, O_WRONLY | O_CREAT | O_APPEND, 0666)) != -1) {
+                if ((fd = scope_open(path, O_WRONLY | O_CREAT | O_APPEND, 0666)) != -1) {
                     if (checkEnv("SCOPE_PAYLOAD_HEADER", "true")) {
-                        g_fn.write(fd, pay, rc);
+                         scope_write(fd, pay, rc);
                     }
 
                     size_t to_write = pinfo->len;
@@ -3581,7 +3582,7 @@ doPayload()
                     int rc;
 
                     while (to_write > 0) {
-                        rc = g_fn.write(fd, &pinfo->data[written], to_write);
+                        rc = scope_write(fd, &pinfo->data[written], to_write);
                         if (rc <= 0) {
                             DBG(NULL);
                             break;
@@ -3591,13 +3592,13 @@ doPayload()
                         to_write -= rc;
                     }
 
-                    g_fn.close(fd);
+                    scope_close(fd);
                 }
             }
 
-            if (bdata) free(bdata);
-            if (pinfo->data) free(pinfo->data);
-            if (pinfo) free(pinfo);
+            if (bdata) scope_free(bdata);
+            if (pinfo->data) scope_free(pinfo->data);
+            if (pinfo) scope_free(pinfo);
         }
     }
 }

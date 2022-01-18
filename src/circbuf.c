@@ -5,20 +5,21 @@
 #include "dbg.h"
 #include "atomic.h"
 #include "circbuf.h"
+#include "scopestdlib.h"
 
 cbuf_handle_t
 cbufInit(size_t size)
 {
-    cbuf_handle_t cbuf = calloc(1, sizeof(struct circbuf_t));
+    cbuf_handle_t cbuf = scope_calloc(1, sizeof(struct circbuf_t));
     if (!cbuf) {
-        DBG("Circbuf:calloc");
+        DBG("Circbuf:scope_calloc");
         return NULL;
     }
     
-    uint64_t *buffer = calloc(size + 1, sizeof(uint64_t));
+    uint64_t *buffer = scope_calloc(size + 1, sizeof(uint64_t));
     if (!buffer) {
-        free(cbuf);
-        DBG("Circbuf:calloc");
+        scope_free(cbuf);
+        DBG("Circbuf:scope_calloc");
         return NULL;
     }
 
@@ -32,8 +33,8 @@ void
 cbufFree(cbuf_handle_t cbuf)
 {
     if (!cbuf) return;
-    if (cbuf->buffer) free(cbuf->buffer);
-    free(cbuf);
+    if (cbuf->buffer) scope_free(cbuf->buffer);
+    scope_free(cbuf);
     return;
 }
 

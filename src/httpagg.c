@@ -6,6 +6,7 @@
 #include "dbg.h"
 #include "httpagg.h"
 #include "utils.h"
+#include "scopestdlib.h"
 
 
 #define DEFAULT_TARGET_LEN ( 128 )
@@ -61,11 +62,11 @@ struct _http_agg_t {
 http_agg_t *
 httpAggCreate()
 {
-    http_agg_t* agg = calloc(1, sizeof(*agg));
-    target_agg_t** target_lst = calloc(1, sizeof(*target_lst) * DEFAULT_TARGET_LEN);
+    http_agg_t* agg = scope_calloc(1, sizeof(*agg));
+    target_agg_t** target_lst = scope_calloc(1, sizeof(*target_lst) * DEFAULT_TARGET_LEN);
     if (!agg || !target_lst) {
-        if (agg) free(agg);
-        if (target_lst) free(target_lst);
+        if (agg) scope_free(agg);
+        if (target_lst) scope_free(target_lst);
         DBG("agg = %p, target_lst = %p", agg, target_lst);
         return NULL;
     }
@@ -86,8 +87,8 @@ httpAggDestroy(http_agg_t **http_agg_ptr)
     http_agg_t* http_agg = *http_agg_ptr;
     httpAggReset(http_agg);
 
-    free(http_agg->target);
-    free(http_agg);
+    scope_free(http_agg->target);
+    scope_free(http_agg);
 
     *http_agg_ptr = NULL;
 }
@@ -100,7 +101,7 @@ str_value(event_t *evt, const char *name)
 
     event_field_t *field;
     for (field = evt->fields; field->value_type != FMT_END; field++) {
-        if ((!strcmp(field->name, name)) &&
+        if ((!scope_strcmp(field->name, name)) &&
             (field->value_type == FMT_STR)) {
             return field->value.str;
         }
@@ -116,7 +117,7 @@ num_value(event_t *evt, const char *name)
 
     event_field_t *field;
     for (field = evt->fields; field->value_type != FMT_END; field++) {
-        if ((!strcmp(field->name, name)) &&
+        if ((!scope_strcmp(field->name, name)) &&
             (field->value_type == FMT_NUM)) {
             return field->value.num;
         }
@@ -133,12 +134,12 @@ get_target_entry(http_agg_t *http_agg, const char* target_val)
     // https://example.com/over/there?name=ferret
     // if a target_val has a query string ignore that part of the uri.
     // This is done as just one small way to manage the cardiality.
-    char *temp_uri = strdup(target_val);
+    char *temp_uri = scope_strdup(target_val);
     if (!temp_uri) {
         DBG(NULL);
         return NULL;
     }
-    char *query_ptr = strchr(temp_uri, '?');
+    char *query_ptr = scope_strchr(temp_uri, '?');
     if (query_ptr) *query_ptr = '\0';
 
 
@@ -146,31 +147,31 @@ get_target_entry(http_agg_t *http_agg, const char* target_val)
     // if so, return a pointer to it.
     int i;
     for (i=0; i<http_agg->count; i++) {
-        if (!strcmp(http_agg->target[i]->uri, temp_uri)) {
-            free(temp_uri);
+        if (!scope_strcmp(http_agg->target[i]->uri, temp_uri)) {
+            scope_free(temp_uri);
             return http_agg->target[i];
         }
     }
 
-    // if not, and we're out of room, realloc
+    // if not, and we're out of room, scope_realloc
     if (http_agg->count >= http_agg->alloc) {
         uint64_t new_size = http_agg->alloc << 2; // same as multiplying by 4
-        target_agg_t **temp_target = realloc(http_agg->target, sizeof(*temp_target) * new_size);
+        target_agg_t **temp_target = scope_realloc(http_agg->target, sizeof(*temp_target) * new_size);
         if (!temp_target) {
-            free(temp_uri);
+            scope_free(temp_uri);
             DBG(NULL);
             return NULL;
         }
-        memset(&temp_target[http_agg->count], 0,
+        scope_memset(&temp_target[http_agg->count], 0,
                sizeof(*temp_target) * (new_size - http_agg->alloc));
         http_agg->target = temp_target;
         http_agg->alloc = new_size;
     }
 
     // Now create the new target entry
-    target_agg_t *temp_target = calloc(1, sizeof(*temp_target));
+    target_agg_t *temp_target = scope_calloc(1, sizeof(*temp_target));
     if (!temp_target) {
-        free(temp_uri);
+        scope_free(temp_uri);
         DBG(NULL);
         return NULL;
     }
@@ -333,8 +334,8 @@ httpAggReset(http_agg_t *http_agg)
     for (i=0; i<http_agg->count; i++) {
         target_agg_t *target = http_agg->target[i];
         if (target) {
-            if (target->uri) free(target->uri);
-            free(target);
+            if (target->uri) scope_free(target->uri);
+            scope_free(target);
         }
         http_agg->target[i] = NULL;
     }

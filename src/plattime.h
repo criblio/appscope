@@ -4,6 +4,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include "scopetypes.h"
+#include "scopestdlib.h"
 #include <time.h>
 
 #define DEFAULT_HW_TIMER TRUE
@@ -37,7 +38,7 @@ getTime(void) {
         uint64_t cnt;
         struct timespec ts;
 
-        clock_gettime(CLOCK_MONOTONIC, &ts);
+        scope_clock_gettime(CLOCK_MONOTONIC, &ts);
         cnt = ts.tv_sec * 1000000000 + ts.tv_nsec;
         return cnt;
     }

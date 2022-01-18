@@ -39,6 +39,7 @@
 #include "runtimecfg.h"
 #include "javaagent.h"
 #include "inject.h"
+#include "scopestdlib.h"
 #include "../contrib/libmusl/musl.h"
 
 #define SSL_FUNC_READ "SSL_read"
@@ -68,7 +69,6 @@ static void threadNow(int);
 static void uv__read_hook(void *);
 
 #ifdef __linux__
-extern int arch_prctl(int, unsigned long);
 extern unsigned long scope_fs;
 
 extern void initGoHook(elf_buf_t*);
@@ -263,7 +263,7 @@ enum_map_t netFailMap[] = {
 // that are dynamically loaded after our constructor has run.
 // Not to point fingers, but I'm looking at you python.
 //
-static void *scope_dlsym(void *, const char *, void *);
+static void *wrap_scope_dlsym(void *, const char *, void *);
 
 static int
 findSymbol(struct dl_phdr_info *info, size_t size, void *data)
@@ -272,8 +272,8 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 
     // Don't bother looking inside libraries until after we've seen our library.
     if (!param->after_scope) {
-        param->after_scope = (strstr(info->dlpi_name, "libscope") != NULL) ||
-            (strstr(info->dlpi_name, "/proc/") != NULL);
+        param->after_scope = (scope_strstr(info->dlpi_name, "libscope") != NULL) ||
+            (scope_strstr(info->dlpi_name, "/proc/") != NULL);
         return 0;
     }
 
@@ -294,7 +294,7 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 #define WRAP_CHECK(func, rc)                                           \
     if (g_fn.func == NULL ) {                                          \
        if (!g_ctl) {                                                   \
-         if ((g_fn.func = scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {  \
+         if ((g_fn.func = wrap_scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {  \
              scopeLogError("ERROR: "#func":NULL\n");         \
              return rc;                                                \
          }                                                             \
@@ -313,7 +313,7 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 #define WRAP_CHECK_VOID(func)                                          \
     if (g_fn.func == NULL ) {                                          \
        if (!g_ctl) {                                                   \
-         if ((g_fn.func = scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {  \
+         if ((g_fn.func = wrap_scope_dlsym(RTLD_NEXT, #func, func)) == NULL) {  \
              scopeLogError("ERROR: "#func":NULL\n");         \
              return;                                                   \
          }                                                             \
@@ -380,7 +380,7 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
  * the warning.
  */
 static int
-scope_dirfd(DIR *dirp)
+wrap_scope_dirfd(DIR *dirp)
 {
     if (!dirp) return -1;
     return dirfd(dirp);
@@ -392,7 +392,7 @@ scope_dirfd(DIR *dirp)
  * implementation where stream is derefrenced without a check for null.
  */
 static int
-scope_fileno(FILE *stream)
+wrap_scope_fileno(FILE *stream)
 {
     if (!stream) return -1;
     return fileno(stream);
@@ -405,9 +405,9 @@ freeNssEntry(void *data)
     nss_list *nssentry = data;
 
     if (!nssentry) return;
-    if (nssentry->ssl_methods) free(nssentry->ssl_methods);
-    if (nssentry->ssl_int_methods) free(nssentry->ssl_int_methods);
-    free(nssentry);
+    if (nssentry->ssl_methods) scope_free(nssentry->ssl_methods);
+    if (nssentry->ssl_int_methods) scope_free(nssentry->ssl_int_methods);
+    scope_free(nssentry);
 }
 
 static time_t
@@ -418,18 +418,14 @@ fileModTime(const char *path)
 
     if (!path) return 0;
 
-    if (!g_fn.open || !g_fn.close) {
-        return 0;
-    }
-
-    if ((fd = g_fn.open(path, O_RDONLY)) == -1) return 0;
+    if ((fd = scope_open(path, O_RDONLY)) == -1) return 0;
     
-    if (fstat(fd, &statbuf) < 0) {
-        g_fn.close(fd);
+    if (scope_fstat(fd, &statbuf) < 0) {
+        scope_close(fd);
         return 0;
     }
 
-    g_fn.close(fd);
+    scope_close(fd);
     // STATMODTIME from os.h as timespec names are different between OSs
     return STATMODTIME(statbuf);
 }
@@ -446,7 +442,7 @@ remoteConfig()
     
     // to be clear; a 1ms timeout
     timeout = 1;
-    memset(&fds, 0x0, sizeof(fds));
+    scope_memset(&fds, 0x0, sizeof(fds));
 
 /*
     Setting fds.events = 0 to neuter ability to process remote
@@ -464,7 +460,7 @@ remoteConfig()
     fds.events = 0;
     fds.fd = ctlConnection(g_ctl, CFG_CTL);
 
-    rc = g_fn.poll(&fds, 1, timeout);
+    rc = scope_poll(&fds, 1, timeout);
 
     /*
      * Error from poll;
@@ -482,24 +478,24 @@ remoteConfig()
     if ((rc == 0) || (fds.revents == 0) || ((fds.revents & POLLIN) == 0) ||
         ((fds.revents & POLLHUP) != 0) || ((fds.revents & POLLNVAL) != 0)) return;
 
-    snprintf(path, sizeof(path), "/tmp/cfg.%d", g_proc.pid);
-    if ((fs = g_fn.fopen(path, "a+")) == NULL) {
+    scope_snprintf(path, sizeof(path), "/tmp/cfg.%d", g_proc.pid);
+    if ((fs = scope_fopen(path, "a+")) == NULL) {
         DBG(NULL);
         scopeLogError("ERROR: remoteConfig:fopen");
         return;
     }
 
-    success = rc = errno = numtries = 0;
+    success = rc = scope_errno = numtries = 0;
     do {
         numtries++;
-        rc = g_fn.recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
+        rc = scope_recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
         if (rc <= 0) {
             // Something has happened to our connection
             ctlDisconnect(g_ctl, CFG_CTL);
             break;
         }
 
-        if (g_fn.fwrite(buf, rc, (size_t)1, fs) <= 0) {
+        if (scope_fwrite(buf, rc, (size_t)1, fs) <= 0) {
             DBG(NULL);
             break;
         } else {
@@ -510,7 +506,7 @@ remoteConfig()
              * and we receive a viable EOM.
              */
             // EOM
-            if (strchr((const char *)buf, '\n') != NULL) {
+            if (scope_strchr((const char *)buf, '\n') != NULL) {
                 success = 1;
                 break;
             } else {
@@ -527,24 +523,24 @@ remoteConfig()
         struct stat sb;
         request_t *req;
 
-        if (fflush(fs) != 0) DBG(NULL);
-        rewind(fs);
-        if (lstat(path, &sb) == -1) {
+        if (scope_fflush(fs) != 0) DBG(NULL);
+        scope_rewind(fs);
+        if (scope_lstat(path, &sb) == -1) {
             sb.st_size = DEFAULT_CONFIG_SIZE;
         }
 
-        cmd = calloc(1, sb.st_size);
+        cmd = scope_calloc(1, sb.st_size);
         if (!cmd) {
-            g_fn.fclose(fs);
-            unlink(path);
+            scope_fclose(fs);
+            scope_unlink(path);
             cmdSendInfoStr(g_ctl, "Error in receive from stream.  Memory error in scope receive.");
             return;
         }
         
-        if (g_fn.fread(cmd, sb.st_size, 1, fs) == 0) {
-            g_fn.fclose(fs);
-            unlink(path);
-            free(cmd);
+        if (scope_fread(cmd, sb.st_size, 1, fs) == 0) {
+            scope_fclose(fs);
+            scope_unlink(path);
+            scope_free(cmd);
             cmdSendInfoStr(g_ctl, "Error in receive from stream.  Read error in scope.");
             return;
         }
@@ -609,13 +605,13 @@ remoteConfig()
             cmdSendInfoStr(g_ctl, "Error in receive from stream.  Memory error in scope parsing.");
         }
 
-        free(cmd);
+        scope_free(cmd);
     } else {
         cmdSendInfoStr(g_ctl, "Error in receive from stream.  Scope receive retries exhausted.");
     }
 
-    g_fn.fclose(fs);
-    unlink(path);
+    scope_fclose(fs);
+    scope_unlink(path);
 }
 
 static void
@@ -634,7 +630,7 @@ doConfig(config_t *cfg)
     setReportingInterval(cfgMtcPeriod(cfg));
     if (!g_thread.startTime) {
         struct timeval tv;
-        gettimeofday(&tv, NULL);
+        scope_gettimeofday(&tv, NULL);
         g_thread.startTime = tv.tv_sec + g_thread.interval;
     }
 
@@ -674,7 +670,7 @@ dynConfig(void)
     char path[PATH_MAX];
     static time_t modtime = 0;
 
-    snprintf(path, sizeof(path), "%s/%s.%d", g_cmddir, DYN_CONFIG_PREFIX, g_proc.pid);
+    scope_snprintf(path, sizeof(path), "%s/%s.%d", g_cmddir, DYN_CONFIG_PREFIX, g_proc.pid);
 
     // Is there a command file for this pid
     if (osIsFilePresent(g_proc.pid, path) == -1) return 0;
@@ -683,14 +679,14 @@ dynConfig(void)
     now = fileModTime(path);
     if (now == modtime) {
         // Been there, try to remove the file and we're done
-        unlink(path);
+        scope_unlink(path);
         return 0;
     }
 
     modtime = now;
 
     // Open the command file
-    if ((fs = g_fn.fopen(path, "r")) == NULL) return -1;
+    if ((fs = scope_fopen(path, "r")) == NULL) return -1;
 
     // Modify the static config from the command file
     cfgProcessCommands(g_staticfg, fs);
@@ -698,8 +694,8 @@ dynConfig(void)
     // Apply the config
     doConfig(g_staticfg);
 
-    g_fn.fclose(fs);
-    unlink(path);
+    scope_fclose(fs);
+    scope_unlink(path);
     return 0;
 }
 
@@ -817,7 +813,7 @@ doThread()
      * Shouldn't hurt anything else.
      */
     struct timeval tv;
-    gettimeofday(&tv, NULL);
+    scope_gettimeofday(&tv, NULL);
     if (tv.tv_sec >= g_thread.startTime) {
         threadNow(0);
     }
@@ -838,7 +834,7 @@ static long long
 doGetProcCPU() {
     struct rusage ruse;
     
-    if (getrusage(RUSAGE_SELF, &ruse) != 0) {
+    if (scope_getrusage(RUSAGE_SELF, &ruse) != 0) {
         return (long long)-1;
     }
 
@@ -852,32 +848,32 @@ setProcId(proc_id_t *proc)
 {
     if (!proc) return;
 
-    proc->pid = getpid();
-    proc->ppid = getppid();
-    if (gethostname(proc->hostname, sizeof(proc->hostname)) != 0) {
+    proc->pid = scope_getpid();
+    proc->ppid = scope_getppid();
+    if (scope_gethostname(proc->hostname, sizeof(proc->hostname)) != 0) {
         scopeLogError("ERROR: gethostname");
     }
     osGetProcname(proc->procname, sizeof(proc->procname));
 
     // free old value of cmd, if an old value exists
-    if (proc->cmd) free(proc->cmd);
+    if (proc->cmd) scope_free(proc->cmd);
     proc->cmd = NULL;
     osGetCmdline(proc->pid, &proc->cmd);
 
     if (proc->hostname && proc->procname && proc->cmd) {
         // limit amount of cmd used in id
-        int cmdlen = strlen(proc->cmd);
+        int cmdlen = scope_strlen(proc->cmd);
         char *ptr = (cmdlen < DEFAULT_CMD_SIZE) ? proc->cmd : &proc->cmd[cmdlen-DEFAULT_CMD_SIZE];
-        snprintf(proc->id, sizeof(proc->id), "%s-%s-%s", proc->hostname, proc->procname, ptr);
+        scope_snprintf(proc->id, sizeof(proc->id), "%s-%s-%s", proc->hostname, proc->procname, ptr);
     } else {
-        snprintf(proc->id, sizeof(proc->id), "badid");
+        scope_snprintf(proc->id, sizeof(proc->id), "badid");
     }
 
-    proc->uid = getuid();
-    if (proc->username) free(proc->username);
+    proc->uid = scope_getuid();
+    if (proc->username) scope_free(proc->username);
     proc->username = osGetUserName(proc->uid);
-    proc->gid = getgid();
-    if (proc->groupname) free(proc->groupname);
+    proc->gid = scope_getgid();
+    if (proc->groupname) scope_free(proc->groupname);
     proc->groupname = osGetGroupName(proc->gid);
     if (osGetCgroup(proc->pid, proc->cgroup, MAX_CGROUP) == FALSE) {
         proc->cgroup[0] = '\0';
@@ -891,7 +887,7 @@ doReset()
     setPidEnv(g_proc.pid);
 
     struct timeval tv;
-    gettimeofday(&tv, NULL);
+    scope_gettimeofday(&tv, NULL);
     g_thread.once = 0;
     g_thread.startTime = tv.tv_sec + g_thread.interval;
 
@@ -1005,9 +1001,9 @@ handleExit(void)
         // wait for a connection to be established 
         // before we emit data
         int wait_time;
-        errno = 0;
-        wait_time = strtoul(wait, NULL, 10);
-        if (!errno && wait_time) {
+        scope_errno = 0;
+        wait_time = scope_strtoul(wait, NULL, 10);
+        if (!scope_errno && wait_time) {
             for (int i = 0; i < wait_time; i++) {
                 if (doConnection() == TRUE) break;
                 sigSafeNanosleep(&ts);
@@ -1044,13 +1040,13 @@ periodic(void *arg)
     static time_t summaryTime, logReportTime;
 
     struct timeval tv;
-    gettimeofday(&tv, NULL);
+    scope_gettimeofday(&tv, NULL);
     logReportTime = summaryTime = tv.tv_sec + g_thread.interval;
 
     perf = checkEnv(PRESERVE_PERF_REPORTING, "true");
 
     while (1) {
-        gettimeofday(&tv, NULL);
+        scope_gettimeofday(&tv, NULL);
         if (tv.tv_sec >= summaryTime) {
             // Process dynamic config changes, if any
             dynConfig();
@@ -1072,7 +1068,7 @@ periodic(void *arg)
                 atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
             }
 
-            gettimeofday(&tv, NULL);
+            scope_gettimeofday(&tv, NULL);
             summaryTime = tv.tv_sec + g_thread.interval;
 
             if (tv.tv_sec >= logReportTime) {
@@ -1184,7 +1180,7 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
     find_sym_t *find = (find_sym_t *)data;
     *(find->out_addr) = NULL;
 
-    if (strstr(info->dlpi_name, find->library)) {
+    if (scope_strstr(info->dlpi_name, find->library)) {
 
         void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
         if (!handle) return 0;
@@ -1222,20 +1218,20 @@ findLibSym(struct dl_phdr_info *info, size_t size, void *data)
  */
 static ssize_t __write_libc(int, const void *, size_t);
 static ssize_t __write_pthread(int, const void *, size_t);
-static ssize_t scope_write(int, const void *, size_t);
+static ssize_t wrap_scope_write(int, const void *, size_t);
 static int internal_sendmmsg(int, struct mmsghdr *, unsigned int, int);
 static ssize_t internal_sendto(int, const void *, size_t, int, const struct sockaddr *, socklen_t);
 static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
 static size_t __stdio_write(struct MUSL_IO_FILE *, const unsigned char *, size_t);
-static long scope_syscall(long, ...);
+static long wrap_scope_syscall(long, ...);
 
 static int 
 findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
 {
-    int len = strlen(info->dlpi_name);
+    int len = scope_strlen(info->dlpi_name);
     int libscope_so_len = 11;
 
-    if(len > libscope_so_len && !strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
+    if(len > libscope_so_len && !scope_strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
         *(char **)data = (char *) info->dlpi_name;
         return 1;
     }
@@ -1265,10 +1261,10 @@ hookSharedObjs(struct dl_phdr_info *info, size_t size, void *data)
     // where libc*.so is for example libc.so.6 or libc.musl-x86_64.so.1
     // where ld-*.so is for example ld-linux-x86-64.so.2 or ld-musl-x86_64.so.1
     // if opening the main exec, name is NULL, else use the full lib name
-    if (strstr(info->dlpi_name, ".so")) {
-        if (strstr(info->dlpi_name, "libc") ||
-            strstr(info->dlpi_name, "ld-") ||
-            strstr(info->dlpi_name, "libscope")) {
+    if (scope_strstr(info->dlpi_name, ".so")) {
+        if (scope_strstr(info->dlpi_name, "libc") ||
+            scope_strstr(info->dlpi_name, "ld-") ||
+            scope_strstr(info->dlpi_name, "libscope")) {
             return FALSE;
         }
         libname = info->dlpi_name;
@@ -1327,13 +1323,13 @@ initHook(int attachedFlag)
 
     // env vars are not always set as needed, be explicit here
     // this is duplicated if we were started from the scope exec
-    if ((osGetExePath(getpid(), &full_path) != -1) &&
+    if ((osGetExePath(scope_getpid(), &full_path) != -1) &&
         ((ebuf = getElf(full_path))) &&
         (is_static(ebuf->buf) == FALSE) && (is_go(ebuf->buf) == TRUE)) {
 #ifdef __GO__
         initGoHook(ebuf);
         threadNow(0);
-        if (arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
+        if (scope_arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
             scopeLogError("initHook:arch_prctl");
         }
 
@@ -1345,7 +1341,7 @@ initHook(int attachedFlag)
             : "%r11"                      //clobbered register
             );
 
-        if (full_path) free(full_path);
+        if (full_path) scope_free(full_path);
         if (ebuf) freeElf(ebuf->buf, ebuf->len);
         return;
 #endif  // __GO__
@@ -1360,7 +1356,7 @@ initHook(int attachedFlag)
         scopeLog(CFG_LOG_TRACE, "%s:%d uv__read at %p", __FUNCTION__, __LINE__, g_fn.uv__read);
     }
 
-    if (full_path) free(full_path);
+    if (full_path) scope_free(full_path);
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
     if (attachedFlag) {
@@ -1431,7 +1427,7 @@ initHook(int attachedFlag)
         }
 
         if (g_fn.syscall) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.syscall, scope_syscall);
+            rc = funchook_prepare(funchook, (void**)&g_fn.syscall, wrap_scope_syscall);
         }
 
         if ((g_ismusl == TRUE) && g_fn.sendto) {
@@ -1483,7 +1479,7 @@ initHook(int attachedFlag)
             // We want to be able to use g_fn.write without
             // accidentally interposing this function.  This resolves
             // https://github.com/criblio/appscope/issues/472
-            g_fn.write = scope_write;
+            g_fn.write = wrap_scope_write;
         }
 
         // hook 'em
@@ -1502,22 +1498,16 @@ initEnv(int *attachedFlag)
     // clear the flag by default
     *attachedFlag = 0;
 
-    if (!g_fn.fopen || !g_fn.fgets || !g_fn.fclose || !g_fn.setenv) {
-        // these log statements use debug level so they can be used with constructor debug
-        scopeLog(CFG_LOG_DEBUG, "ERROR: missing g_fn's for initEnv()");
-        return;
-    }
-
     // build the full path of the .env file
     char path[128];
-    int  pathLen = snprintf(path, sizeof(path), "/dev/shm/scope_attach_%d.env", getpid());
+    int  pathLen = scope_snprintf(path, sizeof(path), "/dev/shm/scope_attach_%d.env", scope_getpid());
     if (pathLen < 0 || pathLen >= sizeof(path)) {
         scopeLog(CFG_LOG_DEBUG, "ERROR: snprintf(scope_attach_PID.env) failed");
         return;
     }
 
     // open it
-    FILE *fd = g_fn.fopen(path, "r");
+    FILE *fd = scope_fopen(path, "r");
     if (fd == NULL) {
         scopeLog(CFG_LOG_DEBUG, "ERROR: fopen(scope_attach_PID.env) failed");
         return;
@@ -1528,12 +1518,12 @@ initEnv(int *attachedFlag)
 
     // read "KEY=VALUE\n" lines and add them to the environment
     char line[8192];
-    while (g_fn.fgets(line, sizeof(line), fd)) {
-        int len = strlen(line);
+    while (scope_fgets(line, sizeof(line), fd)) {
+        int len = scope_strlen(line);
         if (line[len-1] == '\n') line[len-1] = '\0';
-        char *key = strtok(line, "=");
+        char *key = scope_strtok(line, "=");
         if (key) {
-            char *val = strtok(NULL, "=");
+            char *val = scope_strtok(NULL, "=");
             if (val) {
                 fullSetenv(key, val, 1);
             } else {
@@ -1545,7 +1535,7 @@ initEnv(int *attachedFlag)
     }
 
     // done
-    g_fn.fclose(fd);
+    scope_fclose(fd);
 }
 
 __attribute__((constructor)) void
@@ -1565,14 +1555,14 @@ init(void)
         if (!g_fn.close) g_fn.close = dlsym(RTLD_DEFAULT, "close");
 
         g_ismusl =
-            ((osGetExePath(getpid(), &full_path) != -1) &&
-            !strstr(full_path, "ldscope") &&
+            ((osGetExePath(scope_getpid(), &full_path) != -1) &&
+            !scope_strstr(full_path, "ldscope") &&
             ((ebuf = getElf(full_path))) &&
             !is_static(ebuf->buf) &&
             !is_go(ebuf->buf) &&
             is_musl(ebuf->buf));
 
-        if (full_path) free(full_path);
+        if (full_path) scope_free(full_path);
         if (ebuf) freeElf(ebuf->buf, ebuf->len);
     }
 
@@ -1617,7 +1607,7 @@ init(void)
 
     doConfig(cfg);
     g_staticfg = cfg;
-    if (path) free(path);
+    if (path) scope_free(path);
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
 
@@ -1721,7 +1711,7 @@ EXPORTON int
 closedir(DIR *dirp)
 {
     WRAP_CHECK(closedir, -1);
-    int fd = scope_dirfd(dirp);
+    int fd = wrap_scope_dirfd(dirp);
     int rc = g_fn.closedir(dirp);
 
     doCloseAndReportFailures(fd, (rc != -1), "closedir");
@@ -1733,7 +1723,7 @@ EXPORTON struct dirent *
 readdir(DIR *dirp)
 {
     WRAP_CHECK(readdir, NULL);
-    int fd = scope_dirfd(dirp);
+    int fd = wrap_scope_dirfd(dirp);
     int errsave = errno;
     uint64_t initialTime = getTime();
 
@@ -1777,7 +1767,7 @@ fopen(const char *pathname, const char *mode)
         // reporting that our funchook library opens /proc/self/maps
         // with fopen, then calls fgets and fclose on it as well...
         // See https://github.com/criblio/appscope/issues/214 for more info
-        if (strcmp(pathname, "/proc/self/maps")) {
+        if (scope_strcmp(pathname, "/proc/self/maps")) {
             doOpen(fileno(stream), pathname, STREAM, "fopen");
         }
     } else {
@@ -2216,7 +2206,7 @@ __fread_unlocked_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *
 
     size_t rc = g_fn.__fread_unlocked_chk(ptr, ptrlen, size, nmemb, stream);
 
-    doRead(scope_fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "__fread_unlocked_chk", NONE, 0);
+    doRead(wrap_scope_fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "__fread_unlocked_chk", NONE, 0);
 
     return rc;
 }
@@ -2305,7 +2295,7 @@ fseeko64(FILE *stream, off64_t offset, int whence)
 
     int rc = g_fn.fseeko64(stream, offset, whence);
 
-    doSeek(scope_fileno(stream), (rc != -1), "fseeko64");
+    doSeek(wrap_scope_fileno(stream), (rc != -1), "fseeko64");
 
     return rc;
 }
@@ -2317,7 +2307,7 @@ ftello64(FILE *stream)
 
     off64_t rc = g_fn.ftello64(stream);
 
-    doSeek(scope_fileno(stream), (rc != -1), "ftello64");
+    doSeek(wrap_scope_fileno(stream), (rc != -1), "ftello64");
 
     return rc;
 }
@@ -2350,7 +2340,7 @@ fsetpos64(FILE *stream, const fpos64_t *pos)
     WRAP_CHECK(fsetpos64, -1);
     int rc = g_fn.fsetpos64(stream, pos);
 
-    doSeek(scope_fileno(stream), (rc == 0), "fsetpos64");
+    doSeek(wrap_scope_fileno(stream), (rc == 0), "fsetpos64");
 
     return rc;
 }
@@ -2670,7 +2660,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 
     WRAP_CHECK(execve, -1);
 
-    if (strstr(g_proc.procname, "ldscope") ||
+    if (scope_strstr(g_proc.procname, "ldscope") ||
         checkEnv("SCOPE_EXECVE", "false")) {
         return g_fn.execve(pathname, argv, envp);
     }
@@ -2704,7 +2694,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     while ((argv[nargs] != NULL)) nargs++;
 
     size_t plen = sizeof(char *);
-    if ((nargs == 0) || (nargv = calloc(1, ((nargs * plen) + (plen * 2)))) == NULL) {
+    if ((nargs == 0) || (nargv = scope_calloc(1, ((nargs * plen) + (plen * 2)))) == NULL) {
         return g_fn.execve(pathname, argv, envp);
     }
 
@@ -2717,8 +2707,8 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 
     g_fn.execve(nargv[0], nargv, environ);
     saverr = errno;
-    if (nargv) free(nargv);
-    if (scopexec) free(scopexec);
+    if (nargv) scope_free(nargv);
+    if (scopexec) scope_free(scopexec);
     errno = saverr;
     return -1;
 }
@@ -2734,7 +2724,7 @@ __overflow(FILE *stream, int ch)
 
     int rc = g_fn.__overflow(stream, ch);
 
-    doWrite(scope_fileno(stream), initialTime, (rc != EOF), &ch, 1, "__overflow", BUF, 0);
+    doWrite(wrap_scope_fileno(stream), initialTime, (rc != EOF), &ch, 1, "__overflow", BUF, 0);
 
     return rc;
 }
@@ -2788,7 +2778,7 @@ isAnAppScopeConnection(int fd)
  * The DBG() output is ignored until after the constructor runs.
  */
 static long
-scope_syscall(long number, ...)
+wrap_scope_syscall(long number, ...)
 {
     struct FuncArgs fArgs;
 
@@ -2870,29 +2860,28 @@ scope_syscall(long number, ...)
 }
 
 static ssize_t
-scope_write(int fd, const void* buf, size_t size)
+wrap_scope_write(int fd, const void* buf, size_t size)
 {
     return (ssize_t)syscall(SYS_write, fd, buf, size);
 }
 
 static int
-scope_open(const char* pathname)
+wrap_scope_open(const char* pathname)
 {
     // This implementation is largely based on transportConnectFile().
-    int fd = g_fn.open(pathname, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666);
+    int fd = scope_open(pathname, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666);
     if (fd == -1) {
         DBG("%s", pathname);
         return fd;
     }
 
     // Since umask affects open permissions above...
-    if (fchmod(fd, 0666) == -1) {
+    if (scope_fchmod(fd, 0666) == -1) {
         DBG("%d %s", fd, pathname);
     }
     return fd;
 }
 
-#define scope_close(fd) g_fn.close(fd)
 
 EXPORTON size_t
 fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
@@ -2906,7 +2895,7 @@ fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
 
     size_t rc = g_fn.fwrite_unlocked(ptr, size, nitems, stream);
 
-    doWrite(scope_fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite_unlocked", BUF, 0);
+    doWrite(wrap_scope_fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite_unlocked", BUF, 0);
 
     return rc;
 }
@@ -3441,12 +3430,12 @@ SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
     if (result != NULL) {
         nss_list *nssentry;
 
-        if ((((nssentry = calloc(1, sizeof(nss_list))) != NULL)) &&
-            ((nssentry->ssl_methods = calloc(1, sizeof(PRIOMethods))) != NULL) &&
-            ((nssentry->ssl_int_methods = calloc(1, sizeof(PRIOMethods))) != NULL)) {
+        if ((((nssentry = scope_calloc(1, sizeof(nss_list))) != NULL)) &&
+            ((nssentry->ssl_methods = scope_calloc(1, sizeof(PRIOMethods))) != NULL) &&
+            ((nssentry->ssl_int_methods = scope_calloc(1, sizeof(PRIOMethods))) != NULL)) {
 
-            memmove(nssentry->ssl_methods, result->methods, sizeof(PRIOMethods));
-            memmove(nssentry->ssl_int_methods, result->methods, sizeof(PRIOMethods));
+            scope_memmove(nssentry->ssl_methods, result->methods, sizeof(PRIOMethods));
+            scope_memmove(nssentry->ssl_int_methods, result->methods, sizeof(PRIOMethods));
             nssentry->id = (uint64_t)nssentry->ssl_int_methods;
             //scopeLogInfo("fd:%d SSL_ImportFD", (uint64_t)nssentry->id);
 
@@ -3560,7 +3549,7 @@ EXPORTON int
 fclose(FILE *stream)
 {
     WRAP_CHECK(fclose, EOF);
-    int fd = scope_fileno(stream);
+    int fd = wrap_scope_fileno(stream);
 
     if (isAnAppScopeConnection(fd)) return 0;
 
@@ -3740,7 +3729,7 @@ fseek(FILE *stream, long offset, int whence)
     WRAP_CHECK(fseek, -1);
     int rc = g_fn.fseek(stream, offset, whence);
 
-    doSeek(scope_fileno(stream), (rc != -1), "fseek");
+    doSeek(wrap_scope_fileno(stream), (rc != -1), "fseek");
 
     return rc;
 }
@@ -3751,7 +3740,7 @@ fseeko(FILE *stream, off_t offset, int whence)
     WRAP_CHECK(fseeko, -1);
     int rc = g_fn.fseeko(stream, offset, whence);
 
-    doSeek(scope_fileno(stream), (rc != -1), "fseeko");
+    doSeek(wrap_scope_fileno(stream), (rc != -1), "fseeko");
 
     return rc;
 }
@@ -3762,7 +3751,7 @@ ftell(FILE *stream)
     WRAP_CHECK(ftell, -1);
     long rc = g_fn.ftell(stream);
 
-    doSeek(scope_fileno(stream), (rc != -1), "ftell");
+    doSeek(wrap_scope_fileno(stream), (rc != -1), "ftell");
 
     return rc;
 }
@@ -3773,7 +3762,7 @@ ftello(FILE *stream)
     WRAP_CHECK(ftello, -1);
     off_t rc = g_fn.ftello(stream);
 
-    doSeek(scope_fileno(stream), (rc != -1), "ftello");
+    doSeek(wrap_scope_fileno(stream), (rc != -1), "ftello");
 
     return rc;
 }
@@ -3784,7 +3773,7 @@ rewind(FILE *stream)
     WRAP_CHECK_VOID(rewind);
     g_fn.rewind(stream);
 
-    doSeek(scope_fileno(stream), TRUE, "rewind");
+    doSeek(wrap_scope_fileno(stream), TRUE, "rewind");
 
     return;
 }
@@ -3795,7 +3784,7 @@ fsetpos(FILE *stream, const fpos_t *pos)
     WRAP_CHECK(fsetpos, -1);
     int rc = g_fn.fsetpos(stream, pos);
 
-    doSeek(scope_fileno(stream), (rc == 0), "fsetpos");
+    doSeek(wrap_scope_fileno(stream), (rc == 0), "fsetpos");
 
     return rc;
 }
@@ -3806,7 +3795,7 @@ fgetpos(FILE *stream,  fpos_t *pos)
     WRAP_CHECK(fgetpos, -1);
     int rc = g_fn.fgetpos(stream, pos);
 
-    doSeek(scope_fileno(stream), (rc == 0), "fgetpos");
+    doSeek(wrap_scope_fileno(stream), (rc == 0), "fgetpos");
 
     return rc;
 }
@@ -3817,7 +3806,7 @@ fgetpos64(FILE *stream,  fpos64_t *pos)
     WRAP_CHECK(fgetpos64, -1);
     int rc = g_fn.fgetpos64(stream, pos);
 
-    doSeek(scope_fileno(stream), (rc == 0), "fgetpos64");
+    doSeek(wrap_scope_fileno(stream), (rc == 0), "fgetpos64");
 
     return rc;
 }
@@ -3933,7 +3922,7 @@ fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
 
     size_t rc = g_fn.fwrite(ptr, size, nitems, stream);
 
-    doWrite(scope_fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite", BUF, 0);
+    doWrite(wrap_scope_fileno(stream), initialTime, (rc == nitems), ptr, rc*size, "fwrite", BUF, 0);
 
     return rc;
 }
@@ -3949,11 +3938,11 @@ puts(const char *s)
 
     int rc = g_fn.puts(s);
 
-    doWrite(scope_fileno(stdout), initialTime, (rc != EOF), s, strlen(s), "puts", BUF, 0);
+    doWrite(wrap_scope_fileno(stdout), initialTime, (rc != EOF), s, strlen(s), "puts", BUF, 0);
 
     if (rc != EOF) {
         // puts() "writes the string s and a trailing newline to stdout"
-        doWrite(scope_fileno(stdout), initialTime, TRUE, "\n", 1, "puts", BUF, 0);
+        doWrite(wrap_scope_fileno(stdout), initialTime, TRUE, "\n", 1, "puts", BUF, 0);
     }
 
     return rc;
@@ -3970,7 +3959,7 @@ putchar(int c)
 
     int rc = g_fn.putchar(c);
 
-    doWrite(scope_fileno(stdout), initialTime, (rc != EOF), &c, 1, "putchar", BUF, 0);
+    doWrite(wrap_scope_fileno(stdout), initialTime, (rc != EOF), &c, 1, "putchar", BUF, 0);
 
     return rc;
 }
@@ -3986,7 +3975,7 @@ fputs(const char *s, FILE *stream)
 
     int rc = g_fn.fputs(s, stream);
 
-    doWrite(scope_fileno(stream), initialTime, (rc != EOF), s, strlen(s), "fputs", BUF, 0);
+    doWrite(wrap_scope_fileno(stream), initialTime, (rc != EOF), s, strlen(s), "fputs", BUF, 0);
 
     return rc;
 }
@@ -4002,7 +3991,7 @@ fputs_unlocked(const char *s, FILE *stream)
 
     int rc = g_fn.fputs_unlocked(s, stream);
 
-    doWrite(scope_fileno(stream), initialTime, (rc != EOF), s, strlen(s), "fputs_unlocked", BUF, 0);
+    doWrite(wrap_scope_fileno(stream), initialTime, (rc != EOF), s, strlen(s), "fputs_unlocked", BUF, 0);
 
     return rc;
 }
@@ -4054,7 +4043,7 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 
     size_t rc = g_fn.fread(ptr, size, nmemb, stream);
 
-    doRead(scope_fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "fread", NONE, 0);
+    doRead(wrap_scope_fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "fread", NONE, 0);
 
     return rc;
 }
@@ -4068,7 +4057,7 @@ __fread_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *stream)
 
     size_t rc = g_fn.__fread_chk(ptr, ptrlen, size, nmemb, stream);
 
-    doRead(scope_fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "__fread_chk", NONE, 0);
+    doRead(wrap_scope_fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "__fread_chk", NONE, 0);
 
     return rc;
 }
@@ -4081,7 +4070,7 @@ fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
 
     size_t rc = g_fn.fread_unlocked(ptr, size, nmemb, stream);
 
-    doRead(scope_fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "fread_unlocked", NONE, 0);
+    doRead(wrap_scope_fileno(stream), initialTime, (rc == nmemb), NULL, rc*size, "fread_unlocked", NONE, 0);
 
     return rc;
 }
@@ -4094,7 +4083,7 @@ fgets(char *s, int n, FILE *stream)
 
     char* rc = g_fn.fgets(s, n, stream);
 
-    doRead(scope_fileno(stream), initialTime, (rc != NULL), NULL, n, "fgets", NONE, 0);
+    doRead(wrap_scope_fileno(stream), initialTime, (rc != NULL), NULL, n, "fgets", NONE, 0);
 
     return rc;
 }
@@ -4108,7 +4097,7 @@ __fgets_chk(char *s, size_t size, int strsize, FILE *stream)
 
     char* rc = g_fn.__fgets_chk(s, size, strsize, stream);
 
-    doRead(scope_fileno(stream), initialTime, (rc != NULL), NULL, size, "__fgets_chk", NONE, 0);
+    doRead(wrap_scope_fileno(stream), initialTime, (rc != NULL), NULL, size, "__fgets_chk", NONE, 0);
 
     return rc;
 }
@@ -4121,7 +4110,7 @@ fgets_unlocked(char *s, int n, FILE *stream)
 
     char* rc = g_fn.fgets_unlocked(s, n, stream);
 
-    doRead(scope_fileno(stream), initialTime, (rc != NULL), NULL, n, "fgets_unlocked", NONE, 0);
+    doRead(wrap_scope_fileno(stream), initialTime, (rc != NULL), NULL, n, "fgets_unlocked", NONE, 0);
 
     return rc;
 }
@@ -4135,7 +4124,7 @@ __fgetws_chk(wchar_t *ws, size_t size, int strsize, FILE *stream)
 
     wchar_t* rc = g_fn.__fgetws_chk(ws, size, strsize, stream);
 
-    doRead(scope_fileno(stream), initialTime, (rc != NULL), NULL, size*sizeof(wchar_t), "__fgetws_chk", NONE, 0);
+    doRead(wrap_scope_fileno(stream), initialTime, (rc != NULL), NULL, size*sizeof(wchar_t), "__fgetws_chk", NONE, 0);
 
     return rc;
 }
@@ -4148,7 +4137,7 @@ fgetws(wchar_t *ws, int n, FILE *stream)
 
     wchar_t* rc = g_fn.fgetws(ws, n, stream);
 
-    doRead(scope_fileno(stream), initialTime, (rc != NULL), NULL, n*sizeof(wchar_t), "fgetws", NONE, 0);
+    doRead(wrap_scope_fileno(stream), initialTime, (rc != NULL), NULL, n*sizeof(wchar_t), "fgetws", NONE, 0);
 
     return rc;
 }
@@ -4161,7 +4150,7 @@ fgetwc(FILE *stream)
 
     wint_t rc = g_fn.fgetwc(stream);
 
-    doRead(scope_fileno(stream), initialTime, (rc != WEOF), NULL, sizeof(wint_t), "fgetwc", NONE, 0);
+    doRead(wrap_scope_fileno(stream), initialTime, (rc != WEOF), NULL, sizeof(wint_t), "fgetwc", NONE, 0);
 
     return rc;
 }
@@ -4174,7 +4163,7 @@ fgetc(FILE *stream)
 
     int rc = g_fn.fgetc(stream);
 
-    doRead(scope_fileno(stream), initialTime, (rc != EOF), NULL, 1, "fgetc", NONE, 0);
+    doRead(wrap_scope_fileno(stream), initialTime, (rc != EOF), NULL, 1, "fgetc", NONE, 0);
 
     return rc;
 }
@@ -4190,7 +4179,7 @@ fputc(int c, FILE *stream)
 
     int rc = g_fn.fputc(c, stream);
 
-    doWrite(scope_fileno(stream), initialTime, (rc != EOF), &c, 1, "fputc", NONE, 0);
+    doWrite(wrap_scope_fileno(stream), initialTime, (rc != EOF), &c, 1, "fputc", NONE, 0);
 
     return rc;
 }
@@ -4206,7 +4195,7 @@ fputc_unlocked(int c, FILE *stream)
 
     int rc = g_fn.fputc_unlocked(c, stream);
 
-    doWrite(scope_fileno(stream), initialTime, (rc != EOF), &c, 1, "fputc_unlocked", NONE, 0);
+    doWrite(wrap_scope_fileno(stream), initialTime, (rc != EOF), &c, 1, "fputc_unlocked", NONE, 0);
 
     return rc;
 }
@@ -4222,7 +4211,7 @@ putwc(wchar_t wc, FILE *stream)
 
     wint_t rc = g_fn.putwc(wc, stream);
 
-    doWrite(scope_fileno(stream), initialTime, (rc != WEOF), &wc, sizeof(wchar_t), "putwc", NONE, 0);
+    doWrite(wrap_scope_fileno(stream), initialTime, (rc != WEOF), &wc, sizeof(wchar_t), "putwc", NONE, 0);
 
     return rc;
 }
@@ -4238,7 +4227,7 @@ fputwc(wchar_t wc, FILE *stream)
 
     wint_t rc = g_fn.fputwc(wc, stream);
 
-    doWrite(scope_fileno(stream), initialTime, (rc != WEOF), &wc, sizeof(wchar_t), "fputwc", NONE, 0);
+    doWrite(wrap_scope_fileno(stream), initialTime, (rc != WEOF), &wc, sizeof(wchar_t), "fputwc", NONE, 0);
 
     return rc;
 }
@@ -4256,7 +4245,7 @@ fscanf(FILE *stream, const char *format, ...)
                      fArgs.arg[2], fArgs.arg[3],
                      fArgs.arg[4], fArgs.arg[5]);
 
-    doRead(scope_fileno(stream),initialTime, (rc != EOF), NULL, rc, "fscanf", NONE, 0);
+    doRead(wrap_scope_fileno(stream),initialTime, (rc != EOF), NULL, rc, "fscanf", NONE, 0);
 
     return rc;
 }
@@ -4270,7 +4259,7 @@ getline (char **lineptr, size_t *n, FILE *stream)
     ssize_t rc = g_fn.getline(lineptr, n, stream);
 
     size_t bytes = (n) ? *n : 0;
-    doRead(scope_fileno(stream), initialTime, (rc != -1), NULL, bytes, "getline", NONE, 0);
+    doRead(wrap_scope_fileno(stream), initialTime, (rc != -1), NULL, bytes, "getline", NONE, 0);
 
     return rc;
 }
@@ -4285,7 +4274,7 @@ getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
     ssize_t rc = g_fn.getdelim(lineptr, n, delimiter, stream);
 
     size_t bytes = (n) ? *n : 0;
-    doRead(scope_fileno(stream), initialTime, (rc != -1), NULL, bytes, "getdelim", NONE, 0);
+    doRead(wrap_scope_fileno(stream), initialTime, (rc != -1), NULL, bytes, "getdelim", NONE, 0);
 
     return rc;
 }
@@ -4303,7 +4292,7 @@ __getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
     }
 
     size_t bytes = (n) ? *n : 0;
-    doRead(scope_fileno(stream), initialTime, (rc != -1), NULL, bytes, "__getdelim", NONE, 0);
+    doRead(wrap_scope_fileno(stream), initialTime, (rc != -1), NULL, bytes, "__getdelim", NONE, 0);
     return rc;
 }
 
@@ -5075,24 +5064,24 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
 
     if (!g_log) {
         if (!g_constructor_debug_enabled) return;
-        local_buf = scope_log_var_buf + snprintf(scope_log_var_buf, LOG_BUF_SIZE, "Constructor: (pid:%d): ", getpid());
+        local_buf = scope_log_var_buf + scope_snprintf(scope_log_var_buf, LOG_BUF_SIZE, "Constructor: (pid:%d): ", scope_getpid());
         size_t local_buf_len = sizeof(scope_log_var_buf) + (scope_log_var_buf - local_buf) - 1;
 
         va_list args;
         va_start(args, format);
-        int msg_len = vsnprintf(local_buf, local_buf_len, format, args);
+        int msg_len = scope_vsnprintf(local_buf, local_buf_len, format, args);
         va_end(args);
         if (msg_len == -1) {
             DBG(NULL);
             return;
         }
 
-        sprintf(local_buf + msg_len, "\n");
+        scope_sprintf(local_buf + msg_len, "\n");
         local_buf += msg_len + 1;
 
         if (DEFAULT_LOG_LEVEL > level) return;
 
-        int fd = scope_open(DEFAULT_LOG_PATH);
+        int fd = wrap_scope_open(DEFAULT_LOG_PATH);
         if (fd == -1) {
             DBG(NULL);
             return;
@@ -5100,9 +5089,9 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
 
         if (msg_len >= local_buf_len) {
             DBG(NULL);
-            scope_write(fd, overflow_msg, sizeof(overflow_msg));
+            wrap_scope_write(fd, overflow_msg, sizeof(overflow_msg));
         } else {
-            scope_write(fd, scope_log_var_buf, local_buf - scope_log_var_buf);
+            wrap_scope_write(fd, scope_log_var_buf, local_buf - scope_log_var_buf);
         }
         scope_close(fd);
         return;
@@ -5111,28 +5100,28 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
     cfg_log_level_t cfg_level = logLevel(g_log);
     if ((cfg_level == CFG_LOG_NONE) || (cfg_level > level)) return;
 
-    gettimeofday(&tv, NULL);
+    scope_gettimeofday(&tv, NULL);
     msec = tv.tv_usec / 1000; 
     if (msec > 999) {
         tv.tv_sec++;
         msec = 0;
     }
-    localtime_r(&tv.tv_sec, &tm_info);
-    strftime(time_buf, LOG_TIME_SIZE, "%Y-%m-%dT%H:%M:%S", &tm_info); 
-    strftime(tz_buf, LOG_TZ_BUF_SIZE, "%z", &tm_info); 
+    scope_localtime_r(&tv.tv_sec, &tm_info);
+    scope_strftime(time_buf, LOG_TIME_SIZE, "%Y-%m-%dT%H:%M:%S", &tm_info); 
+    scope_strftime(tz_buf, LOG_TZ_BUF_SIZE, "%z", &tm_info); 
 
-    local_buf = scope_log_var_buf + snprintf(scope_log_var_buf, LOG_BUF_SIZE, "Scope: %s(pid:%d): [%s.%03d%s] ", g_proc.procname, g_proc.pid, time_buf, msec, tz_buf);
+    local_buf = scope_log_var_buf + scope_snprintf(scope_log_var_buf, LOG_BUF_SIZE, "Scope: %s(pid:%d): [%s.%03d%s] ", g_proc.procname, g_proc.pid, time_buf, msec, tz_buf);
     size_t local_buf_len = sizeof(scope_log_var_buf) + (scope_log_var_buf - local_buf) - 1;
 
     va_list args;
     va_start(args, format);
-    int msg_len = vsnprintf(local_buf, local_buf_len, format, args);
+    int msg_len = scope_vsnprintf(local_buf, local_buf_len, format, args);
     va_end(args);
     if (msg_len == -1) {
         DBG(NULL);
         return;
     }
-    sprintf(local_buf + msg_len, "\n");
+    scope_sprintf(local_buf + msg_len, "\n");
     local_buf += msg_len + 1;
 
     if (msg_len >= local_buf_len) {
@@ -5223,7 +5212,7 @@ __fdelt_chk(long int fdelt)
 
     if (fdelt < 0 || fdelt >= FD_SETSIZE) {
         DBG(NULL);
-        fprintf(stderr, "__fdelt_chk error: buffer overflow detected?\n");
+        scope_fprintf(scope_stderr, "__fdelt_chk error: buffer overflow detected?\n");
         abort();
     }
 
@@ -5284,7 +5273,7 @@ __longjmp_chk(jmp_buf env, int val)
 
 
 static void *
-scope_dlsym(void *handle, const char *name, void *who)
+wrap_scope_dlsym(void *handle, const char *name, void *who)
 {
     return dlsym(handle, name);
 }

@@ -8,6 +8,7 @@
 #include "dbg.h"
 #include "fn.h"
 #include "os.h"
+#include "scopestdlib.h"
 #include "scopetypes.h"
 #include "utils.h"
 
@@ -91,12 +92,12 @@ func_found_in_executable(const char *symbol, const char *exe)
     }
 
     // turns "bash" into "/bash", for example
-    if (asprintf(&exe_with_preceeding_slash, "/%s", exe) == -1) goto out;
+    if (scope_asprintf(&exe_with_preceeding_slash, "/%s", exe) == -1) goto out;
     func_found = endsWith(symbol_info.dli_fname, exe_with_preceeding_slash);
 
 out:
     if (exe_handle) dlclose(exe_handle);
-    if (exe_with_preceeding_slash) free(exe_with_preceeding_slash);
+    if (exe_with_preceeding_slash) scope_free(exe_with_preceeding_slash);
     return func_found;
 }
 
@@ -183,7 +184,7 @@ bashMemFuncsFound()
         cs_insn *inst;
         for (j=0; j<asm_count; j++) {
             inst = &asm_inst[j];
-            if (!strcmp((const char *)inst->mnemonic, "jmp") &&
+            if (!scope_strcmp((const char *)inst->mnemonic, "jmp") &&
                 ((inst->size == 5) || (inst->size == 2))) {
                 break;
             }
@@ -286,11 +287,11 @@ run_bash_mem_fix(void)
     // uses glibc's memory subsystem instead of bash's.  It's important
     // to make this call before before calls to bashMemFuncsFound() and
     // replaceBashMemFuncs(), since these use the disassembler.
-    cs_opt_mem capstone_mem = {.malloc = g_mem_fn.malloc,
-                               .calloc = g_mem_fn.calloc,
-                               .realloc = g_mem_fn.realloc,
-                               .free = g_mem_fn.free,
-                               .vsnprintf = g_mem_fn.vsnprintf};
+    cs_opt_mem capstone_mem = {.malloc = scope_malloc,
+                               .calloc = scope_calloc,
+                               .realloc = scope_realloc,
+                               .free = scope_free,
+                               .vsnprintf = scope_vsnprintf};
     if ((cs_option(0, CS_OPT_MEM, (size_t)&capstone_mem)) != 0) goto out;
 
     // fill in bash_mem_func by looking up external bash mem funcs

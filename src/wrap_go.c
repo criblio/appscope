@@ -14,6 +14,7 @@
 #include "utils.h"
 #include "fn.h"
 #include "capstone/capstone.h"
+#include "scopestdlib.h"
 
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 //#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
@@ -99,7 +100,7 @@ c_str(gostring_t *go_str)
     if (!go_str || go_str->len <= 0) return NULL;
 
     char *path;
-    if ((path = calloc(1, go_str->len+1)) == NULL) return NULL;
+    if ((path = scope_calloc(1, go_str->len+1)) == NULL) return NULL;
     memmove(path, go_str->str, go_str->len);
     path[go_str->len] = '\0';
 
@@ -109,11 +110,11 @@ c_str(gostring_t *go_str)
 static bool
 looks_like_first_inst_of_go_func(cs_insn* asm_inst)
 {
-    return (!strcmp((const char*)asm_inst->mnemonic, "mov") &&
-            !strcmp((const char*)asm_inst->op_str, "rcx, qword ptr fs:[0xfffffffffffffff8]"))
+    return (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
+            !scope_strcmp((const char*)asm_inst->op_str, "rcx, qword ptr fs:[0xfffffffffffffff8]"))
            || // -buildmode=pie compiles to this:
-           (!strcmp((const char*)asm_inst->mnemonic, "mov") &&
-            !strcmp((const char*)asm_inst->op_str, "rcx, -8"));
+           (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
+            !scope_strcmp((const char*)asm_inst->op_str, "rcx, -8"));
 }
 
 static uint32_t
@@ -164,7 +165,7 @@ patch_first_instruction(funchook_t *funchook,
 
         // Stop when it looks like we've hit another goroutine
         if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
-                  (!strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
+                  (!scope_strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
                   asm_inst[i].size == 1 ))) {
             break;
         }
@@ -221,7 +222,7 @@ patch_return_addrs(funchook_t *funchook,
 
         // Stop when it looks like we've hit another goroutine
         if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
-                  (!strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
+                  (!scope_strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
                   asm_inst[i].size == 1 ))) {
             break;
         }
@@ -237,10 +238,10 @@ patch_return_addrs(funchook_t *funchook,
         // If the current instruction is a RET
         // we want to patch the ADD or SUB immediately before it.
         uint32_t add_arg = 0;
-        if ((!strcmp((const char*)asm_inst[i].mnemonic, "ret") &&
+        if ((!scope_strcmp((const char*)asm_inst[i].mnemonic, "ret") &&
              asm_inst[i].size == 1) &&
-             (((!strcmp((const char*)asm_inst[i-1].mnemonic, "add")) ||
-             ((!strcmp((const char*)asm_inst[i-1].mnemonic, "sub")))) &&
+             (((!scope_strcmp((const char*)asm_inst[i-1].mnemonic, "add")) ||
+             ((!scope_strcmp((const char*)asm_inst[i-1].mnemonic, "sub")))) &&
              (add_arg = add_argument(&asm_inst[i-1])))) {
 
             void *pre_patch_addr = (void*)asm_inst[i-1].address;
@@ -269,11 +270,11 @@ patchClone()
 {
     void *clone = dlsym(RTLD_DEFAULT, "__clone");
     if (clone) {
-        size_t pageSize = getpagesize();
+        size_t pageSize = scope_getpagesize();
         void *addr = (void *)((ptrdiff_t) clone & ~(pageSize - 1));
 
         // set write perms on the page
-        if (mprotect(addr, pageSize, PROT_WRITE | PROT_READ | PROT_EXEC)) {
+        if (scope_mprotect(addr, pageSize, PROT_WRITE | PROT_READ | PROT_EXEC)) {
             scopeLogError("ERROR: patchCLone: mprotect failed\n");
             return;
         }
@@ -282,12 +283,12 @@ patchClone()
             0xb8, 0x00, 0x00, 0x00, 0x00,      // mov $0x0,%eax
             0xc3                               // retq
         };
-        memcpy(clone, ass, sizeof(ass));
+        scope_memcpy(clone, ass, sizeof(ass));
 
         scopeLog(CFG_LOG_DEBUG, "patchClone: CLONE PATCHED\n");
 
         // restore perms to the page
-        if (mprotect(addr, pageSize, PROT_READ | PROT_EXEC)) {
+        if (scope_mprotect(addr, pageSize, PROT_READ | PROT_EXEC)) {
             scopeLogError("ERROR: patchCLone: mprotect restore failed\n");
             return;
         }
@@ -306,17 +307,17 @@ go_major_version(const char *go_runtime_version)
     if (!go_runtime_version) return UNKNOWN_GO_VER;
 
     char buf[256] = {0};
-    strncpy(buf, go_runtime_version, sizeof(buf)-1);
+    scope_strncpy(buf, go_runtime_version, sizeof(buf)-1);
 
-    char *token = strtok(buf, ".");
-    token = strtok(NULL, ".");
+    char *token = scope_strtok(buf, ".");
+    token = scope_strtok(NULL, ".");
     if (!token) {
         return UNKNOWN_GO_VER;
     }
 
-    errno = 0;
-    long val = strtol(token, NULL, 10);
-    if (errno || val <= 0 || val > INT_MAX) {
+    scope_errno = 0;
+    long val = scope_strtol(token, NULL, 10);
+    if (scope_errno || val <= 0 || val > INT_MAX) {
         return UNKNOWN_GO_VER;
     }
 
@@ -361,30 +362,29 @@ adjustGoStructOffsetsForVersion(int go_ver)
     // If an OptionalTag is provided, test_go_struct.sh will not process
     // the line unless it matches a TAG_FILTER which is provided as an
     // argument to the test_go_struct.sh.
-    if (!g_fn.open || !g_fn.close) return;
 
     char* debug_file;
     int fd;
     if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
-        ((fd = g_fn.open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
-        dprintf(fd, "runtime.g|m=%d|\n", g_go.g_to_m);
-        dprintf(fd, "runtime.m|tls=%d|\n", g_go.m_to_tls);
-        dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go.connReader_to_conn);
-        dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go.persistConn_to_conn);
-        dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go.persistConn_to_bufrd);
-        dprintf(fd, "runtime.iface|data=%d|\n", g_go.iface_data);
+        ((fd = scope_open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
+        scope_dprintf(fd, "runtime.g|m=%d|\n", g_go.g_to_m);
+        scope_dprintf(fd, "runtime.m|tls=%d|\n", g_go.m_to_tls);
+        scope_dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go.connReader_to_conn);
+        scope_dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go.persistConn_to_conn);
+        scope_dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go.persistConn_to_bufrd);
+        scope_dprintf(fd, "runtime.iface|data=%d|\n", g_go.iface_data);
         // go 1.8 has a direct netfd_to_sysfd field, others are less direct
         if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
-            dprintf(fd, "net.netFD|pfd=%d|\n", g_go.netfd_to_pd);
-            dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go.pd_to_fd);
+            scope_dprintf(fd, "net.netFD|pfd=%d|\n", g_go.netfd_to_pd);
+            scope_dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go.pd_to_fd);
         } else {
-            dprintf(fd, "net.netFD|sysfd=%d|\n", g_go.netfd_to_sysfd);
+            scope_dprintf(fd, "net.netFD|sysfd=%d|\n", g_go.netfd_to_sysfd);
         }
-        dprintf(fd, "bufio.Reader|buf=%d|\n", g_go.bufrd_to_buf);
-        dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go.conn_to_rwc);
-        dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go.conn_to_tlsState);
-        dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go.persistConn_to_tlsState);
-        g_fn.close(fd);
+        scope_dprintf(fd, "bufio.Reader|buf=%d|\n", g_go.bufrd_to_buf);
+        scope_dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go.conn_to_rwc);
+        scope_dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go.conn_to_tlsState);
+        scope_dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go.persistConn_to_tlsState);
+        scope_close(fd);
     }
 
 }
@@ -398,24 +398,22 @@ getBaseAddress(uint64_t *addr) {
     char pname[1024];
     FILE *fp;
 
-    if (!g_fn.fopen || !g_fn.fgets || !g_fn.fclose) return -1;
-
     if (osGetProcname(pname, sizeof(pname)) == -1) return -1;
 
-    if ((fp = g_fn.fopen("/proc/self/maps", "r")) == NULL) {
+    if ((fp = scope_fopen("/proc/self/maps", "r")) == NULL) {
         return -1;
     }
 
-    while (g_fn.fgets(buf, sizeof(buf), fp) != NULL) {
+    while (scope_fgets(buf, sizeof(buf), fp) != NULL) {
         uint64_t addr_start;
-        sscanf(buf, "%lx-%*x %s %*s %s %*d", &addr_start, perms, offset);
-        if (strstr(buf, pname) != NULL) {
+        scope_sscanf(buf, "%lx-%*x %s %*s %s %*d", &addr_start, perms, offset);
+        if (scope_strstr(buf, pname) != NULL) {
             base_addr = addr_start;
             break;
         }
     }
 
-    g_fn.fclose(fp);
+    scope_fclose(fp);
     if (base_addr) {
         *addr = base_addr;
         return 0;
@@ -431,7 +429,7 @@ initGoHook(elf_buf_t *ebuf)
     gostring_t *go_ver; // There is an implicit len field at go_ver + 0x8
     char *go_runtime_version = NULL;
 
-    g_stack = malloc(32 * 1024);
+    g_stack = scope_malloc(32 * 1024);
     g_threadlist = lstCreate(NULL);
 
     // A go app may need to expand stacks for some C functions
@@ -632,8 +630,8 @@ dumb_thread(void *arg)
     sigfillset(&mask);
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
-    void *dummy = calloc(1, 32);
-    if (dummy) free(dummy);
+    void *dummy = scope_calloc(1, 32);
+    if (dummy) scope_free(dummy);
     pthread_barrier_wait(pbarrier);
     while (1) {
         sleep(0xffffffff);
@@ -899,8 +897,8 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
             );
 
             //initialize tcache
-            void *buf = calloc(1, 0xff);
-            free(buf);
+            void *buf = scope_calloc(1, 0xff);
+            scope_free(buf);
 
             //restore stack
             __asm__ volatile (
@@ -1029,14 +1027,15 @@ c_unlinkat(char *stackaddr)
 
     if (!pathname) {
         scopeLogError("ERROR:go_open: null pathname");
-        puts("Scope:ERROR:open:no pathname");
+        scope_puts("Scope:ERROR:open:no pathname");
+        scope_fflush(scope_stdout);
         return;
     }
 
     funcprint("Scope: unlinkat dirfd %ld pathname %s flags %ld\n", dirfd, pathname, flags);
     doDelete(pathname, "go_unlinkat");
 
-    if (pathname) free(pathname);
+    if (pathname) scope_free(pathname);
 }
 
 EXPORTON void *
@@ -1054,14 +1053,15 @@ c_open(char *stackaddr)
 
     if (!path) {
         scopeLogError("ERROR:go_open: null pathname");
-        puts("Scope:ERROR:open:no path");
+        scope_puts("Scope:ERROR:open:no path");
+        scope_fflush(scope_stdout);
         return;
     }
 
     funcprint("Scope: open of %ld\n", fd);
     doOpen(fd, path, FD, "open");
 
-    if (path) free(path);
+    if (path) scope_free(path);
 }
 
 EXPORTON void *

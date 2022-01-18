@@ -11,6 +11,7 @@
 
 #include "fn.h"
 #include "dbg.h"
+#include "scopestdlib.h"
 #include "transport.h"
 #include "test.h"
 
@@ -128,7 +129,7 @@ transportCreateFileReturnsValidPtrInHappyPath(void** state)
     assert_false(transportNeedsConnection(t));
     transportDestroy(&t);
     assert_null(t);
-    if (unlink(path))
+    if (scope_unlink(path))
         fail_msg("Couldn't delete test file %s", path);
 }
 
@@ -142,12 +143,12 @@ transportCreateFileCreatesFileWithRWPermissionsForAll(void** state)
 
     // test permissions are 0666
     struct stat buf;
-    if (stat(path, &buf))
+    if (scope_stat(path, &buf))
         fail_msg("Couldn't test permissions for file %s", path);
     assert_true((buf.st_mode & 0777) == 0666);
 
     // Clean up
-    if (unlink(path))
+    if (scope_unlink(path))
         fail_msg("Couldn't delete test file %s", path);
 }
 
@@ -254,7 +255,7 @@ static void
 transportSendForNullTransportDoesNothing(void** state)
 {
     const char* msg = "Hey, this is cool!\n";
-    assert_int_equal(transportSend(NULL, msg, strlen(msg)), -1);
+    assert_int_equal(transportSend(NULL, msg, scope_strlen(msg)), -1);
 }
 
 static void
@@ -265,7 +266,7 @@ transportSendForNullMessageDoesNothing(void** state)
     assert_non_null(t);
     assert_int_equal(transportSend(t, NULL, 0), -1);
     transportDestroy(&t);
-    if (unlink(path))
+    if (scope_unlink(path))
         fail_msg("Couldn't delete test file %s", path);
 }
 
@@ -275,11 +276,11 @@ transportSendForUnimplementedTransportTypesIsHarmless(void** state)
     transport_t* t;
 
     t = transportCreateSyslog();
-    transportSend(t, "blah", strlen("blah"));
+    transportSend(t, "blah", scope_strlen("blah"));
     transportDestroy(&t);
 
     t = transportCreateShm();
-    transportSend(t, "blah", strlen("blah"));
+    transportSend(t, "blah", scope_strlen("blah"));
     transportDestroy(&t);
 }
 
@@ -296,11 +297,11 @@ transportSendForUdpTransmitsMsg(void** state)
     if (getaddrinfo(hostname, portname, &hints, &res)) {
         fail_msg("Couldn't create address for socket");
     }
-    int sd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    int sd = scope_socket(res->ai_family, res->ai_socktype, res->ai_protocol);
     if (sd == -1) {
         fail_msg("Couldn't create socket");
     }
-    if (bind(sd, res->ai_addr, res->ai_addrlen) == -1) {
+    if (scope_bind(sd, (const struct sockaddr *)res->ai_addr, res->ai_addrlen) == -1) {
         fail_msg("Couldn't bind socket");
     }
     freeaddrinfo(res);
@@ -309,19 +310,19 @@ transportSendForUdpTransmitsMsg(void** state)
     assert_non_null(t);
     const char msg[] = "This is the payload message to transfer.\n";
     char buf[sizeof(msg)] = {0};  // Has room for a null at the end
-    assert_int_equal(transportSend(t, msg, strlen(msg)), 0);
+    assert_int_equal(transportSend(t, msg, scope_strlen(msg)), 0);
 
     struct sockaddr_storage from = {0};
     socklen_t len = sizeof(from);
     int byteCount=0;
-    if ((byteCount = recvfrom(sd, buf, sizeof(buf), 0, (struct sockaddr*)&from, &len)) != strlen(msg)) {
+    if ((byteCount = scope_recvfrom(sd, buf, sizeof(buf), 0, (struct sockaddr*)&from, &len)) != scope_strlen(msg)) {
         fail_msg("Couldn't recvfrom");
     }
     assert_string_equal(msg, buf);
 
     transportDestroy(&t);
 
-    close(sd);
+    scope_close(sd);
 }
 
 static void
@@ -332,20 +333,20 @@ transportSendForAbstractUnixTransmitsMsg(void** state)
     // Create a unix address for a test socket
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
-    memset(addr.sun_path, 0, sizeof(addr.sun_path));
-    strncpy(addr.sun_path, path, strlen(path));
+    scope_memset(addr.sun_path, 0, sizeof(addr.sun_path));
+    scope_strncpy(addr.sun_path, path, scope_strlen(path));
     addr.sun_path[0] = 0;
-    int addr_len = sizeof(sa_family_t) + strlen(path);
+    int addr_len = sizeof(sa_family_t) + scope_strlen(path);
 
     // Create a test socket that our transport can send to
-    int sd = socket(AF_UNIX, SOCK_STREAM, 0);
+    int sd = scope_socket(AF_UNIX, SOCK_STREAM, 0);
     if (sd == -1) {
         fail_msg("Couldn't create socket");
     }
-    if (bind(sd, &addr, addr_len) == -1) {
+    if (scope_bind(sd, (const struct sockaddr *)&addr, addr_len) == -1) {
         fail_msg("Couldn't bind socket");
     }
-    if (listen(sd, 10) == -1) {
+    if (scope_listen(sd, 10) == -1) {
         fail_msg("Couldn't listen on socket");
     }
 
@@ -355,23 +356,23 @@ transportSendForAbstractUnixTransmitsMsg(void** state)
     assert_false(transportNeedsConnection(t));
     const char msg[] = "This is the payload message to transfer.\n";
     char buf[sizeof(msg)] = {0};  // Has room for a null at the end
-    assert_int_equal(transportSend(t, msg, strlen(msg)), 0);
+    assert_int_equal(transportSend(t, msg, scope_strlen(msg)), 0);
 
     // Verify that our test sockets can rx the stuff sent with the transport
     struct sockaddr_storage from = {0};
     socklen_t from_len = sizeof(from);
-    int rx_sock = accept(sd, (struct sockaddr *)&from, &from_len);
+    int rx_sock = scope_accept(sd, (struct sockaddr *)&from, &from_len);
     assert_true(rx_sock != -1);
-    int byteCount = recv(rx_sock, buf, sizeof(buf), 0);
-    if (byteCount != strlen(msg)) {
+    int byteCount = scope_recv(rx_sock, buf, sizeof(buf), 0);
+    if (byteCount != scope_strlen(msg)) {
         fail_msg("Couldn't recv properly");
     }
     assert_string_equal(msg, buf);
 
     transportDestroy(&t);
 
-    close(rx_sock);
-    close(sd);
+    scope_close(rx_sock);
+    scope_close(sd);
 }
 
 static void
@@ -382,19 +383,19 @@ transportSendForFilepathUnixTransmitsMsg(void** state)
     // Create a unix address for a test socket
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
-    memset(addr.sun_path, 0, sizeof(addr.sun_path));
-    strncpy(addr.sun_path, path, strlen(path));
-    int addr_len = sizeof(sa_family_t) + strlen(path) + 1;
+    scope_memset(addr.sun_path, 0, sizeof(addr.sun_path));
+    scope_strncpy(addr.sun_path, path, scope_strlen(path));
+    int addr_len = sizeof(sa_family_t) + scope_strlen(path) + 1;
 
     // Create a test socket that our transport can send to
-    int sd = socket(AF_UNIX, SOCK_STREAM, 0);
+    int sd = scope_socket(AF_UNIX, SOCK_STREAM, 0);
     if (sd == -1) {
         fail_msg("Couldn't create socket");
     }
-    if (bind(sd, &addr, addr_len) == -1) {
+    if (scope_bind(sd, (const struct sockaddr *)&addr, addr_len) == -1) {
         fail_msg("Couldn't bind socket");
     }
-    if (listen(sd, 10) == -1) {
+    if (scope_listen(sd, 10) == -1) {
         fail_msg("Couldn't listen on socket");
     }
 
@@ -404,24 +405,24 @@ transportSendForFilepathUnixTransmitsMsg(void** state)
     assert_false(transportNeedsConnection(t));
     const char msg[] = "This is the payload message to transfer.\n";
     char buf[sizeof(msg)] = {0};  // Has room for a null at the end
-    assert_int_equal(transportSend(t, msg, strlen(msg)), 0);
+    assert_int_equal(transportSend(t, msg, scope_strlen(msg)), 0);
 
     // Verify that our test sockets can rx the stuff sent with the transport
     struct sockaddr_storage from = {0};
     socklen_t from_len = sizeof(from);
-    int rx_sock = accept(sd, (struct sockaddr *)&from, &from_len);
+    int rx_sock = scope_accept(sd, (struct sockaddr *)&from, &from_len);
     assert_true(rx_sock != -1);
-    int byteCount = recv(rx_sock, buf, sizeof(buf), 0);
-    if (byteCount != strlen(msg)) {
+    int byteCount = scope_recv(rx_sock, buf, sizeof(buf), 0);
+    if (byteCount != scope_strlen(msg)) {
         fail_msg("Couldn't recv properly");
     }
     assert_string_equal(msg, buf);
 
     transportDestroy(&t);
 
-    close(rx_sock);
-    close(sd);
-    unlink(path);
+    scope_close(rx_sock);
+    scope_close(sd);
+    scope_unlink(path);
 }
 
 static void
@@ -433,28 +434,28 @@ transportSendForFilepathUnixFailedTransmitsMsg(void** state)
     struct sockaddr_un addr;
     struct stat socket_stat;
     addr.sun_family = AF_UNIX;
-    memset(addr.sun_path, 0, sizeof(addr.sun_path));
-    strncpy(addr.sun_path, path, strlen(path));
-    int addr_len = sizeof(sa_family_t) + strlen(path) + 1;
+    scope_memset(addr.sun_path, 0, sizeof(addr.sun_path));
+    scope_strncpy(addr.sun_path, path, scope_strlen(path));
+    int addr_len = sizeof(sa_family_t) + scope_strlen(path) + 1;
 
     // Create a test socket that our transport can send to
-    int sd = socket(AF_UNIX, SOCK_STREAM, 0);
+    int sd = scope_socket(AF_UNIX, SOCK_STREAM, 0);
     if (sd == -1) {
         fail_msg("Couldn't create socket");
     }
-    if (bind(sd, &addr, addr_len) == -1) {
+    if (scope_bind(sd, (const struct sockaddr *)&addr, addr_len) == -1) {
         fail_msg("Couldn't bind socket");
     }
-    if (listen(sd, 10) == -1) {
+    if (scope_listen(sd, 10) == -1) {
         fail_msg("Couldn't listen on socket");
     }
 
-    if (stat(path, &socket_stat) != 0) {
+    if (scope_stat(path, &socket_stat) != 0) {
         fail_msg("Couldn't stat socket");
     }
 
     // Take the write permission 
-    if (chmod(path, socket_stat.st_mode & ~(S_IWUSR | S_IWGRP | S_IWOTH)) != 0 ){
+    if (scope_chmod(path, socket_stat.st_mode & ~(S_IWUSR | S_IWGRP | S_IWOTH)) != 0 ){
         fail_msg("Couldn't take the write permission");
     }
 
@@ -464,8 +465,8 @@ transportSendForFilepathUnixFailedTransmitsMsg(void** state)
     assert_true(transportNeedsConnection(t));
     transportDestroy(&t);
 
-    close(sd);
-    unlink(path);
+    scope_close(sd);
+    scope_unlink(path);
 }
 
 static void
@@ -507,7 +508,7 @@ transportSendForFileWritesToFileAfterFlushWhenFullyBuffered(void** state)
 
     transportDestroy(&t);
 
-    if (unlink(path))
+    if (scope_unlink(path))
         fail_msg("Couldn't delete test file %s", path);
 }
 
@@ -551,7 +552,7 @@ transportSendForFileWritesToFileImmediatelyWhenLineBuffered(void** state)
 
     transportDestroy(&t);
 
-    if (unlink(path))
+    if (scope_unlink(path))
         fail_msg("Couldn't delete test file %s", path);
 }
 

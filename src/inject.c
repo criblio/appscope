@@ -16,6 +16,7 @@
 #include <dlfcn.h>
 #include <stddef.h>
 #include <inttypes.h>
+#include "scopestdlib.h"
 #include "dbg.h"
 #include "inject.h"
 
@@ -57,20 +58,20 @@ findLibrary(const char *library, pid_t pid)
     FILE *fd;
     uint64_t addr = 0;
 
-    snprintf(filename, sizeof(filename), "/proc/%d/maps", pid);
-    if ((fd = fopen(filename, "r")) == NULL) {
-        perror("fopen(/proc/PID/maps) failed");
+    scope_snprintf(filename, sizeof(filename), "/proc/%d/maps", pid);
+    if ((fd = scope_fopen(filename, "r")) == NULL) {
+        scope_perror("fopen(/proc/PID/maps) failed");
         return 0;
     }
 
-    while(fgets(buffer, sizeof(buffer), fd)) {
-        if (strstr(buffer, library)) {
-            addr = strtoull(buffer, NULL, 16);
+    while(scope_fgets(buffer, sizeof(buffer), fd)) {
+        if (scope_strstr(buffer, library)) {
+            addr = scope_strtoull(buffer, NULL, 16);
             break;
         }
     }
 
-    fclose(fd);
+    scope_fclose(fd);
     return addr;
 }
 
@@ -84,22 +85,22 @@ freeSpaceAddr(pid_t pid, uint64_t* addr_begin, uint64_t* free_size)
     char str[20];
     char perms[5];
 
-    sprintf(filename, "/proc/%d/maps", pid);
-    if ((fd = fopen(filename, "r")) == NULL) {
-        perror("fopen(/proc/PID/maps) failed");
+    scope_sprintf(filename, "/proc/%d/maps", pid);
+    if ((fd = scope_fopen(filename, "r")) == NULL) {
+        scope_perror("fopen(/proc/PID/maps) failed");
         return EXIT_FAILURE;
     }
 
-    while(fgets(line, 850, fd) != NULL) {
-        sscanf(line, "%lx-%lx %s %*s %s %*d", addr_begin, &addr_end, perms, str);
-        if ((strstr(perms, "x") != NULL) &&
-            (strstr(perms, "w") == NULL)) {
+    while(scope_fgets(line, 850, fd) != NULL) {
+        scope_sscanf(line, "%lx-%lx %s %*s %s %*d", addr_begin, &addr_end, perms, str);
+        if ((scope_strstr(perms, "x") != NULL) &&
+            (scope_strstr(perms, "w") == NULL)) {
             break;
         }
     }
     *free_size = addr_end - *addr_begin;
 
-    fclose(fd);
+    scope_fclose(fd);
     return EXIT_SUCCESS;
 }
 
@@ -112,9 +113,9 @@ ptraceRead(int pid, uint64_t addr, void *data, int len)
     long *ptr = (long *) data;
 
     while (numRead < len) {
-        word = ptrace(PTRACE_PEEKTEXT, pid, addr + numRead, NULL);
+        word = scope_ptrace(PTRACE_PEEKTEXT, pid, (void*)(addr + numRead), NULL);
         if(word == -1) {
-            perror("ptrace(PTRACE_PEEKTEXT) failed");
+            scope_perror("ptrace(PTRACE_PEEKTEXT) failed");
             return EXIT_FAILURE;
         }
         numRead += sizeof(word);
@@ -131,9 +132,9 @@ ptraceWrite(int pid, uint64_t addr, void *data, int len)
     int i = 0;
 
     for(i=0; i < len; i += sizeof(word), word=0) {
-        memcpy(&word, data + i, sizeof(word));
-        if (ptrace(PTRACE_POKETEXT, pid, addr + i, word) == -1) {
-            perror("ptrace(PTRACE_POKETEXT) failed");
+        scope_memcpy(&word, data + i, sizeof(word));
+        if (scope_ptrace(PTRACE_POKETEXT, pid, (void*)(addr + i), (void*)word) == -1) {
+            scope_perror("ptrace(PTRACE_POKETEXT) failed");
             return EXIT_FAILURE;
         }
     }
@@ -145,13 +146,13 @@ static int
 ptraceAttach(pid_t target) {
     int waitpidstatus;
 
-    if(ptrace(PTRACE_ATTACH, target, NULL, NULL) == -1) {
-        perror("ptrace(PTRACE_ATTACH) failed");
+    if(scope_ptrace(PTRACE_ATTACH, target, NULL, NULL) == -1) {
+        scope_perror("ptrace(PTRACE_ATTACH) failed");
         return EXIT_FAILURE;
     }
 
-    if(waitpid(target, &waitpidstatus, WUNTRACED) != target) {
-        perror("waitpid failed");
+    if(scope_waitpid(target, &waitpidstatus, WUNTRACED) != target) {
+        scope_perror("waitpid failed");
         return EXIT_FAILURE;
     }
 
@@ -187,14 +188,14 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     int status;
     uint64_t freeAddr, codeAddr, freeAddrSize;
     char libpath[SCOPE_PATH_SIZE] = {0};
-    int libpathLen = strlen(path) + 1;
+    int libpathLen = scope_strlen(path) + 1;
     int ret = EXIT_FAILURE;
 
     if (libpathLen > SCOPE_PATH_SIZE) {
-        fprintf(stderr, "library path %s is longer than %d, library could not be injected\n", path, SCOPE_PATH_SIZE);
+        scope_fprintf(scope_stderr, "library path %s is longer than %d, library could not be injected\n", path, SCOPE_PATH_SIZE);
         goto exit;
     }
-    strncpy(libpath, path, libpathLen);
+    scope_strncpy(libpath, path, libpathLen);
 
     if (ptraceAttach(pid)) {
         goto exit;
@@ -202,11 +203,11 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
 
     // save registers
     my_iovec.iov_base = &oldregs;
-    if (ptrace(PTRACE_GETREGSET, pid, (void*)NT_PRSTATUS, &my_iovec) == -1) {
-        fprintf(stderr, "error: ptrace get register(), library could not be injected\n");
+    if (scope_ptrace(PTRACE_GETREGSET, pid, (void*)NT_PRSTATUS, &my_iovec) == -1) {
+        scope_fprintf(scope_stderr, "error: ptrace get register(), library could not be injected\n");
         goto detach;
     }
-    memcpy(&regs, &oldregs, sizeof(struct user_regs_struct));
+    scope_memcpy(&regs, &oldregs, sizeof(struct user_regs_struct));
 
     // find free space in text section
     if (freeSpaceAddr(pid, &freeAddr, &freeAddrSize)) {
@@ -215,12 +216,12 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
 
     // sanity check for size condition
     if (freeAddrSize < INJECTED_CODE_SIZE_LEN) {
-        fprintf(stderr, "Insufficient space in  0x%" PRIx64 " to inject, library could not be injected\n", freeAddr);
+        scope_fprintf(scope_stderr, "Insufficient space in  0x%" PRIx64 " to inject, library could not be injected\n", freeAddr);
         goto detach;
     }
     
     // back up the code
-    oldcode = (unsigned char *)malloc(INJECTED_CODE_SIZE_LEN);
+    oldcode = (unsigned char *)scope_malloc(INJECTED_CODE_SIZE_LEN);
     if (ptraceRead(pid, freeAddr, oldcode, INJECTED_CODE_SIZE_LEN)) {
         goto detach;
     }
@@ -247,25 +248,25 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     }
 
     my_iovec.iov_base = &regs;
-    if (ptrace(PTRACE_SETREGSET, pid, (void *)NT_PRSTATUS, &my_iovec) == -1) {
-        fprintf(stderr, "error: ptrace set register(), library could not be injected\n");
+    if (scope_ptrace(PTRACE_SETREGSET, pid, (void *)NT_PRSTATUS, &my_iovec) == -1) {
+        scope_fprintf(scope_stderr, "error: ptrace set register(), library could not be injected\n");
         goto restore_app;
     }
 
     // continue execution and wait until the target process is stopped
-    if (ptrace(PTRACE_CONT, pid, NULL, NULL) == -1) {
-        fprintf(stderr, "error: ptrace continue(), library could not be injected\n");
+    if (scope_ptrace(PTRACE_CONT, pid, NULL, NULL) == -1) {
+        scope_fprintf(scope_stderr, "error: ptrace continue(), library could not be injected\n");
         goto restore_app;
     }
-    waitpid(pid, &status, WUNTRACED);
+    scope_waitpid(pid, &status, WUNTRACED);
 
     // if process has been stopped by SIGSTOP send SIGCONT signal along with PTRACE_CONT call
     if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP) {
-        if (ptrace(PTRACE_CONT, pid, SIGCONT, NULL) == -1) {
-            fprintf(stderr, "error: ptrace continue(), library could not be injected\n");
+        if (scope_ptrace(PTRACE_CONT, pid, (void*)SIGCONT, NULL) == -1) {
+            scope_fprintf(scope_stderr, "error: ptrace continue(), library could not be injected\n");
             goto restore_app;
         }
-        waitpid(pid, &status, WUNTRACED);
+        scope_waitpid(pid, &status, WUNTRACED);
     }
 
     // make sure the target process was stoppend by SIGTRAP triggered by DBG_TRAP
@@ -273,42 +274,42 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
 
         my_iovec.iov_base = &regs;
         // check if the library has been successfully injected
-        if (ptrace(PTRACE_GETREGSET, pid, (void*)NT_PRSTATUS, &my_iovec) == -1) {
-            fprintf(stderr, "error: ptrace get register(), library could not be injected\n");
+        if (scope_ptrace(PTRACE_GETREGSET, pid, (void*)NT_PRSTATUS, &my_iovec) == -1) {
+            scope_fprintf(scope_stderr, "error: ptrace get register(), library could not be injected\n");
             goto restore_app;
         }
         if (RET_REG != 0x0) {
             ret = EXIT_SUCCESS;
             //printf("Appscope library injected at %p\n", (void*)RET_REG);
         } else {
-            fprintf(stderr, "error: dlopen() failed, library could not be injected\n");
+            scope_fprintf(scope_stderr, "error: dlopen() failed, library could not be injected\n");
         }
 
     } else {
-        fprintf(stderr, "error: target process stopped with signal %d\n", WSTOPSIG(status));
+        scope_fprintf(scope_stderr, "error: target process stopped with signal %d\n", WSTOPSIG(status));
     }
 restore_app:
     //restore the app's state
     ptraceWrite(pid, freeAddr, oldcode, INJECTED_CODE_SIZE_LEN);
     my_iovec.iov_base = &oldregs;
-    if (ptrace(PTRACE_SETREGSET, pid, (void *)NT_PRSTATUS, &my_iovec) == -1) {
-        fprintf(stderr, "error: ptrace set register(), error during restore the application state\n");
+    if (scope_ptrace(PTRACE_SETREGSET, pid, (void *)NT_PRSTATUS, &my_iovec) == -1) {
+        scope_fprintf(scope_stderr, "error: ptrace set register(), error during restore the application state\n");
     }
 detach:
-    ptrace(PTRACE_DETACH, pid, NULL, NULL);
+    scope_ptrace(PTRACE_DETACH, pid, NULL, NULL);
 
 exit:
-    free(oldcode);
+    scope_free(oldcode);
     return ret;
 }
 
 static int 
 findLib(struct dl_phdr_info *info, size_t size, void *data)
 {
-    if (strstr(info->dlpi_name, "libc.so") != NULL ||
-        strstr(info->dlpi_name, "ld-musl") != NULL) {
+    if (scope_strstr(info->dlpi_name, "libc.so") != NULL ||
+        scope_strstr(info->dlpi_name, "ld-musl") != NULL) {
         char libpath[PATH_MAX];
-        if (realpath(info->dlpi_name, libpath)) {
+        if (scope_realpath(info->dlpi_name, libpath)) {
             ((libdl_info_t *)data)->path = libpath;
             ((libdl_info_t *)data)->addr = info->dlpi_addr;
             return 1;
@@ -326,7 +327,7 @@ injectScope(int pid, char* path)
     int glibc = TRUE;
 
     if (!dl_iterate_phdr(findLib, &info)) {
-        fprintf(stderr, "error: failed to find local libc\n");
+        scope_fprintf(scope_stderr, "error: failed to find local libc\n");
         return EXIT_FAILURE;
     }
 
@@ -338,14 +339,14 @@ injectScope(int pid, char* path)
     }
 
     if (dlopenAddr == NULL) {
-        fprintf(stderr, "error: failed to find dlopen()\n");
+        scope_fprintf(scope_stderr, "error: failed to find dlopen()\n");
         return EXIT_FAILURE;
     }
 
     // find the base address of libc in the target process
     remoteLib = findLibrary(info.path, pid);
     if (!remoteLib) {
-        fprintf(stderr, "error: failed to find libc in target process\n");
+        scope_fprintf(scope_stderr, "error: failed to find libc in target process\n");
         return EXIT_FAILURE;
     }
 

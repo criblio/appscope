@@ -4,6 +4,7 @@
 #include "ctl.h"
 #include "dbg.h"
 #include "test.h"
+#include "scopestdlib.h"
 #include "runtimecfg.h"
 
 static void

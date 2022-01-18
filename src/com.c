@@ -5,6 +5,7 @@
 #include "dbg.h"
 #include "os.h"
 #include "utils.h"
+#include "scopestdlib.h"
 
 bool g_need_stack_expand = FALSE;
 unsigned g_sendprocessstart = 0;
@@ -23,11 +24,11 @@ msgAddNewLine(char *msg)
 {
     if (!msg) return NULL;
 
-    int strsize = strlen(msg);
-    char *temp = realloc(msg, strsize + 2); // room for "\n\0"
+    int strsize = scope_strlen(msg);
+    char *temp = scope_realloc(msg, strsize + 2); // room for "\n\0"
     if (!temp) {
         DBG(NULL);
-        free(msg);
+        scope_free(msg);
         return NULL;
     }
 
@@ -66,7 +67,7 @@ sendProcessStartMetric()
     };
     event_t evt = INT_EVENT("proc.start", 1, DELTA, fields);
     cmdSendMetric(g_mtc, &evt);
-    if (urlEncodedCmd) free(urlEncodedCmd);
+    if (urlEncodedCmd) scope_free(urlEncodedCmd);
 }
 
 /*
@@ -252,7 +253,7 @@ msgLogConfig(config_t *cfg)
 
     if (cfg_text) {
         scopeLogInfo("%s", cfg_text);
-        free(cfg_text);
+        scope_free(cfg_text);
     }
 
     cJSON_Delete(json);
@@ -319,8 +320,8 @@ pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
 #ifdef __GO__
     int rc, arc;
     char *pcre_stack, *tstack, *gstack;
-    if ((pcre_stack = malloc(PCRE_STACK_SIZE)) == NULL) {
-        scopeLogError("ERROR; pcre2_match_wrapper: malloc");
+    if ((pcre_stack = scope_malloc(PCRE_STACK_SIZE)) == NULL) {
+        scopeLogError("ERROR; pcre2_match_wrapper: scope_malloc");
         return -1;
     }
 
@@ -345,7 +346,7 @@ pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
         :                                 // clobbered register
         );
 
-    if (pcre_stack) free(pcre_stack);
+    if (pcre_stack) scope_free(pcre_stack);
     return rc;
 #else
     return pcre2_match(re, data, size, startoffset, options, match_data, mcontext);
@@ -365,8 +366,8 @@ regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
     int rc, arc;
     char *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
 
-     if ((pcre_stack = malloc(PCRE_STACK_SIZE)) == NULL) {
-        scopeLogError("ERROR; regexec_wrapper: malloc");
+     if ((pcre_stack = scope_malloc(PCRE_STACK_SIZE)) == NULL) {
+        scopeLogError("ERROR; regexec_wrapper: scope_malloc");
         return -1;
     }
 
@@ -391,7 +392,7 @@ regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
         :                                 // clobbered register
         );
 
-    if (pcre_stack) free(pcre_stack);
+    if (pcre_stack) scope_free(pcre_stack);
     return rc;
 #else
     return regexec(preg, string, nmatch, pmatch, eflags);

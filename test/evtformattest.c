@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include "dbg.h"
 #include "evtformat.h"
-
+#include "scopestdlib.h"
 #include "test.h"
 
 static void
@@ -52,7 +52,7 @@ evtFormatMetricHappyPath(void** state)
     char *timestr = cJSON_Print(time);
 
     char* expected = NULL;
-    asprintf(&expected, "{\"sourcetype\":\"metric\","
+    scope_asprintf(&expected, "{\"sourcetype\":\"metric\","
                            "\"_time\":%s,"
                            "\"source\":\"A\","
                            "\"host\":\"host\","
@@ -66,9 +66,9 @@ evtFormatMetricHappyPath(void** state)
     assert_non_null(actual);
     assert_string_equal(expected, actual);
     cJSON_Delete(json);
-    free(actual);
-    free(expected);
-    free(timestr);
+    scope_free(actual);
+    scope_free(expected);
+    scope_free(timestr);
 
     evtFormatDestroy(&evt);
 }
@@ -373,7 +373,7 @@ fmtEventJsonValue(void** state)
                               "\"cmd\":\"cmd\",\"pid\":1234,"
                               "\"data\":\"поспехаў\"}");
 
-    free(str);
+    scope_free(str);
     cJSON_Delete(json);
 }
 
@@ -418,7 +418,7 @@ fmtEventJsonWithCustomTags(void **state)
                               "\"this\":\"rocks\","
                               "\"data\":\"поспехаў\"}");
 
-    free(str);
+    scope_free(str);
     cJSON_Delete(json);
 
 }
@@ -458,7 +458,7 @@ fmtEventJsonWithEmbeddedNulls(void** state)
                               "\"pid\":1234,"
                               "\"data\":\"Unë mund\\u0000të ha qelq dhe nuk\\u0000më gjen gjë\"}");
 
-    free(str);
+    scope_free(str);
     cJSON_Delete(json);
 
     // test that null data omits a data field.
@@ -474,7 +474,7 @@ fmtEventJsonWithEmbeddedNulls(void** state)
                               "\"proc\":\"\","
                               "\"cmd\":\"\","
                               "\"pid\":1234}");
-    free(str);
+    scope_free(str);
     cJSON_Delete(json);
 }
 
@@ -516,7 +516,7 @@ fmtMetricJsonWFields(void** state)
                  "\"_metric_type\":\"histogram\","
                  "\"_value\":2,"
                  "\"A\":\"Z\",\"B\":987,\"C\":\"Y\",\"D\":654}");
-    if (str) free(str);
+    if (str) scope_free(str);
     cJSON_Delete(json);
 }
 
@@ -557,7 +557,7 @@ fmtMetricJsonWDuplicateFields(void **state)
                  "\"_metric_type\":\"histogram\","
                  "\"_value\":2,"
                  "\"A\":\"Z\",\"B\":987,\"C\":\"YYY\",\"D\":\"Y\"}");
-    if (str) free(str);
+    if (str) scope_free(str);
     cJSON_Delete(json);
 }
 
@@ -583,7 +583,7 @@ fmtMetricJsonWFilteredFields(void** state)
                  "\"_metric_type\":\"histogram\","
                  "\"_value\":2,"
                  "\"A\":\"Z\",\"D\":654}");
-    if (str) free(str);
+    if (str) scope_free(str);
     regfree(&re);
     cJSON_Delete(json);
 }
@@ -601,7 +601,7 @@ fmtMetricJsonEscapedValues(void** state)
                  "{\"_metric\":\"Paç \\\"fat!\","
                  "\"_metric_type\":\"set\","
                  "\"_value\":3}");
-        free(str);
+        scope_free(str);
         cJSON_Delete(json);
     }
 
@@ -622,7 +622,7 @@ fmtMetricJsonEscapedValues(void** state)
                  "\"_value\":4,"
                  "\"A\":\"행운을\\t빕니다\","
                  "\"Viel\\\\ Glück\":123}");
-        free(str);
+        scope_free(str);
         cJSON_Delete(json);
     }
 }

@@ -5,6 +5,7 @@
 #include "libdir.h"
 
 #define _XOPEN_SOURCE 500 // for FTW
+#define _GNU_SOURCE
 
 #include <elf.h>
 #include <errno.h>
@@ -19,6 +20,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "scopestdlib.h"
 #include "scopetypes.h" // for ROUND_UP()
 
 #ifndef SCOPE_VER
@@ -76,9 +78,9 @@ static int
 libdirExists(const char *path, int requireDir, int mode)
 {
     struct stat s;
-    if (stat(path, &s)) {
-        if (errno != ENOENT) {
-            perror("stat() failed");
+    if (scope_stat(path, &s)) {
+        if (scope_errno != ENOENT) {
+            scope_perror("stat() failed");
         }
         return 0;
     }
@@ -90,7 +92,7 @@ libdirExists(const char *path, int requireDir, int mode)
         return 0; // FALSE
     }
 
-    return !access(path, mode);
+    return !scope_access(path, mode);
 }
 
 static int
@@ -111,8 +113,8 @@ libdirCreateIfMissing()
     const char *libdir = libdirGet();
 
     if (!libdirDirExists(libdir, R_OK|X_OK)) {
-        if (mkdir(libdir, S_IRWXU|S_IRWXG|S_IRWXO) == -1) {
-            perror("mkdir() failed");
+        if (scope_mkdir(libdir, S_IRWXU|S_IRWXG|S_IRWXO) == -1) {
+            scope_perror("mkdir() failed");
             return -1;
         }
     }
@@ -137,7 +139,7 @@ libdirGetNote(void* buf)
             if (note->nhdr.n_type == NT_GNU_BUILD_ID &&
                 note->nhdr.n_descsz != 0 &&
                 note->nhdr.n_namesz == 4 &&
-                memcmp(note->name, "GNU", 4) == 0) {
+                scope_memcmp(note->name, "GNU", 4) == 0) {
                 return note;
             }
 
@@ -186,39 +188,39 @@ libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t
         }
 
         // open & mmap the file to get its note
-        int fd = open(path, O_RDONLY);
+        int fd = scope_open(path, O_RDONLY);
         if (fd == -1) {
-            perror("open() failed");
+            scope_perror("open() failed");
             return 0;
         }
 
         struct stat s;
-        if (fstat(fd, &s) == -1) {
-            close(fd);
-            perror("mmap() failed");
+        if (scope_fstat(fd, &s) == -1) {
+            scope_close(fd);
+            scope_perror("fstat failed");
             return 0;
         }
 
-        void* buf = mmap(NULL, ROUND_UP(s.st_size, sysconf(_SC_PAGESIZE)),
+        void* buf = scope_mmap(NULL, ROUND_UP(s.st_size, scope_sysconf(_SC_PAGESIZE)),
                 PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
         if (buf == MAP_FAILED) {
-            close(fd);
-            perror("mmap() failed");
+            scope_close(fd);
+            scope_perror("scope_mmap() failed");
             return 0;
         }
 
-        close(fd);
+        scope_close(fd);
 
         // compare the notes
         int cmp = -1;
         note_t* pathNote = libdirGetNote(buf);
         if (pathNote) {
             if (note->nhdr.n_descsz == pathNote->nhdr.n_descsz) {
-                cmp = memcmp(note->build_id, pathNote->build_id, note->nhdr.n_descsz);
+                cmp = scope_memcmp(note->build_id, pathNote->build_id, note->nhdr.n_descsz);
             }
         }
 
-        munmap(buf, s.st_size);
+        scope_munmap(buf, s.st_size);
 
         if (cmp == 0) {
             // notes match, don't re-extract
@@ -226,42 +228,42 @@ libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t
         }
     }
 
-    int tempLen = snprintf(temp, PATH_MAX, "%s.XXXXXX", path);
+    int tempLen = scope_snprintf(temp, PATH_MAX, "%s.XXXXXX", path);
     if (tempLen < 0) {
-        fprintf(stderr, "error: snprintf(0 failed.\n");
+        scope_fprintf(scope_stderr, "error: snprintf(0 failed.\n");
         return -1;
     }
     if (tempLen >= PATH_MAX) {
-        fprintf(stderr, "error: extract temp too long.\n");
+        scope_fprintf(scope_stderr, "error: extract temp too long.\n");
         return -1;
     }
 
-    if ((fd = mkstemp(temp)) < 1) {
-        unlink(temp);
-        perror("mkstemp() failed");
+    if ((fd = scope_mkstemp(temp)) < 1) {
+        scope_unlink(temp);
+        scope_perror("mkstemp() failed");
         return -1;
     }
 
     size_t len = end - start;
-    if (write(fd, start, len) != len) {
-        close(fd);
-        unlink(temp);
-        perror("write() failed");
+    if (scope_write(fd, start, len) != len) {
+        scope_close(fd);
+        scope_unlink(temp);
+        scope_perror("write() failed");
         return -1;
     }
 
     // 0755
-    if (fchmod(fd, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)) {
-        close(fd);
-        unlink(temp);
-        perror("fchmod() failed");
+    if (scope_fchmod(fd, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)) {
+        scope_close(fd);
+        scope_unlink(temp);
+        scope_perror("fchmod() failed");
         return -1;
     }
-    close(fd);
+    scope_close(fd);
 
-    if (rename(temp, path)) {
-        unlink(temp);
-        perror("rename() failed");
+    if (scope_rename(temp, path)) {
+        scope_unlink(temp);
+        scope_perror("rename() failed");
         return -1;
     }
 
@@ -271,8 +273,8 @@ libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t
 static int
 libdirRemove(const char* name, const struct stat *s, int type, struct FTW *ftw)
 {
-    if (remove(name)) {
-        perror("remove() failed");
+    if (scope_remove(name)) {
+        scope_perror("remove() failed");
         return -1;
     }
     return 0;
@@ -290,11 +292,11 @@ libdirSetBase(const char *base)
     g_libdir_info.path[0] = 0;
 
     if (base) {
-        if (strlen(base) >= PATH_MAX) {
-            fprintf(stderr, "error: libdir base path too long.\n");
+        if (scope_strlen(base) >= PATH_MAX) {
+            scope_fprintf(scope_stderr, "error: libdir base path too long.\n");
             return -1;
         }
-        strncpy(g_libdir_info.base, base, sizeof(g_libdir_info.base));
+        scope_strncpy(g_libdir_info.base, base, sizeof(g_libdir_info.base));
     }
 
     return 0;
@@ -320,19 +322,19 @@ libdirGetDir()
             ++ver;
         }
 
-        if ((dash = strchr(ver, '-'))) {
+        if ((dash = scope_strchr(ver, '-'))) {
             verlen = dash - ver;
         } else {
-            verlen = strlen(ver);
+            verlen = scope_strlen(ver);
         }
 
-        if (verlen > PATH_MAX - strlen(SCOPE_LIBDIR_PREFIX) - 1) { // -1 for \0
-            fprintf(stderr, "error: libdir too long\n");
+        if (verlen > PATH_MAX - scope_strlen(SCOPE_LIBDIR_PREFIX) - 1) { // -1 for \0
+            scope_fprintf(scope_stderr, "error: libdir too long\n");
             return 0;
         }
 
-        strncpy(g_libdir_info.dir, SCOPE_LIBDIR_PREFIX, sizeof(g_libdir_info.dir));
-        strncat(g_libdir_info.dir, ver, verlen);
+        scope_strncpy(g_libdir_info.dir, SCOPE_LIBDIR_PREFIX, sizeof(g_libdir_info.dir));
+        scope_strncat(g_libdir_info.dir, ver, verlen);
     }
 
     return g_libdir_info.dir;
@@ -342,13 +344,13 @@ const char*
 libdirGet()
 {
     if (!g_libdir_info.path[0]) {
-        int pathLen = snprintf(g_libdir_info.path, PATH_MAX, "%s/%s", libdirGetBase(), libdirGetDir());
+        int pathLen = scope_snprintf(g_libdir_info.path, PATH_MAX, "%s/%s", libdirGetBase(), libdirGetDir());
         if (pathLen < 0) {
-            fprintf(stderr, "error: snprintf() failed.\n");
+            scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
             return 0;
         }
         if (pathLen >= PATH_MAX) {
-            fprintf(stderr, "error: libdir path too long.\n");
+            scope_fprintf(scope_stderr, "error: libdir path too long.\n");
             return 0;
         }
     }
@@ -360,7 +362,7 @@ int
 libdirClean()
 {
     if (nftw(libdirGet(), libdirRemove, 10, FTW_DEPTH|FTW_MOUNT|FTW_PHYS)) {
-        perror("ntfw() failed");
+        scope_perror("ntfw() failed");
         return -1;
     }
 
@@ -391,13 +393,13 @@ libdirGetLoader()
     static char path[PATH_MAX];
 
     if (!path[0]) {
-        int pathLen = snprintf(path, PATH_MAX, "%s/" SCOPE_LDSCOPEDYN, libdirGet());
+        int pathLen = scope_snprintf(path, PATH_MAX, "%s/" SCOPE_LDSCOPEDYN, libdirGet());
         if (pathLen < 0) {
-            fprintf(stderr, "error: snprintf() failed.\n");
+            scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
             return 0;
         }
         if (pathLen >= PATH_MAX) {
-            fprintf(stderr, "error: loader path too long.\n");
+            scope_fprintf(scope_stderr, "error: loader path too long.\n");
             return 0;
         }
     }
@@ -411,13 +413,13 @@ libdirGetLibrary()
     static char path[PATH_MAX];
 
     if (!path[0]) {
-        int pathLen = snprintf(path, PATH_MAX, "%s/" SCOPE_LIBSCOPE_SO, libdirGet());
+        int pathLen = scope_snprintf(path, PATH_MAX, "%s/" SCOPE_LIBSCOPE_SO, libdirGet());
         if (pathLen < 0) {
-            fprintf(stderr, "error: snprintf() failed.\n");
+            scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
             return 0;
         }
         if (pathLen >= PATH_MAX) {
-            fprintf(stderr, "error: loader path too long.\n");
+            scope_fprintf(scope_stderr, "error: loader path too long.\n");
             return 0;
         }
     }

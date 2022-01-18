@@ -3,7 +3,7 @@
 #include "yaml_private.h"
 
 #ifdef SCOPE_VER
-#include "../../../src/fn.h"
+#include "../../../src/scopestdlib.h"
 #endif
 
 /*
@@ -289,11 +289,7 @@ yaml_file_read_handler(void *data, unsigned char *buffer, size_t size,
 {
     yaml_parser_t *parser = (yaml_parser_t *)data;
 #ifdef SCOPE_VER
-    if (g_fn.fread) {
-        *size_read = g_fn.fread(buffer, 1, size, parser->input.file);
-    } else {
-        *size_read = fread(buffer, 1, size, parser->input.file);
-    }
+    *size_read = scope_fread(buffer, 1, size, parser->input.file);
 #else
     *size_read = fread(buffer, 1, size, parser->input.file);
 #endif
@@ -474,9 +470,7 @@ yaml_file_write_handler(void *data, unsigned char *buffer, size_t size)
 {
     yaml_emitter_t *emitter = (yaml_emitter_t *)data;
 #ifdef SCOPE_VER
-    if (g_fn.fwrite) {
-        return (g_fn.fwrite(buffer, 1, size, emitter->output.file) == size);
-    }
+    return (scope_fwrite(buffer, 1, size, emitter->output.file) == size);
 #endif
     return (fwrite(buffer, 1, size, emitter->output.file) == size);
 }

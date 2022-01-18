@@ -19,6 +19,7 @@
 #include "utils.h"
 #include "fn.h"
 #include "state.h"
+#include "scopestdlib.h"
 
 #ifndef NO_YAML
 #include "yaml.h"
@@ -206,41 +207,40 @@ cfgPathSearch(const char* cfgname)
     //   7) ./scope.yml
 
     char path[1024]; // Somewhat arbitrary choice for MAX_PATH
-    if (!g_fn.access) return NULL;
 
     const char *homedir = getenv("HOME");
     const char *scope_home = getenv("SCOPE_HOME");
     if (scope_home &&
-       (snprintf(path, sizeof(path), "%s/conf/%s", scope_home, cfgname) > 0) &&
-        !g_fn.access(path, R_OK)) {
-        return realpath(path, NULL);
+       (scope_snprintf(path, sizeof(path), "%s/conf/%s", scope_home, cfgname) > 0) &&
+        !scope_access(path, R_OK)) {
+        return scope_realpath(path, NULL);
     }
     if (scope_home &&
-       (snprintf(path, sizeof(path), "%s/%s", scope_home, cfgname) > 0) &&
-        !g_fn.access(path, R_OK)) {
-        return realpath(path, NULL);
+       (scope_snprintf(path, sizeof(path), "%s/%s", scope_home, cfgname) > 0) &&
+        !scope_access(path, R_OK)) {
+        return scope_realpath(path, NULL);
     }
-    if ((snprintf(path, sizeof(path), "/etc/scope/%s", cfgname) > 0 ) &&
-        !g_fn.access(path, R_OK)) {
-        return realpath(path, NULL);
-    }
-    if (homedir &&
-       (snprintf(path, sizeof(path), "%s/conf/%s", homedir, cfgname) > 0) &&
-        !g_fn.access(path, R_OK)) {
-        return realpath(path, NULL);
+    if ((scope_snprintf(path, sizeof(path), "/etc/scope/%s", cfgname) > 0 ) &&
+        !scope_access(path, R_OK)) {
+        return scope_realpath(path, NULL);
     }
     if (homedir &&
-       (snprintf(path, sizeof(path), "%s/%s", homedir, cfgname) > 0) &&
-        !g_fn.access(path, R_OK)) {
-        return realpath(path, NULL);
+       (scope_snprintf(path, sizeof(path), "%s/conf/%s", homedir, cfgname) > 0) &&
+        !scope_access(path, R_OK)) {
+        return scope_realpath(path, NULL);
     }
-    if ((snprintf(path, sizeof(path), "./conf/%s", cfgname) > 0) &&
-        !g_fn.access(path, R_OK)) {
-        return realpath(path, NULL);
+    if (homedir &&
+       (scope_snprintf(path, sizeof(path), "%s/%s", homedir, cfgname) > 0) &&
+        !scope_access(path, R_OK)) {
+        return scope_realpath(path, NULL);
     }
-    if ((snprintf(path, sizeof(path), "./%s", cfgname) > 0) &&
-        !g_fn.access(path, R_OK)) {
-        return realpath(path, NULL);
+    if ((scope_snprintf(path, sizeof(path), "./conf/%s", cfgname) > 0) &&
+        !scope_access(path, R_OK)) {
+        return scope_realpath(path, NULL);
+    }
+    if ((scope_snprintf(path, sizeof(path), "./%s", cfgname) > 0) &&
+        !scope_access(path, R_OK)) {
+        return scope_realpath(path, NULL);
     }
 
     return NULL;
@@ -253,16 +253,16 @@ cfgPath(void)
 
     // If SCOPE_CONF_PATH is set, and the file can be opened, use it.
     char *path;
-    if (envPath && (path = strdup(envPath))) {
+    if (envPath && (path = scope_strdup(envPath))) {
 
-        FILE *fp = NULL;
-        if (g_fn.fopen && g_fn.fclose && (fp = g_fn.fopen(path, "rb"))) {
-            g_fn.fclose(fp);
+        FILE *fp = scope_fopen(path, "rb");
+        if (fp) {
+            scope_fclose(fp);
             return path;
         }
 
         // Couldn't open the file
-        free(path);
+        scope_free(path);
     }
 
     // Otherwise, search for scope.yml
@@ -273,12 +273,12 @@ static void
 processCustomTag(config_t* cfg, const char* e, const char* value)
 {
     char name_buf[1024];
-    strncpy(name_buf, e, sizeof(name_buf));
+    scope_strncpy(name_buf, e, sizeof(name_buf));
 
     char* name = name_buf + (sizeof("SCOPE_TAG_") - 1);
 
     // convert the "=" to a null delimiter for the name
-    char* end = strchr(name, '=');
+    char* end = scope_strchr(name, '=');
     if (end) {
         *end = '\0';
         cfgCustomTagAddFromStr(cfg, name, value);
@@ -291,7 +291,7 @@ envRegex()
 {
     if (g_regex) return g_regex;
 
-    if (!(g_regex = calloc(1, sizeof(regex_t)))) {
+    if (!(g_regex = scope_calloc(1, sizeof(regex_t)))) {
         DBG(NULL);
         return g_regex;
     }
@@ -299,7 +299,7 @@ envRegex()
     if (regcomp(g_regex, "\\$[a-zA-Z0-9_]+", REG_EXTENDED)) {
         // regcomp failed.
         DBG(NULL);
-        free(g_regex);
+        scope_free(g_regex);
         g_regex = NULL;
     }
     return g_regex;
@@ -312,7 +312,7 @@ envRegexFree(void** state)
 {
     if (!g_regex) return;
     regfree(g_regex);
-    free(g_regex);
+    scope_free(g_regex);
 }
 
 static char*
@@ -323,8 +323,8 @@ doEnvVariableSubstitution(const char* value)
     regex_t* re = envRegex();
     regmatch_t match = {0};
 
-    int out_size = strlen(value) + 1;
-    char* outval = calloc(1, out_size);
+    int out_size = scope_strlen(value) + 1;
+    char* outval = scope_calloc(1, out_size);
     if (!outval) {
         DBG("%s", value);
         return NULL;
@@ -343,9 +343,9 @@ doEnvVariableSubstitution(const char* value)
 
         if (escaped) {
             // copy the part before the match, except the escape char '\'
-            outptr = stpncpy(outptr, inptr, match.rm_so - 1);
+            outptr = scope_stpncpy(outptr, inptr, match.rm_so - 1);
             // copy the matching env variable name
-            outptr = stpncpy(outptr, &inptr[match.rm_so], match_size);
+            outptr = scope_stpncpy(outptr, &inptr[match.rm_so], match_size);
             // move to the next part of the input value
             inptr = &inptr[match.rm_eo];
             continue;
@@ -353,35 +353,35 @@ doEnvVariableSubstitution(const char* value)
 
         // lookup the part that matched to see if we can substitute it
         char env_name[match_size + 1];
-        strncpy(env_name, &inptr[match.rm_so], match_size);
+        scope_strncpy(env_name, &inptr[match.rm_so], match_size);
         env_name[match_size] = '\0';
         char* env_value = getenv(&env_name[1]); // offset of 1 skips the $
 
         // Grow outval buffer any time env_value is bigger than env_name
-        int size_growth = (!env_value) ? 0 : strlen(env_value) - match_size;
+        int size_growth = (!env_value) ? 0 : scope_strlen(env_value) - match_size;
         if (size_growth > 0) {
-            char* new_outval = realloc (outval, out_size + size_growth);
+            char* new_outval = scope_realloc(outval, out_size + size_growth);
             if (new_outval) {
                 out_size += size_growth;
                 outptr = new_outval + (outptr - outval);
                 outval = new_outval;
             } else {
                 DBG("%s", value);
-                free(outval);
+                scope_free(outval);
                 return NULL;
             }
         }
 
         // copy the part before the match
-        outptr = stpncpy(outptr, inptr, match.rm_so);
+        outptr = scope_stpncpy(outptr, inptr, match.rm_so);
         // either copy in the env value or the variable that wasn't found
-        outptr = stpcpy(outptr, (env_value) ? env_value : env_name);
+        outptr = scope_stpcpy(outptr, (env_value) ? env_value : env_name);
         // move to the next part of the input value
         inptr = &inptr[match.rm_eo];
     }
 
     // copy whatever is left
-    strcpy(outptr, inptr);
+    scope_strcpy(outptr, inptr);
 
     return outval;
 }
@@ -389,13 +389,12 @@ doEnvVariableSubstitution(const char* value)
 static void
 processCmdDebug(const char* path)
 {
-    if (!path || !path[0] ||
-        !g_fn.fopen || !g_fn.fclose) return;
+    if (!path || !path[0]) return;
 
     FILE* f;
-    if (!(f = g_fn.fopen(path, "a"))) return;
+    if (!(f = scope_fopen(path, "a"))) return;
     dbgDumpAll(f);
-    g_fn.fclose(f);
+    scope_fclose(f);
 }
 
 static void
@@ -407,7 +406,7 @@ processReloadConfig(config_t *cfg, const char* value)
     if (enable == TRUE) {
         char *path = cfgPath();
         cfgSetFromFile(cfg, path);
-        if (path) free(path);
+        if (path) scope_free(path);
     } else {
         cfgSetFromFile(cfg, value);
     }
@@ -434,161 +433,161 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
     char *env_name = NULL;
     char *value = NULL;
     char *env_ptr;
-    env_name = strdup(env_line);
+    env_name = scope_strdup(env_line);
     if (!env_name) goto cleanup;
-    if (!(env_ptr = strchr(env_name, '='))) goto cleanup;
+    if (!(env_ptr = scope_strchr(env_name, '='))) goto cleanup;
     *env_ptr = '\0'; // Delimiting env_name
     if (!(value = doEnvVariableSubstitution(&env_ptr[1]))) goto cleanup;
 
-    if (!strcmp(env_name, "SCOPE_METRIC_ENABLE")) {
+    if (!scope_strcmp(env_name, "SCOPE_METRIC_ENABLE")) {
         cfgMtcEnableSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_METRIC_FORMAT")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_FORMAT")) {
         cfgMtcFormatSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_STATSD_PREFIX")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_STATSD_PREFIX")) {
         cfgMtcStatsDPrefixSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_STATSD_MAXLEN")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_STATSD_MAXLEN")) {
         cfgMtcStatsDMaxLenSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_SUMMARY_PERIOD")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_SUMMARY_PERIOD")) {
         cfgMtcPeriodSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_METRIC_STATSD")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_STATSD")) {
         cfgMtcStatsdEnableSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_CMD_DIR")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_CMD_DIR")) {
         cfgCmdDirSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_CONFIG_EVENT")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_CONFIG_EVENT")) {
         cfgConfigEventSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_METRIC_VERBOSITY")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_VERBOSITY")) {
         cfgMtcVerbositySetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_LOG_LEVEL")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_LOG_LEVEL")) {
         cfgLogLevelSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_METRIC_DEST")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_MTC, value);
-    } else if (!strcmp(env_name, "SCOPE_METRIC_TLS_ENABLE")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_TLS_ENABLE")) {
         cfgTransportTlsEnableSetFromStr(cfg, CFG_MTC, value);
-    } else if (!strcmp(env_name, "SCOPE_METRIC_TLS_VALIDATE_SERVER")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_TLS_VALIDATE_SERVER")) {
         cfgTransportTlsValidateServerSetFromStr(cfg, CFG_MTC, value);
-    } else if (!strcmp(env_name, "SCOPE_METRIC_TLS_CA_CERT_PATH")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_TLS_CA_CERT_PATH")) {
         cfgTransportTlsCACertPathSetFromStr(cfg, CFG_MTC, value);
-    } else if (!strcmp(env_name, "SCOPE_LOG_DEST")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_LOG_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_LOG, value);
-    } else if (!strcmp(env_name, "SCOPE_LOG_TLS_ENABLE")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_LOG_TLS_ENABLE")) {
         cfgTransportTlsEnableSetFromStr(cfg, CFG_LOG, value);
-    } else if (!strcmp(env_name, "SCOPE_LOG_TLS_VALIDATE_SERVER")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_LOG_TLS_VALIDATE_SERVER")) {
         cfgTransportTlsValidateServerSetFromStr(cfg, CFG_LOG, value);
-    } else if (!strcmp(env_name, "SCOPE_LOG_TLS_CA_CERT_PATH")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_LOG_TLS_CA_CERT_PATH")) {
         cfgTransportTlsCACertPathSetFromStr(cfg, CFG_LOG, value);
-    } else if (!strcmp(env_name, "SCOPE_PAYLOAD_ENABLE")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_PAYLOAD_ENABLE")) {
         cfgPayEnableSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_PAYLOAD_DIR")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_PAYLOAD_DIR")) {
         cfgPayDirSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_CMD_DBG_PATH")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_CMD_DBG_PATH")) {
         processCmdDebug(value);
-    } else if (!strcmp(env_name, "SCOPE_CONF_RELOAD")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_CONF_RELOAD")) {
         processReloadConfig(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_DEST")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_CTL, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_TLS_ENABLE")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_TLS_ENABLE")) {
         cfgTransportTlsEnableSetFromStr(cfg, CFG_CTL, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_TLS_VALIDATE_SERVER")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_TLS_VALIDATE_SERVER")) {
         cfgTransportTlsValidateServerSetFromStr(cfg, CFG_CTL, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_TLS_CA_CERT_PATH")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_TLS_CA_CERT_PATH")) {
         cfgTransportTlsCACertPathSetFromStr(cfg, CFG_CTL, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_ENABLE")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_ENABLE")) {
         cfgEvtEnableSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_FORMAT")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_FORMAT")) {
         cfgEventFormatSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_MAXEPS")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_MAXEPS")) {
         cfgEvtRateLimitSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_ENHANCE_FS")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_ENHANCE_FS")) {
         cfgEnhanceFsSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_LOGFILE_NAME")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_LOGFILE_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_FILE, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_CONSOLE_NAME")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_CONSOLE_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_CONSOLE, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_SYSLOG_NAME")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_SYSLOG_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_METRIC_NAME")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_METRIC_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_HTTP_NAME")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_HTTP_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_HTTP_HEADER")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_HTTP_HEADER")) {
         cfgEvtFormatHeaderSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_NET_NAME")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_NET_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_NET, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_FS_NAME")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_FS_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_FS, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_DNS_NAME")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_DNS_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_DNS, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_LOGFILE_FIELD")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_LOGFILE_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_FILE, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_CONSOLE_FIELD")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_CONSOLE_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_CONSOLE, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_SYSLOG_FIELD")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_SYSLOG_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_METRIC_FIELD")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_METRIC_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_HTTP_FIELD")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_HTTP_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_NET_FIELD")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_NET_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_NET, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_FS_FIELD")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_FS_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_FS, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_DNS_FIELD")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_DNS_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_DNS, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_LOGFILE_VALUE")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_LOGFILE_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_FILE, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_CONSOLE_VALUE")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_CONSOLE_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_CONSOLE, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_SYSLOG_VALUE")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_SYSLOG_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_SYSLOG, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_METRIC_VALUE")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_METRIC_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_METRIC, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_HTTP_VALUE")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_HTTP_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_HTTP, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_NET_VALUE")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_NET_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_NET, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_FS_VALUE")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_FS_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_FS, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_DNS_VALUE")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_DNS_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_DNS, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_LOGFILE")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_LOGFILE")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FILE, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_CONSOLE")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_CONSOLE")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_CONSOLE, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_SYSLOG")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_SYSLOG")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_SYSLOG, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_METRIC")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_METRIC")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_METRIC, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_HTTP")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_HTTP")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_HTTP, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_NET")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_NET")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_NET, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_FS")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_FS")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FS, value);
-    } else if (!strcmp(env_name, "SCOPE_EVENT_DNS")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_DNS")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_DNS, value);
-    } else if (!strcmp(env_name, "SCOPE_CRIBL_ENABLE")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_CRIBL_ENABLE")) {
         cfgCriblEnableSetFromStr(cfg, value);
-    } else if (!strcmp(env_name, "SCOPE_CRIBL_TLS_ENABLE")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_CRIBL_TLS_ENABLE")) {
         cfgTransportTlsEnableSetFromStr(cfg, CFG_LS, value);
-    } else if (!strcmp(env_name, "SCOPE_CRIBL_TLS_VALIDATE_SERVER")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_CRIBL_TLS_VALIDATE_SERVER")) {
         cfgTransportTlsValidateServerSetFromStr(cfg, CFG_LS, value);
-    } else if (!strcmp(env_name, "SCOPE_CRIBL_TLS_CA_CERT_PATH")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_CRIBL_TLS_CA_CERT_PATH")) {
         cfgTransportTlsCACertPathSetFromStr(cfg, CFG_LS, value);
-    } else if (!strcmp(env_name, "SCOPE_CRIBL_CLOUD")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_CRIBL_CLOUD")) {
         cfgLogStreamCloudSet(cfg, TRUE);
         cfgTransportSetFromStr(cfg, CFG_LS, value);
-    } else if (!strcmp(env_name, "SCOPE_CRIBL")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_CRIBL")) {
         cfgLogStreamCloudSet(cfg, FALSE);
         cfgTransportSetFromStr(cfg, CFG_LS, value);
-    } else if (!strcmp(env_name, "SCOPE_CRIBL_AUTHTOKEN")) {
+    } else if (!scope_strcmp(env_name, "SCOPE_CRIBL_AUTHTOKEN")) {
         cfgAuthTokenSetFromStr(cfg, value);
     } else if (startsWith(env_name, "SCOPE_TAG_")) {
         processCustomTag(cfg, env_line, value);
     }
 
 cleanup:
-    if (value) free(value);
-    if (env_name) free(env_name);
+    if (value) scope_free(value);
+    if (env_name) scope_free(env_name);
 }
 
 
@@ -618,18 +617,18 @@ cfgProcessEnvironment(config_t* cfg)
 void
 cfgProcessCommands(config_t* cfg, FILE* file)
 {
-    if (!cfg || !file || !g_fn.getline) return;
+    if (!cfg || !file) return;
 
     char *line = NULL;
     size_t len = 0;
 
-    while (g_fn.getline(&line, &len, file) != -1) {
-        line[strcspn(line, "\r\n")] = '\0'; //overwrite first \r or \n with null
+    while (scope_getline(&line, &len, file) != -1) {
+        line[scope_strcspn(line, "\r\n")] = '\0'; //overwrite first \r or \n with null
         processEnvStyleInput(cfg, line);
         line[0] = '\0';
     }
 
-    if (line) free(line);
+    if (line) scope_free(line);
 }
 
 void
@@ -658,10 +657,10 @@ void
 cfgMtcStatsDMaxLenSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
-    errno = 0;
+    scope_errno = 0;
     char* endptr = NULL;
-    unsigned long x = strtoul(value, &endptr, 10);
-    if (errno || *endptr) return;
+    unsigned long x = scope_strtoul(value, &endptr, 10);
+    if (scope_errno || *endptr) return;
 
     cfgMtcStatsDMaxLenSet(cfg, x);
 }
@@ -670,10 +669,10 @@ void
 cfgMtcPeriodSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
-    errno = 0;
+    scope_errno = 0;
     char* endptr = NULL;
-    unsigned long x = strtoul(value, &endptr, 10);
-    if (errno || *endptr) return;
+    unsigned long x = scope_strtoul(value, &endptr, 10);
+    if (scope_errno || *endptr) return;
 
     cfgMtcPeriodSet(cfg, x);
 }
@@ -719,10 +718,10 @@ void
 cfgEvtRateLimitSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
-    errno = 0;
+    scope_errno = 0;
     char* endptr = NULL;
-    unsigned long x = strtoul(value, &endptr, 10);
-    if (errno || *endptr) return;
+    unsigned long x = scope_strtoul(value, &endptr, 10);
+    if (scope_errno || *endptr) return;
 
     cfgEvtRateLimitSet(cfg, x);
 }
@@ -773,10 +772,10 @@ void
 cfgMtcVerbositySetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
-    errno = 0;
+    scope_errno = 0;
     char* endptr = NULL;
-    unsigned long x = strtoul(value, &endptr, 10);
-    if (errno || *endptr) return;
+    unsigned long x = scope_strtoul(value, &endptr, 10);
+    if (scope_errno || *endptr) return;
 
     cfgMtcVerbositySet(cfg, x);
 }
@@ -787,17 +786,17 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
     if (!cfg || !value) return;
 
     // see if value starts with udp://, tcp://, file://, unix:// or equals edge
-    if (value == strstr(value, "udp://")) {
+    if (value == scope_strstr(value, "udp://")) {
 
         // copied to avoid directly modifying the process's env variable
         char value_cpy[1024];
-        strncpy(value_cpy, value, sizeof(value_cpy));
+        scope_strncpy(value_cpy, value, sizeof(value_cpy));
 
         char *host = value_cpy + (sizeof("udp://") - 1);
 
         // convert the ':' to a null delimiter for the host
         // and move port past the null
-        char *port = strrchr(host, ':');
+        char *port = scope_strrchr(host, ':');
         if (!port) return;  // port is *required*
         *port = '\0';
         port++;
@@ -806,17 +805,17 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         cfgTransportHostSet(cfg, t, host);
         cfgTransportPortSet(cfg, t, port);
 
-    } else if (value == strstr(value, "tcp://")) {
+    } else if (value == scope_strstr(value, "tcp://")) {
 
         // copied to avoid directly modifying the process's env variable
         char value_cpy[1024];
-        strncpy(value_cpy, value, sizeof(value_cpy));
+        scope_strncpy(value_cpy, value, sizeof(value_cpy));
 
         char *host = value_cpy + (sizeof("tcp://") - 1);
 
         // convert the ':' to a null delimiter for the host
         // and move port past the null
-        char *port = strrchr(host, ':');
+        char *port = scope_strrchr(host, ':');
         if (!port) return;  // port is *required*
         *port = '\0';
         port++;
@@ -825,15 +824,15 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         cfgTransportHostSet(cfg, t, host);
         cfgTransportPortSet(cfg, t, port);
 
-    } else if (value == strstr(value, "file://")) {
+    } else if (value == scope_strstr(value, "file://")) {
         const char *path = value + (sizeof("file://") - 1);
         cfgTransportTypeSet(cfg, t, CFG_FILE);
         cfgTransportPathSet(cfg, t, path);
-    } else if (value == strstr(value, "unix://")) {
+    } else if (value == scope_strstr(value, "unix://")) {
         const char *path = value + (sizeof("unix://") - 1);
         cfgTransportTypeSet(cfg, t, CFG_UNIX);
         cfgTransportPathSet(cfg, t, path);
-    } else if (strncmp(value, "edge", sizeof("edge") - 1) == 0) {
+    } else if (scope_strncmp(value, "edge", sizeof("edge") - 1) == 0) {
         cfgTransportTypeSet(cfg, t, CFG_EDGE);
     }
 }
@@ -939,7 +938,7 @@ processKeyValuePair(parse_table_t* t, yaml_node_pair_t* pair, config_t* config, 
     int i;
     for (i=0; t[i].type != YAML_NO_NODE; i++) {
         if ((value->type == t[i].type) &&
-            (!strcmp((char*)key->data.scalar.value, t[i].key))) {
+            (!scope_strcmp((char*)key->data.scalar.value, t[i].key))) {
             t[i].fn(config, doc, value);
             break;
         }
@@ -951,7 +950,7 @@ processLevel(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
     cfgLogLevelSetFromStr(config, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -960,7 +959,7 @@ processTransportType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     char* value = stringVal(node);
     which_transport_t c = transport_context;
     cfgTransportTypeSet(config, c, strToVal(transportTypeMap, value));
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -969,7 +968,7 @@ processHost(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     char* value = stringVal(node);
     which_transport_t c = transport_context;
     cfgTransportHostSet(config, c, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -978,7 +977,7 @@ processPort(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     char* value = stringVal(node);
     which_transport_t c = transport_context;
     cfgTransportPortSet(config, c, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -987,7 +986,7 @@ processPath(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     char* value = stringVal(node);
     which_transport_t c = transport_context;
     cfgTransportPathSet(config, c, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -996,7 +995,7 @@ processBuf(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     char* value = stringVal(node);
     which_transport_t c = transport_context;
     cfgTransportBufSet(config, c, strToVal(bufferMap, value));
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1005,7 +1004,7 @@ processTlsEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
     char* value = stringVal(node);
     which_transport_t c = transport_context;
     cfgTransportTlsEnableSetFromStr(config, c, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1014,7 +1013,7 @@ processTlsValidate(config_t *config, yaml_document_t *doc, yaml_node_t *node)
     char* value = stringVal(node);
     which_transport_t c = transport_context;
     cfgTransportTlsValidateServerSetFromStr(config, c, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1023,7 +1022,7 @@ processTlsCaCert(config_t *config, yaml_document_t *doc, yaml_node_t *node)
     char* value = stringVal(node);
     which_transport_t c = transport_context;
     cfgTransportTlsCACertPathSetFromStr(config, c, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1119,8 +1118,8 @@ processTags(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         char* value_str = stringVal(value);
 
         cfgCustomTagAddFromStr(config, key_str, value_str);
-        if (key_str) free(key_str);
-        if (value_str) free(value_str);
+        if (key_str) scope_free(key_str);
+        if (value_str) scope_free(value_str);
     }
 }
 
@@ -1129,7 +1128,7 @@ processFormatTypeMetric(config_t* config, yaml_document_t* doc, yaml_node_t* nod
 {
     char* value = stringVal(node);
     cfgMtcFormatSetFromStr(config, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1137,7 +1136,7 @@ processFormatTypeEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node
 {
     char* value = stringVal(node);
     cfgEventFormatSetFromStr(config, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1145,7 +1144,7 @@ processFormatMaxEps(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
     cfgEvtRateLimitSetFromStr(config, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1153,7 +1152,7 @@ processEnhanceFs(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
     cfgEnhanceFsSetFromStr(config, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1161,7 +1160,7 @@ processStatsDPrefix(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
     cfgMtcStatsDPrefixSetFromStr(config, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1169,7 +1168,7 @@ processStatsDMaxLen(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
     cfgMtcStatsDMaxLenSetFromStr(config, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1177,7 +1176,7 @@ processVerbosity(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
     cfgMtcVerbositySetFromStr(config, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1185,7 +1184,7 @@ processMetricEnable(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
     cfgMtcEnableSetFromStr(config, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1213,10 +1212,10 @@ processMtcWatchType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_SCALAR_NODE) return;
 
     char* value = stringVal(node);
-    if (!strcmp(value, "statsd")) {
+    if (!scope_strcmp(value, "statsd")) {
         cfgMtcStatsdEnableSet(config, TRUE);
     }
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1260,7 +1259,7 @@ processSummaryPeriod(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
     cfgMtcPeriodSetFromStr(config, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1268,7 +1267,7 @@ processCommandDir(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
     cfgCmdDirSetFromStr(config, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1276,7 +1275,7 @@ processConfigEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
     cfgConfigEventSetFromStr(config, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1304,7 +1303,7 @@ processEvtEnable(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
     cfgEvtEnableSetFromStr(config, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1333,7 +1332,7 @@ processEvtWatchType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     char* value = stringVal(node);
     watch_context = strToVal(watchTypeMap, value);
     cfgEvtFormatSourceEnabledSet(config, watch_context, 1);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1343,7 +1342,7 @@ processEvtWatchName(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 
     char* value = stringVal(node);
     cfgEvtFormatNameFilterSetFromStr(config, watch_context, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1353,7 +1352,7 @@ processEvtWatchField(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 
     char* value = stringVal(node);
     cfgEvtFormatFieldFilterSetFromStr(config, watch_context, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1363,7 +1362,7 @@ processEvtWatchValue(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 
     char* value = stringVal(node);
     cfgEvtFormatValueFilterSetFromStr(config, watch_context, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1380,7 +1379,7 @@ processEvtWatchHeader(config_t *config, yaml_document_t *doc, yaml_node_t *node)
         yaml_node_t *node = yaml_document_get_node(doc, *item);
         char *value = stringVal(node);
         cfgEvtFormatHeaderSet(config, value);
-        if (value) free(value);
+        if (value) scope_free(value);
     }
 }
 
@@ -1389,7 +1388,7 @@ isWatchType(yaml_document_t* doc, yaml_node_pair_t* pair)
 {
     yaml_node_t* key = yaml_document_get_node(doc, pair->key);
     if (!key || (key->type != YAML_SCALAR_NODE)) return 0;
-    return !strcmp((char*)key->data.scalar.value, TYPE_NODE);
+    return !scope_strcmp((char*)key->data.scalar.value, TYPE_NODE);
 }
 
 static void
@@ -1491,7 +1490,7 @@ processPayloadEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     char* value = stringVal(node);
     cfgPayEnableSetFromStr(config, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1499,7 +1498,7 @@ processPayloadDir(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     char* value = stringVal(node);
     cfgPayDirSetFromStr(config, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1524,7 +1523,7 @@ processCriblEnable(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     char *value = stringVal(node);
     cfgCriblEnableSetFromStr(config, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1539,7 +1538,7 @@ processAuthToken(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     char* value = stringVal(node);
     cfgAuthTokenSetFromStr(config, value);
-    if (value) free(value);
+    if (value) scope_free(value);
 }
 
 static void
@@ -1564,7 +1563,7 @@ static void
 processProtocolName(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
-    if (protocol_context->protname) free(protocol_context->protname);
+    if (protocol_context->protname) scope_free(protocol_context->protname);
     protocol_context->protname = stringVal(node);
 }
 
@@ -1572,7 +1571,7 @@ static void
 processProtocolRegex(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
-    if (protocol_context->regex) free(protocol_context->regex);
+    if (protocol_context->regex) scope_free(protocol_context->regex);
     protocol_context->regex = stringVal(node);
 }
 
@@ -1583,7 +1582,7 @@ processProtocolBinary(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     char* sVal = stringVal(node);
     unsigned iVal = strToVal(boolMap, sVal);
     if (iVal <= 1) protocol_context->binary = iVal;
-    if (sVal) free(sVal);
+    if (sVal) scope_free(sVal);
 }
 
 static void
@@ -1592,10 +1591,10 @@ processProtocolLen(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_SCALAR_NODE || !protocol_context) return;
     char *sVal = stringVal(node);
     char *endInt = NULL;
-    errno = 0;
-    unsigned long iVal = strtoul(sVal, &endInt, 10);
-    if (!errno && !*endInt) protocol_context->len = iVal;
-    if (sVal) free(sVal);
+    scope_errno = 0;
+    unsigned long iVal = scope_strtoul(sVal, &endInt, 10);
+    if (!scope_errno && !*endInt) protocol_context->len = iVal;
+    if (sVal) scope_free(sVal);
 }
 
 static void
@@ -1605,7 +1604,7 @@ processProtocolDetect(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     char* sVal = stringVal(node);
     unsigned iVal = strToVal(boolMap, sVal);
     if (iVal <= 1) protocol_context->detect = iVal;
-    if (sVal) free(sVal);
+    if (sVal) scope_free(sVal);
 }
 
 static void
@@ -1615,7 +1614,7 @@ processProtocolPayload(config_t* config, yaml_document_t* doc, yaml_node_t* node
     char* sVal = stringVal(node);
     unsigned iVal = strToVal(boolMap, sVal);
     if (iVal <= 1) protocol_context->payload = iVal;
-    if (sVal) free(sVal);
+    if (sVal) scope_free(sVal);
 }
 
 static void
@@ -1634,7 +1633,7 @@ processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     }
 
     // protocol object to populate
-    protocol_context = calloc(1, sizeof(protocol_def_t));
+    protocol_context = scope_calloc(1, sizeof(protocol_def_t));
     if (!protocol_context) {
         DBG(NULL);
         return;
@@ -1682,7 +1681,7 @@ processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     // replace if name matches existing entry
     for (list_key_t key = 0; key <= g_prot_sequence; ++key) {
         protocol_def_t *found = lstFind(g_protlist, key);
-        if (found && !strcmp(protocol_context->protname, found->protname)) {
+        if (found && !scope_strcmp(protocol_context->protname, found->protname)) {
             protocol_context->type = key;
             if (!lstDelete(g_protlist, key)) {
                 DBG(NULL);
@@ -1730,15 +1729,15 @@ processCustomFilterProcname(config_t* config, yaml_document_t* doc, yaml_node_t*
     }
 
     char *valueStr = stringVal(node);
-    if (valueStr && !strcmp(valueStr, g_proc.procname)) {
+    if (valueStr && !scope_strcmp(valueStr, g_proc.procname)) {
         ++custom_match_count;
-        free(valueStr);
+        scope_free(valueStr);
         return;
     }
 
 
     custom_matched = FALSE;
-    if (valueStr) free(valueStr);
+    if (valueStr) scope_free(valueStr);
 }
 
 static void
@@ -1751,14 +1750,14 @@ processCustomFilterArg(config_t* config, yaml_document_t* doc, yaml_node_t* node
     }
 
     char *valueStr = stringVal(node);
-    if (valueStr && strstr(g_proc.cmd, valueStr)) {
+    if (valueStr && scope_strstr(g_proc.cmd, valueStr)) {
         ++custom_match_count;
-        free(valueStr);
+        scope_free(valueStr);
         return;
     }
 
     custom_matched = FALSE;
-    if (valueStr) free(valueStr);
+    if (valueStr) scope_free(valueStr);
 }
 
 static void
@@ -1773,14 +1772,14 @@ processCustomFilterHostname(config_t* config, yaml_document_t* doc, yaml_node_t*
     // Note hostname are not case sensitive so unlike other filters, this is a
     // case-insensitive comparison.
     char *valueStr = stringVal(node);
-    if (valueStr && !strcasecmp(valueStr, g_proc.hostname)) {
+    if (valueStr && !scope_strcasecmp(valueStr, g_proc.hostname)) {
         ++custom_match_count;
-        free(valueStr);
+        scope_free(valueStr);
         return;
     }
 
     custom_matched = FALSE;
-    if (valueStr) free(valueStr);
+    if (valueStr) scope_free(valueStr);
 }
 
 static void
@@ -1794,14 +1793,14 @@ processCustomFilterUsername(config_t* config, yaml_document_t* doc, yaml_node_t*
 
     char *valueStr = stringVal(node);
     struct passwd *pw = getpwuid(g_proc.uid);
-    if (valueStr && pw && !strcmp(valueStr, pw->pw_name)) {
+    if (valueStr && pw && !scope_strcmp(valueStr, pw->pw_name)) {
         ++custom_match_count;
-        free(valueStr);
+        scope_free(valueStr);
         return;
     }
 
     custom_matched = FALSE;
-    if (valueStr) free(valueStr);
+    if (valueStr) scope_free(valueStr);
 }
 
 static void
@@ -1815,28 +1814,28 @@ processCustomFilterEnv(config_t* config, yaml_document_t* doc, yaml_node_t* node
 
     char *valueStr = stringVal(node);
     if (valueStr) {
-        char *equal = strchr(valueStr, '=');
+        char *equal = scope_strchr(valueStr, '=');
         if (equal) *equal = '\0';
         char *envName = valueStr;
         char *envVal = equal ? equal+1 : NULL;
         char *env = getenv(envName);
         if (env) {
             if (envVal) {
-                if (!strcmp(env, envVal)) {
+                if (!scope_strcmp(env, envVal)) {
                     ++custom_match_count;
-                    free(valueStr);
+                    scope_free(valueStr);
                     return;
                 }
             } else {
                 ++custom_match_count;
-                free(valueStr);
+                scope_free(valueStr);
                 return;
             }
         }
     }
 
     custom_matched = FALSE;
-    if (valueStr) free(valueStr);
+    if (valueStr) scope_free(valueStr);
 }
 
 static void
@@ -1848,24 +1847,18 @@ processCustomFilterAncestor(config_t* config, yaml_document_t* doc, yaml_node_t*
         return;
     }
 
-    if (!g_fn.open || !g_fn.close || !g_fn.read) {
-        DBG(NULL);
-        custom_matched = FALSE;
-        return;
-    }
-
     char *valueStr = stringVal(node);
     if (valueStr) {
         pid_t ppid = g_proc.ppid;
         while (ppid > 1) {
             char buf[PATH_MAX];
-            if (snprintf(buf, sizeof(buf), "/proc/%d/exe", ppid) < 0) {
+            if (scope_snprintf(buf, sizeof(buf), "/proc/%d/exe", ppid) < 0) {
                 DBG(NULL);
                 break;
             }
 
             char exe[PATH_MAX];
-            size_t exeLen = readlink(buf, exe, sizeof(exe));
+            size_t exeLen = scope_readlink(buf, exe, sizeof(exe));
             if (exeLen <= 0) {
                 DBG(NULL);
                 break;
@@ -1873,37 +1866,37 @@ processCustomFilterAncestor(config_t* config, yaml_document_t* doc, yaml_node_t*
             exe[exeLen] = '\0';
 
             char* name = exe;
-            name = basename(exe);
-            if (!strcmp(valueStr, name)) {
+            name = scope_basename(exe);
+            if (!scope_strcmp(valueStr, name)) {
                 ++custom_match_count;
-                free(valueStr);
+                scope_free(valueStr);
                 return;
             }
 
-            if (snprintf(buf, sizeof(buf), "/proc/%d/stat", ppid) < 0) {
+            if (scope_snprintf(buf, sizeof(buf), "/proc/%d/stat", ppid) < 0) {
                 DBG(NULL);
                 break;
             }
-            int fd = g_fn.open(buf, O_RDONLY);
+            int fd = scope_open(buf, O_RDONLY);
             if (fd == -1) {
                 DBG(NULL);
                 break;
             }
-            if (g_fn.read(fd, buf, sizeof(buf)) <= 0) { 
+            if (scope_read(fd, buf, sizeof(buf)) <= 0) { 
                 DBG(NULL);
-                g_fn.close(fd);
+                scope_close(fd);
                 break;
             }
-            strtok(buf,  " ");              // (1) pid   %d
-            strtok(NULL, " ");              // (2) comm  %s
-            strtok(NULL, " ");              // (3) state %s
-            ppid = atoi(strtok(NULL, " ")); // (4) ppid  %d
-            g_fn.close(fd);
+            scope_strtok(buf,  " ");              // (1) pid   %d
+            scope_strtok(NULL, " ");              // (2) comm  %s
+            scope_strtok(NULL, " ");              // (3) state %s
+            ppid = scope_atoi(scope_strtok(NULL, " ")); // (4) ppid  %d
+            scope_close(fd);
         }
     }
 
     custom_matched = FALSE;
-    if (valueStr) free(valueStr);
+    if (valueStr) scope_free(valueStr);
 }
 
 static void
@@ -2028,11 +2021,9 @@ cfgSetFromFile(config_t *config, const char* path)
     yaml_parser_t parser;
     yaml_document_t doc;
 
-    if (!g_fn.fopen || !g_fn.fclose) goto cleanup;
-
     if (!config) goto cleanup;
     if (!path) goto cleanup;
-    fp = g_fn.fopen(path, "rb");
+    fp = scope_fopen(path, "rb");
     if (!fp) goto cleanup;
 
     parser_successful = yaml_parser_initialize(&parser);
@@ -2049,7 +2040,7 @@ cfgSetFromFile(config_t *config, const char* path)
 cleanup:
     if (doc_successful) yaml_document_delete(&doc);
     if (parser_successful) yaml_parser_delete(&parser);
-    if (fp) g_fn.fclose(fp);
+    if (fp) scope_fclose(fp);
 }
 
 config_t *
@@ -2069,7 +2060,7 @@ cfgFromString(const char* string)
     parser_successful = yaml_parser_initialize(&parser);
     if (!parser_successful) goto cleanup;
 
-    yaml_parser_set_input_string(&parser, (unsigned char*)string, strlen(string));
+    yaml_parser_set_input_string(&parser, (unsigned char*)string, scope_strlen(string));
 
     doc_successful = yaml_parser_load(&parser, &doc);
     if (!doc_successful) goto cleanup;
@@ -2709,7 +2700,7 @@ cfgLogStreamDefault(config_t *cfg)
 {
     if (!cfg || (cfgLogStreamEnable(cfg) == FALSE)) return -1;
 
-    snprintf(g_logmsg, sizeof(g_logmsg), DEFAULT_LOGSTREAM_LOGMSG);
+    scope_snprintf(g_logmsg, sizeof(g_logmsg), DEFAULT_LOGSTREAM_LOGMSG);
 
     cfg_transport_t ls_type = cfgTransportType(cfg, CFG_LS);
 
@@ -2745,17 +2736,17 @@ cfgLogStreamDefault(config_t *cfg)
     cfgTransportTypeSet(cfg, CFG_CTL, type);
 
     if (cfgMtcFormat(cfg) != TRUE) {
-        strncat(g_logmsg, "Metrics format, ", 20);
+        scope_strncat(g_logmsg, "Metrics format, ", 20);
     }
     cfgMtcFormatSet(cfg, CFG_FMT_NDJSON);
 
     if (cfgLogLevel(cfg) > CFG_LOG_WARN ) {
-        strncat(g_logmsg, "Log level, ", 20);
+        scope_strncat(g_logmsg, "Log level, ", 20);
         cfgLogLevelSet(cfg, CFG_LOG_WARN);
     }
 
     if (!cfgSendProcessStartMsg(cfg)) {
-        strncat(g_logmsg, "Send proc start msg, ", 25);
+        scope_strncat(g_logmsg, "Send proc start msg, ", 25);
         cfgSendProcessStartMsgSet(cfg, TRUE);
     }
 
@@ -2788,7 +2779,7 @@ destroyProtEntry(void *data)
 
     protocol_def_t *pre = data;
     if (pre->re) pcre2_code_free(pre->re);
-    if (pre->regex) free(pre->regex);
-    if (pre->protname) free(pre->protname);
-    free(pre);
+    if (pre->regex) scope_free(pre->regex);
+    if (pre->protname) scope_free(pre->protname);
+    scope_free(pre);
 }

@@ -7,6 +7,7 @@ DEST_FILE="/tmp/output_dest_file"
 CRIBL_SOCKET="/opt/cribl/state/appscope.sock"
 CRIBL_HOME_PATH="/opt/cribl/home"
 CRIBL_HOME_SOCKET="/opt/cribl/home/state/appscope.sock"
+VAR_RUN_SOCKET="/var/run/appscope/appscope.sock"
 
 starttest(){
     CURRENT_TEST=$1
@@ -85,6 +86,31 @@ if [ $count -eq 0 ] ; then
 fi
 
 endtest
+
+
+#
+# scope event destination edge
+#
+
+starttest event_edge_var_run
+
+mkdir -p /var/run/appscope
+nc -lU $VAR_RUN_SOCKET > $DEST_FILE &
+ERR+=$?
+
+scope run --eventdest=edge ls
+ERR+=$?
+
+count=$(grep '"type":"evt"' $DEST_FILE | wc -l)
+if [ $count -eq 0 ] ; then
+    ERR+=1
+fi
+
+endtest
+rm -f $VAR_RUN_SOCKET
+
+
+
 
 #
 # scope cribl destination edge

@@ -769,27 +769,6 @@ cfgMtcVerbositySetFromStr(config_t* cfg, const char* value)
     cfgMtcVerbositySet(cfg, x);
 }
 
-#define EDGE_PATH "/var/run/appscope/appscope.sock"
-static char*
-cfgEdgePath(void){
-    // 1) If EDGE_PATH can be accessed, return that.
-    if (g_fn.access(EDGE_PATH, R_OK|W_OK) == 0) {
-        return strdup(EDGE_PATH);
-    }
-
-    // 2) If CRIBL_HOME is defined, return $CRIBL_HOME/state/appscope.sock
-    const char *cribl_home = getenv("CRIBL_HOME");
-    if (cribl_home) {
-        char new_path[PATH_MAX];
-        int cx = snprintf(new_path, sizeof(new_path), "%s/%s", cribl_home, "state/appscope.sock");
-        if (cx >= 0 && cx < sizeof(new_path)) {
-            return realpath(new_path, NULL);
-        }
-    }
-    // 3) Otherwise, return /opt/cribl/state/appscope.sock
-    return strdup("/opt/cribl/state/appscope.sock");
-}
-
 void
 cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
 {
@@ -844,9 +823,6 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         cfgTransportPathSet(cfg, t, path);
     } else if (strncmp(value, "edge", sizeof("edge") - 1) == 0) {
         cfgTransportTypeSet(cfg, t, CFG_EDGE);
-        char* edge_path = cfgEdgePath();
-        cfgTransportPathSet(cfg, t, edge_path);
-        free(edge_path);
     }
 }
 
@@ -2474,9 +2450,7 @@ initTransport(config_t* cfg, which_transport_t t)
             break;
         case CFG_EDGE:
         {
-            char* edge_path = cfgEdgePath();
-            transport = transportCreateEdge(edge_path);
-            free(edge_path);
+            transport = transportCreateEdge();
             break;
         }
         case CFG_UDP:
@@ -2642,11 +2616,7 @@ cfgLogStreamDefault(config_t *cfg)
     if (ls_type == CFG_UNIX) {
         const char *path = cfgTransportPath(cfg, CFG_LS);
         cfgTransportPathSet(cfg, CFG_CTL, path);
-    } else if (ls_type == CFG_EDGE) {
-        char* edge_path = cfgEdgePath();
-        cfgTransportPathSet(cfg, CFG_CTL, edge_path);
-        free(edge_path);
-    } else {
+    } else if (ls_type == CFG_TCP) {
         // override the CFG_LS transport type to be TCP for type different than UNIX
         cfgTransportTypeSet(cfg, CFG_LS, CFG_TCP);
         // host is already set

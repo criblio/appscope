@@ -198,6 +198,14 @@ transportCreateUnixReturnsNullForInvalidPath(void** state)
     transport_t* t = transportCreateUnix(NULL);
     assert_null(t);
 
+    int size_limit = sizeof (((struct sockaddr_un*)NULL)->sun_path);
+    char too_long_path[size_limit+1];
+    int i;  // This loop just writes ascii '0' through '9' repeatedly.
+    for (i=0; i < size_limit; i++) too_long_path[i]= '0' + i%10;
+    too_long_path[i] = '\0';
+    t = transportCreateUnix(too_long_path);
+    assert_null(t);
+
     assert_int_equal(dbgCountMatchingLines("src/transport.c"), 1);
     dbgInit(); // reset dbg for the rest of the tests
 }

@@ -897,28 +897,37 @@ transportConnectFile(transport_t *t)
     return (t->file.stream != NULL);
 }
 
-#define EDGE_PATH "/var/run/appscope/appscope.sock"
+#define EDGE_PATH_DOCKER "/var/run/appscope/appscope.sock"
+#define EDGE_PATH_DEFAULT "/opt/cribl/state/appscope.sock"
+#define READ_AND_WRITE (R_OK|W_OK)
 static char*
 edgePath(void){
-    // 1) If EDGE_PATH can be accessed, return that.
-    if (g_fn.access && g_fn.access(EDGE_PATH, R_OK|W_OK) == 0) {
-        return strdup(EDGE_PATH);
+    if (!g_fn.access) return NULL;
+
+    // 1) If EDGE_PATH_DOCKER can be accessed, return that.
+    if (g_fn.access(EDGE_PATH_DOCKER, READ_AND_WRITE) == 0) {
+        return strdup(EDGE_PATH_DOCKER);
     }
 
-    // 2) If CRIBL_HOME is defined, return $CRIBL_HOME/state/appscope.sock
+    // 2) If CRIBL_HOME is defined and can be accessed,
+    //    return $CRIBL_HOME/state/appscope.sock
     const char *cribl_home = getenv("CRIBL_HOME");
     if (cribl_home) {
-        char new_path[PATH_MAX];
-        int cx = snprintf(new_path, sizeof(new_path), "%s/%s", cribl_home, "state/appscope.sock");
-        if (cx >= 0 && cx < sizeof(new_path)) {
-            char *final_path = realpath(new_path, NULL);
-            if (final_path) {
-                return final_path;
+        char *new_path = NULL;
+        if (asprintf(&new_path, "%s/%s", cribl_home, "state/appscope.sock") > 0) {
+            if (g_fn.access(new_path, READ_AND_WRITE) == 0) {
+                return new_path;
             }
+            free(new_path);
         }
     }
-    // 3) Otherwise, return /opt/cribl/state/appscope.sock
-    return strdup("/opt/cribl/state/appscope.sock");
+
+    // 3) If EDGE_PATH_DEFAULT can be accessed, return it
+    if (g_fn.access(EDGE_PATH_DEFAULT, READ_AND_WRITE) == 0) {
+        return strdup(EDGE_PATH_DEFAULT);
+    }
+
+    return NULL;
 }
 
 int

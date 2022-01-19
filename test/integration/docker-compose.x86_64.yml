@@ -58,17 +58,6 @@ services:
       dockerfile: ./bash/Dockerfile
     <<: *scope-common
 
-  # skipped on ARM - no attach support yet
-  cli:
-    image: ghcr.io/criblio/appscope-test-cli:${TAG:?Missing TAG environment variable}
-    build:
-      cache_from:
-        - ghcr.io/criblio/appscope-test-cli:${TAG:?Missing TAG environment variable}
-      context: .
-      dockerfile: ./cli/Dockerfile
-    privileged: true
-    <<: *scope-common
-
   # There are no arm64 golang images at Docker Hub for these versions of Go
   go_2:
     image: ghcr.io/criblio/appscope-test-go_2:${TAG:?Missing TAG environment variable}
@@ -452,22 +441,4 @@ services:
       dockerfile: ./java/Dockerfile.oracle
       args:
         JRE_TGZ: jdk/jdk-17.0.1_linux-x64_bin.tar.gz
-    <<: *scope-common
-  # skipped on ARM - no attach support yet
-  attach-glibc:
-    image: ghcr.io/criblio/appscope-test-attach-glibc:${TAG:?Missing TAG environment variable}
-    build:
-      cache_from: 
-        - ghcr.io/criblio/appscope-test-attach-glibc:${TAG:?Missing TAG environment variable}
-      context: .
-      dockerfile: ./attach/Dockerfile.glibc
-    <<: *scope-common
-  # skipped on ARM - no attach support yet
-  attach-musl:
-    image: ghcr.io/criblio/appscope-test-attach-musl:${TAG:?Missing TAG environment variable}
-    build:
-      cache_from: 
-        - ghcr.io/criblio/appscope-test-attach-musl:${TAG:?Missing TAG environment variable}
-      context: .
-      dockerfile: ./attach/Dockerfile.musl
     <<: *scope-common

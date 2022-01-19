@@ -17,6 +17,7 @@ COPY ./cli/test_edge.sh /opt/test/bin/test_edge.sh
 COPY ./cli/expected.yml /
 
 RUN mkdir /opt/test-runner && \
+    mkdir -p /var/run/appscope/ && \
     mkdir -p /opt/cribl/state/ && \
     mkdir -p /opt/cribl/home/state
 

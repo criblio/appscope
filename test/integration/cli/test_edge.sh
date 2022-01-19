@@ -94,7 +94,6 @@ endtest
 
 starttest event_edge_var_run
 
-mkdir -p /var/run/appscope
 nc -lU $VAR_RUN_SOCKET > $DEST_FILE &
 ERR+=$?
 

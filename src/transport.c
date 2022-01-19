@@ -897,6 +897,39 @@ transportConnectFile(transport_t *t)
     return (t->file.stream != NULL);
 }
 
+#define EDGE_PATH_DOCKER "/var/run/appscope/appscope.sock"
+#define EDGE_PATH_DEFAULT "/opt/cribl/state/appscope.sock"
+#define READ_AND_WRITE (R_OK|W_OK)
+static char*
+edgePath(void){
+    if (!g_fn.access) return NULL;
+
+    // 1) If EDGE_PATH_DOCKER can be accessed, return that.
+    if (g_fn.access(EDGE_PATH_DOCKER, READ_AND_WRITE) == 0) {
+        return strdup(EDGE_PATH_DOCKER);
+    }
+
+    // 2) If CRIBL_HOME is defined and can be accessed,
+    //    return $CRIBL_HOME/state/appscope.sock
+    const char *cribl_home = getenv("CRIBL_HOME");
+    if (cribl_home) {
+        char *new_path = NULL;
+        if (asprintf(&new_path, "%s/%s", cribl_home, "state/appscope.sock") > 0) {
+            if (g_fn.access(new_path, READ_AND_WRITE) == 0) {
+                return new_path;
+            }
+            free(new_path);
+        }
+    }
+
+    // 3) If EDGE_PATH_DEFAULT can be accessed, return it
+    if (g_fn.access(EDGE_PATH_DEFAULT, READ_AND_WRITE) == 0) {
+        return strdup(EDGE_PATH_DEFAULT);
+    }
+
+    return NULL;
+}
+
 int
 transportConnect(transport_t *trans)
 {
@@ -917,8 +950,23 @@ transportConnect(transport_t *trans)
             return checkPendingSocketStatus(trans);
         case CFG_FILE:
             return transportConnectFile(trans);
-        case CFG_UNIX:
         case CFG_EDGE:
+            // Edge path needs to be recomputed on every connection attempt.
+            if (trans->local.path) free(trans->local.path);
+            trans->local.path = edgePath();
+            if (!trans->local.path) return 0;
+
+            int pathlen = strlen(trans->local.path);
+            if (pathlen >= sizeof(trans->local.addr.sun_path)) return 0;
+
+            memset(&trans->local.addr, 0, sizeof(trans->local.addr));
+            trans->local.addr.sun_family = AF_UNIX;
+            strncpy(trans->local.addr.sun_path, trans->local.path, pathlen);
+            trans->local.addr_len = pathlen + sizeof(sa_family_t) + 1;
+
+            // Keep going!  (no break or return here!)
+            // CFG_EDGE uses CFG_UNIX's connection logic.
+        case CFG_UNIX:
             if ((trans->local.sock = g_fn.socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
                 DBG("%d %s", trans->local.sock, trans->local.path);
                 return 0;
@@ -1076,32 +1124,22 @@ err:
 }
 
 transport_t*
-transportCreateEdge(const char *path)
+transportCreateEdge(void)
 {
     transport_t *trans = NULL;
-
-    if (!path) goto err;
-
-    int pathlen = strlen(path);
-    if (pathlen >= sizeof(trans->local.addr.sun_path)) goto err;
 
     if (!(trans = newTransport())) goto err;
 
     trans->type = CFG_EDGE;
     trans->local.sock = -1;
-    if (!(trans->local.path = strdup(path))) goto err;
-
-    memset(&trans->local.addr, 0, sizeof(trans->local.addr));
-    trans->local.addr.sun_family = AF_UNIX;
-    strncpy(trans->local.addr.sun_path, path, pathlen);
-    trans->local.addr_len = pathlen + sizeof(sa_family_t) + 1;
+    trans->local.path = NULL;
 
     transportConnect(trans);
 
     return trans;
 
 err:
-    DBG("%s %p", path, trans);
+    DBG("%p", trans);
     transportDestroy(&trans);
     return trans;
 

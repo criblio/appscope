@@ -159,9 +159,7 @@ metric:
     #   tcp://host:port         send to a network server (TCP protocol)
     #   unix://@abstractname    send to a unix domain server w/abstract addr
     #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
-    #   edge                    send to a unix domain server `/opt/cribl/state/appscope.sock`
-    #                           or to `$CRIBL_HOME/state/appscope.sock`
-    #                           if $CRIBL_HOME environment variable is set
+    #   edge                    send to cribl edge (over unix domain)
     #
     # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
     # set the $SCOPE_METRIC_TLS_* variables.
@@ -437,9 +435,7 @@ event:
     #   tcp://host:port         send to a network server (TCP protocol)
     #   unix://@abstractname    send to a unix domain server w/abstract addr
     #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
-    #   edge                    send to a unix domain server `/opt/cribl/state/appscope.sock`
-    #                           or to `$CRIBL_HOME/state/appscope.sock`
-    #                           if $CRIBL_HOME environment variable is set
+    #   edge                    send to cribl edge (over unix domain)
     #
     # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
     # set the $SCOPE_EVENT_TLS_* variables.
@@ -633,9 +629,7 @@ libscope:
       #   tcp://host:port         send to a network server (TCP protocol)
       #   unix://@abstractname    send to a unix domain server w/abstract addr
       #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
-      #   edge                    send to a unix domain server `/opt/cribl/state/appscope.sock`
-      #                           or to `$CRIBL_HOME/state/appscope.sock`
-      #                           if $CRIBL_HOME environment variable is set
+      #   edge                    send to cribl edge (over unix domain)
       #
       # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
       # set the $SCOPE_LOG_TLS_* variables.
@@ -721,9 +715,7 @@ cribl:
     #   tcp://host:port         send to a TCP server
     #   unix://@abstractname    send to a unix domain server w/abstract addr
     #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
-    #   edge                    send to a unix domain server `/opt/cribl/state/appscope.sock`
-    #                           or to `$CRIBL_HOME/state/appscope.sock`
-    #                           if $CRIBL_HOME environment variable is set
+    #   edge                    send to cribl edge (over unix domain)
     #
     # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
     # set the $SCOPE_CRIBL_TLS_* variables.

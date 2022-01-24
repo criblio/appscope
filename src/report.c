@@ -3133,15 +3133,6 @@ createFieldsForCapturedMetrics(const unsigned char *alldims)
     if (!fields) return NULL;
     int ix = 0;
 
-    // Metric fields we always have...
-    H_VALUE(fields[ix], "pid", g_proc.pid, 4);
-    HTTP_NEXT_FLD(ix);
-    H_ATTRIB(fields[ix], "host", g_proc.hostname, 4);
-    HTTP_NEXT_FLD(ix);
-    H_ATTRIB(fields[ix], "proc", g_proc.procname, 4);
-    HTTP_NEXT_FLD(ix);
-
-
     // Metric fields from what we intercepted
     //  eg:   #ceo:clint,date_founded:2017
     //        fieldname1->ceo           fieldval1->clint
@@ -3182,7 +3173,13 @@ reportCapturedMetric(const captured_metric_t *metric)
     const char *value = (const char *)metric->value; // casting away unsigned
     const char *name = (const char *)metric->name; // casting away unsigned
 
-    event_field_t *fields = createFieldsForCapturedMetrics(metric->dims);
+    event_field_t builtInFields[] = {
+        PROC_FIELD(g_proc.procname),
+        PID_FIELD(g_proc.pid),
+        HOST_FIELD(g_proc.hostname),
+        FIELDEND
+    };
+    event_field_t *capturedFields = createFieldsForCapturedMetrics(metric->dims);
 
     // Look for a decimal point.  Comma allows for localization, even
     // though the regex that creates value currently using does not.
@@ -3201,7 +3198,7 @@ reportCapturedMetric(const captured_metric_t *metric)
             }
             goto out;
         }
-        event_t flt_met = FLT_EVENT(name, doubleval, typeFromStr(metric->type), fields);
+        event_t flt_met = FLT_EVENT(name, doubleval, typeFromStr(metric->type), builtInFields);
         memmove(&out_mtc, &flt_met, sizeof(event_t));
     } else {
         // Value looks like an integer value...
@@ -3211,16 +3208,17 @@ reportCapturedMetric(const captured_metric_t *metric)
             DBG("Couldn't be converted to long long: %s", value);
             goto out;
         }
-        event_t int_met = INT_EVENT(name, intval, typeFromStr(metric->type), fields);
+        event_t int_met = INT_EVENT(name, intval, typeFromStr(metric->type), builtInFields);
         memmove(&out_mtc, &int_met, sizeof(event_t));
     }
 
+    out_mtc.capturedFields = capturedFields;
     if (cmdSendMetric(g_mtc, &out_mtc)) {
         scopeLog(CFG_LOG_ERROR, "ERROR: reportCapturedMetric:cmdSendMetric");
     }
 
 out:
-    if (fields) free(fields);
+    if (capturedFields) free(capturedFields);
 }
 
 bool

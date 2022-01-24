@@ -49,7 +49,7 @@ int cmdSendHttp(ctl_t *ctl, event_t *event, uint64_t id, proc_id_t *proc)
     //printf("%s: %s\n", __FUNCTION__, event->name);
     if (!event || !proc) return -1;
 
-    cJSON *json  = fmtMetricJson(event, NULL, CFG_SRC_HTTP);
+    cJSON *json  = fmtMetricJson(event, NULL, CFG_SRC_HTTP, NULL);
     header_event = cJSON_PrintUnformatted(json);
     cJSON_Delete(json);
 

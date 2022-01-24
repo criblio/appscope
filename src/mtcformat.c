@@ -10,10 +10,8 @@
 #include "dbg.h"
 #include "mtcformat.h"
 #include "scopetypes.h"
+#include "strset.h"
 #include "com.h"
-
-#define TRUE 1
-#define FALSE 0
 
 
 struct _mtc_fmt_t
@@ -118,15 +116,14 @@ createStatsFieldString(mtc_fmt_t* fmt, event_field_t* f, char* tag, int sizeofta
 }
 
 static void
-appendStatsdFieldString(mtc_fmt_t* fmt, char* tag, int sz, char** end, int* bytes, int* firstTagAdded)
+appendStatsdFieldString(mtc_fmt_t* fmt, char* tag, int sz, char** end, int* bytes, strset_t* addedFields)
 {
-    if (!*firstTagAdded) {
+    if (strSetEntryCount(addedFields) == 1) {
         sz += 2; // add space for the |#
         if ((*bytes + sz) >= fmt->statsd.max_len) return;
         *end = stpcpy(*end, "|#");
         *end = stpcpy(*end, tag);
         strcpy(*end, "\n"); // add newline, but don't advance end
-        *firstTagAdded = 1;
     } else {
         sz += 1; // add space for the comma
         if ((*bytes + sz) >= fmt->statsd.max_len) return;
@@ -139,7 +136,7 @@ appendStatsdFieldString(mtc_fmt_t* fmt, char* tag, int sz, char** end, int* byte
 
 
 static void
-addStatsdFields(mtc_fmt_t* fmt, event_field_t* fields, char** end, int* bytes, int* firstTagAdded, regex_t* fieldFilter)
+addStatsdFields(mtc_fmt_t* fmt, event_field_t* fields, char** end, int* bytes, strset_t* addedFields, regex_t* fieldFilter)
 {
     if (!fmt || !fields || ! end || !*end || !bytes) return;
 
@@ -155,15 +152,18 @@ addStatsdFields(mtc_fmt_t* fmt, event_field_t* fields, char** end, int* bytes, i
         // Honor Verbosity
         if (f->cardinality > fmt->verbosity) continue;
 
+        // Don't allow duplicate field names
+        if (!strSetAdd(addedFields, f->name)) continue;
+
         sz = createStatsFieldString(fmt, f, tag, sizeof(tag));
         if (sz < 0) break;
 
-        appendStatsdFieldString(fmt, tag, sz, end, bytes, firstTagAdded);
+        appendStatsdFieldString(fmt, tag, sz, end, bytes, addedFields);
     }
 }
 
 static void
-addCustomFields(mtc_fmt_t* fmt, custom_tag_t** tags, char** end, int* bytes, int* firstTagAdded)
+addCustomFields(mtc_fmt_t* fmt, custom_tag_t** tags, char** end, int* bytes, strset_t *addedFields)
 {
     if (!fmt || !tags || !*tags || !end || !*end || !bytes) return;
 
@@ -175,12 +175,15 @@ addCustomFields(mtc_fmt_t* fmt, custom_tag_t** tags, char** end, int* bytes, int
     int i = 0;
     while ((t = tags[i++])) {
 
+        // Don't allow duplicate field names
+        if (!strSetAdd(addedFields, t->name)) continue;
+
         // No verbosity setting exists for custom fields.
 
         sz = snprintf(tag, sizeof(tag), "%s:%s", t->name, t->value);
         if (sz < 0) break;
 
-        appendStatsdFieldString(fmt, tag, sz, end, bytes, firstTagAdded);
+        appendStatsdFieldString(fmt, tag, sz, end, bytes, addedFields);
     }
 }
 
@@ -237,27 +240,19 @@ mtcFormatStatsDString(mtc_fmt_t* fmt, event_t* e, regex_t* fieldFilter)
     // (strcpy doesn't advance end)
     strcpy(end, "\n");
 
-    int firstTagAdded = 0;
-    addCustomFields(fmt, fmt->tags, &end, &bytes, &firstTagAdded);
-    addStatsdFields(fmt, e->fields, &end, &bytes, &firstTagAdded, fieldFilter);
+    // addedFields lets us avoid duplicate field names.  If we go to
+    // add one that's already in the set, skip it.  In this way precidence
+    // is given to capturedFields then custom fields then remaining fields.
+    strset_t *addedFields = strSetCreate(DEFAULT_SET_SIZE);
+    addStatsdFields(fmt, e->capturedFields, &end, &bytes, addedFields, NULL);
+    addCustomFields(fmt, fmt->tags, &end, &bytes, addedFields);
+    addStatsdFields(fmt, e->fields, &end, &bytes, addedFields, fieldFilter);
+    strSetDestroy(&addedFields);
 
     // Now that we're done, we can count the trailing newline
     bytes += 1;
 
     return end_start;
-}
-
-static void
-addCustomJsonFields(mtc_fmt_t *fmt, cJSON *json)
-{
-    custom_tag_t **tags = mtcFormatCustomTags(fmt);
-    if (!fmt || !json || !tags) return;
-
-    custom_tag_t *tag;
-    int i = 0;
-    while ((tag = tags[i++])) {
-        cJSON_AddStringToObject(json, tag->name, tag->value);
-    }
 }
 
 char *
@@ -272,8 +267,8 @@ mtcFormatEventForOutput(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
     if (fmt->format == CFG_FMT_STATSD) {
         msg = mtcFormatStatsDString(fmt, evt, fieldFilter);
     } else if (fmt->format == CFG_FMT_NDJSON) {
-        if (!(json = fmtMetricJson(evt, NULL, CFG_SRC_METRIC))) goto out;
-        addCustomJsonFields(fmt, json);
+        custom_tag_t **tags = mtcFormatCustomTags(fmt);
+        if (!(json = fmtMetricJson(evt, NULL, CFG_SRC_METRIC, tags))) goto out;
 
         // Request is for this json, plus a _time field
         struct timeval tv;

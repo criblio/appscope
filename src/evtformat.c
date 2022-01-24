@@ -7,6 +7,7 @@
 
 #include "dbg.h"
 #include "evtformat.h"
+#include "strset.h"
 #include "com.h"
 
 
@@ -410,14 +411,16 @@ anyValueFieldMatches(regex_t *filter, event_t *metric)
 }
 
 static void
-addCustomJsonFields(evt_fmt_t *evt, cJSON *json)
+addCustomJsonFields(custom_tag_t **tags, cJSON *json, strset_t *addedFields)
 {
-    custom_tag_t **tags = evtFormatCustomTags(evt);
-    if (!evt || !json || !tags) return;
+    if (!json || !tags) return;
 
     custom_tag_t *tag;
     int i = 0;
     while ((tag = tags[i++])) {
+
+        // Don't allow duplicate field names if addedFields is non-null
+        if (addedFields && !strSetAdd(addedFields, tag->name)) continue;
         cJSON_AddStringToObject(json, tag->name, tag->value);
     }
 }
@@ -439,7 +442,9 @@ fmtEventJson(evt_fmt_t *efmt, event_format_t *sev)
     if (!cJSON_AddStringToObjLN(json, CMDNAME, sev->proc->cmd)) goto err;
     if (!cJSON_AddNumberToObjLN(json, PID, sev->proc->pid)) goto err;
     
-    if (efmt) addCustomJsonFields(efmt, json);
+    if (efmt) {
+        addCustomJsonFields(evtFormatCustomTags(efmt), json, NULL);
+    }
     cJSON_AddItemToObjectCS(json, DATA, sev->data);
 
     return json;
@@ -496,7 +501,7 @@ metricTypeStr(data_type_t type)
 }
 
 static int
-addJsonFields(event_field_t *fields, regex_t *fieldFilter, cJSON *json)
+addJsonFields(event_field_t *fields, regex_t *fieldFilter, cJSON *json, strset_t *addedFields)
 {
     if (!fields) return TRUE;
 
@@ -511,6 +516,9 @@ addJsonFields(event_field_t *fields, regex_t *fieldFilter, cJSON *json)
         // skip if this field is not used in events
         if (fld->event_usage == FALSE) continue;
 
+        // Don't allow duplicate field names
+        if (!strSetAdd(addedFields, fld->name)) continue;
+
         if (fld->value_type == FMT_STR) {
             if (!cJSON_AddStringToObjLN(json, fld->name, fld->value.str)) return FALSE;
         } else if (fld->value_type == FMT_NUM) {
@@ -524,7 +532,7 @@ addJsonFields(event_field_t *fields, regex_t *fieldFilter, cJSON *json)
 }
 
 cJSON *
-fmtMetricJson(event_t *metric, regex_t *fieldFilter, watch_t src)
+fmtMetricJson(event_t *metric, regex_t *fieldFilter, watch_t src, custom_tag_t **tags)
 {
     const char *metric_type = NULL;
 
@@ -550,7 +558,16 @@ fmtMetricJson(event_t *metric, regex_t *fieldFilter, watch_t src)
     }
 
     // Add fields
-    if (!addJsonFields(metric->fields, fieldFilter, json)) goto err;
+
+    // addedFields lets us avoid duplicate field names.  If we go to
+    // add one that's already in the set, skip it.  In this way precidence
+    // is given to capturedFields then custom fields then remaining fields.
+    strset_t *addedFields = strSetCreate(DEFAULT_SET_SIZE);
+    if (!addJsonFields(metric->capturedFields, fieldFilter, json, addedFields)) goto err;
+    addCustomJsonFields(tags, json, addedFields);
+    if (!addJsonFields(metric->fields, fieldFilter, json, addedFields)) goto err;
+    strSetDestroy(&addedFields);
+
     return json;
 
 err:
@@ -611,7 +628,7 @@ evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, 
 
     // Format the metric string using the configured metric format type
     if (!metric->data) {
-        event.data = fmtMetricJson(metric, evtFormatFieldFilter(evt, src), src);
+        event.data = fmtMetricJson(metric, evtFormatFieldFilter(evt, src), src, evtFormatCustomTags(evt));
     } else {
         event.data = metric->data;
     }

@@ -54,6 +54,34 @@ if [ $COUNT != "6" ]; then
 fi
 endtest
 
+starttest "captured_dimensions_exist"
+LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
+evaltest
+# pick one metric to test
+METRIC=`grep "^my.histogram" $OUTFILE`
+for DIM in "source:hot-shots"; do
+   if echo $METRIC | grep $DIM; then
+       echo "as expected, found $DIM"
+   else
+       ERR+=1
+   fi
+done
+endtest
+
+starttest "custom_dimensions_exist"
+SCOPE_TAG_customtag=customvalue LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
+evaltest
+# pick one metric to test
+METRIC=`grep "^my.histogram" $OUTFILE`
+for DIM in "customtag:customvalue"; do
+   if echo $METRIC | grep $DIM; then
+       echo "as expected, found $DIM"
+   else
+       ERR+=1
+   fi
+done
+endtest
+
 starttest "builtin_dimensions_exist"
 LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
 evaltest
@@ -68,8 +96,17 @@ for DIM in pid host proc; do
 done
 endtest
 
-starttest "captured_dimensions_exist"
-LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
+
+# Desired "default" dimension priority.  This describes what we want
+# when a field name is common across multiple sources (which source
+# wins).
+#   (1) captured_dimension
+#   (2) custom_dimension
+#   (3) builtin_dimension
+
+# test (1) vs (2) with conflicting "source"
+starttest "captured_tag_priority"
+SCOPE_TAG_source=conflictvalue LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
 evaltest
 # pick one metric to test
 METRIC=`grep "^my.histogram" $OUTFILE`
@@ -80,7 +117,35 @@ for DIM in "source:hot-shots"; do
        ERR+=1
    fi
 done
+for DIM in "source:conflictvalue"; do
+   if echo $METRIC | grep $DIM; then
+       ERR+=1
+       echo "did not expect $DIM to exist"
+   fi
+done
 endtest
+
+# test (2) vs (3) with conflicting "proc"
+starttest "custom_tag_priority"
+SCOPE_TAG_proc=myprocval LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
+evaltest
+# pick one metric to test
+METRIC=`grep "^my.histogram" $OUTFILE`
+for DIM in "proc:myprocval"; do
+   if echo $METRIC | grep $DIM; then
+       echo "as expected, found $DIM"
+   else
+       ERR+=1
+   fi
+done
+for DIM in "proc:node"; do
+   if echo $METRIC | grep $DIM; then
+       ERR+=1
+       echo "did not expect $DIM to exist"
+   fi
+done
+endtest
+
 
 starttest "can_be_disabled"
 LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE SCOPE_METRIC_STATSD=false node hotshot.ts

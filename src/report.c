@@ -2498,7 +2498,8 @@ doTotal(metric_t type)
         ((type == TOT_OPEN || type == TOT_CLOSE) && (!g_summary.fs.open_close)) ||
         ((type == TOT_DNS) && (!g_summary.net.dns))) {
         return;
-    } else if ((type == TOT_PORTS || type == TOT_TCP_CONN || 
+    }
+    if ((type == TOT_PORTS || type == TOT_TCP_CONN || 
         type == TOT_UDP_CONN || type == TOT_OTHER_CONN || 
         type == TOT_NET_OPEN || type == TOT_NET_CLOSE) &&
         (!g_summary.net.open_close)) {

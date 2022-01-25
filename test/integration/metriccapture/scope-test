@@ -15,6 +15,10 @@ starttest(){
 }
 
 evaltest(){
+    if [ $? -ne 0 ]; then
+        echo "It appears that node hotshot.ts crashed."
+        ERR+=1
+    fi
     echo "       Evaluating $CURRENT_TEST"
 }
 

@@ -535,6 +535,7 @@ cJSON *
 fmtMetricJson(event_t *metric, regex_t *fieldFilter, watch_t src, custom_tag_t **tags)
 {
     const char *metric_type = NULL;
+    strset_t *addedFields = NULL;
 
     if (!metric) return NULL;
 
@@ -562,7 +563,7 @@ fmtMetricJson(event_t *metric, regex_t *fieldFilter, watch_t src, custom_tag_t *
     // addedFields lets us avoid duplicate field names.  If we go to
     // add one that's already in the set, skip it.  In this way precidence
     // is given to capturedFields then custom fields then remaining fields.
-    strset_t *addedFields = strSetCreate(DEFAULT_SET_SIZE);
+    addedFields = strSetCreate(DEFAULT_SET_SIZE);
     if (!addJsonFields(metric->capturedFields, fieldFilter, json, addedFields)) goto err;
     addCustomJsonFields(tags, json, addedFields);
     if (!addJsonFields(metric->fields, fieldFilter, json, addedFields)) goto err;
@@ -573,6 +574,7 @@ fmtMetricJson(event_t *metric, regex_t *fieldFilter, watch_t src, custom_tag_t *
 err:
     DBG("_metric=%s _metric_type=%s _value=%lld, fields=%p, json=%p",
         metric->name, metric_type, metric->value, metric->fields, json);
+    if (addedFields) strSetDestroy(&addedFields);
     if (json) cJSON_Delete(json);
 
     return NULL;

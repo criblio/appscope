@@ -521,6 +521,62 @@ fmtMetricJsonWFields(void** state)
 }
 
 static void
+fmtMetricJsonWDuplicateFields(void **state)
+{
+    event_field_t capturedfields[] = {
+        STRFIELD("A",     "Z",  0,  TRUE),
+        NUMFIELD("B",     987,  1,  TRUE),
+        FIELDEND
+    };
+
+    custom_tag_t **tags = calloc(5, sizeof(custom_tag_t*));
+    int i = 0;
+    custom_tag_t *tag = calloc(1, sizeof(*tag));
+    tag->name = strdup("A");
+    tag->value = strdup("XXX");
+    tags[i++] = tag;
+    tag = calloc(1, sizeof(*tag));
+    tag->name = strdup("C");
+    tag->value = strdup("YYY");
+    tags[i++] = tag;
+
+    event_field_t fields[] = {
+        NUMFIELD("A",     987,  1,  TRUE),
+        STRFIELD("B",     "Z",  0,  TRUE),
+        NUMFIELD("C",     654,  3,  TRUE),
+        STRFIELD("D",     "Y",  2,  TRUE),
+        FIELDEND
+    };
+
+    // when duplicates occur:
+    //   capturedFields are a top priority
+    //   then custom tags are the next priority
+    //   then other fields are the lowest priority
+
+    event_t e = INT_EVENT("hey", 2, HISTOGRAM, fields);
+    e.capturedFields = capturedfields;
+    cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC, tags);
+    assert_non_null(json);
+    char* str = cJSON_PrintUnformatted(json);
+    assert_non_null(str);
+    assert_string_equal(str,
+                 "{\"_metric\":\"hey\","
+                 "\"_metric_type\":\"histogram\","
+                 "\"_value\":2,"
+                 "\"A\":\"Z\",\"B\":987,\"C\":\"YYY\",\"D\":\"Y\"}");
+    if (str) free(str);
+    cJSON_Delete(json);
+
+    for (i=0; (tag=tags[i]); i++) {
+        free(tag->name);
+        free(tag->value);
+        free(tag);
+    }
+    free(tags);
+
+}
+
+static void
 fmtMetricJsonWFilteredFields(void** state)
 {
     event_field_t fields[] = {
@@ -829,6 +885,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(fmtEventJsonWithEmbeddedNulls),
         cmocka_unit_test(fmtMetricJsonNoFields),
         cmocka_unit_test(fmtMetricJsonWFields),
+        cmocka_unit_test(fmtMetricJsonWDuplicateFields),
         cmocka_unit_test(fmtMetricJsonWFilteredFields),
         cmocka_unit_test(fmtMetricJsonEscapedValues),
         cmocka_unit_test(evtFormatSourceEnabledSetAndGet),

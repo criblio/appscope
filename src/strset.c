@@ -6,19 +6,19 @@
 typedef struct _strset_t {
     const char **str;
     unsigned int count;
-    unsigned int alloc;
+    unsigned int capacity;
 } strset_t;
 
 strset_t *
 strSetCreate(unsigned int initialCapacity)
 {
-    strset_t *set = calloc(1, sizeof(*set));
-    const char **str = calloc(initialCapacity, sizeof(char *));
+    strset_t *set = malloc(sizeof(*set));
+    const char **str = malloc(initialCapacity * sizeof(char *));
     if (!set || !str) goto err;
 
     set->str = str;
     set->count = 0;
-    set->alloc = initialCapacity;
+    set->capacity = initialCapacity;
 
     return set;
 
@@ -48,15 +48,14 @@ strSetAdd(strset_t *set, const char *str)
     if (strSetContains(set, str)) return FALSE;
 
     // grow if needed
-    if (set->count >= set->alloc) {
-        unsigned int new_alloc = (set->alloc) ? set->alloc * 4 : 2;
-        const char **new_str = realloc(set->str, sizeof(char *) * new_alloc);
+    if (set->count >= set->capacity) {
+        unsigned int new_capacity = (set->capacity) ? set->capacity * 4 : 2;
+        const char **new_str = realloc(set->str, new_capacity * sizeof(char *));
         if (!new_str) {
             return FALSE;
         }
-        memset(&new_str[set->count], 0, sizeof(char*) * (new_alloc-set->count));
         set->str = new_str;
-        set->alloc = new_alloc;
+        set->capacity = new_capacity;
     }
 
     // Add str to the set

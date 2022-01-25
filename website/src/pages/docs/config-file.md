@@ -142,6 +142,25 @@ metric:
     #
     verbosity : 4
 
+  # The `metric > watch[*]` array contains objects that enable different
+  # categories of metrics. Their type property specifies the category.
+  # Comment out an array entry to disable the category. If you comment
+  # out `metric > watch` entirely, the default metric watch list will be
+  # used which has all categories enabled.
+  #
+  watch:
+    # The statsd category creates metrics from statsd network traffic that is
+    # sent from or received by the scoped process.  This includes extended
+    # statsd, where dimensions will be included in the metrics produced.
+    # See the STATSD protocol detector for more info about how
+    # network traffic is determined to contain stastd metric data.
+    #
+    # Set $SCOPE_METRIC_STATSD to true or false to enable or disable this
+    # category.
+    #
+    - type: statsd
+
+
   # Backend connection for metrics
   #
   # When the `cribl` backend is enabled, these settings are ignored and metrics
@@ -159,9 +178,7 @@ metric:
     #   tcp://host:port         send to a network server (TCP protocol)
     #   unix://@abstractname    send to a unix domain server w/abstract addr
     #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
-    #   edge                    send to a unix domain server `/opt/cribl/state/appscope.sock`
-    #                           or to `$CRIBL_HOME/state/appscope.sock`
-    #                           if $CRIBL_HOME environment variable is set
+    #   edge                    send to cribl edge (over unix domain)
     #
     # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
     # set the $SCOPE_METRIC_TLS_* variables.
@@ -306,9 +323,12 @@ event:
     enhancefs: true
 
   # The `event > watch[*]` array contains objects that enable different
-  # categories of events. Their type property specifies the category. The
-  # rest are filters, so only matching events are generated. Comment out an
-  # array entry to disable the category.
+  # categories of events. Their type property specifies the category.
+  # The rest of the properties are filters, so only matching events are
+  # generated. Comment out an array entry to disable the category. If you
+  # comment out `event > watch` entirely, the default event watch list
+  # will be used which has all but metric enabled.
+  #
   watch:
 
     # The file category includes writes to files. It's intended primarily for
@@ -437,9 +457,7 @@ event:
     #   tcp://host:port         send to a network server (TCP protocol)
     #   unix://@abstractname    send to a unix domain server w/abstract addr
     #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
-    #   edge                    send to a unix domain server `/opt/cribl/state/appscope.sock`
-    #                           or to `$CRIBL_HOME/state/appscope.sock`
-    #                           if $CRIBL_HOME environment variable is set
+    #   edge                    send to cribl edge (over unix domain)
     #
     # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
     # set the $SCOPE_EVENT_TLS_* variables.
@@ -633,9 +651,7 @@ libscope:
       #   tcp://host:port         send to a network server (TCP protocol)
       #   unix://@abstractname    send to a unix domain server w/abstract addr
       #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
-      #   edge                    send to a unix domain server `/opt/cribl/state/appscope.sock`
-      #                           or to `$CRIBL_HOME/state/appscope.sock`
-      #                           if $CRIBL_HOME environment variable is set
+      #   edge                    send to cribl edge (over unix domain)
       #
       # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
       # set the $SCOPE_LOG_TLS_* variables.
@@ -721,9 +737,7 @@ cribl:
     #   tcp://host:port         send to a TCP server
     #   unix://@abstractname    send to a unix domain server w/abstract addr
     #   unix:///var/run/mysock  send to a unix domain server w/filesystem addr
-    #   edge                    send to a unix domain server `/opt/cribl/state/appscope.sock`
-    #                           or to `$CRIBL_HOME/state/appscope.sock`
-    #                           if $CRIBL_HOME environment variable is set
+    #   edge                    send to cribl edge (over unix domain)
     #
     # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
     # set the $SCOPE_CRIBL_TLS_* variables.
@@ -896,6 +910,14 @@ protocol:
   #  regex: " HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n"
   #  detect: true
   #  payload: true
+
+  # AppScope uses an internally defined protocol detector for STATSD like the
+  # example below by default.
+  #
+  # Uncomment this and adjust as needed to override the defaults.
+  #
+  #- name: STATSD
+  #  regex: "^([^:]+):([\\d.]+)\\|(c|g|ms|s|h)"
 
   # AppScope uses another internally defined protocol detector for TLS like the
   # example below by default.

@@ -64,7 +64,10 @@ strSetAddDupElementReturnsFalse(void **state)
     assert_false(strSetAdd(set, "Hey"));
     assert_int_equal(strSetEntryCount(set), 1);
 
-    const char *hey = "Hey";
+    // Try to add "Hey" from a string in a different location.
+    // This ensures that the location of the string doesn't
+    // matter at all.  Only the contents of the string should matter.
+    const char hey[16] = "Hey";
     assert_false(strSetAdd(set, hey));
     assert_int_equal(strSetEntryCount(set), 1);
 

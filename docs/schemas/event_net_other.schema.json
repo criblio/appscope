@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/event_net_other.schema.json",
+  "type": "object",
+  "title": "AppScope Event",
+  "description": "A structure described AppScope `net.other` event message",
+  "examples": [{"type":"evt","id":"test_user-server_seqpacket-./server_seqpacket","_channel":"11977632602680","body":{"sourcetype":"metric","_time":1643886739.820863,"source":"net.other","host":"test_user","proc":"server_seqpacket","cmd":"./server_seqpacket","pid":232570,"data":{"_metric":"net.other","_metric_type":"gauge","_value":1,"proc":"server_seqpacket","pid":232570,"fd":3,"proto":"SEQPACKET","port":0,"unit":"connection"}}}],
+  "required": [
+    "type",
+    "id",
+    "_channel",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/metadata.schema.json#/$defs/event_type"
+    },
+    "id": {
+      "$ref": "definitions/metadata.schema.json#/$defs/id"
+    },
+    "_channel": {
+      "$ref": "definitions/metadata.schema.json#/$defs/_channel"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "sourcetype",
+        "_time",
+        "source",
+        "host",
+        "proc",
+        "cmd",
+        "pid",
+        "data"
+      ],
+      "properties": {
+        "sourcetype": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcetypemetric"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        },
+        "source": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcenetother"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "cmd": {
+          "$ref": "definitions/body.schema.json#/$defs/cmd"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "data": {
+          "title": "data",
+          "description": "data",
+          "type": "object",
+          "required": [
+            "_metric",
+            "_metric_type",
+            "_value",
+            "proc",
+            "pid",
+            "fd",
+            "proto",
+            "port",
+            "unit"
+          ],
+          "properties": {
+            "_metric": {
+              "$ref": "definitions/body.schema.json#/$defs/sourcenetother"
+            },
+            "_metric_type": {
+              "$ref": "definitions/body.schema.json#/$defs/metric_type_gauge"
+            },
+            "_value": {
+              "$ref": "definitions/body.schema.json#/$defs/_value"
+            },
+            "proc": {
+              "$ref": "definitions/data.schema.json#/$defs/proc"
+            },
+            "pid": {
+              "$ref": "definitions/data.schema.json#/$defs/pid"
+            },
+            "fd": {
+              "$ref": "definitions/data.schema.json#/$defs/fd"
+            },
+            "proto": {
+              "$ref": "definitions/data.schema.json#/$defs/proto"
+            },
+            "port": {
+              "$ref": "definitions/data.schema.json#/$defs/port"
+            },
+            "unit": {
+              "$ref": "definitions/data.schema.json#/$defs/unit_connection"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

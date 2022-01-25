@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/event_fs_read.schema.json",
+  "type": "object",
+  "title": "AppScope Event",
+  "description": "A structure described AppScope `fs.read` event message",
+  "examples": [{"type":"evt","id":"8bc1398c19f3-accept01-/kernel/syscalls/accept/accept01","_channel":"5890091215105","body":{"sourcetype":"metric","_time":1643735835.455076,"source":"fs.read","host":"8bc1398c19f3","proc":"accept01","cmd":"/opt/test/ltp/testcases/kernel/syscalls/accept/accept01","pid":1933,"data":{"_metric":"fs.read","_metric_type":"histogram","_value":4096,"proc":"accept01","pid":1933,"fd":3,"op":"fgets_unlocked","file":"/etc/passwd","numops":1,"unit":"byte"}}}],
+  "required": [
+    "type",
+    "id",
+    "_channel",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/metadata.schema.json#/$defs/event_type"
+    },
+    "id": {
+      "$ref": "definitions/metadata.schema.json#/$defs/id"
+    },
+    "_channel": {
+      "$ref": "definitions/metadata.schema.json#/$defs/_channel"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "sourcetype",
+        "_time",
+        "source",
+        "host",
+        "proc",
+        "cmd",
+        "pid",
+        "data"
+      ],
+      "properties": {
+        "sourcetype": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcetypemetric"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        },
+        "source": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcefsread"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "cmd": {
+          "$ref": "definitions/body.schema.json#/$defs/cmd"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "data": {
+          "title": "data",
+          "description": "data",
+          "type": "object",
+          "required": [
+            "_metric",
+            "_metric_type",
+            "_value",
+            "proc",
+            "pid",
+            "fd",
+            "op",
+            "file",
+            "numops",
+            "unit"
+          ],
+          "properties": {
+            "_metric": {
+              "$ref": "definitions/body.schema.json#/$defs/sourcefsread"
+            },
+            "_metric_type": {
+              "$ref": "definitions/body.schema.json#/$defs/metric_type_histogram"
+            },
+            "_value": {
+              "$ref": "definitions/body.schema.json#/$defs/_value"
+            },
+            "proc": {
+              "$ref": "definitions/data.schema.json#/$defs/proc"
+            },
+            "pid": {
+              "$ref": "definitions/data.schema.json#/$defs/pid"
+            },
+            "fd": {
+              "$ref": "definitions/data.schema.json#/$defs/fd"
+            },
+            "op": {
+              "$ref": "definitions/data.schema.json#/$defs/op_fs_read"
+            },
+            "file": {
+              "$ref": "definitions/data.schema.json#/$defs/file"
+            },
+            "numops": {
+              "$ref": "definitions/data.schema.json#/$defs/numops"
+            },
+            "unit": {
+              "$ref": "definitions/data.schema.json#/$defs/unit_byte"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

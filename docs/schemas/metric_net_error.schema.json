@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/metric_net_error.schema.json",
+  "type": "object",
+  "title": "AppScope Metric",
+  "description": "A structure described AppScope `net.error` metric message",
+  "examples": [{"type":"metric","body":{"_metric":"net.error","_metric_type":"counter","_value":6,"proc":"accept01","pid":5920,"host":"7cb66c7f77dd","op":"summary","class":"connection","unit":"operation","_time":1643749774.5732141}},{"type":"metric","body":{"_metric":"net.error","_metric_type":"counter","_value":1,"proc":"recv01","pid":3593,"host":"7cb66c7f77dd","op":"recv","class":"rx_tx","unit":"operation","_time":1643749590.5181091}}],
+  "required": [
+    "type",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/metadata.schema.json#/$defs/metric_type"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "_metric",
+        "_metric_type",
+        "_value",
+        "proc",
+        "pid",
+        "host",
+        "class",
+        "unit",
+        "_time"
+      ],
+      "properties": {
+        "_metric": {
+          "$ref": "definitions/body.schema.json#/$defs/sourceneterror"
+        },
+        "_metric_type": {
+          "$ref": "definitions/body.schema.json#/$defs/metric_type_counter"
+        },
+        "_value": {
+          "$ref": "definitions/body.schema.json#/$defs/_value"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "op": {
+          "$ref": "definitions/data.schema.json#/$defs/op"
+        },
+        "class": {
+          "$ref": "definitions/data.schema.json#/$defs/class_net_error"
+        },
+        "unit": {
+          "$ref": "definitions/data.schema.json#/$defs/unit_operation"
+        },
+        "summary": {
+          "$ref": "definitions/data.schema.json#/$defs/summary"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

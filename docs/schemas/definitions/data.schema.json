@@ -1,0 +1,477 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/definitions/data.schema.json",
+  "title": "AppScope data proc properties",
+  "description": "AppScope data proc properties",
+  "$defs": {
+    "addrs": {
+      "title": "addrs",
+      "description": "addrs",
+      "type": "array"
+    },
+    "class_connection": {
+      "title": "connection",
+      "description": "connection",
+      "type": "string",
+      "const": "connection"
+    },
+    "class_fs_error": {
+      "title": "class fs.error",
+      "description": "class fs.error",
+      "type": "string",
+      "enum": ["open_close", "read_write", "stat"]
+    },
+    "class_net_error": {
+      "title": "class net.error",
+      "description": "class net.error",
+      "type": "string",
+      "enum": ["connection", "rx_tx"]
+    },
+    "class_net_rxtx": {
+      "title": "class net.rxtx",
+      "description": "class net.rxrx",
+      "type": "string",
+      "enum": ["inet_tcp", "inet_udp", "unix_tcp", "unix_udp", "other"]
+    },
+    "data": {
+      "title": "data",
+      "description": "data",
+      "type": "string",
+      "enum": ["ssl", "clear"]
+    },
+    "domain": {
+      "title": "domain",
+      "description": "domain",
+      "type": "string"
+    },
+    "duration": {
+      "title": "duration",
+      "description": "duration",
+      "type": "number",
+      "examples": [55]
+    },
+    "fd": {
+      "title": "fd",
+      "description": "fd",
+      "type": "integer",
+      "examples": [4]
+    },
+    "file": {
+      "title": "file",
+      "description": "file",
+      "type": "string"
+    },
+    "file_group": {
+      "title": "file_group",
+      "description": "file_group",
+      "type": "number",
+      "examples": [0]
+    },
+    "file_owner": {
+      "title": "file_owner",
+      "description": "file_owner",
+      "type": "number",
+      "examples": [0]
+    },
+    "file_perms": {
+      "title": "file_perms",
+      "description": "file_perms",
+      "type": "integer",
+      "examples": [777]
+    },
+    "file_read_bytes": {
+      "title": "file_read_bytes",
+      "description": "file_read_bytes",
+      "type": "integer",
+      "examples": [512]
+    },
+    "file_read_ops": {
+      "title": "file_read_ops",
+      "description": "file_read_ops",
+      "type": "integer",
+      "examples": [5]
+    },
+    "file_write_bytes": {
+      "title": "file_write_bytes",
+      "description": "file_write_bytes",
+      "type": "integer",
+      "examples": [10]
+    },
+    "file_write_ops": {
+      "title": "file_write_ops",
+      "description": "file_write_ops",
+      "type": "integer",
+      "examples": [5]
+    },
+    "host": {
+      "title": "host",
+      "description": "host",
+      "type": "string"
+    },
+    "http_client_duration": {
+      "title": "http_client_duration",
+      "description": "http_client_duration",
+      "type": "number"
+    },
+    "http_client_ip": {
+      "title": "http_client_ip",
+      "description": "http_client_ip",
+      "type": "string"
+    },
+    "http_flavor": {
+      "title": "http_flavor",
+      "description": "http_flavor",
+      "type": "string"
+    },
+    "http_frame": {
+      "title": "http_frame",
+      "description": "http_frame",
+      "type": "string",
+      "enum": ["HEADERS", "PUSH_PROMISE"]
+    },
+    "http_host": {
+      "title": "http_host",
+      "description": "http_host",
+      "type": "string"
+    },
+    "http_method": {
+      "title": "http_method",
+      "description": "http_method",
+      "type": "string"
+    },
+    "http_response_content_length": {
+      "title": "http_response_content_length",
+      "description": "http_response_content_length",
+      "type": "number"
+    },
+    "http_scheme": {
+      "title": "http_scheme",
+      "description": "http_scheme",
+      "type": "string",
+      "enum": ["http", "https"]
+    },
+    "http_server_duration": {
+      "title": "http_server_duration",
+      "description": "http_server_duration",
+      "type": "number"
+    },
+    "http_status_code": {
+      "title": "http_status_code",
+      "description": "http_status_code",
+      "type": "integer",
+      "enum": [100, 101, 102, 200, 201, 202, 203, 204, 205, 206, 207, 208, 226, 300, 301, 302, 303, 304, 305, 307, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 421, 422, 423, 424, 426, 428, 429, 431, 444, 451, 499, 500, 501, 502, 503, 504, 505, 506, 507]
+    },
+    "http_status_text": {
+      "title": "http_status_text",
+      "description": "http_status_text",
+      "type": "string",
+      "enum": ["Continue", "Switching Protocols", "Processing", "OK", "Created", "Accepted", "Non-authoritative Information", "No Content", "Reset Content", "Partial Content", "Multi-Status", "Already Reported", "IM Used", "Multiple Choices", "Moved Permanently", "Found", "See Other", "Not Modified", "Use Proxy", "Temporary Redirect", "Permanent Redirect", "Bad Request", "Unauthorized", "Payment Required", "Forbidden", "Not Found", "Method Not Allowed", "Not Acceptable", "Proxy Authentication Required", "Request Timeout", "Conflict", "Gone", "Length Required", "Precondition Failed", "Payload Too Large", "Request-URI Too Long", "Unsupported Media Type", "Requested Range Not Satisfiable", "Expectation Failed", "I'm a teapot", "Misdirected Request", "Unprocessable Entity", "Locked", "Failed Dependency", "Upgrade Required", "Precondition Required", "Too Many Requests", "Request Header Fields Too Large", "Connection Closed Without Response", "Unavailable For Legal Reasons", "Client Closed Request", "Internal Server Error", "Not Implemented", "Bad Gateway", "Service Unavailable", "Gateway Timeout", "HTTP Version Not Supported", "Variant Also Negotiates", "Insufficient Storage"]
+    },
+    "http_stream": {
+      "title": "http_stream",
+      "description": "http_stream",
+      "type": "integer"
+    },
+    "http_target": {
+      "title": "http_target",
+      "description": "http_target",
+      "type": "string"
+    },
+    "http_user_agent": {
+      "title": "http_user_agent",
+      "description": "http_user_agent",
+      "type": "string"
+    },
+    "localip": {
+      "title": "localip",
+      "description": "localip",
+      "type": "string",
+      "examples": ["127.0.0.1"]
+    },
+    "localn": {
+      "title": "localn",
+      "description": "localn",
+      "type": "number"
+    },
+    "localp": {
+      "title": "localp",
+      "description": "localp",
+      "type": "number",
+      "examples": [9109]
+    },
+    "message": {
+      "title": "message",
+      "description": "message",
+      "type": "string"
+    },
+    "net_bytes_recv": {
+      "title": "net_bytes_recv",
+      "description": "net_bytes_recv",
+      "type": "number"
+    },
+    "net_bytes_sent": {
+      "title": "net_bytes_sent",
+      "description": "net_bytes_sent",
+      "type": "number"
+    },
+    "net_close_reason": {
+      "title": "net_close_reason",
+      "description": "net_close_reason",
+      "type": "string",
+      "enum": ["local", "remote"]
+    },
+    "net_protocol": {
+      "title": "net_protocol",
+      "description": "net_protocol",
+      "type": "string",
+      "const": "http"
+    },
+    "net_host_ip": {
+      "title": "net_host_ip",
+      "description": "net_host_ip",
+      "type": "string"
+    },
+    "net_host_port": {
+      "title": "net_host_port",
+      "description": "net_host_port",
+      "type": "integer"
+    },
+    "net_peer_ip": {
+      "title": "net_peer_ip",
+      "description": "net_peer_ip",
+      "type": "string"
+    },
+    "net_peer_port": {
+      "title": "net_peer_port",
+      "description": "net_peer_port",
+      "type": "integer"
+    },
+    "unix_peer_inode": {
+      "title": "unix_peer_inode",
+      "description": "unix_peer_inode",
+      "type": "number"
+    },
+    "net_transport": {
+      "title": "net_transport",
+      "description": "net_transport",
+      "type": "string",
+      "enum": ["IP.TCP", "IP.UDP", "IP.RAW", "IP.RDM", "IP.SEQPACKET", "Unix.TCP", "Unix.UDP", "Unix.RAW", "Unix.RDM", "Unix.SEQPACKET"]
+    },
+    "numops": {
+      "title": "numops",
+      "description": "numops",
+      "type": "number"
+    },
+    "op": {
+      "title": "op",
+      "description": "op",
+      "type": "string"
+    },
+    "op_fs_close": {
+      "title": "op_fs_close",
+      "description": "op_fs_close",
+      "type": "string",
+      "enum": ["go_close", "closedir", "freopen", "freopen64", "close", "fclose", "close$NOCANCEL", "guarded_close_np", "close_nocancel"]
+    },
+    "op_fs_delete": {
+      "title": "op_fs_delete",
+      "description": "op_fs_delete",
+      "type": "string",
+      "enum": ["unlink", "unlinkat"]
+    },
+    "op_fs_open": {
+      "title": "op_fs_open",
+      "description": "op_fs_open",
+      "type": "string",
+      "enum": ["open", "openat", "opendir", "creat", "fopen", "freopen", "open64", "openat64", "__open_2", "__openat_2", "creat64", "fopen64", "freopen64", "recvmsg", "console output", "console input"]
+    },
+    "op_fs_read": {
+      "title": "op_fs_read",
+      "description": "op_fs_read",
+      "type": "string",
+      "enum": ["go_read", "readdir", "pread64", "preadv", "preadv2", "preadv64v2", "__pread_chk", "__read_chk", "__fread_unlocked_chk", "read", "readv", "pread", "fread", "__fread_chk", "fread_unlocked", "fgets", "__fgets_chk", "fgets_unlocked", "__fgetws_chk", "fgetws", "fgetwc", "fgetc", "fscanf", "getline", "getdelim", "__getdelim"]
+    },
+    "op_fs_seek": {
+      "title": "op_fs_seek",
+      "description": "op_fs_seek",
+      "type": "string",
+      "enum": ["lseek64", "fseek64", "ftello64", "fsetpos64", "lseek", "fseek", "fseeko", "ftell", "ftello", "rewind", "fsetpos", "fgetpos", "fgetpos64"]
+    },
+    "op_fs_stat": {
+      "title": "op_fs_stat",
+      "description": "op_fs_stat",
+      "type": "string",
+      "enum": ["statfs64", "__xstat", "__xstat64", "__lxstat", "__lxstat64", "__fxstat", "__fxstatat", "__fxstatat64", "statx", "statfs", "statvfs", "statvfs64", "access", "faccessat", "stat", "lstat", "fstatfs64", "__fxstat", "__fxstat64", "fstatfs", "fstatvfs", "fstatvfs64", "fstat", "fstatat"]
+    },
+    "op_fs_write": {
+      "title": "op_fs_write",
+      "description": "op_fs_write",
+      "type": "string",
+      "enum": ["go_write", "pwrite64", "pwritev", "pwritev64", "pwritev2", "pwritev64v2", "__overflow", "__write_libc", "__write_pthread", "fwrite_unlocked", "__stdio_write", "write", "pwrite", "writev", "fwrite", "puts", "putchar", "fputs", "fputs_unlocked", "fputc", "fputc_unlocked", "putwc", "fputwc"]
+    },
+    "pid": {
+      "title": "pid",
+      "description": "pid",
+      "type": "integer",
+      "examples": [1000]
+    },
+    "port": {
+      "title": "port",
+      "description": "port",
+      "type": "number"
+    },
+    "proc": {
+      "title": "proc",
+      "description": "proc",
+      "type": "string"
+    },
+    "proc_cgroup": {
+      "title": "proc_cgroup",
+      "description": "proc_cgroup",
+      "type": "string",
+      "examples": ["0::/user.slice/user-1000.slice/session-3.scope"]
+    },
+    "proc_gid": {
+      "title": "proc_gid",
+      "description": "proc_gid",
+      "type": "integer",
+      "examples": [0]
+    },
+    "proc_uid": {
+      "title": "proc_uid",
+      "description": "proc_uid",
+      "type": "integer",
+      "examples": [0]
+    },
+    "proto": {
+      "title": "proto",
+      "description": "proto",
+      "type": "string",
+      "enum": ["TCP", "UDP", "RAW", "RDM", "SEQPACKET", "OTHER"]
+    },
+    "proto_tcp": {
+      "title": "proto_tcp",
+      "description": "proto_tcp",
+      "type": "string",
+      "const": "TCP"
+    },
+    "proto_udp": {
+      "title": "proto_udp",
+      "description": "proto_udp",
+      "type": "string",
+      "const": "UDP"
+    },
+    "protocol": {
+      "title": "protocol",
+      "description": "protocol",
+      "type": "string",
+      "enum": ["HTTP"]
+    },
+    "remoteip": {
+      "title": "remoteip",
+      "description": "remoteip",
+      "type": "string",
+      "examples": ["192.158.1.38"]
+    },
+    "remoten": {
+      "title": "remoten",
+      "description": "remoten",
+      "type": "number"
+    },
+    "remotep": {
+      "title": "remotep",
+      "description": "remotep",
+      "type": "number",
+      "examples": [9108]
+    },
+    "summary": {
+      "title": "summary",
+      "description": "summary",
+      "type": "string",
+      "const": "true"
+    },
+    "unit_byte" : {
+      "title": "byte",
+      "description": "Unit - byte",
+      "type": "string",
+      "const": "byte"
+    },
+    "unit_connection": {
+      "title": "connection",
+      "description": "Unit - connection",
+      "type": "string",
+      "const": "connection"
+    },
+    "unit_file" : {
+      "title": "file",
+      "description": "Unit - file",
+      "type": "string",
+      "const": "file"
+    },
+    "unit_instance": {
+      "title": "instance",
+      "description": "Unit - instance",
+      "type": "string",
+      "const": "instance"
+    },
+    "unix_local_inode": {
+      "title": "unix_local_inode",
+      "description": "unix_local_inode",
+      "type": "number"
+    },
+    "unit_kibibyte" : {
+      "title": "kibibyte",
+      "description": "Unit - kibibyte",
+      "type": "string",
+      "const": "kibibyte"
+    },
+    "unit_microsecond" : {
+      "title": "microsecond",
+      "description": "Unit - microsecond",
+      "type": "string",
+      "const": "microsecond"
+    },
+    "unit_millisecond" : {
+      "title": "millisecond",
+      "description": "Unit - millisecond",
+      "type": "string",
+      "const": "millisecond"
+    },
+    "unit_operation" : {
+      "title": "operation",
+      "description": "Unit - operation",
+      "type": "string",
+      "const": "operation"
+    },
+    "unit_percent" : {
+      "title": "percent",
+      "description": "Unit - percent",
+      "type": "string",
+      "const": "percent"
+    },
+    "unit_process" : {
+      "title": "process",
+      "description": "Unit - process",
+      "type": "string",
+      "const": "process"
+    },
+    "unit_request" : {
+      "title": "request",
+      "description": "Unit - request",
+      "type": "string",
+      "const": "request"
+    },
+    "unit_thread" : {
+      "title": "thread",
+      "description": "Unit - thread",
+      "type": "string",
+      "const": "thread"
+    },
+    "x_appscope" : {
+      "title": "x-appscope",
+      "description": "x-appscope",
+      "type": "string",
+      "const": "x-appscope"
+    }
+  }
+}

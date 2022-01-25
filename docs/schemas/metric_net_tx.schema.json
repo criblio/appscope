@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/metric_net_tx.schema.json",
+  "type": "object",
+  "title": "AppScope Metric",
+  "description": "A structure described AppScope `net.tx` metric message",
+  "examples": [{"type":"metric","body":{"_metric":"net.tx","_metric_type":"counter","_value":3,"proc":"recvmsg01","pid":15364,"host":"1f0ec6c8a7bc","unit":"byte","class":"unix_tcp","summary":"true","_time":1643826427.2791359}}, {"type":"metric","body":{"_metric":"net.tx","_metric_type":"counter","_value":16,"proc":"send02","pid":11555,"fd":4,"host":"1f0ec6c8a7bc","domain":"AF_INET","proto":"UDP","localip":"0.0.0.0","localp":0,"remoteip":"127.0.0.1","remotep":38725,"data":"clear","numops":1,"unit":"byte","_time":1643826318.2418549}}, {"type":"metric","body":{"_metric":"net.tx","_metric_type":"counter","_value":1,"proc":"recvmsg01","pid":11548,"fd":3,"host":"1f0ec6c8a7bc","domain":"UNIX","proto":"TCP","localn":48335,"remoten":46396,"data":"clear","numops":1,"unit":"byte","_time":1643826317.162209}}],
+  "required": [
+    "type",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/metadata.schema.json#/$defs/metric_type"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "_metric",
+        "_metric_type",
+        "_value",
+        "proc",
+        "pid",
+        "host",
+        "unit",
+        "_time"
+      ],
+      "properties": {
+        "_metric": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcenettx"
+        },
+        "_metric_type": {
+          "$ref": "definitions/body.schema.json#/$defs/metric_type_counter"
+        },
+        "_value": {
+          "$ref": "definitions/body.schema.json#/$defs/_value"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "fd": {
+          "$ref": "definitions/data.schema.json#/$defs/fd"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "domain": {
+          "$ref": "definitions/data.schema.json#/$defs/domain"
+        },
+        "proto": {
+          "$ref": "definitions/data.schema.json#/$defs/proto"
+        },
+        "localn": {
+          "$ref": "definitions/data.schema.json#/$defs/localn"
+        },
+        "localip": {
+          "$ref": "definitions/data.schema.json#/$defs/localip"
+        },
+        "localp": {
+          "$ref": "definitions/data.schema.json#/$defs/localp"
+        },
+        "remoten": {
+          "$ref": "definitions/data.schema.json#/$defs/remoten"
+        },
+        "remoteip": {
+          "$ref": "definitions/data.schema.json#/$defs/remoteip"
+        },
+        "remotep": {
+          "$ref": "definitions/data.schema.json#/$defs/remotep"
+        },
+        "data": {
+          "$ref": "definitions/body.schema.json#/$defs/data"
+        },
+        "numops": {
+          "$ref": "definitions/data.schema.json#/$defs/numops"
+        },
+        "unit": {
+          "$ref": "definitions/data.schema.json#/$defs/unit_byte"
+        },
+        "class": {
+          "$ref": "definitions/data.schema.json#/$defs/class_net_rxtx"
+        },
+        "summary": {
+          "$ref": "definitions/data.schema.json#/$defs/summary"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

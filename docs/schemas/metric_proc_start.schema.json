@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/metric_proc_start.schema.json",
+  "type": "object",
+  "title": "AppScope Metric",
+  "description": "A structure described AppScope `proc.start` metric message",
+  "examples": [{"type":"metric","body":{"_metric":"proc.start","_metric_type":"counter","_value":1,"proc":"accept01","pid":1945,"gid":0,"groupname":"root","uid":0,"username":"root","host":"7cb66c7f77dd","args":"/opt/test/ltp/testcases/kernel/syscalls/accept/accept01","unit":"process","_time":1643749566.026885}}],
+  "required": [
+    "type",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/metadata.schema.json#/$defs/metric_type"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "_metric",
+        "_metric_type",
+        "_value",
+        "proc",
+        "pid",
+        "gid",
+        "groupname",
+        "uid",
+        "username",
+        "host",
+        "args",
+        "unit",
+        "_time"
+      ],
+      "properties": {
+        "_metric": {
+          "$ref": "definitions/body.schema.json#/$defs/sourceprocstart"
+        },
+        "_metric_type": {
+          "$ref": "definitions/body.schema.json#/$defs/metric_type_counter"
+        },
+        "_value": {
+          "$ref": "definitions/body.schema.json#/$defs/_value"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "gid": {
+          "$ref": "definitions/body.schema.json#/$defs/gid"
+        },
+        "groupname": {
+          "$ref": "definitions/body.schema.json#/$defs/groupname"
+        },
+        "uid": {
+          "$ref": "definitions/body.schema.json#/$defs/uid"
+        },
+        "username": {
+          "$ref": "definitions/body.schema.json#/$defs/username"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "args": {
+          "$ref": "definitions/body.schema.json#/$defs/args"
+        },
+        "unit": {
+          "$ref": "definitions/data.schema.json#/$defs/unit_process"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

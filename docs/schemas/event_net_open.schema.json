@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/event_net_open.schema.json",
+  "type": "object",
+  "title": "AppScope Event",
+  "description": "A structure described AppScope `net.open` event message",
+  "required": [
+    "type",
+    "id",
+    "_channel",
+    "body"
+  ],
+  "examples": [{"type":"evt","id":"8bc1398c19f3-accept02-/kernel/syscalls/accept/accept02","_channel":"5890157346952","body":{"sourcetype":"net","_time":1643735835.5219281,"source":"net.open","host":"8bc1398c19f3","proc":"accept02","cmd":"/opt/test/ltp/testcases/kernel/syscalls/accept/accept02","pid":1936,"data":{"net_transport":"IP.TCP","net_peer_ip":"127.0.0.1","net_peer_port":58625,"net_host_ip":"0.0.0.0","net_host_port":0}}}],
+  "properties": {
+    "type": {
+      "$ref": "definitions/metadata.schema.json#/$defs/event_type"
+    },
+    "id": {
+      "$ref": "definitions/metadata.schema.json#/$defs/id"
+    },
+    "_channel": {
+      "$ref": "definitions/metadata.schema.json#/$defs/_channel"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "sourcetype",
+        "_time",
+        "source",
+        "host",
+        "proc",
+        "cmd",
+        "pid",
+        "data"
+      ],
+      "properties": {
+        "sourcetype": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcetypenet"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        },
+        "source": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcenetopen"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "cmd": {
+          "$ref": "definitions/body.schema.json#/$defs/cmd"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "data": {
+          "title": "data",
+          "description": "data",
+          "type": "object",
+          "required": [
+              "net_transport"
+          ],
+          "oneOf": [
+            {
+              "required": [
+                "net_peer_ip",
+                "net_peer_port",
+                "net_host_ip",
+                "net_host_port"
+              ]
+            },
+            {
+              "required": [
+                "unix_peer_inode",
+                "unix_local_inode"
+              ]
+            }
+          ],
+          "properties": {
+            "net_transport": {
+              "$ref": "definitions/data.schema.json#/$defs/net_transport"
+            },
+            "net_peer_ip": {
+              "$ref": "definitions/data.schema.json#/$defs/net_peer_ip"
+            },
+            "net_peer_port": {
+              "$ref": "definitions/data.schema.json#/$defs/net_peer_port"
+            },
+            "net_host_ip": {
+              "$ref": "definitions/data.schema.json#/$defs/net_host_ip"
+            },
+            "net_host_port": {
+              "$ref": "definitions/data.schema.json#/$defs/net_host_port"
+            },
+            "unix_peer_inode": {
+              "$ref": "definitions/data.schema.json#/$defs/unix_peer_inode"
+            },
+            "unix_local_inode": {
+              "$ref": "definitions/data.schema.json#/$defs/unix_local_inode"
+            },
+            "net_protocol": {
+              "$ref": "definitions/data.schema.json#/$defs/net_protocol"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

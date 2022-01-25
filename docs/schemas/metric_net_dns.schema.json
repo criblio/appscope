@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/metric_net_dns.schema.json",
+  "type": "object",
+  "title": "AppScope Metric",
+  "description": "A structure described AppScope `net.dns` metric message",
+  "examples": [{"type":"metric","body":{"_metric":"net.dns","_metric_type":"counter","_value":1,"proc":"lt-curl","pid":31,"host":"2a6bc132b07a","unit":"request","summary":"true","_time":1643832467.7951341}}, {"type":"metric","body":{"_metric":"net.dns","_metric_type":"counter","_value":1,"proc":"lt-curl","pid":2485,"host":"2a6bc132b07a","domain":"cribl.io","duration":0,"unit":"request","_time":1643832569.764219}}],
+  "required": [
+    "type",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/metadata.schema.json#/$defs/metric_type"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "_metric",
+        "_metric_type",
+        "_value",
+        "proc",
+        "pid",
+        "host",
+        "unit",
+        "_time"
+      ],
+      "properties": {
+        "_metric": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcenetdns"
+        },
+        "_metric_type": {
+          "$ref": "definitions/body.schema.json#/$defs/metric_type_counter"
+        },
+        "_value": {
+          "$ref": "definitions/body.schema.json#/$defs/_value"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "domain": {
+          "$ref": "definitions/data.schema.json#/$defs/domain"
+        },
+        "duration": {
+          "$ref": "definitions/data.schema.json#/$defs/duration"
+        },
+        "unit": {
+          "$ref": "definitions/data.schema.json#/$defs/unit_request"
+        },
+        "summary": {
+          "$ref": "definitions/data.schema.json#/$defs/summary"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

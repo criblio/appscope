@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/event_http_req.schema.json",
+  "type": "object",
+  "title": "AppScope Event",
+  "description": "A structure described AppScope `http.req` event message",
+  "examples": [{"type":"evt","id":"ubuntu-firefox-/usr/lib/firefox/firefox","_channel":"13470846442500","body":{"sourcetype":"http","_time":1643735942.5886259,"source":"http.req","host":"ubuntu","proc":"firefox","cmd":"/usr/lib/firefox/firefox","pid":6544,"data":{"http_method":"GET","http_target":"/canonical.html","http_flavor":"1.1","http_scheme":"http","http_host":"detectportal.firefox.com","http_user_agent":"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:96.0) Gecko/20100101 Firefox/96.0","net_transport":"IP.TCP","net_peer_ip":"34.107.221.82","net_peer_port":80,"net_host_ip":"172.16.198.210","net_host_port":33712}}}],
+  "required": [
+    "type",
+    "id",
+    "_channel",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/metadata.schema.json#/$defs/event_type"
+    },
+    "id": {
+      "$ref": "definitions/metadata.schema.json#/$defs/id"
+    },
+    "_channel": {
+      "$ref": "definitions/metadata.schema.json#/$defs/_channel"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "sourcetype",
+        "_time",
+        "source",
+        "host",
+        "proc",
+        "cmd",
+        "pid",
+        "data"
+      ],
+      "properties": {
+        "sourcetype": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcetypehttp"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        },
+        "source": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcehttpreq"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "cmd": {
+          "$ref": "definitions/body.schema.json#/$defs/cmd"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "data": {
+          "title": "data",
+          "description": "data",
+          "type": "object",
+          "required": [
+            "http_method",
+            "http_target",
+            "http_flavor",
+            "http_scheme",
+            "http_host",
+            "http_user_agent",
+            "net_transport",
+            "net_peer_ip",
+            "net_peer_port",
+            "net_host_ip",
+            "net_host_port"
+          ],
+          "properties": {
+            "http_method": {
+              "$ref": "definitions/data.schema.json#/$defs/http_method"
+            },
+            "http_frame": {
+              "$ref": "definitions/data.schema.json#/$defs/http_frame"
+            },
+            "http_target": {
+              "$ref": "definitions/data.schema.json#/$defs/http_target"
+            },
+            "http_flavor": {
+              "$ref": "definitions/data.schema.json#/$defs/http_flavor"
+            },
+            "http_stream": {
+              "$ref": "definitions/data.schema.json#/$defs/http_stream"
+            },
+            "http_scheme": {
+              "$ref": "definitions/data.schema.json#/$defs/http_scheme"
+            },
+            "http_host": {
+              "$ref": "definitions/data.schema.json#/$defs/http_host"
+            },
+            "http_user_agent": {
+              "$ref": "definitions/data.schema.json#/$defs/http_user_agent"
+            },
+            "http_client_ip": {
+              "$ref": "definitions/data.schema.json#/$defs/http_client_ip"
+            },
+            "net_transport": {
+              "$ref": "definitions/data.schema.json#/$defs/net_transport"
+            },
+            "net_peer_ip": {
+              "$ref": "definitions/data.schema.json#/$defs/net_peer_ip"
+            },
+            "net_peer_port": {
+              "$ref": "definitions/data.schema.json#/$defs/net_peer_port"
+            },
+            "net_host_ip": {
+              "$ref": "definitions/data.schema.json#/$defs/net_host_ip"
+            },
+            "net_host_port": {
+              "$ref": "definitions/data.schema.json#/$defs/net_host_port"
+            },
+            "x_appscope": {
+              "$ref": "definitions/data.schema.json#/$defs/x_appscope"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

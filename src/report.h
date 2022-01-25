@@ -34,6 +34,7 @@ typedef enum {
     FS_WRITE,
     FS_OPEN,
     FS_CLOSE,
+    FS_DELETE,
     FS_SEEK,
     TOT_READ,
     TOT_WRITE,

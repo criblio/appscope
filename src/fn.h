@@ -54,6 +54,8 @@ typedef struct {
     int (*close)(int);
     int (*fclose)(FILE *);
     int (*fcloseall)(void);
+    int (*unlink)(const char *); 
+    int (*unlinkat)(int, const char *, int);   
     ssize_t (*read)(int, void *, size_t);
     ssize_t (*readv)(int, const struct iovec *, int);
     size_t (*fread)(void *, size_t, size_t, FILE *);

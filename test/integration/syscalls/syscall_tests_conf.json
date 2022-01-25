@@ -50,6 +50,8 @@
         "statvfs",
         "statx",
         "syscall",
+        "unlink",
+        "unlinkat",
         "write",
         "writev"
       ],

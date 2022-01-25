@@ -439,6 +439,7 @@ postFSState(int fd, metric_t type, fs_info *fs, const char *funcop, const char *
         case FS_SEEK:
             summarize = &g_summary.fs.seek;
             break;
+        case FS_DELETE:
         default:
             break;
     }
@@ -792,6 +793,11 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
         }
         atomicSwapU64(&g_fsinfo[fd].numClose.evt, 0);
         break;
+    }
+
+    case FS_DELETE:
+    {
+        postFSState(fd, type, NULL, funcop, pathname);
     }
 
     case FS_SEEK:
@@ -2328,6 +2334,12 @@ doDup2(int oldfd, int newfd, int rc, const char *func)
             doUpdateState(NET_ERR_CONN, oldfd, (size_t)0, func, "nopath");
         }
     }
+}
+
+void
+doDelete(const char *pathname, const char *func)
+{
+    doUpdateState(FS_DELETE, -1, 0, func, pathname);
 }
 
 void

@@ -31,6 +31,8 @@
 #define STATSDPREFIX_NODE            "statsdprefix"
 #define STATSDMAXLEN_NODE            "statsdmaxlen"
 #define VERBOSITY_NODE               "verbosity"
+#define WATCH_NODE               "watch"
+#define TYPE_NODE                    "type"
 #define TRANSPORT_NODE           "transport"
 #define TYPE_NODE                    "type"
 #define HOST_NODE                    "host"
@@ -149,6 +151,7 @@ void cfgMtcFormatSetFromStr(config_t*, const char*);
 void cfgMtcStatsDPrefixSetFromStr(config_t*, const char*);
 void cfgMtcStatsDMaxLenSetFromStr(config_t*, const char*);
 void cfgMtcPeriodSetFromStr(config_t*, const char*);
+void cfgMtcStatsdEnableSetFromStr(config_t*, const char*);
 void cfgCmdDirSetFromStr(config_t*, const char*);
 void cfgConfigEventSetFromStr(config_t*, const char*);
 void cfgEvtEnableSetFromStr(config_t*, const char*);
@@ -447,6 +450,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgMtcStatsDMaxLenSetFromStr(cfg, value);
     } else if (!strcmp(env_name, "SCOPE_SUMMARY_PERIOD")) {
         cfgMtcPeriodSetFromStr(cfg, value);
+    } else if (!strcmp(env_name, "SCOPE_METRIC_STATSD")) {
+        cfgMtcStatsdEnableSetFromStr(cfg, value);
     } else if (!strcmp(env_name, "SCOPE_CMD_DIR")) {
         cfgCmdDirSetFromStr(cfg, value);
     } else if (!strcmp(env_name, "SCOPE_CONFIG_EVENT")) {
@@ -671,6 +676,13 @@ cfgMtcPeriodSetFromStr(config_t* cfg, const char* value)
     if (errno || *endptr) return;
 
     cfgMtcPeriodSet(cfg, x);
+}
+
+void
+cfgMtcStatsdEnableSetFromStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgMtcStatsdEnableSet(cfg, strToVal(boolMap, value));
 }
 
 void
@@ -1196,6 +1208,54 @@ processFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
+processMtcWatchType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    char* value = stringVal(node);
+    if (!strcmp(value, "statsd")) {
+        cfgMtcStatsdEnableSet(config, TRUE);
+    }
+    if (value) free(value);
+}
+
+static void
+processMtcSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    parse_table_t t[] = {
+        {YAML_SCALAR_NODE,    TYPE_NODE,            processMtcWatchType},
+        {YAML_NO_NODE,        NULL,                 NULL}
+    };
+
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+}
+static void
+processMtcWatch(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+{
+    // Type can be scalar or sequence.
+    // It will be scalar if there are zero entries, in which case we
+    // clear all values and return.
+    if ((node->type != YAML_SEQUENCE_NODE) &&
+       (node->type != YAML_SCALAR_NODE)) return;
+
+    // absence of one of these values means to clear it.
+    // clear them all, then set values for whatever we find.
+    cfgMtcStatsdEnableSet(config, FALSE);
+
+    if (node->type != YAML_SEQUENCE_NODE) return;
+    yaml_node_item_t* item;
+    foreach(item, node->data.sequence.items) {
+        yaml_node_t* i = yaml_document_get_node(doc, *item);
+        processMtcSource(config, doc, i);
+    }
+}
+
+static void
 processSummaryPeriod(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     char* value = stringVal(node);
@@ -1227,6 +1287,8 @@ processMetric(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     parse_table_t t[] = {
         {YAML_SCALAR_NODE,    ENABLE_NODE,          processMetricEnable},
         {YAML_MAPPING_NODE,   FORMAT_NODE,          processFormat},
+        {YAML_SEQUENCE_NODE,  WATCH_NODE,           processMtcWatch},
+        {YAML_SCALAR_NODE,    WATCH_NODE,           processMtcWatch},
         {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportMetric},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
@@ -1264,7 +1326,7 @@ processEvtFormat(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processWatchType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processEvtWatchType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
 
@@ -1275,7 +1337,7 @@ processWatchType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processWatchName(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processEvtWatchName(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
 
@@ -1285,7 +1347,7 @@ processWatchName(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processWatchField(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processEvtWatchField(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
 
@@ -1295,7 +1357,7 @@ processWatchField(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processWatchValue(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processEvtWatchValue(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     if (node->type != YAML_SCALAR_NODE) return;
 
@@ -1305,7 +1367,7 @@ processWatchValue(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processWatchHeader(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+processEvtWatchHeader(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     if (node->type != YAML_SEQUENCE_NODE) return;
 
@@ -1336,11 +1398,11 @@ processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_MAPPING_NODE) return;
 
     parse_table_t t[] = {
-        {YAML_SCALAR_NODE,    TYPE_NODE,            processWatchType},
-        {YAML_SCALAR_NODE,    NAME_NODE,            processWatchName},
-        {YAML_SCALAR_NODE,    FIELD_NODE,           processWatchField},
-        {YAML_SCALAR_NODE,    VALUE_NODE,           processWatchValue},
-        {YAML_SEQUENCE_NODE,  EX_HEADERS,           processWatchHeader},
+        {YAML_SCALAR_NODE,    TYPE_NODE,            processEvtWatchType},
+        {YAML_SCALAR_NODE,    NAME_NODE,            processEvtWatchName},
+        {YAML_SCALAR_NODE,    FIELD_NODE,           processEvtWatchField},
+        {YAML_SCALAR_NODE,    VALUE_NODE,           processEvtWatchValue},
+        {YAML_SEQUENCE_NODE,  EX_HEADERS,           processEvtWatchHeader},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1362,7 +1424,7 @@ processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 }
 
 static void
-processWatch(config_t* config, yaml_document_t* doc, yaml_node_t* node)
+processEvtWatch(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 {
     // Type can be scalar or sequence.
     // It will be scalar there are zero entries, in which case we
@@ -1394,8 +1456,8 @@ processEvent(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    ENABLE_NODE,          processEvtEnable},
         {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportCtl},
         {YAML_MAPPING_NODE,   FORMAT_NODE,          processEvtFormat},
-        {YAML_SEQUENCE_NODE,  WATCH_NODE,           processWatch},
-        {YAML_SCALAR_NODE,    WATCH_NODE,           processWatch},
+        {YAML_SEQUENCE_NODE,  WATCH_NODE,           processEvtWatch},
+        {YAML_SCALAR_NODE,    WATCH_NODE,           processEvtWatch},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -2174,10 +2236,45 @@ err:
 }
 
 static cJSON*
+createMetricWatchObjectJson(config_t *cfg)
+{
+    cJSON *root = NULL;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, TYPE_NODE, "statsd")) goto err;
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+static cJSON*
+createMetricWatchArrayJson(config_t* cfg)
+{
+    cJSON* root = NULL;
+
+    if (!(root = cJSON_CreateArray())) goto err;
+
+    if (cfgMtcStatsdEnable(cfg)) {
+        cJSON* item;
+        if (!(item = createMetricWatchObjectJson(cfg))) goto err;
+        cJSON_AddItemToArray(root, item);
+    }
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+
+static cJSON*
 createMetricJson(config_t* cfg)
 {
     cJSON* root = NULL;
-    cJSON* transport, *format;
+    cJSON *transport, *format, *watch;
 
     if (!(root = cJSON_CreateObject())) goto err;
 
@@ -2189,6 +2286,9 @@ createMetricJson(config_t* cfg)
 
     if (!(format = createMetricFormatJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(root, FORMAT_NODE, format);
+
+    if (!(watch = createMetricWatchArrayJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(root, WATCH_NODE, watch);
 
     return root;
 err:

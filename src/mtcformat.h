@@ -44,6 +44,7 @@ typedef struct {
     const data_type_t type;
     event_field_t *fields;
     watch_t src;
+    event_field_t *capturedFields;
     cJSON *data;
 } event_t;
 

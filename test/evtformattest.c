@@ -489,7 +489,7 @@ fmtMetricJsonNoFields(void** state)
     data_type_t type;
     for (type=DELTA; type<=SET+1; type++) {
         event_t e = INT_EVENT("A", 1, type, NULL);
-        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC);
+        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC, NULL);
         cJSON* json_type = cJSON_GetObjectItem(json, "_metric_type");
         assert_string_equal(map[type], cJSON_GetStringValue(json_type));
         if (json) cJSON_Delete(json);
@@ -507,7 +507,7 @@ fmtMetricJsonWFields(void** state)
         FIELDEND
     };
     event_t e = INT_EVENT("hey", 2, HISTOGRAM, fields);
-    cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC);
+    cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC, NULL);
     assert_non_null(json);
     char* str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
@@ -516,6 +516,47 @@ fmtMetricJsonWFields(void** state)
                  "\"_metric_type\":\"histogram\","
                  "\"_value\":2,"
                  "\"A\":\"Z\",\"B\":987,\"C\":\"Y\",\"D\":654}");
+    if (str) free(str);
+    cJSON_Delete(json);
+}
+
+static void
+fmtMetricJsonWDuplicateFields(void **state)
+{
+    event_field_t capturedfields[] = {
+        STRFIELD("A",     "Z",  0,  TRUE),
+        NUMFIELD("B",     987,  1,  TRUE),
+        FIELDEND
+    };
+
+    custom_tag_t A = {.name = "A", .value = "XXX"};
+    custom_tag_t C = {.name = "C", .value = "YYY"};
+    custom_tag_t *tags[] = { &A, &C, NULL};
+
+    event_field_t fields[] = {
+        NUMFIELD("A",     987,  1,  TRUE),
+        STRFIELD("B",     "Z",  0,  TRUE),
+        NUMFIELD("C",     654,  3,  TRUE),
+        STRFIELD("D",     "Y",  2,  TRUE),
+        FIELDEND
+    };
+
+    // when duplicates occur:
+    //   capturedFields are a top priority
+    //   then custom tags are the next priority
+    //   then other fields are the lowest priority
+
+    event_t e = INT_EVENT("hey", 2, HISTOGRAM, fields);
+    e.capturedFields = capturedfields;
+    cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC, tags);
+    assert_non_null(json);
+    char* str = cJSON_PrintUnformatted(json);
+    assert_non_null(str);
+    assert_string_equal(str,
+                 "{\"_metric\":\"hey\","
+                 "\"_metric_type\":\"histogram\","
+                 "\"_value\":2,"
+                 "\"A\":\"Z\",\"B\":987,\"C\":\"YYY\",\"D\":\"Y\"}");
     if (str) free(str);
     cJSON_Delete(json);
 }
@@ -533,7 +574,7 @@ fmtMetricJsonWFilteredFields(void** state)
     event_t e = INT_EVENT("hey", 2, HISTOGRAM, fields);
     regex_t re;
     assert_int_equal(regcomp(&re, "[AD]", REG_EXTENDED), 0);
-    cJSON* json = fmtMetricJson(&e, &re, CFG_SRC_METRIC);
+    cJSON* json = fmtMetricJson(&e, &re, CFG_SRC_METRIC, NULL);
     assert_non_null(json);
     char* str = cJSON_PrintUnformatted(json);
     assert_non_null(str);
@@ -552,7 +593,7 @@ fmtMetricJsonEscapedValues(void** state)
 {
     {
         event_t e = INT_EVENT("Paç \"fat!", 3, SET, NULL);    // embedded double quote
-        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC);
+        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC, NULL);
         assert_non_null(json);
         char* str = cJSON_PrintUnformatted(json);
         assert_non_null(str);
@@ -571,7 +612,7 @@ fmtMetricJsonEscapedValues(void** state)
             FIELDEND
         };
         event_t e = INT_EVENT("you", 4, DELTA, fields);
-        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC);
+        cJSON* json = fmtMetricJson(&e, NULL, CFG_SRC_METRIC, NULL);
         assert_non_null(json);
         char* str = cJSON_PrintUnformatted(json);
         assert_non_null(str);
@@ -829,6 +870,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(fmtEventJsonWithEmbeddedNulls),
         cmocka_unit_test(fmtMetricJsonNoFields),
         cmocka_unit_test(fmtMetricJsonWFields),
+        cmocka_unit_test(fmtMetricJsonWDuplicateFields),
         cmocka_unit_test(fmtMetricJsonWFilteredFields),
         cmocka_unit_test(fmtMetricJsonEscapedValues),
         cmocka_unit_test(evtFormatSourceEnabledSetAndGet),

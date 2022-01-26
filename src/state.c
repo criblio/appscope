@@ -456,16 +456,16 @@ postFSState(int fd, metric_t type, fs_info *fs, const char *funcop, const char *
     fs_info *fsp = calloc(1, len);
     if (!fsp) return FALSE;
 
-    memmove(fsp, fs, len);
+    if (fs) memmove(fsp, fs, len);
     fsp->fd = fd;
     fsp->evtype = EVT_FS;
     fsp->data_type = type;
 
-    if (pathname && (fs->path[0] == '\0')) {
+    if (pathname && (!fs || fs->path[0] == '\0')) {
         strncpy(fsp->path, pathname, strnlen(pathname, sizeof(fsp->path)));
     }
 
-    if (funcop && (fs->funcop[0] == '\0')) {
+    if (funcop && (!fs || fs->funcop[0] == '\0')) {
         strncpy(fsp->funcop, funcop, strnlen(funcop, sizeof(fsp->funcop)));
     }
 

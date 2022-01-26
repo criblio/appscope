@@ -529,16 +529,9 @@ fmtMetricJsonWDuplicateFields(void **state)
         FIELDEND
     };
 
-    custom_tag_t **tags = calloc(5, sizeof(custom_tag_t*));
-    int i = 0;
-    custom_tag_t *tag = calloc(1, sizeof(*tag));
-    tag->name = strdup("A");
-    tag->value = strdup("XXX");
-    tags[i++] = tag;
-    tag = calloc(1, sizeof(*tag));
-    tag->name = strdup("C");
-    tag->value = strdup("YYY");
-    tags[i++] = tag;
+    custom_tag_t A = {.name = "A", .value = "XXX"};
+    custom_tag_t C = {.name = "C", .value = "YYY"};
+    custom_tag_t *tags[] = { &A, &C, NULL};
 
     event_field_t fields[] = {
         NUMFIELD("A",     987,  1,  TRUE),
@@ -566,14 +559,6 @@ fmtMetricJsonWDuplicateFields(void **state)
                  "\"A\":\"Z\",\"B\":987,\"C\":\"YYY\",\"D\":\"Y\"}");
     if (str) free(str);
     cJSON_Delete(json);
-
-    for (i=0; (tag=tags[i]); i++) {
-        free(tag->name);
-        free(tag->value);
-        free(tag);
-    }
-    free(tags);
-
 }
 
 static void

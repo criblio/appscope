@@ -798,6 +798,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     case FS_DELETE:
     {
         postFSState(fd, type, NULL, funcop, pathname);
+        break;
     }
 
     case FS_SEEK:

@@ -2438,6 +2438,7 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
         event_t evt = INT_EVENT("fs.delete", 1, DELTA, fields);
         evt.src = CFG_SRC_FS;
         cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
+        break;
     }
 
     default:

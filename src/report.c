@@ -1955,7 +1955,7 @@ getNetPtotocol(net_info *net, event_field_t *nevent, int *ix)
   },
   "_time": timestamp
 }
- */
+*/
 static void
 doNetOpenEvent(net_info *net)
 {
@@ -2790,7 +2790,6 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
             return;
         }
 
-        // Report the net open metric
         const char* metric = "net.open";
         const char* units = "connection";
         const char* err_str = "ERROR: doNetMetric:CONNECTION_OPEN:cmdSendMetric";
@@ -2806,6 +2805,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
             UNIT_FIELD(units),
             FIELDEND
         };
+
+        // Report the net open metric
         event_t evt = INT_EVENT(metric, value->mtc, DELTA, fields);
         if (cmdSendMetric(g_mtc, &evt)) {
             scopeLogError("fd:%d %s", net->fd, err_str);

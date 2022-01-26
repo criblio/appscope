@@ -639,13 +639,12 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     {
         if (!checkNetEntry(fd)) break;
         if ((ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) &&
-            (((g_netinfo[fd].type != SOCK_STREAM) || ((g_netinfo[fd].addrSetRemote == TRUE) && (g_netinfo[fd].addrSetLocal == TRUE))) ||
-            (funcop && !strncmp(funcop, "dup", 3)))) {
-                addToInterfaceCounts(&g_netinfo[fd].counters.netConnOpen, 1);
-                addToInterfaceCounts(&g_ctrs.netConnOpen, 1);
-                if (postNetState(fd, type, &g_netinfo[fd])) {
-                    atomicSwapU64(&g_netinfo[fd].counters.netConnOpen.mtc, 0);
-                }
+            ((g_netinfo[fd].type != SOCK_STREAM) || ((g_netinfo[fd].addrSetRemote == TRUE) && (g_netinfo[fd].addrSetLocal == TRUE)))) {
+            addToInterfaceCounts(&g_netinfo[fd].counters.netConnOpen, 1);
+            addToInterfaceCounts(&g_ctrs.netConnOpen, 1);
+            if (postNetState(fd, type, &g_netinfo[fd])) {
+                atomicSwapU64(&g_netinfo[fd].counters.netConnOpen.mtc, 0);
+            }
         }
         atomicSwapU64(&g_netinfo[fd].counters.netConnOpen.evt, 0);
         break;
@@ -655,13 +654,12 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     {
         if (!checkNetEntry(fd)) break;
         if ((ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) &&
-            (((g_netinfo[fd].type != SOCK_STREAM) || ((g_netinfo[fd].addrSetRemote == TRUE) && (g_netinfo[fd].addrSetLocal == TRUE))) ||
-            (funcop && !strncmp(funcop, "dup", 3)))) {
-                addToInterfaceCounts(&g_netinfo[fd].counters.netConnClose, 1);
-                addToInterfaceCounts(&g_ctrs.netConnClose, 1);
-                if (postNetState(fd, type, &g_netinfo[fd])) {
-                    atomicSwapU64(&g_netinfo[fd].counters.netConnClose.mtc, 0);
-                }
+            ((g_netinfo[fd].type != SOCK_STREAM) || ((g_netinfo[fd].addrSetRemote == TRUE) && (g_netinfo[fd].addrSetLocal == TRUE)))) {
+            addToInterfaceCounts(&g_netinfo[fd].counters.netConnClose, 1);
+            addToInterfaceCounts(&g_ctrs.netConnClose, 1);
+            if (postNetState(fd, type, &g_netinfo[fd])) {
+                atomicSwapU64(&g_netinfo[fd].counters.netConnClose.mtc, 0);
+            }
         }
         atomicSwapU64(&g_netinfo[fd].counters.netConnClose.evt, 0);
         break;
@@ -2074,20 +2072,15 @@ doSend(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
 }
 
 void
-doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
+doAccept(int oldsd, int newsd, struct sockaddr *addr, socklen_t *addrlen, char *func)
 {
-    scopeLog(CFG_LOG_DEBUG, "fd:%d %s", sd, func);
-    if (addr) {
-        addSock(sd, SOCK_STREAM, addr->sa_family);
-    } else {
-        doAddNewSock(sd);
-    }
+    scopeLog(CFG_LOG_DEBUG, "fd:%d %s", newsd, func);
+    doDupSock(oldsd, newsd);
 
-
-    if (getNetEntry(sd) != NULL) {
-        if (addr && addrlen) doSetConnection(sd, addr, *addrlen, REMOTE);
-        doUpdateState(OPEN_PORTS, sd, 1, func, NULL);
-        doUpdateState(NET_CONNECTIONS, sd, 1, func, NULL);
+    if (getNetEntry(newsd) != NULL) {
+        if (addr && addrlen) doSetConnection(newsd, addr, *addrlen, REMOTE);
+        doUpdateState(OPEN_PORTS, newsd, 1, func, NULL);
+        doUpdateState(NET_CONNECTIONS, newsd, 1, func, NULL);
     }
 }
 

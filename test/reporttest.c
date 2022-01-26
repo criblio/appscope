@@ -200,7 +200,7 @@ nothingCrashesBeforeAnyInit(void** state)
     doURL(11, NULL, 0, NETRX);
     doRecv(12, 4312, NULL, 0, BUF);
     doSend(13, 6682, NULL, 0, BUF);
-    doAccept(14, NULL, 0, "acceptFunc");
+    doAccept(14, 14, NULL, 0, "acceptFunc");
     reportFD(15, EVENT_BASED);
     reportAllFds(PERIODIC);
     doRead(16, 987, 1, NULL, 13, "readFunc", BUF, 0);
@@ -532,7 +532,9 @@ doRecvNoSummarization(void** state)
 
     clearTestData();
     setVerbosity(9);
-    doAccept(16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
+    addSock(15, SOCK_STREAM, 0); // set netinfo active = true
+    doSetConnection(15, addr_list->ai_addr, addr_list->ai_addrlen, LOCAL); // set local addr to true
+    doAccept(15, 16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
     assert_int_equal(metricCalls("net.tcp"), 1);
     assert_int_equal(metricCalls("net.port"), 1);
     assert_int_equal(eventCalls("net.tcp"), 1);
@@ -576,6 +578,8 @@ doRecvNoSummarization(void** state)
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
+    doClose(15, "closeFunc");
+    doClose(16, "closeFunc");
     if(addr_list) freeaddrinfo(addr_list);
 }
 
@@ -593,7 +597,9 @@ doRecvSummarizedOpenCloseNotSummarized(void** state)
 
     clearTestData();
     setVerbosity(7);
-    doAccept(16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
+    addSock(15, SOCK_STREAM, 0); // set netinfo active = true
+    doSetConnection(15, addr_list->ai_addr, addr_list->ai_addrlen, LOCAL); // set local addr to true
+    doAccept(15, 16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
     assert_int_equal(metricCalls("net.tcp"), 1);
     assert_int_equal(metricCalls("net.port"), 1);
     assert_int_equal(eventCalls("net.tcp"), 1);
@@ -639,6 +645,8 @@ doRecvSummarizedOpenCloseNotSummarized(void** state)
     assert_int_equal(metricCalls("net.port"), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
+    doClose(15, "closeFunc");
+    doClose(16, "closeFunc");
     if(addr_list) freeaddrinfo(addr_list);
 }
 
@@ -656,7 +664,9 @@ doRecvFullSummarization(void** state)
 
     clearTestData();
     setVerbosity(6);
-    doAccept(16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
+    addSock(15, SOCK_STREAM, 0); // set netinfo active = true
+    doSetConnection(15, addr_list->ai_addr, addr_list->ai_addrlen, LOCAL); // set local addr to true
+    doAccept(15, 16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
     assert_int_equal(metricCalls("net.tcp"), 0);
     assert_int_equal(metricCalls("net.port"), 0);
     assert_int_equal(eventCalls("net.tcp"), 1);
@@ -702,6 +712,8 @@ doRecvFullSummarization(void** state)
     assert_int_equal(metricCalls("net.port"), 0);    // need high water mark?
     assert_int_equal(eventCalls(NULL), 0);
 
+    doClose(15, "closeFunc");
+    doClose(16, "closeFunc");
     if(addr_list) freeaddrinfo(addr_list);
 }
 
@@ -719,7 +731,9 @@ doSendNoSummarization(void** state)
 
     clearTestData();
     setVerbosity(9);
-    doAccept(16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
+    addSock(15, SOCK_STREAM, 0); // set netinfo active = true
+    doSetConnection(15, addr_list->ai_addr, addr_list->ai_addrlen, LOCAL); // set local addr to true
+    doAccept(15, 16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
     assert_int_equal(metricCalls("net.tcp"), 1);
     assert_int_equal(metricCalls("net.port"), 1);
     assert_int_equal(eventCalls("net.tcp"), 1);
@@ -763,6 +777,8 @@ doSendNoSummarization(void** state)
     assert_int_equal(metricCalls(NULL), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
+    doClose(15, "closeFunc");
+    doClose(16, "closeFunc");
     if(addr_list) freeaddrinfo(addr_list);
 }
 
@@ -780,11 +796,15 @@ doSendSummarizedOpenCloseNotSummarized(void** state)
 
     clearTestData();
     setVerbosity(7);
-    doAccept(16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
+    addSock(15, SOCK_STREAM, 0); // set netinfo active = true
+    doSetConnection(15, addr_list->ai_addr, addr_list->ai_addrlen, LOCAL); // set local addr to true
+    doAccept(15, 16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
     assert_int_equal(metricCalls("net.tcp"), 1);
     assert_int_equal(metricCalls("net.port"), 1);
     assert_int_equal(eventCalls("net.tcp"), 1);
     assert_int_equal(eventCalls("net.port"), 1);
+    assert_int_equal(metricCalls("net.open"), 1);
+    assert_int_equal(eventCalls("net.conn.open"), 1);
 
     // Zeros should not be reported on any interface
     // Well, unless it's a change to zero for a gauge
@@ -814,6 +834,8 @@ doSendSummarizedOpenCloseNotSummarized(void** state)
     assert_int_equal(metricCalls("net.port"), 1);
     assert_int_equal(eventCalls("net.tcp"), 1);
     assert_int_equal(eventCalls("net.port"), 1);
+    assert_int_equal(metricCalls("net.close"), 1);
+    assert_int_equal(eventCalls("net.conn.close"), 1);
 
     // doTotal should output net.tx activity from above.
     clearTestData();
@@ -826,6 +848,8 @@ doSendSummarizedOpenCloseNotSummarized(void** state)
     assert_int_equal(metricCalls("net.port"), 0);
     assert_int_equal(eventCalls(NULL), 0);
 
+    doClose(15, "closeFunc");
+    doClose(16, "closeFunc");
     if(addr_list) freeaddrinfo(addr_list);
 }
 
@@ -843,7 +867,9 @@ doSendFullSummarization(void** state)
 
     clearTestData();
     setVerbosity(6);
-    doAccept(16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
+    addSock(15, SOCK_STREAM, 0); // set netinfo active = true
+    doSetConnection(15, addr_list->ai_addr, addr_list->ai_addrlen, LOCAL); // set local addr to true
+    doAccept(15, 16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
     assert_int_equal(metricCalls("net.tcp"), 0);
     assert_int_equal(metricCalls("net.port"), 0);
     assert_int_equal(eventCalls("net.tcp"), 1);
@@ -889,6 +915,8 @@ doSendFullSummarization(void** state)
     assert_int_equal(metricCalls("net.port"), 0);    // need high water mark?
     assert_int_equal(eventCalls(NULL), 0);
 
+    doClose(15, "closeFunc");
+    doClose(16, "closeFunc");
     if(addr_list) freeaddrinfo(addr_list);
 }
 
@@ -1127,7 +1155,9 @@ doDNSSendNoDNSSummarization(void** state)
 
     clearTestData();
     setVerbosity(6);
-    doAccept(16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
+    addSock(15, SOCK_STREAM, 0); // set netinfo active = true
+    doSetConnection(15, addr_list->ai_addr, addr_list->ai_addrlen, LOCAL); // set local addr to true
+    doAccept(15, 16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
     assert_int_equal(metricCalls("net.tcp"), 0);
     assert_int_equal(metricCalls("net.port"), 0);
     assert_int_equal(eventCalls("net.tcp"), 1);
@@ -1194,6 +1224,8 @@ doDNSSendNoDNSSummarization(void** state)
     assert_int_equal(metricValues("net.tx"), 2*13);
     assert_int_equal(eventCalls(NULL), 0);
 
+    doClose(15, "closeFunc");
+    doClose(16, "closeFunc");
     if(addr_list) freeaddrinfo(addr_list);
 }
 
@@ -1211,7 +1243,9 @@ doDNSSendDNSSummarization(void** state)
 
     clearTestData();
     setVerbosity(5);
-    doAccept(16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
+    addSock(15, SOCK_STREAM, 0); // set netinfo active = true
+    doSetConnection(15, addr_list->ai_addr, addr_list->ai_addrlen, LOCAL); // set local addr to true
+    doAccept(15, 16, addr_list->ai_addr, &addr_list->ai_addrlen, "acceptFunc");
     assert_int_equal(metricCalls("net.tcp"), 0);
     assert_int_equal(metricCalls("net.port"), 0);
     assert_int_equal(eventCalls("net.tcp"), 1);
@@ -1278,6 +1312,8 @@ doDNSSendDNSSummarization(void** state)
     assert_int_equal(metricValues("net.dns"), 2);
     assert_int_equal(eventCalls(NULL), 0);
 
+    doClose(15, "closeFunc");
+    doClose(16, "closeFunc");
     if(addr_list) freeaddrinfo(addr_list);
 }
 

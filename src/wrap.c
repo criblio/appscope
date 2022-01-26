@@ -2777,7 +2777,7 @@ scope_syscall(long number, ...)
         }
 
         if (rc != -1) {
-            doAccept(rc, (struct sockaddr *)fArgs.arg[1],
+            doAccept(fArgs.arg[0], rc, (struct sockaddr *)fArgs.arg[1],
                      (socklen_t *)fArgs.arg[2], "accept4");
         } else {
             doUpdateState(NET_ERR_CONN, fArgs.arg[0], 0, "accept4", "nopath");
@@ -3598,7 +3598,7 @@ accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     }
 
     if (sd != -1) {
-        doAccept(sd, addr, addrlen, "accept$NOCANCEL");
+        doAccept(sockfd, sd, addr, addrlen, "accept$NOCANCEL");
     } else {
         doUpdateState(NET_ERR_CONN, sockfd, 0, "accept$NOCANCEL", "nopath");
     }
@@ -4425,7 +4425,7 @@ accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     }
 
     if (sd != -1) {
-        doAccept(sd, addr, addrlen, "accept");
+        doAccept(sockfd, sd, addr, addrlen, "accept");
     } else {
         doUpdateState(NET_ERR_CONN, sockfd, 0, "accept", "nopath");
     }
@@ -4448,7 +4448,7 @@ accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
     }
 
     if (sd != -1) {
-        doAccept(sd, addr, addrlen, "accept4");
+        doAccept(sockfd, sd, addr, addrlen, "accept4");
     } else {
         doUpdateState(NET_ERR_CONN, sockfd, 0, "accept4", "nopath");
     }

@@ -2075,6 +2075,14 @@ void
 doAccept(int oldsd, int newsd, struct sockaddr *addr, socklen_t *addrlen, char *func)
 {
     scopeLog(CFG_LOG_DEBUG, "fd:%d %s", newsd, func);
+
+    // on attach, we may not know that the oldsd was a socket.
+    // now we know it is, so mark it as a socket and get whatever
+    // addressing info we can from the kernel.
+    if (!getNetEntry(oldsd)) {
+        doAddNewSock(oldsd);
+    }
+
     doDupSock(oldsd, newsd);
 
     if (getNetEntry(newsd) != NULL) {

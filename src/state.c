@@ -515,6 +515,8 @@ postNetState(int fd, metric_t type, net_info *net)
     switch (type) {
         case OPEN_PORTS:
         case NET_CONNECTIONS:
+        case CONNECTION_OPEN:
+        case CONNECTION_CLOSE:
         case CONNECTION_DURATION:
             summarize = &g_summary.net.open_close;
             break;
@@ -547,6 +549,7 @@ postNetState(int fd, metric_t type, net_info *net)
     netp->fd = fd;
     netp->evtype = EVT_NET;
     netp->data_type = type;
+    memmove(&netp->counters, &g_ctrs, sizeof(g_ctrs));
 
     cmdPostEvent(g_ctl, (char *)netp);
     return mtc_needs_reporting;
@@ -610,7 +613,6 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
             new_duration = getDuration(g_netinfo[fd].startTime);
             g_netinfo[fd].startTime = 0ULL;
         }
-
         if (new_duration) {
             addToInterfaceCounts(&g_netinfo[fd].numDuration, 1);
             addToInterfaceCounts(&g_netinfo[fd].totalDuration, new_duration);
@@ -620,12 +622,14 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 
         if ((g_netinfo[fd].rxBytes.evt > 0) || (g_netinfo[fd].txBytes.evt > 0) ||
             (g_netinfo[fd].rxBytes.mtc > 0) || (g_netinfo[fd].txBytes.mtc > 0)) {
-            postNetState(fd, type, &g_netinfo[fd]);
-            atomicSwapU64(&g_netinfo[fd].numDuration.mtc, 0);
-            atomicSwapU64(&g_netinfo[fd].totalDuration.mtc, 0);
+            if (postNetState(fd, type, &g_netinfo[fd])) {
+                atomicSwapU64(&g_netinfo[fd].numDuration.mtc, 0);
+                atomicSwapU64(&g_netinfo[fd].totalDuration.mtc, 0);
+            }
             //subFromInterfaceCounts(&g_ctrs.connDurationNum, 1);
             //subFromInterfaceCounts(&g_ctrs.connDurationTotal, new_duration);
         }
+
         atomicSwapU64(&g_netinfo[fd].numDuration.evt, 0);
         atomicSwapU64(&g_netinfo[fd].totalDuration.evt, 0);
         break;
@@ -633,11 +637,31 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 
     case CONNECTION_OPEN:
     {
-        if (checkNetEntry(fd) && ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) &&
-            (((g_netinfo[fd].addrSetRemote == TRUE) && (g_netinfo[fd].addrSetLocal == TRUE)) ||
-             (funcop && !strncmp(funcop, "dup", 3)))) {
-                postNetState(fd, type, &g_netinfo[fd]);
+        if (!checkNetEntry(fd)) break;
+        if ((ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) &&
+            ((g_netinfo[fd].type != SOCK_STREAM) || ((g_netinfo[fd].addrSetRemote == TRUE) && (g_netinfo[fd].addrSetLocal == TRUE)))) {
+            addToInterfaceCounts(&g_netinfo[fd].counters.netConnOpen, 1);
+            addToInterfaceCounts(&g_ctrs.netConnOpen, 1);
+            if (postNetState(fd, type, &g_netinfo[fd])) {
+                atomicSwapU64(&g_netinfo[fd].counters.netConnOpen.mtc, 0);
+            }
         }
+        atomicSwapU64(&g_netinfo[fd].counters.netConnOpen.evt, 0);
+        break;
+    }
+
+    case CONNECTION_CLOSE:
+    {
+        if (!checkNetEntry(fd)) break;
+        if ((ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) &&
+            ((g_netinfo[fd].type != SOCK_STREAM) || ((g_netinfo[fd].addrSetRemote == TRUE) && (g_netinfo[fd].addrSetLocal == TRUE)))) {
+            addToInterfaceCounts(&g_netinfo[fd].counters.netConnClose, 1);
+            addToInterfaceCounts(&g_ctrs.netConnClose, 1);
+            if (postNetState(fd, type, &g_netinfo[fd])) {
+                atomicSwapU64(&g_netinfo[fd].counters.netConnClose.mtc, 0);
+            }
+        }
+        atomicSwapU64(&g_netinfo[fd].counters.netConnClose.evt, 0);
         break;
     }
 
@@ -2051,20 +2075,23 @@ doSend(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
 }
 
 void
-doAccept(int sd, struct sockaddr *addr, socklen_t *addrlen, char *func)
+doAccept(int oldsd, int newsd, struct sockaddr *addr, socklen_t *addrlen, char *func)
 {
-    scopeLog(CFG_LOG_DEBUG, "fd:%d %s", sd, func);
-    if (addr) {
-        addSock(sd, SOCK_STREAM, addr->sa_family);
-    } else {
-        doAddNewSock(sd);
+    scopeLog(CFG_LOG_DEBUG, "fd:%d %s", newsd, func);
+
+    // on attach, we may not know that the oldsd was a socket.
+    // now we know it is, so mark it as a socket and get whatever
+    // addressing info we can from the kernel.
+    if (!getNetEntry(oldsd)) {
+        doAddNewSock(oldsd);
     }
 
+    doDupSock(oldsd, newsd);
 
-    if (getNetEntry(sd) != NULL) {
-        if (addr && addrlen) doSetConnection(sd, addr, *addrlen, REMOTE);
-        doUpdateState(OPEN_PORTS, sd, 1, func, NULL);
-        doUpdateState(NET_CONNECTIONS, sd, 1, func, NULL);
+    if (getNetEntry(newsd) != NULL) {
+        if (addr && addrlen) doSetConnection(newsd, addr, *addrlen, REMOTE);
+        doUpdateState(OPEN_PORTS, newsd, 1, func, NULL);
+        doUpdateState(NET_CONNECTIONS, newsd, 1, func, NULL);
     }
 }
 
@@ -2088,6 +2115,7 @@ reportFD(int fd, control_type_t source)
         if (!g_summary.net.open_close) {
             doNetMetric(OPEN_PORTS, ninfo, source, 0);
             doNetMetric(NET_CONNECTIONS, ninfo, source, 0);
+            doNetMetric(CONNECTION_CLOSE, ninfo, source, 0);
             doNetMetric(CONNECTION_DURATION, ninfo, source, 0);
         }
     }
@@ -2347,6 +2375,7 @@ doClose(int fd, const char *func)
     if (ninfo != NULL) {
         doUpdateState(OPEN_PORTS, fd, -1, func, NULL);
         doUpdateState(NET_CONNECTIONS, fd, -1, func, NULL);
+        doUpdateState(CONNECTION_CLOSE, fd, -1, func, NULL);
         doUpdateState(CONNECTION_DURATION, fd, -1, func, NULL);
         resetHttp(&ninfo->http);
     }

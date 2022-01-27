@@ -56,6 +56,8 @@ typedef struct metric_counters_t {
     counters_element_t  connDurationTotal;
     counters_element_t  dnsDurationNum;
     counters_element_t  dnsDurationTotal;
+    counters_element_t  netConnOpen;
+    counters_element_t  netConnClose;
     counters_element_t  netConnectErrors;
     counters_element_t  netTxRxErrors;
     counters_element_t  netDNSErrors;

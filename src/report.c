@@ -1955,7 +1955,7 @@ getNetPtotocol(net_info *net, event_field_t *nevent, int *ix)
   },
   "_time": timestamp
 }
- */
+*/
 static void
 doNetOpenEvent(net_info *net)
 {
@@ -2490,11 +2490,28 @@ doTotalNetRxTx(metric_t type)
 void
 doTotal(metric_t type)
 {
+    // Only report if enabled
+    if (((type == TOT_READ || type == TOT_WRITE) && (!g_summary.fs.read_write)) ||
+        ((type == TOT_RX || type == TOT_TX) && (!g_summary.net.rx_tx)) ||
+        ((type == TOT_SEEK) && (!g_summary.fs.seek)) ||
+        ((type == TOT_STAT) && (!g_summary.fs.stat)) ||
+        ((type == TOT_OPEN || type == TOT_CLOSE) && (!g_summary.fs.open_close)) ||
+        ((type == TOT_DNS) && (!g_summary.net.dns))) {
+        return;
+    }
+    if ((type == TOT_PORTS || type == TOT_TCP_CONN || 
+        type == TOT_UDP_CONN || type == TOT_OTHER_CONN || 
+        type == TOT_NET_OPEN || type == TOT_NET_CLOSE) &&
+        (!g_summary.net.open_close)) {
+        return;
+    }
+
     const char* metric = "UNKNOWN";
     counters_element_t* value = NULL;
     const char* err_str = "UNKNOWN";
     const char* units = "byte";
     data_type_t aggregation_type = DELTA;
+     
     switch (type) {
         case TOT_READ:
             metric = "fs.read";
@@ -2568,6 +2585,18 @@ doTotal(metric_t type)
             units = "connection";
             aggregation_type = CURRENT;
             break;
+        case TOT_NET_OPEN:
+            metric = "net.open";
+            value = &g_ctrs.netConnOpen;
+            err_str = "ERROR: doTotal:TOT_NET_OPEN:cmdSendMetric";
+            units = "connection";
+            break;
+        case TOT_NET_CLOSE:
+            metric = "net.close";
+            value = &g_ctrs.netConnClose;
+            err_str = "ERROR: doTotal:TOT_NET_CLOSE:cmdSendMetric";
+            units = "connection";
+            break;
         default:
             DBG(NULL);
             return;
@@ -2596,6 +2625,13 @@ doTotal(metric_t type)
 void
 doTotalDuration(metric_t type)
 {
+    // Only report if enabled
+    if (((type == TOT_FS_DURATION) && (!g_summary.fs.open_close)) ||
+        ((type == TOT_NET_DURATION) && (!g_summary.net.open_close)) ||
+        ((type == TOT_DNS_DURATION) && (!g_summary.net.dns))) {
+        return;
+    }
+
     const char* metric = "UNKNOWN";
     counters_element_t* value = NULL;
     counters_element_t* num = NULL;
@@ -2688,7 +2724,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         switch (type) {
         case OPEN_PORTS:
             metric = "net.port";
-            value = &g_ctrs.openPorts;
+            value = &net->counters.openPorts;
             units = "instance";
             err_str = "ERROR: doNetMetric:OPEN_PORTS:cmdSendMetric";
             break;
@@ -2746,7 +2782,71 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
 
     case CONNECTION_OPEN:
     {
+        // Report the net open event
         doNetOpenEvent(net);
+
+        // Only report metric if enabled
+        if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
+            return;
+        }
+
+        const char* metric = "net.open";
+        const char* units = "connection";
+        const char* err_str = "ERROR: doNetMetric:CONNECTION_OPEN:cmdSendMetric";
+        counters_element_t* value = &net->counters.netConnOpen;
+        counters_element_t* global_counter = &g_ctrs.netConnOpen;
+        event_field_t fields[] = {
+            PROC_FIELD(g_proc.procname),
+            PID_FIELD(g_proc.pid),
+            FD_FIELD(net->fd),
+            HOST_FIELD(g_proc.hostname),
+            PROTO_FIELD(proto),
+            PORT_FIELD(localPort),
+            UNIT_FIELD(units),
+            FIELDEND
+        };
+
+        // Report the net open metric
+        event_t evt = INT_EVENT(metric, value->mtc, DELTA, fields);
+        if (cmdSendMetric(g_mtc, &evt)) {
+            scopeLogError("fd:%d %s", net->fd, err_str);
+        }
+        subFromInterfaceCounts(global_counter, value->mtc);
+        atomicSwapU64(&value->mtc, 0);
+
+        break;
+    }
+
+    case CONNECTION_CLOSE:
+    {
+        // Only report metric if enabled
+        if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
+            return;
+        }
+
+        // Report the net close metric
+        const char* metric = "net.close";
+        const char* units = "connection";
+        const char* err_str = "ERROR: doNetMetric:CONNECTION_CLOSE:cmdSendMetric";
+        counters_element_t* value = &net->counters.netConnClose;
+        counters_element_t* global_counter = &g_ctrs.netConnClose;
+        event_field_t mtc_fields[] = {
+            PROC_FIELD(g_proc.procname),
+            PID_FIELD(g_proc.pid),
+            FD_FIELD(net->fd),
+            HOST_FIELD(g_proc.hostname),
+            PROTO_FIELD(proto),
+            PORT_FIELD(localPort),
+            UNIT_FIELD(units),
+            FIELDEND
+        };
+        event_t mtc_evt = INT_EVENT(metric, value->mtc, DELTA, mtc_fields);
+        if (cmdSendMetric(g_mtc, &mtc_evt)) {
+            scopeLogError("fd:%d %s", net->fd, err_str);
+        }
+        subFromInterfaceCounts(global_counter, value->mtc);
+        atomicSwapU64(&value->mtc, 0);
+
         break;
     }
 
@@ -2795,7 +2895,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
             atomicSwapU64(&net->totalDuration.evt, 0);
         }
 
-        // report the close
+        // Report the net close event
         doNetCloseEvent(net, dur);
 
         // Only report metric if enabled
@@ -2813,6 +2913,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         // Don't report zeros.
         if (dur == 0ULL) return;
 
+        // Report the net conn duration metric
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
@@ -2832,6 +2933,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         atomicSwapU64(&net->totalDuration.mtc, 0);
         //atomicSwapU64(&g_ctrs.connDurationNum, 0);
         //atomicSwapU64(&g_ctrs.connDurationTotal, 0);
+
         break;
     }
 

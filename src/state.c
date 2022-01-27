@@ -439,6 +439,7 @@ postFSState(int fd, metric_t type, fs_info *fs, const char *funcop, const char *
         case FS_SEEK:
             summarize = &g_summary.fs.seek;
             break;
+        case FS_DELETE:
         default:
             break;
     }
@@ -455,16 +456,16 @@ postFSState(int fd, metric_t type, fs_info *fs, const char *funcop, const char *
     fs_info *fsp = calloc(1, len);
     if (!fsp) return FALSE;
 
-    memmove(fsp, fs, len);
+    if (fs) memmove(fsp, fs, len);
     fsp->fd = fd;
     fsp->evtype = EVT_FS;
     fsp->data_type = type;
 
-    if (pathname && (fs->path[0] == '\0')) {
+    if (pathname && (!fs || fs->path[0] == '\0')) {
         strncpy(fsp->path, pathname, strnlen(pathname, sizeof(fsp->path)));
     }
 
-    if (funcop && (fs->funcop[0] == '\0')) {
+    if (funcop && (!fs || fs->funcop[0] == '\0')) {
         strncpy(fsp->funcop, funcop, strnlen(funcop, sizeof(fsp->funcop)));
     }
 
@@ -815,6 +816,12 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
             //subFromInterfaceCounts(&g_ctrs.numClose, 1);
         }
         atomicSwapU64(&g_fsinfo[fd].numClose.evt, 0);
+        break;
+    }
+
+    case FS_DELETE:
+    {
+        postFSState(fd, type, NULL, funcop, pathname);
         break;
     }
 
@@ -2359,6 +2366,12 @@ doDup2(int oldfd, int newfd, int rc, const char *func)
             doUpdateState(NET_ERR_CONN, oldfd, (size_t)0, func, "nopath");
         }
     }
+}
+
+void
+doDelete(const char *pathname, const char *func)
+{
+    doUpdateState(FS_DELETE, -1, 0, func, pathname);
 }
 
 void

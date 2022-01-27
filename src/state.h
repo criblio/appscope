@@ -61,6 +61,7 @@ int doDupFile(int, int, const char *);
 int doDupSock(int, int);
 void doDup(int, int, const char *, int);
 void doDup2(int, int, int, const char *);
+void doDelete(const char *, const char *);
 void doClose(int, const char *);
 void doOpen(int, const char *, fs_type_t, const char *);
 void doSendFile(int, int, uint64_t, int, const char *);

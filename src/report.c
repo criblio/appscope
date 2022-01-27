@@ -2423,6 +2423,24 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
         break;
     }
 
+    case FS_DELETE:
+    {
+        event_field_t fields[] = {
+            PROC_FIELD(g_proc.procname),
+            PID_FIELD(g_proc.pid),
+            HOST_FIELD(g_proc.hostname),
+            OP_FIELD(op),
+            FILE_FIELD(pathname),
+            UNIT_FIELD("operation"),
+            FIELDEND
+        };
+
+        event_t evt = INT_EVENT("fs.delete", 1, DELTA, fields);
+        evt.src = CFG_SRC_FS;
+        cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
+        break;
+    }
+
     default:
         DBG(NULL);
     }

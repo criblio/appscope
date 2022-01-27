@@ -168,6 +168,8 @@ static got_list_t inject_hook_list[] = {
     {"close", NULL, &g_fn.close},
     {"fclose", NULL, &g_fn.fclose},
     {"fcloseall", NULL, &g_fn.fcloseall},
+    {"unlink", NULL, &g_fn.unlink},
+    {"unlinkat", NULL, &g_fn.unlinkat},
     {"lseek", NULL, &g_fn.lseek},
     {"fseek", NULL, &g_fn.fseek},
     {"fseeko", NULL, &g_fn.fseeko},
@@ -3542,6 +3544,32 @@ fcloseall(void)
         doCloseAllStreams();
     } else {
         doUpdateState(FS_ERR_OPEN_CLOSE, -1, 0, "fcloseall", "nopath");
+    }
+
+    return rc;
+}
+
+EXPORTON int
+unlink(const char *pathname)
+{
+    WRAP_CHECK(unlink, -1);
+
+    int rc = g_fn.unlink(pathname);
+    if (rc != -1) {
+        doDelete(pathname, "unlink");
+    }
+
+    return rc;
+}
+
+EXPORTON int
+unlinkat(int dirfd, const char *pathname, int flags)
+{
+    WRAP_CHECK(unlinkat, -1);
+
+    int rc = g_fn.unlinkat(dirfd, pathname, flags);
+    if (rc != -1) {
+        doDelete(pathname, "unlinkat");
     }
 
     return rc;

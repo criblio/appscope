@@ -2121,6 +2121,9 @@ doFSOpenEvent(fs_info *fs, const char *op)
         (fs->fd > 2) && strncmp(fs->path, "std", 3)) {
 
         event_field_t fevent[] = {
+            PROC_FIELD(g_proc.procname),
+            PID_FIELD(g_proc.pid),
+            HOST_FIELD(g_proc.hostname),
             FILE_EV_NAME(fs->path),
             PROC_UID(g_proc.uid),
             PROC_GID(g_proc.gid),
@@ -2147,6 +2150,9 @@ doFSCloseEvent(fs_info *fs, const char *op)
         (fs->fd > 2) && strncmp(fs->path, "std", 3)) {
 
         event_field_t fevent[] = {
+            PROC_FIELD(g_proc.procname),
+            PID_FIELD(g_proc.pid),
+            HOST_FIELD(g_proc.hostname),
             FILE_EV_NAME(fs->path),
             PROC_UID(g_proc.uid),
             PROC_GID(g_proc.gid),
@@ -2383,9 +2389,13 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
 
         // Don't report zeros.
         if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) && (numops->evt != 0ULL)) {
-            event_t evt = INT_EVENT(metric, numops->evt, DELTA, fields);
-            cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
-            reported = TRUE;
+            // TODO: this FS_SEEK check avoids duplicate fs.open and fs.close
+            //       events.  doFSOpenEvent() and doFSCloseEvent() are enough.
+            if (type == FS_SEEK) {
+                event_t evt = INT_EVENT(metric, numops->evt, DELTA, fields);
+                cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
+                reported = TRUE;
+            }
         }
 
         if ((type == FS_OPEN) && (numops->evt != 0ULL)) {

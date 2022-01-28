@@ -152,7 +152,7 @@ headerBasicResponse(void **state)
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
-        // printf("looking for %s\n", result[i]);
+        //printf("looking for %s\n", result[i]);
         assert_non_null(strstr(header_event, result[i]));
     }
     free(header_event);
@@ -172,9 +172,9 @@ headerRequestIP(void **state)
         "\"http_client_ip\":\"192.7.7.7\"",
         "\"net_transport\":\"IP.TCP\"",
         "\"net_peer_ip\":\"192.1.2.99\"",
-        "\"net_peer_port\":\"24862\"",
+        "\"net_peer_port\":24862",
         "\"net_host_ip\":\"192.1.2.3\"",
-        "\"net_host_port\":\"3879\"",
+        "\"net_host_port\":3879",
         "\"http_request_content_length\":12345"
     };
 
@@ -184,7 +184,7 @@ headerRequestIP(void **state)
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
-        // printf("looking for %s\n", result[i]);
+        //printf("[%d] looking for %s\n", i, result[i]);
         assert_non_null(strstr(header_event, result[i]));
     }
     free(header_event);
@@ -201,9 +201,9 @@ headerResponseIP(void **state)
         "\"http_server_duration\":0",
         "\"net_transport\":\"IP.TCP\"",
         "\"net_peer_ip\":\"192.1.2.99\"",
-        "\"net_peer_port\":\"24862\"",
+        "\"net_peer_port\":24862",
         "\"net_host_ip\":\"192.1.2.3\"",
-        "\"net_host_port\":\"3879\"",
+        "\"net_host_port\":3879",
         "\"http_response_content_length\":27"
     };
 
@@ -213,7 +213,7 @@ headerResponseIP(void **state)
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
-        // printf("looking for %s\n", result[i]);
+        //printf("looking for %s\n", result[i]);
         assert_non_null(strstr(header_event, result[i]));
     }
     free(header_event);
@@ -241,7 +241,7 @@ headerRequestUnix(void **state)
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
-        // printf("looking for %s\n", result[i]);
+        //printf("looking for %s\n", result[i]);
         assert_non_null(strstr(header_event, result[i]));
     }
     free(header_event);
@@ -261,9 +261,9 @@ userDefinedHeaderExtract(void **state)
         "\"http_client_ip\":\"192.7.7.7\"",
         "\"net_transport\":\"IP.TCP\"",
         "\"net_peer_ip\":\"192.1.2.99\"",
-        "\"net_peer_port\":\"24862\"",
+        "\"net_peer_port\":24862",
         "\"net_host_ip\":\"192.1.2.3\"",
-        "\"net_host_port\":\"3879\"",
+        "\"net_host_port\":3879",
         "\"http_request_content_length\":12345",
         "\"X-MyheaderTag\":\"utesttag\""
     };
@@ -302,9 +302,9 @@ xAppScopeHeaderExtract(void **state)
         "\"http_client_ip\":\"192.7.7.7\"",
         "\"net_transport\":\"IP.TCP\"",
         "\"net_peer_ip\":\"192.1.2.99\"",
-        "\"net_peer_port\":\"24862\"",
+        "\"net_peer_port\":24862",
         "\"net_host_ip\":\"192.1.2.3\"",
-        "\"net_host_port\":\"3879\"",
+        "\"net_host_port\":3879",
         "\"http_request_content_length\":12345",
         "\"x-appscope\":\"app=utest\""
     };

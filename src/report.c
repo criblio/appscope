@@ -333,7 +333,7 @@ getNetInternals(net_info *net, int type,
         }
 
         if (getConn(lconn, laddr, alen, lport, plen) == TRUE) {
-            in_port_t hport = ((struct sockaddr_in *)lconn)->sin_port;
+            in_port_t hport = htons(((struct sockaddr_in *)lconn)->sin_port);
             H_ATTRIB(fields[*ix], "net_host_ip", laddr, 1);
             NEXT_FLD(*ix, maxfld);
             H_VALUE(fields[*ix], "net_host_port", hport, 1);

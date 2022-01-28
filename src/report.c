@@ -2115,10 +2115,8 @@ static void
 doFSOpenEvent(fs_info *fs, const char *op)
 {
     const char *metric = "fs.open";
-    counters_element_t *numops = &fs->numOpen;
 
-    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) &&
-        (fs->fd > 2) && strncmp(fs->path, "std", 3)) {
+    if ((fs->fd > 2) && strncmp(fs->path, "std", 3)) {
 
         event_field_t fevent[] = {
             PROC_FIELD(g_proc.procname),
@@ -2135,8 +2133,8 @@ doFSOpenEvent(fs_info *fs, const char *op)
             FIELDEND
         };
 
-        event_t evt = INT_EVENT(metric, numops->evt, DELTA, fevent);
-        evt.src = CFG_SRC_FS;
+        event_t evt = INT_EVENT(metric, fs->numOpen.evt, DELTA, fevent);
+        evt.src = (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS)) ? CFG_SRC_FS : CFG_SRC_METRIC;
         cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
     }
 }
@@ -2146,8 +2144,7 @@ doFSCloseEvent(fs_info *fs, const char *op)
 {
     const char *metric = "fs.close";
 
-    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) &&
-        (fs->fd > 2) && strncmp(fs->path, "std", 3)) {
+    if ((fs->fd > 2) && strncmp(fs->path, "std", 3)) {
 
         event_field_t fevent[] = {
             PROC_FIELD(g_proc.procname),
@@ -2171,7 +2168,7 @@ doFSCloseEvent(fs_info *fs, const char *op)
         };
 
         event_t evt = INT_EVENT(metric, fs->numClose.evt, DELTA, fevent);
-        evt.src = CFG_SRC_FS;
+        evt.src = (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS)) ? CFG_SRC_FS : CFG_SRC_METRIC;
         cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
     }
 }
@@ -2388,10 +2385,8 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
         };
 
         // Don't report zeros.
-        if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) && (numops->evt != 0ULL)) {
-            // TODO: this FS_SEEK check avoids duplicate fs.open and fs.close
-            //       events.  doFSOpenEvent() and doFSCloseEvent() are enough.
-            if (type == FS_SEEK) {
+        if ((type == FS_SEEK) && (numops->evt != 0ULL)) {
+            if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC)) {
                 event_t evt = INT_EVENT(metric, numops->evt, DELTA, fields);
                 cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
                 reported = TRUE;
@@ -2399,19 +2394,19 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
         }
 
         if ((type == FS_OPEN) && (numops->evt != 0ULL)) {
-            doFSOpenEvent(fs, op);
-            reported = TRUE;
+            if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) ||
+                ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC)) {
+                doFSOpenEvent(fs, op);
+                reported = TRUE;
+            }
         }
 
         if ((type == FS_CLOSE) && (numops->evt != 0ULL)) {
-            doFSCloseEvent(fs, op);
-            reported = TRUE;
-            //atomicSwapU64(&fs->numWrite.evt, 0);
-            //atomicSwapU64(&fs->writeBytes.evt, 0);
-            //atomicSwapU64(&fs->numRead.evt, 0);
-            //atomicSwapU64(&fs->readBytes.evt, 0);
-            //atomicSwapU64(&fs->numDuration.evt, 0);
-            //atomicSwapU64(&fs->totalDuration.evt, 0);
+            if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) ||
+                ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC)) {
+                doFSCloseEvent(fs, op);
+                reported = TRUE;
+            }
         }
 
         if (reported == TRUE) atomicSwapU64(&numops->evt, 0);

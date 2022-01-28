@@ -1,8 +1,10 @@
 #!/bin/bash
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-GOBIN=$(pwd)/.gobin/x86_64
 
-BINDIR=../bin/linux/x86_64
+ARCH=$(uname -m)
+GOBIN=$(pwd)/.gobin/$ARCH
+
+BINDIR=../bin/linux/$ARCH
 SCOPE=${BINDIR}/scope
 
 GO_BINDATA=${GOBIN}/go-bindata

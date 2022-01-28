@@ -158,13 +158,13 @@ endtest
 echo "Creating key files for ruby client and server"
 (cd /opt/test-runner/ruby && openssl req -x509 -newkey rsa:4096 -keyout priv.pem -out cert.pem -days 365 -nodes -subj "/C=US/ST=California/L=San Francisco/O=Cribl/OU=Cribl/CN=localhost")
 starttest Ruby
-RUBY_HTTP_START=$(grep http\. $EVT_FILE 2>/dev/null | grep -c 10101)
+RUBY_HTTP_START=$(grep "http\." $EVT_FILE 2>/dev/null | grep -c 10101)
 (cd /opt/test-runner/ruby && ./server.rb 10101 &)
 sleep 1
 (cd /opt/test-runner/ruby && ldscope ./client.rb 127.0.0.1 10101)
 sleep 1
 evaltest
-RUBY_HTTP_END=$(grep http\. $EVT_FILE 2>/dev/null | grep -c 10101)
+RUBY_HTTP_END=$(grep "http\." $EVT_FILE 2>/dev/null | grep -c 10101)
 
 if (( $RUBY_HTTP_END - $RUBY_HTTP_START < 2 )); then
     ERR+=1
@@ -187,7 +187,7 @@ ldscope /opt/rh/rh-python38/root/usr/bin/python3.8 /opt/test-runner/bin/testssl.
 sleep 1
 evaltest
 
-COUNT=$(grep -c http\. $EVT_FILE)
+COUNT=$(grep -c "http\." $EVT_FILE)
 if (( $COUNT < 2 )); then
     ERR+=1
 fi
@@ -225,11 +225,11 @@ fi
 # php
 #
 starttest php
-PHP_HTTP_START=$(grep http\. $EVT_FILE | grep -c sslclient.php)
+PHP_HTTP_START=$(grep "http\." $EVT_FILE | grep -c sslclient.php)
 ldscope php /opt/test-runner/php/sslclient.php > /dev/null
 evaltest
 
-PHP_HTTP_END=$(grep http\. $EVT_FILE | grep -c sslclient.php)
+PHP_HTTP_END=$(grep "http\." $EVT_FILE | grep -c sslclient.php)
 
 if (( $PHP_HTTP_END - $PHP_HTTP_START < 2 )); then
     ERR+=1
@@ -245,12 +245,12 @@ endtest
 # apache
 #
 starttest apache
-APACHE_HTTP_START=$(grep http\. $EVT_FILE | grep -c httpd)
+APACHE_HTTP_START=$(grep "http\." $EVT_FILE | grep -c httpd)
 ldscope httpd -k start
 ldscope curl -k https://localhost:443/ > /dev/null
 ldscope httpd -k stop
 evaltest
-APACHE_HTTP_END=$(grep http\. $EVT_FILE | grep -c httpd)
+APACHE_HTTP_END=$(grep "http\." $EVT_FILE | grep -c httpd)
 
 if (( $APACHE_HTTP_END - $APACHE_HTTP_START < 2 )); then
     ERR+=1

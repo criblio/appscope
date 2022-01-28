@@ -95,12 +95,12 @@ getNet(int fd)
     struct sockaddr_in sa;
     inet_pton(AF_INET, "192.1.2.3", &sa.sin_addr);
     sa.sin_family = AF_INET;
-    sa.sin_port = 9999;
+    sa.sin_port = htons(9999);
     doSetConnection(fd, (struct sockaddr *)&sa, sizeof(struct sockaddr_in), LOCAL);
 
     inet_pton(AF_INET, "192.1.2.99", &sa.sin_addr);
     sa.sin_family = AF_INET;
-    sa.sin_port = 7777;
+    sa.sin_port = htons(7777);
     doSetConnection(fd, (struct sockaddr *)&sa, sizeof(struct sockaddr_in), REMOTE);
 
     return getNetEntry(fd);
@@ -172,9 +172,9 @@ headerRequestIP(void **state)
         "\"http_client_ip\":\"192.7.7.7\"",
         "\"net_transport\":\"IP.TCP\"",
         "\"net_peer_ip\":\"192.1.2.99\"",
-        "\"net_peer_port\":24862",
+        "\"net_peer_port\":7777",
         "\"net_host_ip\":\"192.1.2.3\"",
-        "\"net_host_port\":3879",
+        "\"net_host_port\":9999",
         "\"http_request_content_length\":12345"
     };
 
@@ -201,9 +201,9 @@ headerResponseIP(void **state)
         "\"http_server_duration\":0",
         "\"net_transport\":\"IP.TCP\"",
         "\"net_peer_ip\":\"192.1.2.99\"",
-        "\"net_peer_port\":24862",
+        "\"net_peer_port\":7777",
         "\"net_host_ip\":\"192.1.2.3\"",
-        "\"net_host_port\":3879",
+        "\"net_host_port\":9999",
         "\"http_response_content_length\":27"
     };
 
@@ -261,9 +261,9 @@ userDefinedHeaderExtract(void **state)
         "\"http_client_ip\":\"192.7.7.7\"",
         "\"net_transport\":\"IP.TCP\"",
         "\"net_peer_ip\":\"192.1.2.99\"",
-        "\"net_peer_port\":24862",
+        "\"net_peer_port\":7777",
         "\"net_host_ip\":\"192.1.2.3\"",
-        "\"net_host_port\":3879",
+        "\"net_host_port\":9999",
         "\"http_request_content_length\":12345",
         "\"X-MyheaderTag\":\"utesttag\""
     };
@@ -302,9 +302,9 @@ xAppScopeHeaderExtract(void **state)
         "\"http_client_ip\":\"192.7.7.7\"",
         "\"net_transport\":\"IP.TCP\"",
         "\"net_peer_ip\":\"192.1.2.99\"",
-        "\"net_peer_port\":24862",
+        "\"net_peer_port\":7777",
         "\"net_host_ip\":\"192.1.2.3\"",
-        "\"net_host_port\":3879",
+        "\"net_host_port\":9999",
         "\"http_request_content_length\":12345",
         "\"x-appscope\":\"app=utest\""
     };

@@ -275,14 +275,14 @@ getConn(struct sockaddr_storage *conn, char *addr, size_t alen, char *port, size
                 return FALSE;
         }
 
-        snprintf(port, plen, "%d", htons(((struct sockaddr_in *)conn)->sin_port));
+        snprintf(port, plen, "%d", ntohs(((struct sockaddr_in *)conn)->sin_port));
     } else if (conn->ss_family == AF_INET6) {
         if (inet_ntop(AF_INET6, &((struct sockaddr_in6 *)conn)->sin6_addr,
                       addr, alen) == NULL) {
                 return  FALSE;
         }
 
-        snprintf(port, plen, "%d", htons(((struct sockaddr_in6 *)conn)->sin6_port));
+        snprintf(port, plen, "%d", ntohs(((struct sockaddr_in6 *)conn)->sin6_port));
     } else {
         return FALSE;
     }
@@ -325,7 +325,7 @@ getNetInternals(net_info *net, int type,
         }
 
         if (getConn(rconn, raddr, alen, rport, plen) == TRUE) {
-            in_port_t pport = htons(((struct sockaddr_in *)rconn)->sin_port);
+            in_port_t pport = ntohs(((struct sockaddr_in *)rconn)->sin_port);
             H_ATTRIB(fields[*ix], "net_peer_ip", raddr, 1);
             NEXT_FLD(*ix, maxfld);
             H_VALUE(fields[*ix], "net_peer_port", pport, 1);
@@ -333,7 +333,7 @@ getNetInternals(net_info *net, int type,
         }
 
         if (getConn(lconn, laddr, alen, lport, plen) == TRUE) {
-            in_port_t hport = htons(((struct sockaddr_in *)lconn)->sin_port);
+            in_port_t hport = ntohs(((struct sockaddr_in *)lconn)->sin_port);
             H_ATTRIB(fields[*ix], "net_host_ip", laddr, 1);
             NEXT_FLD(*ix, maxfld);
             H_VALUE(fields[*ix], "net_host_port", hport, 1);
@@ -1276,8 +1276,8 @@ doHttp2Frame(protocol_info *proto)
                     addHttp2StrField(stream->jsonData, "net_host_ip", addr);
                 }
 
-                addHttp2NumField(stream->jsonData, "net_peer_port", htons(((struct sockaddr_in*)&proto->remoteConn)->sin_port));
-                addHttp2NumField(stream->jsonData, "net_host_port", htons(((struct sockaddr_in*)&proto->localConn)->sin_port));
+                addHttp2NumField(stream->jsonData, "net_peer_port", ntohs(((struct sockaddr_in*)&proto->remoteConn)->sin_port));
+                addHttp2NumField(stream->jsonData, "net_host_port", ntohs(((struct sockaddr_in*)&proto->localConn)->sin_port));
             }
 
             // If it's a request message...

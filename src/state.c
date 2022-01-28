@@ -116,7 +116,7 @@ get_port(int fd, int type, control_type_t which) {
         port = (in_port_t)0;
         break;
     }
-    return htons(port);
+    return ntohs(port);
 }
 
 int
@@ -141,7 +141,7 @@ get_port_net(net_info *net, int type, control_type_t which) {
         port = (in_port_t)0;
         break;
     }
-    return htons(port);
+    return ntohs(port);
 }
 
 bool
@@ -1494,7 +1494,7 @@ doBlockConnection(int fd, const struct sockaddr *addr_arg)
         return 0;
     }
 
-    if (g_cfg.blockconn == htons(port)) {
+    if (g_cfg.blockconn == ntohs(port)) {
         scopeLogInfo("fd:%d doBlockConnection: blocked connection", fd);
         return 1;
     }

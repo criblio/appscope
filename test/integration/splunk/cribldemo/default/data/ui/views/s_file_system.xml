@@ -154,7 +154,7 @@
       <chart>
         <title>FS Stat by File</title>
         <search>
-          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.op.stat" AND index="metrics_test" span=10s BY file
+          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.stat" AND index="metrics_test" span=10s BY file
 | timechart avg(_value) span=10s agg=max limit=5 useother=false BY file
 | fields - _span</query>
           <earliest>$field1.earliest$</earliest>
@@ -174,7 +174,7 @@
       <chart>
         <title>FS Open by File</title>
         <search>
-          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.op.open" AND index="metrics_test" span=10s BY file
+          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.open" AND index="metrics_test" span=10s BY file
 | timechart avg(_value) span=10s agg=max limit=5 useother=false BY file
 | fields - _span</query>
           <earliest>$field1.earliest$</earliest>
@@ -194,7 +194,7 @@
       <chart>
         <title>FS Seek by File</title>
         <search>
-          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.op.seek" AND index="metrics_test" span=10s BY file
+          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.seek" AND index="metrics_test" span=10s BY file
 | timechart avg(_value) span=10s agg=max limit=5 useother=false BY file
 | fields - _span</query>
           <earliest>$field1.earliest$</earliest>
@@ -214,7 +214,7 @@
       <chart>
         <title>FS Close by File</title>
         <search>
-          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.op.close" AND index="metrics_test" span=10s BY file
+          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.close" AND index="metrics_test" span=10s BY file
 | timechart avg(_value) span=10s agg=max limit=5 useother=false BY file
 | fields - _span</query>
           <earliest>$field1.earliest$</earliest>
@@ -236,7 +236,7 @@
       <chart>
         <title>FS Stat by Process</title>
         <search>
-          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.op.stat" AND index="metrics_test" span=10s BY proc
+          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.stat" AND index="metrics_test" span=10s BY proc
 | timechart avg(_value) span=10s agg=max limit=5 useother=false BY proc
 | fields - _span</query>
           <earliest>$field1.earliest$</earliest>
@@ -256,7 +256,7 @@
       <chart>
         <title>FS Open by Process</title>
         <search>
-          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.op.open" AND index="metrics_test" span=10s BY proc
+          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.open" AND index="metrics_test" span=10s BY proc
 | timechart avg(_value) span=10s agg=max limit=5 useother=false BY proc
 | fields - _span</query>
           <earliest>$field1.earliest$</earliest>
@@ -276,7 +276,7 @@
       <chart>
         <title>FS Seek by Process</title>
         <search>
-          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.op.seek" AND index="metrics_test" span=10s BY proc
+          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.seek" AND index="metrics_test" span=10s BY proc
 | timechart avg(_value) span=10s agg=max limit=5 useother=false BY proc
 | fields - _span</query>
           <earliest>$field1.earliest$</earliest>
@@ -296,7 +296,7 @@
       <chart>
         <title>FS Close by Process</title>
         <search>
-          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.op.close" AND index="metrics_test" span=10s BY proc
+          <query>| mstats avg(_value) prestats=true WHERE metric_name="fs.close" AND index="metrics_test" span=10s BY proc
 | timechart avg(_value) span=10s agg=max limit=5 useother=false BY proc
 | fields - _span</query>
           <earliest>$field1.earliest$</earliest>

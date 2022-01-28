@@ -212,16 +212,16 @@ fs.error     	7    	Count	operation  	525	class: stat,file: summary,host: 771f60
 
 
 ```
-[MJ33] Jan 31 19:55:22 cribl http http-resp http.host:localhost:9000 http.method:GET http.scheme:http http.target:/ http.response_content_length:1630
+[MJ33] Jan 31 19:55:22 cribl http http.resp http.host:localhost:9000 http.method:GET http.scheme:http http.target:/ http.response_content_length:1630
 [RT33] Jan 31 19:55:22 cribl http http-metrics duration:0 req_per_sec:2
-[Ta43] Jan 31 19:55:22 cribl http http-req http.host:localhost:9000 http.method:GET http.scheme:http http.target:/
-[fj43] Jan 31 19:55:22 cribl http http-resp http.host:localhost:9000 http.method:GET http.scheme:http http.target:/ http.response_content_length:1630
+[Ta43] Jan 31 19:55:22 cribl http http.req http.host:localhost:9000 http.method:GET http.scheme:http http.target:/
+[fj43] Jan 31 19:55:22 cribl http http.resp http.host:localhost:9000 http.method:GET http.scheme:http http.target:/ http.response_content_length:1630
 [kt43] Jan 31 19:55:22 cribl http http-metrics duration:0 req_per_sec:2
-[mM43] Jan 31 19:55:22 cribl http http-req http.host:localhost:9000 http.method:GET http.scheme:http http.target:/
-[KU43] Jan 31 19:55:22 cribl http http-resp http.host:localhost:9000 http.method:GET http.scheme:http http.target:/ http.response_content_length:1630
+[mM43] Jan 31 19:55:22 cribl http http.req http.host:localhost:9000 http.method:GET http.scheme:http http.target:/
+[KU43] Jan 31 19:55:22 cribl http http.resp http.host:localhost:9000 http.method:GET http.scheme:http http.target:/ http.response_content_length:1630
 [P253] Jan 31 19:55:22 cribl http http-metrics duration:0 req_per_sec:2
-[Rl53] Jan 31 19:55:22 cribl http http-req http.host:localhost:9000 http.method:GET http.scheme:http http.target:/
-[du53] Jan 31 19:55:22 cribl http http-resp http.host:localhost:9000 http.method:GET http.scheme:http http.target:/ http.response_content_length:1630
+[Rl53] Jan 31 19:55:22 cribl http http.req http.host:localhost:9000 http.method:GET http.scheme:http http.target:/
+[du53] Jan 31 19:55:22 cribl http http.resp http.host:localhost:9000 http.method:GET http.scheme:http http.target:/ http.response_content_length:1630
 [iE53] Jan 31 19:55:22 cribl http http-metrics duration:0 req_per_sec:2
 ```
 

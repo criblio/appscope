@@ -17,7 +17,7 @@ The library emits events like the example below when HTTP protocol detection is
   "body": {
     "sourcetype": "net",
     "_time": 1632317484.042796,
-    "source": "remote_protocol",
+    "source": "net.app",
     "host": "dev01",
     "proc": "curl",
     "cmd": "curl -Lso /dev/null --http1.1 http://nghttp2.org/robots.txt",
@@ -79,7 +79,7 @@ except the `http_flavor` value is `2.0`.
   "body": {
     "sourcetype": "http",
     "_time": 1632490879.840472,
-    "source": "http-req",
+    "source": "http.req",
     "host": "dev01",
     "proc": "curl",
     "cmd": "curl --http1.1 https://nghttp2.org/robots.txt",
@@ -119,7 +119,7 @@ events except the `http_flavor` value is `2.0`.
   "body": {
     "sourcetype": "http",
     "_time": 1632490880.010622,
-    "source": "http-resp",
+    "source": "http.resp",
     "host": "dev01",
     "proc": "curl",
     "cmd": "curl --http1.1 https://nghttp2.org/robots.txt",
@@ -229,7 +229,7 @@ The HTTP watch entry controls whether and how the library emits HTTP events.
 Omit the entry uder `event > watch` to disable the HTTP events entirely.
 
 The `name` regex is applied against the `source` value and only events that
-match are emitted. Using something like `http-resp` would cause the library
+match are emitted. Using something like `http.resp` would cause the library
 to only emit the response events and block the request events.  The default is
 `.*` with matches everything thus not blocking anything.
 
@@ -256,14 +256,14 @@ value` match any of the `headers` regexes in the watch. Note headers is a list
 containing zero or more regex strings and match the whole header, not just the
 name or value.
 
-In the example below, the `name` regex blocks the `http-req` events and the
+In the example below, the `name` regex blocks the `http.req` events and the
 `headers` entries add the matching headers.
 
 ```text
 event:
   watch:
     - type: http
-      name: http-resp
+      name: http.resp
       field: .*
       value: .*
       headers:

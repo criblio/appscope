@@ -80,7 +80,7 @@ event:
 
     # Enable extraction of HTTP headers
 #    - type: http
-#      name: .*                      # (http-resp)|(http-metrics)
+#      name: .*                      # (http.resp)|(http-metrics)
 #      field: .*                     # whitelist regex describing field names
 #      value: .*
 #      headers:                      # (?i)X-myHeader.*

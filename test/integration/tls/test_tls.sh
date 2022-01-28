@@ -83,10 +83,10 @@ cd /opt/test
 ldscope ./curlssl/src/curl --head https://cribl.io
 evaltest
 
-grep http-req $EVT_FILE > /dev/null
+grep http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
+grep http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload
@@ -102,10 +102,10 @@ starttest gnutls
 ldscope ./curltls/src/curl --head https://cribl.io
 evaltest
 
-grep http-req $EVT_FILE > /dev/null
+grep http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
+grep http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload
@@ -121,10 +121,10 @@ starttest nss
 ldscope curl --head https://cribl.io
 evaltest
 
-grep http-req $EVT_FILE > /dev/null
+grep http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
+grep http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload
@@ -140,10 +140,10 @@ starttest "node.js"
 ldscope node /opt/test-runner/bin/nodehttp.ts > /dev/null
 evaltest
 
-grep http-req $EVT_FILE | grep net_peer_ip | grep net_peer_port | grep net_host_ip | grep net_host_port > /dev/null
+grep http.req $EVT_FILE | grep net_peer_ip | grep net_peer_port | grep net_host_ip | grep net_host_port > /dev/null
 ERR+=$?
 
-grep http-resp $EVT_FILE | grep net_peer_ip | grep net_peer_port | grep net_host_ip | grep net_host_port > /dev/null
+grep http.resp $EVT_FILE | grep net_peer_ip | grep net_peer_port | grep net_host_ip | grep net_host_port > /dev/null
 ERR+=$?
 
 evalPayload
@@ -208,10 +208,10 @@ if [ "aarch64" != "$(uname -m)" ]; then
 	sleep 1
 	evaltest
 
-	grep http-req $EVT_FILE > /dev/null
+	grep http.req $EVT_FILE > /dev/null
 	ERR+=$?
 
-	grep http-resp $EVT_FILE > /dev/null
+	grep http.resp $EVT_FILE > /dev/null
 	ERR+=$?
 
 	evalPayload

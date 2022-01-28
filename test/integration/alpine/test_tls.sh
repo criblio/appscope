@@ -83,16 +83,16 @@ cd /opt/test
 ldscope /opt/test/curl-ssl --http1.1 --head https://cribl.io
 evaltest
 
-grep http-req $EVT_FILE > /dev/null
+grep http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
+grep http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep net.dns.req $EVT_FILE > /dev/null
+grep dns.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep net.dns.resp $EVT_FILE > /dev/null
+grep dns.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 cat $EVT_FILE
@@ -110,16 +110,16 @@ starttest gnutls
 ldscope /opt/test/curl-tls --http1.1 --head https://cribl.io
 evaltest
 
-grep http-req $EVT_FILE > /dev/null
+grep http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
+grep http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep net.dns.req $EVT_FILE > /dev/null
+grep dns.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep net.dns.resp $EVT_FILE > /dev/null
+grep dns.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload
@@ -135,16 +135,16 @@ starttest nss
 ldscope /opt/test/curl-nss --http1.1 --head https://cribl.io
 evaltest
 
-grep http-req $EVT_FILE > /dev/null
+grep http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
+grep http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep net.dns.req $EVT_FILE > /dev/null
+grep dns.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep net.dns.resp $EVT_FILE > /dev/null
+grep dns.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload
@@ -160,10 +160,10 @@ starttest "node.js"
 ldscope node /opt/test/bin/nodehttp.ts > /dev/null
 evaltest
 
-grep http-req $EVT_FILE > /dev/null
+grep http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
+grep http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload
@@ -225,10 +225,10 @@ starttest Rust
 ldscope /opt/test/bin/http_test > /dev/null
 evaltest
 
-grep http-req $EVT_FILE > /dev/null
+grep http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
+grep http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload

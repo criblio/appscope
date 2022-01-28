@@ -98,11 +98,11 @@ sleep 0.5
 
 evaltest
 
-grep plainServerDynamic $EVT_FILE | grep http-req > /dev/null
+grep plainServerDynamic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
-grep plainServerDynamic $EVT_FILE | grep http-resp > /dev/null
+grep plainServerDynamic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
-grep plainServerDynamic $EVT_FILE | grep http-resp | grep "127.0.0.1" > /dev/null
+grep plainServerDynamic $EVT_FILE | grep http.resp | grep "127.0.0.1" > /dev/null
 ERR+=$?
 
 evalPayload
@@ -133,11 +133,11 @@ sleep 0.5
 
 evaltest
 
-grep plainServerStatic $EVT_FILE | grep http-req > /dev/null
+grep plainServerStatic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
-grep plainServerStatic $EVT_FILE | grep http-resp > /dev/null
+grep plainServerStatic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
-grep plainServerStatic $EVT_FILE | grep http-resp | grep "127.0.0.1" > /dev/null
+grep plainServerStatic $EVT_FILE | grep http.resp | grep "127.0.0.1" > /dev/null
 ERR+=$?
 
 evalPayload
@@ -168,11 +168,11 @@ sleep 0.5
 
 evaltest
 
-grep tlsServerDynamic $EVT_FILE | grep http-req > /dev/null
+grep tlsServerDynamic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
-grep tlsServerDynamic $EVT_FILE | grep http-resp > /dev/null
+grep tlsServerDynamic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
-grep tlsServerDynamic $EVT_FILE | grep http-resp | grep "127.0.0.1" > /dev/null
+grep tlsServerDynamic $EVT_FILE | grep http.resp | grep "127.0.0.1" > /dev/null
 ERR+=$?
 
 evalPayload
@@ -204,11 +204,11 @@ sleep 0.5
 
 evaltest
 
-grep tlsServerStatic $EVT_FILE | grep http-req > /dev/null
+grep tlsServerStatic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
-grep tlsServerStatic $EVT_FILE | grep http-resp > /dev/null
+grep tlsServerStatic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
-grep tlsServerStatic $EVT_FILE | grep http-resp | grep "127.0.0.1" > /dev/null
+grep tlsServerStatic $EVT_FILE | grep http.resp | grep "127.0.0.1" > /dev/null
 ERR+=$?
 
 evalPayload
@@ -230,9 +230,9 @@ sleep 0.5
 
 evaltest
 
-grep plainClientDynamic $EVT_FILE | grep http-req > /dev/null
+grep plainClientDynamic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
-grep plainClientDynamic $EVT_FILE | grep http-resp > /dev/null
+grep plainClientDynamic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
 
 evalPayload
@@ -254,9 +254,9 @@ sleep 0.5
 
 evaltest
 
-grep plainClientStatic $EVT_FILE | grep http-req > /dev/null
+grep plainClientStatic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
-grep plainClientStatic $EVT_FILE | grep http-resp > /dev/null
+grep plainClientStatic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
 
 evalPayload
@@ -278,9 +278,9 @@ sleep 0.5
 
 evaltest
 
-grep tlsClientDynamic $EVT_FILE | grep http-req > /dev/null
+grep tlsClientDynamic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
-grep tlsClientDynamic $EVT_FILE | grep http-resp > /dev/null
+grep tlsClientDynamic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
 
 evalPayload
@@ -302,9 +302,9 @@ sleep 0.5
 
 evaltest
 
-grep tlsClientStatic $EVT_FILE | grep http-req > /dev/null
+grep tlsClientStatic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
-grep tlsClientStatic $EVT_FILE | grep http-resp > /dev/null
+grep tlsClientStatic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
 
 evalPayload
@@ -427,7 +427,7 @@ influx_eval() {
     done
 
     evaltest
-    cnt=`grep -c http-req /go/influx/db/influxd.event`
+    cnt=`grep -c http.req /go/influx/db/influxd.event`
     if (test "$cnt" -lt $1); then
 	    echo "ERROR: Server count is $cnt"
 	    ERR+=1
@@ -435,11 +435,11 @@ influx_eval() {
 	    echo "Server Success count is $cnt"
     fi
 
-    grep http-req /go/influx/db/influxd.event | grep "127.0.0.1" > /dev/null
+    grep http.req /go/influx/db/influxd.event | grep "127.0.0.1" > /dev/null
     ERR+=$?
 
     if [ -e  "/go/influx/db/influxc.event" ]; then
-        cnt=`grep -c http-req /go/influx/db/influxc.event`
+        cnt=`grep -c http.req /go/influx/db/influxc.event`
         if (test "$cnt" -lt $1); then
 	        echo "ERROR: Client count is $cnt"
 	        ERR+=1

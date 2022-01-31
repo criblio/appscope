@@ -63,7 +63,7 @@ func getBusyInABurgerKingBathroom(c net.Conn) {
 			headerJSON, _ := json.MarshalIndent(header, "", "  ")
 			log(c, "%s\n", string(headerJSON))
 		} else {
-			if strings.Contains(data, "http-req") {
+			if strings.Contains(data, "http.req") {
 				fmt.Println("Received : ", atomic.AddUint64(&count, 1))
 			}
 			log(c, data)

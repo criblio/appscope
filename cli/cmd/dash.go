@@ -102,7 +102,7 @@ func readMetrics(workDir string, w *widgets) {
 				"net.tcp",
 				"net.udp",
 				"net.error",
-				"net.conn_duration",
+				"net.duration",
 				"http.requests",
 				"http.server.duration",
 				"http.response.content_length",
@@ -146,7 +146,7 @@ func readMetrics(workDir string, w *widgets) {
 					writeSparklineFloat64(w.netUDP, val)
 				case "net.error":
 					writeSparklineFloat64(w.netError, val)
-				case "net.conn_duration":
+				case "net.duration":
 					writeSparklineFloat64(w.netDuration, val)
 				case "http.requests":
 					writeSparklineFloat64(w.httpReq, val, sparkline.Label(fmt.Sprintf("Requests: %.0f/sec", math.Round(val/10))))

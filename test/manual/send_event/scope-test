@@ -90,14 +90,14 @@ send_event_tcp() {
     # sleep to allow ab to complete
     sleep 10
     if [ "$(wait_for_files "${DEST}")" ]; then
-        found=$(grep '"source":"http-req"' ${DEST} | wc -l)
+        found=$(grep '"source":"http.req"' ${DEST} | wc -l)
         if [ $found -eq $requests ] ; then 
             echo "PASS: No missing http request events"
         else
             echo "FAIL: Missing http request events: expected: $requests, got: $found, dropped: $(($requests-found))"
             ERR+=1
         fi
-        found=$(grep '"source":"http-resp"' ${DEST} | wc -l)
+        found=$(grep '"source":"http.resp"' ${DEST} | wc -l)
         if [ $found -eq $requests ] ; then 
             echo "PASS: No missing http response events"
         else

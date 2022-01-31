@@ -145,7 +145,7 @@ func getFlowFiles(path string) (FlowMap, error) {
 
 func getFlowEvents(r io.ReadSeeker) (FlowMap, error) {
 	em := events.EventMatch{
-		Sources: []string{"net.conn.open", "net.conn.close"},
+		Sources: []string{"net.open", "net.close"},
 	}
 
 	in := make(chan map[string]interface{})

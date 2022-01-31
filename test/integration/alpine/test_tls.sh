@@ -83,16 +83,16 @@ cd /opt/test
 ldscope /opt/test/curl-ssl --http1.1 --head https://cribl.io
 evaltest
 
-grep http-req $EVT_FILE > /dev/null
+grep http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
+grep http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep net.dns.req $EVT_FILE > /dev/null
+grep dns.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep net.dns.resp $EVT_FILE > /dev/null
+grep dns.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 cat $EVT_FILE
@@ -110,16 +110,16 @@ starttest gnutls
 ldscope /opt/test/curl-tls --http1.1 --head https://cribl.io
 evaltest
 
-grep http-req $EVT_FILE > /dev/null
+grep http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
+grep http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep net.dns.req $EVT_FILE > /dev/null
+grep dns.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep net.dns.resp $EVT_FILE > /dev/null
+grep dns.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload
@@ -135,16 +135,16 @@ starttest nss
 ldscope /opt/test/curl-nss --http1.1 --head https://cribl.io
 evaltest
 
-grep http-req $EVT_FILE > /dev/null
+grep http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
+grep http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep net.dns.req $EVT_FILE > /dev/null
+grep dns.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep net.dns.resp $EVT_FILE > /dev/null
+grep dns.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload
@@ -160,10 +160,10 @@ starttest "node.js"
 ldscope node /opt/test/bin/nodehttp.ts > /dev/null
 evaltest
 
-grep http-req $EVT_FILE > /dev/null
+grep http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
+grep http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload
@@ -178,13 +178,13 @@ endtest
 starttest Ruby
 echo "Creating key files for ruby client and server"
 (cd /opt/test/bin && openssl req -x509 -newkey rsa:4096 -keyout priv.pem -out cert.pem -days 365 -nodes -subj "/C=US/ST=California/L=San Francisco/O=Cribl/OU=Cribl/CN=localhost")
-RUBY_HTTP_START=$(grep http- $EVT_FILE | grep 10101 | wc -l)
+RUBY_HTTP_START=$(grep "http\." $EVT_FILE | grep 10101 | wc -l)
 (cd /opt/test/bin && ldscope ./server.rb 10101 &)
 sleep 1
 (cd /opt/test/bin && ldscope ./client.rb 127.0.0.1 10101)
 sleep 1
 evaltest
-RUBY_HTTP_END=$(grep http- $EVT_FILE | grep 10101 | wc -l)
+RUBY_HTTP_END=$(grep "http\." $EVT_FILE | grep 10101 | wc -l)
 
 if (( $RUBY_HTTP_END - $RUBY_HTTP_START < 4 )); then
     ERR+=1
@@ -207,7 +207,7 @@ ldscope python3 /opt/test/bin/testssl.py run_client
 sleep 1
 evaltest
 
-COUNT=$(grep http- $EVT_FILE | wc -l)
+COUNT=$(grep "http\." $EVT_FILE | wc -l)
 if (( $COUNT < 4 )); then
     ERR+=1
 fi
@@ -225,10 +225,10 @@ starttest Rust
 ldscope /opt/test/bin/http_test > /dev/null
 evaltest
 
-grep http-req $EVT_FILE > /dev/null
+grep http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
+grep http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload
@@ -241,11 +241,11 @@ endtest
 # php
 #
 starttest php
-PHP_HTTP_START=$(grep http- $EVT_FILE | grep sslclient.php | wc -l)
+PHP_HTTP_START=$(grep "http\." $EVT_FILE | grep sslclient.php | wc -l)
 ldscope php /opt/test/bin/sslclient.php > /dev/null
 evaltest
 
-PHP_HTTP_END=$(grep http- $EVT_FILE | grep sslclient.php | wc -l)
+PHP_HTTP_END=$(grep "http\." $EVT_FILE | grep sslclient.php | wc -l)
 
 if (( $PHP_HTTP_END - $PHP_HTTP_START < 2 )); then
     ERR+=1
@@ -261,12 +261,12 @@ endtest
 # apache
 #
 starttest apache
-APACHE_HTTP_START=$(grep http- $EVT_FILE | grep httpd | wc -l)
+APACHE_HTTP_START=$(grep "http\." $EVT_FILE | grep httpd | wc -l)
 ldscope httpd -k start
 ldscope curl -k https://localhost:443/
 ldscope httpd -k stop
 evaltest
-APACHE_HTTP_END=$(grep http- $EVT_FILE | grep httpd | wc -l)
+APACHE_HTTP_END=$(grep "http\." $EVT_FILE | grep httpd | wc -l)
 
 if (( $APACHE_HTTP_END - $APACHE_HTTP_START < 2 )); then
     ERR+=1

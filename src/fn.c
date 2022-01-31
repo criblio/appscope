@@ -164,6 +164,8 @@ initFn(void)
     GETADDR(g_fn.close, "close");
     GETADDR(g_fn.fclose, "fclose");
     GETADDR(g_fn.fcloseall, "fcloseall");
+    GETADDR(g_fn.unlink, "unlink");
+    GETADDR(g_fn.unlinkat, "unlinkat");
     GETADDR(g_fn.read, "read");
     GETADDR(g_fn.pread, "pread");
     GETADDR(g_fn.readv, "readv");

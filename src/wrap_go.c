@@ -1077,13 +1077,14 @@ go_socket(char *stackptr)
 static void
 c_accept4(char *stackaddr)
 {
+    uint64_t fd = *(uint64_t*)(stackaddr + 0x8); 
     struct sockaddr *addr  = *(struct sockaddr **)(stackaddr + 0x10);
     socklen_t *addrlen = *(socklen_t**)(stackaddr + 0x18);
     uint64_t sd_out = *(uint64_t*)(stackaddr + 0x28);
 
     if (sd_out != -1) {
         funcprint("Scope: accept4 of %ld\n", sd_out);
-        doAccept(sd_out, addr, addrlen, "go_accept4");
+        doAccept(fd, sd_out, addr, addrlen, "go_accept4");
     }
 }
 

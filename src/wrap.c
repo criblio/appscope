@@ -168,6 +168,8 @@ static got_list_t inject_hook_list[] = {
     {"close", NULL, &g_fn.close},
     {"fclose", NULL, &g_fn.fclose},
     {"fcloseall", NULL, &g_fn.fcloseall},
+    {"unlink", NULL, &g_fn.unlink},
+    {"unlinkat", NULL, &g_fn.unlinkat},
     {"lseek", NULL, &g_fn.lseek},
     {"fseek", NULL, &g_fn.fseek},
     {"fseeko", NULL, &g_fn.fseeko},
@@ -953,6 +955,8 @@ reportPeriodicStuff(void)
     doTotal(TOT_TCP_CONN);
     doTotal(TOT_UDP_CONN);
     doTotal(TOT_OTHER_CONN);
+    doTotal(TOT_NET_OPEN);
+    doTotal(TOT_NET_CLOSE);
 
     doTotalDuration(TOT_FS_DURATION);
     doTotalDuration(TOT_NET_DURATION);
@@ -2775,7 +2779,7 @@ scope_syscall(long number, ...)
         }
 
         if (rc != -1) {
-            doAccept(rc, (struct sockaddr *)fArgs.arg[1],
+            doAccept(fArgs.arg[0], rc, (struct sockaddr *)fArgs.arg[1],
                      (socklen_t *)fArgs.arg[2], "accept4");
         } else {
             doUpdateState(NET_ERR_CONN, fArgs.arg[0], 0, "accept4", "nopath");
@@ -3545,6 +3549,32 @@ fcloseall(void)
     return rc;
 }
 
+EXPORTON int
+unlink(const char *pathname)
+{
+    WRAP_CHECK(unlink, -1);
+
+    int rc = g_fn.unlink(pathname);
+    if (rc != -1) {
+        doDelete(pathname, "unlink");
+    }
+
+    return rc;
+}
+
+EXPORTON int
+unlinkat(int dirfd, const char *pathname, int flags)
+{
+    WRAP_CHECK(unlinkat, -1);
+
+    int rc = g_fn.unlinkat(dirfd, pathname, flags);
+    if (rc != -1) {
+        doDelete(pathname, "unlinkat");
+    }
+
+    return rc;
+}
+
 #ifdef __APPLE__
 EXPORTON int
 close$NOCANCEL(int fd)
@@ -3596,7 +3626,7 @@ accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     }
 
     if (sd != -1) {
-        doAccept(sd, addr, addrlen, "accept$NOCANCEL");
+        doAccept(sockfd, sd, addr, addrlen, "accept$NOCANCEL");
     } else {
         doUpdateState(NET_ERR_CONN, sockfd, 0, "accept$NOCANCEL", "nopath");
     }
@@ -4423,7 +4453,7 @@ accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     }
 
     if (sd != -1) {
-        doAccept(sd, addr, addrlen, "accept");
+        doAccept(sockfd, sd, addr, addrlen, "accept");
     } else {
         doUpdateState(NET_ERR_CONN, sockfd, 0, "accept", "nopath");
     }
@@ -4446,7 +4476,7 @@ accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
     }
 
     if (sd != -1) {
-        doAccept(sd, addr, addrlen, "accept4");
+        doAccept(sockfd, sd, addr, addrlen, "accept4");
     } else {
         doUpdateState(NET_ERR_CONN, sockfd, 0, "accept4", "nopath");
     }

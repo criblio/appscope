@@ -983,8 +983,8 @@ sendAggregatedLogData(ctl_t *ctl, streambuf_t *stmbuf)
     upld.type = UPLD_EVT;
     upld.body = json;
     upld.req = NULL;
-    upld.proc = NULL;
-    upld.uid = 0;
+    upld.proc = stmbuf->id.proc;
+    upld.uid = stmbuf->id.uid;
     char *msg = prepMessage(&upld);
     if (!msg) return;
 

@@ -147,7 +147,7 @@ Displays an interactive dashboard with an overview of what's happening with the 
 
 ### events
 ---
-Outputs events for a session. You can obtain detailed information about each event by inputting the Event ID as a positional parameter. (By default, the Event ID appears in blue, in `[]`'s at the left.) You can provide filters to narrow down by name (e.g., `http`, `net`, `fs`, or `console`), or by field (e.g., `fs.open`, `stdout`, or `net.conn.open`). You can use JavaScript expressions to further refine the query, and to express logic.
+Outputs events for a session. You can obtain detailed information about each event by inputting the Event ID as a positional parameter. (By default, the Event ID appears in blue, in `[]`'s at the left.) You can provide filters to narrow down by name (e.g., `http`, `net`, `fs`, or `console`), or by field (e.g., `fs.open`, `stdout`, or `net.open`). You can use JavaScript expressions to further refine the query, and to express logic.
 
 #### Usage
 

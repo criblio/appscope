@@ -9,6 +9,9 @@ FROM centos:latest
 #RUN curl https://www.getpagespeed.com/files/centos6-scl-rh-eol.repo --output /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo
 #RUN yum -y install centos-release-scl
 #RUN yum -y install rh-python36
+RUN sed -i 's/#baseurl=http:\/\/mirror/baseurl=http:\/\/vault/' /etc/yum.repos.d/CentOS-Linux-AppStream.repo && \
+    sed -i 's/#baseurl=http:\/\/mirror/baseurl=http:\/\/vault/' /etc/yum.repos.d/CentOS-Linux-Extras.repo && \
+    sed -i 's/#baseurl=http:\/\/mirror/baseurl=http:\/\/vault/' /etc/yum.repos.d/CentOS-Linux-BaseOS.repo
 RUN yum -y install python3 && \
     yum -y install epel-release && \
     yum -y install nginx httpd-tools

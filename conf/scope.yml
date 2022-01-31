@@ -402,7 +402,7 @@ event:
     # a single entry in the `headers` array.
     #
     - type: http
-      name: .*         # event name; http-req or http-resp
+      name: .*         # event name; http.req or http.resp
       field: .*        # matches field names; duration, http_status, etc
       value: .*        # matches field values
       headers:         # list of filters matched against header names

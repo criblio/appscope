@@ -21,13 +21,13 @@ echo "==============================================="
 echo "             Testing Redis                     "
 echo "==============================================="
 if [ "$(wait_for_port 6379)" ]; then
-    # Looking for "source":"remote_protocol" events from scoped Redis client.
+    # Looking for "source":"net.app" events from scoped Redis client.
     # Note that the `protocol[*].detect` entry in scope.yml is `true` to start.
 
     # Should not get the event with SCOPE_EVENT_NET=false
     rm -f /opt/test-runner/logs/events.log
 	SCOPE_EVENT_NET=false ldscope redis-cli SET detect hello >/dev/null 2>&1
-	if grep remote_protocol /opt/test-runner/logs/events.log > /dev/null; then
+	if grep net.app /opt/test-runner/logs/events.log > /dev/null; then
         echo "fail: got event with detect:true,  SCOPE_EVENT_NET=false"
         ERR+=1
     else
@@ -37,7 +37,7 @@ if [ "$(wait_for_port 6379)" ]; then
     # Should get the event when SCOPE_EVENT_NET=true
     rm -f /opt/test-runner/logs/events.log
 	SCOPE_EVENT_NET=true ldscope redis-cli SET detect hello >/dev/null 2>&1
-	if grep remote_protocol /opt/test-runner/logs/events.log > /dev/null; then
+	if grep net.app /opt/test-runner/logs/events.log > /dev/null; then
         echo "pass: got event with detect:true,  SCOPE_EVENT_NET=true"
     else
         echo "fail: no  event with detect:true,  SCOPE_EVENT_NET=true"
@@ -50,7 +50,7 @@ if [ "$(wait_for_port 6379)" ]; then
     # Should not get the event when SCOPE_EVENT_NET=false
     rm -f /opt/test-runner/logs/events.log
 	SCOPE_EVENT_NET=true ldscope redis-cli SET detect hello >/dev/null 2>&1
-	if grep remote_protocol /opt/test-runner/logs/events.log > /dev/null; then
+	if grep net.app /opt/test-runner/logs/events.log > /dev/null; then
         echo "fail: got event with detect:false, SCOPE_EVENT_NET=false"
         ERR+=1
     else
@@ -60,7 +60,7 @@ if [ "$(wait_for_port 6379)" ]; then
     # Should not get the event when SCOPE_EVENT_NET=true
     rm -f /opt/test-runner/logs/events.log
 	SCOPE_EVENT_NET=true ldscope redis-cli SET detect hello >/dev/null 2>&1
-	if grep remote_protocol /opt/test-runner/logs/events.log > /dev/null; then
+	if grep net.app /opt/test-runner/logs/events.log > /dev/null; then
         echo "fail: got event with detect:false, SCOPE_EVENT_NET=true"
         ERR+=1
     else
@@ -88,7 +88,7 @@ if [ "x86_64" = "$(uname -m)" ]; then # x86_64 only
 	echo "==============================================="
 	if [ "$(wait_for_port 27017)" ]; then
 		ldscope mongo /opt/test-runner/bin/mongo.js
-		grep remote_protocol /opt/test-runner/logs/events.log > /dev/null
+		grep net.app /opt/test-runner/logs/events.log > /dev/null
 		MONGO_ERR+=$?
 		grep '"protocol":"Mongo"' /opt/test-runner/logs/events.log > /dev/null
 		MONGO_ERR+=$?

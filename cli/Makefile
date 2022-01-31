@@ -31,6 +31,12 @@ build: all
 debug:
 	$(MAKE) scope BUILD_OPTS="-gcflags=all=\"-N -l\""
 
+# If any cli TestGetFlow* test fails, this may need to be rerun
+# and the expected results in flows/flow_test.go will need to be
+# adjusted accordingly.  Blech.
+genflowtest:
+	./flows/gen_flow_test.sh
+
 ## all: build and compress \`scope\`
 all: scope compressscope
 

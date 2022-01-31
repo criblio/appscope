@@ -1,6 +1,9 @@
 FROM centos:latest
 
 COPY detect_proto/mongodb.repo /etc/yum.repos.d/.
+RUN sed -i 's/#baseurl=http:\/\/mirror/baseurl=http:\/\/vault/' /etc/yum.repos.d/CentOS-Linux-AppStream.repo && \
+    sed -i 's/#baseurl=http:\/\/mirror/baseurl=http:\/\/vault/' /etc/yum.repos.d/CentOS-Linux-Extras.repo && \
+    sed -i 's/#baseurl=http:\/\/mirror/baseurl=http:\/\/vault/' /etc/yum.repos.d/CentOS-Linux-BaseOS.repo
 RUN yum -y update && \
     yum -y install epel-release && \
     yum -y install redis wget gdb openssl net-tools

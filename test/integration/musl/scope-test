@@ -105,7 +105,7 @@ ldscope /opt/fwrite/fwrite
 ERR+=$?
 
 sleep 0.5
-count=$(grep '"source":"fs.op.open"' $EVT_FILE | wc -l)
+count=$(grep '"source":"fs.open"' $EVT_FILE | wc -l)
 if [ $count -ne 1 ] ; then
     ERR+=1
 fi
@@ -120,7 +120,7 @@ if [ $count -ne 1 ] ; then
     ERR+=1
 fi
 
-count=$(grep '"source":"fs.op.close"' $EVT_FILE | wc -l)
+count=$(grep '"source":"fs.close"' $EVT_FILE | wc -l)
 if [ $count -ne 1 ] ; then
     ERR+=1
 fi

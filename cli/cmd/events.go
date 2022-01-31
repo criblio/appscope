@@ -54,12 +54,12 @@ var sourcetypeColors = colorOpts{
 }
 
 var sourceFields = map[string][]string{
-	"http-req": {"http_host",
+	"http.req": {"http_host",
 		"http_method",
 		"http_request_content_length",
 		"http_scheme",
 		"http_target"},
-	"http-resp": {"http_host",
+	"http.resp": {"http_host",
 		"http_method",
 		"http_scheme",
 		"http_target",
@@ -73,13 +73,13 @@ var sourceFields = map[string][]string{
 		"file_read_ops",
 		"file_write_bytes",
 		"file_write_ops"},
-	"net.conn.open": {"net_peer_ip",
+	"net.open": {"net_peer_ip",
 		"net_peer_port",
 		"net_host_ip",
 		"net_host_port",
 		"net_protocol",
 		"net_transport"},
-	"net.conn.close": {"net_peer_ip",
+	"net.close": {"net_peer_ip",
 		"net_peer_port",
 		"net_bytes_recv",
 		"net_bytes_sent",
@@ -105,7 +105,7 @@ var eventsCmd = &cobra.Command{
 	Short: "Outputs events for a session",
 	Long: `Outputs events for a session. Detailed information about each event can be obtained by inputting the Event ID (by default, in blue 
 in []'s at the left) as a positional parameter. Filters can be provided to narrow down by source (e.g. http, net, fs, console) 
-or source (e.g. fs.open, stdout, net.conn.open). JavaScript expressions can be used to further refine the query and express logic.`,
+or source (e.g. fs.open, stdout, net.open). JavaScript expressions can be used to further refine the query and express logic.`,
 	Example: `scope events
 scope events -t http
 scope events -s stderr

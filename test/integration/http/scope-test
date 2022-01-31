@@ -87,16 +87,16 @@ starttest "HTTP/1.1"
 rm -rf ${DEST}
 scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http1.1 $URL
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
-    if grep '"source":"http-req"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "PASS: http-req found"
+    if grep '"source":"http.req"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http.req found"
     else
-        echo "FAIL: http-req not found"
+        echo "FAIL: http.req not found"
         ERR+=1
     fi
-    if grep '"source":"http-resp"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "PASS: http-resp found"
+    if grep '"source":"http.resp"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http.resp found"
     else
-        echo "FAIL: http-resp not found"
+        echo "FAIL: http.resp not found"
         ERR+=1
     fi
 else
@@ -110,16 +110,16 @@ starttest "HTTP/1.1 + Payloads"
 rm -rf ${DEST}
 scope run -p -c tcp://localhost:10090 -- curl -Lso /dev/null --http1.1 $URL
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
-    if grep '"source":"http-req"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "PASS: http-req found"
+    if grep '"source":"http.req"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http.req found"
     else
-        echo "FAIL: http-req not found"
+        echo "FAIL: http.req not found"
         ERR+=1
     fi
-    if grep '"source":"http-resp"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "PASS: http-resp found"
+    if grep '"source":"http.resp"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http.resp found"
     else
-        echo "FAIL: http-resp not found"
+        echo "FAIL: http.resp not found"
         ERR+=1
     fi
 else
@@ -133,16 +133,16 @@ starttest "HTTP/2"
 rm -rf ${DEST}
 scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http2-prior-knowledge $URL
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
-    if grep '"source":"http-req"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "PASS: http-req found"
+    if grep '"source":"http.req"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http.req found"
     else
-        echo "FAIL: http-req not found"
+        echo "FAIL: http.req not found"
         ERR+=1
     fi
-    if grep '"source":"http-resp"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "PASS: http-resp found"
+    if grep '"source":"http.resp"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http.resp found"
     else
-        echo "FAIL: http-resp not found"
+        echo "FAIL: http.resp not found"
         ERR+=1
     fi
 else
@@ -156,16 +156,16 @@ starttest "HTTP/2 + Payloads"
 rm -rf ${DEST}
 scope run -p -c tcp://localhost:10090 -- curl -Lso /dev/null --http2-prior-knowledge $URL
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
-    if grep '"source":"http-req"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "PASS: http-req found"
+    if grep '"source":"http.req"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http.req found"
     else
-        echo "FAIL: http-req not found"
+        echo "FAIL: http.req not found"
         ERR+=1
     fi
-    if grep '"source":"http-resp"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "PASS: http-resp found"
+    if grep '"source":"http.resp"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http.resp found"
     else
-        echo "FAIL: http-resp not found"
+        echo "FAIL: http.resp not found"
         ERR+=1
     fi
 else
@@ -183,17 +183,17 @@ SCOPE_HOME=/opt/test/conf_1 \
 LD_PRELOAD=/usr/local/scope/lib/libscope.so \
 curl -Lso /dev/null --http2-prior-knowledge $URL
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
-    if grep '"source":"http-req"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "FAIL: http-req found"
+    if grep '"source":"http.req"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "FAIL: http.req found"
         ERR+=1
     else
-        echo "PASS: http-req not found"
+        echo "PASS: http.req not found"
     fi
-    if grep '"source":"http-resp"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "FAIL: http-resp found"
+    if grep '"source":"http.resp"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "FAIL: http.resp found"
         ERR+=1
     else
-        echo "PASS: http-resp not found"
+        echo "PASS: http.resp not found"
     fi
 else
     echo "FAIL: no output files"
@@ -209,17 +209,17 @@ SCOPE_HOME=/opt/test/conf_2 \
 LD_PRELOAD=/usr/local/scope/lib/libscope.so \
 curl -Lso /dev/null --http2-prior-knowledge $URL
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
-    if grep '"source":"http-req"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "FAIL: http-req found"
+    if grep '"source":"http.req"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "FAIL: http.req found"
         ERR+=1
     else
-        echo "PASS: http-req not found"
+        echo "PASS: http.req not found"
     fi
-    if grep '"source":"http-resp"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "FAIL: http-resp found"
+    if grep '"source":"http.resp"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "FAIL: http.resp found"
         ERR+=1
     else
-        echo "PASS: http-resp not found"
+        echo "PASS: http.resp not found"
     fi
 else
     echo "FAIL: no output files"
@@ -232,16 +232,16 @@ starttest "HTTP/1.1 + HTTPS"
 rm -rf ${DEST}
 scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http1.1 $URL_HTTPS
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
-    if grep '"source":"http-req"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "PASS: http-req found"
+    if grep '"source":"http.req"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http.req found"
     else
-        echo "FAIL: http-req not found"
+        echo "FAIL: http.req not found"
         ERR+=1
     fi
-    if grep '"source":"http-resp"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "PASS: http-resp found"
+    if grep '"source":"http.resp"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http.resp found"
     else
-        echo "FAIL: http-resp not found"
+        echo "FAIL: http.resp not found"
         ERR+=1
     fi
 else
@@ -255,16 +255,16 @@ starttest "HTTP/2 + HTTPS"
 rm -rf ${DEST}
 scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http2-prior-knowledge $URL_HTTPS
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
-    if grep '"source":"http-req"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "PASS: http-req found"
+    if grep '"source":"http.req"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http.req found"
     else
-        echo "FAIL: http-req not found"
+        echo "FAIL: http.req not found"
         ERR+=1
     fi
-    if grep '"source":"http-resp"' ${DEST}/CriblOut-*.json >/dev/null; then
-        echo "PASS: http-resp found"
+    if grep '"source":"http.resp"' ${DEST}/CriblOut-*.json >/dev/null; then
+        echo "PASS: http.resp found"
     else
-        echo "FAIL: http-resp not found"
+        echo "FAIL: http.resp not found"
         ERR+=1
     fi
 else

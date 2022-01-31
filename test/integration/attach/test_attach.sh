@@ -77,10 +77,10 @@ evaltest
 grep -q '"proc":"python3"' $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q http-req $EVT_FILE > /dev/null
+grep -q http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q http-resp $EVT_FILE > /dev/null
+grep -q http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 kill -9 `pidof python3` > /dev/null
@@ -101,10 +101,10 @@ evaltest
 grep -q '"proc":"java"' $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q http-req $EVT_FILE > /dev/null
+grep -q http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q http-resp $EVT_FILE > /dev/null
+grep -q http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 grep -q fs.open $EVT_FILE > /dev/null
@@ -113,10 +113,10 @@ ERR+=$?
 grep -q fs.close $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q net.conn.open $EVT_FILE > /dev/null
+grep -q net.open $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q net.conn.close $EVT_FILE > /dev/null
+grep -q net.close $EVT_FILE > /dev/null
 ERR+=$?
 
 kill -9 `pidof java`

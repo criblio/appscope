@@ -649,7 +649,7 @@ doHttp1Header(protocol_info *proto)
 
             httpFieldEnd(fields, hreport.ix);
 
-            event_t sendEvent = INT_EVENT("http-req", proto->len, SET, fields);
+            event_t sendEvent = INT_EVENT("http.req", proto->len, SET, fields);
             cmdSendHttp(g_ctl, &sendEvent, map->id, &g_proc);
         }
     }
@@ -740,7 +740,7 @@ doHttp1Header(protocol_info *proto)
 
         httpFieldEnd(fields, hreport.ix);
 
-        event_t hevent = INT_EVENT("http-resp", proto->len, SET, fields);
+        event_t hevent = INT_EVENT("http.resp", proto->len, SET, fields);
         cmdSendHttp(g_ctl, &hevent, map->id, &g_proc);
 
         // emit statsd metrics, if enabled.
@@ -1282,9 +1282,9 @@ doHttp2Frame(protocol_info *proto)
 
             // If it's a request message...
             if (stream->msgType == 1) {
-                if (isHttp2NameEnabled("http-req")) {
+                if (isHttp2NameEnabled("http.req")) {
                     // send the request event
-                    event_t event = INT_EVENT("http-req", proto->len, SET, NULL);
+                    event_t event = INT_EVENT("http.req", proto->len, SET, NULL);
                     event.data = stream->jsonData;
                     cmdSendHttp(g_ctl, &event, proto->uid, &g_proc);
                 }
@@ -1332,9 +1332,9 @@ doHttp2Frame(protocol_info *proto)
                     // TODO: HTTP/1->2 upgrade, get value from HTTP/1 request
                 }
 
-                if (isHttp2NameEnabled("http-resp")) {
+                if (isHttp2NameEnabled("http.resp")) {
                     // send the response event
-                    event_t event = INT_EVENT("http-resp", proto->len, SET, NULL);
+                    event_t event = INT_EVENT("http.resp", proto->len, SET, NULL);
                     event.data = stream->jsonData;
                     cmdSendHttp(g_ctl, &event, proto->uid, &g_proc);
                 }
@@ -1401,7 +1401,7 @@ doDetection(protocol_info *proto)
         FIELDEND
     };
 
-    event_t evt = INT_EVENT("remote_protocol", proto->fd, SET, fields);
+    event_t evt = INT_EVENT("net.app", proto->fd, SET, fields);
     evt.src = CFG_SRC_NET;
     cmdSendEvent(g_ctl, &evt, proto->uid, &g_proc);
     destroyProto(proto);
@@ -1617,7 +1617,7 @@ doDNSMetricName(metric_t type, net_info *net)
                     UNIT_FIELD("response"),
                     FIELDEND
                 };
-                event_t dnsMetric = INT_EVENT("net.dns.resp", ctrs->numDNS.evt, DELTA, resp);
+                event_t dnsMetric = INT_EVENT("dns.resp", ctrs->numDNS.evt, DELTA, resp);
                 cmdSendEvent(g_ctl, &dnsMetric, getTime(), &g_proc);
 
                 // This creates a DNS event
@@ -1626,7 +1626,7 @@ doDNSMetricName(metric_t type, net_info *net)
                     DURATION_FIELD(duration->evt / 1000000), // convert ns to ms.
                     FIELDEND
                 };
-                event_t dnsEvent = INT_EVENT("net.dns.resp", ctrs->numDNS.evt, DELTA, evfield);
+                event_t dnsEvent = INT_EVENT("dns.resp", ctrs->numDNS.evt, DELTA, evfield);
                 dnsEvent.src = CFG_SRC_DNS;
                 dnsEvent.data = net->dnsAnswer;
                 cmdSendEvent(g_ctl, &dnsEvent, getTime(), &g_proc);
@@ -1640,7 +1640,7 @@ doDNSMetricName(metric_t type, net_info *net)
                     UNIT_FIELD("request"),
                     FIELDEND
                 };
-                event_t dnsMetric = INT_EVENT("net.dns.req", ctrs->numDNS.evt, DELTA, req);
+                event_t dnsMetric = INT_EVENT("dns.req", ctrs->numDNS.evt, DELTA, req);
                 cmdSendEvent(g_ctl, &dnsMetric, getTime(), &g_proc);
 
                 // This creates a DNS event
@@ -1648,7 +1648,7 @@ doDNSMetricName(metric_t type, net_info *net)
                     DOMAIN_FIELD(net->dnsName),
                     FIELDEND
                 };
-                event_t dnsEvent = INT_EVENT("net.dns.req", ctrs->numDNS.evt, DELTA, evfield);
+                event_t dnsEvent = INT_EVENT("dns.req", ctrs->numDNS.evt, DELTA, evfield);
                 dnsEvent.src = CFG_SRC_DNS;
                 cmdSendEvent(g_ctl, &dnsEvent, getTime(), &g_proc);
             }
@@ -1705,7 +1705,7 @@ doDNSMetricName(metric_t type, net_info *net)
                 FIELDEND
             };
 
-            event_t dnsDurMetric = INT_EVENT("net.dns.duration", dur, DELTA_MS, fields);
+            event_t dnsDurMetric = INT_EVENT("dns.duration", dur, DELTA_MS, fields);
             cmdSendEvent(g_ctl, &dnsDurMetric, getTime(), &g_proc);
             atomicSwapU64(&ctrs->dnsDurationNum.evt, 0);
             atomicSwapU64(&ctrs->dnsDurationTotal.evt, 0);
@@ -1737,7 +1737,7 @@ doDNSMetricName(metric_t type, net_info *net)
             UNIT_FIELD("millisecond"),
             FIELDEND
         };
-        event_t dnsDurMetric = INT_EVENT("net.dns.duration", dur, DELTA_MS, fields);
+        event_t dnsDurMetric = INT_EVENT("dns.duration", dur, DELTA_MS, fields);
         if (cmdSendMetric(g_mtc, &dnsDurMetric)) {
             scopeLogError("ERROR: doDNSMetricName:DNS_DURATION:cmdSendMetric");
         }
@@ -1870,7 +1870,7 @@ doStatMetric(const char *op, const char *pathname, void* ctr)
     };
 
     if (ctrs->numStat.evt != 0) {
-        event_t evt = INT_EVENT("fs.op.stat", ctrs->numStat.evt, DELTA, fields);
+        event_t evt = INT_EVENT("fs.stat", ctrs->numStat.evt, DELTA, fields);
         cmdSendEvent(g_ctl, &evt, getTime(), &g_proc);
     }
 
@@ -1882,7 +1882,7 @@ doStatMetric(const char *op, const char *pathname, void* ctr)
     // Do not report zeros
     if (ctrs->numStat.mtc == 0) return;
 
-    event_t evt = INT_EVENT("fs.op.stat", ctrs->numStat.mtc, DELTA, fields);
+    event_t evt = INT_EVENT("fs.stat", ctrs->numStat.mtc, DELTA, fields);
     if (cmdSendMetric(g_mtc, &evt)) {
         scopeLogError("doStatMetric");
     }
@@ -1936,7 +1936,7 @@ getNetPtotocol(net_info *net, event_field_t *nevent, int *ix)
 /*
 {
   "sourcetype": "net",
-  "source": "net.conn.open",
+  "source": "net.open",
   "cmd": "foo",
   "pid": 10831,
   "host": "hostname",
@@ -1957,7 +1957,7 @@ static void
 doNetOpenEvent(net_info *net)
 {
     int nix = 0;
-    const char *metric = "net.conn.open";
+    const char *metric = "net.open";
     char rport[8];
     char lport[8];
     char raddr[INET6_ADDRSTRLEN];
@@ -1987,7 +1987,7 @@ doNetOpenEvent(net_info *net)
 /*
 {
   "sourcetype": "net",
-  "source": "net.conn.close",
+  "source": "net.close",
   "cmd": "foo",
   "pid": 10831,
   "host": "hostname",
@@ -2013,7 +2013,7 @@ static void
 doNetCloseEvent(net_info *net, uint64_t dur)
 {
     int nix = 0;
-    const char *metric = "net.conn.close";
+    const char *metric = "net.close";
     char rport[8];
     char lport[8];
     char raddr[INET6_ADDRSTRLEN];
@@ -2112,12 +2112,13 @@ static void
 doFSOpenEvent(fs_info *fs, const char *op)
 {
     const char *metric = "fs.open";
-    counters_element_t *numops = &fs->numOpen;
 
-    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) &&
-        (fs->fd > 2) && strncmp(fs->path, "std", 3)) {
+    if ((fs->fd > 2) && strncmp(fs->path, "std", 3)) {
 
         event_field_t fevent[] = {
+            PROC_FIELD(g_proc.procname),
+            PID_FIELD(g_proc.pid),
+            HOST_FIELD(g_proc.hostname),
             FILE_EV_NAME(fs->path),
             PROC_UID(g_proc.uid),
             PROC_GID(g_proc.gid),
@@ -2129,8 +2130,8 @@ doFSOpenEvent(fs_info *fs, const char *op)
             FIELDEND
         };
 
-        event_t evt = INT_EVENT(metric, numops->evt, DELTA, fevent);
-        evt.src = CFG_SRC_FS;
+        event_t evt = INT_EVENT(metric, fs->numOpen.evt, DELTA, fevent);
+        evt.src = (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS)) ? CFG_SRC_FS : CFG_SRC_METRIC;
         cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
     }
 }
@@ -2140,10 +2141,12 @@ doFSCloseEvent(fs_info *fs, const char *op)
 {
     const char *metric = "fs.close";
 
-    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) &&
-        (fs->fd > 2) && strncmp(fs->path, "std", 3)) {
+    if ((fs->fd > 2) && strncmp(fs->path, "std", 3)) {
 
         event_field_t fevent[] = {
+            PROC_FIELD(g_proc.procname),
+            PID_FIELD(g_proc.pid),
+            HOST_FIELD(g_proc.hostname),
             FILE_EV_NAME(fs->path),
             PROC_UID(g_proc.uid),
             PROC_GID(g_proc.gid),
@@ -2162,7 +2165,7 @@ doFSCloseEvent(fs_info *fs, const char *op)
         };
 
         event_t evt = INT_EVENT(metric, fs->numClose.evt, DELTA, fevent);
-        evt.src = CFG_SRC_FS;
+        evt.src = (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS)) ? CFG_SRC_FS : CFG_SRC_METRIC;
         cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
     }
 }
@@ -2342,21 +2345,21 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
         const char* err_str = "UNKNOWN";
         switch (type) {
             case FS_OPEN:
-                metric = "fs.op.open";
+                metric = "fs.open";
                 numops = &fs->numOpen;
                 global_counter = &g_ctrs.numOpen;
                 summarize = &g_summary.fs.open_close;
                 err_str = "ERROR: doFSMetric:FS_OPEN:cmdSendMetric";
                 break;
             case FS_CLOSE:
-                metric = "fs.op.close";
+                metric = "fs.close";
                 numops = &fs->numClose;
                 global_counter = &g_ctrs.numClose;
                 summarize = &g_summary.fs.open_close;
                 err_str = "ERROR: doFSMetric:FS_CLOSE:cmdSendMetric";
                 break;
             case FS_SEEK:
-                metric = "fs.op.seek";
+                metric = "fs.seek";
                 numops = &fs->numSeek;
                 global_counter = &g_ctrs.numSeek;
                 summarize = &g_summary.fs.seek;
@@ -2379,7 +2382,7 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
         };
 
         // Don't report zeros.
-        if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC) && (numops->evt != 0ULL)) {
+        if ((type == FS_SEEK) && (numops->evt != 0ULL)) {
             event_t evt = INT_EVENT(metric, numops->evt, DELTA, fields);
             cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
             reported = TRUE;
@@ -2393,12 +2396,6 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
         if ((type == FS_CLOSE) && (numops->evt != 0ULL)) {
             doFSCloseEvent(fs, op);
             reported = TRUE;
-            //atomicSwapU64(&fs->numWrite.evt, 0);
-            //atomicSwapU64(&fs->writeBytes.evt, 0);
-            //atomicSwapU64(&fs->numRead.evt, 0);
-            //atomicSwapU64(&fs->readBytes.evt, 0);
-            //atomicSwapU64(&fs->numDuration.evt, 0);
-            //atomicSwapU64(&fs->totalDuration.evt, 0);
         }
 
         if (reported == TRUE) atomicSwapU64(&numops->evt, 0);
@@ -2665,7 +2662,7 @@ doTotalDuration(metric_t type)
             err_str = "ERROR: doTotalDuration:TOT_FS_DURATION:cmdSendMetric";
             break;
         case TOT_NET_DURATION:
-            metric = "net.conn_duration";
+            metric = "net.duration";
             value = &g_ctrs.connDurationTotal;
             num = &g_ctrs.connDurationNum;
             aggregation_type = DELTA_MS;
@@ -2674,7 +2671,7 @@ doTotalDuration(metric_t type)
             err_str = "ERROR: doTotalDuration:TOT_NET_DURATION:cmdSendMetric";
             break;
         case TOT_DNS_DURATION:
-            metric = "net.dns.duration";
+            metric = "dns.duration";
             value = &g_ctrs.dnsDurationTotal;
             num = &g_ctrs.dnsDurationNum;
             aggregation_type = DELTA_MS;
@@ -2904,7 +2901,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
                 UNIT_FIELD("millisecond"),
                 FIELDEND
             };
-            event_t evt = INT_EVENT("net.conn_duration", dur, DELTA_MS, fields);
+            event_t evt = INT_EVENT("net.duration", dur, DELTA_MS, fields);
             cmdSendEvent(g_ctl, &evt, net->uid, &g_proc);
             atomicSwapU64(&net->numDuration.evt, 0);
             atomicSwapU64(&net->totalDuration.evt, 0);
@@ -2928,7 +2925,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         // Don't report zeros.
         if (dur == 0ULL) return;
 
-        // Report the net conn duration metric
+        // Report the net.duration metric
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
@@ -2940,7 +2937,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
             UNIT_FIELD("millisecond"),
             FIELDEND
         };
-        event_t evt = INT_EVENT("net.conn_duration", dur, DELTA_MS, fields);
+        event_t evt = INT_EVENT("net.duration", dur, DELTA_MS, fields);
         if (cmdSendMetric(g_mtc, &evt)) {
             scopeLogError("fd:%d ERROR: doNetMetric:CONNECTION_DURATION:cmdSendMetric", net->fd);
         }

@@ -677,7 +677,7 @@ main(int argc, char **argv) {
   switch (ttype) {
       char *verify[2];
   case 1:
-      verify[0] = "fs.op.open";
+      verify[0] = "fs.open";
       verify[1] = "recvmsg";
       verify[2] = "Received_File_Descriptor";
       if (check_event(verify, 3) == -1) {
@@ -695,7 +695,7 @@ main(int argc, char **argv) {
           }
           break;
       case 3:
-          verify[0] = "fs.op.open";
+          verify[0] = "fs.open";
           verify[1] = "recvmsg";
           verify[2] = "Received_File_Descriptor";
           verify[3] = "net.tx";

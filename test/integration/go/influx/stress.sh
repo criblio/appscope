@@ -42,7 +42,7 @@ until test -z "$pexist" ; do
 	pexist=`ps -ef | grep influxd | grep config`
 done
 
-cnt=`grep -c http-req $influx_path/db/influxd.event`
+cnt=`grep -c http.req $influx_path/db/influxd.event`
 if (test "$cnt" -lt 100); then 
 	echo "ERROR: Server count is $cnt"
 	ERR+=1
@@ -51,7 +51,7 @@ else
 fi
 
 if [ -e  "$influx_path/db/influxc.event" ]; then
-    cnt=`grep -c http-req $influx_path/db/influxc.event`
+    cnt=`grep -c http.req $influx_path/db/influxc.event`
     if (test "$cnt" -lt 100); then 
 	    echo "ERROR: Client count is $cnt"
 	    ERR+=1

@@ -66,14 +66,14 @@ nginx_fluentbit_file() {
 
     # validate output
     if [ "$(wait_for_files "/test_output/fluent.out")" ]; then
-        found=$(grep '"source":"http-req"' /test_output/fluent.out | wc -l)
+        found=$(grep '"source":"http.req"' /test_output/fluent.out | wc -l)
         if [ $found -eq $1 ] ; then 
             echo "PASS: No missing http request events"
         else
             echo "FAIL: Missing http request events: expected: $1, got: $found, dropped: $(($1-found))"
             ERR+=1
         fi
-        found=$(grep '"source":"http-resp"' /test_output/fluent.out | wc -l)
+        found=$(grep '"source":"http.resp"' /test_output/fluent.out | wc -l)
         if [ $found -eq $1 ] ; then 
             echo "PASS: No missing http response events"
         else
@@ -116,14 +116,14 @@ nginx_fluentbit_logstream() {
 
     # validate output
     if [ "$(wait_for_files "/test_output/appscope:in_appscope/CriblOut-*.json")" ]; then
-        found=$(grep '"source":"http-req"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
+        found=$(grep '"source":"http.req"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
         if [ $found -eq $1 ] ; then 
             echo "PASS: No missing http request events"
         else
             echo "FAIL: Missing http request events: expected: $1, got: $found, dropped: $(($1-found))"
             ERR+=1
         fi
-        found=$(grep '"source":"http-resp"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
+        found=$(grep '"source":"http.resp"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
         if [ $found -eq $1 ] ; then 
             echo "PASS: No missing http response events"
         else
@@ -166,14 +166,14 @@ multiple_nginx_fluentbit_logstream() {
 
     # validate output
     if [ "$(wait_for_files "/test_output/appscope:in_appscope/CriblOut-*.json")" ]; then
-        found=$(grep '"source":"http-req"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
+        found=$(grep '"source":"http.req"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
         if [ $found -eq $1 ] ; then 
             echo "PASS: No missing http request events"
         else
             echo "FAIL: Missing http request events: expected: $1, got: $found, dropped: $(($1-found))"
             ERR+=1
         fi
-        found=$(grep '"source":"http-resp"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
+        found=$(grep '"source":"http.resp"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
         if [ $found -eq $1 ] ; then 
             echo "PASS: No missing http response events"
         else
@@ -216,14 +216,14 @@ nginx_multiple_fluentbit_logstream() {
 
     # validate output
     if [ "$(wait_for_files "/test_output/appscope:in_appscope/CriblOut-*.json")" ]; then
-        found=$(grep '"source":"http-req"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
+        found=$(grep '"source":"http.req"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
         if [ $found -eq $1 ] ; then 
             echo "PASS: No missing http request events"
         else
             echo "FAIL: Missing http request events: expected: $1, got: $found, dropped: $(($1-found))"
             ERR+=1
         fi
-        found=$(grep '"source":"http-resp"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
+        found=$(grep '"source":"http.resp"' /test_output/appscope:in_appscope/CriblOut-*.json | wc -l)
         if [ $found -eq $1 ] ; then 
             echo "PASS: No missing http response events"
         else

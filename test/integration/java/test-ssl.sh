@@ -104,10 +104,10 @@ if [[ "$CURL_MAX_RETRY" -lt 0 ]]; then
 fi
 
 sleep 2
-grep http-req $EVT_FILE > /dev/null
+grep http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
+grep http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 grep '"net_peer_ip":"127.0.0.1"' $EVT_FILE > /dev/null
@@ -126,10 +126,10 @@ starttest SSLSocketClient
 cd /opt/javassl
 ldscope java -Djavax.net.ssl.trustStore=/opt/tomcat/certs/tomcat.p12 -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=pkcs12 SSLSocketClient > /dev/null
 evaltest
-grep http-req $EVT_FILE > /dev/null
+grep http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep http-resp $EVT_FILE > /dev/null
+grep http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 grep '"net_peer_ip":"127.0.0.1"' $EVT_FILE > /dev/null
@@ -167,10 +167,10 @@ sleep 5
 grep -q '"proc":"java"' $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q http-req $EVT_FILE > /dev/null
+grep -q http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q http-resp $EVT_FILE > /dev/null
+grep -q http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 grep -q fs.open $EVT_FILE > /dev/null
@@ -179,10 +179,10 @@ ERR+=$?
 grep -q fs.close $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q net.conn.open $EVT_FILE > /dev/null
+grep -q net.open $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q net.conn.close $EVT_FILE > /dev/null
+grep -q net.close $EVT_FILE > /dev/null
 ERR+=$?
 
 kill -9 ${HTTP_SERVER_PID}
@@ -204,10 +204,10 @@ sleep 5
 grep -q '"proc":"java"' $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q http-req $EVT_FILE > /dev/null
+grep -q http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q http-resp $EVT_FILE > /dev/null
+grep -q http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 grep -q fs.open $EVT_FILE > /dev/null
@@ -216,10 +216,10 @@ ERR+=$?
 grep -q fs.close $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q net.conn.open $EVT_FILE > /dev/null
+grep -q net.open $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q net.conn.close $EVT_FILE > /dev/null
+grep -q net.close $EVT_FILE > /dev/null
 ERR+=$?
 
 kill -9 ${HTTP_SERVER_PID}
@@ -242,10 +242,10 @@ sleep 5
 grep -q '"proc":"java"' $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q http-req $EVT_FILE > /dev/null
+grep -q http.req $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q http-resp $EVT_FILE > /dev/null
+grep -q http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 grep -q fs.open $EVT_FILE > /dev/null
@@ -254,10 +254,10 @@ ERR+=$?
 grep -q fs.close $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q net.conn.open $EVT_FILE > /dev/null
+grep -q net.open $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q net.conn.close $EVT_FILE > /dev/null
+grep -q net.close $EVT_FILE > /dev/null
 ERR+=$?
 
 kill -9 ${HTTP_SERVER_PID}

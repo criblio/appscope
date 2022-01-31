@@ -2386,27 +2386,19 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
 
         // Don't report zeros.
         if ((type == FS_SEEK) && (numops->evt != 0ULL)) {
-            if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC)) {
-                event_t evt = INT_EVENT(metric, numops->evt, DELTA, fields);
-                cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
-                reported = TRUE;
-            }
+            event_t evt = INT_EVENT(metric, numops->evt, DELTA, fields);
+            cmdSendEvent(g_ctl, &evt, fs->uid, &g_proc);
+            reported = TRUE;
         }
 
         if ((type == FS_OPEN) && (numops->evt != 0ULL)) {
-            if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) ||
-                ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC)) {
-                doFSOpenEvent(fs, op);
-                reported = TRUE;
-            }
+            doFSOpenEvent(fs, op);
+            reported = TRUE;
         }
 
         if ((type == FS_CLOSE) && (numops->evt != 0ULL)) {
-            if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) ||
-                ctlEvtSourceEnabled(g_ctl, CFG_SRC_METRIC)) {
-                doFSCloseEvent(fs, op);
-                reported = TRUE;
-            }
+            doFSCloseEvent(fs, op);
+            reported = TRUE;
         }
 
         if (reported == TRUE) atomicSwapU64(&numops->evt, 0);

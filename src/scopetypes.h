@@ -155,7 +155,6 @@ typedef unsigned int bool;
  * of as requirements. SO, we'll extend this over time.
  */
 #define DEFAULT_CBUF_SIZE (DEFAULT_MAXEVENTSPERSEC * DEFAULT_SUMMARY_PERIOD)
-#define DEFAULT_PAYLOAD_RING_SIZE 10000
 #define DEFAULT_CONFIG_SIZE 30 * 1024
 
 // Unpublished scope env vars that are not processed by config:
@@ -173,6 +172,7 @@ typedef unsigned int bool;
 //    SCOPE_PID                      provided by library
 //    SCOPE_PAYLOAD_HEADER           write payload headers to files
 //    SCOPE_ALLOW_CONSTRUCT_DBG      allows debug inside the constructor
+//    SCOPE_QUEUE_LENGTH             override default circular buffer sizes
 
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"

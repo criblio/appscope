@@ -48,7 +48,7 @@
 #define DOMAIN_FIELD(val)       STRFIELD("domain",         (val), 5, TRUE)
 
 #define FILE_FIELD(val)      STRFIELD("file",              (val), 5, TRUE)
-#define FILE_EV_NAME(val)    STRFIELD("file_name",         (val), 5, TRUE)
+#define FILE_EV_NAME(val)    STRFIELD("file",              (val), 5, TRUE)
 #define FILE_EV_MODE(val)    NUMFIELD("file_perms",        (val), 5, TRUE)
 #define FILE_OWNER(val)      NUMFIELD("file_owner",        (val), 5, TRUE)
 #define FILE_GROUP(val)      NUMFIELD("file_group",        (val), 5, TRUE)
@@ -2322,7 +2322,7 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
             FIELDEND
         };
 
-        event_t rwMetric = INT_EVENT(metric, sizebytes->mtc, HISTOGRAM, fields);
+        event_t rwMetric = INT_EVENT(metric, sizebytes->mtc, DELTA, fields);
 
         if (cmdSendMetric(g_mtc, &rwMetric)) {
             scopeLogError("fd:%d %s", fs->fd, err_str);

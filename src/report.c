@@ -2295,7 +2295,7 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
                 FIELDEND
             };
 
-            event_t rwMetric = INT_EVENT(metric, sizebytes->evt, HISTOGRAM, fields);
+            event_t rwMetric = INT_EVENT(metric, sizebytes->evt, DELTA, fields);
             cmdSendEvent(g_ctl, &rwMetric, fs->uid, &g_proc);
             //atomicSwapU64(&numops->evt, 0);
             //atomicSwapU64(&sizebytes->evt, 0);
@@ -2567,7 +2567,7 @@ doTotal(metric_t type)
             metric = "net.dns";
             value = &g_ctrs.numDNS;
             err_str = "ERROR: doTotal:TOT_DNS:cmdSendMetric";
-            units = "operation";
+            units = "request";
             break;
         case TOT_PORTS:
             metric = "net.port";

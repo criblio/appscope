@@ -93,9 +93,9 @@ except the `http_flavor` value is `2.0`.
       "http_user_agent": "curl/7.74.0",
       "net_transport": "IP.TCP",
       "net_peer_ip": "2400:8902::f03c:91ff:fe69:a454",
-      "net_peer_port": "443",
+      "net_peer_port": 443,
       "net_host_ip": "2601:cf:4500:f481:27c7:7ea0:8bdd:35c0",
-      "net_host_port": "53398"
+      "net_host_port": 53398
     }
   }
 }
@@ -136,9 +136,9 @@ events except the `http_flavor` value is `2.0`.
       "http_user_agent": "curl/7.74.0",
       "net_transport": "IP.TCP",
       "net_peer_ip": "2400:8902::f03c:91ff:fe69:a454",
-      "net_peer_port": "443",
+      "net_peer_port": 443,
       "net_host_ip": "2601:cf:4500:f481:27c7:7ea0:8bdd:35c0",
-      "net_host_port": "53398",
+      "net_host_port": 53398,
       "http_response_content_length": 62
     }
   }

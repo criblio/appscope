@@ -161,10 +161,10 @@ func TestGetFlowFiles(t *testing.T) {
 	assert.NoError(t, err)
 	flowList := flows.List()
 	sort.Slice(flowList, func(i, j int) bool { return flowList[i].BytesSent < flowList[j].BytesSent })
-	assert.Equal(t, 27752, flowList[1].Pid)
-	assert.Equal(t, "99.84.74.114", flowList[1].PeerIP)
-	assert.Equal(t, 443, flowList[1].PeerPort)
-	assert.Equal(t, "27752_99.84.74.114:443_10.8.107.159:33716.out", flowList[1].OutFile)
+	assert.Equal(t, 87236, flowList[1].Pid)
+	assert.Equal(t, "127.0.0.53", flowList[1].PeerIP)
+	assert.Equal(t, 53, flowList[1].PeerPort)
+	assert.Equal(t, "87236_127.0.0.53:53_0.0.0.0:0.out", flowList[1].OutFile)
 	os.RemoveAll("testflows")
 
 }
@@ -179,11 +179,11 @@ func TestGetFlowEvents(t *testing.T) {
 	sort.Slice(flowList, func(i, j int) bool { return flowList[i].BytesSent < flowList[j].BytesSent })
 	f := flowList[0]
 	assert.NoError(t, err)
-	assert.Equal(t, "10.8.107.159", f.HostIP)
-	assert.Equal(t, 33716, f.HostPort)
-	assert.Equal(t, "99.84.74.114", f.PeerIP)
+	assert.Equal(t, "172.16.198.210", f.HostIP)
+	assert.Equal(t, 42846, f.HostPort)
+	assert.Equal(t, "143.204.35.14", f.PeerIP)
 	assert.Equal(t, 443, f.PeerPort)
-	assert.Equal(t, 65626, f.BytesReceived)
+	assert.Equal(t, 65604, f.BytesReceived)
 	os.RemoveAll("testflows")
 }
 
@@ -198,7 +198,7 @@ func TestGetFlows(t *testing.T) {
 	sort.Slice(flowList, func(i, j int) bool { return flowList[i].BytesSent < flowList[j].BytesSent })
 	f := flowList[1]
 	assert.NoError(t, err)
-	assert.Equal(t, 59984, f.BytesReceived)
+	assert.Equal(t, 362, f.BytesReceived)
 	assert.Equal(t, "", f.Protocol)
 	os.RemoveAll("testflows")
 }

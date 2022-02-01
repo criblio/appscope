@@ -163,12 +163,6 @@ func getFlowEvents(r io.ReadSeeker) (FlowMap, error) {
 	ret := FlowMap{}
 	for e := range in {
 		// Reshape ports to ints
-		if _, found := e["data"].(map[string]interface{})["net_host_port"]; found {
-			e["data"].(map[string]interface{})["net_host_port"], _ = strconv.Atoi(e["data"].(map[string]interface{})["net_host_port"].(string))
-		}
-		if _, found := e["data"].(map[string]interface{})["net_peer_port"]; found {
-			e["data"].(map[string]interface{})["net_peer_port"], _ = strconv.Atoi(e["data"].(map[string]interface{})["net_peer_port"].(string))
-		}
 		f := Flow{}
 		err := mapstructure.Decode(e["data"], &f)
 		if err != nil {

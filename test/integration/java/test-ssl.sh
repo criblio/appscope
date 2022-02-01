@@ -113,7 +113,7 @@ ERR+=$?
 grep '"net_peer_ip":"127.0.0.1"' $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -E '"net_peer_port":"[0-9]+"' $EVT_FILE > /dev/null
+grep '"net_peer_port":' $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload
@@ -135,7 +135,7 @@ ERR+=$?
 grep '"net_peer_ip":"127.0.0.1"' $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -E '"net_peer_port":"[0-9]+"' $EVT_FILE > /dev/null
+grep -E '"net_peer_port":' $EVT_FILE > /dev/null
 ERR+=$?
 
 evalPayload

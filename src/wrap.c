@@ -963,12 +963,12 @@ reportPeriodicStuff(void)
     doTotalDuration(TOT_DNS_DURATION);
 
     // Report errors
-    doErrorMetric(NET_ERR_CONN, PERIODIC, "summary", "summary", NULL);
-    doErrorMetric(NET_ERR_RX_TX, PERIODIC, "summary", "summary", NULL);
-    doErrorMetric(NET_ERR_DNS, PERIODIC, "summary", "summary", NULL);
-    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, "summary", "summary", NULL);
-    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, "summary", "summary", NULL);
-    doErrorMetric(FS_ERR_STAT, PERIODIC, "summary", "summary", NULL);
+    doErrorMetric(NET_ERR_CONN, PERIODIC, NULL, NULL, NULL);
+    doErrorMetric(NET_ERR_RX_TX, PERIODIC, NULL, NULL, NULL);
+    doErrorMetric(NET_ERR_DNS, PERIODIC, NULL, NULL, NULL);
+    doErrorMetric(FS_ERR_OPEN_CLOSE, PERIODIC, NULL, NULL, NULL);
+    doErrorMetric(FS_ERR_READ_WRITE, PERIODIC, NULL, NULL, NULL);
+    doErrorMetric(FS_ERR_STAT, PERIODIC, NULL, NULL, NULL);
 
     // report net and file by descriptor
     reportAllFds(PERIODIC);

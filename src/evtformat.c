@@ -520,9 +520,9 @@ addJsonFields(event_field_t *fields, regex_t *fieldFilter, cJSON *json, strset_t
         if (!strSetAdd(addedFields, fld->name)) continue;
 
         if (fld->value_type == FMT_STR) {
-            if (!cJSON_AddStringToObjLN(json, fld->name, fld->value.str)) return FALSE;
+            if (!cJSON_AddStringToObjLN(json, fld->name, fld->value.str)) continue;
         } else if (fld->value_type == FMT_NUM) {
-            if (!cJSON_AddNumberToObjLN(json, fld->name, fld->value.num)) return FALSE;
+            if (!cJSON_AddNumberToObjLN(json, fld->name, fld->value.num)) continue;
         } else {
             DBG("bad field type");
         }

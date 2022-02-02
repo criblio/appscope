@@ -2296,8 +2296,9 @@ doDupSock(int oldfd, int newfd)
         return -1;
     }
 
-    memmove(&g_netinfo[newfd], &g_netinfo[oldfd], sizeof(struct fs_info_t));
+    memmove(&g_netinfo[newfd], &g_netinfo[oldfd], sizeof(struct net_info_t));
     g_netinfo[newfd].active = TRUE;
+    g_netinfo[newfd].uid = getTime();
     g_netinfo[newfd].numTX = (counters_element_t){.mtc=0, .evt=0};
     g_netinfo[newfd].numRX = (counters_element_t){.mtc=0, .evt=0};
     g_netinfo[newfd].txBytes = (counters_element_t){.mtc=0, .evt=0};

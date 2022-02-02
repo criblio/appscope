@@ -624,7 +624,7 @@ ctlCreateTxMsgEvt(void** state)
     assert_non_null(msg);
 
     char expected_msg[] =
-        "{\"type\":\"evt\",\"body\":\"yeah, dude\"}";
+        "{\"type\":\"evt\",\"_channel\":\"none\",\"body\":\"yeah, dude\"}";
     assert_string_equal(msg, expected_msg);
 
     free(msg);

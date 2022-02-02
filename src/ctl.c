@@ -501,6 +501,8 @@ create_evt_json(upload_t *upld)
     if (upld->uid) {
         if (snprintf(numbuf, sizeof(numbuf), "%llu", upld->uid) < 0) goto err;
         if (!cJSON_AddStringToObjLN(json_root, CHANNEL, numbuf)) goto err;
+    } else {
+        if (!cJSON_AddStringToObjLN(json_root, CHANNEL, "none")) goto err;
     }
     cJSON_AddItemToObjectCS(json_root, "body", upld->body);
     return json_root;

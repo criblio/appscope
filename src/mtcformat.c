@@ -106,6 +106,7 @@ createStatsFieldString(mtc_fmt_t* fmt, event_field_t* f, char* tag, int sizeofta
             sz = snprintf(tag, sizeoftag, "%s:%lli", f->name, f->value.num);
             break;
         case FMT_STR:
+            if (!f->value.str) return -1;
             sz = snprintf(tag, sizeoftag, "%s:%s", f->name, f->value.str);
             break;
         default:
@@ -156,7 +157,7 @@ addStatsdFields(mtc_fmt_t* fmt, event_field_t* fields, char** end, int* bytes, s
         if (!strSetAdd(addedFields, f->name)) continue;
 
         sz = createStatsFieldString(fmt, f, tag, sizeof(tag));
-        if (sz < 0) break;
+        if (sz < 0) continue;
 
         appendStatsdFieldString(fmt, tag, sz, end, bytes, addedFields);
     }

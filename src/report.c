@@ -35,6 +35,7 @@
 
 #define DATA_FIELD(val)         STRFIELD("data",           (val), 1, TRUE)
 #define UNIT_FIELD(val)         STRFIELD("unit",           (val), 1, TRUE)
+#define SUMMARY_FIELD(val)      STRFIELD("summary",        (val), 1, TRUE)
 #define CLASS_FIELD(val)        STRFIELD("class",          (val), 2, TRUE)
 #define PROTO_FIELD(val)        STRFIELD("proto",          (val), 2, TRUE)
 #define OP_FIELD(val)           STRFIELD("op",             (val), 3, TRUE)
@@ -1448,8 +1449,6 @@ void
 doErrorMetric(metric_t type, control_type_t source,
               const char *func, const char *name, void* ctr)
 {
-    if (!func || !name) return;
-
     metric_counters* ctrs = (ctr) ? (metric_counters*) ctr : &g_ctrs;
 
     const char err_name[] = "EFAULT";
@@ -1477,6 +1476,11 @@ doErrorMetric(metric_t type, control_type_t source,
                 return;
         }
 
+        event_field_t summary = SUMMARY_FIELD("true");
+        event_field_t fieldend = FIELDEND;
+        // if func and name are both null, this is a summary
+        event_field_t* conditional_field = (func || name) ? &fieldend : &summary;
+
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
@@ -1484,6 +1488,7 @@ doErrorMetric(metric_t type, control_type_t source,
             OP_FIELD(func),
             CLASS_FIELD(class),
             UNIT_FIELD("operation"),
+            *conditional_field, // either a SUMMARY_FIELD or a FIELDEND
             FIELDEND
         };
 
@@ -1556,6 +1561,11 @@ doErrorMetric(metric_t type, control_type_t source,
                 return;
         }
 
+        event_field_t summary = SUMMARY_FIELD("true");
+        event_field_t fieldend = FIELDEND;
+        // if func and name are both null, this is a summary
+        event_field_t* conditional_field = (func || name) ? &fieldend : &summary;
+
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
@@ -1564,6 +1574,7 @@ doErrorMetric(metric_t type, control_type_t source,
             *name_field,
             CLASS_FIELD(class),
             UNIT_FIELD("operation"),
+            *conditional_field, // either a SUMMARY_FIELD or a FIELDEND
             FIELDEND
         };
 
@@ -2486,6 +2497,7 @@ doTotalNetRxTx(metric_t type)
                 HOST_FIELD(g_proc.hostname),
                 UNIT_FIELD(units),
                 CLASS_FIELD(bucketName[bucket]),
+                SUMMARY_FIELD("true"),
                 FIELDEND
             };
             event_t evt = INT_EVENT(metric, (*value)[bucket].mtc, DELTA, fields);
@@ -2622,7 +2634,7 @@ doTotal(metric_t type)
         PID_FIELD(g_proc.pid),
         HOST_FIELD(g_proc.hostname),
         UNIT_FIELD(units),
-        CLASS_FIELD("summary"),
+        SUMMARY_FIELD("true"),
         FIELDEND
     };
     event_t evt = INT_EVENT(metric, value->mtc, aggregation_type, fields);
@@ -2699,7 +2711,7 @@ doTotalDuration(metric_t type)
         PID_FIELD(g_proc.pid),
         HOST_FIELD(g_proc.hostname),
         UNIT_FIELD(units),
-        CLASS_FIELD("summary"),
+        SUMMARY_FIELD("true"),
         FIELDEND
     };
     event_t evt = INT_EVENT(metric, dur, aggregation_type, fields);

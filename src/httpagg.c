@@ -271,6 +271,7 @@ report_target(mtc_t *mtc, target_agg_t *target)
                 NUMFIELD("pid",         g_proc.pid,      4, TRUE),
                 STRFIELD("host",        g_proc.hostname, 4, TRUE),
                 STRFIELD("unit",        "request", 4, TRUE),
+                STRFIELD("summary",     "true",    1, TRUE),
                 FIELDEND
             };
             event_t metric = INT_EVENT("http.requests",
@@ -301,6 +302,7 @@ report_target(mtc_t *mtc, target_agg_t *target)
                 NUMFIELD("pid",         g_proc.pid,      4, TRUE),
                 STRFIELD("host",        g_proc.hostname, 4, TRUE),
                 STRFIELD("unit",        unit, 4, TRUE),
+                STRFIELD("summary",     "true",    1, TRUE),
                 FIELDEND
             };
             event_t metric = INT_EVENT(valToStr(fieldMapOut, i),

@@ -1,5 +1,7 @@
 #define _GNU_SOURCE
 
+#include <errno.h>
+
 #include "circbuf.h"
 #include "com.h"
 #include "dbg.h"
@@ -36,7 +38,19 @@ initMetricCapture(void)
                     errNum, errPos);
         }
     }
-    if (!(g_metric_buf = cbufInit(DEFAULT_CBUF_SIZE))) {
+
+    size_t buf_size = DEFAULT_CBUF_SIZE;
+    char *qlen_str;
+    if ((qlen_str = getenv("SCOPE_QUEUE_LENGTH")) != NULL) {
+        unsigned long qlen;
+        errno = 0;
+        qlen = strtoul(qlen_str, NULL, 10);
+        if (!errno && qlen) {
+            buf_size = qlen;
+        }
+    }
+
+    if (!(g_metric_buf = cbufInit(buf_size))) {
         scopeLogError("ERROR: statsd buffer creation failed");
     }
 }

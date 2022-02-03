@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -580,7 +581,18 @@ ctlCreate()
         goto err;
     }
 
-    ctl->log.ringbuf = cbufInit(DEFAULT_CBUF_SIZE);
+    size_t buf_size = DEFAULT_CBUF_SIZE;
+    char *qlen_str;
+    if ((qlen_str = getenv("SCOPE_QUEUE_LENGTH")) != NULL) {
+        unsigned long qlen;
+        errno = 0;
+        qlen = strtoul(qlen_str, NULL, 10);
+        if (!errno && qlen) {
+            buf_size = qlen;
+        }
+    }
+
+    ctl->log.ringbuf = cbufInit(buf_size);
     if (!ctl->log.ringbuf) {
         DBG(NULL);
         goto err;
@@ -588,7 +600,7 @@ ctlCreate()
     ctl->log.max_agg_bytes = DEFAULT_LOG_MAX_AGG_BYTES;
     ctl->log.flush_period_in_ms = DEFAULT_LOG_FLUSH_PERIOD_IN_MS;
 
-    ctl->events = cbufInit(DEFAULT_CBUF_SIZE);
+    ctl->events = cbufInit(buf_size);
     if (!ctl->events) {
         DBG(NULL);
         goto err;
@@ -598,7 +610,7 @@ ctlCreate()
 
     ctl->payload.enable = DEFAULT_PAYLOAD_ENABLE;
     ctl->payload.dir = (DEFAULT_PAYLOAD_DIR) ? strdup(DEFAULT_PAYLOAD_DIR) : NULL;
-    ctl->payload.ringbuf = cbufInit(DEFAULT_PAYLOAD_RING_SIZE);
+    ctl->payload.ringbuf = cbufInit(buf_size);
     if (!ctl->payload.ringbuf) {
         DBG(NULL);
         goto err;

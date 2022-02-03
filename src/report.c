@@ -1500,7 +1500,8 @@ doErrorMetric(metric_t type, control_type_t source,
         }
 
         // Only report if enabled
-        if ((g_summary.net.error) && (source == EVENT_BASED)) {
+        if (((g_summary.net.error) && (source == EVENT_BASED)) ||
+            ((!g_summary.net.error) && (source == PERIODIC)))  {
             return;
         }
         // Don't report zeros.
@@ -1586,9 +1587,11 @@ doErrorMetric(metric_t type, control_type_t source,
         }
 
         // Only report if enabled
-        if ((source == EVENT_BASED) && *summarize) {
+        if (((*summarize) && (source == EVENT_BASED)) ||
+            ((!*summarize) && (source == PERIODIC)))  {
             return;
         }
+
         // Don't report zeros.
         if (value->mtc == 0) return;
 

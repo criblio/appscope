@@ -21,8 +21,7 @@ To add new event `foo.bar` please create file `event_foo_bar.schema.json`
 - `root` section required update of `"$id"` and `"description"` fields
 - `body` section required update value of following `$ref` in properties in `"sourcetype` and `"source"`
 - `data` section required update of expected `properties` which will be in `data` section of event, in
-  template below - example `properties` are presented as `property_name_1` and `property_name_2`. `required`
-  section should be updated accordingly.
+  template below - example `properties` are presented as `property_name_1` and `property_name_2`.
 
 ```
 {
@@ -87,10 +86,6 @@ To add new event `foo.bar` please create file `event_foo_bar.schema.json`
           "title": "data",
           "description": "data",
           "type": "object",
-          "required": [
-            "property_name_1",
-            "property_name_2"
-          ],
           "properties": {
             "property_name_1": {
               "$ref": "definitions/data.schema.json#/$defs/property_name_1"
@@ -98,8 +93,7 @@ To add new event `foo.bar` please create file `event_foo_bar.schema.json`
             "property_name_2": {
               "$ref": "definitions/data.schema.json#/$defs/property_name_2"
             }
-          },
-          "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false
@@ -117,8 +111,7 @@ To add new metric `foo.bar` please create file `metric_foo_bar.schema.json`
 - `root` section required update of `"$id"` and `"description"` fields
 - `body` section required update value of following `$ref` in properties in `"_metric` and `"_metric_type"`
 - `body` section required update of expected `properties` which will be in `body` section of metrics, in
-  template below - example `properties` is presented as `property_name_1`. `required`
-  section should be updated accordingly.
+  template below - example `properties` is presented as `property_name_1`.
 
 ```
 {
@@ -162,8 +155,7 @@ To add new metric `foo.bar` please create file `metric_foo_bar.schema.json`
         "_time": {
           "$ref": "definitions/body.schema.json#/$defs/_time"
         }
-      },
-      "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false

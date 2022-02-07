@@ -61,15 +61,11 @@
           "title": "data",
           "description": "data",
           "type": "object",
-          "required": [
-            "message"
-          ],
           "properties": {
             "message": {
               "$ref": "definitions/data.schema.json#/$defs/message"
             }
-          },
-          "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

@@ -61,18 +61,6 @@
           "title": "data",
           "description": "data",
           "type": "object",
-          "required": [
-            "_metric",
-            "_metric_type",
-            "_value",
-            "proc",
-            "pid",
-            "fd",
-            "op",
-            "file",
-            "numops",
-            "unit"
-          ],
           "properties": {
             "_metric": {
               "$ref": "definitions/body.schema.json#/$defs/sourcefswrite"
@@ -104,8 +92,7 @@
             "unit": {
               "$ref": "definitions/data.schema.json#/$defs/unit_byte"
             }
-          },
-          "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

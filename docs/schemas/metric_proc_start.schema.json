@@ -72,8 +72,7 @@
         "_time": {
           "$ref": "definitions/body.schema.json#/$defs/_time"
         }
-      },
-      "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false

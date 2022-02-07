@@ -61,25 +61,6 @@
           "title": "data",
           "description": "data",
           "type": "object",
-          "required": [
-              "net_transport"
-          ],
-          "oneOf": [
-            {
-              "required": [
-                "net_peer_ip",
-                "net_peer_port",
-                "net_host_ip",
-                "net_host_port"
-              ]
-            },
-            {
-              "required": [
-                "unix_peer_inode",
-                "unix_local_inode"
-              ]
-            }
-          ],
           "properties": {
             "net_transport": {
               "$ref": "definitions/data.schema.json#/$defs/net_transport"
@@ -105,8 +86,7 @@
             "net_protocol": {
               "$ref": "definitions/data.schema.json#/$defs/net_protocol"
             }
-          },
-          "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

@@ -61,19 +61,6 @@
           "title": "data",
           "description": "data",
           "type": "object",
-          "required": [
-            "http_method",
-            "http_target",
-            "http_flavor",
-            "http_scheme",
-            "http_host",
-            "http_user_agent",
-            "net_transport",
-            "net_peer_ip",
-            "net_peer_port",
-            "net_host_ip",
-            "net_host_port"
-          ],
           "properties": {
             "http_method": {
               "$ref": "definitions/data.schema.json#/$defs/http_method"
@@ -120,8 +107,7 @@
             "x_appscope": {
               "$ref": "definitions/data.schema.json#/$defs/x_appscope"
             }
-          },
-          "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

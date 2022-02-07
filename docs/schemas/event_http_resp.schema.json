@@ -61,22 +61,6 @@
           "title": "data",
           "description": "data",
           "type": "object",
-          "required": [
-            "http_method",
-            "http_target",
-            "http_scheme",
-            "http_flavor",
-            "http_status_code",
-            "http_status_text",
-            "http_host",
-            "http_user_agent",
-            "net_transport",
-            "net_peer_ip",
-            "net_peer_port",
-            "net_host_ip",
-            "net_host_port",
-            "http_response_content_length"
-          ],
           "properties": {
             "http_method": {
               "$ref": "definitions/data.schema.json#/$defs/http_method"
@@ -129,8 +113,7 @@
             "http_response_content_length": {
               "$ref": "definitions/data.schema.json#/$defs/http_response_content_length"
             }
-          },
-          "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

@@ -61,14 +61,6 @@
           "title": "data",
           "description": "data",
           "type": "object",
-          "required": [
-            "proc",
-            "pid",
-            "host",
-            "op",
-            "file",
-            "unit"
-          ],
           "properties": {
             "proc": {
               "$ref": "definitions/data.schema.json#/$defs/proc"
@@ -88,8 +80,7 @@
             "unit": {
               "$ref": "definitions/data.schema.json#/$defs/unit_operation"
             }
-          },
-          "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

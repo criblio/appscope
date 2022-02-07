@@ -61,29 +61,6 @@
           "title": "data",
           "description": "data",
           "type": "object",
-          "required": [
-            "net_transport",
-            "duration",
-            "net_bytes_sent",
-            "net_bytes_recv",
-            "net_close_reason"
-          ],
-          "oneOf": [
-            {
-              "required": [
-                "net_peer_ip",
-                "net_peer_port",
-                "net_host_ip",
-                "net_host_port"
-              ]
-            },
-            {
-              "required": [
-                "unix_peer_inode",
-                "unix_local_inode"
-              ]
-            }
-          ],
           "properties": {
             "net_transport": {
               "$ref": "definitions/data.schema.json#/$defs/net_transport"
@@ -121,8 +98,7 @@
             "net_close_reason": {
               "$ref": "definitions/data.schema.json#/$defs/net_close_reason"
             }
-          },
-          "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

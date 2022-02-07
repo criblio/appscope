@@ -61,11 +61,6 @@
           "title": "data",
           "description": "data",
           "type": "object",
-          "required": [
-            "duration",
-            "domain",
-            "addrs"
-          ],
           "properties": {
             "duration": {
               "$ref": "definitions/data.schema.json#/$defs/duration"
@@ -76,8 +71,7 @@
             "addrs": {
               "$ref": "definitions/data.schema.json#/$defs/addrs"
             }
-          },
-          "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

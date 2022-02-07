@@ -61,24 +61,6 @@
           "title": "data",
           "description": "data",
           "type": "object",
-          "required": [
-            "proc",
-            "pid",
-            "host",
-            "file",
-            "proc_uid",
-            "proc_gid",
-            "proc_cgroup",
-            "file_perms",
-            "file_owner",
-            "file_group",
-            "file_read_bytes",
-            "file_read_ops",
-            "file_write_bytes",
-            "file_write_ops",
-            "duration",
-            "op"
-          ],
           "properties": {
             "proc": {
               "$ref": "definitions/data.schema.json#/$defs/proc"
@@ -128,8 +110,7 @@
             "op": {
               "$ref": "definitions/data.schema.json#/$defs/op_fs_close"
             }
-          },
-          "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

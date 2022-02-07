@@ -61,17 +61,6 @@
           "title": "data",
           "description": "data",
           "type": "object",
-          "required": [
-            "_metric",
-            "_metric_type",
-            "_value",
-            "proc",
-            "pid",
-            "fd",
-            "proto",
-            "port",
-            "unit"
-          ],
           "properties": {
             "_metric": {
               "$ref": "definitions/body.schema.json#/$defs/sourcenetudp"
@@ -100,8 +89,7 @@
             "unit": {
               "$ref": "definitions/data.schema.json#/$defs/unit_connection"
             }
-          },
-          "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

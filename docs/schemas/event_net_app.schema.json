@@ -61,13 +61,6 @@
           "title": "data",
           "description": "data",
           "type": "object",
-          "required": [
-            "proc",
-            "pid",
-            "fd",
-            "host",
-            "protocol"
-          ],
           "properties": {
             "proc": {
               "$ref": "definitions/data.schema.json#/$defs/proc"
@@ -84,8 +77,7 @@
             "protocol": {
               "$ref": "definitions/data.schema.json#/$defs/protocol"
             }
-          },
-          "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

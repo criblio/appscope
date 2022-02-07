@@ -68,8 +68,7 @@
             "domain": {
               "$ref": "definitions/data.schema.json#/$defs/domain"
             }
-          },
-          "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

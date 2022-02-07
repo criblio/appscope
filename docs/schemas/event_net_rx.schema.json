@@ -61,35 +61,6 @@
           "title": "data",
           "description": "data",
           "type": "object",
-          "required": [
-            "_metric",
-            "_metric_type",
-            "_value",
-            "proc",
-            "pid",
-            "fd",
-            "domain",
-            "proto",
-            "data",
-            "numops",
-            "unit"
-          ],
-          "oneOf": [
-            {
-              "required": [
-                "localip",
-                "localp",
-                "remoteip",
-                "remotep"
-              ]
-            },
-            {
-              "required": [
-                "localn",
-                "remoten"
-              ]
-            }
-          ],
           "properties": {
             "_metric": {
               "$ref": "definitions/body.schema.json#/$defs/sourcenetrx"
@@ -142,8 +113,7 @@
             "unit": {
               "$ref": "definitions/data.schema.json#/$defs/unit_byte"
             }
-          },
-          "additionalProperties": false
+          }
         }
       },
       "additionalProperties": false

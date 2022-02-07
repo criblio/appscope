@@ -10,6 +10,12 @@ for schema_file in *.schema.json; do
     json-dereference -s "$schema_file" -o $TMP_DIR_NAME/"$schema_file"
 done
 
+echo "Starting validation examples in JSON Schema"
+
+python3 $EXAMPLE_TEST_PY
+
+echo "Validation examples in JSON Schema has finished"
+
 echo "Starting generating MD files from JSON Schema"
 
 for resolve_schema_file in $TMP_DIR_NAME/*.schema.json; do

@@ -5088,7 +5088,7 @@ pthread_create(pthread_t *thread, const pthread_attr_t *attr,
  * The addition of libssl and libcrypto pull in these
  * glibc internal funcs.
  */
-EXPORTON int
+EXPORTOFF int
 __fprintf_chk(FILE *stream, int flag, const char *format, ...)
 {
     va_list ap;
@@ -5100,7 +5100,7 @@ __fprintf_chk(FILE *stream, int flag, const char *format, ...)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 __sprintf_chk(char *str, int flag, size_t strlen, const char *format, ...)
 {
     va_list ap;
@@ -5112,7 +5112,7 @@ __sprintf_chk(char *str, int flag, size_t strlen, const char *format, ...)
     return rc;
 }
 
-EXPORTON void *
+EXPORTOFF void *
 __memset_chk(void *dest, int cset, size_t len, size_t destlen)
 {
     if (g_fn.__memset_chk) {
@@ -5122,7 +5122,7 @@ __memset_chk(void *dest, int cset, size_t len, size_t destlen)
     return memset(dest, cset, len);
 }
 
-EXPORTON void *
+EXPORTOFF void *
 __memcpy_chk(void *dest, const void *src, size_t len, size_t destlen)
 {
     if (g_fn.__memcpy_chk) {
@@ -5132,7 +5132,7 @@ __memcpy_chk(void *dest, const void *src, size_t len, size_t destlen)
     return memcpy(dest, src, len);
 }
 
-EXPORTON long int
+EXPORTOFF long int
 __fdelt_chk(long int fdelt)
 {
     if (g_fn.__fdelt_chk) {

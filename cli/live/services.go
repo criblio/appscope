@@ -12,12 +12,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Receiver listens for a new unix socket connections and handles scope data
+// Receiver listens for a new scope connection on a unix socket and handles received data
 func Receiver(gctx context.Context, g *errgroup.Group, s *Scope) func() error {
 	return func() error {
 
-		log.Info("Receiver routine running")
-		defer log.Info("Receiver routine exited")
+		log.Info("Scope receiver routine running")
+		defer log.Info("Scope receiver routine exited")
 
 		l, err := Listen()
 		if err != nil {
@@ -63,6 +63,7 @@ func scopeAccept(l net.Listener, newConns chan net.Conn) {
 			}).Error("Accept failed")
 			return
 		}
+		log.Info("Accepted connection from scoped process")
 		newConns <- conn
 	}
 }

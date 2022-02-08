@@ -3,9 +3,11 @@ package cmd
 import (
 	"context"
 	"os"
+	"time"
 
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/live"
+	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
 
 	//	"github.com/criblio/scope/web"
@@ -19,7 +21,7 @@ var liveCmd = &cobra.Command{
 	Short:   "View a scope session live in your browser",
 	Long:    `View a scope session live in your browser.`,
 	Example: `scope live`,
-	Args:    cobra.NoArgs,
+	Args:    cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
 
@@ -31,18 +33,28 @@ var liveCmd = &cobra.Command{
 		g.Go(live.Receiver(gctx, g, s))
 		//		g.Go(web.Server(gctx, g, s))
 
-		// TODO we need to sleep until our listener is ready before run is called
-		// TODO we need to implement go context in run
-		rc.Run(args)
+		// Wait until we're listening before run is called
+		// TODO channel to unblock when listener is ready
+		time.Sleep(2 * time.Second)
+
+		lrc := &run.Config{
+			MetricsFormat: "ndjson",
+			MetricsDest:   "unix://@scopelive",
+			EventsDest:    "unix://@scopelive",
+			Verbosity:     4,
+			Subprocess:    true,
+		}
+		g.Go(lrc.LiveRun(gctx, g, args))
 
 		if err := g.Wait(); err != nil {
-			util.ErrAndExit(err.Error())
+			util.ErrAndExit("Exit reason: " + err.Error())
 		}
 	},
 }
 
 func init() {
-	runCmdFlags(liveCmd, rc)
+	// runCmdFlags(liveCmd, rc)
+
 	// This may be a bad assumption, if we have any args preceding this it might fail
 	runCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		internal.InitConfig()

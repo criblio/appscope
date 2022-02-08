@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/definitions/body.schema.json",
-  "title": "AppScope data body properties",
-  "description": "AppScope data body properties",
+  "title": "Schema for the AppScope event/metric body",
+  "description": "Metadata about the process in which AppScope is running",
   "$defs": {
     "_time": {
       "title": "_time",
@@ -316,37 +316,37 @@
     },
     "sourcetypeconsole": {
       "title": "console",
-      "description": "Source type - console",
+      "description": "Sourcetype - console",
       "type": "string",
       "const": "console"
     },
     "sourcetypedns": {
       "title": "dns",
-      "description": "Source type - dns",
+      "description": "Sourcetype - dns",
       "type": "string",
       "const": "dns"
     },
     "sourcetypefs": {
       "title": "fs",
-      "description": "Source type - fs",
+      "description": "Sourcetype - fs",
       "type": "string",
       "const": "fs"
     },
     "sourcetypehttp": {
       "title": "http",
-      "description": "Source type - http",
+      "description": "Sourcetype - http",
       "type": "string",
       "const": "http"
     },
     "sourcetypemetric": {
       "title": "metric",
-      "description": "Source type - metric",
+      "description": "Sourcetype - metric",
       "type": "string",
       "const": "metric"
     },
     "sourcetypenet": {
       "title": "net",
-      "description": "Source type - net",
+      "description": "Sourcetype - net",
       "type": "string",
       "const": "net"
     },

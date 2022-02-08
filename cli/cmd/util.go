@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 
@@ -20,19 +21,22 @@ func sessionByID(id int) history.SessionList {
 	}
 	sessionCount := len(sessions)
 	if sessionCount != 1 {
-		util.ErrAndExit("error expected a single session, saw: %d", sessionCount)
+		util.ErrAndExit("Session not found. Session count: %d", sessionCount)
 	}
 	return sessions
 }
 
 func promptClean(sl history.SessionList) {
-	fmt.Print("Invalid session, likely an invalid command was scoped or a session file was modified. Would you like to delete this session? (default: yes) [y/n] ")
-	var response string
-	_, err := fmt.Scanf("%s", &response)
-	util.CheckErrSprintf(err, "error reading response: %v", err)
-	if !(response == "n" || response == "no") {
-		sl.Remove()
+	fmt.Println("Invalid session, likely an invalid command was scoped or a session file was modified. Would you like to delete this session? (y/yes)")
+	in := bufio.NewScanner(os.Stdin)
+	in.Scan()
+	response := in.Text()
+	if !(response == "y" || response == "yes") {
+		fmt.Println("No action taken")
+		os.Exit(0)
 	}
+	sl.Remove()
+	fmt.Println("Deleted session.")
 	os.Exit(0)
 }
 

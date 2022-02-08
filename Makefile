@@ -17,7 +17,7 @@ ifeq ($(UNAME_S),linux)
 	OS=linux
 	OS_ID=$(shell egrep '^ID=' /etc/*-release | cut -d= -f2)
 	OS_VER=$(shell egrep '^VERSION_ID=' /etc/*-release | cut -d= -f2 | sed 's/"//g')
-else ifeq ($(UNAME_S),Darwin)
+else ifeq ($(UNAME_S),darwin)
 	OS=macOS
 else
 $(error Building on $(UNAME_S) is unsupported!)

@@ -7,6 +7,8 @@ echo "Resolving references in JSON Schema"
 
 cd schemas
 
+# This creates temporary schema.json files
+
 for schema_file in *.schema.json; do
     [ -f "$schema_file" ] || break
     json-dereference -s "$schema_file" -o $TMP_DIR_NAME/"$schema_file"
@@ -30,7 +32,7 @@ done
 chmod 744 $MD_DIR_NAME
 cp -r $MD_DIR_NAME $MD_OUTPUT_PATH
 
-# Uncomment below to generate resolve JSON Schema
+# Uncomment these lines to save the temporary schema.json files, which otherwise will be lost
 
 # chmod 744 $TMP_DIR_NAME
 # cp -r $TMP_DIR_NAME $MD_OUTPUT_PATH

@@ -181,18 +181,18 @@ image: require-qemu-binfmt
 
 docs-generate: TAG := cribl/scope:docs-$(ARCH)
 docs-generate: require-docker-buildx-builder
-	@echo Building the AppScope Document generator
+	@echo Building the AppScope docs generator
 	@docker buildx build \
 		--tag $(TAG) \
 		--platform linux/$(PLATFORM_$(ARCH)) \
 		--file docker/docs/Dockerfile \
 		.
-	@echo Running the AppScope Document generator
+	@echo Running the AppScope docs generator
 	@docker run \
 		-v $(shell pwd)/docs:/md \
 		-u $(shell id -u):$(shell id -g) \
 		--rm cribl/scope:docs-$(ARCH) 
-	@echo AppScope Document generator finished: md files are available in docs/md_files
+	@echo AppScope docs generator finished: md files are available in docs/md_files
 
 k8s-test: require-kind require-kubectl image
 	docker tag cribl/scope:dev-x86_64 cribl/scope:$(VERSION)

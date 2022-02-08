@@ -190,7 +190,7 @@ docs-generate: require-docker-buildx-builder
 	@echo Running the AppScope docs generator
 	@docker run \
 		-v $(shell pwd)/docs:/md \
-		-u $(shell id -u):$(shell id -g) \
+		--user node:node \
 		--rm cribl/scope:docs-$(ARCH) 
 	@echo AppScope docs generator finished: md files are available in docs/md_files
 

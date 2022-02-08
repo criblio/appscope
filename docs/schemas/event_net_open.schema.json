@@ -13,13 +13,13 @@
   "examples": [{"type":"evt","id":"8bc1398c19f3-accept02-/kernel/syscalls/accept/accept02","_channel":"5890157346952","body":{"sourcetype":"net","_time":1643735835.5219281,"source":"net.open","host":"8bc1398c19f3","proc":"accept02","cmd":"/opt/test/ltp/testcases/kernel/syscalls/accept/accept02","pid":1936,"data":{"net_transport":"IP.TCP","net_peer_ip":"127.0.0.1","net_peer_port":58625,"net_host_ip":"0.0.0.0","net_host_port":0}}}],
   "properties": {
     "type": {
-      "$ref": "definitions/metadata.schema.json#/$defs/event_type"
+      "$ref": "definitions/envelope.schema.json#/$defs/event_type"
     },
     "id": {
-      "$ref": "definitions/metadata.schema.json#/$defs/id"
+      "$ref": "definitions/envelope.schema.json#/$defs/id"
     },
     "_channel": {
-      "$ref": "definitions/metadata.schema.json#/$defs/_channel"
+      "$ref": "definitions/envelope.schema.json#/$defs/_channel"
     },
     "body": {
       "title": "body",

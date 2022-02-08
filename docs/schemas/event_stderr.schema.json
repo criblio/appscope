@@ -13,13 +13,13 @@
   ],
   "properties": {
     "type": {
-      "$ref": "definitions/metadata.schema.json#/$defs/event_type"
+      "$ref": "definitions/envelope.schema.json#/$defs/event_type"
     },
     "id": {
-      "$ref": "definitions/metadata.schema.json#/$defs/id"
+      "$ref": "definitions/envelope.schema.json#/$defs/id"
     },
     "_channel": {
-      "$ref": "definitions/metadata.schema.json#/$defs/_channel"
+      "$ref": "definitions/envelope.schema.json#/$defs/_channel"
     },
     "body": {
       "title": "body",

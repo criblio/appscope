@@ -11,7 +11,7 @@
   "examples": [{"type":"metric","body":{"_metric":"fs.error","_metric_type":"counter","_value":1,"proc":"accept01","pid":13686,"host":"1f0ec6c8a7bc","class":"stat","unit":"operation","summary":"true","_time":1643826403.1238019}}, {"type":"metric","body":{"_metric":"fs.error","_metric_type":"counter","_value":1,"proc":"accept02","pid":9872,"host":"1f0ec6c8a7bc","op":"readdir","file":"/tmp/QxbCjC","class":"read_write","unit":"operation","_time":1643826292.14466}}],
   "properties": {
     "type": {
-      "$ref": "definitions/metadata.schema.json#/$defs/metric_type"
+      "$ref": "definitions/envelope.schema.json#/$defs/metric_type"
     },
     "body": {
       "title": "body",

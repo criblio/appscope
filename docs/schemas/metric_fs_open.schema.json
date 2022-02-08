@@ -11,7 +11,7 @@
   ],
   "properties": {
     "type": {
-      "$ref": "definitions/metadata.schema.json#/$defs/metric_type"
+      "$ref": "definitions/envelope.schema.json#/$defs/metric_type"
     },
     "body": {
       "title": "body",

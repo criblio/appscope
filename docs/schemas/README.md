@@ -47,13 +47,13 @@ To add a new event named `foo.bar`, create a file named `event_foo_bar.schema.js
   ],
   "properties": {
     "type": {
-      "$ref": "definitions/metadata.schema.json#/$defs/event_type"
+      "$ref": "definitions/envelope.schema.json#/$defs/event_type"
     },
     "id": {
-      "$ref": "definitions/metadata.schema.json#/$defs/id"
+      "$ref": "definitions/envelope.schema.json#/$defs/id"
     },
     "_channel": {
-      "$ref": "definitions/metadata.schema.json#/$defs/_channel"
+      "$ref": "definitions/envelope.schema.json#/$defs/_channel"
     },
     "body": {
       "title": "body",
@@ -135,7 +135,7 @@ To add a new metric named `foo.bar`, create a file named `metric_foo_bar.schema.
   ],
   "properties": {
     "type": {
-      "$ref": "definitions/metadata.schema.json#/$defs/metric_type"
+      "$ref": "definitions/envelope.schema.json#/$defs/metric_type"
     },
     "body": {
       "title": "body",

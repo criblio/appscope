@@ -27,6 +27,7 @@ can output full payloads from the flow.`,
 	Example: `scope flows                # Displays all flows
 scope flows 124x3c         # Displays more info about the flow
 scope flows --out 124x3c   # Displays the outbound payload of that flow
+scope flows -p 0.0.0.0/24  # Displays flows in that subnet range
 `,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -128,10 +129,16 @@ scope flows --out 124x3c   # Displays the outbound payload of that flow
 				switch f1.Value().(type) {
 				case int:
 					ret = f1.Value().(int) > f2.Value().(int)
+				case int64:
+					ret = f1.Value().(int64) > f2.Value().(int64)
+				case string:
+					ret = f1.Value().(string) > f2.Value().(string)
 				case time.Time:
 					ret = f1.Value().(time.Time).After(f2.Value().(time.Time))
+				case time.Duration:
+					ret = f1.Value().(time.Duration) > f2.Value().(time.Duration)
 				default:
-					util.ErrAndExit("unknown type for field %s", sortField)
+					util.ErrAndExit("unsupported field type %s", sortField)
 				}
 				if sortReverse {
 					return !ret
@@ -219,8 +226,8 @@ func init() {
 	flowsCmd.Flags().BoolP("all", "a", false, "Show all flows")
 	flowsCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	flowsCmd.Flags().StringP("sort", "s", "", "Sort descending by field (look at JSON output for field names)")
-	flowsCmd.Flags().BoolP("reverse", "r", false, "Reverse sort to ascending")
-	flowsCmd.Flags().IPNetP("peer", "p", net.IPNet{}, "Filter to peers in the given network")
+	flowsCmd.Flags().BoolP("reverse", "r", false, "Reverse sort to ascending. Must be combined with -s")
+	flowsCmd.Flags().IPNetP("peer", "p", net.IPNet{}, "Filter to peers in the given network range (CIDR notation)")
 	// flowsCmd.Flags().StringP("eval", "e", "", "Evaluate JavaScript expression against flow. Must return truthy to print flow.")
 	RootCmd.AddCommand(flowsCmd)
 }

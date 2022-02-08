@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_fs_stat.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `fs.stat` metric message",
+  "title": "AppScope `fs.stat` Metric",
+  "description": "Structure of the `fs.stat` metric",
   "examples": [{"type":"metric","body":{"_metric":"fs.stat","_metric_type":"counter","_value":1,"proc":"accept01","pid":13686,"host":"1f0ec6c8a7bc","unit":"operation","summary":"true","_time":1643826403.1237521}}, {"type":"metric","body":{"_metric":"fs.stat","_metric_type":"counter","_value":1,"proc":"accept01","pid":9871,"host":"1f0ec6c8a7bc","op":"access","file":"/dev/shm","unit":"operation","_time":1643826292.0764461}}],
   "required": [
     "type",

@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/event_fs_write.schema.json",
   "type": "object",
-  "title": "AppScope Event",
-  "description": "A structure described AppScope `fs.write` event message",
+  "title": "AppScope `fs.write` Event",
+  "description": "Structure of the `fs.write` event",
   "examples": [{"type":"evt","id":"8bc1398c19f3-access02-/kernel/syscalls/access/access02","_channel":"5891407740765","body":{"sourcetype":"metric","_time":1643735836.7732489,"source":"fs.write","host":"8bc1398c19f3","proc":"access02","cmd":"/opt/test/ltp/testcases/kernel/syscalls/access/access02","pid":2058,"data":{"_metric":"fs.write","_metric_type":"histogram","_value":10,"proc":"access02","pid":2058,"fd":3,"op":"__write_libc","file":"file_x","numops":1,"unit":"byte"}}}],
   "required": [
     "type",

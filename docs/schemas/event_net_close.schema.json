@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/event_net_close.schema.json",
   "type": "object",
-  "title": "AppScope Event",
-  "description": "A structure described AppScope `net.close` event message",
+  "title": "AppScope `net.close` Event",
+  "description": "Structure of the `net.close` event",
   "examples": [{"type":"evt","id":"8bc1398c19f3-recvfrom01-nel/syscalls/recvfrom/recvfrom01","_channel":"5912618970557","body":{"sourcetype":"net","_time":1643735857.983449,"source":"net.close","host":"8bc1398c19f3","proc":"recvfrom01","cmd":"/opt/test/ltp/testcases/kernel/syscalls/recvfrom/recvfrom01","pid":3793,"data":{"net_transport":"IP.TCP","net_peer_ip":"0.0.0.0","net_peer_port":35533,"net_host_ip":"127.0.0.1","net_host_port":40184,"duration":0,"net_bytes_sent":0,"net_bytes_recv":6,"net_close_reason":"local"}}}],
   "required": [
     "type",

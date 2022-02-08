@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_proc_thread.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `proc.thread` metric message",
+  "title": "AppScope `proc.thread` Metric",
+  "description": "Structure of the `proc.thread` metric",
   "examples": [{"type":"metric","body":{"_metric":"proc.thread","_metric_type":"gauge","_value":1,"proc":"accept01","pid":1946,"host":"7cb66c7f77dd","unit":"thread","_time":1643749566.0304351}}],
   "required": [
     "type",

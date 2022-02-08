@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/event_net_other.schema.json",
   "type": "object",
-  "title": "AppScope Event",
-  "description": "A structure described AppScope `net.other` event message",
+  "title": "AppScope `net.other` Event",
+  "description": "Structure of the `net.other` event",
   "examples": [{"type":"evt","id":"test_user-server_seqpacket-./server_seqpacket","_channel":"11977632602680","body":{"sourcetype":"metric","_time":1643886739.820863,"source":"net.other","host":"test_user","proc":"server_seqpacket","cmd":"./server_seqpacket","pid":232570,"data":{"_metric":"net.other","_metric_type":"gauge","_value":1,"proc":"server_seqpacket","pid":232570,"fd":3,"proto":"SEQPACKET","port":0,"unit":"connection"}}}],
   "required": [
     "type",

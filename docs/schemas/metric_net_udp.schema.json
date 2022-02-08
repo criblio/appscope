@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_net_udp.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `net.udp` metric message",
+  "title": "AppScope `net.udp` Metric",
+  "description": "Structure of the `net.udp` metric",
   "examples": [{"type":"metric","body":{"_metric":"net.udp","_metric_type":"gauge","_value":0,"proc":"accept01","pid":9871,"fd":5,"host":"1f0ec6c8a7bc","proto":"UDP","port":0,"unit":"connection","_time":1643826292.0773721}}],
   "required": [
     "type",

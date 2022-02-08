@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/event_net_open.schema.json",
   "type": "object",
-  "title": "AppScope Event",
-  "description": "A structure described AppScope `net.open` event message",
+  "title": "AppScope `net.open` Event",
+  "description": "Structure of the `net.open` event",
   "required": [
     "type",
     "id",

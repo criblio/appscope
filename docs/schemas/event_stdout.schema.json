@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/event_stdout.schema.json",
   "type": "object",
-  "title": "AppScope Event",
-  "description": "A structure described AppScope console `stdout` event message",
+  "title": "AppScope `stdout` Event",
+  "description": "Structure of the console `stdout` event",
   "examples": [{"type":"evt","id":"ubuntu-sh- /usr/bin/which /usr/bin/firefox","_channel":"13468365092424","body":{"sourcetype":"console","_time":1643735941.602952,"source":"stdout","host":"ubuntu","proc":"sh","cmd":"/bin/sh /usr/bin/which /usr/bin/firefox","pid":6545,"data":{"message":"/usr/bin/firefox\n"}}}],
   "required": [
     "type",

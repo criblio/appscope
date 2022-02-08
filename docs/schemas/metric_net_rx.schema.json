@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_net_rx.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `net.rx` metric message",
+  "title": "AppScope `net.rx` Metric",
+  "description": "Structure of the `net.rx` metric",
   "examples": [{"type":"metric","body":{"_metric":"net.rx","_metric_type":"counter","_value":99000,"proc":"send02","pid":15371,"host":"1f0ec6c8a7bc","unit":"byte","class":"inet_udp","summary":"true","_time":1643826428.564141}}, {"type":"metric","body":{"_metric":"net.rx","_metric_type":"counter","_value":6,"proc":"recvfrom01","pid":11544,"fd":4,"host":"1f0ec6c8a7bc","domain":"AF_INET","proto":"TCP","localip":"127.0.0.1","localp":37432,"remoteip":"0.0.0.0","remotep":40765,"data":"clear","numops":1,"unit":"byte","_time":1643826317.0989721}}, {"type":"metric","body":{"_metric":"net.rx","_metric_type":"counter","_value":16,"proc":"send02","pid":11555,"fd":3,"host":"1f0ec6c8a7bc","domain":"AF_INET","proto":"UDP","localip":"127.0.0.1","localp":0,"remoteip":" ","remotep":0,"data":"clear","numops":1,"unit":"byte","_time":1643826318.241899}}],
   "required": [
     "type",

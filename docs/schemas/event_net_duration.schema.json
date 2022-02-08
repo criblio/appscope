@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/event_net_duration.schema.json",
   "type": "object",
-  "title": "AppScope Event",
-  "description": "A structure described AppScope `net.duration` event message",
+  "title": "AppScope `net.duration` Event",
+  "description": "Structure of the `net.duration` event",
   "examples": [{"type":"evt","id":"8bc1398c19f3-recvmsg01-ernel/syscalls/recvmsg/recvmsg01","_channel":"5912681876432","body":{"sourcetype":"metric","_time":1643735858.046756,"source":"net.duration","host":"8bc1398c19f3","proc":"recvmsg01","cmd":"/opt/test/ltp/testcases/kernel/syscalls/recvmsg/recvmsg01","pid":3798,"data":{"_metric":"net.duration","_metric_type":"timer","_value":1,"proc":"recvmsg01","pid":3798,"fd":4,"proto":"TCP","port":41482,"numops":1,"unit":"millisecond"}}}],
   "required": [
     "type",

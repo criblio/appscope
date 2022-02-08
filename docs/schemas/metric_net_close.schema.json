@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_net_close.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `net.close` metric message",
+  "title": "AppScope `net.close` Metric",
+  "description": "Structure of the `net.close` metric",
   "examples": [{"type":"metric","body":{"_metric":"net.close","_metric_type":"counter","_value":1,"proc":"accept01","pid":13687,"host":"1f0ec6c8a7bc","unit":"connection","summary":"true","_time":1643826403.12145}}, {"type":"metric","body":{"_metric":"net.close","_metric_type":"counter","_value":1,"proc":"accept01","pid":9871,"fd":5,"host":"1f0ec6c8a7bc","proto":"UDP","port":0,"unit":"connection","_time":1643826292.077388}}],
   "required": [
     "type",

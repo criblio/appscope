@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_fs_read.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `fs.read` metric message",
+  "title": "AppScope `fs.read` Metric",
+  "description": "Structure of the `fs.read` metric",
   "examples": [{"type":"metric","body":{"_metric":"fs.read","_metric_type":"counter","_value":13312,"proc":"access01","pid":13697,"host":"1f0ec6c8a7bc","unit":"byte","summary":"true","_time":1643826404.006381}}, {"type":"metric","body":{"_metric":"fs.read","_metric_type":"counter","_value":4096,"proc":"accept01","pid":9871,"fd":3,"host":"1f0ec6c8a7bc","op":"fgets_unlocked","file":"/etc/passwd","numops":1,"unit":"byte","_time":1643826292.076709}}],
   "required": [
     "type",

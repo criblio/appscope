@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_fs_duration.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `fs.duration` metric message",
+  "title": "AppScope `fs.duration` Metric",
+  "description": "Structure of the `fs.duration` metric",
   "examples": [{"type":"metric","body":{"_metric":"fs.duration","_metric_type":"histogram","_value":1,"proc":"access01","pid":13697,"host":"1f0ec6c8a7bc","unit":"microsecond","summary":"true","_time":1643826404.0064421}}, {"type":"metric","body":{"_metric":"fs.duration","_metric_type":"histogram","_value":16,"proc":"accept01","pid":9871,"fd":3,"host":"1f0ec6c8a7bc","op":"fgets_unlocked","file":"/etc/passwd","numops":1,"unit":"microsecond","_time":1643826292.0766749}}],
   "required": [
     "type",

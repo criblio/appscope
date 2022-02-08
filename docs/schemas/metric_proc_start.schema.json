@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_proc_start.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `proc.start` metric message",
+  "title": "AppScope `proc.start` Metric",
+  "description": "Structure of the `proc.start` metric",
   "examples": [{"type":"metric","body":{"_metric":"proc.start","_metric_type":"counter","_value":1,"proc":"accept01","pid":1945,"gid":0,"groupname":"root","uid":0,"username":"root","host":"7cb66c7f77dd","args":"/opt/test/ltp/testcases/kernel/syscalls/accept/accept01","unit":"process","_time":1643749566.026885}}],
   "required": [
     "type",

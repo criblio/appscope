@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_fs_write.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `fs.write` metric message",
+  "title": "AppScope `fs.write` Metric",
+  "description": "Structure of the `fs.write` metric",
   "examples": [{"type":"metric","body":{"_metric":"fs.write","_metric_type":"counter","_value":10,"proc":"access02","pid":13806,"host":"1f0ec6c8a7bc","unit":"byte","summary":"true","_time":1643826404.2349629}}, {"type":"metric","body":{"_metric":"fs.write","_metric_type":"counter","_value":10,"proc":"access02","pid":9991,"fd":3,"host":"1f0ec6c8a7bc","op":"__write_libc","file":"file_x","numops":1,"unit":"byte","_time":1643826293.3853779}}],
   "required": [
     "type",

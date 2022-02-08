@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/event_fs_read.schema.json",
   "type": "object",
-  "title": "AppScope Event",
-  "description": "A structure described AppScope `fs.read` event message",
+  "title": "AppScope `fs.read` Event",
+  "description": "Structure of the `fs.read` event",
   "examples": [{"type":"evt","id":"8bc1398c19f3-accept01-/kernel/syscalls/accept/accept01","_channel":"5890091215105","body":{"sourcetype":"metric","_time":1643735835.455076,"source":"fs.read","host":"8bc1398c19f3","proc":"accept01","cmd":"/opt/test/ltp/testcases/kernel/syscalls/accept/accept01","pid":1933,"data":{"_metric":"fs.read","_metric_type":"histogram","_value":4096,"proc":"accept01","pid":1933,"fd":3,"op":"fgets_unlocked","file":"/etc/passwd","numops":1,"unit":"byte"}}}],
   "required": [
     "type",

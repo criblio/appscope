@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_fs_close.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `fs.close` metric message",
+  "title": "AppScope `fs.close` Metric",
+  "description": "Structure of the `fs.close` metric",
   "examples": [{"type":"metric","body":{"_metric":"fs.close","_metric_type":"counter","_value":1,"proc":"accept01","pid":13687,"host":"1f0ec6c8a7bc","unit":"operation","summary":"true","_time":1643826403.121424}}, {"type":"metric","body":{"_metric":"fs.close","_metric_type":"counter","_value":1,"proc":"accept01","pid":9871,"fd":3,"host":"1f0ec6c8a7bc","op":"close","file":"/dev/shm/ltp_accept01_9870","unit":"operation","_time":1643826292.07658}}],
   "required": [
     "type",

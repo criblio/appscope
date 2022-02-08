@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_net_dns.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `net.dns` metric message",
+  "title": "AppScope `net.dns` Metric",
+  "description": "Structure of the `net.dns` metric",
   "examples": [{"type":"metric","body":{"_metric":"net.dns","_metric_type":"counter","_value":1,"proc":"lt-curl","pid":31,"host":"2a6bc132b07a","unit":"request","summary":"true","_time":1643832467.7951341}}, {"type":"metric","body":{"_metric":"net.dns","_metric_type":"counter","_value":1,"proc":"lt-curl","pid":2485,"host":"2a6bc132b07a","domain":"cribl.io","duration":0,"unit":"request","_time":1643832569.764219}}],
   "required": [
     "type",

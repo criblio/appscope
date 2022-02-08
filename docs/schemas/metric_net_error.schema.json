@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_net_error.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `net.error` metric message",
+  "title": "AppScope `net.error` Metric",
+  "description": "Structure of the `net.error` metric",
   "examples": [{"type":"metric","body":{"_metric":"net.error","_metric_type":"counter","_value":6,"proc":"accept01","pid":5920,"host":"7cb66c7f77dd","op":"summary","class":"connection","unit":"operation","_time":1643749774.5732141}},{"type":"metric","body":{"_metric":"net.error","_metric_type":"counter","_value":1,"proc":"recv01","pid":3593,"host":"7cb66c7f77dd","op":"recv","class":"rx_tx","unit":"operation","_time":1643749590.5181091}}],
   "required": [
     "type",

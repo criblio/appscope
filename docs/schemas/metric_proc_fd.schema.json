@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_proc_fd.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `proc.fd` metric message",
+  "title": "AppScope `proc.fd` Metric",
+  "description": "Structure of the `proc.fd` metric",
   "examples": [{"type":"metric","body":{"_metric":"proc.fd","_metric_type":"gauge","_value":5,"proc":"accept01","pid":1946,"host":"7cb66c7f77dd","unit":"file","_time":1643749566.0304971}}],
   "required": [
     "type",

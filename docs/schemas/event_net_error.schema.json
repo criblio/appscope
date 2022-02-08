@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/event_net_error.schema.json",
   "type": "object",
-  "title": "AppScope Event",
-  "description": "A structure described AppScope `net.error` event message",
+  "title": "AppScope `net.error` Event",
+  "description": "Structure of the `net.error` event",
   "examples": [{"type":"evt","id":"90aac4bb0722-accept01-/kernel/syscalls/accept/accept01","_channel":"2745569202700291","body":{"sourcetype":"metric","_time":1643972258.00885,"source":"net.error","host":"90aac4bb0722","proc":"accept01","cmd":"/opt/test/ltp/testcases/kernel/syscalls/accept/accept01","pid":1934,"data":{"_metric":"net.error","_metric_type":"counter","_value":1,"proc":"accept01","pid":1934,"op":"accept","class":"connection","unit":"operation"}}}],
   "required": [
     "type",

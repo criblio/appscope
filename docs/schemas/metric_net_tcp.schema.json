@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_net_tcp.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `net.tcp` metric message",
+  "title": "AppScope `net.tcp` Metric",
+  "description": "Structure of the `net.tcp` metric",
   "examples": [{"type":"metric","body":{"_metric":"net.tcp","_metric_type":"gauge","_value":1,"proc":"accept02","pid":13689,"host":"1f0ec6c8a7bc","unit":"connection","summary":"true","_time":1643826403.1844971}}, {"type":"metric","body":{"_metric":"net.tcp","_metric_type":"gauge","_value":0,"proc":"accept01","pid":9871,"fd":4,"host":"1f0ec6c8a7bc","proto":"TCP","port":0,"unit":"connection","_time":1643826292.07731}}],
   "required": [
     "type",

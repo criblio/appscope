@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/event_dns_resp.schema.json",
   "type": "object",
-  "title": "AppScope Event",
-  "description": "A structure described AppScope `dns.resp` event message",
+  "title": "AppScope `dns.resp` Event",
+  "description": "Structure of the `dns.resp` event",
   "examples": [{"type":"evt","id":"ubuntu-firefox-/usr/lib/firefox/firefox","_channel":"13470823778038","body":{"sourcetype":"dns","_time":1643735942.5526669,"source":"dns.resp","host":"ubuntu","proc":"firefox","cmd":"/usr/lib/firefox/firefox","pid":6544,"data":{"duration":25,"domain":"detectportal.firefox.com","addrs":["34.107.221.82"]}}}],
   "required": [
     "type",

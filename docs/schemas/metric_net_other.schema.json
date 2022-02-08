@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_net_other.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `net.other` metric message",
+  "title": "AppScope `net.other` Metric",
+  "description": "Structure of the `net.other` metric",
   "examples": [{"type":"metric","body":{"_metric":"net.other","_metric_type":"gauge","_value":1,"proc":"server_seqpacket","pid":234979,"host":"test_user","unit":"connection","summary":"true","_time":1643887036.00144}}, {"type":"metric","body":{"_metric":"net.other","_metric_type":"gauge","_value":1,"proc":"server_seqpacket","pid":235293,"fd":4,"host":"test_user","proto":"SEQPACKET","port":0,"unit":"connection","_time":1643887122.6462259}}],
   "required": [
     "type",

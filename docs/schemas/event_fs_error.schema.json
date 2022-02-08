@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/event_fs_error.schema.json",
   "type": "object",
-  "title": "AppScope Event",
-  "description": "A structure described AppScope `fs.error` event message",
+  "title": "AppScope `fs.error` Event",
+  "description": "Structure of the `fs.error` event",
   "examples":[{"type":"evt","id":"8bc1398c19f3-accept01-/kernel/syscalls/accept/accept01","_channel":"5890094642989","body":{"sourcetype":"metric","_time":1643735835.45777,"source":"fs.error","host":"8bc1398c19f3","proc":"accept01","cmd":"/opt/test/ltp/testcases/kernel/syscalls/accept/accept01","pid":1931,"data":{"_metric":"fs.error","_metric_type":"counter","_value":1,"proc":"accept01","pid":1931,"op":"access","file":"/dev/shm/ltp_accept01_1931","class":"stat","unit":"operation"}}}],
   "required": [
     "type",

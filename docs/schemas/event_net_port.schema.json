@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/event_net_port.schema.json",
   "type": "object",
-  "title": "AppScope Event",
-  "description": "A structure described AppScope `net.port` event message",
+  "title": "AppScope `net.port` Event",
+  "description": "Structure of the `net.port` event",
   "examples": [{"type":"evt","id":"8bc1398c19f3-accept01-/kernel/syscalls/accept/accept01","_channel":"5890091645261","body":{"sourcetype":"metric","_time":1643735835.4552219,"source":"net.port","host":"8bc1398c19f3","proc":"accept01","cmd":"/opt/test/ltp/testcases/kernel/syscalls/accept/accept01","pid":1933,"data":{"_metric":"net.port","_metric_type":"gauge","_value":1,"proc":"accept01","pid":1933,"fd":4,"proto":"TCP","port":0,"unit":"instance"}}}],
   "required": [
     "type",

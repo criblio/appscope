@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_net_open.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `net.open` metric message",
+  "title": "AppScope `net.open` Metric",
+  "description": "Structure of the `net.open` metric",
   "examples": [{"type":"metric","body":{"_metric":"net.open","_metric_type":"counter","_value":1,"proc":"accept01","pid":13687,"host":"1f0ec6c8a7bc","unit":"connection","summary":"true","_time":1643826403.1214371}}, {"type":"metric","body":{"_metric":"net.open","_metric_type":"counter","_value":1,"proc":"lt-curl","pid":2485,"fd":7,"host":"2a6bc132b07a","proto":"UDP","port":0,"unit":"connection","_time":1643832569.7641439}}],
   "required": [
     "type",

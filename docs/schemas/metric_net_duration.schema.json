@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_net_duration.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `net.duration` metric message",
+  "title": "AppScope `net.duration` Metric",
+  "description": "Structure of the `net.duration` metric",
   "examples": [{"type":"metric","body":{"_metric":"net.duration","_metric_type":"timer","_value":1,"proc":"sendfile06_64","pid":15385,"host":"1f0ec6c8a7bc","unit":"millisecond","summary":"true","_time":1643826428.9600739}}, {"type":"metric","body":{"_metric":"net.duration","_metric_type":"timer","_value":53,"proc":"send02","pid":11555,"fd":3,"host":"1f0ec6c8a7bc","proto":"UDP","port":0,"numops":1,"unit":"millisecond","_time":1643826318.65727}}],
   "required": [
     "type",

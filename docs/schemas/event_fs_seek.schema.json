@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/event_fs_seek.json",
   "type": "object",
-  "title": "AppScope Event",
-  "description": "A structure described AppScope `fs.seek` event message",
+  "title": "AppScope `fs.seek` Event",
+  "description": "Structure of the `fs.seek` event",
   "examples": [{"type":"evt","id":"8bc1398c19f3-sh-/bin/sh ./file_x","_channel":"5891441789884","body":{"sourcetype":"metric","_time":1643735836.805196,"source":"fs.seek","host":"8bc1398c19f3","proc":"sh","cmd":"/bin/sh ./file_x","pid":2061,"data":{"_metric":"fs.seek","_metric_type":"counter","_value":1,"proc":"sh","pid":2061,"fd":3,"op":"lseek","file":"./file_x","unit":"operation"}}}],
   "required": [
     "type",

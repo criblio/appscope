@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_http_requests.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `http.requests` metric message",
+  "title": "AppScope `http.requests` Metric",
+  "description": "Structure of the `http.requests` metric",
   "examples": [{"type":"metric","body":{"_metric":"http.requests","_metric_type":"counter","_value":1,"http_target":"/","http_status_code":200,"proc":"lt-curl","pid":788,"host":"c067d78736db","unit":"request","summary":"true","_time":1643924553.6814411}}, {"type":"metric","body":{"_metric":"http.requests","_metric_type":"counter","_value":1,"http_target":"/","http_status_code":200,"proc":"lt-curl","pid":30,"host":"c067d78736db","unit":"request","summary":"true","_time":1643924472.64811}}],
   "required": [
     "type",

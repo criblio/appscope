@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/event_net_rx.schema.json",
   "type": "object",
-  "title": "AppScope Event",
-  "description": "A structure described AppScope `net.rx` event message",
+  "title": "AppScope `net.rx` Event",
+  "description": "Structure of the `net.rx` event",
   "examples": [{"type":"evt","id":"8bc1398c19f3-recvfrom01-nel/syscalls/recvfrom/recvfrom01","_channel":"5912618970557","body":{"sourcetype":"metric","_time":1643735857.9833679,"source":"net.rx","host":"8bc1398c19f3","proc":"recvfrom01","cmd":"/opt/test/ltp/testcases/kernel/syscalls/recvfrom/recvfrom01","pid":3793,"data":{"_metric":"net.rx","_metric_type":"counter","_value":6,"proc":"recvfrom01","pid":3793,"fd":4,"domain":"AF_INET","proto":"TCP","localip":"127.0.0.1","localp":40184,"remoteip":"0.0.0.0","remotep":35533,"data":"clear","numops":1,"unit":"byte"}}}],
   "required": [
     "type",

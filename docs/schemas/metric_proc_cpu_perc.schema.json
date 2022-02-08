@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_proc_cpu_perc.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `proc.cpu_perc` metric message",
+  "title": "AppScope `proc.cpu_perc` Metric",
+  "description": "Structure of the `proc.cpu_perc` metric",
   "examples": [{"type":"metric","body":{"_metric":"proc.cpu_perc","_metric_type":"gauge","_value":0.02107,"proc":"accept01","pid":1946,"host":"7cb66c7f77dd","unit":"percent","_time":1643749566.0303271}}],
   "required": [
     "type",

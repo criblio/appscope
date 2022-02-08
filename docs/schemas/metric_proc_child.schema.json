@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_proc_child.schema.json",
   "type": "object",
-  "title": "AppScope Metric",
-  "description": "A structure described AppScope `proc.child` metric message",
+  "title": "AppScope `proc.child` Metric",
+  "description": "Structure of the `proc.child` metric",
   "examples": [{"type":"metric","body":{"_metric":"proc.child","_metric_type":"gauge","_value":0,"proc":"accept01","pid":1946,"host":"7cb66c7f77dd","unit":"process","_time":1643749566.0305431}}],
   "required": [
     "type",

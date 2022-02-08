@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/event_fs_delete.schema.json",
   "type": "object",
-  "title": "AppScope Event",
-  "description": "A structure described AppScope `fs.delete` event message",
+  "title": "AppScope `fs.delete` Event",
+  "description": "Structure of the `fs.delete` event",
   "examples": [{"type":"evt","id":"b6209181773f-rm-rm test.txt","_channel":"none","body":{"sourcetype":"fs","_time":1643793922.0404379,"_time":1643793922.0404379,"source":"fs.delete","host":"b6209181773f","proc":"rm","cmd":"rm test.txt","pid":306,"data":{"proc":"rm","pid":306,"host":"b6209181773f","op":"unlinkat","file":"test.txt","unit":"operation"}}}],
   "required": [
     "type",

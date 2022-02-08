@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/event_stderr.schema.json",
   "type": "object",
-  "title": "AppScope Event",
-  "description": "A structure described AppScope console `stderr` event message",
+  "title": "AppScope `stderr` Event",
+  "description": "Structure of the console `stderr` event",
   "examples": [{"type":"evt","id":"eaf4d0598443-a.out-./a.out","_channel":"8499188821284","body":{"sourcetype":"console","_time":1643883251.376672,"source":"stderr","host":"eaf4d0598443","proc":"a.out","cmd":"./a.out","pid":986,"data":{"message":"stderr hello world"}}}],
   "required": [
     "type",

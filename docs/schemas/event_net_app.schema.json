@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/event_net_app.schema.json",
   "type": "object",
-  "title": "AppScope Event",
-  "description": "A structure described AppScope `net.app` event message",
+  "title": "AppScope `net.app` Event",
+  "description": "Structure of the `net.app` event",
   "examples": [{"type":"evt","id":"ubuntu-firefox-/usr/lib/firefox/firefox","_channel":"13470846442500","body":{"sourcetype":"net","_time":1643735942.588594,"source":"net.app","host":"ubuntu","proc":"firefox","cmd":"/usr/lib/firefox/firefox","pid":6544,"data":{"proc":"firefox","pid":6544,"fd":91,"host":"ubuntu","protocol":"HTTP"}}}],
   "required": [
     "type",

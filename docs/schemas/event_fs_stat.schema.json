@@ -2,8 +2,8 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/event_fs_stat.schema.json",
   "type": "object",
-  "title": "AppScope Event",
-  "description": "A structure described AppScope `fs.stat` event message",
+  "title": "AppScope `fs.stat` Event",
+  "description": "Structure of the `fs.stat` event",
   "examples":[{"type":"evt","id":"8bc1398c19f3-accept01-/kernel/syscalls/accept/accept01","_channel":"5890091777333","body":{"sourcetype":"metric","_time":1643735835.454905,"source":"fs.stat","host":"8bc1398c19f3","proc":"accept01","cmd":"/opt/test/ltp/testcases/kernel/syscalls/accept/accept01","pid":1933,"data":{"_metric":"fs.stat","_metric_type":"counter","_value":1,"proc":"accept01","pid":1933,"op":"access","file":"/dev/shm","unit":"operation"}}}],
   "required": [
     "type",

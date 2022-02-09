@@ -88,22 +88,24 @@ scope metrics -m net.tx -g
 		metricCols := []map[string]interface{}{}
 		mm := []metrics.Metric{}
 
-		firstMetric := ""
-
-		for m := range in {
-			if firstMetric == "" {
-				firstMetric = m.Name
-			}
-			if cols && m.Name == firstMetric { // use first metric as a breaker for batches of metrics
-				metricCols = append(metricCols, map[string]interface{}{})
-			}
-			if len(names) > 0 {
+		for m := range in { // all metrics
+			if len(names) > 0 { // if -m is used
 				for _, name := range names {
-					if m.Name == name {
+					if m.Name == name { // filter out metrics we arent concerned with
 						if graph {
 							values = append(values, m.Value)
-						} else if cols {
-							metricCols[len(metricCols)-1][m.Name] = m.Value
+						} else if cols { // if -c is used
+							inserted := false
+							for i, column := range metricCols { // place metric value in correct place
+								if _, exists := column[m.Name]; !exists {
+									metricCols[i][m.Name] = m.Value
+									inserted = true
+									break
+								}
+							}
+							if !inserted {
+								metricCols = append(metricCols, map[string]interface{}{m.Name: m.Value})
+							}
 						} else {
 							mm = append(mm, m)
 						}

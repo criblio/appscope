@@ -36,6 +36,7 @@ func Receiver(gctx context.Context, g *errgroup.Group, s *Scope) func() error {
 				if conn == nil {
 					return errors.New("Error in Accept")
 				}
+				s.Unix.Conn = conn
 				g.Go(scopeHandler(gctx, s))
 
 			case <-gctx.Done():
@@ -75,7 +76,7 @@ func scopeHandler(gctx context.Context, s *Scope) func() error {
 		log.Info("Handling scope")
 		defer log.Info("Stopped handling scope")
 
-		reader := bufio.NewReader(s.Conn.Conn)
+		reader := bufio.NewReader(s.Unix.Conn)
 		for {
 			msg, err := ReadMessage(reader)
 			if err != nil {

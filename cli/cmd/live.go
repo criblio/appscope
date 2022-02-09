@@ -39,8 +39,7 @@ var liveCmd = &cobra.Command{
 
 		lrc := &run.Config{
 			MetricsFormat: "ndjson",
-			MetricsDest:   "unix://@scopelive",
-			EventsDest:    "unix://@scopelive",
+			CriblDest:     "unix://@scopelive",
 			Verbosity:     4,
 			Subprocess:    true,
 		}

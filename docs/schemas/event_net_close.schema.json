@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/event_net_close.schema.json",
+  "type": "object",
+  "title": "AppScope `net.close` Event",
+  "description": "Structure of the `net.close` event",
+  "examples": [{"type":"evt","id":"8bc1398c19f3-recvfrom01-nel/syscalls/recvfrom/recvfrom01","_channel":"5912618970557","body":{"sourcetype":"net","_time":1643735857.983449,"source":"net.close","host":"8bc1398c19f3","proc":"recvfrom01","cmd":"/opt/test/ltp/testcases/kernel/syscalls/recvfrom/recvfrom01","pid":3793,"data":{"net_transport":"IP.TCP","net_peer_ip":"0.0.0.0","net_peer_port":35533,"net_host_ip":"127.0.0.1","net_host_port":40184,"duration":0,"net_bytes_sent":0,"net_bytes_recv":6,"net_close_reason":"local"}}}],
+  "required": [
+    "type",
+    "id",
+    "_channel",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/envelope.schema.json#/$defs/event_type"
+    },
+    "id": {
+      "$ref": "definitions/envelope.schema.json#/$defs/id"
+    },
+    "_channel": {
+      "$ref": "definitions/envelope.schema.json#/$defs/_channel"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "sourcetype",
+        "_time",
+        "source",
+        "host",
+        "proc",
+        "cmd",
+        "pid",
+        "data"
+      ],
+      "properties": {
+        "sourcetype": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcetypenet"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        },
+        "source": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcenetclose"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "cmd": {
+          "$ref": "definitions/body.schema.json#/$defs/cmd"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "data": {
+          "title": "data",
+          "description": "data",
+          "type": "object",
+          "properties": {
+            "net_transport": {
+              "$ref": "definitions/data.schema.json#/$defs/net_transport"
+            },
+            "net_peer_ip": {
+              "$ref": "definitions/data.schema.json#/$defs/net_peer_ip"
+            },
+            "net_peer_port": {
+              "$ref": "definitions/data.schema.json#/$defs/net_peer_port"
+            },
+            "net_host_ip": {
+              "$ref": "definitions/data.schema.json#/$defs/net_host_ip"
+            },
+            "net_host_port": {
+              "$ref": "definitions/data.schema.json#/$defs/net_host_port"
+            },
+            "net_protocol": {
+              "$ref": "definitions/data.schema.json#/$defs/net_protocol"
+            },
+            "unix_peer_inode": {
+              "$ref": "definitions/data.schema.json#/$defs/unix_peer_inode"
+            },
+            "unix_local_inode": {
+              "$ref": "definitions/data.schema.json#/$defs/unix_local_inode"
+            },
+            "duration": {
+              "$ref": "definitions/data.schema.json#/$defs/duration"
+            },
+            "net_bytes_sent": {
+              "$ref": "definitions/data.schema.json#/$defs/net_bytes_sent"
+            },
+            "net_bytes_recv": {
+              "$ref": "definitions/data.schema.json#/$defs/net_bytes_recv"
+            },
+            "net_close_reason": {
+              "$ref": "definitions/data.schema.json#/$defs/net_close_reason"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

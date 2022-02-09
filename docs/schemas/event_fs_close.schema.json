@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/event_fs_close.schema.json",
+  "type": "object",
+  "title": "AppScope `fs.close` Event",
+  "description": "Structure of the `fs.close` event",
+  "examples": [{"type":"evt","id":"8bc1398c19f3-accept01-/kernel/syscalls/accept/accept01","_channel":"5890090429747","body":{"sourcetype":"fs","_time":1643735835.4550021,"source":"fs.close","host":"8bc1398c19f3","proc":"accept01","cmd":"/opt/test/ltp/testcases/kernel/syscalls/accept/accept01","pid":1933,"data":{"proc":"accept01","pid":1933,"host":"8bc1398c19f3","file":"/dev/shm/ltp_accept01_1931","proc_uid":0,"proc_gid":0,"proc_cgroup":"0::/system.slice/containerd.service","file_perms":600,"file_owner":0,"file_group":0,"file_read_bytes":0,"file_read_ops":0,"file_write_bytes":0,"file_write_ops":0,"duration":0,"op":"close"}}}],
+  "required": [
+    "type",
+    "id",
+    "_channel",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/envelope.schema.json#/$defs/event_type"
+    },
+    "id": {
+      "$ref": "definitions/envelope.schema.json#/$defs/id"
+    },
+    "_channel": {
+      "$ref": "definitions/envelope.schema.json#/$defs/_channel"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "sourcetype",
+        "_time",
+        "source",
+        "host",
+        "proc",
+        "cmd",
+        "pid",
+        "data"
+      ],
+      "properties": {
+        "sourcetype": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcetypefs"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        },
+        "source": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcefsclose"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "cmd": {
+          "$ref": "definitions/body.schema.json#/$defs/cmd"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "data": {
+          "title": "data",
+          "description": "data",
+          "type": "object",
+          "properties": {
+            "proc": {
+              "$ref": "definitions/data.schema.json#/$defs/proc"
+            },
+            "pid": {
+              "$ref": "definitions/data.schema.json#/$defs/pid"
+            },
+            "host": {
+              "$ref": "definitions/data.schema.json#/$defs/host"
+            },
+            "file": {
+              "$ref": "definitions/data.schema.json#/$defs/file"
+            },
+            "proc_uid": {
+              "$ref": "definitions/data.schema.json#/$defs/proc_uid"
+            },
+            "proc_gid": {
+              "$ref": "definitions/data.schema.json#/$defs/proc_gid"
+            },
+            "proc_cgroup": {
+              "$ref": "definitions/data.schema.json#/$defs/proc_cgroup"
+            },
+            "file_perms": {
+              "$ref": "definitions/data.schema.json#/$defs/file_perms"
+            },
+            "file_owner": {
+              "$ref": "definitions/data.schema.json#/$defs/file_owner"
+            },
+            "file_group": {
+              "$ref": "definitions/data.schema.json#/$defs/file_group"
+            },
+            "file_read_bytes": {
+              "$ref": "definitions/data.schema.json#/$defs/file_read_bytes"
+            },
+            "file_read_ops": {
+              "$ref": "definitions/data.schema.json#/$defs/file_read_ops"
+            },
+            "file_write_bytes": {
+              "$ref": "definitions/data.schema.json#/$defs/file_write_bytes"
+            },
+            "file_write_ops": {
+              "$ref": "definitions/data.schema.json#/$defs/file_write_ops"
+            },
+            "duration": {
+              "$ref": "definitions/data.schema.json#/$defs/duration"
+            },
+            "op": {
+              "$ref": "definitions/data.schema.json#/$defs/op_fs_close"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/metric_fs_seek.schema.json",
+  "type": "object",
+  "title": "AppScope `fs.seek` Metric",
+  "description": "Structure of the `fs.seek` metric",
+  "examples": [{"type":"metric","body":{"_metric":"fs.seek","_metric_type":"counter","_value":3,"proc":"sh","pid":13810,"host":"1f0ec6c8a7bc","unit":"operation","summary":"true","_time":1643826404.1757381}}, {"type":"metric","body":{"_metric":"fs.seek","_metric_type":"counter","_value":1,"proc":"sh","pid":9994,"fd":3,"host":"1f0ec6c8a7bc","op":"lseek","file":"./file_x","unit":"operation","_time":1643826293.4075079}}],
+  "required": [
+    "type",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/envelope.schema.json#/$defs/metric_type"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "_metric",
+        "_metric_type",
+        "_value",
+        "proc",
+        "pid",
+        "host",
+        "unit",
+        "_time"
+      ],
+      "properties": {
+        "_metric": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcefsseek"
+        },
+        "_metric_type": {
+          "$ref": "definitions/body.schema.json#/$defs/metric_type_counter"
+        },
+        "_value": {
+          "$ref": "definitions/body.schema.json#/$defs/_value"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "fd": {
+          "$ref": "definitions/data.schema.json#/$defs/fd"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "op": {
+          "$ref": "definitions/data.schema.json#/$defs/op"
+        },
+        "file": {
+          "$ref": "definitions/data.schema.json#/$defs/file"
+        },
+        "unit": {
+          "$ref": "definitions/data.schema.json#/$defs/unit_operation"
+        },
+        "summary": {
+          "$ref": "definitions/data.schema.json#/$defs/summary"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

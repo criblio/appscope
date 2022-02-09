@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/event_fs_seek.json",
+  "type": "object",
+  "title": "AppScope `fs.seek` Event",
+  "description": "Structure of the `fs.seek` event",
+  "examples": [{"type":"evt","id":"8bc1398c19f3-sh-/bin/sh ./file_x","_channel":"5891441789884","body":{"sourcetype":"metric","_time":1643735836.805196,"source":"fs.seek","host":"8bc1398c19f3","proc":"sh","cmd":"/bin/sh ./file_x","pid":2061,"data":{"_metric":"fs.seek","_metric_type":"counter","_value":1,"proc":"sh","pid":2061,"fd":3,"op":"lseek","file":"./file_x","unit":"operation"}}}],
+  "required": [
+    "type",
+    "id",
+    "_channel",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/envelope.schema.json#/$defs/event_type"
+    },
+    "id": {
+      "$ref": "definitions/envelope.schema.json#/$defs/id"
+    },
+    "_channel": {
+      "$ref": "definitions/envelope.schema.json#/$defs/_channel"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "sourcetype",
+        "_time",
+        "source",
+        "host",
+        "proc",
+        "cmd",
+        "pid",
+        "data"
+      ],
+      "properties": {
+        "sourcetype": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcetypemetric"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        },
+        "source": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcefsseek"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "cmd": {
+          "$ref": "definitions/body.schema.json#/$defs/cmd"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "data": {
+          "title": "data",
+          "description": "data",
+          "type": "object",
+          "properties": {
+            "_metric": {
+              "$ref": "definitions/body.schema.json#/$defs/sourcefsseek"
+            },
+            "_metric_type": {
+              "$ref": "definitions/body.schema.json#/$defs/metric_type_counter"
+            },
+            "_value": {
+              "$ref": "definitions/body.schema.json#/$defs/_value"
+            },
+            "proc": {
+              "$ref": "definitions/data.schema.json#/$defs/proc"
+            },
+            "pid": {
+              "$ref": "definitions/data.schema.json#/$defs/pid"
+            },
+            "fd": {
+              "$ref": "definitions/data.schema.json#/$defs/fd"
+            },
+            "op": {
+              "$ref": "definitions/data.schema.json#/$defs/op_fs_seek"
+            },
+            "file": {
+              "$ref": "definitions/data.schema.json#/$defs/file"
+            },
+            "unit": {
+              "$ref": "definitions/data.schema.json#/$defs/unit_operation"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

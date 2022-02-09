@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/event_net_app.schema.json",
+  "type": "object",
+  "title": "AppScope `net.app` Event",
+  "description": "Structure of the `net.app` event",
+  "examples": [{"type":"evt","id":"ubuntu-firefox-/usr/lib/firefox/firefox","_channel":"13470846442500","body":{"sourcetype":"net","_time":1643735942.588594,"source":"net.app","host":"ubuntu","proc":"firefox","cmd":"/usr/lib/firefox/firefox","pid":6544,"data":{"proc":"firefox","pid":6544,"fd":91,"host":"ubuntu","protocol":"HTTP"}}}],
+  "required": [
+    "type",
+    "id",
+    "_channel",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/envelope.schema.json#/$defs/event_type"
+    },
+    "id": {
+      "$ref": "definitions/envelope.schema.json#/$defs/id"
+    },
+    "_channel": {
+      "$ref": "definitions/envelope.schema.json#/$defs/_channel"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "sourcetype",
+        "_time",
+        "source",
+        "host",
+        "proc",
+        "cmd",
+        "pid",
+        "data"
+      ],
+      "properties": {
+        "sourcetype": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcetypenet"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        },
+        "source": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcenetapp"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "cmd": {
+          "$ref": "definitions/body.schema.json#/$defs/cmd"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "data": {
+          "title": "data",
+          "description": "data",
+          "type": "object",
+          "properties": {
+            "proc": {
+              "$ref": "definitions/data.schema.json#/$defs/proc"
+            },
+            "pid": {
+              "$ref": "definitions/data.schema.json#/$defs/pid"
+            },
+            "fd": {
+              "$ref": "definitions/data.schema.json#/$defs/fd"
+            },
+            "host": {
+              "$ref": "definitions/data.schema.json#/$defs/host"
+            },
+            "protocol": {
+              "$ref": "definitions/data.schema.json#/$defs/protocol"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

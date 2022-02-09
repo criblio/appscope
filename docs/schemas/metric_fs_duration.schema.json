@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/metric_fs_duration.schema.json",
+  "type": "object",
+  "title": "AppScope `fs.duration` Metric",
+  "description": "Structure of the `fs.duration` metric",
+  "examples": [{"type":"metric","body":{"_metric":"fs.duration","_metric_type":"histogram","_value":1,"proc":"access01","pid":13697,"host":"1f0ec6c8a7bc","unit":"microsecond","summary":"true","_time":1643826404.0064421}}, {"type":"metric","body":{"_metric":"fs.duration","_metric_type":"histogram","_value":16,"proc":"accept01","pid":9871,"fd":3,"host":"1f0ec6c8a7bc","op":"fgets_unlocked","file":"/etc/passwd","numops":1,"unit":"microsecond","_time":1643826292.0766749}}],
+  "required": [
+    "type",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/envelope.schema.json#/$defs/metric_type"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "_metric",
+        "_metric_type",
+        "_value",
+        "proc",
+        "pid",
+        "host",
+        "unit",
+        "_time"
+      ],
+      "properties": {
+        "_metric": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcefsduration"
+        },
+        "_metric_type": {
+          "$ref": "definitions/body.schema.json#/$defs/metric_type_histogram"
+        },
+        "_value": {
+          "$ref": "definitions/body.schema.json#/$defs/_value"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "fd": {
+          "$ref": "definitions/data.schema.json#/$defs/fd"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "op": {
+          "$ref": "definitions/data.schema.json#/$defs/op"
+        },
+        "file": {
+          "$ref": "definitions/data.schema.json#/$defs/file"
+        },
+        "numops": {
+          "$ref": "definitions/data.schema.json#/$defs/numops"
+        },
+        "unit": {
+          "$ref": "definitions/data.schema.json#/$defs/unit_microsecond"
+        },
+        "summary": {
+          "$ref": "definitions/data.schema.json#/$defs/summary"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

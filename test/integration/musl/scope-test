@@ -128,6 +128,39 @@ fi
 endtest
 
 
+#
+# tls
+#
+starttest tls
+export SCOPE_EVENT_DEST=tcp://127.0.0.1:9109
+export SCOPE_EVENT_TLS_ENABLE=true
+export SCOPE_EVENT_TLS_VALIDATE_SERVER=false
+export SCOPE_EVENT_TLS_CA_CERT_PATH=/usr/local/scope/cert.pm
+
+# tcpserver receives over a tls session
+cd /usr/local/scope
+./tcpserver -t 9109 > $EVT_FILE &
+
+# ldscope will send over tls session
+ldscope ps -ef
+retval=$?
+
+evaltest
+
+# Verify that ps -ef is successful
+if [ $retval -ne 0 ]; then
+    ERR+=1
+fi
+
+# Verify that data made it through
+if ( ! grep '"sourcetype":"console"' $EVT_FILE ); then
+    ERR+=1
+fi
+
+endtest
+
+
+
 if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""
     echo ""

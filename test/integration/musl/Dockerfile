@@ -1,6 +1,6 @@
 FROM alpine:latest
 
-RUN apk add bash binutils curl gcc gdb musl-dev
+RUN apk add bash binutils curl gcc gdb musl-dev openssl openssl-dev
 
 RUN mkdir -p /opt/fwrite
 COPY ./musl/fwrite.c /opt/fwrite/fwrite.c
@@ -35,6 +35,14 @@ RUN  mkdir /usr/local/scope && \
      ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
 COPY musl/scope-test /usr/local/scope/scope-test
+
+
+COPY musl/tcpserver.c /usr/local/scope/tcpserver.c
+RUN (cd /usr/local/scope &&  \
+     gcc -g tcpserver.c -lssl -lcrypto -o tcpserver && \
+     openssl req -nodes -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem \
+      -subj "/C=US/ST=MN/L=Excelsior/O=Cribl/OU=Engineering/CN=cribl.io")
+
 
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]

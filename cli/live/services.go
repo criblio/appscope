@@ -12,8 +12,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+func init() {
+	log.SetLevel(log.DebugLevel)
+}
+
 // Receiver listens for a new scope connection on a unix socket and handles received data
-func Receiver(gctx context.Context, g *errgroup.Group, s *Scope) func() error {
+func Receiver(gctx context.Context, g *errgroup.Group) func() error {
 	return func() error {
 
 		log.Info("Scope receiver routine running")
@@ -36,6 +40,7 @@ func Receiver(gctx context.Context, g *errgroup.Group, s *Scope) func() error {
 				if conn == nil {
 					return errors.New("Error in Accept")
 				}
+				s := NewScope()
 				s.Unix.Conn = conn
 				g.Go(scopeHandler(gctx, s))
 
@@ -83,28 +88,36 @@ func scopeHandler(gctx context.Context, s *Scope) func() error {
 				return err
 			}
 
-			if len(msg.Data) > 0 {
-				if s.ProcessStart.Format == "" {
-					var header libscope.Header
-					if err := json.Unmarshal([]byte(msg.Raw), &header); err != nil {
-						log.WithFields(log.Fields{
-							"err": err,
-						}).Warn("Unmarshal failed")
-						return nil
-					}
-					if header.Format == "" {
-						log.Warn("No connection header received")
-						return nil
-					}
-					if err := s.Update(header); err != nil {
-						log.WithFields(log.Fields{
-							"err": err,
-						}).Warn("Update failed")
-						return nil
-					}
-
-					log.Info("Process Start Message received: ", header)
+			if msg.IsHeader() {
+				var header libscope.Header
+				if err := json.Unmarshal([]byte(msg.Raw), &header); err != nil {
+					log.WithFields(log.Fields{
+						"err": err,
+					}).Warn("Unmarshal failed")
+					return nil
 				}
+				if header.Format == "" {
+					log.Warn("No connection header received")
+					return nil
+				}
+				if err := s.Update(header); err != nil {
+					log.WithFields(log.Fields{
+						"err": err,
+					}).Warn("Update failed")
+					return nil
+				}
+				log.Debug("Process Start Message received: ", header)
+			} else if msg.IsEvent() {
+				s.EventBuf = append(s.EventBuf, msg.Data)
+				log.Debug("Event received: ", msg.Data)
+			} else if msg.IsMetric() {
+				s.MetricBuf = append(s.MetricBuf, msg.Data)
+				log.Debug("Metric received: ", msg.Data)
+			} else if msg.IsPayload() {
+				s.PayloadBuf = append(s.PayloadBuf, msg.Payload)
+				log.Debug("Payload received: ", msg.Payload)
+			} else {
+				log.Warn("Invalid message type received")
 			}
 
 			select {

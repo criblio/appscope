@@ -279,7 +279,7 @@ func HistoryDir() string {
 
 func (rc *Config) buildMetricsDest() string {
 	var dest string
-	if rc.sc.Cribl.Enable == true {
+	if rc.sc.Cribl.Enable == "true" {
 		if rc.sc.Cribl.Transport.TransportType == "unix" || rc.sc.Cribl.Transport.TransportType == "file" {
 			dest = rc.sc.Cribl.Transport.TransportType + "://" + rc.sc.Cribl.Transport.Path
 		} else {
@@ -297,7 +297,7 @@ func (rc *Config) buildMetricsDest() string {
 
 func (rc *Config) buildEventsDest() string {
 	var dest string
-	if rc.sc.Cribl.Enable == true {
+	if rc.sc.Cribl.Enable == "true" {
 		if rc.sc.Cribl.Transport.TransportType == "unix" || rc.sc.Cribl.Transport.TransportType == "file" {
 			dest = rc.sc.Cribl.Transport.TransportType + "://" + rc.sc.Cribl.Transport.Path
 		} else {

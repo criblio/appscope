@@ -25,13 +25,12 @@ var liveCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
 
-		s := live.NewScope()
 		ctx := context.Context(context.Background())
 		g, gctx := errgroup.WithContext(ctx)
 
 		g.Go(util.Signal(gctx))
-		g.Go(live.Receiver(gctx, g, s))
-		//		g.Go(web.Server(gctx, g, s))
+		g.Go(live.Receiver(gctx, g))
+		//		g.Go(web.Server(gctx, g))
 
 		// Wait until we're listening before run is called
 		// TODO channel to unblock when listener is ready

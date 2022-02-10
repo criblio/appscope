@@ -12,6 +12,9 @@ type Scope struct {
 	sync.RWMutex
 	Unix         UnixConnection  `json:"-"`
 	ProcessStart libscope.Header `json:"processStart"`
+	PayloadBuf   []MessagePayload
+	EventBuf     []MessageData // TODO []event
+	MetricBuf    []MessageData // TODO []metric
 }
 
 // Create a Scope

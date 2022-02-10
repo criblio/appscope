@@ -82,8 +82,7 @@
             }
           }
         }
-      },
-      "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false

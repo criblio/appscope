@@ -147,7 +147,9 @@ func WebServer(gctx context.Context, g *errgroup.Group, s *Scope) func() error {
 		defer log.Info("Web Server routine exited")
 
 		router := gin.Default()
+		router.LoadHTMLGlob("live/templates/*")
 
+		router.GET("/", homeHandler())
 		router.GET("/api/events", scopeEventsHandler(s))
 		router.GET("/api/metrics", scopeMetricsHandler(s))
 		router.GET("/api/payloads", scopeConfigHandler(s))

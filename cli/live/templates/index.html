@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+<style>
+
+body {
+    font-family: Arial, sans-serif;
+}
+
+styled-table {
+    border-collapse: collapse;
+    margin: 25px 0;
+    font-size: 0.9em;
+    font-family: sans-serif;
+    min-width: 400px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+}
+
+styled-table th,
+.styled-table td {
+    padding: 12px 15px;
+}
+
+styled-table tbody tr {
+    border-bottom: 1px solid #dddddd;
+}
+
+.styled-table tbody tr:nth-of-type(even) {
+    background-color: #f3f3f3;
+}
+
+.styled-table tbody tr:last-of-type {
+    border-bottom: 2px solid #009879;
+}
+
+styled-table tbody tr.active-row {
+    font-weight: bold;
+    color: #009879;
+}
+
+</style>
+    <head>
+        <title>AppScope Live</title>
+    </head>
+    <body>
+        <p>Welcome to <strong>AppScope Live</strong></p>
+        <p>Connections:</p>
+        <div id="event_container" class="styled-table"></div>
+        <script>
+            function display(response, container) {
+                            var container = document.getElementById(container);
+                            var table = document.createElement('table');
+                            var tbody = document.createElement('tbody');
+                            for (i = 0; i < response.items.length; i++) {
+                                            var vals = JSON.stringify(response.items[i]);
+                                            var row = document.createElement('tr');
+                                            var cell = document.createElement('td');
+                                            cell.textContent = vals;
+                                            row.appendChild(cell);
+                                            tbody.appendChild(row);
+                                            table.appendChild(tbody);
+                                            container.appendChild(table);
+                                        }
+            }
+            let response = fetch("http://localhost:8080/api/connections")
+                .then((response) => response.json())
+                .then((response) => {display(response, 'event_container');})
+        </script>
+        </table>
+    </body>
+</html>

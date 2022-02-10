@@ -42,11 +42,15 @@
 
 - name: Reference
   child: 
-    - name: CLI Reference
-      path: /docs/cli-reference
 
     - name: Config File
       path: /docs/config-file
+
+    - name: CLI Reference
+      path: /docs/cli-reference
+
+    - name: Schema Reference
+      path: /docs/schema-reference
 
     - name: Other Resources
       path: /docs/other-resources

@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/metric_net_tcp.schema.json",
+  "type": "object",
+  "title": "AppScope `net.tcp` Metric",
+  "description": "Structure of the `net.tcp` metric",
+  "examples": [{"type":"metric","body":{"_metric":"net.tcp","_metric_type":"gauge","_value":1,"proc":"accept02","pid":13689,"host":"1f0ec6c8a7bc","unit":"connection","summary":"true","_time":1643826403.1844971}}, {"type":"metric","body":{"_metric":"net.tcp","_metric_type":"gauge","_value":0,"proc":"accept01","pid":9871,"fd":4,"host":"1f0ec6c8a7bc","proto":"TCP","port":0,"unit":"connection","_time":1643826292.07731}}],
+  "required": [
+    "type",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/envelope.schema.json#/$defs/metric_type"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "_metric",
+        "_metric_type",
+        "_value",
+        "proc",
+        "pid",
+        "host",
+        "unit",
+        "_time"
+      ],
+      "properties": {
+        "_metric": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcenettcp"
+        },
+        "_metric_type": {
+          "$ref": "definitions/body.schema.json#/$defs/metric_type_gauge"
+        },
+        "_value": {
+          "$ref": "definitions/body.schema.json#/$defs/_value"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "fd": {
+          "$ref": "definitions/data.schema.json#/$defs/fd"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "proto": {
+          "$ref": "definitions/data.schema.json#/$defs/proto_tcp"
+        },
+        "port": {
+          "$ref": "definitions/data.schema.json#/$defs/port"
+        },
+        "unit": {
+          "$ref": "definitions/data.schema.json#/$defs/unit_connection"
+        },
+        "summary": {
+          "$ref": "definitions/data.schema.json#/$defs/summary"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/event_net_error.schema.json",
+  "type": "object",
+  "title": "AppScope `net.error` Event",
+  "description": "Structure of the `net.error` event",
+  "examples": [{"type":"evt","id":"90aac4bb0722-accept01-/kernel/syscalls/accept/accept01","_channel":"2745569202700291","body":{"sourcetype":"metric","_time":1643972258.00885,"source":"net.error","host":"90aac4bb0722","proc":"accept01","cmd":"/opt/test/ltp/testcases/kernel/syscalls/accept/accept01","pid":1934,"data":{"_metric":"net.error","_metric_type":"counter","_value":1,"proc":"accept01","pid":1934,"op":"accept","class":"connection","unit":"operation"}}}],
+  "required": [
+    "type",
+    "id",
+    "_channel",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/envelope.schema.json#/$defs/event_type"
+    },
+    "id": {
+      "$ref": "definitions/envelope.schema.json#/$defs/id"
+    },
+    "_channel": {
+      "$ref": "definitions/envelope.schema.json#/$defs/_channel"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "sourcetype",
+        "_time",
+        "source",
+        "host",
+        "proc",
+        "cmd",
+        "pid",
+        "data"
+      ],
+      "properties": {
+        "sourcetype": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcetypemetric"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        },
+        "source": {
+          "$ref": "definitions/body.schema.json#/$defs/sourceneterror"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "cmd": {
+          "$ref": "definitions/body.schema.json#/$defs/cmd"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "data": {
+          "title": "data",
+          "description": "data",
+          "type": "object",
+          "properties": {
+            "_metric": {
+              "$ref": "definitions/body.schema.json#/$defs/sourceneterror"
+            },
+            "_metric_type": {
+              "$ref": "definitions/body.schema.json#/$defs/metric_type_counter"
+            },
+            "_value": {
+              "$ref": "definitions/body.schema.json#/$defs/_value"
+            },
+            "proc": {
+              "$ref": "definitions/data.schema.json#/$defs/proc"
+            },
+            "pid": {
+              "$ref": "definitions/data.schema.json#/$defs/pid"
+            },
+            "op": {
+              "$ref": "definitions/data.schema.json#/$defs/op"
+            },
+            "class": {
+              "$ref": "definitions/data.schema.json#/$defs/class_connection"
+            },
+            "unit": {
+              "$ref": "definitions/data.schema.json#/$defs/unit_operation"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

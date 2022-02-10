@@ -1,0 +1,366 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/definitions/body.schema.json",
+  "title": "Schema for the AppScope event/metric body",
+  "description": "Metadata about the process in which AppScope is running",
+  "$defs": {
+    "_time": {
+      "title": "_time",
+      "description": "_time",
+      "type": "number",
+      "examples": ["1643662126.91777"]
+    },
+    "_value": {
+      "title": "_value",
+      "description": "_value",
+      "type": "number",
+      "examples": [1]
+    },
+    "args": {
+      "title": "args",
+      "description": "args",
+      "type": "string"
+    },
+    "cmd": {
+      "title": "cmd",
+      "description": "cmd",
+      "type": "string",
+      "examples": ["top"]
+    },
+    "data": {
+      "title": "data",
+      "description": "data",
+      "type": "string"
+    },
+    "gid": {
+      "title": "gid",
+      "description": "gid",
+      "type": "integer",
+      "examples": [0]
+    },
+    "groupname": {
+      "title": "groupname",
+      "description": "groupname",
+      "type": "string",
+      "examples": ["root"]
+    },
+    "metric_type_counter": {
+      "title": "counter",
+      "description": "counter",
+      "type": "string",
+      "const": "counter"
+    },
+    "metric_type_gauge": {
+      "title": "gauge",
+      "description": "gauge",
+      "type": "string",
+      "const": "gauge"
+    },
+    "metric_type_histogram": {
+      "title": "histogram",
+      "description": "histogram",
+      "type": "string",
+      "const": "histogram"
+    },
+    "metric_type_timer": {
+      "title": "timer",
+      "description": "timer",
+      "type": "string",
+      "const": "timer"
+    },
+    "sourceconsolestdout": {
+      "title": "stdout",
+      "description": "Source - console stdout",
+      "type": "string",
+      "const": "stdout"
+    },
+    "sourceconsolestderr": {
+      "title": "stderr",
+      "description": "Source - console stderr",
+      "type": "string",
+      "const": "stderr"
+    },
+    "sourcednsduration": {
+      "title": "dns.duration",
+      "description": "Source - DNS duration",
+      "type": "string",
+      "const": "dns.duration"
+    },
+    "sourcednsreq": {
+      "title": "dns.req",
+      "description": "Source - DNS request",
+      "type": "string",
+      "const": "dns.req"
+    },
+    "sourcednsresp": {
+      "title": "dns.resp",
+      "description": "Source - DNS response",
+      "type": "string",
+      "const": "dns.resp"
+    },
+    "sourcefsclose": {
+      "title": "fs.close",
+      "description": "Source - File Close",
+      "type": "string",
+      "const": "fs.close"
+    },
+    "sourcefsdelete": {
+      "title": "fs.delete",
+      "description": "Source - File Delete",
+      "type": "string",
+      "const": "fs.delete"
+    },
+    "sourcefsduration": {
+      "title": "fs.duration",
+      "description": "Source - File Duration",
+      "type": "string",
+      "const": "fs.duration"
+    },
+    "sourcefserror": {
+      "title": "fs.error",
+      "description": "Source - File Error",
+      "type": "string",
+      "const": "fs.error"
+    },
+    "sourcefsopen": {
+      "title": "fs.open",
+      "description": "Source - File open",
+      "type": "string",
+      "const": "fs.open"
+    },
+    "sourcefsread": {
+      "title": "fs.read",
+      "description": "Source - File Read",
+      "type": "string",
+      "const": "fs.read"
+    },
+    "sourcefsseek": {
+      "title": "fs.seek",
+      "description": "Source - File Seek",
+      "type": "string",
+      "const": "fs.seek"
+    },
+    "sourcefsstat": {
+      "title": "fs.stat",
+      "description": "Source - File Stat",
+      "type": "string",
+      "const": "fs.stat"
+    },
+    "sourcefswrite": {
+      "title": "fs.write",
+      "description": "Source - File Write",
+      "type": "string",
+      "const": "fs.write"
+    },
+    "sourcehttpresp" : {
+      "title": "http.resp",
+      "description": "Source - HTTP response",
+      "type": "string",
+      "const": "http.resp"
+    },
+    "sourcehttpreq" : {
+      "title": "http.req",
+      "description": "Source - HTTP request",
+      "type": "string",
+      "const": "http.req"
+    },
+    "sourcehttpclientduration" : {
+      "title": "http.client.duration",
+      "description": "Source - HTTP client duration",
+      "type": "string",
+      "const": "http.client.duration"
+    },
+    "sourcehttprequests" : {
+      "title": "http.requests",
+      "description": "Source - HTTP requests",
+      "type": "string",
+      "const": "http.requests"
+    },
+    "sourcehttprequestcontentlength" : {
+      "title": "http.request.content_length",
+      "description": "Source - HTTP request content length",
+      "type": "string",
+      "const": "http.request.content_length"
+    },
+    "sourcehttpresponsecontentlength" : {
+      "title": "http.response.content_length",
+      "description": "Source - HTTP response content length",
+      "type": "string",
+      "const": "http.response.content_length"
+    },
+    "sourcehttpserverduration" : {
+      "title": "http.server.duration",
+      "description": "Source - HTTP server duration",
+      "type": "string",
+      "const": "http.server.duration"
+    },
+    "sourcenetclose": {
+      "title": "net.close",
+      "description": "Source - Net Close",
+      "type": "string",
+      "const": "net.close"
+    },
+    "sourcenetapp" : {
+      "title": "net.app",
+      "description": "Source - Net App",
+      "type": "string",
+      "const": "net.app"
+    },
+    "sourcenetdns": {
+      "title": "net.dns",
+      "description": "Source - Net DNS",
+      "type": "string",
+      "const": "net.dns"
+    },
+    "sourcenetduration": {
+      "title": "net.duration",
+      "description": "Source - Net duration",
+      "type": "string",
+      "const": "net.duration"
+    },
+    "sourceneterror": {
+      "title": "net.error",
+      "description": "Source - Net Error",
+      "type": "string",
+      "const": "net.error"
+    },
+    "sourcenetopen": {
+      "title": "net.open",
+      "description": "Source - Net Open",
+      "type": "string",
+      "const": "net.open"
+    },
+    "sourcenetother": {
+      "title": "net.other",
+      "description": "Source - Net other",
+      "type": "string",
+      "const": "net.other"
+    },
+    "sourcenetport": {
+      "title": "net.port",
+      "description": "Source - Net port",
+      "type": "string",
+      "const": "net.port"
+    },
+    "sourcenetrx": {
+      "title": "net.rx",
+      "description": "Source - Net RX",
+      "type": "string",
+      "const": "net.rx"
+    },
+    "sourcenettcp": {
+      "title": "net.tcp",
+      "description": "Source - Net tcp",
+      "type": "string",
+      "const": "net.tcp"
+    },
+    "sourcenettx": {
+      "title": "net.tx",
+      "description": "Source - Net TX",
+      "type": "string",
+      "const": "net.tx"
+    },
+    "sourcenetudp": {
+      "title": "net.udp",
+      "description": "Source - Net udp",
+      "type": "string",
+      "const": "net.udp"
+    },
+    "sourcenotice" : {
+      "title": "notice",
+      "description": "Source - notice",
+      "type": "string",
+      "const": "notice"
+    },
+    "sourceprocchild" : {
+      "title": "proc.child",
+      "description": "Source - proc child",
+      "type": "string",
+      "const": "proc.child"
+    },
+    "sourceproccpu" : {
+      "title": "proc.cpu",
+      "description": "Source - proc cpu",
+      "type": "string",
+      "const": "proc.cpu"
+    },
+    "sourceproccpuperc" : {
+      "title": "proc.cpu_perc",
+      "description": "Source - proc cpu_perc",
+      "type": "string",
+      "const": "proc.cpu_perc"
+    },
+    "sourceprocfd" : {
+      "title": "proc.fd",
+      "description": "Source - proc fd",
+      "type": "string",
+      "const": "proc.fd"
+    },
+    "sourceprocmem" : {
+      "title": "proc.mem",
+      "description": "Source - proc memory",
+      "type": "string",
+      "const": "proc.mem"
+    },
+    "sourceprocstart" : {
+      "title": "proc.start",
+      "description": "Source - proc start",
+      "type": "string",
+      "const": "proc.start"
+    },
+    "sourceprocthread" : {
+      "title": "proc.thread",
+      "description": "Source - proc thread",
+      "type": "string",
+      "const": "proc.thread"
+    },
+    "sourcetypeconsole": {
+      "title": "console",
+      "description": "Sourcetype - console",
+      "type": "string",
+      "const": "console"
+    },
+    "sourcetypedns": {
+      "title": "dns",
+      "description": "Sourcetype - dns",
+      "type": "string",
+      "const": "dns"
+    },
+    "sourcetypefs": {
+      "title": "fs",
+      "description": "Sourcetype - fs",
+      "type": "string",
+      "const": "fs"
+    },
+    "sourcetypehttp": {
+      "title": "http",
+      "description": "Sourcetype - http",
+      "type": "string",
+      "const": "http"
+    },
+    "sourcetypemetric": {
+      "title": "metric",
+      "description": "Sourcetype - metric",
+      "type": "string",
+      "const": "metric"
+    },
+    "sourcetypenet": {
+      "title": "net",
+      "description": "Sourcetype - net",
+      "type": "string",
+      "const": "net"
+    },
+    "uid": {
+      "title": "uid",
+      "description": "uid",
+      "type": "integer",
+      "examples": [0]
+    },
+    "username": {
+      "title": "username",
+      "description": "username",
+      "type": "string",
+      "examples": ["root"]
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/metric_net_open.schema.json",
+  "type": "object",
+  "title": "AppScope `net.open` Metric",
+  "description": "Structure of the `net.open` metric",
+  "examples": [{"type":"metric","body":{"_metric":"net.open","_metric_type":"counter","_value":1,"proc":"accept01","pid":13687,"host":"1f0ec6c8a7bc","unit":"connection","summary":"true","_time":1643826403.1214371}}, {"type":"metric","body":{"_metric":"net.open","_metric_type":"counter","_value":1,"proc":"lt-curl","pid":2485,"fd":7,"host":"2a6bc132b07a","proto":"UDP","port":0,"unit":"connection","_time":1643832569.7641439}}],
+  "required": [
+    "type",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/envelope.schema.json#/$defs/metric_type"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "_metric",
+        "_metric_type",
+        "_value",
+        "proc",
+        "pid",
+        "host",
+        "unit",
+        "_time"
+      ],
+      "properties": {
+        "_metric": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcenetopen"
+        },
+        "_metric_type": {
+          "$ref": "definitions/body.schema.json#/$defs/metric_type_counter"
+        },
+        "_value": {
+          "$ref": "definitions/body.schema.json#/$defs/_value"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "fd": {
+          "$ref": "definitions/data.schema.json#/$defs/fd"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "proto": {
+          "$ref": "definitions/data.schema.json#/$defs/proto"
+        },
+        "port": {
+          "$ref": "definitions/data.schema.json#/$defs/port"
+        },
+        "unit": {
+          "$ref": "definitions/data.schema.json#/$defs/unit_connection"
+        },
+        "summary": {
+          "$ref": "definitions/data.schema.json#/$defs/summary"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

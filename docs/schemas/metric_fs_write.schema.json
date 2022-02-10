@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/metric_fs_write.schema.json",
+  "type": "object",
+  "title": "AppScope `fs.write` Metric",
+  "description": "Structure of the `fs.write` metric",
+  "examples": [{"type":"metric","body":{"_metric":"fs.write","_metric_type":"counter","_value":10,"proc":"access02","pid":13806,"host":"1f0ec6c8a7bc","unit":"byte","summary":"true","_time":1643826404.2349629}}, {"type":"metric","body":{"_metric":"fs.write","_metric_type":"counter","_value":10,"proc":"access02","pid":9991,"fd":3,"host":"1f0ec6c8a7bc","op":"__write_libc","file":"file_x","numops":1,"unit":"byte","_time":1643826293.3853779}}],
+  "required": [
+    "type",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/envelope.schema.json#/$defs/metric_type"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "_metric",
+        "_metric_type",
+        "_value",
+        "proc",
+        "pid",
+        "host",
+        "unit",
+        "_time"
+      ],
+      "properties": {
+        "_metric": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcefswrite"
+        },
+        "_metric_type": {
+          "$ref": "definitions/body.schema.json#/$defs/metric_type_counter"
+        },
+        "_value": {
+          "$ref": "definitions/body.schema.json#/$defs/_value"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "fd": {
+          "$ref": "definitions/data.schema.json#/$defs/fd"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "op": {
+          "$ref": "definitions/data.schema.json#/$defs/op_fs_write"
+        },
+        "file": {
+          "$ref": "definitions/data.schema.json#/$defs/file"
+        },
+        "numops": {
+          "$ref": "definitions/data.schema.json#/$defs/numops"
+        },
+        "unit": {
+          "$ref": "definitions/data.schema.json#/$defs/unit_byte"
+        },
+        "summary": {
+          "$ref": "definitions/data.schema.json#/$defs/summary"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

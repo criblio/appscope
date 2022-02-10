@@ -9,6 +9,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 
 	linq "github.com/ahmetb/go-linq/v3"
 	"github.com/criblio/scope/metrics"
@@ -20,11 +21,14 @@ import (
 
 // metricsCmd represents the metrics command
 var metricsCmd = &cobra.Command{
-	Use:     "metrics [flags]",
-	Short:   "Outputs metrics for a session",
-	Long:    `Outputs metrics for a session`,
-	Example: `scope metrics`,
-	Args:    cobra.NoArgs,
+	Use:   "metrics [flags]",
+	Short: "Outputs metrics for a session",
+	Long:  `Outputs metrics for a session`,
+	Example: `scope metrics
+scope metrics -m net.error,fs.error
+scope metrics -m net.tx -g
+	`,
+	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		id, _ := cmd.Flags().GetInt("id")
 		names, _ := cmd.Flags().GetStringSlice("metric")
@@ -62,7 +66,7 @@ var metricsCmd = &cobra.Command{
 		}
 
 		in := make(chan metrics.Metric)
-		offsetChan := make(chan int)
+		// offsetChan := make(chan int)
 		filters := []util.MatchFunc{}
 		if len(names) > 0 {
 			for _, n := range names {
@@ -71,10 +75,11 @@ var metricsCmd = &cobra.Command{
 		} else {
 			filters = []util.MatchFunc{util.MatchAlways}
 		}
+
 		go func() {
-			offset, err := metrics.Reader(file, util.MatchAny(filters...), in)
+			_, err := metrics.Reader(file, util.MatchAny(filters...), in)
 			util.CheckErrSprintf(err, "error reading metrics: %v", err)
-			offsetChan <- offset
+			// offsetChan <- offset
 		}()
 		util.CheckErrSprintf(err, "error reading metrics from file: %v", err)
 
@@ -83,21 +88,24 @@ var metricsCmd = &cobra.Command{
 		metricCols := []map[string]interface{}{}
 		mm := []metrics.Metric{}
 
-		firstMetric := ""
-		for m := range in {
-			if firstMetric == "" {
-				firstMetric = m.Name
-			}
-			if cols && m.Name == firstMetric { // use first metric as a breaker for batches of metrics
-				metricCols = append(metricCols, map[string]interface{}{})
-			}
-			if len(names) > 0 {
+		for m := range in { // all metrics
+			if len(names) > 0 { // if -m is used
 				for _, name := range names {
-					if m.Name == name {
+					if m.Name == name { // filter out metrics we arent concerned with
 						if graph {
 							values = append(values, m.Value)
-						} else if cols {
-							metricCols[len(metricCols)-1][m.Name] = m.Value
+						} else if cols { // if -c is used
+							inserted := false
+							for i, column := range metricCols { // place metric value in correct place
+								if _, exists := column[m.Name]; !exists {
+									metricCols[i][m.Name] = m.Value
+									inserted = true
+									break
+								}
+							}
+							if !inserted {
+								metricCols = append(metricCols, map[string]interface{}{m.Name: m.Value})
+							}
 						} else {
 							mm = append(mm, m)
 						}
@@ -158,6 +166,7 @@ var metricsCmd = &cobra.Command{
 			}).ToSlice(&mm)
 		}
 
+		// Goroutine to intercept stdout to perform truncation and tab replacement
 		r, w := io.Pipe()
 		util.SetOut(w)
 		scanner := bufio.NewScanner(r)
@@ -168,7 +177,11 @@ var metricsCmd = &cobra.Command{
 			// 160, to show all columns.
 			termWidth = 160
 		}
+
+		var wg sync.WaitGroup
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			first := true
 			for scanner.Scan() {
 				line := strings.ReplaceAll(scanner.Text(), "\t", "    ")
@@ -181,6 +194,7 @@ var metricsCmd = &cobra.Command{
 				first = false
 			}
 		}()
+
 		util.PrintObj([]util.ObjField{
 			{Name: "Name", Field: "name"},
 			{Name: "Value", Field: "value"},
@@ -200,14 +214,19 @@ var metricsCmd = &cobra.Command{
 				return ret
 			}},
 		}, mm)
+
+		// Tell goroutine we're done then wait for it
+		// otherwise you might exit before some output is printed
+		w.Close() // Send EOF to scanner, so it ends for loop
+		wg.Wait() // Wait for wg done
 	},
 }
 
 func init() {
 	metricsCmd.Flags().IntP("id", "i", -1, "Display info from specific from session ID")
-	metricsCmd.Flags().StringSliceP("metric", "m", []string{}, "Display only supplied metrics")
-	metricsCmd.Flags().BoolP("graph", "g", false, "Graph this metric")
-	metricsCmd.Flags().BoolP("cols", "c", false, "Display metrics as columns")
+	metricsCmd.Flags().StringSliceP("metric", "m", []string{}, "Display only supplied metrics (comma-separated)")
+	metricsCmd.Flags().BoolP("graph", "g", false, "Graph this metric. Must be combined with -m")
+	metricsCmd.Flags().BoolP("cols", "c", false, "Display metrics as columns. Must be combined with -m")
 	metricsCmd.Flags().BoolP("uniq", "u", false, "Display first instance of each unique metric")
 	RootCmd.AddCommand(metricsCmd)
 }

@@ -17,7 +17,7 @@ ifeq ($(UNAME_S),linux)
 	OS=linux
 	OS_ID=$(shell egrep '^ID=' /etc/*-release | cut -d= -f2)
 	OS_VER=$(shell egrep '^VERSION_ID=' /etc/*-release | cut -d= -f2 | sed 's/"//g')
-else ifeq ($(UNAME_S),Darwin)
+else ifeq ($(UNAME_S),darwin)
 	OS=macOS
 else
 $(error Building on $(UNAME_S) is unsupported!)
@@ -177,7 +177,22 @@ image: require-qemu-binfmt
 		--platform linux/$(PLATFORM_$(ARCH)) \
 		--file docker/base/Dockerfile \
 		--load \
-                .
+		.
+
+docs-generate: TAG := cribl/scope:docs-$(ARCH)
+docs-generate: require-docker-buildx-builder
+	@echo Building the AppScope docs generator
+	@docker buildx build \
+		--tag $(TAG) \
+		--platform linux/$(PLATFORM_$(ARCH)) \
+		--file docker/docs/Dockerfile \
+		.
+	@echo Running the AppScope docs generator
+	@docker run \
+		-v $(shell pwd)/docs:/md \
+		--user node:node \
+		--rm cribl/scope:docs-$(ARCH) 
+	@echo AppScope docs generator finished: md files are available in docs/md_files
 
 k8s-test: require-kind require-kubectl image
 	docker tag cribl/scope:dev-x86_64 cribl/scope:$(VERSION)
@@ -228,6 +243,7 @@ require-kubectl:
 .PHONY: all test clean
 .PHONY: cli% scope
 .PHONY: docker-build docker-run 
-.PHONY: build-arch builder-arch 
+.PHONY: build-arch builder-arch
+.PHONY: docs-generate
 .PHONY: image
 .PHONY: require-docker-buildx-builder require-docker require-docker-buildx require-qemu-binfmt require-kind require-kubectl

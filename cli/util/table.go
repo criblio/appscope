@@ -191,13 +191,13 @@ func getFieldValue(obj interface{}, field ObjField) interface{} {
 	case reflect.Struct:
 		f := GetJSONField(obj, f)
 		if f == nil {
-			return nil
+			return ""
 		}
 		return f.Value()
 	case reflect.Map:
 		ret, ok := obj.(map[string]interface{})[f]
 		if !ok {
-			return nil
+			return ""
 		}
 		return ret
 	default:

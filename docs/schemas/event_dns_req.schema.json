@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/event_dns_req.schema.json",
+  "type": "object",
+  "title": "AppScope `dns.req` Event",
+  "description": "Structure of the `dns.req` event",
+  "examples": [{"type":"evt","id":"ubuntu-firefox-/usr/lib/firefox/firefox","_channel":"13470757294558","body":{"sourcetype":"dns","_time":1643735942.5269871,"source":"dns.req","host":"ubuntu","proc":"firefox","cmd":"/usr/lib/firefox/firefox","pid":6544,"data":{"domain":"detectportal.firefox.com"}}}],
+  "required": [
+    "type",
+    "id",
+    "_channel",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/envelope.schema.json#/$defs/event_type"
+    },
+    "id": {
+      "$ref": "definitions/envelope.schema.json#/$defs/id"
+    },
+    "_channel": {
+      "$ref": "definitions/envelope.schema.json#/$defs/_channel"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "sourcetype",
+        "_time",
+        "source",
+        "host",
+        "proc",
+        "cmd",
+        "pid",
+        "data"
+      ],
+      "properties": {
+        "sourcetype": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcetypedns"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        },
+        "source": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcednsreq"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "cmd": {
+          "$ref": "definitions/body.schema.json#/$defs/cmd"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "data": {
+          "title": "data",
+          "description": "data",
+          "type": "object",
+          "required": [
+            "domain"
+          ],
+          "properties": {
+            "domain": {
+              "$ref": "definitions/data.schema.json#/$defs/domain"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

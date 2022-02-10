@@ -10,5 +10,7 @@ Once you're past those, take a look at these.
 - [RELEASE](./RELEASE.md) - Release Process
 - [BUILD](./BUILD.md) - Build System
 - [INTEGRATION](../test/integration/README.md) - Integration Testing
+- [SCHEMA](./schemas/README.md) - JSON Schema documentation
+
 
 > We will be adding more docs over time.

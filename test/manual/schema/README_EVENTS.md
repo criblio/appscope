@@ -7,7 +7,7 @@ Create the sources, then run the extract script to create a single file with a s
 ## Create the sources
 edit appscope/test/integration/syscalls/Dockerfile
 to the list of ENV settings, add the line:
-ENV SCOPE_EVENT_DEST=file:///tmp/syscalls.evt
+ENV SCOPE_EVENT_DEST=file:///opt/appscope/test/manual/schema/syscalls.evt
 
 ### Get the syscall events
 
@@ -15,10 +15,6 @@ ENV SCOPE_EVENT_DEST=file:///tmp/syscalls.evt
 $ cd appscope/test/integration
 
 $ make syscalls
-
-$ cd appscope/test/manual/schema
-
-$ cp /tmp/syscalls.evt .
 
 ### Get http client events
 

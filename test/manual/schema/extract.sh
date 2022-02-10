@@ -3,7 +3,7 @@
 OUTFILE="samples.evt"
 
 SYSCALLFILE="syscalls.evt"
-EVTLIST="fs.open fs.close net.error fs.error fs.stat fs.open fs.close fs.duration net.duration fs.read fs.write fs.seek fs.stat net.port net.tcp net.udp net.other net.rx net.tx net.open net.close"
+EVTLIST="fs.open fs.close fs.delete net.error fs.error fs.stat fs.open fs.close fs.duration net.duration fs.read fs.write fs.seek fs.stat net.port net.tcp net.udp net.other net.rx net.tx net.open net.close"
 
 HTTPFILE="http_client.evt"
 HTTPLIST="http.req http.resp dns.req dns.resp net.app console"

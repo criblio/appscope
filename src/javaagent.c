@@ -386,6 +386,7 @@ doJavaProtocol(JNIEnv *jni, jobject session, jbyteArray buf, jint offset, jint l
 {
     jint  hash      = (*jni)->CallIntMethod(jni, session, g_java.mid_Object_hashCode);
     jbyte *byteBuf  = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
+    if (!byteBuf) return;
     doProtocol((uint64_t)hash, fd, &byteBuf[offset], (size_t)(len - offset), src, BUF);
     //scopeLogHexError(&byteBuf[offset], (len - offset), "doJavaProtocol");
     (*jni)->ReleasePrimitiveArrayCritical(jni, buf, byteBuf, 0);

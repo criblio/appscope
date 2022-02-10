@@ -6,8 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
+	"net/http"
+	"time"
 
 	"github.com/criblio/scope/libscope"
+	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -17,7 +20,8 @@ func init() {
 }
 
 // Receiver listens for a new scope connection on a unix socket and handles received data
-func Receiver(gctx context.Context, g *errgroup.Group) func() error {
+// We must accept 2 connections ; one for events and metrics and one for payloads
+func Receiver(gctx context.Context, g *errgroup.Group, s *Scope) func() error {
 	return func() error {
 
 		log.Info("Scope receiver routine running")
@@ -40,7 +44,6 @@ func Receiver(gctx context.Context, g *errgroup.Group) func() error {
 				if conn == nil {
 					return errors.New("Error in Accept")
 				}
-				s := NewScope()
 				s.Unix.Conn = conn
 				g.Go(scopeHandler(gctx, s))
 
@@ -75,6 +78,8 @@ func scopeAccept(l net.Listener, newConns chan net.Conn) {
 }
 
 // scopeHandler is a dedicated handler for a scope connection
+// one connection should process header, metrics, events only
+// the other should process payloads only
 func scopeHandler(gctx context.Context, s *Scope) func() error {
 	return func() error {
 
@@ -88,7 +93,7 @@ func scopeHandler(gctx context.Context, s *Scope) func() error {
 				return err
 			}
 
-			if msg.IsHeader() {
+			if msg.IsHeader() && s.ProcessStart.Format == "" {
 				var header libscope.Header
 				if err := json.Unmarshal([]byte(msg.Raw), &header); err != nil {
 					log.WithFields(log.Fields{
@@ -99,14 +104,17 @@ func scopeHandler(gctx context.Context, s *Scope) func() error {
 				if header.Format == "" {
 					log.Warn("No connection header received")
 					return nil
+				} else if header.Format == "scope" {
+					log.Info("Connection header received from payloads connection")
+					return nil
 				}
+				log.Info("Connection header received from events/metrics connection")
 				if err := s.Update(header); err != nil {
 					log.WithFields(log.Fields{
 						"err": err,
 					}).Warn("Update failed")
 					return nil
 				}
-				log.Debug("Process Start Message received: ", header)
 			} else if msg.IsEvent() {
 				s.EventBuf = append(s.EventBuf, msg.Data)
 				log.Debug("Event received: ", msg.Data)
@@ -124,6 +132,53 @@ func scopeHandler(gctx context.Context, s *Scope) func() error {
 			case <-gctx.Done():
 				return gctx.Err()
 			default:
+			}
+		}
+	}
+}
+
+// WebServer serves static web content to provide our web interface
+// and provides a backend/endpoints to serve supported http requests
+func WebServer(gctx context.Context, g *errgroup.Group, s *Scope) func() error {
+	return func() error {
+
+		log.Info("Web Server routine running")
+		defer log.Info("Web Server routine exited")
+
+		router := gin.Default()
+
+		router.GET("/api/events", scopeEventsHandler(s))
+		router.GET("/api/metrics", scopeMetricsHandler(s))
+		router.GET("/api/payloads", scopeConfigHandler(s))
+		router.GET("/api/config", scopeConfigHandler(s))
+		router.GET("/api/connections", scopeConnectionsHandler(s))
+
+		srv := &http.Server{
+			Addr:    ":8080",
+			Handler: router,
+		}
+
+		g.Go(func() error {
+			log.Info("Listening for HTTP requests on ", srv.Addr)
+			defer log.Info("No longer listening to HTTP requests")
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				return err
+			}
+			return nil
+		})
+
+		for {
+			select {
+			case <-gctx.Done():
+
+				// The context is used to inform the server it has 2 seconds to finish
+				// the request it is currently handling
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer cancel()
+
+				// Notify srv.ListenAndServe to shutdown
+				srv.Shutdown(ctx)
+				return gctx.Err()
 			}
 		}
 	}

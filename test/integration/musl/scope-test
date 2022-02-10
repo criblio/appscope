@@ -131,18 +131,19 @@ endtest
 #
 # tls
 #
+# This was written to ensure that #761 stays fixed
 starttest tls
-export SCOPE_EVENT_DEST=tcp://127.0.0.1:9109
-export SCOPE_EVENT_TLS_ENABLE=true
-export SCOPE_EVENT_TLS_VALIDATE_SERVER=false
-export SCOPE_EVENT_TLS_CA_CERT_PATH=/usr/local/scope/cert.pm
 
 # tcpserver receives over a tls session
 cd /usr/local/scope
 ./tcpserver -t 9109 > $EVT_FILE &
 
-# ldscope will send over tls session
-ldscope ps -ef
+# run ldscope with a ton of env vars to send over tls session
+  SCOPE_EVENT_DEST=tcp://127.0.0.1:9109 \
+  SCOPE_EVENT_TLS_ENABLE=true \
+  SCOPE_EVENT_TLS_VALIDATE_SERVER=false \
+  SCOPE_EVENT_TLS_CA_CERT_PATH=/usr/local/scope/cert.pm \
+  ldscope ps -ef
 retval=$?
 
 evaltest

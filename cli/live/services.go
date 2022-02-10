@@ -92,40 +92,41 @@ func scopeHandler(gctx context.Context, s *Scope) func() error {
 			if err != nil {
 				return err
 			}
-
-			if msg.IsHeader() && s.ProcessStart.Format == "" {
-				var header libscope.Header
-				if err := json.Unmarshal([]byte(msg.Raw), &header); err != nil {
-					log.WithFields(log.Fields{
-						"err": err,
-					}).Warn("Unmarshal failed")
-					return nil
+			if msg != nil {
+				if msg.IsHeader() && s.ProcessStart.Format == "" {
+					var header libscope.Header
+					if err := json.Unmarshal([]byte(msg.Raw), &header); err != nil {
+						log.WithFields(log.Fields{
+							"err": err,
+						}).Warn("Unmarshal failed")
+						return nil
+					}
+					if header.Format == "" {
+						log.Warn("No connection header received")
+						return nil
+					} else if header.Format == "scope" {
+						log.Info("Connection header received from payloads connection")
+						return nil
+					}
+					log.Info("Connection header received from events/metrics connection")
+					if err := s.Update(header); err != nil {
+						log.WithFields(log.Fields{
+							"err": err,
+						}).Warn("Update failed")
+						return nil
+					}
+				} else if msg.IsEvent() {
+					s.EventBuf = append(s.EventBuf, msg.Data)
+					log.Debug("Event received: ", msg.Data)
+				} else if msg.IsMetric() {
+					s.MetricBuf = append(s.MetricBuf, msg.Data)
+					log.Debug("Metric received: ", msg.Data)
+				} else if msg.IsPayload() {
+					s.PayloadBuf = append(s.PayloadBuf, msg.Payload)
+					log.Debug("Payload received: ", msg.Payload)
+				} else {
+					log.Warn("Invalid message type received")
 				}
-				if header.Format == "" {
-					log.Warn("No connection header received")
-					return nil
-				} else if header.Format == "scope" {
-					log.Info("Connection header received from payloads connection")
-					return nil
-				}
-				log.Info("Connection header received from events/metrics connection")
-				if err := s.Update(header); err != nil {
-					log.WithFields(log.Fields{
-						"err": err,
-					}).Warn("Update failed")
-					return nil
-				}
-			} else if msg.IsEvent() {
-				s.EventBuf = append(s.EventBuf, msg.Data)
-				log.Debug("Event received: ", msg.Data)
-			} else if msg.IsMetric() {
-				s.MetricBuf = append(s.MetricBuf, msg.Data)
-				log.Debug("Metric received: ", msg.Data)
-			} else if msg.IsPayload() {
-				s.PayloadBuf = append(s.PayloadBuf, msg.Payload)
-				log.Debug("Payload received: ", msg.Payload)
-			} else {
-				log.Warn("Invalid message type received")
 			}
 
 			select {

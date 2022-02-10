@@ -55,6 +55,9 @@ func ReadMessage(reader *bufio.Reader) (*Message, error) {
 	if err != nil && err != io.EOF {
 		return nil, err
 	}
+	if data == "" {
+		return nil, nil
+	}
 
 	// New Message pointer with `data` set
 	message := &Message{Raw: data}

@@ -12,51 +12,53 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 
 Assets are available via Docker and the Cribl CDN at the links below.
 
-- `Docker: cribl/scope:1.0.0`
-- `x86: https://cdn.cribl.io/dl/scope/1.0.0/linux/x86_64/scope`
-- `ARM: https://cdn.cribl.io/dl/scope/1.0.0/linux/aarch64/scope`
+- `Docker`: `cribl/scope:1.0.0`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.0.0/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.0.0/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.0.0/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.0.0/linux/aarch64/scope)
 
 ## New Features
 
+foo
+
 ### Attaching to Processes
 
-- #426 ARM64 attach is now supported
+- **Improvement**: [#426](https://github.com/criblio/appscope/issues/426) ARM64 attach is now supported
 
 ### Configuration
 
-- #721 You can now manually configure the queue size
+- **Improvement**: [#721](https://github.com/criblio/appscope/issues/721) You can now manually configure the queue size
 
 ### Logging
 
-- #678 Time zone is present in all logs
-- #636 The log level of the `missing uv_fileno` error is reduced to debug level
+- **Improvement**: [#678](https://github.com/criblio/appscope/issues/678) Time zone is present in all logs
+- **Improvement**: [#636](https://github.com/criblio/appscope/issues/636) The log level of the `missing uv_fileno` error is reduced to debug level
 
 ### Events and Metrics
 
-- #725 There is now a JSON schema for metrics and events (see /docs/schemas)
-- #723 Metrics and events are now standardized (summary [here](https://github.com/criblio/appscope/issues/712#issuecomment-1030234850)) 
-- #644 Application-specific metrics can be captured
-- #699 Added an option to enable events in the configuration file
-- #402 Added support for readdir to fs events
-- #709 Added support for unlinks / file removals to fs events
-- #162 Added net.open and net.close metrics
+- **Improvement**: [#725](https://github.com/criblio/appscope/issues/725) There is now a JSON schema for metrics and events (see /docs/schemas)
+- **Improvement**: [#723](https://github.com/criblio/appscope/issues/723) Metrics and events are now standardized (summary [here](https://github.com/criblio/appscope/issues/712#issuecomment-1030234850)) 
+- **Improvement**: [#644](https://github.com/criblio/appscope/issues/644) Application-specific metrics can be captured
+- **Improvement**: [#699](https://github.com/criblio/appscope/issues/699) Added an option to enable events in the configuration file
+- **Improvement**: [#402](https://github.com/criblio/appscope/issues/402) Added support for readdir to fs events
+- **Improvement**: [#709](https://github.com/criblio/appscope/issues/709) Added support for unlinks / file removals to fs events
+- **Improvement**: [#162](https://github.com/criblio/appscope/issues/162) Added net.open and net.close metrics
 
 ### Transports and Destinations
 
-- #697 Transport defaults and priorities have changed (summary [here](https://github.com/criblio/appscope/issues/712#issuecomment-1030234850)) 
-- #661 The process uid and gid are now present in the cribl connection header
-- #670 Added a "cribl edge" transport type
-- #707 Added a default search path for Edge
-- #700 Added support for an edge destination in the cli
-- #571 Added support for a unix:// destination in the cli
+- **Improvement**: [#697](https://github.com/criblio/appscope/issues/697) Transport defaults and priorities have changed (summary [here](https://github.com/criblio/appscope/issues/712#issuecomment-1030234850)) 
+- **Improvement**: [#661](https://github.com/criblio/appscope/issues/661) The process uid and gid are now present in the cribl connection header
+- **Improvement**: [#670](https://github.com/criblio/appscope/issues/670) Added a "cribl edge" transport type
+- **Improvement**: [#707](https://github.com/criblio/appscope/issues/707) Added a default search path for Edge
+- **Improvement**: [#700](https://github.com/criblio/appscope/issues/700) Added support for an edge destination in the cli
+- **Improvement**: [#571](https://github.com/criblio/appscope/issues/571) Added support for a unix:// destination in the cli
 
 ## Corrections
 
-- #677 #687 HTTP header extraction is fixed
-- #640 An error message is generated when attaching to a static executable
-- #737 Fixed a seg fault on a busy jenkins
-- #232 Fixed http metric aggregation
-- #657 apt-get no longer hangs
+- **Improvement**: [#677](https://github.com/criblio/appscope/issues/677), [#687](https://github.com/criblio/appscope/issues/687) HTTP header extraction is fixed
+- **Improvement**: [#640](https://github.com/criblio/appscope/issues/640) An error message is generated when attaching to a static executable
+- **Improvement**: [#737](https://github.com/criblio/appscope/issues/737) Fixed a seg fault on a busy jenkins
+- **Improvement**: [#232](https://github.com/criblio/appscope/issues/232) Fixed http metric aggregation
+- **Improvement**: [#657](https://github.com/criblio/appscope/issues/657) apt-get no longer hangs
 
 ## AppScope 0.8.1
 

@@ -43,9 +43,7 @@ AppScope's official v1 release includes advances in metric capture and forwardin
 
 - [#697](https://github.com/criblio/appscope/issues/697) Transport defaults and priorities have changed (summary [here](https://github.com/criblio/appscope/issues/712#issuecomment-1030234850)). 
 - [#661](https://github.com/criblio/appscope/issues/661) The process uid and gid are now present in the `cribl` connection header.
-- [#670](https://github.com/criblio/appscope/issues/670) Added a `cribl edge` transport type.
-- [#707](https://github.com/criblio/appscope/issues/707) Added a default search path for Edge.
-- [#700](https://github.com/criblio/appscope/issues/700) Added support for an `edge` destination in the CLI.
+- [#670](https://github.com/criblio/appscope/issues/670), [#700](https://github.com/criblio/appscope/issues/700), [#707](https://github.com/criblio/appscope/issues/707)  Added an `edge` transport type, with its own default search path and CLI support.
 - [#571](https://github.com/criblio/appscope/issues/571) Added support for a `unix://` destination in the CLI.
 
 ### Fixes

@@ -6,6 +6,58 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.0.0
+
+2022-02-15 - GA Release <!-- Official v1 Release -->
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker: cribl/scope:1.0.0`
+- `x86: https://cdn.cribl.io/dl/scope/1.0.0/linux/x86_64/scope`
+- `ARM: https://cdn.cribl.io/dl/scope/1.0.0/linux/aarch64/scope`
+
+## New Features
+
+### Attaching to Processes
+
+- #426 ARM64 attach is now supported
+
+### Configuration
+
+- #721 You can now manually configure the queue size
+
+### Logging
+
+- #678 Time zone is present in all logs
+- #636 The log level of the `missing uv_fileno` error is reduced to debug level
+
+### Events and Metrics
+
+- #725 There is now a JSON schema for metrics and events (see /docs/schemas)
+- #723 Metrics and events are now standardized (summary [here](https://github.com/criblio/appscope/issues/712#issuecomment-1030234850)) 
+- #644 Application-specific metrics can be captured
+- #699 Added an option to enable events in the configuration file
+- #402 Added support for readdir to fs events
+- #709 Added support for unlinks / file removals to fs events
+- #162 Added net.open and net.close metrics
+
+### Transports and Destinations
+
+- #697 Transport defaults and priorities have changed (summary [here](https://github.com/criblio/appscope/issues/712#issuecomment-1030234850)) 
+- #661 The process uid and gid are now present in the cribl connection header
+- #670 Added a "cribl edge" transport type
+- #707 Added a default search path for Edge
+- #700 Added support for an edge destination in the cli
+- #571 Added support for a unix:// destination in the cli
+
+## Corrections
+
+- #677 #687 HTTP header extraction is fixed
+- #640 An error message is generated when attaching to a static executable
+- #737 Fixed a seg fault on a busy jenkins
+- #232 Fixed http metric aggregation
+- #657 apt-get no longer hangs
+
 ## AppScope 0.8.1
 
 2021-12-21 - Maintenance Pre-Release

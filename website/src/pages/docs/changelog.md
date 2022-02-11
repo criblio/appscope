@@ -22,11 +22,7 @@ foo
 
 #### Instrumentation
 
-- [#426](https://github.com/criblio/appscope/issues/426) ARM64 attach is now supported.
-
-#### Configuration
-
-- [#721](https://github.com/criblio/appscope/issues/721) You can now manually configure the queue size.
+- [#426](https://github.com/criblio/appscope/issues/426) You can now scope (attach to) a running process on ARM64.
 
 #### Logging
 
@@ -35,15 +31,15 @@ foo
 
 #### Events and Metrics
 
-- [#725](https://github.com/criblio/appscope/issues/725) There is now a JSON schema for metrics and events (see /docs/schemas).
-- [#723](https://github.com/criblio/appscope/issues/723) Metrics and events are now standardized (summary [here](https://github.com/criblio/.appscope/issues/712#issuecomment-1030234850)) 
 - [#644](https://github.com/criblio/appscope/issues/644) Application-specific metrics can be captured.
+- [#725](https://github.com/criblio/appscope/issues/725) There is now a JSON schema for metrics and events (see /docs/schemas).
+- [#723](https://github.com/criblio/appscope/issues/723) Metrics and events are now standardized (summary [here](https://github.com/criblio/.appscope/issues/712#issuecomment-1030234850)).
 - [#699](https://github.com/criblio/appscope/issues/699) Added an option to enable events in the configuration file.
 - [#402](https://github.com/criblio/appscope/issues/402) Added support for readdir to `fs` events.
 - [#709](https://github.com/criblio/appscope/issues/709) Added support for unlinks / file removals to `fs` events.
 - [#162](https://github.com/criblio/appscope/issues/162) Added `net.open` and `net.close` metrics.
 
-#### Transports and Destinations
+#### Data Routing
 
 - [#697](https://github.com/criblio/appscope/issues/697) Transport defaults and priorities have changed (summary [here](https://github.com/criblio/appscope/issues/712#issuecomment-1030234850)). 
 - [#661](https://github.com/criblio/appscope/issues/661) The process uid and gid are now present in the `cribl` connection header.
@@ -54,8 +50,8 @@ foo
 
 ### Fixes
 
-- [#677](https://github.com/criblio/appscope/issues/677), [#687](https://github.com/criblio/appscope/issues/687) HTTP header extraction is fixed.
-- [#640](https://github.com/criblio/appscope/issues/640) An error message is generated when attaching to a static executable. <!-- revisit -->
+- [#640](https://github.com/criblio/appscope/issues/640) An error message is now generated when AppScope can't attach to a static executable.
+- [#677](https://github.com/criblio/appscope/issues/677), [#687](https://github.com/criblio/appscope/issues/687) Fixed HTTP header extraction.
 - [#737](https://github.com/criblio/appscope/issues/737) Fixed a seg fault on a busy Jenkins.
 - [#232](https://github.com/criblio/appscope/issues/232) Fixed HTTP metric aggregation.
 - [#657](https://github.com/criblio/appscope/issues/657) `apt-get` no longer hangs.

@@ -58,7 +58,6 @@ body {
   p,
   ul,
   li,
-  table,
   .alert p {
     font-size: 0.75rem;
     font-weight: 300;
@@ -72,20 +71,6 @@ body {
   }
   .row {
     align-items: center;
-  }
-  table {
-    thead {
-      border-bottom: 1px solid black;
-    }
-    tbody tr:nth-child(odd) {
-      background-color: #fafafa;
-    }
-    td {
-      padding: 5px;
-      &:not(:last-child) {
-        padding-right: 20px;
-      }
-    }
   }
 
   p {

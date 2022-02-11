@@ -3,20 +3,20 @@ const { join, basename } = require('path');
 
 async function parseFile(filepath) {
   console.log(`Parsing file ${filepath}...`);
-  const schemaName = basename(filepath, '.schema.json').replace(/^(event|metric)_/, '').replace(/_/g, '.');
+  const schemaName = basename(filepath, '.schema.json').replace(/_/g, '.');
   const schema = JSON.parse(await fs.readFile(filepath, 'utf8'));
 
   const result = [];
 
-  result.push(`## ${schemaName}`);
+  result.push(`### ${schemaName}[^](#schema-reference)`);
   if (schema.description) {
     result.push(schema.description);
   }
   if (schema.examples && schema.examples.length) {
-    if (schema.examples.lengh > 1) {
-      result.push('### Examples');
+    if (schema.examples.length > 1) {
+      result.push('#### Examples');
     } else {
-      result.push('### Example');
+      result.push('#### Example');
     }
     schema.examples.forEach(example => {
       result.push('```json\n' + JSON.stringify(example, undefined, 2) + '\n```');
@@ -30,7 +30,9 @@ async function parseFile(filepath) {
   }
 
   console.log(`    ...done`);
-  return result.join('\n\n');
+  return {
+    schemaName,
+    md: result.join('\n\n')};
 }
 
 function parseProperties({ name, properties = {}, required = []}, propertyStack) {
@@ -64,24 +66,40 @@ function parseProperties({ name, properties = {}, required = []}, propertyStack)
     return `| ${prp} | ${description.join('<br/><br/>')} |`;
   });
   return [
-    `### \`${name}\` properties`,
+    `#### \`${name}\` properties`,
     `| Property | Description |\n|---|---|\n${props.join('\n')}`
   ]
 }
 
+function prepareSection(type, mds) {
+  return `## ${type[0].toUpperCase() + type.slice(1)}\n\n` +
+    mds.map(({schemaName}) => `1. [${schemaName}](#${schemaName.replace(/\./g, '')})`).join('\n') +
+    `\n\n${mds.map(e => e.md).join('\n\n<hr/>\n\n')}`;
+}
+
 async function generateOutput(mds, path) {
+  const result = [
+  ];
+  const toc = [];
   for(const type of ['events', 'metrics', 'other']) {
     console.log(`Will generate output for ${type}...`);
     if (mds[type].length) {
-      await fs.writeFile(
-        join(path, `${type}.md`),
-        `---\ntitle: ${type[0].toUpperCase() + type.slice(1)}\n---\n\n${mds[type].join('\n\n')}`,
-        'utf8');
+      const typeName = type[0].toUpperCase() + type.slice(1);
+      toc.push(`1. [${typeName}](#${type})`);
+      result.push(prepareSection(type, mds[type]));
       console.log('    ...done');
     } else {
       console.log('    ...no entries to process');
     }
   };
+  if (toc.length) {
+    toc.push('\n'); //join will add two new lines at end
+  }
+
+  await fs.writeFile(
+    join(path, `schema-reference.md`),
+    `---\ntitle: Schema Reference\n---\n\n# Schema Reference\n\n${toc.join('\n')}${result.join('\n\n')}`,
+    'utf8');
 }
 
 async function main(tempDir, outPath) {
@@ -93,13 +111,13 @@ async function main(tempDir, outPath) {
 
   const files = (await fs.readdir(tempDir, 'utf8')).filter(f => f.endsWith('.schema.json'));
   for (const filename of files) {
-    const md = await parseFile(join(tempDir, filename));
+    const section = await parseFile(join(tempDir, filename));
     if (filename.startsWith('event_')) {
-      output.events.push(md);
+      output.events.push(section);
     } else if (filename.startsWith('metric_')) {
-      output.metrics.push(md);
+      output.metrics.push(section);
     } else {
-      output.other.push(md);
+      output.other.push(section);
     }
   };
   

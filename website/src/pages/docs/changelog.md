@@ -18,7 +18,7 @@ Assets are available via Docker and the Cribl CDN at the links below.
 
 ### New Features and Improvements
 
-foo
+AppScope's official v1 release includes advances in metric capture and forwarding, stabilization, formal schema definition and associated standardization, and enhanced file system events.
 
 #### Instrumentation
 

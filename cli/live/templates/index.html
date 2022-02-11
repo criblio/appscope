@@ -1,5 +1,6 @@
 <!doctype html>
 <html>
+
 <style>
 
 body {
@@ -39,12 +40,14 @@ styled-table tbody tr.active-row {
 
 </style>
     <head>
-        <title>AppScope Live</title>
+        <title>AppScope</title>
     </head>
     <body>
-        <p>Welcome to <strong>AppScope Live</strong></p>
-        <p>Connections:</p>
-        <div id="event_container" class="styled-table"></div>
+        <h1>Welcome to <strong>AppScope</strong></h1>
+        <p>Connections made:</p>
+        <div id="conns_container" class="styled-table"></div>
+        <p>Files written to:</p>
+        <div id="files_container" class="styled-table"></div>
         <script>
             function display(response, container) {
                             var container = document.getElementById(container);
@@ -63,7 +66,10 @@ styled-table tbody tr.active-row {
             }
             let response = fetch("http://localhost:8080/api/connections")
                 .then((response) => response.json())
-                .then((response) => {display(response, 'event_container');})
+                .then((response) => {display(response, 'conns_container');})
+            let response2 = fetch("http://localhost:8080/api/files")
+                .then((response2) => response2.json())
+                .then((response2) => {display(response2, 'files_container');})
         </script>
         </table>
     </body>

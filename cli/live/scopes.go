@@ -10,10 +10,10 @@ import (
 // Scope is an object model that represents an instance of a scoped process
 type Scope struct {
 	sync.RWMutex
-	Unix         UnixConnection  `json:"-"`
-	ProcessStart libscope.Header `json:"processStart"`
+	UnixConns    []UnixConnection `json:"-"`
+	ProcessStart libscope.Header  `json:"processStart"`
 	PayloadBuf   []MessagePayload
-	EventBuf     []MessageData // TODO []event
+	EventBuf     []libscope.Event
 	MetricBuf    []MessageData // TODO []metric
 }
 
@@ -31,7 +31,7 @@ func (s *Scope) Update(obj interface{}) error {
 	switch o := obj.(type) {
 	// Update UnixConnection
 	case UnixConnection:
-		s.Unix = o
+		//		s.Unix = o
 	// Update Header
 	case libscope.Header:
 		s.ProcessStart = o

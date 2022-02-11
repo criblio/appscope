@@ -38,14 +38,17 @@ func Receiver(gctx context.Context, g *errgroup.Group, s *Scope) func() error {
 		newConns := make(chan net.Conn)
 		go scopeAccept(l, newConns)
 
+		connCount := 0
+
 		for {
 			select {
 			case conn := <-newConns:
 				if conn == nil {
 					return errors.New("Error in Accept")
 				}
-				s.Unix.Conn = conn
-				g.Go(scopeHandler(gctx, s))
+				s.UnixConns = append(s.UnixConns, UnixConnection{conn})
+				g.Go(scopeHandler(gctx, s, connCount))
+				connCount++
 
 			case <-gctx.Done():
 				return gctx.Err()
@@ -80,13 +83,13 @@ func scopeAccept(l net.Listener, newConns chan net.Conn) {
 // scopeHandler is a dedicated handler for a scope connection
 // one connection should process header, metrics, events only
 // the other should process payloads only
-func scopeHandler(gctx context.Context, s *Scope) func() error {
+func scopeHandler(gctx context.Context, s *Scope, connIndex int) func() error {
 	return func() error {
 
 		log.Info("Handling scope")
 		defer log.Info("Stopped handling scope")
 
-		reader := bufio.NewReader(s.Unix.Conn)
+		reader := bufio.NewReader(s.UnixConns[connIndex].Conn)
 		for {
 			msg, err := ReadMessage(reader)
 			if err != nil {
@@ -116,8 +119,15 @@ func scopeHandler(gctx context.Context, s *Scope) func() error {
 						return nil
 					}
 				} else if msg.IsEvent() {
-					s.EventBuf = append(s.EventBuf, msg.Data)
-					log.Debug("Event received: ", msg.Data)
+					var event libscope.Event
+					if err := json.Unmarshal([]byte(msg.Raw), &event); err != nil {
+						log.WithFields(log.Fields{
+							"err": err,
+						}).Warn("Unmarshal failed")
+						return nil
+					}
+					s.EventBuf = append(s.EventBuf, event)
+					log.Debug("Event received: ", event)
 				} else if msg.IsMetric() {
 					s.MetricBuf = append(s.MetricBuf, msg.Data)
 					log.Debug("Metric received: ", msg.Data)
@@ -148,6 +158,7 @@ func WebServer(gctx context.Context, g *errgroup.Group, s *Scope) func() error {
 
 		router := gin.Default()
 		router.LoadHTMLGlob("live/templates/*")
+		router.StaticFile("/favicon.ico", "./live/templates/favicon.ico")
 
 		router.GET("/", homeHandler())
 		router.GET("/api/events", scopeEventsHandler(s))
@@ -155,6 +166,7 @@ func WebServer(gctx context.Context, g *errgroup.Group, s *Scope) func() error {
 		router.GET("/api/payloads", scopeConfigHandler(s))
 		router.GET("/api/config", scopeConfigHandler(s))
 		router.GET("/api/connections", scopeConnectionsHandler(s))
+		router.GET("/api/files", scopeFilesHandler(s))
 
 		srv := &http.Server{
 			Addr:    ":8080",

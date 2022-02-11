@@ -23,13 +23,13 @@ When AppScope establishes a LogStream connection, this sets several AppScope con
 
 These overrides include: 
 
-- Events are enabled.
-- Metrics are enabled.
 - Metrics format is set to `ndjson`.
 - Transport for events, metrics, and payloads use the LogStream connection.
 - Log level, is set to `warning` if originally configured as `error` or `none`.
 
 Any configuration override is logged to AppScope's default log file. 
+
+If you have Events or Metrics enabled (or disabled), they stay how have them. (Before 1.0.0 they would be set to enabled, as an override).
 
 <span id="cloud-unencrypted"> </span>
 

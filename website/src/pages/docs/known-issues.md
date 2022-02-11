@@ -4,6 +4,20 @@ title: Known Issues
 
 # Known Issues
 
+## AppScope 1.0.0
+
+2022-02-215 - GA
+
+As of this AppScope GA release, known issues include:
+
+- [#716](https://github.com/criblio/appscope/issues/716) Further debug crash in node app when transport path is null
+  
+- [#665](https://github.com/criblio/appscope/issues/665) Appscope hangs with connection to expired license Cloud
+  
+- [#478](https://github.com/criblio/appscope/issues/478) libscope.so misses some file/socket close events
+
+- [#405](https://github.com/criblio/appscope/issues/405) `scope attach` to gdb seems to break gdb
+
 ## AppScope 0.8.1
 
 2021-12-21 - Maintenance Pre-Release

@@ -9,10 +9,8 @@ title: Known Issues
 2022-02-215 - GA
 
 As of this AppScope GA release, known issues include:
-  
-- [#478](https://github.com/criblio/appscope/issues/478) libscope.so misses some file/socket close events <!-- probably fixed, John investigating>
 
-- [#405](https://github.com/criblio/appscope/issues/405) `scope attach` to gdb seems to break gdb
+- [#405](https://github.com/criblio/appscope/issues/405) `scope attach` to gdb seems to break gdb.
 
 ## AppScope 0.8.1
 
@@ -32,6 +30,8 @@ As of this AppScope pre-release, known issues include:
 
 - [#362](https://github.com/criblio/appscope/issues/362) AppScope cannot attach to any musl libc process.
 
+  - **Fix:** 0.7.1, in [#378](https://github.com/criblio/appscope/issues/378)  
+
 - [#370](https://github.com/criblio/appscope/issues/370) Unattach/detach, and unload of the libscope library, are not supported.
 
 ## AppScope 0.6
@@ -44,7 +44,7 @@ As of this AppScope pre-release, known issues include:
 
 - [#640](https://github.com/criblio/appscope/issues/640) On Alpine and other distributions based on musl libc, running `appscope attach` against a Go application fails with the error: `failed to find libc in target process`.
 
-  - **Fix:** Planned for 1.0.0
+  - **Fix:** 1.0.0, in [#694](https://github.com/criblio/appscope/issues/694)
 
 - [#35](https://github.com/criblio/appscope/issues/35) Go < v.1.8 is not supported.
 

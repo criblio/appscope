@@ -29,7 +29,7 @@ These overrides include:
 
 Any configuration override is logged to AppScope's default log file. 
 
-If you have Events or Metrics enabled (or disabled), they stay how have them. (Before 1.0.0 they would be set to enabled, as an override).
+If you have Events or Metrics enabled (or disabled), they stay how have them. (Before 1.0.0 they would be set to enabled, as an override). You still have control via environment variables or the config file.
 
 <span id="cloud-unencrypted"> </span>
 

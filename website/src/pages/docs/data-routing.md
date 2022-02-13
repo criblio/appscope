@@ -12,7 +12,7 @@ AppScope gives you multiple ways to route data. The basic operations are:
 
 For each of these operations, the CLI has a command-line option, the config file has a setting, and the AppScope library has an environment variable. In some cases you'll need more than one option, setting, or environment variable to achieve the desired effect.
 
-If you plan to use the config file, it's a good idea to take time to [read it all the way through](/docs/config-file) - then this page is bound to make more sense! 
+If you plan to use the config file, it's a good idea to take time to [read it all the way through](/docs/config-file) - then this page will make more sense! 
 
 <span id="routing-to-cloud"></span>
 
@@ -48,7 +48,11 @@ If you prefer an **unencrypted** connection to LogStream cloud, use `SCOPE_CRIBL
 
 #### Routing to Cloud with the Config File
 
-By default, the `cribl` backend is enabled, and `cribl > transport > type` is set to `edge`. To route data to LogStream Cloud, set `cribl > transport > type` to `tcp` and also specify desired values for the rest of the `cribl > transport` elements, namely `host`, `port`, and `tls`.
+Complete these steps, paying particular attention to the sub-elements of `cribl > transport`, which is where you specify routing:
+
+* Verify that `cribl > enable` is set to `true`, which enables the `cribl` backend. (This is the default setting.)
+* To route data to LogStream Cloud, set `cribl > transport > type` to `tcp`. (The default value is `edge`.)
+* Specify desired values for the rest of the `cribl > transport` sub-elements, namely `host`, `port`, and `tls`.
 
 <span id="routing-events"></span>
 

@@ -40,6 +40,7 @@
   }
   p,
   /* ol, */
+  table,
   li,
   code {
     font-size: 16px;
@@ -79,6 +80,23 @@
         border-radius: 0%;
       }
     }
+  }
+  table {
+    thead {
+      border-bottom: 1px solid black;
+    }
+    tbody tr:nth-child(odd) {
+      background-color: #fafafa;
+    }
+    td {
+      padding: 5px;
+      &:not(:last-child) {
+        padding-right: 20px;
+      }
+    }
+  }
+  h3 a:not(.anchor) {
+    margin-left: 10px;
   }
 }
 

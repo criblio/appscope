@@ -35,7 +35,7 @@ import (
 // dashCmd represents the dash command
 var dashCmd = &cobra.Command{
 	Use:     "dash [flags]",
-	Short:   "Display scope dashboard",
+	Short:   "Display scope dashboard for a previous or active session",
 	Long:    `Displays an interactive dashboard with an overview of whats happening with the selected session.`,
 	Example: `scope dash`,
 	Args:    cobra.NoArgs,

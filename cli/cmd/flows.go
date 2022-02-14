@@ -153,7 +153,7 @@ scope flows --out 124x3c   # Displays the outbound payload of that flow
 						path = filepath.Join(f.BaseDir, f.OutFile)
 					}
 					file, err := os.Open(path)
-					util.CheckErrSprintf(err, "error opening in file %s: %v", path, err)
+					util.CheckErrSprintf(err, "Error opening payload file, did you enable payloads with -p?")
 					io.Copy(os.Stdout, file)
 					return
 				}

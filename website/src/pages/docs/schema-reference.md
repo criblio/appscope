@@ -1977,46 +1977,46 @@ Structure of the console `stdout` event
 
 **File System**
 
+1. [metric.fs.open](#metricfsopen)
 1. [metric.fs.close](#metricfsclose)
 1. [metric.fs.duration](#metricfsduration)
 1. [metric.fs.error](#metricfserror)
-1. [metric.fs.open](#metricfsopen)
 1. [metric.fs.read](#metricfsread)
+1. [metric.fs.write](#metricfswrite)
 1. [metric.fs.seek](#metricfsseek)
 1. [metric.fs.stat](#metricfsstat)
-1. [metric.fs.write](#metricfswrite)
 
 **HTTP**
 
-1. [metric.http.client.duration](#metrichttpclientduration)
-1. [metric.http.request.content.length](#metrichttprequestcontentlength)
 1. [metric.http.requests](#metrichttprequests)
+1. [metric.http.request.content.length](#metrichttprequestcontentlength)
 1. [metric.http.response.content.length](#metrichttpresponsecontentlength)
+1. [metric.http.client.duration](#metrichttpclientduration)
 1. [metric.http.server.duration](#metrichttpserverduration)
 
 **Network**
 
+1. [metric.net.open](#metricnetopen)
 1. [metric.net.close](#metricnetclose)
-1. [metric.net.dns](#metricnetdns)
 1. [metric.net.duration](#metricnetduration)
 1. [metric.net.error](#metricneterror)
-1. [metric.net.open](#metricnetopen)
-1. [metric.net.other](#metricnetother)
-1. [metric.net.port](#metricnetport)
 1. [metric.net.rx](#metricnetrx)
-1. [metric.net.tcp](#metricnettcp)
 1. [metric.net.tx](#metricnettx)
+1. [metric.net.dns](#metricnetdns)
+1. [metric.net.port](#metricnetport)
+1. [metric.net.tcp](#metricnettcp)
 1. [metric.net.udp](#metricnetudp)
+1. [metric.net.other](#metricnetother)
 
 **Process**
 
+1. [metric.proc.fd](#metricprocfd)
+1. [metric.proc.thread](#metricprocthread)
+1. [metric.proc.start](#metricprocstart)
 1. [metric.proc.child](#metricprocchild)
 1. [metric.proc.cpu](#metricproccpu)
 1. [metric.proc.cpu.perc](#metricproccpuperc)
-1. [metric.proc.fd](#metricprocfd)
 1. [metric.proc.mem](#metricprocmem)
-1. [metric.proc.start](#metricprocstart)
-1. [metric.proc.thread](#metricprocthread)
 
 ### metric.fs.close[^](#schema-reference)
 

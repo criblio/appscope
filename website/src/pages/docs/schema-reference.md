@@ -55,7 +55,7 @@ title: Schema Reference
 1. [event.stdout](#eventstdout)
 
 
-### dns.req[^](#schema-reference)
+### dns.req[^](#eventdnsreq)
 
 Structure of the `dns.req` event
 
@@ -111,7 +111,7 @@ Structure of the `dns.req` event
 
 <hr/>
 
-### dns.resp[^](#schema-reference)
+### dns.resp[^](#eventdnsresp)
 
 Structure of the `dns.resp` event
 
@@ -173,7 +173,7 @@ Structure of the `dns.resp` event
 
 <hr/>
 
-### fs.close[^](#schema-reference)
+### fs.close[^](#eventfsclose)
 
 Structure of the `fs.close` event
 
@@ -259,7 +259,7 @@ Structure of the `fs.close` event
 
 <hr/>
 
-### fs.delete[^](#schema-reference)
+### fs.delete[^](#eventfsdelete)
 
 Structure of the `fs.delete` event
 
@@ -325,7 +325,7 @@ Structure of the `fs.delete` event
 
 <hr/>
 
-### fs.duration[^](#schema-reference)
+### fs.duration[^](#eventfsduration)
 
 Structure of the `fs.duration` event
 
@@ -399,7 +399,7 @@ Structure of the `fs.duration` event
 
 <hr/>
 
-### fs.error[^](#schema-reference)
+### fs.error[^](#eventfserror)
 
 Structure of the `fs.error` event
 
@@ -471,7 +471,7 @@ Structure of the `fs.error` event
 
 <hr/>
 
-### fs.open[^](#schema-reference)
+### fs.open[^](#eventfsopen)
 
 Structure of the `fs.open` event
 
@@ -547,7 +547,7 @@ Structure of the `fs.open` event
 
 <hr/>
 
-### fs.read[^](#schema-reference)
+### fs.read[^](#eventfsread)
 
 Structure of the `fs.read` event
 
@@ -621,7 +621,7 @@ Structure of the `fs.read` event
 
 <hr/>
 
-### fs.seek[^](#schema-reference)
+### fs.seek[^](#eventfsseek)
 
 Structure of the `fs.seek` event
 
@@ -693,7 +693,7 @@ Structure of the `fs.seek` event
 
 <hr/>
 
-### fs.stat[^](#schema-reference)
+### fs.stat[^](#eventfsstat)
 
 Structure of the `fs.stat` event
 
@@ -763,7 +763,7 @@ Structure of the `fs.stat` event
 
 <hr/>
 
-### fs.write[^](#schema-reference)
+### fs.write[^](#eventfswrite)
 
 Structure of the `fs.write` event
 
@@ -837,7 +837,7 @@ Structure of the `fs.write` event
 
 <hr/>
 
-### http.req[^](#schema-reference)
+### http.req[^](#eventhttpreq)
 
 Structure of the `http.req` event
 
@@ -917,7 +917,7 @@ Structure of the `http.req` event
 
 <hr/>
 
-### http.resp[^](#schema-reference)
+### http.resp[^](#eventhttpresp)
 
 Structure of the `http.resp` event
 
@@ -1003,7 +1003,7 @@ Structure of the `http.resp` event
 
 <hr/>
 
-### net.app[^](#schema-reference)
+### net.app[^](#eventnetapp)
 
 Structure of the `net.app` event
 
@@ -1067,7 +1067,7 @@ Structure of the `net.app` event
 
 <hr/>
 
-### net.close[^](#schema-reference)
+### net.close[^](#eventnetclose)
 
 Structure of the `net.close` event
 
@@ -1142,7 +1142,7 @@ Structure of the `net.close` event
 
 <hr/>
 
-### net.duration[^](#schema-reference)
+### net.duration[^](#eventnetduration)
 
 Structure of the `net.duration` event
 
@@ -1216,7 +1216,7 @@ Structure of the `net.duration` event
 
 <hr/>
 
-### net.error[^](#schema-reference)
+### net.error[^](#eventneterror)
 
 Structure of the `net.error` event
 
@@ -1286,7 +1286,7 @@ Structure of the `net.error` event
 
 <hr/>
 
-### net.open[^](#schema-reference)
+### net.open[^](#eventnetopen)
 
 Structure of the `net.open` event
 
@@ -1353,7 +1353,7 @@ Structure of the `net.open` event
 
 <hr/>
 
-### net.other[^](#schema-reference)
+### net.other[^](#eventnetother)
 
 Structure of the `net.other` event
 
@@ -1425,7 +1425,7 @@ Structure of the `net.other` event
 
 <hr/>
 
-### net.port[^](#schema-reference)
+### net.port[^](#eventnetport)
 
 Structure of the `net.port` event
 
@@ -1497,7 +1497,7 @@ Structure of the `net.port` event
 
 <hr/>
 
-### net.rx[^](#schema-reference)
+### net.rx[^](#eventnetrx)
 
 Structure of the `net.rx` event
 
@@ -1583,7 +1583,7 @@ Structure of the `net.rx` event
 
 <hr/>
 
-### net.tcp[^](#schema-reference)
+### net.tcp[^](#eventnettcp)
 
 Structure of the `net.tcp` event
 
@@ -1655,7 +1655,7 @@ Structure of the `net.tcp` event
 
 <hr/>
 
-### net.tx[^](#schema-reference)
+### net.tx[^](#eventnettx)
 
 Structure of the `net.tx` event
 
@@ -1741,7 +1741,7 @@ Structure of the `net.tx` event
 
 <hr/>
 
-### net.udp[^](#schema-reference)
+### net.udp[^](#eventnetudp)
 
 Structure of the `net.udp` event
 
@@ -1813,7 +1813,7 @@ Structure of the `net.udp` event
 
 <hr/>
 
-### event.notice[^](#schema-reference)
+### event.notice[^](#eventnotice)
 
 Structure of the `notice` event
 
@@ -1861,7 +1861,7 @@ Structure of the `notice` event
 
 <hr/>
 
-### event.stderr[^](#schema-reference)
+### event.stderr[^](#eventstderr)
 
 Structure of the console `stderr` event
 
@@ -1917,7 +1917,7 @@ Structure of the console `stderr` event
 
 <hr/>
 
-### event.stdout[^](#schema-reference)
+### event.stdout[^](#eventstdout)
 
 Structure of the console `stdout` event
 
@@ -1971,6 +1971,8 @@ Structure of the console `stdout` event
 |---|---|
 | `message` (`string`) | message |
 
+<span id="metrics"> </span>
+
 ## Metrics [^](#schema-reference)
 
 **File System**
@@ -2016,7 +2018,7 @@ Structure of the console `stdout` event
 1. [proc.cpu.perc](#metricproccpuperc)
 1. [proc.mem](#metricprocmem)
 
-### fs.close[^](#schema-reference)
+### fs.close[^](#metricfsclose)
 
 Structure of the `fs.close` metric
 
@@ -2084,7 +2086,7 @@ Structure of the `fs.close` metric
 
 <hr/>
 
-### fs.duration[^](#schema-reference)
+### fs.duration[^](#metricfsduration)
 
 Structure of the `fs.duration` metric
 
@@ -2154,7 +2156,7 @@ Structure of the `fs.duration` metric
 
 <hr/>
 
-### fs.error[^](#schema-reference)
+### fs.error[^](#metricfserror)
 
 Structure of the `fs.error` metric
 
@@ -2223,7 +2225,7 @@ Structure of the `fs.error` metric
 
 <hr/>
 
-### fs.open[^](#schema-reference)
+### fs.open[^](#metricfsopen)
 
 Structure of the `fs.open` metric
 
@@ -2291,7 +2293,7 @@ Structure of the `fs.open` metric
 
 <hr/>
 
-### fs.read[^](#schema-reference)
+### fs.read[^](#metricfsread)
 
 Structure of the `fs.read` metric
 
@@ -2361,7 +2363,7 @@ Structure of the `fs.read` metric
 
 <hr/>
 
-### fs.seek[^](#schema-reference)
+### fs.seek[^](#metricfsseek)
 
 Structure of the `fs.seek` metric
 
@@ -2429,7 +2431,7 @@ Structure of the `fs.seek` metric
 
 <hr/>
 
-### fs.stat[^](#schema-reference)
+### fs.stat[^](#metricfsstat)
 
 Structure of the `fs.stat` metric
 
@@ -2495,7 +2497,7 @@ Structure of the `fs.stat` metric
 
 <hr/>
 
-### fs.write[^](#schema-reference)
+### fs.write[^](#metricfswrite)
 
 Structure of the `fs.write` metric
 
@@ -2565,7 +2567,7 @@ Structure of the `fs.write` metric
 
 <hr/>
 
-### http.client.duration[^](#schema-reference)
+### http.client.duration[^](#metrichttpclientduration)
 
 Structure of the `http.client.duration` metric
 
@@ -2634,7 +2636,7 @@ Structure of the `http.client.duration` metric
 
 <hr/>
 
-### http.request.content.length[^](#schema-reference)
+### http.request.content.length[^](#metrichttprequestcontentlength)
 
 Structure of the `http.request.content_length` metric
 
@@ -2684,7 +2686,7 @@ Structure of the `http.request.content_length` metric
 
 <hr/>
 
-### http.requests[^](#schema-reference)
+### http.requests[^](#metrichttprequests)
 
 Structure of the `http.requests` metric
 
@@ -2753,7 +2755,7 @@ Structure of the `http.requests` metric
 
 <hr/>
 
-### http.response.content.length[^](#schema-reference)
+### http.response.content.length[^](#metrichttpresponsecontentlength)
 
 Structure of the `http.response.content_length` metric
 
@@ -2822,7 +2824,7 @@ Structure of the `http.response.content_length` metric
 
 <hr/>
 
-### http.server.duration[^](#schema-reference)
+### http.server.duration[^](#metrichttpserverduration)
 
 Structure of the `http.server.duration` metric
 
@@ -2891,7 +2893,7 @@ Structure of the `http.server.duration` metric
 
 <hr/>
 
-### net.close[^](#schema-reference)
+### net.close[^](#metricnetclose)
 
 Structure of the `net.close` metric
 
@@ -2960,7 +2962,7 @@ Structure of the `net.close` metric
 
 <hr/>
 
-### net.dns[^](#schema-reference)
+### net.dns[^](#metricnetdns)
 
 Structure of the `net.dns` metric
 
@@ -3026,7 +3028,7 @@ Structure of the `net.dns` metric
 
 <hr/>
 
-### net.duration[^](#schema-reference)
+### net.duration[^](#metricnetduration)
 
 Structure of the `net.duration` metric
 
@@ -3096,7 +3098,7 @@ Structure of the `net.duration` metric
 
 <hr/>
 
-### net.error[^](#schema-reference)
+### net.error[^](#metricneterror)
 
 Structure of the `net.error` metric
 
@@ -3163,7 +3165,7 @@ Structure of the `net.error` metric
 
 <hr/>
 
-### net.open[^](#schema-reference)
+### net.open[^](#metricnetopen)
 
 Structure of the `net.open` metric
 
@@ -3231,7 +3233,7 @@ Structure of the `net.open` metric
 
 <hr/>
 
-### net.other[^](#schema-reference)
+### net.other[^](#metricnetother)
 
 Structure of the `net.other` metric
 
@@ -3299,7 +3301,7 @@ Structure of the `net.other` metric
 
 <hr/>
 
-### net.port[^](#schema-reference)
+### net.port[^](#metricnetport)
 
 Structure of the `net.port` metric
 
@@ -3367,7 +3369,7 @@ Structure of the `net.port` metric
 
 <hr/>
 
-### net.rx[^](#schema-reference)
+### net.rx[^](#metricnetrx)
 
 Structure of the `net.rx` metric
 
@@ -3476,7 +3478,7 @@ Structure of the `net.rx` metric
 
 <hr/>
 
-### net.tcp[^](#schema-reference)
+### net.tcp[^](#metricnettcp)
 
 Structure of the `net.tcp` metric
 
@@ -3544,7 +3546,7 @@ Structure of the `net.tcp` metric
 
 <hr/>
 
-### net.tx[^](#schema-reference)
+### net.tx[^](#metricnettx)
 
 Structure of the `net.tx` metric
 
@@ -3651,7 +3653,7 @@ Structure of the `net.tx` metric
 
 <hr/>
 
-### net.udp[^](#schema-reference)
+### net.udp[^](#metricnetudp)
 
 Structure of the `net.udp` metric
 
@@ -3702,7 +3704,7 @@ Structure of the `net.udp` metric
 
 <hr/>
 
-### proc.child[^](#schema-reference)
+### proc.child[^](#metricprocchild)
 
 Structure of the `proc.child` metric
 
@@ -3746,7 +3748,7 @@ Structure of the `proc.child` metric
 
 <hr/>
 
-### proc.cpu[^](#schema-reference)
+### proc.cpu[^](#metricproccpu)
 
 Structure of the `proc.cpu` metric
 
@@ -3790,7 +3792,7 @@ Structure of the `proc.cpu` metric
 
 <hr/>
 
-### proc.cpu.perc[^](#schema-reference)
+### proc.cpu.perc[^](#metricproccpuperc)
 
 Structure of the `proc.cpu_perc` metric
 
@@ -3834,7 +3836,7 @@ Structure of the `proc.cpu_perc` metric
 
 <hr/>
 
-### proc.fd[^](#schema-reference)
+### proc.fd[^](#metricprocfd)
 
 Structure of the `proc.fd` metric
 
@@ -3878,7 +3880,7 @@ Structure of the `proc.fd` metric
 
 <hr/>
 
-### proc.mem[^](#schema-reference)
+### proc.mem[^](#metricprocmem)
 
 Structure of the `proc.mem` metric
 
@@ -3922,7 +3924,7 @@ Structure of the `proc.mem` metric
 
 <hr/>
 
-### proc.start[^](#schema-reference)
+### proc.start[^](#metricprocstart)
 
 Structure of the `proc.start` metric
 
@@ -3976,7 +3978,7 @@ Structure of the `proc.start` metric
 
 <hr/>
 
-### proc.thread[^](#schema-reference)
+### proc.thread[^](#metricprocthread)
 
 Structure of the `proc.thread` metric
 

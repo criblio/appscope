@@ -59,6 +59,8 @@ module.exports = {
         // footnotes: true,
         // GitHub Flavored Markdown mode (default: true)
         gfm: true,
+        // Disable pedantic mode, which supercedes gfm and is true by default
+        pedantic: false,
         // Plugins configs
         plugins: [
           `gatsby-remark-autolink-headers`,

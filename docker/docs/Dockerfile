@@ -16,6 +16,7 @@ ENV TMP_DIR_NAME="temp"
 ENV EXAMPLE_TEST_PY="/home/node/validation/main.py"
 
 COPY docker/docs/entrypoint.sh /home/node/entrypoint.sh
+COPY docker/docs/schema2md.js /home/node/schema2md.js
 COPY docker/docs/validation /home/node/validation
 
 RUN mkdir -p /home/node/schemas/

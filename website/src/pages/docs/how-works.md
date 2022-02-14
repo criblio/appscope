@@ -8,7 +8,7 @@ AppScope extracts information by interposing functions. When an application call
 
 Child processes are created with the AppScope library present, if the library was present in the parent. In this manner, a single executable is able to start, daemonize, and create any number of children, all of which include interposed functions.
 
-![AppScope system-level design](./images/AppScope_SysLvlDesign.png)
+![AppScope system-level design](./images/AppScope-system-level-design_w1800.png)
 
 ### Performance Overhead
 

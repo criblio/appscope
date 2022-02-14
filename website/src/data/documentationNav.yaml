@@ -45,15 +45,11 @@
 
 - name: Reference
   child: 
-
     - name: Config File
       path: /docs/config-file
 
     - name: CLI Reference
       path: /docs/cli-reference
-
-    - name: Schema Preface
-      path: /docs/schema-preface
 
     - name: Schema Reference
       path: /docs/schema-reference

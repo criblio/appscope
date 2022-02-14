@@ -9,8 +9,13 @@ title: Schema Reference
 
 ## Events
 
+**DNS**
+
 1. [event.dns.req](#eventdnsreq)
 1. [event.dns.resp](#eventdnsresp)
+
+**file system**
+
 1. [event.fs.close](#eventfsclose)
 1. [event.fs.delete](#eventfsdelete)
 1. [event.fs.duration](#eventfsduration)
@@ -20,8 +25,14 @@ title: Schema Reference
 1. [event.fs.seek](#eventfsseek)
 1. [event.fs.stat](#eventfsstat)
 1. [event.fs.write](#eventfswrite)
+
+**HTTP**
+
 1. [event.http.req](#eventhttpreq)
 1. [event.http.resp](#eventhttpresp)
+
+**network**
+
 1. [event.net.app](#eventnetapp)
 1. [event.net.close](#eventnetclose)
 1. [event.net.duration](#eventnetduration)
@@ -33,9 +44,16 @@ title: Schema Reference
 1. [event.net.tcp](#eventnettcp)
 1. [event.net.tx](#eventnettx)
 1. [event.net.udp](#eventnetudp)
+
+**notifications**
+
 1. [event.notice](#eventnotice)
+
+**stderr/stdout**
+
 1. [event.stderr](#eventstderr)
 1. [event.stdout](#eventstdout)
+
 
 ### event.dns.req[^](#schema-reference)
 
@@ -1955,6 +1973,8 @@ Structure of the console `stdout` event
 
 ## Metrics
 
+**file system**
+
 1. [metric.fs.close](#metricfsclose)
 1. [metric.fs.duration](#metricfsduration)
 1. [metric.fs.error](#metricfserror)
@@ -1963,11 +1983,17 @@ Structure of the console `stdout` event
 1. [metric.fs.seek](#metricfsseek)
 1. [metric.fs.stat](#metricfsstat)
 1. [metric.fs.write](#metricfswrite)
+
+**HTTP**
+
 1. [metric.http.client.duration](#metrichttpclientduration)
 1. [metric.http.request.content.length](#metrichttprequestcontentlength)
 1. [metric.http.requests](#metrichttprequests)
 1. [metric.http.response.content.length](#metrichttpresponsecontentlength)
 1. [metric.http.server.duration](#metrichttpserverduration)
+
+**network**
+
 1. [metric.net.close](#metricnetclose)
 1. [metric.net.dns](#metricnetdns)
 1. [metric.net.duration](#metricnetduration)
@@ -1979,6 +2005,9 @@ Structure of the console `stdout` event
 1. [metric.net.tcp](#metricnettcp)
 1. [metric.net.tx](#metricnettx)
 1. [metric.net.udp](#metricnetudp)
+
+**process**
+
 1. [metric.proc.child](#metricprocchild)
 1. [metric.proc.cpu](#metricproccpu)
 1. [metric.proc.cpu.perc](#metricproccpuperc)

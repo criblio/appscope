@@ -1,4 +1,4 @@
-FROM centos:latest
+FROM quay.io/centos/centos:stream8
 
 #RUN curl https://www.getpagespeed.com/files/centos6-eol.repo --output /etc/yum.repos.d/CentOS-Base.repo
 #RUN curl https://www.getpagespeed.com/files/centos6-epel-eol.repo --output /etc/yum.repos.d/epel.repo
@@ -9,9 +9,6 @@ FROM centos:latest
 #RUN curl https://www.getpagespeed.com/files/centos6-scl-rh-eol.repo --output /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo
 #RUN yum -y install centos-release-scl
 #RUN yum -y install rh-python36
-RUN sed -i 's/#baseurl=http:\/\/mirror/baseurl=http:\/\/vault/' /etc/yum.repos.d/CentOS-Linux-AppStream.repo && \
-    sed -i 's/#baseurl=http:\/\/mirror/baseurl=http:\/\/vault/' /etc/yum.repos.d/CentOS-Linux-Extras.repo && \
-    sed -i 's/#baseurl=http:\/\/mirror/baseurl=http:\/\/vault/' /etc/yum.repos.d/CentOS-Linux-BaseOS.repo
 RUN yum -y install python3 && \
     yum -y install epel-release && \
     yum -y install nginx httpd-tools

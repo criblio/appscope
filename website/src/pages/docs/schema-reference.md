@@ -16,15 +16,15 @@ title: Schema Reference
 
 **file system**
 
+1. [event.fs.open](#eventfsopen)
 1. [event.fs.close](#eventfsclose)
-1. [event.fs.delete](#eventfsdelete)
 1. [event.fs.duration](#eventfsduration)
 1. [event.fs.error](#eventfserror)
-1. [event.fs.open](#eventfsopen)
 1. [event.fs.read](#eventfsread)
+1. [event.fs.write](#eventfswrite)
+1. [event.fs.delete](#eventfsdelete)
 1. [event.fs.seek](#eventfsseek)
 1. [event.fs.stat](#eventfsstat)
-1. [event.fs.write](#eventfswrite)
 
 **HTTP**
 
@@ -33,17 +33,17 @@ title: Schema Reference
 
 **network**
 
-1. [event.net.app](#eventnetapp)
+1. [event.net.open](#eventnetopen)
 1. [event.net.close](#eventnetclose)
 1. [event.net.duration](#eventnetduration)
 1. [event.net.error](#eventneterror)
-1. [event.net.open](#eventnetopen)
-1. [event.net.other](#eventnetother)
-1. [event.net.port](#eventnetport)
 1. [event.net.rx](#eventnetrx)
-1. [event.net.tcp](#eventnettcp)
 1. [event.net.tx](#eventnettx)
+1. [event.net.app](#eventnetapp)
+1. [event.net.port](#eventnetport)
+1. [event.net.tcp](#eventnettcp)
 1. [event.net.udp](#eventnetudp)
+1. [event.net.other](#eventnetother)
 
 **notifications**
 
@@ -1970,6 +1970,8 @@ Structure of the console `stdout` event
 | Property | Description |
 |---|---|
 | `message` (`string`) | message |
+
+
 
 ## Metrics
 

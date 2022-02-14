@@ -14,7 +14,7 @@ title: Schema Reference
 1. [event.dns.req](#eventdnsreq)
 1. [event.dns.resp](#eventdnsresp)
 
-**file system**
+**File System**
 
 1. [event.fs.open](#eventfsopen)
 1. [event.fs.close](#eventfsclose)
@@ -31,7 +31,7 @@ title: Schema Reference
 1. [event.http.req](#eventhttpreq)
 1. [event.http.resp](#eventhttpresp)
 
-**network**
+**Network**
 
 1. [event.net.open](#eventnetopen)
 1. [event.net.close](#eventnetclose)
@@ -45,7 +45,7 @@ title: Schema Reference
 1. [event.net.udp](#eventnetudp)
 1. [event.net.other](#eventnetother)
 
-**notifications**
+**System Notification**
 
 1. [event.notice](#eventnotice)
 
@@ -1975,7 +1975,7 @@ Structure of the console `stdout` event
 
 ## Metrics
 
-**file system**
+**File System**
 
 1. [metric.fs.close](#metricfsclose)
 1. [metric.fs.duration](#metricfsduration)
@@ -1994,7 +1994,7 @@ Structure of the console `stdout` event
 1. [metric.http.response.content.length](#metrichttpresponsecontentlength)
 1. [metric.http.server.duration](#metrichttpserverduration)
 
-**network**
+**Network**
 
 1. [metric.net.close](#metricnetclose)
 1. [metric.net.dns](#metricnetdns)
@@ -2008,7 +2008,7 @@ Structure of the console `stdout` event
 1. [metric.net.tx](#metricnettx)
 1. [metric.net.udp](#metricnetudp)
 
-**process**
+**Process**
 
 1. [metric.proc.child](#metricprocchild)
 1. [metric.proc.cpu](#metricproccpu)

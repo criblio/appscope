@@ -18,4 +18,4 @@ The AppScope library (`libscope`) is the core component that resides in applicat
 
 When you work with AppScope, you use the library either directly, through the AppScope CLI, or (rarely) through the `ldscope` utility.
 
-![AppScope system-level design](./images/AppScope_SysLvlDesign.png)
+![AppScope system-level design](./images/AppScope-system-level-design_w1800.png)

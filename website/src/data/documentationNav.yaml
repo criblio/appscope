@@ -53,7 +53,7 @@
       path: /docs/cli-reference
 
     - name: Schema Preface
-      path: /docs/schema-preface.md
+      path: /docs/schema-preface
 
     - name: Schema Reference
       path: /docs/schema-reference

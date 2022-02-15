@@ -4,8 +4,18 @@ title: Schema Reference
 
 # Schema Reference
 
-1. [Events](#events)
-1. [Metrics](#metrics)
+In AppScope, events are structured according to one pattern, and metrics are structured according to another. These patterns are defined rigorously, in validatable [JSON Schema](https://json-schema.org/). 
+
+Three [definitions schemas](https://github.com/criblio/appscope/tree/master/docs/schemas/definitions) govern the basic patterns. Then there is an individual schema for each event and metric, documented below. The definitions schemas define the elements that can be present in individual event and metric schemas, as well as the overall structures into which those elements fit. 
+
+When we say "the AppScope schema," we mean the [whole set](https://github.com/criblio/appscope/tree/master/docs/schemas/) of schemas.
+
+In AppScope 1.0.0, a few elements in the schema that describe events and metrics, namely `title` and `description`, have placeholder values. In future these titles and descriptions may be made more informative. They are essentially "internal documentation" within the schemas and do not affect the how the schemas function in AppScope. In the event that you develop any code that depends on AppScope schemas, be aware that the content of title and description fields may evolve.
+
+## Contents
+
+- [Events](#events)
+- [Metrics](#metrics)
 
 ## Events
 

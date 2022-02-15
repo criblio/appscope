@@ -86,9 +86,9 @@ Structure of the `dns.req` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventdnsreqbody-properties)._ |
 
 #### `dns.req.body` properties
@@ -148,9 +148,9 @@ Structure of the `dns.resp` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventdnsrespbody-properties)._ |
 
 #### `dns.resp.body` properties
@@ -223,9 +223,9 @@ Structure of the `fs.close` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventfsclosebody-properties)._ |
 
 #### `fs.close.body` properties
@@ -301,9 +301,9 @@ Structure of the `fs.delete` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventfsdeletebody-properties)._ |
 
 #### `fs.delete.body` properties
@@ -373,9 +373,9 @@ Structure of the `fs.duration` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventfsdurationbody-properties)._ |
 
 #### `fs.duration.body` properties
@@ -448,9 +448,9 @@ Structure of the `fs.error` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventfserrorbody-properties)._ |
 
 #### `fs.error.body` properties
@@ -524,9 +524,9 @@ Structure of the `fs.open` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventfsopenbody-properties)._ |
 
 #### `fs.open.body` properties
@@ -601,9 +601,9 @@ Structure of the `fs.read` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventfsreadbody-properties)._ |
 
 #### `fs.read.body` properties
@@ -676,9 +676,9 @@ Structure of the `fs.seek` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventfsseekbody-properties)._ |
 
 #### `fs.seek.body` properties
@@ -749,9 +749,9 @@ Structure of the `fs.stat` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventfsstatbody-properties)._ |
 
 #### `fs.stat.body` properties
@@ -823,9 +823,9 @@ Structure of the `fs.write` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventfswritebody-properties)._ |
 
 #### `fs.write.body` properties
@@ -900,9 +900,9 @@ Structure of the `http.req` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventhttpreqbody-properties)._ |
 
 #### `http.req.body` properties
@@ -986,9 +986,9 @@ Structure of the `http.resp` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventhttprespbody-properties)._ |
 
 #### `http.resp.body` properties
@@ -1064,9 +1064,9 @@ Structure of the `net.app` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventnetappbody-properties)._ |
 
 #### `net.app.body` properties
@@ -1134,9 +1134,9 @@ Structure of the `net.close` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventnetclosebody-properties)._ |
 
 #### `net.close.body` properties
@@ -1212,9 +1212,9 @@ Structure of the `net.duration` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventnetdurationbody-properties)._ |
 
 #### `net.duration.body` properties
@@ -1286,9 +1286,9 @@ Structure of the `net.error` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventneterrorbody-properties)._ |
 
 #### `net.error.body` properties
@@ -1355,9 +1355,9 @@ Structure of the `net.open` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventnetopenbody-properties)._ |
 
 #### `net.open.body` properties
@@ -1428,9 +1428,9 @@ Structure of the `net.other` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventnetotherbody-properties)._ |
 
 #### `net.other.body` properties
@@ -1502,9 +1502,9 @@ Structure of the `net.port` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventnetportbody-properties)._ |
 
 #### `net.port.body` properties
@@ -1582,9 +1582,9 @@ Structure of the `net.rx` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventnetrxbody-properties)._ |
 
 #### `net.rx.body` properties
@@ -1664,9 +1664,9 @@ Structure of the `net.tcp` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventnettcpbody-properties)._ |
 
 #### `net.tcp.body` properties
@@ -1744,9 +1744,9 @@ Structure of the `net.tx` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventnettxbody-properties)._ |
 
 #### `net.tx.body` properties
@@ -1826,9 +1826,9 @@ Structure of the `net.udp` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventnetudpbody-properties)._ |
 
 #### `net.udp.body` properties
@@ -1890,9 +1890,9 @@ Structure of the `notice` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventnoticebody-properties)._ |
 
 #### `notice.body` properties
@@ -1942,9 +1942,9 @@ Structure of the console `stderr` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventstderrbody-properties)._ |
 
 #### `stderr.body` properties
@@ -2000,9 +2000,9 @@ Structure of the console `stdout` event
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted |
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventstdoutbody-properties)._ |
 
 #### `stdout.body` properties
@@ -2121,7 +2121,7 @@ Structure of the `fs.close` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricfsclosebody-properties)._ |
 
 #### `fs.close.body` properties
@@ -2192,7 +2192,7 @@ Structure of the `fs.duration` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricfsdurationbody-properties)._ |
 
 #### `fs.duration.body` properties
@@ -2264,7 +2264,7 @@ Structure of the `fs.error` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricfserrorbody-properties)._ |
 
 #### `fs.error.body` properties
@@ -2334,7 +2334,7 @@ Structure of the `fs.open` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricfsopenbody-properties)._ |
 
 #### `fs.open.body` properties
@@ -2405,7 +2405,7 @@ Structure of the `fs.read` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricfsreadbody-properties)._ |
 
 #### `fs.read.body` properties
@@ -2476,7 +2476,7 @@ Structure of the `fs.seek` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricfsseekbody-properties)._ |
 
 #### `fs.seek.body` properties
@@ -2545,7 +2545,7 @@ Structure of the `fs.stat` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricfsstatbody-properties)._ |
 
 #### `fs.stat.body` properties
@@ -2615,7 +2615,7 @@ Structure of the `fs.write` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricfswritebody-properties)._ |
 
 #### `fs.write.body` properties
@@ -2688,7 +2688,7 @@ Structure of the `http.client.duration` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttpclientdurationbody-properties)._ |
 
 #### `http.client.duration.body` properties
@@ -2740,7 +2740,7 @@ Structure of the `http.request.content_length` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttprequestcontentlengthbody-properties)._ |
 
 #### `http.request.content.length.body` properties
@@ -2811,7 +2811,7 @@ Structure of the `http.requests` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttprequestsbody-properties)._ |
 
 #### `http.requests.body` properties
@@ -2882,7 +2882,7 @@ Structure of the `http.response.content_length` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttpresponsecontentlengthbody-properties)._ |
 
 #### `http.response.content.length.body` properties
@@ -2953,7 +2953,7 @@ Structure of the `http.server.duration` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttpserverdurationbody-properties)._ |
 
 #### `http.server.duration.body` properties
@@ -3022,7 +3022,7 @@ Structure of the `net.close` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricnetclosebody-properties)._ |
 
 #### `net.close.body` properties
@@ -3092,7 +3092,7 @@ Structure of the `net.dns` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricnetdnsbody-properties)._ |
 
 #### `net.dns.body` properties
@@ -3162,7 +3162,7 @@ Structure of the `net.duration` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricnetdurationbody-properties)._ |
 
 #### `net.duration.body` properties
@@ -3233,7 +3233,7 @@ Structure of the `net.error` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricneterrorbody-properties)._ |
 
 #### `net.error.body` properties
@@ -3302,7 +3302,7 @@ Structure of the `net.open` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricnetopenbody-properties)._ |
 
 #### `net.open.body` properties
@@ -3372,7 +3372,7 @@ Structure of the `net.other` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricnetotherbody-properties)._ |
 
 #### `net.other.body` properties
@@ -3442,7 +3442,7 @@ Structure of the `net.port` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricnetportbody-properties)._ |
 
 #### `net.port.body` properties
@@ -3544,7 +3544,7 @@ Structure of the `net.rx` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricnetrxbody-properties)._ |
 
 #### `net.rx.body` properties
@@ -3623,7 +3623,7 @@ Structure of the `net.tcp` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricnettcpbody-properties)._ |
 
 #### `net.tcp.body` properties
@@ -3723,7 +3723,7 @@ Structure of the `net.tx` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricnettxbody-properties)._ |
 
 #### `net.tx.body` properties
@@ -3785,7 +3785,7 @@ Structure of the `net.udp` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricnetudpbody-properties)._ |
 
 #### `net.udp.body` properties
@@ -3835,7 +3835,7 @@ Structure of the `proc.child` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricprocchildbody-properties)._ |
 
 #### `proc.child.body` properties
@@ -3881,7 +3881,7 @@ Structure of the `proc.cpu` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricproccpubody-properties)._ |
 
 #### `proc.cpu.body` properties
@@ -3927,7 +3927,7 @@ Structure of the `proc.cpu_perc` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricproccpupercbody-properties)._ |
 
 #### `proc.cpu.perc.body` properties
@@ -3973,7 +3973,7 @@ Structure of the `proc.fd` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricprocfdbody-properties)._ |
 
 #### `proc.fd.body` properties
@@ -4019,7 +4019,7 @@ Structure of the `proc.mem` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricprocmembody-properties)._ |
 
 #### `proc.mem.body` properties
@@ -4070,7 +4070,7 @@ Structure of the `proc.start` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricprocstartbody-properties)._ |
 
 #### `proc.start.body` properties
@@ -4121,7 +4121,7 @@ Structure of the `proc.thread` metric
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events<br/><br/>Value must be `metric`. |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricprocthreadbody-properties)._ |
 
 #### `proc.thread.body` properties

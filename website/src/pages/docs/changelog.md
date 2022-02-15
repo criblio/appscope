@@ -18,7 +18,7 @@ Assets are available via Docker and the Cribl CDN at the links below.
 
 ### New Features and Improvements
 
-AppScope's official v1 release includes advances in metric capture and forwarding, stabilization, formal schema definition and associated standardization, and enhanced file system events.
+AppScope's official v1 release includes advances in metric capture and forwarding, stabilization, formal schema definition and associated standardization, and enhanced filesystem events.
 
 #### Instrumentation
 
@@ -32,16 +32,16 @@ AppScope's official v1 release includes advances in metric capture and forwardin
 #### Events and Metrics
 
 - [#644](https://github.com/criblio/appscope/issues/644) Application-specific metrics can be captured.
-- [#725](https://github.com/criblio/appscope/issues/725) There is now a JSON schema for metrics and events (see /docs/schemas).
-- [#723](https://github.com/criblio/appscope/issues/723) Metrics and events are now standardized (summary [here](https://github.com/criblio/.appscope/issues/712#issuecomment-1030234850)).
-- [#699](https://github.com/criblio/appscope/issues/699) Added an option to enable events in the configuration file.
+- [#725](https://github.com/criblio/appscope/issues/725) Metrics and events are now [defined](https://github.com/criblio/appscope/tree/master/docs/schemas) in JSON Schema.
+- [#723](https://github.com/criblio/appscope/issues/723) Metrics and events are now standardized. (Summary [here](https://github.com/criblio/.appscope/issues/712#issuecomment-1030234850).)
+- [#699](https://github.com/criblio/appscope/issues/699) Added an option to enable events via configuration file entries.
 - [#402](https://github.com/criblio/appscope/issues/402) Added support for readdir to `fs` events.
 - [#709](https://github.com/criblio/appscope/issues/709) Added support for unlinks / file removals to `fs` events.
 - [#162](https://github.com/criblio/appscope/issues/162) Added `net.open` and `net.close` metrics.
 
 #### Data Routing
 
-- [#697](https://github.com/criblio/appscope/issues/697) Transport defaults and priorities have changed (summary [here](https://github.com/criblio/appscope/issues/712#issuecomment-1030234850)). 
+- [#697](https://github.com/criblio/appscope/issues/697) Transport defaults and priorities have changed. (Summary [here](https://github.com/criblio/appscope/issues/712#issuecomment-1030234850).) 
 - [#661](https://github.com/criblio/appscope/issues/661) The process uid and gid are now present in the `cribl` connection header.
 - [#670](https://github.com/criblio/appscope/issues/670), [#700](https://github.com/criblio/appscope/issues/700), [#707](https://github.com/criblio/appscope/issues/707)  Added an `edge` transport type, with its own default search path and CLI support.
 - [#571](https://github.com/criblio/appscope/issues/571) Added support for a `unix://` destination in the CLI.
@@ -79,7 +79,7 @@ AppScope's official v1 release includes advances in metric capture and forwardin
 
 - **Fix**: [#598](https://github.com/criblio/appscope/issues/598) Attempting to scope an executable that is Go version 1.17 or newer no longer causes AppScope to crash. AppScope does not support Go 1.17 yet, but now recognizes these executables and displays an informative message. 
 
-- **Fix**: [#481](https://github.com/criblio/appscope/issues/481),[#575](https://github.com/criblio/appscope/issues/575) With musl libc-based distros, previous limitations on file system write events are now resolved, and no longer apply.
+- **Fix**: [#481](https://github.com/criblio/appscope/issues/481),[#575](https://github.com/criblio/appscope/issues/575) With musl libc-based distros, previous limitations on filesystem write events are now resolved, and no longer apply.
 
 - **Fix**: [#397](https://github.com/criblio/appscope/issues/397),[#403](https://github.com/criblio/appscope/issues/403),[#567](https://github.com/criblio/appscope/issues/567),[#586](https://github.com/criblio/appscope/issues/586) With musl libc-based distros and Java, previous limitations on `scope attach` are now resolved and no longer apply.
 

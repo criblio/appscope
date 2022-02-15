@@ -248,6 +248,12 @@ jobs:
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-ls-hpack-${{ hashFiles('contrib/Makefile', 'contrib/ls-hpack/**') }}
           upload-chunk-size: 1000000
 
+      - name: Login to Dockerhub
+        uses: docker/login-action@v1
+        with:
+          username: scopeci
+          password: ${{ secrets.SCOPECI_TOKEN }}
+
       # Build our `appscope-builder` image. This should only end up using the
       # cached image but because it needs to transfer the results from the
       # builder container into the local Docker registry, it stills take more
@@ -422,6 +428,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Login to Dockerhub
+        uses: docker/login-action@v1
+        with:
+          username: scopeci
+          password: ${{ secrets.SCOPECI_TOKEN }}
+
       - name: Update Test Image
         run: make -C test/integration ${{ matrix.test }}-build
 
@@ -462,6 +474,12 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Dockerhub
+        uses: docker/login-action@v1
+        with:
+          username: scopeci
+          password: ${{ secrets.SCOPECI_TOKEN }}
 
       - name: Update Test Image
         run: make -C test/integration ${{ matrix.test }}-build

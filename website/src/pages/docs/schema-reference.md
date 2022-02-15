@@ -9,50 +9,65 @@ title: Schema Reference
 
 ## Events
 
-**DNS**
-
-1. [dns.req](#eventdnsreq)
-1. [dns.resp](#eventdnsresp)
+<div class="toc-grid">
+<div class="toc-cell">
 
 **File System**
 
-1. [fs.open](#eventfsopen)
-1. [fs.close](#eventfsclose)
-1. [fs.duration](#eventfsduration)
-1. [fs.error](#eventfserror)
-1. [fs.read](#eventfsread)
-1. [fs.write](#eventfswrite)
-1. [fs.delete](#eventfsdelete)
-1. [fs.seek](#eventfsseek)
-1. [fs.stat](#eventfsstat)
+- [fs.open](#eventfsopen)
+- [fs.close](#eventfsclose)
+- [fs.duration](#eventfsduration)
+- [fs.error](#eventfserror)
+- [fs.read](#eventfsread)
+- [fs.write](#eventfswrite)
+- [fs.delete](#eventfsdelete)
+- [fs.seek](#eventfsseek)
+- [fs.stat](#eventfsstat)
 
-**HTTP**
-
-1. [http.req](#eventhttpreq)
-1. [http.resp](#eventhttpresp)
+</div>
+<div class="toc-cell">
 
 **Network**
 
-1. [net.open](#eventnetopen)
-1. [net.close](#eventnetclose)
-1. [net.duration](#eventnetduration)
-1. [net.error](#eventneterror)
-1. [net.rx](#eventnetrx)
-1. [net.tx](#eventnettx)
-1. [net.app](#eventnetapp)
-1. [net.port](#eventnetport)
-1. [net.tcp](#eventnettcp)
-1. [net.udp](#eventnetudp)
-1. [net.other](#eventnetother)
+- [net.close](#eventnetclose)
+- [net.open](#eventnetopen)
+- [net.duration](#eventnetduration)
+- [net.error](#eventneterror)
+- [net.rx](#eventnetrx)
+- [net.tx](#eventnettx)
+- [net.app](#eventnetapp)
+- [net.port](#eventnetport)
+- [net.tcp](#eventnettcp)
+- [net.udp](#eventnetudp)
+- [net.other](#eventnetother)
+
+</div>
+<div class="toc-cell">
+
+**DNS**
+
+- [dns.req](#eventdnsreq)
+- [dns.resp](#eventdnsresp)
+
+**HTTP**
+
+- [http.req](#eventhttpreq)
+- [http.resp](#eventhttpresp)
+
+</div>
+<div class="toc-cell">
 
 **System Notification**
 
-1. [notice](#eventnotice)
+- [notice](#eventnotice)
 
 **stderr/stdout**
 
-1. [event.stderr](#eventstderr)
-1. [event.stdout](#eventstdout)
+- [event.stderr](#eventstderr)
+- [event.stdout](#eventstdout)
+
+</div>
+</div>
 
 <span id="eventdnsreq"> </span>
 
@@ -2028,48 +2043,63 @@ Structure of the console `stdout` event
 
 ## Metrics [^](#schema-reference)
 
+<div class="toc-grid">
+<div class="toc-cell">
+
 **File System**
 
-1. [fs.open](#metricfsopen)
-1. [fs.close](#metricfsclose)
-1. [fs.duration](#metricfsduration)
-1. [fs.error](#metricfserror)
-1. [fs.read](#metricfsread)
-1. [fs.write](#metricfswrite)
-1. [fs.seek](#metricfsseek)
-1. [fs.stat](#metricfsstat)
+- [fs.open](#metricfsopen)
+- [fs.close](#metricfsclose)
+- [fs.duration](#metricfsduration)
+- [fs.error](#metricfserror)
+- [fs.read](#metricfsread)
+- [fs.write](#metricfswrite)
+- [fs.seek](#metricfsseek)
+- [fs.stat](#metricfsstat)
 
-**HTTP**
-
-1. [http.requests](#metrichttprequests)
-1. [http.request.content.length](#metrichttprequestcontentlength)
-1. [http.response.content.length](#metrichttpresponsecontentlength)
-1. [http.client.duration](#metrichttpclientduration)
-1. [http.server.duration](#metrichttpserverduration)
+</div>
+<div class="toc-cell">
 
 **Network**
 
-1. [net.open](#metricnetopen)
-1. [net.close](#metricnetclose)
-1. [net.duration](#metricnetduration)
-1. [net.error](#metricneterror)
-1. [net.rx](#metricnetrx)
-1. [net.tx](#metricnettx)
-1. [net.dns](#metricnetdns)
-1. [net.port](#metricnetport)
-1. [net.tcp](#metricnettcp)
-1. [net.udp](#metricnetudp)
-1. [net.other](#metricnetother)
+- [net.open](#metricnetopen)
+- [net.close](#metricnetclose)
+- [net.duration](#metricnetduration)
+- [net.error](#metricneterror)
+- [net.rx](#metricnetrx)
+- [net.tx](#metricnettx)
+- [net.dns](#metricnetdns)
+- [net.port](#metricnetport)
+- [net.tcp](#metricnettcp)
+- [net.udp](#metricnetudp)
+- [net.other](#metricnetother)
+
+</div>
+<div class="toc-cell">
+
+**HTTP**
+
+- [http.requests](#metrichttprequests)
+- [http.request.content.length](#metrichttprequestcontentlength)
+- [http.response.content.length](#metrichttpresponsecontentlength)
+- [http.client.duration](#metrichttpclientduration)
+- [http.server.duration](#metrichttpserverduration)
+
+</div>
+<div class="toc-cell">
 
 **Process**
 
-1. [proc.fd](#metricprocfd)
-1. [proc.thread](#metricprocthread)
-1. [proc.start](#metricprocstart)
-1. [proc.child](#metricprocchild)
-1. [proc.cpu](#metricproccpu)
-1. [proc.cpu.perc](#metricproccpuperc)
-1. [proc.mem](#metricprocmem)
+- [proc.fd](#metricprocfd)
+- [proc.thread](#metricprocthread)
+- [proc.start](#metricprocstart)
+- [proc.child](#metricprocchild)
+- [proc.cpu](#metricproccpu)
+- [proc.cpu.perc](#metricproccpuperc)
+- [proc.mem](#metricprocmem)
+
+</div>
+</div>
 
 <hr/>
 

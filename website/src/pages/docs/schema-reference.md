@@ -54,8 +54,9 @@ title: Schema Reference
 1. [event.stderr](#eventstderr)
 1. [event.stdout](#eventstdout)
 
+<span id="#eventdnsreq"> </span>
 
-### dns.req[^](#eventdnsreq)
+### dns.req [^](#schema-reference)
 
 Structure of the `dns.req` event
 
@@ -111,7 +112,9 @@ Structure of the `dns.req` event
 
 <hr/>
 
-### dns.resp[^](#eventdnsresp)
+<span id="eventdnsresp"> </span>
+
+### dns.resp[^](#schema-reference)
 
 Structure of the `dns.resp` event
 
@@ -172,6 +175,8 @@ Structure of the `dns.resp` event
 | `addrs` (`array`) | addrs |
 
 <hr/>
+
+<span id="#eventfsclose"> </span>
 
 ### fs.close[^](#eventfsclose)
 
@@ -259,6 +264,8 @@ Structure of the `fs.close` event
 
 <hr/>
 
+<span id="#eventfsdelete"> </span>
+
 ### fs.delete[^](#eventfsdelete)
 
 Structure of the `fs.delete` event
@@ -324,6 +331,8 @@ Structure of the `fs.delete` event
 | `unit` (`string`) | Unit - operation<br/><br/>Value must be `operation`. |
 
 <hr/>
+
+<span id="#eventfsduration"> </span>
 
 ### fs.duration[^](#eventfsduration)
 
@@ -399,6 +408,8 @@ Structure of the `fs.duration` event
 
 <hr/>
 
+<span id="#eventfserror"> </span>
+
 ### fs.error[^](#eventfserror)
 
 Structure of the `fs.error` event
@@ -470,6 +481,8 @@ Structure of the `fs.error` event
 | `unit` (`string`) | Unit - operation<br/><br/>Value must be `operation`. |
 
 <hr/>
+
+<span id="#eventfsopen"> </span>
 
 ### fs.open[^](#eventfsopen)
 
@@ -547,6 +560,8 @@ Structure of the `fs.open` event
 
 <hr/>
 
+<span id="#eventfsread"> </span>
+
 ### fs.read[^](#eventfsread)
 
 Structure of the `fs.read` event
@@ -621,6 +636,8 @@ Structure of the `fs.read` event
 
 <hr/>
 
+<span id="#eventfsseek"> </span>
+
 ### fs.seek[^](#eventfsseek)
 
 Structure of the `fs.seek` event
@@ -693,6 +710,8 @@ Structure of the `fs.seek` event
 
 <hr/>
 
+<span id="#eventfsstat"> </span>
+
 ### fs.stat[^](#eventfsstat)
 
 Structure of the `fs.stat` event
@@ -762,6 +781,8 @@ Structure of the `fs.stat` event
 | `unit` (`string`) | Unit - operation<br/><br/>Value must be `operation`. |
 
 <hr/>
+
+<span id="#eventfswrite"> </span>
 
 ### fs.write[^](#eventfswrite)
 
@@ -836,6 +857,8 @@ Structure of the `fs.write` event
 | `unit` (`string`) | Unit - byte<br/><br/>Value must be `byte`. |
 
 <hr/>
+
+<span id="#eventhttpreq"> </span>
 
 ### http.req[^](#eventhttpreq)
 
@@ -916,6 +939,8 @@ Structure of the `http.req` event
 | `x_appscope` (`string`) | x-appscope<br/><br/>Value must be `x-appscope`. |
 
 <hr/>
+
+<span id="#eventhttpresp"> </span>
 
 ### http.resp[^](#eventhttpresp)
 
@@ -1003,6 +1028,8 @@ Structure of the `http.resp` event
 
 <hr/>
 
+<span id="#eventnetapp"> </span>
+
 ### net.app[^](#eventnetapp)
 
 Structure of the `net.app` event
@@ -1066,6 +1093,8 @@ Structure of the `net.app` event
 | `protocol` (`string`) | protocol<br/><br/>**Possible values:**<ul><li>`HTTP`</li></ul> |
 
 <hr/>
+
+<span id="#eventnetclose"> </span>
 
 ### net.close[^](#eventnetclose)
 
@@ -1142,6 +1171,8 @@ Structure of the `net.close` event
 
 <hr/>
 
+<span id="#eventnetduration"> </span>
+
 ### net.duration[^](#eventnetduration)
 
 Structure of the `net.duration` event
@@ -1216,6 +1247,8 @@ Structure of the `net.duration` event
 
 <hr/>
 
+<span id="#eventneterror"> </span>
+
 ### net.error[^](#eventneterror)
 
 Structure of the `net.error` event
@@ -1286,6 +1319,8 @@ Structure of the `net.error` event
 
 <hr/>
 
+<span id="#eventnetopen"> </span>
+
 ### net.open[^](#eventnetopen)
 
 Structure of the `net.open` event
@@ -1352,6 +1387,8 @@ Structure of the `net.open` event
 | `net_protocol` (`string`) | net_protocol<br/><br/>Value must be `http`. |
 
 <hr/>
+
+<span id="#eventnetother"> </span>
 
 ### net.other[^](#eventnetother)
 
@@ -1425,6 +1462,8 @@ Structure of the `net.other` event
 
 <hr/>
 
+<span id="#eventnetport"> </span>
+
 ### net.port[^](#eventnetport)
 
 Structure of the `net.port` event
@@ -1496,6 +1535,8 @@ Structure of the `net.port` event
 | `unit` (`string`) | Unit - instance<br/><br/>Value must be `instance`. |
 
 <hr/>
+
+<span id="#eventnetrx"> </span>
 
 ### net.rx[^](#eventnetrx)
 
@@ -1583,6 +1624,8 @@ Structure of the `net.rx` event
 
 <hr/>
 
+<span id="#eventnettcp"> </span>
+
 ### net.tcp[^](#eventnettcp)
 
 Structure of the `net.tcp` event
@@ -1654,6 +1697,8 @@ Structure of the `net.tcp` event
 | `unit` (`string`) | Unit - connection<br/><br/>Value must be `connection`. |
 
 <hr/>
+
+<span id="#eventnettx"> </span>
 
 ### net.tx[^](#eventnettx)
 
@@ -1741,6 +1786,8 @@ Structure of the `net.tx` event
 
 <hr/>
 
+<span id="#eventnetudp"> </span>
+
 ### net.udp[^](#eventnetudp)
 
 Structure of the `net.udp` event
@@ -1813,6 +1860,8 @@ Structure of the `net.udp` event
 
 <hr/>
 
+<span id="#eventnotice"> </span>
+
 ### event.notice[^](#eventnotice)
 
 Structure of the `notice` event
@@ -1860,6 +1909,8 @@ Structure of the `notice` event
 | `data` _required_ (`string`) | data |
 
 <hr/>
+
+<span id="#eventstderr"> </span>
 
 ### event.stderr[^](#eventstderr)
 
@@ -1916,6 +1967,8 @@ Structure of the console `stderr` event
 | `message` (`string`) | message |
 
 <hr/>
+
+<span id="#eventstdout"> </span>
 
 ### event.stdout[^](#eventstdout)
 

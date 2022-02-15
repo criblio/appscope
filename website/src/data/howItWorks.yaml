@@ -1,4 +1,4 @@
-- title: How It Works?
+- title: How It Works
   items:
     - item: AppScope consists of a shared library and an executable. In simple terms, you load the library into the address space of a process. With the library loaded, details are extracted from applications as they execute. The executable provides a command line interface (CLI), which can optionally be used to control which processes are interposed, what data is extracted, and how to view and interact with the results. 
   ctaText: Learn More

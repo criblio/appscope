@@ -86,7 +86,10 @@
       border-bottom: 1px solid black;
     }
     tbody tr:nth-child(odd) {
-      background-color: #fafafa;
+      background-color: #bebdc7;
+    }
+    tbody tr:nth-child(even) {
+      background-color: #cbd4ce;
     }
     td {
       padding: 5px;
@@ -130,5 +133,11 @@ p code {
     .align-items-start {
       margin-top: 50px !important;
     }
+  }
+}
+@media (min-width: 768px) {
+  .toc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 }

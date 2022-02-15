@@ -6,6 +6,54 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.0.0
+
+2022-02-15 - GA Release <!-- Official v1 Release -->
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.0.0`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.0.0/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.0.0/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.0.0/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.0.0/linux/aarch64/scope)
+
+### New Features and Improvements
+
+AppScope's official v1 release includes advances in metric capture and forwarding, stabilization, formal schema definition and associated standardization, and enhanced filesystem events.
+
+#### Instrumentation
+
+- [#426](https://github.com/criblio/appscope/issues/426) You can now scope (attach to) a running process on ARM64.
+
+#### Logging
+
+- [#678](https://github.com/criblio/appscope/issues/678) Time zone is present in all logs.
+- [#636](https://github.com/criblio/appscope/issues/636) The log level of the `missing uv_fileno` error is reduced to debug level.
+
+#### Events and Metrics
+
+- [#644](https://github.com/criblio/appscope/issues/644) Application-specific metrics can be captured.
+- [#725](https://github.com/criblio/appscope/issues/725) Metrics and events are now [defined](https://github.com/criblio/appscope/tree/master/docs/schemas) in JSON Schema.
+- [#723](https://github.com/criblio/appscope/issues/723) Metrics and events are now standardized. (Summary [here](https://github.com/criblio/.appscope/issues/712#issuecomment-1030234850).)
+- [#699](https://github.com/criblio/appscope/issues/699) Added an option to enable events via configuration file entries.
+- [#402](https://github.com/criblio/appscope/issues/402) Added support for readdir to `fs` events.
+- [#709](https://github.com/criblio/appscope/issues/709) Added support for unlinks / file removals to `fs` events.
+- [#162](https://github.com/criblio/appscope/issues/162) Added `net.open` and `net.close` metrics.
+
+#### Data Routing
+
+- [#697](https://github.com/criblio/appscope/issues/697) Transport defaults and priorities have changed. (Summary [here](https://github.com/criblio/appscope/issues/712#issuecomment-1030234850).) 
+- [#661](https://github.com/criblio/appscope/issues/661) The process uid and gid are now present in the `cribl` connection header.
+- [#670](https://github.com/criblio/appscope/issues/670), [#700](https://github.com/criblio/appscope/issues/700), [#707](https://github.com/criblio/appscope/issues/707)  Added an `edge` transport type, with its own default search path and CLI support.
+- [#571](https://github.com/criblio/appscope/issues/571) Added support for a `unix://` destination in the CLI.
+
+### Fixes
+
+- [#640](https://github.com/criblio/appscope/issues/640) An error message is now generated when AppScope can't attach to a static executable.
+- [#677](https://github.com/criblio/appscope/issues/677), [#687](https://github.com/criblio/appscope/issues/687) Fixed HTTP header extraction.
+- [#737](https://github.com/criblio/appscope/issues/737) Fixed a seg fault on a busy Jenkins.
+- [#232](https://github.com/criblio/appscope/issues/232) Fixed HTTP metric aggregation.
+- [#657](https://github.com/criblio/appscope/issues/657) `apt-get` no longer hangs.
+
 ## AppScope 0.8.1
 
 2021-12-21 - Maintenance Pre-Release
@@ -31,7 +79,7 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 
 - **Fix**: [#598](https://github.com/criblio/appscope/issues/598) Attempting to scope an executable that is Go version 1.17 or newer no longer causes AppScope to crash. AppScope does not support Go 1.17 yet, but now recognizes these executables and displays an informative message. 
 
-- **Fix**: [#481](https://github.com/criblio/appscope/issues/481),[#575](https://github.com/criblio/appscope/issues/575) With musl libc-based distros, previous limitations on file system write events are now resolved, and no longer apply.
+- **Fix**: [#481](https://github.com/criblio/appscope/issues/481),[#575](https://github.com/criblio/appscope/issues/575) With musl libc-based distros, previous limitations on filesystem write events are now resolved, and no longer apply.
 
 - **Fix**: [#397](https://github.com/criblio/appscope/issues/397),[#403](https://github.com/criblio/appscope/issues/403),[#567](https://github.com/criblio/appscope/issues/567),[#586](https://github.com/criblio/appscope/issues/586) With musl libc-based distros and Java, previous limitations on `scope attach` are now resolved and no longer apply.
 

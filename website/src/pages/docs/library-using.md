@@ -91,7 +91,7 @@ This again executes the `ps` command using the AppScope library. But it also dir
 #### `LD_PRELOAD` with a TCP Connection
 
 ```
-LD_PRELOAD=./libscope.so SCOPE_EVENT_DEST=tcp://localhost:9999 ps -ef
+LD_PRELOAD=./libscope.so SCOPE_EVENT_DEST=tcp://localhost:9999 SCOPE_CRIBL_ENABLE=false ps -ef
 ```
 
 This again executes the `ps` command using the AppScope library. But here, we also specify that events (as opposed to metrics) will be sent over a TCP connection to localhost, using port `9999`. (This event destination setting overrides any config-file setting, as well as the default value.)
@@ -121,7 +121,7 @@ SCOPE_HOME=/opt/scope
 LD_PRELOAD=/opt/scope/libscope.so
 ```
 
-<span id="lambda"> </span>span>
+<span id="lambda"> </span>
 
 ### Deploying the Library in an AWS Lambda Function
 
@@ -166,6 +166,6 @@ You must also tell AppScope where to deliver events. This can be accomplished by
 
 - `SCOPE_CONF_PATH=/opt/scope/assets/scope.yml`
 
-- `SCOPE_EVENT_DEST=tcp://host:port`
+- `SCOPE_EVENT_DEST=tcp://host:port`, which also requires `SCOPE_CRIBL_ENABLE=false`
 
 - `SCOPE_CRIBL=tcp://host:port`

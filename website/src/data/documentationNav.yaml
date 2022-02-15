@@ -37,6 +37,9 @@
     - name: Using TLS for Secure Connections 
       path: /docs/tls
 
+    - name: Data Routing
+      path: /docs/data-routing
+
     - name: Integrating with LogStream
       path: /docs/logstream-integration
 

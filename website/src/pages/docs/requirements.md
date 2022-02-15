@@ -36,7 +36,7 @@ The distros that AppScope supports all require the use of `/tmp`, `/dev/shm`, an
 
 **Only** these runtimes are supported: 
 
-- Open JVM 7 and later, Oracle JVM 7 and later, go1.8 through g1.16 (support for go1.17 is [planned](https://github.com/criblio/appscope/issues/637)).
+- Open JVM 7 and later, Oracle JVM 7 and later, go1.8 through go1.16 (support for go1.17 and newer is [planned](https://github.com/criblio/appscope/issues/637)).
 
 AppScope cannot:
 
@@ -44,3 +44,5 @@ AppScope cannot:
 - Unattach/detach from a running process, once attached.
 
 When an executable that's being scoped has been [stripped](https://en.wikipedia.org/wiki/Strip_(Unix)), it is not possible for `libscope.so` to obtain a file descriptor for an SSL session, and in turn, AppScope cannot include IP and port number fields in HTTP events.
+
+Static executables can be scoped only if they are written in Go.

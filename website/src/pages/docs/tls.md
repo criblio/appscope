@@ -12,7 +12,7 @@ AppScope supports TLS over TCP connections. Here's how that works:
 
 For security's sake, AppScope never opens ports, nor does it listen for or allow incoming connections.
 
-To enable TLS: In the `scope.yml` [config file](/docs/config-file), set the `transport : tls` element to `true`.
+To enable TLS: In the `scope.yml` [config file](/docs/config-file), set the `transport : tls : enable` element to `true`.
 
 To see the TLS-related environment variables, run the command: 
 
@@ -36,17 +36,17 @@ If you **disable** TLS, the port is 10091.
 
 ### CLI usage
 
-Use scope with the `-c` option:
+Use `scope run` with the `-c` option:
 
 ```
-scope -c tls://host:10090
+scope run -c tls://host:10090
 ```
 
 ### Configuration for `LD_PRELOAD` or `ldscope`
 
 To connect AppScope to a LogStream Cloud instance using TLS: 
 
-1. Enable the `transport : tls` element in `scope.yml`.
+1. Enable the `transport : tls : enable` element in `scope.yml`.
 1. Connect to port 10090 on your Cribl.Cloud Ingest Endpoint.
 
 To enable TLS in `scope.yml`, adapt the example below to your environment:

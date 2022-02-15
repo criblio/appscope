@@ -38,4 +38,4 @@ AppScope's ease of use stems from its flexible set of controls:
 
 * Finally, AppScope provides the `ldscope` utility, whose uses include loading the AppScope library into Go executables.
 
-We'll see how to use these methods in their respective contexts, namely [CLI](/docs/cli-using) and [library](/docs/library-using) usage.
+Check out the [CLI](/docs/cli-using) and [library](/docs/library-using) pages to see how it's done.

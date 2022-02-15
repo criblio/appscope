@@ -9,10 +9,8 @@ title: Schema Reference
 
 ## Events
 
-**DNS**
-
-1. [dns.req](#eventdnsreq)
-1. [dns.resp](#eventdnsresp)
+<div class="toc-grid">
+<div class="toc-cell">
 
 **File System**
 
@@ -26,10 +24,8 @@ title: Schema Reference
 1. [fs.seek](#eventfsseek)
 1. [fs.stat](#eventfsstat)
 
-**HTTP**
-
-1. [http.req](#eventhttpreq)
-1. [http.resp](#eventhttpresp)
+</div>
+<div class="toc-cell">
 
 **Network**
 
@@ -45,6 +41,22 @@ title: Schema Reference
 1. [net.udp](#eventnetudp)
 1. [net.other](#eventnetother)
 
+</div>
+<div class="toc-cell">
+
+**DNS**
+
+1. [dns.req](#eventdnsreq)
+1. [dns.resp](#eventdnsresp)
+
+**HTTP**
+
+1. [http.req](#eventhttpreq)
+1. [http.resp](#eventhttpresp)
+
+</div>
+<div class="toc-cell">
+
 **System Notification**
 
 1. [notice](#eventnotice)
@@ -53,6 +65,9 @@ title: Schema Reference
 
 1. [event.stderr](#eventstderr)
 1. [event.stdout](#eventstdout)
+
+</div>
+</div>
 
 <span id="eventdnsreq"> </span>
 
@@ -2028,6 +2043,9 @@ Structure of the console `stdout` event
 
 ## Metrics [^](#schema-reference)
 
+<div class="toc-grid">
+<div class="toc-cell">
+
 **File System**
 
 1. [fs.open](#metricfsopen)
@@ -2039,13 +2057,8 @@ Structure of the console `stdout` event
 1. [fs.seek](#metricfsseek)
 1. [fs.stat](#metricfsstat)
 
-**HTTP**
-
-1. [http.requests](#metrichttprequests)
-1. [http.request.content.length](#metrichttprequestcontentlength)
-1. [http.response.content.length](#metrichttpresponsecontentlength)
-1. [http.client.duration](#metrichttpclientduration)
-1. [http.server.duration](#metrichttpserverduration)
+</div>
+<div class="toc-cell">
 
 **Network**
 
@@ -2061,6 +2074,20 @@ Structure of the console `stdout` event
 1. [net.udp](#metricnetudp)
 1. [net.other](#metricnetother)
 
+</div>
+<div class="toc-cell">
+
+**HTTP**
+
+1. [http.requests](#metrichttprequests)
+1. [http.request.content.length](#metrichttprequestcontentlength)
+1. [http.response.content.length](#metrichttpresponsecontentlength)
+1. [http.client.duration](#metrichttpclientduration)
+1. [http.server.duration](#metrichttpserverduration)
+
+</div>
+<div class="toc-cell">
+
 **Process**
 
 1. [proc.fd](#metricprocfd)
@@ -2070,6 +2097,9 @@ Structure of the console `stdout` event
 1. [proc.cpu](#metricproccpu)
 1. [proc.cpu.perc](#metricproccpuperc)
 1. [proc.mem](#metricprocmem)
+
+</div>
+</div>
 
 <hr/>
 

@@ -9,18 +9,26 @@ name: Build & Test
 on: 
   # Run on pushes to any branch
   push:
+    paths-ignore:
+      - 'website/**'
   # Run on manually triggered workflow
   workflow_dispatch:
   # Run on PRs targeting the default branch or a release branches
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - 'website/**'
     branches:
       - 'main'
       - 'master'
       - 'release/*'
 
-jobs:
+concurrency:
+  group: ${{ github.head_ref }}
+  # Cancel "in progress" workflows that are superceded with later commits
+  cancel-in-progress: true
 
+jobs:
   # This is the first stage of the workflow where we do some initial setup.
   info:
     name: Get Build Info

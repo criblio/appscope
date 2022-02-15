@@ -68,6 +68,7 @@ extern uint64_t g_cbuf_drop_count;
 extern log_t *g_log;
 extern proc_id_t g_proc;
 extern bool g_constructor_debug_enabled;
+extern bool g_ismusl;
 
 void scopeLog(cfg_log_level_t, const char *, ...) PRINTF_FORMAT(2,3);
 void scopeLogHex(cfg_log_level_t, const void *, size_t, const char *, ...) PRINTF_FORMAT(4,5);

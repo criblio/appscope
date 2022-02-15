@@ -9,7 +9,7 @@
 #include "utils.h"
 #include "fn.h"
 
-static int g_ismusl = FALSE;
+static int g_fn_ismusl = FALSE;
 
 /*
  * We need to adjust to how ld.so, libdl, dlopen, dlsym together
@@ -93,7 +93,7 @@ static int g_ismusl = FALSE;
     } else if ((val = dlsym(RTLD_NEXT, sym))) {          \
         DBG(NULL);                                       \
         /* musl ld.so when attaching */                  \
-    } else if (g_ismusl && (val = dlsym(RTLD_DEFAULT, sym))) {       \
+    } else if (g_fn_ismusl && (val = dlsym(RTLD_DEFAULT, sym))) {       \
         DBG(NULL);                                       \
     } else {                                             \
         val = NULL;                                      \
@@ -137,7 +137,7 @@ void
 initFn_musl(void)
 {
     // For use in GETADDR macro...
-    g_ismusl = TRUE;
+    g_fn_ismusl = TRUE;
 
     initFn();
 }

@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 #include <sys/un.h>
 
@@ -1226,7 +1227,12 @@ tcpSendPlain(transport_t *trans, const char *msg, size_t len)
     int rc;
 
     while (bytes_to_send > 0) {
-        rc = g_fn.send(trans->net.sock, &msg[bytes_sent], bytes_to_send, flags);
+        if (g_ismusl == TRUE) {
+            rc = g_fn.syscall(SYS_sendto, trans->net.sock, &msg[bytes_sent], bytes_to_send, flags, NULL, 0);
+        } else {
+            rc = g_fn.send(trans->net.sock, &msg[bytes_sent], bytes_to_send, flags);
+        }
+
         if (rc <= 0) break;
 
         if (rc != bytes_to_send) {
@@ -1297,7 +1303,12 @@ transportSend(transport_t *trans, const char *msg, size_t len)
     switch (trans->type) {
         case CFG_UDP:
             if (trans->net.sock != -1) {
-                int rc = g_fn.send(trans->net.sock, msg, len, 0);
+                int rc;
+                if (g_ismusl == TRUE) {
+                    rc = g_fn.syscall(SYS_sendto, trans->net.sock, msg, len, 0, NULL, 0);
+                } else {
+                    rc = g_fn.send(trans->net.sock, msg, len, 0);
+                }
 
                 if (rc < 0) {
                     switch (errno) {
@@ -1345,7 +1356,12 @@ transportSend(transport_t *trans, const char *msg, size_t len)
 #ifdef __linux__
                 flags |= MSG_NOSIGNAL;
 #endif
-                int rc = g_fn.send(trans->local.sock, msg, len, flags);
+                int rc;
+                if (g_ismusl == TRUE) {
+                    rc = g_fn.syscall(SYS_sendto, trans->local.sock, msg, len, flags, NULL, 0);
+                } else {
+                    rc = g_fn.send(trans->local.sock, msg, len, flags);
+                }
 
                 if (rc < 0) {
                     switch (errno) {

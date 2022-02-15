@@ -35,6 +35,7 @@ log_t *g_log = NULL;
 proc_id_t g_proc = {0};
 bool g_constructor_debug_enabled;
 uint64_t g_cbuf_drop_count = 0;
+bool g_ismusl = FALSE;
 
 void
 dbgInit()

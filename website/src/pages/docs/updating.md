@@ -56,7 +56,7 @@ New routing capabilities in AppScope 1.0.0 required the following changes:
   - `/var/run/appscope/appscope.sock`
   - `$CRIBL_HOME/state/appscope.sock`
   - `/opt/cribl/state/appscope.sock`
-- In the CLI, the `-m` or `--metricdest`, `-e` or `--eventdest`, and `-c` or `--cribldest` options enable you target `edge`, `unix`, or `tcp`.
+- In the CLI, the `-m` or `--metricdest`, `-e` or `--eventdest`, and `-c` or `--cribldest` options all enable you target either `edge`, `unix`, or `tcp`.
   - As before, the default destination for the CLI is the `scope` session directory in the local filesystem.
 
 Learn more about routing [here](/docs/data-routing).

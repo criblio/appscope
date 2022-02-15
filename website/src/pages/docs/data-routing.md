@@ -65,7 +65,7 @@ You can route events independently of metrics.
 Use the `-e` or `--eventdest` option. For example:
 
 ```
-scope run -e <NEED AN EXAMPLE>
+scope run -e tcp://localhost:9109 -- curl https://wttr.in/94105
 ```
 
 #### Routing Events with the AppScope Library 
@@ -75,7 +75,7 @@ Use the `SCOPE_EVENT_DEST` environment variable, and set the `SCOPE_CRIBL_ENABLE
 For example:
 
 ```
-<NEED AN EXAMPLE>
+LD_PRELOAD=./libscope.so SCOPE_CRIBL_ENABLE=false SCOPE_EVENT_DEST=tcp://localhost:9109 curl https://wttr.in/94105
 ```
 
 #### Routing Events with the Config File
@@ -97,8 +97,10 @@ You can route metrics independently of events.
 Use the `-m` or `--metricdest` option. For example:
 
 ```
-scope run -m <NEED AN EXAMPLE>
+scope run -m udp://localhost:8125 -- curl https://wttr.in/94105
 ```
+
+This sends metrics in [ndjson](http://ndjson.org/) format, since ndjson is the default.
 
 <!-- What about ...   --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson" -->
 
@@ -109,8 +111,10 @@ Use the `SCOPE_METRIC_DEST` environment variable, and set the `SCOPE_CRIBL_ENABL
 For example:
 
 ```
-<NEED AN EXAMPLE>
+LD_PRELOAD=./libscope.so SCOPE_CRIBL_ENABLE=false SCOPE_METRIC_DEST=udp://localhost:8125 curl https://wttr.in/94105
 ```
+
+This sends metrics in StatsD format. Adding `SCOPE_METRIC_FORMAT=ndjson` would change the format to ndjson.
 
 #### Routing Metrics with the Config File
 
@@ -118,5 +122,5 @@ Complete these steps, paying particular attention to the sub-elements of `metric
 
 * Set `cribl > enable` to `false` to disable the `cribl` backend.
 * Set `metric > enable` to `true` to enable the metrics backend.
-* Specify desired values for the rest of the `metric` elements, namely `format`, `watch`, and `transport`.
+* Specify desired values for the rest of the `metric` elements, namely `format`, `transport`, and optionally, `watch`.
 

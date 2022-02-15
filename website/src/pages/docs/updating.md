@@ -70,7 +70,7 @@ AppScope now conforms to an event and metric schema (found in `/docs/schemas/`).
 - “id” and “_channel” fields have been added, where previously missing, for consistency.
 - All metric types and units are consistent.
 - All durations are in milliseconds unless explicitly defined otherwise.
-- Event dimension names are consistent, I.e. “file_name” became “file”.
+- Event dimension names are consistent, i.e. “file_name” became “file”.
 - Summarized metrics now all have “class: summary”, whereas before this was inconsistent.
 - Non-aggregated metrics no longer appear alongside aggregated metrics.
 - Event names have been changed as follows:

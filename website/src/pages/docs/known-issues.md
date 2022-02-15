@@ -10,7 +10,7 @@ title: Known Issues
 
 As of this AppScope GA release, known issues include:
 
-- [#405](https://github.com/criblio/appscope/issues/405) `scope attach` to gdb seems to break gdb.
+- [#405](https://github.com/criblio/appscope/issues/405) `scope attach` to GDB seems to break GDB.
 
 ## AppScope 0.8.1
 

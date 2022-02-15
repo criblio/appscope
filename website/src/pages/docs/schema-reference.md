@@ -10,7 +10,7 @@ Three [definitions schemas](https://github.com/criblio/appscope/tree/master/docs
 
 When we say "the AppScope schema," we mean the [whole set](https://github.com/criblio/appscope/tree/master/docs/schemas/) of schemas.
 
-In AppScope 1.0.0, a few elements in the schema that describe events and metrics, namely `title` and `description`, have placeholder values. In future these titles and descriptions may be made more informative. They are essentially "internal documentation" within the schemas and do not affect the how the schemas function in AppScope. In the event that you develop any code that depends on AppScope schemas, be aware that the content of title and description fields may evolve.
+In AppScope 1.0.0, a few elements in the schema that describe events and metrics, namely `title` and `description`, have placeholder values. In future these titles and descriptions may be made more informative. They are essentially "internal documentation" within the schemas and do not affect the how the schemas function in AppScope. In the event that you develop any code that depends on AppScope schemas, be aware that the content of `title` and `description` fields may evolve.
 
 ## Contents
 

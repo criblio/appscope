@@ -10,7 +10,7 @@ AppScope gives you multiple ways to route data. The basic operations are:
 - Routing [events](#routing-events) to a file, local unix socket, or network destination.
 - Routing [metrics](#routing-metrics) to a file, local unix socket, or network destination.
 
-For each of these operations, the CLI has a command-line option, the config file has a setting, and the AppScope library has an environment variable. In some cases you'll need more than one option, setting, or environment variable to achieve the desired effect.
+For each of these operations, the CLI has command-line options, the config file has settings, and the AppScope library has environment variables.
 
 If you plan to use the config file, it's a good idea to take time to [read it all the way through](/docs/config-file) - then this page will make more sense! 
 
@@ -68,6 +68,8 @@ Use the `-e` or `--eventdest` option. For example:
 scope run -e tcp://localhost:9109 -- curl https://wttr.in/94105
 ```
 
+The above example sends events in [ndjson](http://ndjson.org/), the CLI's default output format. To send events in StatsD, you would include `--metricformat statsd` in the command.
+
 #### Routing Events with the AppScope Library 
 
 Use the `SCOPE_EVENT_DEST` environment variable, and set the `SCOPE_CRIBL_ENABLE` to `false`.
@@ -77,6 +79,8 @@ For example:
 ```
 LD_PRELOAD=./libscope.so SCOPE_CRIBL_ENABLE=false SCOPE_EVENT_DEST=tcp://localhost:9109 curl https://wttr.in/94105
 ```
+
+The above example sends events in StatsD, the AppScope library's default output format.
 
 #### Routing Events with the Config File
 
@@ -100,9 +104,7 @@ Use the `-m` or `--metricdest` option. For example:
 scope run -m udp://localhost:8125 -- curl https://wttr.in/94105
 ```
 
-This sends metrics in [ndjson](http://ndjson.org/) format, since ndjson is the default.
-
-<!-- What about ...   --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson" -->
+The above example sends events in [ndjson](http://ndjson.org/), the CLI's default output format. To send events in StatsD, you would include `--metricformat statsd` in the command.
 
 #### Routing Events with the AppScope Library 
 
@@ -114,6 +116,8 @@ For example:
 LD_PRELOAD=./libscope.so SCOPE_CRIBL_ENABLE=false SCOPE_METRIC_DEST=udp://localhost:8125 curl https://wttr.in/94105
 ```
 
+The above example sends events in StatsD, the AppScope library's default output format.
+
 This sends metrics in StatsD format. Adding `SCOPE_METRIC_FORMAT=ndjson` would change the format to ndjson.
 
 #### Routing Metrics with the Config File
@@ -123,4 +127,3 @@ Complete these steps, paying particular attention to the sub-elements of `metric
 * Set `cribl > enable` to `false` to disable the `cribl` backend.
 * Set `metric > enable` to `true` to enable the metrics backend.
 * Specify desired values for the rest of the `metric` elements, namely `format`, `transport`, and optionally, `watch`.
-

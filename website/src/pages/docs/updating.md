@@ -4,18 +4,25 @@ title: Updating
 
 ## Updating
 
-AppScope 1.0.0 makes changes to the `scope.yml` config file (including some default settings), as well as to some metric and event definitions. To update a Maintenance Pre-Release (version 0.8.1 or older) to version 1.0.0, follow this general procedure:
+Changes in AppScope 1.0.0 affect some metric and event definitions, environment variables, and content (including default settings) in the `scope.yml` config file.
 
-* Familiarize yourself with the new [config file](/docs/config-file) and the summary of changes below.
-* Note where anything on which your deployment depends has changed, including:
-  * Config file settings that are now in a different location than they were in the the old config file.
+To update a Maintenance Pre-Release (version 0.8.1 or older) to version 1.0.0, follow this general procedure:
+
+* Familiarize yourself with the [summary of changes](#summary-of-changes) below.
+
+* If you use a config file, [download](https://github.com/criblio/appscope/blob/master/conf/scope.yml) the new config file from github, and read through it. 
+
+* Make a note of changes that affect anything on which your deployment depends, including:
   * Defaults that have changed.
-  * Environment variables that you use outside of the config file that need to be used differently than before.
   * Metrics or events whose structure or names have changed.
-* Edit the new config file and update your notes on environment variable usage.
-* Configure any destinations for AppScope data, or scripts that operate on the data, to work with the changed event and/or metrics.
+  * Environment variables that you use outside of the config file, that need to be used differently than before.
 
- Then you should be ready to proceed with the update.
+* Based on what you discover:
+  * Update how you (plan to) use environment variables.
+  * Edit the new config file (if you are using one).
+  * Configure any destinations to which you're sending data from AppScope, or scripts that operate on the data, to work with the changed event and/or metrics.
+
+Then, go ahead and update!
 
 ### Performing the Update
 
@@ -31,49 +38,55 @@ Then, to confirm the overwrite, verify AppScope's version and build date:
 scope version
 ```
 
-### Summary of Changes in AppScope 1.0
+<span id="summary-of-changes"> </span>
 
-The changes described here partly overlap with the changes you'll observe when you read through the new `scope.yml` config file. It's still worth the time to do that, though.
+### Summary of Changes in AppScope 1.0.0
 
-#### Changes to routing
+This overview of changes should help you prepare to update AppScope.
 
-- The cribl backend is now enabled by default.
-- The cribl transport type is now `edge` by default instead of `tcp`.
-- A new environment variable `SCOPE_CRIBL_ENABLE` determines whether or not to send data to cribl.
-- `SCOPE_CRIBL` or `SCOPE_CRIBL_CLOUD` now only define the cribl transport and destination.
-- When the `edge` transport is used, ldscope/scope will search for a unix domain socket in the following locations:
+#### Changes to Routing 
+
+New routing capabilities in AppScope 1.0.0 required the following changes: 
+
+- The `cribl` backend is now enabled by default, and its transport type now defaults to `edge` instead of `tcp`.
+- A new environment variable, `SCOPE_CRIBL_ENABLE`, determines whether or not to send data to the `cribl` backend.
+- When `SCOPE_CRIBL_ENABLE` is set to `false`, the default destination for the `ldscope` binary is `tcp`, as before.
+- `SCOPE_CRIBL` or `SCOPE_CRIBL_CLOUD` now only define the `cribl` transport and destination.
+- When the `edge` transport is used, `ldscope` and `scope` will search for a unix domain socket. The search tries the following locations, in order, only searching until a socket is found:  
   - `/var/run/appscope/appscope.sock`
-  - `$CRIBL_HOME/state/appscope.sock` (if above not found)
-  - `/opt/cribl/state/appscope.sock` (if above not found)
- 
-Good to know:
-- If you set `SCOPE_CRIBL_ENABLE=false`, the default destination for the ldscope binary will be `tcp`, as before.
-- When using the scope binary, the default destination remains the filesystem (scope session directory).
-- If you want to target `edge`, `unix`, or `tcp` from the scope binary, you can set the metric `dest/event` `dest/crib` dest protocol accordingly.
+  - `$CRIBL_HOME/state/appscope.sock`
+  - `/opt/cribl/state/appscope.sock`
+- In the CLI, the `--metricdest`, `e` or `--eventdest`, and `c` or `--cribldest` options enable you target `edge`, `unix`, or `tcp`.
+  - As before, the default destination for the CLI is the `scope` session directory in the local filesystem.
 
-#### Changes to schema 
+Learn more about routing [here](/docs/data-routing).
 
-AppScope now conforms to an event and metric schema (found in `/docs/schemas/`). Changes to metrics and events produced include:
+#### Changes to Events and Metrics
 
-- `net_peer_port` and `net_host_port` are now of type `integer`, for example:
+AppScope events and metrics are now rigorously defined in schemas found in `/docs/schemas/`. Metrics and events follow more consistent patterns overall. Changes that resolve inconsistencies include:
+
+- All metric types and units are consistent.
+- All durations are in milliseconds unless explicitly defined otherwise.
+- Non-aggregated metrics no longer appear alongside aggregated metrics.
+- All summarized metrics now have `class: summary`.
+- Event dimension names are consistent, e.g., `file_name` is now `file`.
+- `id` and `_channel` fields have been added, where previously missing.
+
+- The data fields `net_peer_port` and `net_host_port` are now of type `integer`, for example:
 
 ```
 {"type":"evt","id":"vm-curl-curl wttr.in","_channel":"118389477035177","body":{"sourcetype":"http","_time":1643997015.8988931,"source":"http.req","host":"vm","proc":"curl","cmd":"curl wttr.in","pid":112157,"data":{"http_method":"GET","http_target":"/","http_flavor":"1.1","http_scheme":"http","http_host":"wttr.in","http_user_agent":"curl/7.74.0","net_transport":"IP.TCP","net_peer_ip":"5.9.243.187","net_peer_port":80,"net_host_ip":"10.0.2.15","net_host_port":44214}}}
 ```
 
-- `http_status_code` used to be a string for http2. It is now an integer for http1 and http2. For example:
+- The data field `http_status_code` used to be a string for HTTP/2 traffic. It is now an integer for both HTTP/1 and HTTP/2 traffic. For example:
 
 ```
 `{"type":"evt","id":"vm-curl- --http2 -I https://nghttp2.org/","_channel":"118695329693352","body":{"sourcetype":"http","_time":1643997322.1907151,"source":"http.resp","host":"vm","proc":"curl","cmd":"curl --http2 -I https://nghttp2.org/","pid":112210,"data":{"http_flavor":"2.0","http_stream":1,"http_status_code":200,"http_status_text":"OK","http_response_content_length":6616,"net_transport":"IP.TCP","net_peer_ip":"139.162.123.134","net_host_ip":"10.0.2.15","net_peer_port":443,"net_host_port":35352,"http_client_duration":186,"http_host":"nghttp2.org","http_method":"HEAD","http_target":"/","http_user_agent":"curl/7.74.0”}}}`
 ```
 
-- “id” and “_channel” fields have been added, where previously missing, for consistency.
-- All metric types and units are consistent.
-- All durations are in milliseconds unless explicitly defined otherwise.
-- Event dimension names are consistent, i.e. “file_name” became “file”.
-- Summarized metrics now all have “class: summary”, whereas before this was inconsistent.
-- Non-aggregated metrics no longer appear alongside aggregated metrics.
-- Event names have been changed as follows:
+Review the tables below to determine whether event or metric name changes affect your use of AppScope.
+
+##### Event Names that Changed in AppScope 1.0.0
 
 Old | New
 -- | --
@@ -91,7 +104,7 @@ Old | New
 `net.conn.open` | `net.open`
 `net.conn.close` | `net.close`
 
-- Metric names have been changed as follows:
+##### Metric Names that Changed in AppScope 1.0.0
 
 Old | New
 -- | --

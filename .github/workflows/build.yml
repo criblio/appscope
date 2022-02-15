@@ -169,6 +169,12 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
+      - name: Login to Dockerhub
+        uses: docker/login-action@v1
+        with:
+          username: scopeci
+          password: ${{ secrets.SCOPECI_TOKEN }}
+
       # This installs the `/proc/sys/fs/binfmt` entries that allow the CI host
       # to build for other architectures under QEMU emulation. It's not really
       # needed here since we're only building natively but we're leaving it in

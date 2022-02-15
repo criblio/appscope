@@ -1358,7 +1358,7 @@ transportSend(transport_t *trans, const char *msg, size_t len)
 #endif
                 int rc;
                 if (g_ismusl == TRUE) {
-                    rc = g_fn.syscall(SYS_sendto, trans->net.sock, msg, len, flags, NULL, 0);
+                    rc = g_fn.syscall(SYS_sendto, trans->local.sock, msg, len, flags, NULL, 0);
                 } else {
                     rc = g_fn.send(trans->local.sock, msg, len, flags);
                 }

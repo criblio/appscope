@@ -135,3 +135,9 @@ p code {
     }
   }
 }
+@media (min-width: 768px) {
+  .toc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}

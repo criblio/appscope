@@ -160,7 +160,7 @@ scope flows -p 0.0.0.0/24  # Displays flows in that subnet range
 						path = filepath.Join(f.BaseDir, f.OutFile)
 					}
 					file, err := os.Open(path)
-					util.CheckErrSprintf(err, "error opening in file %s: %v", path, err)
+					util.CheckErrSprintf(err, "Error opening payload file, did you enable payloads with -p?")
 					io.Copy(os.Stdout, file)
 					return
 				}

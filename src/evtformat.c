@@ -630,7 +630,7 @@ evtFormatHelper(evt_fmt_t *evt, event_t *metric, uint64_t uid, proc_id_t *proc, 
 
     // Format the metric string using the configured metric format type
     if (!metric->data) {
-        event.data = fmtMetricJson(metric, evtFormatFieldFilter(evt, src), src, evtFormatCustomTags(evt));
+        event.data = fmtMetricJson(metric, evtFormatFieldFilter(evt, src), src, NULL);
     } else {
         event.data = metric->data;
     }

@@ -100,8 +100,7 @@
             }
           }
         }
-      },
-      "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false

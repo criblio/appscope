@@ -60,8 +60,7 @@
         "data": {
           "$ref": "definitions/body.schema.json#/$defs/data"
         }
-      },
-      "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false

@@ -178,7 +178,7 @@ Structure of the `dns.resp` event
 
 <span id="eventfsclose"> </span>
 
-### fs.close[^](#eventfsclose)
+### fs.close [^](#schema-reference)
 
 Structure of the `fs.close` event
 
@@ -266,7 +266,7 @@ Structure of the `fs.close` event
 
 <span id="eventfsdelete"> </span>
 
-### fs.delete[^](#eventfsdelete)
+### fs.delete [^](#schema-reference)
 
 Structure of the `fs.delete` event
 
@@ -334,7 +334,7 @@ Structure of the `fs.delete` event
 
 <span id="eventfsduration"> </span>
 
-### fs.duration[^](#eventfsduration)
+### fs.duration [^](#schema-reference)
 
 Structure of the `fs.duration` event
 
@@ -410,7 +410,7 @@ Structure of the `fs.duration` event
 
 <span id="eventfserror"> </span>
 
-### fs.error[^](#eventfserror)
+### fs.error [^](#schema-reference)
 
 Structure of the `fs.error` event
 
@@ -484,7 +484,7 @@ Structure of the `fs.error` event
 
 <span id="eventfsopen"> </span>
 
-### fs.open[^](#eventfsopen)
+### fs.open [^](#schema-reference)
 
 Structure of the `fs.open` event
 
@@ -562,7 +562,7 @@ Structure of the `fs.open` event
 
 <span id="eventfsread"> </span>
 
-### fs.read[^](#eventfsread)
+### fs.read [^](#schema-reference)
 
 Structure of the `fs.read` event
 
@@ -638,7 +638,7 @@ Structure of the `fs.read` event
 
 <span id="eventfsseek"> </span>
 
-### fs.seek[^](#eventfsseek)
+### fs.seek [^](#schema-reference)
 
 Structure of the `fs.seek` event
 
@@ -712,7 +712,7 @@ Structure of the `fs.seek` event
 
 <span id="eventfsstat"> </span>
 
-### fs.stat[^](#eventfsstat)
+### fs.stat [^](#schema-reference)
 
 Structure of the `fs.stat` event
 
@@ -784,7 +784,7 @@ Structure of the `fs.stat` event
 
 <span id="eventfswrite"> </span>
 
-### fs.write[^](#eventfswrite)
+### fs.write [^](#schema-reference)
 
 Structure of the `fs.write` event
 
@@ -860,7 +860,7 @@ Structure of the `fs.write` event
 
 <span id="eventhttpreq"> </span>
 
-### http.req[^](#eventhttpreq)
+### http.req [^](#schema-reference)
 
 Structure of the `http.req` event
 
@@ -942,7 +942,7 @@ Structure of the `http.req` event
 
 <span id="eventhttpresp"> </span>
 
-### http.resp[^](#eventhttpresp)
+### http.resp [^](#schema-reference)
 
 Structure of the `http.resp` event
 
@@ -1030,7 +1030,7 @@ Structure of the `http.resp` event
 
 <span id="eventnetapp"> </span>
 
-### net.app[^](#eventnetapp)
+### net.app [^](#schema-reference)
 
 Structure of the `net.app` event
 
@@ -1096,7 +1096,7 @@ Structure of the `net.app` event
 
 <span id="eventnetclose"> </span>
 
-### net.close[^](#eventnetclose)
+### net.close [^](#schema-reference)
 
 Structure of the `net.close` event
 
@@ -1173,7 +1173,7 @@ Structure of the `net.close` event
 
 <span id="eventnetduration"> </span>
 
-### net.duration[^](#eventnetduration)
+### net.duration [^](#schema-reference)
 
 Structure of the `net.duration` event
 
@@ -1249,7 +1249,7 @@ Structure of the `net.duration` event
 
 <span id="eventneterror"> </span>
 
-### net.error[^](#eventneterror)
+### net.error [^](#schema-reference)
 
 Structure of the `net.error` event
 
@@ -1321,7 +1321,7 @@ Structure of the `net.error` event
 
 <span id="eventnetopen"> </span>
 
-### net.open[^](#eventnetopen)
+### net.open [^](#schema-reference)
 
 Structure of the `net.open` event
 
@@ -1390,7 +1390,7 @@ Structure of the `net.open` event
 
 <span id="eventnetother"> </span>
 
-### net.other[^](#eventnetother)
+### net.other [^](#schema-reference)
 
 Structure of the `net.other` event
 
@@ -1464,7 +1464,7 @@ Structure of the `net.other` event
 
 <span id="eventnetport"> </span>
 
-### net.port[^](#eventnetport)
+### net.port [^](#schema-reference)
 
 Structure of the `net.port` event
 
@@ -1538,7 +1538,7 @@ Structure of the `net.port` event
 
 <span id="eventnetrx"> </span>
 
-### net.rx[^](#eventnetrx)
+### net.rx [^](#schema-reference)
 
 Structure of the `net.rx` event
 
@@ -1626,7 +1626,7 @@ Structure of the `net.rx` event
 
 <span id="eventnettcp"> </span>
 
-### net.tcp[^](#eventnettcp)
+### net.tcp [^](#schema-reference)
 
 Structure of the `net.tcp` event
 
@@ -1700,7 +1700,7 @@ Structure of the `net.tcp` event
 
 <span id="eventnettx"> </span>
 
-### net.tx[^](#eventnettx)
+### net.tx [^](#schema-reference)
 
 Structure of the `net.tx` event
 
@@ -1788,7 +1788,7 @@ Structure of the `net.tx` event
 
 <span id="eventnetudp"> </span>
 
-### net.udp[^](#eventnetudp)
+### net.udp [^](#schema-reference)
 
 Structure of the `net.udp` event
 
@@ -1862,7 +1862,7 @@ Structure of the `net.udp` event
 
 <span id="eventnotice"> </span>
 
-### event.notice[^](#eventnotice)
+### event.notice [^](#schema-reference)
 
 Structure of the `notice` event
 
@@ -1912,7 +1912,7 @@ Structure of the `notice` event
 
 <span id="eventstderr"> </span>
 
-### event.stderr[^](#eventstderr)
+### event.stderr [^](#schema-reference)
 
 Structure of the console `stderr` event
 
@@ -1970,7 +1970,7 @@ Structure of the console `stderr` event
 
 <span id="eventstdout"> </span>
 
-### event.stdout[^](#eventstdout)
+### event.stdout [^](#schema-reference)
 
 Structure of the console `stdout` event
 
@@ -2075,7 +2075,7 @@ Structure of the console `stdout` event
 
 <span id="metricfsclose"> </span>
 
-### fs.close[^](#metricfsclose)
+### fs.close [^](#schema-reference)
 
 Structure of the `fs.close` metric
 
@@ -2145,7 +2145,7 @@ Structure of the `fs.close` metric
 
 <span id="metricfsduration"> </span>
 
-### fs.duration[^](#metricfsduration)
+### fs.duration [^](#schema-reference)
 
 Structure of the `fs.duration` metric
 
@@ -2217,7 +2217,7 @@ Structure of the `fs.duration` metric
 
 <span id="metricfserror"> </span>
 
-### fs.error[^](#metricfserror)
+### fs.error [^](#schema-reference)
 
 Structure of the `fs.error` metric
 
@@ -2288,7 +2288,7 @@ Structure of the `fs.error` metric
 
 <span id="metricfsopen"> </span>
 
-### fs.open[^](#metricfsopen)
+### fs.open [^](#schema-reference)
 
 Structure of the `fs.open` metric
 
@@ -2358,7 +2358,7 @@ Structure of the `fs.open` metric
 
 <span id="metricfsread"> </span>
 
-### fs.read[^](#metricfsread)
+### fs.read [^](#schema-reference)
 
 Structure of the `fs.read` metric
 
@@ -2430,7 +2430,7 @@ Structure of the `fs.read` metric
 
 <span id="metricfsseek"> </span>
 
-### fs.seek[^](#metricfsseek)
+### fs.seek [^](#schema-reference)
 
 Structure of the `fs.seek` metric
 
@@ -2500,7 +2500,7 @@ Structure of the `fs.seek` metric
 
 <span id="metricfsstat"> </span>
 
-### fs.stat[^](#metricfsstat)
+### fs.stat [^](#schema-reference)
 
 Structure of the `fs.stat` metric
 
@@ -2568,7 +2568,7 @@ Structure of the `fs.stat` metric
 
 <span id="metricfswrite"> </span>
 
-### fs.write[^](#metricfswrite)
+### fs.write [^](#schema-reference)
 
 Structure of the `fs.write` metric
 
@@ -2640,7 +2640,7 @@ Structure of the `fs.write` metric
 
 <span id="metrichttpclientduration"> </span>
 
-### http.client.duration[^](#metrichttpclientduration)
+### http.client.duration [^](#schema-reference)
 
 Structure of the `http.client.duration` metric
 
@@ -2711,7 +2711,7 @@ Structure of the `http.client.duration` metric
 
 <span id="metrichttprequestcontentlength"> </span>
 
-### http.request.content.length[^](#metrichttprequestcontentlength)
+### http.request.content.length [^](#schema-reference)
 
 Structure of the `http.request.content_length` metric
 
@@ -2763,7 +2763,7 @@ Structure of the `http.request.content_length` metric
 
 <span id="metrichttprequests"> </span>
 
-### http.requests[^](#metrichttprequests)
+### http.requests [^](#schema-reference)
 
 Structure of the `http.requests` metric
 
@@ -2834,7 +2834,7 @@ Structure of the `http.requests` metric
 
 <span id="metrichttpresponsecontentlength"> </span>
 
-### http.response.content.length[^](#metrichttpresponsecontentlength)
+### http.response.content.length [^](#schema-reference)
 
 Structure of the `http.response.content_length` metric
 
@@ -2905,7 +2905,7 @@ Structure of the `http.response.content_length` metric
 
 <span id="metrichttpserverduration"> </span>
 
-### http.server.duration[^](#metrichttpserverduration)
+### http.server.duration [^](#schema-reference)
 
 Structure of the `http.server.duration` metric
 
@@ -2976,7 +2976,7 @@ Structure of the `http.server.duration` metric
 
 <span id="metricnetclose"> </span>
 
-### net.close[^](#metricnetclose)
+### net.close [^](#schema-reference)
 
 Structure of the `net.close` metric
 
@@ -3047,7 +3047,7 @@ Structure of the `net.close` metric
 
 <span id="metricnetdns"> </span>
 
-### net.dns[^](#metricnetdns)
+### net.dns [^](#schema-reference)
 
 Structure of the `net.dns` metric
 
@@ -3115,7 +3115,7 @@ Structure of the `net.dns` metric
 
 <span id="metricnetduration"> </span>
 
-### net.duration[^](#metricnetduration)
+### net.duration [^](#schema-reference)
 
 Structure of the `net.duration` metric
 
@@ -3187,7 +3187,7 @@ Structure of the `net.duration` metric
 
 <span id="metricneterror"> </span>
 
-### net.error[^](#metricneterror)
+### net.error [^](#schema-reference)
 
 Structure of the `net.error` metric
 
@@ -3256,7 +3256,7 @@ Structure of the `net.error` metric
 
 <span id="metricnetopen"> </span>
 
-### net.open[^](#metricnetopen)
+### net.open [^](#schema-reference)
 
 Structure of the `net.open` metric
 
@@ -3326,7 +3326,7 @@ Structure of the `net.open` metric
 
 <span id="metricnetother"> </span>
 
-### net.other[^](#metricnetother)
+### net.other [^](#schema-reference)
 
 Structure of the `net.other` metric
 
@@ -3396,7 +3396,7 @@ Structure of the `net.other` metric
 
 <span id="metricnetport"> </span>
 
-### net.port[^](#metricnetport)
+### net.port [^](#schema-reference)
 
 Structure of the `net.port` metric
 
@@ -3466,7 +3466,7 @@ Structure of the `net.port` metric
 
 <span id="metricnetrx"> </span>
 
-### net.rx[^](#metricnetrx)
+### net.rx [^](#schema-reference)
 
 Structure of the `net.rx` metric
 
@@ -3577,7 +3577,7 @@ Structure of the `net.rx` metric
 
 <span id="metricnettcp"> </span>
 
-### net.tcp[^](#metricnettcp)
+### net.tcp [^](#schema-reference)
 
 Structure of the `net.tcp` metric
 
@@ -3647,7 +3647,7 @@ Structure of the `net.tcp` metric
 
 <span id="metricnettx"> </span>
 
-### net.tx[^](#metricnettx)
+### net.tx [^](#schema-reference)
 
 Structure of the `net.tx` metric
 
@@ -3756,7 +3756,7 @@ Structure of the `net.tx` metric
 
 <span id="metricnetudp"> </span>
 
-### net.udp[^](#metricnetudp)
+### net.udp [^](#schema-reference)
 
 Structure of the `net.udp` metric
 
@@ -3809,7 +3809,7 @@ Structure of the `net.udp` metric
 
 <span id="metricprocchild"> </span>
 
-### proc.child[^](#metricprocchild)
+### proc.child [^](#schema-reference)
 
 Structure of the `proc.child` metric
 
@@ -3855,7 +3855,7 @@ Structure of the `proc.child` metric
 
 <span id="metricproccpu"> </span>
 
-### proc.cpu[^](#metricproccpu)
+### proc.cpu [^](#schema-reference)
 
 Structure of the `proc.cpu` metric
 
@@ -3901,7 +3901,7 @@ Structure of the `proc.cpu` metric
 
 <span id="metricproccpuperc"> </span>
 
-### proc.cpu.perc[^](#metricproccpuperc)
+### proc.cpu.perc [^](#schema-reference)
 
 Structure of the `proc.cpu_perc` metric
 
@@ -3947,7 +3947,7 @@ Structure of the `proc.cpu_perc` metric
 
 <span id="metricprocfd"> </span>
 
-### proc.fd[^](#metricprocfd)
+### proc.fd [^](#schema-reference)
 
 Structure of the `proc.fd` metric
 
@@ -3993,7 +3993,7 @@ Structure of the `proc.fd` metric
 
 <span id="metricprocmem"> </span>
 
-### proc.mem[^](#metricprocmem)
+### proc.mem [^](#schema-reference)
 
 Structure of the `proc.mem` metric
 
@@ -4039,7 +4039,7 @@ Structure of the `proc.mem` metric
 
 <span id="metricprocstart"> </span>
 
-### proc.start[^](#metricprocstart)
+### proc.start [^](#schema-reference)
 
 Structure of the `proc.start` metric
 
@@ -4095,7 +4095,7 @@ Structure of the `proc.start` metric
 
 <span id="metricprocthread"> </span>
 
-### proc.thread[^](#metricprocthread)
+### proc.thread [^](#schema-reference)
 
 Structure of the `proc.thread` metric
 

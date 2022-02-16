@@ -6,7 +6,7 @@ title: Known Issues
 
 ## AppScope 1.0.0
 
-2022-02-215 - GA
+2022-02-15 - GA
 
 As of this AppScope GA release, known issues include:
 

@@ -67,16 +67,22 @@ In AppScope 1.0.0, a few event and metric schema elements, namely `title` and `d
 </div>
 <div class="toc-cell">
 
+**File**
+
+- [file](#eventfile)
+
+**Console**
+
+- [console](#eventconsole)
+
+
+
 **System Notification**
 
 - [notice](#eventnotice)
 
-**stderr/stdout**
-
-- [event.stderr](#eventstderr)
-- [event.stdout](#eventstdout)
-
 </div>
+
 </div>
 
 <span id="eventdnsreq"> </span>
@@ -1935,11 +1941,11 @@ Structure of the `notice` event
 
 <hr/>
 
-<span id="eventstderr"> </span>
+<span id="eventconsole"> </span>
 
-### event.stderr [^](#schema-reference)
+### console [^](#schema-reference)
 
-Structure of the console `stderr` event
+Structure of the `console` event
 
 #### Example
 
@@ -1963,7 +1969,7 @@ Structure of the console `stderr` event
 }
 ```
 
-#### `event.stderr` properties
+#### `console` properties
 
 | Property | Description |
 |---|---|
@@ -1972,20 +1978,20 @@ Structure of the console `stderr` event
 | `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventstderrbody-properties)._ |
 
-#### `stderr.body` properties
+#### `console.body` properties
 
 | Property | Description |
 |---|---|
 | `sourcetype` _required_ (`string`) | Sourcetype - console<br/><br/>Value must be `console`. |
 | `_time` _required_ (`number`) | _time<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - console stderr<br/><br/>Value must be `stderr`. |
+| `source` _required_ (`string`) | Specifies whether AppScope is capturing either `stderr` or `stdout` from console.<br/><br/>Value must be `stderr` or `stdout`. |
 | `host` _required_ (`string`) | host |
 | `proc` _required_ (`string`) | proc |
 | `cmd` _required_ (`string`) | cmd<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | pid<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventstderrbodydata-properties)._ |
 
-#### `stderr.body.data` properties
+#### `console.body.data` properties
 
 | Property | Description |
 |---|---|
@@ -1993,11 +1999,11 @@ Structure of the console `stderr` event
 
 <hr/>
 
-<span id="eventstdout"> </span>
+<span id="eventfile"> </span>
 
-### event.stdout [^](#schema-reference)
+### file [^](#schema-reference)
 
-Structure of the console `stdout` event
+Structure of the `file` event
 
 #### Example
 
@@ -2007,9 +2013,9 @@ Structure of the console `stdout` event
   "id": "ubuntu-sh- /usr/bin/which /usr/bin/firefox",
   "_channel": "13468365092424",
   "body": {
-    "sourcetype": "console",
+    "sourcetype": "file",
     "_time": 1643735941.602952,
-    "source": "stdout",
+    "source": "/var/log/firefox.log",
     "host": "ubuntu",
     "proc": "sh",
     "cmd": "/bin/sh /usr/bin/which /usr/bin/firefox",
@@ -2021,29 +2027,29 @@ Structure of the console `stdout` event
 }
 ```
 
-#### `event.stdout` properties
+#### `file` properties
 
 | Property | Description |
 |---|---|
 | `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
 | `id` _required_ (`string`) | Identifies the application that the process is associated with. |
 | `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
-| `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventstdoutbody-properties)._ |
+| `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventfilebody-properties)._ |
 
-#### `stdout.body` properties
+#### `file.body` properties
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - console<br/><br/>Value must be `console`. |
+| `sourcetype` _required_ (`string`) | Sourcetype - file<br/><br/>Value must be `file`. |
 | `_time` _required_ (`number`) | _time<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - console stdout<br/><br/>Value must be `stdout`. |
+| `source` _required_ (`string`) | String that describes a file path. |
 | `host` _required_ (`string`) | host |
 | `proc` _required_ (`string`) | proc |
 | `cmd` _required_ (`string`) | cmd<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | pid<br/><br/>**Example:**<br/>`1000` |
-| `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventstdoutbodydata-properties)._ |
+| `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfilebodydata-properties)._ |
 
-#### `stdout.body.data` properties
+#### `file.body.data` properties
 
 | Property | Description |
 |---|---|

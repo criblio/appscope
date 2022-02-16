@@ -389,7 +389,7 @@ jobs:
             aws s3 cp ${TMPDIR}/scope-${ARCH}.tgz     ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.tgz
             aws s3 cp ${TMPDIR}/scope-${ARCH}.tgz.md5 ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.tgz.md5
           done
-          aws cloudfront create-invalidation --distribution-id ${CF_DISTRIBUTION_ID} --paths '/dl/scope/'"$VERSION"'/*'
+          aws cloudfront create-invalidation --distribution-id ${CF_DISTRIBUTION_ID} --paths '/dl/scope/'"$VERSION"'/*' '/dl/scope/latest'
           echo "::endgroup::"
 
           if [ "unreleased" != "${{ needs.info.outputs.tag }}" -a "next" != "${{ needs.info.outputs.tag }}" ]; then

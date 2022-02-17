@@ -108,15 +108,10 @@ Old | New
 
 Old | New
 -- | --
-`http.requests` | `http.req`
-`http.server.duration` | `http.duration.server`
-`http.client.duration` | `http.duration.client`
-`net.dns` | `dns.req`
-`net.dns.duration` | `dns.duration`
 `fs.op.stat` | `fs.stat`
 `fs.op.open` | `fs.open`
 `fs.op.close` | `fs.close`
 `fs.op.seek` | `fs.seek`
-`net.conn.duration` | `net.duration`
 `net.dns.duration` | `dns.duration`
+`net.conn.duration` | `net.duration`
 `net.conn_duration` | `net.duration`

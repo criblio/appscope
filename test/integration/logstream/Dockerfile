@@ -32,6 +32,9 @@ RUN pip3 install -r /opt/test-runner/requirements.txt
 
 COPY ./test_runner/ /opt/test-runner/
 
+# Switching to Python 3.8 required this hack. Not sure where the kafka packages are coming from.
+RUN sed -i 's/\basync\b/is_async/g' /usr/local/lib/python3.8/dist-packages/kafka/producer/*.py
+
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 COPY scope-profile.sh /etc/profile.d/scope.sh
 COPY gdbinit /root/.gdbinit

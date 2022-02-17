@@ -40,8 +40,8 @@
     - name: Data Routing
       path: /docs/data-routing
 
-    - name: Integrating with LogStream
-      path: /docs/logstream-integration
+    - name: Integrating with Cribl
+      path: /docs/cribl-integration
 
 - name: Reference
   child: 

@@ -63,7 +63,12 @@ module.exports = {
         pedantic: false,
         // Plugins configs
         plugins: [
-          `gatsby-remark-autolink-headers`,
+          {
+            resolve: `gatsby-remark-autolink-headers`,
+            options: {
+              enableCustomId: true,
+            }
+          },
           // `gatsby-remark-prismjs`,
           {
             resolve: "gatsby-remark-images",

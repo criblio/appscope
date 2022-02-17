@@ -31,8 +31,8 @@ In AppScope 1.0.0, a few event and metric schema elements, namely `title` and `d
 
 **Network**
 
-- [net.close](#eventnetclose)
 - [net.open](#eventnetopen)
+- [net.close](#eventnetclose)
 - [net.duration](#eventnetduration)
 - [net.error](#eventneterror)
 - [net.rx](#eventnetrx)

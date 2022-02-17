@@ -3,7 +3,7 @@ FROM cribl/cribl:latest
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
         net-tools \
-        python3.6 \
+        python3.8 \
         python3-setuptools \
         python3-pip \
     && apt-get autoremove && apt-get clean \

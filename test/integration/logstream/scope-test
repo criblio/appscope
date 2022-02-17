@@ -1,5 +1,5 @@
 #!/bin/bash
-python3.6 \
+python3.8 \
     /opt/test-runner/app.py \
     -t cribl \
     -l /opt/test-runner/logs/ \

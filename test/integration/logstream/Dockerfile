@@ -3,7 +3,7 @@ FROM cribl/cribl:latest
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
         net-tools \
-        python3.6 \
+        python3.8 \
         python3-setuptools \
         python3-pip \
     && apt-get autoremove && apt-get clean \
@@ -31,6 +31,9 @@ RUN pip3 install wheel
 RUN pip3 install -r /opt/test-runner/requirements.txt
 
 COPY ./test_runner/ /opt/test-runner/
+
+# Switching to Python 3.8 required this hack. Not sure where the kafka packages are coming from.
+RUN sed -i 's/\basync\b/is_async/g' /usr/local/lib/python3.8/dist-packages/kafka/producer/*.py
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 COPY scope-profile.sh /etc/profile.d/scope.sh

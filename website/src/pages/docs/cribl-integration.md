@@ -22,7 +22,7 @@ For example:
 LD_PRELOAD=./libscope.so SCOPE_CRIBL=edge ls -al
 ```
 
-### Scaling to Many Scoped Processes
+### Scaling to Many Scoped Processes {#scaling-scoped-processes}
 
 The number of scoped processes can become very high in two kinds of situations:
 1. Where the application that one instance of AppScope is monitoring spawns a large number of processes - for example, scoping a build process; and,

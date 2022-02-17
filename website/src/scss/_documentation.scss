@@ -37,6 +37,7 @@
   h6 {
     margin-top: 30px;
     margin-bottom: 10px;
+    scroll-margin-top: calc(110px + 0.5rem);
   }
   p,
   /* ol, */
@@ -101,6 +102,9 @@
   h3 a:not(.anchor) {
     margin-left: 10px;
   }
+  hr {
+    border-color: rgba(0, 0, 0, 0.3);
+  }
 }
 
 p code {
@@ -125,6 +129,9 @@ p code {
   }
   img {
     box-shadow: none !important;
+  }
+  hr {
+    border-color: rgba(255, 255, 255, 0.3);
   }
 }
 @media (max-width: 767px) {

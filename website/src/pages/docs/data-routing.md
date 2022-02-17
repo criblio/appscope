@@ -38,13 +38,13 @@ Use the `SCOPE_CRIBL_CLOUD` environment variable to define a TLS-encrypted conne
 SCOPE_CRIBL_CLOUD=tcp://in.logstream.<cloud_instance>.cribl.cloud:10090
 ```
 
-As a convenience, when you set `SCOPE_CRIBL_CLOUD`, AppScope automatically overrides the defaults of three other environment variables, setting them to the values that LogStream Cloud via TLS requires. That produces these (and a few [other](/docs/logstream-integration#parameter-overrides)) settings:
+As a convenience, when you set `SCOPE_CRIBL_CLOUD`, AppScope automatically overrides the defaults of three other environment variables, setting them to the values that LogStream Cloud via TLS requires. That produces these (and a few [other](/docs/cribl-integration#parameter-overrides)) settings:
 
 * `SCOPE_CRIBL_TLS_ENABLE` is set to `true`.
 * `SCOPE_CRIBL_TLS_VALIDATE_SERVER` is set to `true`.
 * `SCOPE_CRIBL_TLS_CA_CERT_PATH` is set to the empty string.
 
-If you prefer an **unencrypted** connection to LogStream cloud, use `SCOPE_CRIBL`, as described [here](/docs/logstream-integration#connecting-to-logstream-cloud-unencrypted).
+If you prefer an **unencrypted** connection to LogStream cloud, use `SCOPE_CRIBL`, as described [here](/docs/cribl-integration#connecting-to-logstream-cloud-unencrypted).
 
 #### Routing to Cloud with the Config File
 

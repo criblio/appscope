@@ -28,7 +28,7 @@ The number of scoped processes can become very high in two kinds of situations:
 1. Where the application that one instance of AppScope is monitoring spawns a large number of processes - for example, scoping a build process; and,
 2. Where many instances of AppScope are monitoring many instances of an application in a distributed architecture - for example, monitoring Apache in a server farm.
 
-In either case, it can help to have AppScope connect to Cribl Edge on the same host, and Cribl Edge then connect to Cribl LogStream over the network.
+In either case, it can help when AppScope connects to Cribl Edge on the same host, and Cribl Edge then connects to Cribl LogStream over the network.
 
 To understand why this is, consider these facts: 
 * Within the same host, AppScope connects to Cribl Edge over unix sockets. 

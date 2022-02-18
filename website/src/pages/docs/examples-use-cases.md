@@ -79,4 +79,4 @@ scope run -m udp://ddog:8125
 
 ### Next Steps
 
-Explore [Integrating with LogStream](/docs/logstream-integration).
+Explore [Integrating with Cribl](/docs/cribl-integration).

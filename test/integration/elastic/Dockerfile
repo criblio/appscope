@@ -1,14 +1,13 @@
-FROM docker.elastic.co/elasticsearch/elasticsearch:7.8.1
+FROM docker.elastic.co/elasticsearch/elasticsearch:7.17.0
 ENV discovery.type=single-node
 
-RUN yum -y update && \
-    yum -y install centos-release-scl && \
-    yum -y install rh-python38 python-virtualenv which
+RUN apt update && \
+    apt install python3-pip -y
+RUN pip3 install virtualenv
 
 RUN mkdir /opt/test-runner/ /opt/test-runner/logs/
 
-RUN source scl_source enable rh-python38 && \
-    virtualenv -p $(which python) /opt/test-runner/
+RUN virtualenv -p $(which python3) /opt/test-runner/
 
 ENV SCOPE_CRIBL_ENABLE=false
 ENV SCOPE_OUT_DEST=udp://localhost:8125
@@ -19,7 +18,6 @@ ENV SCOPE_EVENT_LOGFILE=true
 ENV SCOPE_EVENT_CONSOLE=true
 ENV SCOPE_EVENT_METRIC=true
 ENV SCOPE_EVENT_HTTP=true
-#ENV SCOPE_EVENT_DEST=tcp://172.16.198.132:9109
 
 COPY ./test_runner/requirements.txt /opt/test-runner/requirements.txt
 RUN /opt/test-runner/bin/pip install -r /opt/test-runner/requirements.txt

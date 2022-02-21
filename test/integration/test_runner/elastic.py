@@ -12,14 +12,16 @@ from utils import dotdict, random_string
 from validation import validate_all
 
 config = dotdict({
-    "host": "localhost"
+    "scheme": "http",
+    "host": "localhost",
+    "port": 9200
 })
 
 
 class ElasticIndexAndSearchTest(ApplicationTest):
 
     def do_run(self, scoped) -> Tuple[TestResult, Any]:
-        logging.info(f"Connecting to Elasticsearch at {config.host}")
+        logging.info(f"Connecting to Elasticsearch at {config.scheme} {config.host} {config.port}")
         es = self.__connect_to_es()
 
         logging.info(f"Elastic info: {es.info()}")
@@ -72,7 +74,7 @@ class ElasticIndexAndSearchTest(ApplicationTest):
     @retry(stop_max_attempt_number=5, wait_fixed=5000)
     def __connect_to_es(self):
         logging.info("Attempt")
-        elasticsearch = Elasticsearch(hosts=[{"host": config.host}])
+        elasticsearch = Elasticsearch([{"scheme": config.scheme, "host": config.host, "port": config.port}])
         assert elasticsearch.ping()
         return elasticsearch
 
@@ -98,7 +100,7 @@ def configure(runner: Runner, config):
 
 if __name__ == '__main__':
     logging.basicConfig(level=DEBUG)
-    es = Elasticsearch(hosts=[{"host": "localhost"}])
+    es = Elasticsearch([{"scheme": config.scheme, "host": config.host, "port": config.port}])
 
     index = f"test_{random_string(4)}"
 

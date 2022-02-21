@@ -1,5 +1,5 @@
 tabulate
 splunk-sdk
 retrying
-elasticsearch == 7.17.0
+elasticsearch
 kafka

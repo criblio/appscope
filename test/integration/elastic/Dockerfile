@@ -1,9 +1,15 @@
-FROM docker.elastic.co/elasticsearch/elasticsearch:7.17.0
+FROM docker.elastic.co/elasticsearch/elasticsearch:8.0.0
 ENV discovery.type=single-node
+ENV xpack.security.enabled=false
+USER root
 
 RUN apt update && \
     apt install python3-pip -y
 RUN pip3 install virtualenv
+
+RUN chown elasticsearch:elasticsearch /opt/ /usr/local
+
+USER elasticsearch
 
 RUN mkdir /opt/test-runner/ /opt/test-runner/logs/
 

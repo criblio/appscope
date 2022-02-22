@@ -159,7 +159,7 @@ typedef struct {
     httpId_t id;
 
     // HTTP version detected (0=unknown, 1=HTTP/1.x, 2=HTTP/2.0)
-    size_t version;
+    size_t version[2]; // rx=[0] and tx=[1]
 
     // These will be TRUE if `hdr` ...
     bool isResponse;           // ... contains a complete response header
@@ -167,7 +167,7 @@ typedef struct {
     bool hasConnectionUpgrade; // ... has `Connection: upgrade` header
 
     // HTTP/2 state
-    http_buf_t http2Buf;
+    http_buf_t http2Buf[2]; // buffers for partial frames; rx=[0] and tx=[1]
 } http_state_t;
 
 typedef struct net_info_t {
@@ -176,7 +176,7 @@ typedef struct net_info_t {
     int fd;
     int active;
     int type;
-    http_state_t http[2];      // rx=[0] and tx=[1]
+    http_state_t http;
     bool urlRedirect;
     bool addrSetLocal;
     bool addrSetRemote;

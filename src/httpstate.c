@@ -45,14 +45,17 @@ setHttpState(http_state_t *httpstate, http_enum_t toState)
     if (!httpstate) return;
     switch (toState) {
         case HTTP_NONE:
-            if (httpstate->http2Buf.buf) {
-                free(httpstate->http2Buf.buf);
-                httpstate->http2Buf.buf = 0;
+            // cleanup the stash for the RX and TX sides
+            for (int i = 0; i < 2; ++i) {
+                if (httpstate->http2Buf[i].buf) {
+                    free(httpstate->http2Buf[i].buf);
+                    httpstate->http2Buf[i].buf = 0;
+                }
+                httpstate->http2Buf[i].len = 0;
+                httpstate->http2Buf[i].size = 0;
             }
-            httpstate->http2Buf.len = 0;
-            httpstate->http2Buf.size = 0;
-
-            if (httpstate->hdr) free(httpstate->hdr);
+            if (httpstate->hdr)
+                free(httpstate->hdr);
             httpstate->hdr = NULL;
             httpstate->hdrlen = 0;
             httpstate->hdralloc = 0;
@@ -657,7 +660,7 @@ http2GetFrameStream(http_buf_t *stash, const uint8_t *buf, size_t len)
 */
 
 static bool
-parseHttp2(http_state_t* state, net_info *net,
+parseHttp2(http_state_t* state, net_info *net, int isTx,
         const uint8_t *buf, size_t len, httpId_t *httpId)
 {
     if (!buf || !len) {
@@ -670,7 +673,7 @@ parseHttp2(http_state_t* state, net_info *net,
 
     const uint8_t *bufPos = buf;                    // current position in buf
     size_t         bufLen = len;                    // number of buf bytes left
-    http_buf_t    *stash  = &state->http2Buf;       // stash for partial frames
+    http_buf_t    *stash  = &state->http2Buf[isTx]; // stash for partial frames
     while (bufLen > 0) {
         // skip over MAGIC
         if (bufLen >= HTTP2_MAGIC_LEN && !strncmp((char*)buf, HTTP2_MAGIC, HTTP2_MAGIC_LEN)) {
@@ -733,14 +736,17 @@ static bool
 doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
         metric_t src, httpId_t *httpId)
 {
+    int isTx  = (src == NETTX || src == TLSTX) ? 1 : 0;
+
     //scopeLogHexDebug(buf, len>64 ? 64 : len, "DEBUG: HTTP %s payload; ver=%d, len=%ld",
     //        isTx ? "TX" : "RX", (int)state->version[isTx], len);
 
     // detect HTTP version
-    if (state->version == 0) {
+    if (state->version[isTx] == 0) {
         // Detect HTTP/2 by looking for the "magic" string at the start
         if (len >= HTTP2_MAGIC_LEN && !strncmp(buf, HTTP2_MAGIC, HTTP2_MAGIC_LEN)) {
-            state->version = 2;
+            state->version[isTx] = 2;
+            state->version[!isTx] = 2;
 
             // is there anything after the MAGIC?
             if (len > HTTP2_MAGIC_LEN) {
@@ -756,7 +762,7 @@ doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
         // Detect HTTP/1.x by looking for "HTTP/" which appears as the start
         // of a response and after method and URI in a request.
         else if (searchExec(g_http_start, buf, len) != -1) {
-            state->version = 1;
+            state->version[isTx] = 1;
             // fall through to continue processing
         }
 
@@ -767,14 +773,15 @@ doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
         }
     }
 
-    if (state->version == 1) {
+    if (state->version[isTx] == 1) {
         // process the HTTP/1.x payload
         int ret = parseHttp1(state, buf, len, httpId);
 
         // if we saw a successful upgrade response...
         if (state->isResponse && state->hasUpgrade && state->hasConnectionUpgrade) {
             // upgrade the versions on both sides, TX and RX
-            state->version = 2;
+            state->version[isTx] = 2;
+            state->version[!isTx] = 2;
 
             // clear state
             state->isResponse = FALSE;
@@ -789,13 +796,14 @@ doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
         return ret;
     }
 
-    if (state->version == 2) {
+    if (state->version[isTx] == 2) {
         // process the HTTP/2 payload
-        return parseHttp2(state, net, (uint8_t*)buf, len, httpId);
+        return parseHttp2(state, net, isTx, (uint8_t*)buf, len, httpId);
     }
 
     // invalid HTTP version
-    scopeLogError("ERROR: HTTP/? unexpected version=%ld", state->version);
+    scopeLogError("ERROR: HTTP/? unexpected version on %s; version=%ld",
+            isTx ? "TX" : "RX", state->version[isTx]);
     DBG(NULL);
     return FALSE;
 }
@@ -827,8 +835,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
     // buffers.  If net doesn't exist,  we can at least keep temp state
     // while within the current doHttp().
     http_state_t tempstate = {0};
-    int isTx  = (src == NETTX || src == TLSTX) ? 1 : 0;
-    http_state_t *httpstate = (net) ? &net->http[isTx] : &tempstate;
+    http_state_t *httpstate = (net) ? &net->http : &tempstate;
 
     // Handle the data in it's various formats
     switch (dtype) {

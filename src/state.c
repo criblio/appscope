@@ -87,8 +87,9 @@ destroyNetInfo(void *data)
     if (!data) return;
     net_info *net = (net_info *)data;
 
-    resetHttp(&net->http[0]);
-    resetHttp(&net->http[1]);
+    free(net->http.hdr);
+    free(net->http.http2Buf[0].buf);
+    free(net->http.http2Buf[1].buf);
 
     free(net);
 }
@@ -536,7 +537,7 @@ postNetState(int fd, metric_t type, net_info *net)
         // if NET events are enabled
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) ||
         // if it's a closed HTTP channel (so we can cleanup)
-        (type==CONNECTION_DURATION && net && (net->http[0].version || net->http[1].version)) ||
+        (type==CONNECTION_DURATION && net && (net->http.version[0] || net->http.version[1])) ||
         // if metrics are enabled and it's one we report
         (mtcEnabled(g_mtc) && mtc_needs_reporting);
     if (!need_to_post) return FALSE;
@@ -2306,8 +2307,9 @@ doDupSock(int oldfd, int newfd)
     g_netinfo[newfd].totalDuration = (counters_element_t){.mtc=0, .evt=0};
     g_netinfo[newfd].numDuration = (counters_element_t){.mtc=0, .evt=0};
 
-    resetHttp(&g_netinfo[newfd].http[0]);
-    resetHttp(&g_netinfo[newfd].http[1]);
+    // don't dup the HTTP/2 frame stashes
+    memset(&g_netinfo[newfd].http.http2Buf[0], 0, sizeof(http_buf_t));
+    memset(&g_netinfo[newfd].http.http2Buf[1], 0, sizeof(http_buf_t));
 
     doUpdateState(CONNECTION_OPEN, newfd, 1, "dup", NULL);
     return 0;
@@ -2389,8 +2391,7 @@ doClose(int fd, const char *func)
         doUpdateState(NET_CONNECTIONS, fd, -1, func, NULL);
         doUpdateState(CONNECTION_CLOSE, fd, -1, func, NULL);
         doUpdateState(CONNECTION_DURATION, fd, -1, func, NULL);
-        resetHttp(&ninfo->http[0]);
-        resetHttp(&ninfo->http[1]);
+        resetHttp(&ninfo->http);
     }
 
     // Check both file descriptor tables

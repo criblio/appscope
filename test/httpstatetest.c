@@ -108,12 +108,12 @@ doHttpWithPartialHeaderBeforeClose(void** state)
     assert_false(doHttp(13, 3, &net, buffer, buflen, NETRX, BUF));
     assert_null(g_msg);
 
-    assert_non_null(net.http[0].hdr);
+    assert_non_null(net.http.hdr);
 
     // This acts like a virtual doClose()
-    resetHttp(&net.http[0]);
+    resetHttp(&net.http);
 
-    assert_null(net.http[0].hdr);
+    assert_null(net.http.hdr);
 }
 
 static void

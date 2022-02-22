@@ -2043,9 +2043,7 @@ doNetCloseEvent(net_info *net, uint64_t dur)
                     lport, rport, sizeof(rport),
                     nevent, &nix, NET_MAX_FIELDS);
 
-    if ((net->protoDetect == DETECT_TRUE) &&
-        net->protoProtoDef &&
-        !strcasecmp(net->protoProtoDef->protname, "HTTP")) {
+    if (net->http.state != HTTP_NONE) {
         H_ATTRIB(nevent[nix], "net_protocol", "http", 1);
         NEXT_FLD(nix, NET_MAX_FIELDS);
     }

@@ -144,7 +144,7 @@ Structure of the `dns.req` event
 }
 ```
 
-#### `dns.req` properties {#eventdnsreq}
+#### `dns.req` properties {#eventdnsreqprops}
 
 | Property | Description |
 |---|---|
@@ -204,7 +204,7 @@ Structure of the `dns.resp` event
 }
 ```
 
-#### `dns.resp` properties {#eventdnsresp}
+#### `dns.resp` properties {#eventdnsrespprops}
 
 | Property | Description |
 |---|---|
@@ -277,7 +277,7 @@ Structure of the `fs.close` event
 }
 ```
 
-#### `fs.close` properties {#eventfsclose}
+#### `fs.close` properties {#eventfscloseprops}
 
 | Property | Description |
 |---|---|
@@ -353,7 +353,7 @@ Structure of the `fs.delete` event
 }
 ```
 
-#### `fs.delete` properties {#eventfsdelete}
+#### `fs.delete` properties {#eventfsdeleteprops}
 
 | Property | Description |
 |---|---|
@@ -423,7 +423,7 @@ Structure of the `fs.duration` event
 }
 ```
 
-#### `fs.duration` properties {#eventfsduration}
+#### `fs.duration` properties {#eventfsdurationprops}
 
 | Property | Description |
 |---|---|
@@ -496,7 +496,7 @@ Structure of the `fs.error` event
 }
 ```
 
-#### `fs.error` properties {#eventfserror}
+#### `fs.error` properties {#eventfserrorprops}
 
 | Property | Description |
 |---|---|
@@ -570,7 +570,7 @@ Structure of the `fs.open` event
 }
 ```
 
-#### `fs.open` properties {#eventfsopen}
+#### `fs.open` properties {#eventfsopenprops}
 
 | Property | Description |
 |---|---|
@@ -645,7 +645,7 @@ Structure of the `fs.read` event
 }
 ```
 
-#### `fs.read` properties {#eventfsread}
+#### `fs.read` properties {#eventfsreadprops}
 
 | Property | Description |
 |---|---|
@@ -718,7 +718,7 @@ Structure of the `fs.seek` event
 }
 ```
 
-#### `fs.seek` properties {#eventfsseek}
+#### `fs.seek` properties {#eventfsseekprops}
 
 | Property | Description |
 |---|---|
@@ -789,7 +789,7 @@ Structure of the `fs.stat` event
 }
 ```
 
-#### `fs.stat` properties {#eventfsstat}
+#### `fs.stat` properties {#eventfsstatprops}
 
 | Property | Description |
 |---|---|
@@ -861,7 +861,7 @@ Structure of the `fs.write` event
 }
 ```
 
-#### `fs.write` properties {#eventfswrite}
+#### `fs.write` properties {#eventfswriteprops}
 
 | Property | Description |
 |---|---|
@@ -936,7 +936,7 @@ Structure of the `http.req` event
 }
 ```
 
-#### `http.req` properties {#eventhttpreq}
+#### `http.req` properties {#eventhttpreqprops}
 
 | Property | Description |
 |---|---|
@@ -1020,7 +1020,7 @@ Structure of the `http.resp` event
 }
 ```
 
-#### `http.resp` properties {#eventhttpresp}
+#### `http.resp` properties {#eventhttprespprops}
 
 | Property | Description |
 |---|---|
@@ -1096,7 +1096,7 @@ Structure of the `net.app` event
 }
 ```
 
-#### `net.app` properties {#eventnetapp}
+#### `net.app` properties {#eventnetappprops}
 
 | Property | Description |
 |---|---|
@@ -1164,7 +1164,7 @@ Structure of the `net.close` event
 }
 ```
 
-#### `net.close` properties {#eventnetclose}
+#### `net.close` properties {#eventnetcloseprops}
 
 | Property | Description |
 |---|---|
@@ -1240,7 +1240,7 @@ Structure of the `net.duration` event
 }
 ```
 
-#### `net.duration` properties {#eventnetduration}
+#### `net.duration` properties {#eventnetdurationprops}
 
 | Property | Description |
 |---|---|
@@ -1312,7 +1312,7 @@ Structure of the `net.error` event
 }
 ```
 
-#### `net.error` properties {#eventneterror}
+#### `net.error` properties {#eventneterrorprops}
 
 | Property | Description |
 |---|---|
@@ -1379,7 +1379,7 @@ Structure of the `net.open` event
 }
 ```
 
-#### `net.open` properties {#eventnetopen}
+#### `net.open` properties {#eventnetopenprops}
 
 | Property | Description |
 |---|---|
@@ -1450,7 +1450,7 @@ Structure of the `net.other` event
 }
 ```
 
-#### `net.other` properties {#eventnetother}
+#### `net.other` properties {#eventnetotherprops}
 
 | Property | Description |
 |---|---|
@@ -1522,7 +1522,7 @@ Structure of the `net.port` event
 }
 ```
 
-#### `net.port` properties {#eventnetport}
+#### `net.port` properties {#eventnetportprops}
 
 | Property | Description |
 |---|---|
@@ -1600,7 +1600,7 @@ Structure of the `net.rx` event
 }
 ```
 
-#### `net.rx` properties {#eventnetrx}
+#### `net.rx` properties {#eventnetrxprops}
 
 | Property | Description |
 |---|---|
@@ -1680,7 +1680,7 @@ Structure of the `net.tcp` event
 }
 ```
 
-#### `net.tcp` properties {#eventnettcp}
+#### `net.tcp` properties {#eventnettcpprops}
 
 | Property | Description |
 |---|---|
@@ -1758,7 +1758,7 @@ Structure of the `net.tx` event
 }
 ```
 
-#### `net.tx` properties {#eventnettx}
+#### `net.tx` properties {#eventnettxprops}
 
 | Property | Description |
 |---|---|
@@ -1838,7 +1838,7 @@ Structure of the `net.udp` event
 }
 ```
 
-#### `net.udp` properties {#eventnetudp}
+#### `net.udp` properties {#eventnetudpprops}
 
 | Property | Description |
 |---|---|
@@ -1900,7 +1900,7 @@ Structure of the `notice` event
 }
 ```
 
-#### `notice` properties {#eventnotice}
+#### `notice` properties {#eventnoticeprops}
 
 | Property | Description |
 |---|---|
@@ -1950,7 +1950,7 @@ Structure of the `console` event
 }
 ```
 
-#### `console` properties {#eventconsole}
+#### `console` properties {#eventconsoleprops}
 
 | Property | Description |
 |---|---|
@@ -2006,7 +2006,7 @@ Structure of the `file` event
 }
 ```
 
-#### `file` properties {#eventfile}
+#### `file` properties {#eventfileprops}
 
 | Property | Description |
 |---|---|
@@ -2078,7 +2078,7 @@ Structure of the `fs.close` metric
 }
 ```
 
-#### `fs.close` properties {#metricfsclose}
+#### `fs.close` properties {#metricfscloseprops}
 
 | Property | Description |
 |---|---|
@@ -2147,7 +2147,7 @@ Structure of the `fs.duration` metric
 }
 ```
 
-#### `fs.duration` properties {#metricfsduration}
+#### `fs.duration` properties {#metricfsdurationprops}
 
 | Property | Description |
 |---|---|
@@ -2217,7 +2217,7 @@ Structure of the `fs.error` metric
 }
 ```
 
-#### `fs.error` properties {#metricfserror}
+#### `fs.error` properties {#metricfserrorprops}
 
 | Property | Description |
 |---|---|
@@ -2285,7 +2285,7 @@ Structure of the `fs.open` metric
 }
 ```
 
-#### `fs.open` properties {#metricfsopen}
+#### `fs.open` properties {#metricfsopenprops}
 
 | Property | Description |
 |---|---|
@@ -2354,7 +2354,7 @@ Structure of the `fs.read` metric
 }
 ```
 
-#### `fs.read` properties {#metricfsread}
+#### `fs.read` properties {#metricfsreadprops}
 
 | Property | Description |
 |---|---|
@@ -2423,7 +2423,7 @@ Structure of the `fs.seek` metric
 }
 ```
 
-#### `fs.seek` properties {#metricfsseek}
+#### `fs.seek` properties {#metricfsseekprops}
 
 | Property | Description |
 |---|---|
@@ -2490,7 +2490,7 @@ Structure of the `fs.stat` metric
 }
 ```
 
-#### `fs.stat` properties {#metricfsstat}
+#### `fs.stat` properties {#metricfsstatprops}
 
 | Property | Description |
 |---|---|
@@ -2558,7 +2558,7 @@ Structure of the `fs.write` metric
 }
 ```
 
-#### `fs.write` properties {#metricfswrite}
+#### `fs.write` properties {#metricfswriteprops}
 
 | Property | Description |
 |---|---|
@@ -2629,7 +2629,7 @@ Structure of the `http.duration.client` metric
 }
 ```
 
-#### `http.duration.client` properties {#metrichttpclientduration}
+#### `http.duration.client` properties {#metrichttpclientdurationprops}
 
 | Property | Description |
 |---|---|
@@ -2679,7 +2679,7 @@ Structure of the `http.req.content_length` metric
 }
 ```
 
-#### `http.request.content.length` properties {#metrichttprequestcontentlength}
+#### `http.request.content.length` properties {#metrichttprequestcontentlengthprops}
 
 | Property | Description |
 |---|---|
@@ -2748,7 +2748,7 @@ Structure of the `http.req` metric
 }
 ```
 
-#### `http.req` properties {#metrichttprequests}
+#### `http.req` properties {#metrichttprequestsprops}
 
 | Property | Description |
 |---|---|
@@ -2817,7 +2817,7 @@ Structure of the `http.resp.content_length` metric
 }
 ```
 
-#### `http.response.content.length` properties {#metrichttpresponsecontentlength}
+#### `http.response.content.length` properties {#metrichttpresponsecontentlengthprops}
 
 | Property | Description |
 |---|---|
@@ -2886,7 +2886,7 @@ Structure of the `http.duration.server` metric
 }
 ```
 
-#### `http.duration.server` properties {#metrichttpserverduration}
+#### `http.duration.server` properties {#metrichttpserverdurationprops}
 
 | Property | Description |
 |---|---|
@@ -2953,7 +2953,7 @@ Structure of the `net.close` metric
 }
 ```
 
-#### `net.close` properties {#metricnetclose}
+#### `net.close` properties {#metricnetcloseprops}
 
 | Property | Description |
 |---|---|
@@ -3021,7 +3021,7 @@ Structure of the `dns.req` metric
 }
 ```
 
-#### `dns.req` properties {#metricnetdns}
+#### `dns.req` properties {#metricnetdnsprops}
 
 | Property | Description |
 |---|---|
@@ -3089,7 +3089,7 @@ Structure of the `net.duration` metric
 }
 ```
 
-#### `net.duration` properties {#metricnetduration}
+#### `net.duration` properties {#metricnetdurationprops}
 
 | Property | Description |
 |---|---|
@@ -3158,7 +3158,7 @@ Structure of the `net.error` metric
 }
 ```
 
-#### `net.error` properties {#metricneterror}
+#### `net.error` properties {#metricneterrorprops}
 
 | Property | Description |
 |---|---|
@@ -3225,7 +3225,7 @@ Structure of the `net.open` metric
 }
 ```
 
-#### `net.open` properties {#metricnetopen}
+#### `net.open` properties {#metricnetopenprops}
 
 | Property | Description |
 |---|---|
@@ -3293,7 +3293,7 @@ Structure of the `net.other` metric
 }
 ```
 
-#### `net.other` properties {#metricnetother}
+#### `net.other` properties {#metricnetotherprops}
 
 | Property | Description |
 |---|---|
@@ -3361,7 +3361,7 @@ Structure of the `net.port` metric
 }
 ```
 
-#### `net.port` properties {#metricnetport}
+#### `net.port` properties {#metricnetportprops}
 
 | Property | Description |
 |---|---|
@@ -3461,7 +3461,7 @@ Structure of the `net.rx` metric
 }
 ```
 
-#### `net.rx` properties {#metricnetrx}
+#### `net.rx` properties {#metricnetrxprops}
 
 | Property | Description |
 |---|---|
@@ -3538,7 +3538,7 @@ Structure of the `net.tcp` metric
 }
 ```
 
-#### `net.tcp` properties {#metricnettcp}
+#### `net.tcp` properties {#metricnettcpprops}
 
 | Property | Description |
 |---|---|
@@ -3636,7 +3636,7 @@ Structure of the `net.tx` metric
 }
 ```
 
-#### `net.tx` properties {#metricnettx}
+#### `net.tx` properties {#metricnettxprops}
 
 | Property | Description |
 |---|---|
@@ -3696,7 +3696,7 @@ Structure of the `net.udp` metric
 }
 ```
 
-#### `net.udp` properties {#metricnetudp}
+#### `net.udp` properties {#metricnetudpprops}
 
 | Property | Description |
 |---|---|
@@ -3744,7 +3744,7 @@ Structure of the `proc.child` metric
 }
 ```
 
-#### `proc.child` properties {#metricprocchild}
+#### `proc.child` properties {#metricprocchildprops}
 
 | Property | Description |
 |---|---|
@@ -3788,7 +3788,7 @@ Structure of the `proc.cpu` metric
 }
 ```
 
-#### `proc.cpu` properties {#metricproccpu}
+#### `proc.cpu` properties {#metricproccpuprops}
 
 | Property | Description |
 |---|---|
@@ -3832,7 +3832,7 @@ Structure of the `proc.cpu_perc` metric
 }
 ```
 
-#### `proc.cpu.perc` properties {#metricproccpuperc}
+#### `proc.cpu.perc` properties {#metricproccpupercprops}
 
 | Property | Description |
 |---|---|
@@ -3876,7 +3876,7 @@ Structure of the `proc.fd` metric
 }
 ```
 
-#### `proc.fd` properties {#metricprocfd}
+#### `proc.fd` properties {#metricprocfdprops}
 
 | Property | Description |
 |---|---|
@@ -3920,7 +3920,7 @@ Structure of the `proc.mem` metric
 }
 ```
 
-#### `proc.mem` properties {#metricprocmem}
+#### `proc.mem` properties {#metricprocmemprops}
 
 | Property | Description |
 |---|---|
@@ -3969,7 +3969,7 @@ Structure of the `proc.start` metric
 }
 ```
 
-#### `proc.start` properties {#metricprocstart}
+#### `proc.start` properties {#metricprocstartprops}
 
 | Property | Description |
 |---|---|
@@ -4018,7 +4018,7 @@ Structure of the `proc.thread` metric
 }
 ```
 
-#### `proc.thread` properties {#metricprocthread}
+#### `proc.thread` properties {#metricprocthreadprops}
 
 | Property | Description |
 |---|---|

@@ -98,8 +98,8 @@ In AppScope 1.0.0, a few event and metric schema elements, namely `title` and `d
 **HTTP**
 
 - [http.req](#metrichttpreq)
-- [http.request.content.length](#metrichttpreqcontentlength)
-- [http.response.content.length](#metrichttprespcontentlength)
+- [http.request.content_length](#metrichttpreqcontentlength)
+- [http.response.content_length](#metrichttprespcontentlength)
 - [http.duration.client](#metrichttpdurationclient)
 - [http.duration.server](#metrichttpdurationserver)
 
@@ -2654,7 +2654,7 @@ Structure of the `http.duration.client` metric
 
 <hr/>
 
-### http.request.content.length [^](#schema-reference) {#metrichttpreqcontentlength}
+### http.request.content_length [^](#schema-reference) {#metrichttpreqcontentlength}
 
 Structure of the `http.req.content_length` metric
 
@@ -2679,14 +2679,14 @@ Structure of the `http.req.content_length` metric
 }
 ```
 
-#### `http.request.content.length` properties {#metrichttpreqcontentlengthprops}
+#### `http.request.content_length` properties {#metrichttpreqcontentlengthprops}
 
 | Property | Description |
 |---|---|
 | `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttpreqcontentlengthbody)._ |
 
-#### `http.request.content.length.body` properties {#metrichttpreqcontentlengthbody}
+#### `http.request.content_length.body` properties {#metrichttpreqcontentlengthbody}
 
 | Property | Description |
 |---|---|
@@ -2773,7 +2773,7 @@ Structure of the `http.req` metric
 
 <hr/>
 
-### http.response.content.length [^](#schema-reference) {#metrichttprespcontentlength}
+### http.response.content_length [^](#schema-reference) {#metrichttprespcontentlength}
 
 Structure of the `http.resp.content_length` metric
 
@@ -2817,14 +2817,14 @@ Structure of the `http.resp.content_length` metric
 }
 ```
 
-#### `http.response.content.length` properties {#metrichttprespcontentlengthprops}
+#### `http.response.content_length` properties {#metrichttprespcontentlengthprops}
 
 | Property | Description |
 |---|---|
 | `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttprespcontentlengthbody)._ |
 
-#### `http.response.content.length.body` properties {#metrichttprespcontentlengthbody}
+#### `http.response.content_length.body` properties {#metrichttprespcontentlengthbody}
 
 | Property | Description |
 |---|---|

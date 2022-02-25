@@ -89,7 +89,7 @@ In AppScope 1.0.0, a few event and metric schema elements, namely `title` and `d
 - [net.error](#metricneterror)
 - [net.rx](#metricnetrx)
 - [net.tx](#metricnettx)
-- [dns.req](#metricnetdns)
+- [dns.req](#metricdnsreq)
 - [net.port](#metricnetport)
 - [net.tcp](#metricnettcp)
 - [net.udp](#metricnetudp)
@@ -97,11 +97,11 @@ In AppScope 1.0.0, a few event and metric schema elements, namely `title` and `d
 
 **HTTP**
 
-- [http.req](#metrichttprequests)
-- [http.request.content.length](#metrichttprequestcontentlength)
-- [http.response.content.length](#metrichttpresponsecontentlength)
-- [http.duration.client](#metrichttpclientduration)
-- [http.duration.server](#metrichttpserverduration)
+- [http.req](#metrichttpreq)
+- [http.request.content.length](#metrichttpreqcontentlength)
+- [http.response.content.length](#metrichttprespcontentlength)
+- [http.duration.client](#metrichttpdurationclient)
+- [http.duration.server](#metrichttpdurationserver)
 
 **Process**
 
@@ -2585,7 +2585,7 @@ Structure of the `fs.write` metric
 
 <hr/>
 
-### http.duration.client [^](#schema-reference) {#metrichttpclientduration}
+### http.duration.client [^](#schema-reference) {#metrichttpdurationclient}
 
 Structure of the `http.duration.client` metric
 
@@ -2629,14 +2629,14 @@ Structure of the `http.duration.client` metric
 }
 ```
 
-#### `http.duration.client` properties {#metrichttpclientdurationprops}
+#### `http.duration.client` properties {#metrichttpdurationclientprops}
 
 | Property | Description |
 |---|---|
 | `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
-| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttpclientdurationbody)._ |
+| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttpdurationclientbody)._ |
 
-#### `http.duration.client.body` properties {#metrichttpclientdurationbody}
+#### `http.duration.client.body` properties {#metrichttpdurationclientbody}
 
 | Property | Description |
 |---|---|
@@ -2654,7 +2654,7 @@ Structure of the `http.duration.client` metric
 
 <hr/>
 
-### http.request.content.length [^](#schema-reference) {#metrichttprequestcontentlength}
+### http.request.content.length [^](#schema-reference) {#metrichttpreqcontentlength}
 
 Structure of the `http.req.content_length` metric
 
@@ -2679,14 +2679,14 @@ Structure of the `http.req.content_length` metric
 }
 ```
 
-#### `http.request.content.length` properties {#metrichttprequestcontentlengthprops}
+#### `http.request.content.length` properties {#metrichttpreqcontentlengthprops}
 
 | Property | Description |
 |---|---|
 | `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
-| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttprequestcontentlengthbody)._ |
+| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttpreqcontentlengthbody)._ |
 
-#### `http.request.content.length.body` properties {#metrichttprequestcontentlengthbody}
+#### `http.request.content.length.body` properties {#metrichttpreqcontentlengthbody}
 
 | Property | Description |
 |---|---|
@@ -2704,7 +2704,7 @@ Structure of the `http.req.content_length` metric
 
 <hr/>
 
-### http.req [^](#schema-reference) {#metrichttprequests}
+### http.req [^](#schema-reference) {#metrichttpreq}
 
 Structure of the `http.req` metric
 
@@ -2748,14 +2748,14 @@ Structure of the `http.req` metric
 }
 ```
 
-#### `http.req` properties {#metrichttprequestsprops}
+#### `http.req` properties {#metrichttpreqprops}
 
 | Property | Description |
 |---|---|
 | `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
-| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttprequestsbody)._ |
+| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttpreqbody)._ |
 
-#### `http.req.body` properties {#metrichttprequestsbody}
+#### `http.req.body` properties {#metrichttpreqbody}
 
 | Property | Description |
 |---|---|
@@ -2773,7 +2773,7 @@ Structure of the `http.req` metric
 
 <hr/>
 
-### http.response.content.length [^](#schema-reference) {#metrichttpresponsecontentlength}
+### http.response.content.length [^](#schema-reference) {#metrichttprespcontentlength}
 
 Structure of the `http.resp.content_length` metric
 
@@ -2817,14 +2817,14 @@ Structure of the `http.resp.content_length` metric
 }
 ```
 
-#### `http.response.content.length` properties {#metrichttpresponsecontentlengthprops}
+#### `http.response.content.length` properties {#metrichttprespcontentlengthprops}
 
 | Property | Description |
 |---|---|
 | `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
-| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttpresponsecontentlengthbody)._ |
+| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttprespcontentlengthbody)._ |
 
-#### `http.response.content.length.body` properties {#metrichttpresponsecontentlengthbody}
+#### `http.response.content.length.body` properties {#metrichttprespcontentlengthbody}
 
 | Property | Description |
 |---|---|
@@ -2842,7 +2842,7 @@ Structure of the `http.resp.content_length` metric
 
 <hr/>
 
-### http.duration.server [^](#schema-reference) {#metrichttpserverduration}
+### http.duration.server [^](#schema-reference) {#metrichttpdurationserver}
 
 Structure of the `http.duration.server` metric
 
@@ -2886,14 +2886,14 @@ Structure of the `http.duration.server` metric
 }
 ```
 
-#### `http.duration.server` properties {#metrichttpserverdurationprops}
+#### `http.duration.server` properties {#metrichttpdurationserverprops}
 
 | Property | Description |
 |---|---|
 | `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
-| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttpserverdurationbody)._ |
+| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttpdurationserverbody)._ |
 
-#### `http.duration.server.body` properties {#metrichttpserverdurationbody}
+#### `http.duration.server.body` properties {#metrichttpdurationserverbody}
 
 | Property | Description |
 |---|---|
@@ -2980,7 +2980,7 @@ Structure of the `net.close` metric
 
 <hr/>
 
-### dns.req [^](#schema-reference) {#metricnetdns}
+### dns.req [^](#schema-reference) {#metricdnsreq}
 
 Structure of the `dns.req` metric
 
@@ -3021,14 +3021,14 @@ Structure of the `dns.req` metric
 }
 ```
 
-#### `dns.req` properties {#metricnetdnsprops}
+#### `dns.req` properties {#metricdnsreqprops}
 
 | Property | Description |
 |---|---|
 | `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
-| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricnetdnsbody)._ |
+| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricdnsreqbody)._ |
 
-#### `dns.req.body` properties {#metricnetdnsbody}
+#### `dns.req.body` properties {#metricdnsreqbody}
 
 | Property | Description |
 |---|---|

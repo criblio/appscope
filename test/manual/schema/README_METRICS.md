@@ -42,7 +42,7 @@ These were made by setting these and running the tls test
 
 -rw-r--r--  1 root   root   41129569 Jan 31 23:28 http.out.9
 
-In order to capture the metric http.request.content_length the following command can be used:
+In order to capture the metric http.req.content_length the following command can be used:
 curl -X POST https://reqbin.com/echo/post/json -H "Content-Type: application/json" -d '{"productId": 123456, "quantity": 100}'
 Example:
       export SCOPE_METRIC_VERBOSITY=4 (or 9)
@@ -53,4 +53,4 @@ Example:
 
       ldscope -- curl -X POST https://reqbin.com/echo/post/json -H "Content-Type: application/json" -d '{"productId": 123456, "quantity": 100}'
 
-      the metric for http.request.content_length will be found in http.clen
+      the metric for http.req.content_length will be found in http.clen

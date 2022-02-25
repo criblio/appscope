@@ -2,9 +2,9 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_http_response_content_length.schema.json",
   "type": "object",
-  "title": "AppScope `http.response.content_length` Metric",
-  "description": "Structure of the `http.response.content_length` metric",
-  "examples": [{"type":"metric","body":{"_metric":"http.response.content_length","_metric_type":"counter","_value":58896,"http_target":"/","numops":1,"proc":"lt-curl","pid":788,"host":"c067d78736db","unit":"byte","summary":"true","_time":1643924553.6815}}, {"type":"metric","body":{"_metric":"http.response.content_length","_metric_type":"counter","_value":58896,"http_target":"/","numops":1,"proc":"lt-curl","pid":30,"host":"c067d78736db","unit":"byte","summary":"true","_time":1643924472.648165}}],
+  "title": "AppScope `http.resp.content_length` Metric",
+  "description": "Structure of the `http.resp.content_length` metric",
+  "examples": [{"type":"metric","body":{"_metric":"http.resp.content_length","_metric_type":"counter","_value":58896,"http_target":"/","numops":1,"proc":"lt-curl","pid":788,"host":"c067d78736db","unit":"byte","summary":"true","_time":1643924553.6815}}, {"type":"metric","body":{"_metric":"http.resp.content_length","_metric_type":"counter","_value":58896,"http_target":"/","numops":1,"proc":"lt-curl","pid":30,"host":"c067d78736db","unit":"byte","summary":"true","_time":1643924472.648165}}],
   "required": [
     "type",
     "body"

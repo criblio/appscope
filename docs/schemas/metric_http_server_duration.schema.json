@@ -2,13 +2,13 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/metric_http_server_duration.schema.json",
   "type": "object",
-  "title": "AppScope `http.server.duration` Metric",
-  "description": "Structure of the `http.server.duration` metric",
+  "title": "AppScope `http.duration.server` Metric",
+  "description": "Structure of the `http.duration.server` metric",
   "required": [
     "type",
     "body"
   ],
-  "examples": [{"type":"metric","body":{"_metric":"http.server.duration","_metric_type":"timer","_value":0,"http_target":"/","numops":1,"proc":"httpd","pid":2260,"host":"c067d78736db","unit":"millisecond","summary":"true","_time":1643924563.4509389}}, {"type":"metric","body":{"_metric":"http.server.duration","_metric_type":"timer","_value":1,"http_target":"/","numops":1,"proc":"httpd","pid":648,"host":"c067d78736db","unit":"millisecond","summary":"true","_time":1643924498.3508661}}],
+  "examples": [{"type":"metric","body":{"_metric":"http.duration.server","_metric_type":"timer","_value":0,"http_target":"/","numops":1,"proc":"httpd","pid":2260,"host":"c067d78736db","unit":"millisecond","summary":"true","_time":1643924563.4509389}}, {"type":"metric","body":{"_metric":"http.duration.server","_metric_type":"timer","_value":1,"http_target":"/","numops":1,"proc":"httpd","pid":648,"host":"c067d78736db","unit":"millisecond","summary":"true","_time":1643924498.3508661}}],
   "properties": {
     "type": {
       "$ref": "definitions/envelope.schema.json#/$defs/metric_type"

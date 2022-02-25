@@ -89,7 +89,7 @@ In AppScope 1.0.0, a few event and metric schema elements, namely `title` and `d
 - [net.error](#metricneterror)
 - [net.rx](#metricnetrx)
 - [net.tx](#metricnettx)
-- [net.dns](#metricnetdns)
+- [dns.req](#metricnetdns)
 - [net.port](#metricnetport)
 - [net.tcp](#metricnettcp)
 - [net.udp](#metricnetudp)
@@ -97,11 +97,11 @@ In AppScope 1.0.0, a few event and metric schema elements, namely `title` and `d
 
 **HTTP**
 
-- [http.requests](#metrichttprequests)
+- [http.req](#metrichttprequests)
 - [http.request.content.length](#metrichttprequestcontentlength)
 - [http.response.content.length](#metrichttpresponsecontentlength)
-- [http.client.duration](#metrichttpclientduration)
-- [http.server.duration](#metrichttpserverduration)
+- [http.duration.client](#metrichttpclientduration)
+- [http.duration.server](#metrichttpserverduration)
 
 **Process**
 
@@ -2585,9 +2585,9 @@ Structure of the `fs.write` metric
 
 <hr/>
 
-### http.client.duration [^](#schema-reference) {#metrichttpclientduration}
+### http.duration.client [^](#schema-reference) {#metrichttpclientduration}
 
-Structure of the `http.client.duration` metric
+Structure of the `http.duration.client` metric
 
 #### Examples
 
@@ -2595,7 +2595,7 @@ Structure of the `http.client.duration` metric
 {
   "type": "metric",
   "body": {
-    "_metric": "http.client.duration",
+    "_metric": "http.duration.client",
     "_metric_type": "timer",
     "_value": 6,
     "http_target": "/",
@@ -2614,7 +2614,7 @@ Structure of the `http.client.duration` metric
 {
   "type": "metric",
   "body": {
-    "_metric": "http.client.duration",
+    "_metric": "http.duration.client",
     "_metric_type": "timer",
     "_value": 7,
     "http_target": "/",
@@ -2629,18 +2629,18 @@ Structure of the `http.client.duration` metric
 }
 ```
 
-#### `http.client.duration` properties {#metrichttpclientduration}
+#### `http.duration.client` properties {#metrichttpclientduration}
 
 | Property | Description |
 |---|---|
 | `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttpclientdurationbody)._ |
 
-#### `http.client.duration.body` properties {#metrichttpclientdurationbody}
+#### `http.duration.client.body` properties {#metrichttpclientdurationbody}
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - HTTP client duration<br/><br/>Value must be `http.client.duration`. |
+| `_metric` _required_ (`string`) | Source - HTTP client duration<br/><br/>Value must be `http.duration.client`. |
 | `_metric_type` _required_ (`string`) | timer<br/><br/>Value must be `timer`. |
 | `_value` _required_ (`number`) | _value<br/><br/>**Example:**<br/>`1` |
 | `http_target` _required_ (`string`) | http_target |
@@ -2656,7 +2656,7 @@ Structure of the `http.client.duration` metric
 
 ### http.request.content.length [^](#schema-reference) {#metrichttprequestcontentlength}
 
-Structure of the `http.request.content_length` metric
+Structure of the `http.req.content_length` metric
 
 #### Example
 
@@ -2664,7 +2664,7 @@ Structure of the `http.request.content_length` metric
 {
   "type": "metric",
   "body": {
-    "_metric": "http.request.content_length",
+    "_metric": "http.req.content_length",
     "_metric_type": "counter",
     "_value": 38,
     "http_target": "/echo/post/json",
@@ -2690,7 +2690,7 @@ Structure of the `http.request.content_length` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - HTTP request content length<br/><br/>Value must be `http.request.content_length`. |
+| `_metric` _required_ (`string`) | Source - HTTP request content length<br/><br/>Value must be `http.req.content_length`. |
 | `_metric_type` _required_ (`string`) | counter<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | _value<br/><br/>**Example:**<br/>`1` |
 | `http_target` _required_ (`string`) | http_target |
@@ -2704,9 +2704,9 @@ Structure of the `http.request.content_length` metric
 
 <hr/>
 
-### http.requests [^](#schema-reference) {#metrichttprequests}
+### http.req [^](#schema-reference) {#metrichttprequests}
 
-Structure of the `http.requests` metric
+Structure of the `http.req` metric
 
 #### Examples
 
@@ -2714,7 +2714,7 @@ Structure of the `http.requests` metric
 {
   "type": "metric",
   "body": {
-    "_metric": "http.requests",
+    "_metric": "http.req",
     "_metric_type": "counter",
     "_value": 1,
     "http_target": "/",
@@ -2733,7 +2733,7 @@ Structure of the `http.requests` metric
 {
   "type": "metric",
   "body": {
-    "_metric": "http.requests",
+    "_metric": "http.req",
     "_metric_type": "counter",
     "_value": 1,
     "http_target": "/",
@@ -2748,18 +2748,18 @@ Structure of the `http.requests` metric
 }
 ```
 
-#### `http.requests` properties {#metrichttprequests}
+#### `http.req` properties {#metrichttprequests}
 
 | Property | Description |
 |---|---|
 | `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttprequestsbody)._ |
 
-#### `http.requests.body` properties {#metrichttprequestsbody}
+#### `http.req.body` properties {#metrichttprequestsbody}
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - HTTP requests<br/><br/>Value must be `http.requests`. |
+| `_metric` _required_ (`string`) | Source - HTTP requests<br/><br/>Value must be `http.req`. |
 | `_metric_type` _required_ (`string`) | counter<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | _value<br/><br/>**Example:**<br/>`1` |
 | `http_target` _required_ (`string`) | http_target |
@@ -2775,7 +2775,7 @@ Structure of the `http.requests` metric
 
 ### http.response.content.length [^](#schema-reference) {#metrichttpresponsecontentlength}
 
-Structure of the `http.response.content_length` metric
+Structure of the `http.resp.content_length` metric
 
 #### Examples
 
@@ -2783,7 +2783,7 @@ Structure of the `http.response.content_length` metric
 {
   "type": "metric",
   "body": {
-    "_metric": "http.response.content_length",
+    "_metric": "http.resp.content_length",
     "_metric_type": "counter",
     "_value": 58896,
     "http_target": "/",
@@ -2802,7 +2802,7 @@ Structure of the `http.response.content_length` metric
 {
   "type": "metric",
   "body": {
-    "_metric": "http.response.content_length",
+    "_metric": "http.resp.content_length",
     "_metric_type": "counter",
     "_value": 58896,
     "http_target": "/",
@@ -2828,7 +2828,7 @@ Structure of the `http.response.content_length` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - HTTP response content length<br/><br/>Value must be `http.response.content_length`. |
+| `_metric` _required_ (`string`) | Source - HTTP response content length<br/><br/>Value must be `http.resp.content_length`. |
 | `_metric_type` _required_ (`string`) | counter<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | _value<br/><br/>**Example:**<br/>`1` |
 | `http_target` _required_ (`string`) | http_target |
@@ -2842,9 +2842,9 @@ Structure of the `http.response.content_length` metric
 
 <hr/>
 
-### http.server.duration [^](#schema-reference) {#metrichttpserverduration}
+### http.duration.server [^](#schema-reference) {#metrichttpserverduration}
 
-Structure of the `http.server.duration` metric
+Structure of the `http.duration.server` metric
 
 #### Examples
 
@@ -2852,7 +2852,7 @@ Structure of the `http.server.duration` metric
 {
   "type": "metric",
   "body": {
-    "_metric": "http.server.duration",
+    "_metric": "http.duration.server",
     "_metric_type": "timer",
     "_value": 0,
     "http_target": "/",
@@ -2871,7 +2871,7 @@ Structure of the `http.server.duration` metric
 {
   "type": "metric",
   "body": {
-    "_metric": "http.server.duration",
+    "_metric": "http.duration.server",
     "_metric_type": "timer",
     "_value": 1,
     "http_target": "/",
@@ -2886,18 +2886,18 @@ Structure of the `http.server.duration` metric
 }
 ```
 
-#### `http.server.duration` properties {#metrichttpserverduration}
+#### `http.duration.server` properties {#metrichttpserverduration}
 
 | Property | Description |
 |---|---|
 | `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttpserverdurationbody)._ |
 
-#### `http.server.duration.body` properties {#metrichttpserverdurationbody}
+#### `http.duration.server.body` properties {#metrichttpserverdurationbody}
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - HTTP server duration<br/><br/>Value must be `http.server.duration`. |
+| `_metric` _required_ (`string`) | Source - HTTP server duration<br/><br/>Value must be `http.duration.server`. |
 | `_metric_type` _required_ (`string`) | timer<br/><br/>Value must be `timer`. |
 | `_value` _required_ (`number`) | _value<br/><br/>**Example:**<br/>`1` |
 | `http_target` _required_ (`string`) | http_target |
@@ -2980,9 +2980,9 @@ Structure of the `net.close` metric
 
 <hr/>
 
-### net.dns [^](#schema-reference) {#metricnetdns}
+### dns.req [^](#schema-reference) {#metricnetdns}
 
-Structure of the `net.dns` metric
+Structure of the `dns.req` metric
 
 #### Examples
 
@@ -2990,7 +2990,7 @@ Structure of the `net.dns` metric
 {
   "type": "metric",
   "body": {
-    "_metric": "net.dns",
+    "_metric": "dns.req",
     "_metric_type": "counter",
     "_value": 1,
     "proc": "lt-curl",
@@ -3007,7 +3007,7 @@ Structure of the `net.dns` metric
 {
   "type": "metric",
   "body": {
-    "_metric": "net.dns",
+    "_metric": "dns.req",
     "_metric_type": "counter",
     "_value": 1,
     "proc": "lt-curl",
@@ -3021,18 +3021,18 @@ Structure of the `net.dns` metric
 }
 ```
 
-#### `net.dns` properties {#metricnetdns}
+#### `dns.req` properties {#metricnetdns}
 
 | Property | Description |
 |---|---|
 | `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
 | `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricnetdnsbody)._ |
 
-#### `net.dns.body` properties {#metricnetdnsbody}
+#### `dns.req.body` properties {#metricnetdnsbody}
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - Net DNS<br/><br/>Value must be `net.dns`. |
+| `_metric` _required_ (`string`) | Source - Net DNS<br/><br/>Value must be `dns.req`. |
 | `_metric_type` _required_ (`string`) | counter<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | _value<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | proc |

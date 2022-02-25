@@ -103,10 +103,10 @@ func readMetrics(workDir string, w *widgets) {
 				"net.udp",
 				"net.error",
 				"net.duration",
-				"http.requests",
-				"http.server.duration",
-				"http.response.content_length",
-				"net.dns"}
+				"http.req",
+				"http.duration.server",
+				"http.resp.content_length",
+				"dns.req"}
 			for _, mname := range mnames {
 				var val float64
 				var ok bool
@@ -148,13 +148,13 @@ func readMetrics(workDir string, w *widgets) {
 					writeSparklineFloat64(w.netError, val)
 				case "net.duration":
 					writeSparklineFloat64(w.netDuration, val)
-				case "http.requests":
+				case "http.req":
 					writeSparklineFloat64(w.httpReq, val, sparkline.Label(fmt.Sprintf("Requests: %.0f/sec", math.Round(val/10))))
-				case "http.server.duration":
+				case "http.duration.server":
 					writeSparklineFloat64(w.httpDuration, val, sparkline.Label(fmt.Sprintf("Avg Duration: %.0f ms", val)))
-				case "http.response.content_length":
+				case "http.resp.content_length":
 					writeSparklineFloat64(w.httpBytes, val, sparkline.Label(fmt.Sprintf("Avg Content Length: %.0f bytes", val)))
-				case "net.dns":
+				case "dns.req":
 					writeSparklineFloat64(w.dnsReq, val)
 				}
 			}

@@ -165,34 +165,34 @@
       "const": "http.req"
     },
     "sourcehttpclientduration" : {
-      "title": "http.client.duration",
+      "title": "http.duration.client",
       "description": "Source - HTTP client duration",
       "type": "string",
-      "const": "http.client.duration"
+      "const": "http.duration.client"
     },
     "sourcehttprequests" : {
-      "title": "http.requests",
+      "title": "http.req",
       "description": "Source - HTTP requests",
       "type": "string",
-      "const": "http.requests"
+      "const": "http.req"
     },
     "sourcehttprequestcontentlength" : {
-      "title": "http.request.content_length",
+      "title": "http.req.content_length",
       "description": "Source - HTTP request content length",
       "type": "string",
-      "const": "http.request.content_length"
+      "const": "http.req.content_length"
     },
     "sourcehttpresponsecontentlength" : {
-      "title": "http.response.content_length",
+      "title": "http.resp.content_length",
       "description": "Source - HTTP response content length",
       "type": "string",
-      "const": "http.response.content_length"
+      "const": "http.resp.content_length"
     },
     "sourcehttpserverduration" : {
-      "title": "http.server.duration",
+      "title": "http.duration.server",
       "description": "Source - HTTP server duration",
       "type": "string",
-      "const": "http.server.duration"
+      "const": "http.duration.server"
     },
     "sourcenetclose": {
       "title": "net.close",
@@ -207,10 +207,10 @@
       "const": "net.app"
     },
     "sourcenetdns": {
-      "title": "net.dns",
+      "title": "dns.req",
       "description": "Source - Net DNS",
       "type": "string",
-      "const": "net.dns"
+      "const": "dns.req"
     },
     "sourcenetduration": {
       "title": "net.duration",

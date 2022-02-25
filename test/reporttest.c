@@ -1165,16 +1165,16 @@ doDNSSendNoDNSSummarization(void** state)
 
     // Zeros should not be reported on any interface
     doSend(16, 0, NULL, 0, BUF);
-    assert_int_equal(metricCalls("net.dns"), 0);
+    assert_int_equal(metricCalls("dns.req"), 0);
     assert_int_equal(eventCalls("dns.req"), 0);
 
     // Totals should not be reported if zero either
     doTotal(TOT_DNS);
-    assert_int_equal(metricCalls("net.dns"), 0);
+    assert_int_equal(metricCalls("dns.req"), 0);
     assert_int_equal(eventCalls("dns.req"), 0);
 
 
-    // Without DNS summarization, every net.dns is output
+    // Without DNS summarization, every dns.req is output
     clearTestData();
 
     // A query to look up www.google.com
@@ -1194,8 +1194,8 @@ doDNSSendNoDNSSummarization(void** state)
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 2);
     assert_int_equal(eventRdWrValues("net.tx"), 2*13);
-    assert_int_equal(metricCalls("net.dns"), 2);
-    assert_int_equal(metricValues("net.dns"), 2);
+    assert_int_equal(metricCalls("dns.req"), 2);
+    assert_int_equal(metricValues("dns.req"), 2);
     // the way this is done, there is now a raw event and a DNS event
     // for each doEvent()
     assert_int_equal(eventCalls("dns.req"), 4);
@@ -1207,14 +1207,14 @@ doDNSSendNoDNSSummarization(void** state)
     doClose(16, "closeFunc");
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 0);
-    assert_int_equal(metricCalls("net.dns"), 0);
+    assert_int_equal(metricCalls("dns.req"), 0);
     assert_int_equal(eventCalls("dns.req"), 0);
     assert_int_equal(metricCalls("net.tcp"), 0);
     assert_int_equal(metricCalls("net.port"), 0);
     assert_int_equal(eventCalls("net.tcp"), 1);
     assert_int_equal(eventCalls("net.port"), 1);
 
-    // doTotal shouldn't output net.dns.  It's already reported
+    // doTotal shouldn't output dns.req.  It's already reported
     clearTestData();
     doTotal(TOT_PORTS);
     doTotal(TOT_TCP_CONN);
@@ -1253,16 +1253,16 @@ doDNSSendDNSSummarization(void** state)
 
     // Zeros should not be reported on any interface
     doSend(16, 0, NULL, 0, BUF);
-    assert_int_equal(metricCalls("net.dns"), 0);
+    assert_int_equal(metricCalls("dns.req"), 0);
     assert_int_equal(eventCalls("dns.req"), 0);
 
     // Totals should not be reported if zero either
     doTotal(TOT_DNS);
-    assert_int_equal(metricCalls("net.dns"), 0);
+    assert_int_equal(metricCalls("dns.req"), 0);
     assert_int_equal(eventCalls("dns.req"), 0);
 
 
-    // With DNS summarization, net.dns is not output
+    // With DNS summarization, dns.req is not output
     clearTestData();
 
     // A query to look up www.google.com
@@ -1282,8 +1282,8 @@ doDNSSendDNSSummarization(void** state)
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 2);
     assert_int_equal(eventRdWrValues("net.tx"), 2*13);
-    assert_int_equal(metricCalls("net.dns"), 0);
-    assert_int_equal(metricValues("net.dns"), 0);
+    assert_int_equal(metricCalls("dns.req"), 0);
+    assert_int_equal(metricValues("dns.req"), 0);
     assert_int_equal(eventCalls("dns.req"), 4);
     assert_int_equal(eventValues("dns.req"), 4);
 
@@ -1293,14 +1293,14 @@ doDNSSendDNSSummarization(void** state)
     doClose(16, "closeFunc");
     assert_int_equal(metricCalls("net.tx"), 0);
     assert_int_equal(eventCalls("net.tx"), 0);
-    assert_int_equal(metricCalls("net.dns"), 0);
+    assert_int_equal(metricCalls("dns.req"), 0);
     assert_int_equal(eventCalls("dns.req"), 0);
     assert_int_equal(metricCalls("net.tcp"), 0);
     assert_int_equal(metricCalls("net.port"), 0);
     assert_int_equal(eventCalls("net.tcp"), 1);
     assert_int_equal(eventCalls("net.port"), 1);
 
-    // doTotal should output net.dns and net.tx.  (not reported above)
+    // doTotal should output dns.req and net.tx.  (not reported above)
     clearTestData();
     doTotal(TOT_PORTS);
     doTotal(TOT_TCP_CONN);
@@ -1308,8 +1308,8 @@ doDNSSendDNSSummarization(void** state)
     doTotal(TOT_TX);
     assert_int_equal(metricCalls("net.tx"), 1);
     assert_int_equal(metricValues("net.tx"), 2*13);
-    assert_int_equal(metricCalls("net.dns"), 1);
-    assert_int_equal(metricValues("net.dns"), 2);
+    assert_int_equal(metricCalls("dns.req"), 1);
+    assert_int_equal(metricValues("dns.req"), 2);
     assert_int_equal(eventCalls(NULL), 0);
 
     doClose(15, "closeFunc");

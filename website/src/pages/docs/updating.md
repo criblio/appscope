@@ -113,8 +113,8 @@ Pre-GA | 1.0.1
 `fs.op.close` | `fs.close`
 `fs.op.seek` | `fs.seek` 
 `http.requests` | `http.req`
-`http.request` | `http.req`
-`http.response` | `http.resp`
+`http.request.content_length` | `http.req.content_length`
+`http.response.content_length` | `http.resp.content_length`
 `http.server.duration` | `http.duration.server`
 `http.client.duration` | `http.duration.client`
 `net.dns` | `dns.req`

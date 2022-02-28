@@ -1,10 +1,10 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://appscope.dev/docs/schemas/metric_http_requests.schema.json",
+  "$id": "https://appscope.dev/docs/schemas/metric_http_resp_content_length.schema.json",
   "type": "object",
-  "title": "AppScope `http.requests` Metric",
-  "description": "Structure of the `http.requests` metric",
-  "examples": [{"type":"metric","body":{"_metric":"http.requests","_metric_type":"counter","_value":1,"http_target":"/","http_status_code":200,"proc":"lt-curl","pid":788,"host":"c067d78736db","unit":"request","summary":"true","_time":1643924553.6814411}}, {"type":"metric","body":{"_metric":"http.requests","_metric_type":"counter","_value":1,"http_target":"/","http_status_code":200,"proc":"lt-curl","pid":30,"host":"c067d78736db","unit":"request","summary":"true","_time":1643924472.64811}}],
+  "title": "AppScope `http.resp.content_length` Metric",
+  "description": "Structure of the `http.resp.content_length` metric",
+  "examples": [{"type":"metric","body":{"_metric":"http.resp.content_length","_metric_type":"counter","_value":58896,"http_target":"/","numops":1,"proc":"lt-curl","pid":788,"host":"c067d78736db","unit":"byte","summary":"true","_time":1643924553.6815}}, {"type":"metric","body":{"_metric":"http.resp.content_length","_metric_type":"counter","_value":58896,"http_target":"/","numops":1,"proc":"lt-curl","pid":30,"host":"c067d78736db","unit":"byte","summary":"true","_time":1643924472.648165}}],
   "required": [
     "type",
     "body"
@@ -22,7 +22,7 @@
         "_metric_type",
         "_value",
         "http_target",
-        "http_status_code",
+        "numops",
         "proc",
         "pid",
         "host",
@@ -31,7 +31,7 @@
       ],
       "properties": {
         "_metric": {
-          "$ref": "definitions/body.schema.json#/$defs/sourcehttprequests"
+          "$ref": "definitions/body.schema.json#/$defs/sourcehttprespcontentlength"
         },
         "_metric_type": {
           "$ref": "definitions/body.schema.json#/$defs/metric_type_counter"
@@ -42,8 +42,8 @@
         "http_target": {
           "$ref": "definitions/data.schema.json#/$defs/http_target"
         },
-        "http_status_code": {
-          "$ref": "definitions/data.schema.json#/$defs/http_status_code"
+        "numops": {
+          "$ref": "definitions/data.schema.json#/$defs/numops"
         },
         "proc": {
           "$ref": "definitions/data.schema.json#/$defs/proc"
@@ -55,7 +55,7 @@
           "$ref": "definitions/data.schema.json#/$defs/host"
         },
         "unit": {
-          "$ref": "definitions/data.schema.json#/$defs/unit_request"
+          "$ref": "definitions/data.schema.json#/$defs/unit_byte"
         },
         "summary": {
           "$ref": "definitions/data.schema.json#/$defs/summary"

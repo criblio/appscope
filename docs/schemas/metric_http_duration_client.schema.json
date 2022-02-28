@@ -1,10 +1,10 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://appscope.dev/docs/schemas/metric_http_response_content_length.schema.json",
+  "$id": "https://appscope.dev/docs/schemas/metric_http_duration_client.schema.json",
   "type": "object",
-  "title": "AppScope `http.response.content_length` Metric",
-  "description": "Structure of the `http.response.content_length` metric",
-  "examples": [{"type":"metric","body":{"_metric":"http.response.content_length","_metric_type":"counter","_value":58896,"http_target":"/","numops":1,"proc":"lt-curl","pid":788,"host":"c067d78736db","unit":"byte","summary":"true","_time":1643924553.6815}}, {"type":"metric","body":{"_metric":"http.response.content_length","_metric_type":"counter","_value":58896,"http_target":"/","numops":1,"proc":"lt-curl","pid":30,"host":"c067d78736db","unit":"byte","summary":"true","_time":1643924472.648165}}],
+  "title": "AppScope `http.duration.client` Metric",
+  "description": "Structure of the `http.duration.client` metric",
+  "examples": [{"type":"metric","body":{"_metric":"http.duration.client","_metric_type":"timer","_value":6,"http_target":"/","numops":1,"proc":"lt-curl","pid":788,"host":"c067d78736db","unit":"millisecond","summary":"true","_time":1643924553.681483}},{"type":"metric","body":{"_metric":"http.duration.client","_metric_type":"timer","_value":7,"http_target":"/","numops":1,"proc":"lt-curl","pid":30,"host":"c067d78736db","unit":"millisecond","summary":"true","_time":1643924472.6481481}}],
   "required": [
     "type",
     "body"
@@ -31,10 +31,10 @@
       ],
       "properties": {
         "_metric": {
-          "$ref": "definitions/body.schema.json#/$defs/sourcehttpresponsecontentlength"
+          "$ref": "definitions/body.schema.json#/$defs/sourcehttpdurationclient"
         },
         "_metric_type": {
-          "$ref": "definitions/body.schema.json#/$defs/metric_type_counter"
+          "$ref": "definitions/body.schema.json#/$defs/metric_type_timer"
         },
         "_value": {
           "$ref": "definitions/body.schema.json#/$defs/_value"
@@ -55,9 +55,9 @@
           "$ref": "definitions/data.schema.json#/$defs/host"
         },
         "unit": {
-          "$ref": "definitions/data.schema.json#/$defs/unit_byte"
+          "$ref": "definitions/data.schema.json#/$defs/unit_millisecond"
         },
-        "summary": {
+        "summary" : {
           "$ref": "definitions/data.schema.json#/$defs/summary"
         },
         "_time": {

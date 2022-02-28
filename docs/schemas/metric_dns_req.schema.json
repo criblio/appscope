@@ -1,10 +1,10 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://appscope.dev/docs/schemas/metric_http_client_duration.schema.json",
+  "$id": "https://appscope.dev/docs/schemas/metric_dns_req.schema.json",
   "type": "object",
-  "title": "AppScope `http.client.duration` Metric",
-  "description": "Structure of the `http.client.duration` metric",
-  "examples": [{"type":"metric","body":{"_metric":"http.client.duration","_metric_type":"timer","_value":6,"http_target":"/","numops":1,"proc":"lt-curl","pid":788,"host":"c067d78736db","unit":"millisecond","summary":"true","_time":1643924553.681483}},{"type":"metric","body":{"_metric":"http.client.duration","_metric_type":"timer","_value":7,"http_target":"/","numops":1,"proc":"lt-curl","pid":30,"host":"c067d78736db","unit":"millisecond","summary":"true","_time":1643924472.6481481}}],
+  "title": "AppScope `dns.req` Metric",
+  "description": "Structure of the `dns.req` metric",
+  "examples": [{"type":"metric","body":{"_metric":"dns.req","_metric_type":"counter","_value":1,"proc":"lt-curl","pid":31,"host":"2a6bc132b07a","unit":"request","summary":"true","_time":1643832467.7951341}}, {"type":"metric","body":{"_metric":"dns.req","_metric_type":"counter","_value":1,"proc":"lt-curl","pid":2485,"host":"2a6bc132b07a","domain":"cribl.io","duration":0,"unit":"request","_time":1643832569.764219}}],
   "required": [
     "type",
     "body"
@@ -21,8 +21,6 @@
         "_metric",
         "_metric_type",
         "_value",
-        "http_target",
-        "numops",
         "proc",
         "pid",
         "host",
@@ -31,19 +29,13 @@
       ],
       "properties": {
         "_metric": {
-          "$ref": "definitions/body.schema.json#/$defs/sourcehttpclientduration"
+          "$ref": "definitions/body.schema.json#/$defs/sourcednsreq"
         },
         "_metric_type": {
-          "$ref": "definitions/body.schema.json#/$defs/metric_type_timer"
+          "$ref": "definitions/body.schema.json#/$defs/metric_type_counter"
         },
         "_value": {
           "$ref": "definitions/body.schema.json#/$defs/_value"
-        },
-        "http_target": {
-          "$ref": "definitions/data.schema.json#/$defs/http_target"
-        },
-        "numops": {
-          "$ref": "definitions/data.schema.json#/$defs/numops"
         },
         "proc": {
           "$ref": "definitions/data.schema.json#/$defs/proc"
@@ -54,10 +46,16 @@
         "host": {
           "$ref": "definitions/data.schema.json#/$defs/host"
         },
-        "unit": {
-          "$ref": "definitions/data.schema.json#/$defs/unit_millisecond"
+        "domain": {
+          "$ref": "definitions/data.schema.json#/$defs/domain"
         },
-        "summary" : {
+        "duration": {
+          "$ref": "definitions/data.schema.json#/$defs/duration"
+        },
+        "unit": {
+          "$ref": "definitions/data.schema.json#/$defs/unit_request"
+        },
+        "summary": {
           "$ref": "definitions/data.schema.json#/$defs/summary"
         },
         "_time": {

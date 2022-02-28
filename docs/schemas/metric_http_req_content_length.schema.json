@@ -1,10 +1,10 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://appscope.dev/docs/schemas/metric_net_dns.schema.json",
+  "$id": "https://appscope.dev/docs/schemas/metric_http_req_content_length.schema.json",
   "type": "object",
-  "title": "AppScope `net.dns` Metric",
-  "description": "Structure of the `net.dns` metric",
-  "examples": [{"type":"metric","body":{"_metric":"net.dns","_metric_type":"counter","_value":1,"proc":"lt-curl","pid":31,"host":"2a6bc132b07a","unit":"request","summary":"true","_time":1643832467.7951341}}, {"type":"metric","body":{"_metric":"net.dns","_metric_type":"counter","_value":1,"proc":"lt-curl","pid":2485,"host":"2a6bc132b07a","domain":"cribl.io","duration":0,"unit":"request","_time":1643832569.764219}}],
+  "title": "AppScope `http.req.content_length` Metric",
+  "description": "Structure of the `http.req.content_length` metric",
+  "examples": [{"type":"metric","body":{"_metric":"http.req.content_length","_metric_type":"counter","_value":38,"http_target":"/echo/post/json","numops":1,"proc":"curl","pid":525,"host":"272cc69a120a","unit":"byte","summary":"true","_time":1644230452.63037}}],
   "required": [
     "type",
     "body"
@@ -21,6 +21,8 @@
         "_metric",
         "_metric_type",
         "_value",
+        "http_target",
+        "numops",
         "proc",
         "pid",
         "host",
@@ -29,13 +31,19 @@
       ],
       "properties": {
         "_metric": {
-          "$ref": "definitions/body.schema.json#/$defs/sourcenetdns"
+          "$ref": "definitions/body.schema.json#/$defs/sourcehttpreqcontentlength"
         },
         "_metric_type": {
           "$ref": "definitions/body.schema.json#/$defs/metric_type_counter"
         },
         "_value": {
           "$ref": "definitions/body.schema.json#/$defs/_value"
+        },
+        "http_target": {
+          "$ref": "definitions/data.schema.json#/$defs/http_target"
+        },
+        "numops": {
+          "$ref": "definitions/data.schema.json#/$defs/numops"
         },
         "proc": {
           "$ref": "definitions/data.schema.json#/$defs/proc"
@@ -46,14 +54,8 @@
         "host": {
           "$ref": "definitions/data.schema.json#/$defs/host"
         },
-        "domain": {
-          "$ref": "definitions/data.schema.json#/$defs/domain"
-        },
-        "duration": {
-          "$ref": "definitions/data.schema.json#/$defs/duration"
-        },
         "unit": {
-          "$ref": "definitions/data.schema.json#/$defs/unit_request"
+          "$ref": "definitions/data.schema.json#/$defs/unit_byte"
         },
         "summary": {
           "$ref": "definitions/data.schema.json#/$defs/summary"

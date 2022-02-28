@@ -28,7 +28,7 @@ grep -m 1 net.other  ~/.scope/history/seq_server_xxx/metrics.json  > appscope/te
 
 ```
 
-## `http.request.content_length` metric
+## `http.req.content_length` metric
 
 ```
 

@@ -3,11 +3,11 @@ OUTFILE="/tmp/http.filtered.9"
 
 
 LIST=""
-LIST+="http.client.duration "
-LIST+="http.requests "
-LIST+="http.response.content_length "
-LIST+="http.server.duration "
-LIST+="net.dns "
+LIST+="http.duration.client "
+LIST+="http.req "
+LIST+="http.resp.content_length "
+LIST+="http.duration.server "
+LIST+="dns.req "
 LIST+="net.open "
 
 rm -f $OUTFILE

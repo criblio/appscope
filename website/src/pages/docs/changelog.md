@@ -6,15 +6,29 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.0.1
+
+2022-02-28 - Update to GA Release 
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.0.1`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.0.1/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.0.1/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.0.1/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.0.1/linux/aarch64/scope)
+
+### Fixes
+
+AppScope 1.0.1 updates event and metric names. The AppScope team strongly recommends using AppScope 1.0.1 and not 1.0.0.
+
+#### Schema
+
+- [#815](https://github.com/criblio/appscope/issues/815) Names of events and metrics are now complete, correct, and consistent with the original design intent.
+
 ## AppScope 1.0.0
 
 2022-02-15 - GA Release <!-- Official v1 Release -->
 
-Assets are available via Docker and the Cribl CDN at the links below.
-
-- `Docker`: `cribl/scope:1.0.0`
-- `x86`: [https://cdn.cribl.io/dl/scope/1.0.0/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.0.0/linux/x86_64/scope)
-- `ARM`: [https://cdn.cribl.io/dl/scope/1.0.0/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.0.0/linux/aarch64/scope)
+This release has been replaced by AppScope 1.0.1.
 
 ### New Features and Improvements
 

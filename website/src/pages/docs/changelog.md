@@ -158,7 +158,7 @@ This pre-release addresses the following issues:
 - **Fix**: [#394](https://github.com/criblio/appscope/pull/394) Improved AppScope's regex for determining whether a given filename represents a log file.
 - **Fix**: [#309](https://github.com/criblio/appscope/issues/309) The `scope flows` command now works when `stdin` is a pipe.
 - **Fix**: [#388](https://github.com/criblio/appscope/issues/388) Ensure that all dimension names contain underscores (`_`) rather than periods (`.`). The `http.status` and `http.target` dimensions have been corrected. This change is not backwards-compatible.
-- **Fix**: [#393](https://github.com/criblio/appscope/pull/393) The metrics `http.duration.client` and `http.duration.server` are now the correct type, `timer`. This change is not backwards-compatible.
+- **Fix**: [#393](https://github.com/criblio/appscope/pull/393) The metrics `http.client.duration` and `http.server.duration` are now the correct type, `timer`. This change is not backwards-compatible.
 - **Fix**: [#358](https://github.com/criblio/appscope/pull/358) Cleaned up help for `-d` and `-k` options to `scope prune`.
 
 # Changelog

@@ -1,10 +1,10 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://appscope.dev/docs/schemas/metric_http_request_content_length.schema.json",
+  "$id": "https://appscope.dev/docs/schemas/metric_http_req.schema.json",
   "type": "object",
-  "title": "AppScope `http.req.content_length` Metric",
-  "description": "Structure of the `http.req.content_length` metric",
-  "examples": [{"type":"metric","body":{"_metric":"http.req.content_length","_metric_type":"counter","_value":38,"http_target":"/echo/post/json","numops":1,"proc":"curl","pid":525,"host":"272cc69a120a","unit":"byte","summary":"true","_time":1644230452.63037}}],
+  "title": "AppScope `http.req` Metric",
+  "description": "Structure of the `http.req` metric",
+  "examples": [{"type":"metric","body":{"_metric":"http.req","_metric_type":"counter","_value":1,"http_target":"/","http_status_code":200,"proc":"lt-curl","pid":788,"host":"c067d78736db","unit":"request","summary":"true","_time":1643924553.6814411}}, {"type":"metric","body":{"_metric":"http.req","_metric_type":"counter","_value":1,"http_target":"/","http_status_code":200,"proc":"lt-curl","pid":30,"host":"c067d78736db","unit":"request","summary":"true","_time":1643924472.64811}}],
   "required": [
     "type",
     "body"
@@ -22,7 +22,7 @@
         "_metric_type",
         "_value",
         "http_target",
-        "numops",
+        "http_status_code",
         "proc",
         "pid",
         "host",
@@ -31,7 +31,7 @@
       ],
       "properties": {
         "_metric": {
-          "$ref": "definitions/body.schema.json#/$defs/sourcehttprequestcontentlength"
+          "$ref": "definitions/body.schema.json#/$defs/sourcehttprequests"
         },
         "_metric_type": {
           "$ref": "definitions/body.schema.json#/$defs/metric_type_counter"
@@ -42,8 +42,8 @@
         "http_target": {
           "$ref": "definitions/data.schema.json#/$defs/http_target"
         },
-        "numops": {
-          "$ref": "definitions/data.schema.json#/$defs/numops"
+        "http_status_code": {
+          "$ref": "definitions/data.schema.json#/$defs/http_status_code"
         },
         "proc": {
           "$ref": "definitions/data.schema.json#/$defs/proc"
@@ -55,7 +55,7 @@
           "$ref": "definitions/data.schema.json#/$defs/host"
         },
         "unit": {
-          "$ref": "definitions/data.schema.json#/$defs/unit_byte"
+          "$ref": "definitions/data.schema.json#/$defs/unit_request"
         },
         "summary": {
           "$ref": "definitions/data.schema.json#/$defs/summary"

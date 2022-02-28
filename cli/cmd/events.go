@@ -107,6 +107,7 @@ var eventsCmd = &cobra.Command{
 in []'s at the left) as a positional parameter. Filters can be provided to narrow down by source (e.g. http, net, fs, console) 
 or source (e.g. fs.open, stdout, net.open). JavaScript expressions can be used to further refine the query and express logic.`,
 	Example: `scope events
+scope events m61
 scope events -t http
 scope events -s stderr
 scope events -e 'sourcetype!="net"'

@@ -12,7 +12,7 @@ When we say "the AppScope schema," we mean the [whole set](https://github.com/cr
 
 In AppScope 1.0.1, a few event and metric schema elements, namely `title` and `description`, have placeholder values. In future these may be made more informative. They are essentially "internal documentation" within the schemas and do not affect how the schemas function in AppScope. In the event that you develop any code that depends on AppScope schemas, be aware that the content of `title` and `description` fields may evolve.
 
-**Note**: The AppScope team strongly recommends using AppScope 1.0.1 and not 1.0.0.
+**Note**: AppScope 1.0.0 has been omitted from this documentation because it has been replaced by AppScope 1.0.1.
 
 <div class="toc-grid">
 <div class="toc-cell">

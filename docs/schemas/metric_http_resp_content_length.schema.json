@@ -31,7 +31,7 @@
       ],
       "properties": {
         "_metric": {
-          "$ref": "definitions/body.schema.json#/$defs/sourcehttpresponsecontentlength"
+          "$ref": "definitions/body.schema.json#/$defs/sourcehttprespcontentlength"
         },
         "_metric_type": {
           "$ref": "definitions/body.schema.json#/$defs/metric_type_counter"

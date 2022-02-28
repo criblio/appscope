@@ -29,7 +29,7 @@
       ],
       "properties": {
         "_metric": {
-          "$ref": "definitions/body.schema.json#/$defs/sourcenetdns"
+          "$ref": "definitions/body.schema.json#/$defs/sourcednsreq"
         },
         "_metric_type": {
           "$ref": "definitions/body.schema.json#/$defs/metric_type_counter"

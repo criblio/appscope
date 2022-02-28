@@ -164,31 +164,25 @@
       "type": "string",
       "const": "http.req"
     },
-    "sourcehttpclientduration" : {
+    "sourcehttpdurationclient" : {
       "title": "http.duration.client",
       "description": "Source - HTTP client duration",
       "type": "string",
       "const": "http.duration.client"
     },
-    "sourcehttprequests" : {
-      "title": "http.req",
-      "description": "Source - HTTP requests",
-      "type": "string",
-      "const": "http.req"
-    },
-    "sourcehttprequestcontentlength" : {
+    "sourcehttpreqcontentlength" : {
       "title": "http.req.content_length",
       "description": "Source - HTTP request content length",
       "type": "string",
       "const": "http.req.content_length"
     },
-    "sourcehttpresponsecontentlength" : {
+    "sourcehttprespcontentlength" : {
       "title": "http.resp.content_length",
       "description": "Source - HTTP response content length",
       "type": "string",
       "const": "http.resp.content_length"
     },
-    "sourcehttpserverduration" : {
+    "sourcehttpdurationserver" : {
       "title": "http.duration.server",
       "description": "Source - HTTP server duration",
       "type": "string",
@@ -205,12 +199,6 @@
       "description": "Source - Net App",
       "type": "string",
       "const": "net.app"
-    },
-    "sourcenetdns": {
-      "title": "dns.req",
-      "description": "Source - Net DNS",
-      "type": "string",
-      "const": "dns.req"
     },
     "sourcenetduration": {
       "title": "net.duration",

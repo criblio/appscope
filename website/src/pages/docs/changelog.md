@@ -13,8 +13,8 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 Assets are available via Docker and the Cribl CDN at the links below.
 
 - `Docker`: `cribl/scope:1.0.1`
-- `x86`: [https://cdn.cribl.io/dl/scope/1.0.1/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.0.0/linux/x86_64/scope)
-- `ARM`: [https://cdn.cribl.io/dl/scope/1.0.1/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.0.0/linux/aarch64/scope)
+- `x86`: [https://cdn.cribl.io/dl/scope/1.0.1/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.0.1/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.0.1/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.0.1/linux/aarch64/scope)
 
 ### Fixes
 

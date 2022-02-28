@@ -579,7 +579,7 @@ payload:
   #
   dir: '/tmp'
 
-# Setting the library
+# Setting up the library
 #
 libscope:
 

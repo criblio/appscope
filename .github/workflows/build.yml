@@ -28,7 +28,7 @@ jobs:
     steps:
       # Clone the repo
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # This defines a number of outputs based on the tag being built if there
       # is one. We'll use the outputs in other places.
@@ -167,7 +167,7 @@ jobs:
 
       # Clone the repos
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Login to Dockerhub
         uses: docker/login-action@v1
@@ -329,7 +329,7 @@ jobs:
     steps:
       # Clone the repos
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # Download the built binaries
       - name: Download Binaries
@@ -415,7 +415,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Download Binaries
         uses: actions/download-artifact@v2
@@ -463,7 +463,7 @@ jobs:
     runs-on: [self-hosted,ARM64]
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Download Binaries
         uses: actions/download-artifact@v2
@@ -505,7 +505,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Setup QEMU
         uses: docker/setup-qemu-action@v1

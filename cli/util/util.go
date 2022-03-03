@@ -114,6 +114,13 @@ func GetValue(obj interface{}) reflect.Value {
 // GetJSONField returns a given struct field given a JSON tag value
 func GetJSONField(obj interface{}, field string) *structs.Field {
 	fields := structs.Fields(obj)
+	// Find exact match
+	for _, f := range fields {
+		if f.Tag("json") == field {
+			return f
+		}
+	}
+	// If nothing found, find submatch
 	for _, f := range fields {
 		if strings.Contains(f.Tag("json"), field) {
 			return f
@@ -303,4 +310,23 @@ func JSONBytes(obj interface{}) []byte {
 func IsNumeric(s string) bool {
 	_, err := strconv.ParseFloat(s, 64)
 	return err == nil
+}
+
+// InterfaceToString converts an interface to a string
+func InterfaceToString(i interface{}) string {
+	switch v := i.(type) {
+	case float64:
+		if v-math.Floor(v) < 0.000001 && v < 1e9 {
+			return fmt.Sprintf("%d", int(v))
+		}
+		return fmt.Sprintf("%g", v)
+	case string:
+		stringFmt := "%s"
+		if strings.Contains(v, " ") {
+			stringFmt = "%q"
+		}
+		return fmt.Sprintf(stringFmt, v)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
 }

@@ -8,6 +8,7 @@ type Event struct {
 }
 
 type EventBody struct {
+	Id         string
 	SourceType string                 `json:"sourcetype"`
 	Time       float64                `json:"_time"`
 	Source     string                 `json:"source"`

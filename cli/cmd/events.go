@@ -11,21 +11,22 @@ import (
 	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 /* Args Matrix (X disallows)
  *             id source sourcetype match fields allfields last json follow color all eval sort reverse
- * id          -                                                                  X
+ * id          -
  * source         -                                                               X
  * sourcetype            -                                                        X
  * match                            -                                             X
  * fields                                 -      X
  * allfields                              X      -
  * last                                                    -                      X
- * json                                                                     X
+ * json                                                         -           X
  * follow                                                  X         -                     X    X
  * color                                                                    -
- * all         X  X      X          X                      X                      -   X
+ * all            X      X          X                      X                      -   X
  * eval                                                                           X   -
  * sort                                                              X                     -
  * reverse                                                           X                          -
@@ -57,17 +58,50 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 		em.Sources, _ = cmd.Flags().GetStringSlice("source")
 		em.Sourcetypes, _ = cmd.Flags().GetStringSlice("sourcetype")
 		em.Match, _ = cmd.Flags().GetString("match")
-		em.LastN, _ = cmd.Flags().GetInt("fields")
+		em.LastN, _ = cmd.Flags().GetInt("last")
 		em.AllEvents, _ = cmd.Flags().GetBool("all")
 		jsonOut, _ := cmd.Flags().GetBool("json")
 		allFields, _ := cmd.Flags().GetBool("allfields")
 		fields, _ := cmd.Flags().GetStringSlice("fields")
-		//	eval, _ := cmd.Flags().GetString("eval")
+		eval, _ := cmd.Flags().GetString("eval")
 		sortField, _ := cmd.Flags().GetString("sort")
 		sortReverse, _ := cmd.Flags().GetBool("reverse")
 		id, _ := cmd.Flags().GetInt("id")
 		follow, _ := cmd.Flags().GetBool("follow")
 		forceColor, _ := cmd.Flags().GetBool("color")
+
+		// Disallow bad argument combinations (see Arg Matrix at top of file)
+		if len(em.Sources) > 0 && em.AllEvents {
+			helpErrAndExit(cmd, "Cannot specify --source and --all")
+		} else if len(em.Sourcetypes) > 0 && em.AllEvents {
+			helpErrAndExit(cmd, "Cannot specify --sourcetype and --all")
+		} else if em.Match != "" && em.AllEvents {
+			helpErrAndExit(cmd, "Cannot specify --match and --all")
+		} else if len(fields) > 0 && allFields {
+			helpErrAndExit(cmd, "Cannot specify --fields and --allfields")
+		} else if em.LastN > -1 && em.AllEvents {
+			helpErrAndExit(cmd, "Cannot specify --last and --all")
+		} else if jsonOut && forceColor {
+			helpErrAndExit(cmd, "Cannot specify --json and --color")
+		} else if follow && sortField != "" {
+			helpErrAndExit(cmd, "Cannot specify --follow and --sort")
+		} else if follow && sortReverse {
+			helpErrAndExit(cmd, "Cannot specify --follow and --reverse")
+		} else if em.AllEvents && eval != "" {
+			helpErrAndExit(cmd, "Cannot specify --all and --eval")
+		}
+
+		if !em.AllEvents && em.LastN == -1 {
+			em.LastN = 20
+		}
+
+		termWidth, _, err := terminal.GetSize(0)
+		if err != nil {
+			// If we cannot get the terminal size, we are dealing with redirected stdin
+			// as opposed to an actual terminal, so we will assume terminal width is
+			// 160, to show all columns.
+			termWidth = 160
+		}
 
 		// Get one or many sessions from history
 		sessions := sessionByID(id)
@@ -76,7 +110,6 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 		// Look in default session history path
 		// Look in eventdest path
 		var file util.ReadSeekCloser
-		var err error
 		file, err = os.Open(sessions[0].EventsPath)
 		defer file.Close()
 		if err != nil && strings.Contains(err.Error(), "events.json: no such file or directory") {
@@ -118,7 +151,7 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 		if len(args) > 0 {
 			events.PrintEvent(out, jsonOut)
 		} else {
-			events.PrintEvents(out, fields, sortField, jsonOut, sortReverse, allFields, forceColor)
+			events.PrintEvents(out, fields, sortField, jsonOut, sortReverse, allFields, forceColor, termWidth)
 		}
 	},
 }
@@ -130,7 +163,7 @@ func init() {
 	eventsCmd.Flags().StringP("match", "m", "", "Display events containing supplied string")
 	eventsCmd.Flags().StringSliceP("fields", "", []string{}, "Display custom fields (look at JSON output for field names)")
 	eventsCmd.Flags().Bool("allfields", false, "Displaying hidden fields")
-	eventsCmd.Flags().IntP("last", "n", 20, "Show last <n> events")
+	eventsCmd.Flags().IntP("last", "n", -1, "Show last <n> events")
 	eventsCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	eventsCmd.Flags().BoolP("follow", "f", false, "Follow a file, like tail -f")
 	eventsCmd.Flags().Bool("color", false, "Force color on (if tty detection fails or piping)")

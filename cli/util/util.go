@@ -322,6 +322,7 @@ func InterfaceToString(i interface{}) string {
 		return fmt.Sprintf("%g", v)
 	case string:
 		stringFmt := "%s"
+		// If string has a space, quote it
 		if strings.Contains(v, " ") {
 			stringFmt = "%q"
 		}

@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/ahmetb/go-linq/v3"
@@ -52,7 +54,7 @@ var (
 	}
 )
 
-// Event.Body.Data fields to be displayed by default for a given source
+// sourcefields sets Event.Body.Data fields to be displayed by default for a given source
 var sourceFields = map[string][]string{
 	"http.req": {"http_host",
 		"http_method",
@@ -85,6 +87,14 @@ var sourceFields = map[string][]string{
 		"net_bytes_sent",
 		"net_close_reason",
 		"net_protocol"},
+}
+
+const ansi = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)?\u0007)|(?:(?:\\d{1,4}(?:;\\d{0,4})*)?[\\dA-PRZcf-ntqry=><~]))"
+
+var ansire = regexp.MustCompile(ansi)
+
+func ansiStrip(str string) string {
+	return ansire.ReplaceAllString(str, "")
 }
 
 // EventReader reads a newline delimited JSON documents and sends parsed documents
@@ -217,7 +227,7 @@ func PrintEvent(in chan libscope.EventBody, jsonOut bool) {
 // PrintEvents prints multiple events
 // handles --eval
 // handles --json
-func PrintEvents(in chan libscope.EventBody, fields []string, sortField string, jsonOut, sortReverse, allFields, forceColor bool) {
+func PrintEvents(in chan libscope.EventBody, fields []string, sortField string, jsonOut, sortReverse, allFields, forceColor bool, width int) {
 	enc := json.NewEncoder(os.Stdout)
 
 	//	var vm *goja.Runtime
@@ -262,7 +272,7 @@ func PrintEvents(in chan libscope.EventBody, fields []string, sortField string, 
 
 	// Print events
 	for _, e := range events {
-		out := getEventText(e, forceColor, allFields, fields)
+		out := getEventText(e, forceColor, allFields, fields, width)
 		fmt.Printf("%s\n", out)
 	}
 }
@@ -280,7 +290,7 @@ func (co colorOpts) color(color string) *color.Color {
 // handles --color
 // handles --fields
 // handles --allfields
-func getEventText(e libscope.EventBody, forceColor, allFields bool, fields []string) string {
+func getEventText(e libscope.EventBody, forceColor, allFields bool, fields []string, width int) string {
 	co := darkColorOpts // Hard coded for now
 	if forceColor {
 		color.NoColor = false
@@ -291,48 +301,76 @@ func getEventText(e libscope.EventBody, forceColor, allFields bool, fields []str
 	out += co.color("proc").Sprintf("%s ", e.Proc)
 	out += sourcetypeColors.color(e.SourceType).Sprintf("%s ", e.SourceType)
 	out += co.color("source").Sprintf("%s ", e.Source)
+
+	// Truncate data field
+	truncLen := width - len(ansiStrip(out)) - 1
+
 	if len(fields) > 0 {
-		out += getEventDataText(e.Data, co, fields)
+		out += getEventDataText(e.Data, co, fields, truncLen)
 	} else {
-		out += getEventDataText(e.Data, co, sourceFields[e.Source])
+		out += getEventDataText(e.Data, co, sourceFields[e.Source], truncLen)
 	}
 
 	if allFields {
-		if len(e.Data) > 0 {
-			out += fmt.Sprintf("[[%s]]", getEventDataText(e.Data, co, []string{}))
-		}
+		out += fmt.Sprintf("[[%s]]", getEventDataText(e.Data, co, []string{}, truncLen))
 	}
 	return out
 }
 
 // getEventDataText selects and colors data fields
-func getEventDataText(e map[string]interface{}, co colorOpts, onlyFields []string) string {
+// We support a key:value map (per normal events) and a string (per notices)
+func getEventDataText(e interface{}, co colorOpts, onlyFields []string, truncLen int) string {
 	kv := ""
 
-	// Which keys do we want to display?
-	keys := make([]string, 0, len(e))
-	if len(onlyFields) > 0 {
-		keys = onlyFields
-	} else {
-		for k := range e {
-			keys = append(keys, k)
+	switch d := e.(type) {
+	case map[string]interface{}:
+		// Truncate message field if present
+		maxLen := truncLen - len(" message:\"\"")
+		if msg, ok := d["message"]; ok {
+			trimmed := strings.TrimSpace(fmt.Sprintf("%s", msg))
+			removeRN := strings.ReplaceAll(trimmed, "\r\n", " ")
+			removeN := strings.ReplaceAll(removeRN, "\n", " ")
+			removeR := strings.ReplaceAll(removeN, "\r", " ")
+			stripped := ansiStrip(removeR)
+			d["message"] = util.TruncWithEllipsis(stripped, maxLen)
 		}
-		sort.Strings(keys)
-	}
 
-	// Let's get their values
-	for idx, k := range keys {
-		if _, ok := e[k]; ok {
-			if idx > 0 {
-				kv += co.color("key").Sprint(" ")
+		// Which keys do we want to display?
+		keys := make([]string, 0, len(d))
+		if len(onlyFields) > 0 {
+			keys = onlyFields
+		} else {
+			for k := range d {
+				keys = append(keys, k)
 			}
-			kv += co.color("key").Sprintf("%s", k)
-			kv += co.color("val").Sprintf(":%s", util.InterfaceToString(e[k]))
-
-			// Delete from e so allfields knows what didn't get written yet
-			delete(e, k)
+			sort.Strings(keys)
 		}
+
+		// Let's get their values
+		for idx, k := range keys {
+			if _, ok := d[k]; ok {
+				if idx > 0 {
+					kv += co.color("key").Sprint(" ")
+				}
+				kv += co.color("key").Sprintf("%s", k)
+				kv += co.color("val").Sprintf(":%s", util.InterfaceToString(d[k]))
+
+				// Delete from e so allfields knows what didn't get written yet
+				delete(d, k)
+			}
+		}
+	case string:
+		trimmed := strings.TrimSpace(fmt.Sprintf("%s", d))
+		removeRN := strings.ReplaceAll(trimmed, "\r\n", " ")
+		removeN := strings.ReplaceAll(removeRN, "\n", " ")
+		removeR := strings.ReplaceAll(removeN, "\r", " ")
+		stripped := ansiStrip(removeR)
+		kv += co.color("val").Sprintf("%s", util.InterfaceToString(stripped))
+
+		// Delete from e so allfields knows what didn't get written yet
+		e = ""
 	}
+
 	return kv
 }
 

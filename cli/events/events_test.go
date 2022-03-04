@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/util"
 	"github.com/stretchr/testify/assert"
 )
@@ -12,16 +13,16 @@ func TestReader(t *testing.T) {
 	rawEvent := `{"type":"evt","body":{"sourcetype":"console","id":"d55805e5c25e-echo-/bin/echo true","_time":1609191683.985,"source":"stdout","host":"d55805e5c25e","proc":"echo","cmd":"/bin/echo true","pid":10117,"_channel":"641503557208802","data":"true"}}
 `
 
-	in := make(chan map[string]interface{})
+	in := make(chan libscope.EventBody)
 
 	r := bytes.NewBuffer([]byte(rawEvent))
-	go Reader(r, 0, util.MatchAlways, in)
+	go EventReader(r, 0, util.MatchAlways, in)
 
 	event := <-in
 
-	assert.Equal(t, "console", event["sourcetype"])
-	assert.Equal(t, 1609191683.985, event["_time"])
-	assert.Equal(t, "true", event["data"])
+	assert.Equal(t, "console", event.SourceType)
+	assert.Equal(t, 1609191683.985, event.Time)
+	assert.Equal(t, "true", event.Data)
 }
 
 func TestParseEvent(t *testing.T) {
@@ -30,9 +31,9 @@ func TestParseEvent(t *testing.T) {
 	event, err := ParseEvent([]byte(rawEvent))
 	assert.NoError(t, err)
 
-	assert.Equal(t, "console", event["sourcetype"])
-	assert.Equal(t, 1609191683.985, event["_time"])
-	assert.Equal(t, "true", event["data"])
+	assert.Equal(t, "console", event.SourceType)
+	assert.Equal(t, 1609191683.985, event.Time)
+	assert.Equal(t, "true", event.Data)
 }
 
 func TestReaderWithFilter(t *testing.T) {
@@ -43,10 +44,10 @@ func TestReaderWithFilter(t *testing.T) {
 `
 
 	testFilter := func(filter func(string) bool, len int) {
-		in := make(chan map[string]interface{})
+		in := make(chan libscope.EventBody)
 		r := bytes.NewBuffer([]byte(rawEvent))
-		go Reader(r, 0, filter, in)
-		events := []map[string]interface{}{}
+		go EventReader(r, 0, filter, in)
+		events := []libscope.EventBody{}
 		for e := range in {
 			events = append(events, e)
 		}

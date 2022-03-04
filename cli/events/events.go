@@ -93,7 +93,7 @@ const ansi = "[\u001B\u009B][[\\]()#;?]*(?:(?:(?:[a-zA-Z\\d]*(?:;[a-zA-Z\\d]*)*)
 
 var ansire = regexp.MustCompile(ansi)
 
-func ansiStrip(str string) string {
+func AnsiStrip(str string) string {
 	return ansire.ReplaceAllString(str, "")
 }
 
@@ -272,7 +272,7 @@ func PrintEvents(in chan libscope.EventBody, fields []string, sortField string, 
 
 	// Print events
 	for _, e := range events {
-		out := getEventText(e, forceColor, allFields, fields, width)
+		out := GetEventText(e, forceColor, allFields, fields, width)
 		fmt.Printf("%s\n", out)
 	}
 }
@@ -286,11 +286,11 @@ func (co colorOpts) color(color string) *color.Color {
 	return c
 }
 
-// getEventText selects and colors event fields
+// GetEventText selects and colors event fields
 // handles --color
 // handles --fields
 // handles --allfields
-func getEventText(e libscope.EventBody, forceColor, allFields bool, fields []string, width int) string {
+func GetEventText(e libscope.EventBody, forceColor, allFields bool, fields []string, width int) string {
 	co := darkColorOpts // Hard coded for now
 	if forceColor {
 		color.NoColor = false
@@ -303,7 +303,7 @@ func getEventText(e libscope.EventBody, forceColor, allFields bool, fields []str
 	out += co.color("source").Sprintf("%s ", e.Source)
 
 	// Truncate data field
-	truncLen := width - len(ansiStrip(out)) - 1
+	truncLen := width - len(AnsiStrip(out)) - 1
 
 	if len(fields) > 0 {
 		out += getEventDataText(e.Data, co, fields, truncLen)
@@ -331,7 +331,7 @@ func getEventDataText(e interface{}, co colorOpts, onlyFields []string, truncLen
 			removeRN := strings.ReplaceAll(trimmed, "\r\n", " ")
 			removeN := strings.ReplaceAll(removeRN, "\n", " ")
 			removeR := strings.ReplaceAll(removeN, "\r", " ")
-			stripped := ansiStrip(removeR)
+			stripped := AnsiStrip(removeR)
 			d["message"] = util.TruncWithEllipsis(stripped, maxLen)
 		}
 
@@ -364,7 +364,7 @@ func getEventDataText(e interface{}, co colorOpts, onlyFields []string, truncLen
 		removeRN := strings.ReplaceAll(trimmed, "\r\n", " ")
 		removeN := strings.ReplaceAll(removeRN, "\n", " ")
 		removeR := strings.ReplaceAll(removeN, "\r", " ")
-		stripped := ansiStrip(removeR)
+		stripped := AnsiStrip(removeR)
 		kv += co.color("val").Sprintf("%s", util.InterfaceToString(stripped))
 
 		// Delete from e so allfields knows what didn't get written yet

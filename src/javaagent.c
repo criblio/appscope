@@ -452,41 +452,47 @@ Java_sun_nio_ch_SocketChannelImpl_write(JNIEnv *jni, jobject obj, jobject buf)
 JNIEXPORT jobject JNICALL
 Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject src, jobjectArray dsts, jint offset, jint len)
 {
+    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
     int fd = -1;
-    if (!jni || !obj || !src || !dsts || (offset < 0) || (len < 0)) return NULL;
 
     initJniGlobals(jni);
     initSSLEngineImplGlobals(jni);
-    if (clearJniException(jni)) return NULL;
 
     jint fdVal = (uint64_t) (*jni)->GetIntField(jni, src, g_java.fid_ByteBuffer___fd);
     if (fdVal) {
         fd = fdVal;
     }
 
-    //call the original method
+    if (!preexisting_exception) {
+        clearJniException(jni);
+    }
+
+    // call the original method
+    // if there was a pre-existing exception, don't proceed?
     jobject res = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl___unwrap, src, dsts, offset, len);
-    if (!res || clearJniException(jni)) return NULL;
+    if (preexisting_exception || (*jni)->ExceptionCheck(jni) || !res) {
+        return res;
+    }
 
     jint bytesProduced = (*jni)->CallIntMethod(jni, res, g_java.mid_SSLEngineResult_bytesProduced);
-    if (bytesProduced && (clearJniException(jni) == FALSE)) {
+    if ((clearJniException(jni) == FALSE) && bytesProduced) {
         int i;
         jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
-        if (!session || clearJniException(jni)) return NULL;
+        if (clearJniException(jni) || !session) return res;
 
 
         for (i = offset; i < offset + len; i++) {
-        //for (i=offset; i < (len - offset); i++) {
+            void *buf;
             jobject bufEl  = (*jni)->GetObjectArrayElement(jni, dsts, i);
-            if (!bufEl || clearJniException(jni)) return NULL;
+            if (clearJniException(jni) || !bufEl) return res;
 
             jint pos = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
-            if ((pos <= 0) || clearJniException(jni)) return NULL;
+            if (clearJniException(jni) || (pos <= 0)) return res;
 
             /*
              * We call hasArray() on the buffer object in order to see if a byte array is
              * available. Don't call the array() function if a byte array is not available
-             * as it throws an exception.
+             * as it throws an exception and we don't get any data.
              *
              * From the less than helpful Java docs:
              * hasArray tells whether or not this buffer is backed by an accessible byte array.
@@ -502,20 +508,15 @@ Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject src
              * Returns NULL if JNI access to direct buffers is not supported by this virtual machine.
              */
             if ((*jni)->CallBooleanMethod(jni, bufEl, g_java.mid_ByteBuffer_hasArray) == TRUE) {
-                //scopeLogError("Java_sun_security_ssl_SSLEngineImpl_unwrap has array TRUE");
-                jbyteArray buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
-                if (!buf || clearJniException(jni)) return NULL;
-                //scopeLogError("Java_sun_security_ssl_SSLEngineImpl_unwrap before");
-                doJavaProtocol(jni, session, buf, 0, pos, TLSRX, fd);
+                //jbyteArray jbuf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
+                buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
+                //buf = jbuf;
             } else {
-                void *buf = (*jni)->GetDirectBufferAddress(jni, bufEl);
-                //jlong blen = (*jni)->GetDirectBufferCapacity(jni, bufEl);
-                //uint64_t *bval = (uint64_t *)buf;
-                //scopeLogError("Java_sun_security_ssl_SSLEngineImpl_unwrap buf: %p len %ld pos %d", buf, blen, pos);
-                //scopeLogError("Java_sun_security_ssl_SSLEngineImpl_unwrap buf: 0x%lx", *bval);
-                if (!buf || clearJniException(jni)) return NULL;
-                doJavaProtocol(jni, session, buf, 0, pos, TLSRX, fd);
+                buf = (*jni)->GetDirectBufferAddress(jni, bufEl);
             }
+
+            if (clearJniException(jni) || !buf) return res;
+            doJavaProtocol(jni, session, buf, 0, pos, TLSRX, fd);
         }
     }
 

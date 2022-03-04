@@ -91,6 +91,12 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 			helpErrAndExit(cmd, "Cannot specify --all and --eval")
 		}
 
+		// Display all matches when matching
+		if len(em.Sourcetypes) > 0 || len(em.Sources) > 0 || em.Match != "" {
+			em.AllEvents = true
+		}
+
+		// Set default limit to last 20 events
 		if !em.AllEvents && em.LastN == -1 {
 			em.LastN = 20
 		}

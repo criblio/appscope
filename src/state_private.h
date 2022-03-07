@@ -150,6 +150,8 @@ typedef struct protocol_info_t {
     struct sockaddr_storage remoteConn;
 } protocol_info;
 
+typedef enum {HTTP_RX, HTTP_TX, HTTP_NUM} http_direction_t;
+
 typedef struct {
     http_enum_t state;
     char *hdr;          // Used if state == HDR
@@ -159,7 +161,7 @@ typedef struct {
     httpId_t id;
 
     // HTTP version detected (0=unknown, 1=HTTP/1.x, 2=HTTP/2.0)
-    size_t version[2]; // rx=[0] and tx=[1]
+    int version;
 
     // These will be TRUE if `hdr` ...
     bool isResponse;           // ... contains a complete response header
@@ -167,7 +169,7 @@ typedef struct {
     bool hasConnectionUpgrade; // ... has `Connection: upgrade` header
 
     // HTTP/2 state
-    http_buf_t http2Buf[2]; // buffers for partial frames; rx=[0] and tx=[1]
+    http_buf_t http2Buf; // buffers for partial frames
 } http_state_t;
 
 typedef struct net_info_t {
@@ -176,7 +178,7 @@ typedef struct net_info_t {
     int fd;
     int active;
     int type;
-    http_state_t http;
+    http_state_t http[HTTP_NUM];  // rx=[0] and tx=[1]
     bool urlRedirect;
     bool addrSetLocal;
     bool addrSetRemote;

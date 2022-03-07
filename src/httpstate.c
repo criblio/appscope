@@ -46,17 +46,16 @@ setHttpState(http_state_t *httpstate, http_enum_t toState)
     switch (toState) {
         case HTTP_NONE:
             // cleanup the stash for the RX and TX sides
-            for (int i = 0; i < 2; ++i) {
-                if (httpstate->http2Buf[i].buf) {
-                    free(httpstate->http2Buf[i].buf);
-                    httpstate->http2Buf[i].buf = 0;
-                }
-                httpstate->http2Buf[i].len = 0;
-                httpstate->http2Buf[i].size = 0;
+            if (httpstate->http2Buf.buf) {
+                free(httpstate->http2Buf.buf);
+                httpstate->http2Buf.buf = NULL;
             }
-            if (httpstate->hdr)
+            httpstate->http2Buf.len = 0;
+            httpstate->http2Buf.size = 0;
+            if (httpstate->hdr) {
                 free(httpstate->hdr);
-            httpstate->hdr = NULL;
+                httpstate->hdr = NULL;
+            }
             httpstate->hdrlen = 0;
             httpstate->hdralloc = 0;
             httpstate->clen = 0;
@@ -673,7 +672,7 @@ parseHttp2(http_state_t* state, net_info *net, int isTx,
 
     const uint8_t *bufPos = buf;                    // current position in buf
     size_t         bufLen = len;                    // number of buf bytes left
-    http_buf_t    *stash  = &state->http2Buf[isTx]; // stash for partial frames
+    http_buf_t    *stash  = &state->http2Buf;       // stash for partial frames
     while (bufLen > 0) {
         // skip over MAGIC
         if (bufLen >= HTTP2_MAGIC_LEN && !strncmp((char*)buf, HTTP2_MAGIC, HTTP2_MAGIC_LEN)) {
@@ -733,20 +732,21 @@ parseHttp2(http_state_t* state, net_info *net, int isTx,
 }
 
 static bool
-doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
+doHttpBuffer(http_state_t states[HTTP_NUM], net_info *net, char *buf, size_t len,
         metric_t src, httpId_t *httpId)
 {
     int isTx  = (src == NETTX || src == TLSTX) ? 1 : 0;
+    http_state_t *state = &states[isTx];
 
     //scopeLogHexDebug(buf, len>64 ? 64 : len, "DEBUG: HTTP %s payload; ver=%d, len=%ld",
     //        isTx ? "TX" : "RX", (int)state->version[isTx], len);
 
     // detect HTTP version
-    if (state->version[isTx] == 0) {
+    if (state->version == 0) {
         // Detect HTTP/2 by looking for the "magic" string at the start
         if (len >= HTTP2_MAGIC_LEN && !strncmp(buf, HTTP2_MAGIC, HTTP2_MAGIC_LEN)) {
-            state->version[isTx] = 2;
-            state->version[!isTx] = 2;
+            states[HTTP_RX].version = 2;
+            states[HTTP_TX].version = 2;
 
             // is there anything after the MAGIC?
             if (len > HTTP2_MAGIC_LEN) {
@@ -762,7 +762,8 @@ doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
         // Detect HTTP/1.x by looking for "HTTP/" which appears as the start
         // of a response and after method and URI in a request.
         else if (searchExec(g_http_start, buf, len) != -1) {
-            state->version[isTx] = 1;
+            states[HTTP_RX].version = 1;
+            states[HTTP_TX].version = 1;
             // fall through to continue processing
         }
 
@@ -773,15 +774,15 @@ doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
         }
     }
 
-    if (state->version[isTx] == 1) {
+    if (state->version == 1) {
         // process the HTTP/1.x payload
         int ret = parseHttp1(state, buf, len, httpId);
 
         // if we saw a successful upgrade response...
         if (state->isResponse && state->hasUpgrade && state->hasConnectionUpgrade) {
             // upgrade the versions on both sides, TX and RX
-            state->version[isTx] = 2;
-            state->version[!isTx] = 2;
+            states[HTTP_RX].version = 2;
+            states[HTTP_TX].version = 2;
 
             // clear state
             state->isResponse = FALSE;
@@ -796,14 +797,14 @@ doHttpBuffer(http_state_t* state, net_info *net, char *buf, size_t len,
         return ret;
     }
 
-    if (state->version[isTx] == 2) {
+    if (state->version == 2) {
         // process the HTTP/2 payload
         return parseHttp2(state, net, isTx, (uint8_t*)buf, len, httpId);
     }
 
     // invalid HTTP version
-    scopeLogError("ERROR: HTTP/? unexpected version on %s; version=%ld",
-            isTx ? "TX" : "RX", state->version[isTx]);
+    scopeLogError("ERROR: HTTP/? unexpected version on %s; version=%d",
+            isTx ? "TX" : "RX", state->version);
     DBG(NULL);
     return FALSE;
 }
@@ -834,14 +835,14 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
     // then we can use the http state it provides to look across multiple
     // buffers.  If net doesn't exist,  we can at least keep temp state
     // while within the current doHttp().
-    http_state_t tempstate = {0};
-    http_state_t *httpstate = (net) ? &net->http : &tempstate;
+    http_state_t tempstate[HTTP_NUM] = {0};
+    http_state_t (*httpstate)[HTTP_NUM] = (net) ? &net->http : &tempstate;
 
     // Handle the data in it's various formats
     switch (dtype) {
         case BUF:
         {
-            http_header_found = doHttpBuffer(httpstate, net, buf, len, src, &httpId);
+            http_header_found = doHttpBuffer(*httpstate, net, buf, len, src, &httpId);
             break;
         }
 
@@ -854,7 +855,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
             for (i = 0; i < msg->msg_iovlen; i++) {
                 iov = &msg->msg_iov[i];
                 if (iov && iov->iov_base) {
-                    if (doHttpBuffer(httpstate, net, iov->iov_base, iov->iov_len, src, &httpId)) {
+                    if (doHttpBuffer(*httpstate, net, iov->iov_base, iov->iov_len, src, &httpId)) {
                         http_header_found = TRUE;
                         // stay in loop to count down content length
                     }
@@ -872,7 +873,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
 
             for (i = 0; i < iovcnt; i++) {
                 if (iov[i].iov_base) {
-                    if (doHttpBuffer(httpstate, net, iov[i].iov_base, iov[i].iov_len, src, &httpId)) {
+                    if (doHttpBuffer(*httpstate, net, iov[i].iov_base, iov[i].iov_len, src, &httpId)) {
                         http_header_found = TRUE;
                         // stay in loop to count down content length
                     }
@@ -889,7 +890,7 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
 
     // If our state is temporary, clean up after each doHttp call
     if (httpstate == &tempstate) {
-        setHttpState(httpstate, HTTP_NONE);
+        resetHttp(*httpstate);
     }
 
     if (guard_enabled) while (!atomicCasU64(&g_http_guard[sockfd], 1ULL, 0ULL));
@@ -898,8 +899,9 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
 }
 
 void
-resetHttp(http_state_t *httpstate)
+resetHttp(http_state_t httpstate[HTTP_NUM])
 {
-    setHttpState(httpstate, HTTP_NONE);
+    setHttpState(&httpstate[HTTP_RX], HTTP_NONE);
+    setHttpState(&httpstate[HTTP_TX], HTTP_NONE);
 }
 

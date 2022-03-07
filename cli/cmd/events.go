@@ -92,7 +92,7 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 		}
 
 		// Display all matches when matching
-		if len(em.Sourcetypes) > 0 || len(em.Sources) > 0 || em.Match != "" {
+		if len(em.Sourcetypes) > 0 || len(em.Sources) > 0 || em.Match != "" || eval != "" {
 			em.AllEvents = true
 		}
 

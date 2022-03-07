@@ -13,6 +13,7 @@ import (
 	"github.com/ahmetb/go-linq/v3"
 	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/util"
+	"github.com/dop251/goja"
 	"github.com/fatih/color"
 	"github.com/rs/zerolog/log"
 )
@@ -227,36 +228,49 @@ func PrintEvent(in chan libscope.EventBody, jsonOut bool) {
 // PrintEvents prints multiple events
 // handles --eval
 // handles --json
-func PrintEvents(in chan libscope.EventBody, fields []string, sortField string, jsonOut, sortReverse, allFields, forceColor bool, width int) {
+func PrintEvents(in chan libscope.EventBody, fields []string, sortField, eval string, jsonOut, sortReverse, allFields, forceColor bool, width int) {
 	enc := json.NewEncoder(os.Stdout)
+	var vm *goja.Runtime
+	var prog *goja.Program
+	if eval != "" {
+		vm = goja.New()
+		var err error
+		prog, err = goja.Compile("expr", eval, false)
+		util.CheckErrSprintf(err, "error compiling JavaScript expression: %v", err)
+	}
 
-	//	var vm *goja.Runtime
-	//	var prog *goja.Program
-	//	if eval != "" {
-	//		vm = goja.New()
-	//		prog, err = goja.Compile("expr", eval, false)
-	//		util.CheckErrSprintf(err, "error compiling JavaScript expression: %v", err)
-	//	}
 	events := make([]libscope.EventBody, 0)
 	for e := range in {
-		/*
-			if eval != "" {
-				for k, v := range e {
-					vm.Set(k, v)
+		if eval != "" {
+			// Initialize keys and values from the event for goja query
+			vm.Set("args", e.Args)
+			vm.Set("cmd", e.Cmd)
+			vm.Set("gid", e.Gid)
+			vm.Set("groupname", e.Groupname)
+			vm.Set("host", e.Host)
+			vm.Set("id", e.Id)
+			vm.Set("pid", e.Pid)
+			vm.Set("proc", e.Proc)
+			vm.Set("source", e.Source)
+			vm.Set("sourcetype", e.SourceType)
+			vm.Set("_time", e.Time)
+			vm.Set("uid", e.Uid)
+			vm.Set("username", e.Username)
+			vm.Set("data", e.Data)
+			v, err := vm.RunProgram(prog)
+			util.CheckErrSprintf(err, "error evaluating JavaScript expression: %v", err)
+			res := v.Export()
+			// We support a boolean result only
+			switch r := res.(type) {
+			case bool:
+				if !r {
+					continue
 				}
-				v, err := vm.RunProgram(prog)
-				util.CheckErrSprintf(err, "error evaluating JavaScript expression: %v", err)
-				res := v.Export()
-				switch r := res.(type) {
-				case bool:
-					if !r {
-						continue
-					}
-				default:
-					util.ErrAndExit("error: JavaScript return value is not boolean")
-				}
+			default:
+				util.ErrAndExit("error: JavaScript return value is not boolean")
 			}
-		*/
+		}
+
 		if jsonOut {
 			enc.Encode(e)
 			continue
@@ -266,7 +280,7 @@ func PrintEvents(in chan libscope.EventBody, fields []string, sortField string, 
 	}
 
 	// Sort events
-	if sortField != "" {
+	if len(events) > 0 && sortField != "" {
 		events = sortEvents(events, sortField, sortReverse)
 	}
 

@@ -157,7 +157,7 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 		if len(args) > 0 {
 			events.PrintEvent(out, jsonOut)
 		} else {
-			events.PrintEvents(out, fields, sortField, jsonOut, sortReverse, allFields, forceColor, termWidth)
+			events.PrintEvents(out, fields, sortField, eval, jsonOut, sortReverse, allFields, forceColor, termWidth)
 		}
 	},
 }

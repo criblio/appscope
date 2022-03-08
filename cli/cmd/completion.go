@@ -7,6 +7,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+/* Args Matrix (X disallows)
+ */
+
 var completionCmd = &cobra.Command{
 	Use:   "completion [bash|zsh]",
 	Short: "Generate completion code for specified shell",

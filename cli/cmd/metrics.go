@@ -19,6 +19,15 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
+/* Args Matrix (X disallows)
+ *          id metric graph cols uniq
+ * id       -
+ * metric      -
+ * graph              -     X    X
+ * cols               X     -
+ * uniq               X          -
+ */
+
 // metricsCmd represents the metrics command
 var metricsCmd = &cobra.Command{
 	Use:   "metrics [flags]",
@@ -36,13 +45,18 @@ scope metrics -m net.tx -g
 		cols, _ := cmd.Flags().GetBool("cols")
 		uniq, _ := cmd.Flags().GetBool("uniq")
 
-		sessions := sessionByID(id)
-
-		if graph && len(names) == 0 {
+		// Disallow bad argument combinations (see Arg Matrix at top of file)
+		if graph && cols {
+			helpErrAndExit(cmd, "Cannot specify --graph and --cols")
+		} else if graph && uniq {
+			helpErrAndExit(cmd, "Cannot specify --graph and --uniq")
+		} else if graph && len(names) == 0 {
 			helpErrAndExit(cmd, "Must specify metric names with --graph")
 		} else if cols && len(names) == 0 {
 			helpErrAndExit(cmd, "Must specify metric names with --cols")
 		}
+
+		sessions := sessionByID(id)
 
 		file, err := os.Open(sessions[0].MetricsPath)
 		if err != nil && strings.Contains(err.Error(), "metrics.json: no such file or directory") {

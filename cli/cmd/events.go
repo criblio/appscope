@@ -79,7 +79,7 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 			helpErrAndExit(cmd, "Cannot specify --match and --all")
 		} else if len(fields) > 0 && allFields {
 			helpErrAndExit(cmd, "Cannot specify --fields and --allfields")
-		} else if em.LastN > -1 && em.AllEvents {
+		} else if cmd.Flags().Lookup("last").Changed && em.AllEvents {
 			helpErrAndExit(cmd, "Cannot specify --last and --all")
 		} else if jsonOut && forceColor {
 			helpErrAndExit(cmd, "Cannot specify --json and --color")
@@ -93,12 +93,9 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 
 		// Display all matches when matching
 		if len(em.Sourcetypes) > 0 || len(em.Sources) > 0 || em.Match != "" || eval != "" {
-			em.AllEvents = true
-		}
-
-		// Set default limit to last 20 events
-		if !em.AllEvents && em.LastN == -1 {
-			em.LastN = 20
+			if !cmd.Flags().Lookup("last").Changed {
+				em.AllEvents = true
+			}
 		}
 
 		termWidth, _, err := terminal.GetSize(0)
@@ -169,7 +166,7 @@ func init() {
 	eventsCmd.Flags().StringP("match", "m", "", "Display events containing supplied string")
 	eventsCmd.Flags().StringSliceP("fields", "", []string{}, "Display custom fields (look at JSON output for field names)")
 	eventsCmd.Flags().Bool("allfields", false, "Displaying hidden fields")
-	eventsCmd.Flags().IntP("last", "n", -1, "Show last <n> events")
+	eventsCmd.Flags().IntP("last", "n", 20, "Show last <n> events")
 	eventsCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	eventsCmd.Flags().BoolP("follow", "f", false, "Follow a file, like tail -f")
 	eventsCmd.Flags().Bool("color", false, "Force color on (if tty detection fails or piping)")

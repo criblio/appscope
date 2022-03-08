@@ -425,26 +425,34 @@ saveSocketChannel(JNIEnv *jni, jobject socketChannel, jobject buf)
 JNIEXPORT jint JNICALL
 Java_sun_nio_ch_SocketChannelImpl_read(JNIEnv *jni, jobject obj, jobject buf)
 {
+    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
+
     initJniGlobals(jni);
 #if SSL > 0
     initSSLEngineImplGlobals(jni);
 #endif
     saveSocketChannel(jni, obj, buf);
-    
+
     jint res = (*jni)->CallIntMethod(jni, obj, g_java.mid_SocketChannelImpl___read, buf);
+
+    if (!preexisting_exception) clearJniException(jni);
     return res;
 }
 
 JNIEXPORT jint JNICALL
 Java_sun_nio_ch_SocketChannelImpl_write(JNIEnv *jni, jobject obj, jobject buf)
 {
+    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
+
     initJniGlobals(jni);
 #if SSL > 0
     initSSLEngineImplGlobals(jni);
 #endif
     saveSocketChannel(jni, obj, buf);
-    
+
     jint res = (*jni)->CallIntMethod(jni, obj, g_java.mid_SocketChannelImpl___write, buf);
+
+    if (!preexisting_exception) clearJniException(jni);
     return res;
 }
 
@@ -463,61 +471,55 @@ Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject src
         fd = fdVal;
     }
 
-    if (!preexisting_exception) {
-        clearJniException(jni);
-    }
+    if (!preexisting_exception) clearJniException(jni);
 
     // call the original method
     // if there was a pre-existing exception, don't proceed?
     jobject res = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl___unwrap, src, dsts, offset, len);
-    if (preexisting_exception || (*jni)->ExceptionCheck(jni) || !res) {
-        return res;
-    }
+    if (preexisting_exception || (*jni)->ExceptionCheck(jni) || !res) return res;
 
     jint bytesProduced = (*jni)->CallIntMethod(jni, res, g_java.mid_SSLEngineResult_bytesProduced);
-    if ((clearJniException(jni) == FALSE) && bytesProduced) {
-        int i;
-        jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
-        if (clearJniException(jni) || !session) return res;
+    if (clearJniException(jni) || !bytesProduced) return res;
+
+    int i;
+    jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
+    if (clearJniException(jni) || !session) return res;
 
 
-        for (i = offset; i < offset + len; i++) {
-            void *buf;
-            jobject bufEl  = (*jni)->GetObjectArrayElement(jni, dsts, i);
-            if (clearJniException(jni) || !bufEl) return res;
+    for (i = offset; i < (len - offset); i++) {
+        void *buf;
+        jobject bufEl  = (*jni)->GetObjectArrayElement(jni, dsts, i);
+        if (clearJniException(jni) || !bufEl) return res;
 
-            jint pos = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
-            if (clearJniException(jni) || (pos <= 0)) return res;
+        jint pos = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
+        if (clearJniException(jni) || (pos < 0)) return res;
 
-            /*
-             * We call hasArray() on the buffer object in order to see if a byte array is
-             * available. Don't call the array() function if a byte array is not available
-             * as it throws an exception and we don't get any data.
-             *
-             * From the less than helpful Java docs:
-             * hasArray tells whether or not this buffer is backed by an accessible byte array.
-             * If this method returns true then the array and arrayOffset methods may safely be invoked.
-             * Returns true if, and only if, this buffer is backed by an array and is not read-only.
-             *
-             * From practice, while the byte array is not available, it is direct. Therefore, we
-             * fall back to a direct buffer address function. The direct buffer address function
-             * allows access the same memory region that is accessible to Java code via the buffer object.
-             * Returns the starting address of the memory region referenced by the buffer.
-             * Returns NULL if the memory region is undefined.
-             * Returns NULL if the given object is not a direct java.nio.Buffer.
-             * Returns NULL if JNI access to direct buffers is not supported by this virtual machine.
-             */
-            if ((*jni)->CallBooleanMethod(jni, bufEl, g_java.mid_ByteBuffer_hasArray) == TRUE) {
-                //jbyteArray jbuf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
-                buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
-                //buf = jbuf;
-            } else {
-                buf = (*jni)->GetDirectBufferAddress(jni, bufEl);
-            }
-
-            if (clearJniException(jni) || !buf) return res;
-            doJavaProtocol(jni, session, buf, 0, pos, TLSRX, fd);
+        /*
+         * We call hasArray() on the buffer object in order to see if a byte array is
+         * available. Don't call the array() function if a byte array is not available
+         * as it throws an exception and we don't get any data.
+         *
+         * From the less than helpful Java docs:
+         * hasArray tells whether or not this buffer is backed by an accessible byte array.
+         * If this method returns true then the array and arrayOffset methods may safely be invoked.
+         * Returns true if, and only if, this buffer is backed by an array and is not read-only.
+         *
+         * From practice, while the byte array is not available, it is direct. Therefore, we
+         * fall back to a direct buffer address function. The direct buffer address function
+         * allows access the same memory region that is accessible to Java code via the buffer object.
+         * Returns the starting address of the memory region referenced by the buffer.
+         * Returns NULL if the memory region is undefined.
+         * Returns NULL if the given object is not a direct java.nio.Buffer.
+         * Returns NULL if JNI access to direct buffers is not supported by this virtual machine.
+         */
+        if ((*jni)->CallBooleanMethod(jni, bufEl, g_java.mid_ByteBuffer_hasArray) == TRUE) {
+            buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
+        } else {
+            buf = (*jni)->GetDirectBufferAddress(jni, bufEl);
         }
+
+        if (clearJniException(jni) || !buf) return res;
+        doJavaProtocol(jni, session, buf, 0, pos, TLSRX, fd);
     }
 
     clearJniException(jni);
@@ -533,6 +535,7 @@ Java_com_sun_net_ssl_internal_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj,
 JNIEXPORT jobject JNICALL 
 Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray srcs, jint offset, jint len, jobject dst) 
 {
+    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
     int fd = -1;
 
     initJniGlobals(jni);
@@ -547,28 +550,49 @@ Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray 
     // The original method can change it's value.
     jint initialpos[len];
     int i;
-    for (i=offset; i<len - offset; i++) {
+    for (i=offset; i < (len - offset); i++) {
         jobject bufEl  = (*jni)->GetObjectArrayElement(jni, srcs, i);
         jint pos       = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
         initialpos[i] = pos;
     }
     
+    if (!preexisting_exception) clearJniException(jni);
+
     //call the original method
     jobject res = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl___wrap, srcs, offset, len, dst);
+    if (preexisting_exception || (*jni)->ExceptionCheck(jni) || !res) return res;
 
     jint bytesConsumed = (*jni)->CallIntMethod(jni, res, g_java.mid_SSLEngineResult_bytesConsumed);
-    if (bytesConsumed) {
-        jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
-        for(i=offset;i<len - offset;i++) {
-            jobject bufEl  = (*jni)->GetObjectArrayElement(jni, srcs, i);
-            jint pos       = initialpos[i]; // initial position was saved above
-            jint limit     = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_limit);
-            jbyteArray buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
-            //scopeLogError("Java_sun_security_ssl_SSLEngineImpl_wrap before");
-            doJavaProtocol(jni, session, buf, pos, limit, TLSTX, fd);
+    if (clearJniException(jni) || !bytesConsumed) return res;
+
+    jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
+    if (clearJniException(jni) || !session) return res;
+
+    for (i=offset; i < (len - offset); i++) {
+        void *buf;
+        jobject bufEl = (*jni)->GetObjectArrayElement(jni, srcs, i);
+        if (clearJniException(jni) || !bufEl) return res;
+
+        jint pos = initialpos[i]; // initial position was saved above
+
+        jint limit = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_limit);
+        if (clearJniException(jni) || (limit < 0)) return res;
+
+        /*
+         * There is Java weirdness related to getting a buf from an array.
+         * Refer to Java_sun_security_ssl_SSLEngineImpl_unwrap() for an explanation.
+         */
+        if ((*jni)->CallBooleanMethod(jni, bufEl, g_java.mid_ByteBuffer_hasArray) == TRUE) {
+            buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
+        } else {
+            buf = (*jni)->GetDirectBufferAddress(jni, bufEl);
         }
+
+        if (clearJniException(jni) || !buf) return res;
+        doJavaProtocol(jni, session, buf, pos, limit, TLSTX, fd);
     }
 
+    clearJniException(jni);
     return res;
 }
 
@@ -581,6 +605,7 @@ Java_com_sun_net_ssl_internal_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, j
 JNIEXPORT void JNICALL 
 Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
 {
+    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
     int fd = -1;
 
     initJniGlobals(jni);
@@ -595,19 +620,14 @@ Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray
         session = obj;
     }
 
-    jboolean exception_before_call = (*jni)->ExceptionCheck(jni);
+    if (!preexisting_exception) clearJniException(jni);
     
     //call the original method
     (*jni)->CallVoidMethod(jni, obj, g_java.mid_AppOutputStream___write, buf, offset, len);
+    if (preexisting_exception || (*jni)->ExceptionCheck(jni)) return;
 
-    // This void method doesn't return status.  Using the exception
-    // status as a proxy seems reasonable.
-    jboolean exception_after_call = (*jni)->ExceptionCheck(jni);
-    int original_method_caused_exception = !exception_before_call && exception_after_call;
-    if (!original_method_caused_exception) {
-        //scopeLogError("Java_sun_security_ssl_AppOutputStream_write before");
-        doJavaProtocol(jni, session, buf, offset, len, TLSTX, fd);
-    }
+    doJavaProtocol(jni, session, buf, offset, len, TLSTX, fd);
+    clearJniException(jni);
 }
 
  //support for JDK 11 - 14 where AppOutputStream in a nested class defined inside SSLSocketImpl
@@ -628,6 +648,7 @@ Java_com_sun_net_ssl_internal_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj
 JNIEXPORT jint JNICALL 
 Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
 {
+    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
     int fd = -1;
 
     initJniGlobals(jni);
@@ -642,14 +663,14 @@ Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray b
         session = obj;
     }
 
+    if (!preexisting_exception) clearJniException(jni);
+
     //call the original method
     jint res = (*jni)->CallIntMethod(jni, obj, g_java.mid_AppInputStream___read, buf, offset, len);
+    if (preexisting_exception || (*jni)->ExceptionCheck(jni) || (res < 0)) return res;
 
-    if (res != -1) {
-        //scopeLogError("Java_sun_security_ssl_AppInputStream_read before");
-        doJavaProtocol(jni, session, buf, offset, res, TLSRX, fd);
-    }
-
+    doJavaProtocol(jni, session, buf, offset, res, TLSRX, fd);
+    clearJniException(jni);
     return res;
 }
 

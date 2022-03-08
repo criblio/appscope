@@ -18,6 +18,19 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
+/* Args Matrix (X disallows)
+ *          id in out last all json sort reverse peer
+ * id       -  X  X
+ * in          -  X   X    X   X    X    X       X
+ * out            -   X    X   X    X    X       X
+ * last               -    X
+ * all                     -                     X
+ * json                        -
+ * sort                             -
+ * reverse                               -
+ * peer                                          -
+ */
+
 // flowsCmd represents the flows command
 var flowsCmd = &cobra.Command{
 	Use:   "flows [flags] <ID>",
@@ -26,8 +39,10 @@ var flowsCmd = &cobra.Command{
 can output full payloads from the flow.`,
 	Example: `scope flows                # Displays all flows
 scope flows 124x3c         # Displays more info about the flow
+scope flows --in 124x3c    # Displays the inbound payload of that flow
 scope flows --out 124x3c   # Displays the outbound payload of that flow
 scope flows -p 0.0.0.0/24  # Displays flows in that subnet range
+scope flows --sort net_host_port --reverse  # Sort flows by ascending host port
 `,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -42,6 +57,43 @@ scope flows -p 0.0.0.0/24  # Displays flows in that subnet range
 		peerNet, _ := cmd.Flags().GetIPNet("peer")
 		// eval, _ := cmd.Flags().GetString("eval")
 		enc := json.NewEncoder(os.Stdout)
+
+		// Disallow bad argument combinations (see Arg Matrix at top of file)
+		if cmd.Flags().Lookup("id").Changed && inFile {
+			helpErrAndExit(cmd, "Cannot specify --id and --in")
+		} else if cmd.Flags().Lookup("id").Changed && outFile {
+			helpErrAndExit(cmd, "Cannot specify --id and --out")
+		} else if inFile && outFile {
+			helpErrAndExit(cmd, "Cannot specify --in and --out")
+		} else if inFile && cmd.Flags().Lookup("last").Changed {
+			helpErrAndExit(cmd, "Cannot specify --in and --last")
+		} else if inFile && allFlows {
+			helpErrAndExit(cmd, "Cannot specify --in and --all")
+		} else if inFile && jsonOut {
+			helpErrAndExit(cmd, "Cannot specify --in and --json")
+		} else if inFile && sortField != "" {
+			helpErrAndExit(cmd, "Cannot specify --in and --sort")
+		} else if inFile && sortReverse {
+			helpErrAndExit(cmd, "Cannot specify --in and --reverse")
+		} else if inFile && cmd.Flags().Lookup("peer").Changed {
+			helpErrAndExit(cmd, "Cannot specify --in and --peer")
+		} else if outFile && cmd.Flags().Lookup("last").Changed {
+			helpErrAndExit(cmd, "Cannot specify --out and --last")
+		} else if outFile && allFlows {
+			helpErrAndExit(cmd, "Cannot specify --out and --all")
+		} else if outFile && jsonOut {
+			helpErrAndExit(cmd, "Cannot specify --out and --json")
+		} else if outFile && sortField != "" {
+			helpErrAndExit(cmd, "Cannot specify --out and --sort")
+		} else if outFile && sortReverse {
+			helpErrAndExit(cmd, "Cannot specify --out and --reverse")
+		} else if outFile && cmd.Flags().Lookup("peer").Changed {
+			helpErrAndExit(cmd, "Cannot specify --out and --peer")
+		} else if cmd.Flags().Lookup("last").Changed && allFlows {
+			helpErrAndExit(cmd, "Cannot specify --last and --all")
+		} else if allFlows && cmd.Flags().Lookup("peer").Changed {
+			helpErrAndExit(cmd, "Cannot specify --all and --peer")
+		}
 
 		// var vm *goja.Runtime
 		// var prog *goja.Program

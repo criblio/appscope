@@ -287,7 +287,7 @@ func PrintEvents(in chan libscope.EventBody, fields []string, sortField, eval st
 	// Print events
 	for _, e := range events {
 		out := GetEventText(e, forceColor, allFields, fields, width)
-		fmt.Printf("%s\n", out)
+		util.Printf("%s\n", out)
 	}
 }
 

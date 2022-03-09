@@ -24,7 +24,6 @@ typedef struct {
     jmethodID mid_ByteBuffer_position;
     jmethodID mid_ByteBuffer_limit;
     jmethodID mid_ByteBuffer_hasArray;
-    jmethodID mid_ByteBuffer_isDirect;
     jfieldID  fid_ByteBuffer___fd;
 #if SSL > 0
     jmethodID mid_SSLEngineImpl___wrap;
@@ -232,7 +231,6 @@ initSSLEngineImplGlobals(JNIEnv *jni)
     jclass bufferClass             = (*jni)->FindClass(jni, "java/nio/Buffer");
     g_java.mid_ByteBuffer_array    = (*jni)->GetMethodID(jni, byteBufferClass, "array", "()[B");
     g_java.mid_ByteBuffer_hasArray = (*jni)->GetMethodID(jni, byteBufferClass, "hasArray", "()Z");
-    g_java.mid_ByteBuffer_isDirect = (*jni)->GetMethodID(jni, byteBufferClass, "isDirect", "()Z");
     g_java.mid_ByteBuffer_position = (*jni)->GetMethodID(jni, bufferClass, "position", "()I");
     g_java.mid_ByteBuffer_limit    = (*jni)->GetMethodID(jni, bufferClass, "limit", "()I");
 
@@ -515,6 +513,7 @@ Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject src
         if ((*jni)->CallBooleanMethod(jni, bufEl, g_java.mid_ByteBuffer_hasArray) == TRUE) {
             buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
         } else {
+            // Do we need to test for a direct array here? Seems to work as is.
             buf = (*jni)->GetDirectBufferAddress(jni, bufEl);
         }
 

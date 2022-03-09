@@ -11,6 +11,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+/* Args Matrix (X disallows)
+ *         all running last id dir
+ * all     -   X       X    X
+ * running X   -            X
+ * last    X           -    X
+ * id      X   X       X    -
+ * dir                         -
+ */
+
 // historyCmd represents the history command
 var historyCmd = &cobra.Command{
 	Use:   "history [flags]",
@@ -33,6 +42,20 @@ cat $(scope hist -d)/args.json   # Outputs contents of args.json in the scope hi
 		running, _ := cmd.Flags().GetBool("running")
 		id, _ := cmd.Flags().GetInt("id")
 		onlydir, _ := cmd.Flags().GetBool("dir")
+
+		// Disallow bad argument combinations (see Arg Matrix at top of file)
+		if all && running {
+			helpErrAndExit(cmd, "Cannot specify --all and --running")
+		} else if all && cmd.Flags().Lookup("last").Changed {
+			helpErrAndExit(cmd, "Cannot specify --all and --last")
+		} else if all && cmd.Flags().Lookup("id").Changed {
+			helpErrAndExit(cmd, "Cannot specify --all and --id")
+		} else if running && cmd.Flags().Lookup("id").Changed {
+			helpErrAndExit(cmd, "Cannot specify --running and --id")
+		} else if cmd.Flags().Lookup("last").Changed && cmd.Flags().Lookup("id").Changed {
+			helpErrAndExit(cmd, "Cannot specify --last and --id")
+		}
+
 		sessions := history.GetSessions()
 		if all {
 			fmt.Println("Displaying all sessions")
@@ -42,7 +65,9 @@ cat $(scope hist -d)/args.json   # Outputs contents of args.json in the scope hi
 			}
 			sessions = sessions.Last(last)
 			if onlydir {
-				fmt.Printf("%s\n", sessions[len(sessions)-1].WorkDir)
+				for _, session := range sessions {
+					fmt.Printf("%s\n", session.WorkDir)
+				}
 				os.Exit(0)
 			}
 		} else {

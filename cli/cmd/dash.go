@@ -33,6 +33,11 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
+/* Args Matrix (X disallows)
+ *          id
+ * id       -
+ */
+
 // dashCmd represents the dash command
 var dashCmd = &cobra.Command{
 	Use:     "dash [flags]",

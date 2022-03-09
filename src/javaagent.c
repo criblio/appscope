@@ -9,6 +9,8 @@
 #include <jvmti.h>
 #include "javabci.h"
 
+#define SSL 1
+
 typedef struct {
     jmethodID mid_Object_hashCode;
     jmethodID mid_SSLSocketImpl_getSession;
@@ -21,12 +23,13 @@ typedef struct {
     jmethodID mid_ByteBuffer_array;
     jmethodID mid_ByteBuffer_position;
     jmethodID mid_ByteBuffer_limit;
+    jmethodID mid_ByteBuffer_hasArray;
     jfieldID  fid_ByteBuffer___fd;
-    
+#if SSL > 0
     jmethodID mid_SSLEngineImpl___wrap;
     jmethodID mid_SSLEngineImpl___unwrap;
     jmethodID mid_SSLEngineImpl_getSession;
-    
+#endif
     jmethodID mid_Socket_getInetAddress;
     jmethodID mid_Socket_getPort;
     jmethodID mid_Socket_getImp;
@@ -57,11 +60,12 @@ logJvmtiError(jvmtiEnv *jvmti, jvmtiError errnum, const char *str)
     scopeLogError("ERROR: JVMTI: [%d] %s - %s\n", errnum, (errnum_str == NULL ? "Unknown": errnum_str), (str == NULL? "" : str));
 }
 
-static void 
+static jboolean
 clearJniException(JNIEnv *jni)
 {
     jboolean flag = (*jni)->ExceptionCheck(jni);
     if (flag) (*jni)->ExceptionClear(jni);
+    return flag;
 }
 
 static int 
@@ -82,7 +86,7 @@ initJniGlobals(JNIEnv *jni)
     if (g_java.mid_Object_hashCode != NULL) return;
     jclass objectClass             = (*jni)->FindClass(jni, "java/lang/Object");
     g_java.mid_Object_hashCode     = (*jni)->GetMethodID(jni, objectClass, "hashCode", "()I");
-
+#if SSL > 0
     jclass sslSocketImplClass      = (*jni)->FindClass(jni, "sun/security/ssl/SSLSocketImpl");
     if (sslSocketImplClass == NULL) {
         // Oracle JDK 6
@@ -90,7 +94,7 @@ initJniGlobals(JNIEnv *jni)
         clearJniException(jni);
     }
     g_java.mid_SSLSocketImpl_getSession = (*jni)->GetMethodID(jni, sslSocketImplClass, "getSession", "()Ljavax/net/ssl/SSLSession;");
-
+#endif
     jclass socketClass         = (*jni)->FindClass(jni, "java/net/Socket");
     g_java.mid_Socket_getInetAddress = (*jni)->GetMethodID(jni, socketClass, "getInetAddress", "()Ljava/net/InetAddress;");
     g_java.mid_Socket_getPort      = (*jni)->GetMethodID(jni, socketClass, "getPort", "()I");
@@ -106,10 +110,15 @@ initJniGlobals(JNIEnv *jni)
     g_java.mid_InetAddress_getHostAddress = (*jni)->GetMethodID(jni, inetAddressClass, "getHostAddress", "()Ljava/lang/String;");
 }
 
+#if SSL > 0
 static void 
 initAppOutputStreamGlobals(JNIEnv *jni)
 {
+#if SSL == 0
+    return;
+#endif
     if (g_java.mid_AppOutputStream___write != NULL) return;
+
     jclass appOutputStreamClass = (*jni)->FindClass(jni, "sun/security/ssl/AppOutputStream");
     if (appOutputStreamClass == NULL) {
         // Oracle JDK 6
@@ -145,10 +154,13 @@ initAppOutputStreamGlobals(JNIEnv *jni)
     }
     clearJniException(jni);
 }
-
+#endif
 static void
 initAppInputStreamGlobals(JNIEnv *jni)
 {
+#if SSL == 0
+    return;
+#endif
     if (g_java.mid_AppInputStream___read != NULL) return;
     jclass appInputStreamClass = (*jni)->FindClass(jni, "sun/security/ssl/AppInputStream");
     if (appInputStreamClass == NULL) {
@@ -186,6 +198,7 @@ initAppInputStreamGlobals(JNIEnv *jni)
     clearJniException(jni);
 }
 
+#if SSL > 0
 static void
 initSSLEngineImplGlobals(JNIEnv *jni) 
 {
@@ -217,6 +230,7 @@ initSSLEngineImplGlobals(JNIEnv *jni)
     jclass byteBufferClass         = (*jni)->FindClass(jni, "java/nio/ByteBuffer");
     jclass bufferClass             = (*jni)->FindClass(jni, "java/nio/Buffer");
     g_java.mid_ByteBuffer_array    = (*jni)->GetMethodID(jni, byteBufferClass, "array", "()[B");
+    g_java.mid_ByteBuffer_hasArray = (*jni)->GetMethodID(jni, byteBufferClass, "hasArray", "()Z");
     g_java.mid_ByteBuffer_position = (*jni)->GetMethodID(jni, bufferClass, "position", "()I");
     g_java.mid_ByteBuffer_limit    = (*jni)->GetMethodID(jni, bufferClass, "limit", "()I");
 
@@ -229,6 +243,7 @@ initSSLEngineImplGlobals(JNIEnv *jni)
         clearJniException(jni);
     }
 }
+#endif
 
 void JNICALL 
 ClassFileLoadHook(jvmtiEnv *jvmti_env,
@@ -242,8 +257,11 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
     jint* new_class_data_len,
     unsigned char** new_class_data) 
 {
+#if SSL == 0
+    return;
+#endif
     if (name == NULL) return;
-    
+
     if (strcmp(name, "sun/security/ssl/AppOutputStream") == 0 || 
         strcmp(name, "com/sun/net/ssl/internal/ssl/AppOutputStream") == 0 ||
         strcmp(name, "sun/security/ssl/SSLSocketImpl$AppOutputStream") == 0) {
@@ -384,6 +402,8 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
 static void 
 doJavaProtocol(JNIEnv *jni, jobject session, jbyteArray buf, jint offset, jint len, metric_t src, int fd)
 {
+    if (!jni || !session || !buf) return;
+
     jint  hash      = (*jni)->CallIntMethod(jni, session, g_java.mid_Object_hashCode);
     jbyte *byteBuf  = (*jni)->GetPrimitiveArrayCritical(jni, buf, 0);
     if (!byteBuf) return;
@@ -403,30 +423,42 @@ saveSocketChannel(JNIEnv *jni, jobject socketChannel, jobject buf)
 JNIEXPORT jint JNICALL
 Java_sun_nio_ch_SocketChannelImpl_read(JNIEnv *jni, jobject obj, jobject buf)
 {
+    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
+
     initJniGlobals(jni);
+#if SSL > 0
     initSSLEngineImplGlobals(jni);
-    
+#endif
     saveSocketChannel(jni, obj, buf);
-    
+
     jint res = (*jni)->CallIntMethod(jni, obj, g_java.mid_SocketChannelImpl___read, buf);
+
+    if (!preexisting_exception) clearJniException(jni);
     return res;
 }
 
 JNIEXPORT jint JNICALL
 Java_sun_nio_ch_SocketChannelImpl_write(JNIEnv *jni, jobject obj, jobject buf)
 {
+    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
+
     initJniGlobals(jni);
+#if SSL > 0
     initSSLEngineImplGlobals(jni);
-    
+#endif
     saveSocketChannel(jni, obj, buf);
-    
+
     jint res = (*jni)->CallIntMethod(jni, obj, g_java.mid_SocketChannelImpl___write, buf);
+
+    if (!preexisting_exception) clearJniException(jni);
     return res;
 }
 
+#if SSL > 0
 JNIEXPORT jobject JNICALL
 Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject src, jobjectArray dsts, jint offset, jint len)
 {
+    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
     int fd = -1;
 
     initJniGlobals(jni);
@@ -437,22 +469,59 @@ Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject src
         fd = fdVal;
     }
 
-    //call the original method
+    if (!preexisting_exception) clearJniException(jni);
+
+    // call the original method
+    // if there was a pre-existing exception, don't proceed?
     jobject res = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl___unwrap, src, dsts, offset, len);
+    if (preexisting_exception || (*jni)->ExceptionCheck(jni) || !res) return res;
 
     jint bytesProduced = (*jni)->CallIntMethod(jni, res, g_java.mid_SSLEngineResult_bytesProduced);
-    if (bytesProduced) {
-        jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
-        int i;
-        for(i=offset;i<len - offset;i++) {
-            jobject bufEl  = (*jni)->GetObjectArrayElement(jni, dsts, i);
-            jint pos       = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
-            jbyteArray buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
-            //scopeLogError("Java_sun_security_ssl_SSLEngineImpl_unwrap before");
-            doJavaProtocol(jni, session, buf, 0, pos, TLSRX, fd);
+    if (clearJniException(jni) || !bytesProduced) return res;
+
+    int i;
+    jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
+    if (clearJniException(jni) || !session) return res;
+
+
+    for (i = offset; i < (len - offset); i++) {
+        void *buf;
+        jobject bufEl  = (*jni)->GetObjectArrayElement(jni, dsts, i);
+        if (clearJniException(jni) || !bufEl) return res;
+
+        jint pos = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
+        if (clearJniException(jni) || (pos < 0)) return res;
+
+        /*
+         * We call hasArray() on the buffer object in order to see if a byte array is
+         * available. Don't call the array() function if a byte array is not available
+         * as it throws an exception and we don't get any data.
+         *
+         * From the less than helpful Java docs:
+         * hasArray tells whether or not this buffer is backed by an accessible byte array.
+         * If this method returns true then the array and arrayOffset methods may safely be invoked.
+         * Returns true if, and only if, this buffer is backed by an array and is not read-only.
+         *
+         * From practice, while the byte array is not available, it is direct. Therefore, we
+         * fall back to a direct buffer address function. The direct buffer address function
+         * allows access the same memory region that is accessible to Java code via the buffer object.
+         * Returns the starting address of the memory region referenced by the buffer.
+         * Returns NULL if the memory region is undefined.
+         * Returns NULL if the given object is not a direct java.nio.Buffer.
+         * Returns NULL if JNI access to direct buffers is not supported by this virtual machine.
+         */
+        if ((*jni)->CallBooleanMethod(jni, bufEl, g_java.mid_ByteBuffer_hasArray) == TRUE) {
+            buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
+        } else {
+            // Do we need to test for a direct array here? Seems to work as is.
+            buf = (*jni)->GetDirectBufferAddress(jni, bufEl);
         }
+
+        if (clearJniException(jni) || !buf) return res;
+        doJavaProtocol(jni, session, buf, 0, pos, TLSRX, fd);
     }
 
+    clearJniException(jni);
     return res;
 }
 
@@ -465,6 +534,7 @@ Java_com_sun_net_ssl_internal_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj,
 JNIEXPORT jobject JNICALL 
 Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray srcs, jint offset, jint len, jobject dst) 
 {
+    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
     int fd = -1;
 
     initJniGlobals(jni);
@@ -479,28 +549,49 @@ Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray 
     // The original method can change it's value.
     jint initialpos[len];
     int i;
-    for (i=offset; i<len - offset; i++) {
+    for (i=offset; i < (len - offset); i++) {
         jobject bufEl  = (*jni)->GetObjectArrayElement(jni, srcs, i);
         jint pos       = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_position);
         initialpos[i] = pos;
     }
     
+    if (!preexisting_exception) clearJniException(jni);
+
     //call the original method
     jobject res = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl___wrap, srcs, offset, len, dst);
+    if (preexisting_exception || (*jni)->ExceptionCheck(jni) || !res) return res;
 
     jint bytesConsumed = (*jni)->CallIntMethod(jni, res, g_java.mid_SSLEngineResult_bytesConsumed);
-    if (bytesConsumed) {
-        jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
-        for(i=offset;i<len - offset;i++) {
-            jobject bufEl  = (*jni)->GetObjectArrayElement(jni, srcs, i);
-            jint pos       = initialpos[i]; // initial position was saved above
-            jint limit     = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_limit);
-            jbyteArray buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
-            //scopeLogError("Java_sun_security_ssl_SSLEngineImpl_wrap before");
-            doJavaProtocol(jni, session, buf, pos, limit, TLSTX, fd);
+    if (clearJniException(jni) || !bytesConsumed) return res;
+
+    jobject session = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl_getSession);
+    if (clearJniException(jni) || !session) return res;
+
+    for (i=offset; i < (len - offset); i++) {
+        void *buf;
+        jobject bufEl = (*jni)->GetObjectArrayElement(jni, srcs, i);
+        if (clearJniException(jni) || !bufEl) return res;
+
+        jint pos = initialpos[i]; // initial position was saved above
+
+        jint limit = (*jni)->CallIntMethod(jni, bufEl, g_java.mid_ByteBuffer_limit);
+        if (clearJniException(jni) || (limit < 0)) return res;
+
+        /*
+         * There is Java weirdness related to getting a buf from an array.
+         * Refer to Java_sun_security_ssl_SSLEngineImpl_unwrap() for an explanation.
+         */
+        if ((*jni)->CallBooleanMethod(jni, bufEl, g_java.mid_ByteBuffer_hasArray) == TRUE) {
+            buf = (*jni)->CallObjectMethod(jni, bufEl, g_java.mid_ByteBuffer_array);
+        } else {
+            buf = (*jni)->GetDirectBufferAddress(jni, bufEl);
         }
+
+        if (clearJniException(jni) || !buf) return res;
+        doJavaProtocol(jni, session, buf, pos, limit, TLSTX, fd);
     }
 
+    clearJniException(jni);
     return res;
 }
 
@@ -513,6 +604,7 @@ Java_com_sun_net_ssl_internal_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, j
 JNIEXPORT void JNICALL 
 Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
 {
+    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
     int fd = -1;
 
     initJniGlobals(jni);
@@ -527,19 +619,14 @@ Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray
         session = obj;
     }
 
-    jboolean exception_before_call = (*jni)->ExceptionCheck(jni);
+    if (!preexisting_exception) clearJniException(jni);
     
     //call the original method
     (*jni)->CallVoidMethod(jni, obj, g_java.mid_AppOutputStream___write, buf, offset, len);
+    if (preexisting_exception || (*jni)->ExceptionCheck(jni)) return;
 
-    // This void method doesn't return status.  Using the exception
-    // status as a proxy seems reasonable.
-    jboolean exception_after_call = (*jni)->ExceptionCheck(jni);
-    int original_method_caused_exception = !exception_before_call && exception_after_call;
-    if (!original_method_caused_exception) {
-        //scopeLogError("Java_sun_security_ssl_AppOutputStream_write before");
-        doJavaProtocol(jni, session, buf, offset, len, TLSTX, fd);
-    }
+    doJavaProtocol(jni, session, buf, offset, len, TLSTX, fd);
+    clearJniException(jni);
 }
 
  //support for JDK 11 - 14 where AppOutputStream in a nested class defined inside SSLSocketImpl
@@ -554,10 +641,13 @@ Java_com_sun_net_ssl_internal_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj
 {
     Java_sun_security_ssl_AppOutputStream_write(jni, obj, buf, offset, len);
 }
+#endif
 
+#if SSL > 0
 JNIEXPORT jint JNICALL 
 Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
 {
+    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
     int fd = -1;
 
     initJniGlobals(jni);
@@ -572,14 +662,14 @@ Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray b
         session = obj;
     }
 
+    if (!preexisting_exception) clearJniException(jni);
+
     //call the original method
     jint res = (*jni)->CallIntMethod(jni, obj, g_java.mid_AppInputStream___read, buf, offset, len);
+    if (preexisting_exception || (*jni)->ExceptionCheck(jni) || (res < 0)) return res;
 
-    if (res != -1) {
-        //scopeLogError("Java_sun_security_ssl_AppInputStream_read before");
-        doJavaProtocol(jni, session, buf, offset, res, TLSRX, fd);
-    }
-
+    doJavaProtocol(jni, session, buf, offset, res, TLSRX, fd);
+    clearJniException(jni);
     return res;
 }
 
@@ -595,7 +685,7 @@ Java_com_sun_net_ssl_internal_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, 
 {
     return Java_sun_security_ssl_AppInputStream_read(jni, obj, buf, offset, len);
 }
-
+#endif
 JNIEXPORT jint JNICALL 
 Agent_OnLoad(JavaVM *jvm, char *options, void *reserved) 
 {

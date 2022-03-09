@@ -21,14 +21,14 @@ import (
 /* Args Matrix (X disallows)
  *          id in out last all json sort reverse peer
  * id       -  X  X
- * in          -  X   X    X   X    X    X       X
- * out            -   X    X   X    X    X       X
- * last               -    X
- * all                     -                     X
- * json                        -
- * sort                             -
- * reverse                               -
- * peer                                          -
+ * in       X  -  X   X    X   X    X    X       X
+ * out      X  X  -   X    X   X    X    X       X
+ * last        X  X   -    X
+ * all         X  X   X    -                     X
+ * json        X  X            -
+ * sort        X  X                 -
+ * reverse     X  X                      -
+ * peer        X  X        X                     -
  */
 
 // flowsCmd represents the flows command

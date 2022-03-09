@@ -9,16 +9,16 @@ import (
  *                 cribldest metricformat metricdest eventdest nobreaker authtoken passthrough verbosity payloads loglevel librarypath userconfig
  * cribldest       -                      X          X                             X                                                   X
  * metricformat              -                                                     X                                                   X
- * metricdest                             -                                        X                                                   X
- * eventdest                                         -                             X                                                   X
+ * metricdest      X                      -                                        X                                                   X
+ * eventdest       X                                 -                             X                                                   X
  * nobreaker    											   -                   X                                                   X
  * authtoken                                                             -         X                                                   X
- * passthrough                                                                     -           X         X        X                    X
- * verbosity      																			   -                                       X
- * payloads                                                                                              -                             X
- * loglevel                                                                                                       -                    X
+ * passthrough     X         X            X          X         X         X         -           X         X        X                    X
+ * verbosity      																   X    	   -                                       X
+ * payloads                                                                        X                     -                             X
+ * loglevel                                                                        X                              -                    X
  * librarypath                                                                                                             -
- * userconfig                                                                                                                          -
+ * userconfig      X         X            X          X         X         X         X           X         X        X                    -
  */
 
 // attachCmd represents the run command

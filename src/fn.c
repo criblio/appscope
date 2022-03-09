@@ -232,7 +232,9 @@ initFn(void)
     GETADDR(g_fn.sendto, "sendto");
     GETADDR(g_fn.sendmsg, "sendmsg");
     GETADDR(g_fn.recv, "recv");
+    GETADDR(g_fn.__recv_chk, "__recv_chk");
     GETADDR(g_fn.recvfrom, "recvfrom");
+    GETADDR(g_fn.__recvfrom_chk, "__recvfrom_chk");
     GETADDR(g_fn.recvmsg, "recvmsg");
     GETADDR(g_fn.gethostbyname, "gethostbyname");
     GETADDR(g_fn.gethostbyname2, "gethostbyname2");
@@ -240,6 +242,7 @@ initFn(void)
     GETADDR(g_fn.sigaction, "sigaction");
     GETADDR(g_fn.execve, "execve");
     GETADDR(g_fn.poll, "poll");
+    GETADDR(g_fn.__poll_chk, "__poll_chk");
     GETADDR(g_fn.select, "select");
     GETADDR(g_fn.ns_initparse, "ns_initparse");
     GETADDR(g_fn.ns_parserr, "ns_parserr");
@@ -259,6 +262,7 @@ initFn(void)
     GETADDR(g_fn.freopen64, "freopen64");
     GETADDR(g_fn.creat64, "creat64");
     GETADDR(g_fn.pread64, "pread64");
+    GETADDR(g_fn.__pread64_chk, "__pread64_chk");
     GETADDR(g_fn.preadv, "preadv");
     GETADDR(g_fn.preadv2, "preadv2");
     GETADDR(g_fn.preadv64v2, "preadv64v2");
@@ -320,6 +324,7 @@ initFn(void)
     GETADDR(g_fn.sigtimedwait, "sigtimedwait");
     GETADDR(g_fn.epoll_pwait, "epoll_pwait");
     GETADDR(g_fn.ppoll, "ppoll");
+    GETADDR(g_fn.__ppoll_chk, "__ppoll_chk");
     GETADDR(g_fn.pselect, "pselect");
     GETADDR(g_fn.msgsnd, "msgsnd");
     GETADDR(g_fn.msgrcv, "msgrcv");

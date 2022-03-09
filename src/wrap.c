@@ -90,11 +90,13 @@ static got_list_t inject_hook_list[] = {
     {"sigsuspend",  NULL, &g_fn.sigsuspend},
     {"epoll_wait",  NULL, &g_fn.epoll_wait},
     {"poll",        NULL, &g_fn.poll},
+    {"__poll_chk",  NULL, &g_fn.__poll_chk},
     {"pause",       NULL, &g_fn.pause},
     {"sigwaitinfo", NULL, &g_fn.sigwaitinfo},
     {"sigtimedwait", NULL, &g_fn.sigtimedwait},
     {"epoll_pwait", NULL, &g_fn.epoll_pwait},
     {"ppoll",       NULL, &g_fn.ppoll},
+    {"__ppoll_chk", NULL, &g_fn.__ppoll_chk},
     {"pselect",     NULL, &g_fn.pselect},
     {"msgsnd",      NULL, &g_fn.msgsnd},
     {"msgrcv",      NULL, &g_fn.msgrcv},
@@ -112,6 +114,7 @@ static got_list_t inject_hook_list[] = {
     {"fopen64", NULL, &g_fn.fopen64},
     {"freopen64", NULL, &g_fn.freopen64},
     {"pread64", NULL, &g_fn.pread64},
+    {"__pread64_chk", NULL, &g_fn.__pread64_chk},
     {"preadv", NULL, &g_fn.preadv},
     {"preadv2", NULL, &g_fn.preadv2},
     {"preadv64v2", NULL, &g_fn.preadv64v2},
@@ -224,7 +227,9 @@ static got_list_t inject_hook_list[] = {
     {"sendto", NULL, &g_fn.sendto},
     {"sendmsg", NULL, &g_fn.sendmsg},
     {"recv", NULL, &g_fn.recv},
+    {"__recv_chk", NULL, &g_fn.__recv_chk},
     {"recvfrom", NULL, &g_fn.recvfrom},
+    {"__recvfrom_chk", NULL, &g_fn.__recvfrom_chk},
     {"recvmsg", NULL, &g_fn.recvmsg},
     {"opendir", NULL, &g_fn.opendir},
     {"closedir", NULL, &g_fn.closedir},
@@ -1839,8 +1844,16 @@ EXPORTON int
 poll(struct pollfd *fds, nfds_t nfds, int timeout)
 {
     stopTimer();
-    WRAP_CHECK(epoll_wait, -1);
+    WRAP_CHECK(poll, -1);
     return g_fn.poll(fds, nfds, timeout);
+}
+
+EXPORTON int
+__poll_chk(struct pollfd *fds, nfds_t nfds, int timeout, size_t fdslen)
+{
+    stopTimer();
+    WRAP_CHECK(__poll_chk, -1);
+    return g_fn.__poll_chk(fds, nfds, timeout, fdslen);
 }
 
 EXPORTON int
@@ -1885,6 +1898,15 @@ ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p,
     stopTimer();
     WRAP_CHECK(ppoll, -1);
     return g_fn.ppoll(fds, nfds, tmo_p, sigmask);
+}
+
+EXPORTON int
+__ppoll_chk(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p,
+      const sigset_t *sigmask, size_t fdslen)
+{
+    stopTimer();
+    WRAP_CHECK(__ppoll_chk, -1);
+    return g_fn.__ppoll_chk(fds, nfds, tmo_p, sigmask, fdslen);
 }
 
 EXPORTON int
@@ -2106,6 +2128,19 @@ pread64(int fd, void *buf, size_t count, off_t offset)
 }
 
 EXPORTON ssize_t
+__pread64_chk(int fd, void *buf, size_t count, off_t offset, size_t bufsize)
+{
+    WRAP_CHECK(__pread64_chk, -1);
+    uint64_t initialTime = getTime();
+
+    ssize_t rc = g_fn.__pread64_chk(fd, buf, count, offset, bufsize);
+
+    doRead(fd, initialTime, (rc != -1), (void *)buf, rc, "__pread64_chk", BUF, 0);
+
+    return rc;
+}
+
+EXPORTON ssize_t
 preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 {
     WRAP_CHECK(preadv, -1);
@@ -2158,7 +2193,7 @@ __pread_chk(int fd, void *buf, size_t nbytes, off_t offset, size_t buflen)
     return rc;
 }
 
-EXPORTOFF ssize_t
+EXPORTON ssize_t
 __read_chk(int fd, void *buf, size_t nbytes, size_t buflen)
 {
     // TODO: this function aborts & exits on error, add abort functionality
@@ -4698,6 +4733,31 @@ recv(int sockfd, void *buf, size_t len, int flags)
     return rc;
 }
 
+EXPORTON ssize_t
+__recv_chk(int sockfd, void *buf, size_t len, size_t buflen, int flags)
+{
+    ssize_t rc;
+
+    WRAP_CHECK(__recv_chk, -1);
+    scopeLog(CFG_LOG_TRACE, "fd:%d __recv_chk", sockfd);
+    if ((rc = doURL(sockfd, buf, len, NETRX)) == 0) {
+        rc = g_fn.__recv_chk(sockfd, buf, len, buflen, flags);
+    }
+
+    if (rc != -1) {
+        // it's possible to get DNS over TCP
+        if (remotePortIsDNS(sockfd)) {
+            getDNSAnswer(sockfd, buf, rc, BUF);
+        }
+
+        doRecv(sockfd, rc, buf, rc, BUF);
+    } else {
+        doUpdateState(NET_ERR_RX_TX, sockfd, 0, "__recv_chk", "nopath");
+    }
+
+    return rc;
+}
+
 static ssize_t
 internal_recvfrom(int sockfd, void *buf, size_t len, int flags,
          struct sockaddr *src_addr, socklen_t *addrlen)
@@ -4725,6 +4785,28 @@ recvfrom(int sockfd, void *buf, size_t len, int flags,
          struct sockaddr *src_addr, socklen_t *addrlen)
 {
     return internal_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+}
+
+EXPORTON ssize_t
+__recvfrom_chk(int sockfd, void *buf, size_t len, size_t buflen, int flags,
+         struct sockaddr *src_addr, socklen_t *addrlen)
+{
+    ssize_t rc;
+
+    WRAP_CHECK(__recvfrom_chk, -1);
+    rc = g_fn.__recvfrom_chk(sockfd, buf, len, buflen, flags, src_addr, addrlen);
+    if (rc != -1) {
+        scopeLog(CFG_LOG_TRACE, "fd:%d __recvfrom_chk", sockfd);
+
+        if (remotePortIsDNS(sockfd)) {
+            getDNSAnswer(sockfd, buf, rc, BUF);
+        }
+
+        doRecv(sockfd, rc, buf, rc, BUF);
+    } else {
+        doUpdateState(NET_ERR_RX_TX, sockfd, 0, "__recvfrom_chk", "nopath");
+    }
+    return rc;
 }
 
 static int

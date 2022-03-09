@@ -13,6 +13,7 @@ import (
 
 	"github.com/criblio/scope/events"
 	"github.com/criblio/scope/internal"
+	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/metrics"
 	"github.com/criblio/scope/util"
 	"github.com/mum4k/termdash"
@@ -189,7 +190,7 @@ func readEvents(workDir string, w *widgets) {
 	}
 
 	tr := util.NewTailReader(file)
-	in := make(chan map[string]interface{})
+	in := make(chan libscope.EventBody)
 	eventCount, _ := util.CountLines(eventsPath)
 	termWidth, _, err := terminal.GetSize(0)
 	if err != nil {
@@ -202,16 +203,16 @@ func readEvents(workDir string, w *widgets) {
 	if skipEvents < 0 {
 		skipEvents = 0
 	}
-	go events.Reader(tr, 0, util.MatchSkipN(skipEvents), in)
+	go events.EventReader(tr, 0, util.MatchSkipN(skipEvents), in)
 
 	for e := range in {
-		eventText := getEventText(e, termWidth-4, false)
+		eventText := events.GetEventText(e, true, false, []string{}, termWidth-4)
 		results := ansiToTermDashColors(eventText)
 		for _, r := range results {
 			err = w.events.Write(r.text, r.options)
 			if err != nil {
 				log.Error().Msgf("error writing to console: %v", err)
-				w.events.Write(ansiStrip(r.text), text.WriteCellOpts())
+				w.events.Write(events.AnsiStrip(r.text), text.WriteCellOpts())
 			}
 		}
 	}

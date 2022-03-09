@@ -7,6 +7,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
 )
@@ -29,7 +30,7 @@ type Config struct {
 	UserConfig    string
 
 	now func() time.Time
-	sc  *ScopeConfig
+	sc  *libscope.ScopeConfig
 }
 
 // Run executes a scoped command
@@ -68,6 +69,6 @@ func (rc *Config) Run(args []string) {
 }
 
 // GetScopeConfig returns the ScopeConfig pointer
-func (rc *Config) GetScopeConfig() *ScopeConfig {
+func (rc *Config) GetScopeConfig() *libscope.ScopeConfig {
 	return rc.sc
 }

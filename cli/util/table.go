@@ -23,7 +23,7 @@ func SetOut(newOut io.Writer) {
 	out = newOut
 }
 
-func printf(format string, a ...interface{}) (int, error) {
+func Printf(format string, a ...interface{}) (int, error) {
 	return fmt.Fprintf(out, format, a...)
 }
 
@@ -57,7 +57,7 @@ func PrintObj(fields []ObjField, obj interface{}) error {
 	case reflect.Map:
 		return printObj(fields, obj)
 	default:
-		printf("%v", obj)
+		Printf("%v", obj)
 	}
 	return nil
 }

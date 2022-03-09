@@ -11,10 +11,10 @@ import (
  * metricformat              -                                                     X                                                   X
  * metricdest      X                      -                                        X                                                   X
  * eventdest       X                                 -                             X                                                   X
- * nobreaker    											   -                   X                                                   X
+ * nobreaker                                                   -                   X                                                   X
  * authtoken                                                             -         X                                                   X
  * passthrough     X         X            X          X         X         X         -           X         X        X                    X
- * verbosity      																   X    	   -                                       X
+ * verbosity                                                                       X           -                                       X
  * payloads                                                                        X                     -                             X
  * loglevel                                                                        X                              -                    X
  * librarypath                                                                                                             -

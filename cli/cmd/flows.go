@@ -20,9 +20,9 @@ import (
 
 /* Args Matrix (X disallows)
  *          id in out last all json sort reverse peer
- * id       -  X  X
- * in       X  -  X   X    X   X    X    X       X
- * out      X  X  -   X    X   X    X    X       X
+ * id       -
+ * in          -  X   X    X   X    X    X       X
+ * out         X  -   X    X   X    X    X       X
  * last        X  X   -    X
  * all         X  X   X    -                     X
  * json        X  X            -
@@ -59,11 +59,7 @@ scope flows --sort net_host_port --reverse  # Sort flows by ascending host port
 		enc := json.NewEncoder(os.Stdout)
 
 		// Disallow bad argument combinations (see Arg Matrix at top of file)
-		if cmd.Flags().Lookup("id").Changed && inFile {
-			helpErrAndExit(cmd, "Cannot specify --id and --in")
-		} else if cmd.Flags().Lookup("id").Changed && outFile {
-			helpErrAndExit(cmd, "Cannot specify --id and --out")
-		} else if inFile && outFile {
+		if inFile && outFile {
 			helpErrAndExit(cmd, "Cannot specify --in and --out")
 		} else if inFile && cmd.Flags().Lookup("last").Changed {
 			helpErrAndExit(cmd, "Cannot specify --in and --last")

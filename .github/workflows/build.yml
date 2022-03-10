@@ -9,15 +9,19 @@ name: Build & Test
 on: 
   # Run on pushes to any branch
   push:
-    paths-ignore:
-      - 'website/**'
+    # paths-ignore does not work as expected
+    # it means the workflow will run on any explicit branch
+    # and any other branch where a change to a file except 
+    # one in paths-ignore happens.
+    # paths-ignore:
+    #  - 'website/**'
   # Run on manually triggered workflow
   workflow_dispatch:
   # Run on PRs targeting the default branch or a release branches
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths-ignore:
-      - 'website/**'
+    # paths-ignore:
+    # - 'website/**'
     branches:
       - 'main'
       - 'master'

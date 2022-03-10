@@ -7,7 +7,7 @@ The [`deploy.sh`](./deploy.sh) script is run by the [`website` workflow](../.git
 See the Gatsby docs for complete details but to spin up a local environment for content editors, it should be a matter of:
 1. Install `node` with `brew install node` on MacOS or `apt install nodejs` on Ubuntu. Keep it updated running `brew upgrade node` or `apt update`/`apt upgrade` occasionally.
 2. Install local dependencies in the project with `npm install`.
-3. Run the local development server with `npm run develop`
+3. Run the local development server with `npm run develop`.
 4. Access the local development version of the website at [`http://127.0.0.1:8000/`](https://127.0.0.1:8000/).
 
-> Using Node 16 or higher breaks some if this. It works with 14.
+> Using Node 16 or higher breaks some of this. It works with 14.

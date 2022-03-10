@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/util"
@@ -93,6 +94,8 @@ func TestAnsiStrip(t *testing.T) {
 // - Event format is as expected
 func TestPrintEvents(t *testing.T) {
 
+	_, offset := time.Now().Zone()
+
 	tests := []struct {
 		name       string
 		fields     []string
@@ -107,17 +110,17 @@ func TestPrintEvents(t *testing.T) {
 		expOutput  string
 	}{
 		{name: "simple", fields: []string{}, sortField: "", eval: "", json: false, reverse: false, allFields: false, forceColor: false, width: 160,
-			events:    []libscope.EventBody{{Id: "0", SourceType: "net", Source: "net.close", Host: "test", Proc: "test", Cmd: "test", Data: map[string]interface{}{"net_bytes_sent": 0}}},
-			expOutput: "[0] Dec 31 19:00:00 test net net.close  net_bytes_sent:0"},
+			events:    []libscope.EventBody{{Time: float64(-offset), Id: "0", SourceType: "net", Source: "net.close", Host: "test", Proc: "test", Cmd: "test", Data: map[string]interface{}{"net_bytes_sent": 0}}},
+			expOutput: "[0] Jan  1 00:00:00 test net net.close  net_bytes_sent:0"},
 		{name: "allFields", fields: []string{}, sortField: "", eval: "", json: false, reverse: false, allFields: true, forceColor: false, width: 160,
-			events:    []libscope.EventBody{{Id: "0", SourceType: "net", Source: "net.close", Host: "test", Proc: "test", Cmd: "test", Data: map[string]interface{}{"duration": 0}}},
-			expOutput: "[0] Dec 31 19:00:00 test net net.close [[duration:0]]"},
+			events:    []libscope.EventBody{{Time: float64(-offset), Id: "0", SourceType: "net", Source: "net.close", Host: "test", Proc: "test", Cmd: "test", Data: map[string]interface{}{"duration": 0}}},
+			expOutput: "[0] Jan  1 00:00:00 test net net.close [[duration:0]]"},
 		{name: "fields", fields: []string{"duration"}, sortField: "", eval: "", json: false, reverse: false, allFields: false, forceColor: false, width: 160,
-			events:    []libscope.EventBody{{Id: "0", SourceType: "net", Source: "net.close", Host: "test", Proc: "test", Cmd: "test", Data: map[string]interface{}{"duration": 0}}},
-			expOutput: "[0] Dec 31 19:00:00 test net net.close duration:0"},
+			events:    []libscope.EventBody{{Time: float64(-offset), Id: "0", SourceType: "net", Source: "net.close", Host: "test", Proc: "test", Cmd: "test", Data: map[string]interface{}{"duration": 0}}},
+			expOutput: "[0] Jan  1 00:00:00 test net net.close duration:0"},
 		{name: "eval", fields: []string{}, sortField: "", eval: "source==\"net.close\"", json: false, reverse: false, allFields: false, forceColor: false, width: 160,
-			events:    []libscope.EventBody{{Id: "0", SourceType: "net", Source: "net.close", Host: "test", Proc: "test", Cmd: "test", Data: map[string]interface{}{"net_bytes_sent": 0}}},
-			expOutput: "[0] Dec 31 19:00:00 test net net.close  net_bytes_sent:0"},
+			events:    []libscope.EventBody{{Time: float64(-offset), Id: "0", SourceType: "net", Source: "net.close", Host: "test", Proc: "test", Cmd: "test", Data: map[string]interface{}{"net_bytes_sent": 0}}},
+			expOutput: "[0] Jan  1 00:00:00 test net net.close  net_bytes_sent:0"},
 	}
 
 	for _, tc := range tests {

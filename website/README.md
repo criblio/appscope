@@ -10,4 +10,4 @@ See the Gatsby docs for complete details but to spin up a local environment for 
 3. Run the local development server with `npm run develop`
 4. Access the local development version of the website at [`http://127.0.0.1:8000/`](https://127.0.0.1:8000/).
 
-> Using Node 16 or higher breaks some if this. It works with 14.
+> Using Node 16 or higher breaks some of this. It works with 14.

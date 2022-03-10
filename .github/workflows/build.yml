@@ -28,7 +28,7 @@ on:
       - 'release/*'
 
 concurrency:
-  group: ${{ github.head_ref }}
+  group: ${{ github.ref }}
   # Cancel "in progress" workflows that are superceded with later commits
   cancel-in-progress: true
 

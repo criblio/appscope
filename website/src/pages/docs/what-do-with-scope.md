@@ -25,5 +25,6 @@ AppScope collects and forwards StatsD-style metrics about running applications. 
 - Send metrics from nginx to a specified Datadog server.
 - Send metrics from a Go static application to a specified Datadog server.
 - For any of the above examples, substitute your analytics tool of choice. Optimize the data flow by mediating it through [Cribl LogStream](https://cribl.io/product/).
+- Monitor multiple Apache instances in a server farm, running the data [through Cribl Edge to Cribl LogStream](/docs/cribl-integration#scaling-scoped-processes).
 - Run Firefox from the AppScope CLI, and view results on a terminal-based dashboard.
 - Run Google Chrome from the AppScope CLI, and view results on a terminal-based dashboard. And be surprised.

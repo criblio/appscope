@@ -170,7 +170,7 @@ The library emits metrics like the example below for HTTP activity.
 {
   "type": "metric",
   "body": {
-    "_metric": "http.requests",
+    "_metric": "http.req",
     "_metric_type": "counter",
     "_time": 1632776110.8551781,
     "_value": 1,
@@ -185,10 +185,10 @@ The library emits metrics like the example below for HTTP activity.
 ```
 
 There are three HTTP metrics:
-* `http.requests` counts request messages.
-* `http.client.duration` and `http.server.duration` report the time (in
+* `http.req` counts request messages.
+* `http.duration.client` and `http.duration.server` report the time (in
   milliseconds) between a request and its corresponding response message.
-* `http.request.content_length` and `http.response.content_length` report
+* `http.req.content_length` and `http.resp.content_length` report
   the size (in bytes) of the message content.
 
 ## HTTP Runtime Configuration

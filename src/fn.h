@@ -113,8 +113,11 @@ typedef struct {
                               const struct sockaddr *, socklen_t);
     ssize_t (*sendmsg)(int, const struct msghdr *, int);
     ssize_t (*recv)(int, void *, size_t, int);
-    ssize_t (*recvfrom)(int sockfd, void *buf, size_t len, int flags,
-                                struct sockaddr *src_addr, socklen_t *addrlen);
+    ssize_t (*__recv_chk)(int, void *, size_t, size_t, int);
+    ssize_t (*recvfrom)(int, void *, size_t, int,
+                                struct sockaddr *, socklen_t *);
+    ssize_t (*__recvfrom_chk)(int, void *, size_t, size_t, int,
+                                struct sockaddr *, socklen_t *);
     ssize_t (*recvmsg)(int, struct msghdr *, int);
     struct hostent *(*gethostbyname)(const char *);
     int (*gethostbyname_r)(const char *, struct hostent *, char *, size_t,
@@ -146,6 +149,7 @@ typedef struct {
     size_t (*__fread_unlocked_chk)(void *, size_t, size_t, size_t, FILE *);
     ssize_t (*__getdelim)(char **, size_t *, int, FILE *);
     ssize_t (*pread64)(int, void *, size_t, off_t);
+    ssize_t (*__pread64_chk)(int, void *, size_t, off_t, size_t);
     ssize_t (*preadv)(int, const struct iovec *, int, off_t);
     ssize_t (*preadv2)(int, const struct iovec *, int, off_t, int);
     ssize_t (*preadv64v2)(int, const struct iovec *, int, off_t, int);
@@ -196,6 +200,7 @@ typedef struct {
     void (*PR_SetError)(PRErrorCode, PRInt32);
     int (*execve)(const char *, char * const *, char * const *);
     int (*poll)(struct pollfd *, nfds_t, int);
+    int (*__poll_chk)(struct pollfd *, nfds_t, int, size_t);
     int (*select)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
     int (*nanosleep)(const struct timespec *, struct timespec *);
     int	(*ns_initparse)(const unsigned char *, int, ns_msg *);
@@ -217,6 +222,7 @@ typedef struct {
     ssize_t (*__write_pthread)(int, const void *, size_t);
     int (*epoll_pwait)(int, struct epoll_event *, int, int, const sigset_t *);
     int (*ppoll)(struct pollfd *, nfds_t, const struct timespec *, const sigset_t *);
+    int (*__ppoll_chk)(struct pollfd *, nfds_t, const struct timespec *, const sigset_t *, size_t);
     int (*pause)(void);
     int (*sigsuspend)(const sigset_t *);
     int (*sigwaitinfo)(const sigset_t *, siginfo_t *);

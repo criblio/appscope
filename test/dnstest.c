@@ -160,7 +160,7 @@ checkMetric(char *domain)
     }
 
     while ((getline(&line, &len, fp) != -1) && (loopcnt < MAXLINES)) {
-        if (strstr(line, "net.dns") != NULL) {
+        if (strstr(line, "dns.req") != NULL) {
             char *key, *value, *end;
                 if ((key = strstr(line, "domain:")) != NULL) {
                 if ((value = index(key, ':')) == NULL) break;
@@ -176,7 +176,7 @@ checkMetric(char *domain)
         /* 
          * In the case where we don't expect data getline will
          * loop forever reading lines because it is creating metrics.
-         * If we don't see a net.dns line in the first MAXLINES it's an
+         * If we don't see a dns.req line in the first MAXLINES it's an
          * error.
          */
         loopcnt++;
@@ -243,7 +243,7 @@ getDNSNameBadRequest(void** state)
     // The checks are that: label length is 63 or less, we don't read past
     // the end of the packet, and that the characters that make up the domain
     // are legal.  Before these checks this packet would output something like:
-    // net.dns:1|c|#proc:dnstest,pid:62427,host:ubuntu18_4,domain:<98>à^ZI<88>Ì®^Ý.!^M«=ÖDWd\^H<91>zÒ^};<96>,`Îq<96>^HÀ) o[÷ÿ^?,duration:0,unit:request
+    // dns.req:1|c|#proc:dnstest,pid:62427,host:ubuntu18_4,domain:<98>à^ZI<88>Ì®^Ý.!^M«=ÖDWd\^H<91>zÒ^};<96>,`Îq<96>^HÀ) o[÷ÿ^?,duration:0,unit:request
 
     struct sockaddr_in sa;
     int fd = createSocket(&sa);

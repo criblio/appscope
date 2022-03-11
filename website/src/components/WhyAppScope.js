@@ -1,7 +1,6 @@
 import React from "react";
 import { useStaticQuery, graphql } from "gatsby";
 import { Container, Row, Col } from "react-bootstrap";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import "../scss/_whyAppscope.scss";
 import "../utils/font-awesome";
 
@@ -14,9 +13,18 @@ export default function WhyAppScope() {
             title
             items {
               item
-              icon
               title
+              icon
             }
+          }
+        }
+      }
+      images: allFile(filter: {sourceInstanceName: {eq: "images"}}) {
+        edges { 
+          node {
+            relativePath
+            name
+            publicURL
           }
         }
       }
@@ -31,10 +39,12 @@ export default function WhyAppScope() {
         <Container>
           <Row>
             {data.allWhyAppScopeYaml.edges[0].node.items.map((bullet, i) => {
+              let image = data.images.edges.find(img => img.node.relativePath.includes(bullet.icon));
+              const imageUrl = image && image.node && image.node.publicURL;
               return (
                 <Col xs={12} md={4} className="highlight-col" key={i}>
                   <h3>
-                    <FontAwesomeIcon icon={bullet.icon} />
+                    {imageUrl && <img src={imageUrl} alt={bullet.altText} />}
                   </h3>
                   <h4>{bullet.title}</h4>
                   <p>{bullet.item}</p>

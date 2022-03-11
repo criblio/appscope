@@ -289,7 +289,7 @@
       "title": "op_fs_read",
       "description": "op_fs_read",
       "type": "string",
-      "enum": ["go_read", "readdir", "pread64", "preadv", "preadv2", "preadv64v2", "__pread_chk", "__read_chk", "__fread_unlocked_chk", "read", "readv", "pread", "fread", "__fread_chk", "fread_unlocked", "fgets", "__fgets_chk", "fgets_unlocked", "__fgetws_chk", "fgetws", "fgetwc", "fgetc", "fscanf", "getline", "getdelim", "__getdelim"]
+      "enum": ["go_read", "readdir", "pread64", "__pread64_chk", "preadv", "preadv2", "preadv64v2", "__pread_chk", "__read_chk", "__fread_unlocked_chk", "read", "readv", "pread", "fread", "__fread_chk", "fread_unlocked", "fgets", "__fgets_chk", "fgets_unlocked", "__fgetws_chk", "fgetws", "fgetwc", "fgetc", "fscanf", "getline", "getdelim", "__getdelim"]
     },
     "op_fs_seek": {
       "title": "op_fs_seek",

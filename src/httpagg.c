@@ -28,10 +28,10 @@ enum_map_t fieldMapIn[] = {
 };
 
 enum_map_t fieldMapOut[] = {
-    {"http.server.duration",          SERVER_DURATION},
-    {"http.client.duration",          CLIENT_DURATION},
-    {"http.request.content_length",   REQUEST_BYTES},
-    {"http.response.content_length",  RESPONSE_BYTES},
+    {"http.duration.server",          SERVER_DURATION},
+    {"http.duration.client",          CLIENT_DURATION},
+    {"http.req.content_length",   REQUEST_BYTES},
+    {"http.resp.content_length",  RESPONSE_BYTES},
     {NULL,                    -1}
 };
 
@@ -274,7 +274,7 @@ report_target(mtc_t *mtc, target_agg_t *target)
                 STRFIELD("summary",     "true",    1, TRUE),
                 FIELDEND
             };
-            event_t metric = INT_EVENT("http.requests",
+            event_t metric = INT_EVENT("http.req",
                                        target->status[i].count, DELTA, fields);
             cmdSendMetric(mtc, &metric);
         }

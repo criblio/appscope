@@ -754,12 +754,12 @@ doHttp1Header(protocol_info *proto)
 
             /* TBD AGG Only
             if (map->clen != -1) {
-                event_t http_req_len = INT_EVENT("http.request.content_length", map->clen, DELTA, fields);
+                event_t http_req_len = INT_EVENT("http.req.content_length", map->clen, DELTA, fields);
                 cmdSendMetric(g_mtc, &http_req_len);
             }
 
             if (hreport.clen != -1) {
-                event_t http_rsp_len = INT_EVENT("http.response.content_length", hreport.clen, DELTA, fields);
+                event_t http_rsp_len = INT_EVENT("http.resp.content_length", hreport.clen, DELTA, fields);
                 cmdSendMetric(g_mtc, &http_rsp_len);
             }
             */
@@ -1685,7 +1685,7 @@ doDNSMetricName(metric_t type, net_info *net)
             UNIT_FIELD("request"),
             FIELDEND
         };
-        event_t dnsMetric = INT_EVENT("net.dns", ctrs->numDNS.mtc, DELTA, fields);
+        event_t dnsMetric = INT_EVENT("dns.req", ctrs->numDNS.mtc, DELTA, fields);
         if (cmdSendMetric(g_mtc, &dnsMetric)) {
             scopeLogError("ERROR: doDNSMetricName:DNS:cmdSendMetric");
         }
@@ -2043,7 +2043,9 @@ doNetCloseEvent(net_info *net, uint64_t dur)
                     lport, rport, sizeof(rport),
                     nevent, &nix, NET_MAX_FIELDS);
 
-    if (net->http.state != HTTP_NONE) {
+    if ((net->protoDetect == DETECT_TRUE) &&
+        net->protoProtoDef &&
+        !strcasecmp(net->protoProtoDef->protname, "HTTP")) {
         H_ATTRIB(nevent[nix], "net_protocol", "http", 1);
         NEXT_FLD(nix, NET_MAX_FIELDS);
     }
@@ -2579,7 +2581,7 @@ doTotal(metric_t type)
             units = "operation";
             break;
         case TOT_DNS:
-            metric = "net.dns";
+            metric = "dns.req";
             value = &g_ctrs.numDNS;
             err_str = "ERROR: doTotal:TOT_DNS:cmdSendMetric";
             units = "request";

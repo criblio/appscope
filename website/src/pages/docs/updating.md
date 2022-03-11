@@ -4,9 +4,9 @@ title: Updating
 
 ## Updating
 
-Changes in AppScope 1.0.0 affect some metric and event definitions, environment variables, and content (including default settings) in the `scope.yml` config file.
+Changes in AppScope 1.0 affect some metric and event definitions, environment variables, and content (including default settings) in the `scope.yml` config file.
 
-To update a Maintenance Pre-Release (version 0.8.1 or older) to version 1.0.0, follow this general procedure:
+To update a Maintenance Pre-Release (version 0.8.1 or older) to version 1.0, follow this general procedure:
 
 * Familiarize yourself with the [summary of changes](#summary-of-changes) below.
 
@@ -40,13 +40,13 @@ scope version
 
 <span id="summary-of-changes"> </span>
 
-### Summary of Changes in AppScope 1.0.0
+### Summary of Changes in AppScope 1.0
 
 This overview of changes should help you prepare to update AppScope.
 
 #### Changes to Routing 
 
-New routing capabilities in AppScope 1.0.0 required the following changes: 
+New routing capabilities in AppScope 1.0 required the following changes: 
 
 - The `cribl` backend is now enabled by default, and its transport type now defaults to `edge` instead of `tcp`.
 - A new environment variable, `SCOPE_CRIBL_ENABLE`, determines whether or not to send data to the `cribl` backend.
@@ -84,11 +84,11 @@ AppScope events and metrics are now rigorously defined in schemas found in `/doc
 `{"type":"evt","id":"vm-curl- --http2 -I https://nghttp2.org/","_channel":"118695329693352","body":{"sourcetype":"http","_time":1643997322.1907151,"source":"http.resp","host":"vm","proc":"curl","cmd":"curl --http2 -I https://nghttp2.org/","pid":112210,"data":{"http_flavor":"2.0","http_stream":1,"http_status_code":200,"http_status_text":"OK","http_response_content_length":6616,"net_transport":"IP.TCP","net_peer_ip":"139.162.123.134","net_host_ip":"10.0.2.15","net_peer_port":443,"net_host_port":35352,"http_client_duration":186,"http_host":"nghttp2.org","http_method":"HEAD","http_target":"/","http_user_agent":"curl/7.74.0”}}}`
 ```
 
-Review the tables below to determine whether event or metric name changes affect your use of AppScope.
+Review the tables below to determine whether event or metric name changes affect your use of AppScope.  (AppScope 1.0.0 has been omitted from the tables because it has been replaced by AppScope 1.0.1.)
 
-##### Event Names that Changed in AppScope 1.0.0
+##### Event Names that Changed in AppScope 1.0
 
-Old | New
+Pre-GA | 1.0.1
 -- | --
 `http-req` | `http.req`
 `http-resp` | `http.resp`
@@ -97,26 +97,27 @@ Old | New
 `net.dns.req` | `dns.req`
 `net.dns.duration` | `dns.duration`
 `fs.op.stat` | `fs.stat`
-`fs.op.open` | `fs.open`
+`fs.op.open` | `fs.open` 
 `fs.op.close` | `fs.close`
-`fs.op.seek` | `fs.seek`
+`fs.op.seek` | `fs.seek` 
 `net.conn_duration` | `net.duration`
 `net.conn.open` | `net.open`
 `net.conn.close` | `net.close`
 
-##### Metric Names that Changed in AppScope 1.0.0
+##### Metric Names that Changed in AppScope 1.0
 
-Old | New
--- | --
+Pre-GA | 1.0.1
+-- | -- | --
+`fs.op.stat` | `fs.stat`
+`fs.op.open` | `fs.open`
+`fs.op.close` | `fs.close`
+`fs.op.seek` | `fs.seek` 
 `http.requests` | `http.req`
+`http.request.content_length` | `http.req.content_length`
+`http.response.content_length` | `http.resp.content_length`
 `http.server.duration` | `http.duration.server`
 `http.client.duration` | `http.duration.client`
 `net.dns` | `dns.req`
 `net.dns.duration` | `dns.duration`
-`fs.op.stat` | `fs.stat`
-`fs.op.open` | `fs.open`
-`fs.op.close` | `fs.close`
-`fs.op.seek` | `fs.seek`
 `net.conn.duration` | `net.duration`
-`net.dns.duration` | `dns.duration`
 `net.conn_duration` | `net.duration`

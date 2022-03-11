@@ -13,6 +13,7 @@ import (
 
 	"github.com/criblio/scope/events"
 	"github.com/criblio/scope/internal"
+	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/metrics"
 	"github.com/criblio/scope/util"
 	"github.com/mum4k/termdash"
@@ -31,6 +32,11 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh/terminal"
 )
+
+/* Args Matrix (X disallows)
+ *          id
+ * id       -
+ */
 
 // dashCmd represents the dash command
 var dashCmd = &cobra.Command{
@@ -103,10 +109,10 @@ func readMetrics(workDir string, w *widgets) {
 				"net.udp",
 				"net.error",
 				"net.duration",
-				"http.requests",
-				"http.server.duration",
-				"http.response.content_length",
-				"net.dns"}
+				"http.req",
+				"http.duration.server",
+				"http.resp.content_length",
+				"dns.req"}
 			for _, mname := range mnames {
 				var val float64
 				var ok bool
@@ -148,13 +154,13 @@ func readMetrics(workDir string, w *widgets) {
 					writeSparklineFloat64(w.netError, val)
 				case "net.duration":
 					writeSparklineFloat64(w.netDuration, val)
-				case "http.requests":
+				case "http.req":
 					writeSparklineFloat64(w.httpReq, val, sparkline.Label(fmt.Sprintf("Requests: %.0f/sec", math.Round(val/10))))
-				case "http.server.duration":
+				case "http.duration.server":
 					writeSparklineFloat64(w.httpDuration, val, sparkline.Label(fmt.Sprintf("Avg Duration: %.0f ms", val)))
-				case "http.response.content_length":
+				case "http.resp.content_length":
 					writeSparklineFloat64(w.httpBytes, val, sparkline.Label(fmt.Sprintf("Avg Content Length: %.0f bytes", val)))
-				case "net.dns":
+				case "dns.req":
 					writeSparklineFloat64(w.dnsReq, val)
 				}
 			}
@@ -189,7 +195,7 @@ func readEvents(workDir string, w *widgets) {
 	}
 
 	tr := util.NewTailReader(file)
-	in := make(chan map[string]interface{})
+	in := make(chan libscope.EventBody)
 	eventCount, _ := util.CountLines(eventsPath)
 	termWidth, _, err := terminal.GetSize(0)
 	if err != nil {
@@ -202,16 +208,16 @@ func readEvents(workDir string, w *widgets) {
 	if skipEvents < 0 {
 		skipEvents = 0
 	}
-	go events.Reader(tr, 0, util.MatchSkipN(skipEvents), in)
+	go events.EventReader(tr, 0, util.MatchSkipN(skipEvents), in)
 
 	for e := range in {
-		eventText := getEventText(e, termWidth-4, false)
+		eventText := events.GetEventText(e, true, false, []string{}, termWidth-4)
 		results := ansiToTermDashColors(eventText)
 		for _, r := range results {
 			err = w.events.Write(r.text, r.options)
 			if err != nil {
 				log.Error().Msgf("error writing to console: %v", err)
-				w.events.Write(ansiStrip(r.text), text.WriteCellOpts())
+				w.events.Write(events.AnsiStrip(r.text), text.WriteCellOpts())
 			}
 		}
 	}

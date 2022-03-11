@@ -25,7 +25,7 @@ For example:
 
 Here's a decision tree to help you determine whether to use the CLI or the library.
 
-![CLI vs. Library Decision Tree](./images/decision-tree.png)
+![CLI vs. Library Decision Tree](./images/appscope_tree@2x.jpg)
 
 
 ### The Config File, Env Vars, Flags, and `ldscope`

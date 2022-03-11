@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/criblio/scope/events"
+	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
 )
@@ -153,12 +154,12 @@ func (sessions SessionList) CountAndDuration() (ret SessionList) {
 		} else {
 			file, err := os.Open(s.EventsPath)
 			if err == nil {
-				in := make(chan map[string]interface{})
+				in := make(chan libscope.EventBody)
 				// There may be lines which aren't actually events, so iterate over the last 5 and hope we catch a timestamp
-				go events.Reader(file, 0, util.MatchSkipN(s.EventCount-1), in)
+				go events.EventReader(file, 0, util.MatchSkipN(s.EventCount-1), in)
 				for e := range in {
 					startTime := time.Unix(0, s.Timestamp)
-					endTime := util.ParseEventTime(e["_time"].(float64))
+					endTime := util.ParseEventTime(e.Time)
 					s.Duration = endTime.Sub(startTime)
 					s.EndTimestamp = endTime.UnixNano()
 				}

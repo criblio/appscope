@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/criblio/scope/events"
+	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/util"
 	"github.com/mitchellh/mapstructure"
 )
@@ -148,7 +149,7 @@ func getFlowEvents(r io.ReadSeeker) (FlowMap, error) {
 		Sources: []string{"net.open", "net.close"},
 	}
 
-	in := make(chan map[string]interface{})
+	in := make(chan libscope.EventBody)
 	var readerr error
 	go func() {
 		err := em.Events(r, in)
@@ -164,21 +165,18 @@ func getFlowEvents(r io.ReadSeeker) (FlowMap, error) {
 	for e := range in {
 		// Reshape ports to ints
 		f := Flow{}
-		err := mapstructure.Decode(e["data"], &f)
+		err := mapstructure.Decode(e.Data, &f)
 		if err != nil {
 			return ret, fmt.Errorf("error decoding event: %v", err)
 		}
-		timeFp := e["_time"].(float64)
+		timeFp := e.Time
 		f.LastSentTime = util.ParseEventTime(timeFp)
 		f.StartTime = f.LastSentTime.Add(f.Duration * -1)
-		f.Proc = e["proc"].(string)
-		f.Pid = int(e["pid"].(float64))
+		f.Proc = e.Proc
+		f.Pid = int(e.Pid)
 		f.Hash = f.getHash()
 		f.ID = f.getID()
 		f.Duration = f.Duration * time.Millisecond
-		if err != nil {
-			return ret, fmt.Errorf("error hashing flow: %v", err)
-		}
 		if strings.HasPrefix(f.Transport, "IP") { // Ignore Unix.TCP and others for now
 			ret[f.Hash] = f
 		}

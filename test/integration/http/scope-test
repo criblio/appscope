@@ -285,10 +285,10 @@ curl 127.0.0.1 >/dev/null 2>&1
 sleep 1
 nginx -s stop # kindly exit, to let handleExit() flush the http metrics
 sleep 1
-if grep '"_metric":"http.requests","_metric_type":"counter","_value":3,' out.txt >/dev/null; then
-    echo "PASS: aggregated http.requests found"
+if grep '"_metric":"http.req","_metric_type":"counter","_value":3,' out.txt >/dev/null; then
+    echo "PASS: aggregated http.req found"
 else
-    echo "FAIL: aggregated http.requests not found"
+    echo "FAIL: aggregated http.req not found"
     ERR+=1
 fi
 endtest

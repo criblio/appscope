@@ -6,6 +6,36 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.0.2
+
+2022-03-15 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.0.2`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.0.2/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.0.2/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.0.2/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.0.2/linux/aarch64/scope)
+
+### New Features and Improvements
+
+AppScope 1.0.2 introduces fine-grained control of `scope events` output:
+
+- [#826](https://github.com/criblio/appscope/issues/826) When you do filtering or matching with `scope events`, AppScope now shows **all** results by default. (The filtering/matching options are `--sort`, `--match`, `--source`, and `--sourcetype`.) Alternatively, you can limit the number of events with the `--last` option, e.g., `scope events --last 20`.
+  - When you are **not** filtering or matching, `scope events` shows the last 20 results by default. Use `--last` to specify a different limit, or `--all` to see all results.
+- [#20](https://github.com/criblio/appscope/issues/20) You can now specify one or more field names, with `scope events --fields`, and the output will show only those field names and their values alongside each event. (If you want to restrict output to only those events which **contain** the selected fields, add the `--match` option.)
+- [#813](https://github.com/criblio/appscope/issues/813) You can use the `--sort` option to sort by a top-level field (i.e., a top-level element of the event body). By default, this returns events sorted in descending order, both for numeric values (such as timestamps) and string values (such as the values for the `proc` field). To sort in ascending order, add the `--reverse` flag.
+
+Another usability improvement applies to the CLI as a whole:
+
+- [#611](https://github.com/criblio/appscope/issues/611) Given combinations of arguments that don't make sense, `scope` now responds with an error.
+
+### Fixes
+
+- [#825](https://github.com/criblio/appscope/issues/825) Output of `scope events` is now rendered on one line.
+- [#728](https://github.com/criblio/appscope/issues/728) Added more check (`_chk`) functions to `libscope.so`, without which a scoped command could fail when that command had been compiled with a particular GCC toolchain.
+- [#787](https://github.com/criblio/appscope/issues/787) Through improved HTTP pipelining support, AppScope now avoids some cases where the `http_method` field in HTTP events contained junk. This work continues in [#829](https://github.com/criblio/appscope/issues/829).
+- [#800](https://github.com/criblio/appscope/issues/800) AppScope now checks for conditions which caused Java applications to crash when scoped, and avoids the crashes by applying fallback behaviors where necessary.
+
 ## AppScope 1.0.1
 
 2022-02-28 - Update to GA Release 

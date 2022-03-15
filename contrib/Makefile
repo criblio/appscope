@@ -98,4 +98,5 @@ build/musl/lib/libc.a:
 	@mkdir build/musl
 # To enable debug please add below --enable-debug --enable-optimize=no
 	cd build/musl && ../../musl/configure --disable-shared --disable-wrapper && $(MAKE)
+	objcopy --prefix-symbols=scopelibc_ build/musl/lib/libc.a
 	@[ -z "$(CI)" ] || echo "::endgroup::"

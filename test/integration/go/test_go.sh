@@ -76,6 +76,22 @@ evalPayload(){
 
 
 #
+# syscalls_unlinkat
+#
+starttest syscalls_unlinkat
+cd /go/syscalls
+
+ldscope ./unlinkat
+
+evaltest
+
+grep unlinkat $EVT_FILE | grep fs.delete > /dev/null
+ERR+=$?
+
+endtest
+
+
+#
 # plainServerDynamic
 #
 starttest plainServerDynamic

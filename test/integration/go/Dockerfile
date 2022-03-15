@@ -11,6 +11,11 @@ RUN mkdir /go/thread
 COPY ./go/thread/fileThread.go /go/thread
 RUN cd /go/thread && CGO_ENABLED=0 go build fileThread.go
 
+RUN mkdir /go/syscalls
+COPY ./go/syscalls/unlinkat.go /go/syscalls
+RUN cd /go/syscalls && \
+    go build -o unlinkat unlinkat.go
+
 RUN mkdir /go/net
 COPY ./go/net/plainServer.go /go/net
 RUN cd /go/net && \

@@ -261,3 +261,24 @@ Get:3 http://security.ubuntu.com/ubuntu focal-security/restricted amd64 Packages
 [yC41] Mar 15 16:22:18 http console stdout message:"201 URI Done SHA256-Hash: 200acdc3421757fa8f8759c1cedacae2cf8f5821d7810ca59d8a313c5b3ae71e SHA1-Hash: 28dce64e724849…"
 [oZH1] Mar 15 16:22:20 apt console stdout message:"Building dependency tree         Reading state information... 0%  Reading state information... 48%  Reading state inf…"
 ```
+
+- Scope a command which reads and writes over the network:
+  
+```
+# scope curl wttr.in    
+Weather report: San Francisco, California, United States
+
+                Mist
+   _ - _ - _ -  +55(53) °F     
+    _ - _ - _   ↖ 10 mph       
+   _ - _ - _ -  4 mi           
+                0.0 in         
+...
+```
+- Then, show only events containing the string `net_bytes`, and display the fields `net_bytes_sent` and `net_bytes_recv`, with their values:
+
+```
+scope events --fields net_bytes_sent,net_bytes_recv --match net_bytes
+[XG] Mar 15 17:56:38 curl net net.close net_bytes_sent:1 net_bytes_recv:0
+[zf1] Mar 15 17:56:38 curl net net.close net_bytes_sent:71 net_bytes_recv:8844
+```

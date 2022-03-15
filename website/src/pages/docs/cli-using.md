@@ -34,7 +34,9 @@ scope curl https://google.com
 scope firefox
 ```
 
-You can run this and then try [exploring the captured data](#explore-captured).
+Virtually all modern browsers incorporate the [sandbox](https://web.dev/browser-sandbox/) security mechanism. Some sandbox implementations can interact with AppScope in ways that cause the browser to hang, or not to start. If you encounter this kind of problem, run the browser with the `--no-sandbox` option.
+
+After you scope the browser, try [exploring the captured data](#explore-captured).
 
 **Scope a series of shell commands**. In the shell that you open in this example, every command you run will be scoped:
 
@@ -180,8 +182,6 @@ fs.error     	7    	Count	operation  	525	class: stat,file: summary,host: 771f60
   4000 ┤│                ││       ││                            ││    ││             ││
      0 ┼╯                ╰╯       ╰╯                            ╰╯    ╰╯             ╰╯
 ```
-
-<span id="explore-captured-events"></span>
 
 - Display the last session's captured events with `scope events`:
 

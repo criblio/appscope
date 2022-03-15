@@ -18,7 +18,7 @@ Assets are available via Docker and the Cribl CDN at the links below.
 
 ### New Features and Improvements
 
-AppScope 1.0.2 introduces [fine-grained control](https://appscope.dev/docs/cli-using/#explore-captured-events) of `scope events` output:
+AppScope 1.0.2 introduces fine-grained control of `scope events` output:
 
 - [#20](https://github.com/criblio/appscope/issues/20) You can now select which events to view, with `scope events --fields`.
 - [#813](https://github.com/criblio/appscope/issues/813) You can now sort the output of `scope events --fields` by using the `--sort` and (optionally) the `--reverse` options.

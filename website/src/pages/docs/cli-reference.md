@@ -180,7 +180,7 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
       --color                Force color on (if tty detection fails or piping)
   -e, --eval string          Evaluate JavaScript expression against event. Must return truthy to print event.
                              Note: Post-processes after matching, not guaranteed to return last <n> events.
-      --fields strings       Display custom fields (look at JSON output for field names)
+      --fields strings       Display the names and values for specified fields only, for each event (look at JSON output for field names)
   -f, --follow               Follow a file, like tail -f
   -h, --help                 help for events
   -i, --id int               Display info from specific from session ID (default -1)
@@ -192,7 +192,6 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
   -s, --source strings       Display events matching supplied sources
   -t, --sourcetype strings   Display events matching supplied sourcetypes
 ```
-
 
 ### extract
 ---

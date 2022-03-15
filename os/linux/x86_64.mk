@@ -3,7 +3,7 @@ ARCH_LD_FLAGS=-lcapstone
 ARCH_BINARY=elf64-x86-64
 ARCH_OBJ=i386
 
-LD_FLAGS=$(PCRE2_AR) $(LS_HPACK_AR) -ldl -lpthread -lrt -Lcontrib/build/funchook -lfunchook -Lcontrib/build/funchook/capstone_src-prefix/src/capstone_src-build -lcapstone
+LD_FLAGS=$(MUSL_AR) $(PCRE2_AR) $(LS_HPACK_AR) -ldl -lpthread -lrt -Lcontrib/build/funchook -lfunchook -Lcontrib/build/funchook/capstone_src-prefix/src/capstone_src-build -lcapstone
 INCLUDES=-I./contrib/libyaml/include -I./contrib/cJSON -I./os/$(OS) -I./contrib/pcre2/src -I./contrib/build/pcre2 -I./contrib/funchook/capstone_src/include/ -I./contrib/jni -I./contrib/jni/linux/ -I./contrib/openssl/include -I./contrib/build/openssl/include
 
 #ARCH_RM=&& rm ./test/selfinterpose/wrap_go.o

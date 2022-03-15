@@ -156,10 +156,19 @@ Outputs events for a session. You can obtain detailed information about each eve
 #### Examples
 
 ```
+Examples:
 scope events
-scope events -t http
-scope events -s stderr
-scope events -e 'sourcetype!="net"'
+scope events m61
+scope events --sourcetype http
+scope events --source stderr
+scope events --match file
+scope events --fields net_bytes_sent,net_bytes_recv --match net_bytes
+scope events --follow
+scope events --all
+scope events --allfields
+scope events --id 4
+scope events --sort _time --reverse
+scope events --eval 'sourcetype!="net"'
 scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") == -1 && (data["file.name"] || "").indexOf("/proc") == -1'
 ```
 
@@ -168,14 +177,18 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 ```
   -a, --all                  Show all events
       --allfields            Displaying hidden fields
-      --color                Force color on (if tty detection fails or pipeing)
+      --color                Force color on (if tty detection fails or piping)
   -e, --eval string          Evaluate JavaScript expression against event. Must return truthy to print event.
+                             Note: Post-processes after matching, not guaranteed to return last <n> events.
+      --fields strings       Display custom fields (look at JSON output for field names)
   -f, --follow               Follow a file, like tail -f
-  -h, --help                 Help for events
+  -h, --help                 help for events
   -i, --id int               Display info from specific from session ID (default -1)
-  -j, --json                 Output as newline-delimited JSON
+  -j, --json                 Output as newline delimited JSON
   -n, --last int             Show last <n> events (default 20)
   -m, --match string         Display events containing supplied string
+  -r, --reverse              Reverse sort to ascending. Must be combined with --sort
+      --sort string          Sort descending by field (look at JSON output for field names)
   -s, --source strings       Display events matching supplied sources
   -t, --sourcetype strings   Display events matching supplied sourcetypes
 ```

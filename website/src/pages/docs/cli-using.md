@@ -181,7 +181,7 @@ fs.error     	7    	Count	operation  	525	class: stat,file: summary,host: 771f60
      0 ┼╯                ╰╯       ╰╯                            ╰╯    ╰╯             ╰╯
 ```
 
-
+<span id="explore-captured-events"></span>
 
 - Display the last session's captured events with `scope events`:
 

@@ -60,6 +60,7 @@ tap_t g_go_tap[] = {
     {"syscall.write",                        go_hook_write,        NULL, 0},
     {"syscall.openat",                       go_hook_open,         NULL, 0},
     {"syscall.unlinkat",                     go_hook_unlinkat,     NULL, 0},
+    {"syscall.Getdents",                     go_hook_getdents,     NULL, 0},
     {"syscall.socket",                       go_hook_socket,       NULL, 0},
     {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
     {"syscall.read",                         go_hook_read,         NULL, 0},
@@ -993,6 +994,23 @@ EXPORTON void *
 go_write(char *stackptr)
 {
     return go_switch(stackptr, c_write, go_hook_write);
+}
+
+static void
+c_getdents(char *stackaddr)
+{
+    uint64_t dirfd  = *(uint64_t *)(stackaddr + 0x8);
+    uint64_t rc     = *(uint64_t *)(stackaddr + 0x28);
+    uint64_t initialTime = getTime();
+
+    funcprint("Scope: getdents dirfd %ld\n", dirfd);
+    doRead(dirfd, initialTime, (rc != -1), NULL, rc, "go_getdents", BUF, 0);
+}
+
+EXPORTON void *
+go_getdents(char *stackptr)
+{
+    return go_switch(stackptr, c_getdents, go_hook_getdents);
 }
 
 static void

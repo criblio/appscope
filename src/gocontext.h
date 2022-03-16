@@ -52,6 +52,7 @@ extern void *getSymbol(const char *, char *);
 extern void go_hook_write(void);
 extern void go_hook_open(void);
 extern void go_hook_unlinkat(void);
+extern void go_hook_getdents(void);
 extern void go_hook_socket(void);
 extern void go_hook_accept4(void);
 extern void go_hook_read(void);

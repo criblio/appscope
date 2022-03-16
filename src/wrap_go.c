@@ -233,8 +233,9 @@ patch_return_addrs(funchook_t *funchook,
         uint32_t add_arg = 0;
         if ((!strcmp((const char*)asm_inst[i].mnemonic, "ret") &&
              asm_inst[i].size == 1) &&
-             !strcmp((const char*)asm_inst[i-1].mnemonic, "add") &&
-             (add_arg = add_argument(&asm_inst[i-1]))) {
+             (((!strcmp((const char*)asm_inst[i-1].mnemonic, "add")) ||
+             ((!strcmp((const char*)asm_inst[i-1].mnemonic, "sub")))) &&
+             (add_arg = add_argument(&asm_inst[i-1])))) {
 
             void *pre_patch_addr = (void*)asm_inst[i-1].address;
             void *patch_addr = (void*)asm_inst[i-1].address;

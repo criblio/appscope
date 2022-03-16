@@ -92,6 +92,22 @@ endtest
 
 
 #
+# syscalls_readdir
+#
+starttest syscalls_readdir
+cd /go/syscalls
+
+ldscope ./readdir
+
+evaltest
+
+grep readdir $EVT_FILE | grep fs.read > /dev/null
+ERR+=$?
+
+endtest
+
+
+#
 # plainServerDynamic
 #
 starttest plainServerDynamic

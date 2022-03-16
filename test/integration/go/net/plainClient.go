@@ -4,17 +4,12 @@ import (
 	"bufio"
 	"fmt"
 	"net/http"
-	"os"
 )
 
 func main() {
 
-	fd, err := os.Open(".")
-	fmt.Println(fd)
-
 	resp, err := http.Get("http://cribl.io")
 	if err != nil {
-
 		panic(err)
 	}
 	defer resp.Body.Close()

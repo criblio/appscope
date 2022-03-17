@@ -1,13 +1,15 @@
 package main
 
 import (
+	"io/ioutil"
 	"log"
-	"os"
 )
 
 func main() {
 	// Call syscall.Readdir
-	_, err := os.ReadDir(".")
+	// note: ioutil.ReadDir was superceded by os.ReadDir
+	// but the latter will fail in some versions < go1.16
+	_, err := ioutil.ReadDir(".")
 	if err != nil {
 		log.Fatal(err)
 	}

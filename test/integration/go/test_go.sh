@@ -102,7 +102,7 @@ ldscope ./readdir
 evaltest
 
 grep readdir $EVT_FILE | grep fs.open > /dev/null
-grep readdir $EVT_FILE | grep fs.read > /dev/null
+grep readdir $EVT_FILE | grep fs.close > /dev/null
 ERR+=$?
 
 endtest

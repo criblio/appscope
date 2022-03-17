@@ -63,10 +63,10 @@ tap_t g_go_tap[] = {
     {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
     {"syscall.read",                         go_hook_read,         NULL, 0},
     {"syscall.Close",                        go_hook_close,        NULL, 0},
-    {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
-    {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
-    {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0},
-    {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
+    //{"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
+    //{"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
+    //{"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0},
+    //{"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
     {"runtime.exit",                         go_hook_exit,         NULL, 0},
     {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
     {"TAP_TABLE_END", NULL, NULL, 0}
@@ -107,11 +107,22 @@ c_str(gostring_t *go_str)
 static bool
 looks_like_first_inst_of_go_func(cs_insn* asm_inst)
 {
+        patchprint("%0*lx (%02d) %-24s %s %s\n",
+                   16,
+                   asm_inst->address,
+                   asm_inst->size,
+                   (char*)asm_inst->bytes,
+                   (char*)asm_inst->mnemonic,
+                   (char*)asm_inst->op_str);
+
     return (!strcmp((const char*)asm_inst->mnemonic, "mov") &&
             !strcmp((const char*)asm_inst->op_str, "rcx, qword ptr fs:[0xfffffffffffffff8]"))
-           || // -buildmode=pie compiles to this:
-           (!strcmp((const char*)asm_inst->mnemonic, "mov") &&
-            !strcmp((const char*)asm_inst->op_str, "rcx, -8"));
+        || // -buildmode=pie compiles to this:
+        (!strcmp((const char*)asm_inst->mnemonic, "mov") &&
+         !strcmp((const char*)asm_inst->op_str, "rcx, -8"))
+        || // Go 17
+        (!strcmp((const char*)asm_inst->mnemonic, "cmp") &&
+         !strcmp((const char*)asm_inst->op_str, "rsp, qword ptr [r14 + 0x10]"));
 }
 
 static uint32_t
@@ -153,7 +164,6 @@ patch_first_instruction(funchook_t *funchook,
 {
     int i;
     for (i=0; i<asm_count; i++) {
-
         // Stop when it looks like we've hit another goroutine
         if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
                   (!strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
@@ -161,13 +171,13 @@ patch_first_instruction(funchook_t *funchook,
             break;
         }
 
-        patchprint("%0*lx (%02d) %-24s %s%s\n",
-               16,
-               asm_inst[i].address,
-               asm_inst[i].size,
-               (char*)asm_inst[i].bytes,
-               (char*)asm_inst[i].mnemonic,
-               (char*)asm_inst[i].op_str);
+        patchprint("%0*lx (%02d) %-24s %s %s\n",
+                   16,
+                   asm_inst[i].address,
+                   asm_inst[i].size,
+                   (char*)asm_inst[i].bytes,
+                   (char*)asm_inst[i].mnemonic,
+                   (char*)asm_inst[i].op_str);
 
         uint32_t add_arg=8; // not used, but can't be zero because of go_switch
         if (i == 0) {
@@ -205,7 +215,6 @@ patch_return_addrs(funchook_t *funchook,
 
     int i;
     for (i=0; i<asm_count; i++) {
-
         // We've observed that the first instruction in every goroutine
         // is the same (it retrieves a pointer to the goroutine.)
         // We're checking for it here to make sure things are coherent.
@@ -218,7 +227,7 @@ patch_return_addrs(funchook_t *funchook,
             break;
         }
 
-        patchprint("%0*lx (%02d) %-24s %s%s\n",
+        patchprint("%0*lx (%02d) %-24s %s %s\n",
                16,
                asm_inst[i].address,
                asm_inst[i].size,
@@ -230,12 +239,15 @@ patch_return_addrs(funchook_t *funchook,
         // we want to patch the ADD immediately before it.
         uint32_t add_arg = 0;
         if ((!strcmp((const char*)asm_inst[i].mnemonic, "ret") &&
-             asm_inst[i].size == 1) &&
-             !strcmp((const char*)asm_inst[i-1].mnemonic, "add") &&
-             (add_arg = add_argument(&asm_inst[i-1]))) {
+             asm_inst[i].size == 1) ||
+            (!strcmp((const char*)asm_inst[i].mnemonic, "xorps") &&
+             asm_inst[i].size == 4)) {
+            if (!strcmp((const char*)asm_inst[i-1].mnemonic, "add")) {
+                add_arg = add_argument(&asm_inst[i-1]);
+            }
 
             void *pre_patch_addr = (void*)asm_inst[i-1].address;
-            void *patch_addr = (void*)asm_inst[i-1].address;
+            void *patch_addr = (void*)asm_inst[i].address;
 
             // all add_arg values within a function should be the same
             if (tap->frame_size && (tap->frame_size != add_arg)) {
@@ -250,6 +262,7 @@ patch_return_addrs(funchook_t *funchook,
             patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
             tap->return_addr = patch_addr;
             tap->frame_size = add_arg;
+            break;
         }
     }
     patchprint("\n\n");
@@ -289,7 +302,7 @@ patchClone()
 #define MIN_SUPPORTED_GO_VER (8)
 // Go change passing parameters from stack to register
 // Ref: https://golang.org/doc/go1.17#compile
-#define PARAM_ON_REG_GO_VER (17)
+#define PARAM_ON_REG_GO_VER (18)
 
 static int
 go_major_version(const char *go_runtime_version)
@@ -512,6 +525,7 @@ initGoHook(elf_buf_t *ebuf)
      * are entering the Go func past the runtime stack check?
      * Need to investigate later.
      */
+    //"runtime.asmcgocall.abi0" ??
     if (((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) &&
         ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0)) {
         sysprint("ERROR: can't get the address for runtime.cgocall\n");
@@ -570,7 +584,7 @@ initGoHook(elf_buf_t *ebuf)
         }
 
         patchprint ("********************************\n");
-        patchprint ("** %s  %s 0x%lx **\n", go_runtime_version, tap->func_name, orig_func);
+        patchprint ("** %s  %s 0x%p **\n", go_runtime_version, tap->func_name, orig_func);
         patchprint ("********************************\n");
 
         patch_return_addrs(funchook, asm_inst, asm_count, tap);
@@ -758,7 +772,7 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
     }
 
     uint32_t frame_offset = frame_size(gfunc);
-    if (!frame_offset) goto out;
+    //if (!frame_offset) goto out;
     stackptr += frame_offset;
 
     // call the C handler
@@ -1058,13 +1072,13 @@ go_read(char *stackptr)
 static void
 c_socket(char *stackaddr)
 {
-    uint64_t domain = *(uint64_t*)(stackaddr + 0x8);  // aka family
+    uint64_t domain = *(uint64_t*)(stackaddr + 0x08);  // aka family
     uint64_t type   = *(uint64_t*)(stackaddr + 0x10);
     uint64_t sd     = *(uint64_t*)(stackaddr + 0x20);
 
     if (sd == -1) return;
 
-    funcprint("Scope: socket of %ld\n", sd);
+    funcprint("Scope: socket domain: %ld type: 0x%lx sd: %ld\n", domain, type, sd);
     addSock(sd, type, domain);
 }
 
@@ -1236,27 +1250,28 @@ static void
 c_http_client_write(char *stackaddr)
 {
     int fd = -1;
+    stackaddr -= 0x30;
     uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
     uint64_t w_pc  = *(uint64_t *)(stackaddr + 0x08);
-    uint64_t rc =  *(uint64_t *)(stackaddr + 0x28);
+    uint64_t rc =  *(uint64_t *)(stackaddr + 0x28); // 0x20 -> 0x78??
     uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
 
     if (rc < 1) return;
 
-    pc_conn_if = (w_pc + g_go.persistConn_to_conn);
-    uint64_t tls =  *(uint64_t*)(w_pc + g_go.persistConn_to_tlsState);
+    pc_conn_if = (w_pc + g_go.persistConn_to_conn); // 0x50
+    uint64_t tls =  *(uint64_t*)(w_pc + g_go.persistConn_to_tlsState); //0x60
 
     // conn I/F checking. Ref the comment on c_http_server_read.
     if (pc_conn_if && tls) {
-        w_pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
+        w_pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data); //0x08
         netFD = *(uint64_t *)(w_pc_conn + g_go.iface_data);
         if (!netFD) return;
-        if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
-            pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+        if (g_go.netfd_to_sysfd == UNDEF_OFFSET) { 
+            pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd); //0x00
             if (!pfd) return;
-            fd = *(int *)(pfd + g_go.pd_to_fd);
+            fd = *(int *)(pfd + g_go.pd_to_fd); //0x10
         } else {
-            fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+            fd = *(int *)(netFD + g_go.netfd_to_sysfd); //0x10
         }
 
         doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);

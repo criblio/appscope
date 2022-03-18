@@ -241,7 +241,7 @@ services:
       context: .
       dockerfile: ./go/Dockerfile
       args:
-        GO_IMAGE_VER: golang:1.18-rc
+        GO_IMAGE_VER: golang:1.18
     <<: *scope-common
 
   # no arm64 image

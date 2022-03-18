@@ -54,6 +54,8 @@
 .text
     interpose go_hook_write, go_write
     interpose go_hook_open, go_open
+    interpose go_hook_unlinkat, go_unlinkat
+    interpose go_hook_getdents, go_getdents
     interpose go_hook_socket, go_socket
     interpose go_hook_accept4, go_accept4
     interpose go_hook_read, go_read

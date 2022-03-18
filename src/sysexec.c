@@ -204,9 +204,11 @@ load_elf(char *buf)
 static int
 unmap_all(char *buf, const char **argv)
 {
+    int proc_arg = 1;
+    if (is_static(buf)) proc_arg = 0;
 
     int flen;
-    if ((flen = get_file_size(argv[1])) == -1) {
+    if ((flen = get_file_size(argv[proc_arg])) == -1) {
         scopeLogError("ERROR:unmap_all: file size");
         return -1;
     }

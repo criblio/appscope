@@ -124,6 +124,9 @@ add_argument(cs_insn* asm_inst)
     // In this example, add_argument is 0x58:
     // 000000000063a083 (04) 4883c458                 ADD RSP, 0x58
     // 000000000063a087 (01) c3                       RET
+    // In this example, add_argument is 0xffffffffffffff80:
+    // 000000000046f833 (04) 4883ec80                 SUB RSP, $0xffffffffffffff80
+    // 000000000046f837 (01) c3                       RET
     if (asm_inst->size == 4) {
         unsigned char* inst_addr = (unsigned char*)asm_inst->address;
         return ((unsigned char*)inst_addr)[3];
@@ -132,6 +135,9 @@ add_argument(cs_insn* asm_inst)
     // In this example, add_argument is 0x80:
     // 00000000004a9cc9 (07) 4881c480000000           ADD RSP, 0x80
     // 00000000004a9cd0 (01) c3                       RET
+    // In this example, add_argument is 0xffffffffffffff80:
+    // 000000000046f833 (07) 4883ec80000000           SUB RSP, $0xffffffffffffff80
+    // 000000000046f837 (01) c3                       RET
     if (asm_inst->size == 7) {
         unsigned char* inst_addr = (unsigned char*)asm_inst->address;
         // x86_64 is little-endian.
@@ -229,7 +235,7 @@ patch_return_addrs(funchook_t *funchook,
                (char*)asm_inst[i].op_str);
 
         // If the current instruction is a RET
-        // we want to patch the ADD immediately before it.
+        // we want to patch the ADD or SUB immediately before it.
         uint32_t add_arg = 0;
         if ((!strcmp((const char*)asm_inst[i].mnemonic, "ret") &&
              asm_inst[i].size == 1) &&
@@ -1004,7 +1010,7 @@ c_getdents(char *stackaddr)
     uint64_t rc     = *(uint64_t *)(stackaddr + 0x28);
     uint64_t initialTime = getTime();
 
-    funcprint("Scope: getdents dirfd %ld\n", dirfd);
+    funcprint("Scope: getdents dirfd %ld rc %ld\n", dirfd, rc);
     doRead(dirfd, initialTime, (rc != -1), NULL, rc, "go_getdents", BUF, 0);
 }
 
@@ -1028,7 +1034,7 @@ c_unlinkat(char *stackaddr)
     }
 
     funcprint("Scope: unlinkat dirfd %ld pathname %s flags %ld\n", dirfd, pathname, flags);
-    doDelete(pathname, "unlinkat");
+    doDelete(pathname, "go_unlinkat");
 
     if (pathname) free(pathname);
 }

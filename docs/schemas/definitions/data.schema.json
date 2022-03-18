@@ -277,7 +277,7 @@
       "title": "op_fs_delete",
       "description": "op_fs_delete",
       "type": "string",
-      "enum": ["unlink", "unlinkat"]
+      "enum": ["go_unlinkat", "unlink", "unlinkat"]
     },
     "op_fs_open": {
       "title": "op_fs_open",

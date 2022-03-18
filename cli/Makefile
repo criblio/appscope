@@ -49,9 +49,9 @@ clean:
 ## deps: install dependencies
 deps: $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT)
 $(GO_BINDATA):
-	$(GO) get github.com/go-bindata/go-bindata/...
+	$(GO) install github.com/go-bindata/go-bindata/...
 $(GOVVV):
-	$(GO) get github.com/ahmetb/govvv
+	$(GO) install github.com/ahmetb/govvv
 $(GOLANGCI_LINT):
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
 		sh -s -- -b $(GOBIN) v1.42.1

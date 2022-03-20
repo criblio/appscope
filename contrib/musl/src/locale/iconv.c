@@ -243,7 +243,7 @@ size_t iconv(iconv_t cd, char **restrict in, size_t *restrict inb, char **restri
 	int err;
 	unsigned char type = map[-1];
 	unsigned char totype = tomap[-1];
-	locale_t *ploc = &CURRENT_LOCALE, loc = *ploc;
+	locale_t *ploc, loc = CURRENT_LOCALE;
 
 	if (!in || !*in || !*inb) return 0;
 

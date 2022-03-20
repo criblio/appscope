@@ -37,7 +37,7 @@ hidden char *__gettextdomain(void);
 #define C_LOCALE ((locale_t)&__c_locale)
 #define UTF8_LOCALE ((locale_t)&__c_dot_utf8_locale)
 
-#define CURRENT_LOCALE (__pthread_self()->locale)
+#define CURRENT_LOCALE (&libc.global_locale)
 
 #define CURRENT_UTF8 (!!__pthread_self()->locale->cat[LC_CTYPE])
 

@@ -8,7 +8,7 @@ wint_t __fputwc_unlocked(wchar_t c, FILE *f)
 {
 	char mbc[MB_LEN_MAX];
 	int l;
-	locale_t *ploc = &CURRENT_LOCALE, loc = *ploc;
+	locale_t *ploc, loc = CURRENT_LOCALE;
 
 	if (f->mode <= 0) fwide(f, 1);
 	*ploc = f->locale;

@@ -9,7 +9,7 @@ wint_t ungetwc(wint_t c, FILE *f)
 {
 	unsigned char mbc[MB_LEN_MAX];
 	int l;
-	locale_t *ploc = &CURRENT_LOCALE, loc = *ploc;
+	locale_t *ploc, loc = CURRENT_LOCALE;
 
 	FLOCK(f);
 

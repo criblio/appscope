@@ -243,17 +243,19 @@ patch_return_addrs(funchook_t *funchook,
                (char*)asm_inst[i].mnemonic,
                (char*)asm_inst[i].op_str);
 
-        // If the current instruction is a RET or XORPS
-        // we want to patch the ADD or SUB immediately before it.
+        // If the current instruction is a RET
+        // and previous inst is add or sub, then get the stack frame size.
+        // Or, if the current inst is xorps then proceed without a stack frame size.
+        // If the current inst is not a ret or xorps, don't funchook.
         uint32_t add_arg = 0;
         if (((!strcmp((const char*)asm_inst[i].mnemonic, "ret") &&
-            (asm_inst[i].size == 1)) &&
-            (((!strcmp((const char*)asm_inst[i-1].mnemonic, "add")) ||
-            ((!strcmp((const char*)asm_inst[i-1].mnemonic, "sub")))) &&
-            (add_arg = add_argument(&asm_inst[i-1])))) ||
+              (asm_inst[i].size == 1) &&
+              (!strcmp((const char*)asm_inst[i-1].mnemonic, "add") ||
+               !strcmp((const char*)asm_inst[i-1].mnemonic, "sub")) &&
+              (add_arg = add_argument(&asm_inst[i-1]))) ||
 
-            (!strcmp((const char*)asm_inst[i].mnemonic, "xorps") &&
-            asm_inst[i].size == 4)) {
+             (!strcmp((const char*)asm_inst[i].mnemonic, "xorps") &&
+              (asm_inst[i].size == 4)))) {
 
 
                 void *pre_patch_addr = (void*)asm_inst[i-1].address;
@@ -273,7 +275,6 @@ patch_return_addrs(funchook_t *funchook,
                 tap->return_addr = patch_addr;
                 tap->frame_size = add_arg;
                 break;
-            }
         }
     }
     patchprint("\n\n");

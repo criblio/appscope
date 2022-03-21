@@ -246,14 +246,15 @@ patch_return_addrs(funchook_t *funchook,
         // If the current instruction is a RET or XORPS
         // we want to patch the ADD or SUB immediately before it.
         uint32_t add_arg = 0;
-        if ((!strcmp((const char*)asm_inst[i].mnemonic, "ret") &&
-            asm_inst[i].size == 1) ||
+        if (((!strcmp((const char*)asm_inst[i].mnemonic, "ret") &&
+            (asm_inst[i].size == 1)) &&
+            (((!strcmp((const char*)asm_inst[i-1].mnemonic, "add")) ||
+            ((!strcmp((const char*)asm_inst[i-1].mnemonic, "sub")))) &&
+            (add_arg = add_argument(&asm_inst[i-1])))) ||
+
             (!strcmp((const char*)asm_inst[i].mnemonic, "xorps") &&
             asm_inst[i].size == 4)) {
 
-            if (((!strcmp((const char*)asm_inst[i-1].mnemonic, "add")) ||
-            ((!strcmp((const char*)asm_inst[i-1].mnemonic, "sub")))) &&
-            (add_arg = add_argument(&asm_inst[i-1]))) {
 
                 void *pre_patch_addr = (void*)asm_inst[i-1].address;
                 void *patch_addr = (void*)asm_inst[i].address;
@@ -1109,7 +1110,7 @@ c_read(char *stackaddr)
 
     if (rc == -1) return;
 
-    funcprint("Scope: read of %ld\n", fd);
+    funcprint("Scope: read of %ld rc %ld\n", fd, rc);
     doRead(fd, initialTime, (rc != -1), (void*)buf, rc, "go_read", BUF, 0);
 }
 

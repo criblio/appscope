@@ -202,7 +202,7 @@ jobs:
       # We'll tell BuildX to `--cache-from` this folder to speed up the build
       # of our `appscope-builder` image. 
       - name: Setup Docker Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-buildx-${{ github.sha }}
@@ -210,7 +210,7 @@ jobs:
 
       # Cache downloaded Go dependencies.
       - name: Setup Go Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             ~/.cache/go-build
@@ -224,7 +224,7 @@ jobs:
       # Cache the cmocka build. Use a key based on a hash of all the files used
       # in the build.
       - name: Setup cmocka Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: contrib/build/cmocka
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-cmocka-${{ hashFiles('contrib/Makefile', 'contrib/cmocka/**') }}
@@ -233,7 +233,7 @@ jobs:
       # Cache the funchook build. Use a key based on a hash of all the files
       # used in the build.
       - name: Setup funchook Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: contrib/build/funchook
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-funchook-${{ hashFiles('contrib/Makefile', 'contrib/funchook/**') }}
@@ -242,7 +242,7 @@ jobs:
       # Cache the funchook build. Use a key based on a hash of all the files
       # used in the build.
       - name: Setup pcre2 Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: contrib/build/pcre2
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-pcre2-${{ hashFiles('contrib/Makefile', 'contrib/cpre2/**') }}
@@ -251,7 +251,7 @@ jobs:
       # Cache the openssl build. Use a key based on a hash of all the files
       # used in the build.
       - name: Setup openssl Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: contrib/build/openssl
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-openssl-${{ hashFiles('contrib/Makefile', 'contrib/openssl/**') }}
@@ -260,7 +260,7 @@ jobs:
       # Cache the ls-hpack build. Use a key based on a hash of all the files
       # used in the build.
       - name: Setup ls-hpack Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: contrib/build/ls-hpack
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-ls-hpack-${{ hashFiles('contrib/Makefile', 'contrib/ls-hpack/**') }}

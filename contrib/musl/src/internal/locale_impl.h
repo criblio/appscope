@@ -39,7 +39,7 @@ hidden char *__gettextdomain(void);
 
 #define CURRENT_LOCALE (&libc.global_locale)
 
-#define CURRENT_UTF8 (!!__pthread_self()->locale->cat[LC_CTYPE])
+#define CURRENT_UTF8 (!!&libc.global_locale.cat[LC_CTYPE])
 
 #undef MB_CUR_MAX
 #define MB_CUR_MAX (CURRENT_UTF8 ? 4 : 1)

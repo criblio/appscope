@@ -448,20 +448,13 @@ remoteConfig()
     timeout = 1;
     memset(&fds, 0x0, sizeof(fds));
 
-/*
-    Setting fds.events = 0 to neuter ability to process remote
-    commands... until this is function is reworked to be TLS-friendly.
-
+    // We want to accept incoming requests on TCP, unix, and edge.
+    // However, we don't currently support receving on TLS connections.
     cfg_transport_t ttype = ctlTransportType(g_ctl, CFG_CTL);
-    if ((ttype == (cfg_transport_t)-1) || (ttype == CFG_FILE) ||
-        (ttype ==  CFG_SYSLOG) || (ttype == CFG_SHM)) {
-        fds.events = 0;
-    } else {
-        fds.events = POLLIN;
-    }
-*/
+    int acceptRequests = ((ttype == CFG_TCP) || (ttype == CFG_UNIX) || (ttype == CFG_EDGE))
+                          && !transportIsTls(ctlTransport(g_ctl, CFG_CTL));
+    fds.events = (acceptRequests) ? POLLIN : 0;
 
-    fds.events = 0;
     fds.fd = ctlConnection(g_ctl, CFG_CTL);
 
     rc = g_fn.poll(&fds, 1, timeout);
@@ -536,14 +529,14 @@ remoteConfig()
         cmd = calloc(1, sb.st_size);
         if (!cmd) {
             g_fn.fclose(fs);
-            unlink(path);
+            g_fn.unlink(path);
             cmdSendInfoStr(g_ctl, "Error in receive from stream.  Memory error in scope receive.");
             return;
         }
         
         if (g_fn.fread(cmd, sb.st_size, 1, fs) == 0) {
             g_fn.fclose(fs);
-            unlink(path);
+            g_fn.unlink(path);
             free(cmd);
             cmdSendInfoStr(g_ctl, "Error in receive from stream.  Read error in scope.");
             return;
@@ -615,7 +608,7 @@ remoteConfig()
     }
 
     g_fn.fclose(fs);
-    unlink(path);
+    g_fn.unlink(path);
 }
 
 static void
@@ -683,7 +676,7 @@ dynConfig(void)
     now = fileModTime(path);
     if (now == modtime) {
         // Been there, try to remove the file and we're done
-        unlink(path);
+        g_fn.unlink(path);
         return 0;
     }
 
@@ -699,7 +692,7 @@ dynConfig(void)
     doConfig(g_staticfg);
 
     g_fn.fclose(fs);
-    unlink(path);
+    g_fn.unlink(path);
     return 0;
 }
 

@@ -95,15 +95,10 @@ newTransport()
         DBG(NULL);
         return NULL;
     }
-    if (!g_fn.getaddrinfo) goto out;
 
-    t->getaddrinfo = g_fn.getaddrinfo;
+    t->getaddrinfo = scope_getaddrinfo;
     t->origGetaddrinfo = t->getaddrinfo;  // store a copy
     return t;
-
-  out:
-    scope_free(t);
-    return NULL;
 }
 
 /*
@@ -676,7 +671,7 @@ freeAddressList(transport_t *trans)
 {
     if (!trans || !trans->net.addr.list) return;
 
-    freeaddrinfo(trans->net.addr.list);
+    scope_freeaddrinfo(trans->net.addr.list);
     trans->net.addr.entries = 0;
     trans->net.addr.list = NULL;
     trans->net.addr.next = NULL;

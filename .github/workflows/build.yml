@@ -130,6 +130,7 @@ jobs:
     strategy:
       matrix:
         on: [[ubuntu-latest],[self-hosted,ARM64]]
+      fail-fast: false
     steps:
 
       # Attempt to prune any orphaned docker resources on the EC2 ARM runners

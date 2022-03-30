@@ -31,7 +31,7 @@
       ],
       "properties": {
         "_metric": {
-          "$ref": "definitions/body.schema.json#/$defs/sourcehttpreq"
+          "$ref": "definitions/body.schema.json#/$defs/sourcehttpreqs"
         },
         "_metric_type": {
           "$ref": "definitions/body.schema.json#/$defs/metric_type_counter"

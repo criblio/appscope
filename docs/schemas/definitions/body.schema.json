@@ -73,11 +73,11 @@
       "description": "String that describes a file path.",
       "type": "string"
     },
-    "sourceconsole": {
+    "sourceconsolestderrstdout": {
       "title": "source",
-      "description": "Specifies whether AppScope is capturing either `stderr` or `file` from console.",
+      "description": "Specifies whether AppScope is capturing either `stderr` or `stdout` from console.",
       "type": "string",
-      "enum": ["stderr", "file"]
+      "enum": ["stderr", "stdout"]
     },
     "sourcednsduration": {
       "title": "dns.duration",

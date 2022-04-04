@@ -23,6 +23,7 @@
 #define SWITCH_ENV "SCOPE_SWITCH"
 #define SWITCH_USE_NO_THREAD "no_thread"
 #define SWITCH_USE_THREAD "thread"
+#define EXIT_STACK_SIZE (32 * 1024)
 
 #ifdef ENABLE_CAS_IN_SYSEXEC
 #include "atomic.h"
@@ -75,12 +76,6 @@ tap_t g_go_tap[] = {
     {"TAP_TABLE_END", NULL, NULL, 0}
 };
 
-uint64_t g_glibc_guard = 0LL;
-uint64_t g_go_static = 0LL;
-static list_t *g_threadlist;
-static void *g_stack;
-static bool g_switch_thread;
-
 void (*go_runtime_cgocall)(void);
 
 #if NEEDEVNULL > 0
@@ -101,7 +96,7 @@ c_str(gostring_t *go_str)
 
     char *path;
     if ((path = scope_calloc(1, go_str->len+1)) == NULL) return NULL;
-    memmove(path, go_str->str, go_str->len);
+    scope_memmove(path, go_str->str, go_str->len);
     path[go_str->len] = '\0';
 
     return path;
@@ -178,7 +173,7 @@ patch_first_instruction(funchook_t *funchook,
                (char*)asm_inst[i].mnemonic,
                (char*)asm_inst[i].op_str);
 
-        uint32_t add_arg=8; // not used, but can't be zero because of go_switch
+        uint32_t add_arg=8; // not used, but can't be zero because of do_cfunc
         if (i == 0) {
 
             void *pre_patch_addr = (void*)asm_inst[i].address;
@@ -429,9 +424,6 @@ initGoHook(elf_buf_t *ebuf)
     gostring_t *go_ver; // There is an implicit len field at go_ver + 0x8
     char *go_runtime_version = NULL;
 
-    g_stack = scope_malloc(32 * 1024);
-    g_threadlist = lstCreate(NULL);
-
     // A go app may need to expand stacks for some C functions
     g_need_stack_expand = TRUE;
 
@@ -444,29 +436,12 @@ initGoHook(elf_buf_t *ebuf)
 
     // default to a dynamic app?
     if (checkEnv("SCOPE_EXEC_TYPE", "static")) {
-        g_go_static = 1LL;
+        setGoAppStateStatic(TRUE);
+        patchClone();
         sysprint("This is a static app\n");
     } else {
-        g_go_static = 0LL;
+        setGoAppStateStatic(FALSE);
         sysprint("This is a dynamic app\n");
-    }
-
-    // which go_switch function are we using?
-    // Note that __ctype_init needs to be called through
-    // a function pointer since musl lib support was added.
-    // If that pointer is not initialized, then don't allow
-    // go_switch_no_thread() to be used.
-    if (g_go_static == 1) {
-        if (g_fn.__ctype_init && checkEnv(SWITCH_ENV, SWITCH_USE_NO_THREAD)) {
-            g_switch_thread = FALSE;
-            patchClone();
-        } else if (checkEnv(SWITCH_ENV, SWITCH_USE_THREAD)) {
-            g_switch_thread = TRUE;
-        } else {
-            g_switch_thread = TRUE;
-        }
-    } else {
-        g_switch_thread = TRUE;
     }
 
     int go_major_ver = UNKNOWN_GO_VER;
@@ -480,7 +455,7 @@ initGoHook(elf_buf_t *ebuf)
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
     // if it's a position independent executable, get the base address from /proc/self/maps
     uint64_t base = 0LL;
-    if (ehdr->e_type == ET_DYN && !g_go_static) {
+    if (ehdr->e_type == ET_DYN && (getgoAppStateStatic() == FALSE)) {
         if (getBaseAddress(&base) != 0) {
             sysprint("ERROR: can't get the base address\n");
             return; // don't install our hooks
@@ -621,338 +596,6 @@ frame_size(assembly_fn fn)
     exit(-1);
 }
 
-static void *
-dumb_thread(void *arg)
-{
-    pthread_barrier_t *pbarrier = (pthread_barrier_t *)arg;
-    sigset_t mask;
-
-    sigfillset(&mask);
-    pthread_sigmask(SIG_BLOCK, &mask, NULL);
-
-    void *dummy = scope_calloc(1, 32);
-    if (dummy) scope_free(dummy);
-    pthread_barrier_wait(pbarrier);
-    while (1) {
-        sleep(0xffffffff);
-    }
-    return NULL;
-}
-
-/*
- * There are 2 go_switch() functions that accomplish the
- * same thing. They take different approaches. We want to 
- * see what effect an approach has on performance and reliability.
- * We'll likley get to one instance as we gain experience. 
- *
- * These go_switch() functions are meant to support
- * static and dynamic apps at the same time. It depends
- * on an env var being set in the scope
- * executable. In initGoHook() we get the
- * env var and set the variable g_go_static.
- * If not 0 the executable is static.
- *
- * In the static case we switch TLS/TCB.
- * In the dynamic case we do not switch TLS/TCB.
- */
-/*
-* go_switch_thread() creates a thread in glibc
-* for each 'm'. It then syncs with that thread
-* after the newly created thread inits memory
-* allocation.
-*/
-inline static void *
-go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
-{
-    int fs_valid = 0;
-    uint64_t rc;
-    unsigned long go_tls = 0;
-    unsigned long go_fs = 0;
-    unsigned long go_m = 0;
-    unsigned long *go_v;
-    char *go_g = NULL;
-
-    if (g_go_static) {
-        // Get the Go routine's struct g
-        __asm__ volatile (
-            "mov %%fs:-8, %0"
-            : "=r"(go_g)                      // output
-            :                                 // inputs
-            :                                 // clobbered register
-            );
-
-        if (go_g) {
-            // get struct m from g and pull out the TLS from 'm'
-            go_m = *((unsigned long *)(go_g + g_go.g_to_m));
-            go_v = (unsigned long *)go_m;
-
-            // first entry in a valid m is a pointer to g
-            if (go_v && (*go_v == (unsigned long)go_g)) { //ok to continue;
-                go_tls = (unsigned long)(go_m + g_go.m_to_tls);
-                go_v = (unsigned long *)go_tls;
-
-                // is tls set?
-                if (go_v && (*go_v != 0)) { // continue
-                    go_fs = go_tls + 8; //go compiler uses -8(FS)
-                    go_v = (unsigned long *)go_fs;
-
-                    if (go_v && (*go_v != 0)) { // continue
-                        fs_valid = 1;
-                    }
-                }
-            }
-        }
-
-        if (fs_valid == 0) {
-            // We've seen a case where on process exit static cgo
-            // apps do not have a go_g while they're exiting.
-            // In this case we need to pull the TLS from the kernel
-            // Also seen a case on libmusl where TLS is not set.
-            // Therefore, get fs from the kernel.
-            if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
-                scopeLogError("arch_prctl get go");
-                goto out;
-            }
-        }
-
-        void *thread_fs = NULL;
-        if ((thread_fs = lstFind(g_threadlist, go_fs)) == NULL) {
-            // Switch to the main thread TCB
-            if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-                scopeLogError("arch_prctl set scope");
-                goto out;
-            }
-            pthread_t thread;
-            pthread_barrier_t barrier;
-            if (pthread_barrier_init(&barrier, NULL, 2) != 0) {
-                scopeLogError("pthread_barrier_init failed");
-                goto out;
-            }
-
-            if (!g_fn.pthread_create ||
-                (g_fn.pthread_create(&thread, NULL, dumb_thread, &barrier) != 0)) {
-                scopeLogError("pthread_create failed");
-                goto out;
-            }
-
-            //wait until the thread starts
-            pthread_barrier_wait(&barrier);
-
-            thread_fs = (void *)thread;
-
-            if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
-                scopeLogError("arch_prctl set scope");
-                goto out;
-            }
-
-            if (pthread_barrier_destroy(&barrier) != 0) {
-                scopeLogError("pthread_barrier_destroy failed");
-                goto out;
-            }
-
-            if (lstInsert(g_threadlist, go_fs, thread_fs) == FALSE) {
-                scopeLogError("lstInsert failed");
-                goto out;
-            }
-
-            sysprint("New thread created for GO TLS = 0x%08lx\n", go_fs);
-        } else {
-            if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
-                scopeLogError("arch_prctl set scope");
-                goto out;
-            }
-        }
-    }
-
-    uint32_t frame_offset = frame_size(gfunc);
-    if (!frame_offset) goto out;
-    stackptr += frame_offset;
-
-    // call the C handler
-    __asm__ volatile (
-        "mov %1, %%rdi  \n"
-        "callq *%2  \n"
-        : "=r"(rc)                    // output
-        : "r"(stackptr), "r"(cfunc)   // inputs
-        :                             // clobbered register
-        );
-out:
-    if (g_go_static && go_fs) {
-        // Switch back to the 'm' TLS
-        if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
-            scopeLogError("arch_prctl restore go ");
-        }
-    }
-    return return_addr(gfunc);
-}
-
-/*
-* go_switch_no_thread() creates a glibc TCB for
-* each 'm' and initializes TLS and memory allocation
-* in the newly created TCB. It uses pthread_create()
-* to create a TCB. However, __clone() has previously
-* been disabled in initGoHook(). Therefore, no thread
-* is actually created.
-*
-* Note: we found that this version of go_switch()
-* results in a malloc error when running with the
-* influxdb stress test. Making the thread version
-* the default resolves the issue. Have not found
-* the root cause. Reproduce by running a static
-* influxd, then run the old stress client
-* influx_stress_stat and write event files from
-* the server and client to the file system.
-*/
-inline static void *
-go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
-{
-    int fs_valid = 0;
-    uint64_t rc;
-    unsigned long go_tls = 0;
-    unsigned long go_fs = 0;
-    unsigned long go_m = 0;
-    char *go_g = NULL;
-    unsigned long *go_v;
-    int newThread = FALSE;
-    unsigned long rsp;
-
-    if (g_go_static) {
-        // Get the Go routine's struct g
-        __asm__ volatile (
-            "mov %%fs:-8, %0"
-            : "=r"(go_g)                      // output
-            :                                 // inputs
-            :                                 // clobbered register
-            );
-
-        if (go_g) {
-            // get struct m from g and pull out the TLS from 'm'
-            go_m = *((unsigned long *)(go_g + g_go.g_to_m));
-            go_v = (unsigned long *)go_m;
-
-            // first entry in a valid m is a pointer to g
-            if (go_v && (*go_v == (unsigned long)go_g)) { //ok to continue;
-                go_tls = (unsigned long)(go_m + g_go.m_to_tls);
-                go_v = (unsigned long *)go_tls;
-
-                // is tls set?
-                if (go_v && (*go_v != 0)) { // continue
-                    go_fs = go_tls + 8; //go compiler uses -8(FS)
-                    go_v = (unsigned long *)go_fs;
-
-                    if (go_v && (*go_v != 0)) { // continue
-                        fs_valid = 1;
-                    }
-                }
-            }
-        }
-
-        if (fs_valid == 0) {
-            // We've seen a case where on process exit static cgo
-            // apps do not have a go_g while they're exiting.
-            // In this case we need to pull the TLS from the kernel
-            // Also seen a case on libmusl where TLS is not set.
-            // Therefore, get fs from the kernel.
-            if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
-                scopeLogError("arch_prctl get go");
-                goto out;
-            }
-        }
-
-        void *thread_fs = NULL;
-        if ((thread_fs = lstFind(g_threadlist, go_fs)) == NULL) {
-            // Switch to the main thread TCB
-            if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-                scopeLogError("arch_prctl set scope");
-                goto out;
-            }
-            pthread_t thread;
-            if (!g_fn.pthread_create ||
-                (g_fn.pthread_create(&thread, NULL, dumb_thread, NULL) != 0)) {
-                scopeLogError("pthread_create failed");
-                goto out;
-            }
-            thread_fs = (void *)thread;
-            newThread = TRUE;            
-        } 
-
-        if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
-            scopeLogError("arch_prctl set scope");
-            goto out;
-        }
-
-        if (newThread) {
-            while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) {};
-
-            //Initialize pointers to locale data.
-            if (g_fn.__ctype_init) g_fn.__ctype_init();
-
-            //switch to a bigger stack
-            __asm__ volatile (
-                "mov %%rsp, %0 \n"
-                "mov %1, %%rsp \n"
-                : "=r"(rsp) 
-                : "m"(g_stack)
-                : 
-            );
-
-            //initialize tcache
-            void *buf = scope_calloc(1, 0xff);
-            scope_free(buf);
-
-            //restore stack
-            __asm__ volatile (
-                "mov %0, %%rsp \n"
-                : 
-                : "r"(rsp)
-                : 
-            );
-             
-            atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-
-            if (lstInsert(g_threadlist, go_fs, thread_fs) == FALSE) {
-                scopeLogError("lstInsert failed");
-                goto out;
-            }
-        }
-    }
-    
-    uint32_t frame_offset = frame_size(gfunc);
-    if (!frame_offset) goto out;
-    stackptr += frame_offset;
-
-    // call the C handler
-    __asm__ volatile (
-        "mov %1, %%rdi  \n"
-        "callq *%2  \n"
-        : "=r"(rc)                    // output
-        : "r"(stackptr), "r"(cfunc)   // inputs
-        :                             // clobbered register
-        );
-out:
-    if (g_go_static && go_fs) {
-        // Switch back to the 'm' TLS
-        if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
-            scopeLogError("arch_prctl restore go ");
-        }
-    }
-    return return_addr(gfunc);
-}
-
-/*
-* We want to be able to determine which go_switch
-* function to use at run time.
-*/
-inline static void *
-go_switch(char *stackptr, void *cfunc, void *gfunc)
-{
-    if (g_switch_thread == FALSE) {
-        return go_switch_no_thread(stackptr, cfunc, gfunc);
-    } else {
-        return go_switch_thread(stackptr, cfunc, gfunc);
-    }
-}
-
 /*
  * Putting a comment here that applies to all of the
  * 'C' handlers for interposed functions.
@@ -962,18 +605,10 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
  * stack and the fs register points to an 'm' TLS
  * base address.
  *
- * We need to switch from a 'g' context to a
- * libc context in order to execute 'C' code that
- * calls libc functions. The go_switch() function
- * handles all of that. The address of a specific
- * handler is passed to go_swtich which calls the
- * handler when the appropriate switch has been
- * accopmlished.
- * 
  * Specific handlers are defined as the c_xxx functions.
  * Example, there is a c_write() that handles extracting
  * details for write operations. The address of c_write
- * is passed to go_switch.
+ * is passed to do_cfunc.
  *
  * All handlers take a single parameter, the stack address
  * from the interposed Go function. All params are passed
@@ -983,6 +618,26 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
  * in order to know how to extract values from params and
  * return values.
  */
+inline static void *
+do_cfunc(char *stackptr, void *cfunc, void *gfunc)
+{
+    uint64_t rc;
+    uint32_t frame_offset = frame_size(gfunc);
+    if (!frame_offset) return return_addr(gfunc);
+    stackptr += frame_offset;
+
+    // call the C handler
+    __asm__ volatile (
+        "mov %1, %%rdi  \n"
+        "callq *%2  \n"
+        : "=r"(rc)                    // output
+        : "r"(stackptr), "r"(cfunc)   // inputs
+        :                             // clobbered register
+        );
+
+    return return_addr(gfunc);
+}
+
 static void
 c_write(char *stackaddr)
 {
@@ -998,7 +653,7 @@ c_write(char *stackaddr)
 EXPORTON void *
 go_write(char *stackptr)
 {
-    return go_switch(stackptr, c_write, go_hook_write);
+    return do_cfunc(stackptr, c_write, go_hook_write);
 }
 
 static void
@@ -1015,7 +670,7 @@ c_getdents(char *stackaddr)
 EXPORTON void *
 go_getdents(char *stackptr)
 {
-    return go_switch(stackptr, c_getdents, go_hook_getdents);
+    return do_cfunc(stackptr, c_getdents, go_hook_getdents);
 }
 
 static void
@@ -1041,7 +696,7 @@ c_unlinkat(char *stackaddr)
 EXPORTON void *
 go_unlinkat(char *stackptr)
 {
-    return go_switch(stackptr, c_unlinkat, go_hook_unlinkat);
+    return do_cfunc(stackptr, c_unlinkat, go_hook_unlinkat);
 }
 
 static void
@@ -1067,7 +722,7 @@ c_open(char *stackaddr)
 EXPORTON void *
 go_open(char *stackptr)
 {
-    return go_switch(stackptr, c_open, go_hook_open);
+    return do_cfunc(stackptr, c_open, go_hook_open);
 }
 
 static void
@@ -1083,7 +738,7 @@ c_close(char *stackaddr)
 EXPORTON void *
 go_close(char *stackptr)
 {
-    return go_switch(stackptr, c_close, go_hook_close);
+    return do_cfunc(stackptr, c_close, go_hook_close);
 }
 
 static void
@@ -1103,7 +758,7 @@ c_read(char *stackaddr)
 EXPORTON void *
 go_read(char *stackptr)
 {
-    return go_switch(stackptr, c_read, go_hook_read);
+    return do_cfunc(stackptr, c_read, go_hook_read);
 }
 
 static void
@@ -1122,7 +777,7 @@ c_socket(char *stackaddr)
 EXPORTON void *
 go_socket(char *stackptr)
 {
-    return go_switch(stackptr, c_socket, go_hook_socket);
+    return do_cfunc(stackptr, c_socket, go_hook_socket);
 }
 
 static void
@@ -1142,7 +797,7 @@ c_accept4(char *stackaddr)
 EXPORTON void *
 go_accept4(char *stackptr)
 {
-    return go_switch(stackptr, c_accept4, go_hook_accept4);
+    return do_cfunc(stackptr, c_accept4, go_hook_accept4);
 }
 
 /*
@@ -1217,7 +872,7 @@ c_http_server_read(char *stackaddr)
 EXPORTON void *
 go_tls_read(char *stackptr)
 {
-    return go_switch(stackptr, c_http_server_read, go_hook_tls_read);
+    return do_cfunc(stackptr, c_http_server_read, go_hook_tls_read);
 }
 
 /*
@@ -1265,7 +920,7 @@ c_http_server_write(char *stackaddr)
 EXPORTON void *
 go_tls_write(char *stackptr)
 {
-    return go_switch(stackptr, c_http_server_write, go_hook_tls_write);
+    return do_cfunc(stackptr, c_http_server_write, go_hook_tls_write);
 }
 
 /*
@@ -1318,7 +973,7 @@ c_http_client_write(char *stackaddr)
 EXPORTON void *
 go_pc_write(char *stackptr)
 {
-    return go_switch(stackptr, c_http_client_write, go_hook_pc_write);
+    return do_cfunc(stackptr, c_http_client_write, go_hook_pc_write);
 }
 
 /*
@@ -1377,13 +1032,34 @@ c_http_client_read(char *stackaddr)
 EXPORTON void *
 go_readResponse(char *stackptr)
 {
-    return go_switch(stackptr, c_http_client_read, go_hook_readResponse);
+    return do_cfunc(stackptr, c_http_client_read, go_hook_readResponse);
 }
 
 extern void handleExit(void);
 static void
 c_exit(char *stackaddr)
 {
+    /*
+     * Need to extend the system stack size when calling handleExit().
+     * We see that the stack is exceeded now that we are using an internal libc.
+     */
+    int arc;
+    char *exit_stack, *tstack, *gstack;
+    if ((exit_stack = scope_malloc(EXIT_STACK_SIZE)) == NULL) {
+        return;
+    }
+
+    tstack = exit_stack + EXIT_STACK_SIZE;
+
+    // save the original stack, switch to the tstack
+    __asm__ volatile (
+        "mov %%rsp, %2 \n"
+        "mov %1, %%rsp \n"
+        : "=r"(arc)                  // output
+        : "m"(tstack), "m"(gstack)   // input
+        :                            // clobbered register
+        );
+
     // don't use stackaddr; patch_first_instruction() does not provide
     // frame_size, so stackaddr isn't usable
     funcprint("c_exit");
@@ -1400,16 +1076,26 @@ c_exit(char *stackaddr)
     handleExit();
     // flush the data
     sigSafeNanosleep(&ts);
+
+    // Switch stack back to the original stack
+    __asm__ volatile (
+        "mov %1, %%rsp \n"
+        : "=r"(arc)                       // output
+        : "r"(gstack)                     // inputs
+        :                                 // clobbered register
+        );
+
+    scope_free(exit_stack);
 }
 
 EXPORTON void *
 go_exit(char *stackptr)
 {
-    return go_switch(stackptr, c_exit, go_hook_exit);
+    return do_cfunc(stackptr, c_exit, go_hook_exit);
 }
 
 EXPORTON void *
 go_die(char *stackptr)
 {
-    return go_switch(stackptr, c_exit, go_hook_die);
+    return do_cfunc(stackptr, c_exit, go_hook_die);
 }

@@ -77,5 +77,7 @@ bool delProtocol(request_t *);
 void setRemoteClose(int, int);
 void setFSContentType(int, fs_content_type_t);
 fs_content_type_t getFSContentType(int);
+void setGoAppStateStatic(int);
+int getgoAppStateStatic(void);
 
 #endif // __STATE_H__

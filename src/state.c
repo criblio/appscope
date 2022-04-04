@@ -35,6 +35,7 @@
 
 extern rtconfig g_cfg;
 
+int g_go_static = FALSE;
 int g_numNinfo = NET_ENTRIES;
 int g_numFSinfo = FS_ENTRIES;
 int g_http_guard_enabled = TRUE;
@@ -368,7 +369,7 @@ static int
 postStatErrState(metric_t stat_err, metric_t type, const char *funcop, const char *pathname)
 {
     // something passed in a param that is not a viable address; ltp does this
-    if ((stat_err == EVT_ERR) && (errno == EFAULT)) return FALSE;
+    if ((getgoAppStateStatic() == FALSE) && (stat_err == EVT_ERR) && (errno == EFAULT)) return FALSE;
 
     int *summarize = NULL;
     switch (type) {
@@ -1434,6 +1435,17 @@ getFSContentType(int fd)
     DBG(NULL);
     return FS_CONTENT_UNKNOWN;
 }
+
+void
+setGoAppStateStatic(int static_state) {
+    g_go_static = static_state;
+}
+
+int
+getgoAppStateStatic(void) {
+    return g_go_static;
+}
+
 
 void
 setFSContentType(int fd, fs_content_type_t type)

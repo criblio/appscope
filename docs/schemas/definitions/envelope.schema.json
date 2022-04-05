@@ -2,27 +2,27 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/definitions/envelope.schema.json",
   "title": "Schema for the AppScope event/metric envelope",
-  "description": "A set of basic facts that AppScope uses to describe each event or metric",
+  "description": "A set of basic facts that AppScope uses to describe each event or metric.",
   "$defs": {
     "_channel": {
       "title": "_channel",
-      "description": "Identifies the operation during whose lifetime the event or metric is emitted",
+      "description": "Identifies the operation during whose lifetime the event or metric is emitted.",
       "type": "string"
     },
     "event_type": {
       "title": "type",
-      "description": "Distinguishes events from metrics",
+      "description": "Distinguishes events from metrics.",
       "type": "string",
       "const": "evt"
     },
     "id": {
       "title": "id",
-      "description": "Identifies the application that the process is associated with",
+      "description": "Identifies the application that the process is associated with.",
       "type": "string"
     },
     "metric_type": {
       "title": "type",
-      "description": "Distinguishes metrics from events",
+      "description": "Distinguishes metrics from events.",
       "type": "string",
       "const": "metric"
     }

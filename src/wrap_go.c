@@ -260,7 +260,7 @@ patch_return_addrs(funchook_t *funchook,
 
 
                 void *pre_patch_addr = (void*)asm_inst[i-1].address;
-                void *patch_addr = (void*)asm_inst[i].address;
+                void *patch_addr = (void*)asm_inst[i-1].address;
 
                 // all add_arg values within a function should be the same
                 if (tap->frame_size && (tap->frame_size != add_arg)) {
@@ -1311,8 +1311,9 @@ static void
 c_http_client_write(char *stackaddr)
 {
     int fd = -1;
-    uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
-    uint64_t w_pc  = *(uint64_t *)(stackaddr + 0x08);
+    stackaddr -= 0x30;
+    uint64_t buf = *(uint64_t *)(stackaddr + 0x40);
+    uint64_t w_pc  = *(uint64_t *)(stackaddr + 0x20);
     uint64_t rc =  *(uint64_t *)(stackaddr + 0x20); // 0x20 -> 0x78??
     uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
 

@@ -68,7 +68,7 @@ tap_t g_go_tap[] = {
     //{"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
     //{"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
     //{"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0},
-    //{"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
+    {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
     {"runtime.exit",                         go_hook_exit,         NULL, 0},
     {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
     {"TAP_TABLE_END", NULL, NULL, 0}
@@ -81,6 +81,7 @@ static void *g_stack;
 static bool g_switch_thread;
 
 void (*go_runtime_cgocall)(void);
+void (*go_runtime_cgocall_regs)(void);
 
 #if NEEDEVNULL > 0
 static void
@@ -542,6 +543,14 @@ initGoHook(elf_buf_t *ebuf)
         return; // don't install our hooks
     }
     go_runtime_cgocall = (void *) ((uint64_t)go_runtime_cgocall + base);
+
+    if ((go_runtime_cgocall_regs = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) {
+        sysprint("ERROR: can't get the address for runtime.cgocall-regs\n");
+        return; // don't install our hooks
+    }
+    go_runtime_cgocall_regs = (void *) ((uint64_t)go_runtime_cgocall_regs + base);
+
+    funcprint("asmcgocall %p asmcgocall_regs %p\n", go_runtime_cgocall, go_runtime_cgocall_regs);
 
     csh disass_handle = 0;
     cs_arch arch;
@@ -1302,14 +1311,14 @@ static void
 c_http_client_write(char *stackaddr)
 {
     int fd = -1;
-    stackaddr -= 0x30;
     uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
     uint64_t w_pc  = *(uint64_t *)(stackaddr + 0x08);
-    uint64_t rc =  *(uint64_t *)(stackaddr + 0x28); // 0x20 -> 0x78??
+    uint64_t rc =  *(uint64_t *)(stackaddr + 0x20); // 0x20 -> 0x78??
     uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
 
     if (rc < 1) return;
 
+    //uint64_t w_pc = *(uint64_t *)(w + 0x38);
     pc_conn_if = (w_pc + g_go.persistConn_to_conn); // 0x50
     uint64_t tls =  *(uint64_t*)(w_pc + g_go.persistConn_to_tlsState); //0x60
 

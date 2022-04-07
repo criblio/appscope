@@ -64,4 +64,9 @@ extern void go_hook_pc_write(void);
 extern void go_hook_exit(void);
 extern void go_hook_die(void);
 
+extern void go_hook_reg_readResponse(void);
+extern void go_hook_reg_pc_write(void);
+extern void go_hook_reg_tls_read(void);
+extern void go_hook_reg_tls_write(void);
+
 #endif // __GOTCONTEXT_H__

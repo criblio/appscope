@@ -51,6 +51,30 @@
     jmp *%r11
 .endm
 
+.macro interpose_regs a_func, c_func
+.global \a_func
+.hidden \c_func
+\a_func:
+    mov %rsp, %r11
+    push %rax
+    push %rbx
+
+    mov %r11, %rbx
+    lea \c_func@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov %r11, %rax
+
+    lea go_runtime_cgocall_regs@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+    mov %rax, %r11
+
+    pop %rbx
+    pop %rax
+    jmp *%r11
+.endm
+
 .text
     interpose go_hook_write, go_write
     interpose go_hook_open, go_open
@@ -63,9 +87,14 @@
     interpose go_hook_tls_read, go_tls_read
     interpose go_hook_tls_write, go_tls_write
     interpose go_hook_readResponse, go_readResponse
-    //interpose go_hook_pc_write, go_pc_write
+    interpose go_hook_pc_write, go_pc_write
     interpose go_hook_exit, go_exit
     interpose go_hook_die, go_die
+
+    interpose_regs go_hook_reg_tls_read, go_tls_read
+    interpose_regs go_hook_reg_tls_write, go_tls_write
+    interpose_regs go_hook_reg_pc_write, go_pc_write
+    interpose_regs go_hook_reg_readResponse, go_readResponse
 
 /*
     Debug hint:
@@ -86,23 +115,22 @@
        #interpose go_hook_write, go_write
     4) build
 */
-
 /*
-.global go_hook_pc_write
-go_hook_pc_write:
+.global go_hook_write
+go_hook_write:
     push %rax
     sub $0x18, %rsp
 
-    //mov %rsp, %r11
-    //add $0x20, %r11
-    //mov %r11, 0x08(%rsp)
+    mov %rsp, %r11
+    add $0x20, %r11
+    mov %r11, 0x08(%rsp)
     lea go_pc_write@GOTPCREL(%rip), %r11
     mov (%r11), %r11
-    //mov %r11, (%rsp)
+    mov %r11, (%rsp)
 
-    //lea go_runtime_cgocall@GOTPCREL(%rip), %r11
-    //mov (%r11), %r11
-    //mov (%r11), %r11
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
     call *%r11
     mov %rax, %r11
 
@@ -111,8 +139,9 @@ go_hook_pc_write:
     jmp *%r11
 */
 
-.global go_hook_pc_write
-go_hook_pc_write:
+/*
+.global go_hook_reg_pc_write
+go_hook_reg_pc_write:
     mov %rsp, %r11
     push %rax
     push %rbx
@@ -131,3 +160,4 @@ go_hook_pc_write:
     pop %rbx
     pop %rax
     jmp *%r11
+*/

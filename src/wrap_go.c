@@ -23,6 +23,10 @@
 #define SWITCH_USE_NO_THREAD "no_thread"
 #define SWITCH_USE_THREAD "thread"
 
+#define UNKNOWN_GO_VER (-1)
+#define MIN_SUPPORTED_GO_VER (8)
+#define PARAM_ON_REG_GO_VER (19)
+
 #ifdef ENABLE_CAS_IN_SYSEXEC
 #include "atomic.h"
 #else
@@ -42,6 +46,9 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 #define patchprint devnull
 
 #define UNDEF_OFFSET (-1)
+
+int g_go_major_ver = UNKNOWN_GO_VER;
+
 go_offsets_t g_go = {.g_to_m=48,                   // 0x30
                      .m_to_tls=136,                // 0x88
                      .connReader_to_conn=0,        // 0x00
@@ -56,7 +63,7 @@ go_offsets_t g_go = {.g_to_m=48,                   // 0x30
                      .conn_to_tlsState=48,         // 0x30
                      .persistConn_to_tlsState=96}; // 0x60
 
-tap_t g_go_tap[] = {
+tap_t g_go_tap_16[] = {
     {"syscall.write",                        go_hook_write,        NULL, 0},
     {"syscall.openat",                       go_hook_open,         NULL, 0},
     {"syscall.unlinkat",                     go_hook_unlinkat,     NULL, 0},
@@ -65,10 +72,28 @@ tap_t g_go_tap[] = {
     {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
     {"syscall.read",                         go_hook_read,         NULL, 0},
     {"syscall.Close",                        go_hook_close,        NULL, 0},
-    //{"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
-    //{"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
-    //{"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0},
+    {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
+    {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
+    {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0},
     {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
+    {"runtime.exit",                         go_hook_exit,         NULL, 0},
+    {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
+    {"TAP_TABLE_END", NULL, NULL, 0}
+};
+
+tap_t g_go_tap_17[] = {
+    {"syscall.write",                        go_hook_write,        NULL, 0},
+    {"syscall.openat",                       go_hook_open,         NULL, 0},
+    {"syscall.unlinkat",                     go_hook_unlinkat,     NULL, 0},
+    {"syscall.Getdents",                     go_hook_getdents,     NULL, 0},
+    {"syscall.socket",                       go_hook_socket,       NULL, 0},
+    {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
+    {"syscall.read",                         go_hook_read,         NULL, 0},
+    {"syscall.Close",                        go_hook_close,        NULL, 0},
+    //{"net/http.(*connReader).Read",          go_hook_reg_tls_read,     NULL, 0},
+    //{"net/http.checkConnErrorWriter.Write",  go_hook_reg_tls_write,    NULL, 0},
+    {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse, NULL, 0},
+    {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,     NULL, 0},
     {"runtime.exit",                         go_hook_exit,         NULL, 0},
     {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
     {"TAP_TABLE_END", NULL, NULL, 0}
@@ -260,7 +285,7 @@ patch_return_addrs(funchook_t *funchook,
 
 
                 void *pre_patch_addr = (void*)asm_inst[i-1].address;
-                void *patch_addr = (void*)asm_inst[i].address;
+                void *patch_addr = (void*)asm_inst[i-1].address;
 
                 // all add_arg values within a function should be the same
                 if (tap->frame_size && (tap->frame_size != add_arg)) {
@@ -310,10 +335,6 @@ patchClone()
         }
     }
 }
-
-#define UNKNOWN_GO_VER (-1)
-#define MIN_SUPPORTED_GO_VER (8)
-#define PARAM_ON_REG_GO_VER (19)
 
 static int
 go_major_version(const char *go_runtime_version)
@@ -486,7 +507,6 @@ initGoHook(elf_buf_t *ebuf)
         g_switch_thread = TRUE;
     }
 
-    int go_major_ver = UNKNOWN_GO_VER;
     go_ver = getSymbol(ebuf->buf, "runtime.buildVersion");
     if (!go_ver) {
         //runtime.buildVersion symbol not found, probably dealing with a stripped binary
@@ -513,9 +533,9 @@ initGoHook(elf_buf_t *ebuf)
 
         sysprint("go_runtime_version = %s\n", go_runtime_version);
 
-        go_major_ver = go_major_version(go_runtime_version);
+        g_go_major_ver = go_major_version(go_runtime_version);
     }
-    if (go_major_ver < MIN_SUPPORTED_GO_VER) {
+    if (g_go_major_ver < MIN_SUPPORTED_GO_VER) {
         if (!is_go(ebuf->buf)) {
             // Don't expect to get here, but try to be clear if we do.
             scopeLogWarn("%s is not a go application.  Continuing without AppScope.", ebuf->cmd);
@@ -525,7 +545,7 @@ initGoHook(elf_buf_t *ebuf)
             scopeLogWarn("%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.8 or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd);
         }
         return; // don't install our hooks
-    } else if (go_major_ver >= PARAM_ON_REG_GO_VER) {
+    } else if (g_go_major_ver >= PARAM_ON_REG_GO_VER) {
         scopeLogWarn("%s was compiled with go version `%s`. Versions newer than Go 1.18 are not yet supported. Continuing without AppScope.", ebuf->cmd, go_runtime_version);
         return; // don't install our hooks
     }
@@ -536,19 +556,33 @@ initGoHook(elf_buf_t *ebuf)
      * are entering the Go func past the runtime stack check?
      * Need to investigate later.
      */
-    //"runtime.asmcgocall.abi0" ??
-    if (((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) &&
-        ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0)) {
-        sysprint("ERROR: can't get the address for runtime.cgocall\n");
-        return; // don't install our hooks
+    if (g_go_major_ver > 16) {
+        // using the abi0 I/F for syscall based functions in Go >= 1.17
+        if (((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall.abi0")) == 0) &&
+            ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall.abi0")) == 0)) {
+            sysprint("ERROR: can't get the address for runtime.cgocall\n");
+            return; // don't install our hooks
+        }
+    } else {
+        if (((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) &&
+            ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0)) {
+            sysprint("ERROR: can't get the address for runtime.cgocall\n");
+            return; // don't install our hooks
+        }
     }
+
     go_runtime_cgocall = (void *) ((uint64_t)go_runtime_cgocall + base);
 
-    if ((go_runtime_cgocall_regs = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) {
-        sysprint("ERROR: can't get the address for runtime.cgocall-regs\n");
-        return; // don't install our hooks
+    if (g_go_major_ver > 16) {
+        // using the native I/F for TLS/non syscall functions in Go >= 1.17
+        if ((go_runtime_cgocall_regs = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) {
+            sysprint("ERROR: can't get the address for runtime.cgocall-regs\n");
+            return; // don't install our hooks
+        }
+        go_runtime_cgocall_regs = (void *) ((uint64_t)go_runtime_cgocall_regs + base);
+    } else {
+        go_runtime_cgocall_regs = NULL;
     }
-    go_runtime_cgocall_regs = (void *) ((uint64_t)go_runtime_cgocall_regs + base);
 
     funcprint("asmcgocall %p asmcgocall_regs %p\n", go_runtime_cgocall, go_runtime_cgocall_regs);
 
@@ -569,9 +603,16 @@ initGoHook(elf_buf_t *ebuf)
     cs_insn *asm_inst = NULL;
     unsigned int asm_count = 0;
 
-    adjustGoStructOffsetsForVersion(go_major_ver);
-    tap_t* tap = NULL;
-    for (tap = g_go_tap; tap->assembly_fn; tap++) {
+    adjustGoStructOffsetsForVersion(g_go_major_ver);
+
+    tap_t *gtap, *tap = NULL;
+    if (g_go_major_ver > 16) {
+        gtap = g_go_tap_17;
+    } else {
+        gtap = g_go_tap_16;
+    }
+
+    for (tap = gtap; tap->assembly_fn; tap++) {
 
         if (asm_inst) {
             cs_free(asm_inst, asm_count);
@@ -626,8 +667,14 @@ initGoHook(elf_buf_t *ebuf)
 static void *
 return_addr(assembly_fn fn)
 {
-    tap_t* tap = NULL;
-    for (tap = g_go_tap; tap->assembly_fn; tap++) {
+    tap_t *gtap, *tap = NULL;
+    if (g_go_major_ver > 16) {
+        gtap = g_go_tap_17;
+    } else {
+        gtap = g_go_tap_16;
+    }
+
+    for (tap = gtap; tap->assembly_fn; tap++) {
         if (tap->assembly_fn == fn) return tap->return_addr;
     }
 
@@ -638,8 +685,14 @@ return_addr(assembly_fn fn)
 static uint32_t
 frame_size(assembly_fn fn)
 {
-    tap_t* tap = NULL;
-    for (tap = g_go_tap; tap->assembly_fn; tap++) {
+    tap_t *gtap, *tap = NULL;
+    if (g_go_major_ver > 16) {
+        gtap = g_go_tap_17;
+    } else {
+        gtap = g_go_tap_16;
+    }
+
+    for (tap = gtap; tap->assembly_fn; tap++) {
         if (tap->assembly_fn == fn) return tap->frame_size;
     }
 
@@ -1241,7 +1294,11 @@ c_http_server_read(char *stackaddr)
 EXPORTON void *
 go_tls_read(char *stackptr)
 {
-    return go_switch(stackptr, c_http_server_read, go_hook_tls_read);
+    if (g_go_major_ver > 16) {
+        return go_switch(stackptr, c_http_server_read, go_hook_reg_tls_read);
+    } else {
+        return go_switch(stackptr, c_http_server_read, go_hook_tls_read);
+    }
 }
 
 /*
@@ -1289,7 +1346,11 @@ c_http_server_write(char *stackaddr)
 EXPORTON void *
 go_tls_write(char *stackptr)
 {
-    return go_switch(stackptr, c_http_server_write, go_hook_tls_write);
+    if (g_go_major_ver > 16) {
+        return go_switch(stackptr, c_http_server_write, go_hook_reg_tls_write);
+    } else {
+        return go_switch(stackptr, c_http_server_write, go_hook_tls_write);
+    }
 }
 
 /*
@@ -1313,7 +1374,7 @@ c_http_client_write(char *stackaddr)
     int fd = -1;
     uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
     uint64_t w_pc  = *(uint64_t *)(stackaddr + 0x08);
-    uint64_t rc =  *(uint64_t *)(stackaddr + 0x20); // 0x20 -> 0x78??
+    uint64_t rc =  0; //*(uint64_t *)(stackaddr + 0x20); // 0x20 -> 0x78??
     uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
 
     if (rc < 1) return;
@@ -1343,7 +1404,11 @@ c_http_client_write(char *stackaddr)
 EXPORTON void *
 go_pc_write(char *stackptr)
 {
-    return go_switch(stackptr, c_http_client_write, go_hook_pc_write);
+    if (g_go_major_ver > 16) {
+        return go_switch(stackptr, c_http_client_write, go_hook_reg_pc_write);
+    } else {
+        return go_switch(stackptr, c_http_client_write, go_hook_pc_write);
+    }
 }
 
 /*
@@ -1402,7 +1467,11 @@ c_http_client_read(char *stackaddr)
 EXPORTON void *
 go_readResponse(char *stackptr)
 {
-    return go_switch(stackptr, c_http_client_read, go_hook_readResponse);
+    if (g_go_major_ver > 16) {
+        return go_switch(stackptr, c_http_client_read, go_hook_reg_readResponse);
+    } else {
+        return go_switch(stackptr, c_http_client_read, go_hook_readResponse);
+    }
 }
 
 extern void handleExit(void);

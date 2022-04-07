@@ -62,7 +62,7 @@
     interpose go_hook_close, go_close
     interpose go_hook_tls_read, go_tls_read
     interpose go_hook_tls_write, go_tls_write
-    interpose go_hook_readResponse, go_readResponse
+    //interpose go_hook_readResponse, go_readResponse
     //interpose go_hook_pc_write, go_pc_write
     interpose go_hook_exit, go_exit
     interpose go_hook_die, go_die
@@ -119,6 +119,28 @@ go_hook_pc_write:
 
     mov %r11, %rbx
     lea go_pc_write@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov %r11, %rax
+
+    lea go_runtime_cgocall_regs@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+    mov %rax, %r11
+
+    pop %rbx
+    pop %rax
+    jmp *%r11
+
+
+.global go_hook_readResponse
+go_hook_readResponse:
+    mov %rsp, %r11
+    push %rax
+    push %rbx
+
+    mov %r11, %rbx
+    lea go_readResponse@GOTPCREL(%rip), %r11
     mov (%r11), %r11
     mov %r11, %rax
 

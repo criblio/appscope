@@ -300,7 +300,6 @@ patch_return_addrs(funchook_t *funchook,
                 patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
                 tap->return_addr = patch_addr;
                 tap->frame_size = add_arg;
-                break;
         }
     }
     patchprint("\n\n");
@@ -1372,9 +1371,10 @@ static void
 c_http_client_write(char *stackaddr)
 {
     int fd = -1;
-    uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
-    uint64_t w_pc  = *(uint64_t *)(stackaddr + 0x08);
-    uint64_t rc =  0; //*(uint64_t *)(stackaddr + 0x20); // 0x20 -> 0x78??
+    stackaddr -= 0x30;
+    uint64_t buf = *(uint64_t *)(stackaddr + 0x40);
+    uint64_t w_pc  = *(uint64_t *)(stackaddr + 0x20);
+    uint64_t rc =  *(uint64_t *)(stackaddr + 0x20); // 0x20 -> 0x78??
     uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
 
     if (rc < 1) return;
@@ -1431,8 +1431,9 @@ go_pc_write(char *stackptr)
 static void
 c_http_client_read(char *stackaddr)
 {
-    int fd = -1;
-    uint64_t pc  = *(uint64_t *)(stackaddr + 0x08);
+/*    int fd = -1;
+    stackaddr -= 0x30;
+    uint64_t pc  = *(uint64_t *)(stackaddr + 0x20);
     uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, buf = 0, len = 0;
 
     pc_conn_if = (pc + g_go.persistConn_to_conn);
@@ -1462,6 +1463,7 @@ c_http_client_read(char *stackaddr)
             funcprint("Scope: c_http_client_read of %d\n", fd);
         }
     }
+    */
 }
 
 EXPORTON void *

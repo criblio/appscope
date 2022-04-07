@@ -1623,8 +1623,7 @@ init(void)
 
     initHook(attachedFlag);
     
-    if (checkEnv("SCOPE_APP_TYPE", "go") &&
-        checkEnv("SCOPE_EXEC_TYPE", "static")) {
+    if (checkEnv("SCOPE_APP_TYPE", "go")) {
         threadNow(0);
     } else if (g_ismusl == FALSE) {
         // The check here is meant to be temporary.

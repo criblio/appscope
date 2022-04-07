@@ -96,7 +96,7 @@ class SplunkDirectIndexingTest(ApplicationTest):
 
         return passed(), None
 
-    @retry(stop_max_attempt_number=7, wait_fixed=2000)
+    @retry(stop_max_attempt_number=7, wait_fixed=8000)
     def __assert_same_number_of_events(self, service, expected_events_num, index_name):
         search_query = f"search index={index_name} | stats count"
 
@@ -145,7 +145,7 @@ class SplunkKVStoreTest(ApplicationTest):
              f"Expected to have {records_num} records in kvstore, but found {len(found_records)}")
         ), None
 
-    @retry(stop_max_attempt_number=7, wait_fixed=2000)
+    @retry(stop_max_attempt_number=7, wait_fixed=8000)
     def __create_collection(self, collection_name, service):
         collection = service.kvstore.create(collection_name)
         return collection

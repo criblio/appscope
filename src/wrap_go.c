@@ -65,8 +65,8 @@ tap_t g_go_tap[] = {
     {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
     {"syscall.read",                         go_hook_read,         NULL, 0},
     {"syscall.Close",                        go_hook_close,        NULL, 0},
-    //{"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
-    //{"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
+    {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
+    {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
     {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0},
     {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
     {"runtime.exit",                         go_hook_exit,         NULL, 0},
@@ -275,6 +275,8 @@ patch_return_addrs(funchook_t *funchook,
                 patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
                 tap->return_addr = patch_addr;
                 tap->frame_size = add_arg;
+
+                if (!strcmp((const char*)asm_inst[i].mnemonic, "xorps")) break;
         }
     }
     patchprint("\n\n");
@@ -536,8 +538,8 @@ initGoHook(elf_buf_t *ebuf)
      * Need to investigate later.
      */
     //"runtime.asmcgocall.abi0" ??
-    if (((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) &&
-        ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0)) {
+    if (((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall.abi0")) == 0) &&
+        ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall.abi0")) == 0)) {
         sysprint("ERROR: can't get the address for runtime.cgocall\n");
         return; // don't install our hooks
     }
@@ -1195,7 +1197,8 @@ static void
 c_http_server_read(char *stackaddr)
 {
     int fd = -1;
-    uint64_t connReader = *(uint64_t*)(stackaddr + 0x8);
+ //   stackaddr -= 0x48;
+    uint64_t connReader = *(uint64_t*)(stackaddr + 0x8); // in the wrong stack ??
     if (!connReader) return;   // protect from dereferencing null
     uint64_t buf        = *(uint64_t*)(stackaddr + 0x10);
     // buf len 0x18
@@ -1258,9 +1261,10 @@ static void
 c_http_server_write(char *stackaddr)
 {
     int fd = -1;
-    uint64_t conn = *(uint64_t*)(stackaddr + 0x8);
+    stackaddr -= 0x48; // use the same stack as the go code. because caller is using registers
+    uint64_t conn = *(uint64_t*)(stackaddr + 0x30);
     if (!conn) return;         // protect from dereferencing null
-    uint64_t buf  = *(uint64_t*)(stackaddr + 0x10);
+    uint64_t buf  = *(uint64_t*)(stackaddr + 0x08);
     // buf len 0x18
     // buf cap 0x20
     uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
@@ -1366,9 +1370,9 @@ go_pc_write(char *stackptr)
 static void
 c_http_client_read(char *stackaddr)
 {
-/*    int fd = -1;
-    stackaddr -= 0x30;
-    uint64_t pc  = *(uint64_t *)(stackaddr + 0x20);
+    int fd = -1;
+    stackaddr -= 0x78;
+    uint64_t pc  = *(uint64_t *)(stackaddr + 0x80); // outside the stack frame ??
     uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, buf = 0, len = 0;
 
     pc_conn_if = (pc + g_go.persistConn_to_conn);
@@ -1398,14 +1402,12 @@ c_http_client_read(char *stackaddr)
             funcprint("Scope: c_http_client_read of %d\n", fd);
         }
     }
-    */
 }
 
 EXPORTON void *
 go_readResponse(char *stackptr)
 {
-    return return_addr(go_hook_readResponse);
-//    return go_switch(stackptr, c_http_client_read, go_hook_readResponse);
+    return go_switch(stackptr, c_http_client_read, go_hook_readResponse);
 }
 
 extern void handleExit(void);

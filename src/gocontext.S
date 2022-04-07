@@ -124,7 +124,7 @@ go_hook_write:
     mov %rsp, %r11
     add $0x20, %r11
     mov %r11, 0x08(%rsp)
-    lea go_pc_write@GOTPCREL(%rip), %r11
+    lea go_write@GOTPCREL(%rip), %r11
     mov (%r11), %r11
     mov %r11, (%rsp)
 

@@ -90,8 +90,8 @@ tap_t g_go_tap_17[] = {
     {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
     {"syscall.read",                         go_hook_read,         NULL, 0},
     {"syscall.Close",                        go_hook_close,        NULL, 0},
-    //{"net/http.(*connReader).Read",          go_hook_reg_tls_read,     NULL, 0},
-    //{"net/http.checkConnErrorWriter.Write",  go_hook_reg_tls_write,    NULL, 0},
+    {"net/http.(*connReader).Read",          go_hook_reg_tls_read,     NULL, 0},
+    {"net/http.checkConnErrorWriter.Write",  go_hook_reg_tls_write,    NULL, 0},
     {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse, NULL, 0},
     {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,     NULL, 0},
     {"runtime.exit",                         go_hook_exit,         NULL, 0},
@@ -279,8 +279,7 @@ patch_return_addrs(funchook_t *funchook,
               (!strcmp((const char*)asm_inst[i-1].mnemonic, "add") ||
                !strcmp((const char*)asm_inst[i-1].mnemonic, "sub")) &&
               (add_arg = add_argument(&asm_inst[i-1]))) ||
-
-             (!strcmp((const char*)asm_inst[i].mnemonic, "xorps") &&
+             ((g_go_major_ver > 16) && !strcmp((const char*)asm_inst[i].mnemonic, "xorps") &&
               (asm_inst[i].size == 4)))) {
 
 
@@ -300,6 +299,8 @@ patch_return_addrs(funchook_t *funchook,
                 patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
                 tap->return_addr = patch_addr;
                 tap->frame_size = add_arg;
+
+                if ((g_go_major_ver > 16) && !strcmp((const char*)asm_inst[i].mnemonic, "xorps")) break;
         }
     }
     patchprint("\n\n");

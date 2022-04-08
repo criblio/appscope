@@ -10,6 +10,7 @@ typedef struct {
 
 unsigned int strToVal(enum_map_t[], const char*);
 const char* valToStr(enum_map_t[], unsigned int);
+int strToUnsignedLong(const char* str, unsigned long* val);
 
 int checkEnv(char *, char *);
 int fullSetenv(const char *, const char *, int);

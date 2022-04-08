@@ -9,7 +9,8 @@
 static void
 cmdPostInfoMsgDoesNotCrash(void** state)
 {
-    ctl_t* ctl = ctlCreate();
+    config_t* cfg = cfgCreateDefault();
+    ctl_t* ctl = ctlCreate(cfg);
     assert_non_null(ctl);
 
     assert_int_equal(-1, cmdPostInfoMsg(NULL, NULL));
@@ -18,12 +19,14 @@ cmdPostInfoMsgDoesNotCrash(void** state)
     assert_int_equal(0, cmdPostInfoMsg(ctl, cJSON_CreateString("hey")));
 
     ctlDestroy(&ctl);
+    cfgDestroy(&cfg);
 }
 
 static void
 cmdSendInfoStrDoesNotCrash(void** state)
 {
-    ctl_t* ctl = ctlCreate();
+    config_t* cfg = cfgCreateDefault();
+    ctl_t* ctl = ctlCreate(cfg);
     assert_non_null(ctl);
 
     assert_int_equal(-1, cmdSendInfoStr(NULL, NULL));
@@ -32,12 +35,14 @@ cmdSendInfoStrDoesNotCrash(void** state)
     assert_int_equal(0, cmdSendInfoStr(ctl, "hey"));
 
     ctlDestroy(&ctl);
+    cfgDestroy(&cfg);
 }
 
 static void
 cmdSendResponseDoesNotCrash(void** state)
 {
-    ctl_t* ctl = ctlCreate();
+    config_t* cfg = cfgCreateDefault();
+    ctl_t* ctl = ctlCreate(cfg);
     assert_non_null(ctl);
     const char buf[] =
          "{\"type\": \"req\", \"req\": \"huh?\", \"reqId\": 3.5}";
@@ -53,6 +58,7 @@ cmdSendResponseDoesNotCrash(void** state)
 
     ctlDestroy(&ctl);
     destroyReq(&req);
+    cfgDestroy(&cfg);
 }
 
 static void

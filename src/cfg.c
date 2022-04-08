@@ -58,6 +58,8 @@ struct _config_t
 
     struct {
         cfg_log_level_t level;
+        unsigned long bufthreshold;
+        unsigned long flushperiod;
     } log;
 
     struct {
@@ -214,6 +216,8 @@ cfgCreateDefault()
     }
 
     c->log.level = DEFAULT_LOG_LEVEL;
+    c->log.bufthreshold = DEFAULT_LOG_MAX_AGG_BYTES;
+    c->log.flushperiod = DEFAULT_LOG_FLUSH_PERIOD_IN_MS;
 
     c->pay.enable = DEFAULT_PAYLOAD_ENABLE;
     c->pay.dir = (DEFAULT_PAYLOAD_DIR) ? strdup(DEFAULT_PAYLOAD_DIR) : NULL;
@@ -573,6 +577,18 @@ cfg_log_level_t
 cfgLogLevel(config_t* cfg)
 {
     return (cfg) ? cfg->log.level : DEFAULT_LOG_LEVEL;
+}
+
+unsigned long
+cfgLogBufThreshold(config_t* cfg)
+{
+    return (cfg) ? cfg->log.bufthreshold : DEFAULT_LOG_MAX_AGG_BYTES;
+}
+
+unsigned long
+cfgLogFlushPeriod(config_t* cfg)
+{
+    return (cfg) ? cfg->log.flushperiod : DEFAULT_LOG_FLUSH_PERIOD_IN_MS;
 }
 
 unsigned int
@@ -937,6 +953,20 @@ cfgLogLevelSet(config_t* cfg, cfg_log_level_t level)
 {
     if (!cfg || level < 0 || level > CFG_LOG_NONE) return;
     cfg->log.level = level;
+}
+
+void
+cfgLogBufThresholdSet(config_t* cfg, unsigned long threshold)
+{
+    if (!cfg) return;
+    cfg->log.bufthreshold = threshold;
+}
+
+void
+cfgLogFlushPeriodSet(config_t* cfg, unsigned long period)
+{
+    if (!cfg) return;
+    cfg->log.flushperiod = period;
 }
 
 void

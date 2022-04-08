@@ -259,6 +259,8 @@ ctlParseRxMsgSetCfg(void** state)
         "    \"summaryperiod\": \"13\",\n"
         "    \"log\": {\n"
         "      \"level\": \"debug\",\n"
+        "      \"bufthreshold\": \"32768\",\n"
+        "      \"flushperiod\": \"2000\",\n"
         "      \"transport\": {\n"
         "        \"type\": \"shm\"\n"
         "      }\n"
@@ -641,20 +643,23 @@ ctlSendMsgForNullMtcDoesntCrash(void** state)
 static void
 ctlSendMsgForNullMessageDoesntCrash(void** state)
 {
-    ctl_t* ctl = ctlCreate();
+    config_t* cfg = cfgCreateDefault();
+    ctl_t* ctl = ctlCreate(cfg);
     assert_non_null(ctl);
     transport_t* t = transportCreateSyslog();
     assert_non_null(t);
     ctlTransportSet(ctl, t, CFG_CTL);
     ctlSendMsg(ctl, NULL);
     ctlDestroy(&ctl);
+    cfgDestroy(&cfg);
 }
 
 static void
 ctlTransportSetAndMtcSend(void** state)
 {
     const char* file_path = "/tmp/my.path";
-    ctl_t* ctl = ctlCreate();
+    config_t* cfg = cfgCreateDefault();
+    ctl_t* ctl = ctlCreate(cfg);
     assert_non_null(ctl);
     transport_t* t1 = transportCreateUdp("127.0.0.1", "12345");
     transport_t* t2 = transportCreateUnix("/var/run/scope.sock");
@@ -693,6 +698,7 @@ ctlTransportSetAndMtcSend(void** state)
         fail_msg("Couldn't delete file %s", file_path);
 
     ctlDestroy(&ctl);
+    cfgDestroy(&cfg);
 }
 
 static void
@@ -736,7 +742,8 @@ ctlSendLogConsoleAsciiData(void **state)
                       .procname = "foo",
                       .cmd = "foo",
                       .id = "foo"};
-    ctl_t* ctl = ctlCreate();
+    config_t* cfg = cfgCreateDefault();
+    ctl_t* ctl = ctlCreate(cfg);
     assert_non_null(ctl);
     bool b_res = ctlEvtSourceEnabled(ctl, CFG_SRC_CONSOLE);
     assert_true(b_res);
@@ -747,6 +754,7 @@ ctlSendLogConsoleAsciiData(void **state)
     const char *val = get_cbuf_data();
     assert_string_equal(ascii_text, val);
     ctlDestroy(&ctl);
+    cfgDestroy(&cfg);
     allow_copy_buf_data(FALSE);
 }
 
@@ -769,7 +777,8 @@ ctlSendLogConsoleNoneAsciiData(void **state)
                       .procname = "foo",
                       .cmd = "foo",
                       .id = "foo"};
-    ctl_t* ctl = ctlCreate();
+    config_t* cfg = cfgCreateDefault();
+    ctl_t* ctl = ctlCreate(cfg);
     assert_non_null(ctl);
     bool b_res = ctlEvtSourceEnabled(ctl, CFG_SRC_CONSOLE);
     assert_true(b_res);
@@ -781,6 +790,7 @@ ctlSendLogConsoleNoneAsciiData(void **state)
     assert_string_equal(binary_data_event_msg, val);
     free(non_basic_ascii_text);
     ctlDestroy(&ctl);
+    cfgDestroy(&cfg);
     allow_copy_buf_data(FALSE);
 }
 

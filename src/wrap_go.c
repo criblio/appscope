@@ -82,20 +82,20 @@ tap_t g_go_tap_16[] = {
 };
 
 tap_t g_go_tap_17[] = {
-    {"syscall.write",                        go_hook_write,        NULL, 0},
-    {"syscall.openat",                       go_hook_open,         NULL, 0},
-    {"syscall.unlinkat",                     go_hook_unlinkat,     NULL, 0},
-    {"syscall.Getdents",                     go_hook_getdents,     NULL, 0},
-    {"syscall.socket",                       go_hook_socket,       NULL, 0},
-    {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
-    {"syscall.read",                         go_hook_read,         NULL, 0},
-    {"syscall.Close",                        go_hook_close,        NULL, 0},
+    {"syscall.write",                        go_hook_write,            NULL, 0},
+    {"syscall.openat",                       go_hook_open,             NULL, 0},
+    {"syscall.unlinkat",                     go_hook_unlinkat,         NULL, 0},
+    {"syscall.Getdents",                     go_hook_getdents,         NULL, 0},
+    {"syscall.socket",                       go_hook_socket,           NULL, 0}, // creates a net object
+    {"syscall.accept4",                      go_hook_accept4,          NULL, 0},
+    {"syscall.read",                         go_hook_read,             NULL, 0},
+    {"syscall.Close",                        go_hook_close,            NULL, 0}, // recycles a net object
     {"net/http.(*connReader).Read",          go_hook_reg_tls_read,     NULL, 0},
     {"net/http.checkConnErrorWriter.Write",  go_hook_reg_tls_write,    NULL, 0},
     {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse, NULL, 0},
     {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,     NULL, 0},
-    {"runtime.exit",                         go_hook_exit,         NULL, 0},
-    {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
+    {"runtime.exit",                         go_hook_exit,             NULL, 0},
+    {"runtime.dieFromSignal",                go_hook_die,              NULL, 0},
     {"TAP_TABLE_END", NULL, NULL, 0}
 };
 
@@ -282,9 +282,12 @@ patch_return_addrs(funchook_t *funchook,
              ((g_go_major_ver > 16) && !strcmp((const char*)asm_inst[i].mnemonic, "xorps") &&
               (asm_inst[i].size == 4)))) {
 
-
                 void *pre_patch_addr = (void*)asm_inst[i-1].address;
                 void *patch_addr = (void*)asm_inst[i-1].address;
+                if (!strcmp((const char*)asm_inst[i].mnemonic, "xorps")) {
+                    pre_patch_addr = (void*)asm_inst[i].address;
+                    patch_addr = (void*)asm_inst[i].address;
+                }
 
                 // all add_arg values within a function should be the same
                 if (tap->frame_size && (tap->frame_size != add_arg)) {

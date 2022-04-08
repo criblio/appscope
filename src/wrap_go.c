@@ -282,8 +282,10 @@ patch_return_addrs(funchook_t *funchook,
              ((g_go_major_ver > 16) && !strcmp((const char*)asm_inst[i].mnemonic, "xorps") &&
               (asm_inst[i].size == 4)))) {
 
+                // patch the address before the ret instruction to maintain the callee stack context
                 void *pre_patch_addr = (void*)asm_inst[i-1].address;
                 void *patch_addr = (void*)asm_inst[i-1].address;
+                // we aren't dealing with a ret, we can patch the xorps instruction
                 if (!strcmp((const char*)asm_inst[i].mnemonic, "xorps")) {
                     pre_patch_addr = (void*)asm_inst[i].address;
                     patch_addr = (void*)asm_inst[i].address;

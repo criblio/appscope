@@ -1,15 +1,16 @@
 import React, { useState } from "react";
 import Helmet from "react-helmet";
-
 import { useStaticQuery, graphql, Link } from "gatsby";
 import "../scss/_docsNav.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Search from "./search";
 import "../utils/font-awesome";
+
 const searchIndices = [{ name: `Pages`, title: `Pages` }];
+const DARK_MODE_KEY = 'DARK_MODE';
 
 export default function DocsNav() {
-  const [darkMode, toggleDarkMode] = useState(false);
+  const [darkMode, toggleDarkMode] = useState(localStorage.getItem(DARK_MODE_KEY) === 'true');
   const [mobileNav, openMobileNav] = useState(false);
   const data = useStaticQuery(graphql`
     query DocumentationNav {
@@ -25,6 +26,11 @@ export default function DocsNav() {
     }
   `);
   const navItems = data.allDocumentationNavYaml.nodes;
+  const darkModeClick = () => {
+    localStorage.setItem(DARK_MODE_KEY, !darkMode);
+    toggleDarkMode(!darkMode);
+  }
+
   return (
     <>
       <Helmet
@@ -44,9 +50,7 @@ export default function DocsNav() {
         <h4>
           <FontAwesomeIcon
             icon={darkMode ? ["fas", "toggle-on"] : ["fas", "toggle-off"]}
-            onClick={() => {
-              darkMode ? toggleDarkMode(false) : toggleDarkMode(true);
-            }}
+            onClick={darkModeClick}
           />
           <span>{darkMode ? "Light" : "Dark"}</span>
         </h4>

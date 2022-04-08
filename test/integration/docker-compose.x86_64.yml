@@ -442,3 +442,11 @@ services:
       args:
         JRE_TGZ: jdk/jdk-17.0.1_linux-x64_bin.tar.gz
     <<: *scope-common
+  awsnuke:
+    image: ghcr.io/criblio/appscope-test-awsnuke:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-awsnuke:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./awsnuke/Dockerfile
+    <<: *scope-common

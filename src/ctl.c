@@ -886,15 +886,18 @@ ctlSendLog(ctl_t *ctl, int fd, const char *path, const void *buf, size_t count, 
 
     log_event_t *logevent = NULL;
     if (logType == CFG_SRC_CONSOLE) {
-        fs_content_type_t data_content = getFSContentType(fd);
-        if (data_content == FS_CONTENT_BINARY) {
-            // Handle only first event of binary data, drop and ignore rest
-            return -1;
-        } else if (data_content == FS_CONTENT_UNKNOWN) {
-            data_content = is_data_binary(buf, count) ? FS_CONTENT_BINARY : FS_CONTENT_TEXT;
-            setFSContentType(fd, data_content);
-            if (data_content == FS_CONTENT_BINARY) {
+
+        // Grab previous data_content, then compute and save new data_content
+        fs_content_type_t prev_data_content = getFSContentType(fd);
+        fs_content_type_t cur_data_content = is_data_binary(buf, count) ? FS_CONTENT_BINARY : FS_CONTENT_TEXT;
+        setFSContentType(fd, cur_data_content);
+
+        // Report only first event of binary data, drop and ignore rest
+        if (cur_data_content == FS_CONTENT_BINARY) {
+            if (prev_data_content != FS_CONTENT_BINARY) {
                 logevent = createInternalLogEvent(fd, path, BINARY_DATA_MSG, sizeof(BINARY_DATA_MSG) - 1, uid, proc, logType, filter);
+            } else {
+                return -1;
             }
         }
     }

@@ -311,7 +311,7 @@ jobs:
       # artifact name for this job as well as the other job for ARM. The result
       # is a single artifact with binaries from both jobs.
       - name: Upload Binaries
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: binaries
           path: |

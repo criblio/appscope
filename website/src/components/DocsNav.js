@@ -10,7 +10,8 @@ const searchIndices = [{ name: `Pages`, title: `Pages` }];
 const DARK_MODE_KEY = 'DARK_MODE';
 
 export default function DocsNav() {
-  const [darkMode, toggleDarkMode] = useState(localStorage.getItem(DARK_MODE_KEY) === 'true');
+  const isDarkMode = window ? localStorage.getItem(DARK_MODE_KEY) === 'true' : false;
+  const [darkMode, toggleDarkMode] = useState(isDarkMode);
   const [mobileNav, openMobileNav] = useState(false);
   const data = useStaticQuery(graphql`
     query DocumentationNav {
@@ -27,7 +28,9 @@ export default function DocsNav() {
   `);
   const navItems = data.allDocumentationNavYaml.nodes;
   const darkModeClick = () => {
-    localStorage.setItem(DARK_MODE_KEY, !darkMode);
+    if (window) {
+      localStorage.setItem(DARK_MODE_KEY, !darkMode);
+    }
     toggleDarkMode(!darkMode);
   }
 

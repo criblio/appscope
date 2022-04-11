@@ -20,7 +20,7 @@ Assets are available via Docker and the Cribl CDN at the links below.
 
 AppScope 1.0.3 improves the quality of results when scoping Go executables:
 
-- [#738](https://github.com/criblio/appscope/issues/738) When scoping Go executables, AppScope no longer fails to collect certain events. This was accomplished by creating interpositions for two Go functions: `unlinkat` and `getdents`. AppScope already had the ability to interpose the equivalent functions in C, so this fix brings AppScope's interposition of Go functions into parity with its interposition of C functions.   
+- [#738](https://github.com/criblio/appscope/issues/738) When scoping Go executables, AppScope is now able to produce events from two more Go functions: `unlinkat` and `getdents`. AppScope already had the ability to interpose the equivalent system calls in C (`unlink`, `unlinkat`, `readdir`).
 - [#864](https://github.com/criblio/appscope/issues/864) When scoping Go executables that call the `openat` function, AppScope no longer fails to collect `fs.open` events. This brings AppScope up to date with changes to `openat` in recent versions of Go.
 - [#862](https://github.com/criblio/appscope/issues/862) When scoping dynamic Go executables, AppScope no longer falsely logs nonexistent errors.
 

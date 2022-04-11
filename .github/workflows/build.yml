@@ -345,7 +345,7 @@ jobs:
 
       # Download the built binaries
       - name: Download Binaries
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: binaries
 
@@ -430,7 +430,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download Binaries
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: binaries
 
@@ -478,7 +478,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Download Binaries
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: binaries
 
@@ -536,7 +536,7 @@ jobs:
           password: ${{ secrets.SCOPECI_TOKEN }}
 
       - name: Download Binaries
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: binaries
 

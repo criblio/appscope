@@ -9,8 +9,6 @@
 #include <string.h>
 
 
-// Internal standard library references
-
 // Memory management handling operations
 extern void*  scopelibc_memalign(size_t, size_t);
 extern void*  scopelibc_malloc(size_t);

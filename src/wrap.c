@@ -4395,7 +4395,6 @@ fork()
         // We are the child proc
         doReset();
     }
-    
     return rc;
 }
 

@@ -8,9 +8,12 @@ import "../utils/font-awesome";
 
 const searchIndices = [{ name: `Pages`, title: `Pages` }];
 const DARK_MODE_KEY = 'DARK_MODE';
+// Check if window is defined (so if in the browser or in node.js).
+const isBrowser = typeof window !== 'undefined';
 
 export default function DocsNav() {
-  const [darkMode, toggleDarkMode] = useState(localStorage.getItem(DARK_MODE_KEY) === 'true');
+  const isDarkMode = isBrowser ? localStorage.getItem(DARK_MODE_KEY) === 'true' : false;
+  const [darkMode, toggleDarkMode] = useState(isDarkMode);
   const [mobileNav, openMobileNav] = useState(false);
   const data = useStaticQuery(graphql`
     query DocumentationNav {
@@ -27,7 +30,9 @@ export default function DocsNav() {
   `);
   const navItems = data.allDocumentationNavYaml.nodes;
   const darkModeClick = () => {
-    localStorage.setItem(DARK_MODE_KEY, !darkMode);
+    if (isBrowser) {
+      localStorage.setItem(DARK_MODE_KEY, !darkMode);
+    }
     toggleDarkMode(!darkMode);
   }
 

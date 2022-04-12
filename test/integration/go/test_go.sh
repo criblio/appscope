@@ -131,6 +131,16 @@ sleep 0.5
 
 evaltest
 
+grep plainServerDynamic $EVT_FILE | grep net.app > /dev/null
+ERR+=$?
+grep plainServerDynamic $EVT_FILE | grep net.open > /dev/null
+ERR+=$?
+grep plainServerDynamic $EVT_FILE | grep net.close > /dev/null
+ERR+=$?
+grep plainServerDynamic $EVT_FILE | grep fs.open > /dev/null
+ERR+=$?
+grep plainServerDynamic $EVT_FILE | grep fs.close > /dev/null
+ERR+=$?
 grep plainServerDynamic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
 grep plainServerDynamic $EVT_FILE | grep http.resp > /dev/null
@@ -166,6 +176,16 @@ sleep 0.5
 
 evaltest
 
+grep plainServerStatic $EVT_FILE | grep net.app > /dev/null
+ERR+=$?
+grep plainServerStatic $EVT_FILE | grep net.open > /dev/null
+ERR+=$?
+grep plainServerStatic $EVT_FILE | grep net.close > /dev/null
+ERR+=$?
+grep plainServerStatic $EVT_FILE | grep fs.open > /dev/null
+ERR+=$?
+grep plainServerStatic $EVT_FILE | grep fs.close > /dev/null
+ERR+=$?
 grep plainServerStatic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
 grep plainServerStatic $EVT_FILE | grep http.resp > /dev/null
@@ -201,6 +221,16 @@ sleep 0.5
 
 evaltest
 
+grep tlsServerDynamic $EVT_FILE | grep net.app > /dev/null
+ERR+=$?
+grep tlsServerDynamic $EVT_FILE | grep net.open > /dev/null
+ERR+=$?
+grep tlsServerDynamic $EVT_FILE | grep net.close > /dev/null
+ERR+=$?
+grep tlsServerDynamic $EVT_FILE | grep fs.open > /dev/null
+ERR+=$?
+grep tlsServerDynamic $EVT_FILE | grep fs.close > /dev/null
+ERR+=$?
 grep tlsServerDynamic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
 grep tlsServerDynamic $EVT_FILE | grep http.resp > /dev/null
@@ -237,6 +267,16 @@ sleep 0.5
 
 evaltest
 
+grep tlsServerStatic $EVT_FILE | grep net.app > /dev/null
+ERR+=$?
+grep tlsServerStatic $EVT_FILE | grep net.open > /dev/null
+ERR+=$?
+grep tlsServerStatic $EVT_FILE | grep net.close > /dev/null
+ERR+=$?
+grep tlsServerStatic $EVT_FILE | grep fs.open > /dev/null
+ERR+=$?
+grep tlsServerStatic $EVT_FILE | grep fs.close > /dev/null
+ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep http.resp > /dev/null
@@ -263,9 +303,21 @@ sleep 0.5
 
 evaltest
 
+grep plainClientDynamic $EVT_FILE | grep net.app > /dev/null
+ERR+=$?
+grep plainClientDynamic $EVT_FILE | grep net.open > /dev/null
+ERR+=$?
+grep plainClientDynamic $EVT_FILE | grep net.close > /dev/null
+ERR+=$?
+grep plainClientDynamic $EVT_FILE | grep fs.open > /dev/null
+ERR+=$?
+grep plainClientDynamic $EVT_FILE | grep fs.close > /dev/null
+ERR+=$?
 grep plainClientDynamic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
 grep plainClientDynamic $EVT_FILE | grep http.resp > /dev/null
+ERR+=$?
+grep plainClientDynamic $EVT_FILE | grep console > /dev/null
 ERR+=$?
 
 evalPayload
@@ -287,9 +339,21 @@ sleep 0.5
 
 evaltest
 
+grep plainClientStatic $EVT_FILE | grep net.app > /dev/null
+ERR+=$?
+grep plainClientStatic $EVT_FILE | grep net.open > /dev/null
+ERR+=$?
+grep plainClientStatic $EVT_FILE | grep net.close > /dev/null
+ERR+=$?
+grep plainClientStatic $EVT_FILE | grep fs.open > /dev/null
+ERR+=$?
+grep plainClientStatic $EVT_FILE | grep fs.close > /dev/null
+ERR+=$?
 grep plainClientStatic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
 grep plainClientStatic $EVT_FILE | grep http.resp > /dev/null
+ERR+=$?
+grep plainClientStatic $EVT_FILE | grep console > /dev/null
 ERR+=$?
 
 evalPayload
@@ -311,9 +375,21 @@ sleep 0.5
 
 evaltest
 
+grep tlsClientDynamic $EVT_FILE | grep net.app > /dev/null
+ERR+=$?
+grep tlsClientDynamic $EVT_FILE | grep net.open > /dev/null
+ERR+=$?
+grep tlsClientDynamic $EVT_FILE | grep net.close > /dev/null
+ERR+=$?
+grep tlsClientDynamic $EVT_FILE | grep fs.open > /dev/null
+ERR+=$?
+grep tlsClientDynamic $EVT_FILE | grep fs.close > /dev/null
+ERR+=$?
 grep tlsClientDynamic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
 grep tlsClientDynamic $EVT_FILE | grep http.resp > /dev/null
+ERR+=$?
+grep tlsClientDynamic $EVT_FILE | grep console > /dev/null
 ERR+=$?
 
 evalPayload
@@ -335,9 +411,21 @@ sleep 0.5
 
 evaltest
 
+grep tlsClientStatic $EVT_FILE | grep net.app > /dev/null
+ERR+=$?
+grep tlsClientStatic $EVT_FILE | grep net.open > /dev/null
+ERR+=$?
+grep tlsClientStatic $EVT_FILE | grep net.close > /dev/null
+ERR+=$?
+grep tlsClientStatic $EVT_FILE | grep fs.open > /dev/null
+ERR+=$?
+grep tlsClientStatic $EVT_FILE | grep fs.close > /dev/null
+ERR+=$?
 grep tlsClientStatic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
 grep tlsClientStatic $EVT_FILE | grep http.resp > /dev/null
+ERR+=$?
+grep tlsClientStatic $EVT_FILE | grep console > /dev/null
 ERR+=$?
 
 evalPayload

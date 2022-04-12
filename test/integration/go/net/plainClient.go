@@ -8,7 +8,8 @@ import (
 
 func main() {
 
-	resp, err := http.Get("http://cribl.io")
+	// ensure the website does not redirect to https
+	resp, err := http.Get("http://gnu.org")
 	if err != nil {
 		panic(err)
 	}

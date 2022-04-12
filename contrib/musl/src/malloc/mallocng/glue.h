@@ -31,7 +31,13 @@
 #define assert(x) do { if (!(x)) a_crash(); } while(0)
 #endif
 
-#define brk(p) ((uintptr_t)__syscall(SYS_brk, p))
+#undef brk
+#if USE_BRK
+#include <sys/syscall.h>
+#define brk(p) ((uintptr_t)syscall(SYS_brk, p))
+#else
+#define brk(p) ((p)-1)
+#endif
 
 #define mmap __mmap
 #define madvise __madvise
@@ -39,12 +45,12 @@
 
 #define DISABLE_ALIGNED_ALLOC (__malloc_replaced && !__aligned_alloc_replaced)
 
+extern int getentropy(void *, size_t);
+
 static inline uint64_t get_random_secret()
 {
-	uint64_t secret = (uintptr_t)&secret * 1103515245;
-	for (size_t i=0; libc.auxv[i]; i+=2)
-		if (libc.auxv[i]==AT_RANDOM)
-			memcpy(&secret, (char *)libc.auxv[i+1]+8, sizeof secret);
+	uint64_t secret;
+	getentropy(&secret, sizeof secret);
 	return secret;
 }
 
@@ -52,7 +58,7 @@ static inline uint64_t get_random_secret()
 #define PAGESIZE PAGE_SIZE
 #endif
 
-#define MT (libc.need_locks)
+#define MT (1)
 
 #define RDLOCK_IS_EXCLUSIVE 1
 

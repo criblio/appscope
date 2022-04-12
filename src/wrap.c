@@ -4390,12 +4390,14 @@ fork()
 
     WRAP_CHECK(fork, -1);
     scopeLog(CFG_LOG_DEBUG, "fork");
+    scope_malloc_before_fork();
     rc = g_fn.fork();
+    scope_malloc_after_fork(!rc);
     if (rc == 0) {
         // We are the child proc
         doReset();
     }
-    
+
     return rc;
 }
 

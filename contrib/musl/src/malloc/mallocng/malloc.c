@@ -379,6 +379,10 @@ success:
 	return enframe(g, idx, n, ctr);
 }
 
+void malloc_fork_op(int who) {
+	__malloc_atfork(who);
+}
+
 int is_allzero(void *p)
 {
 	struct meta *g = get_meta(p);

@@ -1,10 +1,13 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://appscope.dev/docs/schemas/event_stderr.schema.json",
+  "$id": "https://appscope.dev/docs/schemas/event_console.schema.json",
   "type": "object",
-  "title": "AppScope `stderr` Event",
-  "description": "Structure of the console `stderr` event",
-  "examples": [{"type":"evt","id":"eaf4d0598443-a.out-./a.out","_channel":"8499188821284","body":{"sourcetype":"console","_time":1643883251.376672,"source":"stderr","host":"eaf4d0598443","proc":"a.out","cmd":"./a.out","pid":986,"data":{"message":"stderr hello world"}}}],
+  "title": "AppScope `console` Event",
+  "description": "Structure of the `console` event",
+  "examples": [
+    {"type":"evt","id":"eaf4d0598443-a.out-./a.out","_channel":"8499188821284","body":{"sourcetype":"console","_time":1643883251.376672,"source":"stderr","host":"eaf4d0598443","proc":"a.out","cmd":"./a.out","pid":986,"data":{"message":"stderr hello world"}}},
+    {"type":"evt","id":"ubuntu-sh- /usr/bin/which /usr/bin/firefox","_channel":"13468365092424","body":{"sourcetype":"console","_time":1643735941.602952,"source":"stdout","host":"ubuntu","proc":"sh","cmd":"/bin/sh /usr/bin/which /usr/bin/firefox","pid":6545,"data":{"message":"/usr/bin/firefox\n"}}}
+  ],
   "required": [
     "type",
     "id",
@@ -43,7 +46,7 @@
           "$ref": "definitions/body.schema.json#/$defs/_time"
         },
         "source": {
-          "$ref": "definitions/body.schema.json#/$defs/sourceconsolestderr"
+          "$ref": "definitions/body.schema.json#/$defs/sourceconsolestderrstdout"
         },
         "host": {
           "$ref": "definitions/data.schema.json#/$defs/host"

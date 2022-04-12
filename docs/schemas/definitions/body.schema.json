@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/definitions/body.schema.json",
   "title": "Schema for the AppScope event/metric body",
-  "description": "Metadata about the process in which AppScope is running",
+  "description": "Metadata about the process in which AppScope is running.",
   "$defs": {
     "_time": {
       "title": "_time",
@@ -68,17 +68,16 @@
       "type": "string",
       "const": "timer"
     },
-    "sourceconsolestdout": {
-      "title": "stdout",
-      "description": "Source - console stdout",
-      "type": "string",
-      "const": "stdout"
+    "sourcefile": {
+      "title": "file",
+      "description": "String that describes a file path.",
+      "type": "string"
     },
-    "sourceconsolestderr": {
-      "title": "stderr",
-      "description": "Source - console stderr",
+    "sourceconsolestderrstdout": {
+      "title": "source",
+      "description": "Specifies whether AppScope is capturing either `stderr` or `stdout` from console.",
       "type": "string",
-      "const": "stderr"
+      "enum": ["stderr", "stdout"]
     },
     "sourcednsduration": {
       "title": "dns.duration",
@@ -88,7 +87,7 @@
     },
     "sourcednsreq": {
       "title": "dns.req",
-      "description": "Source - DNS request",
+      "description": "Source - Net DNS",
       "type": "string",
       "const": "dns.req"
     },
@@ -161,6 +160,12 @@
     "sourcehttpreq" : {
       "title": "http.req",
       "description": "Source - HTTP request",
+      "type": "string",
+      "const": "http.req"
+    },
+    "sourcehttpreqs" : {
+      "title": "http.req",
+      "description": "Source - HTTP requests",
       "type": "string",
       "const": "http.req"
     },
@@ -307,6 +312,12 @@
       "description": "Sourcetype - console",
       "type": "string",
       "const": "console"
+    },
+    "sourcetypefile": {
+      "title": "file",
+      "description": "Sourcetype - file",
+      "type": "string",
+      "const": "file"
     },
     "sourcetypedns": {
       "title": "dns",

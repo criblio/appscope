@@ -31,10 +31,12 @@ scope curl https://google.com
 **Monitor an application that generates a large data set**.
 
 ```
-scope firefox
+scope firefox --no-sandbox
 ```
 
-You can run this and then try [exploring the captured data](#explore-captured).
+We use the `--no-sandbox` option because virtually all modern browsers incorporate the [sandbox](https://web.dev/browser-sandbox/) security mechanism, and some sandbox implementations can interact with AppScope in ways that cause the browser to hang, or not to start.
+
+After you scope the browser, try [exploring the captured data](#explore-captured).
 
 **Scope a series of shell commands**. In the shell that you open in this example, every command you run will be scoped:
 
@@ -181,8 +183,6 @@ fs.error     	7    	Count	operation  	525	class: stat,file: summary,host: 771f60
      0 ┼╯                ╰╯       ╰╯                            ╰╯    ╰╯             ╰╯
 ```
 
-
-
 - Display the last session's captured events with `scope events`:
 
 ```
@@ -234,4 +234,51 @@ ID	COMMAND	CMDLINE                  	PID	AGE   	DURATION	TOTAL EVENTS
 1 	cribl  	/opt/cribl/bin/cribl sta…	50 	2h11m 	2h11m   	6275
 2 	curl   	curl https://google.com  	509	13m30s	206ms   	16
 3 	ps     	ps -ef                   	518	13m18s	22ms    	120
+```
+
+- Scope a command which will produce a variety of events ...
+
+```
+# scope run -- apt update
+Get:1 http://security.ubuntu.com/ubuntu focal-security InRelease [114 kB]
+Get:2 http://archive.ubuntu.com/ubuntu focal InRelease [265 kB]
+Get:3 http://security.ubuntu.com/ubuntu focal-security/restricted amd64 Packages [1027 kB]
+...
+```
+
+- Then, show only the last 10 events of sourcetype `console`, sorted in ascending order by timestamp:
+
+```
+# scope events --sort _time --sourcetype console --last 10 --reverse
+[IHI] Mar 15 16:22:15 apt console stdout message:" 0% [Working]              Get:1 http://security.ubuntu.com/ubuntu focal-security InRelease [114 kB]  0% [Waiting for …"
+[jrL] Mar 15 16:22:15 http console stdout message:"102 Status URI: http://archive.ubuntu.com/ubuntu/dists/focal/InRelease Message: Connecting to archive.ubuntu.com  102…"
+[OUJ] Mar 15 16:22:15 http console stdout message:"102 Status URI: http://security.ubuntu.com/ubuntu/dists/focal-security/InRelease Message: Connecting to security.ubun…"
+[4nT] Mar 15 16:22:16 gpgv console stdout message:"201 URI Done GPGVOutput: GOODSIG 3B4FE6ACC0B21F32  GOODSIG 871920D1991BC93C Signed-By: 790BC7277767219C42C86F933B4FE6…"
+[9WG] Mar 15 16:22:16 gpgv console stdout message:"201 URI Done GPGVOutput: GOODSIG 3B4FE6ACC0B21F32  GOODSIG 871920D1991BC93C Signed-By: 790BC7277767219C42C86F933B4FE6…"
+[hYZ] Mar 15 16:22:16 store console stdout message:"200 URI Start URI: store:/var/lib/apt/lists/partial/security.ubuntu.com_ubuntu_dists_focal-security_restricted_binar…"
+[PmG1] Mar 15 16:22:18 apt console stdout message:" 60% [10 Packages 6535 kB/11.3 MB 58%]                                       78% [Waiting for headers]               …"
+[CVa1] Mar 15 16:22:18 apt console stdout message:" 60% [10 Packages 6535 kB/11.3 MB 58%]                                       78% [Waiting for headers]               …"
+[yC41] Mar 15 16:22:18 http console stdout message:"201 URI Done SHA256-Hash: 200acdc3421757fa8f8759c1cedacae2cf8f5821d7810ca59d8a313c5b3ae71e SHA1-Hash: 28dce64e724849…"
+[oZH1] Mar 15 16:22:20 apt console stdout message:"Building dependency tree         Reading state information... 0%  Reading state information... 48%  Reading state inf…"
+```
+
+- Scope a command which reads and writes over the network:
+  
+```
+# scope curl wttr.in    
+Weather report: San Francisco, California, United States
+
+                Mist
+   _ - _ - _ -  +55(53) °F     
+    _ - _ - _   ↖ 10 mph       
+   _ - _ - _ -  4 mi           
+                0.0 in         
+...
+```
+- Then, show only events containing the string `net_bytes`, and display the fields `net_bytes_sent` and `net_bytes_recv`, with their values:
+
+```
+scope events --fields net_bytes_sent,net_bytes_recv --match net_bytes
+[XG] Mar 15 17:56:38 curl net net.close net_bytes_sent:1 net_bytes_recv:0
+[zf1] Mar 15 17:56:38 curl net net.close net_bytes_sent:71 net_bytes_recv:8844
 ```

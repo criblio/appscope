@@ -1,5 +1,12 @@
 const fs = require('fs/promises');
 const { join, basename } = require('path');
+const { documentPreface, tocOrder, tocHeaders } = require('./layout');
+
+function modifySchemaName(schemaName) {
+  return schemaName
+    .replace(/^(metric|event)\./, '')
+    .replace(/content\.length/, 'content_length');
+}
 
 async function parseFile(filepath) {
   console.log(`Parsing file ${filepath}...`);
@@ -8,7 +15,7 @@ async function parseFile(filepath) {
 
   const result = [];
 
-  result.push(`### ${schemaName}[^](#schema-reference)`);
+  result.push(`### ${modifySchemaName(schemaName)} [^](#schema-reference) {#${schemaName.replace(/\./g, '')}}`);
   if (schema.description) {
     result.push(schema.description);
   }
@@ -23,7 +30,7 @@ async function parseFile(filepath) {
     });
   }
 
-  const propertyStack = [{ name: schemaName, properties: schema.properties, required: schema.required }];
+  const propertyStack = [{ name: schemaName, properties: schema.properties, required: schema.required, baseProps: true }];
 
   while (propertyStack.length) {
     result.push(...parseProperties(propertyStack.shift(), propertyStack));
@@ -35,7 +42,7 @@ async function parseFile(filepath) {
     md: result.join('\n\n')};
 }
 
-function parseProperties({ name, properties = {}, required = []}, propertyStack) {
+function parseProperties({ name, properties = {}, required = [], baseProps = false}, propertyStack) {
   const props = Object.entries(properties).map(([key, value]) => {
     const prp = `\`${key}\` ${required.includes(key) ? '_required_ ' : ''}(\`${value.type}\`)`;
     const description = [
@@ -60,21 +67,32 @@ function parseProperties({ name, properties = {}, required = []}, propertyStack)
         properties: value.properties,
         required: value.required
       });
-      description.push(`_Details [below](#${name.replace(/\./g, '')}${key}-properties)._`);
+      description.push(`_Details [below](#${name.replace(/\./g, '')}${key})._`);
     }
 
     return `| ${prp} | ${description.join('<br/><br/>')} |`;
   });
   return [
-    `#### \`${name}\` properties`,
+    `#### \`${modifySchemaName(name)}\` properties {#${name.replace(/\./g, '')}${baseProps ? 'props' : ''}}`,
     `| Property | Description |\n|---|---|\n${props.join('\n')}`
   ]
 }
 
-function prepareSection(type, mds) {
-  return `## ${type[0].toUpperCase() + type.slice(1)}\n\n` +
-    mds.map(({schemaName}) => `1. [${schemaName}](#${schemaName.replace(/\./g, '')})`).join('\n') +
-    `\n\n${mds.map(e => e.md).join('\n\n<hr/>\n\n')}`;
+function prepareSection(mds) {
+  const toc = [...mds].sort((a, b) => a.order - b.order).reduce(
+    ({toc, lastSection}, {schemaName}) => {
+      const group = schemaName.split('.')[1] || '';
+      if (lastSection !== group) {
+        toc.push(`\n**${tocHeaders[group] || group}**\n`);
+      }
+      toc.push(`- [${modifySchemaName(schemaName)}](#${schemaName.replace(/\./g, '')})`);
+      return {toc, lastSection: group};
+    },
+    { toc: [], lastSection: ''}
+  ).toc.join('\n');
+  const body = mds.map(e => e.md).join('\n\n<hr/>\n\n');
+
+  return { toc: toc.startsWith('\n') ? toc.substring(1) : toc, body };
 }
 
 async function generateOutput(mds, path) {
@@ -85,20 +103,18 @@ async function generateOutput(mds, path) {
     console.log(`Will generate output for ${type}...`);
     if (mds[type].length) {
       const typeName = type[0].toUpperCase() + type.slice(1);
-      toc.push(`1. [${typeName}](#${type})`);
-      result.push(prepareSection(type, mds[type]));
+      const {toc: sectionToC, body} = prepareSection(mds[type]);
+      toc.push(`<div class="toc-cell">\n\n## ${typeName}\n\n${sectionToC}\n\n</div>`);
+      result.push(body);
       console.log('    ...done');
     } else {
       console.log('    ...no entries to process');
     }
   };
-  if (toc.length) {
-    toc.push('\n'); //join will add two new lines at end
-  }
 
   await fs.writeFile(
     join(path, `schema-reference.md`),
-    `---\ntitle: Schema Reference\n---\n\n# Schema Reference\n\n${toc.join('\n')}${result.join('\n\n')}`,
+    `---\ntitle: Schema Reference\n---\n\n# Schema Reference\n\n${documentPreface}\n\n<div class="toc-grid">\n${toc.join('\n')}\n</div>\n\n<hr/>\n\n${result.join('\n\n')}`,
     'utf8');
 }
 
@@ -112,6 +128,7 @@ async function main(tempDir, outPath) {
   const files = (await fs.readdir(tempDir, 'utf8')).filter(f => f.endsWith('.schema.json'));
   for (const filename of files) {
     const section = await parseFile(join(tempDir, filename));
+    section.order = tocOrder.findIndex(v => v === section.schemaName);
     if (filename.startsWith('event_')) {
       output.events.push(section);
     } else if (filename.startsWith('metric_')) {

@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://appscope.dev/docs/schemas/definitions/data.schema.json",
   "title": "Schema for the data field of the AppScope event/metric body",
-  "description": "Metadata about the data within an event or metric",
+  "description": "Metadata about the data within an event or metric.",
   "$defs": {
     "addrs": {
       "title": "addrs",

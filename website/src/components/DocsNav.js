@@ -1,15 +1,19 @@
 import React, { useState } from "react";
 import Helmet from "react-helmet";
-
 import { useStaticQuery, graphql, Link } from "gatsby";
 import "../scss/_docsNav.scss";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Search from "./search";
 import "../utils/font-awesome";
+
 const searchIndices = [{ name: `Pages`, title: `Pages` }];
+const DARK_MODE_KEY = 'DARK_MODE';
+// Check if window is defined (so if in the browser or in node.js).
+const isBrowser = typeof window !== 'undefined';
 
 export default function DocsNav() {
-  const [darkMode, toggleDarkMode] = useState(false);
+  const isDarkMode = isBrowser ? localStorage.getItem(DARK_MODE_KEY) === 'true' : false;
+  const [darkMode, toggleDarkMode] = useState(isDarkMode);
   const [mobileNav, openMobileNav] = useState(false);
   const data = useStaticQuery(graphql`
     query DocumentationNav {
@@ -25,6 +29,13 @@ export default function DocsNav() {
     }
   `);
   const navItems = data.allDocumentationNavYaml.nodes;
+  const darkModeClick = () => {
+    if (isBrowser) {
+      localStorage.setItem(DARK_MODE_KEY, !darkMode);
+    }
+    toggleDarkMode(!darkMode);
+  }
+
   return (
     <>
       <Helmet
@@ -44,9 +55,7 @@ export default function DocsNav() {
         <h4>
           <FontAwesomeIcon
             icon={darkMode ? ["fas", "toggle-on"] : ["fas", "toggle-off"]}
-            onClick={() => {
-              darkMode ? toggleDarkMode(false) : toggleDarkMode(true);
-            }}
+            onClick={darkModeClick}
           />
           <span>{darkMode ? "Light" : "Dark"}</span>
         </h4>

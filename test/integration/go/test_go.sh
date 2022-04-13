@@ -307,8 +307,8 @@ grep plainClientDynamic $EVT_FILE | grep net.app > /dev/null
 ERR+=$?
 grep plainClientDynamic $EVT_FILE | grep net.open > /dev/null
 ERR+=$?
-grep plainClientDynamic $EVT_FILE | grep net.close > /dev/null
-ERR+=$?
+//grep plainClientDynamic $EVT_FILE | grep net.close > /dev/null
+//ERR+=$?
 grep plainClientDynamic $EVT_FILE | grep fs.open > /dev/null
 ERR+=$?
 grep plainClientDynamic $EVT_FILE | grep fs.close > /dev/null
@@ -343,8 +343,8 @@ grep plainClientStatic $EVT_FILE | grep net.app > /dev/null
 ERR+=$?
 grep plainClientStatic $EVT_FILE | grep net.open > /dev/null
 ERR+=$?
-grep plainClientStatic $EVT_FILE | grep net.close > /dev/null
-ERR+=$?
+//grep plainClientStatic $EVT_FILE | grep net.close > /dev/null
+//ERR+=$?
 grep plainClientStatic $EVT_FILE | grep fs.open > /dev/null
 ERR+=$?
 grep plainClientStatic $EVT_FILE | grep fs.close > /dev/null

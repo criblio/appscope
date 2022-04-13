@@ -27,6 +27,9 @@ func main() {
 	}
 
 	// force close the connection to produce a net.close event
-	// without this, we would have to wait for a timeout
-	http.DefaultClient.CloseIdleConnections()
+	// without this, we would have to wait for a timeout;
+	// below is not available in go 1.8
+	//http.DefaultClient.CloseIdleConnections()
+	// alternative is to sleep but that will slow down integration testing
+	// instead, do not expect a net.close event
 }

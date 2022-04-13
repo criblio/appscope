@@ -285,7 +285,7 @@ patch_return_addrs(funchook_t *funchook,
                 // patch the address before the ret instruction to maintain the callee stack context
                 void *pre_patch_addr = (void*)asm_inst[i-1].address;
                 void *patch_addr = (void*)asm_inst[i-1].address;
-                // we aren't dealing with a ret, we can patch the xorps instruction
+                // we aren't dealing with a ret, we must patch the xorps instruction exactly
                 if (!strcmp((const char*)asm_inst[i].mnemonic, "xorps")) {
                     pre_patch_addr = (void*)asm_inst[i].address;
                     patch_addr = (void*)asm_inst[i].address;
@@ -1380,9 +1380,10 @@ c_http_client_write(char *stackaddr)
 {
     int fd = -1;
     stackaddr -= 0x30;
-    uint64_t buf = *(uint64_t *)(stackaddr + 0x40);
     uint64_t w_pc  = *(uint64_t *)(stackaddr + 0x20);
-    uint64_t rc =  *(uint64_t *)(stackaddr + 0x20); // 0x20 -> 0x78??
+    uint64_t buf = *(uint64_t *)(stackaddr + 0x40);
+    //uint64_t rc =  *(uint64_t *)(stackaddr + 0x20); // 0x20 -> 0x78?? // TODO this is not correct
+    uint64_t rc  = *(uint64_t*)(stackaddr + 0x58);
     uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
 
     if (rc < 1) return;

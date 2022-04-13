@@ -148,6 +148,10 @@ ERR+=$?
 grep plainServerDynamic $EVT_FILE | grep http.resp | grep "127.0.0.1" > /dev/null
 ERR+=$?
 
+if [ $ERR -ge 1 ]; then
+    cat $EVT_FILE
+fi
+
 evalPayload
 ERR+=$?
 
@@ -193,6 +197,10 @@ ERR+=$?
 grep plainServerStatic $EVT_FILE | grep http.resp | grep "127.0.0.1" > /dev/null
 ERR+=$?
 
+if [ $ERR -ge 1 ]; then
+    cat $EVT_FILE
+fi
+
 evalPayload
 ERR+=$?
 
@@ -237,6 +245,10 @@ grep tlsServerDynamic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
 grep tlsServerDynamic $EVT_FILE | grep http.resp | grep "127.0.0.1" > /dev/null
 ERR+=$?
+
+if [ $ERR -ge 1 ]; then
+    cat $EVT_FILE
+fi
 
 evalPayload
 ERR+=$?
@@ -284,6 +296,10 @@ ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep http.resp | grep "127.0.0.1" > /dev/null
 ERR+=$?
 
+if [ $ERR -ge 1 ]; then
+    cat $EVT_FILE
+fi
+
 evalPayload
 ERR+=$?
 
@@ -320,6 +336,10 @@ grep plainClientDynamic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
 grep plainClientDynamic $EVT_FILE | grep console > /dev/null
 ERR+=$?
+
+if [ $ERR -ge 1 ]; then
+    cat $EVT_FILE
+fi
 
 evalPayload
 ERR+=$?
@@ -358,6 +378,10 @@ ERR+=$?
 grep plainClientStatic $EVT_FILE | grep console > /dev/null
 ERR+=$?
 
+if [ $ERR -ge 1 ]; then
+    cat $EVT_FILE
+fi
+
 evalPayload
 ERR+=$?
 
@@ -395,6 +419,10 @@ ERR+=$?
 grep tlsClientDynamic $EVT_FILE | grep console > /dev/null
 ERR+=$?
 
+if [ $ERR -ge 1 ]; then
+    cat $EVT_FILE
+fi
+
 evalPayload
 ERR+=$?
 
@@ -431,6 +459,10 @@ grep tlsClientStatic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
 grep tlsClientStatic $EVT_FILE | grep console > /dev/null
 ERR+=$?
+
+if [ $ERR -ge 1 ]; then
+    cat $EVT_FILE
+fi
 
 evalPayload
 ERR+=$?

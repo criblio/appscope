@@ -8,8 +8,9 @@ import (
 
 func main() {
 
-	// ensure the website does not redirect to https
-	resp, err := http.Get("http://gnu.org")
+	// ensure the website does not redirect to https;
+	// also use the www. to avoid an unnecessary redirect
+	resp, err := http.Get("http://www.gnu.org")
 	if err != nil {
 		panic(err)
 	}
@@ -24,4 +25,8 @@ func main() {
 	if err := scanner.Err(); err != nil {
 		panic(err)
 	}
+
+	// force close the connection to produce a net.close event
+	// without this, we would have to wait for a timeout
+	http.DefaultClient.CloseIdleConnections()
 }

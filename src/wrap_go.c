@@ -49,56 +49,151 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 
 int g_go_major_ver = UNKNOWN_GO_VER;
 
-go_offsets_t g_go = {.g_to_m=48,                   // 0x30
-                     .m_to_tls=136,                // 0x88
-                     .connReader_to_conn=0,        // 0x00
-                     .persistConn_to_conn=80,      // 0x50
-                     .persistConn_to_bufrd=104,    // 0x68
-                     .iface_data=8,                // 0x08
-                     .netfd_to_pd=0,               // 0x00
-                     .pd_to_fd=16,                 // 0x10
-                     .netfd_to_sysfd=UNDEF_OFFSET, // 0x10 (defined for go1.8)
-                     .bufrd_to_buf=0,              // 0x00
-                     .conn_to_rwc=16,              // 0x10
-                     .conn_to_tlsState=48,         // 0x30
-                     .persistConn_to_tlsState=96}; // 0x60
-
-tap_t g_go_tap_16[] = {
-    {"syscall.write",                        go_hook_write,        NULL, 0},
-    {"syscall.openat",                       go_hook_open,         NULL, 0},
-    {"syscall.unlinkat",                     go_hook_unlinkat,     NULL, 0},
-    {"syscall.Getdents",                     go_hook_getdents,     NULL, 0},
-    {"syscall.socket",                       go_hook_socket,       NULL, 0},
-    {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
-    {"syscall.read",                         go_hook_read,         NULL, 0},
-    {"syscall.Close",                        go_hook_close,        NULL, 0},
-    {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
-    {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
-    {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0},
-    {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
-    {"runtime.exit",                         go_hook_exit,         NULL, 0},
-    {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
-    {"TAP_TABLE_END", NULL, NULL, 0}
+go_schema_t go_16_schema = {
+    .arg_offsets = {
+        .c_write_fd=8,                    // 0x8
+        .c_write_buf=16,                  // 0x10
+        .c_write_rc=40,                   // 0x28
+        .c_getdents_dirfd=8,              // 0x8
+        .c_getdents_rc=40,                // 0x28
+        .c_unlinkat_dirfd=8,              // 0x8
+        .c_unlinkat_pathname=16,          // 0x10
+        .c_unlinkat_flags=24,             // 0x18
+        .c_open_fd=48,                    // 0x30
+        .c_open_path=16,                  // 0x10
+        .c_close_fd=8,                    // 0x8
+        .c_close_rc=16,                   // 0x10
+        .c_read_fd=8,                     // 0x8
+        .c_read_buf=16,                   // 0x10
+        .c_read_rc=40,                    // 0x28
+        .c_socket_domain=8,               // 0x8
+        .c_socket_type=16,                // 0x10
+        .c_socket_sd=32,                  // 0x20
+        .c_accept4_fd=8,                  // 0x8
+        .c_accept4_addr=16,               // 0x10
+        .c_accept4_addrlen=24,            // 0x18
+        .c_accept4_sd_out=40,             // 0x28
+        .c_http_server_read_connReader=8, // 0x8
+        .c_http_server_read_buf=16,       // 0x10
+        .c_http_server_read_rc=40,        // 0x28
+        .c_http_server_write_stack=0,     // 0x0
+        .c_http_server_write_conn=8,      // 0x8
+        .c_http_server_write_buf=16,      // 0x10
+        .c_http_server_write_rc=40,       // 0x28
+        .c_http_client_write_stack=0,     // 0x0
+        .c_http_client_write_w_pc=8,      // 0x8
+        .c_http_client_write_buf=16,      // 0x10
+        .c_http_client_write_rc=40,       // 0x28
+        .c_http_client_read_stack=0,      // 0x0
+        .c_http_client_read_pc=8,         // 0x8
+    },
+    .struct_offsets = {
+        .g_to_m=48,                   // 0x30
+        .m_to_tls=136,                // 0x88
+        .connReader_to_conn=0,        // 0x00
+        .persistConn_to_conn=80,      // 0x50
+        .persistConn_to_bufrd=104,    // 0x68
+        .iface_data=8,                // 0x08
+        .netfd_to_pd=0,               // 0x00
+        .pd_to_fd=16,                 // 0x10
+        .netfd_to_sysfd=UNDEF_OFFSET, // 0x10 // defined for go1.8
+        .bufrd_to_buf=0,              // 0x00
+        .conn_to_rwc=16,              // 0x10
+        .conn_to_tlsState=48,         // 0x30
+        .persistConn_to_tlsState=96,  // 0x60
+    },
+    .tap = {
+        {"syscall.write",                        go_hook_write,        NULL, 0},
+        {"syscall.openat",                       go_hook_open,         NULL, 0},
+        {"syscall.unlinkat",                     go_hook_unlinkat,     NULL, 0},
+        {"syscall.Getdents",                     go_hook_getdents,     NULL, 0},
+        {"syscall.socket",                       go_hook_socket,       NULL, 0},
+        {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
+        {"syscall.read",                         go_hook_read,         NULL, 0},
+        {"syscall.Close",                        go_hook_close,        NULL, 0},
+        {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
+        {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
+        {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0}, 
+        {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
+        {"runtime.exit",                         go_hook_exit,         NULL, 0},
+        {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
+        {"TAP_TABLE_END", NULL, NULL, 0}
+    },
 };
 
-tap_t g_go_tap_17[] = {
-    {"syscall.write",                        go_hook_write,            NULL, 0},
-    {"syscall.openat",                       go_hook_open,             NULL, 0},
-    {"syscall.unlinkat",                     go_hook_unlinkat,         NULL, 0},
-    {"syscall.Getdents",                     go_hook_getdents,         NULL, 0},
-    {"syscall.socket",                       go_hook_socket,           NULL, 0}, // creates a net object
-    {"syscall.accept4",                      go_hook_accept4,          NULL, 0},
-    {"syscall.read",                         go_hook_read,             NULL, 0},
-    {"syscall.Close",                        go_hook_close,            NULL, 0}, // recycles a net object
-    {"net/http.(*connReader).Read",          go_hook_reg_tls_read,     NULL, 0},
-    {"net/http.checkConnErrorWriter.Write",  go_hook_reg_tls_write,    NULL, 0},
-    {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse, NULL, 0},
-    {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,     NULL, 0},
-    {"runtime.exit",                         go_hook_exit,             NULL, 0},
-    {"runtime.dieFromSignal",                go_hook_die,              NULL, 0},
-    {"TAP_TABLE_END", NULL, NULL, 0}
+go_schema_t go_17_schema = {
+    .arg_offsets = {
+        .c_write_fd=8,                    // 0x8
+        .c_write_buf=16,                  // 0x10
+        .c_write_rc=40,                   // 0x28
+        .c_getdents_dirfd=8,              // 0x8
+        .c_getdents_rc=40,                // 0x28
+        .c_unlinkat_dirfd=8,              // 0x8
+        .c_unlinkat_pathname=16,          // 0x10
+        .c_unlinkat_flags=24,             // 0x18
+        .c_open_fd=56,                    // 0x38 // differs from 16 - i dont see how though
+        .c_open_path=16,                  // 0x10
+        .c_close_fd=8,                    // 0x8
+        .c_close_rc=16,                   // 0x10
+        .c_read_fd=8,                     // 0x8
+        .c_read_buf=16,                   // 0x10
+        .c_read_rc=40,                    // 0x28
+        .c_socket_domain=8,               // 0x8
+        .c_socket_type=16,                // 0x10
+        .c_socket_sd=32,                  // 0x20
+        .c_accept4_fd=8,                  // 0x8
+        .c_accept4_addr=16,               // 0x10
+        .c_accept4_addrlen=24,            // 0x18
+        .c_accept4_sd_out=40,             // 0x28
+        .c_http_server_read_connReader=8, // 0x8
+        .c_http_server_read_buf=16,       // 0x10
+        .c_http_server_read_rc=40,        // 0x28
+        .c_http_server_write_stack=72,    // 0x48 // differs from 16
+        .c_http_server_write_conn=48,     // 0x30 // differs from 16
+        .c_http_server_write_buf=8,       // 0x8  // differs from 16
+        .c_http_server_write_rc=40,       // 0x28
+        .c_http_client_write_stack=48,    // 0x30 // differs from 16
+        .c_http_client_write_w_pc=32,     // 0x20 // differs from 16
+        .c_http_client_write_buf=64,      // 0x40 // differs from 16
+        .c_http_client_write_rc=88,       // 0x58 // differs from 16
+        .c_http_client_read_stack=120,    // 0x78 // differs from 16
+        .c_http_client_read_pc=128,       // 0x80 // differs from 16
+    },
+    .struct_offsets = {
+        .g_to_m=48,                   // 0x30
+        .m_to_tls=136,                // 0x88
+        .connReader_to_conn=0,        // 0x00
+        .persistConn_to_conn=80,      // 0x50
+        .persistConn_to_bufrd=104,    // 0x68
+        .iface_data=8,                // 0x08
+        .netfd_to_pd=0,               // 0x00
+        .pd_to_fd=16,                 // 0x10
+        .netfd_to_sysfd=UNDEF_OFFSET, // 0x10 // defined for go1.8
+        .bufrd_to_buf=0,              // 0x00
+        .conn_to_rwc=16,              // 0x10
+        .conn_to_tlsState=48,         // 0x30
+        .persistConn_to_tlsState=96,  // 0x60
+    },
+    .tap = {
+        {"syscall.write",                        go_hook_write,            NULL, 0},
+        {"syscall.openat",                       go_hook_open,             NULL, 0}, // file open only
+        {"syscall.unlinkat",                     go_hook_unlinkat,         NULL, 0},
+        {"syscall.Getdents",                     go_hook_getdents,         NULL, 0},
+        {"syscall.socket",                       go_hook_socket,           NULL, 0}, // creates a net object
+        {"syscall.accept4",                      go_hook_accept4,          NULL, 0},
+        {"syscall.read",                         go_hook_read,             NULL, 0},
+        {"syscall.Close",                        go_hook_close,            NULL, 0}, // recycles a net object
+        {"net/http.(*connReader).Read",          go_hook_reg_tls_read,     NULL, 0}, // differs from 16
+        {"net/http.checkConnErrorWriter.Write",  go_hook_reg_tls_write,    NULL, 0}, // differs from 16
+        {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse, NULL, 0}, // differs from 16
+        {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,     NULL, 0}, // differs from 16
+        {"runtime.exit",                         go_hook_exit,             NULL, 0},
+        {"runtime.dieFromSignal",                go_hook_die,              NULL, 0},
+        {"TAP_TABLE_END", NULL, NULL, 0}
+    },
 };
 
+go_schema_t *g_go_schema = &go_16_schema;
 uint64_t g_glibc_guard = 0LL;
 uint64_t g_go_static = 0LL;
 static list_t *g_threadlist;
@@ -142,7 +237,7 @@ looks_like_first_inst_of_go_func(cs_insn* asm_inst)
                    (char*)asm_inst->bytes,
                    (char*)asm_inst->mnemonic,
                    (char*)asm_inst->op_str);
-
+        
     return (!strcmp((const char*)asm_inst->mnemonic, "mov") &&
             !strcmp((const char*)asm_inst->op_str, "rcx, qword ptr fs:[0xfffffffffffffff8]"))
         || // -buildmode=pie compiles to this:
@@ -150,7 +245,10 @@ looks_like_first_inst_of_go_func(cs_insn* asm_inst)
          !strcmp((const char*)asm_inst->op_str, "rcx, -8"))
         || // Go 17
         (!strcmp((const char*)asm_inst->mnemonic, "cmp") &&
-         !strcmp((const char*)asm_inst->op_str, "rsp, qword ptr [r14 + 0x10]"));
+         !strcmp((const char*)asm_inst->op_str, "rsp, qword ptr [r14 + 0x10]"))
+        ||
+        (!strcmp((const char*)asm_inst->mnemonic, "lea") &&
+         !strcmp((const char*)asm_inst->op_str, "r12, [rsp - 0x10]"));
 }
 
 static uint32_t
@@ -374,20 +472,20 @@ adjustGoStructOffsetsForVersion(int go_ver)
 
     // go 1.8 has a different m_to_tls offset than other supported versions.
     if (go_ver == 8) {
-        g_go.m_to_tls = 96; // 0x60
+        g_go_schema->struct_offsets.m_to_tls = 96; // 0x60
     }
 
     // go 1.8 is the only version that directly goes from netfd to sysfd.
     if (go_ver == 8) {
-        g_go.netfd_to_sysfd = 16;
+        g_go_schema->struct_offsets.netfd_to_sysfd = 16;
     }
 
     // before go 1.12, persistConn_to_conn and persistConn_to_bufrd
     // have different values than 12 and after
     if (go_ver < 12) {
-        g_go.persistConn_to_conn = 72;  // 0x48
-        g_go.persistConn_to_bufrd = 96; // 0x60
-        g_go.persistConn_to_tlsState=88; // 0x58
+        g_go_schema->struct_offsets.persistConn_to_conn = 72;  // 0x48
+        g_go_schema->struct_offsets.persistConn_to_bufrd = 96; // 0x60
+        g_go_schema->struct_offsets.persistConn_to_tlsState=88; // 0x58
     }
 
 
@@ -408,23 +506,23 @@ adjustGoStructOffsetsForVersion(int go_ver)
     int fd;
     if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
         ((fd = g_fn.open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
-        dprintf(fd, "runtime.g|m=%d|\n", g_go.g_to_m);
-        dprintf(fd, "runtime.m|tls=%d|\n", g_go.m_to_tls);
-        dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go.connReader_to_conn);
-        dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go.persistConn_to_conn);
-        dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go.persistConn_to_bufrd);
-        dprintf(fd, "runtime.iface|data=%d|\n", g_go.iface_data);
+        dprintf(fd, "runtime.g|m=%d|\n", g_go_schema->struct_offsets.g_to_m);
+        dprintf(fd, "runtime.m|tls=%d|\n", g_go_schema->struct_offsets.m_to_tls);
+        dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go_schema->struct_offsets.connReader_to_conn);
+        dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_conn);
+        dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_bufrd);
+        dprintf(fd, "runtime.iface|data=%d|\n", g_go_schema->struct_offsets.iface_data);
         // go 1.8 has a direct netfd_to_sysfd field, others are less direct
-        if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
-            dprintf(fd, "net.netFD|pfd=%d|\n", g_go.netfd_to_pd);
-            dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go.pd_to_fd);
+        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) {
+            dprintf(fd, "net.netFD|pfd=%d|\n", g_go_schema->struct_offsets.netfd_to_pd);
+            dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go_schema->struct_offsets.pd_to_fd);
         } else {
-            dprintf(fd, "net.netFD|sysfd=%d|\n", g_go.netfd_to_sysfd);
+            dprintf(fd, "net.netFD|sysfd=%d|\n", g_go_schema->struct_offsets.netfd_to_sysfd);
         }
-        dprintf(fd, "bufio.Reader|buf=%d|\n", g_go.bufrd_to_buf);
-        dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go.conn_to_rwc);
-        dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go.conn_to_tlsState);
-        dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go.persistConn_to_tlsState);
+        dprintf(fd, "bufio.Reader|buf=%d|\n", g_go_schema->struct_offsets.bufrd_to_buf);
+        dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go_schema->struct_offsets.conn_to_rwc);
+        dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go_schema->struct_offsets.conn_to_tlsState);
+        dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_tlsState);
         g_fn.close(fd);
     }
 
@@ -609,15 +707,11 @@ initGoHook(elf_buf_t *ebuf)
     unsigned int asm_count = 0;
 
     adjustGoStructOffsetsForVersion(g_go_major_ver);
-
-    tap_t *gtap, *tap = NULL;
     if (g_go_major_ver > 16) {
-        gtap = g_go_tap_17;
-    } else {
-        gtap = g_go_tap_16;
+        g_go_schema = &go_17_schema;
     }
 
-    for (tap = gtap; tap->assembly_fn; tap++) {
+    for (tap_t *tap = g_go_schema->tap; tap->assembly_fn; tap++) {
 
         if (asm_inst) {
             cs_free(asm_inst, asm_count);
@@ -672,14 +766,7 @@ initGoHook(elf_buf_t *ebuf)
 static void *
 return_addr(assembly_fn fn)
 {
-    tap_t *gtap, *tap = NULL;
-    if (g_go_major_ver > 16) {
-        gtap = g_go_tap_17;
-    } else {
-        gtap = g_go_tap_16;
-    }
-
-    for (tap = gtap; tap->assembly_fn; tap++) {
+    for (tap_t *tap = g_go_schema->tap; tap->assembly_fn; tap++) {
         if (tap->assembly_fn == fn) return tap->return_addr;
     }
 
@@ -690,14 +777,7 @@ return_addr(assembly_fn fn)
 static uint32_t
 frame_size(assembly_fn fn)
 {
-    tap_t *gtap, *tap = NULL;
-    if (g_go_major_ver > 16) {
-        gtap = g_go_tap_17;
-    } else {
-        gtap = g_go_tap_16;
-    }
-
-    for (tap = gtap; tap->assembly_fn; tap++) {
+    for (tap_t *tap = g_go_schema->tap; tap->assembly_fn; tap++) {
         if (tap->assembly_fn == fn) return tap->frame_size;
     }
 
@@ -767,12 +847,12 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
 
         if (go_g) {
             // get struct m from g and pull out the TLS from 'm'
-            go_m = *((unsigned long *)(go_g + g_go.g_to_m));
+            go_m = *((unsigned long *)(go_g + g_go_schema->struct_offsets.g_to_m));
             go_v = (unsigned long *)go_m;
 
             // first entry in a valid m is a pointer to g
             if (go_v && (*go_v == (unsigned long)go_g)) { //ok to continue;
-                go_tls = (unsigned long)(go_m + g_go.m_to_tls);
+                go_tls = (unsigned long)(go_m + g_go_schema->struct_offsets.m_to_tls);
                 go_v = (unsigned long *)go_tls;
 
                 // is tls set?
@@ -911,12 +991,12 @@ go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
 
         if (go_g) {
             // get struct m from g and pull out the TLS from 'm'
-            go_m = *((unsigned long *)(go_g + g_go.g_to_m));
+            go_m = *((unsigned long *)(go_g + g_go_schema->struct_offsets.g_to_m));
             go_v = (unsigned long *)go_m;
 
             // first entry in a valid m is a pointer to g
             if (go_v && (*go_v == (unsigned long)go_g)) { //ok to continue;
-                go_tls = (unsigned long)(go_m + g_go.m_to_tls);
+                go_tls = (unsigned long)(go_m + g_go_schema->struct_offsets.m_to_tls);
                 go_v = (unsigned long *)go_tls;
 
                 // is tls set?
@@ -1070,9 +1150,9 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
 static void
 c_write(char *stackaddr)
 {
-    uint64_t fd  = *(uint64_t *)(stackaddr + 0x8);
-    uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
-    uint64_t rc =  *(uint64_t *)(stackaddr + 0x28);
+    uint64_t fd  = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_write_fd);
+    uint64_t buf = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_write_buf);
+    uint64_t rc  = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_write_rc);
     uint64_t initialTime = getTime();
 
     funcprint("Scope: write fd %ld rc %ld buf 0x%lx\n", fd, rc, buf);
@@ -1088,8 +1168,8 @@ go_write(char *stackptr)
 static void
 c_getdents(char *stackaddr)
 {
-    uint64_t dirfd  = *(uint64_t *)(stackaddr + 0x8);
-    uint64_t rc     = *(uint64_t *)(stackaddr + 0x28);
+    uint64_t dirfd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_getdents_dirfd);
+    uint64_t rc    = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_getdents_rc);
     uint64_t initialTime = getTime();
 
     funcprint("Scope: getdents dirfd %ld rc %ld\n", dirfd, rc);
@@ -1105,9 +1185,9 @@ go_getdents(char *stackptr)
 static void
 c_unlinkat(char *stackaddr)
 {
-    uint64_t dirfd  = *(uint64_t *)(stackaddr + 0x8);
-    char *pathname = c_str((gostring_t*)(stackaddr + 0x10));
-    uint64_t flags  = *(uint64_t *)(stackaddr + 0x18);
+    uint64_t dirfd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_dirfd);
+    char *pathname = c_str((gostring_t*)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_pathname));
+    uint64_t flags = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_flags);
 
     if (!pathname) {
         scopeLogError("ERROR:go_open: null pathname");
@@ -1130,9 +1210,9 @@ go_unlinkat(char *stackptr)
 static void
 c_open(char *stackaddr)
 {
-    uint64_t fd  = *((uint64_t *)(stackaddr + 0x30));
+    uint64_t fd = *((uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_open_fd));
     // The gostring_t* here has an implicit len field at stackaddr + 0x18
-    char *path = c_str((gostring_t*)(stackaddr + 0x10));
+    char *path  = c_str((gostring_t*)(stackaddr + g_go_schema->arg_offsets.c_open_path));
 
     if (!path) {
         scopeLogError("ERROR:go_open: null pathname");
@@ -1155,8 +1235,8 @@ go_open(char *stackptr)
 static void
 c_close(char *stackaddr)
 {
-    uint64_t fd  = *(uint64_t*)(stackaddr + 0x8);
-    uint64_t rc  = *(uint64_t*)(stackaddr + 0x10);
+    uint64_t fd = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_close_fd);
+    uint64_t rc = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_close_rc);
 
     funcprint("Scope: close of %ld\n", fd);
     doCloseAndReportFailures(fd, (rc != -1), "go_close");
@@ -1171,9 +1251,9 @@ go_close(char *stackptr)
 static void
 c_read(char *stackaddr)
 {
-    uint64_t fd    = *(uint64_t*)(stackaddr + 0x8);
-    uint64_t buf   = *(uint64_t*)(stackaddr + 0x10);
-    uint64_t rc    = *(uint64_t*)(stackaddr + 0x28);
+    uint64_t fd  = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_read_fd);
+    uint64_t buf = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_read_buf);
+    uint64_t rc  = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_read_rc);
     uint64_t initialTime = getTime();
 
     if (rc == -1) return;
@@ -1191,9 +1271,9 @@ go_read(char *stackptr)
 static void
 c_socket(char *stackaddr)
 {
-    uint64_t domain = *(uint64_t*)(stackaddr + 0x08);  // aka family
-    uint64_t type   = *(uint64_t*)(stackaddr + 0x10);
-    uint64_t sd     = *(uint64_t*)(stackaddr + 0x20);
+    uint64_t domain = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_socket_domain);  // aka family
+    uint64_t type   = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_socket_type);
+    uint64_t sd     = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_socket_sd);
 
     if (sd == -1) return;
 
@@ -1210,10 +1290,10 @@ go_socket(char *stackptr)
 static void
 c_accept4(char *stackaddr)
 {
-    uint64_t fd = *(uint64_t*)(stackaddr + 0x8); 
-    struct sockaddr *addr  = *(struct sockaddr **)(stackaddr + 0x10);
-    socklen_t *addrlen = *(socklen_t**)(stackaddr + 0x18);
-    uint64_t sd_out = *(uint64_t*)(stackaddr + 0x28);
+    uint64_t fd           = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_accept4_fd); 
+    struct sockaddr *addr = *(struct sockaddr **)(stackaddr + g_go_schema->arg_offsets.c_accept4_addr);
+    socklen_t *addrlen    = *(socklen_t**)(stackaddr + g_go_schema->arg_offsets.c_accept4_addrlen);
+    uint64_t sd_out       = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_accept4_sd_out);
 
     if (sd_out != -1) {
         funcprint("Scope: accept4 of %ld\n", sd_out);
@@ -1255,19 +1335,19 @@ c_http_server_read(char *stackaddr)
 {
     int fd = -1;
  //   stackaddr -= 0x48;
-    uint64_t connReader = *(uint64_t*)(stackaddr + 0x8); // in the wrong stack ??
+    uint64_t connReader = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_connReader); // in the wrong stack ??
     if (!connReader) return;   // protect from dereferencing null
-    uint64_t buf        = *(uint64_t*)(stackaddr + 0x10);
+    uint64_t buf        = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_buf);
     // buf len 0x18
     // buf cap 0x20
-    uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
+    uint64_t rc         = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_rc);
     uint64_t cr_conn_rwc_if, cr_conn_rwc, netFD, pfd;
 
-    uint64_t conn =  *(uint64_t*)(connReader + g_go.connReader_to_conn);
+    uint64_t conn =  *(uint64_t*)(connReader + g_go_schema->struct_offsets.connReader_to_conn);
     if (!conn) return;         // protect from dereferencing null
 
-    cr_conn_rwc_if = conn + g_go.conn_to_rwc;
-    uint64_t tls =  *(uint64_t*)(conn + g_go.conn_to_tlsState);
+    cr_conn_rwc_if = conn + g_go_schema->struct_offsets.conn_to_rwc;
+    uint64_t tls        = *(uint64_t*)(conn + g_go_schema->struct_offsets.conn_to_tlsState);
 
     /*
      * The rwc net.Conn value can be wrapped as either a *net.TCPConn or
@@ -1280,15 +1360,15 @@ c_http_server_read(char *stackaddr)
      * executables and should no longer be needed.
      */
     if (cr_conn_rwc_if && tls) {
-        cr_conn_rwc = *(uint64_t *)(cr_conn_rwc_if + g_go.iface_data);
-        netFD = *(uint64_t *)(cr_conn_rwc + g_go.iface_data);
+        cr_conn_rwc = *(uint64_t *)(cr_conn_rwc_if + g_go_schema->struct_offsets.iface_data);
+        netFD = *(uint64_t *)(cr_conn_rwc + g_go_schema->struct_offsets.iface_data);
         if (netFD) {
-            pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd);
             if (pfd) {
                 //funcprint("Scope: %s:%d cr %p cr.conn %p cr.conn.rwc_if %p cr.conn.rwc %p netFD %p pfd %p fd %p\n",
                 //          __FUNCTION__, __LINE__, connReader, conn, cr_conn_rwc_if, cr_conn_rwc,
-                //          netFD, pfd, pfd + g_go.pd_to_fd);
-                fd = *(int *)(pfd + g_go.pd_to_fd);
+                //          netFD, pfd, pfd + g_go_schema->struct_offsets.pd_to_fd);
+                fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd);
             }
 
             funcprint("Scope: go_http_server_read of %d\n", fd);
@@ -1322,26 +1402,25 @@ static void
 c_http_server_write(char *stackaddr)
 {
     int fd = -1;
-    stackaddr -= 0x48; // use the same stack as the go code (callee). because caller is using registers
-    uint64_t conn = *(uint64_t*)(stackaddr + 0x30);
+    // use the same stack as the go code (callee). because caller is using registers
+    stackaddr -= g_go_schema->arg_offsets.c_http_server_write_stack; 
+    uint64_t conn = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_conn);
     if (!conn) return;         // protect from dereferencing null
-    uint64_t buf  = *(uint64_t*)(stackaddr + 0x08);
-    // buf len 0x18
-    // buf cap 0x20
-    uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
+    uint64_t buf  = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_buf);
+    uint64_t rc   = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_rc);
     uint64_t w_conn_rwc_if, w_conn_rwc, netFD, pfd;
 
-    w_conn_rwc_if = (conn + g_go.conn_to_rwc);
-    uint64_t tls =  *(uint64_t*)(conn + g_go.conn_to_tlsState);
+    w_conn_rwc_if = (conn + g_go_schema->struct_offsets.conn_to_rwc);
+    uint64_t tls =  *(uint64_t*)(conn + g_go_schema->struct_offsets.conn_to_tlsState);
 
     // conn I/F checking. Ref the comment on c_http_server_read.
     if (w_conn_rwc_if && tls) {
-        w_conn_rwc = *(uint64_t *)(w_conn_rwc_if + g_go.iface_data);
-        netFD = *(uint64_t *)(w_conn_rwc + g_go.iface_data);
+        w_conn_rwc = *(uint64_t *)(w_conn_rwc_if + g_go_schema->struct_offsets.iface_data);
+        netFD = *(uint64_t *)(w_conn_rwc + g_go_schema->struct_offsets.iface_data);
         if (netFD) {
-            pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd);
             if (pfd) {
-                fd = *(int *)(pfd + g_go.pd_to_fd);
+                fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd);
             }
 
             funcprint("Scope: c_http_server_write of %d\n", fd);
@@ -1379,30 +1458,28 @@ static void
 c_http_client_write(char *stackaddr)
 {
     int fd = -1;
-    stackaddr -= 0x30;
-    uint64_t w_pc  = *(uint64_t *)(stackaddr + 0x20);
-    uint64_t buf = *(uint64_t *)(stackaddr + 0x40);
-    //uint64_t rc =  *(uint64_t *)(stackaddr + 0x20); // 0x20 -> 0x78?? // TODO this is not correct
-    uint64_t rc  = *(uint64_t*)(stackaddr + 0x58);
+    stackaddr -= g_go_schema->arg_offsets.c_http_client_write_stack;
+    uint64_t w_pc  = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_w_pc);
+    uint64_t buf   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_buf);
+    uint64_t rc    = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_rc);
     uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
 
     if (rc < 1) return;
 
-    //uint64_t w_pc = *(uint64_t *)(w + 0x38);
-    pc_conn_if = (w_pc + g_go.persistConn_to_conn); // 0x50
-    uint64_t tls =  *(uint64_t*)(w_pc + g_go.persistConn_to_tlsState); //0x60
+    pc_conn_if = (w_pc + g_go_schema->struct_offsets.persistConn_to_conn); 
+    uint64_t tls =  *(uint64_t*)(w_pc + g_go_schema->struct_offsets.persistConn_to_tlsState); 
 
     // conn I/F checking. Ref the comment on c_http_server_read.
     if (pc_conn_if && tls) {
-        w_pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data); //0x08
-        netFD = *(uint64_t *)(w_pc_conn + g_go.iface_data);
+        w_pc_conn = *(uint64_t *)(pc_conn_if + g_go_schema->struct_offsets.iface_data); 
+        netFD = *(uint64_t *)(w_pc_conn + g_go_schema->struct_offsets.iface_data);
         if (!netFD) return;
-        if (g_go.netfd_to_sysfd == UNDEF_OFFSET) { 
-            pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd); //0x00
+        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) { 
+            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd); 
             if (!pfd) return;
-            fd = *(int *)(pfd + g_go.pd_to_fd); //0x10
+            fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd); 
         } else {
-            fd = *(int *)(netFD + g_go.netfd_to_sysfd); //0x10
+            fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
         }
 
         doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
@@ -1441,28 +1518,28 @@ static void
 c_http_client_read(char *stackaddr)
 {
     int fd = -1;
-    stackaddr -= 0x78;
-    uint64_t pc  = *(uint64_t *)(stackaddr + 0x80); // outside the stack frame ??
+    stackaddr -= g_go_schema->arg_offsets.c_http_client_read_stack;
+    uint64_t pc  = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_read_pc); // outside the stack frame ??
     uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, buf = 0, len = 0;
 
-    pc_conn_if = (pc + g_go.persistConn_to_conn);
-    uint64_t tls =  *(uint64_t*)(pc + g_go.persistConn_to_tlsState);
+    pc_conn_if = (pc + g_go_schema->struct_offsets.persistConn_to_conn);
+    uint64_t tls = *(uint64_t*)(pc + g_go_schema->struct_offsets.persistConn_to_tlsState);
 
     // conn I/F checking. Ref the comment on c_http_server_read.
     if (pc_conn_if && tls) {
-        pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
-        netFD = *(uint64_t *)(pc_conn + g_go.iface_data);
+        pc_conn = *(uint64_t *)(pc_conn_if + g_go_schema->struct_offsets.iface_data);
+        netFD = *(uint64_t *)(pc_conn + g_go_schema->struct_offsets.iface_data);
         if (!netFD) return;
-        if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
-            pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) {
+            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd);
             if (!pfd) return;
-            fd = *(int *)(pfd + g_go.pd_to_fd);
+            fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd);
         } else {
-            fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+            fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd);
         }
 
-        if ((pc_br = *(uint64_t *)(pc + g_go.persistConn_to_bufrd)) != 0) {
-            buf = *(uint64_t *)(pc_br + g_go.bufrd_to_buf);
+        if ((pc_br = *(uint64_t *)(pc + g_go_schema->struct_offsets.persistConn_to_bufrd)) != 0) {
+            buf = *(uint64_t *)(pc_br + g_go_schema->struct_offsets.bufrd_to_buf);
             // len is part of the []byte struct; the func doesn't return a len
             len = *(uint64_t *)(pc_br + 0x08);
         }

@@ -49,8 +49,10 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 
 int g_go_major_ver = UNKNOWN_GO_VER;
 
+
 go_schema_t go_16_schema = {
     .arg_offsets = {
+        /*
         .c_write_fd=8,                      // 0x8
         .c_write_buf=16,                    // 0x10
         .c_write_rc=40,                     // 0x28
@@ -84,6 +86,44 @@ go_schema_t go_16_schema = {
         .c_http_client_write_rc=88,         // 0x58
         .c_http_client_read_callee=152,      // 0x98
         .c_http_client_read_pc=8,           // 0x8 
+        */
+
+        .c_write_fd=0x8,                      // 0x
+        .c_write_buf=0x10,                    // 0x
+        .c_write_rc=0x28,                     // 0x
+        .c_getdents_dirfd=0x8,                // 0x
+        .c_getdents_rc=0x28,                  // 0x
+        .c_unlinkat_dirfd=0x8,                // 0x
+        .c_unlinkat_pathname=0x10,            // 0x
+        .c_unlinkat_flags=0x18,               // 0x
+        .c_open_fd=0x30,                      // 0x
+        .c_open_path=0x10,                    // 0x
+        .c_close_fd=0x8,                      // 0x
+        .c_close_rc=0x10,                     // 0x
+        .c_read_fd=0x8,                       // 0x
+        .c_read_buf=0x10,                     // 0x
+        .c_read_rc=0x28,                      // 0x
+        .c_socket_domain=0x8,                 // 0x
+        .c_socket_type=0x10,                  // 0x
+        .c_socket_sd=0x20,                    // 0x
+        .c_accept4_fd=0x8,                    // 0x
+        .c_accept4_addr=0x10,                 // 0x
+        .c_accept4_addrlen=0x18,              // 0x
+        .c_accept4_sd_out=0x28,               // 0x
+        .c_http_server_read_callee=0x0, // 0x
+        .c_http_server_read_connReader=0x8, // 0x
+        .c_http_server_read_buf=0x10,          // 0x
+        .c_http_server_read_rc=0x28,          // 0x
+        .c_http_server_write_callee=0x0,       // 0x
+        .c_http_server_write_conn=0x8,       // 0x
+        .c_http_server_write_buf=0x10,         // 0x
+        .c_http_server_write_rc=0x28,         // 0x
+        .c_http_client_write_callee=0x0,      // 0x
+        .c_http_client_write_w_pc=0x8,       // 0x
+        .c_http_client_write_buf=0x10,         // 0x
+        .c_http_client_write_rc=0x28,         // 0x
+        .c_http_client_read_callee=0x0,      // 0x
+        .c_http_client_read_pc=0x8,           // 0x 
     },
     .struct_offsets = {
         .g_to_m=48,                   // 0x30
@@ -109,10 +149,10 @@ go_schema_t go_16_schema = {
         {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
         {"syscall.read",                         go_hook_read,         NULL, 0},
         {"syscall.Close",                        go_hook_close,        NULL, 0},
-  //      {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
-  //      {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
-  //      {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0}, 
-  //      {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
+        {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
+        {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
+        {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0}, 
+        {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
         {"runtime.exit",                         go_hook_exit,         NULL, 0},
         {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
         {"TAP_TABLE_END", NULL, NULL, 0}
@@ -143,19 +183,19 @@ go_schema_t go_17_schema = {
         .c_accept4_addr=16,                // 0x10
         .c_accept4_addrlen=24,             // 0x18
         .c_accept4_sd_out=56,              // 0x38
-        .c_http_server_read_callee=0,      // 0x0
+        .c_http_server_read_callee=0x48,      // 0x0
         .c_http_server_read_connReader=80, // 0x0
         .c_http_server_read_buf=8,         // 0x8
         .c_http_server_read_rc=40,         // 0x28
-        .c_http_server_write_callee=0,     // 0x0
+        .c_http_server_write_callee=0x48,     // 0x0
         .c_http_server_write_conn=48,      // 0x30
         .c_http_server_write_buf=8,        // 0x8
         .c_http_server_write_rc=16,        // 0x10
-        .c_http_client_write_callee=0,     // 0x0
+        .c_http_client_write_callee=0x30,     // 0x0
         .c_http_client_write_w_pc=32,      // 0x20
         .c_http_client_write_buf=8,        // 0x8
         .c_http_client_write_rc=16,        // 0x10
-        .c_http_client_read_callee=120,    // 0x78
+        .c_http_client_read_callee=0x0,    // 0x78
         .c_http_client_read_pc=8,          // 0x8
     },
     .struct_offsets = {
@@ -923,7 +963,7 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
                 scopeLogError("lstInsert failed");
                 goto out;
             }
-k
+
             sysprint("New thread created for GO TLS = 0x%08lx\n", go_fs);
         } else {
             if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
@@ -1412,9 +1452,13 @@ go_accept4(char *stackptr)
 static void
 c_http_server_read(char *stackaddr)
 {
+    // Take us to the stack frame we're interested in
+    // If this is defined as 0x0, we have decided to stay in the caller stack frame
+    stackaddr -= g_go_schema->arg_offsets.c_http_server_read_callee;
+
     int fd = -1;
- //   stackaddr -= 0x48;
-    uint64_t connReader = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_connReader); // in the wrong stack ??
+
+    uint64_t connReader = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_connReader); 
     if (!connReader) return;   // protect from dereferencing null
     uint64_t buf        = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_buf);
     // buf len 0x18
@@ -1483,9 +1527,11 @@ go_tls_read(char *stackptr)
 static void
 c_http_server_write(char *stackaddr)
 {
+    // Take us to the stack frame we're interested in
+    // If this is defined as 0x0, we have decided to stay in the caller stack frame
+    stackaddr -= g_go_schema->arg_offsets.c_http_server_write_callee;
+
     int fd = -1;
-    // use the same stack as the go code (callee). because caller is using registers
-//    stackaddr -= g_go_schema->arg_offsets.c_http_server_write_stack; 
     uint64_t conn = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_conn);
     if (!conn) return;         // protect from dereferencing null
     uint64_t buf  = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_buf);
@@ -1542,8 +1588,11 @@ go_tls_write(char *stackptr)
 static void
 c_http_client_write(char *stackaddr)
 {
+    // Take us to the stack frame we're interested in
+    // If this is defined as 0x0, we have decided to stay in the caller stack frame
+    stackaddr -= g_go_schema->arg_offsets.c_http_client_write_callee;
+
     int fd = -1;
-  //  stackaddr -= g_go_schema->arg_offsets.c_http_client_write_stack;
     uint64_t w_pc  = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_w_pc);
     uint64_t buf   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_buf);
     uint64_t rc    = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_rc);
@@ -1602,8 +1651,11 @@ go_pc_write(char *stackptr)
 static void
 c_http_client_read(char *stackaddr)
 {
+    // Take us to the stack frame we're interested in
+    // If this is defined as 0x0, we have decided to stay in the caller stack frame
+    stackaddr -= g_go_schema->arg_offsets.c_http_client_read_callee;
+
     int fd = -1;
-  //idk  char *caller_stack = stackaddr + g_go_schema->arg_offsets.c_http_client_read_callee;
     stackaddr += g_go_schema->arg_offsets.c_http_client_read_callee;
     uint64_t pc  = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_read_pc); 
     uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, buf = 0, len = 0;

@@ -4,13 +4,18 @@ import (
 	"bufio"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 func main() {
 
+	client := http.Client{
+		Timeout: 120 * time.Second,
+	}
+
 	// ensure the website does not redirect to https;
 	// also use the www. to avoid an unnecessary redirect
-	resp, err := http.Get("http://www.gnu.org")
+	resp, err := client.Get("http://www.gnu.org")
 	if err != nil {
 		panic(err)
 	}

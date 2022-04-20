@@ -91,6 +91,14 @@
     interpose go_hook_exit, go_exit
     interpose go_hook_die, go_die
 
+    interpose_regs go_hook_reg_write, go_write
+    interpose_regs go_hook_reg_open, go_open
+    interpose_regs go_hook_reg_unlinkat, go_unlinkat
+    interpose_regs go_hook_reg_getdents, go_getdents
+    interpose_regs go_hook_reg_socket, go_socket
+    interpose_regs go_hook_reg_accept4, go_accept4
+    interpose_regs go_hook_reg_read, go_read
+    interpose_regs go_hook_reg_close, go_close
     interpose_regs go_hook_reg_tls_read, go_tls_read
     interpose_regs go_hook_reg_tls_write, go_tls_write
     interpose_regs go_hook_reg_pc_write, go_pc_write

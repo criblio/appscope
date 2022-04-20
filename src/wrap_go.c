@@ -40,8 +40,8 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 
 // compile-time control for debugging
 #define NEEDEVNULL 1
-#define funcprint sysprint
-//#define funcprint devnull
+//#define funcprint sysprint
+#define funcprint devnull
 //#define patchprint sysprint
 #define patchprint devnull
 
@@ -51,41 +51,39 @@ int g_go_major_ver = UNKNOWN_GO_VER;
 
 go_schema_t go_16_schema = {
     .arg_offsets = {
-        .c_write_fd=8,                    // 0x8
-        .c_write_buf=16,                  // 0x10
-        .c_write_rc=40,                   // 0x28
-        .c_getdents_dirfd=8,              // 0x8
-        .c_getdents_rc=40,                // 0x28
-        .c_unlinkat_dirfd=8,              // 0x8
-        .c_unlinkat_pathname=16,          // 0x10
-        .c_unlinkat_flags=24,             // 0x18
-        .c_open_fd=48,                    // 0x30
-        .c_open_path=16,                  // 0x10
-        .c_close_fd=8,                    // 0x8
-        .c_close_rc=16,                   // 0x10
-        .c_read_fd=8,                     // 0x8
-        .c_read_buf=16,                   // 0x10
-        .c_read_rc=40,                    // 0x28
-        .c_socket_domain=8,               // 0x8
-        .c_socket_type=16,                // 0x10
-        .c_socket_sd=32,                  // 0x20
-        .c_accept4_fd=8,                  // 0x8
-        .c_accept4_addr=16,               // 0x10
-        .c_accept4_addrlen=24,            // 0x18
-        .c_accept4_sd_out=40,             // 0x28
-        .c_http_server_read_connReader=8, // 0x8
-        .c_http_server_read_buf=16,       // 0x10
-        .c_http_server_read_rc=40,        // 0x28
-        .c_http_server_write_stack=0,     // 0x0
-        .c_http_server_write_conn=8,      // 0x8
-        .c_http_server_write_buf=16,      // 0x10
-        .c_http_server_write_rc=40,       // 0x28
-        .c_http_client_write_stack=0,     // 0x0
-        .c_http_client_write_w_pc=8,      // 0x8
-        .c_http_client_write_buf=16,      // 0x10
-        .c_http_client_write_rc=40,       // 0x28
-        .c_http_client_read_stack=0,      // 0x0
-        .c_http_client_read_pc=8,         // 0x8
+        .c_write_fd=8,                      // 0x8
+        .c_write_buf=16,                    // 0x10
+        .c_write_rc=40,                     // 0x28
+        .c_getdents_dirfd=8,                // 0x8
+        .c_getdents_rc=32,                  // 0x20
+        .c_unlinkat_dirfd=8,                // 0x8
+        .c_unlinkat_pathname=16,            // 0x10
+        .c_unlinkat_flags=24,               // 0x18
+        .c_open_fd=56,                      // 0x38
+        .c_open_path=16,                    // 0x10
+        .c_close_fd=8,                      // 0x8
+        .c_close_rc=16,                     // 0x10
+        .c_read_fd=8,                       // 0x8
+        .c_read_buf=16,                     // 0x10
+        .c_read_rc=40,                      // 0x28
+        .c_socket_domain=8,                 // 0x8
+        .c_socket_type=16,                  // 0x10
+        .c_socket_sd=32,                    // 0x20
+        .c_accept4_fd=8,                    // 0x8
+        .c_accept4_addr=16,                 // 0x10
+        .c_accept4_addrlen=24,              // 0x18
+        .c_accept4_sd_out=56,               // 0x38
+        .c_http_server_read_connReader=112, // 0x70
+        .c_http_server_read_buf=8,          // 0x8
+        .c_http_server_read_rc=32,          // 0x20
+        .c_http_server_write_conn=96,       // 0x60
+        .c_http_server_write_buf=8,         // 0x8
+        .c_http_server_write_rc=16,         // 0x10
+        .c_http_client_write_w_pc=72,       // 0x48
+        .c_http_client_write_buf=8,         // 0x8
+        .c_http_client_write_rc=88,         // 0x58
+        .c_http_client_read_callee=152,      // 0x98
+        .c_http_client_read_pc=8,           // 0x8 
     },
     .struct_offsets = {
         .g_to_m=48,                   // 0x30
@@ -96,7 +94,7 @@ go_schema_t go_16_schema = {
         .iface_data=8,                // 0x08
         .netfd_to_pd=0,               // 0x00
         .pd_to_fd=16,                 // 0x10
-        .netfd_to_sysfd=UNDEF_OFFSET, // 0x10 // defined for go1.8
+        .netfd_to_sysfd=UNDEF_OFFSET, // 0x10 defined for go1.8
         .bufrd_to_buf=0,              // 0x00
         .conn_to_rwc=16,              // 0x10
         .conn_to_tlsState=48,         // 0x30
@@ -111,10 +109,10 @@ go_schema_t go_16_schema = {
         {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
         {"syscall.read",                         go_hook_read,         NULL, 0},
         {"syscall.Close",                        go_hook_close,        NULL, 0},
-        {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
-        {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
-        {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0}, 
-        {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
+  //      {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
+  //      {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
+  //      {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0}, 
+  //      {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
         {"runtime.exit",                         go_hook_exit,         NULL, 0},
         {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
         {"TAP_TABLE_END", NULL, NULL, 0}
@@ -123,41 +121,42 @@ go_schema_t go_16_schema = {
 
 go_schema_t go_17_schema = {
     .arg_offsets = {
-        .c_write_fd=8,                    // 0x8
-        .c_write_buf=16,                  // 0x10
-        .c_write_rc=40,                   // 0x28
-        .c_getdents_dirfd=8,              // 0x8
-        .c_getdents_rc=40,                // 0x28
-        .c_unlinkat_dirfd=8,              // 0x8
-        .c_unlinkat_pathname=16,          // 0x10
-        .c_unlinkat_flags=24,             // 0x18
-        .c_open_fd=56,                    // 0x38 // differs from 16 - i dont see how though
-        .c_open_path=16,                  // 0x10
-        .c_close_fd=8,                    // 0x8
-        .c_close_rc=16,                   // 0x10
-        .c_read_fd=8,                     // 0x8
-        .c_read_buf=16,                   // 0x10
-        .c_read_rc=40,                    // 0x28
-        .c_socket_domain=8,               // 0x8
-        .c_socket_type=16,                // 0x10
-        .c_socket_sd=32,                  // 0x20
-        .c_accept4_fd=8,                  // 0x8
-        .c_accept4_addr=16,               // 0x10
-        .c_accept4_addrlen=24,            // 0x18
-        .c_accept4_sd_out=40,             // 0x28
-        .c_http_server_read_connReader=8, // 0x8
-        .c_http_server_read_buf=16,       // 0x10
-        .c_http_server_read_rc=40,        // 0x28
-        .c_http_server_write_stack=72,    // 0x48 // differs from 16
-        .c_http_server_write_conn=48,     // 0x30 // differs from 16
-        .c_http_server_write_buf=8,       // 0x8  // differs from 16
-        .c_http_server_write_rc=40,       // 0x28
-        .c_http_client_write_stack=48,    // 0x30 // differs from 16
-        .c_http_client_write_w_pc=32,     // 0x20 // differs from 16
-        .c_http_client_write_buf=64,      // 0x40 // differs from 16
-        .c_http_client_write_rc=88,       // 0x58 // differs from 16
-        .c_http_client_read_stack=120,    // 0x78 // differs from 16
-        .c_http_client_read_pc=128,       // 0x80 // differs from 16
+        .c_write_fd=8,                     // 0x8
+        .c_write_buf=16,                   // 0x10
+        .c_write_rc=40,                    // 0x28
+        .c_getdents_dirfd=8,               // 0x8
+        .c_getdents_rc=32,                 // 0x20
+        .c_unlinkat_dirfd=8,               // 0x8
+        .c_unlinkat_pathname=16,           // 0x10
+        .c_unlinkat_flags=24,              // 0x18
+        .c_open_fd=56,                     // 0x38
+        .c_open_path=16,                   // 0x10
+        .c_close_fd=8,                     // 0x8
+        .c_close_rc=16,                    // 0x10
+        .c_read_fd=8,                      // 0x8
+        .c_read_buf=16,                    // 0x10
+        .c_read_rc=40,                     // 0x28
+        .c_socket_domain=8,                // 0x8
+        .c_socket_type=16,                 // 0x10
+        .c_socket_sd=32,                   // 0x20
+        .c_accept4_fd=8,                   // 0x8
+        .c_accept4_addr=16,                // 0x10
+        .c_accept4_addrlen=24,             // 0x18
+        .c_accept4_sd_out=56,              // 0x38
+        .c_http_server_read_callee=0,      // 0x0
+        .c_http_server_read_connReader=80, // 0x0
+        .c_http_server_read_buf=8,         // 0x8
+        .c_http_server_read_rc=40,         // 0x28
+        .c_http_server_write_callee=0,     // 0x0
+        .c_http_server_write_conn=48,      // 0x30
+        .c_http_server_write_buf=8,        // 0x8
+        .c_http_server_write_rc=16,        // 0x10
+        .c_http_client_write_callee=0,     // 0x0
+        .c_http_client_write_w_pc=32,      // 0x20
+        .c_http_client_write_buf=8,        // 0x8
+        .c_http_client_write_rc=16,        // 0x10
+        .c_http_client_read_callee=120,    // 0x78
+        .c_http_client_read_pc=8,          // 0x8
     },
     .struct_offsets = {
         .g_to_m=48,                   // 0x30
@@ -168,7 +167,7 @@ go_schema_t go_17_schema = {
         .iface_data=8,                // 0x08
         .netfd_to_pd=0,               // 0x00
         .pd_to_fd=16,                 // 0x10
-        .netfd_to_sysfd=UNDEF_OFFSET, // 0x10 // defined for go1.8
+        .netfd_to_sysfd=UNDEF_OFFSET, // 0x10 defined for go1.8
         .bufrd_to_buf=0,              // 0x00
         .conn_to_rwc=16,              // 0x10
         .conn_to_tlsState=48,         // 0x30
@@ -176,17 +175,21 @@ go_schema_t go_17_schema = {
     },
     .tap = {
         {"syscall.write",                        go_hook_write,            NULL, 0},
-        {"syscall.openat",                       go_hook_open,             NULL, 0}, // file open only
+        {"syscall.openat",                       go_hook_open,             NULL, 0}, 
         {"syscall.unlinkat",                     go_hook_unlinkat,         NULL, 0},
         {"syscall.Getdents",                     go_hook_getdents,         NULL, 0},
-        {"syscall.socket",                       go_hook_socket,           NULL, 0}, // creates a net object
-        {"syscall.accept4",                      go_hook_accept4,          NULL, 0},
+        {"syscall.socket",                       go_hook_socket,           NULL, 0}, 
+        {"syscall.accept4",                      go_hook_accept4,          NULL, 0}, // plain server accept
         {"syscall.read",                         go_hook_read,             NULL, 0},
-        {"syscall.Close",                        go_hook_close,            NULL, 0}, // recycles a net object
-        {"net/http.(*connReader).Read",          go_hook_reg_tls_read,     NULL, 0}, // differs from 16
-        {"net/http.checkConnErrorWriter.Write",  go_hook_reg_tls_write,    NULL, 0}, // differs from 16
-        {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse, NULL, 0}, // differs from 16
-        {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,     NULL, 0}, // differs from 16
+        {"syscall.Close",                        go_hook_close,            NULL, 0}, 
+
+        // If we use the register hook functions for these two, we get a seg fault. Why? TODO investigate.
+        {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0}, // tls server read
+        {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0}, // tls server write
+
+        // If we use the stack hook functions for these two, we get a seg fault.
+        {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse,     NULL, 0}, // tls client read
+        {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,         NULL, 0}, // tls client write
         {"runtime.exit",                         go_hook_exit,             NULL, 0},
         {"runtime.dieFromSignal",                go_hook_die,              NULL, 0},
         {"TAP_TABLE_END", NULL, NULL, 0}
@@ -369,8 +372,8 @@ patch_return_addrs(funchook_t *funchook,
 
         // If the current instruction is a RET
         // and previous inst is add or sub, then get the stack frame size.
-        // Or, if the current inst is xorps then proceed without a stack frame size.
-        // If the current inst is not a ret or xorps, don't funchook.
+// Or, if the current inst is xorps then proceed without a stack frame size.
+// If the current inst is not a ret or xorps, don't funchook.
         uint32_t add_arg = 0;
         if (((!strcmp((const char*)asm_inst[i].mnemonic, "ret") &&
               (asm_inst[i].size == 1) &&
@@ -383,11 +386,11 @@ patch_return_addrs(funchook_t *funchook,
                 // patch the address before the ret instruction to maintain the callee stack context
                 void *pre_patch_addr = (void*)asm_inst[i-1].address;
                 void *patch_addr = (void*)asm_inst[i-1].address;
-                // we aren't dealing with a ret, we must patch the xorps instruction exactly
-                if (!strcmp((const char*)asm_inst[i].mnemonic, "xorps")) {
-                    pre_patch_addr = (void*)asm_inst[i].address;
-                    patch_addr = (void*)asm_inst[i].address;
-                }
+// we aren't dealing with a ret, we must patch the xorps instruction exactly
+if (!strcmp((const char*)asm_inst[i].mnemonic, "xorps")) {
+    pre_patch_addr = (void*)asm_inst[i].address;
+    patch_addr = (void*)asm_inst[i].address;
+}
 
                 // all add_arg values within a function should be the same
                 if (tap->frame_size && (tap->frame_size != add_arg)) {
@@ -403,7 +406,7 @@ patch_return_addrs(funchook_t *funchook,
                 tap->return_addr = patch_addr;
                 tap->frame_size = add_arg;
 
-                if ((g_go_major_ver > 16) && !strcmp((const char*)asm_inst[i].mnemonic, "xorps")) break;
+        if ((g_go_major_ver > 16) && !strcmp((const char*)asm_inst[i].mnemonic, "xorps")) break;
         }
     }
     patchprint("\n\n");
@@ -458,6 +461,8 @@ go_major_version(const char *go_runtime_version)
     if (errno || val <= 0 || val > INT_MAX) {
         return UNKNOWN_GO_VER;
     }
+
+    printf("%ld\n", val);
 
     return val;
 }
@@ -918,7 +923,7 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
                 scopeLogError("lstInsert failed");
                 goto out;
             }
-
+k
             sysprint("New thread created for GO TLS = 0x%08lx\n", go_fs);
         } else {
             if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
@@ -1163,6 +1168,13 @@ EXPORTON void *
 go_write(char *stackptr)
 {
     return go_switch(stackptr, c_write, go_hook_write);
+/*
+    if (g_go_major_ver > 16) {
+        return go_switch(stackptr, c_write, go_hook_reg_write);
+    } else {
+        return go_switch(stackptr, c_write, go_hook_write);
+    }
+    */
 }
 
 static void
@@ -1180,39 +1192,57 @@ EXPORTON void *
 go_getdents(char *stackptr)
 {
     return go_switch(stackptr, c_getdents, go_hook_getdents);
+/*
+    if (g_go_major_ver > 16) {
+        return go_switch(stackptr, c_getdents, go_hook_reg_getdents);
+    } else {
+        return go_switch(stackptr, c_getdents, go_hook_getdents);
+    }
+    */
 }
 
 static void
 c_unlinkat(char *stackaddr)
 {
-    uint64_t dirfd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_dirfd);
-    char *pathname = c_str((gostring_t*)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_pathname));
-    uint64_t flags = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_flags);
+    //stackaddr -= 0x60;
+
+    uint64_t dirfd    = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_dirfd);
+    uint64_t pathname = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_pathname);
+    uint64_t flags    = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_flags);
 
     if (!pathname) {
-        scopeLogError("ERROR:go_open: null pathname");
-        puts("Scope:ERROR:open:no pathname");
+        scopeLogError("ERROR:go_unlink: null pathname");
+        puts("Scope:ERROR:unlink:no pathname");
         return;
     }
 
-    funcprint("Scope: unlinkat dirfd %ld pathname %s flags %ld\n", dirfd, pathname, flags);
+    funcprint("Scope: unlinkat dirfd %ld pathname %s flags %ld\n", dirfd, (char *)pathname, flags);
     doDelete(pathname, "go_unlinkat");
 
-    if (pathname) free(pathname);
+  //  if (pathname) free(pathname);
 }
 
 EXPORTON void *
 go_unlinkat(char *stackptr)
 {
     return go_switch(stackptr, c_unlinkat, go_hook_unlinkat);
+/*
+    if (g_go_major_ver > 16) {
+        return go_switch(stackptr, c_unlinkat, go_hook_reg_unlinkat);
+    } else {
+        return go_switch(stackptr, c_unlinkat, go_hook_unlinkat);
+    }
+    */
 }
 
+// Deals with files only. net opens are handles by c_socket
 static void
 c_open(char *stackaddr)
 {
-    uint64_t fd = *((uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_open_fd));
-    // The gostring_t* here has an implicit len field at stackaddr + 0x18
-    char *path  = c_str((gostring_t*)(stackaddr + g_go_schema->arg_offsets.c_open_path));
+//    stackaddr -= 0x90;
+    uint64_t fd    = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_open_fd);
+//    // The gostring_t* here has an implicit len field at stackaddr + 0x18
+    uint64_t path  = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_open_path);
 
     if (!path) {
         scopeLogError("ERROR:go_open: null pathname");
@@ -1223,22 +1253,34 @@ c_open(char *stackaddr)
     funcprint("Scope: open of %ld\n", fd);
     doOpen(fd, path, FD, "open");
 
-    if (path) free(path);
+//    if (path) free(path);
 }
 
 EXPORTON void *
 go_open(char *stackptr)
 {
-    return go_switch(stackptr, c_open, go_hook_open);
+     return go_switch(stackptr, c_open, go_hook_open);
+/*
+    if (g_go_major_ver > 16) {
+        return go_switch(stackptr, c_open, go_hook_reg_open);
+    } else {
+        return go_switch(stackptr, c_open, go_hook_open);
+    }
+    */
+    
 }
 
 static void
 c_close(char *stackaddr)
 {
+  //  stackaddr -= 0x40;
+
     uint64_t fd = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_close_fd);
     uint64_t rc = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_close_rc);
 
     funcprint("Scope: close of %ld\n", fd);
+
+    // If net, deletes a net object
     doCloseAndReportFailures(fd, (rc != -1), "go_close");
 }
 
@@ -1246,11 +1288,20 @@ EXPORTON void *
 go_close(char *stackptr)
 {
     return go_switch(stackptr, c_close, go_hook_close);
+/*
+    if (g_go_major_ver > 16) {
+        return go_switch(stackptr, c_close, go_hook_reg_close);
+    } else {
+        return go_switch(stackptr, c_close, go_hook_close);
+    }
+    */
 }
 
 static void
 c_read(char *stackaddr)
 {
+  //  stackaddr -= 0x50;
+
     uint64_t fd  = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_read_fd);
     uint64_t buf = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_read_buf);
     uint64_t rc  = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_read_rc);
@@ -1266,11 +1317,21 @@ EXPORTON void *
 go_read(char *stackptr)
 {
     return go_switch(stackptr, c_read, go_hook_read);
+
+    /*
+     * if (g_go_major_ver > 16) {
+        return go_switch(stackptr, c_read, go_hook_reg_read);
+    } else {
+        return go_switch(stackptr, c_read, go_hook_read);
+    }
+    */
 }
 
 static void
 c_socket(char *stackaddr)
 {
+ //   stackaddr -= 0x48;
+
     uint64_t domain = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_socket_domain);  // aka family
     uint64_t type   = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_socket_type);
     uint64_t sd     = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_socket_sd);
@@ -1278,6 +1339,8 @@ c_socket(char *stackaddr)
     if (sd == -1) return;
 
     funcprint("Scope: socket domain: %ld type: 0x%lx sd: %ld\n", domain, type, sd);
+
+    // Creates a net object
     addSock(sd, type, domain);
 }
 
@@ -1285,11 +1348,20 @@ EXPORTON void *
 go_socket(char *stackptr)
 {
     return go_switch(stackptr, c_socket, go_hook_socket);
+/*
+    if (g_go_major_ver > 16) {
+        return go_switch(stackptr, c_socket, go_hook_reg_socket);
+    } else {
+        return go_switch(stackptr, c_socket, go_hook_socket);
+    }
+    */
 }
 
 static void
 c_accept4(char *stackaddr)
 {
+  //  stackaddr -= 0x70;
+
     uint64_t fd           = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_accept4_fd); 
     struct sockaddr *addr = *(struct sockaddr **)(stackaddr + g_go_schema->arg_offsets.c_accept4_addr);
     socklen_t *addrlen    = *(socklen_t**)(stackaddr + g_go_schema->arg_offsets.c_accept4_addrlen);
@@ -1305,6 +1377,13 @@ EXPORTON void *
 go_accept4(char *stackptr)
 {
     return go_switch(stackptr, c_accept4, go_hook_accept4);
+/*
+    if (g_go_major_ver > 16) {
+        return go_switch(stackptr, c_accept4, go_hook_reg_accept4);
+    } else {
+        return go_switch(stackptr, c_accept4, go_hook_accept4);
+    }
+    */
 }
 
 /*
@@ -1380,11 +1459,14 @@ c_http_server_read(char *stackaddr)
 EXPORTON void *
 go_tls_read(char *stackptr)
 {
+    return go_switch(stackptr, c_http_server_read, go_hook_tls_read);
+        /*
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_http_server_read, go_hook_reg_tls_read);
     } else {
         return go_switch(stackptr, c_http_server_read, go_hook_tls_read);
     }
+    */
 }
 
 /*
@@ -1403,7 +1485,7 @@ c_http_server_write(char *stackaddr)
 {
     int fd = -1;
     // use the same stack as the go code (callee). because caller is using registers
-    stackaddr -= g_go_schema->arg_offsets.c_http_server_write_stack; 
+//    stackaddr -= g_go_schema->arg_offsets.c_http_server_write_stack; 
     uint64_t conn = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_conn);
     if (!conn) return;         // protect from dereferencing null
     uint64_t buf  = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_buf);
@@ -1432,11 +1514,14 @@ c_http_server_write(char *stackaddr)
 EXPORTON void *
 go_tls_write(char *stackptr)
 {
+    return go_switch(stackptr, c_http_server_write, go_hook_tls_write);
+    /*
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_http_server_write, go_hook_reg_tls_write);
     } else {
         return go_switch(stackptr, c_http_server_write, go_hook_tls_write);
     }
+    */
 }
 
 /*
@@ -1458,7 +1543,7 @@ static void
 c_http_client_write(char *stackaddr)
 {
     int fd = -1;
-    stackaddr -= g_go_schema->arg_offsets.c_http_client_write_stack;
+  //  stackaddr -= g_go_schema->arg_offsets.c_http_client_write_stack;
     uint64_t w_pc  = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_w_pc);
     uint64_t buf   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_buf);
     uint64_t rc    = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_rc);
@@ -1518,8 +1603,9 @@ static void
 c_http_client_read(char *stackaddr)
 {
     int fd = -1;
-    stackaddr -= g_go_schema->arg_offsets.c_http_client_read_stack;
-    uint64_t pc  = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_read_pc); // outside the stack frame ??
+  //idk  char *caller_stack = stackaddr + g_go_schema->arg_offsets.c_http_client_read_callee;
+    stackaddr += g_go_schema->arg_offsets.c_http_client_read_callee;
+    uint64_t pc  = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_read_pc); 
     uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, buf = 0, len = 0;
 
     pc_conn_if = (pc + g_go_schema->struct_offsets.persistConn_to_conn);

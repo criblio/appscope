@@ -230,7 +230,7 @@ go_schema_t go_17_schema = {
         // If we use the stack hook functions for these two, we get a seg fault.
         {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse,     NULL, 0}, // tls client read
         {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,         NULL, 0}, // tls client write
-        {"runtime.exit",                         go_hook_exit,             NULL, 0},
+        {"runtime.exit.abi0",                         go_hook_exit,             NULL, 0},
         {"runtime.dieFromSignal",                go_hook_die,              NULL, 0},
         {"TAP_TABLE_END", NULL, NULL, 0}
     },
@@ -502,8 +502,6 @@ go_major_version(const char *go_runtime_version)
         return UNKNOWN_GO_VER;
     }
 
-    printf("%ld\n", val);
-
     return val;
 }
 
@@ -765,8 +763,10 @@ initGoHook(elf_buf_t *ebuf)
         }
 
         void* orig_func;
-        if (((orig_func = getGoSymbol(ebuf->buf, tap->func_name)) == NULL) &&
-            ((orig_func = getSymbol(ebuf->buf, tap->func_name)) == NULL)) {
+        // Look for the symbol in the ELF symbol table
+        if (((orig_func = getSymbol(ebuf->buf, tap->func_name)) == NULL) &&
+        // Otherwise look in the .gopclntab section
+         ((orig_func = getGoSymbol(ebuf->buf, tap->func_name)) == NULL)) {
             sysprint("ERROR: can't get the address for %s\n", tap->func_name);
             continue;
         }
@@ -1256,7 +1256,7 @@ c_unlinkat(char *stackaddr)
         return;
     }
 
-    funcprint("Scope: unlinkat dirfd %ld pathname %s flags %ld\n", dirfd, (char *)pathname, flags);
+  //  funcprint("Scope: unlinkat dirfd %ld pathname %s flags %ld\n", dirfd, (char *)pathname, flags);
     doDelete(pathname, "go_unlinkat");
 
   //  if (pathname) free(pathname);

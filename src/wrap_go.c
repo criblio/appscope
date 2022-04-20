@@ -230,7 +230,7 @@ go_schema_t go_17_schema = {
         // If we use the stack hook functions for these two, we get a seg fault.
         {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse,     NULL, 0}, // tls client read
         {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,         NULL, 0}, // tls client write
-        {"runtime.exit.abi0",                         go_hook_exit,             NULL, 0},
+        {"runtime.exit.abi0",                    go_hook_exit,             NULL, 0},
         {"runtime.dieFromSignal",                go_hook_die,              NULL, 0},
         {"TAP_TABLE_END", NULL, NULL, 0}
     },
@@ -704,14 +704,14 @@ initGoHook(elf_buf_t *ebuf)
      */
     if (g_go_major_ver > 16) {
         // using the abi0 I/F for syscall based functions in Go >= 1.17
-        if (((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall.abi0")) == 0) &&
-            ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall.abi0")) == 0)) {
+        if (((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall.abi0")) == 0) &&
+            ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall.abi0")) == 0)) {
             sysprint("ERROR: can't get the address for runtime.cgocall\n");
             return; // don't install our hooks
         }
     } else {
-        if (((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) &&
-            ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0)) {
+        if (((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) &&
+            ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall")) == 0)) {
             sysprint("ERROR: can't get the address for runtime.cgocall\n");
             return; // don't install our hooks
         }
@@ -1504,7 +1504,7 @@ EXPORTON void *
 go_tls_read(char *stackptr)
 {
     return go_switch(stackptr, c_http_server_read, go_hook_tls_read);
-        /*
+/*        
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_http_server_read, go_hook_reg_tls_read);
     } else {
@@ -1517,7 +1517,7 @@ go_tls_read(char *stackptr)
   net/http.checkConnErrorWriter.Write
   /usr/local/go/src/net/http/server.go:3433
 
-  conn = stackaddr + 0x08
+  conn (w.c) = stackaddr + 0x08
   conn.rwc_if = conn + 0x10
   conn.rwc = conn.rwc_if + 0x08
   netFD = conn.rwc + 0x08
@@ -1527,6 +1527,7 @@ go_tls_read(char *stackptr)
 static void
 c_http_server_write(char *stackaddr)
 {
+    /*
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
     stackaddr -= g_go_schema->arg_offsets.c_http_server_write_callee;
@@ -1555,13 +1556,14 @@ c_http_server_write(char *stackaddr)
             doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSTX, BUF);
         }
     }
+    */
 }
 
 EXPORTON void *
 go_tls_write(char *stackptr)
 {
     return go_switch(stackptr, c_http_server_write, go_hook_tls_write);
-    /*
+   /* 
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_http_server_write, go_hook_reg_tls_write);
     } else {

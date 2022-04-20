@@ -336,7 +336,7 @@ transportRegisterForExitNotification(void (*fn)(void))
     atexit(fn);
 }
 
-char *
+static char *
 sslErrStr(int ssl_err)
 {
     char * retval = "UNKNOWN ERR";
@@ -367,6 +367,9 @@ sslErrStr(int ssl_err)
             break;
         case SSL_ERROR_SSL:
             retval = "SSL_ERROR_SSL";
+            break;
+        default:
+            DBG(NULL);
             break;
     }
     return retval;

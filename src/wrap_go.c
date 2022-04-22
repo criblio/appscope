@@ -224,12 +224,13 @@ go_schema_t go_17_schema = {
         {"syscall.Close",                        go_hook_close,            NULL, 0}, 
 
         // If we use the register hook functions for these two, we get a seg fault. Why? TODO investigate.
-        {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0}, // tls server read
-        {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0}, // tls server write
+        {"net/http.(*connReader).Read",          go_hook_tls_read,         NULL, 0}, // tls server read
+        {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,        NULL, 0}, // tls server write
 
         // If we use the stack hook functions for these two, we get a seg fault.
-        {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse,     NULL, 0}, // tls client read
-        {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,         NULL, 0}, // tls client write
+        {"net/http.(*persistConn).readResponse", go_hook_readResponse,     NULL, 0}, // tls client read
+        {"net/http.persistConnWriter.Write",     go_hook_pc_write,         NULL, 0}, // tls client write
+
         {"runtime.exit.abi0",                    go_hook_exit,             NULL, 0},
         {"runtime.dieFromSignal",                go_hook_die,              NULL, 0},
         {"TAP_TABLE_END", NULL, NULL, 0}
@@ -811,6 +812,10 @@ initGoHook(elf_buf_t *ebuf)
 static void *
 return_addr(assembly_fn fn)
 {
+    if (g_go_major_ver > 16) {
+        g_go_schema = &go_17_schema;
+    }
+
     for (tap_t *tap = g_go_schema->tap; tap->assembly_fn; tap++) {
         if (tap->assembly_fn == fn) return tap->return_addr;
     }
@@ -822,6 +827,10 @@ return_addr(assembly_fn fn)
 static uint32_t
 frame_size(assembly_fn fn)
 {
+    if (g_go_major_ver > 16) {
+        g_go_schema = &go_17_schema;
+    }
+
     for (tap_t *tap = g_go_schema->tap; tap->assembly_fn; tap++) {
         if (tap->assembly_fn == fn) return tap->frame_size;
     }
@@ -1452,6 +1461,7 @@ go_accept4(char *stackptr)
 static void
 c_http_server_read(char *stackaddr)
 {
+#if 0
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
     stackaddr -= g_go_schema->arg_offsets.c_http_server_read_callee;
@@ -1498,6 +1508,7 @@ c_http_server_read(char *stackaddr)
             doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
         }
     }
+#endif
 }
 
 EXPORTON void *
@@ -1510,7 +1521,7 @@ go_tls_read(char *stackptr)
     } else {
         return go_switch(stackptr, c_http_server_read, go_hook_tls_read);
     }
-    */
+*/ 
 }
 
 /*
@@ -1527,7 +1538,7 @@ go_tls_read(char *stackptr)
 static void
 c_http_server_write(char *stackaddr)
 {
-    /*
+#if 0
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
     stackaddr -= g_go_schema->arg_offsets.c_http_server_write_callee;
@@ -1556,7 +1567,7 @@ c_http_server_write(char *stackaddr)
             doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSTX, BUF);
         }
     }
-    */
+#endif
 }
 
 EXPORTON void *
@@ -1590,6 +1601,7 @@ go_tls_write(char *stackptr)
 static void
 c_http_client_write(char *stackaddr)
 {
+#if 0
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
     stackaddr -= g_go_schema->arg_offsets.c_http_client_write_callee;
@@ -1621,16 +1633,20 @@ c_http_client_write(char *stackaddr)
         doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
         funcprint("Scope: c_http_client_write of %d\n", fd);
     }
+#endif
 }
 
 EXPORTON void *
 go_pc_write(char *stackptr)
 {
+    return go_switch(stackptr, c_http_client_write, go_hook_pc_write);
+    /*
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_http_client_write, go_hook_reg_pc_write);
     } else {
         return go_switch(stackptr, c_http_client_write, go_hook_pc_write);
     }
+    */
 }
 
 /*
@@ -1653,6 +1669,7 @@ go_pc_write(char *stackptr)
 static void
 c_http_client_read(char *stackaddr)
 {
+#if 0
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
     stackaddr -= g_go_schema->arg_offsets.c_http_client_read_callee;
@@ -1689,16 +1706,20 @@ c_http_client_read(char *stackaddr)
             funcprint("Scope: c_http_client_read of %d\n", fd);
         }
     }
+#endif
 }
 
 EXPORTON void *
 go_readResponse(char *stackptr)
 {
+    return go_switch(stackptr, c_http_client_read, go_hook_readResponse);
+   /* 
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_http_client_read, go_hook_reg_readResponse);
     } else {
         return go_switch(stackptr, c_http_client_read, go_hook_readResponse);
     }
+   */ 
 }
 
 extern void handleExit(void);

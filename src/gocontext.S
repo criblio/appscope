@@ -55,23 +55,34 @@
 .global \a_func
 .hidden \c_func
 \a_func:
-    mov %rsp, %r11
     push %rax
     push %rbx
+    sub $0x20, %rsp
+//    mov %rbp,0x18(%rsp)
+//    lea 0x18(%rsp),%rbp
 
-    mov %r11, %rbx
+    mov %rsp, %r11
+    add $0x28, %r11
+    mov %r11, 0x08(%rsp)
     lea \c_func@GOTPCREL(%rip), %r11
     mov (%r11), %r11
-    mov %r11, %rax
+    mov %r11, (%rsp)
 
     lea go_runtime_cgocall_regs@GOTPCREL(%rip), %r11
     mov (%r11), %r11
     mov (%r11), %r11
     call *%r11
+//    xorps %xmm15,%xmm15
+//    mov %fs:0xfffffffffffffff8,%r14
+
     mov %rax, %r11
 
+    mov 0x10(%rsp),%eax
+//    mov 0x18(%rsp),%rbp
+    add $0x20, %rsp
     pop %rbx
     pop %rax
+
     jmp *%r11
 .endm
 
@@ -84,10 +95,10 @@
     interpose go_hook_accept4, go_accept4
     interpose go_hook_read, go_read
     interpose go_hook_close, go_close
-    interpose go_hook_tls_read, go_tls_read
-    interpose go_hook_tls_write, go_tls_write
-    interpose go_hook_readResponse, go_readResponse
-    interpose go_hook_pc_write, go_pc_write
+//    interpose go_hook_tls_read, go_tls_read
+//    interpose go_hook_tls_write, go_tls_write
+//    interpose go_hook_readResponse, go_readResponse
+//    interpose go_hook_pc_write, go_pc_write
     interpose go_hook_exit, go_exit
     interpose go_hook_die, go_die
 
@@ -169,3 +180,136 @@ go_hook_reg_pc_write:
     pop %rax
     jmp *%r11
 */
+
+
+
+.global go_hook_readResponse
+go_hook_readResponse:   
+    push %rax
+    push %rbx
+    sub $0x20, %rsp
+//    mov %rbp,0x18(%rsp)
+//    lea 0x18(%rsp),%rbp
+
+    mov %rsp, %r11
+    add $0x28, %r11
+    mov %r11, 0x08(%rsp)
+    lea go_readResponse@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov %r11, (%rsp)
+
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+//    xorps %xmm15,%xmm15
+//    mov %fs:0xfffffffffffffff8,%r14
+
+    mov %rax, %r11
+
+    mov 0x10(%rsp),%eax
+//    mov 0x18(%rsp),%rbp
+    add $0x20, %rsp
+    pop %rbx
+    pop %rax
+
+    jmp *%r11
+
+
+.global go_hook_pc_write
+go_hook_pc_write:   
+    push %rax
+    push %rbx
+    sub $0x20, %rsp
+//    mov %rbp,0x18(%rsp)
+//    lea 0x18(%rsp),%rbp
+
+    mov %rsp, %r11
+    add $0x28, %r11
+    mov %r11, 0x08(%rsp)
+    lea go_pc_write@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov %r11, (%rsp)
+
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+//    xorps %xmm15,%xmm15
+//    mov %fs:0xfffffffffffffff8,%r14
+
+    mov %rax, %r11
+
+    mov 0x10(%rsp),%eax
+//    mov 0x18(%rsp),%rbp
+    add $0x20, %rsp
+    pop %rbx
+    pop %rax
+
+    jmp *%r11
+
+
+.global go_hook_tls_read
+go_hook_tls_read:   
+    push %rax
+    push %rbx
+    sub $0x20, %rsp
+//    mov %rbp,0x18(%rsp)
+//    lea 0x18(%rsp),%rbp
+
+    mov %rsp, %r11
+    add $0x28, %r11
+    mov %r11, 0x08(%rsp)
+    lea go_tls_read@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov %r11, (%rsp)
+
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+//    xorps %xmm15,%xmm15
+//    mov %fs:0xfffffffffffffff8,%r14
+
+    mov %rax, %r11
+
+    mov 0x10(%rsp),%eax
+//    mov 0x18(%rsp),%rbp
+    add $0x20, %rsp
+    pop %rbx
+    pop %rax
+
+    jmp *%r11
+
+
+.global go_hook_tls_write
+go_hook_tls_write:   
+    push %rax
+    push %rbx
+    sub $0x20, %rsp
+//    mov %rbp,0x18(%rsp)
+//    lea 0x18(%rsp),%rbp
+
+    mov %rsp, %r11
+    add $0x28, %r11
+    mov %r11, 0x08(%rsp)
+    lea go_tls_write@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov %r11, (%rsp)
+
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+//    xorps %xmm15,%xmm15
+//    mov %fs:0xfffffffffffffff8,%r14
+
+    mov %rax, %r11
+
+    mov 0x10(%rsp),%eax
+//    mov 0x18(%rsp),%rbp
+    add $0x20, %rsp
+    pop %rbx
+    pop %rax
+
+    jmp *%r11

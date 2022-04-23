@@ -10,7 +10,7 @@ void freeaddrinfo(struct addrinfo *p)
 	for (cnt=1; p->ai_next; cnt++, p=p->ai_next);
 	struct aibuf *b = (void *)((char *)p - offsetof(struct aibuf, ai));
 	b -= b->slot;
-	LOCK(b->lock);
+	// LOCK(b->lock);
 	if (!(b->ref -= cnt)) free(b);
-	else UNLOCK(b->lock);
+	// else UNLOCK(b->lock);
 }

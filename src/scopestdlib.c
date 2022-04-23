@@ -127,6 +127,7 @@ extern int             scopelibc_poll(struct pollfd *, nfds_t, int);
 extern int             scopelibc_select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
 extern int             scopelibc_getaddrinfo(const char *, const char *, const struct addrinfo *, struct addrinfo **);
 extern void            scopelibc_freeaddrinfo(struct addrinfo *);
+extern int             scopelibc_copyaddrinfo(struct sockaddr *, socklen_t, struct addrinfo **);
 extern int             scopelibc_getnameinfo(const struct sockaddr *, socklen_t, char *, socklen_t, char *, socklen_t, int);
 extern int             scopelibc_getpeername(int, struct sockaddr *, socklen_t *);
 extern struct hostent* scopelibc_gethostbyname(const char *);
@@ -738,6 +739,11 @@ scope_select(int nfds, fd_set *restrict readfds, fd_set *restrict writefds, fd_s
 int
 scope_getaddrinfo(const char *restrict node, const char *restrict service, const struct addrinfo *restrict hints, struct addrinfo **restrict res) {
     return scopelibc_getaddrinfo(node, service, hints, res);
+}
+
+int
+scope_copyaddrinfo(struct sockaddr *addr, socklen_t addrlen, struct addrinfo **restrict res) {
+    return scopelibc_copyaddrinfo(addr, addrlen, res);
 }
 
 void

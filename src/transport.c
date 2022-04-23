@@ -479,15 +479,7 @@ static struct addrinfo *
 getExistingConnectionAddr(transport_t *trans)
 {
     struct addrinfo *ai = NULL;
-
-    if (transportNeedsConnection(trans) || trans->type != CFG_TCP) goto err;
-
-    // Allocate what we need to be compatible with freeaddrinfo()
-    ai = scope_calloc(1, sizeof(struct addrinfo));
-    if (!ai) {
-        DBG(NULL);
-        goto err;
-    }
+    if (transportNeedsConnection(trans) || trans->type != CFG_TCP) goto exit;
 
     // Clear the address value
     socklen_t addrsize = sizeof(trans->net.gai_addr);
@@ -495,26 +487,18 @@ getExistingConnectionAddr(transport_t *trans)
     scope_memset(addr, 0, addrsize);
 
     // lookup the address
-    if (getpeername(trans->net.sock, addr, &addrsize)) {
+    if (scope_getpeername(trans->net.sock, addr, &addrsize)) {
         DBG(NULL);
-        goto err;
+        goto exit;
     }
 
-    // Set all the fields
-    ai->ai_flags = 0;                  // Unused by us
-    ai->ai_family = addr->sa_family;
-    ai->ai_socktype = SOCK_STREAM;
-    ai->ai_protocol = IPPROTO_TCP;
-    ai->ai_addrlen = addrsize;
-    ai->ai_addr = addr;
-    ai->ai_canonname = NULL;           // Unused by us
-    ai->ai_next = NULL;
+    int res = scope_copyaddrinfo(addr, addrsize, &ai);
+    if (res) {
+        DBG(NULL);
+    }
 
+exit:
     return ai;
-
-err:
-    if (ai) scope_free(ai);
-    return NULL;
 }
 
 

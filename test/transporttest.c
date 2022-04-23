@@ -556,6 +556,36 @@ transportSendForFileWritesToFileImmediatelyWhenLineBuffered(void** state)
         fail_msg("Couldn't delete test file %s", path);
 }
 
+static void
+TransportTcpReconnect(void** state)
+{
+    const int port_test = 7890;
+    const int max_try = 100;
+    char port_test_str[5];
+    int server_fd, res, i;
+    struct sockaddr_in server;
+    res = scope_snprintf(port_test_str, sizeof(port_test_str), "%d", port_test);
+    assert_in_range(res, 1, sizeof(port_test_str)-1);
+    for (i = 0; i < max_try; ++i) {
+        server_fd = scope_socket(AF_INET, SOCK_STREAM, 0);
+        assert_int_not_equal(-1, server_fd);
+        server.sin_family = AF_INET;
+        server.sin_addr.s_addr = INADDR_ANY;
+        server.sin_port = scope_htons(port_test);
+
+        res = scope_bind(server_fd,(struct sockaddr *)&server , sizeof(server));
+        assert_int_equal(0, res);
+        res = scope_listen(server_fd, 10);
+        assert_int_equal(0, res);
+
+        transport_t* t = transportCreateTCP("127.0.0.1", port_test_str, FALSE, FALSE, NULL);
+        assert_non_null(t);
+        assert_false(transportNeedsConnection(t));
+        transportReconnect(t);
+        transportDestroy(&t);
+        scope_close(server_fd);
+    }
+}
 
 int
 main(int argc, char* argv[])
@@ -591,6 +621,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(transportSendForFilepathUnixFailedTransmitsMsg),
         cmocka_unit_test(transportSendForFileWritesToFileAfterFlushWhenFullyBuffered),
         cmocka_unit_test(transportSendForFileWritesToFileImmediatelyWhenLineBuffered),
+        cmocka_unit_test(TransportTcpReconnect),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

@@ -172,6 +172,7 @@ ssize_t         scope_recvfrom(int, void *, size_t, int, struct sockaddr *, sock
 int             scope_poll(struct pollfd *, nfds_t, int);
 int             scope_select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
 int             scope_getaddrinfo(const char *, const char *, const struct addrinfo *, struct addrinfo **);
+int             scope_copyaddrinfo(struct sockaddr *, socklen_t, struct addrinfo **);
 void            scope_freeaddrinfo(struct addrinfo *);
 int             scope_getnameinfo(const struct sockaddr *, socklen_t, char *, socklen_t, char *, socklen_t, int);
 int             scope_getpeername(int, struct sockaddr *, socklen_t *);

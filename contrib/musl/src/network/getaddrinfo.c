@@ -133,3 +133,23 @@ int getaddrinfo(const char *restrict host, const char *restrict serv, const stru
 	*res = &out->ai;
 	return 0;
 }
+
+
+int copyaddrinfo(struct sockaddr *addr, socklen_t addrlen, struct addrinfo **restrict res)
+{
+	struct aibuf *out;
+	int nais = 1;
+	out = calloc(1, nais * sizeof(*out) + 1);
+	out[0].slot = 0;
+	out[0].ai = (struct addrinfo){
+			.ai_family = addr->sa_family,
+			.ai_socktype = SOCK_STREAM,
+			.ai_protocol = IPPROTO_TCP,
+			.ai_addrlen = addrlen,
+			.ai_addr = addr,
+			.ai_canonname = NULL,
+			.ai_next = NULL };
+	out[0].ref = nais;
+	*res = &out->ai;
+	return 0;
+}

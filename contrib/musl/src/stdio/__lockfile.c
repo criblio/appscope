@@ -1,9 +1,11 @@
 #include "stdio_impl.h"
 #include "pthread_impl.h"
 
+extern pid_t gettid(void);
+
 int __lockfile(FILE *f)
 {
-	int owner = f->lock, tid = __pthread_self()->tid;
+    int owner = f->lock, tid = gettid();
 	if ((owner & ~MAYBE_WAITERS) == tid)
 		return 0;
 	owner = a_cas(&f->lock, 0, tid);

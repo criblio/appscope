@@ -4,5 +4,5 @@
 
 pid_t gettid(void)
 {
-	return __pthread_self()->tid;
+    return __syscall(SYS_gettid);
 }

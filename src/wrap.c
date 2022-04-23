@@ -4390,7 +4390,17 @@ fork()
 
     WRAP_CHECK(fork, -1);
     scopeLog(CFG_LOG_DEBUG, "fork");
+    // fork duplicates only the thread that calls it. This generate the following problem
+    // we need to ensure that only the thread which calls the fork hold all the locks.
+    // In other situation we will hit the deadlock since the child can try to use a lock
+    // which is locked in parent and no thread will be able to unlock it from child
+    //
+    // P1(parent)          P2(child)
+    // T1 (fork)    ->     T1
+    // T2 (lock)
+    scope_op_before_fork();
     rc = g_fn.fork();
+    scope_op_after_fork(rc);
     if (rc == 0) {
         // We are the child proc
         doReset();

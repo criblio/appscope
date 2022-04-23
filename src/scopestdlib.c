@@ -9,6 +9,10 @@
 #include <string.h>
 
 
+// Internal standard library references
+extern void  scopelibc_lock_before_fork_op(void);
+extern void  scopelibc_unlock_after_fork_op(int);
+
 // Memory management handling operations
 extern void*  scopelibc_memalign(size_t, size_t);
 extern void*  scopelibc_malloc(size_t);
@@ -184,6 +188,18 @@ extern int           scopelibc_tcgetattr(int, struct termios *);
 extern void*         scopelibc_shmat(int, const void *, int);
 extern int           scopelibc_shmdt(const void *);
 extern int           scopelibc_shmget(key_t, size_t, int);
+
+// Fork handling operations
+
+void
+scope_op_before_fork(void) {
+    scopelibc_lock_before_fork_op();
+}
+
+void
+scope_op_after_fork(int who) {
+    scopelibc_unlock_after_fork_op(who);
+}
 
 // Memory management handling operations
 

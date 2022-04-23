@@ -56,6 +56,9 @@ extern FILE scopelibc___stderr_FILE;
 #define scope_stdout   (&scopelibc___stdout_FILE)
 #define scope_stderr   (&scopelibc___stderr_FILE)
 
+void  scope_op_before_fork(void);
+void  scope_op_after_fork(int);
+
 // Memory management handling operations
 void* scope_memalign(size_t, size_t);
 void* scope_malloc(size_t);

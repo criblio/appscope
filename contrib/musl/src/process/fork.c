@@ -84,3 +84,17 @@ pid_t fork(void)
 	if (ret<0) errno = errno_save;
 	return ret;
 }
+
+void lock_before_fork_op(void) {
+	for (int i=0; i<sizeof atfork_locks/sizeof *atfork_locks; i++)
+		if (*atfork_locks[i]) LOCK(*atfork_locks[i]);
+	__malloc_atfork(-1);
+}
+
+void unlock_after_fork_op(int ret) {
+	__malloc_atfork(!ret);
+	for (int i=0; i<sizeof atfork_locks/sizeof *atfork_locks; i++)
+		if (*atfork_locks[i])
+			if (ret) UNLOCK(*atfork_locks[i]);
+			else **atfork_locks[i] = 0;
+}

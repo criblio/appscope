@@ -78,9 +78,6 @@ SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))
 SRC_C_FILES:=$(filter-out src/sysexec.c, $(SRC_C_FILES))
 SRC_C_FILES:=$(filter-out src/wrap_go.c, $(SRC_C_FILES))
 SRC_C_FILES:=$(filter-out src/scope_static.c, $(SRC_C_FILES))
-ifeq (aarch64,$(ARCH))
-SRC_C_FILES:=$(filter-out src/bashmem.c, $(SRC_C_FILES))
-endif
 TEST_C_FILES:=$(wildcard test/*.c)
 TEST_C_FILES:=$(filter-out test/wraptest.c, $(TEST_C_FILES))
 C_FILES:=$(SRC_C_FILES) $(TEST_C_FILES) os/$(OS)/os.c

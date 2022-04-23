@@ -2,7 +2,7 @@ ARG GO_IMAGE_VER=golang:1.14
 FROM $GO_IMAGE_VER
 
 RUN apt-get -o Acquire::Check-Valid-Until=false update && \
-    apt-get install -y vim curl file bsdmainutils
+    apt-get install -y vim curl file bsdmainutils gdb
 
 COPY ./go/test_go.sh /go
 COPY ./go/test_go_struct.sh /go
@@ -70,6 +70,7 @@ COPY ./go/influx/influxdb-selfsigned.crt /etc/ssl/.
 
 ENV SCOPE_CRIBL_ENABLE=false
 ENV SCOPE_LOG_LEVEL=error
+ENV SCOPE_LOG_DEST=file:///tmp/scope.log
 ENV SCOPE_METRIC_VERBOSITY=4
 ENV SCOPE_EVENT_LOGFILE=true
 ENV SCOPE_EVENT_CONSOLE=true

@@ -3,7 +3,7 @@
 #
 # The `contrib/` folder contains a number of external dependencies we keep
 # locally to ensure things don't change under us. The logic here builds them.
-#
+# 
 # To support caching the results, we build most of these into subdirectories of
 # `./build/` and try not to make any changes/additions in the source folders
 # themselves. In CI, we can hash the source folder to get a key for caching the
@@ -106,6 +106,7 @@ build/musl/lib/libc.a:
 	@mkdir build/musl
 # To enable debug please add below --enable-debug --enable-optimize=no
 	cd build/musl && ../../musl/configure --disable-shared --disable-wrapper && $(MAKE)
+	cp build/musl/lib/libc.a build/musl/lib/libc_orig.a
 	objcopy --prefix-symbols=scopelibc_ build/musl/lib/libc.a
 # TODO verify if the code below be done via mfloat-abi=soft not sure if aarch64 support soft though
 # https://developer.arm.com/documentation/dui0774/b/compiler-command-line-options/-mfloat-abi

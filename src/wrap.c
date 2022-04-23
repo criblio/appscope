@@ -5002,50 +5002,6 @@ getaddrinfo(const char *node, const char *service,
     return rc;
 }
 
-// This was added to avoid having libscope.so depend on GLIBC_2.25.
-// libssl.a or libcrypto.a need getentropy which only exists in
-// GLIBC_2.25 and newer.
-EXPORTON int
-getentropy(void *buffer, size_t length)
-{
-    if (SYMBOL_LOADED(getentropy)) {
-        return g_fn.getentropy(buffer, length);
-    }
-
-    // Must be something older than GLIBC_2.25...
-    // Looks like we're on the hook for this.
-
-#ifndef SYS_getrandom
-    errno = ENOSYS;
-    return -1;
-#else
-    if (length > 256) {
-        errno = EIO;
-        return -1;
-    }
-
-    int cancel;
-    int ret = 0;
-    char *pos = buffer;
-    pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &cancel);
-    while (length) {
-        ret = syscall(SYS_getrandom, pos, length, 0);
-        if (ret < 0) {
-            if (errno == EINTR) {
-                continue;
-            } else {
-                break;
-            }
-        }
-        pos += ret;
-        length -= ret;
-        ret = 0;
-    }
-    pthread_setcancelstate(cancel, 0);
-    return ret;
-#endif
-}
-
 #define LOG_BUF_SIZE 4096
 #define LOG_TIME_SIZE 23
 #define LOG_TZ_BUF_SIZE 7

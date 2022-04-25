@@ -214,22 +214,22 @@ go_schema_t go_17_schema = {
         .persistConn_to_tlsState=96,  // 0x60
     },
     .tap = {
-        {"syscall.write",                        go_hook_write,            NULL, 0},
-        {"syscall.openat",                       go_hook_open,             NULL, 0}, 
-        {"syscall.unlinkat",                     go_hook_unlinkat,         NULL, 0},
-        {"syscall.Getdents",                     go_hook_getdents,         NULL, 0},
-        {"syscall.socket",                       go_hook_socket,           NULL, 0}, 
-        {"syscall.accept4",                      go_hook_accept4,          NULL, 0}, // plain server accept
-        {"syscall.read",                         go_hook_read,             NULL, 0},
-        {"syscall.Close",                        go_hook_close,            NULL, 0}, 
+        {"syscall.write",                        go_hook_reg_write,            NULL, 0},
+        {"syscall.openat",                       go_hook_reg_open,             NULL, 0}, 
+        {"syscall.unlinkat",                     go_hook_reg_unlinkat,         NULL, 0},
+        {"syscall.Getdents",                     go_hook_reg_getdents,         NULL, 0},
+        {"syscall.socket",                       go_hook_reg_socket,           NULL, 0}, 
+        {"syscall.accept4",                      go_hook_reg_accept4,          NULL, 0}, // plain server accept
+        {"syscall.read",                         go_hook_reg_read,             NULL, 0},
+        {"syscall.Close",                        go_hook_reg_close,            NULL, 0}, 
 
         // If we use the register hook functions for these two, we get a seg fault. Why? TODO investigate.
-        {"net/http.(*connReader).Read",          go_hook_tls_read,         NULL, 0}, // tls server read
-        {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,        NULL, 0}, // tls server write
+        {"net/http.(*connReader).Read",          go_hook_reg_tls_read,         NULL, 0}, // tls server read
+        {"net/http.checkConnErrorWriter.Write",  go_hook_reg_tls_write,        NULL, 0}, // tls server write
 
         // If we use the stack hook functions for these two, we get a seg fault.
-        {"net/http.(*persistConn).readResponse", go_hook_readResponse,     NULL, 0}, // tls client read
-        {"net/http.persistConnWriter.Write",     go_hook_pc_write,         NULL, 0}, // tls client write
+        {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse,     NULL, 0}, // tls client read
+        {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,         NULL, 0}, // tls client write
 
         {"runtime.exit.abi0",                    go_hook_exit,             NULL, 0},
         {"runtime.dieFromSignal",                go_hook_die,              NULL, 0},
@@ -1216,14 +1216,14 @@ c_write(char *stackaddr)
 EXPORTON void *
 go_write(char *stackptr)
 {
-    return go_switch(stackptr, c_write, go_hook_write);
-/*
+//    return go_switch(stackptr, c_write, go_hook_write);
+
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_write, go_hook_reg_write);
     } else {
         return go_switch(stackptr, c_write, go_hook_write);
     }
-    */
+    
 }
 
 static void
@@ -1240,14 +1240,14 @@ c_getdents(char *stackaddr)
 EXPORTON void *
 go_getdents(char *stackptr)
 {
-    return go_switch(stackptr, c_getdents, go_hook_getdents);
-/*
+//    return go_switch(stackptr, c_getdents, go_hook_getdents);
+
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_getdents, go_hook_reg_getdents);
     } else {
         return go_switch(stackptr, c_getdents, go_hook_getdents);
     }
-    */
+    
 }
 
 static void
@@ -1274,14 +1274,13 @@ c_unlinkat(char *stackaddr)
 EXPORTON void *
 go_unlinkat(char *stackptr)
 {
-    return go_switch(stackptr, c_unlinkat, go_hook_unlinkat);
-/*
+//    return go_switch(stackptr, c_unlinkat, go_hook_unlinkat);
+
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_unlinkat, go_hook_reg_unlinkat);
     } else {
         return go_switch(stackptr, c_unlinkat, go_hook_unlinkat);
     }
-    */
 }
 
 // Deals with files only. net opens are handles by c_socket
@@ -1308,14 +1307,14 @@ c_open(char *stackaddr)
 EXPORTON void *
 go_open(char *stackptr)
 {
-     return go_switch(stackptr, c_open, go_hook_open);
-/*
+//     return go_switch(stackptr, c_open, go_hook_open);
+
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_open, go_hook_reg_open);
     } else {
         return go_switch(stackptr, c_open, go_hook_open);
     }
-    */
+   
     
 }
 
@@ -1336,14 +1335,14 @@ c_close(char *stackaddr)
 EXPORTON void *
 go_close(char *stackptr)
 {
-    return go_switch(stackptr, c_close, go_hook_close);
-/*
+  //  return go_switch(stackptr, c_close, go_hook_close);
+
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_close, go_hook_reg_close);
     } else {
         return go_switch(stackptr, c_close, go_hook_close);
     }
-    */
+    
 }
 
 static void
@@ -1365,15 +1364,14 @@ c_read(char *stackaddr)
 EXPORTON void *
 go_read(char *stackptr)
 {
-    return go_switch(stackptr, c_read, go_hook_read);
+//    return go_switch(stackptr, c_read, go_hook_read);
 
-    /*
-     * if (g_go_major_ver > 16) {
+   
+    if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_read, go_hook_reg_read);
     } else {
         return go_switch(stackptr, c_read, go_hook_read);
     }
-    */
 }
 
 static void
@@ -1396,14 +1394,12 @@ c_socket(char *stackaddr)
 EXPORTON void *
 go_socket(char *stackptr)
 {
-    return go_switch(stackptr, c_socket, go_hook_socket);
-/*
+//    return go_switch(stackptr, c_socket, go_hook_socket);
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_socket, go_hook_reg_socket);
     } else {
         return go_switch(stackptr, c_socket, go_hook_socket);
     }
-    */
 }
 
 static void
@@ -1425,14 +1421,12 @@ c_accept4(char *stackaddr)
 EXPORTON void *
 go_accept4(char *stackptr)
 {
-    return go_switch(stackptr, c_accept4, go_hook_accept4);
-/*
+//    return go_switch(stackptr, c_accept4, go_hook_accept4);
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_accept4, go_hook_reg_accept4);
     } else {
         return go_switch(stackptr, c_accept4, go_hook_accept4);
     }
-    */
 }
 
 /*
@@ -1512,14 +1506,14 @@ c_http_server_read(char *stackaddr)
 EXPORTON void *
 go_tls_read(char *stackptr)
 {
-    return go_switch(stackptr, c_http_server_read, go_hook_tls_read);
-/*        
+//    return go_switch(stackptr, c_http_server_read, go_hook_tls_read);
+        
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_http_server_read, go_hook_reg_tls_read);
     } else {
         return go_switch(stackptr, c_http_server_read, go_hook_tls_read);
     }
-*/ 
+ 
 }
 
 /*
@@ -1569,14 +1563,14 @@ c_http_server_write(char *stackaddr)
 EXPORTON void *
 go_tls_write(char *stackptr)
 {
-    return go_switch(stackptr, c_http_server_write, go_hook_tls_write);
-   /* 
+//    return go_switch(stackptr, c_http_server_write, go_hook_tls_write);
+   
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_http_server_write, go_hook_reg_tls_write);
     } else {
         return go_switch(stackptr, c_http_server_write, go_hook_tls_write);
     }
-    */
+  
 }
 
 /*
@@ -1633,14 +1627,14 @@ c_http_client_write(char *stackaddr)
 EXPORTON void *
 go_pc_write(char *stackptr)
 {
-    return go_switch(stackptr, c_http_client_write, go_hook_pc_write);
-   /* 
+ //   return go_switch(stackptr, c_http_client_write, go_hook_pc_write);
+    
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_http_client_write, go_hook_reg_pc_write);
     } else {
         return go_switch(stackptr, c_http_client_write, go_hook_pc_write);
     }
-    */
+   
 }
 
 /*
@@ -1704,14 +1698,14 @@ c_http_client_read(char *stackaddr)
 EXPORTON void *
 go_readResponse(char *stackptr)
 {
-    return go_switch(stackptr, c_http_client_read, go_hook_readResponse);
-   /* 
+  //  return go_switch(stackptr, c_http_client_read, go_hook_readResponse);
+    
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_http_client_read, go_hook_reg_readResponse);
     } else {
         return go_switch(stackptr, c_http_client_read, go_hook_readResponse);
     }
-   */ 
+    
 }
 
 extern void handleExit(void);

@@ -897,6 +897,10 @@ doReset()
 
     resetState();
 
+    // set stdout/stderr to unknown
+    setFSContentType(STDOUT_FILENO, FS_CONTENT_UNKNOWN);
+    setFSContentType(STDERR_FILENO, FS_CONTENT_UNKNOWN);
+
     logReconnect(g_log);
     mtcReconnect(g_mtc);
     ctlReconnect(g_ctl, CFG_CTL);

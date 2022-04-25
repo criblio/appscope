@@ -13,6 +13,7 @@
 #include "com.h"
 #include "fn.h"
 #include "state.h"
+#include "utils.h"
 
 #define FS_ENTRIES 1024
 #define DEFAULT_LOG_MAX_AGG_BYTES 32768
@@ -21,7 +22,7 @@
 #define CHANNEL "_channel"
 #define ID "id"
 
-#define BINARY_DATA_MSG "Binary data detected--- message"
+#define BINARY_DATA_MSG "-- binary data ignored --"
 #define DEFAULT_BINARY_DATA_SAMPLE_SIZE (256U)
 #define ESC_CHARACTER (0x1B)
 
@@ -48,6 +49,7 @@ struct _ctl_t
     evt_fmt_t *evt;
     cbuf_handle_t events;
     unsigned enhancefs;
+    bool allow_binary_console;
 
     // Used to buffer (aggregate) log and console data
     struct {
@@ -607,6 +609,7 @@ ctlCreate()
     }
 
     ctl->enhancefs = DEFAULT_ENHANCE_FS;
+    ctl->allow_binary_console = checkEnv("SCOPE_ALLOW_BINARY_CONSOLE", "true");
 
     ctl->payload.enable = DEFAULT_PAYLOAD_ENABLE;
     ctl->payload.dir = (DEFAULT_PAYLOAD_DIR) ? strdup(DEFAULT_PAYLOAD_DIR) : NULL;
@@ -885,16 +888,19 @@ ctlSendLog(ctl_t *ctl, int fd, const char *path, const void *buf, size_t count, 
     filter = evtFormatValueFilter(ctl->evt, logType);
 
     log_event_t *logevent = NULL;
-    if (logType == CFG_SRC_CONSOLE) {
-        fs_content_type_t data_content = getFSContentType(fd);
-        if (data_content == FS_CONTENT_BINARY) {
-            // Handle only first event of binary data, drop and ignore rest
-            return -1;
-        } else if (data_content == FS_CONTENT_UNKNOWN) {
-            data_content = is_data_binary(buf, count) ? FS_CONTENT_BINARY : FS_CONTENT_TEXT;
-            setFSContentType(fd, data_content);
-            if (data_content == FS_CONTENT_BINARY) {
+    if (!ctl->allow_binary_console && (logType == CFG_SRC_CONSOLE)) {
+
+        // Grab previous data_content, then compute and save new data_content
+        fs_content_type_t prev_data_content = getFSContentType(fd);
+        fs_content_type_t cur_data_content = is_data_binary(buf, count) ? FS_CONTENT_BINARY : FS_CONTENT_TEXT;
+        setFSContentType(fd, cur_data_content);
+
+        // Report only first event of binary data, drop and ignore rest
+        if (cur_data_content == FS_CONTENT_BINARY) {
+            if (prev_data_content != FS_CONTENT_BINARY) {
                 logevent = createInternalLogEvent(fd, path, BINARY_DATA_MSG, sizeof(BINARY_DATA_MSG) - 1, uid, proc, logType, filter);
+            } else {
+                return -1;
             }
         }
     }

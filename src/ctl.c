@@ -49,7 +49,7 @@ struct _ctl_t
     evt_fmt_t *evt;
     cbuf_handle_t events;
     unsigned enhancefs;
-    bool omit_binary_console;
+    bool allow_binary_console;
 
     // Used to buffer (aggregate) log and console data
     struct {
@@ -609,7 +609,7 @@ ctlCreate()
     }
 
     ctl->enhancefs = DEFAULT_ENHANCE_FS;
-    ctl->omit_binary_console = !checkEnv("SCOPE_ALLOW_BINARY_CONSOLE", "true");
+    ctl->allow_binary_console = checkEnv("SCOPE_ALLOW_BINARY_CONSOLE", "true");
 
     ctl->payload.enable = DEFAULT_PAYLOAD_ENABLE;
     ctl->payload.dir = (DEFAULT_PAYLOAD_DIR) ? strdup(DEFAULT_PAYLOAD_DIR) : NULL;
@@ -888,7 +888,7 @@ ctlSendLog(ctl_t *ctl, int fd, const char *path, const void *buf, size_t count, 
     filter = evtFormatValueFilter(ctl->evt, logType);
 
     log_event_t *logevent = NULL;
-    if (ctl->omit_binary_console && (logType == CFG_SRC_CONSOLE)) {
+    if (!ctl->allow_binary_console && (logType == CFG_SRC_CONSOLE)) {
 
         // Grab previous data_content, then compute and save new data_content
         fs_content_type_t prev_data_content = getFSContentType(fd);

@@ -1461,7 +1461,6 @@ go_accept4(char *stackptr)
 static void
 c_http_server_read(char *stackaddr)
 {
-#if 0
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
     stackaddr -= g_go_schema->arg_offsets.c_http_server_read_callee;
@@ -1508,7 +1507,6 @@ c_http_server_read(char *stackaddr)
             doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
         }
     }
-#endif
 }
 
 EXPORTON void *
@@ -1538,7 +1536,6 @@ go_tls_read(char *stackptr)
 static void
 c_http_server_write(char *stackaddr)
 {
-#if 0
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
     stackaddr -= g_go_schema->arg_offsets.c_http_server_write_callee;
@@ -1567,7 +1564,6 @@ c_http_server_write(char *stackaddr)
             doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSTX, BUF);
         }
     }
-#endif
 }
 
 EXPORTON void *
@@ -1601,7 +1597,6 @@ go_tls_write(char *stackptr)
 static void
 c_http_client_write(char *stackaddr)
 {
-#if 0
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
     stackaddr -= g_go_schema->arg_offsets.c_http_client_write_callee;
@@ -1633,14 +1628,13 @@ c_http_client_write(char *stackaddr)
         doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
         funcprint("Scope: c_http_client_write of %d\n", fd);
     }
-#endif
 }
 
 EXPORTON void *
 go_pc_write(char *stackptr)
 {
     return go_switch(stackptr, c_http_client_write, go_hook_pc_write);
-    /*
+   /* 
     if (g_go_major_ver > 16) {
         return go_switch(stackptr, c_http_client_write, go_hook_reg_pc_write);
     } else {
@@ -1669,7 +1663,6 @@ go_pc_write(char *stackptr)
 static void
 c_http_client_read(char *stackaddr)
 {
-#if 0
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
     stackaddr -= g_go_schema->arg_offsets.c_http_client_read_callee;
@@ -1706,7 +1699,6 @@ c_http_client_read(char *stackaddr)
             funcprint("Scope: c_http_client_read of %d\n", fd);
         }
     }
-#endif
 }
 
 EXPORTON void *

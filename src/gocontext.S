@@ -188,11 +188,9 @@ go_hook_readResponse:
     push %rax
     push %rbx
     sub $0x20, %rsp
-//    mov %rbp,0x18(%rsp)
-//    lea 0x18(%rsp),%rbp
 
     mov %rsp, %r11
-    add $0x28, %r11
+    add $0x30, %r11
     mov %r11, 0x08(%rsp)
     lea go_readResponse@GOTPCREL(%rip), %r11
     mov (%r11), %r11
@@ -202,13 +200,12 @@ go_hook_readResponse:
     mov (%r11), %r11
     mov (%r11), %r11
     call *%r11
-//    xorps %xmm15,%xmm15
-//    mov %fs:0xfffffffffffffff8,%r14
+    xorps %xmm15,%xmm15
+    mov %fs:0xfffffffffffffff8,%r14
 
     mov %rax, %r11
 
-    mov 0x10(%rsp),%eax
-//    mov 0x18(%rsp),%rbp
+//    mov 0x10(%rsp),%eax
     add $0x20, %rsp
     pop %rbx
     pop %rax
@@ -225,7 +222,7 @@ go_hook_pc_write:
 //    lea 0x18(%rsp),%rbp
 
     mov %rsp, %r11
-    add $0x28, %r11
+    add $0x30, %r11
     mov %r11, 0x08(%rsp)
     lea go_pc_write@GOTPCREL(%rip), %r11
     mov (%r11), %r11
@@ -235,12 +232,12 @@ go_hook_pc_write:
     mov (%r11), %r11
     mov (%r11), %r11
     call *%r11
-//    xorps %xmm15,%xmm15
-//    mov %fs:0xfffffffffffffff8,%r14
+    xorps %xmm15,%xmm15
+    mov %fs:0xfffffffffffffff8,%r14
 
     mov %rax, %r11
 
-    mov 0x10(%rsp),%eax
+ //   mov 0x10(%rsp),%eax
 //    mov 0x18(%rsp),%rbp
     add $0x20, %rsp
     pop %rbx
@@ -258,7 +255,7 @@ go_hook_tls_read:
 //    lea 0x18(%rsp),%rbp
 
     mov %rsp, %r11
-    add $0x28, %r11
+    add $0x30, %r11
     mov %r11, 0x08(%rsp)
     lea go_tls_read@GOTPCREL(%rip), %r11
     mov (%r11), %r11
@@ -268,12 +265,12 @@ go_hook_tls_read:
     mov (%r11), %r11
     mov (%r11), %r11
     call *%r11
-//    xorps %xmm15,%xmm15
-//    mov %fs:0xfffffffffffffff8,%r14
+    xorps %xmm15,%xmm15
+    mov %fs:0xfffffffffffffff8,%r14
 
     mov %rax, %r11
 
-    mov 0x10(%rsp),%eax
+//    mov 0x10(%rsp),%eax
 //    mov 0x18(%rsp),%rbp
     add $0x20, %rsp
     pop %rbx
@@ -291,7 +288,7 @@ go_hook_tls_write:
 //    lea 0x18(%rsp),%rbp
 
     mov %rsp, %r11
-    add $0x28, %r11
+    add $0x30, %r11
     mov %r11, 0x08(%rsp)
     lea go_tls_write@GOTPCREL(%rip), %r11
     mov (%r11), %r11
@@ -301,12 +298,12 @@ go_hook_tls_write:
     mov (%r11), %r11
     mov (%r11), %r11
     call *%r11
-//    xorps %xmm15,%xmm15
-//    mov %fs:0xfffffffffffffff8,%r14
+    xorps %xmm15,%xmm15
+    mov %fs:0xfffffffffffffff8,%r14
 
     mov %rax, %r11
 
-    mov 0x10(%rsp),%eax
+ //   mov 0x10(%rsp),%eax
 //    mov 0x18(%rsp),%rbp
     add $0x20, %rsp
     pop %rbx

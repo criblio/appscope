@@ -419,9 +419,10 @@ transportDisconnect(transport_t *trans)
             break;
         case CFG_FILE:
             if (!trans->file.stdout && !trans->file.stderr) {
-                if (trans->file.stream) scope_fclose(trans->file.stream);
+                FILE *stream = trans->file.stream;
+                trans->file.stream = NULL;
+                if (stream) scope_fclose(stream);
             }
-            trans->file.stream = NULL;
             break;
         case CFG_UNIX:
         case CFG_EDGE:

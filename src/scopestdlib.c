@@ -10,6 +10,7 @@
 
 
 // Internal standard library references
+extern void  scopelibc_init_vdso_ehdr(unsigned long);
 extern void  scopelibc_lock_before_fork_op(void);
 extern void  scopelibc_unlock_after_fork_op(int);
 
@@ -191,8 +192,15 @@ extern int           scopelibc_tcgetattr(int, struct termios *);
 extern void*         scopelibc_shmat(int, const void *, int);
 extern int           scopelibc_shmdt(const void *);
 extern int           scopelibc_shmget(key_t, size_t, int);
+extern int           scopelibc_sched_getcpu(void);
 
-// Fork handling operations
+// Internal library operations
+
+void
+scope_init_vdso_ehdr(void) {
+    unsigned long ehdr = getauxval(AT_SYSINFO_EHDR);
+    scopelibc_init_vdso_ehdr(ehdr);
+}
 
 void
 scope_op_before_fork(void) {
@@ -1057,6 +1065,11 @@ scope_shmdt(const void *shmaddr) {
 int
 scope_shmget(key_t key, size_t size, int shmflg) {
     return scopelibc_shmget(key, size, shmflg);
+}
+
+int
+scope_sched_getcpu(void) {
+    return scopelibc_sched_getcpu();
 }
 
 int

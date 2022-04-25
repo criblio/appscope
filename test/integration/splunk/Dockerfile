@@ -21,7 +21,7 @@ RUN cd Python-3.6.5 && \
     make altinstall && \
     cd .. && \
     rm -r Python-3.6.5
-RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+RUN curl https://bootstrap.pypa.io/pip/3.6/get-pip.py -o get-pip.py && \
     python3.6 get-pip.py && \
     rm -f get-pip.py
 

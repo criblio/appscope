@@ -6,6 +6,8 @@ FAILED_TEST_LIST=""
 FAILED_TEST_COUNT=0
 
 EVT_FILE="/go/events.log"
+ERR_FILE="stderr.txt"
+LOG_FILE="/tmp/scope.log"
 touch $EVT_FILE
 
 starttest(){
@@ -24,6 +26,7 @@ endtest(){
     if [ $ERR -eq "0" ]; then
         RESULT=PASSED
     else
+        cat $LOG_FILE
         RESULT=FAILED
         FAILED_TEST_LIST+=$CURRENT_TEST
         FAILED_TEST_LIST+=" "
@@ -37,9 +40,12 @@ endtest(){
     # copy the EVT_FILE to help with debugging
     if (( $DEBUG )) || [ $RESULT == "FAILED" ]; then
         cp $EVT_FILE $EVT_FILE.$CURRENT_TEST
+        cp $LOG_FILE $LOG_FILE.$CURRENT_TEST
     fi
 
     rm $EVT_FILE
+    rm -f $ERR_FILE
+    rm -f $LOG_FILE
 }
 
 export SCOPE_PAYLOAD_ENABLE=true
@@ -119,7 +125,7 @@ ldscope ./plainServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
-sleep 0.5
+sleep 1
 curl http://localhost:${PORT}/hello
 ERR+=$?
 
@@ -127,7 +133,7 @@ ERR+=$?
 pkill -f plainServerDynamic
 
 # this sleep gives plainServerDynamic a chance to report its events on exit
-sleep 0.5
+sleep 1
 
 evaltest
 
@@ -168,7 +174,7 @@ ldscope ./plainServerStatic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
-sleep 0.5
+sleep 1
 curl http://localhost:${PORT}/hello
 ERR+=$?
 
@@ -176,7 +182,7 @@ ERR+=$?
 pkill -f plainServerStatic
 
 # this sleep gives plainServerStatic a chance to report its events on exit
-sleep 0.5
+sleep 1
 
 evaltest
 
@@ -217,7 +223,7 @@ ldscope ./tlsServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
-sleep 0.5
+sleep 1
 curl -k --key server.key --cert server.crt https://localhost:${PORT}/hello
 ERR+=$?
 
@@ -225,7 +231,7 @@ ERR+=$?
 pkill -f tlsServerDynamic
 
 # this sleep gives tlsServerDynamic a chance to report its events on exit
-sleep 0.5
+sleep 1
 
 evaltest
 
@@ -267,7 +273,7 @@ SCOPE_GO_STRUCT_PATH=$STRUCT_PATH ldscope ./tlsServerStatic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
-sleep 0.5
+sleep 1
 curl -k --key server.key --cert server.crt https://localhost:${PORT}/hello
 ERR+=$?
 
@@ -275,7 +281,7 @@ ERR+=$?
 pkill -f tlsServerStatic
 
 # this sleep gives tlsServerStatic a chance to report its events on exit
-sleep 0.5
+sleep 1
 
 evaltest
 
@@ -315,7 +321,7 @@ ldscope ./plainClientDynamic
 ERR+=$?
 
 # this sleep gives plainClientDynamic a chance to report its events on exit
-sleep 0.5
+sleep 1
 
 evaltest
 
@@ -356,7 +362,7 @@ ldscope ./plainClientStatic
 ERR+=$?
 
 # this sleep gives plainClientStatic a chance to report its events on exit
-sleep 0.5
+sleep 1
 
 evaltest
 
@@ -397,7 +403,7 @@ ldscope ./tlsClientDynamic
 ERR+=$?
 
 # this sleep gives tlsClientDynamic a chance to report its events on exit
-sleep 0.5
+sleep 1
 
 evaltest
 
@@ -438,7 +444,7 @@ SCOPE_GO_STRUCT_PATH=$STRUCT_PATH ldscope ./tlsClientStatic
 ERR+=$?
 
 # this sleep gives tlsClientStatic a chance to report its events on exit
-sleep 0.5
+sleep 1
 
 evaltest
 
@@ -517,6 +523,96 @@ ERR+=$?
 
 endtest
 
+
+#
+# signalHandlerDynamic
+#
+starttest signalHandlerDynamic
+cd /go/signals
+ldscope ./signalHandlerDynamic 2>${ERR_FILE}&
+SCOPE_PID=$!
+ERR+=$?
+
+sleep 1
+kill -SIGCHLD $SCOPE_PID &
+
+# verify that process still exists
+if ! ps -p $SCOPE_PID > /dev/null; then
+    echo "$SCOPE_PID ps first fail signalHandlerDynamic"
+    ERR+=1
+fi
+
+while kill -0 ${SCOPE_PID} &> /dev/null; do
+  kill -SIGTERM ${SCOPE_PID}
+  sleep 1
+done
+
+count=$(grep 'bad g' $ERR_FILE | wc -l)
+if [ $count -ne 0 ] ; then
+    ERR+=1
+fi
+
+endtest
+
+#
+# signalHandlerStatic
+#
+starttest signalHandlerStatic
+cd /go/signals
+ldscope ./signalHandlerStatic 2>${ERR_FILE}&
+SCOPE_PID=$!
+ERR+=$?
+
+sleep 1
+kill -SIGCHLD ${SCOPE_PID} &
+
+# verify that process still exists
+if ! ps -p ${SCOPE_PID} > /dev/null; then
+    echo "$SCOPE_PID ps first fail signalHandlerStatic"
+    ERR+=1
+fi
+
+while kill -0 ${SCOPE_PID} &> /dev/null; do
+  kill -SIGTERM ${SCOPE_PID}
+  sleep 1
+done
+
+count=$(grep 'bad g' $ERR_FILE | wc -l)
+if [ $count -ne 0 ] ; then
+    ERR+=1
+fi
+
+endtest
+
+#
+# signalHandlerStaticStripped
+#
+starttest signalHandlerStaticStripped
+cd /go/signals
+ldscope ./signalHandlerStatic 2>${ERR_FILE}&
+SCOPE_PID=$!
+ERR+=$?
+
+sleep 1
+kill -SIGCHLD ${SCOPE_PID} &
+
+# verify that process still exists
+if ! ps -p ${SCOPE_PID} > /dev/null; then
+    echo "$SCOPE_PID ps first fail signalHandlerStaticStripped"
+    ERR+=1
+fi
+
+while kill -0 ${SCOPE_PID} &> /dev/null; do
+  kill -SIGTERM ${SCOPE_PID}
+  sleep 1
+done
+
+count=$(grep 'bad g' $ERR_FILE | wc -l)
+if [ $count -ne 0 ] ; then
+    ERR+=1
+fi
+
+endtest
 
 #
 # cgoDynamic

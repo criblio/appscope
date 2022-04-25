@@ -13,6 +13,10 @@
     SSL_ImportFD;
     *;
   local:
+    scopelibc_*;
+    cJSON_*;
+    yaml_parser_*;
+    yaml_document_*;
     cs_*;          # hides capstone symbols
     SCOPE_SSL_*;   # hides our renamed SSL symbols
     a2d_*;         # the beginning of libssl, libcrypto symbols

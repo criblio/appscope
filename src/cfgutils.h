@@ -8,8 +8,8 @@
 #include "evtformat.h"
 #include "linklist.h"
 
-// cfgPath returns a pointer to a malloc()'d buffer.
-// The caller is responsible for deallocating with free().
+// cfgPath returns a pointer to a scope_malloc()'d buffer.
+// The caller is responsible for deallocating with scope_free().
 char * cfgPath(void);
 
 // reads cfg from yaml file

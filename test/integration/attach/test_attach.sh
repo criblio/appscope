@@ -72,6 +72,7 @@ python3 -m http.server 2> /dev/null &
 sleep 1
 ldscope --attach `pidof python3`
 curl http://localhost:8000
+sleep 1
 evaltest
 
 grep -q '"proc":"python3"' $EVT_FILE > /dev/null

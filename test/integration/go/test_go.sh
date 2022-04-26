@@ -543,7 +543,7 @@ if ! ps -p $SCOPE_PID > /dev/null; then
 fi
 
 while kill -0 ${SCOPE_PID} &> /dev/null; do
-  kill -SIGTERM ${SCOPE_PID}
+  kill -SIGKILL ${SCOPE_PID}
   sleep 1
 done
 
@@ -573,7 +573,7 @@ if ! ps -p ${SCOPE_PID} > /dev/null; then
 fi
 
 while kill -0 ${SCOPE_PID} &> /dev/null; do
-  kill -SIGTERM ${SCOPE_PID}
+  kill -SIGKILL ${SCOPE_PID}
   sleep 1
 done
 
@@ -603,7 +603,7 @@ if ! ps -p ${SCOPE_PID} > /dev/null; then
 fi
 
 while kill -0 ${SCOPE_PID} &> /dev/null; do
-  kill -SIGTERM ${SCOPE_PID}
+  kill -SIGKILL ${SCOPE_PID}
   sleep 1
 done
 

@@ -73,6 +73,16 @@ go_schema_t go_16_schema = {
         .c_accept4_addr=0x10,
         .c_accept4_addrlen=0x18,
         .c_accept4_sd_out=0x28,
+
+        // For all system calls, we read the stack from the Caller. For
+        // non-system calls, we (for some functions) read the stack from
+        // the Callee. We use an offset of either 0 (stay in Caller) or
+        // >0 (go into Callee) to put ourselves into the desired context
+        // where all values are available.
+        // Consideration: In future iterations, it might be a more logical
+        // approach to always grab arguments from the Caller, and always
+        // grab return values from the Callee.
+
         .c_http_server_read_callee=0x0,
         .c_http_server_read_connReader=0x8,
         .c_http_server_read_buf=0x10,
@@ -176,6 +186,10 @@ go_schema_t go_17_schema = {
         .conn_to_tlsState=0x30,
         .persistConn_to_tlsState=0x60,
     },
+    // use the _reg_ assembly functions here, to support changes to Go 1.17
+    // where we preserve the return values stored in registers
+    // and we preserve the g in r14 for future stack checks
+    // Note: we do not need to use the reg functions for go_hook_exit and go_hook_die
     .tap = {
         {"syscall.write",                        go_hook_reg_write,            NULL, 0}, // write
         {"syscall.openat",                       go_hook_reg_open,             NULL, 0}, // file open
@@ -195,7 +209,7 @@ go_schema_t go_17_schema = {
     },
 };
 
-go_schema_t *g_go_schema = &go_16_schema; // overriden if later version
+go_schema_t *g_go_schema = &go_16_schema; // overridden if later version
 uint64_t g_glibc_guard = 0LL;
 uint64_t g_go_static = 0LL;
 static list_t *g_threadlist;
@@ -203,7 +217,6 @@ static void *g_stack;
 static bool g_switch_thread;
 
 void (*go_runtime_cgocall)(void);
-void (*go_runtime_cgocall_regs)(void);
 
 #if NEEDEVNULL > 0
 static void
@@ -229,6 +242,8 @@ c_str(gostring_t *go_str)
     return path;
 }
 
+// Detect the beginning of a Go Function
+// by identifying instructions in the preamble.
 static bool
 looks_like_first_inst_of_go_func(cs_insn* asm_inst)
 {
@@ -240,18 +255,20 @@ looks_like_first_inst_of_go_func(cs_insn* asm_inst)
                (char*)asm_inst->mnemonic,
                (char*)asm_inst->op_str);
         
-    return (!strcmp((const char*)asm_inst->mnemonic, "mov") &&
-            !strcmp((const char*)asm_inst->op_str, "rcx, qword ptr fs:[0xfffffffffffffff8]")) ||
+    return (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
+            !scope_strcmp((const char*)asm_inst->op_str, "rcx, qword ptr fs:[0xfffffffffffffff8]")) ||
             // -buildmode=pie compiles to this:
-            (!strcmp((const char*)asm_inst->mnemonic, "mov") &&
-            !strcmp((const char*)asm_inst->op_str, "rcx, -8")) || 
-            // Go 17
-            (!strcmp((const char*)asm_inst->mnemonic, "cmp") &&
-            !strcmp((const char*)asm_inst->op_str, "rsp, qword ptr [r14 + 0x10]")) ||
-            (!strcmp((const char*)asm_inst->mnemonic, "lea") &&
-            !strcmp((const char*)asm_inst->op_str, "r12, [rsp - 0x10]"));
+            (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
+            !scope_strcmp((const char*)asm_inst->op_str, "rcx, -8")) || 
+            // In Go 17 we extended the definition of function preamble with:
+            (!scope_strcmp((const char*)asm_inst->mnemonic, "cmp") &&
+            !scope_strcmp((const char*)asm_inst->op_str, "rsp, qword ptr [r14 + 0x10]")) ||
+            (!scope_strcmp((const char*)asm_inst->mnemonic, "lea") &&
+            !scope_strcmp((const char*)asm_inst->op_str, "r12, [rsp - 0x10]"));
 }
 
+// Calculate the value to be added/subtracted at an add/sub instruction
+// Returns an absolute value
 static uint32_t
 add_argument(cs_insn* asm_inst)
 {
@@ -299,7 +316,7 @@ patch_first_instruction(funchook_t *funchook,
     for (i=0; i<asm_count; i++) {
         // Stop when it looks like we've hit another goroutine
         if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
-                  (!strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
+                  (!scope_strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
                   asm_inst[i].size == 1 ))) {
             break;
         }
@@ -329,7 +346,10 @@ patch_first_instruction(funchook_t *funchook,
     patchprint("\n\n");
 }
 
-
+// Patch all return addresses
+// If we intend to patch a return, we should actually patch the instruction prior.
+// In some cases, we actually patch the "xorps" instruction instead of the return instruction.
+// In that event, we intend to patch the actual "xorps" instruction, not the instruction prior.
 static void
 patch_return_addrs(funchook_t *funchook,
                    cs_insn* asm_inst, unsigned int asm_count, tap_t* tap)
@@ -354,7 +374,7 @@ patch_return_addrs(funchook_t *funchook,
 
         // Stop when it looks like we've hit another goroutine
         if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
-                  (!strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
+                  (!scope_strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
                   asm_inst[i].size == 1 ))) {
             break;
         }
@@ -367,29 +387,35 @@ patch_return_addrs(funchook_t *funchook,
                (char*)asm_inst[i].mnemonic,
                (char*)asm_inst[i].op_str);
 
+
+        // It is necessary for us to interpose system calls (only) for 1.17 and 1.18
+        // at the "xorps" instruction. This "xorps" instruction is a good place for
+        // us to patch our code in, since it appears right after the system call. We
+        // are able to patch non-system calls at the return instruction per prior versions. 
+
         // If the current instruction is a RET
         // and previous inst is add or sub, then get the stack frame size.
         // Or, if the current inst is xorps then proceed without a stack frame size.
         // If the current inst is not a ret or xorps, don't funchook.
         uint32_t add_arg = 0;
-        if (((!strcmp((const char*)asm_inst[i].mnemonic, "ret") &&
+        if (((!scope_strcmp((const char*)asm_inst[i].mnemonic, "ret") &&
               (asm_inst[i].size == 1) &&
-              (!strcmp((const char*)asm_inst[i-1].mnemonic, "add") ||
-              !strcmp((const char*)asm_inst[i-1].mnemonic, "sub")) &&
+              (!scope_strcmp((const char*)asm_inst[i-1].mnemonic, "add") ||
+              !scope_strcmp((const char*)asm_inst[i-1].mnemonic, "sub")) &&
               (add_arg = add_argument(&asm_inst[i-1]))) ||
-              ((g_go_major_ver > 16) && !strcmp((const char*)asm_inst[i].mnemonic, "xorps") &&
+              ((g_go_major_ver > 16) && !scope_strcmp((const char*)asm_inst[i].mnemonic, "xorps") &&
               (asm_inst[i].size == 4)))) {
 
-            // patch the address before the ret instruction to maintain the callee stack context
+            // Patch the address before the ret instruction to maintain the callee stack context
             void *pre_patch_addr = (void*)asm_inst[i-1].address;
             void *patch_addr = (void*)asm_inst[i-1].address;
             // we aren't dealing with a ret, we must patch the xorps instruction exactly
-            if (!strcmp((const char*)asm_inst[i].mnemonic, "xorps")) {
+            if (!scope_strcmp((const char*)asm_inst[i].mnemonic, "xorps")) {
                 pre_patch_addr = (void*)asm_inst[i].address;
                 patch_addr = (void*)asm_inst[i].address;
             }
 
-            // all add_arg values within a function should be the same
+            // All add_arg values within a function should be the same
             if (tap->frame_size && (tap->frame_size != add_arg)) {
                 patchprint("aborting patch of 0x%p due to mismatched frame size 0x%x\n", pre_patch_addr, add_arg);
                 break;
@@ -403,7 +429,8 @@ patch_return_addrs(funchook_t *funchook,
             tap->return_addr = patch_addr;
             tap->frame_size = add_arg;
 
-            if ((g_go_major_ver > 16) && !strcmp((const char*)asm_inst[i].mnemonic, "xorps")) break;
+            // We need to force a break in the "xorps" case since the code won't be returning here
+            if ((g_go_major_ver > 16) && !scope_strcmp((const char*)asm_inst[i].mnemonic, "xorps")) break;
         }
     }
     patchprint("\n\n");
@@ -439,6 +466,7 @@ patchClone()
     }
 }
 
+// Detect the Go Version of an executable
 static int
 go_major_version(const char *go_runtime_version)
 {
@@ -506,23 +534,23 @@ adjustGoStructOffsetsForVersion(int go_ver)
     int fd;
     if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
         ((fd = g_fn.open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
-        dprintf(fd, "runtime.g|m=%d|\n", g_go_schema->struct_offsets.g_to_m);
-        dprintf(fd, "runtime.m|tls=%d|\n", g_go_schema->struct_offsets.m_to_tls);
-        dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go_schema->struct_offsets.connReader_to_conn);
-        dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_conn);
-        dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_bufrd);
-        dprintf(fd, "runtime.iface|data=%d|\n", g_go_schema->struct_offsets.iface_data);
+        scope_dprintf(fd, "runtime.g|m=%d|\n", g_go_schema->struct_offsets.g_to_m);
+        scope_dprintf(fd, "runtime.m|tls=%d|\n", g_go_schema->struct_offsets.m_to_tls);
+        scope_dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go_schema->struct_offsets.connReader_to_conn);
+        scope_dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_conn);
+        scope_dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_bufrd);
+        scope_dprintf(fd, "runtime.iface|data=%d|\n", g_go_schema->struct_offsets.iface_data);
         // go 1.8 has a direct netfd_to_sysfd field, others are less direct
         if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) {
-            dprintf(fd, "net.netFD|pfd=%d|\n", g_go_schema->struct_offsets.netfd_to_pd);
-            dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go_schema->struct_offsets.pd_to_fd);
+            scope_dprintf(fd, "net.netFD|pfd=%d|\n", g_go_schema->struct_offsets.netfd_to_pd);
+            scope_dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go_schema->struct_offsets.pd_to_fd);
         } else {
-            dprintf(fd, "net.netFD|sysfd=%d|\n", g_go_schema->struct_offsets.netfd_to_sysfd);
+            scope_dprintf(fd, "net.netFD|sysfd=%d|\n", g_go_schema->struct_offsets.netfd_to_sysfd);
         }
-        dprintf(fd, "bufio.Reader|buf=%d|\n", g_go_schema->struct_offsets.bufrd_to_buf);
-        dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go_schema->struct_offsets.conn_to_rwc);
-        dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go_schema->struct_offsets.conn_to_tlsState);
-        dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_tlsState);
+        scope_dprintf(fd, "bufio.Reader|buf=%d|\n", g_go_schema->struct_offsets.bufrd_to_buf);
+        scope_dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go_schema->struct_offsets.conn_to_rwc);
+        scope_dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go_schema->struct_offsets.conn_to_tlsState);
+        scope_dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_tlsState);
         g_fn.close(fd);
     }
 
@@ -659,14 +687,24 @@ initGoHook(elf_buf_t *ebuf)
      * are entering the Go func past the runtime stack check?
      * Need to investigate later.
      */
+
+    /* Go 1.17 introduced a secondary calling convention for the ABI
+     * that allows developers to choose from the native ABI (with
+     * latest changes) vs ABI0 (previous ABI). The new native ABI
+     * was a no-go for us as in some cases (-buildmode=pie) register
+     * %rax was overwritten via a mov to %eax, effectively truncating
+     * the return value to 32 bits where on occasion a 64 bit return
+     * value might be desired.
+     */
     if (g_go_major_ver > 16) {
-        // using the abi0 I/F for syscall based functions in Go >= 1.17
+        // Use the abi0 I/F for syscall based functions in Go >= 1.17
         if (((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall.abi0")) == 0) &&
             ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall.abi0")) == 0)) {
             sysprint("ERROR: can't get the address for runtime.cgocall\n");
             return; // don't install our hooks
         }
     } else {
+        // Use the native abi - the only abi present in <= Go 1.16
         if (((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) &&
             ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall")) == 0)) {
             sysprint("ERROR: can't get the address for runtime.cgocall\n");
@@ -675,19 +713,7 @@ initGoHook(elf_buf_t *ebuf)
     }
 
     go_runtime_cgocall = (void *) ((uint64_t)go_runtime_cgocall + base);
-
-    if (g_go_major_ver > 16) {
-        // using the native I/F for TLS/non syscall functions in Go >= 1.17
-        if ((go_runtime_cgocall_regs = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) {
-            sysprint("ERROR: can't get the address for runtime.cgocall-regs\n");
-            return; // don't install our hooks
-        }
-        go_runtime_cgocall_regs = (void *) ((uint64_t)go_runtime_cgocall_regs + base);
-    } else {
-        go_runtime_cgocall_regs = NULL;
-    }
-
-    funcprint("asmcgocall %p asmcgocall_regs %p\n", go_runtime_cgocall, go_runtime_cgocall_regs);
+    funcprint("asmcgocall %p\n", go_runtime_cgocall);
 
     csh disass_handle = 0;
     cs_arch arch;
@@ -706,13 +732,14 @@ initGoHook(elf_buf_t *ebuf)
     cs_insn *asm_inst = NULL;
     unsigned int asm_count = 0;
 
+    // Update the schema to suit the current version
     adjustGoStructOffsetsForVersion(g_go_major_ver);
     if (g_go_major_ver > 16) {
+        // The Go 17 schema works for 18 also, and possibly future versions
         g_go_schema = &go_17_schema;
     }
 
     for (tap_t *tap = g_go_schema->tap; tap->assembly_fn; tap++) {
-
         if (asm_inst) {
             cs_free(asm_inst, asm_count);
             asm_inst = NULL;
@@ -930,11 +957,14 @@ go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
         }
     }
 
+    // We add the frame size to the stackptr to put our stackaddr in the context of the Caller.
+    // We won't always know the frame size however. For example, when we patch an "xorps" instruction.
+    // Therefore in some functions we will end up with a stack address in the context of
+    // the Callee instead of the Caller.
     uint32_t frame_offset = frame_size(gfunc);
-    //if (!frame_offset) goto out;
     stackptr += frame_offset;
 
-    // call the C handler
+    // Call the C handler
     __asm__ volatile (
         "mov %1, %%rdi  \n"
         "callq *%2  \n"
@@ -1149,6 +1179,8 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
  * in order to know how to extract values from params and
  * return values.
  */
+
+// Extract data from syscall.write (write)
 static void
 c_write(char *stackaddr)
 {
@@ -1171,6 +1203,7 @@ go_write(char *stackptr)
     }
 }
 
+// Extract data from syscall.Getdents (read dir)
 static void
 c_getdents(char *stackaddr)
 {
@@ -1192,6 +1225,7 @@ go_getdents(char *stackptr)
     }
 }
 
+// Extract data from syscall.unlinkat (delete file)
 static void
 c_unlinkat(char *stackaddr)
 {
@@ -1219,6 +1253,7 @@ go_unlinkat(char *stackptr)
     }
 }
 
+// Extract data from syscall.openat (file open)
 // Deals with files only. net opens are handles by c_socket
 static void
 c_open(char *stackaddr)
@@ -1246,6 +1281,7 @@ go_open(char *stackptr)
     }
 }
 
+// Extract data from syscall.Close (close)
 static void
 c_close(char *stackaddr)
 {
@@ -1268,6 +1304,7 @@ go_close(char *stackptr)
     }
 }
 
+// Extract data from syscall.read (read)
 static void
 c_read(char *stackaddr)
 {
@@ -1292,6 +1329,7 @@ go_read(char *stackptr)
     }
 }
 
+// Extract data from syscall.socket (net open)
 static void
 c_socket(char *stackaddr)
 {
@@ -1317,6 +1355,7 @@ go_socket(char *stackptr)
     }
 }
 
+// Extract data from syscall.accept4 (plain server accept)
 static void
 c_accept4(char *stackaddr)
 {
@@ -1342,9 +1381,7 @@ go_accept4(char *stackptr)
 }
 
 /*
-  net/http.(*connReader).Read
-  /usr/local/go/src/net/http/server.go:758
-
+  Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
   cr = stackaddr + 0x08
   cr.conn = *cr
   cr.conn.rwc_if = cr.conn + 0x10
@@ -1352,11 +1389,8 @@ go_accept4(char *stackptr)
   netFD = cr.conn.rwc + 0x08
   pfd = *netFD  (/usr/local/go/src/net/fd_unix.go:20)
   fd = netFD + 0x10
-
-  reference: net/http/server.go
   type connReader struct {
         conn *conn
-
   type conn struct {
           server *Server
           cancelCtx context.CancelFunc
@@ -1364,6 +1398,7 @@ go_accept4(char *stackptr)
           remoteAddr string
           tlsState *tls.ConnectionState
  */
+// Extract data from net/http.(*connReader).Read (tls server read)
 static void
 c_http_server_read(char *stackaddr)
 {
@@ -1426,9 +1461,7 @@ go_tls_read(char *stackptr)
 }
 
 /*
-  net/http.checkConnErrorWriter.Write
-  /usr/local/go/src/net/http/server.go:3433
-
+  Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
   conn (w.c) = stackaddr + 0x08
   conn.rwc_if = conn + 0x10
   conn.rwc = conn.rwc_if + 0x08
@@ -1436,6 +1469,7 @@ go_tls_read(char *stackptr)
   pfd = *netFD
   fd = pfd + 0x10
  */
+// Extract data from net/http.checkConnErrorWriter.Write (tls server write)
 static void
 c_http_server_write(char *stackaddr)
 {
@@ -1480,12 +1514,9 @@ go_tls_write(char *stackptr)
 }
 
 /*
-  net/http.persistConnWriter.Write
-  /usr/local/go/src/net/http/transport.go:1662
-
+  Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
   p = stackaddr + 0x10  (request buffer)
   *p = request string
-
   w = stackaddr + 0x08        (net/http.persistConnWriter *)
   w.pc = stackaddr + 0x08     (net/http.persistConn *)
   w.pc.conn_if = w.pc + 0x50  (interface)
@@ -1494,6 +1525,7 @@ go_tls_write(char *stackptr)
   pfd = netFD + 0x0           (poll.FD)
   fd = pfd + 0x10             (pfd.sysfd)
  */
+// Extract data from net/http.persistConnWriter.Write (tls client write)
 static void
 c_http_client_write(char *stackaddr)
 {
@@ -1541,22 +1573,19 @@ go_pc_write(char *stackptr)
 }
 
 /*
-  net/http.(*persistConn).readResponse
-  /usr/local/go/src/net/http/transport.go:2161
-
+  Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
   pc = stackaddr + 0x08    (net/http.persistConn *)
-
   pc.conn_if = pc + 0x50   (interface)
   conn.data = pc.conn_if + 0x08 (net.conn->TCPConn)
   netFD = conn.data + 0x08 (netFD)
   pfd = netFD + 0x0        (poll.FD)
   fd = pfd + 0x10          (pfd.sysfd)
-
   pc.br = pc.conn + 0x68   (bufio.Reader)
   len = pc.br + 0x08       (bufio.Reader)
   resp = buf + 0x0         (bufio.Reader.buf)
   resp = http response     (char *)
  */
+// Extract data from net/http.(*persistConn).readResponse (tls server read)
 static void
 c_http_client_read(char *stackaddr)
 {

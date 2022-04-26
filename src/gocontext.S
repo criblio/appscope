@@ -51,6 +51,20 @@
     jmp *%r11
 .endm
 
+/*
+ * We created a second macro named with the _regs suffix that is used in
+ * Go 1.17 and 1.18 interpositions. The differences from the previous
+ * asmcgocall macro are slight. The first is that before we do any
+ * interposition, we save the values from the registers %rax and %rbx and
+ * restore them before returning to regular execution. This is because in
+ * Go 1.17 and 1.18, the ABI has fundamentally changed, in that results
+ * are returned in registers. The second difference is that we restore
+ * the value of g into the %r14 register. In Go 1.17 and 1.18, the
+ * function preamble has changed in that it always expects %r14 to
+ * contain the g before entering a function (for stack checking).
+ * If we don't save and restore values in these registers, they will
+ * often become corrupted and result in a serious failure.
+*/
 .macro interpose_regs a_func, c_func
 .global \a_func
 .hidden \c_func

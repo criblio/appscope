@@ -88,8 +88,8 @@ unsigned            mtcFormatStatsDMaxLen(mtc_fmt_t*);
 unsigned            mtcFormatVerbosity(mtc_fmt_t*);
 custom_tag_t**      mtcFormatCustomTags(mtc_fmt_t*);
 
-// This function returns a pointer to a malloc()'d buffer.
-// The caller is responsible for deallocating with free().
+// This function returns a pointer to a scope_malloc()'d buffer.
+// The caller is responsible for deallocating with scope_free().
 char*               mtcFormatEventForOutput(mtc_fmt_t*, event_t*, regex_t*);
 
 // Setters
@@ -98,8 +98,8 @@ void                mtcFormatStatsDMaxLenSet(mtc_fmt_t*, unsigned);
 void                mtcFormatVerbositySet(mtc_fmt_t*, unsigned);
 void                mtcFormatCustomTagsSet(mtc_fmt_t*, custom_tag_t**);
 
-// Helper functions - returns a pointer to a malloc'd buffer.
-// The caller is responsible for deallocating with free().
+// Helper functions - returns a pointer to a scope_malloc()'d buffer.
+// The caller is responsible for deallocating with scope_free().
 char* fmtUrlEncode(const char*);
 char* fmtUrlDecode(const char*);
 

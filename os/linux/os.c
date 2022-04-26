@@ -5,6 +5,7 @@
 #include <pwd.h>
 #include <time.h>
 #include "os.h"
+#include "../../src/scopestdlib.h"
 #include "../../src/dbg.h"
 #include "../../src/fn.h"
 #include "../../src/scopetypes.h"
@@ -16,8 +17,6 @@ static timer_t g_timerid = 0;
 static int
 sendNL(int sd, ino_t node)
 {
-    if (!g_fn.sendmsg) return -1;
-
     struct sockaddr_nl nladdr = {
         .nl_family = AF_NETLINK
     };
@@ -56,7 +55,7 @@ sendNL(int sd, ino_t node)
     };
 
     // should we check for a partial send?
-    if (g_fn.sendmsg(sd, &msg, 0) < 0) {
+    if (scope_sendmsg(sd, &msg, 0) < 0) {
         scopeLog(LOG_LEVEL, "fd:%d ERROR:sendNL:sendmsg", sd);
         return -1;
     }
@@ -67,8 +66,6 @@ sendNL(int sd, ino_t node)
 static ino_t
 getNL(int sd)
 {
-    if (!g_fn.recvmsg) return -1;
-
     int rc;
     char buf[sizeof(struct nlmsghdr) + (sizeof(long) * 4)];
     struct unix_diag_msg *diag;
@@ -89,7 +86,7 @@ getNL(int sd)
         .msg_iovlen = 1
     };
 
-    if ((rc = g_fn.recvmsg(sd, &msg, 0)) <= 0) {
+    if ((rc = scope_recvmsg(sd, &msg, 0)) <= 0) {
         scopeLog(LOG_LEVEL, "fd:%d ERROR:getNL:recvmsg", sd);
         return (ino_t)-1;
     }
@@ -154,18 +151,18 @@ getProcVal(char *srcbuf, const char *tag)
     const char delim[] = ":";
 
     if (!srcbuf) return -1;
-    buf = strdup(srcbuf);
+    buf = scope_strdup(srcbuf);
 
-    entry = strtok_r(buf, delim, &last);
+    entry = scope_strtok_r(buf, delim, &last);
     while (1) {
-        if ((entry = strtok_r(NULL, delim, &last)) == NULL) {
+        if ((entry = scope_strtok_r(NULL, delim, &last)) == NULL) {
             break;
         }
 
-        if (strcasestr((const char *)entry, tag) != NULL) {
+        if (scope_strcasestr((const char *)entry, tag) != NULL) {
             // The next token should be what we want
-            if ((entry = strtok_r(NULL, delim, &last)) != NULL) {
-                if ((val = (uint64_t)strtoll(entry, NULL, 0)) == (long long)0) {
+            if ((entry = scope_strtok_r(NULL, delim, &last)) != NULL) {
+                if ((val = (uint64_t)scope_strtoll(entry, NULL, 0)) == (long long)0) {
                     val = (uint64_t)-1;
                 }
                 break;
@@ -173,7 +170,7 @@ getProcVal(char *srcbuf, const char *tag)
         }
     }
 
-    if (buf) free(buf);
+    if (buf) scope_free(buf);
     return val;
 }
 
@@ -181,20 +178,18 @@ getProcVal(char *srcbuf, const char *tag)
 int
 osUnixSockPeer(ino_t lnode)
 {
-    int nsd;
+    int nsd = scope_socket(AF_NETLINK, SOCK_RAW, NETLINK_SOCK_DIAG);
     ino_t rnode;
 
-    if (!g_fn.socket || !g_fn.close) return -1;
-
-    if ((nsd = g_fn.socket(AF_NETLINK, SOCK_RAW, NETLINK_SOCK_DIAG)) == -1) return -1;
+    if (nsd == -1) return -1;
 
     if (sendNL(nsd, lnode) == -1) {
-        g_fn.close(nsd);
+        scope_close(nsd);
         return -1;
     }
 
     rnode = getNL(nsd);
-    g_fn.close(nsd);
+    scope_close(nsd);
     return rnode;
 }
 
@@ -205,16 +200,16 @@ osGetExePath(pid_t pid, char **path)
     char *buf = *path;
     char pidpath[PATH_MAX];
 
-    if (!(buf = calloc(1, PATH_MAX))) {
-        scopeLogError("ERROR:calloc in osGetExePath");
+    if (!(buf = scope_calloc(1, PATH_MAX))) {
+        scopeLogError("ERROR:scope_calloc in osGetExePath");
         return -1;
     }
 
-    snprintf(pidpath, PATH_MAX, "/proc/%d/exe", pid);
+    scope_snprintf(pidpath, PATH_MAX, "/proc/%d/exe", pid);
 
-    if (readlink(pidpath, buf, PATH_MAX - 1) == -1) {
+    if (scope_readlink(pidpath, buf, PATH_MAX - 1) == -1) {
         scopeLogError("osGetExePath: can't get path to pid %d exe", pid);
-        free(buf);
+        scope_free(buf);
         return -1;
     }
 
@@ -226,13 +221,13 @@ int
 osGetProcname(char *pname, int len)
 {
     if (program_invocation_short_name != NULL) {
-        strncpy(pname, program_invocation_short_name, len);
+        scope_strncpy(pname, program_invocation_short_name, len);
     } else {
         char *ppath = NULL;
 
-        if (osGetExePath(getpid(), &ppath) != -1) {
-            strncpy(pname, basename(ppath), len);
-            if (ppath) free(ppath);
+        if (osGetExePath(scope_getpid(), &ppath) != -1) {
+            scope_strncpy(pname, scope_basename(ppath), len);
+            if (ppath) scope_free(ppath);
         } else {
             return -1;
         }
@@ -249,43 +244,39 @@ osGetProcMemory(pid_t pid)
     const char delim[] = ":";
     char buf[2048];
 
-    if (!g_fn.open || !g_fn.read || !g_fn.close) {
-        return -1;
-    }
-
-    snprintf(buf, sizeof(buf), "/proc/%d/status", pid);
-    if ((fd = g_fn.open(buf, O_RDONLY)) == -1) {
+    scope_snprintf(buf, sizeof(buf), "/proc/%d/status", pid);
+    if ((fd = scope_open(buf, O_RDONLY)) == -1) {
         DBG(NULL);
         return -1;
     }
 
-    if (g_fn.read(fd, buf, sizeof(buf)) == -1) {
+    if (scope_read(fd, buf, sizeof(buf)) == -1) {
         DBG(NULL);
-        g_fn.close(fd);
+        scope_close(fd);
         return -1;
     }
 
-    if ((start = strstr(buf, "VmSize")) == NULL) {
+    if ((start = scope_strstr(buf, "VmSize")) == NULL) {
         DBG(NULL);
-        g_fn.close(fd);
+        scope_close(fd);
         return -1;        
     }
     
-    entry = strtok_r(start, delim, &last);
-    entry = strtok_r(NULL, delim, &last);
+    entry = scope_strtok_r(start, delim, &last);
+    entry = scope_strtok_r(NULL, delim, &last);
     if (entry == NULL) {
         DBG(NULL);
-        g_fn.close(fd);
+        scope_close(fd);
         return -1;        
     }
     
-    if ((result = strtol(entry, NULL, 0)) == (long)0) {
+    if ((result = scope_strtol(entry, NULL, 0)) == (long)0) {
         DBG(NULL);
-        g_fn.close(fd);
+        scope_close(fd);
         return -1;
     }
     
-    g_fn.close(fd);
+    scope_close(fd);
     return (int)result;
 }
 
@@ -298,30 +289,26 @@ osGetNumThreads(pid_t pid)
     const char delim[] = " ";
     char buf[1024];
 
-    if (!g_fn.open || !g_fn.read || !g_fn.close) {
-        return -1;
-    }
-
-    // Get the size of the file with stat, malloc buf then free
-    snprintf(buf, sizeof(buf), "/proc/%d/stat", pid);
-    if ((fd = g_fn.open(buf, O_RDONLY)) == -1) {
+    // Get the size of the file with stat, malloc buf then scope_free
+    scope_snprintf(buf, sizeof(buf), "/proc/%d/stat", pid);
+    if ((fd = scope_open(buf, O_RDONLY)) == -1) {
         DBG(NULL);
         return -1;
     }
 
-    if (g_fn.read(fd, buf, sizeof(buf)) == -1) {
+    if (scope_read(fd, buf, sizeof(buf)) == -1) {
         DBG(NULL);
-        g_fn.close(fd);
+        scope_close(fd);
         return -1;
     }
 
-    entry = strtok_r(buf, delim, &last);
+    entry = scope_strtok_r(buf, delim, &last);
     for (i = 1; i < 20; i++) {
-        entry = strtok_r(NULL, delim, &last);
+        entry = scope_strtok_r(NULL, delim, &last);
     }
-    g_fn.close(fd);
+    scope_close(fd);
 
-    if ((result = strtol(entry, NULL, 0)) == (long)0) {
+    if ((result = scope_strtol(entry, NULL, 0)) == (long)0) {
         DBG(NULL);
         return -1;
     }
@@ -336,21 +323,19 @@ osGetNumFds(pid_t pid)
     struct dirent * entry;
     char buf[1024];
 
-    if (!g_fn.opendir || !g_fn.readdir || !g_fn.closedir) return -1;
-
-    snprintf(buf, sizeof(buf), "/proc/%d/fd", pid);
-    if ((dirp = g_fn.opendir(buf)) == NULL) {
+    scope_snprintf(buf, sizeof(buf), "/proc/%d/fd", pid);
+    if ((dirp = scope_opendir(buf)) == NULL) {
         DBG(NULL);
         return -1;
     }
     
-    while ((entry = g_fn.readdir(dirp)) != NULL) {
+    while ((entry = scope_readdir(dirp)) != NULL) {
         if (entry->d_type != DT_DIR) {
             nfile++;
         }
     }
 
-    g_fn.closedir(dirp);
+    scope_closedir(dirp);
     return nfile - 1; // we opened one fd to read /fd :)
 }
 
@@ -362,19 +347,17 @@ osGetNumChildProcs(pid_t pid)
     struct dirent * entry;
     char buf[1024];
 
-    if (!g_fn.opendir || !g_fn.readdir || !g_fn.closedir) return -1;
-
-    snprintf(buf, sizeof(buf), "/proc/%d/task", pid);
-    if ((dirp = g_fn.opendir(buf)) == NULL) {
+    scope_snprintf(buf, sizeof(buf), "/proc/%d/task", pid);
+    if ((dirp = scope_opendir(buf)) == NULL) {
         DBG(NULL);
         return -1;
     }
     
-    while ((entry = g_fn.readdir(dirp)) != NULL) {
+    while ((entry = scope_readdir(dirp)) != NULL) {
             nchild++;
     }
 
-    g_fn.closedir(dirp);
+    scope_closedir(dirp);
     return nchild - 3; // Not including the parent proc itself and ., ..
 }
 
@@ -386,11 +369,7 @@ osInitTimer(platform_time_t *cfg)
     char *buf;
     const char path[] = "/proc/cpuinfo";
 
-    if (!g_fn.open || !g_fn.read || !g_fn.close) {
-        return -1;
-    }
-
-    if ((fd = g_fn.open(path, O_RDONLY)) == -1) {
+    if ((fd = scope_open(path, O_RDONLY)) == -1) {
         DBG(NULL);
         return -1;
     }
@@ -399,26 +378,26 @@ osInitTimer(platform_time_t *cfg)
      * Anecdotal evidence that there is a max size to proc entrires.
      * In any case this should be big enough.
      */    
-    if ((buf = calloc(1, MAX_PROC)) == NULL) {
+    if ((buf = scope_calloc(1, MAX_PROC)) == NULL) {
         DBG(NULL);
-        g_fn.close(fd);
+        scope_close(fd);
         return -1;
     }
     
-    if (g_fn.read(fd, buf, MAX_PROC) == -1) {
+    if (scope_read(fd, buf, MAX_PROC) == -1) {
         DBG(NULL);
-        g_fn.close(fd);
-        free(buf);
+        scope_close(fd);
+        scope_free(buf);
         return -1;
     }
 
-    if (strstr(buf, "rdtscp") == NULL) {
+    if (scope_strstr(buf, "rdtscp") == NULL) {
         cfg->tsc_rdtscp = FALSE;
     } else {
         cfg->tsc_rdtscp = TRUE;
     }
     
-    if (strstr(buf, "tsc_reliable") == NULL) {
+    if (scope_strstr(buf, "tsc_reliable") == NULL) {
         cfg->tsc_invariant = FALSE;
     } else {
         cfg->tsc_invariant = TRUE;
@@ -466,8 +445,8 @@ osInitTimer(platform_time_t *cfg)
 #error No architecture defined
 #endif
 
-    g_fn.close(fd);
-    free(buf);
+    scope_close(fd);
+    scope_free(buf);
     if (cfg->freq == (uint64_t)-1) {
         DBG(NULL);
         return -1;
@@ -480,11 +459,7 @@ osIsFilePresent(pid_t pid, const char *path)
 {
     struct stat sb = {0};
 
-    if (!g_fn.__xstat) {
-        return -1;
-    }
-
-    if (g_fn.__xstat(_STAT_VER, path, &sb) != 0) {
+    if (scope___xstat(_STAT_VER, path, &sb) != 0) {
         return -1;
     } else {
         return sb.st_size;
@@ -502,24 +477,21 @@ osGetCmdline(pid_t pid, char **cmd)
     char *buf = *cmd;
     buf = NULL;
 
-    if (!g_fn.open || !g_fn.read || !g_fn.close) {
+
+    if ((buf = scope_calloc(1, NCARGS)) == NULL) {
         goto out;
     }
 
-    if ((buf = calloc(1, NCARGS)) == NULL) {
+    if (scope_snprintf(path, sizeof(path), "/proc/%d/cmdline", pid) < 0) {
         goto out;
     }
 
-    if (snprintf(path, sizeof(path), "/proc/%d/cmdline", pid) < 0) {
-        goto out;
-    }
-
-    if ((fd = g_fn.open(path, O_RDONLY)) == -1) {
+    if ((fd = scope_open(path, O_RDONLY)) == -1) {
         DBG(NULL);
         goto out;
     }
 
-    if ((bytesRead = g_fn.read(fd, buf, NCARGS)) <= 0) {
+    if ((bytesRead = scope_read(fd, buf, NCARGS)) <= 0) {
         DBG(NULL);
         goto out;
     }
@@ -532,17 +504,17 @@ osGetCmdline(pid_t pid, char **cmd)
 
 out:
     if (!buf || !buf[0]) {
-        if (buf) free(buf);
-        buf = strdup("none");
+        if (buf) scope_free(buf);
+        buf = scope_strdup("none");
     } else {
-        // buf is big; try to strdup what we've used and free the rest
-        char* tmp = strdup(buf);
+        // buf is big; try to scope_strdup what we've used and scope_free the rest
+        char* tmp = scope_strdup(buf);
         if (tmp) {
-            free(buf);
+            scope_free(buf);
             buf = tmp;
         }
     }
-    if (fd != -1) g_fn.close(fd);
+    if (fd != -1) scope_close(fd);
     *cmd = buf;
     return (*cmd != NULL);
 }
@@ -623,31 +595,27 @@ osGetPageProt(uint64_t addr)
     size_t len = 0;
     char *buf = NULL;
 
-    if (!g_fn.fopen || !g_fn.getline || !g_fn.fclose) {
-        return -1;
-    }
-
     if (addr == 0) {
         return -1;
     }
 
-    FILE *fstream = g_fn.fopen("/proc/self/maps", "r");
+    FILE *fstream = scope_fopen("/proc/self/maps", "r");
     if (fstream == NULL) return -1;
 
-    while (g_fn.getline(&buf, &len, fstream) != -1) {
+    while (scope_getline(&buf, &len, fstream) != -1) {
         char *end = NULL;
-        errno = 0;
-        uint64_t addr1 = strtoull(buf, &end, 0x10);
-        if ((addr1 == 0) || (errno != 0)) {
-            if (buf) free(buf);
-            g_fn.fclose(fstream);
+        scope_errno = 0;
+        uint64_t addr1 = scope_strtoull(buf, &end, 0x10);
+        if ((addr1 == 0) || (scope_errno != 0)) {
+            if (buf) scope_free(buf);
+            scope_fclose(fstream);
             return -1;
         }
 
-        uint64_t addr2 = strtoull(end + 1, &end, 0x10);
-        if ((addr2 == 0) || (errno != 0)) {
-            if (buf) free(buf);
-            g_fn.fclose(fstream);
+        uint64_t addr2 = scope_strtoull(end + 1, &end, 0x10);
+        if ((addr2 == 0) || (scope_errno != 0)) {
+            if (buf) scope_free(buf);
+            scope_fclose(fstream);
             return -1;
         }
 
@@ -660,19 +628,19 @@ osGetPageProt(uint64_t addr)
             prot |= perms[0] == 'r' ? PROT_READ : 0;
             prot |= perms[1] == 'w' ? PROT_WRITE : 0;
             prot |= perms[2] == 'x' ? PROT_EXEC : 0;
-            if (buf) free(buf);
+            if (buf) scope_free(buf);
             break;
         }
 
         if (buf) {
-            free(buf);
+            scope_free(buf);
             buf = NULL;
         }
 
         len = 0;
     }
 
-    g_fn.fclose(fstream);
+    scope_fclose(fstream);
     return prot;
 }
 
@@ -682,15 +650,13 @@ osNeedsConnect(int fd)
     int rc, timeout;
     struct pollfd fds;
 
-    if (!g_fn.poll) return 0;
-
     timeout = 0;
-    memset(&fds, 0x0, sizeof(fds));
+    scope_memset(&fds, 0x0, sizeof(fds));
     fds.events = POLLRDHUP | POLLOUT;
 
     fds.fd = fd;
 
-    rc = g_fn.poll(&fds, 1, timeout);
+    rc = scope_poll(&fds, 1, timeout);
 
     if ((rc != 0) && (((fds.revents & POLLRDHUP) != 0) || ((fds.revents & POLLERR) != 0))) return 1;
     return 0;
@@ -719,39 +685,39 @@ osGetCgroup(pid_t pid, char *cgroup, size_t cglen)
     char *buf = NULL;
     char path[PATH_MAX];
 
-    if (!g_fn.fopen || !g_fn.getline || !g_fn.fclose || (cglen <= 0)) {
+    if (cglen <= 0) {
         return FALSE;
     }
 
-    if (snprintf(path, sizeof(path), "/proc/%d/cgroup", pid) < 0) return FALSE;
+    if (scope_snprintf(path, sizeof(path), "/proc/%d/cgroup", pid) < 0) return FALSE;
 
-    FILE *fstream = g_fn.fopen(path, "r");
+    FILE *fstream = scope_fopen(path, "r");
     if (fstream == NULL) return FALSE;
 
-    while (g_fn.getline(&buf, &len, fstream) != -1) {
-        if (buf && strstr(buf, "0::")) {
-            strncpy(cgroup, buf, cglen);
-            char *nonl = strchr(cgroup, '\n');
+    while (scope_getline(&buf, &len, fstream) != -1) {
+        if (buf && scope_strstr(buf, "0::")) {
+            scope_strncpy(cgroup, buf, cglen);
+            char *nonl = scope_strchr(cgroup, '\n');
             if (nonl) *nonl = '\0';
 
-            free(buf);
-            g_fn.fclose(fstream);
+            scope_free(buf);
+            scope_fclose(fstream);
             return TRUE;
         }
 
-        if (buf) free(buf);
+        if (buf) scope_free(buf);
         buf = NULL;
         len = 0;
     }
 
-    g_fn.fclose(fstream);
+    scope_fclose(fstream);
     return FALSE;
 }
 
 char *
 osGetFileMode(mode_t perm)
 {
-    char *mode = malloc(MODE_STR);
+    char *mode = scope_malloc(MODE_STR);
     if (!mode) return NULL;
 
     mode[0] = (perm & S_IRUSR) ? 'r' : '-';
@@ -774,10 +740,10 @@ osGetUserName(unsigned uid)
     struct passwd *pwd_res = NULL;
     char buf[4096];
 
-    int ret = getpwuid_r(uid, &pwd, buf, sizeof(buf), &pwd_res);
+    int ret = scope_getpwuid_r(uid, &pwd, buf, sizeof(buf), &pwd_res);
     if (ret)
         return NULL;
-    return strdup(pwd.pw_name);
+    return scope_strdup(pwd.pw_name);
 }
 
 char *
@@ -787,8 +753,8 @@ osGetGroupName(unsigned gid)
     struct group *grp_res = NULL;
     char buf[4096];
 
-    int ret = getgrgid_r(gid, &grp, buf, sizeof(buf), &grp_res);
-    if (ret)
-        return NULL;
-    return strdup(grp.gr_name);
+    scope_getgrgid_r(gid, &grp, buf, sizeof(buf), &grp_res);
+    if (grp_res)
+        return scope_strdup(grp.gr_name);
+    return NULL;
 }

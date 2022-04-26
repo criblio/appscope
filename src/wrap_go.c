@@ -255,16 +255,16 @@ looks_like_first_inst_of_go_func(cs_insn* asm_inst)
                (char*)asm_inst->mnemonic,
                (char*)asm_inst->op_str);
         
-    return (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
-            !scope_strcmp((const char*)asm_inst->op_str, "rcx, qword ptr fs:[0xfffffffffffffff8]")) ||
+    return (!strcmp((const char*)asm_inst->mnemonic, "mov") &&
+            !strcmp((const char*)asm_inst->op_str, "rcx, qword ptr fs:[0xfffffffffffffff8]")) ||
             // -buildmode=pie compiles to this:
-            (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
-            !scope_strcmp((const char*)asm_inst->op_str, "rcx, -8")) || 
+            (!strcmp((const char*)asm_inst->mnemonic, "mov") &&
+            !strcmp((const char*)asm_inst->op_str, "rcx, -8")) || 
             // In Go 17 we extended the definition of function preamble with:
-            (!scope_strcmp((const char*)asm_inst->mnemonic, "cmp") &&
-            !scope_strcmp((const char*)asm_inst->op_str, "rsp, qword ptr [r14 + 0x10]")) ||
-            (!scope_strcmp((const char*)asm_inst->mnemonic, "lea") &&
-            !scope_strcmp((const char*)asm_inst->op_str, "r12, [rsp - 0x10]"));
+            (!strcmp((const char*)asm_inst->mnemonic, "cmp") &&
+            !strcmp((const char*)asm_inst->op_str, "rsp, qword ptr [r14 + 0x10]")) ||
+            (!strcmp((const char*)asm_inst->mnemonic, "lea") &&
+            !strcmp((const char*)asm_inst->op_str, "r12, [rsp - 0x10]"));
 }
 
 // Calculate the value to be added/subtracted at an add/sub instruction
@@ -316,7 +316,7 @@ patch_first_instruction(funchook_t *funchook,
     for (i=0; i<asm_count; i++) {
         // Stop when it looks like we've hit another goroutine
         if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
-                  (!scope_strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
+                  (!strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
                   asm_inst[i].size == 1 ))) {
             break;
         }
@@ -374,7 +374,7 @@ patch_return_addrs(funchook_t *funchook,
 
         // Stop when it looks like we've hit another goroutine
         if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
-                  (!scope_strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
+                  (!strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
                   asm_inst[i].size == 1 ))) {
             break;
         }
@@ -398,19 +398,19 @@ patch_return_addrs(funchook_t *funchook,
         // Or, if the current inst is xorps then proceed without a stack frame size.
         // If the current inst is not a ret or xorps, don't funchook.
         uint32_t add_arg = 0;
-        if (((!scope_strcmp((const char*)asm_inst[i].mnemonic, "ret") &&
+        if (((!strcmp((const char*)asm_inst[i].mnemonic, "ret") &&
               (asm_inst[i].size == 1) &&
-              (!scope_strcmp((const char*)asm_inst[i-1].mnemonic, "add") ||
-              !scope_strcmp((const char*)asm_inst[i-1].mnemonic, "sub")) &&
+              (!strcmp((const char*)asm_inst[i-1].mnemonic, "add") ||
+              !strcmp((const char*)asm_inst[i-1].mnemonic, "sub")) &&
               (add_arg = add_argument(&asm_inst[i-1]))) ||
-              ((g_go_major_ver > 16) && !scope_strcmp((const char*)asm_inst[i].mnemonic, "xorps") &&
+              ((g_go_major_ver > 16) && !strcmp((const char*)asm_inst[i].mnemonic, "xorps") &&
               (asm_inst[i].size == 4)))) {
 
             // Patch the address before the ret instruction to maintain the callee stack context
             void *pre_patch_addr = (void*)asm_inst[i-1].address;
             void *patch_addr = (void*)asm_inst[i-1].address;
             // we aren't dealing with a ret, we must patch the xorps instruction exactly
-            if (!scope_strcmp((const char*)asm_inst[i].mnemonic, "xorps")) {
+            if (!strcmp((const char*)asm_inst[i].mnemonic, "xorps")) {
                 pre_patch_addr = (void*)asm_inst[i].address;
                 patch_addr = (void*)asm_inst[i].address;
             }
@@ -430,7 +430,7 @@ patch_return_addrs(funchook_t *funchook,
             tap->frame_size = add_arg;
 
             // We need to force a break in the "xorps" case since the code won't be returning here
-            if ((g_go_major_ver > 16) && !scope_strcmp((const char*)asm_inst[i].mnemonic, "xorps")) break;
+            if ((g_go_major_ver > 16) && !strcmp((const char*)asm_inst[i].mnemonic, "xorps")) break;
         }
     }
     patchprint("\n\n");
@@ -534,23 +534,23 @@ adjustGoStructOffsetsForVersion(int go_ver)
     int fd;
     if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
         ((fd = g_fn.open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
-        scope_dprintf(fd, "runtime.g|m=%d|\n", g_go_schema->struct_offsets.g_to_m);
-        scope_dprintf(fd, "runtime.m|tls=%d|\n", g_go_schema->struct_offsets.m_to_tls);
-        scope_dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go_schema->struct_offsets.connReader_to_conn);
-        scope_dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_conn);
-        scope_dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_bufrd);
-        scope_dprintf(fd, "runtime.iface|data=%d|\n", g_go_schema->struct_offsets.iface_data);
+        dprintf(fd, "runtime.g|m=%d|\n", g_go_schema->struct_offsets.g_to_m);
+        dprintf(fd, "runtime.m|tls=%d|\n", g_go_schema->struct_offsets.m_to_tls);
+        dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go_schema->struct_offsets.connReader_to_conn);
+        dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_conn);
+        dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_bufrd);
+        dprintf(fd, "runtime.iface|data=%d|\n", g_go_schema->struct_offsets.iface_data);
         // go 1.8 has a direct netfd_to_sysfd field, others are less direct
         if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) {
-            scope_dprintf(fd, "net.netFD|pfd=%d|\n", g_go_schema->struct_offsets.netfd_to_pd);
-            scope_dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go_schema->struct_offsets.pd_to_fd);
+            dprintf(fd, "net.netFD|pfd=%d|\n", g_go_schema->struct_offsets.netfd_to_pd);
+            dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go_schema->struct_offsets.pd_to_fd);
         } else {
-            scope_dprintf(fd, "net.netFD|sysfd=%d|\n", g_go_schema->struct_offsets.netfd_to_sysfd);
+            dprintf(fd, "net.netFD|sysfd=%d|\n", g_go_schema->struct_offsets.netfd_to_sysfd);
         }
-        scope_dprintf(fd, "bufio.Reader|buf=%d|\n", g_go_schema->struct_offsets.bufrd_to_buf);
-        scope_dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go_schema->struct_offsets.conn_to_rwc);
-        scope_dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go_schema->struct_offsets.conn_to_tlsState);
-        scope_dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_tlsState);
+        dprintf(fd, "bufio.Reader|buf=%d|\n", g_go_schema->struct_offsets.bufrd_to_buf);
+        dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go_schema->struct_offsets.conn_to_rwc);
+        dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go_schema->struct_offsets.conn_to_tlsState);
+        dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_tlsState);
         g_fn.close(fd);
     }
 

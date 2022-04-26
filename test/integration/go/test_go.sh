@@ -129,6 +129,7 @@ sleep 1
 curl http://localhost:${PORT}/hello
 ERR+=$?
 
+sleep 0.5
 # This stops plainServerDynamic
 pkill -f plainServerDynamic
 
@@ -178,6 +179,7 @@ sleep 1
 curl http://localhost:${PORT}/hello
 ERR+=$?
 
+sleep 0.5
 # This stops plainServerStatic
 pkill -f plainServerStatic
 
@@ -227,6 +229,7 @@ sleep 1
 curl -k --key server.key --cert server.crt https://localhost:${PORT}/hello
 ERR+=$?
 
+sleep 0.5
 # This stops tlsServerDynamic
 pkill -f tlsServerDynamic
 
@@ -277,6 +280,7 @@ sleep 1
 curl -k --key server.key --cert server.crt https://localhost:${PORT}/hello
 ERR+=$?
 
+sleep 0.5
 # This stops tlsServerStatic
 pkill -f tlsServerStatic
 
@@ -543,7 +547,7 @@ if ! ps -p $SCOPE_PID > /dev/null; then
 fi
 
 while kill -0 ${SCOPE_PID} &> /dev/null; do
-  kill -SIGTERM ${SCOPE_PID}
+  kill -SIGKILL ${SCOPE_PID}
   sleep 1
 done
 
@@ -573,7 +577,7 @@ if ! ps -p ${SCOPE_PID} > /dev/null; then
 fi
 
 while kill -0 ${SCOPE_PID} &> /dev/null; do
-  kill -SIGTERM ${SCOPE_PID}
+  kill -SIGKILL ${SCOPE_PID}
   sleep 1
 done
 
@@ -603,7 +607,7 @@ if ! ps -p ${SCOPE_PID} > /dev/null; then
 fi
 
 while kill -0 ${SCOPE_PID} &> /dev/null; do
-  kill -SIGTERM ${SCOPE_PID}
+  kill -SIGKILL ${SCOPE_PID}
   sleep 1
 done
 
@@ -671,11 +675,12 @@ influx_start_server() {
 }
 
 influx_eval() {
+    sleep 2
     pkill -f $2
 
     pexist="influxd"
     until test -z "$pexist" ; do
-	    sleep 1
+	    sleep 2
 	    pexist=`ps -ef | grep influxd | grep config`
     done
 

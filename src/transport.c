@@ -336,6 +336,45 @@ transportRegisterForExitNotification(void (*fn)(void))
     atexit(fn);
 }
 
+static char *
+sslErrStr(int ssl_err)
+{
+    char * retval = "UNKNOWN ERR";
+    switch (ssl_err) {
+        case SSL_ERROR_NONE:
+            retval = "SSL_ERROR_NONE";
+            break;
+        case SSL_ERROR_ZERO_RETURN:
+            retval = "SSL_ERROR_ZERO_RETURN";
+            break;
+        case SSL_ERROR_WANT_READ:
+            retval = "SSL_ERROR_WANT_READ";
+            break;
+        case SSL_ERROR_WANT_WRITE:
+            retval = "SSL_ERROR_WANT_WRITE";
+            break;
+        case SSL_ERROR_WANT_CONNECT:
+            retval = "SSL_ERROR_WANT_CONNECT";
+            break;
+        case SSL_ERROR_WANT_ACCEPT:
+            retval = "SSL_ERROR_WANT_ACCEPT";
+            break;
+        case SSL_ERROR_WANT_X509_LOOKUP:
+            retval = "SSL_ERROR_WANT_X509_LOOKUP";
+            break;
+        case SSL_ERROR_SYSCALL:
+            retval = "SSL_ERROR_SYSCALL";
+            break;
+        case SSL_ERROR_SSL:
+            retval = "SSL_ERROR_SSL";
+            break;
+        default:
+            DBG(NULL);
+            break;
+    }
+    return retval;
+}
+
 static int
 establishTlsSession(transport_t *trans)
 {
@@ -376,18 +415,46 @@ establishTlsSession(transport_t *trans)
         goto err;
     }
 
-    ERR_clear_error(); // to make SSL_get_error reliable
-    int con_rv = SSL_connect(trans->net.tls.ssl);
-    if (con_rv != 1) {
-        char err[256] = {0};
+    int con_rv = -1;
+    while (TRUE) {
+        ERR_clear_error(); // to make SSL_get_error reliable
+        con_rv = SSL_connect(trans->net.tls.ssl);
+        if (con_rv == 1) break; // Successful!
+
+        // WANT_READ and WANT_WRITE aren't *errors*, but are indications
+        // that SSL_connect needs to be retried after there is read or write
+        // activity.  (Happens with non-blocking sockets)
         int ssl_err = SSL_get_error(trans->net.tls.ssl, con_rv);
-        ERR_error_string_n(ssl_err, err, sizeof(err));
-        scopeLogInfo("fd:%d error establishing tls connection: %s", trans->net.sock, err);
-        if (ssl_err == SSL_ERROR_SSL || ssl_err == SSL_ERROR_SYSCALL) {
-            ERR_error_string_n(ERR_peek_last_error() , err, sizeof(err));
-            scopeLogInfo("fd:%d error establishing tls connection: %s %d", trans->net.sock, err, errno);
+        if (ssl_err == SSL_ERROR_WANT_READ || ssl_err == SSL_ERROR_WANT_WRITE) {
+            struct timeval tv = {.tv_sec = MAX_TLS_CONNECT_SECONDS, .tv_usec = 0}; // 5 s
+            fd_set fds;
+            FD_ZERO(&fds);
+            FD_SET(trans->net.sock, &fds);
+            int select_rv;
+            if (ssl_err == SSL_ERROR_WANT_READ) {
+                select_rv = g_fn.select(trans->net.sock+1, &fds, NULL, NULL, &tv);
+            } else { //    SSL_ERROR_WANT_WRITE
+                select_rv = g_fn.select(trans->net.sock+1, NULL, &fds, NULL, &tv);
+            }
+            if (select_rv > 0) continue; // Yes!  time to try SSL_connect again
+
+            // At this point something went wrong with the SSL_connect process.
+            // Report the information we have and cleanup.
+            if (select_rv == 0) {
+                scopeLogInfo("fd:%d error establishing tls connection (timeout)", trans->net.sock);
+            } else {
+                scopeLogInfo("fd:%d error establishing tls connection (select): errno=%d", trans->net.sock, errno);
+            }
             trans->net.failure_reason = TLS_CONN_FAIL;
+            goto err;
         }
+
+        // At this point something went wrong with the SSL_connect process.
+        // Report the information we can and cleanup.
+        char err[256] = {0};
+        ERR_error_string_n(ssl_err, err, sizeof(err));
+        scopeLogInfo("fd:%d error establishing tls connection: %s %s %d", trans->net.sock, sslErrStr(ssl_err), err, errno);
+        trans->net.failure_reason = TLS_CONN_FAIL;
         goto err;
     }
 
@@ -663,11 +730,6 @@ checkPendingSocketStatus(transport_t *trans)
     // If the placeDescriptor call failed, we're done
     if (trans->net.sock == -1) return 0;
 
-    // Set the TCP socket to blocking
-    if ((trans->type == CFG_TCP) && !setSocketBlocking(trans, trans->net.sock, TRUE)) {
-        DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
-    }
-
     // We have a connected socket!  Woot!
     trans->net.connect_attempts = 0;
     trans->net.failure_reason = NO_FAIL;
@@ -677,6 +739,11 @@ checkPendingSocketStatus(transport_t *trans)
         // when successful, we'll have a connected tls socket.
         // when not, this will cleanup, disconnecting the socket.
         establishTlsSession(trans);
+    }
+
+    // Set the TCP socket to blocking
+    if ((trans->type == CFG_TCP) && !setSocketBlocking(trans, trans->net.sock, TRUE)) {
+        DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
     }
 
     return 1;

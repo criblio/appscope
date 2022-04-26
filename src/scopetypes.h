@@ -227,5 +227,10 @@ typedef unsigned int bool;
 #define LD_LIB_ENV "LD_LIBRARY_PATH"
 #define LD_LIB_DIR "libscope-v"
 
+// We've seen TLS connections hang when the remote side drops during the
+// establishTlsSession() process...  this helps ensure we won't hang
+// processes forever while waiting for a single connection to complete.
+#define MAX_TLS_CONNECT_SECONDS 5
+
 #endif // __SCOPETYPES_H__
 

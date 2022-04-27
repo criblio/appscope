@@ -49,8 +49,8 @@ extern int getentropy(void *, size_t);
 
 static inline uint64_t get_random_secret()
 {
-	uint64_t secret;
-	getentropy(&secret, sizeof secret);
+	static uint64_t secret;
+	if (secret == 0) getentropy(&secret, sizeof secret);
 	return secret;
 }
 

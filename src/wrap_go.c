@@ -408,7 +408,7 @@ patch_return_addrs(funchook_t *funchook,
             void *pre_patch_addr = (void*)asm_inst[i-1].address;
             void *patch_addr = (void*)asm_inst[i-1].address;
             // we aren't dealing with a ret, we must patch the xorps instruction exactly
-            if (!strcmp((const char*)asm_inst[i].mnemonic, "xorps")) {
+            if (!scope_strcmp((const char*)asm_inst[i].mnemonic, "xorps")) {
                 pre_patch_addr = (void*)asm_inst[i].address;
                 patch_addr = (void*)asm_inst[i].address;
             }
@@ -428,7 +428,7 @@ patch_return_addrs(funchook_t *funchook,
             tap->frame_size = add_arg;
 
             // We need to force a break in the "xorps" case since the code won't be returning here
-            if ((g_go_major_ver > 16) && !strcmp((const char*)asm_inst[i].mnemonic, "xorps")) break;
+            if ((g_go_major_ver > 16) && !scope_strcmp((const char*)asm_inst[i].mnemonic, "xorps")) break;
         }
     }
     patchprint("\n\n");

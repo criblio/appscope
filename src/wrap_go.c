@@ -224,12 +224,26 @@ devnull(const char* fmt, ...)
 }
 #endif
 
+void
+free_str(char* str) {
+    // Go 17 and higher use null terminated strings instead of a string and a length
+    if (g_go_major_ver > 16) {
+        return;
+    }
+    if(str) scope_free(str);
+}
+
 // c_str() is provided to convert a go-style string to a c-style string.
 // The resulting c_str will need to be passed to free() when it is no
 // longer needed.
 static char *
 c_str(gostring_t *go_str)
 {
+    // Go 17 and higher use null terminated strings instead of a string and a length
+    if (g_go_major_ver > 16) {
+        return (char *)go_str;
+    }
+
     if (!go_str || go_str->len <= 0) return NULL;
 
     char *path;
@@ -877,7 +891,7 @@ c_write(char *stackaddr)
     funcprint("Scope: write fd %ld rc %ld buf %s\n", fd, rc, buf);
     doWrite(fd, initialTime, (rc != -1), buf, rc, "go_write", BUF, 0);
 
-    if (buf) scope_free(buf);
+    free_str(buf);
 }
 
 EXPORTON void *
@@ -930,7 +944,7 @@ c_unlinkat(char *stackaddr)
     funcprint("Scope: unlinkat dirfd %ld pathname %s flags %ld\n", dirfd, pathname, flags);
     doDelete(pathname, "go_unlinkat");
 
-    if (pathname) scope_free(pathname);
+    free_str(pathname);
 }
 
 EXPORTON void *
@@ -961,7 +975,7 @@ c_open(char *stackaddr)
     funcprint("Scope: open of %ld\n", fd);
     doOpen(fd, path, FD, "open");
 
-    if (path) scope_free(path);
+    free_str(path);
 }
 
 EXPORTON void *
@@ -1011,7 +1025,7 @@ c_read(char *stackaddr)
     funcprint("Scope: read of %ld rc %ld\n", fd, rc);
     doRead(fd, initialTime, (rc != -1), buf, rc, "go_read", BUF, 0);
 
-    if(buf) scope_free(buf);
+    free_str(buf);
 }
 
 EXPORTON void *
@@ -1144,7 +1158,7 @@ c_http_server_read(char *stackaddr)
         }
     }
 
-    if (buf) scope_free(buf);
+    free_str(buf);
 }
 
 EXPORTON void *
@@ -1199,7 +1213,7 @@ c_http_server_write(char *stackaddr)
         }
     }
 
-    if (buf) scope_free(buf);
+    free_str(buf);
 }
 
 EXPORTON void *
@@ -1260,7 +1274,7 @@ c_http_client_write(char *stackaddr)
         funcprint("Scope: c_http_client_write of %d\n", fd);
     }
 
-    if (buf) scope_free(buf);
+    free_str(buf);
 }
 
 EXPORTON void *
@@ -1327,7 +1341,7 @@ c_http_client_read(char *stackaddr)
             funcprint("Scope: c_http_client_read of %d\n", fd);
         }
 
-        if (buf) scope_free(buf);
+        free_str(buf);
     }
 }
 

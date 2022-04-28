@@ -870,12 +870,14 @@ static void
 c_write(char *stackaddr)
 {
     uint64_t fd  = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_write_fd);
-    uint64_t buf = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_write_buf);
+    char *buf    = c_str((gostring_t*)(stackaddr + g_go_schema->arg_offsets.c_write_buf));
     uint64_t rc  = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_write_rc);
     uint64_t initialTime = getTime();
 
-    funcprint("Scope: write fd %ld rc %ld buf 0x%lx\n", fd, rc, buf);
-    doWrite(fd, initialTime, (rc != -1), (char *)buf, rc, "go_write", BUF, 0);
+    funcprint("Scope: write fd %ld rc %ld buf %s\n", fd, rc, buf);
+    doWrite(fd, initialTime, (rc != -1), buf, rc, "go_write", BUF, 0);
+
+    if (buf) scope_free(buf);
 }
 
 EXPORTON void *
@@ -915,7 +917,7 @@ static void
 c_unlinkat(char *stackaddr)
 {
     uint64_t dirfd    = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_dirfd);
-    uint64_t pathname = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_pathname);
+    char *pathname    = c_str((gostring_t*)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_pathname));
     uint64_t flags    = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_flags);
 
     if (!pathname) {
@@ -926,7 +928,9 @@ c_unlinkat(char *stackaddr)
     }
 
     funcprint("Scope: unlinkat dirfd %ld pathname %s flags %ld\n", dirfd, pathname, flags);
-    doDelete((char *)pathname, "go_unlinkat");
+    doDelete(pathname, "go_unlinkat");
+
+    if (pathname) scope_free(pathname);
 }
 
 EXPORTON void *
@@ -944,8 +948,8 @@ go_unlinkat(char *stackptr)
 static void
 c_open(char *stackaddr)
 {
-    uint64_t fd    = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_open_fd);
-    uint64_t path  = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_open_path);
+    uint64_t fd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_open_fd);
+    char *path  = c_str((gostring_t*)(stackaddr + g_go_schema->arg_offsets.c_open_path));
 
     if (!path) {
         scopeLogError("ERROR:go_open: null pathname");
@@ -955,7 +959,9 @@ c_open(char *stackaddr)
     }
 
     funcprint("Scope: open of %ld\n", fd);
-    doOpen(fd, (char *)path, FD, "open");
+    doOpen(fd, path, FD, "open");
+
+    if (path) scope_free(path);
 }
 
 EXPORTON void *
@@ -996,14 +1002,16 @@ static void
 c_read(char *stackaddr)
 {
     uint64_t fd  = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_read_fd);
-    uint64_t buf = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_read_buf);
+    char *buf    = c_str((gostring_t*)(stackaddr + g_go_schema->arg_offsets.c_read_buf));
     uint64_t rc  = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_read_rc);
     uint64_t initialTime = getTime();
 
     if (rc == -1) return;
 
     funcprint("Scope: read of %ld rc %ld\n", fd, rc);
-    doRead(fd, initialTime, (rc != -1), (void*)buf, rc, "go_read", BUF, 0);
+    doRead(fd, initialTime, (rc != -1), buf, rc, "go_read", BUF, 0);
+
+    if(buf) scope_free(buf);
 }
 
 EXPORTON void *
@@ -1097,7 +1105,7 @@ c_http_server_read(char *stackaddr)
 
     uint64_t connReader = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_connReader); 
     if (!connReader) return;   // protect from dereferencing null
-    uint64_t buf        = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_buf);
+    char *buf           = c_str((gostring_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_buf));
     // buf len 0x18
     // buf cap 0x20
     uint64_t rc         = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_rc);
@@ -1132,9 +1140,11 @@ c_http_server_read(char *stackaddr)
             }
 
             funcprint("Scope: go_http_server_read of %d\n", fd);
-            doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
+            doProtocol((uint64_t)0, fd, buf, rc, TLSRX, BUF);
         }
     }
+
+    if (buf) scope_free(buf);
 }
 
 EXPORTON void *
@@ -1167,7 +1177,7 @@ c_http_server_write(char *stackaddr)
     int fd = -1;
     uint64_t conn = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_conn);
     if (!conn) return;         // protect from dereferencing null
-    uint64_t buf  = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_buf);
+    char *buf     = c_str((gostring_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_buf));
     uint64_t rc   = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_rc);
     uint64_t w_conn_rwc_if, w_conn_rwc, netFD, pfd;
 
@@ -1185,9 +1195,11 @@ c_http_server_write(char *stackaddr)
             }
 
             funcprint("Scope: c_http_server_write of %d\n", fd);
-            doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSTX, BUF);
+            doProtocol((uint64_t)0, fd, buf, rc, TLSTX, BUF);
         }
     }
+
+    if (buf) scope_free(buf);
 }
 
 EXPORTON void *
@@ -1222,7 +1234,7 @@ c_http_client_write(char *stackaddr)
 
     int fd = -1;
     uint64_t w_pc  = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_w_pc);
-    uint64_t buf   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_buf);
+    char *buf      = c_str((gostring_t*)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_buf));
     uint64_t rc    = *(uint64_t*)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_rc);
     uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
 
@@ -1244,9 +1256,11 @@ c_http_client_write(char *stackaddr)
             fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
         }
 
-        doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
+        doProtocol((uint64_t)0, fd, buf, rc, TLSRX, BUF);
         funcprint("Scope: c_http_client_write of %d\n", fd);
     }
+
+    if (buf) scope_free(buf);
 }
 
 EXPORTON void *
@@ -1283,7 +1297,8 @@ c_http_client_read(char *stackaddr)
     int fd = -1;
     stackaddr += g_go_schema->arg_offsets.c_http_client_read_callee;
     uint64_t pc  = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_read_pc); 
-    uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, buf = 0, len = 0;
+    uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, len = 0;
+    char *buf = NULL;
 
     pc_conn_if = (pc + g_go_schema->struct_offsets.persistConn_to_conn);
     uint64_t tls = *(uint64_t*)(pc + g_go_schema->struct_offsets.persistConn_to_tlsState);
@@ -1302,15 +1317,17 @@ c_http_client_read(char *stackaddr)
         }
 
         if ((pc_br = *(uint64_t *)(pc + g_go_schema->struct_offsets.persistConn_to_bufrd)) != 0) {
-            buf = *(uint64_t *)(pc_br + g_go_schema->struct_offsets.bufrd_to_buf);
+            buf = c_str((gostring_t*)(pc_br + g_go_schema->struct_offsets.bufrd_to_buf));
             // len is part of the []byte struct; the func doesn't return a len
             len = *(uint64_t *)(pc_br + 0x08);
         }
 
         if (buf && (len > 0)) {
-            doProtocol((uint64_t)0, fd, (void *)buf, len, TLSRX, BUF);
+            doProtocol((uint64_t)0, fd, buf, len, TLSRX, BUF);
             funcprint("Scope: c_http_client_read of %d\n", fd);
         }
+
+        if (buf) scope_free(buf);
     }
 }
 

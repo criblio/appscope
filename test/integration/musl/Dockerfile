@@ -1,6 +1,6 @@
 FROM alpine:latest
 
-RUN apk add bash binutils curl gcc gdb musl-dev openssl openssl-dev
+RUN apk add bash binutils curl gcc gdb musl-dev openssl openssl-dev socat
 
 RUN mkdir -p /opt/fwrite
 COPY ./musl/fwrite.c /opt/fwrite/fwrite.c

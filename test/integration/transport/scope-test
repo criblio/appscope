@@ -148,12 +148,14 @@ echo ===========================================================================
 echo
 echo ===============================================================================
 echo "Testing Number of Cribl/TLS Transport Connections"
-rm -f /tmp/appscope.pem
-cat /tmp/appscope.key /tmp/appscope.crt >> /tmp/appscope.pem
-chmod 600 /tmp/appscope.pem
-socat OPENSSL-LISTEN:12345,reuseaddr,cert=/tmp/appscope.pem,cafile=/tmp/appscope.crt,fork,verify=0 /dev/null &
+PEM_FILE=/tmp/appscope.pem
+rm -f $PEM_FILE
+cat /tmp/appscope.key /tmp/appscope.crt >> $PEM_FILE
+chmod 600 $PEM_FILE
+socat OPENSSL-LISTEN:12345,reuseaddr,cert=$PEM_FILE,cafile=/tmp/appscope.crt,fork,verify=0 /dev/null &
 
 if [ "$(wait_for_port 12345)" ]; then
+    ############################################################################
     echo "When in cribl mode, verify there is only one connection when:"
     echo " 1) SCOPE_PAYLOAD_ENABLE=false"
     echo " 2) no protocols are defined"
@@ -228,11 +230,25 @@ if [ "$(wait_for_port 12345)" ]; then
     fi
     sleep 3 # wait for the scoped sleep command to finish
 
+    ############################################################################
+    # Clean up, but don't treat any issues here as test failures
+    if ! rm -f $PEM_FILE; then
+        echo "unable to remove $PEM_FILE during cleanup"
+    fi
+    if ! kill `pidof socat`; then
+        echo "unable to kill socat process during cleanup"
+    fi
+    if ! rm -f $CFG_FILE; then
+        echo "unable to remove $CFG_FILE during cleanup"
+    fi
+
 else
     echo "  FAILED - no listener"
     ERR+=1
     ERRORS="$ERRORS Cribl/TLS_Connections"
 fi
+
+
 
 echo
 echo ===============================================================================

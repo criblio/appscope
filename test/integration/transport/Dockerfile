@@ -3,6 +3,8 @@ FROM cribl/cribl:latest
 RUN apt update && apt install -y \
   curl \
   net-tools \
+  socat \
+  lsof \
 && rm -rf /var/lib/apt/lists/*
 
 ENV CRIBL_NOAUTH=1

@@ -26,7 +26,6 @@ int doGotcha(struct link_map *, got_list_t *, Elf64_Rela *, Elf64_Sym *, char *,
 int getElfEntries(struct link_map *, Elf64_Rela **, Elf64_Sym **, char **, int *rsz);
 Elf64_Shdr* getElfSection(char *, const char *);
 void * getSymbol(const char *, char *);
-void * getGoSymbol(const char *, char *);
 void * getGoVersionAddr(const char*);
 bool is_static(char *);
 bool is_go(char *);

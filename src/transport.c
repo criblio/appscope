@@ -416,9 +416,9 @@ establishTlsSession(transport_t *trans)
             FD_SET(trans->net.sock, &fds);
             int select_rv;
             if (ssl_err == SSL_ERROR_WANT_READ) {
-                select_rv = g_fn.select(trans->net.sock+1, &fds, NULL, NULL, &tv);
+                select_rv = scope_select(trans->net.sock+1, &fds, NULL, NULL, &tv);
             } else { //    SSL_ERROR_WANT_WRITE
-                select_rv = g_fn.select(trans->net.sock+1, NULL, &fds, NULL, &tv);
+                select_rv = scope_select(trans->net.sock+1, NULL, &fds, NULL, &tv);
             }
             if (select_rv > 0) continue; // Yes!  time to try SSL_connect again
 
@@ -427,7 +427,7 @@ establishTlsSession(transport_t *trans)
             if (select_rv == 0) {
                 scopeLogInfo("fd:%d error establishing tls connection (timeout)", trans->net.sock);
             } else {
-                scopeLogInfo("fd:%d error establishing tls connection (select): errno=%d", trans->net.sock, errno);
+                scopeLogInfo("fd:%d error establishing tls connection (select): errno=%d", trans->net.sock, scope_errno);
             }
             trans->net.failure_reason = TLS_CONN_FAIL;
             goto err;
@@ -437,7 +437,7 @@ establishTlsSession(transport_t *trans)
         // Report the information we can and cleanup.
         char err[256] = {0};
         ERR_error_string_n(ssl_err, err, sizeof(err));
-        scopeLogInfo("fd:%d error establishing tls connection: %s %s %d", trans->net.sock, sslErrStr(ssl_err), err, errno);
+        scopeLogInfo("fd:%d error establishing tls connection: %s %s %d", trans->net.sock, sslErrStr(ssl_err), err, scope_errno);
         trans->net.failure_reason = TLS_CONN_FAIL;
         goto err;
     }

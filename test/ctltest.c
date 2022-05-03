@@ -761,9 +761,9 @@ ctlSendLogConsoleNoneAsciiData(void **state)
     non_basic_ascii_text[0] = 128;
     non_basic_ascii_text[1] = 157;
     non_basic_ascii_text[2] = 234;
-    non_basic_ascii_text[3] = '0';
+    non_basic_ascii_text[3] = '\0';
 
-    const char* binary_data_event_msg = "Binary data detected--- message";
+    const char* binary_data_event_msg = "-- binary data ignored --";
     proc_id_t proc = {.pid = 1,
                       .ppid = 1,
                       .hostname = "foo",
@@ -779,9 +779,28 @@ ctlSendLogConsoleNoneAsciiData(void **state)
     ctlSendLog(ctl, STDOUT_FILENO, console_path, non_basic_ascii_text, strlen(non_basic_ascii_text), 0, &proc);
     ctlFlushLog(ctl);
     const char *val = get_cbuf_data();
+    assert_string_not_equal(non_basic_ascii_text, val);
     assert_string_equal(binary_data_event_msg, val);
-    scope_free(non_basic_ascii_text);
     ctlDestroy(&ctl);
+
+    // do this again, with ALLOW_BINARY true
+    // and verify that the binary_data_event_msg does *not* appear.
+    memset(cbuf_data, '\0', sizeof(cbuf_data));
+
+    setenv("SCOPE_ALLOW_BINARY_CONSOLE", "true", 1);
+    ctl = ctlCreate();
+    assert_non_null(ctl);
+    b_res = ctlEvtSourceEnabled(ctl, CFG_SRC_CONSOLE);
+    assert_true(b_res);
+    ctlSendLog(ctl, STDOUT_FILENO, console_path, non_basic_ascii_text, strlen(non_basic_ascii_text), 0, &proc);
+    ctlFlushLog(ctl);
+    val = get_cbuf_data();
+    assert_string_not_equal(binary_data_event_msg, val);
+    assert_string_equal(non_basic_ascii_text, val);
+    ctlDestroy(&ctl);
+    unsetenv("SCOPE_ALLOW_BINARY_CONSOLE");
+
+    scope_free(non_basic_ascii_text);
     allow_copy_buf_data(FALSE);
 }
 

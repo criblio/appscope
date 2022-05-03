@@ -63,7 +63,7 @@
     - name: Known Issues
       path: /docs/known-issues
 
-- name: Community
+- name: Participate
   child: 
     - name: Community
       path: /docs/community      

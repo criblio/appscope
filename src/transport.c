@@ -291,6 +291,7 @@ shutdownTlsSession(transport_t *trans)
     }
 
     if (trans->net.sock != -1) {
+        scope_shutdown(trans->net.sock, SHUT_RDWR);
         scope_close(trans->net.sock);
         trans->net.sock = -1;
     }
@@ -374,6 +375,12 @@ establishTlsSession(transport_t *trans)
         }
         goto err;
     }
+
+    // This improves the delivery but we're unsure of what the cost is
+    // in terms of network usage.
+    // See https://github.com/criblio/appscope/issues/781
+    //
+    // BIO_set_tcp_ndelay(trans->net.sock, TRUE);
 
     if (trans->net.tls.validateserver) {
         // Just test that we received a server cert
@@ -635,6 +642,26 @@ checkPendingSocketStatus(transport_t *trans)
     if ((trans->type == CFG_TCP) && !setSocketBlocking(trans, trans->net.sock, TRUE)) {
         DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
     }
+
+    // Set TCP_QUICKACK
+#if defined(TCP_QUICKACK) && (defined(IPPROTO_TCP) || defined(SOL_TCP))
+    if ((trans->type == CFG_TCP) {
+        int opt;
+        int on = TRUE;
+
+#ifdef SOL_TCP
+        opt=SOL_TCP;
+#else
+#ifdef IPPROTO_TCP
+        opt=IPPROTO_TCP;
+#endif
+#endif
+        if (scope_setsockopt(s,opt,TCP_QUICKACK,&on,sizeof(on))) {
+            DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
+        }
+    }
+#endif
+
 
     // We have a connected socket!  Woot!
     trans->net.connect_attempts = 0;

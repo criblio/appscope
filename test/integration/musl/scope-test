@@ -128,39 +128,40 @@ fi
 endtest
 
 
-##
-## tls
-##
-## This was written to ensure that #761 stays fixed though it wasn't
-## reliable as written #781 will restore this test
-#starttest tls
 #
-## tcpserver receives over a tls session
-#cd /usr/local/scope
-#./tcpserver -t 9109 > $EVT_FILE &
+# tls
 #
-## run ldscope with a ton of env vars to send over tls session
-#  SCOPE_EVENT_DEST=tcp://127.0.0.1:9109 \
-#  SCOPE_EVENT_TLS_ENABLE=true \
-#  SCOPE_EVENT_TLS_VALIDATE_SERVER=false \
-#  SCOPE_EVENT_TLS_CA_CERT_PATH=/usr/local/scope/cert.pm \
-#  ldscope ps -ef
-#retval=$?
-#
-#evaltest
-#
-## Verify that ps -ef is successful
-#if [ $retval -ne 0 ]; then
-#    ERR+=1
-#fi
-#
-## Verify that data made it through
-#if ( ! grep '"sourcetype":"console"' $EVT_FILE ); then
-#    ERR+=1
-#fi
-#
-#endtest
-#
+starttest tls
+
+# socat receives over a tls session and writes to $EVT_FILE
+cat /usr/local/scope/key.pem /usr/local/scope/cert.pem >> /tmp/appscope.pem
+socat OPENSSL-LISTEN:9109,reuseaddr,cert=/tmp/appscope.pem,cafile=/tmp/appscope.pem,fork,verify=0 $EVT_FILE &
+
+# run ldscope with a ton of env vars to send over tls session
+  SCOPE_EVENT_DEST=tcp://127.0.0.1:9109 \
+  SCOPE_EVENT_TLS_ENABLE=true \
+  SCOPE_EVENT_METRIC=true \
+  SCOPE_EVENT_TLS_CA_CERT_PATH=/tmp/appscope.pem \
+  ldscope ps -ef
+retval=$?
+
+evaltest
+
+# Verify that ps -ef is successful
+if [ $retval -ne 0 ]; then
+    ERR+=1
+fi
+
+# Verify that data made it through
+if ( ! grep '"sourcetype":"console"' $EVT_FILE ); then
+    ERR+=1
+fi
+
+endtest
+
+# cleanup socat, since we're done with it now
+kill `pidof socat`
+
 
 
 if (( $FAILED_TEST_COUNT == 0 )); then

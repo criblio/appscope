@@ -995,7 +995,7 @@ handleExit(void)
         // This exists as a safeguard to prevent a hang or crash
         // of our periodic thread from hanging a process at exit.
         struct timespec expiration_time, current_time = {0};
-        clock_gettime(CLOCK_MONOTONIC, &expiration_time);
+        scope_clock_gettime(CLOCK_MONOTONIC, &expiration_time);
         expiration_time.tv_sec += MAX_TLS_CONNECT_SECONDS + 1;
 
         struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
@@ -1003,7 +1003,7 @@ handleExit(void)
         // let the periodic thread finish
         while (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
             sigSafeNanosleep(&ts);
-            clock_gettime(CLOCK_MONOTONIC, &current_time);
+            scope_clock_gettime(CLOCK_MONOTONIC, &current_time);
             if (current_time.tv_sec > expiration_time.tv_sec) {
                 return; // We can't safely do anything else (below)
             }

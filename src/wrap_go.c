@@ -1027,7 +1027,10 @@ c_read(char *stackaddr)
     uint64_t rc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_read_rc);
     uint64_t initialTime = getTime();
 
-    if (rc == -1) return;
+    if (rc == -1) {
+        free_go_str(buf);
+        return;
+    }
 
     funcprint("Scope: read of %ld rc %ld\n", fd, rc);
     doRead(fd, initialTime, (rc != -1), buf, rc, "go_read", BUF, 0);
@@ -1133,7 +1136,12 @@ c_http_server_read(char *stackaddr)
     uint64_t cr_conn_rwc_if, cr_conn_rwc, netFD, pfd;
 
     uint64_t conn =  *(uint64_t *)(connReader + g_go_schema->struct_offsets.connReader_to_conn);
-    if (!conn) return;         // protect from dereferencing null
+
+    // protect from dereferencing null
+    if (!conn) {
+        free_go_str(buf);
+        return;
+    }
 
     cr_conn_rwc_if = conn + g_go_schema->struct_offsets.conn_to_rwc;
     uint64_t tls        = *(uint64_t *)(conn + g_go_schema->struct_offsets.conn_to_tlsState);
@@ -1259,7 +1267,10 @@ c_http_client_write(char *stackaddr)
     uint64_t rc   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_rc);
     uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
 
-    if (rc < 1) return;
+    if (rc < 1) {
+        free_go_str(buf);
+        return;
+    }
 
     pc_conn_if = (w_pc + g_go_schema->struct_offsets.persistConn_to_conn); 
     uint64_t tls =  *(uint64_t*)(w_pc + g_go_schema->struct_offsets.persistConn_to_tlsState); 

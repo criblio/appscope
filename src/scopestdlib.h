@@ -200,7 +200,6 @@ struct tm*    scope_gmtime_r(const time_t *, struct tm *);
 unsigned int  scope_sleep(unsigned int);
 int           scope_usleep(useconds_t);
 int           scope_nanosleep(const struct timespec *, struct timespec *);
-int           scope___xstat(int, const char *, struct stat *);
 int           scope_sigaction(int, const struct sigaction *, struct sigaction *);
 int           scope_sigemptyset(sigset_t *);
 int           scope_pthread_create(pthread_t *, const pthread_attr_t *, void *(*)(void *), void *);

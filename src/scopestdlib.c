@@ -153,7 +153,6 @@ extern struct tm*    scopelibc_gmtime_r(const time_t *, struct tm *);
 extern unsigned int  scopelibc_sleep(unsigned int);
 extern int           scopelibc_usleep(useconds_t);
 extern int           scopelibc_nanosleep(const struct timespec *, struct timespec *);
-extern int           scopelibc___xstat(int, const char *, struct stat *);
 extern int           scopelibc_sigaction(int, const struct sigaction *, struct sigaction *);
 extern int           scopelibc_sigemptyset(sigset_t *);
 extern int           scopelibc_pthread_create(pthread_t *, const pthread_attr_t *, void *(*)(void *), void *);
@@ -870,11 +869,6 @@ scope_usleep(useconds_t usec) {
 int
 scope_nanosleep(const struct timespec *req, struct timespec *rem) {
     return scopelibc_nanosleep(req, rem);
-}
-
-int
-scope___xstat(int ver, const char *path, struct stat *buf) {
-    return scopelibc___xstat(ver, path, buf);
 }
 
 int

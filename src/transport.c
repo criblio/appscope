@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <pthread.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -645,7 +646,7 @@ checkPendingSocketStatus(transport_t *trans)
 
     // Set TCP_QUICKACK
 #if defined(TCP_QUICKACK) && (defined(IPPROTO_TCP) || defined(SOL_TCP))
-    if ((trans->type == CFG_TCP) {
+    if (trans->type == CFG_TCP) {
         int opt;
         int on = TRUE;
 
@@ -656,7 +657,7 @@ checkPendingSocketStatus(transport_t *trans)
         opt=IPPROTO_TCP;
 #endif
 #endif
-        if (scope_setsockopt(s,opt,TCP_QUICKACK,&on,sizeof(on))) {
+        if (scope_setsockopt(trans->net.sock, opt, TCP_QUICKACK, &on, sizeof(on))) {
             DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
         }
     }

@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <pthread.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -291,6 +292,7 @@ shutdownTlsSession(transport_t *trans)
     }
 
     if (trans->net.sock != -1) {
+        scope_shutdown(trans->net.sock, SHUT_RDWR);
         scope_close(trans->net.sock);
         trans->net.sock = -1;
     }
@@ -441,6 +443,12 @@ establishTlsSession(transport_t *trans)
         trans->net.failure_reason = TLS_CONN_FAIL;
         goto err;
     }
+
+    // This improves the delivery but we're unsure of what the cost is
+    // in terms of network usage.
+    // See https://github.com/criblio/appscope/issues/781
+    //
+    // BIO_set_tcp_ndelay(trans->net.sock, TRUE);
 
     if (trans->net.tls.validateserver) {
         // Just test that we received a server cert
@@ -697,6 +705,30 @@ checkPendingSocketStatus(transport_t *trans)
 
     // If the placeDescriptor call failed, we're done
     if (trans->net.sock == -1) return 0;
+
+    // Set the TCP socket to blocking
+    if ((trans->type == CFG_TCP) && !setSocketBlocking(trans, trans->net.sock, TRUE)) {
+        DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
+    }
+
+    // Set TCP_QUICKACK
+#if defined(TCP_QUICKACK) && (defined(IPPROTO_TCP) || defined(SOL_TCP))
+    if (trans->type == CFG_TCP) {
+        int opt;
+        int on = TRUE;
+
+#ifdef SOL_TCP
+        opt=SOL_TCP;
+#else
+#ifdef IPPROTO_TCP
+        opt=IPPROTO_TCP;
+#endif
+#endif
+        if (scope_setsockopt(trans->net.sock, opt, TCP_QUICKACK, &on, sizeof(on))) {
+            DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
+        }
+    }
+#endif
 
     // We have a connected socket!  Woot!
     trans->net.connect_attempts = 0;

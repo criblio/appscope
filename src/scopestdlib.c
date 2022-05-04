@@ -112,6 +112,7 @@ extern const char*         scopelibc_gai_strerror(int);
 extern int             scopelibc_gethostname(char *, size_t);
 extern int             scopelibc_getsockname(int, struct sockaddr *, socklen_t *);
 extern int             scopelibc_getsockopt(int, int, int, void *, socklen_t *);
+extern int             scopelibc_setsockopt(int, int, int, const void *, socklen_t);
 extern int             scopelibc_socket(int, int, int);
 extern int             scopelibc_bind(int, const struct sockaddr *, socklen_t);
 extern int             scopelibc_accept(int, struct sockaddr *, socklen_t *);
@@ -123,6 +124,7 @@ extern ssize_t         scopelibc_sendmsg(int, const struct msghdr *, int);
 extern ssize_t         scopelibc_recv(int, void *, size_t, int);
 extern ssize_t         scopelibc_recvmsg(int, struct msghdr *, int);
 extern ssize_t         scopelibc_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
+extern int             scopelibc_shutdown(int, int);
 extern int             scopelibc_poll(struct pollfd *, nfds_t, int);
 extern int             scopelibc_select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
 extern int             scopelibc_getaddrinfo(const char *, const char *, const struct addrinfo *, struct addrinfo **);
@@ -672,6 +674,11 @@ scope_getsockopt(int sockfd, int level, int optname,  void *restrict optval, soc
 }
 
 int
+scope_setsockopt(int sockfd, int level, int optname,  const void *restrict optval, socklen_t optlen) {
+    return scopelibc_setsockopt(sockfd, level, optname, optval, optlen);
+}
+
+int
 scope_socket(int domain, int type, int protocol) {
     return scopelibc_socket(domain, type, protocol);
 }
@@ -724,6 +731,11 @@ scope_recvmsg(int socket, struct msghdr *message, int flags) {
 ssize_t
 scope_recvfrom(int sockfd, void *restrict buf, size_t len, int flags, struct sockaddr *restrict src_addr, socklen_t *restrict addrlen) {
     return scopelibc_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+}
+
+int
+scope_shutdown(int sockfd, int how) {
+    return scopelibc_shutdown(sockfd, how);
 }
 
 int

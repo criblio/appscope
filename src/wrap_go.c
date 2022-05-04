@@ -67,6 +67,7 @@ go_schema_t go_16_schema = {
         .c_unlinkat_dirfd=0x8,
         .c_unlinkat_pathname=0x10,
         .c_unlinkat_flags=0x18,
+        .c_unlinkat_rc=0x28,
         .c_open_fd=0x30,
         .c_open_path=0x10,
         .c_close_fd=0x8,
@@ -150,6 +151,7 @@ go_schema_t go_17_schema = {
         .c_unlinkat_dirfd=0x8,
         .c_unlinkat_pathname=0x10,
         .c_unlinkat_flags=0x18,
+        .c_unlinkat_rc=0x20,
         .c_open_fd=0x38,
         .c_open_path=0x10,
         .c_close_fd=0x8,
@@ -1162,11 +1164,10 @@ c_unlinkat(char *stackaddr)
     uint64_t dirfd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_dirfd);
     char *pathname = go_str((void *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_pathname));
     uint64_t flags = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_flags);
+    uint64_t rc    = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_rc);
 
-    if (!pathname) {
-        scopeLogError("ERROR:go_unlinkat: null pathname");
-        scope_puts("Scope:ERROR:unlinkat:no pathname");
-        scope_fflush(scope_stdout);
+    if (rc) {
+        free_go_str(pathname);
         return;
     }
 

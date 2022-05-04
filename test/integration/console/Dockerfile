@@ -7,6 +7,11 @@ RUN apt update \
       curl \
       firefox \
       xxd \
+      git-core \
+      openssh-server \
+      apache2 \
+      apache2-utils \
+      vim \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /opt/test/log && \
@@ -37,6 +42,7 @@ RUN  mkdir /usr/local/scope && \
      ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
 COPY ./console/scope-test /usr/local/scope/scope-test
+COPY ./console/httpd.conf /etc/apache2/sites-available/git.conf
 
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]

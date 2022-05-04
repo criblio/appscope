@@ -95,7 +95,7 @@ AppScope's official v1 release includes advances in metric capture and forwardin
 
 - [#644](https://github.com/criblio/appscope/issues/644) Application-specific metrics can be captured.
 - [#725](https://github.com/criblio/appscope/issues/725) Metrics and events are now [defined](https://github.com/criblio/appscope/tree/master/docs/schemas) in JSON Schema.
-- [#723](https://github.com/criblio/appscope/issues/723) Metrics and events are now standardized. (Summary [here](https://github.com/criblio/.appscope/issues/712#issuecomment-1030234850).)
+- [#723](https://github.com/criblio/appscope/issues/723) Metrics and events are now standardized. (Summary [here](https://github.com/criblio/appscope/issues/712#issuecomment-1030234850).)
 - [#699](https://github.com/criblio/appscope/issues/699) Added an option to enable events via configuration file entries.
 - [#402](https://github.com/criblio/appscope/issues/402) Added support for readdir to `fs` events.
 - [#709](https://github.com/criblio/appscope/issues/709) Added support for unlinks / file removals to `fs` events.

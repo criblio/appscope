@@ -2638,6 +2638,24 @@ initEvtFormat(config_t *cfg)
     return evt;
 }
 
+static bool
+protocolDefinitionsUsePayloads()
+{
+    bool retVal = FALSE;
+    protocol_def_t *protoDef = NULL;
+    unsigned int ptype = 0;
+
+    // Loop through all payload definitions.
+    // If any has payload set, return TRUE
+    for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
+        if ((protoDef = lstFind(g_protlist, ptype)) != NULL) {
+            retVal |= protoDef->payload;
+            if (retVal) break;
+        }
+    }
+    return retVal;
+}
+
 ctl_t *
 initCtl(config_t *cfg)
 {
@@ -2656,7 +2674,9 @@ initCtl(config_t *cfg)
     }
     ctlTransportSet(ctl, trans, CFG_CTL);
 
-    if (cfgLogStreamEnable(cfg)) {
+    // We'll create a dedicated payload channel, conditionally.
+    if (cfgLogStreamEnable(cfg)
+            && (cfgPayEnable(cfg) || protocolDefinitionsUsePayloads())) {
         transport_t *trans = initTransport(cfg, CFG_LS);
         if (!trans) {
             ctlDestroy(&ctl);

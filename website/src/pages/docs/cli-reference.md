@@ -483,7 +483,7 @@ scope run -c tcp://127.0.0.1:10091 -- curl https://wttr.in/94105
 ### service
 ---
 
-Configures the specificied `systemd` service to be scoped upon starting.
+Configures the specified `systemd` service to be scoped upon starting.
 
 #### Usage
 

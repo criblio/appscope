@@ -561,7 +561,7 @@ fmtMetricJson(event_t *metric, regex_t *fieldFilter, watch_t src, custom_tag_t *
     // Add fields
 
     // addedFields lets us avoid duplicate field names.  If we go to
-    // add one that's already in the set, skip it.  In this way precidence
+    // add one that's already in the set, skip it.  In this way precedence
     // is given to capturedFields then custom fields then remaining fields.
     addedFields = strSetCreate(DEFAULT_SET_SIZE);
     if (!addJsonFields(metric->capturedFields, fieldFilter, json, addedFields)) goto err;

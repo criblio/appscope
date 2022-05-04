@@ -1261,7 +1261,7 @@ findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
 
 /*
  * Iterate all shared objects and GOT hook as necessary.
- * Return FALSE in all cases in order to interate all objects.
+ * Return FALSE in all cases in order to iterate all objects.
  * Ignore a set of objects we know we don't want to hook.
  */
 static int

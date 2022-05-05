@@ -37,6 +37,7 @@
 #define UNDEF_OFFSET (-1)
 
 int g_go_major_ver = UNKNOWN_GO_VER;
+extern char g_go_build_ver[7];
 
 enum index_hook_t {
     INDEX_HOOK_WRITE            = 0,
@@ -245,25 +246,10 @@ devnull(const char* fmt, ...)
 }
 #endif
 
-
-// c_str() is provided to convert a go-style string to a c-style string.
-// The resulting c_str will need to be passed to free() when it is no
+// Use go_str() whenever a "go string" type needs to be interpreted.
+// The resulting go_str will need to be passed to free_go_str() when it is no
 // longer needed.
-static char *
-c_str(gostring_t *go_str)
-{
-    if (!go_str || go_str->len <= 0) return NULL;
-
-    char *path;
-    if ((path = scope_calloc(1, go_str->len+1)) == NULL) return NULL;
-    scope_memmove(path, go_str->str, go_str->len);
-    path[go_str->len] = '\0';
-
-    return path;
-}
-
-// use go_str() whenever a "go string" type needs to be interpreted.
-// don't use go_str() for byte arrays.
+// Don't use go_str() for byte arrays.
 static char *
 go_str(void *go_str)
 {
@@ -273,7 +259,16 @@ go_str(void *go_str)
        if (!go_str) return NULL;
        return (char *)*(uint64_t *)go_str;
     }
-    return c_str((gostring_t *)go_str);
+
+    gostring_t* go_str_tmp = (gostring_t *)go_str;
+    if (!go_str_tmp || go_str_tmp->len <= 0) return NULL;
+
+    char *c_str;
+    if ((c_str = scope_calloc(1, go_str_tmp->len+1)) == NULL) return NULL;
+    scope_memmove(c_str, go_str_tmp->str, go_str_tmp->len);
+    c_str[go_str_tmp->len] = '\0';
+
+    return c_str;
 }
 
 static void
@@ -785,7 +780,7 @@ initGoHook(elf_buf_t *ebuf)
 {
     int rc;
     funchook_t *funchook;
-    gostring_t *go_ver; // There is an implicit len field at go_ver + 0x8
+    char *go_ver;
     char *go_runtime_version = NULL;
 
     // A go app may need to expand stacks for some C functions
@@ -808,12 +803,6 @@ initGoHook(elf_buf_t *ebuf)
         sysprint("This is a dynamic app\n");
     }
 
-    go_ver = getSymbol(ebuf->buf, "runtime.buildVersion");
-    if (!go_ver) {
-        //runtime.buildVersion symbol not found, probably dealing with a stripped binary
-        //try to retrieve the version symbol address from the .go.buildinfo section
-        go_ver = getGoVersionAddr(ebuf->buf);
-    }
     //check ELF type
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
     // if it's a position independent executable, get the base address from /proc/self/maps
@@ -827,13 +816,25 @@ initGoHook(elf_buf_t *ebuf)
         sysprint("base %lx %lx %lx\n", base, (uint64_t)ebuf->text_addr, textSec->sh_offset);
         base = base - (uint64_t)ebuf->text_addr + textSec->sh_offset;
     }
-    
-    go_ver = (void *) ((uint64_t)go_ver + base);
-    
-    if (go_ver && (go_runtime_version = c_str(go_ver))) {
 
+    void *go_ver_sym = getSymbol(ebuf->buf, "runtime.buildVersion");
+    if (!go_ver_sym) {
+        // runtime.buildVersion symbol not found, probably dealing with a stripped binary
+        // try to retrieve the version symbol address from the .go.buildinfo section
+        // if g_go_build_ver is set we know we're dealing with a char *
+        // if it is not set, we know we're dealing with a "go string"
+        void *ver_addr = getGoVersionAddr(ebuf->buf);
+        if (g_go_build_ver[0] != '\0') {
+            go_ver = (char *)((uint64_t)ver_addr + base);
+        } else {
+            go_ver = go_str((uint64_t)ver_addr + base);
+        }
+    } else {
+        go_ver = go_str((uint64_t)go_ver_sym + base);
+    }
+    
+    if (go_ver && (go_runtime_version = go_ver)) {
         sysprint("go_runtime_version = %s\n", go_runtime_version);
-
         g_go_major_ver = go_major_version(go_runtime_version);
     }
     if (g_go_major_ver < MIN_SUPPORTED_GO_VER) {

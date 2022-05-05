@@ -12,7 +12,7 @@
 #include "scopeelf.h"
 #include "gocontext.h"
 
-gostring_t g_go_build_ver;
+char g_go_build_ver[7];
 
 void
 freeElf(char *buf, size_t len)
@@ -381,8 +381,8 @@ getGoVersionAddr(const char* buf)
                 uint64_t *addressPtr = (uint64_t*)&sec_data[0x10];
                 go_build_ver_addr = (void*)*addressPtr;
             } else if (sec_data[0xf] == 0x02) {
-                g_go_build_ver.len = 6;
-                g_go_build_ver.str = (char*)&sec_data[0x21];
+                scope_memmove(g_go_build_ver, (char*)&sec_data[0x21], 6);
+                g_go_build_ver[6] = '\0';
                 go_build_ver_addr = &g_go_build_ver;
             }
         }

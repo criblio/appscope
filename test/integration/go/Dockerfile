@@ -43,6 +43,8 @@ RUN cd /go/net &&\
     go build -o plainClientDynamic plainClient.go
 RUN cd /go/net && \
     CGO_ENABLED=0 go build -o plainClientStatic plainClient.go
+RUN cd /go/net && \
+    CGO_ENABLED=0 go build -ldflags='-s' -o plainClientStaticStripped plainClient.go
 COPY ./go/net/tlsClient.go /go/net
 RUN cd /go/net && \
     go build -o tlsClientDynamic tlsClient.go

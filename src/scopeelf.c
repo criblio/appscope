@@ -10,6 +10,9 @@
 #include "os.h"
 #include "fn.h"
 #include "scopeelf.h"
+#include "gocontext.h"
+
+gostring_t g_go_build_ver;
 
 void
 freeElf(char *buf, size_t len)
@@ -368,15 +371,22 @@ getGoVersionAddr(const char* buf)
         if (!scope_strcmp(sec_name, ".go.buildinfo") &&
             (sections[i].sh_size >= 0x18) &&
             (!scope_memcmp(&sec_data[0], magic, sizeof(magic))) &&
-            (sec_data[0xe] == 0x08) &&  // 64 bit executables only
-            (sec_data[0xf] == 0x00)) {  // little-endian
+            (sec_data[0xe] == 0x08)) {  // 64 bit executables only
 
-            uint64_t *addressPtr = (uint64_t*)&sec_data[0x10];
-
-            go_build_ver_addr = (void*)*addressPtr;
+            // debug/buildinfo/buildinfo.go
+            // If the endianness has the 2 bit set, then the pointers are zero
+            // and the 32-byte header is followed by varint-prefixed string data
+            // for the two string values we care about.
+            if (sec_data[0xf] == 0x00) {  // little-endian
+                uint64_t *addressPtr = (uint64_t*)&sec_data[0x10];
+                go_build_ver_addr = (void*)*addressPtr;
+            } else if (sec_data[0xf] == 0x02) {
+                g_go_build_ver.len = 6;
+                g_go_build_ver.str = (char*)&sec_data[0x21];
+                go_build_ver_addr = &g_go_build_ver;
+            }
         }
     }
-
     return go_build_ver_addr;
 }
 

@@ -399,6 +399,47 @@ endtest
 
 
 #
+# plainClientStaticStripped
+#
+starttest plainClientStaticStripped
+cd /go/net
+ldscope ./plainClientStaticStripped
+ERR+=$?
+
+# this sleep gives plainClientStaticStripped a chance to report its events on exit
+sleep 1
+
+evaltest
+
+grep plainClientStaticStripped $EVT_FILE | grep net.app > /dev/null
+ERR+=$?
+grep plainClientStaticStripped $EVT_FILE | grep net.open > /dev/null
+ERR+=$?
+# dont wait for this, it's not always guaranteed in the test app's timeframe
+#grep plainClientStaticStripped $EVT_FILE | grep net.close > /dev/null
+#ERR+=$?
+grep plainClientStaticStripped $EVT_FILE | grep fs.open > /dev/null
+ERR+=$?
+grep plainClientStaticStripped $EVT_FILE | grep fs.close > /dev/null
+ERR+=$?
+grep plainClientStaticStripped $EVT_FILE | grep http.req > /dev/null
+ERR+=$?
+grep plainClientStaticStripped $EVT_FILE | grep http.resp > /dev/null
+ERR+=$?
+grep plainClientStaticStripped $EVT_FILE | grep console > /dev/null
+ERR+=$?
+
+if [ $ERR -ge 1 ]; then
+    cat $EVT_FILE
+fi
+
+evalPayload
+ERR+=$?
+
+endtest
+
+
+#
 # tlsClientDynamic
 #
 starttest tlsClientDynamic

@@ -18,6 +18,7 @@
 
 #define GOPCLNTAB_MAGIC_112 0xfffffffb
 #define GOPCLNTAB_MAGIC_116 0xfffffffa
+#define GOPCLNTAB_MAGIC_118 0xfffffff0
 
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 #define EXIT_STACK_SIZE (32 * 1024)
@@ -191,8 +192,8 @@ go_schema_t go_17_schema = {
         {"net/http.checkConnErrorWriter.Write",  go_hook_reg_tls_write,        NULL, 0}, // tls server write
         {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse,     NULL, 0}, // tls client read
         {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,         NULL, 0}, // tls client write
-        {"runtime.exit.abi0",                    go_hook_exit,                 NULL, 0},
-#        {"runtime.exit",                         go_hook_exit,                 NULL, 0},
+//        {"runtime.exit.abi0",                    go_hook_exit,                 NULL, 0},
+        {"runtime.exit",                         go_hook_exit,                 NULL, 0},
         {"runtime.dieFromSignal",                go_hook_die,                  NULL, 0},
         {"TAP_TABLE_END", NULL, NULL, 0}
     },
@@ -336,6 +337,36 @@ getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
                     }
 
                     symtab_addr += 16;
+                }
+            } else if (magic == GOPCLNTAB_MAGIC_118) {
+                uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
+                // In go 1.18 the funcname table and the pcln table are stored in the text section
+                uint64_t text_start = *((const uint64_t *)(pclntab_addr + (3 * 8)));
+                uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (4 * 8)));
+                //uint64_t funcnametab_addr = (uint64_t)(funcnametab_offset + pclntab_addr);
+                uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (8 * 8)));
+                // A "symbtab" is an entry in the pclntab, probably better known as a pcln
+                const void *symtab_addr = (const void *)(pclntab_addr + pclntab_offset);
+                for (i = 0; i < sym_count; i++) {
+                    uint32_t func_offset = *((uint32_t *)(symtab_addr + 4));
+                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 4));
+                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
+                    func_offset = *((uint32_t *)(symtab_addr));
+                    uint64_t func_addr = (uint64_t)(func_offset + text_start);
+                    if (scope_strcmp(sname, func_name) == 0) {
+                        symaddr = func_addr;
+                        scopeLog(CFG_LOG_ERROR, "symbol found %s = 0x%08lx\n", func_name, func_addr);
+                        break;
+                    }
+
+                    if (altname && mnemonic &&
+                        (scope_strcmp(altname, func_name) == 0) &&
+                        (match_assy_instruction((void *)func_addr, mnemonic) == TRUE)) {
+                        symaddr = func_addr;
+                        break;
+                    }
+
+                    symtab_addr += 8;
                 }
             } else {
                 scopeLog(CFG_LOG_DEBUG, "Invalid header in .gopclntab");

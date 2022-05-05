@@ -2420,7 +2420,7 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
             struct stat sbuf;
             int errsave = scope_errno;
 
-            if (scope___xstat(1, g_fsinfo[fd].path, &sbuf) == 0) {
+            if (scope_stat(g_fsinfo[fd].path, &sbuf) == 0) {
                 g_fsinfo[fd].fuid = sbuf.st_uid;
                 g_fsinfo[fd].fgid = sbuf.st_gid;
                 g_fsinfo[fd].mode = sbuf.st_mode;

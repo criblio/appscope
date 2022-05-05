@@ -459,7 +459,7 @@ osIsFilePresent(pid_t pid, const char *path)
 {
     struct stat sb = {0};
 
-    if (scope___xstat(_STAT_VER, path, &sb) != 0) {
+    if (scope_stat(path, &sb) != 0) {
         return -1;
     } else {
         return sb.st_size;

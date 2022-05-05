@@ -7,6 +7,7 @@
 #include <grp.h>
 #include <link.h>
 #include <locale.h>
+#include <sys/auxv.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
@@ -56,6 +57,7 @@ extern FILE scopelibc___stderr_FILE;
 #define scope_stdout   (&scopelibc___stdout_FILE)
 #define scope_stderr   (&scopelibc___stderr_FILE)
 
+void  scope_init_vdso_ehdr(void);
 void  scope_op_before_fork(void);
 void  scope_op_after_fork(int);
 
@@ -198,7 +200,6 @@ struct tm*    scope_gmtime_r(const time_t *, struct tm *);
 unsigned int  scope_sleep(unsigned int);
 int           scope_usleep(useconds_t);
 int           scope_nanosleep(const struct timespec *, struct timespec *);
-int           scope___xstat(int, const char *, struct stat *);
 int           scope_sigaction(int, const struct sigaction *, struct sigaction *);
 int           scope_sigemptyset(sigset_t *);
 int           scope_pthread_create(pthread_t *, const pthread_attr_t *, void *(*)(void *), void *);
@@ -236,5 +237,6 @@ int           scope_tcgetattr(int, struct termios *);
 void*         scope_shmat(int, const void *, int);
 int           scope_shmdt(const void *);
 int           scope_shmget(key_t, size_t, int);
+int           scope_sched_getcpu(void);
 
 #endif // __SCOPE_STDLIB_H__

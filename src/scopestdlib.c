@@ -10,6 +10,7 @@
 
 
 // Internal standard library references
+extern void  scopelibc_init_vdso_ehdr(unsigned long);
 extern void  scopelibc_lock_before_fork_op(void);
 extern void  scopelibc_unlock_after_fork_op(int);
 
@@ -112,6 +113,7 @@ extern const char*         scopelibc_gai_strerror(int);
 extern int             scopelibc_gethostname(char *, size_t);
 extern int             scopelibc_getsockname(int, struct sockaddr *, socklen_t *);
 extern int             scopelibc_getsockopt(int, int, int, void *, socklen_t *);
+extern int             scopelibc_setsockopt(int, int, int, const void *, socklen_t);
 extern int             scopelibc_socket(int, int, int);
 extern int             scopelibc_bind(int, const struct sockaddr *, socklen_t);
 extern int             scopelibc_accept(int, struct sockaddr *, socklen_t *);
@@ -123,6 +125,7 @@ extern ssize_t         scopelibc_sendmsg(int, const struct msghdr *, int);
 extern ssize_t         scopelibc_recv(int, void *, size_t, int);
 extern ssize_t         scopelibc_recvmsg(int, struct msghdr *, int);
 extern ssize_t         scopelibc_recvfrom(int, void *, size_t, int, struct sockaddr *, socklen_t *);
+extern int             scopelibc_shutdown(int, int);
 extern int             scopelibc_poll(struct pollfd *, nfds_t, int);
 extern int             scopelibc_select(int, fd_set *, fd_set *, fd_set *, struct timeval *);
 extern int             scopelibc_getaddrinfo(const char *, const char *, const struct addrinfo *, struct addrinfo **);
@@ -150,7 +153,6 @@ extern struct tm*    scopelibc_gmtime_r(const time_t *, struct tm *);
 extern unsigned int  scopelibc_sleep(unsigned int);
 extern int           scopelibc_usleep(useconds_t);
 extern int           scopelibc_nanosleep(const struct timespec *, struct timespec *);
-extern int           scopelibc___xstat(int, const char *, struct stat *);
 extern int           scopelibc_sigaction(int, const struct sigaction *, struct sigaction *);
 extern int           scopelibc_sigemptyset(sigset_t *);
 extern int           scopelibc_pthread_create(pthread_t *, const pthread_attr_t *, void *(*)(void *), void *);
@@ -189,8 +191,15 @@ extern int           scopelibc_tcgetattr(int, struct termios *);
 extern void*         scopelibc_shmat(int, const void *, int);
 extern int           scopelibc_shmdt(const void *);
 extern int           scopelibc_shmget(key_t, size_t, int);
+extern int           scopelibc_sched_getcpu(void);
 
-// Fork handling operations
+// Internal library operations
+
+void
+scope_init_vdso_ehdr(void) {
+    unsigned long ehdr = getauxval(AT_SYSINFO_EHDR);
+    scopelibc_init_vdso_ehdr(ehdr);
+}
 
 void
 scope_op_before_fork(void) {
@@ -672,6 +681,11 @@ scope_getsockopt(int sockfd, int level, int optname,  void *restrict optval, soc
 }
 
 int
+scope_setsockopt(int sockfd, int level, int optname,  const void *restrict optval, socklen_t optlen) {
+    return scopelibc_setsockopt(sockfd, level, optname, optval, optlen);
+}
+
+int
 scope_socket(int domain, int type, int protocol) {
     return scopelibc_socket(domain, type, protocol);
 }
@@ -724,6 +738,11 @@ scope_recvmsg(int socket, struct msghdr *message, int flags) {
 ssize_t
 scope_recvfrom(int sockfd, void *restrict buf, size_t len, int flags, struct sockaddr *restrict src_addr, socklen_t *restrict addrlen) {
     return scopelibc_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+}
+
+int
+scope_shutdown(int sockfd, int how) {
+    return scopelibc_shutdown(sockfd, how);
 }
 
 int
@@ -850,11 +869,6 @@ scope_usleep(useconds_t usec) {
 int
 scope_nanosleep(const struct timespec *req, struct timespec *rem) {
     return scopelibc_nanosleep(req, rem);
-}
-
-int
-scope___xstat(int ver, const char *path, struct stat *buf) {
-    return scopelibc___xstat(ver, path, buf);
 }
 
 int
@@ -1045,6 +1059,11 @@ scope_shmdt(const void *shmaddr) {
 int
 scope_shmget(key_t key, size_t size, int shmflg) {
     return scopelibc_shmget(key, size, shmflg);
+}
+
+int
+scope_sched_getcpu(void) {
+    return scopelibc_sched_getcpu();
 }
 
 int

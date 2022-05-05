@@ -28,11 +28,13 @@ int sched_getcpu(void)
 	unsigned cpu;
 
 #ifdef VDSO_GETCPU_SYM
-	getcpu_f f = (getcpu_f)vdso_func;
-	if (f) {
-		r = f(&cpu, 0, 0);
-		if (!r) return cpu;
-		if (r != -ENOSYS) return __syscall_ret(r);
+	if (__check_ehdr_init()) {
+		getcpu_f f = (getcpu_f)vdso_func;
+		if (f) {
+			r = f(&cpu, 0, 0);
+			if (!r) return cpu;
+			if (r != -ENOSYS) return __syscall_ret(r);
+		}
 	}
 #endif
 

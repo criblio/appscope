@@ -6,6 +6,16 @@
 #include "libc.h"
 #include "syscall.h"
 
+static size_t _aux_v_ehdr;
+
+int __check_ehdr_init(void) {
+	return (int)_aux_v_ehdr;
+}
+
+void init_vdso_ehdr(unsigned long ehdr) {
+	_aux_v_ehdr = ehdr;
+}
+
 #ifdef VDSO_USEFUL
 
 #if ULONG_MAX == 0xffffffff
@@ -43,10 +53,7 @@ static int checkver(Verdef *def, int vsym, const char *vername, char *strings)
 void *__vdsosym(const char *vername, const char *name)
 {
 	size_t i;
-	for (i=0; libc.auxv[i] != AT_SYSINFO_EHDR; i+=2)
-		if (!libc.auxv[i]) return 0;
-	if (!libc.auxv[i+1]) return 0;
-	Ehdr *eh = (void *)libc.auxv[i+1];
+	Ehdr *eh = (void *)_aux_v_ehdr;
 	Phdr *ph = (void *)((char *)eh + eh->e_phoff);
 	size_t *dynv=0, base=-1;
 	for (i=0; i<eh->e_phnum; i++, ph=(void *)((char *)ph+eh->e_phentsize)) {

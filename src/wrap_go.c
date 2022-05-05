@@ -38,6 +38,24 @@
 
 int g_go_major_ver = UNKNOWN_GO_VER;
 
+enum index_hook_t {
+    INDEX_HOOK_WRITE            = 0,
+    INDEX_HOOK_OPEN             = 1,
+    INDEX_HOOK_UNLINKAT         = 2,
+    INDEX_HOOK_GETDENTS         = 3,
+    INDEX_HOOK_SOCKET           = 4,
+    INDEX_HOOK_ACCEPT           = 5,
+    INDEX_HOOK_READ             = 6,
+    INDEX_HOOK_CLOSE            = 7,
+    INDEX_HOOK_TLS_SERVER_READ  = 8,
+    INDEX_HOOK_TLS_SERVER_WRITE = 9,
+    INDEX_HOOK_TLS_CLIENT_READ  = 10,
+    INDEX_HOOK_TLS_CLIENT_WRITE = 11,
+    INDEX_HOOK_EXIT             = 12,
+    INDEX_HOOK_DIE              = 13,
+    INDEX_HOOK_MAX              = 14
+};
+
 go_schema_t go_16_schema = {
     .arg_offsets = {
         .c_write_fd=0x8,
@@ -103,21 +121,21 @@ go_schema_t go_16_schema = {
         .persistConn_to_tlsState=0x60,
     },
     .tap = {
-        {"syscall.write",                        go_hook_write,        NULL, 0},
-        {"syscall.openat",                       go_hook_open,         NULL, 0},
-        {"syscall.unlinkat",                     go_hook_unlinkat,     NULL, 0},
-        {"syscall.Getdents",                     go_hook_getdents,     NULL, 0},
-        {"syscall.socket",                       go_hook_socket,       NULL, 0},
-        {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
-        {"syscall.read",                         go_hook_read,         NULL, 0},
-        {"syscall.Close",                        go_hook_close,        NULL, 0},
-        {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
-        {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
-        {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0}, 
-        {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
-        {"runtime.exit",                         go_hook_exit,         NULL, 0},
-        {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
-        {"TAP_TABLE_END", NULL, NULL, 0}
+        [INDEX_HOOK_WRITE]            = {"syscall.write",                        go_hook_write,        NULL, 0},
+        [INDEX_HOOK_OPEN]             = {"syscall.openat",                       go_hook_open,         NULL, 0},
+        [INDEX_HOOK_UNLINKAT]         = {"syscall.unlinkat",                     go_hook_unlinkat,     NULL, 0},
+        [INDEX_HOOK_GETDENTS]         = {"syscall.Getdents",                     go_hook_getdents,     NULL, 0},
+        [INDEX_HOOK_SOCKET]           = {"syscall.socket",                       go_hook_socket,       NULL, 0},
+        [INDEX_HOOK_ACCEPT]           = {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
+        [INDEX_HOOK_READ]             = {"syscall.read",                         go_hook_read,         NULL, 0},
+        [INDEX_HOOK_CLOSE]            = {"syscall.Close",                        go_hook_close,        NULL, 0},
+        [INDEX_HOOK_TLS_SERVER_READ]  = {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
+        [INDEX_HOOK_TLS_SERVER_WRITE] = {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
+        [INDEX_HOOK_TLS_CLIENT_READ]  = {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0}, 
+        [INDEX_HOOK_TLS_CLIENT_WRITE] = {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
+        [INDEX_HOOK_EXIT]             = {"runtime.exit",                         go_hook_exit,         NULL, 0},
+        [INDEX_HOOK_DIE]              = {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
+        [INDEX_HOOK_MAX]              = {"TAP_TABLE_END",                        NULL,                 NULL, 0}
     },
 };
 
@@ -180,26 +198,41 @@ go_schema_t go_17_schema = {
     // and we preserve the g in r14 for future stack checks
     // Note: we do not need to use the reg functions for go_hook_exit and go_hook_die
     .tap = {
-        {"syscall.write",                        go_hook_reg_write,            NULL, 0}, // write
-        {"syscall.openat",                       go_hook_reg_open,             NULL, 0}, // file open
-        {"syscall.unlinkat",                     go_hook_reg_unlinkat,         NULL, 0}, // delete file
-        {"syscall.Getdents",                     go_hook_reg_getdents,         NULL, 0}, // read dir
-        {"syscall.socket",                       go_hook_reg_socket,           NULL, 0}, // net open
-        {"syscall.accept4",                      go_hook_reg_accept4,          NULL, 0}, // plain server accept
-        {"syscall.read",                         go_hook_reg_read,             NULL, 0}, // read
-        {"syscall.Close",                        go_hook_reg_close,            NULL, 0}, // close
-        {"net/http.(*connReader).Read",          go_hook_reg_tls_read,         NULL, 0}, // tls server read
-        {"net/http.checkConnErrorWriter.Write",  go_hook_reg_tls_write,        NULL, 0}, // tls server write
-        {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse,     NULL, 0}, // tls client read
-        {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,         NULL, 0}, // tls client write
-//        {"runtime.exit.abi0",                    go_hook_exit,                 NULL, 0},
-        {"runtime.exit",                         go_hook_exit,                 NULL, 0},
-        {"runtime.dieFromSignal",                go_hook_die,                  NULL, 0},
-        {"TAP_TABLE_END", NULL, NULL, 0}
+        [INDEX_HOOK_WRITE]            = {"syscall.write",                        go_hook_reg_write,            NULL, 0}, // write
+        [INDEX_HOOK_OPEN]             = {"syscall.openat",                       go_hook_reg_open,             NULL, 0}, // file open
+        [INDEX_HOOK_UNLINKAT]         = {"syscall.unlinkat",                     go_hook_reg_unlinkat,         NULL, 0}, // delete file
+        [INDEX_HOOK_GETDENTS]         = {"syscall.Getdents",                     go_hook_reg_getdents,         NULL, 0}, // read dir
+        [INDEX_HOOK_SOCKET]           = {"syscall.socket",                       go_hook_reg_socket,           NULL, 0}, // net open
+        [INDEX_HOOK_ACCEPT]           = {"syscall.accept4",                      go_hook_reg_accept4,          NULL, 0}, // plain server accept
+        [INDEX_HOOK_READ]             = {"syscall.read",                         go_hook_reg_read,             NULL, 0}, // read
+        [INDEX_HOOK_CLOSE]            = {"syscall.Close",                        go_hook_reg_close,            NULL, 0}, // close
+        [INDEX_HOOK_TLS_SERVER_READ]  = {"net/http.(*connReader).Read",          go_hook_reg_tls_read,         NULL, 0}, // tls server read
+        [INDEX_HOOK_TLS_SERVER_WRITE] = {"net/http.checkConnErrorWriter.Write",  go_hook_reg_tls_write,        NULL, 0}, // tls server write
+        [INDEX_HOOK_TLS_CLIENT_READ]  = {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse,     NULL, 0}, // tls client read
+        [INDEX_HOOK_TLS_CLIENT_WRITE] = {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,         NULL, 0}, // tls client write
+//        [INDEX_HOOK_EXIT]             = {"runtime.exit.abi0",                    go_hook_exit,                 NULL, 0},
+        [INDEX_HOOK_EXIT]             = {"runtime.exit",                         go_hook_exit,                 NULL, 0},
+        [INDEX_HOOK_DIE]              = {"runtime.dieFromSignal",                go_hook_die,                  NULL, 0},
+        [INDEX_HOOK_MAX]              = {"TAP_TABLE_END",                        NULL,                         NULL, 0}
     },
 };
 
 go_schema_t *g_go_schema = &go_16_schema; // overridden if later version
+
+
+#define GO_HOOK_WRITE            (g_go_schema->tap[INDEX_HOOK_WRITE].assembly_fn)
+#define GO_HOOK_OPEN             (g_go_schema->tap[INDEX_HOOK_OPEN].assembly_fn)
+#define GO_HOOK_UNLINKAT         (g_go_schema->tap[INDEX_HOOK_UNLINKAT].assembly_fn)
+#define GO_HOOK_GETDENTS         (g_go_schema->tap[INDEX_HOOK_GETDENTS].assembly_fn)
+#define GO_HOOK_SOCKET           (g_go_schema->tap[INDEX_HOOK_SOCKET].assembly_fn)
+#define GO_HOOK_ACCEPT           (g_go_schema->tap[INDEX_HOOK_ACCEPT].assembly_fn)
+#define GO_HOOK_READ             (g_go_schema->tap[INDEX_HOOK_READ].assembly_fn)
+#define GO_HOOK_CLOSE            (g_go_schema->tap[INDEX_HOOK_CLOSE].assembly_fn)
+#define GO_HOOK_TLS_SERVER_READ  (g_go_schema->tap[INDEX_HOOK_TLS_SERVER_READ].assembly_fn)
+#define GO_HOOK_TLS_SERVER_WRITE (g_go_schema->tap[INDEX_HOOK_TLS_SERVER_WRITE].assembly_fn)
+#define GO_HOOK_TLS_CLIENT_READ  (g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_READ].assembly_fn)
+#define GO_HOOK_TLS_CLIENT_WRITE (g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_WRITE].assembly_fn)
+
 uint64_t g_glibc_guard = 0LL;
 
 void (*go_runtime_cgocall)(void);
@@ -1044,11 +1077,7 @@ c_write(char *stackaddr)
 EXPORTON void *
 go_write(char *stackptr)
 {
-    if (g_go_major_ver > 16) {
-        return do_cfunc(stackptr, c_write, go_hook_reg_write);
-    } else {
-        return do_cfunc(stackptr, c_write, go_hook_write);
-    }
+    return do_cfunc(stackptr, c_write, GO_HOOK_WRITE);
 }
 
 // Extract data from syscall.Getdents (read dir)
@@ -1066,11 +1095,7 @@ c_getdents(char *stackaddr)
 EXPORTON void *
 go_getdents(char *stackptr)
 {
-    if (g_go_major_ver > 16) {
-        return do_cfunc(stackptr, c_getdents, go_hook_reg_getdents);
-    } else {
-        return do_cfunc(stackptr, c_getdents, go_hook_getdents);
-    }
+    return do_cfunc(stackptr, c_getdents, GO_HOOK_GETDENTS);
 }
 
 // Extract data from syscall.unlinkat (delete file)
@@ -1098,11 +1123,7 @@ c_unlinkat(char *stackaddr)
 EXPORTON void *
 go_unlinkat(char *stackptr)
 {
-    if (g_go_major_ver > 16) {
-        return do_cfunc(stackptr, c_unlinkat, go_hook_reg_unlinkat);
-    } else {
-        return do_cfunc(stackptr, c_unlinkat, go_hook_unlinkat);
-    }
+    return do_cfunc(stackptr, c_unlinkat, GO_HOOK_UNLINKAT);
 }
 
 // Extract data from syscall.openat (file open)
@@ -1130,11 +1151,7 @@ c_open(char *stackaddr)
 EXPORTON void *
 go_open(char *stackptr)
 {
-    if (g_go_major_ver > 16) {
-        return do_cfunc(stackptr, c_open, go_hook_reg_open);
-    } else {
-        return do_cfunc(stackptr, c_open, go_hook_open);
-    }
+    return do_cfunc(stackptr, c_open, GO_HOOK_OPEN);
 }
 
 // Extract data from syscall.Close (close)
@@ -1153,11 +1170,7 @@ c_close(char *stackaddr)
 EXPORTON void *
 go_close(char *stackptr)
 {
-    if (g_go_major_ver > 16) {
-        return do_cfunc(stackptr, c_close, go_hook_reg_close);
-    } else {
-        return do_cfunc(stackptr, c_close, go_hook_close);
-    }
+    return do_cfunc(stackptr, c_close, GO_HOOK_CLOSE);
 }
 
 // Extract data from syscall.read (read)
@@ -1178,11 +1191,7 @@ c_read(char *stackaddr)
 EXPORTON void *
 go_read(char *stackptr)
 {
-    if (g_go_major_ver > 16) {
-        return do_cfunc(stackptr, c_read, go_hook_reg_read);
-    } else {
-        return do_cfunc(stackptr, c_read, go_hook_read);
-    }
+    return do_cfunc(stackptr, c_read, GO_HOOK_READ);
 }
 
 // Extract data from syscall.socket (net open)
@@ -1204,11 +1213,7 @@ c_socket(char *stackaddr)
 EXPORTON void *
 go_socket(char *stackptr)
 {
-    if (g_go_major_ver > 16) {
-        return do_cfunc(stackptr, c_socket, go_hook_reg_socket);
-    } else {
-        return do_cfunc(stackptr, c_socket, go_hook_socket);
-    }
+    return do_cfunc(stackptr, c_socket, GO_HOOK_SOCKET);
 }
 
 // Extract data from syscall.accept4 (plain server accept)
@@ -1229,11 +1234,7 @@ c_accept4(char *stackaddr)
 EXPORTON void *
 go_accept4(char *stackptr)
 {
-    if (g_go_major_ver > 16) {
-        return do_cfunc(stackptr, c_accept4, go_hook_reg_accept4);
-    } else {
-        return do_cfunc(stackptr, c_accept4, go_hook_accept4);
-    }
+    return do_cfunc(stackptr, c_accept4, GO_HOOK_ACCEPT);
 }
 
 /*
@@ -1309,11 +1310,7 @@ c_http_server_read(char *stackaddr)
 EXPORTON void *
 go_tls_read(char *stackptr)
 {
-    if (g_go_major_ver > 16) {
-        return do_cfunc(stackptr, c_http_server_read, go_hook_reg_tls_read);
-    } else {
-        return do_cfunc(stackptr, c_http_server_read, go_hook_tls_read);
-    }
+    return do_cfunc(stackptr, c_http_server_read, GO_HOOK_TLS_SERVER_READ);
 }
 
 /*
@@ -1362,11 +1359,7 @@ c_http_server_write(char *stackaddr)
 EXPORTON void *
 go_tls_write(char *stackptr)
 {
-    if (g_go_major_ver > 16) {
-        return do_cfunc(stackptr, c_http_server_write, go_hook_reg_tls_write);
-    } else {
-        return do_cfunc(stackptr, c_http_server_write, go_hook_tls_write);
-    }
+    return do_cfunc(stackptr, c_http_server_write, GO_HOOK_TLS_SERVER_WRITE);
 }
 
 /*
@@ -1421,11 +1414,7 @@ c_http_client_write(char *stackaddr)
 EXPORTON void *
 go_pc_write(char *stackptr)
 {
-    if (g_go_major_ver > 16) {
-        return do_cfunc(stackptr, c_http_client_write, go_hook_reg_pc_write);
-    } else {
-        return do_cfunc(stackptr, c_http_client_write, go_hook_pc_write);
-    }
+    return do_cfunc(stackptr, c_http_client_write, GO_HOOK_TLS_CLIENT_WRITE);
 }
 
 /*
@@ -1487,11 +1476,7 @@ c_http_client_read(char *stackaddr)
 EXPORTON void *
 go_readResponse(char *stackptr)
 {
-    if (g_go_major_ver > 16) {
-        return do_cfunc(stackptr, c_http_client_read, go_hook_reg_readResponse);
-    } else {
-        return do_cfunc(stackptr, c_http_client_read, go_hook_readResponse);
-    }
+    return do_cfunc(stackptr, c_http_client_read, GO_HOOK_TLS_CLIENT_READ);
 }
 
 extern void handleExit(void);

@@ -36,4 +36,3 @@ These narrative blog posts delve into how people in different roles can solve pr
 - An SRE/developer who needs [application-specific visibility](https://cribl.io/blog/appscope-1-0-changing-the-game-for-sres-and-devs/).
 - An Infosec practitioner who needs to [vet an app for security](https://cribl.io/blog/appscope-1-0-changing-the-game-for-infosec-part-1/) before deployment in an enterprise environment.
 - An Infosec practitioner who wants to [investigate how apps interact](https://cribl.io/blog/appscope-1-0-changing-the-game-for-infosec-part-2/) in an enterprise environment.
-  

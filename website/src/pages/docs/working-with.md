@@ -68,7 +68,7 @@ To interpret a given metric, you must consider its type. There are four possibil
 | `gauge` | A numeric value that can increase or decrease over time – like a temperature or pressure gauge. |
 | `counter` | A cumulative numeric value – it can only increase over time. |
 | `timer` | Measures how long a given event type takes (duration). |
-| `histogram` | A StatsD histogram distributes sampled observations into buckets. With AppScope, we encounter histograms only in the special case where AppScope intercepts StatsD-formatted metrics whose type is `histogram`. AppScope preserves that labelling without actually aggregating values into buckets. |
+| `histogram` | A StatsD histogram distributes sampled observations into buckets. With AppScope, we encounter histograms only in the special case where AppScope intercepts StatsD-formatted metrics whose type is `histogram`. AppScope merely preserves that labelling: we assume that the scoped application has already aggregated the values into buckets. |
 
 For example, `proc.fd` is a `gauge` that indicates how many files were open at one point in time. If we're scoping `top`, that's typically less than 10. By contrast, `fs.open` is a `count` that increments every time a file is opened. When scoping `top` over a reporting period of 10 seconds, you could see values in the hundreds or thousands.
 

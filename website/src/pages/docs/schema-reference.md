@@ -12,7 +12,7 @@ When we say "the AppScope schema," we mean the [whole set](https://github.com/cr
 
 A few event and metric schema elements, namely `title` and `description`, have placeholder values. In future these may be made more informative. They are essentially "internal documentation" within the schemas and do not affect how the schemas function in AppScope. In the event that you develop any code that depends on AppScope schemas, be aware that the content of `title` and `description` fields may evolve.
 
-For more about how events and metrics work in AppScope, see [this](working-with.mdx#events-and-metrics) overview.
+For more about how events and metrics work in AppScope, see [this](working-with#events-and-metrics) overview.
 
 <div class="toc-grid">
 <div class="toc-cell">

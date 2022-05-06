@@ -1,13 +1,13 @@
 - navigationLeft:
   - parent: Products
     child: 
-      - link: LogStream
-        url: https://cribl.io/product/
-      - link: LogStream Cloud
-        url: https://cribl.io/logstream-cloud/
-      - link: Pricing
-        url: https://cribl.io/cribl-logstream-pricing/
-      - link: Download Logstream
-        url: https://cribl.io/download/
+      - link: Cribl Stream
+        url: https://cribl.io/stream/
+      - link: Cribl Edge
+        url: https://cribl.io/edge/
+      - link: Cribl.Cloud
+        url: https://cribl.io/cribl-cloud/
+      - link: AppScope
+        url: https://cribl.io/appscope/
   - parent: About Cribl
     link: https://cribl.io/about-us

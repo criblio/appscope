@@ -706,11 +706,6 @@ checkPendingSocketStatus(transport_t *trans)
     // If the placeDescriptor call failed, we're done
     if (trans->net.sock == -1) return 0;
 
-    // Set the TCP socket to blocking
-    if ((trans->type == CFG_TCP) && !setSocketBlocking(trans, trans->net.sock, TRUE)) {
-        DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
-    }
-
     // Set TCP_QUICKACK
 #if defined(TCP_QUICKACK) && (defined(IPPROTO_TCP) || defined(SOL_TCP))
     if (trans->type == CFG_TCP) {
@@ -739,6 +734,9 @@ checkPendingSocketStatus(transport_t *trans)
         // when successful, we'll have a connected tls socket.
         // when not, this will cleanup, disconnecting the socket.
         establishTlsSession(trans);
+
+        // If the establishTlsSession call failed, we're done
+        if (trans->net.sock == -1) return 0;
     }
 
     // Set the TCP socket to blocking

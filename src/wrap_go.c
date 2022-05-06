@@ -233,6 +233,8 @@ go_schema_t *g_go_schema = &go_16_schema; // overridden if later version
 #define GO_HOOK_TLS_SERVER_WRITE (g_go_schema->tap[INDEX_HOOK_TLS_SERVER_WRITE].assembly_fn)
 #define GO_HOOK_TLS_CLIENT_READ  (g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_READ].assembly_fn)
 #define GO_HOOK_TLS_CLIENT_WRITE (g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_WRITE].assembly_fn)
+#define GO_HOOK_EXIT             (g_go_schema->tap[INDEX_HOOK_EXIT].assembly_fn)
+#define GO_HOOK_DIE              (g_go_schema->tap[INDEX_HOOK_DIE].assembly_fn)
 
 uint64_t g_glibc_guard = 0LL;
 
@@ -398,9 +400,9 @@ getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
                 const void *symtab_addr = pclntab_addr + 16;
 
                 for(i=0; i<sym_count; i++) {
-                    uint64_t sym_addr     = *((const uint64_t *)(symtab_addr));
                     uint64_t func_offset  = *((const uint64_t *)(symtab_addr + 8));
                     uint32_t name_offset  = *((const uint32_t *)(pclntab_addr + func_offset + 8));
+                    uint64_t sym_addr     = *((const uint64_t *)(symtab_addr));
                     const char *func_name = (const char *)(pclntab_addr + name_offset);
 
                     if (scope_strcmp(sname, func_name) == 0) {
@@ -424,9 +426,9 @@ getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
                 uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (7 * 8)));
                 const void *symtab_addr = pclntab_addr + pclntab_offset;
                 for (i = 0; i < sym_count; i++) {
-                    uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
                     uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
                     uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 8));
+                    uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
                     const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
                     if (scope_strcmp(sname, func_name) == 0) {
                         symaddr = sym_addr;
@@ -455,19 +457,19 @@ getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
                 for (i = 0; i < sym_count; i++) {
                     uint32_t func_offset = *((uint32_t *)(symtab_addr + 4));
                     uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 4));
-                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
                     func_offset = *((uint32_t *)(symtab_addr));
-                    uint64_t func_addr = (uint64_t)(func_offset + text_start);
+                    uint64_t sym_addr = (uint64_t)(func_offset + text_start);
+                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
                     if (scope_strcmp(sname, func_name) == 0) {
-                        symaddr = func_addr;
-                        scopeLog(CFG_LOG_ERROR, "symbol found %s = 0x%08lx\n", func_name, func_addr);
+                        symaddr = sym_addr;
+                        scopeLog(CFG_LOG_ERROR, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
                         break;
                     }
 
                     if (altname && mnemonic &&
                         (scope_strcmp(altname, func_name) == 0) &&
-                        (match_assy_instruction((void *)func_addr, mnemonic) == TRUE)) {
-                        symaddr = func_addr;
+                        (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
+                        symaddr = sym_addr;
                         break;
                     }
 
@@ -1588,11 +1590,11 @@ c_exit(char *stackaddr)
 EXPORTON void *
 go_exit(char *stackptr)
 {
-    return do_cfunc(stackptr, c_exit, go_hook_exit);
+    return do_cfunc(stackptr, c_exit, GO_HOOK_EXIT);
 }
 
 EXPORTON void *
 go_die(char *stackptr)
 {
-    return do_cfunc(stackptr, c_exit, go_hook_die);
+    return do_cfunc(stackptr, c_exit, GO_HOOK_DIE);
 }

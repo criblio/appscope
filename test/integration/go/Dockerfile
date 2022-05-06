@@ -22,7 +22,9 @@ RUN cd /go/syscalls && \
 RUN mkdir /go/net
 COPY ./go/net/plainServer.go /go/net
 RUN cd /go/net && \
-    go build -buildmode=pie -o plainServerDynamic plainServer.go
+    go build -buildmode=pie -o plainServerDynamicPie plainServer.go
+RUN cd /go/net && \
+    go build -o plainServerDynamic plainServer.go
 RUN cd /go/net && \
     CGO_ENABLED=0 go build -o plainServerStatic plainServer.go
 COPY ./go/net/tlsServer.go /go/net
@@ -71,7 +73,7 @@ COPY ./go/influx/influxdb-selfsigned.key /etc/ssl/.
 COPY ./go/influx/influxdb-selfsigned.crt /etc/ssl/.
 
 ENV SCOPE_CRIBL_ENABLE=false
-ENV SCOPE_LOG_LEVEL=error
+ENV SCOPE_LOG_LEVEL=warning
 ENV SCOPE_LOG_DEST=file:///tmp/scope.log
 ENV SCOPE_METRIC_VERBOSITY=4
 ENV SCOPE_EVENT_LOGFILE=true

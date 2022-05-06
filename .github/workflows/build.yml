@@ -197,7 +197,7 @@ jobs:
       # Start a BuildX builder. We'll use the outputs later so give it an ID.
       - name: Setup Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       # We'll tell BuildX to `--cache-from` this folder to speed up the build
       # of our `appscope-builder` image. 
@@ -524,7 +524,7 @@ jobs:
 
       - name: Setup Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       # We skip this step if we're not going to push the resulting container image
       - name: Login to Container Registry

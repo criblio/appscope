@@ -1,4 +1,4 @@
-FROM hashicorp/terraform:1.0.9
+FROM hashicorp/terraform:1.1.9
 
 RUN apk add bash
 

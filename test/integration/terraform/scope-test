@@ -60,14 +60,32 @@ for i in $(seq $LOOP_LIMIT); do
    if [ $? -ne 0 ]; then
         ERR+=1
    fi
+   grep "/bin/terraform init" $EVT_FILE | grep "fs.open" > /dev/null
+   if [ $? -ne 0 ]; then
+        ERR+=1
+   fi
+
    ldscope -- /bin/terraform apply -auto-approve
    if [ $? -ne 0 ]; then
         ERR+=1
    fi
+
+   grep "/bin/terraform apply" $EVT_FILE | grep "fs.open" > /dev/null
+   if [ $? -ne 0 ]; then
+        ERR+=1
+   fi
+
    ldscope -- /bin/terraform destroy -auto-approve
    if [ $? -ne 0 ]; then
         ERR+=1
    fi
+
+   grep "/bin/terraform destroy" $EVT_FILE | grep "fs.open" > /dev/null
+   if [ $? -ne 0 ]; then
+        ERR+=1
+   fi
+
+   rm -f $EVT_FILE
 done
 
 endtest

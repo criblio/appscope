@@ -4,7 +4,6 @@ DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
 
 FAILED_TEST_LIST=""
 FAILED_TEST_COUNT=0
-EXPECTED_AWS_NUKE_EXIT_CODE=255
 LOOP_LIMIT=10
 EVT_FILE="/opt/test-runner/logs/events.log"
 METRIC_FILE="/opt/test-runner/logs/metrics.log"
@@ -49,17 +48,44 @@ endtest(){
 }
 
 #
-# test aws-nuke
+# test terraform
 #
 
-starttest aws-nuke
+starttest terraform
 
-cd /opt/awsnuke
+cd /opt/terraform
+
 for i in $(seq $LOOP_LIMIT); do
-    ldscope -- /usr/local/bin/aws-nuke -v -c /opt/awsnuke/example.yaml
-    if [ $? -ne $EXPECTED_AWS_NUKE_EXIT_CODE ]; then
+   ldscope -- /bin/terraform init
+   if [ $? -ne 0 ]; then
         ERR+=1
-    fi
+   fi
+   grep "/bin/terraform init" $EVT_FILE | grep "fs.open" > /dev/null
+   if [ $? -ne 0 ]; then
+        ERR+=1
+   fi
+
+   ldscope -- /bin/terraform apply -auto-approve
+   if [ $? -ne 0 ]; then
+        ERR+=1
+   fi
+
+   grep "/bin/terraform apply" $EVT_FILE | grep "fs.open" > /dev/null
+   if [ $? -ne 0 ]; then
+        ERR+=1
+   fi
+
+   ldscope -- /bin/terraform destroy -auto-approve
+   if [ $? -ne 0 ]; then
+        ERR+=1
+   fi
+
+   grep "/bin/terraform destroy" $EVT_FILE | grep "fs.open" > /dev/null
+   if [ $? -ne 0 ]; then
+        ERR+=1
+   fi
+
+   rm -f $EVT_FILE
 done
 
 endtest

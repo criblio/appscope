@@ -10,6 +10,8 @@ ERR_FILE="stderr.txt"
 LOG_FILE="/tmp/scope.log"
 touch $EVT_FILE
 
+GO_MAJOR_VER=(`echo $GOLANG_VERSION | cut -d '.' -f2`)
+
 starttest(){
     CURRENT_TEST=$1
     echo "==============================================="
@@ -153,6 +155,57 @@ ERR+=$?
 grep plainServerDynamic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
 grep plainServerDynamic $EVT_FILE | grep http.resp | grep "127.0.0.1" > /dev/null
+ERR+=$?
+
+if [ $ERR -ge 1 ]; then
+    cat $EVT_FILE
+fi
+
+evalPayload
+ERR+=$?
+
+endtest
+
+
+#
+# plainServerDynamicPie
+#
+starttest plainServerDynamicPie
+cd /go/net
+PORT=80
+
+ldscope ./plainServerDynamicPie ${PORT} &
+
+# this sleep gives the server a chance to bind to the port
+# before we try to hit it with curl
+sleep 1
+curl http://localhost:${PORT}/hello
+ERR+=$?
+
+sleep 0.5
+# This stops plainServerDynamicPie
+pkill -f plainServerDynamicPie
+
+# this sleep gives plainServerDynamicPie a chance to report its events on exit
+sleep 1
+
+evaltest
+
+grep plainServerDynamicPie $EVT_FILE | grep net.app > /dev/null
+ERR+=$?
+grep plainServerDynamicPie $EVT_FILE | grep net.open > /dev/null
+ERR+=$?
+grep plainServerDynamicPie $EVT_FILE | grep net.close > /dev/null
+ERR+=$?
+grep plainServerDynamicPie $EVT_FILE | grep fs.open > /dev/null
+ERR+=$?
+grep plainServerDynamicPie $EVT_FILE | grep fs.close > /dev/null
+ERR+=$?
+grep plainServerDynamicPie $EVT_FILE | grep http.req > /dev/null
+ERR+=$?
+grep plainServerDynamicPie $EVT_FILE | grep http.resp > /dev/null
+ERR+=$?
+grep plainServerDynamicPie $EVT_FILE | grep http.resp | grep "127.0.0.1" > /dev/null
 ERR+=$?
 
 if [ $ERR -ge 1 ]; then
@@ -387,6 +440,53 @@ grep plainClientStatic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
 grep plainClientStatic $EVT_FILE | grep console > /dev/null
 ERR+=$?
+
+if [ $ERR -ge 1 ]; then
+    cat $EVT_FILE
+fi
+
+evalPayload
+ERR+=$?
+
+endtest
+
+
+#
+# plainClientStaticStripped
+#
+starttest plainClientStaticStripped
+cd /go/net
+ldscope ./plainClientStaticStripped
+ERR+=$?
+
+# this sleep gives plainClientStaticStripped a chance to report its events on exit
+sleep 1
+
+evaltest
+
+# We don't support Go stripped executables < 1.13
+if [ $GO_MAJOR_VER -lt 13 ]; then
+    grep "Continuing without AppScope." ${LOG_FILE}
+    ERR+=$?
+else
+    grep plainClientStaticStripped $EVT_FILE | grep net.app > /dev/null
+    ERR+=$?
+    grep plainClientStaticStripped $EVT_FILE | grep net.open > /dev/null
+    ERR+=$?
+    # dont wait for this, it's not always guaranteed in the test app's timeframe
+    #grep plainClientStaticStripped $EVT_FILE | grep net.close > /dev/null
+    #ERR+=$?
+    grep plainClientStaticStripped $EVT_FILE | grep fs.open > /dev/null
+    ERR+=$?
+    grep plainClientStaticStripped $EVT_FILE | grep fs.close > /dev/null
+    ERR+=$?
+    grep plainClientStaticStripped $EVT_FILE | grep http.req > /dev/null
+    ERR+=$?
+    grep plainClientStaticStripped $EVT_FILE | grep http.resp > /dev/null
+    ERR+=$?
+    grep plainClientStaticStripped $EVT_FILE | grep console > /dev/null
+    ERR+=$?
+fi
 
 if [ $ERR -ge 1 ]; then
     cat $EVT_FILE

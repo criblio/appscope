@@ -16,29 +16,16 @@
 #include "capstone/capstone.h"
 #include "scopestdlib.h"
 
-#define SCOPE_STACK_SIZE (size_t)(32 * 1024)
-//#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
-#define ENABLE_CAS_IN_SYSEXEC 1
+#define GOPCLNTAB_MAGIC_112 0xfffffffb
+#define GOPCLNTAB_MAGIC_116 0xfffffffa
+#define GOPCLNTAB_MAGIC_118 0xfffffff0
 
-#define SWITCH_ENV "SCOPE_SWITCH"
-#define SWITCH_USE_NO_THREAD "no_thread"
-#define SWITCH_USE_THREAD "thread"
+#define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 #define EXIT_STACK_SIZE (32 * 1024)
 
 #define UNKNOWN_GO_VER (-1)
 #define MIN_SUPPORTED_GO_VER (8)
 #define PARAM_ON_REG_GO_VER (19)
-
-#ifdef ENABLE_CAS_IN_SYSEXEC
-#include "atomic.h"
-#else
-// This disables the CAS spinlocks by default.  Aint nobody got time for that.
-bool
-atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
-{
-    return TRUE;
-}
-#endif
 
 // compile-time control for debugging
 #define NEEDEVNULL 1
@@ -50,6 +37,7 @@ atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
 #define UNDEF_OFFSET (-1)
 
 int g_go_major_ver = UNKNOWN_GO_VER;
+static char g_go_build_ver[7];
 
 enum index_hook_t {
     INDEX_HOOK_WRITE            = 0,
@@ -223,7 +211,8 @@ go_schema_t go_17_schema = {
         [INDEX_HOOK_TLS_SERVER_WRITE] = {"net/http.checkConnErrorWriter.Write",  go_hook_reg_tls_write,        NULL, 0}, // tls server write
         [INDEX_HOOK_TLS_CLIENT_READ]  = {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse,     NULL, 0}, // tls client read
         [INDEX_HOOK_TLS_CLIENT_WRITE] = {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,         NULL, 0}, // tls client write
-        [INDEX_HOOK_EXIT]             = {"runtime.exit.abi0",                    go_hook_exit,                 NULL, 0},
+//        [INDEX_HOOK_EXIT]             = {"runtime.exit.abi0",                    go_hook_exit,                 NULL, 0},
+        [INDEX_HOOK_EXIT]             = {"runtime.exit",                         go_hook_exit,                 NULL, 0},
         [INDEX_HOOK_DIE]              = {"runtime.dieFromSignal",                go_hook_die,                  NULL, 0},
         [INDEX_HOOK_MAX]              = {"TAP_TABLE_END",                        NULL,                         NULL, 0}
     },
@@ -244,6 +233,8 @@ go_schema_t *g_go_schema = &go_16_schema; // overridden if later version
 #define GO_HOOK_TLS_SERVER_WRITE (g_go_schema->tap[INDEX_HOOK_TLS_SERVER_WRITE].assembly_fn)
 #define GO_HOOK_TLS_CLIENT_READ  (g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_READ].assembly_fn)
 #define GO_HOOK_TLS_CLIENT_WRITE (g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_WRITE].assembly_fn)
+#define GO_HOOK_EXIT             (g_go_schema->tap[INDEX_HOOK_EXIT].assembly_fn)
+#define GO_HOOK_DIE              (g_go_schema->tap[INDEX_HOOK_DIE].assembly_fn)
 
 uint64_t g_glibc_guard = 0LL;
 
@@ -257,41 +248,242 @@ devnull(const char* fmt, ...)
 }
 #endif
 
-// c_str() is provided to convert a go-style string to a c-style string.
-// The resulting c_str will need to be passed to free() when it is no
+// Use go_str() whenever a "go string" type needs to be interpreted.
+// The resulting go_str will need to be passed to free_go_str() when it is no
 // longer needed.
-static char *
-c_str(gostring_t *go_str)
-{
-    if (!go_str || go_str->len <= 0) return NULL;
-
-    char *path;
-    if ((path = scope_calloc(1, go_str->len+1)) == NULL) return NULL;
-    scope_memmove(path, go_str->str, go_str->len);
-    path[go_str->len] = '\0';
-
-    return path;
-}
-
+// Don't use go_str() for byte arrays.
 static char *
 go_str(void *go_str)
 {
-    // Go 17 and higher use null terminated strings instead of a string and a length
+    // Go 17 and higher use "c style" null terminated strings instead of a string and a length
     if (g_go_major_ver > 16) {
        // We need to deference the address first before casting to a char *
        if (!go_str) return NULL;
        return (char *)*(uint64_t *)go_str;
     }
-    return c_str((gostring_t *)go_str);
+
+    gostring_t* go_str_tmp = (gostring_t *)go_str;
+    if (!go_str_tmp || go_str_tmp->len <= 0) return NULL;
+
+    char *c_str;
+    if ((c_str = scope_calloc(1, go_str_tmp->len+1)) == NULL) return NULL;
+    scope_memmove(c_str, go_str_tmp->str, go_str_tmp->len);
+    c_str[go_str_tmp->len] = '\0';
+
+    return c_str;
 }
 
 static void
 free_go_str(char *str) {
-    // Go 17 and higher use null terminated strings instead of a string and a length
+    // Go 17 and higher use "c style" null terminated strings instead of a string and a length
     if (g_go_major_ver > 16) {
         return;
     }
     if(str) scope_free(str);
+}
+
+static bool
+match_assy_instruction(void *addr, char *mnemonic)
+{
+    csh dhandle = 0;
+    cs_arch arch;
+    cs_mode mode;
+    cs_insn *asm_inst = NULL;
+    unsigned int asm_count = 0;
+    uint64_t size = 32;
+    bool rc = FALSE;
+
+#if defined(__aarch64__)
+    arch = CS_ARCH_ARM64;
+    mode = CS_MODE_LITTLE_ENDIAN;
+#elif defined(__x86_64__)
+    arch = CS_ARCH_X86;
+    mode = CS_MODE_64;
+#else
+    return FALSE;
+#endif
+
+    if (cs_open(arch, mode, &dhandle) != CS_ERR_OK) return FALSE;
+
+    asm_count = cs_disasm(dhandle, addr, size, (uint64_t)addr, 0, &asm_inst);
+    if (asm_count <= 0) return FALSE;
+
+    if (!scope_strcmp((const char*)asm_inst->mnemonic, mnemonic)) rc = TRUE;
+
+    if (asm_inst) cs_free(asm_inst, asm_count);
+    cs_close(&dhandle);
+
+    return rc;
+}
+
+static void *
+getGoVersionAddr(const char* buf)
+{
+    int i;
+    Elf64_Ehdr *ehdr;
+    Elf64_Shdr *sections;
+    const char *section_strtab = NULL;
+    const char *sec_name;
+    const char *sec_data;
+
+    ehdr = (Elf64_Ehdr *)buf;
+    sections = (Elf64_Shdr *)(buf + ehdr->e_shoff);
+    section_strtab = (char *)buf + sections[ehdr->e_shstrndx].sh_offset;
+    const char magic[0xe] = "\xff Go buildinf:";
+    void *go_build_ver_addr = NULL;
+ 
+    for (i = 0; i < ehdr->e_shnum; i++) {
+        sec_name = section_strtab + sections[i].sh_name;
+        sec_data = (const char *)buf + sections[i].sh_offset;
+        // Since go1.13, the .go.buildinfo section has been added to
+        // identify where runtime.buildVersion exists, for the case where
+        // go apps have been stripped of their symbols.
+
+        // offset into sec_data     field contents
+        // -----------------------------------------------------------
+        // 0x0                      build info magic = "\xff Go buildinf:"
+        // 0xe                      binary ptrSize
+        // 0xf                      endianness
+        // 0x10                     pointer to string runtime.buildVersion
+        // 0x10 + ptrSize           pointer to runtime.modinfo
+        // 0x10 + 2 * ptr size      pointer to build flags
+
+        if (!scope_strcmp(sec_name, ".go.buildinfo") &&
+            (sections[i].sh_size >= 0x18) &&
+            (!scope_memcmp(&sec_data[0], magic, sizeof(magic))) &&
+            (sec_data[0xe] == 0x08)) {  // 64 bit executables only
+
+            // debug/buildinfo/buildinfo.go
+            // If the endianness has the 2 bit set, then the pointers are zero
+            // and the 32-byte header is followed by varint-prefixed string data
+            // for the two string values we care about.
+            if (sec_data[0xf] == 0x00) {  // little-endian
+                uint64_t *addressPtr = (uint64_t*)&sec_data[0x10];
+                go_build_ver_addr = (void*)*addressPtr;
+            } else if (sec_data[0xf] == 0x02) {
+                scope_memmove(g_go_build_ver, (char*)&sec_data[0x21], 6);
+                g_go_build_ver[6] = '\0';
+                go_build_ver_addr = &g_go_build_ver;
+            }
+        }
+    }
+    return go_build_ver_addr;
+}
+
+static void *
+getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
+{
+    int i;
+    Elf64_Addr symaddr = 0;
+    Elf64_Ehdr *ehdr;
+    Elf64_Shdr *sections;
+    const char *section_strtab = NULL;
+    const char *sec_name = NULL;
+
+    if (!buf || !sname) return NULL;
+
+    ehdr = (Elf64_Ehdr *)buf;
+    sections = (Elf64_Shdr *)((char *)buf + ehdr->e_shoff);
+    section_strtab = (char *)buf + sections[ehdr->e_shstrndx].sh_offset;
+
+    for (i = 0; i < ehdr->e_shnum; i++) {
+        sec_name = section_strtab + sections[i].sh_name;
+        if (scope_strcmp(".gopclntab", sec_name) == 0) {
+            const void *pclntab_addr = buf + sections[i].sh_offset;
+            /*
+            Go symbol table is stored in the .gopclntab section
+            More info: https://docs.google.com/document/d/1lyPIbmsYbXnpNj57a261hgOYVpNRcgydurVQIyZOz_o/pub
+            */
+            uint32_t magic = *((const uint32_t *)(pclntab_addr));
+            if (magic == GOPCLNTAB_MAGIC_112) {
+                uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
+                const void *symtab_addr = pclntab_addr + 16;
+
+                for(i=0; i<sym_count; i++) {
+                    uint64_t func_offset  = *((const uint64_t *)(symtab_addr + 8));
+                    uint32_t name_offset  = *((const uint32_t *)(pclntab_addr + func_offset + 8));
+                    uint64_t sym_addr     = *((const uint64_t *)(symtab_addr));
+                    const char *func_name = (const char *)(pclntab_addr + name_offset);
+
+                    if (scope_strcmp(sname, func_name) == 0) {
+                        symaddr = sym_addr;
+                        scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
+                        break;
+                    }
+
+                    if (altname && mnemonic &&
+                        (scope_strcmp(altname, func_name) == 0) &&
+                        (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
+                        symaddr = sym_addr;
+                        break;
+                    }
+
+                    symtab_addr += 16;
+                }
+            } else if (magic == GOPCLNTAB_MAGIC_116) {
+                uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
+                uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (3 * 8)));
+                uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (7 * 8)));
+                const void *symtab_addr = pclntab_addr + pclntab_offset;
+                for (i = 0; i < sym_count; i++) {
+                    uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
+                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 8));
+                    uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
+                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
+                    if (scope_strcmp(sname, func_name) == 0) {
+                        symaddr = sym_addr;
+                        scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
+                        break;
+                    }
+
+                    if (altname && mnemonic &&
+                        (scope_strcmp(altname, func_name) == 0) &&
+                        (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
+                        symaddr = sym_addr;
+                        break;
+                    }
+
+                    symtab_addr += 16;
+                }
+            } else if (magic == GOPCLNTAB_MAGIC_118) {
+                uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
+                // In go 1.18 the funcname table and the pcln table are stored in the text section
+                uint64_t text_start = *((const uint64_t *)(pclntab_addr + (3 * 8)));
+                uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (4 * 8)));
+                //uint64_t funcnametab_addr = (uint64_t)(funcnametab_offset + pclntab_addr);
+                uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (8 * 8)));
+                // A "symbtab" is an entry in the pclntab, probably better known as a pcln
+                const void *symtab_addr = (const void *)(pclntab_addr + pclntab_offset);
+                for (i = 0; i < sym_count; i++) {
+                    uint32_t func_offset = *((uint32_t *)(symtab_addr + 4));
+                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 4));
+                    func_offset = *((uint32_t *)(symtab_addr));
+                    uint64_t sym_addr = (uint64_t)(func_offset + text_start);
+                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
+                    if (scope_strcmp(sname, func_name) == 0) {
+                        symaddr = sym_addr;
+                        scopeLog(CFG_LOG_ERROR, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
+                        break;
+                    }
+
+                    if (altname && mnemonic &&
+                        (scope_strcmp(altname, func_name) == 0) &&
+                        (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
+                        symaddr = sym_addr;
+                        break;
+                    }
+
+                    symtab_addr += 8;
+                }
+            } else {
+                scopeLog(CFG_LOG_DEBUG, "Invalid header in .gopclntab");
+                break;
+            }
+            break;
+        }
+    }
+
+    return (void *)symaddr;
 }
 
 // Detect the beginning of a Go Function
@@ -644,7 +836,7 @@ initGoHook(elf_buf_t *ebuf)
 {
     int rc;
     funchook_t *funchook;
-    gostring_t *go_ver; // There is an implicit len field at go_ver + 0x8
+    char *go_ver;
     char *go_runtime_version = NULL;
 
     // A go app may need to expand stacks for some C functions
@@ -667,12 +859,6 @@ initGoHook(elf_buf_t *ebuf)
         sysprint("This is a dynamic app\n");
     }
 
-    go_ver = getSymbol(ebuf->buf, "runtime.buildVersion");
-    if (!go_ver) {
-        //runtime.buildVersion symbol not found, probably dealing with a stripped binary
-        //try to retrieve the version symbol address from the .go.buildinfo section
-        go_ver = getGoVersionAddr(ebuf->buf);
-    }
     //check ELF type
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
     // if it's a position independent executable, get the base address from /proc/self/maps
@@ -686,13 +872,25 @@ initGoHook(elf_buf_t *ebuf)
         sysprint("base %lx %lx %lx\n", base, (uint64_t)ebuf->text_addr, textSec->sh_offset);
         base = base - (uint64_t)ebuf->text_addr + textSec->sh_offset;
     }
-    
-    go_ver = (void *) ((uint64_t)go_ver + base);
-    
-    if (go_ver && (go_runtime_version = c_str(go_ver))) {
 
+    void *go_ver_sym = getSymbol(ebuf->buf, "runtime.buildVersion");
+    if (!go_ver_sym) {
+        // runtime.buildVersion symbol not found, probably dealing with a stripped binary
+        // try to retrieve the version symbol address from the .go.buildinfo section
+        // if g_go_build_ver is set we know we're dealing with a char *
+        // if it is not set, we know we're dealing with a "go string"
+        void *ver_addr = getGoVersionAddr(ebuf->buf);
+        if (g_go_build_ver[0] != '\0') {
+            go_ver = (char *)((uint64_t)ver_addr + base);
+        } else {
+            go_ver = go_str((void *)((uint64_t)ver_addr + base));
+        }
+    } else {
+        go_ver = go_str((void *)((uint64_t)go_ver_sym + base));
+    }
+    
+    if (go_ver && (go_runtime_version = go_ver)) {
         sysprint("go_runtime_version = %s\n", go_runtime_version);
-
         g_go_major_ver = go_major_version(go_runtime_version);
     }
     if (g_go_major_ver < MIN_SUPPORTED_GO_VER) {
@@ -728,14 +926,15 @@ initGoHook(elf_buf_t *ebuf)
     if (g_go_major_ver > 16) {
         // Use the abi0 I/F for syscall based functions in Go >= 1.17
         if (((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall.abi0")) == 0) &&
-            ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall.abi0")) == 0)) {
-            sysprint("ERROR: can't get the address for runtime.cgocall\n");
+            ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall.abi0",
+                                               "runtime.asmcgocall", "mov")) == 0)) {
+            sysprint("ERROR: can't get the address for runtime.cgocall.abi0\n");
             return; // don't install our hooks
         }
     } else {
         // Use the native abi - the only abi present in <= Go 1.16
         if (((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) &&
-            ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall")) == 0)) {
+            ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall", NULL, NULL)) == 0)) {
             sysprint("ERROR: can't get the address for runtime.cgocall\n");
             return; // don't install our hooks
         }
@@ -779,7 +978,7 @@ initGoHook(elf_buf_t *ebuf)
         // Look for the symbol in the ELF symbol table
         if (((orig_func = getSymbol(ebuf->buf, tap->func_name)) == NULL) &&
         // Otherwise look in the .gopclntab section
-         ((orig_func = getGoSymbol(ebuf->buf, tap->func_name)) == NULL)) {
+            ((orig_func = getGoSymbol(ebuf->buf, tap->func_name, NULL, NULL)) == NULL)) {
             sysprint("ERROR: can't get the address for %s\n", tap->func_name);
             continue;
         }
@@ -792,7 +991,7 @@ initGoHook(elf_buf_t *ebuf)
 
         orig_func = (void *) ((uint64_t)orig_func + base);
         asm_count = cs_disasm(disass_handle, orig_func, size,
-                                 (uint64_t)orig_func, 0, &asm_inst);
+                              (uint64_t)orig_func, 0, &asm_inst);
         if (asm_count <= 0) {
             sysprint("ERROR: disassembler fails: %s\n\tlen %" PRIu64 " code %p result %lu\n\ttext addr %p text len %zu oinfotext 0x%" PRIx64 "\n",
                      tap->func_name, size,
@@ -924,14 +1123,12 @@ static void
 c_write(char *stackaddr)
 {
     uint64_t fd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_write_fd);
-    char *buf   = go_str((void *)(stackaddr + g_go_schema->arg_offsets.c_write_buf));
+    char *buf   = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_write_buf);
     uint64_t rc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_write_rc);
     uint64_t initialTime = getTime();
 
     funcprint("Scope: write fd %ld rc %ld buf %s\n", fd, rc, buf);
     doWrite(fd, initialTime, (rc != -1), buf, rc, "go_write", BUF, 0);
-
-    free_go_str(buf);
 }
 
 EXPORTON void *
@@ -1036,7 +1233,7 @@ static void
 c_read(char *stackaddr)
 {
     uint64_t fd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_read_fd);
-    char *buf   = go_str((void *)(stackaddr + g_go_schema->arg_offsets.c_read_buf));
+    char *buf   = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_read_buf);
     uint64_t rc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_read_rc);
     uint64_t initialTime = getTime();
 
@@ -1044,8 +1241,6 @@ c_read(char *stackaddr)
 
     funcprint("Scope: read of %ld rc %ld\n", fd, rc);
     doRead(fd, initialTime, (rc != -1), buf, rc, "go_read", BUF, 0);
-
-    free_go_str(buf);
 }
 
 EXPORTON void *
@@ -1127,13 +1322,13 @@ c_http_server_read(char *stackaddr)
 
     uint64_t connReader = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_connReader); 
     if (!connReader) return;   // protect from dereferencing null
-    char *buf           = go_str((void *)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_buf));
+    char *buf           = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_buf);
     // buf len 0x18
     // buf cap 0x20
     uint64_t rc         = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_rc);
     uint64_t cr_conn_rwc_if, cr_conn_rwc, netFD, pfd;
 
-    uint64_t conn =  *(uint64_t *)(connReader + g_go_schema->struct_offsets.connReader_to_conn);
+    uint64_t conn        =  *(uint64_t *)(connReader + g_go_schema->struct_offsets.connReader_to_conn);
     if (!conn) return;         // protect from dereferencing null
 
     cr_conn_rwc_if = conn + g_go_schema->struct_offsets.conn_to_rwc;
@@ -1165,8 +1360,6 @@ c_http_server_read(char *stackaddr)
             doProtocol((uint64_t)0, fd, buf, rc, TLSRX, BUF);
         }
     }
-
-    free_go_str(buf);
 }
 
 EXPORTON void *
@@ -1195,7 +1388,7 @@ c_http_server_write(char *stackaddr)
     int fd = -1;
     uint64_t conn = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_conn);
     if (!conn) return;         // protect from dereferencing null
-    char *buf     = go_str((void *)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_buf));
+    char *buf     = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_buf);
     uint64_t rc   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_rc);
     uint64_t w_conn_rwc_if, w_conn_rwc, netFD, pfd;
 
@@ -1216,8 +1409,6 @@ c_http_server_write(char *stackaddr)
             doProtocol((uint64_t)0, fd, buf, rc, TLSTX, BUF);
         }
     }
-
-    free_go_str(buf);
 }
 
 EXPORTON void *
@@ -1248,7 +1439,7 @@ c_http_client_write(char *stackaddr)
 
     int fd = -1;
     uint64_t w_pc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_w_pc);
-    char *buf     = go_str((void *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_buf));
+    char *buf     = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_buf);
     uint64_t rc   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_rc);
     uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
 
@@ -1273,8 +1464,6 @@ c_http_client_write(char *stackaddr)
         doProtocol((uint64_t)0, fd, buf, rc, TLSRX, BUF);
         funcprint("Scope: c_http_client_write of %d\n", fd);
     }
-
-    free_go_str(buf);
 }
 
 EXPORTON void *
@@ -1306,7 +1495,7 @@ c_http_client_read(char *stackaddr)
 
     int fd = -1;
     stackaddr += g_go_schema->arg_offsets.c_http_client_read_callee;
-    uint64_t pc  = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_read_pc); 
+    uint64_t pc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_read_pc); 
     uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, len = 0;
     char *buf = NULL;
 
@@ -1327,7 +1516,7 @@ c_http_client_read(char *stackaddr)
         }
 
         if ((pc_br = *(uint64_t *)(pc + g_go_schema->struct_offsets.persistConn_to_bufrd)) != 0) {
-            buf = go_str((void *)(pc_br + g_go_schema->struct_offsets.bufrd_to_buf));
+            buf = (char *)*(uint64_t *)(pc_br + g_go_schema->struct_offsets.bufrd_to_buf);
             // len is part of the []byte struct; the func doesn't return a len
             len = *(uint64_t *)(pc_br + 0x08);
         }
@@ -1336,8 +1525,6 @@ c_http_client_read(char *stackaddr)
             doProtocol((uint64_t)0, fd, buf, len, TLSRX, BUF);
             funcprint("Scope: c_http_client_read of %d\n", fd);
         }
-
-        free_go_str(buf);
     }
 }
 
@@ -1374,7 +1561,7 @@ c_exit(char *stackaddr)
 
     // don't use stackaddr; patch_first_instruction() does not provide
     // frame_size, so stackaddr isn't usable
-    funcprint("c_exit");
+    funcprint("c_exit\n");
 
     int i;
     struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
@@ -1403,11 +1590,11 @@ c_exit(char *stackaddr)
 EXPORTON void *
 go_exit(char *stackptr)
 {
-    return do_cfunc(stackptr, c_exit, go_hook_exit);
+    return do_cfunc(stackptr, c_exit, GO_HOOK_EXIT);
 }
 
 EXPORTON void *
 go_die(char *stackptr)
 {
-    return do_cfunc(stackptr, c_exit, go_hook_die);
+    return do_cfunc(stackptr, c_exit, GO_HOOK_DIE);
 }

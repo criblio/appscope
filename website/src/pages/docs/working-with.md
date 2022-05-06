@@ -55,9 +55,9 @@ When AppScope has [interposed a function](how-works), and then the application b
 Events describe the action performed by the interposed function. For example, a `net.open` event could tell you that a network connection was established by Firefox, from the local IP/port `172.16.198.210:54388` to the remote IP/port `34.107.221.82:80`, using HTTP over TCP.
 
 Metrics can do any of three things:
-* When verbosity is set to lower values, metrics summarize aspects of the action performed by the interposed function, for a reporting period which defaults to 10 seconds. See the `Metric verbosity level` section of the [config file](config-file).
-* When verbosity is set to higher values, metrics provide details about the action performed by the interposed function in real time.
-* When the metric name begins with `proc`, metrics provide information about resource usage for the reporting period.
+* When verbosity is set to lower values, metrics summarize aspects of the action performed by the interposed function, for a reporting period which defaults to 10 seconds. (See the `Metric verbosity level` section of the [config file](config-file).) For example, a `fs.read` metric could tell you that an `httpd` process has read a total of 320967 bytes from the filesystem, having performed multiple reads over a 10-second period.
+* When verbosity is set to higher values, metrics provide details about the action performed by the interposed function in real time. For example, an `fs.read` metric could tell you that an `httpd` process has done one read of 8245 bytes from one specific file, `/etc/httpd/conf/httpd.conf`.
+* When the metric name begins with `proc`, metrics periodically report information about resource usage at a point in time. For example, a `proc.mem` metric could tell you that `httpd` is currently using 62,123 KB of memory.
 
 AppScope outputs metrics either in [StatsD](https://github.com/statsd/statsd) format or in equivalent JSON. AppScope can also watch for and intercept StatsD-formatted metrics being emitted by a scoped application.
   
@@ -68,7 +68,7 @@ To interpret a given metric, you must consider its type. There are four possibil
 | `gauge` | A numeric value that can increase or decrease over time – like a temperature or pressure gauge. |
 | `counter` | A cumulative numeric value – it can only increase over time. |
 | `timer` | Measures how long a given event type takes (duration). |
-| `histogram` | A StatsD histogram distributes sampled observations into buckets. With AppScope, we encounter histograms only in the special case where AppScope intercepts StatsD-formatted metrics whose type is `histogram`. AppScope merely preserves that labelling: we assume that the scoped application has already aggregated the values into buckets. |
+| `histogram` | A StatsD histogram distributes sampled observations into buckets. With AppScope, we encounter histograms only in the special case where AppScope intercepts StatsD-formatted metrics whose type is `histogram`. AppScope merely preserves that labeling: we assume that the scoped application has already aggregated the values into buckets. |
 
 For example, `proc.fd` is a `gauge` that indicates how many files were open at one point in time. If we're scoping `top`, that's typically less than 10. By contrast, `fs.open` is a `count` that increments every time a file is opened. When scoping `top` over a reporting period of 10 seconds, you could see values in the hundreds or thousands.
 

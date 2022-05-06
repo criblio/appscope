@@ -31,7 +31,7 @@ You could do any of the following with AppScope:
 - Run Firefox from the AppScope CLI, and view results on a terminal-based dashboard.
 - Run Google Chrome from the AppScope CLI, and view results on a terminal-based dashboard. And be surprised.
 
-These narrative blog posts delve into how people in different roles can solve problems with AppScope:
+People in different roles can solve different problems with AppScope. Consider the following use cases, explored in depth in blog posts by the AppScope team:
 
 - An SRE/developer who needs [application-specific visibility](https://cribl.io/blog/appscope-1-0-changing-the-game-for-sres-and-devs/).
 - An Infosec practitioner who needs to [vet an app for security](https://cribl.io/blog/appscope-1-0-changing-the-game-for-infosec-part-1/) before deployment in an enterprise environment.

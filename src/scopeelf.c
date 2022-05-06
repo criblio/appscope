@@ -10,9 +10,6 @@
 #include "os.h"
 #include "fn.h"
 #include "scopeelf.h"
-#include "gocontext.h"
-
-char g_go_build_ver[7];
 
 void
 freeElf(char *buf, size_t len)
@@ -334,60 +331,6 @@ getSymbol(const char *buf, char *sname)
     }
 
     return (void *)symaddr;
-}
-
-void *
-getGoVersionAddr(const char* buf)
-{
-    int i;
-    Elf64_Ehdr *ehdr;
-    Elf64_Shdr *sections;
-    const char *section_strtab = NULL;
-    const char *sec_name;
-    const char *sec_data;
-
-    ehdr = (Elf64_Ehdr *)buf;
-    sections = (Elf64_Shdr *)(buf + ehdr->e_shoff);
-    section_strtab = (char *)buf + sections[ehdr->e_shstrndx].sh_offset;
-    const char magic[0xe] = "\xff Go buildinf:";
-    void *go_build_ver_addr = NULL;
- 
-    for (i = 0; i < ehdr->e_shnum; i++) {
-        sec_name = section_strtab + sections[i].sh_name;
-        sec_data = (const char *)buf + sections[i].sh_offset;
-        // Since go1.13, the .go.buildinfo section has been added to
-        // identify where runtime.buildVersion exists, for the case where
-        // go apps have been stripped of their symbols.
-
-        // offset into sec_data     field contents
-        // -----------------------------------------------------------
-        // 0x0                      build info magic = "\xff Go buildinf:"
-        // 0xe                      binary ptrSize
-        // 0xf                      endianness
-        // 0x10                     pointer to string runtime.buildVersion
-        // 0x10 + ptrSize           pointer to runtime.modinfo
-        // 0x10 + 2 * ptr size      pointer to build flags
-
-        if (!scope_strcmp(sec_name, ".go.buildinfo") &&
-            (sections[i].sh_size >= 0x18) &&
-            (!scope_memcmp(&sec_data[0], magic, sizeof(magic))) &&
-            (sec_data[0xe] == 0x08)) {  // 64 bit executables only
-
-            // debug/buildinfo/buildinfo.go
-            // If the endianness has the 2 bit set, then the pointers are zero
-            // and the 32-byte header is followed by varint-prefixed string data
-            // for the two string values we care about.
-            if (sec_data[0xf] == 0x00) {  // little-endian
-                uint64_t *addressPtr = (uint64_t*)&sec_data[0x10];
-                go_build_ver_addr = (void*)*addressPtr;
-            } else if (sec_data[0xf] == 0x02) {
-                scope_memmove(g_go_build_ver, (char*)&sec_data[0x21], 6);
-                g_go_build_ver[6] = '\0';
-                go_build_ver_addr = &g_go_build_ver;
-            }
-        }
-    }
-    return go_build_ver_addr;
 }
 
 bool

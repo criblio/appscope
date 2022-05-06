@@ -10,7 +10,9 @@ title: Known Issues
 
 As of this AppScope release, known issues include:
 
-- [#869](https://github.com/criblio/appscope/issues/869) AppScope's ability to avoid outputting binary data in console messages does not work perfectly in all situations. When data is first sent to the console by a scoped app, AppScope can detect whether it is binary, and if so, redact it while emitting an informative message. But when apps switch back and forth between textual and binary data, AppScope does not detect the change, and binary data can appear in console output.  
+- [#869](https://github.com/criblio/appscope/issues/869) AppScope's ability to avoid outputting binary data in console messages does not work perfectly in all situations. When data is first sent to the console by a scoped app, AppScope can detect whether it is binary, and if so, redact it while emitting an informative message. But when apps switch back and forth between textual and binary data, AppScope does not detect the change, and binary data can appear in console output.
+  - **Fix:** 1.0.4
+  
 - [#831](https://github.com/criblio/appscope/issues/831) When you scope the Microsoft Edge browser, AppScope fails to collect some HTTP events in these situations: (1) When Edge requests the use of HTTP/3; (2) When Edge uses HTTP/1.1 over UDP to request a list of plug-and-play devices from a Microsoft service; and, (3) when Edge uses SSL.  
 
 ## AppScope 1.0.0

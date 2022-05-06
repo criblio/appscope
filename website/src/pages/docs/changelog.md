@@ -6,6 +6,24 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.0.4
+
+2022-05-10 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.0.4`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.0.4/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.0.4/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.0.4/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.0.4/linux/aarch64/scope)
+
+### Fixes
+
+AppScope 1.0.4 aims to resolve reported connectivity issues.
+
+- [#896](https://github.com/criblio/appscope/issues/896) AppScope now creates a connection dedicated to transmitting payload data only if payloads are enabled.
+- [#665](https://github.com/criblio/appscope/issues/665) AppScope now has safeguards to ensure that AppScope does not interfere with scoped processes exiting.
+- [#869](https://github.com/criblio/appscope/issues/869) AppScope now uses an improved algorithm for omitting raw binary data from console events. The improved algorithm is better able to handle commands that switch back and forth between outputting text and outputting raw binary data to the console.
+
 ## AppScope 1.0.3
 
 2022-04-12 - Maintenance Release

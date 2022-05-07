@@ -6,7 +6,7 @@ title: Updating
 
 Changes in AppScope 1.0 affect some metric and event definitions, environment variables, and content (including default settings) in the `scope.yml` config file.
 
-**Note**: By "version 1.0", we mean version 1.0.1 and newer. Version 1.0.0 did not include the complete set of improvements that the AppScope team deems essential to AppScope 1.0, and therefore should be avoided.
+**Note**: By "version 1.0," we mean version 1.0.1 or newer. The AppScope team recommends using a version above 1.0.0, which contained an incomplete feature set.
 
 To update a Maintenance Pre-Release (version 0.8.1 or older) to version 1.0, follow this general procedure:
 

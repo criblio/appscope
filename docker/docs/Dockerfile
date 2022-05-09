@@ -1,4 +1,4 @@
-FROM node
+FROM node:17.9-slim
 
 RUN npm install -g json-dereference-cli json-schema-gendoc
 RUN apt-get update && apt-get install -y \

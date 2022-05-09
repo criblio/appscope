@@ -5,7 +5,7 @@ FAILED_TEST_LIST=""
 FAILED_TEST_COUNT=0
 
 EVT_FILE="/opt/test/log/events.log"
-BINARY_MSG="Binary data detected--- message"
+BINARY_MSG="-- binary data ignored --"
 
 starttest(){
     CURRENT_TEST=$1
@@ -69,7 +69,7 @@ starttest cat_html
 ldscope cat docker/demo/nginx/html/index.html > /dev/null
 evaltest
 
-grep "$BINARY_MSG" $EVT_FILE > /dev/null
+grep -- "$BINARY_MSG" $EVT_FILE > /dev/null
 if [ $? -eq 0 ]; then
     ERR+=1
 fi
@@ -82,13 +82,33 @@ endtest
 
 starttest cat_binary
 
-ldscope cat /usr/local/scope/bin/ldscope > /dev/null
+ldscope cat /bin/bash > /dev/null
 evaltest
 
-grep "$BINARY_MSG" $EVT_FILE > /dev/null
+grep -- "$BINARY_MSG" $EVT_FILE > /dev/null
 ERR+=$?
 
 endtest
+
+
+#
+# cat binary file with ALLOW_BINARY env set
+#   (ensure the $BINARY_MSG does not appear)
+#
+starttest cat_binary_with_ALLOW_BINARY_env
+
+export SCOPE_ALLOW_BINARY_CONSOLE=true
+ldscope cat /bin/bash > /dev/null
+unset SCOPE_ALLOW_BINARY_CONSOLE
+evaltest
+
+grep -- "$BINARY_MSG" $EVT_FILE > /dev/null
+if [ $? -eq 0 ]; then
+    ERR+=1
+fi
+
+endtest
+
 
 #
 # curl png
@@ -99,7 +119,7 @@ starttest curl_png
 ldscope curl https://upload.wikimedia.org/wikipedia/commons/e/e9/Felis_silvestris_silvestris_small_gradual_decrease_of_quality.png --output - > /dev/null
 evaltest
 
-grep "$BINARY_MSG" $EVT_FILE > /dev/null
+grep -- "$BINARY_MSG" $EVT_FILE > /dev/null
 ERR+=$?
 
 endtest
@@ -127,7 +147,7 @@ starttest ls_with_color
 
 ldscope ls --color=always > /dev/null
 evaltest
-grep "$BINARY_MSG" $EVT_FILE > /dev/null
+grep -- "$BINARY_MSG" $EVT_FILE > /dev/null
 if [ $? -eq 0 ]; then
     ERR+=1
 fi
@@ -142,7 +162,7 @@ starttest hexdump
 
 ldscope hexdump /usr/local/scope/lib/libscope.so > /dev/null
 evaltest
-grep "$BINARY_MSG" $EVT_FILE > /dev/null
+grep -- "$BINARY_MSG" $EVT_FILE > /dev/null
 if [ $? -eq 0 ]; then
     ERR+=1
 fi
@@ -157,7 +177,7 @@ starttest xxd
 
 ldscope xxd /usr/local/scope/lib/libscope.so > /dev/null
 evaltest
-grep "$BINARY_MSG" $EVT_FILE > /dev/null
+grep -- "$BINARY_MSG" $EVT_FILE > /dev/null
 if [ $? -eq 0 ]; then
     ERR+=1
 fi
@@ -176,7 +196,7 @@ tar -Pczvf test.tar.gz /usr/bin > /dev/null
 ldscope tar -PxOzf test.tar.gz > /dev/null
 evaltest
 
-grep "$BINARY_MSG" $EVT_FILE > /dev/null
+grep -- "$BINARY_MSG" $EVT_FILE > /dev/null
 ERR+=$?
 
 endtest
@@ -193,6 +213,125 @@ grep '"gid":1234,"groupname":"test_group","uid":3333,"username":"test_user"' $EV
 ERR+=$?
 
 endtest
+
+#
+# git push ssl test
+# (uses git-core and openssl-server deb packages)
+#
+# This git-over-ssl was a failed attempt to duplicate the
+# git send-pack that had a whacky property of switching
+# back and forth between binary and not-binary.  Turns out
+# that git-over-ssl didn't act like this, but this was a
+# lot of work to set up, so I wasn't willing to throw it away.
+useradd git
+echo -e "passwd\npasswd" | passwd git
+mkdir /home/git && chown git:git /home/git
+su git -c "mkdir -p ~/.ssh && chmod 700 ~/.ssh"
+su git -c "touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+su git -c "mkdir -p /home/git/project.git"
+su git -c "cd /home/git/project.git && git init --bare"
+
+service ssh start
+
+ssh-keygen -t rsa -N "" -f /root/.ssh/id_rsa
+cat /root/.ssh/id_rsa.pub >> /home/git/.ssh/authorized_keys
+ssh-keyscan -H localhost >> /root/.ssh/known_hosts
+
+mkdir -p /home/working/project
+cd /home/working/project
+git init
+git config --global user.email "mickey@mouse.com"
+git config --global user.name "Mickey Mouse"
+git remote add origin ssh://git@localhost/home/git/project.git
+man man > textfile.txt
+git add textfile.txt
+tar -czvf binfile.tar.gz /usr/bin/ >/dev/null
+git add binfile.tar.gz
+git commit -m "message"
+
+starttest git_push_ssl_test
+
+ldscope git push --set-upstream origin master
+
+evaltest
+
+grep -- "$BINARY_MSG" $EVT_FILE > /dev/null
+ERR+=$?
+
+# tear down the git stuff that could conflict with future tests
+service ssh stop
+rm -rf /home/working/project
+endtest
+
+#
+# git push https test
+# (uses apache2 apache2-utils deb packags)
+#
+# inspired by https://linuxhint.com/git_server_http_ubuntu/
+#
+# This successfully recreated a scenario observed in Cribl
+# Stream Cloud environments where the first console write
+# was text, but then the console data was alternating between
+# binary and normal text.
+a2enmod env cgi alias rewrite
+
+GIT_DIR="/var/www/git"
+REPO_NAME="myrepo"
+
+mkdir -p "${GIT_DIR}/${REPO_NAME}.git"
+cd "${GIT_DIR}/${REPO_NAME}.git"
+
+git init --bare &> /dev/null
+touch git-daemon-export-ok
+cp hooks/post-update.sample hooks/post-update
+git config http.receivepack true
+git update-server-info
+chown -Rf www-data:www-data ${GIT_DIR}
+sudo chmod -R 755 ${GIT_DIR}
+echo "Git repository '${REPO_NAME}' created in ${GIT_DIR}/${REPO_NAME}.git"
+
+a2dissite 000-default.conf
+a2ensite git.conf
+
+service apache2 restart
+
+mkdir -p /home/working/project
+cd /home/working/project
+git init
+git config --global user.email "mickey@mouse.com"
+git config --global user.name "Mickey Mouse"
+git remote add origin http://localhost/git/myrepo.git
+man man > textfile.txt
+git add textfile.txt
+tar -czvf binfile.tar.gz /usr/bin/ >/dev/null
+git add binfile.tar.gz
+git commit -m "message"
+
+
+sleep 5
+starttest git_push_https_test
+
+ldscope /bin/dash -c "git push --set-upstream origin master"
+
+sleep 5
+
+evaltest
+
+grep "send-pack" $EVT_FILE >/dev/null
+ERR+=$?
+grep -- "$BINARY_MSG" $EVT_FILE > /dev/null
+ERR+=$?
+
+# we've seen >27 MB when binary is not detected properly
+# and just over 1 MB when binary is detected properly
+# consider anything more than 2 MB a failure
+BYTES=$(grep "console" $EVT_FILE | wc --bytes)
+if (( $BYTES > 2000000 )); then
+    ERR+=1
+fi
+
+endtest
+
 
 unset SCOPE_PAYLOAD_ENABLE
 unset SCOPE_PAYLOAD_HEADER

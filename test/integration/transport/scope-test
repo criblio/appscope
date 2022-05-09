@@ -143,6 +143,117 @@ fi
 
 echo
 echo ===============================================================================
+
+
+echo
+echo ===============================================================================
+echo "Testing Number of Cribl/TLS Transport Connections"
+PEM_FILE=/tmp/appscope.pem
+rm -f $PEM_FILE
+cat /tmp/appscope.key /tmp/appscope.crt >> $PEM_FILE
+chmod 600 $PEM_FILE
+socat OPENSSL-LISTEN:12345,reuseaddr,cert=$PEM_FILE,cafile=/tmp/appscope.crt,fork,verify=0 /dev/null &
+
+if [ "$(wait_for_port 12345)" ]; then
+    ############################################################################
+    echo "When in cribl mode, verify there is only one connection when:"
+    echo " 1) SCOPE_PAYLOAD_ENABLE=false"
+    echo " 2) no protocols are defined"
+    SCOPE_PAYLOAD_ENABLE=false \
+    SCOPE_CRIBL_TLS_CA_CERT_PATH=/tmp/appscope.crt \
+        scope run -c tls://127.0.0.1:12345 -- /bin/sleep 3 &
+    sleep 1
+    CON_COUNT=$(lsof -p `pidof sleep` | grep -c 12345)
+    if (( $CON_COUNT != 1 )); then
+        echo "  FAILED - expected one connection"
+        ERR+=1
+        ERRORS="$ERRORS CRIBL/TLS_Connections"
+    else
+        echo "  PASSED"
+    fi
+    sleep 3 # wait for the scoped sleep command to finish
+
+    ############################################################################
+    echo "When in cribl mode, verify there are two connections when:"
+    echo " 1) SCOPE_PAYLOAD_ENABLE=true"
+    echo " 2) no protocols are defined"
+    SCOPE_PAYLOAD_ENABLE=true \
+    SCOPE_CRIBL_TLS_CA_CERT_PATH=/tmp/appscope.crt \
+        scope run -c tls://127.0.0.1:12345 -- /bin/sleep 3 &
+    sleep 1
+    CON_COUNT=$(lsof -p `pidof sleep` | grep -c 12345)
+    if (( $CON_COUNT != 2 )); then
+        echo "  FAILED - expected two connections"
+        ERR+=1
+        ERRORS="$ERRORS CRIBL/TLS_Connections"
+    else
+        echo "  PASSED"
+    fi
+    sleep 3 # wait for the scoped sleep command to finish
+
+    ############################################################################
+    echo "When in cribl mode, verify there are two connections when:"
+    echo " 1) SCOPE_PAYLOAD_ENABLE=false"
+    echo " 2) a protocol has set payload: true"
+
+    # I'm switching to controlling things with a config file just
+    # because the scope cli doesn't have a way to specify protocol
+    # definitions today.  I'm not intending to change any settings
+    # except to add a protocol definition that has "payload: true".
+    CFG_FILE=/tmp/scope.yml
+    echo "payload:" >> $CFG_FILE
+    echo "  enable: false" >> $CFG_FILE
+    echo "cribl:" >> $CFG_FILE
+    echo "  enable: true" >> $CFG_FILE
+    echo "  transport:" >> $CFG_FILE
+    echo "    type: tcp" >> $CFG_FILE
+    echo "    host: 127.0.0.1" >> $CFG_FILE
+    echo "    port: 12345" >> $CFG_FILE
+    echo "    tls:" >> $CFG_FILE
+    echo "      enable: true" >> $CFG_FILE
+    echo "      validateserver: true" >> $CFG_FILE
+    echo "      cacertpath: '/tmp/appscope.crt'" >> $CFG_FILE
+    echo "protocol:" >> $CFG_FILE
+    echo "  - name: Redis" >> $CFG_FILE
+    echo "    regex: .*" >> $CFG_FILE
+    echo "    payload: true" >> $CFG_FILE
+
+    scope run -u $CFG_FILE -- /bin/sleep 3 &
+    sleep 1
+    CON_COUNT=$(lsof -p `pidof sleep` | grep -c 12345)
+    if (( $CON_COUNT != 2 )); then
+        echo "  FAILED - expected two connections"
+        ERR+=1
+        ERRORS="$ERRORS CRIBL/TLS_Connections"
+    else
+        echo "  PASSED"
+    fi
+    sleep 3 # wait for the scoped sleep command to finish
+
+    ############################################################################
+    # Clean up, but don't treat any issues here as test failures
+    if ! rm -f $PEM_FILE; then
+        echo "unable to remove $PEM_FILE during cleanup"
+    fi
+    if ! kill `pidof socat`; then
+        echo "unable to kill socat process during cleanup"
+    fi
+    if ! rm -f $CFG_FILE; then
+        echo "unable to remove $CFG_FILE during cleanup"
+    fi
+
+else
+    echo "  FAILED - no listener"
+    ERR+=1
+    ERRORS="$ERRORS Cribl/TLS_Connections"
+fi
+
+
+
+echo
+echo ===============================================================================
+
+
 if [ -n "$ERRORS" ]; then
     echo >&2 "$ERR test failed; $ERRORS"
 else

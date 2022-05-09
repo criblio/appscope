@@ -4,9 +4,11 @@ title: Community
 
 # Community
 
-## Join Our Slack
+To connect with other AppScope users and developers:
 
-To connect with other AppScope users and developers, [join]( https://cribl.io/community?utm_source=appscope&utm_medium=footer&utm_campaign=appscope) our [Community Slack](https://app.slack.com/client/TD0HGJPT5/CPYBPK65V/thread/C01BM8PU30V-1611001888.001100).
+- Visit Cribl's [Q&A site](https://curious.cribl.io/).
+- Join Cribl's [Community Slack](https://cribl.io/community/#form) and check out the `#appscope` channel.
+- Check out learning and other resources in [Cribl Community](https://cribl.io/community?utm_source=appscope&utm_medium=footer&utm_campaign=appscope).
 
 ## How to Contribute
 

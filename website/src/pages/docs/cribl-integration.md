@@ -10,7 +10,7 @@ AppScope can also easily connect to Cribl LogStream ([overview](https://cribl.io
 
 ## Integrating with Cribl Edge
 
-AppScope will connect with Cribl Edge when the `cribl` backend is enabled with the `edge` transport type. These are default settings for the AppScope libary, which is [best suited](/docs/working-with) for the kinds of longer-running, planned monitoring procedures that tend to scale, and where the AppScope-Cribl Edge combination excels. 
+AppScope will connect with Cribl Edge when the `cribl` backend is enabled with the `edge` transport type. These are default settings for the AppScope library, which is [best suited](/docs/working-with) for the kinds of longer-running, planned monitoring procedures that tend to scale, and where the AppScope-Cribl Edge combination excels. 
 
 The CLI, by contrast, writes to the local filesystem by default; and the CLI is best suited for ad hoc exploration that's less likely to scale to large numbers of scoped processes.
 

@@ -6,6 +6,24 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.0.4
+
+2022-05-10 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.0.4`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.0.4/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.0.4/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.0.4/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.0.4/linux/aarch64/scope)
+
+### Fixes
+
+AppScope 1.0.4 aims to resolve reported connectivity issues.
+
+- [#896](https://github.com/criblio/appscope/issues/896) AppScope now creates a connection dedicated to transmitting payload data only if payloads are enabled.
+- [#665](https://github.com/criblio/appscope/issues/665) AppScope now has safeguards to ensure that AppScope does not interfere with scoped processes exiting.
+- [#869](https://github.com/criblio/appscope/issues/869) AppScope now uses an improved algorithm for omitting raw binary data from console events. The improved algorithm is better able to handle commands that switch back and forth between outputting text and outputting raw binary data to the console.
+
 ## AppScope 1.0.3
 
 2022-04-12 - Maintenance Release
@@ -95,7 +113,7 @@ AppScope's official v1 release includes advances in metric capture and forwardin
 
 - [#644](https://github.com/criblio/appscope/issues/644) Application-specific metrics can be captured.
 - [#725](https://github.com/criblio/appscope/issues/725) Metrics and events are now [defined](https://github.com/criblio/appscope/tree/master/docs/schemas) in JSON Schema.
-- [#723](https://github.com/criblio/appscope/issues/723) Metrics and events are now standardized. (Summary [here](https://github.com/criblio/.appscope/issues/712#issuecomment-1030234850).)
+- [#723](https://github.com/criblio/appscope/issues/723) Metrics and events are now standardized. (Summary [here](https://github.com/criblio/appscope/issues/712#issuecomment-1030234850).)
 - [#699](https://github.com/criblio/appscope/issues/699) Added an option to enable events via configuration file entries.
 - [#402](https://github.com/criblio/appscope/issues/402) Added support for readdir to `fs` events.
 - [#709](https://github.com/criblio/appscope/issues/709) Added support for unlinks / file removals to `fs` events.

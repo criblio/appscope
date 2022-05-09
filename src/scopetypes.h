@@ -173,6 +173,7 @@ typedef unsigned int bool;
 //    SCOPE_PAYLOAD_HEADER           write payload headers to files
 //    SCOPE_ALLOW_CONSTRUCT_DBG      allows debug inside the constructor
 //    SCOPE_QUEUE_LENGTH             override default circular buffer sizes
+//    SCOPE_ALLOW_BINARY_CONSOLE     "true" outputs all console data, always
 
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"
@@ -225,6 +226,11 @@ typedef unsigned int bool;
 // libmusl requires LD_LIBRARY_PATH
 #define LD_LIB_ENV "LD_LIBRARY_PATH"
 #define LD_LIB_DIR "libscope-v"
+
+// We've seen TLS connections hang when the remote side drops during the
+// establishTlsSession() process...  this helps ensure we won't hang
+// processes forever while waiting for a single connection to complete.
+#define MAX_TLS_CONNECT_SECONDS 5
 
 #endif // __SCOPETYPES_H__
 

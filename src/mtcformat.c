@@ -242,7 +242,7 @@ mtcFormatStatsDString(mtc_fmt_t* fmt, event_t* e, regex_t* fieldFilter)
     strcpy(end, "\n");
 
     // addedFields lets us avoid duplicate field names.  If we go to
-    // add one that's already in the set, skip it.  In this way precidence
+    // add one that's already in the set, skip it.  In this way precedence
     // is given to capturedFields then custom fields then remaining fields.
     strset_t *addedFields = strSetCreate(DEFAULT_SET_SIZE);
     addStatsdFields(fmt, e->capturedFields, &end, &bytes, addedFields, NULL);

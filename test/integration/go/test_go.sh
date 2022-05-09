@@ -98,6 +98,22 @@ ERR+=$?
 
 endtest
 
+#
+# syscalls_unlinkatfalse
+#
+starttest unlinkatfalse
+cd /go/syscalls
+
+ldscope ./unlinkatfalse
+
+evaltest
+
+grep unlinkatfalse $EVT_FILE | grep fs.delete > /dev/null
+if [ $? -eq "0" ]; then
+    ERR+=1
+fi
+
+endtest
 
 #
 # syscalls_readdir

@@ -10,6 +10,8 @@ Child processes are created with the AppScope library present, if the library wa
 
 ![AppScope system-level design](./images/AppScope-system-level-design_w1800.png)
 
+If you're curious about the thought process that led to the creation of AppScope, see this [blog](https://cribl.io/blog/the-appscope-origin-story/) by the AppScope team.
+
 ### Performance Overhead
 
 AppScope collects data with, at most, around 2% CPU overhead, and **minimal** latency penalty. In most cases, the overhead is markedly less than 2%, which is significantly more efficient than legacy and current monitoring systems.

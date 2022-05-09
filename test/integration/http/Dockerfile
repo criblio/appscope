@@ -1,5 +1,6 @@
-FROM cribl/cribl:3.1.0-RC4
+FROM cribl/cribl:3.4.1
 
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update && apt install -y \
   curl \
   emacs \

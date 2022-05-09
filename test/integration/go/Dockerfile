@@ -15,9 +15,9 @@ RUN mkdir /go/syscalls
 COPY ./go/syscalls/unlinkat.go /go/syscalls
 RUN cd /go/syscalls && \
     go build -o unlinkat unlinkat.go
-COPY ./go/syscalls/unlinkatfalse.go /go/syscalls
+COPY ./go/syscalls/opfalse.go /go/syscalls
 RUN cd /go/syscalls && \
-    go build -o unlinkatfalse unlinkatfalse.go
+    go build -o opfalse opfalse.go
 COPY ./go/syscalls/readdir.go /go/syscalls
 RUN cd /go/syscalls && \
     go build -o readdir readdir.go

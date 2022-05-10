@@ -266,6 +266,15 @@ jobs:
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-ls-hpack-${{ hashFiles('contrib/Makefile', 'contrib/ls-hpack/**') }}
           upload-chunk-size: 1000000
 
+      # Cache the musl build. Use a key based on a hash of all the files
+      # used in the build.
+      - name: Setup musl Cache
+        uses: actions/cache@v2
+        with:
+          path: contrib/build/musl
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-musl-${{ hashFiles('contrib/Makefile', 'contrib/musl/**') }}
+          upload-chunk-size: 1000000
+
       - name: Login to Dockerhub
         uses: docker/login-action@v2
         with:

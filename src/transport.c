@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <pthread.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -17,6 +18,7 @@
 #include "dbg.h"
 #include "scopetypes.h"
 #include "os.h"
+#include "scopestdlib.h"
 #include "fn.h"
 #include "transport.h"
 
@@ -89,32 +91,15 @@ newTransport()
 {
     transport_t *t;
 
-    t = calloc(1, sizeof(transport_t));
+    t = scope_calloc(1, sizeof(transport_t));
     if (!t) {
         DBG(NULL);
         return NULL;
     }
 
-    // been inconsistent as to when we check for func pointers.
-    // do it here early on and we're good.
-    if (!g_fn.send || !g_fn.open || !g_fn.dup2 || !g_fn.close ||
-        !g_fn.fcntl || !g_fn.fwrite || !g_fn.socket || !g_fn.access ||
-        !g_fn.connect || !g_fn.getaddrinfo || !g_fn.fclose ||
-        !g_fn.select) goto out;
-
-    t->getaddrinfo = g_fn.getaddrinfo;
+    t->getaddrinfo = scope_getaddrinfo;
     t->origGetaddrinfo = t->getaddrinfo;  // store a copy
     return t;
-
-  out:
-    DBG("send=%p open=%p dup2=%p close=%p "
-        "fcntl=%p fwrite=%p socket=%p access=%p connect=%p "
-        "getaddrinfo=%p fclose=%p select=%p",
-        g_fn.send, g_fn.open, g_fn.dup2, g_fn.close,
-        g_fn.fcntl, g_fn.fwrite, g_fn.socket, g_fn.access, g_fn.connect,
-        g_fn.getaddrinfo, g_fn.fclose, g_fn.select);
-    free(t);
-    return NULL;
 }
 
 /*
@@ -142,15 +127,15 @@ placeDescriptor(int fd, transport_t *t)
     int i, dupfd;
 
     for (i = next_fd_to_try; i >= DEFAULT_MIN_FD; i--) {
-        if ((g_fn.fcntl(i, F_GETFD) == -1) && (errno == EBADF)) {
+        if ((scope_fcntl(i, F_GETFD) == -1) && (scope_errno == EBADF)) {
 
             // This fd is available, try to dup it
-            if ((dupfd = g_fn.dup2(fd, i)) == -1) continue;
-            g_fn.close(fd);
+            if ((dupfd = scope_dup2(fd, i)) == -1) continue;
+            scope_close(fd);
 
             // Set close on exec. (dup2 does not preserve FD_CLOEXEC)
-            int flags = g_fn.fcntl(dupfd, F_GETFD, 0);
-            if (g_fn.fcntl(dupfd, F_SETFD, flags | FD_CLOEXEC) == -1) {
+            int flags = scope_fcntl(dupfd, F_GETFD, 0);
+            if (scope_fcntl(dupfd, F_SETFD, flags | FD_CLOEXEC) == -1) {
                 DBG("%d", dupfd);
             }
 
@@ -159,7 +144,7 @@ placeDescriptor(int fd, transport_t *t)
         }
     }
     DBG("%d", t->type);
-    g_fn.close(fd);
+    scope_close(fd);
     return -1;
 }
 
@@ -187,7 +172,7 @@ transportConnection(transport_t *trans)
             return trans->local.sock;
         case CFG_FILE:
             if (trans->file.stream) {
-                return fileno(trans->file.stream);
+                return scope_fileno(trans->file.stream);
             } else {
                 return -1;
             }
@@ -226,7 +211,7 @@ transportNeedsConnection(transport_t *trans)
             // closed by our process.  (errno == EBADF) Stream buffering
             // makes it harder to know when this has happened.
             if ((trans->file.stream) &&
-                (g_fn.fcntl(fileno(trans->file.stream), F_GETFD) == -1)) {
+                (scope_fcntl(scope_fileno(trans->file.stream), F_GETFD) == -1)) {
                 DBG(NULL);
                 transportDisconnect(trans);
             }
@@ -269,7 +254,7 @@ loadRootCertFile(transport_t *trans)
         };
 
         for (i=0; i<sizeof(rootFileList)/sizeof(char*); ++i) {
-            if (!g_fn.access(rootFileList[i], R_OK)) {
+            if (!scope_access(rootFileList[i], R_OK)) {
                 cafile = (char*)rootFileList[i];
                 break;
             }
@@ -307,7 +292,8 @@ shutdownTlsSession(transport_t *trans)
     }
 
     if (trans->net.sock != -1) {
-        g_fn.close(trans->net.sock);
+        scope_shutdown(trans->net.sock, SHUT_RDWR);
+        scope_close(trans->net.sock);
         trans->net.sock = -1;
     }
 }
@@ -432,9 +418,9 @@ establishTlsSession(transport_t *trans)
             FD_SET(trans->net.sock, &fds);
             int select_rv;
             if (ssl_err == SSL_ERROR_WANT_READ) {
-                select_rv = g_fn.select(trans->net.sock+1, &fds, NULL, NULL, &tv);
+                select_rv = scope_select(trans->net.sock+1, &fds, NULL, NULL, &tv);
             } else { //    SSL_ERROR_WANT_WRITE
-                select_rv = g_fn.select(trans->net.sock+1, NULL, &fds, NULL, &tv);
+                select_rv = scope_select(trans->net.sock+1, NULL, &fds, NULL, &tv);
             }
             if (select_rv > 0) continue; // Yes!  time to try SSL_connect again
 
@@ -443,7 +429,7 @@ establishTlsSession(transport_t *trans)
             if (select_rv == 0) {
                 scopeLogInfo("fd:%d error establishing tls connection (timeout)", trans->net.sock);
             } else {
-                scopeLogInfo("fd:%d error establishing tls connection (select): errno=%d", trans->net.sock, errno);
+                scopeLogInfo("fd:%d error establishing tls connection (select): errno=%d", trans->net.sock, scope_errno);
             }
             trans->net.failure_reason = TLS_CONN_FAIL;
             goto err;
@@ -453,10 +439,16 @@ establishTlsSession(transport_t *trans)
         // Report the information we can and cleanup.
         char err[256] = {0};
         ERR_error_string_n(ssl_err, err, sizeof(err));
-        scopeLogInfo("fd:%d error establishing tls connection: %s %s %d", trans->net.sock, sslErrStr(ssl_err), err, errno);
+        scopeLogInfo("fd:%d error establishing tls connection: %s %s %d", trans->net.sock, sslErrStr(ssl_err), err, scope_errno);
         trans->net.failure_reason = TLS_CONN_FAIL;
         goto err;
     }
+
+    // This improves the delivery but we're unsure of what the cost is
+    // in terms of network usage.
+    // See https://github.com/criblio/appscope/issues/781
+    //
+    // BIO_set_tcp_ndelay(trans->net.sock, TRUE);
 
     if (trans->net.tls.validateserver) {
         // Just test that we received a server cert
@@ -496,20 +488,20 @@ transportDisconnect(transport_t *trans)
             // appropriate for both tls and non-tls connections...
             shutdownTlsSession(trans);
             if (trans->net.pending_connect != -1) {
-                g_fn.close(trans->net.pending_connect);
+                scope_close(trans->net.pending_connect);
                 trans->net.pending_connect = -1;
             }
             break;
         case CFG_FILE:
             if (!trans->file.stdout && !trans->file.stderr) {
-                if (trans->file.stream) g_fn.fclose(trans->file.stream);
+                if (trans->file.stream) scope_fclose(trans->file.stream);
             }
             trans->file.stream = NULL;
             break;
         case CFG_UNIX:
         case CFG_EDGE:
             if (trans->local.sock != -1) {
-                g_fn.close(trans->local.sock);
+                scope_close(trans->local.sock);
                 trans->local.sock = -1;
             }
             break;
@@ -562,42 +554,26 @@ static struct addrinfo *
 getExistingConnectionAddr(transport_t *trans)
 {
     struct addrinfo *ai = NULL;
-
-    if (transportNeedsConnection(trans) || trans->type != CFG_TCP) goto err;
-
-    // Allocate what we need to be compatible with freeaddrinfo()
-    ai = calloc(1, sizeof(struct addrinfo));
-    if (!ai) {
-        DBG(NULL);
-        goto err;
-    }
+    if (transportNeedsConnection(trans) || trans->type != CFG_TCP) goto exit;
 
     // Clear the address value
     socklen_t addrsize = sizeof(trans->net.gai_addr);
     struct sockaddr *addr = (struct sockaddr*)&trans->net.gai_addr;
-    memset(addr, 0, addrsize);
+    scope_memset(addr, 0, addrsize);
 
     // lookup the address
-    if (getpeername(trans->net.sock, addr, &addrsize)) {
+    if (scope_getpeername(trans->net.sock, addr, &addrsize)) {
         DBG(NULL);
-        goto err;
+        goto exit;
     }
 
-    // Set all the fields
-    ai->ai_flags = 0;                  // Unused by us
-    ai->ai_family = addr->sa_family;
-    ai->ai_socktype = SOCK_STREAM;
-    ai->ai_protocol = IPPROTO_TCP;
-    ai->ai_addrlen = addrsize;
-    ai->ai_addr = addr;
-    ai->ai_canonname = NULL;           // Unused by us
-    ai->ai_next = NULL;
+    int res = scope_copyaddrinfo(addr, addrsize, &ai);
+    if (res) {
+        DBG(NULL);
+    }
 
+exit:
     return ai;
-
-err:
-    if (ai) free(ai);
-    return NULL;
 }
 
 
@@ -659,7 +635,7 @@ setSocketBlocking(transport_t *trans, int sock, bool block)
 {
     if (!trans) return 0;
 
-    int current_flags = g_fn.fcntl(sock, F_GETFL, NULL);
+    int current_flags = scope_fcntl(sock, F_GETFL, NULL);
     if (current_flags < 0) return FALSE;
 
     int desired_flags;
@@ -673,7 +649,7 @@ setSocketBlocking(transport_t *trans, int sock, bool block)
     if (current_flags == desired_flags) return TRUE;
 
     // fcntl returns 0 if successful
-    return (g_fn.fcntl(sock, F_SETFL, desired_flags) == 0);
+    return (scope_fcntl(sock, F_SETFL, desired_flags) == 0);
 }
 
 static int
@@ -692,9 +668,9 @@ checkPendingSocketStatus(transport_t *trans)
     fd_set pending_results;
     FD_ZERO(&pending_results);
     FD_SET(trans->net.pending_connect, &pending_results);
-    rc = g_fn.select(FD_SETSIZE, NULL, &pending_results, NULL, &tv);
+    rc = scope_select(FD_SETSIZE, NULL, &pending_results, NULL, &tv);
     if (rc < 0) {
-        if (errno == EINTR) {
+        if (scope_errno == EINTR) {
           return 0;
         }
         DBG(NULL);
@@ -709,11 +685,11 @@ checkPendingSocketStatus(transport_t *trans)
     // socket that failed to connect and remove it from the pending list.
     int opt;
     socklen_t optlen = sizeof(opt);
-    if ((getsockopt(trans->net.pending_connect, SOL_SOCKET, SO_ERROR, (void*)(&opt), &optlen) < 0)
+    if ((scope_getsockopt(trans->net.pending_connect, SOL_SOCKET, SO_ERROR, (void*)(&opt), &optlen) < 0)
             || opt) {
         scopeLogInfo("fd:%d connect failed", trans->net.pending_connect);
 
-        g_fn.close(trans->net.pending_connect);
+        scope_close(trans->net.pending_connect);
         trans->net.pending_connect = -1;
         return 0;
     }
@@ -730,6 +706,25 @@ checkPendingSocketStatus(transport_t *trans)
     // If the placeDescriptor call failed, we're done
     if (trans->net.sock == -1) return 0;
 
+    // Set TCP_QUICKACK
+#if defined(TCP_QUICKACK) && (defined(IPPROTO_TCP) || defined(SOL_TCP))
+    if (trans->type == CFG_TCP) {
+        int opt;
+        int on = TRUE;
+
+#ifdef SOL_TCP
+        opt=SOL_TCP;
+#else
+#ifdef IPPROTO_TCP
+        opt=IPPROTO_TCP;
+#endif
+#endif
+        if (scope_setsockopt(trans->net.sock, opt, TCP_QUICKACK, &on, sizeof(on))) {
+            DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
+        }
+    }
+#endif
+
     // We have a connected socket!  Woot!
     trans->net.connect_attempts = 0;
     trans->net.failure_reason = NO_FAIL;
@@ -739,6 +734,9 @@ checkPendingSocketStatus(transport_t *trans)
         // when successful, we'll have a connected tls socket.
         // when not, this will cleanup, disconnecting the socket.
         establishTlsSession(trans);
+
+        // If the establishTlsSession call failed, we're done
+        if (trans->net.sock == -1) return 0;
     }
 
     // Set the TCP socket to blocking
@@ -754,7 +752,7 @@ freeAddressList(transport_t *trans)
 {
     if (!trans || !trans->net.addr.list) return;
 
-    freeaddrinfo(trans->net.addr.list);
+    scope_freeaddrinfo(trans->net.addr.list);
     trans->net.addr.entries = 0;
     trans->net.addr.list = NULL;
     trans->net.addr.next = NULL;
@@ -830,15 +828,15 @@ socketConnectionStart(transport_t *trans)
     struct addrinfo* addr;
     while ((addr = getNextAddressListEntry(trans))) {
         int sock;
-        sock = g_fn.socket(addr->ai_family,
+        sock = scope_socket(addr->ai_family,
                            addr->ai_socktype,
                            addr->ai_protocol);
 
         if (sock == -1) continue;
 
         // Set the socket to close on exec
-        int flags = g_fn.fcntl(sock, F_GETFD, 0);
-        if (g_fn.fcntl(sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
+        int flags = scope_fcntl(sock, F_GETFD, 0);
+        if (scope_fcntl(sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
             DBG("%d %s %s", sock, trans->net.host, trans->net.port);
         }
 
@@ -863,24 +861,21 @@ socketConnectionStart(transport_t *trans)
             portptr = &addr6_ptr->sin6_port;
         } else {
             DBG("%d %s %s %d", sock, trans->net.host, trans->net.port, addr->ai_family);
-            g_fn.close(sock);
+            scope_close(sock);
             continue;
         }
         char addrstr[INET6_ADDRSTRLEN];
-        inet_ntop(addr->ai_family, addrptr, addrstr, sizeof(addrstr));
-        unsigned short port = ntohs(*portptr);
+        scope_inet_ntop(addr->ai_family, addrptr, addrstr, sizeof(addrstr));
+        unsigned short port = scope_ntohs(*portptr);
+        scope_errno = 0;
+        if (scope_connect(sock, addr->ai_addr, addr->ai_addrlen) == -1) {
 
-        errno = 0;
-        if (g_fn.connect(sock,
-                         addr->ai_addr,
-                         addr->ai_addrlen) == -1) {
-
-            if (errno != EINPROGRESS) {
+            if (scope_errno != EINPROGRESS) {
                 scopeLogInfo("fd:%d connect to %s:%d failed", sock, addrstr, port);
                 trans->net.failure_reason = CONN_FAIL;
 
                 // We could create a sock, but not connect.  Clean up.
-                g_fn.close(sock);
+                scope_close(sock);
                 continue;
             }
 
@@ -911,15 +906,15 @@ transportConnectFile(transport_t *t)
 {
     // if stdout/stderr, set stream and skip everything else in the function.
     if (t->file.stdout) {
-        t->file.stream = stdout;
+        t->file.stream = scope_stdout;
         return 1;
     } else if (t->file.stderr) {
-        t->file.stream = stderr;
+        t->file.stream = scope_stderr;
         return 1;
     }
 
     int fd;
-    fd = g_fn.open(t->file.path, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666);
+    fd = scope_open(t->file.path, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666);
     if (fd == -1) {
         DBG("%s", t->file.path);
         transportDisconnect(t);
@@ -933,12 +928,12 @@ transportConnectFile(transport_t *t)
     }
 
     // Needed because umask affects open permissions
-    if (fchmod(fd, 0666) == -1) {
+    if (scope_fchmod(fd, 0666) == -1) {
         DBG("%d %s", fd, t->file.path);
     }
 
     FILE *f;
-    if (!(f = fdopen(fd, "a"))) {
+    if (!(f = scope_fdopen(fd, "a"))) {
         transportDisconnect(t);
         return 0;
     }
@@ -958,7 +953,7 @@ transportConnectFile(transport_t *t)
         default:
             DBG("%d", t->file.buf_policy);
     }
-    if (setvbuf(t->file.stream, NULL, buf_mode, BUFSIZ)) {
+    if (scope_setvbuf(t->file.stream, NULL, buf_mode, BUFSIZ)) {
         DBG(NULL);
     }
 
@@ -970,11 +965,9 @@ transportConnectFile(transport_t *t)
 #define READ_AND_WRITE (R_OK|W_OK)
 static char*
 edgePath(void){
-    if (!g_fn.access) return NULL;
-
     // 1) If EDGE_PATH_DOCKER can be accessed, return that.
-    if (g_fn.access(EDGE_PATH_DOCKER, READ_AND_WRITE) == 0) {
-        return strdup(EDGE_PATH_DOCKER);
+    if (scope_access(EDGE_PATH_DOCKER, READ_AND_WRITE) == 0) {
+        return scope_strdup(EDGE_PATH_DOCKER);
     }
 
     // 2) If CRIBL_HOME is defined and can be accessed,
@@ -982,17 +975,17 @@ edgePath(void){
     const char *cribl_home = getenv("CRIBL_HOME");
     if (cribl_home) {
         char *new_path = NULL;
-        if (asprintf(&new_path, "%s/%s", cribl_home, "state/appscope.sock") > 0) {
-            if (g_fn.access(new_path, READ_AND_WRITE) == 0) {
+        if (scope_asprintf(&new_path, "%s/%s", cribl_home, "state/appscope.sock") > 0) {
+            if (scope_access(new_path, READ_AND_WRITE) == 0) {
                 return new_path;
             }
-            free(new_path);
+            scope_free(new_path);
         }
     }
 
     // 3) If EDGE_PATH_DEFAULT can be accessed, return it
-    if (g_fn.access(EDGE_PATH_DEFAULT, READ_AND_WRITE) == 0) {
-        return strdup(EDGE_PATH_DEFAULT);
+    if (scope_access(EDGE_PATH_DEFAULT, READ_AND_WRITE) == 0) {
+        return scope_strdup(EDGE_PATH_DEFAULT);
     }
 
     return NULL;
@@ -1020,36 +1013,36 @@ transportConnect(transport_t *trans)
             return transportConnectFile(trans);
         case CFG_EDGE:
             // Edge path needs to be recomputed on every connection attempt.
-            if (trans->local.path) free(trans->local.path);
+            if (trans->local.path) scope_free(trans->local.path);
             trans->local.path = edgePath();
             if (!trans->local.path) return 0;
 
-            int pathlen = strlen(trans->local.path);
+            int pathlen = scope_strlen(trans->local.path);
             if (pathlen >= sizeof(trans->local.addr.sun_path)) return 0;
 
-            memset(&trans->local.addr, 0, sizeof(trans->local.addr));
+            scope_memset(&trans->local.addr, 0, sizeof(trans->local.addr));
             trans->local.addr.sun_family = AF_UNIX;
-            strncpy(trans->local.addr.sun_path, trans->local.path, pathlen);
+            scope_strncpy(trans->local.addr.sun_path, trans->local.path, pathlen);
             trans->local.addr_len = pathlen + sizeof(sa_family_t) + 1;
 
             // Keep going!  (no break or return here!)
             // CFG_EDGE uses CFG_UNIX's connection logic.
         case CFG_UNIX:
-            if ((trans->local.sock = g_fn.socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
+            if ((trans->local.sock = scope_socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
                 DBG("%d %s", trans->local.sock, trans->local.path);
                 return 0;
             }
 
             // Set close on exec
-            int flags = g_fn.fcntl(trans->local.sock, F_GETFD, 0);
-            if (g_fn.fcntl(trans->local.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
+            int flags = scope_fcntl(trans->local.sock, F_GETFD, 0);
+            if (scope_fcntl(trans->local.sock, F_SETFD, flags | FD_CLOEXEC) == -1) {
                 DBG("%d %s", trans->local.sock, trans->local.path);
             }
 
-            if (g_fn.connect(trans->local.sock, (const struct sockaddr *)&trans->local.addr,
+            if (scope_connect(trans->local.sock, (const struct sockaddr *)&trans->local.addr,
                              trans->local.addr_len) == -1) {
                 scopeLogInfo("fd:%d (%s) connect failed", trans->local.sock, trans->local.path);
-                g_fn.close(trans->local.sock);
+                scope_close(trans->local.sock);
                 trans->local.sock = -1;
                 return 0;
             }
@@ -1081,11 +1074,11 @@ transportCreateTCP(const char *host, const char *port, unsigned int enable,
     trans->type = CFG_TCP;
     trans->net.sock = -1;
     trans->net.pending_connect = -1;
-    trans->net.host = strdup(host);
-    trans->net.port = strdup(port);
+    trans->net.host = scope_strdup(host);
+    trans->net.port = scope_strdup(port);
     trans->net.tls.enable = enable;
     trans->net.tls.validateserver = validateserver;
-    trans->net.tls.cacertpath = (cacertpath) ? strdup(cacertpath) : NULL;
+    trans->net.tls.cacertpath = (cacertpath) ? scope_strdup(cacertpath) : NULL;
 
     if (!trans->net.host || !trans->net.port) {
         DBG(NULL);
@@ -1111,8 +1104,8 @@ transportCreateUdp(const char* host, const char* port)
     t->type = CFG_UDP;
     t->net.sock = -1;
     t->net.pending_connect = -1;
-    t->net.host = strdup(host);
-    t->net.port = strdup(port);
+    t->net.host = scope_strdup(host);
+    t->net.port = scope_strdup(port);
 
     if (!t->net.host || !t->net.port) {
         DBG(NULL);
@@ -1135,7 +1128,7 @@ transportCreateFile(const char* path, cfg_buffer_t buf_policy)
     if (!t) return NULL; 
 
     t->type = CFG_FILE;
-    t->file.path = strdup(path);
+    t->file.path = scope_strdup(path);
     if (!t->file.path) {
         DBG("%s", path);
         transportDestroy(&t);
@@ -1144,8 +1137,8 @@ transportCreateFile(const char* path, cfg_buffer_t buf_policy)
     t->file.buf_policy = buf_policy;
 
     // See if path is "stdout" or "stderr"
-    t->file.stdout = !strcmp(path, "stdout");
-    t->file.stderr = !strcmp(path, "stderr");
+    t->file.stdout = !scope_strcmp(path, "stdout");
+    t->file.stderr = !scope_strcmp(path, "stderr");
 
     transportConnect(t);
 
@@ -1159,18 +1152,18 @@ transportCreateUnix(const char *path)
 
     if (!path) goto err;
 
-    int pathlen = strlen(path);
+    int pathlen = scope_strlen(path);
     if (pathlen >= sizeof(trans->local.addr.sun_path)) goto err;
 
     if (!(trans = newTransport())) goto err;
 
     trans->type = CFG_UNIX;
     trans->local.sock = -1;
-    if (!(trans->local.path = strdup(path))) goto err;
+    if (!(trans->local.path = scope_strdup(path))) goto err;
 
-    memset(&trans->local.addr, 0, sizeof(trans->local.addr));
+    scope_memset(&trans->local.addr, 0, sizeof(trans->local.addr));
     trans->local.addr.sun_family = AF_UNIX;
-    strncpy(trans->local.addr.sun_path, path, pathlen);
+    scope_strncpy(trans->local.addr.sun_path, path, pathlen);
     trans->local.addr_len = pathlen + sizeof(sa_family_t);
     if (path[0] == '@') {
         // The socket is abstract
@@ -1216,7 +1209,7 @@ err:
 transport_t*
 transportCreateSyslog(void)
 {
-    transport_t* t = calloc(1, sizeof(transport_t));
+    transport_t* t = scope_calloc(1, sizeof(transport_t));
     if (!t) {
         DBG(NULL);
         return NULL;
@@ -1230,7 +1223,7 @@ transportCreateSyslog(void)
 transport_t*
 transportCreateShm()
 {
-    transport_t* t = calloc(1, sizeof(transport_t));
+    transport_t* t = scope_calloc(1, sizeof(transport_t));
     if (!t) {
         DBG(NULL);
         return NULL;
@@ -1251,21 +1244,21 @@ transportDestroy(transport_t **transport)
         case CFG_UDP:
         case CFG_TCP:
             transportDisconnect(trans);
-            if (trans->net.host) free (trans->net.host);
-            if (trans->net.port) free (trans->net.port);
-            if (trans->net.tls.cacertpath) free(trans->net.tls.cacertpath);
+            if (trans->net.host) scope_free(trans->net.host);
+            if (trans->net.port) scope_free(trans->net.port);
+            if (trans->net.tls.cacertpath) scope_free(trans->net.tls.cacertpath);
             freeAddressList(trans);
             break;
         case CFG_UNIX:
         case CFG_EDGE:
-            if (trans->local.path) free(trans->local.path);
+            if (trans->local.path) scope_free(trans->local.path);
             transportDisconnect(trans);
             break;
         case CFG_FILE:
-            if (trans->file.path) free(trans->file.path);
+            if (trans->file.path) scope_free(trans->file.path);
             if (!trans->file.stdout && !trans->file.stderr) {
                 // if stdout/stderr, we didn't open stream, so don't close it
-                if (trans->file.stream) g_fn.fclose(trans->file.stream);
+                if (trans->file.stream) scope_fclose(trans->file.stream);
             }
             break;
         case CFG_SYSLOG:
@@ -1275,7 +1268,7 @@ transportDestroy(transport_t **transport)
         default:
             DBG("%d", trans->type);
     }
-    free(trans);
+    scope_free(trans);
     *transport = NULL;
 }
 
@@ -1295,9 +1288,9 @@ tcpSendPlain(transport_t *trans, const char *msg, size_t len)
 
     while (bytes_to_send > 0) {
         if (g_ismusl == TRUE) {
-            rc = g_fn.syscall(SYS_sendto, trans->net.sock, &msg[bytes_sent], bytes_to_send, flags, NULL, 0);
+            rc = scope_syscall(SYS_sendto, trans->net.sock, &msg[bytes_sent], bytes_to_send, flags, NULL, 0);
         } else {
-            rc = g_fn.send(trans->net.sock, &msg[bytes_sent], bytes_to_send, flags);
+            rc = scope_send(trans->net.sock, &msg[bytes_sent], bytes_to_send, flags);
         }
 
         if (rc <= 0) break;
@@ -1311,7 +1304,7 @@ tcpSendPlain(transport_t *trans, const char *msg, size_t len)
     }
 
     if (rc < 0) {
-        switch (errno) {
+        switch (scope_errno) {
         case EBADF:
         case EPIPE:
             DBG(NULL);
@@ -1372,13 +1365,13 @@ transportSend(transport_t *trans, const char *msg, size_t len)
             if (trans->net.sock != -1) {
                 int rc;
                 if (g_ismusl == TRUE) {
-                    rc = g_fn.syscall(SYS_sendto, trans->net.sock, msg, len, 0, NULL, 0);
+                    rc = scope_syscall(SYS_sendto, trans->net.sock, msg, len, 0, NULL, 0);
                 } else {
-                    rc = g_fn.send(trans->net.sock, msg, len, 0);
+                    rc = scope_send(trans->net.sock, msg, len, 0);
                 }
 
                 if (rc < 0) {
-                    switch (errno) {
+                    switch (scope_errno) {
                     case EBADF:
                         DBG(NULL);
                         transportDisconnect(trans);
@@ -1403,9 +1396,9 @@ transportSend(transport_t *trans, const char *msg, size_t len)
         case CFG_FILE:
             if (trans->file.stream) {
                 size_t msg_size = len;
-                int bytes = g_fn.fwrite(msg, 1, msg_size, trans->file.stream);
+                int bytes = scope_fwrite(msg, 1, msg_size, trans->file.stream);
                 if (bytes != msg_size) {
-                    if (errno == EBADF) {
+                    if (scope_errno == EBADF) {
                         DBG("%d %d", bytes, msg_size);
                         transportDisconnect(trans);
                         transportConnect(trans);
@@ -1425,13 +1418,13 @@ transportSend(transport_t *trans, const char *msg, size_t len)
 #endif
                 int rc;
                 if (g_ismusl == TRUE) {
-                    rc = g_fn.syscall(SYS_sendto, trans->local.sock, msg, len, flags, NULL, 0);
+                    rc = scope_syscall(SYS_sendto, trans->local.sock, msg, len, flags, NULL, 0);
                 } else {
-                    rc = g_fn.send(trans->local.sock, msg, len, flags);
+                    rc = scope_send(trans->local.sock, msg, len, flags);
                 }
 
                 if (rc < 0) {
-                    switch (errno) {
+                    switch (scope_errno) {
                     case EBADF:
                     case EPIPE:
                         DBG(NULL);
@@ -1467,7 +1460,7 @@ transportFlush(transport_t* t)
         case CFG_TCP:
             break;
         case CFG_FILE:
-            if (fflush(t->file.stream) == EOF) {
+            if (scope_fflush(t->file.stream) == EOF) {
                 DBG(NULL);
             }
             break;

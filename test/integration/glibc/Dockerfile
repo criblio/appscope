@@ -4,8 +4,13 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update \
     && apt install -y \
       binutils \
+      gcc \
       musl-dev \
     && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /opt/errno_test
+COPY ./glibc/hello_errno.c /opt/errno_test/hello_errno.c
+RUN gcc -o /opt/errno_test/errno_test /opt/errno_test/hello_errno.c
 
 RUN mkdir -p /opt/extract_scope && \
     mkdir -p /opt/patch_libscope

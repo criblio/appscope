@@ -51,6 +51,51 @@
     jmp *%r11
 .endm
 
+/*
+ * We created a second macro named with the _regs suffix that is used in
+ * Go 1.17 and 1.18 interpositions. The differences from the previous
+ * asmcgocall macro are slight. The first is that before we do any
+ * interposition, we save the values from the registers %rax and %rbx and
+ * restore them before returning to regular execution. This is because in
+ * Go 1.17 and 1.18, the ABI has fundamentally changed, in that results
+ * are returned in registers. The second difference is that we restore
+ * the value of g into the %r14 register. In Go 1.17 and 1.18, the
+ * function preamble has changed in that it always expects %r14 to
+ * contain the g before entering a function (for stack checking).
+ * If we don't save and restore values in these registers, they will
+ * often become corrupted and result in a serious failure.
+*/
+.macro interpose_regs a_func, c_func
+.global \a_func
+.hidden \c_func
+\a_func:
+    push %rax
+    push %rbx
+    sub $0x20, %rsp
+
+    mov %rsp, %r11
+    add $0x30, %r11
+    mov %r11, 0x08(%rsp)
+    lea \c_func@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov %r11, (%rsp)
+
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+    xorps %xmm15,%xmm15
+    mov %fs:0xfffffffffffffff8,%r14
+
+    mov %rax, %r11
+
+    add $0x20, %rsp
+    pop %rbx
+    pop %rax
+
+    jmp *%r11
+.endm
+
 .text
     interpose go_hook_write, go_write
     interpose go_hook_open, go_open
@@ -66,6 +111,19 @@
     interpose go_hook_pc_write, go_pc_write
     interpose go_hook_exit, go_exit
     interpose go_hook_die, go_die
+
+    interpose_regs go_hook_reg_write, go_write
+    interpose_regs go_hook_reg_open, go_open
+    interpose_regs go_hook_reg_unlinkat, go_unlinkat
+    interpose_regs go_hook_reg_getdents, go_getdents
+    interpose_regs go_hook_reg_socket, go_socket
+    interpose_regs go_hook_reg_accept4, go_accept4
+    interpose_regs go_hook_reg_read, go_read
+    interpose_regs go_hook_reg_close, go_close
+    interpose_regs go_hook_reg_tls_read, go_tls_read
+    interpose_regs go_hook_reg_tls_write, go_tls_write
+    interpose_regs go_hook_reg_pc_write, go_pc_write
+    interpose_regs go_hook_reg_readResponse, go_readResponse
 
 /*
     Debug hint:
@@ -107,6 +165,36 @@ go_hook_write:
 
     add $0x18, %rsp
     pop %rax
+    jmp *%r11
+*/
+
+/*
+.global go_hook_regs_readResponse
+go_hook_regs_readResponse:   
+    push %rax
+    push %rbx
+    sub $0x20, %rsp
+
+    mov %rsp, %r11
+    add $0x30, %r11
+    mov %r11, 0x08(%rsp)
+    lea go_readResponse@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov %r11, (%rsp)
+
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
+    mov (%r11), %r11
+    mov (%r11), %r11
+    call *%r11
+    xorps %xmm15,%xmm15
+    mov %fs:0xfffffffffffffff8,%r14
+
+    mov %rax, %r11
+
+    add $0x20, %rsp
+    pop %rbx
+    pop %rax
 
     jmp *%r11
 */
+

@@ -6,7 +6,11 @@ FAILED_TEST_LIST=""
 FAILED_TEST_COUNT=0
 
 EVT_FILE="/go/events.log"
+ERR_FILE="stderr.txt"
+LOG_FILE="/tmp/scope.log"
 touch $EVT_FILE
+
+GO_MAJOR_VER=(`echo $GOLANG_VERSION | cut -d '.' -f2`)
 
 starttest(){
     CURRENT_TEST=$1
@@ -24,6 +28,7 @@ endtest(){
     if [ $ERR -eq "0" ]; then
         RESULT=PASSED
     else
+        cat $LOG_FILE
         RESULT=FAILED
         FAILED_TEST_LIST+=$CURRENT_TEST
         FAILED_TEST_LIST+=" "
@@ -37,9 +42,12 @@ endtest(){
     # copy the EVT_FILE to help with debugging
     if (( $DEBUG )) || [ $RESULT == "FAILED" ]; then
         cp $EVT_FILE $EVT_FILE.$CURRENT_TEST
+        cp $LOG_FILE $LOG_FILE.$CURRENT_TEST
     fi
 
     rm $EVT_FILE
+    rm -f $ERR_FILE
+    rm -f $LOG_FILE
 }
 
 export SCOPE_PAYLOAD_ENABLE=true
@@ -90,6 +98,27 @@ ERR+=$?
 
 endtest
 
+#
+# syscalls_opfalse
+#
+starttest opfalse
+cd /go/syscalls
+
+ldscope ./opfalse
+
+evaltest
+
+grep opfalse $EVT_FILE | grep fs.delete > /dev/null
+if [ $? -eq "0" ]; then
+    ERR+=1
+fi
+
+grep opfalse $EVT_FILE | grep fs.error > /dev/null
+if [ $? -ne "0" ]; then
+    ERR+=1
+fi
+
+endtest
 
 #
 # syscalls_readdir
@@ -119,15 +148,16 @@ ldscope ./plainServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
-sleep 0.5
+sleep 1
 curl http://localhost:${PORT}/hello
 ERR+=$?
 
+sleep 0.5
 # This stops plainServerDynamic
 pkill -f plainServerDynamic
 
 # this sleep gives plainServerDynamic a chance to report its events on exit
-sleep 0.5
+sleep 1
 
 evaltest
 
@@ -159,6 +189,57 @@ endtest
 
 
 #
+# plainServerDynamicPie
+#
+starttest plainServerDynamicPie
+cd /go/net
+PORT=80
+
+ldscope ./plainServerDynamicPie ${PORT} &
+
+# this sleep gives the server a chance to bind to the port
+# before we try to hit it with curl
+sleep 1
+curl http://localhost:${PORT}/hello
+ERR+=$?
+
+sleep 0.5
+# This stops plainServerDynamicPie
+pkill -f plainServerDynamicPie
+
+# this sleep gives plainServerDynamicPie a chance to report its events on exit
+sleep 1
+
+evaltest
+
+grep plainServerDynamicPie $EVT_FILE | grep net.app > /dev/null
+ERR+=$?
+grep plainServerDynamicPie $EVT_FILE | grep net.open > /dev/null
+ERR+=$?
+grep plainServerDynamicPie $EVT_FILE | grep net.close > /dev/null
+ERR+=$?
+grep plainServerDynamicPie $EVT_FILE | grep fs.open > /dev/null
+ERR+=$?
+grep plainServerDynamicPie $EVT_FILE | grep fs.close > /dev/null
+ERR+=$?
+grep plainServerDynamicPie $EVT_FILE | grep http.req > /dev/null
+ERR+=$?
+grep plainServerDynamicPie $EVT_FILE | grep http.resp > /dev/null
+ERR+=$?
+grep plainServerDynamicPie $EVT_FILE | grep http.resp | grep "127.0.0.1" > /dev/null
+ERR+=$?
+
+if [ $ERR -ge 1 ]; then
+    cat $EVT_FILE
+fi
+
+evalPayload
+ERR+=$?
+
+endtest
+
+
+#
 # plainServerStatic
 #
 starttest plainServerStatic
@@ -168,15 +249,16 @@ ldscope ./plainServerStatic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
-sleep 0.5
+sleep 1
 curl http://localhost:${PORT}/hello
 ERR+=$?
 
+sleep 0.5
 # This stops plainServerStatic
 pkill -f plainServerStatic
 
 # this sleep gives plainServerStatic a chance to report its events on exit
-sleep 0.5
+sleep 1
 
 evaltest
 
@@ -217,15 +299,16 @@ ldscope ./tlsServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
-sleep 0.5
+sleep 1
 curl -k --key server.key --cert server.crt https://localhost:${PORT}/hello
 ERR+=$?
 
+sleep 0.5
 # This stops tlsServerDynamic
 pkill -f tlsServerDynamic
 
 # this sleep gives tlsServerDynamic a chance to report its events on exit
-sleep 0.5
+sleep 1
 
 evaltest
 
@@ -267,15 +350,16 @@ SCOPE_GO_STRUCT_PATH=$STRUCT_PATH ldscope ./tlsServerStatic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
-sleep 0.5
+sleep 1
 curl -k --key server.key --cert server.crt https://localhost:${PORT}/hello
 ERR+=$?
 
+sleep 0.5
 # This stops tlsServerStatic
 pkill -f tlsServerStatic
 
 # this sleep gives tlsServerStatic a chance to report its events on exit
-sleep 0.5
+sleep 1
 
 evaltest
 
@@ -315,7 +399,7 @@ ldscope ./plainClientDynamic
 ERR+=$?
 
 # this sleep gives plainClientDynamic a chance to report its events on exit
-sleep 0.5
+sleep 1
 
 evaltest
 
@@ -356,7 +440,7 @@ ldscope ./plainClientStatic
 ERR+=$?
 
 # this sleep gives plainClientStatic a chance to report its events on exit
-sleep 0.5
+sleep 1
 
 evaltest
 
@@ -389,6 +473,53 @@ endtest
 
 
 #
+# plainClientStaticStripped
+#
+starttest plainClientStaticStripped
+cd /go/net
+ldscope ./plainClientStaticStripped
+ERR+=$?
+
+# this sleep gives plainClientStaticStripped a chance to report its events on exit
+sleep 1
+
+evaltest
+
+# We don't support Go stripped executables < 1.13
+if [ $GO_MAJOR_VER -lt 13 ]; then
+    grep "Continuing without AppScope." ${LOG_FILE}
+    ERR+=$?
+else
+    grep plainClientStaticStripped $EVT_FILE | grep net.app > /dev/null
+    ERR+=$?
+    grep plainClientStaticStripped $EVT_FILE | grep net.open > /dev/null
+    ERR+=$?
+    # dont wait for this, it's not always guaranteed in the test app's timeframe
+    #grep plainClientStaticStripped $EVT_FILE | grep net.close > /dev/null
+    #ERR+=$?
+    grep plainClientStaticStripped $EVT_FILE | grep fs.open > /dev/null
+    ERR+=$?
+    grep plainClientStaticStripped $EVT_FILE | grep fs.close > /dev/null
+    ERR+=$?
+    grep plainClientStaticStripped $EVT_FILE | grep http.req > /dev/null
+    ERR+=$?
+    grep plainClientStaticStripped $EVT_FILE | grep http.resp > /dev/null
+    ERR+=$?
+    grep plainClientStaticStripped $EVT_FILE | grep console > /dev/null
+    ERR+=$?
+fi
+
+if [ $ERR -ge 1 ]; then
+    cat $EVT_FILE
+fi
+
+evalPayload
+ERR+=$?
+
+endtest
+
+
+#
 # tlsClientDynamic
 #
 starttest tlsClientDynamic
@@ -397,7 +528,7 @@ ldscope ./tlsClientDynamic
 ERR+=$?
 
 # this sleep gives tlsClientDynamic a chance to report its events on exit
-sleep 0.5
+sleep 1
 
 evaltest
 
@@ -438,7 +569,7 @@ SCOPE_GO_STRUCT_PATH=$STRUCT_PATH ldscope ./tlsClientStatic
 ERR+=$?
 
 # this sleep gives tlsClientStatic a chance to report its events on exit
-sleep 0.5
+sleep 1
 
 evaltest
 
@@ -519,6 +650,96 @@ endtest
 
 
 #
+# signalHandlerDynamic
+#
+starttest signalHandlerDynamic
+cd /go/signals
+ldscope ./signalHandlerDynamic 2>${ERR_FILE}&
+SCOPE_PID=$!
+ERR+=$?
+
+sleep 1
+kill -SIGCHLD $SCOPE_PID &
+
+# verify that process still exists
+if ! ps -p $SCOPE_PID > /dev/null; then
+    echo "$SCOPE_PID ps first fail signalHandlerDynamic"
+    ERR+=1
+fi
+
+while kill -0 ${SCOPE_PID} &> /dev/null; do
+  kill -SIGKILL ${SCOPE_PID}
+  sleep 1
+done
+
+count=$(grep 'bad g' $ERR_FILE | wc -l)
+if [ $count -ne 0 ] ; then
+    ERR+=1
+fi
+
+endtest
+
+#
+# signalHandlerStatic
+#
+starttest signalHandlerStatic
+cd /go/signals
+ldscope ./signalHandlerStatic 2>${ERR_FILE}&
+SCOPE_PID=$!
+ERR+=$?
+
+sleep 1
+kill -SIGCHLD ${SCOPE_PID} &
+
+# verify that process still exists
+if ! ps -p ${SCOPE_PID} > /dev/null; then
+    echo "$SCOPE_PID ps first fail signalHandlerStatic"
+    ERR+=1
+fi
+
+while kill -0 ${SCOPE_PID} &> /dev/null; do
+  kill -SIGKILL ${SCOPE_PID}
+  sleep 1
+done
+
+count=$(grep 'bad g' $ERR_FILE | wc -l)
+if [ $count -ne 0 ] ; then
+    ERR+=1
+fi
+
+endtest
+
+#
+# signalHandlerStaticStripped
+#
+starttest signalHandlerStaticStripped
+cd /go/signals
+ldscope ./signalHandlerStatic 2>${ERR_FILE}&
+SCOPE_PID=$!
+ERR+=$?
+
+sleep 1
+kill -SIGCHLD ${SCOPE_PID} &
+
+# verify that process still exists
+if ! ps -p ${SCOPE_PID} > /dev/null; then
+    echo "$SCOPE_PID ps first fail signalHandlerStaticStripped"
+    ERR+=1
+fi
+
+while kill -0 ${SCOPE_PID} &> /dev/null; do
+  kill -SIGKILL ${SCOPE_PID}
+  sleep 1
+done
+
+count=$(grep 'bad g' $ERR_FILE | wc -l)
+if [ $count -ne 0 ] ; then
+    ERR+=1
+fi
+
+endtest
+
+#
 # cgoDynamic
 #
 starttest cgoDynamic
@@ -575,11 +796,12 @@ influx_start_server() {
 }
 
 influx_eval() {
+    sleep 2
     pkill -f $2
 
     pexist="influxd"
     until test -z "$pexist" ; do
-	    sleep 1
+	    sleep 2
 	    pexist=`ps -ef | grep influxd | grep config`
     done
 

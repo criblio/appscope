@@ -3,7 +3,6 @@
 #include <asm/prctl.h>
 #include <sys/prctl.h>
 #include <signal.h>
-#include <pthread.h>
 
 #include "com.h"
 #include "dbg.h"
@@ -14,72 +13,213 @@
 #include "utils.h"
 #include "fn.h"
 #include "capstone/capstone.h"
+#include "scopestdlib.h"
+
+#define GOPCLNTAB_MAGIC_112 0xfffffffb
+#define GOPCLNTAB_MAGIC_116 0xfffffffa
+#define GOPCLNTAB_MAGIC_118 0xfffffff0
 
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
-//#define ENABLE_SIGNAL_MASKING_IN_SYSEXEC 1
-#define ENABLE_CAS_IN_SYSEXEC 1
+#define EXIT_STACK_SIZE (32 * 1024)
 
-#define SWITCH_ENV "SCOPE_SWITCH"
-#define SWITCH_USE_NO_THREAD "no_thread"
-#define SWITCH_USE_THREAD "thread"
-
-#ifdef ENABLE_CAS_IN_SYSEXEC
-#include "atomic.h"
-#else
-// This disables the CAS spinlocks by default.  Aint nobody got time for that.
-bool
-atomicCasU64(uint64_t* ptr, uint64_t oldval, uint64_t newval)
-{
-    return TRUE;
-}
-#endif
+#define UNKNOWN_GO_VER (-1)
+#define MIN_SUPPORTED_GO_VER (8)
+#define PARAM_ON_REG_GO_VER (19)
 
 // compile-time control for debugging
 #define NEEDEVNULL 1
-#define funcprint sysprint
-//#define funcprint devnull
+//#define funcprint sysprint
+#define funcprint devnull
 //#define patchprint sysprint
 #define patchprint devnull
 
 #define UNDEF_OFFSET (-1)
-go_offsets_t g_go = {.g_to_m=48,                   // 0x30
-                     .m_to_tls=136,                // 0x88
-                     .connReader_to_conn=0,        // 0x00
-                     .persistConn_to_conn=80,      // 0x50
-                     .persistConn_to_bufrd=104,    // 0x68
-                     .iface_data=8,                // 0x08
-                     .netfd_to_pd=0,               // 0x00
-                     .pd_to_fd=16,                 // 0x10
-                     .netfd_to_sysfd=UNDEF_OFFSET, // 0x10 (defined for go1.8)
-                     .bufrd_to_buf=0,              // 0x00
-                     .conn_to_rwc=16,              // 0x10
-                     .conn_to_tlsState=48,         // 0x30
-                     .persistConn_to_tlsState=96}; // 0x60
 
-tap_t g_go_tap[] = {
-    {"syscall.write",                        go_hook_write,        NULL, 0},
-    {"syscall.openat",                       go_hook_open,         NULL, 0},
-    {"syscall.unlinkat",                     go_hook_unlinkat,     NULL, 0},
-    {"syscall.Getdents",                     go_hook_getdents,     NULL, 0},
-    {"syscall.socket",                       go_hook_socket,       NULL, 0},
-    {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
-    {"syscall.read",                         go_hook_read,         NULL, 0},
-    {"syscall.Close",                        go_hook_close,        NULL, 0},
-    {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
-    {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
-    {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0},
-    {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
-    {"runtime.exit",                         go_hook_exit,         NULL, 0},
-    {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
-    {"TAP_TABLE_END", NULL, NULL, 0}
+int g_go_major_ver = UNKNOWN_GO_VER;
+static char g_go_build_ver[7];
+
+enum index_hook_t {
+    INDEX_HOOK_WRITE            = 0,
+    INDEX_HOOK_OPEN             = 1,
+    INDEX_HOOK_UNLINKAT         = 2,
+    INDEX_HOOK_GETDENTS         = 3,
+    INDEX_HOOK_SOCKET           = 4,
+    INDEX_HOOK_ACCEPT           = 5,
+    INDEX_HOOK_READ             = 6,
+    INDEX_HOOK_CLOSE            = 7,
+    INDEX_HOOK_TLS_SERVER_READ  = 8,
+    INDEX_HOOK_TLS_SERVER_WRITE = 9,
+    INDEX_HOOK_TLS_CLIENT_READ  = 10,
+    INDEX_HOOK_TLS_CLIENT_WRITE = 11,
+    INDEX_HOOK_EXIT             = 12,
+    INDEX_HOOK_DIE              = 13,
+    INDEX_HOOK_MAX              = 14
 };
 
-uint64_t g_glibc_guard = 0LL;
-uint64_t g_go_static = 0LL;
-static list_t *g_threadlist;
-static void *g_stack;
-static bool g_switch_thread;
+go_schema_t go_16_schema = {
+    .arg_offsets = {
+        .c_write_fd=0x8,
+        .c_write_buf=0x10,
+        .c_write_rc=0x28,
+        .c_getdents_dirfd=0x8,
+        .c_getdents_rc=0x28,
+        .c_unlinkat_dirfd=0x8,
+        .c_unlinkat_pathname=0x10,
+        .c_unlinkat_flags=0x18,
+        .c_unlinkat_rc=0x28,
+        .c_open_fd=0x30,
+        .c_open_path=0x10,
+        .c_close_fd=0x8,
+        .c_close_rc=0x10,
+        .c_read_fd=0x8,
+        .c_read_buf=0x10,
+        .c_read_rc=0x28,
+        .c_socket_domain=0x8,
+        .c_socket_type=0x10,
+        .c_socket_sd=0x20,
+        .c_accept4_fd=0x8,
+        .c_accept4_addr=0x10,
+        .c_accept4_addrlen=0x18,
+        .c_accept4_sd_out=0x28,
 
+        // For all system calls, we read the stack from the Caller. For
+        // non-system calls, we (for some functions) read the stack from
+        // the Callee. We use an offset of either 0 (stay in Caller) or
+        // >0 (go into Callee) to put ourselves into the desired context
+        // where all values are available.
+        // Consideration: In future iterations, it might be a more logical
+        // approach to always grab arguments from the Caller, and always
+        // grab return values from the Callee.
+
+        .c_http_server_read_callee=0x0,
+        .c_http_server_read_connReader=0x8,
+        .c_http_server_read_buf=0x10,
+        .c_http_server_read_rc=0x28,
+        .c_http_server_write_callee=0x0,
+        .c_http_server_write_conn=0x8,
+        .c_http_server_write_buf=0x10,
+        .c_http_server_write_rc=0x28,
+        .c_http_client_write_callee=0x0,
+        .c_http_client_write_w_pc=0x8,
+        .c_http_client_write_buf=0x10,
+        .c_http_client_write_rc=0x28,
+        .c_http_client_read_callee=0x0,
+        .c_http_client_read_pc=0x8,
+    },
+    .struct_offsets = {
+        .g_to_m=0x30,
+        .m_to_tls=0x88,
+        .connReader_to_conn=0x0,
+        .persistConn_to_conn=0x50,
+        .persistConn_to_bufrd=0x68,
+        .iface_data=0x8,
+        .netfd_to_pd=0x0,
+        .pd_to_fd=0x10,
+        .netfd_to_sysfd=UNDEF_OFFSET, // defined for go1.8
+        .bufrd_to_buf=0x0,
+        .conn_to_rwc=0x10,
+        .conn_to_tlsState=0x30,
+        .persistConn_to_tlsState=0x60,
+    },
+    .tap = {
+        [INDEX_HOOK_WRITE]            = {"syscall.write",                        go_hook_write,        NULL, 0},
+        [INDEX_HOOK_OPEN]             = {"syscall.openat",                       go_hook_open,         NULL, 0},
+        [INDEX_HOOK_UNLINKAT]         = {"syscall.unlinkat",                     go_hook_unlinkat,     NULL, 0},
+        [INDEX_HOOK_GETDENTS]         = {"syscall.Getdents",                     go_hook_getdents,     NULL, 0},
+        [INDEX_HOOK_SOCKET]           = {"syscall.socket",                       go_hook_socket,       NULL, 0},
+        [INDEX_HOOK_ACCEPT]           = {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
+        [INDEX_HOOK_READ]             = {"syscall.read",                         go_hook_read,         NULL, 0},
+        [INDEX_HOOK_CLOSE]            = {"syscall.Close",                        go_hook_close,        NULL, 0},
+        [INDEX_HOOK_TLS_SERVER_READ]  = {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
+        [INDEX_HOOK_TLS_SERVER_WRITE] = {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
+        [INDEX_HOOK_TLS_CLIENT_READ]  = {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0}, 
+        [INDEX_HOOK_TLS_CLIENT_WRITE] = {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
+        [INDEX_HOOK_EXIT]             = {"runtime.exit",                         go_hook_exit,         NULL, 0},
+        [INDEX_HOOK_DIE]              = {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
+        [INDEX_HOOK_MAX]              = {"TAP_TABLE_END",                        NULL,                 NULL, 0}
+    },
+};
+
+go_schema_t go_17_schema = {
+    .arg_offsets = {
+        .c_write_fd=0x8,
+        .c_write_buf=0x10,
+        .c_write_rc=0x28,
+        .c_getdents_dirfd=0x8,
+        .c_getdents_rc=0x20,
+        .c_unlinkat_dirfd=0x8,
+        .c_unlinkat_pathname=0x10,
+        .c_unlinkat_flags=0x18,
+        .c_unlinkat_rc=0x20,
+        .c_open_fd=0x38,
+        .c_open_path=0x10,
+        .c_close_fd=0x8,
+        .c_close_rc=0x10,
+        .c_read_fd=0x8,
+        .c_read_buf=0x10,
+        .c_read_rc=0x28,
+        .c_socket_domain=0x8,
+        .c_socket_type=0x10,
+        .c_socket_sd=0x20,
+        .c_accept4_fd=0x8,
+        .c_accept4_addr=0x10,
+        .c_accept4_addrlen=0x18,
+        .c_accept4_sd_out=0x38,
+        .c_http_server_read_callee=0x48,
+        .c_http_server_read_connReader=0x50,
+        .c_http_server_read_buf=0x8,
+        .c_http_server_read_rc=0x28,
+        .c_http_server_write_callee=0x48,
+        .c_http_server_write_conn=0x30,
+        .c_http_server_write_buf=0x8,
+        .c_http_server_write_rc=0x10,
+        .c_http_client_write_callee=0x30,
+        .c_http_client_write_w_pc=0x20,
+        .c_http_client_write_buf=0x8,
+        .c_http_client_write_rc=0x10,
+        .c_http_client_read_callee=0x0,
+        .c_http_client_read_pc=0x8,
+    },
+    .struct_offsets = {
+        .g_to_m=0x30,
+        .m_to_tls=0x88,
+        .connReader_to_conn=0x0,
+        .persistConn_to_conn=0x50,
+        .persistConn_to_bufrd=0x68,
+        .iface_data=0x8,
+        .netfd_to_pd=0x0,
+        .pd_to_fd=0x10,
+        .netfd_to_sysfd=UNDEF_OFFSET, // defined for go1.8
+        .bufrd_to_buf=0x0,
+        .conn_to_rwc=0x10,
+        .conn_to_tlsState=0x30,
+        .persistConn_to_tlsState=0x60,
+    },
+    // use the _reg_ assembly functions here, to support changes to Go 1.17
+    // where we preserve the return values stored in registers
+    // and we preserve the g in r14 for future stack checks
+    // Note: we do not need to use the reg functions for go_hook_exit and go_hook_die
+    .tap = {
+        [INDEX_HOOK_WRITE]            = {"syscall.write",                        go_hook_reg_write,            NULL, 0}, // write
+        [INDEX_HOOK_OPEN]             = {"syscall.openat",                       go_hook_reg_open,             NULL, 0}, // file open
+        [INDEX_HOOK_UNLINKAT]         = {"syscall.unlinkat",                     go_hook_reg_unlinkat,         NULL, 0}, // delete file
+        [INDEX_HOOK_GETDENTS]         = {"syscall.Getdents",                     go_hook_reg_getdents,         NULL, 0}, // read dir
+        [INDEX_HOOK_SOCKET]           = {"syscall.socket",                       go_hook_reg_socket,           NULL, 0}, // net open
+        [INDEX_HOOK_ACCEPT]           = {"syscall.accept4",                      go_hook_reg_accept4,          NULL, 0}, // plain server accept
+        [INDEX_HOOK_READ]             = {"syscall.read",                         go_hook_reg_read,             NULL, 0}, // read
+        [INDEX_HOOK_CLOSE]            = {"syscall.Close",                        go_hook_reg_close,            NULL, 0}, // close
+        [INDEX_HOOK_TLS_SERVER_READ]  = {"net/http.(*connReader).Read",          go_hook_reg_tls_read,         NULL, 0}, // tls server read
+        [INDEX_HOOK_TLS_SERVER_WRITE] = {"net/http.checkConnErrorWriter.Write",  go_hook_reg_tls_write,        NULL, 0}, // tls server write
+        [INDEX_HOOK_TLS_CLIENT_READ]  = {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse,     NULL, 0}, // tls client read
+        [INDEX_HOOK_TLS_CLIENT_WRITE] = {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,         NULL, 0}, // tls client write
+        [INDEX_HOOK_EXIT]             = {"runtime.exit",                         go_hook_exit,                 NULL, 0},
+        [INDEX_HOOK_DIE]              = {"runtime.dieFromSignal",                go_hook_die,                  NULL, 0},
+        [INDEX_HOOK_MAX]              = {"TAP_TABLE_END",                        NULL,                         NULL, 0}
+    },
+};
+
+go_schema_t *g_go_schema = &go_16_schema; // overridden if later version
+uint64_t g_glibc_guard = 0LL;
 void (*go_runtime_cgocall)(void);
 
 #if NEEDEVNULL > 0
@@ -90,32 +230,266 @@ devnull(const char* fmt, ...)
 }
 #endif
 
-// c_str() is provided to convert a go-style string to a c-style string.
-// The resulting c_str will need to be passed to free() when it is no
+// Use go_str() whenever a "go string" type needs to be interpreted.
+// The resulting go_str will need to be passed to free_go_str() when it is no
 // longer needed.
+// Don't use go_str() for byte arrays.
 static char *
-c_str(gostring_t *go_str)
+go_str(void *go_str)
 {
-    if (!go_str || go_str->len <= 0) return NULL;
+    // Go 17 and higher use "c style" null terminated strings instead of a string and a length
+    if (g_go_major_ver > 16) {
+       // We need to deference the address first before casting to a char *
+       if (!go_str) return NULL;
+       return (char *)*(uint64_t *)go_str;
+    }
 
-    char *path;
-    if ((path = calloc(1, go_str->len+1)) == NULL) return NULL;
-    memmove(path, go_str->str, go_str->len);
-    path[go_str->len] = '\0';
+    gostring_t* go_str_tmp = (gostring_t *)go_str;
+    if (!go_str_tmp || go_str_tmp->len <= 0) return NULL;
 
-    return path;
+    char *c_str;
+    if ((c_str = scope_calloc(1, go_str_tmp->len+1)) == NULL) return NULL;
+    scope_memmove(c_str, go_str_tmp->str, go_str_tmp->len);
+    c_str[go_str_tmp->len] = '\0';
+
+    return c_str;
+}
+
+static void
+free_go_str(char *str) {
+    // Go 17 and higher use "c style" null terminated strings instead of a string and a length
+    if (g_go_major_ver > 16) {
+        return;
+    }
+    if(str) scope_free(str);
 }
 
 static bool
-looks_like_first_inst_of_go_func(cs_insn* asm_inst)
+match_assy_instruction(void *addr, char *mnemonic)
 {
-    return (!strcmp((const char*)asm_inst->mnemonic, "mov") &&
-            !strcmp((const char*)asm_inst->op_str, "rcx, qword ptr fs:[0xfffffffffffffff8]"))
-           || // -buildmode=pie compiles to this:
-           (!strcmp((const char*)asm_inst->mnemonic, "mov") &&
-            !strcmp((const char*)asm_inst->op_str, "rcx, -8"));
+    csh dhandle = 0;
+    cs_arch arch;
+    cs_mode mode;
+    cs_insn *asm_inst = NULL;
+    unsigned int asm_count = 0;
+    uint64_t size = 32;
+    bool rc = FALSE;
+
+#if defined(__aarch64__)
+    arch = CS_ARCH_ARM64;
+    mode = CS_MODE_LITTLE_ENDIAN;
+#elif defined(__x86_64__)
+    arch = CS_ARCH_X86;
+    mode = CS_MODE_64;
+#else
+    return FALSE;
+#endif
+
+    if (cs_open(arch, mode, &dhandle) != CS_ERR_OK) return FALSE;
+
+    asm_count = cs_disasm(dhandle, addr, size, (uint64_t)addr, 0, &asm_inst);
+    if (asm_count <= 0) return FALSE;
+
+    if (!scope_strcmp((const char*)asm_inst->mnemonic, mnemonic)) rc = TRUE;
+
+    if (asm_inst) cs_free(asm_inst, asm_count);
+    cs_close(&dhandle);
+
+    return rc;
 }
 
+static void *
+getGoVersionAddr(const char* buf)
+{
+    int i;
+    Elf64_Ehdr *ehdr;
+    Elf64_Shdr *sections;
+    const char *section_strtab = NULL;
+    const char *sec_name;
+    const char *sec_data;
+
+    ehdr = (Elf64_Ehdr *)buf;
+    sections = (Elf64_Shdr *)(buf + ehdr->e_shoff);
+    section_strtab = (char *)buf + sections[ehdr->e_shstrndx].sh_offset;
+    const char magic[0xe] = "\xff Go buildinf:";
+    void *go_build_ver_addr = NULL;
+ 
+    for (i = 0; i < ehdr->e_shnum; i++) {
+        sec_name = section_strtab + sections[i].sh_name;
+        sec_data = (const char *)buf + sections[i].sh_offset;
+        // Since go1.13, the .go.buildinfo section has been added to
+        // identify where runtime.buildVersion exists, for the case where
+        // go apps have been stripped of their symbols.
+
+        // offset into sec_data     field contents
+        // -----------------------------------------------------------
+        // 0x0                      build info magic = "\xff Go buildinf:"
+        // 0xe                      binary ptrSize
+        // 0xf                      endianness
+        // 0x10                     pointer to string runtime.buildVersion
+        // 0x10 + ptrSize           pointer to runtime.modinfo
+        // 0x10 + 2 * ptr size      pointer to build flags
+
+        if (!scope_strcmp(sec_name, ".go.buildinfo") &&
+            (sections[i].sh_size >= 0x18) &&
+            (!scope_memcmp(&sec_data[0], magic, sizeof(magic))) &&
+            (sec_data[0xe] == 0x08)) {  // 64 bit executables only
+
+            // debug/buildinfo/buildinfo.go
+            // If the endianness has the 2 bit set, then the pointers are zero
+            // and the 32-byte header is followed by varint-prefixed string data
+            // for the two string values we care about.
+            if (sec_data[0xf] == 0x00) {  // little-endian
+                uint64_t *addressPtr = (uint64_t*)&sec_data[0x10];
+                go_build_ver_addr = (void*)*addressPtr;
+            } else if (sec_data[0xf] == 0x02) {
+                scope_memmove(g_go_build_ver, (char*)&sec_data[0x21], 6);
+                g_go_build_ver[6] = '\0';
+                go_build_ver_addr = &g_go_build_ver;
+            }
+        }
+    }
+    return go_build_ver_addr;
+}
+
+static void *
+getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
+{
+    int i;
+    Elf64_Addr symaddr = 0;
+    Elf64_Ehdr *ehdr;
+    Elf64_Shdr *sections;
+    const char *section_strtab = NULL;
+    const char *sec_name = NULL;
+
+    if (!buf || !sname) return NULL;
+
+    ehdr = (Elf64_Ehdr *)buf;
+    sections = (Elf64_Shdr *)((char *)buf + ehdr->e_shoff);
+    section_strtab = (char *)buf + sections[ehdr->e_shstrndx].sh_offset;
+
+    for (i = 0; i < ehdr->e_shnum; i++) {
+        sec_name = section_strtab + sections[i].sh_name;
+        if (scope_strstr(sec_name, ".gopclntab")) {
+            const void *pclntab_addr = buf + sections[i].sh_offset;
+            /*
+            Go symbol table is stored in the .gopclntab section
+            More info: https://docs.google.com/document/d/1lyPIbmsYbXnpNj57a261hgOYVpNRcgydurVQIyZOz_o/pub
+            */
+            uint32_t magic = *((const uint32_t *)(pclntab_addr));
+            if (magic == GOPCLNTAB_MAGIC_112) {
+                uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
+                const void *symtab_addr = pclntab_addr + 16;
+
+                for(i=0; i<sym_count; i++) {
+                    uint64_t func_offset  = *((const uint64_t *)(symtab_addr + 8));
+                    uint32_t name_offset  = *((const uint32_t *)(pclntab_addr + func_offset + 8));
+                    uint64_t sym_addr     = *((const uint64_t *)(symtab_addr));
+                    const char *func_name = (const char *)(pclntab_addr + name_offset);
+
+                    if (scope_strcmp(sname, func_name) == 0) {
+                        symaddr = sym_addr;
+                        scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
+                        break;
+                    }
+
+                    symtab_addr += 16;
+                }
+            } else if (magic == GOPCLNTAB_MAGIC_116) {
+                uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
+                uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (3 * 8)));
+                uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (7 * 8)));
+                const void *symtab_addr = pclntab_addr + pclntab_offset;
+                for (i = 0; i < sym_count; i++) {
+                    uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
+                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 8));
+                    uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
+                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
+                    if (scope_strcmp(sname, func_name) == 0) {
+                        symaddr = sym_addr;
+                        scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
+                        break;
+                    }
+
+                    // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
+                    if (altname && mnemonic &&
+                        (scope_strcmp(altname, func_name) == 0) &&
+                        (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
+                        symaddr = sym_addr;
+                        break;
+                    }
+
+                    symtab_addr += 16;
+                }
+            } else if (magic == GOPCLNTAB_MAGIC_118) {
+                uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
+                // In go 1.18 the funcname table and the pcln table are stored in the text section
+                uint64_t text_start = *((const uint64_t *)(pclntab_addr + (3 * 8)));
+                uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (4 * 8)));
+                //uint64_t funcnametab_addr = (uint64_t)(funcnametab_offset + pclntab_addr);
+                uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (8 * 8)));
+                // A "symbtab" is an entry in the pclntab, probably better known as a pcln
+                const void *symtab_addr = (const void *)(pclntab_addr + pclntab_offset);
+                for (i = 0; i < sym_count; i++) {
+                    uint32_t func_offset = *((uint32_t *)(symtab_addr + 4));
+                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 4));
+                    func_offset = *((uint32_t *)(symtab_addr));
+                    uint64_t sym_addr = (uint64_t)(func_offset + text_start);
+                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
+                    if (scope_strcmp(sname, func_name) == 0) {
+                        symaddr = sym_addr;
+                        scopeLog(CFG_LOG_ERROR, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
+                        break;
+                    }
+
+                    // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
+                    if (altname && mnemonic &&
+                        (scope_strcmp(altname, func_name) == 0) &&
+                        (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
+                        symaddr = sym_addr;
+                        break;
+                    }
+
+                    symtab_addr += 8;
+                }
+            } else {
+                scopeLog(CFG_LOG_DEBUG, "Invalid header in .gopclntab");
+                break;
+            }
+            break;
+        }
+    }
+
+    return (void *)symaddr;
+}
+
+// Detect the beginning of a Go Function
+// by identifying instructions in the preamble.
+static bool
+looks_like_first_inst_of_go_func(cs_insn* asm_inst)
+{
+    patchprint("%0*lx (%02d) %-24s %s %s\n",
+               16,
+               asm_inst->address,
+               asm_inst->size,
+               (char*)asm_inst->bytes,
+               (char*)asm_inst->mnemonic,
+               (char*)asm_inst->op_str);
+        
+    return (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
+            !scope_strcmp((const char*)asm_inst->op_str, "rcx, qword ptr fs:[0xfffffffffffffff8]")) ||
+            // -buildmode=pie compiles to this:
+            (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
+            !scope_strcmp((const char*)asm_inst->op_str, "rcx, -8")) || 
+            // In Go 17 we extended the definition of function preamble with:
+            (!scope_strcmp((const char*)asm_inst->mnemonic, "cmp") &&
+            !scope_strcmp((const char*)asm_inst->op_str, "rsp, qword ptr [r14 + 0x10]")) ||
+            (!scope_strcmp((const char*)asm_inst->mnemonic, "lea") &&
+            !scope_strcmp((const char*)asm_inst->op_str, "r12, [rsp - 0x10]"));
+}
+
+// Calculate the value to be added/subtracted at an add/sub instruction
+// Returns an absolute value
 static uint32_t
 add_argument(cs_insn* asm_inst)
 {
@@ -161,25 +535,23 @@ patch_first_instruction(funchook_t *funchook,
 {
     int i;
     for (i=0; i<asm_count; i++) {
-
         // Stop when it looks like we've hit another goroutine
         if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
-                  (!strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
+                  (!scope_strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
                   asm_inst[i].size == 1 ))) {
             break;
         }
 
-        patchprint("%0*lx (%02d) %-24s %s%s\n",
-               16,
-               asm_inst[i].address,
-               asm_inst[i].size,
-               (char*)asm_inst[i].bytes,
-               (char*)asm_inst[i].mnemonic,
-               (char*)asm_inst[i].op_str);
+        patchprint("%0*lx (%02d) %-24s %s %s\n",
+                   16,
+                   asm_inst[i].address,
+                   asm_inst[i].size,
+                   (char*)asm_inst[i].bytes,
+                   (char*)asm_inst[i].mnemonic,
+                   (char*)asm_inst[i].op_str);
 
-        uint32_t add_arg=8; // not used, but can't be zero because of go_switch
+        uint32_t add_arg=8; // not used, but can't be zero because of do_cfunc
         if (i == 0) {
-
             void *pre_patch_addr = (void*)asm_inst[i].address;
             void *patch_addr = (void*)asm_inst[i].address;
 
@@ -195,7 +567,10 @@ patch_first_instruction(funchook_t *funchook,
     patchprint("\n\n");
 }
 
-
+// Patch all return addresses
+// If we intend to patch a return, we should actually patch the instruction prior.
+// In some cases, we actually patch the "xorps" instruction instead of the return instruction.
+// In that event, we intend to patch the actual "xorps" instruction, not the instruction prior.
 static void
 patch_return_addrs(funchook_t *funchook,
                    cs_insn* asm_inst, unsigned int asm_count, tap_t* tap)
@@ -213,7 +588,6 @@ patch_return_addrs(funchook_t *funchook,
 
     int i;
     for (i=0; i<asm_count; i++) {
-
         // We've observed that the first instruction in every goroutine
         // is the same (it retrieves a pointer to the goroutine.)
         // We're checking for it here to make sure things are coherent.
@@ -221,12 +595,12 @@ patch_return_addrs(funchook_t *funchook,
 
         // Stop when it looks like we've hit another goroutine
         if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
-                  (!strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
+                  (!scope_strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
                   asm_inst[i].size == 1 ))) {
             break;
         }
 
-        patchprint("%0*lx (%02d) %-24s %s%s\n",
+        patchprint("%0*lx (%02d) %-24s %s %s\n",
                16,
                asm_inst[i].address,
                asm_inst[i].size,
@@ -234,19 +608,35 @@ patch_return_addrs(funchook_t *funchook,
                (char*)asm_inst[i].mnemonic,
                (char*)asm_inst[i].op_str);
 
-        // If the current instruction is a RET
-        // we want to patch the ADD or SUB immediately before it.
-        uint32_t add_arg = 0;
-        if ((!strcmp((const char*)asm_inst[i].mnemonic, "ret") &&
-             asm_inst[i].size == 1) &&
-             (((!strcmp((const char*)asm_inst[i-1].mnemonic, "add")) ||
-             ((!strcmp((const char*)asm_inst[i-1].mnemonic, "sub")))) &&
-             (add_arg = add_argument(&asm_inst[i-1])))) {
 
+        // It is necessary for us to interpose system calls (only) for 1.17 and 1.18
+        // at the "xorps" instruction. This "xorps" instruction is a good place for
+        // us to patch our code in, since it appears right after the system call. We
+        // are able to patch non-system calls at the return instruction per prior versions. 
+
+        // If the current instruction is a RET
+        // and previous inst is add or sub, then get the stack frame size.
+        // Or, if the current inst is xorps then proceed without a stack frame size.
+        // If the current inst is not a ret or xorps, don't funchook.
+        uint32_t add_arg = 0;
+        if (((!scope_strcmp((const char*)asm_inst[i].mnemonic, "ret") &&
+              (asm_inst[i].size == 1) &&
+              (!scope_strcmp((const char*)asm_inst[i-1].mnemonic, "add") ||
+              !scope_strcmp((const char*)asm_inst[i-1].mnemonic, "sub")) &&
+              (add_arg = add_argument(&asm_inst[i-1]))) ||
+              ((g_go_major_ver > 16) && !scope_strcmp((const char*)asm_inst[i].mnemonic, "xorps") &&
+              (asm_inst[i].size == 4)))) {
+
+            // Patch the address before the ret instruction to maintain the callee stack context
             void *pre_patch_addr = (void*)asm_inst[i-1].address;
             void *patch_addr = (void*)asm_inst[i-1].address;
+            // we aren't dealing with a ret, we must patch the xorps instruction exactly
+            if (!scope_strcmp((const char*)asm_inst[i].mnemonic, "xorps")) {
+                pre_patch_addr = (void*)asm_inst[i].address;
+                patch_addr = (void*)asm_inst[i].address;
+            }
 
-            // all add_arg values within a function should be the same
+            // All add_arg values within a function should be the same
             if (tap->frame_size && (tap->frame_size != add_arg)) {
                 patchprint("aborting patch of 0x%p due to mismatched frame size 0x%x\n", pre_patch_addr, add_arg);
                 break;
@@ -259,6 +649,9 @@ patch_return_addrs(funchook_t *funchook,
             patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
             tap->return_addr = patch_addr;
             tap->frame_size = add_arg;
+
+            // We need to force a break in the "xorps" case since the code won't be returning here
+            if ((g_go_major_ver > 16) && !scope_strcmp((const char*)asm_inst[i].mnemonic, "xorps")) break;
         }
     }
     patchprint("\n\n");
@@ -269,11 +662,11 @@ patchClone()
 {
     void *clone = dlsym(RTLD_DEFAULT, "__clone");
     if (clone) {
-        size_t pageSize = getpagesize();
+        size_t pageSize = scope_getpagesize();
         void *addr = (void *)((ptrdiff_t) clone & ~(pageSize - 1));
 
         // set write perms on the page
-        if (mprotect(addr, pageSize, PROT_WRITE | PROT_READ | PROT_EXEC)) {
+        if (scope_mprotect(addr, pageSize, PROT_WRITE | PROT_READ | PROT_EXEC)) {
             scopeLogError("ERROR: patchCLone: mprotect failed\n");
             return;
         }
@@ -282,41 +675,36 @@ patchClone()
             0xb8, 0x00, 0x00, 0x00, 0x00,      // mov $0x0,%eax
             0xc3                               // retq
         };
-        memcpy(clone, ass, sizeof(ass));
+        scope_memcpy(clone, ass, sizeof(ass));
 
         scopeLog(CFG_LOG_DEBUG, "patchClone: CLONE PATCHED\n");
 
         // restore perms to the page
-        if (mprotect(addr, pageSize, PROT_READ | PROT_EXEC)) {
+        if (scope_mprotect(addr, pageSize, PROT_READ | PROT_EXEC)) {
             scopeLogError("ERROR: patchCLone: mprotect restore failed\n");
             return;
         }
     }
 }
 
-#define UNKNOWN_GO_VER (-1)
-#define MIN_SUPPORTED_GO_VER (8)
-// Go change passing parameters from stack to register
-// Ref: https://golang.org/doc/go1.17#compile
-#define PARAM_ON_REG_GO_VER (17)
-
+// Detect the Go Version of an executable
 static int
 go_major_version(const char *go_runtime_version)
 {
     if (!go_runtime_version) return UNKNOWN_GO_VER;
 
     char buf[256] = {0};
-    strncpy(buf, go_runtime_version, sizeof(buf)-1);
+    scope_strncpy(buf, go_runtime_version, sizeof(buf)-1);
 
-    char *token = strtok(buf, ".");
-    token = strtok(NULL, ".");
+    char *token = scope_strtok(buf, ".");
+    token = scope_strtok(NULL, ".");
     if (!token) {
         return UNKNOWN_GO_VER;
     }
 
-    errno = 0;
-    long val = strtol(token, NULL, 10);
-    if (errno || val <= 0 || val > INT_MAX) {
+    scope_errno = 0;
+    long val = scope_strtol(token, NULL, 10);
+    if (scope_errno || val <= 0 || val > INT_MAX) {
         return UNKNOWN_GO_VER;
     }
 
@@ -333,20 +721,20 @@ adjustGoStructOffsetsForVersion(int go_ver)
 
     // go 1.8 has a different m_to_tls offset than other supported versions.
     if (go_ver == 8) {
-        g_go.m_to_tls = 96; // 0x60
+        g_go_schema->struct_offsets.m_to_tls = 96; // 0x60
     }
 
     // go 1.8 is the only version that directly goes from netfd to sysfd.
     if (go_ver == 8) {
-        g_go.netfd_to_sysfd = 16;
+        g_go_schema->struct_offsets.netfd_to_sysfd = 16;
     }
 
     // before go 1.12, persistConn_to_conn and persistConn_to_bufrd
     // have different values than 12 and after
     if (go_ver < 12) {
-        g_go.persistConn_to_conn = 72;  // 0x48
-        g_go.persistConn_to_bufrd = 96; // 0x60
-        g_go.persistConn_to_tlsState=88; // 0x58
+        g_go_schema->struct_offsets.persistConn_to_conn = 72;  // 0x48
+        g_go_schema->struct_offsets.persistConn_to_bufrd = 96; // 0x60
+        g_go_schema->struct_offsets.persistConn_to_tlsState=88; // 0x58
     }
 
 
@@ -361,30 +749,29 @@ adjustGoStructOffsetsForVersion(int go_ver)
     // If an OptionalTag is provided, test_go_struct.sh will not process
     // the line unless it matches a TAG_FILTER which is provided as an
     // argument to the test_go_struct.sh.
-    if (!g_fn.open || !g_fn.close) return;
 
     char* debug_file;
     int fd;
     if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
-        ((fd = g_fn.open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
-        dprintf(fd, "runtime.g|m=%d|\n", g_go.g_to_m);
-        dprintf(fd, "runtime.m|tls=%d|\n", g_go.m_to_tls);
-        dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go.connReader_to_conn);
-        dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go.persistConn_to_conn);
-        dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go.persistConn_to_bufrd);
-        dprintf(fd, "runtime.iface|data=%d|\n", g_go.iface_data);
+        ((fd = scope_open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
+        scope_dprintf(fd, "runtime.g|m=%d|\n", g_go_schema->struct_offsets.g_to_m);
+        scope_dprintf(fd, "runtime.m|tls=%d|\n", g_go_schema->struct_offsets.m_to_tls);
+        scope_dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go_schema->struct_offsets.connReader_to_conn);
+        scope_dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_conn);
+        scope_dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_bufrd);
+        scope_dprintf(fd, "runtime.iface|data=%d|\n", g_go_schema->struct_offsets.iface_data);
         // go 1.8 has a direct netfd_to_sysfd field, others are less direct
-        if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
-            dprintf(fd, "net.netFD|pfd=%d|\n", g_go.netfd_to_pd);
-            dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go.pd_to_fd);
+        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) {
+            scope_dprintf(fd, "net.netFD|pfd=%d|\n", g_go_schema->struct_offsets.netfd_to_pd);
+            scope_dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go_schema->struct_offsets.pd_to_fd);
         } else {
-            dprintf(fd, "net.netFD|sysfd=%d|\n", g_go.netfd_to_sysfd);
+            scope_dprintf(fd, "net.netFD|sysfd=%d|\n", g_go_schema->struct_offsets.netfd_to_sysfd);
         }
-        dprintf(fd, "bufio.Reader|buf=%d|\n", g_go.bufrd_to_buf);
-        dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go.conn_to_rwc);
-        dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go.conn_to_tlsState);
-        dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go.persistConn_to_tlsState);
-        g_fn.close(fd);
+        scope_dprintf(fd, "bufio.Reader|buf=%d|\n", g_go_schema->struct_offsets.bufrd_to_buf);
+        scope_dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go_schema->struct_offsets.conn_to_rwc);
+        scope_dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go_schema->struct_offsets.conn_to_tlsState);
+        scope_dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_tlsState);
+        scope_close(fd);
     }
 
 }
@@ -398,24 +785,22 @@ getBaseAddress(uint64_t *addr) {
     char pname[1024];
     FILE *fp;
 
-    if (!g_fn.fopen || !g_fn.fgets || !g_fn.fclose) return -1;
-
     if (osGetProcname(pname, sizeof(pname)) == -1) return -1;
 
-    if ((fp = g_fn.fopen("/proc/self/maps", "r")) == NULL) {
+    if ((fp = scope_fopen("/proc/self/maps", "r")) == NULL) {
         return -1;
     }
 
-    while (g_fn.fgets(buf, sizeof(buf), fp) != NULL) {
+    while (scope_fgets(buf, sizeof(buf), fp) != NULL) {
         uint64_t addr_start;
-        sscanf(buf, "%lx-%*x %s %*s %s %*d", &addr_start, perms, offset);
-        if (strstr(buf, pname) != NULL) {
+        scope_sscanf(buf, "%lx-%*x %s %*s %s %*d", &addr_start, perms, offset);
+        if (scope_strstr(buf, pname) != NULL) {
             base_addr = addr_start;
             break;
         }
     }
 
-    g_fn.fclose(fp);
+    scope_fclose(fp);
     if (base_addr) {
         *addr = base_addr;
         return 0;
@@ -428,11 +813,8 @@ initGoHook(elf_buf_t *ebuf)
 {
     int rc;
     funchook_t *funchook;
-    gostring_t *go_ver; // There is an implicit len field at go_ver + 0x8
+    char *go_ver;
     char *go_runtime_version = NULL;
-
-    g_stack = malloc(32 * 1024);
-    g_threadlist = lstCreate(NULL);
 
     // A go app may need to expand stacks for some C functions
     g_need_stack_expand = TRUE;
@@ -446,43 +828,19 @@ initGoHook(elf_buf_t *ebuf)
 
     // default to a dynamic app?
     if (checkEnv("SCOPE_EXEC_TYPE", "static")) {
-        g_go_static = 1LL;
+        setGoAppStateStatic(TRUE);
+        patchClone();
         sysprint("This is a static app\n");
     } else {
-        g_go_static = 0LL;
+        setGoAppStateStatic(FALSE);
         sysprint("This is a dynamic app\n");
     }
 
-    // which go_switch function are we using?
-    // Note that __ctype_init needs to be called through
-    // a function pointer since musl lib support was added.
-    // If that pointer is not initialized, then don't allow
-    // go_switch_no_thread() to be used.
-    if (g_go_static == 1) {
-        if (g_fn.__ctype_init && checkEnv(SWITCH_ENV, SWITCH_USE_NO_THREAD)) {
-            g_switch_thread = FALSE;
-            patchClone();
-        } else if (checkEnv(SWITCH_ENV, SWITCH_USE_THREAD)) {
-            g_switch_thread = TRUE;
-        } else {
-            g_switch_thread = TRUE;
-        }
-    } else {
-        g_switch_thread = TRUE;
-    }
-
-    int go_major_ver = UNKNOWN_GO_VER;
-    go_ver = getSymbol(ebuf->buf, "runtime.buildVersion");
-    if (!go_ver) {
-        //runtime.buildVersion symbol not found, probably dealing with a stripped binary
-        //try to retrieve the version symbol address from the .go.buildinfo section
-        go_ver = getGoVersionAddr(ebuf->buf);
-    }
     //check ELF type
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
     // if it's a position independent executable, get the base address from /proc/self/maps
     uint64_t base = 0LL;
-    if (ehdr->e_type == ET_DYN && !g_go_static) {
+    if (ehdr->e_type == ET_DYN && (getgoAppStateStatic() == FALSE)) {
         if (getBaseAddress(&base) != 0) {
             sysprint("ERROR: can't get the base address\n");
             return; // don't install our hooks
@@ -491,16 +849,28 @@ initGoHook(elf_buf_t *ebuf)
         sysprint("base %lx %lx %lx\n", base, (uint64_t)ebuf->text_addr, textSec->sh_offset);
         base = base - (uint64_t)ebuf->text_addr + textSec->sh_offset;
     }
-    
-    go_ver = (void *) ((uint64_t)go_ver + base);
-    
-    if (go_ver && (go_runtime_version = c_str(go_ver))) {
 
-        sysprint("go_runtime_version = %s\n", go_runtime_version);
-
-        go_major_ver = go_major_version(go_runtime_version);
+    void *go_ver_sym = getSymbol(ebuf->buf, "runtime.buildVersion");
+    if (!go_ver_sym) {
+        // runtime.buildVersion symbol not found, probably dealing with a stripped binary
+        // try to retrieve the version symbol address from the .go.buildinfo section
+        // if g_go_build_ver is set we know we're dealing with a char *
+        // if it is not set, we know we're dealing with a "go string"
+        void *ver_addr = getGoVersionAddr(ebuf->buf);
+        if (g_go_build_ver[0] != '\0') {
+            go_ver = (char *)((uint64_t)ver_addr);
+        } else {
+            go_ver = go_str((void *)((uint64_t)ver_addr + base));
+        }
+    } else {
+        go_ver = go_str((void *)((uint64_t)go_ver_sym + base));
     }
-    if (go_major_ver < MIN_SUPPORTED_GO_VER) {
+    
+    if (go_ver && (go_runtime_version = go_ver)) {
+        sysprint("go_runtime_version = %s\n", go_runtime_version);
+        g_go_major_ver = go_major_version(go_runtime_version);
+    }
+    if (g_go_major_ver < MIN_SUPPORTED_GO_VER) {
         if (!is_go(ebuf->buf)) {
             // Don't expect to get here, but try to be clear if we do.
             scopeLogWarn("%s is not a go application.  Continuing without AppScope.", ebuf->cmd);
@@ -510,8 +880,8 @@ initGoHook(elf_buf_t *ebuf)
             scopeLogWarn("%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.8 or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd);
         }
         return; // don't install our hooks
-    } else if (go_major_ver >= PARAM_ON_REG_GO_VER) {
-        scopeLogWarn("%s was compiled with go version `%s`. Go1.17 or newer is not yet supported. Continuing without AppScope.", ebuf->cmd, go_runtime_version);
+    } else if (g_go_major_ver >= PARAM_ON_REG_GO_VER) {
+        scopeLogWarn("%s was compiled with go version `%s`. Versions newer than Go 1.18 are not yet supported. Continuing without AppScope.", ebuf->cmd, go_runtime_version);
         return; // don't install our hooks
     }
     /*
@@ -521,12 +891,34 @@ initGoHook(elf_buf_t *ebuf)
      * are entering the Go func past the runtime stack check?
      * Need to investigate later.
      */
-    if (((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) &&
-        ((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0)) {
-        sysprint("ERROR: can't get the address for runtime.cgocall\n");
-        return; // don't install our hooks
+
+    /* Go 1.17 introduced a secondary calling convention for the ABI
+     * that allows developers to choose from the native ABI (with
+     * latest changes) vs ABI0 (previous ABI). The new native ABI
+     * was a no-go for us as in some cases (-buildmode=pie) register
+     * %rax was overwritten via a mov to %eax, effectively truncating
+     * the return value to 32 bits where on occasion a 64 bit return
+     * value might be desired.
+     */
+    if (g_go_major_ver > 16) {
+        // Use the abi0 I/F for syscall based functions in Go >= 1.17
+        if (((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall.abi0")) == 0) &&
+            ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall.abi0",
+                                               "runtime.asmcgocall", "mov")) == 0)) {
+            sysprint("ERROR: can't get the address for runtime.cgocall.abi0\n");
+            return; // don't install our hooks
+        }
+    } else {
+        // Use the native abi - the only abi present in <= Go 1.16
+        if (((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) &&
+            ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall", NULL, NULL)) == 0)) {
+            sysprint("ERROR: can't get the address for runtime.cgocall\n");
+            return; // don't install our hooks
+        }
     }
+
     go_runtime_cgocall = (void *) ((uint64_t)go_runtime_cgocall + base);
+    funcprint("asmcgocall %p\n", go_runtime_cgocall);
 
     csh disass_handle = 0;
     cs_arch arch;
@@ -545,10 +937,14 @@ initGoHook(elf_buf_t *ebuf)
     cs_insn *asm_inst = NULL;
     unsigned int asm_count = 0;
 
-    adjustGoStructOffsetsForVersion(go_major_ver);
-    tap_t* tap = NULL;
-    for (tap = g_go_tap; tap->assembly_fn; tap++) {
+    // Update the schema to suit the current version
+    adjustGoStructOffsetsForVersion(g_go_major_ver);
+    if (g_go_major_ver > 16) {
+        // The Go 17 schema works for 18 also, and possibly future versions
+        g_go_schema = &go_17_schema;
+    }
 
+    for (tap_t *tap = g_go_schema->tap; tap->assembly_fn; tap++) {
         if (asm_inst) {
             cs_free(asm_inst, asm_count);
             asm_inst = NULL;
@@ -556,8 +952,10 @@ initGoHook(elf_buf_t *ebuf)
         }
 
         void* orig_func;
-        if (((orig_func = getGoSymbol(ebuf->buf, tap->func_name)) == NULL) &&
-            ((orig_func = getSymbol(ebuf->buf, tap->func_name)) == NULL)) {
+        // Look for the symbol in the ELF symbol table
+        if (((orig_func = getSymbol(ebuf->buf, tap->func_name)) == NULL) &&
+        // Otherwise look in the .gopclntab section
+            ((orig_func = getGoSymbol(ebuf->buf, tap->func_name, NULL, NULL)) == NULL)) {
             sysprint("ERROR: can't get the address for %s\n", tap->func_name);
             continue;
         }
@@ -570,7 +968,7 @@ initGoHook(elf_buf_t *ebuf)
 
         orig_func = (void *) ((uint64_t)orig_func + base);
         asm_count = cs_disasm(disass_handle, orig_func, size,
-                                 (uint64_t)orig_func, 0, &asm_inst);
+                              (uint64_t)orig_func, 0, &asm_inst);
         if (asm_count <= 0) {
             sysprint("ERROR: disassembler fails: %s\n\tlen %" PRIu64 " code %p result %lu\n\ttext addr %p text len %zu oinfotext 0x%" PRIx64 "\n",
                      tap->func_name, size,
@@ -579,7 +977,7 @@ initGoHook(elf_buf_t *ebuf)
         }
 
         patchprint ("********************************\n");
-        patchprint ("** %s  %s 0x%lx **\n", go_runtime_version, tap->func_name, orig_func);
+        patchprint ("** %s  %s 0x%p **\n", go_runtime_version, tap->func_name, orig_func);
         patchprint ("********************************\n");
 
         patch_return_addrs(funchook, asm_inst, asm_count, tap);
@@ -602,8 +1000,7 @@ initGoHook(elf_buf_t *ebuf)
 static void *
 return_addr(assembly_fn fn)
 {
-    tap_t* tap = NULL;
-    for (tap = g_go_tap; tap->assembly_fn; tap++) {
+    for (tap_t *tap = g_go_schema->tap; tap->assembly_fn; tap++) {
         if (tap->assembly_fn == fn) return tap->return_addr;
     }
 
@@ -614,345 +1011,12 @@ return_addr(assembly_fn fn)
 static uint32_t
 frame_size(assembly_fn fn)
 {
-    tap_t* tap = NULL;
-    for (tap = g_go_tap; tap->assembly_fn; tap++) {
+    for (tap_t *tap = g_go_schema->tap; tap->assembly_fn; tap++) {
         if (tap->assembly_fn == fn) return tap->frame_size;
     }
 
     scopeLogError("FATAL ERROR: no frame size");
     exit(-1);
-}
-
-static void *
-dumb_thread(void *arg)
-{
-    pthread_barrier_t *pbarrier = (pthread_barrier_t *)arg;
-    sigset_t mask;
-
-    sigfillset(&mask);
-    pthread_sigmask(SIG_BLOCK, &mask, NULL);
-
-    void *dummy = calloc(1, 32);
-    if (dummy) free(dummy);
-    pthread_barrier_wait(pbarrier);
-    while (1) {
-        sleep(0xffffffff);
-    }
-    return NULL;
-}
-
-/*
- * There are 2 go_switch() functions that accomplish the
- * same thing. They take different approaches. We want to 
- * see what effect an approach has on performance and reliability.
- * We'll likley get to one instance as we gain experience. 
- *
- * These go_switch() functions are meant to support
- * static and dynamic apps at the same time. It depends
- * on an env var being set in the scope
- * executable. In initGoHook() we get the
- * env var and set the variable g_go_static.
- * If not 0 the executable is static.
- *
- * In the static case we switch TLS/TCB.
- * In the dynamic case we do not switch TLS/TCB.
- */
-/*
-* go_switch_thread() creates a thread in glibc
-* for each 'm'. It then syncs with that thread
-* after the newly created thread inits memory
-* allocation.
-*/
-inline static void *
-go_switch_thread(char *stackptr, void *cfunc, void *gfunc)
-{
-    int fs_valid = 0;
-    uint64_t rc;
-    unsigned long go_tls = 0;
-    unsigned long go_fs = 0;
-    unsigned long go_m = 0;
-    unsigned long *go_v;
-    char *go_g = NULL;
-
-    if (g_go_static) {
-        // Get the Go routine's struct g
-        __asm__ volatile (
-            "mov %%fs:-8, %0"
-            : "=r"(go_g)                      // output
-            :                                 // inputs
-            :                                 // clobbered register
-            );
-
-        if (go_g) {
-            // get struct m from g and pull out the TLS from 'm'
-            go_m = *((unsigned long *)(go_g + g_go.g_to_m));
-            go_v = (unsigned long *)go_m;
-
-            // first entry in a valid m is a pointer to g
-            if (go_v && (*go_v == (unsigned long)go_g)) { //ok to continue;
-                go_tls = (unsigned long)(go_m + g_go.m_to_tls);
-                go_v = (unsigned long *)go_tls;
-
-                // is tls set?
-                if (go_v && (*go_v != 0)) { // continue
-                    go_fs = go_tls + 8; //go compiler uses -8(FS)
-                    go_v = (unsigned long *)go_fs;
-
-                    if (go_v && (*go_v != 0)) { // continue
-                        fs_valid = 1;
-                    }
-                }
-            }
-        }
-
-        if (fs_valid == 0) {
-            // We've seen a case where on process exit static cgo
-            // apps do not have a go_g while they're exiting.
-            // In this case we need to pull the TLS from the kernel
-            // Also seen a case on libmusl where TLS is not set.
-            // Therefore, get fs from the kernel.
-            if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
-                scopeLogError("arch_prctl get go");
-                goto out;
-            }
-        }
-
-        void *thread_fs = NULL;
-        if ((thread_fs = lstFind(g_threadlist, go_fs)) == NULL) {
-            // Switch to the main thread TCB
-            if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-                scopeLogError("arch_prctl set scope");
-                goto out;
-            }
-            pthread_t thread;
-            pthread_barrier_t barrier;
-            if (pthread_barrier_init(&barrier, NULL, 2) != 0) {
-                scopeLogError("pthread_barrier_init failed");
-                goto out;
-            }
-
-            if (!g_fn.pthread_create ||
-                (g_fn.pthread_create(&thread, NULL, dumb_thread, &barrier) != 0)) {
-                scopeLogError("pthread_create failed");
-                goto out;
-            }
-
-            //wait until the thread starts
-            pthread_barrier_wait(&barrier);
-
-            thread_fs = (void *)thread;
-
-            if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
-                scopeLogError("arch_prctl set scope");
-                goto out;
-            }
-
-            if (pthread_barrier_destroy(&barrier) != 0) {
-                scopeLogError("pthread_barrier_destroy failed");
-                goto out;
-            }
-
-            if (lstInsert(g_threadlist, go_fs, thread_fs) == FALSE) {
-                scopeLogError("lstInsert failed");
-                goto out;
-            }
-
-            sysprint("New thread created for GO TLS = 0x%08lx\n", go_fs);
-        } else {
-            if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
-                scopeLogError("arch_prctl set scope");
-                goto out;
-            }
-        }
-    }
-
-    uint32_t frame_offset = frame_size(gfunc);
-    if (!frame_offset) goto out;
-    stackptr += frame_offset;
-
-    // call the C handler
-    __asm__ volatile (
-        "mov %1, %%rdi  \n"
-        "callq *%2  \n"
-        : "=r"(rc)                    // output
-        : "r"(stackptr), "r"(cfunc)   // inputs
-        :                             // clobbered register
-        );
-out:
-    if (g_go_static && go_fs) {
-        // Switch back to the 'm' TLS
-        if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
-            scopeLogError("arch_prctl restore go ");
-        }
-    }
-    return return_addr(gfunc);
-}
-
-/*
-* go_switch_no_thread() creates a glibc TCB for
-* each 'm' and initializes TLS and memory allocation
-* in the newly created TCB. It uses pthread_create()
-* to create a TCB. However, __clone() has previously
-* been disabled in initGoHook(). Therefore, no thread
-* is actually created.
-*
-* Note: we found that this version of go_switch()
-* results in a malloc error when running with the
-* influxdb stress test. Making the thread version
-* the default resolves the issue. Have not found
-* the root cause. Reproduce by running a static
-* influxd, then run the old stress client
-* influx_stress_stat and write event files from
-* the server and client to the file system.
-*/
-inline static void *
-go_switch_no_thread(char *stackptr, void *cfunc, void *gfunc)
-{
-    int fs_valid = 0;
-    uint64_t rc;
-    unsigned long go_tls = 0;
-    unsigned long go_fs = 0;
-    unsigned long go_m = 0;
-    char *go_g = NULL;
-    unsigned long *go_v;
-    int newThread = FALSE;
-    unsigned long rsp;
-
-    if (g_go_static) {
-        // Get the Go routine's struct g
-        __asm__ volatile (
-            "mov %%fs:-8, %0"
-            : "=r"(go_g)                      // output
-            :                                 // inputs
-            :                                 // clobbered register
-            );
-
-        if (go_g) {
-            // get struct m from g and pull out the TLS from 'm'
-            go_m = *((unsigned long *)(go_g + g_go.g_to_m));
-            go_v = (unsigned long *)go_m;
-
-            // first entry in a valid m is a pointer to g
-            if (go_v && (*go_v == (unsigned long)go_g)) { //ok to continue;
-                go_tls = (unsigned long)(go_m + g_go.m_to_tls);
-                go_v = (unsigned long *)go_tls;
-
-                // is tls set?
-                if (go_v && (*go_v != 0)) { // continue
-                    go_fs = go_tls + 8; //go compiler uses -8(FS)
-                    go_v = (unsigned long *)go_fs;
-
-                    if (go_v && (*go_v != 0)) { // continue
-                        fs_valid = 1;
-                    }
-                }
-            }
-        }
-
-        if (fs_valid == 0) {
-            // We've seen a case where on process exit static cgo
-            // apps do not have a go_g while they're exiting.
-            // In this case we need to pull the TLS from the kernel
-            // Also seen a case on libmusl where TLS is not set.
-            // Therefore, get fs from the kernel.
-            if (arch_prctl(ARCH_GET_FS, (unsigned long) &go_fs) == -1) {
-                scopeLogError("arch_prctl get go");
-                goto out;
-            }
-        }
-
-        void *thread_fs = NULL;
-        if ((thread_fs = lstFind(g_threadlist, go_fs)) == NULL) {
-            // Switch to the main thread TCB
-            if (arch_prctl(ARCH_SET_FS, scope_fs) == -1) {
-                scopeLogError("arch_prctl set scope");
-                goto out;
-            }
-            pthread_t thread;
-            if (!g_fn.pthread_create ||
-                (g_fn.pthread_create(&thread, NULL, dumb_thread, NULL) != 0)) {
-                scopeLogError("pthread_create failed");
-                goto out;
-            }
-            thread_fs = (void *)thread;
-            newThread = TRUE;            
-        } 
-
-        if (arch_prctl(ARCH_SET_FS, (unsigned long) thread_fs) == -1) {
-            scopeLogError("arch_prctl set scope");
-            goto out;
-        }
-
-        if (newThread) {
-            while (!atomicCasU64(&g_glibc_guard, 0ULL, 1ULL)) {};
-
-            //Initialize pointers to locale data.
-            if (g_fn.__ctype_init) g_fn.__ctype_init();
-
-            //switch to a bigger stack
-            __asm__ volatile (
-                "mov %%rsp, %0 \n"
-                "mov %1, %%rsp \n"
-                : "=r"(rsp) 
-                : "m"(g_stack)
-                : 
-            );
-
-            //initialize tcache
-            void *buf = calloc(1, 0xff);
-            free(buf);
-
-            //restore stack
-            __asm__ volatile (
-                "mov %0, %%rsp \n"
-                : 
-                : "r"(rsp)
-                : 
-            );
-             
-            atomicCasU64(&g_glibc_guard, 1ULL, 0ULL);
-
-            if (lstInsert(g_threadlist, go_fs, thread_fs) == FALSE) {
-                scopeLogError("lstInsert failed");
-                goto out;
-            }
-        }
-    }
-    
-    uint32_t frame_offset = frame_size(gfunc);
-    if (!frame_offset) goto out;
-    stackptr += frame_offset;
-
-    // call the C handler
-    __asm__ volatile (
-        "mov %1, %%rdi  \n"
-        "callq *%2  \n"
-        : "=r"(rc)                    // output
-        : "r"(stackptr), "r"(cfunc)   // inputs
-        :                             // clobbered register
-        );
-out:
-    if (g_go_static && go_fs) {
-        // Switch back to the 'm' TLS
-        if (arch_prctl(ARCH_SET_FS, go_fs) == -1) {
-            scopeLogError("arch_prctl restore go ");
-        }
-    }
-    return return_addr(gfunc);
-}
-
-/*
-* We want to be able to determine which go_switch
-* function to use at run time.
-*/
-inline static void *
-go_switch(char *stackptr, void *cfunc, void *gfunc)
-{
-    if (g_switch_thread == FALSE) {
-        return go_switch_no_thread(stackptr, cfunc, gfunc);
-    } else {
-        return go_switch_thread(stackptr, cfunc, gfunc);
-    }
 }
 
 /*
@@ -964,18 +1028,10 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
  * stack and the fs register points to an 'm' TLS
  * base address.
  *
- * We need to switch from a 'g' context to a
- * libc context in order to execute 'C' code that
- * calls libc functions. The go_switch() function
- * handles all of that. The address of a specific
- * handler is passed to go_swtich which calls the
- * handler when the appropriate switch has been
- * accopmlished.
- * 
  * Specific handlers are defined as the c_xxx functions.
  * Example, there is a c_write() that handles extracting
  * details for write operations. The address of c_write
- * is passed to go_switch.
+ * is passed to do_cfunc.
  *
  * All handlers take a single parameter, the stack address
  * from the interposed Go function. All params are passed
@@ -985,29 +1041,76 @@ go_switch(char *stackptr, void *cfunc, void *gfunc)
  * in order to know how to extract values from params and
  * return values.
  */
+inline static void *
+do_cfunc(char *stackptr, void *cfunc, void *gfunc)
+{
+    uint64_t rc;
+
+    // We add the frame size to the stackptr to put our stackaddr in the context of the Caller.
+    // We won't always know the frame size however. For example, when we patch an "xorps" instruction.
+    // Therefore in some functions we will end up with a stack address in the context of
+    // the Callee instead of the Caller.
+    uint32_t frame_offset = frame_size(gfunc);
+    stackptr += frame_offset;
+
+    // Call the C handler
+    __asm__ volatile (
+        "mov %1, %%rdi  \n"
+        "callq *%2  \n"
+        : "=r"(rc)                    // output
+        : "r"(stackptr), "r"(cfunc)   // inputs
+        :                             // clobbered register
+        );
+    return return_addr(gfunc);
+}
+
+/*
+ * Putting a comment here that applies to all of the
+ * 'C' handlers for interposed functions.
+ *
+ * The go_xxx function is called by the assy code
+ * in gocontext.S. It is running on a Go system
+ * stack and the fs register points to an 'm' TLS
+ * base address.
+ *
+ * Specific handlers are defined as the c_xxx functions.
+ * Example, there is a c_write() that handles extracting
+ * details for write operations. 
+ *
+ * All handlers take a single parameter, the stack address
+ * from the interposed Go function. All params are passed
+ * on the stack in the Go Runtime. No params passed in
+ * registers. This means return values are also on the
+ * stack. It also means that we need offsets into the stack
+ * in order to know how to extract values from params and
+ * return values.
+ */
+
+// Extract data from syscall.write (write)
 static void
 c_write(char *stackaddr)
 {
-    uint64_t fd  = *(uint64_t *)(stackaddr + 0x8);
-    uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
-    uint64_t rc =  *(uint64_t *)(stackaddr + 0x28);
+    uint64_t fd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_write_fd);
+    char *buf   = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_write_buf);
+    uint64_t rc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_write_rc);
     uint64_t initialTime = getTime();
 
-    funcprint("Scope: write fd %ld rc %ld buf 0x%lx\n", fd, rc, buf);
-    doWrite(fd, initialTime, (rc != -1), (char *)buf, rc, "go_write", BUF, 0);
+    funcprint("Scope: write fd %ld rc %ld buf %s\n", fd, rc, buf);
+    doWrite(fd, initialTime, (rc != -1), buf, rc, "go_write", BUF, 0);
 }
 
 EXPORTON void *
 go_write(char *stackptr)
 {
-    return go_switch(stackptr, c_write, go_hook_write);
+    return do_cfunc(stackptr, c_write, g_go_schema->tap[INDEX_HOOK_WRITE].assembly_fn);
 }
 
+// Extract data from syscall.Getdents (read dir)
 static void
 c_getdents(char *stackaddr)
 {
-    uint64_t dirfd  = *(uint64_t *)(stackaddr + 0x8);
-    uint64_t rc     = *(uint64_t *)(stackaddr + 0x28);
+    uint64_t dirfd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_getdents_dirfd);
+    uint64_t rc    = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_getdents_rc);
     uint64_t initialTime = getTime();
 
     funcprint("Scope: getdents dirfd %ld rc %ld\n", dirfd, rc);
@@ -1017,121 +1120,132 @@ c_getdents(char *stackaddr)
 EXPORTON void *
 go_getdents(char *stackptr)
 {
-    return go_switch(stackptr, c_getdents, go_hook_getdents);
+    return do_cfunc(stackptr, c_getdents, g_go_schema->tap[INDEX_HOOK_GETDENTS].assembly_fn);
 }
 
+// Extract data from syscall.unlinkat (delete file)
 static void
 c_unlinkat(char *stackaddr)
 {
-    uint64_t dirfd  = *(uint64_t *)(stackaddr + 0x8);
-    char *pathname = c_str((gostring_t*)(stackaddr + 0x10));
-    uint64_t flags  = *(uint64_t *)(stackaddr + 0x18);
+    uint64_t dirfd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_dirfd);
+    char *pathname = go_str((void *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_pathname));
+    uint64_t flags = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_flags);
+    uint64_t rc    = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_rc);
 
-    if (!pathname) {
-        scopeLogError("ERROR:go_open: null pathname");
-        puts("Scope:ERROR:open:no pathname");
+    if (rc) {
+        free_go_str(pathname);
         return;
     }
 
     funcprint("Scope: unlinkat dirfd %ld pathname %s flags %ld\n", dirfd, pathname, flags);
     doDelete(pathname, "go_unlinkat");
 
-    if (pathname) free(pathname);
+    free_go_str(pathname);
 }
 
 EXPORTON void *
 go_unlinkat(char *stackptr)
 {
-    return go_switch(stackptr, c_unlinkat, go_hook_unlinkat);
+    return do_cfunc(stackptr, c_unlinkat, g_go_schema->tap[INDEX_HOOK_UNLINKAT].assembly_fn);
 }
 
+// Extract data from syscall.openat (file open)
+// Deals with files only. net opens are handles by c_socket
 static void
 c_open(char *stackaddr)
 {
-    uint64_t fd  = *((uint64_t *)(stackaddr + 0x30));
-    // The gostring_t* here has an implicit len field at stackaddr + 0x18
-    char *path = c_str((gostring_t*)(stackaddr + 0x10));
+    uint64_t fd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_open_fd);
+    char *path  = go_str((void *)(stackaddr + g_go_schema->arg_offsets.c_open_path));
 
     if (!path) {
         scopeLogError("ERROR:go_open: null pathname");
-        puts("Scope:ERROR:open:no path");
+        scope_puts("Scope:ERROR:open:no path");
+        scope_fflush(scope_stdout);
         return;
     }
 
     funcprint("Scope: open of %ld\n", fd);
     doOpen(fd, path, FD, "open");
 
-    if (path) free(path);
+    free_go_str(path);
 }
 
 EXPORTON void *
 go_open(char *stackptr)
 {
-    return go_switch(stackptr, c_open, go_hook_open);
+    return do_cfunc(stackptr, c_open, g_go_schema->tap[INDEX_HOOK_OPEN].assembly_fn);
 }
 
+// Extract data from syscall.Close (close)
 static void
 c_close(char *stackaddr)
 {
-    uint64_t fd  = *(uint64_t*)(stackaddr + 0x8);
-    uint64_t rc  = *(uint64_t*)(stackaddr + 0x10);
+    uint64_t fd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_close_fd);
+    uint64_t rc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_close_rc);
 
     funcprint("Scope: close of %ld\n", fd);
+
+    // If net, deletes a net object
     doCloseAndReportFailures(fd, (rc != -1), "go_close");
 }
 
 EXPORTON void *
 go_close(char *stackptr)
 {
-    return go_switch(stackptr, c_close, go_hook_close);
+    return do_cfunc(stackptr, c_close, g_go_schema->tap[INDEX_HOOK_CLOSE].assembly_fn);
 }
 
+// Extract data from syscall.read (read)
 static void
 c_read(char *stackaddr)
 {
-    uint64_t fd    = *(uint64_t*)(stackaddr + 0x8);
-    uint64_t buf   = *(uint64_t*)(stackaddr + 0x10);
-    uint64_t rc    = *(uint64_t*)(stackaddr + 0x28);
+    uint64_t fd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_read_fd);
+    char *buf   = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_read_buf);
+    uint64_t rc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_read_rc);
     uint64_t initialTime = getTime();
 
     if (rc == -1) return;
 
-    funcprint("Scope: read of %ld\n", fd);
-    doRead(fd, initialTime, (rc != -1), (void*)buf, rc, "go_read", BUF, 0);
+    funcprint("Scope: read of %ld rc %ld\n", fd, rc);
+    doRead(fd, initialTime, (rc != -1), buf, rc, "go_read", BUF, 0);
 }
 
 EXPORTON void *
 go_read(char *stackptr)
 {
-    return go_switch(stackptr, c_read, go_hook_read);
+    return do_cfunc(stackptr, c_read, g_go_schema->tap[INDEX_HOOK_READ].assembly_fn);
 }
 
+// Extract data from syscall.socket (net open)
 static void
 c_socket(char *stackaddr)
 {
-    uint64_t domain = *(uint64_t*)(stackaddr + 0x8);  // aka family
-    uint64_t type   = *(uint64_t*)(stackaddr + 0x10);
-    uint64_t sd     = *(uint64_t*)(stackaddr + 0x20);
+    uint64_t domain = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_socket_domain);  // aka family
+    uint64_t type   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_socket_type);
+    uint64_t sd     = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_socket_sd);
 
     if (sd == -1) return;
 
-    funcprint("Scope: socket of %ld\n", sd);
+    funcprint("Scope: socket domain: %ld type: 0x%lx sd: %ld\n", domain, type, sd);
+
+    // Creates a net object
     addSock(sd, type, domain);
 }
 
 EXPORTON void *
 go_socket(char *stackptr)
 {
-    return go_switch(stackptr, c_socket, go_hook_socket);
+    return do_cfunc(stackptr, c_socket, g_go_schema->tap[INDEX_HOOK_SOCKET].assembly_fn);
 }
 
+// Extract data from syscall.accept4 (plain server accept)
 static void
 c_accept4(char *stackaddr)
 {
-    uint64_t fd = *(uint64_t*)(stackaddr + 0x8); 
-    struct sockaddr *addr  = *(struct sockaddr **)(stackaddr + 0x10);
-    socklen_t *addrlen = *(socklen_t**)(stackaddr + 0x18);
-    uint64_t sd_out = *(uint64_t*)(stackaddr + 0x28);
+    uint64_t fd           = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_accept4_fd); 
+    struct sockaddr *addr = *(struct sockaddr **)(stackaddr + g_go_schema->arg_offsets.c_accept4_addr);
+    socklen_t *addrlen    = *(socklen_t **)(stackaddr + g_go_schema->arg_offsets.c_accept4_addrlen);
+    uint64_t sd_out       = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_accept4_sd_out);
 
     if (sd_out != -1) {
         funcprint("Scope: accept4 of %ld\n", sd_out);
@@ -1142,13 +1256,11 @@ c_accept4(char *stackaddr)
 EXPORTON void *
 go_accept4(char *stackptr)
 {
-    return go_switch(stackptr, c_accept4, go_hook_accept4);
+    return do_cfunc(stackptr, c_accept4, g_go_schema->tap[INDEX_HOOK_ACCEPT].assembly_fn);
 }
 
 /*
-  net/http.(*connReader).Read
-  /usr/local/go/src/net/http/server.go:758
-
+  Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
   cr = stackaddr + 0x08
   cr.conn = *cr
   cr.conn.rwc_if = cr.conn + 0x10
@@ -1156,11 +1268,8 @@ go_accept4(char *stackptr)
   netFD = cr.conn.rwc + 0x08
   pfd = *netFD  (/usr/local/go/src/net/fd_unix.go:20)
   fd = netFD + 0x10
-
-  reference: net/http/server.go
   type connReader struct {
         conn *conn
-
   type conn struct {
           server *Server
           cancelCtx context.CancelFunc
@@ -1168,23 +1277,29 @@ go_accept4(char *stackptr)
           remoteAddr string
           tlsState *tls.ConnectionState
  */
+// Extract data from net/http.(*connReader).Read (tls server read)
 static void
 c_http_server_read(char *stackaddr)
 {
+    // Take us to the stack frame we're interested in
+    // If this is defined as 0x0, we have decided to stay in the caller stack frame
+    stackaddr -= g_go_schema->arg_offsets.c_http_server_read_callee;
+
     int fd = -1;
-    uint64_t connReader = *(uint64_t*)(stackaddr + 0x8);
+
+    uint64_t connReader = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_connReader); 
     if (!connReader) return;   // protect from dereferencing null
-    uint64_t buf        = *(uint64_t*)(stackaddr + 0x10);
+    char *buf           = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_buf);
     // buf len 0x18
     // buf cap 0x20
-    uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
+    uint64_t rc         = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_rc);
     uint64_t cr_conn_rwc_if, cr_conn_rwc, netFD, pfd;
 
-    uint64_t conn =  *(uint64_t*)(connReader + g_go.connReader_to_conn);
+    uint64_t conn        =  *(uint64_t *)(connReader + g_go_schema->struct_offsets.connReader_to_conn);
     if (!conn) return;         // protect from dereferencing null
 
-    cr_conn_rwc_if = conn + g_go.conn_to_rwc;
-    uint64_t tls =  *(uint64_t*)(conn + g_go.conn_to_tlsState);
+    cr_conn_rwc_if = conn + g_go_schema->struct_offsets.conn_to_rwc;
+    uint64_t tls        = *(uint64_t *)(conn + g_go_schema->struct_offsets.conn_to_tlsState);
 
     /*
      * The rwc net.Conn value can be wrapped as either a *net.TCPConn or
@@ -1197,19 +1312,19 @@ c_http_server_read(char *stackaddr)
      * executables and should no longer be needed.
      */
     if (cr_conn_rwc_if && tls) {
-        cr_conn_rwc = *(uint64_t *)(cr_conn_rwc_if + g_go.iface_data);
-        netFD = *(uint64_t *)(cr_conn_rwc + g_go.iface_data);
+        cr_conn_rwc = *(uint64_t *)(cr_conn_rwc_if + g_go_schema->struct_offsets.iface_data);
+        netFD = *(uint64_t *)(cr_conn_rwc + g_go_schema->struct_offsets.iface_data);
         if (netFD) {
-            pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd);
             if (pfd) {
                 //funcprint("Scope: %s:%d cr %p cr.conn %p cr.conn.rwc_if %p cr.conn.rwc %p netFD %p pfd %p fd %p\n",
                 //          __FUNCTION__, __LINE__, connReader, conn, cr_conn_rwc_if, cr_conn_rwc,
-                //          netFD, pfd, pfd + g_go.pd_to_fd);
-                fd = *(int *)(pfd + g_go.pd_to_fd);
+                //          netFD, pfd, pfd + g_go_schema->struct_offsets.pd_to_fd);
+                fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd);
             }
 
             funcprint("Scope: go_http_server_read of %d\n", fd);
-            doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
+            doProtocol((uint64_t)0, fd, buf, rc, TLSRX, BUF);
         }
     }
 }
@@ -1217,47 +1332,48 @@ c_http_server_read(char *stackaddr)
 EXPORTON void *
 go_tls_read(char *stackptr)
 {
-    return go_switch(stackptr, c_http_server_read, go_hook_tls_read);
+    return do_cfunc(stackptr, c_http_server_read, g_go_schema->tap[INDEX_HOOK_TLS_SERVER_READ].assembly_fn);
 }
 
 /*
-  net/http.checkConnErrorWriter.Write
-  /usr/local/go/src/net/http/server.go:3433
-
-  conn = stackaddr + 0x08
+  Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
+  conn (w.c) = stackaddr + 0x08
   conn.rwc_if = conn + 0x10
   conn.rwc = conn.rwc_if + 0x08
   netFD = conn.rwc + 0x08
   pfd = *netFD
   fd = pfd + 0x10
  */
+// Extract data from net/http.checkConnErrorWriter.Write (tls server write)
 static void
 c_http_server_write(char *stackaddr)
 {
+    // Take us to the stack frame we're interested in
+    // If this is defined as 0x0, we have decided to stay in the caller stack frame
+    stackaddr -= g_go_schema->arg_offsets.c_http_server_write_callee;
+
     int fd = -1;
-    uint64_t conn = *(uint64_t*)(stackaddr + 0x8);
+    uint64_t conn = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_conn);
     if (!conn) return;         // protect from dereferencing null
-    uint64_t buf  = *(uint64_t*)(stackaddr + 0x10);
-    // buf len 0x18
-    // buf cap 0x20
-    uint64_t rc  = *(uint64_t*)(stackaddr + 0x28);
+    char *buf     = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_buf);
+    uint64_t rc   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_rc);
     uint64_t w_conn_rwc_if, w_conn_rwc, netFD, pfd;
 
-    w_conn_rwc_if = (conn + g_go.conn_to_rwc);
-    uint64_t tls =  *(uint64_t*)(conn + g_go.conn_to_tlsState);
+    w_conn_rwc_if = (conn + g_go_schema->struct_offsets.conn_to_rwc);
+    uint64_t tls =  *(uint64_t *)(conn + g_go_schema->struct_offsets.conn_to_tlsState);
 
     // conn I/F checking. Ref the comment on c_http_server_read.
     if (w_conn_rwc_if && tls) {
-        w_conn_rwc = *(uint64_t *)(w_conn_rwc_if + g_go.iface_data);
-        netFD = *(uint64_t *)(w_conn_rwc + g_go.iface_data);
+        w_conn_rwc = *(uint64_t *)(w_conn_rwc_if + g_go_schema->struct_offsets.iface_data);
+        netFD = *(uint64_t *)(w_conn_rwc + g_go_schema->struct_offsets.iface_data);
         if (netFD) {
-            pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd);
             if (pfd) {
-                fd = *(int *)(pfd + g_go.pd_to_fd);
+                fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd);
             }
 
             funcprint("Scope: c_http_server_write of %d\n", fd);
-            doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSTX, BUF);
+            doProtocol((uint64_t)0, fd, buf, rc, TLSTX, BUF);
         }
     }
 }
@@ -1265,16 +1381,13 @@ c_http_server_write(char *stackaddr)
 EXPORTON void *
 go_tls_write(char *stackptr)
 {
-    return go_switch(stackptr, c_http_server_write, go_hook_tls_write);
+    return do_cfunc(stackptr, c_http_server_write, g_go_schema->tap[INDEX_HOOK_TLS_SERVER_WRITE].assembly_fn);
 }
 
 /*
-  net/http.persistConnWriter.Write
-  /usr/local/go/src/net/http/transport.go:1662
-
+  Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
   p = stackaddr + 0x10  (request buffer)
   *p = request string
-
   w = stackaddr + 0x08        (net/http.persistConnWriter *)
   w.pc = stackaddr + 0x08     (net/http.persistConn *)
   w.pc.conn_if = w.pc + 0x50  (interface)
@@ -1283,34 +1396,39 @@ go_tls_write(char *stackptr)
   pfd = netFD + 0x0           (poll.FD)
   fd = pfd + 0x10             (pfd.sysfd)
  */
+// Extract data from net/http.persistConnWriter.Write (tls client write)
 static void
 c_http_client_write(char *stackaddr)
 {
+    // Take us to the stack frame we're interested in
+    // If this is defined as 0x0, we have decided to stay in the caller stack frame
+    stackaddr -= g_go_schema->arg_offsets.c_http_client_write_callee;
+
     int fd = -1;
-    uint64_t buf = *(uint64_t *)(stackaddr + 0x10);
-    uint64_t w_pc  = *(uint64_t *)(stackaddr + 0x08);
-    uint64_t rc =  *(uint64_t *)(stackaddr + 0x28);
+    uint64_t w_pc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_w_pc);
+    char *buf     = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_buf);
+    uint64_t rc   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_rc);
     uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
 
     if (rc < 1) return;
 
-    pc_conn_if = (w_pc + g_go.persistConn_to_conn);
-    uint64_t tls =  *(uint64_t*)(w_pc + g_go.persistConn_to_tlsState);
+    pc_conn_if = (w_pc + g_go_schema->struct_offsets.persistConn_to_conn); 
+    uint64_t tls =  *(uint64_t*)(w_pc + g_go_schema->struct_offsets.persistConn_to_tlsState); 
 
     // conn I/F checking. Ref the comment on c_http_server_read.
     if (pc_conn_if && tls) {
-        w_pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
-        netFD = *(uint64_t *)(w_pc_conn + g_go.iface_data);
+        w_pc_conn = *(uint64_t *)(pc_conn_if + g_go_schema->struct_offsets.iface_data); 
+        netFD = *(uint64_t *)(w_pc_conn + g_go_schema->struct_offsets.iface_data);
         if (!netFD) return;
-        if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
-            pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) { 
+            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd); 
             if (!pfd) return;
-            fd = *(int *)(pfd + g_go.pd_to_fd);
+            fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd); 
         } else {
-            fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+            fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
         }
 
-        doProtocol((uint64_t)0, fd, (void *)buf, rc, TLSRX, BUF);
+        doProtocol((uint64_t)0, fd, buf, rc, TLSRX, BUF);
         funcprint("Scope: c_http_client_write of %d\n", fd);
     }
 }
@@ -1318,57 +1436,60 @@ c_http_client_write(char *stackaddr)
 EXPORTON void *
 go_pc_write(char *stackptr)
 {
-    return go_switch(stackptr, c_http_client_write, go_hook_pc_write);
+    return do_cfunc(stackptr, c_http_client_write, g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_WRITE].assembly_fn);
 }
 
 /*
-  net/http.(*persistConn).readResponse
-  /usr/local/go/src/net/http/transport.go:2161
-
+  Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
   pc = stackaddr + 0x08    (net/http.persistConn *)
-
   pc.conn_if = pc + 0x50   (interface)
   conn.data = pc.conn_if + 0x08 (net.conn->TCPConn)
   netFD = conn.data + 0x08 (netFD)
   pfd = netFD + 0x0        (poll.FD)
   fd = pfd + 0x10          (pfd.sysfd)
-
   pc.br = pc.conn + 0x68   (bufio.Reader)
   len = pc.br + 0x08       (bufio.Reader)
   resp = buf + 0x0         (bufio.Reader.buf)
   resp = http response     (char *)
  */
+// Extract data from net/http.(*persistConn).readResponse (tls server read)
 static void
 c_http_client_read(char *stackaddr)
 {
-    int fd = -1;
-    uint64_t pc  = *(uint64_t *)(stackaddr + 0x08);
-    uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, buf = 0, len = 0;
+    // Take us to the stack frame we're interested in
+    // If this is defined as 0x0, we have decided to stay in the caller stack frame
+    stackaddr -= g_go_schema->arg_offsets.c_http_client_read_callee;
 
-    pc_conn_if = (pc + g_go.persistConn_to_conn);
-    uint64_t tls =  *(uint64_t*)(pc + g_go.persistConn_to_tlsState);
+    int fd = -1;
+    stackaddr += g_go_schema->arg_offsets.c_http_client_read_callee;
+    uint64_t pc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_read_pc); 
+    uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, len = 0;
+    char *buf = NULL;
+
+    pc_conn_if = (pc + g_go_schema->struct_offsets.persistConn_to_conn);
+    uint64_t tls = *(uint64_t*)(pc + g_go_schema->struct_offsets.persistConn_to_tlsState);
 
     // conn I/F checking. Ref the comment on c_http_server_read.
     if (pc_conn_if && tls) {
-        pc_conn = *(uint64_t *)(pc_conn_if + g_go.iface_data);
-        netFD = *(uint64_t *)(pc_conn + g_go.iface_data);
+        pc_conn = *(uint64_t *)(pc_conn_if + g_go_schema->struct_offsets.iface_data);
+        netFD = *(uint64_t *)(pc_conn + g_go_schema->struct_offsets.iface_data);
         if (!netFD) return;
-        if (g_go.netfd_to_sysfd == UNDEF_OFFSET) {
-            pfd = *(uint64_t *)(netFD + g_go.netfd_to_pd);
+        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) {
+            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd);
             if (!pfd) return;
-            fd = *(int *)(pfd + g_go.pd_to_fd);
+            fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd);
         } else {
-            fd = *(int *)(netFD + g_go.netfd_to_sysfd);
+            fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd);
         }
 
-        if ((pc_br = *(uint64_t *)(pc + g_go.persistConn_to_bufrd)) != 0) {
-            buf = *(uint64_t *)(pc_br + g_go.bufrd_to_buf);
+        if ((pc_br = *(uint64_t *)(pc + g_go_schema->struct_offsets.persistConn_to_bufrd)) != 0) {
+            buf = (char *)*(uint64_t *)(pc_br + g_go_schema->struct_offsets.bufrd_to_buf);
             // len is part of the []byte struct; the func doesn't return a len
             len = *(uint64_t *)(pc_br + 0x08);
         }
 
         if (buf && (len > 0)) {
-            doProtocol((uint64_t)0, fd, (void *)buf, len, TLSRX, BUF);
+            doProtocol((uint64_t)0, fd, buf, len, TLSRX, BUF);
             funcprint("Scope: c_http_client_read of %d\n", fd);
         }
     }
@@ -1377,16 +1498,37 @@ c_http_client_read(char *stackaddr)
 EXPORTON void *
 go_readResponse(char *stackptr)
 {
-    return go_switch(stackptr, c_http_client_read, go_hook_readResponse);
+    return do_cfunc(stackptr, c_http_client_read, g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_READ].assembly_fn);
 }
 
 extern void handleExit(void);
 static void
 c_exit(char *stackaddr)
 {
+    /*
+     * Need to extend the system stack size when calling handleExit().
+     * We see that the stack is exceeded now that we are using an internal libc.
+     */
+    int arc;
+    char *exit_stack, *tstack, *gstack;
+    if ((exit_stack = scope_malloc(EXIT_STACK_SIZE)) == NULL) {
+        return;
+    }
+
+    tstack = exit_stack + EXIT_STACK_SIZE;
+
+    // save the original stack, switch to the tstack
+    __asm__ volatile (
+        "mov %%rsp, %2 \n"
+        "mov %1, %%rsp \n"
+        : "=r"(arc)                  // output
+        : "m"(tstack), "m"(gstack)   // input
+        :                            // clobbered register
+        );
+
     // don't use stackaddr; patch_first_instruction() does not provide
     // frame_size, so stackaddr isn't usable
-    funcprint("c_exit");
+    funcprint("c_exit\n");
 
     int i;
     struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000}; // 10 us
@@ -1400,16 +1542,26 @@ c_exit(char *stackaddr)
     handleExit();
     // flush the data
     sigSafeNanosleep(&ts);
+
+    // Switch stack back to the original stack
+    __asm__ volatile (
+        "mov %1, %%rsp \n"
+        : "=r"(arc)                       // output
+        : "r"(gstack)                     // inputs
+        :                                 // clobbered register
+        );
+
+    scope_free(exit_stack);
 }
 
 EXPORTON void *
 go_exit(char *stackptr)
 {
-    return go_switch(stackptr, c_exit, go_hook_exit);
+    return do_cfunc(stackptr, c_exit, g_go_schema->tap[INDEX_HOOK_EXIT].assembly_fn);
 }
 
 EXPORTON void *
 go_die(char *stackptr)
 {
-    return go_switch(stackptr, c_exit, go_hook_die);
+    return do_cfunc(stackptr, c_exit, g_go_schema->tap[INDEX_HOOK_DIE].assembly_fn);
 }

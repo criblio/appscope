@@ -2,7 +2,7 @@ ARG GO_IMAGE_VER=golang:1.14
 FROM $GO_IMAGE_VER
 
 RUN apt-get -o Acquire::Check-Valid-Until=false update && \
-    apt-get install -y vim curl file bsdmainutils
+    apt-get install -y vim curl file bsdmainutils gdb
 
 COPY ./go/test_go.sh /go
 COPY ./go/test_go_struct.sh /go
@@ -15,6 +15,9 @@ RUN mkdir /go/syscalls
 COPY ./go/syscalls/unlinkat.go /go/syscalls
 RUN cd /go/syscalls && \
     go build -o unlinkat unlinkat.go
+COPY ./go/syscalls/opfalse.go /go/syscalls
+RUN cd /go/syscalls && \
+    go build -o opfalse opfalse.go
 COPY ./go/syscalls/readdir.go /go/syscalls
 RUN cd /go/syscalls && \
     go build -o readdir readdir.go
@@ -22,7 +25,9 @@ RUN cd /go/syscalls && \
 RUN mkdir /go/net
 COPY ./go/net/plainServer.go /go/net
 RUN cd /go/net && \
-    go build -buildmode=pie -o plainServerDynamic plainServer.go
+    go build -buildmode=pie -o plainServerDynamicPie plainServer.go
+RUN cd /go/net && \
+    go build -o plainServerDynamic plainServer.go
 RUN cd /go/net && \
     CGO_ENABLED=0 go build -o plainServerStatic plainServer.go
 COPY ./go/net/tlsServer.go /go/net
@@ -43,11 +48,20 @@ RUN cd /go/net &&\
     go build -o plainClientDynamic plainClient.go
 RUN cd /go/net && \
     CGO_ENABLED=0 go build -o plainClientStatic plainClient.go
+RUN cd /go/net && \
+    CGO_ENABLED=0 go build -ldflags='-s' -o plainClientStaticStripped plainClient.go
 COPY ./go/net/tlsClient.go /go/net
 RUN cd /go/net && \
     go build -o tlsClientDynamic tlsClient.go
 RUN cd /go/net && \
     CGO_ENABLED=0 go build -o tlsClientStatic tlsClient.go
+
+RUN mkdir /go/signals
+COPY ./go/signals/signalHandler.go /go/signals
+RUN cd /go/signals && \
+    go build -o signalHandlerDynamic signalHandler.go && \
+    CGO_ENABLED=0 go build -o signalHandlerStatic signalHandler.go && \
+    CGO_ENABLED=0 go build -ldflags="-s -w" -o signalHandlerStaticStripped signalHandler.go
 
 RUN mkdir /go/cgo
 COPY ./go/cgo/Makefile /go/cgo
@@ -62,7 +76,8 @@ COPY ./go/influx/influxdb-selfsigned.key /etc/ssl/.
 COPY ./go/influx/influxdb-selfsigned.crt /etc/ssl/.
 
 ENV SCOPE_CRIBL_ENABLE=false
-ENV SCOPE_LOG_LEVEL=error
+ENV SCOPE_LOG_LEVEL=warning
+ENV SCOPE_LOG_DEST=file:///tmp/scope.log
 ENV SCOPE_METRIC_VERBOSITY=4
 ENV SCOPE_EVENT_LOGFILE=true
 ENV SCOPE_EVENT_CONSOLE=true

@@ -4,6 +4,7 @@
 #include "os.h"
 #include "state.h"
 #include "utils.h"
+#include "scopestdlib.h"
 
 #include <jni.h>
 #include <jvmti.h>
@@ -262,9 +263,9 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
 #endif
     if (name == NULL) return;
 
-    if (strcmp(name, "sun/security/ssl/AppOutputStream") == 0 || 
-        strcmp(name, "com/sun/net/ssl/internal/ssl/AppOutputStream") == 0 ||
-        strcmp(name, "sun/security/ssl/SSLSocketImpl$AppOutputStream") == 0) {
+    if (scope_strcmp(name, "sun/security/ssl/AppOutputStream") == 0 || 
+        scope_strcmp(name, "com/sun/net/ssl/internal/ssl/AppOutputStream") == 0 ||
+        scope_strcmp(name, "sun/security/ssl/SSLSocketImpl$AppOutputStream") == 0) {
 
         scopeLogInfo("installing Java SSL hooks for AppOutputStream class...");
 
@@ -288,9 +289,9 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         javaDestroy(&classInfo);
     }
 
-    if (strcmp(name, "sun/security/ssl/AppInputStream") == 0 ||
-        strcmp(name, "com/sun/net/ssl/internal/ssl/AppInputStream") == 0 ||
-        strcmp(name, "sun/security/ssl/SSLSocketImpl$AppInputStream") == 0) {
+    if (scope_strcmp(name, "sun/security/ssl/AppInputStream") == 0 ||
+        scope_strcmp(name, "com/sun/net/ssl/internal/ssl/AppInputStream") == 0 ||
+        scope_strcmp(name, "sun/security/ssl/SSLSocketImpl$AppInputStream") == 0) {
 
         scopeLogInfo("installing Java SSL hooks for AppInputStream class...");
 
@@ -314,8 +315,8 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         javaDestroy(&classInfo);
     }
 
-    if (strcmp(name, "sun/security/ssl/SSLEngineImpl") == 0 || 
-        strcmp(name, "com/sun/net/ssl/internal/ssl/SSLEngineImpl") == 0) {
+    if (scope_strcmp(name, "sun/security/ssl/SSLEngineImpl") == 0 || 
+        scope_strcmp(name, "com/sun/net/ssl/internal/ssl/SSLEngineImpl") == 0) {
         
         scopeLogInfo("installing Java SSL hooks for SSLEngineImpl class...");
 
@@ -348,7 +349,7 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         javaDestroy(&classInfo);
     }
 
-    if (strcmp(name, "sun/nio/ch/SocketChannelImpl") == 0) {
+    if (scope_strcmp(name, "sun/nio/ch/SocketChannelImpl") == 0) {
 
         scopeLogInfo("installing Java SSL hooks for SocketChannelImpl class...");
         java_class_t *classInfo = javaReadClass(class_data);
@@ -380,8 +381,8 @@ ClassFileLoadHook(jvmtiEnv *jvmti_env,
         javaDestroy(&classInfo);
     }
 
-    if (strcmp(name, "java/nio/DirectByteBuffer") == 0 ||
-        strcmp(name, "java/nio/DirectByteBufferR") == 0) {
+    if (scope_strcmp(name, "java/nio/DirectByteBuffer") == 0 ||
+        scope_strcmp(name, "java/nio/DirectByteBufferR") == 0) {
 
         scopeLogInfo("installing Java SSL hooks for java.nio.DirectByteBuffer class...");
         java_class_t *classInfo = javaReadClass(class_data);
@@ -738,26 +739,26 @@ initJavaAgent() {
         https://docs.oracle.com/javase/8/docs/platform/jvmti/jvmti.html#tooloptions
         */
         char opt[1024];
-        snprintf(opt, sizeof(opt), "-agentpath:%s", var);
+        scope_snprintf(opt, sizeof(opt), "-agentpath:%s", var);
 
         char *buf;
-        size_t bufsize = strlen(opt) + 1;
+        size_t bufsize = scope_strlen(opt) + 1;
 
         char *env = getenv("JAVA_TOOL_OPTIONS");
         if (env != NULL) {
-            if (strstr(env, opt) != NULL) {
+            if (scope_strstr(env, opt) != NULL) {
                 //agentpath is already set, do nothing
                 return;
             }
-            bufsize += strlen(env) + 1;
+            bufsize += scope_strlen(env) + 1;
         }
-        buf = malloc(bufsize);
-        snprintf(buf, bufsize, "%s%s%s", env != NULL ? env : "", env != NULL ? " " : "", opt);
+        buf = scope_malloc(bufsize);
+        scope_snprintf(buf, bufsize, "%s%s%s", env != NULL ? env : "", env != NULL ? " " : "", opt);
 
         int result = fullSetenv("JAVA_TOOL_OPTIONS", buf, 1);
         if (result) {
             scopeLogError("ERROR: Could not set JAVA_TOOL_OPTIONS failed\n");
         }
-        free(buf);
+        scope_free(buf);
     }
 }

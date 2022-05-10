@@ -7,6 +7,7 @@
 #include <sys/un.h>
 #include <arpa/inet.h>
 
+#include "scopestdlib.h"
 #include "dbg.h"
 #include "plattime.h"
 #include "runtimecfg.h"
@@ -30,8 +31,8 @@ needleTestSetup(void** state)
     initFn();
     initState();
 
-    strcpy(g_proc.hostname, "thisHostName");
-    strcpy(g_proc.procname, "thisProcName");
+    scope_strcpy(g_proc.hostname, "thisHostName");
+    scope_strcpy(g_proc.procname, "thisProcName");
     g_proc.pid = 77;
 
     // Call the general groupSetup() too.
@@ -68,7 +69,7 @@ int cmdPostEvent(ctl_t *ctl, char *event)
 {
     //printf("%s: data at: %p\n", __FUNCTION__, event);
     doProtocolMetric((protocol_info *)event);
-    free(event);
+    scope_free(event);
     return 0;
 }
 
@@ -80,7 +81,7 @@ getUnix(int fd)
     struct sockaddr_un sa;
     bzero((char *)&sa, sizeof(sa));
     sa.sun_family = AF_UNIX;
-    strncpy(sa.sun_path, UNIX_SOCK_PATH, sizeof(sa.sun_path)-1);
+    scope_strncpy(sa.sun_path, UNIX_SOCK_PATH, sizeof(sa.sun_path)-1);
 
     doSetConnection(fd, (struct sockaddr *)&sa, sizeof(struct sockaddr_in), LOCAL);
 
@@ -117,7 +118,7 @@ headerBasicRequest(void **state)
                        "\"http_host\":\"localhost:4430\"",
                        "\"http_user_agent\":\"curl/7.68.0\""
                      };
-    size_t buflen = strlen(request);
+    size_t buflen = scope_strlen(request);
 
     net_info net = {0};
     net.fd = 0;
@@ -128,9 +129,9 @@ headerBasicRequest(void **state)
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
         //printf("looking for %s\n", result[i]);
-        assert_non_null(strstr(header_event, result[i]));
+        assert_non_null(scope_strstr(header_event, result[i]));
     }
-    free(header_event);
+    scope_free(header_event);
 }
 
 static void
@@ -153,9 +154,9 @@ headerBasicResponse(void **state)
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
         //printf("looking for %s\n", result[i]);
-        assert_non_null(strstr(header_event, result[i]));
+        assert_non_null(scope_strstr(header_event, result[i]));
     }
-    free(header_event);
+    scope_free(header_event);
 }
 
 static void
@@ -185,9 +186,9 @@ headerRequestIP(void **state)
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
         //printf("[%d] looking for %s\n", i, result[i]);
-        assert_non_null(strstr(header_event, result[i]));
+        assert_non_null(scope_strstr(header_event, result[i]));
     }
-    free(header_event);
+    scope_free(header_event);
 }
 
 static void
@@ -214,9 +215,9 @@ headerResponseIP(void **state)
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
         //printf("looking for %s\n", result[i]);
-        assert_non_null(strstr(header_event, result[i]));
+        assert_non_null(scope_strstr(header_event, result[i]));
     }
-    free(header_event);
+    scope_free(header_event);
 }
 
 static void
@@ -242,9 +243,9 @@ headerRequestUnix(void **state)
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
         //printf("looking for %s\n", result[i]);
-        assert_non_null(strstr(header_event, result[i]));
+        assert_non_null(scope_strstr(header_event, result[i]));
     }
-    free(header_event);
+    scope_free(header_event);
 }
 
 static void
@@ -282,9 +283,9 @@ userDefinedHeaderExtract(void **state)
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
         //printf("looking for %s\n", result[i]);
-        assert_non_null(strstr(header_event, result[i]));
+        assert_non_null(scope_strstr(header_event, result[i]));
     }
-    free(header_event);
+    scope_free(header_event);
     cfgDestroy(&cfg);
 }
 
@@ -319,10 +320,10 @@ xAppScopeHeaderExtract(void **state)
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
         //printf("looking for %s\n", result[i]);
-        assert_non_null(strstr(header_event, result[i]));
+        assert_non_null(scope_strstr(header_event, result[i]));
     }
 
-    free(header_event);
+    scope_free(header_event);
     cfgDestroy(&cfg);
 }
 

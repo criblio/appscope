@@ -122,6 +122,21 @@ fi
 
 endtest
 
+#
+# verify errno
+#
+
+starttest errno_verify
+cd /opt/errno_test/
+
+ldscope ./errno_test
+
+if [ $? -ne 0 ]; then
+    ERR+=1
+fi
+
+endtest
+
 if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""
     echo ""

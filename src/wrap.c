@@ -1673,11 +1673,7 @@ open(const char *pathname, int flags, ...)
     LOAD_FUNC_ARGS_VALIST(fArgs, flags);
 
     fd = g_fn.open(pathname, flags, fArgs.arg[0]);
-    if (fd != -1) {
-        doOpen(fd, pathname, FD, "open");
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "open", pathname);
-    }
+    doOpen(fd, pathname, FD, "open");
 
     return fd;
 }
@@ -1691,11 +1687,7 @@ openat(int dirfd, const char *pathname, int flags, ...)
     WRAP_CHECK(openat, -1);
     LOAD_FUNC_ARGS_VALIST(fArgs, flags);
     fd = g_fn.openat(dirfd, pathname, flags, fArgs.arg[0]);
-    if (fd != -1) {
-        doOpen(fd, pathname, FD, "openat");
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "openat", pathname);
-    }
+    doOpen(fd, pathname, FD, "openat");
 
     return fd;
 }
@@ -1707,11 +1699,8 @@ opendir(const char *name)
 
     WRAP_CHECK(opendir, NULL);
     dirp = g_fn.opendir(name);
-    if (dirp != NULL) {
-        doOpen(dirfd(dirp), name, FD, "opendir");
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, -1, 0, "opendir", name);
-    }
+    int fd = (dirp) ? dirfd(dirp) : -1;
+    doOpen(fd, name, FD, "opendir");
 
     return dirp;
 }
@@ -1755,11 +1744,7 @@ creat(const char *pathname, mode_t mode)
 
     WRAP_CHECK(creat, -1);
     fd = g_fn.creat(pathname, mode);
-    if (fd != -1) {
-        doOpen(fd, pathname, FD, "creat");
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "creat", pathname);
-    }
+    doOpen(fd, pathname, FD, "creat");
 
     return fd;
 }
@@ -1771,17 +1756,8 @@ fopen(const char *pathname, const char *mode)
 
     WRAP_CHECK(fopen, NULL);
     stream = g_fn.fopen(pathname, mode);
-    if (stream != NULL) {
-        // This check for /proc/self/maps is because we want to avoid
-        // reporting that our funchook library opens /proc/self/maps
-        // with fopen, then calls fgets and fclose on it as well...
-        // See https://github.com/criblio/appscope/issues/214 for more info
-        if (scope_strcmp(pathname, "/proc/self/maps")) {
-            doOpen(fileno(stream), pathname, STREAM, "fopen");
-        }
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, -1, 0, "fopen", pathname);
-    }
+    int fd = (stream) ? fileno(stream) : -1;
+    doOpen(fd, pathname, STREAM, "fopen");
 
     return stream;
 }
@@ -1987,11 +1963,7 @@ open64(const char *pathname, int flags, ...)
     WRAP_CHECK(open64, -1);
     LOAD_FUNC_ARGS_VALIST(fArgs, flags);
     fd = g_fn.open64(pathname, flags, fArgs.arg[0]);
-    if (fd != -1) {
-        doOpen(fd, pathname, FD, "open64");
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "open64", pathname);
-    }
+    doOpen(fd, pathname, FD, "open64");
 
     return fd;
 }
@@ -2005,11 +1977,7 @@ openat64(int dirfd, const char *pathname, int flags, ...)
     WRAP_CHECK(openat64, -1);
     LOAD_FUNC_ARGS_VALIST(fArgs, flags);
     fd = g_fn.openat64(dirfd, pathname, flags, fArgs.arg[0]);
-    if (fd != -1) {
-        doOpen(fd, pathname, FD, "openat64");
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "openat64", pathname);
-    }
+    doOpen(fd, pathname, FD, "openat64");
 
     return fd;
 }
@@ -2021,11 +1989,7 @@ __open_2(const char *file, int oflag)
 
     WRAP_CHECK(__open_2, -1);
     fd = g_fn.__open_2(file, oflag);
-    if (fd != -1) {
-        doOpen(fd, file, FD, "__open_2");
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "__open_2", file);
-    }
+    doOpen(fd, file, FD, "__open_2");
 
     return fd;
 }
@@ -2037,11 +2001,7 @@ __open64_2(const char *file, int oflag)
 
     WRAP_CHECK(__open64_2, -1);
     fd = g_fn.__open64_2(file, oflag);
-    if (fd != -1) {
-        doOpen(fd, file, FD, "__open64_2");
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "__open64_2", file);
-    }
+    doOpen(fd, file, FD, "__open64_2");
 
     return fd;
 }
@@ -2051,11 +2011,7 @@ __openat_2(int fd, const char *file, int oflag)
 {
     WRAP_CHECK(__openat_2, -1);
     fd = g_fn.__openat_2(fd, file, oflag);
-    if (fd != -1) {
-        doOpen(fd, file, FD, "__openat_2");
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "__openat_2", file);
-    }
+    doOpen(fd, file, FD, "__openat_2");
 
     return fd;
 }
@@ -2068,11 +2024,7 @@ creat64(const char *pathname, mode_t mode)
 
     WRAP_CHECK(creat64, -1);
     fd = g_fn.creat64(pathname, mode);
-    if (fd != -1) {
-        doOpen(fd, pathname, FD, "creat64");
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "creat64", pathname);
-    }
+    doOpen(fd, pathname, FD, "creat64");
 
     return fd;
 }
@@ -2084,11 +2036,8 @@ fopen64(const char *pathname, const char *mode)
 
     WRAP_CHECK(fopen64, NULL);
     stream = g_fn.fopen64(pathname, mode);
-    if (stream != NULL) {
-        doOpen(fileno(stream), pathname, STREAM, "fopen64");
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, -1, 0, "fopen64", pathname);
-    }
+    int fd = (stream) ? fileno(stream) : -1;
+    doOpen(fd, pathname, STREAM, "fopen64");
 
     return stream;
 }
@@ -2101,13 +2050,10 @@ freopen64(const char *pathname, const char *mode, FILE *orig_stream)
     WRAP_CHECK(freopen64, NULL);
     stream = g_fn.freopen64(pathname, mode, orig_stream);
     // freopen just changes the mode if pathname is null
-    if (stream != NULL) {
-        if (pathname != NULL) {
-            doOpen(fileno(stream), pathname, STREAM, "freopen64");
-            doClose(fileno(orig_stream), "freopen64");
-        }
-    } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, -1, 0, "freopen64", pathname);
+    int fd = (stream) ? fileno(stream) : -1;
+    doOpen(fd, pathname, STREAM, "freopen64");
+    if ((stream != NULL) && (pathname != NULL)) {
+        doClose(fileno(orig_stream), "freopen64");
     }
 
     return stream;

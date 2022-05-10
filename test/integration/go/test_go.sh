@@ -99,17 +99,22 @@ ERR+=$?
 endtest
 
 #
-# syscalls_unlinkatfalse
+# syscalls_opfalse
 #
-starttest unlinkatfalse
+starttest opfalse
 cd /go/syscalls
 
-ldscope ./unlinkatfalse
+ldscope ./opfalse
 
 evaltest
 
-grep unlinkatfalse $EVT_FILE | grep fs.delete > /dev/null
+grep opfalse $EVT_FILE | grep fs.delete > /dev/null
 if [ $? -eq "0" ]; then
+    ERR+=1
+fi
+
+grep opfalse $EVT_FILE | grep fs.error > /dev/null
+if [ $? -ne "0" ]; then
     ERR+=1
 fi
 

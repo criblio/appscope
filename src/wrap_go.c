@@ -409,6 +409,14 @@ getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
                         break;
                     }
 
+                    // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
+                    if (altname && mnemonic &&
+                        (scope_strcmp(altname, func_name) == 0) &&
+                        (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
+                        symaddr = sym_addr;
+                        break;
+                    }
+
                     symtab_addr += 16;
                 }
             } else if (magic == GOPCLNTAB_MAGIC_118) {
@@ -432,7 +440,7 @@ getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
                         break;
                     }
 
-                    // In go 1.18 we need to ensure we find the correct symbol in the case of ambiguity
+                    // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
                     if (altname && mnemonic &&
                         (scope_strcmp(altname, func_name) == 0) &&
                         (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {

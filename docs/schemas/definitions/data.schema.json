@@ -283,7 +283,7 @@
       "title": "op_fs_open",
       "description": "op_fs_open",
       "type": "string",
-      "enum": ["open", "openat", "opendir", "creat", "fopen", "freopen", "open64", "openat64", "__open_2", "__openat_2", "creat64", "fopen64", "freopen64", "recvmsg", "console output", "console input"]
+      "enum": ["open", "openat", "opendir", "creat", "fopen", "freopen", "open64", "openat64", "__open64_2", "__open_2", "__openat_2", "creat64", "fopen64", "freopen64", "recvmsg", "console output", "console input"]
     },
     "op_fs_read": {
       "title": "op_fs_read",

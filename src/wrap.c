@@ -2038,7 +2038,7 @@ __open64_2(const char *file, int oflag)
     WRAP_CHECK(__open64_2, -1);
     fd = g_fn.__open64_2(file, oflag);
     if (fd != -1) {
-        doOpen(fd, file, FD, "__open_2");
+        doOpen(fd, file, FD, "__open64_2");
     } else {
         doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "__open64_2", file);
     }

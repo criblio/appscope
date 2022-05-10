@@ -2376,7 +2376,10 @@ doClose(int fd, const char *func)
 void
 doOpen(int fd, const char *path, fs_type_t type, const char *func)
 {
-    if (checkFSEntry(fd) == TRUE) {
+    if (fd == -1) {
+        doUpdateState(FS_ERR_OPEN_CLOSE, -1, 0, func, path);
+        return;
+    } else if (checkFSEntry(fd) == TRUE) {
         if (g_fsinfo[fd].active) {
             scopeLog(CFG_LOG_DEBUG, "fd:%d doOpen: duplicate", fd);
             DBG(NULL);

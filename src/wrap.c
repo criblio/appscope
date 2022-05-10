@@ -2024,7 +2024,7 @@ __open_2(const char *file, int oflag)
     if (fd != -1) {
         doOpen(fd, file, FD, "__open_2");
     } else {
-        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "__openat_2", file);
+        doUpdateState(FS_ERR_OPEN_CLOSE, fd, 0, "__open_2", file);
     }
 
     return fd;

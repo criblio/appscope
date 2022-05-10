@@ -13,6 +13,7 @@ typedef struct {
     int c_unlinkat_dirfd;
     int c_unlinkat_pathname;
     int c_unlinkat_flags;
+    int c_unlinkat_rc;
     int c_open_fd;
     int c_open_path;
     int c_close_fd;

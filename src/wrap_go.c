@@ -3,7 +3,6 @@
 #include <asm/prctl.h>
 #include <sys/prctl.h>
 #include <signal.h>
-#include <pthread.h>
 
 #include "com.h"
 #include "dbg.h"
@@ -213,7 +212,6 @@ go_schema_t go_17_schema = {
         [INDEX_HOOK_TLS_SERVER_WRITE] = {"net/http.checkConnErrorWriter.Write",  go_hook_reg_tls_write,        NULL, 0}, // tls server write
         [INDEX_HOOK_TLS_CLIENT_READ]  = {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse,     NULL, 0}, // tls client read
         [INDEX_HOOK_TLS_CLIENT_WRITE] = {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,         NULL, 0}, // tls client write
-//        [INDEX_HOOK_EXIT]             = {"runtime.exit.abi0",                    go_hook_exit,                 NULL, 0},
         [INDEX_HOOK_EXIT]             = {"runtime.exit",                         go_hook_exit,                 NULL, 0},
         [INDEX_HOOK_DIE]              = {"runtime.dieFromSignal",                go_hook_die,                  NULL, 0},
         [INDEX_HOOK_MAX]              = {"TAP_TABLE_END",                        NULL,                         NULL, 0}
@@ -221,25 +219,7 @@ go_schema_t go_17_schema = {
 };
 
 go_schema_t *g_go_schema = &go_16_schema; // overridden if later version
-
-
-#define GO_HOOK_WRITE            (g_go_schema->tap[INDEX_HOOK_WRITE].assembly_fn)
-#define GO_HOOK_OPEN             (g_go_schema->tap[INDEX_HOOK_OPEN].assembly_fn)
-#define GO_HOOK_UNLINKAT         (g_go_schema->tap[INDEX_HOOK_UNLINKAT].assembly_fn)
-#define GO_HOOK_GETDENTS         (g_go_schema->tap[INDEX_HOOK_GETDENTS].assembly_fn)
-#define GO_HOOK_SOCKET           (g_go_schema->tap[INDEX_HOOK_SOCKET].assembly_fn)
-#define GO_HOOK_ACCEPT           (g_go_schema->tap[INDEX_HOOK_ACCEPT].assembly_fn)
-#define GO_HOOK_READ             (g_go_schema->tap[INDEX_HOOK_READ].assembly_fn)
-#define GO_HOOK_CLOSE            (g_go_schema->tap[INDEX_HOOK_CLOSE].assembly_fn)
-#define GO_HOOK_TLS_SERVER_READ  (g_go_schema->tap[INDEX_HOOK_TLS_SERVER_READ].assembly_fn)
-#define GO_HOOK_TLS_SERVER_WRITE (g_go_schema->tap[INDEX_HOOK_TLS_SERVER_WRITE].assembly_fn)
-#define GO_HOOK_TLS_CLIENT_READ  (g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_READ].assembly_fn)
-#define GO_HOOK_TLS_CLIENT_WRITE (g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_WRITE].assembly_fn)
-#define GO_HOOK_EXIT             (g_go_schema->tap[INDEX_HOOK_EXIT].assembly_fn)
-#define GO_HOOK_DIE              (g_go_schema->tap[INDEX_HOOK_DIE].assembly_fn)
-
 uint64_t g_glibc_guard = 0LL;
-
 void (*go_runtime_cgocall)(void);
 
 #if NEEDEVNULL > 0
@@ -390,7 +370,7 @@ getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
 
     for (i = 0; i < ehdr->e_shnum; i++) {
         sec_name = section_strtab + sections[i].sh_name;
-        if (scope_strcmp(".gopclntab", sec_name) == 0) {
+        if (scope_strstr(sec_name, ".gopclntab")) {
             const void *pclntab_addr = buf + sections[i].sh_offset;
             /*
             Go symbol table is stored in the .gopclntab section
@@ -413,13 +393,6 @@ getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
                         break;
                     }
 
-                    if (altname && mnemonic &&
-                        (scope_strcmp(altname, func_name) == 0) &&
-                        (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
-                        symaddr = sym_addr;
-                        break;
-                    }
-
                     symtab_addr += 16;
                 }
             } else if (magic == GOPCLNTAB_MAGIC_116) {
@@ -438,6 +411,7 @@ getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
                         break;
                     }
 
+                    // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
                     if (altname && mnemonic &&
                         (scope_strcmp(altname, func_name) == 0) &&
                         (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
@@ -468,6 +442,7 @@ getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
                         break;
                     }
 
+                    // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
                     if (altname && mnemonic &&
                         (scope_strcmp(altname, func_name) == 0) &&
                         (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
@@ -883,7 +858,7 @@ initGoHook(elf_buf_t *ebuf)
         // if it is not set, we know we're dealing with a "go string"
         void *ver_addr = getGoVersionAddr(ebuf->buf);
         if (g_go_build_ver[0] != '\0') {
-            go_ver = (char *)((uint64_t)ver_addr + base);
+            go_ver = (char *)((uint64_t)ver_addr);
         } else {
             go_ver = go_str((void *)((uint64_t)ver_addr + base));
         }
@@ -1098,18 +1073,9 @@ do_cfunc(char *stackptr, void *cfunc, void *gfunc)
  * stack and the fs register points to an 'm' TLS
  * base address.
  *
- * We need to switch from a 'g' context to a
- * libc context in order to execute 'C' code that
- * calls libc functions. The go_switch() function
- * handles all of that. The address of a specific
- * handler is passed to go_swtich which calls the
- * handler when the appropriate switch has been
- * accopmlished.
- * 
  * Specific handlers are defined as the c_xxx functions.
  * Example, there is a c_write() that handles extracting
- * details for write operations. The address of c_write
- * is passed to go_switch.
+ * details for write operations. 
  *
  * All handlers take a single parameter, the stack address
  * from the interposed Go function. All params are passed
@@ -1136,7 +1102,7 @@ c_write(char *stackaddr)
 EXPORTON void *
 go_write(char *stackptr)
 {
-    return do_cfunc(stackptr, c_write, GO_HOOK_WRITE);
+    return do_cfunc(stackptr, c_write, g_go_schema->tap[INDEX_HOOK_WRITE].assembly_fn);
 }
 
 // Extract data from syscall.Getdents (read dir)
@@ -1154,7 +1120,7 @@ c_getdents(char *stackaddr)
 EXPORTON void *
 go_getdents(char *stackptr)
 {
-    return do_cfunc(stackptr, c_getdents, GO_HOOK_GETDENTS);
+    return do_cfunc(stackptr, c_getdents, g_go_schema->tap[INDEX_HOOK_GETDENTS].assembly_fn);
 }
 
 // Extract data from syscall.unlinkat (delete file)
@@ -1180,7 +1146,7 @@ c_unlinkat(char *stackaddr)
 EXPORTON void *
 go_unlinkat(char *stackptr)
 {
-    return do_cfunc(stackptr, c_unlinkat, GO_HOOK_UNLINKAT);
+    return do_cfunc(stackptr, c_unlinkat, g_go_schema->tap[INDEX_HOOK_UNLINKAT].assembly_fn);
 }
 
 // Extract data from syscall.openat (file open)
@@ -1207,7 +1173,7 @@ c_open(char *stackaddr)
 EXPORTON void *
 go_open(char *stackptr)
 {
-    return do_cfunc(stackptr, c_open, GO_HOOK_OPEN);
+    return do_cfunc(stackptr, c_open, g_go_schema->tap[INDEX_HOOK_OPEN].assembly_fn);
 }
 
 // Extract data from syscall.Close (close)
@@ -1226,7 +1192,7 @@ c_close(char *stackaddr)
 EXPORTON void *
 go_close(char *stackptr)
 {
-    return do_cfunc(stackptr, c_close, GO_HOOK_CLOSE);
+    return do_cfunc(stackptr, c_close, g_go_schema->tap[INDEX_HOOK_CLOSE].assembly_fn);
 }
 
 // Extract data from syscall.read (read)
@@ -1247,7 +1213,7 @@ c_read(char *stackaddr)
 EXPORTON void *
 go_read(char *stackptr)
 {
-    return do_cfunc(stackptr, c_read, GO_HOOK_READ);
+    return do_cfunc(stackptr, c_read, g_go_schema->tap[INDEX_HOOK_READ].assembly_fn);
 }
 
 // Extract data from syscall.socket (net open)
@@ -1269,7 +1235,7 @@ c_socket(char *stackaddr)
 EXPORTON void *
 go_socket(char *stackptr)
 {
-    return do_cfunc(stackptr, c_socket, GO_HOOK_SOCKET);
+    return do_cfunc(stackptr, c_socket, g_go_schema->tap[INDEX_HOOK_SOCKET].assembly_fn);
 }
 
 // Extract data from syscall.accept4 (plain server accept)
@@ -1290,7 +1256,7 @@ c_accept4(char *stackaddr)
 EXPORTON void *
 go_accept4(char *stackptr)
 {
-    return do_cfunc(stackptr, c_accept4, GO_HOOK_ACCEPT);
+    return do_cfunc(stackptr, c_accept4, g_go_schema->tap[INDEX_HOOK_ACCEPT].assembly_fn);
 }
 
 /*
@@ -1366,7 +1332,7 @@ c_http_server_read(char *stackaddr)
 EXPORTON void *
 go_tls_read(char *stackptr)
 {
-    return do_cfunc(stackptr, c_http_server_read, GO_HOOK_TLS_SERVER_READ);
+    return do_cfunc(stackptr, c_http_server_read, g_go_schema->tap[INDEX_HOOK_TLS_SERVER_READ].assembly_fn);
 }
 
 /*
@@ -1415,7 +1381,7 @@ c_http_server_write(char *stackaddr)
 EXPORTON void *
 go_tls_write(char *stackptr)
 {
-    return do_cfunc(stackptr, c_http_server_write, GO_HOOK_TLS_SERVER_WRITE);
+    return do_cfunc(stackptr, c_http_server_write, g_go_schema->tap[INDEX_HOOK_TLS_SERVER_WRITE].assembly_fn);
 }
 
 /*
@@ -1470,7 +1436,7 @@ c_http_client_write(char *stackaddr)
 EXPORTON void *
 go_pc_write(char *stackptr)
 {
-    return do_cfunc(stackptr, c_http_client_write, GO_HOOK_TLS_CLIENT_WRITE);
+    return do_cfunc(stackptr, c_http_client_write, g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_WRITE].assembly_fn);
 }
 
 /*
@@ -1532,7 +1498,7 @@ c_http_client_read(char *stackaddr)
 EXPORTON void *
 go_readResponse(char *stackptr)
 {
-    return do_cfunc(stackptr, c_http_client_read, GO_HOOK_TLS_CLIENT_READ);
+    return do_cfunc(stackptr, c_http_client_read, g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_READ].assembly_fn);
 }
 
 extern void handleExit(void);
@@ -1591,11 +1557,11 @@ c_exit(char *stackaddr)
 EXPORTON void *
 go_exit(char *stackptr)
 {
-    return do_cfunc(stackptr, c_exit, GO_HOOK_EXIT);
+    return do_cfunc(stackptr, c_exit, g_go_schema->tap[INDEX_HOOK_EXIT].assembly_fn);
 }
 
 EXPORTON void *
 go_die(char *stackptr)
 {
-    return do_cfunc(stackptr, c_exit, GO_HOOK_DIE);
+    return do_cfunc(stackptr, c_exit, g_go_schema->tap[INDEX_HOOK_DIE].assembly_fn);
 }

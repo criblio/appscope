@@ -1,4 +1,4 @@
-FROM cribl/cribl:latest
+FROM cribl/cribl:3.4.1
 
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \

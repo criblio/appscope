@@ -1,0 +1,80 @@
+#!/bin/bash
+
+DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
+
+FAILED_TEST_LIST=""
+FAILED_TEST_COUNT=0
+EXPECTED_AWS_NUKE_EXIT_CODE=255
+LOOP_LIMIT=10
+EVT_FILE="/opt/test-runner/logs/events.log"
+METRIC_FILE="/opt/test-runner/logs/metrics.log"
+SCOPE_LOG_FILE="/opt/test-runner/logs/scope.log"
+
+starttest(){
+    CURRENT_TEST=$1
+    echo "==============================================="
+    echo "             Testing $CURRENT_TEST             "
+    echo "==============================================="
+    ERR=0
+}
+
+evaltest(){
+    echo "             Evaluating $CURRENT_TEST"
+}
+
+endtest(){
+    if [ $ERR -eq "0" ]; then
+        RESULT=PASSED
+    else
+        RESULT=FAILED
+        FAILED_TEST_LIST+=$CURRENT_TEST
+        FAILED_TEST_LIST+=" "
+        FAILED_TEST_COUNT=$(($FAILED_TEST_COUNT + 1))
+    fi
+
+    echo "*************** $CURRENT_TEST $RESULT ***************"
+    echo ""
+    echo ""
+
+    # copy the EVT_FILE/METRIC_FILE/SCOPE_LOG_FILE to help with debugging
+    if (( $DEBUG )) || [ $RESULT == "FAILED" ]; then
+        cp -f $EVT_FILE $EVT_FILE.$CURRENT_TEST
+        cp -f $METRIC_FILE $METRIC_FILE.$CURRENT_TEST
+        cp -f $SCOPE_LOG_FILE $SCOPE_LOG_FILE.$CURRENT_TEST
+    fi
+
+    rm -f $METRIC_FILE
+    rm -f $EVT_FILE
+    rm -f $SCOPE_LOG_FILE
+}
+
+#
+# test aws-nuke
+#
+
+starttest aws-nuke
+
+cd /opt/awsnuke
+for i in $(seq $LOOP_LIMIT); do
+    ldscope -- /usr/local/bin/aws-nuke -v -c /opt/awsnuke/example.yaml
+    if [ $? -ne $EXPECTED_AWS_NUKE_EXIT_CODE ]; then
+        ERR+=1
+    fi
+done
+
+endtest
+
+if (( $FAILED_TEST_COUNT == 0 )); then
+    echo ""
+    echo ""
+    echo "*************** ALL TESTS PASSED ***************"
+else
+    echo "*************** SOME TESTS FAILED ***************"
+    echo "Failed tests: $FAILED_TEST_LIST"
+    echo "Refer to these files for more info:"
+    for FAILED_TEST in $FAILED_TEST_LIST; do
+        echo "  $EVT_FILE.$FAILED_TEST"
+    done
+fi
+
+exit ${FAILED_TEST_COUNT}

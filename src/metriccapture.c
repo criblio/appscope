@@ -6,6 +6,7 @@
 #include "com.h"
 #include "dbg.h"
 #include "metriccapture.h"
+#include "scopestdlib.h"
 
 // Consistent with src/sluice/js/input/MetricsIn.ts
 #define STATSD         "^([^:]+):([\\d.]+)\\|(c|g|ms|s|h)$"
@@ -43,9 +44,9 @@ initMetricCapture(void)
     char *qlen_str;
     if ((qlen_str = getenv("SCOPE_QUEUE_LENGTH")) != NULL) {
         unsigned long qlen;
-        errno = 0;
-        qlen = strtoul(qlen_str, NULL, 10);
-        if (!errno && qlen) {
+        scope_errno = 0;
+        qlen = scope_strtoul(qlen_str, NULL, 10);
+        if (!scope_errno && qlen) {
             buf_size = qlen;
         }
     }
@@ -65,7 +66,7 @@ createCapturedMetric(unsigned char *name, unsigned char *value,
     if (!name || !value || !type) goto err;
 
     // Alloc space
-    base = malloc(sizeof(captured_metric_t));
+    base = scope_malloc(sizeof(captured_metric_t));
     if (!base) goto err;
 
     // Copy in field values
@@ -81,7 +82,7 @@ err:
     if (value) pcre2_substring_free(value);
     if (type) pcre2_substring_free(type);
     if (dims) pcre2_substring_free(dims);
-    if (base) free(base);
+    if (base) scope_free(base);
     return NULL;
 }
 
@@ -94,7 +95,7 @@ destroyCapturedMetric(captured_metric_t **metric)
     if (tmp->value) pcre2_substring_free(tmp->value);
     if (tmp->type) pcre2_substring_free(tmp->type);
     if (tmp->dims) pcre2_substring_free(tmp->dims);
-    free(tmp);
+    scope_free(tmp);
     *metric = NULL;
 }
 

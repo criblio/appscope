@@ -26,6 +26,7 @@
 #include "fn.h"
 #include "os.h"
 #include "utils.h"
+#include "scopestdlib.h"
 
 #define NET_ENTRIES 1024
 #define FS_ENTRIES 1024
@@ -34,6 +35,7 @@
 
 extern rtconfig g_cfg;
 
+int g_go_static = FALSE;
 int g_numNinfo = NET_ENTRIES;
 int g_numFSinfo = FS_ENTRIES;
 int g_http_guard_enabled = TRUE;
@@ -89,7 +91,7 @@ destroyNetInfo(void *data)
 
     resetHttp(net->http);
 
-    free(net);
+    scope_free(net);
 }
 
 int
@@ -114,7 +116,7 @@ get_port(int fd, int type, control_type_t which) {
         port = (in_port_t)0;
         break;
     }
-    return ntohs(port);
+    return scope_ntohs(port);
 }
 
 int
@@ -139,7 +141,7 @@ get_port_net(net_info *net, int type, control_type_t which) {
         port = (in_port_t)0;
         break;
     }
-    return ntohs(port);
+    return scope_ntohs(port);
 }
 
 bool
@@ -154,15 +156,15 @@ delProtocol(request_t *req)
 
     for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
         if ((protolist = lstFind(g_protlist, ptype)) != NULL) {
-            if (strncmp(protoreq->protname, protolist->protname, strlen(protolist->protname)) == 0) {
+            if (scope_strncmp(protoreq->protname, protolist->protname, scope_strlen(protolist->protname)) == 0) {
                 // decrement g_prot_sequence?: values are assigned to an entry, used as a key
                 lstDelete(g_protlist, ptype);
             }
         }
     }
 
-    if (protoreq && protoreq->protname) free(protoreq->protname);
-    if (protoreq) free(protoreq);
+    if (protoreq && protoreq->protname) scope_free(protoreq->protname);
+    if (protoreq) scope_free(protoreq);
     return TRUE;
 }
 
@@ -205,7 +207,7 @@ initPayloadDetect()
     // Setup the TLS protocol-detect regex
     errornumber = 0;
     erroroffset = 0;
-    if ((g_tls_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) goto error;
+    if ((g_tls_protocol_def = scope_calloc(1, sizeof(protocol_def_t))) == NULL) goto error;
     g_tls_protocol_def->protname = "TLS";
     g_tls_protocol_def->binary = TRUE;
     g_tls_protocol_def->len = PAYLOAD_BYTESRC;
@@ -224,7 +226,7 @@ initPayloadDetect()
     // Setup the HTTP protocol-detect regex
     errornumber = 0;
     erroroffset = 0;
-    if ((g_http_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) goto error;
+    if ((g_http_protocol_def = scope_calloc(1, sizeof(protocol_def_t))) == NULL) goto error;
     g_http_protocol_def->protname = "HTTP";
     g_http_protocol_def->regex = "(?: HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n)";
     g_http_protocol_def->detect = TRUE;
@@ -242,7 +244,7 @@ initPayloadDetect()
     // Setup the StatsD protocol-detect regex
     errornumber = 0;
     erroroffset = 0;
-    if ((g_statsd_protocol_def = calloc(1, sizeof(protocol_def_t))) == NULL) goto error;
+    if ((g_statsd_protocol_def = scope_calloc(1, sizeof(protocol_def_t))) == NULL) goto error;
     g_statsd_protocol_def->protname = "STATSD";
     g_statsd_protocol_def->regex = "^([^:]+):([\\d.]+)\\|(c|g|ms|s|h)";
     g_statsd_protocol_def->detect = TRUE;
@@ -274,13 +276,13 @@ void
 initState()
 {
     // Per a Read Update & Change (RUC) model; now that the object is ready assign the global
-    if ((g_netinfo = (net_info *)calloc(1, sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
-        scopeLogError("ERROR: Constructor:Calloc");
+    if ((g_netinfo = (net_info *)scope_calloc(1, sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
+        scopeLogError("ERROR: Constructor:scope_calloc");
     }
 
     // Per RUC...
-    if ((g_fsinfo = (fs_info *)calloc(1, sizeof(struct fs_info_t) * FS_ENTRIES)) == NULL) {
-        scopeLogError("ERROR: Constructor:Calloc");
+    if ((g_fsinfo = (fs_info *)scope_calloc(1, sizeof(struct fs_info_t) * FS_ENTRIES)) == NULL) {
+        scopeLogError("ERROR: Constructor:scope_calloc");
     }
 
     initHttpState();
@@ -288,12 +290,12 @@ initState()
 
     // the http guard array is static while the net fs array is dynamically allocated
     // will need to change if we want to re-size at runtime
-    memset(g_http_guard, 0, sizeof(g_http_guard));
+    scope_memset(g_http_guard, 0, sizeof(g_http_guard));
     {
         // g_http_guard_enable is always false unless
         // SCOPE_HTTP_SERIALIZE_ENABLE is defined and is "true"
         char *spin_env = getenv("SCOPE_HTTP_SERIALIZE_ENABLE");
-        g_http_guard_enabled = (spin_env && !strcmp(spin_env, "true"));
+        g_http_guard_enabled = (spin_env && !scope_strcmp(spin_env, "true"));
     }
 
     g_http_redirect = searchComp(REDIRECTURL);
@@ -309,7 +311,7 @@ initState()
 void
 resetState()
 {
-    memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
+    scope_memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
 }
 
 // DEBUG
@@ -320,13 +322,13 @@ dumpAddrs(int sd)
     in_port_t port;
     char ip[INET6_ADDRSTRLEN];
 
-    inet_ntop(AF_INET,
+    scope_inet_ntop(AF_INET,
               &((struct sockaddr_in *)&g_netinfo[sd].localConn)->sin_addr,
               ip, sizeof(ip));
     port = get_port(sd, g_netinfo[sd].localConn.ss_family, LOCAL);
     scopeLog(CFG_LOG_DEBUG, "fd:%d %s:%d LOCAL: %s:%d", sd, __FUNCTION__, __LINE__, ip, port);
 
-    inet_ntop(AF_INET,
+    scope_inet_ntop(AF_INET,
               &((struct sockaddr_in *)&g_netinfo[sd].remoteConn)->sin_addr,
               ip, sizeof(ip));
     port = get_port(sd, g_netinfo[sd].remoteConn.ss_family, REMOTE);
@@ -346,7 +348,7 @@ doUnixEndpoint(int sd, net_info *net)
 
     if (!net) return;
 
-    if ((fstat(sd, &sbuf) == -1) ||
+    if ((scope_fstat(sd, &sbuf) == -1) ||
         ((sbuf.st_mode & S_IFMT) != S_IFSOCK)) {
         net->lnode = 0;
         net->rnode = 0;
@@ -367,7 +369,7 @@ static int
 postStatErrState(metric_t stat_err, metric_t type, const char *funcop, const char *pathname)
 {
     // something passed in a param that is not a viable address; ltp does this
-    if ((stat_err == EVT_ERR) && (errno == EFAULT)) return FALSE;
+    if ((getgoAppStateStatic() == FALSE) && (stat_err == EVT_ERR) && (errno == EFAULT)) return FALSE;
 
     int *summarize = NULL;
     switch (type) {
@@ -399,21 +401,21 @@ postStatErrState(metric_t stat_err, metric_t type, const char *funcop, const cha
     if (!need_to_post) return FALSE;
 
     size_t len = sizeof(struct stat_err_info_t);
-    stat_err_info *sep = calloc(1, len);
+    stat_err_info *sep = scope_calloc(1, len);
     if (!sep) return FALSE;
 
     sep->evtype = stat_err;
     sep->data_type = type;
 
     if (pathname) {
-        strncpy(sep->name, pathname, strnlen(pathname, sizeof(sep->name)));
+        scope_strncpy(sep->name, pathname, scope_strnlen(pathname, sizeof(sep->name)));
     }
 
     if (funcop) {
-        strncpy(sep->funcop, funcop, strnlen(funcop, sizeof(sep->funcop)));
+        scope_strncpy(sep->funcop, funcop, scope_strnlen(funcop, sizeof(sep->funcop)));
     }
 
-    memmove(&sep->counters, &g_ctrs, sizeof(g_ctrs));
+    scope_memmove(&sep->counters, &g_ctrs, sizeof(g_ctrs));
 
     cmdPostEvent(g_ctl, (char *)sep);
 
@@ -451,20 +453,20 @@ postFSState(int fd, metric_t type, fs_info *fs, const char *funcop, const char *
     if (!need_to_post) return FALSE;
 
     size_t len = sizeof(struct fs_info_t);
-    fs_info *fsp = calloc(1, len);
+    fs_info *fsp = scope_calloc(1, len);
     if (!fsp) return FALSE;
 
-    if (fs) memmove(fsp, fs, len);
+    if (fs) scope_memmove(fsp, fs, len);
     fsp->fd = fd;
     fsp->evtype = EVT_FS;
     fsp->data_type = type;
 
     if (pathname && (!fs || fs->path[0] == '\0')) {
-        strncpy(fsp->path, pathname, strnlen(pathname, sizeof(fsp->path)));
+        scope_strncpy(fsp->path, pathname, scope_strnlen(pathname, sizeof(fsp->path)));
     }
 
     if (funcop && (!fs || fs->funcop[0] == '\0')) {
-        strncpy(fsp->funcop, funcop, strnlen(funcop, sizeof(fsp->funcop)));
+        scope_strncpy(fsp->funcop, funcop, scope_strnlen(funcop, sizeof(fsp->funcop)));
     }
 
     cmdPostEvent(g_ctl, (char *)fsp);
@@ -484,10 +486,10 @@ postDNSState(int fd, metric_t type, net_info *net, uint64_t duration, const char
     if (!need_to_post) return FALSE;
 
     size_t len = sizeof(struct net_info_t);
-    net_info *netp = calloc(1, len);
+    net_info *netp = scope_calloc(1, len);
     if (!netp) return FALSE;
 
-    if (net) memmove(netp, net, len);
+    if (net) scope_memmove(netp, net, len);
     netp->fd = fd;
     netp->evtype = EVT_DNS;
     netp->data_type = type;
@@ -497,10 +499,10 @@ postDNSState(int fd, metric_t type, net_info *net, uint64_t duration, const char
     }
 
     if (domain) {
-        strncpy(netp->dnsName, domain, strnlen(domain, sizeof(netp->dnsName)));
+        scope_strncpy(netp->dnsName, domain, scope_strnlen(domain, sizeof(netp->dnsName)));
     }
 
-    memmove(&netp->counters, &g_ctrs, sizeof(g_ctrs));
+    scope_memmove(&netp->counters, &g_ctrs, sizeof(g_ctrs));
 
     cmdPostEvent(g_ctl, (char *)netp);
 
@@ -541,14 +543,14 @@ postNetState(int fd, metric_t type, net_info *net)
     if (!need_to_post) return FALSE;
 
     size_t len = sizeof(struct net_info_t);
-    net_info *netp = calloc(1, len);
+    net_info *netp = scope_calloc(1, len);
     if (!netp) return FALSE;
 
-    memmove(netp, net, len);
+    scope_memmove(netp, net, len);
     netp->fd = fd;
     netp->evtype = EVT_NET;
     netp->data_type = type;
-    memmove(&netp->counters, &g_ctrs, sizeof(g_ctrs));
+    scope_memmove(&netp->counters, &g_ctrs, sizeof(g_ctrs));
 
     cmdPostEvent(g_ctl, (char *)netp);
     return mtc_needs_reporting;
@@ -942,13 +944,13 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
         int i;
         size_t alen = (cvlen * 2) + 1;
 
-        if ((cpdata = calloc(1, alen)) == NULL) {
+        if ((cpdata = scope_calloc(1, alen)) == NULL) {
             if (net) net->protoDetect = DETECT_FALSE;
             return FALSE;
         }
 
         for (i = 0; i < cvlen; i++) {
-            snprintf(&cpdata[i<<1], 3, "%02x", (unsigned char)buf[i]);
+            scope_snprintf(&cpdata[i<<1], 3, "%02x", (unsigned char)buf[i]);
         }
 
         data = cpdata;
@@ -966,10 +968,10 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
         }
 
         if (protoDef->detect && ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) {
-            if ((proto = calloc(1, sizeof(struct protocol_info_t))) == NULL)
+            if ((proto = scope_calloc(1, sizeof(struct protocol_info_t))) == NULL)
             {
                 if (cpdata)
-                    free(cpdata);
+                    scope_free(cpdata);
                 if (match_data)
                     pcre2_match_data_free(match_data);
                 return FALSE;
@@ -979,7 +981,7 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
             proto->len = sizeof(protocol_def_t);
             proto->fd = sockfd;
             if (net) proto->uid = net->uid;
-            proto->data = (char *)strdup(protoDef->protname);
+            proto->data = (char *)scope_strdup(protoDef->protname);
             cmdPostEvent(g_ctl, (char *)proto);
         }
 
@@ -990,7 +992,7 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
     }
 
     if (match_data) pcre2_match_data_free(match_data);
-    if (cpdata) free(cpdata);
+    if (cpdata) scope_free(cpdata);
 
     return ret;
 }
@@ -1041,18 +1043,18 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
         return -1;
     }
 
-    payload_info *pinfo = calloc(1, sizeof(struct payload_info_t));
+    payload_info *pinfo = scope_calloc(1, sizeof(struct payload_info_t));
     if (!pinfo) {
         return -1;
     }
 
     if (dtype == BUF) {
-        pinfo->data = calloc(1, len);
+        pinfo->data = scope_calloc(1, len);
         if (!pinfo->data) {
-            free(pinfo);
+            scope_free(pinfo);
             return -1;
         }
-        memmove(pinfo->data, buf, len);
+        scope_memmove(pinfo->data, buf, len);
     } else if (dtype == MSG) {
         int i;
         size_t blen = 0;
@@ -1061,15 +1063,15 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
         for (i = 0; i < msg->msg_iovlen; i++) {
             iov = &msg->msg_iov[i];
             if (iov && iov->iov_base && (iov->iov_len > 0)) {
-                char *temp = realloc(pinfo->data, blen + iov->iov_len);
+                char *temp = scope_realloc(pinfo->data, blen + iov->iov_len);
                 if (!temp) {
-                    if (pinfo->data) free(pinfo->data);
-                    free(pinfo);
+                    if (pinfo->data) scope_free(pinfo->data);
+                    scope_free(pinfo);
                     return -1;
                 }
 
                 pinfo->data = temp;
-                memmove(&pinfo->data[blen], iov->iov_base, iov->iov_len);
+                scope_memmove(&pinfo->data[blen], iov->iov_base, iov->iov_len);
                 blen += iov->iov_len;
             }
         }
@@ -1080,27 +1082,27 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
         struct iovec *iov = (struct iovec *)buf;
         for (i = 0; i < len; i++) {
             if (iov[i].iov_base && (iov[i].iov_len > 0)) {
-                char *temp = realloc(pinfo->data, blen + iov[i].iov_len);
+                char *temp = scope_realloc(pinfo->data, blen + iov[i].iov_len);
                 if (!temp) {
-                    if (pinfo->data) free(pinfo->data);
-                    free(pinfo);
+                    if (pinfo->data) scope_free(pinfo->data);
+                    scope_free(pinfo);
                     return -1;
                 }
 
                 pinfo->data = temp;
-                memmove(&pinfo->data[blen], iov[i].iov_base, iov[i].iov_len);
+                scope_memmove(&pinfo->data[blen], iov[i].iov_base, iov[i].iov_len);
                 blen += iov[i].iov_len;
             }
         }
         len = blen;
     } else {
         // no data, no need to continue
-        free(pinfo);
+        scope_free(pinfo);
         return -1;
     }
 
     if (net) {
-        memmove(&pinfo->net, net, sizeof(net_info));
+        scope_memmove(&pinfo->net, net, sizeof(net_info));
     } else {
         pinfo->net.active = 0;
     }
@@ -1119,8 +1121,8 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     }
 
     if (cmdPostPayload(g_ctl, (char *)pinfo) == -1) {
-        if (pinfo->data) free(pinfo->data);
-        if (pinfo) free(pinfo);
+        if (pinfo->data) scope_free(pinfo->data);
+        if (pinfo) scope_free(pinfo);
         return -1;
     }
 
@@ -1145,7 +1147,7 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
     {
         protocol_def_t *tmp_proto_def;
         if ((tmp_proto_def = lstFind(g_protlist, ptype))
-            && (strcmp(tmp_proto_def->protname, "TLS") == 0)) {
+            && (scope_strcmp(tmp_proto_def->protname, "TLS") == 0)) {
             // Use the user-provided one instead of ours
             tls_proto_def = tmp_proto_def;
             break;
@@ -1156,10 +1158,10 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
     int i;
     size_t alen = (tls_proto_def->len * 2) + 1;
     char cpdata[alen];
-    memset(cpdata, 0, alen);
+    scope_memset(cpdata, 0, alen);
     for (i = 0; i < tls_proto_def->len; i++)
     {
-        snprintf(&cpdata[i << 1], 3, "%02x", data[i]);
+        scope_snprintf(&cpdata[i << 1], 3, "%02x", data[i]);
     }
 
     // Apply the regex to the hex-string payload
@@ -1207,8 +1209,8 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
         if ((protoDef = lstFind(g_protlist, ptype)) != NULL) {
             // Remember if we see a protocol definition we have a default for.
-            sawHTTP   |= !strcasecmp(protoDef->protname, "HTTP");
-            sawSTATSD |= !strcasecmp(protoDef->protname, "STATSD");
+            sawHTTP   |= !scope_strcasecmp(protoDef->protname, "HTTP");
+            sawSTATSD |= !scope_strcasecmp(protoDef->protname, "STATSD");
             if (setProtocolByType(sockfd, protoDef, net, buf, len, dtype)) {
                 // We're done since it matched.
                 return;
@@ -1233,13 +1235,13 @@ getChannelNetEntry(uint64_t id)
 {
     net_info *net = lstFind(g_extra_net_info_list, id);
     if (!net) {
-        net = calloc(1, sizeof(net_info));
+        net = scope_calloc(1, sizeof(net_info));
         if (!net) {
             scopeLogError("ERROR: failed to allocate channel's net_info");
             DBG(NULL);
         } else {
             if (lstInsert(g_extra_net_info_list, id, net) != TRUE) {
-                free(net);
+                scope_free(net);
                 net = NULL;
                 scopeLogError("ERROR: failed to save channel's net_info");
                 DBG(NULL);
@@ -1311,13 +1313,13 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
         if (net && net->protoProtoDef) {
             // Process HTTP if detected and events are enabled
             if (cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP) &&
-               !strcasecmp(net->protoProtoDef->protname, "HTTP")) {
+               !scope_strcasecmp(net->protoProtoDef->protname, "HTTP")) {
 
                 doHttp(id, sockfd, net, buf, len, src, dtype);
             }
 
             if (cfgMtcStatsdEnable(g_cfg.staticfg) &&
-                !strcasecmp(net->protoProtoDef->protname, "STATSD")) {
+                !scope_strcasecmp(net->protoProtoDef->protname, "STATSD")) {
 
                 doMetricCapture(id, sockfd, net, buf, len, src, dtype);
             }
@@ -1435,6 +1437,17 @@ getFSContentType(int fd)
 }
 
 void
+setGoAppStateStatic(int static_state) {
+    g_go_static = static_state;
+}
+
+int
+getgoAppStateStatic(void) {
+    return g_go_static;
+}
+
+
+void
 setFSContentType(int fd, fs_content_type_t type)
 {
     struct fs_info_t *fs = getFSEntry(fd);
@@ -1455,10 +1468,10 @@ addSock(int fd, int type, int family)
 
         }
 /*
- * We need to do this realloc.
+ * We need to do this scope_realloc.
  * However, it needs to be done in such a way as to not
- * free the previous object that may be in use by a thread.
- * Possibly not use realloc. Leaving the code in place and this
+ * scope_free the previous object that may be in use by a thread.
+ * Possibly not use scope_realloc. Leaving the code in place and this
  * comment as a reminder.
         if ((fd > g_numNinfo) && (fd < MAX_FDS))  {
             int increase;
@@ -1470,19 +1483,19 @@ addSock(int fd, int type, int family)
                 increase = MAX_FDS;
             }
 
-            // Need to realloc
-            if ((temp = realloc(g_netinfo, sizeof(struct net_info_t) * increase)) == NULL) {
-                scopeLogError("fd:%d ERROR: addSock:realloc", fd);
+            // Need to scope_realloc
+            if ((temp = scope_realloc(g_netinfo, sizeof(struct net_info_t) * increase)) == NULL) {
+                scopeLogError("fd:%d ERROR: addSock:scope_realloc", fd);
                 DBG("re-alloc on Net table failed");
             } else {
-                memset(&temp[g_numNinfo], 0, sizeof(struct net_info_t) * (increase - g_numNinfo));
+                scope_memset(&temp[g_numNinfo], 0, sizeof(struct net_info_t) * (increase - g_numNinfo));
                 g_numNinfo = increase;
                 g_netinfo = temp;
             }
         }
 */
 
-        memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
+        scope_memset(&g_netinfo[fd], 0, sizeof(struct net_info_t));
         g_netinfo[fd].active = TRUE;
         g_netinfo[fd].type = type;
         g_netinfo[fd].localConn.ss_family = family;
@@ -1523,7 +1536,7 @@ doBlockConnection(int fd, const struct sockaddr *addr_arg)
         return 0;
     }
 
-    if (g_cfg.blockconn == ntohs(port)) {
+    if (g_cfg.blockconn == scope_ntohs(port)) {
         scopeLogInfo("fd:%d doBlockConnection: blocked connection", fd);
         return 1;
     }
@@ -1544,11 +1557,11 @@ doSetConnection(int sd, const struct sockaddr *addr, socklen_t len, control_type
     if (((net = getNetEntry(sd)) != NULL) && addr && (len > 0)) {
         if (endp == LOCAL) {
             if ((net->type == SOCK_STREAM) && (net->addrSetLocal == TRUE)) return;
-            memmove(&g_netinfo[sd].localConn, addr, len);
+            scope_memmove(&g_netinfo[sd].localConn, addr, len);
             if (net->type == SOCK_STREAM) net->addrSetLocal = TRUE;
         } else {
             if ((net->type == SOCK_STREAM) && (net->addrSetRemote == TRUE)) return;
-            memmove(&g_netinfo[sd].remoteConn, addr, len);
+            scope_memmove(&g_netinfo[sd].remoteConn, addr, len);
             if (net->type == SOCK_STREAM) net->addrSetRemote = TRUE;
         }
 
@@ -1593,7 +1606,7 @@ doSetAddrs(int sockfd)
 
     if ((net->type == SOCK_STREAM) || (net->type == SOCK_DGRAM)) {
         if ((net->type == SOCK_STREAM) && (net->addrSetLocal == FALSE)) {
-            if (getsockname(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
+            if (scope_getsockname(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
                 doSetConnection(sockfd, (struct sockaddr *)&addr, addrlen, LOCAL);
             }
         }
@@ -1619,12 +1632,12 @@ doAddNewSock(int sockfd)
     struct sockaddr_storage addr;
     socklen_t addrlen = sizeof(addr);
 
-    if (getsockname(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
+    if (scope_getsockname(sockfd, (struct sockaddr *)&addr, &addrlen) != -1) {
         if (addrIsNetDomain(&addr) || addrIsUnixDomain(&addr)) {
             int type;
             socklen_t len = sizeof(type);
 
-            if (getsockopt(sockfd, SOL_SOCKET, SO_TYPE, &type, &len) == 0) {
+            if (scope_getsockopt(sockfd, SOL_SOCKET, SO_TYPE, &type, &len) == 0) {
                 addSock(sockfd, type, addr.ss_family);
             } else {
                 // Really can't add the socket at this point
@@ -1777,57 +1790,15 @@ getDNSName(int sd, void *pkt, int pktlen)
 
     dnsName[dnsNameBytesUsed-1] = '\0'; // overwrite the last period
 
-    if (strncmp(dnsName, g_netinfo[sd].dnsName, dnsNameBytesUsed) == 0) {
+    if (scope_strncmp(dnsName, g_netinfo[sd].dnsName, dnsNameBytesUsed) == 0) {
         // Already sent this from an interposed function
         g_netinfo[sd].dnsSend = TRUE;
     } else {
-        strncpy(g_netinfo[sd].dnsName, dnsName, dnsNameBytesUsed);
+        scope_strncpy(g_netinfo[sd].dnsName, dnsName, dnsNameBytesUsed);
         g_netinfo[sd].dnsSend = FALSE;
     }
 
     return 0;
-}
-
-/*
- * Name server functions are available in a glibc distro
- * from libresolv. They are available in libmusl on a
- * musl based distro, no libresolv is used. So, if we
- * link to libresolv we work on a glibc distro, but
- * we fail on a musl distro. To avoid dealing with
- * that we use function pointers and populate them
- * when they are needed.
- *
- * For clarification, when the executable has a
- * dependency on libresolv the function pointers
- * are resolved at libscope constructor time.
- * Otherwise, we do an explicit dlopen to load
- * libresolv and get the addrs of the functions
- * we need. The dlopen works as libresolv is
- * located in a default lib search path.
- */
-static bool
-getNSFuncs(void)
-{
-    if (!g_fn.dlopen) return FALSE;
-
-    void *handle = g_fn.dlopen("libresolv.so", RTLD_LAZY | RTLD_NODELETE);
-    if (handle == NULL) {
-        scopeLog(CFG_LOG_DEBUG,
-                    "Could not locate libresolv, DNS events will be affected");
-        return FALSE;
-    }
-
-    if (!g_fn.ns_initparse) g_fn.ns_initparse = dlsym(handle, "ns_initparse");
-    if (!g_fn.ns_parserr) g_fn.ns_parserr = dlsym(handle, "ns_parserr");
-    dlclose(handle);
-
-    if (!g_fn.ns_initparse || !g_fn.ns_parserr) {
-        scopeLog(CFG_LOG_DEBUG,
-                    "Could not locate name server functions, DNS events will be affected");
-        return FALSE;
-    }
-
-    return TRUE;
 }
 
 #define DNSDONE(var1, var2) {if (var1) cJSON_Delete(var1); if (var2) cJSON_Delete(var2); return FALSE;}
@@ -1839,12 +1810,8 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
     ns_rr rr;
     ns_msg handle;
 
-    if (!g_fn.ns_initparse || !g_fn.ns_parserr) {
-        if (getNSFuncs() == FALSE) return FALSE;
-    }
-
     // init ns lib
-    if (g_fn.ns_initparse((const unsigned char *)buf, len, &handle) == -1) {
+    if (scope_ns_initparse((const unsigned char *)buf, len, &handle) == -1) {
         scopeLogError("ERROR:init parse");
         return FALSE;
     }
@@ -1856,7 +1823,7 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
             char ipaddr[128];
             //char dispbuf[4096];
 
-            if (g_fn.ns_parserr(&handle, ns_s_an, i, &rr) == -1) {
+            if (scope_ns_parserr(&handle, ns_s_an, i, &rr) == -1) {
                 scopeLogError("ERROR:parse rr");
                 return FALSE;
             }
@@ -1874,12 +1841,12 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
 
             // type A is IPv4, AAA is IPv6
             if (ns_rr_type(rr) == ns_t_a) {
-                if (!inet_ntop(AF_INET, (struct sockaddr_in *)rr.rdata,
+                if (!scope_inet_ntop(AF_INET, (struct sockaddr_in *)rr.rdata,
                                ipaddr, sizeof(ipaddr))) {
                     continue;
                 }
             } else if (ns_rr_type(rr) == ns_t_aaaa) {
-                if (!inet_ntop(AF_INET6, (struct sockaddr_in6 *)rr.rdata,
+                if (!scope_inet_ntop(AF_INET6, (struct sockaddr_in6 *)rr.rdata,
                                ipaddr, sizeof(ipaddr))) {
                     continue;
                 }
@@ -1888,7 +1855,7 @@ parseDNSAnswer(char *buf, size_t len, cJSON *json, cJSON *addrs, int first)
                 continue;
             }
 
-            //snprintf(dispbuf, sizeof(dispbuf), "resolved addr is %s\n", ipaddr);
+            //scope_snprintf(dispbuf, sizeof(dispbuf), "resolved addr is %s\n", ipaddr);
             //scopeLog(CFG_LOG_DEBUG, "%s", dispbuf);
 
             if (!cJSON_AddStringToObjLN(addrs, "addr", ipaddr)) {
@@ -2005,13 +1972,13 @@ doURL(int sockfd, const void *buf, size_t len, metric_t src)
     }
 
     if ((src == NETRX) && (g_netinfo[sockfd].urlRedirect == TRUE) &&
-        (len >= strlen(OVERURL))) {
+        (len >= scope_strlen(OVERURL))) {
         g_netinfo[sockfd].urlRedirect = FALSE;
         // explicit vars as it's nice to have in the debugger
         //char *sbuf = (char *)buf;
         char *url = OVERURL;
-        int urllen = strlen(url);
-        strncpy((char *)buf, url, urllen);
+        int urllen = scope_strlen(url);
+        scope_strncpy((char *)buf, url, urllen);
         return urllen;
     }
     return 0;
@@ -2167,7 +2134,7 @@ doRead(int fd, uint64_t initialTime, int success, const void *buf, ssize_t bytes
             }
         } else if (fs) {
             // Don't count data from stdin
-            if ((fd > 2) || strncmp(fs->path, "std", 3)) {
+            if ((fd > 2) || scope_strncmp(fs->path, "std", 3)) {
                 uint64_t duration = getDuration(initialTime);
                 doUpdateState(FS_DURATION, fd, duration, func, NULL);
                 doUpdateState(FS_READ, fd, bytes, func, NULL);
@@ -2200,7 +2167,7 @@ doWrite(int fd, uint64_t initialTime, int success, const void *buf, ssize_t byte
             }
         } else if (fs) {
             // Don't count data from stdout, stderr
-            if ((fd > 2) || strncmp(fs->path, "std", 3)) {
+            if ((fd > 2) || scope_strncmp(fs->path, "std", 3)) {
                 uint64_t duration = getDuration(initialTime);
                 doUpdateState(FS_DURATION, fd, duration, func, NULL);
                 doUpdateState(FS_WRITE, fd, bytes, func, NULL);
@@ -2294,7 +2261,7 @@ doDupSock(int oldfd, int newfd)
         return -1;
     }
 
-    memmove(&g_netinfo[newfd], &g_netinfo[oldfd], sizeof(struct net_info_t));
+    scope_memmove(&g_netinfo[newfd], &g_netinfo[oldfd], sizeof(struct net_info_t));
     g_netinfo[newfd].active = TRUE;
     g_netinfo[newfd].uid = getTime();
     g_netinfo[newfd].numTX = (counters_element_t){.mtc=0, .evt=0};
@@ -2400,8 +2367,8 @@ doClose(int fd, const char *func)
     // report everything before the info is lost
     reportFD(fd, EVENT_BASED);
 
-    if (ninfo) memset(ninfo, 0, sizeof(struct net_info_t));
-    if (fsinfo) memset(fsinfo, 0, sizeof(struct fs_info_t));
+    if (ninfo) scope_memset(ninfo, 0, sizeof(struct net_info_t));
+    if (fsinfo) scope_memset(fsinfo, 0, sizeof(struct fs_info_t));
 
     if (guard_enabled) while (!atomicCasU64(&g_http_guard[fd], 1ULL, 0ULL));
 }
@@ -2409,17 +2376,20 @@ doClose(int fd, const char *func)
 void
 doOpen(int fd, const char *path, fs_type_t type, const char *func)
 {
-    if (checkFSEntry(fd) == TRUE) {
+    if (fd == -1) {
+        doUpdateState(FS_ERR_OPEN_CLOSE, -1, 0, func, path);
+        return;
+    } else if (checkFSEntry(fd) == TRUE) {
         if (g_fsinfo[fd].active) {
             scopeLog(CFG_LOG_DEBUG, "fd:%d doOpen: duplicate", fd);
             DBG(NULL);
             doClose(fd, func);
         }
 /*
- * We need to do this realloc.
+ * We need to do this scope_realloc.
  * However, it needs to be done in such a way as to not
- * free the previous object that may be in use by a thread.
- * Possibly not use realloc. Leaving the code in place and this
+ * scope_free the previous object that may be in use by a thread.
+ * Possibly not use scope_realloc. Leaving the code in place and this
  * comment as a reminder.
 
         if ((fd > g_numFSinfo) && (fd < MAX_FDS))  {
@@ -2432,33 +2402,33 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
                 increase = MAX_FDS;
             }
 
-            // Need to realloc
-            if ((temp = realloc(g_fsinfo, sizeof(struct fs_info_t) * increase)) == NULL) {
-                scopeLogError("fd:%d ERROR: doOpen:realloc", fd);
+            // Need to scope_realloc
+            if ((temp = scope_realloc(g_fsinfo, sizeof(struct fs_info_t) * increase)) == NULL) {
+                scopeLogError("fd:%d ERROR: doOpen:scope_realloc", fd);
                 DBG("re-alloc on FS table failed");
             } else {
-                memset(&temp[g_numFSinfo], 0, sizeof(struct fs_info_t) * (increase - g_numFSinfo));
+                scope_memset(&temp[g_numFSinfo], 0, sizeof(struct fs_info_t) * (increase - g_numFSinfo));
                 g_fsinfo = temp;
                 g_numFSinfo = increase;
             }
         }
 */
-        memset(&g_fsinfo[fd], 0, sizeof(struct fs_info_t));
+        scope_memset(&g_fsinfo[fd], 0, sizeof(struct fs_info_t));
         g_fsinfo[fd].active = TRUE;
         g_fsinfo[fd].type = type;
         g_fsinfo[fd].uid = getTime();
-        strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
+        scope_strncpy(g_fsinfo[fd].path, path, sizeof(g_fsinfo[fd].path));
 
         if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_FS) && ctlEnhanceFs(g_ctl)) {
             struct stat sbuf;
-            int errsave = errno;
+            int errsave = scope_errno;
 
-            if ((g_fn.__xstat) && (g_fn.__xstat(1, g_fsinfo[fd].path, &sbuf) == 0)) {
+            if (scope_stat(g_fsinfo[fd].path, &sbuf) == 0) {
                 g_fsinfo[fd].fuid = sbuf.st_uid;
                 g_fsinfo[fd].fgid = sbuf.st_gid;
                 g_fsinfo[fd].mode = sbuf.st_mode;
             }
-            errno = errsave;
+            scope_errno = errsave;
         }
 
         doUpdateState(FS_OPEN, fd, 0, func, path);

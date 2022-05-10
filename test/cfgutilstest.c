@@ -11,18 +11,18 @@
 #include "fn.h"
 #include "com.h"
 #include "cfgutils.h"
+#include "scopestdlib.h"
 #include "test.h"
 #include "dbg.h"
 
 #define MAX_PATH 1024
 
-
 static void
 openFileAndExecuteCfgProcessCommands(const char* path, config_t* cfg)
 {
-    FILE* f = fopen(path, "r");
+    FILE* f = scope_fopen(path, "r");
     cfgProcessCommands(cfg, f);
-    fclose(f);
+    scope_fclose(f);
 }
 
 static void
@@ -32,13 +32,13 @@ cfgPathHonorsEnvVar(void** state)
 
     // grab the current working directory
     char origdir[MAX_PATH];
-    assert_non_null(getcwd(origdir, sizeof(origdir)));
+    assert_non_null(scope_getcwd(origdir, sizeof(origdir)));
     // create newdir, and switch to it
     char newdir[MAX_PATH + 12];
 
-    snprintf(newdir, sizeof(newdir), "%s/%s", origdir, "newdir");
-    assert_int_equal(mkdir(newdir, 0777), 0);
-    assert_int_equal(chdir(newdir), 0);
+    scope_snprintf(newdir, sizeof(newdir), "%s/%s", origdir, "newdir");
+    assert_int_equal(scope_mkdir(newdir, 0777), 0);
+    assert_int_equal(scope_chdir(newdir), 0);
 
 
     // Verify that if there is no env variable, cfgPath is null
@@ -49,21 +49,21 @@ cfgPathHonorsEnvVar(void** state)
     assert_null(cfgPath());
 
     // Verify that if there is an env variable, and a file, cfgPath is defined
-    int fd = open(file_path, O_RDWR | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
-    assert_return_code(fd, errno);
+    int fd = scope_open(file_path, O_RDWR | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
+    assert_return_code(fd, scope_errno);
     char* path = cfgPath();
     assert_non_null(path);
     assert_string_equal(path, file_path);
 
     // cleanup
-    free(path);
-    unlink(file_path);
+    scope_free(path);
+    scope_unlink(file_path);
     assert_int_equal(unsetenv("SCOPE_CONF_PATH"), 0);
 
     // change back to origdir
-    assert_int_equal(chdir(origdir), 0);
+    assert_int_equal(scope_chdir(origdir), 0);
     // Delete the directory we created
-    assert_int_equal(rmdir(newdir), 0);
+    assert_int_equal(scope_rmdir(newdir), 0);
 }
 
 /*
@@ -837,8 +837,8 @@ cfgProcessCommandsCmdDebugIsProcessed(void** state)
     // since it's not processed, the file position should be updated
     assert_int_not_equal(file_pos_before, file_pos_after);
 
-    unlink(inpath);
-    if (file_pos_after != -1) unlink(outpath);
+    scope_unlink(inpath);
+    if (file_pos_after != -1) scope_unlink(outpath);
 }
 
 static void
@@ -1870,8 +1870,8 @@ jsonObjectFromCfgAndjsonStringFromCfgRoundTrip(void** state)
     g_prot_sequence = 0;
     cJSON_Delete(json1);
     cJSON_Delete(json2);
-    free(stringified_json1);
-    free(stringified_json2);
+    scope_free(stringified_json1);
+    scope_free(stringified_json2);
 }
 
 
@@ -2043,8 +2043,8 @@ initProc(const char *procname, const char *cmdline, const char *hostname)
     strncpy(g_proc.hostname, hostname, sizeof(g_proc.hostname));
     strncpy(g_proc.procname, procname, sizeof(g_proc.procname));
 
-    if (g_proc.cmd) { free(g_proc.cmd); g_proc.cmd = NULL; }
-    if (cmdline) g_proc.cmd = strdup(cmdline);
+    if (g_proc.cmd) { scope_free(g_proc.cmd); g_proc.cmd = NULL; }
+    if (cmdline) g_proc.cmd = scope_strdup(cmdline);
 }
 
 static void

@@ -9,6 +9,7 @@
 #include "plattime.h"
 #include "search.h"
 #include "atomic.h"
+#include "scopestdlib.h"
 
 #define MIN_HDR_ALLOC (4  * 1024)
 #define MAX_HDR_ALLOC (16 * 1024)
@@ -47,19 +48,20 @@ setHttpState(http_state_t *httpstate, http_enum_t toState)
         case HTTP_NONE:
             // cleanup the stash for the RX and TX sides
             if (httpstate->http2Buf.buf) {
-                free(httpstate->http2Buf.buf);
+                scope_free(httpstate->http2Buf.buf);
                 httpstate->http2Buf.buf = NULL;
             }
             httpstate->http2Buf.len = 0;
             httpstate->http2Buf.size = 0;
             if (httpstate->hdr) {
-                free(httpstate->hdr);
+                scope_free(httpstate->hdr);
                 httpstate->hdr = NULL;
             }
+
             httpstate->hdrlen = 0;
             httpstate->hdralloc = 0;
             httpstate->clen = 0;
-            memset(&(httpstate->id), 0, sizeof(httpId_t));
+            scope_memset(&(httpstate->id), 0, sizeof(httpId_t));
             break;
         case HTTP_HDR:
         case HTTP_HDREND:
@@ -91,9 +93,9 @@ appendHeader(http_state_t *httpstate, char* buf, size_t len)
         }
     }
 
-    // If we need more space, realloc
+    // If we need more space, scope_realloc
     if (alloc_size != httpstate->hdralloc) {
-        char* temp = realloc(httpstate->hdr, alloc_size);
+        char* temp = scope_realloc(httpstate->hdr, alloc_size);
         if (!temp) {
             DBG(NULL);
             // Don't return partial headers...  All or nothing.
@@ -105,7 +107,7 @@ appendHeader(http_state_t *httpstate, char* buf, size_t len)
     }
 
     // Append the data
-    memcpy(&httpstate->hdr[httpstate->hdrlen], buf, len);
+    scope_memcpy(&httpstate->hdr[httpstate->hdrlen], buf, len);
     httpstate->hdrlen += len;
 }
 
@@ -130,9 +132,9 @@ getContentLength(char *header, size_t len)
     PCRE2_UCHAR *cLen; PCRE2_SIZE cLenLen;
     pcre2_substring_get_bynumber(matches, 1, &cLen, &cLenLen);
 
-    errno = 0;
-    size_t ret = strtoull((const char *)cLen, NULL, 0);
-    if ((errno != 0) || (ret == 0)) {
+    scope_errno = 0;
+    size_t ret = scope_strtoull((const char *)cLen, NULL, 0);
+    if ((scope_errno != 0) || (ret == 0)) {
         ret = -1;
     }
 
@@ -231,13 +233,13 @@ reportHttp1(http_state_t *httpstate)
 {
     if (!httpstate || !httpstate->hdr || !httpstate->hdrlen) return -1;
 
-    protocol_info *proto = calloc(1, sizeof(struct protocol_info_t));
-    http_post *post = calloc(1, sizeof(struct http_post_t));
+    protocol_info *proto = scope_calloc(1, sizeof(struct protocol_info_t));
+    http_post *post = scope_calloc(1, sizeof(struct http_post_t));
     if (!proto || !post) {
         // Bummer!  We're losing info.  At least make sure we clean up.
         DBG(NULL);
-        if (post) free(post);
-        if (proto) free(proto);
+        if (post) scope_free(post);
+        if (proto) scope_free(proto);
         return -1;
     }
 
@@ -257,12 +259,12 @@ reportHttp1(http_state_t *httpstate)
     if ((net = getNetEntry(proto->fd))) {
         proto->sock_type = net->type;
         if (net->addrSetLocal) {
-            memcpy(&proto->localConn, &net->localConn, sizeof(struct sockaddr_storage));
+            scope_memcpy(&proto->localConn, &net->localConn, sizeof(struct sockaddr_storage));
         } else {
             proto->localConn.ss_family = -1;
         }
         if (net->addrSetRemote) {
-            memcpy(&proto->remoteConn, &net->remoteConn, sizeof(struct sockaddr_storage));
+            scope_memcpy(&proto->remoteConn, &net->remoteConn, sizeof(struct sockaddr_storage));
         } else {
             proto->remoteConn.ss_family = -1;
         }
@@ -299,7 +301,7 @@ reportHttp2(http_state_t *state, net_info *net, http_buf_t *stash,
         return FALSE;
     }
 
-    http_post *post = calloc(1, sizeof(struct http_post_t));
+    http_post *post = scope_calloc(1, sizeof(struct http_post_t));
     if (!post) {
         scopeLogError("ERROR: failed to allocate post object");
         DBG(NULL);
@@ -308,24 +310,24 @@ reportHttp2(http_state_t *state, net_info *net, http_buf_t *stash,
     post->ssl            = state->id.isSsl;
     post->start_duration = getTime();
     post->id             = state->id.uid;
-    post->hdr            = malloc(frameLen);
+    post->hdr            = scope_malloc(frameLen);
     if (!post->hdr) {
-        free(post);
+        scope_free(post);
         scopeLogError("ERROR: failed to allocate post data");
         DBG(NULL);
         return FALSE;
     }
     if (stash->len) {
-        memcpy(post->hdr, stash->buf, stash->len);
-        memcpy(post->hdr + stash->len, buf, frameLen - stash->len);
+        scope_memcpy(post->hdr, stash->buf, stash->len);
+        scope_memcpy(post->hdr + stash->len, buf, frameLen - stash->len);
     } else {
-        memcpy(post->hdr, buf, frameLen);
+        scope_memcpy(post->hdr, buf, frameLen);
     }
 
-    protocol_info *proto = calloc(1, sizeof(struct protocol_info_t));
+    protocol_info *proto = scope_calloc(1, sizeof(struct protocol_info_t));
     if (!proto) {
-        free(post->hdr);
-        free(post);
+        scope_free(post->hdr);
+        scope_free(post);
         scopeLogError("ERROR: failed to allocate protocol object");
         DBG(NULL);
         return FALSE;
@@ -345,12 +347,12 @@ reportHttp2(http_state_t *state, net_info *net, http_buf_t *stash,
     if (net) {
         proto->sock_type = net->type;
         if (net->addrSetLocal) {
-            memcpy(&proto->localConn, &net->localConn, sizeof(struct sockaddr_storage));
+            scope_memcpy(&proto->localConn, &net->localConn, sizeof(struct sockaddr_storage));
         } else {
             proto->localConn.ss_family = -1;
         }
         if (net->addrSetRemote) {
-            memcpy(&proto->remoteConn, &net->remoteConn, sizeof(struct sockaddr_storage));
+            scope_memcpy(&proto->remoteConn, &net->remoteConn, sizeof(struct sockaddr_storage));
         } else {
             proto->remoteConn.ss_family = -1;
         }
@@ -511,9 +513,9 @@ http2StashFrame(http_buf_t *stash, const uint8_t *buf, size_t len)
     // need to store the `len` we're given plus whatever's already stashed
     size_t need = len + stash->len;
     if (need > stash->size) {
-        // round up to the next 1k boundary and realloc
+        // round up to the next 1k boundary and scope_realloc
         need = ((need + 1023) / 1024) * 1024;
-        uint8_t *newBuf = realloc(stash->buf, need);
+        uint8_t *newBuf = scope_realloc(stash->buf, need);
         if (!newBuf) {
             scopeLogError("ERROR: failed to (re)allocate frame buffer");
             DBG(NULL);
@@ -524,7 +526,7 @@ http2StashFrame(http_buf_t *stash, const uint8_t *buf, size_t len)
     }
 
     // append what we're given to the stash
-    memcpy(stash->buf + stash->len, buf, len);
+    scope_memcpy(stash->buf + stash->len, buf, len);
     stash->len += len;
 }
 
@@ -675,7 +677,7 @@ parseHttp2(http_state_t* state, net_info *net, int isTx,
     http_buf_t    *stash  = &state->http2Buf;       // stash for partial frames
     while (bufLen > 0) {
         // skip over MAGIC
-        if (bufLen >= HTTP2_MAGIC_LEN && !strncmp((char*)buf, HTTP2_MAGIC, HTTP2_MAGIC_LEN)) {
+        if (bufLen >= HTTP2_MAGIC_LEN && !scope_strncmp((char*)buf, HTTP2_MAGIC, HTTP2_MAGIC_LEN)) {
             bufPos += HTTP2_MAGIC_LEN;
             bufLen -= HTTP2_MAGIC_LEN;
             if (!bufLen) return FALSE;
@@ -744,7 +746,7 @@ doHttpBuffer(http_state_t states[HTTP_NUM], net_info *net, char *buf, size_t len
     // detect HTTP version
     if (state->version == 0) {
         // Detect HTTP/2 by looking for the "magic" string at the start
-        if (len >= HTTP2_MAGIC_LEN && !strncmp(buf, HTTP2_MAGIC, HTTP2_MAGIC_LEN)) {
+        if (len >= HTTP2_MAGIC_LEN && !scope_strncmp(buf, HTTP2_MAGIC, HTTP2_MAGIC_LEN)) {
             states[HTTP_RX].version = 2;
             states[HTTP_TX].version = 2;
 

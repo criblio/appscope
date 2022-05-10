@@ -8,9 +8,9 @@
 #include <unistd.h>
 #include "dbg.h"
 #include "mtcformat.h"
+#include "scopestdlib.h"
 
 #include "test.h"
-
 
 static void
 mtcFormatCreateReturnsValidPtrForGoodFormat(void** state)
@@ -142,7 +142,7 @@ mtcFormatEventForOutputNullEventFieldsDoesntCrash(void** state)
     mtc_fmt_t* fmt = mtcFormatCreate(CFG_FMT_STATSD);
     char* msg = mtcFormatEventForOutput(fmt, &e, NULL);
     assert_string_equal(msg, "useful.apps:1|g\n");
-    if (msg) free(msg);
+    if (msg) scope_free(msg);
     mtcFormatDestroy(&fmt);
 }
 
@@ -193,7 +193,7 @@ mtcFormatEventForOutputHappyPathStatsd(void** state)
          g_openPorts, g_procname, pid, fd, g_hostname, proto, localPort);
     assert_true(rv > 0 && rv < 1024);
     assert_string_equal(expected, msg);
-    free(msg);
+    scope_free(msg);
 
     mtcFormatDestroy(&fmt);
     assert_null(fmt);
@@ -253,7 +253,7 @@ mtcFormatEventForOutputHappyPathJson(void** state)
     assert_true(cJSON_HasObjectItem(body, "_time"));
 
     cJSON_Delete(json);
-    free(msg);
+    scope_free(msg);
 
     mtcFormatDestroy(&fmt);
     assert_null(fmt);
@@ -313,7 +313,7 @@ mtcFormatEventForOutputJsonWithCustomFields(void** state)
     assert_true(cJSON_HasObjectItem(body, "_time"));
 
     cJSON_Delete(json);
-    free(msg);
+    scope_free(msg);
 
     mtcFormatDestroy(&fmt);
     assert_null(fmt);
@@ -358,7 +358,7 @@ mtcFormatEventForOutputHappyPathFilteredFields(void** state)
          g_openPorts, g_procname, pid, proto, localPort);
     assert_true(rv > 0 && rv < 1024);
     assert_string_equal(expected, msg);
-    free(msg);
+    scope_free(msg);
 
     regfree(&re);
     mtcFormatDestroy(&fmt);
@@ -382,7 +382,7 @@ mtcFormatEventForOutputWithCustomFields(void** state)
     assert_non_null(msg);
 
     assert_string_equal("statsd.metric:3|g|#name1:value1,name2:value2\n", msg);
-    free(msg);
+    scope_free(msg);
     mtcFormatDestroy(&fmt);
 }
 
@@ -406,7 +406,7 @@ mtcFormatEventForOutputWithCustomAndStatsdFields(void** state)
     assert_non_null(msg);
 
     assert_string_equal("fs.read:3|g|#tag:value,proc:test\n", msg);
-    free(msg);
+    scope_free(msg);
     mtcFormatDestroy(&fmt);
 }
 
@@ -423,7 +423,7 @@ mtcFormatEventForOutputReturnsNullIfSpaceIsInsufficient(void** state)
     assert_non_null(msg);
     assert_string_equal(msg, "98A:-1234567890123456789|ms\n");
     assert_true(strlen(msg) == 28);
-    free(msg);
+    scope_free(msg);
 
     // One character too much (longer name)
     event_t e2 = INT_EVENT("AB", e1.value.integer, e1.type, e1.fields);
@@ -445,7 +445,7 @@ mtcFormatEventForOutputReturnsNullIfSpaceIsInsufficientMax(void** state)
     assert_non_null(msg);
     assert_string_equal(msg, "98A:-179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.00|ms\n");
     assert_true(strlen(msg) == 2+1+315+3);
-    free(msg);
+    scope_free(msg);
 
     // One character too much (longer name)
     event_t e2 = FLT_EVENT("AB", e1.value.floating, e1.type, e1.fields);
@@ -480,7 +480,7 @@ mtcFormatEventForOutputVerifyEachStatsDType(void** state)
                 assert_string_equal(msg, "A:1|s\n");
                 break;
         }
-        free(msg);
+        scope_free(msg);
     }
 
     assert_int_equal(dbgCountMatchingLines("src/mtcformat.c"), 0);
@@ -488,7 +488,7 @@ mtcFormatEventForOutputVerifyEachStatsDType(void** state)
     // In undefined case, just don't crash...
     event_t e = INT_EVENT("A", 1, SET+1, NULL);
     char* msg = mtcFormatEventForOutput(fmt, &e, NULL);
-    if (msg) free(msg);
+    if (msg) scope_free(msg);
 
     assert_int_equal(dbgCountMatchingLines("src/mtcformat.c"), 1);
     dbgInit(); // reset dbg for the rest of the tests
@@ -527,13 +527,13 @@ mtcFormatEventForOutputOmitsFieldsIfSpaceIsInsufficient(void** state)
     //                        1234567890123456789012345678901
     //                       "metric:1|c|#J:222,I:V,H:111,G:W,F:321,E:X,D:654"
     assert_string_equal(msg, "metric:1|c|#J:222,I:V,H:111\n");
-    free(msg);
+    scope_free(msg);
 
     mtcFormatStatsDMaxLenSet(fmt, 32);
     msg = mtcFormatEventForOutput(fmt, &e, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "metric:1|c|#J:222,I:V,H:111,G:W\n");
-    free(msg);
+    scope_free(msg);
 
     mtcFormatDestroy(&fmt);
 }
@@ -561,13 +561,13 @@ mtcFormatEventForOutputHonorsCardinality(void** state)
     char* msg = mtcFormatEventForOutput(fmt, &e, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "metric:1|c|#A:Z\n");
-    free(msg);
+    scope_free(msg);
 
     mtcFormatVerbositySet(fmt, 5);
     msg = mtcFormatEventForOutput(fmt, &e, NULL);
     assert_non_null(msg);
     assert_string_equal(msg, "metric:1|c|#A:Z,B:987,C:Y,D:654,E:X,F:321\n");
-    free(msg);
+    scope_free(msg);
 
     mtcFormatVerbositySet(fmt, 9);
     msg = mtcFormatEventForOutput(fmt, &e, NULL);
@@ -580,7 +580,7 @@ mtcFormatEventForOutputHonorsCardinality(void** state)
         count++;
     }
     assert_true(count == 10);
-    free(msg);
+    scope_free(msg);
 
     mtcFormatDestroy(&fmt);
 }
@@ -624,15 +624,15 @@ fmtUrlEncodeDecodeRoundTrip(void** state)
         assert_non_null(decoded);
         assert_string_equal(decoded, test->decoded);
 
-        free(encoded);
-        free(decoded);
+        scope_free(encoded);
+        scope_free(decoded);
     }
 
     // Verify lower case hex nibbles are tolerated
     char* decoded = fmtUrlDecode("bar%7cpound%23colon%3aampersand%40comma%2cend");
     assert_non_null(decoded);
     assert_string_equal(decoded, "bar|pound#colon:ampersand@comma,end");
-    free(decoded);
+    scope_free(decoded);
 }
 
 static void
@@ -671,7 +671,7 @@ fmtUrlDecodeToleratesBadData(void** state)
         assert_int_equal(dbgCountMatchingLines("src/mtcformat.c"), 1);
         dbgInit(); // reset dbg for the rest of the tests
 
-        free(decoded);
+        scope_free(decoded);
     }
 }
 

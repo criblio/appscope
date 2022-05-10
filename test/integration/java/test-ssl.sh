@@ -84,7 +84,20 @@ evalPayload(){
     return $PAYLOADERR
 }
 
+evalInternalEvents(){
+    echo "Testing that eventsdon't contain internal events for $CURRENT_TEST"
+    # verify that we don't scope event from ourselves
+    # periodic -> mtcConnect -> transportConnect -> socketConnectionStart -> getAddressList
+    count=$(grep -E '"source":"fs.open".*"file":"/etc/hosts"' $EVT_FILE | wc -l)
+    if [ $count -ne 0 ] ; then
+        ERR+=1
+    fi
 
+    count=$(grep -E '"source":"fs.close".*"file":"/etc/hosts"' $EVT_FILE | wc -l)
+    if [ $count -ne 0 ] ; then
+        ERR+=1
+    fi
+}
 
 starttest Tomcat
 ldscope /opt/tomcat/bin/catalina.sh run &
@@ -185,6 +198,8 @@ ERR+=$?
 grep -q net.close $EVT_FILE > /dev/null
 ERR+=$?
 
+evalInternalEvents
+
 kill -9 ${HTTP_SERVER_PID}
 
 endtest
@@ -210,17 +225,13 @@ ERR+=$?
 grep -q http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
-grep -q fs.open $EVT_FILE > /dev/null
-ERR+=$?
-
-grep -q fs.close $EVT_FILE > /dev/null
-ERR+=$?
-
 grep -q net.open $EVT_FILE > /dev/null
 ERR+=$?
 
 grep -q net.close $EVT_FILE > /dev/null
 ERR+=$?
+
+evalInternalEvents
 
 kill -9 ${HTTP_SERVER_PID}
 
@@ -259,6 +270,8 @@ ERR+=$?
 
 grep -q net.close $EVT_FILE > /dev/null
 ERR+=$?
+
+evalInternalEvents
 
 kill -9 ${HTTP_SERVER_PID}
 sleep 1

@@ -10,6 +10,7 @@
 #include "cfgutils.h"
 #include "state.h"
 #include "fn.h"
+#include "scopestdlib.h"
 #include "test.h"
 
 #define BUFSIZE 500
@@ -189,10 +190,10 @@ ctlParseRxMsgSetCfgWithoutDataObjectReturnsParamErr(void** state)
 
     const char** test;
     for (test=body; *test; test++) {
-        assert_return_code(asprintf(&msg, base, *test), errno);
+        assert_return_code(scope_asprintf(&msg, base, *test), scope_errno);
         //printf("%s\n", msg);
         request_t* req = ctlParseRxMsg(msg);
-        free(msg);
+        scope_free(msg);
         assert_non_null(req);
 
         // body is missing, so expect REQ_PARAM_ERR
@@ -271,10 +272,10 @@ ctlParseRxMsgSetCfg(void** state)
     const char** test;
     int run=1;
     for (test=body; *test; test++) {
-        assert_return_code(asprintf(&msg, base, *test), errno);
+        assert_return_code(scope_asprintf(&msg, base, *test), errno);
         //printf("%s\n", msg);
         request_t* req = ctlParseRxMsg(msg);
-        free(msg);
+        scope_free(msg);
         assert_non_null(req);
 
         // body exists! expect REQ_SET_CFG, and non-null req->cfg
@@ -492,7 +493,7 @@ ctlCreateTxMsgInfo(void** state)
         "{\"type\":\"info\",\"body\":\"yeah, dude\"}";
     assert_string_equal(msg, expected_msg);
 
-    free(msg);
+    scope_free(msg);
 }
 
 typedef struct {
@@ -591,7 +592,7 @@ ctlCreateTxMsgResp(void** state)
             assert_null(strstr(tx_msg, "\"message\":"));
         }
 
-        free(tx_msg);
+        scope_free(tx_msg);
         destroyReq(&upload.req);
     }
 
@@ -602,7 +603,7 @@ ctlCreateTxMsgResp(void** state)
     //printf("%s\n", tx_msg);
     assert_non_null(tx_msg);
     assert_non_null(strstr(tx_msg, "\"body\":\"Gnarly\""));
-    free(tx_msg);
+    scope_free(tx_msg);
     destroyReq(&upload.req);
 }
 
@@ -627,14 +628,14 @@ ctlCreateTxMsgEvt(void** state)
         "{\"type\":\"evt\",\"_channel\":\"none\",\"body\":\"yeah, dude\"}";
     assert_string_equal(msg, expected_msg);
 
-    free(msg);
+    scope_free(msg);
 }
 
 
 static void
 ctlSendMsgForNullMtcDoesntCrash(void** state)
 {
-    char* msg = strdup("Hey, this is cool!\n");
+    char* msg = scope_strdup("Hey, this is cool!\n");
     ctlSendMsg(NULL, msg);
 }
 
@@ -670,7 +671,7 @@ ctlTransportSetAndMtcSend(void** state)
     // Test that transport is set by testing side effects of ctlSendMsg
     // affecting the file at file_path when connected to a file transport.
     long file_pos_before = fileEndPosition(file_path);
-    char* msg = strdup("Something to send\n");
+    char* msg = scope_strdup("Something to send\n");
     ctlSendMsg(ctl, msg);
 
     // With CFG_BUFFER_FULLY, this output only happens with the flush
@@ -684,12 +685,12 @@ ctlTransportSetAndMtcSend(void** state)
     // Test that transport is cleared by seeing no side effects.
     ctlTransportSet(ctl, NULL, CFG_CTL);
     file_pos_before = fileEndPosition(file_path);
-    msg = strdup("Something else to send\n");
+    msg = scope_strdup("Something else to send\n");
     ctlSendMsg(ctl, msg);
     file_pos_after = fileEndPosition(file_path);
     assert_int_equal(file_pos_before, file_pos_after);
 
-    if (unlink(file_path))
+    if (scope_unlink(file_path))
         fail_msg("Couldn't delete file %s", file_path);
 
     ctlDestroy(&ctl);
@@ -755,14 +756,14 @@ ctlSendLogConsoleNoneAsciiData(void **state)
 {
     initState();
     const char* console_path = "stdout";
-    char* non_basic_ascii_text = malloc(sizeof(char)*4);
+    char* non_basic_ascii_text = scope_malloc(sizeof(char)*4);
     assert_true(non_basic_ascii_text);
     non_basic_ascii_text[0] = 128;
     non_basic_ascii_text[1] = 157;
     non_basic_ascii_text[2] = 234;
-    non_basic_ascii_text[3] = '0';
+    non_basic_ascii_text[3] = '\0';
 
-    const char* binary_data_event_msg = "Binary data detected--- message";
+    const char* binary_data_event_msg = "-- binary data ignored --";
     proc_id_t proc = {.pid = 1,
                       .ppid = 1,
                       .hostname = "foo",
@@ -778,9 +779,28 @@ ctlSendLogConsoleNoneAsciiData(void **state)
     ctlSendLog(ctl, STDOUT_FILENO, console_path, non_basic_ascii_text, strlen(non_basic_ascii_text), 0, &proc);
     ctlFlushLog(ctl);
     const char *val = get_cbuf_data();
+    assert_string_not_equal(non_basic_ascii_text, val);
     assert_string_equal(binary_data_event_msg, val);
-    free(non_basic_ascii_text);
     ctlDestroy(&ctl);
+
+    // do this again, with ALLOW_BINARY true
+    // and verify that the binary_data_event_msg does *not* appear.
+    memset(cbuf_data, '\0', sizeof(cbuf_data));
+
+    setenv("SCOPE_ALLOW_BINARY_CONSOLE", "true", 1);
+    ctl = ctlCreate();
+    assert_non_null(ctl);
+    b_res = ctlEvtSourceEnabled(ctl, CFG_SRC_CONSOLE);
+    assert_true(b_res);
+    ctlSendLog(ctl, STDOUT_FILENO, console_path, non_basic_ascii_text, strlen(non_basic_ascii_text), 0, &proc);
+    ctlFlushLog(ctl);
+    val = get_cbuf_data();
+    assert_string_not_equal(binary_data_event_msg, val);
+    assert_string_equal(non_basic_ascii_text, val);
+    ctlDestroy(&ctl);
+    unsetenv("SCOPE_ALLOW_BINARY_CONSOLE");
+
+    scope_free(non_basic_ascii_text);
     allow_copy_buf_data(FALSE);
 }
 

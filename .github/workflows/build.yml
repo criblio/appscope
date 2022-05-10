@@ -40,7 +40,7 @@ jobs:
     steps:
       # Clone the repo
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # This defines a number of outputs based on the tag being built if there
       # is one. We'll use the outputs in other places.
@@ -179,10 +179,10 @@ jobs:
 
       # Clone the repos
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Login to Dockerhub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           username: scopeci
           password: ${{ secrets.SCOPECI_TOKEN }}
@@ -192,17 +192,17 @@ jobs:
       # needed here since we're only building natively but we're leaving it in
       # since it'll be done by our build system anyway.
       - name: Setup QEMU
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v2
 
       # Start a BuildX builder. We'll use the outputs later so give it an ID.
       - name: Setup Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       # We'll tell BuildX to `--cache-from` this folder to speed up the build
       # of our `appscope-builder` image. 
       - name: Setup Docker Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3.0.2
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-buildx-${{ github.sha }}
@@ -210,7 +210,7 @@ jobs:
 
       # Cache downloaded Go dependencies.
       - name: Setup Go Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3.0.2
         with:
           path: |
             ~/.cache/go-build
@@ -224,7 +224,7 @@ jobs:
       # Cache the cmocka build. Use a key based on a hash of all the files used
       # in the build.
       - name: Setup cmocka Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3.0.2
         with:
           path: contrib/build/cmocka
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-cmocka-${{ hashFiles('contrib/Makefile', 'contrib/cmocka/**') }}
@@ -233,7 +233,7 @@ jobs:
       # Cache the funchook build. Use a key based on a hash of all the files
       # used in the build.
       - name: Setup funchook Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3.0.2
         with:
           path: contrib/build/funchook
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-funchook-${{ hashFiles('contrib/Makefile', 'contrib/funchook/**') }}
@@ -242,7 +242,7 @@ jobs:
       # Cache the funchook build. Use a key based on a hash of all the files
       # used in the build.
       - name: Setup pcre2 Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3.0.2
         with:
           path: contrib/build/pcre2
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-pcre2-${{ hashFiles('contrib/Makefile', 'contrib/cpre2/**') }}
@@ -251,7 +251,7 @@ jobs:
       # Cache the openssl build. Use a key based on a hash of all the files
       # used in the build.
       - name: Setup openssl Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3.0.2
         with:
           path: contrib/build/openssl
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-openssl-${{ hashFiles('contrib/Makefile', 'contrib/openssl/**') }}
@@ -260,14 +260,23 @@ jobs:
       # Cache the ls-hpack build. Use a key based on a hash of all the files
       # used in the build.
       - name: Setup ls-hpack Cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3.0.2
         with:
           path: contrib/build/ls-hpack
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-ls-hpack-${{ hashFiles('contrib/Makefile', 'contrib/ls-hpack/**') }}
           upload-chunk-size: 1000000
 
+      # Cache the musl build. Use a key based on a hash of all the files
+      # used in the build.
+      - name: Setup musl Cache
+        uses: actions/cache@v2
+        with:
+          path: contrib/build/musl
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-musl-${{ hashFiles('contrib/Makefile', 'contrib/musl/**') }}
+          upload-chunk-size: 1000000
+
       - name: Login to Dockerhub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           username: scopeci
           password: ${{ secrets.SCOPECI_TOKEN }}
@@ -311,7 +320,7 @@ jobs:
       # artifact name for this job as well as the other job for ARM. The result
       # is a single artifact with binaries from both jobs.
       - name: Upload Binaries
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: binaries
           path: |
@@ -341,11 +350,11 @@ jobs:
     steps:
       # Clone the repos
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # Download the built binaries
       - name: Download Binaries
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: binaries
 
@@ -427,10 +436,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Download Binaries
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: binaries
 
@@ -440,14 +449,14 @@ jobs:
       # We skip this step if we're not going to push the resulting container image
       - name: Login to Container Registry
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to Dockerhub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           username: scopeci
           password: ${{ secrets.SCOPECI_TOKEN }}
@@ -475,10 +484,10 @@ jobs:
     runs-on: [self-hosted,ARM64]
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Download Binaries
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: binaries
 
@@ -487,14 +496,14 @@ jobs:
 
       - name: Login to Container Registry
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to Dockerhub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           username: scopeci
           password: ${{ secrets.SCOPECI_TOKEN }}
@@ -517,26 +526,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Setup QEMU
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v2
 
       - name: Setup Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
 
       # We skip this step if we're not going to push the resulting container image
       - name: Login to Container Registry
         # TODO only if needs.test-*.results == 'success'
         if: ${{ needs.info.outputs.push == 'true' }}
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         with:
           username: scopeci
           password: ${{ secrets.SCOPECI_TOKEN }}
 
       - name: Download Binaries
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: binaries
 

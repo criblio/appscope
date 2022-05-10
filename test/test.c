@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include "scopestdlib.h"
 #include "dbg.h"
 #include "test.h"
 
@@ -39,27 +40,27 @@ dbgHasNoUnexpectedFailures(void** state)
 void
 dbgDumpAllToBuffer(char* buf, int size)
 {
-    FILE* f = fmemopen(buf, size, "a+");
+    FILE* f = scope_fmemopen(buf, size, "a+");
     assert_non_null(f);
     dbgDumpAll(f);
-    if (ftell(f) >= size) {
+    if (scope_ftell(f) >= size) {
         fail_msg("size of %d was inadequate for dbgDumpAllToBuffer, "
-                 "%ld was needed", size, ftell(f));
+                 "%ld was needed", size, scope_ftell(f));
     }
-    if (fclose(f)) fail_msg("Couldn't close fmemopen'd file");
+    if (scope_fclose(f)) fail_msg("Couldn't close fmemopen'd file");
 }
 
 int
 writeFile(const char* path, const char* text)
 {
-    FILE* f = fopen(path, "w");
+    FILE* f = scope_fopen(path, "w");
     if (!f)
         fail_msg("Couldn't open file");
 
-    if (!fwrite(text, strlen(text), 1, f))
+    if (!scope_fwrite(text, scope_strlen(text), 1, f))
         fail_msg("Couldn't write file");
 
-    if (fclose(f))
+    if (scope_fclose(f))
         fail_msg("Couldn't close file");
 
     return 0;
@@ -68,17 +69,17 @@ writeFile(const char* path, const char* text)
 int
 deleteFile(const char* path)
 {
-    return unlink(path);
+    return scope_unlink(path);
 }
 
 long
 fileEndPosition(const char* path)
 {
     FILE* f;
-    if ((f = fopen(path, "r"))) {
-        fseek(f, 0, SEEK_END);
-        long pos = ftell(f);
-        fclose(f);
+    if ((f = scope_fopen(path, "r"))) {
+        scope_fseek(f, 0, SEEK_END);
+        long pos = scope_ftell(f);
+        scope_fclose(f);
         return pos;
     }
     return -1;

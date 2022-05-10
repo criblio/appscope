@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include "scopestdlib.h"
 #include "utils.h"
 #include "fn.h"
 #include "dbg.h"
@@ -16,7 +17,7 @@ strToVal(enum_map_t map[], const char *str)
 {
     enum_map_t *m;
     for (m=map; m->str; m++) {
-        if (!strcmp(str, m->str)) return m->val;
+        if (!scope_strcmp(str, m->str)) return m->val;
     }
     return -1;
 }
@@ -36,16 +37,13 @@ checkEnv(char *env, char *val)
 {
     char *estr;
     if (((estr = getenv(env)) != NULL) &&
-       (strncmp(estr, val, strlen(estr)) == 0)) {
+       (scope_strncmp(estr, val, scope_strlen(estr)) == 0)) {
         return TRUE;
     }
     return FALSE;
 }
 
-/*
- * Handling the case where there can be 2 instances
- * of setenv; 1) libc and 2) application.
- */
+
 int
 fullSetenv(const char *key, const char *val, int overwrite)
 {
@@ -69,7 +67,7 @@ void
 setPidEnv(int pid)
 {
     char val[32];
-    int returnval = snprintf(val, sizeof(val), "%d", pid);
+    int returnval = scope_snprintf(val, sizeof(val), "%d", pid);
     if (returnval >= sizeof(val) || returnval == -1) {
         DBG("returnval = %d", returnval);
         return;
@@ -104,61 +102,61 @@ getpath(const char *cmd)
     // an absolute path was specified for cmd.
     if (cmd[0] == '/') {
         //  If we can resolve it, use it.
-        if (!stat(cmd, &buf) && S_ISREG(buf.st_mode) && (buf.st_mode & 0111)) {
-            ret_val = strdup(cmd);
+        if (!scope_stat(cmd, &buf) && S_ISREG(buf.st_mode) && (buf.st_mode & 0111)) {
+            ret_val = scope_strdup(cmd);
         }
         goto out;
     }
 
     // a relative path was specified for cmd.
-    if (strchr(cmd, '/')) {
-        char *cur_dir = get_current_dir_name();
+    if (scope_strchr(cmd, '/')) {
+        char *cur_dir = scope_get_current_dir_name();
         if (!cur_dir) goto out;
 
         char *path = NULL;
-        if (asprintf(&path, "%s/%s", cur_dir, cmd) > 0) {
+        if (scope_asprintf(&path, "%s/%s", cur_dir, cmd) > 0) {
             // If we can resolve it, use it
-            if (!stat(path, &buf) && S_ISREG(buf.st_mode) && (buf.st_mode & 0111)) {
+            if (!scope_stat(path, &buf) && S_ISREG(buf.st_mode) && (buf.st_mode & 0111)) {
                 ret_val = path;
             } else {
-                free(path);
+                scope_free(path);
             }
         }
-        free(cur_dir);
+        scope_free(cur_dir);
         goto out;
     }
 
     // try the current dir
     char *path = NULL;
-    if (asprintf(&path, "./%s", cmd) > 0) {
-        if (!stat(path, &buf) && S_ISREG(buf.st_mode) && (buf.st_mode & 0111)) {
+    if (scope_asprintf(&path, "./%s", cmd) > 0) {
+        if (!scope_stat(path, &buf) && S_ISREG(buf.st_mode) && (buf.st_mode & 0111)) {
             ret_val = path;
             goto out;
         } else {
-            free(path);
+            scope_free(path);
         }
     }
 
     // try to resolve the cmd from PATH env variable
     char *path_env_ptr = getenv("PATH");
     if (!path_env_ptr) goto out;
-    path_env = strdup(path_env_ptr); // create a copy for strtok below
+    path_env = scope_strdup(path_env_ptr); // create a copy for strtok below
     if (!path_env) goto out;
 
     char *saveptr = NULL;
-    char *strtok_path = strtok_r(path_env, ":", &saveptr);
+    char *strtok_path = scope_strtok_r(path_env, ":", &saveptr);
     if (!strtok_path) goto out;
 
     do {
         char *path = NULL;
-        if (asprintf(&path, "%s/%s", strtok_path, cmd) < 0) {
+        if (scope_asprintf(&path, "%s/%s", strtok_path, cmd) < 0) {
             break;
         }
-        if ((stat(path, &buf) == -1) ||    // path doesn't exist
+        if ((scope_stat(path, &buf) == -1) ||    // path doesn't exist
             (!S_ISREG(buf.st_mode)) ||     // path isn't a file
             ((buf.st_mode & 0111) == 0)) { // path isn't executable
 
-            free(path);
+            scope_free(path);
             continue;
         }
 
@@ -166,10 +164,10 @@ getpath(const char *cmd)
         ret_val = path;
         break;
 
-    } while ((strtok_path = strtok_r(NULL, ":", &saveptr)));
+    } while ((strtok_path = scope_strtok_r(NULL, ":", &saveptr)));
 
 out:
-    if (path_env) free(path_env);
+    if (path_env) scope_free(path_env);
     return ret_val;
 }
 #endif //__APPLE__
@@ -179,34 +177,29 @@ int
 startsWith(const char *string, const char *substring)
 {
     if (!string || !substring) return FALSE;
-    return (strncmp(string, substring, strlen(substring)) == 0);
+    return (scope_strncmp(string, substring, scope_strlen(substring)) == 0);
 }
 
 int
 endsWith(const char *string, const char *substring)
 {
     if (!string || !substring) return FALSE;
-    int stringlen = strlen(string);
-    int sublen = strlen(substring);
+    int stringlen = scope_strlen(string);
+    int sublen = scope_strlen(substring);
     return (sublen <= stringlen) &&
-       ((strncmp(&string[stringlen-sublen], substring, sublen)) == 0);
+       ((scope_strncmp(&string[stringlen-sublen], substring, sublen)) == 0);
 }
 
 int
 sigSafeNanosleep(const struct timespec *req)
 {
-    if (!g_fn.nanosleep) {
-        DBG(NULL);
-        return -1;
-    }
-
     struct timespec time = *req;
     int rv;
 
     // If we're interrupted, sleep again for whatever time remains
     do {
-        rv = g_fn.nanosleep(&time, &time);
-    } while (rv && (errno == EINTR));
+        rv = scope_nanosleep(&time, &time);
+    } while (rv && (scope_errno == EINTR));
 
     return rv;
 }

@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <link.h>
 
+#include "scopestdlib.h"
 #include "dbg.h"
 #include "utils.h"
 #include "fn.h"
@@ -114,7 +115,7 @@ getAddr(struct dl_phdr_info *info, size_t size, void *data)
 
     ares->out_addr = NULL;
 
-    if (strstr(info->dlpi_name, "librt.so") == NULL) return 0;
+    if (scope_strstr(info->dlpi_name, "librt.so") == NULL) return 0;
 
     // can we find the symbol in this object
     void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);

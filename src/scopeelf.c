@@ -6,19 +6,17 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include "dbg.h"
+#include "scopestdlib.h"
 #include "os.h"
 #include "fn.h"
 #include "scopeelf.h"
-
-#define GOPCLNTAB_MAGIC_112 0xfffffffb
-#define GOPCLNTAB_MAGIC_116 0xfffffffa
 
 void
 freeElf(char *buf, size_t len)
 {
     if (!buf) return;
 
-    if (munmap(buf, len) == -1) {
+    if (scope_munmap(buf, len) == -1) {
         scopeLogError("freeElf: munmap failed");
     }
 }
@@ -38,7 +36,7 @@ setTextSizeAndLenFromElf(elf_buf_t *ebuf)
     for (i = 0; i < ehdr->e_shnum; i++) {
         sec_name = section_strtab + sections[i].sh_name;
 
-        if (!strcmp(sec_name, ".text")) {
+        if (!scope_strcmp(sec_name, ".text")) {
             ebuf->text_addr = (unsigned char *)sections[i].sh_addr;
             ebuf->text_len = sections[i].sh_size;
             scopeLog(CFG_LOG_DEBUG, "%s:%d %s addr %p - %p\n", __FUNCTION__, __LINE__,
@@ -62,7 +60,7 @@ app_type(char *buf, const uint32_t sh_type, const char *sh_name)
     for (i = 0; i < ehdr->e_shnum; i++) {
         sec_name = section_strtab + sections[i].sh_name;
         //printf("section %s type = %d \n", sec_name, sections[i].sh_type);
-        if (sections[i].sh_type == sh_type && strcmp(sec_name, sh_name) == 0) {
+        if (sections[i].sh_type == sh_type && scope_strcmp(sec_name, sh_name) == 0) {
             return TRUE;
         }
     }
@@ -83,7 +81,7 @@ getElfSection(char *buf, const char *sh_name)
 
     for (i = 0; i < ehdr->e_shnum; i++) {
         sec_name = section_strtab + sections[i].sh_name;
-        if (strcmp(sec_name, sh_name) == 0) {
+        if (scope_strcmp(sec_name, sh_name) == 0) {
             return &sections[i];
         }
     }
@@ -99,31 +97,27 @@ getElf(char *path)
     struct stat sbuf;
     int get_elf_successful = FALSE;
 
-    if (!g_fn.open || !g_fn.close) {
-        scopeLogError("getElf: open/close can't be found");
-        goto out;
-    }
 
-    if ((ebuf = calloc(1, sizeof(elf_buf_t))) == NULL) {
+    if ((ebuf = scope_calloc(1, sizeof(elf_buf_t))) == NULL) {
         scopeLogError("getElf: memory alloc failed");
         goto out;
     }
 
-    if ((fd = g_fn.open(path, O_RDONLY)) == -1) {
+    if ((fd = scope_open(path, O_RDONLY)) == -1) {
         scopeLogError("getElf: open failed");
         goto out;
     }
 
-    if (fstat(fd, &sbuf) == -1) {
+    if (scope_fstat(fd, &sbuf) == -1) {
         scopeLogError("fd:%d getElf: fstat failed", fd);
         goto out;
     }
 
 
-    char * mmap_rv = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
+    char * mmap_rv = scope_mmap(NULL, ROUND_UP(sbuf.st_size, scope_sysconf(_SC_PAGESIZE)),
                           PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
     if (mmap_rv == MAP_FAILED) {
-        scopeLogError("fd:%d getElf: mmap failed", fd);
+        scopeLogError("fd:%d getElf: scope_mmap failed", fd);
         goto out;
     }
 
@@ -133,7 +127,7 @@ getElf(char *path)
 
     elf = (Elf64_Ehdr *)ebuf->buf;
     if((elf->e_ident[EI_MAG0] != 0x7f) ||
-       strncmp((char *)&elf->e_ident[EI_MAG1], "ELF", 3) ||
+       scope_strncmp((char *)&elf->e_ident[EI_MAG1], "ELF", 3) ||
        (elf->e_ident[EI_CLASS] != ELFCLASS64) ||
        (elf->e_ident[EI_DATA] != ELFDATA2LSB)) {
         scopeLogError("fd:%d %s:%d ERROR: %s is not a viable ELF file\n",
@@ -152,10 +146,10 @@ getElf(char *path)
     get_elf_successful = TRUE;
 
 out:
-    if (fd != -1) g_fn.close(fd);
+    if (fd != -1) scope_close(fd);
     if (!get_elf_successful && ebuf) {
         freeElf(ebuf->buf, ebuf->len);
-        free(ebuf);
+        scope_free(ebuf);
         ebuf = NULL;
     }
     return ebuf;
@@ -187,17 +181,17 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
          * symbol table at the program header table level. This is not needed at
          * runtime as the symbol lookup always go through the hash table; ELF64_R_SYM.
          */
-        if (!strcmp(sym[ELF64_R_SYM(rel[i].r_info)].st_name + str, hook->symbol)) {
+        if (!scope_strcmp(sym[ELF64_R_SYM(rel[i].r_info)].st_name + str, hook->symbol)) {
             uint64_t *gfn = hook->gfn;
             uint64_t *gaddr = (uint64_t *)(rel[i].r_offset + lm->l_addr);
-            int page_size = getpagesize();
+            int page_size = scope_getpagesize();
             size_t saddr = ROUND_DOWN((size_t)gaddr, page_size);
             int prot = osGetPageProt((uint64_t)gaddr);
 
             if (prot != -1) {
                 if ((prot & PROT_WRITE) == 0) {
                     // mprotect if write perms are not set
-                    if (mprotect((void *)saddr, (size_t)16, PROT_WRITE | prot) == -1) {
+                    if (scope_mprotect((void *)saddr, (size_t)16, PROT_WRITE | prot) == -1) {
                         scopeLog(CFG_LOG_DEBUG, "doGotcha: mprotect failed");
                         return -1;
                     }
@@ -227,7 +221,7 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
 
             if ((prot & PROT_WRITE) == 0) {
                 // if we didn't mod above leave prot settings as is
-                if (mprotect((void *)saddr, (size_t)16, prot) == -1) {
+                if (scope_mprotect((void *)saddr, (size_t)16, prot) == -1) {
                     scopeLog(CFG_LOG_DEBUG, "doGotcha: mprotect failed");
                     return -1;
                 }
@@ -313,7 +307,7 @@ getSymbol(const char *buf, char *sname)
         if (sections[i].sh_type == SHT_SYMTAB) {
             symtab = (Elf64_Sym *)((char *)buf + sections[i].sh_offset);
             nsyms = sections[i].sh_size / sections[i].sh_entsize;
-        } else if (sections[i].sh_type == SHT_STRTAB && strcmp(sec_name, ".strtab") == 0) {
+        } else if (sections[i].sh_type == SHT_STRTAB && scope_strcmp(sec_name, ".strtab") == 0) {
             strtab = (const char *)(buf + sections[i].sh_offset);
         }
 
@@ -329,7 +323,7 @@ getSymbol(const char *buf, char *sname)
     }
 
     for (i=0; i < nsyms; i++) {
-        if (strcmp(sname, strtab + symtab[i].st_name) == 0) {
+        if (scope_strcmp(sname, strtab + symtab[i].st_name) == 0) {
             symaddr = symtab[i].st_value;
             scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", strtab + symtab[i].st_name, symtab[i].st_value);
             break;
@@ -337,123 +331,6 @@ getSymbol(const char *buf, char *sname)
     }
 
     return (void *)symaddr;
-}
-
-void *
-getGoSymbol(const char *buf, char *sname)
-{
-    int i;
-    Elf64_Addr symaddr = 0;
-    Elf64_Ehdr *ehdr;
-    Elf64_Shdr *sections;
-    const char *section_strtab = NULL;
-    const char *sec_name = NULL;
-
-    if (!buf || !sname) return NULL;
-
-    ehdr = (Elf64_Ehdr *)buf;
-    sections = (Elf64_Shdr *)((char *)buf + ehdr->e_shoff);
-    section_strtab = (char *)buf + sections[ehdr->e_shstrndx].sh_offset;
-
-    for (i = 0; i < ehdr->e_shnum; i++) {
-        sec_name = section_strtab + sections[i].sh_name;
-        if (strcmp(".gopclntab", sec_name) == 0) {
-            const void *pclntab_addr = buf + sections[i].sh_offset;
-            /*
-            Go symbol table is stored in the .gopclntab section
-            More info: https://docs.google.com/document/d/1lyPIbmsYbXnpNj57a261hgOYVpNRcgydurVQIyZOz_o/pub
-            */
-            uint32_t magic = *((const uint32_t *)(pclntab_addr));
-            if (magic == GOPCLNTAB_MAGIC_112) {
-                uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
-                const void *symtab_addr = pclntab_addr + 16;
-
-                for(i=0; i<sym_count; i++) {
-                    uint64_t sym_addr     = *((const uint64_t *)(symtab_addr));
-                    uint64_t func_offset  = *((const uint64_t *)(symtab_addr + 8));
-                    uint32_t name_offset  = *((const uint32_t *)(pclntab_addr + func_offset + 8));
-                    const char *func_name = (const char *)(pclntab_addr + name_offset);
-
-                    if (strcmp(sname, func_name) == 0) {
-                        symaddr = sym_addr;
-                        scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
-                        break;
-                    }
-                    symtab_addr += 16;
-                }
-            } else if (magic == GOPCLNTAB_MAGIC_116) {
-                uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
-                uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (3 * 8)));
-                uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (7 * 8)));
-                const void *symtab_addr = pclntab_addr + pclntab_offset;
-                for (i = 0; i < sym_count; i++) {
-                    uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
-                    uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
-                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 8));
-                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
-                    if (strcmp(sname, func_name) == 0) {
-                        symaddr = sym_addr;
-                        scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
-                        break;
-                    }
-                    symtab_addr += 16;
-                }
-            } else {
-                scopeLog(CFG_LOG_DEBUG, "Invalid header in .gopclntab");
-                break;
-            }
-            break;
-        }
-    }
-
-    return (void *)symaddr;
-}
-
-void *
-getGoVersionAddr(const char* buf)
-{
-    int i;
-    Elf64_Ehdr *ehdr;
-    Elf64_Shdr *sections;
-    const char *section_strtab = NULL;
-    const char *sec_name;
-    const char *sec_data;
-
-    ehdr = (Elf64_Ehdr *)buf;
-    sections = (Elf64_Shdr *)(buf + ehdr->e_shoff);
-    section_strtab = (char *)buf + sections[ehdr->e_shstrndx].sh_offset;
-    const char magic[0xe] = "\xff Go buildinf:";
-    void *go_build_ver_addr = NULL;
- 
-    for (i = 0; i < ehdr->e_shnum; i++) {
-        sec_name = section_strtab + sections[i].sh_name;
-        sec_data = (const char *)buf + sections[i].sh_offset;
-        // Since go1.13, the .go.buildinfo section has been added to
-        // identify where runtime.buildVersion exists, for the case where
-        // go apps have been stripped of their symbols.
-
-        // offset into sec_data     field contents
-        // -----------------------------------------------------------
-        // 0x0                      build info magic = "\xff Go buildinf:"
-        // 0xe                      binary ptrSize
-        // 0xf                      endianness
-        // 0x10                     pointer to string runtime.buildVersion
-        // 0x10 + ptrSize           pointer to runtime.modinfo
-        // 0x10 + 2 * ptr size      pointer to build flags
-
-        if (!strcmp(sec_name, ".go.buildinfo") &&
-            (sections[i].sh_size >= 0x18) &&
-            (!memcmp(&sec_data[0], magic, sizeof(magic))) &&
-            (sec_data[0xe] == 0x08) &&  // 64 bit executables only
-            (sec_data[0xf] == 0x00)) {  // little-endian
-
-            uint64_t *addressPtr = (uint64_t*)&sec_data[0x10];
-
-            go_build_ver_addr = (void*)*addressPtr;
-        }
-    }
-
-    return go_build_ver_addr;
 }
 
 bool
@@ -496,13 +373,13 @@ is_musl(char *buf)
         if ((phead[i].p_type == PT_INTERP)) {
             char *exld = (char *)&buf[phead[i].p_offset];
 
-            ldso = strdup(exld);
+            ldso = scope_strdup(exld);
             if (ldso) {
-                if (strstr(ldso, "musl") != NULL) {
-                    free(ldso);
+                if (scope_strstr(ldso, "musl") != NULL) {
+                    scope_free(ldso);
                     return TRUE;
                 }
-                free(ldso);
+                scope_free(ldso);
             } else {
                 DBG(NULL); // not expected
             }

@@ -4,7 +4,7 @@ OUTFILE=/tmp/free.out
 
 i=0
 echo $HEADERS > $OUTFILE
-while [[ $i -lt 20 ]]; do
+while [[ $i -lt 100 ]]; do
     if [[ $i -ne 0 ]]; then
         sleep 1
     fi

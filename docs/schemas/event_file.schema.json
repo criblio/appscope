@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/event_file.schema.json",
+  "type": "object",
+  "title": "AppScope `file` Event",
+  "description": "Structure of the `file` event",
+  "examples": [{"type":"evt","id":"ubuntu-sh- /usr/bin/which /usr/bin/firefox","_channel":"13468365092424","body":{"sourcetype":"file","_time":1643735941.602952,"source":"/var/log/firefox.log","host":"ubuntu","proc":"sh","cmd":"/bin/sh /usr/bin/which /usr/bin/firefox","pid":6545,"data":{"message":"/usr/bin/firefox\n"}}}],
+  "required": [
+    "type",
+    "id",
+    "_channel",
+    "body"
+  ],
+  "properties": {
+    "type": {
+      "$ref": "definitions/envelope.schema.json#/$defs/event_type"
+    },
+    "id": {
+      "$ref": "definitions/envelope.schema.json#/$defs/id"
+    },
+    "_channel": {
+      "$ref": "definitions/envelope.schema.json#/$defs/_channel"
+    },
+    "body": {
+      "title": "body",
+      "description": "body",
+      "type": "object",
+      "required": [
+        "sourcetype",
+        "_time",
+        "source",
+        "host",
+        "proc",
+        "cmd",
+        "pid",
+        "data"
+      ],
+      "properties": {
+        "sourcetype": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcetypefile"
+        },
+        "_time": {
+          "$ref": "definitions/body.schema.json#/$defs/_time"
+        },
+        "source": {
+          "$ref": "definitions/body.schema.json#/$defs/sourcefile"
+        },
+        "host": {
+          "$ref": "definitions/data.schema.json#/$defs/host"
+        },
+        "proc": {
+          "$ref": "definitions/data.schema.json#/$defs/proc"
+        },
+        "cmd": {
+          "$ref": "definitions/body.schema.json#/$defs/cmd"
+        },
+        "pid": {
+          "$ref": "definitions/data.schema.json#/$defs/pid"
+        },
+        "data": {
+          "title": "data",
+          "description": "data",
+          "type": "object",
+          "properties": {
+            "message": {
+              "$ref": "definitions/data.schema.json#/$defs/message"
+            }
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

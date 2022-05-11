@@ -48,16 +48,6 @@ services:
       - 8000:8000
     <<: *scope-common
 
-  # skipped on ARM - not supported yet
-  bash:
-    image: ghcr.io/criblio/appscope-test-bash:${TAG:?Missing TAG environment variable}
-    build:
-      cache_from:
-        - ghcr.io/criblio/appscope-test-bash:${TAG:?Missing TAG environment variable}
-      context: .
-      dockerfile: ./bash/Dockerfile
-    <<: *scope-common
-
   # There are no arm64 golang images at Docker Hub for these versions of Go
   go_2:
     image: ghcr.io/criblio/appscope-test-go_2:${TAG:?Missing TAG environment variable}

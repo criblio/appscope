@@ -42,26 +42,32 @@ typedef struct {
     int c_tls_client_write_rc;
     int c_tls_client_read_callee;
     int c_tls_client_read_pc;
+    int c_http2_client_read_callee;
+    int c_http2_client_read_fr;
+    int c_http2_client_read_cc;
     int c_http2_client_write_callee;
     int c_http2_client_write_tcpConn;
     int c_http2_client_write_buf;
     int c_http2_client_write_rc;
 } go_arg_offsets_t;
 
-typedef struct {                  // Structure               Field       Offset
-    int g_to_m;                   // "runtime.g"             "m"        "48"
-    int m_to_tls;                 // "runtime.m"             "tls"      "136"
-    int connReader_to_conn;       // "net/http.connReader"   "conn"     "0"
-    int conn_to_tlsState;         // "net/http.conn"         "tlsState" "48"
-    int persistConn_to_conn;      // "net/http.persistConn"  "conn"     "88"
-    int persistConn_to_bufrd;     // "net/http.persistConn"  "br"       "104"
-    int iface_data;               // "runtime.iface"         "data"     "8"
-    int netfd_to_pd;              // "net.netFD"             "pfd"      "0"
-    int pd_to_fd;                 // "internal/poll.FD"      "sysfd"    "16"
-    int netfd_to_sysfd;           // "net.netFD"             "sysfd"    "16"
-    int bufrd_to_buf;             // "bufio/Reader"          "buf"      "0"
-    int conn_to_rwc;              // "net/http.conn"         "rwc"      "0"
-    int persistConn_to_tlsState;  // "net/http.persistConn"  "tlsState" "96"
+typedef struct {                  // Structure                  Field      
+    int g_to_m;                   // "runtime.g"                "m"        
+    int m_to_tls;                 // "runtime.m"                "tls"      
+    int connReader_to_conn;       // "net/http.connReader"      "conn"     
+    int conn_to_tlsState;         // "net/http.conn"            "tlsState" 
+    int persistConn_to_conn;      // "net/http.persistConn"     "conn"     
+    int persistConn_to_bufrd;     // "net/http.persistConn"     "br"       
+    int iface_data;               // "runtime.iface"            "data"     
+    int netfd_to_pd;              // "net.netFD"                "pfd"      
+    int pd_to_fd;                 // "internal/poll.FD"         "sysfd"    
+    int netfd_to_sysfd;           // "net.netFD"                "sysfd"    
+    int bufrd_to_buf;             // "bufio/Reader"             "buf"      
+    int conn_to_rwc;              // "net/http.conn"            "rwc"      
+    int persistConn_to_tlsState;  // "net/http.persistConn"     "tlsState" 
+    int fr_to_readBuf;            // "net/http.http2Framer"     "readBuf" 
+    int fr_to_rc;                 // "net/http.http2Framer"     "readBuf"     
+    int cc_to_tconn;              // "net/http.http2ClientConn" "tconn"
 } go_struct_offsets_t;
 
 typedef struct {
@@ -90,7 +96,7 @@ typedef struct {
 typedef void (*assembly_fn)(void);
 
 extern go_schema_t *g_go_schema;
-extern go_schema_t go_12_schema;
+extern go_schema_t go_8_schema;
 extern go_schema_t go_17_schema;
 extern go_arg_offsets_t g_go_arg;
 extern go_struct_offsets_t g_go_struct;
@@ -115,6 +121,7 @@ extern void go_hook_tls_server_read(void);
 extern void go_hook_tls_server_write(void);
 extern void go_hook_tls_client_read(void);
 extern void go_hook_tls_client_write(void);
+extern void go_hook_http2_client_read(void);
 extern void go_hook_http2_client_write(void);
 extern void go_hook_exit(void);
 extern void go_hook_die(void);
@@ -131,6 +138,7 @@ extern void go_hook_reg_tls_server_read(void);
 extern void go_hook_reg_tls_server_write(void);
 extern void go_hook_reg_tls_client_read(void);
 extern void go_hook_reg_tls_client_write(void);
+extern void go_hook_reg_http2_client_read(void);
 extern void go_hook_reg_http2_client_write(void);
 
 #endif // __GOTCONTEXT_H__

@@ -105,10 +105,11 @@
     interpose go_hook_accept4, go_accept4
     interpose go_hook_read, go_read
     interpose go_hook_close, go_close
-    interpose go_hook_tls_read, go_tls_read
-    interpose go_hook_tls_write, go_tls_write
-    interpose go_hook_readResponse, go_readResponse
-    interpose go_hook_pc_write, go_pc_write
+    interpose go_hook_tls_server_read, go_tls_server_read
+    interpose go_hook_tls_server_write, go_tls_server_write
+    interpose go_hook_tls_client_read, go_tls_client_read
+    interpose go_hook_tls_client_write, go_tls_client_write
+    interpose go_hook_http2_client_write, go_http2_client_write
     interpose go_hook_exit, go_exit
     interpose go_hook_die, go_die
 
@@ -120,10 +121,11 @@
     interpose_regs go_hook_reg_accept4, go_accept4
     interpose_regs go_hook_reg_read, go_read
     interpose_regs go_hook_reg_close, go_close
-    interpose_regs go_hook_reg_tls_read, go_tls_read
-    interpose_regs go_hook_reg_tls_write, go_tls_write
-    interpose_regs go_hook_reg_pc_write, go_pc_write
-    interpose_regs go_hook_reg_readResponse, go_readResponse
+    interpose_regs go_hook_reg_tls_server_read, go_tls_server_read
+    interpose_regs go_hook_reg_tls_server_write, go_tls_server_write
+    interpose_regs go_hook_reg_tls_client_read, go_tls_client_read
+    interpose_regs go_hook_reg_tls_client_write, go_tls_client_write
+    interpose_regs go_hook_reg_http2_client_write, go_http2_client_write
 
 /*
     Debug hint:

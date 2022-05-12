@@ -43,6 +43,7 @@
 static void
 setGoHttpEnvVariable(void)
 {
+#if 0
     if (checkEnv("SCOPE_GO_HTTP1", "false") == TRUE) return;
 
     char *cur_val = getenv(GO_ENV_VAR);
@@ -83,6 +84,7 @@ setGoHttpEnvVariable(void)
         }
         if (new_val) scope_free(new_val);
     }
+#endif
 }
 
 static void

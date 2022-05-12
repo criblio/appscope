@@ -28,20 +28,24 @@ typedef struct {
     int c_accept4_addr;
     int c_accept4_addrlen;
     int c_accept4_sd_out;
-    int c_http_server_read_callee;
-    int c_http_server_read_connReader;
-    int c_http_server_read_buf;
-    int c_http_server_read_rc;
-    int c_http_server_write_callee;
-    int c_http_server_write_conn;
-    int c_http_server_write_buf;
-    int c_http_server_write_rc;
-    int c_http_client_write_callee;
-    int c_http_client_write_w_pc;
-    int c_http_client_write_buf;
-    int c_http_client_write_rc;
-    int c_http_client_read_callee;
-    int c_http_client_read_pc;
+    int c_tls_server_read_callee;
+    int c_tls_server_read_connReader;
+    int c_tls_server_read_buf;
+    int c_tls_server_read_rc;
+    int c_tls_server_write_callee;
+    int c_tls_server_write_conn;
+    int c_tls_server_write_buf;
+    int c_tls_server_write_rc;
+    int c_tls_client_write_callee;
+    int c_tls_client_write_w_pc;
+    int c_tls_client_write_buf;
+    int c_tls_client_write_rc;
+    int c_tls_client_read_callee;
+    int c_tls_client_read_pc;
+    int c_http2_client_write_callee;
+    int c_http2_client_write_tcpConn;
+    int c_http2_client_write_buf;
+    int c_http2_client_write_rc;
 } go_arg_offsets_t;
 
 typedef struct {                  // Structure               Field       Offset
@@ -86,7 +90,7 @@ typedef struct {
 typedef void (*assembly_fn)(void);
 
 extern go_schema_t *g_go_schema;
-extern go_schema_t go_16_schema;
+extern go_schema_t go_12_schema;
 extern go_schema_t go_17_schema;
 extern go_arg_offsets_t g_go_arg;
 extern go_struct_offsets_t g_go_struct;
@@ -107,10 +111,11 @@ extern void go_hook_socket(void);
 extern void go_hook_accept4(void);
 extern void go_hook_read(void);
 extern void go_hook_close(void);
-extern void go_hook_tls_read(void);
-extern void go_hook_tls_write(void);
-extern void go_hook_readResponse(void);
-extern void go_hook_pc_write(void);
+extern void go_hook_tls_server_read(void);
+extern void go_hook_tls_server_write(void);
+extern void go_hook_tls_client_read(void);
+extern void go_hook_tls_client_write(void);
+extern void go_hook_http2_client_write(void);
 extern void go_hook_exit(void);
 extern void go_hook_die(void);
 
@@ -122,9 +127,10 @@ extern void go_hook_reg_socket(void);
 extern void go_hook_reg_accept4(void);
 extern void go_hook_reg_read(void);
 extern void go_hook_reg_close(void);
-extern void go_hook_reg_tls_read(void);
-extern void go_hook_reg_tls_write(void);
-extern void go_hook_reg_readResponse(void);
-extern void go_hook_reg_pc_write(void);
+extern void go_hook_reg_tls_server_read(void);
+extern void go_hook_reg_tls_server_write(void);
+extern void go_hook_reg_tls_client_read(void);
+extern void go_hook_reg_tls_client_write(void);
+extern void go_hook_reg_http2_client_write(void);
 
 #endif // __GOTCONTEXT_H__

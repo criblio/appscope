@@ -39,24 +39,25 @@ int g_go_major_ver = UNKNOWN_GO_VER;
 static char g_go_build_ver[7];
 
 enum index_hook_t {
-    INDEX_HOOK_WRITE            = 0,
-    INDEX_HOOK_OPEN             = 1,
-    INDEX_HOOK_UNLINKAT         = 2,
-    INDEX_HOOK_GETDENTS         = 3,
-    INDEX_HOOK_SOCKET           = 4,
-    INDEX_HOOK_ACCEPT           = 5,
-    INDEX_HOOK_READ             = 6,
-    INDEX_HOOK_CLOSE            = 7,
-    INDEX_HOOK_TLS_SERVER_READ  = 8,
-    INDEX_HOOK_TLS_SERVER_WRITE = 9,
-    INDEX_HOOK_TLS_CLIENT_READ  = 10,
-    INDEX_HOOK_TLS_CLIENT_WRITE = 11,
-    INDEX_HOOK_EXIT             = 12,
-    INDEX_HOOK_DIE              = 13,
-    INDEX_HOOK_MAX              = 14
+    INDEX_HOOK_WRITE,
+    INDEX_HOOK_OPEN,
+    INDEX_HOOK_UNLINKAT,
+    INDEX_HOOK_GETDENTS,
+    INDEX_HOOK_SOCKET,
+    INDEX_HOOK_ACCEPT,
+    INDEX_HOOK_READ,
+    INDEX_HOOK_CLOSE,
+    INDEX_HOOK_TLS_SERVER_READ,
+    INDEX_HOOK_TLS_SERVER_WRITE,
+    INDEX_HOOK_TLS_CLIENT_READ,
+    INDEX_HOOK_TLS_CLIENT_WRITE,
+    INDEX_HOOK_HTTP2_CLIENT_WRITE,
+    INDEX_HOOK_EXIT,
+    INDEX_HOOK_DIE,
+    INDEX_HOOK_MAX,
 };
 
-go_schema_t go_16_schema = {
+go_schema_t go_12_schema = {
     .arg_offsets = {
         .c_write_fd=0x8,
         .c_write_buf=0x10,
@@ -91,20 +92,24 @@ go_schema_t go_16_schema = {
         // approach to always grab arguments from the Caller, and always
         // grab return values from the Callee.
 
-        .c_http_server_read_callee=0x0,
-        .c_http_server_read_connReader=0x8,
-        .c_http_server_read_buf=0x10,
-        .c_http_server_read_rc=0x28,
-        .c_http_server_write_callee=0x0,
-        .c_http_server_write_conn=0x8,
-        .c_http_server_write_buf=0x10,
-        .c_http_server_write_rc=0x28,
-        .c_http_client_write_callee=0x0,
-        .c_http_client_write_w_pc=0x8,
-        .c_http_client_write_buf=0x10,
-        .c_http_client_write_rc=0x28,
-        .c_http_client_read_callee=0x0,
-        .c_http_client_read_pc=0x8,
+        .c_tls_server_read_callee=0x0,
+        .c_tls_server_read_connReader=0x8,
+        .c_tls_server_read_buf=0x10,
+        .c_tls_server_read_rc=0x28,
+        .c_tls_server_write_callee=0x0,
+        .c_tls_server_write_conn=0x8,
+        .c_tls_server_write_buf=0x10,
+        .c_tls_server_write_rc=0x28,
+        .c_tls_client_write_callee=0x0,
+        .c_tls_client_write_w_pc=0x8,
+        .c_tls_client_write_buf=0x10,
+        .c_tls_client_write_rc=0x28,
+        .c_tls_client_read_callee=0x0,
+        .c_tls_client_read_pc=0x8,
+        .c_http2_client_write_callee=0x40,
+        .c_http2_client_write_tcpConn=0x50,
+        .c_http2_client_write_buf=0x8,
+        .c_http2_client_write_rc=0x10,
     },
     .struct_offsets = {
         .g_to_m=0x30,
@@ -122,21 +127,22 @@ go_schema_t go_16_schema = {
         .persistConn_to_tlsState=0x60,
     },
     .tap = {
-        [INDEX_HOOK_WRITE]            = {"syscall.write",                        go_hook_write,        NULL, 0},
-        [INDEX_HOOK_OPEN]             = {"syscall.openat",                       go_hook_open,         NULL, 0},
-        [INDEX_HOOK_UNLINKAT]         = {"syscall.unlinkat",                     go_hook_unlinkat,     NULL, 0},
-        [INDEX_HOOK_GETDENTS]         = {"syscall.Getdents",                     go_hook_getdents,     NULL, 0},
-        [INDEX_HOOK_SOCKET]           = {"syscall.socket",                       go_hook_socket,       NULL, 0},
-        [INDEX_HOOK_ACCEPT]           = {"syscall.accept4",                      go_hook_accept4,      NULL, 0},
-        [INDEX_HOOK_READ]             = {"syscall.read",                         go_hook_read,         NULL, 0},
-        [INDEX_HOOK_CLOSE]            = {"syscall.Close",                        go_hook_close,        NULL, 0},
-        [INDEX_HOOK_TLS_SERVER_READ]  = {"net/http.(*connReader).Read",          go_hook_tls_read,     NULL, 0},
-        [INDEX_HOOK_TLS_SERVER_WRITE] = {"net/http.checkConnErrorWriter.Write",  go_hook_tls_write,    NULL, 0},
-        [INDEX_HOOK_TLS_CLIENT_READ]  = {"net/http.(*persistConn).readResponse", go_hook_readResponse, NULL, 0}, 
-        [INDEX_HOOK_TLS_CLIENT_WRITE] = {"net/http.persistConnWriter.Write",     go_hook_pc_write,     NULL, 0},
-        [INDEX_HOOK_EXIT]             = {"runtime.exit",                         go_hook_exit,         NULL, 0},
-        [INDEX_HOOK_DIE]              = {"runtime.dieFromSignal",                go_hook_die,          NULL, 0},
-        [INDEX_HOOK_MAX]              = {"TAP_TABLE_END",                        NULL,                 NULL, 0}
+        [INDEX_HOOK_WRITE]              = {"syscall.write",                        go_hook_write,              NULL, 0},
+        [INDEX_HOOK_OPEN]               = {"syscall.openat",                       go_hook_open,               NULL, 0},
+        [INDEX_HOOK_UNLINKAT]           = {"syscall.unlinkat",                     go_hook_unlinkat,           NULL, 0},
+        [INDEX_HOOK_GETDENTS]           = {"syscall.Getdents",                     go_hook_getdents,           NULL, 0},
+        [INDEX_HOOK_SOCKET]             = {"syscall.socket",                       go_hook_socket,             NULL, 0},
+        [INDEX_HOOK_ACCEPT]             = {"syscall.accept4",                      go_hook_accept4,            NULL, 0},
+        [INDEX_HOOK_READ]               = {"syscall.read",                         go_hook_read,               NULL, 0},
+        [INDEX_HOOK_CLOSE]              = {"syscall.Close",                        go_hook_close,              NULL, 0},
+        [INDEX_HOOK_TLS_SERVER_READ]    = {"net/http.(*connReader).Read",          go_hook_tls_server_read,    NULL, 0},
+        [INDEX_HOOK_TLS_SERVER_WRITE]   = {"net/http.checkConnErrorWriter.Write",  go_hook_tls_server_write,   NULL, 0},
+        [INDEX_HOOK_TLS_CLIENT_READ]    = {"net/http.(*persistConn).readResponse", go_hook_tls_client_read,    NULL, 0}, 
+        [INDEX_HOOK_TLS_CLIENT_WRITE]   = {"net/http.persistConnWriter.Write",     go_hook_tls_client_write,   NULL, 0},
+        [INDEX_HOOK_HTTP2_CLIENT_WRITE] = {"net/http.http2stickyErrWriter.Write",  go_hook_http2_client_write, NULL, 0},
+        [INDEX_HOOK_EXIT]               = {"runtime.exit",                         go_hook_exit,               NULL, 0},
+        [INDEX_HOOK_DIE]                = {"runtime.dieFromSignal",                go_hook_die,                NULL, 0},
+        [INDEX_HOOK_MAX]                = {"TAP_TABLE_END",                        NULL,                       NULL, 0}
     },
 };
 
@@ -165,20 +171,24 @@ go_schema_t go_17_schema = {
         .c_accept4_addr=0x10,
         .c_accept4_addrlen=0x18,
         .c_accept4_sd_out=0x38,
-        .c_http_server_read_callee=0x48,
-        .c_http_server_read_connReader=0x50,
-        .c_http_server_read_buf=0x8,
-        .c_http_server_read_rc=0x28,
-        .c_http_server_write_callee=0x48,
-        .c_http_server_write_conn=0x30,
-        .c_http_server_write_buf=0x8,
-        .c_http_server_write_rc=0x10,
-        .c_http_client_write_callee=0x30,
-        .c_http_client_write_w_pc=0x20,
-        .c_http_client_write_buf=0x8,
-        .c_http_client_write_rc=0x10,
-        .c_http_client_read_callee=0x0,
-        .c_http_client_read_pc=0x8,
+        .c_tls_server_read_callee=0x48,
+        .c_tls_server_read_connReader=0x50,
+        .c_tls_server_read_buf=0x8,
+        .c_tls_server_read_rc=0x28,
+        .c_tls_server_write_callee=0x48,
+        .c_tls_server_write_conn=0x30,
+        .c_tls_server_write_buf=0x8,
+        .c_tls_server_write_rc=0x10,
+        .c_tls_client_write_callee=0x30,
+        .c_tls_client_write_w_pc=0x20,
+        .c_tls_client_write_buf=0x8,
+        .c_tls_client_write_rc=0x10,
+        .c_tls_client_read_callee=0x0,
+        .c_tls_client_read_pc=0x8,
+        .c_http2_client_write_callee=0x60,
+        .c_http2_client_write_tcpConn=0x48,
+        .c_http2_client_write_buf=0x8,
+        .c_http2_client_write_rc=0x10,
     },
     .struct_offsets = {
         .g_to_m=0x30,
@@ -200,25 +210,26 @@ go_schema_t go_17_schema = {
     // and we preserve the g in r14 for future stack checks
     // Note: we do not need to use the reg functions for go_hook_exit and go_hook_die
     .tap = {
-        [INDEX_HOOK_WRITE]            = {"syscall.write",                        go_hook_reg_write,            NULL, 0}, // write
-        [INDEX_HOOK_OPEN]             = {"syscall.openat",                       go_hook_reg_open,             NULL, 0}, // file open
-        [INDEX_HOOK_UNLINKAT]         = {"syscall.unlinkat",                     go_hook_reg_unlinkat,         NULL, 0}, // delete file
-        [INDEX_HOOK_GETDENTS]         = {"syscall.Getdents",                     go_hook_reg_getdents,         NULL, 0}, // read dir
-        [INDEX_HOOK_SOCKET]           = {"syscall.socket",                       go_hook_reg_socket,           NULL, 0}, // net open
-        [INDEX_HOOK_ACCEPT]           = {"syscall.accept4",                      go_hook_reg_accept4,          NULL, 0}, // plain server accept
-        [INDEX_HOOK_READ]             = {"syscall.read",                         go_hook_reg_read,             NULL, 0}, // read
-        [INDEX_HOOK_CLOSE]            = {"syscall.Close",                        go_hook_reg_close,            NULL, 0}, // close
-        [INDEX_HOOK_TLS_SERVER_READ]  = {"net/http.(*connReader).Read",          go_hook_reg_tls_read,         NULL, 0}, // tls server read
-        [INDEX_HOOK_TLS_SERVER_WRITE] = {"net/http.checkConnErrorWriter.Write",  go_hook_reg_tls_write,        NULL, 0}, // tls server write
-        [INDEX_HOOK_TLS_CLIENT_READ]  = {"net/http.(*persistConn).readResponse", go_hook_reg_readResponse,     NULL, 0}, // tls client read
-        [INDEX_HOOK_TLS_CLIENT_WRITE] = {"net/http.persistConnWriter.Write",     go_hook_reg_pc_write,         NULL, 0}, // tls client write
-        [INDEX_HOOK_EXIT]             = {"runtime.exit",                         go_hook_exit,                 NULL, 0},
-        [INDEX_HOOK_DIE]              = {"runtime.dieFromSignal",                go_hook_die,                  NULL, 0},
-        [INDEX_HOOK_MAX]              = {"TAP_TABLE_END",                        NULL,                         NULL, 0}
+        [INDEX_HOOK_WRITE]              = {"syscall.write",                       go_hook_reg_write,              NULL, 0}, // write
+        [INDEX_HOOK_OPEN]               = {"syscall.openat",                      go_hook_reg_open,               NULL, 0}, // file open
+        [INDEX_HOOK_UNLINKAT]           = {"syscall.unlinkat",                    go_hook_reg_unlinkat,           NULL, 0}, // delete file
+        [INDEX_HOOK_GETDENTS]           = {"syscall.Getdents",                    go_hook_reg_getdents,           NULL, 0}, // read dir
+        [INDEX_HOOK_SOCKET]             = {"syscall.socket",                      go_hook_reg_socket,             NULL, 0}, // net open
+        [INDEX_HOOK_ACCEPT]             = {"syscall.accept4",                     go_hook_reg_accept4,            NULL, 0}, // plain server accept
+        [INDEX_HOOK_READ]               = {"syscall.read",                        go_hook_reg_read,               NULL, 0}, // read
+        [INDEX_HOOK_CLOSE]              = {"syscall.Close",                       go_hook_reg_close,              NULL, 0}, // close
+        [INDEX_HOOK_TLS_SERVER_READ]   = {"net/http.(*connReader).Read",          go_hook_reg_tls_server_read,    NULL, 0}, // tls server read
+        [INDEX_HOOK_TLS_SERVER_WRITE]  = {"net/http.checkConnErrorWriter.Write",  go_hook_reg_tls_server_write,   NULL, 0}, // tls server write
+        [INDEX_HOOK_TLS_CLIENT_READ]   = {"net/http.(*persistConn).readResponse", go_hook_reg_tls_client_read,    NULL, 0}, // tls client read
+        [INDEX_HOOK_TLS_CLIENT_WRITE]  = {"net/http.persistConnWriter.Write",     go_hook_reg_tls_client_write,   NULL, 0}, // tls client write
+        [INDEX_HOOK_HTTP2_CLIENT_WRITE] = {"net/http.http2stickyErrWriter.Write", go_hook_reg_http2_client_write, NULL, 0}, // tls http2 client write
+        [INDEX_HOOK_EXIT]               = {"runtime.exit",                        go_hook_exit,                   NULL, 0},
+        [INDEX_HOOK_DIE]                = {"runtime.dieFromSignal",               go_hook_die,                    NULL, 0},
+        [INDEX_HOOK_MAX]                = {"TAP_TABLE_END",                       NULL,                           NULL, 0}
     },
 };
 
-go_schema_t *g_go_schema = &go_16_schema; // overridden if later version
+go_schema_t *g_go_schema = &go_12_schema; // overridden if later version
 uint64_t g_glibc_guard = 0LL;
 void (*go_runtime_cgocall)(void);
 
@@ -1279,20 +1290,20 @@ go_accept4(char *stackptr)
  */
 // Extract data from net/http.(*connReader).Read (tls server read)
 static void
-c_http_server_read(char *stackaddr)
+c_tls_server_read(char *stackaddr)
 {
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    stackaddr -= g_go_schema->arg_offsets.c_http_server_read_callee;
+    stackaddr -= g_go_schema->arg_offsets.c_tls_server_read_callee;
 
     int fd = -1;
 
-    uint64_t connReader = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_connReader); 
+    uint64_t connReader = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_read_connReader); 
     if (!connReader) return;   // protect from dereferencing null
-    char *buf           = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_buf);
+    char *buf           = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_read_buf);
     // buf len 0x18
     // buf cap 0x20
-    uint64_t rc         = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_read_rc);
+    uint64_t rc         = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_read_rc);
     uint64_t cr_conn_rwc_if, cr_conn_rwc, netFD, pfd;
 
     uint64_t conn        =  *(uint64_t *)(connReader + g_go_schema->struct_offsets.connReader_to_conn);
@@ -1330,9 +1341,9 @@ c_http_server_read(char *stackaddr)
 }
 
 EXPORTON void *
-go_tls_read(char *stackptr)
+go_tls_server_read(char *stackptr)
 {
-    return do_cfunc(stackptr, c_http_server_read, g_go_schema->tap[INDEX_HOOK_TLS_SERVER_READ].assembly_fn);
+    return do_cfunc(stackptr, c_tls_server_read, g_go_schema->tap[INDEX_HOOK_TLS_SERVER_READ].assembly_fn);
 }
 
 /*
@@ -1346,23 +1357,23 @@ go_tls_read(char *stackptr)
  */
 // Extract data from net/http.checkConnErrorWriter.Write (tls server write)
 static void
-c_http_server_write(char *stackaddr)
+c_tls_server_write(char *stackaddr)
 {
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    stackaddr -= g_go_schema->arg_offsets.c_http_server_write_callee;
+    stackaddr -= g_go_schema->arg_offsets.c_tls_server_write_callee;
 
     int fd = -1;
-    uint64_t conn = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_conn);
+    uint64_t conn = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_write_conn);
     if (!conn) return;         // protect from dereferencing null
-    char *buf     = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_buf);
-    uint64_t rc   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_server_write_rc);
+    char *buf     = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_write_buf);
+    uint64_t rc   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_write_rc);
     uint64_t w_conn_rwc_if, w_conn_rwc, netFD, pfd;
 
     w_conn_rwc_if = (conn + g_go_schema->struct_offsets.conn_to_rwc);
     uint64_t tls =  *(uint64_t *)(conn + g_go_schema->struct_offsets.conn_to_tlsState);
 
-    // conn I/F checking. Ref the comment on c_http_server_read.
+    // conn I/F checking. Ref the comment on c_tls_server_read.
     if (w_conn_rwc_if && tls) {
         w_conn_rwc = *(uint64_t *)(w_conn_rwc_if + g_go_schema->struct_offsets.iface_data);
         netFD = *(uint64_t *)(w_conn_rwc + g_go_schema->struct_offsets.iface_data);
@@ -1372,16 +1383,16 @@ c_http_server_write(char *stackaddr)
                 fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd);
             }
 
-            funcprint("Scope: c_http_server_write of %d\n", fd);
+            funcprint("Scope: c_tls_server_write of %d\n", fd);
             doProtocol((uint64_t)0, fd, buf, rc, TLSTX, BUF);
         }
     }
 }
 
 EXPORTON void *
-go_tls_write(char *stackptr)
+go_tls_server_write(char *stackptr)
 {
-    return do_cfunc(stackptr, c_http_server_write, g_go_schema->tap[INDEX_HOOK_TLS_SERVER_WRITE].assembly_fn);
+    return do_cfunc(stackptr, c_tls_server_write, g_go_schema->tap[INDEX_HOOK_TLS_SERVER_WRITE].assembly_fn);
 }
 
 /*
@@ -1398,16 +1409,16 @@ go_tls_write(char *stackptr)
  */
 // Extract data from net/http.persistConnWriter.Write (tls client write)
 static void
-c_http_client_write(char *stackaddr)
+c_tls_client_write(char *stackaddr)
 {
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    stackaddr -= g_go_schema->arg_offsets.c_http_client_write_callee;
+    stackaddr -= g_go_schema->arg_offsets.c_tls_client_write_callee;
 
     int fd = -1;
-    uint64_t w_pc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_w_pc);
-    char *buf     = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_buf);
-    uint64_t rc   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_write_rc);
+    uint64_t w_pc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_write_w_pc);
+    char *buf     = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_write_buf);
+    uint64_t rc   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_write_rc);
     uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
 
     if (rc < 1) return;
@@ -1415,7 +1426,7 @@ c_http_client_write(char *stackaddr)
     pc_conn_if = (w_pc + g_go_schema->struct_offsets.persistConn_to_conn); 
     uint64_t tls =  *(uint64_t*)(w_pc + g_go_schema->struct_offsets.persistConn_to_tlsState); 
 
-    // conn I/F checking. Ref the comment on c_http_server_read.
+    // conn I/F checking. Ref the comment on c_tls_server_read.
     if (pc_conn_if && tls) {
         w_pc_conn = *(uint64_t *)(pc_conn_if + g_go_schema->struct_offsets.iface_data); 
         netFD = *(uint64_t *)(w_pc_conn + g_go_schema->struct_offsets.iface_data);
@@ -1428,15 +1439,15 @@ c_http_client_write(char *stackaddr)
             fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
         }
 
-        doProtocol((uint64_t)0, fd, buf, rc, TLSRX, BUF);
-        funcprint("Scope: c_http_client_write of %d\n", fd);
+        doProtocol((uint64_t)0, fd, buf, rc, TLSTX, BUF);
+        funcprint("Scope: c_tls_client_write of %d\n", fd);
     }
 }
 
 EXPORTON void *
-go_pc_write(char *stackptr)
+go_tls_client_write(char *stackptr)
 {
-    return do_cfunc(stackptr, c_http_client_write, g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_WRITE].assembly_fn);
+    return do_cfunc(stackptr, c_tls_client_write, g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_WRITE].assembly_fn);
 }
 
 /*
@@ -1452,24 +1463,24 @@ go_pc_write(char *stackptr)
   resp = buf + 0x0         (bufio.Reader.buf)
   resp = http response     (char *)
  */
-// Extract data from net/http.(*persistConn).readResponse (tls server read)
+// Extract data from net/http.(*persistConn).readResponse (tls client read)
 static void
-c_http_client_read(char *stackaddr)
+c_tls_client_read(char *stackaddr)
 {
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    stackaddr -= g_go_schema->arg_offsets.c_http_client_read_callee;
+    stackaddr -= g_go_schema->arg_offsets.c_tls_client_read_callee;
 
     int fd = -1;
-    stackaddr += g_go_schema->arg_offsets.c_http_client_read_callee;
-    uint64_t pc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http_client_read_pc); 
+    stackaddr += g_go_schema->arg_offsets.c_tls_client_read_callee;
+    uint64_t pc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_read_pc); 
     uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, len = 0;
     char *buf = NULL;
 
     pc_conn_if = (pc + g_go_schema->struct_offsets.persistConn_to_conn);
     uint64_t tls = *(uint64_t*)(pc + g_go_schema->struct_offsets.persistConn_to_tlsState);
 
-    // conn I/F checking. Ref the comment on c_http_server_read.
+    // conn I/F checking. Ref the comment on c_tls_server_read.
     if (pc_conn_if && tls) {
         pc_conn = *(uint64_t *)(pc_conn_if + g_go_schema->struct_offsets.iface_data);
         netFD = *(uint64_t *)(pc_conn + g_go_schema->struct_offsets.iface_data);
@@ -1490,15 +1501,66 @@ c_http_client_read(char *stackaddr)
 
         if (buf && (len > 0)) {
             doProtocol((uint64_t)0, fd, buf, len, TLSRX, BUF);
-            funcprint("Scope: c_http_client_read of %d\n", fd);
+            funcprint("Scope: c_tls_client_read of %d\n", fd);
         }
     }
 }
 
 EXPORTON void *
-go_readResponse(char *stackptr)
+go_tls_client_read(char *stackptr)
 {
-    return do_cfunc(stackptr, c_http_client_read, g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_READ].assembly_fn);
+    return do_cfunc(stackptr, c_tls_client_read, g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_READ].assembly_fn);
+}
+
+/*
+  Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
+  p = stackaddr + 0x8              (request buffer)
+  *p = request string
+  sew.conn.data = stackaddr + 0x48 (TCPConn)
+  netFD = tcpConn + 0x08           (netFD)
+  pfd = netFD + 0x0                (poll.FD)
+  fd = pfd + 0x10                  (pfd.sysfd)
+ */
+// Extract data from net/http.http2stickyErrWriter.Write (tls http2 client write)
+static void
+c_http2_client_write(char *stackaddr)
+{
+
+    // Take us to the stack frame we're interested in
+    // If this is defined as 0x0, we have decided to stay in the caller stack frame
+    stackaddr -= g_go_schema->arg_offsets.c_http2_client_write_callee;
+
+    int fd = -1;
+
+    // tcpConn is sew.conn.data
+    uint64_t tcpConn = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_tcpConn);
+    char *buf        = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_buf);
+    uint64_t rc      = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_rc);
+    uint64_t netFD, pfd;
+
+    if (rc < 1) return;
+
+    // conn I/F checking. Ref the comment on c_http_server_read.
+    if (tcpConn) {
+        netFD = *(uint64_t *)(tcpConn + g_go_schema->struct_offsets.iface_data);
+        if (!netFD) return;
+        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) { 
+            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd); 
+            if (!pfd) return;
+            fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd); 
+        } else {
+            fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
+        }
+
+        doProtocol((uint64_t)0, fd, buf, rc, TLSTX, BUF);
+        funcprint("Scope: c_http2_client_write of %d\n", fd);
+    }
+}
+
+EXPORTON void *
+go_http2_client_write(char *stackptr)
+{
+    return do_cfunc(stackptr, c_http2_client_write, g_go_schema->tap[INDEX_HOOK_HTTP2_CLIENT_WRITE].assembly_fn);
 }
 
 extern void handleExit(void);

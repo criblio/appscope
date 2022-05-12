@@ -481,8 +481,7 @@ remoteConfig()
         numtries++;
         rc = scope_recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
         if (rc <= 0) {
-            // Something has happened to our connection
-            ctlDisconnect(g_ctl, CFG_CTL);
+            // Something has happened to this incoming message
             break;
         }
 

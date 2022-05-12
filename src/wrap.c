@@ -445,9 +445,8 @@ remoteConfig()
 
     // We want to accept incoming requests on TCP, unix, and edge.
     // However, we don't currently support receving on TLS connections.
-    cfg_transport_t ttype = ctlTransportType(g_ctl, CFG_CTL);
-    int acceptRequests = ((ttype == CFG_TCP) || (ttype == CFG_UNIX) || (ttype == CFG_EDGE))
-                          && !transportIsTls(ctlTransport(g_ctl, CFG_CTL));
+    int acceptRequests = transportSupportsCommandControl(
+                                          ctlTransport(g_ctl, CFG_CTL));
     fds.events = (acceptRequests) ? POLLIN : 0;
 
     fds.fd = ctlConnection(g_ctl, CFG_CTL);

@@ -157,18 +157,21 @@ transportType(transport_t *trans)
 }
 
 int
-transportIsTls(transport_t *trans)
+transportSupportsCommandControl(transport_t *trans)
 {
     if (!trans) return FALSE;
 
     switch (trans->type) {
-        case CFG_UDP:
         case CFG_TCP:
-            return trans->net.tls.enable;
+            // It would be possible to support incoming commands over tls,
+            // but our code doesn't support this today.
+            return !trans->net.tls.enable;
+        case CFG_UNIX:
+        case CFG_EDGE:
+            return TRUE;
         default:
             return FALSE;
     }
-    return FALSE;
 }
 
 

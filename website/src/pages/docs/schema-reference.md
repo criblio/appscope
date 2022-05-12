@@ -123,6 +123,82 @@ For more about how events and metrics work in AppScope, see [this](working-with#
 
 <hr/>
 
+### console [^](#schema-reference) {#eventconsole}
+
+Structure of the `console` event
+
+#### Examples
+
+```json
+{
+  "type": "evt",
+  "id": "eaf4d0598443-a.out-./a.out",
+  "_channel": "8499188821284",
+  "body": {
+    "sourcetype": "console",
+    "_time": 1643883251.376672,
+    "source": "stderr",
+    "host": "eaf4d0598443",
+    "proc": "a.out",
+    "cmd": "./a.out",
+    "pid": 986,
+    "data": {
+      "message": "stderr hello world"
+    }
+  }
+}
+```
+
+```json
+{
+  "type": "evt",
+  "id": "ubuntu-sh- /usr/bin/which /usr/bin/firefox",
+  "_channel": "13468365092424",
+  "body": {
+    "sourcetype": "console",
+    "_time": 1643735941.602952,
+    "source": "stdout",
+    "host": "ubuntu",
+    "proc": "sh",
+    "cmd": "/bin/sh /usr/bin/which /usr/bin/firefox",
+    "pid": 6545,
+    "data": {
+      "message": "/usr/bin/firefox\n"
+    }
+  }
+}
+```
+
+#### `console` properties {#eventconsoleprops}
+
+| Property | Description |
+|---|---|
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
+| `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventconsolebody)._ |
+
+#### `console.body` properties {#eventconsolebody}
+
+| Property | Description |
+|---|---|
+| `sourcetype` _required_ (`string`) | Sourcetype - console<br/><br/>Value must be `console`. |
+| `_time` _required_ (`number`) | _time<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Specifies whether AppScope is capturing either `stderr` or `stdout` from console.<br/><br/>**Possible values:**<ul><li>`stderr`</li><li>`stdout`</li></ul> |
+| `host` _required_ (`string`) | host |
+| `proc` _required_ (`string`) | proc |
+| `cmd` _required_ (`string`) | cmd<br/><br/>**Example:**<br/>`top` |
+| `pid` _required_ (`integer`) | pid<br/><br/>**Example:**<br/>`1000` |
+| `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventconsolebodydata)._ |
+
+#### `console.body.data` properties {#eventconsolebodydata}
+
+| Property | Description |
+|---|---|
+| `message` (`string`) | message |
+
+<hr/>
+
 ### dns.req [^](#schema-reference) {#eventdnsreq}
 
 Structure of the `dns.req` event
@@ -164,7 +240,7 @@ Structure of the `dns.req` event
 |---|---|
 | `sourcetype` _required_ (`string`) | Sourcetype - dns<br/><br/>Value must be `dns`. |
 | `_time` _required_ (`number`) | _time<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - DNS request<br/><br/>Value must be `dns.req`. |
+| `source` _required_ (`string`) | Source - Net DNS<br/><br/>Value must be `dns.req`. |
 | `host` _required_ (`string`) | host |
 | `proc` _required_ (`string`) | proc |
 | `cmd` _required_ (`string`) | cmd<br/><br/>**Example:**<br/>`top` |
@@ -238,6 +314,62 @@ Structure of the `dns.resp` event
 | `duration` (`number`) | duration<br/><br/>**Example:**<br/>`55` |
 | `domain` (`string`) | domain |
 | `addrs` (`array`) | addrs |
+
+<hr/>
+
+### file [^](#schema-reference) {#eventfile}
+
+Structure of the `file` event
+
+#### Example
+
+```json
+{
+  "type": "evt",
+  "id": "ubuntu-sh- /usr/bin/which /usr/bin/firefox",
+  "_channel": "13468365092424",
+  "body": {
+    "sourcetype": "file",
+    "_time": 1643735941.602952,
+    "source": "/var/log/firefox.log",
+    "host": "ubuntu",
+    "proc": "sh",
+    "cmd": "/bin/sh /usr/bin/which /usr/bin/firefox",
+    "pid": 6545,
+    "data": {
+      "message": "/usr/bin/firefox\n"
+    }
+  }
+}
+```
+
+#### `file` properties {#eventfileprops}
+
+| Property | Description |
+|---|---|
+| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
+| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
+| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
+| `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventfilebody)._ |
+
+#### `file.body` properties {#eventfilebody}
+
+| Property | Description |
+|---|---|
+| `sourcetype` _required_ (`string`) | Sourcetype - file<br/><br/>Value must be `file`. |
+| `_time` _required_ (`number`) | _time<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | String that describes a file path. |
+| `host` _required_ (`string`) | host |
+| `proc` _required_ (`string`) | proc |
+| `cmd` _required_ (`string`) | cmd<br/><br/>**Example:**<br/>`top` |
+| `pid` _required_ (`integer`) | pid<br/><br/>**Example:**<br/>`1000` |
+| `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfilebodydata)._ |
+
+#### `file.body.data` properties {#eventfilebodydata}
+
+| Property | Description |
+|---|---|
+| `message` (`string`) | message |
 
 <hr/>
 
@@ -387,7 +519,7 @@ Structure of the `fs.delete` event
 | `proc` (`string`) | proc |
 | `pid` (`integer`) | pid<br/><br/>**Example:**<br/>`1000` |
 | `host` (`string`) | host |
-| `op` (`string`) | op_fs_delete<br/><br/>**Possible values:**<ul><li>`unlink`</li><li>`unlinkat`</li></ul> |
+| `op` (`string`) | op_fs_delete<br/><br/>**Possible values:**<ul><li>`go_unlinkat`</li><li>`unlink`</li><li>`unlinkat`</li></ul> |
 | `file` (`string`) | file |
 | `unit` (`string`) | Unit - operation<br/><br/>Value must be `operation`. |
 
@@ -611,7 +743,7 @@ Structure of the `fs.open` event
 | `file_perms` (`integer`) | file_perms<br/><br/>**Example:**<br/>`777` |
 | `file_owner` (`number`) | file_owner<br/><br/>**Example:**<br/>`0` |
 | `file_group` (`number`) | file_group<br/><br/>**Example:**<br/>`0` |
-| `op` (`string`) | op_fs_open<br/><br/>**Possible values:**<ul><li>`open`</li><li>`openat`</li><li>`opendir`</li><li>`creat`</li><li>`fopen`</li><li>`freopen`</li><li>`open64`</li><li>`openat64`</li><li>`__open_2`</li><li>`__openat_2`</li><li>`creat64`</li><li>`fopen64`</li><li>`freopen64`</li><li>`recvmsg`</li><li>`console output`</li><li>`console input`</li></ul> |
+| `op` (`string`) | op_fs_open<br/><br/>**Possible values:**<ul><li>`open`</li><li>`openat`</li><li>`opendir`</li><li>`creat`</li><li>`fopen`</li><li>`freopen`</li><li>`open64`</li><li>`openat64`</li><li>`__open64_2`</li><li>`__open_2`</li><li>`__openat_2`</li><li>`creat64`</li><li>`fopen64`</li><li>`freopen64`</li><li>`recvmsg`</li><li>`console output`</li><li>`console input`</li></ul> |
 
 <hr/>
 
@@ -682,7 +814,7 @@ Structure of the `fs.read` event
 | `proc` (`string`) | proc |
 | `pid` (`integer`) | pid<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | fd<br/><br/>**Example:**<br/>`4` |
-| `op` (`string`) | op_fs_read<br/><br/>**Possible values:**<ul><li>`go_read`</li><li>`readdir`</li><li>`pread64`</li><li>`preadv`</li><li>`preadv2`</li><li>`preadv64v2`</li><li>`__pread_chk`</li><li>`__read_chk`</li><li>`__fread_unlocked_chk`</li><li>`read`</li><li>`readv`</li><li>`pread`</li><li>`fread`</li><li>`__fread_chk`</li><li>`fread_unlocked`</li><li>`fgets`</li><li>`__fgets_chk`</li><li>`fgets_unlocked`</li><li>`__fgetws_chk`</li><li>`fgetws`</li><li>`fgetwc`</li><li>`fgetc`</li><li>`fscanf`</li><li>`getline`</li><li>`getdelim`</li><li>`__getdelim`</li></ul> |
+| `op` (`string`) | op_fs_read<br/><br/>**Possible values:**<ul><li>`go_read`</li><li>`go_getdents`</li><li>`readdir`</li><li>`pread64`</li><li>`__pread64_chk`</li><li>`preadv`</li><li>`preadv2`</li><li>`preadv64v2`</li><li>`__pread_chk`</li><li>`__read_chk`</li><li>`__fread_unlocked_chk`</li><li>`read`</li><li>`readv`</li><li>`pread`</li><li>`fread`</li><li>`__fread_chk`</li><li>`fread_unlocked`</li><li>`fgets`</li><li>`__fgets_chk`</li><li>`fgets_unlocked`</li><li>`__fgetws_chk`</li><li>`fgetws`</li><li>`fgetwc`</li><li>`fgetc`</li><li>`fscanf`</li><li>`getline`</li><li>`getdelim`</li><li>`__getdelim`</li></ul> |
 | `file` (`string`) | file |
 | `numops` (`number`) | numops |
 | `unit` (`string`) | Unit - byte<br/><br/>Value must be `byte`. |
@@ -1927,117 +2059,69 @@ Structure of the `notice` event
 | `pid` _required_ (`integer`) | pid<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`string`) | data |
 
-<hr/>
+### dns.req [^](#schema-reference) {#metricdnsreq}
 
-### console [^](#schema-reference) {#eventconsole}
+Structure of the `dns.req` metric
 
-Structure of the `console` event
-
-#### Example
+#### Examples
 
 ```json
 {
-  "type": "evt",
-  "id": "eaf4d0598443-a.out-./a.out",
-  "_channel": "8499188821284",
+  "type": "metric",
   "body": {
-    "sourcetype": "console",
-    "_time": 1643883251.376672,
-    "source": "stderr",
-    "host": "eaf4d0598443",
-    "proc": "a.out",
-    "cmd": "./a.out",
-    "pid": 986,
-    "data": {
-      "message": "stderr hello world"
-    }
+    "_metric": "dns.req",
+    "_metric_type": "counter",
+    "_value": 1,
+    "proc": "lt-curl",
+    "pid": 31,
+    "host": "2a6bc132b07a",
+    "unit": "request",
+    "summary": "true",
+    "_time": 1643832467.795134
   }
 }
 ```
 
-#### `console` properties {#eventconsoleprops}
-
-| Property | Description |
-|---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
-| `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventconsolebody)._ |
-
-#### `console.body` properties {#eventconsolebody}
-
-| Property | Description |
-|---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - console<br/><br/>Value must be `console`. |
-| `_time` _required_ (`number`) | _time<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Specifies whether AppScope is capturing either `stderr` or `file` from console.<br/><br/>Value must be `stderr` or `file`. |
-| `host` _required_ (`string`) | host |
-| `proc` _required_ (`string`) | proc |
-| `cmd` _required_ (`string`) | cmd<br/><br/>**Example:**<br/>`top` |
-| `pid` _required_ (`integer`) | pid<br/><br/>**Example:**<br/>`1000` |
-| `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventconsolebodydata)._ |
-
-#### `console.body.data` properties {#eventconsolebodydata}
-
-| Property | Description |
-|---|---|
-| `message` (`string`) | message |
-
-<hr/>
-
-### file [^](#schema-reference) {#eventfile}
-
-Structure of the `file` event
-
-#### Example
-
 ```json
 {
-  "type": "evt",
-  "id": "ubuntu-sh- /usr/bin/which /usr/bin/firefox",
-  "_channel": "13468365092424",
+  "type": "metric",
   "body": {
-    "sourcetype": "file",
-    "_time": 1643735941.602952,
-    "source": "/var/log/firefox.log",
-    "host": "ubuntu",
-    "proc": "sh",
-    "cmd": "/bin/sh /usr/bin/which /usr/bin/firefox",
-    "pid": 6545,
-    "data": {
-      "message": "/usr/bin/firefox\n"
-    }
+    "_metric": "dns.req",
+    "_metric_type": "counter",
+    "_value": 1,
+    "proc": "lt-curl",
+    "pid": 2485,
+    "host": "2a6bc132b07a",
+    "domain": "cribl.io",
+    "duration": 0,
+    "unit": "request",
+    "_time": 1643832569.764219
   }
 }
 ```
 
-#### `file` properties {#eventfileprops}
+#### `dns.req` properties {#metricdnsreqprops}
 
 | Property | Description |
 |---|---|
-| `type` _required_ (`string`) | Distinguishes events from metrics.<br/><br/>Value must be `evt`. |
-| `id` _required_ (`string`) | Identifies the application that the process is associated with. |
-| `_channel` _required_ (`string`) | Identifies the operation during whose lifetime the event or metric is emitted. |
-| `body` _required_ (`object`) | body<br/><br/>_Details [below](#eventfilebody)._ |
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
+| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricdnsreqbody)._ |
 
-#### `file.body` properties {#eventfilebody}
+#### `dns.req.body` properties {#metricdnsreqbody}
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - file<br/><br/>Value must be `file`. |
-| `_time` _required_ (`number`) | _time<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | String that describes a file path. |
-| `host` _required_ (`string`) | host |
+| `_metric` _required_ (`string`) | Source - Net DNS<br/><br/>Value must be `dns.req`. |
+| `_metric_type` _required_ (`string`) | counter<br/><br/>Value must be `counter`. |
+| `_value` _required_ (`number`) | _value<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | proc |
-| `cmd` _required_ (`string`) | cmd<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | pid<br/><br/>**Example:**<br/>`1000` |
-| `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfilebodydata)._ |
-
-#### `file.body.data` properties {#eventfilebodydata}
-
-| Property | Description |
-|---|---|
-| `message` (`string`) | message |
+| `host` _required_ (`string`) | host |
+| `domain` (`string`) | domain |
+| `duration` (`number`) | duration<br/><br/>**Example:**<br/>`55` |
+| `unit` _required_ (`string`) | Unit - request<br/><br/>Value must be `request`. |
+| `summary` (`string`) | summary<br/><br/>Value must be `true`. |
+| `_time` _required_ (`number`) | _time<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -2308,7 +2392,7 @@ Structure of the `fs.open` metric
 | `pid` _required_ (`integer`) | pid<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | fd<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | host |
-| `op` (`string`) | op_fs_open<br/><br/>**Possible values:**<ul><li>`open`</li><li>`openat`</li><li>`opendir`</li><li>`creat`</li><li>`fopen`</li><li>`freopen`</li><li>`open64`</li><li>`openat64`</li><li>`__open_2`</li><li>`__openat_2`</li><li>`creat64`</li><li>`fopen64`</li><li>`freopen64`</li><li>`recvmsg`</li><li>`console output`</li><li>`console input`</li></ul> |
+| `op` (`string`) | op_fs_open<br/><br/>**Possible values:**<ul><li>`open`</li><li>`openat`</li><li>`opendir`</li><li>`creat`</li><li>`fopen`</li><li>`freopen`</li><li>`open64`</li><li>`openat64`</li><li>`__open64_2`</li><li>`__open_2`</li><li>`__openat_2`</li><li>`creat64`</li><li>`fopen64`</li><li>`freopen64`</li><li>`recvmsg`</li><li>`console output`</li><li>`console input`</li></ul> |
 | `file` (`string`) | file |
 | `unit` _required_ (`string`) | Unit - operation<br/><br/>Value must be `operation`. |
 | `summary` (`string`) | summary<br/><br/>Value must be `true`. |
@@ -2377,7 +2461,7 @@ Structure of the `fs.read` metric
 | `pid` _required_ (`integer`) | pid<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | fd<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | host |
-| `op` (`string`) | op_fs_read<br/><br/>**Possible values:**<ul><li>`go_read`</li><li>`readdir`</li><li>`pread64`</li><li>`preadv`</li><li>`preadv2`</li><li>`preadv64v2`</li><li>`__pread_chk`</li><li>`__read_chk`</li><li>`__fread_unlocked_chk`</li><li>`read`</li><li>`readv`</li><li>`pread`</li><li>`fread`</li><li>`__fread_chk`</li><li>`fread_unlocked`</li><li>`fgets`</li><li>`__fgets_chk`</li><li>`fgets_unlocked`</li><li>`__fgetws_chk`</li><li>`fgetws`</li><li>`fgetwc`</li><li>`fgetc`</li><li>`fscanf`</li><li>`getline`</li><li>`getdelim`</li><li>`__getdelim`</li></ul> |
+| `op` (`string`) | op_fs_read<br/><br/>**Possible values:**<ul><li>`go_read`</li><li>`go_getdents`</li><li>`readdir`</li><li>`pread64`</li><li>`__pread64_chk`</li><li>`preadv`</li><li>`preadv2`</li><li>`preadv64v2`</li><li>`__pread_chk`</li><li>`__read_chk`</li><li>`__fread_unlocked_chk`</li><li>`read`</li><li>`readv`</li><li>`pread`</li><li>`fread`</li><li>`__fread_chk`</li><li>`fread_unlocked`</li><li>`fgets`</li><li>`__fgets_chk`</li><li>`fgets_unlocked`</li><li>`__fgetws_chk`</li><li>`fgetws`</li><li>`fgetwc`</li><li>`fgetc`</li><li>`fscanf`</li><li>`getline`</li><li>`getdelim`</li><li>`__getdelim`</li></ul> |
 | `file` (`string`) | file |
 | `numops` (`number`) | numops |
 | `unit` _required_ (`string`) | Unit - byte<br/><br/>Value must be `byte`. |
@@ -2659,51 +2743,70 @@ Structure of the `http.duration.client` metric
 
 <hr/>
 
-### http.req.content_length [^](#schema-reference) {#metrichttpreqcontentlength}
+### http.duration.server [^](#schema-reference) {#metrichttpdurationserver}
 
-Structure of the `http.req.content_length` metric
+Structure of the `http.duration.server` metric
 
-#### Example
+#### Examples
 
 ```json
 {
   "type": "metric",
   "body": {
-    "_metric": "http.req.content_length",
-    "_metric_type": "counter",
-    "_value": 38,
-    "http_target": "/echo/post/json",
+    "_metric": "http.duration.server",
+    "_metric_type": "timer",
+    "_value": 0,
+    "http_target": "/",
     "numops": 1,
-    "proc": "curl",
-    "pid": 525,
-    "host": "272cc69a120a",
-    "unit": "byte",
+    "proc": "httpd",
+    "pid": 2260,
+    "host": "c067d78736db",
+    "unit": "millisecond",
     "summary": "true",
-    "_time": 1644230452.63037
+    "_time": 1643924563.450939
   }
 }
 ```
 
-#### `http.req.content_length` properties {#metrichttpreqcontentlengthprops}
+```json
+{
+  "type": "metric",
+  "body": {
+    "_metric": "http.duration.server",
+    "_metric_type": "timer",
+    "_value": 1,
+    "http_target": "/",
+    "numops": 1,
+    "proc": "httpd",
+    "pid": 648,
+    "host": "c067d78736db",
+    "unit": "millisecond",
+    "summary": "true",
+    "_time": 1643924498.350866
+  }
+}
+```
+
+#### `http.duration.server` properties {#metrichttpdurationserverprops}
 
 | Property | Description |
 |---|---|
 | `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
-| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttpreqcontentlengthbody)._ |
+| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttpdurationserverbody)._ |
 
-#### `http.req.content_length.body` properties {#metrichttpreqcontentlengthbody}
+#### `http.duration.server.body` properties {#metrichttpdurationserverbody}
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - HTTP request content length<br/><br/>Value must be `http.req.content_length`. |
-| `_metric_type` _required_ (`string`) | counter<br/><br/>Value must be `counter`. |
+| `_metric` _required_ (`string`) | Source - HTTP server duration<br/><br/>Value must be `http.duration.server`. |
+| `_metric_type` _required_ (`string`) | timer<br/><br/>Value must be `timer`. |
 | `_value` _required_ (`number`) | _value<br/><br/>**Example:**<br/>`1` |
 | `http_target` _required_ (`string`) | http_target |
 | `numops` _required_ (`number`) | numops |
 | `proc` _required_ (`string`) | proc |
 | `pid` _required_ (`integer`) | pid<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | host |
-| `unit` _required_ (`string`) | Unit - byte<br/><br/>Value must be `byte`. |
+| `unit` _required_ (`string`) | Unit - millisecond<br/><br/>Value must be `millisecond`. |
 | `summary` (`string`) | summary<br/><br/>Value must be `true`. |
 | `_time` _required_ (`number`) | _time<br/><br/>**Example:**<br/>`1643662126.91777` |
 
@@ -2778,6 +2881,56 @@ Structure of the `http.req` metric
 
 <hr/>
 
+### http.req.content_length [^](#schema-reference) {#metrichttpreqcontentlength}
+
+Structure of the `http.req.content_length` metric
+
+#### Example
+
+```json
+{
+  "type": "metric",
+  "body": {
+    "_metric": "http.req.content_length",
+    "_metric_type": "counter",
+    "_value": 38,
+    "http_target": "/echo/post/json",
+    "numops": 1,
+    "proc": "curl",
+    "pid": 525,
+    "host": "272cc69a120a",
+    "unit": "byte",
+    "summary": "true",
+    "_time": 1644230452.63037
+  }
+}
+```
+
+#### `http.req.content_length` properties {#metrichttpreqcontentlengthprops}
+
+| Property | Description |
+|---|---|
+| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
+| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttpreqcontentlengthbody)._ |
+
+#### `http.req.content_length.body` properties {#metrichttpreqcontentlengthbody}
+
+| Property | Description |
+|---|---|
+| `_metric` _required_ (`string`) | Source - HTTP request content length<br/><br/>Value must be `http.req.content_length`. |
+| `_metric_type` _required_ (`string`) | counter<br/><br/>Value must be `counter`. |
+| `_value` _required_ (`number`) | _value<br/><br/>**Example:**<br/>`1` |
+| `http_target` _required_ (`string`) | http_target |
+| `numops` _required_ (`number`) | numops |
+| `proc` _required_ (`string`) | proc |
+| `pid` _required_ (`integer`) | pid<br/><br/>**Example:**<br/>`1000` |
+| `host` _required_ (`string`) | host |
+| `unit` _required_ (`string`) | Unit - byte<br/><br/>Value must be `byte`. |
+| `summary` (`string`) | summary<br/><br/>Value must be `true`. |
+| `_time` _required_ (`number`) | _time<br/><br/>**Example:**<br/>`1643662126.91777` |
+
+<hr/>
+
 ### http.resp.content_length [^](#schema-reference) {#metrichttprespcontentlength}
 
 Structure of the `http.resp.content_length` metric
@@ -2847,75 +3000,6 @@ Structure of the `http.resp.content_length` metric
 
 <hr/>
 
-### http.duration.server [^](#schema-reference) {#metrichttpdurationserver}
-
-Structure of the `http.duration.server` metric
-
-#### Examples
-
-```json
-{
-  "type": "metric",
-  "body": {
-    "_metric": "http.duration.server",
-    "_metric_type": "timer",
-    "_value": 0,
-    "http_target": "/",
-    "numops": 1,
-    "proc": "httpd",
-    "pid": 2260,
-    "host": "c067d78736db",
-    "unit": "millisecond",
-    "summary": "true",
-    "_time": 1643924563.450939
-  }
-}
-```
-
-```json
-{
-  "type": "metric",
-  "body": {
-    "_metric": "http.duration.server",
-    "_metric_type": "timer",
-    "_value": 1,
-    "http_target": "/",
-    "numops": 1,
-    "proc": "httpd",
-    "pid": 648,
-    "host": "c067d78736db",
-    "unit": "millisecond",
-    "summary": "true",
-    "_time": 1643924498.350866
-  }
-}
-```
-
-#### `http.duration.server` properties {#metrichttpdurationserverprops}
-
-| Property | Description |
-|---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
-| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metrichttpdurationserverbody)._ |
-
-#### `http.duration.server.body` properties {#metrichttpdurationserverbody}
-
-| Property | Description |
-|---|---|
-| `_metric` _required_ (`string`) | Source - HTTP server duration<br/><br/>Value must be `http.duration.server`. |
-| `_metric_type` _required_ (`string`) | timer<br/><br/>Value must be `timer`. |
-| `_value` _required_ (`number`) | _value<br/><br/>**Example:**<br/>`1` |
-| `http_target` _required_ (`string`) | http_target |
-| `numops` _required_ (`number`) | numops |
-| `proc` _required_ (`string`) | proc |
-| `pid` _required_ (`integer`) | pid<br/><br/>**Example:**<br/>`1000` |
-| `host` _required_ (`string`) | host |
-| `unit` _required_ (`string`) | Unit - millisecond<br/><br/>Value must be `millisecond`. |
-| `summary` (`string`) | summary<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time<br/><br/>**Example:**<br/>`1643662126.91777` |
-
-<hr/>
-
 ### net.close [^](#schema-reference) {#metricnetclose}
 
 Structure of the `net.close` metric
@@ -2980,72 +3064,6 @@ Structure of the `net.close` metric
 | `proto` (`string`) | proto<br/><br/>**Possible values:**<ul><li>`TCP`</li><li>`UDP`</li><li>`RAW`</li><li>`RDM`</li><li>`SEQPACKET`</li><li>`OTHER`</li></ul> |
 | `port` (`number`) | port |
 | `unit` _required_ (`string`) | Unit - connection<br/><br/>Value must be `connection`. |
-| `summary` (`string`) | summary<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time<br/><br/>**Example:**<br/>`1643662126.91777` |
-
-<hr/>
-
-### dns.req [^](#schema-reference) {#metricdnsreq}
-
-Structure of the `dns.req` metric
-
-#### Examples
-
-```json
-{
-  "type": "metric",
-  "body": {
-    "_metric": "dns.req",
-    "_metric_type": "counter",
-    "_value": 1,
-    "proc": "lt-curl",
-    "pid": 31,
-    "host": "2a6bc132b07a",
-    "unit": "request",
-    "summary": "true",
-    "_time": 1643832467.795134
-  }
-}
-```
-
-```json
-{
-  "type": "metric",
-  "body": {
-    "_metric": "dns.req",
-    "_metric_type": "counter",
-    "_value": 1,
-    "proc": "lt-curl",
-    "pid": 2485,
-    "host": "2a6bc132b07a",
-    "domain": "cribl.io",
-    "duration": 0,
-    "unit": "request",
-    "_time": 1643832569.764219
-  }
-}
-```
-
-#### `dns.req` properties {#metricdnsreqprops}
-
-| Property | Description |
-|---|---|
-| `type` _required_ (`string`) | Distinguishes metrics from events.<br/><br/>Value must be `metric`. |
-| `body` _required_ (`object`) | body<br/><br/>_Details [below](#metricdnsreqbody)._ |
-
-#### `dns.req.body` properties {#metricdnsreqbody}
-
-| Property | Description |
-|---|---|
-| `_metric` _required_ (`string`) | Source - Net DNS<br/><br/>Value must be `dns.req`. |
-| `_metric_type` _required_ (`string`) | counter<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | proc |
-| `pid` _required_ (`integer`) | pid<br/><br/>**Example:**<br/>`1000` |
-| `host` _required_ (`string`) | host |
-| `domain` (`string`) | domain |
-| `duration` (`number`) | duration<br/><br/>**Example:**<br/>`55` |
-| `unit` _required_ (`string`) | Unit - request<br/><br/>Value must be `request`. |
 | `summary` (`string`) | summary<br/><br/>Value must be `true`. |
 | `_time` _required_ (`number`) | _time<br/><br/>**Example:**<br/>`1643662126.91777` |
 

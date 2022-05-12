@@ -3,11 +3,11 @@ const documentPreface =
 
 Three [definitions schemas](https://github.com/criblio/appscope/tree/master/docs/schemas/definitions) govern the basic patterns. Then there is an individual schema for each event and metric, documented below. The definitions schemas define the elements that can be present in individual event and metric schemas, as well as the overall structures into which those elements fit. 
 
-When we say "the AppScope schema," we mean the [whole set](https://github.com/criblio/appscope/tree/master/docs/schemas/) of schemas.
+When we say "the AppScope schema," we mean the [whole set](https://github.com/criblio/appscope/tree/master/docs/schemas/) of schemas. The AppScope schema now in use was introduced in AppScope 1.0.1.
 
-In AppScope 1.0.1, a few event and metric schema elements, namely \`title\` and \`description\`, have placeholder values. In future these may be made more informative. They are essentially "internal documentation" within the schemas and do not affect how the schemas function in AppScope. In the event that you develop any code that depends on AppScope schemas, be aware that the content of \`title\` and \`description\` fields may evolve.
+A few event and metric schema elements, namely \`title\` and \`description\`, have placeholder values. In the future, we might make these more informative. They are essentially "internal documentation" within the schemas and do not affect how the schemas function in AppScope. In the event that you develop any code that depends on AppScope schemas, be aware that the content of \`title\` and \`description\` fields may evolve.
 
-**Note**: AppScope 1.0.0 has been omitted from this documentation because it has been replaced by AppScope 1.0.1.`;
+For more about how events and metrics work in AppScope, see [this](working-with#events-and-metrics) overview.`;
 
 const tocOrder = [
   'event.fs.open',

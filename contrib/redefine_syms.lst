@@ -70,6 +70,7 @@ setsockopt scopelibc_setsockopt
 shmat scopelibc_shmat
 shmdt scopelibc_shmdt
 shmget scopelibc_shmget
+shutdown scopelibc_shutdown
 socket scopelibc_socket
 sprintf scopelibc_sprintf
 sscanf scopelibc_sscanf

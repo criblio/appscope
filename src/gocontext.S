@@ -71,10 +71,11 @@
 \a_func:
     push %rax
     push %rbx
+    push %rcx
     sub $0x20, %rsp
 
     mov %rsp, %r11
-    add $0x30, %r11
+    add $0x38, %r11
     mov %r11, 0x08(%rsp)
     lea \c_func@GOTPCREL(%rip), %r11
     mov (%r11), %r11
@@ -90,6 +91,7 @@
     mov %rax, %r11
 
     add $0x20, %rsp
+    pop %rcx
     pop %rbx
     pop %rax
 

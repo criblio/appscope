@@ -66,6 +66,7 @@ typedef struct {                  // Structure                  Field
     int conn_to_rwc;              // "net/http.conn"            "rwc"      
     int persistConn_to_tlsState;  // "net/http.persistConn"     "tlsState" 
     int fr_to_readBuf;            // "net/http.http2Framer"     "readBuf" 
+    int fr_to_headerBuf;          // "net/http.http2Framer"     "headerBuf" 
     int fr_to_rc;                 // "net/http.http2Framer"     "readBuf"     
     int cc_to_tconn;              // "net/http.http2ClientConn" "tconn"
 } go_struct_offsets_t;

@@ -20,5 +20,6 @@ int startsWith(const char *string, const char *substring);
 int endsWith(const char *string, const char *substring);
 
 int sigSafeNanosleep(const struct timespec *req);
+void scope_backtrace(void);
 
 #endif // __UTILS_H__

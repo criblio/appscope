@@ -10,6 +10,9 @@
 #include "dbg.h"
 #include "runtimecfg.h"
 
+#define UNW_LOCAL_ONLY
+#include "libunwind.h"
+
 rtconfig g_cfg = {0};
 
 unsigned int
@@ -202,4 +205,30 @@ sigSafeNanosleep(const struct timespec *req)
     } while (rv && (scope_errno == EINTR));
 
     return rv;
+}
+
+#define SYMBOL_NAME_LEN (256)
+void
+scope_backtrace(void)
+{
+    unw_cursor_t cursor; unw_context_t uc;
+    unw_word_t ip;
+    int ret = 0;
+
+    unw_getcontext(&uc);
+    unw_init_local(&cursor, &uc);
+    
+    while (unw_step(&cursor) > 0) {
+        char symbol[SYMBOL_NAME_LEN];
+        unw_word_t offset;
+        unw_get_reg(&cursor, UNW_REG_IP, &ip);
+
+        //Obtain symbol name
+        ret = unw_get_proc_name(&cursor, symbol, SYMBOL_NAME_LEN, &offset);
+        if ( ret!=0 ){
+            scope_printf("ip = %lx, ret = %d\n", (long) ip, ret);
+        } else {
+            scope_printf("ip = %lx, func_name = %s\n", (long) ip, symbol);
+        }
+    }  
 }

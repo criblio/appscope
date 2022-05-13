@@ -8,7 +8,7 @@
  * gcc -g test/manual/tcpserver.c -Icontrib/build/openssl/include -Icontrib/openssl/include -L contrib/build/openssl -Wl,-R$PWD/contrib/build/openssl -lpthread -lssl -lcrypto -o tcpserver
  *
  * Build Statically:
- * gcc -g -DSSL_read=SCOPE_SSL_read test/manual/tcpserver.c -Icontrib/openssl/include -Icontrib/build/openssl/include contrib/build/openssl/libssl.a contrib/build/openssl/libcrypto.a -lpthread -ldl -o tcpserver
+ * gcc -g -DSSL_write=SCOPE_SSL_write -DSSL_read=SCOPE_SSL_read test/manual/tcpserver.c -Icontrib/openssl/include -Icontrib/build/openssl/include contrib/build/openssl/libssl.a contrib/build/openssl/libcrypto.a -lpthread -ldl -o tcpserver
  *
  * generate unencrypted TLS key and certificate:
  * openssl req -nodes -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem
@@ -505,10 +505,11 @@ tcp_ssl(int socket)
     }
     printf("TLS connection accepted.\n");
 
-    FD_ZERO(&read_set);
-    FD_SET(fd, &read_set);
-
     while(1) {
+        FD_ZERO(&read_set);
+        FD_SET(fd, &read_set);
+        FD_SET(0, &read_set); // stdin
+
         int r = pselect(fd+1, &read_set, NULL, NULL, NULL, &sa.sa_mask);
         if (exit_request) {
             printf("\nReceived interrupt, exiting gracefully\n");
@@ -518,6 +519,47 @@ tcp_ssl(int socket)
             fprintf(stderr, "error in select\n");
             return -1;
         } else if (r > 0) {
+
+            if (FD_ISSET(0, &read_set)) {
+
+                // command input from stdin
+                char *cmd;
+
+                if (fgetc(stdin) == 'U') {
+                    int cmdfd;
+                    fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+                    if ((cmdfd = open(CMDFILE, O_RDONLY)) < 0) {
+                        perror("open");
+                        continue;
+                    }
+
+                    if ((cmd = calloc(1, BUFSIZE)) == NULL) {
+                        perror("calloc");
+                        close(cmdfd);
+                        continue;
+                    }
+
+                    int rc = read(cmdfd, cmd, (size_t)BUFSIZE);
+                    if (rc <= 0) {
+                        perror("read");
+                        free(cmd);
+                        close(cmdfd);
+                        continue;
+                    }
+
+                            fprintf(stderr, "%s:%d cmdfd=%d rc %d\n%s\n", __FUNCTION__, __LINE__,
+                                    cmdfd, rc, cmd);
+                            if (SCOPE_SSL_write(ssl, cmd, rc) < 0) { // MSG_DONTWAIT
+                                perror("send");
+                            }
+
+                    close(cmdfd);
+                    free(cmd);
+                }
+
+            }
+
+
             ret = ssl_read(ssl);
             if (ret < 0) {
                 return -1;

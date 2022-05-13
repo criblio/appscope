@@ -443,20 +443,12 @@ remoteConfig()
     timeout = 1;
     scope_memset(&fds, 0x0, sizeof(fds));
 
-/*
-    Setting fds.events = 0 to neuter ability to process remote
-    commands... until this is function is reworked to be TLS-friendly.
+    // We want to accept incoming requests on TCP, unix, and edge.
+    // However, we don't currently support receving on TLS connections.
+    int acceptRequests = transportSupportsCommandControl(
+                                          ctlTransport(g_ctl, CFG_CTL));
+    fds.events = (acceptRequests) ? POLLIN : 0;
 
-    cfg_transport_t ttype = ctlTransportType(g_ctl, CFG_CTL);
-    if ((ttype == (cfg_transport_t)-1) || (ttype == CFG_FILE) ||
-        (ttype ==  CFG_SYSLOG) || (ttype == CFG_SHM)) {
-        fds.events = 0;
-    } else {
-        fds.events = POLLIN;
-    }
-*/
-
-    fds.events = 0;
     fds.fd = ctlConnection(g_ctl, CFG_CTL);
 
     rc = scope_poll(&fds, 1, timeout);
@@ -489,8 +481,7 @@ remoteConfig()
         numtries++;
         rc = scope_recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
         if (rc <= 0) {
-            // Something has happened to our connection
-            ctlDisconnect(g_ctl, CFG_CTL);
+            // Something has happened to this incoming message
             break;
         }
 

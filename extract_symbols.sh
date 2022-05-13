@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Perform a check if in contrib code were not translated symbols.
+# Perform a check if in contrib code has not translated symbols.
 #
 
 # List of symbols which are ignored in replacement process

@@ -557,7 +557,7 @@ transportSendForFileWritesToFileImmediatelyWhenLineBuffered(void** state)
 }
 
 static void
-TransportTcpReconnect(void** state)
+transportTcpReconnect(void** state)
 {
     const int port_test = 7890;
     const int max_try = 100;
@@ -621,7 +621,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(transportSendForFilepathUnixFailedTransmitsMsg),
         cmocka_unit_test(transportSendForFileWritesToFileAfterFlushWhenFullyBuffered),
         cmocka_unit_test(transportSendForFileWritesToFileImmediatelyWhenLineBuffered),
-        cmocka_unit_test(TransportTcpReconnect),
+        cmocka_unit_test(transportTcpReconnect),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

@@ -217,8 +217,9 @@ scope_backtrace(void)
 
     unw_getcontext(&uc);
     unw_init_local(&cursor, &uc);
-    
+    int frame = 0;
     while (unw_step(&cursor) > 0) {
+        frame +=1;
         char symbol[SYMBOL_NAME_LEN];
         unw_word_t offset;
         unw_get_reg(&cursor, UNW_REG_IP, &ip);
@@ -226,9 +227,10 @@ scope_backtrace(void)
         //Obtain symbol name
         ret = unw_get_proc_name(&cursor, symbol, SYMBOL_NAME_LEN, &offset);
         if ( ret!=0 ){
-            scope_printf("ip = %lx, ret = %d\n", (long) ip, ret);
+            scope_printf("frame= %d, ip = %lx, ret = %d\n", frame, (long) ip, ret);
         } else {
-            scope_printf("ip = %lx, func_name = %s\n", (long) ip, symbol);
+            scope_printf("frame= %d, ip = %lx, func_name = %s\n", frame, (long) ip, symbol);
         }
-    }  
+    }
+     scope_printf("\n");
 }

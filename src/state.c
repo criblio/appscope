@@ -795,6 +795,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 
     case FS_OPEN:
     {
+        scope_backtrace();
         if (!checkFSEntry(fd)) break;
         addToInterfaceCounts(&g_fsinfo[fd].numOpen, 1);
         addToInterfaceCounts(&g_ctrs.numOpen, 1);

@@ -16,7 +16,8 @@ PCRE2_AR=contrib/build/pcre2/libpcre2-posix.a contrib/build/pcre2/libpcre2-8.a
 OPENSSL_AR=contrib/build/openssl/libssl.a contrib/build/openssl/libcrypto.a
 LS_HPACK_AR=contrib/build/ls-hpack/libls-hpack.a
 MUSL_AR=contrib/build/musl/lib/libc.a
-TEST_AR=$(MUSL_AR) $(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR} $(LS_HPACK_AR)
+UNWIND_AR=contrib/build/libunwind/src/.libs/libunwind.a
+TEST_AR=$(MUSL_AR) ${UNWIND_AR} $(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR} $(LS_HPACK_AR)
 #TEST_LIB=contrib/build/cmocka/src/libcmocka.dylib
 TEST_LIB=contrib/build/cmocka/src/libcmocka.so
 TEST_INCLUDES=-I./src -I./contrib/cmocka/include -I contrib/ls-hpack
@@ -39,6 +40,9 @@ include os/linux/$(ARCH).mk
 $(MUSL_AR):
 	@$(MAKE) -C contrib musl
 
+$(UNWIND_AR):
+	@$(MAKE) -C contrib libunwind
+
 $(OPENSSL_AR):
 	@$(MAKE) -C contrib openssl
 
@@ -50,7 +54,7 @@ $(LDSCOPEDYN): src/fn.c src/scopestdlib.c os/$(OS)/os.c src/dbg.c src/scopeelf.c
 	gcc -Wall -g $(ARCH_CFLAGS) $(DISTRO_FLAGS) \
 		-DSCOPE_VER=\"$(SCOPE_VER)\" \
 		src/fn.c src/scopestdlib.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c \
-		-ldl -lrt -o $@ ${MUSL_AR} -I./os/$(OS) $(INCLUDES)
+		-ldl -lrt -o $@ ${MUSL_AR} ${UNWIND_AR} -I./os/$(OS) $(INCLUDES)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 $(LDSCOPE): src/scope_static.c src/libdir.c src/scopestdlib.c $(LDSCOPEDYN) $(LIBSCOPE)
@@ -66,7 +70,7 @@ $(LDSCOPE): src/scope_static.c src/libdir.c src/scopestdlib.c $(LDSCOPEDYN) $(LI
 		src/scope_static.c src/scopestdlib.c src/libdir.c \
 		$(INCLUDES) \
 		$(LDSCOPEDYN).o $(LIBSCOPE:.so=.o) \
-		-lrt -lpthread -o $@ ${MUSL_AR}
+		-lrt -lpthread -o $@ ${MUSL_AR} ${UNWIND_AR}
 	$(RM) $(LDSCOPEDYN).o $(LIBSCOPE:.so=.o)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 

@@ -12,7 +12,7 @@
 
 ARCH ?= $(shell uname -m)
 
-all: cJSON cmocka funchook libyaml openssl pcre2 ls-hpack musl
+all: cJSON cmocka funchook libyaml openssl pcre2 ls-hpack musl libunwind
 clean:
 	-@$(MAKE) -C cJSON clean
 	-@$(RM) -r build/*
@@ -22,6 +22,7 @@ cJSON: cJSON/libcjson.a
 cmocka: build/cmocka/src/libcmocka.so
 funchook: build/funchook/libfunchook.a
 libyaml: build/libyaml/src/.libs/libyaml.a
+libunwind: build/libunwind/src/.libs/libunwind.a
 openssl: build/openssl/libssl.a build/openssl/libcrypto.a
 pcre2: build/pcre2/libpcre2-posix.a build/pcre2/libpcre2-8.a
 ls-hpack: build/ls-hpack/libls-hpack.a
@@ -98,6 +99,14 @@ build/ls-hpack/libls-hpack.a:
 	@mkdir build/ls-hpack
 	cd build/ls-hpack && cmake ../../ls-hpack -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_BUILD_TYPE=Release -DLSHPACK_XXH=ON && $(MAKE)
 	objcopy --redefine-syms redefine_syms.lst build/ls-hpack/libls-hpack.a
+	@[ -z "$(CI)" ] || echo "::endgroup::"
+
+build/libunwind/src/.libs/libunwind.a:
+	@echo "$${CI:+::group::}Building libunwind"
+	@$(RM) -r build/libunwind
+	@mkdir build/libunwind
+	cd build/libunwind && autoreconf -fvi ../../libunwind && ../../libunwind/configure --disable-shared --disable-minidebuginfo CFLAGS=-fPIC && $(MAKE)
+	objcopy --redefine-syms redefine_syms.lst build/libunwind/src/.libs/libunwind.a
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 build/musl/lib/libc.a:

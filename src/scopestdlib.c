@@ -29,6 +29,8 @@ extern int    scopelibc_memcmp(const void *, const void *, size_t);
 extern int    scopelibc_mprotect(void *, size_t, int);
 extern void*  scopelibc_memcpy(void *, const void *, size_t);
 extern int    scopelibc_mlock(const void *, size_t);
+extern int    scopelibc_msync(void *, size_t, int);
+extern int    scopelibc_mincore(void *, size_t, unsigned char *);
 
 // File handling operations
 extern FILE*          scopelibc_fopen(const char *, const char *);
@@ -70,6 +72,7 @@ extern char*          scopelibc_getcwd(char *, size_t);
 extern int            scopelibc_lstat(const char *, struct stat *);
 extern int            scopelibc_rename(const char *, const char *);
 extern int            scopelibc_remove(const char *);
+extern int            scopelibc_pipe2(int [2], int);
 
 // String handling operations
 extern char*               scopelibc_realpath(const char *, char *);
@@ -283,6 +286,15 @@ scope_mlock(const void *addr, size_t len) {
     return scopelibc_mlock(addr, len);
 }
 
+int
+scope_msync(void *addr, size_t length, int flags) {
+    return scopelibc_msync(addr, length, flags);
+}
+
+int
+scope_mincore(void *addr, size_t length, unsigned char *vec) {
+    return scopelibc_mincore(addr, length, vec);
+}
 
 // File handling operations
 
@@ -477,6 +489,11 @@ scope_rename(const char *oldpath, const char *newpath) {
 int
 scope_remove(const char *pathname) {
     return scopelibc_remove(pathname);
+}
+
+int
+scope_pipe2(int pipefd[2], int flags) {
+    return scopelibc_pipe2(pipefd, flags);
 }
 
 char*

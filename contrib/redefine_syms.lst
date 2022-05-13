@@ -27,6 +27,7 @@ fread scopelibc_fread
 free scopelibc_free
 freeaddrinfo scopelibc_freeaddrinfo
 fseek scopelibc_fseek
+fstat scopelibc_fstat
 ftell scopelibc_ftell
 fwrite scopelibc_fwrite
 gai_strerror scopelibc_gai_strerror
@@ -34,6 +35,7 @@ getaddrinfo scopelibc_getaddrinfo
 getentropy scopelibc_getentropy
 gethostbyname scopelibc_gethostbyname
 getnameinfo scopelibc_getnameinfo
+getpagesize scopelibc_getpagesize
 getpid scopelibc_getpid
 getsockname scopelibc_getsockname
 getsockopt scopelibc_getsockopt
@@ -50,15 +52,18 @@ memcmp scopelibc_memcmp
 memcpy scopelibc_memcpy
 memmove scopelibc_memmove
 memset scopelibc_memset
+mincore scopelibc_mincore
 mlock scopelibc_mlock
 mmap scopelibc_mmap
 mprotect scopelibc_mprotect
+msync scopelibc_msync
 munmap scopelibc_munmap
 open scopelibc_open
 opendir scopelibc_opendir
 perror scopelibc_perror
 qsort scopelibc_qsort
 qsort_r scopelibc_qsort_r
+pipe2 scopelibc_pipe2
 read scopelibc_read
 readdir scopelibc_readdir
 realloc scopelibc_realloc

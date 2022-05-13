@@ -275,6 +275,15 @@ jobs:
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-musl-${{ hashFiles('contrib/Makefile', 'contrib/musl/**') }}
           upload-chunk-size: 1000000
 
+      # Cache the libunwind build. Use a key based on a hash of all the files
+      # used in the build.
+      - name: Setup libunwind Cache
+        uses: actions/cache@v3.0.2
+        with:
+          path: contrib/build/libunwind
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-libunwind-${{ hashFiles('contrib/Makefile', 'contrib/libunwind/**') }}
+          upload-chunk-size: 1000000
+
       - name: Login to Dockerhub
         uses: docker/login-action@v2
         with:

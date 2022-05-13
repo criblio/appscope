@@ -587,6 +587,53 @@ transportTcpReconnect(void** state)
     }
 }
 
+static void
+transportTcpRemoteControlSupport(void** state)
+{
+    transport_t* t = NULL;
+    assert_false(transportSupportsCommandControl(t));
+
+    t = transportCreateTCP("127.0.0.1", "mom's apple pie recipe", TRUE, FALSE, NULL);
+    assert_non_null(t);
+    assert_false(transportSupportsCommandControl(t));
+    transportDestroy(&t);
+
+    t = transportCreateUdp("127.0.0.1", "12345");
+    assert_non_null(t);
+    assert_false(transportSupportsCommandControl(t));
+    transportDestroy(&t);
+
+    t = transportCreateSyslog();
+    assert_non_null(t);
+    assert_false(transportSupportsCommandControl(t));
+    transportDestroy(&t);
+
+    t = transportCreateShm();
+    assert_non_null(t);
+    assert_false(transportSupportsCommandControl(t));
+    transportDestroy(&t);
+
+    t = transportCreateFile("/tmp/my.path", CFG_BUFFER_FULLY);
+    assert_non_null(t);
+    assert_false(transportSupportsCommandControl(t));
+    transportDestroy(&t);
+
+    t = transportCreateUnix("/var/run/scope.sock");
+    assert_non_null(t);
+    assert_true(transportSupportsCommandControl(t));
+    transportDestroy(&t);
+
+    t = transportCreateTCP("127.0.0.1", "mom's apple pie recipe", FALSE, FALSE, NULL);
+    assert_non_null(t);
+    assert_true(transportSupportsCommandControl(t));
+    transportDestroy(&t);
+
+    t = transportCreateEdge();
+    assert_non_null(t);
+    assert_true(transportSupportsCommandControl(t));
+    transportDestroy(&t);
+}
+
 int
 main(int argc, char* argv[])
 {
@@ -622,6 +669,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(transportSendForFileWritesToFileAfterFlushWhenFullyBuffered),
         cmocka_unit_test(transportSendForFileWritesToFileImmediatelyWhenLineBuffered),
         cmocka_unit_test(transportTcpReconnect),
+        cmocka_unit_test(transportTcpRemoteControlSupport),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

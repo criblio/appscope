@@ -28,7 +28,7 @@ declare -a stdlib_ignore_syms=('/_GLOBAL_OFFSET_TABLE_/d'
 )
 
 # List of contrib libraries used by the libscope.so
-declare -a conrib_libs=("./contrib/build/ls-hpack/libls-hpack.a" 
+declare -a conrib_libs=(
 "./contrib/cJSON/libcjson.a" 
 "./contrib/build/funchook/libfunchook.a"
 "./contrib/build/funchook/capstone_src-prefix/src/capstone_src-build/libcapstone.a"

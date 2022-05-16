@@ -11,9 +11,12 @@
 #include "utils.h"
 #include "scopestdlib.h"
 
+#define UNW_LOCAL_ONLY
+#include "libunwind.h"
 
 #define MAX_INSTANCES_PER_LINE 2
 #define MAX_NUM_LINES 256
+#define SYMBOL_BT_NAME_LEN (256)
 
 typedef struct {
     time_t time;
@@ -254,7 +257,6 @@ dbgAddLine(const char *key, const char *fmt, ...)
             str = NULL;
         }
     }
-
     dbgAddLineHelper(key, str);
 }
 
@@ -268,6 +270,36 @@ void __attribute__((weak))
 scopeLog(cfg_log_level_t level, const char *format, ...)
 {
     return;
+}
+
+void
+scopeBacktrace(cfg_log_level_t level)
+{
+    unw_cursor_t cursor;
+    unw_context_t uc;
+    unw_word_t ip;
+
+    unw_getcontext(&uc);
+    unw_init_local(&cursor, &uc);
+    int frame_count = 0;
+    scopeLog(level, "--- scopeBacktrace");
+    while(unw_step(&cursor) > 0) {
+        char symbol[SYMBOL_BT_NAME_LEN];
+        unw_word_t offset;
+
+        int ret = unw_get_reg(&cursor, UNW_REG_IP, &ip);
+        if (ret) {
+            continue;
+        }
+
+        ret = unw_get_proc_name(&cursor, symbol, SYMBOL_BT_NAME_LEN, &offset);
+        if (!ret) {
+            scopeLog(level, "#%d 0x%lx %s + %d", frame_count, (long)ip, symbol, (int)offset);
+        } else {
+            scopeLog(level, "#%d  0x%lx ?", frame_count, (long)ip);
+        }
+        frame_count++;
+    }
 }
 
 void

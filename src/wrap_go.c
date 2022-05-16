@@ -39,23 +39,24 @@ int g_go_major_ver = UNKNOWN_GO_VER;
 static char g_go_build_ver[7];
 
 enum index_hook_t {
-    INDEX_HOOK_WRITE = 0,
-    INDEX_HOOK_OPEN = 1,
-    INDEX_HOOK_UNLINKAT = 2,
-    INDEX_HOOK_GETDENTS = 3,
-    INDEX_HOOK_SOCKET = 4,
-    INDEX_HOOK_ACCEPT = 5,
-    INDEX_HOOK_READ = 6,
-    INDEX_HOOK_CLOSE = 7,
-    INDEX_HOOK_TLS_SERVER_READ = 8,
-    INDEX_HOOK_TLS_SERVER_WRITE = 9,
-    INDEX_HOOK_TLS_CLIENT_READ = 10,
-    INDEX_HOOK_TLS_CLIENT_WRITE = 11,
-    INDEX_HOOK_HTTP2_CLIENT_READ = 12,
-    INDEX_HOOK_HTTP2_CLIENT_WRITE = 13,
-    INDEX_HOOK_EXIT = 14,
-    INDEX_HOOK_DIE = 15,
-    INDEX_HOOK_MAX = 16,
+    INDEX_HOOK_WRITE,
+    INDEX_HOOK_OPEN,
+    INDEX_HOOK_UNLINKAT,
+    INDEX_HOOK_GETDENTS,
+    INDEX_HOOK_SOCKET,
+    INDEX_HOOK_ACCEPT,
+    INDEX_HOOK_READ,
+    INDEX_HOOK_CLOSE,
+    INDEX_HOOK_TLS_SERVER_READ,
+    INDEX_HOOK_TLS_SERVER_WRITE,
+    INDEX_HOOK_TLS_CLIENT_READ,
+    INDEX_HOOK_TLS_CLIENT_WRITE,
+    INDEX_HOOK_HTTP2_SERVER_WRITE,
+    INDEX_HOOK_HTTP2_CLIENT_READ,
+    INDEX_HOOK_HTTP2_CLIENT_WRITE,
+    INDEX_HOOK_EXIT,
+    INDEX_HOOK_DIE,
+    INDEX_HOOK_MAX,
 };
 
 go_schema_t go_8_schema = {
@@ -107,6 +108,8 @@ go_schema_t go_8_schema = {
         .c_tls_client_write_rc=0x28,
         .c_tls_client_read_callee=0x0,
         .c_tls_client_read_pc=0x8,
+        .c_http2_server_write_callee=0x0,
+        .c_http2_server_write_sc=0x30,
         .c_http2_client_read_callee=0xa8,
         .c_http2_client_read_fr=0x0,
         .c_http2_client_read_cc=0x70,
@@ -130,9 +133,12 @@ go_schema_t go_8_schema = {
         .conn_to_tlsState=0x30,
         .persistConn_to_tlsState=0x60,
         .fr_to_readBuf=0x58,
+        .fr_to_writeBuf=0x88,
         .fr_to_headerBuf=0x40,
         .fr_to_rc=0x60,
         .cc_to_tconn=0x10,
+        .sc_to_fr=0x48,
+        .sc_to_conn=0x18,
     },
     .tap = {
         [INDEX_HOOK_WRITE]              = {"syscall.write",                        go_hook_write,              NULL, 0},
@@ -147,6 +153,7 @@ go_schema_t go_8_schema = {
         [INDEX_HOOK_TLS_SERVER_WRITE]   = {"net/http.checkConnErrorWriter.Write",  go_hook_tls_server_write,   NULL, 0},
         [INDEX_HOOK_TLS_CLIENT_READ]    = {"net/http.(*persistConn).readResponse", go_hook_tls_client_read,    NULL, 0}, 
         [INDEX_HOOK_TLS_CLIENT_WRITE]   = {"net/http.persistConnWriter.Write",     go_hook_tls_client_write,   NULL, 0},
+        [INDEX_HOOK_HTTP2_SERVER_WRITE] = {"net/http.(*http2serverConn).Flush",    go_hook_http2_server_write, NULL, 0},
         [INDEX_HOOK_HTTP2_CLIENT_READ]  = {"net/http.(*http2Framer).ReadFrame",    go_hook_http2_client_read,  NULL, 0},
         [INDEX_HOOK_HTTP2_CLIENT_WRITE] = {"net/http.http2stickyErrWriter.Write",  go_hook_http2_client_write, NULL, 0},
         [INDEX_HOOK_EXIT]               = {"runtime.exit",                         go_hook_exit,               NULL, 0},
@@ -194,6 +201,8 @@ go_schema_t go_17_schema = {
         .c_tls_client_write_rc=0x10,
         .c_tls_client_read_callee=0x0,
         .c_tls_client_read_pc=0x8,
+        .c_http2_server_write_callee=0x0,
+        .c_http2_server_write_sc=0x30,
         .c_http2_client_read_callee=0xa8,
         .c_http2_client_read_fr=0x0,
         .c_http2_client_read_cc=0x70,
@@ -217,9 +226,12 @@ go_schema_t go_17_schema = {
         .conn_to_tlsState=0x30,
         .persistConn_to_tlsState=0x60,
         .fr_to_readBuf=0x58,
+        .fr_to_writeBuf=0x88,
         .fr_to_headerBuf=0x40,
         .fr_to_rc=0x60,
         .cc_to_tconn=0x10,
+        .sc_to_fr=0x48,
+        .sc_to_conn=0x18,
     },
     // use the _reg_ assembly functions here, to support changes to Go 1.17
     // where we preserve the return values stored in registers
@@ -238,6 +250,7 @@ go_schema_t go_17_schema = {
         [INDEX_HOOK_TLS_SERVER_WRITE]   = {"net/http.checkConnErrorWriter.Write",  go_hook_reg_tls_server_write,   NULL, 0}, // tls server write
         [INDEX_HOOK_TLS_CLIENT_READ]    = {"net/http.(*persistConn).readResponse", go_hook_reg_tls_client_read,    NULL, 0}, // tls client read
         [INDEX_HOOK_TLS_CLIENT_WRITE]   = {"net/http.persistConnWriter.Write",     go_hook_reg_tls_client_write,   NULL, 0}, // tls client write
+        [INDEX_HOOK_HTTP2_SERVER_WRITE] = {"net/http.(*http2serverConn).Flush",    go_hook_reg_http2_server_write, NULL, 0}, // tls http2 server write
         [INDEX_HOOK_HTTP2_CLIENT_READ]  = {"net/http.(*http2Framer).ReadFrame",    go_hook_reg_http2_client_read,  NULL, 0}, // tls http2 client read
         [INDEX_HOOK_HTTP2_CLIENT_WRITE] = {"net/http.http2stickyErrWriter.Write",  go_hook_reg_http2_client_write, NULL, 0}, // tls http2 client write
         [INDEX_HOOK_EXIT]               = {"runtime.exit",                         go_hook_exit,                   NULL, 0},
@@ -1529,6 +1542,79 @@ EXPORTON void *
 go_tls_client_read(char *stackptr)
 {
     return do_cfunc(stackptr, c_tls_client_read, g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_READ].assembly_fn);
+}
+
+/*
+  Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
+  sc = stackaddr + 0x30 [!in calleR]
+  fr = sc + 0x48
+  conn (sc.conn.data) = sc + 0x18
+  conn.rwc_if = conn + 0x10
+  conn.rwc = conn.rwc_if + 0x08
+  netFD = conn.rwc + 0x08
+  pfd = *netFD
+  fd = pfd + 0x10
+ */
+// Extract data from net/http.(*http2serverConn).Flush (tls http2 server write)
+static void
+c_http2_server_write(char *stackaddr)
+{
+    // Take us to the stack frame we're interested in
+    // If this is defined as 0x0, we have decided to stay in the caller stack frame
+    stackaddr -= g_go_schema->arg_offsets.c_http2_server_write_callee;
+
+    int fd = -1;
+
+    uint64_t sc      = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_server_write_sc);
+    if (!sc) return;         // protect from dereferencing null
+
+    uint64_t fr      = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_fr);
+    if (!fr) return;         // protect from dereferencing null
+
+    char *buf        = (char *)(fr + g_go_schema->struct_offsets.fr_to_headerBuf);
+    char *writeBuf   = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_writeBuf);
+    if (!buf) return;
+    if (!writeBuf) return;
+
+    uint8_t *newbuf = (uint8_t *)buf; 
+    uint32_t rc = 0;
+    rc += newbuf[0] << 16;
+    rc += newbuf[1] << 8;
+    rc += newbuf[2];
+
+//    uint64_t rc = *(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_rc);
+    rc += 9;
+
+    char *frame = (char *)scope_malloc(rc);
+    if (!frame) return;
+    scope_memmove(frame, buf, 9);
+    scope_memmove(frame + 9, writeBuf, rc - 9);
+
+
+    uint64_t tcpConn = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_conn);
+    uint64_t netFD, pfd;
+
+    // conn I/F checking. Ref the comment on c_http_server_read.
+    if (tcpConn) {
+        netFD = *(uint64_t *)(tcpConn + g_go_schema->struct_offsets.iface_data);
+        if (!netFD) return;
+        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) { 
+            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd); 
+            if (!pfd) return;
+            fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd); 
+        } else {
+            fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
+        }
+
+        doProtocol((uint64_t)0, fd, frame, rc, TLSTX, BUF);
+        funcprint("Scope: c_http2_server_write of %d\n", fd);
+    }
+}
+
+EXPORTON void *
+go_http2_server_write(char *stackptr)
+{
+    return do_cfunc(stackptr, c_http2_server_write, g_go_schema->tap[INDEX_HOOK_HTTP2_SERVER_WRITE].assembly_fn);
 }
 
 /*

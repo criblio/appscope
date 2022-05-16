@@ -42,6 +42,8 @@ typedef struct {
     int c_tls_client_write_rc;
     int c_tls_client_read_callee;
     int c_tls_client_read_pc;
+    int c_http2_server_write_callee;
+    int c_http2_server_write_sc;
     int c_http2_client_read_callee;
     int c_http2_client_read_fr;
     int c_http2_client_read_cc;
@@ -66,9 +68,12 @@ typedef struct {                  // Structure                  Field
     int conn_to_rwc;              // "net/http.conn"            "rwc"      
     int persistConn_to_tlsState;  // "net/http.persistConn"     "tlsState" 
     int fr_to_readBuf;            // "net/http.http2Framer"     "readBuf" 
+    int fr_to_writeBuf;           // "net/http.http2Framer"     "writeBuf" 
     int fr_to_headerBuf;          // "net/http.http2Framer"     "headerBuf" 
     int fr_to_rc;                 // "net/http.http2Framer"     "readBuf"     
     int cc_to_tconn;              // "net/http.http2ClientConn" "tconn"
+    int sc_to_fr;                 // "net/http.http2serverConn" "http2framer"
+    int sc_to_conn;               // "net/http.http2serverConn" "conn"
 } go_struct_offsets_t;
 
 typedef struct {
@@ -122,6 +127,7 @@ extern void go_hook_tls_server_read(void);
 extern void go_hook_tls_server_write(void);
 extern void go_hook_tls_client_read(void);
 extern void go_hook_tls_client_write(void);
+extern void go_hook_http2_server_write(void);
 extern void go_hook_http2_client_read(void);
 extern void go_hook_http2_client_write(void);
 extern void go_hook_exit(void);
@@ -139,6 +145,7 @@ extern void go_hook_reg_tls_server_read(void);
 extern void go_hook_reg_tls_server_write(void);
 extern void go_hook_reg_tls_client_read(void);
 extern void go_hook_reg_tls_client_write(void);
+extern void go_hook_reg_http2_server_write(void);
 extern void go_hook_reg_http2_client_read(void);
 extern void go_hook_reg_http2_client_write(void);
 

@@ -243,6 +243,9 @@ search_for_spot:
 void
 dbgAddLine(const char *key, const char *fmt, ...)
 {
+    // TODO verify should this be called always
+    // scopeBacktrace(CFG_LOG_ERROR);
+
     if (!g_dbg) return;
 
     // Create the string

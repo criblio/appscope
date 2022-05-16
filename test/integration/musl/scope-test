@@ -6,6 +6,7 @@ FAILED_TEST_LIST=""
 FAILED_TEST_COUNT=0
 
 EVT_FILE="/opt/test-runner/logs/events.log"
+SCOPE_LOG_FILE="/opt/test-runner/logs/scope.log"
 
 starttest(){
     CURRENT_TEST=$1
@@ -38,7 +39,12 @@ endtest(){
         cp -f $EVT_FILE $EVT_FILE.$CURRENT_TEST
     fi
 
+    if [ $RESULT == "FAILED" ]; then
+        cat $SCOPE_LOG_FILE
+    fi
+
     rm -f $EVT_FILE
+    rm -f $SCOPE_LOG_FILE
 }
 
 #
@@ -127,6 +133,74 @@ fi
 
 endtest
 
+#
+# verify fault_test_read_only_mem
+#
+
+starttest fault_test_read_only_mem
+
+cd /opt/fault_test/
+
+SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 0
+
+grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+if [ "x86_64" = "$(uname -m)" ]; then
+    grep "test_function" $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+fi
+
+grep "Invalid permissions for mapped object" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+#
+# verify fault_test_not_mapped_mem
+#
+
+starttest fault_test_not_mapped_mem
+
+cd /opt/fault_test/
+
+SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 1
+
+grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+if [ "x86_64" = "$(uname -m)" ]; then
+    grep "test_function" $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+fi
+
+grep "Address not mapped to object" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+#
+# verify fault_test_bus_error
+#
+
+starttest fault_test_bus_error
+
+cd /opt/fault_test/
+
+SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 2
+
+grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+if [ "x86_64" = "$(uname -m)" ]; then
+    grep "test_function" $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+fi
+
+grep "Nonexistent physical address" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+endtest
 
 #
 # tls

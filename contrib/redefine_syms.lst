@@ -79,6 +79,7 @@ shutdown scopelibc_shutdown
 socket scopelibc_socket
 sprintf scopelibc_sprintf
 sscanf scopelibc_sscanf
+stat scopelibc_stat
 stderr scopelibc_stderr
 strcasecmp scopelibc_strcasecmp
 strcat scopelibc_strcat

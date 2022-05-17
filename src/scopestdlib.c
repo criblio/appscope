@@ -73,6 +73,7 @@ extern int            scopelibc_lstat(const char *, struct stat *);
 extern int            scopelibc_rename(const char *, const char *);
 extern int            scopelibc_remove(const char *);
 extern int            scopelibc_pipe2(int [2], int);
+extern void           scopelibc_setbuf(FILE *, char *);
 
 // String handling operations
 extern char*               scopelibc_realpath(const char *, char *);
@@ -494,6 +495,11 @@ scope_remove(const char *pathname) {
 int
 scope_pipe2(int pipefd[2], int flags) {
     return scopelibc_pipe2(pipefd, flags);
+}
+
+void
+scope_setbuf(FILE *restrict stream, char *restrict buf) {
+    scopelibc_setbuf(stream, buf);
 }
 
 char*

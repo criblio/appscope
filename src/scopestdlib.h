@@ -120,6 +120,7 @@ int            scope_lstat(const char *, struct stat *);
 int            scope_rename(const char *, const char *);
 int            scope_remove(const char *);
 int            scope_pipe2(int [2], int);
+void           scope_setbuf(FILE *, char *);
 
 // String handling operations
 char*              scope_realpath(const char *, char *);

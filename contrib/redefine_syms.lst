@@ -100,7 +100,6 @@ strstr scopelibc_strstr
 strtod scopelibc_strtod
 strtol scopelibc_strtol
 strtoul scopelibc_strtoul
-syscall scopelibc_syscall
 sysconf scopelibc_sysconf
 tcgetattr scopelibc_tcgetattr
 tcsetattr scopelibc_tcsetattr

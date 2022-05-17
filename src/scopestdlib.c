@@ -197,6 +197,28 @@ extern int           scopelibc_shmdt(const void *);
 extern int           scopelibc_shmget(key_t, size_t, int);
 extern int           scopelibc_sched_getcpu(void);
 
+static int g_go_static;
+
+// TODO consider moving GOAppState API somewhere else
+void
+scopeSetGoAppStateStatic(int static_state) {
+    g_go_static = static_state;
+}
+
+int
+scopeGetGoAppStateStatic(void) {
+    return g_go_static;
+}
+
+int
+SCOPE_DlIteratePhdr(int (*callback) (struct dl_phdr_info *info, size_t size, void *data), void *data)
+{
+    // TODO provide implementation for static GO
+    // We cannot use dl_iterate_phdr since it uses TLS
+    // To retrieve information about go symbols we need to implement own
+    return (!scopeGetGoAppStateStatic()) ? dl_iterate_phdr(callback, data) : 0;
+}
+
 // Internal library operations
 
 void

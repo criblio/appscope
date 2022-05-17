@@ -57,6 +57,12 @@ extern FILE scopelibc___stderr_FILE;
 #define scope_stdout   (&scopelibc___stdout_FILE)
 #define scope_stderr   (&scopelibc___stderr_FILE)
 
+// Other
+extern void scopeSetGoAppStateStatic(int);
+extern int scopeGetGoAppStateStatic(void);
+
+// Custom operations
+
 void  scope_init_vdso_ehdr(void);
 void  scope_op_before_fork(void);
 void  scope_op_after_fork(int);

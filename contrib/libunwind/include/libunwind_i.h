@@ -156,12 +156,18 @@ target_is_big_endian()
 #pragma weak pthread_mutex_lock
 #pragma weak pthread_mutex_unlock
 
+#if defined(CONFIG_PTHTREAD_API)
 #define mutex_init(l)                                                   \
         (pthread_mutex_init != NULL ? pthread_mutex_init ((l), NULL) : 0)
 #define mutex_lock(l)                                                   \
         (pthread_mutex_lock != NULL ? pthread_mutex_lock (l) : 0)
 #define mutex_unlock(l)                                                 \
         (pthread_mutex_unlock != NULL ? pthread_mutex_unlock (l) : 0)
+#else
+#define mutex_init(l)
+#define mutex_lock(l)
+#define mutex_unlock(l)
+#endif
 
 #define UNWI_OBJ(fn)      UNW_PASTE(UNW_PREFIX,UNW_PASTE(I,fn))
 #define UNWI_ARCH_OBJ(fn) UNW_PASTE(UNW_PASTE(UNW_PASTE(_UI,UNW_TARGET),_), fn)

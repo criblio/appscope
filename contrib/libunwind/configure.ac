@@ -278,6 +278,15 @@ if test x$enable_block_signals = xyes; then
 fi
 AC_MSG_RESULT([$enable_block_signals])
 
+AC_MSG_CHECKING([whether to use pthead API])
+AC_ARG_ENABLE(pthread_api,
+AS_HELP_STRING([--enable-pthread-api],[Enable pthread API]),,
+[enable_pthread_api=yes])
+if test x$enable_pthread_api = xyes; then
+  AC_DEFINE([CONFIG_PTHTREAD_API], [1], [Enable pthread API])
+fi
+AC_MSG_RESULT([$enable_pthread_api])
+
 AC_MSG_CHECKING([whether to validate memory addresses before use])
 AC_ARG_ENABLE(conservative_checks,
 AS_HELP_STRING([--enable-conservative-checks],[Validate all memory addresses before use]),,

@@ -106,7 +106,7 @@ build/libunwind/src/.libs/libunwind.a:
 	@$(RM) -r build/libunwind
 	@mkdir build/libunwind
 # To enable debug please add below --enable-debug
-	cd build/libunwind && autoreconf -fvi ../../libunwind && ../../libunwind/configure --disable-shared --disable-minidebuginfo --disable-documentation --disable-tests CFLAGS=-fPIC && $(MAKE)
+	cd build/libunwind && autoreconf -fvi ../../libunwind && ../../libunwind/configure --disable-pthread-api --disable-shared --disable-minidebuginfo --disable-documentation --disable-tests CFLAGS=-fPIC && $(MAKE)
 	objcopy --redefine-syms redefine_syms.lst build/libunwind/src/.libs/libunwind.a
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 

@@ -6,364 +6,364 @@
   "$defs": {
     "addrs": {
       "title": "addrs",
-      "description": "addrs",
+      "description": "IP address(es) of the domain which the scoped application has sent a DNS request about.",
       "type": "array"
     },
     "class_connection": {
       "title": "connection",
-      "description": "connection",
+      "description": "connection REVISIT",
       "type": "string",
       "const": "connection"
     },
     "class_fs_error": {
       "title": "class fs.error",
-      "description": "class fs.error",
+      "description": "Specifies the subcategory of filesystem error whose instances are aggregated in this event or metric. ",
       "type": "string",
       "enum": ["open_close", "read_write", "stat"]
     },
     "class_net_error": {
       "title": "class net.error",
-      "description": "class net.error",
+      "description": "Specifies the subcategory of network error whose instances are aggregated in this event or metric.",
       "type": "string",
       "enum": ["connection", "rx_tx"]
     },
     "class_net_rxtx": {
       "title": "class net.rxtx",
-      "description": "class net.rxrx",
+      "description": "Specifies the subcategory of send and receive operations whose instances are aggregated in this event or metric.",
       "type": "string",
       "enum": ["inet_tcp", "inet_udp", "unix_tcp", "unix_udp", "other"]
     },
     "data": {
       "title": "data",
-      "description": "data",
+      "description": "Specifies whether the data is unencrypted (clear) or encrypted (ssl). ???",
       "type": "string",
       "enum": ["ssl", "clear"]
     },
     "domain": {
       "title": "domain",
-      "description": "domain",
+      "description": "The domain which the scoped application made a DNS request about.",
       "type": "string"
     },
     "duration": {
       "title": "duration",
-      "description": "duration",
+      "description": "Duration in milliseconds.",
       "type": "number",
       "examples": [55]
     },
     "fd": {
       "title": "fd",
-      "description": "fd",
+      "description": "The file descriptor for the operation described by the event or metric.",
       "type": "integer",
       "examples": [4]
     },
     "file": {
       "title": "file",
-      "description": "file",
+      "description": "The name of the file affected by the operation described by the event or metric.",
       "type": "string"
     },
     "file_group": {
       "title": "file_group",
-      "description": "file_group",
+      "description": "The group ID in the permissions of the file affected by the operation described by the event or metric.",
       "type": "number",
       "examples": [0]
     },
     "file_owner": {
       "title": "file_owner",
-      "description": "file_owner",
+      "description": "The user ID of the owner in the permissions of the file affected by the operation described by the event or metric. REVISIT",
       "type": "number",
       "examples": [0]
     },
     "file_perms": {
       "title": "file_perms",
-      "description": "file_perms",
+      "description": "The permissions, in octal format, of the file affected by the operation described by the event or metric.",
       "type": "integer",
       "examples": [777]
     },
     "file_read_bytes": {
       "title": "file_read_bytes",
-      "description": "file_read_bytes",
+      "description": "Specifies the number of bytes of data that were read for the file. REVISIT",
       "type": "integer",
       "examples": [512]
     },
     "file_read_ops": {
       "title": "file_read_ops",
-      "description": "file_read_ops",
+      "description": "When verbosity is set to aggregate, specifies how many individual read operations were aggregated.",
       "type": "integer",
       "examples": [5]
     },
     "file_write_bytes": {
       "title": "file_write_bytes",
-      "description": "file_write_bytes",
+      "description": "Specifies the number of bytes of data that were written to the file.",
       "type": "integer",
       "examples": [10]
     },
     "file_write_ops": {
       "title": "file_write_ops",
-      "description": "file_write_ops",
+      "description": "When verbosity is set to aggregate, specifies how many individual write operations were aggregated.",
       "type": "integer",
       "examples": [5]
     },
     "host": {
       "title": "host",
-      "description": "host",
+      "description": "Specifies the hostname for the host on which the scoped application was run.",
       "type": "string"
     },
     "http_client_duration": {
       "title": "http_client_duration",
-      "description": "http_client_duration",
+      "description": "Duration in milliseconds measuring the time the request is issued until the time the response is received.",
       "type": "number"
     },
     "http_client_ip": {
       "title": "http_client_ip",
-      "description": "http_client_ip",
+      "description": "IP address REVISIT",
       "type": "string"
     },
     "http_flavor": {
       "title": "http_flavor",
-      "description": "http_flavor",
+      "description": "Specifies whether an HTTP request or response is in HTTP/1.1 or HTTP/2.0.",
       "type": "string"
     },
     "http_frame": {
       "title": "http_frame",
-      "description": "http_frame",
+      "description": "REVISIT",
       "type": "string",
       "enum": ["HEADERS", "PUSH_PROMISE"]
     },
     "http_host": {
       "title": "http_host",
-      "description": "http_host",
+      "description": "The hostname of the host to which the scoped application is making an HTTP request or from which it's receiving a response, unless the scoped application is an HTTP server, in which case it's the server's hostname.",
       "type": "string"
     },
     "http_method": {
       "title": "http_method",
-      "description": "http_method",
+      "description": "Specifies the method of an HTTP request in the data; e.g., GET, POST, PATCH, etc.",
       "type": "string"
     },
     "http_response_content_length": {
       "title": "http_response_content_length",
-      "description": "http_response_content_length",
+      "description": "Specifies the length in bytes of the HTTP response body.",
       "type": "number"
     },
     "http_scheme": {
       "title": "http_scheme",
-      "description": "http_scheme",
+      "description": "http_scheme HOW TO PHRASE THIS?",
       "type": "string",
       "enum": ["http", "https"]
     },
     "http_server_duration": {
       "title": "http_server_duration",
-      "description": "http_server_duration",
+      "description": "Duration in milliseconds measuring the time the request was received until the time the response was issued.",
       "type": "number"
     },
     "http_status_code": {
       "title": "http_status_code",
-      "description": "http_status_code",
+      "description": "Specifies the status code of an HTTP response.",
       "type": "integer",
       "enum": [100, 101, 102, 200, 201, 202, 203, 204, 205, 206, 207, 208, 226, 300, 301, 302, 303, 304, 305, 307, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 421, 422, 423, 424, 426, 428, 429, 431, 444, 451, 499, 500, 501, 502, 503, 504, 505, 506, 507]
     },
     "http_status_text": {
       "title": "http_status_text",
-      "description": "http_status_text",
+      "description": "The standard text that accompanies an HTTP response status code.",
       "type": "string",
       "enum": ["Continue", "Switching Protocols", "Processing", "OK", "Created", "Accepted", "Non-authoritative Information", "No Content", "Reset Content", "Partial Content", "Multi-Status", "Already Reported", "IM Used", "Multiple Choices", "Moved Permanently", "Found", "See Other", "Not Modified", "Use Proxy", "Temporary Redirect", "Permanent Redirect", "Bad Request", "Unauthorized", "Payment Required", "Forbidden", "Not Found", "Method Not Allowed", "Not Acceptable", "Proxy Authentication Required", "Request Timeout", "Conflict", "Gone", "Length Required", "Precondition Failed", "Payload Too Large", "Request-URI Too Long", "Unsupported Media Type", "Requested Range Not Satisfiable", "Expectation Failed", "I'm a teapot", "Misdirected Request", "Unprocessable Entity", "Locked", "Failed Dependency", "Upgrade Required", "Precondition Required", "Too Many Requests", "Request Header Fields Too Large", "Connection Closed Without Response", "Unavailable For Legal Reasons", "Client Closed Request", "Internal Server Error", "Not Implemented", "Bad Gateway", "Service Unavailable", "Gateway Timeout", "HTTP Version Not Supported", "Variant Also Negotiates", "Insufficient Storage"]
     },
     "http_stream": {
       "title": "http_stream",
-      "description": "http_stream",
+      "description": "http_stream REVISIT - relates to HTTP/2.2",
       "type": "integer"
     },
     "http_target": {
       "title": "http_target",
-      "description": "http_target",
+      "description": "The component of a URL ... REVISIT",
       "type": "string"
     },
     "http_user_agent": {
       "title": "http_user_agent",
-      "description": "http_user_agent",
+      "description": "Describes the web client that issued a request. MORE??",
       "type": "string"
     },
     "localip": {
       "title": "localip",
-      "description": "localip",
+      "description": "The IP address portion of a network address. REFINE",
       "type": "string",
       "examples": ["127.0.0.1"]
     },
     "localn": {
       "title": "localn",
-      "description": "localn",
+      "description": "The inode of a local Unix socket connection. VERIFY",
       "type": "number"
     },
     "localp": {
       "title": "localp",
-      "description": "localp",
+      "description": "The port portion of a network address. REFINE",
       "type": "number",
       "examples": [9109]
     },
     "message": {
       "title": "message",
-      "description": "message",
+      "description": "The textual data being written to a console or file.",
       "type": "string"
     },
     "net_bytes_recv": {
       "title": "net_bytes_recv",
-      "description": "net_bytes_recv",
+      "description": "Specifies the number of bytes of data that were received over a network connection.",
       "type": "number"
     },
     "net_bytes_sent": {
       "title": "net_bytes_sent",
-      "description": "net_bytes_sent",
+      "description": "Specifies the number of bytes of data that were sent over a network connection.",
       "type": "number"
     },
     "net_close_reason": {
       "title": "net_close_reason",
-      "description": "net_close_reason",
+      "description": "Specifies which end of a network connection initiated the closing of the connection.",
       "type": "string",
       "enum": ["local", "remote"]
     },
     "net_protocol": {
       "title": "net_protocol",
-      "description": "net_protocol",
+      "description": "net_protocol REVISIT - IS THERE ONLY ONE VALUE NOW, AND IN FUTURE OTHERS MIGHT BE SUPPORTED?",
       "type": "string",
       "const": "http"
     },
     "net_host_ip": {
       "title": "net_host_ip",
-      "description": "net_host_ip",
+      "description": "The IP portion of the local side of a network connection.",
       "type": "string"
     },
     "net_host_port": {
       "title": "net_host_port",
-      "description": "net_host_port",
+      "description": "The port portion of the local side of a network connection.",
       "type": "integer"
     },
     "net_peer_ip": {
       "title": "net_peer_ip",
-      "description": "net_peer_ip",
+      "description": "The IP portion of the remote side of a network connection.",
       "type": "string"
     },
     "net_peer_port": {
       "title": "net_peer_port",
-      "description": "net_peer_port",
+      "description": "The port portion of the remote side of a network connection.",
       "type": "integer"
     },
     "unix_peer_inode": {
       "title": "unix_peer_inode",
-      "description": "unix_peer_inode",
+      "description": "REVISIT",
       "type": "number"
     },
     "net_transport": {
       "title": "net_transport",
-      "description": "net_transport",
+      "description": "REVISIT",
       "type": "string",
       "enum": ["IP.TCP", "IP.UDP", "IP.RAW", "IP.RDM", "IP.SEQPACKET", "Unix.TCP", "Unix.UDP", "Unix.RAW", "Unix.RDM", "Unix.SEQPACKET"]
     },
     "numops": {
       "title": "numops",
-      "description": "numops",
+      "description": "When verbosity is set to aggregate, specifies how many individual operations were aggregated.",
       "type": "number"
     },
     "op": {
       "title": "op",
-      "description": "op",
+      "description": "When verbosity is set to not aggregate, identifies what function in the code was executed.",
       "type": "string"
     },
     "op_fs_close": {
       "title": "op_fs_close",
-      "description": "op_fs_close",
+      "description": "When verbosity is set to not aggregate, identifies the filesystem close operation that was executed.",
       "type": "string",
       "enum": ["go_close", "closedir", "freopen", "freopen64", "close", "fclose", "close$NOCANCEL", "guarded_close_np", "close_nocancel"]
     },
     "op_fs_delete": {
       "title": "op_fs_delete",
-      "description": "op_fs_delete",
+      "description": "PATTERN",
       "type": "string",
       "enum": ["go_unlinkat", "unlink", "unlinkat"]
     },
     "op_fs_open": {
       "title": "op_fs_open",
-      "description": "op_fs_open",
+      "description": "PATTERN",
       "type": "string",
       "enum": ["open", "openat", "opendir", "creat", "fopen", "freopen", "open64", "openat64", "__open64_2", "__open_2", "__openat_2", "creat64", "fopen64", "freopen64", "recvmsg", "console output", "console input"]
     },
     "op_fs_read": {
       "title": "op_fs_read",
-      "description": "op_fs_read",
+      "description": "PATTERN",
       "type": "string",
       "enum": ["go_read", "go_getdents", "readdir", "pread64", "__pread64_chk", "preadv", "preadv2", "preadv64v2", "__pread_chk", "__read_chk", "__fread_unlocked_chk", "read", "readv", "pread", "fread", "__fread_chk", "fread_unlocked", "fgets", "__fgets_chk", "fgets_unlocked", "__fgetws_chk", "fgetws", "fgetwc", "fgetc", "fscanf", "getline", "getdelim", "__getdelim"]
     },
     "op_fs_seek": {
-      "title": "op_fs_seek",
-      "description": "op_fs_seek",
+      "title": "PATTERN",
+      "description": "op_fs_seek WITH UNDERSCORES OR NOT?",
       "type": "string",
       "enum": ["lseek64", "fseek64", "ftello64", "fsetpos64", "lseek", "fseek", "fseeko", "ftell", "ftello", "rewind", "fsetpos", "fgetpos", "fgetpos64"]
     },
     "op_fs_stat": {
-      "title": "op_fs_stat",
-      "description": "op_fs_stat",
+      "title": "PATTERN",
+      "description": "op_fs_stat WITH UNDERSCORES OR NOT?",
       "type": "string",
       "enum": ["statfs64", "__xstat", "__xstat64", "__lxstat", "__lxstat64", "__fxstat", "__fxstatat", "__fxstatat64", "statx", "statfs", "statvfs", "statvfs64", "access", "faccessat", "stat", "lstat", "fstatfs64", "__fxstat", "__fxstat64", "fstatfs", "fstatvfs", "fstatvfs64", "fstat", "fstatat"]
     },
     "op_fs_write": {
-      "title": "op_fs_write",
-      "description": "op_fs_write",
+      "title": "PATTERN",
+      "description": "op_fs_write WITH UNDERSCORES OR NOT?",
       "type": "string",
       "enum": ["go_write", "pwrite64", "pwritev", "pwritev64", "pwritev2", "pwritev64v2", "__overflow", "__write_libc", "__write_pthread", "fwrite_unlocked", "__stdio_write", "write", "pwrite", "writev", "fwrite", "puts", "putchar", "fputs", "fputs_unlocked", "fputc", "fputc_unlocked", "putwc", "fputwc"]
     },
     "pid": {
       "title": "pid",
-      "description": "pid",
+      "description": "The process ID of the scoped application.",
       "type": "integer",
       "examples": [1000]
     },
     "port": {
       "title": "port",
-      "description": "port",
+      "description": "Specifies a network port that was opened before a network connection was initiated, or closed after the connection closed. REVISIT",
       "type": "number"
     },
     "proc": {
       "title": "proc",
-      "description": "proc",
+      "description": "The name of the process for the scoped application.",
       "type": "string"
     },
     "proc_cgroup": {
       "title": "proc_cgroup",
-      "description": "proc_cgroup",
+      "description": "Specifies the control group that was used in container creation.",
       "type": "string",
       "examples": ["0::/user.slice/user-1000.slice/session-3.scope"]
     },
     "proc_gid": {
       "title": "proc_gid",
-      "description": "proc_gid",
+      "description": "PERMISSIONS - The process group ID of the scoped application OR executing process.",
       "type": "integer",
       "examples": [0]
     },
     "proc_uid": {
       "title": "proc_uid",
-      "description": "proc_uid",
+      "description": "PERMISSIONS - proc_uid",
       "type": "integer",
       "examples": [0]
     },
     "proto": {
       "title": "proto",
-      "description": "proto",
+      "description": "REVISIT - The transmission protocol that the scoped application used to send data.",
       "type": "string",
       "enum": ["TCP", "UDP", "RAW", "RDM", "SEQPACKET", "OTHER"]
     },
     "proto_tcp": {
       "title": "proto_tcp",
-      "description": "proto_tcp",
+      "description": "REVISIT - similar to above",
       "type": "string",
       "const": "TCP"
     },
     "proto_udp": {
       "title": "proto_udp",
-      "description": "proto_udp",
+      "description": "REVISIT - similar to above",
       "type": "string",
       "const": "UDP"
     },
     "protocol": {
       "title": "protocol",
-      "description": "protocol",
+      "description": "Specifies the protocol that AppScope detected in data transmitted on a network connection.",
       "type": "string",
       "enum": ["HTTP"]
     },

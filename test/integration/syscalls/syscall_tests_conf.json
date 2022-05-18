@@ -145,7 +145,6 @@
         "open13",
         "statfs02_64",
         "statfs02",
-        "recvmsg01"
       ],
       "exclude_glibc_tests": []
     },

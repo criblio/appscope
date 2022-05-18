@@ -6,71 +6,71 @@
   "$defs": {
     "_time": {
       "title": "_time",
-      "description": "_time",
+      "description": "_time MEANING WHAT",
       "type": "number",
       "examples": ["1643662126.91777"]
     },
     "_value": {
       "title": "_value",
-      "description": "_value",
+      "description": "_value OF WHAT",
       "type": "number",
       "examples": [1]
     },
     "args": {
       "title": "args",
-      "description": "args",
+      "description": "args TO WHAT? MY GUESS: The arguments with which the scoped command was run.",
       "type": "string"
     },
     "cmd": {
       "title": "cmd",
-      "description": "cmd",
+      "description": "cmd MEANING, THE SCOPED COMMAND?",
       "type": "string",
       "examples": ["top"]
     },
     "data": {
       "title": "data",
-      "description": "data",
+      "description": "data MEANING, THE DATA THAT THE SCOPED COMMAND OUTPUT ... ? ",
       "type": "string"
     },
     "gid": {
       "title": "gid",
-      "description": "gid",
+      "description": "gid OF WHAT",
       "type": "integer",
       "examples": [0]
     },
     "groupname": {
       "title": "groupname",
-      "description": "groupname",
+      "description": "groupname REFERRING TO WHAT KIND OF GROUP",
       "type": "string",
       "examples": ["root"]
     },
     "metric_type_counter": {
       "title": "counter",
-      "description": "counter",
+      "description": "Indicates that the metric is a counter.",
       "type": "string",
       "const": "counter"
     },
     "metric_type_gauge": {
       "title": "gauge",
-      "description": "gauge",
+      "description": "Indicates that the metric is a gauge.",
       "type": "string",
       "const": "gauge"
     },
     "metric_type_histogram": {
       "title": "histogram",
-      "description": "histogram",
+      "description": "Indicates that the metric from the scoped command is a histogram.",
       "type": "string",
       "const": "histogram"
     },
     "metric_type_timer": {
       "title": "timer",
-      "description": "timer",
+      "description": "Indicates that the metric is a timer.",
       "type": "string",
       "const": "timer"
     },
     "sourcefile": {
       "title": "file",
-      "description": "String that describes a file path.",
+      "description": "String that describes a file path. IN WHAT CONTEXT? ",
       "type": "string"
     },
     "sourceconsolestderrstdout": {
@@ -321,19 +321,19 @@
     },
     "sourcetypedns": {
       "title": "dns",
-      "description": "Sourcetype - dns",
+      "description": "Sourcetype - DNS",
       "type": "string",
       "const": "dns"
     },
     "sourcetypefs": {
       "title": "fs",
-      "description": "Sourcetype - fs",
+      "description": "Sourcetype - filesystem",
       "type": "string",
       "const": "fs"
     },
     "sourcetypehttp": {
       "title": "http",
-      "description": "Sourcetype - http",
+      "description": "Sourcetype - HTTP",
       "type": "string",
       "const": "http"
     },
@@ -351,13 +351,13 @@
     },
     "uid": {
       "title": "uid",
-      "description": "uid",
+      "description": "uid for the user WHO DID WHAT?",
       "type": "integer",
       "examples": [0]
     },
     "username": {
       "title": "username",
-      "description": "username",
+      "description": "username for the user WHO DID WHAT?",
       "type": "string",
       "examples": ["root"]
     }

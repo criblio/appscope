@@ -912,6 +912,15 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     }
 }
 
+bool
+isProtocolSet(int fd)
+{
+    net_info *net;
+    net = getNetEntry(fd);
+    if (net && net->protoDetect != DETECT_PENDING) return TRUE;
+    return FALSE;
+}
+
 static bool
 setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size_t len)
 {
@@ -1264,6 +1273,7 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
     net_info *net = getNetEntry(sockfd);    // first try by descriptor
     if (!net) net = getChannelNetEntry(id); // fallback to using channel ID
 
+    if (src == TLSTX || src == TLSRX) {
     scopeLogHexDebug(buf, len > 64 ? 64 : len, // limit hexdump to 64
             "DEBUG: doProtocol(id=%ld, fd=%d, len=%ld, src=%s, dtyp=%s) TLS=%s PROTO=%s",
             id, sockfd, len,
@@ -1284,6 +1294,7 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
             net->protoDetect == DETECT_TRUE    ? "TRUE" :
             net->protoDetect == DETECT_FALSE   ? "FALSE" : "INVALID"
             );
+    }
 
     // Ignore empty payloads that should have been blocked by our interpositions
     if (!len) {

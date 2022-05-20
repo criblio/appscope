@@ -79,5 +79,6 @@ void setFSContentType(int, fs_content_type_t);
 fs_content_type_t getFSContentType(int);
 void setGoAppStateStatic(int);
 int getgoAppStateStatic(void);
+bool isProtocolSet(int);
 
 #endif // __STATE_H__

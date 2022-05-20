@@ -72,10 +72,11 @@
     push %rax
     push %rbx
     push %rcx
+    push %rdi
     sub $0x20, %rsp
 
     mov %rsp, %r11
-    add $0x38, %r11
+    add $0x40, %r11
     mov %r11, 0x08(%rsp)
     lea \c_func@GOTPCREL(%rip), %r11
     mov (%r11), %r11
@@ -91,6 +92,7 @@
     mov %rax, %r11
 
     add $0x20, %rsp
+    pop %rdi
     pop %rcx
     pop %rbx
     pop %rax
@@ -111,6 +113,7 @@
     interpose go_hook_tls_server_write, go_tls_server_write
     interpose go_hook_tls_client_read, go_tls_client_read
     interpose go_hook_tls_client_write, go_tls_client_write
+    interpose go_hook_http2_server_read, go_http2_server_read
     interpose go_hook_http2_server_write, go_http2_server_write
     interpose go_hook_http2_client_read, go_http2_client_read
     interpose go_hook_http2_client_write, go_http2_client_write
@@ -129,6 +132,7 @@
     interpose_regs go_hook_reg_tls_server_write, go_tls_server_write
     interpose_regs go_hook_reg_tls_client_read, go_tls_client_read
     interpose_regs go_hook_reg_tls_client_write, go_tls_client_write
+    interpose_regs go_hook_reg_http2_server_read, go_http2_server_read
     interpose_regs go_hook_reg_http2_server_write, go_http2_server_write
     interpose_regs go_hook_reg_http2_client_read, go_http2_client_read
     interpose_regs go_hook_reg_http2_client_write, go_http2_client_write

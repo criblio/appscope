@@ -43,7 +43,7 @@ typedef struct {
     int c_tls_client_read_callee;
     int c_tls_client_read_pc;
     int c_http2_server_read_sc;
-    int c_http2_client_read_sc;
+    int c_http2_client_read_cc;
     int c_http2_server_write_callee;
     int c_http2_server_write_sc;
     int c_http2_client_write_callee;
@@ -70,6 +70,7 @@ typedef struct {                  // Structure                  Field
     int fr_to_writeBuf;           // "net/http.http2Framer"     "writeBuf" 
     int fr_to_headerBuf;          // "net/http.http2Framer"     "headerBuf" 
     int fr_to_rc;                 // "net/http.http2Framer"     "readBuf"     
+    int cc_to_fr;                 // "net/http.http2ClientConn" "http2framer"
     int cc_to_tconn;              // "net/http.http2ClientConn" "tconn"
     int sc_to_fr;                 // "net/http.http2serverConn" "http2framer"
     int sc_to_conn;               // "net/http.http2serverConn" "conn"

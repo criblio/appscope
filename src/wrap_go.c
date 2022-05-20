@@ -37,6 +37,7 @@
 
 int g_go_major_ver = UNKNOWN_GO_VER;
 static char g_go_build_ver[7];
+static char g_ReadFrame_addr[64]; // Is this large enough for any memory addr?
 
 enum index_hook_t {
     INDEX_HOOK_WRITE,
@@ -110,7 +111,7 @@ go_schema_t go_8_schema = {
         .c_tls_client_read_callee=0x0,
         .c_tls_client_read_pc=0x8,
         .c_http2_server_read_sc=0xd0,
-        .c_http2_client_read_sc=0xd0,
+        .c_http2_client_read_cc=0xd0,
         .c_http2_server_write_callee=0x0,
         .c_http2_server_write_sc=0x30,
         .c_http2_client_write_callee=0x40,
@@ -202,7 +203,7 @@ go_schema_t go_17_schema = {
         .c_tls_client_write_rc=0x10,
         .c_tls_client_read_callee=0x0,
         .c_tls_client_read_pc=0x8,
-        .c_http2_client_read_sc=0xd0,
+        .c_http2_client_read_cc=0x68,
         .c_http2_server_read_sc=0xd0,
         .c_http2_server_write_callee=0x0,
         .c_http2_server_write_sc=0x30,
@@ -229,6 +230,7 @@ go_schema_t go_17_schema = {
         .fr_to_writeBuf=0x88,
         .fr_to_headerBuf=0x40,
         .fr_to_rc=0x60,
+        .cc_to_fr=0x130,
         .cc_to_tconn=0x10,
         .sc_to_fr=0x48,
         .sc_to_conn=0x18,
@@ -658,9 +660,11 @@ patch_addrs(funchook_t *funchook,
         // PATCH CALL
         // In the case of some functions, we want to patch just after a "call" instruction.
         // Note: We don't need a frame size here.
-        if ((!scope_strcmp(tap->func_name, "net/http.(*http2serverConn).readFrames")) &&
+        if ((!scope_strcmp(tap->func_name, "net/http.(*http2serverConn).readFrames")) || 
+            (!scope_strcmp(tap->func_name, "net/http.(*http2clientConnReadLoop).run"))) {
+            if (
             (!scope_strcmp((const char*)asm_inst[i].mnemonic, "call")) &&
-            (!scope_strcmp((const char*)asm_inst[i].op_str, "0x5ee3a0")) &&
+            (scope_strstr(g_ReadFrame_addr, (const char*)asm_inst[i].op_str)) &&
             (asm_inst[i].size == 5)) {
 
             // In the "call" case, we want to patch the instruction after the call
@@ -682,7 +686,7 @@ patch_addrs(funchook_t *funchook,
             tap->frame_size = add_arg;
 
             break; // We need to force a break in this case
-        }
+        }}
 
         // PATCH RET
         // If the current instruction is a RET
@@ -1003,9 +1007,17 @@ initGoHook(elf_buf_t *ebuf)
             return; // don't install our hooks
         }
     }
-
-    go_runtime_cgocall = (void *) ((uint64_t)go_runtime_cgocall + base);
+    go_runtime_cgocall = (void *)((uint64_t)go_runtime_cgocall + base);
     funcprint("asmcgocall %p\n", go_runtime_cgocall);
+
+    uint64_t *ReadFrame_addr;
+    if (((ReadFrame_addr = getSymbol(ebuf->buf, "net/http.(*http2Framer).ReadFrame")) == 0) &&
+        ((ReadFrame_addr = getGoSymbol(ebuf->buf, "net/http.(*http2Framer).ReadFrame", NULL, NULL)) == 0)) {
+        sysprint("ERROR: can't get the address for net/http.(*http2Framer).ReadFrame\n");
+        return; // don't install our hooks
+    }
+    ReadFrame_addr = (uint64_t *)((uint64_t)ReadFrame_addr + base);
+    sprintf(g_ReadFrame_addr, "%p\n", ReadFrame_addr);
 
     csh disass_handle = 0;
     cs_arch arch;
@@ -1683,9 +1695,9 @@ c_http2_client_read(char *stackaddr)
 {
     int fd = -1;
 
-    uint64_t sc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_read_sc);
+    uint64_t cc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_read_cc);
 
-    uint64_t fr   = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_fr);
+    uint64_t fr   = *(uint64_t *)(cc + g_go_schema->struct_offsets.cc_to_fr);
     if (!fr) return;
     char *buf     = (char *)(fr + g_go_schema->struct_offsets.fr_to_headerBuf);
     char *readBuf = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_readBuf);
@@ -1706,7 +1718,7 @@ c_http2_client_read(char *stackaddr)
     scope_memmove(frame, buf, 9);
     scope_memmove(frame + 9, readBuf, rc - 9);
 
-    uint64_t tcpConn = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_conn);
+    uint64_t tcpConn = *(uint64_t *)(cc + g_go_schema->struct_offsets.cc_to_tconn);
     uint64_t netFD, pfd;
 
     if (rc < 1) {

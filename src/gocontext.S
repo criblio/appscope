@@ -64,40 +64,56 @@
  * contain the g before entering a function (for stack checking).
  * If we don't save and restore values in these registers, they will
  * often become corrupted and result in a serious failure.
-*/
+ *
+ * From: https://go.googlesource.com/go/+/refs/heads/dev.regabi/src/cmd/compile/internal-abi.md
+ * The following registers are used for integer arguments and results:
+ * RAX, RBX, RCX, RDI, RSI, R8, R9, R10, R11
+ *
+ * Note that X15 is defined to be always a fixed value of zero
+ */
 .macro interpose_regs a_func, c_func
 .global \a_func
 .hidden \c_func
 \a_func:
+    endbr64
+    mov %rsp, %r12
     push %rax
     push %rbx
     push %rcx
     push %rdi
+    push %rsi
+    push %r8
+    push %r9
+    push %r10
+    push %r11
     sub $0x20, %rsp
 
-    mov %rsp, %r11
-    add $0x40, %r11
-    mov %r11, 0x08(%rsp)
-    lea \c_func@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    mov %r11, (%rsp)
+    mov %r12, 0x08(%rsp)
+    lea \c_func@GOTPCREL(%rip), %r12
+    mov (%r12), %r12
+    mov %r12, (%rsp)
 
-    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    mov (%r11), %r11
-    call *%r11
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r12
+    mov (%r12), %r12
+    mov (%r12), %r12
+    call *%r12
     xorps %xmm15,%xmm15
     mov %fs:0xfffffffffffffff8,%r14
 
-    mov %rax, %r11
+    mov %rax, %r12
 
     add $0x20, %rsp
+    pop %r11
+    pop %r10
+    pop %r9
+    pop %r8
+    pop %rsi
     pop %rdi
     pop %rcx
     pop %rbx
     pop %rax
 
-    jmp *%r11
+    jmp *%r12
 .endm
 
 .text
@@ -181,32 +197,45 @@ go_hook_write:
 */
 
 /*
-.global go_hook_regs_readResponse
-go_hook_regs_readResponse:   
+.global go_hook_reg_tls_client_write
+go_hook_reg_tls_client_write:   
+    endbr64
+    mov %rsp, %r12
     push %rax
     push %rbx
+    push %rcx
+    push %rdi
+    push %rsi
+    push %r8
+    push %r9
+    push %r10
+    push %r11
     sub $0x20, %rsp
 
-    mov %rsp, %r11
-    add $0x30, %r11
-    mov %r11, 0x08(%rsp)
-    lea go_readResponse@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    mov %r11, (%rsp)
+    mov %r12, 0x08(%rsp)
+    lea go_tls_client_write@GOTPCREL(%rip), %r12
+    mov (%r12), %r12
+    mov %r12, (%rsp)
 
-    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    mov (%r11), %r11
-    call *%r11
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r12
+    mov (%r12), %r12
+    mov (%r12), %r12
+    call *%r12
     xorps %xmm15,%xmm15
     mov %fs:0xfffffffffffffff8,%r14
 
-    mov %rax, %r11
+    mov %rax, %r12
 
     add $0x20, %rsp
+    pop %r11
+    pop %r10
+    pop %r9
+    pop %r8
+    pop %rsi
+    pop %rdi
+    pop %rcx
     pop %rbx
     pop %rax
 
-    jmp *%r11
+    jmp *%r12
 */
-

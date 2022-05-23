@@ -65,7 +65,7 @@ wait_for_files() {
 }
 
 # Start LogStream
-[ -z "$(pgrep cribl)" ] || { /opt/cribl/bin/cribl stop; sleep 5; }
+[ -z "$(pgrep cribl)" ] || { /opt/cribl/bin/cribl stop; sleep 30; }
 [ -d /tmp/out ] && rm -rf /tmp/out
 [ -d /tmp/out ] || mkdir /tmp/out
 /opt/cribl/bin/cribl start
@@ -73,6 +73,8 @@ if [ ! "$(wait_for_port 10090)" ]; then
     echo >&2 "error: LogStream failed to start; aborting test"
     exit 1
 fi
+
+sleep 30
 
 # Each of these tests are running scoped curl connected to the local LogStream's
 # AppScope source. Logstream is setup to dump data sent to that source to NDJSON

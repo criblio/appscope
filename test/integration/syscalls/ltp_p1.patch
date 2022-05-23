@@ -1,0 +1,13 @@
+diff --git a/testcases/kernel/syscalls/recvmsg/recvmsg01.c b/testcases/kernel/syscalls/recvmsg/recvmsg01.c
+index 3ce7ab027..ea27ce5a1 100644
+--- a/testcases/kernel/syscalls/recvmsg/recvmsg01.c
++++ b/testcases/kernel/syscalls/recvmsg/recvmsg01.c
+@@ -275,7 +275,7 @@ void cleanup(void)
+ 	}
+ 	if (tmpsunpath[0] != '\0')
+ 		(void)unlink(tmpsunpath);
+-	tst_rmdir();
++	//tst_rmdir();
+ 
+ }
+ 

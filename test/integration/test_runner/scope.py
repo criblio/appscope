@@ -5,14 +5,6 @@ import subprocess
 import time
 import threading
 
-def get_scope_version(scope_path: str) -> str:
-    completed_proc = subprocess.run([scope_path], universal_newlines=True, stdout=subprocess.PIPE)
-    stdout = completed_proc.stdout
-    for line in stdout.splitlines():
-        if "Scope Version: " in line:
-            return line.strip().replace("Scope Version: ", "")
-
-
 class ScopeDataCollector:
 
     def __init__(self, metric_type: str) -> None:

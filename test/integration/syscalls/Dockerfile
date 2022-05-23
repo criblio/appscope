@@ -8,6 +8,7 @@ RUN yum -y update && \
     yum clean all
 
 RUN mkdir -p /opt/test-runner/logs/ /opt/test
+COPY ./syscalls/ltp_p1.patch /opt/test/
 
 RUN cd /opt/test && \
       wget https://github.com/linux-test-project/ltp/archive/refs/tags/20210524.zip && \
@@ -15,6 +16,7 @@ RUN cd /opt/test && \
       rm -f 20210524.zip && \
       mv ltp-20210524 ltp && \
       cd /opt/test/ltp && \
+      patch -p1 < /opt/test/ltp_p1.patch && \
       make autotools && \
       ./configure && \
       make -j

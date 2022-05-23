@@ -1,9 +1,10 @@
 FROM alpine:latest
 
-RUN apk add bash python3 py3-pip wget
+RUN apk add bash python3 py3-pip wget patch
 RUN pip3 install virtualenv
 
 RUN mkdir -p /opt/test-runner/logs/ /opt/test
+COPY ./syscalls/ltp_p1.patch /opt/test/
 
 RUN cd /opt/test && \
       wget https://github.com/linux-test-project/ltp/archive/refs/tags/20210927.zip && \
@@ -12,6 +13,7 @@ RUN cd /opt/test && \
       mv ltp-20210927 ltp && \
       cd /opt/test/ltp && \
       ./ci/alpine.sh && \
+      patch -p1 < /opt/test/ltp_p1.patch && \
       make autotools && \
       ./configure && \
       make -j

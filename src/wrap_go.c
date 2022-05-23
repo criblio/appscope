@@ -78,7 +78,7 @@ go_schema_t go_8_schema = {
         .c_close_rc=0x10,
         .c_read_fd=0x8,
         .c_read_buf=0x10,
-        .c_read_rc=0x18,
+        .c_read_rc=0x28,
         .c_socket_domain=0x8,
         .c_socket_type=0x10,
         .c_socket_sd=0x20,
@@ -110,12 +110,12 @@ go_schema_t go_8_schema = {
         .c_tls_client_write_rc=0x28,
         .c_tls_client_read_callee=0x0,
         .c_tls_client_read_pc=0x8,
-        .c_http2_server_read_sc=0xd0,
-        .c_http2_client_read_cc=0xd0,
+        .c_http2_client_read_cc=0x78,
+        .c_http2_server_read_sc=0x128,
         .c_http2_server_write_callee=0x0,
-        .c_http2_server_write_sc=0x30,
+        .c_http2_server_write_sc=0x8,
         .c_http2_client_write_callee=0x40,
-        .c_http2_client_write_tcpConn=0x50,
+        .c_http2_client_write_tcpConn=0x0,
         .c_http2_client_write_buf=0x8,
         .c_http2_client_write_rc=0x10,
     },
@@ -133,10 +133,11 @@ go_schema_t go_8_schema = {
         .conn_to_rwc=0x10,
         .conn_to_tlsState=0x30,
         .persistConn_to_tlsState=0x60,
-        .fr_to_readBuf=0x58,
-        .fr_to_writeBuf=0x88,
-        .fr_to_headerBuf=0x40,
+        .fr_to_readBuf=0x50,
+        .fr_to_writeBuf=0x80,
+        .fr_to_headerBuf=0x38,
         .fr_to_rc=0x60,
+        .cc_to_fr=0xd0,
         .cc_to_tconn=0x10,
         .sc_to_fr=0x48,
         .sc_to_conn=0x18,
@@ -248,8 +249,6 @@ go_schema_t go_17_schema = {
         [INDEX_HOOK_ACCEPT]             = {"syscall.accept4",                         go_hook_reg_accept4,            NULL, 0}, // plain server accept
         [INDEX_HOOK_READ]               = {"syscall.read",                            go_hook_reg_read,               NULL, 0}, // read
         [INDEX_HOOK_CLOSE]              = {"syscall.Close",                           go_hook_reg_close,              NULL, 0}, // close
-        [INDEX_HOOK_EXIT]               = {"runtime.exit",                            go_hook_exit,                   NULL, 0},
-        [INDEX_HOOK_DIE]                = {"runtime.dieFromSignal",                   go_hook_die,                    NULL, 0},
         [INDEX_HOOK_TLS_SERVER_READ]    = {"net/http.(*connReader).Read",             go_hook_reg_tls_server_read,    NULL, 0},
         [INDEX_HOOK_TLS_SERVER_WRITE]   = {"net/http.checkConnErrorWriter.Write",     go_hook_reg_tls_server_write,   NULL, 0},
         [INDEX_HOOK_TLS_CLIENT_READ]    = {"net/http.(*persistConn).readResponse",    go_hook_reg_tls_client_read,    NULL, 0},
@@ -258,6 +257,8 @@ go_schema_t go_17_schema = {
         [INDEX_HOOK_HTTP2_SERVER_WRITE] = {"net/http.(*http2serverConn).Flush",       go_hook_reg_http2_server_write, NULL, 0},
         [INDEX_HOOK_HTTP2_CLIENT_READ]  = {"net/http.(*http2clientConnReadLoop).run", go_hook_reg_http2_client_read,  NULL, 0},
         [INDEX_HOOK_HTTP2_CLIENT_WRITE] = {"net/http.http2stickyErrWriter.Write",     go_hook_reg_http2_client_write, NULL, 0}, 
+        [INDEX_HOOK_EXIT]               = {"runtime.exit",                            go_hook_exit,                   NULL, 0},
+        [INDEX_HOOK_DIE]                = {"runtime.dieFromSignal",                   go_hook_die,                    NULL, 0},
         [INDEX_HOOK_MAX]                = {"TAP_TABLE_END",                           NULL,                           NULL, 0}
     },
 };
@@ -1826,7 +1827,7 @@ c_http2_server_write(char *stackaddr)
             doProtocol((uint64_t)0, fd, PRI_str, scope_strlen(PRI_str), TLSRX, BUF);
         }
 
-        funcprint("Scope: c_http2_server_write of %d %ld\n", fd, rc);
+        funcprint("Scope: c_http2_server_write of %d %i\n", fd, rc);
         doProtocol((uint64_t)0, fd, writeBuf, rc, TLSTX, BUF);
     }
 }

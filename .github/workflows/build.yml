@@ -325,6 +325,18 @@ jobs:
         id: tests
         run: echo "::set-output name=tests-${{ steps.env.outputs.arch }}::$(make -s -C test/integration tests | egrep -v '.*java(9|1[023456])$' | sort -V | jq -ncR '[inputs]')"
 
+      - name: Print size of Binaries
+        run: |
+          echo "::group::libscope.so"
+          stat -c %s lib/linux/${{ steps.env.outputs.arch }}/libscope.so
+          echo "::endgroup::"
+          echo "::group::scope"
+          stat -c %s bin/linux/${{ steps.env.outputs.arch }}/scope
+          echo "::endgroup::"
+          echo "::group::ldscope"
+          stat -c %s bin/linux/${{ steps.env.outputs.arch }}/ldscope
+          echo "::endgroup::"
+
       # Upload the built binaries for use by later stages. We specify the same
       # artifact name for this job as well as the other job for ARM. The result
       # is a single artifact with binaries from both jobs.
@@ -371,7 +383,7 @@ jobs:
       - name: Chmod Binaries
         run: chmod +x lib/linux/*/* bin/linux/*/*
 
-      # Depoly to the CDN
+      # Deploy to the CDN
       - name: Deploy
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

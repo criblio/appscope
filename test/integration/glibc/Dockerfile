@@ -12,6 +12,9 @@ RUN mkdir -p /opt/errno_test
 COPY ./glibc/hello_errno.c /opt/errno_test/hello_errno.c
 RUN gcc -o /opt/errno_test/errno_test /opt/errno_test/hello_errno.c
 
+COPY ./glibc/hello_fault.c /opt/fault_test/hello_fault.c
+RUN gcc -O0 -g -o /opt/fault_test/fault_test /opt/fault_test/hello_fault.c -lrt
+
 RUN mkdir -p /opt/extract_scope && \
     mkdir -p /opt/patch_libscope
 

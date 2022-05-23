@@ -22,6 +22,10 @@
     a2d_*;         # the beginning of libssl, libcrypto symbols
     a2i_*;
     lshpack_*;     # hides ls-hpack symbols
+    _Ux86_64_*;    # hides libunwind symbols
+    _ULx86_64_*;   # hides libunwind symbols
+    _ULaarch64_*;  # hides libunwind symbols
+    SCOPE_DlIteratePhdr;
     ACCESS_*;
     ADMISSIONS_*;
     ADMISSION_*;

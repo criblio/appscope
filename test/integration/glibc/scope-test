@@ -39,6 +39,10 @@ endtest(){
         cp -f $EVT_FILE $EVT_FILE.$CURRENT_TEST
     fi
 
+    if [ $RESULT == "FAILED" ]; then
+        cat $SCOPE_LOG_FILE
+    fi
+
     rm -f $EVT_FILE
     rm -f $SCOPE_LOG_FILE
 }
@@ -134,6 +138,84 @@ ldscope ./errno_test
 if [ $? -ne 0 ]; then
     ERR+=1
 fi
+
+endtest
+
+#
+# verify fault_test_read_only_mem
+#
+
+starttest fault_test_read_only_mem
+
+cd /opt/fault_test/
+
+SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 0
+
+grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+if [ "x86_64" = "$(uname -m)" ]; then
+    grep "read_only_area_error" $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+
+    grep "test_function" $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+fi
+
+grep "Invalid permissions for mapped object" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+#
+# verify fault_test_not_mapped_mem
+#
+
+starttest fault_test_not_mapped_mem
+
+cd /opt/fault_test/
+
+SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 1
+
+grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+if [ "x86_64" = "$(uname -m)" ]; then
+    grep "not_mapped_address_error" $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+
+    grep "test_function" $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+fi
+
+grep "Address not mapped to object" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+#
+# verify fault_test_bus_error
+#
+
+starttest fault_test_bus_error
+
+cd /opt/fault_test/
+
+SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 2
+
+grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+if [ "x86_64" = "$(uname -m)" ]; then
+    grep "bus_error" $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+
+    grep "test_function" $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+fi
+
+grep "Nonexistent physical address" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
 
 endtest
 

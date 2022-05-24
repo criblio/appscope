@@ -160,6 +160,45 @@ metric:
     #
     - type: statsd
 
+    # Metric file system
+    #   Type:     string
+    #   Values:   fs
+    #   Default:  fs
+    #   Override: $SCOPE_METRIC_FS
+    #
+    - type: fs
+
+    # Metric network
+    #   Type:     string
+    #   Values:   network
+    #   Default:  network
+    #   Override: $SCOPE_METRIC_NETWORK
+    #
+    - type: network
+
+    # Metric http
+    #   Type:     string
+    #   Values:   http
+    #   Default:  http
+    #   Override: $SCOPE_METRIC_HTTP
+    #
+    - type: http
+  
+    # Metric dns
+    #   Type:     string
+    #   Values:   dns
+    #   Default:  dns
+    #   Override: $SCOPE_METRIC_DNS
+    #
+    - type: dns
+  
+    # Metric process
+    #   Type:     string
+    #   Values:   process
+    #   Default:  process
+    #   Override: $SCOPE_METRIC_PROC
+    #
+    - type: process
 
   # Backend connection for metrics
   #

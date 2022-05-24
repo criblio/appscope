@@ -1015,7 +1015,6 @@ initGoHook(elf_buf_t *ebuf)
     if (((ReadFrame_addr = getSymbol(ebuf->buf, "net/http.(*http2Framer).ReadFrame")) == 0) &&
         ((ReadFrame_addr = getGoSymbol(ebuf->buf, "net/http.(*http2Framer).ReadFrame", NULL, NULL)) == 0)) {
         sysprint("WARN: can't get the address for net/http.(*http2Framer).ReadFrame\n");
-        return; // don't install our hooks
     }
     ReadFrame_addr = (uint64_t *)((uint64_t)ReadFrame_addr + base);
     sprintf(g_ReadFrame_addr, "%p\n", ReadFrame_addr);

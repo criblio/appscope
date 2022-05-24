@@ -31,9 +31,6 @@
 #include "inject.h"
 #include "os.h"
 
-#define GO_ENV_VAR "GODEBUG"
-#define GO_ENV_SERVER_VALUE "http2server"
-#define GO_ENV_CLIENT_VALUE "http2client"
 
 static void
 showUsage(char *prog)

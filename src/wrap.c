@@ -443,20 +443,12 @@ remoteConfig()
     timeout = 1;
     scope_memset(&fds, 0x0, sizeof(fds));
 
-/*
-    Setting fds.events = 0 to neuter ability to process remote
-    commands... until this is function is reworked to be TLS-friendly.
+    // We want to accept incoming requests on TCP, unix, and edge.
+    // However, we don't currently support receving on TLS connections.
+    int acceptRequests = transportSupportsCommandControl(
+                                          ctlTransport(g_ctl, CFG_CTL));
+    fds.events = (acceptRequests) ? POLLIN : 0;
 
-    cfg_transport_t ttype = ctlTransportType(g_ctl, CFG_CTL);
-    if ((ttype == (cfg_transport_t)-1) || (ttype == CFG_FILE) ||
-        (ttype ==  CFG_SYSLOG) || (ttype == CFG_SHM)) {
-        fds.events = 0;
-    } else {
-        fds.events = POLLIN;
-    }
-*/
-
-    fds.events = 0;
     fds.fd = ctlConnection(g_ctl, CFG_CTL);
 
     rc = scope_poll(&fds, 1, timeout);
@@ -489,8 +481,7 @@ remoteConfig()
         numtries++;
         rc = scope_recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
         if (rc <= 0) {
-            // Something has happened to our connection
-            ctlDisconnect(g_ctl, CFG_CTL);
+            // Something has happened to this incoming message
             break;
         }
 
@@ -1559,6 +1550,68 @@ initEnv(int *attachedFlag)
     scope_fclose(fd);
 }
 
+void
+scope_sig_handler(int sig, siginfo_t *info, void *secret)
+{
+    scopeLogError("!scope_sig_handler signal %d errno %d fault address %p, reason of fault:", info->si_signo, info->si_errno, info->si_addr);
+    int sig_code = info->si_code;
+
+    if (info->si_signo == SIGSEGV) {
+        switch (sig_code) {
+            case SEGV_MAPERR:
+                scopeLogError("Address not mapped to object");
+                break;
+            case SEGV_ACCERR:
+                scopeLogError("Invalid permissions for mapped object");
+                break;
+            case SEGV_BNDERR:
+                scopeLogError("Failed address bound checks");
+                break;
+            case SEGV_PKUERR:
+                scopeLogError("Access was denied by memory protection keys");
+                break;
+            default: 
+                scopeLogError("Unknown Error");
+                break;
+        }
+    } else if (info->si_signo == SIGBUS) {
+        switch (sig_code) {
+            case BUS_ADRALN:
+                scopeLogError("Invalid address alignment");
+                break;
+            case BUS_ADRERR:
+                scopeLogError("Nonexistent physical address");
+                break;
+            case BUS_OBJERR:
+                scopeLogError("Object-specific hardware error");
+                break;
+            case BUS_MCEERR_AR:
+                scopeLogError("Hardware memory error consumed on a machine check");
+                break;
+            case BUS_MCEERR_AO:
+                scopeLogError("Hardware memory error detected in process but not consumed");
+                break;
+            default: 
+                scopeLogError("Unknown Error");
+                break;
+        }
+    }
+    scopeBacktrace(CFG_LOG_ERROR);
+    abort();
+}
+
+static void
+initSigErrorHandler(void)
+{
+    if (checkEnv("SCOPE_ERROR_SIGNAL_HANDLER", "true") && g_fn.sigaction) {
+        struct sigaction act = { 0 };
+        act.sa_handler = (void (*))scope_sig_handler;
+        act.sa_flags = SA_RESTART | SA_SIGINFO;
+        g_fn.sigaction(SIGSEGV, &act, NULL);
+        g_fn.sigaction(SIGBUS, &act, NULL);
+    }
+}
+
 __attribute__((constructor)) void
 init(void)
 {
@@ -1606,6 +1659,7 @@ init(void)
     g_constructor_debug_enabled = checkEnv("SCOPE_ALLOW_CONSTRUCT_DBG", "true");
 
     initState();
+    initSigErrorHandler();
 
     g_nsslist = lstCreate(freeNssEntry);
 
@@ -1645,6 +1699,7 @@ init(void)
     }
 
     osInitJavaAgent();
+
 }
 
 EXPORTON int

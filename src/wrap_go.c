@@ -920,11 +920,11 @@ initGoHook(elf_buf_t *ebuf)
 
     // default to a dynamic app?
     if (checkEnv("SCOPE_EXEC_TYPE", "static")) {
-        setGoAppStateStatic(TRUE);
+        scopeSetGoAppStateStatic(TRUE);
         patchClone();
         sysprint("This is a static app\n");
     } else {
-        setGoAppStateStatic(FALSE);
+        scopeSetGoAppStateStatic(FALSE);
         sysprint("This is a dynamic app\n");
     }
 
@@ -932,7 +932,7 @@ initGoHook(elf_buf_t *ebuf)
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
     // if it's a position independent executable, get the base address from /proc/self/maps
     uint64_t base = 0LL;
-    if (ehdr->e_type == ET_DYN && (getgoAppStateStatic() == FALSE)) {
+    if (ehdr->e_type == ET_DYN && (scopeGetGoAppStateStatic() == FALSE)) {
         if (getBaseAddress(&base) != 0) {
             sysprint("ERROR: can't get the base address\n");
             return; // don't install our hooks

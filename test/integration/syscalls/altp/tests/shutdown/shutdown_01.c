@@ -39,10 +39,6 @@ int do_test() {
                     break;
                 }
             }
-
-            if(shutdown(s, SHUT_RDWR) != 0) {
-                TEST_ERROR();
-            }
         }
     } else {
         struct sockaddr_in ip_addr;

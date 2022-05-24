@@ -57,6 +57,12 @@ extern FILE scopelibc___stderr_FILE;
 #define scope_stdout   (&scopelibc___stdout_FILE)
 #define scope_stderr   (&scopelibc___stderr_FILE)
 
+// Other
+extern void scopeSetGoAppStateStatic(int);
+extern int scopeGetGoAppStateStatic(void);
+
+// Custom operations
+
 void  scope_init_vdso_ehdr(void);
 void  scope_op_before_fork(void);
 void  scope_op_after_fork(int);
@@ -76,6 +82,8 @@ int   scope_memcmp(const void *, const void *, size_t);
 int   scope_mprotect(void *, size_t, int);
 void* scope_memcpy(void *, const void *, size_t);
 int   scope_mlock(const void *, size_t);
+int   scope_msync(void *, size_t, int);
+int   scope_mincore(void *, size_t, unsigned char *);
 
 // File handling operations
 FILE*          scope_fopen(const char *, const char *);
@@ -117,6 +125,8 @@ char*          scope_getcwd(char *, size_t);
 int            scope_lstat(const char *, struct stat *);
 int            scope_rename(const char *, const char *);
 int            scope_remove(const char *);
+int            scope_pipe2(int [2], int);
+void           scope_setbuf(FILE *, char *);
 
 // String handling operations
 char*              scope_realpath(const char *, char *);

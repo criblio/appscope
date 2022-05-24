@@ -104,16 +104,16 @@ go_schema_t go_8_schema = {
         .c_tls_server_write_conn=0x8,
         .c_tls_server_write_buf=0x10,
         .c_tls_server_write_rc=0x28,
+        .c_tls_client_read_callee=0x0,
+        .c_tls_client_read_pc=0x8,
         .c_tls_client_write_callee=0x0,
         .c_tls_client_write_w_pc=0x8,
         .c_tls_client_write_buf=0x10,
         .c_tls_client_write_rc=0x28,
-        .c_tls_client_read_callee=0x0,
-        .c_tls_client_read_pc=0x8,
-        .c_http2_client_read_cc=0x78,
         .c_http2_server_read_sc=0x128,
         .c_http2_server_write_callee=0x0,
         .c_http2_server_write_sc=0x8,
+        .c_http2_client_read_cc=0x78,
         .c_http2_client_write_callee=0x40,
         .c_http2_client_write_tcpConn=0x0,
         .c_http2_client_write_buf=0x8,
@@ -198,16 +198,16 @@ go_schema_t go_17_schema = {
         .c_tls_server_write_conn=0x30,
         .c_tls_server_write_buf=0x8,
         .c_tls_server_write_rc=0x10,
+        .c_tls_client_read_callee=0x0,
+        .c_tls_client_read_pc=0x8,
         .c_tls_client_write_callee=0x30,
         .c_tls_client_write_w_pc=0x20,
         .c_tls_client_write_buf=0x8,
         .c_tls_client_write_rc=0x10,
-        .c_tls_client_read_callee=0x0,
-        .c_tls_client_read_pc=0x8,
-        .c_http2_client_read_cc=0x68,
         .c_http2_server_read_sc=0xd0,
         .c_http2_server_write_callee=0x0,
         .c_http2_server_write_sc=0x30,
+        .c_http2_client_read_cc=0x68,
         .c_http2_client_write_callee=0x60,
         .c_http2_client_write_tcpConn=0x48,
         .c_http2_client_write_buf=0x8,
@@ -1485,61 +1485,6 @@ go_tls_server_write(char *stackptr)
 
 /*
   Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
-  p = stackaddr + 0x10  (request buffer)
-  *p = request string
-  w = stackaddr + 0x08        (net/http.persistConnWriter *)
-  w.pc = stackaddr + 0x08     (net/http.persistConn *)
-  w.pc.conn_if = w.pc + 0x50  (interface)
-  w.pc.conn = w.pc.conn_if + 0x08 (net.conn->TCPConn)
-  netFD = w.pc.conn + 0x08    (netFD)
-  pfd = netFD + 0x0           (poll.FD)
-  fd = pfd + 0x10             (pfd.sysfd)
- */
-// Extract data from net/http.persistConnWriter.Write (tls client write)
-static void
-c_tls_client_write(char *stackaddr)
-{
-    // Take us to the stack frame we're interested in
-    // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    stackaddr -= g_go_schema->arg_offsets.c_tls_client_write_callee;
-
-    int fd = -1;
-    uint64_t w_pc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_write_w_pc);
-    char *buf     = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_write_buf);
-    uint64_t rc   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_write_rc);
-    uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
-
-    if (rc < 1) return;
-
-    pc_conn_if = (w_pc + g_go_schema->struct_offsets.persistConn_to_conn); 
-    uint64_t tls =  *(uint64_t*)(w_pc + g_go_schema->struct_offsets.persistConn_to_tlsState); 
-
-    // conn I/F checking. Ref the comment on c_tls_server_read.
-    if (pc_conn_if && tls) {
-        w_pc_conn = *(uint64_t *)(pc_conn_if + g_go_schema->struct_offsets.iface_data); 
-        netFD = *(uint64_t *)(w_pc_conn + g_go_schema->struct_offsets.iface_data);
-        if (!netFD) return;
-        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) { 
-            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd); 
-            if (!pfd) return;
-            fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd); 
-        } else {
-            fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
-        }
-
-        doProtocol((uint64_t)0, fd, buf, rc, TLSTX, BUF);
-        funcprint("Scope: c_tls_client_write of %d\n", fd);
-    }
-}
-
-EXPORTON void *
-go_tls_client_write(char *stackptr)
-{
-    return do_cfunc(stackptr, c_tls_client_write, g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_WRITE].assembly_fn);
-}
-
-/*
-  Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
   pc = stackaddr + 0x08    (net/http.persistConn *)
   pc.conn_if = pc + 0x50   (interface)
   conn.data = pc.conn_if + 0x08 (net.conn->TCPConn)
@@ -1598,6 +1543,61 @@ EXPORTON void *
 go_tls_client_read(char *stackptr)
 {
     return do_cfunc(stackptr, c_tls_client_read, g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_READ].assembly_fn);
+}
+
+/*
+  Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
+  p = stackaddr + 0x10  (request buffer)
+  *p = request string
+  w = stackaddr + 0x08        (net/http.persistConnWriter *)
+  w.pc = stackaddr + 0x08     (net/http.persistConn *)
+  w.pc.conn_if = w.pc + 0x50  (interface)
+  w.pc.conn = w.pc.conn_if + 0x08 (net.conn->TCPConn)
+  netFD = w.pc.conn + 0x08    (netFD)
+  pfd = netFD + 0x0           (poll.FD)
+  fd = pfd + 0x10             (pfd.sysfd)
+ */
+// Extract data from net/http.persistConnWriter.Write (tls client write)
+static void
+c_tls_client_write(char *stackaddr)
+{
+    // Take us to the stack frame we're interested in
+    // If this is defined as 0x0, we have decided to stay in the caller stack frame
+    stackaddr -= g_go_schema->arg_offsets.c_tls_client_write_callee;
+
+    int fd = -1;
+    uint64_t w_pc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_write_w_pc);
+    char *buf     = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_write_buf);
+    uint64_t rc   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_write_rc);
+    uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
+
+    if (rc < 1) return;
+
+    pc_conn_if = (w_pc + g_go_schema->struct_offsets.persistConn_to_conn); 
+    uint64_t tls =  *(uint64_t*)(w_pc + g_go_schema->struct_offsets.persistConn_to_tlsState); 
+
+    // conn I/F checking. Ref the comment on c_tls_server_read.
+    if (pc_conn_if && tls) {
+        w_pc_conn = *(uint64_t *)(pc_conn_if + g_go_schema->struct_offsets.iface_data); 
+        netFD = *(uint64_t *)(w_pc_conn + g_go_schema->struct_offsets.iface_data);
+        if (!netFD) return;
+        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) { 
+            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd); 
+            if (!pfd) return;
+            fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd); 
+        } else {
+            fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
+        }
+
+        doProtocol((uint64_t)0, fd, buf, rc, TLSTX, BUF);
+        funcprint("Scope: c_tls_client_write of %d\n", fd);
+    }
+}
+
+EXPORTON void *
+go_tls_client_write(char *stackptr)
+{
+    return do_cfunc(stackptr, c_tls_client_write, g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_WRITE].assembly_fn);
 }
 
 /*
@@ -1677,78 +1677,6 @@ go_http2_server_read(char *stackptr)
 {
     return do_cfunc(stackptr, c_http2_server_read, g_go_schema->tap[INDEX_HOOK_HTTP2_SERVER_READ].assembly_fn);
 
-}
-
-/*
-  Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
-  fr = stackaddr + 0x?                  (http2Framer)
-  fr.readBuf = *fr + 0x?                (response buffer)
-  rl.cc = stackaddr + 0x70 [!in calleR] (http2ClientConn)
-  rl.cc.tconn = *(rl.cc) + 0x?          (TCPConn)
-  netFD = TCPConn + 0x08                (netFD)
-  pfd = netFD + 0x0                     (poll.FD)
-  fd = pfd + 0x10                       (pfd.sysfd)
- */
-// Extract data from net/http.(*http2Framer).ReadFrame (tls http2 client/server read)
-static void
-c_http2_client_read(char *stackaddr)
-{
-    int fd = -1;
-
-    uint64_t cc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_read_cc);
-
-    uint64_t fr   = *(uint64_t *)(cc + g_go_schema->struct_offsets.cc_to_fr);
-    if (!fr) return;
-    char *buf     = (char *)(fr + g_go_schema->struct_offsets.fr_to_headerBuf);
-    char *readBuf = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_readBuf);
-    if (!buf) return;
-    if (!readBuf) return;
-
-    uint8_t *newbuf = (uint8_t *)buf; 
-    uint32_t rc = 0;
-    rc += newbuf[0] << 16;
-    rc += newbuf[1] << 8;
-    rc += newbuf[2];
-
-//    uint64_t rc = *(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_rc);
-    rc += 9;
-
-    char *frame = (char *)scope_malloc(rc);
-    if (!frame) return;
-    scope_memmove(frame, buf, 9);
-    scope_memmove(frame + 9, readBuf, rc - 9);
-
-    uint64_t tcpConn = *(uint64_t *)(cc + g_go_schema->struct_offsets.cc_to_tconn);
-    uint64_t netFD, pfd;
-
-    if (rc < 1) {
-       scope_free(frame);
-       return;
-    }
-
-    // conn I/F checking. Ref the comment on c_http_server_read.
-    if (tcpConn) {
-        netFD = *(uint64_t *)(tcpConn + g_go_schema->struct_offsets.iface_data);
-        if (!netFD) return;
-        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) { 
-            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd); 
-            if (!pfd) return;
-            fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd); 
-        } else {
-            fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
-        }
-
-        doProtocol((uint64_t)0, fd, frame, rc, TLSRX, BUF);
-        funcprint("Scope: c_http2_client_read of %d\n", fd);
-    }
-
-    scope_free(frame);
-}
-
-EXPORTON void *
-go_http2_client_read(char *stackptr)
-{
-    return do_cfunc(stackptr, c_http2_client_read, g_go_schema->tap[INDEX_HOOK_HTTP2_CLIENT_READ].assembly_fn);
 }
 
 /*
@@ -1835,6 +1763,78 @@ EXPORTON void *
 go_http2_server_write(char *stackptr)
 {
     return do_cfunc(stackptr, c_http2_server_write, g_go_schema->tap[INDEX_HOOK_HTTP2_SERVER_WRITE].assembly_fn);
+}
+
+/*
+  Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
+  fr = stackaddr + 0x?                  (http2Framer)
+  fr.readBuf = *fr + 0x?                (response buffer)
+  rl.cc = stackaddr + 0x70 [!in calleR] (http2ClientConn)
+  rl.cc.tconn = *(rl.cc) + 0x?          (TCPConn)
+  netFD = TCPConn + 0x08                (netFD)
+  pfd = netFD + 0x0                     (poll.FD)
+  fd = pfd + 0x10                       (pfd.sysfd)
+ */
+// Extract data from net/http.(*http2Framer).ReadFrame (tls http2 client/server read)
+static void
+c_http2_client_read(char *stackaddr)
+{
+    int fd = -1;
+
+    uint64_t cc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_read_cc);
+
+    uint64_t fr   = *(uint64_t *)(cc + g_go_schema->struct_offsets.cc_to_fr);
+    if (!fr) return;
+    char *buf     = (char *)(fr + g_go_schema->struct_offsets.fr_to_headerBuf);
+    char *readBuf = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_readBuf);
+    if (!buf) return;
+    if (!readBuf) return;
+
+    uint8_t *newbuf = (uint8_t *)buf; 
+    uint32_t rc = 0;
+    rc += newbuf[0] << 16;
+    rc += newbuf[1] << 8;
+    rc += newbuf[2];
+
+//    uint64_t rc = *(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_rc);
+    rc += 9;
+
+    char *frame = (char *)scope_malloc(rc);
+    if (!frame) return;
+    scope_memmove(frame, buf, 9);
+    scope_memmove(frame + 9, readBuf, rc - 9);
+
+    uint64_t tcpConn = *(uint64_t *)(cc + g_go_schema->struct_offsets.cc_to_tconn);
+    uint64_t netFD, pfd;
+
+    if (rc < 1) {
+       scope_free(frame);
+       return;
+    }
+
+    // conn I/F checking. Ref the comment on c_http_server_read.
+    if (tcpConn) {
+        netFD = *(uint64_t *)(tcpConn + g_go_schema->struct_offsets.iface_data);
+        if (!netFD) return;
+        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) { 
+            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd); 
+            if (!pfd) return;
+            fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd); 
+        } else {
+            fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
+        }
+
+        doProtocol((uint64_t)0, fd, frame, rc, TLSRX, BUF);
+        funcprint("Scope: c_http2_client_read of %d\n", fd);
+    }
+
+    scope_free(frame);
+}
+
+EXPORTON void *
+go_http2_client_read(char *stackptr)
+{
+    return do_cfunc(stackptr, c_http2_client_read, g_go_schema->tap[INDEX_HOOK_HTTP2_CLIENT_READ].assembly_fn);
 }
 
 /*

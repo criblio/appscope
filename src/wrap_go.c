@@ -27,11 +27,11 @@
 #define PARAM_ON_REG_GO_VER (19)
 
 // compile-time control for debugging
-// #define NEEDEVNULL 1
-#define funcprint sysprint
-// #define funcprint devnull
-#define patchprint sysprint
-// #define patchprint devnull
+#define NEEDEVNULL 1
+//#define funcprint sysprint
+#define funcprint devnull
+//#define patchprint sysprint
+#define patchprint devnull
 
 #define UNDEF_OFFSET (-1)
 
@@ -1014,7 +1014,7 @@ initGoHook(elf_buf_t *ebuf)
     uint64_t *ReadFrame_addr;
     if (((ReadFrame_addr = getSymbol(ebuf->buf, "net/http.(*http2Framer).ReadFrame")) == 0) &&
         ((ReadFrame_addr = getGoSymbol(ebuf->buf, "net/http.(*http2Framer).ReadFrame", NULL, NULL)) == 0)) {
-        sysprint("ERROR: can't get the address for net/http.(*http2Framer).ReadFrame\n");
+        sysprint("WARN: can't get the address for net/http.(*http2Framer).ReadFrame\n");
         return; // don't install our hooks
     }
     ReadFrame_addr = (uint64_t *)((uint64_t)ReadFrame_addr + base);
@@ -1056,7 +1056,7 @@ initGoHook(elf_buf_t *ebuf)
         if (((orig_func = getSymbol(ebuf->buf, tap->func_name)) == NULL) &&
         // Otherwise look in the .gopclntab section
             ((orig_func = getGoSymbol(ebuf->buf, tap->func_name, NULL, NULL)) == NULL)) {
-            sysprint("ERROR: can't get the address for %s\n", tap->func_name);
+            sysprint("WARN: can't get the address for %s\n", tap->func_name);
             continue;
         }
 
@@ -1115,7 +1115,7 @@ frame_size(assembly_fn fn)
         if (tap->assembly_fn == fn) return tap->frame_size;
     }
 
-    scopeLogError("FATAL ERROR: no frame size");
+    scopeLogWarn("WARN: no frame size");
     exit(-1);
 }
 

@@ -668,26 +668,27 @@ patch_addrs(funchook_t *funchook,
             (scope_strstr(g_ReadFrame_addr, (const char*)asm_inst[i].op_str)) &&
             (asm_inst[i].size == 5)) {
 
-            // In the "call" case, we want to patch the instruction after the call
-            void *pre_patch_addr = (void*)asm_inst[i].address;
-            void *patch_addr = (void*)asm_inst[i+1].address;
+                // In the "call" case, we want to patch the instruction after the call
+                void *pre_patch_addr = (void*)asm_inst[i].address;
+                void *patch_addr = (void*)asm_inst[i+1].address;
 
-/*remove?*/ if (tap->frame_size && (tap->frame_size != add_arg)) {
-                patchprint("aborting patch of 0x%p due to mismatched frame size 0x%x\n", pre_patch_addr, add_arg);
-                break;
+    /*remove?*/ if (tap->frame_size && (tap->frame_size != add_arg)) {
+                    patchprint("aborting patch of 0x%p due to mismatched frame size 0x%x\n", pre_patch_addr, add_arg);
+                    break;
+                }
+                if (funchook_prepare(funchook, (void**)&patch_addr, tap->assembly_fn)) {
+                    patchprint("failed to patch 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
+                    continue;
+                }
+
+                patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
+                patchprint("return addr %p\n", patch_addr);
+                tap->return_addr = patch_addr;
+                tap->frame_size = add_arg;
+
+                break; // We need to force a break in this case
             }
-            if (funchook_prepare(funchook, (void**)&patch_addr, tap->assembly_fn)) {
-                patchprint("failed to patch 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
-                continue;
-            }
-
-            patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
-            patchprint("return addr %p\n", patch_addr);
-            tap->return_addr = patch_addr;
-            tap->frame_size = add_arg;
-
-            break; // We need to force a break in this case
-        }}
+        }
 
         // PATCH RET
         // If the current instruction is a RET
@@ -1017,7 +1018,7 @@ initGoHook(elf_buf_t *ebuf)
         sysprint("WARN: can't get the address for net/http.(*http2Framer).ReadFrame\n");
     }
     ReadFrame_addr = (uint64_t *)((uint64_t)ReadFrame_addr + base);
-    sprintf(g_ReadFrame_addr, "%p\n", ReadFrame_addr);
+    scope_sprintf(g_ReadFrame_addr, "%p\n", ReadFrame_addr);
 
     csh disass_handle = 0;
     cs_arch arch;

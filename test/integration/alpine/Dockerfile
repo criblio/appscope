@@ -37,21 +37,21 @@ RUN mkdir -p /opt/test && \
     cd /opt/test/curlssl && \
       ./buildconf && \
       ./configure --with-ssl --without-gnutls --without-nss && \
-      make -j8 && \
+      make -j"$(nproc)" && \
     cd /opt/test && \
       tar xvzf curl-7.69.1.tar.gz && \
       mv curl-7.69.1 curltls && \
     cd /opt/test/curltls && \
       ./buildconf && \
       ./configure --without-ssl --with-gnutls --without-nss && \
-      make -j8 && \
+      make -j"$(nproc)" && \
     cd /opt/test && \
       tar xvzf curl-7.69.1.tar.gz && \
       mv curl-7.69.1 curlnss && \
     cd /opt/test/curlnss && \
       ./buildconf && \
       ./configure --without-ssl --without-gnutls --with-nss && \
-      make -j8 && \
+      make -j"$(nproc)" && \
     cd /opt/test && \
       cp curlssl/src/.libs/curl curl-ssl && \
       cp curltls/src/.libs/curl curl-tls && \

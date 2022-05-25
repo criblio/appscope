@@ -6,7 +6,7 @@
   "$defs": {
     "addrs": {
       "title": "addrs",
-      "description": "IP address(es) of the domain which the scoped application has sent a DNS request about.",
+      "description": "IP address(es) of the domain that the scoped application has sent a DNS request about.",
       "type": "array"
     },
     "class_connection": {
@@ -35,13 +35,13 @@
     },
     "data": {
       "title": "data",
-      "description": "Specifies whether the data is unencrypted (clear) or encrypted (ssl). ???",
+      "description": "Specifies whether the data is unencrypted (clear) or encrypted (SSL). ???",
       "type": "string",
       "enum": ["ssl", "clear"]
     },
     "domain": {
       "title": "domain",
-      "description": "The domain which the scoped application made a DNS request about.",
+      "description": "The domain that the scoped application made a DNS request about.",
       "type": "string"
     },
     "duration": {

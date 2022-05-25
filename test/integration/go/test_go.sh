@@ -604,10 +604,9 @@ endtest
 # 
 # tlsClientDynamicHTTP1 
 #
-GODEBUG=http2client=0,http2server=0
 starttest tlsClientDynamicHTTP1
 cd /go/net
-ldscope ./tlsClientDynamic
+GODEBUG=http2client=0,http2server=0 ldscope ./tlsClientDynamic
 ERR+=$?
 
 # this sleep gives tlsClientDynamic a chance to report its events on exit
@@ -641,17 +640,15 @@ evalPayload
 ERR+=$?
 
 endtest
-unset GODEBUG
 
 
 # 
 # tlsServerDynamicHTTP1 
 #
-GODEBUG=http2client=0,http2server=0
 starttest tlsServerDynamicHTTP1
 cd /go/net
 PORT=4430
-ldscope ./tlsServerDynamic ${PORT} &
+GODEBUG=http2client=0,http2server=0 ldscope ./tlsServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -693,7 +690,6 @@ evalPayload
 ERR+=$?
 
 endtest
-unset GODEBUG
 
 
 #

@@ -18,13 +18,15 @@
 #define GOPCLNTAB_MAGIC_112 0xfffffffb
 #define GOPCLNTAB_MAGIC_116 0xfffffffa
 #define GOPCLNTAB_MAGIC_118 0xfffffff0
-
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 #define EXIT_STACK_SIZE (32 * 1024)
-
 #define UNKNOWN_GO_VER (-1)
 #define MIN_SUPPORTED_GO_VER (8)
 #define PARAM_ON_REG_GO_VER (19)
+#define HTTP2_FRAME_HEADER_LEN (9)
+#define PRI_STR "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
+#define PRI_STR_LEN (sizeof(PRI_STR)+1)
+#define UNDEF_OFFSET (-1)
 
 // compile-time control for debugging
 #define NEEDEVNULL 1
@@ -32,8 +34,6 @@
 #define funcprint devnull
 //#define patchprint sysprint
 #define patchprint devnull
-
-#define UNDEF_OFFSET (-1)
 
 int g_go_major_ver = UNKNOWN_GO_VER;
 static char g_go_build_ver[7];
@@ -283,7 +283,7 @@ static char *
 go_str(void *go_str)
 {
     // Go 17 and higher use "c style" null terminated strings instead of a string and a length
-    if (g_go_major_ver > 16) {
+    if (g_go_major_ver >= 17) {
        // We need to deference the address first before casting to a char *
        if (!go_str) return NULL;
        return (char *)*(uint64_t *)go_str;
@@ -303,7 +303,7 @@ go_str(void *go_str)
 static void
 free_go_str(char *str) {
     // Go 17 and higher use "c style" null terminated strings instead of a string and a length
-    if (g_go_major_ver > 16) {
+    if (g_go_major_ver >= 17) {
         return;
     }
     if(str) scope_free(str);
@@ -723,7 +723,7 @@ patch_addrs(funchook_t *funchook,
         // us to patch our code in, since it appears right after the system call. We
         // are able to patch non-system calls at the return instruction per prior versions. 
         // Note: We don't need a frame size here.
-        else if ((g_go_major_ver > 16) && (!scope_strcmp((const char*)asm_inst[i].mnemonic, "xorps")) &&
+        else if ((g_go_major_ver >= 17) && (!scope_strcmp((const char*)asm_inst[i].mnemonic, "xorps")) &&
             (asm_inst[i].size == 4)) {
 
             // In the "xorps" case we want to patch the xorps instruction exactly
@@ -992,7 +992,7 @@ initGoHook(elf_buf_t *ebuf)
      * the return value to 32 bits where on occasion a 64 bit return
      * value might be desired.
      */
-    if (g_go_major_ver > 16) {
+    if (g_go_major_ver >= 17) {
         // Use the abi0 I/F for syscall based functions in Go >= 1.17
         if (((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall.abi0")) == 0) &&
             ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall.abi0",
@@ -1038,7 +1038,7 @@ initGoHook(elf_buf_t *ebuf)
 
     // Update the schema to suit the current version
     adjustGoStructOffsetsForVersion(g_go_major_ver);
-    if (g_go_major_ver > 16) {
+    if (g_go_major_ver >= 17) {
         // The Go 17 schema works for 18 also, and possibly future versions
         g_go_schema = &go_17_schema;
     }
@@ -1529,11 +1529,10 @@ c_tls_client_read(char *stackaddr)
         buf = (char *)*(uint64_t *)(pc_br + g_go_schema->struct_offsets.bufrd_to_buf);
         // len is part of the []byte struct; the func doesn't return a len
         len = *(uint64_t *)(pc_br + 0x08);
-    }
-
-    if (buf && (len > 0)) {
-        doProtocol((uint64_t)0, fd, buf, len, TLSRX, BUF);
-        funcprint("Scope: c_tls_client_read of %d\n", fd);
+        if (buf && (len > 0)) {
+            doProtocol((uint64_t)0, fd, buf, len, TLSRX, BUF);
+            funcprint("Scope: c_tls_client_read of %d\n", fd);
+        }
     }
 }
 
@@ -1616,12 +1615,12 @@ c_http2_server_read(char *stackaddr)
     rc += newbuf[1] << 8;
     rc += newbuf[2];
     if (rc < 1) return;
-    rc += 9;
+    rc += HTTP2_FRAME_HEADER_LEN;
 
     char *frame = (char *)scope_malloc(rc);
     if (!frame) return;
-    scope_memmove(frame, buf, 9);
-    scope_memmove(frame + 9, readBuf, rc - 9);
+    scope_memmove(frame, buf, HTTP2_FRAME_HEADER_LEN);
+    scope_memmove(frame + HTTP2_FRAME_HEADER_LEN, readBuf, rc - HTTP2_FRAME_HEADER_LEN);
 
     uint64_t tcpConn = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_conn);
     if (!tcpConn ) {
@@ -1633,8 +1632,7 @@ c_http2_server_read(char *stackaddr)
 
     // If Proto is not yet detected, we must call doProtocol with a PRI string         
     if (isProtocolSet(fd) == FALSE) {
-        char *PRI_str = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
-        doProtocol((uint64_t)0, fd, PRI_str, scope_strlen(PRI_str), TLSRX, BUF);
+        doProtocol((uint64_t)0, fd, PRI_STR, PRI_STR_LEN, TLSRX, BUF);
     }
 
     doProtocol((uint64_t)0, fd, frame, rc, TLSRX, BUF);
@@ -1682,7 +1680,7 @@ c_http2_server_write(char *stackaddr)
     rc += newbuf[1] << 8;
     rc += newbuf[2];
     if (rc < 1) return;
-    rc += 9;
+    rc += HTTP2_FRAME_HEADER_LEN;
 
     // At times, the buffer contains 0. We don't want to call doProtocol when
     // the header is empty (length and type bytes are all 0).
@@ -1692,8 +1690,8 @@ c_http2_server_write(char *stackaddr)
 
     char *frame = (char *)scope_malloc(rc);
     if (!frame) return;
-    scope_memmove(frame, buf, 9);
-    scope_memmove(frame + 9, writeBuf, rc - 9);
+    scope_memmove(frame, buf, HTTP2_FRAME_HEADER_LEN);
+    scope_memmove(frame + HTTP2_FRAME_HEADER_LEN, writeBuf, rc - HTTP2_FRAME_HEADER_LEN);
 
     uint64_t tcpConn = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_conn);
     if (!tcpConn) {
@@ -1705,8 +1703,7 @@ c_http2_server_write(char *stackaddr)
     
     // If Proto is not yet detected, we must call doProtocol with a PRI string         
     if (isProtocolSet(fd) == FALSE) {
-        char *PRI_str = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
-        doProtocol((uint64_t)0, fd, PRI_str, scope_strlen(PRI_str), TLSRX, BUF);
+        doProtocol((uint64_t)0, fd, PRI_STR, PRI_STR_LEN, TLSRX, BUF);
     }
 
     funcprint("Scope: c_http2_server_write of %d %i\n", fd, rc);
@@ -1747,12 +1744,12 @@ c_http2_client_read(char *stackaddr)
     rc += newbuf[1] << 8;
     rc += newbuf[2];
     if (rc < 1) return;
-    rc += 9;
+    rc += HTTP2_FRAME_HEADER_LEN;
 
     char *frame = (char *)scope_malloc(rc);
     if (!frame) return;
-    scope_memmove(frame, buf, 9);
-    scope_memmove(frame + 9, readBuf, rc - 9);
+    scope_memmove(frame, buf, HTTP2_FRAME_HEADER_LEN);
+    scope_memmove(frame + HTTP2_FRAME_HEADER_LEN, readBuf, rc - HTTP2_FRAME_HEADER_LEN);
 
     uint64_t tcpConn = *(uint64_t *)(cc + g_go_schema->struct_offsets.cc_to_tconn);
     if (!tcpConn) {

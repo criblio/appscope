@@ -702,8 +702,8 @@ parseHttp2(http_state_t* state, net_info *net, int isTx,
             return FALSE;
         }
 
-        scopeLogDebug("DEBUG: HTTP/2 %s frame found; type=0x%02x, flags=0x%02x, stream=%d",
-                isTx ? "TX" : "RX", fType, fFlags, fStream);
+        //scopeLogDebug("DEBUG: HTTP/2 %s frame found; type=0x%02x, flags=0x%02x, stream=%d",
+        //        isTx ? "TX" : "RX", fType, fFlags, fStream);
 
         // process interesting frames
         switch (fType) {

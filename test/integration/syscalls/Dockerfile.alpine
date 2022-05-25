@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM alpine:3.15
 
 RUN apk add bash python3 py3-pip wget patch
 RUN pip3 install virtualenv
@@ -6,11 +6,12 @@ RUN pip3 install virtualenv
 RUN mkdir -p /opt/test-runner/logs/ /opt/test
 COPY ./syscalls/ltp_p1.patch /opt/test/
 
+ARG LTP_VERSION=20210927
 RUN cd /opt/test && \
-      wget https://github.com/linux-test-project/ltp/archive/refs/tags/20210927.zip && \
-      unzip 20210927.zip && \
-      rm -f 20210927.zip && \
-      mv ltp-20210927 ltp && \
+      wget https://github.com/linux-test-project/ltp/archive/refs/tags/${LTP_VERSION}.zip && \
+      unzip ${LTP_VERSION}.zip && \
+      rm -f ${LTP_VERSION}.zip && \
+      mv ltp-${LTP_VERSION} ltp && \
       cd /opt/test/ltp && \
       ./ci/alpine.sh && \
       patch -p1 < /opt/test/ltp_p1.patch && \

@@ -590,7 +590,7 @@ http2GetFrameType(http_buf_t *stash, const uint8_t *buf, size_t len)
     return ret;
 }
 
-
+#if 0
 static uint8_t
 http2GetFrameFlags(http_buf_t *stash, const uint8_t *buf, size_t len)
 {
@@ -658,6 +658,7 @@ http2GetFrameStream(http_buf_t *stash, const uint8_t *buf, size_t len)
 
     return ret;
 }
+#endif
 
 
 static bool
@@ -692,8 +693,8 @@ parseHttp2(http_state_t* state, net_info *net, int isTx,
         // get the header values
         uint32_t fLen    = http2GetFrameLength(stash, bufPos, bufLen);
         uint8_t  fType   = http2GetFrameType(stash, bufPos, bufLen);
-        uint8_t  fFlags  = http2GetFrameFlags(stash, bufPos, bufLen);
-        uint32_t fStream = http2GetFrameStream(stash, bufPos, bufLen);
+        //uint8_t  fFlags  = http2GetFrameFlags(stash, bufPos, bufLen);
+        //uint32_t fStream = http2GetFrameStream(stash, bufPos, bufLen);
 
         // stash the buffer if we don't have enough for the whole frame
         if (stash->len + bufLen < (9 + fLen)) {

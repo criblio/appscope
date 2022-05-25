@@ -1164,6 +1164,32 @@ do_cfunc(char *stackptr, void *cfunc, void *gfunc)
 }
 
 /*
+  Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
+  netFD = TCPConn + 0x08                (netFD)
+  pfd = netFD + 0x0                     (poll.FD)
+  fd = pfd + 0x10                       (pfd.sysfd)
+  */
+// Retrieve a file descriptor from a Go conn interface
+static int
+getFDFromConn(uint64_t tcpConn) {
+    if (!tcpConn) return -1;
+
+    uint64_t netFD = *(uint64_t *)(tcpConn + g_go_schema->struct_offsets.iface_data);
+    if (!netFD) return -1;
+
+    if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) { 
+        uint64_t pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd); 
+        if (!pfd) return -1;
+
+        return *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd); 
+    } else {
+        return *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
+    }
+    return -1;
+}
+
+
+/*
  * Putting a comment here that applies to all of the
  * 'C' handlers for interposed functions.
  *
@@ -1384,21 +1410,12 @@ c_tls_server_read(char *stackaddr)
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
     stackaddr -= g_go_schema->arg_offsets.c_tls_server_read_callee;
 
-    int fd = -1;
-
     uint64_t connReader = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_read_connReader); 
     if (!connReader) return;   // protect from dereferencing null
     char *buf           = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_read_buf);
-    // buf len 0x18
-    // buf cap 0x20
     uint64_t rc         = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_read_rc);
-    uint64_t cr_conn_rwc_if, cr_conn_rwc, netFD, pfd;
-
-    uint64_t conn        =  *(uint64_t *)(connReader + g_go_schema->struct_offsets.connReader_to_conn);
+    uint64_t conn       =  *(uint64_t *)(connReader + g_go_schema->struct_offsets.connReader_to_conn);
     if (!conn) return;         // protect from dereferencing null
-
-    cr_conn_rwc_if = conn + g_go_schema->struct_offsets.conn_to_rwc;
-    uint64_t tls        = *(uint64_t *)(conn + g_go_schema->struct_offsets.conn_to_tlsState);
 
     /*
      * The rwc net.Conn value can be wrapped as either a *net.TCPConn or
@@ -1410,22 +1427,18 @@ c_tls_server_read(char *stackaddr)
      * and checking the type to determine TLS. This doesn't work on stripped
      * executables and should no longer be needed.
      */
-    if (cr_conn_rwc_if && tls) {
-        cr_conn_rwc = *(uint64_t *)(cr_conn_rwc_if + g_go_schema->struct_offsets.iface_data);
-        netFD = *(uint64_t *)(cr_conn_rwc + g_go_schema->struct_offsets.iface_data);
-        if (netFD) {
-            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd);
-            if (pfd) {
-                //funcprint("Scope: %s:%d cr %p cr.conn %p cr.conn.rwc_if %p cr.conn.rwc %p netFD %p pfd %p fd %p\n",
-                //          __FUNCTION__, __LINE__, connReader, conn, cr_conn_rwc_if, cr_conn_rwc,
-                //          netFD, pfd, pfd + g_go_schema->struct_offsets.pd_to_fd);
-                fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd);
-            }
+    uint64_t cr_conn_rwc_if = conn + g_go_schema->struct_offsets.conn_to_rwc;
+    if (!cr_conn_rwc_if) return;
+    uint64_t tls   = *(uint64_t *)(conn + g_go_schema->struct_offsets.conn_to_tlsState);
+    if (!tls) return;
+   
+    uint64_t tcpConn = *(uint64_t *)(cr_conn_rwc_if + g_go_schema->struct_offsets.iface_data);
+    if (!tcpConn) return;
 
-            funcprint("Scope: go_http_server_read of %d\n", fd);
-            doProtocol((uint64_t)0, fd, buf, rc, TLSRX, BUF);
-        }
-    }
+    int fd = getFDFromConn(tcpConn);
+
+    funcprint("Scope: go_http_server_read of %d\n", fd);
+    doProtocol((uint64_t)0, fd, buf, rc, TLSRX, BUF);
 }
 
 EXPORTON void *
@@ -1451,30 +1464,23 @@ c_tls_server_write(char *stackaddr)
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
     stackaddr -= g_go_schema->arg_offsets.c_tls_server_write_callee;
 
-    int fd = -1;
     uint64_t conn = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_write_conn);
     if (!conn) return;         // protect from dereferencing null
     char *buf     = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_write_buf);
     uint64_t rc   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_write_rc);
-    uint64_t w_conn_rwc_if, w_conn_rwc, netFD, pfd;
 
-    w_conn_rwc_if = (conn + g_go_schema->struct_offsets.conn_to_rwc);
+    uint64_t w_conn_rwc_if = (conn + g_go_schema->struct_offsets.conn_to_rwc);
+    if (!w_conn_rwc_if) return;
     uint64_t tls =  *(uint64_t *)(conn + g_go_schema->struct_offsets.conn_to_tlsState);
+    if (!tls) return;
 
-    // conn I/F checking. Ref the comment on c_tls_server_read.
-    if (w_conn_rwc_if && tls) {
-        w_conn_rwc = *(uint64_t *)(w_conn_rwc_if + g_go_schema->struct_offsets.iface_data);
-        netFD = *(uint64_t *)(w_conn_rwc + g_go_schema->struct_offsets.iface_data);
-        if (netFD) {
-            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd);
-            if (pfd) {
-                fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd);
-            }
+    uint64_t tcpConn = *(uint64_t *)(w_conn_rwc_if + g_go_schema->struct_offsets.iface_data);
+    if (!tcpConn) return;
 
-            funcprint("Scope: c_tls_server_write of %d\n", fd);
-            doProtocol((uint64_t)0, fd, buf, rc, TLSTX, BUF);
-        }
-    }
+    int fd = getFDFromConn(tcpConn);
+
+    funcprint("Scope: c_tls_server_write of %d\n", fd);
+    doProtocol((uint64_t)0, fd, buf, rc, TLSTX, BUF);
 }
 
 EXPORTON void *
@@ -1504,38 +1510,30 @@ c_tls_client_read(char *stackaddr)
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
     stackaddr -= g_go_schema->arg_offsets.c_tls_client_read_callee;
 
-    int fd = -1;
-    stackaddr += g_go_schema->arg_offsets.c_tls_client_read_callee;
     uint64_t pc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_read_pc); 
-    uint64_t pc_conn_if, pc_conn, netFD, pfd, pc_br, len = 0;
-    char *buf = NULL;
+    if (!pc) return;
 
-    pc_conn_if = (pc + g_go_schema->struct_offsets.persistConn_to_conn);
+    uint64_t pc_conn_if = (pc + g_go_schema->struct_offsets.persistConn_to_conn);
+    if (!pc_conn_if) return;
     uint64_t tls = *(uint64_t*)(pc + g_go_schema->struct_offsets.persistConn_to_tlsState);
+    if (!tls) return;
 
-    // conn I/F checking. Ref the comment on c_tls_server_read.
-    if (pc_conn_if && tls) {
-        pc_conn = *(uint64_t *)(pc_conn_if + g_go_schema->struct_offsets.iface_data);
-        netFD = *(uint64_t *)(pc_conn + g_go_schema->struct_offsets.iface_data);
-        if (!netFD) return;
-        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) {
-            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd);
-            if (!pfd) return;
-            fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd);
-        } else {
-            fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd);
-        }
+    uint64_t tcpConn = *(uint64_t *)(pc_conn_if + g_go_schema->struct_offsets.iface_data);
+    if (!tcpConn) return;
 
-        if ((pc_br = *(uint64_t *)(pc + g_go_schema->struct_offsets.persistConn_to_bufrd)) != 0) {
-            buf = (char *)*(uint64_t *)(pc_br + g_go_schema->struct_offsets.bufrd_to_buf);
-            // len is part of the []byte struct; the func doesn't return a len
-            len = *(uint64_t *)(pc_br + 0x08);
-        }
+    int fd = getFDFromConn(tcpConn);
 
-        if (buf && (len > 0)) {
-            doProtocol((uint64_t)0, fd, buf, len, TLSRX, BUF);
-            funcprint("Scope: c_tls_client_read of %d\n", fd);
-        }
+    uint64_t pc_br, len = 0;
+    char *buf = NULL;
+    if ((pc_br = *(uint64_t *)(pc + g_go_schema->struct_offsets.persistConn_to_bufrd)) != 0) {
+        buf = (char *)*(uint64_t *)(pc_br + g_go_schema->struct_offsets.bufrd_to_buf);
+        // len is part of the []byte struct; the func doesn't return a len
+        len = *(uint64_t *)(pc_br + 0x08);
+    }
+
+    if (buf && (len > 0)) {
+        doProtocol((uint64_t)0, fd, buf, len, TLSRX, BUF);
+        funcprint("Scope: c_tls_client_read of %d\n", fd);
     }
 }
 
@@ -1565,33 +1563,23 @@ c_tls_client_write(char *stackaddr)
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
     stackaddr -= g_go_schema->arg_offsets.c_tls_client_write_callee;
 
-    int fd = -1;
     uint64_t w_pc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_write_w_pc);
     char *buf     = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_write_buf);
     uint64_t rc   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_write_rc);
-    uint64_t pc_conn_if, w_pc_conn, netFD, pfd;
-
     if (rc < 1) return;
 
-    pc_conn_if = (w_pc + g_go_schema->struct_offsets.persistConn_to_conn); 
+    uint64_t pc_conn_if = (w_pc + g_go_schema->struct_offsets.persistConn_to_conn); 
+    if (!pc_conn_if) return;
     uint64_t tls =  *(uint64_t*)(w_pc + g_go_schema->struct_offsets.persistConn_to_tlsState); 
+    if (!tls) return;
 
-    // conn I/F checking. Ref the comment on c_tls_server_read.
-    if (pc_conn_if && tls) {
-        w_pc_conn = *(uint64_t *)(pc_conn_if + g_go_schema->struct_offsets.iface_data); 
-        netFD = *(uint64_t *)(w_pc_conn + g_go_schema->struct_offsets.iface_data);
-        if (!netFD) return;
-        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) { 
-            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd); 
-            if (!pfd) return;
-            fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd); 
-        } else {
-            fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
-        }
+    uint64_t tcpConn = *(uint64_t *)(pc_conn_if + g_go_schema->struct_offsets.iface_data); 
+    if (!tcpConn) return;
 
-        doProtocol((uint64_t)0, fd, buf, rc, TLSTX, BUF);
-        funcprint("Scope: c_tls_client_write of %d\n", fd);
-    }
+    int fd = getFDFromConn(tcpConn);
+    
+    doProtocol((uint64_t)0, fd, buf, rc, TLSTX, BUF);
+    funcprint("Scope: c_tls_client_write of %d\n", fd);
 }
 
 EXPORTON void *
@@ -1602,27 +1590,24 @@ go_tls_client_write(char *stackptr)
 
 /*
   Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
-  fr = stackaddr + 0x?                  (http2Framer)
-  fr.readBuf = *fr + 0x?                (response buffer)
-  rl.cc = stackaddr + 0x70 [!in calleR] (http2ClientConn)
-  rl.cc.tconn = *(rl.cc) + 0x?          (TCPConn)
-  netFD = TCPConn + 0x08                (netFD)
-  pfd = netFD + 0x0                     (poll.FD)
-  fd = pfd + 0x10                       (pfd.sysfd)
+  Our variable    Memory loc        Go variable
+  sc              stackaddr + 0xd0  sc
+  fr              sc + 0x48         sc.fr
+  buf             fr + 0x40         sc.fr.headerBuf 
+  readBuf         fr + 0x58         sc.fr.readBuf
+  tcpConn         sc + 0x18         sc.conn
  */
-// Extract data from net/http.(*http2Framer).ReadFrame (tls http2 client/server read)
+// Extract data from net/http.(*http2serverConn).readFrames (tls http2 server read)
 static void
 c_http2_server_read(char *stackaddr)
 {
-    int fd = -1;
-
     uint64_t sc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_server_read_sc);
-
+    if (!sc) return;
     uint64_t fr   = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_fr);
     if (!fr) return;
     char *buf     = (char *)(fr + g_go_schema->struct_offsets.fr_to_headerBuf);
-    char *readBuf = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_readBuf);
     if (!buf) return;
+    char *readBuf = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_readBuf);
     if (!readBuf) return;
 
     uint8_t *newbuf = (uint8_t *)buf; 
@@ -1630,8 +1615,7 @@ c_http2_server_read(char *stackaddr)
     rc += newbuf[0] << 16;
     rc += newbuf[1] << 8;
     rc += newbuf[2];
-
-//    uint64_t rc = *(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_rc);
+    if (rc < 1) return;
     rc += 9;
 
     char *frame = (char *)scope_malloc(rc);
@@ -1640,34 +1624,21 @@ c_http2_server_read(char *stackaddr)
     scope_memmove(frame + 9, readBuf, rc - 9);
 
     uint64_t tcpConn = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_conn);
-    uint64_t netFD, pfd;
-
-    if (rc < 1) {
+    if (!tcpConn ) {
        scope_free(frame);
        return;
     }
 
-    // conn I/F checking. Ref the comment on c_http_server_read.
-    if (tcpConn) {
-        netFD = *(uint64_t *)(tcpConn + g_go_schema->struct_offsets.iface_data);
-        if (!netFD) return;
-        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) { 
-            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd); 
-            if (!pfd) return;
-            fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd); 
-        } else {
-            fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
-        }
+    int fd = getFDFromConn(tcpConn);
 
-        // If Proto is not yet detected, we must call doProtocol with a PRI string         
-        if (isProtocolSet(fd) == FALSE) {
-            char *PRI_str = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
-            doProtocol((uint64_t)0, fd, PRI_str, scope_strlen(PRI_str), TLSRX, BUF);
-        }
-
-        doProtocol((uint64_t)0, fd, frame, rc, TLSRX, BUF);
-        funcprint("Scope: c_http2_server_read of %d\n", fd);
+    // If Proto is not yet detected, we must call doProtocol with a PRI string         
+    if (isProtocolSet(fd) == FALSE) {
+        char *PRI_str = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
+        doProtocol((uint64_t)0, fd, PRI_str, scope_strlen(PRI_str), TLSRX, BUF);
     }
+
+    doProtocol((uint64_t)0, fd, frame, rc, TLSRX, BUF);
+    funcprint("Scope: c_http2_server_read of %d\n", fd);
 
     scope_free(frame);
 }
@@ -1681,15 +1652,13 @@ go_http2_server_read(char *stackptr)
 
 /*
   Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
-  sc = stackaddr + 0x30 [!in calleR]
-  fr = sc + 0x48
-  conn (sc.conn.data) = sc + 0x18
-  conn.rwc_if = conn + 0x10
-  conn.rwc = conn.rwc_if + 0x08
-  netFD = conn.rwc + 0x08
-  pfd = *netFD
-  fd = pfd + 0x10
- */
+  Our variable    Memory loc        Go variable
+  sc              stackaddr + 0x30  sc
+  fr              sc + 0x48         sc.fr
+  buf             fr + 0x40         sc.fr.headerBuf
+  writeBuf        fr + 0x88         sc.fr.writeBuf
+  tcpConn         sc + 0x18         sc.conn
+  */
 // Extract data from net/http.(*http2serverConn).Flush (tls http2 server write)
 static void
 c_http2_server_write(char *stackaddr)
@@ -1698,18 +1667,13 @@ c_http2_server_write(char *stackaddr)
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
     stackaddr -= g_go_schema->arg_offsets.c_http2_server_write_callee;
 
-    int fd = -1;
-
-
     uint64_t sc      = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_server_write_sc);
-    if (!sc) return;         // protect from dereferencing null
-
+    if (!sc) return;
     uint64_t fr      = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_fr);
-    if (!fr) return;         // protect from dereferencing null
-
+    if (!fr) return;  
     char *buf        = (char *)(fr + g_go_schema->struct_offsets.fr_to_headerBuf);
-    char *writeBuf   = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_writeBuf);
     if (!buf) return;
+    char *writeBuf   = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_writeBuf);
     if (!writeBuf) return;
 
     uint8_t *newbuf = (uint8_t *)writeBuf; 
@@ -1717,46 +1681,36 @@ c_http2_server_write(char *stackaddr)
     rc += newbuf[0] << 16;
     rc += newbuf[1] << 8;
     rc += newbuf[2];
+    if (rc < 1) return;
+    rc += 9;
 
     // At times, the buffer contains 0. We don't want to call doProtocol when
     // the header is empty (length and type bytes are all 0).
     // Especially since it will set PROTO to false if it's the first call to doProtocol
     // on this socket.
-    if (!rc && !newbuf[3]) return;
-
-//    uint64_t rc = *(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_rc);
-    rc += 9;
+    if (!newbuf[3]) return;
 
     char *frame = (char *)scope_malloc(rc);
     if (!frame) return;
     scope_memmove(frame, buf, 9);
     scope_memmove(frame + 9, writeBuf, rc - 9);
 
-
     uint64_t tcpConn = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_conn);
-    uint64_t netFD, pfd;
-
-    // conn I/F checking. Ref the comment on c_http_server_read.
-    if (tcpConn) {
-        netFD = *(uint64_t *)(tcpConn + g_go_schema->struct_offsets.iface_data);
-        if (!netFD) return;
-        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) { 
-            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd); 
-            if (!pfd) return;
-            fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd); 
-        } else {
-            fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
-        }
-
-        // If Proto is not yet detected, we must call doProtocol with a PRI string         
-        if (isProtocolSet(fd) == FALSE) {
-            char *PRI_str = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
-            doProtocol((uint64_t)0, fd, PRI_str, scope_strlen(PRI_str), TLSRX, BUF);
-        }
-
-        funcprint("Scope: c_http2_server_write of %d %i\n", fd, rc);
-        doProtocol((uint64_t)0, fd, writeBuf, rc, TLSTX, BUF);
+    if (!tcpConn) {
+        scope_free(frame);
+        return;
     }
+
+    int fd = getFDFromConn(tcpConn);
+    
+    // If Proto is not yet detected, we must call doProtocol with a PRI string         
+    if (isProtocolSet(fd) == FALSE) {
+        char *PRI_str = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n";
+        doProtocol((uint64_t)0, fd, PRI_str, scope_strlen(PRI_str), TLSRX, BUF);
+    }
+
+    funcprint("Scope: c_http2_server_write of %d %i\n", fd, rc);
+    doProtocol((uint64_t)0, fd, writeBuf, rc, TLSTX, BUF);
 }
 
 EXPORTON void *
@@ -1767,27 +1721,24 @@ go_http2_server_write(char *stackptr)
 
 /*
   Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
-  fr = stackaddr + 0x?                  (http2Framer)
-  fr.readBuf = *fr + 0x?                (response buffer)
-  rl.cc = stackaddr + 0x70 [!in calleR] (http2ClientConn)
-  rl.cc.tconn = *(rl.cc) + 0x?          (TCPConn)
-  netFD = TCPConn + 0x08                (netFD)
-  pfd = netFD + 0x0                     (poll.FD)
-  fd = pfd + 0x10                       (pfd.sysfd)
+  Our variable    Memory loc        Go variable
+  cc              stackaddr + 68    cc
+  fr              sc + 0x130        cc.fr
+  buf             fr + 0x40         cc.fr.headerBuf 
+  readBuf         fr + 0x58         cc.fr.readBuf
+  tcpConn         sc + 0x10         cc.conn
  */
-// Extract data from net/http.(*http2Framer).ReadFrame (tls http2 client/server read)
+// Extract data from net/http.(*http2clientConnReadLoop).run (tls http2 client read)
 static void
 c_http2_client_read(char *stackaddr)
 {
-    int fd = -1;
-
     uint64_t cc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_read_cc);
-
+    if (!cc) return;
     uint64_t fr   = *(uint64_t *)(cc + g_go_schema->struct_offsets.cc_to_fr);
     if (!fr) return;
     char *buf     = (char *)(fr + g_go_schema->struct_offsets.fr_to_headerBuf);
-    char *readBuf = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_readBuf);
     if (!buf) return;
+    char *readBuf = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_readBuf);
     if (!readBuf) return;
 
     uint8_t *newbuf = (uint8_t *)buf; 
@@ -1795,8 +1746,7 @@ c_http2_client_read(char *stackaddr)
     rc += newbuf[0] << 16;
     rc += newbuf[1] << 8;
     rc += newbuf[2];
-
-//    uint64_t rc = *(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_rc);
+    if (rc < 1) return;
     rc += 9;
 
     char *frame = (char *)scope_malloc(rc);
@@ -1805,28 +1755,15 @@ c_http2_client_read(char *stackaddr)
     scope_memmove(frame + 9, readBuf, rc - 9);
 
     uint64_t tcpConn = *(uint64_t *)(cc + g_go_schema->struct_offsets.cc_to_tconn);
-    uint64_t netFD, pfd;
-
-    if (rc < 1) {
+    if (!tcpConn) {
        scope_free(frame);
        return;
     }
 
-    // conn I/F checking. Ref the comment on c_http_server_read.
-    if (tcpConn) {
-        netFD = *(uint64_t *)(tcpConn + g_go_schema->struct_offsets.iface_data);
-        if (!netFD) return;
-        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) { 
-            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd); 
-            if (!pfd) return;
-            fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd); 
-        } else {
-            fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
-        }
+    int fd = getFDFromConn(tcpConn);
 
-        doProtocol((uint64_t)0, fd, frame, rc, TLSRX, BUF);
-        funcprint("Scope: c_http2_client_read of %d\n", fd);
-    }
+    doProtocol((uint64_t)0, fd, frame, rc, TLSRX, BUF);
+    funcprint("Scope: c_http2_client_read of %d\n", fd);
 
     scope_free(frame);
 }
@@ -1839,12 +1776,10 @@ go_http2_client_read(char *stackptr)
 
 /*
   Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
-  p = stackaddr + 0x8              (request buffer)
-  *p = request string
-  sew.conn.data = stackaddr + 0x48 (TCPConn)
-  netFD = tcpConn + 0x08           (netFD)
-  pfd = netFD + 0x0                (poll.FD)
-  fd = pfd + 0x10                  (pfd.sysfd)
+  Our variable    Memory loc        Go variable
+  tcpConn         stackaddr + 0x48  sew.conn
+  buf             stackaddr + 0x8   p
+  rc              stackaddr + 0x10  p
  */
 // Extract data from net/http.http2stickyErrWriter.Write (tls http2 client write)
 static void
@@ -1854,31 +1789,16 @@ c_http2_client_write(char *stackaddr)
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
     stackaddr -= g_go_schema->arg_offsets.c_http2_client_write_callee;
 
-    int fd = -1;
-
-    // tcpConn is sew.conn.data
     uint64_t tcpConn = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_tcpConn);
+    if (!tcpConn) return;
     char *buf        = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_buf);
     uint64_t rc      = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_rc);
-    uint64_t netFD, pfd;
-
     if (rc < 1) return;
 
-    // conn I/F checking. Ref the comment on c_http_server_read.
-    if (tcpConn) {
-        netFD = *(uint64_t *)(tcpConn + g_go_schema->struct_offsets.iface_data);
-        if (!netFD) return;
-        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) { 
-            pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd); 
-            if (!pfd) return;
-            fd = *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd); 
-        } else {
-            fd = *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
-        }
-
-        doProtocol((uint64_t)0, fd, buf, rc, TLSTX, BUF);
-        funcprint("Scope: c_http2_client_write of %d\n", fd);
-    }
+    int fd = getFDFromConn(tcpConn);
+    
+    doProtocol((uint64_t)0, fd, buf, rc, TLSTX, BUF);
+    funcprint("Scope: c_http2_client_write of %d\n", fd);
 }
 
 EXPORTON void *

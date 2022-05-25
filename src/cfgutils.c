@@ -2481,11 +2481,36 @@ err:
     return NULL;
 }
 
+static cJSON*
+createCriblJson(config_t* cfg)
+{
+    cJSON *root = NULL;
+    cJSON *transport;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, ENABLE_NODE,
+                          valToStr(boolMap, cfgLogStreamEnable(cfg)))) goto err;
+
+    if (!(transport = createTransportJson(cfg, CFG_LS))) goto err;
+    cJSON_AddItemToObjectCS(root, TRANSPORT_NODE, transport);
+
+    // Represent NULL as an empty string
+    const char *token = cfgAuthToken(cfg);
+    token = (token) ? token : "";
+    if (!cJSON_AddStringToObjLN(root, AUTHTOKEN_NODE, token)) goto err;
+
+    return root;
+err:
+    if(root) cJSON_Delete(root);
+    return NULL;
+}
+
 cJSON*
 jsonObjectFromCfg(config_t* cfg)
 {
-    cJSON* json_root = NULL;
-    cJSON* metric, *libscope, *event, *payload, *tags, *protocol;
+    cJSON *json_root = NULL;
+    cJSON *metric, *libscope, *event, *payload, *tags, *protocol, *cribl;
 
     if (!(json_root = cJSON_CreateObject())) goto err;
 
@@ -2506,6 +2531,9 @@ jsonObjectFromCfg(config_t* cfg)
 
     if (!(protocol = createProtocolJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(json_root, PROTOCOL_NODE, protocol);
+
+    if (!(cribl = createCriblJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(json_root, CRIBL_NODE, cribl);
 
     return json_root;
 err:

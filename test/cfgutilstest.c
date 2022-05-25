@@ -1167,6 +1167,10 @@ verifyDefaults(config_t* config)
     // the protocol list should be empty too
     assert_non_null        (g_protlist);
     assert_int_equal       (g_prot_sequence, 0);
+
+    assert_int_equal       (cfgLogStreamEnable(config), DEFAULT_LOGSTREAM_ENABLE);
+    assert_int_equal       (cfgTransportType(config, CFG_LS), DEFAULT_LS_TYPE);
+    assert_null            (cfgAuthToken(config));
 }
 
 static void
@@ -1223,8 +1227,14 @@ cfgReadGoodYaml(void** state)
         "      buffering: full\n"
         "      type: syslog\n"
         "tags:\n"
-        "  name1 : value1\n"
-        "  name2 : value2\n"
+        "  name1: value1\n"
+        "  name2: value2\n"
+        "cribl:\n"
+        "  enable: true\n"
+        "  transport:\n"
+        "    type: unix\n"
+        "    path: '@abstractsock'\n"
+        "  authtoken: ''\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
@@ -1277,6 +1287,10 @@ cfgReadGoodYaml(void** state)
     assert_int_equal(cfgLogLevel(config), CFG_LOG_DEBUG);
     assert_int_equal(cfgPayEnable(config), FALSE);
     assert_string_equal(cfgPayDir(config), "/my/dir");
+    assert_int_equal       (cfgLogStreamEnable(config), TRUE);
+    assert_int_equal       (cfgTransportType(config, CFG_LS), CFG_UNIX);
+    assert_string_equal    (cfgTransportPath(config, CFG_LS), "@abstractsock");
+    assert_null            (cfgAuthToken(config));
     cfgDestroy(&config);
     lstDestroy(&g_protlist);
     g_prot_sequence = 0;
@@ -1462,7 +1476,14 @@ const char* jsonText =
     "  },\n"
     "  'protocol': [\n"
     "    {'name':'eg1','regex':'.*'}\n"
-    "  ]\n"
+    "  ],\n"
+    "  'cribl': {\n"
+    "    'enable': 'false',\n"
+    "    'transport': {\n"
+    "      'type': 'shm'\n"
+    "    },\n"
+    "    'authtoken': 'shhdonotsharethistokenwithjustanyone'\n"
+    "  }\n"
     "}\n";
 
 static void
@@ -1522,6 +1543,10 @@ cfgReadGoodJson(void** state)
     assert_int_equal   (g_prot_sequence, 1);
     assert_non_null    (prot = lstFind(g_protlist, 1));
     assert_string_equal(prot->protname, "eg1");
+
+    assert_int_equal       (cfgLogStreamEnable(config), FALSE);
+    assert_int_equal       (cfgTransportType(config, CFG_LS), CFG_SHM);
+    assert_string_equal    (cfgAuthToken(config), "shhdonotsharethistokenwithjustanyone");
 
     cfgDestroy(&config);
     lstDestroy(&g_protlist);

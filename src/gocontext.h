@@ -45,6 +45,9 @@ typedef struct {
     int c_http2_server_read_sc;
     int c_http2_server_write_callee;
     int c_http2_server_write_sc;
+    int c_http2_server_preface_callee;
+    int c_http2_server_preface_sc;
+    int c_http2_server_preface_rc;
     int c_http2_client_read_cc;
     int c_http2_client_write_callee;
     int c_http2_client_write_tcpConn;
@@ -148,6 +151,7 @@ extern void go_hook_reg_tls_client_read(void);
 extern void go_hook_reg_tls_client_write(void);
 extern void go_hook_reg_http2_server_read(void);
 extern void go_hook_reg_http2_server_write(void);
+extern void go_hook_reg_http2_server_preface(void);
 extern void go_hook_reg_http2_client_read(void);
 extern void go_hook_reg_http2_client_write(void);
 

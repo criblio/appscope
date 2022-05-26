@@ -354,7 +354,7 @@ sleep 1
 curl -k --key server.key --cert server.crt https://localhost:${PORT}/hello
 ERR+=$?
 
-sleep 0.5
+sleep 5
 # This stops tlsServerStatic
 pkill -f tlsServerStatic
 
@@ -367,15 +367,14 @@ grep tlsServerStatic $EVT_FILE | grep net.app > /dev/null
 ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep net.open > /dev/null
 ERR+=$?
-grep tlsServerStatic $EVT_FILE | grep net.close > /dev/null
-ERR+=$?
+# dont wait for this, it's not always guaranteed in the test app's timeframe
+#grep tlsServerStatic $EVT_FILE | grep net.close > /dev/null
+#ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep fs.open > /dev/null
 ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep fs.close > /dev/null
 ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep http.req > /dev/null
-ERR+=$?
-grep tlsServerStatic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
@@ -569,7 +568,7 @@ SCOPE_GO_STRUCT_PATH=$STRUCT_PATH ldscope ./tlsClientStatic
 ERR+=$?
 
 # this sleep gives tlsClientStatic a chance to report its events on exit
-sleep 1
+sleep 5
 
 evaltest
 
@@ -604,10 +603,10 @@ endtest
 # 
 # tlsClientDynamicHTTP1 
 #
-GODEBUG=http2client=0,http2server=0
+
 starttest tlsClientDynamicHTTP1
 cd /go/net
-ldscope ./tlsClientDynamic
+GODEBUG=http2client=0,http2server=0 ldscope ./tlsClientDynamic
 ERR+=$?
 
 # this sleep gives tlsClientDynamic a chance to report its events on exit

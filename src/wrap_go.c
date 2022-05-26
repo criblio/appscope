@@ -25,7 +25,7 @@
 #define PARAM_ON_REG_GO_VER (19)
 #define HTTP2_FRAME_HEADER_LEN (9)
 #define PRI_STR "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
-#define PRI_STR_LEN (sizeof(PRI_STR)+1)
+#define PRI_STR_LEN sizeof(PRI_STR)
 #define UNDEF_OFFSET (-1)
 
 // compile-time control for debugging
@@ -58,6 +58,7 @@ enum index_hook_t {
     INDEX_HOOK_HTTP2_SERVER_WRITE,
     INDEX_HOOK_HTTP2_CLIENT_READ,
     INDEX_HOOK_HTTP2_CLIENT_WRITE,
+    INDEX_HOOK_HTTP2_SERVER_PREFACE,
     INDEX_HOOK_MAX,
 };
 
@@ -207,6 +208,9 @@ go_schema_t go_17_schema = {
         .c_http2_server_read_sc=0xd0,
         .c_http2_server_write_callee=0x0,
         .c_http2_server_write_sc=0x30,
+        .c_http2_server_preface_callee=0xc8,
+        .c_http2_server_preface_sc=0xd0,
+        .c_http2_server_preface_rc=0x58,
         .c_http2_client_read_cc=0x68,
         .c_http2_client_write_callee=0x60,
         .c_http2_client_write_tcpConn=0x48,
@@ -241,25 +245,26 @@ go_schema_t go_17_schema = {
     // and we preserve the g in r14 for future stack checks
     // Note: we do not need to use the reg functions for go_hook_exit and go_hook_die
     .tap = {
-        [INDEX_HOOK_WRITE]              = {"syscall.write",                           go_hook_reg_write,              NULL, 0}, // write
-        [INDEX_HOOK_OPEN]               = {"syscall.openat",                          go_hook_reg_open,               NULL, 0}, // file open
-        [INDEX_HOOK_UNLINKAT]           = {"syscall.unlinkat",                        go_hook_reg_unlinkat,           NULL, 0}, // delete file
-        [INDEX_HOOK_GETDENTS]           = {"syscall.Getdents",                        go_hook_reg_getdents,           NULL, 0}, // read dir
-        [INDEX_HOOK_SOCKET]             = {"syscall.socket",                          go_hook_reg_socket,             NULL, 0}, // net open
-        [INDEX_HOOK_ACCEPT]             = {"syscall.accept4",                         go_hook_reg_accept4,            NULL, 0}, // plain server accept
-        [INDEX_HOOK_READ]               = {"syscall.read",                            go_hook_reg_read,               NULL, 0}, // read
-        [INDEX_HOOK_CLOSE]              = {"syscall.Close",                           go_hook_reg_close,              NULL, 0}, // close
-        [INDEX_HOOK_TLS_SERVER_READ]    = {"net/http.(*connReader).Read",             go_hook_reg_tls_server_read,    NULL, 0},
-        [INDEX_HOOK_TLS_SERVER_WRITE]   = {"net/http.checkConnErrorWriter.Write",     go_hook_reg_tls_server_write,   NULL, 0},
-        [INDEX_HOOK_TLS_CLIENT_READ]    = {"net/http.(*persistConn).readResponse",    go_hook_reg_tls_client_read,    NULL, 0},
-        [INDEX_HOOK_TLS_CLIENT_WRITE]   = {"net/http.persistConnWriter.Write",        go_hook_reg_tls_client_write,   NULL, 0}, 
-        [INDEX_HOOK_HTTP2_SERVER_READ]  = {"net/http.(*http2serverConn).readFrames",  go_hook_reg_http2_server_read,  NULL, 0},
-        [INDEX_HOOK_HTTP2_SERVER_WRITE] = {"net/http.(*http2serverConn).Flush",       go_hook_reg_http2_server_write, NULL, 0},
-        [INDEX_HOOK_HTTP2_CLIENT_READ]  = {"net/http.(*http2clientConnReadLoop).run", go_hook_reg_http2_client_read,  NULL, 0},
-        [INDEX_HOOK_HTTP2_CLIENT_WRITE] = {"net/http.http2stickyErrWriter.Write",     go_hook_reg_http2_client_write, NULL, 0}, 
-        [INDEX_HOOK_EXIT]               = {"runtime.exit",                            go_hook_exit,                   NULL, 0},
-        [INDEX_HOOK_DIE]                = {"runtime.dieFromSignal",                   go_hook_die,                    NULL, 0},
-        [INDEX_HOOK_MAX]                = {"TAP_TABLE_END",                           NULL,                           NULL, 0}
+        [INDEX_HOOK_WRITE]                = {"syscall.write",                           go_hook_reg_write,                NULL, 0}, // write
+        [INDEX_HOOK_OPEN]                 = {"syscall.openat",                          go_hook_reg_open,                 NULL, 0}, // file open
+        [INDEX_HOOK_UNLINKAT]             = {"syscall.unlinkat",                        go_hook_reg_unlinkat,             NULL, 0}, // delete file
+        [INDEX_HOOK_GETDENTS]             = {"syscall.Getdents",                        go_hook_reg_getdents,             NULL, 0}, // read dir
+        [INDEX_HOOK_SOCKET]               = {"syscall.socket",                          go_hook_reg_socket,               NULL, 0}, // net open
+        [INDEX_HOOK_ACCEPT]               = {"syscall.accept4",                         go_hook_reg_accept4,              NULL, 0}, // plain server accept
+        [INDEX_HOOK_READ]                 = {"syscall.read",                            go_hook_reg_read,                 NULL, 0}, // read
+        [INDEX_HOOK_CLOSE]                = {"syscall.Close",                           go_hook_reg_close,                NULL, 0}, // close
+        [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_hook_reg_tls_server_read,      NULL, 0},
+        [INDEX_HOOK_TLS_SERVER_WRITE]     = {"net/http.checkConnErrorWriter.Write",     go_hook_reg_tls_server_write,     NULL, 0},
+        [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_hook_reg_tls_client_read,      NULL, 0},
+        [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_hook_reg_tls_client_write,     NULL, 0},
+        [INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_hook_reg_http2_server_read,    NULL, 0},
+        [INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_hook_reg_http2_server_write,   NULL, 0},
+        [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
+        [INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_hook_reg_http2_client_read,    NULL, 0},
+        [INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_hook_reg_http2_client_write,   NULL, 0},
+        [INDEX_HOOK_EXIT]                 = {"runtime.exit",                            go_hook_exit,                     NULL, 0},
+        [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal",                   go_hook_die,                      NULL, 0},
+        [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                             NULL, 0}
     },
 };
 
@@ -830,6 +835,13 @@ adjustGoStructOffsetsForVersion(int go_ver)
         g_go_schema->struct_offsets.persistConn_to_tlsState=88; // 0x58
     }
 
+    if (go_ver == 17) {
+        g_go_schema->arg_offsets.c_http2_client_write_callee=0x30;
+        g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x40;
+        g_go_schema->struct_offsets.fr_to_readBuf=0x50;
+        g_go_schema->struct_offsets.fr_to_writeBuf=0x80;
+        g_go_schema->struct_offsets.fr_to_headerBuf=0x38;
+    }
 
     // This creates a file specified by test/integration/go/test_go.sh
     // and used by test/integration/go/test_go_struct.sh.
@@ -1037,12 +1049,13 @@ initGoHook(elf_buf_t *ebuf)
     cs_insn *asm_inst = NULL;
     unsigned int asm_count = 0;
 
-    // Update the schema to suit the current version
-    adjustGoStructOffsetsForVersion(g_go_major_ver);
     if (g_go_major_ver >= 17) {
         // The Go 17 schema works for 18 also, and possibly future versions
         g_go_schema = &go_17_schema;
     }
+
+    // Update the schema to suit the current version
+    adjustGoStructOffsetsForVersion(g_go_major_ver);
 
     for (tap_t *tap = g_go_schema->tap; tap->assembly_fn; tap++) {
         if (asm_inst) {
@@ -1609,6 +1622,8 @@ c_http2_server_read(char *stackaddr)
     if (!buf) return;
     char *readBuf = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_readBuf);
     if (!readBuf) return;
+    uint64_t tcpConn = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_conn);
+    if (!tcpConn ) return;
 
     uint8_t *newbuf = (uint8_t *)buf; 
     uint32_t rc = 0;
@@ -1618,23 +1633,13 @@ c_http2_server_read(char *stackaddr)
     if (rc < 1) return;
     rc += HTTP2_FRAME_HEADER_LEN;
 
+    int fd = getFDFromConn(tcpConn);
+    funcprint("Scope: c_http2_server_read: buf 0x%x readBuf 0x%x\n", *buf, *readBuf);
+
     char *frame = (char *)scope_malloc(rc);
     if (!frame) return;
     scope_memmove(frame, buf, HTTP2_FRAME_HEADER_LEN);
     scope_memmove(frame + HTTP2_FRAME_HEADER_LEN, readBuf, rc - HTTP2_FRAME_HEADER_LEN);
-
-    uint64_t tcpConn = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_conn);
-    if (!tcpConn ) {
-       scope_free(frame);
-       return;
-    }
-
-    int fd = getFDFromConn(tcpConn);
-
-    // If Proto is not yet detected, we must call doProtocol with a PRI string         
-    if (isProtocolSet(fd) == FALSE) {
-        doProtocol((uint64_t)0, fd, PRI_STR, PRI_STR_LEN, TLSRX, BUF);
-    }
 
     doProtocol((uint64_t)0, fd, frame, rc, TLSRX, BUF);
     funcprint("Scope: c_http2_server_read of %d\n", fd);
@@ -1668,19 +1673,31 @@ c_http2_server_write(char *stackaddr)
 
     uint64_t sc      = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_server_write_sc);
     if (!sc) return;
+
     uint64_t fr      = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_fr);
     if (!fr) return;  
-    char *buf        = (char *)(fr + g_go_schema->struct_offsets.fr_to_headerBuf);
-    if (!buf) return;
+
     char *writeBuf   = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_writeBuf);
     if (!writeBuf) return;
+
+    uint64_t tcpConn = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_conn);
+    if (!tcpConn) return;
+
+    int fd = getFDFromConn(tcpConn);
+
+    /*
+     * If Proto is not yet detected, wait for the preface string to be received.
+     * We expect that the only write that occurs in this case is a settings
+     * frame. Refer to src/net/http/h2_bundle.go:(sc *httpServerConn) serve().
+     * This is related to the nature of the parallel/async behavior of sc.
+     */
+    if (isProtocolSet(fd) == FALSE) return;
 
     uint8_t *newbuf = (uint8_t *)writeBuf; 
     uint32_t rc = 0;
     rc += newbuf[0] << 16;
     rc += newbuf[1] << 8;
     rc += newbuf[2];
-    if (rc < 1) return;
     rc += HTTP2_FRAME_HEADER_LEN;
 
     // At times, the buffer contains 0. We don't want to call doProtocol when
@@ -1688,24 +1705,6 @@ c_http2_server_write(char *stackaddr)
     // Especially since it will set PROTO to false if it's the first call to doProtocol
     // on this socket.
     if (!newbuf[3]) return;
-
-    char *frame = (char *)scope_malloc(rc);
-    if (!frame) return;
-    scope_memmove(frame, buf, HTTP2_FRAME_HEADER_LEN);
-    scope_memmove(frame + HTTP2_FRAME_HEADER_LEN, writeBuf, rc - HTTP2_FRAME_HEADER_LEN);
-
-    uint64_t tcpConn = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_conn);
-    if (!tcpConn) {
-        scope_free(frame);
-        return;
-    }
-
-    int fd = getFDFromConn(tcpConn);
-    
-    // If Proto is not yet detected, we must call doProtocol with a PRI string         
-    if (isProtocolSet(fd) == FALSE) {
-        doProtocol((uint64_t)0, fd, PRI_STR, PRI_STR_LEN, TLSRX, BUF);
-    }
 
     funcprint("Scope: c_http2_server_write of %d %i\n", fd, rc);
     doProtocol((uint64_t)0, fd, writeBuf, rc, TLSTX, BUF);
@@ -1715,6 +1714,47 @@ EXPORTON void *
 go_http2_server_write(char *stackptr)
 {
     return do_cfunc(stackptr, c_http2_server_write, g_go_schema->tap[INDEX_HOOK_HTTP2_SERVER_WRITE].assembly_fn);
+}
+
+/*
+  Offsets here may be outdated/incorrect for certain versions. Leaving for reference:
+  Our variable    Memory loc        Go variable
+  rc              stackaddr + 0x58  err
+  sc              stackaddr + 0x30  sc
+  fr              sc + 0x48         sc.fr
+  tcpConn         sc + 0x18         sc.conn
+  */
+// Extract data from net/http.(*http2serverConn).readPreface (tls http2 server write)
+static void
+c_http2_server_preface(char *stackaddr)
+{
+    // Take us to the stack frame we're interested in
+    // If this is defined as 0x0, we have decided to stay in the caller stack frame
+    stackaddr -= g_go_schema->arg_offsets.c_http2_server_preface_callee;
+
+    uint64_t *rc = (uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_server_preface_rc);
+    if ((rc == NULL) || (rc == (uint64_t *)0xffffffff)) return;
+    if (*rc != 0) return;
+
+    uint64_t sc      = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_server_preface_sc);
+    if (!sc) return;
+
+    uint64_t fr      = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_fr);
+    if (!fr) return;
+
+    uint64_t tcpConn = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_conn);
+    if (!tcpConn) return;
+
+    int fd = getFDFromConn(tcpConn);
+
+    funcprint("Scope: c_http2_server_preface of %d %ld\n", fd, *rc);
+    doProtocol((uint64_t)0, fd, PRI_STR, PRI_STR_LEN - 1, TLSRX, BUF);
+}
+
+EXPORTON void *
+go_http2_server_preface(char *stackptr)
+{
+    return do_cfunc(stackptr, c_http2_server_preface, g_go_schema->tap[INDEX_HOOK_HTTP2_SERVER_PREFACE].assembly_fn);
 }
 
 /*

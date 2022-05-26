@@ -96,4 +96,11 @@ void scopeBacktrace(cfg_log_level_t);
 #define scopeLogHexTrace(...)
 #endif
 
+// Bit operations
+
+#define SCOPE_BIT_SET(base, bit_val)   ((base) |= (1ULL<<(bit_val)))
+#define SCOPE_BIT_CLEAR(base, bit_val) ((base) &= ~(1ULL<<(bit_val)))
+#define SCOPE_BIT_SET_VAR(base, bit_val, val) ((!!(val)) ? SCOPE_BIT_SET(base, bit_val) : SCOPE_BIT_CLEAR(base, bit_val))
+#define SCOPE_BIT_CHECK(base, bit_val) (!!((base) & (1ULL<<(bit_val))))
+
 #endif // __DBG_H__

@@ -98,6 +98,7 @@ void doTotalDuration(metric_t);
 void doHttpAgg(void);
 void doEvent(void);
 void doPayload(void);
+void doProcStartMetric(void);
 bool doConnection(void);
 
 #endif // __REPORT_H__

@@ -9,6 +9,23 @@
       "description": "addrs",
       "type": "array"
     },
+    "binary": {
+      "title": "binary",
+      "description": "binary",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
+    "buffering": {
+      "title": "buffering",
+      "description": "buffering",
+      "type": "string",
+      "enum": ["line", "full"]
+    },
+    "cacertpath": {
+      "title": "cacertpath",
+      "description": "cacertpath",
+      "type": "string"
+    },
     "class_connection": {
       "title": "connection",
       "description": "connection",
@@ -33,11 +50,33 @@
       "type": "string",
       "enum": ["inet_tcp", "inet_udp", "unix_tcp", "unix_udp", "other"]
     },
+    "configevent": {
+      "title": "configevent",
+      "description": "configevent",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
+    "commanddir": {
+      "title": "commanddir",
+      "description": "commanddir",
+      "type": "string"
+    },
     "data": {
       "title": "data",
       "description": "data",
       "type": "string",
       "enum": ["ssl", "clear"]
+    },
+    "detect": {
+      "title": "detect",
+      "description": "detect",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
+    "dir": {
+      "title": "dir",
+      "description": "dir",
+      "type": "string"
     },
     "domain": {
       "title": "domain",
@@ -50,11 +89,28 @@
       "type": "number",
       "examples": [55]
     },
+    "enable": {
+      "title": "enable",
+      "description": "enable",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
+    "enhancefs": {
+      "title": "enhancefs",
+      "description": "enhancefs",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
     "fd": {
       "title": "fd",
       "description": "fd",
       "type": "integer",
       "examples": [4]
+    },
+    "field": {
+      "title": "field",
+      "description": "field",
+      "type": "string"
     },
     "file": {
       "title": "file",
@@ -103,9 +159,20 @@
       "type": "integer",
       "examples": [5]
     },
+    "format_type": {
+      "title": "type",
+      "description": "type",
+      "type": "string",
+      "enum": ["statsd", "ndjson"]
+    },
     "host": {
       "title": "host",
       "description": "host",
+      "type": "string"
+    },
+    "hostname": {
+      "title": "hostname",
+      "description": "hostname",
       "type": "string"
     },
     "http_client_duration": {
@@ -182,6 +249,22 @@
       "description": "http_user_agent",
       "type": "string"
     },
+    "id": {
+      "title": "id",
+      "description": "id",
+      "type": "string"
+    },
+    "len": {
+      "title": "len",
+      "description": "len",
+      "type": "integer"
+    },
+    "libscopever": {
+      "title": "libscopever",
+      "description": "libscopever",
+      "type": "string",
+      "examples": ["v1.0.0"]
+    },
     "localip": {
       "title": "localip",
       "description": "localip",
@@ -199,9 +282,25 @@
       "type": "number",
       "examples": [9109]
     },
+    "log_level": {
+      "title": "level",
+      "description": "level",
+      "type": "string",
+      "enum": ["debug", "info", "warning", "error", "none"]
+    },
+    "maxeventpersec": {
+      "title": "maxeventpersec",
+      "description": "maxeventpersec",
+      "type": "integer"
+    },
     "message": {
       "title": "message",
       "description": "message",
+      "type": "string"
+    },
+    "name": {
+      "title": "name",
+      "description": "name",
       "type": "string"
     },
     "net_bytes_recv": {
@@ -309,6 +408,18 @@
       "type": "string",
       "enum": ["go_write", "pwrite64", "pwritev", "pwritev64", "pwritev2", "pwritev64v2", "__overflow", "__write_libc", "__write_pthread", "fwrite_unlocked", "__stdio_write", "write", "pwrite", "writev", "fwrite", "puts", "putchar", "fputs", "fputs_unlocked", "fputc", "fputc_unlocked", "putwc", "fputwc"]
     },
+    "path": {
+      "title": "path",
+      "description": "path",
+      "type": "string",
+      "examples": ["/tmp/scope.log"]
+    },
+    "payload": {
+      "title": "payload",
+      "description": "payload",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
     "pid": {
       "title": "pid",
       "description": "pid",
@@ -319,6 +430,16 @@
       "title": "port",
       "description": "port",
       "type": "number"
+    },
+    "port_str": {
+      "title": "port",
+      "description": "port",
+      "type": "string"
+    },
+    "ppid": {
+      "title": "ppid",
+      "description": "ppid",
+      "type": "integer"
     },
     "proc": {
       "title": "proc",
@@ -342,6 +463,11 @@
       "description": "proc_uid",
       "type": "integer",
       "examples": [0]
+    },
+    "procname": {
+      "title": "procname",
+      "description": "procname",
+      "type": "string"
     },
     "proto": {
       "title": "proto",
@@ -367,6 +493,11 @@
       "type": "string",
       "enum": ["HTTP"]
     },
+    "regex": {
+      "title": "regex",
+      "description": "regex",
+      "type": "string"
+    },
     "remoteip": {
       "title": "remoteip",
       "description": "remoteip",
@@ -384,11 +515,32 @@
       "type": "number",
       "examples": [9108]
     },
+    "statsdprefix": {
+      "title": "statsdprefix",
+      "description": "statsdprefix",
+      "type": "string"
+    },
+    "statsdmaxlen": {
+      "title": "statsdmaxlen",
+      "description": "statsdmaxlen",
+      "type": "integer"
+    },
     "summary": {
       "title": "summary",
       "description": "summary",
       "type": "string",
       "const": "true"
+    },
+    "summaryperiod": {
+      "title": "summaryperiod",
+      "description": "summaryperiod",
+      "type": "integer"
+    },
+    "transport_type": {
+      "title": "type",
+      "description": "transport type",
+      "type": "string",
+      "enum": ["tcp", "udp", "unix", "file", "edge"]
     },
     "unit_byte" : {
       "title": "byte",
@@ -466,6 +618,66 @@
       "description": "Unit - thread",
       "type": "string",
       "const": "thread"
+    },
+    "validateserver": {
+      "title": "validateserver",
+      "description": "validateserver",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
+    "value": {
+      "title": "value",
+      "description": "value",
+      "type": "string"
+    },
+    "verbosity" : {
+      "title": "verbosity",
+      "description": "verbosity",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9
+    },
+    "watch_type_event_console" : {
+      "title": "type",
+      "description": "type",
+      "type": "string",
+      "const": "console"
+    },
+    "watch_type_event_dns" : {
+      "title": "type",
+      "description": "type",
+      "type": "string",
+      "const": "dns"
+    },
+    "watch_type_event_file" : {
+      "title": "type",
+      "description": "type",
+      "type": "string",
+      "const": "file"
+    },
+    "watch_type_event_fs" : {
+      "title": "type",
+      "description": "type",
+      "type": "string",
+      "const": "fs"
+    },
+    "watch_type_event_http" : {
+      "title": "type",
+      "description": "type",
+      "type": "string",
+      "const": "http"
+    },
+    "watch_type_event_net" : {
+      "title": "type",
+      "description": "type",
+      "type": "string",
+      "const": "net"
+    },
+    "watch_type_metric" : {
+      "title": "type",
+      "description": "type",
+      "type": "string",
+      "const": "statsd"
     },
     "x_appscope" : {
       "title": "x-appscope",

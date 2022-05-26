@@ -131,6 +131,7 @@
     interpose go_hook_tls_client_write, go_tls_client_write
     interpose go_hook_http2_server_read, go_http2_server_read
     interpose go_hook_http2_server_write, go_http2_server_write
+    interpose go_hook_http2_server_preface, go_http2_server_preface
     interpose go_hook_http2_client_read, go_http2_client_read
     interpose go_hook_http2_client_write, go_http2_client_write
     interpose go_hook_exit, go_exit

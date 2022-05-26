@@ -132,6 +132,7 @@ extern void go_hook_tls_client_read(void);
 extern void go_hook_tls_client_write(void);
 extern void go_hook_http2_server_read(void);
 extern void go_hook_http2_server_write(void);
+extern void go_hook_http2_server_preface(void);
 extern void go_hook_http2_client_read(void);
 extern void go_hook_http2_client_write(void);
 extern void go_hook_exit(void);

@@ -146,7 +146,7 @@
     },
     "http_scheme": {
       "title": "http_scheme",
-      "description": "http_scheme HOW TO PHRASE THIS?",
+      "description": "http_scheme HOW TO PHRASE THIS? REVISIT",
       "type": "string",
       "enum": ["http", "https"]
     },
@@ -179,29 +179,29 @@
     },
     "http_user_agent": {
       "title": "http_user_agent",
-      "description": "Describes the web client that issued a request. MORE??",
+      "description": "Describes the web client that issued a request. MORE?? REVISIT",
       "type": "string"
     },
     "localip": {
       "title": "localip",
-      "description": "The IP address portion of a network address. REFINE",
+      "description": "The IP address portion of a network address. REFINE - REVISIT",
       "type": "string",
       "examples": ["127.0.0.1"]
     },
     "localn": {
       "title": "localn",
-      "description": "The inode of a local Unix socket connection. VERIFY",
+      "description": "The inode of a local Unix socket connection. VERIFY - REVISIT",
       "type": "number"
     },
     "localp": {
       "title": "localp",
-      "description": "The port portion of a network address. REFINE",
+      "description": "The port portion of a network address. REFINE - REVISIT",
       "type": "number",
       "examples": [9109]
     },
     "message": {
       "title": "message",
-      "description": "The textual data being written to a console or file.",
+      "description": "The textual data written to a console or file. REVISIT - tense?",
       "type": "string"
     },
     "net_bytes_recv": {

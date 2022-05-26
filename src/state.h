@@ -39,6 +39,16 @@ void initState();
 void resetState();
 
 void setVerbosity(unsigned);
+void setFsEnable(unsigned);
+void setNetworkEnable(unsigned);
+void setHttpEnable(unsigned);
+void setDnsEnable(unsigned);
+void setProcEnable(unsigned);
+bool fsEnable(void);
+bool networkEnable(void);
+bool httpEnable(void);
+bool dnsEnable(void);
+bool procEnable(void);
 void addSock(int, int, int);
 int doBlockConnection(int, const struct sockaddr *);
 void doSetConnection(int, const struct sockaddr *, socklen_t, control_type_t);

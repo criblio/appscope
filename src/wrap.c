@@ -625,6 +625,13 @@ doConfig(config_t *cfg)
     }
 
     setVerbosity(cfgMtcVerbosity(cfg));
+
+    setFsEnable(cfgMtcFsEnable(cfg));
+    setNetworkEnable(cfgMtcNetworkEnable(cfg));
+    setHttpEnable(cfgMtcHttpEnable(cfg));
+    setDnsEnable(cfgMtcDnsEnable(cfg));
+    setProcEnable(cfgMtcProcEnable(cfg));
+
     g_cmddir = cfgCmdDir(cfg);
     g_sendprocessstart = cfgSendProcessStartMsg(cfg);
 

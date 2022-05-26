@@ -153,6 +153,7 @@ void cfgMtcStatsDPrefixSetFromStr(config_t*, const char*);
 void cfgMtcStatsDMaxLenSetFromStr(config_t*, const char*);
 void cfgMtcPeriodSetFromStr(config_t*, const char*);
 void cfgMtcStatsdEnableSetFromStr(config_t*, const char*);
+void cfgMtcCategoryEnableSetFromStr(config_t*, const char*, metric_category_t);
 void cfgCmdDirSetFromStr(config_t*, const char*);
 void cfgConfigEventSetFromStr(config_t*, const char*);
 void cfgEvtEnableSetFromStr(config_t*, const char*);
@@ -451,6 +452,16 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgMtcPeriodSetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_METRIC_STATSD")) {
         cfgMtcStatsdEnableSetFromStr(cfg, value);
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_FS")) {
+        cfgMtcCategoryEnableSetFromStr(cfg, value, CFG_MTC_FS);
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_NETWORK")) {
+        cfgMtcCategoryEnableSetFromStr(cfg, value, CFG_MTC_NETWORK);
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_HTTP")) {
+        cfgMtcCategoryEnableSetFromStr(cfg, value, CFG_MTC_HTTP);
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_DNS")) {
+        cfgMtcCategoryEnableSetFromStr(cfg, value, CFG_MTC_DNS);
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_PROC")) {
+        cfgMtcCategoryEnableSetFromStr(cfg, value, CFG_MTC_PROC);
     } else if (!scope_strcmp(env_name, "SCOPE_CMD_DIR")) {
         cfgCmdDirSetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_CONFIG_EVENT")) {
@@ -682,6 +693,13 @@ cfgMtcStatsdEnableSetFromStr(config_t *cfg, const char *value)
 {
     if (!cfg || !value) return;
     cfgMtcStatsdEnableSet(cfg, strToVal(boolMap, value));
+}
+
+void
+cfgMtcCategoryEnableSetFromStr(config_t *cfg, const char *value, metric_category_t type)
+{
+    if (!cfg || !value) return;
+    cfgMtcCategoryEnableSet(cfg, strToVal(boolMap, value), type);
 }
 
 void

@@ -44,6 +44,7 @@ uint64_t g_http_guard[NET_ENTRIES];
 // this data have been moved into report.c.  This is managed with the
 // include of state_private.h above.
 summary_t g_summary = {{0}};
+mtc_info g_mtcinfo;
 net_info *g_netinfo;
 fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
@@ -1345,6 +1346,66 @@ setVerbosity(unsigned verbosity)
     summarize->net.dns =        (verbosity < 6);
     summarize->net.open_close = (verbosity < 7);
     summarize->net.rx_tx =      (verbosity < 9);
+}
+
+void
+setFsEnable(unsigned val)
+{
+    g_mtcinfo.fs_enable = val;
+}
+
+void
+setNetworkEnable(unsigned val)
+{
+    g_mtcinfo.network_enable = val;
+}
+
+void
+setHttpEnable(unsigned val)
+{
+    g_mtcinfo.http_enable = val;
+}
+
+void
+setDnsEnable(unsigned val)
+{
+    g_mtcinfo.dns_enable = val;
+}
+
+void
+setProcEnable(unsigned val)
+{
+    g_mtcinfo.proc_enable = val;
+}
+
+bool
+fsEnable(void)
+{
+    return g_mtcinfo.fs_enable;
+}
+
+bool
+networkEnable(void)
+{
+    return g_mtcinfo.network_enable;
+}
+
+bool
+httpEnable(void)
+{
+    return g_mtcinfo.http_enable;
+}
+
+bool
+dnsEnable(void)
+{
+    return g_mtcinfo.dns_enable;
+}
+
+bool
+procEnable(void)
+{
+    return g_mtcinfo.proc_enable;
 }
 
 bool

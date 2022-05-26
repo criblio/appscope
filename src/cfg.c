@@ -43,7 +43,13 @@ struct _config_t
         } statsd;
         unsigned period;
         unsigned verbosity;
+        unsigned fs_enable;
+        unsigned network_enable;
+        unsigned http_enable;
+        unsigned dns_enable;
+        unsigned proc_enable;
     } mtc;
+    // FIXME: use single variable and flags for access
 
     struct {
         unsigned enable;
@@ -181,6 +187,11 @@ cfgCreateDefault()
     c->mtc.statsd.enable = DEFAULT_MTC_STATSD_ENABLE;
     c->mtc.period = DEFAULT_SUMMARY_PERIOD;
     c->mtc.verbosity = DEFAULT_MTC_VERBOSITY;
+    c->mtc.fs_enable = DEFAULT_MTC_FS_ENABLE;
+    c->mtc.network_enable = DEFAULT_MTC_NETWORK_ENABLE;
+    c->mtc.http_enable = DEFAULT_MTC_HTTP_ENABLE;
+    c->mtc.dns_enable = DEFAULT_MTC_DNS_ENABLE;
+    c->mtc.proc_enable = DEFAULT_MTC_PROC_ENABLE;
     c->evt.enable = DEFAULT_EVT_ENABLE;
     c->evt.format = DEFAULT_CTL_FORMAT;
     c->evt.ratelimit = DEFAULT_MAXEVENTSPERSEC;
@@ -289,6 +300,36 @@ unsigned
 cfgMtcEnable(config_t* cfg)
 {
     return (cfg) ? cfg->mtc.enable : DEFAULT_MTC_ENABLE;
+}
+
+unsigned
+cfgMtcFsEnable(config_t* cfg)
+{
+    return (cfg) ? cfg->mtc.fs_enable : DEFAULT_MTC_FS_ENABLE;
+}
+
+unsigned
+cfgMtcNetworkEnable(config_t* cfg)
+{
+    return (cfg) ? cfg->mtc.network_enable : DEFAULT_MTC_NETWORK_ENABLE;
+}
+
+unsigned
+cfgMtcHttpEnable(config_t* cfg)
+{
+    return (cfg) ? cfg->mtc.http_enable : DEFAULT_MTC_HTTP_ENABLE;
+}
+
+unsigned
+cfgMtcDnsEnable(config_t* cfg)
+{
+    return (cfg) ? cfg->mtc.dns_enable : DEFAULT_MTC_DNS_ENABLE;
+}
+
+unsigned
+cfgMtcProcEnable(config_t* cfg)
+{
+    return (cfg) ? cfg->mtc.proc_enable : DEFAULT_MTC_PROC_ENABLE;
 }
 
 cfg_mtc_format_t
@@ -669,6 +710,32 @@ cfgMtcStatsdEnableSet(config_t *cfg, unsigned val)
 {
     if (!cfg || val > 1) return;
     cfg->mtc.statsd.enable = val;
+}
+
+void
+cfgMtcCategoryEnableSet(config_t *cfg, unsigned val, metric_category_t type)
+{
+    if (!cfg || val > 1) return;
+
+    switch (type) {
+        case CFG_MTC_FS:
+            cfg->mtc.fs_enable = val;
+            break;
+        case CFG_MTC_NETWORK:
+            cfg->mtc.network_enable = val;
+            break;
+        case CFG_MTC_HTTP:
+            cfg->mtc.http_enable = val;
+            break;
+        case CFG_MTC_DNS:
+            cfg->mtc.dns_enable = val;
+            break;
+        case CFG_MTC_PROC:
+            cfg->mtc.proc_enable = val;
+            break;
+        default:
+            DBG(NULL);
+    }
 }
 
 void

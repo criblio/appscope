@@ -237,6 +237,11 @@ doReadFileNoSummarization(void** state)
 {
     clearTestData();
     setVerbosity(9);
+    setFsEnable(1);
+    setNetworkEnable(1);
+    setHttpEnable(1);
+    setDnsEnable(1);
+    setProcEnable(1);
     doOpen(16, "/the/file/path", FD, "openFunc");
     assert_int_equal(metricCalls("fs.open"), 1);
     assert_int_equal(eventCalls("fs.open"), 1);

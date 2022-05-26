@@ -208,6 +208,37 @@ cfgMtcStatsdEnableSetAndGet(void** state)
 }
 
 static void
+cfgMtcCategoryEnableSetAndGet(void** state)
+{
+    config_t *config = cfgCreateDefault();
+
+    unsigned int (*get_cfg_mtc_fun[])(config_t *) = 
+    { cfgMtcFsEnable,
+      cfgMtcNetEnable,
+      cfgMtcHttpEnable,
+      cfgMtcDnsEnable,
+      cfgMtcProcEnable
+    };
+    metric_category_t category;
+
+    for (category=CFG_MTC_FS; category<=CFG_MTC_PROC; ++category) {
+        cfgMtcCategoryEnableSet(config, FALSE, category);
+        assert_int_equal(get_cfg_mtc_fun[category](config), FALSE);
+        cfgMtcCategoryEnableSet(config, TRUE, category);
+        assert_int_equal(get_cfg_mtc_fun[category](config), TRUE);
+        // 2 is outside of allowed range; should be ignored.
+        cfgMtcCategoryEnableSet(config, 2, category);
+        assert_int_equal(get_cfg_mtc_fun[category](config), TRUE);
+    }
+
+    cfgMtcCategoryEnableSet(config, FALSE, CFG_MTC_PROC+1);;
+    assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 1);
+    dbgInit(); // reset dbg for the rest of the tests
+
+    cfgDestroy(&config);
+}
+
+static void
 cfgCmdDirSetAndGet(void** state)
 {
     config_t* config = cfgCreateDefault();
@@ -657,6 +688,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgMtcVerbositySetAndGet),
         cmocka_unit_test(cfgMtcPeriodSetAndGet),
         cmocka_unit_test(cfgMtcStatsdEnableSetAndGet),
+        cmocka_unit_test(cfgMtcCategoryEnableSetAndGet),
         cmocka_unit_test(cfgCmdDirSetAndGet),
         cmocka_unit_test(cfgSendProcessStartMsgSetAndGet),
         cmocka_unit_test(cfgEvtEnableSetAndGet),

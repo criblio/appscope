@@ -35,7 +35,7 @@
 //#define patchprint sysprint
 #define patchprint devnull
 
-extern int g_go_major_ver;
+int g_go_major_ver = UNKNOWN_GO_VER;
 static char g_go_build_ver[7];
 static char g_ReadFrame_addr[sizeof(void *)];
 
@@ -158,11 +158,11 @@ go_schema_t go_8_schema = {
         [INDEX_HOOK_TLS_SERVER_WRITE]     = {"net/http.checkConnErrorWriter.Write",     go_hook_tls_server_write,     NULL, 0},
         [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_hook_tls_client_read,      NULL, 0}, 
         [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_hook_tls_client_write,     NULL, 0},
-        [INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_hook_http2_server_read,    NULL, 0},
-        [INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_hook_http2_server_write,   NULL, 0},
-        [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_http2_server_preface, NULL, 0},
-        [INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_hook_http2_client_read,    NULL, 0},
-        [INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_hook_http2_client_write,   NULL, 0},
+        //[INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_hook_http2_server_read,    NULL, 0},
+        //[INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_hook_http2_server_write,   NULL, 0},
+        //[INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_http2_server_preface, NULL, 0},
+        //[INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_hook_http2_client_read,    NULL, 0},
+        //[INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_hook_http2_client_write,   NULL, 0},
         [INDEX_HOOK_EXIT]                 = {"runtime.exit",                            go_hook_exit,                 NULL, 0},
         [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal",                   go_hook_die,                  NULL, 0},
         [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                         NULL, 0}
@@ -1014,6 +1014,19 @@ initGoHook(elf_buf_t *ebuf)
             ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall", NULL, NULL)) == 0)) {
             sysprint("ERROR: can't get the address for runtime.cgocall\n");
             return; // don't install our hooks
+        }
+
+        /*
+         * For Go 8-16 we don't yet support HTTP2. Therefore, we want to force the use of
+         * HTTP1. This allows that to be accomplished at run time. Otherwise we would need
+         * to get the version at the time the app is loaded.
+         */
+        uint64_t *nohttp2;
+        if (((nohttp2 = getSymbol(ebuf->buf, "net/http.omitBundledHTTP2")) == 0) &&
+            ((nohttp2 = getGoSymbol(ebuf->buf, "net/http.omitBundledHTTP2", NULL, NULL)) == 0)) {
+            sysprint("ERROR: can't get the address for omitBundledHTTP2\n");
+        } else {
+            *nohttp2 = TRUE;
         }
     }
     go_runtime_cgocall = (void *)((uint64_t)go_runtime_cgocall + base);

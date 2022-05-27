@@ -11,9 +11,6 @@
 #include "fn.h"
 #include "scopeelf.h"
 
-#define UNKNOWN_GO_VER (-1)
-int g_go_major_ver = UNKNOWN_GO_VER;
-
 void
 freeElf(char *buf, size_t len)
 {

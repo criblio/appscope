@@ -22,7 +22,7 @@
 #define EXIT_STACK_SIZE (32 * 1024)
 #define UNKNOWN_GO_VER (-1)
 #define MIN_SUPPORTED_GO_VER (8)
-#define PARAM_ON_REG_GO_VER (19)
+#define MAX_SUPPORTED_GO_VER (18)
 #define HTTP2_FRAME_HEADER_LEN (9)
 #define PRI_STR "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 #define PRI_STR_LEN sizeof(PRI_STR)
@@ -35,9 +35,9 @@
 //#define patchprint sysprint
 #define patchprint devnull
 
-int g_go_major_ver = UNKNOWN_GO_VER;
+extern int g_go_major_ver;
 static char g_go_build_ver[7];
-static char g_ReadFrame_addr[64]; // Is this large enough for any memory addr?
+static char g_ReadFrame_addr[sizeof(void *)];
 
 enum index_hook_t {
     INDEX_HOOK_WRITE,
@@ -111,17 +111,17 @@ go_schema_t go_8_schema = {
         .c_tls_client_write_w_pc=0x8,
         .c_tls_client_write_buf=0x10,
         .c_tls_client_write_rc=0x28,
-        .c_http2_server_read_sc=0x128,
-        .c_http2_server_write_callee=0x0,
-        .c_http2_server_write_sc=0x8,
-        .c_http2_server_preface_callee=0xd0,
-        .c_http2_server_preface_sc=0x60,
-        .c_http2_server_preface_rc=0xe0, // not 100% about this one
-        .c_http2_client_read_cc=0x80,
-        .c_http2_client_write_callee=0x58,
-        .c_http2_client_write_tcpConn=0x0,
-        .c_http2_client_write_buf=0x8,
-        .c_http2_client_write_rc=0x10,
+//        .c_http2_server_read_sc=0x128,
+//        .c_http2_server_write_callee=0x0,
+//        .c_http2_server_write_sc=0x8,
+//        .c_http2_server_preface_callee=0xd0,
+//        .c_http2_server_preface_sc=0x60,
+//        .c_http2_server_preface_rc=0xe0, 
+//        .c_http2_client_read_cc=0x80,
+//        .c_http2_client_write_callee=0x58,
+//        .c_http2_client_write_tcpConn=0x0,
+//        .c_http2_client_write_buf=0x8,
+//        .c_http2_client_write_rc=0x10,
     },
     .struct_offsets = {
         .g_to_m=0x30,
@@ -137,14 +137,13 @@ go_schema_t go_8_schema = {
         .conn_to_rwc=0x10,
         .conn_to_tlsState=0x30,
         .persistConn_to_tlsState=0x60,
-        .fr_to_readBuf=0x50,
-        .fr_to_writeBuf=0x80,
-        .fr_to_headerBuf=0x38,
-        .fr_to_rc=0x60,
-        .cc_to_fr=0xc8,
-        .cc_to_tconn=0x10,
-        .sc_to_fr=0x48,
-        .sc_to_conn=0x18,
+//        .fr_to_readBuf=0x50,
+//        .fr_to_writeBuf=0x80,
+//        .fr_to_headerBuf=0x38,
+//        .cc_to_fr=0xc8,
+//        .cc_to_tconn=0x10,
+//        .sc_to_fr=0x48,
+//        .sc_to_conn=0x18,
     },
     .tap = {
         [INDEX_HOOK_WRITE]                = {"syscall.write",                           go_hook_write,                NULL, 0},
@@ -238,7 +237,6 @@ go_schema_t go_17_schema = {
         .fr_to_readBuf=0x58,
         .fr_to_writeBuf=0x88,
         .fr_to_headerBuf=0x40,
-        .fr_to_rc=0x60,
         .cc_to_fr=0x130,
         .cc_to_tconn=0x10,
         .sc_to_fr=0x48,
@@ -681,10 +679,6 @@ patch_addrs(funchook_t *funchook,
                 void *pre_patch_addr = (void*)asm_inst[i].address;
                 void *patch_addr = (void*)asm_inst[i+1].address;
 
-    /*remove?*/ if (tap->frame_size && (tap->frame_size != add_arg)) {
-                    patchprint("aborting patch of 0x%p due to mismatched frame size 0x%x\n", pre_patch_addr, add_arg);
-                    break;
-                }
                 if (funchook_prepare(funchook, (void**)&patch_addr, tap->assembly_fn)) {
                     patchprint("failed to patch 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
                     continue;
@@ -740,10 +734,6 @@ patch_addrs(funchook_t *funchook,
             void *pre_patch_addr = (void*)asm_inst[i].address;
             void *patch_addr = (void*)asm_inst[i].address;
 
-/*remove?*/ if (tap->frame_size && (tap->frame_size != add_arg)) {
-                patchprint("aborting patch of 0x%p due to mismatched frame size 0x%x\n", pre_patch_addr, add_arg);
-                break;
-            }
             if (funchook_prepare(funchook, (void**)&patch_addr, tap->assembly_fn)) {
                 patchprint("failed to patch 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
                 continue;
@@ -837,17 +827,6 @@ adjustGoStructOffsetsForVersion(int go_ver)
         g_go_schema->struct_offsets.persistConn_to_conn = 72;  // 0x48
         g_go_schema->struct_offsets.persistConn_to_bufrd = 96; // 0x60
         g_go_schema->struct_offsets.persistConn_to_tlsState=88; // 0x58
-    }
-
-    if (go_ver == 12 || go_ver == 13) {
-        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
-        g_go_schema->arg_offsets.c_http2_client_write_callee=0x40;
-        g_go_schema->struct_offsets.cc_to_fr=0xd0;
-    }
-
-    if (go_ver == 16) {
-        g_go_schema->arg_offsets.c_http2_client_read_cc=0xe0;
-        g_go_schema->arg_offsets.c_http2_server_preface_callee=0xc0;
     }
 
     if (go_ver == 17) {
@@ -1000,10 +979,11 @@ initGoHook(elf_buf_t *ebuf)
             scopeLogWarn("%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.8 or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd);
         }
         return; // don't install our hooks
-    } else if (g_go_major_ver >= PARAM_ON_REG_GO_VER) {
+    } else if (g_go_major_ver > MAX_SUPPORTED_GO_VER) {
         scopeLogWarn("%s was compiled with go version `%s`. Versions newer than Go 1.18 are not yet supported. Continuing without AppScope.", ebuf->cmd, go_runtime_version);
         return; // don't install our hooks
-    }
+    } 
+
     /*
      * Note: calling runtime.cgocall results in the Go error
      *       "fatal error: cgocall unavailable"

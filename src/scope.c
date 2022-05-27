@@ -31,6 +31,62 @@
 #include "inject.h"
 #include "os.h"
 
+#define MIN_HTTP2_GO_VER (17)
+#define GO_ENV_VAR "GODEBUG"
+#define GO_ENV_SERVER_VALUE "http2server"
+#define GO_ENV_CLIENT_VALUE "http2client"
+
+extern int g_go_major_ver;
+
+// If possible, we want to set GODEBUG=http2server=0,http2client=0
+// This tells go not to upgrade to http2, which allows
+// our http1 protocol capture stuff to do it's thing.
+// We consider this temporary, because when we support http2
+// it will not be necessary.
+static void
+setGoHttpEnvVariable(void)
+{
+    if (checkEnv("SCOPE_GO_HTTP1", "false") == TRUE) return;
+
+    char *cur_val = getenv(GO_ENV_VAR);
+
+    // If GODEBUG isn't set, try to set it to http2server=0,http2client=0
+    if (!cur_val) {
+        if (setenv(GO_ENV_VAR, GO_ENV_SERVER_VALUE "=0," GO_ENV_CLIENT_VALUE "=0", 1)) {
+            perror("setGoHttpEnvVariable:setenv");
+        }
+        return;
+    }
+
+    // GODEBUG is set.
+    // If http2server wasn't specified, let's append ",http2server=0"
+    if (!scope_strstr(cur_val, GO_ENV_SERVER_VALUE)) {
+        char *new_val = NULL;
+        if ((scope_asprintf(&new_val, "%s,%s=0", cur_val, GO_ENV_SERVER_VALUE) == -1)) {
+            scope_perror("setGoHttpEnvVariable:asprintf");
+            return;
+        }
+        if (setenv(GO_ENV_VAR, new_val, 1)) {
+            perror("setGoHttpEnvVariable:setenv");
+        }
+        if (new_val) scope_free(new_val);
+    }
+
+    cur_val = getenv(GO_ENV_VAR);
+
+    // If http2client wasn't specified, let's append ",http2client=0"
+    if (!scope_strstr(cur_val, GO_ENV_CLIENT_VALUE)) {
+        char *new_val = NULL;
+        if ((scope_asprintf(&new_val, "%s,%s=0", cur_val, GO_ENV_CLIENT_VALUE) == -1)) {
+            scope_perror("setGoHttpEnvVariable:asprintf");
+            return;
+        }
+        if (setenv(GO_ENV_VAR, new_val, 1)) {
+            perror("setGoHttpEnvVariable:setenv");
+        }
+        if (new_val) scope_free(new_val);
+    }
+}
 
 static void
 showUsage(char *prog)
@@ -190,6 +246,10 @@ main(int argc, char **argv, char **env)
         if (setenv("SCOPE_APP_TYPE", "go", 1) == -1) {
             perror("setenv");
             goto err;
+        }
+        if (g_go_major_ver < MIN_HTTP2_GO_VER) {
+            scopeLogDebug("%s was compiled with go version `%s`. Versions older than Go 1.17 will not use HTTP2.", ebuf->cmd, go_runtime_version);
+            setGoHttpEnvVariable();
         }
     } else {
         if (setenv("SCOPE_APP_TYPE", "native", 1) == -1) {

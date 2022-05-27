@@ -6,42 +6,42 @@
   "$defs": {
     "addrs": {
       "title": "addrs",
-      "description": "IP address(es) of the domain that the scoped application has sent a DNS request about.",
+      "description": "IP address(es) of the domain for which the scoped app sent a DNS request.",
       "type": "array"
     },
     "class_connection": {
       "title": "connection",
-      "description": "connection REVISIT",
+      "description": "Subcategory of network error.",
       "type": "string",
       "const": "connection"
     },
     "class_fs_error": {
       "title": "class fs.error",
-      "description": "Specifies the subcategory of filesystem error whose instances are aggregated in this event or metric. ",
+      "description": "Subcategory of filesystem error.",
       "type": "string",
       "enum": ["open_close", "read_write", "stat"]
     },
     "class_net_error": {
       "title": "class net.error",
-      "description": "Specifies the subcategory of network error whose instances are aggregated in this event or metric.",
+      "description": "Subcategory of network error.",
       "type": "string",
       "enum": ["connection", "rx_tx"]
     },
     "class_net_rxtx": {
       "title": "class net.rxtx",
-      "description": "Specifies the subcategory of send and receive operations whose instances are aggregated in this event or metric.",
+      "description": "Subcategory of send and receive operations.",
       "type": "string",
       "enum": ["inet_tcp", "inet_udp", "unix_tcp", "unix_udp", "other"]
     },
     "data": {
       "title": "data",
-      "description": "Specifies whether the data is unencrypted (clear) or encrypted (SSL). ???",
+      "description": "Specifies whether data was unencrypted (clear) or encrypted (SSL).",
       "type": "string",
       "enum": ["ssl", "clear"]
     },
     "domain": {
       "title": "domain",
-      "description": "The domain that the scoped application made a DNS request about.",
+      "description": "The domain for which the scoped app made a DNS request.",
       "type": "string"
     },
     "duration": {
@@ -52,70 +52,70 @@
     },
     "fd": {
       "title": "fd",
-      "description": "The file descriptor for the operation described by the event or metric.",
+      "description": "The file descriptor for an operation.",
       "type": "integer",
       "examples": [4]
     },
     "file": {
       "title": "file",
-      "description": "The name of the file affected by the operation described by the event or metric.",
+      "description": "The name of the file.",
       "type": "string"
     },
     "file_group": {
       "title": "file_group",
-      "description": "The group ID in the permissions of the file affected by the operation described by the event or metric.",
+      "description": "The group ID of the file owner.",
       "type": "number",
       "examples": [0]
     },
     "file_owner": {
       "title": "file_owner",
-      "description": "The user ID of the owner in the permissions of the file affected by the operation described by the event or metric. REVISIT",
+      "description": "The user ID of the file owner.",
       "type": "number",
       "examples": [0]
     },
     "file_perms": {
       "title": "file_perms",
-      "description": "The permissions, in octal format, of the file affected by the operation described by the event or metric.",
+      "description": "The permissions of the file, in octal format.",
       "type": "integer",
       "examples": [777]
     },
     "file_read_bytes": {
       "title": "file_read_bytes",
-      "description": "Specifies the number of bytes of data that were read for the file. REVISIT",
+      "description": "The number of bytes of data read from a file.",
       "type": "integer",
       "examples": [512]
     },
     "file_read_ops": {
       "title": "file_read_ops",
-      "description": "When verbosity is set to aggregate, specifies how many individual read operations were aggregated.",
+      "description": "Count of individual read operations aggregated.",
       "type": "integer",
       "examples": [5]
     },
     "file_write_bytes": {
       "title": "file_write_bytes",
-      "description": "Specifies the number of bytes of data that were written to the file.",
+      "description": "The number of bytes of data written to a file.",
       "type": "integer",
       "examples": [10]
     },
     "file_write_ops": {
       "title": "file_write_ops",
-      "description": "When verbosity is set to aggregate, specifies how many individual write operations were aggregated.",
+      "description": "Count of individual write operations aggregated.",
       "type": "integer",
       "examples": [5]
     },
     "host": {
       "title": "host",
-      "description": "Specifies the hostname for the host on which the scoped application was run.",
+      "description": "Hostname for the host on which the scoped app was run.",
       "type": "string"
     },
     "http_client_duration": {
       "title": "http_client_duration",
-      "description": "Duration in milliseconds measuring the time the request is issued until the time the response is received.",
+      "description": "Time elapsed between when a request was issued and when the response was received, in milliseconds.",
       "type": "number"
     },
     "http_client_ip": {
       "title": "http_client_ip",
-      "description": "IP address REVISIT",
+      "description": "IP address of the host that issued an HTTP request or received the response.",
       "type": "string"
     },
     "http_flavor": {
@@ -125,13 +125,13 @@
     },
     "http_frame": {
       "title": "http_frame",
-      "description": "REVISIT",
+      "description": "Type of the HTTP/2 frame as described in RFC 7540.",
       "type": "string",
       "enum": ["HEADERS", "PUSH_PROMISE"]
     },
     "http_host": {
       "title": "http_host",
-      "description": "The hostname of the host to which the scoped application is making an HTTP request or from which it's receiving a response, unless the scoped application is an HTTP server, in which case it's the server's hostname.",
+      "description": "Hostname of the host to which an HTTP request was sent; or, from which a response was received.",
       "type": "string"
     },
     "http_method": {
@@ -146,13 +146,13 @@
     },
     "http_scheme": {
       "title": "http_scheme",
-      "description": "http_scheme HOW TO PHRASE THIS? REVISIT",
+      "description": "Specifies whether data was unencrypted (HTTP) or encrypted (HTTPS).",
       "type": "string",
       "enum": ["http", "https"]
     },
     "http_server_duration": {
       "title": "http_server_duration",
-      "description": "Duration in milliseconds measuring the time the request was received until the time the response was issued.",
+      "description": "Time elapsed between when a request was received and when the response was issued, in milliseconds.",
       "type": "number"
     },
     "http_status_code": {
@@ -169,49 +169,49 @@
     },
     "http_stream": {
       "title": "http_stream",
-      "description": "http_stream REVISIT - relates to HTTP/2.2",
+      "description": "HTTP/2 Stream Identifier.",
       "type": "integer"
     },
     "http_target": {
       "title": "http_target",
-      "description": "The component of a URL ... REVISIT",
+      "description": "In a URL, the path or file after the FQDN.",
       "type": "string"
     },
     "http_user_agent": {
       "title": "http_user_agent",
-      "description": "Describes the web client that issued a request. MORE?? REVISIT",
+      "description": "HTTP header property describing the web client.",
       "type": "string"
     },
     "localip": {
       "title": "localip",
-      "description": "The IP address portion of a network address. REFINE - REVISIT",
+      "description": "The IP address portion of the local end of a network connection.",
       "type": "string",
       "examples": ["127.0.0.1"]
     },
     "localn": {
       "title": "localn",
-      "description": "The inode of a local Unix socket connection. VERIFY - REVISIT",
+      "description": "Inode number for the local end of a UNIX domain socket.",
       "type": "number"
     },
     "localp": {
       "title": "localp",
-      "description": "The port portion of a network address. REFINE - REVISIT",
+      "description": "The port portion of the local end of a network connection.",
       "type": "number",
       "examples": [9109]
     },
     "message": {
       "title": "message",
-      "description": "The textual data written to a console or file. REVISIT - tense?",
+      "description": "The textual data written to a console or file.",
       "type": "string"
     },
     "net_bytes_recv": {
       "title": "net_bytes_recv",
-      "description": "Specifies the number of bytes of data that were received over a network connection.",
+      "description": "The number of bytes of data received over a network connection.",
       "type": "number"
     },
     "net_bytes_sent": {
       "title": "net_bytes_sent",
-      "description": "Specifies the number of bytes of data that were sent over a network connection.",
+      "description": "The number of bytes of data sent over a network connection.",
       "type": "number"
     },
     "net_close_reason": {
@@ -222,13 +222,13 @@
     },
     "net_protocol": {
       "title": "net_protocol",
-      "description": "net_protocol REVISIT - IS THERE ONLY ONE VALUE NOW, AND IN FUTURE OTHERS MIGHT BE SUPPORTED?",
+      "description": "First network protocol detected from data sent or received.",
       "type": "string",
       "const": "http"
     },
     "net_host_ip": {
       "title": "net_host_ip",
-      "description": "The IP portion of the local side of a network connection.",
+      "description": "The IP address portion of the local side of a network connection.",
       "type": "string"
     },
     "net_host_port": {
@@ -238,7 +238,7 @@
     },
     "net_peer_ip": {
       "title": "net_peer_ip",
-      "description": "The IP portion of the remote side of a network connection.",
+      "description": "The IP address portion of the remote side of a network connection.",
       "type": "string"
     },
     "net_peer_port": {
@@ -248,228 +248,228 @@
     },
     "unix_peer_inode": {
       "title": "unix_peer_inode",
-      "description": "REVISIT",
+      "description": "Inode number for the remote end of a UNIX domain socket.",
       "type": "number"
     },
     "net_transport": {
       "title": "net_transport",
-      "description": "REVISIT",
+      "description": "Network layer used (before the dot) and transport layer used (after the dot).",
       "type": "string",
       "enum": ["IP.TCP", "IP.UDP", "IP.RAW", "IP.RDM", "IP.SEQPACKET", "Unix.TCP", "Unix.UDP", "Unix.RAW", "Unix.RDM", "Unix.SEQPACKET"]
     },
     "numops": {
       "title": "numops",
-      "description": "When verbosity is set to aggregate, specifies how many individual operations were aggregated.",
+      "description": "Count of individual operations aggregated.",
       "type": "number"
     },
     "op": {
       "title": "op",
-      "description": "When verbosity is set to not aggregate, identifies what function in the code was executed.",
+      "description": "The function that was executed.",
       "type": "string"
     },
     "op_fs_close": {
       "title": "op_fs_close",
-      "description": "When verbosity is set to not aggregate, identifies the filesystem close operation that was executed.",
+      "description": "The close operation that was executed on the filesytem.",
       "type": "string",
       "enum": ["go_close", "closedir", "freopen", "freopen64", "close", "fclose", "close$NOCANCEL", "guarded_close_np", "close_nocancel"]
     },
     "op_fs_delete": {
       "title": "op_fs_delete",
-      "description": "PATTERN",
+      "description": "The delete operation that was executed on the filesytem.",
       "type": "string",
       "enum": ["go_unlinkat", "unlink", "unlinkat"]
     },
     "op_fs_open": {
       "title": "op_fs_open",
-      "description": "PATTERN",
+      "description": "The open operation that was executed on the filesystem.",
       "type": "string",
       "enum": ["open", "openat", "opendir", "creat", "fopen", "freopen", "open64", "openat64", "__open64_2", "__open_2", "__openat_2", "creat64", "fopen64", "freopen64", "recvmsg", "console output", "console input"]
     },
     "op_fs_read": {
       "title": "op_fs_read",
-      "description": "PATTERN",
+      "description": "The read operation that was executed on the filesytem.",
       "type": "string",
       "enum": ["go_read", "go_getdents", "readdir", "pread64", "__pread64_chk", "preadv", "preadv2", "preadv64v2", "__pread_chk", "__read_chk", "__fread_unlocked_chk", "read", "readv", "pread", "fread", "__fread_chk", "fread_unlocked", "fgets", "__fgets_chk", "fgets_unlocked", "__fgetws_chk", "fgetws", "fgetwc", "fgetc", "fscanf", "getline", "getdelim", "__getdelim"]
     },
     "op_fs_seek": {
-      "title": "PATTERN",
-      "description": "op_fs_seek WITH UNDERSCORES OR NOT?",
+      "title": "op_fs_seek",
+      "description": "The seek operation that was executed on the filesytem.",
       "type": "string",
       "enum": ["lseek64", "fseek64", "ftello64", "fsetpos64", "lseek", "fseek", "fseeko", "ftell", "ftello", "rewind", "fsetpos", "fgetpos", "fgetpos64"]
     },
     "op_fs_stat": {
-      "title": "PATTERN",
-      "description": "op_fs_stat WITH UNDERSCORES OR NOT?",
+      "title": "op_fs_stat",
+      "description": "The stat operation that was executed on the filesytem.",
       "type": "string",
       "enum": ["statfs64", "__xstat", "__xstat64", "__lxstat", "__lxstat64", "__fxstat", "__fxstatat", "__fxstatat64", "statx", "statfs", "statvfs", "statvfs64", "access", "faccessat", "stat", "lstat", "fstatfs64", "__fxstat", "__fxstat64", "fstatfs", "fstatvfs", "fstatvfs64", "fstat", "fstatat"]
     },
     "op_fs_write": {
-      "title": "PATTERN",
-      "description": "op_fs_write WITH UNDERSCORES OR NOT?",
+      "title": "op_fs_write",
+      "description": "The write operation that was executed on the filesytem.",
       "type": "string",
       "enum": ["go_write", "pwrite64", "pwritev", "pwritev64", "pwritev2", "pwritev64v2", "__overflow", "__write_libc", "__write_pthread", "fwrite_unlocked", "__stdio_write", "write", "pwrite", "writev", "fwrite", "puts", "putchar", "fputs", "fputs_unlocked", "fputc", "fputc_unlocked", "putwc", "fputwc"]
     },
     "pid": {
       "title": "pid",
-      "description": "The process ID of the scoped application.",
+      "description": "The process ID of the scoped app.",
       "type": "integer",
       "examples": [1000]
     },
     "port": {
       "title": "port",
-      "description": "Specifies a network port that was opened before a network connection was initiated, or closed after the connection closed. REVISIT",
+      "description": "Network port opened before a connection was initiated, or closed after the connection closed.",
       "type": "number"
     },
     "proc": {
       "title": "proc",
-      "description": "The name of the process for the scoped application.",
+      "description": "The name of the process of the scoped app.",
       "type": "string"
     },
     "proc_cgroup": {
       "title": "proc_cgroup",
-      "description": "Specifies the control group that was used in container creation.",
+      "description": "The control group used in container creation.",
       "type": "string",
       "examples": ["0::/user.slice/user-1000.slice/session-3.scope"]
     },
     "proc_gid": {
       "title": "proc_gid",
-      "description": "PERMISSIONS - The process group ID of the scoped application OR executing process.",
+      "description": "The group ID of the user who started the scoped app.",
       "type": "integer",
       "examples": [0]
     },
     "proc_uid": {
       "title": "proc_uid",
-      "description": "PERMISSIONS - proc_uid",
+      "description": "The user ID of the user who started the scoped app.",
       "type": "integer",
       "examples": [0]
     },
     "proto": {
       "title": "proto",
-      "description": "REVISIT - The transmission protocol that the scoped application used to send data.",
+      "description": "The transmission protocol that the scoped app used to send data.",
       "type": "string",
       "enum": ["TCP", "UDP", "RAW", "RDM", "SEQPACKET", "OTHER"]
     },
     "proto_tcp": {
       "title": "proto_tcp",
-      "description": "REVISIT - similar to above",
+      "description": "The transmission protocol that the scoped app used to send data.",
       "type": "string",
       "const": "TCP"
     },
     "proto_udp": {
       "title": "proto_udp",
-      "description": "REVISIT - similar to above",
+      "description": "The transmission protocol that the scoped app used to send data.",
       "type": "string",
       "const": "UDP"
     },
     "protocol": {
       "title": "protocol",
-      "description": "Specifies the protocol that AppScope detected in data transmitted on a network connection.",
+      "description": "Protocol detected in data transmitted over a network connection.",
       "type": "string",
       "enum": ["HTTP"]
     },
     "remoteip": {
       "title": "remoteip",
-      "description": "remoteip",
+      "description": "IP address for the remote end of a network socket.",
       "type": "string",
       "examples": ["192.158.1.38"]
     },
     "remoten": {
       "title": "remoten",
-      "description": "remoten",
+      "description": "Inode number for the remote end of a UNIX domain socket.",
       "type": "number"
     },
     "remotep": {
       "title": "remotep",
-      "description": "remotep",
+      "description": "Port for the remote end of a network socket.",
       "type": "number",
       "examples": [9108]
     },
     "summary": {
       "title": "summary",
-      "description": "summary",
+      "description": "When true, indicates that the metric value is an aggregation.",
       "type": "string",
       "const": "true"
     },
     "unit_byte" : {
       "title": "byte",
-      "description": "Unit - byte",
+      "description": "Indicates that the metric's value is in bytes.",
       "type": "string",
       "const": "byte"
     },
     "unit_connection": {
       "title": "connection",
-      "description": "Unit - connection",
+      "description": "Indicates that the metric's value is a number of connections.",
       "type": "string",
       "const": "connection"
     },
     "unit_file" : {
       "title": "file",
-      "description": "Unit - file",
+      "description": "Indicates that the metric's value is a number of files.",
       "type": "string",
       "const": "file"
     },
     "unit_instance": {
       "title": "instance",
-      "description": "Unit - instance",
+      "description": "Indicates that the metric's value is a number of instances.",
       "type": "string",
       "const": "instance"
     },
     "unix_local_inode": {
       "title": "unix_local_inode",
-      "description": "unix_local_inode",
+      "description": "Inode number for the local end of a UNIX domain socket.",
       "type": "number"
     },
     "unit_kibibyte" : {
       "title": "kibibyte",
-      "description": "Unit - kibibyte",
+      "description": "Indicates that the metric's value is in kibibytes.",
       "type": "string",
       "const": "kibibyte"
     },
     "unit_microsecond" : {
       "title": "microsecond",
-      "description": "Unit - microsecond",
+      "description": "Indicates that the metric's value is in microseconds.",
       "type": "string",
       "const": "microsecond"
     },
     "unit_millisecond" : {
       "title": "millisecond",
-      "description": "Unit - millisecond",
+      "description": "Indicates that the metric's value is in milliseconds.",
       "type": "string",
       "const": "millisecond"
     },
     "unit_operation" : {
       "title": "operation",
-      "description": "Unit - operation",
+      "description": "Indicates that the metric's value is a number of operations.",
       "type": "string",
       "const": "operation"
     },
     "unit_percent" : {
       "title": "percent",
-      "description": "Unit - percent",
+      "description": "Indicates that the metric's value is a percentage.",
       "type": "string",
       "const": "percent"
     },
     "unit_process" : {
       "title": "process",
-      "description": "Unit - process",
+      "description": "Indicates that the metric's value is a number of processes.",
       "type": "string",
       "const": "process"
     },
     "unit_request" : {
       "title": "request",
-      "description": "Unit - request",
+      "description": "Indicates that the metric's value is a number of a requests.",
       "type": "string",
       "const": "request"
     },
     "unit_thread" : {
       "title": "thread",
-      "description": "Unit - thread",
+      "description": "Indicates that the metric's value is a number of threads.",
       "type": "string",
       "const": "thread"
     },
     "x_appscope" : {
       "title": "x-appscope",
-      "description": "x-appscope",
+      "description": "TBD - possibly related to headers.",
       "type": "string",
       "const": "x-appscope"
     }

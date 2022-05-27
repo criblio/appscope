@@ -114,9 +114,9 @@ go_schema_t go_8_schema = {
         .c_http2_server_read_sc=0x128,
         .c_http2_server_write_callee=0x0,
         .c_http2_server_write_sc=0x8,
-        .c_http2_server_preface_callee=0xc8,
-        .c_http2_server_preface_sc=0xd0,
-        .c_http2_server_preface_rc=0x58,
+        .c_http2_server_preface_callee=0xd0,
+        .c_http2_server_preface_sc=0x60,
+        .c_http2_server_preface_rc=0xe0, // not 100% about this one
         .c_http2_client_read_cc=0x78,
         .c_http2_client_write_callee=0x40,
         .c_http2_client_write_tcpConn=0x0,
@@ -837,6 +837,11 @@ adjustGoStructOffsetsForVersion(int go_ver)
         g_go_schema->struct_offsets.persistConn_to_conn = 72;  // 0x48
         g_go_schema->struct_offsets.persistConn_to_bufrd = 96; // 0x60
         g_go_schema->struct_offsets.persistConn_to_tlsState=88; // 0x58
+    }
+
+    if (go_ver == 16) {
+        g_go_schema->arg_offsets.c_http2_client_read_cc=0xe0;
+        g_go_schema->arg_offsets.c_http2_server_preface_callee=0xc0;
     }
 
     if (go_ver == 17) {
@@ -1708,7 +1713,7 @@ c_http2_server_write(char *stackaddr)
     // the header is empty (length and type bytes are all 0).
     // Especially since it will set PROTO to false if it's the first call to doProtocol
     // on this socket.
-    if (!newbuf[3]) return;
+    if ((rc < 1) && (!newbuf[3])) return;
 
     funcprint("Scope: c_http2_server_write of %d %i\n", fd, rc);
     doProtocol((uint64_t)0, fd, writeBuf, rc, TLSTX, BUF);

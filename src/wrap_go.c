@@ -1026,6 +1026,7 @@ initGoHook(elf_buf_t *ebuf)
             ((nohttp2 = getGoSymbol(ebuf->buf, "net/http.omitBundledHTTP2", NULL, NULL)) == 0)) {
             sysprint("ERROR: can't get the address for omitBundledHTTP2\n");
         } else {
+            nohttp2 = (void *)((uint64_t)nohttp2 + base);
             *nohttp2 = TRUE;
         }
     }

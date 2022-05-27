@@ -117,8 +117,8 @@ go_schema_t go_8_schema = {
         .c_http2_server_preface_callee=0xd0,
         .c_http2_server_preface_sc=0x60,
         .c_http2_server_preface_rc=0xe0, // not 100% about this one
-        .c_http2_client_read_cc=0x78,
-        .c_http2_client_write_callee=0x40,
+        .c_http2_client_read_cc=0x80,
+        .c_http2_client_write_callee=0x58,
         .c_http2_client_write_tcpConn=0x0,
         .c_http2_client_write_buf=0x8,
         .c_http2_client_write_rc=0x10,
@@ -141,7 +141,7 @@ go_schema_t go_8_schema = {
         .fr_to_writeBuf=0x80,
         .fr_to_headerBuf=0x38,
         .fr_to_rc=0x60,
-        .cc_to_fr=0xd0,
+        .cc_to_fr=0xc8,
         .cc_to_tconn=0x10,
         .sc_to_fr=0x48,
         .sc_to_conn=0x18,
@@ -837,6 +837,12 @@ adjustGoStructOffsetsForVersion(int go_ver)
         g_go_schema->struct_offsets.persistConn_to_conn = 72;  // 0x48
         g_go_schema->struct_offsets.persistConn_to_bufrd = 96; // 0x60
         g_go_schema->struct_offsets.persistConn_to_tlsState=88; // 0x58
+    }
+
+    if (go_ver == 12 || go_ver == 13) {
+        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
+        g_go_schema->arg_offsets.c_http2_client_write_callee=0x40;
+        g_go_schema->struct_offsets.cc_to_fr=0xd0;
     }
 
     if (go_ver == 16) {

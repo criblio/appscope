@@ -27,6 +27,7 @@
 #include "utils.h"
 #include "runtimecfg.h"
 #include "cfg.h"
+#include "os.h"
 #include "scopestdlib.h"
 
 #ifndef AF_NETLINK
@@ -1769,11 +1770,19 @@ doDNSMetricName(metric_t type, net_info *net)
 }
 
 void
-doProcMetric(metric_t type, long long measurement)
+doProcMetric(metric_t type)
 {
+    long long measurement;
     switch (type) {
     case PROC_CPU:
     {
+            static long long cpuState = 0;
+            long long cpu = osGetProcCPU();
+            if (cpu == -1) {
+                return;
+            }
+            measurement = cpu - cpuState;
+            cpuState = cpu;
         {
             event_field_t fields[] = {
                 PROC_FIELD(g_proc.procname),
@@ -1811,6 +1820,10 @@ doProcMetric(metric_t type, long long measurement)
 
     case PROC_MEM:
     {
+        measurement = osGetProcMemory(g_proc.pid);
+        if (measurement == -1) {
+            return;
+        }
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
@@ -1825,6 +1838,11 @@ doProcMetric(metric_t type, long long measurement)
 
     case PROC_THREAD:
     {
+        measurement = osGetNumThreads(g_proc.pid);
+        if (measurement == -1) {
+            return;
+        }
+
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
@@ -1839,6 +1857,11 @@ doProcMetric(metric_t type, long long measurement)
 
     case PROC_FD:
     {
+        measurement = osGetNumFds(g_proc.pid);
+        if (measurement == -1) {
+            return;
+        }
+
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
@@ -1853,6 +1876,11 @@ doProcMetric(metric_t type, long long measurement)
 
     case PROC_CHILD:
     {
+        measurement = osGetNumChildProcs(g_proc.pid);
+        if (measurement < 0) {
+            measurement = 0;
+        }
+
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),

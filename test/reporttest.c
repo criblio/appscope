@@ -183,7 +183,7 @@ nothingCrashesBeforeAnyInit(void** state)
     setReportingInterval(10);
     doProcStartMetric();
     doErrorMetric(NET_ERR_CONN, PERIODIC, "A", "B", NULL);
-    doProcMetric(PROC_CPU, 2345);
+    doProcMetric(PROC_CPU);
     doStatMetric("statFunc", "/the/path/to/something", NULL);
     doTotal(TOT_READ);
     doTotalDuration(TOT_DNS_DURATION);

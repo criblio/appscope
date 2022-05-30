@@ -3602,3 +3602,38 @@ doPayload()
         }
     }
 }
+
+void
+doProcStartMetric(void)
+{
+    if (procMtcEnable() == FALSE) {
+        return;
+    }
+
+    char *urlEncodedCmd = NULL;
+    char *command = g_proc.cmd; // default is no encoding
+
+    // If we're reporting in statsd format, url encode the cmd
+    // to avoid characters that could cause parsing problems
+    // for statsd aggregators  :|@#,
+    if (cfgMtcFormat(g_cfg.staticfg) == CFG_FMT_STATSD) {
+        urlEncodedCmd = fmtUrlEncode(g_proc.cmd);
+        command = urlEncodedCmd;
+    }
+
+    event_field_t fields[] = {
+        STRFIELD("proc", (g_proc.procname), 4, TRUE),
+        NUMFIELD("pid", (g_proc.pid), 4, TRUE),
+        NUMFIELD("gid", (g_proc.gid), 4, TRUE),
+        STRFIELD("groupname", (g_proc.groupname), 4, TRUE),
+        NUMFIELD("uid", (g_proc.uid), 4, TRUE),
+        STRFIELD("username", (g_proc.username), 4, TRUE),
+        STRFIELD("host", (g_proc.hostname), 4, TRUE),
+        STRFIELD("args", (command), 7, TRUE),
+        STRFIELD("unit", ("process"), 1, TRUE),
+        FIELDEND
+    };
+    event_t evt = INT_EVENT("proc.start", 1, DELTA, fields);
+    cmdSendMetric(g_mtc, &evt);
+    if (urlEncodedCmd) scope_free(urlEncodedCmd);
+}

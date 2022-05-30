@@ -897,6 +897,8 @@ doReset()
     atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
 
     reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
+    doProcStartMetric();
+
     threadInit();
 }
 
@@ -915,27 +917,30 @@ reportPeriodicStuff(void)
     doEvent();
     doPayload();
 
-    // We report CPU time for this period.
-    cpu = doGetProcCPU();
-    if (cpu != -1) {
-        doProcMetric(PROC_CPU, cpu - cpuState);
-        cpuState = cpu;
+    // TODO: move the code inside if below to report.c
+    if (procMtcEnable()) {
+        // We report CPU time for this period.
+        cpu = doGetProcCPU();
+        if (cpu != -1) {
+            doProcMetric(PROC_CPU, cpu - cpuState);
+            cpuState = cpu;
+        }
+
+        mem = osGetProcMemory(g_proc.pid);
+        if (mem != -1) doProcMetric(PROC_MEM, mem);
+
+        nthread = osGetNumThreads(g_proc.pid);
+        if (nthread != -1) doProcMetric(PROC_THREAD, nthread);
+
+        nfds = osGetNumFds(g_proc.pid);
+        if (nfds != -1) doProcMetric(PROC_FD, nfds);
+
+        children = osGetNumChildProcs(g_proc.pid);
+        if (children < 0) {
+            children = 0;
+        }
+        doProcMetric(PROC_CHILD, children);
     }
-
-    mem = osGetProcMemory(g_proc.pid);
-    if (mem != -1) doProcMetric(PROC_MEM, mem);
-
-    nthread = osGetNumThreads(g_proc.pid);
-    if (nthread != -1) doProcMetric(PROC_THREAD, nthread);
-
-    nfds = osGetNumFds(g_proc.pid);
-    if (nfds != -1) doProcMetric(PROC_FD, nfds);
-
-    children = osGetNumChildProcs(g_proc.pid);
-    if (children < 0) {
-        children = 0;
-    }
-    doProcMetric(PROC_CHILD, children);
 
     // report totals (not by file descriptor/socket descriptor)
     doTotal(TOT_READ);
@@ -1681,6 +1686,7 @@ init(void)
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
     reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
+    doProcStartMetric();
 
     // replaces atexit(handleExit);  Allows events to be reported before
     // the TLS destructors are run.  This mechanism is used regardless

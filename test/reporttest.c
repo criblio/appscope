@@ -181,7 +181,7 @@ nothingCrashesBeforeAnyInit(void** state)
 
     // report.h
     setReportingInterval(10);
-    sendProcessStartMetric();
+    doProcStartMetric();
     doErrorMetric(NET_ERR_CONN, PERIODIC, "A", "B", NULL);
     doProcMetric(PROC_CPU, 2345);
     doStatMetric("statFunc", "/the/path/to/something", NULL);

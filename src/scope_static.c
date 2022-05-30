@@ -541,7 +541,7 @@ static const char scope_help_configuration[] =
 "        SCOPE_METRIC_FS\n"
 "            Create metrics describing file connectivity.\n"
 "            true, false  Default is true.\n"
-"        SCOPE_METRIC_NETWORK\n"
+"        SCOPE_METRIC_NET\n"
 "            Create metrics describing network connectivity.\n"
 "            true, false  Default is true.\n"
 "        SCOPE_METRIC_HTTP\n"

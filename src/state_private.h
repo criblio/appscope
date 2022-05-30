@@ -243,15 +243,6 @@ typedef struct payload_info_t {
     char *data;
 } payload_info;
 
-typedef struct mtc_info_t {
-    bool fs_enable;
-    bool network_enable;
-    bool http_enable;
-    bool dns_enable;
-    bool proc_enable;
-} mtc_info;
-// TODO use single variable - even char will do the job
-
 // Accessor functions defined in state.c, but used in report.c too.
 int get_port(int, int, control_type_t);
 int get_port_net(net_info *, int, control_type_t);
@@ -273,7 +264,7 @@ void subFromInterfaceCounts(counters_element_t *, uint64_t);
 
 // Data that lives in state.c, but is used in report.c too.
 extern summary_t g_summary;
-extern mtc_info g_mtcinfo;
+extern unsigned char g_mtcinfo;
 extern net_info *g_netinfo;
 extern fs_info *g_fsinfo;
 extern metric_counters g_ctrs;

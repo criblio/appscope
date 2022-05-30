@@ -152,11 +152,11 @@ metric:
 
     # Metric network
     #   Type:     string
-    #   Values:   network
-    #   Default:  network
-    #   Override: $SCOPE_METRIC_NETWORK
+    #   Values:   net
+    #   Default:  net
+    #   Override: $SCOPE_METRIC_NET
     #
-    - type: network
+    - type: net
 
     # Metric http
     #   Type:     string

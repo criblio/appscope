@@ -161,7 +161,7 @@ endtest
 
 starttest network_disable_event_disable
 
-SCOPE_EVENT_ENABLE=false SCOPE_METRIC_NETWORK=false ldscope -- curl https://cribl.io -o /dev/null
+SCOPE_EVENT_ENABLE=false SCOPE_METRIC_NET=false ldscope -- curl https://cribl.io -o /dev/null
 ERR+=$?
 
 allow_list_data curl_fs_metrics $METRIC_FILE
@@ -209,7 +209,7 @@ endtest
 
 starttest disable_all_metrics_with_variants
 
-SCOPE_EVENT_ENABLE=false SCOPE_METRIC_FS=false SCOPE_METRIC_NETWORK=false SCOPE_METRIC_HTTP=false SCOPE_METRIC_PROC=false ldscope -- curl https://cribl.io -o /dev/null
+SCOPE_EVENT_ENABLE=false SCOPE_METRIC_FS=false SCOPE_METRIC_NET=false SCOPE_METRIC_HTTP=false SCOPE_METRIC_PROC=false ldscope -- curl https://cribl.io -o /dev/null
 ERR+=$?
 
 # check if metric file is empty

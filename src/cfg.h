@@ -23,7 +23,7 @@ unsigned            cfgMtcStatsDMaxLen(config_t*);
 unsigned            cfgMtcPeriod(config_t*);
 unsigned            cfgMtcStatsdEnable(config_t *);
 unsigned            cfgMtcFsEnable(config_t*);
-unsigned            cfgMtcNetworkEnable(config_t*);
+unsigned            cfgMtcNetEnable(config_t*);
 unsigned            cfgMtcHttpEnable(config_t*);
 unsigned            cfgMtcDnsEnable(config_t*);
 unsigned            cfgMtcProcEnable(config_t*);

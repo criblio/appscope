@@ -13,6 +13,11 @@ verifyDefaults(config_t* config)
 {
     assert_int_equal       (cfgMtcEnable(config), DEFAULT_MTC_ENABLE);
     assert_int_equal       (cfgMtcFormat(config), DEFAULT_MTC_FORMAT);
+    assert_int_equal       (cfgMtcFsEnable(config), DEFAULT_MTC_FS_ENABLE);
+    assert_int_equal       (cfgMtcNetEnable(config), DEFAULT_MTC_NET_ENABLE);
+    assert_int_equal       (cfgMtcHttpEnable(config), DEFAULT_MTC_HTTP_ENABLE);
+    assert_int_equal       (cfgMtcDnsEnable(config), DEFAULT_MTC_DNS_ENABLE);
+    assert_int_equal       (cfgMtcProcEnable(config), DEFAULT_MTC_PROC_ENABLE);
     assert_string_equal    (cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
     assert_int_equal       (cfgMtcStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
     assert_int_equal       (cfgMtcVerbosity(config), DEFAULT_MTC_VERBOSITY);

@@ -454,8 +454,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgMtcStatsdEnableSetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_METRIC_FS")) {
         cfgMtcCategoryEnableSetFromStr(cfg, value, CFG_MTC_FS);
-    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_NETWORK")) {
-        cfgMtcCategoryEnableSetFromStr(cfg, value, CFG_MTC_NETWORK);
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_NET")) {
+        cfgMtcCategoryEnableSetFromStr(cfg, value, CFG_MTC_NET);
     } else if (!scope_strcmp(env_name, "SCOPE_METRIC_HTTP")) {
         cfgMtcCategoryEnableSetFromStr(cfg, value, CFG_MTC_HTTP);
     } else if (!scope_strcmp(env_name, "SCOPE_METRIC_DNS")) {

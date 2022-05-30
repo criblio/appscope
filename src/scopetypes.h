@@ -26,7 +26,7 @@ typedef enum {CFG_SRC_FILE,
               CFG_SRC_MAX} watch_t;
 
 typedef enum {CFG_MTC_FS,
-              CFG_MTC_NETWORK,
+              CFG_MTC_NET,
               CFG_MTC_HTTP,
               CFG_MTC_DNS,
               CFG_MTC_PROC} metric_category_t;
@@ -69,7 +69,7 @@ typedef unsigned int bool;
 #define DEFAULT_MTC_ENABLE TRUE
 #define DEFAULT_MTC_FORMAT CFG_FMT_STATSD
 #define DEFAULT_MTC_FS_ENABLE TRUE
-#define DEFAULT_MTC_NETWORK_ENABLE TRUE
+#define DEFAULT_MTC_NET_ENABLE TRUE
 #define DEFAULT_MTC_HTTP_ENABLE TRUE
 #define DEFAULT_MTC_DNS_ENABLE TRUE
 #define DEFAULT_MTC_PROC_ENABLE TRUE

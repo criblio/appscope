@@ -44,7 +44,7 @@ uint64_t g_http_guard[NET_ENTRIES];
 // this data have been moved into report.c.  This is managed with the
 // include of state_private.h above.
 summary_t g_summary = {{0}};
-mtc_info g_mtcinfo;
+unsigned char g_mtcinfo;
 net_info *g_netinfo;
 fs_info *g_fsinfo;
 metric_counters g_ctrs = {{0}};
@@ -82,6 +82,12 @@ static list_t *g_extra_net_info_list = NULL;
 #define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
+
+#define METRIC_FS_BIT      0
+#define METRIC_NET_BIT     1
+#define METRIC_HTTP_BIT    2
+#define METRIC_DNS_BIT     3
+#define METRIC_PROC_BIT    4
 
 static void
 destroyNetInfo(void *data)
@@ -1349,63 +1355,43 @@ setVerbosity(unsigned verbosity)
 }
 
 void
-setFsEnable(unsigned val)
+setCategoryMtcEnable(unsigned fs_val, unsigned net_val, unsigned http_val, unsigned dns_val, unsigned proc_val)
 {
-    g_mtcinfo.fs_enable = val;
-}
-
-void
-setNetworkEnable(unsigned val)
-{
-    g_mtcinfo.network_enable = val;
-}
-
-void
-setHttpEnable(unsigned val)
-{
-    g_mtcinfo.http_enable = val;
-}
-
-void
-setDnsEnable(unsigned val)
-{
-    g_mtcinfo.dns_enable = val;
-}
-
-void
-setProcEnable(unsigned val)
-{
-    g_mtcinfo.proc_enable = val;
+    SCOPE_BIT_SET_VAR(g_mtcinfo, CFG_MTC_FS, fs_val);
+    SCOPE_BIT_SET_VAR(g_mtcinfo, CFG_MTC_NET, net_val);
+    SCOPE_BIT_SET_VAR(g_mtcinfo, CFG_MTC_HTTP, http_val);
+    SCOPE_BIT_SET_VAR(g_mtcinfo, CFG_MTC_DNS, dns_val);
+    SCOPE_BIT_SET_VAR(g_mtcinfo, CFG_MTC_PROC, proc_val);
 }
 
 bool
-fsEnable(void)
+fsMtcEnable(void)
 {
-    return g_mtcinfo.fs_enable;
+    return SCOPE_BIT_CHECK(g_mtcinfo, METRIC_FS_BIT);
 }
 
 bool
-networkEnable(void)
+netMtcEnable(void)
 {
-    return g_mtcinfo.network_enable;
+    return SCOPE_BIT_CHECK(g_mtcinfo, METRIC_NET_BIT);
 }
 
 bool
-httpEnable(void)
+httpMtcEnable(void)
 {
-    return g_mtcinfo.http_enable;
+    return SCOPE_BIT_CHECK(g_mtcinfo, METRIC_HTTP_BIT);
 }
 
 bool
-dnsEnable(void)
+dnsMtcEnable(void)
 {
-    return g_mtcinfo.dns_enable;
+    return SCOPE_BIT_CHECK(g_mtcinfo, METRIC_DNS_BIT);
 }
 
 bool
-procEnable(void)
+procMtcEnable(void)
 {
-    return g_mtcinfo.proc_enable;
+    return SCOPE_BIT_CHECK(g_mtcinfo, METRIC_PROC_BIT);
 }
 
 bool

@@ -182,12 +182,12 @@ Structure of the `console` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - console<br/><br/>Value must be `console`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is console.<br/><br/>Value must be `console`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Specifies whether AppScope is capturing either `stderr` or `stdout` from console.<br/><br/>**Possible values:**<ul><li>`stderr`</li><li>`stdout`</li></ul> |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventconsolebodydata)._ |
 
@@ -238,12 +238,12 @@ Structure of the `dns.req` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - DNS<br/><br/>Value must be `dns`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - Net DNS<br/><br/>Value must be `dns.req`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is DNS.<br/><br/>Value must be `dns`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a Network DNS operation.<br/><br/>Value must be `dns.req`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventdnsreqbodydata)._ |
 
@@ -298,12 +298,12 @@ Structure of the `dns.resp` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - DNS<br/><br/>Value must be `dns`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - DNS response<br/><br/>Value must be `dns.resp`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is DNS.<br/><br/>Value must be `dns`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a DNS response operation .<br/><br/>Value must be `dns.resp`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventdnsrespbodydata)._ |
 
@@ -356,12 +356,12 @@ Structure of the `file` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - file<br/><br/>Value must be `file`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | String that describes a file path. IN WHAT CONTEXT?  |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is file.<br/><br/>Value must be `file`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | String that describes a file path. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfilebodydata)._ |
 
@@ -427,12 +427,12 @@ Structure of the `fs.close` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - filesystem<br/><br/>Value must be `fs`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - File Close<br/><br/>Value must be `fs.close`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is filesystem.<br/><br/>Value must be `fs`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a File Close operation.<br/><br/>Value must be `fs.close`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfsclosebodydata)._ |
 
@@ -503,12 +503,12 @@ Structure of the `fs.delete` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - filesystem<br/><br/>Value must be `fs`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - File Delete<br/><br/>Value must be `fs.delete`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is filesystem.<br/><br/>Value must be `fs`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a File Delete operation.<br/><br/>Value must be `fs.delete`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfsdeletebodydata)._ |
 
@@ -573,12 +573,12 @@ Structure of the `fs.duration` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - metric<br/><br/>Value must be `metric`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - File Duration<br/><br/>Value must be `fs.duration`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is metric.<br/><br/>Value must be `metric`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a File Duration operation.<br/><br/>Value must be `fs.duration`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfsdurationbodydata)._ |
 
@@ -586,9 +586,9 @@ Structure of the `fs.duration` event
 
 | Property | Description |
 |---|---|
-| `_metric` (`string`) | Source - File Duration<br/><br/>Value must be `fs.duration`. |
-| `_metric_type` (`string`) | Indicates that the metric from the scoped command is a histogram.<br/><br/>Value must be `histogram`. |
-| `_value` (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_metric` (`string`) | Indicates that the Source is a File Duration operation.<br/><br/>Value must be `fs.duration`. |
+| `_metric_type` (`string`) | Indicates that the metric from the scoped app is a histogram.<br/><br/>Value must be `histogram`. |
+| `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -646,12 +646,12 @@ Structure of the `fs.error` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - metric<br/><br/>Value must be `metric`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - File Error<br/><br/>Value must be `fs.error`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is metric.<br/><br/>Value must be `metric`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a File Error operation.<br/><br/>Value must be `fs.error`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfserrorbodydata)._ |
 
@@ -659,9 +659,9 @@ Structure of the `fs.error` event
 
 | Property | Description |
 |---|---|
-| `_metric` (`string`) | Source - File Error<br/><br/>Value must be `fs.error`. |
+| `_metric` (`string`) | Indicates that the Source is a File Error operation.<br/><br/>Value must be `fs.error`. |
 | `_metric_type` (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `op` (`string`) | The function that was executed. |
@@ -720,12 +720,12 @@ Structure of the `fs.open` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - filesystem<br/><br/>Value must be `fs`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - File open<br/><br/>Value must be `fs.open`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is filesystem.<br/><br/>Value must be `fs`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a File open operation.<br/><br/>Value must be `fs.open`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfsopenbodydata)._ |
 
@@ -795,12 +795,12 @@ Structure of the `fs.read` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - metric<br/><br/>Value must be `metric`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - File Read<br/><br/>Value must be `fs.read`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is metric.<br/><br/>Value must be `metric`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a File Read operation. <br/><br/>Value must be `fs.read`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfsreadbodydata)._ |
 
@@ -808,9 +808,9 @@ Structure of the `fs.read` event
 
 | Property | Description |
 |---|---|
-| `_metric` (`string`) | Source - File Read<br/><br/>Value must be `fs.read`. |
-| `_metric_type` (`string`) | Indicates that the metric from the scoped command is a histogram.<br/><br/>Value must be `histogram`. |
-| `_value` (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_metric` (`string`) | Indicates that the Source is a File Read operation. <br/><br/>Value must be `fs.read`. |
+| `_metric_type` (`string`) | Indicates that the metric from the scoped app is a histogram.<br/><br/>Value must be `histogram`. |
+| `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -868,12 +868,12 @@ Structure of the `fs.seek` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - metric<br/><br/>Value must be `metric`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - File Seek<br/><br/>Value must be `fs.seek`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is metric.<br/><br/>Value must be `metric`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a File Seek operation.<br/><br/>Value must be `fs.seek`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfsseekbodydata)._ |
 
@@ -881,9 +881,9 @@ Structure of the `fs.seek` event
 
 | Property | Description |
 |---|---|
-| `_metric` (`string`) | Source - File Seek<br/><br/>Value must be `fs.seek`. |
+| `_metric` (`string`) | Indicates that the Source is a File Seek operation.<br/><br/>Value must be `fs.seek`. |
 | `_metric_type` (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -939,12 +939,12 @@ Structure of the `fs.stat` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - metric<br/><br/>Value must be `metric`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - File Stat<br/><br/>Value must be `fs.stat`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is metric.<br/><br/>Value must be `metric`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a File Stat operation.<br/><br/>Value must be `fs.stat`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfsstatbodydata)._ |
 
@@ -952,9 +952,9 @@ Structure of the `fs.stat` event
 
 | Property | Description |
 |---|---|
-| `_metric` (`string`) | Source - File Stat<br/><br/>Value must be `fs.stat`. |
+| `_metric` (`string`) | Indicates that the Source is a File Stat operation.<br/><br/>Value must be `fs.stat`. |
 | `_metric_type` (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `op` (`string`) | The stat operation that was executed on the filesytem.<br/><br/>**Possible values:**<ul><li>`statfs64`</li><li>`__xstat`</li><li>`__xstat64`</li><li>`__lxstat`</li><li>`__lxstat64`</li><li>`__fxstat`</li><li>`__fxstatat`</li><li>`__fxstatat64`</li><li>`statx`</li><li>`statfs`</li><li>`statvfs`</li><li>`statvfs64`</li><li>`access`</li><li>`faccessat`</li><li>`stat`</li><li>`lstat`</li><li>`fstatfs64`</li><li>`__fxstat`</li><li>`__fxstat64`</li><li>`fstatfs`</li><li>`fstatvfs`</li><li>`fstatvfs64`</li><li>`fstat`</li><li>`fstatat`</li></ul> |
@@ -1011,12 +1011,12 @@ Structure of the `fs.write` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - metric<br/><br/>Value must be `metric`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - File Write<br/><br/>Value must be `fs.write`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is metric.<br/><br/>Value must be `metric`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a File Write operation.<br/><br/>Value must be `fs.write`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfswritebodydata)._ |
 
@@ -1024,9 +1024,9 @@ Structure of the `fs.write` event
 
 | Property | Description |
 |---|---|
-| `_metric` (`string`) | Source - File Write<br/><br/>Value must be `fs.write`. |
-| `_metric_type` (`string`) | Indicates that the metric from the scoped command is a histogram.<br/><br/>Value must be `histogram`. |
-| `_value` (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_metric` (`string`) | Indicates that the Source is a File Write operation.<br/><br/>Value must be `fs.write`. |
+| `_metric_type` (`string`) | Indicates that the metric from the scoped app is a histogram.<br/><br/>Value must be `histogram`. |
+| `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -1086,12 +1086,12 @@ Structure of the `http.req` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - HTTP<br/><br/>Value must be `http`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - HTTP request<br/><br/>Value must be `http.req`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is HTTP.<br/><br/>Value must be `http`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the event Source is an HTTP request.<br/><br/>Value must be `http.req`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventhttpreqbodydata)._ |
 
@@ -1170,12 +1170,12 @@ Structure of the `http.resp` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - HTTP<br/><br/>Value must be `http`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - HTTP response<br/><br/>Value must be `http.resp`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is HTTP.<br/><br/>Value must be `http`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is an HTTP response.<br/><br/>Value must be `http.resp`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventhttprespbodydata)._ |
 
@@ -1246,12 +1246,12 @@ Structure of the `net.app` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - net<br/><br/>Value must be `net`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - Net App<br/><br/>Value must be `net.app`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is net (meaning network).<br/><br/>Value must be `net`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a Network App (protocol detection) operation.<br/><br/>Value must be `net.app`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnetappbodydata)._ |
 
@@ -1314,12 +1314,12 @@ Structure of the `net.close` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - net<br/><br/>Value must be `net`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - Net Close<br/><br/>Value must be `net.close`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is net (meaning network).<br/><br/>Value must be `net`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a Network Close operation.<br/><br/>Value must be `net.close`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnetclosebodydata)._ |
 
@@ -1390,12 +1390,12 @@ Structure of the `net.duration` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - metric<br/><br/>Value must be `metric`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - Net duration<br/><br/>Value must be `net.duration`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is metric.<br/><br/>Value must be `metric`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a counter that measures Network duration.<br/><br/>Value must be `net.duration`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnetdurationbodydata)._ |
 
@@ -1403,9 +1403,9 @@ Structure of the `net.duration` event
 
 | Property | Description |
 |---|---|
-| `_metric` (`string`) | Source - Net duration<br/><br/>Value must be `net.duration`. |
+| `_metric` (`string`) | Indicates that the Source is a counter that measures Network duration.<br/><br/>Value must be `net.duration`. |
 | `_metric_type` (`string`) | Indicates that the metric is a timer.<br/><br/>Value must be `timer`. |
-| `_value` (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -1462,12 +1462,12 @@ Structure of the `net.error` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - metric<br/><br/>Value must be `metric`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - Net Error<br/><br/>Value must be `net.error`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is metric.<br/><br/>Value must be `metric`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a Network Error operation.<br/><br/>Value must be `net.error`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventneterrorbodydata)._ |
 
@@ -1475,9 +1475,9 @@ Structure of the `net.error` event
 
 | Property | Description |
 |---|---|
-| `_metric` (`string`) | Source - Net Error<br/><br/>Value must be `net.error`. |
+| `_metric` (`string`) | Indicates that the Source is a Network Error operation.<br/><br/>Value must be `net.error`. |
 | `_metric_type` (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `op` (`string`) | The function that was executed. |
@@ -1529,12 +1529,12 @@ Structure of the `net.open` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - net<br/><br/>Value must be `net`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - Net Open<br/><br/>Value must be `net.open`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is net (meaning network).<br/><br/>Value must be `net`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a Network Open operation.<br/><br/>Value must be `net.open`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnetopenbodydata)._ |
 
@@ -1600,12 +1600,12 @@ Structure of the `net.other` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - metric<br/><br/>Value must be `metric`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - Net other<br/><br/>Value must be `net.other`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is metric.<br/><br/>Value must be `metric`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a Network operation of an other-than-standard kind.<br/><br/>Value must be `net.other`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnetotherbodydata)._ |
 
@@ -1613,9 +1613,9 @@ Structure of the `net.other` event
 
 | Property | Description |
 |---|---|
-| `_metric` (`string`) | Source - Net other<br/><br/>Value must be `net.other`. |
+| `_metric` (`string`) | Indicates that the Source is a Network operation of an other-than-standard kind.<br/><br/>Value must be `net.other`. |
 | `_metric_type` (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
-| `_value` (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -1672,12 +1672,12 @@ Structure of the `net.port` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - metric<br/><br/>Value must be `metric`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - Net port<br/><br/>Value must be `net.port`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is metric.<br/><br/>Value must be `metric`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a gauge that identifies open ports.<br/><br/>Value must be `net.port`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnetportbodydata)._ |
 
@@ -1685,9 +1685,9 @@ Structure of the `net.port` event
 
 | Property | Description |
 |---|---|
-| `_metric` (`string`) | Source - Net port<br/><br/>Value must be `net.port`. |
+| `_metric` (`string`) | Indicates that the Source is a gauge that identifies open ports.<br/><br/>Value must be `net.port`. |
 | `_metric_type` (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
-| `_value` (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -1750,12 +1750,12 @@ Structure of the `net.rx` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - metric<br/><br/>Value must be `metric`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - Net RX<br/><br/>Value must be `net.rx`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is metric.<br/><br/>Value must be `metric`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a Network receive operation.<br/><br/>Value must be `net.rx`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnetrxbodydata)._ |
 
@@ -1763,9 +1763,9 @@ Structure of the `net.rx` event
 
 | Property | Description |
 |---|---|
-| `_metric` (`string`) | Source - Net RX<br/><br/>Value must be `net.rx`. |
+| `_metric` (`string`) | Indicates that the Source is a Network receive operation.<br/><br/>Value must be `net.rx`. |
 | `_metric_type` (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -1830,12 +1830,12 @@ Structure of the `net.tcp` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - metric<br/><br/>Value must be `metric`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - Net tcp<br/><br/>Value must be `net.tcp`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is metric.<br/><br/>Value must be `metric`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a gauge that shows the current count of open TCP ports.<br/><br/>Value must be `net.tcp`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnettcpbodydata)._ |
 
@@ -1843,9 +1843,9 @@ Structure of the `net.tcp` event
 
 | Property | Description |
 |---|---|
-| `_metric` (`string`) | Source - Net tcp<br/><br/>Value must be `net.tcp`. |
+| `_metric` (`string`) | Indicates that the Source is a gauge that shows the current count of open TCP ports.<br/><br/>Value must be `net.tcp`. |
 | `_metric_type` (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
-| `_value` (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -1908,12 +1908,12 @@ Structure of the `net.tx` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - metric<br/><br/>Value must be `metric`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - Net TX<br/><br/>Value must be `net.tx`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is metric.<br/><br/>Value must be `metric`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a Network transmit operation.<br/><br/>Value must be `net.tx`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnettxbodydata)._ |
 
@@ -1921,9 +1921,9 @@ Structure of the `net.tx` event
 
 | Property | Description |
 |---|---|
-| `_metric` (`string`) | Source - Net TX<br/><br/>Value must be `net.tx`. |
+| `_metric` (`string`) | Indicates that the Source is a Network transmit operation.<br/><br/>Value must be `net.tx`. |
 | `_metric_type` (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -1988,12 +1988,12 @@ Structure of the `net.udp` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - metric<br/><br/>Value must be `metric`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - Net udp<br/><br/>Value must be `net.udp`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is metric.<br/><br/>Value must be `metric`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is a gauge that shows the current count of open UDP ports.<br/><br/>Value must be `net.udp`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnetudpbodydata)._ |
 
@@ -2001,9 +2001,9 @@ Structure of the `net.udp` event
 
 | Property | Description |
 |---|---|
-| `_metric` (`string`) | Source - Net udp<br/><br/>Value must be `net.udp`. |
+| `_metric` (`string`) | Indicates that the Source is a gauge that shows the current count of open UDP ports.<br/><br/>Value must be `net.udp`. |
 | `_metric_type` (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
-| `_value` (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -2050,14 +2050,14 @@ Structure of the `notice` event
 
 | Property | Description |
 |---|---|
-| `sourcetype` _required_ (`string`) | Sourcetype - metric<br/><br/>Value must be `metric`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
-| `source` _required_ (`string`) | Source - notice<br/><br/>Value must be `notice`. |
+| `sourcetype` _required_ (`string`) | Indicates that the Sourcetype is metric.<br/><br/>Value must be `metric`. |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `source` _required_ (`string`) | Indicates that the Source is an AppScope notification.<br/><br/>Value must be `notice`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
-| `cmd` _required_ (`string`) | cmd MEANING, THE SCOPED COMMAND?<br/><br/>**Example:**<br/>`top` |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
-| `data` _required_ (`string`) | data MEANING, THE DATA THAT THE SCOPED COMMAND OUTPUT ... ?  |
+| `data` _required_ (`string`) | The data that the scoped app emitted as output. |
 
 ### dns.req [^](#schema-reference) {#metricdnsreq}
 
@@ -2111,9 +2111,9 @@ Structure of the `dns.req` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - Net DNS<br/><br/>Value must be `dns.req`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a Network DNS operation.<br/><br/>Value must be `dns.req`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -2121,7 +2121,7 @@ Structure of the `dns.req` metric
 | `duration` (`number`) | Duration in milliseconds.<br/><br/>**Example:**<br/>`55` |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of a requests.<br/><br/>Value must be `request`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -2178,9 +2178,9 @@ Structure of the `fs.close` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - File Close<br/><br/>Value must be `fs.close`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a File Close operation.<br/><br/>Value must be `fs.close`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -2189,7 +2189,7 @@ Structure of the `fs.close` metric
 | `file` (`string`) | The name of the file. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of operations.<br/><br/>Value must be `operation`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -2247,9 +2247,9 @@ Structure of the `fs.duration` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - File Duration<br/><br/>Value must be `fs.duration`. |
-| `_metric_type` _required_ (`string`) | Indicates that the metric from the scoped command is a histogram.<br/><br/>Value must be `histogram`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_metric` _required_ (`string`) | Indicates that the Source is a File Duration operation.<br/><br/>Value must be `fs.duration`. |
+| `_metric_type` _required_ (`string`) | Indicates that the metric from the scoped app is a histogram.<br/><br/>Value must be `histogram`. |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -2259,7 +2259,7 @@ Structure of the `fs.duration` metric
 | `numops` (`number`) | Count of individual operations aggregated. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in microseconds.<br/><br/>Value must be `microsecond`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -2317,9 +2317,9 @@ Structure of the `fs.error` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - File Error<br/><br/>Value must be `fs.error`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a File Error operation.<br/><br/>Value must be `fs.error`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -2328,7 +2328,7 @@ Structure of the `fs.error` metric
 | `class` _required_ (`string`) | Subcategory of filesystem error.<br/><br/>**Possible values:**<ul><li>`open_close`</li><li>`read_write`</li><li>`stat`</li></ul> |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of operations.<br/><br/>Value must be `operation`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -2385,9 +2385,9 @@ Structure of the `fs.open` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - File open<br/><br/>Value must be `fs.open`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a File open operation.<br/><br/>Value must be `fs.open`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -2396,7 +2396,7 @@ Structure of the `fs.open` metric
 | `file` (`string`) | The name of the file. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of operations.<br/><br/>Value must be `operation`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -2454,9 +2454,9 @@ Structure of the `fs.read` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - File Read<br/><br/>Value must be `fs.read`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a File Read operation. <br/><br/>Value must be `fs.read`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -2466,7 +2466,7 @@ Structure of the `fs.read` metric
 | `numops` (`number`) | Count of individual operations aggregated. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in bytes.<br/><br/>Value must be `byte`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -2523,9 +2523,9 @@ Structure of the `fs.seek` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - File Seek<br/><br/>Value must be `fs.seek`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a File Seek operation.<br/><br/>Value must be `fs.seek`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -2534,7 +2534,7 @@ Structure of the `fs.seek` metric
 | `file` (`string`) | The name of the file. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of operations.<br/><br/>Value must be `operation`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -2590,9 +2590,9 @@ Structure of the `fs.stat` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - File Stat<br/><br/>Value must be `fs.stat`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a File Stat operation.<br/><br/>Value must be `fs.stat`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -2600,7 +2600,7 @@ Structure of the `fs.stat` metric
 | `file` (`string`) | The name of the file. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of operations.<br/><br/>Value must be `operation`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -2658,9 +2658,9 @@ Structure of the `fs.write` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - File Write<br/><br/>Value must be `fs.write`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a File Write operation.<br/><br/>Value must be `fs.write`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -2670,7 +2670,7 @@ Structure of the `fs.write` metric
 | `numops` (`number`) | Count of individual operations aggregated. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in bytes.<br/><br/>Value must be `byte`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -2729,9 +2729,9 @@ Structure of the `http.duration.client` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - HTTP client duration<br/><br/>Value must be `http.duration.client`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a counter that measures HTTP client duration.<br/><br/>Value must be `http.duration.client`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a timer.<br/><br/>Value must be `timer`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `http_target` _required_ (`string`) | In a URL, the path or file after the FQDN. |
 | `numops` _required_ (`number`) | Count of individual operations aggregated. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
@@ -2739,7 +2739,7 @@ Structure of the `http.duration.client` metric
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in milliseconds.<br/><br/>Value must be `millisecond`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -2798,9 +2798,9 @@ Structure of the `http.duration.server` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - HTTP server duration<br/><br/>Value must be `http.duration.server`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a counter that measures HTTP server duration.<br/><br/>Value must be `http.duration.server`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a timer.<br/><br/>Value must be `timer`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `http_target` _required_ (`string`) | In a URL, the path or file after the FQDN. |
 | `numops` _required_ (`number`) | Count of individual operations aggregated. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
@@ -2808,7 +2808,7 @@ Structure of the `http.duration.server` metric
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in milliseconds.<br/><br/>Value must be `millisecond`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -2867,9 +2867,9 @@ Structure of the `http.req` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - HTTP requests<br/><br/>Value must be `http.req`. |
+| `_metric` _required_ (`string`) | Indicates that the metric Source aggregates HTTP requests and responses.<br/><br/>Value must be `http.req`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `http_target` _required_ (`string`) | In a URL, the path or file after the FQDN. |
 | `http_status_code` _required_ (`integer`) | Specifies the status code of an HTTP response.<br/><br/>**Possible values:**<ul><li>`100`</li><li>`101`</li><li>`102`</li><li>`200`</li><li>`201`</li><li>`202`</li><li>`203`</li><li>`204`</li><li>`205`</li><li>`206`</li><li>`207`</li><li>`208`</li><li>`226`</li><li>`300`</li><li>`301`</li><li>`302`</li><li>`303`</li><li>`304`</li><li>`305`</li><li>`307`</li><li>`400`</li><li>`401`</li><li>`402`</li><li>`403`</li><li>`404`</li><li>`405`</li><li>`406`</li><li>`407`</li><li>`408`</li><li>`409`</li><li>`410`</li><li>`411`</li><li>`412`</li><li>`413`</li><li>`414`</li><li>`415`</li><li>`416`</li><li>`417`</li><li>`418`</li><li>`421`</li><li>`422`</li><li>`423`</li><li>`424`</li><li>`426`</li><li>`428`</li><li>`429`</li><li>`431`</li><li>`444`</li><li>`451`</li><li>`499`</li><li>`500`</li><li>`501`</li><li>`502`</li><li>`503`</li><li>`504`</li><li>`505`</li><li>`506`</li><li>`507`</li></ul> |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
@@ -2877,7 +2877,7 @@ Structure of the `http.req` metric
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of a requests.<br/><br/>Value must be `request`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -2917,9 +2917,9 @@ Structure of the `http.req.content_length` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - HTTP request content length<br/><br/>Value must be `http.req.content_length`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a counter that measures HTTP request content length.<br/><br/>Value must be `http.req.content_length`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `http_target` _required_ (`string`) | In a URL, the path or file after the FQDN. |
 | `numops` _required_ (`number`) | Count of individual operations aggregated. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
@@ -2927,7 +2927,7 @@ Structure of the `http.req.content_length` metric
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in bytes.<br/><br/>Value must be `byte`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -2986,9 +2986,9 @@ Structure of the `http.resp.content_length` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - HTTP response content length<br/><br/>Value must be `http.resp.content_length`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a counter that measures HTTP response content length.<br/><br/>Value must be `http.resp.content_length`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `http_target` _required_ (`string`) | In a URL, the path or file after the FQDN. |
 | `numops` _required_ (`number`) | Count of individual operations aggregated. |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
@@ -2996,7 +2996,7 @@ Structure of the `http.resp.content_length` metric
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in bytes.<br/><br/>Value must be `byte`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -3053,9 +3053,9 @@ Structure of the `net.close` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - Net Close<br/><br/>Value must be `net.close`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a Network Close operation.<br/><br/>Value must be `net.close`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -3065,7 +3065,7 @@ Structure of the `net.close` metric
 | `port` (`number`) | Network port opened before a connection was initiated, or closed after the connection closed. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of connections.<br/><br/>Value must be `connection`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -3123,9 +3123,9 @@ Structure of the `net.duration` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - Net duration<br/><br/>Value must be `net.duration`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a counter that measures Network duration.<br/><br/>Value must be `net.duration`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a timer.<br/><br/>Value must be `timer`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -3135,7 +3135,7 @@ Structure of the `net.duration` metric
 | `numops` (`number`) | Count of individual operations aggregated. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in milliseconds.<br/><br/>Value must be `millisecond`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -3192,9 +3192,9 @@ Structure of the `net.error` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - Net Error<br/><br/>Value must be `net.error`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a Network Error operation.<br/><br/>Value must be `net.error`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -3202,7 +3202,7 @@ Structure of the `net.error` metric
 | `class` _required_ (`string`) | Subcategory of network error.<br/><br/>**Possible values:**<ul><li>`connection`</li><li>`rx_tx`</li></ul> |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of operations.<br/><br/>Value must be `operation`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -3259,9 +3259,9 @@ Structure of the `net.open` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - Net Open<br/><br/>Value must be `net.open`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a Network Open operation.<br/><br/>Value must be `net.open`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -3270,7 +3270,7 @@ Structure of the `net.open` metric
 | `port` (`number`) | Network port opened before a connection was initiated, or closed after the connection closed. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of connections.<br/><br/>Value must be `connection`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -3327,9 +3327,9 @@ Structure of the `net.other` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - Net other<br/><br/>Value must be `net.other`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a Network operation of an other-than-standard kind.<br/><br/>Value must be `net.other`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -3338,7 +3338,7 @@ Structure of the `net.other` metric
 | `port` (`number`) | Network port opened before a connection was initiated, or closed after the connection closed. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of connections.<br/><br/>Value must be `connection`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -3395,9 +3395,9 @@ Structure of the `net.port` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - Net port<br/><br/>Value must be `net.port`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a gauge that identifies open ports.<br/><br/>Value must be `net.port`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -3406,7 +3406,7 @@ Structure of the `net.port` metric
 | `port` (`number`) | Network port opened before a connection was initiated, or closed after the connection closed. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of instances.<br/><br/>Value must be `instance`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -3495,9 +3495,9 @@ Structure of the `net.rx` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - Net RX<br/><br/>Value must be `net.rx`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a Network receive operation.<br/><br/>Value must be `net.rx`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -3510,12 +3510,12 @@ Structure of the `net.rx` metric
 | `remoten` (`number`) | Inode number for the remote end of a UNIX domain socket. |
 | `remoteip` (`string`) | IP address for the remote end of a network socket.<br/><br/>**Example:**<br/>`192.158.1.38` |
 | `remotep` (`number`) | Port for the remote end of a network socket.<br/><br/>**Example:**<br/>`9108` |
-| `data` (`string`) | data MEANING, THE DATA THAT THE SCOPED COMMAND OUTPUT ... ?  |
+| `data` (`string`) | The data that the scoped app emitted as output. |
 | `numops` (`number`) | Count of individual operations aggregated. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in bytes.<br/><br/>Value must be `byte`. |
 | `class` (`string`) | Subcategory of send and receive operations.<br/><br/>**Possible values:**<ul><li>`inet_tcp`</li><li>`inet_udp`</li><li>`unix_tcp`</li><li>`unix_udp`</li><li>`other`</li></ul> |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -3572,9 +3572,9 @@ Structure of the `net.tcp` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - Net tcp<br/><br/>Value must be `net.tcp`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a gauge that shows the current count of open TCP ports.<br/><br/>Value must be `net.tcp`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -3583,7 +3583,7 @@ Structure of the `net.tcp` metric
 | `port` (`number`) | Network port opened before a connection was initiated, or closed after the connection closed. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of connections.<br/><br/>Value must be `connection`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -3670,9 +3670,9 @@ Structure of the `net.tx` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - Net TX<br/><br/>Value must be `net.tx`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a Network transmit operation.<br/><br/>Value must be `net.tx`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -3685,12 +3685,12 @@ Structure of the `net.tx` metric
 | `remoten` (`number`) | Inode number for the remote end of a UNIX domain socket. |
 | `remoteip` (`string`) | IP address for the remote end of a network socket.<br/><br/>**Example:**<br/>`192.158.1.38` |
 | `remotep` (`number`) | Port for the remote end of a network socket.<br/><br/>**Example:**<br/>`9108` |
-| `data` (`string`) | data MEANING, THE DATA THAT THE SCOPED COMMAND OUTPUT ... ?  |
+| `data` (`string`) | The data that the scoped app emitted as output. |
 | `numops` (`number`) | Count of individual operations aggregated. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in bytes.<br/><br/>Value must be `byte`. |
 | `class` (`string`) | Subcategory of send and receive operations.<br/><br/>**Possible values:**<ul><li>`inet_tcp`</li><li>`inet_udp`</li><li>`unix_tcp`</li><li>`unix_udp`</li><li>`other`</li></ul> |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -3730,9 +3730,9 @@ Structure of the `net.udp` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - Net udp<br/><br/>Value must be `net.udp`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a gauge that shows the current count of open UDP ports.<br/><br/>Value must be `net.udp`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` _required_ (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
@@ -3741,7 +3741,7 @@ Structure of the `net.udp` metric
 | `port` _required_ (`number`) | Network port opened before a connection was initiated, or closed after the connection closed. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of connections.<br/><br/>Value must be `connection`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -3778,14 +3778,14 @@ Structure of the `proc.child` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - proc child<br/><br/>Value must be `proc.child`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a gauge of child processes spawned.<br/><br/>Value must be `proc.child`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of processes.<br/><br/>Value must be `process`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -3822,14 +3822,14 @@ Structure of the `proc.cpu` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - proc cpu<br/><br/>Value must be `proc.cpu`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a counter of microseconds of the process's CPU were scheduled.<br/><br/>Value must be `proc.cpu`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in microseconds.<br/><br/>Value must be `microsecond`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -3866,14 +3866,14 @@ Structure of the `proc.cpu_perc` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - proc cpu_perc<br/><br/>Value must be `proc.cpu_perc`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a gauge that measures percentage of CPU used by the process.<br/><br/>Value must be `proc.cpu_perc`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a percentage.<br/><br/>Value must be `percent`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -3910,14 +3910,14 @@ Structure of the `proc.fd` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - proc fd<br/><br/>Value must be `proc.fd`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a gauge that reports how many file descriptors the process has opened.<br/><br/>Value must be `proc.fd`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of files.<br/><br/>Value must be `file`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -3954,14 +3954,14 @@ Structure of the `proc.mem` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - proc memory<br/><br/>Value must be `proc.mem`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a gauge that reports process memory consumption.<br/><br/>Value must be `proc.mem`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in kibibytes.<br/><br/>Value must be `kibibyte`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -4003,19 +4003,19 @@ Structure of the `proc.start` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - proc start<br/><br/>Value must be `proc.start`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a counter which can only be 1, meaning that the process has started.<br/><br/>Value must be `proc.start`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
-| `gid` _required_ (`integer`) | gid OF WHAT<br/><br/>**Example:**<br/>`0` |
-| `groupname` _required_ (`string`) | groupname REFERRING TO WHAT KIND OF GROUP<br/><br/>**Example:**<br/>`root` |
-| `uid` _required_ (`integer`) | uid for the user WHO DID WHAT?<br/><br/>**Example:**<br/>`0` |
-| `username` _required_ (`string`) | username for the user WHO DID WHAT?<br/><br/>**Example:**<br/>`root` |
+| `gid` _required_ (`integer`) | Group ID of the user who created the process.<br/><br/>**Example:**<br/>`0` |
+| `groupname` _required_ (`string`) | Groupname of the user who created the process.<br/><br/>**Example:**<br/>`root` |
+| `uid` _required_ (`integer`) | User ID of the user who created the process.<br/><br/>**Example:**<br/>`0` |
+| `username` _required_ (`string`) | Username of the user who created the process.<br/><br/>**Example:**<br/>`root` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `args` _required_ (`string`) | args TO WHAT? MY GUESS: The arguments with which the scoped command was run. |
+| `args` _required_ (`string`) | The arguments with which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of processes.<br/><br/>Value must be `process`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 
 <hr/>
 
@@ -4052,11 +4052,11 @@ Structure of the `proc.thread` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Source - proc thread<br/><br/>Value must be `proc.thread`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a gauge that reports how many threads are runnning in the process.<br/><br/>Value must be `proc.thread`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
-| `_value` _required_ (`number`) | _value OF WHAT<br/><br/>**Example:**<br/>`1` |
+| `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the process of the scoped app. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of threads.<br/><br/>Value must be `thread`. |
-| `_time` _required_ (`number`) | _time MEANING WHAT<br/><br/>**Example:**<br/>`1643662126.91777` |
+| `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |

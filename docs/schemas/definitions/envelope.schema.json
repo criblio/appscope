@@ -11,12 +11,12 @@
     },
     "authtoken": {
       "title": "authtoken",
-      "description": "authtoken",
+      "description": "TBD authtoken",
       "type": "string"
     },
     "breaker": {
       "title": "breaker",
-      "description": "breaker",
+      "description": "TBD breaker",
       "type": "string",
       "const": "Cribl - Do Not Break Ruleset"
     },
@@ -28,7 +28,7 @@
     },
     "format": {
       "title": "format",
-      "description": "format",
+      "description": "TBD format",
       "type": "string",
       "enum": ["scope", "ndjson"]
     },

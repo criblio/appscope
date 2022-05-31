@@ -455,7 +455,7 @@ Structure of the `fs.close` event
 | `file_write_bytes` (`integer`) | The number of bytes of data written to a file.<br/><br/>**Example:**<br/>`10` |
 | `file_write_ops` (`integer`) | Count of individual write operations aggregated.<br/><br/>**Example:**<br/>`5` |
 | `duration` (`number`) | Duration in milliseconds.<br/><br/>**Example:**<br/>`55` |
-| `op` (`string`) | The close operation that was executed on the filesytem.<br/><br/>**Possible values:**<ul><li>`go_close`</li><li>`closedir`</li><li>`freopen`</li><li>`freopen64`</li><li>`close`</li><li>`fclose`</li><li>`close$NOCANCEL`</li><li>`guarded_close_np`</li><li>`close_nocancel`</li></ul> |
+| `op` (`string`) | The close operation that was executed on the filesystem.<br/><br/>**Possible values:**<ul><li>`go_close`</li><li>`closedir`</li><li>`freopen`</li><li>`freopen64`</li><li>`close`</li><li>`fclose`</li><li>`close$NOCANCEL`</li><li>`guarded_close_np`</li><li>`close_nocancel`</li></ul> |
 
 <hr/>
 
@@ -519,7 +519,7 @@ Structure of the `fs.delete` event
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` (`string`) | Hostname for the host on which the scoped app was run. |
-| `op` (`string`) | The delete operation that was executed on the filesytem.<br/><br/>**Possible values:**<ul><li>`go_unlinkat`</li><li>`unlink`</li><li>`unlinkat`</li></ul> |
+| `op` (`string`) | The delete operation that was executed on the filesystem.<br/><br/>**Possible values:**<ul><li>`go_unlinkat`</li><li>`unlink`</li><li>`unlinkat`</li></ul> |
 | `file` (`string`) | The name of the file. |
 | `unit` (`string`) | Indicates that the metric's value is a number of operations.<br/><br/>Value must be `operation`. |
 
@@ -814,7 +814,7 @@ Structure of the `fs.read` event
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
-| `op` (`string`) | The read operation that was executed on the filesytem.<br/><br/>**Possible values:**<ul><li>`go_read`</li><li>`go_getdents`</li><li>`readdir`</li><li>`pread64`</li><li>`__pread64_chk`</li><li>`preadv`</li><li>`preadv2`</li><li>`preadv64v2`</li><li>`__pread_chk`</li><li>`__read_chk`</li><li>`__fread_unlocked_chk`</li><li>`read`</li><li>`readv`</li><li>`pread`</li><li>`fread`</li><li>`__fread_chk`</li><li>`fread_unlocked`</li><li>`fgets`</li><li>`__fgets_chk`</li><li>`fgets_unlocked`</li><li>`__fgetws_chk`</li><li>`fgetws`</li><li>`fgetwc`</li><li>`fgetc`</li><li>`fscanf`</li><li>`getline`</li><li>`getdelim`</li><li>`__getdelim`</li></ul> |
+| `op` (`string`) | The read operation that was executed on the filesystem.<br/><br/>**Possible values:**<ul><li>`go_read`</li><li>`go_getdents`</li><li>`readdir`</li><li>`pread64`</li><li>`__pread64_chk`</li><li>`preadv`</li><li>`preadv2`</li><li>`preadv64v2`</li><li>`__pread_chk`</li><li>`__read_chk`</li><li>`__fread_unlocked_chk`</li><li>`read`</li><li>`readv`</li><li>`pread`</li><li>`fread`</li><li>`__fread_chk`</li><li>`fread_unlocked`</li><li>`fgets`</li><li>`__fgets_chk`</li><li>`fgets_unlocked`</li><li>`__fgetws_chk`</li><li>`fgetws`</li><li>`fgetwc`</li><li>`fgetc`</li><li>`fscanf`</li><li>`getline`</li><li>`getdelim`</li><li>`__getdelim`</li></ul> |
 | `file` (`string`) | The name of the file. |
 | `numops` (`number`) | Count of individual operations aggregated. |
 | `unit` (`string`) | Indicates that the metric's value is in bytes.<br/><br/>Value must be `byte`. |
@@ -887,7 +887,7 @@ Structure of the `fs.seek` event
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
-| `op` (`string`) | The seek operation that was executed on the filesytem.<br/><br/>**Possible values:**<ul><li>`lseek64`</li><li>`fseek64`</li><li>`ftello64`</li><li>`fsetpos64`</li><li>`lseek`</li><li>`fseek`</li><li>`fseeko`</li><li>`ftell`</li><li>`ftello`</li><li>`rewind`</li><li>`fsetpos`</li><li>`fgetpos`</li><li>`fgetpos64`</li></ul> |
+| `op` (`string`) | The seek operation that was executed on the filesystem.<br/><br/>**Possible values:**<ul><li>`lseek64`</li><li>`fseek64`</li><li>`ftello64`</li><li>`fsetpos64`</li><li>`lseek`</li><li>`fseek`</li><li>`fseeko`</li><li>`ftell`</li><li>`ftello`</li><li>`rewind`</li><li>`fsetpos`</li><li>`fgetpos`</li><li>`fgetpos64`</li></ul> |
 | `file` (`string`) | The name of the file. |
 | `unit` (`string`) | Indicates that the metric's value is a number of operations.<br/><br/>Value must be `operation`. |
 
@@ -957,7 +957,7 @@ Structure of the `fs.stat` event
 | `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
-| `op` (`string`) | The stat operation that was executed on the filesytem.<br/><br/>**Possible values:**<ul><li>`statfs64`</li><li>`__xstat`</li><li>`__xstat64`</li><li>`__lxstat`</li><li>`__lxstat64`</li><li>`__fxstat`</li><li>`__fxstatat`</li><li>`__fxstatat64`</li><li>`statx`</li><li>`statfs`</li><li>`statvfs`</li><li>`statvfs64`</li><li>`access`</li><li>`faccessat`</li><li>`stat`</li><li>`lstat`</li><li>`fstatfs64`</li><li>`__fxstat`</li><li>`__fxstat64`</li><li>`fstatfs`</li><li>`fstatvfs`</li><li>`fstatvfs64`</li><li>`fstat`</li><li>`fstatat`</li></ul> |
+| `op` (`string`) | The stat operation that was executed on the filesystem.<br/><br/>**Possible values:**<ul><li>`statfs64`</li><li>`__xstat`</li><li>`__xstat64`</li><li>`__lxstat`</li><li>`__lxstat64`</li><li>`__fxstat`</li><li>`__fxstatat`</li><li>`__fxstatat64`</li><li>`statx`</li><li>`statfs`</li><li>`statvfs`</li><li>`statvfs64`</li><li>`access`</li><li>`faccessat`</li><li>`stat`</li><li>`lstat`</li><li>`fstatfs64`</li><li>`__fxstat`</li><li>`__fxstat64`</li><li>`fstatfs`</li><li>`fstatvfs`</li><li>`fstatvfs64`</li><li>`fstat`</li><li>`fstatat`</li></ul> |
 | `file` (`string`) | The name of the file. |
 | `unit` (`string`) | Indicates that the metric's value is a number of operations.<br/><br/>Value must be `operation`. |
 
@@ -1030,7 +1030,7 @@ Structure of the `fs.write` event
 | `proc` (`string`) | The name of the process of the scoped app. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
-| `op` (`string`) | The write operation that was executed on the filesytem.<br/><br/>**Possible values:**<ul><li>`go_write`</li><li>`pwrite64`</li><li>`pwritev`</li><li>`pwritev64`</li><li>`pwritev2`</li><li>`pwritev64v2`</li><li>`__overflow`</li><li>`__write_libc`</li><li>`__write_pthread`</li><li>`fwrite_unlocked`</li><li>`__stdio_write`</li><li>`write`</li><li>`pwrite`</li><li>`writev`</li><li>`fwrite`</li><li>`puts`</li><li>`putchar`</li><li>`fputs`</li><li>`fputs_unlocked`</li><li>`fputc`</li><li>`fputc_unlocked`</li><li>`putwc`</li><li>`fputwc`</li></ul> |
+| `op` (`string`) | The write operation that was executed on the filesystem.<br/><br/>**Possible values:**<ul><li>`go_write`</li><li>`pwrite64`</li><li>`pwritev`</li><li>`pwritev64`</li><li>`pwritev2`</li><li>`pwritev64v2`</li><li>`__overflow`</li><li>`__write_libc`</li><li>`__write_pthread`</li><li>`fwrite_unlocked`</li><li>`__stdio_write`</li><li>`write`</li><li>`pwrite`</li><li>`writev`</li><li>`fwrite`</li><li>`puts`</li><li>`putchar`</li><li>`fputs`</li><li>`fputs_unlocked`</li><li>`fputc`</li><li>`fputc_unlocked`</li><li>`putwc`</li><li>`fputwc`</li></ul> |
 | `file` (`string`) | The name of the file. |
 | `numops` (`number`) | Count of individual operations aggregated. |
 | `unit` (`string`) | Indicates that the metric's value is in bytes.<br/><br/>Value must be `byte`. |
@@ -1113,7 +1113,7 @@ Structure of the `http.req` event
 | `net_peer_port` (`integer`) | The port portion of the remote side of a network connection. |
 | `net_host_ip` (`string`) | The IP address portion of the local side of a network connection. |
 | `net_host_port` (`integer`) | The port portion of the local side of a network connection. |
-| `x_appscope` (`string`) | TBD - possibly related to headers.<br/><br/>Value must be `x-appscope`. |
+| `x_appscope` (`string`) | Value of the `x-appscope` HTTP header (if present).<br/><br/>Value must be `x-appscope`. |
 
 <hr/>
 
@@ -2185,7 +2185,7 @@ Structure of the `fs.close` metric
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `op` (`string`) | The close operation that was executed on the filesytem.<br/><br/>**Possible values:**<ul><li>`go_close`</li><li>`closedir`</li><li>`freopen`</li><li>`freopen64`</li><li>`close`</li><li>`fclose`</li><li>`close$NOCANCEL`</li><li>`guarded_close_np`</li><li>`close_nocancel`</li></ul> |
+| `op` (`string`) | The close operation that was executed on the filesystem.<br/><br/>**Possible values:**<ul><li>`go_close`</li><li>`closedir`</li><li>`freopen`</li><li>`freopen64`</li><li>`close`</li><li>`fclose`</li><li>`close$NOCANCEL`</li><li>`guarded_close_np`</li><li>`close_nocancel`</li></ul> |
 | `file` (`string`) | The name of the file. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of operations.<br/><br/>Value must be `operation`. |
 | `summary` (`string`) | When true, indicates that the metric value is an aggregation.<br/><br/>Value must be `true`. |
@@ -2461,7 +2461,7 @@ Structure of the `fs.read` metric
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `op` (`string`) | The read operation that was executed on the filesytem.<br/><br/>**Possible values:**<ul><li>`go_read`</li><li>`go_getdents`</li><li>`readdir`</li><li>`pread64`</li><li>`__pread64_chk`</li><li>`preadv`</li><li>`preadv2`</li><li>`preadv64v2`</li><li>`__pread_chk`</li><li>`__read_chk`</li><li>`__fread_unlocked_chk`</li><li>`read`</li><li>`readv`</li><li>`pread`</li><li>`fread`</li><li>`__fread_chk`</li><li>`fread_unlocked`</li><li>`fgets`</li><li>`__fgets_chk`</li><li>`fgets_unlocked`</li><li>`__fgetws_chk`</li><li>`fgetws`</li><li>`fgetwc`</li><li>`fgetc`</li><li>`fscanf`</li><li>`getline`</li><li>`getdelim`</li><li>`__getdelim`</li></ul> |
+| `op` (`string`) | The read operation that was executed on the filesystem.<br/><br/>**Possible values:**<ul><li>`go_read`</li><li>`go_getdents`</li><li>`readdir`</li><li>`pread64`</li><li>`__pread64_chk`</li><li>`preadv`</li><li>`preadv2`</li><li>`preadv64v2`</li><li>`__pread_chk`</li><li>`__read_chk`</li><li>`__fread_unlocked_chk`</li><li>`read`</li><li>`readv`</li><li>`pread`</li><li>`fread`</li><li>`__fread_chk`</li><li>`fread_unlocked`</li><li>`fgets`</li><li>`__fgets_chk`</li><li>`fgets_unlocked`</li><li>`__fgetws_chk`</li><li>`fgetws`</li><li>`fgetwc`</li><li>`fgetc`</li><li>`fscanf`</li><li>`getline`</li><li>`getdelim`</li><li>`__getdelim`</li></ul> |
 | `file` (`string`) | The name of the file. |
 | `numops` (`number`) | Count of individual operations aggregated. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in bytes.<br/><br/>Value must be `byte`. |
@@ -2665,7 +2665,7 @@ Structure of the `fs.write` metric
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `op` (`string`) | The write operation that was executed on the filesytem.<br/><br/>**Possible values:**<ul><li>`go_write`</li><li>`pwrite64`</li><li>`pwritev`</li><li>`pwritev64`</li><li>`pwritev2`</li><li>`pwritev64v2`</li><li>`__overflow`</li><li>`__write_libc`</li><li>`__write_pthread`</li><li>`fwrite_unlocked`</li><li>`__stdio_write`</li><li>`write`</li><li>`pwrite`</li><li>`writev`</li><li>`fwrite`</li><li>`puts`</li><li>`putchar`</li><li>`fputs`</li><li>`fputs_unlocked`</li><li>`fputc`</li><li>`fputc_unlocked`</li><li>`putwc`</li><li>`fputwc`</li></ul> |
+| `op` (`string`) | The write operation that was executed on the filesystem.<br/><br/>**Possible values:**<ul><li>`go_write`</li><li>`pwrite64`</li><li>`pwritev`</li><li>`pwritev64`</li><li>`pwritev2`</li><li>`pwritev64v2`</li><li>`__overflow`</li><li>`__write_libc`</li><li>`__write_pthread`</li><li>`fwrite_unlocked`</li><li>`__stdio_write`</li><li>`write`</li><li>`pwrite`</li><li>`writev`</li><li>`fwrite`</li><li>`puts`</li><li>`putchar`</li><li>`fputs`</li><li>`fputs_unlocked`</li><li>`fputc`</li><li>`fputc_unlocked`</li><li>`putwc`</li><li>`fputwc`</li></ul> |
 | `file` (`string`) | The name of the file. |
 | `numops` (`number`) | Count of individual operations aggregated. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in bytes.<br/><br/>Value must be `byte`. |

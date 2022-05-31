@@ -155,6 +155,23 @@ static list_t *g_http2_channels = NULL;
 
 #define DEFAULT_MIN_DURATION_TIME (1)
 
+typedef enum
+{
+    HTTP_LEVEL_NONE,      // None
+    HTTP_LEVEL_LIMITED,   // Limited - HTTP Metrics only
+    HTTP_LEVEL_FULL       // Full    - HTTP Events + optional HTTP Metrics
+} http_level_t;
+
+static http_level_t
+http_parsing_level(void)
+{
+    if (ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP)) return HTTP_LEVEL_FULL;
+
+    if (mtcEnabled(g_mtc) && (httpMtcEnable())) return HTTP_LEVEL_LIMITED;
+    
+    return HTTP_LEVEL_NONE;
+}
+
 static void
 destroyHttpMap(void *data)
 {
@@ -533,7 +550,7 @@ httpFieldsInternal(event_field_t *fields, http_report *hreport, protocol_info *p
 }
 
 static void
-doHttp1Header(protocol_info *proto)
+doHttp1HeaderFull(protocol_info *proto)
 {
     if (!proto || !proto->data) {
         destroyProto(proto);
@@ -964,7 +981,7 @@ addHttp2StrFieldLN(cJSON *jsonData, const char* field, const char *value)
 }
 
 static void
-doHttp2Frame(protocol_info *proto)
+doHttp2FrameFull(protocol_info *proto)
 {
     // require the protocol object and it's data pointer to be set
     if (!proto || !proto->data) {
@@ -1409,14 +1426,48 @@ doDetection(protocol_info *proto)
     destroyProto(proto);
 }
 
+static void
+doHttp1HeaderShort(protocol_info *proto)
+{
+    //TODO provide implementation
+}
+
+static void
+doHttp2FrameShort(protocol_info *proto)
+{
+    //TODO provide implementation
+}
+
 void
 doProtocolMetric(protocol_info *proto)
 {
     if (!proto) return;
+
+    http_level_t http_level = http_parsing_level();
     if ((proto->ptype == EVT_HREQ) || (proto->ptype == EVT_HRES)) {
-        doHttp1Header(proto);
+        switch (http_level) {
+            case HTTP_LEVEL_FULL:
+                doHttp1HeaderFull(proto);
+                break;
+            case HTTP_LEVEL_LIMITED:
+                doHttp1HeaderShort(proto);
+                break;
+            default:
+                destroyProto(proto);
+                break;
+        }
     } else if (proto->ptype == EVT_H2FRAME) {
-        doHttp2Frame(proto);
+        switch (http_level) {
+            case HTTP_LEVEL_FULL:
+                doHttp2FrameFull(proto);
+                break;
+            case HTTP_LEVEL_LIMITED:
+                doHttp2FrameShort(proto);
+                break;
+            default:
+                destroyProto(proto);
+                break;
+        }
     } else if (proto->ptype == EVT_DETECT) {
         doDetection(proto);
     }

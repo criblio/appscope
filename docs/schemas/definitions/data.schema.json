@@ -269,13 +269,13 @@
     },
     "op_fs_close": {
       "title": "op_fs_close",
-      "description": "The close operation that was executed on the filesytem.",
+      "description": "The close operation that was executed on the filesystem.",
       "type": "string",
       "enum": ["go_close", "closedir", "freopen", "freopen64", "close", "fclose", "close$NOCANCEL", "guarded_close_np", "close_nocancel"]
     },
     "op_fs_delete": {
       "title": "op_fs_delete",
-      "description": "The delete operation that was executed on the filesytem.",
+      "description": "The delete operation that was executed on the filesystem.",
       "type": "string",
       "enum": ["go_unlinkat", "unlink", "unlinkat"]
     },
@@ -287,25 +287,25 @@
     },
     "op_fs_read": {
       "title": "op_fs_read",
-      "description": "The read operation that was executed on the filesytem.",
+      "description": "The read operation that was executed on the filesystem.",
       "type": "string",
       "enum": ["go_read", "go_getdents", "readdir", "pread64", "__pread64_chk", "preadv", "preadv2", "preadv64v2", "__pread_chk", "__read_chk", "__fread_unlocked_chk", "read", "readv", "pread", "fread", "__fread_chk", "fread_unlocked", "fgets", "__fgets_chk", "fgets_unlocked", "__fgetws_chk", "fgetws", "fgetwc", "fgetc", "fscanf", "getline", "getdelim", "__getdelim"]
     },
     "op_fs_seek": {
       "title": "op_fs_seek",
-      "description": "The seek operation that was executed on the filesytem.",
+      "description": "The seek operation that was executed on the filesystem.",
       "type": "string",
       "enum": ["lseek64", "fseek64", "ftello64", "fsetpos64", "lseek", "fseek", "fseeko", "ftell", "ftello", "rewind", "fsetpos", "fgetpos", "fgetpos64"]
     },
     "op_fs_stat": {
       "title": "op_fs_stat",
-      "description": "The stat operation that was executed on the filesytem.",
+      "description": "The stat operation that was executed on the filesystem.",
       "type": "string",
       "enum": ["statfs64", "__xstat", "__xstat64", "__lxstat", "__lxstat64", "__fxstat", "__fxstatat", "__fxstatat64", "statx", "statfs", "statvfs", "statvfs64", "access", "faccessat", "stat", "lstat", "fstatfs64", "__fxstat", "__fxstat64", "fstatfs", "fstatvfs", "fstatvfs64", "fstat", "fstatat"]
     },
     "op_fs_write": {
       "title": "op_fs_write",
-      "description": "The write operation that was executed on the filesytem.",
+      "description": "The write operation that was executed on the filesystem.",
       "type": "string",
       "enum": ["go_write", "pwrite64", "pwritev", "pwritev64", "pwritev2", "pwritev64v2", "__overflow", "__write_libc", "__write_pthread", "fwrite_unlocked", "__stdio_write", "write", "pwrite", "writev", "fwrite", "puts", "putchar", "fputs", "fputs_unlocked", "fputc", "fputc_unlocked", "putwc", "fputwc"]
     },
@@ -469,7 +469,7 @@
     },
     "x_appscope" : {
       "title": "x-appscope",
-      "description": "TBD - possibly related to headers.",
+      "description": "Value of the `x-appscope` HTTP header (if present).",
       "type": "string",
       "const": "x-appscope"
     }

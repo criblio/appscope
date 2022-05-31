@@ -414,8 +414,9 @@ getHttpStatus(char *header, size_t len, char **stext)
 
     val = &header[ix + scope_strlen(HTTP_STATUS) + 1];
     // note that the spec defines the status code to be exactly 3 chars/digits
-    *stext = &header[ix + scope_strlen(HTTP_STATUS) + 6];
-
+    if (stext) {
+        *stext = &header[ix + scope_strlen(HTTP_STATUS) + 6];
+    }
     scope_errno = 0;
     rc = scope_strtoull(val, NULL, 0);
     if ((scope_errno != 0) || (rc == 0)) {
@@ -440,6 +441,46 @@ headerMatch(regex_t *re, const char *match)
 
     if (!regexec_wrapper(re, match, 0, NULL, 0)) return TRUE;
 
+    return FALSE;
+}
+
+static bool
+httpFieldsMetric(event_field_t *fields, http_report *hreport, char *hdr,
+           size_t hdr_len, protocol_info *proto)
+{
+    if (!fields || !hreport || !proto || !hdr) return FALSE;
+    // Start with fields from the header
+    char *savea = NULL, *header;
+
+    hreport->clen = -1;
+
+    if ((hreport->ptype == EVT_HREQ) && (hreport->hreq)) {
+        scope_strncpy(hreport->hreq, hdr, hdr_len);
+        header = hreport->hreq;
+    } else if ((hreport->ptype == EVT_HRES) && (hreport->hres)) {
+        scope_strncpy(hreport->hres, hdr, hdr_len);
+        header = hreport->hres;
+    } else {
+        scopeLogWarn("fd:%d WARN: httpFields: proto ptype is not req or resp", proto->fd);
+        return FALSE;
+    }
+
+    char *thishdr = scope_strtok_r(header, "\r\n", &savea);
+    if (!thishdr) {
+        scopeLogWarn("fd:%d WARN: httpFields: parse an http header", proto->fd);
+        return FALSE;
+    }
+
+    while ((thishdr = scope_strtok_r(NULL, "\r\n", &savea)) != NULL) {
+        if (scope_strcasestr(thishdr, "Content-Length:")) {
+            scope_errno = 0;
+            if (((hreport->clen = scope_strtoull(scope_strchr(thishdr, ':') + 2, NULL, 0)) == 0) || (scope_errno != 0)) {
+                hreport->clen = -1;
+            } else {
+                return TRUE;
+            }
+        }
+    }
     return FALSE;
 }
 
@@ -1429,7 +1470,145 @@ doDetection(protocol_info *proto)
 static void
 doHttp1HeaderShort(protocol_info *proto)
 {
-    //TODO provide implementation
+    if (!proto->data) {
+        destroyProto(proto);
+        return;
+    }
+
+    event_field_t fields[HTTP_MAX_FIELDS];
+    http_report hreport;
+    http_post *post = (http_post *)proto->data;
+    http_map *map;
+
+    if ((map = lstFind(g_maplist, post->id)) == NULL) {
+        // lazy open
+        if ((map = scope_calloc(1, sizeof(http_map))) == NULL) {
+            destroyProto(proto);
+            return;
+        }
+
+        if (lstInsert(g_maplist, post->id, map) == FALSE) {
+            destroyHttpMap(map);
+            destroyProto(proto);
+            return;
+        }
+
+        struct timeval tv;
+        scope_gettimeofday(&tv, NULL);
+
+        map->id = post->id;
+        map->first_time = tv.tv_sec;
+        map->req = NULL;
+        map->req_len = 0;
+    }
+
+    hreport.ix = 0;
+    hreport.hreq = NULL;
+    hreport.hres = NULL;
+
+    if (proto->ptype == EVT_HREQ) {
+        map->start_time = post->start_duration;
+        map->req = (char *)post->hdr;
+        map->req_len = proto->len;
+    }
+
+    char header[map->req_len];
+    // we're either building a new req or we have a previous req
+    if (map->req) {
+        if ((hreport.hreq = scope_calloc(1, map->req_len)) == NULL) {
+            scopeLogError("fd:%d ERROR: doHttp1Header: hreq memory allocation failure", proto->fd);
+            return;
+        }
+
+        char *savea = NULL;
+        scope_strncpy(header, map->req, map->req_len);
+
+        char *headertok = scope_strtok_r(header, "\r\n", &savea);
+        if (!headertok) {
+            scope_free(hreport.hreq);
+            scopeLogWarn("fd:%d WARN: doHttp1Header: parse an http request header", proto->fd);
+            return;
+        }
+
+        scope_strtok_r(headertok, " ", &savea);
+        char *target_str = scope_strtok_r(NULL, " ", &savea);
+        if (target_str) {
+            H_ATTRIB(fields[hreport.ix], "http_target", target_str, 4);
+            HTTP_NEXT_FLD(hreport.ix);
+        } else {
+            scopeLogWarn("fd:%d WARN: doHttp1Header: no target in an http request header", proto->fd);
+        }
+    }
+
+    if (proto->ptype == EVT_HREQ) {
+        hreport.ptype = EVT_HREQ;
+        // Fields common to request & response
+        httpFieldsMetric(fields, &hreport, map->req, map->req_len, proto);
+        httpFieldsInternal(fields, &hreport, proto);
+
+        if (hreport.clen != -1) {
+            H_VALUE(fields[hreport.ix], "http_request_content_length", hreport.clen, EVENT_ONLY_ATTR);
+            HTTP_NEXT_FLD(hreport.ix);
+        }
+        map->clen = hreport.clen;
+
+        httpFieldEnd(fields, hreport.ix);
+    }
+
+    if (proto->ptype == EVT_HRES) {
+        if ((hreport.hres = scope_calloc(1, proto->len)) == NULL) {
+            scopeLogError("fd:%d ERROR: doHttp1Header: hres memory allocation failure", proto->fd);
+            return;
+        }
+
+        struct timeval tv;
+        scope_gettimeofday(&tv, NULL);
+
+        map->resp = (char *)post->hdr;
+
+        if (!map->req) {
+            map->duration = 0;
+        } else {
+            map->duration = getDurationNow(post->start_duration, map->start_time);
+            map->duration = map->duration / 1000000;
+        }
+
+        size_t status = getHttpStatus((char *)map->resp, proto->len, NULL);
+
+        H_VALUE(fields[hreport.ix], "http_status_code", status, 1);
+        HTTP_NEXT_FLD(hreport.ix);
+
+        // Fields common to request & response
+        if (map->req) {
+            hreport.ptype = EVT_HREQ;
+            httpFieldsMetric(fields, &hreport, map->req, map->req_len, proto);
+            if (hreport.clen != -1) {
+                H_VALUE(fields[hreport.ix], "http_request_content_length", hreport.clen, EVENT_ONLY_ATTR);
+                HTTP_NEXT_FLD(hreport.ix);
+            }
+            map->clen = hreport.clen;
+        }
+
+        hreport.ptype = EVT_HRES;
+        httpFieldsMetric(fields, &hreport, map->resp, proto->len, proto);
+        httpFieldsInternal(fields, &hreport, proto);
+        if (hreport.clen != -1) {
+            H_VALUE(fields[hreport.ix], "http_response_content_length", hreport.clen, EVENT_ONLY_ATTR);
+            HTTP_NEXT_FLD(hreport.ix);
+        }
+
+        httpFieldEnd(fields, hreport.ix);
+
+        char *mtx_name = (proto->isServer) ? "http_server_duration" : "http_client_duration";
+        event_t http_dur = INT_EVENT(mtx_name, map->duration, DELTA_MS, fields);
+        httpAggAddMetric(g_http_agg, &http_dur, map->clen, hreport.clen);
+
+        if (lstDelete(g_maplist, post->id) == FALSE) DBG(NULL);
+    }
+
+    if (hreport.hreq) scope_free(hreport.hreq);
+    if (hreport.hres) scope_free(hreport.hres);
+    destroyProto(proto);
 }
 
 static void

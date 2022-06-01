@@ -471,10 +471,10 @@ main(int argc, char **argv, char **env)
             goto err;
         }
 
-        getGoVersion(ebuf); 
-        if (g_go_major_ver < MIN_SUPPORTED_GO_HTTP2) {
-            setGoHttpEnvVariable();
-        }
+//        getGoVersion(ebuf); 
+//        if (g_go_major_ver < MIN_SUPPORTED_GO_HTTP2) {
+//            setGoHttpEnvVariable();
+//        }
 
     } else {
         if (setenv("SCOPE_APP_TYPE", "native", 1) == -1) {

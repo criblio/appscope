@@ -35,7 +35,8 @@
 //#define patchprint sysprint
 #define patchprint devnull
 
-int g_go_major_ver = UNKNOWN_GO_VER;
+int g_go_minor_ver = UNKNOWN_GO_VER;
+int g_go_maint_ver = UNKNOWN_GO_VER;
 static char g_go_build_ver[7];
 static char g_ReadFrame_addr[sizeof(void *)];
 
@@ -111,17 +112,17 @@ go_schema_t go_8_schema = {
         .c_tls_client_write_w_pc=0x8,
         .c_tls_client_write_buf=0x10,
         .c_tls_client_write_rc=0x28,
-//        .c_http2_server_read_sc=0x128,
-//        .c_http2_server_write_callee=0x0,
-//        .c_http2_server_write_sc=0x8,
-//        .c_http2_server_preface_callee=0xd0,
-//        .c_http2_server_preface_sc=0x60,
-//        .c_http2_server_preface_rc=0xe0, 
-//        .c_http2_client_read_cc=0x80,
-//        .c_http2_client_write_callee=0x58,
-//        .c_http2_client_write_tcpConn=0x0,
-//        .c_http2_client_write_buf=0x8,
-//        .c_http2_client_write_rc=0x10,
+        .c_http2_server_read_sc=0x128,
+        .c_http2_server_write_callee=0x0,
+        .c_http2_server_write_sc=0x8,
+        .c_http2_server_preface_callee=0xd0,
+        .c_http2_server_preface_sc=0x60,
+        .c_http2_server_preface_rc=0xe0, 
+        .c_http2_client_read_cc=0x80,
+        .c_http2_client_write_callee=0x58,
+        .c_http2_client_write_tcpConn=0x0,
+        .c_http2_client_write_buf=0x8,
+        .c_http2_client_write_rc=0x10,
     },
     .struct_offsets = {
         .g_to_m=0x30,
@@ -137,13 +138,13 @@ go_schema_t go_8_schema = {
         .conn_to_rwc=0x10,
         .conn_to_tlsState=0x30,
         .persistConn_to_tlsState=0x60,
-//        .fr_to_readBuf=0x50,
-//        .fr_to_writeBuf=0x80,
-//        .fr_to_headerBuf=0x38,
-//        .cc_to_fr=0xc8,
-//        .cc_to_tconn=0x10,
-//        .sc_to_fr=0x48,
-//        .sc_to_conn=0x18,
+        .fr_to_readBuf=0x50,
+        .fr_to_writeBuf=0x80,
+        .fr_to_headerBuf=0x38,
+        .cc_to_fr=0xc8,
+        .cc_to_tconn=0x10,
+        .sc_to_fr=0x48,
+        .sc_to_conn=0x18,
     },
     .tap = {
         [INDEX_HOOK_WRITE]                = {"syscall.write",                           go_hook_write,                NULL, 0},
@@ -158,11 +159,11 @@ go_schema_t go_8_schema = {
         [INDEX_HOOK_TLS_SERVER_WRITE]     = {"net/http.checkConnErrorWriter.Write",     go_hook_tls_server_write,     NULL, 0},
         [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_hook_tls_client_read,      NULL, 0}, 
         [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_hook_tls_client_write,     NULL, 0},
-        //[INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_hook_http2_server_read,    NULL, 0},
-        //[INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_hook_http2_server_write,   NULL, 0},
-        //[INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_http2_server_preface, NULL, 0},
-        //[INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_hook_http2_client_read,    NULL, 0},
-        //[INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_hook_http2_client_write,   NULL, 0},
+        [INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_hook_http2_server_read,    NULL, 0},
+        [INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_hook_http2_server_write,   NULL, 0},
+        [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_http2_server_preface, NULL, 0},
+        [INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_hook_http2_client_read,    NULL, 0},
+        [INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_hook_http2_client_write,   NULL, 0},
         [INDEX_HOOK_EXIT]                 = {"runtime.exit",                            go_hook_exit,                 NULL, 0},
         [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal",                   go_hook_die,                  NULL, 0},
         [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                         NULL, 0}
@@ -290,7 +291,7 @@ static char *
 go_str(void *go_str)
 {
     // Go 17 and higher use "c style" null terminated strings instead of a string and a length
-    if (g_go_major_ver >= 17) {
+    if (g_go_minor_ver >= 17) {
        // We need to deference the address first before casting to a char *
        if (!go_str) return NULL;
        return (char *)*(uint64_t *)go_str;
@@ -310,7 +311,7 @@ go_str(void *go_str)
 static void
 free_go_str(char *str) {
     // Go 17 and higher use "c style" null terminated strings instead of a string and a length
-    if (g_go_major_ver >= 17) {
+    if (g_go_minor_ver >= 17) {
         return;
     }
     if(str) scope_free(str);
@@ -727,7 +728,7 @@ patch_addrs(funchook_t *funchook,
         // us to patch our code in, since it appears right after the system call. We
         // are able to patch non-system calls at the return instruction per prior versions. 
         // Note: We don't need a frame size here.
-        else if ((g_go_major_ver >= 17) && (!scope_strcmp((const char*)asm_inst[i].mnemonic, "xorps")) &&
+        else if ((g_go_minor_ver >= 17) && (!scope_strcmp((const char*)asm_inst[i].mnemonic, "xorps")) &&
             (asm_inst[i].size == 4)) {
 
             // In the "xorps" case we want to patch the xorps instruction exactly
@@ -779,62 +780,77 @@ patchClone()
     }
 }
 
-// Detect the Go Version of an executable
-static int
-go_major_version(const char *go_runtime_version)
+// Get the Go Version numbers from a complete version string
+// Stores the minor and maintenance version numbers in global variables
+static void
+go_version_numbers(const char *go_runtime_version)
 {
-    if (!go_runtime_version) return UNKNOWN_GO_VER;
+    if (!go_runtime_version) return;
+    g_go_minor_ver = UNKNOWN_GO_VER;
+    g_go_maint_ver = 0; // Default to 0 in case not present
 
     char buf[256] = {0};
     scope_strncpy(buf, go_runtime_version, sizeof(buf)-1);
 
-    char *token = scope_strtok(buf, ".");
-    token = scope_strtok(NULL, ".");
-    if (!token) {
-        return UNKNOWN_GO_VER;
-    }
+    scope_strtok(buf, ".");
 
+    // Get the minor version number
+    char *minor = scope_strtok(NULL, ".");
+    if (!minor) return;
     scope_errno = 0;
-    long val = scope_strtol(token, NULL, 10);
-    if (scope_errno || val <= 0 || val > INT_MAX) {
-        return UNKNOWN_GO_VER;
-    }
+    long minor_val = scope_strtol(minor, NULL, 10);
+    if (scope_errno || minor_val <= 0 || minor_val > INT_MAX) return;
+    g_go_minor_ver = minor_val;
 
-    return val;
+    // Get the maintenance version number
+    char *maint = scope_strtok(NULL, ".");
+    if (!maint) return;
+    scope_errno = 0;
+    long maint_val = scope_strtol(maint, NULL, 10);
+    if (scope_errno || maint_val <= 0 || maint_val > INT_MAX) return;
+    g_go_maint_ver = maint_val;
 }
 
 static void
-adjustGoStructOffsetsForVersion(int go_ver)
+adjustGoStructOffsetsForVersion()
 {
-    if (!go_ver) {
-        sysprint("ERROR: can't determine major go version\n");
+    if (!g_go_minor_ver) {
+        sysprint("ERROR: can't determine minor go version\n");
         return;
     }
 
     // go 1.8 has a different m_to_tls offset than other supported versions.
-    if (go_ver == 8) {
+    if (g_go_minor_ver == 8) {
         g_go_schema->struct_offsets.m_to_tls = 96; // 0x60
     }
 
     // go 1.8 is the only version that directly goes from netfd to sysfd.
-    if (go_ver == 8) {
+    if (g_go_minor_ver == 8) {
         g_go_schema->struct_offsets.netfd_to_sysfd = 16;
     }
 
     // before go 1.12, persistConn_to_conn and persistConn_to_bufrd
     // have different values than 12 and after
-    if (go_ver < 12) {
+    if (g_go_minor_ver < 12) {
         g_go_schema->struct_offsets.persistConn_to_conn = 72;  // 0x48
         g_go_schema->struct_offsets.persistConn_to_bufrd = 96; // 0x60
         g_go_schema->struct_offsets.persistConn_to_tlsState=88; // 0x58
     }
 
-    if (go_ver == 17) {
+    if (g_go_minor_ver == 16) {
+        g_go_schema->arg_offsets.c_http2_client_read_cc=0xe0;
+        g_go_schema->arg_offsets.c_http2_server_preface_callee=0xc0;
+    }
+
+    if (g_go_minor_ver == 17) {
         g_go_schema->arg_offsets.c_http2_client_write_callee=0x30;
         g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x40;
         g_go_schema->struct_offsets.fr_to_readBuf=0x50;
         g_go_schema->struct_offsets.fr_to_writeBuf=0x80;
         g_go_schema->struct_offsets.fr_to_headerBuf=0x38;
+        if (g_go_maint_ver < 3) {
+            g_go_schema->struct_offsets.cc_to_fr=0xd0;
+        }
     }
 
     // This creates a file specified by test/integration/go/test_go.sh
@@ -967,9 +983,11 @@ initGoHook(elf_buf_t *ebuf)
     
     if (go_ver && (go_runtime_version = go_ver)) {
         sysprint("go_runtime_version = %s\n", go_runtime_version);
-        g_go_major_ver = go_major_version(go_runtime_version);
+        go_version_numbers(go_runtime_version);
+         printf("minor ver: %d\n", g_go_minor_ver);
+         printf("maint ver: %d\n", g_go_maint_ver);
     }
-    if (g_go_major_ver < MIN_SUPPORTED_GO_VER) {
+    if (g_go_minor_ver < MIN_SUPPORTED_GO_VER) {
         if (!is_go(ebuf->buf)) {
             // Don't expect to get here, but try to be clear if we do.
             scopeLogWarn("%s is not a go application.  Continuing without AppScope.", ebuf->cmd);
@@ -979,7 +997,7 @@ initGoHook(elf_buf_t *ebuf)
             scopeLogWarn("%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.8 or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd);
         }
         return; // don't install our hooks
-    } else if (g_go_major_ver > MAX_SUPPORTED_GO_VER) {
+    } else if (g_go_minor_ver > MAX_SUPPORTED_GO_VER) {
         scopeLogWarn("%s was compiled with go version `%s`. Versions newer than Go 1.18 are not yet supported. Continuing without AppScope.", ebuf->cmd, go_runtime_version);
         return; // don't install our hooks
     } 
@@ -1000,7 +1018,7 @@ initGoHook(elf_buf_t *ebuf)
      * the return value to 32 bits where on occasion a 64 bit return
      * value might be desired.
      */
-    if (g_go_major_ver >= 17) {
+    if (g_go_minor_ver >= 17) {
         // Use the abi0 I/F for syscall based functions in Go >= 1.17
         if (((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall.abi0")) == 0) &&
             ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall.abi0",
@@ -1014,20 +1032,6 @@ initGoHook(elf_buf_t *ebuf)
             ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall", NULL, NULL)) == 0)) {
             sysprint("ERROR: can't get the address for runtime.cgocall\n");
             return; // don't install our hooks
-        }
-
-        /*
-         * For Go 8-16 we don't yet support HTTP2. Therefore, we want to force the use of
-         * HTTP1. This allows that to be accomplished at run time. Otherwise we would need
-         * to get the version at the time the app is loaded.
-         */
-        uint64_t *nohttp2;
-        if (((nohttp2 = getSymbol(ebuf->buf, "net/http.omitBundledHTTP2")) == 0) &&
-            ((nohttp2 = getGoSymbol(ebuf->buf, "net/http.omitBundledHTTP2", NULL, NULL)) == 0)) {
-            sysprint("ERROR: can't get the address for omitBundledHTTP2\n");
-        } else {
-            nohttp2 = (void *)((uint64_t)nohttp2 + base);
-            *nohttp2 = TRUE;
         }
     }
     go_runtime_cgocall = (void *)((uint64_t)go_runtime_cgocall + base);
@@ -1058,13 +1062,12 @@ initGoHook(elf_buf_t *ebuf)
     cs_insn *asm_inst = NULL;
     unsigned int asm_count = 0;
 
-    if (g_go_major_ver >= 17) {
+    if (g_go_minor_ver >= 17) {
         // The Go 17 schema works for 18 also, and possibly future versions
         g_go_schema = &go_17_schema;
     }
-
     // Update the schema to suit the current version
-    adjustGoStructOffsetsForVersion(g_go_major_ver);
+    adjustGoStructOffsetsForVersion();
 
     for (tap_t *tap = g_go_schema->tap; tap->assembly_fn; tap++) {
         if (asm_inst) {

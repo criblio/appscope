@@ -112,6 +112,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_NET_NAME ".*"
 #define DEFAULT_SRC_FS_NAME ".*"
 #define DEFAULT_SRC_DNS_NAME ".*"
+#define DEFAULT_ALLOW_BINARY_CONSOLE TRUE
 #define DEFAULT_MTC_IPPORT_VERBOSITY 1
 
 #define DEFAULT_SRC_FILE TRUE

@@ -29,6 +29,7 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgEventFormat(config), DEFAULT_CTL_FORMAT);
     assert_int_equal       (cfgEvtRateLimit(config), DEFAULT_MAXEVENTSPERSEC);
     assert_int_equal       (cfgEnhanceFs(config), DEFAULT_ENHANCE_FS);
+    assert_int_equal       (cfgEvtAllowBinaryConsole(config), DEFAULT_ALLOW_BINARY_CONSOLE);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_FILE), DEFAULT_SRC_FILE_VALUE);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_CONSOLE), DEFAULT_SRC_CONSOLE_VALUE);
     assert_string_equal    (cfgEvtFormatValueFilter(config, CFG_SRC_SYSLOG), DEFAULT_SRC_SYSLOG_VALUE);
@@ -299,6 +300,23 @@ cfgEnhanceFsSetAndGet(void** state)
     assert_int_equal(cfgEnhanceFs(config), 0);
     cfgEnhanceFsSet(config, 1);
     assert_int_equal(cfgEnhanceFs(config), 1);
+    cfgDestroy(&config);
+}
+
+static void
+cfgEvtAllowBinaryConsoleSetAndGet(void** state)
+{
+    config_t *config = cfgCreateDefault();
+    cfgEvtAllowBinaryConsoleSet(config, TRUE);
+    assert_int_equal(cfgEvtAllowBinaryConsole(config), TRUE);
+
+    cfgEvtAllowBinaryConsoleSet(config, FALSE);
+    assert_int_equal(cfgEvtAllowBinaryConsole(config), FALSE);
+
+    // 2 is outside of allowed range; should be ignored.
+    cfgEvtAllowBinaryConsoleSet(config, 2);
+    assert_int_equal(cfgEvtAllowBinaryConsole(config), FALSE);
+
     cfgDestroy(&config);
 }
 
@@ -677,6 +695,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgEventFormatSetAndGet),
         cmocka_unit_test(cfgEvtRateLimitSetAndGet),
         cmocka_unit_test(cfgEnhanceFsSetAndGet),
+        cmocka_unit_test(cfgEvtAllowBinaryConsoleSetAndGet),
 
         cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &log),
         cmocka_unit_test_prestate(cfgEvtFormatValueFilterSetAndGet, &con),

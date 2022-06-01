@@ -56,6 +56,7 @@ struct _config_t
         unsigned src[CFG_SRC_MAX];
         size_t numHeaders;
         header_extract_t **hextract;
+        unsigned allowbinaryconsole;
     } evt;
 
     struct {
@@ -204,6 +205,7 @@ cfgCreateDefault()
 
     c->evt.hextract = DEFAULT_SRC_HTTP_HEADER;
     c->evt.numHeaders = 0;
+    c->evt.allowbinaryconsole = DEFAULT_ALLOW_BINARY_CONSOLE;
 
     which_transport_t tp;
     for (tp=CFG_MTC; tp<CFG_WHICH_MAX; tp++) {
@@ -459,6 +461,14 @@ cfgEvtFormatSourceEnabled(config_t *cfg, watch_t src)
 
     DBG("%d", src);
     return srcEnabledDefault[CFG_SRC_FILE];
+}
+
+unsigned
+cfgEvtAllowBinaryConsole(config_t *cfg)
+{
+    if (cfg) return cfg->evt.allowbinaryconsole;
+
+    return DEFAULT_ALLOW_BINARY_CONSOLE;
 }
 
 unsigned
@@ -838,6 +848,13 @@ cfgEvtFormatSourceEnabledSet(config_t* cfg, watch_t src, unsigned val)
 {
     if (!cfg || src < 0 || src >= CFG_SRC_MAX || val > 1) return;
     cfg->evt.src[src] = val;
+}
+
+void
+cfgEvtAllowBinaryConsoleSet(config_t *cfg, unsigned val)
+{
+    if (!cfg || val < 0 || val > 1) return;
+    cfg->evt.allowbinaryconsole = val;
 }
 
 void

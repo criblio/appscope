@@ -140,6 +140,15 @@ enum_map_t watchTypeMap[] = {
     {NULL,                    -1}
 };
 
+enum_map_t mtcCategoriesWatchTypeMap[] = {
+    {"fs",                    CFG_MTC_FS},
+    {"net",                   CFG_MTC_NET},
+    {"http",                  CFG_MTC_HTTP},
+    {"dns",                   CFG_MTC_DNS},
+    {"process",               CFG_MTC_PROC},
+    {NULL,                    -1}
+};
+
 enum_map_t boolMap[] = {
     {"true",                  TRUE},
     {"false",                 FALSE},
@@ -1233,6 +1242,14 @@ processMtcWatchType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (!scope_strcmp(value, "statsd")) {
         cfgMtcStatsdEnableSet(config, TRUE);
     }
+
+    metric_category_t category;
+    for(category = CFG_MTC_FS; category <= CFG_MTC_PROC; ++category) {
+        if (!scope_strcmp(value, mtcCategoriesWatchTypeMap[category].str)) {
+            cfgMtcCategoryEnableSet(config, TRUE, category);
+        }
+    }
+
     if (value) scope_free(value);
 }
 
@@ -1263,6 +1280,11 @@ processMtcWatch(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     // absence of one of these values means to clear it.
     // clear them all, then set values for whatever we find.
     cfgMtcStatsdEnableSet(config, FALSE);
+    
+    metric_category_t category;
+    for (category=CFG_MTC_FS; category<=CFG_MTC_PROC; ++category) {
+        cfgMtcCategoryEnableSet(config, FALSE, category);
+    }
 
     if (node->type != YAML_SEQUENCE_NODE) return;
     yaml_node_item_t* item;

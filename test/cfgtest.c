@@ -13,16 +13,16 @@ verifyDefaults(config_t* config)
 {
     assert_int_equal       (cfgMtcEnable(config), DEFAULT_MTC_ENABLE);
     assert_int_equal       (cfgMtcFormat(config), DEFAULT_MTC_FORMAT);
-    assert_int_equal       (cfgMtcFsEnable(config), DEFAULT_MTC_FS_ENABLE);
-    assert_int_equal       (cfgMtcNetEnable(config), DEFAULT_MTC_NET_ENABLE);
-    assert_int_equal       (cfgMtcHttpEnable(config), DEFAULT_MTC_HTTP_ENABLE);
-    assert_int_equal       (cfgMtcDnsEnable(config), DEFAULT_MTC_DNS_ENABLE);
-    assert_int_equal       (cfgMtcProcEnable(config), DEFAULT_MTC_PROC_ENABLE);
+    assert_int_equal       (cfgMtcWatchEnable(config, CFG_MTC_FS), DEFAULT_MTC_FS_ENABLE);
+    assert_int_equal       (cfgMtcWatchEnable(config, CFG_MTC_NET), DEFAULT_MTC_NET_ENABLE);
+    assert_int_equal       (cfgMtcWatchEnable(config, CFG_MTC_HTTP), DEFAULT_MTC_HTTP_ENABLE);
+    assert_int_equal       (cfgMtcWatchEnable(config, CFG_MTC_DNS), DEFAULT_MTC_DNS_ENABLE);
+    assert_int_equal       (cfgMtcWatchEnable(config, CFG_MTC_PROC), DEFAULT_MTC_PROC_ENABLE);
     assert_string_equal    (cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
     assert_int_equal       (cfgMtcStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
     assert_int_equal       (cfgMtcVerbosity(config), DEFAULT_MTC_VERBOSITY);
     assert_int_equal       (cfgMtcPeriod(config), DEFAULT_SUMMARY_PERIOD);
-    assert_int_equal       (cfgMtcStatsdEnable(config), DEFAULT_MTC_STATSD_ENABLE);
+    assert_int_equal       (cfgMtcWatchEnable(config, CFG_MTC_STATSD), DEFAULT_MTC_STATSD_ENABLE);
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
     assert_int_equal       (cfgSendProcessStartMsg(config), DEFAULT_PROCESS_START_MSG);
     assert_int_equal       (cfgEvtEnable(config), DEFAULT_EVT_ENABLE);
@@ -198,45 +198,23 @@ cfgMtcPeriodSetAndGet(void** state)
 }
 
 static void
-cfgMtcStatsdEnableSetAndGet(void** state)
-{
-    config_t *config = cfgCreateDefault();
-    cfgMtcStatsdEnableSet(config, TRUE);
-    assert_int_equal(cfgMtcStatsdEnable(config), TRUE);
-    cfgMtcStatsdEnableSet(config, FALSE);
-    assert_int_equal(cfgMtcStatsdEnable(config), FALSE);
-
-    // 2 is outside of allowed range; should be ignored.
-    cfgMtcStatsdEnableSet(config, 2);
-    assert_int_equal(cfgMtcStatsdEnable(config), FALSE);
-    cfgDestroy(&config);
-}
-
-static void
-cfgMtcCategoryEnableSetAndGet(void** state)
+cfgMtcWatchEnableSetAndGet(void** state)
 {
     config_t *config = cfgCreateDefault();
 
-    unsigned int (*get_cfg_mtc_fun[])(config_t *) = 
-    { cfgMtcFsEnable,
-      cfgMtcNetEnable,
-      cfgMtcHttpEnable,
-      cfgMtcDnsEnable,
-      cfgMtcProcEnable
-    };
-    metric_category_t category;
+    metric_watch_t watch;
 
-    for (category=CFG_MTC_FS; category<=CFG_MTC_PROC; ++category) {
-        cfgMtcCategoryEnableSet(config, FALSE, category);
-        assert_int_equal(get_cfg_mtc_fun[category](config), FALSE);
-        cfgMtcCategoryEnableSet(config, TRUE, category);
-        assert_int_equal(get_cfg_mtc_fun[category](config), TRUE);
+    for (watch=CFG_MTC_FS; watch<=CFG_MTC_STATSD; ++watch) {
+        cfgMtcWatchEnableSet(config, FALSE, watch);
+        assert_int_equal(cfgMtcWatchEnable(config, watch), FALSE);
+        cfgMtcWatchEnableSet(config, TRUE, watch);
+        assert_int_equal(cfgMtcWatchEnable(config, watch), TRUE);
         // 2 is outside of allowed range; should be ignored.
-        cfgMtcCategoryEnableSet(config, 2, category);
-        assert_int_equal(get_cfg_mtc_fun[category](config), TRUE);
+        cfgMtcWatchEnableSet(config, 2, watch);
+        assert_int_equal(cfgMtcWatchEnable(config, watch), TRUE);
     }
 
-    cfgMtcCategoryEnableSet(config, FALSE, CFG_MTC_PROC+1);;
+    cfgMtcWatchEnableSet(config, FALSE, CFG_MTC_STATSD+1);;
     assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 1);
     dbgInit(); // reset dbg for the rest of the tests
 
@@ -692,8 +670,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgMtcStatsDMaxLenSetAndGet),
         cmocka_unit_test(cfgMtcVerbositySetAndGet),
         cmocka_unit_test(cfgMtcPeriodSetAndGet),
-        cmocka_unit_test(cfgMtcStatsdEnableSetAndGet),
-        cmocka_unit_test(cfgMtcCategoryEnableSetAndGet),
+        cmocka_unit_test(cfgMtcWatchEnableSetAndGet),
         cmocka_unit_test(cfgCmdDirSetAndGet),
         cmocka_unit_test(cfgSendProcessStartMsgSetAndGet),
         cmocka_unit_test(cfgEvtEnableSetAndGet),

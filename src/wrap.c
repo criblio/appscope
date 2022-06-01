@@ -917,7 +917,7 @@ reportPeriodicStuff(void)
     doPayload();
 
     // TODO: move the code inside if below to report.c
-    if (cfgMtcProcEnable(g_cfg.staticfg)) {
+    if (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_PROC)) {
         // We report CPU time for this period.
         cpu = doGetProcCPU();
         if (cpu != -1) {

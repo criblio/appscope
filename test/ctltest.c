@@ -774,6 +774,8 @@ ctlSendLogConsoleNoneAsciiData(void **state)
     assert_non_null(ctl);
     bool b_res = ctlEvtSourceEnabled(ctl, CFG_SRC_CONSOLE);
     assert_true(b_res);
+    // with ALLOW_BINARY false, verify that the binary_data_event_msg appears.
+    ctlAllowBinaryConsoleSet(ctl, FALSE);
     allow_copy_buf_data(TRUE);
 
     ctlSendLog(ctl, STDOUT_FILENO, console_path, non_basic_ascii_text, strlen(non_basic_ascii_text), 0, &proc);
@@ -787,7 +789,7 @@ ctlSendLogConsoleNoneAsciiData(void **state)
     // and verify that the binary_data_event_msg does *not* appear.
     memset(cbuf_data, '\0', sizeof(cbuf_data));
 
-    setenv("SCOPE_ALLOW_BINARY_CONSOLE", "true", 1);
+    ctlAllowBinaryConsoleSet(ctl, TRUE);
     ctl = ctlCreate();
     assert_non_null(ctl);
     b_res = ctlEvtSourceEnabled(ctl, CFG_SRC_CONSOLE);
@@ -798,7 +800,6 @@ ctlSendLogConsoleNoneAsciiData(void **state)
     assert_string_not_equal(binary_data_event_msg, val);
     assert_string_equal(non_basic_ascii_text, val);
     ctlDestroy(&ctl);
-    unsetenv("SCOPE_ALLOW_BINARY_CONSOLE");
 
     scope_free(non_basic_ascii_text);
     allow_copy_buf_data(FALSE);

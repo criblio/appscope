@@ -139,6 +139,7 @@ unsigned int    ctlPayEnable(ctl_t *);
 void            ctlPayEnableSet(ctl_t *, unsigned int);
 const char *    ctlPayDir(ctl_t *);
 void            ctlPayDirSet(ctl_t *, const char *);
+void            ctlAllowBinaryConsoleSet(ctl_t *, unsigned);
 
 // Retrieve events
 uint64_t   ctlGetEvent(ctl_t *);

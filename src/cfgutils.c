@@ -169,6 +169,7 @@ void cfgEvtEnableSetFromStr(config_t*, const char*);
 void cfgEventFormatSetFromStr(config_t*, const char*);
 void cfgEvtRateLimitSetFromStr(config_t*, const char*);
 void cfgEnhanceFsSetFromStr(config_t*, const char*);
+void cfgAllowBinaryConsoleSetFromStr(config_t *, const char *);
 void cfgEvtFormatValueFilterSetFromStr(config_t*, watch_t, const char*);
 void cfgEvtFormatFieldFilterSetFromStr(config_t*, watch_t, const char*);
 void cfgEvtFormatNameFilterSetFromStr(config_t*, watch_t, const char*);
@@ -519,6 +520,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgEvtRateLimitSetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_ENHANCE_FS")) {
         cfgEnhanceFsSetFromStr(cfg, value);
+    } else if (!scope_strcmp(env_name, "SCOPE_ALLOW_BINARY_CONSOLE")) {
+        cfgAllowBinaryConsoleSetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_LOGFILE_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_CONSOLE_NAME")) {
@@ -751,6 +754,13 @@ cfgEnhanceFsSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
     cfgEnhanceFsSet(cfg, strToVal(boolMap, value));
+}
+
+void
+cfgAllowBinaryConsoleSetFromStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgEvtAllowBinaryConsoleSet(cfg, strToVal(boolMap, value));
 }
 
 void
@@ -2756,6 +2766,7 @@ initCtl(config_t *cfg)
     ctlEnhanceFsSet(ctl, cfgEnhanceFs(cfg));
     ctlPayEnableSet(ctl, cfgPayEnable(cfg));
     ctlPayDirSet(ctl,    cfgPayDir(cfg));
+    ctlAllowBinaryConsoleSet(ctl, cfgEvtAllowBinaryConsole(cfg));
 
     return ctl;
 }

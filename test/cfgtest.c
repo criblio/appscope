@@ -13,6 +13,11 @@ verifyDefaults(config_t* config)
 {
     assert_int_equal       (cfgMtcEnable(config), DEFAULT_MTC_ENABLE);
     assert_int_equal       (cfgMtcFormat(config), DEFAULT_MTC_FORMAT);
+    assert_int_equal       (cfgMtcFsEnable(config), DEFAULT_MTC_FS_ENABLE);
+    assert_int_equal       (cfgMtcNetEnable(config), DEFAULT_MTC_NET_ENABLE);
+    assert_int_equal       (cfgMtcHttpEnable(config), DEFAULT_MTC_HTTP_ENABLE);
+    assert_int_equal       (cfgMtcDnsEnable(config), DEFAULT_MTC_DNS_ENABLE);
+    assert_int_equal       (cfgMtcProcEnable(config), DEFAULT_MTC_PROC_ENABLE);
     assert_string_equal    (cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
     assert_int_equal       (cfgMtcStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
     assert_int_equal       (cfgMtcVerbosity(config), DEFAULT_MTC_VERBOSITY);
@@ -204,6 +209,37 @@ cfgMtcStatsdEnableSetAndGet(void** state)
     // 2 is outside of allowed range; should be ignored.
     cfgMtcStatsdEnableSet(config, 2);
     assert_int_equal(cfgMtcStatsdEnable(config), FALSE);
+    cfgDestroy(&config);
+}
+
+static void
+cfgMtcCategoryEnableSetAndGet(void** state)
+{
+    config_t *config = cfgCreateDefault();
+
+    unsigned int (*get_cfg_mtc_fun[])(config_t *) = 
+    { cfgMtcFsEnable,
+      cfgMtcNetEnable,
+      cfgMtcHttpEnable,
+      cfgMtcDnsEnable,
+      cfgMtcProcEnable
+    };
+    metric_category_t category;
+
+    for (category=CFG_MTC_FS; category<=CFG_MTC_PROC; ++category) {
+        cfgMtcCategoryEnableSet(config, FALSE, category);
+        assert_int_equal(get_cfg_mtc_fun[category](config), FALSE);
+        cfgMtcCategoryEnableSet(config, TRUE, category);
+        assert_int_equal(get_cfg_mtc_fun[category](config), TRUE);
+        // 2 is outside of allowed range; should be ignored.
+        cfgMtcCategoryEnableSet(config, 2, category);
+        assert_int_equal(get_cfg_mtc_fun[category](config), TRUE);
+    }
+
+    cfgMtcCategoryEnableSet(config, FALSE, CFG_MTC_PROC+1);;
+    assert_int_equal(dbgCountMatchingLines("src/cfg.c"), 1);
+    dbgInit(); // reset dbg for the rest of the tests
+
     cfgDestroy(&config);
 }
 
@@ -657,6 +693,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(cfgMtcVerbositySetAndGet),
         cmocka_unit_test(cfgMtcPeriodSetAndGet),
         cmocka_unit_test(cfgMtcStatsdEnableSetAndGet),
+        cmocka_unit_test(cfgMtcCategoryEnableSetAndGet),
         cmocka_unit_test(cfgCmdDirSetAndGet),
         cmocka_unit_test(cfgSendProcessStartMsgSetAndGet),
         cmocka_unit_test(cfgEvtEnableSetAndGet),

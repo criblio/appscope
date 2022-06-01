@@ -35,6 +35,7 @@ struct _config_t
 {
     struct {
         unsigned enable;
+        unsigned char categories;
         cfg_mtc_format_t format;
         struct {
             char* prefix;
@@ -162,7 +163,7 @@ static cfg_buffer_t bufDefault[] = {
     DEFAULT_LS_BUF,
 };
 
-    
+
 ///////////////////////////////////
 // Constructors Destructors
 ///////////////////////////////////
@@ -181,6 +182,11 @@ cfgCreateDefault()
     c->mtc.statsd.enable = DEFAULT_MTC_STATSD_ENABLE;
     c->mtc.period = DEFAULT_SUMMARY_PERIOD;
     c->mtc.verbosity = DEFAULT_MTC_VERBOSITY;
+    SCOPE_BIT_SET_VAR(c->mtc.categories, CFG_MTC_FS, DEFAULT_MTC_FS_ENABLE);
+    SCOPE_BIT_SET_VAR(c->mtc.categories, CFG_MTC_NET, DEFAULT_MTC_NET_ENABLE);
+    SCOPE_BIT_SET_VAR(c->mtc.categories, CFG_MTC_HTTP, DEFAULT_MTC_HTTP_ENABLE);
+    SCOPE_BIT_SET_VAR(c->mtc.categories, CFG_MTC_DNS, DEFAULT_MTC_DNS_ENABLE);
+    SCOPE_BIT_SET_VAR(c->mtc.categories, CFG_MTC_PROC, DEFAULT_MTC_PROC_ENABLE);
     c->evt.enable = DEFAULT_EVT_ENABLE;
     c->evt.format = DEFAULT_CTL_FORMAT;
     c->evt.ratelimit = DEFAULT_MAXEVENTSPERSEC;
@@ -289,6 +295,36 @@ unsigned
 cfgMtcEnable(config_t* cfg)
 {
     return (cfg) ? cfg->mtc.enable : DEFAULT_MTC_ENABLE;
+}
+
+unsigned
+cfgMtcFsEnable(config_t* cfg)
+{
+    return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_FS) : DEFAULT_MTC_FS_ENABLE;
+}
+
+unsigned
+cfgMtcNetEnable(config_t* cfg)
+{
+    return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_NET) : DEFAULT_MTC_NET_ENABLE;
+}
+
+unsigned
+cfgMtcHttpEnable(config_t* cfg)
+{
+    return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_HTTP) : DEFAULT_MTC_HTTP_ENABLE;
+}
+
+unsigned
+cfgMtcDnsEnable(config_t* cfg)
+{
+    return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_DNS) : DEFAULT_MTC_DNS_ENABLE;
+}
+
+unsigned
+cfgMtcProcEnable(config_t* cfg)
+{
+    return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_PROC) : DEFAULT_MTC_PROC_ENABLE;
 }
 
 cfg_mtc_format_t
@@ -669,6 +705,25 @@ cfgMtcStatsdEnableSet(config_t *cfg, unsigned val)
 {
     if (!cfg || val > 1) return;
     cfg->mtc.statsd.enable = val;
+}
+
+void
+cfgMtcCategoryEnableSet(config_t *cfg, unsigned val, metric_category_t type)
+{
+    if (!cfg || val > 1) return;
+
+    switch (type) {
+        case CFG_MTC_FS:
+        case CFG_MTC_NET:
+        case CFG_MTC_HTTP:
+        case CFG_MTC_DNS:
+        case CFG_MTC_PROC:
+            SCOPE_BIT_SET_VAR(cfg->mtc.categories, type, val);
+            break;
+        default:
+            DBG(NULL);
+            break;
+    }
 }
 
 void

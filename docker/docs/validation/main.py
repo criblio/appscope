@@ -29,6 +29,14 @@ class SchemaProperty(abc.ABC):
     def disable_unknown_property(self) -> None:
         pass
 
+
+class StartMsg(SchemaProperty):
+
+    ## TODO make this generic and add implementation for start msg
+    def disable_unknown_property(self) -> None:
+        pass
+
+
 class Event(SchemaProperty):
 
     def disable_unknown_property(self) -> None:
@@ -41,12 +49,20 @@ class Metric(SchemaProperty):
         self.schema['properties']['body'].update({'additionalProperties': False})
 
 
-def is_event (schema:dict) -> bool:
-    properties = schema.get('properties')
+def identify_schema(schema_name: str, schema_json: dict) -> SchemaProperty:
+    properties = schema_json.get('properties')
+    if properties.get('info'):
+        return StartMsg(schema_name, schema_json)
+
     type = properties.get('type')
     type_value = type.get('const')
-    return type_value == 'evt'
-
+    if type_value == 'evt':
+        return Event(schema_name, schema_json)
+    elif type_value == 'metric':
+        return Metric(schema_name, schema_json)
+    else:
+        print(f'Type unknown {type_value}')
+        sys.exit(1)
 
 def main():
     for schema_name in os.listdir(SCHEMA_RESOLVE_DIR):
@@ -55,7 +71,7 @@ def main():
             schema_data = f.read()
         schema_json = json.loads(schema_data)
 
-        schema = Event(schema_name, schema_json) if is_event(schema_json) else Metric(schema_name, schema_json)
+        schema = identify_schema(schema_name, schema_json)
         schema.disable_unknown_property()
         schema.validate_examples()
 

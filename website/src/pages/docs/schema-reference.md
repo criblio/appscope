@@ -2067,7 +2067,7 @@ Structure of the `notice` event
 
 ### start.msg [^](#schema-reference) {#eventstartmsg}
 
-Structure of the start message
+TBD Structure of the start message
 
 #### Example
 
@@ -2208,40 +2208,40 @@ Structure of the start message
 
 | Property | Description |
 |---|---|
-| `authtoken` (`string`) | authtoken |
-| `format` _required_ (`string`) | format<br/><br/>**Possible values:**<ul><li>`scope`</li><li>`ndjson`</li></ul> |
-| `breaker` (`string`) | breaker<br/><br/>Value must be `Cribl - Do Not Break Ruleset`. |
-| `info` _required_ (`object`) | info<br/><br/>_Details [below](#eventstartmsginfo)._ |
+| `authtoken` (`string`) | TBD authtoken |
+| `format` _required_ (`string`) | TBD format<br/><br/>**Possible values:**<ul><li>`scope`</li><li>`ndjson`</li></ul> |
+| `breaker` (`string`) | TBD breaker<br/><br/>Value must be `Cribl - Do Not Break Ruleset`. |
+| `info` _required_ (`object`) | TBD info<br/><br/>_Details [below](#eventstartmsginfo)._ |
 
 #### `start.msg.info` properties {#eventstartmsginfo}
 
 | Property | Description |
 |---|---|
-| `process` _required_ (`object`) | process<br/><br/>_Details [below](#eventstartmsginfoprocess)._ |
-| `configuration` _required_ (`object`) | configuration<br/><br/>_Details [below](#eventstartmsginfoconfiguration)._ |
-| `environment` _required_ (`object`) | environment<br/><br/>_Details [below](#eventstartmsginfoenvironment)._ |
+| `process` _required_ (`object`) | TBD process<br/><br/>_Details [below](#eventstartmsginfoprocess)._ |
+| `configuration` _required_ (`object`) | TBD configuration<br/><br/>_Details [below](#eventstartmsginfoconfiguration)._ |
+| `environment` _required_ (`object`) | TBD environment<br/><br/>_Details [below](#eventstartmsginfoenvironment)._ |
 
 #### `start.msg.info.process` properties {#eventstartmsginfoprocess}
 
 | Property | Description |
 |---|---|
-| `libscopever` _required_ (`string`) | libscopever<br/><br/>**Example:**<br/>`v1.0.0` |
-| `pid` _required_ (`integer`) | pid<br/><br/>**Example:**<br/>`1000` |
-| `ppid` _required_ (`integer`) | ppid |
-| `gid` _required_ (`integer`) | gid<br/><br/>**Example:**<br/>`0` |
-| `groupname` _required_ (`string`) | groupname<br/><br/>**Example:**<br/>`root` |
-| `uid` _required_ (`integer`) | uid<br/><br/>**Example:**<br/>`0` |
-| `username` _required_ (`string`) | username<br/><br/>**Example:**<br/>`root` |
-| `hostname` _required_ (`string`) | hostname |
-| `procname` _required_ (`string`) | procname |
-| `cmd` _required_ (`string`) | cmd<br/><br/>**Example:**<br/>`top` |
-| `id` _required_ (`string`) | id |
+| `libscopever` _required_ (`string`) | TBD libscopever<br/><br/>**Example:**<br/>`v1.0.0` |
+| `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
+| `ppid` _required_ (`integer`) | TBD ppid |
+| `gid` _required_ (`integer`) | Group ID of the user who created the process.<br/><br/>**Example:**<br/>`0` |
+| `groupname` _required_ (`string`) | Groupname of the user who created the process.<br/><br/>**Example:**<br/>`root` |
+| `uid` _required_ (`integer`) | User ID of the user who created the process.<br/><br/>**Example:**<br/>`0` |
+| `username` _required_ (`string`) | Username of the user who created the process.<br/><br/>**Example:**<br/>`root` |
+| `hostname` _required_ (`string`) | TBD hostname |
+| `procname` _required_ (`string`) | TBD procname |
+| `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
+| `id` _required_ (`string`) | TBD id |
 
 #### `start.msg.info.configuration` properties {#eventstartmsginfoconfiguration}
 
 | Property | Description |
 |---|---|
-| `current` (`object`) | current<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrent)._ |
+| `current` (`object`) | TBD current<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrent)._ |
 
 #### `start.msg.info.environment` properties {#eventstartmsginfoenvironment}
 
@@ -2253,44 +2253,44 @@ Structure of the start message
 
 | Property | Description |
 |---|---|
-| `metric` (`object`) | metric<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentmetric)._ |
-| `libscope` (`object`) | libscope<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentlibscope)._ |
-| `event` (`object`) | event<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentevent)._ |
-| `payload` (`object`) | payload<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentpayload)._ |
-| `tags` (`object`) | tags<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrenttags)._ |
-| `protocol` (`array`) | protocol |
-| `cribl` (`object`) | cribl<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentcribl)._ |
+| `metric` (`object`) | TBD metric<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentmetric)._ |
+| `libscope` (`object`) | TBD libscope<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentlibscope)._ |
+| `event` (`object`) | TBD event<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentevent)._ |
+| `payload` (`object`) | TBD payload<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentpayload)._ |
+| `tags` (`object`) | TBD tags<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrenttags)._ |
+| `protocol` (`array`) | TBD protocol |
+| `cribl` (`object`) | TBD cribl<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentcribl)._ |
 
 #### `start.msg.info.configuration.current.metric` properties {#eventstartmsginfoconfigurationcurrentmetric}
 
 | Property | Description |
 |---|---|
-| `enable` (`string`) | enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `transport` (`object`) | transport<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentmetrictransport)._ |
-| `format` (`object`) | format<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentmetricformat)._ |
-| `watch` (`array`) | watch |
+| `enable` (`string`) | TBD enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `transport` (`object`) | TBD transport<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentmetrictransport)._ |
+| `format` (`object`) | TBD format<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentmetricformat)._ |
+| `watch` (`array`) | TBD watch |
 
 #### `start.msg.info.configuration.current.libscope` properties {#eventstartmsginfoconfigurationcurrentlibscope}
 
 | Property | Description |
 |---|---|
-| `log` (`object`) | log<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentlibscopelog)._ |
+| `log` (`object`) | TBD log<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentlibscopelog)._ |
 
 #### `start.msg.info.configuration.current.event` properties {#eventstartmsginfoconfigurationcurrentevent}
 
 | Property | Description |
 |---|---|
-| `enable` (`string`) | enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `transport` (`object`) | transport<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrenteventtransport)._ |
-| `format` (`object`) | format<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrenteventformat)._ |
-| `watch` (`array`) | watch |
+| `enable` (`string`) | TBD enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `transport` (`object`) | TBD transport<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrenteventtransport)._ |
+| `format` (`object`) | TBD format<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrenteventformat)._ |
+| `watch` (`array`) | TBD watch |
 
 #### `start.msg.info.configuration.current.payload` properties {#eventstartmsginfoconfigurationcurrentpayload}
 
 | Property | Description |
 |---|---|
-| `enable` (`string`) | enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `dir` (`string`) | dir |
+| `enable` (`string`) | TBD enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `dir` (`string`) | TBD dir |
 
 #### `start.msg.info.configuration.current.tags` properties {#eventstartmsginfoconfigurationcurrenttags}
 
@@ -2302,112 +2302,112 @@ Structure of the start message
 
 | Property | Description |
 |---|---|
-| `enable` (`string`) | enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `transport` (`object`) | transport<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentcribltransport)._ |
-| `authtoken` (`string`) | authtoken |
+| `enable` (`string`) | TBD enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `transport` (`object`) | TBD transport<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentcribltransport)._ |
+| `authtoken` (`string`) | TBD authtoken |
 
 #### `start.msg.info.configuration.current.metric.transport` properties {#eventstartmsginfoconfigurationcurrentmetrictransport}
 
 | Property | Description |
 |---|---|
-| `type` (`string`) | transport type<br/><br/>**Possible values:**<ul><li>`tcp`</li><li>`udp`</li><li>`unix`</li><li>`file`</li><li>`edge`</li></ul> |
-| `host` (`string`) | host |
-| `port` (`string`) | port |
-| `path` (`string`) | path<br/><br/>**Example:**<br/>`/tmp/scope.log` |
-| `buffering` (`string`) | buffering<br/><br/>**Possible values:**<ul><li>`line`</li><li>`full`</li></ul> |
-| `tls` (`object`) | tls<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentmetrictransporttls)._ |
+| `type` (`string`) | TBD transport type<br/><br/>**Possible values:**<ul><li>`tcp`</li><li>`udp`</li><li>`unix`</li><li>`file`</li><li>`edge`</li></ul> |
+| `host` (`string`) | Hostname for the host on which the scoped app was run. |
+| `port` (`string`) | TBD port |
+| `path` (`string`) | TBD path<br/><br/>**Example:**<br/>`/tmp/scope.log` |
+| `buffering` (`string`) | TBD buffering<br/><br/>**Possible values:**<ul><li>`line`</li><li>`full`</li></ul> |
+| `tls` (`object`) | TBD tls<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentmetrictransporttls)._ |
 
 #### `start.msg.info.configuration.current.metric.format` properties {#eventstartmsginfoconfigurationcurrentmetricformat}
 
 | Property | Description |
 |---|---|
-| `type` (`string`) | type<br/><br/>**Possible values:**<ul><li>`statsd`</li><li>`ndjson`</li></ul> |
-| `statsdprefix` (`string`) | statsdprefix |
-| `statsdmaxlen` (`integer`) | statsdmaxlen |
-| `verbosity` (`integer`) | verbosity |
+| `type` (`string`) | TBD type<br/><br/>**Possible values:**<ul><li>`statsd`</li><li>`ndjson`</li></ul> |
+| `statsdprefix` (`string`) | TBD statsdprefix |
+| `statsdmaxlen` (`integer`) | TBD statsdmaxlen |
+| `verbosity` (`integer`) | TBD verbosity |
 
 #### `start.msg.info.configuration.current.libscope.log` properties {#eventstartmsginfoconfigurationcurrentlibscopelog}
 
 | Property | Description |
 |---|---|
-| `level` (`string`) | level<br/><br/>**Possible values:**<ul><li>`debug`</li><li>`info`</li><li>`warning`</li><li>`error`</li><li>`none`</li></ul> |
-| `transport` (`object`) | transport<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentlibscopelogtransport)._ |
-| `configevent` (`string`) | configevent<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `summaryperiod` (`integer`) | summaryperiod |
-| `commanddir` (`string`) | commanddir |
+| `level` (`string`) | TBD level<br/><br/>**Possible values:**<ul><li>`debug`</li><li>`info`</li><li>`warning`</li><li>`error`</li><li>`none`</li></ul> |
+| `transport` (`object`) | TBD transport<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentlibscopelogtransport)._ |
+| `configevent` (`string`) | TBD configevent<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `summaryperiod` (`integer`) | TBD summaryperiod |
+| `commanddir` (`string`) | TBD commanddir |
 
 #### `start.msg.info.configuration.current.event.transport` properties {#eventstartmsginfoconfigurationcurrenteventtransport}
 
 | Property | Description |
 |---|---|
-| `type` (`string`) | transport type<br/><br/>**Possible values:**<ul><li>`tcp`</li><li>`udp`</li><li>`unix`</li><li>`file`</li><li>`edge`</li></ul> |
-| `host` (`string`) | host |
-| `port` (`string`) | port |
-| `path` (`string`) | path<br/><br/>**Example:**<br/>`/tmp/scope.log` |
-| `buffering` (`string`) | buffering<br/><br/>**Possible values:**<ul><li>`line`</li><li>`full`</li></ul> |
-| `tls` (`object`) | tls<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrenteventtransporttls)._ |
+| `type` (`string`) | TBD transport type<br/><br/>**Possible values:**<ul><li>`tcp`</li><li>`udp`</li><li>`unix`</li><li>`file`</li><li>`edge`</li></ul> |
+| `host` (`string`) | Hostname for the host on which the scoped app was run. |
+| `port` (`string`) | TBD port |
+| `path` (`string`) | TBD path<br/><br/>**Example:**<br/>`/tmp/scope.log` |
+| `buffering` (`string`) | TBD buffering<br/><br/>**Possible values:**<ul><li>`line`</li><li>`full`</li></ul> |
+| `tls` (`object`) | TBD tls<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrenteventtransporttls)._ |
 
 #### `start.msg.info.configuration.current.event.format` properties {#eventstartmsginfoconfigurationcurrenteventformat}
 
 | Property | Description |
 |---|---|
-| `type` (`string`) | type<br/><br/>**Possible values:**<ul><li>`statsd`</li><li>`ndjson`</li></ul> |
-| `maxeventpersec` (`integer`) | maxeventpersec |
-| `enhancefs` (`string`) | enhancefs<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `type` (`string`) | TBD type<br/><br/>**Possible values:**<ul><li>`statsd`</li><li>`ndjson`</li></ul> |
+| `maxeventpersec` (`integer`) | TBD maxeventpersec |
+| `enhancefs` (`string`) | TBD enhancefs<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
 
 #### `start.msg.info.configuration.current.cribl.transport` properties {#eventstartmsginfoconfigurationcurrentcribltransport}
 
 | Property | Description |
 |---|---|
-| `type` (`string`) | transport type<br/><br/>**Possible values:**<ul><li>`tcp`</li><li>`udp`</li><li>`unix`</li><li>`file`</li><li>`edge`</li></ul> |
-| `host` (`string`) | host |
-| `port` (`string`) | port |
-| `path` (`string`) | path<br/><br/>**Example:**<br/>`/tmp/scope.log` |
-| `buffering` (`string`) | buffering<br/><br/>**Possible values:**<ul><li>`line`</li><li>`full`</li></ul> |
-| `tls` (`object`) | tls<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentcribltransporttls)._ |
+| `type` (`string`) | TBD transport type<br/><br/>**Possible values:**<ul><li>`tcp`</li><li>`udp`</li><li>`unix`</li><li>`file`</li><li>`edge`</li></ul> |
+| `host` (`string`) | Hostname for the host on which the scoped app was run. |
+| `port` (`string`) | TBD port |
+| `path` (`string`) | TBD path<br/><br/>**Example:**<br/>`/tmp/scope.log` |
+| `buffering` (`string`) | TBD buffering<br/><br/>**Possible values:**<ul><li>`line`</li><li>`full`</li></ul> |
+| `tls` (`object`) | TBD tls<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentcribltransporttls)._ |
 
 #### `start.msg.info.configuration.current.metric.transport.tls` properties {#eventstartmsginfoconfigurationcurrentmetrictransporttls}
 
 | Property | Description |
 |---|---|
-| `enable` (`string`) | enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `validateserver` (`string`) | validateserver<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `cacertpath` (`string`) | cacertpath |
+| `enable` (`string`) | TBD enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `validateserver` (`string`) | TBD validateserver<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `cacertpath` (`string`) | TBD cacertpath |
 
 #### `start.msg.info.configuration.current.libscope.log.transport` properties {#eventstartmsginfoconfigurationcurrentlibscopelogtransport}
 
 | Property | Description |
 |---|---|
-| `type` (`string`) | transport type<br/><br/>**Possible values:**<ul><li>`tcp`</li><li>`udp`</li><li>`unix`</li><li>`file`</li><li>`edge`</li></ul> |
-| `host` (`string`) | host |
-| `port` (`string`) | port |
-| `path` (`string`) | path<br/><br/>**Example:**<br/>`/tmp/scope.log` |
-| `buffering` (`string`) | buffering<br/><br/>**Possible values:**<ul><li>`line`</li><li>`full`</li></ul> |
-| `tls` (`object`) | tls<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentlibscopelogtransporttls)._ |
+| `type` (`string`) | TBD transport type<br/><br/>**Possible values:**<ul><li>`tcp`</li><li>`udp`</li><li>`unix`</li><li>`file`</li><li>`edge`</li></ul> |
+| `host` (`string`) | Hostname for the host on which the scoped app was run. |
+| `port` (`string`) | TBD port |
+| `path` (`string`) | TBD path<br/><br/>**Example:**<br/>`/tmp/scope.log` |
+| `buffering` (`string`) | TBD buffering<br/><br/>**Possible values:**<ul><li>`line`</li><li>`full`</li></ul> |
+| `tls` (`object`) | TBD tls<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentlibscopelogtransporttls)._ |
 
 #### `start.msg.info.configuration.current.event.transport.tls` properties {#eventstartmsginfoconfigurationcurrenteventtransporttls}
 
 | Property | Description |
 |---|---|
-| `enable` (`string`) | enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `validateserver` (`string`) | validateserver<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `cacertpath` (`string`) | cacertpath |
+| `enable` (`string`) | TBD enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `validateserver` (`string`) | TBD validateserver<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `cacertpath` (`string`) | TBD cacertpath |
 
 #### `start.msg.info.configuration.current.cribl.transport.tls` properties {#eventstartmsginfoconfigurationcurrentcribltransporttls}
 
 | Property | Description |
 |---|---|
-| `enable` (`string`) | enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `validateserver` (`string`) | validateserver<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `cacertpath` (`string`) | cacertpath |
+| `enable` (`string`) | TBD enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `validateserver` (`string`) | TBD validateserver<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `cacertpath` (`string`) | TBD cacertpath |
 
 #### `start.msg.info.configuration.current.libscope.log.transport.tls` properties {#eventstartmsginfoconfigurationcurrentlibscopelogtransporttls}
 
 | Property | Description |
 |---|---|
-| `enable` (`string`) | enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `validateserver` (`string`) | validateserver<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `cacertpath` (`string`) | cacertpath |
+| `enable` (`string`) | TBD enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `validateserver` (`string`) | TBD validateserver<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `cacertpath` (`string`) | TBD cacertpath |
 
 ### dns.req [^](#schema-reference) {#metricdnsreq}
 

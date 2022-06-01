@@ -2279,6 +2279,7 @@ createMetricWatchArrayJson(config_t* cfg)
     metric_watch_t category;
     for(category = CFG_MTC_FS; category <= CFG_MTC_STATSD; ++category) {
         cJSON* item;
+        if (!cfgMtcWatchEnable(cfg, category)) continue;
         if (!(item = createMetricWatchObjectJson(cfg, mtcWatchTypeMap[category].str))) goto err;
         cJSON_AddItemToArray(root, item);
     }

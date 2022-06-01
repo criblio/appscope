@@ -20,6 +20,7 @@
 #include <dirent.h>
 
 #include "atomic.h"
+#include "backoff.h"
 #include "cfg.h"
 #include "cfgutils.h"
 #include "com.h"
@@ -430,44 +431,21 @@ fileModTime(const char *path)
 }
 
 static void
-remoteConfig()
+remoteConfig(void)
 {
-    int timeout;
-    struct pollfd fds;
+    int fd;
     int rc, success, numtries;
     FILE *fs;
     char buf[1024];
     char path[PATH_MAX];
-    
-    // to be clear; a 1ms timeout
-    timeout = 1;
-    scope_memset(&fds, 0x0, sizeof(fds));
 
-    // We want to accept incoming requests on TCP, unix, and edge.
-    // However, we don't currently support receving on TLS connections.
-    int acceptRequests = transportSupportsCommandControl(
-                                          ctlTransport(g_ctl, CFG_CTL));
-    fds.events = (acceptRequests) ? POLLIN : 0;
+    fd = ctlConnection(g_ctl, CFG_CTL);
 
-    fds.fd = ctlConnection(g_ctl, CFG_CTL);
+    rc = transportPoll(ctlTransport(g_ctl, CFG_CTL), fd);
 
-    rc = scope_poll(&fds, 1, timeout);
-
-    /*
-     * Error from poll;
-     * doing this separtately in order to count errors. Necessary?
-     */
-    if (rc < 0) {
-        DBG(NULL);
+    if (rc <= 0) {
         return;
     }
-
-    /*
-     * Timeout or no read data?
-     * We can track exceptions where revents != POLLIN. Necessary?
-     */
-    if ((rc == 0) || (fds.revents == 0) || ((fds.revents & POLLIN) == 0) ||
-        ((fds.revents & POLLHUP) != 0) || ((fds.revents & POLLNVAL) != 0)) return;
 
     scope_snprintf(path, sizeof(path), "/tmp/cfg.%d", g_proc.pid);
     if ((fs = scope_fopen(path, "a+")) == NULL) {
@@ -479,7 +457,7 @@ remoteConfig()
     success = rc = scope_errno = numtries = 0;
     do {
         numtries++;
-        rc = scope_recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
+        rc = scope_recv(fd, buf, sizeof(buf), MSG_DONTWAIT);
         if (rc <= 0) {
             // Something has happened to this incoming message
             break;
@@ -1089,6 +1067,7 @@ periodic(void *arg)
             scope_gettimeofday(&tv, NULL);
             summaryTime = tv.tv_sec + g_thread.interval;
 
+            //TODO: Improve this message/modify it?
             if (tv.tv_sec >= logReportTime) {
                 if (ctlNeedsConnection(g_ctl, CFG_CTL)) {
                     scopeLog(CFG_LOG_WARN, "event destination not connected. messages dropped: "

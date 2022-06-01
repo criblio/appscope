@@ -248,5 +248,7 @@ void*         scope_shmat(int, const void *, int);
 int           scope_shmdt(const void *);
 int           scope_shmget(key_t, size_t, int);
 int           scope_sched_getcpu(void);
+long          scope_random(void);
+void          scope_srandom(unsigned int);
 
 #endif // __SCOPE_STDLIB_H__

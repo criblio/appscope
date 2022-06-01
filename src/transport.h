@@ -36,10 +36,10 @@ int                 transportConnection(transport_t *);
 int                 transportDisconnect(transport_t *);
 int                 transportReconnect(transport_t *);
 cfg_transport_t     transportType(transport_t *);
-int                 transportSupportsCommandControl(transport_t *);
 uint64_t            transportConnectAttempts(transport_t *);
 net_fail_t          transportFailureReason(transport_t *);
 
 // Misc
 void                transportRegisterForExitNotification(void (*fn)(void));
+int                 transportPoll(transport_t *, int);
 #endif // __TRANSPORT_H__

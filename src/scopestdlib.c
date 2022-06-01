@@ -196,6 +196,8 @@ extern void*         scopelibc_shmat(int, const void *, int);
 extern int           scopelibc_shmdt(const void *);
 extern int           scopelibc_shmget(key_t, size_t, int);
 extern int           scopelibc_sched_getcpu(void);
+extern long          scopelibc_random(void);
+extern void          scopelibc_srandom(unsigned int);
 
 static int g_go_static;
 
@@ -1109,6 +1111,16 @@ scope_shmget(key_t key, size_t size, int shmflg) {
 int
 scope_sched_getcpu(void) {
     return scopelibc_sched_getcpu();
+}
+
+long
+scope_random(void) {
+    return scopelibc_random();
+}
+
+void
+scope_srandom(unsigned int seed) {
+    scopelibc_srandom(seed);
 }
 
 int

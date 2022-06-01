@@ -20,6 +20,7 @@
 #include "os.h"
 #include "scopestdlib.h"
 #include "fn.h"
+#include "backoff.h"
 #include "transport.h"
 
 // Yuck.  Avoids naming conflict between our src/wrap.c and libssl.a
@@ -156,24 +157,95 @@ transportType(transport_t *trans)
     return trans->type;
 }
 
-int
-transportSupportsCommandControl(transport_t *trans)
-{
+bool
+transpotInitBackoff(transport_t *trans) {
+
     if (!trans) return FALSE;
 
     switch (trans->type) {
         case CFG_TCP:
-            // It would be possible to support incoming commands over tls,
-            // but our code doesn't support this today.
-            return !trans->net.tls.enable;
+        case CFG_UDP:
         case CFG_UNIX:
         case CFG_EDGE:
-            return TRUE;
+            return (backoffInit(1000, 1000, 1000, 1234) == BACKOFF_OK);
+            break;
         default:
             return FALSE;
+            break;
     }
 }
 
+unsigned
+transportGetBackoffTime(transport_t *trans){
+    unsigned backoff_time = 0;
+    if (!trans) return backoff_time;
+
+    switch (trans->type) {
+        case CFG_TCP:
+        case CFG_UDP:
+        case CFG_UNIX:
+        case CFG_EDGE:
+            if(backoffGetTime(&backoff_time) == BACKOFF_OK)
+                return backoff_time;
+            return 0;
+            break;
+        default:
+            return backoff_time;
+            break;
+    }
+}
+
+int
+transportPoll(transport_t *trans, int fd)
+{    
+    // to be clear; a 1ms timeout
+    int timeout = 1;
+    int rc;
+    struct pollfd fds = {0};
+
+    // We want to accept incoming requests on TCP, unix, and edge.
+    // However, we don't currently support receving on TLS connections.
+    if (trans) {
+        switch (trans->type) {
+            case CFG_TCP:
+                // It would be possible to support incoming commands over tls,
+                // but our code doesn't support this today.
+                if (!trans->net.tls.enable)
+                    fds.events = POLLIN;
+                break;
+            case CFG_UNIX:
+            case CFG_EDGE:
+                fds.events = POLLIN;
+                break;
+            default:
+                break;
+        }
+    }
+    fds.fd = fd;
+
+    rc = scope_poll(&fds, 1, timeout);
+    scopeLogError("transportPoll called rc %d", rc);
+
+    /*
+     * Error from scope_poll
+     * doing this separtately in order to count errors. Necessary?
+     */
+    if (rc < 0) {
+        DBG(NULL);
+        return rc;
+    }
+
+    /*
+     * Timeout or no read data?
+     * We can track exceptions where revents != POLLIN. Necessary?
+     */
+    if ((rc == 0) || (fds.revents == 0) || ((fds.revents & POLLIN) == 0) ||
+        ((fds.revents & POLLHUP) != 0) || ((fds.revents & POLLNVAL) != 0)) {
+        return 0;
+    }
+
+    return rc;
+}
 
 int
 transportConnection(transport_t *trans)

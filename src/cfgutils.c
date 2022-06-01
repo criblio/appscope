@@ -140,6 +140,10 @@ enum_map_t watchTypeMap[] = {
     {NULL,                    -1}
 };
 
+// TODO extend the structure below with statsd
+// Keep in mind that metric_category_t is a bit no
+// so statsd should be a last one
+
 enum_map_t mtcCategoriesWatchTypeMap[] = {
     {"fs",                    CFG_MTC_FS},
     {"net",                   CFG_MTC_NET},

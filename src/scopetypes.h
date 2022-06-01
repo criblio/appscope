@@ -29,7 +29,8 @@ typedef enum {CFG_MTC_FS,
               CFG_MTC_NET,
               CFG_MTC_HTTP,
               CFG_MTC_DNS,
-              CFG_MTC_PROC} metric_category_t;
+              CFG_MTC_PROC, 
+              CFG_MTC_STATSD} metric_watch_t;
 
 #define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))

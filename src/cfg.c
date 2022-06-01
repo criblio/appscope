@@ -298,33 +298,24 @@ cfgMtcEnable(config_t* cfg)
 }
 
 unsigned
-cfgMtcFsEnable(config_t* cfg)
-{
-    return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_FS) : DEFAULT_MTC_FS_ENABLE;
-}
-
-unsigned
-cfgMtcNetEnable(config_t* cfg)
-{
-    return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_NET) : DEFAULT_MTC_NET_ENABLE;
-}
-
-unsigned
-cfgMtcHttpEnable(config_t* cfg)
-{
-    return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_HTTP) : DEFAULT_MTC_HTTP_ENABLE;
-}
-
-unsigned
-cfgMtcDnsEnable(config_t* cfg)
-{
-    return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_DNS) : DEFAULT_MTC_DNS_ENABLE;
-}
-
-unsigned
-cfgMtcProcEnable(config_t* cfg)
-{
-    return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_PROC) : DEFAULT_MTC_PROC_ENABLE;
+cfgMtcWatchEnable(config_t* cfg, metric_watch_t category) {
+    switch(category){
+        case CFG_MTC_FS:
+            return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_FS) : DEFAULT_MTC_FS_ENABLE;
+        case CFG_MTC_NET:
+            return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_NET) : DEFAULT_MTC_NET_ENABLE;
+        case CFG_MTC_HTTP:
+            return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_HTTP) : DEFAULT_MTC_HTTP_ENABLE;
+        case CFG_MTC_DNS:
+            return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_DNS) : DEFAULT_MTC_DNS_ENABLE;
+        case CFG_MTC_PROC:
+            return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_PROC) : DEFAULT_MTC_PROC_ENABLE;
+        case CFG_MTC_STATSD:
+            return (cfg) ? cfg->mtc.statsd.enable : DEFAULT_MTC_STATSD_ENABLE;
+        default:
+            DBG(NULL);
+            return 0;
+    }
 }
 
 cfg_mtc_format_t
@@ -351,11 +342,6 @@ cfgMtcPeriod(config_t* cfg)
     return (cfg) ? cfg->mtc.period : DEFAULT_SUMMARY_PERIOD;
 }
 
-unsigned
-cfgMtcStatsdEnable(config_t *cfg)
-{
-    return (cfg) ? cfg->mtc.statsd.enable : DEFAULT_MTC_STATSD_ENABLE;
-}
 
 const char *
 cfgCmdDir(config_t* cfg)
@@ -701,14 +687,7 @@ cfgMtcPeriodSet(config_t* cfg, unsigned val)
 }
 
 void
-cfgMtcStatsdEnableSet(config_t *cfg, unsigned val)
-{
-    if (!cfg || val > 1) return;
-    cfg->mtc.statsd.enable = val;
-}
-
-void
-cfgMtcCategoryEnableSet(config_t *cfg, unsigned val, metric_category_t type)
+cfgMtcWatchEnableSet(config_t *cfg, unsigned val, metric_watch_t type)
 {
     if (!cfg || val > 1) return;
 
@@ -719,6 +698,9 @@ cfgMtcCategoryEnableSet(config_t *cfg, unsigned val, metric_category_t type)
         case CFG_MTC_DNS:
         case CFG_MTC_PROC:
             SCOPE_BIT_SET_VAR(cfg->mtc.categories, type, val);
+            break;
+        case CFG_MTC_STATSD:
+            cfg->mtc.statsd.enable = val;
             break;
         default:
             DBG(NULL);

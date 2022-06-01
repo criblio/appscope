@@ -300,7 +300,7 @@ cfgMtcEnable(config_t* cfg)
 unsigned
 cfgMtcFsEnable(config_t* cfg)
 {
-    return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_FS) : DEFAULT_MTC_ENABLE;
+    return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_FS) : DEFAULT_MTC_FS_ENABLE;
 }
 
 unsigned

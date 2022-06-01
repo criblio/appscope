@@ -39,6 +39,7 @@ const tocOrder = [
   'event.console',
   'event.stderr',
   'event.notice',
+  'event.start.msg',
 
   'metric.fs.open',
   'metric.fs.close',
@@ -81,6 +82,7 @@ const tocHeaders = {
   file: 'File',
   console: 'Console',
   notice: 'System Notification',
+  start: `Start Message`,
   proc: 'Process'
 }
 

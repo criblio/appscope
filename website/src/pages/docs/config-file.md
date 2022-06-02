@@ -394,6 +394,9 @@ event:
     # category. The regular expressions can be set with
     # $SCOPE_EVENT_CONSOLE_NAME and $SCOPE_EVENT_CONSOLE_VALUE.
     #
+    # Set $SCOPE_ALLOW_BINARY_CONSOLE to true or false to allow or disallow
+    # emiting binary data for console events.
+    #
     - type: console
       name: (stdout)|(stderr)
       value: .*

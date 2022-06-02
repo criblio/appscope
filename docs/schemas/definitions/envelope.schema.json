@@ -9,11 +9,28 @@
       "description": "Identifies the operation during whose lifetime the event or metric is emitted.",
       "type": "string"
     },
+    "authtoken": {
+      "title": "authtoken",
+      "description": "TBD authtoken",
+      "type": "string"
+    },
+    "breaker": {
+      "title": "breaker",
+      "description": "TBD breaker",
+      "type": "string",
+      "const": "Cribl - Do Not Break Ruleset"
+    },
     "event_type": {
       "title": "type",
       "description": "Distinguishes events from metrics.",
       "type": "string",
       "const": "evt"
+    },
+    "format": {
+      "title": "format",
+      "description": "TBD format",
+      "type": "string",
+      "enum": ["scope", "ndjson"]
     },
     "id": {
       "title": "id",

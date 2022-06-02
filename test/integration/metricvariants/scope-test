@@ -1,0 +1,260 @@
+#!/bin/bash
+DEBUG=0  # set this to 1 to capture the OUTFILE for each test
+
+FAILED_TEST_LIST=""
+FAILED_TEST_COUNT=0
+
+EVT_FILE="/opt/test-runner/logs/events.log"
+METRIC_FILE="/opt/test-runner/logs/metrics.log"
+SCOPE_LOG_FILE="/opt/test-runner/logs/scope.log"
+
+starttest(){
+    CURRENT_TEST=$1
+    echo "==================================="
+    echo "       Testing $CURRENT_TEST       "
+    echo "==================================="
+    ERR=0
+}
+
+evaltest(){
+    if [ $? -ne 0 ]; then
+        echo "It appears that node hotshot.ts crashed."
+        ERR+=1
+    fi
+    echo "       Evaluating $CURRENT_TEST"
+}
+
+endtest(){
+    if [ $ERR -eq "0" ]; then
+        RESULT=PASSED
+    else
+        RESULT=FAILED
+        FAILED_TEST_LIST+=$CURRENT_TEST
+        FAILED_TEST_LIST+=" "
+        FAILED_TEST_COUNT=$(($FAILED_TEST_COUNT + 1))
+    fi
+
+    echo "*************** $CURRENT_TEST $RESULT ***************"
+    echo ""
+    echo ""
+
+    # copy the EVT_FILE to help with debugging
+    if (( $DEBUG )) || [ $RESULT == "FAILED" ]; then
+        cp $EVT_FILE $EVT_FILE.$CURRENT_TEST 2>/dev/null
+        cp $METRIC_FILE $METRIC_FILE.$CURRENT_TEST 2>/dev/null
+        cp $LOG_FILE $LOG_FILE.$CURRENT_TEST 2>/dev/null
+    fi
+
+    rm -f $EVT_FILE
+    rm -f $METRIC_FILE
+    rm -f $LOG_FILE
+}
+
+declare -a curl_fs_metrics=(
+"fs.open:"
+"fs.close:"
+"fs.duration:"
+"fs.error:"
+"fs.read:"
+"fs.write:"
+)
+
+declare -a curl_fs_events=(
+'"source":"fs.open"'
+'"source":"fs.close"'
+)
+
+declare -a curl_net_metrics=(
+"net.close:"
+"net.error:"
+"net.rx:"
+"net.tx:"
+"net.port:"
+"net.tcp:"
+"net.udp:"
+)
+
+declare -a curl_net_events=(
+'"source":"net.open"'
+'"source":"net.close"'
+)
+
+declare -a curl_http_metrics=(
+"http.req:"
+"http.resp.content_length:"
+"http.duration.client:"
+)
+
+declare -a curl_http_events=(
+'"source":"http.resp"'
+'"source":"http.req"'
+)
+
+declare -a curl_proc_metrics=(
+"proc.start:" 
+"proc.cpu:"
+"proc.mem:"
+"proc.thread:"
+"proc.fd:"
+"proc.child:"
+)
+
+allow_list_data(){
+    local -n data_array=$1
+    local input_file=$2
+    for single_data in "${data_array[@]}"
+    do
+        egrep -q "$single_data" $input_file
+        if [ $? -ne "0" ]; then
+            echo "Missing event/metric: $single_data"
+            ERR+=1
+        fi
+    done
+}
+
+deny_list_data(){
+    local -n data_array=$1
+    local input_file=$2
+    for single_data in "${data_array[@]}"
+    do
+        egrep -q "$single_data" $input_file
+        if [ $? -eq "0" ]; then
+            echo "Metric/Event not expected: $single_data"
+            ERR+=1
+        fi
+    done
+}
+
+cd /opt/test-runner
+
+starttest all_metrics_and_events_enabled
+
+ldscope -- curl https://cribl.io -o /dev/null
+ERR+=$?
+
+allow_list_data curl_fs_metrics $METRIC_FILE
+allow_list_data curl_net_metrics $METRIC_FILE
+allow_list_data curl_http_metrics $METRIC_FILE
+allow_list_data curl_proc_metrics $METRIC_FILE
+
+allow_list_data curl_fs_events $EVT_FILE
+allow_list_data curl_net_events $EVT_FILE
+allow_list_data curl_http_events $EVT_FILE
+
+endtest
+
+starttest all_metrics_and_events_enabled_http_disabled
+
+SCOPE_EVENT_HTTP=false ldscope -- curl https://cribl.io -o /dev/null
+ERR+=$?
+
+allow_list_data curl_fs_metrics $METRIC_FILE
+allow_list_data curl_net_metrics $METRIC_FILE
+allow_list_data curl_http_metrics $METRIC_FILE
+allow_list_data curl_proc_metrics $METRIC_FILE
+
+allow_list_data curl_fs_events $EVT_FILE
+allow_list_data curl_net_events $EVT_FILE
+deny_list_data curl_http_events $EVT_FILE
+
+endtest
+
+starttest fs_disable_event_disable
+
+SCOPE_EVENT_ENABLE=false SCOPE_METRIC_FS=false ldscope -- curl https://cribl.io -o /dev/null
+ERR+=$?
+
+deny_list_data curl_fs_metrics $METRIC_FILE
+allow_list_data curl_net_metrics $METRIC_FILE
+allow_list_data curl_http_metrics $METRIC_FILE
+allow_list_data curl_proc_metrics $METRIC_FILE
+
+deny_list_data curl_fs_events $EVT_FILE
+deny_list_data curl_net_events $EVT_FILE
+deny_list_data curl_http_events $EVT_FILE
+
+endtest
+
+starttest network_disable_event_disable
+
+SCOPE_EVENT_ENABLE=false SCOPE_METRIC_NET=false ldscope -- curl https://cribl.io -o /dev/null
+ERR+=$?
+
+allow_list_data curl_fs_metrics $METRIC_FILE
+deny_list_data curl_net_metrics $METRIC_FILE
+allow_list_data curl_http_metrics $METRIC_FILE
+allow_list_data curl_proc_metrics $METRIC_FILE
+
+deny_list_data curl_fs_events $EVT_FILE
+deny_list_data curl_net_events $EVT_FILE
+deny_list_data curl_http_events $EVT_FILE
+
+endtest
+
+starttest http_disable_event_disable
+
+SCOPE_EVENT_ENABLE=false SCOPE_METRIC_HTTP=false ldscope -- curl https://cribl.io -o /dev/null
+ERR+=$?
+
+allow_list_data curl_fs_metrics $METRIC_FILE
+allow_list_data curl_net_metrics $METRIC_FILE
+deny_list_data curl_http_metrics $METRIC_FILE
+allow_list_data curl_proc_metrics $METRIC_FILE
+
+deny_list_data curl_fs_events $EVT_FILE
+deny_list_data curl_net_events $EVT_FILE
+deny_list_data curl_http_events $EVT_FILE
+
+endtest
+
+starttest proc_disable_event_disable
+
+SCOPE_EVENT_ENABLE=false SCOPE_METRIC_PROC=false ldscope -- curl https://cribl.io -o /dev/null
+ERR+=$?
+
+allow_list_data curl_fs_metrics $METRIC_FILE
+allow_list_data curl_net_metrics $METRIC_FILE
+allow_list_data curl_http_metrics $METRIC_FILE
+deny_list_data curl_proc_metrics $METRIC_FILE
+
+deny_list_data curl_fs_events $EVT_FILE
+deny_list_data curl_net_events $EVT_FILE
+deny_list_data curl_http_events $EVT_FILE
+
+endtest
+
+starttest disable_all_metrics_with_variants
+
+SCOPE_EVENT_ENABLE=false SCOPE_METRIC_FS=false SCOPE_METRIC_NET=false SCOPE_METRIC_HTTP=false SCOPE_METRIC_PROC=false ldscope -- curl https://cribl.io -o /dev/null
+ERR+=$?
+
+# check if metric file is empty
+if [ -s "$METRIC_FILE" ]; then
+    ERR+=1
+fi
+deny_list_data curl_fs_metrics $METRIC_FILE
+deny_list_data curl_net_metrics $METRIC_FILE
+deny_list_data curl_http_metrics $METRIC_FILE
+deny_list_data curl_proc_metrics $METRIC_FILE
+
+deny_list_data curl_fs_events $EVT_FILE
+deny_list_data curl_net_events $EVT_FILE
+deny_list_data curl_http_events $EVT_FILE
+
+endtest
+
+
+if (( $FAILED_TEST_COUNT == 0 )); then
+    echo ""
+    echo ""
+    echo "*************** ALL TESTS PASSED ***************"
+else
+    echo "*************** SOME TESTS FAILED ***************"
+    echo "Failed tests: $FAILED_TEST_LIST"
+    echo "Refer to these files for more info:"
+    for FAILED_TEST in $FAILED_TEST_LIST; do
+        echo "  $OUTFILE.$FAILED_TEST"
+    done
+fi
+
+exit ${FAILED_TEST_COUNT}

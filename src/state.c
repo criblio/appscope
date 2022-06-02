@@ -82,6 +82,7 @@ static list_t *g_extra_net_info_list = NULL;
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
 
+
 static void
 destroyNetInfo(void *data)
 {
@@ -1319,14 +1320,13 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
         }
 
         if (net && net->protoProtoDef) {
-            // Process HTTP if detected and events are enabled
-            if (cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP) &&
-               !scope_strcasecmp(net->protoProtoDef->protname, "HTTP")) {
-
+            // Process HTTP if detected and http or metrics are enabled
+            if ((!scope_strcasecmp(net->protoProtoDef->protname, "HTTP")) &&
+                ((cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) || (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_HTTP)))) {
                 doHttp(id, sockfd, net, buf, len, src, dtype);
             }
 
-            if (cfgMtcStatsdEnable(g_cfg.staticfg) &&
+            if (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_STATSD) &&
                 !scope_strcasecmp(net->protoProtoDef->protname, "STATSD")) {
 
                 doMetricCapture(id, sockfd, net, buf, len, src, dtype);

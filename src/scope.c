@@ -257,22 +257,27 @@ getGoVersion(elf_buf_t *ebuf) {
     }
     */
 
-//        Elf64_Shdr* textSec = getElfSection(ebuf->buf, ".text");
-        Elf64_Shdr* dataSec = getElfSection(ebuf->buf, ".data");
+    Elf64_Shdr *textSec = getElfSection(ebuf->buf, ".text");
+    Elf64_Shdr *dataSec = getElfSection(ebuf->buf, ".data");
 //        Elf64_Shdr* rodataSec = getElfSection(ebuf->buf, ".rodata");
 
+
+    uint64_t taddr = (uint64_t)textSec->sh_addr;
+    uint64_t toff = (uint64_t)textSec->sh_offset;
+    uint64_t go_cgo_callers = (uint64_t)getSymbol(ebuf->buf, "_cgo_callers");
 
     uint64_t go_ver_str_sym = (uint64_t)getSymbol(ebuf->buf, "runtime.buildVersion.str");
     if (go_ver_str_sym) {
         char *go_ver_sym_1 = (char *)((uint64_t)ebuf->buf + (go_ver_str_sym - (uint64_t)dataSec->sh_addr) + (uint64_t)dataSec->sh_offset);
         go_ver = (char *)(go_ver_sym_1 + base);
     } else {
-        void *go_ver_sym = getSymbol(ebuf->buf, "runtime.buildVersion");
+        uint64_t go_ver_sym = (uint64_t)getSymbol(ebuf->buf, "runtime.buildVersion");
         if (go_ver_sym) {
-            // Start of file + Offset into rodata + Offset of rodata in the file
+            // Start of file + Offset into data + Offset of data in the file
+            // ebuf->buf + dataSec->sh_offset + (go_cgo_callers - dataSec->sh_addr)
             uint64_t *go_ver_sym_1 = (uint64_t *)((uint64_t)ebuf->buf + (go_ver_sym - (uint64_t)dataSec->sh_addr) + (uint64_t)dataSec->sh_offset);
 
-            uint64_t go_ver_sym_2 = ((uint64_t )ebuf->buf + (*go_ver_sym_1 - (uint64_t)dataSec->sh_addr) + (uint64_t)dataSec->sh_offset);
+            uint64_t go_ver_sym_2 = ((uint64_t )ebuf->buf + (*go_ver_sym_1 - (uint64_t)textSec->sh_addr) + (uint64_t)textSec->sh_offset);
 
             gostring_t go_str_tmp = {
                .len = (int)*((char *)go_ver_sym_1 + 0x8),
@@ -289,6 +294,15 @@ getGoVersion(elf_buf_t *ebuf) {
     }
 
     if (!go_ver) {
+        /*
+         * function symbol from elf file image
+         * pclntab entry for the function; 8-17 pclntab functab is addrs, 18 functab is offsets
+         *
+         * version from runtime.buildinfo.str in elf file image; only in 17 & 18; without go
+         * version from runtime.buildinfo in the elf image
+         *
+         * version from .go.buildinfo; if little endian get a string else get an offset
+         */
         // runtime.buildVersion symbol not found, probably dealing with a stripped binary
         // try to retrieve the version symbol address from the .go.buildinfo section
         // if g_go_build_ver is set we know we're dealing with a char *
@@ -297,10 +311,34 @@ getGoVersion(elf_buf_t *ebuf) {
         if (g_go_build_ver[0] != '\0') {
             go_ver = (char *)((uint64_t)ver_addr);
         } else {
+            // ebuf->buf + textSec->sh_offset + (0x825bd0 - textSec->sh_addr)
+            // ebuf->buf + textSec->sh_offset + (0x00000000006a6198 - textSec->sh_addr)
+            // ebuf->buf + textSec->sh_offset + (0x00000000006a6198 - textSec->sh_addr)
+            uint64_t *go_ver_sym_1 = (uint64_t *)((uint64_t)ebuf->buf + (ver_addr - (uint64_t)textSec->sh_addr) + (uint64_t)textSec->sh_offset);
+
+            uint64_t go_ver_sym_2 = ((uint64_t )ebuf->buf + (*go_ver_sym_1 - (uint64_t)textSec->sh_addr) + (uint64_t)textSec->sh_offset);
+
+            gostring_t go_str_tmp = {
+                .len = (int)*((char *)go_ver_sym_1 + 0x8),
+                .str = (char *)go_ver_sym_2,
+            };
+
+            char *c_str;
+            if ((c_str = scope_calloc(1, go_str_tmp.len+1)) == NULL) return;
+            scope_memmove(c_str, go_str_tmp.str, go_str_tmp.len);
+            c_str[go_str_tmp.len] = '\0';
+
+            go_ver = c_str;
+        }
+    }
+#if 0
+        if (g_go_build_ver[0] != '\0') {
+            go_ver = (char *)((uint64_t)ver_addr);
+        } else {
             go_ver = go_str((void *)((uint64_t)ver_addr + base));
         }
     }
-    
+#endif
     if (!go_ver) {
         scope_fprintf(scope_stderr, "error: could not get go version. Note: We do not support \
                 static stripped executables built with versions of Go prior to 1.13\n");
@@ -470,12 +508,12 @@ main(int argc, char **argv, char **env)
             perror("setenv");
             goto err;
         }
-
+#if 1
         getGoVersion(ebuf); 
         if (g_go_major_ver < MIN_SUPPORTED_GO_HTTP2) {
             setGoHttpEnvVariable();
         }
-
+#endif
     } else {
         if (setenv("SCOPE_APP_TYPE", "native", 1) == -1) {
             perror("setenv");

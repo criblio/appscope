@@ -848,16 +848,6 @@ adjustGoStructOffsetsForVersion()
         g_go_schema->struct_offsets.cc_to_fr=0xd0;
     }
 
-    if (g_go_minor_ver == 11) {
-        g_go_schema->arg_offsets.c_http2_client_write_callee=0x40;
-        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
-        g_go_schema->arg_offsets.c_http2_server_read_sc=0x188;
-        g_go_schema->arg_offsets.c_http2_server_preface_callee=0x108;
-        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
-        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
-        g_go_schema->struct_offsets.cc_to_fr=0xd0;
-    }
-
     // before go 1.12, persistConn_to_conn and persistConn_to_bufrd
     // have different values than 12 and after
     if (g_go_minor_ver < 12) {
@@ -866,9 +856,29 @@ adjustGoStructOffsetsForVersion()
         g_go_schema->struct_offsets.persistConn_to_tlsState=88; // 0x58
     }
 
+    if ((g_go_minor_ver == 11) || (g_go_minor_ver == 12) || (g_go_minor_ver == 13) ||
+        (g_go_minor_ver == 14) || (g_go_minor_ver == 15)) {
+        g_go_schema->arg_offsets.c_http2_client_write_callee=0x40;
+        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
+        g_go_schema->arg_offsets.c_http2_server_read_sc=0x128;
+        g_go_schema->arg_offsets.c_http2_server_preface_callee=0x108;
+        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
+        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
+        g_go_schema->struct_offsets.cc_to_fr=0xd0;
+    }
+
     if (g_go_minor_ver == 16) {
+        g_go_schema->arg_offsets.c_http2_client_write_callee=0x40;
         g_go_schema->arg_offsets.c_http2_client_read_cc=0xe0;
-        g_go_schema->arg_offsets.c_http2_server_preface_callee=0xc0;
+        g_go_schema->arg_offsets.c_http2_server_read_sc=0xe8;
+        g_go_schema->arg_offsets.c_http2_server_preface_callee=0x108;
+        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
+        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
+        g_go_schema->struct_offsets.cc_to_fr=0xd0;
+
+        if (g_go_maint_ver > 9) {
+            g_go_schema->struct_offsets.cc_to_fr=0x130;
+        }
     }
 
     if (g_go_minor_ver == 17) {

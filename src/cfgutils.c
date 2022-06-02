@@ -2353,12 +2353,12 @@ createWatchObjectJson(config_t *cfg, watch_t src)
             for (i = 0; i < numhead; i++) {
                 char *hstr = (char *)cfgEvtFormatHeader(cfg, i);
                 if (hstr) {
-                    cJSON_AddStringToObjLN(headers, "headers", hstr);
+                    cJSON_AddStringToObjLN(headers, EX_HEADERS, hstr);
                 }
             }
         }
 
-        cJSON_AddItemToObject(root, "headers", headers);
+        cJSON_AddItemToObject(root, EX_HEADERS, headers);
     }
 
     return root;

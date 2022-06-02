@@ -376,6 +376,7 @@ event:
     - type: console
       name: (stdout)|(stderr) # matches the output stream
       value: .*               # matches data written
+      allowbinary: true
 
     # The net category includes open and close events on network connections.
     # The name filter is applied to the sourcetype in the event which are only

@@ -397,6 +397,7 @@ event:
     - type: console
       name: (stdout)|(stderr)
       value: .*
+      allowbinary: true
 
     # The net category includes network operations like listen, connect, close,
     # send, recv, etc. The name, field, and value properties are regular

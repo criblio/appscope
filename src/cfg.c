@@ -466,9 +466,7 @@ cfgEvtFormatSourceEnabled(config_t *cfg, watch_t src)
 unsigned
 cfgEvtAllowBinaryConsole(config_t *cfg)
 {
-    if (cfg) return cfg->evt.allowbinaryconsole;
-
-    return DEFAULT_ALLOW_BINARY_CONSOLE;
+    return (cfg) ? cfg->evt.allowbinaryconsole : DEFAULT_ALLOW_BINARY_CONSOLE;
 }
 
 unsigned

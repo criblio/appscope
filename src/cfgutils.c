@@ -65,6 +65,7 @@
 #define FIELD_NODE                   "field"
 #define VALUE_NODE                   "value"
 #define EX_HEADERS                   "headers"
+#define ALLOW_BINARY_NODE            "allowbinary"
 
 #define PAYLOAD_NODE         "payload"
 #define ENABLE_NODE              "enable"
@@ -1421,6 +1422,17 @@ processEvtWatchHeader(config_t *config, yaml_document_t *doc, yaml_node_t *node)
     }
 }
 
+static void
+processEvtWatchBinary(config_t *config, yaml_document_t *doc, yaml_node_t *node){
+    // watch binary is only valid for console
+    if (node->type != YAML_SCALAR_NODE || watch_context!= CFG_SRC_CONSOLE) return;
+
+    char* sVal = stringVal(node);
+    unsigned iVal = strToVal(boolMap, sVal);
+    cfgEvtAllowBinaryConsoleSet(config, iVal);
+    if (sVal) scope_free(sVal);
+}
+
 static int
 isWatchType(yaml_document_t* doc, yaml_node_pair_t* pair)
 {
@@ -1440,6 +1452,7 @@ processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    FIELD_NODE,           processEvtWatchField},
         {YAML_SCALAR_NODE,    VALUE_NODE,           processEvtWatchValue},
         {YAML_SEQUENCE_NODE,  EX_HEADERS,           processEvtWatchHeader},
+        {YAML_SCALAR_NODE,    ALLOW_BINARY_NODE,    processEvtWatchBinary},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -2359,6 +2372,9 @@ createWatchObjectJson(config_t *cfg, watch_t src)
         }
 
         cJSON_AddItemToObject(root, EX_HEADERS, headers);
+    } else if (src == CFG_SRC_CONSOLE) {
+    if (!cJSON_AddStringToObjLN(root, ALLOW_BINARY_NODE,
+                                  valToStr(boolMap, cfgEvtAllowBinaryConsole(cfg)))) goto err;
     }
 
     return root;

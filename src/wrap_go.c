@@ -829,6 +829,35 @@ adjustGoStructOffsetsForVersion()
         g_go_schema->struct_offsets.netfd_to_sysfd = 16;
     }
 
+    if (g_go_minor_ver == 9) {
+        g_go_schema->arg_offsets.c_http2_client_write_callee=0x60;
+        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
+        g_go_schema->arg_offsets.c_http2_server_read_sc=0x188;
+        g_go_schema->arg_offsets.c_http2_server_preface_callee=0x108;
+        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
+        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
+    }
+
+    if (g_go_minor_ver == 10) {
+        g_go_schema->arg_offsets.c_http2_client_write_callee=0x48;
+        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
+        g_go_schema->arg_offsets.c_http2_server_read_sc=0x188;
+        g_go_schema->arg_offsets.c_http2_server_preface_callee=0x108;
+        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
+        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
+        g_go_schema->struct_offsets.cc_to_fr=0xd0;
+    }
+
+    if (g_go_minor_ver == 11) {
+        g_go_schema->arg_offsets.c_http2_client_write_callee=0x40;
+        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
+        g_go_schema->arg_offsets.c_http2_server_read_sc=0x188;
+        g_go_schema->arg_offsets.c_http2_server_preface_callee=0x108;
+        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
+        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
+        g_go_schema->struct_offsets.cc_to_fr=0xd0;
+    }
+
     // before go 1.12, persistConn_to_conn and persistConn_to_bufrd
     // have different values than 12 and after
     if (g_go_minor_ver < 12) {

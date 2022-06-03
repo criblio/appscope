@@ -2110,6 +2110,21 @@ TBD Structure of the start message
           },
           "watch": [
             {
+              "type": "fs"
+            },
+            {
+              "type": "net"
+            },
+            {
+              "type": "http"
+            },
+            {
+              "type": "dns"
+            },
+            {
+              "type": "process"
+            },
+            {
               "type": "statsd"
             }
           ]

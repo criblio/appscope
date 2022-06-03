@@ -20,6 +20,12 @@ metric:
       enable: false
       validateserver: false
       cacertpath: ""
+  watch:
+  - type: fs
+  - type: net
+  - type: http
+  - type: dns
+  - type: process
 event:
   enable: true
   format:

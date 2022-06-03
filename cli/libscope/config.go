@@ -39,10 +39,11 @@ type ScopePayloadConfig struct {
 
 // ScopeWatchConfig represents a watch configuration
 type ScopeWatchConfig struct {
-	WatchType string `mapstructure:"type" json:"type" yaml:"type"`
-	Name      string `mapstructure:"name" json:"name" yaml:"name"`
-	Field     string `mapstructure:"field,omitempty" json:"field,omitempty" yaml:"field,omitempty"`
-	Value     string `mapstructure:"value" json:"value" yaml:"value"`
+	WatchType   string `mapstructure:"type" json:"type" yaml:"type"`
+	Name        string `mapstructure:"name" json:"name" yaml:"name"`
+	Field       string `mapstructure:"field,omitempty" json:"field,omitempty" yaml:"field,omitempty"`
+	Value       string `mapstructure:"value" json:"value" yaml:"value"`
+	AllowBinary bool   `mapstructure:"allowbinary,omitempty" json:"allowbinary,omitempty" yaml:"allowbinary,omitempty"`
 }
 
 // ScopeLibscopeConfig represents how to configure libscope

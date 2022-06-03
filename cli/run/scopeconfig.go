@@ -49,9 +49,10 @@ func (c *Config) SetDefault() error {
 					Value:     ".*",
 				},
 				{
-					WatchType: "console",
-					Name:      "(stdout|stderr)",
-					Value:     ".*",
+					WatchType:   "console",
+					Name:        "(stdout|stderr)",
+					Value:       ".*",
+					AllowBinary: true,
 				},
 				{
 					WatchType: "net",

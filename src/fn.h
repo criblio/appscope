@@ -247,6 +247,14 @@ typedef struct {
     DIR *(*opendir)(const char *);
     int (*closedir)(DIR *);
     struct dirent *(*readdir)(DIR *);
+    void *(*malloc)(size_t);
+    void (*free)(void *);
+    void *(*calloc)(size_t, size_t);
+    void *(*realloc)(void *, size_t);
+    size_t (*malloc_usable_size)(void *);
+    char *(*strdup)(const char *s);
+    void *(*mmap)(void *, size_t, int, int, int, off_t);
+    int   (*munmap)(void *, size_t);
 #endif // __linux__
 
 #if defined(__linux__) && defined(__STATX__)

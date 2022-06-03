@@ -276,6 +276,30 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
 }
 
 void
+scopeBacktraceTest(void) {
+    unw_cursor_t cursor;
+    unw_context_t uc;
+    unw_word_t ip;
+    unw_getcontext(&uc);
+    unw_init_local(&cursor, &uc);
+    unw_step(&cursor); //skip first frame 
+    while(unw_step(&cursor) > 0) {
+        char symbol[SYMBOL_BT_NAME_LEN];
+        unw_word_t offset;
+
+        int ret = unw_get_reg(&cursor, UNW_REG_IP, &ip);
+        if (ret) {
+            continue;
+        }
+        //this is slow hashtable ?
+        ret = unw_get_proc_name(&cursor, symbol, SYMBOL_BT_NAME_LEN, &offset);
+        if (!ret) {
+            scopeLogError("scopeBacktraceTest found symbol %s", symbol);
+        }
+    }
+}
+
+void
 scopeBacktrace(cfg_log_level_t level)
 {
     unw_cursor_t cursor;

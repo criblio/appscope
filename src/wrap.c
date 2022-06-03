@@ -80,6 +80,14 @@ static got_list_t hook_list[] = {
 
 static got_list_t inject_hook_list[] = {
     {"sigaction",   NULL, &g_fn.sigaction},
+    {"malloc",      NULL, &g_fn.malloc},
+    {"calloc",      NULL, &g_fn.calloc},
+    {"free",        NULL, &g_fn.free},
+    {"realloc",     NULL, &g_fn.realloc},
+    {"malloc_usable_size", NULL, &g_fn.malloc_usable_size},
+    {"strdup",      NULL, &g_fn.strdup},
+    {"mmap",        NULL, &g_fn.mmap},
+    {"munmap",      NULL, &g_fn.munmap},
     {"open",        NULL, &g_fn.open},
     {"openat",      NULL, &g_fn.openat},
     {"fopen",       NULL, &g_fn.fopen},
@@ -1618,10 +1626,38 @@ initSigErrorHandler(void)
     }
 }
 
+void wait_in_loop(void)
+{
+    volatile int test = 1;
+    while(test){
+        sleep(1);
+    }
+}
+
+
 __attribute__((constructor)) void
 init(void)
 {
+    // wait_in_loop();
     scope_init_vdso_ehdr();
+    g_fn.calloc = dlsym(RTLD_NEXT, "calloc");
+    if (!g_fn.calloc) g_fn.calloc = dlsym(RTLD_DEFAULT, "calloc");
+    g_fn.mmap = dlsym(RTLD_NEXT, "mmap");
+    if (!g_fn.mmap) g_fn.mmap = dlsym(RTLD_DEFAULT, "mmap");
+    g_fn.munmap = dlsym(RTLD_NEXT, "munmap");
+    if (!g_fn.munmap) g_fn.munmap = dlsym(RTLD_DEFAULT, "munmap");
+    g_fn.malloc = dlsym(RTLD_NEXT, "malloc");
+    if (!g_fn.malloc) g_fn.malloc = dlsym(RTLD_DEFAULT, "malloc");
+    g_fn.free = dlsym(RTLD_NEXT, "free");
+    if (!g_fn.free) g_fn.free = dlsym(RTLD_DEFAULT, "free");
+    g_fn.realloc = dlsym(RTLD_NEXT, "realloc");
+    if (!g_fn.realloc) g_fn.realloc = dlsym(RTLD_DEFAULT, "realloc");
+    g_fn.strdup = dlsym(RTLD_NEXT, "strdup");
+    if (!g_fn.strdup) g_fn.strdup = dlsym(RTLD_DEFAULT, "strdup");
+
+    g_fn.malloc_usable_size = dlsym(RTLD_NEXT, "malloc_usable_size");
+    if (!g_fn.malloc_usable_size) g_fn.malloc_usable_size = dlsym(RTLD_DEFAULT, "malloc_usable_size");
+
     // Bootstrapping...  we need to know if we're in musl so we can
     // call the right initFn function...
     {
@@ -1723,6 +1759,142 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
     }
 
     return g_fn.sigaction(signum, act, oldact);
+}
+
+static int call_backtrace = 0;
+static size_t no_bytes_allocated;
+static void *calloc_mem = NULL;
+
+EXPORTON char *
+strdup(const char *s) {
+    WRAP_CHECK(strdup, NULL);
+
+    char *str = g_fn.strdup(s);
+
+    if(g_log) {
+        size_t allocated_size = g_fn.malloc_usable_size(str);
+        no_bytes_allocated += allocated_size;
+        if (call_backtrace)
+            scopeBacktraceTest();
+        scopeLogError("function = %s allocate: %zu bytes\n. Total allocated size %zu bytes\n", __FUNCTION__, allocated_size, no_bytes_allocated);
+     }
+
+    return str;
+}
+
+EXPORTON void *
+malloc(size_t size) {
+    WRAP_CHECK(malloc, NULL);
+
+    void *ptr = g_fn.malloc(size);
+
+    if(g_log) {
+        if (call_backtrace)
+            scopeBacktraceTest();
+        size_t allocated_size = g_fn.malloc_usable_size(ptr);
+        no_bytes_allocated += allocated_size;
+
+        scopeLogError("function = %s allocate: %zu bytes, requested %zu bytes. Total allocated size %zu bytes\n", __FUNCTION__, allocated_size, size, no_bytes_allocated);
+    }
+
+    return ptr;
+}
+
+EXPORTON void *
+calloc(size_t nmemb, size_t size) {
+
+    if (g_fn.calloc == NULL) {
+        calloc_mem = scope_calloc(nmemb, size);
+        return calloc_mem;
+    }
+
+    WRAP_CHECK(calloc, NULL);
+
+    void *ptr = g_fn.calloc(nmemb, size);
+    if(g_log) {
+        if (call_backtrace)
+            scopeBacktraceTest();
+        size_t allocated_size = g_fn.malloc_usable_size(ptr);
+        no_bytes_allocated += allocated_size;
+
+        scopeLogError("function = %s allocate: %zu bytes, requested %zu bytes. Total allocated size %zu bytes\n", __FUNCTION__, allocated_size, size*nmemb, no_bytes_allocated);
+    }
+
+    return ptr;
+}
+
+EXPORTON void *
+realloc(void *ptr, size_t size) {
+    WRAP_CHECK(realloc, NULL);
+
+    void *new_ptr = g_fn.realloc(ptr, size);
+
+    if(g_log) {
+        if (call_backtrace)
+            scopeBacktraceTest();
+        size_t prev_size = g_fn.malloc_usable_size(ptr);
+        no_bytes_allocated -= prev_size;
+
+        size_t new_size = g_fn.malloc_usable_size(new_ptr);
+        no_bytes_allocated += new_size;
+
+        scopeLogError("function = %s reallocate: from %zu to %zu bytes, requested %zu bytes. Total allocated size %zu bytes\n", __FUNCTION__, prev_size, new_size, size, no_bytes_allocated);
+    }
+
+    return new_ptr;
+}
+
+EXPORTON void
+free(void *ptr) {
+    WRAP_CHECK_VOID(free);
+
+    if(ptr) {
+        if(g_log) {
+            if (call_backtrace)
+                scopeBacktraceTest();
+            size_t freed_size = g_fn.malloc_usable_size(ptr);
+            no_bytes_allocated -= freed_size;
+
+            scopeLogError("function = %s freeing: %zu bytes. Total allocated size %zu bytes\n", __FUNCTION__, freed_size, no_bytes_allocated);
+        }
+    }
+    if (ptr == calloc_mem) {
+        scopeLogError("calloc_mem\n");
+        scope_free(calloc_mem);
+    } else {
+        g_fn.free(ptr);
+    }
+}
+
+EXPORTON void *
+mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
+{
+    WRAP_CHECK(mmap, NULL);
+    void * ptr = g_fn.mmap(addr, length, prot, flags, fd, offset);
+
+    if (ptr != MAP_FAILED) {
+        // no_bytes_allocated += length;
+        scopeLogError("function = %s map: %zu bytes ", __FUNCTION__, length);
+        // scopeLogError("Total allocated size: %zu bytes", no_bytes_allocated);
+    }
+
+    return ptr;
+}
+
+EXPORTON int
+munmap(void *addr, size_t length)
+{
+    WRAP_CHECK(munmap, -1);
+
+    int res = g_fn.munmap(addr, length);
+
+    if (!res) {
+        // no_bytes_allocated -= length;
+        scopeLogError("function = %s unmap: %zu bytes ", __FUNCTION__, length);
+        // scopeLogError("Total allocated size: %zu bytes", no_bytes_allocated);
+    }
+
+    return res;
 }
 
 EXPORTON int

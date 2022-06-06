@@ -1880,7 +1880,10 @@ c_http2_client_write(char *stackaddr)
 
     uint64_t tcpConn = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_tcpConn);
     if (!tcpConn) return;
+
     char *buf        = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_buf);
+    if (!buf) return;
+
     uint64_t rc      = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_rc);
     if (rc < 1) return;
 

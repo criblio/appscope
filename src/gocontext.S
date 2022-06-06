@@ -7,6 +7,9 @@
 .global \a_func
 .hidden \c_func
 \a_func:
+    // grab the caller stack address before changing anything
+    mov %rsp, %r11
+
     // This creates a stack frame of 0x20 bytes
     // The add grows the stacks by 0x18
     // The push decrements the stack pointer, $rsp, by 8
@@ -18,8 +21,6 @@
     // Call the 'C' handler with the current stack pointer
     // as argument, e.g.:
     // go_write(stackptr)
-    mov %rsp, %r11
-    add $0x20, %r11
     mov %r11, 0x08(%rsp)
     lea \c_func@GOTPCREL(%rip), %r11
     mov (%r11), %r11

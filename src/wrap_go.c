@@ -120,9 +120,9 @@ go_schema_t go_8_schema = {
         .c_http2_server_preface_rc=0xe0, 
         .c_http2_client_read_cc=0x80,
         .c_http2_client_write_callee=0x58,
-        .c_http2_client_write_tcpConn=0x0,
-        .c_http2_client_write_buf=0x8,
-        .c_http2_client_write_rc=0x10,
+        .c_http2_client_write_tcpConn=0x10,
+        .c_http2_client_write_buf=0x68,
+        .c_http2_client_write_rc=0x28,
     },
     .struct_offsets = {
         .g_to_m=0x30,
@@ -1023,8 +1023,8 @@ initGoHook(elf_buf_t *ebuf)
     if (go_ver && (go_runtime_version = go_ver)) {
         sysprint("go_runtime_version = %s\n", go_runtime_version);
         go_version_numbers(go_runtime_version);
-         printf("minor ver: %d\n", g_go_minor_ver);
-         printf("maint ver: %d\n", g_go_maint_ver);
+        //printf("minor ver: %d\n", g_go_minor_ver);
+        //printf("maint ver: %d\n", g_go_maint_ver);
     }
     if (g_go_minor_ver < MIN_SUPPORTED_GO_VER) {
         if (!is_go(ebuf->buf)) {
@@ -1829,6 +1829,10 @@ c_http2_client_read(char *stackaddr)
     if (!buf) return;
     char *readBuf = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_readBuf);
     if (!readBuf) return;
+    uint64_t tcpConn = *(uint64_t *)(cc + g_go_schema->struct_offsets.cc_to_tconn);
+    if (!tcpConn) return;
+
+    int fd = getFDFromConn(tcpConn);
 
     uint8_t *newbuf = (uint8_t *)buf; 
     uint32_t rc = 0;
@@ -1842,14 +1846,6 @@ c_http2_client_read(char *stackaddr)
     if (!frame) return;
     scope_memmove(frame, buf, HTTP2_FRAME_HEADER_LEN);
     scope_memmove(frame + HTTP2_FRAME_HEADER_LEN, readBuf, rc - HTTP2_FRAME_HEADER_LEN);
-
-    uint64_t tcpConn = *(uint64_t *)(cc + g_go_schema->struct_offsets.cc_to_tconn);
-    if (!tcpConn) {
-       scope_free(frame);
-       return;
-    }
-
-    int fd = getFDFromConn(tcpConn);
 
     doProtocol((uint64_t)0, fd, frame, rc, TLSRX, BUF);
     funcprint("Scope: c_http2_client_read of %d\n", fd);
@@ -1874,13 +1870,12 @@ go_http2_client_read(char *stackptr)
 static void
 c_http2_client_write(char *stackaddr)
 {
-    // Take us to the stack frame we're interested in
-    // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    stackaddr -= g_go_schema->arg_offsets.c_http2_client_write_callee;
-
     uint64_t tcpConn = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_tcpConn);
     if (!tcpConn) return;
+
     char *buf        = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_buf);
+    if (!buf) return;
+
     uint64_t rc      = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_rc);
     if (rc < 1) return;
 

@@ -47,6 +47,9 @@ func (c *Config) SetDefault() error {
 				{
 					WatchType: "process",
 				},
+				{
+					WatchType: "statsd",
+				},
 			},
 		},
 		Event: libscope.ScopeEventConfig{

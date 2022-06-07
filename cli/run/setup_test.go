@@ -157,6 +157,7 @@ metric:
   - type: http
   - type: dns
   - type: process
+  - type: statsd
 event:
   enable: true
   format:

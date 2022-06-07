@@ -251,10 +251,15 @@ typedef struct {
     void (*free)(void *);
     void *(*calloc)(size_t, size_t);
     void *(*realloc)(void *, size_t);
+    int (*posix_memalign)(void **, size_t, size_t);
+    void *(*aligned_alloc)(size_t, size_t);
+    void *(*valloc)(size_t);
+    void *(*memalign)(size_t, size_t);
+    void *(*pvalloc)(size_t);
     size_t (*malloc_usable_size)(void *);
-    char *(*strdup)(const char *s);
+    char *(*strdup)(const char *);
     void *(*mmap)(void *, size_t, int, int, int, off_t);
-    int   (*munmap)(void *, size_t);
+    int  (*munmap)(void *, size_t);
 #endif // __linux__
 
 #if defined(__linux__) && defined(__STATX__)

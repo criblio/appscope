@@ -84,6 +84,11 @@ static got_list_t inject_hook_list[] = {
     {"calloc",      NULL, &g_fn.calloc},
     {"free",        NULL, &g_fn.free},
     {"realloc",     NULL, &g_fn.realloc},
+    {"posix_memalign", NULL, &g_fn.posix_memalign},
+    {"memalign", NULL, &g_fn.memalign},
+    {"aligned_alloc", NULL, &g_fn.aligned_alloc},
+    {"valloc", NULL, &g_fn.valloc},
+    {"pvalloc", NULL, &g_fn.pvalloc},
     {"malloc_usable_size", NULL, &g_fn.malloc_usable_size},
     {"strdup",      NULL, &g_fn.strdup},
     {"mmap",        NULL, &g_fn.mmap},
@@ -1654,6 +1659,16 @@ init(void)
     if (!g_fn.realloc) g_fn.realloc = dlsym(RTLD_DEFAULT, "realloc");
     g_fn.strdup = dlsym(RTLD_NEXT, "strdup");
     if (!g_fn.strdup) g_fn.strdup = dlsym(RTLD_DEFAULT, "strdup");
+    g_fn.posix_memalign = dlsym(RTLD_NEXT, "posix_memalign");
+    if (!g_fn.posix_memalign) g_fn.posix_memalign = dlsym(RTLD_DEFAULT, "posix_memalign");
+    g_fn.aligned_alloc = dlsym(RTLD_NEXT, "aligned_alloc");
+    if (!g_fn.aligned_alloc) g_fn.aligned_alloc = dlsym(RTLD_DEFAULT, "aligned_alloc");
+    g_fn.valloc = dlsym(RTLD_NEXT, "valloc");
+    if (!g_fn.valloc) g_fn.valloc = dlsym(RTLD_DEFAULT, "valloc");
+    g_fn.pvalloc = dlsym(RTLD_NEXT, "pvalloc");
+    if (!g_fn.pvalloc) g_fn.pvalloc = dlsym(RTLD_DEFAULT, "pvalloc");
+    g_fn.memalign = dlsym(RTLD_NEXT, "memalign");
+    if (!g_fn.memalign) g_fn.memalign = dlsym(RTLD_DEFAULT, "memalign");
 
     g_fn.malloc_usable_size = dlsym(RTLD_NEXT, "malloc_usable_size");
     if (!g_fn.malloc_usable_size) g_fn.malloc_usable_size = dlsym(RTLD_DEFAULT, "malloc_usable_size");
@@ -1777,9 +1792,86 @@ strdup(const char *s) {
         if (call_backtrace)
             scopeBacktraceTest();
         scopeLogError("function = %s allocate: %zu bytes\n. Total allocated size %zu bytes\n", __FUNCTION__, allocated_size, no_bytes_allocated);
-     }
+    }
 
     return str;
+}
+EXPORTON int
+posix_memalign(void **memptr, size_t alignment, size_t size) {
+    WRAP_CHECK(posix_memalign, -1);
+
+    int res = g_fn.posix_memalign(memptr, alignment, size);
+
+    if(g_log) {
+        size_t allocated_size = g_fn.malloc_usable_size(*memptr);
+        no_bytes_allocated += allocated_size;
+        if (call_backtrace)
+            scopeBacktraceTest();
+        scopeLogError("function = %s allocate: %zu bytes\n. Total allocated size %zu bytes\n", __FUNCTION__, allocated_size, no_bytes_allocated);
+    }
+    return res;
+}
+
+EXPORTON void*
+aligned_alloc(size_t alignment, size_t size) {
+    WRAP_CHECK(aligned_alloc, NULL);
+  
+    void* ptr = g_fn.aligned_alloc(alignment, size);
+    if(g_log) {
+        size_t allocated_size = g_fn.malloc_usable_size(ptr);
+        no_bytes_allocated += allocated_size;
+        if (call_backtrace)
+            scopeBacktraceTest();
+        scopeLogError("function = %s allocate: %zu bytes\n. Total allocated size %zu bytes\n", __FUNCTION__, allocated_size, no_bytes_allocated);
+    }
+    return ptr;
+}
+
+EXPORTON void*
+valloc(size_t size) {
+    WRAP_CHECK(valloc, NULL);
+  
+    void* ptr = g_fn.valloc(size);
+    if(g_log) {
+        size_t allocated_size = g_fn.malloc_usable_size(ptr);
+        no_bytes_allocated += allocated_size;
+        if (call_backtrace)
+            scopeBacktraceTest();
+        scopeLogError("function = %s allocate: %zu bytes\n. Total allocated size %zu bytes\n", __FUNCTION__, allocated_size, no_bytes_allocated);
+    }
+    return ptr;
+}
+
+
+EXPORTON void*
+pvalloc(size_t size) {
+    WRAP_CHECK(pvalloc, NULL);
+  
+    void* ptr = g_fn.pvalloc(size);
+    if(g_log) {
+        size_t allocated_size = g_fn.malloc_usable_size(ptr);
+        no_bytes_allocated += allocated_size;
+        if (call_backtrace)
+            scopeBacktraceTest();
+        scopeLogError("function = %s allocate: %zu bytes\n. Total allocated size %zu bytes\n", __FUNCTION__, allocated_size, no_bytes_allocated);
+    }
+    return ptr;
+}
+
+EXPORTON void*
+memalign(size_t alignment, size_t size) {
+    WRAP_CHECK(memalign, NULL);
+
+    void* ptr = g_fn.memalign(alignment, size);
+
+    if(g_log) {
+        size_t allocated_size = g_fn.malloc_usable_size(ptr);
+        no_bytes_allocated += allocated_size;
+        if (call_backtrace)
+            scopeBacktraceTest();
+        scopeLogError("function = %s allocate: %zu bytes\n. Total allocated size %zu bytes\n", __FUNCTION__, allocated_size, no_bytes_allocated);
+    }
+    return ptr;
 }
 
 EXPORTON void *

@@ -3,7 +3,7 @@
   "$id": "https://appscope.dev/docs/schemas/event_start_msg.schema.json",
   "type": "object",
   "title": "AppScope Start message",
-  "description": "TBD Structure of the start message",
+  "description": "Structure of the start message",
   "examples": [{"format":"ndjson","info":{"process":{"libscopever":"v1.1.0","pid":35673,"ppid":3390,"gid":1000,"groupname":"test_user","uid":1000,"username":"test_user","hostname":"test_user","procname":"ls","cmd":"ls --color=auto","id":"test_user-ls-ls --color=auto"},"configuration":{"current":{"metric":{"enable":"true","transport":{"type":"udp","host":"127.0.0.1","port":"8125","tls":{"enable":"false","validateserver":"true","cacertpath":""}},"format":{"type":"statsd","statsdprefix":"","statsdmaxlen":512,"verbosity":4},"watch":[{"type":"statsd"}]},"libscope":{"log":{"level":"info","transport":{"type":"file","path":"/tmp/scope.log","buffering":"line"}},"configevent":"true","summaryperiod":10,"commanddir":"/tmp"},"event":{"enable":"true","transport":{"type":"tcp","host":"127.0.0.1","port":"9109","tls":{"enable":"false","validateserver":"true","cacertpath":""}},"format":{"type":"ndjson","maxeventpersec":10000,"enhancefs":"true"},"watch":[{"type":"file","name":"(\\/logs?\\/)|(\\.log$)|(\\.log[.\\d])","field":".*","value":".*"},{"type":"console","name":"(stdout)|(stderr)","field":".*","value":".*"},{"type":"http","name":".*","field":".*","value":".*","headers":[]},{"type":"net","name":".*","field":".*","value":".*"},{"type":"fs","name":".*","field":".*","value":".*"},{"type":"dns","name":".*","field":".*","value":".*"}]},"payload":{"enable":"false","dir":"/tmp"},"tags":{},"protocol":[],"cribl":{"enable":"false","transport":{"type":"edge"},"authtoken":""}}},"environment":{}}}],
   "required": [
     "format",
@@ -21,7 +21,7 @@
     },
     "info": {
       "title": "info",
-      "description": "TBD info",
+      "description": "The principal container for start-message information, in the form of nested `process`, `configuration`, and `environment` objects.",
       "type": "object",
       "required": [
           "process",
@@ -31,7 +31,7 @@
       "properties": {
         "process": {
           "title": "process",
-          "description": "TBD process",
+          "description": "Describes the process associated with the scoped app.",
           "type": "object",
           "required": [
             "libscopever",
@@ -84,17 +84,17 @@
         },
         "configuration": {
           "title": "configuration",
-          "description": "TBD configuration",
+          "description": "Container for configurations. For now, describes current configuration only.",
           "type": "object",
           "properties": {
             "current": {
               "title": "current",
-              "description": "TBD current",
+              "description": "Describes the current configuration.",
               "type": "object",
               "properties": {
                 "metric": {
                   "title": "metric",
-                  "description": "TBD metric",
+                  "description": "Settings for metrics. See `scope.yml`.",
                   "type": "object",
                   "properties": {
                     "enable": {
@@ -102,7 +102,7 @@
                     },
                     "transport": {
                       "title": "transport",
-                      "description": "TBD transport",
+                      "description": "Backend connection for metrics or events. See `scope.yml`.",
                       "type": "object",
                       "properties": {
                         "type": {
@@ -122,7 +122,7 @@
                         },
                         "tls": {
                           "title": "tls",
-                          "description": "TBD tls",
+                          "description": "TLS connection settings. See `scope.yml`.",
                           "type": "object",
                           "properties": {
                             "enable": {
@@ -140,7 +140,7 @@
                     },
                     "format": {
                       "title": "format",
-                      "description": "TBD format",
+                      "description": "Settings for the format of metric data. See `scope.yml`.",
                       "type": "object",
                       "properties": {
                         "type": {
@@ -159,7 +159,7 @@
                     },
                     "watch": {
                       "title": "watch",
-                      "description": "TBD watch",
+                      "description": "Array containing objects that enable different categories of metrics. See `scope.yml`.",
                       "type": "array",
                       "items": [
                         {
@@ -175,12 +175,12 @@
                 },
                 "libscope": {
                   "title": "libscope",
-                  "description": "TBD libscope",
+                  "description": "Specifies how to set up the AppScope library. See `scope.yml`.",
                   "type": "object",
                   "properties": {
                     "log": {
                       "title": "log",
-                      "description": "TBD log",
+                      "description": "Logging settings for the AppScope library. See `scope.yml`.",
                       "type": "object",
                       "properties": {
                         "level": {
@@ -188,7 +188,7 @@
                         },
                         "transport": {
                           "title": "transport",
-                          "description": "TBD transport",
+                          "description": "Backend connection for AppScope library logging. See `scope.yml`.",
                           "type": "object",
                           "properties": {
                             "type": {
@@ -208,7 +208,7 @@
                             },
                             "tls": {
                               "title": "tls",
-                              "description": "TBD tls",
+                              "description": "TLS settings for backend used by the AppScope library. See `scope.yml.`",
                               "type": "object",
                               "properties": {
                                 "enable": {
@@ -239,7 +239,7 @@
                 },
                 "event": {
                   "title": "event",
-                  "description": "TBD event",
+                  "description": "Settings for events. See `scope.yml`.",
                   "type": "object",
                   "properties": {
                     "enable": {
@@ -247,7 +247,7 @@
                     },
                     "transport": {
                       "title": "transport",
-                      "description": "TBD transport",
+                      "description": "Backend connection for events. See `scope.yml`.",
                       "type": "object",
                       "properties": {
                         "type": {
@@ -267,7 +267,7 @@
                         },
                         "tls": {
                           "title": "tls",
-                          "description": "TBD tls",
+                          "description": "Specifies whether to enable TLS for the metrics backend. See `scope.yml`.",
                           "type": "object",
                           "properties": {
                             "enable": {
@@ -285,7 +285,7 @@
                     },
                     "format": {
                       "title": "format",
-                      "description": "TBD format",
+                      "description": "Settings for the format of event data. See `scope.yml`.",
                       "type": "object",
                       "properties": {
                         "type": {
@@ -301,7 +301,7 @@
                     },
                     "watch": {
                       "title": "watch",
-                      "description": "TBD watch",
+                      "description": "Array containing objects that enable different categories of events. See `scope.yml`.",
                       "type": "array",
                       "items": [
                         {
@@ -412,7 +412,7 @@
                 },
                 "payload": {
                   "title": "payload",
-                  "description": "TBD payload",
+                  "description": "Settings for enabling and storing payloads. See `scope.yml`.",
                   "type": "object",
                   "properties": {
                     "enable": {
@@ -425,12 +425,12 @@
                 },
                 "tags": {
                   "title": "tags",
-                  "description": "TBD tags",
+                  "description": "User-defined tags which become fields in generated events and metrics. See `scope.yml`.",
                   "type": "object"
                 },
                 "protocol": {
                   "title": "protocol",
-                  "description": "TBD protocol",
+                  "description": "List whose entries define protocols that AppScope should detect in network payloads, and how to handle matches. See `scope.yml`.",
                   "type": "array",
                   "items": [
                     {
@@ -460,7 +460,7 @@
                 },
                 "cribl": {
                   "title": "cribl",
-                  "description": "TBD cribl",
+                  "description": "Settings for the `cribl` backend. See `scope.yml`.",
                   "type": "object",
                   "properties": {
                     "enable": {
@@ -468,7 +468,7 @@
                     },
                     "transport": {
                       "title": "transport",
-                      "description": "TBD transport",
+                      "description": "Backend connection to Cribl Edge or Stream. See `scope.yml`.",
                       "type": "object",
                       "properties": {
                         "type": {
@@ -488,7 +488,7 @@
                         },
                         "tls": {
                           "title": "tls",
-                          "description": "TBD tls",
+                          "description": "TLS settings for the Cribl backend. See `scope.yml`.",
                           "type": "object",
                           "properties": {
                             "enable": {
@@ -515,7 +515,7 @@
         },
         "environment": {
           "title": "environment",
-          "description": "TBD environment",
+          "description": "Environment variables present when the current configuration was loaded.",
           "type": "object"
         }
       }

@@ -190,7 +190,7 @@ Structure of the `console` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Specifies whether AppScope is capturing either `stderr` or `stdout` from console.<br/><br/>**Possible values:**<ul><li>`stderr`</li><li>`stdout`</li></ul> |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventconsolebodydata)._ |
@@ -246,7 +246,7 @@ Structure of the `dns.req` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a Network DNS operation.<br/><br/>Value must be `dns.req`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventdnsreqbodydata)._ |
@@ -306,7 +306,7 @@ Structure of the `dns.resp` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a DNS response operation .<br/><br/>Value must be `dns.resp`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventdnsrespbodydata)._ |
@@ -364,7 +364,7 @@ Structure of the `file` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | String that describes a file path. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfilebodydata)._ |
@@ -435,7 +435,7 @@ Structure of the `fs.close` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a File Close operation.<br/><br/>Value must be `fs.close`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfsclosebodydata)._ |
@@ -444,7 +444,7 @@ Structure of the `fs.close` event
 
 | Property | Description |
 |---|---|
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` (`string`) | Hostname for the host on which the scoped app was run. |
 | `file` (`string`) | The name of the file. |
@@ -511,7 +511,7 @@ Structure of the `fs.delete` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a File Delete operation.<br/><br/>Value must be `fs.delete`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfsdeletebodydata)._ |
@@ -520,7 +520,7 @@ Structure of the `fs.delete` event
 
 | Property | Description |
 |---|---|
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` (`string`) | Hostname for the host on which the scoped app was run. |
 | `op` (`string`) | The delete operation that was executed on the filesystem.<br/><br/>**Possible values:**<ul><li>`go_unlinkat`</li><li>`unlink`</li><li>`unlinkat`</li></ul> |
@@ -581,7 +581,7 @@ Structure of the `fs.duration` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a File Duration operation.<br/><br/>Value must be `fs.duration`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfsdurationbodydata)._ |
@@ -593,7 +593,7 @@ Structure of the `fs.duration` event
 | `_metric` (`string`) | Indicates that the Source is a File Duration operation.<br/><br/>Value must be `fs.duration`. |
 | `_metric_type` (`string`) | Indicates that the metric from the scoped app is a histogram.<br/><br/>Value must be `histogram`. |
 | `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `op` (`string`) | The function that was executed. |
@@ -654,7 +654,7 @@ Structure of the `fs.error` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a File Error operation.<br/><br/>Value must be `fs.error`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfserrorbodydata)._ |
@@ -666,7 +666,7 @@ Structure of the `fs.error` event
 | `_metric` (`string`) | Indicates that the Source is a File Error operation.<br/><br/>Value must be `fs.error`. |
 | `_metric_type` (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `op` (`string`) | The function that was executed. |
 | `file` (`string`) | The name of the file. |
@@ -728,7 +728,7 @@ Structure of the `fs.open` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a File open operation.<br/><br/>Value must be `fs.open`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfsopenbodydata)._ |
@@ -737,7 +737,7 @@ Structure of the `fs.open` event
 
 | Property | Description |
 |---|---|
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` (`string`) | Hostname for the host on which the scoped app was run. |
 | `file` (`string`) | The name of the file. |
@@ -803,7 +803,7 @@ Structure of the `fs.read` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a File Read operation. <br/><br/>Value must be `fs.read`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfsreadbodydata)._ |
@@ -815,7 +815,7 @@ Structure of the `fs.read` event
 | `_metric` (`string`) | Indicates that the Source is a File Read operation. <br/><br/>Value must be `fs.read`. |
 | `_metric_type` (`string`) | Indicates that the metric from the scoped app is a histogram.<br/><br/>Value must be `histogram`. |
 | `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `op` (`string`) | The read operation that was executed on the filesystem.<br/><br/>**Possible values:**<ul><li>`go_read`</li><li>`go_getdents`</li><li>`readdir`</li><li>`pread64`</li><li>`__pread64_chk`</li><li>`preadv`</li><li>`preadv2`</li><li>`preadv64v2`</li><li>`__pread_chk`</li><li>`__read_chk`</li><li>`__fread_unlocked_chk`</li><li>`read`</li><li>`readv`</li><li>`pread`</li><li>`fread`</li><li>`__fread_chk`</li><li>`fread_unlocked`</li><li>`fgets`</li><li>`__fgets_chk`</li><li>`fgets_unlocked`</li><li>`__fgetws_chk`</li><li>`fgetws`</li><li>`fgetwc`</li><li>`fgetc`</li><li>`fscanf`</li><li>`getline`</li><li>`getdelim`</li><li>`__getdelim`</li></ul> |
@@ -876,7 +876,7 @@ Structure of the `fs.seek` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a File Seek operation.<br/><br/>Value must be `fs.seek`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfsseekbodydata)._ |
@@ -888,7 +888,7 @@ Structure of the `fs.seek` event
 | `_metric` (`string`) | Indicates that the Source is a File Seek operation.<br/><br/>Value must be `fs.seek`. |
 | `_metric_type` (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `op` (`string`) | The seek operation that was executed on the filesystem.<br/><br/>**Possible values:**<ul><li>`lseek64`</li><li>`fseek64`</li><li>`ftello64`</li><li>`fsetpos64`</li><li>`lseek`</li><li>`fseek`</li><li>`fseeko`</li><li>`ftell`</li><li>`ftello`</li><li>`rewind`</li><li>`fsetpos`</li><li>`fgetpos`</li><li>`fgetpos64`</li></ul> |
@@ -947,7 +947,7 @@ Structure of the `fs.stat` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a File Stat operation.<br/><br/>Value must be `fs.stat`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfsstatbodydata)._ |
@@ -959,7 +959,7 @@ Structure of the `fs.stat` event
 | `_metric` (`string`) | Indicates that the Source is a File Stat operation.<br/><br/>Value must be `fs.stat`. |
 | `_metric_type` (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `op` (`string`) | The stat operation that was executed on the filesystem.<br/><br/>**Possible values:**<ul><li>`statfs64`</li><li>`__xstat`</li><li>`__xstat64`</li><li>`__lxstat`</li><li>`__lxstat64`</li><li>`__fxstat`</li><li>`__fxstatat`</li><li>`__fxstatat64`</li><li>`statx`</li><li>`statfs`</li><li>`statvfs`</li><li>`statvfs64`</li><li>`access`</li><li>`faccessat`</li><li>`stat`</li><li>`lstat`</li><li>`fstatfs64`</li><li>`__fxstat`</li><li>`__fxstat64`</li><li>`fstatfs`</li><li>`fstatvfs`</li><li>`fstatvfs64`</li><li>`fstat`</li><li>`fstatat`</li></ul> |
 | `file` (`string`) | The name of the file. |
@@ -1019,7 +1019,7 @@ Structure of the `fs.write` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a File Write operation.<br/><br/>Value must be `fs.write`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventfswritebodydata)._ |
@@ -1031,7 +1031,7 @@ Structure of the `fs.write` event
 | `_metric` (`string`) | Indicates that the Source is a File Write operation.<br/><br/>Value must be `fs.write`. |
 | `_metric_type` (`string`) | Indicates that the metric from the scoped app is a histogram.<br/><br/>Value must be `histogram`. |
 | `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `op` (`string`) | The write operation that was executed on the filesystem.<br/><br/>**Possible values:**<ul><li>`go_write`</li><li>`pwrite64`</li><li>`pwritev`</li><li>`pwritev64`</li><li>`pwritev2`</li><li>`pwritev64v2`</li><li>`__overflow`</li><li>`__write_libc`</li><li>`__write_pthread`</li><li>`fwrite_unlocked`</li><li>`__stdio_write`</li><li>`write`</li><li>`pwrite`</li><li>`writev`</li><li>`fwrite`</li><li>`puts`</li><li>`putchar`</li><li>`fputs`</li><li>`fputs_unlocked`</li><li>`fputc`</li><li>`fputc_unlocked`</li><li>`putwc`</li><li>`fputwc`</li></ul> |
@@ -1094,7 +1094,7 @@ Structure of the `http.req` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the event Source is an HTTP request.<br/><br/>Value must be `http.req`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventhttpreqbodydata)._ |
@@ -1178,7 +1178,7 @@ Structure of the `http.resp` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is an HTTP response.<br/><br/>Value must be `http.resp`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventhttprespbodydata)._ |
@@ -1254,7 +1254,7 @@ Structure of the `net.app` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a Network App (protocol detection) operation.<br/><br/>Value must be `net.app`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnetappbodydata)._ |
@@ -1263,7 +1263,7 @@ Structure of the `net.app` event
 
 | Property | Description |
 |---|---|
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` (`string`) | Hostname for the host on which the scoped app was run. |
@@ -1322,7 +1322,7 @@ Structure of the `net.close` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a Network Close operation.<br/><br/>Value must be `net.close`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnetclosebodydata)._ |
@@ -1398,7 +1398,7 @@ Structure of the `net.duration` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a counter that measures Network duration.<br/><br/>Value must be `net.duration`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnetdurationbodydata)._ |
@@ -1410,7 +1410,7 @@ Structure of the `net.duration` event
 | `_metric` (`string`) | Indicates that the Source is a counter that measures Network duration.<br/><br/>Value must be `net.duration`. |
 | `_metric_type` (`string`) | Indicates that the metric is a timer.<br/><br/>Value must be `timer`. |
 | `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `proto` (`string`) | The transmission protocol that the scoped app used to send data.<br/><br/>**Possible values:**<ul><li>`TCP`</li><li>`UDP`</li><li>`RAW`</li><li>`RDM`</li><li>`SEQPACKET`</li><li>`OTHER`</li></ul> |
@@ -1470,7 +1470,7 @@ Structure of the `net.error` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a Network Error operation.<br/><br/>Value must be `net.error`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventneterrorbodydata)._ |
@@ -1482,7 +1482,7 @@ Structure of the `net.error` event
 | `_metric` (`string`) | Indicates that the Source is a Network Error operation.<br/><br/>Value must be `net.error`. |
 | `_metric_type` (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `op` (`string`) | The function that was executed. |
 | `class` (`string`) | Subcategory of network error.<br/><br/>Value must be `connection`. |
@@ -1537,7 +1537,7 @@ Structure of the `net.open` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a Network Open operation.<br/><br/>Value must be `net.open`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnetopenbodydata)._ |
@@ -1608,7 +1608,7 @@ Structure of the `net.other` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a Network operation of an other-than-standard kind.<br/><br/>Value must be `net.other`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnetotherbodydata)._ |
@@ -1620,7 +1620,7 @@ Structure of the `net.other` event
 | `_metric` (`string`) | Indicates that the Source is a Network operation of an other-than-standard kind.<br/><br/>Value must be `net.other`. |
 | `_metric_type` (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
 | `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `proto` (`string`) | The transmission protocol that the scoped app used to send data.<br/><br/>**Possible values:**<ul><li>`TCP`</li><li>`UDP`</li><li>`RAW`</li><li>`RDM`</li><li>`SEQPACKET`</li><li>`OTHER`</li></ul> |
@@ -1680,7 +1680,7 @@ Structure of the `net.port` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a gauge that identifies open ports.<br/><br/>Value must be `net.port`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnetportbodydata)._ |
@@ -1692,7 +1692,7 @@ Structure of the `net.port` event
 | `_metric` (`string`) | Indicates that the Source is a gauge that identifies open ports.<br/><br/>Value must be `net.port`. |
 | `_metric_type` (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
 | `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `proto` (`string`) | The transmission protocol that the scoped app used to send data.<br/><br/>**Possible values:**<ul><li>`TCP`</li><li>`UDP`</li><li>`RAW`</li><li>`RDM`</li><li>`SEQPACKET`</li><li>`OTHER`</li></ul> |
@@ -1758,7 +1758,7 @@ Structure of the `net.rx` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a Network receive operation.<br/><br/>Value must be `net.rx`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnetrxbodydata)._ |
@@ -1770,7 +1770,7 @@ Structure of the `net.rx` event
 | `_metric` (`string`) | Indicates that the Source is a Network receive operation.<br/><br/>Value must be `net.rx`. |
 | `_metric_type` (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `domain` (`string`) | The domain for which the scoped app made a DNS request. |
@@ -1838,7 +1838,7 @@ Structure of the `net.tcp` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a gauge that shows the current count of open TCP ports.<br/><br/>Value must be `net.tcp`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnettcpbodydata)._ |
@@ -1850,7 +1850,7 @@ Structure of the `net.tcp` event
 | `_metric` (`string`) | Indicates that the Source is a gauge that shows the current count of open TCP ports.<br/><br/>Value must be `net.tcp`. |
 | `_metric_type` (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
 | `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `proto` (`string`) | The transmission protocol that the scoped app used to send data.<br/><br/>Value must be `TCP`. |
@@ -1916,7 +1916,7 @@ Structure of the `net.tx` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a Network transmit operation.<br/><br/>Value must be `net.tx`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnettxbodydata)._ |
@@ -1928,7 +1928,7 @@ Structure of the `net.tx` event
 | `_metric` (`string`) | Indicates that the Source is a Network transmit operation.<br/><br/>Value must be `net.tx`. |
 | `_metric_type` (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `domain` (`string`) | The domain for which the scoped app made a DNS request. |
@@ -1996,7 +1996,7 @@ Structure of the `net.udp` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is a gauge that shows the current count of open UDP ports.<br/><br/>Value must be `net.udp`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`object`) | data<br/><br/>_Details [below](#eventnetudpbodydata)._ |
@@ -2008,7 +2008,7 @@ Structure of the `net.udp` event
 | `_metric` (`string`) | Indicates that the Source is a gauge that shows the current count of open UDP ports.<br/><br/>Value must be `net.udp`. |
 | `_metric_type` (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
 | `_value` (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` (`string`) | The name of the process of the scoped app. |
+| `proc` (`string`) | The name of the scoped app's process. |
 | `pid` (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `proto` (`string`) | The transmission protocol that the scoped app used to send data.<br/><br/>Value must be `UDP`. |
@@ -2058,7 +2058,7 @@ Structure of the `notice` event
 | `_time` _required_ (`number`) | The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.<br/><br/>**Example:**<br/>`1643662126.91777` |
 | `source` _required_ (`string`) | Indicates that the Source is an AppScope notification.<br/><br/>Value must be `notice`. |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `data` _required_ (`string`) | The data that the scoped app emitted as output. |
@@ -2067,7 +2067,7 @@ Structure of the `notice` event
 
 ### start.msg [^](#schema-reference) {#eventstartmsg}
 
-TBD Structure of the start message
+Structure of the start message
 
 #### Example
 
@@ -2208,40 +2208,40 @@ TBD Structure of the start message
 
 | Property | Description |
 |---|---|
-| `authtoken` (`string`) | TBD authtoken |
-| `format` _required_ (`string`) | TBD format<br/><br/>**Possible values:**<ul><li>`scope`</li><li>`ndjson`</li></ul> |
-| `breaker` (`string`) | TBD breaker<br/><br/>Value must be `Cribl - Do Not Break Ruleset`. |
-| `info` _required_ (`object`) | TBD info<br/><br/>_Details [below](#eventstartmsginfo)._ |
+| `authtoken` (`string`) | Token used for authenticating to Cribl Edge or Stream. |
+| `format` _required_ (`string`) | Specifies the format for output of events and metrics from AppScope. See `scope.yml`.<br/><br/>**Possible values:**<ul><li>`scope`</li><li>`ndjson`</li></ul> |
+| `breaker` (`string`) | Specifies an Event Breaker for Cribl Edge or Stream to use.<br/><br/>Value must be `Cribl - Do Not Break Ruleset`. |
+| `info` _required_ (`object`) | The principal container for start-message information, in the form of nested `process`, `configuration`, and `environment` objects.<br/><br/>_Details [below](#eventstartmsginfo)._ |
 
 #### `start.msg.info` properties {#eventstartmsginfo}
 
 | Property | Description |
 |---|---|
-| `process` _required_ (`object`) | TBD process<br/><br/>_Details [below](#eventstartmsginfoprocess)._ |
-| `configuration` _required_ (`object`) | TBD configuration<br/><br/>_Details [below](#eventstartmsginfoconfiguration)._ |
-| `environment` _required_ (`object`) | TBD environment<br/><br/>_Details [below](#eventstartmsginfoenvironment)._ |
+| `process` _required_ (`object`) | Describes the process associated with the scoped app.<br/><br/>_Details [below](#eventstartmsginfoprocess)._ |
+| `configuration` _required_ (`object`) | Container for configurations. For now, describes current configuration only.<br/><br/>_Details [below](#eventstartmsginfoconfiguration)._ |
+| `environment` _required_ (`object`) | Environment variables present when the current configuration was loaded.<br/><br/>_Details [below](#eventstartmsginfoenvironment)._ |
 
 #### `start.msg.info.process` properties {#eventstartmsginfoprocess}
 
 | Property | Description |
 |---|---|
-| `libscopever` _required_ (`string`) | TBD libscopever<br/><br/>**Example:**<br/>`v1.0.0` |
+| `libscopever` _required_ (`string`) | Version of the AppScope library that is currently loaded.<br/><br/>**Example:**<br/>`v1.0.0` |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
-| `ppid` _required_ (`integer`) | TBD ppid |
+| `ppid` _required_ (`integer`) | The process ID of the parent process of the scoped app. |
 | `gid` _required_ (`integer`) | Group ID of the user who created the process.<br/><br/>**Example:**<br/>`0` |
 | `groupname` _required_ (`string`) | Groupname of the user who created the process.<br/><br/>**Example:**<br/>`root` |
 | `uid` _required_ (`integer`) | User ID of the user who created the process.<br/><br/>**Example:**<br/>`0` |
 | `username` _required_ (`string`) | Username of the user who created the process.<br/><br/>**Example:**<br/>`root` |
-| `hostname` _required_ (`string`) | TBD hostname |
-| `procname` _required_ (`string`) | TBD procname |
+| `hostname` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
+| `procname` _required_ (`string`) | The name of the scoped app's process. |
 | `cmd` _required_ (`string`) | The command that was run to start the scoped app.<br/><br/>**Example:**<br/>`top` |
-| `id` _required_ (`string`) | TBD id |
+| `id` _required_ (`string`) | An ID that concatenates (possibly truncated) the scoped app's hostname, procname, and command, to facilitate correlation of similar processes when searching, graphing, or aggregating. |
 
 #### `start.msg.info.configuration` properties {#eventstartmsginfoconfiguration}
 
 | Property | Description |
 |---|---|
-| `current` (`object`) | TBD current<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrent)._ |
+| `current` (`object`) | Describes the current configuration.<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrent)._ |
 
 #### `start.msg.info.environment` properties {#eventstartmsginfoenvironment}
 
@@ -2253,44 +2253,44 @@ TBD Structure of the start message
 
 | Property | Description |
 |---|---|
-| `metric` (`object`) | TBD metric<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentmetric)._ |
-| `libscope` (`object`) | TBD libscope<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentlibscope)._ |
-| `event` (`object`) | TBD event<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentevent)._ |
-| `payload` (`object`) | TBD payload<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentpayload)._ |
-| `tags` (`object`) | TBD tags<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrenttags)._ |
-| `protocol` (`array`) | TBD protocol |
-| `cribl` (`object`) | TBD cribl<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentcribl)._ |
+| `metric` (`object`) | Settings for metrics. See `scope.yml`.<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentmetric)._ |
+| `libscope` (`object`) | Specifies how to set up the AppScope library. See `scope.yml`.<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentlibscope)._ |
+| `event` (`object`) | Settings for events. See `scope.yml`.<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentevent)._ |
+| `payload` (`object`) | Settings for enabling and storing payloads. See `scope.yml`.<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentpayload)._ |
+| `tags` (`object`) | User-defined tags which become fields in generated events and metrics. See `scope.yml`.<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrenttags)._ |
+| `protocol` (`array`) | List whose entries define protocols that AppScope should detect in network payloads, and how to handle matches. See `scope.yml`. |
+| `cribl` (`object`) | Settings for the `cribl` backend. See `scope.yml`.<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentcribl)._ |
 
 #### `start.msg.info.configuration.current.metric` properties {#eventstartmsginfoconfigurationcurrentmetric}
 
 | Property | Description |
 |---|---|
-| `enable` (`string`) | TBD enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `transport` (`object`) | TBD transport<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentmetrictransport)._ |
-| `format` (`object`) | TBD format<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentmetricformat)._ |
-| `watch` (`array`) | TBD watch |
+| `enable` (`string`) | Specifies whether a feature or some functionality is enabled or disabled overall.<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `transport` (`object`) | Backend connection for metrics or events. See `scope.yml`.<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentmetrictransport)._ |
+| `format` (`object`) | Settings for the format of metric data. See `scope.yml`.<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentmetricformat)._ |
+| `watch` (`array`) | Array containing objects that enable different categories of metrics. See `scope.yml`. |
 
 #### `start.msg.info.configuration.current.libscope` properties {#eventstartmsginfoconfigurationcurrentlibscope}
 
 | Property | Description |
 |---|---|
-| `log` (`object`) | TBD log<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentlibscopelog)._ |
+| `log` (`object`) | Logging settings for the AppScope library. See `scope.yml`.<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentlibscopelog)._ |
 
 #### `start.msg.info.configuration.current.event` properties {#eventstartmsginfoconfigurationcurrentevent}
 
 | Property | Description |
 |---|---|
-| `enable` (`string`) | TBD enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `transport` (`object`) | TBD transport<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrenteventtransport)._ |
-| `format` (`object`) | TBD format<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrenteventformat)._ |
-| `watch` (`array`) | TBD watch |
+| `enable` (`string`) | Specifies whether a feature or some functionality is enabled or disabled overall.<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `transport` (`object`) | Backend connection for events. See `scope.yml`.<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrenteventtransport)._ |
+| `format` (`object`) | Settings for the format of event data. See `scope.yml`.<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrenteventformat)._ |
+| `watch` (`array`) | Array containing objects that enable different categories of events. See `scope.yml`. |
 
 #### `start.msg.info.configuration.current.payload` properties {#eventstartmsginfoconfigurationcurrentpayload}
 
 | Property | Description |
 |---|---|
-| `enable` (`string`) | TBD enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `dir` (`string`) | TBD dir |
+| `enable` (`string`) | Specifies whether a feature or some functionality is enabled or disabled overall.<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `dir` (`string`) | Specifies director where payload data should be written. Applies only when payloads are enabled and a backend other than `cribl` is used. See `scope.yml`. |
 
 #### `start.msg.info.configuration.current.tags` properties {#eventstartmsginfoconfigurationcurrenttags}
 
@@ -2302,112 +2302,112 @@ TBD Structure of the start message
 
 | Property | Description |
 |---|---|
-| `enable` (`string`) | TBD enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `transport` (`object`) | TBD transport<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentcribltransport)._ |
-| `authtoken` (`string`) | TBD authtoken |
+| `enable` (`string`) | Specifies whether a feature or some functionality is enabled or disabled overall.<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `transport` (`object`) | Backend connection to Cribl Edge or Stream. See `scope.yml`.<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentcribltransport)._ |
+| `authtoken` (`string`) | Token used for authenticating to Cribl Edge or Stream. |
 
 #### `start.msg.info.configuration.current.metric.transport` properties {#eventstartmsginfoconfigurationcurrentmetrictransport}
 
 | Property | Description |
 |---|---|
-| `type` (`string`) | TBD transport type<br/><br/>**Possible values:**<ul><li>`tcp`</li><li>`udp`</li><li>`unix`</li><li>`file`</li><li>`edge`</li></ul> |
+| `type` (`string`) | Specifies the transport mechanism on which to send and/or receive data. See `scope.yml`.<br/><br/>**Possible values:**<ul><li>`tcp`</li><li>`udp`</li><li>`unix`</li><li>`file`</li><li>`edge`</li></ul> |
 | `host` (`string`) | Hostname for the host on which the scoped app was run. |
-| `port` (`string`) | TBD port |
-| `path` (`string`) | TBD path<br/><br/>**Example:**<br/>`/tmp/scope.log` |
-| `buffering` (`string`) | TBD buffering<br/><br/>**Possible values:**<ul><li>`line`</li><li>`full`</li></ul> |
-| `tls` (`object`) | TBD tls<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentmetrictransporttls)._ |
+| `port` (`string`) | Connection port. See `scope.yml`. |
+| `path` (`string`) | File or UNIX domain socket path. See `scope.yml`.<br/><br/>**Example:**<br/>`/tmp/scope.log` |
+| `buffering` (`string`) | File buffering. See `scope.yml`.<br/><br/>**Possible values:**<ul><li>`line`</li><li>`full`</li></ul> |
+| `tls` (`object`) | TLS connection settings. See `scope.yml`.<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentmetrictransporttls)._ |
 
 #### `start.msg.info.configuration.current.metric.format` properties {#eventstartmsginfoconfigurationcurrentmetricformat}
 
 | Property | Description |
 |---|---|
-| `type` (`string`) | TBD type<br/><br/>**Possible values:**<ul><li>`statsd`</li><li>`ndjson`</li></ul> |
-| `statsdprefix` (`string`) | TBD statsdprefix |
-| `statsdmaxlen` (`integer`) | TBD statsdmaxlen |
-| `verbosity` (`integer`) | TBD verbosity |
+| `type` (`string`) | Specifies the format of metric data. See `scope.yml`. <br/><br/>**Possible values:**<ul><li>`statsd`</li><li>`ndjson`</li></ul> |
+| `statsdprefix` (`string`) | Specifies a prefix to prepend the metric name. See `scope.yml`. |
+| `statsdmaxlen` (`integer`) | Specifies the maximum length for a string that expresses a StatsD metric. See `scope.yml`. |
+| `verbosity` (`integer`) | Controls the tag cardinality and aggregation of a metric. See `scope.yml`. |
 
 #### `start.msg.info.configuration.current.libscope.log` properties {#eventstartmsginfoconfigurationcurrentlibscopelog}
 
 | Property | Description |
 |---|---|
-| `level` (`string`) | TBD level<br/><br/>**Possible values:**<ul><li>`debug`</li><li>`info`</li><li>`warning`</li><li>`error`</li><li>`none`</li></ul> |
-| `transport` (`object`) | TBD transport<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentlibscopelogtransport)._ |
-| `configevent` (`string`) | TBD configevent<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `summaryperiod` (`integer`) | TBD summaryperiod |
-| `commanddir` (`string`) | TBD commanddir |
+| `level` (`string`) | Specifies log level. See `scope.yml`.<br/><br/>**Possible values:**<ul><li>`debug`</li><li>`info`</li><li>`warning`</li><li>`error`</li><li>`none`</li></ul> |
+| `transport` (`object`) | Backend connection for AppScope library logging. See `scope.yml`.<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentlibscopelogtransport)._ |
+| `configevent` (`string`) | When enabled, AppScope guarantees that a process start message is the first event sent over the current connection.<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `summaryperiod` (`integer`) | Time interval over which to perform aggregation. See `scope.yml`. |
+| `commanddir` (`string`) | The directory in which the command that launched the scoped app was run. |
 
 #### `start.msg.info.configuration.current.event.transport` properties {#eventstartmsginfoconfigurationcurrenteventtransport}
 
 | Property | Description |
 |---|---|
-| `type` (`string`) | TBD transport type<br/><br/>**Possible values:**<ul><li>`tcp`</li><li>`udp`</li><li>`unix`</li><li>`file`</li><li>`edge`</li></ul> |
+| `type` (`string`) | Specifies the transport mechanism on which to send and/or receive data. See `scope.yml`.<br/><br/>**Possible values:**<ul><li>`tcp`</li><li>`udp`</li><li>`unix`</li><li>`file`</li><li>`edge`</li></ul> |
 | `host` (`string`) | Hostname for the host on which the scoped app was run. |
-| `port` (`string`) | TBD port |
-| `path` (`string`) | TBD path<br/><br/>**Example:**<br/>`/tmp/scope.log` |
-| `buffering` (`string`) | TBD buffering<br/><br/>**Possible values:**<ul><li>`line`</li><li>`full`</li></ul> |
-| `tls` (`object`) | TBD tls<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrenteventtransporttls)._ |
+| `port` (`string`) | Connection port. See `scope.yml`. |
+| `path` (`string`) | File or UNIX domain socket path. See `scope.yml`.<br/><br/>**Example:**<br/>`/tmp/scope.log` |
+| `buffering` (`string`) | File buffering. See `scope.yml`.<br/><br/>**Possible values:**<ul><li>`line`</li><li>`full`</li></ul> |
+| `tls` (`object`) | Specifies whether to enable TLS for the metrics backend. See `scope.yml`.<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrenteventtransporttls)._ |
 
 #### `start.msg.info.configuration.current.event.format` properties {#eventstartmsginfoconfigurationcurrenteventformat}
 
 | Property | Description |
 |---|---|
-| `type` (`string`) | TBD type<br/><br/>**Possible values:**<ul><li>`statsd`</li><li>`ndjson`</li></ul> |
-| `maxeventpersec` (`integer`) | TBD maxeventpersec |
-| `enhancefs` (`string`) | TBD enhancefs<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `type` (`string`) | Specifies the format of metric data. See `scope.yml`. <br/><br/>**Possible values:**<ul><li>`statsd`</li><li>`ndjson`</li></ul> |
+| `maxeventpersec` (`integer`) | Specifies a rate limit for events. See `scope.yml`. |
+| `enhancefs` (`string`) | Specifies whether to display full information about `fs` events.<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
 
 #### `start.msg.info.configuration.current.cribl.transport` properties {#eventstartmsginfoconfigurationcurrentcribltransport}
 
 | Property | Description |
 |---|---|
-| `type` (`string`) | TBD transport type<br/><br/>**Possible values:**<ul><li>`tcp`</li><li>`udp`</li><li>`unix`</li><li>`file`</li><li>`edge`</li></ul> |
+| `type` (`string`) | Specifies the transport mechanism on which to send and/or receive data. See `scope.yml`.<br/><br/>**Possible values:**<ul><li>`tcp`</li><li>`udp`</li><li>`unix`</li><li>`file`</li><li>`edge`</li></ul> |
 | `host` (`string`) | Hostname for the host on which the scoped app was run. |
-| `port` (`string`) | TBD port |
-| `path` (`string`) | TBD path<br/><br/>**Example:**<br/>`/tmp/scope.log` |
-| `buffering` (`string`) | TBD buffering<br/><br/>**Possible values:**<ul><li>`line`</li><li>`full`</li></ul> |
-| `tls` (`object`) | TBD tls<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentcribltransporttls)._ |
+| `port` (`string`) | Connection port. See `scope.yml`. |
+| `path` (`string`) | File or UNIX domain socket path. See `scope.yml`.<br/><br/>**Example:**<br/>`/tmp/scope.log` |
+| `buffering` (`string`) | File buffering. See `scope.yml`.<br/><br/>**Possible values:**<ul><li>`line`</li><li>`full`</li></ul> |
+| `tls` (`object`) | TLS settings for the Cribl backend. See `scope.yml`.<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentcribltransporttls)._ |
 
 #### `start.msg.info.configuration.current.metric.transport.tls` properties {#eventstartmsginfoconfigurationcurrentmetrictransporttls}
 
 | Property | Description |
 |---|---|
-| `enable` (`string`) | TBD enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `validateserver` (`string`) | TBD validateserver<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `cacertpath` (`string`) | TBD cacertpath |
+| `enable` (`string`) | Specifies whether a feature or some functionality is enabled or disabled overall.<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `validateserver` (`string`) | Specifies whether to validate the TLS server certificate. See `scope.yml`.<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `cacertpath` (`string`) | CA Certificate Path. See `scope.yml`. |
 
 #### `start.msg.info.configuration.current.libscope.log.transport` properties {#eventstartmsginfoconfigurationcurrentlibscopelogtransport}
 
 | Property | Description |
 |---|---|
-| `type` (`string`) | TBD transport type<br/><br/>**Possible values:**<ul><li>`tcp`</li><li>`udp`</li><li>`unix`</li><li>`file`</li><li>`edge`</li></ul> |
+| `type` (`string`) | Specifies the transport mechanism on which to send and/or receive data. See `scope.yml`.<br/><br/>**Possible values:**<ul><li>`tcp`</li><li>`udp`</li><li>`unix`</li><li>`file`</li><li>`edge`</li></ul> |
 | `host` (`string`) | Hostname for the host on which the scoped app was run. |
-| `port` (`string`) | TBD port |
-| `path` (`string`) | TBD path<br/><br/>**Example:**<br/>`/tmp/scope.log` |
-| `buffering` (`string`) | TBD buffering<br/><br/>**Possible values:**<ul><li>`line`</li><li>`full`</li></ul> |
-| `tls` (`object`) | TBD tls<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentlibscopelogtransporttls)._ |
+| `port` (`string`) | Connection port. See `scope.yml`. |
+| `path` (`string`) | File or UNIX domain socket path. See `scope.yml`.<br/><br/>**Example:**<br/>`/tmp/scope.log` |
+| `buffering` (`string`) | File buffering. See `scope.yml`.<br/><br/>**Possible values:**<ul><li>`line`</li><li>`full`</li></ul> |
+| `tls` (`object`) | TLS settings for backend used by the AppScope library. See `scope.yml.`<br/><br/>_Details [below](#eventstartmsginfoconfigurationcurrentlibscopelogtransporttls)._ |
 
 #### `start.msg.info.configuration.current.event.transport.tls` properties {#eventstartmsginfoconfigurationcurrenteventtransporttls}
 
 | Property | Description |
 |---|---|
-| `enable` (`string`) | TBD enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `validateserver` (`string`) | TBD validateserver<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `cacertpath` (`string`) | TBD cacertpath |
+| `enable` (`string`) | Specifies whether a feature or some functionality is enabled or disabled overall.<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `validateserver` (`string`) | Specifies whether to validate the TLS server certificate. See `scope.yml`.<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `cacertpath` (`string`) | CA Certificate Path. See `scope.yml`. |
 
 #### `start.msg.info.configuration.current.cribl.transport.tls` properties {#eventstartmsginfoconfigurationcurrentcribltransporttls}
 
 | Property | Description |
 |---|---|
-| `enable` (`string`) | TBD enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `validateserver` (`string`) | TBD validateserver<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `cacertpath` (`string`) | TBD cacertpath |
+| `enable` (`string`) | Specifies whether a feature or some functionality is enabled or disabled overall.<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `validateserver` (`string`) | Specifies whether to validate the TLS server certificate. See `scope.yml`.<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `cacertpath` (`string`) | CA Certificate Path. See `scope.yml`. |
 
 #### `start.msg.info.configuration.current.libscope.log.transport.tls` properties {#eventstartmsginfoconfigurationcurrentlibscopelogtransporttls}
 
 | Property | Description |
 |---|---|
-| `enable` (`string`) | TBD enable<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `validateserver` (`string`) | TBD validateserver<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
-| `cacertpath` (`string`) | TBD cacertpath |
+| `enable` (`string`) | Specifies whether a feature or some functionality is enabled or disabled overall.<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `validateserver` (`string`) | Specifies whether to validate the TLS server certificate. See `scope.yml`.<br/><br/>**Possible values:**<ul><li>`true`</li><li>`false`</li></ul> |
+| `cacertpath` (`string`) | CA Certificate Path. See `scope.yml`. |
 
 ### dns.req [^](#schema-reference) {#metricdnsreq}
 
@@ -2464,7 +2464,7 @@ Structure of the `dns.req` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a Network DNS operation.<br/><br/>Value must be `dns.req`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `domain` (`string`) | The domain for which the scoped app made a DNS request. |
@@ -2531,7 +2531,7 @@ Structure of the `fs.close` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a File Close operation.<br/><br/>Value must be `fs.close`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -2600,7 +2600,7 @@ Structure of the `fs.duration` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a File Duration operation.<br/><br/>Value must be `fs.duration`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric from the scoped app is a histogram.<br/><br/>Value must be `histogram`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -2670,7 +2670,7 @@ Structure of the `fs.error` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a File Error operation.<br/><br/>Value must be `fs.error`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `op` (`string`) | The function that was executed. |
@@ -2738,7 +2738,7 @@ Structure of the `fs.open` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a File open operation.<br/><br/>Value must be `fs.open`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -2807,7 +2807,7 @@ Structure of the `fs.read` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a File Read operation. <br/><br/>Value must be `fs.read`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -2876,7 +2876,7 @@ Structure of the `fs.seek` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a File Seek operation.<br/><br/>Value must be `fs.seek`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -2943,7 +2943,7 @@ Structure of the `fs.stat` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a File Stat operation.<br/><br/>Value must be `fs.stat`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `op` (`string`) | The function that was executed. |
@@ -3011,7 +3011,7 @@ Structure of the `fs.write` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a File Write operation.<br/><br/>Value must be `fs.write`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -3084,7 +3084,7 @@ Structure of the `http.duration.client` metric
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `http_target` _required_ (`string`) | In a URL, the path or file after the FQDN. |
 | `numops` _required_ (`number`) | Count of individual operations aggregated. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in milliseconds.<br/><br/>Value must be `millisecond`. |
@@ -3153,7 +3153,7 @@ Structure of the `http.duration.server` metric
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `http_target` _required_ (`string`) | In a URL, the path or file after the FQDN. |
 | `numops` _required_ (`number`) | Count of individual operations aggregated. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in milliseconds.<br/><br/>Value must be `millisecond`. |
@@ -3222,7 +3222,7 @@ Structure of the `http.req` metric
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `http_target` _required_ (`string`) | In a URL, the path or file after the FQDN. |
 | `http_status_code` _required_ (`integer`) | Specifies the status code of an HTTP response.<br/><br/>**Possible values:**<ul><li>`100`</li><li>`101`</li><li>`102`</li><li>`200`</li><li>`201`</li><li>`202`</li><li>`203`</li><li>`204`</li><li>`205`</li><li>`206`</li><li>`207`</li><li>`208`</li><li>`226`</li><li>`300`</li><li>`301`</li><li>`302`</li><li>`303`</li><li>`304`</li><li>`305`</li><li>`307`</li><li>`400`</li><li>`401`</li><li>`402`</li><li>`403`</li><li>`404`</li><li>`405`</li><li>`406`</li><li>`407`</li><li>`408`</li><li>`409`</li><li>`410`</li><li>`411`</li><li>`412`</li><li>`413`</li><li>`414`</li><li>`415`</li><li>`416`</li><li>`417`</li><li>`418`</li><li>`421`</li><li>`422`</li><li>`423`</li><li>`424`</li><li>`426`</li><li>`428`</li><li>`429`</li><li>`431`</li><li>`444`</li><li>`451`</li><li>`499`</li><li>`500`</li><li>`501`</li><li>`502`</li><li>`503`</li><li>`504`</li><li>`505`</li><li>`506`</li><li>`507`</li></ul> |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of a requests.<br/><br/>Value must be `request`. |
@@ -3272,7 +3272,7 @@ Structure of the `http.req.content_length` metric
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `http_target` _required_ (`string`) | In a URL, the path or file after the FQDN. |
 | `numops` _required_ (`number`) | Count of individual operations aggregated. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in bytes.<br/><br/>Value must be `byte`. |
@@ -3341,7 +3341,7 @@ Structure of the `http.resp.content_length` metric
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `http_target` _required_ (`string`) | In a URL, the path or file after the FQDN. |
 | `numops` _required_ (`number`) | Count of individual operations aggregated. |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in bytes.<br/><br/>Value must be `byte`. |
@@ -3406,7 +3406,7 @@ Structure of the `net.close` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a Network Close operation.<br/><br/>Value must be `net.close`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -3476,7 +3476,7 @@ Structure of the `net.duration` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a counter that measures Network duration.<br/><br/>Value must be `net.duration`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a timer.<br/><br/>Value must be `timer`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -3545,7 +3545,7 @@ Structure of the `net.error` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a Network Error operation.<br/><br/>Value must be `net.error`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `op` (`string`) | The function that was executed. |
@@ -3612,7 +3612,7 @@ Structure of the `net.open` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a Network Open operation.<br/><br/>Value must be `net.open`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -3680,7 +3680,7 @@ Structure of the `net.other` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a Network operation of an other-than-standard kind.<br/><br/>Value must be `net.other`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -3748,7 +3748,7 @@ Structure of the `net.port` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a gauge that identifies open ports.<br/><br/>Value must be `net.port`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -3848,7 +3848,7 @@ Structure of the `net.rx` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a Network receive operation.<br/><br/>Value must be `net.rx`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -3925,7 +3925,7 @@ Structure of the `net.tcp` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a gauge that shows the current count of open TCP ports.<br/><br/>Value must be `net.tcp`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -4023,7 +4023,7 @@ Structure of the `net.tx` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a Network transmit operation.<br/><br/>Value must be `net.tx`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -4083,7 +4083,7 @@ Structure of the `net.udp` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a gauge that shows the current count of open UDP ports.<br/><br/>Value must be `net.udp`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `fd` _required_ (`integer`) | The file descriptor for an operation.<br/><br/>**Example:**<br/>`4` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
@@ -4131,7 +4131,7 @@ Structure of the `proc.child` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a gauge of child processes spawned.<br/><br/>Value must be `proc.child`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of processes.<br/><br/>Value must be `process`. |
@@ -4175,7 +4175,7 @@ Structure of the `proc.cpu` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a counter of microseconds of the process's CPU were scheduled.<br/><br/>Value must be `proc.cpu`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in microseconds.<br/><br/>Value must be `microsecond`. |
@@ -4219,7 +4219,7 @@ Structure of the `proc.cpu_perc` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a gauge that measures percentage of CPU used by the process.<br/><br/>Value must be `proc.cpu_perc`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a percentage.<br/><br/>Value must be `percent`. |
@@ -4263,7 +4263,7 @@ Structure of the `proc.fd` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a gauge that reports how many file descriptors the process has opened.<br/><br/>Value must be `proc.fd`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of files.<br/><br/>Value must be `file`. |
@@ -4307,7 +4307,7 @@ Structure of the `proc.mem` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a gauge that reports process memory consumption.<br/><br/>Value must be `proc.mem`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is in kibibytes.<br/><br/>Value must be `kibibyte`. |
@@ -4356,7 +4356,7 @@ Structure of the `proc.start` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a counter which can only be 1, meaning that the process has started.<br/><br/>Value must be `proc.start`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a counter.<br/><br/>Value must be `counter`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `gid` _required_ (`integer`) | Group ID of the user who created the process.<br/><br/>**Example:**<br/>`0` |
 | `groupname` _required_ (`string`) | Groupname of the user who created the process.<br/><br/>**Example:**<br/>`root` |
@@ -4405,7 +4405,7 @@ Structure of the `proc.thread` metric
 | `_metric` _required_ (`string`) | Indicates that the Source is a gauge that reports how many threads are runnning in the process.<br/><br/>Value must be `proc.thread`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
-| `proc` _required_ (`string`) | The name of the process of the scoped app. |
+| `proc` _required_ (`string`) | The name of the scoped app's process. |
 | `pid` _required_ (`integer`) | The process ID of the scoped app.<br/><br/>**Example:**<br/>`1000` |
 | `host` _required_ (`string`) | Hostname for the host on which the scoped app was run. |
 | `unit` _required_ (`string`) | Indicates that the metric's value is a number of threads.<br/><br/>Value must be `thread`. |

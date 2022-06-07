@@ -65,6 +65,7 @@
 #define FIELD_NODE                   "field"
 #define VALUE_NODE                   "value"
 #define EX_HEADERS                   "headers"
+#define ALLOW_BINARY_NODE            "allowbinary"
 
 #define PAYLOAD_NODE         "payload"
 #define ENABLE_NODE              "enable"
@@ -169,6 +170,7 @@ void cfgEvtEnableSetFromStr(config_t*, const char*);
 void cfgEventFormatSetFromStr(config_t*, const char*);
 void cfgEvtRateLimitSetFromStr(config_t*, const char*);
 void cfgEnhanceFsSetFromStr(config_t*, const char*);
+void cfgAllowBinaryConsoleSetFromStr(config_t *, const char *);
 void cfgEvtFormatValueFilterSetFromStr(config_t*, watch_t, const char*);
 void cfgEvtFormatFieldFilterSetFromStr(config_t*, watch_t, const char*);
 void cfgEvtFormatNameFilterSetFromStr(config_t*, watch_t, const char*);
@@ -519,6 +521,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgEvtRateLimitSetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_ENHANCE_FS")) {
         cfgEnhanceFsSetFromStr(cfg, value);
+    } else if (!scope_strcmp(env_name, "SCOPE_ALLOW_BINARY_CONSOLE")) {
+        cfgAllowBinaryConsoleSetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_LOGFILE_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_CONSOLE_NAME")) {
@@ -751,6 +755,13 @@ cfgEnhanceFsSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
     cfgEnhanceFsSet(cfg, strToVal(boolMap, value));
+}
+
+void
+cfgAllowBinaryConsoleSetFromStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgEvtAllowBinaryConsoleSet(cfg, strToVal(boolMap, value));
 }
 
 void
@@ -1411,6 +1422,16 @@ processEvtWatchHeader(config_t *config, yaml_document_t *doc, yaml_node_t *node)
     }
 }
 
+static void
+processEvtWatchBinary(config_t *config, yaml_document_t *doc, yaml_node_t *node){
+    // watch binary is only valid for console
+    if (node->type != YAML_SCALAR_NODE || watch_context!= CFG_SRC_CONSOLE) return;
+
+    char* value = stringVal(node);
+    cfgAllowBinaryConsoleSetFromStr(config, value);
+    if (value) scope_free(value);
+}
+
 static int
 isWatchType(yaml_document_t* doc, yaml_node_pair_t* pair)
 {
@@ -1430,6 +1451,7 @@ processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    FIELD_NODE,           processEvtWatchField},
         {YAML_SCALAR_NODE,    VALUE_NODE,           processEvtWatchValue},
         {YAML_SEQUENCE_NODE,  EX_HEADERS,           processEvtWatchHeader},
+        {YAML_SCALAR_NODE,    ALLOW_BINARY_NODE,    processEvtWatchBinary},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -2343,12 +2365,15 @@ createWatchObjectJson(config_t *cfg, watch_t src)
             for (i = 0; i < numhead; i++) {
                 char *hstr = (char *)cfgEvtFormatHeader(cfg, i);
                 if (hstr) {
-                    cJSON_AddStringToObjLN(headers, "headers", hstr);
+                    cJSON_AddStringToObjLN(headers, EX_HEADERS, hstr);
                 }
             }
         }
 
-        cJSON_AddItemToObject(root, "headers", headers);
+        cJSON_AddItemToObject(root, EX_HEADERS, headers);
+    } else if (src == CFG_SRC_CONSOLE) {
+    if (!cJSON_AddStringToObjLN(root, ALLOW_BINARY_NODE,
+                                  valToStr(boolMap, cfgEvtAllowBinaryConsole(cfg)))) goto err;
     }
 
     return root;
@@ -2756,6 +2781,7 @@ initCtl(config_t *cfg)
     ctlEnhanceFsSet(ctl, cfgEnhanceFs(cfg));
     ctlPayEnableSet(ctl, cfgPayEnable(cfg));
     ctlPayDirSet(ctl,    cfgPayDir(cfg));
+    ctlAllowBinaryConsoleSet(ctl, cfgEvtAllowBinaryConsole(cfg));
 
     return ctl;
 }

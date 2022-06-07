@@ -170,6 +170,7 @@ event:
   - type: console
     name: (stdout|stderr)
     value: .*
+    allowbinary: true
   - type: net
     name: .*
     field: .*

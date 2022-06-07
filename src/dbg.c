@@ -307,7 +307,7 @@ scopeBacktraceFull(long long size, const char* alloc_fun, size_t total_size) {
     unw_getcontext(&uc);
     unw_init_local(&cursor, &uc);
     unw_step(&cursor); //skip first frame
-    scopeLogError("%s begin\n", __FUNCTION__);
+    scopeLogError("%s begin", __FUNCTION__);
     while(unw_step(&cursor) > 0) {
         char symbol[SYMBOL_BT_NAME_LEN];
         unw_word_t offset;

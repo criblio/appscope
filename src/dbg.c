@@ -345,7 +345,6 @@ scopeBacktraceFilter(const char** str, int str_size, long long size, const char*
     unw_getcontext(&uc);
     unw_init_local(&cursor, &uc);
     unw_step(&cursor); //skip first frame
-    scopeLogError("%s begin", __FUNCTION__);
     while(unw_step(&cursor) > 0) {
         char symbol[SYMBOL_BT_NAME_LEN];
         unw_word_t offset;
@@ -358,8 +357,10 @@ scopeBacktraceFilter(const char** str, int str_size, long long size, const char*
         if(test) {
             for (int i=0; i < str_size; ++i) {
                 if(scope_strstr(test->name, str[i])) {
+                    scopeLogError("%s begin", __FUNCTION__);
                     scopeLogError("func symbol: %s, malloc_fun: %s, size allocated: %lld, total size allocated: %zu", test->name, alloc_fun, size, total_size);
-                    goto end;
+                    scopeLogError("%s end\n", __FUNCTION__);
+                    return;
                 }
             }
         } else {
@@ -368,8 +369,10 @@ scopeBacktraceFilter(const char** str, int str_size, long long size, const char*
                 add_backtrace_hash(ip, symbol);
                 for (int i=0; i < str_size; ++i) {
                     if(scope_strstr(symbol, str[i])) {
+                        scopeLogError("%s begin", __FUNCTION__);
                         scopeLogError("func symbol: %s, malloc_fun: %s, size allocated: %lld, total size allocated: %zu", symbol, alloc_fun, size, total_size);
-                        goto end;
+                        scopeLogError("%s end\n", __FUNCTION__);
+                        return;
                     }
                 }
             } else {
@@ -377,8 +380,6 @@ scopeBacktraceFilter(const char** str, int str_size, long long size, const char*
             }
         }
     }
-    end:
-        scopeLogError("%s end\n", __FUNCTION__);
 }
 
 void

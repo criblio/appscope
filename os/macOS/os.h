@@ -46,3 +46,4 @@ extern char *osGetFileMode(mode_t);
 extern int osNeedsConnect(int);
 extern const char *osGetUserName(unsigned);
 extern const char *osGetGroupName(unsigned);
+extern long long osGetProcCPU(void);

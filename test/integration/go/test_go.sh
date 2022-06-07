@@ -175,7 +175,7 @@ grep plainServerDynamic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
 grep plainServerDynamic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
-grep plainServerDynamic $EVT_FILE | grep http.resp | grep "127.0.0.1" > /dev/null
+grep plainServerDynamic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
 
 if [ $ERR -ge 1 ]; then
@@ -226,7 +226,7 @@ grep plainServerDynamicPie $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
 grep plainServerDynamicPie $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
-grep plainServerDynamicPie $EVT_FILE | grep http.resp | grep "127.0.0.1" > /dev/null
+grep plainServerDynamicPie $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
 
 if [ $ERR -ge 1 ]; then
@@ -276,7 +276,7 @@ grep plainServerStatic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
 grep plainServerStatic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
-grep plainServerStatic $EVT_FILE | grep http.resp | grep "127.0.0.1" > /dev/null
+grep plainServerStatic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
 
 if [ $ERR -ge 1 ]; then
@@ -326,7 +326,7 @@ grep tlsServerDynamic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
 grep tlsServerDynamic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
-grep tlsServerDynamic $EVT_FILE | grep http.resp | grep "127.0.0.1" > /dev/null
+grep tlsServerDynamic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
 
 if [ $ERR -ge 1 ]; then
@@ -354,7 +354,7 @@ sleep 1
 curl -k --key server.key --cert server.crt https://localhost:${PORT}/hello
 ERR+=$?
 
-sleep 0.5
+sleep 5
 # This stops tlsServerStatic
 pkill -f tlsServerStatic
 
@@ -367,8 +367,9 @@ grep tlsServerStatic $EVT_FILE | grep net.app > /dev/null
 ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep net.open > /dev/null
 ERR+=$?
-grep tlsServerStatic $EVT_FILE | grep net.close > /dev/null
-ERR+=$?
+# dont wait for this, it's not always guaranteed in the test app's timeframe
+#grep tlsServerStatic $EVT_FILE | grep net.close > /dev/null
+#ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep fs.open > /dev/null
 ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep fs.close > /dev/null
@@ -376,8 +377,6 @@ ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep http.req > /dev/null
 ERR+=$?
 grep tlsServerStatic $EVT_FILE | grep http.resp > /dev/null
-ERR+=$?
-grep tlsServerStatic $EVT_FILE | grep http.resp | grep "127.0.0.1" > /dev/null
 ERR+=$?
 
 if [ $ERR -ge 1 ]; then
@@ -569,7 +568,7 @@ SCOPE_GO_STRUCT_PATH=$STRUCT_PATH ldscope ./tlsClientStatic
 ERR+=$?
 
 # this sleep gives tlsClientStatic a chance to report its events on exit
-sleep 1
+sleep 5
 
 evaltest
 
@@ -589,6 +588,97 @@ ERR+=$?
 grep tlsClientStatic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
 grep tlsClientStatic $EVT_FILE | grep console > /dev/null
+ERR+=$?
+
+if [ $ERR -ge 1 ]; then
+    cat $EVT_FILE
+fi
+
+evalPayload
+ERR+=$?
+
+endtest
+
+
+# 
+# tlsClientDynamicHTTP1 
+#
+starttest tlsClientDynamicHTTP1
+cd /go/net
+GODEBUG=http2client=0,http2server=0 ldscope ./tlsClientDynamic
+ERR+=$?
+
+# this sleep gives tlsClientDynamic a chance to report its events on exit
+sleep 1
+
+evaltest
+
+grep tlsClientDynamic $EVT_FILE | grep net.app > /dev/null
+ERR+=$?
+grep tlsClientDynamic $EVT_FILE | grep net.open > /dev/null
+ERR+=$?
+# dont wait for this, it's not always guaranteed in the test app's timeframe
+#grep tlsClientDynamic $EVT_FILE | grep net.close > /dev/null
+#ERR+=$?
+grep tlsClientDynamic $EVT_FILE | grep fs.open > /dev/null
+ERR+=$?
+grep tlsClientDynamic $EVT_FILE | grep fs.close > /dev/null
+ERR+=$?
+grep tlsClientDynamic $EVT_FILE | grep http.req > /dev/null
+ERR+=$?
+grep tlsClientDynamic $EVT_FILE | grep http.resp > /dev/null
+ERR+=$?
+grep tlsClientDynamic $EVT_FILE | grep console > /dev/null
+ERR+=$?
+
+if [ $ERR -ge 1 ]; then
+    cat $EVT_FILE
+fi
+
+evalPayload
+ERR+=$?
+
+endtest
+
+
+# 
+# tlsServerDynamicHTTP1 
+#
+starttest tlsServerDynamicHTTP1
+cd /go/net
+PORT=4430
+GODEBUG=http2client=0,http2server=0 ldscope ./tlsServerDynamic ${PORT} &
+
+# this sleep gives the server a chance to bind to the port
+# before we try to hit it with curl
+sleep 1
+curl -k --key server.key --cert server.crt https://localhost:${PORT}/hello
+ERR+=$?
+
+sleep 0.5
+# This stops tlsServerDynamic
+pkill -f tlsServerDynamic
+
+# this sleep gives tlsServerDynamic a chance to report its events on exit
+sleep 1
+
+evaltest
+
+grep tlsServerDynamic $EVT_FILE | grep net.app > /dev/null
+ERR+=$?
+grep tlsServerDynamic $EVT_FILE | grep net.open > /dev/null
+ERR+=$?
+grep tlsServerDynamic $EVT_FILE | grep net.close > /dev/null
+ERR+=$?
+grep tlsServerDynamic $EVT_FILE | grep fs.open > /dev/null
+ERR+=$?
+grep tlsServerDynamic $EVT_FILE | grep fs.close > /dev/null
+ERR+=$?
+grep tlsServerDynamic $EVT_FILE | grep http.req > /dev/null
+ERR+=$?
+grep tlsServerDynamic $EVT_FILE | grep http.resp > /dev/null
+ERR+=$?
+grep tlsServerDynamic $EVT_FILE | grep http.resp > /dev/null
 ERR+=$?
 
 if [ $ERR -ge 1 ]; then
@@ -814,7 +904,7 @@ influx_eval() {
 	    echo "Server Success count is $cnt"
     fi
 
-    grep http.req /go/influx/db/influxd.event | grep "127.0.0.1" > /dev/null
+    grep http.req /go/influx/db/influxd.event > /dev/null
     ERR+=$?
 
     if [ -e  "/go/influx/db/influxc.event" ]; then

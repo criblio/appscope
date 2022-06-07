@@ -1027,8 +1027,8 @@ initGoHook(elf_buf_t *ebuf)
     if (go_ver && (go_runtime_version = go_ver)) {
         sysprint("go_runtime_version = %s\n", go_runtime_version);
         go_version_numbers(go_runtime_version);
-        //printf("minor ver: %d\n", g_go_minor_ver);
-        //printf("maint ver: %d\n", g_go_maint_ver);
+        //scope_printf("minor ver: %d\n", g_go_minor_ver);
+        //scope_printf("maint ver: %d\n", g_go_maint_ver);
     }
     if (g_go_minor_ver < MIN_SUPPORTED_GO_VER) {
         if (!is_go(ebuf->buf)) {

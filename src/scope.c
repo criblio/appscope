@@ -30,7 +30,6 @@
 #include "utils.h"
 #include "inject.h"
 #include "os.h"
-#include "gocontext.h"
 
 static void
 showUsage(char *prog)

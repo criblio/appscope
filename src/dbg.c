@@ -368,8 +368,9 @@ scopeBacktraceTest2(const char** str, int str_size, long long size, const char* 
                         return TRUE;
                     }
                 }
+            } else {
+                add_backtrace_hash(ip, "");
             }
-            // add_backtrace_hash(ip, "");
         }
     }
     return FALSE;

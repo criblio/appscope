@@ -1776,12 +1776,15 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
     return g_fn.sigaction(signum, act, oldact);
 }
 
+//TODO handle below via env variable and configuration option
+
 #define ALL_FUNC 0
 #define SEARCH_FUN 1
 
-static const int call_backtrace = SEARCH_FUN;
+static const int call_backtrace = ALL_FUNC;
 static size_t no_bytes_allocated;
 static void *calloc_mem = NULL;
+//TODO handle below via file parsing
 
 const char *search_array[] = {"zlib", "deflate", "inflate"};
 const int search_size = 3;
@@ -1796,12 +1799,9 @@ strdup(const char *s) {
         size_t allocated_size = g_fn.malloc_usable_size(str);
         no_bytes_allocated += allocated_size;
         if (call_backtrace == ALL_FUNC) {
-            scopeBacktraceTest();
+            scopeBacktraceFull((long long)allocated_size, "strdup", no_bytes_allocated);
         } else if (call_backtrace == SEARCH_FUN) {
-                scopeBacktraceTest2(search_array, search_size, (long long)allocated_size, "strdup");
-            // if(scopeBacktraceTest2(search_array)) {
-            //     scopeLogError("function = %s allocate: %zu bytes\n. Total allocated size %zu bytes\n", __FUNCTION__, allocated_size, no_bytes_allocated);
-            // }
+            scopeBacktraceFilter(search_array, search_size, (long long)allocated_size, "strdup", no_bytes_allocated);
         }
     }
 
@@ -1817,12 +1817,9 @@ posix_memalign(void **memptr, size_t alignment, size_t size) {
         size_t allocated_size = g_fn.malloc_usable_size(*memptr);
         no_bytes_allocated += allocated_size;
         if (call_backtrace == ALL_FUNC) {
-            scopeBacktraceTest();
+            scopeBacktraceFull((long long)allocated_size, "posix_memalign", no_bytes_allocated);
         } else if (call_backtrace == SEARCH_FUN) {
-            scopeBacktraceTest2(search_array, search_size, (long long)allocated_size, "posix_memalign");
-            // if(scopeBacktraceTest2(search_array)) {
-            //     scopeLogError("function = %s allocate: %zu bytes\n. Total allocated size %zu bytes\n", __FUNCTION__, allocated_size, no_bytes_allocated);
-            // }
+            scopeBacktraceFilter(search_array, search_size, (long long)allocated_size, "posix_memalign", no_bytes_allocated);
         }
     }
     return res;
@@ -1837,12 +1834,9 @@ aligned_alloc(size_t alignment, size_t size) {
         size_t allocated_size = g_fn.malloc_usable_size(ptr);
         no_bytes_allocated += allocated_size;
         if (call_backtrace == ALL_FUNC) {
-            scopeBacktraceTest();
+            scopeBacktraceFull((long long)allocated_size, "aligned_alloc", no_bytes_allocated);
         } else if (call_backtrace == SEARCH_FUN) {
-            scopeBacktraceTest2(search_array, search_size, (long long)allocated_size, "aligned_alloc");
-            // if(scopeBacktraceTest2(search_array)) {
-            //     scopeLogError("function = %s allocate: %zu bytes\n. Total allocated size %zu bytes\n", __FUNCTION__, allocated_size, no_bytes_allocated);
-            // }
+            scopeBacktraceFilter(search_array, search_size, (long long)allocated_size, "aligned_alloc", no_bytes_allocated);
         }
     }
     return ptr;
@@ -1857,12 +1851,9 @@ valloc(size_t size) {
         size_t allocated_size = g_fn.malloc_usable_size(ptr);
         no_bytes_allocated += allocated_size;
         if (call_backtrace == ALL_FUNC) {
-            scopeBacktraceTest();
+            scopeBacktraceFull((long long)allocated_size, "valloc", no_bytes_allocated);
         } else if (call_backtrace == SEARCH_FUN) {
-            scopeBacktraceTest2(search_array, search_size, (long long)allocated_size, "valloc");
-            // if(scopeBacktraceTest2(search_array)) {
-            //     scopeLogError("function = %s allocate: %zu bytes\n. Total allocated size %zu bytes\n", __FUNCTION__, allocated_size, no_bytes_allocated);
-            // }
+            scopeBacktraceFilter(search_array, search_size, (long long)allocated_size, "valloc", no_bytes_allocated);
         }
     }
     return ptr;
@@ -1878,12 +1869,9 @@ pvalloc(size_t size) {
         size_t allocated_size = g_fn.malloc_usable_size(ptr);
         no_bytes_allocated += allocated_size;
         if (call_backtrace == ALL_FUNC) {
-            scopeBacktraceTest();
+            scopeBacktraceFull((long long)allocated_size, "pvalloc", no_bytes_allocated);
         } else if (call_backtrace == SEARCH_FUN) {
-            scopeBacktraceTest2(search_array, search_size, (long long)allocated_size, "pvalloc");
-            // if (scopeBacktraceTest2(search_array)) {
-            //     scopeLogError("function = %s allocate: %zu bytes\n. Total allocated size %zu bytes\n", __FUNCTION__, allocated_size, no_bytes_allocated);
-            // }
+            scopeBacktraceFilter(search_array, search_size, (long long)allocated_size, "pvalloc", no_bytes_allocated);
         }
     }
     return ptr;
@@ -1899,12 +1887,9 @@ memalign(size_t alignment, size_t size) {
         size_t allocated_size = g_fn.malloc_usable_size(ptr);
         no_bytes_allocated += allocated_size;
         if (call_backtrace == ALL_FUNC) {
-            scopeBacktraceTest();
+            scopeBacktraceFull((long long)allocated_size, "memalign", no_bytes_allocated);
         } else if (call_backtrace == SEARCH_FUN) {
-            scopeBacktraceTest2(search_array, search_size, (long long)allocated_size, "memalign");
-            // if (scopeBacktraceTest2(search_array)) {
-            //     scopeLogError("function = %s allocate: %zu bytes\n. Total allocated size %zu bytes\n", __FUNCTION__, allocated_size, no_bytes_allocated);
-            // }
+            scopeBacktraceFilter(search_array, search_size, (long long)allocated_size, "memalign", no_bytes_allocated);
         }
     }
     return ptr;
@@ -1920,12 +1905,9 @@ malloc(size_t size) {
         size_t allocated_size = g_fn.malloc_usable_size(ptr);
         no_bytes_allocated += allocated_size;
         if (call_backtrace == ALL_FUNC) {
-            scopeBacktraceTest();
+            scopeBacktraceFull((long long)allocated_size, "malloc", no_bytes_allocated);
         } else if (call_backtrace == SEARCH_FUN) {
-            scopeBacktraceTest2(search_array, search_size, (long long)allocated_size, "malloc");
-            // if(scopeBacktraceTest2(search_array)) {
-            //     scopeLogError("function = %s allocate: %zu bytes, requested %zu bytes. Total allocated size %zu bytes\n", __FUNCTION__, allocated_size, size, no_bytes_allocated);
-            // }
+            scopeBacktraceFilter(search_array, search_size, (long long)allocated_size, "malloc", no_bytes_allocated);
         }
     }
 
@@ -1947,12 +1929,9 @@ calloc(size_t nmemb, size_t size) {
         size_t allocated_size = g_fn.malloc_usable_size(ptr);
         no_bytes_allocated += allocated_size;
         if (call_backtrace == ALL_FUNC) {
-            scopeBacktraceTest();
+            scopeBacktraceFull((long long)allocated_size, "calloc", no_bytes_allocated);
         } else if (call_backtrace == SEARCH_FUN) {
-            scopeBacktraceTest2(search_array, search_size, (long long)allocated_size, "calloc");
-            // if(scopeBacktraceTest2(search_array)) {
-            //     scopeLogError("function = %s allocate: %zu bytes, requested %zu bytes. Total allocated size %zu bytes\n", __FUNCTION__, allocated_size, size*nmemb, no_bytes_allocated);
-            // }
+            scopeBacktraceFilter(search_array, search_size, (long long)allocated_size, "calloc", no_bytes_allocated);
         }
     }
 
@@ -1972,12 +1951,9 @@ realloc(void *ptr, size_t size) {
             size_t new_size = g_fn.malloc_usable_size(new_ptr);
             no_bytes_allocated += new_size;
             if (call_backtrace == ALL_FUNC) {
-                scopeBacktraceTest();
+                scopeBacktraceFull(((long long)(new_size)-(long long)prev_size), "realloc", no_bytes_allocated);
             } else if (call_backtrace == SEARCH_FUN) {
-            scopeBacktraceTest2(search_array, search_size, ((long long)(new_size)-(long long)prev_size), "realloc");
-                // if(scopeBacktraceTest2(search_array)) {
-                //     scopeLogError("function = %s reallocate: from %zu to %zu bytes, requested %zu bytes. Total allocated size %zu bytes\n", __FUNCTION__, prev_size, new_size, size, no_bytes_allocated);
-                // }
+                scopeBacktraceFilter(search_array, search_size, ((long long)(new_size)-(long long)prev_size), "realloc", no_bytes_allocated);
             }
     }
 
@@ -1993,12 +1969,9 @@ free(void *ptr) {
             size_t freed_size = g_fn.malloc_usable_size(ptr);
             no_bytes_allocated -= freed_size;
             if (call_backtrace == ALL_FUNC) {
-                scopeBacktraceTest();
+                scopeBacktraceFull(-((long long)freed_size), "free", no_bytes_allocated);
             } else if (call_backtrace == SEARCH_FUN) {
-                scopeBacktraceTest2(search_array, search_size, -((long long)freed_size), "free");
-                // if(scopeBacktraceTest2(search_array)) {
-                //  scopeLogError("function = %s freeing: %zu bytes. Total allocated size %zu bytes\n", __FUNCTION__, freed_size, no_bytes_allocated);
-                // }
+                scopeBacktraceFilter(search_array, search_size, -((long long)freed_size), "free", no_bytes_allocated);
             }
         }
     }

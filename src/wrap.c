@@ -1776,7 +1776,7 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
     return g_fn.sigaction(signum, act, oldact);
 }
 
-static int call_backtrace = 0;
+static int call_backtrace = 1;
 static size_t no_bytes_allocated;
 static void *calloc_mem = NULL;
 

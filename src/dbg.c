@@ -10,6 +10,7 @@
 #include "dbg.h"
 #include "utils.h"
 #include "scopestdlib.h"
+#include "uthash.h"
 
 #define UNW_LOCAL_ONLY
 #include "libunwind.h"
@@ -275,6 +276,29 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
     return;
 }
 
+
+struct b_hash_struct {
+    uint64_t ip;
+    char *name;
+    UT_hash_handle hh; /* makes this structure hashable */
+};
+
+struct b_hash_struct *backtrace_hash = NULL;
+
+static void add_backtrace_hash(uint64_t ip, const char* name) {
+     struct b_hash_struct* bh = (struct b_hash_struct*)scope_malloc(sizeof(struct b_hash_struct));
+    bh->ip = ip;
+    bh->name = scope_strdup(name);
+    HASH_ADD_INT(backtrace_hash, ip, bh);
+}
+
+static struct b_hash_struct *find_backtrace_hash(uint64_t ip) {
+    struct b_hash_struct *s;
+
+    HASH_FIND_INT(backtrace_hash, &ip, s);
+    return s;
+}
+
 void
 scopeBacktraceTest(void) {
     unw_cursor_t cursor;
@@ -291,10 +315,15 @@ scopeBacktraceTest(void) {
         if (ret) {
             continue;
         }
-        //this is slow hashtable ?
-        ret = unw_get_proc_name(&cursor, symbol, SYMBOL_BT_NAME_LEN, &offset);
-        if (!ret) {
-            scopeLogError("scopeBacktraceTest found symbol %s", symbol);
+        struct b_hash_struct *test = find_backtrace_hash(ip);
+        if(test) {
+            scopeLogError("scopeBacktraceTest cached found symbol %s ip %lu", test->name, ip);
+        } else {
+            ret = unw_get_proc_name(&cursor, symbol, SYMBOL_BT_NAME_LEN, &offset);
+            if (!ret) {
+                scopeLogError("scopeBacktraceTest getproc_name found symbol %s", symbol);
+                add_backtrace_hash(ip, symbol);
+            }
         }
     }
 }

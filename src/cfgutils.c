@@ -1427,10 +1427,9 @@ processEvtWatchBinary(config_t *config, yaml_document_t *doc, yaml_node_t *node)
     // watch binary is only valid for console
     if (node->type != YAML_SCALAR_NODE || watch_context!= CFG_SRC_CONSOLE) return;
 
-    char* sVal = stringVal(node);
-    unsigned iVal = strToVal(boolMap, sVal);
-    cfgEvtAllowBinaryConsoleSet(config, iVal);
-    if (sVal) scope_free(sVal);
+    char* value = stringVal(node);
+    cfgAllowBinaryConsoleSetFromStr(config, value);
+    if (value) scope_free(value);
 }
 
 static int

@@ -317,15 +317,62 @@ scopeBacktraceTest(void) {
         }
         struct b_hash_struct *test = find_backtrace_hash(ip);
         if(test) {
-            scopeLogError("scopeBacktraceTest cached found symbol %s ip %lu", test->name, ip);
+            scopeLogError("scopeBacktraceTest (cached) found symbol %s", test->name);
         } else {
             ret = unw_get_proc_name(&cursor, symbol, SYMBOL_BT_NAME_LEN, &offset);
             if (!ret) {
-                scopeLogError("scopeBacktraceTest getproc_name found symbol %s", symbol);
+                scopeLogError("scopeBacktraceTest (not cached) found symbol %s", symbol);
                 add_backtrace_hash(ip, symbol);
             }
         }
     }
+}
+
+bool
+scopeBacktraceTest2(const char** str, int str_size, long long size, const char* alloc_fun) {
+    unw_cursor_t cursor;
+    unw_context_t uc;
+    unw_word_t ip;
+    unw_getcontext(&uc);
+    unw_init_local(&cursor, &uc);
+    unw_step(&cursor); //skip first frame 
+    while(unw_step(&cursor) > 0) {
+        char symbol[SYMBOL_BT_NAME_LEN];
+        unw_word_t offset;
+
+        int ret = unw_get_reg(&cursor, UNW_REG_IP, &ip);
+        if (ret) {
+            continue;
+        }
+        struct b_hash_struct *test = find_backtrace_hash(ip);
+        if(test) {
+            for (int i=0; i < str_size; ++i) {
+                if(scope_strstr(test->name, str[i])) {
+                    // Dl_info info = {};
+                    // if (dladdr((void *)ip, &info))
+                    //     scopeLogError(" %s:%s", info.dli_fname, info.dli_sname ? info.dli_sname : "");
+                    scopeLogError("func symbol: %s, malloc_fun: %s, size allocated: %lld", test->name, alloc_fun, size);
+                    return TRUE;
+                }
+            }
+        } else {
+            ret = unw_get_proc_name(&cursor, symbol, SYMBOL_BT_NAME_LEN, &offset);
+            if (!ret) {
+                add_backtrace_hash(ip, symbol);
+                for (int i=0; i < str_size; ++i) {
+                    if(scope_strstr(symbol, str[i])) {
+                        // Dl_info info = {};
+                        // if (dladdr((void *)ip, &info))
+                        //     scopeLogError(" %s:%s", info.dli_fname, info.dli_sname ? info.dli_sname : "");
+                        scopeLogError("func symbol: %s, malloc_fun: %s, size allocated: %lld", symbol, alloc_fun, size);
+                        return TRUE;
+                    }
+                }
+            }
+            // add_backtrace_hash(ip, "");
+        }
+    }
+    return FALSE;
 }
 
 void

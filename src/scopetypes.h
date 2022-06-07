@@ -112,6 +112,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_NET_NAME ".*"
 #define DEFAULT_SRC_FS_NAME ".*"
 #define DEFAULT_SRC_DNS_NAME ".*"
+#define DEFAULT_ALLOW_BINARY_CONSOLE TRUE
 #define DEFAULT_MTC_IPPORT_VERBOSITY 1
 
 #define DEFAULT_SRC_FILE TRUE
@@ -186,7 +187,6 @@ typedef unsigned int bool;
 //    SCOPE_ALLOW_CONSTRUCT_DBG      allows debug inside the constructor
 //    SCOPE_ERROR_SIGNAL_HANDLER     allows to register SIGSEGV&SIGBUS handler
 //    SCOPE_QUEUE_LENGTH             override default circular buffer sizes
-//    SCOPE_ALLOW_BINARY_CONSOLE     "true" outputs all console data, always
 
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"

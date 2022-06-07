@@ -2170,7 +2170,8 @@ TBD Structure of the start message
               "type": "console",
               "name": "(stdout)|(stderr)",
               "field": ".*",
-              "value": ".*"
+              "value": ".*",
+              "allowbinary": "true"
             },
             {
               "type": "http",

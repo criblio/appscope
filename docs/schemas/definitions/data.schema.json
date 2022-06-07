@@ -9,6 +9,12 @@
       "description": "IP address(es) of the domain for which the scoped app sent a DNS request.",
       "type": "array"
     },
+    "allowbinary": {
+      "title": "allowbinary",
+      "description": "TBD allowbinary",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
     "binary": {
       "title": "binary",
       "description": "TBD binary",

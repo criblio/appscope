@@ -912,6 +912,15 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     }
 }
 
+bool
+isProtocolSet(int fd)
+{
+    net_info *net;
+    net = getNetEntry(fd);
+    if (net && net->protoDetect != DETECT_PENDING) return TRUE;
+    return FALSE;
+}
+
 static bool
 setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size_t len)
 {

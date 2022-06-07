@@ -49,6 +49,7 @@ type ScopeEventWatchConfig struct {
 	Name      string `mapstructure:"name" json:"name" yaml:"name"`
 	Field     string `mapstructure:"field,omitempty" json:"field,omitempty" yaml:"field,omitempty"`
 	Value     string `mapstructure:"value" json:"value" yaml:"value"`
+	AllowBinary bool   `mapstructure:"allowbinary,omitempty" json:"allowbinary,omitempty" yaml:"allowbinary,omitempty"`
 }
 
 // ScopeLibscopeConfig represents how to configure libscope

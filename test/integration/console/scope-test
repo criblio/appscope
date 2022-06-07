@@ -77,12 +77,15 @@ fi
 endtest
 
 #
-# cat binary file
+# cat binary file with ALLOW_BINARY env false
+#   (ensure the $BINARY_MSG appears)
 #
 
 starttest cat_binary
 
+export SCOPE_ALLOW_BINARY_CONSOLE=false
 ldscope cat /bin/bash > /dev/null
+unset SCOPE_ALLOW_BINARY_CONSOLE
 evaltest
 
 grep -- "$BINARY_MSG" $EVT_FILE > /dev/null
@@ -92,7 +95,7 @@ endtest
 
 
 #
-# cat binary file with ALLOW_BINARY env set
+# cat binary file with ALLOW_BINARY env true
 #   (ensure the $BINARY_MSG does not appear)
 #
 starttest cat_binary_with_ALLOW_BINARY_env
@@ -108,6 +111,13 @@ if [ $? -eq 0 ]; then
 fi
 
 endtest
+
+#########################################################################
+#
+#     For all remaining tests, set SCOPE_ALLOW_BINARY_CONSOLE false
+#
+#########################################################################
+export SCOPE_ALLOW_BINARY_CONSOLE=false
 
 
 #

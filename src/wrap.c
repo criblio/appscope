@@ -1628,6 +1628,7 @@ initSigErrorHandler(void)
         act.sa_flags = SA_RESTART | SA_SIGINFO;
         g_fn.sigaction(SIGSEGV, &act, NULL);
         g_fn.sigaction(SIGBUS, &act, NULL);
+        g_fn.sigaction(SIGABRT, &act, NULL);
     }
 }
 

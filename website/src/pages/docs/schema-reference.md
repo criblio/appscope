@@ -2110,6 +2110,21 @@ Structure of the start message
           },
           "watch": [
             {
+              "type": "fs"
+            },
+            {
+              "type": "net"
+            },
+            {
+              "type": "http"
+            },
+            {
+              "type": "dns"
+            },
+            {
+              "type": "process"
+            },
+            {
               "type": "statsd"
             }
           ]
@@ -2155,7 +2170,8 @@ Structure of the start message
               "type": "console",
               "name": "(stdout)|(stderr)",
               "field": ".*",
-              "value": ".*"
+              "value": ".*",
+              "allowbinary": "true"
             },
             {
               "type": "http",

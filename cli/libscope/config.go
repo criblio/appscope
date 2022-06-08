@@ -18,17 +18,18 @@ type ScopeCriblConfig struct {
 
 // ScopeMetricConfig represents how to output metrics
 type ScopeMetricConfig struct {
-	Enable    bool              `mapstructure:"enable" json:"enable" yaml:"enable"`
-	Format    ScopeOutputFormat `mapstructure:"format" json:"format" yaml:"format"`
-	Transport ScopeTransport    `mapstructure:"transport,omitempty" json:"transport,omitempty" yaml:"transport,omitempty"`
+	Enable    bool                     `mapstructure:"enable" json:"enable" yaml:"enable"`
+	Format    ScopeOutputFormat        `mapstructure:"format" json:"format" yaml:"format"`
+	Transport ScopeTransport           `mapstructure:"transport,omitempty" json:"transport,omitempty" yaml:"transport,omitempty"`
+	Watch     []ScopeMetricWatchConfig `mapstructure:"watch" json:"watch" yaml:"watch"`
 }
 
 // ScopeEventConfig represents how to output events
 type ScopeEventConfig struct {
-	Enable    bool               `mapstructure:"enable" json:"enable" yaml:"enable"`
-	Format    ScopeOutputFormat  `mapstructure:"format" json:"format" yaml:"format"`
-	Transport ScopeTransport     `mapstructure:"transport,omitempty" json:"transport,omitempty" yaml:"transport,omitempty"`
-	Watch     []ScopeWatchConfig `mapstructure:"watch" json:"watch" yaml:"watch"`
+	Enable    bool                    `mapstructure:"enable" json:"enable" yaml:"enable"`
+	Format    ScopeOutputFormat       `mapstructure:"format" json:"format" yaml:"format"`
+	Transport ScopeTransport          `mapstructure:"transport,omitempty" json:"transport,omitempty" yaml:"transport,omitempty"`
+	Watch     []ScopeEventWatchConfig `mapstructure:"watch" json:"watch" yaml:"watch"`
 }
 
 // ScopePayloadConfig represents how to capture payloads
@@ -37,12 +38,18 @@ type ScopePayloadConfig struct {
 	Dir    string `mapstructure:"dir" json:"dir" yaml:"dir"`
 }
 
-// ScopeWatchConfig represents a watch configuration
-type ScopeWatchConfig struct {
+// ScopeMetricWatchConfig represents a metric watch configuration
+type ScopeMetricWatchConfig struct {
+	WatchType string `mapstructure:"type" json:"type" yaml:"type"`
+}
+
+// ScopeEventWatchConfig represents a event watch configuration
+type ScopeEventWatchConfig struct {
 	WatchType string `mapstructure:"type" json:"type" yaml:"type"`
 	Name      string `mapstructure:"name" json:"name" yaml:"name"`
 	Field     string `mapstructure:"field,omitempty" json:"field,omitempty" yaml:"field,omitempty"`
 	Value     string `mapstructure:"value" json:"value" yaml:"value"`
+	AllowBinary bool   `mapstructure:"allowbinary,omitempty" json:"allowbinary,omitempty" yaml:"allowbinary,omitempty"`
 }
 
 // ScopeLibscopeConfig represents how to configure libscope

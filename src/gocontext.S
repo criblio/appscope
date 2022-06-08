@@ -7,6 +7,9 @@
 .global \a_func
 .hidden \c_func
 \a_func:
+    // grab the caller stack address before changing anything
+    mov %rsp, %r11
+
     // This creates a stack frame of 0x20 bytes
     // The add grows the stacks by 0x18
     // The push decrements the stack pointer, $rsp, by 8
@@ -18,8 +21,6 @@
     // Call the 'C' handler with the current stack pointer
     // as argument, e.g.:
     // go_write(stackptr)
-    mov %rsp, %r11
-    add $0x20, %r11
     mov %r11, 0x08(%rsp)
     lea \c_func@GOTPCREL(%rip), %r11
     mov (%r11), %r11
@@ -64,36 +65,56 @@
  * contain the g before entering a function (for stack checking).
  * If we don't save and restore values in these registers, they will
  * often become corrupted and result in a serious failure.
-*/
+ *
+ * From: https://go.googlesource.com/go/+/refs/heads/dev.regabi/src/cmd/compile/internal-abi.md
+ * The following registers are used for integer arguments and results:
+ * RAX, RBX, RCX, RDI, RSI, R8, R9, R10, R11
+ *
+ * Note that X15 is defined to be always a fixed value of zero
+ */
 .macro interpose_regs a_func, c_func
 .global \a_func
 .hidden \c_func
 \a_func:
+    endbr64
+    mov %rsp, %r12
     push %rax
     push %rbx
+    push %rcx
+    push %rdi
+    push %rsi
+    push %r8
+    push %r9
+    push %r10
+    push %r11
     sub $0x20, %rsp
 
-    mov %rsp, %r11
-    add $0x30, %r11
-    mov %r11, 0x08(%rsp)
-    lea \c_func@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    mov %r11, (%rsp)
+    mov %r12, 0x08(%rsp)
+    lea \c_func@GOTPCREL(%rip), %r12
+    mov (%r12), %r12
+    mov %r12, (%rsp)
 
-    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    mov (%r11), %r11
-    call *%r11
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r12
+    mov (%r12), %r12
+    mov (%r12), %r12
+    call *%r12
     xorps %xmm15,%xmm15
     mov %fs:0xfffffffffffffff8,%r14
 
-    mov %rax, %r11
+    mov %rax, %r12
 
     add $0x20, %rsp
+    pop %r11
+    pop %r10
+    pop %r9
+    pop %r8
+    pop %rsi
+    pop %rdi
+    pop %rcx
     pop %rbx
     pop %rax
 
-    jmp *%r11
+    jmp *%r12
 .endm
 
 .text
@@ -105,10 +126,15 @@
     interpose go_hook_accept4, go_accept4
     interpose go_hook_read, go_read
     interpose go_hook_close, go_close
-    interpose go_hook_tls_read, go_tls_read
-    interpose go_hook_tls_write, go_tls_write
-    interpose go_hook_readResponse, go_readResponse
-    interpose go_hook_pc_write, go_pc_write
+    interpose go_hook_tls_server_read, go_tls_server_read
+    interpose go_hook_tls_server_write, go_tls_server_write
+    interpose go_hook_tls_client_read, go_tls_client_read
+    interpose go_hook_tls_client_write, go_tls_client_write
+    interpose go_hook_http2_server_read, go_http2_server_read
+    interpose go_hook_http2_server_write, go_http2_server_write
+    interpose go_hook_http2_server_preface, go_http2_server_preface
+    interpose go_hook_http2_client_read, go_http2_client_read
+    interpose go_hook_http2_client_write, go_http2_client_write
     interpose go_hook_exit, go_exit
     interpose go_hook_die, go_die
 
@@ -120,10 +146,15 @@
     interpose_regs go_hook_reg_accept4, go_accept4
     interpose_regs go_hook_reg_read, go_read
     interpose_regs go_hook_reg_close, go_close
-    interpose_regs go_hook_reg_tls_read, go_tls_read
-    interpose_regs go_hook_reg_tls_write, go_tls_write
-    interpose_regs go_hook_reg_pc_write, go_pc_write
-    interpose_regs go_hook_reg_readResponse, go_readResponse
+    interpose_regs go_hook_reg_tls_server_read, go_tls_server_read
+    interpose_regs go_hook_reg_tls_server_write, go_tls_server_write
+    interpose_regs go_hook_reg_tls_client_read, go_tls_client_read
+    interpose_regs go_hook_reg_tls_client_write, go_tls_client_write
+    interpose_regs go_hook_reg_http2_server_read, go_http2_server_read
+    interpose_regs go_hook_reg_http2_server_write, go_http2_server_write
+    interpose_regs go_hook_reg_http2_server_preface, go_http2_server_preface
+    interpose_regs go_hook_reg_http2_client_read, go_http2_client_read
+    interpose_regs go_hook_reg_http2_client_write, go_http2_client_write
 
 /*
     Debug hint:
@@ -169,32 +200,45 @@ go_hook_write:
 */
 
 /*
-.global go_hook_regs_readResponse
-go_hook_regs_readResponse:   
+.global go_hook_reg_tls_client_write
+go_hook_reg_tls_client_write:   
+    endbr64
+    mov %rsp, %r12
     push %rax
     push %rbx
+    push %rcx
+    push %rdi
+    push %rsi
+    push %r8
+    push %r9
+    push %r10
+    push %r11
     sub $0x20, %rsp
 
-    mov %rsp, %r11
-    add $0x30, %r11
-    mov %r11, 0x08(%rsp)
-    lea go_readResponse@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    mov %r11, (%rsp)
+    mov %r12, 0x08(%rsp)
+    lea go_tls_client_write@GOTPCREL(%rip), %r12
+    mov (%r12), %r12
+    mov %r12, (%rsp)
 
-    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    mov (%r11), %r11
-    call *%r11
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r12
+    mov (%r12), %r12
+    mov (%r12), %r12
+    call *%r12
     xorps %xmm15,%xmm15
     mov %fs:0xfffffffffffffff8,%r14
 
-    mov %rax, %r11
+    mov %rax, %r12
 
     add $0x20, %rsp
+    pop %r11
+    pop %r10
+    pop %r9
+    pop %r8
+    pop %rsi
+    pop %rdi
+    pop %rcx
     pop %rbx
     pop %rax
 
-    jmp *%r11
+    jmp *%r12
 */
-

@@ -182,3 +182,8 @@ osGetGroupName(unsigned gid)
 {
     return NULL;
 }
+
+long long
+osGetProcCPU(void) {
+    return -1;
+}

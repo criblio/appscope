@@ -590,7 +590,7 @@ http2GetFrameType(http_buf_t *stash, const uint8_t *buf, size_t len)
     return ret;
 }
 
-/*
+#if 0
 static uint8_t
 http2GetFrameFlags(http_buf_t *stash, const uint8_t *buf, size_t len)
 {
@@ -614,9 +614,9 @@ http2GetFrameFlags(http_buf_t *stash, const uint8_t *buf, size_t len)
 
     return ret;
 }
-*/
 
-/*
+
+
 static uint32_t
 http2GetFrameStream(http_buf_t *stash, const uint8_t *buf, size_t len)
 {
@@ -658,7 +658,8 @@ http2GetFrameStream(http_buf_t *stash, const uint8_t *buf, size_t len)
 
     return ret;
 }
-*/
+#endif
+
 
 static bool
 parseHttp2(http_state_t* state, net_info *net, int isTx,

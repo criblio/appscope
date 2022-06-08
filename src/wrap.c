@@ -820,20 +820,6 @@ stopTimer(void)
     threadNow(0);
 }
 
-// Return process specific CPU usage in microseconds
-static long long
-doGetProcCPU() {
-    struct rusage ruse;
-    
-    if (scope_getrusage(RUSAGE_SELF, &ruse) != 0) {
-        return (long long)-1;
-    }
-
-    return
-        (((long long)ruse.ru_utime.tv_sec + (long long)ruse.ru_stime.tv_sec) * 1000 * 1000) +
-        ((long long)ruse.ru_utime.tv_usec + (long long)ruse.ru_stime.tv_usec);
-}
-
 static void
 setProcId(proc_id_t *proc)
 {
@@ -904,11 +890,6 @@ doReset()
 static void
 reportPeriodicStuff(void)
 {
-    long mem;
-    int nthread, nfds, children;
-    long long cpu = 0;
-    static long long cpuState = 0;
-
     // aggregate and send http metrics
     doHttpAgg();
 
@@ -916,29 +897,12 @@ reportPeriodicStuff(void)
     doEvent();
     doPayload();
 
-    // TODO: move the code inside if below to report.c
     if (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_PROC)) {
-        // We report CPU time for this period.
-        cpu = doGetProcCPU();
-        if (cpu != -1) {
-            doProcMetric(PROC_CPU, cpu - cpuState);
-            cpuState = cpu;
-        }
-
-        mem = osGetProcMemory(g_proc.pid);
-        if (mem != -1) doProcMetric(PROC_MEM, mem);
-
-        nthread = osGetNumThreads(g_proc.pid);
-        if (nthread != -1) doProcMetric(PROC_THREAD, nthread);
-
-        nfds = osGetNumFds(g_proc.pid);
-        if (nfds != -1) doProcMetric(PROC_FD, nfds);
-
-        children = osGetNumChildProcs(g_proc.pid);
-        if (children < 0) {
-            children = 0;
-        }
-        doProcMetric(PROC_CHILD, children);
+        doProcMetric(PROC_CPU);
+        doProcMetric(PROC_MEM);
+        doProcMetric(PROC_THREAD);
+        doProcMetric(PROC_FD);
+        doProcMetric(PROC_CHILD);
     }
 
     // report totals (not by file descriptor/socket descriptor)

@@ -3846,7 +3846,9 @@ dlopen(const char *filename, int flags)
     scopeLog(CFG_LOG_DEBUG, "dlopen called for %s with %s", filename, fbuf);
 
     WRAP_CHECK(dlopen, NULL);
-
+    if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_OPENAT) {
+        scopeBacktraceOp("dlopen", filename);
+    }
     /*
      * Attempting to hook a number of GOT entries based on a static list.
      * Get the link map and the ELF sections once since they are used for

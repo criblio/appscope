@@ -300,6 +300,40 @@ static struct b_hash_struct *find_backtrace_hash(uint64_t ip) {
 }
 
 void
+scopeBacktraceOp(const char* func, const char* path) {
+    unw_cursor_t cursor;
+    unw_context_t uc;
+    unw_word_t ip;
+    unw_getcontext(&uc);
+    unw_init_local(&cursor, &uc);
+    unw_step(&cursor); //skip first frame
+    scopeLogError("%s begin", __FUNCTION__);
+    while(unw_step(&cursor) > 0) {
+        char symbol[SYMBOL_BT_NAME_LEN];
+        unw_word_t offset;
+
+        int ret = unw_get_reg(&cursor, UNW_REG_IP, &ip);
+        if (ret) {
+            continue;
+        }
+        struct b_hash_struct *test = find_backtrace_hash(ip);
+        if(test) {
+            scopeLogError("func symbol: %s, fun: %s, arg %s", test->name, func, path);
+        } else {
+            ret = unw_get_proc_name(&cursor, symbol, SYMBOL_BT_NAME_LEN, &offset);
+            if (!ret) {
+                scopeLogError("func symbol: %s, fun: %s, arg %s", symbol, func, path);
+                add_backtrace_hash(ip, symbol);
+            } else {
+                scopeLogError("func symbol: unknown, fun: %s, arg %s", func, path);
+                add_backtrace_hash(ip, "unknown");
+            }
+        }
+    }
+    scopeLogError("%s end\n", __FUNCTION__);
+}
+
+void
 scopeBacktraceFull(long long size, const char* alloc_fun, size_t total_size) {
     unw_cursor_t cursor;
     unw_context_t uc;

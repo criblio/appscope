@@ -2079,6 +2079,10 @@ openat(int dirfd, const char *pathname, int flags, ...)
 
     WRAP_CHECK(openat, -1);
     LOAD_FUNC_ARGS_VALIST(fArgs, flags);
+    if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_OPENAT) {
+        scopeBacktraceOp("openat", pathname);
+    }
+
     fd = g_fn.openat(dirfd, pathname, flags, fArgs.arg[0]);
     doOpen(fd, pathname, FD, "openat");
 
@@ -2369,6 +2373,10 @@ openat64(int dirfd, const char *pathname, int flags, ...)
 
     WRAP_CHECK(openat64, -1);
     LOAD_FUNC_ARGS_VALIST(fArgs, flags);
+    if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_OPENAT) {
+        scopeBacktraceOp("openat64", pathname);
+    }
+
     fd = g_fn.openat64(dirfd, pathname, flags, fArgs.arg[0]);
     doOpen(fd, pathname, FD, "openat64");
 
@@ -2403,6 +2411,10 @@ EXPORTON int
 __openat_2(int fd, const char *file, int oflag)
 {
     WRAP_CHECK(__openat_2, -1);
+
+    if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_OPENAT) {
+        scopeBacktraceOp("__openat_2", file);
+    }
     fd = g_fn.__openat_2(fd, file, oflag);
     doOpen(fd, file, FD, "__openat_2");
 

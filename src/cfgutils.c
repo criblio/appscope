@@ -125,6 +125,7 @@ enum_map_t logLevelMap[] = {
 enum_map_t backtraceLevel[] = {
     {"full",                  CFG_BACKTRACE_FULL},
     {"filter",                CFG_BACKTRACE_FILTER},
+    {"openat",                CFG_BACKTRACE_OPENAT},
     {"none",                  CFG_BACKTRACE_NONE},
     {NULL,                    -1}
 };

@@ -79,7 +79,7 @@ struct _config_t
     custom_tag_t** tags;
     unsigned max_tags;
     cfg_backtrace_t backtrace_option;
-    char* backtrace_filer_file;
+    char* backtrace_filter_file;
     char* commanddir;
     unsigned processstartmsg;
     unsigned enhancefs;
@@ -390,7 +390,7 @@ cfgBacktrace(config_t* cfg)
 const char*
 cfgBacktraceFilterFile(config_t* cfg)
 {
-    return (cfg) ? cfg->backtrace_filer_file : NULL;
+    return (cfg) ? cfg->backtrace_filter_file : NULL;
 }
 
 const char*
@@ -1004,12 +1004,12 @@ void
 cfgBacktraceFilterFileSet(config_t* cfg, const char* path)
 {
     if (!cfg) return;
-    if (cfg->backtrace_filer_file) scope_free(cfg->backtrace_filer_file);
+    if (cfg->backtrace_filter_file) scope_free(cfg->backtrace_filter_file);
     if (!path || (path[0] == '\0')) {
         return;
     }
 
-    cfg->backtrace_filer_file = scope_strdup(path);
+    cfg->backtrace_filter_file = scope_strdup(path);
 }
 
 void

@@ -16,6 +16,7 @@ typedef enum {CFG_LOG_TRACE,
               CFG_LOG_NONE} cfg_log_level_t;
 typedef enum {CFG_BACKTRACE_FULL,
               CFG_BACKTRACE_FILTER,
+              CFG_BACKTRACE_OPENAT,
               CFG_BACKTRACE_NONE} cfg_backtrace_t;
 typedef enum {CFG_BUFFER_FULLY, CFG_BUFFER_LINE} cfg_buffer_t;
 typedef enum {CFG_SRC_FILE,

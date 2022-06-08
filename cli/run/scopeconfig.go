@@ -72,7 +72,7 @@ func (c *Config) SetDefault() error {
 					WatchType:   "console",
 					Name:        "(stdout|stderr)",
 					Value:       ".*",
-					AllowBinary: true,
+					AllowBinary: "false",
 				},
 				{
 					WatchType: "net",

@@ -46,7 +46,7 @@ event:
   - type: console
     name: (stdout|stderr)
     value: .*
-    allowbinary: true
+    allowbinary: false
   - type: net
     name: .*
     field: .*

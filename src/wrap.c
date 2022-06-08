@@ -1639,6 +1639,56 @@ void wait_in_loop(void)
     }
 }
 
+static size_t backtrace_search_size;
+static char** backtrace_search;
+
+static void doBacktraceCfg(void)
+{
+    if (cfgBacktrace(g_cfg.staticfg) != CFG_BACKTRACE_FILTER) {
+        return;
+    }
+
+    char buf[4096];
+    int i;
+    const char *input_file = cfgBacktraceFilterFile(g_cfg.staticfg);
+    if (input_file == NULL) {
+        return;
+    }
+
+    FILE* file_handler = scope_fopen(input_file, "r");
+    if (file_handler == NULL) {
+        return;
+    }
+    while (scope_fgets(buf, sizeof(buf), file_handler) != NULL) {                                      
+       backtrace_search_size++;
+    }
+
+    scope_rewind(file_handler);
+
+    backtrace_search = scope_malloc(backtrace_search_size * sizeof(char *));
+    if ((const char **)backtrace_search == NULL) {
+        goto file_close;
+    }
+
+    for (i = 0; i < backtrace_search_size; i++) {    
+        scope_fgets(buf, sizeof(buf), file_handler);
+
+        buf[scope_strcspn(buf, "\r\n")] = '\0';
+
+        backtrace_search[i] = scope_strdup(buf);
+        if ((const char **)backtrace_search[i] == NULL) {
+            while(i--) {
+                scope_free((const char **)backtrace_search[i]);
+            }
+            scope_free((const char **)backtrace_search);
+            goto file_close;
+        }
+    }
+
+    file_close:
+        scope_fclose(file_handler);
+}
+
 
 __attribute__((constructor)) void
 init(void)
@@ -1733,6 +1783,7 @@ init(void)
     g_getdelim = 0;
 
     g_cfg.staticfg = g_staticfg;
+    doBacktraceCfg();
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
     reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
@@ -1776,18 +1827,8 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
     return g_fn.sigaction(signum, act, oldact);
 }
 
-//TODO handle below via env variable and configuration option
-
-#define ALL_FUNC 0
-#define SEARCH_FUN 1
-
-static const int call_backtrace = ALL_FUNC;
 static size_t no_bytes_allocated;
 static void *calloc_mem = NULL;
-//TODO handle below via file parsing
-
-const char *search_array[] = {"zlib", "deflate", "inflate"};
-const int search_size = 3;
 
 EXPORTON char *
 strdup(const char *s) {
@@ -1798,10 +1839,11 @@ strdup(const char *s) {
     if(g_log) {
         size_t allocated_size = g_fn.malloc_usable_size(str);
         no_bytes_allocated += allocated_size;
-        if (call_backtrace == ALL_FUNC) {
+        
+        if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FULL) {
             scopeBacktraceFull((long long)allocated_size, "strdup", no_bytes_allocated);
-        } else if (call_backtrace == SEARCH_FUN) {
-            scopeBacktraceFilter(search_array, search_size, (long long)allocated_size, "strdup", no_bytes_allocated);
+        } else if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FILTER) {
+            scopeBacktraceFilter((const char **)backtrace_search, backtrace_search_size, (long long)allocated_size, "strdup", no_bytes_allocated);
         }
     }
 
@@ -1816,10 +1858,10 @@ posix_memalign(void **memptr, size_t alignment, size_t size) {
     if(g_log) {
         size_t allocated_size = g_fn.malloc_usable_size(*memptr);
         no_bytes_allocated += allocated_size;
-        if (call_backtrace == ALL_FUNC) {
+        if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FULL) {
             scopeBacktraceFull((long long)allocated_size, "posix_memalign", no_bytes_allocated);
-        } else if (call_backtrace == SEARCH_FUN) {
-            scopeBacktraceFilter(search_array, search_size, (long long)allocated_size, "posix_memalign", no_bytes_allocated);
+        } else if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FILTER) {
+            scopeBacktraceFilter((const char **)backtrace_search, backtrace_search_size, (long long)allocated_size, "posix_memalign", no_bytes_allocated);
         }
     }
     return res;
@@ -1833,10 +1875,10 @@ aligned_alloc(size_t alignment, size_t size) {
     if(g_log) {
         size_t allocated_size = g_fn.malloc_usable_size(ptr);
         no_bytes_allocated += allocated_size;
-        if (call_backtrace == ALL_FUNC) {
+        if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FULL) {
             scopeBacktraceFull((long long)allocated_size, "aligned_alloc", no_bytes_allocated);
-        } else if (call_backtrace == SEARCH_FUN) {
-            scopeBacktraceFilter(search_array, search_size, (long long)allocated_size, "aligned_alloc", no_bytes_allocated);
+        } else if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FILTER) {
+            scopeBacktraceFilter((const char **)backtrace_search, backtrace_search_size, (long long)allocated_size, "aligned_alloc", no_bytes_allocated);
         }
     }
     return ptr;
@@ -1850,10 +1892,10 @@ valloc(size_t size) {
     if(g_log) {
         size_t allocated_size = g_fn.malloc_usable_size(ptr);
         no_bytes_allocated += allocated_size;
-        if (call_backtrace == ALL_FUNC) {
+        if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FULL) {
             scopeBacktraceFull((long long)allocated_size, "valloc", no_bytes_allocated);
-        } else if (call_backtrace == SEARCH_FUN) {
-            scopeBacktraceFilter(search_array, search_size, (long long)allocated_size, "valloc", no_bytes_allocated);
+        } else if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FILTER) {
+            scopeBacktraceFilter((const char **)backtrace_search, backtrace_search_size, (long long)allocated_size, "valloc", no_bytes_allocated);
         }
     }
     return ptr;
@@ -1868,10 +1910,10 @@ pvalloc(size_t size) {
     if(g_log) {
         size_t allocated_size = g_fn.malloc_usable_size(ptr);
         no_bytes_allocated += allocated_size;
-        if (call_backtrace == ALL_FUNC) {
+        if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FULL) {
             scopeBacktraceFull((long long)allocated_size, "pvalloc", no_bytes_allocated);
-        } else if (call_backtrace == SEARCH_FUN) {
-            scopeBacktraceFilter(search_array, search_size, (long long)allocated_size, "pvalloc", no_bytes_allocated);
+        } else if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FILTER) {
+            scopeBacktraceFilter((const char **)backtrace_search, backtrace_search_size, (long long)allocated_size, "pvalloc", no_bytes_allocated);
         }
     }
     return ptr;
@@ -1886,10 +1928,10 @@ memalign(size_t alignment, size_t size) {
     if(g_log) {
         size_t allocated_size = g_fn.malloc_usable_size(ptr);
         no_bytes_allocated += allocated_size;
-        if (call_backtrace == ALL_FUNC) {
+        if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FULL) {
             scopeBacktraceFull((long long)allocated_size, "memalign", no_bytes_allocated);
-        } else if (call_backtrace == SEARCH_FUN) {
-            scopeBacktraceFilter(search_array, search_size, (long long)allocated_size, "memalign", no_bytes_allocated);
+        } else if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FILTER) {
+            scopeBacktraceFilter((const char **)backtrace_search, backtrace_search_size, (long long)allocated_size, "memalign", no_bytes_allocated);
         }
     }
     return ptr;
@@ -1904,10 +1946,10 @@ malloc(size_t size) {
     if(g_log) {
         size_t allocated_size = g_fn.malloc_usable_size(ptr);
         no_bytes_allocated += allocated_size;
-        if (call_backtrace == ALL_FUNC) {
+        if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FULL) {
             scopeBacktraceFull((long long)allocated_size, "malloc", no_bytes_allocated);
-        } else if (call_backtrace == SEARCH_FUN) {
-            scopeBacktraceFilter(search_array, search_size, (long long)allocated_size, "malloc", no_bytes_allocated);
+        } else if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FILTER) {
+            scopeBacktraceFilter((const char **)backtrace_search, backtrace_search_size, (long long)allocated_size, "malloc", no_bytes_allocated);
         }
     }
 
@@ -1928,10 +1970,10 @@ calloc(size_t nmemb, size_t size) {
     if(g_log) {
         size_t allocated_size = g_fn.malloc_usable_size(ptr);
         no_bytes_allocated += allocated_size;
-        if (call_backtrace == ALL_FUNC) {
+        if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FULL) {
             scopeBacktraceFull((long long)allocated_size, "calloc", no_bytes_allocated);
-        } else if (call_backtrace == SEARCH_FUN) {
-            scopeBacktraceFilter(search_array, search_size, (long long)allocated_size, "calloc", no_bytes_allocated);
+        } else if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FILTER) {
+            scopeBacktraceFilter((const char **)backtrace_search, backtrace_search_size, (long long)allocated_size, "calloc", no_bytes_allocated);
         }
     }
 
@@ -1950,10 +1992,10 @@ realloc(void *ptr, size_t size) {
 
             size_t new_size = g_fn.malloc_usable_size(new_ptr);
             no_bytes_allocated += new_size;
-            if (call_backtrace == ALL_FUNC) {
+            if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FULL) {
                 scopeBacktraceFull(((long long)(new_size)-(long long)prev_size), "realloc", no_bytes_allocated);
-            } else if (call_backtrace == SEARCH_FUN) {
-                scopeBacktraceFilter(search_array, search_size, ((long long)(new_size)-(long long)prev_size), "realloc", no_bytes_allocated);
+            } else if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FILTER) {
+                scopeBacktraceFilter((const char **)backtrace_search, backtrace_search_size, ((long long)(new_size)-(long long)prev_size), "realloc", no_bytes_allocated);
             }
     }
 
@@ -1968,10 +2010,10 @@ free(void *ptr) {
         if(g_log) {
             size_t freed_size = g_fn.malloc_usable_size(ptr);
             no_bytes_allocated -= freed_size;
-            if (call_backtrace == ALL_FUNC) {
+            if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FULL) {
                 scopeBacktraceFull(-((long long)freed_size), "free", no_bytes_allocated);
-            } else if (call_backtrace == SEARCH_FUN) {
-                scopeBacktraceFilter(search_array, search_size, -((long long)freed_size), "free", no_bytes_allocated);
+            } else if (cfgBacktrace(g_cfg.staticfg) == CFG_BACKTRACE_FILTER) {
+                scopeBacktraceFilter((const char **)backtrace_search, backtrace_search_size, -((long long)freed_size), "free", no_bytes_allocated);
             }
         }
     }

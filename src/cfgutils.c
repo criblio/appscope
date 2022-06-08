@@ -122,6 +122,13 @@ enum_map_t logLevelMap[] = {
     {NULL,                    -1}
 };
 
+enum_map_t backtraceLevel[] = {
+    {"full",                  CFG_BACKTRACE_FULL},
+    {"filter",                CFG_BACKTRACE_FILTER},
+    {"none",                  CFG_BACKTRACE_NONE},
+    {NULL,                    -1}
+};
+
 enum_map_t bufferMap[] = {
     {"line",                  CFG_BUFFER_LINE},
     {"full",                  CFG_BUFFER_FULLY},
@@ -180,6 +187,8 @@ void cfgTransportTlsValidateServerSetFromStr(config_t *, which_transport_t, cons
 void cfgTransportTlsCACertPathSetFromStr(config_t *, which_transport_t, const char *);
 void cfgCustomTagAddFromStr(config_t*, const char*, const char*);
 void cfgLogLevelSetFromStr(config_t*, const char*);
+void cfgBacktraceSetFromStr(config_t*, const char*);
+void cfgBacktraceFilterFileSetFromStr(config_t*, const char*);
 void cfgPayEnableSetFromStr(config_t*, const char*);
 void cfgPayDirSetFromStr(config_t*, const char*);
 void cfgAuthTokenSetFromStr(config_t*, const char*);
@@ -479,6 +488,10 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgMtcVerbositySetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_LOG_LEVEL")) {
         cfgLogLevelSetFromStr(cfg, value);
+    } else if (!scope_strcmp(env_name, "SCOPE_BACKTRACE")) {
+        cfgBacktraceSetFromStr(cfg, value);
+    } else if (!scope_strcmp(env_name, "SCOPE_BACKTRACE_FILTER")) {
+        cfgBacktraceFilterFileSetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_METRIC_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_MTC, value);
     } else if (!scope_strcmp(env_name, "SCOPE_METRIC_TLS_ENABLE")) {
@@ -892,6 +905,20 @@ cfgLogLevelSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
     cfgLogLevelSet(cfg, strToVal(logLevelMap, value));
+}
+
+void
+cfgBacktraceSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    cfgBacktraceSet(cfg, strToVal(backtraceLevel, value));
+}
+
+void
+cfgBacktraceFilterFileSetFromStr(config_t* cfg, const char* value)
+{
+    if (!cfg || !value) return;
+    cfgBacktraceFilterFileSet(cfg, value);
 }
 
 void

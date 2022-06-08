@@ -14,6 +14,9 @@ typedef enum {CFG_LOG_TRACE,
               CFG_LOG_WARN,
               CFG_LOG_ERROR,
               CFG_LOG_NONE} cfg_log_level_t;
+typedef enum {CFG_BACKTRACE_FULL,
+              CFG_BACKTRACE_FILTER,
+              CFG_BACKTRACE_NONE} cfg_backtrace_t;
 typedef enum {CFG_BUFFER_FULLY, CFG_BUFFER_LINE} cfg_buffer_t;
 typedef enum {CFG_SRC_FILE,
               CFG_SRC_CONSOLE,
@@ -125,6 +128,7 @@ typedef unsigned int bool;
 
 #define DEFAULT_MAXEVENTSPERSEC 10000
 #define DEFAULT_ENHANCE_FS TRUE
+#define DEFAULT_BACKTRACE_OPTION CFG_BACKTRACE_NONE
 #define DEFAULT_PORTBLOCK 0
 #define DEFAULT_METRIC_CBUF_SIZE 50 * 1024
 #define DEFAULT_PROCESS_START_MSG TRUE

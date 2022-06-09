@@ -147,9 +147,9 @@ go_schema_t go_8_schema = {
         .fr_to_writeBuf=0x80,
         .fr_to_headerBuf=0x38,
         .cc_to_fr=0xc8,
-        .cc_to_tconn=0x10,
+        .cc_to_tconn=0x8,
         .sc_to_fr=0x48,
-        .sc_to_conn=0x18,
+        .sc_to_conn=0x10,
     },
     .tap = {
         [INDEX_HOOK_WRITE]                = {"syscall.write",                           go_hook_write,                NULL, 0},
@@ -244,9 +244,9 @@ go_schema_t go_17_schema = {
         .fr_to_writeBuf=0x88,
         .fr_to_headerBuf=0x40,
         .cc_to_fr=0x130,
-        .cc_to_tconn=0x10,
+        .cc_to_tconn=0x8,
         .sc_to_fr=0x48,
-        .sc_to_conn=0x18,
+        .sc_to_conn=0x10,
     },
     // use the _reg_ assembly functions here, to support changes to Go 1.17
     // where we preserve the return values stored in registers
@@ -929,6 +929,13 @@ adjustGoStructOffsetsForVersion()
         scope_dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go_schema->struct_offsets.conn_to_rwc);
         scope_dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go_schema->struct_offsets.conn_to_tlsState);
         scope_dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_tlsState);
+        scope_dprintf(fd, "net/http.http2Framer|readBuf=%d|Server\n", g_go_schema->struct_offsets.fr_to_readBuf);
+        scope_dprintf(fd, "net/http.http2Framer|wbuf=%d|Server\n", g_go_schema->struct_offsets.fr_to_writeBuf);
+        scope_dprintf(fd, "net/http.http2Framer|headerBuf=%d|Server\n", g_go_schema->struct_offsets.fr_to_headerBuf);
+        scope_dprintf(fd, "net/http.http2ClientConn|fr=%d|Client\n", g_go_schema->struct_offsets.cc_to_fr);
+        scope_dprintf(fd, "net/http.http2ClientConn|tconn=%d|Client\n", g_go_schema->struct_offsets.cc_to_tconn);
+        scope_dprintf(fd, "net/http.http2serverConn|framer=%d|Server\n", g_go_schema->struct_offsets.sc_to_fr);
+        scope_dprintf(fd, "net/http.http2serverConn|conn=%d|Server\n", g_go_schema->struct_offsets.sc_to_conn);
         scope_close(fd);
     }
 
@@ -1680,8 +1687,10 @@ c_http2_server_read(char *stackaddr)
     if (!buf) return;
     char *readBuf = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_readBuf);
     if (!readBuf) return;
-    uint64_t tcpConn = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_conn);
-    if (!tcpConn ) return;
+    uint64_t conn_if = (sc + g_go_schema->struct_offsets.sc_to_conn); 
+    if (!conn_if) return;
+    uint64_t tcpConn = *(uint64_t *)(conn_if + g_go_schema->struct_offsets.iface_data); 
+    if (!tcpConn) return;
 
     uint8_t *newbuf = (uint8_t *)buf; 
     uint32_t rc = 0;
@@ -1728,17 +1737,15 @@ c_http2_server_write(char *stackaddr)
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
     stackaddr -= g_go_schema->arg_offsets.c_http2_server_write_callee;
-
     uint64_t sc      = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_server_write_sc);
     if (!sc) return;
-
     uint64_t fr      = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_fr);
     if (!fr) return;  
-
     char *writeBuf   = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_writeBuf);
     if (!writeBuf) return;
-
-    uint64_t tcpConn = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_conn);
+    uint64_t conn_if = (sc + g_go_schema->struct_offsets.sc_to_conn); 
+    if (!conn_if) return;
+    uint64_t tcpConn = *(uint64_t *)(conn_if + g_go_schema->struct_offsets.iface_data); 
     if (!tcpConn) return;
 
     int fd = getFDFromConn(tcpConn);
@@ -1790,17 +1797,16 @@ c_http2_server_preface(char *stackaddr)
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
     stackaddr -= g_go_schema->arg_offsets.c_http2_server_preface_callee;
 
-    uint64_t *rc = (uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_server_preface_rc);
+    uint64_t *rc     = (uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_server_preface_rc);
     if ((rc == NULL) || (rc == (uint64_t *)0xffffffff)) return;
     if (*rc != 0) return;
-
     uint64_t sc      = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_server_preface_sc);
     if (!sc) return;
-
     uint64_t fr      = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_fr);
     if (!fr) return;
-
-    uint64_t tcpConn = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_conn);
+    uint64_t conn_if = (sc + g_go_schema->struct_offsets.sc_to_conn); 
+    if (!conn_if) return;
+    uint64_t tcpConn = *(uint64_t *)(conn_if + g_go_schema->struct_offsets.iface_data); 
     if (!tcpConn) return;
 
     int fd = getFDFromConn(tcpConn);
@@ -1828,15 +1834,17 @@ go_http2_server_preface(char *stackptr)
 static void
 c_http2_client_read(char *stackaddr)
 {
-    uint64_t cc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_read_cc);
+    uint64_t cc         = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_read_cc);
     if (!cc) return;
-    uint64_t fr   = *(uint64_t *)(cc + g_go_schema->struct_offsets.cc_to_fr);
+    uint64_t fr         = *(uint64_t *)(cc + g_go_schema->struct_offsets.cc_to_fr);
     if (!fr) return;
-    char *buf     = (char *)(fr + g_go_schema->struct_offsets.fr_to_headerBuf);
+    char *buf           = (char *)(fr + g_go_schema->struct_offsets.fr_to_headerBuf);
     if (!buf) return;
-    char *readBuf = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_readBuf);
+    char *readBuf       = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_readBuf);
     if (!readBuf) return;
-    uint64_t tcpConn = *(uint64_t *)(cc + g_go_schema->struct_offsets.cc_to_tconn);
+    uint64_t conn_if = (cc + g_go_schema->struct_offsets.cc_to_tconn); 
+    if (!conn_if) return;
+    uint64_t tcpConn    = *(uint64_t *)(conn_if + g_go_schema->struct_offsets.iface_data); 
     if (!tcpConn) return;
 
     int fd = getFDFromConn(tcpConn);
@@ -1883,10 +1891,8 @@ c_http2_client_write(char *stackaddr)
 
     uint64_t tcpConn = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_tcpConn);
     if (!tcpConn) return;
-
     char *buf        = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_buf);
     if (!buf) return;
-
     uint64_t rc      = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_rc);
     if (rc < 1) return;
 

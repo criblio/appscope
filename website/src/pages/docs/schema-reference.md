@@ -4418,7 +4418,7 @@ Structure of the `proc.thread` metric
 
 | Property | Description |
 |---|---|
-| `_metric` _required_ (`string`) | Indicates that the Source is a gauge that reports how many threads are runnning in the process.<br/><br/>Value must be `proc.thread`. |
+| `_metric` _required_ (`string`) | Indicates that the Source is a gauge that reports how many threads are running in the process.<br/><br/>Value must be `proc.thread`. |
 | `_metric_type` _required_ (`string`) | Indicates that the metric is a gauge.<br/><br/>Value must be `gauge`. |
 | `_value` _required_ (`number`) | The value reported by the event or metric.<br/><br/>**Example:**<br/>`1` |
 | `proc` _required_ (`string`) | The name of the scoped app's process. |

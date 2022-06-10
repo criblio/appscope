@@ -303,7 +303,7 @@
     },
     "sourceprocthread" : {
       "title": "proc.thread",
-      "description": "Indicates that the Source is a gauge that reports how many threads are runnning in the process.",
+      "description": "Indicates that the Source is a gauge that reports how many threads are running in the process.",
       "type": "string",
       "const": "proc.thread"
     },

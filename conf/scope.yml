@@ -942,7 +942,7 @@ protocol:
   # Uncomment this and adjust as needed to override the defaults.
   #
   #- name: HTTP
-  #  regex: " HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n"
+  #  regex: "HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n"
 
   # AppScope uses an internally defined protocol detector for STATSD like the
   # example below by default.

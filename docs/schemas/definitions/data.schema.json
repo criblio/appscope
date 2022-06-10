@@ -11,7 +11,7 @@
     },
     "allowbinary": {
       "title": "allowbinary",
-      "description": "TBD allowbinary",
+      "description": "When false, AppScope attempts to omit any console writes that contain non-printable characters, while adding 'binary data ignored' to the console event data.",
       "type": "string",
       "enum": ["true", "false"]
     },
@@ -681,31 +681,31 @@
     },
     "watch_type_metric_fs" : {
       "title": "type",
-      "description": "TBD type",
+      "description": "If present, AppScope will capture and emit filesystem metrics.",
       "type": "string",
       "const": "fs"
     },
     "watch_type_metric_net" : {
       "title": "type",
-      "description": "TBD type",
+      "description":  "If present, AppScope will capture and emit network metrics.",
       "type": "string",
       "const": "net"
     },
     "watch_type_metric_http" : {
       "title": "type",
-      "description": "TBD type",
+      "description": "If present, AppScope will capture and emit HTTP metrics.",
       "type": "string",
       "const": "http"
     },
     "watch_type_metric_dns" : {
       "title": "type",
-      "description": "TBD type",
+      "description":  "If present, AppScope will capture and emit DNS metrics.",
       "type": "string",
       "const": "dns"
     },
     "watch_type_metric_proc" : {
       "title": "type",
-      "description": "TBD type",
+      "description": "If present, AppScope will capture and emit process metrics.",
       "type": "string",
       "const": "process"
     },

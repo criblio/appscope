@@ -10,6 +10,7 @@
 #include "dbg.h"
 #include "utils.h"
 #include "scopestdlib.h"
+#include "uthash.h"
 
 #define UNW_LOCAL_ONLY
 #include "libunwind.h"
@@ -273,6 +274,146 @@ void __attribute__((weak))
 scopeLog(cfg_log_level_t level, const char *format, ...)
 {
     return;
+}
+
+
+struct b_hash_struct {
+    uint64_t ip;
+    char *name;
+    UT_hash_handle hh; /* makes this structure hashable */
+};
+
+struct b_hash_struct *backtrace_hash = NULL;
+
+static void add_backtrace_hash(uint64_t ip, const char* name) {
+     struct b_hash_struct* bh = (struct b_hash_struct*)scope_malloc(sizeof(struct b_hash_struct));
+    bh->ip = ip;
+    bh->name = scope_strdup(name);
+    HASH_ADD_INT(backtrace_hash, ip, bh);
+}
+
+static struct b_hash_struct *find_backtrace_hash(uint64_t ip) {
+    struct b_hash_struct *s;
+
+    HASH_FIND_INT(backtrace_hash, &ip, s);
+    return s;
+}
+
+void
+scopeBacktraceOp(const char* func, const char* path) {
+    unw_cursor_t cursor;
+    unw_context_t uc;
+    unw_word_t ip;
+    unw_getcontext(&uc);
+    unw_init_local(&cursor, &uc);
+    unw_step(&cursor); //skip first frame
+    scopeLogError("%s begin", __FUNCTION__);
+    while(unw_step(&cursor) > 0) {
+        char symbol[SYMBOL_BT_NAME_LEN];
+        unw_word_t offset;
+
+        int ret = unw_get_reg(&cursor, UNW_REG_IP, &ip);
+        if (ret) {
+            continue;
+        }
+        struct b_hash_struct *test = find_backtrace_hash(ip);
+        if(test) {
+            scopeLogError("func symbol: %s, fun: %s, arg %s", test->name, func, path);
+        } else {
+            ret = unw_get_proc_name(&cursor, symbol, SYMBOL_BT_NAME_LEN, &offset);
+            if (!ret) {
+                scopeLogError("func symbol: %s, fun: %s, arg %s", symbol, func, path);
+                add_backtrace_hash(ip, symbol);
+            } else {
+                scopeLogError("func symbol: unknown, fun: %s, arg %s", func, path);
+                add_backtrace_hash(ip, "unknown");
+            }
+        }
+    }
+    scopeLogError("%s end\n", __FUNCTION__);
+}
+
+void
+scopeBacktraceFull(long long size, const char* alloc_fun, size_t total_size) {
+    unw_cursor_t cursor;
+    unw_context_t uc;
+    unw_word_t ip;
+    unw_getcontext(&uc);
+    unw_init_local(&cursor, &uc);
+    unw_step(&cursor); //skip first frame
+    scopeLogError("%s begin", __FUNCTION__);
+    while(unw_step(&cursor) > 0) {
+        char symbol[SYMBOL_BT_NAME_LEN];
+        unw_word_t offset;
+
+        int ret = unw_get_reg(&cursor, UNW_REG_IP, &ip);
+        if (ret) {
+            continue;
+        }
+        struct b_hash_struct *test = find_backtrace_hash(ip);
+        if(test) {
+            scopeLogError("func symbol: %s, malloc_fun: %s, size allocated: %lld, total size allocated: %zu", test->name, alloc_fun, size, total_size);
+        } else {
+            ret = unw_get_proc_name(&cursor, symbol, SYMBOL_BT_NAME_LEN, &offset);
+            if (!ret) {
+                scopeLogError("func symbol: %s, malloc_fun: %s, size allocated: %lld, total size allocated: %zu", symbol, alloc_fun, size, total_size);
+                add_backtrace_hash(ip, symbol);
+            } else {
+                scopeLogError("func symbol: unknown, malloc_fun: %s, size allocated: %lld, total size allocated: %zu", alloc_fun, size, total_size);
+                add_backtrace_hash(ip, "unknown");
+            }
+        }
+    }
+    scopeLogError("%s end\n", __FUNCTION__);
+}
+
+// Dl_info info = {};
+// if (dladdr((void *)ip, &info))
+//     scopeLogError(" %s:%s", info.dli_fname, info.dli_sname ? info.dli_sname : "");
+
+void
+scopeBacktraceFilter(const char** str, int str_size, long long size, const char* alloc_fun, size_t total_size) {
+    unw_cursor_t cursor;
+    unw_context_t uc;
+    unw_word_t ip;
+    unw_getcontext(&uc);
+    unw_init_local(&cursor, &uc);
+    unw_step(&cursor); //skip first frame
+    while(unw_step(&cursor) > 0) {
+        char symbol[SYMBOL_BT_NAME_LEN];
+        unw_word_t offset;
+
+        int ret = unw_get_reg(&cursor, UNW_REG_IP, &ip);
+        if (ret) {
+            continue;
+        }
+        struct b_hash_struct *test = find_backtrace_hash(ip);
+        if(test) {
+            for (int i=0; i < str_size; ++i) {
+                if(scope_strstr(test->name, str[i])) {
+                    scopeLogError("%s begin", __FUNCTION__);
+                    scopeLogError("func symbol: %s, malloc_fun: %s, size allocated: %lld, total size allocated: %zu", test->name, alloc_fun, size, total_size);
+                    scopeLogError("%s end\n", __FUNCTION__);
+                    return;
+                }
+            }
+        } else {
+            ret = unw_get_proc_name(&cursor, symbol, SYMBOL_BT_NAME_LEN, &offset);
+            if (!ret) {
+                add_backtrace_hash(ip, symbol);
+                for (int i=0; i < str_size; ++i) {
+                    if(scope_strstr(symbol, str[i])) {
+                        scopeLogError("%s begin", __FUNCTION__);
+                        scopeLogError("func symbol: %s, malloc_fun: %s, size allocated: %lld, total size allocated: %zu", symbol, alloc_fun, size, total_size);
+                        scopeLogError("%s end\n", __FUNCTION__);
+                        return;
+                    }
+                }
+            } else {
+                add_backtrace_hash(ip, "unknown");
+            }
+        }
+    }
 }
 
 void

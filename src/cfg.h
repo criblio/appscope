@@ -29,6 +29,8 @@ unsigned            cfgEvtEnable(config_t*);
 cfg_mtc_format_t    cfgEventFormat(config_t*);
 unsigned            cfgEvtRateLimit(config_t*);
 unsigned            cfgEnhanceFs(config_t*);
+cfg_backtrace_t     cfgBacktrace(config_t*);
+const char*         cfgBacktraceFilterFile(config_t*);
 const char*         cfgEvtFormatValueFilter(config_t*, watch_t);
 const char*         cfgEvtFormatFieldFilter(config_t*, watch_t);
 const char*         cfgEvtFormatNameFilter(config_t*, watch_t);
@@ -82,6 +84,8 @@ void                cfgTransportTlsValidateServerSet(config_t *, which_transport
 void                cfgTransportTlsCACertPathSet(config_t *, which_transport_t, const char *);
 void                cfgCustomTagAdd(config_t*, const char*, const char*);
 void                cfgLogLevelSet(config_t*, cfg_log_level_t);
+void                cfgBacktraceSet(config_t*, cfg_backtrace_t);
+void                cfgBacktraceFilterFileSet(config_t*, const char*);
 void                cfgPayEnableSet(config_t*, unsigned int);
 void                cfgPayDirSet(config_t*, const char *);
 void                cfgEvtFormatHeaderSet(config_t *, const char *);

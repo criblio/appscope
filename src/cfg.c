@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -78,7 +79,8 @@ struct _config_t
 
     custom_tag_t** tags;
     unsigned max_tags;
-
+    cfg_backtrace_t backtrace_option;
+    char* backtrace_filter_file;
     char* commanddir;
     unsigned processstartmsg;
     unsigned enhancefs;
@@ -164,7 +166,6 @@ static cfg_buffer_t bufDefault[] = {
     DEFAULT_LS_BUF,
 };
 
-
 ///////////////////////////////////
 // Constructors Destructors
 ///////////////////////////////////
@@ -233,6 +234,7 @@ cfgCreateDefault()
     c->commanddir = (DEFAULT_COMMAND_DIR) ? scope_strdup(DEFAULT_COMMAND_DIR) : NULL;
     c->processstartmsg = DEFAULT_PROCESS_START_MSG;
     c->enhancefs = DEFAULT_ENHANCE_FS;
+    c->backtrace_option = DEFAULT_BACKTRACE_OPTION;
 
     c->logstream.enable = DEFAULT_LOGSTREAM_ENABLE;
     c->logstream.cloud = DEFAULT_LOGSTREAM_CLOUD;
@@ -379,6 +381,18 @@ unsigned
 cfgEnhanceFs(config_t* cfg)
 {
     return (cfg) ? cfg->enhancefs : DEFAULT_ENHANCE_FS;
+}
+
+cfg_backtrace_t
+cfgBacktrace(config_t* cfg)
+{
+    return (cfg) ? cfg->backtrace_option : DEFAULT_BACKTRACE_OPTION;
+}
+
+const char*
+cfgBacktraceFilterFile(config_t* cfg)
+{
+    return (cfg) ? cfg->backtrace_filter_file : NULL;
 }
 
 const char*
@@ -990,6 +1004,27 @@ cfgLogLevelSet(config_t* cfg, cfg_log_level_t level)
 {
     if (!cfg || level < 0 || level > CFG_LOG_NONE) return;
     cfg->log.level = level;
+}
+
+
+
+void
+cfgBacktraceSet(config_t* cfg, cfg_backtrace_t backtrace)
+{
+    if (!cfg || backtrace < 0 || backtrace > CFG_BACKTRACE_NONE) return;
+    cfg->backtrace_option = backtrace;
+}
+
+void
+cfgBacktraceFilterFileSet(config_t* cfg, const char* path)
+{
+    if (!cfg) return;
+    if (cfg->backtrace_filter_file) scope_free(cfg->backtrace_filter_file);
+    if (!path || (path[0] == '\0')) {
+        return;
+    }
+
+    cfg->backtrace_filter_file = scope_strdup(path);
 }
 
 void

@@ -73,6 +73,9 @@ extern bool g_ismusl;
 void scopeLog(cfg_log_level_t, const char *, ...) PRINTF_FORMAT(2,3);
 void scopeLogHex(cfg_log_level_t, const void *, size_t, const char *, ...) PRINTF_FORMAT(4,5);
 void scopeBacktrace(cfg_log_level_t);
+void scopeBacktraceOp(const char*, const char*);
+void scopeBacktraceFull(long long, const char*, size_t);
+void scopeBacktraceFilter(const char**, int, long long, const char*, size_t);
 
 #define scopeLogError(...) scopeLog(CFG_LOG_ERROR, __VA_ARGS__)
 #define scopeLogWarn(...)  scopeLog(CFG_LOG_WARN,  __VA_ARGS__)

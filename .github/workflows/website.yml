@@ -12,16 +12,23 @@ name: Deploy Website
 on:
   push:
     branches:
-      - master
+      - 'master'
     tags:
       - 'web*'
     paths:
       - 'website/**'
+      - 'docker/docs/layout.js'
+      - 'docs/schemas/**'
 jobs:
   website:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: "Checkout Repository"
+        uses: actions/checkout@v3
+
+      - name: "Build schema-reference.md"
+        run: make docs-generate
+
       - name: "Website Deploy"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}

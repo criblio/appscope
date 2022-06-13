@@ -6,6 +6,38 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.1.0
+
+2022-06-28 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.1.0`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.1.0/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.1.0/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.1.0/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.1.0/linux/aarch64/scope)
+
+### New Features and Improvements
+
+AppScope 1.1.0 introduces improved capabilities for scoping Go applications:
+
+- [#637](https://github.com/criblio/appscope/issues/637) Support for go17 and go18.
+- [#904](https://github.com/criblio/appscope/issues/904) Support for HTTP2 when scoping Go executables. 
+- [#667](https://github.com/criblio/appscope/issues/607) AppScope's own internal libc, which resolves problems we'd seen when scoping Go apps that handle signals.
+
+Usability improvements include:
+
+- [#917](https://github.com/criblio/appscope/issues/917) Individual on/off control for all classes of metric data using metric watch types, via the config file or environment variables. Since event watch types already existed, this means that you can now turn all classes of events and metrics on or off individually.
+- [#969](https://github.com/criblio/appscope/issues/969) AppScope now sends a [start message](schema-reference#eventstartmsg) event to the log. 
+- [#812](https://github.com/criblio/appscope/issues/812) Metric and event [schemas](schema-reference) now include more informative definitions. 
+- [#938](https://github.com/criblio/appscope/issues/938) A new `SCOPE_ERROR_SIGNAL_HANDLER` environment variable, provided for situations where a scoped app is crashing. Setting this variable to `true` sends backtrace information to the log, which can help you diagnose problems. 
+- [#918](https://github.com/criblio/appscope/issues/918) The config file now includes a `cribl` section for configuring output via the Cribl backend. 
+- [#498](https://github.com/criblio/appscope/issues/498) AppScope can now accept remote commands over UNIX sockets or non-TLS TCP connections. 
+
+### Fixes
+
+- [#781](https://github.com/criblio/appscope/issues/781) Makes delivery of data as processes exit more consistent.
+- [#970](https://github.com/criblio/appscope/issues/970), [#988](https://github.com/criblio/appscope/issues/988) The CLI now defaults to `allowbinary=false` to redact binary data that would otherwise show up in console output.
+
 ## AppScope 1.0.4
 
 2022-05-10 - Maintenance Release

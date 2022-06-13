@@ -36,7 +36,7 @@ The distros that AppScope supports all require the use of `/tmp`, `/dev/shm`, an
 
 **Only** these runtimes are supported: 
 
-- Open JVM 7 and later, Oracle JVM 7 and later, go1.8 through go1.16 (support for go1.17 and newer is [planned](https://github.com/criblio/appscope/issues/637)).
+- Open JVM 7 and later, Oracle JVM 7 and later, go1.8 through go1.18.
 
 AppScope cannot:
 

@@ -8,7 +8,7 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 
 ## AppScope 1.1.0
 
-2022-06-28 - Maintenance Release
+2022-06-28 - Minor Release
 
 Assets are available via Docker and the Cribl CDN at the links below.
 

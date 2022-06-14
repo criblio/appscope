@@ -27,16 +27,16 @@ AppScope 1.1.0 introduces improved capabilities for scoping Go applications:
 Usability improvements include:
 
 - [#917](https://github.com/criblio/appscope/issues/917) Individual on/off control for all classes of metric data using metric watch types, via the config file or environment variables. Since event watch types already existed, this means that you can now turn all classes of events and metrics on or off individually.
-- [#969](https://github.com/criblio/appscope/issues/969) AppScope now sends a [start message](schema-reference#eventstartmsg) event to the log. 
-- [#812](https://github.com/criblio/appscope/issues/812) Metric and event [schemas](schema-reference) now include more informative definitions. 
+- [#812](https://github.com/criblio/appscope/issues/812) Metric and event [schemas](schema-reference) now include more informative definitions.
+- [#969](https://github.com/criblio/appscope/issues/969) The start message (`start.msg`) event which AppScope sends when log level is `info` or `debug` is now [documented](schema-reference#eventstartmsg) in the schema.
 - [#938](https://github.com/criblio/appscope/issues/938) A new `SCOPE_ERROR_SIGNAL_HANDLER` environment variable, provided for situations where a scoped app is crashing. Setting this variable to `true` sends backtrace information to the log, which can help you diagnose problems. 
-- [#918](https://github.com/criblio/appscope/issues/918) The config file now includes a `cribl` section for configuring output via the Cribl backend. 
-- [#498](https://github.com/criblio/appscope/issues/498) AppScope can now accept remote commands over UNIX sockets or non-TLS TCP connections. 
-
+- [#498](https://github.com/criblio/appscope/issues/498) AppScope can now accept remote commands over UNIX sockets or non-TLS TCP connections.
+- [#970](https://github.com/criblio/appscope/issues/970), [#988](https://github.com/criblio/appscope/issues/988) Better controls for redacting binary data that would otherwise show up in AppScope output. In the AppScope library, `SCOPE_ALLOW_BINARY_CONSOLE` can now be set using the environment variable (prior to 1.1.0, the only available method) or in the config file. For the library, its default value has been changed from `false` to `true`. Meanwhile, the CLI still defaults to `allowbinary=false`, because allowing binary data in CLI output makes sense only in rare cases.
+ 
 ### Fixes
 
-- [#781](https://github.com/criblio/appscope/issues/781) Makes delivery of data as processes exit more consistent.
-- [#970](https://github.com/criblio/appscope/issues/970), [#988](https://github.com/criblio/appscope/issues/988) The CLI now defaults to `allowbinary=false` to redact binary data that would otherwise show up in console output.
+- [#781](https://github.com/criblio/appscope/issues/781) Delivery of data as processes exit is now more consistent.
+- [#918](https://github.com/criblio/appscope/issues/918) When AppScope reports its configuration (upon start of a new scoped process), it now includes the formerly missing `cribl` section describing [Cribl backend](cribl-integration#integrating-with-cribl-edge) configuration.
 
 ## AppScope 1.0.4
 

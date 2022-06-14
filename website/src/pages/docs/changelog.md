@@ -22,7 +22,7 @@ AppScope 1.1.0 introduces improved capabilities for scoping Go applications:
 
 - [#637](https://github.com/criblio/appscope/issues/637) Support for go17 and go18.
 - [#904](https://github.com/criblio/appscope/issues/904) Support for HTTP2 when scoping Go executables. 
-- [#667](https://github.com/criblio/appscope/issues/607) AppScope's own internal libc, which resolves problems we'd seen when scoping Go apps that handle signals.
+- [#667](https://github.com/criblio/appscope/issues/667) AppScope's own internal libc, which resolves problems we'd seen when scoping Go apps that handle signals.
 
 Usability improvements include:
 

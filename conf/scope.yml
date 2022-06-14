@@ -142,6 +142,45 @@ metric:
     #
     - type: statsd
 
+    # Metric file system
+    #   Type:     string
+    #   Values:   fs
+    #   Default:  fs
+    #   Override: $SCOPE_METRIC_FS
+    #
+    - type: fs
+
+    # Metric network
+    #   Type:     string
+    #   Values:   net
+    #   Default:  net
+    #   Override: $SCOPE_METRIC_NET
+    #
+    - type: net
+
+    # Metric http
+    #   Type:     string
+    #   Values:   http
+    #   Default:  http
+    #   Override: $SCOPE_METRIC_HTTP
+    #
+    - type: http
+  
+    # Metric dns
+    #   Type:     string
+    #   Values:   dns
+    #   Default:  dns
+    #   Override: $SCOPE_METRIC_DNS
+    #
+    - type: dns
+  
+    # Metric process
+    #   Type:     string
+    #   Values:   process
+    #   Default:  process
+    #   Override: $SCOPE_METRIC_PROC
+    #
+    - type: process
 
   # Backend connection for metrics
   #
@@ -334,9 +373,13 @@ event:
     # category. The regular expressions can be set with
     # $SCOPE_EVENT_CONSOLE_NAME and $SCOPE_EVENT_CONSOLE_VALUE.
     #
+    # Set $SCOPE_ALLOW_BINARY_CONSOLE to true or false to allow or disallow
+    # emiting binary data for console events.
+    #
     - type: console
       name: (stdout)|(stderr) # matches the output stream
       value: .*               # matches data written
+      allowbinary: true
 
     # The net category includes open and close events on network connections.
     # The name filter is applied to the sourcetype in the event which are only
@@ -899,7 +942,7 @@ protocol:
   # Uncomment this and adjust as needed to override the defaults.
   #
   #- name: HTTP
-  #  regex: " HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n"
+  #  regex: "HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n"
 
   # AppScope uses an internally defined protocol detector for STATSD like the
   # example below by default.

@@ -12,7 +12,7 @@
 
 ARCH ?= $(shell uname -m)
 
-all: cJSON cmocka funchook libyaml openssl pcre2 ls-hpack musl
+all: cJSON cmocka funchook libyaml openssl pcre2 ls-hpack musl libunwind
 clean:
 	-@$(MAKE) -C cJSON clean
 	-@$(RM) -r build/*
@@ -22,6 +22,7 @@ cJSON: cJSON/libcjson.a
 cmocka: build/cmocka/src/libcmocka.so
 funchook: build/funchook/libfunchook.a
 libyaml: build/libyaml/src/.libs/libyaml.a
+libunwind: build/libunwind/src/.libs/libunwind.a
 openssl: build/openssl/libssl.a build/openssl/libcrypto.a
 pcre2: build/pcre2/libpcre2-posix.a build/pcre2/libpcre2-8.a
 ls-hpack: build/ls-hpack/libls-hpack.a
@@ -76,7 +77,7 @@ build/openssl/libssl.a build/openssl/libcrypto.a:
 	@echo "$${CI:+::group::}Building openssl"
 	@$(RM) -r build/openssl
 	@mkdir build/openssl
-	cd build/openssl && ../../openssl/Configure no-engine no-async no-tests no-unit-test && make -j8
+	cd build/openssl && ../../openssl/Configure no-engine no-async no-tests no-unit-test no-threads && make -j8
 	# Yuck.  Avoids naming conflict between our wrap.c and libssl.a
 	objcopy --redefine-sym SSL_read=SCOPE_SSL_read build/openssl/libssl.a
 	objcopy --redefine-sym SSL_write=SCOPE_SSL_write build/openssl/libssl.a
@@ -98,6 +99,18 @@ build/ls-hpack/libls-hpack.a:
 	@mkdir build/ls-hpack
 	cd build/ls-hpack && cmake ../../ls-hpack -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_BUILD_TYPE=Release -DLSHPACK_XXH=ON && $(MAKE)
 	objcopy --redefine-syms redefine_syms.lst build/ls-hpack/libls-hpack.a
+	@[ -z "$(CI)" ] || echo "::endgroup::"
+
+build/libunwind/src/.libs/libunwind.a:
+	@echo "$${CI:+::group::}Building libunwind"
+	@$(RM) -r build/libunwind
+	@mkdir build/libunwind
+# To enable debug please add below --enable-debug
+	cd build/libunwind && autoreconf -fvi ../../libunwind && ../../libunwind/configure --disable-pthread-api --disable-shared --disable-minidebuginfo --disable-documentation --disable-tests CFLAGS=-fPIC && $(MAKE)
+	objcopy --redefine-syms redefine_syms.lst build/libunwind/src/.libs/libunwind.a
+	if [ "x86_64" = "$(ARCH)" ]; then \
+		objcopy --redefine-sym dl_iterate_phdr=SCOPE_DlIteratePhdr build/libunwind/src/.libs/libunwind.a; \
+	fi
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 build/musl/lib/libc.a:

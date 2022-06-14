@@ -247,9 +247,11 @@ endtest
 starttest apache
 APACHE_HTTP_START=$(grep "http\." $EVT_FILE | grep -c httpd)
 ldscope httpd -k start
+sleep 2
 ldscope curl -k https://localhost:443/ > /dev/null
 ldscope httpd -k stop
 evaltest
+sleep 5
 APACHE_HTTP_END=$(grep "http\." $EVT_FILE | grep -c httpd)
 
 if (( $APACHE_HTTP_END - $APACHE_HTTP_START < 2 )); then

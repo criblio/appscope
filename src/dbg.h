@@ -72,6 +72,7 @@ extern bool g_ismusl;
 
 void scopeLog(cfg_log_level_t, const char *, ...) PRINTF_FORMAT(2,3);
 void scopeLogHex(cfg_log_level_t, const void *, size_t, const char *, ...) PRINTF_FORMAT(4,5);
+void scopeBacktrace(cfg_log_level_t);
 
 #define scopeLogError(...) scopeLog(CFG_LOG_ERROR, __VA_ARGS__)
 #define scopeLogWarn(...)  scopeLog(CFG_LOG_WARN,  __VA_ARGS__)
@@ -94,5 +95,12 @@ void scopeLogHex(cfg_log_level_t, const void *, size_t, const char *, ...) PRINT
 #define scopeLogHexDebug(...)
 #define scopeLogHexTrace(...)
 #endif
+
+// Bit operations
+
+#define SCOPE_BIT_SET(base, bit_val)   ((base) |= (1ULL<<(bit_val)))
+#define SCOPE_BIT_CLEAR(base, bit_val) ((base) &= ~(1ULL<<(bit_val)))
+#define SCOPE_BIT_SET_VAR(base, bit_val, val) ((!!(val)) ? SCOPE_BIT_SET(base, bit_val) : SCOPE_BIT_CLEAR(base, bit_val))
+#define SCOPE_BIT_CHECK(base, bit_val) (!!((base) & (1ULL<<(bit_val))))
 
 #endif // __DBG_H__

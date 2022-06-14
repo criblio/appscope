@@ -25,17 +25,13 @@ echo "Finished validating examples in JSON Schema"
 echo "Generating Markdown files from JSON Schema"
 
 node ../schema2md.js $TMP_DIR_NAME $MD_DIR_NAME
+
+# Uncomment these lines to save the temporary schema.json files, which otherwise will be lost
 # for resolve_schema_file in $TMP_DIR_NAME/*.schema.json; do
 #     [ -f "$resolve_schema_file" ] || break
 #     json-schema-gendoc $resolve_schema_file > $MD_DIR_NAME/${resolve_schema_file##*/}.md
 # done
 
-chmod 744 $MD_DIR_NAME
-cp -r $MD_DIR_NAME $MD_OUTPUT_PATH
-
-# Uncomment these lines to save the temporary schema.json files, which otherwise will be lost
-
-# chmod 744 $TMP_DIR_NAME
-# cp -r $TMP_DIR_NAME $MD_OUTPUT_PATH
+cp -rT $MD_DIR_NAME $MD_OUTPUT_PATH
 
 echo "Finished generating Markdown files from JSON Schema"

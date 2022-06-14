@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Perform a check if in contrib code were not translated symbols.
+# Perform a check if in contrib code has not translated symbols.
 #
 
 # List of symbols which are ignored in replacement process
@@ -19,6 +19,7 @@ declare -a stdlib_ignore_syms=('/_GLOBAL_OFFSET_TABLE_/d'
 '/^secure_getenv/d'
 '/^signal/d'
 '/^sigaction/d'
+'/^syscall/d'
 '/^pthread_/d'
 '/^dlopen/d'
 '/^dladdr/d'
@@ -28,7 +29,7 @@ declare -a stdlib_ignore_syms=('/_GLOBAL_OFFSET_TABLE_/d'
 )
 
 # List of contrib libraries used by the libscope.so
-declare -a conrib_libs=("./contrib/build/ls-hpack/libls-hpack.a" 
+declare -a conrib_libs=(
 "./contrib/cJSON/libcjson.a" 
 "./contrib/build/funchook/libfunchook.a"
 "./contrib/build/funchook/capstone_src-prefix/src/capstone_src-build/libcapstone.a"
@@ -37,6 +38,7 @@ declare -a conrib_libs=("./contrib/build/ls-hpack/libls-hpack.a"
 "./contrib/build/openssl/libssl.a"
 "./contrib/build/pcre2/libpcre2-8.a"
 "./contrib/build/ls-hpack/libls-hpack.a"
+"./contrib/build/libunwind/src/.libs/libunwind.a"
 "./contrib/build/musl/lib/libc_orig.a" ## must be last
 )
 

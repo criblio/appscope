@@ -6,470 +6,718 @@
   "$defs": {
     "addrs": {
       "title": "addrs",
-      "description": "addrs",
+      "description": "IP address(es) of the domain for which the scoped app sent a DNS request.",
       "type": "array"
+    },
+    "allowbinary": {
+      "title": "allowbinary",
+      "description": "When false, AppScope attempts to omit any console writes that contain non-printable characters, while adding 'binary data ignored' to the console event data.",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
+    "binary": {
+      "title": "binary",
+      "description": "When true, the regex in protocol detection operates on data after its conversion to hex-string representation. See `scope.yml`.",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
+    "buffering": {
+      "title": "buffering",
+      "description": "File buffering. See `scope.yml`.",
+      "type": "string",
+      "enum": ["line", "full"]
+    },
+    "cacertpath": {
+      "title": "cacertpath",
+      "description": "CA Certificate Path. See `scope.yml`.",
+      "type": "string"
     },
     "class_connection": {
       "title": "connection",
-      "description": "connection",
+      "description": "Subcategory of network error.",
       "type": "string",
       "const": "connection"
     },
     "class_fs_error": {
       "title": "class fs.error",
-      "description": "class fs.error",
+      "description": "Subcategory of filesystem error.",
       "type": "string",
       "enum": ["open_close", "read_write", "stat"]
     },
     "class_net_error": {
       "title": "class net.error",
-      "description": "class net.error",
+      "description": "Subcategory of network error.",
       "type": "string",
       "enum": ["connection", "rx_tx"]
     },
     "class_net_rxtx": {
       "title": "class net.rxtx",
-      "description": "class net.rxrx",
+      "description": "Subcategory of send and receive operations.",
       "type": "string",
       "enum": ["inet_tcp", "inet_udp", "unix_tcp", "unix_udp", "other"]
     },
+    "configevent": {
+      "title": "configevent",
+      "description": "When enabled, AppScope guarantees that a process start message is the first event sent over the current connection.",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
+    "commanddir": {
+      "title": "commanddir",
+      "description": "The directory in which the command that launched the scoped app was run.",
+      "type": "string"
+    },
     "data": {
       "title": "data",
-      "description": "data",
+      "description": "Specifies whether data was unencrypted (clear) or encrypted (SSL).",
       "type": "string",
       "enum": ["ssl", "clear"]
     },
+    "detect": {
+      "title": "detect",
+      "description": "When true, AppScope sends a `net.app` event when a protocol has been detected. See `scope.yml`.",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
+    "dir": {
+      "title": "dir",
+      "description": "Specifies director where payload data should be written. Applies only when payloads are enabled and a backend other than `cribl` is used. See `scope.yml`.",
+      "type": "string"
+    },
     "domain": {
       "title": "domain",
-      "description": "domain",
+      "description": "The domain for which the scoped app made a DNS request.",
       "type": "string"
     },
     "duration": {
       "title": "duration",
-      "description": "duration",
+      "description": "Duration in milliseconds.",
       "type": "number",
       "examples": [55]
     },
+    "enable": {
+      "title": "enable",
+      "description": "Specifies whether a feature or some functionality is enabled or disabled overall.",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
+    "enhancefs": {
+      "title": "enhancefs",
+      "description": "Specifies whether to display full information about `fs` events.",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
     "fd": {
       "title": "fd",
-      "description": "fd",
+      "description": "The file descriptor for an operation.",
       "type": "integer",
       "examples": [4]
     },
+    "field": {
+      "title": "field",
+      "description": "Regex to match events containing the specified field. See `scope.yml`.",
+      "type": "string"
+    },
     "file": {
       "title": "file",
-      "description": "file",
+      "description": "The name of the file.",
       "type": "string"
     },
     "file_group": {
       "title": "file_group",
-      "description": "file_group",
+      "description": "The group ID of the file owner.",
       "type": "number",
       "examples": [0]
     },
     "file_owner": {
       "title": "file_owner",
-      "description": "file_owner",
+      "description": "The user ID of the file owner.",
       "type": "number",
       "examples": [0]
     },
     "file_perms": {
       "title": "file_perms",
-      "description": "file_perms",
+      "description": "The permissions of the file, in octal format.",
       "type": "integer",
       "examples": [777]
     },
     "file_read_bytes": {
       "title": "file_read_bytes",
-      "description": "file_read_bytes",
+      "description": "The number of bytes of data read from a file.",
       "type": "integer",
       "examples": [512]
     },
     "file_read_ops": {
       "title": "file_read_ops",
-      "description": "file_read_ops",
+      "description": "Count of individual read operations aggregated.",
       "type": "integer",
       "examples": [5]
     },
     "file_write_bytes": {
       "title": "file_write_bytes",
-      "description": "file_write_bytes",
+      "description": "The number of bytes of data written to a file.",
       "type": "integer",
       "examples": [10]
     },
     "file_write_ops": {
       "title": "file_write_ops",
-      "description": "file_write_ops",
+      "description": "Count of individual write operations aggregated.",
       "type": "integer",
       "examples": [5]
     },
+    "format_type": {
+      "title": "type",
+      "description": "Specifies the format of metric data. See `scope.yml`. ",
+      "type": "string",
+      "enum": ["statsd", "ndjson"]
+    },
     "host": {
       "title": "host",
-      "description": "host",
+      "description": "Hostname for the host on which the scoped app was run.",
+      "type": "string"
+    },
+    "hostname": {
+      "title": "hostname",
+      "description": "Hostname for the host on which the scoped app was run.",
       "type": "string"
     },
     "http_client_duration": {
       "title": "http_client_duration",
-      "description": "http_client_duration",
+      "description": "Time elapsed between when a request was issued and when the response was received, in milliseconds.",
       "type": "number"
     },
     "http_client_ip": {
       "title": "http_client_ip",
-      "description": "http_client_ip",
+      "description": "IP address of the host that issued an HTTP request or received the response.",
       "type": "string"
     },
     "http_flavor": {
       "title": "http_flavor",
-      "description": "http_flavor",
+      "description": "Specifies whether an HTTP request or response is in HTTP/1.1 or HTTP/2.0.",
       "type": "string"
     },
     "http_frame": {
       "title": "http_frame",
-      "description": "http_frame",
+      "description": "Type of the HTTP/2 frame as described in RFC 7540.",
       "type": "string",
       "enum": ["HEADERS", "PUSH_PROMISE"]
     },
     "http_host": {
       "title": "http_host",
-      "description": "http_host",
+      "description": "Hostname of the host to which an HTTP request was sent; or, from which a response was received.",
       "type": "string"
     },
     "http_method": {
       "title": "http_method",
-      "description": "http_method",
+      "description": "Specifies the method of an HTTP request in the data; e.g., GET, POST, PATCH, etc.",
       "type": "string"
     },
     "http_response_content_length": {
       "title": "http_response_content_length",
-      "description": "http_response_content_length",
+      "description": "Specifies the length in bytes of the HTTP response body.",
       "type": "number"
     },
     "http_scheme": {
       "title": "http_scheme",
-      "description": "http_scheme",
+      "description": "Specifies whether data was unencrypted (HTTP) or encrypted (HTTPS).",
       "type": "string",
       "enum": ["http", "https"]
     },
     "http_server_duration": {
       "title": "http_server_duration",
-      "description": "http_server_duration",
+      "description": "Time elapsed between when a request was received and when the response was issued, in milliseconds.",
       "type": "number"
     },
     "http_status_code": {
       "title": "http_status_code",
-      "description": "http_status_code",
+      "description": "Specifies the status code of an HTTP response.",
       "type": "integer",
       "enum": [100, 101, 102, 200, 201, 202, 203, 204, 205, 206, 207, 208, 226, 300, 301, 302, 303, 304, 305, 307, 400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413, 414, 415, 416, 417, 418, 421, 422, 423, 424, 426, 428, 429, 431, 444, 451, 499, 500, 501, 502, 503, 504, 505, 506, 507]
     },
     "http_status_text": {
       "title": "http_status_text",
-      "description": "http_status_text",
+      "description": "The standard text that accompanies an HTTP response status code.",
       "type": "string",
       "enum": ["Continue", "Switching Protocols", "Processing", "OK", "Created", "Accepted", "Non-authoritative Information", "No Content", "Reset Content", "Partial Content", "Multi-Status", "Already Reported", "IM Used", "Multiple Choices", "Moved Permanently", "Found", "See Other", "Not Modified", "Use Proxy", "Temporary Redirect", "Permanent Redirect", "Bad Request", "Unauthorized", "Payment Required", "Forbidden", "Not Found", "Method Not Allowed", "Not Acceptable", "Proxy Authentication Required", "Request Timeout", "Conflict", "Gone", "Length Required", "Precondition Failed", "Payload Too Large", "Request-URI Too Long", "Unsupported Media Type", "Requested Range Not Satisfiable", "Expectation Failed", "I'm a teapot", "Misdirected Request", "Unprocessable Entity", "Locked", "Failed Dependency", "Upgrade Required", "Precondition Required", "Too Many Requests", "Request Header Fields Too Large", "Connection Closed Without Response", "Unavailable For Legal Reasons", "Client Closed Request", "Internal Server Error", "Not Implemented", "Bad Gateway", "Service Unavailable", "Gateway Timeout", "HTTP Version Not Supported", "Variant Also Negotiates", "Insufficient Storage"]
     },
     "http_stream": {
       "title": "http_stream",
-      "description": "http_stream",
+      "description": "HTTP/2 Stream Identifier.",
       "type": "integer"
     },
     "http_target": {
       "title": "http_target",
-      "description": "http_target",
+      "description": "In a URL, the path or file after the FQDN.",
       "type": "string"
     },
     "http_user_agent": {
       "title": "http_user_agent",
-      "description": "http_user_agent",
+      "description": "HTTP header property describing the web client.",
       "type": "string"
+    },
+    "id": {
+      "title": "id",
+      "description": "An ID that concatenates (possibly truncated) the scoped app's hostname, procname, and command, to facilitate correlation of similar processes when searching, graphing, or aggregating.",
+      "type": "string"
+    },
+    "len": {
+      "title": "len",
+      "description": "Number of bytes to convert to hex when `binary` is true. See `scope.yml`.",
+      "type": "integer"
+    },
+    "libscopever": {
+      "title": "libscopever",
+      "description": "Version of the AppScope library that is currently loaded.",
+      "type": "string",
+      "examples": ["v1.0.0"]
     },
     "localip": {
       "title": "localip",
-      "description": "localip",
+      "description": "The IP address portion of the local end of a network connection.",
       "type": "string",
       "examples": ["127.0.0.1"]
     },
     "localn": {
       "title": "localn",
-      "description": "localn",
+      "description": "Inode number for the local end of a UNIX domain socket.",
       "type": "number"
     },
     "localp": {
       "title": "localp",
-      "description": "localp",
+      "description": "The port portion of the local end of a network connection.",
       "type": "number",
       "examples": [9109]
     },
+    "log_level": {
+      "title": "level",
+      "description": "Specifies log level. See `scope.yml`.",
+      "type": "string",
+      "enum": ["debug", "info", "warning", "error", "none"]
+    },
+    "maxeventpersec": {
+      "title": "maxeventpersec",
+      "description": "Specifies a rate limit for events. See `scope.yml`.",
+      "type": "integer"
+    },
     "message": {
       "title": "message",
-      "description": "message",
+      "description": "The textual data written to a console or file.",
+      "type": "string"
+    },
+    "name": {
+      "title": "name",
+      "description": "Regex that succeeds when an event name matches the specified name. See `scope.yml`.",
       "type": "string"
     },
     "net_bytes_recv": {
       "title": "net_bytes_recv",
-      "description": "net_bytes_recv",
+      "description": "The number of bytes of data received over a network connection.",
       "type": "number"
     },
     "net_bytes_sent": {
       "title": "net_bytes_sent",
-      "description": "net_bytes_sent",
+      "description": "The number of bytes of data sent over a network connection.",
       "type": "number"
     },
     "net_close_reason": {
       "title": "net_close_reason",
-      "description": "net_close_reason",
+      "description": "Specifies which end of a network connection initiated the closing of the connection.",
       "type": "string",
       "enum": ["local", "remote"]
     },
     "net_protocol": {
       "title": "net_protocol",
-      "description": "net_protocol",
+      "description": "First network protocol detected from data sent or received.",
       "type": "string",
       "const": "http"
     },
     "net_host_ip": {
       "title": "net_host_ip",
-      "description": "net_host_ip",
+      "description": "The IP address portion of the local side of a network connection.",
       "type": "string"
     },
     "net_host_port": {
       "title": "net_host_port",
-      "description": "net_host_port",
+      "description": "The port portion of the local side of a network connection.",
       "type": "integer"
     },
     "net_peer_ip": {
       "title": "net_peer_ip",
-      "description": "net_peer_ip",
+      "description": "The IP address portion of the remote side of a network connection.",
       "type": "string"
     },
     "net_peer_port": {
       "title": "net_peer_port",
-      "description": "net_peer_port",
+      "description": "The port portion of the remote side of a network connection.",
       "type": "integer"
     },
     "unix_peer_inode": {
       "title": "unix_peer_inode",
-      "description": "unix_peer_inode",
+      "description": "Inode number for the remote end of a UNIX domain socket.",
       "type": "number"
     },
     "net_transport": {
       "title": "net_transport",
-      "description": "net_transport",
+      "description": "Network layer used (before the dot) and transport layer used (after the dot).",
       "type": "string",
       "enum": ["IP.TCP", "IP.UDP", "IP.RAW", "IP.RDM", "IP.SEQPACKET", "Unix.TCP", "Unix.UDP", "Unix.RAW", "Unix.RDM", "Unix.SEQPACKET"]
     },
     "numops": {
       "title": "numops",
-      "description": "numops",
+      "description": "Count of individual operations aggregated.",
       "type": "number"
     },
     "op": {
       "title": "op",
-      "description": "op",
+      "description": "The function that was executed.",
       "type": "string"
     },
     "op_fs_close": {
       "title": "op_fs_close",
-      "description": "op_fs_close",
+      "description": "The close operation that was executed on the filesystem.",
       "type": "string",
       "enum": ["go_close", "closedir", "freopen", "freopen64", "close", "fclose", "close$NOCANCEL", "guarded_close_np", "close_nocancel"]
     },
     "op_fs_delete": {
       "title": "op_fs_delete",
-      "description": "op_fs_delete",
+      "description": "The delete operation that was executed on the filesystem.",
       "type": "string",
       "enum": ["go_unlinkat", "unlink", "unlinkat"]
     },
     "op_fs_open": {
       "title": "op_fs_open",
-      "description": "op_fs_open",
+      "description": "The open operation that was executed on the filesystem.",
       "type": "string",
       "enum": ["open", "openat", "opendir", "creat", "fopen", "freopen", "open64", "openat64", "__open64_2", "__open_2", "__openat_2", "creat64", "fopen64", "freopen64", "recvmsg", "console output", "console input"]
     },
     "op_fs_read": {
       "title": "op_fs_read",
-      "description": "op_fs_read",
+      "description": "The read operation that was executed on the filesystem.",
       "type": "string",
       "enum": ["go_read", "go_getdents", "readdir", "pread64", "__pread64_chk", "preadv", "preadv2", "preadv64v2", "__pread_chk", "__read_chk", "__fread_unlocked_chk", "read", "readv", "pread", "fread", "__fread_chk", "fread_unlocked", "fgets", "__fgets_chk", "fgets_unlocked", "__fgetws_chk", "fgetws", "fgetwc", "fgetc", "fscanf", "getline", "getdelim", "__getdelim"]
     },
     "op_fs_seek": {
       "title": "op_fs_seek",
-      "description": "op_fs_seek",
+      "description": "The seek operation that was executed on the filesystem.",
       "type": "string",
       "enum": ["lseek64", "fseek64", "ftello64", "fsetpos64", "lseek", "fseek", "fseeko", "ftell", "ftello", "rewind", "fsetpos", "fgetpos", "fgetpos64"]
     },
     "op_fs_stat": {
       "title": "op_fs_stat",
-      "description": "op_fs_stat",
+      "description": "The stat operation that was executed on the filesystem.",
       "type": "string",
       "enum": ["statfs64", "__xstat", "__xstat64", "__lxstat", "__lxstat64", "__fxstat", "__fxstatat", "__fxstatat64", "statx", "statfs", "statvfs", "statvfs64", "access", "faccessat", "stat", "lstat", "fstatfs64", "__fxstat", "__fxstat64", "fstatfs", "fstatvfs", "fstatvfs64", "fstat", "fstatat"]
     },
     "op_fs_write": {
       "title": "op_fs_write",
-      "description": "op_fs_write",
+      "description": "The write operation that was executed on the filesystem.",
       "type": "string",
       "enum": ["go_write", "pwrite64", "pwritev", "pwritev64", "pwritev2", "pwritev64v2", "__overflow", "__write_libc", "__write_pthread", "fwrite_unlocked", "__stdio_write", "write", "pwrite", "writev", "fwrite", "puts", "putchar", "fputs", "fputs_unlocked", "fputc", "fputc_unlocked", "putwc", "fputwc"]
     },
+    "path": {
+      "title": "path",
+      "description": "File or UNIX domain socket path. See `scope.yml`.",
+      "type": "string",
+      "examples": ["/tmp/scope.log"]
+    },
+    "payload": {
+      "title": "payload",
+      "description": "Specifies whether to emit network payloads. See `scope.yml`.",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
     "pid": {
       "title": "pid",
-      "description": "pid",
+      "description": "The process ID of the scoped app.",
       "type": "integer",
       "examples": [1000]
     },
     "port": {
       "title": "port",
-      "description": "port",
+      "description": "Network port opened before a connection was initiated, or closed after the connection closed.",
       "type": "number"
+    },
+    "port_str": {
+      "title": "port",
+      "description": "Connection port. See `scope.yml`.",
+      "type": "string"
+    },
+    "ppid": {
+      "title": "ppid",
+      "description": "The process ID of the parent process of the scoped app.",
+      "type": "integer"
     },
     "proc": {
       "title": "proc",
-      "description": "proc",
+      "description": "The name of the scoped app's process.",
       "type": "string"
     },
     "proc_cgroup": {
       "title": "proc_cgroup",
-      "description": "proc_cgroup",
+      "description": "The control group used in container creation.",
       "type": "string",
       "examples": ["0::/user.slice/user-1000.slice/session-3.scope"]
     },
     "proc_gid": {
       "title": "proc_gid",
-      "description": "proc_gid",
+      "description": "The group ID of the user who started the scoped app.",
       "type": "integer",
       "examples": [0]
     },
     "proc_uid": {
       "title": "proc_uid",
-      "description": "proc_uid",
+      "description": "The user ID of the user who started the scoped app.",
       "type": "integer",
       "examples": [0]
     },
+    "procname": {
+      "title": "procname",
+      "description": "The name of the scoped app's process.",
+      "type": "string"
+    },
     "proto": {
       "title": "proto",
-      "description": "proto",
+      "description": "The transmission protocol that the scoped app used to send data.",
       "type": "string",
       "enum": ["TCP", "UDP", "RAW", "RDM", "SEQPACKET", "OTHER"]
     },
     "proto_tcp": {
       "title": "proto_tcp",
-      "description": "proto_tcp",
+      "description": "The transmission protocol that the scoped app used to send data.",
       "type": "string",
       "const": "TCP"
     },
     "proto_udp": {
       "title": "proto_udp",
-      "description": "proto_udp",
+      "description": "The transmission protocol that the scoped app used to send data.",
       "type": "string",
       "const": "UDP"
     },
     "protocol": {
       "title": "protocol",
-      "description": "protocol",
+      "description": "Protocol detected in data transmitted over a network connection.",
       "type": "string",
       "enum": ["HTTP"]
     },
+    "regex": {
+      "title": "regex",
+      "description": "Specifies the regular expression that AppScope should use to detect a protocol. See `scope.yml`.",
+      "type": "string"
+    },
     "remoteip": {
       "title": "remoteip",
-      "description": "remoteip",
+      "description": "IP address for the remote end of a network socket.",
       "type": "string",
       "examples": ["192.158.1.38"]
     },
     "remoten": {
       "title": "remoten",
-      "description": "remoten",
+      "description": "Inode number for the remote end of a UNIX domain socket.",
       "type": "number"
     },
     "remotep": {
       "title": "remotep",
-      "description": "remotep",
+      "description": "Port for the remote end of a network socket.",
       "type": "number",
       "examples": [9108]
     },
+    "statsdprefix": {
+      "title": "statsdprefix",
+      "description": "Specifies a prefix to prepend the metric name. See `scope.yml`.",
+      "type": "string"
+    },
+    "statsdmaxlen": {
+      "title": "statsdmaxlen",
+      "description": "Specifies the maximum length for a string that expresses a StatsD metric. See `scope.yml`.",
+      "type": "integer"
+    },
     "summary": {
       "title": "summary",
-      "description": "summary",
+      "description": "When true, indicates that the metric value is an aggregation.",
       "type": "string",
       "const": "true"
     },
+    "summaryperiod": {
+      "title": "summaryperiod",
+      "description": "Time interval over which to perform aggregation. See `scope.yml`.",
+      "type": "integer"
+    },
+    "transport_type": {
+      "title": "type",
+      "description": "Specifies the transport mechanism on which to send and/or receive data. See `scope.yml`.",
+      "type": "string",
+      "enum": ["tcp", "udp", "unix", "file", "edge"]
+    },
     "unit_byte" : {
       "title": "byte",
-      "description": "Unit - byte",
+      "description": "Indicates that the metric's value is in bytes.",
       "type": "string",
       "const": "byte"
     },
     "unit_connection": {
       "title": "connection",
-      "description": "Unit - connection",
+      "description": "Indicates that the metric's value is a number of connections.",
       "type": "string",
       "const": "connection"
     },
     "unit_file" : {
       "title": "file",
-      "description": "Unit - file",
+      "description": "Indicates that the metric's value is a number of files.",
       "type": "string",
       "const": "file"
     },
     "unit_instance": {
       "title": "instance",
-      "description": "Unit - instance",
+      "description": "Indicates that the metric's value is a number of instances.",
       "type": "string",
       "const": "instance"
     },
     "unix_local_inode": {
       "title": "unix_local_inode",
-      "description": "unix_local_inode",
+      "description": "Inode number for the local end of a UNIX domain socket.",
       "type": "number"
     },
     "unit_kibibyte" : {
       "title": "kibibyte",
-      "description": "Unit - kibibyte",
+      "description": "Indicates that the metric's value is in kibibytes.",
       "type": "string",
       "const": "kibibyte"
     },
     "unit_microsecond" : {
       "title": "microsecond",
-      "description": "Unit - microsecond",
+      "description": "Indicates that the metric's value is in microseconds.",
       "type": "string",
       "const": "microsecond"
     },
     "unit_millisecond" : {
       "title": "millisecond",
-      "description": "Unit - millisecond",
+      "description": "Indicates that the metric's value is in milliseconds.",
       "type": "string",
       "const": "millisecond"
     },
     "unit_operation" : {
       "title": "operation",
-      "description": "Unit - operation",
+      "description": "Indicates that the metric's value is a number of operations.",
       "type": "string",
       "const": "operation"
     },
     "unit_percent" : {
       "title": "percent",
-      "description": "Unit - percent",
+      "description": "Indicates that the metric's value is a percentage.",
       "type": "string",
       "const": "percent"
     },
     "unit_process" : {
       "title": "process",
-      "description": "Unit - process",
+      "description": "Indicates that the metric's value is a number of processes.",
       "type": "string",
       "const": "process"
     },
     "unit_request" : {
       "title": "request",
-      "description": "Unit - request",
+      "description": "Indicates that the metric's value is a number of a requests.",
       "type": "string",
       "const": "request"
     },
     "unit_thread" : {
       "title": "thread",
-      "description": "Unit - thread",
+      "description": "Indicates that the metric's value is a number of threads.",
       "type": "string",
       "const": "thread"
     },
+    "validateserver": {
+      "title": "validateserver",
+      "description": "Specifies whether to validate the TLS server certificate. See `scope.yml`.",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
+    "value": {
+      "title": "value",
+      "description": "Regex to match events where any field has the specified value. See `scope.yml`.",
+      "type": "string"
+    },
+    "verbosity" : {
+      "title": "verbosity",
+      "description": "Controls the tag cardinality and aggregation of a metric. See `scope.yml`.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9
+    },
+    "watch_type_event_console" : {
+      "title": "type",
+      "description": "If present, AppScope will capture and emit console events.",
+      "type": "string",
+      "const": "console"
+    },
+    "watch_type_event_dns" : {
+      "title": "type",
+      "description": "If present, AppScope will capture and emit DNS events.",
+      "type": "string",
+      "const": "dns"
+    },
+    "watch_type_event_file" : {
+      "title": "type",
+      "description": "If present, AppScope will capture and emit logfile events.",
+      "type": "string",
+      "const": "file"
+    },
+    "watch_type_event_fs" : {
+      "title": "type",
+      "description": "If present, AppScope will capture and emit filesystem events.",
+      "type": "string",
+      "const": "fs"
+    },
+    "watch_type_event_http" : {
+      "title": "type",
+      "description": "If present, AppScope will capture and emit HTTP events.",
+      "type": "string",
+      "const": "http"
+    },
+    "watch_type_event_net" : {
+      "title": "type",
+      "description": "If present, AppScope will capture and emit network events.",
+      "type": "string",
+      "const": "net"
+    },
+    "watch_type_metric_fs" : {
+      "title": "type",
+      "description": "If present, AppScope will capture and emit filesystem metrics.",
+      "type": "string",
+      "const": "fs"
+    },
+    "watch_type_metric_net" : {
+      "title": "type",
+      "description":  "If present, AppScope will capture and emit network metrics.",
+      "type": "string",
+      "const": "net"
+    },
+    "watch_type_metric_http" : {
+      "title": "type",
+      "description": "If present, AppScope will capture and emit HTTP metrics.",
+      "type": "string",
+      "const": "http"
+    },
+    "watch_type_metric_dns" : {
+      "title": "type",
+      "description":  "If present, AppScope will capture and emit DNS metrics.",
+      "type": "string",
+      "const": "dns"
+    },
+    "watch_type_metric_proc" : {
+      "title": "type",
+      "description": "If present, AppScope will capture and emit process metrics.",
+      "type": "string",
+      "const": "process"
+    },
+    "watch_type_metric_statsd" : {
+      "title": "type",
+      "description": "If present, AppScope will capture metrics from the scoped app, and emit them as events.",
+      "type": "string",
+      "const": "statsd"
+    },
     "x_appscope" : {
       "title": "x-appscope",
-      "description": "x-appscope",
+      "description": "Value of the `x-appscope` HTTP header (if present).",
       "type": "string",
       "const": "x-appscope"
     }

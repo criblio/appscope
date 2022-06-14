@@ -91,13 +91,14 @@ extern ctl_t *g_ctl;
 void initReporting(void);
 void setReportingInterval(int);
 void doErrorMetric(metric_t, control_type_t, const char *, const char *, void *);
-void doProcMetric(metric_t, long long);
+void doProcMetric(metric_t);
 void doStatMetric(const char *, const char *, void *);
 void doTotal(metric_t);
 void doTotalDuration(metric_t);
 void doHttpAgg(void);
 void doEvent(void);
 void doPayload(void);
+void doProcStartMetric(void);
 bool doConnection(void);
 
 #endif // __REPORT_H__

@@ -27,6 +27,7 @@
 #include "utils.h"
 #include "runtimecfg.h"
 #include "cfg.h"
+#include "os.h"
 #include "scopestdlib.h"
 
 #ifndef AF_NETLINK
@@ -746,7 +747,7 @@ doHttp1Header(protocol_info *proto)
         cmdSendHttp(g_ctl, &hevent, map->id, &g_proc);
 
         // emit statsd metrics, if enabled.
-        if (mtcEnabled(g_mtc)) {
+        if ((mtcEnabled(g_mtc)) && (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_HTTP))) {
 
             char *mtx_name = (proto->isServer) ? "http_server_duration" : "http_client_duration";
             event_t http_dur = INT_EVENT(mtx_name, map->duration, DELTA_MS, fields);
@@ -1342,7 +1343,7 @@ doHttp2Frame(protocol_info *proto)
                 }
 
                 // if metrics are enabled...
-                if (mtcEnabled(g_mtc)) {
+                if (mtcEnabled(g_mtc) && (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_HTTP))) {
                     // update HTTP metrics
                     event_field_t fields[] = {
                         STRFIELD("http_target", stream->lastTarget, 4, TRUE),
@@ -1500,9 +1501,10 @@ doErrorMetric(metric_t type, control_type_t source,
              atomicSwapU64(&value->evt, 0);
         }
 
-        // Only report if enabled
-        if (((g_summary.net.error) && (source == EVENT_BASED)) ||
-            ((!g_summary.net.error) && (source == PERIODIC)))  {
+        // Only report if metrics enabled
+        if ((!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_NET)) ||
+           ((g_summary.net.error) && (source == EVENT_BASED)) ||
+           ((!g_summary.net.error) && (source == PERIODIC))) {
             return;
         }
         // Don't report zeros.
@@ -1587,9 +1589,10 @@ doErrorMetric(metric_t type, control_type_t source,
             atomicSwapU64(&value->evt, 0);
         }
 
-        // Only report if enabled
-        if (((*summarize) && (source == EVENT_BASED)) ||
-            ((!*summarize) && (source == PERIODIC)))  {
+        // Only report if metrics enabled
+        if ((!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_FS)) ||
+            ((*summarize) && (source == EVENT_BASED)) ||
+            ((!*summarize) && (source == PERIODIC))) {
             return;
         }
 
@@ -1669,8 +1672,8 @@ doDNSMetricName(metric_t type, net_info *net)
             }
         }
 
-        // Only report if enabled
-        if (g_summary.net.dns) {
+        // Only report if metrics enabled
+        if ((g_summary.net.dns) || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_DNS))) {
             return;
         }
 
@@ -1726,8 +1729,8 @@ doDNSMetricName(metric_t type, net_info *net)
             atomicSwapU64(&ctrs->dnsDurationTotal.evt, 0);
         }
 
-        // Only report if enabled
-        if (g_summary.net.dns) {
+        // Only report if metrics enabled
+        if ((g_summary.net.dns) || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_DNS))) {
             return;
         }
 
@@ -1767,11 +1770,19 @@ doDNSMetricName(metric_t type, net_info *net)
 }
 
 void
-doProcMetric(metric_t type, long long measurement)
+doProcMetric(metric_t type)
 {
+    long long measurement;
     switch (type) {
     case PROC_CPU:
     {
+            static long long cpuState = 0;
+            long long cpu = osGetProcCPU();
+            if (cpu == -1) {
+                return;
+            }
+            measurement = cpu - cpuState;
+            cpuState = cpu;
         {
             event_field_t fields[] = {
                 PROC_FIELD(g_proc.procname),
@@ -1809,6 +1820,10 @@ doProcMetric(metric_t type, long long measurement)
 
     case PROC_MEM:
     {
+        measurement = osGetProcMemory(g_proc.pid);
+        if (measurement == -1) {
+            return;
+        }
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
@@ -1823,6 +1838,11 @@ doProcMetric(metric_t type, long long measurement)
 
     case PROC_THREAD:
     {
+        measurement = osGetNumThreads(g_proc.pid);
+        if (measurement == -1) {
+            return;
+        }
+
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
@@ -1837,6 +1857,11 @@ doProcMetric(metric_t type, long long measurement)
 
     case PROC_FD:
     {
+        measurement = osGetNumFds(g_proc.pid);
+        if (measurement == -1) {
+            return;
+        }
+
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
@@ -1851,6 +1876,11 @@ doProcMetric(metric_t type, long long measurement)
 
     case PROC_CHILD:
     {
+        measurement = osGetNumChildProcs(g_proc.pid);
+        if (measurement < 0) {
+            measurement = 0;
+        }
+
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
@@ -1890,7 +1920,7 @@ doStatMetric(const char *op, const char *pathname, void* ctr)
     }
 
     // Only report if enabled
-    if (g_summary.fs.stat) {
+    if ((g_summary.fs.stat) || !cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_FS)) {
         return;
     }
 
@@ -2231,6 +2261,12 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
             ////atomicSwapU64(&g_ctrs.fsDurationTotal.evt, 0);
         }
 
+        // Only report if metrics enabled
+        if (((g_summary.fs.read_write) && (source == EVENT_BASED)) ||
+           (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_FS))) {
+            return;
+        }
+
         dur = 0ULL;
         cachedDurationNum = fs->numDuration.mtc; // avoid div by zero
         if (cachedDurationNum >= 1) {
@@ -2240,11 +2276,6 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
 
         // Don't report zeros
         if (dur == 0ULL) return;
-
-        // Only report if enabled
-        if ((g_summary.fs.read_write) && (source == EVENT_BASED)) {
-            return;
-        }
 
         event_field_t fields[] = {
             PROC_FIELD(g_proc.procname),
@@ -2319,8 +2350,9 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
             ////atomicSwapU64(global_counter->evt, 0);
         }
 
-        // Only report if enabled
-        if ((g_summary.fs.read_write) && (source == EVENT_BASED)) {
+        // Only report if metrics enabled
+        if (((g_summary.fs.read_write) && (source == EVENT_BASED)) ||
+           (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_FS))) {
             return;
         }
 
@@ -2417,8 +2449,10 @@ doFSMetric(metric_t type, fs_info *fs, control_type_t source,
 
         if (reported == TRUE) atomicSwapU64(&numops->evt, 0);
 
-        // Only report if enabled
-        if (*summarize && (source == EVENT_BASED)) {
+
+        // Only report if metrics enabled
+        if ((*summarize && (source == EVENT_BASED)) ||
+           (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_FS))) {
             return;
         }
 
@@ -2520,22 +2554,6 @@ doTotalNetRxTx(metric_t type)
 void
 doTotal(metric_t type)
 {
-    // Only report if enabled
-    if (((type == TOT_READ || type == TOT_WRITE) && (!g_summary.fs.read_write)) ||
-        ((type == TOT_RX || type == TOT_TX) && (!g_summary.net.rx_tx)) ||
-        ((type == TOT_SEEK) && (!g_summary.fs.seek)) ||
-        ((type == TOT_STAT) && (!g_summary.fs.stat)) ||
-        ((type == TOT_OPEN || type == TOT_CLOSE) && (!g_summary.fs.open_close)) ||
-        ((type == TOT_DNS) && (!g_summary.net.dns))) {
-        return;
-    }
-    if ((type == TOT_PORTS || type == TOT_TCP_CONN || 
-        type == TOT_UDP_CONN || type == TOT_OTHER_CONN || 
-        type == TOT_NET_OPEN || type == TOT_NET_CLOSE) &&
-        (!g_summary.net.open_close)) {
-        return;
-    }
-
     const char* metric = "UNKNOWN";
     counters_element_t* value = NULL;
     const char* err_str = "UNKNOWN";
@@ -2544,50 +2562,68 @@ doTotal(metric_t type)
      
     switch (type) {
         case TOT_READ:
+            if (!g_summary.fs.read_write || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_FS)))
+                return;
             metric = "fs.read";
             value = &g_ctrs.readBytes;
             err_str = "ERROR: doTotal:TOT_READ:cmdSendMetric";
             break;
         case TOT_WRITE:
+            if (!g_summary.fs.read_write || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_FS)))
+                return;
             metric = "fs.write";
             value = &g_ctrs.writeBytes;
             err_str = "ERROR: doTotal:TOT_WRITE:cmdSendMetric";
             break;
         case TOT_RX:
         case TOT_TX:
+            if (!g_summary.net.rx_tx || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_NET)))
+                return;
             doTotalNetRxTx(type);
             return;   // <--  We're doing the work above; nothing to see here.
         case TOT_SEEK:
+            if (!g_summary.fs.seek || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_FS)))
+                return;
             metric = "fs.seek";
             value = &g_ctrs.numSeek;
             err_str = "ERROR: doTotal:TOT_SEEK:cmdSendMetric";
             units = "operation";
             break;
         case TOT_STAT:
+            if (!g_summary.fs.stat || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_FS)))
+                return;
             metric = "fs.stat";
             value = &g_ctrs.numStat;
             err_str = "ERROR: doTotal:TOT_STAT:cmdSendMetric";
             units = "operation";
             break;
         case TOT_OPEN:
+            if (!g_summary.fs.open_close || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_FS)))
+                return;
             metric = "fs.open";
             value = &g_ctrs.numOpen;
             err_str = "ERROR: doTotal:TOT_OPEN:cmdSendMetric";
             units = "operation";
             break;
         case TOT_CLOSE:
+            if (!g_summary.fs.open_close || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_FS)))
+                return;
             metric = "fs.close";
             value = &g_ctrs.numClose;
             err_str = "ERROR: doTotal:TOT_CLOSE:cmdSendMetric";
             units = "operation";
             break;
         case TOT_DNS:
+            if (!g_summary.net.dns || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_DNS)))
+                return;
             metric = "dns.req";
             value = &g_ctrs.numDNS;
             err_str = "ERROR: doTotal:TOT_DNS:cmdSendMetric";
             units = "request";
             break;
         case TOT_PORTS:
+            if (!g_summary.net.open_close || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_NET)))
+                return;
             metric = "net.port";
             value = &g_ctrs.openPorts;
             err_str = "ERROR: doTotal:TOT_PORTS:cmdSendMetric";
@@ -2595,6 +2631,8 @@ doTotal(metric_t type)
             aggregation_type = CURRENT;
             break;
         case TOT_TCP_CONN:
+            if (!g_summary.net.open_close || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_NET)))
+                return;
             metric = "net.tcp";
             value = &g_ctrs.netConnectionsTcp;
             err_str = "ERROR: doTotal:TOT_TCP_CONN:cmdSendMetric";
@@ -2602,6 +2640,8 @@ doTotal(metric_t type)
             aggregation_type = CURRENT;
             break;
         case TOT_UDP_CONN:
+            if (!g_summary.net.open_close || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_NET)))
+                return;
             metric = "net.udp";
             value = &g_ctrs.netConnectionsUdp;
             err_str = "ERROR: doTotal:TOT_UDP_CONN:cmdSendMetric";
@@ -2609,6 +2649,8 @@ doTotal(metric_t type)
             aggregation_type = CURRENT;
             break;
         case TOT_OTHER_CONN:
+            if (!g_summary.net.open_close || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_NET)))
+                return;
             metric = "net.other";
             value = &g_ctrs.netConnectionsOther;
             err_str = "ERROR: doTotal:TOT_OTHER_CONN:cmdSendMetric";
@@ -2616,12 +2658,16 @@ doTotal(metric_t type)
             aggregation_type = CURRENT;
             break;
         case TOT_NET_OPEN:
+            if (!g_summary.net.open_close || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_NET)))
+                return;
             metric = "net.open";
             value = &g_ctrs.netConnOpen;
             err_str = "ERROR: doTotal:TOT_NET_OPEN:cmdSendMetric";
             units = "connection";
             break;
         case TOT_NET_CLOSE:
+            if (!g_summary.net.open_close || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_NET)))
+                return;
             metric = "net.close";
             value = &g_ctrs.netConnClose;
             err_str = "ERROR: doTotal:TOT_NET_CLOSE:cmdSendMetric";
@@ -2655,13 +2701,6 @@ doTotal(metric_t type)
 void
 doTotalDuration(metric_t type)
 {
-    // Only report if enabled
-    if (((type == TOT_FS_DURATION) && (!g_summary.fs.open_close)) ||
-        ((type == TOT_NET_DURATION) && (!g_summary.net.open_close)) ||
-        ((type == TOT_DNS_DURATION) && (!g_summary.net.dns))) {
-        return;
-    }
-
     const char* metric = "UNKNOWN";
     counters_element_t* value = NULL;
     counters_element_t* num = NULL;
@@ -2671,6 +2710,8 @@ doTotalDuration(metric_t type)
     const char* err_str = "UNKNOWN";
     switch (type) {
         case TOT_FS_DURATION:
+            if (!g_summary.fs.open_close || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_FS)))
+                return;
             metric = "fs.duration";
             value = &g_ctrs.fsDurationTotal;
             num = &g_ctrs.fsDurationNum;
@@ -2680,6 +2721,8 @@ doTotalDuration(metric_t type)
             err_str = "ERROR: doTotalDuration:TOT_FS_DURATION:cmdSendMetric";
             break;
         case TOT_NET_DURATION:
+            if (!g_summary.net.open_close || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_NET)))
+                return;
             metric = "net.duration";
             value = &g_ctrs.connDurationTotal;
             num = &g_ctrs.connDurationNum;
@@ -2689,6 +2732,8 @@ doTotalDuration(metric_t type)
             err_str = "ERROR: doTotalDuration:TOT_NET_DURATION:cmdSendMetric";
             break;
         case TOT_DNS_DURATION:
+            if (!g_summary.net.dns || (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_DNS)))
+                return;
             metric = "dns.duration";
             value = &g_ctrs.dnsDurationTotal;
             num = &g_ctrs.dnsDurationNum;
@@ -2795,8 +2840,9 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
             //atomicSwapU64(value->evt, 0ULL);
         }
 
-        // Only report if enabled
-        if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
+        // Only report metric if enabled
+        if (((g_summary.net.open_close) && (source == EVENT_BASED)) ||
+           (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_NET))) {
             return;
         }
 
@@ -2816,7 +2862,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         doNetOpenEvent(net);
 
         // Only report metric if enabled
-        if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
+        if (((g_summary.net.open_close) && (source == EVENT_BASED)) ||
+           (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_NET))) {
             return;
         }
 
@@ -2850,7 +2897,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
     case CONNECTION_CLOSE:
     {
         // Only report metric if enabled
-        if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
+        if (((g_summary.net.open_close) && (source == EVENT_BASED)) ||
+           (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_NET))) {
             return;
         }
 
@@ -2929,7 +2977,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         doNetCloseEvent(net, dur);
 
         // Only report metric if enabled
-        if ((g_summary.net.open_close) && (source == EVENT_BASED)) {
+        if (((g_summary.net.open_close) && (source == EVENT_BASED)) ||
+           (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_NET))) {
             return;
         }
 
@@ -3073,16 +3122,13 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
              atomicSwapU64(&net->rxBytes.evt, 0);
         }
 
-        if ((g_summary.net.rx_tx) && (source == EVENT_BASED)) {
+        if (((g_summary.net.rx_tx) && (source == EVENT_BASED)) ||
+           (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_NET))) {
             return;
         }
 
         // Don't report zeros.
         if (net->rxBytes.mtc == 0ULL) return;
-
-        if ((g_summary.net.rx_tx) && (source == EVENT_BASED)) {
-            return;
-        }
 
         event_t rxNetMetric = INT_EVENT("net.rx", net->rxBytes.mtc, DELTA, rxFields);
         scope_memmove(&rxMetric, &rxNetMetric, sizeof(event_t));
@@ -3207,7 +3253,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         // Don't report zeros.
         if (net->txBytes.mtc == 0ULL) return;
 
-        if ((g_summary.net.rx_tx) && (source == EVENT_BASED)) {
+        if (((g_summary.net.rx_tx) && (source == EVENT_BASED)) ||
+           (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_NET))) {
             return;
         }
 
@@ -3384,7 +3431,9 @@ doConnection(void)
 void
 doHttpAgg()
 {
-    httpAggSendReport(g_http_agg, g_mtc);
+    if (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_HTTP)) {
+        httpAggSendReport(g_http_agg, g_mtc);
+    }
     httpAggReset(g_http_agg);
 }
 
@@ -3601,4 +3650,39 @@ doPayload()
             if (pinfo) scope_free(pinfo);
         }
     }
+}
+
+void
+doProcStartMetric(void)
+{
+    if (!cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_PROC)) {
+        return;
+    }
+
+    char *urlEncodedCmd = NULL;
+    char *command = g_proc.cmd; // default is no encoding
+
+    // If we're reporting in statsd format, url encode the cmd
+    // to avoid characters that could cause parsing problems
+    // for statsd aggregators  :|@#,
+    if (cfgMtcFormat(g_cfg.staticfg) == CFG_FMT_STATSD) {
+        urlEncodedCmd = fmtUrlEncode(g_proc.cmd);
+        command = urlEncodedCmd;
+    }
+
+    event_field_t fields[] = {
+        STRFIELD("proc", (g_proc.procname), 4, TRUE),
+        NUMFIELD("pid", (g_proc.pid), 4, TRUE),
+        NUMFIELD("gid", (g_proc.gid), 4, TRUE),
+        STRFIELD("groupname", (g_proc.groupname), 4, TRUE),
+        NUMFIELD("uid", (g_proc.uid), 4, TRUE),
+        STRFIELD("username", (g_proc.username), 4, TRUE),
+        STRFIELD("host", (g_proc.hostname), 4, TRUE),
+        STRFIELD("args", (command), 7, TRUE),
+        STRFIELD("unit", ("process"), 1, TRUE),
+        FIELDEND
+    };
+    event_t evt = INT_EVENT("proc.start", 1, DELTA, fields);
+    cmdSendMetric(g_mtc, &evt);
+    if (urlEncodedCmd) scope_free(urlEncodedCmd);
 }

@@ -7,11 +7,11 @@ RUN apt-get update && apt-get install -y \
 
 RUN pip3 install jsonschema
 
-USER node
+USER root
 WORKDIR /home/node/
 
 ENV MD_DIR_NAME="md_files"
-ENV MD_OUTPUT_PATH="/md"
+ENV MD_OUTPUT_PATH="/home/node/appscope/website/src/pages/docs/"
 ENV TMP_DIR_NAME="temp"
 ENV EXAMPLE_TEST_PY="/home/node/validation/main.py"
 

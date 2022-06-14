@@ -610,7 +610,7 @@ ctlCreate()
     }
 
     ctl->enhancefs = DEFAULT_ENHANCE_FS;
-    ctl->allow_binary_console = checkEnv("SCOPE_ALLOW_BINARY_CONSOLE", "true");
+    ctl->allow_binary_console = DEFAULT_ALLOW_BINARY_CONSOLE;
 
     ctl->payload.enable = DEFAULT_PAYLOAD_ENABLE;
     ctl->payload.dir = (DEFAULT_PAYLOAD_DIR) ? scope_strdup(DEFAULT_PAYLOAD_DIR) : NULL;
@@ -1295,6 +1295,13 @@ ctlPayDirSet(ctl_t *ctl, const char *dir)
     }
 
     ctl->payload.dir = scope_strdup(dir);
+}
+
+void
+ctlAllowBinaryConsoleSet(ctl_t *ctl, unsigned val)
+{
+    if (!ctl || val < 0 || val > 1) return;
+    ctl->allow_binary_console = val;
 }
 
 

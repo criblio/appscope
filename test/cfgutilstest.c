@@ -288,28 +288,28 @@ static void
 cfgProcessEnvironmentWatchStatsdEnable(void **state)
 {
     config_t *cfg = cfgCreateDefault();
-    cfgMtcStatsdEnableSet(cfg, TRUE);
-    assert_int_equal(cfgMtcStatsdEnable(cfg), TRUE);
+    cfgMtcWatchEnableSet(cfg, TRUE, CFG_MTC_STATSD);
+    assert_int_equal(cfgMtcWatchEnable(cfg, CFG_MTC_STATSD), TRUE);
 
     // should override current cfg
     assert_int_equal(setenv("SCOPE_METRIC_STATSD", "false", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgMtcStatsdEnable(cfg), FALSE);
+    assert_int_equal(cfgMtcWatchEnable(cfg, CFG_MTC_STATSD), FALSE);
 
     // should override current cfg
     assert_int_equal(setenv("SCOPE_METRIC_STATSD", "true", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgMtcStatsdEnable(cfg), TRUE);
+    assert_int_equal(cfgMtcWatchEnable(cfg, CFG_MTC_STATSD), TRUE);
 
     // if env is not defined, cfg should not be affected
     assert_int_equal(unsetenv("SCOPE_METRIC_STATSD"), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgMtcStatsdEnable(cfg), TRUE);
+    assert_int_equal(cfgMtcWatchEnable(cfg, CFG_MTC_STATSD), TRUE);
 
     // unrecognised value should not affect cfg
     assert_int_equal(setenv("SCOPE_METRIC_STATSD", "sure thing", 1), 0);
     cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgMtcStatsdEnable(cfg), TRUE);
+    assert_int_equal(cfgMtcWatchEnable(cfg, CFG_MTC_STATSD), TRUE);
 
     // Just don't crash on null cfg
     cfgDestroy(&cfg);
@@ -939,7 +939,7 @@ cfgProcessCommandsFromFile(void** state)
     assert_int_equal(cfgMtcEnable(cfg), FALSE);
     assert_string_equal(cfgMtcStatsDPrefix(cfg), "prefix.");
     assert_int_equal(cfgMtcStatsDMaxLen(cfg), 1024);
-    assert_int_equal(cfgMtcStatsdEnable(cfg), FALSE);
+    assert_int_equal(cfgMtcWatchEnable(cfg, CFG_MTC_STATSD), FALSE);
     assert_int_equal(cfgMtcPeriod(cfg), 11);
     assert_string_equal(cfgCmdDir(cfg), "/the/path/");
     assert_int_equal(cfgSendProcessStartMsg(cfg), FALSE);
@@ -1101,7 +1101,7 @@ verifyDefaults(config_t* config)
     assert_int_equal       (cfgMtcFormat(config), DEFAULT_MTC_FORMAT);
     assert_string_equal    (cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
     assert_int_equal       (cfgMtcStatsDMaxLen(config), DEFAULT_STATSD_MAX_LEN);
-    assert_int_equal       (cfgMtcStatsdEnable(config), DEFAULT_MTC_STATSD_ENABLE);
+    assert_int_equal       (cfgMtcWatchEnable(config, CFG_MTC_STATSD), DEFAULT_MTC_STATSD_ENABLE);
     assert_int_equal       (cfgMtcVerbosity(config), DEFAULT_MTC_VERBOSITY);
     assert_int_equal       (cfgMtcPeriod(config), DEFAULT_SUMMARY_PERIOD);
     assert_string_equal    (cfgCmdDir(config), DEFAULT_COMMAND_DIR);
@@ -1167,6 +1167,10 @@ verifyDefaults(config_t* config)
     // the protocol list should be empty too
     assert_non_null        (g_protlist);
     assert_int_equal       (g_prot_sequence, 0);
+
+    assert_int_equal       (cfgLogStreamEnable(config), DEFAULT_LOGSTREAM_ENABLE);
+    assert_int_equal       (cfgTransportType(config, CFG_LS), DEFAULT_LS_TYPE);
+    assert_null            (cfgAuthToken(config));
 }
 
 static void
@@ -1223,8 +1227,14 @@ cfgReadGoodYaml(void** state)
         "      buffering: full\n"
         "      type: syslog\n"
         "tags:\n"
-        "  name1 : value1\n"
-        "  name2 : value2\n"
+        "  name1: value1\n"
+        "  name2: value2\n"
+        "cribl:\n"
+        "  enable: true\n"
+        "  transport:\n"
+        "    type: unix\n"
+        "    path: '@abstractsock'\n"
+        "  authtoken: ''\n"
         "...\n";
     const char* path = CFG_FILE_NAME;
     writeFile(path, yamlText);
@@ -1236,7 +1246,7 @@ cfgReadGoodYaml(void** state)
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_NDJSON);
     assert_string_equal(cfgMtcStatsDPrefix(config), "cribl.scope.");
     assert_int_equal(cfgMtcStatsDMaxLen(config), 1024);
-    assert_int_equal(cfgMtcStatsdEnable(config), FALSE);
+    assert_int_equal(cfgMtcWatchEnable(config, CFG_MTC_STATSD), FALSE);
     assert_int_equal(cfgMtcVerbosity(config), 3);
     assert_int_equal(cfgMtcPeriod(config), 11);
     assert_string_equal(cfgCmdDir(config), "/tmp");
@@ -1277,6 +1287,10 @@ cfgReadGoodYaml(void** state)
     assert_int_equal(cfgLogLevel(config), CFG_LOG_DEBUG);
     assert_int_equal(cfgPayEnable(config), FALSE);
     assert_string_equal(cfgPayDir(config), "/my/dir");
+    assert_int_equal       (cfgLogStreamEnable(config), TRUE);
+    assert_int_equal       (cfgTransportType(config, CFG_LS), CFG_UNIX);
+    assert_string_equal    (cfgTransportPath(config, CFG_LS), "@abstractsock");
+    assert_null            (cfgAuthToken(config));
     cfgDestroy(&config);
     lstDestroy(&g_protlist);
     g_prot_sequence = 0;
@@ -1462,7 +1476,14 @@ const char* jsonText =
     "  },\n"
     "  'protocol': [\n"
     "    {'name':'eg1','regex':'.*'}\n"
-    "  ]\n"
+    "  ],\n"
+    "  'cribl': {\n"
+    "    'enable': 'false',\n"
+    "    'transport': {\n"
+    "      'type': 'shm'\n"
+    "    },\n"
+    "    'authtoken': 'shhdonotsharethistokenwithjustanyone'\n"
+    "  }\n"
     "}\n";
 
 static void
@@ -1479,7 +1500,7 @@ cfgReadGoodJson(void** state)
     assert_string_equal(cfgMtcStatsDPrefix(config), "cribl.scope.");
     assert_int_equal(cfgMtcStatsDMaxLen(config), 42);
     assert_int_equal(cfgMtcVerbosity(config), 0);
-    assert_int_equal(cfgMtcStatsdEnable(config), TRUE);
+    assert_int_equal(cfgMtcWatchEnable(config, CFG_MTC_STATSD), TRUE);
     assert_int_equal(cfgMtcPeriod(config), 13);
     assert_int_equal(cfgSendProcessStartMsg(config), TRUE);
     assert_int_equal(cfgEvtEnable(config), FALSE);
@@ -1522,6 +1543,10 @@ cfgReadGoodJson(void** state)
     assert_int_equal   (g_prot_sequence, 1);
     assert_non_null    (prot = lstFind(g_protlist, 1));
     assert_string_equal(prot->protname, "eg1");
+
+    assert_int_equal       (cfgLogStreamEnable(config), FALSE);
+    assert_int_equal       (cfgTransportType(config, CFG_LS), CFG_SHM);
+    assert_string_equal    (cfgAuthToken(config), "shhdonotsharethistokenwithjustanyone");
 
     cfgDestroy(&config);
     lstDestroy(&g_protlist);

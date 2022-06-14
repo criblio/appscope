@@ -151,6 +151,13 @@ metric:
       enable: false
       validateserver: false
       cacertpath: ""
+  watch:
+  - type: fs
+  - type: net
+  - type: http
+  - type: dns
+  - type: process
+  - type: statsd
 event:
   enable: true
   format:
@@ -170,6 +177,7 @@ event:
   - type: console
     name: (stdout|stderr)
     value: .*
+    allowbinary: false
   - type: net
     name: .*
     field: .*

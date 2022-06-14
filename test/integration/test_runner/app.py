@@ -11,7 +11,7 @@ import splunk
 import syscalls
 from reporting import print_summary, store_results_to_file
 from runner import Runner
-from scope import ScopeDataCollector, get_scope_version, create_listener
+from scope import ScopeDataCollector, create_listener
 from validation import default_test_set_validators
 from watcher import TestWatcher
 
@@ -47,8 +47,6 @@ def main():
     logging.info(f"Logs path: {logs_path}")
     logging.info(f"Metrics destination type: {args.metric_type}")
 
-    scope_version = get_scope_version(args.scope_path)
-    logging.info(f"Scope Version: {scope_version}")
     test_watcher = TestWatcher(execution_id)
     test_watcher.start()
     scope_data_collector = ScopeDataCollector(args.metric_type)
@@ -77,7 +75,7 @@ def main():
             test_watcher.finish_with_error(str(e))
 
     print_summary(test_watcher.get_all_results())
-    store_results_to_file(watcher=test_watcher, path=logs_path, scope_version=scope_version)
+    store_results_to_file(watcher=test_watcher, path=logs_path, scope_version="")
     logging.shutdown()
 
     return (0, 1)[test_watcher.has_failures()]

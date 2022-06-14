@@ -25,6 +25,13 @@ typedef enum {CFG_SRC_FILE,
               CFG_SRC_DNS,
               CFG_SRC_MAX} watch_t;
 
+typedef enum {CFG_MTC_FS,
+              CFG_MTC_NET,
+              CFG_MTC_HTTP,
+              CFG_MTC_DNS,
+              CFG_MTC_PROC, 
+              CFG_MTC_STATSD} metric_watch_t;
+
 #define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 
@@ -62,6 +69,11 @@ typedef unsigned int bool;
 
 #define DEFAULT_MTC_ENABLE TRUE
 #define DEFAULT_MTC_FORMAT CFG_FMT_STATSD
+#define DEFAULT_MTC_FS_ENABLE TRUE
+#define DEFAULT_MTC_NET_ENABLE TRUE
+#define DEFAULT_MTC_HTTP_ENABLE TRUE
+#define DEFAULT_MTC_DNS_ENABLE TRUE
+#define DEFAULT_MTC_PROC_ENABLE TRUE
 #define DEFAULT_STATSD_MAX_LEN 512
 #define DEFAULT_STATSD_PREFIX ""
 #define DEFAULT_MTC_STATSD_ENABLE TRUE
@@ -100,6 +112,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_NET_NAME ".*"
 #define DEFAULT_SRC_FS_NAME ".*"
 #define DEFAULT_SRC_DNS_NAME ".*"
+#define DEFAULT_ALLOW_BINARY_CONSOLE TRUE
 #define DEFAULT_MTC_IPPORT_VERBOSITY 1
 
 #define DEFAULT_SRC_FILE TRUE
@@ -172,8 +185,8 @@ typedef unsigned int bool;
 //    SCOPE_PID                      provided by library
 //    SCOPE_PAYLOAD_HEADER           write payload headers to files
 //    SCOPE_ALLOW_CONSTRUCT_DBG      allows debug inside the constructor
+//    SCOPE_ERROR_SIGNAL_HANDLER     allows to register SIGSEGV&SIGBUS handler
 //    SCOPE_QUEUE_LENGTH             override default circular buffer sizes
-//    SCOPE_ALLOW_BINARY_CONSOLE     "true" outputs all console data, always
 
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"

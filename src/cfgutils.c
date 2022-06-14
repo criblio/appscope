@@ -65,6 +65,7 @@
 #define FIELD_NODE                   "field"
 #define VALUE_NODE                   "value"
 #define EX_HEADERS                   "headers"
+#define ALLOW_BINARY_NODE            "allowbinary"
 
 #define PAYLOAD_NODE         "payload"
 #define ENABLE_NODE              "enable"
@@ -140,6 +141,16 @@ enum_map_t watchTypeMap[] = {
     {NULL,                    -1}
 };
 
+enum_map_t mtcWatchTypeMap[] = {
+    {"fs",                    CFG_MTC_FS},
+    {"net",                   CFG_MTC_NET},
+    {"http",                  CFG_MTC_HTTP},
+    {"dns",                   CFG_MTC_DNS},
+    {"process",               CFG_MTC_PROC},
+    {"statsd",                CFG_MTC_STATSD},
+    {NULL,                    -1}
+};
+
 enum_map_t boolMap[] = {
     {"true",                  TRUE},
     {"false",                 FALSE},
@@ -152,13 +163,14 @@ void cfgMtcFormatSetFromStr(config_t*, const char*);
 void cfgMtcStatsDPrefixSetFromStr(config_t*, const char*);
 void cfgMtcStatsDMaxLenSetFromStr(config_t*, const char*);
 void cfgMtcPeriodSetFromStr(config_t*, const char*);
-void cfgMtcStatsdEnableSetFromStr(config_t*, const char*);
+void cfgMtcWatchEnableSetFromStr(config_t*, const char*, metric_watch_t);
 void cfgCmdDirSetFromStr(config_t*, const char*);
 void cfgConfigEventSetFromStr(config_t*, const char*);
 void cfgEvtEnableSetFromStr(config_t*, const char*);
 void cfgEventFormatSetFromStr(config_t*, const char*);
 void cfgEvtRateLimitSetFromStr(config_t*, const char*);
 void cfgEnhanceFsSetFromStr(config_t*, const char*);
+void cfgAllowBinaryConsoleSetFromStr(config_t *, const char *);
 void cfgEvtFormatValueFilterSetFromStr(config_t*, watch_t, const char*);
 void cfgEvtFormatFieldFilterSetFromStr(config_t*, watch_t, const char*);
 void cfgEvtFormatNameFilterSetFromStr(config_t*, watch_t, const char*);
@@ -450,7 +462,17 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
     } else if (!scope_strcmp(env_name, "SCOPE_SUMMARY_PERIOD")) {
         cfgMtcPeriodSetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_METRIC_STATSD")) {
-        cfgMtcStatsdEnableSetFromStr(cfg, value);
+        cfgMtcWatchEnableSetFromStr(cfg, value, CFG_MTC_STATSD);
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_FS")) {
+        cfgMtcWatchEnableSetFromStr(cfg, value, CFG_MTC_FS);
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_NET")) {
+        cfgMtcWatchEnableSetFromStr(cfg, value, CFG_MTC_NET);
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_HTTP")) {
+        cfgMtcWatchEnableSetFromStr(cfg, value, CFG_MTC_HTTP);
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_DNS")) {
+        cfgMtcWatchEnableSetFromStr(cfg, value, CFG_MTC_DNS);
+    } else if (!scope_strcmp(env_name, "SCOPE_METRIC_PROC")) {
+        cfgMtcWatchEnableSetFromStr(cfg, value, CFG_MTC_PROC);
     } else if (!scope_strcmp(env_name, "SCOPE_CMD_DIR")) {
         cfgCmdDirSetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_CONFIG_EVENT")) {
@@ -499,6 +521,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgEvtRateLimitSetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_ENHANCE_FS")) {
         cfgEnhanceFsSetFromStr(cfg, value);
+    } else if (!scope_strcmp(env_name, "SCOPE_ALLOW_BINARY_CONSOLE")) {
+        cfgAllowBinaryConsoleSetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_LOGFILE_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_CONSOLE_NAME")) {
@@ -678,10 +702,10 @@ cfgMtcPeriodSetFromStr(config_t* cfg, const char* value)
 }
 
 void
-cfgMtcStatsdEnableSetFromStr(config_t *cfg, const char *value)
+cfgMtcWatchEnableSetFromStr(config_t *cfg, const char *value, metric_watch_t type)
 {
     if (!cfg || !value) return;
-    cfgMtcStatsdEnableSet(cfg, strToVal(boolMap, value));
+    cfgMtcWatchEnableSet(cfg, strToVal(boolMap, value), type);
 }
 
 void
@@ -731,6 +755,13 @@ cfgEnhanceFsSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
     cfgEnhanceFsSet(cfg, strToVal(boolMap, value));
+}
+
+void
+cfgAllowBinaryConsoleSetFromStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgEvtAllowBinaryConsoleSet(cfg, strToVal(boolMap, value));
 }
 
 void
@@ -1212,9 +1243,14 @@ processMtcWatchType(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     if (node->type != YAML_SCALAR_NODE) return;
 
     char* value = stringVal(node);
-    if (!scope_strcmp(value, "statsd")) {
-        cfgMtcStatsdEnableSet(config, TRUE);
+
+    metric_watch_t category;
+    for(category = CFG_MTC_FS; category <= CFG_MTC_STATSD; ++category) {
+        if (!scope_strcmp(value, mtcWatchTypeMap[category].str)) {
+            cfgMtcWatchEnableSet(config, TRUE, category);
+        }
     }
+
     if (value) scope_free(value);
 }
 
@@ -1244,7 +1280,10 @@ processMtcWatch(config_t* config, yaml_document_t* doc, yaml_node_t* node)
 
     // absence of one of these values means to clear it.
     // clear them all, then set values for whatever we find.
-    cfgMtcStatsdEnableSet(config, FALSE);
+    metric_watch_t category;
+    for (category=CFG_MTC_FS; category<=CFG_MTC_STATSD; ++category) {
+        cfgMtcWatchEnableSet(config, FALSE, category);
+    }
 
     if (node->type != YAML_SEQUENCE_NODE) return;
     yaml_node_item_t* item;
@@ -1383,6 +1422,16 @@ processEvtWatchHeader(config_t *config, yaml_document_t *doc, yaml_node_t *node)
     }
 }
 
+static void
+processEvtWatchBinary(config_t *config, yaml_document_t *doc, yaml_node_t *node){
+    // watch binary is only valid for console
+    if (node->type != YAML_SCALAR_NODE || watch_context!= CFG_SRC_CONSOLE) return;
+
+    char* value = stringVal(node);
+    cfgAllowBinaryConsoleSetFromStr(config, value);
+    if (value) scope_free(value);
+}
+
 static int
 isWatchType(yaml_document_t* doc, yaml_node_pair_t* pair)
 {
@@ -1402,6 +1451,7 @@ processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    FIELD_NODE,           processEvtWatchField},
         {YAML_SCALAR_NODE,    VALUE_NODE,           processEvtWatchValue},
         {YAML_SEQUENCE_NODE,  EX_HEADERS,           processEvtWatchHeader},
+        {YAML_SCALAR_NODE,    ALLOW_BINARY_NODE,    processEvtWatchBinary},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -2227,13 +2277,13 @@ err:
 }
 
 static cJSON*
-createMetricWatchObjectJson(config_t *cfg)
+createMetricWatchObjectJson(config_t *cfg, const char* name)
 {
     cJSON *root = NULL;
 
     if (!(root = cJSON_CreateObject())) goto err;
 
-    if (!cJSON_AddStringToObjLN(root, TYPE_NODE, "statsd")) goto err;
+    if (!cJSON_AddStringToObjLN(root, TYPE_NODE, name)) goto err;
 
     return root;
 err:
@@ -2248,9 +2298,11 @@ createMetricWatchArrayJson(config_t* cfg)
 
     if (!(root = cJSON_CreateArray())) goto err;
 
-    if (cfgMtcStatsdEnable(cfg)) {
+    metric_watch_t category;
+    for(category = CFG_MTC_FS; category <= CFG_MTC_STATSD; ++category) {
         cJSON* item;
-        if (!(item = createMetricWatchObjectJson(cfg))) goto err;
+        if (!cfgMtcWatchEnable(cfg, category)) continue;
+        if (!(item = createMetricWatchObjectJson(cfg, mtcWatchTypeMap[category].str))) goto err;
         cJSON_AddItemToArray(root, item);
     }
 
@@ -2313,12 +2365,15 @@ createWatchObjectJson(config_t *cfg, watch_t src)
             for (i = 0; i < numhead; i++) {
                 char *hstr = (char *)cfgEvtFormatHeader(cfg, i);
                 if (hstr) {
-                    cJSON_AddStringToObjLN(headers, "headers", hstr);
+                    cJSON_AddStringToObjLN(headers, EX_HEADERS, hstr);
                 }
             }
         }
 
-        cJSON_AddItemToObject(root, "headers", headers);
+        cJSON_AddItemToObject(root, EX_HEADERS, headers);
+    } else if (src == CFG_SRC_CONSOLE) {
+    if (!cJSON_AddStringToObjLN(root, ALLOW_BINARY_NODE,
+                                  valToStr(boolMap, cfgEvtAllowBinaryConsole(cfg)))) goto err;
     }
 
     return root;
@@ -2481,11 +2536,36 @@ err:
     return NULL;
 }
 
+static cJSON*
+createCriblJson(config_t* cfg)
+{
+    cJSON *root = NULL;
+    cJSON *transport;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, ENABLE_NODE,
+                          valToStr(boolMap, cfgLogStreamEnable(cfg)))) goto err;
+
+    if (!(transport = createTransportJson(cfg, CFG_LS))) goto err;
+    cJSON_AddItemToObjectCS(root, TRANSPORT_NODE, transport);
+
+    // Represent NULL as an empty string
+    const char *token = cfgAuthToken(cfg);
+    token = (token) ? token : "";
+    if (!cJSON_AddStringToObjLN(root, AUTHTOKEN_NODE, token)) goto err;
+
+    return root;
+err:
+    if(root) cJSON_Delete(root);
+    return NULL;
+}
+
 cJSON*
 jsonObjectFromCfg(config_t* cfg)
 {
-    cJSON* json_root = NULL;
-    cJSON* metric, *libscope, *event, *payload, *tags, *protocol;
+    cJSON *json_root = NULL;
+    cJSON *metric, *libscope, *event, *payload, *tags, *protocol, *cribl;
 
     if (!(json_root = cJSON_CreateObject())) goto err;
 
@@ -2506,6 +2586,9 @@ jsonObjectFromCfg(config_t* cfg)
 
     if (!(protocol = createProtocolJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(json_root, PROTOCOL_NODE, protocol);
+
+    if (!(cribl = createCriblJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(json_root, CRIBL_NODE, cribl);
 
     return json_root;
 err:
@@ -2698,6 +2781,7 @@ initCtl(config_t *cfg)
     ctlEnhanceFsSet(ctl, cfgEnhanceFs(cfg));
     ctlPayEnableSet(ctl, cfgPayEnable(cfg));
     ctlPayDirSet(ctl,    cfgPayDir(cfg));
+    ctlAllowBinaryConsoleSet(ctl, cfgEvtAllowBinaryConsole(cfg));
 
     return ctl;
 }

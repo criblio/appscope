@@ -443,20 +443,12 @@ remoteConfig()
     timeout = 1;
     scope_memset(&fds, 0x0, sizeof(fds));
 
-/*
-    Setting fds.events = 0 to neuter ability to process remote
-    commands... until this is function is reworked to be TLS-friendly.
+    // We want to accept incoming requests on TCP, unix, and edge.
+    // However, we don't currently support receving on TLS connections.
+    int acceptRequests = transportSupportsCommandControl(
+                                          ctlTransport(g_ctl, CFG_CTL));
+    fds.events = (acceptRequests) ? POLLIN : 0;
 
-    cfg_transport_t ttype = ctlTransportType(g_ctl, CFG_CTL);
-    if ((ttype == (cfg_transport_t)-1) || (ttype == CFG_FILE) ||
-        (ttype ==  CFG_SYSLOG) || (ttype == CFG_SHM)) {
-        fds.events = 0;
-    } else {
-        fds.events = POLLIN;
-    }
-*/
-
-    fds.events = 0;
     fds.fd = ctlConnection(g_ctl, CFG_CTL);
 
     rc = scope_poll(&fds, 1, timeout);
@@ -489,8 +481,7 @@ remoteConfig()
         numtries++;
         rc = scope_recv(fds.fd, buf, sizeof(buf), MSG_DONTWAIT);
         if (rc <= 0) {
-            // Something has happened to our connection
-            ctlDisconnect(g_ctl, CFG_CTL);
+            // Something has happened to this incoming message
             break;
         }
 
@@ -634,6 +625,7 @@ doConfig(config_t *cfg)
     }
 
     setVerbosity(cfgMtcVerbosity(cfg));
+
     g_cmddir = cfgCmdDir(cfg);
     g_sendprocessstart = cfgSendProcessStartMsg(cfg);
 
@@ -828,20 +820,6 @@ stopTimer(void)
     threadNow(0);
 }
 
-// Return process specific CPU usage in microseconds
-static long long
-doGetProcCPU() {
-    struct rusage ruse;
-    
-    if (scope_getrusage(RUSAGE_SELF, &ruse) != 0) {
-        return (long long)-1;
-    }
-
-    return
-        (((long long)ruse.ru_utime.tv_sec + (long long)ruse.ru_stime.tv_sec) * 1000 * 1000) +
-        ((long long)ruse.ru_utime.tv_usec + (long long)ruse.ru_stime.tv_usec);
-}
-
 static void
 setProcId(proc_id_t *proc)
 {
@@ -904,17 +882,14 @@ doReset()
     atomicCasU64(&reentrancy_guard, 1ULL, 0ULL);
 
     reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
+    doProcStartMetric();
+
     threadInit();
 }
 
 static void
 reportPeriodicStuff(void)
 {
-    long mem;
-    int nthread, nfds, children;
-    long long cpu = 0;
-    static long long cpuState = 0;
-
     // aggregate and send http metrics
     doHttpAgg();
 
@@ -922,27 +897,13 @@ reportPeriodicStuff(void)
     doEvent();
     doPayload();
 
-    // We report CPU time for this period.
-    cpu = doGetProcCPU();
-    if (cpu != -1) {
-        doProcMetric(PROC_CPU, cpu - cpuState);
-        cpuState = cpu;
+    if (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_PROC)) {
+        doProcMetric(PROC_CPU);
+        doProcMetric(PROC_MEM);
+        doProcMetric(PROC_THREAD);
+        doProcMetric(PROC_FD);
+        doProcMetric(PROC_CHILD);
     }
-
-    mem = osGetProcMemory(g_proc.pid);
-    if (mem != -1) doProcMetric(PROC_MEM, mem);
-
-    nthread = osGetNumThreads(g_proc.pid);
-    if (nthread != -1) doProcMetric(PROC_THREAD, nthread);
-
-    nfds = osGetNumFds(g_proc.pid);
-    if (nfds != -1) doProcMetric(PROC_FD, nfds);
-
-    children = osGetNumChildProcs(g_proc.pid);
-    if (children < 0) {
-        children = 0;
-    }
-    doProcMetric(PROC_CHILD, children);
 
     // report totals (not by file descriptor/socket descriptor)
     doTotal(TOT_READ);
@@ -1559,6 +1520,68 @@ initEnv(int *attachedFlag)
     scope_fclose(fd);
 }
 
+void
+scope_sig_handler(int sig, siginfo_t *info, void *secret)
+{
+    scopeLogError("!scope_sig_handler signal %d errno %d fault address %p, reason of fault:", info->si_signo, info->si_errno, info->si_addr);
+    int sig_code = info->si_code;
+
+    if (info->si_signo == SIGSEGV) {
+        switch (sig_code) {
+            case SEGV_MAPERR:
+                scopeLogError("Address not mapped to object");
+                break;
+            case SEGV_ACCERR:
+                scopeLogError("Invalid permissions for mapped object");
+                break;
+            case SEGV_BNDERR:
+                scopeLogError("Failed address bound checks");
+                break;
+            case SEGV_PKUERR:
+                scopeLogError("Access was denied by memory protection keys");
+                break;
+            default: 
+                scopeLogError("Unknown Error");
+                break;
+        }
+    } else if (info->si_signo == SIGBUS) {
+        switch (sig_code) {
+            case BUS_ADRALN:
+                scopeLogError("Invalid address alignment");
+                break;
+            case BUS_ADRERR:
+                scopeLogError("Nonexistent physical address");
+                break;
+            case BUS_OBJERR:
+                scopeLogError("Object-specific hardware error");
+                break;
+            case BUS_MCEERR_AR:
+                scopeLogError("Hardware memory error consumed on a machine check");
+                break;
+            case BUS_MCEERR_AO:
+                scopeLogError("Hardware memory error detected in process but not consumed");
+                break;
+            default: 
+                scopeLogError("Unknown Error");
+                break;
+        }
+    }
+    scopeBacktrace(CFG_LOG_ERROR);
+    abort();
+}
+
+static void
+initSigErrorHandler(void)
+{
+    if (checkEnv("SCOPE_ERROR_SIGNAL_HANDLER", "true") && g_fn.sigaction) {
+        struct sigaction act = { 0 };
+        act.sa_handler = (void (*))scope_sig_handler;
+        act.sa_flags = SA_RESTART | SA_SIGINFO;
+        g_fn.sigaction(SIGSEGV, &act, NULL);
+        g_fn.sigaction(SIGBUS, &act, NULL);
+    }
+}
+
 __attribute__((constructor)) void
 init(void)
 {
@@ -1606,6 +1629,7 @@ init(void)
     g_constructor_debug_enabled = checkEnv("SCOPE_ALLOW_CONSTRUCT_DBG", "true");
 
     initState();
+    initSigErrorHandler();
 
     g_nsslist = lstCreate(freeNssEntry);
 
@@ -1625,6 +1649,7 @@ init(void)
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
     reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
+    doProcStartMetric();
 
     // replaces atexit(handleExit);  Allows events to be reported before
     // the TLS destructors are run.  This mechanism is used regardless
@@ -1645,6 +1670,7 @@ init(void)
     }
 
     osInitJavaAgent();
+
 }
 
 EXPORTON int

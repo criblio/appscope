@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM alpine:3.15
 
 RUN apk add go openssl make file bash curl autoconf automake libtool openssl-dev rust nodejs ruby python3 php php-openssl apache2 apache2-ssl python3-dev py3-pip libffi-dev cargo && \
     go clean -cache
@@ -37,21 +37,21 @@ RUN mkdir -p /opt/test && \
     cd /opt/test/curlssl && \
       ./buildconf && \
       ./configure --with-ssl --without-gnutls --without-nss && \
-      make -j8 && \
+      make -j"$(nproc)" && \
     cd /opt/test && \
       tar xvzf curl-7.69.1.tar.gz && \
       mv curl-7.69.1 curltls && \
     cd /opt/test/curltls && \
       ./buildconf && \
       ./configure --without-ssl --with-gnutls --without-nss && \
-      make -j8 && \
+      make -j"$(nproc)" && \
     cd /opt/test && \
       tar xvzf curl-7.69.1.tar.gz && \
       mv curl-7.69.1 curlnss && \
     cd /opt/test/curlnss && \
       ./buildconf && \
       ./configure --without-ssl --without-gnutls --with-nss && \
-      make -j8 && \
+      make -j"$(nproc)" && \
     cd /opt/test && \
       cp curlssl/src/.libs/curl curl-ssl && \
       cp curltls/src/.libs/curl curl-tls && \

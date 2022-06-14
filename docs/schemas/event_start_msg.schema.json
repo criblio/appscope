@@ -1,0 +1,569 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://appscope.dev/docs/schemas/event_start_msg.schema.json",
+  "type": "object",
+  "title": "AppScope Start message",
+  "description": "Structure of the start message",
+  "examples": [{"format":"ndjson","info":{"process":{"libscopever":"v1.1.0","pid":35673,"ppid":3390,"gid":1000,"groupname":"test_user","uid":1000,"username":"test_user","hostname":"test_user","procname":"ls","cmd":"ls --color=auto","id":"test_user-ls-ls --color=auto"},"configuration":{"current":{"metric":{"enable":"true","transport":{"type":"udp","host":"127.0.0.1","port":"8125","tls":{"enable":"false","validateserver":"true","cacertpath":""}},"format":{"type":"statsd","statsdprefix":"","statsdmaxlen":512,"verbosity":4},"watch":[{"type":"fs"},{"type":"net"},{"type":"http"},{"type":"dns"},{"type":"process"},{"type":"statsd"}]},"libscope":{"log":{"level":"info","transport":{"type":"file","path":"/tmp/scope.log","buffering":"line"}},"configevent":"true","summaryperiod":10,"commanddir":"/tmp"},"event":{"enable":"true","transport":{"type":"tcp","host":"127.0.0.1","port":"9109","tls":{"enable":"false","validateserver":"true","cacertpath":""}},"format":{"type":"ndjson","maxeventpersec":10000,"enhancefs":"true"},"watch":[{"type":"file","name":"(\\/logs?\\/)|(\\.log$)|(\\.log[.\\d])","field":".*","value":".*"},{"type":"console","name":"(stdout)|(stderr)","field":".*","value":".*","allowbinary":"true"},{"type":"http","name":".*","field":".*","value":".*","headers":[]},{"type":"net","name":".*","field":".*","value":".*"},{"type":"fs","name":".*","field":".*","value":".*"},{"type":"dns","name":".*","field":".*","value":".*"}]},"payload":{"enable":"false","dir":"/tmp"},"tags":{},"protocol":[],"cribl":{"enable":"false","transport":{"type":"edge"},"authtoken":""}}},"environment":{}}}],
+  "required": [
+    "format",
+    "info"
+  ],
+  "properties": {
+    "authtoken": {
+      "$ref": "definitions/envelope.schema.json#/$defs/authtoken"
+    },
+    "format": {
+      "$ref": "definitions/envelope.schema.json#/$defs/format"
+    },
+    "breaker": {
+      "$ref": "definitions/envelope.schema.json#/$defs/breaker"
+    },
+    "info": {
+      "title": "info",
+      "description": "The principal container for start-message information, in the form of nested `process`, `configuration`, and `environment` objects.",
+      "type": "object",
+      "required": [
+          "process",
+          "configuration",
+          "environment"
+      ],
+      "properties": {
+        "process": {
+          "title": "process",
+          "description": "Describes the process associated with the scoped app.",
+          "type": "object",
+          "required": [
+            "libscopever",
+            "pid",
+            "ppid",
+            "gid",
+            "groupname",
+            "uid",
+            "username",
+            "hostname",
+            "procname",
+            "cmd",
+            "id"
+          ],
+          "properties": {
+            "libscopever": {
+              "$ref": "definitions/data.schema.json#/$defs/libscopever"
+            },
+            "pid": {
+              "$ref": "definitions/data.schema.json#/$defs/pid"
+            },
+            "ppid": {
+              "$ref": "definitions/data.schema.json#/$defs/ppid"
+            },
+            "gid": {
+              "$ref": "definitions/body.schema.json#/$defs/gid"
+            },
+            "groupname": {
+              "$ref": "definitions/body.schema.json#/$defs/groupname"
+            },
+            "uid": {
+              "$ref": "definitions/body.schema.json#/$defs/uid"
+            },
+            "username": {
+              "$ref": "definitions/body.schema.json#/$defs/username"
+            },
+            "hostname": {
+              "$ref": "definitions/data.schema.json#/$defs/hostname"
+            },
+            "procname": {
+              "$ref": "definitions/data.schema.json#/$defs/procname"
+            },
+            "cmd": {
+              "$ref": "definitions/body.schema.json#/$defs/cmd"
+            },
+            "id": {
+              "$ref": "definitions/data.schema.json#/$defs/id"
+            }
+          }
+        },
+        "configuration": {
+          "title": "configuration",
+          "description": "Container for configurations. For now, describes current configuration only.",
+          "type": "object",
+          "properties": {
+            "current": {
+              "title": "current",
+              "description": "Describes the current configuration.",
+              "type": "object",
+              "properties": {
+                "metric": {
+                  "title": "metric",
+                  "description": "Settings for metrics. See `scope.yml`.",
+                  "type": "object",
+                  "properties": {
+                    "enable": {
+                      "$ref": "definitions/data.schema.json#/$defs/enable"
+                    },
+                    "transport": {
+                      "title": "transport",
+                      "description": "Backend connection for metrics or events. See `scope.yml`.",
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "$ref": "definitions/data.schema.json#/$defs/transport_type"
+                        },
+                        "host": {
+                          "$ref": "definitions/data.schema.json#/$defs/host"
+                        },
+                        "port": {
+                          "$ref": "definitions/data.schema.json#/$defs/port_str"
+                        },
+                        "path": {
+                          "$ref": "definitions/data.schema.json#/$defs/path"
+                        },
+                        "buffering": {
+                          "$ref": "definitions/data.schema.json#/$defs/buffering"
+                        },
+                        "tls": {
+                          "title": "tls",
+                          "description": "TLS connection settings. See `scope.yml`.",
+                          "type": "object",
+                          "properties": {
+                            "enable": {
+                              "$ref": "definitions/data.schema.json#/$defs/enable"
+                            },
+                            "validateserver": {
+                              "$ref": "definitions/data.schema.json#/$defs/validateserver"
+                            },
+                            "cacertpath": {
+                              "$ref": "definitions/data.schema.json#/$defs/cacertpath"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "format": {
+                      "title": "format",
+                      "description": "Settings for the format of metric data. See `scope.yml`.",
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "$ref": "definitions/data.schema.json#/$defs/format_type"
+                        },
+                        "statsdprefix": {
+                          "$ref": "definitions/data.schema.json#/$defs/statsdprefix"
+                        },
+                        "statsdmaxlen": {
+                          "$ref": "definitions/data.schema.json#/$defs/statsdmaxlen"
+                        },
+                        "verbosity": {
+                          "$ref": "definitions/data.schema.json#/$defs/verbosity"
+                        }
+                      }
+                    },
+                    "watch": {
+                      "title": "watch",
+                      "description": "Array containing objects that enable different categories of metrics. See `scope.yml`.",
+                      "type": "array",
+                      "items": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "$ref": "definitions/data.schema.json#/$defs/watch_type_metric_fs"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "$ref": "definitions/data.schema.json#/$defs/watch_type_metric_net"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "$ref": "definitions/data.schema.json#/$defs/watch_type_metric_http"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "$ref": "definitions/data.schema.json#/$defs/watch_type_metric_dns"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "$ref": "definitions/data.schema.json#/$defs/watch_type_metric_proc"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "$ref": "definitions/data.schema.json#/$defs/watch_type_metric_statsd"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                "libscope": {
+                  "title": "libscope",
+                  "description": "Specifies how to set up the AppScope library. See `scope.yml`.",
+                  "type": "object",
+                  "properties": {
+                    "log": {
+                      "title": "log",
+                      "description": "Logging settings for the AppScope library. See `scope.yml`.",
+                      "type": "object",
+                      "properties": {
+                        "level": {
+                          "$ref": "definitions/data.schema.json#/$defs/log_level"
+                        },
+                        "transport": {
+                          "title": "transport",
+                          "description": "Backend connection for AppScope library logging. See `scope.yml`.",
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "$ref": "definitions/data.schema.json#/$defs/transport_type"
+                            },
+                            "host": {
+                              "$ref": "definitions/data.schema.json#/$defs/host"
+                            },
+                            "port": {
+                              "$ref": "definitions/data.schema.json#/$defs/port_str"
+                            },
+                            "path": {
+                              "$ref": "definitions/data.schema.json#/$defs/path"
+                            },
+                            "buffering": {
+                              "$ref": "definitions/data.schema.json#/$defs/buffering"
+                            },
+                            "tls": {
+                              "title": "tls",
+                              "description": "TLS settings for backend used by the AppScope library. See `scope.yml.`",
+                              "type": "object",
+                              "properties": {
+                                "enable": {
+                                  "$ref": "definitions/data.schema.json#/$defs/enable"
+                                },
+                                "validateserver": {
+                                  "$ref": "definitions/data.schema.json#/$defs/validateserver"
+                                },
+                                "cacertpath": {
+                                  "$ref": "definitions/data.schema.json#/$defs/cacertpath"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "configevent": {
+                          "$ref": "definitions/data.schema.json#/$defs/configevent"
+                        },
+                        "summaryperiod": {
+                          "$ref": "definitions/data.schema.json#/$defs/summaryperiod"
+                        },
+                        "commanddir": {
+                          "$ref": "definitions/data.schema.json#/$defs/commanddir"
+                        }
+                      }
+                    }
+                  }
+                },
+                "event": {
+                  "title": "event",
+                  "description": "Settings for events. See `scope.yml`.",
+                  "type": "object",
+                  "properties": {
+                    "enable": {
+                      "$ref": "definitions/data.schema.json#/$defs/enable"
+                    },
+                    "transport": {
+                      "title": "transport",
+                      "description": "Backend connection for events. See `scope.yml`.",
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "$ref": "definitions/data.schema.json#/$defs/transport_type"
+                        },
+                        "host": {
+                          "$ref": "definitions/data.schema.json#/$defs/host"
+                        },
+                        "port": {
+                          "$ref": "definitions/data.schema.json#/$defs/port_str"
+                        },
+                        "path": {
+                          "$ref": "definitions/data.schema.json#/$defs/path"
+                        },
+                        "buffering": {
+                          "$ref": "definitions/data.schema.json#/$defs/buffering"
+                        },
+                        "tls": {
+                          "title": "tls",
+                          "description": "Specifies whether to enable TLS for the metrics backend. See `scope.yml`.",
+                          "type": "object",
+                          "properties": {
+                            "enable": {
+                              "$ref": "definitions/data.schema.json#/$defs/enable"
+                            },
+                            "validateserver": {
+                              "$ref": "definitions/data.schema.json#/$defs/validateserver"
+                            },
+                            "cacertpath": {
+                              "$ref": "definitions/data.schema.json#/$defs/cacertpath"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "format": {
+                      "title": "format",
+                      "description": "Settings for the format of event data. See `scope.yml`.",
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "$ref": "definitions/data.schema.json#/$defs/format_type"
+                        },
+                        "maxeventpersec": {
+                          "$ref": "definitions/data.schema.json#/$defs/maxeventpersec"
+                        },
+                        "enhancefs": {
+                          "$ref": "definitions/data.schema.json#/$defs/enhancefs"
+                        }
+                      }
+                    },
+                    "watch": {
+                      "title": "watch",
+                      "description": "Array containing objects that enable different categories of events. See `scope.yml`.",
+                      "type": "array",
+                      "items": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "$ref": "definitions/data.schema.json#/$defs/watch_type_event_file"
+                            },
+                            "name": {
+                              "$ref": "definitions/data.schema.json#/$defs/name"
+                            },
+                            "field": {
+                              "$ref": "definitions/data.schema.json#/$defs/field"
+                            },
+                            "value": {
+                              "$ref": "definitions/data.schema.json#/$defs/value"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "$ref": "definitions/data.schema.json#/$defs/watch_type_event_console"
+                            },
+                            "name": {
+                              "$ref": "definitions/data.schema.json#/$defs/name"
+                            },
+                            "field": {
+                              "$ref": "definitions/data.schema.json#/$defs/field"
+                            },
+                            "value": {
+                              "$ref": "definitions/data.schema.json#/$defs/value"
+                            },
+                            "allowbinary": {
+                              "$ref": "definitions/data.schema.json#/$defs/allowbinary"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "$ref": "definitions/data.schema.json#/$defs/watch_type_event_http"
+                            },
+                            "name": {
+                              "$ref": "definitions/data.schema.json#/$defs/name"
+                            },
+                            "field": {
+                              "$ref": "definitions/data.schema.json#/$defs/field"
+                            },
+                            "value": {
+                              "$ref": "definitions/data.schema.json#/$defs/value"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "$ref": "definitions/data.schema.json#/$defs/watch_type_event_net"
+                            },
+                            "name": {
+                              "$ref": "definitions/data.schema.json#/$defs/name"
+                            },
+                            "field": {
+                              "$ref": "definitions/data.schema.json#/$defs/field"
+                            },
+                            "value": {
+                              "$ref": "definitions/data.schema.json#/$defs/value"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "$ref": "definitions/data.schema.json#/$defs/watch_type_event_fs"
+                            },
+                            "name": {
+                              "$ref": "definitions/data.schema.json#/$defs/name"
+                            },
+                            "field": {
+                              "$ref": "definitions/data.schema.json#/$defs/field"
+                            },
+                            "value": {
+                              "$ref": "definitions/data.schema.json#/$defs/value"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "$ref": "definitions/data.schema.json#/$defs/watch_type_event_dns"
+                            },
+                            "name": {
+                              "$ref": "definitions/data.schema.json#/$defs/name"
+                            },
+                            "field": {
+                              "$ref": "definitions/data.schema.json#/$defs/field"
+                            },
+                            "value": {
+                              "$ref": "definitions/data.schema.json#/$defs/value"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                "payload": {
+                  "title": "payload",
+                  "description": "Settings for enabling and storing payloads. See `scope.yml`.",
+                  "type": "object",
+                  "properties": {
+                    "enable": {
+                      "$ref": "definitions/data.schema.json#/$defs/enable"
+                    },
+                    "dir": {
+                      "$ref": "definitions/data.schema.json#/$defs/dir"
+                    }
+                  }
+                },
+                "tags": {
+                  "title": "tags",
+                  "description": "User-defined tags which become fields in generated events and metrics. See `scope.yml`.",
+                  "type": "object"
+                },
+                "protocol": {
+                  "title": "protocol",
+                  "description": "List whose entries define protocols that AppScope should detect in network payloads, and how to handle matches. See `scope.yml`.",
+                  "type": "array",
+                  "items": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "$ref": "definitions/data.schema.json#/$defs/name"
+                        },
+                        "regex": {
+                          "$ref": "definitions/data.schema.json#/$defs/regex"
+                        },
+                        "binary": {
+                          "$ref": "definitions/data.schema.json#/$defs/binary"
+                        },
+                        "len": {
+                          "$ref": "definitions/data.schema.json#/$defs/len"
+                        },
+                        "detect": {
+                          "$ref": "definitions/data.schema.json#/$defs/detect"
+                        },
+                        "payload": {
+                          "$ref": "definitions/data.schema.json#/$defs/payload"
+                        }
+                      }
+                    }
+                  ]
+                },
+                "cribl": {
+                  "title": "cribl",
+                  "description": "Settings for the `cribl` backend. See `scope.yml`.",
+                  "type": "object",
+                  "properties": {
+                    "enable": {
+                      "$ref": "definitions/data.schema.json#/$defs/enable"
+                    },
+                    "transport": {
+                      "title": "transport",
+                      "description": "Backend connection to Cribl Edge or Stream. See `scope.yml`.",
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "$ref": "definitions/data.schema.json#/$defs/transport_type"
+                        },
+                        "host": {
+                          "$ref": "definitions/data.schema.json#/$defs/host"
+                        },
+                        "port": {
+                          "$ref": "definitions/data.schema.json#/$defs/port_str"
+                        },
+                        "path": {
+                          "$ref": "definitions/data.schema.json#/$defs/path"
+                        },
+                        "buffering": {
+                          "$ref": "definitions/data.schema.json#/$defs/buffering"
+                        },
+                        "tls": {
+                          "title": "tls",
+                          "description": "TLS settings for the Cribl backend. See `scope.yml`.",
+                          "type": "object",
+                          "properties": {
+                            "enable": {
+                              "$ref": "definitions/data.schema.json#/$defs/enable"
+                            },
+                            "validateserver": {
+                              "$ref": "definitions/data.schema.json#/$defs/validateserver"
+                            },
+                            "cacertpath": {
+                              "$ref": "definitions/data.schema.json#/$defs/cacertpath"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "authtoken": {
+                      "$ref": "definitions/envelope.schema.json#/$defs/authtoken"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "environment": {
+          "title": "environment",
+          "description": "Environment variables present when the current configuration was loaded.",
+          "type": "object"
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -160,6 +160,45 @@ metric:
     #
     - type: statsd
 
+    # Metric file system
+    #   Type:     string
+    #   Values:   fs
+    #   Default:  fs
+    #   Override: $SCOPE_METRIC_FS
+    #
+    - type: fs
+
+    # Metric network
+    #   Type:     string
+    #   Values:   net
+    #   Default:  net
+    #   Override: $SCOPE_METRIC_NET
+    #
+    - type: net
+
+    # Metric http
+    #   Type:     string
+    #   Values:   http
+    #   Default:  http
+    #   Override: $SCOPE_METRIC_HTTP
+    #
+    - type: http
+  
+    # Metric dns
+    #   Type:     string
+    #   Values:   dns
+    #   Default:  dns
+    #   Override: $SCOPE_METRIC_DNS
+    #
+    - type: dns
+  
+    # Metric process
+    #   Type:     string
+    #   Values:   process
+    #   Default:  process
+    #   Override: $SCOPE_METRIC_PROC
+    #
+    - type: process
 
   # Backend connection for metrics
   #
@@ -355,9 +394,13 @@ event:
     # category. The regular expressions can be set with
     # $SCOPE_EVENT_CONSOLE_NAME and $SCOPE_EVENT_CONSOLE_VALUE.
     #
+    # Set $SCOPE_ALLOW_BINARY_CONSOLE to true or false to allow or disallow
+    # emiting binary data for console events.
+    #
     - type: console
       name: (stdout)|(stderr)
       value: .*
+      allowbinary: true
 
     # The net category includes network operations like listen, connect, close,
     # send, recv, etc. The name, field, and value properties are regular
@@ -907,7 +950,7 @@ protocol:
   # HTTP detection when not using LogStream.
   #
   #- name: HTTP
-  #  regex: " HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n"
+  #  regex: "HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n"
   #  detect: true
   #  payload: true
 

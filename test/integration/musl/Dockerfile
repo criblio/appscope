@@ -6,6 +6,10 @@ RUN mkdir -p /opt/fwrite
 COPY ./musl/fwrite.c /opt/fwrite/fwrite.c
 RUN gcc -o /opt/fwrite/fwrite /opt/fwrite/fwrite.c
 
+RUN mkdir -p /opt/fault_test
+COPY ./musl/hello_fault.c /opt/fault_test/hello_fault.c
+RUN gcc -O0 -g -o /opt/fault_test/fault_test /opt/fault_test/hello_fault.c -lrt
+
 RUN mkdir -p /opt/extract_scope && \
     mkdir -p /opt/patch_libscope
 

@@ -46,7 +46,6 @@ cJSON *msgStart(proc_id_t *, config_t *, which_transport_t);
 char *msgAddNewLine(char *);
 void msgLogConfig(config_t *);
 void reportProcessStart(ctl_t *, bool, which_transport_t);
-void sendProcessStartMetric();
 
 // Create a json object describing the current configuration
 cJSON *jsonConfigurationObject(config_t *);

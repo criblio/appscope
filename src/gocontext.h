@@ -28,36 +28,55 @@ typedef struct {
     int c_accept4_addr;
     int c_accept4_addrlen;
     int c_accept4_sd_out;
-    int c_http_server_read_callee;
-    int c_http_server_read_connReader;
-    int c_http_server_read_buf;
-    int c_http_server_read_rc;
-    int c_http_server_write_callee;
-    int c_http_server_write_conn;
-    int c_http_server_write_buf;
-    int c_http_server_write_rc;
-    int c_http_client_write_callee;
-    int c_http_client_write_w_pc;
-    int c_http_client_write_buf;
-    int c_http_client_write_rc;
-    int c_http_client_read_callee;
-    int c_http_client_read_pc;
+    int c_tls_server_read_callee;
+    int c_tls_server_read_connReader;
+    int c_tls_server_read_buf;
+    int c_tls_server_read_rc;
+    int c_tls_server_write_callee;
+    int c_tls_server_write_conn;
+    int c_tls_server_write_buf;
+    int c_tls_server_write_rc;
+    int c_tls_client_read_callee;
+    int c_tls_client_read_pc;
+    int c_tls_client_write_callee;
+    int c_tls_client_write_w_pc;
+    int c_tls_client_write_buf;
+    int c_tls_client_write_rc;
+    int c_http2_server_read_sc;
+    int c_http2_server_write_callee;
+    int c_http2_server_write_sc;
+    int c_http2_server_preface_callee;
+    int c_http2_server_preface_sc;
+    int c_http2_server_preface_rc;
+    int c_http2_client_read_cc;
+    int c_http2_client_write_callee;
+    int c_http2_client_write_tcpConn;
+    int c_http2_client_write_buf;
+    int c_http2_client_write_rc;
 } go_arg_offsets_t;
 
-typedef struct {                  // Structure               Field       Offset
-    int g_to_m;                   // "runtime.g"             "m"        "48"
-    int m_to_tls;                 // "runtime.m"             "tls"      "136"
-    int connReader_to_conn;       // "net/http.connReader"   "conn"     "0"
-    int conn_to_tlsState;         // "net/http.conn"         "tlsState" "48"
-    int persistConn_to_conn;      // "net/http.persistConn"  "conn"     "88"
-    int persistConn_to_bufrd;     // "net/http.persistConn"  "br"       "104"
-    int iface_data;               // "runtime.iface"         "data"     "8"
-    int netfd_to_pd;              // "net.netFD"             "pfd"      "0"
-    int pd_to_fd;                 // "internal/poll.FD"      "sysfd"    "16"
-    int netfd_to_sysfd;           // "net.netFD"             "sysfd"    "16"
-    int bufrd_to_buf;             // "bufio/Reader"          "buf"      "0"
-    int conn_to_rwc;              // "net/http.conn"         "rwc"      "0"
-    int persistConn_to_tlsState;  // "net/http.persistConn"  "tlsState" "96"
+typedef struct {                  // Structure                  Field      
+    int g_to_m;                   // "runtime.g"                "m"        
+    int m_to_tls;                 // "runtime.m"                "tls"      
+    int connReader_to_conn;       // "net/http.connReader"      "conn"     
+    int conn_to_tlsState;         // "net/http.conn"            "tlsState" 
+    int persistConn_to_conn;      // "net/http.persistConn"     "conn"     
+    int persistConn_to_bufrd;     // "net/http.persistConn"     "br"       
+    int iface_data;               // "runtime.iface"            "data"     
+    int netfd_to_pd;              // "net.netFD"                "pfd"      
+    int pd_to_fd;                 // "internal/poll.FD"         "sysfd"    
+    int netfd_to_sysfd;           // "net.netFD"                "sysfd"    
+    int bufrd_to_buf;             // "bufio/Reader"             "buf"      
+    int conn_to_rwc;              // "net/http.conn"            "rwc"      
+    int persistConn_to_tlsState;  // "net/http.persistConn"     "tlsState" 
+    int fr_to_readBuf;            // "net/http.http2Framer"     "readBuf" 
+    int fr_to_writeBuf;           // "net/http.http2Framer"     "writeBuf" 
+    int fr_to_headerBuf;          // "net/http.http2Framer"     "headerBuf" 
+    int fr_to_rc;                 // "net/http.http2Framer"     "readBuf"     
+    int cc_to_fr;                 // "net/http.http2ClientConn" "http2framer"
+    int cc_to_tconn;              // "net/http.http2ClientConn" "tconn"
+    int sc_to_fr;                 // "net/http.http2serverConn" "http2framer"
+    int sc_to_conn;               // "net/http.http2serverConn" "conn"
 } go_struct_offsets_t;
 
 typedef struct {
@@ -86,7 +105,7 @@ typedef struct {
 typedef void (*assembly_fn)(void);
 
 extern go_schema_t *g_go_schema;
-extern go_schema_t go_16_schema;
+extern go_schema_t go_8_schema;
 extern go_schema_t go_17_schema;
 extern go_arg_offsets_t g_go_arg;
 extern go_struct_offsets_t g_go_struct;
@@ -107,10 +126,15 @@ extern void go_hook_socket(void);
 extern void go_hook_accept4(void);
 extern void go_hook_read(void);
 extern void go_hook_close(void);
-extern void go_hook_tls_read(void);
-extern void go_hook_tls_write(void);
-extern void go_hook_readResponse(void);
-extern void go_hook_pc_write(void);
+extern void go_hook_tls_server_read(void);
+extern void go_hook_tls_server_write(void);
+extern void go_hook_tls_client_read(void);
+extern void go_hook_tls_client_write(void);
+extern void go_hook_http2_server_read(void);
+extern void go_hook_http2_server_write(void);
+extern void go_hook_http2_server_preface(void);
+extern void go_hook_http2_client_read(void);
+extern void go_hook_http2_client_write(void);
 extern void go_hook_exit(void);
 extern void go_hook_die(void);
 
@@ -122,9 +146,14 @@ extern void go_hook_reg_socket(void);
 extern void go_hook_reg_accept4(void);
 extern void go_hook_reg_read(void);
 extern void go_hook_reg_close(void);
-extern void go_hook_reg_tls_read(void);
-extern void go_hook_reg_tls_write(void);
-extern void go_hook_reg_readResponse(void);
-extern void go_hook_reg_pc_write(void);
+extern void go_hook_reg_tls_server_read(void);
+extern void go_hook_reg_tls_server_write(void);
+extern void go_hook_reg_tls_client_read(void);
+extern void go_hook_reg_tls_client_write(void);
+extern void go_hook_reg_http2_server_read(void);
+extern void go_hook_reg_http2_server_write(void);
+extern void go_hook_reg_http2_server_preface(void);
+extern void go_hook_reg_http2_client_read(void);
+extern void go_hook_reg_http2_client_write(void);
 
 #endif // __GOTCONTEXT_H__

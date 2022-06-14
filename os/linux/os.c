@@ -758,3 +758,17 @@ osGetGroupName(unsigned gid)
         return scope_strdup(grp.gr_name);
     return NULL;
 }
+
+// Return process specific CPU usage in microseconds
+long long
+osGetProcCPU(void) {
+    struct rusage ruse;
+    
+    if (scope_getrusage(RUSAGE_SELF, &ruse) != 0) {
+        return -1;
+    }
+
+    return
+        (((long long)ruse.ru_utime.tv_sec + (long long)ruse.ru_stime.tv_sec) * 1000 * 1000) +
+        ((long long)ruse.ru_utime.tv_usec + (long long)ruse.ru_stime.tv_usec);
+}

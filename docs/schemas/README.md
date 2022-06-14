@@ -2,13 +2,13 @@
 
 AppScope generates events and metrics whose structure is defined in JSON Schema. Each event and metric is defined in its own JSON Schema file in this directory. 
 
-To generate a set of Markdown files from the JSON Schema files, call:
+To generate a `schema-reference.md` markdown file from the JSON Schema files, call:
 
 ```
 make docs-generate
 ```
 
-The Markdown files will appear in `docs/md_files`.
+This will overwrite following file: `website/src/pages/docs/schema-reference.md`.
 
 This README also explains how to add a new event or metric.
 

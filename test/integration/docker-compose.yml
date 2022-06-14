@@ -19,6 +19,15 @@ services:
       dockerfile: ./alpine/Dockerfile
     <<: *scope-common
 
+  bash:
+    image: ghcr.io/criblio/appscope-test-bash:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-bash:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./bash/Dockerfile
+    <<: *scope-common
+
   syscalls:
     image: ghcr.io/criblio/appscope-test-syscalls:${TAG:?Missing TAG environment variable}
     build:
@@ -94,6 +103,15 @@ services:
         - ghcr.io/criblio/appscope-test-metriccapture:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./metriccapture/Dockerfile
+    <<: *scope-common
+
+  metricvariants:
+    image: ghcr.io/criblio/appscope-test-metricvariants:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-metricvariants:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./metricvariants/Dockerfile
     <<: *scope-common
 
   java8:

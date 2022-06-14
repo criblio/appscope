@@ -35,6 +35,7 @@ struct _config_t
 {
     struct {
         unsigned enable;
+        unsigned char categories;
         cfg_mtc_format_t format;
         struct {
             char* prefix;
@@ -55,6 +56,7 @@ struct _config_t
         unsigned src[CFG_SRC_MAX];
         size_t numHeaders;
         header_extract_t **hextract;
+        unsigned allowbinaryconsole;
     } evt;
 
     struct {
@@ -162,7 +164,7 @@ static cfg_buffer_t bufDefault[] = {
     DEFAULT_LS_BUF,
 };
 
-    
+
 ///////////////////////////////////
 // Constructors Destructors
 ///////////////////////////////////
@@ -181,6 +183,11 @@ cfgCreateDefault()
     c->mtc.statsd.enable = DEFAULT_MTC_STATSD_ENABLE;
     c->mtc.period = DEFAULT_SUMMARY_PERIOD;
     c->mtc.verbosity = DEFAULT_MTC_VERBOSITY;
+    SCOPE_BIT_SET_VAR(c->mtc.categories, CFG_MTC_FS, DEFAULT_MTC_FS_ENABLE);
+    SCOPE_BIT_SET_VAR(c->mtc.categories, CFG_MTC_NET, DEFAULT_MTC_NET_ENABLE);
+    SCOPE_BIT_SET_VAR(c->mtc.categories, CFG_MTC_HTTP, DEFAULT_MTC_HTTP_ENABLE);
+    SCOPE_BIT_SET_VAR(c->mtc.categories, CFG_MTC_DNS, DEFAULT_MTC_DNS_ENABLE);
+    SCOPE_BIT_SET_VAR(c->mtc.categories, CFG_MTC_PROC, DEFAULT_MTC_PROC_ENABLE);
     c->evt.enable = DEFAULT_EVT_ENABLE;
     c->evt.format = DEFAULT_CTL_FORMAT;
     c->evt.ratelimit = DEFAULT_MAXEVENTSPERSEC;
@@ -198,6 +205,7 @@ cfgCreateDefault()
 
     c->evt.hextract = DEFAULT_SRC_HTTP_HEADER;
     c->evt.numHeaders = 0;
+    c->evt.allowbinaryconsole = DEFAULT_ALLOW_BINARY_CONSOLE;
 
     which_transport_t tp;
     for (tp=CFG_MTC; tp<CFG_WHICH_MAX; tp++) {
@@ -291,6 +299,27 @@ cfgMtcEnable(config_t* cfg)
     return (cfg) ? cfg->mtc.enable : DEFAULT_MTC_ENABLE;
 }
 
+unsigned
+cfgMtcWatchEnable(config_t* cfg, metric_watch_t category) {
+    switch(category){
+        case CFG_MTC_FS:
+            return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_FS) : DEFAULT_MTC_FS_ENABLE;
+        case CFG_MTC_NET:
+            return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_NET) : DEFAULT_MTC_NET_ENABLE;
+        case CFG_MTC_HTTP:
+            return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_HTTP) : DEFAULT_MTC_HTTP_ENABLE;
+        case CFG_MTC_DNS:
+            return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_DNS) : DEFAULT_MTC_DNS_ENABLE;
+        case CFG_MTC_PROC:
+            return (cfg) ? SCOPE_BIT_CHECK(cfg->mtc.categories, CFG_MTC_PROC) : DEFAULT_MTC_PROC_ENABLE;
+        case CFG_MTC_STATSD:
+            return (cfg) ? cfg->mtc.statsd.enable : DEFAULT_MTC_STATSD_ENABLE;
+        default:
+            DBG(NULL);
+            return 0;
+    }
+}
+
 cfg_mtc_format_t
 cfgMtcFormat(config_t* cfg)
 {
@@ -315,11 +344,6 @@ cfgMtcPeriod(config_t* cfg)
     return (cfg) ? cfg->mtc.period : DEFAULT_SUMMARY_PERIOD;
 }
 
-unsigned
-cfgMtcStatsdEnable(config_t *cfg)
-{
-    return (cfg) ? cfg->mtc.statsd.enable : DEFAULT_MTC_STATSD_ENABLE;
-}
 
 const char *
 cfgCmdDir(config_t* cfg)
@@ -437,6 +461,12 @@ cfgEvtFormatSourceEnabled(config_t *cfg, watch_t src)
 
     DBG("%d", src);
     return srcEnabledDefault[CFG_SRC_FILE];
+}
+
+unsigned
+cfgEvtAllowBinaryConsole(config_t *cfg)
+{
+    return (cfg) ? cfg->evt.allowbinaryconsole : DEFAULT_ALLOW_BINARY_CONSOLE;
 }
 
 unsigned
@@ -665,10 +695,25 @@ cfgMtcPeriodSet(config_t* cfg, unsigned val)
 }
 
 void
-cfgMtcStatsdEnableSet(config_t *cfg, unsigned val)
+cfgMtcWatchEnableSet(config_t *cfg, unsigned val, metric_watch_t type)
 {
     if (!cfg || val > 1) return;
-    cfg->mtc.statsd.enable = val;
+
+    switch (type) {
+        case CFG_MTC_FS:
+        case CFG_MTC_NET:
+        case CFG_MTC_HTTP:
+        case CFG_MTC_DNS:
+        case CFG_MTC_PROC:
+            SCOPE_BIT_SET_VAR(cfg->mtc.categories, type, val);
+            break;
+        case CFG_MTC_STATSD:
+            cfg->mtc.statsd.enable = val;
+            break;
+        default:
+            DBG(NULL);
+            break;
+    }
 }
 
 void
@@ -801,6 +846,13 @@ cfgEvtFormatSourceEnabledSet(config_t* cfg, watch_t src, unsigned val)
 {
     if (!cfg || src < 0 || src >= CFG_SRC_MAX || val > 1) return;
     cfg->evt.src[src] = val;
+}
+
+void
+cfgEvtAllowBinaryConsoleSet(config_t *cfg, unsigned val)
+{
+    if (!cfg || val < 0 || val > 1) return;
+    cfg->evt.allowbinaryconsole = val;
 }
 
 void

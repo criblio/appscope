@@ -6,65 +6,65 @@
   "$defs": {
     "_time": {
       "title": "_time",
-      "description": "_time",
+      "description": "The moment in time when AppScope reported the event or metric. In UNIX time with integer part in seconds and fractional part in microseconds.",
       "type": "number",
       "examples": ["1643662126.91777"]
     },
     "_value": {
       "title": "_value",
-      "description": "_value",
+      "description": "The value reported by the event or metric.",
       "type": "number",
       "examples": [1]
     },
     "args": {
       "title": "args",
-      "description": "args",
+      "description": "The arguments with which the scoped app was run.",
       "type": "string"
     },
     "cmd": {
       "title": "cmd",
-      "description": "cmd",
+      "description": "The command that was run to start the scoped app.",
       "type": "string",
       "examples": ["top"]
     },
     "data": {
       "title": "data",
-      "description": "data",
+      "description": "The data that the scoped app emitted as output.",
       "type": "string"
     },
     "gid": {
       "title": "gid",
-      "description": "gid",
+      "description": "Group ID of the user who created the process.",
       "type": "integer",
       "examples": [0]
     },
     "groupname": {
       "title": "groupname",
-      "description": "groupname",
+      "description": "Groupname of the user who created the process.",
       "type": "string",
       "examples": ["root"]
     },
     "metric_type_counter": {
       "title": "counter",
-      "description": "counter",
+      "description": "Indicates that the metric is a counter.",
       "type": "string",
       "const": "counter"
     },
     "metric_type_gauge": {
       "title": "gauge",
-      "description": "gauge",
+      "description": "Indicates that the metric is a gauge.",
       "type": "string",
       "const": "gauge"
     },
     "metric_type_histogram": {
       "title": "histogram",
-      "description": "histogram",
+      "description": "Indicates that the metric from the scoped app is a histogram.",
       "type": "string",
       "const": "histogram"
     },
     "metric_type_timer": {
       "title": "timer",
-      "description": "timer",
+      "description": "Indicates that the metric is a timer.",
       "type": "string",
       "const": "timer"
     },
@@ -81,283 +81,283 @@
     },
     "sourcednsduration": {
       "title": "dns.duration",
-      "description": "Source - DNS duration",
+      "description": "Indicates that the Source is a DNS duration operation.",
       "type": "string",
       "const": "dns.duration"
     },
     "sourcednsreq": {
       "title": "dns.req",
-      "description": "Source - Net DNS",
+      "description": "Indicates that the Source is a Network DNS operation.",
       "type": "string",
       "const": "dns.req"
     },
     "sourcednsresp": {
       "title": "dns.resp",
-      "description": "Source - DNS response",
+      "description": "Indicates that the Source is a DNS response operation .",
       "type": "string",
       "const": "dns.resp"
     },
     "sourcefsclose": {
       "title": "fs.close",
-      "description": "Source - File Close",
+      "description": "Indicates that the Source is a File Close operation.",
       "type": "string",
       "const": "fs.close"
     },
     "sourcefsdelete": {
       "title": "fs.delete",
-      "description": "Source - File Delete",
+      "description": "Indicates that the Source is a File Delete operation.",
       "type": "string",
       "const": "fs.delete"
     },
     "sourcefsduration": {
       "title": "fs.duration",
-      "description": "Source - File Duration",
+      "description": "Indicates that the Source is a File Duration operation.",
       "type": "string",
       "const": "fs.duration"
     },
     "sourcefserror": {
       "title": "fs.error",
-      "description": "Source - File Error",
+      "description": "Indicates that the Source is a File Error operation.",
       "type": "string",
       "const": "fs.error"
     },
     "sourcefsopen": {
       "title": "fs.open",
-      "description": "Source - File open",
+      "description": "Indicates that the Source is a File open operation.",
       "type": "string",
       "const": "fs.open"
     },
     "sourcefsread": {
       "title": "fs.read",
-      "description": "Source - File Read",
+      "description": "Indicates that the Source is a File Read operation. ",
       "type": "string",
       "const": "fs.read"
     },
     "sourcefsseek": {
       "title": "fs.seek",
-      "description": "Source - File Seek",
+      "description": "Indicates that the Source is a File Seek operation.",
       "type": "string",
       "const": "fs.seek"
     },
     "sourcefsstat": {
       "title": "fs.stat",
-      "description": "Source - File Stat",
+      "description": "Indicates that the Source is a File Stat operation.",
       "type": "string",
       "const": "fs.stat"
     },
     "sourcefswrite": {
       "title": "fs.write",
-      "description": "Source - File Write",
+      "description": "Indicates that the Source is a File Write operation.",
       "type": "string",
       "const": "fs.write"
     },
     "sourcehttpresp" : {
       "title": "http.resp",
-      "description": "Source - HTTP response",
+      "description": "Indicates that the Source is an HTTP response.",
       "type": "string",
       "const": "http.resp"
     },
     "sourcehttpreq" : {
       "title": "http.req",
-      "description": "Source - HTTP request",
+      "description": "Indicates that the event Source is an HTTP request.",
       "type": "string",
       "const": "http.req"
     },
     "sourcehttpreqs" : {
       "title": "http.req",
-      "description": "Source - HTTP requests",
+      "description": "Indicates that the metric Source aggregates HTTP requests and responses.",
       "type": "string",
       "const": "http.req"
     },
     "sourcehttpdurationclient" : {
       "title": "http.duration.client",
-      "description": "Source - HTTP client duration",
+      "description": "Indicates that the Source is a counter that measures HTTP client duration.",
       "type": "string",
       "const": "http.duration.client"
     },
     "sourcehttpreqcontentlength" : {
       "title": "http.req.content_length",
-      "description": "Source - HTTP request content length",
+      "description": "Indicates that the Source is a counter that measures HTTP request content length.",
       "type": "string",
       "const": "http.req.content_length"
     },
     "sourcehttprespcontentlength" : {
       "title": "http.resp.content_length",
-      "description": "Source - HTTP response content length",
+      "description": "Indicates that the Source is a counter that measures HTTP response content length.",
       "type": "string",
       "const": "http.resp.content_length"
     },
     "sourcehttpdurationserver" : {
       "title": "http.duration.server",
-      "description": "Source - HTTP server duration",
+      "description": "Indicates that the Source is a counter that measures HTTP server duration.",
       "type": "string",
       "const": "http.duration.server"
     },
     "sourcenetclose": {
       "title": "net.close",
-      "description": "Source - Net Close",
+      "description": "Indicates that the Source is a Network Close operation.",
       "type": "string",
       "const": "net.close"
     },
     "sourcenetapp" : {
       "title": "net.app",
-      "description": "Source - Net App",
+      "description": "Indicates that the Source is a Network App (protocol detection) operation.",
       "type": "string",
       "const": "net.app"
     },
     "sourcenetduration": {
       "title": "net.duration",
-      "description": "Source - Net duration",
+      "description": "Indicates that the Source is a counter that measures Network duration.",
       "type": "string",
       "const": "net.duration"
     },
     "sourceneterror": {
       "title": "net.error",
-      "description": "Source - Net Error",
+      "description": "Indicates that the Source is a Network Error operation.",
       "type": "string",
       "const": "net.error"
     },
     "sourcenetopen": {
       "title": "net.open",
-      "description": "Source - Net Open",
+      "description": "Indicates that the Source is a Network Open operation.",
       "type": "string",
       "const": "net.open"
     },
     "sourcenetother": {
       "title": "net.other",
-      "description": "Source - Net other",
+      "description": "Indicates that the Source is a Network operation of an other-than-standard kind.",
       "type": "string",
       "const": "net.other"
     },
     "sourcenetport": {
       "title": "net.port",
-      "description": "Source - Net port",
+      "description": "Indicates that the Source is a gauge that identifies open ports.",
       "type": "string",
       "const": "net.port"
     },
     "sourcenetrx": {
       "title": "net.rx",
-      "description": "Source - Net RX",
+      "description": "Indicates that the Source is a Network receive operation.",
       "type": "string",
       "const": "net.rx"
     },
     "sourcenettcp": {
       "title": "net.tcp",
-      "description": "Source - Net tcp",
+      "description": "Indicates that the Source is a gauge that shows the current count of open TCP ports.",
       "type": "string",
       "const": "net.tcp"
     },
     "sourcenettx": {
       "title": "net.tx",
-      "description": "Source - Net TX",
+      "description": "Indicates that the Source is a Network transmit operation.",
       "type": "string",
       "const": "net.tx"
     },
     "sourcenetudp": {
       "title": "net.udp",
-      "description": "Source - Net udp",
+      "description": "Indicates that the Source is a gauge that shows the current count of open UDP ports.",
       "type": "string",
       "const": "net.udp"
     },
     "sourcenotice" : {
       "title": "notice",
-      "description": "Source - notice",
+      "description": "Indicates that the Source is an AppScope notification.",
       "type": "string",
       "const": "notice"
     },
     "sourceprocchild" : {
       "title": "proc.child",
-      "description": "Source - proc child",
+      "description": "Indicates that the Source is a gauge of child processes spawned.",
       "type": "string",
       "const": "proc.child"
     },
     "sourceproccpu" : {
       "title": "proc.cpu",
-      "description": "Source - proc cpu",
+      "description": "Indicates that the Source is a counter of microseconds of the process's CPU were scheduled.",
       "type": "string",
       "const": "proc.cpu"
     },
     "sourceproccpuperc" : {
       "title": "proc.cpu_perc",
-      "description": "Source - proc cpu_perc",
+      "description": "Indicates that the Source is a gauge that measures percentage of CPU used by the process.",
       "type": "string",
       "const": "proc.cpu_perc"
     },
     "sourceprocfd" : {
       "title": "proc.fd",
-      "description": "Source - proc fd",
+      "description": "Indicates that the Source is a gauge that reports how many file descriptors the process has opened.",
       "type": "string",
       "const": "proc.fd"
     },
     "sourceprocmem" : {
       "title": "proc.mem",
-      "description": "Source - proc memory",
+      "description": "Indicates that the Source is a gauge that reports process memory consumption.",
       "type": "string",
       "const": "proc.mem"
     },
     "sourceprocstart" : {
       "title": "proc.start",
-      "description": "Source - proc start",
+      "description": "Indicates that the Source is a counter which can only be 1, meaning that the process has started.",
       "type": "string",
       "const": "proc.start"
     },
     "sourceprocthread" : {
       "title": "proc.thread",
-      "description": "Source - proc thread",
+      "description": "Indicates that the Source is a gauge that reports how many threads are running in the process.",
       "type": "string",
       "const": "proc.thread"
     },
     "sourcetypeconsole": {
       "title": "console",
-      "description": "Sourcetype - console",
+      "description": "Indicates that the Sourcetype is console.",
       "type": "string",
       "const": "console"
     },
     "sourcetypefile": {
       "title": "file",
-      "description": "Sourcetype - file",
+      "description": "Indicates that the Sourcetype is file.",
       "type": "string",
       "const": "file"
     },
     "sourcetypedns": {
       "title": "dns",
-      "description": "Sourcetype - dns",
+      "description": "Indicates that the Sourcetype is DNS.",
       "type": "string",
       "const": "dns"
     },
     "sourcetypefs": {
       "title": "fs",
-      "description": "Sourcetype - fs",
+      "description": "Indicates that the Sourcetype is filesystem.",
       "type": "string",
       "const": "fs"
     },
     "sourcetypehttp": {
       "title": "http",
-      "description": "Sourcetype - http",
+      "description": "Indicates that the Sourcetype is HTTP.",
       "type": "string",
       "const": "http"
     },
     "sourcetypemetric": {
       "title": "metric",
-      "description": "Sourcetype - metric",
+      "description": "Indicates that the Sourcetype is metric.",
       "type": "string",
       "const": "metric"
     },
     "sourcetypenet": {
       "title": "net",
-      "description": "Sourcetype - net",
+      "description": "Indicates that the Sourcetype is net (meaning network).",
       "type": "string",
       "const": "net"
     },
     "uid": {
       "title": "uid",
-      "description": "uid",
+      "description": "User ID of the user who created the process.",
       "type": "integer",
       "examples": [0]
     },
     "username": {
       "title": "username",
-      "description": "username",
+      "description": "Username of the user who created the process.",
       "type": "string",
       "examples": ["root"]
     }

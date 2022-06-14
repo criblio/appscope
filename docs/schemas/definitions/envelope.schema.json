@@ -9,11 +9,28 @@
       "description": "Identifies the operation during whose lifetime the event or metric is emitted.",
       "type": "string"
     },
+    "authtoken": {
+      "title": "authtoken",
+      "description": "Token used for authenticating to Cribl Edge or Stream.",
+      "type": "string"
+    },
+    "breaker": {
+      "title": "breaker",
+      "description": "Specifies an Event Breaker for Cribl Edge or Stream to use.",
+      "type": "string",
+      "const": "Cribl - Do Not Break Ruleset"
+    },
     "event_type": {
       "title": "type",
       "description": "Distinguishes events from metrics.",
       "type": "string",
       "const": "evt"
+    },
+    "format": {
+      "title": "format",
+      "description": "Specifies the format for output of events and metrics from AppScope. See `scope.yml`.",
+      "type": "string",
+      "enum": ["scope", "ndjson"]
     },
     "id": {
       "title": "id",

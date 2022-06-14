@@ -35,7 +35,6 @@
 
 extern rtconfig g_cfg;
 
-int g_go_static = FALSE;
 int g_numNinfo = NET_ENTRIES;
 int g_numFSinfo = FS_ENTRIES;
 int g_http_guard_enabled = TRUE;
@@ -82,6 +81,7 @@ static list_t *g_extra_net_info_list = NULL;
 #define ARGS_FIELD(val)         STRFIELD("args",           (val),        7)
 #define DURATION_FIELD(val)     NUMFIELD("duration",       (val),        8)
 #define NUMOPS_FIELD(val)       NUMFIELD("numops",         (val),        8)
+
 
 static void
 destroyNetInfo(void *data)
@@ -228,7 +228,7 @@ initPayloadDetect()
     erroroffset = 0;
     if ((g_http_protocol_def = scope_calloc(1, sizeof(protocol_def_t))) == NULL) goto error;
     g_http_protocol_def->protname = "HTTP";
-    g_http_protocol_def->regex = "(?: HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n)";
+    g_http_protocol_def->regex = "(?:HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n)";
     g_http_protocol_def->detect = TRUE;
     g_http_protocol_def->re = pcre2_compile((PCRE2_SPTR)g_http_protocol_def->regex,
                                             PCRE2_ZERO_TERMINATED, 0,
@@ -369,7 +369,7 @@ static int
 postStatErrState(metric_t stat_err, metric_t type, const char *funcop, const char *pathname)
 {
     // something passed in a param that is not a viable address; ltp does this
-    if ((getgoAppStateStatic() == FALSE) && (stat_err == EVT_ERR) && (errno == EFAULT)) return FALSE;
+    if ((scopeGetGoAppStateStatic() == FALSE) && (stat_err == EVT_ERR) && (errno == EFAULT)) return FALSE;
 
     int *summarize = NULL;
     switch (type) {
@@ -912,6 +912,15 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     }
 }
 
+bool
+isProtocolSet(int fd)
+{
+    net_info *net;
+    net = getNetEntry(fd);
+    if (net && net->protoDetect != DETECT_PENDING) return TRUE;
+    return FALSE;
+}
+
 static bool
 setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size_t len)
 {
@@ -1311,14 +1320,13 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
         }
 
         if (net && net->protoProtoDef) {
-            // Process HTTP if detected and events are enabled
-            if (cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP) &&
-               !scope_strcasecmp(net->protoProtoDef->protname, "HTTP")) {
-
+            // Process HTTP if detected and http or metrics are enabled
+            if ((!scope_strcasecmp(net->protoProtoDef->protname, "HTTP")) &&
+                ((cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) || (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_HTTP)))) {
                 doHttp(id, sockfd, net, buf, len, src, dtype);
             }
 
-            if (cfgMtcStatsdEnable(g_cfg.staticfg) &&
+            if (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_STATSD) &&
                 !scope_strcasecmp(net->protoProtoDef->protname, "STATSD")) {
 
                 doMetricCapture(id, sockfd, net, buf, len, src, dtype);
@@ -1435,17 +1443,6 @@ getFSContentType(int fd)
     DBG(NULL);
     return FS_CONTENT_UNKNOWN;
 }
-
-void
-setGoAppStateStatic(int static_state) {
-    g_go_static = static_state;
-}
-
-int
-getgoAppStateStatic(void) {
-    return g_go_static;
-}
-
 
 void
 setFSContentType(int fd, fs_content_type_t type)

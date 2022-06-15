@@ -42,6 +42,7 @@ extern FILE scopelibc___stdin_FILE;
 extern FILE scopelibc___stdout_FILE;
 extern FILE scopelibc___stderr_FILE;
 extern unsigned short ** scopelibc___ctype_b_loc(void);
+extern int32_t ** scopelibc___ctype_tolower_loc(void);
 
 #define scope_fcntl    scopelibc_fcntl
 #define scope_open     scopelibc_open

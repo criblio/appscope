@@ -1150,3 +1150,9 @@ scope___ctype_b_loc (void)
 {
     return scopelibc___ctype_b_loc();
 }
+
+int32_t **
+scope___ctype_tolower_loc(void)
+{
+    return scopelibc___ctype_tolower_loc();
+}

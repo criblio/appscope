@@ -1,3 +1,5 @@
+__ctype_b_loc scope___ctype_b_loc
+__ctype_tolower_loc scope___ctype_tolower_loc
 __errno_location scopelibc___errno_location
 __isoc99_sscanf scope__iso99_sscanf
 __snprintf_chk scope___snprintf_chk

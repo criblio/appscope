@@ -1144,3 +1144,15 @@ scope__iso99_sscanf(const char *restrict s, const char *restrict fmt, ...)
     va_end(ap);
     return ret;
 }
+
+unsigned short **
+scope___ctype_b_loc (void)
+{
+    return scopelibc___ctype_b_loc();
+}
+
+int32_t **
+scope___ctype_tolower_loc(void)
+{
+    return scopelibc___ctype_tolower_loc();
+}

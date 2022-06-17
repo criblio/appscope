@@ -90,6 +90,7 @@ build/pcre2/libpcre2-posix.a build/pcre2/libpcre2-8.a:
 	@$(RM) -r build/pcre2
 	@mkdir build/pcre2
 	cd build/pcre2 && cmake ../../pcre2 && $(MAKE)
+	objcopy --redefine-syms redefine_syms.lst build/pcre2/libpcre2-posix.a
 	objcopy --redefine-syms redefine_syms.lst build/pcre2/libpcre2-8.a
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 

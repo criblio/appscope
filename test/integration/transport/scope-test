@@ -68,13 +68,24 @@ if [ "$(wait_for_port 10090)" ]; then
     SCOPE_CRIBL_TLS_CA_CERT_PATH=/tmp/appscope.crt \
         scope run -c tls://127.0.0.1:10090 -- curl -Lso /dev/null https://cribl.io
     if [ "$(wait_for_files "/tmp/out/appscope:in_appscope_tls/CriblOut-*.json")" ]; then
-        echo "  PASSED"
+        echo "  PASSED (curl)"
     else
-        echo "  FAILED - missing output files"
+        echo "  FAILED - missing output files (curl)"
         ERR+=1
         ERRORS="$ERRORS Cribl/TLS"
         ls -lR /tmp/out
     fi
+
+    # Make sure that static go programs don't crash when using tls.
+    # This was added in response to issue #992, an aws-nuke crash.
+    sleep 1
+    scope run -c tls://127.0.0.1:10090 -- /opt/test/bin/plainClientStatic
+    if [ $? -ne "0" ]; then
+        echo "  FAILED - plainClientStatic crashed"
+        ERR+=1
+        ERRORS="$ERRORS Cribl/TLS"
+    fi
+
 else
     echo "  FAILED - no listener"
     ERR+=1

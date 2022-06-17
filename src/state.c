@@ -52,6 +52,8 @@ static search_t* g_http_redirect = NULL;
 static protocol_def_t *g_tls_protocol_def = NULL;
 static protocol_def_t *g_http_protocol_def = NULL;
 static protocol_def_t *g_statsd_protocol_def = NULL;
+static bool g_userHTTP = FALSE;
+static bool g_userTLS = FALSE;
 
 // Linked list, indexed by channel ID, of net_info pointers used in
 // doProtocol() when it's not provided with a valid file descriptor.
@@ -195,6 +197,7 @@ addProtocol(request_t *req)
         return FALSE;
     }
 
+    setExternalProto(proto);
     return TRUE;
 }
 
@@ -912,6 +915,23 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     }
 }
 
+/*
+ * Called when we add a protocol entry.
+ * If a user protocol entry defines HTTP &/or TLS, then save.
+ * Just noting that they are available at this time.
+ */
+void
+setExternalProto(protocol_def_t *proto)
+{
+    if (scope_strcasecmp(proto->protname, "HTTP") == 0) {
+        g_userHTTP = TRUE;
+    }
+
+    if (scope_strcasecmp(proto->protname, "TLS") == 0) {
+        g_userTLS = TRUE;
+    }
+}
+
 bool
 isProtocolSet(int fd)
 {
@@ -1151,6 +1171,22 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
     unsigned int ptype;
     protocol_def_t *tls_proto_def = g_tls_protocol_def; // use ours by default
 
+    // 16030[0-3].{4}0[12] 16 03 00|01|02|03 *+2     01|02
+    // example:            16 03 01           00 ff  01    00  00
+    if ((net && (g_userTLS == FALSE)) &&
+        (data[0] == (char)0x16) && (data[1] == (char)0x03) &&
+        ((data[2] == (char)0x00) || (data[2] == (char)0x01) ||
+         (data[2] == (char)0x02) ||(data[2] == (char)0x03)) &&
+        ((data[5] == (char)0x01) || (data[5] == (char)0x02))) {
+        net->tlsDetect = DETECT_TRUE;
+        net->tlsProtoDef = tls_proto_def;
+        return;
+    } else if (net && (g_userHTTP == FALSE) && detectHttp(buf, len)) {
+        net->tlsDetect = DETECT_FALSE;
+        net->tlsProtoDef = g_http_protocol_def;
+        return;
+    }
+
     // Look for an overridden TLS entry from the protocol detector configs
     for (ptype = 0; ptype <= g_prot_sequence; ptype++)
     {
@@ -1214,6 +1250,12 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
         return;
     }
 
+    if (net && (g_userHTTP == FALSE) && detectHttp(buf, len)) {
+        net->protoDetect = DETECT_TRUE;
+        net->protoProtoDef = g_http_protocol_def;
+        return;
+    }
+
     // Check first against the protocol entries in the configs.
     for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
         if ((protoDef = lstFind(g_protlist, ptype)) != NULL) {
@@ -1229,10 +1271,11 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
 
     // Try default protocol definitions if they haven't been overridden.
     if (!sawHTTP && setProtocolByType(sockfd, g_http_protocol_def, net, buf, len, dtype)) {
-            return;
+        return;
     }
+
     if (!sawSTATSD && setProtocolByType(sockfd, g_statsd_protocol_def, net, buf, len, dtype)) {
-            return;
+        return;
     }
 }
 
@@ -1274,7 +1317,7 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
     if (!net) net = getChannelNetEntry(id); // fallback to using channel ID
 
     scopeLogHexDebug(buf, len > 64 ? 64 : len, // limit hexdump to 64
-            "DEBUG: doProtocol(id=%ld, fd=%d, len=%ld, src=%s, dtyp=%s) TLS=%s PROTO=%s",
+                     "DEBUG: doProtocol(id=%ld, fd=%d, len=%ld, src=%s, dtyp=%s) TLS=%s PROTO=%s",
             id, sockfd, len,
             src == NETRX ? "NETRX" :
             src == NETTX ? "NETTX" :
@@ -1295,7 +1338,7 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
             );
 
     // Ignore empty payloads that should have been blocked by our interpositions
-    if (!len) {
+    if (len < 4) {
         scopeLogDebug("DEBUG: fd:%d ignoring empty payload", sockfd);
         return 0;
     }
@@ -1328,7 +1371,6 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
 
             if (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_STATSD) &&
                 !scope_strcasecmp(net->protoProtoDef->protname, "STATSD")) {
-
                 doMetricCapture(id, sockfd, net, buf, len, src, dtype);
             }
         }
@@ -1984,7 +2026,7 @@ doURL(int sockfd, const void *buf, size_t len, metric_t src)
 int
 doRecv(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
 {
-    if (checkNetEntry(sockfd) == TRUE) {
+     if (checkNetEntry(sockfd) == TRUE) {
         if (!g_netinfo[sockfd].active) {
             doAddNewSock(sockfd);
         }

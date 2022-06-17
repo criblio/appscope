@@ -1752,6 +1752,8 @@ processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
             --g_prot_sequence;
             destroyProtEntry(protocol_context);
             DBG(NULL);
+        } else {
+            setExternalProto(protocol_context);
         }
         protocol_context = NULL;
     }

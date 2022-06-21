@@ -37,6 +37,7 @@ Usability improvements include:
 
 - [#781](https://github.com/criblio/appscope/issues/781) Delivery of data as processes exit is now more consistent.
 - [#918](https://github.com/criblio/appscope/issues/918) When AppScope reports its configuration (upon start of a new scoped process), it now includes the formerly missing `cribl` section describing [Cribl backend](cribl-integration#integrating-with-cribl-edge) configuration.
+- [#994](https://github.com/criblio/appscope/issues/994) When you try to scope a Go application on ARM, which is [not supported](requirements#known-limitations), AppScope now leaves the Go app un-instrumented, allowing the app to run normally. Before this bug was discovered and fixed, a scoped Go app on ARM would not run at all.
 
 ## AppScope 1.0.4
 

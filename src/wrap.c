@@ -151,6 +151,7 @@ static got_list_t inject_hook_list[] = {
     {"fstatat", NULL, &g_fn.fstatat},
     {"prctl", NULL, &g_fn.prctl},
     {"execve", NULL, &g_fn.execve},
+    {"execv", NULL, &g_fn.execv},
     {"syscall", NULL, &g_fn.syscall},
     {"sendfile", NULL, &g_fn.sendfile},
     {"sendfile64", NULL, &g_fn.sendfile64},
@@ -2630,20 +2631,16 @@ prctl(int option, ...)
     return g_fn.prctl(option, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2], fArgs.arg[3]);
 }
 
-EXPORTON int
-execve(const char *pathname, char *const argv[], char *const envp[])
+static char*
+getLdscopeExec(const char* pathname)
 {
-    int i, nargs, saverr;
-    bool isstat = FALSE, isgo = FALSE;
-    char **nargv;
-    elf_buf_t *ebuf;
     char *scopexec = NULL;
-
-    WRAP_CHECK(execve, -1);
+    bool isstat = FALSE, isgo = FALSE;
+    elf_buf_t *ebuf;
 
     if (scope_strstr(g_proc.procname, "ldscope") ||
         checkEnv("SCOPE_EXECVE", "false")) {
-        return g_fn.execve(pathname, argv, envp);
+        return NULL;
     }
 
     if ((ebuf = getElf((char *)pathname))) {
@@ -2659,7 +2656,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
      * In this case we use ldscope only to force the use of HTTP 1.1.
      */
     if (getenv("LD_PRELOAD") && (isstat == FALSE) && (isgo == FALSE)) {
-        return g_fn.execve(pathname, argv, envp);
+        return NULL;
     }
 
     scopexec = getenv("SCOPE_EXEC_PATH");
@@ -2667,7 +2664,62 @@ execve(const char *pathname, char *const argv[], char *const envp[])
         ((scopexec = getpath("ldscope")) == NULL)) {
 
         // can't find the scope executable
-        scopeLogWarn("execve: can't find a scope executable for %s", pathname);
+        scopeLogWarn("can't find a scope executable for %s", pathname);
+        return NULL;
+    }
+
+    return scopexec;
+}
+
+EXPORTON int
+execv(const char *pathname, char *const argv[])
+{
+    int i, nargs, saverr;
+    char *scopexec;
+    char **nargv;
+
+    WRAP_CHECK(execv, -1);
+
+    scopexec = getLdscopeExec(pathname);
+    if (scopexec == NULL) {
+        return g_fn.execv(pathname, argv);
+    }
+
+    nargs = 0;
+    while ((argv[nargs] != NULL)) nargs++;
+
+    size_t plen = sizeof(char *);
+    if ((nargs == 0) || (nargv = scope_calloc(1, ((nargs * plen) + (plen * 2)))) == NULL) {
+        return g_fn.execv(pathname, argv);
+    }
+
+    nargv[0] = scopexec;
+    nargv[1] = (char *)pathname;
+
+    for (i = 2; i <= nargs; i++) {
+        nargv[i] = argv[i - 1];
+    }
+
+    g_fn.execv(nargv[0], nargv);
+    saverr = errno;
+    if (nargv) scope_free(nargv);
+    scope_free(scopexec);
+    errno = saverr;
+    return -1;
+}
+
+
+EXPORTON int
+execve(const char *pathname, char *const argv[], char *const envp[])
+{
+    int i, nargs, saverr;
+    char *scopexec;
+    char **nargv;
+
+    WRAP_CHECK(execve, -1);
+
+    scopexec = getLdscopeExec(pathname);
+    if (scopexec == NULL) {
         return g_fn.execve(pathname, argv, envp);
     }
 
@@ -2689,7 +2741,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     g_fn.execve(nargv[0], nargv, environ);
     saverr = errno;
     if (nargv) scope_free(nargv);
-    if (scopexec) scope_free(scopexec);
+    scope_free(scopexec);
     errno = saverr;
     return -1;
 }

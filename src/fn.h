@@ -199,6 +199,7 @@ typedef struct {
     int (*PR_FileDesc2NativeHandle)(PRFileDesc *);
     void (*PR_SetError)(PRErrorCode, PRInt32);
     int (*execve)(const char *, char * const *, char * const *);
+    int (*execv)(const char *, char * const *);
     int (*poll)(struct pollfd *, nfds_t, int);
     int (*__poll_chk)(struct pollfd *, nfds_t, int, size_t);
     int (*select)(int, fd_set *, fd_set *, fd_set *, struct timeval *);

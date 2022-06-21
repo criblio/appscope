@@ -242,6 +242,7 @@ initFn(void)
     GETADDR(g_fn.getaddrinfo, "getaddrinfo");
     GETADDR(g_fn.sigaction, "sigaction");
     GETADDR(g_fn.execve, "execve");
+    GETADDR(g_fn.execv, "execv");
     GETADDR(g_fn.poll, "poll");
     GETADDR(g_fn.__poll_chk, "__poll_chk");
     GETADDR(g_fn.select, "select");

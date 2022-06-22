@@ -85,7 +85,7 @@ scope attach --payloads 2000
 #### Flags
 
 ```
-  -a, --authtoken string      Set AuthToken for Cribl Cribl Stream
+  -a, --authtoken string      Set AuthToken for Cribl Stream
   -c, --cribldest string      Set Cribl Stream destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
   -h, --help                  Help for attach
@@ -93,7 +93,7 @@ scope attach --payloads 2000
       --loglevel string       Set ldscope log level (debug, warning, info, error, none)
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
-  -n, --nobreaker             Set Cribl Cribl Stream to not break streams into events
+  -n, --nobreaker             Set Cribl Stream to not break streams into events
       --passthrough           Runs ldscope with current environment & no config
   -p, --payloads              Capture payloads of network transactions
   -u, --userconfig string     Run ldscope with a user specified config file; overrides all other settings
@@ -217,13 +217,13 @@ scope extract --metricdest tcp://some.host:8125 --eventdest tcp://other.host:100
 #### Flags:
  
 ```
-  -a, --authtoken string      Set AuthToken for Cribl Cribl Stream
-  -c, --cribldest string      Set Cribl Cribl Stream destination for metrics & events (host:port defaults to tls://)
+  -a, --authtoken string      Set AuthToken for Cribl Stream
+  -c, --cribldest string      Set Cribl Stream destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
   -h, --help                  Help for extract
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
-  -n, --nobreaker             Set Cribl Cribl Stream to not break streams into events
+  -n, --nobreaker             Set Cribl Stream to not break streams into events
 ```
 
 ### flows
@@ -332,9 +332,9 @@ kubectl label namespace default scope=enabled
 
 ```
       --app string            Name of the app in Kubernetes (default "scope")
-  -a, --authtoken string      Set AuthToken for Cribl Cribl Stream
+  -a, --authtoken string      Set AuthToken for Cribl Stream
       --certfile string       Certificate file for TLS in the container (mounted secret) (default "/etc/certs/tls.crt")
-  -c, --cribldest string      Set Cribl Cribl Stream destination for metrics & events (host:port defaults to tls://)
+  -c, --cribldest string      Set Cribl Stream destination for metrics & events (host:port defaults to tls://)
       --debug                 Turn on debug logging in the scope webhook container
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
   -h, --help                  Help for k8s
@@ -342,7 +342,7 @@ kubectl label namespace default scope=enabled
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
       --namespace string      Name of the namespace in which to install; default is "default"
-  -n, --nobreaker             Set Cribl Cribl Stream to not break streams into events
+  -n, --nobreaker             Set Cribl Stream to not break streams into events
       --port int              Port to listen on (default 4443)
       --server                Run Webhook server
       --version string        Version of scope to deploy
@@ -464,15 +464,15 @@ scope run -c tcp://127.0.0.1:10091 -- curl https://wttr.in/94105
 #### Flags
 
 ```
-  -a, --authtoken string      Set AuthToken for Cribl Cribl Stream
-  -c, --cribldest string      Set Cribl Cribl Stream destination for metrics & events (host:port defaults to tls://)
+  -a, --authtoken string      Set AuthToken for Cribl Stream
+  -c, --cribldest string      Set Cribl Stream destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
   -h, --help                  Help for run
   -l, --librarypath string    Set path for dynamic libraries
       --loglevel string       Set ldscope log level (debug, warning, info, error, none)
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
-  -n, --nobreaker             Set Cribl Cribl Stream to not break streams into events
+  -n, --nobreaker             Set Cribl Stream to not break streams into events
       --passthrough           Run ldscope with current environment & no config
   -p, --payloads              Capture payloads of network transactions
   -u, --userconfig string     Run ldscope with a user specified config file; overrides all other settings
@@ -498,14 +498,14 @@ scope service  cribl -c tls://in.my-instance.cribl.cloud:10090
 #### Flags
 
 ```
-  -a, --authtoken string      Set AuthToken for Cribl Cribl Stream
-  -c, --cribldest string      Set Cribl Cribl Stream destination for metrics & events (host:port defaults to tls://)
+  -a, --authtoken string      Set AuthToken for Cribl Stream
+  -c, --cribldest string      Set Cribl Stream destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
       --force                 Bypass confirmation prompt
   -h, --help                  Help for service
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
-  -n, --nobreaker             Set Cribl Cribl Stream to not break streams into events
+  -n, --nobreaker             Set Cribl Stream to not break streams into events
   -u, --user string           Specify owner username
   
 ```
@@ -560,8 +560,8 @@ scope watch --interval=10s -- curl https://wttr.in/94105
 #### Flags
 
 ```
-  -a, --authtoken string      Set AuthToken for Cribl Cribl Stream
-  -c, --cribldest string      Set Cribl Cribl Stream destination for metrics & events (host:port defaults to tls://)
+  -a, --authtoken string      Set AuthToken for Cribl Stream
+  -c, --cribldest string      Set Cribl Stream destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
   -h, --help                  Help for watch
   -i, --interval string       Run every <x>(s|m|h)
@@ -569,7 +569,7 @@ scope watch --interval=10s -- curl https://wttr.in/94105
       --loglevel string       Set ldscope log level (debug, warning, info, error, none)
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
-  -n, --nobreaker             Set Cribl Cribl Stream to not break streams into events
+  -n, --nobreaker             Set Cribl Stream to not break streams into events
       --passthrough           Run ldscope with current environment & no config
   -p, --payloads              Capture payloads of network transactions
   -u, --userconfig string     Run ldscope with a user specified config file. Overrides all other settings.

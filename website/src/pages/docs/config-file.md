@@ -54,7 +54,7 @@ Below are the default contents of `scope.yml`:
 #
 # Use the `scope extract` command to get a copy of the default `scope.yml`.
 #
-# Use the command below to get a stripped down version of this config.
+# Use the command below to get a stripped-down version of this config.
 #
 #   egrep -v '^ *#.*$' scope.yml | sed '/^$/d' >scope-minimal.yml
 # 
@@ -365,13 +365,13 @@ event:
   # categories of events. Their type property specifies the category.
   # The rest of the properties are filters, so only matching events are
   # generated. Comment out an array entry to disable the category. If you
-  # comment out `event > watch` entirely, the default event watch list
-  # will be used which has all but metric enabled.
+  # comment out `event > watch` entirely, the default event watch list,
+  # which has all but metric enabled, will be used.
   #
   watch:
 
     # The file category includes writes to files. It's intended primarily for
-    # monitoring log files but is capable of generating events to writes to any
+    # monitoring log files, but is capable of generating events from writes to any
     # file. The name and value properties are regular expressions applied to
     # the filename and written data, respectively. Events will be generated when
     # both match.
@@ -395,7 +395,7 @@ event:
     # $SCOPE_EVENT_CONSOLE_NAME and $SCOPE_EVENT_CONSOLE_VALUE.
     #
     # Set $SCOPE_ALLOW_BINARY_CONSOLE to true or false to allow or disallow
-    # emiting binary data for console events.
+    # emitting binary data for console events.
     #
     - type: console
       name: (stdout)|(stderr)
@@ -443,10 +443,10 @@ event:
       field: .*
       value: .*
 
-    # The http category includes HTTP request and response events. It currently
-    # only supports HTTP/1.x, not HTTP/2. The name, field, value, and headers
-    # properties are regular expressions applied to the corresponding event
-    # properties. Events will be generated when all match.
+    # The http category includes HTTP request and response events.
+    # The name, field, value, and headers properties are regular expressions 
+    # applied to the corresponding event properties. Events will be generated 
+    # when all match.
     #
     # Set $SCOPE_EVENT_HTTP to true or false to enable or disable this
     # category. The regular expressions can be set with $SCOPE_EVENT_HTTP_NAME,
@@ -461,12 +461,11 @@ event:
       value: .*
       headers: .*                 # yes, this should be singular but it's not.
 
-    # The metric category is very seldom used. It includes events for
-    # operations that are included in the metric aggregation described earlier
-    # in `metric > verbosity`. It essentially enables events the same way
-    # that setting verbosity to 9 generates raw metrics. This is only ever used
-    # as a last resort when tracking down a problem and should rarely, if ever,
-    # be enabled. Fraught with peril!
+    # The metric category is very seldom used.
+    # If turned on, AppScope sends non-aggregated metrics out the event channel.
+    # By non-aggregated, we mean metrics with verbosity set to the maximum. 
+    # This is only ever used as a last resort when tracking down a problem. 
+    # Enable rarely, if ever. Fraught with peril!
     #
     # The name, field, and value properties are all regular expressions. Only
     # matching events will be generated.
@@ -632,9 +631,9 @@ libscope:
   #   Default:  true
   #   Override: $SCOPE_CONFIG_EVENT
   #
-  # The connect-event message is the first one set on the connection and
+  # The config-event message is the first one set on the connection and
   # contains details identifying the scoped program and the runtime configs.
-  # It's  more commonly referred to as the process-start message.
+  # It's more commonly referred to as the process-start message.
   #
   configevent: true
 
@@ -816,7 +815,7 @@ cribl:
     #   Override: the port token in the $SCOPE_CRIBL or $SCOPE_CRIBL_CLOUD URL
     #
     # Defaults to 10090, which is the TCP port on the AppScope Source
-    # in LogStream. If you are using the cloud version, 10090 is the TLS port
+    # in Cribl Stream. If you are using the cloud version, 10090 is the TLS port
     # on the client-facing load balancer which is proxied to the cloud instance's
     # TCP:10090 port, without TLS.
     #
@@ -892,7 +891,7 @@ tags:
   # Tags can also be added with environment variables prefixed with SCOPE_TAG_.
   # For example, SCOPE_TAG_service=eg is equivalent to the "service" example
   # below. The value of the environment variable may contain other variables
-  # as described above too; i.e. SCOPE_TAG_user=\$USER.
+  # as described above, e.g., SCOPE_TAG_user=\$USER.
   #
   #user: $USER
   #service: eg
@@ -908,7 +907,7 @@ protocol:
   # Entries have the following properties:
   #
   #   name     String protocol name used in protocol-detect events and payload
-  #            headers sent to LogStream (required)
+  #            headers sent to Cribl Stream (required)
   #   regex    The regular expression to use (required)
   #   binary   Boolean indicating whether the regex should be applied to a
   #            hex-string version of the payload instead of the binary payload
@@ -924,8 +923,8 @@ protocol:
   # options here are ignored.
   #
   # Warning: The `name` value is currently inserted into the JSON header for
-  # payloads sent to LogStream so it cannot contain double quotes or
-  # back-slashes without breaking the JSON. It needs to be kept fairly short
+  # payloads sent to Cribl Stream so it cannot contain double quotes or
+  # backslashes without breaking the JSON. It needs to be kept fairly short
   # too so the header doesn't exceed the 1k limit. If this becomes a problem,
   # we'll consider adding logging and validation.
   #
@@ -944,10 +943,10 @@ protocol:
   #  len: 14
 
   # AppScope uses an internally defined protocol detector for HTTP like the
-  # example below automatically when the LogStream backend is enabled.
+  # example below automatically when the Cribl Stream backend is enabled.
   #
   # Uncomment this and adjust as needed to override the defaults or to enable
-  # HTTP detection when not using LogStream.
+  # HTTP detection when not using Cribl Stream.
   #
   #- name: HTTP
   #  regex: "HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n"
@@ -967,8 +966,8 @@ protocol:
   #
   # Uncomment this entry to override the regex details or to set detect to
   # false.  The payload setting here is never used. AppScope never sends
-  # encrypted payloads to disk and only sends payloads to LogSteam during TLS
-  # negotiation.
+  # encrypted payloads to disk and only sends payloads to Cribl Stream during
+  # TLS negotiation.
   #
   #- name: TLS
   #  regex: "^16030[0-3].{4}0[12]"
@@ -979,9 +978,9 @@ protocol:
 # Custom configs
 #
 custom:
-  # Entries here represent overrides of the settings defined above for scoped
-  # processes that match a set of filters. Each has a name and `filter` and
-  # `config` entries as shown below.
+  # Each custom entry has a name, a `filter` element, and a `config` element. 
+  # When a scoped process matches the filter(s), the setting defined
+  # in the `config` element overrides previously-defined settings.
   #
   #   name:
   #     filter:
@@ -1044,9 +1043,10 @@ custom:
   #    tags:
   #      service: eg
 
-  # Enable the Cribl/Logstream destination for Nginx processes. Both this entry
-  # and the `example` entry above would apply if both filters match so the
-  # service tag here would override the one above.
+  # Enable the Cribl.Cloud-managed Cribl Stream destination for Nginx
+  # processes. Both this entry and the `example` entry above would 
+  # apply if both filters match – so the service tag here would 
+  # override the one above.
   #
   #nginx:
   #  filter:

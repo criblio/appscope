@@ -443,10 +443,10 @@ event:
       field: .*
       value: .*
 
-    # The http category includes HTTP request and response events. It currently
-    # supports only HTTP/1.x, not HTTP/2. The name, field, value, and headers
-    # properties are regular expressions applied to the corresponding event
-    # properties. Events will be generated when all match.
+    # The http category includes HTTP request and response events.
+    # The name, field, value, and headers properties are regular expressions 
+    # applied to the corresponding event properties. Events will be generated 
+    # when all match.
     #
     # Set $SCOPE_EVENT_HTTP to true or false to enable or disable this
     # category. The regular expressions can be set with $SCOPE_EVENT_HTTP_NAME,
@@ -461,12 +461,11 @@ event:
       value: .*
       headers: .*                 # yes, this should be singular but it's not.
 
-    # The metric category is very seldom used. It includes events for
-    # operations that are included in the metric aggregation described earlier
-    # in `metric > verbosity`. It essentially enables events the same way
-    # that setting verbosity to 9 generates raw metrics. This is only ever used
-    # as a last resort when tracking down a problem and should rarely, if ever,
-    # be enabled. Fraught with peril!
+    # The metric category is very seldom used.
+    # If turned on, AppScope sends non-aggregated metrics out the event channel.
+    # By non-aggregated, we mean metrics with verbosity set to the maximum. 
+    # This is only ever used as a last resort when tracking down a problem. 
+    # Enable rarely, if ever. Fraught with peril!
     #
     # The name, field, and value properties are all regular expressions. Only
     # matching events will be generated.
@@ -632,7 +631,7 @@ libscope:
   #   Default:  true
   #   Override: $SCOPE_CONFIG_EVENT
   #
-  # The connect-event message is the first one set on the connection and
+  # The config-event message is the first one set on the connection and
   # contains details identifying the scoped program and the runtime configs.
   # It's more commonly referred to as the process-start message.
   #

@@ -22,14 +22,14 @@ ldscope --help configuration | grep TLS
 
 ## Using TLS in Cribl.Cloud
 
-AppScope uses TLS by default to communicate with Cribl Stream Cloud (that is, Cribl Stream in Cribl.Cloud). Cribl Stream has an AppScope Source ready to use out-of-the-box.
+AppScope uses TLS by default to communicate with Cribl Stream on Cribl.Cloud. Cribl Stream has an AppScope Source ready to use out-of-the-box.
 
 Within Cribl.Cloud, a front-end load balancer (reverse proxy) handles the encrypted TLS traffic and relays it to the AppScope Source port in Cribl Stream. The connection from the load balancer to Cribl Stream does **not** use TLS, and you should not enable TLS on the [AppScope Source](https://docs.cribl.io/docs/sources-appscope) in Cribl Stream. No changes in Cribl Stream configuration are needed.
 
 AppScope connects to your Cribl.Cloud Ingest Endpoint on port 10090. The Ingest Endpoint URL is always the same except for the Cribl.Cloud Organization ID, which Cribl Stream uses in the hostname portion, in the following way:
 
 ```
-https://in.Cribl Stream.<organization-ID>.cribl.cloud:10090
+https://in.logstream.<organization-ID>.cribl.cloud:10090
 ```
 
 If you **disable** TLS, the port is 10091.
@@ -44,7 +44,7 @@ scope run -c tls://host:10090
 
 ### Configuration for `LD_PRELOAD` or `ldscope`
 
-To connect AppScope to a Cribl Stream Cloud instance using TLS: 
+To connect AppScope to a Cribl.Cloud-managed instance of Cribl Stream using TLS: 
 
 1. Enable the `transport : tls : enable` element in `scope.yml`.
 1. Connect to port 10090 on your Cribl.Cloud Ingest Endpoint.
@@ -66,6 +66,6 @@ cribl:
 
 ## Scoping Without TLS
 
-If you prefer to connect to Cribl Stream Cloud without encryption, connect to port 10091 instead of port 10090, and disable the `tls` element in `scope.yml`.
+If you prefer to connect to Cribl Stream on Cribl.Cloud without encryption, connect to port 10091 instead of port 10090, and disable the `tls` element in `scope.yml`.
 
 No changes in Cribl Stream configuration are needed.

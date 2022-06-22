@@ -41,16 +41,17 @@ Sending data through Cribl Edge has other benefits: Cribl Edge is capable of fil
 
 ## Integrating with Cribl Stream
 
-To define a TLS-encrypted connection to Cribl Stream Cloud, just set the `SCOPE_CRIBL_CLOUD` environment variable, specifying a transport type, a host name or IPv4 address, and a port number. 
+To define a TLS-encrypted connection to Cribl Stream on Cribl.Cloud, just set the `SCOPE_CRIBL_CLOUD` environment variable, specifying a transport type, a host name or IPv4 address, and a port number. 
 
 For example:
 
 ```
 SCOPE_CRIBL_CLOUD=tcp://in.logstream.<cloud_instance>.cribl.cloud:10090
 ```
-By default, Cribl Stream Cloud instances have port `10090` configured to use [TLS](/docs/tls) over TCP, and a built-in AppScope Source to receive data from AppScope. You can change the [AppScope Source configuration](https://docs.cribl.io/docs/sources-appscope), or create additional AppScope Sources, as needed.
 
-This is the easiest way to integrate AppScope with Cribl Stream. It is also possible to connect to Cribl Stream Cloud [unencrypted](#cloud-unencrypted); or, to Cribl Stream [on-prem](#on-prem), encrypted or not.
+By default, Cribl.Cloud-managed instances of Cribl Stream have port `10090` configured to use [TLS](/docs/tls) over TCP, and a built-in AppScope Source to receive data from AppScope. You can change the [AppScope Source configuration](https://docs.cribl.io/docs/sources-appscope), or create additional AppScope Sources, as needed.
+
+This is the easiest way to integrate AppScope with Cribl Stream. It is also possible to connect to Cribl Stream on Cribl.Cloud [unencrypted](#cloud-unencrypted); or, to Cribl Stream [on-prem](#on-prem), encrypted or not.
 
 ### Parameter Overrides
 
@@ -68,9 +69,9 @@ If you have events or metrics enabled (or disabled), they retain this setting. (
 
 <span id="cloud-unencrypted"> </span>
 
-### Connecting to Cribl Stream Cloud Unencrypted 
+### Connecting to Cribl Stream on Cribl.Cloud, Unencrypted 
 
-To define an **unencrypted** connection to a Cribl Stream Cloud instance, set the `SCOPE_CRIBL` environment variable (**not** `SCOPE_CRIBL_CLOUD`) and specify port `10091`.
+To define an **unencrypted** connection to a Cribl.Cloud-managed instance of Cribl Stream, set the `SCOPE_CRIBL` environment variable (**not** `SCOPE_CRIBL_CLOUD`) and specify port `10091`.
 
 For example:
 

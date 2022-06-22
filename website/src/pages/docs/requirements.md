@@ -49,3 +49,5 @@ AppScope cannot:
 When an executable that's being scoped has been [stripped](https://en.wikipedia.org/wiki/Strip_(Unix)), it is not possible for `libscope.so` to obtain a file descriptor for an SSL session, and in turn, AppScope cannot include IP and port number fields in HTTP events.
 
 Static executables can be scoped only if they are written in Go.
+
+Static stripped Go executables can be scoped only when built with go1.13 or newer.

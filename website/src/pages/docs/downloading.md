@@ -55,6 +55,8 @@ Now you are ready to explore the CLI:
 - Try some basic CLI commands in [Using the CLI](/docs/cli-using).
 - See the complete [CLI Reference](/docs/cli-reference).
 
+If an application crashes when scoped, you can set the `SCOPE_ERROR_SIGNAL_HANDLER` environment variable to `true` to turn on backtrace logging. This should provide more informative logs if crashes recur. Feel free to [contact](community) the AppScope team and/or [open a new issue](https://github.com/criblio/appscope/issues) if this happens.
+
 <span id="where-from"> </span>
 
 ### What's the Best Location to Run AppScope From?

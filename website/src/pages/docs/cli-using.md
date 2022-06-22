@@ -14,7 +14,9 @@ To learn more, see the [CLI Reference](/docs/cli-reference), and/or run `scope 
 
 The basic AppScope CLI command is `scope`. The following examples provide an overview of how to use it.
 
-**Scope a new process.** In these examples, we'll test-run well-known Linux commands and view the results:
+#### Scope a New Process 
+
+In these examples, we'll test-run well-known Linux commands and view the results:
 
 ```
 scope top
@@ -28,17 +30,19 @@ scope ls -al
 scope curl https://google.com
 ```
 
-**Monitor an application that generates a large data set**.
+#### Monitor an App that Generates a Large Data Set
+
+We use the `--no-sandbox` option because virtually all modern browsers incorporate the [sandbox](https://web.dev/browser-sandbox/) security mechanism, and some sandbox implementations can interact with AppScope in ways that cause the browser to hang, or not to start.
 
 ```
 scope firefox --no-sandbox
 ```
 
-We use the `--no-sandbox` option because virtually all modern browsers incorporate the [sandbox](https://web.dev/browser-sandbox/) security mechanism, and some sandbox implementations can interact with AppScope in ways that cause the browser to hang, or not to start.
-
 After you scope the browser, try [exploring the captured data](#explore-captured).
 
-**Scope a series of shell commands**. In the shell that you open in this example, every command you run will be scoped:
+#### Scope a Series of Shell Commands
+
+In the shell that you open in this example, every command you run will be scoped:
 
 ```
 scope bash
@@ -47,12 +51,15 @@ scope bash
 To release a process like `scope bash` above, `exit` the process in the shell. If you do this with the bash shell itself, you won't be able to `scope bash` again in the same terminal session.
 
 
-**Scope [Cribl LogStream](https://cribl.io/download/), if you have it installed**. As with other applications, it's interesting to see what AppScope shows LogStream doing:
+#### Scope [Cribl Stream](https://cribl.io/download/)
 
+As with other applications, it's interesting to see what AppScope shows Cribl Stream doing:
 
 `scope $CRIBL_HOME/bin/cribl server`
 
-**Scope a running process.** This example scopes the process whose PID is `12345`:
+#### Scope a Running Process
+
+This example scopes the process whose PID is `12345`:
 
 ```
 sudo bin/linux/scope attach 12345
@@ -61,13 +68,37 @@ sudo bin/linux/scope attach 12345
 This example requires some preparation, as explained in [Scoping a Running Process](#scope-running).
 
 
-**Invoke a configuration file while scoping a new process.** This example scopes the `echo` command while invoking a configuration file named `cloud.yml`:
+#### Invoke a Config File While Scoping a New Process
+
+This example scopes the `echo` command while invoking a configuration file named `cloud.yml`:
 
 ```
 scope run -u cloud.yml -- echo foo
 ```
 
 Why create a custom configuration file? One popular reason is to change the destination to which AppScope sends captured data to someplace other than the local filesystem (the default). To learn about the possibilities, read the comments in the default [Configuration File](/docs/config-file).
+
+#### Use a Custom HTTP Header to Mark Your Data
+
+When scoping apps that make HTTP requests, you can add the `X-Appscope` header (setting its content to the string of your choice). 
+
+Here's a trivial example of how this feature might be useful:
+
+Suppose you want to scope HTTP requests to a weather forecast service, looking at many different cities, but labeling the data by country.
+
+You could use the `X-Appscope` header to do your labeling:
+
+```
+$ ldscope curl --header "X-Appscope: Canada" wttr.in/calgary
+$ ldscope curl --header "X-Appscope: Canada" wttr.in/ottawa
+...
+
+$ ldscope curl --header "X-Appscope: Brazil" wttr.in/recife
+$ ldscope curl --header "X-Appscope: Brazil" wttr.in/riodejaneiro
+...
+```
+
+In the resulting AppScope events, the `body` > `data` element would include an `"x-appscope"` field whose value would be the country named in the request's `X-Appscope` header.
 
 <span id="scope-running"></span>
 
@@ -77,7 +108,7 @@ You attach AppScope to a process using a process ID or a process name.
 
 #### Attaching by Process ID
 
-In this example, we grep for process IDs of `cribl` (LogStream) processes, then attach to a process of interest:
+In this example, we grep for process IDs of `cribl` (Cribl Stream) processes, then attach to a process of interest:
 
 ```
 $ ps -ef | grep cribl
@@ -90,7 +121,7 @@ ubuntu@ip-127-0-0-1:~/someusername/appscope3$ sudo bin/linux/scope attach 1820
 
 #### Attaching by Process Name
 
-In this example, we try to attach to a LogStream process by its name, which will be `cribl`. Since there's more than one process, AppScope lists them and prompts us to choose one:
+In this example, we try to attach to a Cribl Stream process by its name, which will be `cribl`. Since there's more than one process, AppScope lists them and prompts us to choose one:
 
 ```
 $ sudo bin/linux/scope attach cribl
@@ -156,6 +187,8 @@ fs.close     	29   	Count	operation  	525	class: summary,host: 771f60292e26,proc
 fs.duration  	83   	Count	microsecond	525	class: summary,host: 771f60292e26,proc: ps
 fs.error     	7    	Count	operation  	525	class: stat,file: summary,host: 771f60292e26,op: summary,proc: ps
 ```
+
+- Note that by default, the AppScope CLI redacts binary data from console output. Although in most situations, the default behaviors of the AppScope CLI and library are the same, they differ for binary data: it's omitted in the CLI, and allowed when using the library. To change this, use the `allowbinary=true` flag. The equivalent environment variable is `SCOPE_ALLOW_BINARY_CONSOLE`. In the config file, `allowbinary` is an attribute of the `console` watch type for events.  
 
 - Plot a chart of last session's `proc.cpu` metric with `scope metrics -m proc.cpu -g`:
 

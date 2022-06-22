@@ -155,10 +155,20 @@ Complete these steps, paying particular attention to the sub-elements of `metric
 
 ### Muting Events and Metrics {#muting}
 
-You can use environment variables to turn off all event and metric output, as well as payloads. Set these variables to `false` to "mute" AppScope:
+You can use a config file or environment variables to turn off all event and metric output, as well as payloads.
+
+To "mute" AppScope using the config file, set the following to false:
+
+* `event > enable`
+* `metric > enable`
+* `payload > enable`
+
+Or, set these variables to `false` 
 
 * `SCOPE_EVENT_ENABLE`
 * `SCOPE_METRIC_ENABLE`
 * `SCOPE_PAYLOAD_ENABLE`
+
+Note that these techniques apply only when you begin scoping a process. If you are interested in changing the configuration of AppScope after the scoped process has started, [contact](community) the AppScope team.
 
 Another approach is to create a custom config that omits (or comments out) all watch types in the `metric > watch[*]` and `event > watch[*]` arrays in the [config file](config-file). (Of course, you can turn any class of metric or event data on or off [individually](working-with#events-and-metrics), too.)

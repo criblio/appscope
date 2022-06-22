@@ -22,4 +22,4 @@ Currently scope’d applications will continue to run. To remove the AppScope li
 
 ### Muting Without Removing
 
-If you need AppScope to temporarily stop producing output, you do not need to remove AppScope: you can just use a custom config [mute](data-routing#muting) all events and metrics.
+If you need AppScope to temporarily stop producing output, you do not need to remove AppScope: you can just use a custom config to [mute](data-routing#muting) all events and metrics.

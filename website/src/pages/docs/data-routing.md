@@ -7,10 +7,10 @@ title: Data Routing
 AppScope gives you multiple ways to route data. The basic operations are:
 
 - Routing [both events and metrics](#routing-to-edge) to [Cribl Edge](https://docs.cribl.io/edge/).
-- Routing [both events and metrics](#routing-to-cloud) to [Cribl Stream](https://docs.cribl.io/logstream).
+- Routing [both events and metrics](#routing-to-cloud) to [Cribl Stream](https://docs.cribl.io/stream).
 - Routing [events](#routing-events) to a file, local unix socket, network destination, or Cribl Edge.
 - Routing [metrics](#routing-metrics) to a file, local unix socket, network destination, or Cribl Edge.
-- [Muting](#muting) all events and metrics so that AppScope produces no output.
+- [Muting](#muting) events, metrics, and payloads so that AppScope produces no output.
 
 For each of these operations, the CLI has command-line options, the config file has settings, and the AppScope library has environment variables.
 
@@ -73,7 +73,7 @@ As a convenience, when you set `SCOPE_CRIBL_CLOUD`, AppScope automatically overr
 * `SCOPE_CRIBL_TLS_VALIDATE_SERVER` is set to `true`.
 * `SCOPE_CRIBL_TLS_CA_CERT_PATH` is set to the empty string.
 
-If you prefer an **unencrypted** connection to Cribl.Cloud, use `SCOPE_CRIBL`, as described [here](/docs/cribl-integration#connecting-to-logstream-cloud-unencrypted).
+If you prefer an **unencrypted** connection to Cribl.Cloud, use `SCOPE_CRIBL`, as described [here](/docs/cribl-integration#cloud-unencrypted).
 
 #### Routing to Cribl.Cloud with the Config File
 
@@ -155,4 +155,10 @@ Complete these steps, paying particular attention to the sub-elements of `metric
 
 ### Muting Events and Metrics {#muting}
 
-You can use a custom config to turn off all event and metric output. To do this, omit (or comment out) all watch types in the `metric > watch[*]` and `event > watch[*]` arrays in the [config file](config-file). (Of course, you can turn any class of metric or event data on or off [individually](working-with#events-and-metrics), too.)
+You can use environment variables to turn off all event and metric output, as well as payloads. Set these variables to `false` to "mute" AppScope:
+
+* `SCOPE_EVENT_ENABLE`
+* `SCOPE_METRIC_ENABLE`
+* `SCOPE_PAYLOAD_ENABLE`
+
+Another approach is to create a custom config that omits (or comments out) all watch types in the `metric > watch[*]` and `event > watch[*]` arrays in the [config file](config-file). (Of course, you can turn any class of metric or event data on or off [individually](working-with#events-and-metrics), too.)

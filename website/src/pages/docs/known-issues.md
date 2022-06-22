@@ -4,10 +4,6 @@ title: Known Issues
 
 # Known Issues
 
-:::info
-foobar
-:::
-
 ## AppScope 1.0.3
 
 2022-04-12 - Maintenance Release

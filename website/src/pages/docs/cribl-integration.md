@@ -89,7 +89,7 @@ An on-prem instance of Cribl Stream has an AppScope Source built in. However, by
 - The Source listens on port 10090.
 - On the Source, TLS is disabled by default.
 
-To connect from AppScope, you'll need to [configure](https://docs.cribl.io/logstream/sources-appscope) the AppScope Source in Cribl Stream. This includes
+To connect from AppScope, you'll need to [configure](https://docs.cribl.io/stream/sources-appscope) the AppScope Source in Cribl Stream. This includes
 enabling the Source; configuring it to listen on the desired port; and, enabling and configuring TLS if desired.
 
 Then, to define a connection to the on-prem Cribl Stream instance, set `SCOPE_CRIBL`.  

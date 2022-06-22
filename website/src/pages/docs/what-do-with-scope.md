@@ -4,7 +4,7 @@ title: Cool, but What Can I do with It?
 
 # Cool, but What Can I Do with It?
 
-AppScope offers APM-like, black-box instrumentation of any unmodified Linux executable and application. You can use AppScope in single-user troubleshooting, or in a distributed production deployment, with little extra tooling infrastructure. Especially when paired with [Cribl LogStream](https://cribl.io/product/), AppScope can deliver just the data you need to your existing tools.
+AppScope offers APM-like, black-box instrumentation of any unmodified Linux executable and application. You can use AppScope in single-user troubleshooting, or in a distributed production deployment, with little extra tooling infrastructure. Especially when paired with [Cribl Stream](https://cribl.io/product/), AppScope can deliver just the data you need to your existing tools.
 
 ## Instrument, Collect, and Observe
 
@@ -26,8 +26,8 @@ You could do any of the following with AppScope:
 - Send HTTP events from Slack to a specified Splunk server.
 - Send metrics from nginx to a specified Datadog server.
 - Send metrics from a Go static application to a specified Datadog server.
-- For any of the above examples, substitute your analytics tool of choice. Optimize the data flow by mediating it through [Cribl LogStream](https://cribl.io/product/).
-- Monitor multiple Apache instances in a server farm, running the data [through Cribl Edge to Cribl LogStream](/docs/cribl-integration#scaling-scoped-processes).
+- For any of the above examples, substitute your analytics tool of choice. Optimize the data flow by mediating it through [Cribl Stream](https://cribl.io/product/).
+- Monitor multiple Apache instances in a server farm, running the data [through Cribl Edge to Cribl Stream](/docs/cribl-integration#scaling-scoped-processes).
 - Run Firefox from the AppScope CLI, and view results on a terminal-based dashboard.
 - Run Google Chrome from the AppScope CLI, and view results on a terminal-based dashboard. And be surprised.
 

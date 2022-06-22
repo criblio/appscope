@@ -4,6 +4,10 @@ title: Known Issues
 
 # Known Issues
 
+:::info
+foobar
+:::
+
 ## AppScope 1.0.3
 
 2022-04-12 - Maintenance Release
@@ -68,7 +72,7 @@ As of this AppScope pre-release, known issues include:
 - [#10](https://github.com/criblio/appscope/issues/10), [#165,](https://github.com/criblio/appscope/issues/165) Scoping the Docker executable is problematic.
   - **Fix:** 0.7
 
-- [#119](https://github.com/criblio/appscope/issues/119) HTTP 2 metrics and headers can be viewed only with [Cribl LogStream](https://cribl.io/product/).
+- [#119](https://github.com/criblio/appscope/issues/119) HTTP 2 metrics and headers can be viewed only with [Cribl Cribl Stream](https://cribl.io/product/).
 
   - **Fix:** 0.8.0, in [#543](https://github.com/criblio/appscope/issues/543) 
 

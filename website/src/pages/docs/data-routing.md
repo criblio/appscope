@@ -7,9 +7,10 @@ title: Data Routing
 AppScope gives you multiple ways to route data. The basic operations are:
 
 - Routing [both events and metrics](#routing-to-edge) to [Cribl Edge](https://docs.cribl.io/edge/).
-- Routing [both events and metrics](#routing-to-cloud) to [Cribl LogStream](https://docs.cribl.io/logstream).
+- Routing [both events and metrics](#routing-to-cloud) to [Cribl Stream](https://docs.cribl.io/logstream).
 - Routing [events](#routing-events) to a file, local unix socket, network destination, or Cribl Edge.
 - Routing [metrics](#routing-metrics) to a file, local unix socket, network destination, or Cribl Edge.
+- [Muting](#muting) all events and metrics so that AppScope produces no output.
 
 For each of these operations, the CLI has command-line options, the config file has settings, and the AppScope library has environment variables.
 
@@ -44,9 +45,9 @@ Complete these steps, paying particular attention to the sub-elements of `cribl 
 * Verify that `cribl > enable` is set to `true`, which enables the `cribl` backend. (This is the default setting.)
 * To route data to Cribl Edge, set `cribl > transport > type` to `edge`. (This is the default value.)
 
-### Routing to LogStream in the Cloud {#routing-to-cloud}
+### Routing to Cribl Stream in the Cloud {#routing-to-cloud}
 
-In a single operation, you can route both events and metrics to LogStream in the Cloud, or Cribl.Cloud for short.
+In a single operation, you can route both events and metrics to Cribl Stream in the Cloud, or Cribl.Cloud for short.
 
 #### Routing to Cribl.Cloud with the CLI
 
@@ -151,3 +152,7 @@ Complete these steps, paying particular attention to the sub-elements of `metric
 * Set `cribl > enable` to `false` to disable the `cribl` backend.
 * Set `metric > enable` to `true` to enable the metrics backend.
 * Specify desired values for the rest of the `metric` elements, namely `format`, `transport`, and optionally, `watch`.
+
+### Muting Events and Metrics {#muting}
+
+You can use a custom config to turn off all event and metric output. To do this, omit (or comment out) all watch types in the `metric > watch[*]` and `event > watch[*]` arrays in the [config file](config-file). (Of course, you can turn any class of metric or event data on or off [individually](working-with#events-and-metrics), too.)

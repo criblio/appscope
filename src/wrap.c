@@ -2788,7 +2788,7 @@ __write_pthread(int fd, const void *buf, size_t size)
     return rc;
 }
 
-static int
+static bool
 isAnAppScopeConnection(int fd)
 {
     if (fd == -1) return FALSE;

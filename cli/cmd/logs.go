@@ -13,7 +13,7 @@ import (
 var logsCmd = &cobra.Command{
 	Use:     "logs",
 	Short:   "Display scope logs",
-	Long:    `Display internal scope logs for troubleshooting scope itself`,
+	Long:    `Displays internal AppScope logs for troubleshooting AppScope itself.`,
 	Example: `scope logs`,
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -56,8 +56,8 @@ var logsCmd = &cobra.Command{
 }
 
 func init() {
-	logsCmd.Flags().IntP("id", "i", -1, "Display logs from specific from session ID")
-	logsCmd.Flags().IntP("last", "n", 20, "Show last <n> lines")
+	logsCmd.Flags().IntP("id", "i", -1, "Display logs from specific from session ID (default -1)")
+	logsCmd.Flags().IntP("last", "n", 20, "Show last <n> lines (default 20)")
 	logsCmd.Flags().BoolP("scope", "s", false, "Show scope.log (from CLI) instead of ldscope.log (from library)")
 	logsCmd.Flags().StringP("service", "S", "", "Display logs from a Systemd service instead of a session)")
 	RootCmd.AddCommand(logsCmd)

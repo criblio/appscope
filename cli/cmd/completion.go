@@ -13,6 +13,7 @@ import (
 var completionCmd = &cobra.Command{
 	Use:   "completion [bash|zsh]",
 	Short: "Generate completion code for specified shell",
+	Long: "Generates completion code for specified shell.",
 	Example: `scope completion bash > /etc/bash_completion.d/scope # Generates and install scope autocompletion for bash
 source <(scope completion bash)                      # Generates and load scope autocompletion for bash
 `,

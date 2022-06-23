@@ -13,9 +13,10 @@ import (
 var pruneCmd = &cobra.Command{
 	Use:   "prune [flags]",
 	Short: "Prune deletes session history",
-	Long:  `Scope stores captured data in a directory per session. Prune allows you to delete prior sessions. `,
+	Long:  `Prunes (deletes) one or more sessions from the history.`,
 	Example: `scope prune -k 20
-scope prune -a`,
+scope prune -a
+scope prune -d 1`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		keep, _ := cmd.Flags().GetInt("keep")

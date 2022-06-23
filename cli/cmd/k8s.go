@@ -15,12 +15,9 @@ var opt k8s.Options
 var k8sCmd = &cobra.Command{
 	Use:   "k8s",
 	Short: "Install scope in kubernetes",
-	Long: `The k8s command prints configurations to be passed to kubectl which will automatically instrument newly launched containers. This installs
-a mutating admission webhook which adds an initContainer to each pod along with some environment variables which installs scope for all
-all processes in that container.
+	Long: `Prints configurations to pass to kubectl, which then automatically instruments newly-launched containers. This installs a mutating admission webhook, which adds an initContainer to each pod. The webhook also sets environment variables that install AppScope for all processes in that container.
 
-The --*dest flags accept file names like /tmp/scope.log or URLs like file:///tmp/scope.log. They may also
-be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
+The --*dest flags accept file names like /tmp/scope.log; URLs like file:///tmp/scope.log; or sockets specified with the pattern unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
 	Example: `scope k8s --metricdest tcp://some.host:8125 --eventdest tcp://other.host:10070 | kubectl apply -f -
 kubectl label namespace default scope=enabled`,
 	Args: cobra.NoArgs,
@@ -58,12 +55,12 @@ kubectl label namespace default scope=enabled`,
 
 func init() {
 	RootCmd.AddCommand(k8sCmd)
-	k8sCmd.Flags().StringVar(&opt.App, "app", "scope", "Name of the app in Kubernetes")
-	k8sCmd.Flags().StringVar(&opt.Namespace, "namespace", "default", "Name of the namespace to install in")
+	k8sCmd.Flags().StringVar(&opt.App, "app", "scope", "Name of the app in Kubernetes (default \"scope\")")
+	k8sCmd.Flags().StringVar(&opt.Namespace, "namespace", "default", "Name of the namespace in which to install; default is \"default\"")
 	k8sCmd.Flags().StringVar(&opt.Version, "version", "", "Version of scope to deploy")
-	k8sCmd.Flags().StringVar(&opt.CertFile, "certfile", "/etc/certs/tls.crt", "Certificate file for TLS in the container (mounted secret)")
-	k8sCmd.Flags().StringVar(&opt.KeyFile, "keyfile", "/etc/certs/tls.key", "Private key file for TLS in the container (mounted secret)")
-	k8sCmd.Flags().IntVar(&opt.Port, "port", 4443, "Port to listen on")
+	k8sCmd.Flags().StringVar(&opt.CertFile, "certfile", "/etc/certs/tls.crt", "Certificate file for TLS in the container (mounted secret) (default \"/etc/certs/tls.crt\"")
+	k8sCmd.Flags().StringVar(&opt.KeyFile, "keyfile", "/etc/certs/tls.key", "Private key file for TLS in the container (mounted secret) (default \"/etc/certs/tls.key\")")
+	k8sCmd.Flags().IntVar(&opt.Port, "port", 4443, "Port to listen on (default 443)")
 	k8sCmd.Flags().Bool("server", false, "Run Webhook server")
 	k8sCmd.Flags().BoolVar(&opt.Debug, "debug", false, "Turn on debug logging in the scope webhook container")
 	metricAndEventDestFlags(k8sCmd, rc)

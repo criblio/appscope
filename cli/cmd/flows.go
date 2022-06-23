@@ -35,8 +35,7 @@ import (
 var flowsCmd = &cobra.Command{
 	Use:   "flows [flags] <ID>",
 	Short: "Observed flows from the session, potentially including payloads",
-	Long: `Displays observed flows from the given session. If ran with payload capture on,
-can output full payloads from the flow.`,
+	Long: `Displays observed flows from the given session. If run with payload capture on, outputs full payloads from the flow.`,
 	Example: `scope flows                # Displays all flows
 scope flows 124x3c         # Displays more info about the flow
 scope flows --in 124x3c    # Displays the inbound payload of that flow

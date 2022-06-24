@@ -2627,6 +2627,7 @@ prctl(int option, ...)
     LOAD_FUNC_ARGS_VALIST(fArgs, option);
 
     if (option == PR_SET_SECCOMP) {
+        scopeLog(CFG_LOG_DEBUG, "prctl: PR_SET_SECCOMP - opt out from prctl.");
         return 0;
     }
 

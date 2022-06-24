@@ -1,0 +1,100 @@
+#!/bin/bash
+DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
+
+FAILED_TEST_LIST=""
+FAILED_TEST_COUNT=0
+
+LOG_FILE="/opt/test-runner/scope.log"
+EVT_FILE="/opt/test-runner/events.log"
+
+starttest(){
+    CURRENT_TEST=$1
+    echo "==============================================="
+    echo "             Testing $CURRENT_TEST             "
+    echo "==============================================="
+    ERR=0
+}
+
+evaltest(){
+    echo "             Evaluating $CURRENT_TEST"
+}
+
+endtest(){
+    if [ $ERR -eq "0" ]; then
+        RESULT=PASSED
+    else
+        RESULT=FAILED
+        FAILED_TEST_LIST+=$CURRENT_TEST
+        FAILED_TEST_LIST+=" "
+        FAILED_TEST_COUNT=$(($FAILED_TEST_COUNT + 1))
+    fi
+
+    echo "*************** $CURRENT_TEST $RESULT ***************"
+    echo ""
+    echo ""
+
+    # copy the EVT_FILE to help with debugging
+    if (( $DEBUG )) || [ $RESULT == "FAILED" ]; then
+        cp -f $EVT_FILE $EVT_FILE.$CURRENT_TEST
+    fi
+
+    rm -f $EVT_FILE
+    rm -f $LOG_FILE
+}
+
+#
+# sshd
+#
+
+starttest sshd_scope
+
+cd /opt/test-runner
+ldscope -- /usr/sbin/sshd -o "SetEnv PATH=$PATH SCOPE_CRIBL_ENABLE=$SCOPE_CRIBL_ENABLE SCOPE_EVENT_DEST=$SCOPE_EVENT_DEST SCOPE_LOG_DEST=$SCOPE_LOG_DEST"
+ERR+=$?
+
+sleep 2
+
+sshpass -p "sshuser" ssh -o StrictHostKeyChecking=no sshuser@localhost '/usr/bin/bash -s' < ssh_test.sh
+ERR+=$?
+
+egrep '"cmd":"/usr/bin/curl -I https://www.wikipedia.org/"' $EVT_FILE > /dev/null
+ERR+=$?
+
+EVENTS_NO=$(egrep '"proc":"curl"' $EVT_FILE | wc -l)
+if (( $EVENTS_NO < 1 )); then
+    ERR+=1
+fi
+
+egrep '"/usr/bin/dig google.com' $EVT_FILE > /dev/null
+ERR+=$?
+
+EVENTS_NO=$(egrep '"proc":"dig"' $EVT_FILE | wc -l)
+if (( $EVENTS_NO < 1 )); then
+    ERR+=1
+fi
+
+egrep '"/usr/bin/touch example_test' $EVT_FILE > /dev/null
+ERR+=$?
+
+EVENTS_NO=$(egrep '"proc":"touch"' $EVT_FILE | wc -l)
+if (( $EVENTS_NO < 1 )); then
+    ERR+=1
+fi
+
+endtest
+
+
+if (( $FAILED_TEST_COUNT == 0 )); then
+    echo ""
+    echo ""
+    echo "*************** ALL TESTS PASSED ***************"
+else
+    echo "*************** SOME TESTS FAILED ***************"
+    echo "Failed tests: $FAILED_TEST_LIST"
+    echo "Refer to these files for more info:"
+    for FAILED_TEST in $FAILED_TEST_LIST; do
+        echo "  $EVT_FILE.$FAILED_TEST"
+    done
+fi
+
+exit ${FAILED_TEST_COUNT}

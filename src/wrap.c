@@ -373,6 +373,8 @@ findSymbol(struct dl_phdr_info *info, size_t size, void *data)
 
 #endif // __linux__
 
+#define APPSCOPE_NPROC (2U)
+
 /*
  * This would appear to be extraneous. However, the function closedir()
  * is defined using the __nonnull function attribute, which results in
@@ -3563,6 +3565,43 @@ _exit(int status)
 }
 
 #endif // __linux__
+
+EXPORTON int
+setrlimit(__rlimit_resource_t resource, const struct rlimit *rlim)
+{
+    WRAP_CHECK(setrlimit, -1);
+
+    /*
+    * Setting value to 0 prevents file creation, we want to prevent
+    * it regarding the fact that destination path can point to file.
+    */
+    if ((resource == RLIMIT_FSIZE) && ((rlim->rlim_cur == 0) || (rlim->rlim_max == 0))) {
+        scopeLog(CFG_LOG_DEBUG, "setrlimit: RLIMIT_FSIZE with limit=0 prevents file creation - opt out from setrlimit.");
+        return 0;
+    } else if (resource == RLIMIT_NPROC) {
+
+        /*
+        * Increase the request limit on the number of extant thread,
+        * including those managed by the AppScope.
+        */
+        struct rlimit *local_rlimit =(struct rlimit *)rlim;
+        
+        /*
+        * The code below prevent overflow with AppScope process limit adjustement:
+        * rlim_t is a unsigned type.
+        */
+        if (local_rlimit->rlim_cur <= (rlim_t)(RLIM_INFINITY - APPSCOPE_NPROC)) {
+            local_rlimit->rlim_cur += APPSCOPE_NPROC;
+        }
+
+        if (local_rlimit->rlim_max <= (rlim_t)(RLIM_INFINITY - APPSCOPE_NPROC)) {
+            local_rlimit->rlim_max += APPSCOPE_NPROC;
+        }
+        return g_fn.setrlimit(resource, (const struct rlimit *)local_rlimit);
+    }
+
+    return g_fn.setrlimit(resource, rlim);
+}
 
 EXPORTON int
 close(int fd)

@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <arpa/nameser.h>
 #include <dirent.h>
+#include <sys/resource.h>
 
 #ifdef __linux__
 #ifndef io_context_t
@@ -248,6 +249,7 @@ typedef struct {
     DIR *(*opendir)(const char *);
     int (*closedir)(DIR *);
     struct dirent *(*readdir)(DIR *);
+    int (*setrlimit)(__rlimit_resource_t, const struct rlimit *);
 #endif // __linux__
 
 #if defined(__linux__) && defined(__STATX__)

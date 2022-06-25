@@ -32,7 +32,7 @@ import (
 var metricsCmd = &cobra.Command{
 	Use:   "metrics [flags]",
 	Short: "Outputs metrics for a session",
-	Long:  `Outputs metrics for a session`,
+	Long:  `Outputs metrics for a session.`,
 	Example: `scope metrics
 scope metrics -m net.error,fs.error
 scope metrics -m net.tx -g
@@ -238,7 +238,7 @@ scope metrics -m net.tx -g
 
 func init() {
 	metricsCmd.Flags().IntP("id", "i", -1, "Display info from specific from session ID")
-	metricsCmd.Flags().StringSliceP("metric", "m", []string{}, "Display only supplied metrics (comma-separated)")
+	metricsCmd.Flags().StringSliceP("metric", "m", []string{}, "Display for specified metrics only (comma-separated)")
 	metricsCmd.Flags().BoolP("graph", "g", false, "Graph this metric. Must be combined with -m")
 	metricsCmd.Flags().BoolP("cols", "c", false, "Display metrics as columns. Must be combined with -m")
 	metricsCmd.Flags().BoolP("uniq", "u", false, "Display first instance of each unique metric")

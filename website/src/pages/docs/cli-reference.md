@@ -34,7 +34,7 @@ Usage:
   scope [subcommand]
 
 Available Subcommands:
-  attach      Scope an existing PID
+  attach      Scope a currently-running process
   completion  Generate completion code for specified shell
   dash        Display scope dashboard
   events      Outputs events for a session
@@ -69,16 +69,17 @@ As noted just above, to see a specific subcommand's help or its required paramet
 ### attach
 ---
 
-Scopes an existing PID. Pass additional arguments if you want to capture payloads or to increase metric verbosity.
+Scopes a currently-running process identified by PID or ProcessName.
 
 #### Usage
 
-`scope attach [flags] [PID]`
+`scope attach [flags] PID | <process_name>`
 
 #### Examples
 
 ```
 scope attach 1000
+scope attach firefox
 scope attach --payloads 2000
 ```
 
@@ -108,7 +109,7 @@ Generates completion code for specified shell.
 
 #### Usage
 
-`scope completion [bash|zsh] [flags]`
+`scope completion [flags] [bash|zsh]`
 
 #### Examples
 
@@ -195,7 +196,7 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 
 ### extract
 ---
-Outputs `ldscope`, `libscope.so`, `scope.yml`, and `scope_protocol.yml` to the provided directory. You can configure these files to instrument any application, and to output the data to any existing tool via simple TCP protocols. The `libscope` component can easily be used with any dynamic or static application, regardless of the runtime.
+Outputs `ldscope`, `libscope.so`, and `scope.yml` to the provided directory. You can configure these files to instrument any application, and to output the data to any existing tool via simple TCP protocols.
 
 #### Usage
 
@@ -242,7 +243,10 @@ Displays observed flows from the given session. If run with payload capture on, 
 ```
 scope flows                # Displays all flows
 scope flows 124x3c         # Displays more info about the flow
+scope flows --in 124x3c    # Displays the inbound payload of that flow
 scope flows --out 124x3c   # Displays the outbound payload of that flow
+scope flows -p 0.0.0.0/24  # Displays flows in that subnet range
+scope flows --sort net_host_port --reverse  # Sort flows by ascending host port
 ```
 
 #### Flags
@@ -277,7 +281,7 @@ Displays help content for any AppScope subcommand. Just type `scope help [subcom
 ### history
 ---
 
-The `history` subcommand lists and prints information about sessions. Every time you scope a command, that is called an AppScope session. Each session has a directory which is referenced by a session ID. By default, the AppScope CLI stores all the information it collects during a given session in that session's directory. When you run `history`, you see a listing of sessions, one session per scoped command, along with information about when the session started, how many events were output during the session, and so on. 
+Prints information about sessions. Every time you scope a command, that is called an AppScope session. Each session has a directory which is referenced by a session ID. By default, the AppScope CLI stores all the information it collects during a given session in that session's directory. When you run `history`, you see a listing of sessions, one session per scoped command, along with information about when the session started, how many events were output during the session, and so on.
 
 #### Usage
 
@@ -315,7 +319,7 @@ cat $(scope hist -d)/args.json   # Outputs contents of args.json in the scope hi
 
 Prints configurations to pass to `kubectl`, which then automatically instruments newly-launched containers. This installs a mutating admission webhook, which adds an `initContainer` to each pod. The webhook also sets environment variables that install AppScope for all processes in that container.
 
-The `--*dest` flags accept file names like `/tmp/scope.log`; URLs like `file:///tmp/scope.log`; or sockets specified with the pattern `tcp://hostname:port`, `udp://hostname:port`, or `tls://hostname:port`.
+The `--*dest` flags accept file names like `/tmp/scope.log`; URLs like `file:///tmp/scope.log`; or sockets specified with the pattern `unix:///var/run/mysock`, `tcp://hostname:port`, `udp://hostname:port`, or `tls://hostname:port`.
 
 #### Usage
 
@@ -391,11 +395,11 @@ Outputs metrics for a session.
 #### Flags
 
 ```
-  -c, --cols             Display metrics as columns
-  -g, --graph            Graph this metric
+  -c, --cols             Display metrics as columns. Must be combined with -m
+  -g, --graph            Graph this metric. Must be combined with -m
   -h, --help             Help for metrics
   -i, --id int           Display info from specific from session ID (default -1)
-  -m, --metric strings   Display for specified metrics only
+  -m, --metric strings   Display for specified metrics only (comma-separated)
   -u, --uniq             Display first instance of each unique metric
 ```
 
@@ -413,7 +417,7 @@ Prunes (deletes) one or more sessions from the history.
 ```
 scope prune -k 20
 scope prune -a
-scope delete -d 1
+scope prune -d 1
 ```
 
 #### Flags
@@ -431,7 +435,7 @@ Negative arguments are not allowed.
 ### ps
 ---
 
-List all processes into which the libscope library is injected.
+Lists all processes into which the libscope library is injected.
 
 #### Usage
 
@@ -444,7 +448,7 @@ Executes a scoped command. By default, calling `scope` with no subcommands will 
 `scope`. However, `scope` allows for additional arguments to be passed to `run`, to capture payloads or to increase metrics' 
 verbosity. Must be called with the `--` flag, e.g., `scope run -- <command>`, to prevent AppScope from attempting to parse flags passed to the executed command.
 
-The `--*dest` flags accept file names like `/tmp/scope.log`; URLs like `file:///tmp/scope.log`; or sockets specified with the pattern `tcp://hostname:port`, `udp://hostname:port`, or `tls://hostname:port`.
+The `--*dest` flags accept file names like `/tmp/scope.log`; URLs like `file:///tmp/scope.log`; or sockets specified with the pattern `unix:///var/run/mysock`, `tcp://hostname:port`, `udp://hostname:port`, or `tls://hostname:port`.
 
 #### Usage
 
@@ -458,7 +462,7 @@ scope run -- perl -e 'print "foo\n"'
 scope run --payloads -- nc -lp 10001
 scope run -- curl https://wttr.in/94105
 scope run -c tcp://127.0.0.1:10091 -- curl https://wttr.in/94105
-
+scope run -c edge -- top
 ```
 
 #### Flags

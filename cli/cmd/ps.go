@@ -16,7 +16,7 @@ import (
 var psCmd = &cobra.Command{
 	Use:   "ps",
 	Short: "List processes currently being scoped",
-	Long:  `List all processes where the libscope library is injected`,
+	Long:  `Lists all processes where the libscope library is injected.`,
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()

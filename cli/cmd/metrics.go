@@ -237,7 +237,7 @@ scope metrics -m net.tx -g
 }
 
 func init() {
-	metricsCmd.Flags().IntP("id", "i", -1, "Display info from specific from session ID (default -1)")
+	metricsCmd.Flags().IntP("id", "i", -1, "Display info from specific from session ID")
 	metricsCmd.Flags().StringSliceP("metric", "m", []string{}, "Display for specified metrics only (comma-separated)")
 	metricsCmd.Flags().BoolP("graph", "g", false, "Graph this metric. Must be combined with -m")
 	metricsCmd.Flags().BoolP("cols", "c", false, "Display metrics as columns. Must be combined with -m")

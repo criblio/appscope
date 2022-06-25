@@ -34,7 +34,7 @@ Usage:
   scope [subcommand]
 
 Available Subcommands:
-  attach      Scope a currently running process
+  attach      Scope a currently-running process
   completion  Generate completion code for specified shell
   dash        Display scope dashboard
   events      Outputs events for a session
@@ -69,11 +69,11 @@ As noted just above, to see a specific subcommand's help or its required paramet
 ### attach
 ---
 
-Scopes a currently running process identified by PID or ProcessName.
+Scopes a currently-running process identified by PID or ProcessName.
 
 #### Usage
 
-`scope attach [flags] [PID/ProcessName]`
+`scope attach [flags] PID | <process_name>`
 
 #### Examples
 
@@ -109,7 +109,7 @@ Generates completion code for specified shell.
 
 #### Usage
 
-`scope completion [bash|zsh] [flags]`
+`scope completion [flags] [bash|zsh]`
 
 #### Examples
 

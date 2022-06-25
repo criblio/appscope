@@ -144,12 +144,12 @@ metric:
   # The `metric > watch[*]` array contains objects that enable different
   # categories of metrics. Their `type` property specifies the category.
   # Comment out an array entry to disable the category. If you comment
-  # out `metric > watch` entirely, the default metric watch list will be
-  # used which has all categories enabled.
+  # out `metric > watch` entirely, AppScope will use the default metric
+  # watch list, which has all categories enabled.
   #
   watch:
     # The statsd category creates metrics from statsd network traffic that is
-    # sent from or received by the scoped process.  This includes extended
+    # sent from or received by the scoped process. This includes extended
     # statsd, where dimensions will be included in the metrics produced.
     # See the STATSD protocol detector for more info about how
     # network traffic is determined to contain stastd metric data.
@@ -207,7 +207,7 @@ metric:
   transport:
 
     # Set $SCOPE_METRIC_DEST to override the type, host, port, and path configs
-    # below.  The environment variable should be set to a URL.
+    # below. The environment variable should be set to a URL.
     #
     #   file:///tmp/output.log  send to a file; note the triple slash
     #   file://stdout           send to standard out
@@ -239,7 +239,7 @@ metric:
 
     # Connection port
     #   Type:     integer or string
-    #   Values:   IP port number or service name
+    #   Values:   port number or service name
     #   Default:  8125
     #   Override: the port token in the $SCOPE_METRIC_DEST URL
     #
@@ -360,8 +360,8 @@ event:
   # The `event > watch[*]` array contains objects that enable different
   # categories of events. Their `type` property specifies the category.
   # Comment out an array entry to disable the category. If you comment
-  # out `event > watch` entirely, the default event watch list, which
-  # has all but metric enabled, will be used.
+  # out `event > watch` entirely, AppScope will use the default event
+  # watch list, which has all categories except metric enabled.
   #
   watch:
 
@@ -412,7 +412,7 @@ event:
       value: .*
 
     # The fs category includes filesystem operations like open, close,
-    # and delete.  The name, field, and value properties are regular
+    # and delete. The name, field, and value properties are regular
     # expressions applied to the corresponding event properties. Events
     # will be generated when all match.
     #
@@ -490,7 +490,7 @@ event:
   transport:
 
     # Set $SCOPE_EVENT_DEST to override the type, host, port, and path configs
-    # below.  The environment variable should be set to a URL.
+    # below. The environment variable should be set to a URL.
     #
     #   file:///tmp/output.log  send to a file; note the triple slash
     #   file://stdout           send to standard out
@@ -522,7 +522,7 @@ event:
 
     # Connection port
     #   Type:     integer or string
-    #   Values:   IP port number or service name
+    #   Values:   port number or service name
     #   Default:  9109
     #   Override: the port token in the $SCOPE_EVENT_DEST URL
     #
@@ -684,7 +684,7 @@ libscope:
     transport:
 
       # Set $SCOPE_LOG_DEST to override the type, host, port, and path configs
-      # below.  The environment variable should be set to a URL.
+      # below. The environment variable should be set to a URL.
       #
       #   file:///tmp/output.log  send to a file; note the triple slash
       #   file://stdout           send to standard out
@@ -716,7 +716,7 @@ libscope:
 
       # Connection port
       #   Type:     integer or string
-      #   Values:   IP port number or service name
+      #   Values:   port number or service name
       #   Default:  (none)
       #   Override: the port token in the $SCOPE_LOG_DEST URL
       #
@@ -810,7 +810,7 @@ cribl:
 
     # Connection port
     #   Type:     integer or string
-    #   Values:   IP port number or service name
+    #   Values:   port number or service name
     #   Default:  10090
     #   Override: the port token in the $SCOPE_CRIBL or $SCOPE_CRIBL_CLOUD URL
     #

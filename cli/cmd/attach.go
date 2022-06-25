@@ -23,9 +23,9 @@ import (
 
 // attachCmd represents the run command
 var attachCmd = &cobra.Command{
-	Use:   "attach [flags] [PID/ProcessName]",
-	Short: "Scope a currently running process",
-	Long: `Scopes a currently running process identified by PID or ProcessName.
+	Use:   "attach [flags] PID | <process_name>",
+	Short: "Scope a currently-running process",
+	Long: `Scopes a currently-running process identified by PID or <process_name>.
 
 The --*dest flags accept file names like /tmp/scope.log or URLs like file:///tmp/scope.log. They may also
 be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,

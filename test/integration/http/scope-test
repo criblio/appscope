@@ -4,7 +4,7 @@
 
 # This is the URL for a file on a server that supports various HTTP/1.x and
 # HTTP/2 requests. We found it in the tests for WireShark.
-URL=http://nghttp2.org/robots.txt
+URL=http://gnu.org/robots.txt
 URL_HTTPS=https://nghttp2.org/robots.txt
 
 # LogStream will be configured to dump NDJSON output files here.

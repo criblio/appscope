@@ -32,6 +32,7 @@
 #define FS_ENTRIES 1024
 #define NUM_ATTEMPTS 100
 #define MAX_CONVERT (size_t)256
+#define TLS_HANDSHAKE_BYTE 0x16
 
 extern rtconfig g_cfg;
 
@@ -1297,6 +1298,12 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
     // Ignore empty payloads that should have been blocked by our interpositions
     if (!len) {
         scopeLogDebug("DEBUG: fd:%d ignoring empty payload", sockfd);
+        return 0;
+    }
+
+    // Ignore the single byte often received at the start of the TLS handshake sequence
+    if ((net && net->tlsDetect == DETECT_PENDING) &&
+        (len == 1) && (buf) && (*(char *)buf == TLS_HANDSHAKE_BYTE)) {
         return 0;
     }
 

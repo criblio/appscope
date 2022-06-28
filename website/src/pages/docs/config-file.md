@@ -815,11 +815,11 @@ cribl:
     #   Override: the port token in the $SCOPE_CRIBL or $SCOPE_CRIBL_CLOUD URL
     #
     # Defaults to 10090, which is the TCP port on the AppScope Source
-    # in Cribl Stream. If you are using the cloud version, 10090 is the TLS port
-    # on the client-facing load balancer which is proxied to the cloud instance's
-    # TCP:10090 port, without TLS.
+    # in Cribl Stream or Cribl Edge. If you are using the cloud version, 
+    # 10090 is the TLS port on the client-facing load balancer which is 
+    # proxied to the cloud instance's TCP:10090 port, without TLS.
     #
-    # Use 10091 here if you need to connect to Cribl Cloud without TLS and
+    # Use 10091 here if you need to connect to Cribl.Cloud without TLS and
     # are not making any changes in the AppScope Source.
     #
     # Only applies when the connection type is tcp.
@@ -907,7 +907,7 @@ protocol:
   # Entries have the following properties:
   #
   #   name     String protocol name used in protocol-detect events and payload
-  #            headers sent to Cribl Stream (required)
+  #            headers sent to Cribl Stream or Cribl Edge (required)
   #   regex    The regular expression to use (required)
   #   binary   Boolean indicating whether the regex should be applied to a
   #            hex-string version of the payload instead of the binary payload
@@ -923,10 +923,10 @@ protocol:
   # options here are ignored.
   #
   # Warning: The `name` value is currently inserted into the JSON header for
-  # payloads sent to Cribl Stream so it cannot contain double quotes or
-  # backslashes without breaking the JSON. It needs to be kept fairly short
-  # too so the header doesn't exceed the 1k limit. If this becomes a problem,
-  # we'll consider adding logging and validation.
+  # payloads sent to Cribl Stream or Cribl Edge, so it cannot contain double 
+  # quotes or backslashes without breaking the JSON. It needs to be kept fairly 
+  # short, too, so the header doesn't exceed the 1k limit. If this becomes a 
+  # problem, we'll consider adding logging and validation.
   #
 
   # Example for the plain-text Redis protocol using the default detect and
@@ -963,7 +963,7 @@ protocol:
   #
   # Uncomment this entry to override the regex details or to set detect to
   # false. The payload setting here is never used. AppScope never sends
-  # encrypted payloads to disk or to Cribl Stream.
+  # encrypted payloads to disk, to Cribl Stream, or to Cribl Edge.
   #
   #- name: TLS
   #  regex: "^(?:(?:16030[0-3].{4})|(?:8[0-9a-fA-F]{3}01))"
@@ -1039,10 +1039,11 @@ custom:
   #    tags:
   #      service: eg
 
-  # Enable the Cribl.Cloud-managed Cribl Stream destination for Nginx
+  # Enable the Cribl Stream destination for Nginx
   # processes. Both this entry and the `example` entry above would
-  # apply if both filters match – so the service tag here would override
-  # the one above.
+  # apply if both filters match – so the service tag here would
+  # override the one above. In this example, we use a Cribl.Cloud-managed 
+  # Cribl Stream instance.
   #
   #nginx:
   #  filter:

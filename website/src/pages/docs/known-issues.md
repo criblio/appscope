@@ -4,15 +4,6 @@ title: Known Issues
 
 # Known Issues
 
-## AppScope 1.1.0
-
-2022-06-29 - Maintenance Release
-
-As of this AppScope release, known issues include:
-
-- [#1017](https://github.com/criblio/appscope/issues/1017) When you scope Nginx with TLS enabled, HTTP requests produce no HTTP events.
-  - **Fix:** 1.1.1
-
 ## AppScope 1.0.3
 
 2022-04-12 - Maintenance Release

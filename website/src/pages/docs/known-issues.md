@@ -10,7 +10,7 @@ title: Known Issues
 
 As of this AppScope release, known issues include:
 
-- [#1017](https://github.com/criblio/appscope/issues/1017) When you scope Nginx with TLS enabled, HTTP requests produce no HTTP events.
+- [#1017](https://github.com/criblio/appscope/issues/1017) AppScope incorrectly handles the single-byte message that web clients sometimes send before their ClientHello message. When you scope a server with TLS enabled, this can cause AppScope to produce no HTTP events.
   - **Fix:** 1.1.1
 
 ## AppScope 1.0.3

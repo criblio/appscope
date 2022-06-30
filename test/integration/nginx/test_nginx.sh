@@ -3,16 +3,6 @@
 DEBUG=0 # set this to 1 to capture the EVT_FILE for each test
 FAILED_TEST_LIST=""
 FAILED_TEST_COUNT=0
-SCOPE_LOG_DEST=file:///tmp/scope.log
-SCOPE_EVENT_DEST=file:///tmp/events.log
-SCOPE_METRIC_DEST=file:///tmp/events.log
-SCOPE_CRIBL_ENABLE=false
-SCOPE_LOG_LEVEL=error
-SCOPE_METRIC_VERBOSITY=4
-SCOPE_EVENT_LOGFILE=true
-SCOPE_EVENT_CONSOLE=true
-SCOPE_EVENT_METRIC=true
-SCOPE_EVENT_HTTP=true
 EVT_FILE="/tmp/events.json"
 MTC_FILE="/tmp/metrics.json"
 LOG_FILE="/tmp/scope.log"
@@ -110,7 +100,7 @@ endtest
 
 
 # Init test
-# starttest "nginx http1 tls"
+starttest "nginx http1 tls"
 
 # Run scoped nginx
 scope run -- nginx
@@ -158,7 +148,7 @@ endtest
 
 
 # Init test
-# starttest "nginx http2"
+starttest "nginx http2"
 
 # Run scoped nginx
 scope run -- nginx
@@ -206,7 +196,7 @@ endtest
 
 
 # Init test
-# starttest "nginx http2 tls"
+starttest "nginx http2 tls"
 
 # Run scoped nginx
 scope run -- nginx

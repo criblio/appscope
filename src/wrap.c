@@ -4698,6 +4698,10 @@ recv(int sockfd, void *buf, size_t len, int flags)
         rc = g_fn.recv(sockfd, buf, len, flags);
     }
 
+    // If called with the MSG_PEEK flag set, don't do any scope processing
+    // as it could result in processing of duplicate bytes later
+    if (flags & MSG_PEEK) return rc;
+
     if (rc != -1) {
         // it's possible to get DNS over TCP
         if (remotePortIsDNS(sockfd)) {
@@ -4723,6 +4727,10 @@ __recv_chk(int sockfd, void *buf, size_t len, size_t buflen, int flags)
         rc = g_fn.__recv_chk(sockfd, buf, len, buflen, flags);
     }
 
+    // If called with the MSG_PEEK flag set, don't do any scope processing
+    // as it could result in processing of duplicate bytes later
+    if (flags & MSG_PEEK) return rc;
+
     if (rc != -1) {
         // it's possible to get DNS over TCP
         if (remotePortIsDNS(sockfd)) {
@@ -4745,13 +4753,16 @@ internal_recvfrom(int sockfd, void *buf, size_t len, int flags,
 
     WRAP_CHECK(recvfrom, -1);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+
+    // If called with the MSG_PEEK flag set, don't do any scope processing
+    // as it could result in processing of duplicate bytes later
+    if (flags & MSG_PEEK) return rc;
+
     if (rc != -1) {
         scopeLog(CFG_LOG_TRACE, "fd:%d recvfrom", sockfd);
-
         if (remotePortIsDNS(sockfd)) {
             getDNSAnswer(sockfd, buf, rc, BUF);
         }
-
         doRecv(sockfd, rc, buf, rc, BUF);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, 0, "recvfrom", "nopath");
@@ -4774,13 +4785,16 @@ __recvfrom_chk(int sockfd, void *buf, size_t len, size_t buflen, int flags,
 
     WRAP_CHECK(__recvfrom_chk, -1);
     rc = g_fn.__recvfrom_chk(sockfd, buf, len, buflen, flags, src_addr, addrlen);
+
+    // If called with the MSG_PEEK flag set, don't do any scope processing
+    // as it could result in processing of duplicate bytes later
+    if (flags & MSG_PEEK) return rc;
+
     if (rc != -1) {
         scopeLog(CFG_LOG_TRACE, "fd:%d __recvfrom_chk", sockfd);
-
         if (remotePortIsDNS(sockfd)) {
             getDNSAnswer(sockfd, buf, rc, BUF);
         }
-
         doRecv(sockfd, rc, buf, rc, BUF);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, 0, "__recvfrom_chk", "nopath");
@@ -4833,6 +4847,11 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
     
     WRAP_CHECK(recvmsg, -1);
     rc = g_fn.recvmsg(sockfd, msg, flags);
+
+    // If called with the MSG_PEEK flag set, don't do any scope processing
+    // as it could result in processing of duplicate bytes later
+    if (flags & MSG_PEEK) return rc;
+
     if (rc != -1) {
         size_t msg_iovlen_orig;
         size_t msg_controllen_orig;
@@ -4883,6 +4902,11 @@ recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
 
     WRAP_CHECK(recvmmsg, -1);
     rc = g_fn.recvmmsg(sockfd, msgvec, vlen, flags, timeout);
+
+    // If called with the MSG_PEEK flag set, don't do any scope processing
+    // as it could result in processing of duplicate bytes later
+    if (flags & MSG_PEEK) return rc;
+
     if (rc != -1) {
         scopeLog(CFG_LOG_TRACE, "fd:%d recvmmsg", sockfd);
 

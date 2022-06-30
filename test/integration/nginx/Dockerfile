@@ -32,6 +32,16 @@ COPY ./nginx/ca.key /etc/ssl/private
 COPY docker-entrypoint.sh /
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+ENV SCOPE_LOG_DEST=file:///tmp/scope.log
+ENV SCOPE_EVENT_DEST=file:///tmp/events.json
+ENV SCOPE_METRIC_DEST=file:///tmp/metrics.json
+ENV SCOPE_CRIBL_ENABLE=false
+ENV SCOPE_LOG_LEVEL=error
+ENV SCOPE_METRIC_VERBOSITY=4
+ENV SCOPE_EVENT_LOGFILE=true
+ENV SCOPE_EVENT_CONSOLE=true
+ENV SCOPE_EVENT_METRIC=true
+ENV SCOPE_EVENT_HTTP=true
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 

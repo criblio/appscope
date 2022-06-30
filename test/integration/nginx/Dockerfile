@@ -21,14 +21,18 @@ RUN mkdir -p /var/run/appscope/ && \
     ln -s /opt/appscope/bin/linux/$(uname -m)/ldscope /usr/local/scope/bin/ldscope && \
     ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
+RUN openssl genrsa -out ca.key 2048 && \
+    openssl req -new -key ca.key -out ca.csr -subj "/C=US/ST=California/L=San Francisco/O=Cribl/OU=Cribl/CN=localhost" && \
+    openssl x509 -req -days 3650 -in ca.csr -signkey ca.key -out ca.crt && \
+    cp ca.crt /etc/ssl/certs/ && \
+    cp ca.key /etc/ssl/private/ && \
+    cp ca.csr /etc/ssl/private/
+
 COPY scope-profile.sh /etc/profile.d/scope.sh
 COPY gdbinit /root/.gdbinit
 COPY ./nginx/scope-test /usr/local/scope/scope-test
 COPY ./nginx/test_nginx.sh /opt/test/bin/test_nginx.sh
 COPY ./nginx/nginx.conf /etc/nginx/nginx.conf
-COPY ./nginx/ca.crt /etc/ssl/certs
-COPY ./nginx/ca.csr /etc/ssl/private
-COPY ./nginx/ca.key /etc/ssl/private
 COPY docker-entrypoint.sh /
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"

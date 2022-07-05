@@ -18,6 +18,7 @@ on:
     paths:
       - 'website/**'
       - 'docker/docs/layout.js'
+      - 'docker/docs/schema2md.js'
       - 'docs/schemas/**'
 jobs:
   website:

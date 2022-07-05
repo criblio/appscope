@@ -12,6 +12,10 @@ cd schemas
 for schema_file in *.schema.json; do
     [ -f "$schema_file" ] || break
     json-dereference -s "$schema_file" -o $TMP_DIR_NAME/"$schema_file"
+    if [ ! -f $TMP_DIR_NAME/"$schema_file" ]; then
+        echo "Error during resolving references in following file: $schema_file"
+        exit 1
+    fi
 done
 
 echo "Finished resolving references in JSON Schema"

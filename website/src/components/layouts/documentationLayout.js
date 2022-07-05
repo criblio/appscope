@@ -3,12 +3,16 @@ import { Container, Row, Col } from "react-bootstrap";
 import DocsNav from "../DocsNav";
 import Header from "../Header";
 import MobileHeader from "../MobileHeader";
+import { Helmet } from "react-helmet";
 
 import "../../scss/_documentation.scss";
 import Footer from "../Footer";
 export default function Layout({ children }) {
   return (
     <>
+      <Helmet>
+        <meta name="og:image" content={'https://cribl.io/wp-content/uploads/2022/01/thumb.appScope.fullColorWhiteAlt.png'} />
+      </Helmet>
       <div className="display-xs">
         <MobileHeader />
       </div>

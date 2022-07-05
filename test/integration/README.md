@@ -96,11 +96,6 @@ This test is explicitly using `LD_PRELOAD` while other tests are using a mix of
 `LD_PRELOAD` from some other tests to speed them up but we'll keep it here to
 make sure that startup scheme is getting wrung out.
 
-### `nginx`
-
-Tests Nginx web server using Apache Benchmark tool.
-
-
 ## `test-runner` Framework
 
 Some of the tests use a framework in the `./test-runner/` directory. In

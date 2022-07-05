@@ -402,16 +402,29 @@ jobs:
 
           echo "::group::Prep Content"
           mkdir ${TMPDIR}/scope
+          mkdir ${TMPDIR}/lib
 
           cp conf/scope.yml ${TMPDIR}/scope
           for ARCH in x86_64 aarch64; do
             cp bin/linux/${ARCH}/{scope,ldscope} ${TMPDIR}/scope
             cp lib/linux/${ARCH}/libscope.so ${TMPDIR}/scope
+            # Create tgz and tgz.md5 of binaries and config (for each arch)
             (cd ${TMPDIR} && tar cfz scope.tgz scope)
             (cd ${TMPDIR} && md5sum scope.tgz > scope-${ARCH}.tgz.md5)
             (cd ${TMPDIR} && mv scope.tgz scope-${ARCH}.tgz)
+            # Copy scope binary and create scope.md5 (for each arch)
             (cd ${TMPDIR}/scope && md5sum scope > ../scope-${ARCH}.md5)
             cp ${TMPDIR}/scope/scope ${TMPDIR}/scope-${ARCH}
+          done
+
+          cp conf/scope.yml ${TMPDIR}/lib
+          for ARCH in x86_64 aarch64; do
+            cp bin/linux/${ARCH}/ldscope ${TMPDIR}/lib
+            cp lib/linux/${ARCH}/libscope.so ${TMPDIR}/lib
+            # Create zip and zip.md5 of binaries and config (for each arch)
+            (cd ${TMPDIR} && zip -r aws-lambda-layer.zip ./lib)
+            (cd ${TMPDIR} && md5sum aws-lambda-layer.zip > aws-lambda-layer-${ARCH}.zip.md5)
+            (cd ${TMPDIR} && mv aws-lambda-layer.zip aws-lambda-layer-${ARCH}.zip)
           done
           ls -laR ${TMPDIR}
           echo "::endgroup::"
@@ -421,15 +434,19 @@ jobs:
             echo "${{ needs.info.outputs.tag }}" > ${TMPDIR}/latest
             aws s3 cp ${TMPDIR}/latest ${S3_SCOPE}/latest
           fi
-          aws s3 cp ${TMPDIR}/scope-x86_64         ${S3_SCOPE}/${VERSION}/linux/scope
-          aws s3 cp ${TMPDIR}/scope-x86_64.md5     ${S3_SCOPE}/${VERSION}/linux/scope.md5
-          aws s3 cp ${TMPDIR}/scope-x86_64.tgz     ${S3_SCOPE}/${VERSION}/linux/scope.tgz
-          aws s3 cp ${TMPDIR}/scope-x86_64.tgz.md5 ${S3_SCOPE}/${VERSION}/linux/scope.tgz.md5
+          aws s3 cp ${TMPDIR}/scope-x86_64                    ${S3_SCOPE}/${VERSION}/linux/scope
+          aws s3 cp ${TMPDIR}/scope-x86_64.md5                ${S3_SCOPE}/${VERSION}/linux/scope.md5
+          aws s3 cp ${TMPDIR}/scope-x86_64.tgz                ${S3_SCOPE}/${VERSION}/linux/scope.tgz
+          aws s3 cp ${TMPDIR}/scope-x86_64.tgz.md5            ${S3_SCOPE}/${VERSION}/linux/scope.tgz.md5
+          aws s3 cp ${TMPDIR}/aws-lambda-layer-x86_64.zip     ${S3_SCOPE}/${VERSION}/linux/aws-lambda-layer.zip
+          aws s3 cp ${TMPDIR}/aws-lambda-layer-x86_64.zip.md5 ${S3_SCOPE}/${VERSION}/linux/aws-lambda-layer.zip.md5
           for ARCH in x86_64 aarch64; do
-            aws s3 cp ${TMPDIR}/scope-${ARCH}         ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope
-            aws s3 cp ${TMPDIR}/scope-${ARCH}.md5     ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.md5
-            aws s3 cp ${TMPDIR}/scope-${ARCH}.tgz     ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.tgz
-            aws s3 cp ${TMPDIR}/scope-${ARCH}.tgz.md5 ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.tgz.md5
+            aws s3 cp ${TMPDIR}/scope-${ARCH}                    ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope
+            aws s3 cp ${TMPDIR}/scope-${ARCH}.md5                ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.md5
+            aws s3 cp ${TMPDIR}/scope-${ARCH}.tgz                ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.tgz
+            aws s3 cp ${TMPDIR}/scope-${ARCH}.tgz.md5            ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.tgz.md5
+            aws s3 cp ${TMPDIR}/aws-lambda-layer-${ARCH}.zip     ${S3_SCOPE}/${VERSION}/linux/${ARCH}/aws-lambda-layer.zip
+            aws s3 cp ${TMPDIR}/aws-lambda-layer-${ARCH}.zip.md5 ${S3_SCOPE}/${VERSION}/linux/${ARCH}/aws-lambda-layer.zip.md5
           done
           aws cloudfront create-invalidation --distribution-id ${CF_DISTRIBUTION_ID} --paths '/dl/scope/'"$VERSION"'/*' '/dl/scope/latest'
           echo "::endgroup::"
@@ -441,6 +458,8 @@ jobs:
               gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}.md5"
               gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}.tgz"
               gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}.tgz.md5"
+              gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/aws-lambda-layer-${ARCH}.zip"
+              gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/aws-lambda-layer-${ARCH}.zip.md5"
             done
             echo "::endgroup::"
           fi

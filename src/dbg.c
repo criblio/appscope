@@ -358,3 +358,43 @@ scopeLogHex(cfg_log_level_t level, const void *data, size_t size, const char *fo
     }
     scopeLog(level, "  %04x: %s %s", i-16, hex, txt);
 }
+
+void
+scopeHexDump(cfg_log_level_t level, src_data_t dtype, void *buf, size_t len)
+{
+    size_t dlen;
+
+    if (!buf) return;
+
+    if (dtype == BUF) {
+        // simple buffer, pass it through
+        dlen = len > 64 ? 64 : len;
+        scopeLogHex(level, buf, dlen, "BUF:");
+    } else if (dtype == MSG) {
+        // buffer is a msghdr for sendmsg/recvmsg
+        int i;
+        struct msghdr *msg = (struct msghdr *)buf;
+        struct iovec *iov;
+
+        for (i = 0; i < msg->msg_iovlen; i++) {
+            iov = &msg->msg_iov[i];
+            dlen = iov->iov_len > 64 ? 64 : iov->iov_len;
+            if (iov && iov->iov_base && (iov->iov_len > 0)) {
+                scopeLogHex(level, iov->iov_base, dlen, "MSG:");
+            }
+        }
+    } else if ( dtype == IOV) {
+        // buffer is an iovec, len is the iovcnt
+        int i;
+        struct iovec *iov = (struct iovec *)buf;
+
+        for (i = 0; i < len; i++) {
+            if (iov[i].iov_base && (iov[i].iov_len > 0)) {
+                dlen = iov[i].iov_len > 64 ? 64 : iov[i].iov_len;
+                scopeLogHex(level, iov[i].iov_base, dlen, "IOV:");
+            }
+        }
+    } else {
+        DBG(NULL); // just a note
+    }
+}

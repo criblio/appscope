@@ -32,6 +32,8 @@
 #define FS_ENTRIES 1024
 #define NUM_ATTEMPTS 100
 #define MAX_CONVERT (size_t)256
+#define MIN_PKT 0
+#define MIN_TLS_LEN 6
 
 extern rtconfig g_cfg;
 
@@ -915,6 +917,29 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     }
 }
 
+static bool
+notifyProtocol(int sockfd, net_info *net, protocol_def_t *protoDef)
+{
+    protocol_info *proto;
+
+    if (protoDef->detect && ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) {
+        if ((proto = scope_calloc(1, sizeof(struct protocol_info_t))) == NULL) {
+            return FALSE;
+        }
+
+        proto->evtype = EVT_PROTO;
+        proto->ptype = EVT_DETECT;
+        proto->len = sizeof(protocol_def_t);
+        proto->fd = sockfd;
+        if (net) proto->uid = net->uid;
+        proto->data = (char *)scope_strdup(protoDef->protname);
+        cmdPostEvent(g_ctl, (char *)proto);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
 /*
  * Called when we add a protocol entry.
  * If a user protocol entry defines HTTP &/or TLS, then save.
@@ -946,7 +971,6 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
 {
     char *data, *cpdata = NULL;
     pcre2_match_data *match_data;
-    protocol_info *proto;
     bool ret = FALSE;
 
     // nothing we can do; don't risk reading past end of a buffer
@@ -961,7 +985,8 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
     // precedence to a len defined with the protocol definition
     // if a len was not provided in the definition use the one passed
     // therefore, len is now protoDef->len
-    if (protoDef->len > 0) {
+    // however, don't allow the cvlen to be larger than the packet len
+    if ((protoDef->len > 0) && (protoDef->len <= len)) {
         cvlen = protoDef->len;
     }
 
@@ -996,22 +1021,10 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
             net->protoProtoDef = protoDef;
         }
 
-        if (protoDef->detect && ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) {
-            if ((proto = scope_calloc(1, sizeof(struct protocol_info_t))) == NULL)
-            {
-                if (cpdata)
-                    scope_free(cpdata);
-                if (match_data)
-                    pcre2_match_data_free(match_data);
-                return FALSE;
-            }
-            proto->evtype = EVT_PROTO;
-            proto->ptype = EVT_DETECT;
-            proto->len = sizeof(protocol_def_t);
-            proto->fd = sockfd;
-            if (net) proto->uid = net->uid;
-            proto->data = (char *)scope_strdup(protoDef->protname);
-            cmdPostEvent(g_ctl, (char *)proto);
+        if (notifyProtocol(sockfd, net, protoDef) == FALSE) {
+            if (cpdata) scope_free(cpdata);
+            if (match_data) pcre2_match_data_free(match_data);
+            return FALSE;
         }
 
         ret = TRUE; // matched
@@ -1047,7 +1060,7 @@ setProtocolByType(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf
                 ret = ret || setProtocol(sockfd, protoDef, net, iov->iov_base, iov->iov_len);
             }
         }
-    } else if ( dtype == IOV) {
+    } else if (dtype == IOV) {
         // buffer is an iovec, len is the iovcnt
         int i;
         struct iovec *iov = (struct iovec *)buf;
@@ -1163,33 +1176,40 @@ extractPayload(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
  * 
  * Sets net->tlsDetect and net->tlsProtoDef.
  */
-static void
-detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
+static bool
+detectTLSBinary(net_info *net, void *buf, size_t len)
 {
-    int rc;
     unsigned char *data = buf;
-    unsigned int ptype;
-    protocol_def_t *tls_proto_def = g_tls_protocol_def; // use ours by default
 
     // 16030[0-3].{4}0[12] 16 03 00|01|02|03 *+2     01|02
     // example:            16 03 01           00 ff  01    00  00
-    if ((net && (g_userTLS == FALSE)) &&
+    if ((net && (g_userTLS == FALSE)) && (len >= MIN_TLS_LEN) &&
         (data[0] == (char)0x16) && (data[1] == (char)0x03) &&
         ((data[2] == (char)0x00) || (data[2] == (char)0x01) ||
          (data[2] == (char)0x02) ||(data[2] == (char)0x03)) &&
         ((data[5] == (char)0x01) || (data[5] == (char)0x02))) {
         net->tlsDetect = DETECT_TRUE;
-        net->tlsProtoDef = tls_proto_def;
-        return;
+        net->tlsProtoDef = g_tls_protocol_def;
+        return TRUE;
     } else if (net && (g_userHTTP == FALSE) && detectHttp(buf, len)) {
         net->tlsDetect = DETECT_FALSE;
         net->tlsProtoDef = g_http_protocol_def;
-        return;
+        return TRUE;
     }
 
+    return FALSE;
+}
+
+static void
+detectTLSRegex(int sockfd, net_info *net, void *buf, size_t len, src_data_t dtype)
+{
+    int rc;
+    unsigned int ptype;
+    unsigned char *data = buf;
+    protocol_def_t *tls_proto_def = g_tls_protocol_def; // use ours by default
+
     // Look for an overridden TLS entry from the protocol detector configs
-    for (ptype = 0; ptype <= g_prot_sequence; ptype++)
-    {
+    for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
         protocol_def_t *tmp_proto_def;
         if ((tmp_proto_def = lstFind(g_protlist, ptype))
             && (scope_strcmp(tmp_proto_def->protname, "TLS") == 0)) {
@@ -1204,17 +1224,54 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
     size_t alen = (tls_proto_def->len * 2) + 1;
     char cpdata[alen];
     scope_memset(cpdata, 0, alen);
-    for (i = 0; i < tls_proto_def->len; i++)
-    {
-        scope_snprintf(&cpdata[i << 1], 3, "%02x", data[i]);
+
+    if (dtype == BUF) {
+        if (len < MIN_TLS_LEN) return;
+        size_t dlen = (tls_proto_def->len <= len) ? tls_proto_def->len : len;
+        for (i = 0; i < dlen; i++) {
+            scope_snprintf(&cpdata[i << 1], 3, "%02x", data[i]);
+        }
+    } else if (dtype == MSG) {
+        int j;
+        struct msghdr *msg = (struct msghdr *)buf;
+        struct iovec *iov;
+        for (i = 0; i < msg->msg_iovlen; i++) {
+            iov = &msg->msg_iov[i];
+            if (iov && iov->iov_base && (iov->iov_len > 0)) {
+                unsigned char *data = iov->iov_base;
+                size_t dlen = (tls_proto_def->len <= iov->iov_len) ?
+                    tls_proto_def->len : iov->iov_len;
+
+                for (j = 0; j < dlen; j++) {
+                    scope_snprintf(&cpdata[j << 1], 3, "%02x", data[j]);
+                }
+            }
+        }
+    } else if (dtype == IOV) {
+        // buffer is an iovec, len is the iovcnt
+        int j;
+        struct iovec *iov = (struct iovec *)buf;
+        for (i = 0; i < len; i++) {
+            if (iov[i].iov_base && (iov[i].iov_len > 0)) {
+                unsigned char *data = iov[i].iov_base;
+                size_t dlen = (tls_proto_def->len <= iov[i].iov_len) ?
+                    tls_proto_def->len : iov[i].iov_len;
+
+                for (j = 0; j < dlen; j++) {
+                    scope_snprintf(&cpdata[j << 1], 3, "%02x", data[j]);
+                }
+            }
+        }
+    } else {
+        DBG(NULL); // how do we even get here?
+        return;    // no need to continue;
     }
 
     // Apply the regex to the hex-string payload
     pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(tls_proto_def->re, NULL);
     if ((rc = pcre2_match_wrapper(tls_proto_def->re, (PCRE2_SPTR)cpdata,
                                   (PCRE2_SIZE)alen, 0, 0,
-                                  match_data, NULL)) > 0)
-    {
+                                  match_data, NULL)) > 0) {
         // matched, set the detect-state to TRUE
         net->tlsDetect = DETECT_TRUE;
         net->tlsProtoDef = tls_proto_def;
@@ -1222,9 +1279,7 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
         if (tls_proto_def->detect) {
             // TODO send TLS protocol-detect event
         }
-    }
-    else
-    {
+    } else {
         // didn't match, set the detect-state to FALSE
         net->tlsDetect = DETECT_FALSE;
         if (rc != PCRE2_ERROR_NOMATCH)
@@ -1233,28 +1288,68 @@ detectTLS(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_da
             scopeLog(CFG_LOG_DEBUG, "%s: fd:%d TLS regex failed", __FUNCTION__, sockfd);
         }
     }
+
     pcre2_match_data_free(match_data);
 }
 
 static void
-detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
+detectTLS(int sockfd, net_info *net, char *buf, size_t len, src_data_t dtype)
+{
+    bool rc = FALSE;
+
+    if (dtype == BUF) {
+        // simple buffer, pass it through
+        rc = detectTLSBinary(net, buf, len);
+    } else if (dtype == MSG) {
+        // buffer is a msghdr for sendmsg/recvmsg
+        int i;
+        struct msghdr *msg = (struct msghdr *)buf;
+        struct iovec *iov;
+        for (i = 0; i < msg->msg_iovlen; i++) {
+            iov = &msg->msg_iov[i];
+            if ((iov && iov->iov_base && (iov->iov_len > 0)) &&
+                ((rc = detectTLSBinary(net, iov->iov_base, iov->iov_len)) == TRUE)) {
+                break;
+            }
+        }
+    } else if (dtype == IOV) {
+        // buffer is an iovec, len is the iovcnt
+        int i;
+        struct iovec *iov = (struct iovec *)buf;
+        for (i = 0; i < len; i++) {
+            if ((iov[i].iov_base && (iov[i].iov_len > 0)) &&
+                ((rc = detectTLSBinary(net, iov[i].iov_base, iov[i].iov_len)) == TRUE)) {
+                break;
+            }
+        }
+    } else {
+        DBG(NULL); // just a note
+    }
+
+    if (rc == FALSE) detectTLSRegex(sockfd, net, buf, len, dtype);
+    return;
+}
+
+static bool
+detectProtoByString(int sockfd, net_info *net, void *buf, size_t len)
+{
+    if (net && (g_userHTTP == FALSE) && detectHttp(buf, len)) {
+        net->protoDetect = DETECT_TRUE;
+        net->protoProtoDef = g_http_protocol_def;
+        notifyProtocol(sockfd, net, g_http_protocol_def);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static void
+detectProtoByRegex(int sockfd, net_info *net, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
     unsigned int ptype;
     protocol_def_t *protoDef;
     bool sawHTTP = FALSE;
     bool sawSTATSD = FALSE;
-
-    // No need to try protocol detection in raw TLS data
-    if (net && net->tlsDetect == DETECT_TRUE     // TLS detected already
-        && (src == NETRX || src == NETTX)) {     // raw payload
-        return;
-    }
-
-    if (net && (g_userHTTP == FALSE) && detectHttp(buf, len)) {
-        net->protoDetect = DETECT_TRUE;
-        net->protoProtoDef = g_http_protocol_def;
-        return;
-    }
 
     // Check first against the protocol entries in the configs.
     for (ptype = 0; ptype <= g_prot_sequence; ptype++) {
@@ -1277,6 +1372,51 @@ detectProtocol(int sockfd, net_info *net, void *buf, size_t len, metric_t src, s
     if (!sawSTATSD && setProtocolByType(sockfd, g_statsd_protocol_def, net, buf, len, dtype)) {
         return;
     }
+}
+
+static void
+detectProtocol(int sockfd, net_info *net, char *buf, size_t len, metric_t src, src_data_t dtype)
+{
+    bool rc = FALSE;
+
+    // No need to try protocol detection in raw TLS data
+    if (net && (net->tlsDetect == DETECT_TRUE)   // TLS detected already
+        && ((src == NETRX) || (src == NETTX))) {     // raw payload
+        return;
+    }
+
+    if (dtype == BUF) {
+        // simple buffer, pass it through
+        rc = detectProtoByString(sockfd, net, buf, len);
+    } else if (dtype == MSG) {
+        // buffer is a msghdr for sendmsg/recvmsg
+        int i;
+        struct msghdr *msg = (struct msghdr *)buf;
+        struct iovec *iov;
+        for (i = 0; i < msg->msg_iovlen; i++) {
+            iov = &msg->msg_iov[i];
+            if (iov && iov->iov_base && (iov->iov_len > 0) &&
+                ((rc = detectProtoByString(sockfd, net, iov->iov_base, iov->iov_len)) == TRUE)) {
+                break;
+            }
+        }
+    } else if (dtype == IOV) {
+        // buffer is an iovec, len is the iovcnt
+        int i;
+        struct iovec *iov = (struct iovec *)buf;
+        for (i = 0; i < len; i++) {
+            if (iov[i].iov_base && (iov[i].iov_len > 0) &&
+                ((rc = detectProtoByString(sockfd, net, iov[i].iov_base, iov[i].iov_len)) == TRUE)) {
+                break;
+            }
+        }
+    } else {
+        DBG(NULL); // just a note
+    }
+
+    if (rc == FALSE) detectProtoByRegex(sockfd, net, buf, len, src, dtype);
+
+    return;
 }
 
 // Alternative to getNetEntry() that returns a net_info for the given channel
@@ -1316,36 +1456,39 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
     net_info *net = getNetEntry(sockfd);    // first try by descriptor
     if (!net) net = getChannelNetEntry(id); // fallback to using channel ID
 
-    scopeLogHexDebug(buf, len > 64 ? 64 : len, // limit hexdump to 64
-                     "DEBUG: doProtocol(id=%ld, fd=%d, len=%ld, src=%s, dtyp=%s) TLS=%s PROTO=%s",
-            id, sockfd, len,
-            src == NETRX ? "NETRX" :
-            src == NETTX ? "NETTX" :
-            src == TLSRX ? "TLSRX" :
-            src == TLSTX ? "TLSTX" : "?",
-            dtype == BUF  ? "BUF" :
-            dtype == MSG  ? "MSG" :
-            dtype == IOV  ? "IOV" :
-            dtype == NONE ? "NONE" : "?",
-            net == NULL ? "NULL" :
-            net->tlsDetect == DETECT_PENDING ? "PENDING" :
-            net->tlsDetect == DETECT_TRUE    ? "TRUE" :
-            net->tlsDetect == DETECT_FALSE   ? "FALSE" : "INVALID",
-            net == NULL ? "NULL" :
-            net->protoDetect == DETECT_PENDING ? "PENDING" :
-            net->protoDetect == DETECT_TRUE    ? "TRUE" :
-            net->protoDetect == DETECT_FALSE   ? "FALSE" : "INVALID"
-            );
+    scopeLog(CFG_LOG_INFO, "DEBUG: doProtocol (id=%ld, fd=%d, len=%ld, src=%s, dtype=%s) TLS=%s PROTO=%s",
+             id, sockfd, len,
+             src == NETRX ? "NETRX" :
+             src == NETTX ? "NETTX" :
+             src == TLSRX ? "TLSRX" :
+             src == TLSTX ? "TLSTX" :
+             "?",
+             dtype == BUF  ? "BUF" :
+             dtype == MSG  ? "MSG" :
+             dtype == IOV  ? "IOV" :
+             dtype == NONE ? "NONE" :
+             "?",
+             net == NULL ? "NULL" :
+             net->tlsDetect == DETECT_PENDING ? "PENDING" :
+             net->tlsDetect == DETECT_TRUE    ? "TRUE" :
+             net->tlsDetect == DETECT_FALSE   ? "FALSE" :
+             "INVALID",
+             net == NULL ? "NULL" :
+             net->protoDetect == DETECT_PENDING ? "PENDING" :
+             net->protoDetect == DETECT_TRUE    ? "TRUE" :
+             net->protoDetect == DETECT_FALSE   ? "FALSE" :
+             "INVALID");
+    scopeHexDump(CFG_LOG_INFO, dtype, buf, len);
 
     // Ignore empty payloads that should have been blocked by our interpositions
-    if (len < 4) {
+    if (len <= MIN_PKT) {
         scopeLogDebug("DEBUG: fd:%d ignoring empty payload", sockfd);
         return 0;
     }
 
     // Do TLS detection if not already done
     if (net && net->tlsDetect == DETECT_PENDING) {
-        detectTLS(sockfd, net, buf, len, src, dtype);
+        detectTLS(sockfd, net, buf, len, dtype);
     }
 
     // Only process unencrypted payloads

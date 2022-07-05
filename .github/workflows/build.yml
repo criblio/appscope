@@ -402,6 +402,7 @@ jobs:
 
           echo "::group::Prep Content"
           mkdir ${TMPDIR}/scope
+          mkdir ${TMPDIR}/lib
 
           cp conf/scope.yml ${TMPDIR}/scope
           for ARCH in x86_64 aarch64; do
@@ -411,13 +412,19 @@ jobs:
             (cd ${TMPDIR} && tar cfz scope.tgz scope)
             (cd ${TMPDIR} && md5sum scope.tgz > scope-${ARCH}.tgz.md5)
             (cd ${TMPDIR} && mv scope.tgz scope-${ARCH}.tgz)
-            # Create zip and zip.md5 of binaries and config (for each arch)
-            (cd ${TMPDIR} && zip -r aws-lambda-layer.zip scope)
-            (cd ${TMPDIR} && md5sum aws-lambda-layer.zip > aws-lambda-layer-${ARCH}.zip.md5)
-            (cd ${TMPDIR} && mv aws-lambda-layer.zip aws-lambda-layer-${ARCH}.zip)
             # Copy scope binary and create scope.md5 (for each arch)
             (cd ${TMPDIR}/scope && md5sum scope > ../scope-${ARCH}.md5)
             cp ${TMPDIR}/scope/scope ${TMPDIR}/scope-${ARCH}
+          done
+
+          cp conf/scope.yml ${TMPDIR}/lib
+          for ARCH in x86_64 aarch64; do
+            cp bin/linux/${ARCH}/ldscope ${TMPDIR}/lib
+            cp lib/linux/${ARCH}/libscope.so ${TMPDIR}/lib
+            # Create zip and zip.md5 of binaries and config (for each arch)
+            (cd ${TMPDIR} && zip -r aws-lambda-layer.zip ./lib)
+            (cd ${TMPDIR} && md5sum aws-lambda-layer.zip > aws-lambda-layer-${ARCH}.zip.md5)
+            (cd ${TMPDIR} && mv aws-lambda-layer.zip aws-lambda-layer-${ARCH}.zip)
           done
           ls -laR ${TMPDIR}
           echo "::endgroup::"

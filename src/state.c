@@ -33,7 +33,7 @@
 #define NUM_ATTEMPTS 100
 #define MAX_CONVERT (size_t)256
 #define MIN_PKT 0
-#define MIN_TLS_LEN 6
+#define MIN_TLS_LEN 5
 
 extern rtconfig g_cfg;
 
@@ -1186,8 +1186,7 @@ detectTLSBinary(net_info *net, void *buf, size_t len)
     if ((net && (g_userTLS == FALSE)) && (len >= MIN_TLS_LEN) &&
         (data[0] == (char)0x16) && (data[1] == (char)0x03) &&
         ((data[2] == (char)0x00) || (data[2] == (char)0x01) ||
-         (data[2] == (char)0x02) ||(data[2] == (char)0x03)) &&
-        ((data[5] == (char)0x01) || (data[5] == (char)0x02))) {
+         (data[2] == (char)0x02) ||(data[2] == (char)0x03))) {
         net->tlsDetect = DETECT_TRUE;
         net->tlsProtoDef = g_tls_protocol_def;
         return TRUE;
@@ -1226,7 +1225,6 @@ detectTLSRegex(int sockfd, net_info *net, void *buf, size_t len, src_data_t dtyp
     scope_memset(cpdata, 0, alen);
 
     if (dtype == BUF) {
-        if (len < MIN_TLS_LEN) return;
         size_t dlen = (tls_proto_def->len <= len) ? tls_proto_def->len : len;
         for (i = 0; i < dlen; i++) {
             scope_snprintf(&cpdata[i << 1], 3, "%02x", data[i]);
@@ -1455,8 +1453,8 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
     // Find the net_info for the channel
     net_info *net = getNetEntry(sockfd);    // first try by descriptor
     if (!net) net = getChannelNetEntry(id); // fallback to using channel ID
-
-    scopeLog(CFG_LOG_INFO, "DEBUG: doProtocol (id=%ld, fd=%d, len=%ld, src=%s, dtype=%s) TLS=%s PROTO=%s",
+#ifdef DEBUG
+    scopeLog(CFG_LOG_DEBUG, "DEBUG: doProtocol (id=%ld, fd=%d, len=%ld, src=%s, dtype=%s) TLS=%s PROTO=%s",
              id, sockfd, len,
              src == NETRX ? "NETRX" :
              src == NETTX ? "NETTX" :
@@ -1478,7 +1476,10 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
              net->protoDetect == DETECT_TRUE    ? "TRUE" :
              net->protoDetect == DETECT_FALSE   ? "FALSE" :
              "INVALID");
-    scopeHexDump(CFG_LOG_INFO, dtype, buf, len);
+
+    cfg_log_level_t cfg_level = logLevel(g_log);
+    if (cfg_level <= CFG_LOG_DEBUG) scopeHexDump(CFG_LOG_DEBUG, dtype, buf, len);
+#endif
 
     // Ignore empty payloads that should have been blocked by our interpositions
     if (len <= MIN_PKT) {

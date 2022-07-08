@@ -11,7 +11,7 @@ title: Known Issues
 As of this AppScope release, known issues include:
 
 - [#1017](https://github.com/criblio/appscope/issues/1017) AppScope incorrectly handles the single-byte message that web clients sometimes send before their ClientHello message. When you scope a server with TLS enabled, this can cause AppScope to fail to produce HTTP events.
-  - **Fix:** 1.1.1
+  - **Fix:** 1.1.1, in [#1018](https://github.com/criblio/appscope/issues/1018)
 
 ## AppScope 1.0.3
 

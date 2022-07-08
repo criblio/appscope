@@ -125,47 +125,39 @@ LD_PRELOAD=/opt/scope/libscope.so
 
 ### Deploying the Library in an AWS Lambda Function
 
-You can interpose the `libscope.so` library into an AWS Lambda function as a [Lambda layer](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html), using these steps. By default, Lambda functions use `lib` as their `LD_LIBRARY_PATH`, which makes loading AppScope very easy.
+You can interpose the `libscope.so` library into an AWS Lambda function as a [Lambda layer](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html). By default, Lambda functions use `lib` as their `LD_LIBRARY_PATH`, which makes loading AppScope easy.
 
-1. Run `scope extract`.
+Assuming that you have [created](https://aws.amazon.com/lambda/getting-started/) one or more AWS Lambda functions, all you need to do is add the Lambda layer, then set environment variables for the Lambda function.
 
-```
-mkdir lib
-scope extract ./lib
-```
+#### Adding an AppScope AWS Lambda Layer
 
-2. Modify the `scope.yml` configuration file as appropriate.
+1. Start with one of the AWS Lambda Layers for AppScope that Cribl provides. You can obtain the AWS Lambda Layers and their MD5 checksums from the Cribl CDN, or via Docker. See the Cribl [downloads page](https://cribl.io/download/#tab-1). 
+2. Complete the procedure for creating a layer described in the [AWS docs](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-create), uploading your AppScope AWS Lambda Layer ZIP file in the **upload your layer code** step, and choosing `x86_64` or `ARM64`, as appropriate, for **Compatible architectures**.
+3. After you click **Create**, note the **Version ARN** shown for your newly-created layer.
+4. Navigate to **Lambda** > **Layers** > **Add layer**, and in the **Choose a layer** section, select **Specify an ARN**. 
+5. Enter your layer's ARN, click **Verify**, and then click **Add**.  
 
-3. Compress `libscope.so` into a `.zip` file:
+#### Setting the Lambda Function's Environment Variables
 
-```
-tar pvczf lambda_layer.zip lib/
-```
+The AWS docs [explain](https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html) how to set environmental variables for Lambda functions. You'll need to enter the following AppScope environment variable settings in the AWS UI.
 
-4. Create a [Lambda layer](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-create), and associate the runtimes you want to use with AppScope in your Lambda functions. 
+1. `LD_PRELOAD` gets your Lambda function working with AppScope.
 
-5. Upload the `lambda_layer.zip` file created in Step 3.
+    - `LD_PRELOAD=libscope.so`
 
-6. Add the custom layer to your Lambda function by selecting the previously created layer and version. 
+2. `SCOPE_EXEC_PATH` is required for static executables (like the Go runtime).
 
-#### Environment Variables
+    - `SCOPE_EXEC_PATH=/lib/ldscope`
 
-At a minimum, you must set the `LD_PRELOAD` environment variable in your Lambda configuration:
+3. To tell AppScope where to deliver events, the required environment variable depends on your desired [Data Routing](data-routing).
 
-```
-LD_PRELOAD=libscope.so
-```
+    - For example, `SCOPE_CRIBL_CLOUD` is required for an [AppScope Source](https://docs.cribl.io/stream/sources-appscope) in a Cribl.Cloud-managed instance of Cribl Stream. (Substitute your host and port values for the placeholders.)
 
-For static executables (like the Go runtime), set `SCOPE_EXEC_PATH` to run `ldscope`:
+    - `SCOPE_CRIBL_CLOUD=tcp://<host>:<port>`
 
-```
-SCOPE_EXEC_PATH=/lib/ldscope
-```
+4. Optionally, set additional environment variables as desired. 
 
-You must also tell AppScope where to deliver events. This can be accomplished by setting any one of the following environment variables:
+    - For example, `SCOPE_CONF_PATH` ensures that your Lambda function uses AppScope with the correct config file. (Edit the path if yours is different.)
 
-- `SCOPE_CONF_PATH=/opt/scope/assets/scope.yml`
+    - `SCOPE_CONF_PATH=/opt/scope/assets/scope.yml`
 
-- `SCOPE_EVENT_DEST=tcp://host:port`, which also requires `SCOPE_CRIBL_ENABLE=false`
-
-- `SCOPE_CRIBL=tcp://host:port`

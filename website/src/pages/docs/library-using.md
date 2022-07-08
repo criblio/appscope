@@ -139,7 +139,7 @@ Assuming that you have [created](https://aws.amazon.com/lambda/getting-started/)
 
 #### Setting the Lambda Function's Environment Variables
 
-The AWS docs [explain](https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html) how to set environmental variables for Lambda functions. The relevant AppScope environment variables are as follows:
+The AWS docs [explain](https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html) how to set environmental variables for Lambda functions. You'll need to enter the following AppScope environment variable settings in the AWS UI.
 
 1. `LD_PRELOAD` gets your Lambda function working with AppScope.
 

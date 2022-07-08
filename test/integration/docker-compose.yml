@@ -256,4 +256,12 @@ services:
     privileged: true
     <<: *scope-common
 
+  sshd:
+    image: ghcr.io/criblio/appscope-test-sshd:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-sshd:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./sshd/Dockerfile
+    <<: *scope-common
 # vim: ts=2 sw=2 et :

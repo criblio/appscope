@@ -25,7 +25,7 @@ var serviceCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		// must be root
-		if 0 != os.Getuid() {
+		if os.Getuid() != 0 {
 			util.ErrAndExit("error: must be run as root")
 		}
 

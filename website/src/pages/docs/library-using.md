@@ -127,7 +127,7 @@ LD_PRELOAD=/opt/scope/libscope.so
 
 You can interpose the `libscope.so` library into an AWS Lambda function as a [Lambda layer](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html). By default, Lambda functions use `lib` as their `LD_LIBRARY_PATH`, which makes loading AppScope easy.
 
-Assuming that you have created one or more AWS Lambda functions as described [here](https://aws.amazon.com/lambda/getting-started/), all you need to do is add the Lambda layer, then set environment variables for the Lambda function.
+Assuming that you have [created](https://aws.amazon.com/lambda/getting-started/) one or more AWS Lambda functions, all you need to do is add the Lambda layer, then set environment variables for the Lambda function.
 
 #### Adding an AppScope AWS Lambda Layer
 
@@ -139,29 +139,25 @@ Assuming that you have created one or more AWS Lambda functions as described [he
 
 #### Setting the Lambda Function's Environment Variables
 
-The AWS documentation [explains](https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html) how to set environmental variables for Lambda functions. 
+The AWS docs [explain](https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html) how to set environmental variables for Lambda functions. The relevant AppScope environment variables are as follows:
 
-To get your Lambda function working with AppScope, begin by setting `LD_PRELOAD`:
+1. `LD_PRELOAD` gets your Lambda function working with AppScope.
 
-```
-LD_PRELOAD=libscope.so
-```
+    - `LD_PRELOAD=libscope.so`
 
-For static executables (like the Go runtime), set `SCOPE_EXEC_PATH` to run `ldscope`:
+2. `SCOPE_EXEC_PATH` is required for static executables (like the Go runtime).
 
-```
-SCOPE_EXEC_PATH=/lib/ldscope
-```
+    - `SCOPE_EXEC_PATH=/lib/ldscope`
 
-You must also tell AppScope where to deliver events. To do this, set any one of the following environment variables, substituting your real host and port values for the placeholders:
+3. To tell AppScope where to deliver events, the required environment variable depends on your desired [Data Routing](data-routing).
 
-- `SCOPE_CONF_PATH=/opt/scope/assets/scope.yml` – edit the path if yours is different.
+    - For example, `SCOPE_CRIBL_CLOUD` is required for an [AppScope Source](https://docs.cribl.io/stream/sources-appscope) in a Cribl.Cloud-managed instance of Cribl Stream. (Substitute your host and port values for the placeholders.)
 
-- `SCOPE_EVENT_DEST=tcp://<host>:<port>` – also requires `SCOPE_CRIBL_ENABLE=false`.
+    - `SCOPE_CRIBL_CLOUD=tcp://<host>:<port>`
 
-- `SCOPE_CRIBL=tcp://<host>:<port>`
+4. Optionally, set additional environment variables as desired. 
 
-- `SCOPE_CRIBL=edge` – this is what you'd use for an [AppScope Source](https://docs.cribl.io/edge/sources-appscope) in Cribl Edge.
+    - For example, `SCOPE_CONF_PATH` ensures that your Lambda function uses AppScope with the correct config file. (Edit the path if yours is different.)
 
-- `SCOPE_CRIBL_CLOUD=tcp://<host>:<port>` – this is what you'd use for an [AppScope Source](https://docs.cribl.io/stream/sources-appscope) in a Cribl.Cloud-managed instance of Cribl Stream.
+    - `SCOPE_CONF_PATH=/opt/scope/assets/scope.yml`
 

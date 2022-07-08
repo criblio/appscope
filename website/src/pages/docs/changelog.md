@@ -9,13 +9,16 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 
 2022-07-12 - Maintenance Release
 
-Assets are available via Docker and the Cribl CDN at the links below.
+Assets are available from the Cribl CDN at the links below.
 
-- `Docker`: `cribl/scope:1.1.1`
 - `AppScope for x86`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/scope)
 - `AppScope for ARM`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/scope)
 - `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/aws-lambda-layer.zip)
 - `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/aws-lambda-layer.zip)
+
+Assets other than AWS Lambda Layers are available via Docker.
+
+- `Docker`: `cribl/scope:1.1.1`
 
 ### New Features and Improvements
 

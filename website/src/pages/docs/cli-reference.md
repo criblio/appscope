@@ -496,7 +496,7 @@ Configures the specified `systemd` service to be scoped upon starting.
 #### Examples
 
 ```
-scope service  cribl -c tls://in.my-instance.cribl.cloud:10090
+scope service cribl -c tls://in.my-instance.cribl.cloud:10090
 ```
 
 #### Flags

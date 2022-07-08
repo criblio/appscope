@@ -21,7 +21,7 @@ var serviceCmd = &cobra.Command{
 	Use:     "service SERVICE [flags]",
 	Short:   "Configure a systemd service to be scoped",
 	Long:    `Configures the specified systemd service to be scoped upon starting.`,
-	Example: `scope service  cribl -c tls://in.my-instance.cribl.cloud:10090`,
+	Example: `scope service cribl -c tls://in.my-instance.cribl.cloud:10090`,
 	Args:    cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		// must be root

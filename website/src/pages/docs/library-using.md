@@ -161,4 +161,7 @@ You must also tell AppScope where to deliver events. To do this, set any one of 
 
 - `SCOPE_CRIBL=tcp://<host>:<port>`
 
-- `SCOPE_CRIBL_CLOUD=tcp://<host>:<port>`
+- `SCOPE_CRIBL=edge` – this is what you'd use for an [AppScope Source](https://docs.cribl.io/edge/sources-appscope) in Cribl Edge.
+
+- `SCOPE_CRIBL_CLOUD=tcp://<host>:<port>` – this is what you'd use for an [AppScope Source](https://docs.cribl.io/stream/sources-appscope) in a Cribl.Cloud-managed instance of Cribl Stream.
+

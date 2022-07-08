@@ -21,9 +21,7 @@ Assets are available via Docker and the Cribl CDN at the links below.
 
 ### New Features and Improvements
 
-AppScope 1.1.1 introduces downloadable AWS Lambda Layer assets:
-
-- [#1017](https://github.com/criblio/appscope/issues/1017) AppScope downloadable assets now include an [AWS Lambda Layer](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-concepts.html#gettingstarted-concepts-layer) for x86, `aws-lambda-layer-x86_64.zip`, and one for ARM, `aws-lambda-layer-aarch64.zip`, along with their respective MD5 checksums.
+- [#1017](https://github.com/criblio/appscope/issues/1017) AppScope downloadable assets now include [AWS Lambda Layers](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-concepts.html#gettingstarted-concepts-layer) for x86 and for ARM, along with their respective MD5 checksums.
 
 ### Fixes
 

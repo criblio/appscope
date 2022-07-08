@@ -1,10 +1,34 @@
 ---
 title: Changelog
 ---
-
 # Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
+
+## AppScope 1.1.1
+
+2022-07-12 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.1.1`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/aws-lambda-layer-x86_64.zip](https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/aws-lambda-layer-x86_64.zip)
+  - `MD5 checksum`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/aws-lambda-layer-x86_64.zip.md5](https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/aws-lambda-layer-x86_64.zip.md5)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/aws-lambda-layer-aarch64.zip](https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/aws-lambda-layer-aarch64.zip)
+  - `MD5 checksum`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/aws-lambda-layer-aarch64.zip.md5](https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/aws-lambda-layer-aarch64.zip.md5)
+
+### New Features and Improvements
+
+AppScope 1.1.1 introduces downloadable AWS Lambda Layer assets:
+
+- [#1017](https://github.com/criblio/appscope/issues/1017) AppScope downloadable assets now include an [AWS Lambda Layer](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-concepts.html#gettingstarted-concepts-layer) for x86, `aws-lambda-layer-x86_64.zip`, and one for ARM, `aws-lambda-layer-aarch64.zip`, along with their respective MD5 checksums.
+
+### Fixes
+
+- [#1017](https://github.com/criblio/appscope/issues/1017) AppScope now correctly handles the single-byte message that web clients sometimes send before their ClientHello message. This enables AppScope to correctly produce HTTP events when you scope a server with TLS enabled.
+- [#1006](https://github.com/criblio/appscope/issues/1006) AppScope now correctly instruments the child processes of an sshd process started by a server. Prior to this, AppScope already instrumented the parent sshd process by interposing the `execve` system call. Now, in order to instrument the child sshd processes too, AppScope also interposes the `execv` system call, and overrides some of the sandboxing that sshd normally imposes using `setrlimit`. Changing `setrlimit` settings enables AppScope to perform actions required by AppScope's configured backend and transport, such as establishing connections, creating threads, and creating files.
 
 ## AppScope 1.1.0
 

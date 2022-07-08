@@ -26,8 +26,9 @@ Assets other than AWS Lambda Layers are available via Docker.
 
 ### Fixes
 
-- [#1017](https://github.com/criblio/appscope/issues/1017) AppScope now correctly handles the single-byte message that web clients sometimes send before their ClientHello message. This enables AppScope to correctly produce HTTP events when you scope a server with TLS enabled.
-- [#1006](https://github.com/criblio/appscope/issues/1006) AppScope now correctly instruments the child processes of an sshd process started by a server. Prior to this, AppScope already instrumented the parent sshd process by interposing the `execve` system call. Now, in order to instrument the child sshd processes too, AppScope also interposes the `execv` system call, and overrides some of the sandboxing that sshd normally imposes using `setrlimit`. Changing `setrlimit` settings enables AppScope to perform actions required by AppScope's configured backend and transport, such as establishing connections, creating threads, and creating files.
+- [#1017](https://github.com/criblio/appscope/issues/1017) AppScope now correctly handles the "peek" flag in interposed functions that receive network data. Before this change, when a server "peeked" at the first byte of data, AppScope counted that byte twice, which broke protocol detection. This fix enables AppScope to correctly produce HTTP events when scoping a server that uses "peek" flags.
+
+- [#1006](https://github.com/criblio/appscope/issues/1006) AppScope now correctly instruments the child processes of an sshd process started by a server. To do this, AppScope interposes both the `execve` and `execv` system calls, and overrides some of the sandboxing that sshd normally imposes using `setrlimit`. Interposing `execv` is new, and gives AppScope visibility into sshd child processes. Changing `setrlimit` settings enables AppScope to perform actions required by AppScope's configured backend and transport, such as establishing connections, creating threads, and creating files.
 
 ## AppScope 1.1.0
 

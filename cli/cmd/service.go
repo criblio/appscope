@@ -120,7 +120,7 @@ func installScope(serviceName string, unameMachine string, unameSysname string, 
 	}
 
 	// create the config directory
-	configBaseDir := fmt.Sprintf("/etc/scope")
+	configBaseDir := "/etc/scope"
 	if _, err := os.Stat(configBaseDir); err != nil {
 		err := os.Mkdir(configBaseDir, 0755)
 		util.CheckErrSprintf(err, "error: failed to create config base directory; %v", err)
@@ -132,14 +132,14 @@ func installScope(serviceName string, unameMachine string, unameSysname string, 
 	}
 
 	// create the log directory
-	logDir := fmt.Sprintf("/var/log/scope")
+	logDir := "/var/log/scope"
 	if _, err := os.Stat(logDir); err != nil {
 		err := os.Mkdir(logDir, 0755) // TODO chown/chgrp to who?
 		util.CheckErrSprintf(err, "error: failed to create log directory; %v", err)
 	}
 
 	// create the run directory
-	runDir := fmt.Sprintf("/var/run/scope")
+	runDir := "/var/run/scope"
 	if _, err := os.Stat(runDir); err != nil {
 		err := os.Mkdir(runDir, 0755) // TODO chown/chgrp to who?
 		util.CheckErrSprintf(err, "error: failed to create run directory; %v", err)

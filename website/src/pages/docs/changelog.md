@@ -12,16 +12,14 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 Assets are available via Docker and the Cribl CDN at the links below.
 
 - `Docker`: `cribl/scope:1.1.1`
-- `x86`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/scope)
-- `ARM`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/scope)
-- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/aws-lambda-layer-x86_64.zip](https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/aws-lambda-layer-x86_64.zip)
-  - `MD5 checksum`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/aws-lambda-layer-x86_64.zip.md5](https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/aws-lambda-layer-x86_64.zip.md5)
-- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/aws-lambda-layer-aarch64.zip](https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/aws-lambda-layer-aarch64.zip)
-  - `MD5 checksum`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/aws-lambda-layer-aarch64.zip.md5](https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/aws-lambda-layer-aarch64.zip.md5)
+- `AppScope for x86`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/scope)
+- `AppScope for ARM`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/aws-lambda-layer.zip)
 
 ### New Features and Improvements
 
-- [#1017](https://github.com/criblio/appscope/issues/1017) AppScope downloadable assets now include [AWS Lambda Layers](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-concepts.html#gettingstarted-concepts-layer) for x86 and for ARM, along with their respective MD5 checksums.
+- [#964](https://github.com/criblio/appscope/issues/964) AppScope downloadable assets now include [AWS Lambda Layers](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-concepts.html#gettingstarted-concepts-layer) for x86 and for ARM, along with their respective MD5 checksums.
 
 ### Fixes
 

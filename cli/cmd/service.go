@@ -207,6 +207,15 @@ func installSystemd(serviceName string, unameMachine string, unameSysname string
 		content := fmt.Sprintf("[Service]\nEnvironment=LD_PRELOAD=%s\nEnvironment=SCOPE_HOME=/etc/scope/%s\n", libraryPath, serviceName)
 		err := ioutil.WriteFile(envConfPath, []byte(content), 0644)
 		util.CheckErrSprintf(err, "error: failed to create override file; %v", err)
+	} else {
+		rawBytes, err := ioutil.ReadFile(envConfPath)
+		util.CheckErrSprintf(err, "error: failed to read a override file %s; %v", envConfPath, err)
+		fileContent := string(rawBytes)
+		if !strings.Contains(fileContent, "Environment=SCOPE_HOME=/etc/scope") {
+			content := fmt.Sprintf("[Service]\nEnvironment=LD_PRELOAD=%s\nEnvironment=SCOPE_HOME=/etc/scope/%s\n", libraryPath, serviceName)
+			err := ioutil.WriteFile(envConfPath, []byte(content), 0644)
+			util.CheckErrSprintf(err, "error: failed to update override file %s; %v", envConfPath, err)
+		}
 	}
 
 	fmt.Printf("\nThe %s service has been updated to run with AppScope.\n", serviceName)
@@ -241,6 +250,15 @@ func installInitd(serviceName string, unameMachine string, unameSysname string, 
 		content := fmt.Sprintf("LD_PRELOAD=%s\nSCOPE_HOME=/etc/scope/%s\n", libraryPath, serviceName)
 		err := ioutil.WriteFile(sysconfigFile, []byte(content), 0644)
 		util.CheckErrSprintf(err, "error: failed to create sysconfig file; %v", err)
+	} else {
+		rawBytes, err := ioutil.ReadFile(sysconfigFile)
+		util.CheckErrSprintf(err, "error: failed to read a override file %s; %v", sysconfigFile, err)
+		fileContent := string(rawBytes)
+		if !strings.Contains(fileContent, "Environment=SCOPE_HOME=/etc/scope") {
+			content := fmt.Sprintf("[Service]\nEnvironment=LD_PRELOAD=%s\nEnvironment=SCOPE_HOME=/etc/scope/%s\n", libraryPath, serviceName)
+			err := ioutil.WriteFile(sysconfigFile, []byte(content), 0644)
+			util.CheckErrSprintf(err, "error: failed to update sysconfig file %s; %v", sysconfigFile, err)
+		}
 	}
 
 	fmt.Printf("\nThe %s service has been updated to run with AppScope.\n", serviceName)

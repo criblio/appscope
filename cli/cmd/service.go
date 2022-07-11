@@ -171,12 +171,11 @@ func installScope(serviceName string, unameMachine string, unameSysname string, 
 
 func installSystemd(serviceName string, unameMachine string, unameSysname string, libcName string) {
 	serviceFile := "/etc/systemd/system/" + serviceName + ".service"
-	if _, err := os.Stat(serviceFile); err != nil {
+	if !util.CheckFileExists(serviceFile) {
 		serviceFile = "/run/systemd/system/" + serviceName + ".service"
-		if _, err := os.Stat(serviceFile); err != nil {
+		if !util.CheckFileExists(serviceFile) {
 			serviceFile = "/usr/lib/systemd/system/" + serviceName + ".service"
-			if _, err := os.Stat(serviceFile); err != nil {
-				serviceFile = "/usr/lib/systemd/system/" + serviceName + ".service"
+			if !util.CheckFileExists(serviceFile) {
 				util.ErrAndExit("error: didn't find service file; " + serviceName + ".service")
 			}
 		}

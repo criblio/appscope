@@ -57,13 +57,13 @@ var serviceCmd = &cobra.Command{
 		libcName := "gnu"
 
 		// Systemd
-		if _, err := os.Stat("/etc/systemd"); err == nil {
+		if util.CheckDirExists("/etc/systemd") {
 			installSystemd(serviceName, unameMachine, unameSysname, libcName)
 			os.Exit(0)
 		}
 
 		// Init.d
-		if _, err := os.Stat("/etc/init.d"); err == nil {
+		if util.CheckDirExists("/etc/init.d") {
 			installInitd(serviceName, unameMachine, unameSysname, libcName)
 			os.Exit(0)
 		}
@@ -98,21 +98,21 @@ func confirm(s string) bool {
 func installScope(serviceName string, unameMachine string, unameSysname string, libcName string) string {
 	// determine the library directory
 	libraryDir := fmt.Sprintf("/usr/lib/%s-%s-%s", unameMachine, unameSysname, libcName)
-	if _, err := os.Stat(libraryDir); err != nil {
+	if !util.CheckDirExists(libraryDir) {
 		libraryDir = "/usr/lib64"
-		if _, err := os.Stat(libraryDir); err != nil {
+		if !util.CheckDirExists(libraryDir) {
 			util.ErrAndExit("error: failed to determine library directory")
 		}
 	}
 
 	// extract the library
 	libraryDir = libraryDir + "/cribl"
-	if _, err := os.Stat(libraryDir); err != nil {
+	if !util.CheckDirExists(libraryDir) {
 		err := os.Mkdir(libraryDir, 0755)
 		util.CheckErrSprintf(err, "error: failed to create library directory; %v", err)
 	}
 	libraryPath := libraryDir + "/libscope.so"
-	if _, err := os.Stat(libraryPath); err != nil {
+	if !util.CheckFileExists(libraryPath) {
 		asset, err := run.Asset("build/libscope.so")
 		util.CheckErrSprintf(err, "error: failed to find libscope.so asset; %v", err)
 		err = ioutil.WriteFile(libraryPath, asset, 0755)
@@ -121,26 +121,26 @@ func installScope(serviceName string, unameMachine string, unameSysname string, 
 
 	// create the config directory
 	configBaseDir := "/etc/scope"
-	if _, err := os.Stat(configBaseDir); err != nil {
+	if !util.CheckDirExists(configBaseDir) {
 		err := os.Mkdir(configBaseDir, 0755)
 		util.CheckErrSprintf(err, "error: failed to create config base directory; %v", err)
 	}
 	configDir := fmt.Sprintf("/etc/scope/%s", serviceName)
-	if _, err := os.Stat(configDir); err != nil {
+	if !util.CheckDirExists(configDir) {
 		err := os.Mkdir(configDir, 0755)
 		util.CheckErrSprintf(err, "error: failed to create config directory; %v", err)
 	}
 
 	// create the log directory
 	logDir := "/var/log/scope"
-	if _, err := os.Stat(logDir); err != nil {
+	if !util.CheckDirExists(logDir) {
 		err := os.Mkdir(logDir, 0755) // TODO chown/chgrp to who?
 		util.CheckErrSprintf(err, "error: failed to create log directory; %v", err)
 	}
 
 	// create the run directory
 	runDir := "/var/run/scope"
-	if _, err := os.Stat(runDir); err != nil {
+	if !util.CheckDirExists(runDir) {
 		err := os.Mkdir(runDir, 0755) // TODO chown/chgrp to who?
 		util.CheckErrSprintf(err, "error: failed to create run directory; %v", err)
 	}
@@ -213,7 +213,7 @@ func installSystemd(serviceName string, unameMachine string, unameSysname string
 
 func installInitd(serviceName string, unameMachine string, unameSysname string, libcName string) {
 	initScript := "/etc/init.d/" + serviceName
-	if _, err := os.Stat(initScript); err != nil {
+	if !util.CheckFileExists(initScript) {
 		util.ErrAndExit("error: didn't find service script; " + initScript)
 	}
 
@@ -232,7 +232,7 @@ func installInitd(serviceName string, unameMachine string, unameSysname string, 
 	libraryPath := installScope(serviceName, unameMachine, unameSysname, libcName)
 
 	sysconfigFile := "/etc/sysconfig/" + serviceName
-	if _, err := os.Stat(sysconfigFile); err != nil {
+	if !util.CheckFileExists(sysconfigFile) {
 		content := fmt.Sprintf("LD_PRELOAD=%s\nSCOPE_HOME=/etc/scope/%s\n", libraryPath, serviceName)
 		err := ioutil.WriteFile(sysconfigFile, []byte(content), 0644)
 		util.CheckErrSprintf(err, "error: failed to create sysconfig file; %v", err)

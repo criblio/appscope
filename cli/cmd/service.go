@@ -147,24 +147,18 @@ func installScope(serviceName string, unameMachine string, unameSysname string, 
 
 	// extract scope.yml
 	configPath := fmt.Sprintf("/etc/scope/%s/scope.yml", serviceName)
-	if _, err := os.Stat(configPath); err != nil {
-		asset, err := run.Asset("build/scope.yml")
-		util.CheckErrSprintf(err, "error: failed to find scope.yml asset; %v", err)
-		err = ioutil.WriteFile(configPath, asset, 0644)
-		util.CheckErrSprintf(err, "error: failed to extract scope.yml; %v", err)
-		if rc.MetricsDest != "" || rc.EventsDest != "" || rc.CriblDest != "" {
-			examplePath := fmt.Sprintf("/etc/scope/%s/scope_example.yml", serviceName)
-			err = os.Rename(configPath, examplePath)
-			util.CheckErrSprintf(err, "error: failed to move scope.yml to scope_example.yml; %v", err)
-			rc.WorkDir = configDir
-			rc.SetDefault()
-			sc := rc.GetScopeConfig()
-			sc.Libscope.Log.Transport.Path = logDir + "/cribl.log"
-			sc.Libscope.CommandDir = runDir
-			err = rc.WriteScopeConfig(configPath, 0644)
-			util.CheckErrSprintf(err, "error: failed to create scope.yml: %v", err)
-		}
-	}
+	asset, err := run.Asset("build/scope.yml")
+	util.CheckErrSprintf(err, "error: failed to find scope.yml asset; %v", err)
+	err = ioutil.WriteFile(configPath, asset, 0644)
+	util.CheckErrSprintf(err, "error: failed to extract scope.yml; %v", err)
+	examplePath := fmt.Sprintf("/etc/scope/%s/scope_example.yml", serviceName)
+	err = os.Rename(configPath, examplePath)
+	util.CheckErrSprintf(err, "error: failed to move scope.yml to scope_example.yml; %v", err)
+	rc.WorkDir = configDir
+	rc.CommandDir = runDir
+	rc.LogDest = "file://" + logDir + "/cribl.log"
+	err = rc.WriteScopeConfig(configPath, 0644)
+	util.CheckErrSprintf(err, "error: failed to create scope.yml: %v", err)
 
 	return libraryPath
 }

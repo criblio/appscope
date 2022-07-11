@@ -268,6 +268,17 @@ func (c *Config) configFromRunOpts() error {
 		}
 	}
 
+	if c.LogDest != "" {
+		err := parseDest(&c.sc.Libscope.Log.Transport, c.LogDest)
+		if err != nil {
+			return err
+		}
+	}
+
+	if c.CommandDir != "" {
+		c.sc.Libscope.CommandDir = c.CommandDir
+	}
+
 	// Add AuthToken to config regardless of cribldest being set
 	// To support mixing of config and environment variables
 	c.sc.Cribl.AuthToken = c.AuthToken

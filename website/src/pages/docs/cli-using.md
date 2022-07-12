@@ -66,8 +66,6 @@ Suppose you want to scope HTTP requests to a weather forecast service, looking a
 
 You could use the `X-Appscope` header to do your labeling:
 
-<!-- TBD - can this just be scope rather than ldscope? -->
-
 ```
 scope curl --header "X-Appscope: Canada" wttr.in/calgary
 scope curl --header "X-Appscope: Canada" wttr.in/ottawa

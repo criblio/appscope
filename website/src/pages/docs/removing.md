@@ -4,10 +4,10 @@ title: Removing
 
 ## Removing
 
-You can remove AppScope by simply deleting the binary (along with the rest of the contents of the `scope` directory):
+You can remove AppScope by simply deleting the binary (along with the rest of the contents of the `SCOPE_HOME` directory):
 
 ```
-rm -rf /opt/scope/
+rm -rf /opt/appscope/
 ```
 
 …and the associated history directory:

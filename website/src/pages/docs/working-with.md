@@ -34,7 +34,6 @@ Here's a decision tree to help you determine whether to use the CLI or the libra
 
 ![CLI vs. Library Decision Tree](./images/appscope_tree@2x.jpg)
 
-
 ## The Config File, Env Vars, Flags, and `ldscope` {#config-file-etc}
 
 AppScope's ease of use stems from its flexible set of controls:

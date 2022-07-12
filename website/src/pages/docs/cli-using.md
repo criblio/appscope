@@ -14,7 +14,7 @@ To learn more, see the [CLI Reference](/docs/cli-reference), and/or run `scope 
 
 ### CLI Basics
 
-The basic AppScope CLI command is `scope`. The following examples progress from simple to more involved. Scoping a running process gets [its own section](/docs/scope-running). The final section explains how to scope an app that generates a large data set, and then [explore](/docs/explore-captured) that data.
+The basic AppScope CLI command is `scope`. The following examples progress from simple to more involved. Scoping a running process gets [its own section](#scope-running). The final section explains how to scope an app that generates a large data set, and then [explore](#explore-captured) that data.
 
 #### Scope a New Process 
 

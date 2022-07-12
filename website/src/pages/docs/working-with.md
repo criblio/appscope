@@ -48,12 +48,12 @@ Check out the [CLI](/docs/cli-using) and [library](/docs/library-using) pages to
 
 ## Events and Metrics in AppScope {#events-and-metrics}
 
-When AppScope has [interposed a function](how-works), and then the application being scoped executes that function, AppScope can emit events and metrics. Both events and metrics follow patterns that are rigorously defined in validatable [JSON Schema](https://json-schema.org/), and documented in the [Schema Reference](schema-reference).
+When AppScope has [interposed a function](/docs/how-works), and then the application being scoped executes that function, AppScope can emit events and metrics. Both events and metrics follow patterns that are rigorously defined in validatable [JSON Schema](https://json-schema.org/), and documented in the [Schema Reference](/docs/schema-reference).
 
 Events describe the action performed by the interposed function. For example, a `net.open` event could tell you that a network connection was established by Firefox, from the local IP/port `172.16.198.210:54388` to the remote IP/port `34.107.221.82:80`, using HTTP over TCP.
 
 Metrics can do any of three things:
-* When verbosity is set to lower values, metrics summarize aspects of the action performed by the interposed function, for a reporting period that defaults to 10 seconds. (See the `Metric verbosity level` section of the [config file](config-file).) For example, a `fs.read` metric could tell you that an `httpd` process has read a total of 320967 bytes from the filesystem, having performed multiple reads over a 10-second period.
+* When verbosity is set to lower values, metrics summarize aspects of the action performed by the interposed function, for a reporting period that defaults to 10 seconds. (See the `Metric verbosity level` section of the [config file](/docs/config-file).) For example, a `fs.read` metric could tell you that an `httpd` process has read a total of 320967 bytes from the filesystem, having performed multiple reads over a 10-second period.
 * When verbosity is set to higher values, metrics provide details about the action performed by the interposed function in real time. For example, an `fs.read` metric could tell you that an `httpd` process has done one read of 8245 bytes from one specific file, `/etc/httpd/conf/httpd.conf`.
 * When the metric name begins with `proc`, metrics periodically report information about resource usage at a point in time. For example, a `proc.mem` metric could tell you that `httpd` is currently using 62,123 KB of memory.
 
@@ -72,4 +72,4 @@ For example, `proc.fd` is a `gauge` that indicates how many files were open at o
 
 It's important to take into account whether the application or command you are scoping is short-lived or longer-lasting. For commands that complete very quickly, a `gauge` will report the value at the moment that AppScope exits the process.
 
-By default, all classes of events and metrics are turned on – but you can turn any class of metric or event data on or off individually. To do this, include or omit the desired watch type(s) from the `metric > watch[*]` array and/or the `event > watch[*]` array in the [config file](config-file). Environment variables can achieve the same effect. For example, the environment variable to turn off metrics of watch type `statsd` would be `SCOPE_METRIC_STATSD=false`. To turn on events of watch type `logfile`, you'd use `SCOPE_EVENT_LOGFILE=true`.
+By default, all classes of events and metrics are turned on – but you can turn any class of metric or event data on or off individually. To do this, include or omit the desired watch type(s) from the `metric > watch[*]` array and/or the `event > watch[*]` array in the [config file](/docs/config-file). Environment variables can achieve the same effect. For example, the environment variable to turn off metrics of watch type `statsd` would be `SCOPE_METRIC_STATSD=false`. To turn on events of watch type `logfile`, you'd use `SCOPE_EVENT_LOGFILE=true`.

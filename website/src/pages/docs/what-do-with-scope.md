@@ -21,7 +21,7 @@ AppScope collects and forwards StatsD-style metrics about running applications. 
 
 ## Use Cases
 
-You could do any of the following with AppScope (see [Further Examples](examples-use-cases) for details):
+You could do any of the following with AppScope (see [Further Examples](/docs/examples-use-cases) for details):
 
 - Send HTTP events from Slack to a specified Splunk server.
 - Send metrics from nginx to a specified Datadog server.

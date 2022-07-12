@@ -181,12 +181,7 @@ net.rx           401        Count    byte           5470    class: unix_tcp,host
 net.tx           361        Count    byte           5470    class: unix_tcp,host: my_hostname,proc: ps,summary: …
 fs.seek          150        Count    operation      5470    host: my_hostname,proc: ps,summary: true
 fs.stat          136        Count    operation      5470    host: my_hostname,proc: ps,summary: true
-fs.open          396        Count    operation      5470    host: my_hostname,proc: ps,summary: true
-fs.close         394        Count    operation      5470    host: my_hostname,proc: ps,summary: true
-fs.duration      4          Count    microsecond    5470    host: my_hostname,proc: ps,summary: true
-net.error        3          Count    operation      5470    class: rx_tx,host: my_hostname,proc: ps,summary: true
-fs.error         191        Count    operation      5470    class: read_write,host: my_hostname,proc: ps,summary…
-fs.error         11         Count    operation      5470    class: stat,host: my_hostname,proc: ps,summary: true
+...
 ```
 
 Plot a chart of last session's `proc.cpu` metric with `scope metrics -m proc.cpu -g`:
@@ -225,19 +220,7 @@ Display the last session's captured events with `scope events`:
 [vQA1] Jul 12 02:11:15 ps fs fs.open file:/proc/17721/cmdline
 [IXA1] Jul 12 02:11:15 ps fs fs.close file:/proc/17721/cmdline file_read_bytes:0 file_read_ops:1 file_write_bytes:0 file_write_ops:0
 [s6B1] Jul 12 02:11:15 ps fs fs.open file:/proc/17758/stat
-[EdB1] Jul 12 02:11:15 ps fs fs.close file:/proc/17758/stat file_read_bytes:341 file_read_ops:1 file_write_bytes:0 file_write_ops:0
-[mmB1] Jul 12 02:11:15 ps fs fs.open file:/proc/17758/status
-[ytB1] Jul 12 02:11:15 ps fs fs.close file:/proc/17758/status file_read_bytes:1313 file_read_ops:1 file_write_bytes:0 file_write_ops:0
-[kCB1] Jul 12 02:11:15 ps fs fs.open file:/proc/17758/cmdline
-[yJB1] Jul 12 02:11:15 ps fs fs.close file:/proc/17758/cmdline file_read_bytes:21 file_read_ops:2 file_write_bytes:0 file_write_ops:0
-[hSB1] Jul 12 02:11:15 ps fs fs.open file:/proc/31597/stat
-[tZB1] Jul 12 02:11:15 ps fs fs.close file:/proc/31597/stat file_read_bytes:182 file_read_ops:1 file_write_bytes:0 file_write_ops:0
-[b8C1] Jul 12 02:11:15 ps fs fs.open file:/proc/31597/status
-[ofC1] Jul 12 02:11:15 ps fs fs.close file:/proc/31597/status file_read_bytes:967 file_read_ops:1 file_write_bytes:0 file_write_ops:0
-[9oC1] Jul 12 02:11:15 ps fs fs.open file:/proc/31597/cmdline
-[ovC1] Jul 12 02:11:15 ps fs fs.close file:/proc/31597/cmdline file_read_bytes:0 file_read_ops:1 file_write_bytes:0 file_write_ops:0
-[7EC1] Jul 12 02:11:15 ps fs fs.close file:/proc file_read_bytes:0 file_read_ops:0 file_write_bytes:0 file_write_ops:0
-[EMC1] Jul 12 02:11:15 ps console stdout message:"UID        PID  PPID  C STIME TTY          TIME CMD root       …"
+...
 ```
 
 Now scope a command which produces HTTP and other kinds of events:

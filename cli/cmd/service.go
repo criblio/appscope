@@ -63,7 +63,7 @@ var serviceCmd = &cobra.Command{
 		}
 
 		// Init.d
-		if util.CheckFileExists("/etc/init.d") {
+		if util.CheckDirExists("/etc/init.d") {
 			installInitd(serviceName, unameMachine, unameSysname, libcName)
 			os.Exit(0)
 		}

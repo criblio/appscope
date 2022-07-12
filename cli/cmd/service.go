@@ -226,11 +226,12 @@ func installInitd(serviceName string, unameMachine string, unameSysname string, 
 	if !util.CheckFileExists(initScript) {
 		util.ErrAndExit("error: didn't find service script; " + initScript)
 	}
+	sysconfigFile := "/etc/sysconfig/" + serviceName
 
 	if !forceFlag {
 		fmt.Printf("\nThis command will make the following changes if not found already:\n")
 		fmt.Printf("  - install libscope.so into /usr/lib/%s-%s-%s/cribl/\n", unameMachine, unameSysname, libcName)
-		fmt.Printf("  - create /etc/sysconfig/%s\n", serviceName)
+		fmt.Printf("  - create %s\n", sysconfigFile)
 		fmt.Printf("  - create /etc/scope/%s/scope.yml\n", serviceName)
 		fmt.Printf("  - create /var/log/scope/\n")
 		fmt.Printf("  - create /var/run/scope/\n")
@@ -241,7 +242,6 @@ func installInitd(serviceName string, unameMachine string, unameSysname string, 
 
 	libraryPath := installScope(serviceName, unameMachine, unameSysname, libcName)
 
-	sysconfigFile := "/etc/sysconfig/" + serviceName
 	if !util.CheckFileExists(sysconfigFile) {
 		content := fmt.Sprintf("LD_PRELOAD=%s\nSCOPE_HOME=/etc/scope/%s\n", libraryPath, serviceName)
 		err := ioutil.WriteFile(sysconfigFile, []byte(content), 0644)

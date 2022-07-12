@@ -201,6 +201,15 @@ services:
       dockerfile: ./service/Dockerfile.systemd
     <<: *scope-common
 
+  service-openrc:
+    image: ghcr.io/criblio/appscope-test-service-openrc:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-service-openrc:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./service/Dockerfile.openrc
+    <<: *scope-common
+
   console:
     image: ghcr.io/criblio/appscope-test-console:${TAG:?Missing TAG environment variable}
     build:

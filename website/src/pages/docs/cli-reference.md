@@ -48,7 +48,7 @@ Available Subcommands:
   prune       Prune deletes session history
   ps          List processes currently being scoped
   run         Executes a scoped command
-  service     Configure a systemd service to be scoped
+  service     Configure a systemd/OpenRC service to be scoped
   version     Display scope version
   watch       Executes a scoped command on an interval
 
@@ -487,7 +487,7 @@ scope run -c edge -- top
 ### service
 ---
 
-Configures the specified `systemd` service to be scoped upon starting.
+Configures the specified `systemd`/`OpenRC` service to be scoped upon starting.
 
 #### Usage
 

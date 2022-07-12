@@ -12,6 +12,8 @@ rm -rf /opt/appscope/
 
 …and the associated history directory:
 
+<!-- TBD doublecheck below with John -->
+
 ```
 cd ~
 rm -rf .scope/

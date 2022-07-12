@@ -4,19 +4,21 @@ title: Using the CLI
 
 ## Using The Command Line Interface (CLI)
 
-As soon as you download AppScope, you can start using the CLI to explore and gain insight into application behavior. No installation or configuration is required.
+As soon as you [download](downloading) AppScope, you can start using the CLI to explore and gain insight into application behavior. No installation or configuration is required.
 
 The CLI provides a rich set of capabilities for capturing and managing data from single applications. Data is captured in the local filesystem.
 
-To learn more, see the [CLI Reference](/docs/cli-reference), and/or run `scope --help` or `scope -h`.
+By default, the AppScope CLI redacts binary data from console output. Although in most situations, the default behaviors of the AppScope CLI and library are the same, they differ for binary data: it's omitted in the CLI, and allowed when using the library. To change this, use the `allowbinary=true` flag. The equivalent environment variable is `SCOPE_ALLOW_BINARY_CONSOLE`. In the config file, `allowbinary` is an attribute of the `console` watch type for events. 
+
+To learn more, see the [CLI Reference](/docs/cli-reference), and/or run `scope --help` or `scope -h`. And check out the [Further Examples](examples-use-cases), which include both CLI and library use cases.
 
 ### CLI Basics
 
-The basic AppScope CLI command is `scope`. The following examples provide an overview of how to use it.
+The basic AppScope CLI command is `scope`. The following examples progress from simple to more involved. Scoping a running process gets [its own section](scope-running). The final section explains how to scope an app that generates a large data set, and then [explore](explore-captured) that data.
 
 #### Scope a New Process 
 
-In these examples, we'll test-run well-known Linux commands and view the results:
+Try scoping some well-known Linux commands, and view the results:
 
 ```
 scope top
@@ -27,18 +29,14 @@ scope ls -al
 ```
 
 ```
-scope curl https://google.com
+scope curl https://www.google.com
 ```
 
-#### Monitor an App that Generates a Large Data Set
-
-We use the `--no-sandbox` option because virtually all modern browsers incorporate the [sandbox](https://web.dev/browser-sandbox/) security mechanism, and some sandbox implementations can interact with AppScope in ways that cause the browser to hang, or not to start.
+When scoping browsers, we use the `--no-sandbox` option because virtually all modern browsers incorporate the [sandbox](https://web.dev/browser-sandbox/) security mechanism, and some sandbox implementations can interact with AppScope in ways that cause the browser to hang, or not to start.
 
 ```
 scope firefox --no-sandbox
 ```
-
-After you scope the browser, try [exploring the captured data](#explore-captured).
 
 #### Scope a Series of Shell Commands
 
@@ -50,37 +48,17 @@ scope bash
 
 To release a process like `scope bash` above, `exit` the process in the shell. If you do this with the bash shell itself, you won't be able to `scope bash` again in the same terminal session.
 
-
 #### Scope [Cribl Stream](https://cribl.io/download/)
 
-As with other applications, it's interesting to see what AppScope shows Cribl Stream doing:
+See what AppScope shows Cribl Stream doing:
 
 `scope $CRIBL_HOME/bin/cribl server`
 
-#### Scope a Running Process
-
-This example scopes the process whose PID is `12345`:
-
-```
-sudo bin/linux/scope attach 12345
-```
-
-This example requires some preparation, as explained in [Scoping a Running Process](#scope-running).
-
-
-#### Invoke a Config File While Scoping a New Process
-
-This example scopes the `echo` command while invoking a configuration file named `cloud.yml`:
-
-```
-scope run -u cloud.yml -- echo foo
-```
-
-Why create a custom configuration file? One popular reason is to change the destination to which AppScope sends captured data to someplace other than the local filesystem (the default). To learn about the possibilities, read the comments in the default [Configuration File](/docs/config-file).
+You can take the idea of using AppScope to reveal application behavior [much further](https://cribl.io/blog/appscope-1-0-changing-the-game-for-infosec-part-2/). 
 
 #### Use a Custom HTTP Header to Mark Your Data
 
-When scoping apps that make HTTP requests, you can add the `X-Appscope` header (setting its content to the string of your choice). 
+When scoping apps that make HTTP requests, you can add the `X-Appscope` header, setting its content to the string of your choice. 
 
 Here's a trivial example of how this feature might be useful:
 
@@ -88,35 +66,52 @@ Suppose you want to scope HTTP requests to a weather forecast service, looking a
 
 You could use the `X-Appscope` header to do your labeling:
 
+<!-- TBD - can this just be scope rather than ldscope? -->
+
 ```
-$ ldscope curl --header "X-Appscope: Canada" wttr.in/calgary
-$ ldscope curl --header "X-Appscope: Canada" wttr.in/ottawa
+scope curl --header "X-Appscope: Canada" wttr.in/calgary
+scope curl --header "X-Appscope: Canada" wttr.in/ottawa
 ...
 
-$ ldscope curl --header "X-Appscope: Brazil" wttr.in/recife
-$ ldscope curl --header "X-Appscope: Brazil" wttr.in/riodejaneiro
+scope curl --header "X-Appscope: Brazil" wttr.in/recife
+scope curl --header "X-Appscope: Brazil" wttr.in/riodejaneiro
 ...
 ```
 
 In the resulting AppScope events, the `body` > `data` element would include an `"x-appscope"` field whose value would be the country named in the request's `X-Appscope` header.
 
+
+#### Invoke a Config File While Scoping a New Process
+
+Why create a custom configuration file? One popular reason is to change the destination to which AppScope sends captured data to someplace other than the local filesystem (the default). To learn about the possibilities, read the comments in the default [Configuration File](/docs/config-file).
+
+This example scopes the `echo` command while invoking a configuration file named `cloud.yml`:
+
+```
+scope run -u cloud.yml -- echo foo
+```
+
 <span id="scope-running"></span>
 
 ### Scoping a Running Process
 
-You attach AppScope to a process using a process ID or a process name.
+You attach AppScope to a process using either a process ID or a process name.
 
 #### Attaching by Process ID
 
-In this example, we grep for process IDs of `cribl` (Cribl Stream) processes, then attach to a process of interest:
+In this example, we'll start by grepping for process IDs of `cribl` (Cribl Stream) processes: 
 
 ```
 $ ps -ef | grep cribl
 ubuntu    1820     1  1 21:03 pts/4    00:00:02 /home/ubuntu/someusername/cribl/3.1.2/m/cribl/bin/cribl server
 ubuntu    1838  1820  4 21:03 pts/4    00:00:07 /home/ubuntu/someusername/cribl/3.1.2/m/cribl/bin/cribl /home/ubuntu/someusername/cribl/3.1.2/m/cribl/bin/cribl.js server -r CONFIG_HELPER
 ubuntu    1925 30025  0 21:06 pts/3    00:00:00 grep --color=auto cribl
-ubuntu@ip-127-0-0-1:~/someusername/appscope3$ sudo bin/linux/scope attach 1820
+```
 
+Then, we'll attach to a process of interest:
+
+```
+ubuntu@ip-127-0-0-1:~/someusername/appscope3$ sudo scope attach 1820
 ```
 
 #### Attaching by Process Name
@@ -124,11 +119,11 @@ ubuntu@ip-127-0-0-1:~/someusername/appscope3$ sudo bin/linux/scope attach 1820
 In this example, we try to attach to a Cribl Stream process by its name, which will be `cribl`. Since there's more than one process, AppScope lists them and prompts us to choose one:
 
 ```
-$ sudo bin/linux/scope attach cribl
+$ sudo scope attach cribl
 Found multiple processes matching that name...
 ID  PID   USER    SCOPED  COMMAND
-1   1820  ubuntu  false   /home/ubuntu/someusername/cribl/3.1.2/m/cribl/bin/cribl server
-2   1838  ubuntu  false   /home/ubuntu/someusername/cribl/3.1.2/m/cribl/bin/cribl /home/ubuntu/someusername/cribl/3.1.2/m/cribl/bin/cribl.js server -r CONFIG_HELPER
+1   1820  ubuntu  false   /home/ubuntu/someusername/cribl/3.5.1/m/cribl/bin/cribl server
+2   1838  ubuntu  false   /home/ubuntu/someusername/cribl/3.5.1/m/cribl/bin/cribl /home/ubuntu/someusername/cribl/3.5.1/m/cribl/bin/cribl.js server -r CONFIG_HELPER
 Select an ID from the list:
 2
 WARNING: Session history will be stored in /home/ubuntu/.scope/history and owned by root
@@ -154,43 +149,49 @@ No HTTP/1.1 events and headers are emitted when AppScope attaches to a Go proces
 
 No events are emitted from files or sockets that exist before AppScope attaches to a process.
 
-- After AppScope attaches to a process, whatever file descriptors and/or socket descriptors that the process had already opened before that,
-AppScope will not report any **new** activity on those file or socket descriptors.
+- After AppScope attaches to a process, AppScope will not report any **new** activity on file or socket descriptors that the process had already opened.
 
   - For example, suppose a process opens a socket descriptor before AppScope is attached. Subsequent sends and receives on this socket will not produce AppScope events.
 
    - AppScope events will be produced only for sockets opened **after** AppScope is attached.
 
-
 <span id="explore-captured"></span>
 
 ### Exploring Captured Data
 
-To see the monitoring and visualization features AppScope offers, exercise some of its sub-commands and options. E.g.:
+You can scope apps that generate large data sets, and then use AppScope CLI sub-commands and options to monitor and visualize the data.
 
-- Show last session's captured metrics with `scope metrics`:
+Run the following command and then we'll explore how to monitor and visualize the results of the session:
 
 ```
-NAME         	VALUE	TYPE 	UNIT       	PID	TAGS
-proc.start   	1    	Count	process    	525	args: %2Fusr%2Fbin%2Fps%20-ef,gid: 0,groupname: root,host: 771f60292e26,proc: ps,uid: 0,username: root
-proc.cpu     	10000	Count	microsecond	525	host: 771f60292e26,proc: ps
-proc.cpu_perc	0.1  	Gauge	percent    	525	host: 771f60292e26,proc: ps
-proc.mem     	16952	Gauge	kibibyte   	525	host: 771f60292e26,proc: ps
-proc.thread  	1    	Gauge	thread     	525	host: 771f60292e26,proc: ps
-proc.fd      	6    	Gauge	file       	525	host: 771f60292e26,proc: ps
-proc.child   	0    	Gauge	process    	525	host: 771f60292e26,proc: ps
-fs.read      	77048	Count	byte       	525	class: summary,host: 771f60292e26,proc: ps
-fs.seek      	2    	Count	operation  	525	class: summary,host: 771f60292e26,proc: ps
-fs.stat      	15   	Count	operation  	525	class: summary,host: 771f60292e26,proc: ps
-fs.open      	31   	Count	operation  	525	class: summary,host: 771f60292e26,proc: ps
-fs.close     	29   	Count	operation  	525	class: summary,host: 771f60292e26,proc: ps
-fs.duration  	83   	Count	microsecond	525	class: summary,host: 771f60292e26,proc: ps
-fs.error     	7    	Count	operation  	525	class: stat,file: summary,host: 771f60292e26,op: summary,proc: ps
+scope run -- ps -ef
 ```
 
-- Note that by default, the AppScope CLI redacts binary data from console output. Although in most situations, the default behaviors of the AppScope CLI and library are the same, they differ for binary data: it's omitted in the CLI, and allowed when using the library. To change this, use the `allowbinary=true` flag. The equivalent environment variable is `SCOPE_ALLOW_BINARY_CONSOLE`. In the config file, `allowbinary` is an attribute of the `console` watch type for events.  
+Show last session's captured metrics with `scope metrics`:
 
-- Plot a chart of last session's `proc.cpu` metric with `scope metrics -m proc.cpu -g`:
+```
+NAME             VALUE      TYPE     UNIT           PID     TAGS
+proc.start       1          Count    process        5470    args: ps -ef,gid: 0,groupname: root,host: ip-10-8-107-15…
+proc.cpu         60898      Count    microsecond    5470    host: my_hostname,proc: ps
+proc.cpu_perc    0.60898    Gauge    percent        5470    host: my_hostname,proc: ps
+proc.mem         67512      Gauge    kibibyte       5470    host: my_hostname,proc: ps
+proc.thread      2          Gauge    thread         5470    host: my_hostname,proc: ps
+proc.fd          6          Gauge    file           5470    host: my_hostname,proc: ps
+proc.child       1          Gauge    process        5470    host: my_hostname,proc: ps
+fs.read          379832     Count    byte           5470    host: my_hostname,proc: ps,summary: true
+net.rx           401        Count    byte           5470    class: unix_tcp,host: my_hostname,proc: ps,summary: …
+net.tx           361        Count    byte           5470    class: unix_tcp,host: my_hostname,proc: ps,summary: …
+fs.seek          150        Count    operation      5470    host: my_hostname,proc: ps,summary: true
+fs.stat          136        Count    operation      5470    host: my_hostname,proc: ps,summary: true
+fs.open          396        Count    operation      5470    host: my_hostname,proc: ps,summary: true
+fs.close         394        Count    operation      5470    host: my_hostname,proc: ps,summary: true
+fs.duration      4          Count    microsecond    5470    host: my_hostname,proc: ps,summary: true
+net.error        3          Count    operation      5470    class: rx_tx,host: my_hostname,proc: ps,summary: true
+fs.error         191        Count    operation      5470    class: read_write,host: my_hostname,proc: ps,summary…
+fs.error         11         Count    operation      5470    class: stat,host: my_hostname,proc: ps,summary: true
+```
+
+Plot a chart of last session's `proc.cpu` metric with `scope metrics -m proc.cpu -g`:
 
 ```
  80000 ┼                   ╭╮
@@ -216,102 +217,109 @@ fs.error     	7    	Count	operation  	525	class: stat,file: summary,host: 771f60
      0 ┼╯                ╰╯       ╰╯                            ╰╯    ╰╯             ╰╯
 ```
 
-- Display the last session's captured events with `scope events`:
+Display the last session's captured events with `scope events`:
 
 ```
-[j98] Jan 31 21:38:53 ps console stdout 19:40
-[2d8] Jan 31 21:38:53 ps console stdout pts/1
-[Ng8] Jan 31 21:38:53 ps console stdout 00:00:11
-[Ck8] Jan 31 21:38:53 ps console stdout /opt/cribl/bin/cribl /opt/cribl/bin/cribl.js server -r WORKER
-[fp8] Jan 31 21:38:53 ps console stdout root
-[Ys8] Jan 31 21:38:53 ps console stdout 518
-[Lw8] Jan 31 21:38:53 ps console stdout 10
-[uA8] Jan 31 21:38:53 ps console stdout 0
-[aE8] Jan 31 21:38:53 ps console stdout 21:38
-[VH8] Jan 31 21:38:53 ps console stdout pts/1
-[EL8] Jan 31 21:38:53 ps console stdout 00:00:00
-[tP8] Jan 31 21:38:53 ps console stdout ldscope ps -ef
-[nT8] Jan 31 21:38:53 ps console stdout root
-[4X8] Jan 31 21:38:53 ps console stdout 525
-[T%8] Jan 31 21:38:53 ps console stdout 518
-[C29] Jan 31 21:38:53 ps console stdout 0
-[i69] Jan 31 21:38:53 ps console stdout 21:38
-[1a9] Jan 31 21:38:53 ps console stdout pts/1
-[Md9] Jan 31 21:38:53 ps console stdout 00:00:00
-[Bh9] Jan 31 21:38:53 ps console stdout /usr/bin/ps -ef
+[EkA1] Jul 12 02:11:15 ps fs fs.open file:/proc/17721/stat
+[OrA1] Jul 12 02:11:15 ps fs fs.close file:/proc/17721/stat file_read_bytes:158 file_read_ops:1 file_write_bytes:0 file_write_ops:0
+[xAA1] Jul 12 02:11:15 ps fs fs.open file:/proc/17721/status
+[LHA1] Jul 12 02:11:15 ps fs fs.close file:/proc/17721/status file_read_bytes:952 file_read_ops:1 file_write_bytes:0 file_write_ops:0
+[vQA1] Jul 12 02:11:15 ps fs fs.open file:/proc/17721/cmdline
+[IXA1] Jul 12 02:11:15 ps fs fs.close file:/proc/17721/cmdline file_read_bytes:0 file_read_ops:1 file_write_bytes:0 file_write_ops:0
+[s6B1] Jul 12 02:11:15 ps fs fs.open file:/proc/17758/stat
+[EdB1] Jul 12 02:11:15 ps fs fs.close file:/proc/17758/stat file_read_bytes:341 file_read_ops:1 file_write_bytes:0 file_write_ops:0
+[mmB1] Jul 12 02:11:15 ps fs fs.open file:/proc/17758/status
+[ytB1] Jul 12 02:11:15 ps fs fs.close file:/proc/17758/status file_read_bytes:1313 file_read_ops:1 file_write_bytes:0 file_write_ops:0
+[kCB1] Jul 12 02:11:15 ps fs fs.open file:/proc/17758/cmdline
+[yJB1] Jul 12 02:11:15 ps fs fs.close file:/proc/17758/cmdline file_read_bytes:21 file_read_ops:2 file_write_bytes:0 file_write_ops:0
+[hSB1] Jul 12 02:11:15 ps fs fs.open file:/proc/31597/stat
+[tZB1] Jul 12 02:11:15 ps fs fs.close file:/proc/31597/stat file_read_bytes:182 file_read_ops:1 file_write_bytes:0 file_write_ops:0
+[b8C1] Jul 12 02:11:15 ps fs fs.open file:/proc/31597/status
+[ofC1] Jul 12 02:11:15 ps fs fs.close file:/proc/31597/status file_read_bytes:967 file_read_ops:1 file_write_bytes:0 file_write_ops:0
+[9oC1] Jul 12 02:11:15 ps fs fs.open file:/proc/31597/cmdline
+[ovC1] Jul 12 02:11:15 ps fs fs.close file:/proc/31597/cmdline file_read_bytes:0 file_read_ops:1 file_write_bytes:0 file_write_ops:0
+[7EC1] Jul 12 02:11:15 ps fs fs.close file:/proc file_read_bytes:0 file_read_ops:0 file_write_bytes:0 file_write_ops:0
+[EMC1] Jul 12 02:11:15 ps console stdout message:"UID        PID  PPID  C STIME TTY          TIME CMD root       …"
 ```
 
-- Filter out everything but `http` from the last session's events, with `scope events -t http`:
-
+Now scope a command which produces HTTP and other kinds of events:
 
 ```
-[MJ33] Jan 31 19:55:22 cribl http http.resp http.host:localhost:9000 http.method:GET http.scheme:http http.target:/ http.response_content_length:1630
-[RT33] Jan 31 19:55:22 cribl http http-metrics duration:0 req_per_sec:2
-[Ta43] Jan 31 19:55:22 cribl http http.req http.host:localhost:9000 http.method:GET http.scheme:http http.target:/
-[fj43] Jan 31 19:55:22 cribl http http.resp http.host:localhost:9000 http.method:GET http.scheme:http http.target:/ http.response_content_length:1630
-[kt43] Jan 31 19:55:22 cribl http http-metrics duration:0 req_per_sec:2
-[mM43] Jan 31 19:55:22 cribl http http.req http.host:localhost:9000 http.method:GET http.scheme:http http.target:/
-[KU43] Jan 31 19:55:22 cribl http http.resp http.host:localhost:9000 http.method:GET http.scheme:http http.target:/ http.response_content_length:1630
-[P253] Jan 31 19:55:22 cribl http http-metrics duration:0 req_per_sec:2
-[Rl53] Jan 31 19:55:22 cribl http http.req http.host:localhost:9000 http.method:GET http.scheme:http http.target:/
-[du53] Jan 31 19:55:22 cribl http http.resp http.host:localhost:9000 http.method:GET http.scheme:http http.target:/ http.response_content_length:1630
-[iE53] Jan 31 19:55:22 cribl http http-metrics duration:0 req_per_sec:2
+scope run -- curl https://www.google.com
 ```
 
+Filter out everything but `http` from the last session's events, with `scope events -t http`:
 
-- View the history of the current AppScope session with `scope history`:
+```
+[vL1] Jul 12 02:14:07 curl http http.req http_host:www.google.com http_method:GET http_scheme:https http_target:/
+[PU1] Jul 12 02:14:08 curl http http.resp http_host:www.google.com http_method:GET http_target:/
+```
+
+View the history of the current AppScope session with `scope history`:
 
 ```
 Displaying last 20 sessions
-ID	COMMAND	CMDLINE                  	PID	AGE   	DURATION	TOTAL EVENTS
-1 	cribl  	/opt/cribl/bin/cribl sta…	50 	2h11m 	2h11m   	6275
-2 	curl   	curl https://google.com  	509	13m30s	206ms   	16
-3 	ps     	ps -ef                   	518	13m18s	22ms    	120
+ID	COMMAND	CMDLINE                  	PID 	AGE 	DURATION	TOTAL EVENTS
+4 	ps     	ps -ef                   	5464	3m6s	12ms    	788
+5 	curl   	curl https://www.google.…	5492	14s 	141ms   	20
 ```
 
-- Scope a command which will produce a variety of events ...
+Scope another command which will produce a variety of events ...
 
 ```
 # scope run -- apt update
-Get:1 http://security.ubuntu.com/ubuntu focal-security InRelease [114 kB]
-Get:2 http://archive.ubuntu.com/ubuntu focal InRelease [265 kB]
-Get:3 http://security.ubuntu.com/ubuntu focal-security/restricted amd64 Packages [1027 kB]
+Hit:1 http://us-west-2.ec2.archive.ubuntu.com/ubuntu bionic InRelease
+Get:2 http://us-west-2.ec2.archive.ubuntu.com/ubuntu bionic-updates InRelease [88.7 kB]                                      
+Get:3 http://us-west-2.ec2.archive.ubuntu.com/ubuntu bionic-backports InRelease [74.6 kB]                                    
+Hit:4 https://download.docker.com/linux/ubuntu bionic InRelease                                                                                
+Get:5 http://security.ubuntu.com/ubuntu bionic-security InRelease [88.7 kB]                                                                    
+Hit:6 https://baltocdn.com/helm/stable/debian all InRelease
 ...
 ```
 
-- Then, show only the last 10 events of sourcetype `console`, sorted in ascending order by timestamp:
+... Then, show only the last 10 events of sourcetype `console`, sorted in ascending order by timestamp:
 
 ```
 # scope events --sort _time --sourcetype console --last 10 --reverse
-[IHI] Mar 15 16:22:15 apt console stdout message:" 0% [Working]              Get:1 http://security.ubuntu.com/ubuntu focal-security InRelease [114 kB]  0% [Waiting for …"
-[jrL] Mar 15 16:22:15 http console stdout message:"102 Status URI: http://archive.ubuntu.com/ubuntu/dists/focal/InRelease Message: Connecting to archive.ubuntu.com  102…"
-[OUJ] Mar 15 16:22:15 http console stdout message:"102 Status URI: http://security.ubuntu.com/ubuntu/dists/focal-security/InRelease Message: Connecting to security.ubun…"
-[4nT] Mar 15 16:22:16 gpgv console stdout message:"201 URI Done GPGVOutput: GOODSIG 3B4FE6ACC0B21F32  GOODSIG 871920D1991BC93C Signed-By: 790BC7277767219C42C86F933B4FE6…"
-[9WG] Mar 15 16:22:16 gpgv console stdout message:"201 URI Done GPGVOutput: GOODSIG 3B4FE6ACC0B21F32  GOODSIG 871920D1991BC93C Signed-By: 790BC7277767219C42C86F933B4FE6…"
-[hYZ] Mar 15 16:22:16 store console stdout message:"200 URI Start URI: store:/var/lib/apt/lists/partial/security.ubuntu.com_ubuntu_dists_focal-security_restricted_binar…"
-[PmG1] Mar 15 16:22:18 apt console stdout message:" 60% [10 Packages 6535 kB/11.3 MB 58%]                                       78% [Waiting for headers]               …"
-[CVa1] Mar 15 16:22:18 apt console stdout message:" 60% [10 Packages 6535 kB/11.3 MB 58%]                                       78% [Waiting for headers]               …"
-[yC41] Mar 15 16:22:18 http console stdout message:"201 URI Done SHA256-Hash: 200acdc3421757fa8f8759c1cedacae2cf8f5821d7810ca59d8a313c5b3ae71e SHA1-Hash: 28dce64e724849…"
-[oZH1] Mar 15 16:22:20 apt console stdout message:"Building dependency tree         Reading state information... 0%  Reading state information... 48%  Reading state inf…"
+[g2Wg] Jul 12 02:14:49 apt console stdout message:"                                  0% [Working] 0% [16 Packages store 0 B]                …"
+[zvUe] Jul 12 02:14:49 apt console stdout message:"                                  0% [Working] 0% [16 Packages store 0 B]                …"
+[ucRe] Jul 12 02:14:50 find console stdout message:/var/lib/apt/lists/security.ubuntu.com_ubuntu_dists_bionic-security_universe_binary-amd6…
+[zkRe] Jul 12 02:14:50 dirname console stdout message:/var/lib/update-notifier
+[I0Se] Jul 12 02:14:50 mktemp console stdout message:/var/lib/update-notifier/tmp.ut1sgTEuvb
+[gmUg] Jul 12 02:14:54 python3 console stdout message:"39 updates can be applied immediately. To see these additional updates run: apt list …"
+[gZ7h] Jul 12 02:14:54 apt console stdout message:"Reading package lists... 0%"
+[1a2i] Jul 12 02:14:54 apt console stdout message:"Reading package lists... 0%  Reading package lists... 0%  Reading package lists... 3%  Re…"
+[cp1i] Jul 12 02:14:54 apt console stdout message:"Reading package lists... 0%  Reading package lists... 0%  Reading package lists... 3%  Re…"
+[QU2i] Jul 12 02:14:56 apt console stderr message:"W: An error occurred during the signature verification. The repository is not updated and…"
 ```
 
-- Scope a command which reads and writes over the network:
+Scope a command which reads and writes over the network:
   
 ```
 # scope curl wttr.in    
-Weather report: San Francisco, California, United States
+Weather report: Portland, Oregon, United States
 
-                Mist
-   _ - _ - _ -  +55(53) °F     
-    _ - _ - _   ↖ 10 mph       
-   _ - _ - _ -  4 mi           
-                0.0 in         
+      \   /     Sunny
+       .-.      93 °F          
+    ― (   ) ―   ↓ 6 mph        
+       `-’      9 mi           
+      /   \     0.0 in         
+                                                       ┌─────────────┐                                                       
+┌──────────────────────────────┬───────────────────────┤  Mon 11 Jul ├───────────────────────┬──────────────────────────────┐
+│            Morning           │             Noon      └──────┬──────┘     Evening           │             Night            │
+├──────────────────────────────┼──────────────────────────────┼──────────────────────────────┼──────────────────────────────┤
+│     \   /     Sunny          │     \   /     Sunny          │     \   /     Sunny          │     \   /     Clear          │
+│      .-.      68 °F          │      .-.      89 °F          │      .-.      +95(93) °F     │      .-.      78 °F          │
+│   ― (   ) ―   ↓ 5-6 mph      │   ― (   ) ―   ↘ 6-7 mph      │   ― (   ) ―   ↘ 10-11 mph    │   ― (   ) ―   ↘ 8-15 mph     │
+│      `-’      6 mi           │      `-’      6 mi           │      `-’      6 mi           │      `-’      6 mi           │
+│     /   \     0.0 in | 0%    │     /   \     0.0 in | 0%    │     /   \     0.0 in | 0%    │     /   \     0.0 in | 0%    │
+└──────────────────────────────┴──────────────────────────────┴──────────────────────────────┴──────────────────────────────┘       
 ...
 ```
-- Then, show only events containing the string `net_bytes`, and display the fields `net_bytes_sent` and `net_bytes_recv`, with their values:
+
+Then, show only events containing the string `net_bytes`, and display the fields `net_bytes_sent` and `net_bytes_recv`, with their values:
 
 ```
-scope events --fields net_bytes_sent,net_bytes_recv --match net_bytes
-[XG] Mar 15 17:56:38 curl net net.close net_bytes_sent:1 net_bytes_recv:0
-[zf1] Mar 15 17:56:38 curl net net.close net_bytes_sent:71 net_bytes_recv:8844
+# scope events --fields net_bytes_sent,net_bytes_recv --match net_bytes
+[e91] Jul 12 02:15:41 curl net net.close net_bytes_sent:71 net_bytes_recv:8773
 ```

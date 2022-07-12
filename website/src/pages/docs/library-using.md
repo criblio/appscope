@@ -66,6 +66,8 @@ To use the library directly, you rely on the `LD_PRELOAD` environment variable.
 
 The following examples provide an overview of this way of working with the library. All the examples call the system-level `ps` command, just to show how the syntax works.
 
+For more, check out the [Further Examples](examples-use-cases), which include both CLI and library use cases.
+
 #### `LD_PRELOAD` with a Single Command
 
 Start with this basic example:

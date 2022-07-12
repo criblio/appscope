@@ -10,7 +10,6 @@ AppScope gives you multiple ways to route data. The basic operations are:
 - Routing [both events and metrics](#routing-to-cloud) to [Cribl Stream](https://docs.cribl.io/stream).
 - Routing [events](#routing-events) to a file, local unix socket, network destination, or Cribl Edge.
 - Routing [metrics](#routing-metrics) to a file, local unix socket, network destination, or Cribl Edge.
-- [Muting](#muting) events, metrics, and payloads so that AppScope produces no output.
 
 For each of these operations, the CLI has command-line options, the config file has settings, and the AppScope library has environment variables.
 

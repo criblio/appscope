@@ -12,8 +12,6 @@ rm -rf /opt/appscope/
 
 …and the associated history directory:
 
-<!-- TBD doublecheck below with John -->
-
 ```
 cd ~
 rm -rf .scope/
@@ -22,6 +20,3 @@ rm -rf .scope/
 
 Currently scope’d applications will continue to run. To remove the AppScope library from a running process, you will need to restart that process.
 
-### Muting Without Removing
-
-If you need AppScope to temporarily stop producing output, you do not need to remove AppScope: you can just use a custom config to [mute](data-routing#muting) all events and metrics.

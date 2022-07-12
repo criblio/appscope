@@ -26,14 +26,13 @@ For example:
 
 * You are developing code, and you want to see how its behavior changes as you iterate. **Use the CLI.**
 
-* You are running curl commands against a website, and want to see what changes when you switch between HTTP/1.1 and HTTP/2.2 and/or HTTP and HTTPS. **Use the CLI.** 
+* You are running cURL commands against a website, and want to see what changes when you switch between HTTP/1.1 and HTTP/2.2 and/or HTTP and HTTPS. **Use the CLI.** 
 
 * You are running nginx in a specific, unchanging way dictated by the requirements of your organization, and you want to see metrics. **Use the library.**
 
 Here's a decision tree to help you determine whether to use the CLI or the library.
 
 ![CLI vs. Library Decision Tree](./images/appscope_tree@2x.jpg)
-
 
 ## The Config File, Env Vars, Flags, and `ldscope` {#config-file-etc}
 

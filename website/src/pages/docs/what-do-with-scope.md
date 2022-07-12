@@ -21,15 +21,15 @@ AppScope collects and forwards StatsD-style metrics about running applications. 
 
 ## Use Cases
 
-You could do any of the following with AppScope:
+You could do any of the following with AppScope (see [Further Examples](examples-use-cases) for details):
 
 - Send HTTP events from Slack to a specified Splunk server.
 - Send metrics from nginx to a specified Datadog server.
 - Send metrics from a Go static application to a specified Datadog server.
 - For any of the above examples, substitute your analytics tool of choice. Optimize the data flow by mediating it through [Cribl Stream](https://cribl.io/product/).
-- Monitor multiple Apache instances in a server farm, running the data [through Cribl Edge to Cribl Stream](/docs/cribl-integration#scaling-scoped-processes).
 - Run Firefox from the AppScope CLI, and view results on a terminal-based dashboard.
 - Run Google Chrome from the AppScope CLI, and view results on a terminal-based dashboard. And be surprised.
+- Monitor multiple Apache instances in a server farm, running the data [through Cribl Edge to Cribl Stream](/docs/cribl-integration#scaling-scoped-processes).
 
 People in different roles can solve different problems with AppScope. Consider the following use cases, explored in depth in blog posts by the AppScope team:
 

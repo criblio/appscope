@@ -36,10 +36,10 @@ If you **disable** TLS, the port is 10091.
 
 ### CLI usage
 
-Use `scope run` with the `-c` option:
+Use `scope run` with the `-c` option (in this example, we're scoping `ps -ef`):
 
 ```
-scope run -c tls://host:10090
+scope run -c tls://host:10090 -- ps -ef
 ```
 
 ### Configuration for `LD_PRELOAD` or `ldscope`

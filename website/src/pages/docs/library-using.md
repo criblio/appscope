@@ -6,26 +6,32 @@ title: Using the Library
 
 To use the library for the first time in a given environment, complete this quick procedure:
 
-1. Download AppScope. 
-
-2. Choose a `SCOPE_HOME` directory, i.e., the [directory from which AppScope should run](/docs/downloading#where-from) in your environment.
-
-3. Extract (`scope extract`) the contents of the AppScope binary into the `SCOPE_HOME` directory.
-
-For example, you could create an AppScope home directory called `assets`:
-
-```
-user@myhost:/opt/scope$ mkdir assets
-user@myhost:/opt/scope$ bin/linux/scope extract assets
-Successfully extracted to /opt/scope/assets.
-user@myhost:/opt/scope$ ll assets
-total 17008
-drwxrwxr-x  2 user user    4096 Oct 26 14:47 .
-drwxrwxr-x 18 user user    4096 Oct 26 14:47 ..
--rwxr-xr-x  1 user user 9206704 Oct 26 14:47 ldscope
--rwxr-xr-x  1 user user 8161448 Oct 26 14:47 libscope.so
--rw-r--r--  1 user user   33231 Oct 26 14:47 scope.yml
-```
+1. [Download](downloading) AppScope. 
+2. Decide on a `SCOPE_HOME` directory, i.e., the [directory from which AppScope should run](/docs/downloading#where-from) in your environment.
+3. Set `SCOPE_HOME` to the desired directory.
+   ```
+   ubuntu@my_hostname:~/someuser/temp$ export SCOPE_HOME=/opt/appscope
+   ```
+4. Create the `SCOPE_HOME` directory. (Here, `sudo` is required because `opt` is owned by root.)
+   ```
+   ubuntu@my_hostname:~/someuser/temp$ sudo mkdir $SCOPE_HOME
+   ```
+5. Extract (`scope extract`) the contents of the AppScope binary into the `SCOPE_HOME` directory.
+   ```
+   ubuntu@my_hostname:~/someuser/temp$ sudo ./scope extract $SCOPE_HOME
+   Successfully extracted to /opt/appscope.
+   ```
+6. Verify that `SCOPE_HOME` contains the AppScope library (`libscope.so`), the `ldscope` utility, and the config file (`scope.yml`). 
+   ```
+   ubuntu@my_hostname:~/someuser/temp$ ls -al $SCOPE_HOME
+   total 20528
+   drwxr-xr-x 2 root root     4096 Jul 11 22:51 .
+   drwxr-xr-x 5 root root     4096 Jul 11 22:51 ..
+   -rwxr-xr-x 1 root root 11308832 Jul 11 22:51 ldscope
+   -rwxr-xr-x 1 root root  9663240 Jul 11 22:51 libscope.so
+   -rw-r--r-- 1 root root    35755 Jul 11 22:51 scope.yml
+   ubuntu@my_hostname:~/someuser/temp$ 
+   ```
 
 Now you are ready to configure AppScope to instrument any application and output data to any existing tool via simple TCP protocols.
 
@@ -40,7 +46,7 @@ How the library is loaded depends on the type of executable. A dynamic loader ca
 To see the full set of library environment variables, run the following command:
 
 ```
-/opt/scope/assets/ldscope --help | egrep "^[[:space:]]{8}SCOPE_"
+/opt/appscope/ldscope --help | egrep "^[[:space:]]{8}SCOPE_"
 ```
 
 For the default settings in the sample `scope.yml` configuration file, see [Config File](/docs/config-file), or inspect the most-recent file on [GitHub](https://github.com/criblio/appscope/blob/master/conf/scope.yml).
@@ -59,6 +65,8 @@ This can help you get a clear idea of exactly how AppScope is configured, assumi
 To use the library directly, you rely on the `LD_PRELOAD` environment variable. 
 
 The following examples provide an overview of this way of working with the library. All the examples call the system-level `ps` command, just to show how the syntax works.
+
+For more, check out the [Further Examples](examples-use-cases), which include both CLI and library use cases.
 
 #### `LD_PRELOAD` with a Single Command
 
@@ -96,29 +104,29 @@ LD_PRELOAD=./libscope.so SCOPE_EVENT_DEST=tcp://localhost:9999 SCOPE_CRIBL_ENABL
 
 This again executes the `ps` command using the AppScope library. But here, we also specify that events (as opposed to metrics) will be sent over a TCP connection to localhost, using port `9999`. (This event destination setting overrides any config-file setting, as well as the default value.)
 
-### Adding AppScope to a `systemd` (boot-time) Service 
+### Adding AppScope to a `systemd` (boot-time) Service
 
 In this example, we'll add AppScope to the `httpd` service, described by an `httpd.service` file which contains an `EnvironmentFile=/etc/sysconfig/httpd` entry.
 
-1. Extract the library to a new directory (`/opt/scope` in this example):
+1. Extract the library to a new directory (`/opt/appscope` in this example):
 
 ```
-mkdir /opt/scope && cd /opt/scope
+mkdir /opt/appscope && cd /opt/appscope
 curl -Lo scope https://cdn.cribl.io/dl/scope/\
  $(curl -L https://cdn.cribl.io/dl/scope/latest)/linux/scope && \
  chmod 755 ./scope
 ./scope extract .
 ```
 
-The result will be that the system uses `/opt/scope/scope.yml` to configure `libscope.so`.
+The result will be that the system uses `/opt/appscope/scope.yml` to configure `libscope.so`.
 
 2. Add an `LD_PRELOAD` environment variable to the `systemd` config file.
 
 In the `httpd.service` file, edit the `/etc/sysconfig/httpd` entry to include the following environment variables:
 
 ```
-SCOPE_HOME=/opt/scope
-LD_PRELOAD=/opt/scope/libscope.so
+SCOPE_HOME=/opt/appscope
+LD_PRELOAD=/opt/appscope/libscope.so
 ```
 
 <span id="lambda"> </span>
@@ -159,5 +167,5 @@ The AWS docs [explain](https://docs.aws.amazon.com/lambda/latest/dg/configuratio
 
     - For example, `SCOPE_CONF_PATH` ensures that your Lambda function uses AppScope with the correct config file. (Edit the path if yours is different.)
 
-    - `SCOPE_CONF_PATH=/opt/scope/assets/scope.yml`
+    - `SCOPE_CONF_PATH=/opt/appscope/scope.yml`
 

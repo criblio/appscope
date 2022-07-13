@@ -4,7 +4,7 @@ title: Further Examples
 
 ## Further Examples
 
-These examples provide details for most of the [use cases](what-do-with-scope#use-cases) introduced earlier.
+These examples provide details for most of the [use cases](/docs/what-do-with-scope#use-cases) introduced earlier.
 
 #### Viewing Browser Results in a Dashboard
 

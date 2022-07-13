@@ -151,6 +151,7 @@ static got_list_t inject_hook_list[] = {
     {"fstatat", NULL, &g_fn.fstatat},
     {"prctl", NULL, &g_fn.prctl},
     {"execve", NULL, &g_fn.execve},
+    {"execv", NULL, &g_fn.execv},
     {"syscall", NULL, &g_fn.syscall},
     {"sendfile", NULL, &g_fn.sendfile},
     {"sendfile64", NULL, &g_fn.sendfile64},
@@ -2624,26 +2625,23 @@ prctl(int option, ...)
     LOAD_FUNC_ARGS_VALIST(fArgs, option);
 
     if (option == PR_SET_SECCOMP) {
+        scopeLog(CFG_LOG_DEBUG, "prctl: PR_SET_SECCOMP - opt out from prctl.");
         return 0;
     }
 
     return g_fn.prctl(option, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2], fArgs.arg[3]);
 }
 
-EXPORTON int
-execve(const char *pathname, char *const argv[], char *const envp[])
+static char*
+getLdscopeExec(const char* pathname)
 {
-    int i, nargs, saverr;
-    bool isstat = FALSE, isgo = FALSE;
-    char **nargv;
-    elf_buf_t *ebuf;
     char *scopexec = NULL;
-
-    WRAP_CHECK(execve, -1);
+    bool isstat = FALSE, isgo = FALSE;
+    elf_buf_t *ebuf;
 
     if (scope_strstr(g_proc.procname, "ldscope") ||
         checkEnv("SCOPE_EXECVE", "false")) {
-        return g_fn.execve(pathname, argv, envp);
+        return NULL;
     }
 
     if ((ebuf = getElf((char *)pathname))) {
@@ -2659,7 +2657,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
      * In this case we use ldscope only to force the use of HTTP 1.1.
      */
     if (getenv("LD_PRELOAD") && (isstat == FALSE) && (isgo == FALSE)) {
-        return g_fn.execve(pathname, argv, envp);
+        return NULL;
     }
 
     scopexec = getenv("SCOPE_EXEC_PATH");
@@ -2667,7 +2665,62 @@ execve(const char *pathname, char *const argv[], char *const envp[])
         ((scopexec = getpath("ldscope")) == NULL)) {
 
         // can't find the scope executable
-        scopeLogWarn("execve: can't find a scope executable for %s", pathname);
+        scopeLogWarn("can't find a scope executable for %s", pathname);
+        return NULL;
+    }
+
+    return scopexec;
+}
+
+EXPORTON int
+execv(const char *pathname, char *const argv[])
+{
+    int i, nargs, saverr;
+    char *scopexec;
+    char **nargv;
+
+    WRAP_CHECK(execv, -1);
+
+    scopexec = getLdscopeExec(pathname);
+    if (scopexec == NULL) {
+        return g_fn.execv(pathname, argv);
+    }
+
+    nargs = 0;
+    while ((argv[nargs] != NULL)) nargs++;
+
+    size_t plen = sizeof(char *);
+    if ((nargs == 0) || (nargv = scope_calloc(1, ((nargs * plen) + (plen * 2)))) == NULL) {
+        return g_fn.execv(pathname, argv);
+    }
+
+    nargv[0] = scopexec;
+    nargv[1] = (char *)pathname;
+
+    for (i = 2; i <= nargs; i++) {
+        nargv[i] = argv[i - 1];
+    }
+
+    g_fn.execv(nargv[0], nargv);
+    saverr = errno;
+    if (nargv) scope_free(nargv);
+    scope_free(scopexec);
+    errno = saverr;
+    return -1;
+}
+
+
+EXPORTON int
+execve(const char *pathname, char *const argv[], char *const envp[])
+{
+    int i, nargs, saverr;
+    char *scopexec;
+    char **nargv;
+
+    WRAP_CHECK(execve, -1);
+
+    scopexec = getLdscopeExec(pathname);
+    if (scopexec == NULL) {
         return g_fn.execve(pathname, argv, envp);
     }
 
@@ -2689,7 +2742,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     g_fn.execve(nargv[0], nargv, environ);
     saverr = errno;
     if (nargv) scope_free(nargv);
-    if (scopexec) scope_free(scopexec);
+    scope_free(scopexec);
     errno = saverr;
     return -1;
 }
@@ -2736,7 +2789,7 @@ __write_pthread(int fd, const void *buf, size_t size)
     return rc;
 }
 
-static int
+static bool
 isAnAppScopeConnection(int fd)
 {
     if (fd == -1) return FALSE;
@@ -3511,6 +3564,32 @@ _exit(int status)
 }
 
 #endif // __linux__
+
+EXPORTON int
+setrlimit(__rlimit_resource_t resource, const struct rlimit *rlim)
+{
+    WRAP_CHECK(setrlimit, -1);
+
+    if ((rlim->rlim_cur == 0) || (rlim->rlim_max == 0)) {
+        if (resource == RLIMIT_FSIZE) {
+            /*
+            * Setting value to 0 prevents file creation, we want to prevent
+            * it regarding the fact that destination path can point to file.
+            */
+            scopeLog(CFG_LOG_DEBUG, "setrlimit: RLIMIT_FSIZE with limit=0 prevents file creation - opt out from setrlimit.");
+            return 0;
+        } else if (resource == RLIMIT_NPROC) {
+            /*
+            * Setting value to 0 prevents process/thread creation for specific user.
+            * We want to prevent it regarding the fact that we want to create out periodic thread.
+            */
+            scopeLog(CFG_LOG_DEBUG, "setrlimit: RLIMIT_NPROC with limit=0 prevents process/thread creation - opt out from setrlimit.");
+            return 0;
+        }
+    }
+
+    return g_fn.setrlimit(resource, rlim);
+}
 
 EXPORTON int
 close(int fd)
@@ -4698,6 +4777,10 @@ recv(int sockfd, void *buf, size_t len, int flags)
         rc = g_fn.recv(sockfd, buf, len, flags);
     }
 
+    // If called with the MSG_PEEK flag set, don't do any scope processing
+    // as it could result in processing of duplicate bytes later
+    if (flags & MSG_PEEK) return rc;
+
     if (rc != -1) {
         // it's possible to get DNS over TCP
         if (remotePortIsDNS(sockfd)) {
@@ -4723,6 +4806,10 @@ __recv_chk(int sockfd, void *buf, size_t len, size_t buflen, int flags)
         rc = g_fn.__recv_chk(sockfd, buf, len, buflen, flags);
     }
 
+    // If called with the MSG_PEEK flag set, don't do any scope processing
+    // as it could result in processing of duplicate bytes later
+    if (flags & MSG_PEEK) return rc;
+
     if (rc != -1) {
         // it's possible to get DNS over TCP
         if (remotePortIsDNS(sockfd)) {
@@ -4745,13 +4832,16 @@ internal_recvfrom(int sockfd, void *buf, size_t len, int flags,
 
     WRAP_CHECK(recvfrom, -1);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+
+    // If called with the MSG_PEEK flag set, don't do any scope processing
+    // as it could result in processing of duplicate bytes later
+    if (flags & MSG_PEEK) return rc;
+
     if (rc != -1) {
         scopeLog(CFG_LOG_TRACE, "fd:%d recvfrom", sockfd);
-
         if (remotePortIsDNS(sockfd)) {
             getDNSAnswer(sockfd, buf, rc, BUF);
         }
-
         doRecv(sockfd, rc, buf, rc, BUF);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, 0, "recvfrom", "nopath");
@@ -4774,13 +4864,16 @@ __recvfrom_chk(int sockfd, void *buf, size_t len, size_t buflen, int flags,
 
     WRAP_CHECK(__recvfrom_chk, -1);
     rc = g_fn.__recvfrom_chk(sockfd, buf, len, buflen, flags, src_addr, addrlen);
+
+    // If called with the MSG_PEEK flag set, don't do any scope processing
+    // as it could result in processing of duplicate bytes later
+    if (flags & MSG_PEEK) return rc;
+
     if (rc != -1) {
         scopeLog(CFG_LOG_TRACE, "fd:%d __recvfrom_chk", sockfd);
-
         if (remotePortIsDNS(sockfd)) {
             getDNSAnswer(sockfd, buf, rc, BUF);
         }
-
         doRecv(sockfd, rc, buf, rc, BUF);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, 0, "__recvfrom_chk", "nopath");
@@ -4833,6 +4926,11 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
     
     WRAP_CHECK(recvmsg, -1);
     rc = g_fn.recvmsg(sockfd, msg, flags);
+
+    // If called with the MSG_PEEK flag set, don't do any scope processing
+    // as it could result in processing of duplicate bytes later
+    if (flags & MSG_PEEK) return rc;
+
     if (rc != -1) {
         size_t msg_iovlen_orig;
         size_t msg_controllen_orig;
@@ -4883,6 +4981,11 @@ recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
 
     WRAP_CHECK(recvmmsg, -1);
     rc = g_fn.recvmmsg(sockfd, msgvec, vlen, flags, timeout);
+
+    // If called with the MSG_PEEK flag set, don't do any scope processing
+    // as it could result in processing of duplicate bytes later
+    if (flags & MSG_PEEK) return rc;
+
     if (rc != -1) {
         scopeLog(CFG_LOG_TRACE, "fd:%d recvmmsg", sockfd);
 

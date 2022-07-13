@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <arpa/nameser.h>
 #include <dirent.h>
+#include <sys/resource.h>
 
 #ifdef __linux__
 #ifndef io_context_t
@@ -199,6 +200,7 @@ typedef struct {
     int (*PR_FileDesc2NativeHandle)(PRFileDesc *);
     void (*PR_SetError)(PRErrorCode, PRInt32);
     int (*execve)(const char *, char * const *, char * const *);
+    int (*execv)(const char *, char * const *);
     int (*poll)(struct pollfd *, nfds_t, int);
     int (*__poll_chk)(struct pollfd *, nfds_t, int, size_t);
     int (*select)(int, fd_set *, fd_set *, fd_set *, struct timeval *);
@@ -247,6 +249,7 @@ typedef struct {
     DIR *(*opendir)(const char *);
     int (*closedir)(DIR *);
     struct dirent *(*readdir)(DIR *);
+    int (*setrlimit)(__rlimit_resource_t, const struct rlimit *);
 #endif // __linux__
 
 #if defined(__linux__) && defined(__STATX__)

@@ -24,9 +24,7 @@ import (
 var historyCmd = &cobra.Command{
 	Use:   "history [flags]",
 	Short: "List scope session history",
-	Long: `Each scope execution maintains a directory full of information collected by scope. History lists sessions and 
-prints information on individual sessions. History displays information on what was executed, when they were 
-started, how many events they output, etc.`,
+	Long: `Prints information about sessions. Every time you scope a command, that is called an AppScope session. Each session has a directory which is referenced by a session ID. By default, the AppScope CLI stores all the information it collects during a given session in that session's directory. When you run history, you see a listing of sessions, one session per scoped command, along with information about when the session started, how many events were output during the session, and so on.`,
 	Example: `scope history                    # Displays session history
 scope hist                       # Shortcut for scope history
 scope hist -r                    # Displays running sessions

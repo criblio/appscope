@@ -15,7 +15,7 @@ var versionTag bool
 var versionCmd = &cobra.Command{
 	Use:   "version [flags]",
 	Short: "Display scope version",
-	Long:  `Output version info.`,
+	Long:  `Outputs version info.`,
 	Example: `scope version
 scope version --date
 scope version --summary
@@ -44,7 +44,7 @@ scope version --tag`,
 
 func init() {
 	RootCmd.AddCommand(versionCmd)
-	versionCmd.Flags().BoolVar(&versionSummary, "summary", false, "output just the summary")
-	versionCmd.Flags().BoolVar(&versionDate, "date", false, "output just the date")
-	versionCmd.Flags().BoolVar(&versionTag, "tag", false, "output just the tag")
+	versionCmd.Flags().BoolVar(&versionSummary, "summary", false, "Output just the summary")
+	versionCmd.Flags().BoolVar(&versionDate, "date", false, "Output just the date")
+	versionCmd.Flags().BoolVar(&versionTag, "tag", false, "Output just the tag")
 }

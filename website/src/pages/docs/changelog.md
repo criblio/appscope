@@ -1,10 +1,34 @@
 ---
 title: Changelog
 ---
-
 # Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
+
+## AppScope 1.1.1
+
+2022-07-12 - Maintenance Release
+
+Assets are available from the Cribl CDN at the links below.
+
+- `AppScope for x86`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/scope)
+- `AppScope for ARM`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.1.1/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.1.1/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path. 
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.1.1`.
+
+### New Features and Improvements
+
+- [#964](https://github.com/criblio/appscope/issues/964) AppScope downloadable assets now include [AWS Lambda Layers](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-concepts.html#gettingstarted-concepts-layer) for x86 and for ARM, along with their respective MD5 checksums.
+
+### Fixes
+
+- [#1017](https://github.com/criblio/appscope/issues/1017) AppScope now correctly handles the "peek" flag in interposed functions that receive network data. Before this change, when a server "peeked" at the first byte of data, AppScope counted that byte twice, which broke protocol detection. This fix enables AppScope to correctly produce HTTP events when scoping a server that uses "peek" flags.
+
+- [#1006](https://github.com/criblio/appscope/issues/1006) AppScope now correctly instruments the child processes of an sshd process started by a server. To do this, AppScope interposes both the `execve` and `execv` system calls, and overrides some of the sandboxing that sshd normally imposes using `setrlimit`. Interposing `execv` is new, and gives AppScope visibility into sshd child processes. Changing `setrlimit` settings enables AppScope to perform actions required by AppScope's configured backend and transport, such as establishing connections, creating threads, and creating files.
 
 ## AppScope 1.1.0
 
@@ -37,6 +61,7 @@ Usability improvements include:
 
 - [#781](https://github.com/criblio/appscope/issues/781) Delivery of data as processes exit is now more consistent.
 - [#918](https://github.com/criblio/appscope/issues/918) When AppScope reports its configuration (upon start of a new scoped process), it now includes the formerly missing `cribl` section describing [Cribl backend](cribl-integration#integrating-with-cribl-edge) configuration.
+- [#994](https://github.com/criblio/appscope/issues/994) When you try to scope a Go application on ARM, which is [not supported](requirements#known-limitations), AppScope now leaves the Go app un-instrumented, allowing the app to run normally. Before this bug was discovered and fixed, a scoped Go app on ARM would not run at all.
 
 ## AppScope 1.0.4
 

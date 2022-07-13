@@ -13,7 +13,7 @@ import (
 var logsCmd = &cobra.Command{
 	Use:     "logs",
 	Short:   "Display scope logs",
-	Long:    `Display internal scope logs for troubleshooting scope itself`,
+	Long:    `Displays internal AppScope logs for troubleshooting AppScope itself.`,
 	Example: `scope logs`,
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {

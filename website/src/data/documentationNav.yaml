@@ -37,6 +37,9 @@
     - name: Using TLS for Secure Connections 
       path: /docs/tls
 
+    - name: Further Examples
+      path: /docs/examples-use-cases
+
     - name: Data Routing
       path: /docs/data-routing
 

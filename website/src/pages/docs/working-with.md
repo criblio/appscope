@@ -26,14 +26,13 @@ For example:
 
 * You are developing code, and you want to see how its behavior changes as you iterate. **Use the CLI.**
 
-* You are running curl commands against a website, and want to see what changes when you switch between HTTP/1.1 and HTTP/2.2 and/or HTTP and HTTPS. **Use the CLI.** 
+* You are running cURL commands against a website, and want to see what changes when you switch between HTTP/1.1 and HTTP/2.2 and/or HTTP and HTTPS. **Use the CLI.** 
 
 * You are running nginx in a specific, unchanging way dictated by the requirements of your organization, and you want to see metrics. **Use the library.**
 
 Here's a decision tree to help you determine whether to use the CLI or the library.
 
 ![CLI vs. Library Decision Tree](./images/appscope_tree@2x.jpg)
-
 
 ## The Config File, Env Vars, Flags, and `ldscope` {#config-file-etc}
 
@@ -72,3 +71,5 @@ To interpret a given metric, you must consider its type. There are four possibil
 For example, `proc.fd` is a `gauge` that indicates how many files were open at one point in time. If we're scoping `top`, that's typically fewer than 10. By contrast, `fs.open` is a `count` that increments every time a file is opened. When scoping `top` over a reporting period of 10 seconds, you could see values in the hundreds or thousands.
 
 It's important to take into account whether the application or command you are scoping is short-lived or longer-lasting. For commands that complete very quickly, a `gauge` will report the value at the moment that AppScope exits the process.
+
+By default, all classes of events and metrics are turned on – but you can turn any class of metric or event data on or off individually. To do this, include or omit the desired watch type(s) from the `metric > watch[*]` array and/or the `event > watch[*]` array in the [config file](config-file). Environment variables can achieve the same effect. For example, the environment variable to turn off metrics of watch type `statsd` would be `SCOPE_METRIC_STATSD=false`. To turn on events of watch type `logfile`, you'd use `SCOPE_EVENT_LOGFILE=true`.

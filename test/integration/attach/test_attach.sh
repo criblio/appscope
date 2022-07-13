@@ -85,6 +85,7 @@ grep -q http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
 kill -9 `pidof python3` > /dev/null
+
 endtest
 
 #
@@ -122,7 +123,50 @@ ERR+=$?
 
 kill -9 `pidof java`
 
+sleep 1
+
 endtest
+
+#
+# attach execve_test
+#
+
+starttest execve_test
+
+cd /opt/exec_test/
+./exec_test 0 &
+EXEC_TEST_PID=`pidof exec_test`
+
+ldscope --attach ${EXEC_TEST_PID}
+ERR+=$?
+
+wait ${EXEC_TEST_PID}
+
+egrep '"cmd":"/usr/bin/curl -I https://cribl.io"' $EVT_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+#
+# attach execv_test
+#
+
+starttest execv_test
+
+cd /opt/exec_test/
+./exec_test 1 &
+EXEC_TEST_PID=`pidof exec_test`
+
+ldscope --attach ${EXEC_TEST_PID}
+ERR+=$?
+
+wait ${EXEC_TEST_PID}
+
+egrep '"cmd":"/usr/bin/wget -S --spider --no-check-certificate https://cribl.io"' $EVT_FILE > /dev/null
+ERR+=$?
+
+endtest
+
 
 if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""

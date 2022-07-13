@@ -36,9 +36,7 @@ import (
 var eventsCmd = &cobra.Command{
 	Use:   "events [flags] ([eventId])",
 	Short: "Outputs events for a session",
-	Long: `Outputs events for a session. Detailed information about each event can be obtained by inputting the Event ID (by default, in blue 
-in []'s at the left) as a positional parameter. Filters can be provided to narrow down by source (e.g. http, net, fs, console) 
-or source (e.g. fs.open, stdout, net.open). JavaScript expressions can be used to further refine the query and express logic.`,
+	Long: `Outputs events for a session. You can obtain detailed information about each event by inputting the Event ID as a positional parameter. (By default, the Event ID appears in blue in []'s at the left.) You can provide filters to narrow down by name (e.g., http, net, fs, console), or by field (e.g., fs.open, stdout, or net.open). You can use JavaScript expressions to further refine the query, and to express logic.`,
 	Example: `scope events
 scope events m61
 scope events --sourcetype http

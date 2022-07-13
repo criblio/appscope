@@ -4,6 +4,15 @@ title: Known Issues
 
 # Known Issues
 
+## AppScope 1.1.0
+
+2022-06-29 - Maintenance Release
+
+As of this AppScope release, known issues include:
+
+- [#1017](https://github.com/criblio/appscope/issues/1017) **Updated description**: AppScope incorrectly handles the "peek" flag in interposed functions that receive network data. When a server "peeks" at the first byte of data, AppScope counts that byte twice, which breaks protocol detection. AppScope then fails to correctly produce HTTP events.
+  - **Fix:** 1.1.1, in [#1018](https://github.com/criblio/appscope/issues/1018)
+
 ## AppScope 1.0.3
 
 2022-04-12 - Maintenance Release
@@ -68,7 +77,7 @@ As of this AppScope pre-release, known issues include:
 - [#10](https://github.com/criblio/appscope/issues/10), [#165,](https://github.com/criblio/appscope/issues/165) Scoping the Docker executable is problematic.
   - **Fix:** 0.7
 
-- [#119](https://github.com/criblio/appscope/issues/119) HTTP 2 metrics and headers can be viewed only with [Cribl LogStream](https://cribl.io/product/).
+- [#119](https://github.com/criblio/appscope/issues/119) HTTP 2 metrics and headers can be viewed only with [Cribl LogStream](https://cribl.io/product/).
 
   - **Fix:** 0.8.0, in [#543](https://github.com/criblio/appscope/issues/543) 
 

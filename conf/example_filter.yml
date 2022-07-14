@@ -1,0 +1,17 @@
+allow_process:
+  - name: "nginx"
+    action_on: attach
+    config_file: "/etc/my_scope_dir/example_scope.yml"
+
+  - name: "sshd"
+    arg: "-debug"
+    action_on: none
+
+  - name: "sendmail"
+    action_on: restart
+
+deny_process:
+  - name: "ls"
+    arg: "-l"
+
+  - name: "top"

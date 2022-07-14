@@ -43,6 +43,7 @@
 
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
+#define ZERO_UUID "00000000-0000-4000-8000-000000000000"
 
 static thread_timing g_thread = {0};
 static config_t *g_staticfg = NULL;
@@ -1620,6 +1621,22 @@ init(void)
 
     setProcId(&g_proc);
     setPidEnv(g_proc.pid);
+
+    char *machine_id = {0};
+    if (getMachineID(&machine_id)) {
+        scopeLogError("ERROR: getMachineID");
+    } else {
+        scope_strncpy(g_proc.machine_id, machine_id, MACHINE_ID_LEN);
+        g_proc.machine_id[MACHINE_ID_LEN] = '\0';
+    }
+
+    char *uuid = ZERO_UUID;
+    if (generateUUIDv4(&uuid) {
+        scopeLogError("ERROR: generateUUIDv4");
+    } else {
+        scope_strncpy(g_proc.uuid, uuid, UUID_LEN);
+        g_proc.uuid[UUID_LEN] = '\0';
+    }
 
     // initEnv() will set this TRUE if it detects `scope_attach_PID.env` in
     // `/dev/shm` with our PID indicating we were injected into a running

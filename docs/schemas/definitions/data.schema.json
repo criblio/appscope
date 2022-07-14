@@ -294,6 +294,11 @@
       "type": "string",
       "enum": ["debug", "info", "warning", "error", "none"]
     },
+    "machine_id" : {
+      "title": "machine_id",
+      "description": "A unique identifier for a machine.",
+      "type": "string",
+    },
     "maxeventpersec": {
       "title": "maxeventpersec",
       "description": "Specifies a rate limit for events. See `scope.yml`.",
@@ -624,6 +629,11 @@
       "description": "Indicates that the metric's value is a number of threads.",
       "type": "string",
       "const": "thread"
+    },
+    "uuid" : {
+      "title": "uuid",
+      "description": "A unique identifier for a process.",
+      "type": "string",
     },
     "validateserver": {
       "title": "validateserver",

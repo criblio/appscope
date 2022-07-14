@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <time.h>
 
 #include "scopestdlib.h"
@@ -9,6 +10,9 @@
 #include "fn.h"
 #include "dbg.h"
 #include "runtimecfg.h"
+#include "openssl/evp.h"
+
+#define MD5_LEN 32
 
 rtconfig g_cfg = {0};
 
@@ -203,3 +207,94 @@ sigSafeNanosleep(const struct timespec *req)
 
     return rv;
 }
+
+// Generate a UUID v4 string using a random generator
+int
+generateUUIDv4(char **string)
+{
+   if (string == NULL) return 1;
+
+    unsigned char key[16];
+    static bool seeded = FALSE;
+
+    if (!seeded) {
+        srand((unsigned int)time(NULL));
+        seeded = TRUE;
+    }
+
+    for (int i = 0; i < 16; i++) {
+        key[i] = (unsigned char)rand() % 255;
+    }
+
+    key[6] = 0x40 | (key[6] & 0xf); // Set version to 4
+    key[8] = 0x80 | (key[8] & 0x3f); // Set variant to 8
+
+    scope_asprintf(string,
+        "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+        key[0], key[1], key[2], key[3],
+        key[4], key[5], key[6], key[7], 
+        key[8], key[9], key[10], key[11],
+        key[12], key[13], key[14], key[15]);
+
+    return 0;
+}
+
+// Get the Machine ID, or if not available, create one
+int
+getMachineID(char **string)
+{
+    if (string == NULL) return 1;
+
+    char buf[MACHINE_ID_LEN + 1];
+    FILE *fp;
+
+    if ((fp = scope_fopen("/etc/machine-id", "r")) == NULL) {
+        return 1;
+    }
+    if (scope_fgets(buf, sizeof(buf), fp) == NULL) {
+        return 1;
+    }
+    scope_fclose(fp);
+
+    scope_asprintf(string, buf, MACHINE_ID_LEN);
+
+    return 0;
+}
+
+// Create a Machine ID - an MD5 hash of the hostname
+static int
+createMachineID(char **string)
+{
+    if (string == NULL) return 1;
+
+    char hostname[MAX_HOSTNAME];
+    if (scope_gethostname(hostname, sizeof(hostname)) != 0) {
+        scopeLogError("ERROR: gethostname");
+    }
+
+    char md5[MD5_LEN + 1];
+    generateMD5(hostname, strlen(hostname), md5);
+    scope_asprintf(string, "%s", md5);
+
+    return 0;
+}
+
+// Generate an MD5 hash from a string
+void
+generateMD5(const char *data, int len, char *md5_buf)
+{
+    unsigned char md5_value[EVP_MAX_MD_SIZE];
+    unsigned int md5_len;
+    EVP_MD_CTX *md5_ctx = EVP_MD_CTX_new();
+    const EVP_MD *md5 = EVP_md5();
+
+    EVP_DigestInit_ex(md5_ctx, md5, NULL);
+    EVP_DigestUpdate(md5_ctx, data, len);
+    EVP_DigestFinal_ex(md5_ctx, md5_value, &md5_len);
+    EVP_MD_CTX_free(md5_ctx);
+
+    for (int i = 0; i < md5_len; i++) {
+        scope_snprintf(&(md5_buf[i * 2]), 16 * 2, "%02x", md5_value[i]);
+    }
+}
+

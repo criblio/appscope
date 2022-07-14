@@ -24,10 +24,12 @@ type Config struct {
 	CriblDest     string
 	Subprocess    bool
 	Loglevel      string
+	LogDest       string
 	LibraryPath   string
 	NoBreaker     bool
 	AuthToken     string
 	UserConfig    string
+	CommandDir    string
 
 	now func() time.Time
 	sc  *libscope.ScopeConfig
@@ -66,9 +68,4 @@ func (rc *Config) Run(args []string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Run()
-}
-
-// GetScopeConfig returns the ScopeConfig pointer
-func (rc *Config) GetScopeConfig() *libscope.ScopeConfig {
-	return rc.sc
 }

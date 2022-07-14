@@ -147,45 +147,47 @@ func installScope(serviceName string, unameMachine string, unameSysname string, 
 
 	// extract scope.yml
 	configPath := fmt.Sprintf("/etc/scope/%s/scope.yml", serviceName)
-	if _, err := os.Stat(configPath); err != nil {
-		asset, err := run.Asset("build/scope.yml")
-		util.CheckErrSprintf(err, "error: failed to find scope.yml asset; %v", err)
-		err = ioutil.WriteFile(configPath, asset, 0644)
-		util.CheckErrSprintf(err, "error: failed to extract scope.yml; %v", err)
-		if rc.MetricsDest != "" || rc.EventsDest != "" || rc.CriblDest != "" {
-			examplePath := fmt.Sprintf("/etc/scope/%s/scope_example.yml", serviceName)
-			err = os.Rename(configPath, examplePath)
-			util.CheckErrSprintf(err, "error: failed to move scope.yml to scope_example.yml; %v", err)
-			rc.WorkDir = configDir
-			rc.SetDefault()
-			sc := rc.GetScopeConfig()
-			sc.Libscope.Log.Transport.Path = logDir + "/cribl.log"
-			sc.Libscope.CommandDir = runDir
-			err = rc.WriteScopeConfig(configPath, 0644)
-			util.CheckErrSprintf(err, "error: failed to create scope.yml: %v", err)
-		}
-	}
+	asset, err := run.Asset("build/scope.yml")
+	util.CheckErrSprintf(err, "error: failed to find scope.yml asset; %v", err)
+	err = ioutil.WriteFile(configPath, asset, 0644)
+	util.CheckErrSprintf(err, "error: failed to extract scope.yml; %v", err)
+	examplePath := fmt.Sprintf("/etc/scope/%s/scope_example.yml", serviceName)
+	err = os.Rename(configPath, examplePath)
+	util.CheckErrSprintf(err, "error: failed to move scope.yml to scope_example.yml; %v", err)
+	rc.WorkDir = configDir
+	rc.CommandDir = runDir
+	rc.LogDest = "file://" + logDir + "/cribl.log"
+	err = rc.WriteScopeConfig(configPath, 0644)
+	util.CheckErrSprintf(err, "error: failed to create scope.yml: %v", err)
 
 	return libraryPath
 }
 
-func installSystemd(serviceName string, unameMachine string, unameSysname string, libcName string) {
-	serviceFile := "/etc/systemd/system/" + serviceName + ".service"
-	if _, err := os.Stat(serviceFile); err != nil {
-		serviceFile = "/run/systemd/system/" + serviceName + ".service"
-		if _, err := os.Stat(serviceFile); err != nil {
-			serviceFile = "/usr/lib/systemd/system/" + serviceName + ".service"
-			if _, err := os.Stat(serviceFile); err != nil {
-				serviceFile = "/usr/lib/systemd/system/" + serviceName + ".service"
-				util.ErrAndExit("error: didn't find service file; " + serviceName + ".service")
-			}
+func locateService(serviceName string) bool {
+	servicePrefixDirs := []string{"/etc/systemd/system/", "/lib/systemd/system/", "/run/systemd/system/", "/usr/lib/systemd/system/"}
+	for _, prefixDir := range servicePrefixDirs {
+		if util.CheckFileExists(prefixDir + serviceName + ".service") {
+			return true
 		}
 	}
+	return false
+}
+
+func installSystemd(serviceName string, unameMachine string, unameSysname string, libcName string) {
+	if !locateService(serviceName) {
+		util.ErrAndExit("error: didn't find service file; " + serviceName + ".service")
+	}
+	serviceDir := "/etc/systemd/system/" + serviceName + ".service.d"
+	if !util.CheckDirExists(serviceDir) {
+		err := os.MkdirAll(serviceDir, 0655)
+		util.CheckErrSprintf(err, "error: failed to create serviceDir directory; %v", err)
+	}
+	serviceEnvPath := serviceDir + "/env.conf"
 
 	if !forceFlag {
 		fmt.Printf("\nThis command will make the following changes if not found already:\n")
 		fmt.Printf("  - install libscope.so into /usr/lib/%s-%s-%s/cribl/\n", unameMachine, unameSysname, libcName)
-		fmt.Printf("  - create %s.d/env.conf override\n", serviceFile)
+		fmt.Printf("  - create %s override\n", serviceEnvPath)
 		fmt.Printf("  - create /etc/scope/%s/scope.yml\n", serviceName)
 		fmt.Printf("  - create /var/log/scope/\n")
 		fmt.Printf("  - create /var/run/scope/\n")
@@ -196,15 +198,9 @@ func installSystemd(serviceName string, unameMachine string, unameSysname string
 
 	libraryPath := installScope(serviceName, unameMachine, unameSysname, libcName)
 
-	overrideDir := fmt.Sprintf("%s.d", serviceFile)
-	if _, err := os.Stat(overrideDir); err != nil {
-		err := os.Mkdir(overrideDir, 0755) // TODO not ideal
-		util.CheckErrSprintf(err, "error: failed to create override directory; %v", err)
-	}
-	overridePath := fmt.Sprintf("%s.d/env.conf", serviceFile)
-	if _, err := os.Stat(overridePath); err != nil {
+	if !util.CheckFileExists(serviceEnvPath) {
 		content := fmt.Sprintf("[Service]\nEnvironment=LD_PRELOAD=%s\nEnvironment=SCOPE_HOME=/etc/scope/%s\n", libraryPath, serviceName)
-		err := ioutil.WriteFile(overridePath, []byte(content), 0644)
+		err := ioutil.WriteFile(serviceEnvPath, []byte(content), 0644)
 		util.CheckErrSprintf(err, "error: failed to create override file; %v", err)
 	}
 

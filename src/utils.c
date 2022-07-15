@@ -317,40 +317,44 @@ getMacAddr(char *string)
     DIR *d;
     struct dirent *dir;
     struct stat buf;
-    char path_buf[256];
     char mac_buf[MAC_ADDR_LEN];
-    char *physical_if_name;
+    char dir_path[256];
+    char link_path[256];
+    char addr_path[256];
+    bool found = FALSE;
     
-    d = scope_opendir("/sys/class/net");
+    d = scope_opendir("/sys/class/net/");
     if (!d) return 1;
 
-    // Check if interface eth0 exists
+    // Check if interface eth exists
     // Otherwise find an interface that does not contain "virtual" in the soft link
     while ((dir = scope_readdir(d)) != NULL) {
-        if (scope_strcmp(dir->d_name, "eth0") == 0) {
-            physical_if_name = dir->d_name;
+        scope_sprintf(dir_path, "/sys/class/net/%s", dir->d_name);
+
+        if (scope_strcmp(dir->d_name, "eth") == 0) {
+            found = TRUE;
             break;
         }
-        if (scope_lstat(dir->d_name, &buf) != 0) {
+    
+        if (scope_lstat(dir_path, &buf) != 0) {
             break;
         }
         if (S_ISLNK(buf.st_mode)) {
-            (void)scope_readlink(dir->d_name, path_buf, sizeof(path_buf));
-            if (scope_strstr(path_buf, "virtual") == NULL) {
-                physical_if_name = dir->d_name;
+            (void)scope_readlink(dir_path, link_path, sizeof(link_path));
+            if (scope_strstr(link_path, "virtual") == NULL) {
+                found = TRUE;
                 break;
             }
         }
     }
     scope_closedir(d);
 
-    if (!physical_if_name) {
+    if (!found) {
         scopeLogError("Error: getMacAddr: No physical interface found");
         return 1;
     }
 
-    char addr_path[256];
-    scope_sprintf(addr_path, "/sys/class/net/%s/address", physical_if_name);
+    scope_sprintf(addr_path, "%s/address", dir_path);
 
     FILE *fp;
     if ((fp = scope_fopen(addr_path, "r")) == NULL) {

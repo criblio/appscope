@@ -25,5 +25,6 @@ void setUUID(char *string);
 void setMachineID(char *string);
 int createMachineID(char *string);
 void generateMD5(const char *data, int len, char *md5_buf);
+int getMacAddr(char *string);
 
 #endif // __UTILS_H__

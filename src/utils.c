@@ -13,6 +13,7 @@
 #include "openssl/evp.h"
 
 #define MD5_LEN 32
+#define MAC_ADDR_LEN 17
 
 rtconfig g_cfg = {0};
 
@@ -213,7 +214,7 @@ void
 setUUID(char *string)
 {
    if (string == NULL) {
-       scopeLogError("ERROR: setUUIDv4");
+       scopeLogError("ERROR: setUUIDv4: Null string");
        return;
    }
 
@@ -245,7 +246,7 @@ void
 setMachineID(char *string)
 {
     if (string == NULL) {
-        scopeLogError("ERROR: setMachineID");
+        scopeLogError("ERROR: setMachineID: Null string");
         return;
     }
 
@@ -277,14 +278,14 @@ createMachineID(char *string)
 {
     if (string == NULL) return 1;
 
-    char hostname[MAX_HOSTNAME];
-    if (scope_gethostname(hostname, sizeof(hostname)) != 0) {
-        scopeLogError("ERROR: gethostname");
+    char mac_addr[MAC_ADDR_LEN];
+    if (getMacAddr(mac_addr)) {
+        scopeLogError("ERROR: createMachineID: getMacAddr");
         return 1;
     }
 
     char md5[MD5_LEN + 1];
-    generateMD5(hostname, scope_strlen(hostname), md5);
+    generateMD5(mac_addr, scope_strlen(mac_addr), md5);
     scope_sprintf(string, "%s", md5);
 
     return 0;
@@ -307,5 +308,63 @@ generateMD5(const char *data, int len, char *md5_buf)
     for (int i = 0; i < md5_len; i++) {
         scope_snprintf(&(md5_buf[i * 2]), 16 * 2, "%02x", md5_value[i]);
     }
+}
+
+// Get the machine's physical MAC address
+int
+getMacAddr(char *string)
+{
+    DIR *d;
+    struct dirent *dir;
+    struct stat buf;
+    char path_buf[256];
+    char mac_buf[MAC_ADDR_LEN];
+    char *physical_if_name;
+    
+    d = scope_opendir("/sys/class/net");
+    if (!d) return 1;
+
+    // Check if interface eth0 exists
+    // Otherwise find an interface that does not contain "virtual" in the soft link
+    while ((dir = scope_readdir(d)) != NULL) {
+        if (scope_strcmp(dir->d_name, "eth0") == 0) {
+            physical_if_name = dir->d_name;
+            break;
+        }
+        if (scope_lstat(dir->d_name, &buf) != 0) {
+            break;
+        }
+        if (S_ISLNK(buf.st_mode)) {
+            (void)scope_readlink(dir->d_name, path_buf, sizeof(path_buf));
+            if (scope_strstr(path_buf, "virtual") == NULL) {
+                physical_if_name = dir->d_name;
+                break;
+            }
+        }
+    }
+    scope_closedir(d);
+
+    if (!physical_if_name) {
+        scopeLogError("Error: getMacAddr: No physical interface found");
+        return 1;
+    }
+
+    char addr_path[256];
+    scope_sprintf(addr_path, "/sys/class/net/%s/address", physical_if_name);
+
+    FILE *fp;
+    if ((fp = scope_fopen(addr_path, "r")) == NULL) {
+        scopeLogError("Error: getMacAddr: No address file found");
+        return 1;
+    }
+    if (scope_fgets(mac_buf, sizeof(mac_buf), fp) == NULL) {
+        scopeLogError("Error: getMacAddr: No address found in file");
+        scope_fclose(fp);
+        return 1;
+    }
+    scope_fclose(fp);
+
+    scope_sprintf(string, mac_buf, MAC_ADDR_LEN);
+    return 0;
 }
 

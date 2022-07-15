@@ -54,7 +54,7 @@ $(LDSCOPEDYN): src/fn.c src/scopestdlib.c os/$(OS)/os.c src/dbg.c src/scopeelf.c
 	gcc -Wall -g $(ARCH_CFLAGS) $(DISTRO_FLAGS) \
 		-DSCOPE_VER=\"$(SCOPE_VER)\" \
 		src/fn.c src/scopestdlib.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c \
-		-ldl -lrt -o $@ ${MUSL_AR} ${UNWIND_AR} -I./os/$(OS) $(INCLUDES)
+		-ldl -lrt -o $@ ${MUSL_AR} ${UNWIND_AR} ${OPENSSL_AR} -I./os/$(OS) $(INCLUDES)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 $(LDSCOPE): src/scope_static.c src/libdir.c src/scopestdlib.c $(LDSCOPEDYN) $(LIBSCOPE)

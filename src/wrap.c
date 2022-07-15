@@ -40,6 +40,7 @@
 #include "inject.h"
 #include "scopestdlib.h"
 #include "../contrib/libmusl/musl.h"
+#include "openssl/evp.h"
 
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
@@ -1622,21 +1623,8 @@ init(void)
     setProcId(&g_proc);
     setPidEnv(g_proc.pid);
 
-    char *machine_id = {0};
-    if (getMachineID(&machine_id)) {
-        scopeLogError("ERROR: getMachineID");
-    } else {
-        scope_strncpy(g_proc.machine_id, machine_id, MACHINE_ID_LEN);
-        g_proc.machine_id[MACHINE_ID_LEN] = '\0';
-    }
-
-    char *uuid = ZERO_UUID;
-    if (generateUUIDv4(&uuid) {
-        scopeLogError("ERROR: generateUUIDv4");
-    } else {
-        scope_strncpy(g_proc.uuid, uuid, UUID_LEN);
-        g_proc.uuid[UUID_LEN] = '\0';
-    }
+    setMachineID(g_proc.machine_id);
+    setUUID(g_proc.uuid);
 
     // initEnv() will set this TRUE if it detects `scope_attach_PID.env` in
     // `/dev/shm` with our PID indicating we were injected into a running

@@ -209,72 +209,83 @@ sigSafeNanosleep(const struct timespec *req)
 }
 
 // Generate a UUID v4 string using a random generator
-int
-generateUUIDv4(char **string)
+void
+setUUID(char *string)
 {
-   if (string == NULL) return 1;
+   if (string == NULL) {
+       scopeLogError("ERROR: setUUIDv4");
+       return;
+   }
 
     unsigned char key[16];
     static bool seeded = FALSE;
 
     if (!seeded) {
-        srand((unsigned int)time(NULL));
+        scope_srand((unsigned int)scope_time(NULL));
         seeded = TRUE;
     }
 
     for (int i = 0; i < 16; i++) {
-        key[i] = (unsigned char)rand() % 255;
+        key[i] = (unsigned char)scope_rand() % 255;
     }
 
     key[6] = 0x40 | (key[6] & 0xf); // Set version to 4
     key[8] = 0x80 | (key[8] & 0x3f); // Set variant to 8
 
-    scope_asprintf(string,
+    scope_sprintf(string,
         "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
         key[0], key[1], key[2], key[3],
         key[4], key[5], key[6], key[7], 
         key[8], key[9], key[10], key[11],
         key[12], key[13], key[14], key[15]);
-
-    return 0;
 }
 
 // Get the Machine ID, or if not available, create one
-int
-getMachineID(char **string)
+void
+setMachineID(char *string)
 {
-    if (string == NULL) return 1;
+    if (string == NULL) {
+        scopeLogError("ERROR: setMachineID");
+        return;
+    }
 
     char buf[MACHINE_ID_LEN + 1];
     FILE *fp;
 
-    if ((fp = scope_fopen("/etc/machine-id", "r")) == NULL) {
-        return 1;
+    // Try to get a machine id from /etc
+    if ((fp = scope_fopen("/etc/machine-id", "r")) != NULL) {
+        if (scope_fgets(buf, sizeof(buf), fp) == NULL) {
+            scopeLogInfo("INFO: setMachineID: Could not read Machine ID from file /etc/machine-id");
+        }
+        scope_fclose(fp);
     }
-    if (scope_fgets(buf, sizeof(buf), fp) == NULL) {
-        return 1;
+
+    if (scope_strlen(buf) != MACHINE_ID_LEN) {
+        scopeLogInfo("INFO: setMachineID: Machine ID not found or unexpected length. Creating one.");
+        if (createMachineID(buf)) {
+            scopeLogError("ERROR: setMachineID: Error creating Machine ID");
+            return;
+        }
     }
-    scope_fclose(fp);
 
-    scope_asprintf(string, buf, MACHINE_ID_LEN);
-
-    return 0;
+    scope_sprintf(string, buf, MACHINE_ID_LEN);
 }
 
 // Create a Machine ID - an MD5 hash of the hostname
-static int
-createMachineID(char **string)
+int
+createMachineID(char *string)
 {
     if (string == NULL) return 1;
 
     char hostname[MAX_HOSTNAME];
     if (scope_gethostname(hostname, sizeof(hostname)) != 0) {
         scopeLogError("ERROR: gethostname");
+        return 1;
     }
 
     char md5[MD5_LEN + 1];
-    generateMD5(hostname, strlen(hostname), md5);
-    scope_asprintf(string, "%s", md5);
+    generateMD5(hostname, scope_strlen(hostname), md5);
+    scope_sprintf(string, "%s", md5);
 
     return 0;
 }

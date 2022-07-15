@@ -21,8 +21,9 @@ int endsWith(const char *string, const char *substring);
 
 int sigSafeNanosleep(const struct timespec *req);
 
-int generateUUIDv4(char **string);
-int getMachineID(char **string);
-void generateMD5(const char *data, int len, char *md5);
+void setUUID(char *string);
+void setMachineID(char *string);
+int createMachineID(char *string);
+void generateMD5(const char *data, int len, char *md5_buf);
 
 #endif // __UTILS_H__

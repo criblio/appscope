@@ -1,6 +1,6 @@
 FROM ubuntu
 
-RUN apt update -y && apt install -y curl systemctl
+RUN apt update -y && apt install -y curl systemctl nginx pcregrep
 
 RUN ARCH=$(uname -m | sed -e 's/x86_64/x64/' -e 's/aarch64/arm64/') \
  && curl -Lo /tmp/cribl.tgz https://cdn.cribl.io/dl/3.1.0/cribl-3.1.0-f765e418-linux-${ARCH}.tgz \

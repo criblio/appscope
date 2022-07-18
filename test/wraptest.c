@@ -39,7 +39,7 @@ testSetUUID(void **state)
     assert_int_equal(strlen(uuid), 36);
 
     // UUID version is 4
-    assert_int_equal(uuid[16], 4);
+    assert_int_equal(uuid[14] - '0', 4);
 }
 
 static void
@@ -292,6 +292,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(envRegexFree),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
         cmocka_unit_test(testSetUUID),
+        cmocka_unit_test(testSetMachineID),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

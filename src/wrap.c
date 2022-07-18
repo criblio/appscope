@@ -1184,9 +1184,8 @@ hookAll(struct dl_phdr_info *info, size_t size, void *data)
 
     scopeLog(CFG_LOG_DEBUG, "%s: shared obj: %s", __FUNCTION__, info->dlpi_name);
 
-    // don't hook funcs from libscope, ld.so or libc
-    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-") ||
-        scope_strstr(info->dlpi_name, "libc")) return FALSE;
+    // don't hook funcs from libscope or ld.so
+    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) return FALSE;
 
     void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
     if (handle == NULL) return FALSE;
@@ -4226,6 +4225,10 @@ fputwc(wchar_t wc, FILE *stream)
     return rc;
 }
 
+/*
+ * Note: we are not interposing fscanf.
+ * It's here as an example. We will need to deal with the variable arg list in order to turn this on.
+ */
 EXPORTOFF int
 fscanf(FILE *stream, const char *format, ...)
 {
@@ -5388,7 +5391,6 @@ static got_list_t inject_hook_list[] = {
     {"fputc_unlocked", fputc_unlocked, &g_fn.fputc_unlocked},
     {"putwc", putwc, &g_fn.putwc},
     {"fputwc", fputwc, &g_fn.fputwc},
-    //{"fscanf", fscanf, &g_fn.fscanf},
     {"getline", getline, &g_fn.getline},
     {"getdelim", getdelim, &g_fn.getdelim},
     {"__getdelim", __getdelim, &g_fn.__getdelim},

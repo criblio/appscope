@@ -12,8 +12,9 @@
 #include "runtimecfg.h"
 #include "openssl/evp.h"
 
-#define MD5_LEN 32
+#define HASH_LEN 32
 #define MAC_ADDR_LEN 17
+#define ZERO_MACHINE_ID "00000000000000000000000000000000"
 
 rtconfig g_cfg = {0};
 
@@ -249,6 +250,7 @@ setMachineID(char *string)
         scopeLogError("ERROR: setMachineID: Null string");
         return;
     }
+    scope_sprintf(string, ZERO_MACHINE_ID, MACHINE_ID_LEN);
 
     char buf[MACHINE_ID_LEN + 1];
     FILE *fp;
@@ -272,7 +274,7 @@ setMachineID(char *string)
     scope_sprintf(string, buf, MACHINE_ID_LEN);
 }
 
-// Create a Machine ID - an MD5 hash of the hostname
+// Create a Machine ID from a mac address
 int
 createMachineID(char *string)
 {
@@ -284,30 +286,13 @@ createMachineID(char *string)
         return 1;
     }
 
-    char md5[MD5_LEN + 1];
-    generateMD5(mac_addr, scope_strlen(mac_addr), md5);
-    scope_sprintf(string, "%s", md5);
-
+    scope_sprintf(string,
+        "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+        mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3],
+        mac_addr[4], mac_addr[5], mac_addr[6], mac_addr[7], 
+        mac_addr[8], mac_addr[9], mac_addr[10], mac_addr[11],
+        mac_addr[12], mac_addr[13], mac_addr[14], mac_addr[15]);
     return 0;
-}
-
-// Generate an MD5 hash from a string
-void
-generateMD5(const char *data, int len, char *md5_buf)
-{
-    unsigned char md5_value[EVP_MAX_MD_SIZE];
-    unsigned int md5_len;
-    EVP_MD_CTX *md5_ctx = EVP_MD_CTX_new();
-    const EVP_MD *md5 = EVP_md5();
-
-    EVP_DigestInit_ex(md5_ctx, md5, NULL);
-    EVP_DigestUpdate(md5_ctx, data, len);
-    EVP_DigestFinal_ex(md5_ctx, md5_value, &md5_len);
-    EVP_MD_CTX_free(md5_ctx);
-
-    for (int i = 0; i < md5_len; i++) {
-        scope_snprintf(&(md5_buf[i * 2]), 16 * 2, "%02x", md5_value[i]);
-    }
 }
 
 // Get the machine's physical MAC address
@@ -331,7 +316,7 @@ getMacAddr(char *string)
     while ((dir = scope_readdir(d)) != NULL) {
         scope_sprintf(dir_path, "/sys/class/net/%s", dir->d_name);
 
-        if (scope_strcmp(dir->d_name, "eth") == 0) {
+        if (scope_strstr(dir->d_name, "eth") != 0) {
             found = TRUE;
             break;
         }

@@ -44,7 +44,6 @@
 
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
-#define ZERO_UUID "00000000-0000-4000-8000-000000000000"
 
 static thread_timing g_thread = {0};
 static config_t *g_staticfg = NULL;

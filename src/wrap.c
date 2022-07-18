@@ -92,12 +92,6 @@ enum_map_t netFailMap[] = {
     {NULL,                                             -1}
 };
 
-static got_list_t hook_list[] = {
-    {"SSL_read", SSL_read, &g_fn.SSL_read},
-    {"SSL_write", SSL_write, &g_fn.SSL_write},
-    {NULL, NULL, NULL}
-};
-
 // When used with dl_iterate_phdr(), this has a similar result to
 // scope_dlsym(RTLD_NEXT, ).  But, unlike scope_dlsym(RTLD_NEXT, )
 // it will never return a symbol in our library.  This is
@@ -1081,12 +1075,10 @@ hookSharedObjs(struct dl_phdr_info *info, size_t size, void *data)
     if (!info || !data || !info->dlpi_name) return FALSE;
 
     struct link_map *lm;
-    void *addr = NULL;
     Elf64_Sym *sym = NULL;
     Elf64_Rela *rel = NULL;
     char *str = NULL;
     int rsz = 0;
-    void *libscopeHandle = data;
     const char *libname = NULL;
 
     // don't attempt to hook libscope.so, libc*.so, ld-*.so
@@ -1108,8 +1100,6 @@ hookSharedObjs(struct dl_phdr_info *info, size_t size, void *data)
     // Get the link map and ELF sections in advance of something matching
     if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
         for (int i=0; inject_hook_list[i].symbol; i++) {
-            addr = dlsym(libscopeHandle, inject_hook_list[i].symbol);
-            inject_hook_list[i].func = addr;
 
             if ((dlsym(handle, inject_hook_list[i].symbol)) &&
                 (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1)) {
@@ -1144,6 +1134,36 @@ hookInject()
     return FALSE;
 }
 
+static int
+hookMain(bool filter)
+{
+    struct link_map *lm;
+    Elf64_Sym *sym = NULL;
+    Elf64_Rela *rel = NULL;
+    char *str = NULL;
+    int rsz = 0;
+
+    void *handle = g_fn.dlopen(NULL, RTLD_NOW);
+    if (handle == NULL) return FALSE;
+
+    // Get the link map and ELF sections in advance of something matching
+    if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+        for (int i=0; inject_hook_list[i].symbol; i++) {
+            // if the proc passes the filter then GOT hook all else only hook execve
+            // TODO; all execv?
+            if (((filter == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
+                dlsym(handle, inject_hook_list[i].symbol)) {
+                if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1) {
+                    scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from main", inject_hook_list[i].symbol);
+                }
+            }
+        }
+    }
+
+    dlclose(handle);
+    return TRUE;
+}
+
 /*
  * Iterate all shared objects and GOT hook as necessary.
  * Filter the process from an external filter list.
@@ -1162,7 +1182,13 @@ hookAll(struct dl_phdr_info *info, size_t size, void *data)
     int rsz = 0;
     bool *filter = data;
 
-    void *handle = g_fn.dlopen(info->dlpi_name, RTLD_LAZY);
+    scopeLog(CFG_LOG_DEBUG, "%s: shared obj: %s", __FUNCTION__, info->dlpi_name);
+
+    // don't hook funcs from libscope, ld.so or libc
+    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-") ||
+        scope_strstr(info->dlpi_name, "libc")) return FALSE;
+
+    void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
     if (handle == NULL) return FALSE;
 
     // Get the link map and ELF sections in advance of something matching
@@ -1240,6 +1266,7 @@ initHook(int attachedFlag)
         // GOT hooking all interposed funcs
         filter = filterProc(full_path);
         dl_iterate_phdr(hookAll, &filter);
+        hookMain(filter);
     }
 
     // libmusl
@@ -2877,7 +2904,7 @@ SSL_read(SSL *ssl, void *buf, int num)
 {
     int rc;
     
-    //scopeLogError("SSL_read");
+    scopeLogTrace("SSL_read");
     WRAP_CHECK(SSL_read, -1);
     rc = g_fn.SSL_read(ssl, buf, num);
 
@@ -2895,7 +2922,7 @@ SSL_write(SSL *ssl, const void *buf, int num)
 {
     int rc;
     
-    //scopeLogError("SSL_write");
+    scopeLogTrace("SSL_write");
     WRAP_CHECK(SSL_write, -1);
 
     rc = g_fn.SSL_write(ssl, buf, num);
@@ -3430,7 +3457,11 @@ dlopen(const char *filename, int flags)
      * GOT entries.
      */
     handle = g_fn.dlopen(filename, flags);
-    if (handle && (flags & RTLD_DEEPBIND)) {
+
+    // if we aren't loading, then be done.
+    if (flags & RTLD_NOLOAD) return handle;
+
+    if (handle) {
         Elf64_Sym *sym = NULL;
         Elf64_Rela *rel = NULL;
         char *str = NULL;
@@ -3442,10 +3473,10 @@ dlopen(const char *filename, int flags)
             scopeLog(CFG_LOG_DEBUG, "\tlibrary:  %s", lm->l_name);
 
             // for each symbol in the list try to hook
-            for (i=0; hook_list[i].symbol; i++) {
-                if ((dlsym(handle, hook_list[i].symbol)) &&
-                    (doGotcha(lm, (got_list_t *)&hook_list[i], rel, sym, str, rsz, 0) != -1)) {
-                    scopeLog(CFG_LOG_DEBUG, "\tdlopen interposed  %s", hook_list[i].symbol);
+            for (i=0; inject_hook_list[i].symbol; i++) {
+                if ((dlsym(handle, inject_hook_list[i].symbol)) &&
+                    (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 0) != -1)) {
+                    scopeLog(CFG_LOG_DEBUG, "\tdlopen interposed  %s", inject_hook_list[i].symbol);
                 }
             }
         }
@@ -4204,9 +4235,9 @@ fscanf(FILE *stream, const char *format, ...)
     uint64_t initialTime = getTime();
 
     int rc = g_fn.fscanf(stream, format,
-                     fArgs.arg[0], fArgs.arg[1],
-                     fArgs.arg[2], fArgs.arg[3],
-                     fArgs.arg[4], fArgs.arg[5]);
+                         fArgs.arg[0], fArgs.arg[1],
+                         fArgs.arg[2], fArgs.arg[3],
+                         fArgs.arg[4], fArgs.arg[5]);
 
     doRead(wrap_scope_fileno(stream),initialTime, (rc != EOF), NULL, rc, "fscanf", NONE, 0);
 
@@ -5312,11 +5343,11 @@ static got_list_t inject_hook_list[] = {
     {"gnutls_record_recv", gnutls_record_recv, &g_fn.gnutls_record_recv},
     {"gnutls_record_recv_early_data", gnutls_record_recv_early_data, &g_fn.gnutls_record_recv_early_data},
     {"gnutls_record_recv_packet", gnutls_record_recv_packet, &g_fn.gnutls_record_recv_packet},
-    {"gnutls_record_recv_seq", NULL, &g_fn.gnutls_record_recv_seq},
-    {"gnutls_record_send", NULL, &g_fn.gnutls_record_send},
-    {"gnutls_record_send2", NULL, &g_fn.gnutls_record_send2},
-    {"gnutls_record_send_early_data", NULL, &g_fn.gnutls_record_send_early_data},
-    {"gnutls_record_send_range", NULL, &g_fn.gnutls_record_send_range},
+    {"gnutls_record_recv_seq", gnutls_record_recv_seq, &g_fn.gnutls_record_recv_seq},
+    {"gnutls_record_send", gnutls_record_send, &g_fn.gnutls_record_send},
+    {"gnutls_record_send2", gnutls_record_send2, &g_fn.gnutls_record_send2},
+    {"gnutls_record_send_early_data", gnutls_record_send_early_data, &g_fn.gnutls_record_send_early_data},
+    {"gnutls_record_send_range", gnutls_record_send_range, &g_fn.gnutls_record_send_range},
     {"dlopen", dlopen, &g_fn.dlopen},
     {"_exit", _exit, &g_fn._exit},
     {"close", close, &g_fn.close},
@@ -5357,7 +5388,7 @@ static got_list_t inject_hook_list[] = {
     {"fputc_unlocked", fputc_unlocked, &g_fn.fputc_unlocked},
     {"putwc", putwc, &g_fn.putwc},
     {"fputwc", fputwc, &g_fn.fputwc},
-    {"fscanf", fscanf, &g_fn.fscanf},
+    //{"fscanf", fscanf, &g_fn.fscanf},
     {"getline", getline, &g_fn.getline},
     {"getdelim", getdelim, &g_fn.getdelim},
     {"__getdelim", __getdelim, &g_fn.__getdelim},
@@ -5399,5 +5430,6 @@ static got_list_t inject_hook_list[] = {
     {"__fdelt_chk", __fdelt_chk, &g_fn.__fdelt_chk},
     {"__register_atfork", __register_atfork, &g_fn.__register_atfork},
     {"setrlimit", setrlimit, &g_fn.setrlimit},
+    {"SSL_ImportFD", SSL_ImportFD, &g_fn.SSL_ImportFD},
     {NULL, NULL, NULL}
 };

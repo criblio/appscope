@@ -182,7 +182,6 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
          * runtime as the symbol lookup always go through the hash table; ELF64_R_SYM.
          */
         if (!scope_strcmp(sym[ELF64_R_SYM(rel[i].r_info)].st_name + str, hook->symbol)) {
-            uint64_t *gfn = hook->gfn;
             uint64_t *gaddr = (uint64_t *)(rel[i].r_offset + lm->l_addr);
             int page_size = scope_getpagesize();
             size_t saddr = ROUND_DOWN((size_t)gaddr, page_size);
@@ -213,7 +212,9 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
              * of the shared module as defined in the link map's l_addr + offset.
              * as in: rel[i].r_offset + lm->l_addr
              */
-            if (!attach) *gfn = *gaddr;
+            // been here before, don't update the GOT entry TODO: mprotect
+            if ((void *)*gaddr == hook->func) return -1;
+
             uint64_t prev = *gaddr;
             *gaddr = (uint64_t)hook->func;
             scopeLog(CFG_LOG_DEBUG, "%s:%d sym=%s offset 0x%lx GOT entry %p saddr 0x%lx, prev=0x%lx, curr=%p",

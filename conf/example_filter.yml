@@ -1,9 +1,12 @@
 # AppScope Process-Filter Config
 deny:
+  - filter: "python3"
+    args: "http.server"
   - filter: "ls"
   - filter: "top"
 allow:
   - filter: "nginx"
+    action_on: "attach" #Possible values "none", "restart"
     config:
         metric:
           enable: true

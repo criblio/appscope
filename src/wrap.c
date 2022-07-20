@@ -40,7 +40,6 @@
 #include "inject.h"
 #include "scopestdlib.h"
 #include "../contrib/libmusl/musl.h"
-#include "openssl/evp.h"
 
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"

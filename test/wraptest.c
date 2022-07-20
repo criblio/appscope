@@ -30,27 +30,6 @@ extern int osInitTSC(struct rtconfig_t *);
 
 rtconfig g_cfg = {0};
 
-static void
-testSetUUID(void **state)
-{
-    char uuid[37];
-    setUUID(uuid);
-
-    assert_int_equal(strlen(uuid), 36);
-
-    // UUID version is 4
-    assert_int_equal(uuid[14] - '0', 4);
-}
-
-static void
-testSetMachineID(void **state)
-{
-    char mach_id[33];
-    setMachineID(mach_id);
-
-    assert_int_equal(strlen(mach_id), 32);
-}
-
 /*
  * The env var SCOPE_HOME is set in
  * the Makefile or script that runs 

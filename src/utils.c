@@ -10,11 +10,12 @@
 #include "fn.h"
 #include "dbg.h"
 #include "runtimecfg.h"
-#include "openssl/evp.h"
 
-#define HASH_LEN 32
 #define MAC_ADDR_LEN 17
 #define ZERO_MACHINE_ID "00000000000000000000000000000000"
+
+static int createMachineID(char *string);
+static int getMacAddr(char *string);
 
 rtconfig g_cfg = {0};
 
@@ -234,7 +235,7 @@ setUUID(char *string)
     key[6] = 0x40 | (key[6] & 0xf); // Set version to 4
     key[8] = 0x80 | (key[8] & 0x3f); // Set variant to 8
 
-    scope_sprintf(string,
+    scope_snprintf(string, UUID_LEN + 1,
         "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
         key[0], key[1], key[2], key[3],
         key[4], key[5], key[6], key[7], 
@@ -250,9 +251,9 @@ setMachineID(char *string)
         scopeLogError("ERROR: setMachineID: Null string");
         return;
     }
-    scope_sprintf(string, ZERO_MACHINE_ID, MACHINE_ID_LEN);
+    scope_strncpy(string, ZERO_MACHINE_ID, MACHINE_ID_LEN + 1);
 
-    char buf[MACHINE_ID_LEN + 1];
+    char buf[MACHINE_ID_LEN + 1] = {0};
     FILE *fp;
 
     // Try to get a machine id from /etc
@@ -271,11 +272,11 @@ setMachineID(char *string)
         }
     }
 
-    scope_sprintf(string, buf, MACHINE_ID_LEN);
+    scope_strncpy(string, buf, MACHINE_ID_LEN + 1);
 }
 
 // Create a Machine ID from a mac address
-int
+static int
 createMachineID(char *string)
 {
     if (string == NULL) return 1;
@@ -286,7 +287,7 @@ createMachineID(char *string)
         return 1;
     }
 
-    scope_sprintf(string,
+    scope_snprintf(string, MACHINE_ID_LEN + 1, 
         "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
         mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3],
         mac_addr[4], mac_addr[5], mac_addr[6], mac_addr[7], 
@@ -296,7 +297,7 @@ createMachineID(char *string)
 }
 
 // Get the machine's physical MAC address
-int
+static int
 getMacAddr(char *string)
 {
     DIR *d;
@@ -353,7 +354,7 @@ getMacAddr(char *string)
     }
     scope_fclose(fp);
 
-    scope_sprintf(string, mac_buf, MAC_ADDR_LEN);
+    scope_strncpy(string, mac_buf, MAC_ADDR_LEN + 1);
     return 0;
 }
 

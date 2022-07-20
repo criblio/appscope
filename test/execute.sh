@@ -68,6 +68,7 @@ run_test test/${OS}/cfgutilstest
 run_test test/${OS}/cfgtest
 run_test test/${OS}/transporttest
 run_test test/${OS}/logtest
+run_test test/${OS}/utilstest
 run_test test/${OS}/mtctest
 run_test test/${OS}/evtformattest
 run_test test/${OS}/ctltest

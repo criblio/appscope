@@ -23,7 +23,5 @@ int sigSafeNanosleep(const struct timespec *req);
 
 void setUUID(char *string);
 void setMachineID(char *string);
-int createMachineID(char *string);
-int getMacAddr(char *string);
 
 #endif // __UTILS_H__

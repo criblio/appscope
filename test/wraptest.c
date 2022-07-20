@@ -270,8 +270,6 @@ main(int argc, char* argv[])
         //cmocka_unit_test(testSyscallDbg),
         cmocka_unit_test(envRegexFree),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
-        cmocka_unit_test(testSetUUID),
-        cmocka_unit_test(testSetMachineID),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

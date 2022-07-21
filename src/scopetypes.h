@@ -37,6 +37,8 @@ typedef enum {CFG_MTC_FS,
 
 #define MAX_HOSTNAME 255
 #define MAX_PROCNAME 128
+#define MACHINE_ID_LEN 32
+#define UUID_LEN 36
 #define DEFAULT_CMD_SIZE 32
 #define MAX_ID 512
 #define MAX_CGROUP 512
@@ -55,6 +57,8 @@ typedef struct
     char cgroup[MAX_CGROUP];
     char *username;
     char *groupname;
+    char machine_id[MACHINE_ID_LEN + 1];
+    char uuid[UUID_LEN + 1];
 } proc_id_t;
 
 #define TRUE 1

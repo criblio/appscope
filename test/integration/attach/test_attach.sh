@@ -42,6 +42,22 @@ endtest(){
     rm -f $EVT_FILE
 }
 
+wait_for_proc_start(){
+    local proc_name=$1
+    for i in `seq 1 8`;
+    do
+        if pidof $proc_name > /dev/null; then
+            echo "Process $proc_name started"
+            return
+        fi
+        echo "Sleep for the $i time because $proc_name did not started"
+        sleep 1
+    done
+
+    echo "Process $proc_name did not started"
+    ERR+=1
+}
+
 #
 # Top
 #
@@ -135,15 +151,25 @@ starttest execve_test
 
 cd /opt/exec_test/
 ./exec_test 0 &
+
+wait_for_proc_start "exec_test"
 EXEC_TEST_PID=`pidof exec_test`
 
 ldscope --attach ${EXEC_TEST_PID}
-ERR+=$?
+if [ $? -ne 0 ]; then
+    echo "attach failed"
+    ERR+=1
+fi
 
 wait ${EXEC_TEST_PID}
+sleep 2
 
 egrep '"cmd":"/usr/bin/curl -I https://cribl.io"' $EVT_FILE > /dev/null
-ERR+=$?
+if [ $? -ne 0 ]; then
+    echo "Curl event not found"
+    cat $EVT_FILE
+    ERR+=1
+fi
 
 endtest
 
@@ -155,15 +181,25 @@ starttest execv_test
 
 cd /opt/exec_test/
 ./exec_test 1 &
+
+wait_for_proc_start "exec_test"
 EXEC_TEST_PID=`pidof exec_test`
 
 ldscope --attach ${EXEC_TEST_PID}
-ERR+=$?
+if [ $? -ne 0 ]; then
+    echo "attach failed"
+    ERR+=1
+fi
 
 wait ${EXEC_TEST_PID}
+sleep 2
 
 egrep '"cmd":"/usr/bin/wget -S --spider --no-check-certificate https://cribl.io"' $EVT_FILE > /dev/null
-ERR+=$?
+if [ $? -ne 0 ]; then
+    echo "Wget event not found"
+    cat $EVT_FILE
+    ERR+=1
+fi
 
 endtest
 

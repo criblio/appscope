@@ -73,6 +73,7 @@ typedef enum {
     EVT_H2FRAME, // HTTP/2 frame
     EVT_DETECT,
     EVT_PAYLOAD,
+    EVT_SEC,
     TLSRX,
     TLSTX
 } metric_t;

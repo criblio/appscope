@@ -138,6 +138,7 @@ enum_map_t watchTypeMap[] = {
     {"net",                   CFG_SRC_NET},
     {"fs",                    CFG_SRC_FS},
     {"dns",                   CFG_SRC_DNS},
+    {"security",              CFG_SRC_SEC},
     {NULL,                    -1}
 };
 
@@ -541,6 +542,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_FS, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_DNS_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_DNS, value);
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_SEC_NAME")) {
+        cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_SEC, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_LOGFILE_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_CONSOLE_FIELD")) {
@@ -557,6 +560,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_FS, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_DNS_FIELD")) {
         cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_DNS, value);
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_SEC_FIELD")) {
+        cfgEvtFormatFieldFilterSetFromStr(cfg, CFG_SRC_SEC, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_LOGFILE_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_CONSOLE_VALUE")) {
@@ -573,6 +578,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_FS, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_DNS_VALUE")) {
         cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_DNS, value);
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_SEC_VALUE")) {
+        cfgEvtFormatValueFilterSetFromStr(cfg, CFG_SRC_SEC, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_LOGFILE")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_CONSOLE")) {
@@ -589,6 +596,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_FS, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_DNS")) {
         cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_DNS, value);
+    } else if (!scope_strcmp(env_name, "SCOPE_EVENT_SEC")) {
+        cfgEvtFormatSourceEnabledSetFromStr(cfg, CFG_SRC_SEC, value);
     } else if (!scope_strcmp(env_name, "SCOPE_CRIBL_ENABLE")) {
         cfgCriblEnableSetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_CRIBL_TLS_ENABLE")) {
@@ -2714,6 +2723,8 @@ initEvtFormat(config_t *cfg)
         evtFormatFieldFilterSet(evt, src, cfgEvtFormatFieldFilter(cfg, src));
         evtFormatValueFilterSet(evt, src, cfgEvtFormatValueFilter(cfg, src));
     }
+    evtFormatSourceEnabledSet(evt, CFG_SRC_SEC, 1); 
+    evtFormatSourceEnabledSet(evt, CFG_SRC_DNS, 1); 
 
     evtFormatRateLimitSet(evt, cfgEvtRateLimit(cfg));
     evtFormatCustomTagsSet(evt, cfgCustomTags(cfg));

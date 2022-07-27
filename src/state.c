@@ -2039,6 +2039,18 @@ doSend(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
         if ((sockfd != -1) && buf && (len > 0)) {
             doProtocol((uint64_t)-1, sockfd, (void *)buf, len, NETTX, src);
         }
+
+        /*
+        if IP address matches x.x.x.x
+            size_t len = sizeof(security_info_t);
+            security_info_t *secp = scope_calloc(1, len);
+            if (!secp) return;
+
+            secp->evtype = EVT_SEC;
+            scope_strncpy(secp->path, path, scope_strnlen(path, sizeof(secp->path)));
+
+            cmdPostEvent(g_ctl, (char *)secp);
+        */
     }
     return 0;
 }

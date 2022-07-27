@@ -58,6 +58,7 @@ static enum_map_t watchTypeMap[] = {
     {"net",          CFG_SRC_NET},
     {"fs",           CFG_SRC_FS},
     {"dns",          CFG_SRC_DNS},
+    {"security",     CFG_SRC_SEC},
     {NULL,                    -1}
 };
 
@@ -104,6 +105,7 @@ static const char *valueFilterDefault[] = {
     DEFAULT_SRC_NET_VALUE,
     DEFAULT_SRC_FS_VALUE,
     DEFAULT_SRC_DNS_VALUE,
+    DEFAULT_SRC_SEC_VALUE,
 };
 
 static const char *fieldFilterDefault[] = {
@@ -115,6 +117,7 @@ static const char *fieldFilterDefault[] = {
     DEFAULT_SRC_NET_FIELD,
     DEFAULT_SRC_FS_FIELD,
     DEFAULT_SRC_DNS_FIELD,
+    DEFAULT_SRC_SEC_FIELD,
 };
 
 static const char *nameFilterDefault[] = {
@@ -126,6 +129,7 @@ static const char *nameFilterDefault[] = {
     DEFAULT_SRC_NET_NAME,
     DEFAULT_SRC_FS_NAME,
     DEFAULT_SRC_DNS_NAME,
+    DEFAULT_SRC_SEC_NAME,
 };
 
 static unsigned srcEnabledDefault[] = {
@@ -137,6 +141,7 @@ static unsigned srcEnabledDefault[] = {
     DEFAULT_SRC_NET,
     DEFAULT_SRC_FS,
     DEFAULT_SRC_DNS,
+    DEFAULT_SRC_SEC,
 };
 
 

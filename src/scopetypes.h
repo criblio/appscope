@@ -23,6 +23,7 @@ typedef enum {CFG_SRC_FILE,
               CFG_SRC_NET,
               CFG_SRC_FS,
               CFG_SRC_DNS,
+              CFG_SRC_SEC,
               CFG_SRC_MAX} watch_t;
 
 typedef enum {CFG_MTC_FS,
@@ -95,6 +96,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_NET_VALUE ".*"
 #define DEFAULT_SRC_FS_VALUE ".*"
 #define DEFAULT_SRC_DNS_VALUE ".*"
+#define DEFAULT_SRC_SEC_VALUE ".*"
 #define DEFAULT_SRC_FILE_FIELD ".*"
 #define DEFAULT_SRC_CONSOLE_FIELD ".*"
 #define DEFAULT_SRC_SYSLOG_FIELD ".*"
@@ -103,6 +105,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_NET_FIELD ".*"
 #define DEFAULT_SRC_FS_FIELD ".*"
 #define DEFAULT_SRC_DNS_FIELD ".*"
+#define DEFAULT_SRC_SEC_FIELD ".*"
 #define DEFAULT_SRC_FILE_NAME "(\\/logs?\\/)|(\\.log$)|(\\.log[.\\d])"
 #define DEFAULT_SRC_CONSOLE_NAME "(stdout)|(stderr)"
 #define DEFAULT_SRC_SYSLOG_NAME ".*"
@@ -112,6 +115,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_NET_NAME ".*"
 #define DEFAULT_SRC_FS_NAME ".*"
 #define DEFAULT_SRC_DNS_NAME ".*"
+#define DEFAULT_SRC_SEC_NAME ".*"
 #define DEFAULT_ALLOW_BINARY_CONSOLE TRUE
 #define DEFAULT_MTC_IPPORT_VERBOSITY 1
 
@@ -123,6 +127,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_NET TRUE
 #define DEFAULT_SRC_FS TRUE
 #define DEFAULT_SRC_DNS TRUE
+#define DEFAULT_SRC_SEC TRUE
 
 #define DEFAULT_MAXEVENTSPERSEC 10000
 #define DEFAULT_ENHANCE_FS TRUE

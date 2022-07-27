@@ -137,6 +137,12 @@ typedef struct {
     size_t   size; // num bytes allocated
 } http_buf_t;
 
+typedef struct {
+    metric_t evtype;
+    char path[PATH_MAX];
+    char host[INET6_ADDRSTRLEN];
+} security_info_t;
+
 typedef struct protocol_info_t {
     metric_t evtype;
     metric_t ptype;

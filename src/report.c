@@ -1978,6 +1978,24 @@ getNetPtotocol(net_info *net, event_field_t *nevent, int *ix)
     return;
 }
 
+
+// Create a security event when a connection is made to a blacklisted IP
+void
+IPSecurity(const char* raddr)
+{
+    if (!scope_strcmp(raddr, "5.9.243.187")) {
+
+        size_t len = sizeof(security_info_t);
+        security_info_t *secp = scope_calloc(1, len);
+        if (!secp) return;
+
+        secp->evtype = EVT_SEC;
+        scope_strncpy(secp->host, raddr, scope_strnlen(raddr, sizeof(secp->host)));
+
+        cmdPostEvent(g_ctl, (char *)secp);
+    }
+}
+
 /*
 {
   "sourcetype": "net",
@@ -2016,6 +2034,8 @@ doNetOpenEvent(net_info *net)
                     laddr, raddr, sizeof(raddr),
                     lport, rport, sizeof(rport),
                     nevent, &nix, NET_MAX_FIELDS);
+
+    IPSecurity(raddr);    
 
     getNetPtotocol(net, nevent, &nix);
 
@@ -3438,6 +3458,36 @@ doHttpAgg()
 }
 
 void
+doSecurityMetric(security_info_t *sec)
+{
+    if (strlen(sec->host) > 0) {
+        event_field_t fields[] = {
+            STRFIELD("host", sec->host, 4, TRUE),
+            PROC_FIELD(g_proc.procname),
+            PID_FIELD(g_proc.pid),
+            HOST_FIELD(g_proc.hostname),
+            UNIT_FIELD("process"),
+            FIELDEND
+        };
+        event_t event = INT_EVENT("security.connection", 1, CURRENT, fields);
+        event.src = CFG_SRC_SEC;
+        sendEvent(g_mtc, &event);
+    } else {
+        event_field_t fields[] = {
+            STRFIELD("LD_PRELOAD", sec->path, 4, TRUE),
+            PROC_FIELD(g_proc.procname),
+            PID_FIELD(g_proc.pid),
+            HOST_FIELD(g_proc.hostname),
+            UNIT_FIELD("process"),
+            FIELDEND
+        };
+        event_t event = INT_EVENT("security.library", 1, CURRENT, fields);
+        event.src = CFG_SRC_SEC;
+        sendEvent(g_mtc, &event);
+    }
+}
+
+void
 doEvent()
 {
     uint64_t data;
@@ -3451,6 +3501,7 @@ doEvent()
             fs_info *fs;
             stat_err_info *staterr;
             protocol_info *proto;
+            security_info_t *sec;
 
             if (event->evtype == EVT_NET) {
                 net = (net_info *)data;
@@ -3470,6 +3521,9 @@ doEvent()
             } else if (event->evtype == EVT_PROTO) {
                 proto = (protocol_info *)data;
                 doProtocolMetric(proto);
+            } else if (event->evtype == EVT_SEC) {
+                sec = (security_info_t *)data;
+                doSecurityMetric(sec);
             } else {
                 DBG(NULL);
                 return;

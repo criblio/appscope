@@ -2724,7 +2724,6 @@ initEvtFormat(config_t *cfg)
         evtFormatValueFilterSet(evt, src, cfgEvtFormatValueFilter(cfg, src));
     }
     evtFormatSourceEnabledSet(evt, CFG_SRC_SEC, 1); 
-    evtFormatSourceEnabledSet(evt, CFG_SRC_DNS, 1); 
 
     evtFormatRateLimitSet(evt, cfgEvtRateLimit(cfg));
     evtFormatCustomTagsSet(evt, cfgCustomTags(cfg));

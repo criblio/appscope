@@ -139,6 +139,7 @@ typedef struct {
 
 typedef struct {
     metric_t evtype;
+    char lib[PATH_MAX];
     char path[PATH_MAX];
     char host[INET6_ADDRSTRLEN];
 } security_info_t;

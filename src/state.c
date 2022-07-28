@@ -2039,18 +2039,6 @@ doSend(int sockfd, ssize_t rc, const void *buf, size_t len, src_data_t src)
         if ((sockfd != -1) && buf && (len > 0)) {
             doProtocol((uint64_t)-1, sockfd, (void *)buf, len, NETTX, src);
         }
-
-        /*
-        if IP address matches x.x.x.x
-            size_t len = sizeof(security_info_t);
-            security_info_t *secp = scope_calloc(1, len);
-            if (!secp) return;
-
-            secp->evtype = EVT_SEC;
-            scope_strncpy(secp->path, path, scope_strnlen(path, sizeof(secp->path)));
-
-            cmdPostEvent(g_ctl, (char *)secp);
-        */
     }
     return 0;
 }
@@ -2442,6 +2430,8 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
 
         doUpdateState(FS_OPEN, fd, 0, func, path);
         scopeLog(CFG_LOG_TRACE, "fd:%d %s", fd, func);
+
+        fileSecurity(path);
     }
 }
 
@@ -2568,4 +2558,61 @@ getNetRxTxBucket(net_info *net)
     }
 
     return bucket;
+}
+
+// Create a security event when a watched file is opened
+void
+fileSecurity(const char* path)
+{
+    if (!scope_strcmp(path, "/etc/passwd") || !scope_strcmp(path, "/etc/shadow")) {
+
+        size_t len = sizeof(security_info_t);
+        security_info_t *secp = scope_calloc(1, len);
+        if (!secp) return;
+
+        secp->evtype = EVT_SEC;
+        scope_strncpy(secp->path, path, scope_strnlen(path, sizeof(secp->path)));
+
+        cmdPostEvent(g_ctl, (char *)secp);
+    }
+}
+
+// Create a security event when a connection is made to a blacklisted IP
+void
+netSecurity(const char* raddr)
+{
+    if (!scope_strcmp(raddr, "5.9.243.187")) {
+
+        size_t len = sizeof(security_info_t);
+        security_info_t *secp = scope_calloc(1, len);
+        if (!secp) return;
+
+        secp->evtype = EVT_SEC;
+        scope_strncpy(secp->host, raddr, scope_strnlen(raddr, sizeof(secp->host)));
+
+        cmdPostEvent(g_ctl, (char *)secp);
+    }
+}
+
+// Read environment variables, creating events where necessary
+void
+envSecurity()
+{
+    char* lib_path;
+    for (int i = 0; environ[i]; i++) {
+        if ((lib_path = scope_strstr(environ[i], "LD_PRELOAD"))) {
+
+            if (scope_strcmp(environ[i], "LD_PRELOAD=/tmp/libscope-web/libscope.so")) {
+                // Generate a security event if the LD_PRELOAD env var is unusual
+                size_t len = sizeof(security_info_t);
+                security_info_t *secp = scope_calloc(1, len);
+                if (!secp) return;
+
+                secp->evtype = EVT_SEC;
+                scope_strncpy(secp->lib, lib_path, scope_strnlen(lib_path, sizeof(secp->lib)));
+
+                cmdPostEvent(g_ctl, (char *)secp);
+            }
+        }
+    }
 }

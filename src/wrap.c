@@ -1584,29 +1584,6 @@ initSigErrorHandler(void)
     }
 }
 
-// Read environment variables, creating events where necessary
-void
-readEnvironment()
-{
-    char* path;
-    for (int i = 0; environ[i]; i++) {
-        if ((path = scope_strstr(environ[i], "LD_PRELOAD"))) {
-
-            if (scope_strcmp(environ[i], "LD_PRELOAD=/tmp/libscope-web/libscope.so")) {
-                // Generate a security event if the LD_PRELOAD env var is unusual
-                size_t len = sizeof(security_info_t);
-                security_info_t *secp = scope_calloc(1, len);
-                if (!secp) return;
-
-                secp->evtype = EVT_SEC;
-                scope_strncpy(secp->path, path, scope_strnlen(path, sizeof(secp->path)));
-
-                cmdPostEvent(g_ctl, (char *)secp);
-            }
-        }
-    }
-}
-
 __attribute__((constructor)) void
 init(void)
 {
@@ -1696,7 +1673,7 @@ init(void)
 
     osInitJavaAgent();
 
-    readEnvironment();
+    envSecurity();
 }
 
 EXPORTON int

@@ -2560,6 +2560,20 @@ getNetRxTxBucket(net_info *net)
     return bucket;
 }
 
+// Create a security event when a critical function is called
+void
+funcSecurity(const char* funcname)
+{
+    size_t len = sizeof(security_info_t);
+    security_info_t *secp = scope_calloc(1, len);
+    if (!secp) return;
+
+    secp->evtype = EVT_SEC;
+    scope_strncpy(secp->func, funcname, scope_strnlen(funcname, sizeof(secp->func)));
+
+    cmdPostEvent(g_ctl, (char *)secp);
+}
+
 // Create a security event when a watched file is opened
 void
 fileSecurity(const char* path)

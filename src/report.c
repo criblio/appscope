@@ -3321,6 +3321,18 @@ doSecurityMetric(security_info_t *sec)
         event_t event = INT_EVENT("security.file_open", 1, CURRENT, fields);
         event.src = CFG_SRC_SEC;
         sendEvent(g_mtc, &event);
+    } else if (strlen(sec->func) > 0) {
+        event_field_t fields[] = {
+            STRFIELD("function", sec->func, 4, TRUE),
+            PROC_FIELD(g_proc.procname),
+            PID_FIELD(g_proc.pid),
+            HOST_FIELD(g_proc.hostname),
+            UNIT_FIELD("process"),
+            FIELDEND
+        };
+        event_t event = INT_EVENT("security.function", 1, CURRENT, fields);
+        event.src = CFG_SRC_SEC;
+        sendEvent(g_mtc, &event);
     } else {
         event_field_t fields[] = {
             STRFIELD("LD_PRELOAD", sec->lib, 4, TRUE),

@@ -142,6 +142,7 @@ typedef struct {
     char lib[PATH_MAX];
     char path[PATH_MAX];
     char host[INET6_ADDRSTRLEN];
+    char func[FUNC_MAX];
 } security_info_t;
 
 typedef struct protocol_info_t {

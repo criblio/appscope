@@ -2626,9 +2626,8 @@ prctl(int option, ...)
     WRAP_CHECK(prctl, -1);
     LOAD_FUNC_ARGS_VALIST(fArgs, option);
 
-    funcSecurity("prctl");
-
     if (option == PR_SET_SECCOMP) {
+        funcSecurity("prctl: SECCOMP");
         scopeLog(CFG_LOG_DEBUG, "prctl: PR_SET_SECCOMP - opt out from prctl.");
         return 0;
     }

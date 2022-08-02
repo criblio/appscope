@@ -2578,7 +2578,9 @@ funcSecurity(const char* funcname)
 void
 fileSecurity(const char* path)
 {
-    if (!scope_strcmp(path, "/etc/passwd") || !scope_strcmp(path, "/etc/shadow")) {
+    if (!scope_strcmp(path, "/etc/passwd") || \
+            scope_strstr(path, ".ssh/authorized_keys") || \
+            scope_strstr(path, ".bash_history")) {
 
         size_t len = sizeof(security_info_t);
         security_info_t *secp = scope_calloc(1, len);

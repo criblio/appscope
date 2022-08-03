@@ -604,16 +604,15 @@ osGetPageProt(uint64_t addr)
 
     while (scope_getline(&buf, &len, fstream) != -1) {
         char *end = NULL;
-        scope_errno = 0;
         uint64_t addr1 = scope_strtoull(buf, &end, 0x10);
-        if ((addr1 == 0) || (scope_errno != 0)) {
+        if ((addr1 == 0) || (addr1 == ULLONG_MAX)) {
             if (buf) scope_free(buf);
             scope_fclose(fstream);
             return -1;
         }
 
         uint64_t addr2 = scope_strtoull(end + 1, &end, 0x10);
-        if ((addr2 == 0) || (scope_errno != 0)) {
+        if ((addr2 == 0) || (addr2 == ULLONG_MAX)) {
             if (buf) scope_free(buf);
             scope_fclose(fstream);
             return -1;

@@ -198,9 +198,8 @@ sigSafeNanosleep(const struct timespec *req)
 
     // If we're interrupted, sleep again for whatever time remains
     do {
-        // DR: use nanosleep instead of scope_nanosleep and use errno instead of scope_errno?
-        rv = nanosleep(&time, &time);
-    } while (rv && (errno == EINTR));
+        rv = scope_nanosleep(&time, &time);
+    } while (rv && (scope_errno == EINTR));
 
     return rv;
 }

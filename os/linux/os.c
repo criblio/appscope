@@ -611,7 +611,6 @@ osGetPageProt(uint64_t addr)
             return -1;
         }
 
-        scope_errno = 0;
         uint64_t addr2 = scope_strtoull(end + 1, &end, 0x10);
         if ((addr2 == 0) || (addr2 == ULLONG_MAX)) {
             if (buf) scope_free(buf);

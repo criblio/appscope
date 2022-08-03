@@ -815,9 +815,8 @@ handleExit(void)
         // wait for a connection to be established 
         // before we emit data
         int wait_time;
-        scope_errno = 0;
         wait_time = scope_strtoul(wait, NULL, 10);
-        if (!scope_errno && wait_time) {
+        if ((wait_time != 0) && (wait_time != ULONG_MAX)) {
             for (int i = 0; i < wait_time; i++) {
                 if (doConnection() == TRUE) break;
                 sigSafeNanosleep(&ts);
@@ -1686,6 +1685,8 @@ readdir(DIR *dirp)
 
     doRead(fd, initialTime, (errno != 0), NULL, sizeof(struct dirent), "readdir", BUF, 0);
 
+    // DR: no longer necessary with scope_errno?
+    // dirfd is documengted not to set errno.
     // If readdir modified errno, leave the errno value alone.
     // Otherwise, restore the saved errno value (before we set it to zero.)
     errno = (errno) ? errno : errsave;
@@ -2604,7 +2605,7 @@ getLdscopeExec(const char* pathname)
 EXPORTOFF int
 execv(const char *pathname, char *const argv[])
 {
-    int i, nargs, saverr;
+    int i, nargs;
     char *scopexec;
     char **nargv;
 
@@ -2631,10 +2632,8 @@ execv(const char *pathname, char *const argv[])
     }
 
     g_fn.execv(nargv[0], nargv);
-    saverr = errno;
     if (nargv) scope_free(nargv);
     scope_free(scopexec);
-    errno = saverr;
     return -1;
 }
 
@@ -2642,7 +2641,7 @@ execv(const char *pathname, char *const argv[])
 EXPORTOFF int
 execve(const char *pathname, char *const argv[], char *const envp[])
 {
-    int i, nargs, saverr;
+    int i, nargs;
     char *scopexec;
     char **nargv;
 
@@ -2669,10 +2668,8 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     }
 
     g_fn.execve(nargv[0], nargv, environ);
-    saverr = errno;
     if (nargv) scope_free(nargv);
     scope_free(scopexec);
-    errno = saverr;
     return -1;
 }
 

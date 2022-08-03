@@ -945,11 +945,22 @@ reportPeriodicStuff(void)
     mtcFlush(g_mtc);
 }
 
+// forward declaration
+static void inspectGotTables(void);
+
 void
 handleExit(void)
 {
     if (g_exitdone == TRUE) return;
     g_exitdone = TRUE;
+
+//#define TMPDBGFILE "/tmp/john"
+#ifdef TMPDBGFILE
+    FILE *mydbg = scope_fopen(TMPDBGFILE, "a");
+    scope_fprintf(mydbg, "********* exit time **************\n");
+    scope_fclose(mydbg);
+#endif // TMPDBGFILE
+    inspectGotTables();
 
     if (!atomicCasU64(&reentrancy_guard, 0ULL, 1ULL)) {
 
@@ -1584,6 +1595,174 @@ initSigErrorHandler(void)
     }
 }
 
+static char *
+fileNameFromAddr(uint64_t addr)
+{
+    FILE *fd = NULL;
+    char line[850];
+    uint64_t addr_begin, addr_end;
+    char str[256];
+    char *returnval = NULL;
+
+    if ((fd = scope_fopen("/proc/self/maps", "r")) == NULL) {
+        scopeLogDebug("fopen(/proc/self/maps) failed");
+        return NULL;
+    }
+
+    while(scope_fgets(line, sizeof(line), fd) != NULL) {
+// 7f409827c000-7f40989ae000 r-xp 00000000 ca:01 13663715 /lib/linux/libscope.so
+        scope_sscanf(line, "%lx-%lx %*s %*s %*s %*s %255s", &addr_begin, &addr_end, str);
+        if ((addr >= addr_begin) && (addr < addr_end)) {
+            break;
+        }
+        addr_begin = 0;
+        addr_end = 0;
+    }
+
+    // Found it!
+    if (addr_begin && addr_end) {
+        returnval = scope_strdup(str);
+    }
+
+    scope_fclose(fd);
+    return returnval;
+}
+
+enum_map_t typeMap[] = {
+    {"STT_NOTYPE",     STT_NOTYPE},
+    {"STT_OBJECT",     STT_OBJECT},
+    {"STT_FUNC",       STT_FUNC},
+    {"STT_SECTION",    STT_SECTION},
+    {"STT_FILE",       STT_FILE},
+    {"STT_COMMON",     STT_COMMON},
+    {"STT_TLS",        STT_TLS},
+    {"STT_GNU_IFUNC",  STT_GNU_IFUNC},
+    {NULL,             -1}
+};
+
+enum_map_t bindMap[] = {
+    {"STB_LOCAL",      STB_LOCAL},
+    {"STB_GLOBAL",     STB_GLOBAL},
+    {"STB_WEAK",       STB_WEAK},
+    {"STB_GNU_UNIQUE", STB_GNU_UNIQUE},
+    {NULL,             -1}
+};
+
+enum_map_t visMap[] = {
+    {"STV_DEFAULT",    STV_DEFAULT},
+    {"STV_INTERNAL",   STV_INTERNAL},
+    {"STV_HIDDEN",     STV_HIDDEN},
+    {"STV_PROTECTED",  STV_PROTECTED},
+    {NULL,             -1}
+};
+
+static int
+inspectLib(struct dl_phdr_info *info, size_t size, void *data)
+{
+#ifdef TMPDBGFILE
+    FILE *mydbg = scope_fopen(TMPDBGFILE, "a");
+    scope_fprintf(mydbg, "**Lib = %s\n", info->dlpi_name);
+#endif // TMPDBGFILE
+
+    void *handle = g_fn.dlopen(info->dlpi_name, RTLD_LAZY);
+    if (!handle) return 0;
+
+    struct link_map *lm;
+    if (dlinfo(handle, RTLD_DI_LINKMAP, &lm) == -1) return 0;
+
+    Elf64_Sym *sym = NULL;
+    Elf64_Rela *rel = NULL;
+    char *str = NULL;
+    int rsz = 0;
+    if (getElfEntries(lm, &rel, &sym, &str, &rsz) == -1) return 0;
+    rsz /= sizeof(Elf64_Rela);
+#ifdef TMPDBGFILE
+    scope_fprintf(mydbg, "  #entries = %d\n", rsz);
+#endif // TMPDBGFILE
+
+    int i;
+    for (i=0; i<rsz; i++) {
+        // get info that is derived from the link map
+        char *fname = sym[ELF64_R_SYM(rel[i].r_info)].st_name + str;
+        uint64_t got_addr = rel[i].r_offset + lm->l_addr;
+        uint64_t got_value = *((uint64_t *)got_addr);
+        if (!fname) continue;
+
+        // Ignore got values that are resolved within it's own library.
+        // These seem to be one of these two cases that aren't interesting:
+        //   undefined symbols that haven't been called yet (resolve to plt section)
+        //   locally defined external symbols (resolve to text section)
+        char *file_from_maps_file = fileNameFromAddr(got_value);
+        char *file_from_link_map = scope_realpath(info->dlpi_name, NULL);
+        int found_locally = file_from_link_map && !strcmp(file_from_maps_file, file_from_link_map);
+        if (found_locally) goto next;
+
+        // get info that comes from libdl
+        Dl_info info = {0};
+        Elf64_Sym *symbol;
+        int dladdr_successful = dladdr1((const void *)got_value, &info, (void **)&symbol, RTLD_DL_SYMENT) != 0;
+        if (!dladdr_successful) goto next;
+
+        // If the function name and address from the link map matches
+        // the function name and address from dladdr1 info, continue on.
+        if (info.dli_sname && !strcmp(fname, info.dli_sname) &&
+            ((void*)got_value == info.dli_saddr)) goto next;
+
+        // For now, ignore stuff from libc.  Reasons include:
+        //   name missmatches that aren't meaningful free->cfree, calloc->__libc_calloc, etc.
+        //   libdl doesn't know about libc's vectorized functions (sse2, sse42, avx, avx2)
+        //     examples include: memcmp memmove strlen strncasecmp strncmp
+        if (strstr(file_from_maps_file, "/libc-")) goto next;
+        if (strstr(file_from_maps_file, "/libc.")) goto next;
+
+        // For now, ignore stuff from vdso.  Reasons include:
+        //   name missmatches that aren't meaningful gettimeofday->__vdso_gettimeofday
+        //   libc link map has blank fnames for __vdso_time, __vdso_gettimeofday
+        if (!strcmp(file_from_maps_file, "[vdso]")) goto next;
+
+        // For now, ignore stuff from libpthread.
+        //   name missmatches that aren't meaningful __pthread_barrier_init->pthread_barrier_init
+        if (strstr(file_from_maps_file, "/libpthread")) goto next;
+
+        // Create a security event!  It at this point we've detected a
+        // got function that appears to us to be hijacked.
+        // 
+        //    if (info->dlpi_name) 
+        //      "In %s, function %s appears to be hijacked by library %s", info->dlpi_name, fname, file_from_maps_file
+        //    else 
+        //      "In %s, function %s appears to be hijacked by library %s", g_proc.procname, fname, file_from_maps_file
+#ifdef TMPDBGFILE
+        scope_fprintf(mydbg, "  %d 0x%016lx 0x%016lx %-30s %s\n", found_locally, got_value, got_addr, fname, file_from_maps_file);
+        scope_fprintf(mydbg, "    %s 0x%p %s 0x%p\n", info.dli_fname, info.dli_fbase, info.dli_sname, info.dli_saddr);
+        if (!symbol) {
+            scope_fprintf(mydbg, "    symbol not found\n");
+        } else {
+            const char *type = valToStr(typeMap, ELF64_ST_TYPE(symbol->st_info));
+            const char *bind = valToStr(bindMap, ELF64_ST_BIND(symbol->st_info));
+            const char *vis  = valToStr(visMap,  ELF64_ST_VISIBILITY(symbol->st_other));
+            scope_fprintf(mydbg, "    %d %s %s %s %d 0x%p %d\n",
+               symbol->st_name, type, bind, vis, symbol->st_shndx, symbol->st_value, symbol->st_size);
+        }
+#endif // TMPDBGFILE
+
+next:
+        scope_free(file_from_maps_file);
+        scope_free(file_from_link_map);
+    }
+
+    dlclose(handle);
+#ifdef TMPDBGFILE
+    scope_fclose(mydbg);
+#endif // TMPDBGFILE
+    return 0;
+}
+
+static void
+inspectGotTables(void)
+{
+    dl_iterate_phdr(inspectLib, NULL);
+}
+
 __attribute__((constructor)) void
 init(void)
 {
@@ -1674,6 +1853,12 @@ init(void)
     osInitJavaAgent();
 
     envSecurity();
+#ifdef TMPDBGFILE
+    FILE *mydbg = scope_fopen(TMPDBGFILE, "a");
+    scope_fprintf(mydbg, "********* constructor time **************\n");
+    scope_fclose(mydbg);
+#endif // TMPDBGFILE
+    inspectGotTables();
 }
 
 EXPORTON int

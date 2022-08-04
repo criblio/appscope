@@ -1724,12 +1724,12 @@ inspectLib(struct dl_phdr_info *info, size_t size, void *data)
         //   name missmatches that aren't meaningful __pthread_barrier_init->pthread_barrier_init
         if (strstr(file_from_maps_file, "/libpthread")) goto next;
 
-        const char *exe_or_lib_name = info->dlpi_name ? info->dlpi_name : g_proc.procname;
+        const char *exe_or_lib_name = info->dlpi_name[0] ? info->dlpi_name : g_proc.procname;
         gotSecurity(fname, exe_or_lib_name, file_from_maps_file);
 
 #ifdef TMPDBGFILE
         scope_fprintf(mydbg, "  %d 0x%016lx 0x%016lx %-30s %s\n", found_locally, got_value, got_addr, fname, file_from_maps_file);
-        scope_fprintf(mydbg, "    %s 0x%p %s 0x%p\n", info.dli_fname, info.dli_fbase, info.dli_sname, info.dli_saddr);
+        scope_fprintf(mydbg, "    %s 0x%p %s 0x%p\n", dl_info.dli_fname, dl_info.dli_fbase, dl_info.dli_sname, dl_info.dli_saddr);
         if (!symbol) {
             scope_fprintf(mydbg, "    symbol not found\n");
         } else {

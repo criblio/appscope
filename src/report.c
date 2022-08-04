@@ -3300,8 +3300,8 @@ doSecurityMetric(security_info_t *sec)
     if (strlen(sec->dlpi_name) > 0) {
         event_field_t fields[] = {
             STRFIELD("function", sec->func, 4, TRUE),
-            STRFIELD("dlpi_name", sec->dlpi_name, 4, TRUE),
-            STRFIELD("maps_file", sec->path, 4, TRUE),
+            STRFIELD("redirected_from", sec->dlpi_name, 4, TRUE),
+            STRFIELD("redirected_to", sec->path, 4, TRUE),
             PROC_FIELD(g_proc.procname),
             PID_FIELD(g_proc.pid),
             HOST_FIELD(g_proc.hostname),

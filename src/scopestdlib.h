@@ -256,6 +256,7 @@ int           scope_shmget(key_t, size_t, int);
 int           scope_sched_getcpu(void);
 int           scope_rand(void);
 void          scope_srand(unsigned int);
+int           scope_setns(int, int);
 
 
 #endif // __SCOPE_STDLIB_H__

@@ -202,6 +202,7 @@ extern int           scopelibc_shmget(key_t, size_t, int);
 extern int           scopelibc_sched_getcpu(void);
 extern int           scopelibc_rand(void);
 extern void          scopelibc_srand(unsigned int);
+extern int           scopelibc_setns(int, int);
 
 static int g_go_static;
 
@@ -1195,3 +1196,8 @@ scope_srand(unsigned int seed)
     scopelibc_srand(seed);
 }
 
+int
+scope_setns(int fd, int nstype)
+{
+    return scopelibc_setns(fd, nstype);
+}

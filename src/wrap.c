@@ -1698,15 +1698,15 @@ inspectLib(struct dl_phdr_info *info, size_t size, void *data)
         if (found_locally) goto next;
 
         // get info that comes from libdl
-        Dl_info info = {0};
+        Dl_info dl_info = {0};
         Elf64_Sym *symbol;
-        int dladdr_successful = dladdr1((const void *)got_value, &info, (void **)&symbol, RTLD_DL_SYMENT) != 0;
+        int dladdr_successful = dladdr1((const void *)got_value, &dl_info, (void **)&symbol, RTLD_DL_SYMENT) != 0;
         if (!dladdr_successful) goto next;
 
         // If the function name and address from the link map matches
         // the function name and address from dladdr1 info, continue on.
-        if (info.dli_sname && !strcmp(fname, info.dli_sname) &&
-            ((void*)got_value == info.dli_saddr)) goto next;
+        if (dl_info.dli_sname && !strcmp(fname, dl_info.dli_sname) &&
+            ((void*)got_value == dl_info.dli_saddr)) goto next;
 
         // For now, ignore stuff from libc.  Reasons include:
         //   name missmatches that aren't meaningful free->cfree, calloc->__libc_calloc, etc.
@@ -1724,16 +1724,9 @@ inspectLib(struct dl_phdr_info *info, size_t size, void *data)
         //   name missmatches that aren't meaningful __pthread_barrier_init->pthread_barrier_init
         if (strstr(file_from_maps_file, "/libpthread")) goto next;
 
-        info.dli_sname ? gotSecurity(fname, info.dli_sname, file_from_maps_file) :
-            gotSecurity(fname, g_proc.procname, file_from_maps_file);
+        const char *exe_or_lib_name = info->dlpi_name ? info->dlpi_name : g_proc.procname;
+        gotSecurity(fname, exe_or_lib_name, file_from_maps_file);
 
-        // Create a security event!  It at this point we've detected a
-        // got function that appears to us to be hijacked.
-        // 
-        //    if (info->dlpi_name) 
-        //      "In %s, function %s appears to be hijacked by library %s", info->dlpi_name, fname, file_from_maps_file
-        //    else 
-        //      "In %s, function %s appears to be hijacked by library %s", g_proc.procname, fname, file_from_maps_file
 #ifdef TMPDBGFILE
         scope_fprintf(mydbg, "  %d 0x%016lx 0x%016lx %-30s %s\n", found_locally, got_value, got_addr, fname, file_from_maps_file);
         scope_fprintf(mydbg, "    %s 0x%p %s 0x%p\n", info.dli_fname, info.dli_fbase, info.dli_sname, info.dli_saddr);

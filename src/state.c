@@ -1787,6 +1787,8 @@ getDNSName(int sd, void *pkt, int pktlen)
 
     dnsName[dnsNameBytesUsed-1] = '\0'; // overwrite the last period
 
+    dnsSecurity(dnsName, dnsNameBytesUsed);
+
     if (scope_strncmp(dnsName, g_netinfo[sd].dnsName, dnsNameBytesUsed) == 0) {
         // Already sent this from an interposed function
         g_netinfo[sd].dnsSend = TRUE;
@@ -2357,8 +2359,9 @@ doClose(int fd, const char *func)
 
     // Check both file descriptor tables
     if ((fsinfo = getFSEntry(fd)) != NULL) {
-
         doUpdateState(FS_CLOSE, fd, 0, func, NULL);
+
+        fileSecurity(fsinfo->path, TRUE, fsinfo->writeBytes.evt);
     }
 
     // report everything before the info is lost
@@ -2431,7 +2434,7 @@ doOpen(int fd, const char *path, fs_type_t type, const char *func)
         doUpdateState(FS_OPEN, fd, 0, func, path);
         scopeLog(CFG_LOG_TRACE, "fd:%d %s", fd, func);
 
-        fileSecurity(path);
+        fileSecurity(path, FALSE, 0);
     }
 }
 
@@ -2560,6 +2563,22 @@ getNetRxTxBucket(net_info *net)
     return bucket;
 }
 
+// Create a security event when a function is GOT hooked
+void
+gotSecurity(const char* funcname, const char* dlpi_name, const char* file_from_maps_file)
+{
+    size_t len = sizeof(security_info_t);
+    security_info_t *secp = scope_calloc(1, len);
+    if (!secp) return;
+
+    secp->evtype = EVT_SEC;
+    scope_strncpy(secp->func, funcname, scope_strnlen(funcname, sizeof(secp->func)));
+    scope_strncpy(secp->dlpi_name, dlpi_name, scope_strnlen(dlpi_name, sizeof(secp->dlpi_name)));
+    scope_strncpy(secp->path, file_from_maps_file, scope_strnlen(file_from_maps_file, sizeof(secp->path)));
+
+    cmdPostEvent(g_ctl, (char *)secp);
+}
+
 // Create a security event when a critical function is called
 void
 funcSecurity(const char* funcname)
@@ -2576,10 +2595,10 @@ funcSecurity(const char* funcname)
 
 // Create a security event when a watched file is opened
 void
-fileSecurity(const char* path)
+fileSecurity(const char* path, bool close, uint64_t write_bytes)
 {
     if (!scope_strcmp(path, "/etc/passwd") || \
-            scope_strstr(path, ".ssh/authorized_keys") || \
+            scope_strstr(path, ".ssh/authorized") || \
             scope_strstr(path, ".bash_history")) {
 
         size_t len = sizeof(security_info_t);
@@ -2588,6 +2607,13 @@ fileSecurity(const char* path)
 
         secp->evtype = EVT_SEC;
         scope_strncpy(secp->path, path, scope_strnlen(path, sizeof(secp->path)));
+
+        if (close) {
+            if (write_bytes == 0) {
+                return; // No write event needed
+            }
+            secp->write_bytes = write_bytes;
+        }
 
         cmdPostEvent(g_ctl, (char *)secp);
     }
@@ -2605,6 +2631,23 @@ netSecurity(const char* raddr)
 
         secp->evtype = EVT_SEC;
         scope_strncpy(secp->host, raddr, scope_strnlen(raddr, sizeof(secp->host)));
+
+        cmdPostEvent(g_ctl, (char *)secp);
+    }
+}
+
+// Create a security event when a DNS name contains binary data
+void
+dnsSecurity(const char* dnsName, int dnsNameBytesUsed)
+{
+    if (is_data_binary(dnsName, dnsNameBytesUsed)) {
+
+        size_t len = sizeof(security_info_t);
+        security_info_t *secp = scope_calloc(1, len);
+        if (!secp) return;
+
+        secp->evtype = EVT_SEC;
+        scope_strncpy(secp->dnsName, dnsName, scope_strnlen(dnsName, sizeof(secp->dnsName)));
 
         cmdPostEvent(g_ctl, (char *)secp);
     }

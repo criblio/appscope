@@ -78,9 +78,11 @@ void setRemoteClose(int, int);
 void setFSContentType(int, fs_content_type_t);
 fs_content_type_t getFSContentType(int);
 bool isProtocolSet(int);
+void gotSecurity(const char*, const char*, const char*);
 void funcSecurity(const char*);
-void fileSecurity(const char*);
+void fileSecurity(const char*, bool, uint64_t);
 void netSecurity(const char*);
+void dnsSecurity(const char*, int);
 void envSecurity();
 
 #endif // __STATE_H__

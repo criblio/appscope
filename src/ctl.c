@@ -24,8 +24,6 @@
 #define ID "id"
 
 #define BINARY_DATA_MSG "-- binary data ignored --"
-#define DEFAULT_BINARY_DATA_SAMPLE_SIZE (256U)
-#define ESC_CHARACTER (0x1B)
 
 typedef struct {
     char *buf;
@@ -849,20 +847,6 @@ destroyInternalLogEvent(log_event_t **eventptr)
     if (event->data)    scope_free(event->data);
     if (event)          scope_free(event);
     *eventptr = NULL;
-}
-
-static bool
-is_data_binary(const void *buf, size_t count)
-{
-    const char* b_buf = (const char *)buf;
-    size_t min_len = (count < DEFAULT_BINARY_DATA_SAMPLE_SIZE) ? count : DEFAULT_BINARY_DATA_SAMPLE_SIZE;
-    size_t i;
-    for (i = 0; i < min_len; i++) {
-        if (!scope_isprint(b_buf[i]) && !scope_isspace(b_buf[i]) && b_buf[i] != ESC_CHARACTER) {
-            return TRUE;
-        }
-    }
-    return FALSE;
 }
 
 int

@@ -1724,6 +1724,9 @@ inspectLib(struct dl_phdr_info *info, size_t size, void *data)
         //   name missmatches that aren't meaningful __pthread_barrier_init->pthread_barrier_init
         if (strstr(file_from_maps_file, "/libpthread")) goto next;
 
+        info.dli_sname ? gotSecurity(fname, info.dli_sname, file_from_maps_file) :
+            gotSecurity(fname, g_proc.procname, file_from_maps_file);
+
         // Create a security event!  It at this point we've detected a
         // got function that appears to us to be hijacked.
         // 

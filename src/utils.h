@@ -21,4 +21,6 @@ int endsWith(const char *string, const char *substring);
 
 int sigSafeNanosleep(const struct timespec *req);
 
+bool is_data_binary(const void *buf, size_t count);
+
 #endif // __UTILS_H__

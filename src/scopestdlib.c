@@ -54,6 +54,7 @@ extern int            scopelibc_access(const char *, int);
 extern FILE*          scopelibc_fmemopen(void *, size_t, const char *);
 extern long           scopelibc_ftell(FILE *);
 extern int            scopelibc_fseek(FILE *, long, int);
+extern off_t          scopelibc_lseek(int, off_t, int);
 extern int            scopelibc_unlink(const char *);
 extern int            scopelibc_dup2(int, int);
 extern char*          scopelibc_basename(char *);
@@ -202,6 +203,7 @@ extern int           scopelibc_shmget(key_t, size_t, int);
 extern int           scopelibc_sched_getcpu(void);
 extern int           scopelibc_rand(void);
 extern void          scopelibc_srand(unsigned int);
+extern int           scopelibc_ftruncate(int, off_t);
 extern int           scopelibc_setns(int, int);
 
 static int g_go_static;
@@ -429,6 +431,11 @@ scope_ftell(FILE *stream) {
 int
 scope_fseek(FILE *stream, long offset, int whence) {
     return scopelibc_fseek(stream, offset, whence);
+}
+
+off_t
+scope_lseek(int fd, off_t offset, int whence) {
+    return scopelibc_lseek(fd, offset, whence);
 }
 
 int
@@ -1136,6 +1143,11 @@ scope_shmget(key_t key, size_t size, int shmflg) {
 int
 scope_sched_getcpu(void) {
     return scopelibc_sched_getcpu();
+}
+
+int
+scope_ftruncate(int fildes, off_t length) {
+    return scopelibc_ftruncate(fildes, length);
 }
 
 int

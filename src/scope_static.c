@@ -18,6 +18,7 @@
 #include "scopestdlib.h"
 #include "scopetypes.h"
 #include "libdir.h"
+#include "ns.h"
 
 /*
  * This code exists solely to support the ability to
@@ -976,7 +977,7 @@ main(int argc, char **argv, char **env)
 {
     char *attachArg = 0;
     char path[PATH_MAX] = {0};
-
+    int pid = -1;
     // process command line
     for (;;) {
         int index = 0;
@@ -1046,6 +1047,37 @@ main(int argc, char **argv, char **env)
         scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --attach option\n");
     }
 
+    // perform namespace switch if required
+    if (attachArg) {
+        // must be root
+        if (scope_getuid()) {
+            scope_printf("error: --attach requires root\n");
+            return EXIT_FAILURE;
+        }
+
+        // target process must exist
+        pid = scope_atoi(attachArg);
+        if (pid < 1) {
+            scope_printf("error: invalid --attach PID: %s\n", attachArg);
+            return EXIT_FAILURE;
+        }
+
+        int nsAttachPid = 0;
+
+
+        /*
+        * If the expected process exists in different namespace (container)
+        * we do a following switch context sequence:
+        * - load static loader file into memory
+        * - switch the namespace from parent
+        * - save previously loaded static loader into new namespace
+        * - fork & execute static loader attach one more time with update PID
+        */
+        if (nsIsPidInChildNs(pid, &nsAttachPid) == TRUE) {
+            return nsForkAndExec(pid, nsAttachPid);
+        }
+    }
+
     // extract to the library directory
     if (libdirExtractLoader()) {
         scope_fprintf(scope_stderr, "error: failed to extract loader\n");
@@ -1077,18 +1109,7 @@ main(int argc, char **argv, char **env)
 
     // create /dev/shm/scope_${PID}.env when attaching
     if (attachArg) {
-        // must be root
-        if (scope_getuid()) {
-            scope_printf("error: --attach requires root\n");
-            return EXIT_FAILURE;
-        }
 
-        // target process must exist
-        int pid = scope_atoi(attachArg);
-        if (pid < 1) {
-            scope_printf("error: invalid --attach PID: %s\n", attachArg);
-            return EXIT_FAILURE;
-        }
         scope_snprintf(path, sizeof(path), "/proc/%d", pid);
         if (scope_access(path, F_OK)) {
             scope_printf("error: --attach PID not a current process: %d\n", pid);

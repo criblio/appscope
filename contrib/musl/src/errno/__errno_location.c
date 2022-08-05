@@ -1,6 +1,5 @@
 #define _GNU_SOURCE
 #include <errno.h>
-#include <unistd.h>
 #include "pthread_impl.h"
 
 int errno_val;

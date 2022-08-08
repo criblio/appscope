@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <errno.h>
 #include "pthread_impl.h"
 

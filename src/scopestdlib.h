@@ -59,6 +59,25 @@ extern int32_t ** scopelibc___ctype_tolower_loc(void);
 #define scope_stdout   (&scopelibc___stdout_FILE)
 #define scope_stderr   (&scopelibc___stderr_FILE)
 
+/*
+ * Notes on the use of errno.
+ * There are 2 errno values; errno and scope_errno.
+ *
+ * errno is set by the application. It should be
+ * used, for the most part, by interposed functions where
+ * results of application behavior needs to be checked. It
+ * should only ever be set by libscope in specific cases.
+ *
+ * scope_errno is used by the internal libc.
+ * This value is not thread specific, thread safe, as we avoid the
+ * use of the %fs register and TLS behavior with the internal libc.
+ *
+ * Use scope_errno only for functions called from the periodic
+ * thread, during libscope constructor, from ldscope or from ldscopedyn.
+ *
+ * Other functions, primarily those called from interposed functions, can
+ * not safely reference scope_errno.
+ */
 // Other
 extern void scopeSetGoAppStateStatic(int);
 extern int scopeGetGoAppStateStatic(void);

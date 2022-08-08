@@ -702,7 +702,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved)
     }
 
     jvmtiCapabilities capabilities;
-    memset(&capabilities,0, sizeof(capabilities));
+    scope_memset(&capabilities,0, sizeof(capabilities));
 
     capabilities.can_generate_all_class_hook_events = 1;
     error = (*env)->AddCapabilities(env, &capabilities);
@@ -718,7 +718,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved)
     }
    
     jvmtiEventCallbacks callbacks;
-    memset(&callbacks, 0, sizeof(callbacks));
+    scope_memset(&callbacks, 0, sizeof(callbacks));
     callbacks.ClassFileLoadHook = &ClassFileLoadHook;
     error = (*env)->SetEventCallbacks(env, &callbacks, sizeof(callbacks));
     if (error != JVMTI_ERROR_NONE) {

@@ -199,7 +199,12 @@ nsIsPidInChildNs(pid_t pid, pid_t *nsPid)
  
  /*
  * Perform fork and exec which cause that direct children
- * effectively will join a new PID namespace
+ * effectively will join a new PID namespace.
+ *
+ * Reassociating the PID namespace (setns CLONE_NEWPID) has somewhat different from 
+ * other namespace types. Reassociating the calling thread with a PID namespace
+ * changes only the PID namespace that subsequently created child processes of
+ * the caller will be placed in. It does not change the PID namespace of the caller itself.
  *
  * Returns status of operation
  */

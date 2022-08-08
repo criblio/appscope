@@ -3,7 +3,7 @@
 
 #include "scopetypes.h"
 
-bool nsIsPidInChildNs(pid_t pid, pid_t *nsPid);
-int nsForkAndExec(pid_t parentPid, pid_t nsPid);
+bool nsIsPidInChildNs(pid_t, pid_t *);
+int nsForkAndExec(pid_t, pid_t);
 
 #endif // __NS_H__

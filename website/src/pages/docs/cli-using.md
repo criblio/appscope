@@ -4,17 +4,17 @@ title: Using the CLI
 
 ## Using The Command Line Interface (CLI)
 
-As soon as you [download](downloading) AppScope, you can start using the CLI to explore and gain insight into application behavior. No installation or configuration is required.
+As soon as you [download](/docs/downloading) AppScope, you can start using the CLI to explore and gain insight into application behavior. No installation or configuration is required.
 
 The CLI provides a rich set of capabilities for capturing and managing data from single applications. Data is captured in the local filesystem.
 
 By default, the AppScope CLI redacts binary data from console output. Although in most situations, the default behaviors of the AppScope CLI and library are the same, they differ for binary data: it's omitted in the CLI, and allowed when using the library. To change this, use the `allowbinary=true` flag. The equivalent environment variable is `SCOPE_ALLOW_BINARY_CONSOLE`. In the config file, `allowbinary` is an attribute of the `console` watch type for events. 
 
-To learn more, see the [CLI Reference](/docs/cli-reference), and/or run `scope --help` or `scope -h`. And check out the [Further Examples](examples-use-cases), which include both CLI and library use cases.
+To learn more, see the [CLI Reference](/docs/cli-reference), and/or run `scope --help` or `scope -h`. And check out the [Further Examples](/docs/examples-use-cases), which include both CLI and library use cases.
 
 ### CLI Basics
 
-The basic AppScope CLI command is `scope`. The following examples progress from simple to more involved. Scoping a running process gets [its own section](scope-running). The final section explains how to scope an app that generates a large data set, and then [explore](explore-captured) that data.
+The basic AppScope CLI command is `scope`. The following examples progress from simple to more involved. Scoping a running process gets [its own section](#scope-running). The final section explains how to scope an app that generates a large data set, and then [explore](#explore-captured) that data.
 
 #### Scope a New Process 
 

@@ -1,4 +1,4 @@
-FROM alpine:3.15
+FROM alpine:3.16.1
 
 RUN apk add bash python3 py3-pip wget patch
 RUN pip3 install virtualenv
@@ -40,7 +40,7 @@ COPY ./test_runner /opt/test-runner/
 COPY ./syscalls/syscall_tests_conf.json /opt/test-runner/syscall_tests_conf.json
 
 # # # Switching to Python 3.8 required this hack. Not sure where the kafka packages are coming from.
-RUN sed -i 's/\basync\b/is_async/g' /opt/test-runner/lib/python3.9/site-packages/kafka/producer/*.py
+RUN sed -i 's/\basync\b/is_async/g' /opt/test-runner/lib/python3.10/site-packages/kafka/producer/*.py
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 COPY scope-profile.sh /etc/profile.d/scope.sh

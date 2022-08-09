@@ -6,7 +6,7 @@ title: Using the Library
 
 To use the library for the first time in a given environment, complete this quick procedure:
 
-1. [Download](downloading) AppScope. 
+1. [Download](/docs/downloading) AppScope. 
 2. Decide on a `SCOPE_HOME` directory, i.e., the [directory from which AppScope should run](/docs/downloading#where-from) in your environment.
 3. Set `SCOPE_HOME` to the desired directory.
    ```
@@ -66,7 +66,7 @@ To use the library directly, you rely on the `LD_PRELOAD` environment variable.
 
 The following examples provide an overview of this way of working with the library. All the examples call the system-level `ps` command, just to show how the syntax works.
 
-For more, check out the [Further Examples](examples-use-cases), which include both CLI and library use cases.
+For more, check out the [Further Examples](/docs/examples-use-cases), which include both CLI and library use cases.
 
 #### `LD_PRELOAD` with a Single Command
 
@@ -157,7 +157,7 @@ The AWS docs [explain](https://docs.aws.amazon.com/lambda/latest/dg/configuratio
 
     - `SCOPE_EXEC_PATH=/lib/ldscope`
 
-3. To tell AppScope where to deliver events, the required environment variable depends on your desired [Data Routing](data-routing).
+3. To tell AppScope where to deliver events, the required environment variable depends on your desired [Data Routing](/docs/data-routing).
 
     - For example, `SCOPE_CRIBL_CLOUD` is required for an [AppScope Source](https://docs.cribl.io/stream/sources-appscope) in a Cribl.Cloud-managed instance of Cribl Stream. (Substitute your host and port values for the placeholders.)
 

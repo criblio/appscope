@@ -1621,6 +1621,9 @@ init(void)
     setProcId(&g_proc);
     setPidEnv(g_proc.pid);
 
+    setMachineID(g_proc.machine_id);
+    setUUID(g_proc.uuid);
+
     // initEnv() will set this TRUE if it detects `scope_attach_PID.env` in
     // `/dev/shm` with our PID indicating we were injected into a running
     // process.

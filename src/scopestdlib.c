@@ -196,6 +196,8 @@ extern void*         scopelibc_shmat(int, const void *, int);
 extern int           scopelibc_shmdt(const void *);
 extern int           scopelibc_shmget(key_t, size_t, int);
 extern int           scopelibc_sched_getcpu(void);
+extern int           scopelibc_rand(void);
+extern void          scopelibc_srand(unsigned int);
 
 static int g_go_static;
 
@@ -1156,3 +1158,16 @@ scope___ctype_tolower_loc(void)
 {
     return scopelibc___ctype_tolower_loc();
 }
+
+int
+scope_rand(void)
+{
+    return scopelibc_rand();
+}
+
+void
+scope_srand(unsigned int seed)
+{
+    scopelibc_srand(seed);
+}
+

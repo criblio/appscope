@@ -8,10 +8,14 @@ import WhyAppScope from "../components/WhyAppScope";
 import HowItWorks from "../components/HowItWorks";
 import GetStarted from "../components/GetStarted";
 import SEO from "../components/SEO";
+import { Helmet } from "react-helmet";
 const IndexPage = () => {
   return (
     <main>
       <SEO />
+      <Helmet>
+        <meta name="og:image" content={'https://cribl.io/wp-content/uploads/2022/01/thumb.appScope.fullColorWhiteAlt.png'} />
+      </Helmet>
       {/* <Alert /> */}
       <div className="display-xs">
         <MobileHeader />

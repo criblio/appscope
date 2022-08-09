@@ -173,8 +173,9 @@ jsonProcessObject(proc_id_t *proc)
         if (!(cJSON_AddStringToObjLN(root, "cmd", proc->cmd))) goto err;
     }
     if (!(cJSON_AddStringToObjLN(root, "id", proc->id))) goto err;
-    // starttime
-
+    if (!(cJSON_AddStringToObjLN(root, "machine_id", proc->machine_id))) goto err;
+    if (!(cJSON_AddStringToObjLN(root, "uuid", proc->uuid))) goto err;
+ 
     return root;
 err:
     if (root) cJSON_Delete(root);

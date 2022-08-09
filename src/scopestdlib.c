@@ -54,6 +54,7 @@ extern int            scopelibc_access(const char *, int);
 extern FILE*          scopelibc_fmemopen(void *, size_t, const char *);
 extern long           scopelibc_ftell(FILE *);
 extern int            scopelibc_fseek(FILE *, long, int);
+extern off_t          scopelibc_lseek(int, off_t, int);
 extern int            scopelibc_unlink(const char *);
 extern int            scopelibc_dup2(int, int);
 extern char*          scopelibc_basename(char *);
@@ -171,6 +172,10 @@ extern int           scopelibc_getpwuid_r(uid_t, struct passwd *, char *, size_t
 extern pid_t         scopelibc_getpid(void);
 extern pid_t         scopelibc_getppid(void);
 extern uid_t         scopelibc_getuid(void);
+extern uid_t         scopelibc_geteuid(void);
+extern gid_t         scopelibc_getegid(void);
+extern int           scopelibc_seteuid(uid_t);
+extern int           scopelibc_setegid(gid_t);
 extern gid_t         scopelibc_getgid(void);
 extern void*         scopelibc_dlopen(const char *, int);
 extern int           scopelibc_dlclose(void *);
@@ -198,6 +203,8 @@ extern int           scopelibc_shmget(key_t, size_t, int);
 extern int           scopelibc_sched_getcpu(void);
 extern int           scopelibc_rand(void);
 extern void          scopelibc_srand(unsigned int);
+extern int           scopelibc_ftruncate(int, off_t);
+extern int           scopelibc_setns(int, int);
 
 static int g_go_static;
 
@@ -424,6 +431,11 @@ scope_ftell(FILE *stream) {
 int
 scope_fseek(FILE *stream, long offset, int whence) {
     return scopelibc_fseek(stream, offset, whence);
+}
+
+off_t
+scope_lseek(int fd, off_t offset, int whence) {
+    return scopelibc_lseek(fd, offset, whence);
 }
 
 int
@@ -983,6 +995,26 @@ scope_getuid(void) {
     return scopelibc_getuid();
 }
 
+uid_t
+scope_geteuid(void) {
+    return scopelibc_geteuid();
+}
+
+gid_t
+scope_getegid(void) {
+    return scopelibc_getegid();
+}
+
+int
+scope_seteuid(uid_t euid) {
+    return scopelibc_seteuid(euid);
+}
+
+int
+scope_setegid(gid_t egid) {
+    return scopelibc_setegid(egid);
+}
+
 gid_t
 scope_getgid(void) {
     return scopelibc_getgid();
@@ -1114,6 +1146,11 @@ scope_sched_getcpu(void) {
 }
 
 int
+scope_ftruncate(int fildes, off_t length) {
+    return scopelibc_ftruncate(fildes, length);
+}
+
+int
 scope___snprintf_chk(char *str, size_t maxlen, int flag, size_t slen, const char * format, ...)
 {
     int ret;
@@ -1171,3 +1208,8 @@ scope_srand(unsigned int seed)
     scopelibc_srand(seed);
 }
 
+int
+scope_setns(int fd, int nstype)
+{
+    return scopelibc_setns(fd, nstype);
+}

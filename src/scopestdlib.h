@@ -128,6 +128,7 @@ int            scope_access(const char *, int);
 FILE*          scope_fmemopen(void *, size_t, const char *);
 long           scope_ftell(FILE *);
 int            scope_fseek(FILE *, long, int);
+off_t          scope_lseek(int, off_t, int);
 int            scope_unlink(const char *);
 int            scope_dup2(int, int);
 char*          scope_basename(char *);
@@ -244,6 +245,10 @@ int           scope_getpwuid_r(uid_t, struct passwd *, char *, size_t, struct pa
 pid_t         scope_getpid(void);
 pid_t         scope_getppid(void);
 uid_t         scope_getuid(void);
+uid_t         scope_geteuid(void);
+gid_t         scope_getegid(void);
+int           scope_seteuid(uid_t);
+int           scope_setegid(gid_t);
 gid_t         scope_getgid(void);
 void*         scope_dlopen(const char *, int);
 void*         scope_dlsym(void *, const char *);
@@ -269,8 +274,10 @@ void*         scope_shmat(int, const void *, int);
 int           scope_shmdt(const void *);
 int           scope_shmget(key_t, size_t, int);
 int           scope_sched_getcpu(void);
+int           scope_ftruncate(int, off_t);
 int           scope_rand(void);
 void          scope_srand(unsigned int);
+int           scope_setns(int, int);
 
 
 #endif // __SCOPE_STDLIB_H__

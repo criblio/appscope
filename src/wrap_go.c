@@ -22,7 +22,7 @@
 #define EXIT_STACK_SIZE (32 * 1024)
 #define UNKNOWN_GO_VER (-1)
 #define MIN_SUPPORTED_GO_VER (8)
-#define MAX_SUPPORTED_GO_VER (18)
+#define MAX_SUPPORTED_GO_VER (19)
 #define HTTP2_FRAME_HEADER_LEN (9)
 #define PRI_STR "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 #define PRI_STR_LEN sizeof(PRI_STR)
@@ -270,7 +270,7 @@ go_schema_t go_17_schema = {
         [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
         [INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_hook_reg_http2_client_read,    NULL, 0},
         [INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_hook_reg_http2_client_write,   NULL, 0},
-        [INDEX_HOOK_EXIT]                 = {"runtime.exit",                            go_hook_exit,                     NULL, 0},
+        [INDEX_HOOK_EXIT]                 = {"runtime.exit.abi0",                            go_hook_exit,                     NULL, 0},
         [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal",                   go_hook_die,                      NULL, 0},
         [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                             NULL, 0}
     },

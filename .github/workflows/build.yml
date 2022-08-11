@@ -430,10 +430,6 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::Deploy to https://cdn.cribl.io/dl/scope/${VERSION}"
-          if [ -n "${{ needs.info.outputs.latest }}" ]; then
-            echo "${{ needs.info.outputs.tag }}" > ${TMPDIR}/latest
-            aws s3 cp ${TMPDIR}/latest ${S3_SCOPE}/latest
-          fi
           aws s3 cp ${TMPDIR}/scope-x86_64                    ${S3_SCOPE}/${VERSION}/linux/scope
           aws s3 cp ${TMPDIR}/scope-x86_64.md5                ${S3_SCOPE}/${VERSION}/linux/scope.md5
           aws s3 cp ${TMPDIR}/scope-x86_64.tgz                ${S3_SCOPE}/${VERSION}/linux/scope.tgz
@@ -448,7 +444,7 @@ jobs:
             aws s3 cp ${TMPDIR}/aws-lambda-layer-${ARCH}.zip     ${S3_SCOPE}/${VERSION}/linux/${ARCH}/aws-lambda-layer.zip
             aws s3 cp ${TMPDIR}/aws-lambda-layer-${ARCH}.zip.md5 ${S3_SCOPE}/${VERSION}/linux/${ARCH}/aws-lambda-layer.zip.md5
           done
-          aws cloudfront create-invalidation --distribution-id ${CF_DISTRIBUTION_ID} --paths '/dl/scope/'"$VERSION"'/*' '/dl/scope/latest'
+          aws cloudfront create-invalidation --distribution-id ${CF_DISTRIBUTION_ID} --paths '/dl/scope/'"$VERSION"'/*'
           echo "::endgroup::"
 
           if [ "unreleased" != "${{ needs.info.outputs.tag }}" -a "next" != "${{ needs.info.outputs.tag }}" ]; then
@@ -612,7 +608,6 @@ jobs:
           docker buildx build \
                 --builder ${{ steps.buildx.outputs.name }} \
                 --tag cribl/scope:${VERSION} \
-                ${LATEST:+--tag cribl/scope:latest} \
                 --platform linux/amd64,linux/arm64/v8 \
                 --output type=${TYPE} \
                 --file docker/base/Dockerfile \

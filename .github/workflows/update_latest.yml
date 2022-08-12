@@ -48,7 +48,7 @@ jobs:
     name: Update CDN Latest
     runs-on: ubuntu-latest
     needs: info
-    if: ${{ needs.info.outputs.tag != "" && needs.info.outputs.prerelease = "" }}
+    if: ${{ needs.info.outputs.tag != "" && needs.info.outputs.prerelease == "" }}
     steps:
       - name: Update dl/scope/latest
         env:
@@ -73,7 +73,7 @@ jobs:
     name: Update Latest Tag in Dockerhub
     runs-on: ubuntu-latest
     needs: [info,update-cdn-latest]
-    if: ${{ needs.info.outputs.tag != "" && needs.info.outputs.prerelease = "" }}
+    if: ${{ needs.info.outputs.tag != "" && needs.info.outputs.prerelease == "" }}
     steps:
       - name: Login to Dockerhub
         uses: docker/login-action@v2
@@ -89,6 +89,7 @@ jobs:
           crane tag cribl/scope:${{ needs.info.outputs.tag }} latest
 
       - name: Print Digest/Manifest Information
+        run: |
           echo "digest and manifest for cribl/scope:${{ needs.info.outputs.tag }}"
           crane digest cribl/scope:${{ needs.info.outputs.tag }}
           crane manifest cribl/scope:${{ needs.info.outputs.tag }} | jq .

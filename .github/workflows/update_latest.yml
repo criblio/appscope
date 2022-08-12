@@ -1,0 +1,87 @@
+#
+# AppScope - Update Latest Workflow
+#
+# Update what is returned by https://cdn.cribl.io/dl/scope/latest
+# And update the "latest" tag on https://hub.docker.com/r/cribl/scope/tags
+#
+# based on:
+#   https://levelup.gitconnected.com/how-to-manually-trigger-a-github-actions-workflow-4712542f1960
+# instructions for use:
+#   https://docs.github.com/en/actions/managing-workflow-runs/manually-running-a-workflow
+#
+name: Update Latest
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: New Latest Version (example value "1.1.2")
+        default: ""
+        required: true
+jobs:
+  update-cdn-latest:
+    name: Update CDN Latest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update dl/scope/latest
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "::group::Updating https://cdn.cribl.io/dl/scope/latest to ${{ github.event.inputs.version }}"
+          S3_SCOPE=s3://io.cribl.cdn/dl/scope
+          TMPDIR=${RUNNER_TEMP}
+
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "${{ github.event.inputs.version }}" > ${TMPDIR}/latest
+            aws s3 cp ${TMPDIR}/latest ${S3_SCOPE}/latest
+            aws cloudfront create-invalidation --distribution-id ${CF_DISTRIBUTION_ID} --paths '/dl/scope/latest'
+          fi
+          echo "::endgroup::"
+
+  update-dockerhub-latest:
+    name: Update Latest Tag in Dockerhub
+    runs-on: ubuntu-latest
+    needs: update-cdn-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          ref: v${{ github.event.inputs.version }}
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Setup Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Dockerhub
+        uses: docker/login-action@v2
+        with:
+          username: scopeci
+          password: ${{ secrets.SCOPECI_TOKEN }}
+
+      - name: Download Binaries
+        uses: actions/download-artifact@v3
+        with:
+          name: binaries
+
+      - name: Chmod Binaries
+        run: chmod +x lib/linux/*/* bin/linux/*/*
+
+      # Build the multi-architecture container image with the
+      # latest tag
+      - name: Build Image
+        run: |
+          echo "::group::Build cribl/scope:latest Image"
+          docker buildx build \
+                --builder ${{ steps.buildx.outputs.name }} \
+                --tag cribl/scope:latest \
+                --platform linux/amd64,linux/arm64/v8 \
+                --output type=registry \
+                --file docker/base/Dockerfile \
+                .
+          echo "::endgroup::"

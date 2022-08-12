@@ -56,11 +56,6 @@ jobs:
           if [ -z "${GITHUB_REF%%refs/tags/v*}" -a "true" = "${{ steps.version.outputs.is-semver }}" ]; then
               echo "::set-output name=tag::${{ steps.version.outputs.version-without-v }}"
               echo "::set-output name=push::true"
-              if [ -z "${{ steps.version.outputs.prerelease }}" ]; then
-                if [ "${{ steps.version.outputs.version }}" = "$(git tag -l v* | sort -V | tail -1)" ]; then
-                  echo "::set-output name=latest::true"
-                fi
-              fi
           else
             echo "::set-output name=branch::${GITHUB_REF#*refs/heads/}"
             if [ "refs/heads/main" = "${GITHUB_REF}" -o "refs/heads/master" = "${GITHUB_REF}" ]; then
@@ -82,7 +77,6 @@ jobs:
           echo "build=\"${{ steps.version.outputs.build }}\""
           echo "is-semver=\"${{ steps.version.outputs.is-semver }}\""
           echo "tag=\"${{ steps.tag.outputs.tag }}\""
-          echo "latest=\"${{ steps.tag.outputs.latest }}\""
           echo "push=\"${{ steps.tag.outputs.push }}\""
           echo "branch=\"${{ steps.tag.outputs.branch }}\""
 
@@ -116,7 +110,6 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       is-semver: ${{ steps.version.outputs.is-semver }}
       tag: ${{ steps.tag.outputs.tag }}
-      latest: ${{ steps.tag.outputs.latest }}
       push: ${{ steps.tag.outputs.push }}
       branch: ${{ steps.tag.outputs.branch }}
 
@@ -430,10 +423,6 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::Deploy to https://cdn.cribl.io/dl/scope/${VERSION}"
-          if [ -n "${{ needs.info.outputs.latest }}" ]; then
-            echo "${{ needs.info.outputs.tag }}" > ${TMPDIR}/latest
-            aws s3 cp ${TMPDIR}/latest ${S3_SCOPE}/latest
-          fi
           aws s3 cp ${TMPDIR}/scope-x86_64                    ${S3_SCOPE}/${VERSION}/linux/scope
           aws s3 cp ${TMPDIR}/scope-x86_64.md5                ${S3_SCOPE}/${VERSION}/linux/scope.md5
           aws s3 cp ${TMPDIR}/scope-x86_64.tgz                ${S3_SCOPE}/${VERSION}/linux/scope.tgz
@@ -448,7 +437,7 @@ jobs:
             aws s3 cp ${TMPDIR}/aws-lambda-layer-${ARCH}.zip     ${S3_SCOPE}/${VERSION}/linux/${ARCH}/aws-lambda-layer.zip
             aws s3 cp ${TMPDIR}/aws-lambda-layer-${ARCH}.zip.md5 ${S3_SCOPE}/${VERSION}/linux/${ARCH}/aws-lambda-layer.zip.md5
           done
-          aws cloudfront create-invalidation --distribution-id ${CF_DISTRIBUTION_ID} --paths '/dl/scope/'"$VERSION"'/*' '/dl/scope/latest'
+          aws cloudfront create-invalidation --distribution-id ${CF_DISTRIBUTION_ID} --paths '/dl/scope/'"$VERSION"'/*'
           echo "::endgroup::"
 
           if [ "unreleased" != "${{ needs.info.outputs.tag }}" -a "next" != "${{ needs.info.outputs.tag }}" ]; then
@@ -598,7 +587,6 @@ jobs:
       - name: Build Image
         env:
           VERSION: ${{ needs.info.outputs.tag }}
-          LATEST: ${{ needs.info.outputs.latest }}
           PUSH: ${{ needs.info.outputs.push }}
         run: |
           # TODO only if needs.test-*.results == 'success'
@@ -612,7 +600,6 @@ jobs:
           docker buildx build \
                 --builder ${{ steps.buildx.outputs.name }} \
                 --tag cribl/scope:${VERSION} \
-                ${LATEST:+--tag cribl/scope:latest} \
                 --platform linux/amd64,linux/arm64/v8 \
                 --output type=${TYPE} \
                 --file docker/base/Dockerfile \

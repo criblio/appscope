@@ -18,8 +18,8 @@ on:
         default: ""
         required: true
 jobs:
-  update-latest:
-    name: Update Latest
+  update-cdn-latest:
+    name: Update CDN Latest
     runs-on: ubuntu-latest
     steps:
       - name: Update dl/scope/latest
@@ -41,9 +41,10 @@ jobs:
           fi
           echo "::endgroup::"
 
-  container-image-latest:
-    name: Build Container Image
+  update-dockerhub-latest:
+    name: Update Latest Tag in Dockerhub
     runs-on: ubuntu-latest
+    needs: update-cdn-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3

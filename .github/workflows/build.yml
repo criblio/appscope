@@ -56,11 +56,6 @@ jobs:
           if [ -z "${GITHUB_REF%%refs/tags/v*}" -a "true" = "${{ steps.version.outputs.is-semver }}" ]; then
               echo "::set-output name=tag::${{ steps.version.outputs.version-without-v }}"
               echo "::set-output name=push::true"
-              if [ -z "${{ steps.version.outputs.prerelease }}" ]; then
-                if [ "${{ steps.version.outputs.version }}" = "$(git tag -l v* | sort -V | tail -1)" ]; then
-                  echo "::set-output name=latest::true"
-                fi
-              fi
           else
             echo "::set-output name=branch::${GITHUB_REF#*refs/heads/}"
             if [ "refs/heads/main" = "${GITHUB_REF}" -o "refs/heads/master" = "${GITHUB_REF}" ]; then
@@ -82,7 +77,6 @@ jobs:
           echo "build=\"${{ steps.version.outputs.build }}\""
           echo "is-semver=\"${{ steps.version.outputs.is-semver }}\""
           echo "tag=\"${{ steps.tag.outputs.tag }}\""
-          echo "latest=\"${{ steps.tag.outputs.latest }}\""
           echo "push=\"${{ steps.tag.outputs.push }}\""
           echo "branch=\"${{ steps.tag.outputs.branch }}\""
 
@@ -116,7 +110,6 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       is-semver: ${{ steps.version.outputs.is-semver }}
       tag: ${{ steps.tag.outputs.tag }}
-      latest: ${{ steps.tag.outputs.latest }}
       push: ${{ steps.tag.outputs.push }}
       branch: ${{ steps.tag.outputs.branch }}
 
@@ -594,7 +587,6 @@ jobs:
       - name: Build Image
         env:
           VERSION: ${{ needs.info.outputs.tag }}
-          LATEST: ${{ needs.info.outputs.latest }}
           PUSH: ${{ needs.info.outputs.push }}
         run: |
           # TODO only if needs.test-*.results == 'success'

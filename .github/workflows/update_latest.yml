@@ -52,8 +52,10 @@ jobs:
           username: scopeci
           password: ${{ secrets.SCOPECI_TOKEN }}
 
-      - name: Update the Latest Tag
+      - name: Setup Crane
         uses: imjasonh/setup-crane@v0.1
+
+      - name: Update the Latest Tag
         run: |
           crane digest cribl/scope:${{ github.event.inputs.version }}
           crane tag cribl/scope:${{ github.event.inputs.version }} latest

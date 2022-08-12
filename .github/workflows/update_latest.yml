@@ -46,24 +46,17 @@ jobs:
     runs-on: ubuntu-latest
     needs: update-cdn-latest
     steps:
-      - name: Login to Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Login to Dockerhub
         uses: docker/login-action@v2
         with:
           username: scopeci
           password: ${{ secrets.SCOPECI_TOKEN }}
 
-      - name: Pull the Image
-        run: docker pull cribl/scope:${{ github.event.inputs.version }}
-
       - name: Update the Latest Tag
-        run: docker tag cribl/scope:${{ github.event.inputs.version }} cribl/scope:latest
-
-      - name: Push the Tag
-        run: docker push cribl/scope:latest
+        uses: imjasonh/setup-crane@v0.1
+        run: |
+          crane digest cribl/scope:${{ github.event.inputs.version }}
+          crane tag cribl/scope:${{ github.event.inputs.version }} latest
+          crane digest cribl/scope:latest
+          crane manifest cribl/scope:${{ github.event.inputs.version }} | jq .
+          crane manifest cribl/scope:latest | jq .

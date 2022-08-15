@@ -27,6 +27,7 @@
 #define PRI_STR "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 #define PRI_STR_LEN sizeof(PRI_STR)
 #define UNDEF_OFFSET (-1)
+#define REGISTER_STACK_SIZE 0x48
 
 // compile-time control for debugging
 #define NEEDEVNULL 1
@@ -270,7 +271,7 @@ go_schema_t go_17_schema = {
         [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
         [INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_hook_reg_http2_client_read,    NULL, 0},
         [INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_hook_reg_http2_client_write,   NULL, 0},
-        [INDEX_HOOK_EXIT]                 = {"runtime.exit.abi0",                            go_hook_exit,                     NULL, 0},
+        [INDEX_HOOK_EXIT]                 = {"runtime.exit",                            go_hook_exit,                     NULL, 0},
         [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal",                   go_hook_die,                      NULL, 0},
         [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                             NULL, 0}
     },
@@ -287,13 +288,13 @@ go_schema_t go_19_schema = {
         .c_unlinkat_pathname=0x10,
         .c_unlinkat_flags=0x18,
         .c_unlinkat_rc=0x20,
-        .c_open_fd= -0x30,
-        .c_open_path=0x38,
+        .c_open_fd=0x40,
+        .c_open_path=0x10,
         .c_close_fd=0x8,
         .c_close_rc=0x10,
-        .c_read_fd=0x80,
-        .c_read_buf=0x58,
-        .c_read_rc= -0x38,
+        .c_read_fd=0x38,
+        .c_read_buf=0x10,
+        .c_read_rc= 0x40,
         .c_socket_domain=0x8,
         .c_socket_type=0x10,
         .c_socket_sd=0x20,
@@ -371,7 +372,7 @@ go_schema_t go_19_schema = {
         [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_reg_stack_http2_server_preface, NULL, 0},
         [INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_reg_stack_http2_client_read,    NULL, 0},
         [INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_reg_stack_http2_client_write,   NULL, 0},
-        [INDEX_HOOK_EXIT]                 = {"runtime.exit.abi0",                       go_hook_exit,                      NULL, 0},
+        [INDEX_HOOK_EXIT]                 = {"runtime.exit",                            go_hook_exit,                      NULL, 0},
         [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal",                   go_hook_die,                       NULL, 0},
         [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                              NULL, 0}
     },
@@ -1315,34 +1316,42 @@ frame_size(assembly_fn fn)
  * details for write operations. The address of c_write
  * is passed to do_cfunc.
  *
- * All handlers take a single parameter, the stack address
- * from the interposed Go function. All params are passed
- * on the stack in the Go Runtime. No params passed in
- * registers. This means return values are also on the
- * stack. It also means that we need offsets into the stack
- * in order to know how to extract values from params and
- * return values.
+ * ****** Memory Layout Go 8+  ******
+ * Callee Stack                   = stackptr                   = Return Values
+ * Caller Stack                   = stackptr + frame_size      = Input Params
+ *
+ * ****** Memory Layout Go 17+ ******
+ * 9 Values pushed from Registers = stackptr                   = Return Values
+ * Callee Stack                   = stackptr + (9*0x8=0x48)    
+ * Caller Stack                   = Callee Stack + frame_size  = Input Params
+ *
  */
 inline static void *
 do_cfunc(char *stackptr, void *cfunc, void *gfunc)
 {
     uint64_t rc;
+    char *input_params;
+    char *return_values;
 
-    // We add the frame size to the stackptr to put our stackaddr in the context of the Caller.
-    // We won't always know the frame size however. For example, when we patch an "xorps" or "call" 
-    // instruction. Therefore in some functions we will end up with a stack address in the context 
-    // of the Callee instead of the Caller.
     uint32_t frame_offset = frame_size(gfunc);
-    stackptr += frame_offset;
+    if (g_go_minor_ver >= 19) {
+        input_params = stackptr + REGISTER_STACK_SIZE + frame_offset;
+        return_values = stackptr;
+    } else {
+        input_params = stackptr + frame_offset;
+        return_values = stackptr + frame_offset; // TODO get return values from callee, remove frame_offset
+    }
 
     // Call the C handler
     __asm__ volatile (
         "mov %1, %%rdi  \n"
-        "callq *%2  \n"
-        : "=r"(rc)                    // output
-        : "r"(stackptr), "r"(cfunc)   // inputs
-        :                             // clobbered register
+        "mov %2, %%rsi  \n"
+        "callq *%3  \n"
+        : "=r"(rc)                                            // output
+        : "r"(input_params), "r"(return_values), "r"(cfunc)   // inputs
+        :                                                     // clobbered register
         );
+
     return return_addr(gfunc);
 }
 
@@ -1371,36 +1380,13 @@ getFDFromConn(uint64_t tcpConn) {
     return -1;
 }
 
-
-/*
- * Putting a comment here that applies to all of the
- * 'C' handlers for interposed functions.
- *
- * The go_xxx function is called by the assy code
- * in gocontext.S. It is running on a Go system
- * stack and the fs register points to an 'm' TLS
- * base address.
- *
- * Specific handlers are defined as the c_xxx functions.
- * Example, there is a c_write() that handles extracting
- * details for write operations. 
- *
- * All handlers take a single parameter, the stack address
- * from the interposed Go function. All params are passed
- * on the stack in the Go Runtime. No params passed in
- * registers. This means return values are also on the
- * stack. It also means that we need offsets into the stack
- * in order to know how to extract values from params and
- * return values.
- */
-
 // Extract data from syscall.write (write)
 static void
-c_write(char *stackaddr)
+c_write(char *input_params, char *return_values)
 {
-    uint64_t fd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_write_fd);
-    char *buf   = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_write_buf);
-    uint64_t rc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_write_rc);
+    uint64_t fd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_write_fd);
+    char *buf   = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_write_buf);
+    uint64_t rc = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_write_rc);
     uint64_t initialTime = getTime();
 
     funcprint("Scope: write fd %ld rc %ld buf %s\n", fd, rc, buf);
@@ -1415,10 +1401,10 @@ go_write(char *stackptr)
 
 // Extract data from syscall.Getdents (read dir)
 static void
-c_getdents(char *stackaddr)
+c_getdents(char *input_params, char *return_values)
 {
-    uint64_t dirfd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_getdents_dirfd);
-    uint64_t rc    = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_getdents_rc);
+    uint64_t dirfd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_getdents_dirfd);
+    uint64_t rc    = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_getdents_rc);
     uint64_t initialTime = getTime();
 
     funcprint("Scope: getdents dirfd %ld rc %ld\n", dirfd, rc);
@@ -1433,12 +1419,12 @@ go_getdents(char *stackptr)
 
 // Extract data from syscall.unlinkat (delete file)
 static void
-c_unlinkat(char *stackaddr)
+c_unlinkat(char *input_params, char *return_values)
 {
-    uint64_t dirfd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_dirfd);
-    char *pathname = go_str((void *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_pathname));
-    uint64_t flags = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_flags);
-    uint64_t rc    = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_unlinkat_rc);
+    uint64_t dirfd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_unlinkat_dirfd);
+    char *pathname = go_str((void *)(input_params + g_go_schema->arg_offsets.c_unlinkat_pathname));
+    uint64_t flags = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_unlinkat_flags);
+    uint64_t rc    = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_unlinkat_rc);
 
     if (rc) {
         free_go_str(pathname);
@@ -1460,10 +1446,10 @@ go_unlinkat(char *stackptr)
 // Extract data from syscall.openat (file open)
 // Deals with files only. net opens are handles by c_socket
 static void
-c_open(char *stackaddr)
+c_open(char *input_params, char *return_values)
 {
-    uint64_t fd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_open_fd);
-    char *path  = go_str((void *)(stackaddr + g_go_schema->arg_offsets.c_open_path));
+    char *path  = go_str((void *)(input_params + g_go_schema->arg_offsets.c_open_path));
+    uint64_t fd = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_open_fd);
 
     if (!path) {
         scopeLogError("ERROR:go_open: null pathname");
@@ -1486,10 +1472,10 @@ go_open(char *stackptr)
 
 // Extract data from syscall.Close (close)
 static void
-c_close(char *stackaddr)
+c_close(char *input_params, char *return_values)
 {
-    uint64_t fd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_close_fd);
-    uint64_t rc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_close_rc);
+    uint64_t fd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_close_fd);
+    uint64_t rc = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_close_rc);
 
     funcprint("Scope: close of %ld\n", fd);
 
@@ -1505,11 +1491,11 @@ go_close(char *stackptr)
 
 // Extract data from syscall.read (read)
 static void
-c_read(char *stackaddr)
+c_read(char *input_params, char *return_values)
 {
-    uint64_t fd = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_read_fd);
-    char *buf   = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_read_buf);
-    uint64_t rc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_read_rc);
+    uint64_t fd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_read_fd);
+    char *buf   = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_read_buf);
+    uint64_t rc = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_read_rc);
     uint64_t initialTime = getTime();
 
     if (rc == -1) return;
@@ -1526,11 +1512,11 @@ go_read(char *stackptr)
 
 // Extract data from syscall.socket (net open)
 static void
-c_socket(char *stackaddr)
+c_socket(char *input_params, char *return_values)
 {
-    uint64_t domain = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_socket_domain);  // aka family
-    uint64_t type   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_socket_type);
-    uint64_t sd     = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_socket_sd);
+    uint64_t domain = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_socket_domain);  // aka family
+    uint64_t type   = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_socket_type);
+    uint64_t sd     = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_socket_sd);
 
     if (sd == -1) return;
 
@@ -1548,12 +1534,12 @@ go_socket(char *stackptr)
 
 // Extract data from syscall.accept4 (plain server accept)
 static void
-c_accept4(char *stackaddr)
+c_accept4(char *input_params, char *return_values)
 {
-    uint64_t fd           = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_accept4_fd); 
-    struct sockaddr *addr = *(struct sockaddr **)(stackaddr + g_go_schema->arg_offsets.c_accept4_addr);
-    socklen_t *addrlen    = *(socklen_t **)(stackaddr + g_go_schema->arg_offsets.c_accept4_addrlen);
-    uint64_t sd_out       = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_accept4_sd_out);
+    uint64_t fd           = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_accept4_fd); 
+    struct sockaddr *addr = *(struct sockaddr **)(input_params + g_go_schema->arg_offsets.c_accept4_addr);
+    socklen_t *addrlen    = *(socklen_t **)(input_params + g_go_schema->arg_offsets.c_accept4_addrlen);
+    uint64_t sd_out       = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_accept4_sd_out);
 
     if (sd_out != -1) {
         funcprint("Scope: accept4 of %ld\n", sd_out);
@@ -1587,19 +1573,20 @@ go_accept4(char *stackptr)
  */
 // Extract data from net/http.(*connReader).Read (tls server read)
 static void
-c_tls_server_read(char *stackaddr)
+c_tls_server_read(char *input_params, char *return_values)
 {
     // The do_cfunc handler puts us into the stack of the caller by default, using the frame size.
     // For these functions, we want to be in the stack of the callee, which is why we are subtracting
     // the '..callee' value.
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    stackaddr -= g_go_schema->arg_offsets.c_tls_server_read_callee;
+    input_params -= g_go_schema->arg_offsets.c_tls_server_read_callee;
+    return_values -= g_go_schema->arg_offsets.c_tls_server_read_callee;
 
-    uint64_t connReader = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_read_connReader); 
+    uint64_t connReader = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_tls_server_read_connReader); 
     if (!connReader) return;   // protect from dereferencing null
-    char *buf           = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_read_buf);
-    uint64_t rc         = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_read_rc);
+    char *buf           = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_tls_server_read_buf);
+    uint64_t rc         = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_tls_server_read_rc);
     uint64_t conn       =  *(uint64_t *)(connReader + g_go_schema->struct_offsets.connReader_to_conn);
     if (!conn) return;         // protect from dereferencing null
 
@@ -1644,16 +1631,17 @@ go_tls_server_read(char *stackptr)
  */
 // Extract data from net/http.checkConnErrorWriter.Write (tls server write)
 static void
-c_tls_server_write(char *stackaddr)
+c_tls_server_write(char *input_params, char *return_values)
 {
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    stackaddr -= g_go_schema->arg_offsets.c_tls_server_write_callee;
+    input_params -= g_go_schema->arg_offsets.c_tls_server_write_callee;
+    return_values -= g_go_schema->arg_offsets.c_tls_server_write_callee;
 
-    uint64_t conn = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_write_conn);
+    uint64_t conn = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_tls_server_write_conn);
     if (!conn) return;         // protect from dereferencing null
-    char *buf     = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_write_buf);
-    uint64_t rc   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_server_write_rc);
+    char *buf     = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_tls_server_write_buf);
+    uint64_t rc   = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_tls_server_write_rc);
 
     uint64_t w_conn_rwc_if = (conn + g_go_schema->struct_offsets.conn_to_rwc);
     if (!w_conn_rwc_if) return;
@@ -1690,13 +1678,14 @@ go_tls_server_write(char *stackptr)
  */
 // Extract data from net/http.(*persistConn).readResponse (tls client read)
 static void
-c_tls_client_read(char *stackaddr)
+c_tls_client_read(char *input_params, char *return_values)
 {
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    stackaddr -= g_go_schema->arg_offsets.c_tls_client_read_callee;
+    input_params -= g_go_schema->arg_offsets.c_tls_client_read_callee;
+    return_values -= g_go_schema->arg_offsets.c_tls_client_read_callee;
 
-    uint64_t pc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_read_pc); 
+    uint64_t pc = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_tls_client_read_pc); 
     if (!pc) return;
 
     uint64_t pc_conn_if = (pc + g_go_schema->struct_offsets.persistConn_to_conn);
@@ -1742,15 +1731,16 @@ go_tls_client_read(char *stackptr)
  */
 // Extract data from net/http.persistConnWriter.Write (tls client write)
 static void
-c_tls_client_write(char *stackaddr)
+c_tls_client_write(char *input_params, char *return_values)
 {
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    stackaddr -= g_go_schema->arg_offsets.c_tls_client_write_callee;
+    input_params -= g_go_schema->arg_offsets.c_tls_client_write_callee;
+    return_values -= g_go_schema->arg_offsets.c_tls_client_write_callee;
 
-    uint64_t w_pc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_write_w_pc);
-    char *buf     = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_write_buf);
-    uint64_t rc   = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_tls_client_write_rc);
+    uint64_t w_pc = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_tls_client_write_w_pc);
+    char *buf     = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_tls_client_write_buf);
+    uint64_t rc   = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_tls_client_write_rc);
     if (rc < 1) return;
 
     uint64_t pc_conn_if = (w_pc + g_go_schema->struct_offsets.persistConn_to_conn); 
@@ -1784,9 +1774,9 @@ go_tls_client_write(char *stackptr)
  */
 // Extract data from net/http.(*http2serverConn).readFrames (tls http2 server read)
 static void
-c_http2_server_read(char *stackaddr)
+c_http2_server_read(char *input_params, char *return_values)
 {
-    uint64_t sc = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_server_read_sc);
+    uint64_t sc = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_http2_server_read_sc);
     if (!sc) return;
     uint64_t fr   = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_fr);
     if (!fr) return;
@@ -1839,12 +1829,14 @@ go_http2_server_read(char *stackptr)
   */
 // Extract data from net/http.(*http2serverConn).Flush (tls http2 server write)
 static void
-c_http2_server_write(char *stackaddr)
+c_http2_server_write(char *input_params, char *return_values)
 {
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    stackaddr -= g_go_schema->arg_offsets.c_http2_server_write_callee;
-    uint64_t sc      = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_server_write_sc);
+    input_params -= g_go_schema->arg_offsets.c_http2_server_write_callee;
+    return_values -= g_go_schema->arg_offsets.c_http2_server_write_callee;
+
+    uint64_t sc      = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_http2_server_write_sc);
     if (!sc) return;
     uint64_t fr      = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_fr);
     if (!fr) return;  
@@ -1898,16 +1890,17 @@ go_http2_server_write(char *stackptr)
   */
 // Extract data from net/http.(*http2serverConn).readPreface (tls http2 server write)
 static void
-c_http2_server_preface(char *stackaddr)
+c_http2_server_preface(char *input_params, char *return_values)
 {
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    stackaddr -= g_go_schema->arg_offsets.c_http2_server_preface_callee;
+    input_params -= g_go_schema->arg_offsets.c_http2_server_preface_callee;
+    return_values -= g_go_schema->arg_offsets.c_http2_server_preface_callee;
 
-    uint64_t *rc     = (uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_server_preface_rc);
+    uint64_t *rc     = (uint64_t *)(return_values + g_go_schema->arg_offsets.c_http2_server_preface_rc);
     if ((rc == NULL) || (rc == (uint64_t *)0xffffffff)) return;
     if (*rc != 0) return;
-    uint64_t sc      = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_server_preface_sc);
+    uint64_t sc      = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_http2_server_preface_sc);
     if (!sc) return;
     uint64_t fr      = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_fr);
     if (!fr) return;
@@ -1939,9 +1932,9 @@ go_http2_server_preface(char *stackptr)
  */
 // Extract data from net/http.(*http2clientConnReadLoop).run (tls http2 client read)
 static void
-c_http2_client_read(char *stackaddr)
+c_http2_client_read(char *input_params, char *return_values)
 {
-    uint64_t cc         = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_read_cc);
+    uint64_t cc         = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_http2_client_read_cc);
     if (!cc) return;
     uint64_t fr         = *(uint64_t *)(cc + g_go_schema->struct_offsets.cc_to_fr);
     if (!fr) return;
@@ -1990,17 +1983,18 @@ go_http2_client_read(char *stackptr)
  */
 // Extract data from net/http.http2stickyErrWriter.Write (tls http2 client write)
 static void
-c_http2_client_write(char *stackaddr)
+c_http2_client_write(char *input_params, char *return_values)
 {
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    stackaddr -= g_go_schema->arg_offsets.c_http2_client_write_callee;
+    input_params -= g_go_schema->arg_offsets.c_http2_client_write_callee;
+    return_values -= g_go_schema->arg_offsets.c_http2_client_write_callee;
 
-    uint64_t tcpConn = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_tcpConn);
+    uint64_t tcpConn = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_http2_client_write_tcpConn);
     if (!tcpConn) return;
-    char *buf        = (char *)*(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_buf);
+    char *buf        = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_http2_client_write_buf);
     if (!buf) return;
-    uint64_t rc      = *(uint64_t *)(stackaddr + g_go_schema->arg_offsets.c_http2_client_write_rc);
+    uint64_t rc      = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_http2_client_write_rc);
     if (rc < 1) return;
 
     int fd = getFDFromConn(tcpConn);
@@ -2017,7 +2011,7 @@ go_http2_client_write(char *stackptr)
 
 extern void handleExit(void);
 static void
-c_exit(char *stackaddr)
+c_exit(char *input_params, char *return_values)
 {
     /*
      * Need to extend the system stack size when calling handleExit().

@@ -156,4 +156,22 @@ extern void go_hook_reg_http2_server_preface(void);
 extern void go_hook_reg_http2_client_read(void);
 extern void go_hook_reg_http2_client_write(void);
 
+extern void go_reg_stack_write(void);
+extern void go_reg_stack_open(void);
+extern void go_reg_stack_unlinkat(void);
+extern void go_reg_stack_getdents(void);
+extern void go_reg_stack_socket(void);
+extern void go_reg_stack_accept4(void);
+extern void go_reg_stack_read(void);
+extern void go_reg_stack_close(void);
+extern void go_reg_stack_tls_server_read(void);
+extern void go_reg_stack_tls_server_write(void);
+extern void go_reg_stack_tls_client_read(void);
+extern void go_reg_stack_tls_client_write(void);
+extern void go_reg_stack_http2_server_read(void);
+extern void go_reg_stack_http2_server_write(void);
+extern void go_reg_stack_http2_server_preface(void);
+extern void go_reg_stack_http2_client_read(void);
+extern void go_reg_stack_http2_client_write(void);
+
 #endif // __GOTCONTEXT_H__

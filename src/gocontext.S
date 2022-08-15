@@ -117,6 +117,52 @@
     jmp *%r12
 .endm
 
+.macro interpose_stack_regs a_func, c_func
+.global \a_func
+.hidden \c_func
+\a_func:
+    endbr64
+    //mov %rsp, %r12
+    push %rax
+    push %rbx
+    push %rcx
+    push %rdi
+    push %rsi
+    push %r8
+    push %r9
+    push %r10
+    push %r11
+    mov %rsp, %r12
+    sub $0x20, %rsp
+
+    mov %r12, 0x08(%rsp)
+    lea \c_func@GOTPCREL(%rip), %r12
+    mov (%r12), %r12
+    mov %r12, (%rsp)
+
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r12
+    mov (%r12), %r12
+    mov (%r12), %r12
+    call *%r12
+    xorps %xmm15,%xmm15
+    mov %fs:0xfffffffffffffff8,%r14
+
+    mov %rax, %r12
+
+    add $0x20, %rsp
+    pop %r11
+    pop %r10
+    pop %r9
+    pop %r8
+    pop %rsi
+    pop %rdi
+    pop %rcx
+    pop %rbx
+    pop %rax
+
+    jmp *%r12
+.endm
+
 .text
     interpose go_hook_write, go_write
     interpose go_hook_open, go_open
@@ -155,6 +201,24 @@
     interpose_regs go_hook_reg_http2_server_preface, go_http2_server_preface
     interpose_regs go_hook_reg_http2_client_read, go_http2_client_read
     interpose_regs go_hook_reg_http2_client_write, go_http2_client_write
+
+    interpose_stack_regs go_reg_stack_write, go_write
+    interpose_stack_regs go_reg_stack_open, go_open
+    interpose_stack_regs go_reg_stack_unlinkat, go_unlinkat
+    interpose_stack_regs go_reg_stack_getdents, go_getdents
+    interpose_stack_regs go_reg_stack_socket, go_socket
+    interpose_stack_regs go_reg_stack_accept4, go_accept4
+    interpose_stack_regs go_reg_stack_read, go_read
+    interpose_stack_regs go_reg_stack_close, go_close
+    interpose_stack_regs go_reg_stack_tls_server_read, go_tls_server_read
+    interpose_stack_regs go_reg_stack_tls_server_write, go_tls_server_write
+    interpose_stack_regs go_reg_stack_tls_client_read, go_tls_client_read
+    interpose_stack_regs go_reg_stack_tls_client_write, go_tls_client_write
+    interpose_stack_regs go_reg_stack_http2_server_read, go_http2_server_read
+    interpose_stack_regs go_reg_stack_http2_server_write, go_http2_server_write
+    interpose_stack_regs go_reg_stack_http2_server_preface, go_http2_server_preface
+    interpose_stack_regs go_reg_stack_http2_client_read, go_http2_client_read
+    interpose_stack_regs go_reg_stack_http2_client_write, go_http2_client_write
 
 /*
     Debug hint:

@@ -276,6 +276,107 @@ go_schema_t go_17_schema = {
     },
 };
 
+go_schema_t go_19_schema = {
+    .arg_offsets = {
+        .c_write_fd=0x8,
+        .c_write_buf=0x10,
+        .c_write_rc=0x28,
+        .c_getdents_dirfd=0x8,
+        .c_getdents_rc=0x20,
+        .c_unlinkat_dirfd=0x8,
+        .c_unlinkat_pathname=0x10,
+        .c_unlinkat_flags=0x18,
+        .c_unlinkat_rc=0x20,
+        .c_open_fd= -0x30,
+        .c_open_path=0x38,
+        .c_close_fd=0x8,
+        .c_close_rc=0x10,
+        .c_read_fd=0x80,
+        .c_read_buf=0x58,
+        .c_read_rc= -0x38,
+        .c_socket_domain=0x8,
+        .c_socket_type=0x10,
+        .c_socket_sd=0x20,
+        .c_accept4_fd=0x8,
+        .c_accept4_addr=0x10,
+        .c_accept4_addrlen=0x18,
+        .c_accept4_sd_out=0x38,
+        .c_tls_server_read_callee=0x48,
+        .c_tls_server_read_connReader=0x50,
+        .c_tls_server_read_buf=0x8,
+        .c_tls_server_read_rc=0x28,
+        .c_tls_server_write_callee=0x48,
+        .c_tls_server_write_conn=0x30,
+        .c_tls_server_write_buf=0x8,
+        .c_tls_server_write_rc=0x10,
+        .c_tls_client_read_callee=0x0,
+        .c_tls_client_read_pc=0x8,
+        .c_tls_client_write_callee=0x30,
+        .c_tls_client_write_w_pc=0x20,
+        .c_tls_client_write_buf=0x8,
+        .c_tls_client_write_rc=0x10,
+        .c_http2_server_read_sc=0xd0,
+        .c_http2_server_write_callee=0x0,
+        .c_http2_server_write_sc=0x30,
+        .c_http2_server_preface_callee=0xc8,
+        .c_http2_server_preface_sc=0xd0,
+        .c_http2_server_preface_rc=0x58,
+        .c_http2_client_read_cc=0x68,
+        .c_http2_client_write_callee=0x30,
+        .c_http2_client_write_tcpConn=0x40,
+        .c_http2_client_write_buf=0x8,
+        .c_http2_client_write_rc=0x10,
+    },
+    .struct_offsets = {
+        .g_to_m=0x30,
+        .m_to_tls=0x88,
+        .connReader_to_conn=0x0,
+        .persistConn_to_conn=0x50,
+        .persistConn_to_bufrd=0x68,
+        .iface_data=0x8,
+        .netfd_to_pd=0x0,
+        .pd_to_fd=0x10,
+        .netfd_to_sysfd=UNDEF_OFFSET, // defined for go1.8
+        .bufrd_to_buf=0x0,
+        .conn_to_rwc=0x10,
+        .conn_to_tlsState=0x30,
+        .persistConn_to_tlsState=0x60,
+        .fr_to_readBuf=0x58,
+        .fr_to_writeBuf=0x88,
+        .fr_to_headerBuf=0x40,
+        .cc_to_fr=0x130,
+        .cc_to_tconn=0x8,
+        .sc_to_fr=0x48,
+        .sc_to_conn=0x10,
+    },
+    // use the _reg_ assembly functions here, to support changes to Go 1.17
+    // where we preserve the return values stored in registers
+    // and we preserve the g in r14 for future stack checks
+    // Note: we do not need to use the reg functions for go_hook_exit and go_hook_die
+    .tap = {
+        [INDEX_HOOK_WRITE]                = {"syscall.write",                           go_reg_stack_write,                NULL, 0}, // write
+        [INDEX_HOOK_OPEN]                 = {"syscall.openat",                          go_reg_stack_open,                 NULL, 0}, // file open
+        [INDEX_HOOK_UNLINKAT]             = {"syscall.unlinkat",                        go_reg_stack_unlinkat,             NULL, 0}, // delete file
+        [INDEX_HOOK_GETDENTS]             = {"syscall.Getdents",                        go_reg_stack_getdents,             NULL, 0}, // read dir
+        [INDEX_HOOK_SOCKET]               = {"syscall.socket",                          go_reg_stack_socket,               NULL, 0}, // net open
+        [INDEX_HOOK_ACCEPT]               = {"syscall.accept4",                         go_reg_stack_accept4,              NULL, 0}, // plain server accept
+        [INDEX_HOOK_READ]                 = {"syscall.read",                            go_reg_stack_read,                 NULL, 0}, // read
+        [INDEX_HOOK_CLOSE]                = {"syscall.Close",                           go_reg_stack_close,                NULL, 0}, // close
+        [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_reg_stack_tls_server_read,      NULL, 0},
+        [INDEX_HOOK_TLS_SERVER_WRITE]     = {"net/http.checkConnErrorWriter.Write",     go_reg_stack_tls_server_write,     NULL, 0},
+        [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_reg_stack_tls_client_read,      NULL, 0},
+        [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_reg_stack_tls_client_write,     NULL, 0},
+        [INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_reg_stack_http2_server_read,    NULL, 0},
+        [INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_reg_stack_http2_server_write,   NULL, 0},
+        [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_reg_stack_http2_server_preface, NULL, 0},
+        [INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_reg_stack_http2_client_read,    NULL, 0},
+        [INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_reg_stack_http2_client_write,   NULL, 0},
+        [INDEX_HOOK_EXIT]                 = {"runtime.exit.abi0",                       go_hook_exit,                      NULL, 0},
+        [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal",                   go_hook_die,                       NULL, 0},
+        [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                              NULL, 0}
+    },
+};
+
 go_schema_t *g_go_schema = &go_8_schema; // overridden if later version
 uint64_t g_glibc_guard = 0LL;
 void (*go_runtime_cgocall)(void);
@@ -1116,6 +1217,12 @@ initGoHook(elf_buf_t *ebuf)
         // The Go 17 schema works for 18 also, and possibly future versions
         g_go_schema = &go_17_schema;
     }
+
+    if (g_go_minor_ver >= 19) {
+        // The Go 19 schema...possibly future versions
+        g_go_schema = &go_19_schema;
+    }
+
     // Update the schema to suit the current version
     adjustGoStructOffsetsForVersion();
 

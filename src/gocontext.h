@@ -156,6 +156,7 @@ extern void go_hook_reg_http2_server_preface(void);
 extern void go_hook_reg_http2_client_read(void);
 extern void go_hook_reg_http2_client_write(void);
 
+extern void go_reg_stack_syscall(void);
 extern void go_reg_stack_write(void);
 extern void go_reg_stack_open(void);
 extern void go_reg_stack_unlinkat(void);

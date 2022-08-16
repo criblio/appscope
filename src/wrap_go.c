@@ -30,18 +30,21 @@
 #define REGISTER_STACK_SIZE 0x48
 
 // compile-time control for debugging
-#define NEEDEVNULL 1
-//#define funcprint sysprint
-#define funcprint devnull
-//#define patchprint sysprint
-#define patchprint devnull
+// #define NEEDEVNULL 1
+#define funcprint sysprint
+//#define funcprint devnull
+#define patchprint sysprint
+//#define patchprint devnull
 
 int g_go_minor_ver = UNKNOWN_GO_VER;
 int g_go_maint_ver = UNKNOWN_GO_VER;
 static char g_go_build_ver[7];
 static char g_ReadFrame_addr[sizeof(void *)];
+static char g_RawSyscall6_addr[sizeof(void *)];
 
 enum index_hook_t {
+    INDEX_HOOK_SYSCALL,
+    INDEX_HOOK_SYSCALL6,
     INDEX_HOOK_WRITE,
     INDEX_HOOK_OPEN,
     INDEX_HOOK_UNLINKAT,
@@ -279,9 +282,9 @@ go_schema_t go_17_schema = {
 
 go_schema_t go_19_schema = {
     .arg_offsets = {
-        .c_write_fd=0x8,
+        .c_write_fd=0x58,
         .c_write_buf=0x10,
-        .c_write_rc=0x28,
+        .c_write_rc=0x40,
         .c_getdents_dirfd=0x8,
         .c_getdents_rc=0x20,
         .c_unlinkat_dirfd=0x8,
@@ -291,7 +294,7 @@ go_schema_t go_19_schema = {
         .c_open_fd=0x40,
         .c_open_path=0x10,
         .c_close_fd=0x8,
-        .c_close_rc=0x10,
+        .c_close_rc=0x40,
         .c_read_fd=0x38,
         .c_read_buf=0x10,
         .c_read_rc= 0x40,
@@ -355,23 +358,25 @@ go_schema_t go_19_schema = {
     // and we preserve the g in r14 for future stack checks
     // Note: we do not need to use the reg functions for go_hook_exit and go_hook_die
     .tap = {
-        [INDEX_HOOK_WRITE]                = {"syscall.write",                           go_reg_stack_write,                NULL, 0}, // write
-        [INDEX_HOOK_OPEN]                 = {"syscall.openat",                          go_reg_stack_open,                 NULL, 0}, // file open
-        [INDEX_HOOK_UNLINKAT]             = {"syscall.unlinkat",                        go_reg_stack_unlinkat,             NULL, 0}, // delete file
-        [INDEX_HOOK_GETDENTS]             = {"syscall.Getdents",                        go_reg_stack_getdents,             NULL, 0}, // read dir
-        [INDEX_HOOK_SOCKET]               = {"syscall.socket",                          go_reg_stack_socket,               NULL, 0}, // net open
-        [INDEX_HOOK_ACCEPT]               = {"syscall.accept4",                         go_reg_stack_accept4,              NULL, 0}, // plain server accept
-        [INDEX_HOOK_READ]                 = {"syscall.read",                            go_reg_stack_read,                 NULL, 0}, // read
-        [INDEX_HOOK_CLOSE]                = {"syscall.Close",                           go_reg_stack_close,                NULL, 0}, // close
-        [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_reg_stack_tls_server_read,      NULL, 0},
-        [INDEX_HOOK_TLS_SERVER_WRITE]     = {"net/http.checkConnErrorWriter.Write",     go_reg_stack_tls_server_write,     NULL, 0},
-        [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_reg_stack_tls_client_read,      NULL, 0},
-        [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_reg_stack_tls_client_write,     NULL, 0},
-        [INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_reg_stack_http2_server_read,    NULL, 0},
-        [INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_reg_stack_http2_server_write,   NULL, 0},
-        [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_reg_stack_http2_server_preface, NULL, 0},
-        [INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_reg_stack_http2_client_read,    NULL, 0},
-        [INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_reg_stack_http2_client_write,   NULL, 0},
+        [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",                         go_reg_stack_syscall,              NULL, 0},
+        [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",                        go_reg_stack_syscall,              NULL, 0},
+//        [INDEX_HOOK_WRITE]                = {"syscall.write",                           go_reg_stack_write,                NULL, 0}, // write
+//        [INDEX_HOOK_OPEN]                 = {"syscall.openat",                          go_reg_stack_open,                 NULL, 0}, // file open
+//        [INDEX_HOOK_UNLINKAT]             = {"syscall.unlinkat",                        go_reg_stack_unlinkat,             NULL, 0}, // delete file
+//        [INDEX_HOOK_GETDENTS]             = {"syscall.Getdents",                        go_reg_stack_getdents,             NULL, 0}, // read dir
+//        [INDEX_HOOK_SOCKET]               = {"syscall.socket",                          go_reg_stack_socket,               NULL, 0}, // net open
+//        [INDEX_HOOK_ACCEPT]               = {"syscall.accept4",                         go_reg_stack_accept4,              NULL, 0}, // plain server accept
+//        [INDEX_HOOK_READ]                 = {"syscall.read",                            go_reg_stack_read,                 NULL, 0}, // read
+//        [INDEX_HOOK_CLOSE]                = {"syscall.Close",                           go_reg_stack_close,                NULL, 0}, // close
+//        [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_reg_stack_tls_server_read,      NULL, 0},
+//        [INDEX_HOOK_TLS_SERVER_WRITE]     = {"net/http.checkConnErrorWriter.Write",     go_reg_stack_tls_server_write,     NULL, 0},
+//        [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_reg_stack_tls_client_read,      NULL, 0},
+//        [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_reg_stack_tls_client_write,     NULL, 0},
+//        [INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_reg_stack_http2_server_read,    NULL, 0},
+//        [INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_reg_stack_http2_server_write,   NULL, 0},
+//        [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_reg_stack_http2_server_preface, NULL, 0},
+//        [INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_reg_stack_http2_client_read,    NULL, 0},
+//        [INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_reg_stack_http2_client_write,   NULL, 0},
         [INDEX_HOOK_EXIT]                 = {"runtime.exit",                            go_hook_exit,                      NULL, 0},
         [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal",                   go_hook_die,                       NULL, 0},
         [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                              NULL, 0}
@@ -645,7 +650,14 @@ looks_like_first_inst_of_go_func(cs_insn* asm_inst)
             (!scope_strcmp((const char*)asm_inst->mnemonic, "cmp") &&
             !scope_strcmp((const char*)asm_inst->op_str, "rsp, qword ptr [r14 + 0x10]")) ||
             (!scope_strcmp((const char*)asm_inst->mnemonic, "lea") &&
-            scope_strstr((const char*)asm_inst->op_str, "r12, [rsp - "));
+            scope_strstr((const char*)asm_inst->op_str, "r12, [rsp - ")) ||
+            
+            (!scope_strcmp((const char*)asm_inst->mnemonic, "sub") &&
+            scope_strstr((const char*)asm_inst->op_str, "rsp, 0x68")) ||
+
+            (!scope_strcmp((const char*)asm_inst->mnemonic, "add") &&
+            scope_strstr((const char*)asm_inst->op_str, "rsp, -0x80"))
+            ;
             /*
             (!scope_strcmp((const char*)asm_inst->mnemonic, "lea") &&
             !scope_strcmp((const char*)asm_inst->op_str, "r12, [rsp - 0x28]")) ||
@@ -784,7 +796,7 @@ patch_addrs(funchook_t *funchook,
             (asm_inst[i].size == 5)) {
 
                 // In the "call" case, we want to patch the instruction after the call
-                void *pre_patch_addr = (void*)asm_inst[i].address;
+                void *pre_patch_addr = (void*)asm_inst[i+1].address;
                 void *patch_addr = (void*)asm_inst[i+1].address;
 
                 if (funchook_prepare(funchook, (void**)&patch_addr, tap->assembly_fn)) {
@@ -800,6 +812,35 @@ patch_addrs(funchook_t *funchook,
                 break; // We need to force a break in this case
             }
         }
+
+        // PATCH CALL
+        // In the case of some functions, we want to patch just after a "call" instruction.
+        // Note: We don't need a frame size here.
+        else if ((!scope_strcmp(tap->func_name, "syscall.Syscall")) || 
+            (!scope_strcmp(tap->func_name, "syscall.Syscall6"))) {
+            if (
+            (!scope_strcmp((const char*)asm_inst[i].mnemonic, "call")) &&
+            (scope_strstr(g_RawSyscall6_addr, (const char*)asm_inst[i].op_str)) &&
+            (asm_inst[i].size == 5)) {
+
+                // In the "call" case, we want to patch the instruction after the call
+                void *pre_patch_addr = (void*)asm_inst[i+1].address;
+                void *patch_addr = (void*)asm_inst[i+1].address;
+
+                if (funchook_prepare(funchook, (void**)&patch_addr, tap->assembly_fn)) {
+                    patchprint("failed to patch 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
+                    continue;
+                }
+
+                patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
+                patchprint("return addr %p\n", patch_addr);
+                tap->return_addr = patch_addr;
+                tap->frame_size = add_arg;
+
+                break; // We need to force a break in this case
+            }
+        }
+
 
         // PATCH RET
         // If the current instruction is a RET
@@ -1197,6 +1238,15 @@ initGoHook(elf_buf_t *ebuf)
     ReadFrame_addr = (uint64_t *)((uint64_t)ReadFrame_addr + base);
     scope_sprintf(g_ReadFrame_addr, "%p\n", ReadFrame_addr);
 
+    uint64_t *RawSyscall6_addr;
+    if (((RawSyscall6_addr = getSymbol(ebuf->buf, "syscall.RawSyscall6")) == 0) &&
+        ((RawSyscall6_addr = getGoSymbol(ebuf->buf, "syscall.RawSyscall6", NULL, NULL)) == 0)) {
+        sysprint("WARN: can't get the address for syscall.RawSyscall6\n");
+    }
+    RawSyscall6_addr = (uint64_t *)((uint64_t)RawSyscall6_addr + base);
+    scope_sprintf(g_RawSyscall6_addr, "%p\n", RawSyscall6_addr);
+
+
     csh disass_handle = 0;
     cs_arch arch;
     cs_mode mode;
@@ -1318,12 +1368,12 @@ frame_size(assembly_fn fn)
  *
  * ****** Memory Layout Go 8+  ******
  * Callee Stack                   = stackptr                   = Return Values
- * Caller Stack                   = stackptr + frame_size      = Input Params
+ * Caller Stack                   = stackptr + frame_size      = Input Params (at ret)
  *
  * ****** Memory Layout Go 17+ ******
  * 9 Values pushed from Registers = stackptr                   = Return Values
  * Callee Stack                   = stackptr + (9*0x8=0x48)    
- * Caller Stack                   = Callee Stack + frame_size  = Input Params
+ * Caller Stack                   = Callee Stack + frame_size  = Input Params (at ret)
  *
  */
 inline static void *
@@ -1334,12 +1384,12 @@ do_cfunc(char *stackptr, void *cfunc, void *gfunc)
     char *return_values;
 
     uint32_t frame_offset = frame_size(gfunc);
-    if (g_go_minor_ver >= 19) {
-        input_params = stackptr + REGISTER_STACK_SIZE + frame_offset;
+    if (g_go_minor_ver >= 19) {                    // TODO go 17+
+        input_params = stackptr + REGISTER_STACK_SIZE; // + frame_offset;
         return_values = stackptr;
     } else {
         input_params = stackptr + frame_offset;
-        return_values = stackptr + frame_offset; // TODO get return values from callee, remove frame_offset
+        return_values = stackptr + frame_offset;   // TODO get return values from callee, remove frame_offset
     }
 
     // Call the C handler
@@ -1378,6 +1428,137 @@ getFDFromConn(uint64_t tcpConn) {
         return *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
     }
     return -1;
+}
+
+// Extract data from syscall.Syscall 
+static void
+c_syscall(char *input_params, char *return_values)
+{
+    uint64_t syscall = *(uint64_t *)(input_params + 0x40);
+    uint64_t rc = *(uint64_t *)(return_values + 0x40);
+
+    switch(syscall) {
+    case 1: // write
+        {
+            uint64_t fd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_write_fd);
+            char *buf   = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_write_buf);
+            uint64_t initialTime = getTime();
+
+            funcprint("Scope: write fd %ld rc %ld buf %s\n", fd, rc, buf);
+            doWrite(fd, initialTime, (rc != -1), buf, rc, "go_write", BUF, 0);
+        }
+        break;
+           
+    case 257: // openat
+        {
+            char *path  = go_str((void *)(input_params + g_go_schema->arg_offsets.c_open_path));
+            uint64_t fd = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_open_fd);
+
+            if (!path) {
+                scopeLogError("ERROR:go_open: null pathname");
+                scope_puts("Scope:ERROR:open:no path");
+                scope_fflush(scope_stdout);
+                return;
+            }
+
+            funcprint("Scope: open of %ld\n", fd);
+            doOpen(fd, path, FD, "open");
+
+            free_go_str(path);
+        }
+        break;
+           
+    case 263: // unlinkat
+        {
+            uint64_t dirfd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_unlinkat_dirfd);
+            char *pathname = go_str((void *)(input_params + g_go_schema->arg_offsets.c_unlinkat_pathname));
+            uint64_t flags = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_unlinkat_flags);
+
+            if (rc) {
+                free_go_str(pathname);
+                return;
+            }
+
+            funcprint("Scope: unlinkat dirfd %ld pathname %s flags %ld\n", dirfd, pathname, flags);
+            doDelete(pathname, "go_unlinkat");
+
+            free_go_str(pathname);
+        }
+        break;
+
+    case 78: // getdents
+        {
+            uint64_t dirfd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_getdents_dirfd);
+            uint64_t initialTime = getTime();
+
+            funcprint("Scope: getdents dirfd %ld rc %ld\n", dirfd, rc);
+            doRead(dirfd, initialTime, (rc != -1), NULL, rc, "go_getdents", BUF, 0);
+        }
+        break;
+
+    case 41: // socket
+        {
+            uint64_t domain = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_socket_domain);  // aka family
+            uint64_t type   = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_socket_type);
+            uint64_t sd     = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_socket_sd);
+
+            if (sd == -1) return;
+
+            funcprint("Scope: socket domain: %ld type: 0x%lx sd: %ld\n", domain, type, sd);
+
+            // Creates a net object
+            addSock(sd, type, domain);
+        }
+        break;
+
+    case 288: // accept4
+        {
+            uint64_t fd           = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_accept4_fd); 
+            struct sockaddr *addr = *(struct sockaddr **)(input_params + g_go_schema->arg_offsets.c_accept4_addr);
+            socklen_t *addrlen    = *(socklen_t **)(input_params + g_go_schema->arg_offsets.c_accept4_addrlen);
+            uint64_t sd_out       = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_accept4_sd_out);
+
+            if (sd_out != -1) {
+                funcprint("Scope: accept4 of %ld\n", sd_out);
+                doAccept(fd, sd_out, addr, addrlen, "go_accept4");
+            }
+        }
+        break;
+
+    case 0: // read
+        {
+            uint64_t fd = *(uint64_t *)(input_params + 0x48);
+            char *buf   = (char *)*(uint64_t *)(input_params + 0x50);
+
+            uint64_t initialTime = getTime();
+
+            if (rc == -1) return;
+
+            funcprint("Scope: read of %ld rc %ld\n", fd, rc);
+            doRead(fd, initialTime, (rc != -1), buf, rc, "go_read", BUF, 0);
+        } 
+        break;
+
+    case 3: // close
+        {
+            uint64_t fd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_close_fd);
+
+            funcprint("Scope: close of %ld\n", fd);
+
+            // If net, deletes a net object
+            doCloseAndReportFailures(fd, (rc != -1), "go_close");
+        }
+        break;
+
+    default:
+        break;
+    }
+}
+
+EXPORTON void *
+go_syscall(char *stackptr)
+{
+    return do_cfunc(stackptr, c_syscall, g_go_schema->tap[INDEX_HOOK_SYSCALL].assembly_fn);
 }
 
 // Extract data from syscall.write (write)

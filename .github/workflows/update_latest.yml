@@ -42,9 +42,14 @@ jobs:
 
       - name: Check Tag
         run: |
-          if [[ ${{ steps.tag.outputs.tag }} == '' || ${{ steps.version.outputs.prerelease }} != '' ]]; then
+          if [ "${{ steps.tag.outputs.tag }}" == '' ]; then
               echo "The git version ${{ steps.version.outputs.version }} is not usable..."
-              echo "  It must start with a v, be a valid semantic version, and not be a prerelease"
+              echo "  It must start with a v, and be a valid semantic version"
+              exit 1
+          fi
+          if [ "${{ steps.version.outputs.prerelease }}" != '' ]; then
+              echo "The git version ${{ steps.version.outputs.version }} is not usable..."
+              echo "  It must not be a prerelease"
               exit 1
           fi
 

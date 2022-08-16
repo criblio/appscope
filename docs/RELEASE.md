@@ -77,12 +77,12 @@ additional steps are taken depending on the trigger.
 The [`website`](../.github/workflows/website.yml) workflow handles building and
 deploying the [`website/`](../website/) content to <https://staging.appscope.dev/>
 and <https://appscope.dev/>. The staging website is intended to always reflect
-the master branch.  The production website is updated only when a "web" tag
-has been applied and pushed.  See the build script in that folder for details.
+the master branch. The production website is updated only when a "web" tag
+has been applied and pushed. See the build script in that folder for details.
 
 The [`update_latest`](../.github/workflows/update_latest.yml) workflow updates
 the value returned by `https://cdn.cribl.io/dl/scope/latest`, and updates
-the `latest` tag at `https://hub.docker.com/r/cribl/scope/tags`.  This workflow
+the `latest` tag at `https://hub.docker.com/r/cribl/scope/tags`. This workflow
 is run manually, and does not have any automatic triggers.
 
 ## CDN

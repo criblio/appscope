@@ -271,7 +271,10 @@ main(int argc, char **argv, char **env)
 
     sys_exec(ebuf, inferior_command, argc-optind, &argv[optind], env);
 
-    return 0;
+    // We should not return from sys_exec unless there was an error loading the static exec.
+    // In this case, just start the exec without being scoped.
+    execve(argv[optind], &argv[optind], environ);
+
 err:
     if (ebuf) scope_free(ebuf);
     exit(EXIT_FAILURE);

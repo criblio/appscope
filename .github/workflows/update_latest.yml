@@ -93,7 +93,7 @@ jobs:
           password: ${{ secrets.SCOPECI_TOKEN }}
 
       - name: Setup Crane
-        uses: imjasonh/setup-crane@v0.1
+        uses: imjasonh/setup-crane@v0.2
 
       - name: Update the Latest Tag
         run: |

@@ -257,6 +257,7 @@
     interpose_regs go_hook_reg_http2_client_read, go_http2_client_read
     interpose_regs go_hook_reg_http2_client_write, go_http2_client_write
 
+    interpose_stack_regs go_reg_stack_syscall, go_syscall
     interpose_stack_regs go_reg_stack_write, go_write
     interpose_stack_regs go_reg_stack_open, go_open
     interpose_stack_regs go_reg_stack_unlinkat, go_unlinkat

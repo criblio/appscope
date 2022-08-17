@@ -163,6 +163,61 @@
     jmp *%r12
 .endm
 
+ /*
+  * Stub for use with a low level syscall function
+  * Create a stack with input params
+  * Make the syscall
+  * Add to the stack with return params
+  * Call asmcgocall with params for c_syscall and the created stack
+  * Be sure to jump to the trampoline after the syscall which is
+  * plus 2 bytes from the return value from funchook_prepare; the trampoline.
+  */
+.macro interpose_syscall_regs a_func, c_func
+.global \a_func
+.hidden \c_func
+\a_func:
+    endbr64
+    push %r9
+    push %r8
+    push %r10
+    push %rdx
+    push %rsi
+    push %rdi
+    push %rax
+
+    syscall
+
+    push %rax
+
+    mov %rsp, %r12
+    sub $0x20, %rsp
+
+    mov %r12, 0x08(%rsp)
+    lea \c_func@GOTPCREL(%rip), %r12
+    mov (%r12), %r12
+    mov %r12, (%rsp)
+
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r12
+    mov (%r12), %r12
+    mov (%r12), %r12
+    call *%r12
+
+    mov %rax, %r12
+
+    add $0x20, %rsp
+    pop %rax
+    pop %rax
+    pop %rdi
+    pop %rsi
+    pop %rdx
+    pop %r10
+    pop %r8
+    pop %r9
+
+    add $0x2, %r12
+    jmp *%r12
+.endm
+
 .text
     interpose go_hook_write, go_write
     interpose go_hook_open, go_open
@@ -220,6 +275,7 @@
     interpose_stack_regs go_reg_stack_http2_client_read, go_http2_client_read
     interpose_stack_regs go_reg_stack_http2_client_write, go_http2_client_write
 
+    //interpose_syscall_regs go_reg_syscall go_syscall
 /*
     Debug hint:
     When you need to change the assy code, 

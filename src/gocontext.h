@@ -175,4 +175,6 @@ extern void go_reg_stack_http2_server_preface(void);
 extern void go_reg_stack_http2_client_read(void);
 extern void go_reg_stack_http2_client_write(void);
 
+extern void go_reg_syscall(void);
+
 #endif // __GOTCONTEXT_H__

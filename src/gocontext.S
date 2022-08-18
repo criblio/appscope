@@ -203,17 +203,17 @@
     call *%r12
 
     mov %rax, %r12
-
     add $0x20, %rsp
+
     pop %rax
-    pop %rax
+	add $0x8, %rsp
     pop %rdi
     pop %rsi
     pop %rdx
     pop %r10
     pop %r8
     pop %r9
-
+	
     add $0x2, %r12
     jmp *%r12
 .endm
@@ -276,7 +276,7 @@
     interpose_stack_regs go_reg_stack_http2_client_read, go_http2_client_read
     interpose_stack_regs go_reg_stack_http2_client_write, go_http2_client_write
 
-    //interpose_syscall_regs go_reg_syscall go_syscall
+    interpose_syscall_regs go_reg_syscall go_syscall
 /*
     Debug hint:
     When you need to change the assy code, 

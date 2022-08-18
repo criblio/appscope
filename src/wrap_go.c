@@ -40,11 +40,10 @@ int g_go_minor_ver = UNKNOWN_GO_VER;
 int g_go_maint_ver = UNKNOWN_GO_VER;
 static char g_go_build_ver[7];
 static char g_ReadFrame_addr[sizeof(void *)];
-static char g_RawSyscall6_addr[sizeof(void *)];
 
 enum index_hook_t {
     INDEX_HOOK_SYSCALL,
-    INDEX_HOOK_SYSCALL6,
+//    INDEX_HOOK_SYSCALL6,
     INDEX_HOOK_WRITE,
     INDEX_HOOK_OPEN,
     INDEX_HOOK_UNLINKAT,
@@ -358,8 +357,8 @@ go_schema_t go_19_schema = {
     // and we preserve the g in r14 for future stack checks
     // Note: we do not need to use the reg functions for go_hook_exit and go_hook_die
     .tap = {
-        [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",                         go_reg_stack_syscall,              NULL, 0},
-        [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",                        go_reg_stack_syscall,              NULL, 0},
+          [INDEX_HOOK_SYSCALL]              = {"runtime/internal/syscall.Syscall6",       go_reg_syscall,              NULL, 0},
+//          [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",                      go_reg_stack_syscall6,             NULL, 0},
 //        [INDEX_HOOK_WRITE]                = {"syscall.write",                           go_reg_stack_write,                NULL, 0}, // write
 //        [INDEX_HOOK_OPEN]                 = {"syscall.openat",                          go_reg_stack_open,                 NULL, 0}, // file open
 //        [INDEX_HOOK_UNLINKAT]             = {"syscall.unlinkat",                        go_reg_stack_unlinkat,             NULL, 0}, // delete file
@@ -656,8 +655,13 @@ looks_like_first_inst_of_go_func(cs_insn* asm_inst)
             scope_strstr((const char*)asm_inst->op_str, "rsp, 0x68")) ||
 
             (!scope_strcmp((const char*)asm_inst->mnemonic, "add") &&
-            scope_strstr((const char*)asm_inst->op_str, "rsp, -0x80"))
+            scope_strstr((const char*)asm_inst->op_str, "rsp, -0x80")) ||
+
+            (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
+            !scope_strcmp((const char*)asm_inst->op_str, "r10, rsi"))
+
             ;
+
             /*
             (!scope_strcmp((const char*)asm_inst->mnemonic, "lea") &&
             !scope_strcmp((const char*)asm_inst->op_str, "r12, [rsp - 0x28]")) ||
@@ -816,16 +820,14 @@ patch_addrs(funchook_t *funchook,
         // PATCH CALL
         // In the case of some functions, we want to patch just after a "call" instruction.
         // Note: We don't need a frame size here.
-        else if ((!scope_strcmp(tap->func_name, "syscall.Syscall")) || 
-            (!scope_strcmp(tap->func_name, "syscall.Syscall6"))) {
+        else if ((!scope_strcmp(tap->func_name, "runtime/internal/syscall.Syscall6"))) { 
             if (
-            (!scope_strcmp((const char*)asm_inst[i].mnemonic, "call")) &&
-            (scope_strstr(g_RawSyscall6_addr, (const char*)asm_inst[i].op_str)) &&
-            (asm_inst[i].size == 5)) {
+            (!scope_strcmp((const char*)asm_inst[i].mnemonic, "syscall")) &&
+            (asm_inst[i].size == 2)) {
 
-                // In the "call" case, we want to patch the instruction after the call
-                void *pre_patch_addr = (void*)asm_inst[i+1].address;
-                void *patch_addr = (void*)asm_inst[i+1].address;
+                // In the "syscall" case, we want to patch the syscall instruction directly
+                void *pre_patch_addr = (void*)asm_inst[i].address;
+                void *patch_addr = (void*)asm_inst[i].address;
 
                 if (funchook_prepare(funchook, (void**)&patch_addr, tap->assembly_fn)) {
                     patchprint("failed to patch 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
@@ -1238,15 +1240,6 @@ initGoHook(elf_buf_t *ebuf)
     ReadFrame_addr = (uint64_t *)((uint64_t)ReadFrame_addr + base);
     scope_sprintf(g_ReadFrame_addr, "%p\n", ReadFrame_addr);
 
-    uint64_t *RawSyscall6_addr;
-    if (((RawSyscall6_addr = getSymbol(ebuf->buf, "syscall.RawSyscall6")) == 0) &&
-        ((RawSyscall6_addr = getGoSymbol(ebuf->buf, "syscall.RawSyscall6", NULL, NULL)) == 0)) {
-        sysprint("WARN: can't get the address for syscall.RawSyscall6\n");
-    }
-    RawSyscall6_addr = (uint64_t *)((uint64_t)RawSyscall6_addr + base);
-    scope_sprintf(g_RawSyscall6_addr, "%p\n", RawSyscall6_addr);
-
-
     csh disass_handle = 0;
     cs_arch arch;
     cs_mode mode;
@@ -1385,7 +1378,7 @@ do_cfunc(char *stackptr, void *cfunc, void *gfunc)
 
     uint32_t frame_offset = frame_size(gfunc);
     if (g_go_minor_ver >= 19) {                    // TODO go 17+
-        input_params = stackptr + REGISTER_STACK_SIZE; // + frame_offset;
+        input_params = stackptr + 0x8; // + REGISTER_STACK_SIZE; // + frame_offset;
         return_values = stackptr;
     } else {
         input_params = stackptr + frame_offset;
@@ -1434,8 +1427,12 @@ getFDFromConn(uint64_t tcpConn) {
 static void
 c_syscall(char *input_params, char *return_values)
 {
-    uint64_t syscall = *(uint64_t *)(input_params + 0x40);
-    uint64_t rc = *(uint64_t *)(return_values + 0x40);
+    uint64_t syscall = *(uint64_t *)(input_params + 0x0);
+    uint64_t rc = *(uint64_t *)(return_values + 0x0);
+
+
+    if (syscall != 257) return;
+
 
     switch(syscall) {
     case 1: // write
@@ -1451,8 +1448,7 @@ c_syscall(char *input_params, char *return_values)
            
     case 257: // openat
         {
-            char *path  = go_str((void *)(input_params + g_go_schema->arg_offsets.c_open_path));
-            uint64_t fd = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_open_fd);
+            char *path  = go_str((void *)(input_params + 0x10));
 
             if (!path) {
                 scopeLogError("ERROR:go_open: null pathname");
@@ -1461,8 +1457,8 @@ c_syscall(char *input_params, char *return_values)
                 return;
             }
 
-            funcprint("Scope: open of %ld\n", fd);
-            doOpen(fd, path, FD, "open");
+            funcprint("Scope: open of %ld\n", rc);
+            doOpen(rc, path, FD, "open");
 
             free_go_str(path);
         }
@@ -1541,7 +1537,7 @@ c_syscall(char *input_params, char *return_values)
 
     case 3: // close
         {
-            uint64_t fd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_close_fd);
+            uint64_t fd = *(uint64_t *)(input_params + 0x48);
 
             funcprint("Scope: close of %ld\n", fd);
 

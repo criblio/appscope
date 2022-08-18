@@ -2215,7 +2215,7 @@ void
 doStatPath(const char *path, int rc, const char *func)
 {
     if (rc != -1) {
-        scopeLog(CFG_LOG_DEBUG, "%s", func);
+        scopeLog(CFG_LOG_TRACE, "%s", func);
         doUpdateState(FS_STAT, -1, 0, func, path);
     } else {
         doUpdateState(FS_ERR_STAT, -1, (size_t)0, func, path);

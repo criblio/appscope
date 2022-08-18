@@ -54,6 +54,7 @@ static const char *g_cmddir;
 static list_t *g_nsslist;
 static uint64_t reentrancy_guard = 0ULL;
 static rlim_t g_max_fds = 0;
+static funchook_t *g_funchook;
 
 typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
@@ -266,6 +267,56 @@ fileModTime(const char *path)
     return STATMODTIME(statbuf);
 }
 
+/*
+ * Handle the detach operation
+ */
+static int
+unHookAll(struct dl_phdr_info *info, size_t size, void *data)
+{
+    if (!info || !info->dlpi_name) return FALSE;
+
+    struct link_map *lm;
+    Elf64_Sym *sym = NULL;
+    Elf64_Rela *rel = NULL;
+    char *str = NULL;
+    int rsz = 0;
+
+    scopeLog(CFG_LOG_DEBUG, "%s: shared obj: %s", __FUNCTION__, info->dlpi_name);
+
+    // don't hook funcs from libscope or ld.so
+    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) return FALSE;
+
+    void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
+    if (handle == NULL) return FALSE;
+
+    // Get the link map and ELF sections in advance of something matching
+    if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+        for (int i=0; inject_hook_list[i].symbol; i++) {
+            if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 0) != -1) {
+                scopeLog(CFG_LOG_DEBUG, "\tGOT detached %s from shared obj %s",
+                         inject_hook_list[i].symbol, info->dlpi_name);
+            }
+        }
+    }
+
+    dlclose(handle);
+    return FALSE;
+}
+
+static bool
+cmdDetach(void)
+{
+    scopeLog(CFG_LOG_DEBUG, "%s:%d", __FUNCTION__, __LINE__);
+    dl_iterate_phdr(unHookAll, NULL);
+    if (funchook_uninstall(g_funchook, 0) != 0) {
+        scopeLog(CFG_LOG_DEBUG, "%s:%d funchook uninstall failed",
+                 __FUNCTION__, __LINE__);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 static void
 remoteConfig()
 {
@@ -282,8 +333,7 @@ remoteConfig()
 
     // We want to accept incoming requests on TCP, unix, and edge.
     // However, we don't currently support receving on TLS connections.
-    int acceptRequests = transportSupportsCommandControl(
-                                          ctlTransport(g_ctl, CFG_CTL));
+    int acceptRequests = transportSupportsCommandControl(ctlTransport(g_ctl, CFG_CTL));
     fds.events = (acceptRequests) ? POLLIN : 0;
 
     fds.fd = ctlConnection(g_ctl, CFG_CTL);
@@ -521,6 +571,9 @@ dynConfig(void)
 
     // Apply the config
     doConfig(g_staticfg);
+
+    // DR: temporary
+    cmdDetach();
 
     scope_fclose(fs);
     scope_unlink(path);
@@ -1212,7 +1265,6 @@ static void
 initHook(int attachedFlag)
 {
     int rc;
-    funchook_t *funchook;
     bool should_we_patch = FALSE;
     char *full_path = NULL;
     elf_buf_t *ebuf = NULL;
@@ -1336,7 +1388,7 @@ initHook(int attachedFlag)
     if (should_we_patch || g_fn.__write_libc || g_fn.__write_pthread ||
         ((g_ismusl == FALSE) && g_fn.sendmmsg) ||
         ((g_ismusl == TRUE) && (g_fn.sendto || g_fn.recvfrom))) {
-        funchook = funchook_create();
+        g_funchook = funchook_create();
 
         if (logLevel(g_log) <= CFG_LOG_TRACE) {
             // TODO: add some mechanism to get the config'd log file path
@@ -1346,41 +1398,41 @@ initHook(int attachedFlag)
         if (should_we_patch) {
             g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
 
-            if (g_fn.SSL_read) rc = funchook_prepare(funchook, (void**)&g_fn.SSL_read, ssl_read_hook);
+            if (g_fn.SSL_read) rc = funchook_prepare(g_funchook, (void**)&g_fn.SSL_read, ssl_read_hook);
 
             g_fn.SSL_write = (ssl_wrfunc_t)load_func(NULL, SSL_FUNC_WRITE);
 
-            if (g_fn.SSL_write) rc = funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
+            if (g_fn.SSL_write) rc = funchook_prepare(g_funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
         }
 
         // sendmmsg, sendto, recvfrom for internal libc use in DNS queries
         if ((g_ismusl == FALSE) && g_fn.sendmmsg) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, internal_sendmmsg);
+            rc = funchook_prepare(g_funchook, (void**)&g_fn.sendmmsg, internal_sendmmsg);
         }
 
         if (g_fn.syscall) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.syscall, wrap_scope_syscall);
+            rc = funchook_prepare(g_funchook, (void**)&g_fn.syscall, wrap_scope_syscall);
         }
 
         if ((g_ismusl == TRUE) && g_fn.sendto) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.sendto, internal_sendto);
+            rc = funchook_prepare(g_funchook, (void**)&g_fn.sendto, internal_sendto);
         }
 
         if ((g_ismusl == TRUE) && g_fn.recvfrom) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.recvfrom, internal_recvfrom);
+            rc = funchook_prepare(g_funchook, (void**)&g_fn.recvfrom, internal_recvfrom);
         }
 
         // Used for mapping SSL IDs to fds with libuv. Must be funchooked since it's internal to libuv
         if (!g_fn.uv_fileno) g_fn.uv_fileno = load_func(NULL, "uv_fileno");
-        if (g_fn.uv__read) rc = funchook_prepare(funchook, (void**)&g_fn.uv__read, uv__read_hook);
+        if (g_fn.uv__read) rc = funchook_prepare(g_funchook, (void**)&g_fn.uv__read, uv__read_hook);
 
         if (g_ismusl == FALSE) {
             if (g_fn.__write_libc) {
-                rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
+                rc = funchook_prepare(g_funchook, (void**)&g_fn.__write_libc, __write_libc);
             }
 
             if (g_fn.__write_pthread) {
-                rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
+                rc = funchook_prepare(g_funchook, (void**)&g_fn.__write_pthread, __write_pthread);
             }
 
             // We want to be able to use g_fn.write without
@@ -1390,10 +1442,10 @@ initHook(int attachedFlag)
         }
 
         // hook 'em
-        rc = funchook_install(funchook, 0);
+        rc = funchook_install(g_funchook, 0);
         if (rc != 0) {
             scopeLogError("ERROR: failed to install SSL_read hook. (%s)\n",
-                        funchook_error_message(funchook));
+                        funchook_error_message(g_funchook));
             return;
         }
     }
@@ -3471,7 +3523,7 @@ dlopen(const char *filename, int flags)
             // for each symbol in the list try to hook
             for (i=0; inject_hook_list[i].symbol; i++) {
                 if ((dlsym(handle, inject_hook_list[i].symbol)) &&
-                    (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 0) != -1)) {
+                    (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1)) {
                     scopeLog(CFG_LOG_DEBUG, "\tdlopen interposed  %s", inject_hook_list[i].symbol);
                 }
             }

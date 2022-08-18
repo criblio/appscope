@@ -165,6 +165,7 @@ map_segment(char *buf, Elf64_Phdr *phead)
     load_sections(buf, (char *)phead->p_vaddr, (size_t)lsize);
 
     if (((prot & PROT_WRITE) == 0) && (scope_mprotect(laddr, lsize, prot) == -1)) {
+        scope_munmap(addr, ROUND_UP((size_t)lsize, phead->p_align));
         scopeLogError("ERROR: load_segment:mprotect");
         return -1;
     }
@@ -196,7 +197,10 @@ load_elf(char *buf)
 
     for (i = 0; i < pnum; i++) {
         if (phead[i].p_type == PT_LOAD) {
-	  if (map_segment(buf, &phead[i]) == -1) return (Elf64_Addr)NULL;
+            if (map_segment(buf, &phead[i]) == -1) {
+                scope_munmap(pheadaddr, ROUND_UP((size_t)(pnum * phsize), pgsz));
+                return (Elf64_Addr)NULL;
+            }
         }
     }
 

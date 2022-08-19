@@ -741,8 +741,8 @@ doHttpBuffer(http_state_t states[HTTP_NUM], net_info *net, char *buf, size_t len
     int isTx  = (src == NETTX || src == TLSTX) ? 1 : 0;
     http_state_t *state = &states[isTx];
 
-    //scopeLogHexDebug(buf, len>64 ? 64 : len, "DEBUG: HTTP %s payload; ver=%d, len=%ld",
-    //        isTx ? "TX" : "RX", (int)state->version[isTx], len);
+    scopeLogHexDebug(buf, len>64 ? 64 : len, "DEBUG: HTTP %s payload; ver=%d, len=%ld",
+            isTx ? "TX" : "RX", state->version, len);
 
     // detect HTTP version
     if (state->version == 0) {

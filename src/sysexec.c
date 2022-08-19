@@ -22,7 +22,7 @@
 #include "state.h"
 #include "gocontext.h"
 
-#define SYSPRINT_CONSOLE 1
+#define SYSPRINT_CONSOLE 0
 #define PRINT_BUF_SIZE 1024
 #define HEAP_SIZE (size_t)(500 * 1024)
 // 1Mb + an 8kb guard

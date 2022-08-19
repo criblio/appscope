@@ -30,11 +30,11 @@
 #define REGISTER_STACK_SIZE 0x48
 
 // compile-time control for debugging
-// #define NEEDEVNULL 1
-#define funcprint sysprint
-//#define funcprint devnull
-#define patchprint sysprint
-//#define patchprint devnull
+#define NEEDEVNULL 1
+//#define funcprint sysprint
+#define funcprint devnull
+//#define patchprint sysprint
+#define patchprint devnull
 
 int g_go_minor_ver = UNKNOWN_GO_VER;
 int g_go_maint_ver = UNKNOWN_GO_VER;
@@ -43,7 +43,10 @@ static char g_ReadFrame_addr[sizeof(void *)];
 
 enum index_hook_t {
     INDEX_HOOK_SYSCALL,
-//    INDEX_HOOK_SYSCALL6,
+    INDEX_HOOK_EXIT,
+    INDEX_HOOK_DIE,
+    INDEX_HOOK_MAX,
+    INDEX_HOOK_SYSCALL6,
     INDEX_HOOK_WRITE,
     INDEX_HOOK_OPEN,
     INDEX_HOOK_UNLINKAT,
@@ -52,8 +55,6 @@ enum index_hook_t {
     INDEX_HOOK_ACCEPT,
     INDEX_HOOK_READ,
     INDEX_HOOK_CLOSE,
-    INDEX_HOOK_EXIT,
-    INDEX_HOOK_DIE,
     INDEX_HOOK_TLS_SERVER_READ,
     INDEX_HOOK_TLS_SERVER_WRITE,
     INDEX_HOOK_TLS_CLIENT_READ,
@@ -63,7 +64,6 @@ enum index_hook_t {
     INDEX_HOOK_HTTP2_CLIENT_READ,
     INDEX_HOOK_HTTP2_CLIENT_WRITE,
     INDEX_HOOK_HTTP2_SERVER_PREFACE,
-    INDEX_HOOK_MAX,
 };
 
 go_schema_t go_8_schema = {
@@ -357,8 +357,7 @@ go_schema_t go_19_schema = {
     // and we preserve the g in r14 for future stack checks
     // Note: we do not need to use the reg functions for go_hook_exit and go_hook_die
     .tap = {
-          [INDEX_HOOK_SYSCALL]              = {"runtime/internal/syscall.Syscall6",       go_reg_syscall,              NULL, 0},
-//          [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",                      go_reg_stack_syscall6,             NULL, 0},
+//        [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",                      go_reg_stack_syscall6,             NULL, 0},
 //        [INDEX_HOOK_WRITE]                = {"syscall.write",                           go_reg_stack_write,                NULL, 0}, // write
 //        [INDEX_HOOK_OPEN]                 = {"syscall.openat",                          go_reg_stack_open,                 NULL, 0}, // file open
 //        [INDEX_HOOK_UNLINKAT]             = {"syscall.unlinkat",                        go_reg_stack_unlinkat,             NULL, 0}, // delete file
@@ -376,6 +375,7 @@ go_schema_t go_19_schema = {
 //        [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_reg_stack_http2_server_preface, NULL, 0},
 //        [INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_reg_stack_http2_client_read,    NULL, 0},
 //        [INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_reg_stack_http2_client_write,   NULL, 0},
+        [INDEX_HOOK_SYSCALL]              = {"runtime/internal/syscall.Syscall6",       go_reg_syscall,                    NULL, 0},
         [INDEX_HOOK_EXIT]                 = {"runtime.exit",                            go_hook_exit,                      NULL, 0},
         [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal",                   go_hook_die,                       NULL, 0},
         [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                              NULL, 0}
@@ -658,7 +658,10 @@ looks_like_first_inst_of_go_func(cs_insn* asm_inst)
             scope_strstr((const char*)asm_inst->op_str, "rsp, -0x80")) ||
 
             (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
-            !scope_strcmp((const char*)asm_inst->op_str, "r10, rsi"))
+            !scope_strcmp((const char*)asm_inst->op_str, "r10, rsi")) ||
+
+            (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
+            scope_strstr((const char*)asm_inst->op_str, "rax, qword ptr [rsp +"))
 
             ;
 
@@ -1259,7 +1262,7 @@ initGoHook(elf_buf_t *ebuf)
 
     if (g_go_minor_ver >= 17) {
         // The Go 17 schema works for 18 also, and possibly future versions
-        g_go_schema = &go_17_schema;
+        g_go_schema = &go_19_schema;
     }
 
     if (g_go_minor_ver >= 19) {
@@ -1428,17 +1431,13 @@ static void
 c_syscall(char *input_params, char *return_values)
 {
     uint64_t syscall = *(uint64_t *)(input_params + 0x0);
-    uint64_t rc = *(uint64_t *)(return_values + 0x0);
-
-
-    if (syscall != 257) return;
-
+    int64_t rc = *(int64_t *)(return_values + 0x0);
 
     switch(syscall) {
     case 1: // write
         {
-            uint64_t fd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_write_fd);
-            char *buf   = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_write_buf);
+            uint64_t fd = *(uint64_t *)(input_params + 0x8);
+            char *buf   = (char *)*(uint64_t *)(input_params + 0x10);
             uint64_t initialTime = getTime();
 
             funcprint("Scope: write fd %ld rc %ld buf %s\n", fd, rc, buf);
@@ -1466,14 +1465,11 @@ c_syscall(char *input_params, char *return_values)
            
     case 263: // unlinkat
         {
-            uint64_t dirfd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_unlinkat_dirfd);
-            char *pathname = go_str((void *)(input_params + g_go_schema->arg_offsets.c_unlinkat_pathname));
-            uint64_t flags = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_unlinkat_flags);
+            if (rc) return;
 
-            if (rc) {
-                free_go_str(pathname);
-                return;
-            }
+            uint64_t dirfd = *(uint64_t *)(input_params + 0x8);
+            char *pathname = go_str((void *)(input_params + 0x10));
+            uint64_t flags = *(uint64_t *)(input_params + 0x18);
 
             funcprint("Scope: unlinkat dirfd %ld pathname %s flags %ld\n", dirfd, pathname, flags);
             doDelete(pathname, "go_unlinkat");
@@ -1482,9 +1478,9 @@ c_syscall(char *input_params, char *return_values)
         }
         break;
 
-    case 78: // getdents
+    case 217: // getdents64
         {
-            uint64_t dirfd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_getdents_dirfd);
+            uint64_t dirfd = *(uint64_t *)(input_params + 0x8);
             uint64_t initialTime = getTime();
 
             funcprint("Scope: getdents dirfd %ld rc %ld\n", dirfd, rc);
@@ -1494,55 +1490,46 @@ c_syscall(char *input_params, char *return_values)
 
     case 41: // socket
         {
-            uint64_t domain = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_socket_domain);  // aka family
-            uint64_t type   = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_socket_type);
-            uint64_t sd     = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_socket_sd);
+            if (rc == -1) return;
 
-            if (sd == -1) return;
+            uint64_t domain = *(uint64_t *)(input_params + 0x8);  // aka family
+            uint64_t type   = *(uint64_t *)(input_params + 0x10);
 
-            funcprint("Scope: socket domain: %ld type: 0x%lx sd: %ld\n", domain, type, sd);
-
-            // Creates a net object
-            addSock(sd, type, domain);
+            funcprint("Scope: socket domain: %ld type: 0x%lx sd: %ld\n", domain, type, rc);
+            addSock(rc, type, domain); // Creates a net object
         }
         break;
 
     case 288: // accept4
         {
-            uint64_t fd           = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_accept4_fd); 
-            struct sockaddr *addr = *(struct sockaddr **)(input_params + g_go_schema->arg_offsets.c_accept4_addr);
-            socklen_t *addrlen    = *(socklen_t **)(input_params + g_go_schema->arg_offsets.c_accept4_addrlen);
-            uint64_t sd_out       = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_accept4_sd_out);
+            if (rc == -1) return;
 
-            if (sd_out != -1) {
-                funcprint("Scope: accept4 of %ld\n", sd_out);
-                doAccept(fd, sd_out, addr, addrlen, "go_accept4");
-            }
+            uint64_t fd           = *(uint64_t *)(input_params + 0x8); 
+            struct sockaddr *addr = *(struct sockaddr **)(input_params + 0x10);
+            socklen_t *addrlen    = *(socklen_t **)(input_params + 0x18);
+
+            funcprint("Scope: accept4 of %ld\n", rc);
+            doAccept(fd, rc, addr, addrlen, "go_accept4");
         }
         break;
 
     case 0: // read
         {
-            uint64_t fd = *(uint64_t *)(input_params + 0x48);
-            char *buf   = (char *)*(uint64_t *)(input_params + 0x50);
-
+            uint64_t fd = *(uint64_t *)(input_params + 0x8);
+            char *buf   = (char *)*(uint64_t *)(input_params + 0x10);
             uint64_t initialTime = getTime();
 
-            if (rc == -1) return;
-
             funcprint("Scope: read of %ld rc %ld\n", fd, rc);
-            doRead(fd, initialTime, (rc != -1), buf, rc, "go_read", BUF, 0);
+            doRead(fd, initialTime, (rc >= 0), buf, rc, "go_read", BUF, 0);
         } 
         break;
 
     case 3: // close
         {
-            uint64_t fd = *(uint64_t *)(input_params + 0x48);
+            uint64_t fd = *(uint64_t *)(input_params + 0x8);
 
             funcprint("Scope: close of %ld\n", fd);
-
-            // If net, deletes a net object
-            doCloseAndReportFailures(fd, (rc != -1), "go_close");
+            doCloseAndReportFailures(fd, (rc != -1), "go_close"); // If net, deletes a net object
         }
         break;
 

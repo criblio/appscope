@@ -1,5 +1,5 @@
 allow:
-- procname: cribl
+- procname: redis
   arg: start
   config:
     cribl:
@@ -86,7 +86,7 @@ allow:
     payload:
       dir: /tmp
       enable: false
-- procname: top
+- procname: memcached
   arg: start
   config:
     cribl:

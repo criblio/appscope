@@ -63,6 +63,7 @@ func (rc *Config) Start() error {
 	fmt.Println("Start parsing Allow Process List")
 	for i, alllowProc := range startCfg.AllowProc {
 		// TODO Remove the Printf below
+		fmt.Println("Parsing Allow Process", i)
 		// Attach
 		allProcToAttach, err := util.ProcessesByName(alllowProc.Procname)
 		if err != nil {
@@ -70,25 +71,24 @@ func (rc *Config) Start() error {
 			continue
 		}
 		for _, procToAttach := range allProcToAttach {
-			fmt.Println("Following PID", procToAttach.Pid, "will be attached")
+			fmt.Println("Following Process", alllowProc.Procname, "PID", procToAttach.Pid, "will be attached")
 			// TODO call attach here
 		}
 
 		// TODO Service
 
 		// TODO Handle interactive process
-		fmt.Println("Parsing Allow Process", i)
-		fmt.Printf("%+v\n", alllowProc)
+		// fmt.Printf("%+v\n", alllowProc)
 	}
 	// TODO Remove the Println below
 	fmt.Println("DEBUG End parsing Allow Process List")
 	fmt.Println("DEBUG Start Deny Process List")
-	for i, denyProc := range startCfg.DenyProc {
+	for i, _ := range startCfg.DenyProc {
 		// TODO Remove the Printf below
+		fmt.Println("Parsing Deny Process", i)
 		// TODO Deservice ??
 		// TODO Deattach ??
-		fmt.Println("Parsing Deny Process", i)
-		fmt.Printf("%+v\n", denyProc)
+		// fmt.Printf("%+v\n", denyProc)
 	}
 	// TODO Remove the Println below
 	fmt.Println("DEBUG End parsing Deny Process List")

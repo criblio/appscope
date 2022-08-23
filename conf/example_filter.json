@@ -1,7 +1,7 @@
 {
   "allow": [
     {
-      "procname": "cribl",
+      "procname": "redis",
       "arg": "start",
       "config": {
         "metric": {
@@ -132,7 +132,7 @@
       }
     },
     {
-      "procname": "top",
+      "procname": "memcached",
       "arg": "start",
       "config": {
         "metric": {

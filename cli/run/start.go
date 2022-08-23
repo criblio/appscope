@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 
 	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/util"
@@ -60,10 +61,10 @@ func (rc *Config) Start() error {
 	}
 
 	// TODO Remove the Printf
-	fmt.Println("Start parsing Allow Process List")
-	for i, alllowProc := range startCfg.AllowProc {
+	// fmt.Println("Start parsing Allow Process List")
+	for _, alllowProc := range startCfg.AllowProc {
 		// TODO Remove the Printf below
-		fmt.Println("Parsing Allow Process", i)
+		// fmt.Println("Parsing Allow Process", i)
 		// Attach
 		allProcToAttach, err := util.ProcessesByName(alllowProc.Procname)
 		if err != nil {
@@ -72,26 +73,35 @@ func (rc *Config) Start() error {
 		}
 		for _, procToAttach := range allProcToAttach {
 			fmt.Println("Following Process", alllowProc.Procname, "PID", procToAttach.Pid, "will be attached")
-			// TODO call attach here
+			if !procToAttach.Scoped {
+				err := rc.Attach([]string{strconv.Itoa(procToAttach.Pid)})
+				if err == nil {
+					fmt.Println("Process", alllowProc.Procname, "PID", procToAttach.Pid, "successfully attached")
+				} else {
+					fmt.Println("Process", alllowProc.Procname, "PID", procToAttach.Pid, "failed with attach", err)
+				}
+			} else {
+				fmt.Println("Process", alllowProc.Procname, "PID", procToAttach.Pid, "attach skipped - already scoped")
+			}
+			// TODO Service
+
+			// TODO Handle interactive process
+
 		}
-
-		// TODO Service
-
-		// TODO Handle interactive process
 		// fmt.Printf("%+v\n", alllowProc)
 	}
 	// TODO Remove the Println below
-	fmt.Println("DEBUG End parsing Allow Process List")
-	fmt.Println("DEBUG Start Deny Process List")
-	for i, _ := range startCfg.DenyProc {
-		// TODO Remove the Printf below
-		fmt.Println("Parsing Deny Process", i)
-		// TODO Deservice ??
-		// TODO Deattach ??
-		// fmt.Printf("%+v\n", denyProc)
-	}
+	// fmt.Println("DEBUG End parsing Allow Process List")
+	// fmt.Println("DEBUG Start Deny Process List")
+	// for i, _ := range startCfg.DenyProc {
+	// TODO Remove the Printf below
+	// fmt.Println("Parsing Deny Process", i)
+	// TODO Deservice ??
+	// TODO Deattach ??
+	// fmt.Printf("%+v\n", denyProc)
+	// }
 	// TODO Remove the Println below
-	fmt.Println("DEBUG End parsing Deny Process List")
+	// fmt.Println("DEBUG End parsing Deny Process List")
 
 	return nil
 }

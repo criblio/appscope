@@ -4,7 +4,7 @@
 #include "cfg.h"
 
 typedef struct rtconfig_t {
-    int funcs_attached;       // TRUE when functions are interposed, FALSE otherwise
+    bool funcs_attached;       // TRUE when functions are interposed, FALSE otherwise
     int blockconn;
     config_t *staticfg;
 } rtconfig;

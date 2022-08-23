@@ -39,7 +39,10 @@ func (rc *Config) Attach(args []string) {
 	// Get PID by name if non-numeric, otherwise validate/use args[0]
 	var pid int
 	if !util.IsNumeric(args[0]) {
-		procs := util.ProcessesByName(args[0])
+		procs, err := util.ProcessesByName(args[0])
+		if err != nil {
+			util.ErrAndExit("%v", err)
+		}
 		if len(procs) == 1 {
 			pid = procs[0].Pid
 		} else if len(procs) > 1 {

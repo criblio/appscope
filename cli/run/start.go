@@ -84,11 +84,14 @@ func (rc *Config) Start() error {
 				fmt.Println("Process", alllowProc.Procname, "PID", procToAttach.Pid, "attach skipped - already scoped")
 			}
 			// Check if service at least on host?
-			status, err := util.PidService()
-			if err == nil && status == true {
+			status, err := util.PidService(procToAttach.Pid)
+			if err != nil {
+				fmt.Println("Error gettin Process", alllowProc.Procname, "PID", procToAttach.Pid, "service status", err)
+			}
+			if status {
 				fmt.Println("Following Process", alllowProc.Procname, "PID", procToAttach.Pid, "will be serviced")
 			} else {
-				fmt.Println("Process", alllowProc.Procname, "PID", procToAttach.Pid, "service skipped - already scoped")
+				fmt.Println("Following Process", alllowProc.Procname, "PID", procToAttach.Pid, "is not a service")
 			}
 
 			// TODO Handle interactive process

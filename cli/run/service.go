@@ -2,6 +2,7 @@ package run
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -10,17 +11,25 @@ import (
 	"github.com/criblio/scope/util"
 )
 
-func (rc *Config) Service(serviceName string, user string, force bool) {
+var (
+	ErrRoot             = errors.New("must be run as a root")
+	ErrSyscallUname     = errors.New("syscall.Uname failed")
+	ErrUnkonwBootSystem = errors.New("unknown boot system")
+)
+
+func (rc *Config) Service(serviceName string, user string, force bool) error {
 	// TODO: move it to separate package
 	// must be root
 	if os.Getuid() != 0 {
-		util.ErrAndExit("error: must be run as root")
+		return ErrRoot
 	}
 
 	// get uname pieces
 	utsname := syscall.Utsname{}
 	err := syscall.Uname(&utsname)
-	util.CheckErrSprintf(err, "error: syscall.Uname failed; %v", err)
+	if err != nil {
+		return ErrSyscallUname
+	}
 	buf := make([]byte, 0, 64)
 	for _, v := range utsname.Machine[:] {
 		if v == 0 {
@@ -51,10 +60,9 @@ func (rc *Config) Service(serviceName string, user string, force bool) {
 		// Initd
 		rc.installInitd(serviceName, unameMachine, unameSysname, libcName, force)
 	} else {
-		// Unknown
-		util.ErrAndExit("error: unknown boot system\n")
+		return ErrUnkonwBootSystem
 	}
-	os.Exit(0)
+	return nil
 }
 
 func confirm(s string) bool {

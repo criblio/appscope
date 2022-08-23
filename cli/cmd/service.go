@@ -11,13 +11,13 @@ var serviceCmd = &cobra.Command{
 	Long:    `Configures the specified systemd/OpenRC service to be scoped upon starting.`,
 	Example: `scope service cribl -c tls://in.my-instance.cribl.cloud:10090`,
 	Args:    cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// service name is the first and only argument
 		force, _ := cmd.Flags().GetBool("force")
 		// TODO add handle user parameter
 		user, _ := cmd.Flags().GetString("user")
 		serviceName := args[0]
-		rc.Service(serviceName, user, force)
+		return rc.Service(serviceName, user, force)
 	},
 }
 

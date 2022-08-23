@@ -70,8 +70,9 @@ func ProcessesByName(name string) (Processes, error) {
 			continue
 		}
 
+		// TODO in container namespace we cannot depend on following info
 		userName, err := PidUser(pid)
-		if err != nil {
+		if err != nil && !errors.Is(err, ErrMissingUser) {
 			continue
 		}
 
@@ -122,8 +123,9 @@ func ProcessesScoped() (Processes, error) {
 			continue
 		}
 
+		// TODO in container namespace we cannot depend on following info
 		userName, err := PidUser(pid)
-		if err != nil {
+		if err != nil && !errors.Is(err, ErrMissingUser) {
 			continue
 		}
 

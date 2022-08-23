@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/criblio/scope/libscope"
+	"github.com/criblio/scope/util"
 	"gopkg.in/yaml.v2"
 )
 
@@ -62,6 +63,20 @@ func (rc *Config) Start() error {
 	fmt.Println("Start parsing Allow Process List")
 	for i, alllowProc := range startCfg.AllowProc {
 		// TODO Remove the Printf below
+		// Attach
+		allProcToAttach, err := util.ProcessesByName(alllowProc.Procname)
+		if err != nil {
+			fmt.Println("error in get pocess by name %w", err)
+			continue
+		}
+		for _, procToAttach := range allProcToAttach {
+			fmt.Println("Following PID", procToAttach.Pid, "will be attached")
+			// TODO call attach here
+		}
+
+		// TODO Service
+
+		// TODO Handle interactive process
 		fmt.Println("Parsing Allow Process", i)
 		fmt.Printf("%+v\n", alllowProc)
 	}
@@ -70,6 +85,8 @@ func (rc *Config) Start() error {
 	fmt.Println("DEBUG Start Deny Process List")
 	for i, denyProc := range startCfg.DenyProc {
 		// TODO Remove the Printf below
+		// TODO Deservice ??
+		// TODO Deattach ??
 		fmt.Println("Parsing Deny Process", i)
 		fmt.Printf("%+v\n", denyProc)
 	}

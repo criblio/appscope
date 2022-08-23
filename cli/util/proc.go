@@ -27,7 +27,7 @@ type Processes []Process
 var (
 	ErrOpenProc       = errors.New("cannot open proc directory")
 	ErrReadProc       = errors.New("cannot read from proc directory")
-	ErrGetProcCmd     = errors.New("error getting process command")
+	ErrGetProcStatus  = errors.New("error getting process status")
 	ErrGetProcCmdLine = errors.New("error getting process command line")
 	ErrMissingUser    = errors.New("unable to find user")
 )
@@ -149,7 +149,7 @@ func PidUser(pid int) (string, error) {
 	// Get uid from status
 	pStat, err := linuxproc.ReadProcessStatus(fmt.Sprintf("/proc/%v/status", pid))
 	if err != nil {
-		return "", ErrGetProcCmd
+		return "", ErrGetProcStatus
 	}
 
 	// Lookup username by uid
@@ -186,7 +186,7 @@ func PidCommand(pid int) (string, error) {
 	// Get command from status
 	pStat, err := linuxproc.ReadProcessStatus(fmt.Sprintf("/proc/%v/status", pid))
 	if err != nil {
-		return "", ErrGetProcCmd
+		return "", ErrGetProcStatus
 	}
 
 	return pStat.Name, nil
@@ -211,4 +211,13 @@ func PidExists(pid int) bool {
 		return true
 	}
 	return false
+}
+
+func PidService(pid int) (bool, error) {
+	// Get ppid from status
+	pStat, err := linuxproc.ReadProcessStatus(fmt.Sprintf("/proc/%v/status", pid))
+	if err != nil {
+		return false, ErrGetProcStatus
+	}
+	return pStat.PPid == 1, nil
 }

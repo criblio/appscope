@@ -47,6 +47,11 @@ enum index_hook_t {
     INDEX_HOOK_TLS_CLIENT_WRITE,
     INDEX_HOOK_TLS_SERVER_READ,
     INDEX_HOOK_TLS_SERVER_WRITE,
+    INDEX_HOOK_HTTP2_CLIENT_READ,
+    INDEX_HOOK_HTTP2_CLIENT_WRITE,
+    INDEX_HOOK_HTTP2_SERVER_READ,
+    INDEX_HOOK_HTTP2_SERVER_WRITE,
+    INDEX_HOOK_HTTP2_SERVER_PREFACE,
     INDEX_HOOK_SYSCALL,
     INDEX_HOOK_EXIT,
     INDEX_HOOK_DIE,
@@ -61,11 +66,6 @@ enum index_hook_t {
     INDEX_HOOK_SOCKET,
     INDEX_HOOK_ACCEPT,
     INDEX_HOOK_READ,
-    INDEX_HOOK_HTTP2_SERVER_READ,
-    INDEX_HOOK_HTTP2_SERVER_WRITE,
-    INDEX_HOOK_HTTP2_CLIENT_READ,
-    INDEX_HOOK_HTTP2_CLIENT_WRITE,
-    INDEX_HOOK_HTTP2_SERVER_PREFACE,
 };
 
 go_schema_t go_8_schema = {
@@ -372,11 +372,11 @@ go_schema_t go_19_schema = {
         [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_hook_reg_tls_client_write,     NULL, 0},
         [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_hook_reg_tls_server_read,      NULL, 0},
         [INDEX_HOOK_TLS_SERVER_WRITE]     = {"net/http.checkConnErrorWriter.Write",     go_hook_reg_tls_server_write,     NULL, 0},
-//        [INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_reg_stack_http2_server_read,    NULL, 0},
-//        [INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_reg_stack_http2_server_write,   NULL, 0},
-//        [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_reg_stack_http2_server_preface, NULL, 0},
-//        [INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_reg_stack_http2_client_read,    NULL, 0},
-//        [INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_reg_stack_http2_client_write,   NULL, 0},
+        [INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_hook_reg_http2_client_read,    NULL, 0},
+        [INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_hook_reg_http2_client_write,   NULL, 0},
+        [INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_hook_reg_http2_server_read,    NULL, 0},
+        [INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_hook_reg_http2_server_write,   NULL, 0},
+        [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
         [INDEX_HOOK_SYSCALL]              = {"runtime/internal/syscall.Syscall6",       go_reg_syscall,                    NULL, 0},
         [INDEX_HOOK_EXIT]                 = {"runtime.exit",                            go_hook_exit,                      NULL, 0},
         [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal",                   go_hook_die,                       NULL, 0},
@@ -1978,6 +1978,8 @@ go_tls_client_write(char *stackptr)
 static void
 c_http2_server_read(char *input_params, char *return_values)
 {
+    input_params -= 0x8;
+
     uint64_t sc = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_http2_server_read_sc);
     if (!sc) return;
     uint64_t fr   = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_fr);
@@ -2035,8 +2037,10 @@ c_http2_server_write(char *input_params, char *return_values)
 {
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    input_params -= g_go_schema->arg_offsets.c_http2_server_write_callee;
-    return_values -= g_go_schema->arg_offsets.c_http2_server_write_callee;
+ //   input_params -= g_go_schema->arg_offsets.c_http2_server_write_callee;
+//    return_values -= g_go_schema->arg_offsets.c_http2_server_write_callee;
+
+    input_params -= 0x8;
 
     uint64_t sc      = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_http2_server_write_sc);
     if (!sc) return;
@@ -2094,10 +2098,11 @@ go_http2_server_write(char *stackptr)
 static void
 c_http2_server_preface(char *input_params, char *return_values)
 {
+    input_params -= 0x8;
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    input_params -= g_go_schema->arg_offsets.c_http2_server_preface_callee;
-    return_values -= g_go_schema->arg_offsets.c_http2_server_preface_callee;
+//    input_params -= g_go_schema->arg_offsets.c_http2_server_preface_callee;
+//    return_values -= g_go_schema->arg_offsets.c_http2_server_preface_callee;
 
     uint64_t *rc     = (uint64_t *)(return_values + g_go_schema->arg_offsets.c_http2_server_preface_rc);
     if ((rc == NULL) || (rc == (uint64_t *)0xffffffff)) return;
@@ -2136,6 +2141,8 @@ go_http2_server_preface(char *stackptr)
 static void
 c_http2_client_read(char *input_params, char *return_values)
 {
+    input_params -= 0x8;
+
     uint64_t cc         = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_http2_client_read_cc);
     if (!cc) return;
     uint64_t fr         = *(uint64_t *)(cc + g_go_schema->struct_offsets.cc_to_fr);
@@ -2187,12 +2194,14 @@ go_http2_client_read(char *stackptr)
 static void
 c_http2_client_write(char *input_params, char *return_values)
 {
+    input_params -= 0x8;
+   
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    input_params -= g_go_schema->arg_offsets.c_http2_client_write_callee;
-    return_values -= g_go_schema->arg_offsets.c_http2_client_write_callee;
+ //   input_params -= g_go_schema->arg_offsets.c_http2_client_write_callee;
+//    return_values -= g_go_schema->arg_offsets.c_http2_client_write_callee;
 
-    uint64_t tcpConn = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_http2_client_write_tcpConn);
+    uint64_t tcpConn = *(uint64_t *)(input_params + 0x48);// g_go_schema->arg_offsets.c_http2_client_write_tcpConn);
     if (!tcpConn) return;
     char *buf        = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_http2_client_write_buf);
     if (!buf) return;

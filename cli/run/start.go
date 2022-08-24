@@ -74,6 +74,7 @@ func (rc *Config) Start() error {
 		for _, procToAttach := range allProcToAttach {
 			fmt.Println("Following Process", alllowProc.Procname, "PID", procToAttach.Pid, "will be attached")
 			if !procToAttach.Scoped {
+				// TODO we need to pass configuration file but handle this not via file location
 				err := rc.Attach([]string{strconv.Itoa(procToAttach.Pid)})
 				if err == nil {
 					fmt.Println("Process", alllowProc.Procname, "PID", procToAttach.Pid, "successfully attached")
@@ -94,7 +95,7 @@ func (rc *Config) Start() error {
 				fmt.Println("Following Process", alllowProc.Procname, "PID", procToAttach.Pid, "is not a service")
 			}
 
-			// TODO Handle interactive process
+			// TODO Handle interactive process which configuration should be used ?
 
 		}
 		// fmt.Printf("%+v\n", alllowProc)

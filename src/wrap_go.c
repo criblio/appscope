@@ -30,35 +30,37 @@
 #define REGISTER_STACK_SIZE 0x48
 
 // compile-time control for debugging
-#define NEEDEVNULL 1
-//#define funcprint sysprint
-#define funcprint devnull
-//#define patchprint sysprint
-#define patchprint devnull
+//#define NEEDEVNULL 1
+#define funcprint sysprint
+//#define funcprint devnull
+#define patchprint sysprint
+//#define patchprint devnull
 
 int g_go_minor_ver = UNKNOWN_GO_VER;
 int g_go_maint_ver = UNKNOWN_GO_VER;
 static char g_go_build_ver[7];
 static char g_ReadFrame_addr[sizeof(void *)];
+static char g_Syscall_addr[sizeof(void *)];
 
 enum index_hook_t {
+    INDEX_HOOK_TLS_CLIENT_READ,
+    INDEX_HOOK_TLS_CLIENT_WRITE,
+    INDEX_HOOK_TLS_SERVER_READ,
+    INDEX_HOOK_TLS_SERVER_WRITE,
     INDEX_HOOK_SYSCALL,
     INDEX_HOOK_EXIT,
     INDEX_HOOK_DIE,
     INDEX_HOOK_MAX,
+
     INDEX_HOOK_SYSCALL6,
     INDEX_HOOK_WRITE,
     INDEX_HOOK_OPEN,
+    INDEX_HOOK_CLOSE,
     INDEX_HOOK_UNLINKAT,
     INDEX_HOOK_GETDENTS,
     INDEX_HOOK_SOCKET,
     INDEX_HOOK_ACCEPT,
     INDEX_HOOK_READ,
-    INDEX_HOOK_CLOSE,
-    INDEX_HOOK_TLS_SERVER_READ,
-    INDEX_HOOK_TLS_SERVER_WRITE,
-    INDEX_HOOK_TLS_CLIENT_READ,
-    INDEX_HOOK_TLS_CLIENT_WRITE,
     INDEX_HOOK_HTTP2_SERVER_READ,
     INDEX_HOOK_HTTP2_SERVER_WRITE,
     INDEX_HOOK_HTTP2_CLIENT_READ,
@@ -366,10 +368,10 @@ go_schema_t go_19_schema = {
 //        [INDEX_HOOK_ACCEPT]               = {"syscall.accept4",                         go_reg_stack_accept4,              NULL, 0}, // plain server accept
 //        [INDEX_HOOK_READ]                 = {"syscall.read",                            go_reg_stack_read,                 NULL, 0}, // read
 //        [INDEX_HOOK_CLOSE]                = {"syscall.Close",                           go_reg_stack_close,                NULL, 0}, // close
-//        [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_reg_stack_tls_server_read,      NULL, 0},
-//        [INDEX_HOOK_TLS_SERVER_WRITE]     = {"net/http.checkConnErrorWriter.Write",     go_reg_stack_tls_server_write,     NULL, 0},
-//        [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_reg_stack_tls_client_read,      NULL, 0},
-//        [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_reg_stack_tls_client_write,     NULL, 0},
+        [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_hook_reg_tls_client_read,      NULL, 0},
+        [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_hook_reg_tls_client_write,     NULL, 0},
+        [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_hook_reg_tls_server_read,      NULL, 0},
+        [INDEX_HOOK_TLS_SERVER_WRITE]     = {"net/http.checkConnErrorWriter.Write",     go_hook_reg_tls_server_write,     NULL, 0},
 //        [INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_reg_stack_http2_server_read,    NULL, 0},
 //        [INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_reg_stack_http2_server_write,   NULL, 0},
 //        [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_reg_stack_http2_server_preface, NULL, 0},
@@ -658,10 +660,10 @@ looks_like_first_inst_of_go_func(cs_insn* asm_inst)
             scope_strstr((const char*)asm_inst->op_str, "rsp, -0x80")) ||
 
             (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
-            !scope_strcmp((const char*)asm_inst->op_str, "r10, rsi")) ||
+            !scope_strcmp((const char*)asm_inst->op_str, "r10, rsi")) 
 
-            (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
-            scope_strstr((const char*)asm_inst->op_str, "rax, qword ptr [rsp +"))
+//            (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
+//            scope_strstr((const char*)asm_inst->op_str, "rax, qword ptr [rsp +"))
 
             ;
 
@@ -773,6 +775,16 @@ patch_addrs(funchook_t *funchook,
 
     int i;
     for (i=0; i<asm_count; i++) {
+
+
+        uint32_t add_arg = 0;
+
+        patchprint("looking at %0*lx (%02d) %-24s %s %s\n",
+               16, asm_inst[i].address, asm_inst[i].size,
+               (char*)asm_inst[i].bytes, (char*)asm_inst[i].mnemonic,
+               (char*)asm_inst[i].op_str);
+
+
         // We've observed that the first instruction in every goroutine
         // is the same (it retrieves a pointer to the goroutine.)
         // We're checking for it here to make sure things are coherent.
@@ -785,12 +797,6 @@ patch_addrs(funchook_t *funchook,
             break;
         }
 
-        patchprint("%0*lx (%02d) %-24s %s %s\n",
-               16, asm_inst[i].address, asm_inst[i].size,
-               (char*)asm_inst[i].bytes, (char*)asm_inst[i].mnemonic,
-               (char*)asm_inst[i].op_str);
-
-        uint32_t add_arg = 0;
              
         // PATCH CALL
         // In the case of some functions, we want to patch just after a "call" instruction.
@@ -845,7 +851,6 @@ patch_addrs(funchook_t *funchook,
                 break; // We need to force a break in this case
             }
         }
-
 
         // PATCH RET
         // If the current instruction is a RET
@@ -1243,6 +1248,14 @@ initGoHook(elf_buf_t *ebuf)
     ReadFrame_addr = (uint64_t *)((uint64_t)ReadFrame_addr + base);
     scope_sprintf(g_ReadFrame_addr, "%p\n", ReadFrame_addr);
 
+    uint64_t *Syscall_addr;
+    if (((Syscall_addr = getSymbol(ebuf->buf, "syscall.Syscall")) == 0) &&
+        ((Syscall_addr = getGoSymbol(ebuf->buf, "syscall.Syscall", NULL, NULL)) == 0)) {
+        sysprint("WARN: can't get the address for syscall.Syscall\n");
+    }
+    Syscall_addr = (uint64_t *)((uint64_t)Syscall_addr + base);
+    scope_sprintf(g_Syscall_addr, "%p\n", Syscall_addr);
+
     csh disass_handle = 0;
     cs_arch arch;
     cs_mode mode;
@@ -1375,6 +1388,9 @@ frame_size(assembly_fn fn)
 inline static void *
 do_cfunc(char *stackptr, void *cfunc, void *gfunc)
 {
+
+funcprint("Scope: cfunc %x\n", cfunc);
+
     uint64_t rc;
     char *input_params;
     char *return_values;
@@ -1638,13 +1654,16 @@ go_open(char *stackptr)
 static void
 c_close(char *input_params, char *return_values)
 {
-    uint64_t fd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_close_fd);
-    uint64_t rc = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_close_rc);
+    /*
+    uint64_t fd = *(uint64_t *)(input_params + 0x30); //g_go_schema->arg_offsets.c_close_fd);
+//    uint64_t rc = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_close_rc);
 
     funcprint("Scope: close of %ld\n", fd);
 
     // If net, deletes a net object
-    doCloseAndReportFailures(fd, (rc != -1), "go_close");
+    //doCloseAndReportFailures(fd, (rc != -1), "go_close");
+    doCloseAndReportFailures(fd, 0, "go_close");
+    */
 }
 
 EXPORTON void *
@@ -1744,8 +1763,10 @@ c_tls_server_read(char *input_params, char *return_values)
     // the '..callee' value.
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    input_params -= g_go_schema->arg_offsets.c_tls_server_read_callee;
-    return_values -= g_go_schema->arg_offsets.c_tls_server_read_callee;
+
+    input_params -= 0x8;
+//    input_params -= g_go_schema->arg_offsets.c_tls_server_read_callee;
+//    return_values -= g_go_schema->arg_offsets.c_tls_server_read_callee;
 
     uint64_t connReader = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_tls_server_read_connReader); 
     if (!connReader) return;   // protect from dereferencing null
@@ -1797,10 +1818,12 @@ go_tls_server_read(char *stackptr)
 static void
 c_tls_server_write(char *input_params, char *return_values)
 {
+    input_params -= 0x8;
+
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    input_params -= g_go_schema->arg_offsets.c_tls_server_write_callee;
-    return_values -= g_go_schema->arg_offsets.c_tls_server_write_callee;
+//    input_params -= g_go_schema->arg_offsets.c_tls_server_write_callee;
+//    return_values -= g_go_schema->arg_offsets.c_tls_server_write_callee;
 
     uint64_t conn = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_tls_server_write_conn);
     if (!conn) return;         // protect from dereferencing null
@@ -1844,10 +1867,16 @@ go_tls_server_write(char *stackptr)
 static void
 c_tls_client_read(char *input_params, char *return_values)
 {
+funcprint("Scope: enter c_tls_client_read\n");
+    input_params -= 0x8;
+
+    // go to caller of readResponse to get pc
+    input_params += 0x78;
+
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    input_params -= g_go_schema->arg_offsets.c_tls_client_read_callee;
-    return_values -= g_go_schema->arg_offsets.c_tls_client_read_callee;
+    //input_params -= g_go_schema->arg_offsets.c_tls_client_read_callee;
+    //return_values -= g_go_schema->arg_offsets.c_tls_client_read_callee;
 
     uint64_t pc = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_tls_client_read_pc); 
     if (!pc) return;
@@ -1897,28 +1926,37 @@ go_tls_client_read(char *stackptr)
 static void
 c_tls_client_write(char *input_params, char *return_values)
 {
+funcprint("Scope: enter c_tls_client_write\n");
+
+    input_params -= 0x8;
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
-    input_params -= g_go_schema->arg_offsets.c_tls_client_write_callee;
-    return_values -= g_go_schema->arg_offsets.c_tls_client_write_callee;
+ 
+    //  input_params -= g_go_schema->arg_offsets.c_tls_client_write_callee;
+  //  return_values -= g_go_schema->arg_offsets.c_tls_client_write_callee;
 
     uint64_t w_pc = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_tls_client_write_w_pc);
     char *buf     = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_tls_client_write_buf);
     uint64_t rc   = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_tls_client_write_rc);
+funcprint("Scope: c_tls_client_write rc %d\n", rc);
     if (rc < 1) return;
 
     uint64_t pc_conn_if = (w_pc + g_go_schema->struct_offsets.persistConn_to_conn); 
+funcprint("Scope: c_tls_client_write pc_conn_if %d\n", pc_conn_if);
     if (!pc_conn_if) return;
     uint64_t tls =  *(uint64_t*)(w_pc + g_go_schema->struct_offsets.persistConn_to_tlsState); 
+funcprint("Scope: c_tls_client_write tls %d\n", tls);
     if (!tls) return;
 
     uint64_t tcpConn = *(uint64_t *)(pc_conn_if + g_go_schema->struct_offsets.iface_data); 
+funcprint("Scope: c_tls_client_write tcpConn %d\n", tcpConn);
     if (!tcpConn) return;
 
     int fd = getFDFromConn(tcpConn);
+funcprint("Scope: c_tls_client_write fd %d\n", fd);
     
     doProtocol((uint64_t)0, fd, buf, rc, TLSTX, BUF);
-    funcprint("Scope: c_tls_client_write of %d\n", fd);
+funcprint("Scope: c_tls_client_write of %d\n", fd);
 }
 
 EXPORTON void *
@@ -2177,6 +2215,8 @@ extern void handleExit(void);
 static void
 c_exit(char *input_params, char *return_values)
 {
+    // TODO Remove
+//    while (scope_sleep(1000)) {};
     /*
      * Need to extend the system stack size when calling handleExit().
      * We see that the stack is exceeded now that we are using an internal libc.

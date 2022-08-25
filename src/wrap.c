@@ -54,7 +54,7 @@ static const char *g_cmddir;
 static list_t *g_nsslist;
 static uint64_t reentrancy_guard = 0ULL;
 static rlim_t g_max_fds = 0;
-static funchook_t *g_funchook;
+static bool g_detached = FALSE;
 
 typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
@@ -308,12 +308,7 @@ cmdDetach(void)
 {
     scopeLog(CFG_LOG_DEBUG, "%s:%d", __FUNCTION__, __LINE__);
     dl_iterate_phdr(unHookAll, NULL);
-    if (funchook_uninstall(g_funchook, 0) != 0) {
-        scopeLog(CFG_LOG_DEBUG, "%s:%d funchook uninstall failed",
-                 __FUNCTION__, __LINE__);
-        return FALSE;
-    }
-
+    g_detached = TRUE;
     return TRUE;
 }
 
@@ -983,8 +978,10 @@ ssl_read_hook(SSL *ssl, void *buf, int num)
 {
     int rc;
 
-    scopeLog(CFG_LOG_TRACE, "ssl_read_hook");
     WRAP_CHECK(SSL_read, -1);
+    if (g_detached == TRUE) return g_fn.SSL_read(ssl, buf, num);
+
+    scopeLog(CFG_LOG_TRACE, "ssl_read_hook");
     rc = g_fn.SSL_read(ssl, buf, num);
     if (rc > 0) {
         int fd = -1;
@@ -1001,8 +998,10 @@ ssl_write_hook(SSL *ssl, void *buf, int num)
 {
     int rc;
 
-    scopeLog(CFG_LOG_TRACE, "ssl_write_hook");
     WRAP_CHECK(SSL_write, -1);
+    if (g_detached == TRUE) return g_fn.SSL_write(ssl, buf, num);
+
+    scopeLog(CFG_LOG_TRACE, "ssl_write_hook");
     rc = g_fn.SSL_write(ssl, buf, num);
     if (rc > 0) {
         int fd = -1;
@@ -1269,6 +1268,7 @@ initHook(int attachedFlag)
     char *full_path = NULL;
     elf_buf_t *ebuf = NULL;
     bool filter;
+    funchook_t *funchook;
 
     // env vars are not always set as needed, be explicit here
     // this is duplicated if we were started from the scope exec
@@ -1388,7 +1388,7 @@ initHook(int attachedFlag)
     if (should_we_patch || g_fn.__write_libc || g_fn.__write_pthread ||
         ((g_ismusl == FALSE) && g_fn.sendmmsg) ||
         ((g_ismusl == TRUE) && (g_fn.sendto || g_fn.recvfrom))) {
-        g_funchook = funchook_create();
+        funchook = funchook_create();
 
         if (logLevel(g_log) <= CFG_LOG_TRACE) {
             // TODO: add some mechanism to get the config'd log file path
@@ -1398,41 +1398,41 @@ initHook(int attachedFlag)
         if (should_we_patch) {
             g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
 
-            if (g_fn.SSL_read) rc = funchook_prepare(g_funchook, (void**)&g_fn.SSL_read, ssl_read_hook);
+            if (g_fn.SSL_read) rc = funchook_prepare(funchook, (void**)&g_fn.SSL_read, ssl_read_hook);
 
             g_fn.SSL_write = (ssl_wrfunc_t)load_func(NULL, SSL_FUNC_WRITE);
 
-            if (g_fn.SSL_write) rc = funchook_prepare(g_funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
+            if (g_fn.SSL_write) rc = funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
         }
 
         // sendmmsg, sendto, recvfrom for internal libc use in DNS queries
         if ((g_ismusl == FALSE) && g_fn.sendmmsg) {
-            rc = funchook_prepare(g_funchook, (void**)&g_fn.sendmmsg, internal_sendmmsg);
+            rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, internal_sendmmsg);
         }
 
         if (g_fn.syscall) {
-            rc = funchook_prepare(g_funchook, (void**)&g_fn.syscall, wrap_scope_syscall);
+            rc = funchook_prepare(funchook, (void**)&g_fn.syscall, wrap_scope_syscall);
         }
 
         if ((g_ismusl == TRUE) && g_fn.sendto) {
-            rc = funchook_prepare(g_funchook, (void**)&g_fn.sendto, internal_sendto);
+            rc = funchook_prepare(funchook, (void**)&g_fn.sendto, internal_sendto);
         }
 
         if ((g_ismusl == TRUE) && g_fn.recvfrom) {
-            rc = funchook_prepare(g_funchook, (void**)&g_fn.recvfrom, internal_recvfrom);
+            rc = funchook_prepare(funchook, (void**)&g_fn.recvfrom, internal_recvfrom);
         }
 
         // Used for mapping SSL IDs to fds with libuv. Must be funchooked since it's internal to libuv
         if (!g_fn.uv_fileno) g_fn.uv_fileno = load_func(NULL, "uv_fileno");
-        if (g_fn.uv__read) rc = funchook_prepare(g_funchook, (void**)&g_fn.uv__read, uv__read_hook);
+        if (g_fn.uv__read) rc = funchook_prepare(funchook, (void**)&g_fn.uv__read, uv__read_hook);
 
         if (g_ismusl == FALSE) {
             if (g_fn.__write_libc) {
-                rc = funchook_prepare(g_funchook, (void**)&g_fn.__write_libc, __write_libc);
+                rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
             }
 
             if (g_fn.__write_pthread) {
-                rc = funchook_prepare(g_funchook, (void**)&g_fn.__write_pthread, __write_pthread);
+                rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
             }
 
             // We want to be able to use g_fn.write without
@@ -1442,10 +1442,10 @@ initHook(int attachedFlag)
         }
 
         // hook 'em
-        rc = funchook_install(g_funchook, 0);
+        rc = funchook_install(funchook, 0);
         if (rc != 0) {
             scopeLogError("ERROR: failed to install SSL_read hook. (%s)\n",
-                        funchook_error_message(g_funchook));
+                        funchook_error_message(funchook));
             return;
         }
     }
@@ -2745,6 +2745,8 @@ static ssize_t
 __write_libc(int fd, const void *buf, size_t size)
 {
     WRAP_CHECK(__write_libc, -1);
+    if ((g_ismusl == FALSE) && (g_detached == TRUE)) return g_fn.__write_libc(fd, buf, size);
+
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.__write_libc(fd, buf, size);
@@ -2758,6 +2760,8 @@ static ssize_t
 __write_pthread(int fd, const void *buf, size_t size)
 {
     WRAP_CHECK(__write_pthread, -1);
+    if ((g_ismusl == FALSE) && (g_detached == TRUE)) return g_fn.__write_pthread(fd, buf, size);
+
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.__write_pthread(fd, buf, size);
@@ -2796,6 +2800,11 @@ wrap_scope_syscall(long number, ...)
 
     WRAP_CHECK(syscall, -1);
     LOAD_FUNC_ARGS_VALIST(fArgs, number);
+
+    if (g_detached == TRUE) {
+        return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],
+                            fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
+    }
 
     switch (number) {
     case SYS_close:
@@ -4635,6 +4644,8 @@ internal_sendto(int sockfd, const void *buf, size_t len, int flags,
     ssize_t rc;
     WRAP_CHECK(sendto, -1);
     rc = g_fn.sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+    if ((g_ismusl == TRUE) && (g_detached == TRUE)) return rc; 
+
     if (rc != -1) {
         scopeLog(CFG_LOG_TRACE, "fd:%d sendto", sockfd);
         doSetConnection(sockfd, dest_addr, addrlen, REMOTE);
@@ -4716,7 +4727,10 @@ internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int fla
     ssize_t rc;
 
     WRAP_CHECK(sendmmsg, -1);
+
     rc = g_fn.sendmmsg(sockfd, msgvec, vlen, flags);
+    if ((g_ismusl == FALSE) && (g_detached == TRUE)) return rc;
+
     if (rc != -1) {
         scopeLog(CFG_LOG_TRACE, "fd:%d sendmmsg", sockfd);
 
@@ -4818,6 +4832,7 @@ internal_recvfrom(int sockfd, void *buf, size_t len, int flags,
 
     WRAP_CHECK(recvfrom, -1);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+    if ((g_ismusl == TRUE) && (g_detached == TRUE)) return rc;
 
     // If called with the MSG_PEEK flag set, don't do any scope processing
     // as it could result in processing of duplicate bytes later
@@ -5262,6 +5277,8 @@ __fdelt_chk(long int fdelt)
 static void
 uv__read_hook(void *stream)
 {
+    if (g_detached == TRUE) return g_fn.uv__read(stream);
+
     if (SYMBOL_LOADED(uv_fileno)) g_fn.uv_fileno(stream, &g_ssl_fd);
     //scopeLog(CFG_LOG_TRACE, "%s: fd %d", __FUNCTION__, g_ssl_fd);
     if (g_fn.uv__read) return g_fn.uv__read(stream);

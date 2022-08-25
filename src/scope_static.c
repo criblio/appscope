@@ -1084,15 +1084,17 @@ main(int argc, char **argv, char **env)
             return EXIT_FAILURE;
         }
 
-        int nsAttachPid = 0;
+        pid_t nsAttachPid = 0;
 
 
         /*
         * If the expected process exists in different namespace (container)
         * we do a following switch context sequence:
         * - load static loader file into memory
+        * - [optionally] save the configuration file pointed by SCOPE_CONF_PATH into memory
         * - switch the namespace from parent
         * - save previously loaded static loader into new namespace
+        * - [optionally] save previously loaded configuration file into new namespace
         * - fork & execute static loader attach one more time with update PID
         */
         if (nsIsPidInChildNs(pid, &nsAttachPid) == TRUE) {

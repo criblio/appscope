@@ -11,88 +11,86 @@
  * further cleaning like reverse return logic in libdirExists
  */
 #define LDSCOPE_IN_CHILD_NS "/tmp/ldscope"
+
 #define VALID_NS_DEPTH 2
 
 /*
- * Load static loader (ldscope) into memory.
+ * Load File into memory.
  *
- * Returns loader memory address in case of success, NULL otherwise.
+ * Returns memory address in case of success, NULL otherwise.
  */
 static char*
-loadLdscopeMem(size_t *ldscopeSize)
+loadFileIntoMem(size_t *size, char* path)
 {
-    // Load ldscope into memory
-    char *ldscopeMem = NULL;
+    // Load file into memory
+    char *resMem = NULL;
 
-    char ldscopePath[PATH_MAX] = {0};
-
-    if (scope_readlink("/proc/self/exe", ldscopePath, sizeof(ldscopePath) - 1) == -1) {
-        scope_perror("readlink(/proc/self/exe) failed");
-        goto closeLdscopeFd;
+    if (path == NULL) {
+        return resMem;
     }
 
-    int ldscopeInputFd = scope_open(ldscopePath, O_RDONLY);
-    if (!ldscopeInputFd) {
+    int fd = scope_open(path, O_RDONLY);
+    if (!fd) {
         scope_perror("scope_open failed");
-        goto closeLdscopeFd;
+        goto closeFd;
     }
 
-    *ldscopeSize = scope_lseek(ldscopeInputFd, 0, SEEK_END);
-    if (*ldscopeSize == (off_t)-1) {
+    *size = scope_lseek(fd, 0, SEEK_END);
+    if (*size == (off_t)-1) {
         scope_perror("scope_lseek failed");
-        goto closeLdscopeFd;
+        goto closeFd;
     }
 
-    ldscopeMem = scope_mmap(NULL, *ldscopeSize, PROT_READ, MAP_PRIVATE, ldscopeInputFd, 0);
-    if (ldscopeMem == MAP_FAILED) {
+    resMem = scope_mmap(NULL, *size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (resMem == MAP_FAILED) {
         scope_perror("scope_mmap failed");
-        ldscopeMem = NULL;
-        goto closeLdscopeFd;
+        resMem = NULL;
+        goto closeFd;
     }
 
-closeLdscopeFd:
+closeFd:
 
-    scope_close(ldscopeInputFd);
+    scope_close(fd);
 
-    return ldscopeMem;
+    return resMem;
 }
 
 /*
- * Extract static loader (ldscope) into child namespace.
+ * Extract file from parent namespace into child namespace.
  *
  * Returns TRUE in case of success, FALSE otherwise.
  */
 static bool
-extractLdscopeToChildNamespace(char* ldscopeMem, size_t ldscopeSize)
+extractMemToChildNamespace(char* inputMem, size_t inputSize, const char *outFile, mode_t outPermFlag)
 {
     bool status = FALSE;
 
-    int ldscopeDestFd = scope_open(LDSCOPE_IN_CHILD_NS, O_RDWR | O_CREAT, 0771);
-    if (!ldscopeDestFd) {
+    int outFd = scope_open(outFile, O_RDWR | O_CREAT, outPermFlag);
+    if (!outFd) {
         scope_perror("scope_open failed");
         return status;
     }
 
-    if (scope_ftruncate(ldscopeDestFd, ldscopeSize) != 0) {
+    if (scope_ftruncate(outFd, inputSize) != 0) {
         goto cleanupDestFd;
     }
 
-    char* dest = scope_mmap(NULL, ldscopeSize, PROT_READ | PROT_WRITE, MAP_SHARED, ldscopeDestFd, 0);
+    char* dest = scope_mmap(NULL, inputSize, PROT_READ | PROT_WRITE, MAP_SHARED, outFd, 0);
     if (dest == MAP_FAILED) {
         goto cleanupDestFd;
     }
 
-    scope_memcpy(dest, ldscopeMem, ldscopeSize);
+    scope_memcpy(dest, inputMem, inputSize);
 
-    scope_munmap(dest, ldscopeSize);
+    scope_munmap(dest, inputSize);
 
     status = TRUE;
 
 cleanupDestFd:
 
-    scope_close(ldscopeDestFd);
+    scope_close(outFd);
 
-    return TRUE;
+    return status;
 }
 
 static bool
@@ -100,11 +98,21 @@ join_namespace(pid_t hostPid)
 {
     bool status = FALSE;
     size_t ldscopeSize = 0;
+    size_t cfgSize = 0;
 
-    char *ldscopeMem = loadLdscopeMem(&ldscopeSize);
+    char path[PATH_MAX] = {0};
+
+    if (scope_readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
+       return status;
+    }
+
+    char *ldscopeMem = loadFileIntoMem(&ldscopeSize, path);
     if (ldscopeMem == NULL) {
         return status;
     }
+
+    // Configuration is optional
+    char *scopeCfgMem = loadFileIntoMem(&cfgSize, getenv("SCOPE_CONF_PATH"));
 
     /*
     * Reassociate current process to the "child namespace"
@@ -112,7 +120,7 @@ join_namespace(pid_t hostPid)
     *   be created in separate namespace
     *   In other words the calling process will not change it's ownPID
     *   namespace
-    * - mount namespace - allows to copy static loader into a "child namespace"
+    * - mount namespace - allows to copy file(s) into a "child namespace"
     */
     char *nsType[] = {"pid", "mnt"};
 
@@ -120,25 +128,38 @@ join_namespace(pid_t hostPid)
         char nsPath[PATH_MAX] = {0};
         if (scope_snprintf(nsPath, sizeof(nsPath), "/proc/%d/ns/%s", hostPid, nsType[i]) < 0) {
             scope_perror("scope_snprintf failed");
-            goto cleanupLdscopeMem;
+            goto cleanupMem;
         }
         int nsFd = scope_open(nsPath, O_RDONLY);
         if (!nsFd) {
             scope_perror("scope_open failed");
-            goto cleanupLdscopeMem;
+            goto cleanupMem;
         }
 
         if (scope_setns(nsFd, 0) != 0) {
             scope_perror("setns failed");
-            goto cleanupLdscopeMem;
+            goto cleanupMem;
         }
     }
 
-    status = extractLdscopeToChildNamespace(ldscopeMem, ldscopeSize);
+    status = extractMemToChildNamespace(ldscopeMem, ldscopeSize, LDSCOPE_IN_CHILD_NS, 0775);
 
-cleanupLdscopeMem:
+    if (scopeCfgMem) {
+        char scopeCfgPath[PATH_MAX] = {0};
+
+        scope_snprintf(scopeCfgPath, sizeof(scopeCfgPath), "/tmp/scope_%d.yml", hostPid);
+        status = extractMemToChildNamespace(scopeCfgMem, cfgSize, scopeCfgPath, 0664);
+        // replace the SCOPE_CONF_PATH with namespace path
+        setenv("SCOPE_CONF_PATH", scopeCfgPath, 1);
+    }   
+
+cleanupMem:
 
     scope_munmap(ldscopeMem, ldscopeSize);
+
+    if (scopeCfgMem) {
+        scope_munmap(scopeCfgMem, cfgSize);
+    }
 
     return status;
 }

@@ -303,11 +303,41 @@ unHookAll(struct dl_phdr_info *info, size_t size, void *data)
     return FALSE;
 }
 
-static bool
+bool
 cmdDetach(void)
 {
+    if (!g_cfg.funcs_attached) return TRUE;
+
     scopeLog(CFG_LOG_DEBUG, "%s:%d", __FUNCTION__, __LINE__);
     dl_iterate_phdr(unHookAll, NULL);
+    if (funchook_uninstall(g_funchook, 0) != 0) {
+        scopeLog(CFG_LOG_DEBUG, "%s:%d funchook uninstall failed",
+                 __FUNCTION__, __LINE__);
+        return FALSE;
+    }
+
+    g_cfg.funcs_attached = FALSE;
+    return TRUE;
+}
+
+bool
+cmdAttach(void)
+{
+    if (g_cfg.funcs_attached) return TRUE;
+
+/*
+    JRC TBD
+    scopeLog(CFG_LOG_DEBUG, "%s:%d", __FUNCTION__, __LINE__);
+    dl_iterate_phdr(unHookAll, NULL);
+
+    if (funchook_uninstall(g_funchook, 0) != 0) {
+        scopeLog(CFG_LOG_DEBUG, "%s:%d funchook uninstall failed",
+                 __FUNCTION__, __LINE__);
+        return FALSE;
+    }
+*/
+
+    g_cfg.funcs_attached = TRUE;
     g_detached = TRUE;
     return TRUE;
 }
@@ -449,11 +479,11 @@ remoteConfig()
                     break;
                 case REQ_SWITCH:
                     switch (req->action) {
-                        case URL_REDIRECT_ON:
-                            g_cfg.urls = 1;
+                        case FUNC_DETACH:
+                            cmdDetach();
                             break;
-                        case URL_REDIRECT_OFF:
-                             g_cfg.urls = 0;
+                        case FUNC_ATTACH:
+                            cmdAttach();
                             break;
                         default:
                             DBG("%d", req->action);
@@ -566,9 +596,6 @@ dynConfig(void)
 
     // Apply the config
     doConfig(g_staticfg);
-
-    // DR: temporary
-    cmdDetach();
 
     scope_fclose(fs);
     scope_unlink(path);
@@ -1626,6 +1653,7 @@ init(void)
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
 
+    g_cfg.funcs_attached = TRUE;
     g_cfg.staticfg = g_staticfg;
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
@@ -4620,7 +4648,6 @@ send(int sockfd, const void *buf, size_t len, int flags)
 {
     ssize_t rc;
     WRAP_CHECK(send, -1);
-    doURL(sockfd, buf, len, NETTX);
     rc = g_fn.send(sockfd, buf, len, flags);
     if (rc != -1) {
         scopeLog(CFG_LOG_TRACE, "fd:%d send", sockfd);
@@ -4773,9 +4800,7 @@ recv(int sockfd, void *buf, size_t len, int flags)
 
     WRAP_CHECK(recv, -1);
     scopeLog(CFG_LOG_TRACE, "fd:%d recv", sockfd);
-    if ((rc = doURL(sockfd, buf, len, NETRX)) == 0) {
-        rc = g_fn.recv(sockfd, buf, len, flags);
-    }
+    rc = g_fn.recv(sockfd, buf, len, flags);
 
     // If called with the MSG_PEEK flag set, don't do any scope processing
     // as it could result in processing of duplicate bytes later
@@ -4802,9 +4827,7 @@ __recv_chk(int sockfd, void *buf, size_t len, size_t buflen, int flags)
 
     WRAP_CHECK(__recv_chk, -1);
     scopeLog(CFG_LOG_TRACE, "fd:%d __recv_chk", sockfd);
-    if ((rc = doURL(sockfd, buf, len, NETRX)) == 0) {
-        rc = g_fn.__recv_chk(sockfd, buf, len, buflen, flags);
-    }
+    rc = g_fn.__recv_chk(sockfd, buf, len, buflen, flags);
 
     // If called with the MSG_PEEK flag set, don't do any scope processing
     // as it could result in processing of duplicate bytes later

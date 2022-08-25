@@ -25,11 +25,11 @@ type Process struct {
 type Processes []Process
 
 var (
-	ErrOpenProc       = errors.New("cannot open proc directory")
-	ErrReadProc       = errors.New("cannot read from proc directory")
-	ErrGetProcStatus  = errors.New("error getting process status")
-	ErrGetProcCmdLine = errors.New("error getting process command line")
-	ErrMissingUser    = errors.New("unable to find user")
+	errOpenProc       = errors.New("cannot open proc directory")
+	errReadProc       = errors.New("cannot read from proc directory")
+	errGetProcStatus  = errors.New("error getting process status")
+	errGetProcCmdLine = errors.New("error getting process command line")
+	errMissingUser    = errors.New("unable to find user")
 )
 
 // ProcessesByName returns an array of processes that match a given name
@@ -38,13 +38,13 @@ func ProcessesByName(name string) (Processes, error) {
 
 	procDir, err := os.Open("/proc")
 	if err != nil {
-		return processes, ErrOpenProc
+		return processes, errOpenProc
 	}
 	defer procDir.Close()
 
 	procs, err := procDir.Readdirnames(0)
 	if err != nil {
-		return processes, ErrReadProc
+		return processes, errReadProc
 	}
 
 	i := 1
@@ -72,7 +72,7 @@ func ProcessesByName(name string) (Processes, error) {
 
 		// TODO in container namespace we cannot depend on following info
 		userName, err := PidUser(pid)
-		if err != nil && !errors.Is(err, ErrMissingUser) {
+		if err != nil && !errors.Is(err, errMissingUser) {
 			continue
 		}
 
@@ -96,13 +96,13 @@ func ProcessesScoped() (Processes, error) {
 
 	procDir, err := os.Open("/proc")
 	if err != nil {
-		return processes, ErrOpenProc
+		return processes, errOpenProc
 	}
 	defer procDir.Close()
 
 	procs, err := procDir.Readdirnames(0)
 	if err != nil {
-		return processes, ErrReadProc
+		return processes, errReadProc
 	}
 
 	i := 1
@@ -125,7 +125,7 @@ func ProcessesScoped() (Processes, error) {
 
 		// TODO in container namespace we cannot depend on following info
 		userName, err := PidUser(pid)
-		if err != nil && !errors.Is(err, ErrMissingUser) {
+		if err != nil && !errors.Is(err, errMissingUser) {
 			continue
 		}
 
@@ -151,13 +151,13 @@ func PidUser(pid int) (string, error) {
 	// Get uid from status
 	pStat, err := linuxproc.ReadProcessStatus(fmt.Sprintf("/proc/%v/status", pid))
 	if err != nil {
-		return "", ErrGetProcStatus
+		return "", errGetProcStatus
 	}
 
 	// Lookup username by uid
 	user, err := user.LookupId(fmt.Sprint(pStat.RealUid))
 	if err != nil {
-		return "", ErrMissingUser
+		return "", errMissingUser
 	}
 
 	return user.Username, nil
@@ -188,7 +188,7 @@ func PidCommand(pid int) (string, error) {
 	// Get command from status
 	pStat, err := linuxproc.ReadProcessStatus(fmt.Sprintf("/proc/%v/status", pid))
 	if err != nil {
-		return "", ErrGetProcStatus
+		return "", errGetProcStatus
 	}
 
 	return pStat.Name, nil
@@ -199,7 +199,7 @@ func PidCmdline(pid int) (string, error) {
 	// Get cmdline
 	cmdline, err := linuxproc.ReadProcessCmdline(fmt.Sprintf("/proc/%v/cmdline", pid))
 	if err != nil {
-		return "", ErrGetProcCmdLine
+		return "", errGetProcCmdLine
 
 	}
 
@@ -219,7 +219,7 @@ func PidService(pid int) (bool, error) {
 	// Get ppid from status
 	pStat, err := linuxproc.ReadProcessStatus(fmt.Sprintf("/proc/%v/status", pid))
 	if err != nil {
-		return false, ErrGetProcStatus
+		return false, errGetProcStatus
 	}
 	return pStat.PPid == 1, nil
 }

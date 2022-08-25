@@ -12,48 +12,48 @@ import (
 )
 
 var (
-	ErrRoot                = errors.New("must be run as a root")
-	ErrSyscallUname        = errors.New("syscall.Uname failed")
-	ErrUnkownBootSystem    = errors.New("unknown boot system")
-	ErrConfirmFailed       = errors.New("confirm failed")
-	ErrCreateLibDir        = errors.New("failed to create library directory")
-	ErrCreateScopeYml      = errors.New("failed to create scope.yml")
-	ErrCreateServiceDir    = errors.New("failed to create service directory")
-	ErrAssetLibscope       = errors.New("failed to find libscope.so asset")
-	ErrAssetLdscope        = errors.New("failed to find ldscope asset")
-	ErrAssetScopeYml       = errors.New("failed to find scope.yml asset")
-	ErrExtractLib          = errors.New("failed to extract library")
-	ErrExtractLoader       = errors.New("failed to extract loader")
-	ErrExtractScopeYml     = errors.New("failed to extract scope.yml")
-	ErrMoveScopeYml        = errors.New("failed to move scope.yml to scope_example.yml")
-	ErrRemoveLoader        = errors.New("failed to remove loader")
-	ErrCreateConfigBaseDir = errors.New("failed to create config base directory")
-	ErrCreateConfigDir     = errors.New("failed to create config directory")
-	ErrCreateRunDir        = errors.New("failed to create run directory")
-	ErrCreateLogDir        = errors.New("failed to create log directory")
-	ErrMissingService      = errors.New("missing service file")
-	ErrCancel              = errors.New("info: canceled")
-	ErrOverrideFileCreate  = errors.New("failed to create override file")
-	ErrOverrideFileRead    = errors.New("failed to read override file")
-	ErrOverrideFileUpdate  = errors.New("failed to update override file")
-	ErrSysConfigFileCreate = errors.New("failed to create sysconfig file")
-	ErrSysConfigFileOpen   = errors.New("failed to open sysconfig file")
-	ErrSysConfigFileUpdate = errors.New("failed to update sysconfig file")
-	ErrSysConfigFileRead   = errors.New("failed to read sysconfig file")
+	errRoot                = errors.New("must be run as a root")
+	errSyscallUname        = errors.New("syscall.Uname failed")
+	errUnkownBootSystem    = errors.New("unknown boot system")
+	errConfirmFailed       = errors.New("confirm failed")
+	errCreateLibDir        = errors.New("failed to create library directory")
+	errCreateScopeYml      = errors.New("failed to create scope.yml")
+	errCreateServiceDir    = errors.New("failed to create service directory")
+	errAssetLibscope       = errors.New("failed to find libscope.so asset")
+	errAssetLdscope        = errors.New("failed to find ldscope asset")
+	errAssetScopeYml       = errors.New("failed to find scope.yml asset")
+	errExtractLib          = errors.New("failed to extract library")
+	errExtractLoader       = errors.New("failed to extract loader")
+	errExtractScopeYml     = errors.New("failed to extract scope.yml")
+	errMoveScopeYml        = errors.New("failed to move scope.yml to scope_example.yml")
+	errRemoveLoader        = errors.New("failed to remove loader")
+	errCreateConfigBaseDir = errors.New("failed to create config base directory")
+	errCreateConfigDir     = errors.New("failed to create config directory")
+	errCreateRunDir        = errors.New("failed to create run directory")
+	errCreateLogDir        = errors.New("failed to create log directory")
+	errMissingService      = errors.New("missing service file")
+	errCancel              = errors.New("info: canceled")
+	errOverrideFileCreate  = errors.New("failed to create override file")
+	errOverrideFileRead    = errors.New("failed to read override file")
+	errOverrideFileUpdate  = errors.New("failed to update override file")
+	errSysConfigFileCreate = errors.New("failed to create sysconfig file")
+	errSysConfigFileOpen   = errors.New("failed to open sysconfig file")
+	errSysConfigFileUpdate = errors.New("failed to update sysconfig file")
+	errSysConfigFileRead   = errors.New("failed to read sysconfig file")
 )
 
 func (rc *Config) Service(serviceName string, user string, force bool) error {
 	// TODO: move it to separate package
 	// must be root
 	if os.Getuid() != 0 {
-		return ErrRoot
+		return errRoot
 	}
 
 	// get uname pieces
 	utsname := syscall.Utsname{}
 	err := syscall.Uname(&utsname)
 	if err != nil {
-		return ErrSyscallUname
+		return errSyscallUname
 	}
 	buf := make([]byte, 0, 64)
 	for _, v := range utsname.Machine[:] {
@@ -85,7 +85,7 @@ func (rc *Config) Service(serviceName string, user string, force bool) error {
 		// Initd
 		return rc.installInitd(serviceName, unameMachine, unameSysname, libcName, force)
 	}
-	return ErrUnkownBootSystem
+	return errUnkownBootSystem
 }
 
 func confirm(s string) (bool, error) {
@@ -94,7 +94,7 @@ func confirm(s string) (bool, error) {
 		fmt.Printf("%s [y/n]: ", s)
 		resp, err := reader.ReadString('\n')
 		if err != nil {
-			return false, ErrConfirmFailed
+			return false, errConfirmFailed
 		}
 		resp = strings.ToLower(strings.TrimSpace(resp))
 		if resp == "y" || resp == "yes" {
@@ -110,7 +110,7 @@ func (rc *Config) installScope(serviceName string, unameMachine string, unameSys
 	libraryDir := fmt.Sprintf("/usr/lib/%s-%s-%s", unameMachine, unameSysname, libcName)
 	if !util.CheckDirExists(libraryDir) {
 		if err := os.MkdirAll(libraryDir, 0755); err != nil {
-			return "", ErrCreateLibDir
+			return "", errCreateLibDir
 		}
 	}
 
@@ -118,46 +118,46 @@ func (rc *Config) installScope(serviceName string, unameMachine string, unameSys
 	libraryDir = libraryDir + "/cribl"
 	if !util.CheckDirExists(libraryDir) {
 		if err := os.Mkdir(libraryDir, 0755); err != nil {
-			return "", ErrCreateLibDir
+			return "", errCreateLibDir
 		}
 	}
 	libraryPath := libraryDir + "/libscope.so"
 	if !util.CheckFileExists(libraryPath) {
 		asset, err := Asset("build/libscope.so")
 		if err != nil {
-			return "", ErrAssetLibscope
+			return "", errAssetLibscope
 		}
 
 		if err := os.WriteFile(libraryPath, asset, 0755); err != nil {
-			return "", ErrExtractLib
+			return "", errExtractLib
 		}
 	}
 
 	// patch the library
 	asset, err := Asset("build/ldscope")
 	if err != nil {
-		return "", ErrAssetLdscope
+		return "", errAssetLdscope
 	}
 	loaderPath := libraryDir + "/ldscope"
 	if err := os.WriteFile(loaderPath, asset, 0755); err != nil {
-		return "", ErrExtractLoader
+		return "", errExtractLoader
 	}
 	rc.Patch(libraryDir)
 	if err = os.Remove(loaderPath); err != nil {
-		return "", ErrRemoveLoader
+		return "", errRemoveLoader
 	}
 
 	// create the config directory
 	configBaseDir := "/etc/scope"
 	if !util.CheckDirExists(configBaseDir) {
 		if err := os.Mkdir(configBaseDir, 0755); err != nil {
-			return "", ErrCreateConfigBaseDir
+			return "", errCreateConfigBaseDir
 		}
 	}
 	configDir := fmt.Sprintf("/etc/scope/%s", serviceName)
 	if !util.CheckDirExists(configDir) {
 		if err := os.Mkdir(configDir, 0755); err != nil {
-			return "", ErrCreateConfigDir
+			return "", errCreateConfigDir
 		}
 	}
 
@@ -166,7 +166,7 @@ func (rc *Config) installScope(serviceName string, unameMachine string, unameSys
 	if !util.CheckDirExists(logDir) {
 		// TODO chown/chgrp to who?
 		if err := os.Mkdir(logDir, 0755); err != nil {
-			return "", ErrCreateLogDir
+			return "", errCreateLogDir
 		}
 	}
 
@@ -175,7 +175,7 @@ func (rc *Config) installScope(serviceName string, unameMachine string, unameSys
 	if !util.CheckDirExists(runDir) {
 		// TODO chown/chgrp to who?
 		if err := os.Mkdir(runDir, 0755); err != nil {
-			return "", ErrCreateRunDir
+			return "", errCreateRunDir
 		}
 
 	}
@@ -184,21 +184,21 @@ func (rc *Config) installScope(serviceName string, unameMachine string, unameSys
 	configPath := fmt.Sprintf("/etc/scope/%s/scope.yml", serviceName)
 	asset, err = Asset("build/scope.yml")
 	if err != nil {
-		return "", ErrAssetScopeYml
+		return "", errAssetScopeYml
 	}
 
 	if err := os.WriteFile(configPath, asset, 0644); err != nil {
-		return "", ErrExtractScopeYml
+		return "", errExtractScopeYml
 	}
 	examplePath := fmt.Sprintf("/etc/scope/%s/scope_example.yml", serviceName)
 	if err := os.Rename(configPath, examplePath); err != nil {
-		return "", ErrMoveScopeYml
+		return "", errMoveScopeYml
 	}
 	rc.WorkDir = configDir
 	rc.CommandDir = runDir
 	rc.LogDest = "file://" + logDir + "/cribl.log"
 	if err := rc.WriteScopeConfig(configPath, 0644); err != nil {
-		return "", ErrCreateScopeYml
+		return "", errCreateScopeYml
 	}
 
 	return libraryPath, nil
@@ -216,12 +216,12 @@ func locateService(serviceName string) bool {
 
 func (rc *Config) installSystemd(serviceName string, unameMachine string, unameSysname string, libcName string, force bool) error {
 	if !locateService(serviceName) {
-		return fmt.Errorf("%v %v.service", ErrMissingService, serviceName)
+		return fmt.Errorf("%v %v.service", errMissingService, serviceName)
 	}
 	serviceDir := "/etc/systemd/system/" + serviceName + ".service.d"
 	if !util.CheckDirExists(serviceDir) {
 		if err := os.MkdirAll(serviceDir, 0655); err != nil {
-			return ErrCreateServiceDir
+			return errCreateServiceDir
 		}
 	}
 	serviceEnvPath := serviceDir + "/env.conf"
@@ -235,7 +235,7 @@ func (rc *Config) installSystemd(serviceName string, unameMachine string, unameS
 		fmt.Printf("  - create /var/run/scope/\n")
 		status, err := confirm("Ready to proceed?")
 		if err != nil || !status {
-			return ErrCancel
+			return errCancel
 		}
 	}
 
@@ -247,13 +247,13 @@ func (rc *Config) installSystemd(serviceName string, unameMachine string, unameS
 		// Create env.conf
 		content := fmt.Sprintf("[Service]\nEnvironment=LD_PRELOAD=%s\nEnvironment=SCOPE_HOME=/etc/scope/%s\n", libraryPath, serviceName)
 		if err := os.WriteFile(serviceEnvPath, []byte(content), 0644); err != nil {
-			return ErrOverrideFileCreate
+			return errOverrideFileCreate
 		}
 	} else {
 		// Modify env.conf
 		data, err := os.ReadFile(serviceEnvPath)
 		if err != nil {
-			return ErrOverrideFileRead
+			return errOverrideFileRead
 		}
 		strData := string(data)
 		if !strings.Contains(strData, "[Service]\n") {
@@ -261,12 +261,12 @@ func (rc *Config) installSystemd(serviceName string, unameMachine string, unameS
 			content := fmt.Sprintf("[Service]\nEnvironment=LD_PRELOAD=%s\nEnvironment=SCOPE_HOME=/etc/scope/%s\n", libraryPath, serviceName)
 			f, err := os.OpenFile(serviceEnvPath, os.O_APPEND|os.O_WRONLY, 0644)
 			if err != nil {
-				return ErrSysConfigFileOpen
+				return errSysConfigFileOpen
 			}
 			defer f.Close()
 			_, err = f.WriteString(content)
 			if err != nil {
-				return ErrOverrideFileUpdate
+				return errOverrideFileUpdate
 			}
 		} else {
 			// Update Service section
@@ -281,7 +281,7 @@ func (rc *Config) installSystemd(serviceName string, unameMachine string, unameS
 				strData = strings.Replace(strData, oldData, newData, 1)
 			}
 			if err := os.WriteFile(serviceEnvPath, []byte(strData), 0644); err != nil {
-				return ErrOverrideFileCreate
+				return errOverrideFileCreate
 			}
 		}
 	}
@@ -297,7 +297,7 @@ func (rc *Config) installSystemd(serviceName string, unameMachine string, unameS
 func (rc *Config) installInitd(serviceName string, unameMachine string, unameSysname string, libcName string, force bool) error {
 	initScript := "/etc/init.d/" + serviceName
 	if !util.CheckFileExists(initScript) {
-		return fmt.Errorf("%v %v", ErrMissingService, initScript)
+		return fmt.Errorf("%v %v", errMissingService, initScript)
 	}
 
 	sysconfigFile := "/etc/sysconfig/" + serviceName
@@ -311,7 +311,7 @@ func (rc *Config) installInitd(serviceName string, unameMachine string, unameSys
 		fmt.Printf("  - create /var/run/scope/\n")
 		status, err := confirm("Ready to proceed?")
 		if err != nil || !status {
-			return ErrCancel
+			return errCancel
 		}
 	}
 
@@ -323,34 +323,34 @@ func (rc *Config) installInitd(serviceName string, unameMachine string, unameSys
 	if !util.CheckFileExists(sysconfigFile) {
 		content := fmt.Sprintf("LD_PRELOAD=%s\nSCOPE_HOME=/etc/scope/%s\n", libraryPath, serviceName)
 		if err := os.WriteFile(sysconfigFile, []byte(content), 0644); err != nil {
-			return ErrSysConfigFileCreate
+			return errSysConfigFileCreate
 		}
 	} else {
 		data, err := os.ReadFile(sysconfigFile)
 		if err != nil {
-			return ErrSysConfigFileRead
+			return errSysConfigFileRead
 		}
 		strData := string(data)
 		if !strings.Contains(strData, "LD_PRELOAD=") {
 			content := fmt.Sprintf("LD_PRELOAD=%s\n", libraryPath)
 			f, err := os.OpenFile(sysconfigFile, os.O_APPEND|os.O_WRONLY, 0644)
 			if err != nil {
-				return ErrSysConfigFileOpen
+				return errSysConfigFileOpen
 			}
 			defer f.Close()
 			if _, err := f.WriteString(content); err != nil {
-				return ErrSysConfigFileUpdate
+				return errSysConfigFileUpdate
 			}
 		}
 		if !strings.Contains(strData, "SCOPE_HOME=") {
 			content := fmt.Sprintf("SCOPE_HOME=/etc/scope/%s\n", serviceName)
 			f, err := os.OpenFile(sysconfigFile, os.O_APPEND|os.O_WRONLY, 0644)
 			if err != nil {
-				return ErrSysConfigFileOpen
+				return errSysConfigFileOpen
 			}
 			defer f.Close()
 			if _, err = f.WriteString(content); err != nil {
-				return ErrSysConfigFileUpdate
+				return errSysConfigFileUpdate
 			}
 		}
 	}
@@ -365,7 +365,7 @@ func (rc *Config) installInitd(serviceName string, unameMachine string, unameSys
 func (rc *Config) installOpenRc(serviceName string, unameMachine string, unameSysname string, libcName string, force bool) error {
 	initScript := "/etc/init.d/" + serviceName
 	if !util.CheckFileExists(initScript) {
-		return fmt.Errorf("%v %v", ErrMissingService, initScript)
+		return fmt.Errorf("%v %v", errMissingService, initScript)
 	}
 
 	initConfigScript := "/etc/conf.d/" + serviceName
@@ -379,7 +379,7 @@ func (rc *Config) installOpenRc(serviceName string, unameMachine string, unameSy
 		fmt.Printf("  - create /var/run/scope/\n")
 		status, err := confirm("Ready to proceed?")
 		if err != nil || !status {
-			return ErrCancel
+			return errCancel
 		}
 	}
 
@@ -392,34 +392,34 @@ func (rc *Config) installOpenRc(serviceName string, unameMachine string, unameSy
 		fmt.Printf("Write to a file %s", initConfigScript)
 		content := fmt.Sprintf("export LD_PRELOAD=%s\nexport SCOPE_HOME=/etc/scope/%s\n", libraryPath, serviceName)
 		if err := os.WriteFile(initConfigScript, []byte(content), 0644); err != nil {
-			return ErrSysConfigFileUpdate
+			return errSysConfigFileUpdate
 		}
 	} else {
 		data, err := os.ReadFile(initConfigScript)
 		if err != nil {
-			return ErrSysConfigFileRead
+			return errSysConfigFileRead
 		}
 		strData := string(data)
 		if !strings.Contains(strData, "export LD_PRELOAD=") {
 			content := fmt.Sprintf("export LD_PRELOAD=%s\n", libraryPath)
 			f, err := os.OpenFile(initConfigScript, os.O_APPEND|os.O_WRONLY, 0644)
 			if err != nil {
-				return ErrSysConfigFileOpen
+				return errSysConfigFileOpen
 			}
 			defer f.Close()
 			if _, err := f.WriteString(content); err != nil {
-				return ErrSysConfigFileUpdate
+				return errSysConfigFileUpdate
 			}
 		}
 		if !strings.Contains(strData, "export SCOPE_HOME=") {
 			content := fmt.Sprintf("export SCOPE_HOME=/etc/scope/%s\n", serviceName)
 			f, err := os.OpenFile(initConfigScript, os.O_APPEND|os.O_WRONLY, 0644)
 			if err != nil {
-				return ErrSysConfigFileOpen
+				return errSysConfigFileOpen
 			}
 			defer f.Close()
 			if _, err = f.WriteString(content); err != nil {
-				return ErrSysConfigFileUpdate
+				return errSysConfigFileUpdate
 			}
 		}
 	}

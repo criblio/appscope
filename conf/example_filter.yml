@@ -3,7 +3,7 @@ allow:
   arg: start
   config:
     cribl:
-      enable: true
+      enable: false
       transport:
         host: 127.0.0.1
         port: 10090
@@ -58,7 +58,7 @@ allow:
         level: warning
         transport:
           buffer: line
-          path: /tmp/scope.log
+          path: /tmp/scope2.log
           type: file
       summaryperiod: 10
     metric:
@@ -86,7 +86,7 @@ allow:
     payload:
       dir: /tmp
       enable: false
-- procname: memcached
+- procname: nginx
   arg: start
   config:
     cribl:

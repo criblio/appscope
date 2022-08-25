@@ -16,18 +16,18 @@ import (
 )
 
 var (
-	ErrGetCurrentUser           = errors.New("unable to get current user")
-	ErrMissingAdmPriv           = errors.New("you must have administrator privileges to attach to a process")
-	ErrGetLinuxCap              = errors.New("unable to get linux capabilities for current process")
-	ErrLoadLinuxCap             = errors.New("unable to load linux capabilities for current process")
-	ErrMissingPtrace            = errors.New("missing PTRACE capabilities to attach to a process")
-	ErrMissingProc              = errors.New("no process found matching that name")
-	ErrPidInvalid               = errors.New("invalid PID")
-	ErrPidMissing               = errors.New("PID does not exist")
-	ErrCreateLdscope            = errors.New("error creating ldscope")
-	ErrAttachFailedAlreadyScope = errors.New("attach failed. This process is already being scoped")
-	ErrLibraryNotExit           = errors.New("library Path does not exist")
-	ErrInvalidSelection         = errors.New("invalid Selection")
+	errGetCurrentUser   = errors.New("unable to get current user")
+	errMissingAdmPriv   = errors.New("you must have administrator privileges to attach to a process")
+	errGetLinuxCap      = errors.New("unable to get linux capabilities for current process")
+	errLoadLinuxCap     = errors.New("unable to load linux capabilities for current process")
+	errMissingPtrace    = errors.New("missing PTRACE capabilities to attach to a process")
+	errMissingProc      = errors.New("no process found matching that name")
+	errPidInvalid       = errors.New("invalid PID")
+	errPidMissing       = errors.New("PID does not exist")
+	errCreateLdscope    = errors.New("error creating ldscope")
+	errAlreadyScope     = errors.New("attach failed. This process is already being scoped")
+	errLibraryNotExit   = errors.New("library Path does not exist")
+	errInvalidSelection = errors.New("invalid Selection")
 )
 
 // Attach scopes an existing PID
@@ -35,22 +35,22 @@ func (rc *Config) Attach(args []string) error {
 	// Validate user has root permissions
 	user, err := user.Current()
 	if err != nil {
-		return ErrGetCurrentUser
+		return errGetCurrentUser
 	}
 	if user.Uid != "0" {
-		return ErrMissingAdmPriv
+		return errMissingAdmPriv
 	}
 	// Validate PTRACE capability
 	c, err := capability.NewPid2(0)
 	if err != nil {
-		return ErrGetLinuxCap
+		return errGetLinuxCap
 	}
 	err = c.Load()
 	if err != nil {
-		return ErrLoadLinuxCap
+		return errLoadLinuxCap
 	}
 	if !c.Get(capability.EFFECTIVE, capability.CAP_SYS_PTRACE) {
-		return ErrMissingPtrace
+		return errMissingPtrace
 	}
 	// Get PID by name if non-numeric, otherwise validate/use args[0]
 	var pid int
@@ -68,26 +68,26 @@ func (rc *Config) Attach(args []string) error {
 				return err
 			}
 		} else {
-			return ErrMissingProc
+			return errMissingProc
 		}
 		args[0] = fmt.Sprint(pid)
 	} else {
 		pid, err = strconv.Atoi(args[0])
 		if err != nil {
-			return ErrPidInvalid
+			return errPidInvalid
 		}
 	}
 	// Check PID exists
 	if !util.PidExists(pid) {
-		return ErrPidMissing
+		return errPidMissing
 	}
 	// Check PID is not already being scoped
 	if util.PidScoped(pid) {
-		return ErrAttachFailedAlreadyScope
+		return errAlreadyScope
 	}
 	// Create ldscope
 	if err := createLdscope(); err != nil {
-		return ErrCreateLdscope
+		return errCreateLdscope
 	}
 	// Normal operational, not passthrough, create directory for this run
 	// Directory contains scope.yml which is configured to output to that
@@ -104,7 +104,7 @@ func (rc *Config) Attach(args []string) error {
 	if len(rc.LibraryPath) > 0 {
 		// Validate path exists
 		if !util.CheckDirExists(rc.LibraryPath) {
-			return ErrLibraryNotExit
+			return errLibraryNotExit
 		}
 		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
@@ -136,7 +136,7 @@ func choosePid(procs util.Processes) (int, error) {
 	i, err := strconv.ParseUint(selection, 10, 32)
 	i--
 	if err != nil || i >= uint64(len(procs)) {
-		return -1, ErrInvalidSelection
+		return -1, errInvalidSelection
 	}
 	return procs[i].Pid, nil
 }

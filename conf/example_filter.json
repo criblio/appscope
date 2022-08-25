@@ -132,7 +132,7 @@
       }
     },
     {
-      "procname": "memcached",
+      "procname": "nginx",
       "arg": "start",
       "config": {
         "metric": {
@@ -242,13 +242,13 @@
             "level": "warning",
             "transport": {
               "type": "file",
-              "path": "/tmp/scope.log",
+              "path": "/tmp/scope2.log",
               "buffer": "line"
             }
           }
         },
         "cribl": {
-          "enable": true,
+          "enable": false,
           "transport": {
             "type": "edge",
             "host": "127.0.0.1",

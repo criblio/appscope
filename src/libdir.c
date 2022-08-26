@@ -392,6 +392,12 @@ libdirExtractLibrary()
             libdirGetLibraryNote());
 }
 
+int
+libdirExtractLibraryTo(const char* path)
+{
+    return libdirFileExtract(path, &_binary_libscope_so_start, &_binary_libscope_so_end);
+}
+
 const char *
 libdirGetLoader()
 {

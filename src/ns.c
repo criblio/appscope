@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "ns.h"
+#include "libdir.h"
 #include "scopestdlib.h"
 
 /*
@@ -263,7 +264,6 @@ nsSetup(pid_t pid)
     char * scopeCfgFilterMem = NULL;
     int status = EXIT_FAILURE;
 
-    // Configuration is optional
     scopeCfgFilterMem = loadFileIntoMem(&filterFileSize, getenv("SCOPE_FILTER_PATH"));
     if (scopeCfgFilterMem == NULL) {
         return status;
@@ -273,6 +273,7 @@ nsSetup(pid_t pid)
         goto cleanupMem;
     }
 
+    // Setup filter file 
     if (extractMemToChildNamespace(scopeCfgFilterMem, filterFileSize, "/tmp/scope_filter.yml", 0664) == FALSE) {
         goto cleanupMem;
     }
@@ -283,6 +284,9 @@ nsSetup(pid_t pid)
     }
 
     // Setup libscope.so
+    if (libdirExtractLibraryTo(LIBSCOPE_IN_CHILD_NS)) {
+        goto cleanupMem;
+    }
 
     status = EXIT_SUCCESS;
 

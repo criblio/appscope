@@ -19,6 +19,7 @@
 #include "scopestdlib.h"
 #include "dbg.h"
 #include "inject.h"
+#include "os.h"
 
 #define __RTLD_DLOPEN	0x80000000
 
@@ -49,31 +50,6 @@ typedef struct {
     #define RET_REG regs.regs[0]
     #define DBG_TRAP "brk #0 \n"
 #endif
-
-static uint64_t
-findLibrary(const char *library, pid_t pid)
-{
-    char filename[PATH_MAX];
-    char buffer[9076];
-    FILE *fd;
-    uint64_t addr = 0;
-
-    scope_snprintf(filename, sizeof(filename), "/proc/%d/maps", pid);
-    if ((fd = scope_fopen(filename, "r")) == NULL) {
-        scope_perror("fopen(/proc/PID/maps) failed");
-        return 0;
-    }
-
-    while(scope_fgets(buffer, sizeof(buffer), fd)) {
-        if (scope_strstr(buffer, library)) {
-            addr = scope_strtoull(buffer, NULL, 16);
-            break;
-        }
-    }
-
-    scope_fclose(fd);
-    return addr;
-}
 
 static int
 freeSpaceAddr(pid_t pid, uint64_t* addr_begin, uint64_t* free_size)
@@ -344,7 +320,7 @@ injectScope(int pid, char* path)
     }
 
     // find the base address of libc in the target process
-    remoteLib = findLibrary(info.path, pid);
+    remoteLib = osFindLibrary(info.path, pid);
     if (!remoteLib) {
         scope_fprintf(scope_stderr, "error: failed to find libc in target process\n");
         return EXIT_FAILURE;

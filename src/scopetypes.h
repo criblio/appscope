@@ -249,5 +249,9 @@ typedef unsigned int bool;
 // processes forever while waiting for a single connection to complete.
 #define MAX_TLS_CONNECT_SECONDS 5
 
+// The dynamic config file location used by the CLI
+#define DYN_CONFIG_CLI_DIR "/dev/shm"
+#define DYN_CONFIG_CLI_PREFIX "scope_dconf"
+
 #endif // __SCOPETYPES_H__
 

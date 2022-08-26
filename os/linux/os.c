@@ -771,3 +771,28 @@ osGetProcCPU(void) {
         (((long long)ruse.ru_utime.tv_sec + (long long)ruse.ru_stime.tv_sec) * 1000 * 1000) +
         ((long long)ruse.ru_utime.tv_usec + (long long)ruse.ru_stime.tv_usec);
 }
+
+uint64_t
+osFindLibrary(const char *library, pid_t pid)
+{
+    char filename[PATH_MAX];
+    char buffer[9076];
+    FILE *fd;
+    uint64_t addr = 0;
+
+    scope_snprintf(filename, sizeof(filename), "/proc/%d/maps", pid);
+    if ((fd = scope_fopen(filename, "r")) == NULL) {
+        scope_perror("fopen(/proc/PID/maps) failed");
+        return 0;
+    }
+
+    while(scope_fgets(buffer, sizeof(buffer), fd)) {
+        if (scope_strstr(buffer, library)) {
+            addr = scope_strtoull(buffer, NULL, 16);
+            break;
+        }
+    }
+
+    scope_fclose(fd);
+    return addr;
+}

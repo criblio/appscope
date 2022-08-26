@@ -957,6 +957,7 @@ showUsage(char *prog)
       "\n"
       "usage: %s [OPTIONS] [--] EXECUTABLE [ARGS...]\n"
       "       %s [OPTIONS] --attach PID\n"
+      "       %s [OPTIONS] --detach PID\n"
       "\n"
       "options:\n"
       "  -u, --usage           display this info\n"
@@ -964,6 +965,7 @@ showUsage(char *prog)
       "  -l, --libbasedir DIR  specify parent for the library directory (default: /tmp)\n"
       "  -f DIR                alias for \"-l DIR\" for backward compatibility\n"
       "  -a, --attach PID      attach to the specified process ID\n"
+      "  -d, --detach PID      detach from the specified process ID\n"
       "  -p, --patch SO_FILE   patch specified libscope.so \n"
       "\n"
       "Help sections are OVERVIEW, CONFIGURATION, METRICS, EVENTS, and PROTOCOLS.\n"
@@ -985,6 +987,7 @@ static struct option opts[] = {
     { "usage",      no_argument,       0, 'u'},
     { "help",       optional_argument, 0, 'h' },
     { "attach",     required_argument, 0, 'a' },
+    { "detach",     required_argument, 0, 'd' },
     { "libbasedir", required_argument, 0, 'l' },
     { "patch",      required_argument, 0, 'p' },
     { 0, 0, 0, 0 }
@@ -996,6 +999,8 @@ main(int argc, char **argv, char **env)
     char *attachArg = 0;
     char path[PATH_MAX] = {0};
     int pid = -1;
+    char attachType = 'u';
+
     // process command line
     for (;;) {
         int index = 0;
@@ -1007,7 +1012,7 @@ main(int argc, char **argv, char **env)
         // The initial `:` lets us handle options with optional values like
         // `-h` and `-h SECTION`.
         //
-        int opt = getopt_long(argc, argv, "+:uh:a:l:f:p:", opts, &index);
+        int opt = getopt_long(argc, argv, "+:uh:a:d:l:f:p:", opts, &index);
         if (opt == -1) {
             break;
         }
@@ -1024,6 +1029,11 @@ main(int argc, char **argv, char **env)
                 return EXIT_SUCCESS;
             case 'a':
                 attachArg = optarg;
+                attachType = 'a';
+                break;
+            case 'd':
+                attachArg = optarg;
+                attachType = 'd';
                 break;
             case 'f':
                 // accept -f as alias for -l for BC
@@ -1053,26 +1063,20 @@ main(int argc, char **argv, char **env)
         }
     }
 
-    // either --attach or a command are required
+    // either --attach, --detach or a command are required
     if (!attachArg && optind >= argc) {
-        scope_fprintf(scope_stderr, "error: missing --attach option or EXECUTABLE argument\n");
+        scope_fprintf(scope_stderr, "error: missing --attach/--detach option or EXECUTABLE argument\n");
         showUsage(scope_basename(argv[0]));
         return EXIT_FAILURE;
     }
 
-    // use --attach, ignore executable and args
+    // use --attach/--detach, ignore executable and args
     if (attachArg && optind < argc) {
-        scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --attach option\n");
+        scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --attach/--detach option\n");
     }
 
     // perform namespace switch if required
     if (attachArg) {
-        // must be root
-        if (scope_getuid()) {
-            scope_printf("error: --attach requires root\n");
-            return EXIT_FAILURE;
-        }
-
         // target process must exist
         pid = scope_atoi(attachArg);
         if (pid < 1) {
@@ -1125,15 +1129,16 @@ main(int argc, char **argv, char **env)
         setenv("SCOPE_EXEC_PATH", execPath, 0);
     }
 
-    // create /dev/shm/scope_${PID}.env when attaching
     if (attachArg) {
-
         scope_snprintf(path, sizeof(path), "/proc/%d", pid);
         if (scope_access(path, F_OK)) {
-            scope_printf("error: --attach PID not a current process: %d\n", pid);
+            scope_printf("error: --attach/--detach PID not a current process: %d\n", pid);
             return EXIT_FAILURE;
         }
+    }
 
+    // create /dev/shm/scope_${PID}.env when attaching
+    if (attachArg && (attachType == 'a')) {
         // create .env file for the library to load
         scope_snprintf(path, sizeof(path), "/scope_attach_%d.env", pid);
         int fd = scope_shm_open(path, O_RDWR|O_CREAT, S_IRUSR|S_IRGRP|S_IROTH);
@@ -1167,7 +1172,11 @@ main(int argc, char **argv, char **env)
     execArgv[execArgc++] = (char *) libdirGetLoader();
 
     if (attachArg) {
-        execArgv[execArgc++] = "-a";
+        if (attachType == 'a') {
+            execArgv[execArgc++] = "-a";
+        } else {
+            execArgv[execArgc++] = "-d";
+        }
         execArgv[execArgc++] = attachArg;
     } else {
         while (optind < argc) {

@@ -631,13 +631,22 @@ dynConfig(void)
 {
     FILE *fs;
     time_t now;
-    char path[PATH_MAX];
+    char *path;
+    char userpath[PATH_MAX];
+    char clipath[PATH_MAX];
     static time_t modtime = 0;
 
-    scope_snprintf(path, sizeof(path), "%s/%s.%d", g_cmddir, DYN_CONFIG_PREFIX, g_proc.pid);
+    scope_snprintf(userpath, sizeof(userpath), "%s/%s.%d", g_cmddir, DYN_CONFIG_PREFIX, g_proc.pid);
+    scope_snprintf(clipath, sizeof(clipath), "%s/%s.%d", DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, g_proc.pid);
 
     // Is there a command file for this pid
-    if (osIsFilePresent(g_proc.pid, path) == -1) return 0;
+    if (osIsFilePresent(g_proc.pid, userpath) != -1) {
+        path = userpath;
+    } else if (osIsFilePresent(g_proc.pid, clipath) != -1) {
+        path = clipath;
+    } else {
+        return 0;
+    }
 
     // Have we already processed this file?
     now = fileModTime(path);

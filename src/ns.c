@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "ns.h"
+#include "service.h"
 #include "libdir.h"
 #include "scopestdlib.h"
 
@@ -14,6 +15,7 @@
 #define LDSCOPE_IN_CHILD_NS "/tmp/ldscope"
 #define LIBSCOPE_IN_CHILD_NS "/tmp/libscope.so"
 #define PROFILE_SETUP "LD_PRELOAD=/tmp/libscope.so\n"
+#define PROFILE_SETUP_LEN (sizeof(PROFILE_SETUP)-1)
 
 #define VALID_NS_DEPTH 2
 
@@ -239,13 +241,15 @@ nsIsPidInChildNs(pid_t pid, pid_t *nsPid)
 static bool
 setupProfile(void){
     int fd = scope_open("/etc/profile.d/scope.sh", O_CREAT | O_RDWR | O_TRUNC, 0644);
+
     if (fd < 0) {
         scope_perror("scope_fopen failed");
         return FALSE;
     }
 
-    if (scope_write(fd, PROFILE_SETUP, sizeof(PROFILE_SETUP)-1 ) != sizeof(PROFILE_SETUP)-1) {
+    if (scope_write(fd, PROFILE_SETUP, PROFILE_SETUP_LEN) != PROFILE_SETUP_LEN) {
         scope_perror("scope_write failed");
+        scope_close(fd);
         return FALSE;
     }
 
@@ -258,7 +262,17 @@ setupProfile(void){
 }
 
 int
-nsSetup(pid_t pid)
+nsService(pid_t pid, const char* serviceName) {
+
+    if (setNamespace(pid, "mnt") == FALSE) {
+        return -1;
+    }
+
+    return serviceSetup(serviceName);
+}
+
+int
+nsConfigure(pid_t pid)
 {
     size_t filterFileSize = 0;
     char * scopeCfgFilterMem = NULL;

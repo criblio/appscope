@@ -125,23 +125,33 @@ func setupHostCfg(cfgData []byte) error {
 	return nil
 }
 
-func SetupContainer(cfgData []byte) {
+func SetupContainer(cfgData []byte, allowProcs []allowProcConfig) {
 	// Setup Container namespace
 	os.Setenv("SCOPE_FILTER_PATH", "/tmp/scope_filter.yml")
 	// Iterate over all containers
 	// Extract Filter file
 	// Setup   /etc/profile.d
-	// Extract libscope.so (TODO)
-	// Run service command (TODO)
+	// Extract libscope.so
+	// Run service command
 	cPids, _ := util.GetDockerPids()
 	for _, cPid := range cPids {
 		log.Debug().Msgf("Start set up namespace for Pid %d", cPid)
 		ld := loader.ScopeLoader{Path: ldscopePath()}
-		if err := ld.SetupNs(cPid); err != nil {
+		if err := ld.Configure(cPid); err != nil {
 			log.Error().Err(err).Msgf("Setup container namespace failed for PID %v", cPid)
 			startErr = err
 		} else {
 			log.Debug().Msgf("Setup container succesfully PID: %v", cPid)
+		}
+
+		for _, process := range allowProcs {
+			log.Debug().Msgf("Start setup service %v for container PID: %v", process.Procname, cPid)
+			if err := ld.ServiceContainer(process.Procname, cPid); err != nil {
+				log.Error().Err(err).Msgf("Setup service %v failed for container PID: %v", process.Procname, cPid)
+				startErr = err
+			} else {
+				log.Debug().Msgf("Setup service succesfully: %v for container PID: %v", process.Procname, cPid)
+			}
 		}
 	}
 	os.Unsetenv("SCOPE_FILTER_PATH")
@@ -174,7 +184,7 @@ func (rc *Config) Start() error {
 		log.Debug().Msg("Setup Filter on Host succeded.")
 	}
 
-	SetupContainer(startcfgData)
+	SetupContainer(startcfgData, startCfg.AllowProc)
 
 	// Iterate over allowed process
 	// Attach to services on Host and container
@@ -205,12 +215,12 @@ func (rc *Config) Start() error {
 
 			// TODO: pass the libscope.so well known location and inform service about it
 			// quiet status?
-			if err := rc.startServiceStage(alllowProc.Procname, cfgSingleProc); err != nil {
-				log.Error().Err(err).Msgf("Service setup failed for process: %v", alllowProc.Procname)
-				startErr = err
-			} else {
-				log.Debug().Msgf("Serivce setup succeded for process %v", alllowProc.Procname)
-			}
+			// if err := rc.startServiceStage(alllowProc.Procname, cfgSingleProc); err != nil {
+			// 	log.Error().Err(err).Msgf("Service setup failed for process: %v", alllowProc.Procname)
+			// 	startErr = err
+			// } else {
+			// 	log.Debug().Msgf("Serivce setup succeded for process %v", alllowProc.Procname)
+			// }
 		}
 	}
 

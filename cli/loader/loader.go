@@ -12,8 +12,16 @@ type ScopeLoader struct {
 	Path string
 }
 
-func (sL *ScopeLoader) SetupNs(cpid int) error {
-	cmd := exec.Command(sL.Path, "--setupns", strconv.Itoa(cpid))
+func (sL *ScopeLoader) Configure(cpid int) error {
+	cmd := exec.Command(sL.Path, "--configure", strconv.Itoa(cpid))
+	cmd.Env = os.Environ()
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func (sL *ScopeLoader) ServiceContainer(serviceName string, cpid int) error {
+	cmd := exec.Command(sL.Path, "--service", serviceName, "--configure", strconv.Itoa(cpid))
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

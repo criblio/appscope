@@ -4,11 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
-	"syscall"
 
+	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
 	"github.com/syndtr/gocapability/capability"
@@ -102,16 +101,11 @@ func (rc *Config) Attach(args []string) error {
 		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
-	// Prepend "--attach" to args
-	args = append([]string{"--attach"}, args...)
+	ld := loader.ScopeLoader{Path: ldscopePath()}
 	if !rc.Subprocess {
-		return syscall.Exec(ldscopePath(), append([]string{"ldscope"}, args...), env)
+		return ld.Attach(args, env)
 	}
-	cmd := exec.Command(ldscopePath(), args...)
-	cmd.Env = env
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	return ld.AttachSubProc(args, env)
 }
 
 // choosePid presents a user interface for selecting a PID

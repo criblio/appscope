@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"syscall"
 
+	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/util"
 )
 
@@ -142,7 +144,8 @@ func (rc *Config) installScope(serviceName string, unameMachine string, unameSys
 	if err := os.WriteFile(loaderPath, asset, 0755); err != nil {
 		return "", errExtractLoader
 	}
-	rc.Patch(libraryDir)
+	ld := loader.ScopeLoader{Path: loaderPath}
+	ld.Patch(path.Join(libraryDir, "libscope.so"))
 	if err = os.Remove(loaderPath); err != nil {
 		return "", errRemoveLoader
 	}

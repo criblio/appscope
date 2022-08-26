@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/criblio/scope/libscope"
+	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v2"
@@ -124,6 +125,28 @@ func setupHostCfg(cfgData []byte) error {
 	return nil
 }
 
+func SetupContainer(cfgData []byte) {
+	// Setup Container namespace
+	os.Setenv("SCOPE_FILTER_PATH", "/tmp/scope_filter.yml")
+	// Iterate over all containers
+	// Extract Filter file
+	// Setup   /etc/profile.d
+	// Extract libscope.so (TODO)
+	// Run service command (TODO)
+	cPids, _ := util.GetDockerPids()
+	for _, cPid := range cPids {
+		log.Debug().Msgf("Start set up namespace for Pid %d", cPid)
+		ld := loader.ScopeLoader{Path: ldscopePath()}
+		if err := ld.SetupNs(cPid); err != nil {
+			log.Error().Err(err).Msgf("Setup container namespace failed for PID %v", cPid)
+			startErr = err
+		} else {
+			log.Debug().Msgf("Setup container succesfully PID: %v", cPid)
+		}
+	}
+	os.Unsetenv("SCOPE_FILTER_PATH")
+}
+
 func (rc *Config) Start() error {
 	rc.setupWorkDir([]string{"start"}, true)
 	// Validate user has root permissions
@@ -151,24 +174,7 @@ func (rc *Config) Start() error {
 		log.Debug().Msg("Setup Filter on Host succeded.")
 	}
 
-	// Setup Container namespace
-	os.Setenv("SCOPE_FILTER_PATH", "/tmp/scope_filter.yml")
-	// Iterate over all containers
-	// Extract Filter file
-	// Setup   /etc/profile.d
-	// Extract libscope.so (TODO)
-	// Run service command (TODO)
-	cPids, _ := util.GetDockerPids()
-	for _, cPid := range cPids {
-		log.Debug().Msgf("Start set up namespace for Pid %d", cPid)
-		if err := rc.SetupContainer(cPid); err != nil {
-			log.Error().Err(err).Msgf("Setup container namespace failed for PID %v", cPid)
-			startErr = err
-		} else {
-			log.Debug().Msgf("Setup container succesfully PID: %v", cPid)
-		}
-	}
-	os.Unsetenv("SCOPE_FILTER_PATH")
+	SetupContainer(startcfgData)
 
 	// Iterate over allowed process
 	// Attach to services on Host and container

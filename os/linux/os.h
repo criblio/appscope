@@ -51,7 +51,7 @@ extern int osGetNumFds(pid_t);
 extern int osGetNumChildProcs(pid_t);
 extern int osInitTimer(platform_time_t *);
 extern int osGetProcMemory(pid_t);
-extern int osIsFilePresent(pid_t, const char *);
+extern int osIsFilePresent(const char *);
 extern int osGetCmdline(pid_t, char **);
 extern bool osThreadInit(void(*handler)(int), unsigned);
 extern int osUnixSockPeer(ino_t);

@@ -640,9 +640,9 @@ dynConfig(void)
     scope_snprintf(clipath, sizeof(clipath), "%s/%s.%d", DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, g_proc.pid);
 
     // Is there a command file for this pid
-    if (osIsFilePresent(g_proc.pid, userpath) != -1) {
+    if (osIsFilePresent(userpath) != -1) {
         path = userpath;
-    } else if (osIsFilePresent(g_proc.pid, clipath) != -1) {
+    } else if (osIsFilePresent(clipath) != -1) {
         path = clipath;
     } else {
         return 0;

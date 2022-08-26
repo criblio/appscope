@@ -214,12 +214,3 @@ func PidExists(pid int) bool {
 	}
 	return false
 }
-
-func PidService(pid int) (bool, error) {
-	// Get ppid from status
-	pStat, err := linuxproc.ReadProcessStatus(fmt.Sprintf("/proc/%v/status", pid))
-	if err != nil {
-		return false, errGetProcStatus
-	}
-	return pStat.PPid == 1, nil
-}

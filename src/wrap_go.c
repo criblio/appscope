@@ -27,14 +27,13 @@
 #define PRI_STR "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 #define PRI_STR_LEN sizeof(PRI_STR)
 #define UNDEF_OFFSET (-1)
-#define REGISTER_STACK_SIZE 0x48
 
 // compile-time control for debugging
-#define NEEDEVNULL 1
-//#define funcprint sysprint
-#define funcprint devnull
-//#define patchprint sysprint
-#define patchprint devnull
+//#define NEEDEVNULL 1
+#define funcprint sysprint
+//#define funcprint devnull
+#define patchprint sysprint
+//#define patchprint devnull
 
 int g_go_minor_ver = UNKNOWN_GO_VER;
 int g_go_maint_ver = UNKNOWN_GO_VER;
@@ -1251,7 +1250,7 @@ initGoHook(elf_buf_t *ebuf)
 
     if (g_go_minor_ver >= 17) {
         // The Go 17 schema works for 18 also, and possibly future versions
-        g_go_schema = &go_19_schema;
+        g_go_schema = &go_17_schema;
     }
 
     if (g_go_minor_ver >= 19) {
@@ -1351,15 +1350,17 @@ frame_size(assembly_fn fn)
  * details for write operations. The address of c_write
  * is passed to do_cfunc.
  *
- * ****** Memory Layout Go 8+  ******
- * Callee Stack                   = stackptr                   = Return Values
- * Caller Stack                   = stackptr + frame_size      = Input Params (at ret)
+ * ****** Memory Layout go_hook_ ******
+ * Callee Stack                   = stackptr                          = Input Params and Return Values
+ * Caller Stack                   = stackptr + frame_size             = Input Params and Return Values
  *
- * ****** Memory Layout Go 17+ ******
- * 9 Values pushed from Registers = stackptr                   = Return Values
- * Callee Stack                   = stackptr + (9*0x8=0x48)    
- * Caller Stack                   = Callee Stack + frame_size  = Input Params (at ret)
+ * ****** Memory Layout go_reg_syscall ******
+ * Return value from rax          = stackptr                          = Return Values
+ * Input params from rax...r9     = stackptr + 0x8                    = Input Params
+ * Callee Stack                   = stackptr + (0x8 * 10)
+ * Caller Stack                   = stackptr + (0x8 * 10) + frame_size
  *
+ * NOTE: Avoid using values from a Caller stack where possible since the Caller function could differ.
  */
 inline static void *
 do_cfunc(char *stackptr, void *cfunc, void *gfunc)
@@ -1369,13 +1370,13 @@ do_cfunc(char *stackptr, void *cfunc, void *gfunc)
     char *return_values;
 
     uint32_t frame_offset = frame_size(gfunc);
-    if (g_go_minor_ver >= 19) {                    // TODO go 17+
-        input_params = stackptr + 0x8; // + REGISTER_STACK_SIZE; // + frame_offset;
-        return_values = stackptr;
-    } else {
-        input_params = stackptr + frame_offset;
-        return_values = stackptr + frame_offset;   // TODO get return values from callee, remove frame_offset
-    }
+
+    input_params = stackptr; // if using go_reg_syscall, you need to add 0x8
+    return_values = stackptr;
+
+/*input_params = stackptr + frame_offset;
+  return_values = stackptr + frame_offset;   // TODO get return values from callee, remove frame_offset
+*/
 
     // Call the C handler
     __asm__ volatile (
@@ -1419,6 +1420,8 @@ getFDFromConn(uint64_t tcpConn) {
 static void
 c_syscall(char *input_params, char *return_values)
 {
+    input_params += 0x8; // see do_cfunc
+
     uint64_t syscall = *(uint64_t *)(input_params + 0x0);
     int64_t rc = *(int64_t *)(return_values + 0x0);
     if(rc < 0) rc = -1; // kernel syscalls can return values < -1
@@ -1788,8 +1791,6 @@ go_tls_server_read(char *stackptr)
 static void
 c_tls_server_write(char *input_params, char *return_values)
 {
-    input_params -= 0x8;
-
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
 //    input_params -= g_go_schema->arg_offsets.c_tls_server_write_callee;
@@ -1837,8 +1838,6 @@ go_tls_server_write(char *stackptr)
 static void
 c_tls_client_read(char *input_params, char *return_values)
 {
-    input_params -= 0x8;
-
     // go to caller of readResponse to get pc
     input_params += g_go_schema->arg_offsets.c_tls_client_read_caller;
     return_values += g_go_schema->arg_offsets.c_tls_client_read_caller;
@@ -1896,10 +1895,8 @@ go_tls_client_read(char *stackptr)
 static void
 c_tls_client_write(char *input_params, char *return_values)
 {
-    input_params -= 0x8;
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
- 
     //  input_params -= g_go_schema->arg_offsets.c_tls_client_write_callee;
   //  return_values -= g_go_schema->arg_offsets.c_tls_client_write_callee;
 
@@ -1940,8 +1937,6 @@ go_tls_client_write(char *stackptr)
 static void
 c_http2_server_read(char *input_params, char *return_values)
 {
-    input_params -= 0x8;
-
     uint64_t sc = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_http2_server_read_sc);
     if (!sc) return;
     uint64_t fr   = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_fr);
@@ -2001,8 +1996,6 @@ c_http2_server_write(char *input_params, char *return_values)
  //   input_params -= g_go_schema->arg_offsets.c_http2_server_write_callee;
 //    return_values -= g_go_schema->arg_offsets.c_http2_server_write_callee;
 
-    input_params -= 0x8;
-
     uint64_t sc      = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_http2_server_write_sc);
     if (!sc) return;
     uint64_t fr      = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_fr);
@@ -2059,7 +2052,6 @@ go_http2_server_write(char *stackptr)
 static void
 c_http2_server_preface(char *input_params, char *return_values)
 {
-    input_params -= 0x8;
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
 //    input_params -= g_go_schema->arg_offsets.c_http2_server_preface_callee;
@@ -2102,8 +2094,6 @@ go_http2_server_preface(char *stackptr)
 static void
 c_http2_client_read(char *input_params, char *return_values)
 {
-    input_params -= 0x8;
-
     uint64_t cc         = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_http2_client_read_cc);
     if (!cc) return;
     uint64_t fr         = *(uint64_t *)(cc + g_go_schema->struct_offsets.cc_to_fr);
@@ -2155,8 +2145,6 @@ go_http2_client_read(char *stackptr)
 static void
 c_http2_client_write(char *input_params, char *return_values)
 {
-    input_params -= 0x8;
-   
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
  //   input_params -= g_go_schema->arg_offsets.c_http2_client_write_callee;

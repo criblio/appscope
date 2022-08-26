@@ -5,5 +5,6 @@
 
 bool nsIsPidInChildNs(pid_t, pid_t *);
 int nsForkAndExec(pid_t, pid_t);
+int nsSetup(pid_t);
 
 #endif // __NS_H__

@@ -958,6 +958,7 @@ showUsage(char *prog)
       "usage: %s [OPTIONS] [--] EXECUTABLE [ARGS...]\n"
       "       %s [OPTIONS] --attach PID\n"
       "       %s [OPTIONS] --detach PID\n"
+      "       %s [OPTIONS] --setupns PID\n"
       "\n"
       "options:\n"
       "  -u, --usage           display this info\n"
@@ -966,6 +967,7 @@ showUsage(char *prog)
       "  -f DIR                alias for \"-l DIR\" for backward compatibility\n"
       "  -a, --attach PID      attach to the specified process ID\n"
       "  -d, --detach PID      detach from the specified process ID\n"
+      "  -s, --setupns PID     setup namespace for specified process ID\n"
       "  -p, --patch SO_FILE   patch specified libscope.so \n"
       "\n"
       "Help sections are OVERVIEW, CONFIGURATION, METRICS, EVENTS, and PROTOCOLS.\n"
@@ -977,7 +979,7 @@ showUsage(char *prog)
       "https://github.com/criblio/appscope. Please direct feature requests and\n"
       "defect reports there.\n"
       "\n",
-      SCOPE_VER, prog, prog, prog
+      SCOPE_VER, prog, prog, prog, prog
     );
     scope_fflush(scope_stdout);
 }
@@ -988,6 +990,7 @@ static struct option opts[] = {
     { "help",       optional_argument, 0, 'h' },
     { "attach",     required_argument, 0, 'a' },
     { "detach",     required_argument, 0, 'd' },
+    { "setupns",    required_argument, 0, 's' },
     { "libbasedir", required_argument, 0, 'l' },
     { "patch",      required_argument, 0, 'p' },
     { 0, 0, 0, 0 }
@@ -996,7 +999,8 @@ static struct option opts[] = {
 int
 main(int argc, char **argv, char **env)
 {
-    char *attachArg = 0;
+    char *attachArg = NULL;
+    char *setupArg = NULL;
     char path[PATH_MAX] = {0};
     int pid = -1;
     char attachType = 'u';
@@ -1012,7 +1016,7 @@ main(int argc, char **argv, char **env)
         // The initial `:` lets us handle options with optional values like
         // `-h` and `-h SECTION`.
         //
-        int opt = getopt_long(argc, argv, "+:uh:a:d:l:f:p:", opts, &index);
+        int opt = getopt_long(argc, argv, "+:uh:a:d:l:f:p:s:", opts, &index);
         if (opt == -1) {
             break;
         }
@@ -1034,6 +1038,9 @@ main(int argc, char **argv, char **env)
             case 'd':
                 attachArg = optarg;
                 attachType = 'd';
+                break;
+            case 's':
+                setupArg = optarg;
                 break;
             case 'f':
                 // accept -f as alias for -l for BC
@@ -1063,16 +1070,48 @@ main(int argc, char **argv, char **env)
         }
     }
 
-    // either --attach, --detach or a command are required
+    // either --attach, --detach, --setupns or a command are required
     if (!attachArg && optind >= argc) {
-        scope_fprintf(scope_stderr, "error: missing --attach, --detach option or EXECUTABLE argument\n");
+        scope_fprintf(scope_stderr, "error: missing --attach, --detach, --setupns option or EXECUTABLE argument\n");
+        showUsage(scope_basename(argv[0]));
+        return EXIT_FAILURE;
+    }
+
+    if (attachArg && setupArg) {
+        scope_fprintf(scope_stderr, "error: --attach/--detach and --setupns cannot be used together\n");
         showUsage(scope_basename(argv[0]));
         return EXIT_FAILURE;
     }
 
     // use --attach, --detach, ignore executable and args
-    if (attachArg && optind < argc) {
-        scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --attach, --detach option\n");
+    if (optind < argc) {
+        if (attachArg) {
+            scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --attach, --detach option\n");
+        } else if (setupArg) {
+            scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --setupns option\n");
+        }
+    }
+
+   if (setupArg) {
+        // must be root
+        if (scope_getuid()) {
+            scope_printf("error: --setupns requires root\n");
+            return EXIT_FAILURE;
+        }
+
+        // target process must exist
+        pid = scope_atoi(setupArg);
+        if (pid < 1) {
+            scope_printf("error: invalid --setupns PID: %s\n", setupArg);
+            return EXIT_FAILURE;
+        }
+
+        pid_t nsAttachPid = 0;
+
+        if (nsIsPidInChildNs(pid, &nsAttachPid) == TRUE) {
+            return nsSetup(pid);
+        }
+        return EXIT_FAILURE;
     }
 
     // perform namespace switch if required

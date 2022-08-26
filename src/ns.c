@@ -11,6 +11,8 @@
  * further cleaning like reverse return logic in libdirExists
  */
 #define LDSCOPE_IN_CHILD_NS "/tmp/ldscope"
+#define LIBSCOPE_IN_CHILD_NS "/tmp/libscope.so"
+#define PROFILE_SETUP "LD_PRELOAD=/tmp/libscope.so\n"
 
 #define VALID_NS_DEPTH 2
 
@@ -94,6 +96,33 @@ cleanupDestFd:
 }
 
 static bool
+setNamespace(pid_t pid, const char* ns)
+{
+    bool res = FALSE;
+    char nsPath[PATH_MAX] = {0};
+    int nsFd;
+    if (scope_snprintf(nsPath, sizeof(nsPath), "/proc/%d/ns/%s", pid, ns) < 0) {
+        scope_perror("scope_snprintf failed");
+        goto exit;
+    }
+
+    if ((nsFd = scope_open(nsPath, O_RDONLY)) == -1) {
+        scope_perror("scope_open failed");
+        goto exit;
+    }
+
+    if (scope_setns(nsFd, 0) != 0) {
+        scope_perror("setns failed");
+        goto exit;
+    }
+
+    res = TRUE;
+exit:
+
+    return res;
+}
+
+static bool
 join_namespace(pid_t hostPid)
 {
     bool status = FALSE;
@@ -122,27 +151,13 @@ join_namespace(pid_t hostPid)
     *   namespace
     * - mount namespace - allows to copy file(s) into a "child namespace"
     */
-    char *nsType[] = {"pid", "mnt"};
-
-    for (int i = 0; i < (sizeof(nsType)/sizeof(nsType[0])); ++i) {
-        char nsPath[PATH_MAX] = {0};
-        int nsFd;
-
-        if (scope_snprintf(nsPath, sizeof(nsPath), "/proc/%d/ns/%s", hostPid, nsType[i]) < 0) {
-            scope_perror("scope_snprintf failed");
-            goto cleanupMem;
-        }
-
-        if ((nsFd = scope_open(nsPath, O_RDONLY)) == -1) {
-            scope_perror("scope_open failed");
-            goto cleanupMem;
-        }
-
-        if (scope_setns(nsFd, 0) != 0) {
-            scope_perror("setns failed");
-            goto cleanupMem;
-        }
+    if (setNamespace(hostPid, "pid") == FALSE) {
+        goto cleanupMem;
     }
+    if (setNamespace(hostPid, "mnt") == FALSE) {
+        goto cleanupMem;
+    }
+
 
     status = extractMemToChildNamespace(ldscopeMem, ldscopeSize, LDSCOPE_IN_CHILD_NS, 0775);
 
@@ -216,6 +231,64 @@ nsIsPidInChildNs(pid_t pid, pid_t *nsPid)
     }
 
     scope_fclose(fstream);
+
+    return status;
+}
+
+static bool
+setupProfile(void){
+    int fd = scope_open("/etc/profile.d/scope.sh", O_CREAT | O_RDWR | O_TRUNC, 0644);
+    if (fd < 0) {
+        scope_perror("scope_fopen failed");
+        return FALSE;
+    }
+
+    if (scope_write(fd, PROFILE_SETUP, sizeof(PROFILE_SETUP)-1 ) != sizeof(PROFILE_SETUP)-1) {
+        scope_perror("scope_write failed");
+        return FALSE;
+    }
+
+    if (scope_close(fd) != 0) {
+        scope_perror("scope_fopen failed");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+int
+nsSetup(pid_t pid)
+{
+    size_t filterFileSize = 0;
+    char * scopeCfgFilterMem = NULL;
+    int status = EXIT_FAILURE;
+
+    // Configuration is optional
+    scopeCfgFilterMem = loadFileIntoMem(&filterFileSize, getenv("SCOPE_FILTER_PATH"));
+    if (scopeCfgFilterMem == NULL) {
+        return status;
+    }
+
+    if (setNamespace(pid, "mnt") == FALSE) {
+        goto cleanupMem;
+    }
+
+    if (extractMemToChildNamespace(scopeCfgFilterMem, filterFileSize, "/tmp/scope_filter.yml", 0664) == FALSE) {
+        goto cleanupMem;
+    }
+
+    // Setup /etc/profile
+    if (setupProfile() == FALSE) {
+        goto cleanupMem;
+    }
+
+    // Setup libscope.so
+
+    status = EXIT_SUCCESS;
+
+cleanupMem:
+
+    scope_munmap(scopeCfgFilterMem, filterFileSize);
 
     return status;
 }

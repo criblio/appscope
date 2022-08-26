@@ -40,7 +40,16 @@ echo "    Command Line Options Test"
 echo "================================="
 
 run ./bin/linux/${ARCH}/ldscope
-outputs "error: missing --attach, --detach option or EXECUTABLE"
+outputs "error: missing --attach, --detach, --setupns option or EXECUTABLE argument"
+outputs "Cribl AppScope"
+returns 1
+
+run ./bin/linux/${ARCH}/ldscope -s
+outputs "missing required value for -s option"
+returns 1
+
+run ./bin/linux/${ARCH}/ldscope -a dummy_service_value -s 1
+outputs "error: --attach/--detach and --setupns cannot be used together"
 outputs "Cribl AppScope"
 returns 1
 

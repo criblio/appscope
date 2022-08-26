@@ -5,6 +5,21 @@
 #define EXPORTON __attribute__((visibility("default")))
 
 typedef struct {
+    int c_syscall_write_fd;
+    int c_syscall_write_buf;
+    int c_syscall_openat_path;
+    int c_syscall_unlinkat_dirfd;
+    int c_syscall_unlinkat_pathname;
+    int c_syscall_unlinkat_flags;
+    int c_syscall_getdents64_dirfd;
+    int c_syscall_socket_domain;
+    int c_syscall_socket_type;
+    int c_syscall_accept4_fd;
+    int c_syscall_accept4_addr;
+    int c_syscall_accept4_addrlen;
+    int c_syscall_read_fd;
+    int c_syscall_read_buf;
+    int c_syscall_close_fd;
     int c_write_fd;
     int c_write_buf;
     int c_write_rc;
@@ -36,6 +51,7 @@ typedef struct {
     int c_tls_server_write_conn;
     int c_tls_server_write_buf;
     int c_tls_server_write_rc;
+    int c_tls_client_read_caller;
     int c_tls_client_read_callee;
     int c_tls_client_read_pc;
     int c_tls_client_write_callee;

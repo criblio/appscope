@@ -282,6 +282,21 @@ go_schema_t go_17_schema = {
 
 go_schema_t go_19_schema = {
     .arg_offsets = {
+        .c_syscall_write_fd=0x8,
+        .c_syscall_write_buf=0x10,
+        .c_syscall_openat_path=0x10,
+        .c_syscall_unlinkat_dirfd=0x8,
+        .c_syscall_unlinkat_pathname=0x10,
+        .c_syscall_unlinkat_flags=0x18,
+        .c_syscall_getdents64_dirfd=0x8,
+        .c_syscall_socket_domain=0x8,
+        .c_syscall_socket_type=0x10,
+        .c_syscall_accept4_fd=0x8,
+        .c_syscall_accept4_addr=0x10,
+        .c_syscall_accept4_addrlen=0x18,
+        .c_syscall_read_fd=0x8,
+        .c_syscall_read_buf=0x10,
+        .c_syscall_close_fd=0x8,
         .c_write_fd=0x58,
         .c_write_buf=0x10,
         .c_write_rc=0x40,
@@ -313,7 +328,7 @@ go_schema_t go_19_schema = {
         .c_tls_server_write_conn=0x30,
         .c_tls_server_write_buf=0x8,
         .c_tls_server_write_rc=0x10,
-        .c_tls_client_read_callee=0x0,
+        .c_tls_client_read_caller=0x78,
         .c_tls_client_read_pc=0x8,
         .c_tls_client_write_callee=0x30,
         .c_tls_client_write_w_pc=0x20,
@@ -321,13 +336,13 @@ go_schema_t go_19_schema = {
         .c_tls_client_write_rc=0x10,
         .c_http2_server_read_sc=0xd0,
         .c_http2_server_write_callee=0x0,
-        .c_http2_server_write_sc=0x30,
+        .c_http2_server_write_sc=0x40,
         .c_http2_server_preface_callee=0xc8,
         .c_http2_server_preface_sc=0xd0,
         .c_http2_server_preface_rc=0x58,
         .c_http2_client_read_cc=0x68,
         .c_http2_client_write_callee=0x30,
-        .c_http2_client_write_tcpConn=0x40,
+        .c_http2_client_write_tcpConn=0x48,
         .c_http2_client_write_buf=0x8,
         .c_http2_client_write_rc=0x10,
     },
@@ -1013,6 +1028,11 @@ adjustGoStructOffsetsForVersion()
         g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
     }
 
+    if (g_go_minor_ver == 19) {
+        g_go_schema->arg_offsets.c_http2_server_write_sc=0x40;
+        g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
+    }
+
     // This creates a file specified by test/integration/go/test_go.sh
     // and used by test/integration/go/test_go_struct.sh.
     //
@@ -1165,7 +1185,7 @@ initGoHook(elf_buf_t *ebuf)
         }
         return; // don't install our hooks
     } else if (g_go_minor_ver > MAX_SUPPORTED_GO_VER) {
-        scopeLogWarn("%s was compiled with go version `%s`. Versions newer than Go 1.18 are not yet supported. Continuing without AppScope.", ebuf->cmd, go_runtime_version);
+        scopeLogWarn("%s was compiled with go version `%s`. Versions newer than Go 1.%d are not yet supported. Continuing without AppScope.", ebuf->cmd, go_runtime_version, MAX_SUPPORTED_GO_VER);
         return; // don't install our hooks
     } 
 
@@ -1235,7 +1255,7 @@ initGoHook(elf_buf_t *ebuf)
     }
 
     if (g_go_minor_ver >= 19) {
-        // The Go 19 schema...possibly future versions
+        // The Go 19 schema, and possibly future versions
         g_go_schema = &go_19_schema;
     }
 
@@ -1406,8 +1426,8 @@ c_syscall(char *input_params, char *return_values)
     switch(syscall) {
     case 1: // write
         {
-            uint64_t fd = *(uint64_t *)(input_params + 0x8);
-            char *buf   = (char *)*(uint64_t *)(input_params + 0x10);
+            uint64_t fd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_write_fd);
+            char *buf   = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_write_buf);
             uint64_t initialTime = getTime();
 
             funcprint("Scope: write fd %ld rc %ld buf %s\n", fd, rc, buf);
@@ -1417,8 +1437,7 @@ c_syscall(char *input_params, char *return_values)
            
     case 257: // openat
         {
-            char *path  = go_str((void *)(input_params + 0x10));
-
+            char *path = go_str((void *)(input_params + g_go_schema->arg_offsets.c_syscall_openat_path));
             if (!path) {
                 scopeLogError("ERROR:go_open: null pathname");
                 scope_puts("Scope:ERROR:open:no path");
@@ -1437,9 +1456,9 @@ c_syscall(char *input_params, char *return_values)
         {
             if (rc) return;
 
-            uint64_t dirfd = *(uint64_t *)(input_params + 0x8);
-            char *pathname = go_str((void *)(input_params + 0x10));
-            uint64_t flags = *(uint64_t *)(input_params + 0x18);
+            uint64_t dirfd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_unlinkat_dirfd);
+            char *pathname = go_str((void *)(input_params + g_go_schema->arg_offsets.c_syscall_unlinkat_pathname));
+            uint64_t flags = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_unlinkat_flags);
 
             funcprint("Scope: unlinkat dirfd %ld pathname %s flags %ld\n", dirfd, pathname, flags);
             doDelete(pathname, "go_unlinkat");
@@ -1450,7 +1469,7 @@ c_syscall(char *input_params, char *return_values)
 
     case 217: // getdents64
         {
-            uint64_t dirfd = *(uint64_t *)(input_params + 0x8);
+            uint64_t dirfd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_getdents64_dirfd);
             uint64_t initialTime = getTime();
 
             funcprint("Scope: getdents dirfd %ld rc %ld\n", dirfd, rc);
@@ -1462,8 +1481,8 @@ c_syscall(char *input_params, char *return_values)
         {
             if (rc == -1) return;
 
-            uint64_t domain = *(uint64_t *)(input_params + 0x8);  // aka family
-            uint64_t type   = *(uint64_t *)(input_params + 0x10);
+            uint64_t domain = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_socket_domain);  // aka family
+            uint64_t type   = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_socket_type);
 
             funcprint("Scope: socket domain: %ld type: 0x%lx sd: %ld\n", domain, type, rc);
             addSock(rc, type, domain); // Creates a net object
@@ -1474,9 +1493,9 @@ c_syscall(char *input_params, char *return_values)
         {
             if (rc == -1) return;
 
-            uint64_t fd           = *(uint64_t *)(input_params + 0x8); 
-            struct sockaddr *addr = *(struct sockaddr **)(input_params + 0x10);
-            socklen_t *addrlen    = *(socklen_t **)(input_params + 0x18);
+            uint64_t fd           = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_accept4_fd); 
+            struct sockaddr *addr = *(struct sockaddr **)(input_params + g_go_schema->arg_offsets.c_syscall_accept4_addr);
+            socklen_t *addrlen    = *(socklen_t **)(input_params + g_go_schema->arg_offsets.c_syscall_accept4_addrlen);
 
             funcprint("Scope: accept4 of %ld\n", rc);
             doAccept(fd, rc, addr, addrlen, "go_accept4");
@@ -1485,8 +1504,8 @@ c_syscall(char *input_params, char *return_values)
 
     case 0: // read
         {
-            uint64_t fd = *(uint64_t *)(input_params + 0x8);
-            char *buf   = (char *)*(uint64_t *)(input_params + 0x10);
+            uint64_t fd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_read_fd);
+            char *buf   = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_read_buf);
             uint64_t initialTime = getTime();
 
             funcprint("Scope: read of %ld rc %ld\n", fd, rc);
@@ -1496,7 +1515,7 @@ c_syscall(char *input_params, char *return_values)
 
     case 3: // close
         {
-            uint64_t fd = *(uint64_t *)(input_params + 0x8);
+            uint64_t fd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_close_fd);
 
             funcprint("Scope: close of %ld\n", fd);
             doCloseAndReportFailures(fd, (rc != -1), "go_close"); // If net, deletes a net object
@@ -1821,7 +1840,8 @@ c_tls_client_read(char *input_params, char *return_values)
     input_params -= 0x8;
 
     // go to caller of readResponse to get pc
-    input_params += 0x78;
+    input_params += g_go_schema->arg_offsets.c_tls_client_read_caller;
+    return_values += g_go_schema->arg_offsets.c_tls_client_read_caller;
 
     // Take us to the stack frame we're interested in
     // If this is defined as 0x0, we have decided to stay in the caller stack frame
@@ -1961,7 +1981,6 @@ EXPORTON void *
 go_http2_server_read(char *stackptr)
 {
     return do_cfunc(stackptr, c_http2_server_read, g_go_schema->tap[INDEX_HOOK_HTTP2_SERVER_READ].assembly_fn);
-
 }
 
 /*
@@ -1984,7 +2003,7 @@ c_http2_server_write(char *input_params, char *return_values)
 
     input_params -= 0x8;
 
-    uint64_t sc      = *(uint64_t *)(input_params + 0x40);// g_go_schema->arg_offsets.c_http2_server_write_sc);
+    uint64_t sc      = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_http2_server_write_sc);
     if (!sc) return;
     uint64_t fr      = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_fr);
     if (!fr) return;  
@@ -2143,7 +2162,7 @@ c_http2_client_write(char *input_params, char *return_values)
  //   input_params -= g_go_schema->arg_offsets.c_http2_client_write_callee;
 //    return_values -= g_go_schema->arg_offsets.c_http2_client_write_callee;
 
-    uint64_t tcpConn = *(uint64_t *)(input_params + 0x48);// g_go_schema->arg_offsets.c_http2_client_write_tcpConn);
+    uint64_t tcpConn = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_http2_client_write_tcpConn);
     if (!tcpConn) return;
     char *buf        = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_http2_client_write_buf);
     if (!buf) return;
@@ -2166,8 +2185,6 @@ extern void handleExit(void);
 static void
 c_exit(char *input_params, char *return_values)
 {
-    // TODO Remove
-//    while (scope_sleep(1000)) {};
     /*
      * Need to extend the system stack size when calling handleExit().
      * We see that the stack is exceeded now that we are using an internal libc.

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
 	"strconv"
 	"syscall"
@@ -16,8 +15,6 @@ import (
 )
 
 var (
-	errGetCurrentUser   = errors.New("unable to get current user")
-	errMissingAdmPriv   = errors.New("you must have administrator privileges to attach to a process")
 	errGetLinuxCap      = errors.New("unable to get linux capabilities for current process")
 	errLoadLinuxCap     = errors.New("unable to load linux capabilities for current process")
 	errMissingPtrace    = errors.New("missing PTRACE capabilities to attach to a process")
@@ -33,12 +30,8 @@ var (
 // Attach scopes an existing PID
 func (rc *Config) Attach(args []string) error {
 	// Validate user has root permissions
-	user, err := user.Current()
-	if err != nil {
-		return errGetCurrentUser
-	}
-	if user.Uid != "0" {
-		return errMissingAdmPriv
+	if err := util.UserVerifyRootPerm(); err != nil {
+		return err
 	}
 	// Validate PTRACE capability
 	c, err := capability.NewPid2(0)

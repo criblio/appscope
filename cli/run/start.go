@@ -119,6 +119,10 @@ func startSetupFilterCfgHost(cfgData []byte) error {
 }
 
 func (rc *Config) Start() error {
+	// Validate user has root permissions
+	if err := util.UserVerifyRootPerm(); err != nil {
+		return err
+	}
 	startCfg, startcfgData, err := getConfigFromStdin()
 	if err != nil {
 		return err

@@ -24,13 +24,13 @@ loadFileIntoMem(size_t *size, char* path)
 {
     // Load file into memory
     char *resMem = NULL;
+    int fd;
 
     if (path == NULL) {
         return resMem;
     }
 
-    int fd = scope_open(path, O_RDONLY);
-    if (!fd) {
+    if ((fd = scope_open(path, O_RDONLY)) == -1) {
         scope_perror("scope_open failed");
         goto closeFd;
     }
@@ -64,9 +64,9 @@ static bool
 extractMemToChildNamespace(char* inputMem, size_t inputSize, const char *outFile, mode_t outPermFlag)
 {
     bool status = FALSE;
+    int outFd;
 
-    int outFd = scope_open(outFile, O_RDWR | O_CREAT, outPermFlag);
-    if (!outFd) {
+    if ((outFd = scope_open(outFile, O_RDWR | O_CREAT, outPermFlag)) == -1) {
         scope_perror("scope_open failed");
         return status;
     }
@@ -126,12 +126,14 @@ join_namespace(pid_t hostPid)
 
     for (int i = 0; i < (sizeof(nsType)/sizeof(nsType[0])); ++i) {
         char nsPath[PATH_MAX] = {0};
+        int nsFd;
+
         if (scope_snprintf(nsPath, sizeof(nsPath), "/proc/%d/ns/%s", hostPid, nsType[i]) < 0) {
             scope_perror("scope_snprintf failed");
             goto cleanupMem;
         }
-        int nsFd = scope_open(nsPath, O_RDONLY);
-        if (!nsFd) {
+
+        if ((nsFd = scope_open(nsPath, O_RDONLY)) == -1) {
             scope_perror("scope_open failed");
             goto cleanupMem;
         }

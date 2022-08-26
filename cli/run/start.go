@@ -113,9 +113,12 @@ func startSetupFilterCfgHost(cfgData []byte) error {
 			return err
 		}
 	}
-
 	const EdgeCfgLoc = "/tmp/scope_main.yml"
 	return os.WriteFile(EdgeCfgLoc, cfgData, 0644)
+}
+
+func setupFilterCfgOnHost(cfgData []byte) error {
+	return os.WriteFile("/tmp/scope_filter.yml", cfgData, 0644)
 }
 
 func (rc *Config) Start() error {
@@ -128,7 +131,32 @@ func (rc *Config) Start() error {
 		return err
 	}
 
-	// TODO Repalce fmt.print with cli Log
+	if err := createLdscope(); err != nil {
+		return err
+	}
+
+	// Setup Filter file on Host
+	if err := setupFilterCfgOnHost(startcfgData); err != nil {
+		return err
+	}
+
+	// Setup Container namespace
+	os.Setenv("SCOPE_FILTER_PATH", "/tmp/scope_filter.yml")
+	// Iterate over all containers
+	cPids, _ := util.GetDockerPids()
+	// fmt.Println("Getting container PIDs status", err)
+	for _, cPid := range cPids {
+		// fmt.Println("Container Process Id", cPid)
+		err = rc.SetupContainer(cPid)
+		fmt.Println("Container Process Id Setup status", err)
+	}
+	os.Unsetenv("SCOPE_FILTER_PATH")
+
+	// Host
+
+	// Setup filter on the host
+
+	// TODO Replace fmt.print with cli Log
 
 	// Start from the Host
 
@@ -136,23 +164,21 @@ func (rc *Config) Start() error {
 	// Description: Copy the filter file and libscope.so to well known location /tmp
 	// Notes: The stage is required to iterate over containers and host
 	//        TODO: need access to all container
-	err = startSetupFilterCfgHost(startcfgData)
-	fmt.Println("Setup Filter Host  Status:", err)
+	// err = startSetupFilterCfgHost(startcfgData)
+	// fmt.Println("Setup Filter Host  Status:", err)
 
-	// Setup Interactive Process Stage Host
-	// Description: Setup the /etc/profile.d/scope.sh script
-	// Notes: The stage is required to iterate over containers and host
-	//        TODO: need access to all containers
-	err = startInterProcessStageHost(startcfgData)
-	fmt.Println("Interactive Process Host Setup Status", err)
+	// // Setup Interactive Process Stage Host
+	// // Description: Setup the /etc/profile.d/scope.sh script
+	// // Notes: The stage is required to iterate over containers and host
+	// //        TODO: need access to all containers
+	// err = startInterProcessStageHost(startcfgData)
+	// fmt.Println("Interactive Process Host Setup Status", err)
 
-	// Iterate over all containers
-	// Get all Docker control groups !!
-	//
 	// Run SetupFilter
 	// Run SetupIntePRocess
 	// For each allow list process
-	//    Run Service Stage
+	//    Run Service Stage	}
+	//
 
 	for _, alllowProc := range startCfg.AllowProc {
 

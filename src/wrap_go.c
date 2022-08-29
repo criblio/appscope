@@ -219,87 +219,140 @@ go_schema_t go_17_schema = {
     },
 };
 
-go_schema_t go_19_schema = {
-    .arg_offsets = {
-        .c_syscall_write_fd=0x8,
-        .c_syscall_write_buf=0x10,
-        .c_syscall_openat_path=0x10,
-        .c_syscall_unlinkat_dirfd=0x8,
-        .c_syscall_unlinkat_pathname=0x10,
-        .c_syscall_unlinkat_flags=0x18,
-        .c_syscall_getdents64_dirfd=0x8,
-        .c_syscall_socket_domain=0x8,
-        .c_syscall_socket_type=0x10,
-        .c_syscall_accept4_fd=0x8,
-        .c_syscall_accept4_addr=0x10,
-        .c_syscall_accept4_addrlen=0x18,
-        .c_syscall_read_fd=0x8,
-        .c_syscall_read_buf=0x10,
-        .c_syscall_close_fd=0x8,
-        .c_tls_server_read_connReader=0x50,
-        .c_tls_server_read_buf=0x8,
-        .c_tls_server_read_rc=0x28,
-        .c_tls_server_write_conn=0x30,
-        .c_tls_server_write_buf=0x8,
-        .c_tls_server_write_rc=0x10,
-        .c_tls_client_read_caller=0x78,
-        .c_tls_client_read_pc=0x8,
-        .c_tls_client_write_w_pc=0x20,
-        .c_tls_client_write_buf=0x8,
-        .c_tls_client_write_rc=0x10,
-        .c_http2_server_read_sc=0xd0,
-        .c_http2_server_write_sc=0x40,
-        .c_http2_server_preface_sc=0xd0,
-        .c_http2_server_preface_rc=0x58,
-        .c_http2_client_read_cc=0x68,
-        .c_http2_client_write_tcpConn=0x48,
-        .c_http2_client_write_buf=0x8,
-        .c_http2_client_write_rc=0x10,
-    },
-    .struct_offsets = {
-        .g_to_m=0x30,
-        .m_to_tls=0x88,
-        .connReader_to_conn=0x0,
-        .persistConn_to_conn=0x50,
-        .persistConn_to_bufrd=0x68,
-        .iface_data=0x8,
-        .netfd_to_pd=0x0,
-        .pd_to_fd=0x10,
-        .netfd_to_sysfd=UNDEF_OFFSET, // defined for go1.8
-        .bufrd_to_buf=0x0,
-        .conn_to_rwc=0x10,
-        .conn_to_tlsState=0x30,
-        .persistConn_to_tlsState=0x60,
-        .fr_to_readBuf=0x58,
-        .fr_to_writeBuf=0x88,
-        .fr_to_headerBuf=0x40,
-        .cc_to_fr=0x130,
-        .cc_to_tconn=0x8,
-        .sc_to_fr=0x48,
-        .sc_to_conn=0x10,
-    },
-    // use the _reg_ assembly functions here, to support changes in Go 1.17
-    // where we must preserve the return values stored in registers
-    // and we must preserve the g in r14 for future stack checks
-    // Note: we do not need to use the reg functions for go_hook_exit and go_hook_die
-    .tap = {
-        [INDEX_HOOK_SYSCALL]              = {"runtime/internal/syscall.Syscall6",       go_reg_syscall,                   NULL, 0},
-        [INDEX_HOOK_RAWSYSCALL]           = {"",                                        go_reg_rawsyscall,                NULL, 0},
-        [INDEX_HOOK_SYSCALL6]             = {"",                                        go_reg_syscall6,                  NULL, 0},
-        [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_hook_reg_tls_client_read,      NULL, 0},
-        [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_hook_reg_tls_client_write,     NULL, 0},
-        [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_hook_reg_tls_server_read,      NULL, 0},
-        [INDEX_HOOK_TLS_SERVER_WRITE]     = {"net/http.checkConnErrorWriter.Write",     go_hook_reg_tls_server_write,     NULL, 0},
-        [INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_hook_reg_http2_client_read,    NULL, 0},
-        [INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_hook_reg_http2_client_write,   NULL, 0},
-        [INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_hook_reg_http2_server_read,    NULL, 0},
-        [INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_hook_reg_http2_server_write,   NULL, 0},
-        [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
-        [INDEX_HOOK_EXIT]                 = {"runtime.exit",                            go_hook_exit,                     NULL, 0},
-        [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal",                   go_hook_die,                      NULL, 0},
-        [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                             NULL, 0}
-    },
-};
+static void
+adjustGoStructOffsetsForVersion()
+{
+    if (!g_go_minor_ver) {
+        sysprint("ERROR: can't determine minor go version\n");
+        return;
+    }
+
+    if (g_go_minor_ver == 8) {
+        g_go_schema->struct_offsets.m_to_tls = 96; // 0x60
+    }
+
+    if (g_go_minor_ver == 8) {
+        // go 1.8 is the only version that directly goes from netfd to sysfd.
+        g_go_schema->struct_offsets.netfd_to_sysfd = 16;
+    }
+
+    if (g_go_minor_ver == 9) {
+        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
+        g_go_schema->arg_offsets.c_http2_server_read_sc=0x188;
+        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
+        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
+    }
+
+    if (g_go_minor_ver == 10) {
+        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
+        g_go_schema->arg_offsets.c_http2_server_read_sc=0x188;
+        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
+        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
+        g_go_schema->struct_offsets.cc_to_fr=0xd0;
+    }
+
+    if (g_go_minor_ver == 11) {
+        g_go_schema->arg_offsets.c_tls_client_read_caller=0x80,
+        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
+        g_go_schema->arg_offsets.c_http2_server_read_sc=0x128;
+        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
+        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
+        g_go_schema->struct_offsets.cc_to_fr=0xd0;
+    }
+
+    if (g_go_minor_ver < 12) {
+        g_go_schema->struct_offsets.persistConn_to_conn = 72;  // 0x48
+        g_go_schema->struct_offsets.persistConn_to_bufrd = 96; // 0x60
+        g_go_schema->struct_offsets.persistConn_to_tlsState=88; // 0x58
+    }
+
+    if ((g_go_minor_ver == 12) || (g_go_minor_ver == 13) ||
+        (g_go_minor_ver == 14) || (g_go_minor_ver == 15)) {
+        g_go_schema->arg_offsets.c_tls_client_read_caller=0x98,
+        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
+        g_go_schema->arg_offsets.c_http2_server_read_sc=0x128;
+        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
+        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
+        g_go_schema->struct_offsets.cc_to_fr=0xd0;
+    }
+
+    if (g_go_minor_ver == 16) {
+        g_go_schema->arg_offsets.c_tls_client_read_caller=0x98,
+        g_go_schema->arg_offsets.c_http2_client_read_cc=0xe0;
+        g_go_schema->arg_offsets.c_http2_server_read_sc=0xe8;
+        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
+        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
+        g_go_schema->struct_offsets.cc_to_fr=0xd0;
+
+        if (g_go_maint_ver > 9) {
+            g_go_schema->struct_offsets.cc_to_fr=0x130;
+        }
+    }
+
+    if (g_go_minor_ver == 17) {
+        g_go_schema->struct_offsets.fr_to_readBuf=0x50;
+        g_go_schema->struct_offsets.fr_to_writeBuf=0x80;
+        g_go_schema->struct_offsets.fr_to_headerBuf=0x38;
+        
+        if (g_go_maint_ver < 3) {
+            g_go_schema->struct_offsets.cc_to_fr=0xd0;
+        }
+    }
+
+    if (g_go_minor_ver == 18) {
+        g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
+    }
+
+    if (g_go_minor_ver == 19) {
+        g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
+
+        g_go_schema->tap[INDEX_HOOK_SYSCALL].func_name = "runtime/internal/syscall.Syscall6";
+        g_go_schema->tap[INDEX_HOOK_RAWSYSCALL].func_name = "";
+        g_go_schema->tap[INDEX_HOOK_SYSCALL6].func_name = "";
+    }
+}
+
+// This creates a file specified by test/integration/go/test_go.sh
+// and used by test/integration/go/test_go_struct.sh.
+// Why?  To test structure offsets in go that can vary. (above)
+// The format is:
+//   StructureName|FieldName=DecimalOffsetValue|OptionalTag
+// If an OptionalTag is provided, test_go_struct.sh will not process
+// the line unless it matches a TAG_FILTER which is provided as an
+// argument to the test_go_struct.sh.
+void
+createGoStructFile(void) {
+    char* debug_file;
+    int fd;
+    if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
+        ((fd = scope_open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
+        scope_dprintf(fd, "runtime.g|m=%d|\n", g_go_schema->struct_offsets.g_to_m);
+        scope_dprintf(fd, "runtime.m|tls=%d|\n", g_go_schema->struct_offsets.m_to_tls);
+        scope_dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go_schema->struct_offsets.connReader_to_conn);
+        scope_dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_conn);
+        scope_dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_bufrd);
+        scope_dprintf(fd, "runtime.iface|data=%d|\n", g_go_schema->struct_offsets.iface_data);
+        // go 1.8 has a direct netfd_to_sysfd field, others are less direct
+        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) {
+            scope_dprintf(fd, "net.netFD|pfd=%d|\n", g_go_schema->struct_offsets.netfd_to_pd);
+            scope_dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go_schema->struct_offsets.pd_to_fd);
+        } else {
+            scope_dprintf(fd, "net.netFD|sysfd=%d|\n", g_go_schema->struct_offsets.netfd_to_sysfd);
+        }
+        scope_dprintf(fd, "bufio.Reader|buf=%d|\n", g_go_schema->struct_offsets.bufrd_to_buf);
+        scope_dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go_schema->struct_offsets.conn_to_rwc);
+        scope_dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go_schema->struct_offsets.conn_to_tlsState);
+        scope_dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_tlsState);
+        scope_dprintf(fd, "net/http.http2Framer|readBuf=%d|Server\n", g_go_schema->struct_offsets.fr_to_readBuf);
+        scope_dprintf(fd, "net/http.http2Framer|wbuf=%d|Server\n", g_go_schema->struct_offsets.fr_to_writeBuf);
+        scope_dprintf(fd, "net/http.http2Framer|headerBuf=%d|Server\n", g_go_schema->struct_offsets.fr_to_headerBuf);
+        scope_dprintf(fd, "net/http.http2ClientConn|fr=%d|Client\n", g_go_schema->struct_offsets.cc_to_fr);
+        scope_dprintf(fd, "net/http.http2ClientConn|tconn=%d|Client\n", g_go_schema->struct_offsets.cc_to_tconn);
+        scope_dprintf(fd, "net/http.http2serverConn|framer=%d|Server\n", g_go_schema->struct_offsets.sc_to_fr);
+        scope_dprintf(fd, "net/http.http2serverConn|conn=%d|Server\n", g_go_schema->struct_offsets.sc_to_conn);
+        scope_close(fd);
+    }
+}
 
 go_schema_t *g_go_schema = &go_8_schema; // overridden if later version
 uint64_t g_glibc_guard = 0LL;
@@ -338,6 +391,7 @@ go_str(void *go_str)
     return c_str;
 }
 
+/* 
 static void
 free_go_str(char *str) {
     // Go 17 and higher use "c style" null terminated strings instead of a string and a length
@@ -346,6 +400,7 @@ free_go_str(char *str) {
     }
     if(str) scope_free(str);
 }
+*/
 
 static bool
 match_assy_instruction(void *addr, char *mnemonic)
@@ -831,142 +886,6 @@ go_version_numbers(const char *go_runtime_version)
     g_go_maint_ver = maint_val;
 }
 
-static void
-adjustGoStructOffsetsForVersion()
-{
-    if (!g_go_minor_ver) {
-        sysprint("ERROR: can't determine minor go version\n");
-        return;
-    }
-
-    // go 1.8 has a different m_to_tls offset than other supported versions.
-    if (g_go_minor_ver == 8) {
-        g_go_schema->struct_offsets.m_to_tls = 96; // 0x60
-    }
-
-    // go 1.8 is the only version that directly goes from netfd to sysfd.
-    if (g_go_minor_ver == 8) {
-        g_go_schema->struct_offsets.netfd_to_sysfd = 16;
-    }
-
-    if (g_go_minor_ver == 9) {
-        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
-        g_go_schema->arg_offsets.c_http2_server_read_sc=0x188;
-        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
-        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
-    }
-
-    if (g_go_minor_ver == 10) {
-        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
-        g_go_schema->arg_offsets.c_http2_server_read_sc=0x188;
-        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
-        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
-        g_go_schema->struct_offsets.cc_to_fr=0xd0;
-    }
-
-    if (g_go_minor_ver == 11) {
-        g_go_schema->arg_offsets.c_tls_client_read_caller=0x80,
-        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
-        g_go_schema->arg_offsets.c_http2_server_read_sc=0x128;
-        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
-        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
-        g_go_schema->struct_offsets.cc_to_fr=0xd0;
-    }
-
-    // before go 1.12, persistConn_to_conn and persistConn_to_bufrd
-    // have different values than 12 and after
-    if (g_go_minor_ver < 12) {
-        g_go_schema->struct_offsets.persistConn_to_conn = 72;  // 0x48
-        g_go_schema->struct_offsets.persistConn_to_bufrd = 96; // 0x60
-        g_go_schema->struct_offsets.persistConn_to_tlsState=88; // 0x58
-    }
-
-    if ((g_go_minor_ver == 12) || (g_go_minor_ver == 13) ||
-        (g_go_minor_ver == 14) || (g_go_minor_ver == 15)) {
-        g_go_schema->arg_offsets.c_tls_client_read_caller=0x98,
-        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
-        g_go_schema->arg_offsets.c_http2_server_read_sc=0x128;
-        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
-        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
-        g_go_schema->struct_offsets.cc_to_fr=0xd0;
-    }
-
-    if (g_go_minor_ver == 16) {
-        g_go_schema->arg_offsets.c_tls_client_read_caller=0x98,
-        g_go_schema->arg_offsets.c_http2_client_read_cc=0xe0;
-        g_go_schema->arg_offsets.c_http2_server_read_sc=0xe8;
-        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
-        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
-        g_go_schema->struct_offsets.cc_to_fr=0xd0;
-
-        if (g_go_maint_ver > 9) {
-            g_go_schema->struct_offsets.cc_to_fr=0x130;
-        }
-    }
-
-    if (g_go_minor_ver == 17) {
-        g_go_schema->struct_offsets.fr_to_readBuf=0x50;
-        g_go_schema->struct_offsets.fr_to_writeBuf=0x80;
-        g_go_schema->struct_offsets.fr_to_headerBuf=0x38;
-        
-        if (g_go_maint_ver < 3) {
-            g_go_schema->struct_offsets.cc_to_fr=0xd0;
-        }
-    }
-
-    if (g_go_minor_ver == 18) {
-        g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
-    }
-
-    if (g_go_minor_ver == 19) {
-        g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
-    }
-
-    // This creates a file specified by test/integration/go/test_go.sh
-    // and used by test/integration/go/test_go_struct.sh.
-    //
-    // Why?  To test structure offsets in go that can vary. (above)
-    //
-    // The format is:
-    //   StructureName|FieldName=DecimalOffsetValue|OptionalTag
-    //
-    // If an OptionalTag is provided, test_go_struct.sh will not process
-    // the line unless it matches a TAG_FILTER which is provided as an
-    // argument to the test_go_struct.sh.
-
-    char* debug_file;
-    int fd;
-    if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
-        ((fd = scope_open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
-        scope_dprintf(fd, "runtime.g|m=%d|\n", g_go_schema->struct_offsets.g_to_m);
-        scope_dprintf(fd, "runtime.m|tls=%d|\n", g_go_schema->struct_offsets.m_to_tls);
-        scope_dprintf(fd, "net/http.connReader|conn=%d|Server\n", g_go_schema->struct_offsets.connReader_to_conn);
-        scope_dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_conn);
-        scope_dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_bufrd);
-        scope_dprintf(fd, "runtime.iface|data=%d|\n", g_go_schema->struct_offsets.iface_data);
-        // go 1.8 has a direct netfd_to_sysfd field, others are less direct
-        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) {
-            scope_dprintf(fd, "net.netFD|pfd=%d|\n", g_go_schema->struct_offsets.netfd_to_pd);
-            scope_dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go_schema->struct_offsets.pd_to_fd);
-        } else {
-            scope_dprintf(fd, "net.netFD|sysfd=%d|\n", g_go_schema->struct_offsets.netfd_to_sysfd);
-        }
-        scope_dprintf(fd, "bufio.Reader|buf=%d|\n", g_go_schema->struct_offsets.bufrd_to_buf);
-        scope_dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go_schema->struct_offsets.conn_to_rwc);
-        scope_dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go_schema->struct_offsets.conn_to_tlsState);
-        scope_dprintf(fd, "net/http.persistConn|tlsState=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_tlsState);
-        scope_dprintf(fd, "net/http.http2Framer|readBuf=%d|Server\n", g_go_schema->struct_offsets.fr_to_readBuf);
-        scope_dprintf(fd, "net/http.http2Framer|wbuf=%d|Server\n", g_go_schema->struct_offsets.fr_to_writeBuf);
-        scope_dprintf(fd, "net/http.http2Framer|headerBuf=%d|Server\n", g_go_schema->struct_offsets.fr_to_headerBuf);
-        scope_dprintf(fd, "net/http.http2ClientConn|fr=%d|Client\n", g_go_schema->struct_offsets.cc_to_fr);
-        scope_dprintf(fd, "net/http.http2ClientConn|tconn=%d|Client\n", g_go_schema->struct_offsets.cc_to_tconn);
-        scope_dprintf(fd, "net/http.http2serverConn|framer=%d|Server\n", g_go_schema->struct_offsets.sc_to_fr);
-        scope_dprintf(fd, "net/http.http2serverConn|conn=%d|Server\n", g_go_schema->struct_offsets.sc_to_conn);
-        scope_close(fd);
-    }
-
-}
-
 int
 getBaseAddress(uint64_t *addr) {
     uint64_t base_addr = 0;
@@ -1139,17 +1058,14 @@ initGoHook(elf_buf_t *ebuf)
     unsigned int asm_count = 0;
 
     if (g_go_minor_ver >= 17) {
-        // The Go 17 schema works for 18 also, and possibly future versions
+        // The Go 17 schema works for 1.17-1.19 and possibly future versions
         g_go_schema = &go_17_schema;
-    }
-
-    if (g_go_minor_ver >= 19) {
-        // The Go 19 schema, and possibly future versions
-        g_go_schema = &go_19_schema;
     }
 
     // Update the schema to suit the current version
     adjustGoStructOffsetsForVersion();
+    // For validation tests:
+    createGoStructFile();
 
     for (tap_t *tap = g_go_schema->tap; tap->assembly_fn; tap++) {
         if (asm_inst) {

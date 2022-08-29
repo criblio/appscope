@@ -117,7 +117,7 @@ attachCmd(pid_t pid, const char *on_off)
     if ((fs = scope_fopen(path, "w+")) == NULL) return EXIT_FAILURE;
 
     scope_snprintf(cmd, sizeof(cmd), "SCOPE_CMD_ATTACH=%s", on_off);
-    if (scope_fwrite(cmd, strlen(cmd), 1, fs) <= 0) return EXIT_FAILURE;
+    if (scope_fwrite(cmd, scope_strlen(cmd), 1, fs) <= 0) return EXIT_FAILURE;
 
     scope_fclose(fs);
     return 0;
@@ -336,7 +336,7 @@ main(int argc, char **argv, char **env)
 
     sys_exec(ebuf, inferior_command, argc-optind, &argv[optind], env);
 
-    return 0;
+    return EXIT_SUCCESS;
 err:
     if (ebuf) scope_free(ebuf);
     exit(EXIT_FAILURE);

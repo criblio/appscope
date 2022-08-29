@@ -162,7 +162,7 @@ out:
  * The relocation table's entries have a one-to-one correspondence with the PLT.
  */
 int
-doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym, char *str, int rsz, int attach)
+doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym, char *str, int rsz, bool attach)
 {
     int i, match = -1;
     uint64_t prev;
@@ -221,7 +221,7 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
              * as in: rel[i].r_offset + lm->l_addr
              */
             prev = *gaddr;
-            if (attach == 1) {
+            if (attach == TRUE) {
                 // been here before, don't update the GOT entry
                 if ((void *)*gaddr == hook->func) return -1;
                 *gaddr = (uint64_t)hook->func;

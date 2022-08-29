@@ -287,7 +287,7 @@ hookAll(struct dl_phdr_info *info, size_t size, void *data)
     scopeLog(CFG_LOG_DEBUG, "%s: shared obj: %s", __FUNCTION__, info->dlpi_name);
 
     // don't hook funcs from libscope or ld.so
-    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) return FALSE;
+    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) return 0;
 
     void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
     if (handle == NULL) return FALSE;
@@ -299,7 +299,7 @@ hookAll(struct dl_phdr_info *info, size_t size, void *data)
             // TODO; all execv?
             if (((*filter == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
                 dlsym(handle, inject_hook_list[i].symbol)) {
-                if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1) {
+                if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1) {
                     scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from shared obj %s",
                              inject_hook_list[i].symbol, info->dlpi_name);
                 }
@@ -308,7 +308,7 @@ hookAll(struct dl_phdr_info *info, size_t size, void *data)
     }
 
     dlclose(handle);
-    return FALSE;
+    return 0;
 }
 
 static int
@@ -330,7 +330,7 @@ hookMain(bool filter)
             // TODO; all execv?
             if (((filter == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
                 dlsym(handle, inject_hook_list[i].symbol)) {
-                if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1) {
+                if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1) {
                     scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from main", inject_hook_list[i].symbol);
                 }
             }
@@ -366,7 +366,7 @@ unHookAll(struct dl_phdr_info *info, size_t size, void *data)
     // Get the link map and ELF sections in advance of something matching
     if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
         for (int i=0; inject_hook_list[i].symbol; i++) {
-            if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 0) != -1) {
+            if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, FALSE) != -1) {
                 scopeLog(CFG_LOG_DEBUG, "\tGOT detached %s from shared obj %s",
                          inject_hook_list[i].symbol, info->dlpi_name);
             }
@@ -1250,7 +1250,7 @@ hookSharedObjs(struct dl_phdr_info *info, size_t size, void *data)
         for (int i=0; inject_hook_list[i].symbol; i++) {
 
             if ((dlsym(handle, inject_hook_list[i].symbol)) &&
-                (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1)) {
+                (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1)) {
                     scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from shared obj %s",
                              inject_hook_list[i].symbol, info->dlpi_name);
             }
@@ -3555,7 +3555,7 @@ dlopen(const char *filename, int flags)
             // for each symbol in the list try to hook
             for (i=0; inject_hook_list[i].symbol; i++) {
                 if ((dlsym(handle, inject_hook_list[i].symbol)) &&
-                    (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1)) {
+                    (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1)) {
                     scopeLog(CFG_LOG_DEBUG, "\tdlopen interposed  %s", inject_hook_list[i].symbol);
                 }
             }

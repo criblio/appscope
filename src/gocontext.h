@@ -43,29 +43,28 @@ typedef struct {
     int c_accept4_addr;
     int c_accept4_addrlen;
     int c_accept4_sd_out;
-    int c_tls_server_read_callee;
+    int c_tls_server_read_caller;
     int c_tls_server_read_connReader;
     int c_tls_server_read_buf;
     int c_tls_server_read_rc;
-    int c_tls_server_write_callee;
+    int c_tls_server_write_caller;
     int c_tls_server_write_conn;
     int c_tls_server_write_buf;
     int c_tls_server_write_rc;
     int c_tls_client_read_caller;
-    int c_tls_client_read_callee;
     int c_tls_client_read_pc;
-    int c_tls_client_write_callee;
+    int c_tls_client_write_caller;
     int c_tls_client_write_w_pc;
     int c_tls_client_write_buf;
     int c_tls_client_write_rc;
     int c_http2_server_read_sc;
-    int c_http2_server_write_callee;
+    int c_http2_server_write_caller;
     int c_http2_server_write_sc;
-    int c_http2_server_preface_callee;
+    int c_http2_server_preface_caller;
     int c_http2_server_preface_sc;
     int c_http2_server_preface_rc;
     int c_http2_client_read_cc;
-    int c_http2_client_write_callee;
+    int c_http2_client_write_caller;
     int c_http2_client_write_tcpConn;
     int c_http2_client_write_buf;
     int c_http2_client_write_rc;
@@ -192,5 +191,7 @@ extern void go_reg_stack_http2_client_read(void);
 extern void go_reg_stack_http2_client_write(void);
 
 extern void go_reg_syscall(void);
+extern void go_reg_rawsyscall(void);
+extern void go_reg_syscall6(void);
 
 #endif // __GOTCONTEXT_H__

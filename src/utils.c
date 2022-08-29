@@ -6,6 +6,7 @@
 #include <time.h>
 
 #include "scopestdlib.h"
+#include "plattime.h"
 #include "utils.h"
 #include "fn.h"
 #include "dbg.h"
@@ -196,7 +197,7 @@ endsWith(const char *string, const char *substring)
     return (sublen <= stringlen) &&
        ((scope_strncmp(&string[stringlen-sublen], substring, sublen)) == 0);
 }
-
+/*
 int
 sigSafeNanosleep(const struct timespec *req)
 {
@@ -207,6 +208,23 @@ sigSafeNanosleep(const struct timespec *req)
     do {
         rv = scope_nanosleep(&time, &time);
     } while (rv && (scope_errno == EINTR));
+
+    return rv;
+}
+*/
+int
+sigSafeNanosleep(const struct timespec *req)
+{
+    struct timespec time = *req;
+    uint64_t ctime = getTime();
+    uint64_t elapsed;
+    int rv;
+
+    // If we're interrupted, sleep again for whatever time remains                                                                                                                                                  
+    do {
+        rv = scope_nanosleep(&time, &time);
+        elapsed = getDuration(ctime);
+    } while (rv && (elapsed < req->tv_nsec));
 
     return rv;
 }

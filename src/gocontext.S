@@ -278,6 +278,8 @@
     interpose_stack_regs go_reg_stack_http2_client_write, go_http2_client_write
 
     interpose_syscall_regs go_reg_syscall go_syscall
+    interpose_syscall_regs go_reg_rawsyscall go_rawsyscall
+    interpose_syscall_regs go_reg_syscall6 go_syscall6
 /*
     Debug hint:
     When you need to change the assy code, 

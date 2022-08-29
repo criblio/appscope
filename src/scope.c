@@ -56,7 +56,7 @@ showUsage(char *prog)
       "https://github.com/criblio/appscope. Please direct feature requests and\n"
       "defect reports there.\n"
       "\n",
-      SCOPE_VER, prog, prog
+      SCOPE_VER, prog, prog, prog
     );
 }
 
@@ -185,7 +185,7 @@ main(int argc, char **argv, char **env)
 
     // use --attach or --detach, ignore executable and args
     if (attachArg && optind < argc) {
-        scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --attach/--detach option\n");
+        scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --attach, --detach option\n");
     }
 
     // SCOPE_LIB_PATH environment variable is required
@@ -211,13 +211,17 @@ main(int argc, char **argv, char **env)
     if (attachArg) {
         int pid = scope_atoi(attachArg);
         if (pid < 1) {
-            scope_fprintf(scope_stderr, "error: invalid PID for --attach\n");
+            scope_fprintf(scope_stderr, "error: invalid PID for --attach, --detach\n");
             return EXIT_FAILURE;
         }
 
         if (attachType == 'a') {
-            if (osFindLibrary("libscope.so", pid) == 0) {
-                // libscope does not exist, a new attach
+            uint64_t rc = osFindLibrary("libscope.so", pid);
+            if (rc == -1) {
+                scope_fprintf(scope_stderr, "error: can't get path to executable for pid %d\n", pid);
+                return EXIT_FAILURE;
+            } else if (rc == 0) {
+                // proc exists, libscope does not exist, a new attach
                 return attach(pid, scopeLibPath);
             } else {
                 // libscope exists, a reattach

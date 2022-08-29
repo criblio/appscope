@@ -782,8 +782,8 @@ osFindLibrary(const char *library, pid_t pid)
 
     scope_snprintf(filename, sizeof(filename), "/proc/%d/maps", pid);
     if ((fd = scope_fopen(filename, "r")) == NULL) {
-        scope_perror("fopen(/proc/PID/maps) failed");
-        return 0;
+        // return no proc found as opposed to no libscope found
+        return -1;
     }
 
     while(scope_fgets(buffer, sizeof(buffer), fd)) {

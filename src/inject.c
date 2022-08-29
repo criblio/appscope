@@ -321,7 +321,7 @@ injectScope(int pid, char* path)
 
     // find the base address of libc in the target process
     remoteLib = osFindLibrary(info.path, pid);
-    if (!remoteLib) {
+    if ((remoteLib == 0) || (remoteLib == -1)) {
         scope_fprintf(scope_stderr, "error: failed to find libc in target process\n");
         return EXIT_FAILURE;
     }

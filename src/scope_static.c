@@ -977,7 +977,7 @@ showUsage(char *prog)
       "https://github.com/criblio/appscope. Please direct feature requests and\n"
       "defect reports there.\n"
       "\n",
-      SCOPE_VER, prog, prog
+      SCOPE_VER, prog, prog, prog
     );
     scope_fflush(scope_stdout);
 }
@@ -1065,14 +1065,14 @@ main(int argc, char **argv, char **env)
 
     // either --attach, --detach or a command are required
     if (!attachArg && optind >= argc) {
-        scope_fprintf(scope_stderr, "error: missing --attach/--detach option or EXECUTABLE argument\n");
+        scope_fprintf(scope_stderr, "error: missing --attach, --detach option or EXECUTABLE argument\n");
         showUsage(scope_basename(argv[0]));
         return EXIT_FAILURE;
     }
 
-    // use --attach/--detach, ignore executable and args
+    // use --attach, --detach, ignore executable and args
     if (attachArg && optind < argc) {
-        scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --attach/--detach option\n");
+        scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --attach, --detach option\n");
     }
 
     // perform namespace switch if required
@@ -1080,7 +1080,7 @@ main(int argc, char **argv, char **env)
         // target process must exist
         pid = scope_atoi(attachArg);
         if (pid < 1) {
-            scope_printf("error: invalid --attach PID: %s\n", attachArg);
+            scope_printf("error: invalid --attach, --detach PID: %s\n", attachArg);
             return EXIT_FAILURE;
         }
 
@@ -1132,7 +1132,7 @@ main(int argc, char **argv, char **env)
     if (attachArg) {
         scope_snprintf(path, sizeof(path), "/proc/%d", pid);
         if (scope_access(path, F_OK)) {
-            scope_printf("error: --attach/--detach PID not a current process: %d\n", pid);
+            scope_printf("error: --attach, --detach PID not a current process: %d\n", pid);
             return EXIT_FAILURE;
         }
     }

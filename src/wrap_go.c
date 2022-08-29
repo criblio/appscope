@@ -29,11 +29,11 @@
 #define UNDEF_OFFSET (-1)
 
 // compile-time control for debugging
-//#define NEEDEVNULL 1
-#define funcprint sysprint
-//#define funcprint devnull
-#define patchprint sysprint
-//#define patchprint devnull
+#define NEEDEVNULL 1
+//#define funcprint sysprint
+#define funcprint devnull
+//#define patchprint sysprint
+#define patchprint devnull
 
 int g_go_minor_ver = UNKNOWN_GO_VER;
 int g_go_maint_ver = UNKNOWN_GO_VER;
@@ -44,14 +44,6 @@ enum index_hook_t {
     INDEX_HOOK_SYSCALL,
     INDEX_HOOK_RAWSYSCALL,
     INDEX_HOOK_SYSCALL6,
-    INDEX_HOOK_WRITE,
-    INDEX_HOOK_OPEN,
-    INDEX_HOOK_CLOSE,
-    INDEX_HOOK_UNLINKAT,
-    INDEX_HOOK_GETDENTS,
-    INDEX_HOOK_SOCKET,
-    INDEX_HOOK_ACCEPT,
-    INDEX_HOOK_READ,
     INDEX_HOOK_TLS_CLIENT_READ,
     INDEX_HOOK_TLS_CLIENT_WRITE,
     INDEX_HOOK_TLS_SERVER_READ,
@@ -64,6 +56,15 @@ enum index_hook_t {
     INDEX_HOOK_EXIT,
     INDEX_HOOK_DIE,
     INDEX_HOOK_MAX,
+
+    INDEX_HOOK_WRITE,
+    INDEX_HOOK_OPEN,
+    INDEX_HOOK_CLOSE,
+    INDEX_HOOK_UNLINKAT,
+    INDEX_HOOK_GETDENTS,
+    INDEX_HOOK_SOCKET,
+    INDEX_HOOK_ACCEPT,
+    INDEX_HOOK_READ,
 };
 
 go_schema_t go_8_schema = {
@@ -2190,7 +2191,6 @@ extern void handleExit(void);
 static void
 c_exit(char *input_params, char *return_values)
 {
-    while(sleep(5)) {};
     /*
      * Need to extend the system stack size when calling handleExit().
      * We see that the stack is exceeded now that we are using an internal libc.

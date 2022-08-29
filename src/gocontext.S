@@ -123,7 +123,6 @@
 .hidden \c_func
 \a_func:
     endbr64
-    //mov %rsp, %r12
     push %rax
     push %rbx
     push %rcx
@@ -220,14 +219,6 @@
 .endm
 
 .text
-    interpose go_hook_write, go_write
-    interpose go_hook_open, go_open
-    interpose go_hook_unlinkat, go_unlinkat
-    interpose go_hook_getdents, go_getdents
-    interpose go_hook_socket, go_socket
-    interpose go_hook_accept4, go_accept4
-    interpose go_hook_read, go_read
-    interpose go_hook_close, go_close
     interpose go_hook_tls_server_read, go_tls_server_read
     interpose go_hook_tls_server_write, go_tls_server_write
     interpose go_hook_tls_client_read, go_tls_client_read
@@ -240,14 +231,6 @@
     interpose go_hook_exit, go_exit
     interpose go_hook_die, go_die
 
-    interpose_regs go_hook_reg_write, go_write
-    interpose_regs go_hook_reg_open, go_open
-    interpose_regs go_hook_reg_unlinkat, go_unlinkat
-    interpose_regs go_hook_reg_getdents, go_getdents
-    interpose_regs go_hook_reg_socket, go_socket
-    interpose_regs go_hook_reg_accept4, go_accept4
-    interpose_regs go_hook_reg_read, go_read
-    interpose_regs go_hook_reg_close, go_close
     interpose_regs go_hook_reg_tls_server_read, go_tls_server_read
     interpose_regs go_hook_reg_tls_server_write, go_tls_server_write
     interpose_regs go_hook_reg_tls_client_read, go_tls_client_read
@@ -258,28 +241,10 @@
     interpose_regs go_hook_reg_http2_client_read, go_http2_client_read
     interpose_regs go_hook_reg_http2_client_write, go_http2_client_write
 
-    interpose_stack_regs go_reg_stack_syscall, go_syscall
-    interpose_stack_regs go_reg_stack_write, go_write
-    interpose_stack_regs go_reg_stack_open, go_open
-    interpose_stack_regs go_reg_stack_unlinkat, go_unlinkat
-    interpose_stack_regs go_reg_stack_getdents, go_getdents
-    interpose_stack_regs go_reg_stack_socket, go_socket
-    interpose_stack_regs go_reg_stack_accept4, go_accept4
-    interpose_stack_regs go_reg_stack_read, go_read
-    interpose_stack_regs go_reg_stack_close, go_close
-    interpose_stack_regs go_reg_stack_tls_server_read, go_tls_server_read
-    interpose_stack_regs go_reg_stack_tls_server_write, go_tls_server_write
-    interpose_stack_regs go_reg_stack_tls_client_read, go_tls_client_read
-    interpose_stack_regs go_reg_stack_tls_client_write, go_tls_client_write
-    interpose_stack_regs go_reg_stack_http2_server_read, go_http2_server_read
-    interpose_stack_regs go_reg_stack_http2_server_write, go_http2_server_write
-    interpose_stack_regs go_reg_stack_http2_server_preface, go_http2_server_preface
-    interpose_stack_regs go_reg_stack_http2_client_read, go_http2_client_read
-    interpose_stack_regs go_reg_stack_http2_client_write, go_http2_client_write
-
     interpose_syscall_regs go_reg_syscall go_syscall
     interpose_syscall_regs go_reg_rawsyscall go_rawsyscall
     interpose_syscall_regs go_reg_syscall6 go_syscall6
+
 /*
     Debug hint:
     When you need to change the assy code, 

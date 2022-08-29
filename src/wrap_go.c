@@ -39,6 +39,17 @@ int g_go_minor_ver = UNKNOWN_GO_VER;
 int g_go_maint_ver = UNKNOWN_GO_VER;
 static char g_go_build_ver[7];
 static char g_ReadFrame_addr[sizeof(void *)];
+go_schema_t *g_go_schema = &go_8_schema; // overridden if later version
+uint64_t g_glibc_guard = 0LL;
+void (*go_runtime_cgocall)(void);
+
+#if NEEDEVNULL > 0
+static void
+devnull(const char* fmt, ...)
+{
+    return;
+}
+#endif
 
 enum index_hook_t {
     INDEX_HOOK_SYSCALL,
@@ -353,18 +364,6 @@ createGoStructFile(void) {
         scope_close(fd);
     }
 }
-
-go_schema_t *g_go_schema = &go_8_schema; // overridden if later version
-uint64_t g_glibc_guard = 0LL;
-void (*go_runtime_cgocall)(void);
-
-#if NEEDEVNULL > 0
-static void
-devnull(const char* fmt, ...)
-{
-    return;
-}
-#endif
 
 // Use go_str() whenever a "go string" type needs to be interpreted.
 // The resulting go_str will need to be passed to free_go_str() when it is no
@@ -997,14 +996,6 @@ initGoHook(elf_buf_t *ebuf)
         return; // don't install our hooks
     } 
 
-    /*
-     * Note: calling runtime.cgocall results in the Go error
-     *       "fatal error: cgocall unavailable"
-     * Calling runtime.asmcgocall does work. Possibly because we
-     * are entering the Go func past the runtime stack check?
-     * Need to investigate later.
-     */
-
     /* Go 1.17 introduced a secondary calling convention for the ABI
      * that allows developers to choose from the native ABI (with
      * latest changes) vs ABI0 (previous ABI). The new native ABI
@@ -1371,10 +1362,6 @@ c_tls_server_read(char *input_params, char *return_values)
      * *tls.Conn. We are using tlsState *tls.ConnectionState as the indicator
      * of type. If the tlsState field is not 0, the rwc field is of type
      * *tls.Conn. Example; net/http/server.go type conn struct.
-     *
-     * For reference, we were looking at the I/F type from go.itab.*crypto/tls.Conn,net.Conn
-     * and checking the type to determine TLS. This doesn't work on stripped
-     * executables and should no longer be needed.
      */
     uint64_t cr_conn_rwc_if = conn + g_go_schema->struct_offsets.conn_to_rwc;
     if (!cr_conn_rwc_if) return;

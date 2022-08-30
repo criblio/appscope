@@ -92,14 +92,13 @@ go_schema_t go_8_schema = {
         .c_tls_server_write_conn=0x8,
         .c_tls_server_write_buf=0x10,
         .c_tls_server_write_rc=0x28,
-        .c_tls_client_read_caller=0x58,
         .c_tls_client_read_pc=0x8,
-        .c_tls_client_write_caller=0x40,
         .c_tls_client_write_w_pc=0x8,
         .c_tls_client_write_buf=0x10,
         .c_tls_client_write_rc=0x28,
         .c_http2_server_read_sc=0x128,
         .c_http2_server_write_sc=0x8,
+        .c_http2_server_preface_callee=0xd0,
         .c_http2_server_preface_sc=0x60,
         .c_http2_server_preface_rc=0xe0, 
         .c_http2_client_read_cc=0x80,
@@ -130,9 +129,9 @@ go_schema_t go_8_schema = {
         .sc_to_conn=0x10,
     },
     .tap = {
-        [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",                         go_reg_syscall,                   NULL, 0},
-        [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",                      go_reg_rawsyscall,                NULL, 0},
-        [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",                        go_reg_syscall6,                  NULL, 0},
+        [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",                         go_reg_syscall,               NULL, 0},
+        [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",                      go_reg_rawsyscall,            NULL, 0},
+        [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",                        go_reg_syscall6,              NULL, 0},
         [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_hook_tls_client_read,      NULL, 0}, 
         [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_hook_tls_client_write,     NULL, 0},
         [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_hook_tls_server_read,      NULL, 0},
@@ -171,8 +170,7 @@ go_schema_t go_17_schema = {
         .c_tls_server_write_conn=0x30,
         .c_tls_server_write_buf=0x8,
         .c_tls_server_write_rc=0x10,
-        .c_tls_client_read_caller=0x78,
-        .c_tls_client_read_pc=0x8,
+        .c_tls_client_read_pc=0x28,
         .c_tls_client_write_w_pc=0x20,
         .c_tls_client_write_buf=0x8,
         .c_tls_client_write_rc=0x10,
@@ -240,9 +238,6 @@ adjustGoStructOffsetsForVersion()
 
     if (g_go_minor_ver == 8) {
         g_go_schema->struct_offsets.m_to_tls = 96; // 0x60
-    }
-
-    if (g_go_minor_ver == 8) {
         // go 1.8 is the only version that directly goes from netfd to sysfd.
         g_go_schema->struct_offsets.netfd_to_sysfd = 16;
     }
@@ -250,6 +245,7 @@ adjustGoStructOffsetsForVersion()
     if (g_go_minor_ver == 9) {
         g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
         g_go_schema->arg_offsets.c_http2_server_read_sc=0x188;
+        g_go_schema->arg_offsets.c_http2_server_preface_callee=0x108;
         g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
         g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
     }
@@ -257,13 +253,13 @@ adjustGoStructOffsetsForVersion()
     if (g_go_minor_ver == 10) {
         g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
         g_go_schema->arg_offsets.c_http2_server_read_sc=0x188;
+        g_go_schema->arg_offsets.c_http2_server_preface_callee=0x108;
         g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
         g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
         g_go_schema->struct_offsets.cc_to_fr=0xd0;
     }
 
     if (g_go_minor_ver == 11) {
-        g_go_schema->arg_offsets.c_tls_client_read_caller=0x80,
         g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
         g_go_schema->arg_offsets.c_http2_server_read_sc=0x128;
         g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
@@ -279,18 +275,18 @@ adjustGoStructOffsetsForVersion()
 
     if ((g_go_minor_ver == 12) || (g_go_minor_ver == 13) ||
         (g_go_minor_ver == 14) || (g_go_minor_ver == 15)) {
-        g_go_schema->arg_offsets.c_tls_client_read_caller=0x98,
         g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
         g_go_schema->arg_offsets.c_http2_server_read_sc=0x128;
+        g_go_schema->arg_offsets.c_http2_server_preface_callee=0x108;
         g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
         g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
         g_go_schema->struct_offsets.cc_to_fr=0xd0;
     }
 
     if (g_go_minor_ver == 16) {
-        g_go_schema->arg_offsets.c_tls_client_read_caller=0x98,
         g_go_schema->arg_offsets.c_http2_client_read_cc=0xe0;
         g_go_schema->arg_offsets.c_http2_server_read_sc=0xe8;
+        g_go_schema->arg_offsets.c_http2_server_preface_callee=0x108;
         g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
         g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
         g_go_schema->struct_offsets.cc_to_fr=0xd0;
@@ -311,10 +307,12 @@ adjustGoStructOffsetsForVersion()
     }
 
     if (g_go_minor_ver == 18) {
+        g_go_schema->arg_offsets.c_tls_client_read_pc=0x80;
         g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
     }
 
     if (g_go_minor_ver == 19) {
+        g_go_schema->arg_offsets.c_tls_client_read_pc=0x80;
         g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
 
         g_go_schema->tap[INDEX_HOOK_SYSCALL].func_name = "runtime/internal/syscall.Syscall6";
@@ -1172,10 +1170,21 @@ do_cfunc(char *stackptr, void *cfunc, void *gfunc)
     input_params = stackptr; // if using go_reg_syscall, you need to add 0x8
     return_values = stackptr;
 
-/* uint32_t frame_offset = frame_size(gfunc);
-  input_params = stackptr + frame_offset;
-  return_values = stackptr + frame_offset;   
-*/
+    /*
+     * In <= Go 1.16 we must rely on the caller stack for tls_ and http2_ functions
+     * because the values we need only exist there, at the point where we patch.
+     * We can get to the caller stack by adding the frame size which will be >0
+     * for tls_and http2_ function hooks where we hook on the return -1 instruction.
+     * This code will therefore put us in the caller context for <= 1.16.
+     *
+     * In Go 1.17 and higher, the values we need are present in the callee stack
+     * (because register values are copied onto the callee stack).
+     */
+    if (g_go_minor_ver <= 16) {
+        uint32_t frame_offset = frame_size(gfunc);
+        input_params += frame_offset;
+        return_values += frame_offset;   
+    }
 
     // Call the C handler
     __asm__ volatile (
@@ -1416,10 +1425,6 @@ go_tls_server_write(char *stackptr)
 static void
 c_tls_client_read(char *input_params, char *return_values)
 {
-    // go to caller of readResponse to get pc
-    input_params += g_go_schema->arg_offsets.c_tls_client_read_caller;
-    return_values += g_go_schema->arg_offsets.c_tls_client_read_caller;
-
     uint64_t pc = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_tls_client_read_pc); 
     if (!pc) return;
 
@@ -1456,9 +1461,6 @@ go_tls_client_read(char *stackptr)
 static void
 c_tls_client_write(char *input_params, char *return_values)
 {
-    input_params += g_go_schema->arg_offsets.c_tls_client_write_caller;
-    return_values += g_go_schema->arg_offsets.c_tls_client_write_caller;
-
     uint64_t w_pc = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_tls_client_write_w_pc);
     char *buf     = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_tls_client_write_buf);
     uint64_t rc   = *(uint64_t *)(return_values + g_go_schema->arg_offsets.c_tls_client_write_rc);
@@ -1580,6 +1582,10 @@ go_http2_server_write(char *stackptr)
 static void
 c_http2_server_preface(char *input_params, char *return_values)
 {
+    // In this function in <= go 16 we have to go to the callee to get input params and return values
+    input_params -= g_go_schema->arg_offsets.c_http2_server_preface_callee;
+    return_values -= g_go_schema->arg_offsets.c_http2_server_preface_callee;
+
     uint64_t *rc     = (uint64_t *)(return_values + g_go_schema->arg_offsets.c_http2_server_preface_rc);
     if ((rc == NULL) || (rc == (uint64_t *)0xffffffff)) return;
     if (*rc != 0) return;

@@ -89,7 +89,6 @@
     push %r11
     sub $0x20, %rsp
 
-
     mov %r12, 0x08(%rsp)
     lea \c_func@GOTPCREL(%rip), %r12
     mov (%r12), %r12

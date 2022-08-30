@@ -1271,10 +1271,7 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
 {
     // Find the net_info for the channel
     net_info *net = getNetEntry(sockfd);    // first try by descriptor
-    if (!net) {
-        net = getChannelNetEntry(id); // fallback to using channel ID
-        if (net && ((src == TLSTX || src == TLSRX))) net->tlsDetect = DETECT_TRUE;
-    }
+    if (!net) net = getChannelNetEntry(id); // fallback to using channel ID
 
     scopeLogHexDebug(buf, len > 64 ? 64 : len, // limit hexdump to 64
             "DEBUG: doProtocol(id=%ld, fd=%d, len=%ld, src=%s, dtyp=%s) TLS=%s PROTO=%s",

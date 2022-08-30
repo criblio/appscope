@@ -145,25 +145,27 @@ map_segment(char *buf, Elf64_Phdr *phead)
     lsize = phead->p_memsz + ((char*)phead->p_vaddr - laddr);
 
 
-    sysprint("%s:%d vaddr 0x%lx size 0x%lx\n",
-             __FUNCTION__, __LINE__, phead->p_vaddr, (size_t)phead->p_memsz);
+    sysprint("%s:%d vaddr 0x%lx size 0x%lx laddr %p\n",
+             __FUNCTION__, __LINE__, phead->p_vaddr, (size_t)phead->p_memsz, laddr);
 
     if ((addr = scope_mmap(laddr, ROUND_UP((size_t)lsize, phead->p_align),
-                     prot | PROT_WRITE,
-                     MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED,
-                     -1, (off_t)NULL)) == MAP_FAILED) {
+		      prot | PROT_WRITE,
+		      MAP_PRIVATE | MAP_ANONYMOUS,
+		      -1, (off_t)NULL)) == MAP_FAILED) {
         scopeLogError("ERROR: load_segment:scope_mmap");
         return -1;
     }
 
     if (laddr != addr) {
-        scopeLogError("ERROR: load_segment:scope_mmap:laddr mismatch");
-        return -1;
+      scope_munmap(addr, ROUND_UP((size_t)lsize, phead->p_align));
+      scopeLogError("ERROR: map_segment:scope_mmap:laddr mismatch. The kernel could not map to an address that the executable requires. This executable is not 'scoped'.");
+      return -1;
     }
 
     load_sections(buf, (char *)phead->p_vaddr, (size_t)lsize);
 
     if (((prot & PROT_WRITE) == 0) && (scope_mprotect(laddr, lsize, prot) == -1)) {
+        scope_munmap(addr, ROUND_UP((size_t)lsize, phead->p_align));
         scopeLogError("ERROR: load_segment:mprotect");
         return -1;
     }
@@ -195,7 +197,10 @@ load_elf(char *buf)
 
     for (i = 0; i < pnum; i++) {
         if (phead[i].p_type == PT_LOAD) {
-            map_segment(buf, &phead[i]);
+            if (map_segment(buf, &phead[i]) == -1) {
+                scope_munmap(pheadaddr, ROUND_UP((size_t)(pnum * phsize), pgsz));
+                return (Elf64_Addr)NULL;
+            }
         }
     }
 
@@ -385,11 +390,12 @@ sys_exec(elf_buf_t *ebuf, const char *path, int argc, const char **argv, const c
     scopeLog(CFG_LOG_DEBUG, "fd:%d sys_exec type:", ehdr->e_type);
 
     phaddr = load_elf((char *)ebuf->buf);
+    if (!phaddr) return -1;
 
     // TODO: are we loading a Go app or a glibc app?
     initGoHook(ebuf);
 
     set_go((char *)ebuf->buf, argc, argv, env, phaddr);
 
-    return 0;
+    return -1;
 }

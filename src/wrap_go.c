@@ -259,21 +259,13 @@ adjustGoStructOffsetsForVersion()
         g_go_schema->struct_offsets.cc_to_fr=0xd0;
     }
 
-    if (g_go_minor_ver == 11) {
-        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
-        g_go_schema->arg_offsets.c_http2_server_read_sc=0x128;
-        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
-        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
-        g_go_schema->struct_offsets.cc_to_fr=0xd0;
-    }
-
     if (g_go_minor_ver < 12) {
         g_go_schema->struct_offsets.persistConn_to_conn = 72;  // 0x48
         g_go_schema->struct_offsets.persistConn_to_bufrd = 96; // 0x60
         g_go_schema->struct_offsets.persistConn_to_tlsState=88; // 0x58
     }
 
-    if ((g_go_minor_ver == 12) || (g_go_minor_ver == 13) ||
+    if ((g_go_minor_ver == 11) || (g_go_minor_ver == 12) || (g_go_minor_ver == 13) ||
         (g_go_minor_ver == 14) || (g_go_minor_ver == 15)) {
         g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
         g_go_schema->arg_offsets.c_http2_server_read_sc=0x128;

@@ -210,9 +210,9 @@ go_schema_t go_17_schema = {
     // and we must preserve the g in r14 for future stack checks
     // Note: we do not need to use the reg functions for go_hook_exit and go_hook_die
     .tap = {
-        [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall.abi0",                    go_reg_syscall,                   NULL, 0},
-        [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall.abi0",                 go_reg_rawsyscall,                NULL, 0},
-        [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6.abi0",                   go_reg_syscall6,                  NULL, 0},
+        [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",       /* .abi0 */       go_reg_syscall,                   NULL, 0},
+        [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",    /* .abi0 */       go_reg_rawsyscall,                NULL, 0},
+        [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",      /* .abi0 */       go_reg_syscall6,                  NULL, 0},
         [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_hook_reg_tls_client_read,      NULL, 0},
         [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_hook_reg_tls_client_write,     NULL, 0},
         [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_hook_reg_tls_server_read,      NULL, 0},
@@ -222,8 +222,8 @@ go_schema_t go_17_schema = {
         [INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_hook_reg_http2_server_read,    NULL, 0},
         [INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_hook_reg_http2_server_write,   NULL, 0},
         [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
-        [INDEX_HOOK_EXIT]                 = {"runtime.exit",                            go_hook_exit,                     NULL, 0},
-        [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal",                   go_hook_die,                      NULL, 0},
+        [INDEX_HOOK_EXIT]                 = {"runtime.exit",          /* .abi0 */       go_hook_exit,                     NULL, 0},
+        [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal", /* .abi0 */       go_hook_die,                      NULL, 0},
         [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                             NULL, 0}
     },
 };

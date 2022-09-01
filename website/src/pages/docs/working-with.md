@@ -82,4 +82,4 @@ If `configevent` is set to `true`, AppScope sends a process‑start message upon
   - **Process ID**, with key `pid` and a value that is always unique at any given time, but that the machine can reuse for different processes at different times.
   - **ID**, with key `id` and a value that concatenates (and may truncate) the scoped app's hostname, procname, and command. This value is not guaranteed to be unique.
 
-By itself, the **UUID** process ID is unique for a given machine. In principle, **UUID** together with **Machine ID** constitutes a tuple ID that is unique across all machine namespaces.
+By itself, the **UUID** process ID is unique for a given machine. In principle, **UUID** and **Machine ID** together constitute a tuple ID that is unique across all machine namespaces.

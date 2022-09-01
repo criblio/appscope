@@ -12,8 +12,24 @@ type ScopeLoader struct {
 	Path string
 }
 
-func (sL *ScopeLoader) Configure(cpid int) error {
-	cmd := exec.Command(sL.Path, "--configure", strconv.Itoa(cpid))
+func (sL *ScopeLoader) ConfigureHost(filterFilePath string) error {
+	cmd := exec.Command(sL.Path, "--configure", filterFilePath)
+	cmd.Env = os.Environ()
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func (sL *ScopeLoader) ConfigureContainer(filterFilePath string, cpid int) error {
+	cmd := exec.Command(sL.Path, "--configure", filterFilePath, "--namespace", strconv.Itoa(cpid))
+	cmd.Env = os.Environ()
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func (sL *ScopeLoader) ServiceHost(serviceName string) error {
+	cmd := exec.Command(sL.Path, "--service", serviceName)
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -21,7 +37,7 @@ func (sL *ScopeLoader) Configure(cpid int) error {
 }
 
 func (sL *ScopeLoader) ServiceContainer(serviceName string, cpid int) error {
-	cmd := exec.Command(sL.Path, "--service", serviceName, "--configure", strconv.Itoa(cpid))
+	cmd := exec.Command(sL.Path, "--service", serviceName, "--namespace", strconv.Itoa(cpid))
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

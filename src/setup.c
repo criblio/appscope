@@ -1,7 +1,10 @@
 #define _GNU_SOURCE
 #include <fcntl.h>
+#include <stdlib.h>
 
-#include "service.h"
+#include "loaderop.h"
+#include "libdir.h"
+#include "setup.h"
 #include "scopestdlib.h"
 
 #define OPENRC_DIR "/etc/rc.conf"
@@ -18,6 +21,17 @@
 
 #define OPENRC_CFG "export LD_PRELOAD=/tmp/libscope.so\n"
 #define OPENRC_CFG_LEN (sizeof(OPENRC_CFG) - 1)
+
+/*
+ * TODO: Refactor this hardcoded path
+ * This can be consolidated with libdir.c but required
+ * further cleaning like reverse return logic in libdirExists
+ */
+
+#define LIBSCOPE_LOC "/tmp/libscope.so"
+#define PROFILE_SETUP "LD_PRELOAD=/tmp/libscope.so\n"
+#define PROFILE_SETUP_LEN (sizeof(PROFILE_SETUP)-1)
+
 
 typedef enum {
     SERVICE_CFG_ERROR,
@@ -292,12 +306,12 @@ modifyServiceCfgSystemd(const char* serviceCfgPath) {
 
     while (!scope_feof(readFd)) {
         char buf[4096] = {0};
-        scope_fscanf(readFd, "%s", buf);
+        int res = scope_fscanf(readFd, "%s", buf);
 
         if (scope_strcmp(buf, "[Service]") == 0) {
             serviceSectionFound = TRUE;
             scope_fprintf(newFd, "%s", SYSTEMD_CFG);
-        } else {
+        } else if (res == 0){
             scope_fprintf(newFd, "%s ", buf);
         }
     }
@@ -345,7 +359,7 @@ static struct service_ops OpenRcService = {
  * Returns 0 if service was setup correctly -1 otherwise.
  */
 int
-serviceSetup(const char* serviceName) {
+setupService(const char* serviceName) {
     struct stat sb = {0};
     struct service_ops *service;
 
@@ -356,19 +370,19 @@ serviceSetup(const char* serviceName) {
     if (scope_stat(OPENRC_DIR, &sb) == 0) {
         service = &OpenRcService;
         if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/conf.d/%s", serviceName) < 0) {
-            scope_perror("error: serviceSetup, scope_snprintf OpenRc failed");
+            scope_perror("error: setupService, scope_snprintf OpenRc failed");
             return -1;
         }
     } else if (scope_stat(SYSTEMD_DIR, &sb) == 0) {
         service = &SystemDService;
         if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/systemd/system/%s.service.d/env.conf", serviceName) < 0) {
-            scope_perror("error: serviceSetup, scope_snprintf SystemD failed");
+            scope_perror("error: setupService, scope_snprintf SystemD failed");
             return -1;
         }
     } else if (scope_stat(INITD_DIR, &sb) == 0) {
         service = &InitDService;
         if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/sysconfig/%s", serviceName) < 0) {
-            scope_perror("error: serviceSetup, scope_snprintf InitD failed");
+            scope_perror("error: setupService, scope_snprintf InitD failed");
             return -1;
         }
     } else {
@@ -397,4 +411,149 @@ serviceSetup(const char* serviceName) {
     scope_chmod(serviceCfgPath, 0644);
     
     return status;
+}
+
+
+ /*
+ * Setup the /etc/profile scope startup script
+ * Returns status of operation TRUE in case of success, FALSE otherwise
+ */
+static bool
+setupProfile(void) {
+    int fd = scope_open("/etc/profile.d/scope.sh", O_CREAT | O_RDWR | O_TRUNC, 0644);
+
+    if (fd < 0) {
+        scope_perror("scope_fopen failed");
+        return FALSE;
+    }
+
+    if (scope_write(fd, PROFILE_SETUP, PROFILE_SETUP_LEN) != PROFILE_SETUP_LEN) {
+        scope_perror("scope_write failed");
+        scope_close(fd);
+        return FALSE;
+    }
+
+    if (scope_close(fd) != 0) {
+        scope_perror("scope_fopen failed");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+ /*
+ * Extract memory to filter file /tmp/scope_filter.yml
+ *
+ * Returns status of operation TRUE in case of success, FALSE otherwise
+ */
+static bool
+setupExtractFilterFile(void* filterFileMem, size_t filterSize) {
+    int filterFd;
+    bool status = FALSE;
+
+    if ((filterFd = scope_open("/tmp/scope_filter.yml", O_RDWR | O_CREAT, 0664)) == -1) {
+        scope_perror("scope_open failed");
+        return status;
+    }
+
+    if (scope_ftruncate(filterFd, filterSize) != 0) {
+        goto cleanupDestFd;
+    }
+
+    char* dest = scope_mmap(NULL, filterSize, PROT_READ | PROT_WRITE, MAP_SHARED, filterFd, 0);
+    if (dest == MAP_FAILED) {
+        goto cleanupDestFd;
+    }
+
+    scope_memcpy(dest, filterFileMem, filterSize);
+
+    status = TRUE;
+
+cleanupDestFd:
+
+    scope_close(filterFd);
+
+    return status;
+
+}
+
+/*
+ * Load File into memory.
+ *
+ * Returns memory address in case of success, NULL otherwise.
+ */
+char*
+setupLoadFileIntoMem(size_t *size, char* path)
+{
+    // Load file into memory
+    char *resMem = NULL;
+    int fd;
+
+    if (path == NULL) {
+        return resMem;
+    }
+
+    if ((fd = scope_open(path, O_RDONLY)) == -1) {
+        scope_perror("scope_open failed");
+        goto closeFd;
+    }
+
+    *size = scope_lseek(fd, 0, SEEK_END);
+    if (*size == (off_t)-1) {
+        scope_perror("scope_lseek failed");
+        goto closeFd;
+    }
+
+    resMem = scope_mmap(NULL, *size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (resMem == MAP_FAILED) {
+        scope_perror("scope_mmap failed");
+        resMem = NULL;
+        goto closeFd;
+    }
+
+closeFd:
+
+    scope_close(fd);
+
+    return resMem;
+}
+
+ /*
+ * Configure the environment
+ * - setup /etc/profile file
+ * - extract memory to filter file /tmp/scope_filter.yml
+ * - extract libscope.so to /tmp/libscope.so 
+ * - patch the library
+ * Returns status of operation TRUE in case of success, FALSE otherwise
+ */
+bool
+setupConfigure(void* filterFileMem, size_t filterSize, bool setProfile) {
+    if (setProfile == TRUE) { 
+        // Setup /etc/profile
+        if (setupProfile() == FALSE) {
+            scope_fprintf(scope_stderr, "setupProfile failed\n");
+            return FALSE;
+        }
+    }
+
+    // Setup Filter file
+    if (setupExtractFilterFile(filterFileMem, filterSize) == FALSE) {
+        scope_fprintf(scope_stderr, "setup filter file failed\n");
+        return FALSE;
+    }
+
+    // Extract libscope.so
+    if (libdirExtractLibraryTo(LIBSCOPE_LOC)) {
+        scope_fprintf(scope_stderr, "extract libscope.so failed\n");
+        return FALSE;
+    }
+
+    // Patch the library
+    if (loaderOpPatchLibrary(LIBSCOPE_LOC) == PATCH_FAILED) {
+        scope_fprintf(scope_stderr, "patch libscope.so failed\n");
+        return FALSE;
+    }
+
+
+    return TRUE;
 }

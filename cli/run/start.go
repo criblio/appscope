@@ -1,8 +1,8 @@
 package run
 
 import (
-	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"strconv"
 
@@ -89,53 +89,46 @@ func (rc *Config) startAttachStage(process util.Process, cfgData []byte) error {
 	return errAlreadyScope
 }
 
-func (rc *Config) startServiceStage(procName string, cfgData []byte) error {
-	return rc.Service(procName, "root", true)
-}
-
-func setupHostCfg(cfgData []byte) error {
-	const defaultLibLoc = "/tmp/libscope.so"
-	const defaultFilterLoc = "/tmp/scope_filter.yml"
-	const defaultProfileScript = "/etc/profile.d/scope.sh"
-
-	asset, err := Asset("build/libscope.so")
+func setupHost(filterData []byte) error {
+	tempFile, err := ioutil.TempFile("/tmp", "temp_filter")
 	if err != nil {
 		return err
+	} else {
+		log.Debug().Msg("Create test_filter succeded.")
+	}
+	defer os.Remove(tempFile.Name())
+
+	if _, err := tempFile.Write(filterData); err != nil {
+		return err
+	} else {
+		log.Debug().Msg("Write test_filter succeded.")
 	}
 
-	// Setup libscope.so
-	if err := os.WriteFile(defaultLibLoc, asset, 0775); err != nil {
+	ld := loader.ScopeLoader{Path: ldscopePath()}
+	if err := ld.ConfigureHost(tempFile.Name()); err != nil {
+		os.Remove(tempFile.Name())
+		log.Debug().Msg("Setup on Host failed.")
+		log.Fatal().Err(err)
 		return err
+	} else {
+		log.Debug().Msg("Setup on Host succeded.")
 	}
-	// Setup filter file
-	if err := os.WriteFile(defaultFilterLoc, cfgData, 0644); err != nil {
-		return err
-	}
-
-	// Setup defualt Profile
-	if err := os.WriteFile(defaultProfileScript, []byte(fmt.Sprintf("LoremIpsum=%s", defaultLibLoc)), 0644); err != nil {
-		return err
-	}
-
-	// Enable this after last commit
-	// if err := os.WriteFile(defaultProfileScript, []byte(fmt.Sprintf("LD_PRELOAD=%s", defaultLibLoc)), 0644); err != nil {
-	// 	return err
-	// }
 
 	return nil
 }
 
-func SetupContainer(cfgData []byte, allowProcs []allowProcConfig) {
-	os.Setenv("SCOPE_FILTER_PATH", "/tmp/scope_filter.yml")
+func SetupContainer(allowProcs []allowProcConfig) error {
 	// Iterate over all containers
 	cPids, _ := util.GetDockerPids()
 	for _, cPid := range cPids {
 		log.Debug().Msgf("Start set up namespace for Pid %d", cPid)
+
 		// Setup /etc/profile.d
-		// Extract Filter file
+		// Extract filter file
 		// Extract libscope.so
+
 		ld := loader.ScopeLoader{Path: ldscopePath()}
-		if err := ld.Configure(cPid); err != nil {
+		if err := ld.ConfigureContainer("/tmp/scope_filter.yml", cPid); err != nil {
 			log.Error().Err(err).Msgf("Setup container namespace failed for PID %v", cPid)
 			startErr = err
 		} else {
@@ -154,11 +147,12 @@ func SetupContainer(cfgData []byte, allowProcs []allowProcConfig) {
 			}
 		}
 	}
-	os.Unsetenv("SCOPE_FILTER_PATH")
+	return nil
 }
 
 func (rc *Config) Start() error {
 	rc.setupWorkDir([]string{"start"}, true)
+
 	// Validate user has root permissions
 	if err := util.UserVerifyRootPerm(); err != nil {
 		log.Fatal().Err(err)
@@ -176,20 +170,34 @@ func (rc *Config) Start() error {
 		return err
 	}
 
-	// Setup Filter file on Host
-	if err := setupHostCfg(startcfgData); err != nil {
-		log.Fatal().Err(err)
-		return err
+	// Setup Host
+	if err := setupHost(startcfgData); err != nil {
+		log.Error().Err(err).Msgf("Setup host failed: %v", err)
+		startErr = err
 	} else {
-		log.Debug().Msg("Setup Filter on Host succeded.")
+		log.Debug().Msgf("Setup host succesfully")
 	}
 
-	SetupContainer(startcfgData, startCfg.AllowProc)
+	if err := SetupContainer(startCfg.AllowProc); err != nil {
+		log.Error().Err(err).Msgf("Setup container failed: %v", err)
+		startErr = err
+	} else {
+		log.Debug().Msgf("Setup container succesfully")
+	}
 
 	// Iterate over allowed process
 	// Attach to services on Host and container
 	// Setup service on Host
 	for _, alllowProc := range startCfg.AllowProc {
+
+		// Setup service
+		ld := loader.ScopeLoader{Path: ldscopePath()}
+		if err := ld.ServiceHost(alllowProc.Procname); err != nil {
+			log.Error().Err(err).Msgf("Setup service %v failed for host.", alllowProc.Procname)
+			startErr = err
+		} else {
+			log.Debug().Msgf("Setup service succesfully: %v for host.", alllowProc.Procname)
+		}
 
 		cfgSingleProc, err := yaml.Marshal(alllowProc.Config)
 		if err != nil {
@@ -212,15 +220,6 @@ func (rc *Config) Start() error {
 			} else {
 				log.Debug().Msgf("Attach succeded for PID %v", process.Pid)
 			}
-
-			// TODO: pass the libscope.so well known location and inform service about it
-			// quiet status?
-			// if err := rc.startServiceStage(alllowProc.Procname, cfgSingleProc); err != nil {
-			// 	log.Error().Err(err).Msgf("Service setup failed for process: %v", alllowProc.Procname)
-			// 	startErr = err
-			// } else {
-			// 	log.Debug().Msgf("Serivce setup succeded for process %v", alllowProc.Procname)
-			// }
 		}
 	}
 

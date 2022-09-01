@@ -126,16 +126,14 @@ func setupHostCfg(cfgData []byte) error {
 }
 
 func SetupContainer(cfgData []byte, allowProcs []allowProcConfig) {
-	// Setup Container namespace
 	os.Setenv("SCOPE_FILTER_PATH", "/tmp/scope_filter.yml")
 	// Iterate over all containers
-	// Extract Filter file
-	// Setup   /etc/profile.d
-	// Extract libscope.so
-	// Run service command
 	cPids, _ := util.GetDockerPids()
 	for _, cPid := range cPids {
 		log.Debug().Msgf("Start set up namespace for Pid %d", cPid)
+		// Setup /etc/profile.d
+		// Extract Filter file
+		// Extract libscope.so
 		ld := loader.ScopeLoader{Path: ldscopePath()}
 		if err := ld.Configure(cPid); err != nil {
 			log.Error().Err(err).Msgf("Setup container namespace failed for PID %v", cPid)
@@ -144,8 +142,10 @@ func SetupContainer(cfgData []byte, allowProcs []allowProcConfig) {
 			log.Debug().Msgf("Setup container succesfully PID: %v", cPid)
 		}
 
+		// Iterate over all allowed processses
 		for _, process := range allowProcs {
 			log.Debug().Msgf("Start setup service %v for container PID: %v", process.Procname, cPid)
+			// Setup service
 			if err := ld.ServiceContainer(process.Procname, cPid); err != nil {
 				log.Error().Err(err).Msgf("Setup service %v failed for container PID: %v", process.Procname, cPid)
 				startErr = err

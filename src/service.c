@@ -39,9 +39,9 @@ struct service_ops {
  */
 static bool
 isServiceInstalledSystemD(const char* serviceName) {
+
     /*
-    * List of directories which can contain service configruation file
-    *
+    * List of directories which can contain service configruation file.
     */
     const char* const servicePrefixList[] = {
         "/etc/systemd/system/",
@@ -54,7 +54,7 @@ isServiceInstalledSystemD(const char* serviceName) {
         char cfgPath[PATH_MAX] = {0};
         struct stat st = {0};
         if (scope_snprintf(cfgPath, sizeof(cfgPath), "%s/%s.service", servicePrefixList[i], serviceName) < 0) {
-            scope_perror("scope_snprintf failed");
+            scope_perror("error: isServiceInstalledSystemD, scope_snprintf failed");
             return FALSE;
         }
 
@@ -75,7 +75,7 @@ isServiceInstalledInitDOpenRc(const char* serviceName) {
     char cfgPath[PATH_MAX] = {0};
     struct stat st = {0};
     if (scope_snprintf(cfgPath, sizeof(cfgPath), "/etc/init.d/%s", serviceName) < 0) {
-        scope_perror("scope_snprintf failed");
+        scope_perror("error: isServiceInstalledInitDOpenRc, scope_snprintf failed");
         return FALSE;
     }
 
@@ -94,19 +94,19 @@ serviceCfgStatusSystemD(const char* serviceName) {
     service_cfg_status_t ret = SERVICE_CFG_ERROR;
 
     if (scope_snprintf(cfgScript, sizeof(cfgScript), "/etc/systemd/system/%s.service.d/", serviceName) < 0) {
-        scope_perror("scope_snprintf failed");
+        scope_perror("error: serviceCfgStatusSystemD, scope_snprintf failed");
         return ret;
     }
 
-    // create service.d directory if it does not exists 
+    // create service.d directory if it does not exists.
     if (scope_stat(cfgScript, &st) != 0) {
         if (scope_mkdir(cfgScript, 0644) != 0) {
-            scope_perror("scope_mkdir failed");
+            scope_perror("error: serviceCfgStatusSystemD, scope_mkdir failed");
             return ret;
         }   
     }
 
-    scope_strncat(cfgScript, "env.conf", sizeof("env.conf")-1);
+    scope_strncat(cfgScript, "env.conf", sizeof("env.conf") - 1);
 
     if (scope_stat(cfgScript, &st) == 0) {
         ret = SERVICE_CFG_EXIST;
@@ -129,7 +129,7 @@ serviceCfgStatusInitD(const char* serviceName) {
     service_cfg_status_t ret = SERVICE_CFG_ERROR;
 
     if (scope_snprintf(cfgScript, sizeof(cfgScript), "/etc/sysconfig/%s", serviceName) < 0) {
-        scope_perror("scope_snprintf failed");
+        scope_perror("error: serviceCfgStatusInitD, scope_snprintf failed");
         return ret;
     }
 
@@ -153,7 +153,7 @@ serviceCfgStatusOpenRc(const char* serviceName) {
     service_cfg_status_t ret = SERVICE_CFG_ERROR;
 
     if (scope_snprintf(cfgScript, sizeof(cfgScript), "/etc/conf.d/%s", serviceName) < 0) {
-        scope_perror("scope_snprintf failed");
+        scope_perror("error: serviceCfgStatusOpenRc, scope_snprintf failed");
         return ret;
     }
 
@@ -176,12 +176,12 @@ newServiceCfgSystemD(const char* serviceCfgPath) {
     FILE *fPtr = scope_fopen(serviceCfgPath, "a");
 
     if (fPtr == NULL) {
-        scope_perror("newServiceCfgSystemD scope_fopen failed");
+        scope_perror("error: newServiceCfgSystemD, scope_fopen failed");
         return -1;
     }
 
     if (scope_fwrite(SYSTEMD_CFG, sizeof(char), SYSTEMD_CFG_LEN, fPtr) < SYSTEMD_CFG_LEN) {
-        scope_perror("newServiceCfgSystemD scope_fwrite failed");
+        scope_perror("error: newServiceCfgSystemD, scope_fwrite failed");
         res = -1;
     }
 
@@ -201,12 +201,12 @@ newServiceCfgInitD(const char* serviceCfgPath) {
     FILE *fPtr = scope_fopen(serviceCfgPath, "a");
 
     if (fPtr == NULL) {
-        scope_perror("newServiceCfgInitD scope_fopen failed");
+        scope_perror("error: newServiceCfgInitD, scope_fopen failed");
         return -1;
     }
 
     if (scope_fwrite(INITD_CFG, sizeof(char), INITD_CFG_LEN, fPtr) < INITD_CFG_LEN) {
-        scope_perror("newServiceCfgInitD scope_fwrite failed");
+        scope_perror("error: newServiceCfgInitD, scope_fwrite failed");
         res = -1;
     }
 
@@ -226,12 +226,12 @@ newServiceCfgOpenRc(const char* serviceCfgPath) {
     FILE *fPtr = scope_fopen(serviceCfgPath, "a");
 
     if (fPtr == NULL) {
-        scope_perror("newServiceCfgOpenRc scope_fopen failed");
+        scope_perror("error: newServiceCfgOpenRc, scope_fopen failed");
         return -1;
     }
 
     if (scope_fwrite(OPENRC_CFG, sizeof(char), OPENRC_CFG_LEN, fPtr) < OPENRC_CFG_LEN) {
-        scope_perror("newServiceCfgOpenRc scope_fwrite failed");
+        scope_perror("error: newServiceCfgOpenRc, scope_fwrite failed");
         res = -1;
     }
 
@@ -280,12 +280,12 @@ modifyServiceCfgSystemd(const char* serviceCfgPath) {
     bool serviceSectionFound = FALSE;
 
     if ((readFd = scope_fopen(serviceCfgPath, "r")) == NULL) {
-        scope_perror("scope_fopen failed");
+        scope_perror("error: modifyServiceCfgSystemd, scope_fopen serviceFile failed");
         return -1;
     }
 
     if ((newFd = scope_fopen(tempPath, "w+")) == NULL) {
-        scope_perror("scope_fopen failed");
+        scope_perror("error: modifyServiceCfgSystemd, scope_fopen tempFile failed");
         scope_fclose(readFd);
         return -1;
     }
@@ -311,7 +311,7 @@ modifyServiceCfgSystemd(const char* serviceCfgPath) {
     scope_fclose(readFd);
 
     if (scope_rename(tempPath, serviceCfgPath)) {
-        scope_perror("scope_rename failed");
+        scope_perror("error: modifyServiceCfgSystemd, scope_rename failed");
     }
     scope_unlink(tempPath);
 
@@ -340,7 +340,7 @@ static struct service_ops OpenRcService = {
 };
 
 /*
- * Setup specific service
+ * Setup specific service.
  *
  * Returns 0 if service was setup correctly -1 otherwise.
  */
@@ -356,19 +356,19 @@ serviceSetup(const char* serviceName) {
     if (scope_stat(OPENRC_DIR, &sb) == 0) {
         service = &OpenRcService;
         if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/conf.d/%s", serviceName) < 0) {
-            scope_perror("scope_snprintf failed");
+            scope_perror("error: serviceSetup, scope_snprintf OpenRc failed");
             return -1;
         }
     } else if (scope_stat(SYSTEMD_DIR, &sb) == 0) {
         service = &SystemDService;
         if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/systemd/system/%s.service.d/env.conf", serviceName) < 0) {
-            scope_perror("scope_snprintf failed");
+            scope_perror("error: serviceSetup, scope_snprintf SystemD failed");
             return -1;
         }
     } else if (scope_stat(INITD_DIR, &sb) == 0) {
         service = &InitDService;
         if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/sysconfig/%s", serviceName) < 0) {
-            scope_perror("scope_snprintf failed");
+            scope_perror("error: serviceSetup, scope_snprintf InitD failed");
             return -1;
         }
     } else {
@@ -387,15 +387,14 @@ serviceSetup(const char* serviceName) {
     } else if (cfgStatus == SERVICE_CFG_NEW) {
         // Fresh configuration
         status = service->newServiceCfg(serviceCfgPath);
-        scope_chmod(serviceCfgPath, 0644);
     } else if (isCfgFileConfigured(serviceCfgPath) == FALSE) {
         // Modification of configuration file
         status = service->modifyServiceCfg(serviceCfgPath);
-        scope_chmod(serviceCfgPath, 0644);
     } else {
         // Service was already setup correctly
-        status = 0;
+        return 0;
     }
+    scope_chmod(serviceCfgPath, 0644);
     
     return status;
 }

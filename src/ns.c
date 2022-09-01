@@ -239,6 +239,10 @@ nsIsPidInChildNs(pid_t pid, pid_t *nsPid)
     return status;
 }
 
+ /*
+ * Setup the /etc/profile scope startup script
+ * Returns status of operation TRUE in case of success, FALSE otherwise
+ */
 static bool
 setupProfile(void){
     int fd = scope_open("/etc/profile.d/scope.sh", O_CREAT | O_RDWR | O_TRUNC, 0644);
@@ -262,6 +266,11 @@ setupProfile(void){
     return TRUE;
 }
 
+ 
+ /*
+ * Setup the service for specified child process
+ * Returns status of operation 0 in case of success, other values in case of failure
+ */
 int
 nsService(pid_t pid, const char* serviceName) {
 
@@ -272,6 +281,17 @@ nsService(pid_t pid, const char* serviceName) {
     return serviceSetup(serviceName);
 }
 
+ 
+ /*
+ * Configure the child mount namespace
+ * - load into memory filter file content from the host
+ * - switch the mount namespace to child
+ * - setup /etc/profile file
+ * - extract memory filter file /tmp/libscope.so 
+ * - extract libscope.so to /tmp/libscope.so 
+ * - patch the library
+ * Returns status of operation 0 in case of success, other values in case of failure
+ */
 int
 nsConfigure(pid_t pid)
 {
@@ -281,29 +301,36 @@ nsConfigure(pid_t pid)
 
     scopeCfgFilterMem = loadFileIntoMem(&filterFileSize, getenv("SCOPE_FILTER_PATH"));
     if (scopeCfgFilterMem == NULL) {
+        scope_fprintf(scope_stderr, "error: Filter file location (SCOPE_FILTER_PATH) was not defined\n");
         return status;
     }
 
     if (setNamespace(pid, "mnt") == FALSE) {
+        scope_fprintf(scope_stderr, "setNamespace mnt failed\n");
         goto cleanupMem;
     }
 
-    // Setup filter file 
+    // Extract filter file 
     if (extractMemToChildNamespace(scopeCfgFilterMem, filterFileSize, "/tmp/scope_filter.yml", 0664) == FALSE) {
+        scope_fprintf(scope_stderr, "extract filter to child namespace failed\n");
         goto cleanupMem;
     }
 
     // Setup /etc/profile
     if (setupProfile() == FALSE) {
+        scope_fprintf(scope_stderr, "setupProfile failed\n");
         goto cleanupMem;
     }
 
-    // Setup libscope.so
+    // Extract libscope.so
     if (libdirExtractLibraryTo(LIBSCOPE_IN_CHILD_NS)) {
+        scope_fprintf(scope_stderr, "extract libscope.so failed\n");
         goto cleanupMem;
     }
 
+    // Patch the library
     if (loaderOpPatchLibrary(LIBSCOPE_IN_CHILD_NS) == PATCH_FAILED) {
+        scope_fprintf(scope_stderr, "patch libscope.so failed\n");
         goto cleanupMem;
     }
 

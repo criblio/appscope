@@ -3,7 +3,13 @@
 
 #include "scopetypes.h"
 
-int loaderOpPatchLibrary(const char*);
+typedef enum {
+    PATCH_FAILED,   // patch operation was failed
+    PATCH_SUCCESS,  // patch operation was success
+    PATCH_NO_OP,    // patch operation was not performed
+} patch_status_t;
+
+patch_status_t loaderOpPatchLibrary(const char*);
 char * loaderOpGetLoader(const char *);
 int loaderOpSetLibrary(const char *);
 int loaderOpSetupLoader(char *);

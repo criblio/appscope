@@ -266,17 +266,22 @@ loaderOpSetLibrary(const char *libpath) {
     return (found - 1);
 }
 
-int
+patch_status_t
 loaderOpPatchLibrary(const char *so_path) {
-    int result = EXIT_FAILURE;
+    patch_status_t patch_res = PATCH_NO_OP;
 
     char *ldso = loaderOpGetLoader(EXE_TEST_FILE);
     if (ldso && scope_strstr(ldso, LIBMUSL) != NULL) {
-        result = loaderOpSetLibrary(so_path);
+        if (!loaderOpSetLibrary(so_path)) {
+            patch_res = PATCH_SUCCESS;
+        } else {
+            patch_res = PATCH_FAILED;
+        }
     }
+
     scope_free(ldso);
 
-    return result;
+    return patch_res;
 }
 
 // modify the loader string in the .interp section of ldscope

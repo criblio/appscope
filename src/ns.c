@@ -303,7 +303,7 @@ nsConfigure(pid_t pid)
         goto cleanupMem;
     }
 
-    if (loaderOpPatchLibrary(LIBSCOPE_IN_CHILD_NS) != 0) {
+    if (loaderOpPatchLibrary(LIBSCOPE_IN_CHILD_NS) == PATCH_FAILED) {
         goto cleanupMem;
     }
 

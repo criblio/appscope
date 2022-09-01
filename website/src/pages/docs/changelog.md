@@ -5,6 +5,26 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.1.3
+
+2022-09-06 - Maintenance Release
+
+Assets are available from the Cribl CDN at the links below.
+
+- `AppScope for x86`: [https://cdn.cribl.io/dl/scope/1.1.3/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.1.3/linux/x86_64/scope)
+- `AppScope for ARM`: [https://cdn.cribl.io/dl/scope/1.1.3/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.1.3/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.1.3/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.1.3/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.1.3/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.1.3/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path. 
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.1.3`.
+
+### Fixes
+
+- [#1067](https://github.com/criblio/appscope/issues/1067) When you run `scope attach` and then select an ID that's beyond the range of the resulting list, AppScope now handles this gracefully, and a kernel panic no longer occurs.
+- [#1080](https://github.com/criblio/appscope/issues/1080) On an M1 Mac, if you try to scope a Go static executable in a Docker container emulating x86_64 Linux, the executable will simply run un-scoped. This limitation results from an address mapping conflict between the emulator and the Go executable. With this bug fix, AppScope handles the limitation gracefully, and the Go executable no longer segfaults.
+
 ## AppScope 1.1.2
 
 2022-08-09 - Maintenance Release

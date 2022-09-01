@@ -76,7 +76,7 @@ By default, all classes of events and metrics are turned on – but you can turn
 
 ## The process‑start message
 
-If `configevent` is set to `true`, AppScope sends a process‑start message (the [start.msg](schema-reference#eventstartmsg) event) upon establishing a new connection. This message reports the configs in effect at the time, and also includes four distinct identifiers:
+If `configevent` is set to `true`, AppScope sends a process‑start message upon establishing a new connection. This message – the [start.msg](schema-reference#eventstartmsg) event – reports the configs in effect at the time, and also includes four distinct identifiers:
   - **UUID** with key `uuid` and a value in [canonical UUID form](https://en.wikipedia.org/wiki/Universally_unique_identifier). UUID is a universally-unique process identifier, meaning that no two processes will ever have the same UUID value on the same machine.
   - **Machine ID** with key `machine_id` and a value that AppScope obtains from `/etc/machine-id`. The machine ID uniquely identifies the host, as described in the [man page](https://man7.org/linux/man-pages/man5/machine-id.5.html). When `/etc/machine-id` is not available (e.g., in Alpine, or in a container), AppScope generates the machine ID using a repeatable MD5 hash of the host's first MAC address. Two containers on the same host can have the same machine ID.
   - **Process ID**, with key `pid` and a value that is always unique at any given time, but that the machine can reuse for different processes at different times.

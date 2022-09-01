@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "ns.h"
+#include "loaderop.h"
 #include "service.h"
 #include "libdir.h"
 #include "scopestdlib.h"
@@ -299,6 +300,10 @@ nsConfigure(pid_t pid)
 
     // Setup libscope.so
     if (libdirExtractLibraryTo(LIBSCOPE_IN_CHILD_NS)) {
+        goto cleanupMem;
+    }
+
+    if (loaderOpPatchLibrary(LIBSCOPE_IN_CHILD_NS) != 0) {
         goto cleanupMem;
     }
 

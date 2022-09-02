@@ -4,7 +4,7 @@
 #include "scopetypes.h"
 
 int setupService(const char *);
-bool setupConfigure(void *, size_t, bool);
+int setupConfigure(void *, size_t, bool);
 char* setupLoadFileIntoMem(size_t *, char*);
 
 #endif // __SETUP_H__

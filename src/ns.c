@@ -216,7 +216,7 @@ nsConfigure(pid_t pid, void* scopeCfgFilterMem, size_t filterFileSize)
         return EXIT_FAILURE;
     }
 
-    if (setupConfigure(scopeCfgFilterMem, filterFileSize, TRUE) == FALSE) {
+    if (setupConfigure(scopeCfgFilterMem, filterFileSize, TRUE)) {
         scope_fprintf(scope_stderr, "setup child namespace failed\n");
         return EXIT_FAILURE;
     }

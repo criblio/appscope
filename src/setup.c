@@ -524,36 +524,35 @@ closeFd:
  * - extract memory to filter file /tmp/scope_filter.yml
  * - extract libscope.so to /tmp/libscope.so 
  * - patch the library
- * Returns status of operation TRUE in case of success, FALSE otherwise
+ * Returns status of operation 0 in case of success, other value otherwise
  */
-bool
+int
 setupConfigure(void* filterFileMem, size_t filterSize, bool setProfile) {
     if (setProfile == TRUE) { 
         // Setup /etc/profile
         if (setupProfile() == FALSE) {
             scope_fprintf(scope_stderr, "setupProfile failed\n");
-            return FALSE;
+            return -1;
         }
     }
 
     // Setup Filter file
     if (setupExtractFilterFile(filterFileMem, filterSize) == FALSE) {
         scope_fprintf(scope_stderr, "setup filter file failed\n");
-        return FALSE;
+        return -1;
     }
 
     // Extract libscope.so
     if (libdirExtractLibraryTo(LIBSCOPE_LOC)) {
         scope_fprintf(scope_stderr, "extract libscope.so failed\n");
-        return FALSE;
+        return -1;
     }
 
     // Patch the library
     if (loaderOpPatchLibrary(LIBSCOPE_LOC) == PATCH_FAILED) {
         scope_fprintf(scope_stderr, "patch libscope.so failed\n");
-        return FALSE;
+        return -1;
     }
 
-
-    return TRUE;
+    return 0;
 }

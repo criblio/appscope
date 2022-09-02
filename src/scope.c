@@ -95,11 +95,6 @@ attach(pid_t pid, char *scopeLibPath)
     scope_printf("Attaching to process %d\n", pid);
     int ret = injectScope(pid, scopeLibPath);
 
-    // remove the config that `ldscope` created
-    char path[PATH_MAX];
-    scope_snprintf(path, sizeof(path), "/scope_attach_%d.env", pid);
-    scope_shm_unlink(path);
-
     // done
     return ret;
 }
@@ -107,20 +102,73 @@ attach(pid_t pid, char *scopeLibPath)
 static int
 attachCmd(pid_t pid, const char *on_off)
 {
-    FILE *fs;
+    int fd;
     char path[PATH_MAX];
     char cmd[64];
 
     scope_snprintf(path, sizeof(path), "%s/%s.%d",
                    DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, pid);
 
-    if ((fs = scope_fopen(path, "w+")) == NULL) return EXIT_FAILURE;
+    fd = scope_open(path, O_RDWR|O_CREAT);
+    if (fd == -1) {
+        scope_perror("open() of dynamic config file");
+        return EXIT_FAILURE;
+    }
+
+    /*
+     * Ensuring that the process being operated on can remove
+     * the dyn config file being created here.
+     * In the case where a root user executes the command,
+     * we need to close and then chmod in order to apply this.
+     */
+    scope_close(fd);
+
+    if (scope_chmod(path, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH) == -1) {
+        scope_perror("chmod");
+        return EXIT_FAILURE;
+    }
+
+    /*
+     * Below represents steps to handle an odd corener case;
+     * A process is scoped. Then, a detach command is executed
+     * as root. The original process can't remove the file. Ugh.
+     */
+    if (getuid() == 0) {
+        char *sauid, *sagid, *eptr;
+        uid_t auid, agid;
+
+        if (((sauid = getenv("SUDO_UID"))) &&
+            ((sagid = getenv("SUDO_GID")))) {
+            auid = scope_strtol(sauid, &eptr, 10);
+            if (scope_errno || auid <= 0 || auid > INT_MAX) {
+                scope_perror("strtol on UID");
+                return EXIT_FAILURE;
+            }
+
+            agid = scope_strtol(sagid, &eptr, 10);
+            if (scope_errno || agid <= 0 || agid > INT_MAX) {
+                scope_perror("strtol on GID");
+                return EXIT_FAILURE;
+            }
+        }
+
+        if (chown(path, auid, agid) == -1) {
+            scope_perror("chown");
+            return EXIT_FAILURE;
+        }
+    }
+
+    fd = scope_open(path, O_RDWR);
+    if (fd == -1) {
+        scope_perror("open() of dynamic config file");
+        return EXIT_FAILURE;
+    }
 
     scope_snprintf(cmd, sizeof(cmd), "SCOPE_CMD_ATTACH=%s", on_off);
-    if (scope_fwrite(cmd, scope_strlen(cmd), 1, fs) <= 0) return EXIT_FAILURE;
+    if (scope_write(fd, cmd, scope_strlen(cmd)) <= 0) return EXIT_FAILURE;
 
-    scope_fclose(fs);
-    return 0;
+    scope_close(fd);
+    return EXIT_SUCCESS;
 }
 
 // long aliases for short options
@@ -215,25 +263,39 @@ main(int argc, char **argv, char **env)
             return EXIT_FAILURE;
         }
 
+        uint64_t rc = osFindLibrary("libscope.so", pid);
+
         if (attachType == 'a') {
-            uint64_t rc = osFindLibrary("libscope.so", pid);
+            int ret;
+            char path[PATH_MAX];
+
             if (rc == -1) {
                 scope_fprintf(scope_stderr, "error: can't get path to executable for pid %d\n", pid);
-                return EXIT_FAILURE;
+                ret = EXIT_FAILURE;
             } else if (rc == 0) {
                 // proc exists, libscope does not exist, a new attach
-                return attach(pid, scopeLibPath);
+                ret = attach(pid, scopeLibPath);
             } else {
                 // libscope exists, a reattach
-                int rc;
-                char path[PATH_MAX];
-
-                rc = attachCmd(pid, "true");
-                scope_snprintf(path, sizeof(path), "/scope_attach_%d.env", pid);
-                scope_shm_unlink(path);
-                return rc;
+                scope_printf("reattaching to pid %d\n", pid);
+                ret = attachCmd(pid, "true");
             }
+
+            // remove the env var file
+            scope_snprintf(path, sizeof(path), "/scope_attach_%d.env", pid);
+            scope_shm_unlink(path);
+            return ret;
         } else if (attachType == 'd') {
+            // pid & libscope need to exist before moving forward
+            if (rc == -1) {
+                scope_fprintf(scope_stderr, "error: pid %d does not exist\n", pid);
+                return EXIT_FAILURE;
+            } else if (rc == 0) {
+                // proc exists, libscope does not exist.
+                scope_fprintf(scope_stderr, "error: pid %d has never been attached\n", pid);
+                return EXIT_FAILURE;
+            }
+            scope_printf("detaching from pid %d\n", pid);
             return attachCmd(pid, "false");
         } else {
             scope_fprintf(scope_stderr, "error: attach or detach with invalid option\n");

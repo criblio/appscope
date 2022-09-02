@@ -530,7 +530,7 @@ showUsage(char *prog)
       "  -f DIR                       alias for \"-l DIR\" for backward compatibility\n"
       "  -a, --attach PID             attach to the specified process ID\n"
       "  -d, --detach PID             detach from the specified process ID\n"
-      "  -c, --configure FILTER_PATH  configure namespace with FILTER_PATH for specified proces PID\n"
+      "  -c, --configure FILTER_PATH  configure scope environment with FILTER_PATH\n"
       "  -s, --service SERVICE        setup specified service NAME\n"
       "  -n  --namespace PID          perform service/configure operation on specified container PID\n"
       "  -p, --patch SO_FILE          patch specified libscope.so\n"
@@ -661,6 +661,18 @@ main(int argc, char **argv, char **env)
 
     if (attachArg && configFilterPath) {
         scope_fprintf(scope_stderr, "error: --attach/--detach and --configure cannot be used together\n");
+        showUsage(scope_basename(argv[0]));
+        return EXIT_FAILURE;
+    }
+
+    if (configFilterPath && serviceName) {
+        scope_fprintf(scope_stderr, "error: --configure and --service cannot be used together\n");
+        showUsage(scope_basename(argv[0]));
+        return EXIT_FAILURE;
+    }
+
+    if (nsPidArg && ((configFilterPath == NULL) && (serviceName == NULL))) {
+        scope_fprintf(scope_stderr, "error: --namespace option required --configure or --service option\n");
         showUsage(scope_basename(argv[0]));
         return EXIT_FAILURE;
     }

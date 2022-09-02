@@ -1,6 +1,7 @@
 package run
 
 import (
+	"errors"
 	"io"
 	"io/ioutil"
 	"os"
@@ -60,7 +61,6 @@ func getConfigFromStdin() (startConfig, []byte, error) {
 }
 
 func (rc *Config) startAttachStage(process util.Process, cfgData []byte) error {
-
 	if !process.Scoped {
 		pid := strconv.Itoa(process.Pid)
 		tmpFile, err := os.CreateTemp(".", pid)
@@ -79,8 +79,11 @@ func (rc *Config) startAttachStage(process util.Process, cfgData []byte) error {
 
 		env := append(os.Environ(), "SCOPE_CONF_PATH="+tmpFile.Name())
 		ld := loader.ScopeLoader{Path: ldscopePath()}
-		if err := ld.AttachSubProc([]string{pid}, env); err != nil {
-			return err
+		stdoutStderr, err := ld.AttachSubProc([]string{pid}, env)
+		if err != nil {
+			log.Error().Err(err).Msgf("Attach failed for PID %v details, %v", pid, stdoutStderr)
+		} else {
+			log.Debug().Msgf("Attach success")
 		}
 		os.Unsetenv("SCOPE_CONF_PATH")
 		return err
@@ -104,13 +107,15 @@ func setupHost(filterData []byte) error {
 	}
 
 	ld := loader.ScopeLoader{Path: ldscopePath()}
-	if err := ld.ConfigureHost(tempFile.Name()); err != nil {
+
+	stdoutStderr, err := ld.ConfigureHost(tempFile.Name())
+	if err != nil {
 		os.Remove(tempFile.Name())
 		log.Debug().Msg("Setup on Host failed.")
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msgf("Configure Host failed details %v", stdoutStderr)
 		return err
 	} else {
-		log.Debug().Msg("Setup on Host succeded.")
+		log.Debug().Msgf("Setup on Host succeded %v", stdoutStderr)
 	}
 
 	return nil
@@ -127,8 +132,9 @@ func SetupContainer(allowProcs []allowProcConfig) error {
 		// Extract libscope.so
 
 		ld := loader.ScopeLoader{Path: ldscopePath()}
-		if err := ld.ConfigureContainer("/tmp/scope_filter.yml", cPid); err != nil {
-			log.Error().Err(err).Msgf("Setup container namespace failed for PID %v", cPid)
+		stdoutStderr, err := ld.ConfigureContainer("/tmp/scope_filter.yml", cPid)
+		if err != nil {
+			log.Error().Err(err).Msgf("Setup container namespace failed for PID %v, details %v", cPid, stdoutStderr)
 			startErr = err
 		} else {
 			log.Debug().Msgf("Setup container succesfully PID: %v", cPid)
@@ -138,8 +144,9 @@ func SetupContainer(allowProcs []allowProcConfig) error {
 		for _, process := range allowProcs {
 			log.Debug().Msgf("Start setup service %v for container PID: %v", process.Procname, cPid)
 			// Setup service
-			if err := ld.ServiceContainer(process.Procname, cPid); err != nil {
-				log.Error().Err(err).Msgf("Setup service %v failed for container PID: %v", process.Procname, cPid)
+			stdoutStderr, err := ld.ServiceContainer(process.Procname, cPid)
+			if err != nil {
+				log.Error().Err(err).Msgf("Setup service %v failed for container PID: %v, details %v", process.Procname, cPid, stdoutStderr)
 				startErr = err
 			} else {
 				log.Debug().Msgf("Setup service succesfully: %v for container PID: %v", process.Procname, cPid)
@@ -191,8 +198,9 @@ func (rc *Config) Start() error {
 
 		// Setup service
 		ld := loader.ScopeLoader{Path: ldscopePath()}
-		if err := ld.ServiceHost(alllowProc.Procname); err != nil {
-			log.Error().Err(err).Msgf("Setup service %v failed for host.", alllowProc.Procname)
+		stdoutStderr, err := ld.ServiceHost(alllowProc.Procname)
+		if err != nil {
+			log.Error().Err(err).Msgf("Setup service %v failed for host, details %v", alllowProc.Procname, stdoutStderr)
 			startErr = err
 		} else {
 			log.Debug().Msgf("Setup service succesfully: %v for host.", alllowProc.Procname)
@@ -213,7 +221,12 @@ func (rc *Config) Start() error {
 		}
 
 		for _, process := range allProc {
-			if err := rc.startAttachStage(process, cfgSingleProc); err != nil {
+			err := rc.startAttachStage(process, cfgSingleProc)
+			if errors.Is(err, errAlreadyScope) {
+				log.Debug().Msgf("Process PID %v is already scoped", process.Pid)
+				continue
+			}
+			if err != nil {
 				log.Error().Err(err).Msgf("Attach failed for PID %v", process.Pid)
 				startErr = err
 			} else {

@@ -105,7 +105,8 @@ func (rc *Config) Attach(args []string) error {
 	if !rc.Subprocess {
 		return ld.Attach(args, env)
 	}
-	return ld.AttachSubProc(args, env)
+	_, err = ld.AttachSubProc(args, env)
+	return err
 }
 
 // choosePid presents a user interface for selecting a PID

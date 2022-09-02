@@ -8,7 +8,7 @@ import (
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start a scoped process list",
-	Long:  `start a scoped process list.`,
+	Long:  `Start a scoped process list.`,
 	Example: `
 	scope start < example_filter.yml
 	cat example_filter.json | scope start

@@ -49,6 +49,7 @@ Available Subcommands:
   ps          List processes currently being scoped
   run         Executes a scoped command
   service     Configure a systemd/OpenRC service to be scoped
+  start       Start a scoped process list
   version     Display scope version
   watch       Executes a scoped command on an interval
 
@@ -514,6 +515,27 @@ scope service cribl -c tls://in.my-instance.cribl.cloud:10090
   
 ```
 
+### start
+---
+
+Start a scoped process list.
+
+#### Usage
+
+`scope start [flags]`
+
+#### Examples
+
+```
+scope start < example_filter.yml
+cat example_filter.json | scope start
+```
+
+#### Flags
+
+```
+  -h, --help                  Help for start
+```
 
 ### version
 ----

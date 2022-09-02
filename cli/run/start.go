@@ -67,23 +67,22 @@ func (rc *Config) startAttachStage(process util.Process, cfgData []byte) error {
 		if err != nil {
 			return err
 		}
+		defer os.Remove(tmpFile.Name())
 
 		if _, err := tmpFile.Write(cfgData); err != nil {
-			os.Remove(tmpFile.Name())
 			return err
 		}
 
 		if err := tmpFile.Close(); err != nil {
-			os.Remove(tmpFile.Name())
 			return err
 		}
 
-		rc.Subprocess = true
-		rc.Passthrough = true
-		os.Setenv("SCOPE_CONF_PATH", tmpFile.Name())
-		err = rc.Attach([]string{pid})
+		env := append(os.Environ(), "SCOPE_CONF_PATH="+tmpFile.Name())
+		ld := loader.ScopeLoader{Path: ldscopePath()}
+		if err := ld.AttachSubProc([]string{pid}, env); err != nil {
+			return err
+		}
 		os.Unsetenv("SCOPE_CONF_PATH")
-		os.Remove(tmpFile.Name())
 		return err
 	}
 	return errAlreadyScope

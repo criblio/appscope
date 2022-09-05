@@ -20,11 +20,11 @@ func TestProcessesByName(t *testing.T) {
 	user, _ := user.Current()
 	exp := Processes{
 		Process{
-			ID:      1,
-			Pid:     os.Getpid(),
-			User:    user.Username,
-			Command: strings.Join(os.Args[:], " "),
-			Scoped:  false,
+			ID:          1,
+			Pid:         os.Getpid(),
+			User:        user.Username,
+			Command:     strings.Join(os.Args[:], " "),
+			ScopeStatus: Unscoped,
 		},
 	}
 	assert.Equal(t, exp, result)
@@ -42,7 +42,7 @@ func TestPidScopeMapByProcessName(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, pidMap, 1)
 	assert.Contains(t, pidMap, os.Getpid())
-	assert.Equal(t, pidMap[os.Getpid()], false)
+	assert.Equal(t, pidMap[os.Getpid()], Unscoped)
 }
 
 // TestPidScopeMapByProcessName
@@ -70,7 +70,7 @@ func TestPidScopeMapByCmdLine(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, pidMap, 1)
 	assert.Contains(t, pidMap, os.Getpid())
-	assert.Equal(t, pidMap[os.Getpid()], false)
+	assert.Equal(t, pidMap[os.Getpid()], Unscoped)
 }
 
 // TestPidScopeMapByCmdLineCharShorter
@@ -86,7 +86,7 @@ func TestPidScopeMapByCmdLineCharShorter(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, pidMap, 1)
 	assert.Contains(t, pidMap, os.Getpid())
-	assert.Equal(t, pidMap[os.Getpid()], false)
+	assert.Equal(t, pidMap[os.Getpid()], Unscoped)
 }
 
 // TestPidUser

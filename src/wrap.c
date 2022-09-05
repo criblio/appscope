@@ -27,6 +27,7 @@
 #include "dns.h"
 #include "fn.h"
 #include "httpagg.h"
+#include "libstate.h"
 #include "os.h"
 #include "plattime.h"
 #include "report.h"
@@ -380,18 +381,22 @@ unHookAll(struct dl_phdr_info *info, size_t size, void *data)
 bool
 cmdDetach(void)
 {
-    if (!g_cfg.funcs_attached) return TRUE;
+    if (!g_cfg.funcs_scoped) return TRUE;
+
+    libstateLoaded(g_proc.pid);
 
     scopeLog(CFG_LOG_DEBUG, "%s:%d", __FUNCTION__, __LINE__);
     dl_iterate_phdr(unHookAll, NULL);
-    g_cfg.funcs_attached = FALSE;
+    g_cfg.funcs_scoped = FALSE;
     return TRUE;
 }
 
 bool
 cmdAttach(void)
 {
-    if (g_cfg.funcs_attached) return TRUE;
+    if (g_cfg.funcs_scoped) return TRUE;
+
+    libstateScoped();
 
     bool filter = TRUE;
     scopeLog(CFG_LOG_DEBUG, "%s:%d", __FUNCTION__, __LINE__);
@@ -399,7 +404,7 @@ cmdAttach(void)
     dl_iterate_phdr(hookAll, &filter);
     hookMain(filter);
 
-    g_cfg.funcs_attached = TRUE;
+    g_cfg.funcs_scoped = TRUE;
     return TRUE;
 }
 
@@ -1076,7 +1081,7 @@ ssl_read_hook(SSL *ssl, void *buf, int num)
     int rc;
 
     WRAP_CHECK(SSL_read, -1);
-    if (g_cfg.funcs_attached == FALSE) return g_fn.SSL_read(ssl, buf, num);
+    if (g_cfg.funcs_scoped == FALSE) return g_fn.SSL_read(ssl, buf, num);
 
     scopeLog(CFG_LOG_TRACE, "ssl_read_hook");
     rc = g_fn.SSL_read(ssl, buf, num);
@@ -1096,7 +1101,7 @@ ssl_write_hook(SSL *ssl, void *buf, int num)
     int rc;
 
     WRAP_CHECK(SSL_write, -1);
-    if (g_cfg.funcs_attached == FALSE) return g_fn.SSL_write(ssl, buf, num);
+    if (g_cfg.funcs_scoped == FALSE) return g_fn.SSL_write(ssl, buf, num);
 
     scopeLog(CFG_LOG_TRACE, "ssl_write_hook");
     rc = g_fn.SSL_write(ssl, buf, num);
@@ -1339,6 +1344,13 @@ initHook(int attachedFlag)
         filter = filterProc(full_path);
         dl_iterate_phdr(hookAll, &filter);
         hookMain(filter);
+    }
+
+    // Set information about library state
+    if (filter) {
+        libstateScoped();
+    } else {
+        libstateLoaded(g_proc.pid);
     }
 
     // libmusl
@@ -1648,7 +1660,7 @@ init(void)
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
 
-    g_cfg.funcs_attached = TRUE;
+    g_cfg.funcs_scoped = TRUE;
     g_cfg.staticfg = g_staticfg;
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
@@ -1674,7 +1686,6 @@ init(void)
     }
 
     osInitJavaAgent();
-
 }
 
 EXPORTOFF int
@@ -2768,7 +2779,7 @@ static ssize_t
 __write_libc(int fd, const void *buf, size_t size)
 {
     WRAP_CHECK(__write_libc, -1);
-    if ((g_ismusl == FALSE) && (g_cfg.funcs_attached == FALSE)) return g_fn.__write_libc(fd, buf, size);
+    if ((g_ismusl == FALSE) && (g_cfg.funcs_scoped == FALSE)) return g_fn.__write_libc(fd, buf, size);
 
     uint64_t initialTime = getTime();
 
@@ -2783,7 +2794,7 @@ static ssize_t
 __write_pthread(int fd, const void *buf, size_t size)
 {
     WRAP_CHECK(__write_pthread, -1);
-    if ((g_ismusl == FALSE) && (g_cfg.funcs_attached == FALSE)) return g_fn.__write_pthread(fd, buf, size);
+    if ((g_ismusl == FALSE) && (g_cfg.funcs_scoped == FALSE)) return g_fn.__write_pthread(fd, buf, size);
 
     uint64_t initialTime = getTime();
 
@@ -2824,7 +2835,7 @@ wrap_scope_syscall(long number, ...)
     WRAP_CHECK(syscall, -1);
     LOAD_FUNC_ARGS_VALIST(fArgs, number);
 
-    if (g_cfg.funcs_attached == FALSE) {
+    if (g_cfg.funcs_scoped == FALSE) {
         return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],
                             fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
     }
@@ -4666,7 +4677,7 @@ internal_sendto(int sockfd, const void *buf, size_t len, int flags,
     ssize_t rc;
     WRAP_CHECK(sendto, -1);
     rc = g_fn.sendto(sockfd, buf, len, flags, dest_addr, addrlen);
-    if ((g_ismusl == TRUE) && (g_cfg.funcs_attached == FALSE)) return rc; 
+    if ((g_ismusl == TRUE) && (g_cfg.funcs_scoped == FALSE)) return rc; 
 
     if (rc != -1) {
         scopeLog(CFG_LOG_TRACE, "fd:%d sendto", sockfd);
@@ -4751,7 +4762,7 @@ internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int fla
     WRAP_CHECK(sendmmsg, -1);
 
     rc = g_fn.sendmmsg(sockfd, msgvec, vlen, flags);
-    if ((g_ismusl == FALSE) && (g_cfg.funcs_attached == FALSE)) return rc;
+    if ((g_ismusl == FALSE) && (g_cfg.funcs_scoped == FALSE)) return rc;
 
     if (rc != -1) {
         scopeLog(CFG_LOG_TRACE, "fd:%d sendmmsg", sockfd);
@@ -4850,7 +4861,7 @@ internal_recvfrom(int sockfd, void *buf, size_t len, int flags,
 
     WRAP_CHECK(recvfrom, -1);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
-    if ((g_ismusl == TRUE) && (g_cfg.funcs_attached == FALSE)) return rc;
+    if ((g_ismusl == TRUE) && (g_cfg.funcs_scoped == FALSE)) return rc;
 
     // If called with the MSG_PEEK flag set, don't do any scope processing
     // as it could result in processing of duplicate bytes later
@@ -5295,7 +5306,7 @@ __fdelt_chk(long int fdelt)
 static void
 uv__read_hook(void *stream)
 {
-    if (g_cfg.funcs_attached == FALSE) return g_fn.uv__read(stream);
+    if (g_cfg.funcs_scoped == FALSE) return g_fn.uv__read(stream);
 
     if (SYMBOL_LOADED(uv_fileno)) g_fn.uv_fileno(stream, &g_ssl_fd);
     //scopeLog(CFG_LOG_TRACE, "%s: fd %d", __FUNCTION__, g_ssl_fd);

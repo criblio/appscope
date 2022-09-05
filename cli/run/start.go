@@ -139,7 +139,7 @@ func startAttach(allowProc allowProcConfig) error {
 	}
 
 	for pid, scopeState := range pidsToAttach {
-		if scopeState {
+		if scopeState == util.Scoped {
 			log.Info().
 				Str("pid", strconv.Itoa(pid)).
 				Msgf("Attach Failed. Process: %v is already scoped.", pid)

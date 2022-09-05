@@ -48,6 +48,11 @@ cleanupDestFd:
     return status;
 }
 
+/*
+ * Reassociate process identified with pid with a specific namespace described by ns.
+ *
+ * Returns TRUE if operation was success, FALSE otherwise.
+ */
 static bool
 setNamespace(pid_t pid, const char *ns)
 {
@@ -71,8 +76,13 @@ setNamespace(pid_t pid, const char *ns)
     return TRUE;
 }
 
+/*
+ * Joins the child PID and mount namespace.
+ *
+ * Returns TRUE if operation was success, FALSE otherwise.
+ */
 static bool
-join_namespace(pid_t hostPid)
+joinNamespace(pid_t hostPid)
 {
     bool status = FALSE;
     size_t ldscopeSize = 0;
@@ -219,6 +229,38 @@ nsConfigure(pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize)
 
     return EXIT_SUCCESS;
 }
+
+ /*
+ * Check if libscope.so is loaded in specified PID
+ * Returns TRUE if library is loaded, FALSE otherwise.
+ */
+static bool
+isLibScopeLoaded(pid_t pid)
+{
+    char mapsPath[PATH_MAX] = {0};
+    char buffer[9076];
+    FILE *fd;
+    bool status = FALSE;
+
+    if (scope_snprintf(mapsPath, sizeof(mapsPath), "/proc/%d/maps", pid) < 0) {
+        return status;
+    }
+
+    if ((fd = scope_fopen(mapsPath, "r")) == NULL) {
+        return status;
+    }
+
+    while (scope_fgets(buffer, sizeof(buffer), fd)) {
+        if (scope_strstr(buffer, "libscope.so")) {
+            status = TRUE;
+            break;
+        }
+    }
+
+    scope_fclose(fd);
+    return status;
+}
+
  
  /*
  * Perform fork and exec which cause that direct children
@@ -232,12 +274,30 @@ nsConfigure(pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize)
  * Returns status of operation
  */
 int
-nsForkAndExec(pid_t parentPid, pid_t nsPid)
+nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
 {
-    if (join_namespace(parentPid) == FALSE) {
+    char *opStatus = "Detach";
+    char *childOp = "-d";
+    bool libLoaded = isLibScopeLoaded(parentPid);
+
+    if (attachType == 'a') {
+        childOp = "-a";
+        opStatus = (libLoaded == FALSE) ? "Attach" : "Reattach";
+    } else if (libLoaded == FALSE) {
+        scope_fprintf(scope_stderr, "error: PID: %d has never been attached\n", parentPid);
+        return EXIT_FAILURE; 
+    }
+     /*
+    * TODO In case of Reattach/Detach - when libLoaded = TRUE
+    * We only need the mount namespace to /dev/shm but currently ldscopedyn
+    * also check the pid namespace
+    */
+
+    if (joinNamespace(parentPid) == FALSE) {
         scope_fprintf(scope_stderr, "error: join_namespace failed\n");
         return EXIT_FAILURE; 
     }
+
     pid_t child = fork();
     if (child < 0) {
         scope_fprintf(scope_stderr, "error: fork() failed\n");
@@ -257,8 +317,7 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid)
         }
 
         execArgv[execArgc++] = LDSCOPE_IN_CHILD_NS;
-
-        execArgv[execArgc++] = "-a";
+        execArgv[execArgc++] = childOp;
         execArgv[execArgc++] = nsAttachPidStr;
 
         return execve(LDSCOPE_IN_CHILD_NS, execArgv, environ);
@@ -269,12 +328,12 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid)
     if (WIFEXITED(status)) {
         int exitChildStatus = WEXITSTATUS(status);
         if (exitChildStatus == 0) {
-            scope_fprintf(scope_stderr, "Attach to process %d in child process succeeded\n", parentPid);
+            scope_fprintf(scope_stderr, "%s to process %d in child process succeeded\n", opStatus, parentPid);
         } else {
-            scope_fprintf(scope_stderr, "Attach to process %d in child process failed\n", parentPid);
+            scope_fprintf(scope_stderr, "%s to process %d in child process failed\n", opStatus, parentPid);
         }
         return exitChildStatus;
     }
-    scope_fprintf(scope_stderr, "error: attach failed() failed\n");
+    scope_fprintf(scope_stderr, "error: %s failed() failed\n", opStatus);
     return EXIT_FAILURE;
 }

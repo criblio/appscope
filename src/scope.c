@@ -115,43 +115,33 @@ attachCmd(pid_t pid, const char *on_off)
         return EXIT_FAILURE;
     }
 
-    /*
-     * Ensuring that the process being operated on can remove
-     * the dyn config file being created here.
-     * In the case where a root user executes the command,
-     * we need to close and then chmod in order to apply this.
-     */
-    scope_close(fd);
-
-    if (scope_chmod(path, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH) == -1) {
-        scope_perror("chmod");
+    if (scope_fchmod(fd, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH) == -1) {
+        scope_perror("scope_fchmod() failed");
         return EXIT_FAILURE;
     }
 
     /*
-     * Below represents steps to handle an odd corener case;
-     * A process is scoped. Then, a detach command is executed
-     * as root. The original process can't remove the file. Ugh.
+     * Ensuring that the process being operated on can remove
+     * the dyn config file being created here.
+     * In the case where a root user executes the command,
+     * we need to change ownership of dyn config file.
      */
+
     if (scope_getuid() == 0) {
         uid_t euid = -1;
         gid_t egid = -1;
 
         if (osGetProcUidGid(pid, &euid, &egid) == -1) {
             scope_fprintf(scope_stderr, "error: osGetProcUidGid() failed\n");
+            scope_close(fd);
             return EXIT_FAILURE;
         }
 
-        if (scope_chown(path, euid, egid) == -1) {
-            scope_perror("chown");
+        if (scope_fchown(fd, euid, egid) == -1) {
+            scope_perror("scope_fchown() failed");
+            scope_close(fd);
             return EXIT_FAILURE;
         }
-    }
-
-    fd = scope_open(path, O_RDWR);
-    if (fd == -1) {
-        scope_perror("open() of dynamic config file");
-        return EXIT_FAILURE;
     }
 
     scope_snprintf(cmd, sizeof(cmd), "SCOPE_CMD_ATTACH=%s", on_off);

@@ -279,6 +279,7 @@ int           scope_rand(void);
 void          scope_srand(unsigned int);
 int           scope_setns(int, int);
 int           scope_chown(const char *, uid_t, gid_t);
+int           scope_fchown(int, uid_t, gid_t);
 
 
 #endif // __SCOPE_STDLIB_H__

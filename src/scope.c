@@ -165,7 +165,11 @@ attachCmd(pid_t pid, const char *on_off)
     }
 
     scope_snprintf(cmd, sizeof(cmd), "SCOPE_CMD_ATTACH=%s", on_off);
-    if (scope_write(fd, cmd, scope_strlen(cmd)) <= 0) return EXIT_FAILURE;
+    if (scope_write(fd, cmd, scope_strlen(cmd)) <= 0) {
+        scope_perror("scope_write() failed");
+        scope_close(fd);
+        return EXIT_FAILURE;
+    }
 
     scope_close(fd);
     return EXIT_SUCCESS;

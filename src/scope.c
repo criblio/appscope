@@ -133,7 +133,7 @@ attachCmd(pid_t pid, const char *on_off)
      * A process is scoped. Then, a detach command is executed
      * as root. The original process can't remove the file. Ugh.
      */
-    if (getuid() == 0) {
+    if (scope_getuid() == 0) {
         char *sauid, *sagid, *eptr;
         uid_t auid, agid;
 
@@ -152,7 +152,7 @@ attachCmd(pid_t pid, const char *on_off)
             }
         }
 
-        if (chown(path, auid, agid) == -1) {
+        if (scope_chown(path, auid, agid) == -1) {
             scope_perror("chown");
             return EXIT_FAILURE;
         }

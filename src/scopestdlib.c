@@ -205,6 +205,7 @@ extern int           scopelibc_rand(void);
 extern void          scopelibc_srand(unsigned int);
 extern int           scopelibc_ftruncate(int, off_t);
 extern int           scopelibc_setns(int, int);
+extern int           scopelibc_chown(const char *, uid_t, gid_t);
 
 static int g_go_static;
 
@@ -1212,4 +1213,9 @@ int
 scope_setns(int fd, int nstype)
 {
     return scopelibc_setns(fd, nstype);
+}
+
+int
+scope_chown(const char *pathname, uid_t owner, gid_t group) {
+    return scopelibc_chown(pathname, owner, group);
 }

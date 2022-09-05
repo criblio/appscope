@@ -29,6 +29,7 @@ typedef uint64_t fpos64_t;
 #endif
 
 extern int osGetProcname(char *, size_t);
+extern int osGetProcUidGid(pid_t, uid_t *, gid_t *);
 extern int osGetNumThreads(pid_t);
 extern int osGetNumFds(pid_t);
 extern int osGetNumChildProcs(pid_t);

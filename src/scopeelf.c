@@ -162,9 +162,10 @@ out:
  * The relocation table's entries have a one-to-one correspondence with the PLT.
  */
 int
-doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym, char *str, int rsz, int attach)
+doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym, char *str, int rsz, bool attach)
 {
     int i, match = -1;
+    uint64_t prev;
 
     for (i = 0; i < rsz / sizeof(Elf64_Rela); i++) {
         /*
@@ -219,11 +220,16 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
              * of the shared module as defined in the link map's l_addr + offset.
              * as in: rel[i].r_offset + lm->l_addr
              */
-            // been here before, don't update the GOT entry
-            if ((void *)*gaddr == hook->func) return -1;
+            prev = *gaddr;
+            if (attach == TRUE) {
+                // been here before, don't update the GOT entry
+                if ((void *)*gaddr == hook->func) return -1;
+                *gaddr = (uint64_t)hook->func;
+            } else {
+                // handle a detach operation
+                *gaddr = *(uint64_t *)hook->gfn;
+            }
 
-            uint64_t prev = *gaddr;
-            *gaddr = (uint64_t)hook->func;
             scopeLog(CFG_LOG_DEBUG, "%s:%d sym=%s offset 0x%lx GOT entry %p saddr 0x%lx, prev=0x%lx, curr=%p",
                         __FUNCTION__, __LINE__, hook->symbol, rel[i].r_offset, gaddr, saddr, prev, hook->func);
 
@@ -397,3 +403,4 @@ is_musl(char *buf)
 
     return FALSE;
 }
+

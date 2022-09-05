@@ -40,7 +40,7 @@ echo "    Command Line Options Test"
 echo "================================="
 
 run ./bin/linux/${ARCH}/ldscope
-outputs "error: missing --attach option or EXECUTABLE"
+outputs "error: missing --attach, --detach option or EXECUTABLE"
 outputs "Cribl AppScope"
 returns 1
 
@@ -133,21 +133,22 @@ returns 1
 if [ "0" == "$(id -u)" ]; then
 
     run ./bin/linux/${ARCH}/ldscope -a not_a_pid
-    outputs "invalid --attach PID"
+    outputs "invalid --attach, --detach PID"
     returns 1
 
     run ./bin/linux/${ARCH}/ldscope -a -999
-    outputs "invalid --attach PID"
+    outputs "invalid --attach, --detach PID"
     returns 1
 
     run ./bin/linux/${ARCH}/ldscope -a 999999999
-    outputs "error: --attach PID not a current process"
+    outputs "error: --attach, --detach PID not a current process"
     returns 1
 
 else 
 
+    # we don't require root unless the pid exists and libscope is not present in the maps file
     run ./bin/linux/${ARCH}/ldscope -a 999999999
-    outputs "error: --attach requires root"
+    outputs "error: --attach, --detach PID not a current process"
     returns 1
 
 fi
@@ -157,7 +158,7 @@ outputs foo
 returns 0
 
 run ./bin/linux/${ARCH}/ldscopedyn
-outputs "missing --attach or EXECUTABLE"
+outputs "missing --attach, --detach or EXECUTABLE"
 returns 1
 
 run ./bin/linux/${ARCH}/ldscopedyn -z 
@@ -195,7 +196,7 @@ export -n SCOPE_LIB_PATH
 
 export SCOPE_LIB_PATH=./lib/linux/${ARCH}/libscope.so
 run ./bin/linux/${ARCH}/ldscopedyn -a 999999999 echo
-outputs "ignoring EXECUTABLE argument with --attach option"
+outputs "ignoring EXECUTABLE argument with --attach, --detach option"
 returns 1
 export -n SCOPE_LIB_PATH
 

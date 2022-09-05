@@ -30,8 +30,8 @@ typedef enum {
 
 typedef enum {
     NO_ACTION,
-    URL_REDIRECT_ON,
-    URL_REDIRECT_OFF
+    FUNC_DETACH,
+    FUNC_ATTACH,
 } switch_action_t;
 
 /**

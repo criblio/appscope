@@ -23,6 +23,12 @@ osGetProcMemory(pid_t pid)
 }
 
 int
+osGetProcUidGid(pid_t pid, uid_t *uid, gid_t *gid)
+{
+    return -1;
+}
+
+int
 osGetNumThreads(pid_t pid)
 {
     struct proc_taskinfo task;

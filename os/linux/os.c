@@ -236,6 +236,53 @@ osGetProcname(char *pname, int len)
 }
 
 int
+osGetProcUidGid(pid_t pid, uid_t *uid, gid_t *gid)
+{
+    char path[PATH_MAX] = {0};
+    char buffer[4096];
+    uid_t eUid = -1;
+    gid_t eGid = -1;
+
+    if (scope_snprintf(path, sizeof(path), "/proc/%d/status", pid) < 0) return -1;
+
+    FILE *fstream = scope_fopen(path, "r");
+    if (fstream == NULL) {
+        return -1;
+    }
+
+    while (scope_fgets(buffer, sizeof(buffer), fstream)) {
+        const char delimiters[] = ": \t";
+        if (scope_strstr(buffer, "Uid:")) {
+            char *entry, *last;
+            // Skip Uid string
+            entry = scope_strtok_r(buffer, delimiters, &last);
+            // Get real Uid value
+            entry = scope_strtok_r(NULL, delimiters, &last);
+            eUid = scope_atoi(entry);
+        }
+
+        if (scope_strstr(buffer, "Gid:")) {
+            char *entry, *last;
+            // Skip Gid string
+            entry = scope_strtok_r(buffer, delimiters, &last);
+            // Get real Gid value
+            entry = scope_strtok_r(NULL, delimiters, &last);
+            eGid = scope_atoi(entry);
+        }
+    }
+
+    scope_fclose(fstream);
+
+    if (eUid != -1 && eGid != -1) {
+        *uid = eUid;
+        *gid = eGid;
+        return 0;
+    }
+
+    return -1;
+}
+
+int
 osGetProcMemory(pid_t pid)
 {
     int fd;
@@ -770,4 +817,29 @@ osGetProcCPU(void) {
     return
         (((long long)ruse.ru_utime.tv_sec + (long long)ruse.ru_stime.tv_sec) * 1000 * 1000) +
         ((long long)ruse.ru_utime.tv_usec + (long long)ruse.ru_stime.tv_usec);
+}
+
+uint64_t
+osFindLibrary(const char *library, pid_t pid)
+{
+    char filename[PATH_MAX];
+    char buffer[9076];
+    FILE *fd;
+    uint64_t addr = 0;
+
+    scope_snprintf(filename, sizeof(filename), "/proc/%d/maps", pid);
+    if ((fd = scope_fopen(filename, "r")) == NULL) {
+        // return no proc found as opposed to no libscope found
+        return -1;
+    }
+
+    while(scope_fgets(buffer, sizeof(buffer), fd)) {
+        if (scope_strstr(buffer, library)) {
+            addr = scope_strtoull(buffer, NULL, 16);
+            break;
+        }
+    }
+
+    scope_fclose(fd);
+    return addr;
 }

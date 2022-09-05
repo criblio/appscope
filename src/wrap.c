@@ -266,6 +266,143 @@ fileModTime(const char *path)
     return STATMODTIME(statbuf);
 }
 
+/*
+ * Iterate all shared objects and GOT hook as necessary.
+ * Filter the process from an external filter list.
+ * If the filter fails only hook execve.
+ * If the filter passes hook all interposed functions.
+ */
+static int
+hookAll(struct dl_phdr_info *info, size_t size, void *data)
+{
+    if (!info || !info->dlpi_name || !data) return FALSE;
+
+    struct link_map *lm;
+    Elf64_Sym *sym = NULL;
+    Elf64_Rela *rel = NULL;
+    char *str = NULL;
+    int rsz = 0;
+    bool *filter = data;
+
+    scopeLog(CFG_LOG_DEBUG, "%s: shared obj: %s", __FUNCTION__, info->dlpi_name);
+
+    // don't hook funcs from libscope or ld.so
+    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) return 0;
+
+    void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
+    if (handle == NULL) return FALSE;
+
+    // Get the link map and ELF sections in advance of something matching
+    if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+        for (int i=0; inject_hook_list[i].symbol; i++) {
+            // if the proc passes the filter then GOT hook all else only hook execve
+            // TODO; all execv?
+            if (((*filter == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
+                dlsym(handle, inject_hook_list[i].symbol)) {
+                if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1) {
+                    scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from shared obj %s",
+                             inject_hook_list[i].symbol, info->dlpi_name);
+                }
+            }
+        }
+    }
+
+    dlclose(handle);
+    return 0;
+}
+
+static int
+hookMain(bool filter)
+{
+    struct link_map *lm;
+    Elf64_Sym *sym = NULL;
+    Elf64_Rela *rel = NULL;
+    char *str = NULL;
+    int rsz = 0;
+
+    void *handle = g_fn.dlopen(NULL, RTLD_NOW);
+    if (handle == NULL) return FALSE;
+
+    // Get the link map and ELF sections in advance of something matching
+    if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+        for (int i=0; inject_hook_list[i].symbol; i++) {
+            // if the proc passes the filter then GOT hook all else only hook execve
+            // TODO; all execv?
+            if (((filter == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
+                dlsym(handle, inject_hook_list[i].symbol)) {
+                if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1) {
+                    scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from main", inject_hook_list[i].symbol);
+                }
+            }
+        }
+    }
+
+    dlclose(handle);
+    return TRUE;
+}
+
+/*
+ * Handle the detach operation
+ */
+static int
+unHookAll(struct dl_phdr_info *info, size_t size, void *data)
+{
+    if (!info || !info->dlpi_name) return FALSE;
+
+    struct link_map *lm;
+    Elf64_Sym *sym = NULL;
+    Elf64_Rela *rel = NULL;
+    char *str = NULL;
+    int rsz = 0;
+
+    scopeLog(CFG_LOG_DEBUG, "%s: shared obj: %s", __FUNCTION__, info->dlpi_name);
+
+    // don't hook funcs from libscope or ld.so
+    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) return FALSE;
+
+    void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
+    if (handle == NULL) return FALSE;
+
+    // Get the link map and ELF sections in advance of something matching
+    if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+        for (int i=0; inject_hook_list[i].symbol; i++) {
+            if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, FALSE) != -1) {
+                scopeLog(CFG_LOG_DEBUG, "\tGOT detached %s from shared obj %s",
+                         inject_hook_list[i].symbol, info->dlpi_name);
+            }
+        }
+    }
+
+    dlclose(handle);
+    return FALSE;
+}
+
+bool
+cmdDetach(void)
+{
+    if (!g_cfg.funcs_attached) return TRUE;
+
+    scopeLog(CFG_LOG_DEBUG, "%s:%d", __FUNCTION__, __LINE__);
+    dl_iterate_phdr(unHookAll, NULL);
+    g_cfg.funcs_attached = FALSE;
+    return TRUE;
+}
+
+bool
+cmdAttach(void)
+{
+    if (g_cfg.funcs_attached) return TRUE;
+
+    bool filter = TRUE;
+    scopeLog(CFG_LOG_DEBUG, "%s:%d", __FUNCTION__, __LINE__);
+
+    dl_iterate_phdr(hookAll, &filter);
+    hookMain(filter);
+
+    g_cfg.funcs_attached = TRUE;
+    return TRUE;
+}
+
 static void
 remoteConfig()
 {
@@ -282,8 +419,7 @@ remoteConfig()
 
     // We want to accept incoming requests on TCP, unix, and edge.
     // However, we don't currently support receving on TLS connections.
-    int acceptRequests = transportSupportsCommandControl(
-                                          ctlTransport(g_ctl, CFG_CTL));
+    int acceptRequests = transportSupportsCommandControl(ctlTransport(g_ctl, CFG_CTL));
     fds.events = (acceptRequests) ? POLLIN : 0;
 
     fds.fd = ctlConnection(g_ctl, CFG_CTL);
@@ -404,11 +540,11 @@ remoteConfig()
                     break;
                 case REQ_SWITCH:
                     switch (req->action) {
-                        case URL_REDIRECT_ON:
-                            g_cfg.urls = 1;
+                        case FUNC_DETACH:
+                            cmdDetach();
                             break;
-                        case URL_REDIRECT_OFF:
-                             g_cfg.urls = 0;
+                        case FUNC_ATTACH:
+                            cmdAttach();
                             break;
                         default:
                             DBG("%d", req->action);
@@ -495,13 +631,22 @@ dynConfig(void)
 {
     FILE *fs;
     time_t now;
-    char path[PATH_MAX];
+    char *path;
+    char userpath[PATH_MAX];
+    char clipath[PATH_MAX];
     static time_t modtime = 0;
 
-    scope_snprintf(path, sizeof(path), "%s/%s.%d", g_cmddir, DYN_CONFIG_PREFIX, g_proc.pid);
+    scope_snprintf(userpath, sizeof(userpath), "%s/%s.%d", g_cmddir, DYN_CONFIG_PREFIX, g_proc.pid);
+    scope_snprintf(clipath, sizeof(clipath), "%s/%s.%d", DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, g_proc.pid);
 
     // Is there a command file for this pid
-    if (osIsFilePresent(g_proc.pid, path) == -1) return 0;
+    if (osIsFilePresent(g_proc.pid, userpath) != -1) {
+        path = userpath;
+    } else if (osIsFilePresent(g_proc.pid, clipath) != -1) {
+        path = clipath;
+    } else {
+        return 0;
+    }
 
     // Have we already processed this file?
     now = fileModTime(path);
@@ -930,8 +1075,10 @@ ssl_read_hook(SSL *ssl, void *buf, int num)
 {
     int rc;
 
-    scopeLog(CFG_LOG_TRACE, "ssl_read_hook");
     WRAP_CHECK(SSL_read, -1);
+    if (g_cfg.funcs_attached == FALSE) return g_fn.SSL_read(ssl, buf, num);
+
+    scopeLog(CFG_LOG_TRACE, "ssl_read_hook");
     rc = g_fn.SSL_read(ssl, buf, num);
     if (rc > 0) {
         int fd = -1;
@@ -948,8 +1095,10 @@ ssl_write_hook(SSL *ssl, void *buf, int num)
 {
     int rc;
 
-    scopeLog(CFG_LOG_TRACE, "ssl_write_hook");
     WRAP_CHECK(SSL_write, -1);
+    if (g_cfg.funcs_attached == FALSE) return g_fn.SSL_write(ssl, buf, num);
+
+    scopeLog(CFG_LOG_TRACE, "ssl_write_hook");
     rc = g_fn.SSL_write(ssl, buf, num);
     if (rc > 0) {
         int fd = -1;
@@ -1101,7 +1250,7 @@ hookSharedObjs(struct dl_phdr_info *info, size_t size, void *data)
         for (int i=0; inject_hook_list[i].symbol; i++) {
 
             if ((dlsym(handle, inject_hook_list[i].symbol)) &&
-                (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1)) {
+                (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1)) {
                     scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from shared obj %s",
                              inject_hook_list[i].symbol, info->dlpi_name);
             }
@@ -1133,90 +1282,15 @@ hookInject()
     return FALSE;
 }
 
-static int
-hookMain(bool filter)
-{
-    struct link_map *lm;
-    Elf64_Sym *sym = NULL;
-    Elf64_Rela *rel = NULL;
-    char *str = NULL;
-    int rsz = 0;
-
-    void *handle = g_fn.dlopen(NULL, RTLD_NOW);
-    if (handle == NULL) return FALSE;
-
-    // Get the link map and ELF sections in advance of something matching
-    if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
-        for (int i=0; inject_hook_list[i].symbol; i++) {
-            // if the proc passes the filter then GOT hook all else only hook execve
-            // TODO; all execv?
-            if (((filter == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
-                dlsym(handle, inject_hook_list[i].symbol)) {
-                if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1) {
-                    scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from main", inject_hook_list[i].symbol);
-                }
-            }
-        }
-    }
-
-    dlclose(handle);
-    return TRUE;
-}
-
-/*
- * Iterate all shared objects and GOT hook as necessary.
- * Filter the process from an external filter list.
- * If the filter fails only hook execve.
- * If the filter passes hook all interposed functions.
- */
-static int
-hookAll(struct dl_phdr_info *info, size_t size, void *data)
-{
-    if (!info || !info->dlpi_name || !data) return FALSE;
-
-    struct link_map *lm;
-    Elf64_Sym *sym = NULL;
-    Elf64_Rela *rel = NULL;
-    char *str = NULL;
-    int rsz = 0;
-    bool *filter = data;
-
-    scopeLog(CFG_LOG_DEBUG, "%s: shared obj: %s", __FUNCTION__, info->dlpi_name);
-
-    // don't hook funcs from libscope or ld.so
-    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) return FALSE;
-
-    void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
-    if (handle == NULL) return FALSE;
-
-    // Get the link map and ELF sections in advance of something matching
-    if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
-        for (int i=0; inject_hook_list[i].symbol; i++) {
-            // if the proc passes the filter then GOT hook all else only hook execve
-            // TODO; all execv?
-            if (((*filter == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
-                dlsym(handle, inject_hook_list[i].symbol)) {
-                if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1) {
-                    scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from shared obj %s",
-                             inject_hook_list[i].symbol, info->dlpi_name);
-                }
-            }
-        }
-    }
-
-    dlclose(handle);
-    return FALSE;
-}
-
 static void
 initHook(int attachedFlag)
 {
     int rc;
-    funchook_t *funchook;
     bool should_we_patch = FALSE;
     char *full_path = NULL;
     elf_buf_t *ebuf = NULL;
     bool filter;
+    funchook_t *funchook;
 
     // env vars are not always set as needed, be explicit here
     // this is duplicated if we were started from the scope exec
@@ -1574,6 +1648,7 @@ init(void)
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
 
+    g_cfg.funcs_attached = TRUE;
     g_cfg.staticfg = g_staticfg;
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
@@ -2693,6 +2768,8 @@ static ssize_t
 __write_libc(int fd, const void *buf, size_t size)
 {
     WRAP_CHECK(__write_libc, -1);
+    if ((g_ismusl == FALSE) && (g_cfg.funcs_attached == FALSE)) return g_fn.__write_libc(fd, buf, size);
+
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.__write_libc(fd, buf, size);
@@ -2706,6 +2783,8 @@ static ssize_t
 __write_pthread(int fd, const void *buf, size_t size)
 {
     WRAP_CHECK(__write_pthread, -1);
+    if ((g_ismusl == FALSE) && (g_cfg.funcs_attached == FALSE)) return g_fn.__write_pthread(fd, buf, size);
+
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.__write_pthread(fd, buf, size);
@@ -2744,6 +2823,11 @@ wrap_scope_syscall(long number, ...)
 
     WRAP_CHECK(syscall, -1);
     LOAD_FUNC_ARGS_VALIST(fArgs, number);
+
+    if (g_cfg.funcs_attached == FALSE) {
+        return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],
+                            fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
+    }
 
     switch (number) {
     case SYS_close:
@@ -3471,7 +3555,7 @@ dlopen(const char *filename, int flags)
             // for each symbol in the list try to hook
             for (i=0; inject_hook_list[i].symbol; i++) {
                 if ((dlsym(handle, inject_hook_list[i].symbol)) &&
-                    (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 0) != -1)) {
+                    (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1)) {
                     scopeLog(CFG_LOG_DEBUG, "\tdlopen interposed  %s", inject_hook_list[i].symbol);
                 }
             }
@@ -4559,7 +4643,6 @@ send(int sockfd, const void *buf, size_t len, int flags)
 {
     ssize_t rc;
     WRAP_CHECK(send, -1);
-    doURL(sockfd, buf, len, NETTX);
     rc = g_fn.send(sockfd, buf, len, flags);
     if (rc != -1) {
         scopeLog(CFG_LOG_TRACE, "fd:%d send", sockfd);
@@ -4583,6 +4666,8 @@ internal_sendto(int sockfd, const void *buf, size_t len, int flags,
     ssize_t rc;
     WRAP_CHECK(sendto, -1);
     rc = g_fn.sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+    if ((g_ismusl == TRUE) && (g_cfg.funcs_attached == FALSE)) return rc; 
+
     if (rc != -1) {
         scopeLog(CFG_LOG_TRACE, "fd:%d sendto", sockfd);
         doSetConnection(sockfd, dest_addr, addrlen, REMOTE);
@@ -4664,7 +4749,10 @@ internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int fla
     ssize_t rc;
 
     WRAP_CHECK(sendmmsg, -1);
+
     rc = g_fn.sendmmsg(sockfd, msgvec, vlen, flags);
+    if ((g_ismusl == FALSE) && (g_cfg.funcs_attached == FALSE)) return rc;
+
     if (rc != -1) {
         scopeLog(CFG_LOG_TRACE, "fd:%d sendmmsg", sockfd);
 
@@ -4707,9 +4795,7 @@ recv(int sockfd, void *buf, size_t len, int flags)
 
     WRAP_CHECK(recv, -1);
     scopeLog(CFG_LOG_TRACE, "fd:%d recv", sockfd);
-    if ((rc = doURL(sockfd, buf, len, NETRX)) == 0) {
-        rc = g_fn.recv(sockfd, buf, len, flags);
-    }
+    rc = g_fn.recv(sockfd, buf, len, flags);
 
     // If called with the MSG_PEEK flag set, don't do any scope processing
     // as it could result in processing of duplicate bytes later
@@ -4736,9 +4822,7 @@ __recv_chk(int sockfd, void *buf, size_t len, size_t buflen, int flags)
 
     WRAP_CHECK(__recv_chk, -1);
     scopeLog(CFG_LOG_TRACE, "fd:%d __recv_chk", sockfd);
-    if ((rc = doURL(sockfd, buf, len, NETRX)) == 0) {
-        rc = g_fn.__recv_chk(sockfd, buf, len, buflen, flags);
-    }
+    rc = g_fn.__recv_chk(sockfd, buf, len, buflen, flags);
 
     // If called with the MSG_PEEK flag set, don't do any scope processing
     // as it could result in processing of duplicate bytes later
@@ -4766,6 +4850,7 @@ internal_recvfrom(int sockfd, void *buf, size_t len, int flags,
 
     WRAP_CHECK(recvfrom, -1);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+    if ((g_ismusl == TRUE) && (g_cfg.funcs_attached == FALSE)) return rc;
 
     // If called with the MSG_PEEK flag set, don't do any scope processing
     // as it could result in processing of duplicate bytes later
@@ -5210,6 +5295,8 @@ __fdelt_chk(long int fdelt)
 static void
 uv__read_hook(void *stream)
 {
+    if (g_cfg.funcs_attached == FALSE) return g_fn.uv__read(stream);
+
     if (SYMBOL_LOADED(uv_fileno)) g_fn.uv_fileno(stream, &g_ssl_fd);
     //scopeLog(CFG_LOG_TRACE, "%s: fd %d", __FUNCTION__, g_ssl_fd);
     if (g_fn.uv__read) return g_fn.uv__read(stream);

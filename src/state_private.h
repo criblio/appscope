@@ -179,7 +179,6 @@ typedef struct net_info_t {
     int active;
     int type;
     http_state_t http[HTTP_NUM];  // rx=[0] and tx=[1]
-    bool urlRedirect;
     bool addrSetLocal;
     bool addrSetRemote;
     bool addrSetUnix;

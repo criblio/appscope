@@ -430,6 +430,25 @@ processReloadConfig(config_t *cfg, const char* value)
     }
 }
 
+extern bool cmdDetach(void);
+extern bool cmdAttach(void);
+
+static void
+processAttach(const char* value)
+{
+    if (!value) return;
+    unsigned int attach = strToVal(boolMap, value);
+
+    switch (attach) {
+        case FALSE:
+            cmdDetach();
+            break;
+        case TRUE:
+            cmdAttach();
+            break;
+    }
+}
+
 //
 // An example of this format: SCOPE_STATSD_MAXLEN=1024
 //
@@ -505,6 +524,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         processCmdDebug(value);
     } else if (!scope_strcmp(env_name, "SCOPE_CONF_RELOAD")) {
         processReloadConfig(cfg, value);
+    } else if (!scope_strcmp(env_name, "SCOPE_CMD_ATTACH")) {
+        processAttach(value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_CTL, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_TLS_ENABLE")) {
@@ -631,6 +652,7 @@ cfgProcessEnvironment(config_t* cfg)
         // Some things should only be processed as commands, not as
         // environment variables.  Skip them here.
         if (startsWith(e, "SCOPE_CMD_DBG_PATH")) continue;
+        if (startsWith(e, "SCOPE_CMD_ATTACH")) continue;
         if (startsWith(e, "SCOPE_CONF_RELOAD")) continue;
 
         // Process everything else.

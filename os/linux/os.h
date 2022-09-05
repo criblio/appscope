@@ -45,6 +45,7 @@
 extern char *program_invocation_short_name;
 
 extern int osGetProcname(char *, int);
+extern int osGetProcUidGid(pid_t, uid_t *, gid_t *);
 extern int osGetNumThreads(pid_t);
 extern int osGetNumFds(pid_t);
 extern int osGetNumChildProcs(pid_t);
@@ -64,5 +65,6 @@ extern int osNeedsConnect(int);
 extern char *osGetUserName(unsigned);
 extern char *osGetGroupName(unsigned);
 extern long long osGetProcCPU(void);
+extern uint64_t osFindLibrary(const char *, pid_t);
 
 #endif  //__OS_H__

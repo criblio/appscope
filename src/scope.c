@@ -42,10 +42,12 @@ showUsage(char *prog)
       "\n"
       "usage: %s [OPTIONS] --lib LIBRARY [--] EXECUTABLE [ARGS...]\n"
       "       %s [OPTIONS] --attach PID\n"
+      "       %s [OPTIONS] --detach PID\n"
       "\n"
       "options:\n"
       "  -u, -h, --usage, --help  display this info\n"
       "  -a, --attach PID         attach to the specified process ID\n"
+      "  -d, --detach PID         detach from the specified process ID\n"
       "\n"
       "Unless you are an AppScope developer, you are likely in the wrong place.\n"
       "See `scope` or `ldscope` instead.\n"
@@ -54,8 +56,103 @@ showUsage(char *prog)
       "https://github.com/criblio/appscope. Please direct feature requests and\n"
       "defect reports there.\n"
       "\n",
-      SCOPE_VER, prog, prog
+      SCOPE_VER, prog, prog, prog
     );
+}
+
+static int
+attach(pid_t pid, char *scopeLibPath)
+{
+    char *exe_path = NULL;
+    elf_buf_t *ebuf;
+
+    if (scope_getuid()) {
+        scope_printf("error: --attach requires root\n");
+        return EXIT_FAILURE;
+    }
+
+    if (osGetExePath(pid, &exe_path) == -1) {
+        scope_fprintf(scope_stderr, "error: can't get path to executable for pid %d\n", pid);
+        return EXIT_FAILURE;
+    }
+
+    if ((ebuf = getElf(exe_path)) == NULL) {
+        scope_free(exe_path);
+        scope_fprintf(scope_stderr, "error: can't read the executable %s\n", exe_path);
+        return EXIT_FAILURE;
+    }
+
+    if (is_static(ebuf->buf) == TRUE) {
+        scope_fprintf(scope_stderr, "error: can't attach to the static executable: %s\nNote that the executable can be 'scoped' using the command 'scope run -- %s'\n", exe_path, exe_path);
+        scope_free(exe_path);
+        freeElf(ebuf->buf, ebuf->len);
+        return EXIT_FAILURE;
+    }
+
+    scope_free(exe_path);
+    freeElf(ebuf->buf, ebuf->len);
+
+    scope_printf("Attaching to process %d\n", pid);
+    int ret = injectScope(pid, scopeLibPath);
+
+    // done
+    return ret;
+}
+
+static int
+attachCmd(pid_t pid, const char *on_off)
+{
+    int fd;
+    char path[PATH_MAX];
+    char cmd[64];
+
+    scope_snprintf(path, sizeof(path), "%s/%s.%d",
+                   DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, pid);
+
+    fd = scope_open(path, O_RDWR|O_CREAT);
+    if (fd == -1) {
+        scope_perror("open() of dynamic config file");
+        return EXIT_FAILURE;
+    }
+
+    if (scope_fchmod(fd, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH) == -1) {
+        scope_perror("scope_fchmod() failed");
+        return EXIT_FAILURE;
+    }
+
+    /*
+     * Ensuring that the process being operated on can remove
+     * the dyn config file being created here.
+     * In the case where a root user executes the command,
+     * we need to change ownership of dyn config file.
+     */
+
+    if (scope_getuid() == 0) {
+        uid_t euid = -1;
+        gid_t egid = -1;
+
+        if (osGetProcUidGid(pid, &euid, &egid) == -1) {
+            scope_fprintf(scope_stderr, "error: osGetProcUidGid() failed\n");
+            scope_close(fd);
+            return EXIT_FAILURE;
+        }
+
+        if (scope_fchown(fd, euid, egid) == -1) {
+            scope_perror("scope_fchown() failed");
+            scope_close(fd);
+            return EXIT_FAILURE;
+        }
+    }
+
+    scope_snprintf(cmd, sizeof(cmd), "SCOPE_CMD_ATTACH=%s", on_off);
+    if (scope_write(fd, cmd, scope_strlen(cmd)) <= 0) {
+        scope_perror("scope_write() failed");
+        scope_close(fd);
+        return EXIT_FAILURE;
+    }
+
+    scope_close(fd);
+    return EXIT_SUCCESS;
 }
 
 // long aliases for short options
@@ -63,6 +160,7 @@ static struct option options[] = {
     {"help",    no_argument,       0, 'h'},
     {"usage",   no_argument,       0, 'u'},
     {"attach",  required_argument, 0, 'a'},
+    {"detach",  required_argument, 0, 'd'},
     {0, 0, 0, 0}
 };
 
@@ -71,9 +169,12 @@ main(int argc, char **argv, char **env)
 {
     // process command line
     char *attachArg = 0;
+    char *scopeLibPath;
+    char attachType = 'u';
+
     for (;;) {
         int index = 0;
-        int opt = getopt_long(argc, argv, "+:uha:", options, &index);
+        int opt = getopt_long(argc, argv, "+:uha:d:", options, &index);
         if (opt == -1) {
             break;
         }
@@ -84,6 +185,11 @@ main(int argc, char **argv, char **env)
                 return EXIT_SUCCESS;
             case 'a':
                 attachArg = optarg;
+                attachType = 'a';
+                break;
+            case 'd':
+                attachArg = optarg;
+                attachType = 'd';
                 break;
             case ':':
                 // options missing their value end up here
@@ -104,18 +210,18 @@ main(int argc, char **argv, char **env)
 
     // either --attach or an executable is required
     if (!attachArg && optind >= argc) {
-        scope_fprintf(scope_stderr, "error: missing --attach or EXECUTABLE argument\n");
+        scope_fprintf(scope_stderr, "error: missing --attach, --detach or EXECUTABLE argument\n");
         showUsage(scope_basename(argv[0]));
         return EXIT_FAILURE;
     }
 
-    // use --attach, ignore executable and args
+    // use --attach or --detach, ignore executable and args
     if (attachArg && optind < argc) {
-        scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --attach option\n");
+        scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --attach, --detach option\n");
     }
 
     // SCOPE_LIB_PATH environment variable is required
-    char* scopeLibPath = getenv("SCOPE_LIB_PATH");
+    scopeLibPath = getenv("SCOPE_LIB_PATH");
     if (!scopeLibPath) {
         scope_fprintf(scope_stderr, "error: SCOPE_LIB_PATH must be set to point to libscope.so\n");
         return EXIT_FAILURE;
@@ -135,46 +241,51 @@ main(int argc, char **argv, char **env)
     setPidEnv(scope_getpid());
 
     if (attachArg) {
-        char *exe_path = NULL;
-        elf_buf_t *ebuf;
-
         int pid = scope_atoi(attachArg);
         if (pid < 1) {
-            scope_fprintf(scope_stderr, "error: invalid PID for --attach\n");
+            scope_fprintf(scope_stderr, "error: invalid PID for --attach, --detach\n");
             return EXIT_FAILURE;
         }
 
-        if (osGetExePath(pid, &exe_path) == -1) {
-            scope_fprintf(scope_stderr, "error: can't get path to executable for pid %d\n", pid);
+        uint64_t rc = osFindLibrary("libscope.so", pid);
+
+        if (attachType == 'a') {
+            int ret;
+            char path[PATH_MAX];
+
+            if (rc == -1) {
+                scope_fprintf(scope_stderr, "error: can't get path to executable for pid %d\n", pid);
+                ret = EXIT_FAILURE;
+            } else if (rc == 0) {
+                // proc exists, libscope does not exist, a new attach
+                ret = attach(pid, scopeLibPath);
+            } else {
+                // libscope exists, a reattach
+                scope_printf("Reattaching to pid %d\n", pid);
+                ret = attachCmd(pid, "true");
+            }
+
+            // remove the env var file
+            scope_snprintf(path, sizeof(path), "/scope_attach_%d.env", pid);
+            scope_shm_unlink(path);
+            return ret;
+        } else if (attachType == 'd') {
+            // pid & libscope need to exist before moving forward
+            if (rc == -1) {
+                scope_fprintf(scope_stderr, "error: pid %d does not exist\n", pid);
+                return EXIT_FAILURE;
+            } else if (rc == 0) {
+                // proc exists, libscope does not exist.
+                scope_fprintf(scope_stderr, "error: pid %d has never been attached\n", pid);
+                return EXIT_FAILURE;
+            }
+            scope_printf("Detaching from pid %d\n", pid);
+            return attachCmd(pid, "false");
+        } else {
+            scope_fprintf(scope_stderr, "error: attach or detach with invalid option\n");
+            showUsage(scope_basename(argv[0]));
             return EXIT_FAILURE;
         }
-
-        if ((ebuf = getElf(exe_path)) == NULL) {
-            scope_free(exe_path);
-            scope_fprintf(scope_stderr, "error: can't read the executable %s\n", exe_path);
-            return EXIT_FAILURE;
-        }
-
-        if (is_static(ebuf->buf) == TRUE) {
-            scope_fprintf(scope_stderr, "error: can't attach to the static executable: %s\nNote that the executable can be 'scoped' using the command 'scope run -- %s'\n", exe_path, exe_path);
-            scope_free(exe_path);
-            freeElf(ebuf->buf, ebuf->len);
-            return EXIT_FAILURE;
-        }
-
-        scope_free(exe_path);
-        freeElf(ebuf->buf, ebuf->len);
-
-        scope_printf("Attaching to process %d\n", pid);
-        int ret = injectScope(pid, scopeLibPath);
-
-        // remove the config that `ldscope`
-        char path[PATH_MAX];
-        scope_snprintf(path, sizeof(path), "/scope_attach_%d.env", pid);
-        scope_shm_unlink(path);
-
-        // done
-        return ret;
     }
 
     char *inferior_command = getpath(argv[optind]);
@@ -271,7 +382,7 @@ main(int argc, char **argv, char **env)
 
     sys_exec(ebuf, inferior_command, argc-optind, &argv[optind], env);
 
-    return 0;
+    return EXIT_SUCCESS;
 err:
     if (ebuf) scope_free(ebuf);
     exit(EXIT_FAILURE);

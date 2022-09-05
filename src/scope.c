@@ -277,7 +277,7 @@ main(int argc, char **argv, char **env)
                 ret = attach(pid, scopeLibPath);
             } else {
                 // libscope exists, a reattach
-                scope_printf("reattaching to pid %d\n", pid);
+                scope_printf("Reattaching to pid %d\n", pid);
                 ret = attachCmd(pid, "true");
             }
 
@@ -295,7 +295,7 @@ main(int argc, char **argv, char **env)
                 scope_fprintf(scope_stderr, "error: pid %d has never been attached\n", pid);
                 return EXIT_FAILURE;
             }
-            scope_printf("detaching from pid %d\n", pid);
+            scope_printf("Detaching from pid %d\n", pid);
             return attachCmd(pid, "false");
         } else {
             scope_fprintf(scope_stderr, "error: attach or detach with invalid option\n");

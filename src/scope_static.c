@@ -781,6 +781,11 @@ main(int argc, char **argv, char **env)
         * - fork & execute static loader attach one more time with update PID
         */
         if (nsIsPidInChildNs(pid, &nsAttachPid) == TRUE) {
+            // must be root to switch namespace
+            if (scope_getuid()) {
+                scope_printf("error: --attach requires root\n");
+                return EXIT_FAILURE;
+            }
             return nsForkAndExec(pid, nsAttachPid);
         }
     }

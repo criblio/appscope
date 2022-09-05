@@ -134,25 +134,15 @@ attachCmd(pid_t pid, const char *on_off)
      * as root. The original process can't remove the file. Ugh.
      */
     if (scope_getuid() == 0) {
-        char *sauid, *sagid, *eptr;
-        uid_t auid, agid;
+        uid_t euid = -1;
+        gid_t egid = -1;
 
-        if (((sauid = getenv("SUDO_UID"))) &&
-            ((sagid = getenv("SUDO_GID")))) {
-            auid = scope_strtol(sauid, &eptr, 10);
-            if (scope_errno || auid <= 0 || auid > INT_MAX) {
-                scope_perror("strtol on UID");
-                return EXIT_FAILURE;
-            }
-
-            agid = scope_strtol(sagid, &eptr, 10);
-            if (scope_errno || agid <= 0 || agid > INT_MAX) {
-                scope_perror("strtol on GID");
-                return EXIT_FAILURE;
-            }
+        if (osGetProcUidGid(pid, &euid, &egid) == -1) {
+            scope_fprintf(scope_stderr, "error: osGetProcUidGid() failed\n");
+            return EXIT_FAILURE;
         }
 
-        if (scope_chown(path, auid, agid) == -1) {
+        if (scope_chown(path, euid, egid) == -1) {
             scope_perror("chown");
             return EXIT_FAILURE;
         }

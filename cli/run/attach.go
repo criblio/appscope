@@ -111,9 +111,9 @@ func choosePid(procs util.Processes) int {
 	fmt.Println("Select an ID from the list:")
 	var selection string
 	fmt.Scanln(&selection)
-	i, err := strconv.Atoi(selection)
+	i, err := strconv.ParseUint(selection, 10, 32)
 	i--
-	if err != nil || i < 0 || i > len(procs) {
+	if err != nil || i >= uint64(len(procs)) {
 		util.ErrAndExit("Invalid Selection")
 	}
 	return procs[i].Pid

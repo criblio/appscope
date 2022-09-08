@@ -106,6 +106,7 @@ func startAttachSingleProcess(pid string, cfgData []byte) error {
 // startAttach attach to all allowed processes on the host and on the container
 // It returns the status of operation.
 func startAttach(alllowProc allowProcConfig) error {
+	var procsToAttach util.Processes
 	cfgSingleProc, err := yaml.Marshal(alllowProc.Config)
 	if err != nil {
 		log.Error().
@@ -115,17 +116,32 @@ func startAttach(alllowProc allowProcConfig) error {
 		return err
 	}
 
-	allProc, err := util.ProcessesByName(alllowProc.Procname)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Str("process", alllowProc.Procname).
-			Msgf("Attach Failed. Retrieve process name: %v failed.", alllowProc.Procname)
-		startErr = err
-		return err
+	if alllowProc.Procname != "" {
+		procsList, err := util.ProcessesByName(alllowProc.Procname, true)
+		if err != nil {
+			log.Error().
+				Err(err).
+				Str("process", alllowProc.Procname).
+				Msgf("Attach Failed. Retrieve process name: %v failed.", alllowProc.Procname)
+			startErr = err
+			return err
+		}
+		procsToAttach = append(procsToAttach, procsList...)
+	}
+	if alllowProc.Arg != "" {
+		procsList, err := util.ProcessesByName(alllowProc.Arg, false)
+		if err != nil {
+			log.Error().
+				Err(err).
+				Str("process", alllowProc.Arg).
+				Msgf("Attach Failed. Retrieve arg: %v failed.", alllowProc.Arg)
+			startErr = err
+			return err
+		}
+		procsToAttach = append(procsToAttach, procsList...)
 	}
 
-	for _, process := range allProc {
+	for _, process := range procsToAttach {
 		if process.Scoped {
 			log.Info().
 				Str("pid", strconv.Itoa(process.Pid)).

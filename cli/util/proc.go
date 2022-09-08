@@ -33,7 +33,7 @@ var (
 )
 
 // ProcessesByName returns an array of processes that match a given name
-func ProcessesByName(name string) (Processes, error) {
+func ProcessesByName(name string, partialMatch bool) (Processes, error) {
 	processes := make([]Process, 0)
 
 	procDir, err := os.Open("/proc")
@@ -75,16 +75,17 @@ func ProcessesByName(name string) (Processes, error) {
 		if err != nil && !errors.Is(err, errMissingUser) {
 			continue
 		}
-
-		if strings.Contains(command, name) {
-			processes = append(processes, Process{
-				ID:      i,
-				Pid:     pid,
-				User:    userName,
-				Scoped:  PidScoped(pid),
-				Command: cmdLine,
-			})
-			i++
+		if partialMatch {
+			if strings.Contains(command, name) {
+				processes = append(processes, Process{
+					ID:      i,
+					Pid:     pid,
+					User:    userName,
+					Scoped:  PidScoped(pid),
+					Command: cmdLine,
+				})
+				i++
+			}
 		}
 	}
 	return processes, nil
@@ -200,7 +201,6 @@ func PidCmdline(pid int) (string, error) {
 	cmdline, err := linuxproc.ReadProcessCmdline(fmt.Sprintf("/proc/%v/cmdline", pid))
 	if err != nil {
 		return "", errGetProcCmdLine
-
 	}
 
 	return cmdline, nil

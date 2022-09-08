@@ -23,20 +23,12 @@ type startConfig struct {
 type procConfig struct {
 	Procname string `mapstructure:"procname,omitempty" json:"procname,omitempty" yaml:"procname,omitempty"`
 	Arg      string `mapstructure:"arg,omitempty" json:"arg,omitempty" yaml:"arg,omitempty"`
-	Hostname string `mapstructure:"hostname,omitempty" json:"hostname,omitempty" yaml:"hostname,omitempty"`
-	Username string `mapstructure:"username,omitempty" json:"username,omitempty" yaml:"username,omitempty"`
-	Env      string `mapstructure:"env,omitempty" json:"env,omitempty" yaml:"env,omitempty"`
-	Ancestor string `mapstructure:"ancestor,omitempty" json:"ancestor,omitempty" yaml:"ancestor,omitempty"`
 }
 
 // allowProcConfig represents a allowed process configuration
 type allowProcConfig struct {
 	Procname string               `mapstructure:"procname,omitempty" json:"procname,omitempty" yaml:"procname,omitempty"`
 	Arg      string               `mapstructure:"arg,omitempty" json:"arg,omitempty" yaml:"arg,omitempty"`
-	Hostname string               `mapstructure:"hostname,omitempty" json:"hostname,omitempty" yaml:"hostname,omitempty"`
-	Username string               `mapstructure:"username,omitempty" json:"username,omitempty" yaml:"username,omitempty"`
-	Env      string               `mapstructure:"env,omitempty" json:"env,omitempty" yaml:"env,omitempty"`
-	Ancestor string               `mapstructure:"ancestor,omitempty" json:"ancestor,omitempty" yaml:"ancestor,omitempty"`
 	Config   libscope.ScopeConfig `mapstructure:"config" json:"config" yaml:"config"`
 }
 

@@ -183,12 +183,21 @@
     push %rsi
     push %rdi
     push %rdx
-	push %rcx
-	push %rbx
+    push %rcx
+    push %rbx
     push %rax
 
     syscall
 
+    push %r11
+    push %r10
+    push %r9
+    push %r8
+    push %rsi
+    push %rdi
+    push %rdx
+    push %rcx
+    push %rbx
     push %rax
 
     mov %rsp, %r12
@@ -208,18 +217,17 @@
     add $0x20, %rsp
 
     pop %rax
-	add $0x8, %rsp
-	pop %rax
-	pop %rbx
-	pop %rcx
-	pop %rdx
+    pop %rbx
+    pop %rcx
+    pop %rdx
     pop %rdi
     pop %rsi
     pop %r8
     pop %r9
     pop %r10
     pop %r11
-	
+	add $0x50, %rsp
+
     add $0x2, %r12
     jmp *%r12
 .endm

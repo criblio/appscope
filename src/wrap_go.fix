@@ -1223,7 +1223,7 @@ getFDFromConn(uint64_t tcpConn) {
 static void
 c_syscall(char *input_params, char *return_values)
 {
-    input_params += 0x8; // see do_cfunc
+    input_params += 0x50; // see do_cfunc
 
     uint64_t syscall_num = *(uint64_t *)(input_params + 0x0);
     int64_t rc = *(int64_t *)(return_values + 0x0);

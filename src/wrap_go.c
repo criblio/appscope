@@ -149,21 +149,21 @@ go_schema_t go_8_schema = {
 
 go_schema_t go_17_schema = {
     .arg_offsets = {
-        .c_syscall_write_fd=0x8,
-        .c_syscall_write_buf=0x10,
-        .c_syscall_openat_path=0x10,
-        .c_syscall_unlinkat_dirfd=0x8,
-        .c_syscall_unlinkat_pathname=0x10,
-        .c_syscall_unlinkat_flags=0x18,
-        .c_syscall_getdents64_dirfd=0x8,
-        .c_syscall_socket_domain=0x8,
-        .c_syscall_socket_type=0x10,
-        .c_syscall_accept4_fd=0x8,
-        .c_syscall_accept4_addr=0x10,
-        .c_syscall_accept4_addrlen=0x18,
-        .c_syscall_read_fd=0x8,
-        .c_syscall_read_buf=0x10,
-        .c_syscall_close_fd=0x8,
+        .c_syscall_write_fd=0x20,
+        .c_syscall_write_buf=0x28,
+        .c_syscall_openat_path=0x28,
+        .c_syscall_unlinkat_dirfd=0x20,
+        .c_syscall_unlinkat_pathname=0x28,
+        .c_syscall_unlinkat_flags=0x18, //?
+        .c_syscall_getdents64_dirfd=0x20,
+        .c_syscall_socket_domain=0x20,
+        .c_syscall_socket_type=0x28,
+        .c_syscall_accept4_fd=0x20,
+        .c_syscall_accept4_addr=0x28,
+        .c_syscall_accept4_addrlen=0x18, //?
+        .c_syscall_read_fd=0x20,
+        .c_syscall_read_buf=0x28,
+        .c_syscall_close_fd=0x20,
         .c_tls_server_read_connReader=0x50,
         .c_tls_server_read_buf=0x8,
         .c_tls_server_read_rc=0x28,
@@ -1223,13 +1223,17 @@ getFDFromConn(uint64_t tcpConn) {
 static void
 c_syscall(char *input_params, char *return_values)
 {
-    input_params += 0x8; // see do_cfunc
+    input_params += 0x50; // see do_cfunc
 
-    uint64_t syscall = *(uint64_t *)(input_params + 0x0);
+    uint64_t syscall_num = *(uint64_t *)(input_params + 0x0);
     int64_t rc = *(int64_t *)(return_values + 0x0);
     if(rc < 0) rc = -1; // kernel syscalls can return values < -1
-
-    switch(syscall) {
+                        
+  //  struct timespec ts = {.tv_sec=0, .tv_nsec=10000000};
+  //  scope_nanosleep(&ts, NULL);
+//  scope_sleep(1);
+//    return;
+    switch(syscall_num) {
     case 1: // write
         {
             uint64_t fd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_write_fd);
@@ -1240,7 +1244,7 @@ c_syscall(char *input_params, char *return_values)
             doWrite(fd, initialTime, (rc != -1), buf, rc, "go_write", BUF, 0);
         }
         break;
-           
+
     case 257: // openat
         {
             char *path = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_openat_path);
@@ -1291,6 +1295,7 @@ c_syscall(char *input_params, char *return_values)
         }
         break;
 
+           
     case 288: // accept4
         {
             if (rc == -1) return;
@@ -1328,6 +1333,29 @@ c_syscall(char *input_params, char *return_values)
         break;
     }
 }
+/*
+// Extract data from syscall.Socket (net open)
+static void
+c_socket(char *input_params, char *return_values)
+{
+    uint64_t rc     = *(uint64_t *)(return_values + 0x40); // g_go_schema->arg_offsets.c_socket_rc);
+    uint64_t domain = 0x2; //  *(uint64_t *)(input_params + 0x50); // g_go_schema->arg_offsets.c_socket_domain);  // aka family
+    uint64_t type   = 0x80801; // *(uint64_t *)(input_params + 0x58); // g_go_schema->arg_offsets.c_socket_type);
+
+    if (rc == -1) return;
+
+    funcprint("Scope: socket domain: %ld type: 0x%lx sd: %ld\n", domain, type, rc);
+
+    // Creates a net object
+    addSock(rc, type, domain);
+}
+
+EXPORTON void *
+go_socket(char *stackptr)
+{
+    return do_cfunc(stackptr, c_socket, g_go_schema->tap[INDEX_HOOK_SOCKET].assembly_fn);
+}
+*/
 
 EXPORTON void *
 go_syscall(char *stackptr)

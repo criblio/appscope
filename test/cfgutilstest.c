@@ -17,6 +17,46 @@
 
 #define MAX_PATH 1024
 
+
+static char dirPath[PATH_MAX];
+
+static int
+testDirPath(char *path, const char *argv0) {
+    char buf[PATH_MAX];
+    if (argv0[0] == '/') {
+        scope_strcpy(buf, argv0);
+    } else {
+        if (scope_getcwd(buf, PATH_MAX) == NULL) {
+            scope_perror("getcwd error");
+            return -1;
+        }
+        scope_strcat(buf, "/");
+        scope_strcat(buf, argv0);
+    }
+
+    if (scope_realpath(buf, path) == NULL) {
+        scope_perror("scope_realpath error");
+        return -1;
+    }
+
+    /*
+    * Retrieve the test directory path.
+    * From:
+    * /<dir>/appscope/test/linux/cfgutilsfiltertest
+    * To:
+    * /<dir>/appscope/test/
+    */
+    for (int i= 0; i < 2; ++i) {
+        path = scope_dirname(path);
+        if (path == NULL) {
+            scope_perror("scope_dirname error");
+            return -1;
+        }
+    }
+    return 0;
+}
+
+
 static void
 openFileAndExecuteCfgProcessCommands(const char* path, config_t* cfg)
 {
@@ -2538,6 +2578,186 @@ cfgReadCustomAnchorExtend(void **state)
     cfgDestroy(&config);
 }
 
+static void
+filterEmptyProc(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+    filter_status_t res = cfgFilterStatus(NULL, path, cfg);
+    assert_int_equal(res, FILTER_ERROR);
+    dbgInit(); // reset dbg for the rest of the tests
+    // cleanup
+    cfgDestroy(&cfg);
+    assert_null(cfg);
+}
+
+static void
+filterNullFilterPath(void **state) {
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+    filter_status_t res = cfgFilterStatus("foo", NULL, cfg);
+    assert_int_equal(res, FILTER_ERROR);
+    dbgInit(); // reset dbg for the rest of the tests
+    // cleanup
+    cfgDestroy(&cfg);
+    assert_null(cfg);
+}
+
+static void
+filterNullCfg(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    filter_status_t res = cfgFilterStatus("foo", path, NULL);
+    assert_int_equal(res, FILTER_ERROR);
+    dbgInit(); // reset dbg for the rest of the tests
+}
+
+static void
+filterNonExistingFilterFile(void **state) {
+    char path[PATH_MAX] = {0};    
+    scope_snprintf(path, sizeof(path), "%s/data/filter_non_existing.yml", dirPath);
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+    filter_status_t res = cfgFilterStatus("foo", path, cfg);
+    assert_int_equal(res, FILTER_SCOPED);
+    // cleanup
+    cfgDestroy(&cfg);
+    assert_null(cfg);
+}
+
+static void
+filterProcNameAllowListPresent(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+    filter_status_t res = cfgFilterStatus("redis", path, cfg);
+    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    // cleanup
+    cfgDestroy(&cfg);
+    assert_null(cfg);
+}
+
+static void
+filterProcNameDenyListPresent(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+    filter_status_t res = cfgFilterStatus("git", path, cfg);
+    assert_int_equal(res, FILTER_NOT_SCOPED);
+    // cleanup
+    cfgDestroy(&cfg);
+    assert_null(cfg);
+}
+
+static void
+filterArgAllowListPresent(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+    filter_status_t res = cfgFilterStatus("redis", path, cfg);
+    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    // cleanup
+    cfgDestroy(&cfg);
+    assert_null(cfg);
+}
+
+static void
+filterArgDenyListPresent(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+    filter_status_t res = cfgFilterStatus("git", path, cfg);
+    assert_int_equal(res, FILTER_NOT_SCOPED);
+    // cleanup
+    cfgDestroy(&cfg);
+    assert_null(cfg);
+}
+
+static void
+filterArgAllowListPartFindPresent(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+    filter_status_t res = cfgFilterStatus("redis-server", path, cfg);
+    assert_int_equal(res, FILTER_NOT_SCOPED);
+    scope_memset(path, 0, sizeof(path));
+    scope_snprintf(path, sizeof(path), "%s/data/filter_1.yml", dirPath);
+    res = cfgFilterStatus("redis-server", path, cfg);
+    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    // cleanup
+    cfgDestroy(&cfg);
+    assert_null(cfg);
+}
+
+static void
+filterArgAllowListEmptyProcMissing(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+
+    filter_status_t res = cfgFilterStatus("memcached", path, cfg);
+    assert_int_equal(res, FILTER_NOT_SCOPED);
+    // cleanup
+    cfgDestroy(&cfg);
+    assert_null(cfg);
+}
+
+static void
+filterArgAllowListNotEmptyProcMissing(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter_2.yml", dirPath);
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+    filter_status_t res = cfgFilterStatus("memcached", path, cfg);
+    assert_int_equal(res, FILTER_SCOPED);
+
+    scope_memset(path, 0, PATH_MAX);
+
+    scope_snprintf(path, sizeof(path), "%s/data/filter_3.yml", dirPath);
+    res = cfgFilterStatus("memcached", path, cfg);
+    assert_int_equal(res, FILTER_SCOPED);
+    // cleanup
+    cfgDestroy(&cfg);
+    assert_null(cfg);
+}
+
+static void
+filterVerifyCfg(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+    filter_status_t res = cfgFilterStatus("redis", path, cfg);
+    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    // redis: cribl disable error log level /tmp/redis.log
+    assert_int_equal(cfgLogStreamEnable(cfg), FALSE);
+    assert_int_equal(cfgLogLevel(cfg), CFG_LOG_ERROR);
+    assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/redis.log");
+    // cleanup
+    cfgDestroy(&cfg);
+    assert_null(cfg);
+
+    cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+    res = cfgFilterStatus("htop", path, cfg);
+    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    // htop: cribl enable info log level /tmp/htop.log
+    assert_int_equal(cfgLogStreamEnable(cfg), TRUE);
+    assert_int_equal(cfgLogLevel(cfg), CFG_LOG_INFO);
+    assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/htop.log");
+    // cleanup
+    cfgDestroy(&cfg);
+    assert_null(cfg);
+
+}
+
 // Defined in src/cfgutils.c
 // This is not a proper test, it just exists to make valgrind output
 // more readable when analyzing this test, by deallocating the compiled
@@ -2549,6 +2769,9 @@ int
 main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
+    if (testDirPath(dirPath, argv[0])) {
+        return EXIT_FAILURE;
+    }
     initFn();
 
     source_state_t log = {"SCOPE_EVENT_LOGFILE", CFG_SRC_FILE, DEFAULT_SRC_FILE};
@@ -2616,6 +2839,18 @@ main(int argc, char* argv[])
         cmocka_unit_test(initMtcReturnsPtr),
         cmocka_unit_test(initEvtFormatReturnsPtr),
         cmocka_unit_test(initCtlReturnsPtr),
+        cmocka_unit_test(filterEmptyProc),
+        cmocka_unit_test(filterNullFilterPath),
+        cmocka_unit_test(filterNullCfg),
+        cmocka_unit_test(filterNonExistingFilterFile),
+        cmocka_unit_test(filterProcNameAllowListPresent),
+        cmocka_unit_test(filterProcNameDenyListPresent),
+        cmocka_unit_test(filterArgAllowListPresent),
+        cmocka_unit_test(filterArgDenyListPresent),
+        cmocka_unit_test(filterArgAllowListPartFindPresent),
+        cmocka_unit_test(filterArgAllowListEmptyProcMissing),
+        cmocka_unit_test(filterArgAllowListNotEmptyProcMissing),
+        cmocka_unit_test(filterVerifyCfg),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
         cmocka_unit_test(cfgReadProtocol),
         cmocka_unit_test(cfgReadCustomEmptyFilter),

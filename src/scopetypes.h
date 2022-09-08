@@ -76,6 +76,7 @@ typedef unsigned int bool;
 
 #define CFG_MAX_VERBOSITY 9
 #define CFG_FILE_NAME "scope.yml"
+#define DEFAULT_SCOPE_FILTER_LOC "/tmp/scope_filter.yml"
 
 #define DEFAULT_MTC_ENABLE TRUE
 #define DEFAULT_MTC_FORMAT CFG_FMT_STATSD

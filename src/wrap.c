@@ -1194,13 +1194,6 @@ static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, so
 static size_t __stdio_write(struct MUSL_IO_FILE *, const unsigned char *, size_t);
 static long wrap_scope_syscall(long, ...);
 
-static bool
-filterProc(const char *proc)
-{
-    // does this process pass the the allow filter?
-    return TRUE;
-}
-
 static int 
 findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
 {
@@ -1285,13 +1278,12 @@ hookInject()
 }
 
 static void
-initHook(int attachedFlag)
+initHook(int attachedFlag, bool scopedFlag)
 {
     int rc;
     bool should_we_patch = FALSE;
     char *full_path = NULL;
     elf_buf_t *ebuf = NULL;
-    bool filter;
     funchook_t *funchook;
 
     // env vars are not always set as needed, be explicit here
@@ -1335,12 +1327,10 @@ initHook(int attachedFlag)
     if (attachedFlag) {
         // responding to the inject command
         hookInject();
-        filter = TRUE;
     } else {
         // GOT hooking all interposed funcs
-        filter = filterProc(full_path);
-        dl_iterate_phdr(hookAll, &filter);
-        hookMain(filter);
+        dl_iterate_phdr(hookAll, &scopedFlag);
+        hookMain(scopedFlag);
     }
 
     // libmusl
@@ -1369,7 +1359,7 @@ initHook(int attachedFlag)
     }
 
     // if we are not hooking all, then we're done
-    if (filter == FALSE) return;
+    if (scopedFlag == FALSE) return;
 
     if (dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *handle = g_fn.dlopen(full_path, RTLD_NOW);
@@ -1586,6 +1576,8 @@ initSigErrorHandler(void)
 __attribute__((constructor)) void
 init(void)
 {
+    config_t *cfg = NULL;
+    char *path = NULL;
     scope_init_vdso_ehdr();
     // Bootstrapping...  we need to know if we're in musl so we can
     // call the right initFn function...
@@ -1640,8 +1632,45 @@ init(void)
 
     initTime();
 
-    char *path = cfgPath();
-    config_t *cfg = cfgRead(path);
+    /*
+    * We scoped(instrument) our code in following cases:
+    * - when we are attaching
+    * - when the filter file is not exists
+    * - when process is found on the allow list
+    * - when process is not found on the allowed and deny list and the allow process list is empty
+    */
+    bool scopedFlag = FALSE;
+    bool skipReadCfg = FALSE;
+
+    if (attachedFlag) {
+        scopedFlag = TRUE;
+    } else {
+        cfg = cfgCreateDefault();
+        filter_status_t res = cfgFilterStatus(g_proc.cmd, DEFAULT_SCOPE_FILTER_LOC, cfg);
+        switch (res) {
+            case FILTER_SCOPED:
+                scopedFlag = TRUE;
+                break;
+            case FILTER_SCOPED_WITH_CFG:
+                scopedFlag = TRUE;
+                skipReadCfg = TRUE;
+                break;
+            case FILTER_NOT_SCOPED:
+                scopedFlag = FALSE;
+                break;
+            case FILTER_ERROR:
+            default:
+                scopedFlag = FALSE;
+                DBG(NULL);
+                break;
+        }
+    }
+    if (skipReadCfg == FALSE) {
+        path = cfgPath();
+        if (cfg) cfgDestroy(&cfg);
+        cfg = cfgRead(path);
+    }
+
     cfgProcessEnvironment(cfg);
 
     doConfig(cfg);
@@ -1662,7 +1691,7 @@ init(void)
     // of whether TLS is actually configured on any transport.
     transportRegisterForExitNotification(handleExit);
 
-    initHook(attachedFlag);
+    initHook(attachedFlag, scopedFlag);
     
     if (checkEnv("SCOPE_APP_TYPE", "go")) {
         threadNow(0);

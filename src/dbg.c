@@ -321,6 +321,7 @@ scopeLogHex(cfg_log_level_t level, const void *data, size_t size, const char *fo
     va_start(args, format);
     int buflen = scope_vsnprintf(buf, sizeof(buf), format, args);
     va_end(args);
+    
     if (buflen == -1) {
         scopeLog(level, "%s (format too long!) (%ld bytes)", format, size);
     } else {

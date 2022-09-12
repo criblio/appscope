@@ -1223,12 +1223,38 @@ getFDFromConn(uint64_t tcpConn) {
 static void
 c_syscall(char *input_params, char *return_values)
 {
-    input_params += 0x8; // see do_cfunc
+//    input_params += 0x8; // see do_cfunc
+
+    uint64_t rax = *(uint64_t *)(input_params + 0x0);
+    uint64_t rdi = *(uint64_t *)(input_params + 0x20);
+    uint64_t rsi = *(uint64_t *)(input_params + 0x28);
+    uint64_t rdx = *(uint64_t *)(input_params + 0x18);
+    uint64_t rcx = *(uint64_t *)(input_params + 0x10);
+    uint64_t r8 = *(uint64_t *)(input_params + 0x30);
+    uint64_t r9 = *(uint64_t *)(input_params + 0x38);
+    uint64_t r11;
+
+    __asm__ volatile (
+        "mov %3, %%rax \n"
+        "mov %4, %%rdi \n"
+        "mov %5, %%rsi \n"
+        "mov %6, %%rdx \n"
+        "mov %7, %%rcx \n"
+        "mov %8, %%r8  \n"
+        "mov %9, %%r9  \n"
+        "syscall  \n"
+        "mov %%rax, %0  \n"
+        "mov %%rcx, %1  \n"
+        "mov %%r11, %2  \n"
+        : "=r"(rax), "=r"(rcx), "=r"(r11)                                     // output
+        : "m"(rax), "m"(rdi), "m"(rsi), "m"(rdx), "m"(rcx), "m"(r8), "m"(r9)  // inputs
+        : "%rax", "%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9", "%r11"        // clobbered register
+        );
 
     uint64_t syscall_num = *(uint64_t *)(input_params + 0x0);
     int64_t rc = *(int64_t *)(return_values + 0x0);
     if(rc < 0) rc = -1; // kernel syscalls can return values < -1
-                        
+
   //  struct timespec ts = {.tv_sec=0, .tv_nsec=10000000};
   //  scope_nanosleep(&ts, NULL);
 //  scope_sleep(1);
@@ -1332,7 +1358,14 @@ c_syscall(char *input_params, char *return_values)
     default:
         break;
     }
+
+
+    *(uint64_t *)(input_params + 0x0) = rax; // return code back into input_params to be popped into %rax
+    *(uint64_t *)(input_params + 0x10) = rcx; 
+    *(uint64_t *)(input_params + 0x48) = r11; 
+
 }
+
 /*
 // Extract data from syscall.Socket (net open)
 static void

@@ -1274,7 +1274,6 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
     net_info *net = getNetEntry(sockfd);    // first try by descriptor
     if (!net) net = getChannelNetEntry(id); // fallback to using channel ID
 
-    /*
     scopeLogHexDebug(buf, len > 64 ? 64 : len, // limit hexdump to 64
             "DEBUG: doProtocol(id=%ld, fd=%d, len=%ld, src=%s, dtyp=%s) TLS=%s PROTO=%s",
             id, sockfd, len,
@@ -1295,7 +1294,6 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
             net->protoDetect == DETECT_TRUE    ? "TRUE" :
             net->protoDetect == DETECT_FALSE   ? "FALSE" : "INVALID"
             );
-            */
             
 
     // Ignore empty payloads that should have been blocked by our interpositions

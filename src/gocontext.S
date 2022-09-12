@@ -178,18 +178,18 @@
     endbr64
     push %r11
     push %r10
-    push %r9
-    push %r8
-    push %rsi
-    push %rdi
-    push %rdx
-	push %rcx
-	push %rbx
-    push %rax
+    push %r9     // linux 6th param
+    push %r8     // linux 5th param
+    push %rsi    // linux 2nd param
+    push %rdi    // linux 1st param
+    push %rdx    // linux 3rd param
+	push %rcx    // linux 4th param
+	push %rbx    
+    push %rax    // linux syscall num 
 
-    syscall
+ // syscall
 
-    push %rax
+//  push %rax
 
     mov %rsp, %r12
     sub $0x20, %rsp
@@ -208,7 +208,7 @@
     add $0x20, %rsp
 
     pop %rax
-	add $0x8, %rsp
+//  add $0x8, %rsp
 	pop %rbx
 	pop %rcx
 	pop %rdx

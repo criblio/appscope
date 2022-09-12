@@ -527,13 +527,11 @@ closeFd:
  * Returns status of operation 0 in case of success, other value otherwise
  */
 int
-setupConfigure(void* filterFileMem, size_t filterSize, bool setProfile) {
-    if (setProfile == TRUE) { 
-        // Setup /etc/profile
-        if (setupProfile() == FALSE) {
-            scope_fprintf(scope_stderr, "setupProfile failed\n");
-            return -1;
-        }
+setupConfigure(void* filterFileMem, size_t filterSize) {
+    // Setup /etc/profile
+    if (setupProfile() == FALSE) {
+        scope_fprintf(scope_stderr, "setupProfile failed\n");
+        return -1;
     }
 
     // Setup Filter file

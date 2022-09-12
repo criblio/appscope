@@ -743,7 +743,7 @@ main(int argc, char **argv, char **env)
 
         if (pid == -1) {
             // Configure on Host
-            status = setupConfigure(confgFilterMem, configFilterSize, FALSE);
+            status = setupConfigure(confgFilterMem, configFilterSize);
         } else {
             // Configure on Container
             pid_t nsAttachPid = 0;

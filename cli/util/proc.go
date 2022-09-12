@@ -86,6 +86,17 @@ func ProcessesByName(name string, partialMatch bool) (Processes, error) {
 				})
 				i++
 			}
+		} else {
+			if command == name {
+				processes = append(processes, Process{
+					ID:      i,
+					Pid:     pid,
+					User:    userName,
+					Scoped:  PidScoped(pid),
+					Command: cmdLine,
+				})
+				i++
+			}
 		}
 	}
 	return processes, nil

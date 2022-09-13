@@ -154,7 +154,7 @@ func startAttach(alllowProc allowProcConfig) error {
 //
 // - extract filter into the filter file in /tmp/scope_filter.yml
 //
-// - extract libscope.so into the filter file in /tmp/libscope.so
+// - extract libscope.so into /tmp/libscope.so
 //
 // It returns the status of operation.
 func startConfigureHost(filterData []byte) error {
@@ -229,7 +229,7 @@ func startServiceHost(serviceName string) error {
 //
 // - extract filter into the filter file in /tmp/scope_filter.yml in the container.
 //
-// - extract libscope.so into the filter file in /tmp/libscope.so in the container.
+// - extract libscope.so into /tmp/libscope.so in the container.
 //
 // - service services defined by the allowProcs process name list in the container.
 //

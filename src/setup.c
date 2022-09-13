@@ -29,7 +29,7 @@
  */
 
 #define LIBSCOPE_LOC "/tmp/libscope.so"
-#define PROFILE_SETUP "LD_PRELOAD=/tmp/libscope.so\n"
+#define PROFILE_SETUP "export LD_PRELOAD=/tmp/libscope.so\n"
 #define PROFILE_SETUP_LEN (sizeof(PROFILE_SETUP)-1)
 
 

@@ -1,6 +1,7 @@
 package run
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -55,7 +56,7 @@ func getConfigFromStdin() (startConfig, []byte, error) {
 // startAttachSingleProcess attach to the the specific process identifed by pid with configuration pass in cfgData.
 // It returns the status of operation.
 func startAttachSingleProcess(pid string, cfgData []byte) error {
-	tmpFile, err := os.CreateTemp(".", pid)
+	tmpFile, err := os.Create(fmt.Sprintf("/tmp/tmpAttachCfg_%s.yml", pid))
 	if err != nil {
 		log.Error().
 			Err(err).

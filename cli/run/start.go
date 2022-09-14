@@ -301,7 +301,7 @@ func startSetupContainer(allowProcs []allowProcConfig) error {
 	return nil
 }
 
-// Run start command responsible for setup host and container env
+// Start runs start command responsible for setup host and container env
 // It returns the status of operation.
 func (rc *Config) Start() error {
 	rc.setupWorkDir([]string{"start"}, true)
@@ -349,10 +349,7 @@ func (rc *Config) Start() error {
 		startAttach(allowProc)
 	}
 
-	// Deny list actions
-	// Currently NOP
-	// Detach ?
-	// Deservice ?
+	// TODO: Deny list actions (Detach?/Deservice?)
 
 	return startErr
 }

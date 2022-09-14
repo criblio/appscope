@@ -101,11 +101,11 @@ func (rc *Config) Attach(args []string) error {
 		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
-	ld := loader.ScopeLoader{Path: ldscopePath()}
+	sL := loader.ScopeLoader{Path: ldscopePath()}
 	if !rc.Subprocess {
-		return ld.Attach(args, env)
+		return sL.Attach(args, env)
 	}
-	_, err = ld.AttachSubProc(args, env)
+	_, err = sL.AttachSubProc(args, env)
 	return err
 }
 

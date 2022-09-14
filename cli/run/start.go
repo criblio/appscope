@@ -79,8 +79,8 @@ func startAttachSingleProcess(pid string, cfgData []byte) error {
 	}
 
 	env := append(os.Environ(), "SCOPE_CONF_PATH="+tmpFile.Name())
-	ld := loader.ScopeLoader{Path: ldscopePath()}
-	stdoutStderr, err := ld.AttachSubProc([]string{pid}, env)
+	sL := loader.ScopeLoader{Path: ldscopePath()}
+	stdoutStderr, err := sL.AttachSubProc([]string{pid}, env)
 	if err != nil {
 		log.Error().
 			Err(err).
@@ -185,9 +185,9 @@ func startConfigureHost(filterData []byte) error {
 			Msg("Setup host. Write test_filter success.")
 	}
 
-	ld := loader.ScopeLoader{Path: ldscopePath()}
+	sL := loader.ScopeLoader{Path: ldscopePath()}
 
-	stdoutStderr, err := ld.ConfigureHost(tempFile.Name())
+	stdoutStderr, err := sL.ConfigureHost(tempFile.Name())
 	if err != nil {
 		log.Error().
 			Err(err).
@@ -209,8 +209,8 @@ func startConfigureHost(filterData []byte) error {
 //
 // It returns the status of operation.
 func startServiceHost(serviceName string) error {
-	ld := loader.ScopeLoader{Path: ldscopePath()}
-	stdoutStderr, err := ld.ServiceHost(serviceName)
+	sL := loader.ScopeLoader{Path: ldscopePath()}
+	stdoutStderr, err := sL.ServiceHost(serviceName)
 	if err == nil {
 		log.Info().
 			Str("service", serviceName).

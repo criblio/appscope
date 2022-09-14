@@ -59,9 +59,9 @@ func (rc *Config) Run(args []string) {
 		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
-	ld := loader.ScopeLoader{Path: ldscopePath()}
+	sL := loader.ScopeLoader{Path: ldscopePath()}
 	if !rc.Subprocess {
-		ld.Run(args, env)
+		sL.Run(args, env)
 	}
-	ld.RunSubProc(args, env)
+	sL.RunSubProc(args, env)
 }

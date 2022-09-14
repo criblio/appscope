@@ -100,9 +100,9 @@ func startAttachSingleProcess(pid string, cfgData []byte) error {
 
 // startAttach attach to all allowed processes on the host and on the container
 // It returns the status of operation.
-func startAttach(alllowProc allowProcConfig) error {
+func startAttach(allowProc allowProcConfig) error {
 	var procsToAttach util.Processes
-	cfgSingleProc, err := yaml.Marshal(alllowProc.Config)
+	cfgSingleProc, err := yaml.Marshal(allowProc.Config)
 	if err != nil {
 		log.Error().
 			Err(err).
@@ -111,25 +111,25 @@ func startAttach(alllowProc allowProcConfig) error {
 		return err
 	}
 
-	if alllowProc.Procname != "" {
-		procsList, err := util.ProcessesByName(alllowProc.Procname, true)
+	if allowProc.Procname != "" {
+		procsList, err := util.ProcessesByName(allowProc.Procname, true)
 		if err != nil {
 			log.Error().
 				Err(err).
-				Str("process", alllowProc.Procname).
-				Msgf("Attach Failed. Retrieve process name: %v failed.", alllowProc.Procname)
+				Str("process", allowProc.Procname).
+				Msgf("Attach Failed. Retrieve process name: %v failed.", allowProc.Procname)
 			startErr = err
 			return err
 		}
 		procsToAttach = append(procsToAttach, procsList...)
 	}
-	if alllowProc.Arg != "" {
-		procsList, err := util.ProcessesByName(alllowProc.Arg, false)
+	if allowProc.Arg != "" {
+		procsList, err := util.ProcessesByName(allowProc.Arg, false)
 		if err != nil {
 			log.Error().
 				Err(err).
-				Str("process", alllowProc.Arg).
-				Msgf("Attach Failed. Retrieve arg: %v failed.", alllowProc.Arg)
+				Str("process", allowProc.Arg).
+				Msgf("Attach Failed. Retrieve arg: %v failed.", allowProc.Arg)
 			startErr = err
 			return err
 		}
@@ -310,7 +310,7 @@ func (rc *Config) Start() error {
 	if err := util.UserVerifyRootPerm(); err != nil {
 		log.Fatal().
 			Err(err).
-			Msg("Verfy root permission failed.")
+			Msg("Verify root permission failed.")
 		startErr = err
 		return err
 	}
@@ -342,11 +342,11 @@ func (rc *Config) Start() error {
 	// Iterate over allowed process
 	// Setup service on Host
 	// Attach to services on Host and container
-	for _, alllowProc := range startCfg.AllowProc {
+	for _, allowProc := range startCfg.AllowProc {
 
-		startServiceHost(alllowProc.Procname)
+		startServiceHost(allowProc.Procname)
 
-		startAttach(alllowProc)
+		startAttach(allowProc)
 	}
 
 	// Deny list actions

@@ -22,7 +22,7 @@ var (
 	errPidMissing       = errors.New("PID does not exist")
 	errCreateLdscope    = errors.New("error creating ldscope")
 	errAlreadyScope     = errors.New("attach failed. This process is already being scoped")
-	errLibraryNotExit   = errors.New("library Path does not exist")
+	errLibraryNotExist  = errors.New("library Path does not exist")
 	errInvalidSelection = errors.New("invalid Selection")
 )
 
@@ -96,7 +96,7 @@ func (rc *Config) Attach(args []string) error {
 	if len(rc.LibraryPath) > 0 {
 		// Validate path exists
 		if !util.CheckDirExists(rc.LibraryPath) {
-			return errLibraryNotExit
+			return errLibraryNotExist
 		}
 		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)

@@ -40,10 +40,10 @@ typedef enum {
 } service_cfg_status_t;
 
 struct service_ops {
-    bool (*isServiceInstalled)(const char* serviceName);
-    service_cfg_status_t (*serviceCfgStatus)(const char* serviceCfgPath);
-    service_status_t (*newServiceCfg)(const char* serviceCfgPath);
-    service_status_t (*modifyServiceCfg)(const char* serviceCfgPath);
+    bool (*isServiceInstalled)(const char *serviceName);
+    service_cfg_status_t (*serviceCfgStatus)(const char *serviceCfgPath);
+    service_status_t (*newServiceCfg)(const char *serviceCfgPath);
+    service_status_t (*modifyServiceCfg)(const char *serviceCfgPath);
 };
 
 /*
@@ -57,7 +57,7 @@ isServiceInstalledSystemD(const char* serviceName) {
     /*
     * List of directories which can contain service configruation file.
     */
-    const char* const servicePrefixList[] = {
+    const char *const servicePrefixList[] = {
         "/etc/systemd/system/",
         "/lib/systemd/system/",
         "/run/systemd/system/",
@@ -85,7 +85,7 @@ isServiceInstalledSystemD(const char* serviceName) {
  * Returns TRUE if service is installed FALSE otherwise.
  */
 static bool
-isServiceInstalledInitDOpenRc(const char* serviceName) {
+isServiceInstalledInitDOpenRc(const char *serviceName) {
     char cfgPath[PATH_MAX] = {0};
     struct stat st = {0};
     if (scope_snprintf(cfgPath, sizeof(cfgPath), "/etc/init.d/%s", serviceName) < 0) {
@@ -102,7 +102,7 @@ isServiceInstalledInitDOpenRc(const char* serviceName) {
  * Returns status of the Service file.
  */
 static service_cfg_status_t
-serviceCfgStatusSystemD(const char* serviceName) {
+serviceCfgStatusSystemD(const char *serviceName) {
     char cfgScript[PATH_MAX] = {0};
     struct stat st = {0};
     service_cfg_status_t ret = SERVICE_CFG_ERROR;
@@ -137,7 +137,7 @@ serviceCfgStatusSystemD(const char* serviceName) {
  * Returns status of the Service file.
  */
 static service_cfg_status_t
-serviceCfgStatusInitD(const char* serviceName) {
+serviceCfgStatusInitD(const char *serviceName) {
     char cfgScript[PATH_MAX] = {0};
     struct stat st = {0};
     service_cfg_status_t ret = SERVICE_CFG_ERROR;
@@ -161,7 +161,7 @@ serviceCfgStatusInitD(const char* serviceName) {
  * Returns status of the Service file.
  */
 static service_cfg_status_t
-serviceCfgStatusOpenRc(const char* serviceName) {
+serviceCfgStatusOpenRc(const char *serviceName) {
     char cfgScript[PATH_MAX] = {0};
     struct stat st = {0};
     service_cfg_status_t ret = SERVICE_CFG_ERROR;
@@ -185,7 +185,7 @@ serviceCfgStatusOpenRc(const char* serviceName) {
  * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
 static service_status_t
-newServiceCfgSystemD(const char* serviceCfgPath) {
+newServiceCfgSystemD(const char *serviceCfgPath) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
     FILE *fPtr = scope_fopen(serviceCfgPath, "a");
 
@@ -235,7 +235,7 @@ newServiceCfgInitD(const char* serviceCfgPath) {
  * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
 static service_status_t
-newServiceCfgOpenRc(const char* serviceCfgPath) {
+newServiceCfgOpenRc(const char *serviceCfgPath) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
     FILE *fPtr = scope_fopen(serviceCfgPath, "a");
 
@@ -260,7 +260,7 @@ newServiceCfgOpenRc(const char* serviceCfgPath) {
  * Returns TRUE if service is already configured FALSE otherwise.
  */
 static bool
-isCfgFileConfigured(const char* serviceCfgPath) {
+isCfgFileConfigured(const char *serviceCfgPath) {
     FILE *fPtr;
     int res = FALSE;
     char buf[4096] = {0};
@@ -287,7 +287,7 @@ isCfgFileConfigured(const char* serviceCfgPath) {
  * Returns SERVICE_STATUS_SUCCESS if service was modified correctly, other values in case of failure.
  */
 static service_status_t
-modifyServiceCfgSystemd(const char* serviceCfgPath) {
+modifyServiceCfgSystemd(const char *serviceCfgPath) {
     FILE *readFd;
     FILE *newFd;
     char *tempPath = "/tmp/tmpFile-XXXXXX";
@@ -359,7 +359,7 @@ static struct service_ops OpenRcService = {
  * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
 service_status_t
-setupService(const char* serviceName) {
+setupService(const char *serviceName) {
     struct stat sb = {0};
     struct service_ops *service;
 
@@ -447,7 +447,7 @@ setupProfile(void) {
  * Returns status of operation TRUE in case of success, FALSE otherwise
  */
 static bool
-setupExtractFilterFile(void* filterFileMem, size_t filterSize) {
+setupExtractFilterFile(void *filterFileMem, size_t filterSize) {
     int filterFd;
     bool status = FALSE;
 
@@ -483,7 +483,7 @@ cleanupDestFd:
  * Returns memory address in case of success, NULL otherwise.
  */
 char*
-setupLoadFileIntoMem(size_t *size, char* path)
+setupLoadFileIntoMem(size_t *size, char *path)
 {
     // Load file into memory
     char *resMem = NULL;

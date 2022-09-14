@@ -16,7 +16,7 @@
  * Returns TRUE in case of success, FALSE otherwise.
  */
 static bool
-extractMemToChildNamespace(char* inputMem, size_t inputSize, const char *outFile, mode_t outPermFlag)
+extractMemToChildNamespace(char *inputMem, size_t inputSize, const char *outFile, mode_t outPermFlag)
 {
     bool status = FALSE;
     int outFd;
@@ -30,7 +30,7 @@ extractMemToChildNamespace(char* inputMem, size_t inputSize, const char *outFile
         goto cleanupDestFd;
     }
 
-    char* dest = scope_mmap(NULL, inputSize, PROT_READ | PROT_WRITE, MAP_SHARED, outFd, 0);
+    char *dest = scope_mmap(NULL, inputSize, PROT_READ | PROT_WRITE, MAP_SHARED, outFd, 0);
     if (dest == MAP_FAILED) {
         goto cleanupDestFd;
     }
@@ -49,7 +49,7 @@ cleanupDestFd:
 }
 
 static bool
-setNamespace(pid_t pid, const char* ns)
+setNamespace(pid_t pid, const char *ns)
 {
     bool res = FALSE;
     char nsPath[PATH_MAX] = {0};
@@ -192,7 +192,7 @@ nsIsPidInChildNs(pid_t pid, pid_t *nsPid)
  * Returns status of operation SERVICE_STATUS_SUCCESS in case of success, other values in case of failure
  */
 service_status_t
-nsService(pid_t pid, const char* serviceName) {
+nsService(pid_t pid, const char *serviceName) {
 
     if (setNamespace(pid, "mnt") == FALSE) {
         return SERVICE_STATUS_ERROR_OTHER;
@@ -209,7 +209,7 @@ nsService(pid_t pid, const char* serviceName) {
  * Returns status of operation 0 in case of success, other values in case of failure
  */
 int
-nsConfigure(pid_t pid, void* scopeCfgFilterMem, size_t filterFileSize)
+nsConfigure(pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize)
 {
     if (setNamespace(pid, "mnt") == FALSE) {
         scope_fprintf(scope_stderr, "setNamespace mnt failed\n");

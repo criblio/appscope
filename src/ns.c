@@ -51,28 +51,24 @@ cleanupDestFd:
 static bool
 setNamespace(pid_t pid, const char *ns)
 {
-    bool res = FALSE;
     char nsPath[PATH_MAX] = {0};
     int nsFd;
     if (scope_snprintf(nsPath, sizeof(nsPath), "/proc/%d/ns/%s", pid, ns) < 0) {
         scope_perror("scope_snprintf failed");
-        goto exit;
+        return FALSE;
     }
 
     if ((nsFd = scope_open(nsPath, O_RDONLY)) == -1) {
         scope_perror("scope_open failed");
-        goto exit;
+        return FALSE;
     }
 
     if (scope_setns(nsFd, 0) != 0) {
         scope_perror("setns failed");
-        goto exit;
+        return FALSE;
     }
 
-    res = TRUE;
-exit:
-
-    return res;
+    return TRUE;
 }
 
 static bool
@@ -85,7 +81,7 @@ join_namespace(pid_t hostPid)
     char path[PATH_MAX] = {0};
 
     if (scope_readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
-       return status;
+        return status;
     }
 
     char *ldscopeMem = setupLoadFileIntoMem(&ldscopeSize, path);

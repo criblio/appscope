@@ -3,6 +3,7 @@
 
 #include "scopetypes.h"
 
+bool nsIsPidInSeparateMntNs(pid_t, bool *);
 bool nsIsPidInChildNs(pid_t, pid_t *);
 int nsForkAndExec(pid_t, pid_t);
 int nsConfigure(pid_t, void*, size_t);

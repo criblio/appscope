@@ -22,7 +22,7 @@ extractMemToChildNamespace(char* inputMem, size_t inputSize, const char *outFile
     int outFd;
 
     if ((outFd = scope_open(outFile, O_RDWR | O_CREAT, outPermFlag)) == -1) {
-        scope_perror("scope_open failed");
+        scope_perror("extractMemToChildNamespace scope_open failed");
         return status;
     }
 
@@ -60,7 +60,7 @@ setNamespace(pid_t pid, const char* ns)
     }
 
     if ((nsFd = scope_open(nsPath, O_RDONLY)) == -1) {
-        scope_perror("scope_open failed");
+        scope_perror("setNamespace scope_open failed");
         goto exit;
     }
 
@@ -76,7 +76,7 @@ exit:
 }
 
 static bool
-join_namespace(pid_t hostPid)
+join_namespace(pid_t hostPid, bool switchPidNs)
 {
     bool status = FALSE;
     size_t ldscopeSize = 0;
@@ -104,8 +104,10 @@ join_namespace(pid_t hostPid)
     *   namespace
     * - mount namespace - allows to copy file(s) into a "child namespace"
     */
-    if (setNamespace(hostPid, "pid") == FALSE) {
-        goto cleanupMem;
+    if (switchPidNs) {
+        if (setNamespace(hostPid, "pid") == FALSE) {
+            goto cleanupMem;
+        }
     }
     if (setNamespace(hostPid, "mnt") == FALSE) {
         goto cleanupMem;
@@ -131,6 +133,43 @@ cleanupMem:
     }
 
     return status;
+}
+
+/*
+ * Check for PID exists in a separate mnt namespace
+ * Returns TRUE in mntRes if current process and a one specified by PID are in diffent mnt namespaces FALSE otherwise.
+ */
+bool
+nsIsPidInSeparateMntNs(pid_t pid, bool *mntRes) {
+    char selfPath[PATH_MAX] = {0};
+    char pidPath[PATH_MAX] = {0};
+
+    struct stat selfSt = {0};
+    struct stat pidSt = {0};
+
+    if (scope_snprintf(selfPath, sizeof(selfPath), "/proc/%d/ns/mnt", scope_getpid()) < 0) {
+        return FALSE;
+    }
+
+    if (scope_snprintf(pidPath, sizeof(pidPath), "/proc/%d/ns/mnt", pid) < 0) {
+        return FALSE;
+    }
+
+    if (scope_lstat(selfPath, &selfSt)) {
+        return FALSE;
+    }
+
+    if (scope_lstat(pidPath, &pidSt)) {
+        return FALSE;
+    }
+
+    if (selfSt.st_ino == pidSt.st_ino) {
+        *mntRes = FALSE;
+    } else {
+        *mntRes = TRUE;
+    }
+
+    return TRUE;
 }
 
 /*
@@ -238,7 +277,8 @@ nsConfigure(pid_t pid, void* scopeCfgFilterMem, size_t filterFileSize)
 int
 nsForkAndExec(pid_t parentPid, pid_t nsPid)
 {
-    if (join_namespace(parentPid) == FALSE) {
+    bool switchPidNs = (parentPid != nsPid) ? TRUE : FALSE;
+    if (join_namespace(parentPid, switchPidNs) == FALSE) {
         scope_fprintf(scope_stderr, "error: join_namespace failed\n");
         return EXIT_FAILURE; 
     }

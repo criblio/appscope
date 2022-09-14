@@ -788,6 +788,25 @@ main(int argc, char **argv, char **env)
             }
             return nsForkAndExec(pid, nsAttachPid);
         }
+
+        /*
+        * Handle the PrivateTmp settings
+        */
+        bool nsDifferentMnt = FALSE;
+        if (nsIsPidInSeparateMntNs(pid, &nsDifferentMnt) == FALSE) {
+            scope_printf("error: comparing information about mnt namespace\n");
+            return EXIT_FAILURE;
+        }
+
+        if (nsDifferentMnt == TRUE) {
+            // must be root to switch namespace
+            if (scope_getuid()) {
+                scope_printf("error: --attach requires root\n");
+                return EXIT_FAILURE;
+            }
+            return nsForkAndExec(pid, pid);
+        }
+
     }
 
     // extract to the library directory

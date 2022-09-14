@@ -13,8 +13,7 @@ var startCmd = &cobra.Command{
 	scope start < example_filter.yml
 	cat example_filter.json | scope start
 	`,
-	Args:         cobra.NoArgs,
-	SilenceUsage: true,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return rc.Start()
 	},

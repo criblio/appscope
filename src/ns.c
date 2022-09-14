@@ -189,13 +189,13 @@ nsIsPidInChildNs(pid_t pid, pid_t *nsPid)
 
  /*
  * Setup the service for specified child process
- * Returns status of operation 0 in case of success, other values in case of failure
+ * Returns status of operation SERVICE_STATUS_SUCCESS in case of success, other values in case of failure
  */
-int
+service_status_t
 nsService(pid_t pid, const char* serviceName) {
 
     if (setNamespace(pid, "mnt") == FALSE) {
-        return -1;
+        return SERVICE_STATUS_ERROR_OTHER;
     }
 
     return setupService(serviceName);

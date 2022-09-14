@@ -42,8 +42,8 @@ typedef enum {
 struct service_ops {
     bool (*isServiceInstalled)(const char* serviceName);
     service_cfg_status_t (*serviceCfgStatus)(const char* serviceCfgPath);
-    int (*newServiceCfg)(const char* serviceCfgPath);
-    int (*modifyServiceCfg)(const char* serviceCfgPath);
+    service_status_t (*newServiceCfg)(const char* serviceCfgPath);
+    service_status_t (*modifyServiceCfg)(const char* serviceCfgPath);
 };
 
 /*
@@ -182,21 +182,21 @@ serviceCfgStatusOpenRc(const char* serviceName) {
 /*
  * Setup new service configuration for Systemd service.
  *
- * Returns 0 if service was setup correctly -1 otherwise.
+ * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
-static int
+static service_status_t
 newServiceCfgSystemD(const char* serviceCfgPath) {
-    int res = 0;
+    service_status_t res = SERVICE_STATUS_SUCCESS;
     FILE *fPtr = scope_fopen(serviceCfgPath, "a");
 
     if (fPtr == NULL) {
         scope_perror("error: newServiceCfgSystemD, scope_fopen failed");
-        return -1;
+        return SERVICE_STATUS_ERROR_OTHER;
     }
 
     if (scope_fwrite(SYSTEMD_CFG, sizeof(char), SYSTEMD_CFG_LEN, fPtr) < SYSTEMD_CFG_LEN) {
         scope_perror("error: newServiceCfgSystemD, scope_fwrite failed");
-        res = -1;
+        res = SERVICE_STATUS_ERROR_OTHER;
     }
 
     scope_fclose(fPtr);
@@ -207,21 +207,21 @@ newServiceCfgSystemD(const char* serviceCfgPath) {
 /*
  * Setup new service configuration for initD service.
  *
- * Returns 0 if service was setup correctly -1 otherwise.
+ * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
-static int
+static service_status_t
 newServiceCfgInitD(const char* serviceCfgPath) {
-    int res = 0;
+    service_status_t res = SERVICE_STATUS_SUCCESS;
     FILE *fPtr = scope_fopen(serviceCfgPath, "a");
 
     if (fPtr == NULL) {
         scope_perror("error: newServiceCfgInitD, scope_fopen failed");
-        return -1;
+        return SERVICE_STATUS_ERROR_OTHER;
     }
 
     if (scope_fwrite(INITD_CFG, sizeof(char), INITD_CFG_LEN, fPtr) < INITD_CFG_LEN) {
         scope_perror("error: newServiceCfgInitD, scope_fwrite failed");
-        res = -1;
+        res = SERVICE_STATUS_ERROR_OTHER;
     }
 
     scope_fclose(fPtr);
@@ -232,21 +232,21 @@ newServiceCfgInitD(const char* serviceCfgPath) {
 /*
  * Setup new service configuration for OpenRc service.
  *
- * Returns 0 if service was setup correctly -1 otherwise.
+ * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
-static int
+static service_status_t
 newServiceCfgOpenRc(const char* serviceCfgPath) {
-    int res = 0;
+    service_status_t res = SERVICE_STATUS_SUCCESS;
     FILE *fPtr = scope_fopen(serviceCfgPath, "a");
 
     if (fPtr == NULL) {
         scope_perror("error: newServiceCfgOpenRc, scope_fopen failed");
-        return -1;
+        return SERVICE_STATUS_ERROR_OTHER;
     }
 
     if (scope_fwrite(OPENRC_CFG, sizeof(char), OPENRC_CFG_LEN, fPtr) < OPENRC_CFG_LEN) {
         scope_perror("error: newServiceCfgOpenRc, scope_fwrite failed");
-        res = -1;
+        res = SERVICE_STATUS_ERROR_OTHER;
     }
 
     scope_fclose(fPtr);
@@ -284,24 +284,24 @@ isCfgFileConfigured(const char* serviceCfgPath) {
 /*
  * Modify configuration for Systemd service.
  *
- * Returns 0 if service was modified correctly -1 otherwise.
+ * Returns SERVICE_STATUS_SUCCESS if service was modified correctly, other values in case of failure.
  */
-static int
+static service_status_t
 modifyServiceCfgSystemd(const char* serviceCfgPath) {
     FILE *readFd;
     FILE *newFd;
-    char * tempPath = "/tmp/tmpFile-XXXXXX";
+    char *tempPath = "/tmp/tmpFile-XXXXXX";
     bool serviceSectionFound = FALSE;
 
     if ((readFd = scope_fopen(serviceCfgPath, "r")) == NULL) {
         scope_perror("error: modifyServiceCfgSystemd, scope_fopen serviceFile failed");
-        return -1;
+        return SERVICE_STATUS_ERROR_OTHER;
     }
 
     if ((newFd = scope_fopen(tempPath, "w+")) == NULL) {
         scope_perror("error: modifyServiceCfgSystemd, scope_fopen tempFile failed");
         scope_fclose(readFd);
-        return -1;
+        return SERVICE_STATUS_ERROR_OTHER;
     }
 
     while (!scope_feof(readFd)) {
@@ -329,7 +329,7 @@ modifyServiceCfgSystemd(const char* serviceCfgPath) {
     }
     scope_unlink(tempPath);
 
-    return -1;
+    return SERVICE_STATUS_SUCCESS;
 }
 
 static struct service_ops SystemDService = {
@@ -356,48 +356,48 @@ static struct service_ops OpenRcService = {
 /*
  * Setup specific service.
  *
- * Returns 0 if service was setup correctly -1 otherwise.
+ * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
-int
+service_status_t
 setupService(const char* serviceName) {
     struct stat sb = {0};
     struct service_ops *service;
 
     char serviceCfgPath[PATH_MAX] = {0};
 
-    int status;
+    service_status_t status;
 
     if (scope_stat(OPENRC_DIR, &sb) == 0) {
         service = &OpenRcService;
         if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/conf.d/%s", serviceName) < 0) {
             scope_perror("error: setupService, scope_snprintf OpenRc failed");
-            return -1;
+            return SERVICE_STATUS_ERROR_OTHER;
         }
     } else if (scope_stat(SYSTEMD_DIR, &sb) == 0) {
         service = &SystemDService;
         if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/systemd/system/%s.service.d/env.conf", serviceName) < 0) {
             scope_perror("error: setupService, scope_snprintf SystemD failed");
-            return -1;
+            return SERVICE_STATUS_ERROR_OTHER;
         }
     } else if (scope_stat(INITD_DIR, &sb) == 0) {
         service = &InitDService;
         if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/sysconfig/%s", serviceName) < 0) {
             scope_perror("error: setupService, scope_snprintf InitD failed");
-            return -1;
+            return SERVICE_STATUS_ERROR_OTHER;
         }
     } else {
         scope_fprintf(scope_stderr, "error: unknown boot system\n");
-        return -1;
+        return SERVICE_STATUS_ERROR_OTHER;
     }
 
     if (service->isServiceInstalled(serviceName) == FALSE) {
-        scope_fprintf(scope_stderr, "error: service %s is not installed\n", serviceName);
-        return -1;
+        scope_fprintf(scope_stderr, "info: service %s is not installed\n", serviceName);
+        return SERVICE_STATUS_NOT_INSTALLED;
     }
 
     service_cfg_status_t cfgStatus =  service->serviceCfgStatus(serviceName);
     if (cfgStatus == SERVICE_CFG_ERROR) {
-        return -1;
+        return SERVICE_STATUS_ERROR_OTHER;
     } else if (cfgStatus == SERVICE_CFG_NEW) {
         // Fresh configuration
         status = service->newServiceCfg(serviceCfgPath);
@@ -406,7 +406,7 @@ setupService(const char* serviceName) {
         status = service->modifyServiceCfg(serviceCfgPath);
     } else {
         // Service was already setup correctly
-        return 0;
+        return SERVICE_STATUS_SUCCESS;
     }
     scope_chmod(serviceCfgPath, 0644);
     

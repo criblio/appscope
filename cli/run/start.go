@@ -1,10 +1,12 @@
 package run
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"strconv"
 
 	"github.com/criblio/scope/libscope"
@@ -209,17 +211,24 @@ func startConfigureHost(filterData []byte) error {
 func startServiceHost(serviceName string) error {
 	ld := loader.ScopeLoader{Path: ldscopePath()}
 	stdoutStderr, err := ld.ServiceHost(serviceName)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Str("service", serviceName).
-			Str("loaderDetails", stdoutStderr).
-			Msgf("Service %v host failed.", serviceName)
-		startErr = err
-	} else {
+	if err == nil {
 		log.Info().
 			Str("service", serviceName).
 			Msgf("Service %v host success.", serviceName)
+	} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
+		if ee.ExitCode() == 1 {
+			log.Error().
+				Err(err).
+				Str("service", serviceName).
+				Str("loaderDetails", stdoutStderr).
+				Msgf("Service %v host failed.", serviceName)
+			startErr = err
+		} else {
+			log.Info().
+				Str("service", serviceName).
+				Str("loaderDetails", stdoutStderr).
+				Msgf("Service %v host failed.", serviceName)
+		}
 	}
 	return err
 }
@@ -265,19 +274,27 @@ func startSetupContainer(allowProcs []allowProcConfig) error {
 		for _, process := range allowProcs {
 			// Setup service
 			stdoutStderr, err := ld.ServiceContainer(process.Procname, cPid)
-			if err != nil {
-				log.Error().
-					Err(err).
-					Str("service", process.Procname).
-					Str("pid", strconv.Itoa(cPid)).
-					Str("loaderDetails", stdoutStderr).
-					Msgf("Setup containers failed. Service %v container %v failed.", process.Procname, cPid)
-				startErr = err
-			} else {
+			if err == nil {
 				log.Info().
 					Str("service", process.Procname).
 					Str("pid", strconv.Itoa(cPid)).
 					Msgf("Setup containers. Service %v container %v success.", process.Procname, cPid)
+			} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
+				if ee.ExitCode() == 1 {
+					log.Error().
+						Err(err).
+						Str("service", process.Procname).
+						Str("pid", strconv.Itoa(cPid)).
+						Str("loaderDetails", stdoutStderr).
+						Msgf("Setup containers failed. Service %v container %v failed.", process.Procname, cPid)
+					startErr = err
+				} else {
+					log.Info().
+						Str("service", process.Procname).
+						Str("pid", strconv.Itoa(cPid)).
+						Str("loaderDetails", stdoutStderr).
+						Msgf("Setup containers failed. Service %v container %v failed.", process.Procname, cPid)
+				}
 			}
 		}
 	}

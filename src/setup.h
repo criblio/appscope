@@ -3,7 +3,7 @@
 
 #include "scopetypes.h"
 
-int setupService(const char *);
+service_status_t setupService(const char *);
 int setupConfigure(void *, size_t);
 char* setupLoadFileIntoMem(size_t *, char*);
 

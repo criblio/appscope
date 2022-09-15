@@ -7,6 +7,8 @@
 #include "setup.h"
 #include "scopestdlib.h"
 
+#define BUFSIZE (4096)
+
 #define OPENRC_DIR "/etc/rc.conf"
 #define SYSTEMD_DIR "/etc/systemd"
 #define INITD_DIR "/etc/init.d"
@@ -263,7 +265,7 @@ static bool
 isCfgFileConfigured(const char *serviceCfgPath) {
     FILE *fPtr;
     int res = FALSE;
-    char buf[4096] = {0};
+    char buf[BUFSIZE] = {0};
 
     if ((fPtr = scope_fopen(serviceCfgPath, "r")) == NULL) {
         scope_perror("isCfgFileConfigured scope_fopen failed");

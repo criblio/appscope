@@ -203,6 +203,8 @@
     mov (%r12), %r12
     mov (%r12), %r12
     call *%r12
+    xorps %xmm15,%xmm15
+    mov %fs:0xfffffffffffffff8,%r14
 
     mov %rax, %r12
     add $0x20, %rsp
@@ -219,7 +221,7 @@
     pop %r10
     pop %r11
 	
-    add $0x2, %r12
+//    add $0x2, %r12
     jmp *%r12
 .endm
 
@@ -246,9 +248,13 @@
     interpose_regs go_hook_reg_http2_client_read, go_http2_client_read
     interpose_regs go_hook_reg_http2_client_write, go_http2_client_write
 
-    interpose_syscall_regs go_reg_syscall go_syscall
-    interpose_syscall_regs go_reg_rawsyscall go_rawsyscall
-    interpose_syscall_regs go_reg_syscall6 go_syscall6
+    interpose_syscall_regs go_hook_reg_syscall go_syscall
+    interpose_syscall_regs go_hook_reg_rawsyscall go_rawsyscall
+    interpose_syscall_regs go_hook_reg_syscall6 go_syscall6
+
+    interpose_syscall_regs go_hook_set_inputs_g_syscall go_set_inputs_g_syscall
+    interpose_syscall_regs go_hook_set_inputs_g_rawsyscall go_set_inputs_g_rawsyscall
+    interpose_syscall_regs go_hook_set_inputs_g_syscall6 go_set_inputs_g_syscall6
 
 /*
     Debug hint:

@@ -52,6 +52,9 @@ devnull(const char* fmt, ...)
 #endif
 
 enum index_hook_t {
+    INDEX_HOOK_SYSCALL_START,
+    INDEX_HOOK_RAWSYSCALL_START,
+    INDEX_HOOK_SYSCALL6_START,
     INDEX_HOOK_SYSCALL,
     INDEX_HOOK_RAWSYSCALL,
     INDEX_HOOK_SYSCALL6,
@@ -71,21 +74,21 @@ enum index_hook_t {
 
 go_schema_t go_8_schema = {
     .arg_offsets = {
-        .c_syscall_write_fd=0x8,
-        .c_syscall_write_buf=0x10,
-        .c_syscall_openat_path=0x10,
-        .c_syscall_unlinkat_dirfd=0x8,
-        .c_syscall_unlinkat_pathname=0x10,
+        .c_syscall_write_fd=0x20,
+        .c_syscall_write_buf=0x28,
+        .c_syscall_openat_path=0x28,
+        .c_syscall_unlinkat_dirfd=0x20,
+        .c_syscall_unlinkat_pathname=0x28,
         .c_syscall_unlinkat_flags=0x18,
-        .c_syscall_getdents64_dirfd=0x8,
-        .c_syscall_socket_domain=0x8,
-        .c_syscall_socket_type=0x10,
-        .c_syscall_accept4_fd=0x8,
-        .c_syscall_accept4_addr=0x10,
+        .c_syscall_getdents64_dirfd=0x20,
+        .c_syscall_socket_domain=0x20,
+        .c_syscall_socket_type=0x28,
+        .c_syscall_accept4_fd=0x20,
+        .c_syscall_accept4_addr=0x28,
         .c_syscall_accept4_addrlen=0x18,
-        .c_syscall_read_fd=0x8,
-        .c_syscall_read_buf=0x10,
-        .c_syscall_close_fd=0x8,
+        .c_syscall_read_fd=0x20,
+        .c_syscall_read_buf=0x28,
+        .c_syscall_close_fd=0x20,
         .c_tls_server_read_connReader=0x8,
         .c_tls_server_read_buf=0x10,
         .c_tls_server_read_rc=0x28,
@@ -108,6 +111,7 @@ go_schema_t go_8_schema = {
     },
     .struct_offsets = {
         .g_to_m=0x30,
+        .g_to_goid=0x98,
         .m_to_tls=0x88,
         .connReader_to_conn=0x0,
         .persistConn_to_conn=0x50,
@@ -129,9 +133,9 @@ go_schema_t go_8_schema = {
         .sc_to_conn=0x10,
     },
     .tap = {
-        [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",                         go_reg_syscall,               NULL, 0},
-        [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",                      go_reg_rawsyscall,            NULL, 0},
-        [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",                        go_reg_syscall6,              NULL, 0},
+        [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",                         go_hook_reg_syscall,          NULL, 0},
+        [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",                      go_hook_reg_rawsyscall,       NULL, 0},
+        [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",                        go_hook_reg_syscall6,         NULL, 0},
         [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_hook_tls_client_read,      NULL, 0}, 
         [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_hook_tls_client_write,     NULL, 0},
         [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_hook_tls_server_read,      NULL, 0},
@@ -154,13 +158,13 @@ go_schema_t go_17_schema = {
         .c_syscall_openat_path=0x28,
         .c_syscall_unlinkat_dirfd=0x20,
         .c_syscall_unlinkat_pathname=0x28,
-        .c_syscall_unlinkat_flags=0x18, //?
+        .c_syscall_unlinkat_flags=0x18,
         .c_syscall_getdents64_dirfd=0x20,
         .c_syscall_socket_domain=0x20,
         .c_syscall_socket_type=0x28,
         .c_syscall_accept4_fd=0x20,
         .c_syscall_accept4_addr=0x28,
-        .c_syscall_accept4_addrlen=0x18, //?
+        .c_syscall_accept4_addrlen=0x18,
         .c_syscall_read_fd=0x20,
         .c_syscall_read_buf=0x28,
         .c_syscall_close_fd=0x20,
@@ -185,6 +189,7 @@ go_schema_t go_17_schema = {
     },
     .struct_offsets = {
         .g_to_m=0x30,
+        .g_to_goid=0x98,
         .m_to_tls=0x88,
         .connReader_to_conn=0x0,
         .persistConn_to_conn=0x50,
@@ -210,9 +215,12 @@ go_schema_t go_17_schema = {
     // and we must preserve the g in r14 for future stack checks
     // Note: we do not need to use the reg functions for go_hook_exit and go_hook_die
     .tap = {
-        [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",       /* .abi0 */       go_reg_syscall,                   NULL, 0},
-        [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",    /* .abi0 */       go_reg_rawsyscall,                NULL, 0},
-        [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",      /* .abi0 */       go_reg_syscall6,                  NULL, 0},
+        [INDEX_HOOK_SYSCALL_START]        = {"syscall.Syscall",       /* .abi0 */       go_hook_set_inputs_g_syscall,     NULL, 0},
+        [INDEX_HOOK_RAWSYSCALL_START]     = {"syscall.RawSyscall",    /* .abi0 */       go_hook_set_inputs_g_rawsyscall,  NULL, 0},
+        [INDEX_HOOK_SYSCALL6_START]       = {"syscall.Syscall6",      /* .abi0 */       go_hook_set_inputs_g_syscall6,    NULL, 0},
+        [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",       /* .abi0 */       go_hook_reg_syscall,              NULL, 0},
+        [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",    /* .abi0 */       go_hook_reg_rawsyscall,           NULL, 0},
+        [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",      /* .abi0 */       go_hook_reg_syscall6,             NULL, 0},
         [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_hook_reg_tls_client_read,      NULL, 0},
         [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_hook_reg_tls_client_write,     NULL, 0},
         [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_hook_reg_tls_server_read,      NULL, 0},
@@ -307,9 +315,9 @@ adjustGoStructOffsetsForVersion()
         g_go_schema->arg_offsets.c_tls_client_read_pc=0x80;
         g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
 
-        g_go_schema->tap[INDEX_HOOK_SYSCALL].func_name = "runtime/internal/syscall.Syscall6";
-        g_go_schema->tap[INDEX_HOOK_RAWSYSCALL].func_name = "";
-        g_go_schema->tap[INDEX_HOOK_SYSCALL6].func_name = "";
+//        g_go_schema->tap[INDEX_HOOK_SYSCALL].func_name = "runtime/internal/syscall.Syscall6";
+//        g_go_schema->tap[INDEX_HOOK_RAWSYSCALL].func_name = "";
+//        g_go_schema->tap[INDEX_HOOK_SYSCALL6].func_name = "";
     }
 }
 
@@ -647,71 +655,15 @@ add_argument(cs_insn* asm_inst)
     return 0;
 }
 
-// Caution!  patch_first_instruction can only be used for things
-// that won't trigger a stackscan in go.  If your go function contains
-// a call to runtime.morestack_noctxt or calls any other function that
-// does, it can trigger a stackscan.  And you'll end up here trying
-// to understand what this comment is telling you.
-static void
-patch_first_instruction(funchook_t *funchook,
-               cs_insn* asm_inst, unsigned int asm_count, tap_t* tap)
-{
-    int i;
-    for (i=0; i<asm_count; i++) {
-        // Stop when it looks like we've hit another goroutine
-        if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
-                  (!scope_strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
-                  asm_inst[i].size == 1 ))) {
-            break;
-        }
-
-        patchprint("%0*lx (%02d) %-24s %s %s\n",
-                   16,
-                   asm_inst[i].address,
-                   asm_inst[i].size,
-                   (char*)asm_inst[i].bytes,
-                   (char*)asm_inst[i].mnemonic,
-                   (char*)asm_inst[i].op_str);
-
-        uint32_t add_arg=8; // not used, but can't be zero because of do_cfunc
-        if (i == 0) {
-            void *pre_patch_addr = (void*)asm_inst[i].address;
-            void *patch_addr = (void*)asm_inst[i].address;
-
-            if (funchook_prepare(funchook, (void**)&patch_addr, tap->assembly_fn)) {
-                patchprint("failed to patch 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
-                continue;
-            }
-            patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
-            tap->return_addr = patch_addr;
-            tap->frame_size = add_arg;
-        }
-    }
-    patchprint("\n\n");
-}
-
 // Patch all intended addresses
-// By default, this function patches the RETurn instruction although there are exceptions.
-// In some cases, we intend to patch the "xorps" instruction instead of the return instruction.
-// In some cases, we intend to patch the "call" instruction instead.
 static void
 patch_addrs(funchook_t *funchook,
                    cs_insn* asm_inst, unsigned int asm_count, tap_t* tap)
 {
     if (!funchook || !asm_inst || !asm_count || !tap) return;
 
-    // Special handling for runtime.exit, runtime.dieFromSignal
-    // Since the go folks wrote them in assembly, they don't follow
-    // conventions that other go functions do.
-    if ((tap->assembly_fn == go_hook_exit) ||
-        (tap->assembly_fn == go_hook_die)) {
-        patch_first_instruction(funchook, asm_inst, asm_count, tap);
-        return;
-    }
-
-    int i;
     uint32_t add_arg = 0;
-    for (i=0; i<asm_count; i++) {
+    for (int i=0; i<asm_count; i++) {
         add_arg = 0;
 
         patchprint("%0*lx (%02d) %-24s %s %s\n",
@@ -719,16 +671,38 @@ patch_addrs(funchook_t *funchook,
                (char*)asm_inst[i].bytes, (char*)asm_inst[i].mnemonic,
                (char*)asm_inst[i].op_str);
 
-        // We've observed that the first instruction in every goroutine
-        // is the same (it retrieves a pointer to the goroutine.)
-        // We're checking for it here to make sure things are coherent.
- //       if (i == 0 && !looks_like_first_inst_of_go_func(&asm_inst[i])) break;
-
         // Stop when it looks like we've hit another goroutine
         if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
-                  (!scope_strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
-                  asm_inst[i].size == 1 ))) {
+            (!scope_strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
+            asm_inst[i].size == 1 ))) {
             break;
+        }
+
+        // PATCH FIRST INSTRUCTION
+        // Special handling for runtime.exit, runtime.dieFromSignal
+        // Since the go folks wrote them in assembly, they don't follow
+        // conventions that other go functions do.
+        // We also patch syscalls at the first (and last) instruction.
+        if (i == 0 && ((tap->assembly_fn == go_hook_exit) ||
+            (tap->assembly_fn == go_hook_die) ||
+            (tap->assembly_fn == go_hook_set_inputs_g_syscall) ||
+            (tap->assembly_fn == go_hook_set_inputs_g_rawsyscall) ||
+            (tap->assembly_fn == go_hook_set_inputs_g_syscall6))) {
+
+            // In this case we want to patch at the first instruction 
+            void *pre_patch_addr = (void*)asm_inst[i].address;
+            void *patch_addr = (void*)asm_inst[i].address;
+
+            if (funchook_prepare(funchook, (void**)&patch_addr, tap->assembly_fn)) {
+                patchprint("failed to patch 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
+                continue;
+            }
+
+            patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
+            tap->return_addr = patch_addr;
+            tap->frame_size = add_arg;
+
+            break; // Done patching
         }
 
         // PATCH SPECIAL CALL INSTRUCTION
@@ -751,36 +725,11 @@ patch_addrs(funchook_t *funchook,
                 }
 
                 patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
-                patchprint("return addr %p\n", patch_addr);
                 tap->return_addr = patch_addr;
                 tap->frame_size = add_arg;
 
-                break; // We need to force a break in this case
+                break; // Done patching
             }
-        }
-
-        // PATCH SYSCALL INSTRUCTION
-        // In the case of some functions, we want to patch at a "syscall" instruction.
-        // Note: We don't need a frame size here.
-        else if (
-            (!scope_strcmp((const char*)asm_inst[i].mnemonic, "syscall")) &&
-            (asm_inst[i].size == 2)) {
-
-            // In the "syscall" case, we want to patch the syscall instruction directly
-            void *pre_patch_addr = (void*)asm_inst[i].address;
-            void *patch_addr = (void*)asm_inst[i].address;
-
-            if (funchook_prepare(funchook, (void**)&patch_addr, tap->assembly_fn)) {
-                patchprint("failed to patch 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
-                continue;
-            }
-
-            patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
-            patchprint("return addr %p\n", patch_addr);
-            tap->return_addr = patch_addr;
-            tap->frame_size = add_arg;
-
-            break; // We need to force a break in this case
         }
 
         // PATCH JUST BEFORE RET INSTRUCTION
@@ -1219,51 +1168,133 @@ getFDFromConn(uint64_t tcpConn) {
     return -1;
 }
 
+static int 
+c_set_inputs_g(char *input_params)
+{
+    // Get the register values from our stack
+    uint64_t rax = *(uint64_t *)(input_params + 0x0);
+    uint64_t rbx = *(uint64_t *)(input_params + 0x8);
+    uint64_t rcx = *(uint64_t *)(input_params + 0x10);
+    uint64_t rdi = *(uint64_t *)(input_params + 0x20);
+    uint64_t rsi = *(uint64_t *)(input_params + 0x28);
+    uint64_t r8 = *(uint64_t *)(input_params + 0x30);
+    uint64_t r9 = *(uint64_t *)(input_params + 0x38);
+
+    uint64_t go_g;
+    // Get the g from the fs register
+    __asm__ volatile (
+        "mov %%fs:-8, %0"
+        : "=r"(go_g)                      // output
+        :                                 // inputs
+        :                                 // clobbered register
+        );
+
+    if (!go_g) {
+        funcprint("Scope: failed to get go g\n");
+        return 1;
+    }
+
+    // Get the pointer to goid (stored in struct g). Seems unused.
+    uint64_t *goid_ptr = (uint64_t *)(go_g + g_go_schema->struct_offsets.g_to_goid);
+
+    inputs_g_t *inputs_g = (inputs_g_t *)scope_malloc(sizeof(inputs_g_t));
+    if (!inputs_g) return 1;
+
+    inputs_g->goid = *goid_ptr;
+    inputs_g->p1 = rax;
+    inputs_g->p2 = rbx;
+    inputs_g->p3 = rcx;
+    inputs_g->p4 = rdi;
+    inputs_g->p5 = rsi;
+    inputs_g->p6 = r8;
+    inputs_g->p7 = r9;
+ 
+    // Store the address of our input params structure in g.goid
+    *goid_ptr = (uint64_t)inputs_g;
+ 
+    return 0;
+}
+
+EXPORTON void *
+go_set_inputs_g_syscall(char *stackptr)
+{
+    return do_cfunc(stackptr, c_set_inputs_g, g_go_schema->tap[INDEX_HOOK_SYSCALL_START].assembly_fn);
+}
+
+EXPORTON void *
+go_set_inputs_g_rawsyscall(char *stackptr)
+{
+    return do_cfunc(stackptr, c_set_inputs_g, g_go_schema->tap[INDEX_HOOK_RAWSYSCALL_START].assembly_fn);
+}
+
+EXPORTON void *
+go_set_inputs_g_syscall6(char *stackptr)
+{
+    return do_cfunc(stackptr, c_set_inputs_g, g_go_schema->tap[INDEX_HOOK_SYSCALL6_START].assembly_fn);
+}
+
+static uint64_t
+c_get_inputs_g()
+{
+    uint64_t go_g;
+    // Get the g from the fs register
+    __asm__ volatile (
+        "mov %%fs:-8, %0"
+        : "=r"(go_g)                      // output
+        :                                 // inputs
+        :                                 // clobbered register
+        );
+
+    if (!go_g) {
+        funcprint("Scope: failed to get go g\n");
+        return 0;
+    }
+
+    return *(uint64_t *)(go_g + g_go_schema->struct_offsets.g_to_goid);
+}
+
+static void
+c_free_inputs_g(inputs_g_t *inputs_g)
+{
+    uint64_t go_g;
+    // Get the g from the fs register
+    __asm__ volatile (
+        "mov %%fs:-8, %0"
+        : "=r"(go_g)                      // output
+        :                                 // inputs
+        :                                 // clobbered register
+        );
+
+    if (!go_g) {
+        funcprint("Scope: failed to get go g\n");
+        scope_free(inputs_g);
+        return;
+    }
+
+    uint64_t *goid_ptr = (uint64_t *)(go_g + g_go_schema->struct_offsets.g_to_goid);
+
+ //   scope_free((void *)*goid_ptr);
+    *goid_ptr = inputs_g->goid; // Restore goid to g.goid
+                                
+    scope_free(inputs_g);
+}
+
 // Extract data from syscall.Syscall 
 static void
 c_syscall(char *input_params, char *return_values)
 {
-//    input_params += 0x8; // see do_cfunc
+//input_params += 0x8; // see do_cfunc
+    inputs_g_t *inputs_g = (inputs_g_t *)c_get_inputs_g();
 
-    uint64_t rax = *(uint64_t *)(input_params + 0x0);
-    uint64_t rdi = *(uint64_t *)(input_params + 0x20);
-    uint64_t rsi = *(uint64_t *)(input_params + 0x28);
-    uint64_t rdx = *(uint64_t *)(input_params + 0x18);
-    uint64_t rcx = *(uint64_t *)(input_params + 0x10);
-    uint64_t r8 = *(uint64_t *)(input_params + 0x30);
-    uint64_t r9 = *(uint64_t *)(input_params + 0x38);
-    uint64_t r11;
-
-    __asm__ volatile (
-        "mov %3, %%rax \n"
-        "mov %4, %%rdi \n"
-        "mov %5, %%rsi \n"
-        "mov %6, %%rdx \n"
-        "mov %7, %%rcx \n"
-        "mov %8, %%r8  \n"
-        "mov %9, %%r9  \n"
-        "syscall  \n"
-        "mov %%rax, %0  \n"
-        "mov %%rcx, %1  \n"
-        "mov %%r11, %2  \n"
-        : "=r"(rax), "=r"(rcx), "=r"(r11)                                     // output
-        : "m"(rax), "m"(rdi), "m"(rsi), "m"(rdx), "m"(rcx), "m"(r8), "m"(r9)  // inputs
-        : "%rax", "%rdi", "%rsi", "%rdx", "%rcx", "%r8", "%r9", "%r11"        // clobbered register
-        );
-
-    uint64_t syscall_num = *(uint64_t *)(input_params + 0x0);
+    uint64_t syscall_num = inputs_g->p1;
     int64_t rc = *(int64_t *)(return_values + 0x0);
     if(rc < 0) rc = -1; // kernel syscalls can return values < -1
 
-  //  struct timespec ts = {.tv_sec=0, .tv_nsec=10000000};
-  //  scope_nanosleep(&ts, NULL);
-//  scope_sleep(1);
-//    return;
     switch(syscall_num) {
     case 1: // write
         {
-            uint64_t fd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_write_fd);
-            char *buf   = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_write_buf);
+            uint64_t fd = inputs_g->p2; 
+            char *buf   = (char *)inputs_g->p3;
             uint64_t initialTime = getTime();
 
             funcprint("Scope: write fd %ld rc %ld buf %s\n", fd, rc, buf);
@@ -1273,7 +1304,7 @@ c_syscall(char *input_params, char *return_values)
 
     case 257: // openat
         {
-            char *path = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_openat_path);
+            char *path = (char *)inputs_g->p3;
             if (!path) {
                 scopeLogError("ERROR:go_open: null pathname");
                 scope_puts("Scope:ERROR:open:no path");
@@ -1290,9 +1321,9 @@ c_syscall(char *input_params, char *return_values)
         {
             if (rc) return;
 
-            uint64_t dirfd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_unlinkat_dirfd);
-            char *pathname = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_unlinkat_pathname);
-            uint64_t flags = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_unlinkat_flags);
+            uint64_t dirfd = inputs_g->p2;
+            char *pathname = (char *)inputs_g->p3;
+            uint64_t flags = inputs_g->p4;
 
             funcprint("Scope: unlinkat dirfd %ld pathname %s flags %ld\n", dirfd, pathname, flags);
             doDelete(pathname, "go_unlinkat");
@@ -1301,7 +1332,7 @@ c_syscall(char *input_params, char *return_values)
 
     case 217: // getdents64
         {
-            uint64_t dirfd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_getdents64_dirfd);
+            uint64_t dirfd = inputs_g->p2;
             uint64_t initialTime = getTime();
 
             funcprint("Scope: getdents dirfd %ld rc %ld\n", dirfd, rc);
@@ -1313,8 +1344,8 @@ c_syscall(char *input_params, char *return_values)
         {
             if (rc == -1) return;
 
-            uint64_t domain = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_socket_domain);  // aka family
-            uint64_t type   = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_socket_type);
+            uint64_t domain = inputs_g->p2;
+            uint64_t type   = inputs_g->p3;
 
             funcprint("Scope: socket domain: %ld type: 0x%lx sd: %ld\n", domain, type, rc);
             addSock(rc, type, domain); // Creates a net object
@@ -1326,9 +1357,9 @@ c_syscall(char *input_params, char *return_values)
         {
             if (rc == -1) return;
 
-            uint64_t fd           = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_accept4_fd); 
-            struct sockaddr *addr = *(struct sockaddr **)(input_params + g_go_schema->arg_offsets.c_syscall_accept4_addr);
-            socklen_t *addrlen    = *(socklen_t **)(input_params + g_go_schema->arg_offsets.c_syscall_accept4_addrlen);
+            uint64_t fd           = inputs_g->p2;
+            struct sockaddr *addr = (struct sockaddr *)inputs_g->p3;
+            socklen_t *addrlen    = (socklen_t *)inputs_g->p4;
 
             funcprint("Scope: accept4 of %ld\n", rc);
             doAccept(fd, rc, addr, addrlen, "go_accept4");
@@ -1337,8 +1368,8 @@ c_syscall(char *input_params, char *return_values)
 
     case 0: // read
         {
-            uint64_t fd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_read_fd);
-            char *buf   = (char *)*(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_read_buf);
+            uint64_t fd = inputs_g->p2;
+            char *buf   = (char *)inputs_g->p3;
             uint64_t initialTime = getTime();
 
             funcprint("Scope: read of %ld rc %ld\n", fd, rc);
@@ -1348,7 +1379,7 @@ c_syscall(char *input_params, char *return_values)
 
     case 3: // close
         {
-            uint64_t fd = *(uint64_t *)(input_params + g_go_schema->arg_offsets.c_syscall_close_fd);
+            uint64_t fd = inputs_g->p2;
 
             funcprint("Scope: close of %ld\n", fd);
             doCloseAndReportFailures(fd, (rc != -1), "go_close"); // If net, deletes a net object
@@ -1359,36 +1390,8 @@ c_syscall(char *input_params, char *return_values)
         break;
     }
 
-
-    *(uint64_t *)(input_params + 0x0) = rax; // return code back into input_params to be popped into %rax
-    *(uint64_t *)(input_params + 0x10) = rcx; 
-    *(uint64_t *)(input_params + 0x48) = r11; 
-
+    c_free_inputs_g(inputs_g);
 }
-
-/*
-// Extract data from syscall.Socket (net open)
-static void
-c_socket(char *input_params, char *return_values)
-{
-    uint64_t rc     = *(uint64_t *)(return_values + 0x40); // g_go_schema->arg_offsets.c_socket_rc);
-    uint64_t domain = 0x2; //  *(uint64_t *)(input_params + 0x50); // g_go_schema->arg_offsets.c_socket_domain);  // aka family
-    uint64_t type   = 0x80801; // *(uint64_t *)(input_params + 0x58); // g_go_schema->arg_offsets.c_socket_type);
-
-    if (rc == -1) return;
-
-    funcprint("Scope: socket domain: %ld type: 0x%lx sd: %ld\n", domain, type, rc);
-
-    // Creates a net object
-    addSock(rc, type, domain);
-}
-
-EXPORTON void *
-go_socket(char *stackptr)
-{
-    return do_cfunc(stackptr, c_socket, g_go_schema->tap[INDEX_HOOK_SOCKET].assembly_fn);
-}
-*/
 
 EXPORTON void *
 go_syscall(char *stackptr)

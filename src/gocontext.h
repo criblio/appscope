@@ -43,6 +43,7 @@ typedef struct {
 
 typedef struct {                  // Structure                  Field      
     int g_to_m;                   // "runtime.g"                "m"        
+    int g_to_goid;                // "runtime.g"                "goid"
     int m_to_tls;                 // "runtime.m"                "tls"      
     int connReader_to_conn;       // "net/http.connReader"      "conn"     
     int conn_to_tlsState;         // "net/http.conn"            "tlsState" 
@@ -88,6 +89,17 @@ typedef struct {
     int   len;  // 0x8 offset
 } gostring_t;
 
+typedef struct {
+    uint64_t goid;
+    uint64_t p1;
+    uint64_t p2;
+    uint64_t p3;
+    uint64_t p4;
+    uint64_t p5;
+    uint64_t p6;
+    uint64_t p7;
+} inputs_g_t;
+
 typedef void (*assembly_fn)(void);
 
 extern go_schema_t *g_go_schema;
@@ -126,8 +138,12 @@ extern void go_hook_reg_http2_server_preface(void);
 extern void go_hook_reg_http2_client_read(void);
 extern void go_hook_reg_http2_client_write(void);
 
-extern void go_reg_syscall(void);
-extern void go_reg_rawsyscall(void);
-extern void go_reg_syscall6(void);
+extern void go_hook_reg_syscall(void);
+extern void go_hook_reg_rawsyscall(void);
+extern void go_hook_reg_syscall6(void);
+
+extern void go_hook_set_inputs_g_syscall(void);
+extern void go_hook_set_inputs_g_rawsyscall(void);
+extern void go_hook_set_inputs_g_syscall6(void);
 
 #endif // __GOTCONTEXT_H__

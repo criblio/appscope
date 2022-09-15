@@ -103,7 +103,7 @@ get_dir(const char *path, char *fres, size_t len) {
     return res;
 }
 
-char *
+static char *
 loaderOpGetLoader(const char *exe) {
     int i, fd;
     struct stat sbuf;
@@ -153,7 +153,7 @@ loaderOpGetLoader(const char *exe) {
 }
 
 // modify NEEDED entries in libscope.so to avoid dependencies
-int
+static int
 loaderOpSetLibrary(const char *libpath) {
     int i, fd, found, name;
     struct stat sbuf;

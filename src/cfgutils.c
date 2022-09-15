@@ -2934,7 +2934,7 @@ typedef struct {
     bool filterMatch;       // flag indicate that cfg should be parsed for the process
 } filter_cfg_t;
 
-typedef void (*node_filter_fn)(yaml_document_t*, yaml_node_t*, filter_cfg_t *);
+typedef void (*node_filter_fn)(yaml_document_t *, yaml_node_t *, filter_cfg_t *);
 
 typedef struct {
     yaml_node_type_t type;
@@ -2947,8 +2947,8 @@ typedef struct {
 */
 static void
 processKeyValuePairFilter(yaml_document_t *doc, yaml_node_pair_t *pair, const parse_filter_table_t *fEntry, filter_cfg_t *fCfg) {
-    yaml_node_t* nodeKey = yaml_document_get_node(doc, pair->key);
-    yaml_node_t* nodeValue = yaml_document_get_node(doc, pair->value);
+    yaml_node_t *nodeKey = yaml_document_get_node(doc, pair->key);
+    yaml_node_t *nodeValue = yaml_document_get_node(doc, pair->value);
 
     if (nodeKey->type != YAML_SCALAR_NODE) return;
 
@@ -3018,11 +3018,11 @@ processAllowSeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
     };
 
 
-    yaml_node_item_t* seqItem;
+    yaml_node_item_t *seqItem;
     foreach(seqItem, node->data.sequence.items) {
         // Allow list is not empty
         fCfg->emptyAllowList = FALSE;
-        yaml_node_t* nodeMap = yaml_document_get_node(doc, *seqItem);
+        yaml_node_t *nodeMap = yaml_document_get_node(doc, *seqItem);
 
         if (nodeMap->type != YAML_MAPPING_NODE) return;
 
@@ -3071,9 +3071,9 @@ processDenySeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
         {YAML_NO_NODE,     NULL,               NULL}
     };
 
-    yaml_node_item_t* seqItem;
+    yaml_node_item_t *seqItem;
     foreach(seqItem, node->data.sequence.items) {
-        yaml_node_t* nodeMap = yaml_document_get_node(doc, *seqItem);
+        yaml_node_t *nodeMap = yaml_document_get_node(doc, *seqItem);
 
         if (nodeMap->type != YAML_MAPPING_NODE) return;
 

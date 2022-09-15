@@ -2579,12 +2579,24 @@ cfgReadCustomAnchorExtend(void **state)
 }
 
 static void
-filterEmptyProc(void **state) {
+filterEmptyProcName(void **state) {
     char path[PATH_MAX] = {0};
     scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus(NULL, path, cfg);
+    filter_status_t res = cfgFilterStatus(NULL, "foo", path, cfg);
+    assert_int_equal(res, FILTER_ERROR);
+    dbgInit(); // reset dbg for the rest of the tests
+    // cleanup
+    cfgDestroy(&cfg);
+    assert_null(cfg);
+}
+
+static void
+filterEmptyProcCmdLine(void **state) {
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+    filter_status_t res = cfgFilterStatus("foo", NULL, NULL, cfg);
     assert_int_equal(res, FILTER_ERROR);
     dbgInit(); // reset dbg for the rest of the tests
     // cleanup
@@ -2596,7 +2608,7 @@ static void
 filterNullFilterPath(void **state) {
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("foo", NULL, cfg);
+    filter_status_t res = cfgFilterStatus("foo", "foo", NULL, cfg);
     assert_int_equal(res, FILTER_ERROR);
     dbgInit(); // reset dbg for the rest of the tests
     // cleanup
@@ -2608,7 +2620,7 @@ static void
 filterNullCfg(void **state) {
     char path[PATH_MAX] = {0};
     scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
-    filter_status_t res = cfgFilterStatus("foo", path, NULL);
+    filter_status_t res = cfgFilterStatus("foo", "foo", path, NULL);
     assert_int_equal(res, FILTER_ERROR);
     dbgInit(); // reset dbg for the rest of the tests
 }
@@ -2619,7 +2631,7 @@ filterNonExistingFilterFile(void **state) {
     scope_snprintf(path, sizeof(path), "%s/data/filter_non_existing.yml", dirPath);
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("foo", path, cfg);
+    filter_status_t res = cfgFilterStatus("foo", "foo", path, cfg);
     assert_int_equal(res, FILTER_SCOPED);
     // cleanup
     cfgDestroy(&cfg);
@@ -2632,7 +2644,7 @@ filterProcNameAllowListPresent(void **state) {
     scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("redis", path, cfg);
+    filter_status_t res = cfgFilterStatus("redis", "redis", path, cfg);
     assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
     // cleanup
     cfgDestroy(&cfg);
@@ -2645,7 +2657,7 @@ filterProcNameDenyListPresent(void **state) {
     scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("git", path, cfg);
+    filter_status_t res = cfgFilterStatus("git", "git", path, cfg);
     assert_int_equal(res, FILTER_NOT_SCOPED);
     // cleanup
     cfgDestroy(&cfg);
@@ -2658,7 +2670,7 @@ filterArgAllowListPresent(void **state) {
     scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("redis", path, cfg);
+    filter_status_t res = cfgFilterStatus("redis", "redis", path, cfg);
     assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
     // cleanup
     cfgDestroy(&cfg);
@@ -2671,7 +2683,7 @@ filterArgDenyListPresent(void **state) {
     scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("git", path, cfg);
+    filter_status_t res = cfgFilterStatus("git", "git", path, cfg);
     assert_int_equal(res, FILTER_NOT_SCOPED);
     // cleanup
     cfgDestroy(&cfg);
@@ -2684,11 +2696,11 @@ filterArgAllowListPartFindPresent(void **state) {
     scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("redis-server", path, cfg);
+    filter_status_t res = cfgFilterStatus("redis-server", "redis-server", path, cfg);
     assert_int_equal(res, FILTER_NOT_SCOPED);
     scope_memset(path, 0, sizeof(path));
     scope_snprintf(path, sizeof(path), "%s/data/filter_1.yml", dirPath);
-    res = cfgFilterStatus("redis-server", path, cfg);
+    res = cfgFilterStatus("redis-server", "redis-server", path, cfg);
     assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
     // cleanup
     cfgDestroy(&cfg);
@@ -2702,7 +2714,7 @@ filterArgAllowListEmptyProcMissing(void **state) {
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
-    filter_status_t res = cfgFilterStatus("memcached", path, cfg);
+    filter_status_t res = cfgFilterStatus("memcached", "memcached", path, cfg);
     assert_int_equal(res, FILTER_NOT_SCOPED);
     // cleanup
     cfgDestroy(&cfg);
@@ -2715,13 +2727,13 @@ filterArgAllowListNotEmptyProcMissing(void **state) {
     scope_snprintf(path, sizeof(path), "%s/data/filter_2.yml", dirPath);
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("memcached", path, cfg);
+    filter_status_t res = cfgFilterStatus("memcached", "memcached", path, cfg);
     assert_int_equal(res, FILTER_SCOPED);
 
     scope_memset(path, 0, PATH_MAX);
 
     scope_snprintf(path, sizeof(path), "%s/data/filter_3.yml", dirPath);
-    res = cfgFilterStatus("memcached", path, cfg);
+    res = cfgFilterStatus("memcached", "memcached", path, cfg);
     assert_int_equal(res, FILTER_SCOPED);
     // cleanup
     cfgDestroy(&cfg);
@@ -2734,7 +2746,7 @@ filterVerifyCfg(void **state) {
     scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("redis", path, cfg);
+    filter_status_t res = cfgFilterStatus("redis", "redis", path, cfg);
     assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
     // redis: cribl disable error log level /tmp/redis.log
     assert_int_equal(cfgLogStreamEnable(cfg), FALSE);
@@ -2746,7 +2758,7 @@ filterVerifyCfg(void **state) {
 
     cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    res = cfgFilterStatus("htop", path, cfg);
+    res = cfgFilterStatus("htop", "htop", path, cfg);
     assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
     // htop: cribl enable info log level /tmp/htop.log
     assert_int_equal(cfgLogStreamEnable(cfg), TRUE);
@@ -2839,7 +2851,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(initMtcReturnsPtr),
         cmocka_unit_test(initEvtFormatReturnsPtr),
         cmocka_unit_test(initCtlReturnsPtr),
-        cmocka_unit_test(filterEmptyProc),
+        cmocka_unit_test(filterEmptyProcName),
+        cmocka_unit_test(filterEmptyProcCmdLine),
         cmocka_unit_test(filterNullFilterPath),
         cmocka_unit_test(filterNullCfg),
         cmocka_unit_test(filterNonExistingFilterFile),

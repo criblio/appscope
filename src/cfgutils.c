@@ -2927,11 +2927,12 @@ typedef enum {
 } proc_status;
 
 typedef struct {
-    const char *cmd;        // command which be searched in the filter file
-    proc_status  status;    // status describes the presence of the process on list
-    bool emptyAllowList;    // emptyAllowList describes if the allow list is empty or not
-    config_t *cfg;          // configuration for the scope list
-    bool filterMatch;       // flag indicate that cfg should be parsed for the process
+    const char *procName;    // process name which be searched in the filter file
+    const char *procCmdLine; // process command line which be searched in the filter file
+    proc_status  status;     // status describes the presence of the process on list
+    bool emptyAllowList;     // emptyAllowList describes if the allow list is empty or not
+    config_t *cfg;           // configuration for the scope list
+    bool filterMatch;        // flag indicate that cfg should be parsed for the process
 } filter_cfg_t;
 
 typedef void (*node_filter_fn)(yaml_document_t *, yaml_node_t *, filter_cfg_t *);
@@ -2971,20 +2972,20 @@ static void
 processAllowProcNameScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
     if (node->type != YAML_SCALAR_NODE) return;
 
-    if (!scope_strcmp(fCfg->cmd, ((const char*) node->data.scalar.value))) {
+    if (!scope_strcmp(fCfg->procName, ((const char*) node->data.scalar.value))) {
         fCfg->status = PROC_ALLOWED;
         fCfg->filterMatch = TRUE;
     }
 }
 
 /*
-* Process allow arg Scalar Node
+* Process allow process command line Scalar Node
 */
 static void
-processAllowArgScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+processAllowProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
     if (node->type != YAML_SCALAR_NODE) return;
 
-    if (scope_strstr(fCfg->cmd, ((const char*) node->data.scalar.value)) != NULL) {
+    if (scope_strstr(fCfg->procCmdLine, ((const char*) node->data.scalar.value)) != NULL) {
         fCfg->status = PROC_ALLOWED;
         fCfg->filterMatch = TRUE;
     }
@@ -3012,7 +3013,7 @@ processAllowSeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
 
     parse_filter_table_t t[] = {
         {YAML_SCALAR_NODE,  ALLOW_PROCNAME_NODE, processAllowProcNameScalar},
-        {YAML_SCALAR_NODE,  ALLOW_ARG_NODE,      processAllowArgScalar},
+        {YAML_SCALAR_NODE,  ALLOW_ARG_NODE,      processAllowProcCmdLineScalar},
         {YAML_MAPPING_NODE, ALLOW_CONFIG_NODE,   processAllowConfig},
         {YAML_NO_NODE,      NULL,                NULL}
     };
@@ -3041,19 +3042,19 @@ static void
 processDenyProcNameScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
     if (node->type != YAML_SCALAR_NODE) return;
 
-    if (!scope_strcmp(fCfg->cmd, ((const char*) node->data.scalar.value))) {
+    if (!scope_strcmp(fCfg->procName, ((const char*) node->data.scalar.value))) {
         fCfg->status = PROC_DENIED;
     }
 }
 
 /*
-* Process deny arg Scalar Node
+* Process deny process command line Scalar Node
 */
 static void
-processDenyArgScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+processDenyProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
     if (node->type != YAML_SCALAR_NODE) return;
 
-    if (scope_strstr(fCfg->cmd, ((const char*) node->data.scalar.value)) != NULL) {
+    if (scope_strstr(fCfg->procCmdLine, ((const char*) node->data.scalar.value)) != NULL) {
         fCfg->status = PROC_DENIED;
     }
 }
@@ -3067,7 +3068,7 @@ processDenySeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
 
     parse_filter_table_t t[] = {
         {YAML_SCALAR_NODE, DENY_PROCNAME_NODE, processDenyProcNameScalar},
-        {YAML_SCALAR_NODE, DENY_ARG_NODE,      processDenyArgScalar},
+        {YAML_SCALAR_NODE, DENY_ARG_NODE,      processDenyProcCmdLineScalar},
         {YAML_NO_NODE,     NULL,               NULL}
     };
 
@@ -3156,9 +3157,9 @@ cleanup_filter_file:
  *
  */
 filter_status_t
-cfgFilterStatus(const char *cmd, const char *filterPath, config_t *cfg) {
+cfgFilterStatus(const char *procName, const char* procCmdLine, const char *filterPath, config_t *cfg) {
 
-    if ((cmd == NULL) || (cfg == NULL) || (filterPath == NULL)) {
+    if ((procName == NULL) || (cfg == NULL) || (filterPath == NULL)) {
         DBG(NULL);
         return FILTER_ERROR;
     }
@@ -3170,7 +3171,8 @@ cfgFilterStatus(const char *cmd, const char *filterPath, config_t *cfg) {
         return FILTER_SCOPED;
     }
 
-    filter_cfg_t fCfg = {.cmd = cmd, 
+    filter_cfg_t fCfg = {.procName = procName,
+                         .procCmdLine = procCmdLine,
                          .status = PROC_NOT_FOUND,
                          .emptyAllowList = TRUE,
                          .filterMatch = FALSE,

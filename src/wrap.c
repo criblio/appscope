@@ -1646,7 +1646,7 @@ init(void)
         scopedFlag = TRUE;
     } else {
         cfg = cfgCreateDefault();
-        filter_status_t res = cfgFilterStatus(g_proc.cmd, DEFAULT_SCOPE_FILTER_LOC, cfg);
+        filter_status_t res = cfgFilterStatus(g_proc.procname, g_proc.cmd, DEFAULT_SCOPE_FILTER_LOC, cfg);
         switch (res) {
             case FILTER_SCOPED:
                 scopedFlag = TRUE;

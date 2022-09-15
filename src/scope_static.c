@@ -709,8 +709,8 @@ main(int argc, char **argv, char **env)
             return setupService(serviceName);
         } else {
             // Service on Container
-            pid_t nsAttachPid = 0;
-            if (nsIsPidInChildNs(pid, &nsAttachPid) == TRUE) {
+            pid_t nsContainerPid = 0;
+            if (nsIsPidInChildNs(pid, &nsContainerPid) == TRUE) {
                 return nsService(pid, serviceName);
             }
         }
@@ -746,8 +746,8 @@ main(int argc, char **argv, char **env)
             status = setupConfigure(confgFilterMem, configFilterSize);
         } else {
             // Configure on Container
-            pid_t nsAttachPid = 0;
-            if (nsIsPidInChildNs(pid, &nsAttachPid) == TRUE) {
+            pid_t nsContainerPid = 0;
+            if (nsIsPidInChildNs(pid, &nsContainerPid) == TRUE) {
                 status = nsConfigure(pid, confgFilterMem, configFilterSize);
             }
         }

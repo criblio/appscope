@@ -21,6 +21,9 @@ type Process struct {
 	Command string `json:"command"`
 }
 
+// PidScopeMap is a map of Pid and Scope state
+type PidScopeMapState map[int]bool
+
 // Processes is an array of Process
 type Processes []Process
 
@@ -32,8 +35,75 @@ var (
 	errMissingUser    = errors.New("unable to find user")
 )
 
+// searchPidByProcName check if specified inputProcName fully match the pid's process name
+func searchPidByProcName(pid int, inputProcName string) bool {
+
+	procName, err := PidCommand(pid)
+	if err != nil {
+		return false
+	}
+	return inputProcName == procName
+}
+
+// searchPidByCmdLine check if specified inputArg submatch the pid's command line
+func searchPidByCmdLine(pid int, inputArg string) bool {
+
+	cmdLine, err := PidCmdline(pid)
+	if err != nil {
+		return false
+	}
+	return strings.Contains(cmdLine, inputArg)
+}
+
+type searchFun func(int, string) bool
+
+// pidScopeMapSearch returns an map of processes that met conditions in searchFun
+func pidScopeMapSearch(inputArg string, sF searchFun) (PidScopeMapState, error) {
+	pidMap := make(PidScopeMapState)
+
+	procDir, err := os.Open("/proc")
+	if err != nil {
+		return pidMap, errOpenProc
+	}
+	defer procDir.Close()
+
+	procs, err := procDir.Readdirnames(0)
+	if err != nil {
+		return pidMap, errReadProc
+	}
+
+	for _, p := range procs {
+		// Skip non-integers as they are not PIDs
+		if !IsNumeric(p) {
+			continue
+		}
+
+		// Convert directory name to integer
+		pid, err := strconv.Atoi(p)
+		if err != nil {
+			continue
+		}
+
+		if sF(pid, inputArg) {
+			pidMap[pid] = PidScoped(pid)
+		}
+	}
+
+	return pidMap, nil
+}
+
+// PidScopeMapByProcessName returns an map of processes name that are found by process name match
+func PidScopeMapByProcessName(procname string) (PidScopeMapState, error) {
+	return pidScopeMapSearch(procname, searchPidByProcName)
+}
+
+// PidScopeMapByArg returns an map of processes that are found by cmdLine submatch
+func PidScopeMapByCmdLine(cmdLine string) (PidScopeMapState, error) {
+	return pidScopeMapSearch(cmdLine, searchPidByCmdLine)
+}
+
 // ProcessesByName returns an array of processes that match a given name
-func ProcessesByName(name string, partialMatch bool) (Processes, error) {
+func ProcessesByName(name string) (Processes, error) {
 	processes := make([]Process, 0)
 
 	procDir, err := os.Open("/proc")
@@ -75,28 +145,17 @@ func ProcessesByName(name string, partialMatch bool) (Processes, error) {
 		if err != nil && !errors.Is(err, errMissingUser) {
 			continue
 		}
-		if partialMatch {
-			if strings.Contains(command, name) {
-				processes = append(processes, Process{
-					ID:      i,
-					Pid:     pid,
-					User:    userName,
-					Scoped:  PidScoped(pid),
-					Command: cmdLine,
-				})
-				i++
-			}
-		} else {
-			if command == name {
-				processes = append(processes, Process{
-					ID:      i,
-					Pid:     pid,
-					User:    userName,
-					Scoped:  PidScoped(pid),
-					Command: cmdLine,
-				})
-				i++
-			}
+
+		// Add process if there is a name match
+		if strings.Contains(command, name) {
+			processes = append(processes, Process{
+				ID:      i,
+				Pid:     pid,
+				User:    userName,
+				Scoped:  PidScoped(pid),
+				Command: cmdLine,
+			})
+			i++
 		}
 	}
 	return processes, nil

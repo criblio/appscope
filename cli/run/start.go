@@ -101,7 +101,7 @@ func startAttachSingleProcess(pid string, cfgData []byte) error {
 // startAttach attach to all allowed processes on the host and on the container
 // It returns the status of operation.
 func startAttach(allowProc allowProcConfig) error {
-	var procsToAttach util.Processes
+	var pidsToAttach util.PidScopeMapState
 	cfgSingleProc, err := yaml.Marshal(allowProc.Config)
 	if err != nil {
 		log.Error().
@@ -112,7 +112,7 @@ func startAttach(allowProc allowProcConfig) error {
 	}
 
 	if allowProc.Procname != "" {
-		procsList, err := util.ProcessesByName(allowProc.Procname, true)
+		procsMap, err := util.PidScopeMapByProcessName(allowProc.Procname)
 		if err != nil {
 			log.Error().
 				Err(err).
@@ -121,10 +121,10 @@ func startAttach(allowProc allowProcConfig) error {
 			startErr = err
 			return err
 		}
-		procsToAttach = append(procsToAttach, procsList...)
+		pidsToAttach = procsMap
 	}
 	if allowProc.Arg != "" {
-		procsList, err := util.ProcessesByName(allowProc.Arg, false)
+		procsMap, err := util.PidScopeMapByCmdLine(allowProc.Arg)
 		if err != nil {
 			log.Error().
 				Err(err).
@@ -133,18 +133,20 @@ func startAttach(allowProc allowProcConfig) error {
 			startErr = err
 			return err
 		}
-		procsToAttach = append(procsToAttach, procsList...)
+		for k, v := range procsMap {
+			pidsToAttach[k] = v
+		}
 	}
 
-	for _, process := range procsToAttach {
-		if process.Scoped {
+	for pid, scopeState := range pidsToAttach {
+		if scopeState {
 			log.Info().
-				Str("pid", strconv.Itoa(process.Pid)).
-				Msgf("Attach Failed. Process: %v is already scoped.", process.Pid)
+				Str("pid", strconv.Itoa(pid)).
+				Msgf("Attach Failed. Process: %v is already scoped.", pid)
 			continue
 		}
 
-		startAttachSingleProcess(strconv.Itoa(process.Pid), cfgSingleProc)
+		startAttachSingleProcess(strconv.Itoa(pid), cfgSingleProc)
 
 	}
 

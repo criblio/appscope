@@ -54,7 +54,7 @@ struct service_ops {
  * Returns TRUE if service is installed FALSE otherwise.
  */
 static bool
-isServiceInstalledSystemD(const char* serviceName) {
+isServiceInstalledSystemD(const char *serviceName) {
 
     /*
     * List of directories which can contain service configruation file.
@@ -212,7 +212,7 @@ newServiceCfgSystemD(const char *serviceCfgPath) {
  * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
 static service_status_t
-newServiceCfgInitD(const char* serviceCfgPath) {
+newServiceCfgInitD(const char *serviceCfgPath) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
     FILE *fPtr = scope_fopen(serviceCfgPath, "a");
 
@@ -462,7 +462,7 @@ setupExtractFilterFile(void *filterFileMem, size_t filterSize) {
         goto cleanupDestFd;
     }
 
-    char* dest = scope_mmap(NULL, filterSize, PROT_READ | PROT_WRITE, MAP_SHARED, filterFd, 0);
+    char *dest = scope_mmap(NULL, filterSize, PROT_READ | PROT_WRITE, MAP_SHARED, filterFd, 0);
     if (dest == MAP_FAILED) {
         goto cleanupDestFd;
     }
@@ -529,7 +529,7 @@ closeFd:
  * Returns status of operation 0 in case of success, other value otherwise
  */
 int
-setupConfigure(void* filterFileMem, size_t filterSize) {
+setupConfigure(void *filterFileMem, size_t filterSize) {
     // Setup /etc/profile
     if (setupProfile() == FALSE) {
         scope_fprintf(scope_stderr, "setupProfile failed\n");

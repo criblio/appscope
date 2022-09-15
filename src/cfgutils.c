@@ -3163,7 +3163,10 @@ cfgFilterStatus(const char *cmd, const char *filterPath, config_t *cfg) {
         return FILTER_ERROR;
     }
 
-    if (!filterPath || scope_access(filterPath, R_OK)) {
+    /*
+    * If the filter file is missing we scope every process
+    */
+    if (scope_access(filterPath, R_OK)) {
         return FILTER_SCOPED;
     }
 

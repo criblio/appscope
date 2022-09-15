@@ -308,7 +308,7 @@ func (rc *Config) Start() error {
 
 	// Validate user has root permissions
 	if err := util.UserVerifyRootPerm(); err != nil {
-		log.Fatal().
+		log.Error().
 			Err(err).
 			Msg("Verify root permission failed.")
 		startErr = err
@@ -318,7 +318,7 @@ func (rc *Config) Start() error {
 	// Retrieve input data
 	startCfg, startcfgData, err := getConfigFromStdin()
 	if err != nil {
-		log.Fatal().
+		log.Error().
 			Err(err).
 			Msg("Read filter file failed.")
 		startErr = err
@@ -326,7 +326,7 @@ func (rc *Config) Start() error {
 	}
 
 	if err := createLdscope(); err != nil {
-		log.Fatal().
+		log.Error().
 			Err(err).
 			Msg("Create ldscope failed.")
 		startErr = err

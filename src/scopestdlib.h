@@ -35,6 +35,7 @@ extern int  scopelibc_dprintf(int, const char *, ...);
 extern int  scopelibc_fprintf(FILE *, const char *, ...);
 extern int  scopelibc_snprintf(char *, size_t, const char *, ...);
 extern int  scopelibc_sscanf(const char *, const char *, ...);
+extern int  scopelibc_fscanf(FILE *, const char *, ...);
 extern int  scopelibc_sprintf(char *, const char *, ...);
 extern int  scopelibc_asprintf(char **, const char *, ...);
 extern int  scopelibc_errno_val;
@@ -52,6 +53,7 @@ extern int32_t ** scopelibc___ctype_tolower_loc(void);
 #define scope_fprintf  scopelibc_fprintf
 #define scope_snprintf scopelibc_snprintf
 #define scope_sscanf   scopelibc_sscanf
+#define scope_fscanf   scopelibc_fscanf
 #define scope_sprintf  scopelibc_sprintf
 #define scope_asprintf scopelibc_asprintf
 #define scope_errno    scopelibc_errno_val

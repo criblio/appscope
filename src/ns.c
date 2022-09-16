@@ -3,94 +3,70 @@
 #include <stdlib.h>
 
 #include "ns.h"
+#include "setup.h"
 #include "scopestdlib.h"
 
-/*
- * TODO: Refactor this hardcoded path
- * This can be consolidated with libdir.c but required
- * further cleaning like reverse return logic in libdirExists
- */
 #define LDSCOPE_IN_CHILD_NS "/tmp/ldscope"
 #define VALID_NS_DEPTH 2
 
-/*
- * Load static loader (ldscope) into memory.
- *
- * Returns loader memory address in case of success, NULL otherwise.
- */
-static char*
-loadLdscopeMem(size_t *ldscopeSize)
-{
-    // Load ldscope into memory
-    char *ldscopeMem = NULL;
-
-    char ldscopePath[PATH_MAX] = {0};
-
-    if (scope_readlink("/proc/self/exe", ldscopePath, sizeof(ldscopePath) - 1) == -1) {
-        scope_perror("readlink(/proc/self/exe) failed");
-        goto closeLdscopeFd;
-    }
-
-    int ldscopeInputFd = scope_open(ldscopePath, O_RDONLY);
-    if (!ldscopeInputFd) {
-        scope_perror("scope_open failed");
-        goto closeLdscopeFd;
-    }
-
-    *ldscopeSize = scope_lseek(ldscopeInputFd, 0, SEEK_END);
-    if (*ldscopeSize == (off_t)-1) {
-        scope_perror("scope_lseek failed");
-        goto closeLdscopeFd;
-    }
-
-    ldscopeMem = scope_mmap(NULL, *ldscopeSize, PROT_READ, MAP_PRIVATE, ldscopeInputFd, 0);
-    if (ldscopeMem == MAP_FAILED) {
-        scope_perror("scope_mmap failed");
-        ldscopeMem = NULL;
-        goto closeLdscopeFd;
-    }
-
-closeLdscopeFd:
-
-    scope_close(ldscopeInputFd);
-
-    return ldscopeMem;
-}
 
 /*
- * Extract static loader (ldscope) into child namespace.
+ * Extract file from parent namespace into child namespace.
  *
  * Returns TRUE in case of success, FALSE otherwise.
  */
 static bool
-extractLdscopeToChildNamespace(char* ldscopeMem, size_t ldscopeSize)
+extractMemToChildNamespace(char *inputMem, size_t inputSize, const char *outFile, mode_t outPermFlag)
 {
     bool status = FALSE;
+    int outFd;
 
-    int ldscopeDestFd = scope_open(LDSCOPE_IN_CHILD_NS, O_RDWR | O_CREAT, 0771);
-    if (!ldscopeDestFd) {
+    if ((outFd = scope_open(outFile, O_RDWR | O_CREAT, outPermFlag)) == -1) {
         scope_perror("scope_open failed");
         return status;
     }
 
-    if (scope_ftruncate(ldscopeDestFd, ldscopeSize) != 0) {
+    if (scope_ftruncate(outFd, inputSize) != 0) {
         goto cleanupDestFd;
     }
 
-    char* dest = scope_mmap(NULL, ldscopeSize, PROT_READ | PROT_WRITE, MAP_SHARED, ldscopeDestFd, 0);
+    char *dest = scope_mmap(NULL, inputSize, PROT_READ | PROT_WRITE, MAP_SHARED, outFd, 0);
     if (dest == MAP_FAILED) {
         goto cleanupDestFd;
     }
 
-    scope_memcpy(dest, ldscopeMem, ldscopeSize);
+    scope_memcpy(dest, inputMem, inputSize);
 
-    scope_munmap(dest, ldscopeSize);
+    scope_munmap(dest, inputSize);
 
     status = TRUE;
 
 cleanupDestFd:
 
-    scope_close(ldscopeDestFd);
+    scope_close(outFd);
+
+    return status;
+}
+
+static bool
+setNamespace(pid_t pid, const char *ns)
+{
+    char nsPath[PATH_MAX] = {0};
+    int nsFd;
+    if (scope_snprintf(nsPath, sizeof(nsPath), "/proc/%d/ns/%s", pid, ns) < 0) {
+        scope_perror("scope_snprintf failed");
+        return FALSE;
+    }
+
+    if ((nsFd = scope_open(nsPath, O_RDONLY)) == -1) {
+        scope_perror("scope_open failed");
+        return FALSE;
+    }
+
+    if (scope_setns(nsFd, 0) != 0) {
+        scope_perror("setns failed");
+        return FALSE;
+    }
 
     return TRUE;
 }
@@ -100,11 +76,21 @@ join_namespace(pid_t hostPid)
 {
     bool status = FALSE;
     size_t ldscopeSize = 0;
+    size_t cfgSize = 0;
 
-    char *ldscopeMem = loadLdscopeMem(&ldscopeSize);
+    char path[PATH_MAX] = {0};
+
+    if (scope_readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
+        return status;
+    }
+
+    char *ldscopeMem = setupLoadFileIntoMem(&ldscopeSize, path);
     if (ldscopeMem == NULL) {
         return status;
     }
+
+    // Configuration is optional
+    char *scopeCfgMem = setupLoadFileIntoMem(&cfgSize, getenv("SCOPE_CONF_PATH"));
 
     /*
     * Reassociate current process to the "child namespace"
@@ -112,33 +98,33 @@ join_namespace(pid_t hostPid)
     *   be created in separate namespace
     *   In other words the calling process will not change it's ownPID
     *   namespace
-    * - mount namespace - allows to copy static loader into a "child namespace"
+    * - mount namespace - allows to copy file(s) into a "child namespace"
     */
-    char *nsType[] = {"pid", "mnt"};
-
-    for (int i = 0; i < (sizeof(nsType)/sizeof(nsType[0])); ++i) {
-        char nsPath[PATH_MAX] = {0};
-        if (scope_snprintf(nsPath, sizeof(nsPath), "/proc/%d/ns/%s", hostPid, nsType[i]) < 0) {
-            scope_perror("scope_snprintf failed");
-            goto cleanupLdscopeMem;
-        }
-        int nsFd = scope_open(nsPath, O_RDONLY);
-        if (!nsFd) {
-            scope_perror("scope_open failed");
-            goto cleanupLdscopeMem;
-        }
-
-        if (scope_setns(nsFd, 0) != 0) {
-            scope_perror("setns failed");
-            goto cleanupLdscopeMem;
-        }
+    if (setNamespace(hostPid, "pid") == FALSE) {
+        goto cleanupMem;
+    }
+    if (setNamespace(hostPid, "mnt") == FALSE) {
+        goto cleanupMem;
     }
 
-    status = extractLdscopeToChildNamespace(ldscopeMem, ldscopeSize);
+    status = extractMemToChildNamespace(ldscopeMem, ldscopeSize, LDSCOPE_IN_CHILD_NS, 0775);
 
-cleanupLdscopeMem:
+    if (scopeCfgMem) {
+        char scopeCfgPath[PATH_MAX] = {0};
+
+        scope_snprintf(scopeCfgPath, sizeof(scopeCfgPath), "/tmp/scope_%d.yml", hostPid);
+        status = extractMemToChildNamespace(scopeCfgMem, cfgSize, scopeCfgPath, 0664);
+        // replace the SCOPE_CONF_PATH with namespace path
+        setenv("SCOPE_CONF_PATH", scopeCfgPath, 1);
+    }   
+
+cleanupMem:
 
     scope_munmap(ldscopeMem, ldscopeSize);
+
+    if (scopeCfgMem) {
+        scope_munmap(scopeCfgMem, cfgSize);
+    }
 
     return status;
 }
@@ -195,6 +181,43 @@ nsIsPidInChildNs(pid_t pid, pid_t *nsPid)
     scope_fclose(fstream);
 
     return status;
+}
+
+ /*
+ * Setup the service for specified child process
+ * Returns status of operation SERVICE_STATUS_SUCCESS in case of success, other values in case of failure
+ */
+service_status_t
+nsService(pid_t pid, const char *serviceName) {
+
+    if (setNamespace(pid, "mnt") == FALSE) {
+        return SERVICE_STATUS_ERROR_OTHER;
+    }
+
+    return setupService(serviceName);
+}
+
+ 
+ /*
+ * Configure the child mount namespace
+ * - switch the mount namespace to child
+ * - configure the setup
+ * Returns status of operation 0 in case of success, other values in case of failure
+ */
+int
+nsConfigure(pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize)
+{
+    if (setNamespace(pid, "mnt") == FALSE) {
+        scope_fprintf(scope_stderr, "setNamespace mnt failed\n");
+        return EXIT_FAILURE;
+    }
+
+    if (setupConfigure(scopeCfgFilterMem, filterFileSize)) {
+        scope_fprintf(scope_stderr, "setup child namespace failed\n");
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
 }
  
  /*

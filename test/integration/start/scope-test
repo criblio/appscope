@@ -1,0 +1,143 @@
+#! /bin/bash
+DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
+
+FAILED_TEST_LIST=""
+FAILED_TEST_COUNT=0
+
+fail() { ERR+=1; echo >&2 "fail:" $@; }
+
+starttest(){
+    CURRENT_TEST=$1
+    echo "==============================================="
+    echo "             Testing $CURRENT_TEST             "
+    echo "==============================================="
+    ERR=0
+}
+
+evaltest(){
+    echo "             Evaluating $CURRENT_TEST"
+}
+
+endtest(){
+    if [ $ERR -eq "0" ]; then
+        RESULT=PASSED
+    else
+        RESULT=FAILED
+        FAILED_TEST_LIST+=$CURRENT_TEST
+        FAILED_TEST_LIST+=" "
+        FAILED_TEST_COUNT=$(($FAILED_TEST_COUNT + 1))
+    fi
+
+    echo "*************** $CURRENT_TEST $RESULT ***************"
+    echo ""
+    echo ""
+
+}
+
+#
+# scope start
+#
+
+starttest scope_start
+
+# Star processses
+memcached -u root &
+redis-server &
+nginx &
+
+cd /opt/
+scope start < /opt/test-runner/scope_filter1.yml
+
+# check if filter file is in known location
+if [ ! -f /tmp/scope_filter.yml ]; then
+    fail "missing /tmp/scope_filter.yml"
+fi
+
+# compare the filter file
+cmp -s /tmp/scope_filter.yml /opt/test-runner/scope_filter1.yml
+if [ $? -ne "0" ]; then
+    fail "mismatch /tmp/scope_filter.yml and scope_filter1.yml"
+fi
+
+# check if libscope.so is in known location
+if [ ! -f /tmp/libscope.so ]; then
+    fail "missing /tmp/libscope.so"
+fi
+
+# check if etc/profile.d was updated
+if [ ! -f /etc/profile.d/scope.sh ]; then
+    fail "missing /etc/profile.d/scope.sh"
+fi
+
+# check the content of etc/profile.d/scope.sh
+grep -q "export LD_PRELOAD=/tmp/libscope.so" /etc/profile.d/scope.sh
+if [ $? -ne "0" ]; then
+    fail "missing export LD_PRELOAD in /etc/profile.d/scope.sh"
+fi
+
+curl localhost:80
+# Dummy sleep to ensure that data will be in the file
+sleep 2
+
+# check if redis-server was properly scoped
+if [ ! -f /tmp/redis_events.log ]; then
+    fail "missing /tmp/redis_events.log"
+fi
+
+# check the content of redis_events.log
+grep -q '"cmd":"redis-server' /tmp/redis_events.log
+if [ $? -ne "0" ]; then
+    fail "missing redis-server cmd in /tmp/redis_events.log"
+fi
+
+if [ ! -f /tmp/redis_metrics.log ]; then
+    fail "missing /tmp/redis_metrics.log"
+fi
+
+if [ ! -f /tmp/redis_scope.log ]; then
+    fail "missing /tmp/redis_scope.log"
+fi
+
+# check if nginx was properly scoped
+if [ ! -f /tmp/nginx_events.log ]; then
+    fail "missing /tmp/nginx_events.log"
+fi
+
+grep -q '"cmd":"nginx: worker process"' /tmp/nginx_events.log
+if [ $? -ne "0" ]; then
+    fail "missing nginx: worker process cmd in /tmp/nginx_events.log"
+fi
+
+if [ ! -f /tmp/nginx_metrics.log ]; then
+    fail "missing /tmp/nginx_metrics.log"
+fi
+
+if [ ! -f /tmp/nginx_scope.log ]; then
+    fail "missing /tmp/nginx_scope.log"
+fi
+
+scope start < /opt/test-runner/scope_filter2.yml
+# compare the filter file it should be overwritten
+
+cmp -s /tmp/scope_filter.yml /opt/test-runner/scope_filter2.yml
+if [ $? -ne "0" ]; then
+    fail "mismatch /tmp/scope_filter.yml and scope_filter2.yml"
+fi
+
+endtest
+
+
+if (( $FAILED_TEST_COUNT == 0 )); then
+    echo ""
+    echo ""
+    echo "*************** ALL TESTS PASSED ***************"
+else
+    echo "*************** SOME TESTS FAILED ***************"
+    echo "Failed tests: $FAILED_TEST_LIST"
+    echo "Refer to these files for more info:"
+    for FAILED_TEST in $FAILED_TEST_LIST; do
+        echo "  $EVT_FILE.$FAILED_TEST"
+    done
+fi
+
+exit ${FAILED_TEST_COUNT}

@@ -40,7 +40,39 @@ echo "    Command Line Options Test"
 echo "================================="
 
 run ./bin/linux/${ARCH}/ldscope
-outputs "error: missing --attach, --detach option or EXECUTABLE"
+outputs "error: missing --attach, --detach, --configure, --service option or EXECUTABLE argument"
+outputs "Cribl AppScope"
+returns 1
+
+run ./bin/linux/${ARCH}/ldscope -n
+outputs "missing required value for -n option"
+returns 1
+
+run ./bin/linux/${ARCH}/ldscope -n 1 ls
+outputs "error: --namespace option required --configure or --service option"
+outputs "Cribl AppScope"
+returns 1
+
+run ./bin/linux/${ARCH}/ldscope -c
+outputs "missing required value for -c option"
+returns 1
+
+run ./bin/linux/${ARCH}/ldscope -s
+outputs "missing required value for -s option"
+returns 1
+
+run ./bin/linux/${ARCH}/ldscope -s dummy_service_value -c dummy_filter_value
+outputs "error: --configure and --service cannot be used together"
+outputs "Cribl AppScope"
+returns 1
+
+run ./bin/linux/${ARCH}/ldscope -a dummy_service_value -s 1
+outputs "error: --attach/--detach and --service cannot be used together"
+outputs "Cribl AppScope"
+returns 1
+
+run ./bin/linux/${ARCH}/ldscope -c dummy_filter_value -a 1
+outputs "error: --attach/--detach and --configure cannot be used together"
 outputs "Cribl AppScope"
 returns 1
 

@@ -79,7 +79,7 @@ osInitTSC(platform_time_t *cfg)
 }
 
 int
-osIsFilePresent(pid_t pid, const char *path)
+osIsFilePresent(const char *path)
 {
     struct stat sb = {};
     if (stat(path, &sb) != 0) {

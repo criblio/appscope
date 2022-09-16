@@ -12,10 +12,11 @@ import (
 // TestProcessesByName
 // Assertions:
 // - The expected process array is returned
+// - No error is returned
 func TestProcessesByName(t *testing.T) {
 	// Current process
 	name := "util.test"
-	result := ProcessesByName(name)
+	result, err := ProcessesByName(name, true)
 	user, _ := user.Current()
 	exp := Processes{
 		Process{
@@ -27,11 +28,13 @@ func TestProcessesByName(t *testing.T) {
 		},
 	}
 	assert.Equal(t, exp, result)
+	assert.NoError(t, err)
 }
 
 // TestPidUser
 // Assertions:
 // - The expected user value is returned
+// - No error is returned
 func TestPidUser(t *testing.T) {
 	/*
 		 * Disabled since we run as "builder" for `make docker-build`.
@@ -49,28 +52,33 @@ func TestPidUser(t *testing.T) {
 	}
 	username := currentUser.Username
 	pid := os.Getpid()
-	result := PidUser(pid)
+	result, err := PidUser(pid)
 	assert.Equal(t, username, result)
+	assert.NoError(t, err)
 }
 
 // TestPidCommand
 // Assertions:
 // - The expected command value is returned
+// - No error is returned
 func TestPidCommand(t *testing.T) {
 	// Current process command
 	pid := os.Getpid()
-	result := PidCommand(pid)
+	result, err := PidCommand(pid)
 	assert.Equal(t, "util.test", result)
+	assert.NoError(t, err)
 }
 
 // TestPidCmdline
 // Assertions:
 // - The expected cmdline value is returned
+// - No error is returned
 func TestPidCmdline(t *testing.T) {
 	// Current process command
 	pid := os.Getpid()
-	result := PidCmdline(pid)
+	result, err := PidCmdline(pid)
 	assert.Equal(t, strings.Join(os.Args[:], " "), result)
+	assert.NoError(t, err)
 }
 
 // TestPidExists

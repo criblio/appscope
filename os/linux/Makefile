@@ -57,7 +57,7 @@ $(LDSCOPEDYN): src/fn.c src/scopestdlib.c os/$(OS)/os.c src/dbg.c src/scopeelf.c
 		-ldl -lrt -o $@ ${MUSL_AR} ${UNWIND_AR} -I./os/$(OS) $(INCLUDES)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
-$(LDSCOPE): src/scope_static.c src/libdir.c src/scopestdlib.c src/ns.c $(LDSCOPEDYN) $(LIBSCOPE)
+$(LDSCOPE): src/scope_static.c src/libdir.c src/scopestdlib.c src/ns.c src/setup.c src/loaderop.c $(LDSCOPEDYN) $(LIBSCOPE)
 	@echo "$${CI:+::group::}Building $@"
 	cd $(dir $(LDSCOPEDYN)) && objcopy \
 		-I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) \
@@ -67,7 +67,7 @@ $(LDSCOPE): src/scope_static.c src/libdir.c src/scopestdlib.c src/ns.c $(LDSCOPE
 		$(notdir $(LIBSCOPE)) $(notdir $(LIBSCOPE:.so=.o))
 	gcc -Wall -static -g $(ARCH_CFLAGS) $(DISTRO_FLAGS) \
 		-DSCOPE_VER=\"$(SCOPE_VER)\" \
-		src/scope_static.c src/scopestdlib.c src/libdir.c src/ns.c  \
+		src/scope_static.c src/scopestdlib.c src/libdir.c src/ns.c src/setup.c src/loaderop.c  \
 		$(INCLUDES) \
 		$(LDSCOPEDYN).o $(LIBSCOPE:.so=.o) \
 		-lrt -lpthread -o $@ ${MUSL_AR} ${UNWIND_AR}

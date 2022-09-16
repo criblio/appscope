@@ -33,7 +33,7 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 scope attach firefox 
 scope attach --payloads 2000`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		internal.InitConfig()
 
 		// Disallow bad argument combinations (see Arg Matrix at top of file)
@@ -77,7 +77,7 @@ scope attach --payloads 2000`,
 			helpErrAndExit(cmd, "Cannot specify --loglevel and --userconfig")
 		}
 
-		rc.Attach(args)
+		return rc.Attach(args)
 	},
 }
 

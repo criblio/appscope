@@ -103,6 +103,29 @@ scope attach --payloads 2000
 
 ```
 
+### detach
+---
+
+Unscopes a currently-running process identified by PID or ProcessName.
+
+#### Usage
+
+`scope detach [flags] PID | <process_name>`
+
+#### Examples
+
+```
+scope detach 1000
+scope detach firefox
+```
+
+#### Flags
+
+```
+  -h, --help                  Help for detach
+
+```
+
 ### completion
 ---
 

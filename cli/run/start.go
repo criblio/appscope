@@ -248,10 +248,17 @@ func startSetupContainer(allowProcs []allowProcConfig) error {
 	// Iterate over all containers
 	cPids, err := util.GetDockerPids()
 	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("Setup containers failed.")
-		startErr = err
+		switch {
+		case errors.Is(err, util.ErrDockerNotAvailable):
+			log.Info().
+				Msgf("Setup containers skipped. Docker is not available")
+			return nil
+		default:
+			log.Error().
+				Err(err).
+				Msg("Setup containers failed.")
+			startErr = err
+		}
 	}
 
 	for _, cPid := range cPids {

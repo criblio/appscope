@@ -47,6 +47,9 @@ nginx &
 
 cd /opt/
 scope start < /opt/test-runner/scope_filter1.yml
+if [ $? -ne "0" ]; then
+    fail "scope start failed"
+fi
 
 # check if filter file is in known location
 if [ ! -f /tmp/scope_filter.yml ]; then
@@ -117,8 +120,11 @@ if [ ! -f /tmp/nginx_scope.log ]; then
 fi
 
 scope start < /opt/test-runner/scope_filter2.yml
-# compare the filter file it should be overwritten
+if [ $? -ne "0" ]; then
+    fail "scope start failed"
+fi
 
+# compare the filter file it should be overwritten
 cmp -s /tmp/scope_filter.yml /opt/test-runner/scope_filter2.yml
 if [ $? -ne "0" ]; then
     fail "mismatch /tmp/scope_filter.yml and scope_filter2.yml"

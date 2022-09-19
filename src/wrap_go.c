@@ -1050,6 +1050,14 @@ initGoHook(elf_buf_t *ebuf)
     }
 }
 
+void *
+return_addr_idx(int idx)
+{
+    if ((idx < 0) || (idx > INDEX_HOOK_MAX)) return NULL;
+
+    return (void *)g_go_schema->tap[idx].return_addr;
+}
+
 static void *
 return_addr(assembly_fn fn)
 {

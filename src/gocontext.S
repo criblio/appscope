@@ -225,6 +225,86 @@
     jmp *%r12
 .endm
 
+.macro interpose_syscall_lim a_func, c_func, idx
+.global \a_func
+.hidden \c_func
+\a_func:
+    endbr64
+    // Is this a syscall we support?
+    cmp  $0x1, %rax
+    je 1f
+    cmp $0x101, %rax
+	je 1f
+	cmp $0x107, %rax
+	je 1f
+	cmp $0xd9, %rax
+	je 1f
+	cmp $0x29, %rax
+	je 1f
+	cmp $0x120, %rax
+	je 1f
+	cmp $0x0, %rax
+	je 1f
+	cmp $0x3, %rax
+	je 1f
+
+    // if not a supported syscall, get the return addr and done
+    push %rdi
+    push %rax
+    mov $\idx, %rdi
+    lea return_addr_idx@GOTPCREL(%rip), %r12
+    mov (%r12), %r12
+    call *%r12
+    mov %rax, %r12
+    pop %rax
+    pop %rdi
+    jmp *%r12
+
+1:
+    push %r11
+    push %r10
+    push %r9     // linux 6th param
+    push %r8     // linux 5th param
+    push %rsi    // linux 2nd param
+    push %rdi    // linux 1st param
+    push %rdx    // linux 3rd param
+    push %rcx    // linux 4th param
+    push %rbx
+    push %rax    // linux syscall num
+
+
+    mov %rsp, %r12
+    sub $0x20, %rsp
+
+    mov %r12, 0x08(%rsp)
+    lea \c_func@GOTPCREL(%rip), %r12
+    mov (%r12), %r12
+    mov %r12, (%rsp)
+
+    lea go_runtime_cgocall@GOTPCREL(%rip), %r12
+    mov (%r12), %r12
+    mov (%r12), %r12
+    call *%r12
+    xorps %xmm15,%xmm15
+    mov %fs:0xfffffffffffffff8,%r14
+
+    mov %rax, %r12
+    add $0x20, %rsp
+
+    pop %rax
+	pop %rbx
+	pop %rcx
+	pop %rdx
+    pop %rdi
+    pop %rsi
+    pop %r8
+    pop %r9
+    pop %r10
+    pop %r11
+
+    jmp *%r12
+.endm
+
 .text
     interpose go_hook_tls_server_read, go_tls_server_read
     interpose go_hook_tls_server_write, go_tls_server_write
@@ -256,6 +336,8 @@
     interpose_syscall_regs go_hook_set_inputs_g_rawsyscall go_set_inputs_g_rawsyscall
     interpose_syscall_regs go_hook_set_inputs_g_syscall6 go_set_inputs_g_syscall6
 
+    //interpose_syscall_lim go_hook_reg_syscall go_syscall 0x3
+    //interpose_syscall_lim go_hook_set_inputs_g_syscall go_set_inputs_g_syscall 0x0
 /*
     Debug hint:
     When you need to change the assy code, 

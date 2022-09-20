@@ -176,6 +176,7 @@
 .hidden \c_func
 \a_func:
     endbr64
+
     push %r11
     push %r10
     push %r9     // linux 6th param
@@ -305,6 +306,66 @@
     jmp *%r12
 .endm
 
+.macro interpose_syscall_nostack a_func, c_func
+.global \a_func
+.hidden \c_func
+\a_func:
+    endbr64
+    // get thge g
+    mov  %fs:0xfffffffffffffff8, %r12
+
+    // is g valid?
+    cmp  $0x0, %r12
+    je   1f
+
+    // is this g m->gsignal? if so, already on the system stack
+    mov  0x30(%r12), %r13         // g->m
+    mov  0x50(%r13), %r13         // m->gsignal
+    cmp  %r12, %r13
+    je   1f
+
+    // is this g g->m->g0 (new thread), if so, already on the system stack
+    mov  0x30(%r12), %r13         // g->m
+    mov  (%r13), %r13             // m->g0
+    cmp  %r12, %r13
+    je   1f
+
+    // else switch to system stack
+    // set g state to use of system stack
+    lea go_systemstack_switch@GOTPCREL(%rip), %r13
+    mov (%r13), %r13
+    mov (%r13), %r13
+    call *%r13
+
+    mov  0x30(%r12), %r13         // g->m
+    mov  (%r13), %r13             // m->g0
+
+    // the system stack switch
+    mov  %rsp, %r12               // r12 is caller stack, r14 is caller g
+    mov  %r13, %fs:0xfffffffffffffff8
+    mov  0x38(%r13), %rsp         // m->g0->sched.sp
+
+    // create stack frame on the system stack
+    //sub  $0x10, %rsp
+    //and  $0xfffffffffffffff0, %rsp
+    lea  \c_func@GOTPCREL(%rip), %r13
+    mov  (%r13), %r13
+    call c_handler
+
+    mov  %r14, %fs:0xfffffffffffffff8    // restore the caller g
+    mov  %r12, %rsp                      // restore the caller stack
+
+    jmp *%r13                           // return through the trampoline
+
+    // The curreent g is using the system stack, don't switch stacks
+1:
+    mov  %rsp, %r12
+    lea \c_func@GOTPCREL(%rip), %r13
+    mov  (%r13), %r13
+    call c_handler
+    jmp  *%r13
+.endm
+
 .text
     interpose go_hook_tls_server_read, go_tls_server_read
     interpose go_hook_tls_server_write, go_tls_server_write
@@ -328,16 +389,71 @@
     interpose_regs go_hook_reg_http2_client_read, go_http2_client_read
     interpose_regs go_hook_reg_http2_client_write, go_http2_client_write
 
-    interpose_syscall_regs go_hook_reg_syscall go_syscall
-    interpose_syscall_regs go_hook_reg_rawsyscall go_rawsyscall
-    interpose_syscall_regs go_hook_reg_syscall6 go_syscall6
+    //nterpose_syscall_regs go_hook_reg_syscall go_syscall
+    //interpose_syscall_regs go_hook_reg_rawsyscall go_rawsyscall
+    //interpose_syscall_regs go_hook_reg_syscall6 go_syscall6
 
-    interpose_syscall_regs go_hook_set_inputs_g_syscall go_set_inputs_g_syscall
-    interpose_syscall_regs go_hook_set_inputs_g_rawsyscall go_set_inputs_g_rawsyscall
-    interpose_syscall_regs go_hook_set_inputs_g_syscall6 go_set_inputs_g_syscall6
+    //interpose_syscall_regs go_hook_set_inputs_g_syscall go_set_inputs_g_syscall
+    //interpose_syscall_regs go_hook_set_inputs_g_rawsyscall go_set_inputs_g_rawsyscall
+    //interpose_syscall_regs go_hook_set_inputs_g_syscall6 go_set_inputs_g_syscall6
 
-    //interpose_syscall_lim go_hook_reg_syscall go_syscall 0x3
-    //interpose_syscall_lim go_hook_set_inputs_g_syscall go_set_inputs_g_syscall 0x0
+
+    interpose_syscall_nostack go_hook_reg_syscall go_syscall
+    interpose_syscall_nostack go_hook_reg_rawsyscall go_rawsyscall
+    interpose_syscall_nostack go_hook_reg_syscall6 go_syscall6
+
+    interpose_syscall_nostack go_hook_set_inputs_g_syscall go_set_inputs_g_syscall
+    interpose_syscall_nostack go_hook_set_inputs_g_rawsyscall go_set_inputs_g_rawsyscall
+    interpose_syscall_nostack go_hook_set_inputs_g_syscall6 go_set_inputs_g_syscall6
+
+c_handler:
+    // inputs:
+    // r12 is the caller stack
+    // r13 is c_func address
+    // r14 is the caller g
+    // returns:
+    // r13 is the trampoline address
+
+    // save regs on the stack
+    push %r14    // caller g
+    push %r12    // caller stack
+    push %r11
+    push %r10
+    push %r9     // linux 6th param
+    push %r8     // linux 5th param
+    push %rsi    // linux 2nd param
+    push %rdi    // linux 1st param
+    push %rdx    // linux 3rd param
+    push %rcx    // linux 4th param
+    push %rbx
+    push %rax    // linux syscall num
+
+    mov  %rsp, %rdi                      // C func param
+    //lea  \c_func@GOTPCREL(%rip), %r12
+    call *%r13
+
+    // handle return state and restore stack
+    // save the return through trampoline addr from the C func
+    mov %rax, %r13
+    //xorps %xmm15,%xmm15
+    //mov %fs:0xfffffffffffffff8, %r14
+
+    // restore saved registers
+    pop  %rax
+	pop  %rbx
+	pop  %rcx
+	pop  %rdx
+    pop  %rdi
+    pop  %rsi
+    pop  %r8
+    pop  %r9
+    pop  %r10
+    pop  %r11
+    pop  %r12                            // caller stack
+    pop  %r14                            // caller g
+    // add $0x10, %rsp
+    ret
+
 /*
     Debug hint:
     When you need to change the assy code, 

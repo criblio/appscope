@@ -42,6 +42,7 @@ static char g_ReadFrame_addr[sizeof(void *)];
 go_schema_t *g_go_schema = &go_8_schema; // overridden if later version
 uint64_t g_glibc_guard = 0LL;
 void (*go_runtime_cgocall)(void);
+uint64_t go_systemstack_switch;
 
 #if NEEDEVNULL > 0
 static void
@@ -969,6 +970,15 @@ initGoHook(elf_buf_t *ebuf)
     }
     ReadFrame_addr = (uint64_t *)((uint64_t)ReadFrame_addr + base);
     scope_sprintf(g_ReadFrame_addr, "%p\n", ReadFrame_addr);
+
+
+    if (((go_systemstack_switch = (uint64_t)getSymbol(ebuf->buf, "gosave_systemstack_switch")) == 0) &&
+        ((go_systemstack_switch = (uint64_t)getGoSymbol(ebuf->buf, "gosave_systemstack_switch", NULL, NULL)) == 0)) {
+        sysprint("WARN: can't get the address for gosave_systemstack_switch\n");
+    }
+    go_systemstack_switch = (uint64_t)((char *)go_systemstack_switch + base);
+    // DEBUG
+    sysprint("address for gosave_systemstack_switch: 0x%lx\n", go_systemstack_switch);
 
     csh disass_handle = 0;
     cs_arch arch;

@@ -48,53 +48,8 @@
     // The value returned from our 'C' handler function is always
     // the address of the trampoline that gets us back to the
     // original Go function. The correct trampoline address is
-    // created by funchook_prepapre().
+    // created by funchook_prepare().
     jmp *%r11
-.endm
-
-.macro interpose_regs a_func, c_func
-.global \a_func
-.hidden \c_func
-\a_func:
-    endbr64
-    mov %rsp, %r12
-    push %rax
-    push %rbx
-    push %rcx
-    push %rdi
-    push %rsi
-    push %r8
-    push %r9
-    push %r10
-    push %r11
-    sub $0x20, %rsp
-
-    mov %r12, 0x08(%rsp)
-    lea \c_func@GOTPCREL(%rip), %r12
-    mov (%r12), %r12
-    mov %r12, (%rsp)
-
-    lea go_runtime_cgocall@GOTPCREL(%rip), %r12
-    mov (%r12), %r12
-    mov (%r12), %r12
-    call *%r12
-    xorps %xmm15,%xmm15
-    mov %fs:0xfffffffffffffff8,%r14
-
-    mov %rax, %r12
-
-    add $0x20, %rsp
-    pop %r11
-    pop %r10
-    pop %r9
-    pop %r8
-    pop %rsi
-    pop %rdi
-    pop %rcx
-    pop %rbx
-    pop %rax
-
-    jmp *%r12
 .endm
 
 /*
@@ -108,17 +63,14 @@
  * RAX, RBX, RCX, RDI, RSI, R8, R9, R10, R11
  * Note that X15 is defined to be always a fixed value of zero
  */
-.macro interpose_system_stack a_func, c_func, idx
+.macro interpose_system_stack a_func, c_func
 .global \a_func
 .hidden \c_func
 \a_func:
     endbr64
 
-//TODO if syscall do syscall_check
-
-    mov  %fs:0xfffffffffffffff8, %r12   // g
-
     // Is g valid?
+    mov  %fs:0xfffffffffffffff8, %r12   // g
     cmp  $0x0, %r12
     je   1f
 
@@ -216,7 +168,6 @@ c_handler:
 
     ret
  
-/*
 c_syscall_handler:
     // Inputs:
     // r12 is the caller stack
@@ -268,56 +219,79 @@ c_syscall_handler:
 
   add $0x2, %r13                       // Skip the syscall instruction
     ret
- 
-syscall_check:
-    // Inputs:
-    // ? is the index
-
-    // Is this a syscall we support?
-    cmp  $0x1, %rax
-    je 1f
-    cmp $0x101, %rax
-	je 1f
-	cmp $0x107, %rax
-	je 1f
-	cmp $0xd9, %rax
-	je 1f
-	cmp $0x29, %rax
-	je 1f
-	cmp $0x120, %rax
-	je 1f
-	cmp $0x0, %rax
-	je 1f
-	cmp $0x3, %rax
-	je 1f
-
-    // If not a supported syscall, get the return addr and done
-    push %rdi
-    push %rax
-    mov $\idx, %rdi
-    lea return_addr_idx@GOTPCREL(%rip), %r12 // not safe?
-    mov (%r12), %r12
-    call *%r12
-    mov %rax, %r12
-    pop %rax
-    pop %rdi
-    jmp *%r12
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+.macro interpose_system_stack2 a_func, c_func
+.global \a_func
+.hidden \c_func
+\a_func:
+    endbr64
+
+    // Is g valid?
+    mov  %fs:0xfffffffffffffff8, %r12   // g
+    cmp  $0x0, %r12
+    je   1f
+
+    // Is this g m->gsignal? If so, already on the system stack
+    mov  0x30(%r12), %r13               // g->m
+    mov  0x50(%r13), %r13               // m->gsignal
+    cmp  %r12, %r13
+    je   1f
+
+    // Is this g g->m->g0 (new thread)? If so, already on the system stack
+    mov  0x30(%r12), %r13               // g->m
+    mov  (%r13), %r13                   // m->g0
+    cmp  %r12, %r13
+    je   1f
+
+    // Else switch to system stack
+    // Set g state to use system stack
+ //   lea go_systemstack_switch@GOTPCREL(%rip), %r13
+ //   mov (%r13), %r13
+ //   mov (%r13), %r13
+ //   call *%r13
+
+    mov  0x30(%r12), %r13               // g->m
+    mov  (%r13), %r13                   // m->g0
+
+    // The system stack switch
+    mov  %fs:0xfffffffffffffff8, %r14   // Ensure r14 points to g in all versions
+    mov  %rsp, %r12                     // r12 is g_stack (note: if making callbacks, use offset instead)
+    mov  %r13, %fs:0xfffffffffffffff8   // Make current g m->g0 (The context switch)
+    mov  0x38(%r13), %rsp               // m->g0->sched.sp (The stack switch)
+
+    //and  $0xfffffffffffffff0, %rsp
+    lea  \c_func@GOTPCREL(%rip), %r13 
+    mov  (%r13), %r13
+    call c_syscall_handler
+
+	mov %r14, %fs:0xfffffffffffffff8    // Restore the g
+	mov %r12, %rsp                      // Restore the g_stack
+
+    jmp *%r13                           // Return through the trampoline
 
 1:
-	ret
+    // The current g is using the system stack, don't switch stacks
+    mov  %rsp, %r12
+    lea \c_func@GOTPCREL(%rip), %r13
+    mov  (%r13), %r13
+    call c_syscall_handler
+    jmp  *%r13
+.endm
 
 
-return_to_trampoline:
-    // If not a supported syscall, get the return addr and done
-    mov $\idx, %r13
-    lea return_addr_idx_asm@GOTPCREL(%rip), %r12 // not safe?
-    mov (%r12), %r12
-    call *%r12
-    jmp *%r13
-*/
 
 
 .text
@@ -333,6 +307,9 @@ return_to_trampoline:
     interpose              go_hook_exit                      go_exit
     interpose              go_hook_die                       go_die
 
+    interpose_system_stack2 go_hook_reg_syscall               go_syscall
+    interpose_system_stack2 go_hook_reg_rawsyscall            go_rawsyscall
+    interpose_system_stack2 go_hook_reg_syscall6              go_syscall6
     interpose_system_stack go_hook_reg_tls_server_read       go_tls_server_read
     interpose_system_stack go_hook_reg_tls_server_write      go_tls_server_write
     interpose_system_stack go_hook_reg_tls_client_read       go_tls_client_read
@@ -342,11 +319,4 @@ return_to_trampoline:
     interpose_system_stack go_hook_reg_http2_server_preface  go_http2_server_preface
     interpose_system_stack go_hook_reg_http2_client_read     go_http2_client_read
     interpose_system_stack go_hook_reg_http2_client_write    go_http2_client_write
-
-    interpose_system_stack go_hook_set_inputs_g_syscall      go_set_inputs_g_syscall    0x0
-    interpose_system_stack go_hook_set_inputs_g_rawsyscall   go_set_inputs_g_rawsyscall 0x1
-    interpose_system_stack go_hook_set_inputs_g_syscall6     go_set_inputs_g_syscall6   0x2
-    interpose_system_stack go_hook_reg_syscall               go_syscall                 0x3
-    interpose_system_stack go_hook_reg_rawsyscall            go_rawsyscall              0x4
-    interpose_system_stack go_hook_reg_syscall6              go_syscall6                0x5
 

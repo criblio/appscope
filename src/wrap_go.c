@@ -53,9 +53,6 @@ devnull(const char* fmt, ...)
 #endif
 
 enum index_hook_t {
-    INDEX_HOOK_SYSCALL_START,
-    INDEX_HOOK_RAWSYSCALL_START,
-    INDEX_HOOK_SYSCALL6_START,
     INDEX_HOOK_SYSCALL,
     INDEX_HOOK_RAWSYSCALL,
     INDEX_HOOK_SYSCALL6,
@@ -112,7 +109,6 @@ go_schema_t go_8_schema = {
     },
     .struct_offsets = {
         .g_to_m=0x30,
-        .g_to_goid=0x98,
         .m_to_tls=0x88,
         .connReader_to_conn=0x0,
         .persistConn_to_conn=0x50,
@@ -190,7 +186,6 @@ go_schema_t go_17_schema = {
     },
     .struct_offsets = {
         .g_to_m=0x30,
-        .g_to_goid=0x98,
         .m_to_tls=0x88,
         .connReader_to_conn=0x0,
         .persistConn_to_conn=0x50,
@@ -216,9 +211,6 @@ go_schema_t go_17_schema = {
     // and we must preserve the g in r14 for future stack checks
     // Note: we do not need to use the reg functions for go_hook_exit and go_hook_die
     .tap = {
-        [INDEX_HOOK_SYSCALL_START]        = {"syscall.Syscall",       /* .abi0 */       go_hook_set_inputs_g_syscall,     NULL, 0},
-        [INDEX_HOOK_RAWSYSCALL_START]     = {"syscall.RawSyscall",    /* .abi0 */       go_hook_set_inputs_g_rawsyscall,  NULL, 0},
-        [INDEX_HOOK_SYSCALL6_START]       = {"syscall.Syscall6",      /* .abi0 */       go_hook_set_inputs_g_syscall6,    NULL, 0},
         [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",       /* .abi0 */       go_hook_reg_syscall,              NULL, 0},
         [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",    /* .abi0 */       go_hook_reg_rawsyscall,           NULL, 0},
         [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",      /* .abi0 */       go_hook_reg_syscall6,             NULL, 0},
@@ -316,9 +308,9 @@ adjustGoStructOffsetsForVersion()
         g_go_schema->arg_offsets.c_tls_client_read_pc=0x80;
         g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
 
-//        g_go_schema->tap[INDEX_HOOK_SYSCALL].func_name = "runtime/internal/syscall.Syscall6";
-//        g_go_schema->tap[INDEX_HOOK_RAWSYSCALL].func_name = "";
-//        g_go_schema->tap[INDEX_HOOK_SYSCALL6].func_name = "";
+        g_go_schema->tap[INDEX_HOOK_SYSCALL].func_name = "runtime/internal/syscall.Syscall6";
+        g_go_schema->tap[INDEX_HOOK_RAWSYSCALL].func_name = "";
+        g_go_schema->tap[INDEX_HOOK_SYSCALL6].func_name = "";
     }
 }
 
@@ -685,12 +677,28 @@ patch_addrs(funchook_t *funchook,
         // conventions that other go functions do.
         // We also patch syscalls at the first (and last) instruction.
         if (i == 0 && ((tap->assembly_fn == go_hook_exit) ||
-            (tap->assembly_fn == go_hook_die) ||
-            (tap->assembly_fn == go_hook_set_inputs_g_syscall) ||
-            (tap->assembly_fn == go_hook_set_inputs_g_rawsyscall) ||
-            (tap->assembly_fn == go_hook_set_inputs_g_syscall6))) {
+            (tap->assembly_fn == go_hook_die))) {
 
-            // In this case we want to patch at the first instruction 
+            // In this case we want to patch the instruction directly
+            void *pre_patch_addr = (void*)asm_inst[i].address;
+            void *patch_addr = (void*)asm_inst[i].address;
+
+            if (funchook_prepare(funchook, (void**)&patch_addr, tap->assembly_fn)) {
+                patchprint("failed to patch 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
+                continue;
+            }
+
+            patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
+            tap->return_addr = patch_addr;
+            tap->frame_size = add_arg;
+
+            break; // Done patching
+        }
+
+        // PATCH SYSCALLS
+        if (!scope_strcmp((const char*)asm_inst[i].mnemonic, "syscall")) {
+
+            // In the "syscall" case, we want to patch the instruction directly 
             void *pre_patch_addr = (void*)asm_inst[i].address;
             void *patch_addr = (void*)asm_inst[i].address;
 
@@ -1059,32 +1067,6 @@ initGoHook(elf_buf_t *ebuf)
         return;
     }
 }
-/*
-void
-return_addr_idx_asm()
-{
-    int idx;
-    void *return_addr = NULL;
-
-    __asm__ volatile (
-        "mov %1, %%r13  \n"
-        :                           // output
-        : "r"(idx)                  // inputs
-        :                           // clobbered register
-        );
-
-    if ((idx >= 0) && (idx < INDEX_HOOK_MAX)) {
-        return_addr = (void *)g_go_schema->tap[idx].return_addr;
-    }
-
-    __asm__ volatile (
-        "mov %%r13, %1  \n"
-        : "=r"(return_addr)         // output
-        :                           // inputs
-        :                           // clobbered register
-        );
-}
-*/
 
 void *
 return_addr_idx(int idx)
@@ -1208,143 +1190,29 @@ getFDFromConn(uint64_t tcpConn) {
     return -1;
 }
 
-static int 
-c_set_inputs_g(char *input_params)
-{
-    // Get the register values from our stack
-    uint64_t rax = *(uint64_t *)(input_params + 0x0);
-    uint64_t rbx = *(uint64_t *)(input_params + 0x8);
-    uint64_t rcx = *(uint64_t *)(input_params + 0x10);
-    uint64_t rdi = *(uint64_t *)(input_params + 0x20);
-    uint64_t rsi = *(uint64_t *)(input_params + 0x28);
-    uint64_t r8 = *(uint64_t *)(input_params + 0x30);
-    uint64_t r9 = *(uint64_t *)(input_params + 0x38);
-
-    uint64_t go_g;
-    // Get the g from the fs register
-    __asm__ volatile (
-        "mov %%fs:-8, %0"
-        : "=r"(go_g)                      // output
-        :                                 // inputs
-        :                                 // clobbered register
-        );
-
-    if (!go_g) {
-        funcprint("Scope: failed to get go g\n");
-        return 1;
-    }
-
-    // Get the pointer to goid (stored in struct g). Seems unused.
-    uint64_t *goid_ptr = (uint64_t *)(go_g + g_go_schema->struct_offsets.g_to_goid);
-
-    inputs_g_t *inputs_g = (inputs_g_t *)scope_malloc(sizeof(inputs_g_t));
-    if (!inputs_g) return 1;
-
-    inputs_g->goid = *goid_ptr;
-    inputs_g->p1 = rax;
-    inputs_g->p2 = rbx;
-    inputs_g->p3 = rcx;
-    inputs_g->p4 = rdi;
-    inputs_g->p5 = rsi;
-    inputs_g->p6 = r8;
-    inputs_g->p7 = r9;
- 
-    // Store the address of our input params structure in g.goid
-    *goid_ptr = (uint64_t)inputs_g;
- 
-    return 0;
-}
-
-EXPORTON void *
-go_set_inputs_g_syscall(char *stackptr)
-{
-    return do_cfunc(stackptr, c_set_inputs_g, g_go_schema->tap[INDEX_HOOK_SYSCALL_START].assembly_fn);
-}
-
-EXPORTON void *
-go_set_inputs_g_rawsyscall(char *stackptr)
-{
-    return do_cfunc(stackptr, c_set_inputs_g, g_go_schema->tap[INDEX_HOOK_RAWSYSCALL_START].assembly_fn);
-}
-
-EXPORTON void *
-go_set_inputs_g_syscall6(char *stackptr)
-{
-    return do_cfunc(stackptr, c_set_inputs_g, g_go_schema->tap[INDEX_HOOK_SYSCALL6_START].assembly_fn);
-}
-
-static uint64_t
-c_get_inputs_g()
-{
-    uint64_t go_g;
-    // Get the g from the fs register
-    __asm__ volatile (
-        "mov %%fs:-8, %0"
-        : "=r"(go_g)                      // output
-        :                                 // inputs
-        :                                 // clobbered register
-        );
-
-    if (!go_g) {
-        funcprint("Scope: failed to get go g\n");
-        return 0;
-    }
-
-    return *(uint64_t *)(go_g + g_go_schema->struct_offsets.g_to_goid);
-}
-
-static void
-c_free_inputs_g(inputs_g_t *inputs_g)
-{
-    uint64_t go_g;
-    // Get the g from the fs register
-    __asm__ volatile (
-        "mov %%fs:-8, %0"
-        : "=r"(go_g)                      // output
-        :                                 // inputs
-        :                                 // clobbered register
-        );
-
-    if (!go_g) {
-        funcprint("Scope: failed to get go g\n");
-        scope_free(inputs_g);
-        return;
-    }
-
-    uint64_t *goid_ptr = (uint64_t *)(go_g + g_go_schema->struct_offsets.g_to_goid);
-
- //   scope_free((void *)*goid_ptr);
-    *goid_ptr = inputs_g->goid; // Restore goid to g.goid
-                                
-    scope_free(inputs_g);
-}
-
 // Extract data from syscall.Syscall 
 static void
 c_syscall(char *sys_stack, char *g_stack)
 {
-    inputs_g_t *inputs_g = (inputs_g_t *)c_get_inputs_g();
-    if (!inputs_g) return;
-
-    uint64_t syscall_num = inputs_g->p1;
     int64_t rc = *(int64_t *)(sys_stack + 0x0);
     if(rc < 0) rc = -1; // kernel syscalls can return values < -1
+
+    uint64_t syscall_num = *(int64_t *)(sys_stack + 0x8);
 
     switch(syscall_num) {
     case 1: // write
         {
-            uint64_t fd = inputs_g->p2; 
-            char *buf   = (char *)inputs_g->p3;
+            uint64_t fd = *(int64_t *)(sys_stack + 0x28);
+            char *buf   = (char *)*(uint64_t *)(sys_stack + 0x30);
             uint64_t initialTime = getTime();
 
             funcprint("Scope: write fd %ld rc %ld buf %s\n", fd, rc, buf);
             doWrite(fd, initialTime, (rc != -1), buf, rc, "go_write", BUF, 0);
         }
         break;
-
     case 257: // openat
         {
-            char *path = (char *)inputs_g->p3;
+            char *path = (char *)*(uint64_t *)(sys_stack + 0x30);
             if (!path) {
                 scopeLogError("ERROR:go_open: null pathname");
                 scope_puts("Scope:ERROR:open:no path");
@@ -1356,81 +1224,71 @@ c_syscall(char *sys_stack, char *g_stack)
             doOpen(rc, path, FD, "open");
         }
         break;
-           
     case 263: // unlinkat
         {
             if (rc) return;
 
-            uint64_t dirfd = inputs_g->p2;
-            char *pathname = (char *)inputs_g->p3;
-            uint64_t flags = inputs_g->p4;
+            uint64_t dirfd = *(int64_t *)(sys_stack + 0x28);
+            char *pathname = (char *)*(uint64_t *)(sys_stack + 0x30);
+            uint64_t flags = *(int64_t *)(sys_stack + 0x20);
 
             funcprint("Scope: unlinkat dirfd %ld pathname %s flags %ld\n", dirfd, pathname, flags);
             doDelete(pathname, "go_unlinkat");
         }
         break;
-
     case 217: // getdents64
         {
-            uint64_t dirfd = inputs_g->p2;
+            uint64_t dirfd = *(int64_t *)(sys_stack + 0x28);
             uint64_t initialTime = getTime();
 
             funcprint("Scope: getdents dirfd %ld rc %ld\n", dirfd, rc);
             doRead(dirfd, initialTime, (rc != -1), NULL, rc, "go_getdents", BUF, 0);
         }
         break;
-
     case 41: // socket
         {
             if (rc == -1) return;
 
-            uint64_t domain = inputs_g->p2;
-            uint64_t type   = inputs_g->p3;
+            uint64_t domain = *(int64_t *)(sys_stack + 0x28);
+            uint64_t type   = *(int64_t *)(sys_stack + 0x30);
 
             funcprint("Scope: socket domain: %ld type: 0x%lx sd: %ld\n", domain, type, rc);
             addSock(rc, type, domain); // Creates a net object
         }
         break;
-
-           
     case 288: // accept4
         {
             if (rc == -1) return;
 
-            uint64_t fd           = inputs_g->p2;
-            struct sockaddr *addr = (struct sockaddr *)inputs_g->p3;
-            socklen_t *addrlen    = (socklen_t *)inputs_g->p4;
+            uint64_t fd           = *(int64_t *)(sys_stack + 0x28);
+            struct sockaddr *addr = *(struct sockaddr **)(sys_stack + 0x30);
+            socklen_t *addrlen    = *(socklen_t **)(sys_stack + 0x20);
 
             funcprint("Scope: accept4 of %ld\n", rc);
             doAccept(fd, rc, addr, addrlen, "go_accept4");
         }
         break;
-
     case 0: // read
         {
-            uint64_t fd = inputs_g->p2;
-            char *buf   = (char *)inputs_g->p3;
+            uint64_t fd = *(int64_t *)(sys_stack + 0x28);
+            char *buf   = (char *)*(uint64_t *)(sys_stack + 0x30);
             uint64_t initialTime = getTime();
 
             funcprint("Scope: read of %ld rc %ld\n", fd, rc);
             doRead(fd, initialTime, (rc >= 0), buf, rc, "go_read", BUF, 0);
         } 
         break;
-
     case 3: // close
         {
-            uint64_t fd = inputs_g->p2;
+            uint64_t fd = *(int64_t *)(sys_stack + 0x28);
 
             funcprint("Scope: close of %ld\n", fd);
             doCloseAndReportFailures(fd, (rc != -1), "go_close"); // If net, deletes a net object
         }
         break;
-
     default:
         break;
     }
-
-    c_free_inputs_g(inputs_g);
 }
 
 EXPORTON void *

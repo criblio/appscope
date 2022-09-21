@@ -1149,13 +1149,8 @@ inline static void *
 do_cfunc(char *stackptr, void *cfunc, void *gfunc)
 {
     uint64_t rc;
-    char *input_params;
-    char *return_values;
-
-    input_params = stackptr; // if using go_reg_syscall, you need to add 0x8
-    return_values = stackptr;
-
-    char *g_stack = *(uint64_t *)(input_params + 0x50);
+    char *sys_stack = stackptr;     // if using go_reg_syscall, you need to add 0x8 to get to input params
+    char *g_stack = *(uint64_t *)(sys_stack + 0x50); 
 
     /*
      * In <= Go 1.16 we must rely on the caller stack for tls_ and http2_ functions
@@ -1169,19 +1164,17 @@ do_cfunc(char *stackptr, void *cfunc, void *gfunc)
      */
     if (g_go_minor_ver <= 16) {
         uint32_t frame_offset = frame_size(gfunc);
-        input_params += frame_offset;
-        return_values += frame_offset;   
+        sys_stack += frame_offset;
     }
 
     // Call the C handler
     __asm__ volatile (
         "mov %1, %%rdi  \n"
         "mov %2, %%rsi  \n"
-        "mov %3, %%rdx  \n"
-        "callq *%4  \n"
-        : "=r"(rc)                                                           // output
-        : "r"(input_params), "r"(return_values), "r"(g_stack), "m"(cfunc)    // inputs
-        :                                                                    // clobbered register
+        "callq *%3  \n"
+        : "=r"(rc)                                    // output
+        : "r"(sys_stack), "r"(g_stack), "r"(cfunc)    // inputs
+        :                                             // clobbered register
         );
 
     return return_addr(gfunc);
@@ -1328,14 +1321,13 @@ c_free_inputs_g(inputs_g_t *inputs_g)
 
 // Extract data from syscall.Syscall 
 static void
-c_syscall(char *input_params, char *return_values)
+c_syscall(char *sys_stack, char *g_stack)
 {
-//input_params += 0x8; // see do_cfunc
     inputs_g_t *inputs_g = (inputs_g_t *)c_get_inputs_g();
     if (!inputs_g) return;
 
     uint64_t syscall_num = inputs_g->p1;
-    int64_t rc = *(int64_t *)(return_values + 0x0);
+    int64_t rc = *(int64_t *)(sys_stack + 0x0);
     if(rc < 0) rc = -1; // kernel syscalls can return values < -1
 
     switch(syscall_num) {
@@ -1461,7 +1453,7 @@ go_syscall6(char *stackptr)
 
 // Extract data from net/http.(*connReader).Read (tls server read)
 static void
-c_tls_server_read(char *input_params, char *return_values, char *g_stack)
+c_tls_server_read(char *sys_stack, char *g_stack)
 {
     uint64_t connReader = *(uint64_t *)(g_stack + g_go_schema->arg_offsets.c_tls_server_read_connReader); 
     if (!connReader) return;   // protect from dereferencing null
@@ -1498,7 +1490,7 @@ go_tls_server_read(char *stackptr)
 
 // Extract data from net/http.checkConnErrorWriter.Write (tls server write)
 static void
-c_tls_server_write(char *input_params, char *return_values, char *g_stack)
+c_tls_server_write(char *sys_stack, char *g_stack)
 {
     uint64_t conn = *(uint64_t *)(g_stack + g_go_schema->arg_offsets.c_tls_server_write_conn);
     if (!conn) return;         // protect from dereferencing null
@@ -1527,7 +1519,7 @@ go_tls_server_write(char *stackptr)
 
 // Extract data from net/http.(*persistConn).readResponse (tls client read)
 static void
-c_tls_client_read(char *input_params, char *return_values, char *g_stack)
+c_tls_client_read(char *sys_stack, char *g_stack)
 {
     uint64_t pc = *(uint64_t *)(g_stack + g_go_schema->arg_offsets.c_tls_client_read_pc); 
     if (!pc) return;
@@ -1563,7 +1555,7 @@ go_tls_client_read(char *stackptr)
 
 // Extract data from net/http.persistConnWriter.Write (tls client write)
 static void
-c_tls_client_write(char *input_params, char *return_values, char *g_stack)
+c_tls_client_write(char *sys_stack, char *g_stack)
 {
     uint64_t w_pc = *(uint64_t *)(g_stack + g_go_schema->arg_offsets.c_tls_client_write_w_pc);
     char *buf     = (char *)*(uint64_t *)(g_stack + g_go_schema->arg_offsets.c_tls_client_write_buf);
@@ -1591,7 +1583,7 @@ go_tls_client_write(char *stackptr)
 
 // Extract data from net/http.(*http2serverConn).readFrames (tls http2 server read)
 static void
-c_http2_server_read(char *input_params, char *return_values, char *g_stack)
+c_http2_server_read(char *sys_stack, char *g_stack)
 {
     uint64_t sc = *(uint64_t *)(g_stack + g_go_schema->arg_offsets.c_http2_server_read_sc);
     if (!sc) return;
@@ -1636,7 +1628,7 @@ go_http2_server_read(char *stackptr)
 
 // Extract data from net/http.(*http2serverConn).Flush (tls http2 server write)
 static void
-c_http2_server_write(char *input_params, char *return_values, char *g_stack)
+c_http2_server_write(char *sys_stack, char *g_stack)
 {
     uint64_t sc      = *(uint64_t *)(g_stack + g_go_schema->arg_offsets.c_http2_server_write_sc);
     if (!sc) return;
@@ -1684,7 +1676,7 @@ go_http2_server_write(char *stackptr)
 
 // Extract data from net/http.(*http2serverConn).readPreface (tls http2 server write)
 static void
-c_http2_server_preface(char *input_params, char *return_values, char *g_stack)
+c_http2_server_preface(char *sys_stack, char *g_stack)
 {
     // In this function in <= go 16 we have to go to the callee to get input params and return values
     g_stack -= g_go_schema->arg_offsets.c_http2_server_preface_callee;
@@ -1725,7 +1717,7 @@ go_http2_server_preface(char *stackptr)
  */
 // Extract data from net/http.(*http2clientConnReadLoop).run (tls http2 client read)
 static void
-c_http2_client_read(char *input_params, char *return_values, char *g_stack)
+c_http2_client_read(char *sys_stack, char *g_stack)
 {
     uint64_t cc         = *(uint64_t *)(g_stack + g_go_schema->arg_offsets.c_http2_client_read_cc);
     if (!cc) return;
@@ -1769,7 +1761,7 @@ go_http2_client_read(char *stackptr)
 
 // Extract data from net/http.http2stickyErrWriter.Write (tls http2 client write)
 static void
-c_http2_client_write(char *input_params, char *return_values, char *g_stack)
+c_http2_client_write(char *sys_stack, char *g_stack)
 {
     uint64_t tcpConn = *(uint64_t *)(g_stack + g_go_schema->arg_offsets.c_http2_client_write_tcpConn);
     if (!tcpConn) return;
@@ -1792,7 +1784,7 @@ go_http2_client_write(char *stackptr)
 
 extern void handleExit(void);
 static void
-c_exit(char *input_params, char *return_values)
+c_exit(char *sys_stack)
 {
     /*
      * Need to extend the system stack size when calling handleExit().

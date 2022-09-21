@@ -114,7 +114,7 @@
 \a_func:
     endbr64
 
-//TODO if syscall call syscall_check
+//TODO if syscall do syscall_check
 
     mov  %fs:0xfffffffffffffff8, %r12   // g
 

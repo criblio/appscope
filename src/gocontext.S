@@ -1,3 +1,11 @@
+#define g_m 0x30
+#define m_g0 0x0
+#define m_gsignal 0x50
+#define g_sched_sp 0x38
+#define g_sched_pc 0x40
+#define g_sched_ret 0x58
+#define g_sched_bp 0x68
+#define m_g0_sched_sp 0x38
 
 // The macro interpose takes 3 params
 // the name of the global variable as defined above ex: go_hook_write
@@ -118,42 +126,44 @@
 
     mov  %fs:0xfffffffffffffff8, %r12   // g
 
-    // Is g valid?
+    //  g == 0; a thread is starting or exiting; It's using the system stack
     cmp  $0x0, %r12
     je   1f
 
     // Is this g m->gsignal? If so, already on the system stack
-    mov  0x30(%r12), %r13               // g->m
-    mov  0x50(%r13), %r13               // m->gsignal
+    mov  g_m(%r12), %r13                // g->m
+    mov  m_gsignal(%r13), %r13          // m->gsignal
     cmp  %r12, %r13
     je   1f
 
     // Is this g g->m->g0 (new thread)? If so, already on the system stack
-    mov  0x30(%r12), %r13               // g->m
+    mov  g_m(%r12), %r13                // g->m
     mov  (%r13), %r13                   // m->g0
     cmp  %r12, %r13
     je   1f
 
     // Else switch to system stack
     // Set g state to use system stack
- //   lea go_systemstack_switch@GOTPCREL(%rip), %r13
- //   mov (%r13), %r13
- //   mov (%r13), %r13
- //   call *%r13
+    lea  go_systemstack_switch@GOTPCREL(%rip), %r13
+    mov  %r13, g_sched_pc(%r12)         // store addr of system stack switch in g->sched.pc
+    lea  0x8(%rsp), %r13
+    mov  %r13, g_sched_sp(%r12)         // store g stack in g->sched.sp
+    movq $0x0, g_sched_ret(%r12)        // store NULL in g->sched.ret
+    mov  %rbp, g_sched_bp(%r12)         // store g frame pointer in g->sched.bp
 
-    mov  0x30(%r12), %r13               // g->m
+    mov  g_m(%r12), %r13                // g->m
     mov  (%r13), %r13                   // m->g0
 
     // The system stack switch
     mov  %fs:0xfffffffffffffff8, %r14   // Ensure r14 points to g in all versions
     mov  %rsp, %r12                     // r12 is g_stack (note: if making callbacks, use offset instead)
     mov  %r13, %fs:0xfffffffffffffff8   // Make current g m->g0 (The context switch)
-    mov  0x38(%r13), %rsp               // m->g0->sched.sp (The stack switch)
+    mov  m_g0_sched_sp(%r13), %rsp      // m->g0->sched.sp (The stack switch)
 
-    //and  $0xfffffffffffffff0, %rsp
     lea  \c_func@GOTPCREL(%rip), %r13 
     mov  (%r13), %r13
-    call c_handler
+    call c_handler                      // Safe to call a C func now that we are on the system stack
+                                        // Registers are saved & restored in c_handler
 
 	mov %r14, %fs:0xfffffffffffffff8    // Restore the g
 	mov %r12, %rsp                      // Restore the g_stack
@@ -174,6 +184,9 @@ c_handler:
     // r12 is the caller stack
     // r13 is c_func address
     // r14 is the caller g
+    // Note: r14 is not set in the case where a stack switch isn't needed
+    //       It's ok here becasue we don't use it to restore the g
+    //       However, don't rely on r14 in C code
     // Returns:
     // r13 is the trampoline address
 

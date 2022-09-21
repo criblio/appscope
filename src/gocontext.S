@@ -52,26 +52,6 @@
     jmp *%r11
 .endm
 
-/*
- * We created a second macro named with the _regs suffix that is used in
- * Go 1.17 and 1.18 interpositions. The differences from the previous
- * asmcgocall macro are slight. The first is that before we do any
- * interposition, we save the values from the registers %rax and %rbx and
- * restore them before returning to regular execution. This is because in
- * Go 1.17 and 1.18, the ABI has fundamentally changed, in that results
- * are returned in registers. The second difference is that we restore
- * the value of g into the %r14 register. In Go 1.17 and 1.18, the
- * function preamble has changed in that it always expects %r14 to
- * contain the g before entering a function (for stack checking).
- * If we don't save and restore values in these registers, they will
- * often become corrupted and result in a serious failure.
- *
- * From: https://go.googlesource.com/go/+/refs/heads/dev.regabi/src/cmd/compile/internal-abi.md
- * The following registers are used for integer arguments and results:
- * RAX, RBX, RCX, RDI, RSI, R8, R9, R10, R11
- *
- * Note that X15 is defined to be always a fixed value of zero
- */
 .macro interpose_regs a_func, c_func
 .global \a_func
 .hidden \c_func
@@ -117,66 +97,89 @@
     jmp *%r12
 .endm
 
-.macro interpose_stack_regs a_func, c_func
+/*
+ * Go 17+ will pass input params and return values in registers.
+ * This macro will move us onto the system stack (like asmcgocall) and push registers onto it for our usage,
+ * and so that we can restore them after calling our c_func.
+ * We must not push anything onto the go stack, else the stack checker will create a panic.
+
+ * From: https://go.googlesource.com/go/+/refs/heads/dev.regabi/src/cmd/compile/internal-abi.md
+ * The following registers are used for integer arguments and results:
+ * RAX, RBX, RCX, RDI, RSI, R8, R9, R10, R11
+ * Note that X15 is defined to be always a fixed value of zero
+ */
+.macro interpose_system_stack a_func, c_func, idx
 .global \a_func
 .hidden \c_func
 \a_func:
     endbr64
-    push %rax
-    push %rbx
-    push %rcx
-    push %rdi
-    push %rsi
-    push %r8
-    push %r9
-    push %r10
-    push %r11
-    mov %rsp, %r12
-    sub $0x20, %rsp
 
-    mov %r12, 0x08(%rsp)
-    lea \c_func@GOTPCREL(%rip), %r12
-    mov (%r12), %r12
-    mov %r12, (%rsp)
+//TODO if syscall call syscall_check
 
-    lea go_runtime_cgocall@GOTPCREL(%rip), %r12
-    mov (%r12), %r12
-    mov (%r12), %r12
-    call *%r12
-    xorps %xmm15,%xmm15
-    mov %fs:0xfffffffffffffff8,%r14
+    mov  %fs:0xfffffffffffffff8, %r12   // g
 
-    mov %rax, %r12
+    // Is g valid?
+    cmp  $0x0, %r12
+    je   1f
 
-    add $0x20, %rsp
-    pop %r11
-    pop %r10
-    pop %r9
-    pop %r8
-    pop %rsi
-    pop %rdi
-    pop %rcx
-    pop %rbx
-    pop %rax
+    // Is this g m->gsignal? If so, already on the system stack
+    mov  0x30(%r12), %r13               // g->m
+    mov  0x50(%r13), %r13               // m->gsignal
+    cmp  %r12, %r13
+    je   1f
 
-    jmp *%r12
+    // Is this g g->m->g0 (new thread)? If so, already on the system stack
+    mov  0x30(%r12), %r13               // g->m
+    mov  (%r13), %r13                   // m->g0
+    cmp  %r12, %r13
+    je   1f
+
+    // Else switch to system stack
+    // Set g state to use system stack
+ //   lea go_systemstack_switch@GOTPCREL(%rip), %r13
+ //   mov (%r13), %r13
+ //   mov (%r13), %r13
+ //   call *%r13
+
+    mov  0x30(%r12), %r13               // g->m
+    mov  (%r13), %r13                   // m->g0
+
+    // The system stack switch
+    mov  %fs:0xfffffffffffffff8, %r14   // Ensure r14 points to g in all versions
+    mov  %rsp, %r12                     // r12 is g_stack (note: if making callbacks, use offset instead)
+    mov  %r13, %fs:0xfffffffffffffff8   // Make current g m->g0 (The context switch)
+    mov  0x38(%r13), %rsp               // m->g0->sched.sp (The stack switch)
+
+    //and  $0xfffffffffffffff0, %rsp
+    lea  \c_func@GOTPCREL(%rip), %r13 
+    mov  (%r13), %r13
+    call c_handler
+
+	mov %r14, %fs:0xfffffffffffffff8    // Restore the g
+	mov %r12, %rsp                      // Restore the g_stack
+
+    jmp *%r13                           // Return through the trampoline
+
+1:
+    // The current g is using the system stack, don't switch stacks
+    mov  %rsp, %r12
+    lea \c_func@GOTPCREL(%rip), %r13
+    mov  (%r13), %r13
+    call c_handler
+    jmp  *%r13
 .endm
 
- /*
-  * Stub for use with a low level syscall function
-  * Create a stack with input params
-  * Make the syscall
-  * Add to the stack with return params
-  * Call asmcgocall with params for c_syscall and the created stack
-  * Be sure to jump to the trampoline after the syscall which is
-  * plus 2 bytes from the return value from funchook_prepare; the trampoline.
-  */
-.macro interpose_syscall_regs a_func, c_func
-.global \a_func
-.hidden \c_func
-\a_func:
-    endbr64
+c_handler:
+    // Inputs:
+    // r12 is the caller stack
+    // r13 is c_func address
+    // r14 is the caller g
+    // Returns:
+    // r13 is the trampoline address
 
+    // Save regs on the stack
+    push %r14    // caller g
+    push %r12    // caller stack
     push %r11
     push %r10
     push %r9     // linux 6th param
@@ -184,53 +187,92 @@
     push %rsi    // linux 2nd param
     push %rdi    // linux 1st param
     push %rdx    // linux 3rd param
-	push %rcx    // linux 4th param
-	push %rbx    
-    push %rax    // linux syscall num 
+    push %rcx    // linux 4th param
+    push %rbx
+    push %rax    // linux syscall num
 
- // syscall
+    mov  %rsp, %rdi                      // C func param
+    call *%r13
 
-//  push %rax
+    // Handle return state and restore stack
+    // Save the return through trampoline addr from the C func
+    mov %rax, %r13
+    //xorps %xmm15,%xmm15
+    //mov %fs:0xfffffffffffffff8, %r14
 
-    mov %rsp, %r12
-    sub $0x20, %rsp
+    // Restore saved registers
+    pop  %rax
+	pop  %rbx
+	pop  %rcx
+	pop  %rdx
+    pop  %rdi
+    pop  %rsi
+    pop  %r8
+    pop  %r9
+    pop  %r10
+    pop  %r11
+    pop  %r12                            // Caller stack
+    pop  %r14                            // Caller g
 
-    mov %r12, 0x08(%rsp)
-    lea \c_func@GOTPCREL(%rip), %r12
-    mov (%r12), %r12
-    mov %r12, (%rsp)
+    ret
+ 
+/*
+c_syscall_handler:
+    // Inputs:
+    // r12 is the caller stack
+    // r13 is c_func address
+    // r14 is the caller g
+    // Returns:
+    // r13 is the trampoline address
 
-    lea go_runtime_cgocall@GOTPCREL(%rip), %r12
-    mov (%r12), %r12
-    mov (%r12), %r12
-    call *%r12
-    xorps %xmm15,%xmm15
-    mov %fs:0xfffffffffffffff8,%r14
+    // Save regs on the stack
+    push %r14    // caller g
+    push %r12    // caller stack
+    push %r11
+    push %r10
+    push %r9     // linux 6th param
+    push %r8     // linux 5th param
+    push %rsi    // linux 2nd param
+    push %rdi    // linux 1st param
+    push %rdx    // linux 3rd param
+    push %rcx    // linux 4th param
+    push %rbx
+    push %rax    // linux syscall num
 
-    mov %rax, %r12
-    add $0x20, %rsp
+  syscall
+  push %rax
 
-    pop %rax
-//  add $0x8, %rsp
-	pop %rbx
-	pop %rcx
-	pop %rdx
-    pop %rdi
-    pop %rsi
-    pop %r8
-    pop %r9
-    pop %r10
-    pop %r11
-	
-//    add $0x2, %r12
-    jmp *%r12
-.endm
+    mov  %rsp, %rdi                      // C func param
+    call *%r13
 
-.macro interpose_syscall_lim a_func, c_func, idx
-.global \a_func
-.hidden \c_func
-\a_func:
-    endbr64
+    // Handle return state and restore stack
+    // Save the return through trampoline addr from the C func
+    mov %rax, %r13
+    //xorps %xmm15,%xmm15
+    //mov %fs:0xfffffffffffffff8, %r14
+
+    // Restore saved registers
+    pop  %rax
+  add $0x8, %rsp
+	pop  %rbx
+	pop  %rcx
+	pop  %rdx
+    pop  %rdi
+    pop  %rsi
+    pop  %r8
+    pop  %r9
+    pop  %r10
+    pop  %r11
+    pop  %r12                            // Caller stack
+    pop  %r14                            // Caller g
+
+  add $0x2, %r13                       // Skip the syscall instruction
+    ret
+ 
+syscall_check:
+    // Inputs:
+    // ? is the index
+
     // Is this a syscall we support?
     cmp  $0x1, %rax
     je 1f
@@ -249,11 +291,11 @@
 	cmp $0x3, %rax
 	je 1f
 
-    // if not a supported syscall, get the return addr and done
+    // If not a supported syscall, get the return addr and done
     push %rdi
     push %rax
     mov $\idx, %rdi
-    lea return_addr_idx@GOTPCREL(%rip), %r12
+    lea return_addr_idx@GOTPCREL(%rip), %r12 // not safe?
     mov (%r12), %r12
     call *%r12
     mov %rax, %r12
@@ -261,282 +303,50 @@
     pop %rdi
     jmp *%r12
 
+
+
+
 1:
-    push %r11
-    push %r10
-    push %r9     // linux 6th param
-    push %r8     // linux 5th param
-    push %rsi    // linux 2nd param
-    push %rdi    // linux 1st param
-    push %rdx    // linux 3rd param
-    push %rcx    // linux 4th param
-    push %rbx
-    push %rax    // linux syscall num
+	ret
 
 
-    mov %rsp, %r12
-    sub $0x20, %rsp
-
-    mov %r12, 0x08(%rsp)
-    lea \c_func@GOTPCREL(%rip), %r12
-    mov (%r12), %r12
-    mov %r12, (%rsp)
-
-    lea go_runtime_cgocall@GOTPCREL(%rip), %r12
-    mov (%r12), %r12
+return_to_trampoline:
+    // If not a supported syscall, get the return addr and done
+    mov $\idx, %r13
+    lea return_addr_idx_asm@GOTPCREL(%rip), %r12 // not safe?
     mov (%r12), %r12
     call *%r12
-    xorps %xmm15,%xmm15
-    mov %fs:0xfffffffffffffff8,%r14
+    jmp *%r13
+*/
 
-    mov %rax, %r12
-    add $0x20, %rsp
-
-    pop %rax
-	pop %rbx
-	pop %rcx
-	pop %rdx
-    pop %rdi
-    pop %rsi
-    pop %r8
-    pop %r9
-    pop %r10
-    pop %r11
-
-    jmp *%r12
-.endm
-
-.macro interpose_syscall_nostack a_func, c_func
-.global \a_func
-.hidden \c_func
-\a_func:
-    endbr64
-    // get thge g
-    mov  %fs:0xfffffffffffffff8, %r12
-
-    // is g valid?
-    cmp  $0x0, %r12
-    je   1f
-
-    // is this g m->gsignal? if so, already on the system stack
-    mov  0x30(%r12), %r13         // g->m
-    mov  0x50(%r13), %r13         // m->gsignal
-    cmp  %r12, %r13
-    je   1f
-
-    // is this g g->m->g0 (new thread), if so, already on the system stack
-    mov  0x30(%r12), %r13         // g->m
-    mov  (%r13), %r13             // m->g0
-    cmp  %r12, %r13
-    je   1f
-
-    // else switch to system stack
-    // set g state to use of system stack
-    lea go_systemstack_switch@GOTPCREL(%rip), %r13
-    mov (%r13), %r13
-    mov (%r13), %r13
-    call *%r13
-
-    mov  0x30(%r12), %r13         // g->m
-    mov  (%r13), %r13             // m->g0
-
-    // the system stack switch
-    mov  %rsp, %r12               // r12 is caller stack, r14 is caller g
-    mov  %r13, %fs:0xfffffffffffffff8
-    mov  0x38(%r13), %rsp         // m->g0->sched.sp
-
-    // create stack frame on the system stack
-    //sub  $0x10, %rsp
-    //and  $0xfffffffffffffff0, %rsp
-    lea  \c_func@GOTPCREL(%rip), %r13
-    mov  (%r13), %r13
-    call c_handler
-
-    mov  %r14, %fs:0xfffffffffffffff8    // restore the caller g
-    mov  %r12, %rsp                      // restore the caller stack
-
-    jmp *%r13                           // return through the trampoline
-
-    // The curreent g is using the system stack, don't switch stacks
-1:
-    mov  %rsp, %r12
-    lea \c_func@GOTPCREL(%rip), %r13
-    mov  (%r13), %r13
-    call c_handler
-    jmp  *%r13
-.endm
 
 .text
-    interpose go_hook_tls_server_read, go_tls_server_read
-    interpose go_hook_tls_server_write, go_tls_server_write
-    interpose go_hook_tls_client_read, go_tls_client_read
-    interpose go_hook_tls_client_write, go_tls_client_write
-    interpose go_hook_http2_server_read, go_http2_server_read
-    interpose go_hook_http2_server_write, go_http2_server_write
-    interpose go_hook_http2_server_preface, go_http2_server_preface
-    interpose go_hook_http2_client_read, go_http2_client_read
-    interpose go_hook_http2_client_write, go_http2_client_write
-    interpose go_hook_exit, go_exit
-    interpose go_hook_die, go_die
+    interpose              go_hook_tls_server_read           go_tls_server_read
+    interpose              go_hook_tls_server_write          go_tls_server_write
+    interpose              go_hook_tls_client_read           go_tls_client_read
+    interpose              go_hook_tls_client_write          go_tls_client_write
+    interpose              go_hook_http2_server_read         go_http2_server_read
+    interpose              go_hook_http2_server_write        go_http2_server_write
+    interpose              go_hook_http2_server_preface      go_http2_server_preface
+    interpose              go_hook_http2_client_read         go_http2_client_read
+    interpose              go_hook_http2_client_write        go_http2_client_write
+    interpose              go_hook_exit                      go_exit
+    interpose              go_hook_die                       go_die
 
-    interpose_regs go_hook_reg_tls_server_read, go_tls_server_read
-    interpose_regs go_hook_reg_tls_server_write, go_tls_server_write
-    interpose_regs go_hook_reg_tls_client_read, go_tls_client_read
-    interpose_regs go_hook_reg_tls_client_write, go_tls_client_write
-    interpose_regs go_hook_reg_http2_server_read, go_http2_server_read
-    interpose_regs go_hook_reg_http2_server_write, go_http2_server_write
-    interpose_regs go_hook_reg_http2_server_preface, go_http2_server_preface
-    interpose_regs go_hook_reg_http2_client_read, go_http2_client_read
-    interpose_regs go_hook_reg_http2_client_write, go_http2_client_write
+    interpose_system_stack go_hook_reg_tls_server_read       go_tls_server_read
+    interpose_system_stack go_hook_reg_tls_server_write      go_tls_server_write
+    interpose_system_stack go_hook_reg_tls_client_read       go_tls_client_read
+    interpose_system_stack go_hook_reg_tls_client_write      go_tls_client_write
+    interpose_system_stack go_hook_reg_http2_server_read     go_http2_server_read
+    interpose_system_stack go_hook_reg_http2_server_write    go_http2_server_write
+    interpose_system_stack go_hook_reg_http2_server_preface  go_http2_server_preface
+    interpose_system_stack go_hook_reg_http2_client_read     go_http2_client_read
+    interpose_system_stack go_hook_reg_http2_client_write    go_http2_client_write
 
-    //nterpose_syscall_regs go_hook_reg_syscall go_syscall
-    //interpose_syscall_regs go_hook_reg_rawsyscall go_rawsyscall
-    //interpose_syscall_regs go_hook_reg_syscall6 go_syscall6
+    interpose_system_stack go_hook_set_inputs_g_syscall      go_set_inputs_g_syscall    0x0
+    interpose_system_stack go_hook_set_inputs_g_rawsyscall   go_set_inputs_g_rawsyscall 0x1
+    interpose_system_stack go_hook_set_inputs_g_syscall6     go_set_inputs_g_syscall6   0x2
+    interpose_system_stack go_hook_reg_syscall               go_syscall                 0x3
+    interpose_system_stack go_hook_reg_rawsyscall            go_rawsyscall              0x4
+    interpose_system_stack go_hook_reg_syscall6              go_syscall6                0x5
 
-    //interpose_syscall_regs go_hook_set_inputs_g_syscall go_set_inputs_g_syscall
-    //interpose_syscall_regs go_hook_set_inputs_g_rawsyscall go_set_inputs_g_rawsyscall
-    //interpose_syscall_regs go_hook_set_inputs_g_syscall6 go_set_inputs_g_syscall6
-
-
-    interpose_syscall_nostack go_hook_reg_syscall go_syscall
-    interpose_syscall_nostack go_hook_reg_rawsyscall go_rawsyscall
-    interpose_syscall_nostack go_hook_reg_syscall6 go_syscall6
-
-    interpose_syscall_nostack go_hook_set_inputs_g_syscall go_set_inputs_g_syscall
-    interpose_syscall_nostack go_hook_set_inputs_g_rawsyscall go_set_inputs_g_rawsyscall
-    interpose_syscall_nostack go_hook_set_inputs_g_syscall6 go_set_inputs_g_syscall6
-
-c_handler:
-    // inputs:
-    // r12 is the caller stack
-    // r13 is c_func address
-    // r14 is the caller g
-    // returns:
-    // r13 is the trampoline address
-
-    // save regs on the stack
-    push %r14    // caller g
-    push %r12    // caller stack
-    push %r11
-    push %r10
-    push %r9     // linux 6th param
-    push %r8     // linux 5th param
-    push %rsi    // linux 2nd param
-    push %rdi    // linux 1st param
-    push %rdx    // linux 3rd param
-    push %rcx    // linux 4th param
-    push %rbx
-    push %rax    // linux syscall num
-
-    mov  %rsp, %rdi                      // C func param
-    //lea  \c_func@GOTPCREL(%rip), %r12
-    call *%r13
-
-    // handle return state and restore stack
-    // save the return through trampoline addr from the C func
-    mov %rax, %r13
-    //xorps %xmm15,%xmm15
-    //mov %fs:0xfffffffffffffff8, %r14
-
-    // restore saved registers
-    pop  %rax
-	pop  %rbx
-	pop  %rcx
-	pop  %rdx
-    pop  %rdi
-    pop  %rsi
-    pop  %r8
-    pop  %r9
-    pop  %r10
-    pop  %r11
-    pop  %r12                            // caller stack
-    pop  %r14                            // caller g
-    // add $0x10, %rsp
-    ret
-
-/*
-    Debug hint:
-    When you need to change the assy code, 
-    it's a pain to step through the code
-    in macro form. What has worked much better
-    is to copy/paste the code from the macro
-    and execute it as one of the interposition
-    handlers. The code below is a replica of
-    what's in the macro with comments removed
-    and labels changed (if any).
-
-    In order to use this as go_hook_write, for
-    example,
-    1) uncomment the code below
-    2) change go_hook_write_1 to go_hook_write
-    3) comment the macro instance above
-       #interpose go_hook_write, go_write
-    4) build
-*/
-/*
-.global go_hook_write
-go_hook_write:
-    push %rax
-    sub $0x18, %rsp
-
-    mov %rsp, %r11
-    add $0x20, %r11
-    mov %r11, 0x08(%rsp)
-    lea go_write@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    mov %r11, (%rsp)
-
-    lea go_runtime_cgocall@GOTPCREL(%rip), %r11
-    mov (%r11), %r11
-    mov (%r11), %r11
-    call *%r11
-    mov %rax, %r11
-
-    add $0x18, %rsp
-    pop %rax
-    jmp *%r11
-*/
-
-/*
-.global go_hook_reg_tls_client_write
-go_hook_reg_tls_client_write:   
-    endbr64
-    mov %rsp, %r12
-    push %rax
-    push %rbx
-    push %rcx
-    push %rdi
-    push %rsi
-    push %r8
-    push %r9
-    push %r10
-    push %r11
-    sub $0x20, %rsp
-
-    mov %r12, 0x08(%rsp)
-    lea go_tls_client_write@GOTPCREL(%rip), %r12
-    mov (%r12), %r12
-    mov %r12, (%rsp)
-
-    lea go_runtime_cgocall@GOTPCREL(%rip), %r12
-    mov (%r12), %r12
-    mov (%r12), %r12
-    call *%r12
-    xorps %xmm15,%xmm15
-    mov %fs:0xfffffffffffffff8,%r14
-
-    mov %rax, %r12
-
-    add $0x20, %rsp
-    pop %r11
-    pop %r10
-    pop %r9
-    pop %r8
-    pop %rsi
-    pop %rdi
-    pop %rcx
-    pop %rbx
-    pop %rax
-
-    jmp *%r12
-*/

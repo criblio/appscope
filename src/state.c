@@ -1293,7 +1293,7 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
             net->protoDetect == DETECT_TRUE    ? "TRUE" :
             net->protoDetect == DETECT_FALSE   ? "FALSE" : "INVALID"
             );
-            
+
     // Ignore empty payloads that should have been blocked by our interpositions
     if (!len) {
         scopeLogDebug("DEBUG: fd:%d ignoring empty payload", sockfd);

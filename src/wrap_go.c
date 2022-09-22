@@ -21,7 +21,7 @@
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 #define EXIT_STACK_SIZE (32 * 1024)
 #define UNKNOWN_GO_VER (-1)
-#define MIN_SUPPORTED_GO_VER (8)
+#define MIN_SUPPORTED_GO_VER (9)
 #define MAX_SUPPORTED_GO_VER (19)
 #define HTTP2_FRAME_HEADER_LEN (9)
 #define PRI_STR "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
@@ -39,7 +39,7 @@ int g_go_minor_ver = UNKNOWN_GO_VER;
 int g_go_maint_ver = UNKNOWN_GO_VER;
 static char g_go_build_ver[7];
 static char g_ReadFrame_addr[sizeof(void *)];
-go_schema_t *g_go_schema = &go_8_schema; // overridden if later version
+go_schema_t *g_go_schema = &go_9_schema; // overridden if later version
 uint64_t g_glibc_guard = 0LL;
 uint64_t go_systemstack_switch;
 
@@ -69,7 +69,7 @@ enum index_hook_t {
     INDEX_HOOK_MAX,
 };
 
-go_schema_t go_8_schema = {
+go_schema_t go_9_schema = {
     .arg_offsets = {
         .c_syscall_rc=0x0,
         .c_syscall_num=0x60,
@@ -89,12 +89,12 @@ go_schema_t go_8_schema = {
         .c_tls_client_write_w_pc=0x8,
         .c_tls_client_write_buf=0x10,
         .c_tls_client_write_rc=0x28,
-        .c_http2_server_read_sc=0x128,
+        .c_http2_server_read_sc=0x188,
         .c_http2_server_write_sc=0x8,
-        .c_http2_server_preface_callee=0xd0,
-        .c_http2_server_preface_sc=0x60,
-        .c_http2_server_preface_rc=0xe0, 
-        .c_http2_client_read_cc=0x80,
+        .c_http2_server_preface_callee=0x108,
+        .c_http2_server_preface_sc=0x110,
+        .c_http2_server_preface_rc=0x120,
+        .c_http2_client_read_cc=0x78,
         .c_http2_client_write_tcpConn=0x10,
         .c_http2_client_write_buf=0x68,
         .c_http2_client_write_rc=0x28,
@@ -108,7 +108,7 @@ go_schema_t go_8_schema = {
         .iface_data=0x8,
         .netfd_to_pd=0x0,
         .pd_to_fd=0x10,
-        .netfd_to_sysfd=UNDEF_OFFSET, // defined for go1.8
+        .netfd_to_sysfd=UNDEF_OFFSET,
         .bufrd_to_buf=0x0,
         .conn_to_rwc=0x10,
         .conn_to_tlsState=0x30,
@@ -178,7 +178,7 @@ go_schema_t go_17_schema = {
         .iface_data=0x8,
         .netfd_to_pd=0x0,
         .pd_to_fd=0x10,
-        .netfd_to_sysfd=UNDEF_OFFSET, // defined for go1.8
+        .netfd_to_sysfd=UNDEF_OFFSET,
         .bufrd_to_buf=0x0,
         .conn_to_rwc=0x10,
         .conn_to_tlsState=0x30,
@@ -191,10 +191,6 @@ go_schema_t go_17_schema = {
         .sc_to_fr=0x48,
         .sc_to_conn=0x10,
     },
-    // use the _reg_ assembly functions here, to support changes in Go 1.17
-    // where we must preserve the return values stored in registers
-    // and we must preserve the g in r14 for future stack checks
-    // Note: we do not need to use the reg functions for go_hook_exit and go_hook_die
     .tap = {
         [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",       /* .abi0 */       go_hook_reg_syscall,              NULL, 0},
         [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",    /* .abi0 */       go_hook_reg_rawsyscall,           NULL, 0},
@@ -220,20 +216,6 @@ adjustGoStructOffsetsForVersion()
     if (!g_go_minor_ver) {
         sysprint("ERROR: can't determine minor go version\n");
         return;
-    }
-
-    if (g_go_minor_ver == 8) {
-        g_go_schema->struct_offsets.m_to_tls = 96; // 0x60
-        // go 1.8 is the only version that directly goes from netfd to sysfd.
-        g_go_schema->struct_offsets.netfd_to_sysfd = 16;
-    }
-
-    if (g_go_minor_ver == 9) {
-        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
-        g_go_schema->arg_offsets.c_http2_server_read_sc=0x188;
-        g_go_schema->arg_offsets.c_http2_server_preface_callee=0x108;
-        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
-        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
     }
 
     if (g_go_minor_ver == 10) {
@@ -319,13 +301,8 @@ createGoStructFile(void) {
         scope_dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_conn);
         scope_dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_bufrd);
         scope_dprintf(fd, "runtime.iface|data=%d|\n", g_go_schema->struct_offsets.iface_data);
-        // go 1.8 has a direct netfd_to_sysfd field, others are less direct
-        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) {
-            scope_dprintf(fd, "net.netFD|pfd=%d|\n", g_go_schema->struct_offsets.netfd_to_pd);
-            scope_dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go_schema->struct_offsets.pd_to_fd);
-        } else {
-            scope_dprintf(fd, "net.netFD|sysfd=%d|\n", g_go_schema->struct_offsets.netfd_to_sysfd);
-        }
+        scope_dprintf(fd, "net.netFD|pfd=%d|\n", g_go_schema->struct_offsets.netfd_to_pd);
+        scope_dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go_schema->struct_offsets.pd_to_fd);
         scope_dprintf(fd, "bufio.Reader|buf=%d|\n", g_go_schema->struct_offsets.bufrd_to_buf);
         scope_dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go_schema->struct_offsets.conn_to_rwc);
         scope_dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go_schema->struct_offsets.conn_to_tlsState);
@@ -919,9 +896,9 @@ initGoHook(elf_buf_t *ebuf)
             // Don't expect to get here, but try to be clear if we do.
             scopeLogWarn("%s is not a go application.  Continuing without AppScope.", ebuf->cmd);
         } else if (go_runtime_version) {
-            scopeLogWarn("%s was compiled with go version `%s`.  AppScope can only instrument go1.8 or newer.  Continuing without AppScope.", ebuf->cmd, go_runtime_version);
+            scopeLogWarn("%s was compiled with go version `%s`.  AppScope can only instrument go1.%d or newer.  Continuing without AppScope.", ebuf->cmd, go_runtime_version, MIN_SUPPORTED_GO_VER);
         } else {
-            scopeLogWarn("%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.8 or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd);
+            scopeLogWarn("%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.%d or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd, MIN_SUPPORTED_GO_VER);
         }
         return; // don't install our hooks
     } else if (g_go_minor_ver > MAX_SUPPORTED_GO_VER) {
@@ -1025,14 +1002,6 @@ initGoHook(elf_buf_t *ebuf)
     }
 }
 
-void *
-return_addr_idx(int idx)
-{
-    if ((idx < 0) || (idx > INDEX_HOOK_MAX)) return NULL;
-
-    return (void *)g_go_schema->tap[idx].return_addr;
-}
-
 static void *
 return_addr(assembly_fn fn)
 {
@@ -1068,16 +1037,6 @@ frame_size(assembly_fn fn)
  * Example, there is a c_write() that handles extracting
  * details for write operations. The address of c_write
  * is passed to do_cfunc.
- *
- * ****** Memory Layout go_hook_ ******
- * Callee Stack                   = stackptr                          = Input Params and Return Values
- * Caller Stack                   = stackptr + frame_size             = Input Params and Return Values
- *
- * ****** Memory Layout go_reg_syscall ******
- * Return value from rax          = stackptr                          = Return Values
- * Input params from rax...r9     = stackptr + 0x8                    = Input Params
- * Callee Stack                   = stackptr + (0x8 * 10)
- * Caller Stack                   = stackptr + (0x8 * 10) + frame_size
  *
  * NOTE: Avoid using values from a Caller stack where possible since the Caller
  * function could differ.

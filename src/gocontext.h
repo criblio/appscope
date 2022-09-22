@@ -5,21 +5,6 @@
 #define EXPORTON __attribute__((visibility("default")))
 
 typedef struct {
-    int c_syscall_write_fd;
-    int c_syscall_write_buf;
-    int c_syscall_openat_path;
-    int c_syscall_unlinkat_dirfd;
-    int c_syscall_unlinkat_pathname;
-    int c_syscall_unlinkat_flags;
-    int c_syscall_getdents64_dirfd;
-    int c_syscall_socket_domain;
-    int c_syscall_socket_type;
-    int c_syscall_accept4_fd;
-    int c_syscall_accept4_addr;
-    int c_syscall_accept4_addrlen;
-    int c_syscall_read_fd;
-    int c_syscall_read_buf;
-    int c_syscall_close_fd;
     int c_syscall_rc;
     int c_syscall_num;
     int c_syscall_p1;
@@ -77,7 +62,6 @@ typedef struct {
     // These are constants at build time
     char *   func_name;    // name of go function
     void *   assembly_fn;  // scope handler function (in assembly)
-
     // These are set at runtime.
     void *   return_addr;  // addr of where in go to resume after patch
     uint32_t frame_size;   // size of go stack frame
@@ -99,7 +83,7 @@ typedef struct {
 typedef void (*assembly_fn)(void);
 
 extern go_schema_t *g_go_schema;
-extern go_schema_t go_8_schema;
+extern go_schema_t go_9_schema;
 extern go_schema_t go_17_schema;
 extern go_arg_offsets_t g_go_arg;
 extern go_struct_offsets_t g_go_struct;
@@ -112,18 +96,9 @@ extern void initGoHook(elf_buf_t*);
 extern void sysprint(const char *, ...) PRINTF_FORMAT(1, 2);
 extern void *getSymbol(const char *, char *);
 
-extern void go_hook_tls_server_read(void);
-extern void go_hook_tls_server_write(void);
-extern void go_hook_tls_client_read(void);
-extern void go_hook_tls_client_write(void);
-extern void go_hook_http2_server_read(void);
-extern void go_hook_http2_server_write(void);
-extern void go_hook_http2_server_preface(void);
-extern void go_hook_http2_client_read(void);
-extern void go_hook_http2_client_write(void);
-extern void go_hook_exit(void);
-extern void go_hook_die(void);
-
+extern void go_hook_reg_syscall(void);
+extern void go_hook_reg_rawsyscall(void);
+extern void go_hook_reg_syscall6(void);
 extern void go_hook_reg_tls_server_read(void);
 extern void go_hook_reg_tls_server_write(void);
 extern void go_hook_reg_tls_client_read(void);
@@ -133,13 +108,7 @@ extern void go_hook_reg_http2_server_write(void);
 extern void go_hook_reg_http2_server_preface(void);
 extern void go_hook_reg_http2_client_read(void);
 extern void go_hook_reg_http2_client_write(void);
-
-extern void go_hook_reg_syscall(void);
-extern void go_hook_reg_rawsyscall(void);
-extern void go_hook_reg_syscall6(void);
-
-extern void go_hook_set_inputs_g_syscall(void);
-extern void go_hook_set_inputs_g_rawsyscall(void);
-extern void go_hook_set_inputs_g_syscall6(void);
+extern void go_hook_exit(void);
+extern void go_hook_die(void);
 
 #endif // __GOTCONTEXT_H__

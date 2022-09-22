@@ -1,11 +1,11 @@
 #define g_m 0x30
 #define m_g0 0x0
 #define m_gsignal 0x50
-#define g_sched_sp 0x38
+#define g_sched_sp 0x38 //0x40 in 8
 #define g_sched_pc 0x40
 #define g_sched_ret 0x58
 #define g_sched_bp 0x68
-#define m_g0_sched_sp 0x38
+#define m_g0_sched_sp 0x38 //0x40 in 8
 
 /*
  * Go 17+ will pass input params and return values in registers.

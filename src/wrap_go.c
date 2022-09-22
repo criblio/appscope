@@ -21,7 +21,7 @@
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 #define EXIT_STACK_SIZE (32 * 1024)
 #define UNKNOWN_GO_VER (-1)
-#define MIN_SUPPORTED_GO_VER (8)
+#define MIN_SUPPORTED_GO_VER (9)
 #define MAX_SUPPORTED_GO_VER (19)
 #define HTTP2_FRAME_HEADER_LEN (9)
 #define PRI_STR "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
@@ -39,9 +39,8 @@ int g_go_minor_ver = UNKNOWN_GO_VER;
 int g_go_maint_ver = UNKNOWN_GO_VER;
 static char g_go_build_ver[7];
 static char g_ReadFrame_addr[sizeof(void *)];
-go_schema_t *g_go_schema = &go_8_schema; // overridden if later version
+go_schema_t *g_go_schema = &go_9_schema; // overridden if later version
 uint64_t g_glibc_guard = 0LL;
-void (*go_runtime_cgocall)(void);
 uint64_t go_systemstack_switch;
 
 #if NEEDEVNULL > 0
@@ -70,14 +69,14 @@ enum index_hook_t {
     INDEX_HOOK_MAX,
 };
 
-go_schema_t go_8_schema = {
+go_schema_t go_9_schema = {
     .arg_offsets = {
         .c_syscall_rc=0x0,
         .c_syscall_num=0x60,
-        .c_syscall_p1=0x10,
-        .c_syscall_p2=0x18,
-        .c_syscall_p3=0x20,
-        .c_syscall_p4=0x28,
+        .c_syscall_p1=0x20,
+        .c_syscall_p2=0x28,
+        .c_syscall_p3=0x18,
+        .c_syscall_p4=0x10,
         .c_syscall_p5=0x30,
         .c_syscall_p6=0x38,
         .c_tls_server_read_connReader=0x8,
@@ -90,12 +89,12 @@ go_schema_t go_8_schema = {
         .c_tls_client_write_w_pc=0x8,
         .c_tls_client_write_buf=0x10,
         .c_tls_client_write_rc=0x28,
-        .c_http2_server_read_sc=0x128,
+        .c_http2_server_read_sc=0x188,
         .c_http2_server_write_sc=0x8,
-        .c_http2_server_preface_callee=0xd0,
-        .c_http2_server_preface_sc=0x60,
-        .c_http2_server_preface_rc=0xe0, 
-        .c_http2_client_read_cc=0x80,
+        .c_http2_server_preface_callee=0x108,
+        .c_http2_server_preface_sc=0x110,
+        .c_http2_server_preface_rc=0x120,
+        .c_http2_client_read_cc=0x78,
         .c_http2_client_write_tcpConn=0x10,
         .c_http2_client_write_buf=0x68,
         .c_http2_client_write_rc=0x28,
@@ -109,7 +108,7 @@ go_schema_t go_8_schema = {
         .iface_data=0x8,
         .netfd_to_pd=0x0,
         .pd_to_fd=0x10,
-        .netfd_to_sysfd=UNDEF_OFFSET, // defined for go1.8
+        .netfd_to_sysfd=UNDEF_OFFSET,
         .bufrd_to_buf=0x0,
         .conn_to_rwc=0x10,
         .conn_to_tlsState=0x30,
@@ -145,10 +144,10 @@ go_schema_t go_17_schema = {
     .arg_offsets = {
         .c_syscall_rc=0x0,
         .c_syscall_num=0x60,
-        .c_syscall_p1=0x10,
-        .c_syscall_p2=0x18,
-        .c_syscall_p3=0x20,
-        .c_syscall_p4=0x28,
+        .c_syscall_p1=0x20,
+        .c_syscall_p2=0x28,
+        .c_syscall_p3=0x18,
+        .c_syscall_p4=0x10,
         .c_syscall_p5=0x30,
         .c_syscall_p6=0x38,
         .c_tls_server_read_connReader=0x50,
@@ -179,7 +178,7 @@ go_schema_t go_17_schema = {
         .iface_data=0x8,
         .netfd_to_pd=0x0,
         .pd_to_fd=0x10,
-        .netfd_to_sysfd=UNDEF_OFFSET, // defined for go1.8
+        .netfd_to_sysfd=UNDEF_OFFSET,
         .bufrd_to_buf=0x0,
         .conn_to_rwc=0x10,
         .conn_to_tlsState=0x30,
@@ -192,10 +191,6 @@ go_schema_t go_17_schema = {
         .sc_to_fr=0x48,
         .sc_to_conn=0x10,
     },
-    // use the _reg_ assembly functions here, to support changes in Go 1.17
-    // where we must preserve the return values stored in registers
-    // and we must preserve the g in r14 for future stack checks
-    // Note: we do not need to use the reg functions for go_hook_exit and go_hook_die
     .tap = {
         [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",       /* .abi0 */       go_hook_reg_syscall,              NULL, 0},
         [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",    /* .abi0 */       go_hook_reg_rawsyscall,           NULL, 0},
@@ -221,20 +216,6 @@ adjustGoStructOffsetsForVersion()
     if (!g_go_minor_ver) {
         sysprint("ERROR: can't determine minor go version\n");
         return;
-    }
-
-    if (g_go_minor_ver == 8) {
-        g_go_schema->struct_offsets.m_to_tls = 96; // 0x60
-        // go 1.8 is the only version that directly goes from netfd to sysfd.
-        g_go_schema->struct_offsets.netfd_to_sysfd = 16;
-    }
-
-    if (g_go_minor_ver == 9) {
-        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
-        g_go_schema->arg_offsets.c_http2_server_read_sc=0x188;
-        g_go_schema->arg_offsets.c_http2_server_preface_callee=0x108;
-        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
-        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
     }
 
     if (g_go_minor_ver == 10) {
@@ -294,14 +275,6 @@ adjustGoStructOffsetsForVersion()
         g_go_schema->arg_offsets.c_tls_client_read_pc=0x80;
         g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
 
-        // In go 19 we hook a function that has values in syscall registers
-        g_go_schema->arg_offsets.c_syscall_p1=0x20;
-        g_go_schema->arg_offsets.c_syscall_p2=0x28;
-        g_go_schema->arg_offsets.c_syscall_p3=0x18;
-        g_go_schema->arg_offsets.c_syscall_p4=0x10;
-        g_go_schema->arg_offsets.c_syscall_p5=0x30;
-        g_go_schema->arg_offsets.c_syscall_p6=0x38;
-
         g_go_schema->tap[INDEX_HOOK_SYSCALL].func_name = "runtime/internal/syscall.Syscall6";
         g_go_schema->tap[INDEX_HOOK_RAWSYSCALL].func_name = "";
         g_go_schema->tap[INDEX_HOOK_SYSCALL6].func_name = "";
@@ -328,13 +301,8 @@ createGoStructFile(void) {
         scope_dprintf(fd, "net/http.persistConn|conn=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_conn);
         scope_dprintf(fd, "net/http.persistConn|br=%d|Client\n", g_go_schema->struct_offsets.persistConn_to_bufrd);
         scope_dprintf(fd, "runtime.iface|data=%d|\n", g_go_schema->struct_offsets.iface_data);
-        // go 1.8 has a direct netfd_to_sysfd field, others are less direct
-        if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) {
-            scope_dprintf(fd, "net.netFD|pfd=%d|\n", g_go_schema->struct_offsets.netfd_to_pd);
-            scope_dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go_schema->struct_offsets.pd_to_fd);
-        } else {
-            scope_dprintf(fd, "net.netFD|sysfd=%d|\n", g_go_schema->struct_offsets.netfd_to_sysfd);
-        }
+        scope_dprintf(fd, "net.netFD|pfd=%d|\n", g_go_schema->struct_offsets.netfd_to_pd);
+        scope_dprintf(fd, "internal/poll.FD|Sysfd=%d|\n", g_go_schema->struct_offsets.pd_to_fd);
         scope_dprintf(fd, "bufio.Reader|buf=%d|\n", g_go_schema->struct_offsets.bufrd_to_buf);
         scope_dprintf(fd, "net/http.conn|rwc=%d|Server\n", g_go_schema->struct_offsets.conn_to_rwc);
         scope_dprintf(fd, "net/http.conn|tlsState=%d|Server\n", g_go_schema->struct_offsets.conn_to_tlsState);
@@ -928,42 +896,15 @@ initGoHook(elf_buf_t *ebuf)
             // Don't expect to get here, but try to be clear if we do.
             scopeLogWarn("%s is not a go application.  Continuing without AppScope.", ebuf->cmd);
         } else if (go_runtime_version) {
-            scopeLogWarn("%s was compiled with go version `%s`.  AppScope can only instrument go1.8 or newer.  Continuing without AppScope.", ebuf->cmd, go_runtime_version);
+            scopeLogWarn("%s was compiled with go version `%s`.  AppScope can only instrument go1.%d or newer.  Continuing without AppScope.", ebuf->cmd, go_runtime_version, MIN_SUPPORTED_GO_VER);
         } else {
-            scopeLogWarn("%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.8 or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd);
+            scopeLogWarn("%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.%d or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd, MIN_SUPPORTED_GO_VER);
         }
         return; // don't install our hooks
     } else if (g_go_minor_ver > MAX_SUPPORTED_GO_VER) {
         scopeLogWarn("%s was compiled with go version `%s`. Versions newer than Go 1.%d are not yet supported. Continuing without AppScope.", ebuf->cmd, go_runtime_version, MAX_SUPPORTED_GO_VER);
         return; // don't install our hooks
     } 
-
-    /* Go 1.17 introduced a secondary calling convention for the ABI
-     * that allows developers to choose from the native ABI (with
-     * latest changes) vs ABI0 (previous ABI). The new native ABI
-     * was a no-go for us as in some cases (-buildmode=pie) register
-     * %rax was overwritten via a mov to %eax, effectively truncating
-     * the return value to 32 bits where on occasion a 64 bit return
-     * value might be desired.
-     */
-    if (g_go_minor_ver >= 17) {
-        // Use the abi0 I/F for syscall based functions in Go >= 1.17
-        if (((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall.abi0")) == 0) &&
-            ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall.abi0",
-                                               "runtime.asmcgocall", "mov")) == 0)) {
-            sysprint("ERROR: can't get the address for runtime.cgocall.abi0\n");
-            return; // don't install our hooks
-        }
-    } else {
-        // Use the native abi - the only abi present in <= Go 1.16
-        if (((go_runtime_cgocall = getSymbol(ebuf->buf, "runtime.asmcgocall")) == 0) &&
-            ((go_runtime_cgocall = getGoSymbol(ebuf->buf, "runtime.asmcgocall", NULL, NULL)) == 0)) {
-            sysprint("ERROR: can't get the address for runtime.cgocall\n");
-            return; // don't install our hooks
-        }
-    }
-    go_runtime_cgocall = (void *)((uint64_t)go_runtime_cgocall + base);
-    funcprint("asmcgocall %p\n", go_runtime_cgocall);
 
     uint64_t *ReadFrame_addr;
     if (((ReadFrame_addr = getSymbol(ebuf->buf, "net/http.(*http2Framer).ReadFrame")) == 0) &&
@@ -973,13 +914,13 @@ initGoHook(elf_buf_t *ebuf)
     ReadFrame_addr = (uint64_t *)((uint64_t)ReadFrame_addr + base);
     scope_sprintf(g_ReadFrame_addr, "%p\n", ReadFrame_addr);
 
-
-    if (((go_systemstack_switch = (uint64_t)getSymbol(ebuf->buf, "gosave_systemstack_switch")) == 0) &&
-        ((go_systemstack_switch = (uint64_t)getGoSymbol(ebuf->buf, "gosave_systemstack_switch", NULL, NULL)) == 0)) {
-        sysprint("WARN: can't get the address for gosave_systemstack_switch\n");
+    char gosave[30] = "gosave";
+    if (g_go_minor_ver >= 17) scope_strcpy(gosave, "gosave_systemstack_switch");
+    if (((go_systemstack_switch = (uint64_t)getSymbol(ebuf->buf, gosave)) == 0) &&
+        ((go_systemstack_switch = (uint64_t)getGoSymbol(ebuf->buf, gosave, NULL, NULL)) == 0)) {
+        sysprint("WARN: can't get the address for %s\n", gosave);
     }
     go_systemstack_switch = (uint64_t)((char *)go_systemstack_switch + base);
-    // DEBUG
     sysprint("address for gosave_systemstack_switch: 0x%lx\n", go_systemstack_switch);
 
     csh disass_handle = 0;
@@ -1003,7 +944,6 @@ initGoHook(elf_buf_t *ebuf)
         // The Go 17 schema works for 1.17-1.19 and possibly future versions
         g_go_schema = &go_17_schema;
     }
-
     // Update the schema to suit the current version
     adjustGoStructOffsetsForVersion();
     // For validation tests:
@@ -1062,14 +1002,6 @@ initGoHook(elf_buf_t *ebuf)
     }
 }
 
-void *
-return_addr_idx(int idx)
-{
-    if ((idx < 0) || (idx > INDEX_HOOK_MAX)) return NULL;
-
-    return (void *)g_go_schema->tap[idx].return_addr;
-}
-
 static void *
 return_addr(assembly_fn fn)
 {
@@ -1105,16 +1037,6 @@ frame_size(assembly_fn fn)
  * Example, there is a c_write() that handles extracting
  * details for write operations. The address of c_write
  * is passed to do_cfunc.
- *
- * ****** Memory Layout go_hook_ ******
- * Callee Stack                   = stackptr                          = Input Params and Return Values
- * Caller Stack                   = stackptr + frame_size             = Input Params and Return Values
- *
- * ****** Memory Layout go_reg_syscall ******
- * Return value from rax          = stackptr                          = Return Values
- * Input params from rax...r9     = stackptr + 0x8                    = Input Params
- * Callee Stack                   = stackptr + (0x8 * 10)
- * Caller Stack                   = stackptr + (0x8 * 10) + frame_size
  *
  * NOTE: Avoid using values from a Caller stack where possible since the Caller
  * function could differ.
@@ -1184,23 +1106,19 @@ getFDFromConn(uint64_t tcpConn) {
     return -1;
 }
 
-// Extract data from syscall.Syscall 
+// Extract data from syscalls. Values are available in registers saved on sys_stack.
 static void
 c_syscall(char *sys_stack, char *g_stack)
 {
-    uint64_t syscall_num = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_num); // Always get this from registers since its only preserved there 
-    int64_t rc           = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_rc);  // Always get this from registers since the return code is always in rax
+    uint64_t syscall_num = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_num);
+    int64_t rc           = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_rc);
     if(rc < 0) rc = -1; // kernel syscalls can return values < -1
-
-    char *stack = g_stack;
-    // In go 19 we hook a function that receives inputs in registers, which we put on the system stack
-    if (g_go_minor_ver >= 19) stack = sys_stack;
 
     switch(syscall_num) {
     case 1: // write
         {
-            uint64_t fd = *(int64_t *)(stack + g_go_schema->arg_offsets.c_syscall_p1);
-            char *buf   = (char *)*(uint64_t *)(stack + g_go_schema->arg_offsets.c_syscall_p2);
+            uint64_t fd = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
+            char *buf   = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
             uint64_t initialTime = getTime();
 
             funcprint("Scope: write fd %ld rc %ld buf %s\n", fd, rc, buf);
@@ -1209,7 +1127,7 @@ c_syscall(char *sys_stack, char *g_stack)
         break;
     case 257: // openat
         {
-            char *path = (char *)*(uint64_t *)(stack + g_go_schema->arg_offsets.c_syscall_p2);
+            char *path = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
             if (!path) {
                 scopeLogError("ERROR:go_open: null pathname");
                 scope_puts("Scope:ERROR:open:no path");
@@ -1225,9 +1143,9 @@ c_syscall(char *sys_stack, char *g_stack)
         {
             if (rc) return;
 
-            uint64_t dirfd = *(int64_t *)(stack + g_go_schema->arg_offsets.c_syscall_p1);
-            char *pathname = (char *)*(uint64_t *)(stack + g_go_schema->arg_offsets.c_syscall_p2);
-            uint64_t flags = *(int64_t *)(stack + 0x20);
+            uint64_t dirfd = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
+            char *pathname = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
+            uint64_t flags = *(int64_t *)(sys_stack + 0x20);
 
             funcprint("Scope: unlinkat dirfd %ld pathname %s flags %ld\n", dirfd, pathname, flags);
             doDelete(pathname, "go_unlinkat");
@@ -1235,7 +1153,7 @@ c_syscall(char *sys_stack, char *g_stack)
         break;
     case 217: // getdents64
         {
-            uint64_t dirfd = *(int64_t *)(stack + g_go_schema->arg_offsets.c_syscall_p1);
+            uint64_t dirfd = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
             uint64_t initialTime = getTime();
 
             funcprint("Scope: getdents dirfd %ld rc %ld\n", dirfd, rc);
@@ -1246,8 +1164,8 @@ c_syscall(char *sys_stack, char *g_stack)
         {
             if (rc == -1) return;
 
-            uint64_t domain = *(int64_t *)(stack + g_go_schema->arg_offsets.c_syscall_p1);
-            uint64_t type   = *(int64_t *)(stack + g_go_schema->arg_offsets.c_syscall_p2);
+            uint64_t domain = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
+            uint64_t type   = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
 
             funcprint("Scope: socket domain: %ld type: 0x%lx sd: %ld\n", domain, type, rc);
             addSock(rc, type, domain); // Creates a net object
@@ -1257,9 +1175,9 @@ c_syscall(char *sys_stack, char *g_stack)
         {
             if (rc == -1) return;
 
-            uint64_t fd           = *(int64_t *)(stack + g_go_schema->arg_offsets.c_syscall_p1);
-            struct sockaddr *addr = *(struct sockaddr **)(stack + g_go_schema->arg_offsets.c_syscall_p2);
-            socklen_t *addrlen    = *(socklen_t **)(stack + g_go_schema->arg_offsets.c_syscall_p3);
+            uint64_t fd           = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
+            struct sockaddr *addr = *(struct sockaddr **)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
+            socklen_t *addrlen    = *(socklen_t **)(sys_stack + g_go_schema->arg_offsets.c_syscall_p3);
 
             funcprint("Scope: accept4 of %ld\n", rc);
             doAccept(fd, rc, addr, addrlen, "go_accept4");
@@ -1267,8 +1185,8 @@ c_syscall(char *sys_stack, char *g_stack)
         break;
     case 0: // read
         {
-            uint64_t fd = *(int64_t *)(stack + g_go_schema->arg_offsets.c_syscall_p1);
-            char *buf   = (char *)*(uint64_t *)(stack + g_go_schema->arg_offsets.c_syscall_p2);
+            uint64_t fd = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
+            char *buf   = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
             uint64_t initialTime = getTime();
 
             funcprint("Scope: read of %ld rc %ld\n", fd, rc);
@@ -1277,7 +1195,7 @@ c_syscall(char *sys_stack, char *g_stack)
         break;
     case 3: // close
         {
-            uint64_t fd = *(int64_t *)(stack + g_go_schema->arg_offsets.c_syscall_p1);
+            uint64_t fd = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
 
             funcprint("Scope: close of %ld\n", fd);
             doCloseAndReportFailures(fd, (rc != -1), "go_close"); // If net, deletes a net object

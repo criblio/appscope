@@ -1,11 +1,11 @@
 #define g_m 0x30
 #define m_g0 0x0
 #define m_gsignal 0x50
-#define g_sched_sp 0x38
+#define g_sched_sp 0x38 //0x40 in 8
 #define g_sched_pc 0x40
 #define g_sched_ret 0x58
 #define g_sched_bp 0x68
-#define m_g0_sched_sp 0x38
+#define m_g0_sched_sp 0x38 //0x40 in 8
 
 // The macro interpose takes 3 params
 // the name of the global variable as defined above ex: go_hook_write
@@ -310,18 +310,6 @@ c_syscall_handler:
 
 
 .text
-    interpose              go_hook_tls_server_read           go_tls_server_read
-    interpose              go_hook_tls_server_write          go_tls_server_write
-    interpose              go_hook_tls_client_read           go_tls_client_read
-    interpose              go_hook_tls_client_write          go_tls_client_write
-    interpose              go_hook_http2_server_read         go_http2_server_read
-    interpose              go_hook_http2_server_write        go_http2_server_write
-    interpose              go_hook_http2_server_preface      go_http2_server_preface
-    interpose              go_hook_http2_client_read         go_http2_client_read
-    interpose              go_hook_http2_client_write        go_http2_client_write
-    interpose              go_hook_exit                      go_exit
-    interpose              go_hook_die                       go_die
-
     interpose_system_stack2 go_hook_reg_syscall               go_syscall
     interpose_system_stack2 go_hook_reg_rawsyscall            go_rawsyscall
     interpose_system_stack2 go_hook_reg_syscall6              go_syscall6
@@ -334,4 +322,7 @@ c_syscall_handler:
     interpose_system_stack go_hook_reg_http2_server_preface  go_http2_server_preface
     interpose_system_stack go_hook_reg_http2_client_read     go_http2_client_read
     interpose_system_stack go_hook_reg_http2_client_write    go_http2_client_write
+    interpose_system_stack go_hook_exit                      go_exit
+    interpose_system_stack go_hook_die                       go_die
+
 

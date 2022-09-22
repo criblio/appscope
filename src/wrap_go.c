@@ -1126,7 +1126,7 @@ do_cfunc(char *stackptr, void *cfunc, void *gfunc)
 {
     uint64_t rc;
     char *sys_stack = stackptr;  
-    char *g_stack = *(uint64_t *)(sys_stack + 0x50); 
+    char *g_stack = (char *)*(uint64_t *)(sys_stack + 0x50); 
 
     /*
      * In <= Go 1.16 we must rely on the caller stack for tls_ and http2_ functions

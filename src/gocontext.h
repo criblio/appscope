@@ -20,6 +20,14 @@ typedef struct {
     int c_syscall_read_fd;
     int c_syscall_read_buf;
     int c_syscall_close_fd;
+    int c_syscall_rc;
+    int c_syscall_num;
+    int c_syscall_p1;
+    int c_syscall_p2;
+    int c_syscall_p3;
+    int c_syscall_p4;
+    int c_syscall_p5;
+    int c_syscall_p6;
     int c_tls_server_read_connReader;
     int c_tls_server_read_buf;
     int c_tls_server_read_rc;
@@ -43,7 +51,6 @@ typedef struct {
 
 typedef struct {                  // Structure                  Field      
     int g_to_m;                   // "runtime.g"                "m"        
-    int g_to_goid;                // "runtime.g"                "goid"
     int m_to_tls;                 // "runtime.m"                "tls"      
     int connReader_to_conn;       // "net/http.connReader"      "conn"     
     int conn_to_tlsState;         // "net/http.conn"            "tlsState" 
@@ -88,17 +95,6 @@ typedef struct {
     char* str;  // 0x0 offset
     int   len;  // 0x8 offset
 } gostring_t;
-
-typedef struct {
-    uint64_t goid;
-    uint64_t p1;
-    uint64_t p2;
-    uint64_t p3;
-    uint64_t p4;
-    uint64_t p5;
-    uint64_t p6;
-    uint64_t p7;
-} inputs_g_t;
 
 typedef void (*assembly_fn)(void);
 

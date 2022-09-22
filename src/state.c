@@ -1269,7 +1269,6 @@ getChannelNetEntry(uint64_t id)
 int
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
- //   scope_printf("\n\nhere\n\n");
     // Find the net_info for the channel
     net_info *net = getNetEntry(sockfd);    // first try by descriptor
     if (!net) net = getChannelNetEntry(id); // fallback to using channel ID
@@ -1295,7 +1294,6 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
             net->protoDetect == DETECT_FALSE   ? "FALSE" : "INVALID"
             );
             
-
     // Ignore empty payloads that should have been blocked by our interpositions
     if (!len) {
         scopeLogDebug("DEBUG: fd:%d ignoring empty payload", sockfd);

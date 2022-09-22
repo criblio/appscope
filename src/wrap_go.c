@@ -1535,7 +1535,6 @@ c_http2_server_preface(char *sys_stack, char *g_stack)
 {
     // In this function in <= go 16 we have to go to the callee to get input params and return values
     g_stack -= g_go_schema->arg_offsets.c_http2_server_preface_callee;
-    g_stack -= g_go_schema->arg_offsets.c_http2_server_preface_callee;
 
     uint64_t *rc     = (uint64_t *)(g_stack + g_go_schema->arg_offsets.c_http2_server_preface_rc);
     if ((rc == NULL) || (rc == (uint64_t *)0xffffffff)) return;

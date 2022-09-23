@@ -15,6 +15,15 @@
 #include <stdint.h>
 #include "cmocka.h"
 
+
+// Some weak symbols to help with compilation
+#ifndef bool
+typedef unsigned int bool;
+#endif
+bool __attribute__((weak)) cmdAttach(void) { return 1; }
+bool __attribute__((weak)) cmdDetach(void) { return 1; }
+
+
 // This is a convenient place to stick some helper functions too...
 
 int groupSetup(void** state);

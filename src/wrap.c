@@ -66,176 +66,12 @@ static void *periodic(void *);
 static void doConfig(config_t *);
 static void threadNow(int);
 static void uv__read_hook(void *);
+static got_list_t inject_hook_list[];
 
 #ifdef __linux__
 extern unsigned long scope_fs;
 
 extern void initGoHook(elf_buf_t*);
-
-static got_list_t hook_list[] = {
-    {"SSL_read", SSL_read, &g_fn.SSL_read},
-    {"SSL_write", SSL_write, &g_fn.SSL_write},
-    {NULL, NULL, NULL}
-};
-
-static got_list_t inject_hook_list[] = {
-    {"sigaction",   NULL, &g_fn.sigaction},
-    {"open",        NULL, &g_fn.open},
-    {"openat",      NULL, &g_fn.openat},
-    {"fopen",       NULL, &g_fn.fopen},
-    {"freopen",     NULL, &g_fn.freopen},
-    {"nanosleep",   NULL, &g_fn.nanosleep},
-    {"select",      NULL, &g_fn.select},
-    {"sigsuspend",  NULL, &g_fn.sigsuspend},
-    {"epoll_wait",  NULL, &g_fn.epoll_wait},
-    {"poll",        NULL, &g_fn.poll},
-    {"__poll_chk",  NULL, &g_fn.__poll_chk},
-    {"pause",       NULL, &g_fn.pause},
-    {"sigwaitinfo", NULL, &g_fn.sigwaitinfo},
-    {"sigtimedwait", NULL, &g_fn.sigtimedwait},
-    {"epoll_pwait", NULL, &g_fn.epoll_pwait},
-    {"ppoll",       NULL, &g_fn.ppoll},
-    {"__ppoll_chk", NULL, &g_fn.__ppoll_chk},
-    {"pselect",     NULL, &g_fn.pselect},
-    {"msgsnd",      NULL, &g_fn.msgsnd},
-    {"msgrcv",      NULL, &g_fn.msgrcv},
-    {"semop",       NULL, &g_fn.semop},
-    {"semtimedop",  NULL, &g_fn.semtimedop},
-    {"clock_nanosleep", NULL, &g_fn.clock_nanosleep},
-    {"usleep", NULL, &g_fn.usleep},
-    {"io_getevents", NULL, &g_fn.io_getevents},
-    {"open64", NULL, &g_fn.open64},
-    {"openat64", NULL, &g_fn.openat64},
-    {"__open_2", NULL, &g_fn.__open_2},
-    {"__open64_2", NULL, &g_fn.__open64_2},
-    {"__openat_2", NULL, &g_fn.__openat_2},
-    {"creat64", NULL, &g_fn.creat64},
-    {"fopen64", NULL, &g_fn.fopen64},
-    {"freopen64", NULL, &g_fn.freopen64},
-    {"pread64", NULL, &g_fn.pread64},
-    {"__pread64_chk", NULL, &g_fn.__pread64_chk},
-    {"preadv", NULL, &g_fn.preadv},
-    {"preadv2", NULL, &g_fn.preadv2},
-    {"preadv64v2", NULL, &g_fn.preadv64v2},
-    {"__pread_chk", NULL, &g_fn.__pread_chk},
-    {"__read_chk", NULL, &g_fn.__read_chk},
-    {"__fread_unlocked_chk", NULL, &g_fn.__fread_unlocked_chk},
-    {"pwrite64", NULL, &g_fn.pwrite64},
-    {"pwritev", NULL, &g_fn.pwritev},
-    {"pwritev64", NULL, &g_fn.pwritev64},
-    {"pwritev2", NULL, &g_fn.pwritev2},
-    {"pwritev64v2", NULL, &g_fn.pwritev64v2},
-    {"lseek64", NULL, &g_fn.lseek64},
-    {"fseeko64", NULL, &g_fn.fseeko64},
-    {"ftello64", NULL, &g_fn.ftello64},
-    {"statfs64", NULL, &g_fn.statfs64},
-    {"fstatfs64", NULL, &g_fn.fstatfs64},
-    {"fsetpos64", NULL, &g_fn.fsetpos64},
-    {"__xstat", NULL, &g_fn.__xstat},
-    {"__xstat64", NULL, &g_fn.__xstat64},
-    {"__lxstat", NULL, &g_fn.__lxstat},
-    {"__lxstat64", NULL, &g_fn.__lxstat64},
-    {"__fxstat", NULL, &g_fn.__fxstat},
-    {"__fxstatat", NULL, &g_fn.__fxstatat},
-    {"__fxstatat64", NULL, &g_fn.__fxstatat64},
-    {"statfs", NULL, &g_fn.statfs},
-    {"fstatfs", NULL, &g_fn.fstatfs},
-    {"statvfs", NULL, &g_fn.statvfs},
-    {"statvfs64", NULL, &g_fn.statvfs64},
-    {"fstatvfs", NULL, &g_fn.fstatvfs},
-    {"fstatvfs64", NULL, &g_fn.fstatvfs64},
-    {"access", NULL, &g_fn.access},
-    {"faccessat", NULL, &g_fn.faccessat},
-    {"gethostbyname_r", NULL, &g_fn.gethostbyname_r},
-    {"gethostbyname2_r", NULL, &g_fn.gethostbyname2_r},
-    {"fstatat", NULL, &g_fn.fstatat},
-    {"prctl", NULL, &g_fn.prctl},
-    {"execve", NULL, &g_fn.execve},
-    {"execv", NULL, &g_fn.execv},
-    {"syscall", NULL, &g_fn.syscall},
-    {"sendfile", NULL, &g_fn.sendfile},
-    {"sendfile64", NULL, &g_fn.sendfile64},
-    {"SSL_read", NULL, &g_fn.SSL_read},
-    {"SSL_write", NULL, &g_fn.SSL_write},
-    {"gnutls_record_recv", NULL, &g_fn.gnutls_record_recv},
-    {"gnutls_record_recv_early_data", NULL, &g_fn.gnutls_record_recv_early_data},
-    {"gnutls_record_recv_packet", NULL, &g_fn.gnutls_record_recv_packet},
-    {"gnutls_record_recv_seq", NULL, &g_fn.gnutls_record_recv_seq},
-    {"gnutls_record_send", NULL, &g_fn.gnutls_record_send},
-    {"gnutls_record_send2", NULL, &g_fn.gnutls_record_send2},
-    {"gnutls_record_send_early_data", NULL, &g_fn.gnutls_record_send_early_data},
-    {"gnutls_record_send_range", NULL, &g_fn.gnutls_record_send_range},
-    {"dlopen", NULL, &g_fn.dlopen},
-    {"_exit", NULL, &g_fn._exit},
-    {"close", NULL, &g_fn.close},
-    {"fclose", NULL, &g_fn.fclose},
-    {"fcloseall", NULL, &g_fn.fcloseall},
-    {"unlink", NULL, &g_fn.unlink},
-    {"unlinkat", NULL, &g_fn.unlinkat},
-    {"lseek", NULL, &g_fn.lseek},
-    {"fseek", NULL, &g_fn.fseek},
-    {"fseeko", NULL, &g_fn.fseeko},
-    {"ftell", NULL, &g_fn.ftell},
-    {"ftello", NULL, &g_fn.ftello},
-    {"rewind", NULL, &g_fn.rewind},
-    {"fsetpos", NULL, &g_fn.fsetpos},
-    {"fgetpos", NULL, &g_fn.fgetpos},
-    {"fgetpos64", NULL, &g_fn.fgetpos64},
-    {"write", NULL, &g_fn.write},
-    {"pwrite", NULL, &g_fn.pwrite},
-    {"writev", NULL, &g_fn.writev},
-    {"fwrite", NULL, &g_fn.fwrite},
-    {"puts", NULL, &g_fn.puts},
-    {"putchar", NULL, &g_fn.putchar},
-    {"fputs", NULL, &g_fn.fputs},
-    {"fputs_unlocked", NULL, &g_fn.fputs_unlocked},
-    {"read", NULL, &g_fn.read},
-    {"readv", NULL, &g_fn.readv},
-    {"pread", NULL, &g_fn.pread},
-    {"fread", NULL, &g_fn.fread},
-    {"__fread_chk", NULL, &g_fn.__fread_chk},
-    {"fgets", NULL, &g_fn.fgets},
-    {"__fgets_chk", NULL, &g_fn.__fgets_chk},
-    {"fgets_unlocked", NULL, &g_fn.fgets_unlocked},
-    {"__fgetws_chk", NULL, &g_fn.__fgetws_chk},
-    {"fgetws", NULL, &g_fn.fgetws},
-    {"fgetwc", NULL, &g_fn.fgetwc},
-    {"fgetc", NULL, &g_fn.fgetc},
-    {"fputc", NULL, &g_fn.fputc},
-    {"fputc_unlocked", NULL, &g_fn.fputc_unlocked},
-    {"putwc", NULL, &g_fn.putwc},
-    {"fputwc", NULL, &g_fn.fputwc},
-    {"fscanf", NULL, &g_fn.fscanf},
-    {"getline", NULL, &g_fn.getline},
-    {"getdelim", NULL, &g_fn.getdelim},
-    {"__getdelim", NULL, &g_fn.__getdelim},
-    {"fcntl", NULL, &g_fn.fcntl},
-    {"fcntl64", NULL, &g_fn.fcntl64},
-    {"dup", NULL, &g_fn.dup},
-    {"dup2", NULL, &g_fn.dup2},
-    {"dup3", NULL, &g_fn.dup3},
-    {"vsyslog", NULL, &g_fn.vsyslog},
-    {"fork", NULL, &g_fn.fork},
-    {"socket", NULL, &g_fn.socket},
-    {"shutdown", NULL, &g_fn.shutdown},
-    {"listen", NULL, &g_fn.listen},
-    {"accept", NULL, &g_fn.accept},
-    {"accept4", NULL, &g_fn.accept4},
-    {"bind", NULL, &g_fn.bind},
-    {"connect", NULL, &g_fn.connect},
-    {"send", NULL, &g_fn.send},
-    {"sendto", NULL, &g_fn.sendto},
-    {"sendmsg", NULL, &g_fn.sendmsg},
-    {"recv", NULL, &g_fn.recv},
-    {"__recv_chk", NULL, &g_fn.__recv_chk},
-    {"recvfrom", NULL, &g_fn.recvfrom},
-    {"__recvfrom_chk", NULL, &g_fn.__recvfrom_chk},
-    {"recvmsg", NULL, &g_fn.recvmsg},
-    {"opendir", NULL, &g_fn.opendir},
-    {"closedir", NULL, &g_fn.closedir},
-    {"readdir", NULL, &g_fn.readdir},
-    {NULL, NULL, NULL}
-};
 
 typedef struct
 {
@@ -430,6 +266,143 @@ fileModTime(const char *path)
     return STATMODTIME(statbuf);
 }
 
+/*
+ * Iterate all shared objects and GOT hook as necessary.
+ * Filter the process from an external filter list.
+ * If the filter fails only hook execve.
+ * If the filter passes hook all interposed functions.
+ */
+static int
+hookAll(struct dl_phdr_info *info, size_t size, void *data)
+{
+    if (!info || !info->dlpi_name || !data) return FALSE;
+
+    struct link_map *lm;
+    Elf64_Sym *sym = NULL;
+    Elf64_Rela *rel = NULL;
+    char *str = NULL;
+    int rsz = 0;
+    bool *filter = data;
+
+    scopeLog(CFG_LOG_DEBUG, "%s: shared obj: %s", __FUNCTION__, info->dlpi_name);
+
+    // don't hook funcs from libscope or ld.so
+    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) return 0;
+
+    void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
+    if (handle == NULL) return FALSE;
+
+    // Get the link map and ELF sections in advance of something matching
+    if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+        for (int i=0; inject_hook_list[i].symbol; i++) {
+            // if the proc passes the filter then GOT hook all else only hook execve
+            // TODO; all execv?
+            if (((*filter == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
+                dlsym(handle, inject_hook_list[i].symbol)) {
+                if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1) {
+                    scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from shared obj %s",
+                             inject_hook_list[i].symbol, info->dlpi_name);
+                }
+            }
+        }
+    }
+
+    dlclose(handle);
+    return 0;
+}
+
+static int
+hookMain(bool filter)
+{
+    struct link_map *lm;
+    Elf64_Sym *sym = NULL;
+    Elf64_Rela *rel = NULL;
+    char *str = NULL;
+    int rsz = 0;
+
+    void *handle = g_fn.dlopen(NULL, RTLD_NOW);
+    if (handle == NULL) return FALSE;
+
+    // Get the link map and ELF sections in advance of something matching
+    if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+        for (int i=0; inject_hook_list[i].symbol; i++) {
+            // if the proc passes the filter then GOT hook all else only hook execve
+            // TODO; all execv?
+            if (((filter == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
+                dlsym(handle, inject_hook_list[i].symbol)) {
+                if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1) {
+                    scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from main", inject_hook_list[i].symbol);
+                }
+            }
+        }
+    }
+
+    dlclose(handle);
+    return TRUE;
+}
+
+/*
+ * Handle the detach operation
+ */
+static int
+unHookAll(struct dl_phdr_info *info, size_t size, void *data)
+{
+    if (!info || !info->dlpi_name) return FALSE;
+
+    struct link_map *lm;
+    Elf64_Sym *sym = NULL;
+    Elf64_Rela *rel = NULL;
+    char *str = NULL;
+    int rsz = 0;
+
+    scopeLog(CFG_LOG_DEBUG, "%s: shared obj: %s", __FUNCTION__, info->dlpi_name);
+
+    // don't hook funcs from libscope or ld.so
+    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) return FALSE;
+
+    void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
+    if (handle == NULL) return FALSE;
+
+    // Get the link map and ELF sections in advance of something matching
+    if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+        for (int i=0; inject_hook_list[i].symbol; i++) {
+            if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, FALSE) != -1) {
+                scopeLog(CFG_LOG_DEBUG, "\tGOT detached %s from shared obj %s",
+                         inject_hook_list[i].symbol, info->dlpi_name);
+            }
+        }
+    }
+
+    dlclose(handle);
+    return FALSE;
+}
+
+bool
+cmdDetach(void)
+{
+    if (!g_cfg.funcs_attached) return TRUE;
+
+    scopeLog(CFG_LOG_DEBUG, "%s:%d", __FUNCTION__, __LINE__);
+    dl_iterate_phdr(unHookAll, NULL);
+    g_cfg.funcs_attached = FALSE;
+    return TRUE;
+}
+
+bool
+cmdAttach(void)
+{
+    if (g_cfg.funcs_attached) return TRUE;
+
+    bool filter = TRUE;
+    scopeLog(CFG_LOG_DEBUG, "%s:%d", __FUNCTION__, __LINE__);
+
+    dl_iterate_phdr(hookAll, &filter);
+    hookMain(filter);
+
+    g_cfg.funcs_attached = TRUE;
+    return TRUE;
+}
+
 static void
 remoteConfig()
 {
@@ -446,8 +419,7 @@ remoteConfig()
 
     // We want to accept incoming requests on TCP, unix, and edge.
     // However, we don't currently support receving on TLS connections.
-    int acceptRequests = transportSupportsCommandControl(
-                                          ctlTransport(g_ctl, CFG_CTL));
+    int acceptRequests = transportSupportsCommandControl(ctlTransport(g_ctl, CFG_CTL));
     fds.events = (acceptRequests) ? POLLIN : 0;
 
     fds.fd = ctlConnection(g_ctl, CFG_CTL);
@@ -568,11 +540,11 @@ remoteConfig()
                     break;
                 case REQ_SWITCH:
                     switch (req->action) {
-                        case URL_REDIRECT_ON:
-                            g_cfg.urls = 1;
+                        case FUNC_DETACH:
+                            cmdDetach();
                             break;
-                        case URL_REDIRECT_OFF:
-                             g_cfg.urls = 0;
+                        case FUNC_ATTACH:
+                            cmdAttach();
                             break;
                         default:
                             DBG("%d", req->action);
@@ -659,13 +631,22 @@ dynConfig(void)
 {
     FILE *fs;
     time_t now;
-    char path[PATH_MAX];
+    char *path;
+    char userpath[PATH_MAX];
+    char clipath[PATH_MAX];
     static time_t modtime = 0;
 
-    scope_snprintf(path, sizeof(path), "%s/%s.%d", g_cmddir, DYN_CONFIG_PREFIX, g_proc.pid);
+    scope_snprintf(userpath, sizeof(userpath), "%s/%s.%d", g_cmddir, DYN_CONFIG_PREFIX, g_proc.pid);
+    scope_snprintf(clipath, sizeof(clipath), "%s/%s.%d", DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, g_proc.pid);
 
     // Is there a command file for this pid
-    if (osIsFilePresent(g_proc.pid, path) == -1) return 0;
+    if (osIsFilePresent(userpath) != -1) {
+        path = userpath;
+    } else if (osIsFilePresent(clipath) != -1) {
+        path = clipath;
+    } else {
+        return 0;
+    }
 
     // Have we already processed this file?
     now = fileModTime(path);
@@ -979,9 +960,8 @@ handleExit(void)
         // wait for a connection to be established 
         // before we emit data
         int wait_time;
-        scope_errno = 0;
         wait_time = scope_strtoul(wait, NULL, 10);
-        if (!scope_errno && wait_time) {
+        if ((wait_time != 0) && (wait_time != ULONG_MAX)) {
             for (int i = 0; i < wait_time; i++) {
                 if (doConnection() == TRUE) break;
                 sigSafeNanosleep(&ts);
@@ -1095,8 +1075,10 @@ ssl_read_hook(SSL *ssl, void *buf, int num)
 {
     int rc;
 
-    scopeLog(CFG_LOG_TRACE, "ssl_read_hook");
     WRAP_CHECK(SSL_read, -1);
+    if (g_cfg.funcs_attached == FALSE) return g_fn.SSL_read(ssl, buf, num);
+
+    scopeLog(CFG_LOG_TRACE, "ssl_read_hook");
     rc = g_fn.SSL_read(ssl, buf, num);
     if (rc > 0) {
         int fd = -1;
@@ -1113,8 +1095,10 @@ ssl_write_hook(SSL *ssl, void *buf, int num)
 {
     int rc;
 
-    scopeLog(CFG_LOG_TRACE, "ssl_write_hook");
     WRAP_CHECK(SSL_write, -1);
+    if (g_cfg.funcs_attached == FALSE) return g_fn.SSL_write(ssl, buf, num);
+
+    scopeLog(CFG_LOG_TRACE, "ssl_write_hook");
     rc = g_fn.SSL_write(ssl, buf, num);
     if (rc > 0) {
         int fd = -1;
@@ -1208,6 +1192,13 @@ static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, so
 static size_t __stdio_write(struct MUSL_IO_FILE *, const unsigned char *, size_t);
 static long wrap_scope_syscall(long, ...);
 
+static bool
+filterProc(const char *proc)
+{
+    // does this process pass the the allow filter?
+    return TRUE;
+}
+
 static int 
 findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
 {
@@ -1232,12 +1223,10 @@ hookSharedObjs(struct dl_phdr_info *info, size_t size, void *data)
     if (!info || !data || !info->dlpi_name) return FALSE;
 
     struct link_map *lm;
-    void *addr = NULL;
     Elf64_Sym *sym = NULL;
     Elf64_Rela *rel = NULL;
     char *str = NULL;
     int rsz = 0;
-    void *libscopeHandle = data;
     const char *libname = NULL;
 
     // don't attempt to hook libscope.so, libc*.so, ld-*.so
@@ -1259,11 +1248,9 @@ hookSharedObjs(struct dl_phdr_info *info, size_t size, void *data)
     // Get the link map and ELF sections in advance of something matching
     if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
         for (int i=0; inject_hook_list[i].symbol; i++) {
-            addr = dlsym(libscopeHandle, inject_hook_list[i].symbol);
-            inject_hook_list[i].func = addr;
 
             if ((dlsym(handle, inject_hook_list[i].symbol)) &&
-                (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, 1) != -1)) {
+                (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1)) {
                     scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from shared obj %s",
                              inject_hook_list[i].symbol, info->dlpi_name);
             }
@@ -1299,10 +1286,11 @@ static void
 initHook(int attachedFlag)
 {
     int rc;
-    funchook_t *funchook;
     bool should_we_patch = FALSE;
     char *full_path = NULL;
     elf_buf_t *ebuf = NULL;
+    bool filter;
+    funchook_t *funchook;
 
     // env vars are not always set as needed, be explicit here
     // this is duplicated if we were started from the scope exec
@@ -1343,8 +1331,43 @@ initHook(int attachedFlag)
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
     if (attachedFlag) {
+        // responding to the inject command
         hookInject();
+        filter = TRUE;
+    } else {
+        // GOT hooking all interposed funcs
+        filter = filterProc(full_path);
+        dl_iterate_phdr(hookAll, &filter);
+        hookMain(filter);
     }
+
+    // libmusl
+    // Note that both stdout & stderr objects point to the same write function.
+    // They are init'd with a static object. After the first write the
+    // write pointer is modified. We handle that mod in the interposed
+    // function __stdio_write().
+    if ((g_ismusl == TRUE) && (!g_fn.__stdout_write || !g_fn.__stderr_write)) {
+        // Get the static initializer for the stdout write function pointer
+        struct MUSL_IO_FILE *stdout_write = (struct MUSL_IO_FILE *)stdout;
+
+        // Save the write pointer
+        g_fn.__stdout_write = (size_t (*)(FILE *, const unsigned char *, size_t))stdout_write->write;
+
+        // Modify the write pointer to use our function
+        stdout_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+
+        // same for stderr
+        struct MUSL_IO_FILE *stderr_write = (struct MUSL_IO_FILE *)stderr;
+
+        // Save the write pointer
+        g_fn.__stderr_write = (size_t (*)(FILE *, const unsigned char *, size_t))stderr_write->write;
+
+        // Modify the write pointer to use our function
+        stderr_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
+    }
+
+    // if we are not hooking all, then we're done
+    if (filter == FALSE) return;
 
     if (dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *handle = g_fn.dlopen(full_path, RTLD_NOW);
@@ -1396,12 +1419,12 @@ initHook(int attachedFlag)
 
         if (should_we_patch) {
             g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
-    
-            rc = funchook_prepare(funchook, (void**)&g_fn.SSL_read, ssl_read_hook);
+
+            if (g_fn.SSL_read) rc = funchook_prepare(funchook, (void**)&g_fn.SSL_read, ssl_read_hook);
 
             g_fn.SSL_write = (ssl_wrfunc_t)load_func(NULL, SSL_FUNC_WRITE);
 
-            rc = funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
+            if (g_fn.SSL_write) rc = funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
         }
 
         // sendmmsg, sendto, recvfrom for internal libc use in DNS queries
@@ -1424,31 +1447,6 @@ initHook(int attachedFlag)
         // Used for mapping SSL IDs to fds with libuv. Must be funchooked since it's internal to libuv
         if (!g_fn.uv_fileno) g_fn.uv_fileno = load_func(NULL, "uv_fileno");
         if (g_fn.uv__read) rc = funchook_prepare(funchook, (void**)&g_fn.uv__read, uv__read_hook);
-
-        // libmusl
-        // Note that both stdout & stderr objects point to the same write function.
-        // They are init'd with a static object. After the first write the
-        // write pointer is modified. We handle that mod in the interposed
-        // function __stdio_write().
-        if ((g_ismusl == TRUE) && (!g_fn.__stdout_write || !g_fn.__stderr_write)) {
-            // Get the static initializer for the stdout write function pointer
-            struct MUSL_IO_FILE *stdout_write = (struct MUSL_IO_FILE *)stdout;
-
-            // Save the write pointer
-            g_fn.__stdout_write = (size_t (*)(FILE *, const unsigned char *, size_t))stdout_write->write;
-
-            // Modify the write pointer to use our function
-            stdout_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
-
-            // same for stderr
-            struct MUSL_IO_FILE *stderr_write = (struct MUSL_IO_FILE *)stderr;
-
-            // Save the write pointer
-            g_fn.__stderr_write = (size_t (*)(FILE *, const unsigned char *, size_t))stderr_write->write;
-
-            // Modify the write pointer to use our function
-            stderr_write->write = (size_t (*)(FILE *, const unsigned char *, size_t))__stdio_write;
-        }
 
         if (g_ismusl == FALSE) {
             if (g_fn.__write_libc) {
@@ -1629,6 +1627,7 @@ init(void)
     // process.
     int attachedFlag = 0;
     initEnv(&attachedFlag);
+
     // logging inside constructor start from this line
     g_constructor_debug_enabled = checkEnv("SCOPE_ALLOW_CONSTRUCT_DBG", "true");
 
@@ -1649,6 +1648,7 @@ init(void)
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
 
+    g_cfg.funcs_attached = TRUE;
     g_cfg.staticfg = g_staticfg;
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
@@ -1677,7 +1677,7 @@ init(void)
 
 }
 
-EXPORTON int
+EXPORTOFF int
 sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 {
     WRAP_CHECK(sigaction, -1);
@@ -1693,7 +1693,7 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
     return g_fn.sigaction(signum, act, oldact);
 }
 
-EXPORTON int
+EXPORTOFF int
 open(const char *pathname, int flags, ...)
 {
     int fd;
@@ -1708,7 +1708,7 @@ open(const char *pathname, int flags, ...)
     return fd;
 }
 
-EXPORTON int
+EXPORTOFF int
 openat(int dirfd, const char *pathname, int flags, ...)
 {
     int fd;
@@ -1722,7 +1722,7 @@ openat(int dirfd, const char *pathname, int flags, ...)
     return fd;
 }
 
-EXPORTON DIR *
+EXPORTOFF DIR *
 opendir(const char *name)
 {
     DIR *dirp;
@@ -1735,7 +1735,7 @@ opendir(const char *name)
     return dirp;
 }
 
-EXPORTON int
+EXPORTOFF int
 closedir(DIR *dirp)
 {
     WRAP_CHECK(closedir, -1);
@@ -1747,7 +1747,7 @@ closedir(DIR *dirp)
     return rc;
 }
 
-EXPORTON struct dirent *
+EXPORTOFF struct dirent *
 readdir(DIR *dirp)
 {
     WRAP_CHECK(readdir, NULL);
@@ -1760,6 +1760,8 @@ readdir(DIR *dirp)
 
     doRead(fd, initialTime, (errno != 0), NULL, sizeof(struct dirent), "readdir", BUF, 0);
 
+    // DR: no longer necessary with scope_errno?
+    // dirfd is documengted not to set errno.
     // If readdir modified errno, leave the errno value alone.
     // Otherwise, restore the saved errno value (before we set it to zero.)
     errno = (errno) ? errno : errsave;
@@ -1767,7 +1769,7 @@ readdir(DIR *dirp)
 }
 
 // Note: creat64 is defined to be obsolete
-EXPORTON int
+EXPORTOFF int
 creat(const char *pathname, mode_t mode)
 {
     int fd;
@@ -1779,7 +1781,7 @@ creat(const char *pathname, mode_t mode)
     return fd;
 }
 
-EXPORTON FILE *
+EXPORTOFF FILE *
 fopen(const char *pathname, const char *mode)
 {
     FILE *stream;
@@ -1792,7 +1794,7 @@ fopen(const char *pathname, const char *mode)
     return stream;
 }
 
-EXPORTON FILE *
+EXPORTOFF FILE *
 freopen(const char *pathname, const char *mode, FILE *orig_stream)
 {
     FILE *stream;
@@ -1813,7 +1815,7 @@ freopen(const char *pathname, const char *mode, FILE *orig_stream)
 }
 
 #ifdef __linux__
-EXPORTON int
+EXPORTOFF int
 nanosleep(const struct timespec *req, struct timespec *rem)
 {
     stopTimer();
@@ -1821,7 +1823,7 @@ nanosleep(const struct timespec *req, struct timespec *rem)
     return g_fn.nanosleep(req, rem);
 }
 
-EXPORTON int
+EXPORTOFF int
 select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)
 {
     stopTimer();
@@ -1829,7 +1831,7 @@ select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct ti
     return g_fn.select(nfds, readfds, writefds, exceptfds, timeout);
 }
 
-EXPORTON int
+EXPORTOFF int
 sigsuspend(const sigset_t *mask)
 {
     stopTimer();
@@ -1837,7 +1839,7 @@ sigsuspend(const sigset_t *mask)
     return g_fn.sigsuspend(mask);
 }
 
-EXPORTON int
+EXPORTOFF int
 epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
 {
     stopTimer();
@@ -1845,7 +1847,7 @@ epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
     return g_fn.epoll_wait(epfd, events, maxevents, timeout);
 }
 
-EXPORTON int
+EXPORTOFF int
 poll(struct pollfd *fds, nfds_t nfds, int timeout)
 {
     stopTimer();
@@ -1853,7 +1855,7 @@ poll(struct pollfd *fds, nfds_t nfds, int timeout)
     return g_fn.poll(fds, nfds, timeout);
 }
 
-EXPORTON int
+EXPORTOFF int
 __poll_chk(struct pollfd *fds, nfds_t nfds, int timeout, size_t fdslen)
 {
     stopTimer();
@@ -1861,7 +1863,7 @@ __poll_chk(struct pollfd *fds, nfds_t nfds, int timeout, size_t fdslen)
     return g_fn.__poll_chk(fds, nfds, timeout, fdslen);
 }
 
-EXPORTON int
+EXPORTOFF int
 pause(void)
 {
     stopTimer();
@@ -1869,7 +1871,7 @@ pause(void)
     return g_fn.pause();
 }
 
-EXPORTON int
+EXPORTOFF int
 sigwaitinfo(const sigset_t *set, siginfo_t *info)
 {
     stopTimer();
@@ -1877,7 +1879,7 @@ sigwaitinfo(const sigset_t *set, siginfo_t *info)
     return g_fn.sigwaitinfo(set, info);
 }
 
-EXPORTON int
+EXPORTOFF int
 sigtimedwait(const sigset_t *set, siginfo_t *info,
              const struct timespec *timeout)
 {
@@ -1886,7 +1888,7 @@ sigtimedwait(const sigset_t *set, siginfo_t *info,
     return g_fn.sigtimedwait(set, info, timeout);
 }
 
-EXPORTON int
+EXPORTOFF int
 epoll_pwait(int epfd, struct epoll_event *events,
             int maxevents, int timeout,
             const sigset_t *sigmask)
@@ -1896,7 +1898,7 @@ epoll_pwait(int epfd, struct epoll_event *events,
     return g_fn.epoll_pwait(epfd, events, maxevents, timeout, sigmask);
 }
 
-EXPORTON int
+EXPORTOFF int
 ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p,
       const sigset_t *sigmask)
 {
@@ -1905,7 +1907,7 @@ ppoll(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p,
     return g_fn.ppoll(fds, nfds, tmo_p, sigmask);
 }
 
-EXPORTON int
+EXPORTOFF int
 __ppoll_chk(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p,
       const sigset_t *sigmask, size_t fdslen)
 {
@@ -1914,7 +1916,7 @@ __ppoll_chk(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p,
     return g_fn.__ppoll_chk(fds, nfds, tmo_p, sigmask, fdslen);
 }
 
-EXPORTON int
+EXPORTOFF int
 pselect(int nfds, fd_set *readfds, fd_set *writefds,
         fd_set *exceptfds, const struct timespec *timeout,
         const sigset_t *sigmask)
@@ -1924,7 +1926,7 @@ pselect(int nfds, fd_set *readfds, fd_set *writefds,
     return g_fn.pselect(nfds, readfds, writefds, exceptfds, timeout, sigmask);
 }
 
-EXPORTON int
+EXPORTOFF int
 msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg)
 {
     stopTimer();
@@ -1932,7 +1934,7 @@ msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg)
     return g_fn.msgsnd(msqid, msgp, msgsz, msgflg);
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg)
 {
     stopTimer();
@@ -1940,7 +1942,7 @@ msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg)
     return g_fn.msgrcv(msqid, msgp, msgsz, msgtyp, msgflg);
 }
 
-EXPORTON int
+EXPORTOFF int
 semop(int semid, struct sembuf *sops, size_t nsops)
 {
     stopTimer();
@@ -1948,7 +1950,7 @@ semop(int semid, struct sembuf *sops, size_t nsops)
     return g_fn.semop(semid, sops, nsops);
 }
 
-EXPORTON int
+EXPORTOFF int
 semtimedop(int semid, struct sembuf *sops, size_t nsops,
            const struct timespec *timeout)
 {
@@ -1957,7 +1959,7 @@ semtimedop(int semid, struct sembuf *sops, size_t nsops,
     return g_fn.semtimedop(semid, sops, nsops, timeout);
 }
 
-EXPORTON int
+EXPORTOFF int
 clock_nanosleep(clockid_t clockid, int flags,
                 const struct timespec *request,
                 struct timespec *remain)
@@ -1967,7 +1969,7 @@ clock_nanosleep(clockid_t clockid, int flags,
     return g_fn.clock_nanosleep(clockid, flags, request, remain);
 }
 
-EXPORTON int
+EXPORTOFF int
 usleep(useconds_t usec)
 {
     stopTimer();
@@ -1975,7 +1977,7 @@ usleep(useconds_t usec)
     return g_fn.usleep(usec);
 }
 
-EXPORTON int
+EXPORTOFF int
 io_getevents(io_context_t ctx_id, long min_nr, long nr,
              struct io_event *events, struct timespec *timeout)
 {
@@ -1984,7 +1986,7 @@ io_getevents(io_context_t ctx_id, long min_nr, long nr,
     return g_fn.io_getevents(ctx_id, min_nr, nr, events, timeout);
 }
 
-EXPORTON int
+EXPORTOFF int
 open64(const char *pathname, int flags, ...)
 {
     int fd;
@@ -1998,7 +2000,7 @@ open64(const char *pathname, int flags, ...)
     return fd;
 }
 
-EXPORTON int
+EXPORTOFF int
 openat64(int dirfd, const char *pathname, int flags, ...)
 {
     int fd;
@@ -2012,7 +2014,7 @@ openat64(int dirfd, const char *pathname, int flags, ...)
     return fd;
 }
 
-EXPORTON int
+EXPORTOFF int
 __open_2(const char *file, int oflag)
 {
     int fd;
@@ -2024,7 +2026,7 @@ __open_2(const char *file, int oflag)
     return fd;
 }
 
-EXPORTON int
+EXPORTOFF int
 __open64_2(const char *file, int oflag)
 {
     int fd;
@@ -2036,7 +2038,7 @@ __open64_2(const char *file, int oflag)
     return fd;
 }
 
-EXPORTON int
+EXPORTOFF int
 __openat_2(int fd, const char *file, int oflag)
 {
     WRAP_CHECK(__openat_2, -1);
@@ -2047,7 +2049,7 @@ __openat_2(int fd, const char *file, int oflag)
 }
 
 // Note: creat64 is defined to be obsolete
-EXPORTON int
+EXPORTOFF int
 creat64(const char *pathname, mode_t mode)
 {
     int fd;
@@ -2059,7 +2061,7 @@ creat64(const char *pathname, mode_t mode)
     return fd;
 }
 
-EXPORTON FILE *
+EXPORTOFF FILE *
 fopen64(const char *pathname, const char *mode)
 {
     FILE *stream;
@@ -2072,7 +2074,7 @@ fopen64(const char *pathname, const char *mode)
     return stream;
 }
 
-EXPORTON FILE *
+EXPORTOFF FILE *
 freopen64(const char *pathname, const char *mode, FILE *orig_stream)
 {
     FILE *stream;
@@ -2089,7 +2091,7 @@ freopen64(const char *pathname, const char *mode, FILE *orig_stream)
     return stream;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 pread64(int fd, void *buf, size_t count, off_t offset)
 {
     WRAP_CHECK(pread64, -1);
@@ -2102,7 +2104,7 @@ pread64(int fd, void *buf, size_t count, off_t offset)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 __pread64_chk(int fd, void *buf, size_t count, off_t offset, size_t bufsize)
 {
     WRAP_CHECK(__pread64_chk, -1);
@@ -2115,7 +2117,7 @@ __pread64_chk(int fd, void *buf, size_t count, off_t offset, size_t bufsize)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 {
     WRAP_CHECK(preadv, -1);
@@ -2128,7 +2130,7 @@ preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 {
     WRAP_CHECK(preadv2, -1);
@@ -2141,7 +2143,7 @@ preadv2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 {
     WRAP_CHECK(preadv64v2, -1);
@@ -2154,7 +2156,7 @@ preadv64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 __pread_chk(int fd, void *buf, size_t nbytes, off_t offset, size_t buflen)
 {
     // TODO: this function aborts & exits on error, add abort functionality
@@ -2168,7 +2170,7 @@ __pread_chk(int fd, void *buf, size_t nbytes, off_t offset, size_t buflen)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 __read_chk(int fd, void *buf, size_t nbytes, size_t buflen)
 {
     // TODO: this function aborts & exits on error, add abort functionality
@@ -2196,7 +2198,7 @@ __fread_unlocked_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
 {
     WRAP_CHECK(pwrite64, -1);
@@ -2209,7 +2211,7 @@ pwrite64(int fd, const void *buf, size_t nbyte, off_t offset)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 {
     WRAP_CHECK(pwritev, -1);
@@ -2222,7 +2224,7 @@ pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 pwritev64(int fd, const struct iovec *iov, int iovcnt, off64_t offset)
 {
     WRAP_CHECK(pwritev64, -1);
@@ -2235,7 +2237,7 @@ pwritev64(int fd, const struct iovec *iov, int iovcnt, off64_t offset)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 pwritev2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 {
     WRAP_CHECK(pwritev2, -1);
@@ -2248,7 +2250,7 @@ pwritev2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags)
 {
     WRAP_CHECK(pwritev64v2, -1);
@@ -2261,7 +2263,7 @@ pwritev64v2(int fd, const struct iovec *iov, int iovcnt, off_t offset, int flags
     return rc;
 }
 
-EXPORTON off64_t
+EXPORTOFF off64_t
 lseek64(int fd, off64_t offset, int whence)
 {
     WRAP_CHECK(lseek64, -1);
@@ -2273,7 +2275,7 @@ lseek64(int fd, off64_t offset, int whence)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fseeko64(FILE *stream, off64_t offset, int whence)
 {
     WRAP_CHECK(fseeko64, -1);
@@ -2285,7 +2287,7 @@ fseeko64(FILE *stream, off64_t offset, int whence)
     return rc;
 }
 
-EXPORTON off64_t
+EXPORTOFF off64_t
 ftello64(FILE *stream)
 {
     WRAP_CHECK(ftello64, -1);
@@ -2297,7 +2299,7 @@ ftello64(FILE *stream)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 statfs64(const char *path, struct statfs64 *buf)
 {
     WRAP_CHECK(statfs64, -1);
@@ -2308,7 +2310,7 @@ statfs64(const char *path, struct statfs64 *buf)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fstatfs64(int fd, struct statfs64 *buf)
 {
     WRAP_CHECK(fstatfs64, -1);
@@ -2319,7 +2321,7 @@ fstatfs64(int fd, struct statfs64 *buf)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fsetpos64(FILE *stream, const fpos64_t *pos)
 {
     WRAP_CHECK(fsetpos64, -1);
@@ -2330,7 +2332,7 @@ fsetpos64(FILE *stream, const fpos64_t *pos)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 __xstat(int ver, const char *path, struct stat *stat_buf)
 {
     WRAP_CHECK(__xstat, -1);
@@ -2341,7 +2343,7 @@ __xstat(int ver, const char *path, struct stat *stat_buf)
     return rc;    
 }
 
-EXPORTON int
+EXPORTOFF int
 __xstat64(int ver, const char *path, struct stat64 *stat_buf)
 {
     WRAP_CHECK(__xstat64, -1);
@@ -2352,7 +2354,7 @@ __xstat64(int ver, const char *path, struct stat64 *stat_buf)
     return rc;    
 }
 
-EXPORTON int
+EXPORTOFF int
 __lxstat(int ver, const char *path, struct stat *stat_buf)
 {
     WRAP_CHECK(__lxstat, -1);
@@ -2363,7 +2365,7 @@ __lxstat(int ver, const char *path, struct stat *stat_buf)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 __lxstat64(int ver, const char *path, struct stat64 *stat_buf)
 {
     WRAP_CHECK(__lxstat64, -1);
@@ -2374,7 +2376,7 @@ __lxstat64(int ver, const char *path, struct stat64 *stat_buf)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 __fxstat(int ver, int fd, struct stat *stat_buf)
 {
     WRAP_CHECK(__fxstat, -1);
@@ -2385,7 +2387,7 @@ __fxstat(int ver, int fd, struct stat *stat_buf)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 __fxstat64(int ver, int fd, struct stat64 * stat_buf)
 {
     WRAP_CHECK(__fxstat64, -1);
@@ -2396,7 +2398,7 @@ __fxstat64(int ver, int fd, struct stat64 * stat_buf)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 __fxstatat(int ver, int dirfd, const char *path, struct stat *stat_buf, int flags)
 {
     WRAP_CHECK(__fxstatat, -1);
@@ -2407,7 +2409,7 @@ __fxstatat(int ver, int dirfd, const char *path, struct stat *stat_buf, int flag
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 __fxstatat64(int ver, int dirfd, const char * path, struct stat64 * stat_buf, int flags)
 {
     WRAP_CHECK(__fxstatat64, -1);
@@ -2419,7 +2421,7 @@ __fxstatat64(int ver, int dirfd, const char * path, struct stat64 * stat_buf, in
 }
 
 #ifdef __STATX__
-EXPORTON int
+EXPORTOFF int
 statx(int dirfd, const char *pathname, int flags,
       unsigned int mask, struct statx *statxbuf)
 {
@@ -2432,7 +2434,7 @@ statx(int dirfd, const char *pathname, int flags,
 }
 #endif // __STATX__
 
-EXPORTON int
+EXPORTOFF int
 statfs(const char *path, struct statfs *buf)
 {
     WRAP_CHECK(statfs, -1);
@@ -2443,7 +2445,7 @@ statfs(const char *path, struct statfs *buf)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fstatfs(int fd, struct statfs *buf)
 {
     WRAP_CHECK(fstatfs, -1);
@@ -2454,7 +2456,7 @@ fstatfs(int fd, struct statfs *buf)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 statvfs(const char *path, struct statvfs *buf)
 {
     WRAP_CHECK(statvfs, -1);
@@ -2465,7 +2467,7 @@ statvfs(const char *path, struct statvfs *buf)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 statvfs64(const char *path, struct statvfs64 *buf)
 {
     WRAP_CHECK(statvfs64, -1);
@@ -2476,7 +2478,7 @@ statvfs64(const char *path, struct statvfs64 *buf)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fstatvfs(int fd, struct statvfs *buf)
 {
     WRAP_CHECK(fstatvfs, -1);
@@ -2487,7 +2489,7 @@ fstatvfs(int fd, struct statvfs *buf)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fstatvfs64(int fd, struct statvfs64 *buf)
 {
     WRAP_CHECK(fstatvfs64, -1);
@@ -2498,7 +2500,7 @@ fstatvfs64(int fd, struct statvfs64 *buf)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 access(const char *pathname, int mode)
 {
     WRAP_CHECK(access, -1);
@@ -2509,7 +2511,7 @@ access(const char *pathname, int mode)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 faccessat(int dirfd, const char *pathname, int mode, int flags)
 {
     WRAP_CHECK(faccessat, -1);
@@ -2608,7 +2610,7 @@ lstat(const char *pathname, struct stat *statbuf)
     return rc;
 }
 */
-EXPORTON int
+EXPORTOFF int
 fstatat(int fd, const char *path, struct stat *buf, int flag)
 {
     WRAP_CHECK(fstatat, -1);
@@ -2619,7 +2621,7 @@ fstatat(int fd, const char *path, struct stat *buf, int flag)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 prctl(int option, ...)
 {
     struct FuncArgs fArgs;
@@ -2675,10 +2677,10 @@ getLdscopeExec(const char* pathname)
     return scopexec;
 }
 
-EXPORTON int
+EXPORTOFF int
 execv(const char *pathname, char *const argv[])
 {
-    int i, nargs, saverr;
+    int i, nargs;
     char *scopexec;
     char **nargv;
 
@@ -2705,18 +2707,16 @@ execv(const char *pathname, char *const argv[])
     }
 
     g_fn.execv(nargv[0], nargv);
-    saverr = errno;
     if (nargv) scope_free(nargv);
     scope_free(scopexec);
-    errno = saverr;
     return -1;
 }
 
 
-EXPORTON int
+EXPORTOFF int
 execve(const char *pathname, char *const argv[], char *const envp[])
 {
-    int i, nargs, saverr;
+    int i, nargs;
     char *scopexec;
     char **nargv;
 
@@ -2743,14 +2743,12 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     }
 
     g_fn.execve(nargv[0], nargv, environ);
-    saverr = errno;
     if (nargv) scope_free(nargv);
     scope_free(scopexec);
-    errno = saverr;
     return -1;
 }
 
-EXPORTON int
+EXPORTOFF int
 __overflow(FILE *stream, int ch)
 {
     WRAP_CHECK(__overflow, EOF);
@@ -2770,6 +2768,8 @@ static ssize_t
 __write_libc(int fd, const void *buf, size_t size)
 {
     WRAP_CHECK(__write_libc, -1);
+    if ((g_ismusl == FALSE) && (g_cfg.funcs_attached == FALSE)) return g_fn.__write_libc(fd, buf, size);
+
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.__write_libc(fd, buf, size);
@@ -2783,6 +2783,8 @@ static ssize_t
 __write_pthread(int fd, const void *buf, size_t size)
 {
     WRAP_CHECK(__write_pthread, -1);
+    if ((g_ismusl == FALSE) && (g_cfg.funcs_attached == FALSE)) return g_fn.__write_pthread(fd, buf, size);
+
     uint64_t initialTime = getTime();
 
     ssize_t rc = g_fn.__write_pthread(fd, buf, size);
@@ -2821,6 +2823,11 @@ wrap_scope_syscall(long number, ...)
 
     WRAP_CHECK(syscall, -1);
     LOAD_FUNC_ARGS_VALIST(fArgs, number);
+
+    if (g_cfg.funcs_attached == FALSE) {
+        return g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2],
+                            fArgs.arg[3], fArgs.arg[4], fArgs.arg[5]);
+    }
 
     switch (number) {
     case SYS_close:
@@ -2920,7 +2927,7 @@ wrap_scope_open(const char* pathname)
 }
 
 
-EXPORTON size_t
+EXPORTOFF size_t
 fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
 {
     WRAP_CHECK(fwrite_unlocked, 0);
@@ -2946,7 +2953,7 @@ fwrite_unlocked(const void *ptr, size_t size, size_t nitems, FILE *stream)
  * We optionally emit metrics if the destination uses a socket
  * We do not emit a separate metric if the destination is a file
  */
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 sendfile(int out_fd, int in_fd, off_t *offset, size_t count)
 {
     WRAP_CHECK(sendfile, -1);
@@ -2959,7 +2966,7 @@ sendfile(int out_fd, int in_fd, off_t *offset, size_t count)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 sendfile64(int out_fd, int in_fd, off64_t *offset, size_t count)
 {
     WRAP_CHECK(sendfile, -1);
@@ -2972,12 +2979,12 @@ sendfile64(int out_fd, int in_fd, off64_t *offset, size_t count)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 SSL_read(SSL *ssl, void *buf, int num)
 {
     int rc;
     
-    //scopeLogError("SSL_read");
+    scopeLogTrace("SSL_read");
     WRAP_CHECK(SSL_read, -1);
     rc = g_fn.SSL_read(ssl, buf, num);
 
@@ -2990,12 +2997,12 @@ SSL_read(SSL *ssl, void *buf, int num)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 SSL_write(SSL *ssl, const void *buf, int num)
 {
     int rc;
     
-    //scopeLogError("SSL_write");
+    scopeLogTrace("SSL_write");
     WRAP_CHECK(SSL_write, -1);
 
     rc = g_fn.SSL_write(ssl, buf, num);
@@ -3043,7 +3050,7 @@ gnutls_get_fd(gnutls_session_t session)
     return fd;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
 {
     ssize_t rc;
@@ -3059,7 +3066,7 @@ gnutls_record_recv(gnutls_session_t session, void *data, size_t data_size)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 gnutls_record_recv_early_data(gnutls_session_t session, void *data, size_t data_size)
 {
     ssize_t rc;
@@ -3090,7 +3097,7 @@ gnutls_record_recv_packet(gnutls_session_t session, gnutls_packet_t *packet)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 gnutls_record_recv_seq(gnutls_session_t session, void *data, size_t data_size, unsigned char *seq)
 {
     ssize_t rc;
@@ -3106,7 +3113,7 @@ gnutls_record_recv_seq(gnutls_session_t session, void *data, size_t data_size, u
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
 {
     ssize_t rc;
@@ -3122,7 +3129,7 @@ gnutls_record_send(gnutls_session_t session, const void *data, size_t data_size)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 gnutls_record_send2(gnutls_session_t session, const void *data, size_t data_size,
                     size_t pad, unsigned flags)
 {
@@ -3139,7 +3146,7 @@ gnutls_record_send2(gnutls_session_t session, const void *data, size_t data_size
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 gnutls_record_send_early_data(gnutls_session_t session, const void *data, size_t data_size)
 {
     ssize_t rc;
@@ -3155,7 +3162,7 @@ gnutls_record_send_early_data(gnutls_session_t session, const void *data, size_t
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 gnutls_record_send_range(gnutls_session_t session, const void *data, size_t data_size,
                          const gnutls_range_st *range)
 {
@@ -3456,7 +3463,7 @@ nss_recvfrom(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags,
     return rc;
 }
 
-EXPORTON PRFileDesc *
+EXPORTOFF PRFileDesc *
 SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
 {
     PRFileDesc *result;
@@ -3504,7 +3511,7 @@ SSL_ImportFD(PRFileDesc *model, PRFileDesc *currFd)
     return result;
 }
 
-EXPORTON void *
+EXPORTOFF void *
 dlopen(const char *filename, int flags)
 {
     void *handle;
@@ -3530,7 +3537,11 @@ dlopen(const char *filename, int flags)
      * GOT entries.
      */
     handle = g_fn.dlopen(filename, flags);
-    if (handle && (flags & RTLD_DEEPBIND)) {
+
+    // if we aren't loading, then be done.
+    if (flags & RTLD_NOLOAD) return handle;
+
+    if (handle) {
         Elf64_Sym *sym = NULL;
         Elf64_Rela *rel = NULL;
         char *str = NULL;
@@ -3542,10 +3553,10 @@ dlopen(const char *filename, int flags)
             scopeLog(CFG_LOG_DEBUG, "\tlibrary:  %s", lm->l_name);
 
             // for each symbol in the list try to hook
-            for (i=0; hook_list[i].symbol; i++) {
-                if ((dlsym(handle, hook_list[i].symbol)) &&
-                    (doGotcha(lm, (got_list_t *)&hook_list[i], rel, sym, str, rsz, 0) != -1)) {
-                    scopeLog(CFG_LOG_DEBUG, "\tdlopen interposed  %s", hook_list[i].symbol);
+            for (i=0; inject_hook_list[i].symbol; i++) {
+                if ((dlsym(handle, inject_hook_list[i].symbol)) &&
+                    (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1)) {
+                    scopeLog(CFG_LOG_DEBUG, "\tdlopen interposed  %s", inject_hook_list[i].symbol);
                 }
             }
         }
@@ -3554,7 +3565,7 @@ dlopen(const char *filename, int flags)
     return handle;
 }
 
-EXPORTON void
+EXPORTOFF void
 _exit(int status)
 {
     handleExit();
@@ -3568,7 +3579,7 @@ _exit(int status)
 
 #endif // __linux__
 
-EXPORTON int
+EXPORTOFF int
 setrlimit(__rlimit_resource_t resource, const struct rlimit *rlim)
 {
     WRAP_CHECK(setrlimit, -1);
@@ -3594,7 +3605,7 @@ setrlimit(__rlimit_resource_t resource, const struct rlimit *rlim)
     return g_fn.setrlimit(resource, rlim);
 }
 
-EXPORTON int
+EXPORTOFF int
 close(int fd)
 {
     WRAP_CHECK(close, -1);
@@ -3608,7 +3619,7 @@ close(int fd)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fclose(FILE *stream)
 {
     WRAP_CHECK(fclose, EOF);
@@ -3623,7 +3634,7 @@ fclose(FILE *stream)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fcloseall(void)
 {
     WRAP_CHECK(close, EOF);
@@ -3638,7 +3649,7 @@ fcloseall(void)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 unlink(const char *pathname)
 {
     WRAP_CHECK(unlink, -1);
@@ -3651,7 +3662,7 @@ unlink(const char *pathname)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 unlinkat(int dirfd, const char *pathname, int flags)
 {
     WRAP_CHECK(unlinkat, -1);
@@ -3665,7 +3676,7 @@ unlinkat(int dirfd, const char *pathname, int flags)
 }
 
 #ifdef __APPLE__
-EXPORTON int
+EXPORTOFF int
 close$NOCANCEL(int fd)
 {
     WRAP_CHECK(close$NOCANCEL, -1);
@@ -3678,7 +3689,7 @@ close$NOCANCEL(int fd)
 }
 
 
-EXPORTON int
+EXPORTOFF int
 guarded_close_np(int fd, void *guard)
 {
     WRAP_CHECK(guarded_close_np, -1);
@@ -3700,7 +3711,7 @@ close_nocancel(int fd)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
     int sd;
@@ -3723,7 +3734,7 @@ accept$NOCANCEL(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     return sd;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 __sendto_nocancel(int sockfd, const void *buf, size_t len, int flags,
                   const struct sockaddr *dest_addr, socklen_t addrlen)
 {
@@ -3775,7 +3786,7 @@ DNSServiceQueryRecord(void *sdRef, uint32_t flags, uint32_t interfaceIndex,
 
 #endif // __APPLE__
 
-EXPORTON off_t
+EXPORTOFF off_t
 lseek(int fd, off_t offset, int whence)
 {
     WRAP_CHECK(lseek, -1);
@@ -3786,7 +3797,7 @@ lseek(int fd, off_t offset, int whence)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fseek(FILE *stream, long offset, int whence)
 {
     WRAP_CHECK(fseek, -1);
@@ -3797,7 +3808,7 @@ fseek(FILE *stream, long offset, int whence)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fseeko(FILE *stream, off_t offset, int whence)
 {
     WRAP_CHECK(fseeko, -1);
@@ -3808,7 +3819,7 @@ fseeko(FILE *stream, off_t offset, int whence)
     return rc;
 }
 
-EXPORTON long
+EXPORTOFF long
 ftell(FILE *stream)
 {
     WRAP_CHECK(ftell, -1);
@@ -3819,7 +3830,7 @@ ftell(FILE *stream)
     return rc;
 }
 
-EXPORTON off_t
+EXPORTOFF off_t
 ftello(FILE *stream)
 {
     WRAP_CHECK(ftello, -1);
@@ -3830,7 +3841,7 @@ ftello(FILE *stream)
     return rc;
 }
 
-EXPORTON void
+EXPORTOFF void
 rewind(FILE *stream)
 {
     WRAP_CHECK_VOID(rewind);
@@ -3841,7 +3852,7 @@ rewind(FILE *stream)
     return;
 }
 
-EXPORTON int
+EXPORTOFF int
 fsetpos(FILE *stream, const fpos_t *pos)
 {
     WRAP_CHECK(fsetpos, -1);
@@ -3852,7 +3863,7 @@ fsetpos(FILE *stream, const fpos_t *pos)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fgetpos(FILE *stream,  fpos_t *pos)
 {
     WRAP_CHECK(fgetpos, -1);
@@ -3863,7 +3874,7 @@ fgetpos(FILE *stream,  fpos_t *pos)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fgetpos64(FILE *stream,  fpos64_t *pos)
 {
     WRAP_CHECK(fgetpos64, -1);
@@ -3932,7 +3943,7 @@ __stdio_write(struct MUSL_IO_FILE *stream, const unsigned char *buf, size_t len)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 write(int fd, const void *buf, size_t count)
 {
     WRAP_CHECK(write, -1);
@@ -3948,7 +3959,7 @@ write(int fd, const void *buf, size_t count)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 pwrite(int fd, const void *buf, size_t nbyte, off_t offset)
 {
     WRAP_CHECK(pwrite, -1);
@@ -3961,7 +3972,7 @@ pwrite(int fd, const void *buf, size_t nbyte, off_t offset)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 writev(int fd, const struct iovec *iov, int iovcnt)
 {
     WRAP_CHECK(writev, -1);
@@ -3974,7 +3985,7 @@ writev(int fd, const struct iovec *iov, int iovcnt)
     return rc;
 }
 
-EXPORTON size_t
+EXPORTOFF size_t
 fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
 {
     WRAP_CHECK(fwrite, 0);
@@ -3990,7 +4001,7 @@ fwrite(const void * ptr, size_t size, size_t nitems, FILE * stream)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 puts(const char *s)
 {
     WRAP_CHECK(puts, EOF);
@@ -4011,7 +4022,7 @@ puts(const char *s)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 putchar(int c)
 {
     WRAP_CHECK(putchar, EOF);
@@ -4027,7 +4038,7 @@ putchar(int c)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fputs(const char *s, FILE *stream)
 {
     WRAP_CHECK(fputs, EOF);
@@ -4043,7 +4054,7 @@ fputs(const char *s, FILE *stream)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fputs_unlocked(const char *s, FILE *stream)
 {
     WRAP_CHECK(fputs_unlocked, EOF);
@@ -4059,7 +4070,7 @@ fputs_unlocked(const char *s, FILE *stream)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 read(int fd, void *buf, size_t count)
 {
     WRAP_CHECK(read, -1);
@@ -4072,7 +4083,7 @@ read(int fd, void *buf, size_t count)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 readv(int fd, const struct iovec *iov, int iovcnt)
 {
     WRAP_CHECK(readv, -1);
@@ -4085,7 +4096,7 @@ readv(int fd, const struct iovec *iov, int iovcnt)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 pread(int fd, void *buf, size_t count, off_t offset)
 {
     WRAP_CHECK(pread, -1);
@@ -4098,7 +4109,7 @@ pread(int fd, void *buf, size_t count, off_t offset)
     return rc;
 }
 
-EXPORTON size_t
+EXPORTOFF size_t
 fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     WRAP_CHECK(fread, 0);
@@ -4111,7 +4122,7 @@ fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
     return rc;
 }
 
-EXPORTON size_t
+EXPORTOFF size_t
 __fread_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *stream)
 {
     // TODO: this function aborts & exits on error, add abort functionality
@@ -4125,7 +4136,7 @@ __fread_chk(void *ptr, size_t ptrlen, size_t size, size_t nmemb, FILE *stream)
     return rc;
 }
 
-EXPORTON size_t
+EXPORTOFF size_t
 fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     WRAP_CHECK(fread_unlocked, 0);
@@ -4138,7 +4149,7 @@ fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
     return rc;
 }
 
-EXPORTON char *
+EXPORTOFF char *
 fgets(char *s, int n, FILE *stream)
 {
     WRAP_CHECK(fgets, NULL);
@@ -4151,7 +4162,7 @@ fgets(char *s, int n, FILE *stream)
     return rc;
 }
 
-EXPORTON char *
+EXPORTOFF char *
 __fgets_chk(char *s, size_t size, int strsize, FILE *stream)
 {
     // TODO: this function aborts & exits on error, add abort functionality
@@ -4165,7 +4176,7 @@ __fgets_chk(char *s, size_t size, int strsize, FILE *stream)
     return rc;
 }
 
-EXPORTON char *
+EXPORTOFF char *
 fgets_unlocked(char *s, int n, FILE *stream)
 {
     WRAP_CHECK(fgets_unlocked, NULL);
@@ -4178,7 +4189,7 @@ fgets_unlocked(char *s, int n, FILE *stream)
     return rc;
 }
 
-EXPORTON wchar_t *
+EXPORTOFF wchar_t *
 __fgetws_chk(wchar_t *ws, size_t size, int strsize, FILE *stream)
 {
     // TODO: this function aborts & exits on error, add abort functionality
@@ -4192,7 +4203,7 @@ __fgetws_chk(wchar_t *ws, size_t size, int strsize, FILE *stream)
     return rc;
 }
 
-EXPORTON wchar_t *
+EXPORTOFF wchar_t *
 fgetws(wchar_t *ws, int n, FILE *stream)
 {
     WRAP_CHECK(fgetws, NULL);
@@ -4205,7 +4216,7 @@ fgetws(wchar_t *ws, int n, FILE *stream)
     return rc;
 }
 
-EXPORTON wint_t
+EXPORTOFF wint_t
 fgetwc(FILE *stream)
 {
     WRAP_CHECK(fgetwc, WEOF);
@@ -4218,7 +4229,7 @@ fgetwc(FILE *stream)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fgetc(FILE *stream)
 {
     WRAP_CHECK(fgetc, EOF);
@@ -4231,7 +4242,7 @@ fgetc(FILE *stream)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fputc(int c, FILE *stream)
 {
     WRAP_CHECK(fputc, EOF);
@@ -4247,7 +4258,7 @@ fputc(int c, FILE *stream)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fputc_unlocked(int c, FILE *stream)
 {
     WRAP_CHECK(fputc_unlocked, EOF);
@@ -4263,7 +4274,7 @@ fputc_unlocked(int c, FILE *stream)
     return rc;
 }
 
-EXPORTON wint_t
+EXPORTOFF wint_t
 putwc(wchar_t wc, FILE *stream)
 {
     WRAP_CHECK(putwc, WEOF);
@@ -4279,7 +4290,7 @@ putwc(wchar_t wc, FILE *stream)
     return rc;
 }
 
-EXPORTON wint_t
+EXPORTOFF wint_t
 fputwc(wchar_t wc, FILE *stream)
 {
     WRAP_CHECK(fputwc, WEOF);
@@ -4295,6 +4306,10 @@ fputwc(wchar_t wc, FILE *stream)
     return rc;
 }
 
+/*
+ * Note: we are not interposing fscanf.
+ * It's here as an example. We will need to deal with the variable arg list in order to turn this on.
+ */
 EXPORTOFF int
 fscanf(FILE *stream, const char *format, ...)
 {
@@ -4304,16 +4319,16 @@ fscanf(FILE *stream, const char *format, ...)
     uint64_t initialTime = getTime();
 
     int rc = g_fn.fscanf(stream, format,
-                     fArgs.arg[0], fArgs.arg[1],
-                     fArgs.arg[2], fArgs.arg[3],
-                     fArgs.arg[4], fArgs.arg[5]);
+                         fArgs.arg[0], fArgs.arg[1],
+                         fArgs.arg[2], fArgs.arg[3],
+                         fArgs.arg[4], fArgs.arg[5]);
 
     doRead(wrap_scope_fileno(stream),initialTime, (rc != EOF), NULL, rc, "fscanf", NONE, 0);
 
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 getline (char **lineptr, size_t *n, FILE *stream)
 {
     WRAP_CHECK(getline, -1);
@@ -4327,7 +4342,7 @@ getline (char **lineptr, size_t *n, FILE *stream)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
 {
     WRAP_CHECK(getdelim, -1);
@@ -4342,7 +4357,7 @@ getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 __getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
 {
     WRAP_CHECK(__getdelim, -1);
@@ -4359,7 +4374,7 @@ __getdelim (char **lineptr, size_t *n, int delimiter, FILE *stream)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fcntl(int fd, int cmd, ...)
 {
     struct FuncArgs fArgs;
@@ -4375,7 +4390,7 @@ fcntl(int fd, int cmd, ...)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 fcntl64(int fd, int cmd, ...)
 {
     struct FuncArgs fArgs;
@@ -4391,7 +4406,7 @@ fcntl64(int fd, int cmd, ...)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 dup(int fd)
 {
     WRAP_CHECK(dup, -1);
@@ -4401,7 +4416,7 @@ dup(int fd)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 dup2(int oldfd, int newfd)
 {
     WRAP_CHECK(dup2, -1);
@@ -4420,7 +4435,7 @@ dup2(int oldfd, int newfd)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 dup3(int oldfd, int newfd, int flags)
 {
     WRAP_CHECK(dup3, -1);
@@ -4447,7 +4462,7 @@ vsyslog(int priority, const char *format, va_list ap)
     return;
 }
 
-EXPORTON pid_t
+EXPORTOFF pid_t
 fork()
 {
     pid_t rc;
@@ -4472,7 +4487,7 @@ fork()
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 socket(int socket_family, int socket_type, int protocol)
 {
     int sd;
@@ -4502,7 +4517,7 @@ socket(int socket_family, int socket_type, int protocol)
     return sd;
 }
 
-EXPORTON int
+EXPORTOFF int
 shutdown(int sockfd, int how)
 {
     int rc;
@@ -4518,7 +4533,7 @@ shutdown(int sockfd, int how)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 listen(int sockfd, int backlog)
 {
     int rc;
@@ -4536,7 +4551,7 @@ listen(int sockfd, int backlog)
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
     int sd;
@@ -4559,7 +4574,7 @@ accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
     return sd;
 }
 
-EXPORTON int
+EXPORTOFF int
 accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
 {
     int sd;
@@ -4582,7 +4597,7 @@ accept4(int sockfd, struct sockaddr *addr, socklen_t *addrlen, int flags)
     return sd;
 }
 
-EXPORTON int
+EXPORTOFF int
 bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
     int rc;
@@ -4600,7 +4615,7 @@ bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 
 }
 
-EXPORTON int
+EXPORTOFF int
 connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
     int rc;
@@ -4623,12 +4638,11 @@ connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 send(int sockfd, const void *buf, size_t len, int flags)
 {
     ssize_t rc;
     WRAP_CHECK(send, -1);
-    doURL(sockfd, buf, len, NETTX);
     rc = g_fn.send(sockfd, buf, len, flags);
     if (rc != -1) {
         scopeLog(CFG_LOG_TRACE, "fd:%d send", sockfd);
@@ -4652,6 +4666,8 @@ internal_sendto(int sockfd, const void *buf, size_t len, int flags,
     ssize_t rc;
     WRAP_CHECK(sendto, -1);
     rc = g_fn.sendto(sockfd, buf, len, flags, dest_addr, addrlen);
+    if ((g_ismusl == TRUE) && (g_cfg.funcs_attached == FALSE)) return rc; 
+
     if (rc != -1) {
         scopeLog(CFG_LOG_TRACE, "fd:%d sendto", sockfd);
         doSetConnection(sockfd, dest_addr, addrlen, REMOTE);
@@ -4669,14 +4685,14 @@ internal_sendto(int sockfd, const void *buf, size_t len, int flags,
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 sendto(int sockfd, const void *buf, size_t len, int flags,
        const struct sockaddr *dest_addr, socklen_t addrlen)
 {
     return internal_sendto(sockfd, buf, len, flags, dest_addr, addrlen);
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 sendmsg(int sockfd, const struct msghdr *msg, int flags)
 {
     ssize_t rc;
@@ -4733,7 +4749,10 @@ internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int fla
     ssize_t rc;
 
     WRAP_CHECK(sendmmsg, -1);
+
     rc = g_fn.sendmmsg(sockfd, msgvec, vlen, flags);
+    if ((g_ismusl == FALSE) && (g_cfg.funcs_attached == FALSE)) return rc;
+
     if (rc != -1) {
         scopeLog(CFG_LOG_TRACE, "fd:%d sendmmsg", sockfd);
 
@@ -4762,23 +4781,21 @@ internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int fla
     return rc;
 }
 
-EXPORTON int
+EXPORTOFF int
 sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags)
 {
     return internal_sendmmsg(sockfd, msgvec, vlen, flags);
 }
 #endif // __linux__
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 recv(int sockfd, void *buf, size_t len, int flags)
 {
     ssize_t rc;
 
     WRAP_CHECK(recv, -1);
     scopeLog(CFG_LOG_TRACE, "fd:%d recv", sockfd);
-    if ((rc = doURL(sockfd, buf, len, NETRX)) == 0) {
-        rc = g_fn.recv(sockfd, buf, len, flags);
-    }
+    rc = g_fn.recv(sockfd, buf, len, flags);
 
     // If called with the MSG_PEEK flag set, don't do any scope processing
     // as it could result in processing of duplicate bytes later
@@ -4798,16 +4815,14 @@ recv(int sockfd, void *buf, size_t len, int flags)
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 __recv_chk(int sockfd, void *buf, size_t len, size_t buflen, int flags)
 {
     ssize_t rc;
 
     WRAP_CHECK(__recv_chk, -1);
     scopeLog(CFG_LOG_TRACE, "fd:%d __recv_chk", sockfd);
-    if ((rc = doURL(sockfd, buf, len, NETRX)) == 0) {
-        rc = g_fn.__recv_chk(sockfd, buf, len, buflen, flags);
-    }
+    rc = g_fn.__recv_chk(sockfd, buf, len, buflen, flags);
 
     // If called with the MSG_PEEK flag set, don't do any scope processing
     // as it could result in processing of duplicate bytes later
@@ -4835,6 +4850,7 @@ internal_recvfrom(int sockfd, void *buf, size_t len, int flags,
 
     WRAP_CHECK(recvfrom, -1);
     rc = g_fn.recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+    if ((g_ismusl == TRUE) && (g_cfg.funcs_attached == FALSE)) return rc;
 
     // If called with the MSG_PEEK flag set, don't do any scope processing
     // as it could result in processing of duplicate bytes later
@@ -4852,14 +4868,14 @@ internal_recvfrom(int sockfd, void *buf, size_t len, int flags,
     return rc;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 recvfrom(int sockfd, void *buf, size_t len, int flags,
          struct sockaddr *src_addr, socklen_t *addrlen)
 {
     return internal_recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 __recvfrom_chk(int sockfd, void *buf, size_t len, size_t buflen, int flags,
          struct sockaddr *src_addr, socklen_t *addrlen)
 {
@@ -4922,7 +4938,7 @@ doAccessRights(struct msghdr *msg)
     return 0;
 }
 
-EXPORTON ssize_t
+EXPORTOFF ssize_t
 recvmsg(int sockfd, struct msghdr *msg, int flags)
 {
     ssize_t rc;
@@ -4976,7 +4992,7 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
 }
 
 #ifdef __linux__
-EXPORTON int
+EXPORTOFF int
 recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
          int flags, struct timespec *timeout)
 {
@@ -5190,7 +5206,7 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
  * they do not call our lib constructor. We interpose this
  * as a means to call the constructor before the go app runs.
  */
-EXPORTON int
+EXPORTOFF int
 pthread_create(pthread_t *thread, const pthread_attr_t *attr,
                void *(*start_routine)(void *), void *arg)
 {
@@ -5279,6 +5295,8 @@ __fdelt_chk(long int fdelt)
 static void
 uv__read_hook(void *stream)
 {
+    if (g_cfg.funcs_attached == FALSE) return g_fn.uv__read(stream);
+
     if (SYMBOL_LOADED(uv_fileno)) g_fn.uv_fileno(stream, &g_ssl_fd);
     //scopeLog(CFG_LOG_TRACE, "%s: fd %d", __FUNCTION__, g_ssl_fd);
     if (g_fn.uv__read) return g_fn.uv__read(stream);
@@ -5330,3 +5348,174 @@ wrap_scope_dlsym(void *handle, const char *name, void *who)
     return dlsym(handle, name);
 }
 
+static got_list_t inject_hook_list[] = {
+    {"sigaction",   sigaction, &g_fn.sigaction},
+    {"open",        open, &g_fn.open},
+    {"openat",      openat, &g_fn.openat},
+    {"fopen",       fopen, &g_fn.fopen},
+    {"freopen",     freopen, &g_fn.freopen},
+    {"nanosleep",   nanosleep, &g_fn.nanosleep},
+    {"select",      select, &g_fn.select},
+    {"sigsuspend",  sigsuspend, &g_fn.sigsuspend},
+    {"epoll_wait",  epoll_wait, &g_fn.epoll_wait},
+    {"poll",        poll, &g_fn.poll},
+    {"__poll_chk",  __poll_chk, &g_fn.__poll_chk},
+    {"pause",       pause, &g_fn.pause},
+    {"sigwaitinfo", sigwaitinfo, &g_fn.sigwaitinfo},
+    {"sigtimedwait", sigtimedwait, &g_fn.sigtimedwait},
+    {"epoll_pwait", epoll_pwait, &g_fn.epoll_pwait},
+    {"ppoll",       ppoll, &g_fn.ppoll},
+    {"__ppoll_chk", __ppoll_chk, &g_fn.__ppoll_chk},
+    {"pselect",     pselect, &g_fn.pselect},
+    {"msgsnd",      msgsnd, &g_fn.msgsnd},
+    {"msgrcv",      msgrcv, &g_fn.msgrcv},
+    {"semop",       semop, &g_fn.semop},
+    {"semtimedop",  semtimedop, &g_fn.semtimedop},
+    {"clock_nanosleep", clock_nanosleep, &g_fn.clock_nanosleep},
+    {"usleep", usleep, &g_fn.usleep},
+    {"io_getevents", io_getevents, &g_fn.io_getevents},
+    {"open64", open64, &g_fn.open64},
+    {"openat64", openat64, &g_fn.openat64},
+    {"__open_2", __open_2, &g_fn.__open_2},
+    {"__open64_2", __open64_2, &g_fn.__open64_2},
+    {"__openat_2", __openat_2, &g_fn.__openat_2},
+    {"creat64", creat64, &g_fn.creat64},
+    {"fopen64", fopen64, &g_fn.fopen64},
+    {"freopen64", freopen64, &g_fn.freopen64},
+    {"pread64", pread64, &g_fn.pread64},
+    {"__pread64_chk", __pread64_chk, &g_fn.__pread64_chk},
+    {"preadv", preadv, &g_fn.preadv},
+    {"preadv2", preadv2, &g_fn.preadv2},
+    {"preadv64v2", preadv64v2, &g_fn.preadv64v2},
+    {"__pread_chk", __pread_chk, &g_fn.__pread_chk},
+    {"__read_chk", __read_chk, &g_fn.__read_chk},
+    {"__fread_unlocked_chk", __fread_unlocked_chk, &g_fn.__fread_unlocked_chk},
+    {"pwrite64", pwrite64, &g_fn.pwrite64},
+    {"pwritev", pwritev, &g_fn.pwritev},
+    {"pwritev64", pwritev64, &g_fn.pwritev64},
+    {"pwritev2", pwritev2, &g_fn.pwritev2},
+    {"pwritev64v2", pwritev64v2, &g_fn.pwritev64v2},
+    {"lseek64", lseek64, &g_fn.lseek64},
+    {"fseeko64", fseeko64, &g_fn.fseeko64},
+    {"ftello64", ftello64, &g_fn.ftello64},
+    {"statfs64", statfs64, &g_fn.statfs64},
+    {"fstatfs64", fstatfs64, &g_fn.fstatfs64},
+    {"fsetpos64", fsetpos64, &g_fn.fsetpos64},
+    {"__xstat", __xstat, &g_fn.__xstat},
+    {"__xstat64", __xstat64, &g_fn.__xstat64},
+    {"__lxstat", __lxstat, &g_fn.__lxstat},
+    {"__lxstat64", __lxstat64, &g_fn.__lxstat64},
+    {"__fxstat", __fxstat, &g_fn.__fxstat},
+    {"__fxstatat", __fxstatat, &g_fn.__fxstatat},
+    {"__fxstatat64", __fxstatat64, &g_fn.__fxstatat64},
+    {"statfs", statfs, &g_fn.statfs},
+    {"fstatfs", fstatfs, &g_fn.fstatfs},
+    {"statvfs", statvfs, &g_fn.statvfs},
+    {"statvfs64", statvfs64, &g_fn.statvfs64},
+    {"fstatvfs", fstatvfs, &g_fn.fstatvfs},
+    {"fstatvfs64", fstatvfs64, &g_fn.fstatvfs64},
+    {"access", access, &g_fn.access},
+    {"faccessat", faccessat, &g_fn.faccessat},
+    {"gethostbyname_r", gethostbyname_r, &g_fn.gethostbyname_r},
+    {"gethostbyname2_r", gethostbyname2_r, &g_fn.gethostbyname2_r},
+    {"fstatat", fstatat, &g_fn.fstatat},
+    {"prctl", prctl, &g_fn.prctl},
+    {"execve", execve, &g_fn.execve},
+    {"execv", execv, &g_fn.execv},
+    {"syscall", syscall, &g_fn.syscall},
+    {"sendfile", sendfile, &g_fn.sendfile},
+    {"sendfile64", sendfile64, &g_fn.sendfile64},
+    {"SSL_read", SSL_read, &g_fn.SSL_read},
+    {"SSL_write", SSL_write, &g_fn.SSL_write},
+    {"gnutls_record_recv", gnutls_record_recv, &g_fn.gnutls_record_recv},
+    {"gnutls_record_recv_early_data", gnutls_record_recv_early_data, &g_fn.gnutls_record_recv_early_data},
+    {"gnutls_record_recv_packet", gnutls_record_recv_packet, &g_fn.gnutls_record_recv_packet},
+    {"gnutls_record_recv_seq", gnutls_record_recv_seq, &g_fn.gnutls_record_recv_seq},
+    {"gnutls_record_send", gnutls_record_send, &g_fn.gnutls_record_send},
+    {"gnutls_record_send2", gnutls_record_send2, &g_fn.gnutls_record_send2},
+    {"gnutls_record_send_early_data", gnutls_record_send_early_data, &g_fn.gnutls_record_send_early_data},
+    {"gnutls_record_send_range", gnutls_record_send_range, &g_fn.gnutls_record_send_range},
+    {"dlopen", dlopen, &g_fn.dlopen},
+    {"_exit", _exit, &g_fn._exit},
+    {"close", close, &g_fn.close},
+    {"fclose", fclose, &g_fn.fclose},
+    {"fcloseall", fcloseall, &g_fn.fcloseall},
+    {"unlink", unlink, &g_fn.unlink},
+    {"unlinkat", unlinkat, &g_fn.unlinkat},
+    {"lseek", lseek, &g_fn.lseek},
+    {"fseek", fseek, &g_fn.fseek},
+    {"fseeko", fseeko, &g_fn.fseeko},
+    {"ftell", ftell, &g_fn.ftell},
+    {"ftello", ftello, &g_fn.ftello},
+    {"rewind", rewind, &g_fn.rewind},
+    {"fsetpos", fsetpos, &g_fn.fsetpos},
+    {"fgetpos", fgetpos, &g_fn.fgetpos},
+    {"fgetpos64", fgetpos64, &g_fn.fgetpos64},
+    {"write", write, &g_fn.write},
+    {"pwrite", pwrite, &g_fn.pwrite},
+    {"writev", writev, &g_fn.writev},
+    {"fwrite", fwrite, &g_fn.fwrite},
+    {"puts", puts, &g_fn.puts},
+    {"putchar", putchar, &g_fn.putchar},
+    {"fputs", fputs, &g_fn.fputs},
+    {"fputs_unlocked", fputs_unlocked, &g_fn.fputs_unlocked},
+    {"read", read, &g_fn.read},
+    {"readv", readv, &g_fn.readv},
+    {"pread", pread, &g_fn.pread},
+    {"fread", fread, &g_fn.fread},
+    {"__fread_chk", __fread_chk, &g_fn.__fread_chk},
+    {"fgets", fgets, &g_fn.fgets},
+    {"__fgets_chk", __fgets_chk, &g_fn.__fgets_chk},
+    {"fgets_unlocked", fgets_unlocked, &g_fn.fgets_unlocked},
+    {"__fgetws_chk", __fgetws_chk, &g_fn.__fgetws_chk},
+    {"fgetws", fgetws, &g_fn.fgetws},
+    {"fgetwc", fgetwc, &g_fn.fgetwc},
+    {"fgetc", fgetc, &g_fn.fgetc},
+    {"fputc", fputc, &g_fn.fputc},
+    {"fputc_unlocked", fputc_unlocked, &g_fn.fputc_unlocked},
+    {"putwc", putwc, &g_fn.putwc},
+    {"fputwc", fputwc, &g_fn.fputwc},
+    {"getline", getline, &g_fn.getline},
+    {"getdelim", getdelim, &g_fn.getdelim},
+    {"__getdelim", __getdelim, &g_fn.__getdelim},
+    {"fcntl", fcntl, &g_fn.fcntl},
+    {"fcntl64", fcntl64, &g_fn.fcntl64},
+    {"dup", dup, &g_fn.dup},
+    {"dup2", dup2, &g_fn.dup2},
+    {"dup3", dup3, &g_fn.dup3},
+    {"vsyslog", vsyslog, &g_fn.vsyslog},
+    {"fork", fork, &g_fn.fork},
+    {"socket", socket, &g_fn.socket},
+    {"shutdown", shutdown, &g_fn.shutdown},
+    {"listen", listen, &g_fn.listen},
+    {"accept", accept, &g_fn.accept},
+    {"accept4", accept4, &g_fn.accept4},
+    {"bind", bind, &g_fn.bind},
+    {"connect", connect, &g_fn.connect},
+    {"send", send, &g_fn.send},
+    {"sendto", sendto, &g_fn.sendto},
+    {"sendmsg", sendmsg, &g_fn.sendmsg},
+    {"sendmmsg", sendmmsg, &g_fn.sendmmsg},
+    {"recv", recv, &g_fn.recv},
+    {"__recv_chk", __recv_chk, &g_fn.__recv_chk},
+    {"recvfrom", recvfrom, &g_fn.recvfrom},
+    {"__recvfrom_chk", __recvfrom_chk, &g_fn.__recvfrom_chk},
+    {"recvmsg", recvmsg, &g_fn.recvmsg},
+    {"opendir", opendir, &g_fn.opendir},
+    {"closedir", closedir, &g_fn.closedir},
+    {"readdir", readdir, &g_fn.readdir},
+    {"gethostbyname", gethostbyname, &g_fn.gethostbyname},
+    {"gethostbyname2", gethostbyname2, &g_fn.gethostbyname2},
+    {"gethostbyname_r", gethostbyname_r, &g_fn.gethostbyname_r},
+    {"gethostbyname2_r", gethostbyname2_r, &g_fn.gethostbyname2_r},
+    {"getaddrinfo", getaddrinfo, &g_fn.getaddrinfo},
+    {"__fprintf_chk", __fprintf_chk, &g_fn.__fprintf_chk},
+    {"__memset_chk", __memset_chk, &g_fn.__memset_chk},
+    {"__memcpy_chk", __memcpy_chk, &g_fn.__memcpy_chk},
+    {"__sprintf_chk", __sprintf_chk, &g_fn.__sprintf_chk},
+    {"__fdelt_chk", __fdelt_chk, &g_fn.__fdelt_chk},
+    {"__register_atfork", __register_atfork, &g_fn.__register_atfork},
+    {"setrlimit", setrlimit, &g_fn.setrlimit},
+    {"SSL_ImportFD", SSL_ImportFD, &g_fn.SSL_ImportFD},
+    {NULL, NULL, NULL}
+};

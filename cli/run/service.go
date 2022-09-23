@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"syscall"
 
+	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/util"
 )
 
@@ -100,7 +102,8 @@ func (rc *Config) installScope(serviceName string, unameMachine string, unameSys
 	loaderPath := libraryDir + "/ldscope"
 	err = os.WriteFile(loaderPath, asset, 0755)
 	util.CheckErrSprintf(err, "error: failed to extract loader; %v", err)
-	rc.Patch(libraryDir)
+	ld := loader.ScopeLoader{Path: loaderPath}
+	ld.Patch(path.Join(libraryDir, "libscope.so"))
 	err = os.Remove(loaderPath)
 	util.CheckErrSprintf(err, "error: failed to remove loader; %v", err)
 

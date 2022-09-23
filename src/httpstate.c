@@ -132,9 +132,8 @@ getContentLength(char *header, size_t len)
     PCRE2_UCHAR *cLen; PCRE2_SIZE cLenLen;
     pcre2_substring_get_bynumber(matches, 1, &cLen, &cLenLen);
 
-    scope_errno = 0;
     size_t ret = scope_strtoull((const char *)cLen, NULL, 0);
-    if ((scope_errno != 0) || (ret == 0)) {
+    if ((ret == 0) || (ret == ULLONG_MAX)) {
         ret = -1;
     }
 

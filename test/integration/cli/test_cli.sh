@@ -161,9 +161,42 @@ returns 0
 
 endtest
 
+#
+# Scope start no input
+#
+starttest "Scope start no input"
+
+# Scope start
+run scope start
+outputs "missing filter data"
+returns 1
+
+endtest
+
+#
+# Scope start empty file pipeline
+#
+starttest "Scope start empty file pipeline"
+
+OUT=$(cat /opt/test-runner/empty_file | scope start 2>/dev/null)
+RET=$?
+outputs "missing filter data"
+returns 1
 
 
+endtest
 
+#
+# Scope start empty file redirect
+#
+starttest "Scope start empty file redirect"
+
+OUT=$(scope start < /opt/test-runner/empty_file 2>/dev/null)
+RET=$?
+outputs "missing filter data"
+returns 1
+
+endtest
 
 ################# END TESTS ################# 
 

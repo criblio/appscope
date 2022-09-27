@@ -19,7 +19,8 @@ COPY ./cli/expected.yml /
 RUN mkdir /opt/test-runner && \
     mkdir -p /var/run/appscope/ && \
     mkdir -p /opt/cribl/state/ && \
-    mkdir -p /opt/cribl/home/state
+    mkdir -p /opt/cribl/home/state && \
+    touch /opt/test-runner/empty_file
 
 ENV SCOPE_CRIBL_ENABLE=false
 ENV SCOPE_LOG_LEVEL=error

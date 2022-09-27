@@ -38,21 +38,19 @@ type allowProcConfig struct {
 // return status from start operation
 var startErr error
 
-// Retrieve and unmarshall configuration passed in stdin.
-// It returns the status of operation.
-func getConfigFromStdin() (startConfig, []byte, error) {
+var (
+	errMissingData = errors.New("missing filter data")
+)
+
+// startConfigfromData loads a start configuration from data
+// It returns the configuration.
+func startConfigfromData(dataIn []byte) (startConfig, error) {
 
 	var startCfg startConfig
 
-	data, err := io.ReadAll(os.Stdin)
+	err := yaml.Unmarshal(dataIn, &startCfg)
 
-	if err != nil {
-		return startCfg, data, err
-	}
-
-	err = yaml.Unmarshal(data, &startCfg)
-
-	return startCfg, data, err
+	return startCfg, err
 }
 
 // startAttachSingleProcess attach to the the specific process identifed by pid with configuration pass in cfgData.
@@ -250,10 +248,17 @@ func startSetupContainer(allowProcs []allowProcConfig) error {
 	// Iterate over all containers
 	cPids, err := util.GetDockerPids()
 	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("Setup containers failed.")
-		startErr = err
+		switch {
+		case errors.Is(err, util.ErrDockerNotAvailable):
+			log.Info().
+				Msgf("Setup containers skipped. Docker is not available")
+			return nil
+		default:
+			log.Error().
+				Err(err).
+				Msg("Setup containers failed.")
+			startErr = err
+		}
 	}
 
 	for _, cPid := range cPids {
@@ -303,10 +308,37 @@ func startSetupContainer(allowProcs []allowProcConfig) error {
 	return nil
 }
 
+// getStartData reads data from Stdin
+func getStartData() []byte {
+	var startData []byte
+	stdinFs, err := os.Stdin.Stat()
+
+	if err != nil {
+		return startData
+	}
+
+	// Verify size of data for mode other than a pipe
+	if stdinFs.Size() == 0 && stdinFs.Mode()&os.ModeNamedPipe == 0 {
+		return startData
+	}
+
+	startData, _ = io.ReadAll(os.Stdin)
+	return startData
+}
+
 // Start runs start command responsible for setup host and container env
 // It returns the status of operation.
 func (rc *Config) Start() error {
 	rc.setupWorkDir([]string{"start"}, true)
+
+	cfgData := getStartData()
+	if len(cfgData) == 0 {
+		startErr = errMissingData
+		log.Error().
+			Err(startErr).
+			Msg("Missing filter data.")
+		return startErr
+	}
 
 	// Validate user has root permissions
 	if err := util.UserVerifyRootPerm(); err != nil {
@@ -318,7 +350,7 @@ func (rc *Config) Start() error {
 	}
 
 	// Retrieve input data
-	startCfg, startcfgData, err := getConfigFromStdin()
+	startCfg, err := startConfigfromData(cfgData)
 	if err != nil {
 		log.Error().
 			Err(err).
@@ -336,7 +368,7 @@ func (rc *Config) Start() error {
 	}
 
 	// Configure Host
-	startConfigureHost(startcfgData)
+	startConfigureHost(cfgData)
 
 	// Setup Containers
 	startSetupContainer(startCfg.AllowProc)

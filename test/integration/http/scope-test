@@ -5,8 +5,8 @@
 # Some sites support HTTP2, others HTTP1
 H2_URL=http://nghttp2.org/robots.txt
 H2_URL_HTTPS=https://nghttp2.org/robots.txt
-H1_URL=http://gnu.org
-H1_URL_HTTPS=https://gnu.org
+H1_URL=http://google.com
+H1_URL_HTTPS=https://google.com
 
 # LogStream will be configured to dump NDJSON output files here.
 DEST=/tmp/out/appscope:in_appscope

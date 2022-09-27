@@ -109,29 +109,17 @@ services:
       args:
         GO_IMAGE_VER: golang:1.7
     <<: *scope-common
-  # golang:1.8 is available for arm64 but some Debian dependencies aren't
   go_8:
     image: ghcr.io/criblio/appscope-test-go_8:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
         - ghcr.io/criblio/appscope-test-go_8:${TAG:?Missing TAG environment variable}
       context: .
-      dockerfile: ./go/Dockerfile
+      dockerfile: ./go/unsupported/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.8
     <<: *scope-common
-
   # the rest of the Go tests are skipped on ARM until we add support in scope
-  go_8:
-    image: ghcr.io/criblio/appscope-test-go_8:${TAG:?Missing TAG environment variable}
-    build:
-      cache_from:
-        - ghcr.io/criblio/appscope-test-go_8:${TAG:?Missing TAG environment variable}
-      context: .
-      dockerfile: ./go/Dockerfile
-      args:
-        GO_IMAGE_VER: golang:1.8
-    <<: *scope-common
   go_9:
     image: ghcr.io/criblio/appscope-test-go_9:${TAG:?Missing TAG environment variable}
     build:
@@ -232,6 +220,16 @@ services:
       dockerfile: ./go/Dockerfile
       args:
         GO_IMAGE_VER: golang:1.18
+    <<: *scope-common
+  go_19:
+    image: ghcr.io/criblio/appscope-test-go_19:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-go_19:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./go/Dockerfile
+      args:
+        GO_IMAGE_VER: golang:1.19
     <<: *scope-common
 
   # no arm64 image

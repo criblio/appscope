@@ -5,6 +5,54 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.1.3
+
+2022-09-06 - Maintenance Release
+
+Assets are available from the Cribl CDN at the links below.
+
+- `AppScope for x86`: [https://cdn.cribl.io/dl/scope/1.1.3/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.1.3/linux/x86_64/scope)
+- `AppScope for ARM`: [https://cdn.cribl.io/dl/scope/1.1.3/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.1.3/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.1.3/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.1.3/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.1.3/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.1.3/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.1.3`.
+
+### Fixes
+
+- [#1067](https://github.com/criblio/appscope/issues/1067) When you run `scope attach` and then select an ID that's beyond the range of the resulting list, AppScope now handles this gracefully, and the AppScope CLI no longer crashes.
+- [#1080](https://github.com/criblio/appscope/issues/1080) On an M1 Mac, trying to scope a Go static executable in a Docker container emulating x86_64 Linux results in an address mapping conflict between the Go executable and the emulator. AppScope now handles this limitation by allowing the Go executable to run un-scoped. With this fix, the Go executable no longer segfaults.
+
+## AppScope 1.1.2
+
+2022-08-09 - Maintenance Release
+
+Assets are available from the Cribl CDN at the links below.
+
+- `AppScope for x86`: [https://cdn.cribl.io/dl/scope/1.1.2/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.1.2/linux/x86_64/scope)
+- `AppScope for ARM`: [https://cdn.cribl.io/dl/scope/1.1.2/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.1.2/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.1.2/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.1.2/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.1.2/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.1.2/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path. 
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.1.2`.
+
+### New Features and Improvements
+
+- [#1025](https://github.com/criblio/appscope/issues/1025) The process‑start message (the [start.msg](schema-reference#eventstartmsg) event) now includes a total of four identifiers. By itself, the new **UUID** process ID is unique for a given machine. In principle, **UUID** together with the new **Machine ID** constitutes a tuple ID that is unique across all machine namespaces. Here's a summary of the IDs available in AppScope 1.1.2:
+    - **UUID** (new in AppScope 1.1.2), with key `uuid` and a value in [canonical UUID form](https://en.wikipedia.org/wiki/Universally_unique_identifier). UUID is a universally-unique process identifier, meaning that no two processes will ever have the same UUID value on the same machine.
+    - **Machine ID** (new in AppScope 1.1.2), with key `machine_id` and a value that AppScope obtains from `/etc/machine-id`. The machine ID uniquely identifies the host, as described in the [man page](https://man7.org/linux/man-pages/man5/machine-id.5.html). When `/etc/machine-id` is not available (e.g., in Alpine, or in a container), AppScope generates the machine ID using a repeatable MD5 hash of the host's first MAC address. Two containers on the same host can have the same machine ID.
+    - **Process ID**, with key `pid` and a value that is always unique at any given time, but that the machine can reuse for different processes at different times.
+    - **ID**, with key `id` and a value that concatenates (and may truncate) the scoped app's hostname, procname, and command. This value is not guaranteed to be unique.
+- [#1037](https://github.com/criblio/appscope/issues/1037) You can now run `scope service` on Linux distros that use the OpenRC init manager (e.g., Alpine), as well as on distros that use systemd (which was already supported). See the [CLI reference](cli-reference#service).
+
+### Fixes
+
+- [#1035](https://github.com/criblio/appscope/issues/1035) The `scope service` command no longer ignores the `-c` (`--cribldest`), `-e` (`--eventdest`), and `-m` (`--metricdest`) options.
+
 ## AppScope 1.1.1
 
 2022-07-12 - Maintenance Release

@@ -382,7 +382,14 @@ main(int argc, char **argv, char **env)
 
     sys_exec(ebuf, inferior_command, argc-optind, &argv[optind], env);
 
-    return EXIT_SUCCESS;
+    /*
+     * We should not return from sys_exec unless there was an error loading the static exec.
+     * In this case, just start the exec without being scoped.
+     * Was wondering if we should free the mapped elf image.
+     * But, since we exec on failure to load, it doesn't matter.
+     */
+    execve(argv[optind], &argv[optind], environ);
+
 err:
     if (ebuf) scope_free(ebuf);
     exit(EXIT_FAILURE);

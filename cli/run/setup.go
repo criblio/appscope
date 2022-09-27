@@ -186,8 +186,6 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 	payloadsDir := filepath.Join(rc.WorkDir, "payloads")
 	err = os.MkdirAll(payloadsDir, dirPerms)
 	util.CheckErrSprintf(err, "error creating payloads dir: %v", err)
-
-	log.Info().Str("workDir", rc.WorkDir).Msg("created working directory")
 }
 
 func (rc *Config) populateWorkDir(args []string, attach bool) {

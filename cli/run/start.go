@@ -328,7 +328,13 @@ func getStartData() []byte {
 
 // Start runs start command responsible for setup host and container env
 // It returns the status of operation.
-func (rc *Config) Start() error {
+func (rc *Config) Start(force bool) error {
+	if !force {
+		if !util.Confirm("\n\nAre you sure you want to proceed?") {
+			util.ErrAndExit("Exiting due to cancelled start command")
+		}
+	}
+
 	rc.setupWorkDir([]string{"start"}, true)
 
 	cfgData := getStartData()

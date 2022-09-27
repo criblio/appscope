@@ -331,3 +331,21 @@ func InterfaceToString(i interface{}) string {
 		return fmt.Sprintf("%v", v)
 	}
 }
+
+// Confirm allows a user to confirm y/n with stdin
+func Confirm(s string) bool {
+	fmt.Printf("%s [y/n]: ", s)
+
+	var in string
+	_, err := fmt.Scan(&in)
+	CheckErrSprintf(err, "error: confirm failed; %v", err)
+
+	in = strings.TrimSpace(in)
+	in = strings.ToLower(in)
+
+	if in == "y" || in == "yes" {
+		return true
+	}
+
+	return false
+}

@@ -78,7 +78,7 @@ func (rc *Config) Attach(args []string) error {
 		return errAlreadyScope
 	}
 	// Create ldscope
-	if err := createLdscope(); err != nil {
+	if err := CreateLdscope(); err != nil {
 		return errCreateLdscope
 	}
 	// Normal operational, not passthrough, create directory for this run
@@ -101,7 +101,7 @@ func (rc *Config) Attach(args []string) error {
 		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
-	sL := loader.ScopeLoader{Path: ldscopePath()}
+	sL := loader.ScopeLoader{Path: LdscopePath()}
 	if !rc.Subprocess {
 		return sL.Attach(args, env)
 	}

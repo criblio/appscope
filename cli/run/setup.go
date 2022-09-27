@@ -17,13 +17,13 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func ldscopePath() string {
+func LdscopePath() string {
 	return filepath.Join(util.ScopeHome(), "ldscope")
 }
 
-// createLdscope creates ldscope in $SCOPE_HOME
-func createLdscope() error {
-	ldscope := ldscopePath()
+// CreateLdscope creates ldscope in $SCOPE_HOME
+func CreateLdscope() error {
+	ldscope := LdscopePath()
 	ldscopeInfo, _ := AssetInfo("build/ldscope")
 
 	// If it exists, don't create

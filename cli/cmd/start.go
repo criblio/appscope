@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/criblio/scope/start"
 	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
 )
@@ -41,7 +42,7 @@ var startCmd = &cobra.Command{
 				util.ErrAndExit("Exiting due to cancelled start command")
 			}
 		}
-		if err := run.Start(args[0]); err != nil {
+		if err := start.Start(args[0]); err != nil {
 			util.ErrAndExit("Exiting due to start failure")
 		}
 	},

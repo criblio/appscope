@@ -3,7 +3,6 @@ package run
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -35,23 +34,9 @@ type allowProcConfig struct {
 	Config   libscope.ScopeConfig `mapstructure:"config" json:"config" yaml:"config"`
 }
 
-// return status from start operation
-var startErr error
-
 var (
 	errMissingData = errors.New("missing filter data")
 )
-
-// startConfigfromData loads a start configuration from data
-// It returns the configuration.
-func startConfigfromData(dataIn []byte) (startConfig, error) {
-
-	var startCfg startConfig
-
-	err := yaml.Unmarshal(dataIn, &startCfg)
-
-	return startCfg, err
-}
 
 // startAttachSingleProcess attach to the the specific process identifed by pid with configuration pass in cfgData.
 // It returns the status of operation.
@@ -61,8 +46,7 @@ func startAttachSingleProcess(pid string, cfgData []byte) error {
 		log.Error().
 			Err(err).
 			Str("pid", pid).
-			Msgf("Attach PID %v Failed. Create temporary attach configuration failed.", pid)
-		startErr = err
+			Msgf("Attach PID %v failed. Create temporary attach configuration failed.", pid)
 		return err
 	}
 	defer os.Remove(tmpFile.Name())
@@ -71,8 +55,7 @@ func startAttachSingleProcess(pid string, cfgData []byte) error {
 		log.Error().
 			Err(err).
 			Str("pid", pid).
-			Msgf("Attach PID %v Failed. Write temporary attach configuration failed.", pid)
-		startErr = err
+			Msgf("Attach PID %v failed. Write temporary attach configuration failed.", pid)
 		return err
 	}
 
@@ -84,8 +67,8 @@ func startAttachSingleProcess(pid string, cfgData []byte) error {
 			Err(err).
 			Str("pid", pid).
 			Str("loaderDetails", stdoutStderr).
-			Msgf("Attach PID %v Failed. Write temporary attach configuration failed.", pid)
-		startErr = err
+			Msgf("Attach PID %v failed.", pid)
+		return err
 	} else {
 		log.Info().
 			Str("pid", pid).
@@ -93,7 +76,7 @@ func startAttachSingleProcess(pid string, cfgData []byte) error {
 	}
 
 	os.Unsetenv("SCOPE_CONF_PATH")
-	return err
+	return nil
 }
 
 // startAttach attach to all allowed processes on the host and on the container
@@ -105,7 +88,6 @@ func startAttach(allowProc allowProcConfig) error {
 		log.Error().
 			Err(err).
 			Msg("Attach Failed. Serialize configuration failed.")
-		startErr = err
 		return err
 	}
 
@@ -116,7 +98,6 @@ func startAttach(allowProc allowProcConfig) error {
 				Err(err).
 				Str("process", allowProc.Procname).
 				Msgf("Attach Failed. Retrieve process name: %v failed.", allowProc.Procname)
-			startErr = err
 			return err
 		}
 		pidsToAttach = procsMap
@@ -128,7 +109,6 @@ func startAttach(allowProc allowProcConfig) error {
 				Err(err).
 				Str("process", allowProc.Arg).
 				Msgf("Attach Failed. Retrieve arg: %v failed.", allowProc.Arg)
-			startErr = err
 			return err
 		}
 		for k, v := range procsMap {
@@ -138,62 +118,26 @@ func startAttach(allowProc allowProcConfig) error {
 
 	for pid, scopeState := range pidsToAttach {
 		if scopeState {
-			log.Info().
+			log.Warn().
 				Str("pid", strconv.Itoa(pid)).
 				Msgf("Attach Failed. Process: %v is already scoped.", pid)
 			continue
 		}
 
 		startAttachSingleProcess(strconv.Itoa(pid), cfgSingleProc)
-
 	}
 
 	return nil
 }
 
-// startConfigureHost setup the Host:
-//
-// - setup /etc/profile.d/scope.sh
-//
-// - extract filter into the filter file in /tmp/scope_filter.yml
-//
-// - extract libscope.so into /tmp/libscope.so
-//
-// It returns the status of operation.
-func startConfigureHost(filterData []byte) error {
-	tempFile, err := ioutil.TempFile("/tmp", "temp_filter")
-	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("Setup host failed. Create temporary filter file.")
-		startErr = err
-		return err
-	} else {
-		log.Info().
-			Msg("Setup host. Create test_filter success.")
-	}
-	defer os.Remove(tempFile.Name())
-
-	if _, err := tempFile.Write(filterData); err != nil {
-		log.Error().
-			Err(err).
-			Msg("Setup host failed. Write to temporary filter file.")
-		startErr = err
-		return err
-	} else {
-		log.Info().
-			Msg("Setup host. Write test_filter success.")
-	}
-
+func startConfigureHost(filename string) error {
 	sL := loader.ScopeLoader{Path: ldscopePath()}
-
-	stdoutStderr, err := sL.ConfigureHost(tempFile.Name())
+	stdoutStderr, err := sL.ConfigureHost(filename)
 	if err != nil {
-		log.Error().
+		log.Warn().
 			Err(err).
 			Str("loaderDetails", stdoutStderr).
 			Msg("Setup host failed.")
-		startErr = err
 		return err
 	} else {
 		log.Info().
@@ -203,11 +147,6 @@ func startConfigureHost(filterData []byte) error {
 	return nil
 }
 
-// startServiceHost setup the Container:
-//
-// - setup service defined by the serviceName on the host.
-//
-// It returns the status of operation.
 func startServiceHost(serviceName string) error {
 	sL := loader.ScopeLoader{Path: ldscopePath()}
 	stdoutStderr, err := sL.ServiceHost(serviceName)
@@ -217,179 +156,163 @@ func startServiceHost(serviceName string) error {
 			Msgf("Service %v host success.", serviceName)
 	} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
 		if ee.ExitCode() == 1 {
-			log.Error().
+			log.Warn().
 				Err(err).
 				Str("service", serviceName).
 				Str("loaderDetails", stdoutStderr).
 				Msgf("Service %v host failed.", serviceName)
-			startErr = err
 		} else {
-			log.Info().
+			log.Warn().
 				Str("service", serviceName).
 				Str("loaderDetails", stdoutStderr).
 				Msgf("Service %v host failed.", serviceName)
 		}
 	}
-	return err
+	return nil
 }
 
-// startSetupContainer setup the Container:
-//
-// - setup /etc/profile.d/scope.sh in the container.
-//
-// - extract filter into the filter file in /tmp/scope_filter.yml in the container.
-//
-// - extract libscope.so into /tmp/libscope.so in the container.
-//
-// - service services defined by the allowProcs process name list in the container.
-//
-// It returns the status of operation.
-func startSetupContainer(allowProcs []allowProcConfig) error {
-	// Iterate over all containers
+func startConfigureContainers(allowProcs []allowProcConfig) error {
+	// Discover all containers
 	cPids, err := util.GetDockerPids()
 	if err != nil {
 		switch {
 		case errors.Is(err, util.ErrDockerNotAvailable):
-			log.Info().
-				Msgf("Setup containers skipped. Docker is not available")
+			log.Warn().
+				Msgf("Configure containers skipped. Docker is not available")
 			return nil
 		default:
 			log.Error().
 				Err(err).
-				Msg("Setup containers failed.")
-			startErr = err
+				Msg("Configure containers failed.")
+			return err
 		}
 	}
 
+	ld := loader.ScopeLoader{Path: ldscopePath()}
+
+	// Iterate over all containers
 	for _, cPid := range cPids {
-		ld := loader.ScopeLoader{Path: ldscopePath()}
 		stdoutStderr, err := ld.ConfigureContainer("/tmp/scope_filter.yml", cPid)
 		if err != nil {
-			log.Error().
+			log.Warn().
 				Err(err).
 				Str("pid", strconv.Itoa(cPid)).
 				Str("loaderDetails", stdoutStderr).
-				Msgf("Setup containers failed. Setup container %v failed.", cPid)
-			startErr = err
+				Msgf("Configure containers failed. Configure container %v failed.", cPid)
 		} else {
 			log.Info().
 				Str("pid", strconv.Itoa(cPid)).
-				Msgf("Setup containers. Setup container %v success.", cPid)
+				Msgf("Configure containers success. Configure container %v success.", cPid)
 		}
+	}
 
-		// Iterate over all allowed processses
-		for _, process := range allowProcs {
-			// Setup service
-			stdoutStderr, err := ld.ServiceContainer(process.Procname, cPid)
-			if err == nil {
-				log.Info().
+	return nil
+}
+
+func startServiceContainers(allowProcs []allowProcConfig) error {
+	// Discover all containers
+	cPids, err := util.GetDockerPids()
+	if err != nil {
+		switch {
+		case errors.Is(err, util.ErrDockerNotAvailable):
+			log.Warn().
+				Msgf("Setup container services skipped. Docker is not available")
+			return nil
+		default:
+			log.Warn().
+				Err(err).
+				Msg("Setup container services failed.")
+			return nil
+		}
+	}
+
+	ld := loader.ScopeLoader{Path: ldscopePath()}
+
+	// Iterate over all containers
+	for _, cPid := range cPids {
+		//																	// Iterate over all allowed processses
+		//																	for _, process := range allowProcs {
+		stdoutStderr, err := ld.ServiceContainer(process.Procname, cPid)
+		if err == nil {
+			log.Info().
+				Str("service", process.Procname).
+				Str("pid", strconv.Itoa(cPid)).
+				Msgf("Setup containers. Service %v container %v success.", process.Procname, cPid)
+		} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
+			if ee.ExitCode() == 1 {
+				log.Warn().
+					Err(err).
 					Str("service", process.Procname).
 					Str("pid", strconv.Itoa(cPid)).
-					Msgf("Setup containers. Service %v container %v success.", process.Procname, cPid)
-			} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
-				if ee.ExitCode() == 1 {
-					log.Error().
-						Err(err).
-						Str("service", process.Procname).
-						Str("pid", strconv.Itoa(cPid)).
-						Str("loaderDetails", stdoutStderr).
-						Msgf("Setup containers failed. Service %v container %v failed.", process.Procname, cPid)
-					startErr = err
-				} else {
-					log.Info().
-						Str("service", process.Procname).
-						Str("pid", strconv.Itoa(cPid)).
-						Str("loaderDetails", stdoutStderr).
-						Msgf("Setup containers failed. Service %v container %v failed.", process.Procname, cPid)
-				}
+					Str("loaderDetails", stdoutStderr).
+					Msgf("Setup containers failed. Service %v container %v failed.", process.Procname, cPid)
+			} else {
+				log.Warn().
+					Str("service", process.Procname).
+					Str("pid", strconv.Itoa(cPid)).
+					Str("loaderDetails", stdoutStderr).
+					Msgf("Setup containers failed. Service %v container %v failed.", process.Procname, cPid)
 			}
 		}
 	}
 	return nil
 }
 
-// getStartData reads data from Stdin
-func getStartData() []byte {
-	var startData []byte
-	stdinFs, err := os.Stdin.Stat()
-
-	if err != nil {
-		return startData
-	}
-
-	// Verify size of data for mode other than a pipe
-	if stdinFs.Size() == 0 && stdinFs.Mode()&os.ModeNamedPipe == 0 {
-		return startData
-	}
-
-	startData, _ = io.ReadAll(os.Stdin)
-	return startData
-}
-
-// Start runs start command responsible for setup host and container env
-// It returns the status of operation.
-func (rc *Config) Start(force bool) error {
-	if !force {
-		if !util.Confirm("\n\nAre you sure you want to proceed?") {
-			util.ErrAndExit("Exiting due to cancelled start command")
-		}
-	}
-
+// Start performs setup of scope in the host and containers
+func (rc *Config) Start(filename string) error {
 	rc.setupWorkDir([]string{"start"}, true)
 
-	cfgData := getStartData()
-	if len(cfgData) == 0 {
-		startErr = errMissingData
+	cfgData, err := ioutil.ReadFile(filename)
+	if err != nil {
 		log.Error().
-			Err(startErr).
-			Msg("Missing filter data.")
-		return startErr
+			Err(err)
+		return err
 	}
-
-	// Validate user has root permissions
-	if err := util.UserVerifyRootPerm(); err != nil {
+	if len(cfgData) == 0 {
 		log.Error().
 			Err(err).
-			Msg("Verify root permission failed.")
-		startErr = err
+			Msg("Missing filter data.")
 		return err
 	}
 
-	// Retrieve input data
-	startCfg, err := startConfigfromData(cfgData)
+	var startCfg startConfig
+	err = yaml.Unmarshal(dataIn, &startCfg)
 	if err != nil {
 		log.Error().
 			Err(err).
-			Msg("Read filter file failed.")
-		startErr = err
+			Msg("Read of filter file failed.")
 		return err
 	}
 
-	if err := createLdscope(); err != nil {
+	if err = createLdscope(); err != nil {
 		log.Error().
 			Err(err).
 			Msg("Create ldscope failed.")
-		startErr = err
 		return err
 	}
 
-	// Configure Host
-	startConfigureHost(cfgData)
+	if err = startConfigureHost(filename); err != nil {
+		return err
+	}
 
-	// Setup Containers
-	startSetupContainer(startCfg.AllowProc)
+	if err = startConfigureContainers(); err != nil {
+		return err
+	}
 
-	// Iterate over allowed process
-	// Setup service on Host
-	// Attach to services on Host and container
+	if err = startServiceHost(); err != nil {
+		return err
+	}
+
+	if err = startServiceContainers(startCfg.AllowProc); err != nil {
+		return err
+	}
+
 	for _, allowProc := range startCfg.AllowProc {
-
-		startServiceHost(allowProc.Procname)
-
-		startAttach(allowProc)
+		if err = startAttach(allowProc); err != nil {
+			return err
+		}
 	}
 
 	// TODO: Deny list actions (Detach?/Deservice?)
-
-	return startErr
+	return
 }

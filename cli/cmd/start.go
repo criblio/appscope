@@ -3,13 +3,16 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
 )
 
 /* Args Matrix (X disallows)
+ *                 force
+ * force           -
  */
 
-const usage string = `The following actions will be performed on the host and in all relevant containers:
+const startUsage string = `The following actions will be performed on the host and in all relevant containers:
 - Extraction of libscope.so to /tmp/libscope.so 
 - Extraction of the filter input to /tmp/scope_filter.yml
 - Attach to all existing "allowed" processes defined in the filter file
@@ -27,16 +30,20 @@ var startCmd = &cobra.Command{
 	Short: "Start scoping a filtered selection of processes and services",
 	Long: `Start scoping a filtered selection of processes and services on the host and in all relevant containers.
 
-` + usage,
-	Example: `  scope start < example_filter.yml
-  cat example_filter.json | scope start`,
-	Args: cobra.NoArgs,
+` + startUsage,
+	Example: `  scope start example_filter.yml`,
+	Args:    cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		force, _ := cmd.Flags().GetBool("force")
 		if !force {
-			fmt.Printf(usage)
+			fmt.Printf(startUsage)
+			if !util.Confirm("\n\nAre you sure you want to proceed?") {
+				util.ErrAndExit("Exiting due to cancelled start command")
+			}
 		}
-		rc.Start(force)
+		if err := rc.Start(args[0]); err != nil {
+			util.ErrAndExit("Exiting due to start failure")
+		}
 	},
 }
 

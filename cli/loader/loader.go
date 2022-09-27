@@ -12,18 +12,22 @@ type ScopeLoader struct {
 	Path string
 }
 
+// Setup /etc/profile.d/scope.sh on host
 func (sL *ScopeLoader) ConfigureHost(filterFilePath string) (string, error) {
 	return sL.RunSubProc([]string{"--configure", filterFilePath}, os.Environ())
 }
 
+// Setup /etc/profile.d/scope.sh in containers
 func (sL *ScopeLoader) ConfigureContainer(filterFilePath string, cpid int) (string, error) {
 	return sL.RunSubProc([]string{"--configure", filterFilePath, "--namespace", strconv.Itoa(cpid)}, os.Environ())
 }
 
+// Add service configurations on host
 func (sL *ScopeLoader) ServiceHost(serviceName string) (string, error) {
 	return sL.RunSubProc([]string{"--service", serviceName}, os.Environ())
 }
 
+// Add service configurations in containers
 func (sL *ScopeLoader) ServiceContainer(serviceName string, cpid int) (string, error) {
 	return sL.RunSubProc([]string{"--service", serviceName, "--namespace", strconv.Itoa(cpid)}, os.Environ())
 }

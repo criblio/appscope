@@ -1,0 +1,140 @@
+{
+  "allow": [
+    {
+      "procname": "cribl",
+      "arg": "start",
+      "config": {
+        "metric": {
+          "enable": true,
+          "format": {
+            "type": "statsd",
+            "statsdprefix": null,
+            "statsdmaxlen": 512,
+            "verbosity": 4
+          },
+          "watch": [
+            {
+              "type": "statsd"
+            },
+            {
+              "type": "fs"
+            },
+            {
+              "type": "net"
+            },
+            {
+              "type": "http"
+            },
+            {
+              "type": "dns"
+            },
+            {
+              "type": "process"
+            }
+          ],
+          "transport": {
+            "type": "udp",
+            "host": "127.0.0.1",
+            "port": 8125,
+            "tls": {
+              "enable": false,
+              "validateserver": true,
+              "cacertpath": ""
+            }
+          }
+        },
+        "event": {
+          "enable": true,
+          "format": {
+            "type": "ndjson",
+            "maxeventpersec": 10000,
+            "enhancefs": true
+          },
+          "watch": [
+            {
+              "type": "file",
+              "name": "(\\/logs?\\/)|(\\.log$)|(\\.log[.\\d])",
+              "value": ".*"
+            },
+            {
+              "type": "console",
+              "name": "(stdout)|(stderr)",
+              "value": ".*",
+              "allowbinary": true
+            },
+            {
+              "type": "net",
+              "name": ".*",
+              "field": ".*",
+              "value": ".*"
+            },
+            {
+              "type": "fs",
+              "name": ".*",
+              "field": ".*",
+              "value": ".*"
+            },
+            {
+              "type": "dns",
+              "name": ".*",
+              "field": ".*",
+              "value": ".*"
+            },
+            {
+              "type": "http",
+              "name": ".*",
+              "field": ".*",
+              "value": ".*",
+              "headers": null
+            }
+          ],
+          "transport": {
+            "type": "tcp",
+            "host": "127.0.0.1",
+            "port": 9109,
+            "tls": {
+              "enable": false,
+              "validateserver": true,
+              "cacertpath": ""
+            }
+          }
+        },
+        "payload": {
+          "enable": false,
+          "dir": "/tmp"
+        },
+        "libscope": {
+          "configevent": true,
+          "summaryperiod": 10,
+          "commanddir": "/tmp",
+          "log": {
+            "level": "warning",
+            "transport": {
+              "type": "file",
+              "path": "/tmp/scope.log",
+              "buffer": "line"
+            }
+          }
+        },
+        "cribl": {
+          "enable": true,
+          "transport": {
+            "type": "edge",
+            "host": "127.0.0.1",
+            "port": 10090,
+            "tls": {
+              "enable": false,
+              "validateserver": true,
+              "cacertpath": ""
+            }
+          }
+        }
+      }
+    }
+  ],
+  "deny": [
+    {
+      "procname": "git"
+    }
+  ]
+}

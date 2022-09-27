@@ -32,6 +32,12 @@ typedef enum {CFG_MTC_FS,
               CFG_MTC_PROC, 
               CFG_MTC_STATSD} metric_watch_t;
 
+typedef enum {
+    SERVICE_STATUS_SUCCESS = 0,         // service operation was success
+    SERVICE_STATUS_ERROR_OTHER = 1,     // service was not installed
+    SERVICE_STATUS_NOT_INSTALLED = 2,   // service operation was failed
+} service_status_t;
+
 #define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 
@@ -248,6 +254,10 @@ typedef unsigned int bool;
 // establishTlsSession() process...  this helps ensure we won't hang
 // processes forever while waiting for a single connection to complete.
 #define MAX_TLS_CONNECT_SECONDS 5
+
+// The dynamic config file location used by the CLI
+#define DYN_CONFIG_CLI_DIR "/dev/shm"
+#define DYN_CONFIG_CLI_PREFIX "scope_dconf"
 
 #endif // __SCOPETYPES_H__
 

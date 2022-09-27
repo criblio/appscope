@@ -162,9 +162,10 @@ out:
  * The relocation table's entries have a one-to-one correspondence with the PLT.
  */
 int
-doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym, char *str, int rsz, int attach)
+doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym, char *str, int rsz, bool attach)
 {
     int i, match = -1;
+    uint64_t prev;
 
     for (i = 0; i < rsz / sizeof(Elf64_Rela); i++) {
         /*
@@ -180,9 +181,15 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
          * According to the ELF spec there is no size/number of entries for the
          * symbol table at the program header table level. This is not needed at
          * runtime as the symbol lookup always go through the hash table; ELF64_R_SYM.
+         *
+         * Locating and dereferencing the GOT can be confusing, for reference:
+         * What symbol is defined in this GOT entry
+         * .rel.plt -> r.info -> .dynsym -> st_name -> .dynstr -> read\0
+         *
+         * If this is a symbol we want to interpose, then:
+         * .rel.plt -> r.offset + load address -> GOT entry for read
          */
         if (!scope_strcmp(sym[ELF64_R_SYM(rel[i].r_info)].st_name + str, hook->symbol)) {
-            uint64_t *gfn = hook->gfn;
             uint64_t *gaddr = (uint64_t *)(rel[i].r_offset + lm->l_addr);
             int page_size = scope_getpagesize();
             size_t saddr = ROUND_DOWN((size_t)gaddr, page_size);
@@ -213,9 +220,16 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
              * of the shared module as defined in the link map's l_addr + offset.
              * as in: rel[i].r_offset + lm->l_addr
              */
-            if (!attach) *gfn = *gaddr;
-            uint64_t prev = *gaddr;
-            *gaddr = (uint64_t)hook->func;
+            prev = *gaddr;
+            if (attach == TRUE) {
+                // been here before, don't update the GOT entry
+                if ((void *)*gaddr == hook->func) return -1;
+                *gaddr = (uint64_t)hook->func;
+            } else {
+                // handle a detach operation
+                *gaddr = *(uint64_t *)hook->gfn;
+            }
+
             scopeLog(CFG_LOG_DEBUG, "%s:%d sym=%s offset 0x%lx GOT entry %p saddr 0x%lx, prev=0x%lx, curr=%p",
                         __FUNCTION__, __LINE__, hook->symbol, rel[i].r_offset, gaddr, saddr, prev, hook->func);
 
@@ -389,3 +403,4 @@ is_musl(char *buf)
 
     return FALSE;
 }
+

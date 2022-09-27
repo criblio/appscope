@@ -197,7 +197,6 @@ nothingCrashesBeforeAnyInit(void** state)
     doSetAddrs(8);
     doAddNewSock(9);
     getDNSName(10, NULL, 0);
-    doURL(11, NULL, 0, NETRX);
     doRecv(12, 4312, NULL, 0, BUF);
     doSend(13, 6682, NULL, 0, BUF);
     doAccept(14, 14, NULL, 0, "acceptFunc");

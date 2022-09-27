@@ -170,11 +170,55 @@ libdirGetLibraryNote()
 }
 
 static int
+libdirFileExtract(const char *path, unsigned char *start, unsigned char *end)
+{
+    int fd;
+    char temp[PATH_MAX];
+
+    int tempLen = scope_snprintf(temp, PATH_MAX, "%s.XXXXXX", path);
+    if (tempLen < 0) {
+        scope_fprintf(scope_stderr, "error: snprintf(0 failed.\n");
+        return -1;
+    }
+    if (tempLen >= PATH_MAX) {
+        scope_fprintf(scope_stderr, "error: extract temp too long.\n");
+        return -1;
+    }
+
+    if ((fd = scope_mkstemp(temp)) < 1) {
+        scope_unlink(temp);
+        scope_perror("mkstemp() failed");
+        return -1;
+    }
+
+    size_t len = end - start;
+    if (scope_write(fd, start, len) != len) {
+        scope_close(fd);
+        scope_unlink(temp);
+        scope_perror("write() failed");
+        return -1;
+    }
+
+    // 0755
+    if (scope_fchmod(fd, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)) {
+        scope_close(fd);
+        scope_unlink(temp);
+        scope_perror("fchmod() failed");
+        return -1;
+    }
+    scope_close(fd);
+
+    if (scope_rename(temp, path)) {
+        scope_unlink(temp);
+        scope_perror("rename() failed");
+        return -1;
+    }
+    return 0;
+}
+
+static int
 libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t* note)
 {
-    char temp[PATH_MAX];
-    int fd;
-
     if (libdirCreateIfMissing()) {
         return -1;
     }
@@ -228,46 +272,7 @@ libdirExtract(const char *path, unsigned char *start, unsigned char *end, note_t
         }
     }
 
-    int tempLen = scope_snprintf(temp, PATH_MAX, "%s.XXXXXX", path);
-    if (tempLen < 0) {
-        scope_fprintf(scope_stderr, "error: snprintf(0 failed.\n");
-        return -1;
-    }
-    if (tempLen >= PATH_MAX) {
-        scope_fprintf(scope_stderr, "error: extract temp too long.\n");
-        return -1;
-    }
-
-    if ((fd = scope_mkstemp(temp)) < 1) {
-        scope_unlink(temp);
-        scope_perror("mkstemp() failed");
-        return -1;
-    }
-
-    size_t len = end - start;
-    if (scope_write(fd, start, len) != len) {
-        scope_close(fd);
-        scope_unlink(temp);
-        scope_perror("write() failed");
-        return -1;
-    }
-
-    // 0755
-    if (scope_fchmod(fd, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH)) {
-        scope_close(fd);
-        scope_unlink(temp);
-        scope_perror("fchmod() failed");
-        return -1;
-    }
-    scope_close(fd);
-
-    if (scope_rename(temp, path)) {
-        scope_unlink(temp);
-        scope_perror("rename() failed");
-        return -1;
-    }
-
-    return 0;
+    return libdirFileExtract(path, start, end);
 }
 
 static int
@@ -385,6 +390,12 @@ libdirExtractLibrary()
             &_binary_libscope_so_start,
             &_binary_libscope_so_end,
             libdirGetLibraryNote());
+}
+
+int
+libdirExtractLibraryTo(const char* path)
+{
+    return libdirFileExtract(path, &_binary_libscope_so_start, &_binary_libscope_so_end);
 }
 
 const char *

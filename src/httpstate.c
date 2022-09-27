@@ -132,9 +132,8 @@ getContentLength(char *header, size_t len)
     PCRE2_UCHAR *cLen; PCRE2_SIZE cLenLen;
     pcre2_substring_get_bynumber(matches, 1, &cLen, &cLenLen);
 
-    scope_errno = 0;
     size_t ret = scope_strtoull((const char *)cLen, NULL, 0);
-    if ((scope_errno != 0) || (ret == 0)) {
+    if ((ret == 0) || (ret == ULLONG_MAX)) {
         ret = -1;
     }
 
@@ -742,7 +741,7 @@ doHttpBuffer(http_state_t states[HTTP_NUM], net_info *net, char *buf, size_t len
     http_state_t *state = &states[isTx];
 
     //scopeLogHexDebug(buf, len>64 ? 64 : len, "DEBUG: HTTP %s payload; ver=%d, len=%ld",
-    //        isTx ? "TX" : "RX", (int)state->version[isTx], len);
+    //        isTx ? "TX" : "RX", state->version, len);
 
     // detect HTTP version
     if (state->version == 0) {

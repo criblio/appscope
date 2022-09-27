@@ -23,6 +23,12 @@ osGetProcMemory(pid_t pid)
 }
 
 int
+osGetProcUidGid(pid_t pid, uid_t *uid, gid_t *gid)
+{
+    return -1;
+}
+
+int
 osGetNumThreads(pid_t pid)
 {
     struct proc_taskinfo task;
@@ -73,7 +79,7 @@ osInitTSC(platform_time_t *cfg)
 }
 
 int
-osIsFilePresent(pid_t pid, const char *path)
+osIsFilePresent(const char *path)
 {
     struct stat sb = {};
     if (stat(path, &sb) != 0) {

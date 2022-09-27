@@ -99,8 +99,8 @@ typedef struct {
 } switch_map_t;
 
 static switch_map_t switch_map[] = {
-    {"redirect-on",      URL_REDIRECT_ON},
-    {"redirect-off",     URL_REDIRECT_OFF},
+    {"detach",           FUNC_DETACH},
+    {"attach",           FUNC_ATTACH},
     {NULL,               NO_ACTION}
 };
 

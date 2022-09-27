@@ -41,7 +41,7 @@ var startCmd = &cobra.Command{
 				util.ErrAndExit("Exiting due to cancelled start command")
 			}
 		}
-		if err := rc.Start(args[0]); err != nil {
+		if err := run.Start(args[0]); err != nil {
 			util.ErrAndExit("Exiting due to start failure")
 		}
 	},

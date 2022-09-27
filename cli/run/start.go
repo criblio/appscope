@@ -15,14 +15,14 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// startConfig represents processed configuration
+// startConfig represents a processed configuration
 type startConfig struct {
 	AllowProc []allowProcConfig `mapstructure:"allow,omitempty" json:"allow,omitempty" yaml:"allow"`
-	DenyProc  []procConfig      `mapstructure:"deny,omitempty" json:"deny,omitempty" yaml:"deny"`
+	DenyProc  []denyProcConfig  `mapstructure:"deny,omitempty" json:"deny,omitempty" yaml:"deny"`
 }
 
-// procConfig represents a process configuration
-type procConfig struct {
+// denyProcConfig represents a denied process configuration
+type denyProcConfig struct {
 	Procname string `mapstructure:"procname,omitempty" json:"procname,omitempty" yaml:"procname,omitempty"`
 	Arg      string `mapstructure:"arg,omitempty" json:"arg,omitempty" yaml:"arg,omitempty"`
 }
@@ -260,8 +260,6 @@ func startServiceContainers(allowProcs []allowProcConfig) error {
 
 // Start performs setup of scope in the host and containers
 func (rc *Config) Start(filename string) error {
-	rc.setupWorkDir([]string{"start"}, true)
-
 	cfgData, err := ioutil.ReadFile(filename)
 	if err != nil {
 		log.Error().

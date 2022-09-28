@@ -47,8 +47,18 @@ func (sL *ScopeLoader) ServiceContainer(serviceName string, cpid int) (string, e
 	return sL.RunSubProc([]string{"--service", serviceName, "--namespace", strconv.Itoa(cpid)}, os.Environ())
 }
 
-func (sL *ScopeLoader) Patch(libraryPath string) (string, error) {
-	return sL.RunSubProc([]string{"--patch", libraryPath}, os.Environ())
+// If root:
+// - Attach to a process on the host or in containers
+func (sL *ScopeLoader) Attach(args []string, env []string) error {
+	args = append([]string{"--attach"}, args...)
+	return sL.Run(args, env)
+}
+
+// If root:
+// - Attach to a process on the host or in containers
+func (sL *ScopeLoader) AttachSubProc(args []string, env []string) (string, error) {
+	args = append([]string{"--attach"}, args...)
+	return sL.RunSubProc(args, env)
 }
 
 func (sL *ScopeLoader) Run(args []string, env []string) error {
@@ -63,12 +73,6 @@ func (sL *ScopeLoader) RunSubProc(args []string, env []string) (string, error) {
 	return string(stdoutStderr[:]), err
 }
 
-func (sL *ScopeLoader) Attach(args []string, env []string) error {
-	args = append([]string{"--attach"}, args...)
-	return sL.Run(args, env)
-}
-
-func (sL *ScopeLoader) AttachSubProc(args []string, env []string) (string, error) {
-	args = append([]string{"--attach"}, args...)
-	return sL.RunSubProc(args, env)
+func (sL *ScopeLoader) Patch(libraryPath string) (string, error) {
+	return sL.RunSubProc([]string{"--patch", libraryPath}, os.Environ())
 }

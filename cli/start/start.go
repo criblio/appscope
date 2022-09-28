@@ -39,6 +39,8 @@ var (
 	errMissingData = errors.New("missing filter data")
 )
 
+// TODO: the file creation steps here might not be needed because a filter file should be present
+// and libscope.so should detect it (when that functionality is complete)
 // startAttachSingleProcess attach to the the specific process identifed by pid with configuration pass in cfgData.
 // It returns the status of operation.
 func startAttachSingleProcess(pid string, cfgData []byte) error {

@@ -31,7 +31,7 @@
  */
 
 #define LIBSCOPE_LOC "/tmp/libscope.so"
-#define PROFILE_SETUP "export LD_PRELOAD=/tmp/libscope.so\n"
+#define PROFILE_SETUP "export LD_PRELOAD=\"/tmp/libscope.so $LD_PRELOAD\"\n"
 #define PROFILE_SETUP_LEN (sizeof(PROFILE_SETUP)-1)
 
 
@@ -530,24 +530,23 @@ closeFd:
  */
 int
 setupConfigure(void *filterFileMem, size_t filterSize) {
-    // Setup /etc/profile
+    // Setup /etc/profile.d/scope.sh
     if (setupProfile() == FALSE) {
         scope_fprintf(scope_stderr, "setupProfile failed\n");
         return -1;
     }
 
-    // Setup Filter file
+    // Extract the filter file to /tmp/scope_filter.yml
     if (setupExtractFilterFile(filterFileMem, filterSize) == FALSE) {
         scope_fprintf(scope_stderr, "setup filter file failed\n");
         return -1;
     }
 
-    // Extract libscope.so
+    // Extract libscope.so to /tmp/libscope.so
     if (libdirExtractLibraryTo(LIBSCOPE_LOC)) {
         scope_fprintf(scope_stderr, "extract libscope.so failed\n");
         return -1;
     }
-
     // Patch the library
     if (loaderOpPatchLibrary(LIBSCOPE_LOC) == PATCH_FAILED) {
         scope_fprintf(scope_stderr, "patch libscope.so failed\n");

@@ -80,57 +80,62 @@ func startAttachSingleProcess(pid string, cfgData []byte) error {
 	return nil
 }
 
-// startAttach attach to all allowed processes on the host and on the container
-// It returns the status of operation.
-func startAttach(allowProc allowProcConfig) error {
-	var pidsToAttach util.PidScopeMapState
-	cfgSingleProc, err := yaml.Marshal(allowProc.Config)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("Attach Failed. Serialize configuration failed.")
-		return err
-	}
+// for the host
+// for all containers
+// for all allowed proc
+func startAttach(allowProcs []allowProcConfig) error {
 
-	if allowProc.Procname != "" {
-		procsMap, err := util.PidScopeMapByProcessName(allowProc.Procname)
+	// Iterate over all allowed processses
+	for _, process := range allowProcs {
+		var pidsToAttach util.PidScopeMapState
+		cfgSingleProc, err := yaml.Marshal(process.Config)
 		if err != nil {
 			log.Error().
 				Err(err).
-				Str("process", allowProc.Procname).
-				Msgf("Attach Failed. Retrieve process name: %v failed.", allowProc.Procname)
+				Msg("Attach Failed. Serialize configuration failed.")
 			return err
 		}
-		pidsToAttach = procsMap
-	}
-	if allowProc.Arg != "" {
-		procsMap, err := util.PidScopeMapByCmdLine(allowProc.Arg)
-		if err != nil {
-			log.Error().
-				Err(err).
-				Str("process", allowProc.Arg).
-				Msgf("Attach Failed. Retrieve arg: %v failed.", allowProc.Arg)
-			return err
-		}
-		for k, v := range procsMap {
-			pidsToAttach[k] = v
-		}
-	}
 
-	for pid, scopeState := range pidsToAttach {
-		if scopeState {
-			log.Warn().
-				Str("pid", strconv.Itoa(pid)).
-				Msgf("Attach Failed. Process: %v is already scoped.", pid)
-			continue
+		if process.Procname != "" {
+			procsMap, err := util.PidScopeMapByProcessName(process.Procname)
+			if err != nil {
+				log.Error().
+					Err(err).
+					Str("process", process.Procname).
+					Msgf("Attach Failed. Retrieve process name: %v failed.", process.Procname)
+				return err
+			}
+			pidsToAttach = procsMap
+		}
+		if process.Arg != "" {
+			procsMap, err := util.PidScopeMapByCmdLine(process.Arg)
+			if err != nil {
+				log.Error().
+					Err(err).
+					Str("process", process.Arg).
+					Msgf("Attach Failed. Retrieve arg: %v failed.", process.Arg)
+				return err
+			}
+			for k, v := range procsMap {
+				pidsToAttach[k] = v
+			}
 		}
 
-		startAttachSingleProcess(strconv.Itoa(pid), cfgSingleProc)
-	}
+		for pid, scopeState := range pidsToAttach {
+			if scopeState {
+				log.Warn().
+					Str("pid", strconv.Itoa(pid)).
+					Msgf("Attach Failed. Process: %v is already scoped.", pid)
+				continue
+			}
 
+			startAttachSingleProcess(strconv.Itoa(pid), cfgSingleProc)
+		}
+	}
 	return nil
 }
 
+// for the host
 func startConfigureHost(filename string) error {
 	sL := loader.ScopeLoader{Path: run.LdscopePath()}
 	stdoutStderr, err := sL.ConfigureHost(filename)
@@ -148,31 +153,8 @@ func startConfigureHost(filename string) error {
 	return nil
 }
 
-func startServiceHost(serviceName string) error {
-	sL := loader.ScopeLoader{Path: run.LdscopePath()}
-	stdoutStderr, err := sL.ServiceHost(serviceName)
-	if err == nil {
-		log.Info().
-			Str("service", serviceName).
-			Msgf("Service %v host success.", serviceName)
-	} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
-		if ee.ExitCode() == 1 {
-			log.Warn().
-				Err(err).
-				Str("service", serviceName).
-				Str("loaderDetails", stdoutStderr).
-				Msgf("Service %v host failed.", serviceName)
-		} else {
-			log.Warn().
-				Str("service", serviceName).
-				Str("loaderDetails", stdoutStderr).
-				Msgf("Service %v host failed.", serviceName)
-		}
-	}
-	return nil
-}
-
-func startConfigureContainers(allowProcs []allowProcConfig) error {
+// for all containers
+func startConfigureContainers(filename string) error {
 	// Discover all containers
 	cPids, err := util.GetDockerPids()
 	if err != nil {
@@ -193,7 +175,7 @@ func startConfigureContainers(allowProcs []allowProcConfig) error {
 
 	// Iterate over all containers
 	for _, cPid := range cPids {
-		stdoutStderr, err := ld.ConfigureContainer("/tmp/scope_filter.yml", cPid)
+		stdoutStderr, err := ld.ConfigureContainer(filename, cPid)
 		if err != nil {
 			log.Warn().
 				Err(err).
@@ -210,6 +192,38 @@ func startConfigureContainers(allowProcs []allowProcConfig) error {
 	return nil
 }
 
+// for the host
+// for all allowed proc
+func startServiceHost(allowProcs []allowProcConfig) error {
+	sL := loader.ScopeLoader{Path: run.LdscopePath()}
+
+	// Iterate over all allowed processses
+	for _, process := range allowProcs {
+		stdoutStderr, err := sL.ServiceHost(process.Procname)
+		if err == nil {
+			log.Info().
+				Str("service", process.Procname).
+				Msgf("Service %v host success.", process.Procname)
+		} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
+			if ee.ExitCode() == 1 {
+				log.Warn().
+					Err(err).
+					Str("service", process.Procname).
+					Str("loaderDetails", stdoutStderr).
+					Msgf("Service %v host failed.", process.Procname)
+			} else {
+				log.Warn().
+					Str("service", process.Procname).
+					Str("loaderDetails", stdoutStderr).
+					Msgf("Service %v host failed.", process.Procname)
+			}
+		}
+	}
+	return nil
+}
+
+// for all containers
+// for all allowed proc
 func startServiceContainers(allowProcs []allowProcConfig) error {
 	// Discover all containers
 	cPids, err := util.GetDockerPids()
@@ -229,30 +243,31 @@ func startServiceContainers(allowProcs []allowProcConfig) error {
 
 	ld := loader.ScopeLoader{Path: run.LdscopePath()}
 
-	// Iterate over all containers
-	for _, cPid := range cPids {
-		//																	// Iterate over all allowed processses
-		//																	for _, process := range allowProcs {
-		stdoutStderr, err := ld.ServiceContainer(process.Procname, cPid)
-		if err == nil {
-			log.Info().
-				Str("service", process.Procname).
-				Str("pid", strconv.Itoa(cPid)).
-				Msgf("Setup containers. Service %v container %v success.", process.Procname, cPid)
-		} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
-			if ee.ExitCode() == 1 {
-				log.Warn().
-					Err(err).
+	// Iterate over all allowed processses
+	for _, process := range allowProcs {
+		// Iterate over all containers
+		for _, cPid := range cPids {
+			stdoutStderr, err := ld.ServiceContainer(process.Procname, cPid)
+			if err == nil {
+				log.Info().
 					Str("service", process.Procname).
 					Str("pid", strconv.Itoa(cPid)).
-					Str("loaderDetails", stdoutStderr).
-					Msgf("Setup containers failed. Service %v container %v failed.", process.Procname, cPid)
-			} else {
-				log.Warn().
-					Str("service", process.Procname).
-					Str("pid", strconv.Itoa(cPid)).
-					Str("loaderDetails", stdoutStderr).
-					Msgf("Setup containers failed. Service %v container %v failed.", process.Procname, cPid)
+					Msgf("Setup containers. Service %v container %v success.", process.Procname, cPid)
+			} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
+				if ee.ExitCode() == 1 {
+					log.Warn().
+						Err(err).
+						Str("service", process.Procname).
+						Str("pid", strconv.Itoa(cPid)).
+						Str("loaderDetails", stdoutStderr).
+						Msgf("Setup containers failed. Service %v container %v failed.", process.Procname, cPid)
+				} else {
+					log.Warn().
+						Str("service", process.Procname).
+						Str("pid", strconv.Itoa(cPid)).
+						Str("loaderDetails", stdoutStderr).
+						Msgf("Setup containers failed. Service %v container %v failed.", process.Procname, cPid)
+				}
 			}
 		}
 	}
@@ -275,8 +290,7 @@ func Start(filename string) error {
 	}
 
 	var startCfg startConfig
-	err = yaml.Unmarshal(dataIn, &startCfg)
-	if err != nil {
+	if err = yaml.Unmarshal(cfgData, &startCfg); err != nil {
 		log.Error().
 			Err(err).
 			Msg("Read of filter file failed.")
@@ -294,11 +308,11 @@ func Start(filename string) error {
 		return err
 	}
 
-	if err = startConfigureContainers(); err != nil {
+	if err = startConfigureContainers(filename); err != nil {
 		return err
 	}
 
-	if err = startServiceHost(); err != nil {
+	if err = startServiceHost(startCfg.AllowProc); err != nil {
 		return err
 	}
 
@@ -306,12 +320,10 @@ func Start(filename string) error {
 		return err
 	}
 
-	for _, allowProc := range startCfg.AllowProc {
-		if err = startAttach(allowProc); err != nil {
-			return err
-		}
+	if err = startAttach(startCfg.AllowProc); err != nil {
+		return err
 	}
 
 	// TODO: Deny list actions (Detach?/Deservice?)
-	return
+	return nil
 }

@@ -16,7 +16,6 @@ import (
 const startUsage string = `The following actions will be performed on the host and in all relevant containers:
 - Extraction of libscope.so to /tmp/libscope.so 
 - Extraction of the filter input to /tmp/scope_filter.yml
-- Attach to all existing "allowed" processes defined in the filter file
 
 If you run this command with administrator privileges, the following will be performed on the host and in all relevant containers:
 - Extraction of libscope.so to /usr/lib/appscope/ 

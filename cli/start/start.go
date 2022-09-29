@@ -339,11 +339,7 @@ func Start(filename string) error {
 
 	// If the `scope start` command is run inside a container, we should call `ldscope --starthost`
 	// which will instead run `scope start` on the host
-	incontainer, err := util.InContainer()
-	if err != nil {
-		return err
-	}
-	if incontainer {
+	if util.InContainer() {
 		if err := extract(filename); err != nil {
 			return err
 		}

@@ -1,11 +1,9 @@
 package util
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"os"
-	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -55,27 +53,9 @@ func GetDockerPids() ([]int, error) {
  * 9:cpuset:/docker/092ca4a972aebb1a684f3a1adbabdc05721595008024b5be45dbc21cf0f8b19d
  * 9:cpuset:/
  */
-func InContainer() (bool, error) {
-	cgfile, err := os.Open("/proc/self/cgroup")
-	if err != nil {
-		return false, err
+func InContainer() bool {
+	if _, err := os.Open("/proc/2/comm"); err != nil {
+		return true
 	}
-	defer cgfile.Close()
-
-	scanner := bufio.NewScanner(cgfile)
-	for scanner.Scan() {
-		if strings.Contains(scanner.Text(), "cpuset:/") {
-			if len(scanner.Text()) > 8 {
-				return true, nil
-			}
-			return false, nil
-		}
-		continue
-	}
-
-	if err := scanner.Err(); err != nil {
-		return false, err
-	}
-
-	return false, nil
+	return false
 }

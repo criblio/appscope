@@ -352,15 +352,6 @@ func Confirm(s string) bool {
 
 // CopyFile copies a file from a source to a destination
 func CopyFile(src, dst string) (int64, error) {
-	sourceFileStat, err := os.Stat(src)
-	if err != nil {
-		return 0, err
-	}
-
-	if !sourceFileStat.Mode().IsRegular() {
-		return 0, fmt.Errorf("%s is not a regular file", src)
-	}
-
 	source, err := os.Open(src)
 	if err != nil {
 		return 0, err

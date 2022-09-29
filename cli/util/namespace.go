@@ -1,8 +1,11 @@
 package util
 
 import (
+	"bufio"
 	"context"
 	"errors"
+	"os"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
@@ -38,4 +41,41 @@ func GetDockerPids() ([]int, error) {
 		pids[indx] = ins.State.Pid
 	}
 	return pids, nil
+}
+
+/*
+ * Detect whether or not scope was executed inside a container
+ * What is a reasonable algorithm for determining if the current process is in a container?
+ * Checking ~/.dockerenv doesn't work for non-docker containers
+ * Checking hierarchies in /proc/1/cgroup == / works in some case. However, some hierarchies
+ * on non-containers are /init.scope (Ubuntu 20.04 cgroup 0 and 1). Not reliable.
+ * Checking for container=lxc | docker in /proc/1/environ works for lxc but not docker, and it
+ * requires root privs.
+ * Start with /proc/self/cgroup, check the cpuset line for / == host /docker|lxd|lxc == container
+ * 9:cpuset:/docker/092ca4a972aebb1a684f3a1adbabdc05721595008024b5be45dbc21cf0f8b19d
+ * 9:cpuset:/
+ */
+func InContainer() (bool, error) {
+	cgfile, err := os.Open("/proc/self/cgroup")
+	if err != nil {
+		return false, err
+	}
+	defer cgfile.Close()
+
+	scanner := bufio.NewScanner(cgfile)
+	for scanner.Scan() {
+		if strings.Contains(scanner.Text(), "cpuset:/") {
+			if len(scanner.Text()) > 8 {
+				return true, nil
+			}
+			return false, nil
+		}
+		continue
+	}
+
+	if err := scanner.Err(); err != nil {
+		return false, err
+	}
+
+	return false, nil
 }

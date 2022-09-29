@@ -276,8 +276,46 @@ func startServiceContainers(allowProcs []allowProcConfig) error {
 	return nil
 }
 
+// extract extracts ldscope, scope, and the filter file to /tmp
+func extract(filterFile string) error {
+	// Extract ldscope
+	perms := os.FileMode(0755)
+	b, err := run.Asset("build/ldscope")
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("Error retrieving ldscope asset.")
+		return err
+	}
+	if err = ioutil.WriteFile("/tmp/ldscope", b, perms); err != nil {
+		log.Error().
+			Err(err).
+			Msg("Error writing ldscope to /tmp.")
+		return err
+	}
+
+	// Copy filter file
+	if _, err := util.CopyFile(filterFile, "/tmp/scope_filter.yml"); err != nil {
+		log.Error().
+			Err(err).
+			Msg("Error writing filter file to /tmp.")
+		return err
+	}
+
+	// Copy scope
+	if _, err := util.CopyFile(os.Args[0], "/tmp/scope"); err != nil {
+		log.Error().
+			Err(err).
+			Msg("Error writing scope to /tmp.")
+		return err
+	}
+
+	return nil
+}
+
 // Start performs setup of scope in the host and containers
 func Start(filename string) error {
+
 	cfgData, err := ioutil.ReadFile(filename)
 	if err != nil {
 		log.Error().
@@ -297,6 +335,39 @@ func Start(filename string) error {
 			Err(err).
 			Msg("Read of filter file failed.")
 		return err
+	}
+
+	// If the `scope start` command is run inside a container, we should call `ldscope --starthost`
+	// which will instead run `scope start` on the host
+	incontainer, err := util.InContainer()
+	if err != nil {
+		return err
+	}
+	if incontainer {
+		if err := extract(filename); err != nil {
+			return err
+		}
+
+		ld := loader.ScopeLoader{Path: run.LdscopePath()}
+		stdoutStderr, err := ld.StartHost()
+		if err == nil {
+			log.Info().
+				Msgf("Start host success.")
+		} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
+			if ee.ExitCode() == 1 {
+				log.Error().
+					Err(err).
+					Str("loaderDetails", stdoutStderr).
+					Msgf("Start host failed.")
+				return err
+			} else {
+				log.Error().
+					Str("loaderDetails", stdoutStderr).
+					Msgf("Start host failed.")
+				return err
+			}
+		}
+		return nil
 	}
 
 	if err = run.CreateLdscope(); err != nil {

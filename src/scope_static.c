@@ -560,6 +560,7 @@ static struct option opts[] = {
     { "service",    required_argument,    0, 's' },
     { "libbasedir", required_argument,    0, 'l' },
     { "patch",      required_argument,    0, 'p' },
+    { "starthost",  no_argument,          0, 'r' },
     { 0, 0, 0, 0 }
 };
 
@@ -585,7 +586,7 @@ main(int argc, char **argv, char **env)
         // The initial `:` lets us handle options with optional values like
         // `-h` and `-h SECTION`.
         //
-        int opt = getopt_long(argc, argv, "+:uh:a:d:n:l:f:p:c:s:", opts, &index);
+        int opt = getopt_long(argc, argv, "+:uh:a:d:n:l:f:p:c:s:r", opts, &index);
         if (opt == -1) {
             break;
         }
@@ -624,6 +625,9 @@ main(int argc, char **argv, char **env)
                 break;
             case 'p':
                 return (loaderOpPatchLibrary(optarg) == PATCH_SUCCESS) ? EXIT_SUCCESS : EXIT_FAILURE;
+                break;
+            case 'r':
+                return nsHostStart();
                 break;
             case ':':
                 // options missing their value end up here

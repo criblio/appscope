@@ -9,19 +9,21 @@
 
 #define BUFSIZE (4096)
 
+#define SCOPE_EXEC_PATH "/usr/lib/appscope" 
+
 #define OPENRC_DIR "/etc/rc.conf"
 #define SYSTEMD_DIR "/etc/systemd"
 #define INITD_DIR "/etc/init.d"
 
-#define SETUP_SERVICE "LD_PRELOAD=/tmp/libscope.so"
+#define SETUP_SERVICE "LD_PRELOAD=/usr/lib/appscope/libscope.so"
 
-#define SYSTEMD_CFG "[Service]\nEnvironment=LD_PRELOAD=/tmp/libscope.so\n"
+#define SYSTEMD_CFG "[Service]\nEnvironment=LD_PRELOAD=/usr/lib/appscope/libscope.so\n"
 #define SYSTEMD_CFG_LEN (sizeof(SYSTEMD_CFG) - 1)
 
-#define INITD_CFG "LD_PRELOAD=/tmp/libscope.so\n"
+#define INITD_CFG "LD_PRELOAD=/usr/lib/appscope/libscope.so\n"
 #define INITD_CFG_LEN (sizeof(INITD_CFG) - 1)
 
-#define OPENRC_CFG "export LD_PRELOAD=/tmp/libscope.so\n"
+#define OPENRC_CFG "export LD_PRELOAD=/usr/lib/appscope/libscope.so\n"
 #define OPENRC_CFG_LEN (sizeof(OPENRC_CFG) - 1)
 
 /*
@@ -30,8 +32,9 @@
  * further cleaning like reverse return logic in libdirExists
  */
 
-#define LIBSCOPE_LOC "/tmp/libscope.so"
-#define PROFILE_SETUP "export LD_PRELOAD=\"/tmp/libscope.so $LD_PRELOAD\"\n"
+#define LIBSCOPE_LOC "/usr/lib/appscope/libscope.so"
+#define FILTER_LOC "/usr/lib/appscope/scope_filter"
+#define PROFILE_SETUP "export LD_PRELOAD=\"/usr/lib/appscope/libscope.so $LD_PRELOAD\"\n"
 #define PROFILE_SETUP_LEN (sizeof(PROFILE_SETUP)-1)
 
 
@@ -444,7 +447,7 @@ setupProfile(void) {
 }
 
  /*
- * Extract memory to filter file /tmp/scope_filter.yml
+ * Extract memory to filter file /usr/lib/appscope/scope_filter
  *
  * Returns status of operation TRUE in case of success, FALSE otherwise
  */
@@ -453,7 +456,7 @@ setupExtractFilterFile(void *filterFileMem, size_t filterSize) {
     int filterFd;
     bool status = FALSE;
 
-    if ((filterFd = scope_open("/tmp/scope_filter.yml", O_RDWR | O_CREAT, 0664)) == -1) {
+    if ((filterFd = scope_open(FILTER_LOC, O_RDWR | O_CREAT, 0664)) == -1) {
         scope_perror("scope_open failed");
         return status;
     }
@@ -476,7 +479,6 @@ cleanupDestFd:
     scope_close(filterFd);
 
     return status;
-
 }
 
 /*
@@ -523,8 +525,8 @@ closeFd:
  /*
  * Configure the environment
  * - setup /etc/profile file
- * - extract memory to filter file /tmp/scope_filter.yml
- * - extract libscope.so to /tmp/libscope.so 
+ * - extract memory to filter file /usr/lib/appscope/scope_filter
+ * - extract libscope.so to /usr/lib/appscope/libscope.so 
  * - patch the library
  * Returns status of operation 0 in case of success, other value otherwise
  */
@@ -536,13 +538,21 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
         return -1;
     }
 
-    // Extract the filter file to /tmp/scope_filter.yml
+    // Check for presence of a /usr/lib/appscope directory; add if doesn't exist
+    // TODO: not correct, needs to be dynamic
+    if (opendir(SCOPE_EXEC_PATH) == NULL) {
+        if (mkdir(SCOPE_EXEC_PATH, 0755) == -1) {
+            scope_perror("setupConfigure: mkdir failed");
+        }
+    }
+
+    // Extract the filter file to /usr/lib/appscope/scope_filter
     if (setupExtractFilterFile(filterFileMem, filterSize) == FALSE) {
         scope_fprintf(scope_stderr, "setup filter file failed\n");
         return -1;
     }
 
-    // Extract libscope.so to /tmp/libscope.so
+    // Extract libscope.so to /usr/lib/appscope/libscope.so
     if (libdirExtractLibraryTo(LIBSCOPE_LOC)) {
         scope_fprintf(scope_stderr, "extract libscope.so failed\n");
         return -1;

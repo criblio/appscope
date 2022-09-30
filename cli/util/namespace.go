@@ -49,9 +49,8 @@ func GetDockerPids() ([]int, error) {
  * on non-containers are /init.scope (Ubuntu 20.04 cgroup 0 and 1). Not reliable.
  * Checking for container=lxc | docker in /proc/1/environ works for lxc but not docker, and it
  * requires root privs.
- * Start with /proc/self/cgroup, check the cpuset line for / == host /docker|lxd|lxc == container
- * 9:cpuset:/docker/092ca4a972aebb1a684f3a1adbabdc05721595008024b5be45dbc21cf0f8b19d
- * 9:cpuset:/
+ * Checking /proc/self/cgroup for content after cpuset doesn't work in all cases
+ * So, we check for the presence of /proc/2/comm
  */
 func InContainer() bool {
 	if _, err := os.Open("/proc/2/comm"); err != nil {

@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 
 	"github.com/criblio/scope/internal"
@@ -350,9 +349,17 @@ func extractFilterFile(cfgData []byte) error {
 
 // Start performs setup of scope in the host and containers
 func Start() error {
-	filePerms := os.FileMode(0644)
-	internal.CreateLogFile(filepath.Join("/tmp/scope.log"), filePerms)
+	filePerms := os.FileMode(0666)
+	internal.CreateLogFile("/tmp/scope.log", filePerms)
+	os.Chmod("/tmp/scope.log", filePerms)
 	internal.SetDebug()
+
+	// Validate user has root permissions
+	if err := util.UserVerifyRootPerm(); err != nil {
+		log.Error().
+			Msg("Scope start requires administrator permissions.")
+		return err
+	}
 
 	cfgData := getStartData()
 	if len(cfgData) == 0 {

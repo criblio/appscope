@@ -8,11 +8,11 @@
 
 #define LDSCOPE_IN_CHILD_NS "/tmp/ldscope"
 #define LDSCOPE_IN_HOST_NS "/usr/lib/appscope/ldscope"          // TODO
-#define LDSCOPE_CONFIG_IN_CHILD "/tmp/scope_filter.yml"         // TODO
-#define LDSCOPE_CONFIG_IN_HOST "/usr/lib/appscope/scope_filter.yml" // TODO
+#define LDSCOPE_CONFIG_IN_CHILD "/tmp/scope_filter"         // TODO
+#define LDSCOPE_CONFIG_IN_HOST "/usr/lib/appscope/scope_filter" // TODO
 #define VALID_NS_DEPTH 2
 #define SCOPE_CRONTAB "* * * * * root /tmp/scope_att.sh\n"
-#define SCOPE_CRON_SCRIPT "#! /bin/bash\ntouch /tmp/scope_test\nrm /etc/cron.d/scope_cron\n%s start -f < %s/scope_filter.yml\n"
+#define SCOPE_CRON_SCRIPT "#! /bin/bash\ntouch /tmp/scope_test\nrm /etc/cron.d/scope_cron\n%s start -f < %s/scope_filter\n"
 #define SCOPE_CRON_PATH "/etc/cron.d/scope_cron"
 #define SCOPE_SCRIPT_PATH "/tmp/scope_att.sh"
 #define SCOPE_EXEC_PATH "/usr/lib/appscope"       // TODO: not correct, needs to be dynamic
@@ -121,7 +121,7 @@ join_namespace(pid_t hostPid)
     if (scopeCfgMem) {
         char scopeCfgPath[PATH_MAX] = {0};
 
-        scope_snprintf(scopeCfgPath, sizeof(scopeCfgPath), "/tmp/scope_%d.yml", hostPid);
+        scope_snprintf(scopeCfgPath, sizeof(scopeCfgPath), LDSCOPE_CONFIG_IN_CHILD, hostPid);
         status = extractMemToChildNamespace(scopeCfgMem, cfgSize, scopeCfgPath, 0664);
         // replace the SCOPE_CONF_PATH with namespace path
         setenv("SCOPE_CONF_PATH", scopeCfgPath, 1);

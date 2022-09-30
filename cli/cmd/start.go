@@ -48,7 +48,7 @@ var startCmd = &cobra.Command{
 }
 
 func init() {
-	startCmd.Flags().Bool("force", false, "Bypass confirmation prompt")
+	startCmd.Flags().BoolP("force", "f", false, "Bypass confirmation prompt")
 
 	RootCmd.AddCommand(startCmd)
 }

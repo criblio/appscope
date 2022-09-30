@@ -6,8 +6,10 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 
+	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/run"
@@ -315,6 +317,9 @@ func extract(filterFile string) error {
 
 // Start performs setup of scope in the host and containers
 func Start(filename string) error {
+
+	filePerms := os.FileMode(0644)
+	internal.CreateLogFile(filepath.Join("/tmp/scope.log"), filePerms)
 
 	cfgData, err := ioutil.ReadFile(filename)
 	if err != nil {

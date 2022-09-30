@@ -12,7 +12,7 @@
 #define LDSCOPE_CONFIG_IN_HOST "/usr/lib/appscope/scope_filter.yml" // TODO
 #define VALID_NS_DEPTH 2
 #define SCOPE_CRONTAB "* * * * * root /tmp/scope_att.sh\n"
-#define SCOPE_CRON_SCRIPT "#! /bin/bash\ntouch /tmp/scope_test\nrm /etc/cron.d/scope_cron\nsudo %s start -f %s/scope_filter.yml\n"
+#define SCOPE_CRON_SCRIPT "#! /bin/bash\ntouch /tmp/scope_test\nrm /etc/cron.d/scope_cron\n%s start -f %s/scope_filter.yml\n"
 #define SCOPE_CRON_PATH "/etc/cron.d/scope_cron"
 #define SCOPE_SCRIPT_PATH "/tmp/scope_att.sh"
 #define SCOPE_EXEC_PATH "/usr/lib/appscope"       // TODO: not correct, needs to be dynamic
@@ -377,14 +377,24 @@ create_cron(void)
 static bool
 setHostNamespace(const char *ns)
 {
-    char nsPath[PATH_MAX] = {0};
     int nsFd;
+    char *nsPp;
+    char procPath[64];
+    char nsPath[PATH_MAX] = {0};
 
-    // TODO: either /hostfs or $CRIBL_EDGE_FS_ROOT
-    if (scope_snprintf(nsPath, sizeof(nsPath), "/hostfs/proc/1/ns/%s", ns) < 0) {
+    // $CRIBL_EDGE_FS_ROOT else /hostfs
+    if ((nsPp = getenv("CRIBL_EDGE_FS_ROOT"))) {
+        scope_strncpy(nsPath, nsPp, sizeof(nsPath));
+    } else {
+        scope_strncpy(nsPath, "/hostfs", 10);
+    }
+
+    if (scope_snprintf(procPath, sizeof(procPath), "/proc/1/ns/%s", ns) < 0) {
         scope_perror("setHostNamespace: scope_snprintf failed");
         return FALSE;
     }
+
+    scope_strncat(nsPath, procPath, sizeof(procPath) - 1);
 
     if ((nsFd = scope_open(nsPath, O_RDONLY)) == -1) {
         scope_perror("setHostNamespace: scope_open failed");
@@ -441,6 +451,17 @@ join_host_namespace(void)
      */
     if (setHostNamespace("mnt") == FALSE) {
         goto cleanupMem;
+    }
+
+    /*
+     * At this point we are using the host fs.
+     * Ensure that we have the dest dir
+     */
+    if (opendir(SCOPE_EXEC_PATH) == NULL) {
+        if (mkdir(SCOPE_EXEC_PATH, 0755) == -1) {
+            scope_perror("join_host_namespace: mkdir failed");
+            goto cleanupMem;
+        }
     }
 
     if ((status = extractMemToChildNamespace(ldscopeMem, ldscopeSize, LDSCOPE_IN_HOST_NS, 0775)) == FALSE) {

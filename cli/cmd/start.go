@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/criblio/scope/start"
 	"github.com/criblio/scope/util"
@@ -31,24 +32,24 @@ var startCmd = &cobra.Command{
 	Long: `Start scoping a filtered selection of processes and services on the host and in all relevant containers.
 
 ` + startUsage,
-	Example: `  scope start example_filter.yml`,
-	Args:    cobra.ExactArgs(1),
+	Example: `  scope start < example_filter.yml
+  cat example_filter.json | scope start`,
+	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		force, _ := cmd.Flags().GetBool("force")
 		if !force {
 			fmt.Printf(startUsage)
-			if !util.Confirm("\n\nAre you sure you want to proceed?") {
-				util.ErrAndExit("Exiting due to cancelled start command")
-			}
+			fmt.Println("\n\nIf you wish to proceed, run again with the -f flag.")
+			os.Exit(0)
 		}
-		if err := start.Start(args[0]); err != nil {
+		if err := start.Start(); err != nil {
 			util.ErrAndExit("Exiting due to start failure")
 		}
 	},
 }
 
 func init() {
-	startCmd.Flags().BoolP("force", "f", false, "Bypass confirmation prompt")
+	startCmd.Flags().BoolP("force", "f", false, "Use this flag when you're sure you want to run scope start")
 
 	RootCmd.AddCommand(startCmd)
 }

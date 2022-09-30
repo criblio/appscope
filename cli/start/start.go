@@ -3,6 +3,7 @@ package start
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -278,8 +279,8 @@ func startServiceContainers(allowProcs []allowProcConfig) error {
 	return nil
 }
 
-// extract extracts ldscope, scope, and the filter file to /tmp
-func extract(filterFile string) error {
+// extract extracts ldscope and scope to /tmp
+func extract() error {
 	// Extract ldscope
 	perms := os.FileMode(0755)
 	b, err := run.Asset("build/ldscope")
@@ -296,19 +297,51 @@ func extract(filterFile string) error {
 		return err
 	}
 
-	// Copy filter file
-	if _, err := util.CopyFile(filterFile, "/tmp/scope_filter.yml"); err != nil {
-		log.Error().
-			Err(err).
-			Msg("Error writing filter file to /tmp.")
-		return err
-	}
-
 	// Copy scope
 	if _, err := util.CopyFile(os.Args[0], "/tmp/scope"); err != nil {
+		if err != os.ErrExist {
+			log.Error().
+				Err(err).
+				Msg("Error writing scope to /tmp.")
+			return err
+		}
+	}
+
+	return nil
+}
+
+// getStartData reads data from Stdin
+func getStartData() []byte {
+	var startData []byte
+	stdinFs, err := os.Stdin.Stat()
+	if err != nil {
+		return startData
+	}
+
+	// Verify size of data for mode other than a pipe
+	if stdinFs.Size() == 0 && stdinFs.Mode()&os.ModeNamedPipe == 0 {
+		return startData
+	}
+
+	startData, _ = io.ReadAll(os.Stdin)
+	return startData
+}
+
+// extractFilterFile creates a filter file in /tmp
+func extractFilterFile(cfgData []byte) error {
+	f, err := os.OpenFile("/tmp/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
 		log.Error().
 			Err(err).
-			Msg("Error writing scope to /tmp.")
+			Msg("Failed to create filter file.")
+		return err
+	}
+	defer f.Close()
+
+	if _, err = f.Write(cfgData); err != nil {
+		log.Error().
+			Err(err).
+			Msg("Failed to write to filter file.")
 		return err
 	}
 
@@ -316,42 +349,39 @@ func extract(filterFile string) error {
 }
 
 // Start performs setup of scope in the host and containers
-func Start(filename string) error {
-
+func Start() error {
 	filePerms := os.FileMode(0644)
 	internal.CreateLogFile(filepath.Join("/tmp/scope.log"), filePerms)
 	internal.SetDebug()
 
-	cfgData, err := ioutil.ReadFile(filename)
-	if err != nil {
-		log.Error().
-			Err(err)
-		return err
-	}
+	cfgData := getStartData()
 	if len(cfgData) == 0 {
+		startErr := errMissingData
 		log.Error().
-			Err(err).
+			Err(startErr).
 			Msg("Missing filter data.")
-		return err
+		return startErr
 	}
 
 	var startCfg startConfig
-	if err = yaml.Unmarshal(cfgData, &startCfg); err != nil {
+	if err := yaml.Unmarshal(cfgData, &startCfg); err != nil {
 		log.Error().
 			Err(err).
 			Msg("Read of filter file failed.")
 		return err
 	}
 
+	if err := extractFilterFile(cfgData); err != nil {
+		return err
+	}
+
 	// If the `scope start` command is run inside a container, we should call `ldscope --starthost`
 	// which will instead run `scope start` on the host
 	if util.InContainer() {
-		fmt.Println("before extract")
-		if err := extract(filename); err != nil {
+		if err := extract(); err != nil {
 			return err
 		}
 
-		fmt.Println("before ldscope --starthost")
 		ld := loader.ScopeLoader{Path: "/tmp/ldscope"}
 		stdoutStderr, err := ld.StartHost()
 		if err == nil {
@@ -371,34 +401,33 @@ func Start(filename string) error {
 				return err
 			}
 		}
-		fmt.Println("before successful return")
 		return nil
 	}
 
-	if err = run.CreateLdscope(); err != nil {
+	if err := run.CreateLdscope(); err != nil {
 		log.Error().
 			Err(err).
 			Msg("Create ldscope failed.")
 		return err
 	}
 
-	if err = startConfigureHost(filename); err != nil {
+	if err := startConfigureHost("/tmp/scope_filter"); err != nil {
 		return err
 	}
 
-	if err = startConfigureContainers(filename); err != nil {
+	if err := startConfigureContainers("/tmp/scope_filter"); err != nil {
 		return err
 	}
 
-	if err = startServiceHost(startCfg.AllowProc); err != nil {
+	if err := startServiceHost(startCfg.AllowProc); err != nil {
 		return err
 	}
 
-	if err = startServiceContainers(startCfg.AllowProc); err != nil {
+	if err := startServiceContainers(startCfg.AllowProc); err != nil {
 		return err
 	}
 
-	if err = startAttach(startCfg.AllowProc); err != nil {
+	if err := startAttach(startCfg.AllowProc); err != nil {
 		return err
 	}
 

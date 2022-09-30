@@ -12,7 +12,7 @@
 #define LDSCOPE_CONFIG_IN_HOST "/usr/lib/appscope/scope_filter.yml" // TODO
 #define VALID_NS_DEPTH 2
 #define SCOPE_CRONTAB "* * * * * root /tmp/scope_att.sh\n"
-#define SCOPE_CRON_SCRIPT "#! /bin/bash\ntouch /tmp/scope_test\nrm /etc/cron.d/scope_cron\nsudo %s start -f %s/scope_filter.yml\n"
+#define SCOPE_CRON_SCRIPT "#! /bin/bash\ntouch /tmp/scope_test\nrm /etc/cron.d/scope_cron\n%s start -f < %s/scope_filter\n"
 #define SCOPE_CRON_PATH "/etc/cron.d/scope_cron"
 #define SCOPE_SCRIPT_PATH "/tmp/scope_att.sh"
 #define SCOPE_EXEC_PATH "/usr/lib/appscope"       // TODO: not correct, needs to be dynamic

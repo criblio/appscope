@@ -320,6 +320,7 @@ func Start(filename string) error {
 
 	filePerms := os.FileMode(0644)
 	internal.CreateLogFile(filepath.Join("/tmp/scope.log"), filePerms)
+	internal.SetDebug()
 
 	cfgData, err := ioutil.ReadFile(filename)
 	if err != nil {

@@ -346,11 +346,13 @@ func Start(filename string) error {
 	// If the `scope start` command is run inside a container, we should call `ldscope --starthost`
 	// which will instead run `scope start` on the host
 	if util.InContainer() {
+		fmt.Println("before extract")
 		if err := extract(filename); err != nil {
 			return err
 		}
 
-		ld := loader.ScopeLoader{Path: run.LdscopePath()}
+		fmt.Println("before ldscope --starthost")
+		ld := loader.ScopeLoader{Path: "/tmp/ldscope"}
 		stdoutStderr, err := ld.StartHost()
 		if err == nil {
 			log.Info().
@@ -369,6 +371,7 @@ func Start(filename string) error {
 				return err
 			}
 		}
+		fmt.Println("before successful return")
 		return nil
 	}
 

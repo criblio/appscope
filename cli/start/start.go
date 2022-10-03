@@ -357,11 +357,10 @@ func Start() error {
 
 	cfgData := getStartData()
 	if len(cfgData) == 0 {
-		startErr := errMissingData
 		log.Error().
-			Err(startErr).
+			Err(errMissingData).
 			Msg("Missing filter data.")
-		return startErr
+		return errMissingData
 	}
 
 	var startCfg startConfig

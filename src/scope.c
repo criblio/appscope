@@ -108,7 +108,7 @@ attachCmd(pid_t pid, bool attach)
     scope_snprintf(path, sizeof(path), "%s/%s.%d",
                    DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, pid);
 
-    fd = scope_open(path, O_RDWR|O_CREAT);
+    fd = scope_open(path, O_WRONLY|O_CREAT);
     if (fd == -1) {
         scope_perror("open() of dynamic config file");
         return EXIT_FAILURE;

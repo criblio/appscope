@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/start"
 	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
@@ -32,6 +33,8 @@ var startCmd = &cobra.Command{
   cat example_filter.json | scope start`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		internal.InitConfig()
+
 		force, _ := cmd.Flags().GetBool("force")
 		if !force {
 			fmt.Printf(startUsage)
@@ -39,7 +42,7 @@ var startCmd = &cobra.Command{
 			os.Exit(0)
 		}
 		if err := start.Start(); err != nil {
-			util.ErrAndExit("Exiting due to start failure")
+			util.ErrAndExit("Exiting due to start failure. See the logs for more info.")
 		}
 	},
 }

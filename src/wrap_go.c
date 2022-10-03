@@ -1046,6 +1046,8 @@ frame_size(assembly_fn fn)
 inline static void *
 do_cfunc(char *stackptr, void *cfunc, void *gfunc)
 {
+    if (g_cfg.funcs_attached == FALSE) return return_addr(gfunc);
+
     uint64_t rc;
     char *sys_stack = stackptr;  
     char *g_stack = (char *)*(uint64_t *)(sys_stack + 0x50); 

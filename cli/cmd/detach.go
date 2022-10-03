@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// detachCmd represents the run command
+// detachCmd represents the detach command
 var detachCmd = &cobra.Command{
 	Use:   "detach [flags] PID | <process_name>",
 	Short: "Unscope a currently-running process",

@@ -12,7 +12,7 @@ import (
 /* Args Matrix (X disallows)
  */
 
-// psCmd represents the run command
+// psCmd represents the ps command
 var psCmd = &cobra.Command{
 	Use:   "ps",
 	Short: "List processes currently being scoped",

@@ -148,7 +148,6 @@ func startConfigureHost(filename string) error {
 			Err(err).
 			Str("loaderDetails", stdoutStderr).
 			Msg("Setup host failed.")
-		return err
 	} else {
 		log.Info().
 			Msg("Setup host success.")
@@ -166,13 +165,12 @@ func startConfigureContainers(filename string) error {
 		case errors.Is(err, util.ErrDockerNotAvailable):
 			log.Warn().
 				Msgf("Configure containers skipped. Docker is not available")
-			return nil
 		default:
 			log.Error().
 				Err(err).
 				Msg("Configure containers failed.")
-			return err
 		}
+		return nil
 	}
 
 	ld := loader.ScopeLoader{Path: run.LdscopePath()}
@@ -236,13 +234,12 @@ func startServiceContainers(allowProcs []allowProcConfig) error {
 		case errors.Is(err, util.ErrDockerNotAvailable):
 			log.Warn().
 				Msgf("Setup container services skipped. Docker is not available")
-			return nil
 		default:
 			log.Warn().
 				Err(err).
 				Msg("Setup container services failed.")
-			return nil
 		}
+		return nil
 	}
 
 	ld := loader.ScopeLoader{Path: run.LdscopePath()}

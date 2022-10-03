@@ -53,7 +53,7 @@ func GetDockerPids() ([]int, error) {
  * So, we check for the presence of /proc/2/comm
  */
 func InContainer() bool {
-	if _, err := os.Open("/proc/2/comm"); err != nil {
+	if _, err := os.Stat("/proc/2/comm"); err != nil {
 		return true
 	}
 	return false

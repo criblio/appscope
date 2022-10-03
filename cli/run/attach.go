@@ -28,7 +28,7 @@ var (
 
 // Attach scopes an existing PID
 func (rc *Config) Attach(args []string) error {
-	pid, err := handleInputPid(args[0])
+	pid, err := handleInputArg(args[0])
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func (rc *Config) Attach(args []string) error {
 
 // Detach unscopes an existing PID
 func (rc *Config) Detach(args []string) error {
-	pid, err := handleInputPid(args[0])
+	pid, err := handleInputArg(args[0])
 	if err != nil {
 		return err
 	}
@@ -122,8 +122,8 @@ func (rc *Config) Detach(args []string) error {
 	return err
 }
 
-// handleInputPid handles the input argument
-func handleInputPid(InputArg string) (int, error) {
+// handleInputArg handles the input argument (process id/name)
+func handleInputArg(InputArg string) (int, error) {
 	// Get PID by name if non-numeric, otherwise validate/use InputArg
 	var pid int
 	var err error
@@ -152,6 +152,7 @@ func handleInputPid(InputArg string) (int, error) {
 			if err != nil || i >= uint64(len(procs)) {
 				return -1, errInvalidSelection
 			}
+			pid = procs[i].Pid
 		} else {
 			return -1, errMissingProc
 		}

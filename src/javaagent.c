@@ -459,18 +459,18 @@ Java_sun_nio_ch_SocketChannelImpl_write(JNIEnv *jni, jobject obj, jobject buf)
 JNIEXPORT jobject JNICALL
 Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject src, jobjectArray dsts, jint offset, jint len)
 {
+    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
+    int fd = -1;
+
+    initJniGlobals(jni);
+    initSSLEngineImplGlobals(jni);
+
     if (g_cfg.funcs_attached == FALSE) {
         //call the original method
         jobject res = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl___unwrap, src, dsts, offset, len);
         clearJniException(jni);
         return res;
     }
-
-    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
-    int fd = -1;
-
-    initJniGlobals(jni);
-    initSSLEngineImplGlobals(jni);
 
     jint fdVal = (uint64_t) (*jni)->GetIntField(jni, src, g_java.fid_ByteBuffer___fd);
     if (fdVal) {
@@ -542,18 +542,18 @@ Java_com_sun_net_ssl_internal_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj,
 JNIEXPORT jobject JNICALL 
 Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray srcs, jint offset, jint len, jobject dst) 
 {
+    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
+    int fd = -1;
+
+    initJniGlobals(jni);
+    initSSLEngineImplGlobals(jni);
+
     if (g_cfg.funcs_attached == FALSE) {
         //call the original method
         jobject res = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl___wrap, srcs, offset, len, dst);
         clearJniException(jni);
         return res;
     }
-
-    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
-    int fd = -1;
-
-    initJniGlobals(jni);
-    initSSLEngineImplGlobals(jni);
 
     jint fdVal = (uint64_t) (*jni)->GetIntField(jni, dst, g_java.fid_ByteBuffer___fd);
     if (fdVal) {
@@ -619,18 +619,18 @@ Java_com_sun_net_ssl_internal_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, j
 JNIEXPORT void JNICALL 
 Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
 {
+    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
+    int fd = -1;
+
+    initJniGlobals(jni);
+    initAppOutputStreamGlobals(jni);
+
     if (g_cfg.funcs_attached == FALSE) {
         //call the original method
         (*jni)->CallVoidMethod(jni, obj, g_java.mid_AppOutputStream___write, buf, offset, len);
         clearJniException(jni);
         return;
     }
-
-    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
-    int fd = -1;
-
-    initJniGlobals(jni);
-    initAppOutputStreamGlobals(jni);
 
     jobject session;
     if (g_java.fid_AppOutputStream_socket != NULL) {
@@ -669,18 +669,18 @@ Java_com_sun_net_ssl_internal_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj
 JNIEXPORT jint JNICALL 
 Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray buf, jint offset, jint len) 
 {
+    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
+    int fd = -1;
+
+    initJniGlobals(jni);
+    initAppInputStreamGlobals(jni);
+
     if (g_cfg.funcs_attached == FALSE) {
         //call the original method
         jint res = (*jni)->CallIntMethod(jni, obj, g_java.mid_AppInputStream___read, buf, offset, len);
         clearJniException(jni);
         return res;
     }
-
-    jboolean preexisting_exception = (*jni)->ExceptionCheck(jni);
-    int fd = -1;
-
-    initJniGlobals(jni);
-    initAppInputStreamGlobals(jni);
 
     jobject session;
     if (g_java.fid_AppInputStream_socket != NULL) {

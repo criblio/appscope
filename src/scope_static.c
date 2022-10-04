@@ -534,6 +534,7 @@ showUsage(char *prog)
       "  -s, --service SERVICE        setup specified service NAME\n"
       "  -n  --namespace PID          perform service/configure operation on specified container PID\n"
       "  -p, --patch SO_FILE          patch specified libscope.so\n"
+      "  -r, --starthost              execute the scope start command in a host context\n"
       "\n"
       "Help sections are OVERVIEW, CONFIGURATION, METRICS, EVENTS, and PROTOCOLS.\n"
       "\n"

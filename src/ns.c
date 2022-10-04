@@ -386,7 +386,7 @@ setHostNamespace(const char *ns)
     if ((nsPp = getenv("CRIBL_EDGE_FS_ROOT"))) {
         scope_strncpy(nsPath, nsPp, sizeof(nsPath));
     } else {
-        scope_strncpy(nsPath, "/hostfs", 10);
+        scope_strncpy(nsPath, "/hostfs", sizeof("/hostfs"));
     }
 
     if (scope_snprintf(procPath, sizeof(procPath), "/proc/1/ns/%s", ns) < 0) {
@@ -397,7 +397,7 @@ setHostNamespace(const char *ns)
     scope_strncat(nsPath, procPath, sizeof(procPath) - 1);
 
     if ((nsFd = scope_open(nsPath, O_RDONLY)) == -1) {
-        scope_perror("setHostNamespace: scope_open failed");
+        scope_perror("setHostNamespace: scope_open failed: host fs is not mounted:");
         return FALSE;
     }
 
@@ -417,6 +417,7 @@ join_host_namespace(void)
     size_t ldscopeSize = 0;
     size_t cfgSize = 0;
     size_t scopeSize = 0;
+    DIR *dirp = NULL;
     char path[PATH_MAX] = {0};
 
     if (scope_readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
@@ -457,8 +458,8 @@ join_host_namespace(void)
      * At this point we are using the host fs.
      * Ensure that we have the dest dir
      */
-    if (opendir(SCOPE_EXEC_PATH) == NULL) {
-        if (mkdir(SCOPE_EXEC_PATH, 0755) == -1) {
+    if ((dirp = scope_opendir(SCOPE_EXEC_PATH)) == NULL) {
+        if (scope_mkdir(SCOPE_EXEC_PATH, 0755) == -1) {
             scope_perror("join_host_namespace: mkdir failed");
             goto cleanupMem;
         }
@@ -486,11 +487,11 @@ cleanupMem:
 
     scope_munmap(ldscopeMem, ldscopeSize);
 
-    if (scopeCfgMem) {
-        scope_munmap(scopeCfgMem, cfgSize);
-    }
+    if (scopeCfgMem) scope_munmap(scopeCfgMem, cfgSize);
 
     scope_munmap(scopeMem, scopeSize);
+
+    if (dirp) scope_closedir(dirp);
 
     return status;
 }

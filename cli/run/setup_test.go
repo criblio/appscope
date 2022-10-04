@@ -22,7 +22,7 @@ func TestCreateLdscope(t *testing.T) {
 	tmpLdscope := filepath.Join(".foo", "ldscope")
 	os.Setenv("SCOPE_HOME", ".foo")
 	internal.InitConfig()
-	err := createLdscope()
+	err := CreateLdscope()
 	assert.NoError(t, err)
 
 	wb, _ := Asset("build/ldscope")
@@ -36,14 +36,14 @@ func TestCreateLdscope(t *testing.T) {
 	assert.Equal(t, hash2, hash3)
 
 	// Call again, should use cached copy
-	err = createLdscope()
+	err = CreateLdscope()
 	assert.NoError(t, err)
 
 	os.Chtimes(tmpLdscope, time.Now(), time.Now())
 	ldscopeInfo, _ := AssetInfo("build/ldscope")
 	stat, _ := os.Stat(tmpLdscope)
 	assert.NotEqual(t, ldscopeInfo.ModTime(), stat.ModTime())
-	err = createLdscope()
+	err = CreateLdscope()
 	assert.NoError(t, err)
 	stat, _ = os.Stat(tmpLdscope)
 	assert.Equal(t, ldscopeInfo.ModTime(), stat.ModTime())

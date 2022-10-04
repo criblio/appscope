@@ -486,8 +486,8 @@ cleanupDestFd:
  *
  * Returns memory address in case of success, NULL otherwise.
  */
-char*
-setupLoadFileIntoMem(size_t *size, char *path)
+char *
+setupLoadFileIntoMem(size_t *size, const char *path)
 {
     // Load file into memory
     char *resMem = NULL;

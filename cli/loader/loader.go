@@ -70,3 +70,15 @@ func (sL *ScopeLoader) RunSubProc(args []string, env []string) (string, error) {
 func (sL *ScopeLoader) Patch(libraryPath string) (string, error) {
 	return sL.RunSubProc([]string{"--patch", libraryPath}, os.Environ())
 }
+
+// Detach transforms the calling process into a ldscope detach operation
+func (sL *ScopeLoader) Detach(args []string, env []string) error {
+	args = append([]string{"--detach"}, args...)
+	return sL.Run(args, env)
+}
+
+// DetachSubProc runs a ldscope detach as a seperate process
+func (sL *ScopeLoader) DetachSubProc(args []string, env []string) (string, error) {
+	args = append([]string{"--detach"}, args...)
+	return sL.RunSubProc(args, env)
+}

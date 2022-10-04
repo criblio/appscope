@@ -664,11 +664,12 @@ dynConfig(void)
     // Modify the static config from the command file
     cfgProcessCommands(g_staticfg, fs);
 
+    scope_fclose(fs);
+    scope_unlink(path);
+
     // Apply the config
     doConfig(g_staticfg);
 
-    scope_fclose(fs);
-    scope_unlink(path);
     return 0;
 }
 
@@ -872,6 +873,8 @@ doReset()
 static void
 reportPeriodicStuff(void)
 {
+    if (g_cfg.funcs_attached == FALSE) return;
+
     // aggregate and send http metrics
     doHttpAgg();
 
@@ -3938,8 +3941,10 @@ __stdio_write(struct MUSL_IO_FILE *stream, const unsigned char *buf, size_t len)
         }
     }
 
-    if (dothis == 1) doWrite(stream->fd, initialTime, (rc != -1),
-                             iov, rc, "__stdio_write", IOV, iovcnt);
+    if ((dothis == 1) && (g_cfg.funcs_attached == TRUE)) {
+        doWrite(stream->fd, initialTime, (rc != -1), iov, rc, "__stdio_write", IOV, iovcnt);
+    }
+
     return rc;
 }
 

@@ -664,11 +664,12 @@ dynConfig(void)
     // Modify the static config from the command file
     cfgProcessCommands(g_staticfg, fs);
 
+    scope_fclose(fs);
+    scope_unlink(path);
+
     // Apply the config
     doConfig(g_staticfg);
 
-    scope_fclose(fs);
-    scope_unlink(path);
     return 0;
 }
 

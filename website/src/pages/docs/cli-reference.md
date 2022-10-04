@@ -37,6 +37,7 @@ Available Subcommands:
   attach      Scope a currently-running process
   completion  Generate completion code for specified shell
   dash        Display scope dashboard
+  detach      Unscope a currently-running process
   events      Outputs events for a session
   extract     Output instrumentary library files to <dir>
   flows       Observed flows from the session, potentially including payloads
@@ -100,6 +101,29 @@ scope attach --payloads 2000
   -p, --payloads              Capture payloads of network transactions
   -u, --userconfig string     Run ldscope with a user specified config file; overrides all other settings
   -v, --verbosity int         Set scope metric verbosity (default 4)
+
+```
+
+### detach
+---
+
+Unscopes a currently-running process identified by PID or ProcessName.
+
+#### Usage
+
+`scope detach [flags] PID | <process_name>`
+
+#### Examples
+
+```
+scope detach 1000
+scope detach firefox
+```
+
+#### Flags
+
+```
+  -h, --help                  Help for detach
 
 ```
 

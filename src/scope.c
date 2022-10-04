@@ -100,16 +100,15 @@ attach(pid_t pid, char *scopeLibPath)
 }
 
 static int
-attachCmd(pid_t pid, const char *on_off)
+attachCmd(pid_t pid, bool attach)
 {
     int fd;
     char path[PATH_MAX];
-    char cmd[64];
 
     scope_snprintf(path, sizeof(path), "%s/%s.%d",
                    DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, pid);
 
-    fd = scope_open(path, O_RDWR|O_CREAT);
+    fd = scope_open(path, O_WRONLY|O_CREAT);
     if (fd == -1) {
         scope_perror("open() of dynamic config file");
         return EXIT_FAILURE;
@@ -143,12 +142,28 @@ attachCmd(pid_t pid, const char *on_off)
             return EXIT_FAILURE;
         }
     }
-
-    scope_snprintf(cmd, sizeof(cmd), "SCOPE_CMD_ATTACH=%s", on_off);
+    const char *cmd = (attach == TRUE) ? "SCOPE_CMD_ATTACH=true" : "SCOPE_CMD_ATTACH=false";
     if (scope_write(fd, cmd, scope_strlen(cmd)) <= 0) {
         scope_perror("scope_write() failed");
         scope_close(fd);
         return EXIT_FAILURE;
+    }
+
+    if (attach == TRUE) {
+        /*
+         * Reload the configuration during reattach if we want to redirect data
+         * into other place e.g via cli
+         */
+        char *scopeConfReload = getenv("SCOPE_CONF_RELOAD");
+        if (scopeConfReload) {
+            char reloadCmd[PATH_MAX] = {0};
+            scope_snprintf(reloadCmd, sizeof(reloadCmd), "\nSCOPE_CONF_RELOAD=%s", scopeConfReload);
+            if (scope_write(fd, reloadCmd, scope_strlen(reloadCmd)) <= 0) {
+                scope_perror("scope_write() failed");
+                scope_close(fd);
+                return EXIT_FAILURE;
+            }
+        }
     }
 
     scope_close(fd);
@@ -262,7 +277,7 @@ main(int argc, char **argv, char **env)
             } else {
                 // libscope exists, a reattach
                 scope_printf("Reattaching to pid %d\n", pid);
-                ret = attachCmd(pid, "true");
+                ret = attachCmd(pid, TRUE);
             }
 
             // remove the env var file
@@ -280,7 +295,7 @@ main(int argc, char **argv, char **env)
                 return EXIT_FAILURE;
             }
             scope_printf("Detaching from pid %d\n", pid);
-            return attachCmd(pid, "false");
+            return attachCmd(pid, FALSE);
         } else {
             scope_fprintf(scope_stderr, "error: attach or detach with invalid option\n");
             showUsage(scope_basename(argv[0]));

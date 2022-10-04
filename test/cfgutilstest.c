@@ -77,7 +77,10 @@ cfgPathHonorsEnvVar(void** state)
     char newdir[MAX_PATH + 12];
 
     scope_snprintf(newdir, sizeof(newdir), "%s/%s", origdir, "newdir");
-    assert_int_equal(scope_mkdir(newdir, 0777), 0);
+    if (scope_access(newdir, R_OK)) {
+        assert_int_equal(scope_mkdir(newdir, 0777), 0);
+    }
+
     assert_int_equal(scope_chdir(newdir), 0);
 
 
@@ -2592,12 +2595,18 @@ filterEmptyProcName(void **state) {
     assert_null(cfg);
 }
 
+/*
+ * Note: a NULL filter path implies use default paths.
+ * We have not configured defaults. So, there is no
+ * filter file found. With no filter file we assume
+ * all files are to be scoped. Look for a SCOPED return value.
+ */
 static void
 filterEmptyProcCmdLine(void **state) {
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("foo", NULL, NULL, cfg);
-    assert_int_equal(res, FILTER_ERROR);
+    assert_int_equal(res, FILTER_SCOPED);
     dbgInit(); // reset dbg for the rest of the tests
     // cleanup
     cfgDestroy(&cfg);
@@ -2609,7 +2618,7 @@ filterNullFilterPath(void **state) {
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("foo", "foo", NULL, cfg);
-    assert_int_equal(res, FILTER_ERROR);
+    assert_int_equal(res, FILTER_SCOPED);
     dbgInit(); // reset dbg for the rest of the tests
     // cleanup
     cfgDestroy(&cfg);
@@ -2784,6 +2793,20 @@ main(int argc, char* argv[])
     if (testDirPath(dirPath, argv[0])) {
         return EXIT_FAILURE;
     }
+
+    // Remove any default filter files before running the tests
+    if ((scope_access(DEFAULT_SCOPE_FILTER_LOC1, R_OK) == 0) &&
+        (scope_unlink(DEFAULT_SCOPE_FILTER_LOC1) != 0)) {
+        scope_perror("Remove default filter files before running the tests");
+        return EXIT_FAILURE;
+    }
+
+    if ((scope_access(DEFAULT_SCOPE_FILTER_LOC2, R_OK) == 0) &&
+        (scope_unlink(DEFAULT_SCOPE_FILTER_LOC2) != 0)) {
+        scope_perror("Remove default filter files before running the tests");
+        return EXIT_FAILURE;
+    }
+
     initFn();
 
     source_state_t log = {"SCOPE_EVENT_LOGFILE", CFG_SRC_FILE, DEFAULT_SRC_FILE};

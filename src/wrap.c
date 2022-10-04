@@ -1646,7 +1646,8 @@ init(void)
         scopedFlag = TRUE;
     } else {
         cfg = cfgCreateDefault();
-        filter_status_t res = cfgFilterStatus(g_proc.procname, g_proc.cmd, DEFAULT_SCOPE_FILTER_LOC, cfg);
+        // NULL filter file implies use defaults
+        filter_status_t res = cfgFilterStatus(g_proc.procname, g_proc.cmd, NULL, cfg);
         switch (res) {
             case FILTER_SCOPED:
                 scopedFlag = TRUE;
@@ -1679,7 +1680,7 @@ init(void)
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
 
-    g_cfg.funcs_attached = TRUE;
+    g_cfg.funcs_attached = scopedFlag;
     g_cfg.staticfg = g_staticfg;
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 

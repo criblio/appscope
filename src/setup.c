@@ -540,8 +540,8 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
 
     // Check for presence of a /usr/lib/appscope directory; add if doesn't exist
     // TODO: not correct, needs to be dynamic
-    if (opendir(SCOPE_EXEC_PATH) == NULL) {
-        if (mkdir(SCOPE_EXEC_PATH, 0755) == -1) {
+    if (scope_opendir(SCOPE_EXEC_PATH) == NULL) {
+        if (scope_mkdir(SCOPE_EXEC_PATH, 0755) == -1) {
             scope_perror("setupConfigure: mkdir failed");
         }
     }

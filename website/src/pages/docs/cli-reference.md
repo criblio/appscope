@@ -542,7 +542,7 @@ scope service cribl -c tls://in.my-instance.cribl.cloud:10090
 ### start
 ---
 
-Start scoping a filtered selection of processes and services.
+Start scoping a filtered selection of processes and services on the host and in all relevant containers..
 
 The following actions will be performed on the host and in all relevant containers:
 - Extraction of libscope.so to /usr/lib/appscope/ 
@@ -565,6 +565,7 @@ cat example_filter.json | scope start
 #### Flags
 
 ```
+  -f, --force   Use this flag when you're sure you want to run scope start
   -h, --help    help for start
 ```
 

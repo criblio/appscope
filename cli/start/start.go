@@ -90,7 +90,7 @@ func startAttach(allowProcs []allowProcConfig) error {
 
 	// Iterate over all allowed processses
 	for _, process := range allowProcs {
-		var pidsToAttach util.PidScopeMapState
+		pidsToAttach := make(util.PidScopeMapState)
 		cfgSingleProc, err := yaml.Marshal(process.Config)
 		if err != nil {
 			log.Error().

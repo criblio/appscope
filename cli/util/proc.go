@@ -32,6 +32,7 @@ var (
 	errReadProc       = errors.New("cannot read from proc directory")
 	errGetProcStatus  = errors.New("error getting process status")
 	errGetProcCmdLine = errors.New("error getting process command line")
+	errGetProcTask    = errors.New("error getting process task")
 	errMissingUser    = errors.New("unable to find user")
 )
 
@@ -274,6 +275,23 @@ func PidCmdline(pid int) (string, error) {
 	}
 
 	return cmdline, nil
+}
+
+// PidThreadsPids gets the all the thread PIDs readed from  specified by PID
+func PidThreadsPids(pid int) ([]int, error) {
+	files, err := ioutil.ReadDir(fmt.Sprintf("/proc/%v/task", pid))
+	if err != nil {
+		return nil, errGetProcTask
+	}
+
+	threadPids := make([]int, len(files))
+
+	for _, file := range files {
+		tid, _ := strconv.Atoi(file.Name())
+		threadPids = append(threadPids, tid)
+	}
+
+	return threadPids, nil
 }
 
 // PidExists checks if a PID is valid

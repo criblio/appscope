@@ -124,6 +124,18 @@ func startAttach(allowProcs []allowProcConfig) error {
 			}
 		}
 
+		// Exclude current scope process all Os threads from attach list
+		scopeThreads, err := util.PidThreadsPids(os.Getpid())
+		if err != nil {
+			log.Warn().
+				Str("pid", strconv.Itoa(os.Getpid())).
+				Msgf("Exclude scope process %v from attach failed.", os.Getpid())
+		}
+
+		for _, scopePid := range scopeThreads {
+			delete(pidsToAttach, scopePid)
+		}
+
 		for pid, scopeState := range pidsToAttach {
 			if scopeState {
 				log.Warn().

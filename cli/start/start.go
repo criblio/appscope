@@ -85,7 +85,7 @@ func startAttachSingleProcess(pid string, cfgData []byte) error {
 
 // for the host
 // for all containers
-// for all allowed proc
+// for all allowed proc OR arg
 func startAttach(allowProcs []allowProcConfig) error {
 
 	// Iterate over all allowed processses
@@ -212,23 +212,25 @@ func startServiceHost(allowProcs []allowProcConfig) error {
 
 	// Iterate over all allowed processses
 	for _, process := range allowProcs {
-		stdoutStderr, err := sL.ServiceHost(process.Procname)
-		if err == nil {
-			log.Info().
-				Str("service", process.Procname).
-				Msgf("Service %v host success.", process.Procname)
-		} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
-			if ee.ExitCode() == 1 {
-				log.Warn().
-					Err(err).
+		if process.Procname != "" {
+			stdoutStderr, err := sL.ServiceHost(process.Procname)
+			if err == nil {
+				log.Info().
 					Str("service", process.Procname).
-					Str("loaderDetails", stdoutStderr).
-					Msgf("Service %v host failed.", process.Procname)
-			} else {
-				log.Warn().
-					Str("service", process.Procname).
-					Str("loaderDetails", stdoutStderr).
-					Msgf("Service %v host failed.", process.Procname)
+					Msgf("Service %v host success.", process.Procname)
+			} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
+				if ee.ExitCode() == 1 {
+					log.Warn().
+						Err(err).
+						Str("service", process.Procname).
+						Str("loaderDetails", stdoutStderr).
+						Msgf("Service %v host failed.", process.Procname)
+				} else {
+					log.Warn().
+						Str("service", process.Procname).
+						Str("loaderDetails", stdoutStderr).
+						Msgf("Service %v host failed.", process.Procname)
+				}
 			}
 		}
 	}
@@ -257,28 +259,30 @@ func startServiceContainers(allowProcs []allowProcConfig) error {
 
 	// Iterate over all allowed processses
 	for _, process := range allowProcs {
-		// Iterate over all containers
-		for _, cPid := range cPids {
-			stdoutStderr, err := ld.ServiceContainer(process.Procname, cPid)
-			if err == nil {
-				log.Info().
-					Str("service", process.Procname).
-					Str("pid", strconv.Itoa(cPid)).
-					Msgf("Setup containers. Service %v container %v success.", process.Procname, cPid)
-			} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
-				if ee.ExitCode() == 1 {
-					log.Warn().
-						Err(err).
+		if process.Procname != "" {
+			// Iterate over all containers
+			for _, cPid := range cPids {
+				stdoutStderr, err := ld.ServiceContainer(process.Procname, cPid)
+				if err == nil {
+					log.Info().
 						Str("service", process.Procname).
 						Str("pid", strconv.Itoa(cPid)).
-						Str("loaderDetails", stdoutStderr).
-						Msgf("Setup containers failed. Service %v container %v failed.", process.Procname, cPid)
-				} else {
-					log.Warn().
-						Str("service", process.Procname).
-						Str("pid", strconv.Itoa(cPid)).
-						Str("loaderDetails", stdoutStderr).
-						Msgf("Setup containers failed. Service %v container %v failed.", process.Procname, cPid)
+						Msgf("Setup containers. Service %v container %v success.", process.Procname, cPid)
+				} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
+					if ee.ExitCode() == 1 {
+						log.Warn().
+							Err(err).
+							Str("service", process.Procname).
+							Str("pid", strconv.Itoa(cPid)).
+							Str("loaderDetails", stdoutStderr).
+							Msgf("Setup containers failed. Service %v container %v failed.", process.Procname, cPid)
+					} else {
+						log.Warn().
+							Str("service", process.Procname).
+							Str("pid", strconv.Itoa(cPid)).
+							Str("loaderDetails", stdoutStderr).
+							Msgf("Setup containers failed. Service %v container %v failed.", process.Procname, cPid)
+					}
 				}
 			}
 		}

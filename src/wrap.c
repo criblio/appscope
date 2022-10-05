@@ -1646,8 +1646,18 @@ init(void)
         scopedFlag = TRUE;
     } else {
         cfg = cfgCreateDefault();
-        // NULL filter file implies use defaults
-        filter_status_t res = cfgFilterStatus(g_proc.procname, g_proc.cmd, NULL, cfg);
+        char *filterPath = NULL;
+
+        /*
+        * Look for a filter file in default locations
+        */
+        if (scope_access(DEFAULT_SCOPE_FILTER_LOC1, R_OK) == 0) {
+            filterPath = DEFAULT_SCOPE_FILTER_LOC1;
+        } else if (scope_access(DEFAULT_SCOPE_FILTER_LOC2, R_OK) == 0) {
+            filterPath = DEFAULT_SCOPE_FILTER_LOC2;
+        }
+
+        filter_status_t res = cfgFilterStatus(g_proc.procname, g_proc.cmd, filterPath, cfg);
         switch (res) {
             case FILTER_SCOPED:
                 scopedFlag = TRUE;

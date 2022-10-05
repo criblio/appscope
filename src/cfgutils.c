@@ -3159,30 +3159,17 @@ cleanup_filter_file:
 filter_status_t
 cfgFilterStatus(const char *procName, const char *procCmdLine, char *filterPath, config_t *cfg)
 {
-    bool dupd = FALSE;
-
     if ((procName == NULL) || (cfg == NULL)) {
         DBG(NULL);
         return FILTER_ERROR;
     }
 
     /*
-    * If the filter file is missing we scope every process
-    * A NUll filterPath implies look for a filter file in default locations
+    * If the filter file is missing (NULL) we scope every process
     */
     if (filterPath == NULL) {
-        if (scope_access(DEFAULT_SCOPE_FILTER_LOC1, R_OK) == 0) {
-            filterPath = scope_strdup(DEFAULT_SCOPE_FILTER_LOC1);
-            dupd = TRUE;
-        } else if (scope_access(DEFAULT_SCOPE_FILTER_LOC2, R_OK) == 0) {
-            filterPath = scope_strdup(DEFAULT_SCOPE_FILTER_LOC2);
-            dupd = TRUE;
-        } else {
-            return FILTER_SCOPED;
-        }
+        return FILTER_SCOPED;
     }
-
-    if (scope_access(filterPath, R_OK)) return FILTER_SCOPED;
 
     filter_cfg_t fCfg = {.procName = procName,
                          .procCmdLine = procCmdLine,
@@ -3192,24 +3179,19 @@ cfgFilterStatus(const char *procName, const char *procCmdLine, char *filterPath,
                          .cfg = cfg};
     bool res = filterParseFile(filterPath, &fCfg);
     if (res == FALSE) {
-        if (dupd == TRUE) scope_free(filterPath);
         return FILTER_ERROR;
     }
 
     switch (fCfg.status) {
         case PROC_NOT_FOUND:
             // Depending on presence of allow list process we instrument the process or not
-            if (dupd == TRUE) scope_free(filterPath);
             return (fCfg.emptyAllowList == TRUE) ? FILTER_SCOPED : FILTER_NOT_SCOPED;
         case PROC_ALLOWED:
-            if (dupd == TRUE) scope_free(filterPath);
             return FILTER_SCOPED_WITH_CFG;
         case PROC_DENIED:
-            if (dupd == TRUE) scope_free(filterPath);
             return FILTER_NOT_SCOPED;
     }
 
     DBG(NULL);
-    if (dupd == TRUE) scope_free(filterPath);
     return FILTER_ERROR;
 }

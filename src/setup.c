@@ -444,7 +444,7 @@ setupProfile(void) {
 }
 
  /*
- * Extract memory to filter file /tmp/scope_filter.yml
+ * Extract memory to filter file /tmp/scope_filter
  *
  * Returns status of operation TRUE in case of success, FALSE otherwise
  */
@@ -453,7 +453,7 @@ setupExtractFilterFile(void *filterFileMem, size_t filterSize) {
     int filterFd;
     bool status = FALSE;
 
-    if ((filterFd = scope_open("/tmp/scope_filter.yml", O_RDWR | O_CREAT, 0664)) == -1) {
+    if ((filterFd = scope_open("/tmp/scope_filter", O_RDWR | O_CREAT, 0664)) == -1) {
         scope_perror("scope_open failed");
         return status;
     }
@@ -523,7 +523,7 @@ closeFd:
  /*
  * Configure the environment
  * - setup /etc/profile file
- * - extract memory to filter file /tmp/scope_filter.yml
+ * - extract memory to filter file /tmp/scope_filter
  * - extract libscope.so to /tmp/libscope.so 
  * - patch the library
  * Returns status of operation 0 in case of success, other value otherwise

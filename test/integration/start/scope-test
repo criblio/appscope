@@ -52,14 +52,14 @@ if [ $? -ne "0" ]; then
 fi
 
 # check if filter file is in known location
-if [ ! -f /tmp/scope_filter.yml ]; then
-    fail "missing /tmp/scope_filter.yml"
+if [ ! -f /tmp/scope_filter ]; then
+    fail "missing /tmp/scope_filter"
 fi
 
 # compare the filter file
-cmp -s /tmp/scope_filter.yml /opt/test-runner/scope_filter1.yml
+cmp -s /tmp/scope_filter /opt/test-runner/scope_filter1.yml
 if [ $? -ne "0" ]; then
-    fail "mismatch /tmp/scope_filter.yml and scope_filter1.yml"
+    fail "mismatch /tmp/scope_filter and scope_filter1.yml"
 fi
 
 # check if libscope.so is in known location
@@ -125,9 +125,9 @@ if [ $? -ne "0" ]; then
 fi
 
 # compare the filter file it should be overwritten
-cmp -s /tmp/scope_filter.yml /opt/test-runner/scope_filter2.yml
+cmp -s /tmp/scope_filter /opt/test-runner/scope_filter2.yml
 if [ $? -ne "0" ]; then
-    fail "mismatch /tmp/scope_filter.yml and scope_filter2.yml"
+    fail "mismatch /tmp/scope_filter and scope_filter2.yml"
 fi
 
 endtest

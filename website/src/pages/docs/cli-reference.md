@@ -522,7 +522,7 @@ Perform a scope start operation based on the filter input.
 
 Following actions will be performed:
 - extraction libscope.so to /tmp/libscope.so on the host and on the containers
-- extraction filter input to /tmp/scope_filter.yml on the host and on the containers
+- extraction filter input to /tmp/scope_filter on the host and on the containers
 - setup etc/profile script to use LD_PRELOAD=/tmp/libscope.so on the host and on the containers
 - setup the services which meet the allow list conditions on the host and on the containers
 - attach to the processes which meet the allow list conditions on the host and on the containers

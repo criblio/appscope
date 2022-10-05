@@ -155,7 +155,7 @@ func startAttach(allowProc allowProcConfig) error {
 //
 // - setup /etc/profile.d/scope.sh
 //
-// - extract filter into the filter file in /tmp/scope_filter.yml
+// - extract filter into the filter file in /tmp/scope_filter
 //
 // - extract libscope.so into /tmp/libscope.so
 //
@@ -237,7 +237,7 @@ func startServiceHost(serviceName string) error {
 //
 // - setup /etc/profile.d/scope.sh in the container.
 //
-// - extract filter into the filter file in /tmp/scope_filter.yml in the container.
+// - extract filter into the filter file in /tmp/scope_filter in the container.
 //
 // - extract libscope.so into /tmp/libscope.so in the container.
 //
@@ -263,7 +263,7 @@ func startSetupContainer(allowProcs []allowProcConfig) error {
 
 	for _, cPid := range cPids {
 		ld := loader.ScopeLoader{Path: ldscopePath()}
-		stdoutStderr, err := ld.ConfigureContainer("/tmp/scope_filter.yml", cPid)
+		stdoutStderr, err := ld.ConfigureContainer("/tmp/scope_filter", cPid)
 		if err != nil {
 			log.Error().
 				Err(err).

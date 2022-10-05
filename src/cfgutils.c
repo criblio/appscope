@@ -3151,13 +3151,11 @@ cleanup_filter_file:
     return status;
 }
 
-
 /*
  * Verify against filter file if specifc process command should be scoped.
- *
  */
 filter_status_t
-cfgFilterStatus(const char *procName, const char *procCmdLine, char *filterPath, config_t *cfg)
+cfgFilterStatus(const char *procName, const char *procCmdLine, const char *filterPath, config_t *cfg)
 {
     if ((procName == NULL) || (cfg == NULL)) {
         DBG(NULL);
@@ -3165,7 +3163,7 @@ cfgFilterStatus(const char *procName, const char *procCmdLine, char *filterPath,
     }
 
     /*
-    * If the filter file is missing (NULL) we scope every process
+    *  If the filter file is missing (NULL) we scope every process
     */
     if (filterPath == NULL) {
         return FILTER_SCOPED;

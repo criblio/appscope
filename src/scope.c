@@ -108,9 +108,16 @@ attachCmd(pid_t pid, bool attach)
     scope_snprintf(path, sizeof(path), "%s/%s.%d",
                    DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, pid);
 
+    /*
+     * Unlink a possible existing file before creating a new one
+     * due to a fact that scope_open will fail if the file is
+     * sealed (still processed on library side).
+     * File sealing is supported on tmpfs - /dev/shm (DYN_CONFIG_CLI_DIR).
+     */
+    scope_unlink(path);
     fd = scope_open(path, O_WRONLY|O_CREAT);
     if (fd == -1) {
-        scope_perror("open() of dynamic config file");
+        scope_perror("scope_open() of dynamic config file");
         return EXIT_FAILURE;
     }
 

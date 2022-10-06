@@ -552,11 +552,16 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
         return -1;
     }
 
-    // Extract libscope.so to /usr/lib/appscope/libscope.so
-    if (libdirExtractLibraryTo(LIBSCOPE_LOC)) {
+    // Extract libscope.so to /usr/lib/appscope/libscope.so (and ldscopedyn)
+    if (libdirExtract(LIBRARY_FILE)) {
         scope_fprintf(scope_stderr, "extract libscope.so failed\n");
         return -1;
     }
+    if (scope_strcmp(libdirGetPath(LIBRARY_FILE), LIBSCOPE_LOC)) {
+        scope_fprintf(scope_stderr, "extract libscope.so failed: unwanted location\n");
+        return -1;
+    }
+
     // Patch the library
     if (loaderOpPatchLibrary(LIBSCOPE_LOC) == PATCH_FAILED) {
         scope_fprintf(scope_stderr, "patch libscope.so failed\n");

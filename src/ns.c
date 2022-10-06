@@ -25,8 +25,7 @@
  * Returns TRUE in case of success, FALSE otherwise.
  */
 static bool
-extractMemToChildNamespace(char *inputMem, size_t inputSize, const char *outFile, mode_t outPermFlag)
-{
+extractMemToChildNamespace(char *inputMem, size_t inputSize, const char *outFile, mode_t outPermFlag) {
     bool status = FALSE;
     int outFd;
 
@@ -58,8 +57,7 @@ cleanupDestFd:
 }
 
 static bool
-setNamespace(pid_t pid, const char *ns)
-{
+setNamespace(pid_t pid, const char *ns) {
     char nsPath[PATH_MAX] = {0};
     int nsFd;
     if (scope_snprintf(nsPath, sizeof(nsPath), "/proc/%d/ns/%s", pid, ns) < 0) {
@@ -81,8 +79,7 @@ setNamespace(pid_t pid, const char *ns)
 }
 
 static bool
-join_namespace(pid_t hostPid)
-{
+joinChildNamespace(pid_t hostPid) {
     bool status = FALSE;
     size_t ldscopeSize = 0;
     size_t cfgSize = 0;
@@ -144,8 +141,7 @@ cleanupMem:
  * Returns TRUE if specific process contains two namespaces FALSE otherwise.
  */
 bool
-nsIsPidInChildNs(pid_t pid, pid_t *nsPid)
-{
+nsIsPidInChildNs(pid_t pid, pid_t *nsPid) {
     char path[PATH_MAX] = {0};
     char buffer[4096];
     bool status = FALSE;
@@ -214,8 +210,7 @@ nsService(pid_t pid, const char *serviceName) {
  * Returns status of operation 0 in case of success, other values in case of failure
  */
 int
-nsConfigure(pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize)
-{
+nsConfigure(pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize) {
     if (setNamespace(pid, "mnt") == FALSE) {
         scope_fprintf(scope_stderr, "setNamespace mnt failed\n");
         return EXIT_FAILURE;
@@ -241,10 +236,9 @@ nsConfigure(pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize)
  * Returns status of operation
  */
 int
-nsForkAndExec(pid_t parentPid, pid_t nsPid)
-{
-    if (join_namespace(parentPid) == FALSE) {
-        scope_fprintf(scope_stderr, "error: join_namespace failed\n");
+nsForkAndExec(pid_t parentPid, pid_t nsPid) {
+    if (joinChildNamespace(parentPid) == FALSE) {
+        scope_fprintf(scope_stderr, "error: joinChildNamespace failed\n");
         return EXIT_FAILURE; 
     }
     pid_t child = fork();
@@ -299,73 +293,72 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid)
  * This should be called after the fs namespace has been switched.
  */
 static bool
-create_cron(void)
-{
+createCron(void) {
     int outFd;
     char buf[1024];
     char path[PATH_MAX] = {0};
 
     // Create the script to be executed by cron
     if (scope_snprintf(path, sizeof(path), SCOPE_SCRIPT_PATH) < 0) {
-        scope_perror("create_cron: script path: error: snprintf() failed\n");
+        scope_perror("createCron: script path: error: snprintf() failed\n");
         scope_fprintf(scope_stdout, "path: %s\n", path);
         return FALSE;
     }
 
     if ((outFd = scope_open(path, O_RDWR | O_CREAT, 0775)) == -1) {
-        scope_perror("create_cron: script path: scope_open failed");
+        scope_perror("createCron: script path: scope_open failed");
         scope_fprintf(scope_stdout, "path: %s\n", path);
         return FALSE;
     }
 
     if (scope_snprintf(buf, sizeof(buf), SCOPE_CRON_SCRIPT, SCOPE_EXEC, SCOPE_EXEC_PATH) < 0) {
-        scope_perror("create_cron: script: error: snprintf() failed\n");
+        scope_perror("createCron: script: error: snprintf() failed\n");
         scope_close(outFd);
         return FALSE;
     }
 
     if (scope_write(outFd, buf, scope_strlen(buf)) == -1) {
-        scope_perror("create_cron: script: scope_write failed");
+        scope_perror("createCron: script: scope_write failed");
         scope_fprintf(scope_stdout, "path: %s\n", path);
         scope_close(outFd);
         return FALSE;
     }
 
     if (scope_close(outFd) == -1) {
-        scope_perror("create_cron: script: scope_close failed");
+        scope_perror("createCron: script: scope_close failed");
         scope_fprintf(scope_stdout, "path: %s\n", path);
         return FALSE;
     }
 
     // Create the cron entry
     if (scope_snprintf(path, sizeof(path), SCOPE_CRON_PATH) < 0) {
-        scope_perror("create_cron: cron: error: snprintf() failed\n");
+        scope_perror("createCron: cron: error: snprintf() failed\n");
         scope_fprintf(scope_stdout, "path: %s\n", path);
         return FALSE;
     }
 
     if (scope_snprintf(buf, sizeof(buf), SCOPE_CRONTAB) < 0) {
-        scope_perror("create_cron: cron: error: snprintf() failed\n");
+        scope_perror("createCron: cron: error: snprintf() failed\n");
         scope_fprintf(scope_stdout, "path: %s\n", path);
         return FALSE;
     }
 
     if ((outFd = scope_open(path, O_RDWR | O_CREAT, 0775)) == -1) {
-        scope_perror("create_cron: cron: scope_open failed");
+        scope_perror("createCron: cron: scope_open failed");
         scope_fprintf(scope_stdout, "path: %s\n", path);
         return FALSE;
     }
 
     // crond will detect this file entry and run on its' next cycle
     if (scope_write(outFd, buf, scope_strlen(buf)) == -1) {
-        scope_perror("create_cron: cron: scope_write failed");
+        scope_perror("createCron: cron: scope_write failed");
         scope_fprintf(scope_stdout, "path: %s\n", path);
         scope_close(outFd);
         return FALSE;
     }
 
     if (scope_close(outFd) == -1) {
-        scope_perror("create_cron: cron: scope_close failed");
+        scope_perror("createCron: cron: scope_close failed");
         scope_fprintf(scope_stdout, "path: %s\n", path);
         return FALSE;
     }
@@ -375,8 +368,7 @@ create_cron(void)
 }
 
 static bool
-setHostNamespace(const char *ns)
-{
+setHostNamespace(const char *ns) {
     int nsFd;
     char *nsPp;
     char procPath[64];
@@ -411,8 +403,7 @@ setHostNamespace(const char *ns)
 }
 
 static bool
-join_host_namespace(void)
-{
+joinHostNamespace(void) {
     bool status = FALSE;
     size_t ldscopeSize = 0;
     size_t cfgSize = 0;
@@ -460,7 +451,7 @@ join_host_namespace(void)
      */
     if ((dirp = scope_opendir(SCOPE_EXEC_PATH)) == NULL) {
         if (scope_mkdir(SCOPE_EXEC_PATH, 0755) == -1) {
-            scope_perror("join_host_namespace: mkdir failed");
+            scope_perror("joinHostNamespace: mkdir failed");
             goto cleanupMem;
         }
     }
@@ -497,16 +488,15 @@ cleanupMem:
 }
 
 int
-nsHostStart(void)
-{
+nsHostStart(void) {
     scope_fprintf(scope_stdout, "Executing from a container, run the start command from the host\n");
 
-    if (join_host_namespace() == FALSE) {
-        scope_fprintf(scope_stderr, "error: join_host_namespace failed\n");
+    if (joinHostNamespace() == FALSE) {
+        scope_fprintf(scope_stderr, "error: joinHostNamespace failed\n");
         return EXIT_FAILURE;
     }
 
-    create_cron();
+    createCron();
 
     return EXIT_SUCCESS;
 }

@@ -526,12 +526,13 @@ closeFd:
  * Configure the environment
  * - setup /etc/profile.d/scope.sh
  * - extract memory to filter file /usr/lib/appscope/scope_filter
- * - extract libscope.so to /usr/lib/appscope/libscope.so 
+ * - extract libscope.so to /usr/lib/appscope/libscope.so if it doesn't exists
  * - patch the library
  * Returns status of operation 0 in case of success, other value otherwise
  */
 int
 setupConfigure(void *filterFileMem, size_t filterSize) {
+    struct stat st = {0};
     DIR *dirp; 
 
     // Setup /etc/profile.d/scope.sh
@@ -555,6 +556,11 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
     if (setupExtractFilterFile(filterFileMem, filterSize) == FALSE) {
         scope_fprintf(scope_stderr, "setup filter file failed\n");
         return -1;
+    }
+
+    // Do not overwrite the /usr/lib/appscope/libscope.so if it already exists
+    if (scope_stat(LIBSCOPE_LOC, &st) == 0) {
+        return 0;
     }
 
     // Extract libscope.so to /usr/lib/appscope/libscope.so

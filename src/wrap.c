@@ -1703,16 +1703,28 @@ init(void)
     g_cfg.staticfg = g_staticfg;
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
-    reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
-    doProcStartMetric();
-
     // replaces atexit(handleExit);  Allows events to be reported before
     // the TLS destructors are run.  This mechanism is used regardless
     // of whether TLS is actually configured on any transport.
     transportRegisterForExitNotification(handleExit);
 
     initHook(attachedFlag, scopedFlag);
-    
+
+    /*
+     * If we are interposing (scoping) this process, then proceed
+     * with start messages. Else, we need the periodic thread to
+     * remain mute.
+     *
+     * We start the thread for now so that we can respond to
+     * dynamic and remote commands. This allows a re-attach
+     * command, for example, to be executed on a process that
+     * was previously not scoped.
+     */
+    if (g_cfg.funcs_attached == TRUE) {
+        reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
+        doProcStartMetric();
+    }
+
     if (checkEnv("SCOPE_APP_TYPE", "go")) {
         threadNow(0);
     } else if (g_ismusl == FALSE) {
@@ -1725,7 +1737,6 @@ init(void)
     }
 
     osInitJavaAgent();
-
 }
 
 EXPORTOFF int

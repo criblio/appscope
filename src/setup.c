@@ -524,7 +524,7 @@ closeFd:
 
  /*
  * Configure the environment
- * - setup /etc/profile file
+ * - setup /etc/profile.d/scope.sh
  * - extract memory to filter file /usr/lib/appscope/scope_filter
  * - extract libscope.so to /usr/lib/appscope/libscope.so 
  * - patch the library

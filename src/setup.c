@@ -532,6 +532,8 @@ closeFd:
  */
 int
 setupConfigure(void *filterFileMem, size_t filterSize) {
+    DIR *dirp; 
+
     // Setup /etc/profile.d/scope.sh
     if (setupProfile() == FALSE) {
         scope_fprintf(scope_stderr, "setupProfile failed\n");
@@ -540,10 +542,13 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
 
     // Check for presence of a /usr/lib/appscope directory; add if doesn't exist
     // TODO: not correct, needs to be dynamic
-    if (scope_opendir(SCOPE_EXEC_PATH) == NULL) {
+    dirp = scope_opendir(SCOPE_EXEC_PATH);
+    if (dirp == NULL) {
         if (scope_mkdir(SCOPE_EXEC_PATH, 0755) == -1) {
             scope_perror("setupConfigure: mkdir failed");
         }
+    } else {
+        scope_closedir(dirp);
     }
 
     // Extract the filter file to /usr/lib/appscope/scope_filter

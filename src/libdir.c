@@ -316,7 +316,7 @@ libdirGetPath(int file)
             return 0;
         }
         if (pathLen >= PATH_MAX) {
-            scope_fprintf(scope_stderr, "error: loader path too long.\n");
+            scope_fprintf(scope_stderr, "error: path too long.\n");
             return 0;
         }
         if (!scope_access(path, R_OK)) {
@@ -331,7 +331,7 @@ libdirGetPath(int file)
         return 0;
     }
     if (pathLen >= PATH_MAX) {
-        scope_fprintf(scope_stderr, "error: loader path too long.\n");
+        scope_fprintf(scope_stderr, "error: path too long.\n");
         return 0;
     }
     if (!scope_access(path, R_OK)) {
@@ -345,7 +345,7 @@ libdirGetPath(int file)
         return 0;
     }
     if (pathLen >= PATH_MAX) {
-        scope_fprintf(scope_stderr, "error: loader path too long.\n");
+        scope_fprintf(scope_stderr, "error: path too long.\n");
         return 0;
     }
     if (!scope_access(path, R_OK)) {
@@ -355,7 +355,7 @@ libdirGetPath(int file)
     return 0;
 }
 
-// Does not respect custom base
+// Does not respect a custom base
 int
 libdirExtract(int file)
 {

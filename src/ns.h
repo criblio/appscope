@@ -4,7 +4,7 @@
 #include "scopetypes.h"
 
 bool nsIsPidInChildNs(pid_t, pid_t *);
-int nsForkAndExec(pid_t, pid_t);
+int nsForkAndExec(pid_t, pid_t, char);
 int nsConfigure(pid_t, void *, size_t);
 service_status_t nsService(pid_t, const char *);
 int nsHostStart(void);

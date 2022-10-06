@@ -1575,11 +1575,17 @@ initSigErrorHandler(void)
 }
 
 /*
-* Look for a filter file in default locations
+* Look for a filter file
 * returns NULL if none were accessible
 */
 static const char *
 getFilterPath(void) {
+    if (checkEnv("SCOPE_FILTER", "false") == TRUE) {
+        // Skip handling the filter file
+        return NULL;
+    }
+
+    // use the defaults
     const char *const defaultFilterLoc[] = {
         "/usr/lib/appscope/scope_filter",
         "/tmp/scope_filter"
@@ -1656,9 +1662,8 @@ init(void)
     /*
     * We scope application in following cases:
     * - when we are attaching
-    * - when the filter file is not exists
-    * - when process is found on the allow list
-    * - when process is not found on the allowed and deny list and the allow process list is empty
+    * - when the filter file does not exists
+    * - when process match the allow list
     */
     bool scopedFlag = FALSE;
     bool skipReadCfg = FALSE;
@@ -1704,9 +1709,6 @@ init(void)
     g_cfg.staticfg = g_staticfg;
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
-    reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
-    doProcStartMetric();
-
     // replaces atexit(handleExit);  Allows events to be reported before
     // the TLS destructors are run.  This mechanism is used regardless
     // of whether TLS is actually configured on any transport.
@@ -1714,6 +1716,21 @@ init(void)
 
     initHook(attachedFlag, scopedFlag);
     
+    /*
+     * If we are interposing (scoping) this process, then proceed
+     * with start messages. Else, we need the periodic thread to
+     * remain mute.
+     *
+     * We start the thread for now so that we can respond to
+     * dynamic and remote commands. This allows a re-attach
+     * command, for example, to be executed on a process that
+     * was previously not scoped.
+     */
+    if (g_cfg.funcs_attached == TRUE) {
+        reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
+        doProcStartMetric();
+    }
+
     if (checkEnv("SCOPE_APP_TYPE", "go")) {
         threadNow(0);
     } else if (g_ismusl == FALSE) {

@@ -791,7 +791,7 @@ main(int argc, char **argv, char **env)
                 scope_printf("error: --attach requires root\n");
                 return EXIT_FAILURE;
             }
-            return nsForkAndExec(pid, nsAttachPid);
+            return nsForkAndExec(pid, nsAttachPid, attachType);
         }
     }
 

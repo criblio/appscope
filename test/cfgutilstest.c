@@ -2742,13 +2742,13 @@ filterArgAllowListNotEmptyProcMissing(void **state) {
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("memcached", "memcached", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_SCOPED);
+    assert_int_equal(res, FILTER_NOT_SCOPED);
 
     scope_memset(path, 0, PATH_MAX);
 
     scope_snprintf(path, sizeof(path), "%s/data/filter_3.yml", dirPath);
     res = cfgFilterStatus("memcached", "memcached", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_SCOPED);
+    assert_int_equal(res, FILTER_NOT_SCOPED);
     // cleanup
     cfgDestroy(&cfg);
     assert_null(cfg);

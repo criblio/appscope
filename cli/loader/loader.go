@@ -14,14 +14,14 @@ type ScopeLoader struct {
 
 // - Setup /etc/profile.d/scope.sh on host
 // - Extract libscope.so to /usr/lib/appscope/libscope.so on host
-// - Extract filter input to /usr/lib/appscope/scope_filter.yml on host
+// - Extract filter input to /usr/lib/appscope/scope_filter on host
 func (sL *ScopeLoader) ConfigureHost(filterFilePath string) (string, error) {
 	return sL.RunSubProc([]string{"--configure", filterFilePath}, os.Environ())
 }
 
 // - Setup /etc/profile.d/scope.sh in containers
 // - Extract libscope.so to /usr/lib/appscope/libscope.so in containers
-// - Extract filter input to /usr/lib/appscope/scope_filter.yml in containers
+// - Extract filter input to /usr/lib/appscope/scope_filter in containers
 func (sL *ScopeLoader) ConfigureContainer(filterFilePath string, cpid int) (string, error) {
 	return sL.RunSubProc([]string{"--configure", filterFilePath, "--namespace", strconv.Itoa(cpid)}, os.Environ())
 }

@@ -524,14 +524,17 @@ closeFd:
 
  /*
  * Configure the environment
- * - setup /etc/profile file
+ * - setup /etc/profile.d/scope.sh
  * - extract memory to filter file /usr/lib/appscope/scope_filter
- * - extract libscope.so to /usr/lib/appscope/libscope.so 
+ * - extract libscope.so to /usr/lib/appscope/libscope.so if it doesn't exists
  * - patch the library
  * Returns status of operation 0 in case of success, other value otherwise
  */
 int
 setupConfigure(void *filterFileMem, size_t filterSize) {
+    struct stat st = {0};
+    DIR *dirp; 
+
     // Setup /etc/profile.d/scope.sh
     if (setupProfile() == FALSE) {
         scope_fprintf(scope_stderr, "setupProfile failed\n");
@@ -540,10 +543,13 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
 
     // Check for presence of a /usr/lib/appscope directory; add if doesn't exist
     // TODO: not correct, needs to be dynamic
-    if (scope_opendir(SCOPE_EXEC_PATH) == NULL) {
+    dirp = scope_opendir(SCOPE_EXEC_PATH);
+    if (dirp == NULL) {
         if (scope_mkdir(SCOPE_EXEC_PATH, 0755) == -1) {
             scope_perror("setupConfigure: mkdir failed");
         }
+    } else {
+        scope_closedir(dirp);
     }
 
     // Extract the filter file to /usr/lib/appscope/scope_filter

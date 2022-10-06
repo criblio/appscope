@@ -1656,9 +1656,8 @@ init(void)
     /*
     * We scope application in following cases:
     * - when we are attaching
-    * - when the filter file is not exists
-    * - when process is found on the allow list
-    * - when process is not found on the allowed and deny list and the allow process list is empty
+    * - when the filter file does not exists
+    * - when process match the allow list
     */
     bool scopedFlag = FALSE;
     bool skipReadCfg = FALSE;

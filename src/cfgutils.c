@@ -2930,7 +2930,6 @@ typedef struct {
     const char *procName;    // process name which be searched in the filter file
     const char *procCmdLine; // process command line which be searched in the filter file
     proc_status  status;     // status describes the presence of the process on list
-    bool emptyAllowList;     // emptyAllowList describes if the allow list is empty or not
     config_t *cfg;           // configuration for the scope list
     bool filterMatch;        // flag indicate that cfg should be parsed for the process
 } filter_cfg_t;
@@ -3021,8 +3020,6 @@ processAllowSeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
 
     yaml_node_item_t *seqItem;
     foreach(seqItem, node->data.sequence.items) {
-        // Allow list is not empty
-        fCfg->emptyAllowList = FALSE;
         yaml_node_t *nodeMap = yaml_document_get_node(doc, *seqItem);
 
         if (nodeMap->type != YAML_MAPPING_NODE) return;
@@ -3172,7 +3169,6 @@ cfgFilterStatus(const char *procName, const char *procCmdLine, const char *filte
     filter_cfg_t fCfg = {.procName = procName,
                          .procCmdLine = procCmdLine,
                          .status = PROC_NOT_FOUND,
-                         .emptyAllowList = TRUE,
                          .filterMatch = FALSE,
                          .cfg = cfg};
     bool res = filterParseFile(filterPath, &fCfg);
@@ -3182,12 +3178,10 @@ cfgFilterStatus(const char *procName, const char *procCmdLine, const char *filte
 
     switch (fCfg.status) {
         case PROC_NOT_FOUND:
-            // Depending on presence of allow list process we instrument the process or not
-            return (fCfg.emptyAllowList == TRUE) ? FILTER_SCOPED : FILTER_NOT_SCOPED;
-        case PROC_ALLOWED:
-            return FILTER_SCOPED_WITH_CFG;
         case PROC_DENIED:
             return FILTER_NOT_SCOPED;
+        case PROC_ALLOWED:
+            return FILTER_SCOPED_WITH_CFG;
     }
 
     DBG(NULL);

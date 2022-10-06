@@ -28,11 +28,7 @@
 #endif
 
 #ifndef SCOPE_LIBDIR_BASE
-#define SCOPE_LIBDIR_BASE "/tmp"
-#endif
-
-#ifndef SCOPE_LIBDIR_PREFIX
-#define SCOPE_LIBDIR_PREFIX "libscope-"
+#define SCOPE_LIBDIR_BASE "/tmp/appscope"
 #endif
 
 #ifndef SCOPE_LDSCOPEDYN
@@ -163,13 +159,13 @@ libdirGetDir()
             verlen = scope_strlen(ver);
         }
 
-        if (verlen > PATH_MAX - scope_strlen(SCOPE_LIBDIR_PREFIX) - 1) { // -1 for \0
+        if (verlen > PATH_MAX - 1) { // -1 for \0
             scope_fprintf(scope_stderr, "error: libdir too long\n");
             return 0;
         }
 
-        scope_strncpy(g_libdir_info.version_dir, SCOPE_LIBDIR_PREFIX, sizeof(g_libdir_info.version_dir));
-        scope_strncat(g_libdir_info.version_dir, ver, verlen);
+        scope_strncpy(g_libdir_info.version_dir, ver, verlen);
+        g_libdir_info.version_dir[verlen] = '\0';
     }
 
     return g_libdir_info.version_dir;

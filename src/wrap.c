@@ -1575,11 +1575,17 @@ initSigErrorHandler(void)
 }
 
 /*
-* Look for a filter file in default locations
+* Look for a filter file
 * returns NULL if none were accessible
 */
 static const char *
 getFilterPath(void) {
+    if (checkEnv("SCOPE_FILTER", "false") == TRUE) {
+        // Skip handling the filter file
+        return NULL;
+    }
+
+    // use the defaults
     const char *const defaultFilterLoc[] = {
         "/usr/lib/appscope/scope_filter",
         "/tmp/scope_filter"

@@ -183,6 +183,8 @@ typedef unsigned int bool;
 // Unpublished scope env vars that are not processed by config:
 //    SCOPE_APP_TYPE                 internal use only
 //    SCOPE_EXEC_TYPE                internal use only
+//    SCOPE_FILTER                   "false" disables handling the filter file
+//                                   TODO: add handling other values as a path to a filter file
 //    SCOPE_EXECVE                   "false" disables scope of child procs
 //    SCOPE_EXEC_PATH                specifies path to ldscope executable
 //    SCOPE_CRIBL_NO_BREAKER         adds breaker property to process start message

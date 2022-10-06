@@ -45,10 +45,10 @@
 
 // private global state
 static struct {
-    char version_dir[PATH_MAX];  // name of the subdirectory under base i.e. libscope-web
-    char lib_base[PATH_MAX]; // full path to the library base directory i.e. /tmp or /usr/lib/appscope
+    char version_dir[PATH_MAX];  // name of the subdirectory under base i.e. 1.0.0
+    char lib_base[PATH_MAX]; // full path to the library base directory i.e. /tmp/appscope or /usr/lib/appscope
     char lib_path[PATH_MAX]; // full path to the library file
-    char ld_base[PATH_MAX]; // full path to the loader base directory i.e. /tmp or /usr/lib/appscope
+    char ld_base[PATH_MAX]; // full path to the loader base directory i.e. /tmp/appscope or /usr/lib/appscope
     char ld_path[PATH_MAX]; // full path to the loader file
 } g_libdir_info;
 

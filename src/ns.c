@@ -10,7 +10,6 @@
 #define LDSCOPE_IN_HOST_NS "/usr/lib/appscope/ldscope"          // TODO
 #define LDSCOPE_CONFIG_IN_CHILD "/tmp/scope_filter"         // TODO
 #define LDSCOPE_CONFIG_IN_HOST "/usr/lib/appscope/scope_filter" // TODO
-#define VALID_NS_DEPTH 2
 #define SCOPE_CRONTAB "* * * * * root /tmp/scope_att.sh\n"
 #define SCOPE_CRON_SCRIPT "#! /bin/bash\ntouch /tmp/scope_test\nrm /etc/cron.d/scope_cron\n%s start -f < %s/scope_filter\n"
 #define SCOPE_CRON_PATH "/etc/cron.d/scope_cron"
@@ -142,13 +141,16 @@ cleanupMem:
  */
 bool
 nsIsPidInChildNs(pid_t pid, pid_t *nsPid) {
+    const int validNsDepth = 2;
     char path[PATH_MAX] = {0};
     char buffer[4096];
     bool status = FALSE;
     int lastNsPid = 0;
     int nsDepth = 0;
 
-    if (scope_snprintf(path, sizeof(path), "/proc/%d/status", pid) < 0) return FALSE;
+    if (scope_snprintf(path, sizeof(path), "/proc/%d/status", pid) < 0) {
+        return FALSE;
+    }
 
     FILE *fstream = scope_fopen(path, "r");
 
@@ -176,9 +178,9 @@ nsIsPidInChildNs(pid_t pid, pid_t *nsPid) {
 
     /*
     * TODO: we currently tested nesting depth 
-    * equals VALID_NS_DEPTH, check more depth level
+    * equals validNsDepth, check more depth level
     */
-    if (nsDepth == VALID_NS_DEPTH) {
+    if (nsDepth == validNsDepth) {
         status = TRUE;
         *nsPid = lastNsPid;
     }

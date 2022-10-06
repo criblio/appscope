@@ -20,7 +20,6 @@ int         libdirClean();  // remove it and it's contents
 int libdirExtractLoader();  // extract to $libdir/ldscopedyn
 int libdirExtractLibrary(); // extract to $libdir/libscope.so
 int libdirExtractLibraryTo(const char* path);    // extract to path pointing to libscope.so
-int libdirLinkLoader(const char *from, const char *to); // ln -s $to $libdir/from
 
 // Get paths of things in the Library Directory
 const char* libdirGetLoader();  // returns "$libdir/ldscopedyn"

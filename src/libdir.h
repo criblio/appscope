@@ -13,7 +13,6 @@
 
 int         libdirSetBase(int file, const char *base);    // Override default base dir i.e. /tmp
 int         libdirExtract(int file);                      // Extracts file to default path
-const char* libdirGetPath(int file);                      // Get full path to file. Sets if not done yet
-int         libdirClean();                                // Remove all directories and contents
+const char* libdirGetPath(int file);                      // Get full path to existing file 
 
 #endif // _SCOPE_LIBDIR_H

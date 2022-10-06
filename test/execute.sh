@@ -41,9 +41,6 @@ run_test() {
 
 CWD="$(pwd)"
 
-# verify the test environment
-check_filter_existence
-
 if [ -d $CWD/coverage ]; then
     rm -rf $CWD/coverage
 fi

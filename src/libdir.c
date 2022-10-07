@@ -45,11 +45,13 @@
 
 // private global state
 static struct {
-    char version_dir[PATH_MAX];  // name of the subdirectory under base i.e. 1.0.0
+    char ver[PATH_MAX];      // name of the subdirectory under base i.e. 1.0.0
     char lib_base[PATH_MAX]; // full path to the library base directory i.e. /tmp/appscope or /usr/lib/appscope
     char lib_path[PATH_MAX]; // full path to the library file
-    char ld_base[PATH_MAX]; // full path to the loader base directory i.e. /tmp/appscope or /usr/lib/appscope
-    char ld_path[PATH_MAX]; // full path to the loader file
+    char lib_dir[PATH_MAX];  // full path to the library dir
+    char ld_base[PATH_MAX];  // full path to the loader base directory i.e. /tmp/appscope or /usr/lib/appscope
+    char ld_path[PATH_MAX];  // full path to the loader file
+    char ld_dir[PATH_MAX];   // full path to the loader dir
 } g_libdir_info;
 
 // We use `objcopy` in the Makefile to get `ldscopedyn` into an object we then
@@ -103,10 +105,11 @@ libdirFileExists(const char *path, int mode)
     return libdirExists(path, 0, mode);
 }
 
+// - Sets global ver
 static const char*
-libdirGetDir()
+libdirGetVer()
 {
-    if (!g_libdir_info.version_dir[0]) {
+    if (!g_libdir_info.ver[0]) {
         char *ver = SCOPE_VER;
         char *dash;
         size_t verlen;
@@ -126,11 +129,11 @@ libdirGetDir()
             return 0;
         }
 
-        scope_strncpy(g_libdir_info.version_dir, ver, verlen);
-        g_libdir_info.version_dir[verlen] = '\0';
+        scope_strncpy(g_libdir_info.ver, ver, verlen);
+        g_libdir_info.ver[verlen] = '\0';
     }
 
-    return g_libdir_info.version_dir;
+    return g_libdir_info.ver;
 }
 
 static note_t*
@@ -175,24 +178,88 @@ libdirGetNote(file_t file)
     return 0;
 }
 
-int
-libdirExtractFileTo(file_t file, const char* path)
-{
-    unsigned char *start;
-    unsigned char *end;
-
-    if (file == LOADER_FILE) {
-        start = &_binary_ldscopedyn_start;
-        end = &_binary_ldscopedyn_end;
-    } else {
-        start = &_binary_libscope_so_start;
-        end = &_binary_libscope_so_end;
+static int
+libdirCheckNote(file_t file, const char *path) {
+    note_t *note = libdirGetNote(file);
+    if (!note) {
+        // no note given to compare against so we're done.
+        return -1;
     }
 
+    // open & mmap the file to get its note
+    int fd = scope_open(path, O_RDONLY);
+    if (fd == -1) {
+        scope_perror("open() failed");
+        return -1;
+    }
+
+    struct stat s;
+    if (scope_fstat(fd, &s) == -1) {
+        scope_close(fd);
+        scope_perror("fstat failed");
+        return -1;
+    }
+
+    void* buf = scope_mmap(NULL, ROUND_UP(s.st_size, scope_sysconf(_SC_PAGESIZE)),
+            PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
+    if (buf == MAP_FAILED) {
+        scope_close(fd);
+        scope_perror("scope_mmap() failed");
+        return -1;
+    }
+
+    scope_close(fd);
+
+    // compare the notes
+    int cmp = -1;
+    note_t* pathNote = libdirGetNote(file);
+    if (pathNote) {
+        if (note->nhdr.n_descsz == pathNote->nhdr.n_descsz) {
+            cmp = scope_memcmp(note->build_id, pathNote->build_id, note->nhdr.n_descsz);
+        }
+    }
+
+    scope_munmap(buf, s.st_size);
+
+    return cmp; // 0 if notes match
+}
+
+// - Sets global path
+int
+libdirExtractFile(file_t file, const char* dir)
+{
     int fd;
     char temp[PATH_MAX];
+    unsigned char *start;
+    unsigned char *end;
+    char *tmp_path;
+    char *path;
+    char *filename;
 
-    int tempLen = scope_snprintf(temp, PATH_MAX, "%s.XXXXXX", path);
+    if (file == LOADER_FILE) {
+        filename = SCOPE_LDSCOPEDYN;
+        start = &_binary_ldscopedyn_start;
+        end = &_binary_ldscopedyn_end;
+        path = g_libdir_info.ld_path;
+    } else {
+        filename = SCOPE_LIBSCOPE_SO;
+        start = &_binary_libscope_so_start;
+        end = &_binary_libscope_so_end;
+        path = g_libdir_info.lib_path;
+    }
+
+    int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s", dir, filename);
+    if (pathLen < 0) {
+        scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
+        return -1;
+    }
+    if (pathLen >= PATH_MAX) {
+        scope_fprintf(scope_stderr, "error: path too long.\n");
+        return -1;
+    }
+
+
+    int tempLen = scope_snprintf(temp, PATH_MAX, "%s.XXXXXX", tmp_path);
     if (tempLen < 0) {
         scope_fprintf(scope_stderr, "error: snprintf(0 failed.\n");
         return -1;
@@ -225,27 +292,60 @@ libdirExtractFileTo(file_t file, const char* path)
     }
     scope_close(fd);
 
-    if (scope_rename(temp, path)) {
+    if (scope_rename(temp, tmp_path)) {
         scope_unlink(temp);
         scope_perror("rename() failed");
         return -1;
     }
+
+    path = tmp_path;
     return 0;
 }
 
-static int
-libdirCreateDirsIfMissing(file_t file)
+// Create directory recursively if missing
+// Return extract directory 
+// - Sets global ver
+// - Sets global base
+// - Sets global dir
+static char *
+libdirCreateDirIfMissing(file_t file)
 {
+    char *ver;
+    char *base;
+    char *dir;
+    if (file == LOADER_FILE) {
+        ver = g_libdir_info.ver;
+        base = g_libdir_info.ld_base;
+        dir = g_libdir_info.ld_dir;
+    } else {
+        ver = g_libdir_info.ver;
+        base = g_libdir_info.lib_base;
+        dir = g_libdir_info.lib_dir;
+    }
+
+    ver = (char *)libdirGetVer();
+
     // stat /usr/lib/appscope/<ver>
-    // if exists, return
+    // if exists
+    //   set base
+    //   set dir
+    //   return dir
     // 
     // if root, create /usr/lib/appscope/<ver>
-    // return
+    //   set base
+    //   set dir
+    //   return dir
     //
     // stat /tmp/appscope/<ver> 
-    // if exists, return
+    // if exists
+    //   set base
+    //   set dir
+    //   return dir
     //
     // create /tmp/appscope/<ver>/
+    //   set base
+    //   set dir
+    //   return dir
 
     // see libdirSetBase() for ideas
         
@@ -265,14 +365,17 @@ libdirCreateDirsIfMissing(file_t file)
 // External
 // ----------------------------------------------------------------------------
 
+// - Sets global base
 int
 libdirSetBase(file_t file, const char *base)
 {
-    g_libdir_info.version_dir[0] = 0;
+    g_libdir_info.ver[0] = 0;
     g_libdir_info.lib_base[0] = 0;
     g_libdir_info.lib_path[0] = 0;
+    g_libdir_info.lib_dir[0] = 0;
     g_libdir_info.ld_base[0] = 0;
     g_libdir_info.ld_path[0] = 0;
+    g_libdir_info.ld_dir[0] = 0;
 
     if (base) {
         if (scope_strlen(base) >= PATH_MAX) {
@@ -291,17 +394,23 @@ libdirSetBase(file_t file, const char *base)
     return -1;
 }
 
+// - Sets global path (if file found)
 const char *
 libdirGetPath(file_t file)
 {
+    const char *ver = libdirGetVer();
+    char *tmp_path;
     char *path;
     char *base;
+    char *filename;
     if (file == LOADER_FILE) {
         path = g_libdir_info.ld_path;
         base = g_libdir_info.ld_base;
+        filename = SCOPE_LDSCOPEDYN;
     } else {
         path = g_libdir_info.lib_path;
         base = g_libdir_info.lib_base;
+        filename = SCOPE_LIBSCOPE_SO;
     }
         
     if (path[0]) {
@@ -310,7 +419,7 @@ libdirGetPath(file_t file)
 
     // Check custom base first
     if (base) {
-        int pathLen = scope_snprintf(path, PATH_MAX, "%s/%s/%s", base, libdirGetDir(), SCOPE_LDSCOPEDYN);
+        int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", base, ver, filename);
         if (pathLen < 0) {
             scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
             return 0;
@@ -319,13 +428,14 @@ libdirGetPath(file_t file)
             scope_fprintf(scope_stderr, "error: path too long.\n");
             return 0;
         }
-        if (!scope_access(path, R_OK)) {
+        if (!scope_access(tmp_path, R_OK)) {
+            path = tmp_path;
             return path;
         }
     }
 
     // Check install base next
-    int pathLen = scope_snprintf(path, PATH_MAX, "%s/%s/%s", SCOPE_INSTALL_BASE, libdirGetDir(), SCOPE_LDSCOPEDYN);
+    int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", SCOPE_INSTALL_BASE, ver, filename);
     if (pathLen < 0) {
         scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
         return 0;
@@ -335,11 +445,12 @@ libdirGetPath(file_t file)
         return 0;
     }
     if (!scope_access(path, R_OK)) {
+        path = tmp_path;
         return path;
     }
 
     // Check temp base next
-    pathLen = scope_snprintf(path, PATH_MAX, "%s/%s/%s", SCOPE_TEMP_BASE, libdirGetDir(), SCOPE_LDSCOPEDYN);
+    pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", SCOPE_TEMP_BASE, ver, filename);
     if (pathLen < 0) {
         scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
         return 0;
@@ -349,72 +460,31 @@ libdirGetPath(file_t file)
         return 0;
     }
     if (!scope_access(path, R_OK)) {
+        path = tmp_path;
         return path;
     }
 
     return 0;
 }
 
-// Does not respect a custom base
+// Does not extract to a custom base
 int
 libdirExtract(file_t file)
 {
-    int location = libdirCreateDirsIfMissing(file);
-    if (location < 0) {
+    const char *path = libdirGetPath(file);
+    if (path) {
+        // file exists
+        if (!libdirCheckNote(file, path)) {
+            // note is ok
+            return 0;
+        }
+    }
+    
+    char *dir = libdirCreateDirIfMissing(file);
+    if (!dir) {
         return -1;
     }
-        
-    const char *path = libdirGetPath(file);
-    if (libdirFileExists(path, R_OK|X_OK)) {
-        // extracted file already exists
 
-        note_t *note = libdirGetNote(file);
-        if (!note) {
-            // no note given to compare against so we're done.
-            return 0;
-        }
-
-        // open & mmap the file to get its note
-        int fd = scope_open(path, O_RDONLY);
-        if (fd == -1) {
-            scope_perror("open() failed");
-            return 0;
-        }
-
-        struct stat s;
-        if (scope_fstat(fd, &s) == -1) {
-            scope_close(fd);
-            scope_perror("fstat failed");
-            return 0;
-        }
-
-        void* buf = scope_mmap(NULL, ROUND_UP(s.st_size, scope_sysconf(_SC_PAGESIZE)),
-                PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
-        if (buf == MAP_FAILED) {
-            scope_close(fd);
-            scope_perror("scope_mmap() failed");
-            return 0;
-        }
-
-        scope_close(fd);
-
-        // compare the notes
-        int cmp = -1;
-        note_t* pathNote = libdirGetNote(file);
-        if (pathNote) {
-            if (note->nhdr.n_descsz == pathNote->nhdr.n_descsz) {
-                cmp = scope_memcmp(note->build_id, pathNote->build_id, note->nhdr.n_descsz);
-            }
-        }
-
-        scope_munmap(buf, s.st_size);
-
-        if (cmp == 0) {
-            // notes match, don't re-extract
-            return 0;
-        }
-    }
-
-    return libdirExtractFileTo(file, path);
+    return libdirExtractFile(file, dir);
 }
 

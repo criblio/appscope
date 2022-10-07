@@ -31,6 +31,8 @@
 #include "inject.h"
 #include "os.h"
 
+static bool useDynConfAttach = FALSE;
+
 static void
 showUsage(char *prog)
 {
@@ -102,79 +104,129 @@ attach(pid_t pid, char *scopeLibPath)
 static int
 attachCmd(pid_t pid, bool attach)
 {
-    int fd;
-    char path[PATH_MAX];
-
-    scope_snprintf(path, sizeof(path), "%s/%s.%d",
-                   DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, pid);
+    int sfd, mfd;
+    export_sm_t *exaddr;
+    char buf[PATH_MAX];
 
     /*
-     * Unlink a possible existing file before creating a new one
-     * due to a fact that scope_open will fail if the file is
-     * sealed (still processed on library side).
-     * File sealing is supported on tmpfs - /dev/shm (DYN_CONFIG_CLI_DIR).
+     * Not sure how to handle this dual case
+     * Probably don't want to remove the code for dyn config of reattach
+     * Maybe this becomes dynamic?
      */
-    scope_unlink(path);
-    fd = scope_open(path, O_WRONLY|O_CREAT);
-    if (fd == -1) {
-        scope_perror("scope_open() of dynamic config file");
-        return EXIT_FAILURE;
-    }
-
-    if (scope_fchmod(fd, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH) == -1) {
-        scope_perror("scope_fchmod() failed");
-        return EXIT_FAILURE;
-    }
-
-    /*
-     * Ensuring that the process being operated on can remove
-     * the dyn config file being created here.
-     * In the case where a root user executes the command,
-     * we need to change ownership of dyn config file.
-     */
-
-    if (scope_getuid() == 0) {
-        uid_t euid = -1;
-        gid_t egid = -1;
-
-        if (osGetProcUidGid(pid, &euid, &egid) == -1) {
-            scope_fprintf(scope_stderr, "error: osGetProcUidGid() failed\n");
-            scope_close(fd);
+    if (useDynConfAttach == FALSE) {
+        // e.g. memfd:scope_anon
+        sfd = osFindFd(pid, SM_NAME);
+        if (sfd < 0) {
+            scope_fprintf(scope_stderr, "error: %s: osFindFd failed\n", __FUNCTION__);
             return EXIT_FAILURE;
         }
 
-        if (scope_fchown(fd, euid, egid) == -1) {
-            scope_perror("scope_fchown() failed");
-            scope_close(fd);
+        scope_snprintf(buf, sizeof(buf), "/proc/%d/fd/%d", pid, sfd);
+        if ((mfd = scope_open(buf, O_RDONLY)) == -1) {
+            scope_close(sfd);
+            scope_perror("open");
             return EXIT_FAILURE;
         }
-    }
-    const char *cmd = (attach == TRUE) ? "SCOPE_CMD_ATTACH=true" : "SCOPE_CMD_ATTACH=false";
-    if (scope_write(fd, cmd, scope_strlen(cmd)) <= 0) {
-        scope_perror("scope_write() failed");
-        scope_close(fd);
-        return EXIT_FAILURE;
-    }
 
-    if (attach == TRUE) {
+        if ((exaddr = scope_mmap(NULL, sizeof(export_sm_t), PROT_READ,
+                                 MAP_SHARED, mfd, 0)) == MAP_FAILED) {
+            scope_close(sfd);
+            scope_close(mfd);
+            scope_perror("mmap");
+            return EXIT_FAILURE;
+        }
+
+        if (injectReattach(pid, exaddr->cmdAttachAddr) == EXIT_FAILURE) {
+            scope_fprintf(scope_stderr, "error: %s: the reattach command failed\n", __FUNCTION__);
+        }
+
+        //scope_fprintf(scope_stderr, "%s: %s 0x%lx\n", __FUNCTION__, buf, exaddr->cmdAttachAddr);
+
+        scope_close(sfd);
+        scope_close(mfd);
+
+        if (scope_munmap(exaddr, sizeof(export_sm_t))) {
+            scope_fprintf(scope_stderr, "error: %s: unmapping in the the reattach command failed\n", __FUNCTION__);
+            return EXIT_FAILURE;
+        }
+
+        return EXIT_SUCCESS;
+    } else {
+        int fd;
+        char path[PATH_MAX];
+
+        scope_snprintf(path, sizeof(path), "%s/%s.%d",
+                       DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, pid);
+
         /*
-         * Reload the configuration during reattach if we want to redirect data
-         * into other place e.g via cli
+         * Unlink a possible existing file before creating a new one
+         * due to a fact that scope_open will fail if the file is
+         * sealed (still processed on library side).
+         * File sealing is supported on tmpfs - /dev/shm (DYN_CONFIG_CLI_DIR).
          */
-        char *scopeConfReload = getenv("SCOPE_CONF_RELOAD");
-        if (scopeConfReload) {
-            char reloadCmd[PATH_MAX] = {0};
-            scope_snprintf(reloadCmd, sizeof(reloadCmd), "\nSCOPE_CONF_RELOAD=%s", scopeConfReload);
-            if (scope_write(fd, reloadCmd, scope_strlen(reloadCmd)) <= 0) {
-                scope_perror("scope_write() failed");
+        scope_unlink(path);
+        fd = scope_open(path, O_WRONLY|O_CREAT);
+        if (fd == -1) {
+            scope_perror("scope_open() of dynamic config file");
+            return EXIT_FAILURE;
+        }
+
+        if (scope_fchmod(fd, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH) == -1) {
+            scope_perror("scope_fchmod() failed");
+            return EXIT_FAILURE;
+        }
+
+        /*
+         * Ensuring that the process being operated on can remove
+         * the dyn config file being created here.
+         * In the case where a root user executes the command,
+         * we need to change ownership of dyn config file.
+         */
+
+        if (scope_getuid() == 0) {
+            uid_t euid = -1;
+            gid_t egid = -1;
+
+            if (osGetProcUidGid(pid, &euid, &egid) == -1) {
+                scope_fprintf(scope_stderr, "error: osGetProcUidGid() failed\n");
+                scope_close(fd);
+                return EXIT_FAILURE;
+            }
+
+            if (scope_fchown(fd, euid, egid) == -1) {
+                scope_perror("scope_fchown() failed");
                 scope_close(fd);
                 return EXIT_FAILURE;
             }
         }
-    }
 
-    scope_close(fd);
-    return EXIT_SUCCESS;
+        const char *cmd = (attach == TRUE) ? "SCOPE_CMD_ATTACH=true" : "SCOPE_CMD_ATTACH=false";
+        if (scope_write(fd, cmd, scope_strlen(cmd)) <= 0) {
+            scope_perror("scope_write() failed");
+            scope_close(fd);
+            return EXIT_FAILURE;
+        }
+
+        if (attach == TRUE) {
+            /*
+             * Reload the configuration during reattach if we want to redirect data
+             * into other place e.g via cli
+             */
+            char *scopeConfReload = getenv("SCOPE_CONF_RELOAD");
+            if (scopeConfReload) {
+                char reloadCmd[PATH_MAX] = {0};
+                scope_snprintf(reloadCmd, sizeof(reloadCmd), "\nSCOPE_CONF_RELOAD=%s", scopeConfReload);
+                if (scope_write(fd, reloadCmd, scope_strlen(reloadCmd)) <= 0) {
+                    scope_perror("scope_write() failed");
+                    scope_close(fd);
+                    return EXIT_FAILURE;
+                }
+            }
+        }
+
+        scope_close(fd);
+        return EXIT_SUCCESS;
+    }
 }
 
 // long aliases for short options

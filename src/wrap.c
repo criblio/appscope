@@ -400,6 +400,11 @@ cmdAttach(void)
     hookMain(filter);
 
     g_cfg.funcs_attached = TRUE;
+
+    if (g_proc.smfd > 0) {
+        scope_close(g_proc.smfd);
+    }
+
     return TRUE;
 }
 
@@ -1633,7 +1638,6 @@ init(void)
 
     setProcId(&g_proc);
     setPidEnv(g_proc.pid);
-
     setMachineID(g_proc.machine_id);
     setUUID(g_proc.uuid);
 
@@ -1723,17 +1727,26 @@ init(void)
     if (g_cfg.funcs_attached == TRUE) {
         reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
         doProcStartMetric();
-    }
 
-    if (checkEnv("SCOPE_APP_TYPE", "go")) {
-        threadNow(0);
-    } else if (g_ismusl == FALSE) {
-        // The check here is meant to be temporary.
-        // The behavior of timer_delete() in musl libc
-        // is different than that of gnu libc.
-        // Therefore, until that is investigated we don't
-        // enable a timer/signal.
-        threadInit();
+        if (checkEnv("SCOPE_APP_TYPE", "go")) {
+            threadNow(0);
+        } else if (g_ismusl == FALSE) {
+            /*
+             * The check here is meant to be temporary.
+             * The behavior of timer_delete() in musl libc
+             * is different than that of gnu libc.
+             * Therefore, until that is investigated we don't
+             * enable a timer/signal.
+             */
+            threadInit();
+        }
+    } else {
+        /*
+         * When libscope is loaded and we are not interposing
+         * we don't start the thread. Rather, we create the
+         * SM segment to enable a reattach command.
+         */
+        osCreateSM(&g_proc, (unsigned long)cmdAttach);
     }
 
     osInitJavaAgent();

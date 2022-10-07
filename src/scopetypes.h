@@ -49,6 +49,11 @@ typedef enum {
 #define MAX_ID 512
 #define MAX_CGROUP 512
 #define MODE_STR 16
+#define SM_NAME "scope_anon"
+
+#ifndef bool
+typedef unsigned int bool;
+#endif
 
 typedef struct
 {
@@ -56,6 +61,8 @@ typedef struct
     pid_t ppid;
     uid_t uid;
     gid_t gid;
+    int smfd;
+    unsigned long smaddr;
     char hostname[MAX_HOSTNAME];
     char procname[MAX_PROCNAME];
     char *cmd;
@@ -67,12 +74,14 @@ typedef struct
     char uuid[UUID_LEN + 1];
 } proc_id_t;
 
+typedef struct
+{
+    unsigned long cmdAttachAddr;
+    bool scoped;
+} export_sm_t;
+
 #define TRUE 1
 #define FALSE 0
-
-#ifndef bool
-typedef unsigned int bool;
-#endif
 
 #define CFG_MAX_VERBOSITY 9
 #define CFG_FILE_NAME "scope.yml"

@@ -134,7 +134,7 @@ libdirGetDir()
 }
 
 static note_t*
-libdirGetNote(int file)
+libdirGetNote(file_t file)
 {
     unsigned char *buf;
     if (file == LOADER_FILE) {
@@ -176,7 +176,7 @@ libdirGetNote(int file)
 }
 
 int
-libdirExtractFileTo(int file, const char* path)
+libdirExtractFileTo(file_t file, const char* path)
 {
     unsigned char *start;
     unsigned char *end;
@@ -234,7 +234,7 @@ libdirExtractFileTo(int file, const char* path)
 }
 
 static int
-libdirCreateDirsIfMissing(int file)
+libdirCreateDirsIfMissing(file_t file)
 {
     // stat /usr/lib/appscope/<ver>
     // if exists, return
@@ -266,7 +266,7 @@ libdirCreateDirsIfMissing(int file)
 // ----------------------------------------------------------------------------
 
 int
-libdirSetBase(int file, const char *base)
+libdirSetBase(file_t file, const char *base)
 {
     g_libdir_info.version_dir[0] = 0;
     g_libdir_info.lib_base[0] = 0;
@@ -292,7 +292,7 @@ libdirSetBase(int file, const char *base)
 }
 
 const char *
-libdirGetPath(int file)
+libdirGetPath(file_t file)
 {
     char *path;
     char *base;
@@ -357,7 +357,7 @@ libdirGetPath(int file)
 
 // Does not respect a custom base
 int
-libdirExtract(int file)
+libdirExtract(file_t file)
 {
     int location = libdirCreateDirsIfMissing(file);
     if (location < 0) {

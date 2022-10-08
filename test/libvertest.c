@@ -20,6 +20,18 @@ normalizedVersionDevTest(void **state) {
 }
 
 static void
+normalizedVersionDevTestWrongFormat(void **state) {
+    const char *version = libverNormalizedVersion("vv1.2.0");
+    assert_string_equal(version, "dev");
+    version = libverNormalizedVersion("v1.2..0");
+    assert_string_equal(version, "dev");
+    version = libverNormalizedVersion("v1.2.0.");
+    assert_string_equal(version, "dev");
+    version = libverNormalizedVersion("v1.a.0.");
+    assert_string_equal(version, "dev");
+}
+
+static void
 normalizedVersionNullTest(void **state) {
     const char *version = libverNormalizedVersion(NULL);
     assert_string_equal(version, "dev");
@@ -109,6 +121,7 @@ main(int argc, char* argv[]) {
         cmocka_unit_test(normalizedVersionOfficialTest),
         cmocka_unit_test(normalizedVersionDevTest),
         cmocka_unit_test(normalizedVersionNullTest),
+        cmocka_unit_test(normalizedVersionDevTestWrongFormat),
         cmocka_unit_test(mkdirNestedWrongPathNull),
         cmocka_unit_test(mkdirNestedWrongPathFile),
         cmocka_unit_test(mkdirNestedWrongPathCurrentDir),

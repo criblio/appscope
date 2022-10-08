@@ -223,6 +223,7 @@ uint16_t        scope_htons(uint16_t);
 int           scope_atoi(const char *);
 int           scope_isspace(int);
 int           scope_isprint(int);
+int           scope_isdigit(int);
 void          scope_perror(const char *);
 int           scope_gettimeofday(struct timeval *, struct timezone *);
 int           scope_timer_create(clockid_t, struct sigevent *, timer_t *);

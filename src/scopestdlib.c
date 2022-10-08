@@ -147,6 +147,7 @@ extern uint16_t        scopelibc_htons(uint16_t);
 extern int           scopelibc_atoi(const char *);
 extern int           scopelibc_isspace(int);
 extern int           scopelibc_isprint(int);
+extern int           scopelibc_isdigit(int);
 extern void          scopelibc_perror(const char*);
 extern int           scopelibc_gettimeofday(struct timeval *, struct timezone *);
 extern int           scopelibc_timer_create(clockid_t, struct sigevent *, timer_t *);
@@ -875,6 +876,11 @@ scope_isspace(int c) {
 int
 scope_isprint(int c) {
     return scopelibc_isprint(c);
+}
+
+int
+scope_isdigit(int c) {
+    return scopelibc_isdigit(c);
 }
 
 void

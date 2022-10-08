@@ -16,11 +16,11 @@ import (
  */
 
 const startUsage string = `The following actions will be performed on the host and in all relevant containers:
-- Extraction of libscope.so to /usr/lib/appscope/ 
-- Extraction of the filter input to /usr/lib/appscope/
+- Extraction of libscope.so to /usr/lib/appscope/<version>/
+- Extraction of the filter input to  /usr/lib/appscope/<version>/
 - Attach to all existing "allowed" processes defined in the filter file
-- Install etc/profile.d/scope.sh script to preload /usr/lib/appscope/libscope.so
-- Modify the relevant service configurations to preload /usr/lib/appscope/libscope.so`
+- Install etc/profile.d/scope.sh script to preload /usr/lib/appscope/<version>/libscope.so
+- Modify the relevant service configurations to preload /usr/lib/appscope/<version>/libscope.so`
 
 // startCmd represents the start command
 var startCmd = &cobra.Command{

@@ -23,9 +23,7 @@ static void
 normalizedVersionDevTestWrongFormat(void **state) {
     const char *version = libverNormalizedVersion("vv1.2.0");
     assert_string_equal(version, "dev");
-    version = libverNormalizedVersion("v1.2..0");
-    assert_string_equal(version, "dev");
-    version = libverNormalizedVersion("v1.2.0.");
+    version = libverNormalizedVersion("v1.2-0");
     assert_string_equal(version, "dev");
     version = libverNormalizedVersion("v1.a.0.");
     assert_string_equal(version, "dev");

@@ -4,6 +4,7 @@
 
 #include "libver.h"
 #include "scopestdlib.h"
+#include "scopetypes.h"
 
 /*
  * Returns normalized version string
@@ -11,14 +12,26 @@
  * - "%d.%d.%d" for official release (e.g. "1.3.0" for "v1.3.0")
  */
 const char *
-libverNormalizedVersion(const char* version) {
-    // Treat the version which not begins with v as an unofficial
-    // TODO: be more restricted here
+libverNormalizedVersion(const char *version) {
+
     if ((version == NULL) || (*version != 'v')) {
         return "dev";
     }
-
     ++version;
+    size_t versionSize = scope_strlen(version);
+
+    for (int i = 0; i < versionSize; ++i) {
+        // Only digit and "." are accepted
+        if ((scope_isdigit(version[i]) == 0) && version[i] != '.' ) {
+            return "dev"; 
+        }
+        if (i == 0 || i == versionSize) {
+            // First and last character must be number
+            if (scope_isdigit(version[i]) == 0) {
+                return "dev";
+            }
+        }
+    }
     return version;
 }
 
@@ -27,7 +40,7 @@ libverNormalizedVersion(const char* version) {
  * Returns operation status
  */
 static mkdir_status_t
-checkIfDirExists(const char* absDirPath) {
+checkIfDirExists(const char *absDirPath) {
     struct stat st = {0};
     if (!scope_stat(absDirPath, &st)) {
         if (S_ISDIR(st.st_mode)) {
@@ -44,7 +57,7 @@ checkIfDirExists(const char* absDirPath) {
  * Returns operation status
  */
 mkdir_status_t
-libverMkdirNested(const char* absDirPath) {
+libverMkdirNested(const char *absDirPath) {
     int mkdirRes = -1;
     /* Operate only on absolute path */
     if (absDirPath == NULL || *absDirPath != '/') {

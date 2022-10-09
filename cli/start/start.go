@@ -7,8 +7,10 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 
+	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/run"
@@ -290,7 +292,7 @@ func startServiceContainers(allowProcs []allowProcConfig) error {
 	return nil
 }
 
-// extract extracts ldscope and scope to /tmp
+// extract extracts ldscope and scope to /tmp/appscope/version/
 func extract() error {
 	// Extract ldscope
 	perms := os.FileMode(0755)
@@ -301,7 +303,8 @@ func extract() error {
 			Msg("Error retrieving ldscope asset.")
 		return err
 	}
-	if err = ioutil.WriteFile("/tmp/ldscope", b, perms); err != nil {
+	scopeDir := filepath.Join("/tmp/appscope/", internal.GetNormalizedVersion())
+	if err = ioutil.WriteFile(filepath.Join(scopeDir, "ldscope"), b, perms); err != nil {
 		log.Error().
 			Err(err).
 			Msg("Error writing ldscope to /tmp.")
@@ -309,7 +312,7 @@ func extract() error {
 	}
 
 	// Copy scope
-	if _, err := util.CopyFile(os.Args[0], "/tmp/scope"); err != nil {
+	if _, err := util.CopyFile(os.Args[0], filepath.Join(scopeDir, "scope")); err != nil {
 		if err != os.ErrExist {
 			log.Error().
 				Err(err).
@@ -398,7 +401,7 @@ func Start() error {
 			return err
 		}
 
-		ld := loader.ScopeLoader{Path: "/tmp/ldscope"}
+		ld := loader.ScopeLoader{Path: filepath.Join("/tmp/appscope/", internal.GetNormalizedVersion(), "ldscope")}
 		stdoutStderr, err := ld.StartHost()
 		if err == nil {
 			log.Info().

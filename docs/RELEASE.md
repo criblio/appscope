@@ -24,7 +24,7 @@ to a minimum.
 
   * ... `major` when breaking changes (BCs) are made.
   * ... `minor` when we add features without BCs.
-  * ... `maintenace` for bug fixes without BCs.
+  * ... `maintenance` for bug fixes without BCs.
 
   We append `-rc#` suffixes for release candidates.
 

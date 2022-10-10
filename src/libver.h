@@ -11,6 +11,6 @@ typedef enum {
     MKDIR_STATUS_OTHER_ISSUE = 3,      // other error
 } mkdir_status_t;
 
-mkdir_status_t libverMkdirNested(const char*);
+mkdir_status_t libverMkdirNested(const char *);
 
 #endif // __LIBVER_H__

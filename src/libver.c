@@ -35,7 +35,7 @@ libverNormalizedVersion(const char *version) {
     return version;
 }
 
- /*
+/*
  * Verify if following absolute path points to directory
  * Returns operation status
  */
@@ -52,7 +52,7 @@ checkIfDirExists(const char *absDirPath) {
     return MKDIR_STATUS_OTHER_ISSUE;
 }
 
- /*
+/*
  * Create a directory in following absolute path creating any intermediate directories as necessary
  * Returns operation status
  */

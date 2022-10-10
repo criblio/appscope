@@ -14,15 +14,6 @@
 #define SYSTEMD_DIR "/etc/systemd"
 #define INITD_DIR "/etc/init.d"
 
-#define SYSTEMD_CFG "[Service]\nEnvironment=LD_PRELOAD=/usr/lib/appscope/libscope.so\n"
-#define SYSTEMD_CFG_LEN (sizeof(SYSTEMD_CFG) - 1)
-
-#define INITD_CFG "LD_PRELOAD=/usr/lib/appscope/libscope.so\n"
-#define INITD_CFG_LEN (sizeof(INITD_CFG) - 1)
-
-#define OPENRC_CFG "export LD_PRELOAD=/usr/lib/appscope/libscope.so\n"
-#define OPENRC_CFG_LEN (sizeof(OPENRC_CFG) - 1)
-
 /*
  * TODO: Refactor this hardcoded path
  * This can be consolidated with libdir.c but required
@@ -185,6 +176,8 @@ serviceCfgStatusOpenRc(const char *serviceName) {
 static service_status_t
 newServiceCfgSystemD(const char *serviceCfgPath) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
+    char cfgEntry[BUFSIZE] = {0};
+
     FILE *fPtr = scope_fopen(serviceCfgPath, "a");
 
     if (fPtr == NULL) {
@@ -192,7 +185,9 @@ newServiceCfgSystemD(const char *serviceCfgPath) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    if (scope_fwrite(SYSTEMD_CFG, sizeof(char), SYSTEMD_CFG_LEN, fPtr) < SYSTEMD_CFG_LEN) {
+    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+    size_t size = scope_snprintf(cfgEntry, BUFSIZE, "[Service]\nEnvironment=LD_PRELOAD=/usr/lib/appscope/%s/libscope.so\n", loaderVersion);
+    if (scope_fwrite(cfgEntry, sizeof(char), size, fPtr) < size) {
         scope_perror("error: newServiceCfgSystemD, scope_fwrite failed");
         res = SERVICE_STATUS_ERROR_OTHER;
     }
@@ -210,6 +205,8 @@ newServiceCfgSystemD(const char *serviceCfgPath) {
 static service_status_t
 newServiceCfgInitD(const char *serviceCfgPath) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
+    char cfgEntry[BUFSIZE] = {0};
+
     FILE *fPtr = scope_fopen(serviceCfgPath, "a");
 
     if (fPtr == NULL) {
@@ -217,7 +214,9 @@ newServiceCfgInitD(const char *serviceCfgPath) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    if (scope_fwrite(INITD_CFG, sizeof(char), INITD_CFG_LEN, fPtr) < INITD_CFG_LEN) {
+    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+    size_t size = scope_snprintf(cfgEntry, BUFSIZE, "LD_PRELOAD=/usr/lib/appscope/%s/libscope.so\n", loaderVersion);
+    if (scope_fwrite(cfgEntry, sizeof(char), size, fPtr) < size) {
         scope_perror("error: newServiceCfgInitD, scope_fwrite failed");
         res = SERVICE_STATUS_ERROR_OTHER;
     }
@@ -235,6 +234,8 @@ newServiceCfgInitD(const char *serviceCfgPath) {
 static service_status_t
 newServiceCfgOpenRc(const char *serviceCfgPath) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
+    char cfgEntry[BUFSIZE] = {0};
+
     FILE *fPtr = scope_fopen(serviceCfgPath, "a");
 
     if (fPtr == NULL) {
@@ -242,7 +243,9 @@ newServiceCfgOpenRc(const char *serviceCfgPath) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    if (scope_fwrite(OPENRC_CFG, sizeof(char), OPENRC_CFG_LEN, fPtr) < OPENRC_CFG_LEN) {
+    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+    size_t size = scope_snprintf(cfgEntry, BUFSIZE, "export LD_PRELOAD=/usr/lib/appscope/%s/libscope.so\n", loaderVersion);
+    if (scope_fwrite(cfgEntry, sizeof(char), size, fPtr) < size) {
         scope_perror("error: newServiceCfgOpenRc, scope_fwrite failed");
         res = SERVICE_STATUS_ERROR_OTHER;
     }
@@ -291,6 +294,7 @@ modifyServiceCfgSystemd(const char *serviceCfgPath) {
     FILE *newFd;
     char *tempPath = "/tmp/tmpFile-XXXXXX";
     bool serviceSectionFound = FALSE;
+    char cfgEntry[BUFSIZE] = {0};
 
     if ((readFd = scope_fopen(serviceCfgPath, "r")) == NULL) {
         scope_perror("error: modifyServiceCfgSystemd, scope_fopen serviceFile failed");
@@ -303,13 +307,16 @@ modifyServiceCfgSystemd(const char *serviceCfgPath) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
+    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+    scope_snprintf(cfgEntry, BUFSIZE, "[Service]\nEnvironment=LD_PRELOAD=/usr/lib/appscope/%s/libscope.so\n", loaderVersion);
+
     while (!scope_feof(readFd)) {
         char buf[4096] = {0};
         int res = scope_fscanf(readFd, "%s", buf);
 
         if (scope_strcmp(buf, "[Service]") == 0) {
             serviceSectionFound = TRUE;
-            scope_fprintf(newFd, "%s", SYSTEMD_CFG);
+            scope_fprintf(newFd, "%s", cfgEntry);
         } else if (res == 0){
             scope_fprintf(newFd, "%s ", buf);
         }
@@ -317,7 +324,7 @@ modifyServiceCfgSystemd(const char *serviceCfgPath) {
 
     // the file was empty
     if (serviceSectionFound == FALSE) {
-        scope_fprintf(newFd, "%s", SYSTEMD_CFG);
+        scope_fprintf(newFd, "%s", cfgEntry);
     }
 
     scope_fclose(newFd);

@@ -535,15 +535,14 @@ closeFd:
  */
 int
 setupConfigure(void *filterFileMem, size_t filterSize) {
-    struct stat st = {0};
     char path[PATH_MAX] = {0};
 
     // Create destination directory if not exists
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
-    mkdir_status_t res = libdirMkdirNested(path);
+    mkdir_status_t res = libdirCreateDirIfMissing(path);
     if (res == MKDIR_STATUS_OTHER_ISSUE) {
-        scope_fprintf(scope_stderr, "setupConfigure: libdirMkdirNested failed\n");
+        scope_fprintf(scope_stderr, "setupConfigure: libdirCreateDirIfMissing failed\n");
         return -1;
     }
     scope_strncat(path, "libscope.so", sizeof("libscope.so"));
@@ -555,7 +554,7 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
     }
 
     // Setup /etc/profile.d/scope.sh
-    if (setupProfile() == FALSE) {
+    if (setupProfile(path) == FALSE) {
         scope_fprintf(scope_stderr, "setupProfile failed\n");
         return -1;
     }
@@ -566,7 +565,7 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
         scope_fprintf(scope_stderr, "extract libscope.so failed\n");
         return -1;
     }
-    if (scope_strcmp(libdirGetPath(LIBRARY_FILE), LIBSCOPE_LOC)) {
+    if (scope_strcmp(libdirGetPath(LIBRARY_FILE), path)) {
         scope_fprintf(scope_stderr, "extract libscope.so failed: unwanted location\n");
         return -1;
     }

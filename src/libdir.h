@@ -20,9 +20,9 @@ typedef enum {
     MKDIR_STATUS_OTHER_ISSUE = 3,      // Other error
 } mkdir_status_t;
 
-mkdir_status_t libdirMkdirNested(const char *dir);
-int libdirSetBase(file_t file, const char *base);    // Override default base dir i.e. /tmp
-int libdirExtract(file_t file);                      // Extracts file to default path
-const char *libdirGetPath(file_t file);              // Get full path to existing file
+mkdir_status_t libdirCreateDirIfMissing(const char *dir);
+int libdirSetBase(file_t file, const char *base);         // Override default base dir i.e. /tmp
+int libdirExtract(file_t file);                           // Extracts file to default path
+const char *libdirGetPath(file_t file);                   // Get full path to existing file
 
 #endif // _SCOPE_LIBDIR_H

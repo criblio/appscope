@@ -541,9 +541,9 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
     // Create destination directory if not exists
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
-    mkdir_status_t res = libverMkdirNested(path);
+    mkdir_status_t res = libdirMkdirNested(path);
     if (res == MKDIR_STATUS_OTHER_ISSUE) {
-        scope_fprintf(scope_stderr, "setupConfigure: libverMkdirNested failed\n");
+        scope_fprintf(scope_stderr, "setupConfigure: libdirMkdirNested failed\n");
         return -1;
     }
     scope_strncat(path, "libscope.so", sizeof("libscope.so"));

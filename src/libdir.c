@@ -284,25 +284,76 @@ libdirCreateFileIfMissing(file_t file, const char* path)
     return 0;
 }
 
-static int 
-libdirCreateDirIfMissing(const char *dir)
-{
-
-/* old code
-    if (!libdirDirExists(libdir, R_OK|X_OK)) {
-        if (scope_mkdir(libdir, S_IRWXU|S_IRWXG|S_IRWXO) == -1) {
-            scope_perror("mkdir() failed");
-            return -1;
+// Verify if following absolute path points to directory
+// Returns operation status
+static mkdir_status_t
+checkIfDirExists(const char *absDirPath) {
+    struct stat st = {0};
+    if (!scope_stat(absDirPath, &st)) {
+        if (S_ISDIR(st.st_mode)) {
+            return MKDIR_STATUS_EXISTS;
         }
+        // TODO: add permissions to check if the file can be created there
+        return MKDIR_STATUS_NOT_ABSOLUTE_DIR;
     }
-*/
-
-    return 0;
+    // stat fails
+    return MKDIR_STATUS_OTHER_ISSUE;
 }
 
 // ----------------------------------------------------------------------------
 // External
 // ----------------------------------------------------------------------------
+
+// Create a directory in following absolute path creating any intermediate directories as necessary
+// Returns operation status
+mkdir_status_t
+libdirCreateDirIfMissing(const char *dir) {
+    int mkdirRes = -1;
+    /* Operate only on absolute path */
+    if (dir == NULL || *dir != '/') {
+        return MKDIR_STATUS_NOT_ABSOLUTE_DIR;
+    }
+
+    mkdir_status_t res = checkIfDirExists(dir);
+
+    /* exit if path exists */
+    if (res != MKDIR_STATUS_OTHER_ISSUE) {
+        return res;
+    }
+
+    char* tempPath = scope_strdup(dir);
+    if (tempPath == NULL) {
+        goto end;
+    }
+
+    /* traverse the full path */
+    for (char* p = tempPath + 1; *p; p++) {
+        if (*p == '/') {
+            /* Temporarily truncate */
+            *p = '\0';
+            scope_errno = 0;
+            mkdirRes = scope_mkdir(tempPath, 0755);
+            /* scope_mkdir fails with error other than directory exists */
+            if (mkdirRes && (scope_errno != EEXIST)) {
+                 goto end;
+            }
+            *p = '/';
+        }
+    }
+
+    /* last element */
+    scope_errno = 0;
+    mkdirRes = scope_mkdir(tempPath, 0755);
+    if (mkdirRes && (scope_errno != EEXIST)) {
+        goto end;
+    }
+
+    res = MKDIR_STATUS_CREATED;
+
+end:
+    scope_free(tempPath);
+    return res;
+}
 
 // Set custom base directory of library
 // - Sets global base
@@ -446,7 +497,7 @@ libdirExtract(file_t file)
         scope_fprintf(scope_stderr, "error: path too long.\n");
         return -1;
     }
-    if (!libdirCreateDirIfMissing(tmp_dir)) {
+    if (libdirCreateDirIfMissing(tmp_dir) <= MKDIR_STATUS_EXISTS) {
         int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s", tmp_dir, filename);
         if (pathLen < 0) {
             scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
@@ -472,7 +523,7 @@ libdirExtract(file_t file)
         scope_fprintf(scope_stderr, "error: path too long.\n");
         return -1;
     }
-    if (!libdirCreateDirIfMissing(tmp_dir)) {
+    if (libdirCreateDirIfMissing(tmp_dir) <= MKDIR_STATUS_EXISTS) {
         int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s", tmp_dir, filename);
         if (pathLen < 0) {
             scope_fprintf(scope_stderr, "error: snprintf() failed.\n");

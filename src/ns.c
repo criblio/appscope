@@ -4,6 +4,7 @@
 
 #include "ns.h"
 #include "libver.h"
+#include "libdir.h"
 #include "setup.h"
 #include "scopestdlib.h"
 
@@ -119,10 +120,10 @@ joinChildNamespace(pid_t hostPid) {
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
 
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
-    mkdir_status_t res = libverMkdirNested(path);
+    mkdir_status_t res = libdirMkdirNested(path);
     if (res == MKDIR_STATUS_OTHER_ISSUE) {
         scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
-        mkdir_status_t res = libverMkdirNested(path);
+        mkdir_status_t res = libdirMkdirNested(path);
         if (res == MKDIR_STATUS_OTHER_ISSUE) {
             goto cleanupMem;
         }
@@ -531,7 +532,7 @@ joinHostNamespace(const char *filterPath) {
      * Ensure that we have the dest dir
      */
     scope_snprintf(appscopePath, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
-    mkdir_status_t res = libverMkdirNested(appscopePath);
+    mkdir_status_t res = libdirMkdirNested(appscopePath);
     if (res == MKDIR_STATUS_OTHER_ISSUE) {
         scope_perror("joinHostNamespace: mkdir failed");
         goto cleanupMem;

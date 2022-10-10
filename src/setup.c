@@ -30,9 +30,6 @@
  */
 
 #define FILTER_LOC "/usr/lib/appscope/scope_filter"
-#define PROFILE_SETUP "export LD_PRELOAD=\"/usr/lib/appscope/libscope.so $LD_PRELOAD\"\n"
-#define PROFILE_SETUP_LEN (sizeof(PROFILE_SETUP)-1)
-
 
 typedef enum {
     SERVICE_CFG_ERROR,
@@ -421,7 +418,8 @@ setupService(const char *serviceName) {
  * Returns status of operation TRUE in case of success, FALSE otherwise
  */
 static bool
-setupProfile(void) {
+setupProfile(const char* libscopePath) {
+    char buf[PATH_MAX] = {0};
     int fd = scope_open("/etc/profile.d/scope.sh", O_CREAT | O_RDWR | O_TRUNC, 0644);
 
     if (fd < 0) {
@@ -429,7 +427,8 @@ setupProfile(void) {
         return FALSE;
     }
 
-    if (scope_write(fd, PROFILE_SETUP, PROFILE_SETUP_LEN) != PROFILE_SETUP_LEN) {
+    size_t len = scope_snprintf(buf, sizeof(buf), "export LD_PRELOAD=\"%s $LD_PRELOAD\"\n", libscopePath);
+    if (scope_write(fd, buf, len) != len) {
         scope_perror("scope_write failed");
         scope_close(fd);
         return FALSE;
@@ -533,11 +532,6 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
     char path[PATH_MAX] = {0};
     DIR *dirp; 
 
-    // Setup /etc/profile.d/scope.sh
-    if (setupProfile() == FALSE) {
-        scope_fprintf(scope_stderr, "setupProfile failed\n");
-        return -1;
-    }
 
     // Create destination directory if not exists
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
@@ -548,6 +542,12 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
         return -1;
     }
     scope_strncat(path, "libscope.so", sizeof("libscope.so"));
+
+    // Setup /etc/profile.d/scope.sh
+    if (setupProfile(path) == FALSE) {
+        scope_fprintf(scope_stderr, "setupProfile failed\n");
+        return -1;
+    }
 
     // Extract the filter file to /usr/lib/appscope/scope_filter
     if (setupExtractFilterFile(filterFileMem, filterSize) == FALSE) {

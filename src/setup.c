@@ -14,8 +14,6 @@
 #define SYSTEMD_DIR "/etc/systemd"
 #define INITD_DIR "/etc/init.d"
 
-#define SETUP_SERVICE "LD_PRELOAD=/usr/lib/appscope/libscope.so"
-
 #define SYSTEMD_CFG "[Service]\nEnvironment=LD_PRELOAD=/usr/lib/appscope/libscope.so\n"
 #define SYSTEMD_CFG_LEN (sizeof(SYSTEMD_CFG) - 1)
 
@@ -274,7 +272,8 @@ isCfgFileConfigured(const char *serviceCfgPath) {
     }
 
     while(scope_fgets(buf, sizeof(buf), fPtr)) {
-        if (scope_strstr(buf, SETUP_SERVICE)) {
+        // TODO improve it to verify particular version ?
+        if (scope_strstr(buf, "/libscope.so")) {
             res = TRUE;
             break;
         }

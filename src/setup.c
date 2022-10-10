@@ -532,18 +532,9 @@ closeFd:
  */
 int
 setupConfigure(void *filterFileMem, size_t filterSize) {
-    struct stat st = {0};
-    DIR *dirp; 
-
-    // Setup /etc/profile.d/scope.sh
-    if (setupProfile() == FALSE) {
-        scope_fprintf(scope_stderr, "setupProfile failed\n");
-        return -1;
-    }
-
     // Check for presence of a /usr/lib/appscope directory; add if doesn't exist
     // TODO: not correct, needs to be dynamic
-    dirp = scope_opendir(SCOPE_EXEC_PATH);
+    DIR *dirp = scope_opendir(SCOPE_EXEC_PATH);
     if (dirp == NULL) {
         if (scope_mkdir(SCOPE_EXEC_PATH, 0755) == -1) {
             scope_perror("setupConfigure: mkdir failed");
@@ -558,16 +549,23 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
         return -1;
     }
 
-    // Do not overwrite the /usr/lib/appscope/libscope.so if it already exists
-    if (scope_stat(LIBSCOPE_LOC, &st) == 0) {
-        return 0;
+    // Setup /etc/profile.d/scope.sh
+    if (setupProfile() == FALSE) {
+        scope_fprintf(scope_stderr, "setupProfile failed\n");
+        return -1;
     }
 
-    // Extract libscope.so to /usr/lib/appscope/libscope.so
-    if (libdirExtractLibraryTo(LIBSCOPE_LOC)) {
+    // Extract libscope.so to /usr/lib/appscope/libscope.so (and ldscopedyn)
+    // Creates /usr/lib/appscope if it doesn't exist, and we're root
+    if (libdirExtract(LIBRARY_FILE)) {
         scope_fprintf(scope_stderr, "extract libscope.so failed\n");
         return -1;
     }
+    if (scope_strcmp(libdirGetPath(LIBRARY_FILE), LIBSCOPE_LOC)) {
+        scope_fprintf(scope_stderr, "extract libscope.so failed: unwanted location\n");
+        return -1;
+    }
+
     // Patch the library
     if (loaderOpPatchLibrary(LIBSCOPE_LOC) == PATCH_FAILED) {
         scope_fprintf(scope_stderr, "patch libscope.so failed\n");

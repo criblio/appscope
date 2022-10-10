@@ -51,8 +51,8 @@ func (sL *ScopeLoader) AttachSubProc(args []string, env []string) (string, error
 
 // Used when scope has detected that we are running the `scope start` command inside a container
 // Tell ldscope to run the `scope start` command on the host instead
-func (sL *ScopeLoader) StartHost() (string, error) {
-	return sL.RunSubProc([]string{"--starthost"}, os.Environ())
+func (sL *ScopeLoader) StartHost(filterPath string) (string, error) {
+	return sL.RunSubProc([]string{"--starthost", filterPath}, os.Environ())
 }
 
 func (sL *ScopeLoader) Run(args []string, env []string) error {

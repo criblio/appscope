@@ -487,7 +487,7 @@ setHostNamespace(const char *ns) {
 }
 
 static bool
-joinHostNamespace(void) {
+joinHostNamespace(const char *filterPath) {
     bool status = FALSE;
     size_t ldscopeSize = 0;
     size_t cfgSize = 0;
@@ -505,9 +505,8 @@ joinHostNamespace(void) {
         return status;
     }
 
-    // Check for the filter file
-    const char *scopeFilterContainerPath = "/tmp/scope_filter";
-    char *scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, scopeFilterContainerPath);
+    // Load the filter configuration into memory
+    char *scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, filterPath);
 
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
     scope_snprintf(appscopePath, PATH_MAX, "/usr/lib/appscope/%s/scope", loaderVersion);
@@ -548,9 +547,6 @@ joinHostNamespace(void) {
         if ((status == extractMemToChildNamespace(scopeFilterCfgMem, cfgSize, scopeFilterHostPath, 0664)) == FALSE) {
             goto cleanupMem;
         }
-
-        // replace the SCOPE_CONF_PATH with namespace path
-        setenv("SCOPE_CONF_PATH", scopeFilterHostPath, 1);
     }
     scope_snprintf(appscopePath, PATH_MAX, "/usr/lib/appscope/%s/scope", loaderVersion);
     status = extractMemToChildNamespace(scopeMem, scopeSize, appscopePath, 0775);
@@ -568,11 +564,19 @@ cleanupMem:
     return status;
 }
 
+ /*
+ * Perform ldsope host start operation - this operation begins from container namespace.
+ *
+ * - switch namespace to host
+ * - create cron entry with filter file
+ *
+ * Returns exit code of operation
+ */
 int
-nsHostStart(void) {
+nsHostStart(const char* filterPath) {
     scope_fprintf(scope_stdout, "Executing from a container, run the start command from the host\n");
 
-    if (joinHostNamespace() == FALSE) {
+    if (joinHostNamespace(filterPath) == FALSE) {
         scope_fprintf(scope_stderr, "error: joinHostNamespace failed\n");
         return EXIT_FAILURE;
     }

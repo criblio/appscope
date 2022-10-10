@@ -530,8 +530,6 @@ int
 setupConfigure(void *filterFileMem, size_t filterSize) {
     struct stat st = {0};
     char path[PATH_MAX] = {0};
-    DIR *dirp; 
-
 
     // Create destination directory if not exists
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);

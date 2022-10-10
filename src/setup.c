@@ -4,12 +4,11 @@
 
 #include "loaderop.h"
 #include "libdir.h"
+#include "libver.h"
 #include "setup.h"
 #include "scopestdlib.h"
 
 #define BUFSIZE (4096)
-
-#define SCOPE_EXEC_PATH "/usr/lib/appscope" 
 
 #define OPENRC_DIR "/etc/rc.conf"
 #define SYSTEMD_DIR "/etc/systemd"
@@ -32,7 +31,6 @@
  * further cleaning like reverse return logic in libdirExists
  */
 
-#define LIBSCOPE_LOC "/usr/lib/appscope/libscope.so"
 #define FILTER_LOC "/usr/lib/appscope/scope_filter"
 #define PROFILE_SETUP "export LD_PRELOAD=\"/usr/lib/appscope/libscope.so $LD_PRELOAD\"\n"
 #define PROFILE_SETUP_LEN (sizeof(PROFILE_SETUP)-1)
@@ -525,14 +523,15 @@ closeFd:
  /*
  * Configure the environment
  * - setup /etc/profile.d/scope.sh
- * - extract memory to filter file /usr/lib/appscope/scope_filter
- * - extract libscope.so to /usr/lib/appscope/libscope.so if it doesn't exists
+ * - extract memory to filter file /usr/lib/appscope/scope_filter or /tmp/scope_filter
+ * - extract libscope.so to /usr/lib/appscope/<version>/libscope.so or /tmp/appscope/<version>/libscope.so if it doesn't exists
  * - patch the library
  * Returns status of operation 0 in case of success, other value otherwise
  */
 int
 setupConfigure(void *filterFileMem, size_t filterSize) {
     struct stat st = {0};
+    char path[PATH_MAX] = {0};
     DIR *dirp; 
 
     // Setup /etc/profile.d/scope.sh
@@ -541,16 +540,15 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
         return -1;
     }
 
-    // Check for presence of a /usr/lib/appscope directory; add if doesn't exist
-    // TODO: not correct, needs to be dynamic
-    dirp = scope_opendir(SCOPE_EXEC_PATH);
-    if (dirp == NULL) {
-        if (scope_mkdir(SCOPE_EXEC_PATH, 0755) == -1) {
-            scope_perror("setupConfigure: mkdir failed");
-        }
-    } else {
-        scope_closedir(dirp);
+    // Create destination directory if not exists
+    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+    scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
+    mkdir_status_t res = libverMkdirNested(path);
+    if (res == MKDIR_STATUS_OTHER_ISSUE) {
+        scope_fprintf(scope_stderr, "setupConfigure: libverMkdirNested failed\n");
+        return -1;
     }
+    scope_strncat(path, "libscope.so", sizeof("libscope.so"));
 
     // Extract the filter file to /usr/lib/appscope/scope_filter
     if (setupExtractFilterFile(filterFileMem, filterSize) == FALSE) {
@@ -558,18 +556,18 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
         return -1;
     }
 
-    // Do not overwrite the /usr/lib/appscope/libscope.so if it already exists
-    if (scope_stat(LIBSCOPE_LOC, &st) == 0) {
+    // Do not overwrite the /usr/lib/appscope/<version>/libscope.so if it already exists
+    if (scope_stat(path, &st) == 0) {
         return 0;
     }
 
-    // Extract libscope.so to /usr/lib/appscope/libscope.so
-    if (libdirExtractLibraryTo(LIBSCOPE_LOC)) {
+    // Extract libscope.so to /usr/lib/appscope/<version>/libscope.so
+    if (libdirExtractLibraryTo(path)) {
         scope_fprintf(scope_stderr, "extract libscope.so failed\n");
         return -1;
     }
     // Patch the library
-    if (loaderOpPatchLibrary(LIBSCOPE_LOC) == PATCH_FAILED) {
+    if (loaderOpPatchLibrary(path) == PATCH_FAILED) {
         scope_fprintf(scope_stderr, "patch libscope.so failed\n");
         return -1;
     }

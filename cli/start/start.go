@@ -292,8 +292,8 @@ func startServiceContainers(allowProcs []allowProcConfig) error {
 	return nil
 }
 
-// extract extracts ldscope and scope to /tmp/appscope/version/
-func extract() error {
+// extract extracts ldscope and scope to scope directory
+func extract(scopeDir string) error {
 	// Extract ldscope
 	perms := os.FileMode(0755)
 	b, err := run.Asset("build/ldscope")
@@ -303,19 +303,20 @@ func extract() error {
 			Msg("Error retrieving ldscope asset.")
 		return err
 	}
-	scopeDir := filepath.Join("/tmp/appscope/", internal.GetNormalizedVersion())
-	err = os.MkdirAll(scopeDir, perms)
+
+	scopeDirVersion := filepath.Join(scopeDir, internal.GetNormalizedVersion())
+	err = os.MkdirAll(scopeDirVersion, perms)
 	if err != nil {
 		log.Error().
 			Err(err).
-			Msgf("Error creating %s directory.", scopeDir)
+			Msgf("Error creating %s directory.", scopeDirVersion)
 		return err
 	}
 
-	if err = ioutil.WriteFile(filepath.Join(scopeDir, "ldscope"), b, perms); err != nil {
+	if err = ioutil.WriteFile(filepath.Join(scopeDirVersion, "ldscope"), b, perms); err != nil {
 		log.Error().
 			Err(err).
-			Msgf("Error writing ldscope to %s.", scopeDir)
+			Msgf("Error writing ldscope to %s.", scopeDirVersion)
 		return err
 	}
 
@@ -349,14 +350,24 @@ func getStartData() []byte {
 	return startData
 }
 
-// extractFilterFile creates a filter file in /tmp/scope_filter
-func extractFilterFile(cfgData []byte) error {
-	f, err := os.OpenFile("/tmp/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+// createFilterFile creates a filter file in /usr/lib/appscope/scope_filter or /tmp/scope_filter
+// It returns the filter file name and status
+func createFilterFile() (*os.File, error) {
+	f, err := os.OpenFile("/usr/lib/appscope/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		f, err = os.OpenFile("/tmp/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+	}
+	return f, err
+}
+
+// extractFilterFile creates a filter file in /usr/lib/appscope/scope_filter or /tmp/scope_filter
+func extractFilterFile(cfgData []byte) (string, error) {
+	f, err := createFilterFile()
 	if err != nil {
 		log.Error().
 			Err(err).
 			Msg("Failed to create filter file.")
-		return err
+		return "", err
 	}
 	defer f.Close()
 
@@ -364,10 +375,9 @@ func extractFilterFile(cfgData []byte) error {
 		log.Error().
 			Err(err).
 			Msg("Failed to write to filter file.")
-		return err
+		return "", err
 	}
-
-	return nil
+	return f.Name(), nil
 }
 
 // Start performs setup of scope in the host and containers
@@ -398,19 +408,20 @@ func Start() error {
 		return err
 	}
 
-	if err := extractFilterFile(cfgData); err != nil {
+	filterPath, err := extractFilterFile(cfgData)
+	if err != nil {
 		return err
 	}
 
 	// If the `scope start` command is run inside a container, we should call `ldscope --starthost`
 	// which will instead run `scope start` on the host
 	if util.InContainer() {
-		if err := extract(); err != nil {
+		if err := extract(filepath.Base(filterPath)); err != nil {
 			return err
 		}
 
-		ld := loader.ScopeLoader{Path: filepath.Join("/tmp/appscope/", internal.GetNormalizedVersion(), "ldscope")}
-		stdoutStderr, err := ld.StartHost("/tmp/scope_filter")
+		ld := loader.ScopeLoader{Path: filepath.Join(filepath.Base(filterPath), internal.GetNormalizedVersion(), "ldscope")}
+		stdoutStderr, err := ld.StartHost(filterPath)
 		if err == nil {
 			log.Info().
 				Msgf("Start host success.")
@@ -438,11 +449,11 @@ func Start() error {
 		return err
 	}
 
-	if err := startConfigureHost("/tmp/scope_filter"); err != nil {
+	if err := startConfigureHost(filterPath); err != nil {
 		return err
 	}
 
-	if err := startConfigureContainers("/tmp/scope_filter"); err != nil {
+	if err := startConfigureContainers(filterPath); err != nil {
 		return err
 	}
 

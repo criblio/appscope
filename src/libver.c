@@ -46,6 +46,7 @@ checkIfDirExists(const char *absDirPath) {
         if (S_ISDIR(st.st_mode)) {
             return MKDIR_STATUS_EXISTS;
         }
+        // TODO: add permissions to check if the file can be created there
         return MKDIR_STATUS_NOT_ABSOLUTE_DIR;
     }
     // stat fails

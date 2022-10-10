@@ -3,10 +3,10 @@
 #include <stdlib.h>
 
 #include "ns.h"
+#include "libver.h"
 #include "setup.h"
 #include "scopestdlib.h"
 
-#define LDSCOPE_IN_CHILD_NS "/tmp/ldscope"
 #define LDSCOPE_IN_HOST_NS "/usr/lib/appscope/ldscope"          // TODO
 #define LDSCOPE_CONFIG_IN_CHILD "/tmp/scope_filter"         // TODO
 #define LDSCOPE_CONFIG_IN_HOST "/usr/lib/appscope/scope_filter" // TODO
@@ -122,7 +122,21 @@ joinChildNamespace(pid_t hostPid) {
         goto cleanupMem;
     }
 
-    status = extractMemToChildNamespace(ldscopeMem, ldscopeSize, LDSCOPE_IN_CHILD_NS, 0775);
+    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+
+    scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
+    mkdir_status_t res = libverMkdirNested(path);
+    if (res == MKDIR_STATUS_OTHER_ISSUE) {
+        scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
+        mkdir_status_t res = libverMkdirNested(path);
+        if (res == MKDIR_STATUS_OTHER_ISSUE) {
+            goto cleanupMem;
+        }
+    }
+
+    scope_strncat(path, "ldscope", sizeof("ldscope"));
+
+    status = extractMemToChildNamespace(ldscopeMem, ldscopeSize, path, 0775);
 
     if (scopeCfgMem) {
         char scopeCfgPath[PATH_MAX] = {0};
@@ -309,6 +323,8 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
         scope_fprintf(scope_stderr, "error: fork() failed\n");
         return EXIT_FAILURE;
     } else if (child == 0) {
+        char loaderInChildPath[PATH_MAX] = {0};
+
         // Child
         char *nsAttachPidStr = NULL;
         if (scope_asprintf(&nsAttachPidStr, "%d", nsPid) <= 0) {
@@ -322,11 +338,21 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
             return EXIT_FAILURE;
         }
 
-        execArgv[execArgc++] = LDSCOPE_IN_CHILD_NS;
+        const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+        scope_snprintf(loaderInChildPath, PATH_MAX, "/usr/lib/appscope/%s/ldscope", loaderVersion);
+        if (scope_access(loaderInChildPath, R_OK)) {
+            scope_snprintf(loaderInChildPath, PATH_MAX, "/tmp/appscope/%s/ldscope", loaderVersion);
+            if (scope_access(loaderInChildPath, R_OK)) {
+                scope_fprintf(scope_stderr, "error: access ldscope failed\n");
+                return EXIT_FAILURE;
+            }
+        }
+
+        execArgv[execArgc++] = loaderInChildPath;
         execArgv[execArgc++] = childOp;
         execArgv[execArgc++] = nsAttachPidStr;
 
-        return execve(LDSCOPE_IN_CHILD_NS, execArgv, environ);
+        return execve(loaderInChildPath, execArgv, environ);
     }
     // Parent
     int status;

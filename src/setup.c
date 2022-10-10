@@ -548,28 +548,29 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
     }
     scope_strncat(path, "libscope.so", sizeof("libscope.so"));
 
-    // Setup /etc/profile.d/scope.sh
-    if (setupProfile(path) == FALSE) {
-        scope_fprintf(scope_stderr, "setupProfile failed\n");
-        return -1;
-    }
-
     // Extract the filter file to /usr/lib/appscope/scope_filter
     if (setupExtractFilterFile(filterFileMem, filterSize) == FALSE) {
         scope_fprintf(scope_stderr, "setup filter file failed\n");
         return -1;
     }
 
-    // Do not overwrite the /usr/lib/appscope/<version>/libscope.so if it already exists
-    if (scope_stat(path, &st) == 0) {
-        return 0;
+    // Setup /etc/profile.d/scope.sh
+    if (setupProfile() == FALSE) {
+        scope_fprintf(scope_stderr, "setupProfile failed\n");
+        return -1;
     }
 
-    // Extract libscope.so to /usr/lib/appscope/<version>/libscope.so
-    if (libdirExtractLibraryTo(path)) {
+    // Extract libscope.so to /usr/lib/appscope/libscope.so (and ldscopedyn)
+    // Creates /usr/lib/appscope if it doesn't exist, and we're root
+    if (libdirExtract(LIBRARY_FILE)) {
         scope_fprintf(scope_stderr, "extract libscope.so failed\n");
         return -1;
     }
+    if (scope_strcmp(libdirGetPath(LIBRARY_FILE), LIBSCOPE_LOC)) {
+        scope_fprintf(scope_stderr, "extract libscope.so failed: unwanted location\n");
+        return -1;
+    }
+
     // Patch the library
     if (loaderOpPatchLibrary(path) == PATCH_FAILED) {
         scope_fprintf(scope_stderr, "patch libscope.so failed\n");

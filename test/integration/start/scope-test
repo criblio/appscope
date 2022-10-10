@@ -46,25 +46,27 @@ redis-server &
 nginx &
 
 cd /opt/
-scope start < /opt/test-runner/scope_filter1.yml
+scope start -f < /opt/test-runner/scope_filter1.yml
 if [ $? -ne "0" ]; then
     fail "scope start failed"
 fi
 
-# check if filter file is in known location
-if [ ! -f /tmp/scope_filter ]; then
-    fail "missing /tmp/scope_filter"
+LIBSCOPE_PATH=$(find /usr/lib/appscope/ -name libscope.so)
+
+# check if filter file is placed in known location
+if [ ! -f /usr/lib/appscope/scope_filter ]; then
+    fail "missing /usr/lib/appscope/scope_filter"
 fi
 
 # compare the filter file
-cmp -s /tmp/scope_filter /opt/test-runner/scope_filter1.yml
+cmp -s /usr/lib/appscope/scope_filter /opt/test-runner/scope_filter1.yml
 if [ $? -ne "0" ]; then
-    fail "mismatch /tmp/scope_filter and scope_filter1.yml"
+    fail "mismatch /usr/lib/appscope/scope_filter and scope_filter1.yml"
 fi
 
-# check if libscope.so is in known location
-if [ ! -f /tmp/libscope.so ]; then
-    fail "missing /tmp/libscope.so"
+# check if libscope.so is placed in known location
+if [ ! -f $LIBSCOPE_PATH ]; then
+    fail "missing $LIBSCOPE_PATH"
 fi
 
 # check if etc/profile.d was updated
@@ -73,7 +75,7 @@ if [ ! -f /etc/profile.d/scope.sh ]; then
 fi
 
 # check the content of etc/profile.d/scope.sh
-grep -q "export LD_PRELOAD=/tmp/libscope.so" /etc/profile.d/scope.sh
+grep -q "export LD_PRELOAD=$libscopePath" /etc/profile.d/scope.sh
 if [ $? -ne "0" ]; then
     fail "missing export LD_PRELOAD in /etc/profile.d/scope.sh"
 fi
@@ -119,15 +121,15 @@ if [ ! -f /tmp/nginx_scope.log ]; then
     fail "missing /tmp/nginx_scope.log"
 fi
 
-scope start < /opt/test-runner/scope_filter2.yml
+scope start -f < /opt/test-runner/scope_filter2.yml
 if [ $? -ne "0" ]; then
     fail "scope start failed"
 fi
 
 # compare the filter file it should be overwritten
-cmp -s /tmp/scope_filter /opt/test-runner/scope_filter2.yml
+cmp -s /usr/lib/appscope/scope_filter /opt/test-runner/scope_filter2.yml
 if [ $? -ne "0" ]; then
-    fail "mismatch /tmp/scope_filter and scope_filter2.yml"
+    fail "mismatch /usr/lib/appscope/scope_filter and scope_filter2.yml"
 fi
 
 endtest

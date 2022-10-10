@@ -22,6 +22,7 @@
 
 #include "scopestdlib.h"
 #include "scopetypes.h" // for ROUND_UP()
+#include "libver.h"
 
 #ifndef SCOPE_VER
 #error "Missing SCOPE_VER"
@@ -76,35 +77,6 @@ typedef struct {
 // Internal
 // ----------------------------------------------------------------------------
 
-/*
-static int
-libdirExists(const char *path, int requireDir, int mode)
-{
-    struct stat s;
-    if (scope_stat(path, &s)) {
-        if (scope_errno != ENOENT) {
-            scope_perror("stat() failed");
-        }
-        return 0;
-    }
-
-    if (requireDir && !S_ISDIR(s.st_mode)) {
-        return 0; // FALSE
-    }
-    if (!requireDir && S_ISDIR(s.st_mode)) {
-        return 0; // FALSE
-    }
-
-    return !scope_access(path, mode);
-}
-
-static int
-libdirFileExists(const char *path, int mode)
-{
-    return libdirExists(path, 0, mode);
-}
-*/
-
 // Get version directory name
 // - Sets global ver
 static const char*
@@ -130,7 +102,9 @@ libdirGetVer()
             return 0;
         }
 
-        scope_strncpy(g_libdir_info.ver, ver, verlen);
+        const char *version = libverNormalizedVersion(ver);
+
+        scope_strncpy(g_libdir_info.ver, version, scope_strlen(version));
         g_libdir_info.ver[verlen] = '\0';
     }
 
@@ -287,7 +261,7 @@ libdirCreateFileIfMissing(file_t file, const char* path)
 // Verify if following absolute path points to directory
 // Returns operation status
 static mkdir_status_t
-checkIfDirExists(const char *absDirPath) {
+libdirCheckIfDirExists(const char *absDirPath) {
     struct stat st = {0};
     if (!scope_stat(absDirPath, &st)) {
         if (S_ISDIR(st.st_mode)) {
@@ -314,7 +288,7 @@ libdirCreateDirIfMissing(const char *dir) {
         return MKDIR_STATUS_NOT_ABSOLUTE_DIR;
     }
 
-    mkdir_status_t res = checkIfDirExists(dir);
+    mkdir_status_t res = libdirCheckIfDirExists(dir);
 
     /* exit if path exists */
     if (res != MKDIR_STATUS_OTHER_ISSUE) {

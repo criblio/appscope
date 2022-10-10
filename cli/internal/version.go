@@ -30,3 +30,11 @@ func GetBuildDate() string {
 func GetVersion() string {
 	return Version
 }
+
+// GetNormalizedVersion returns version for official version or "dev"
+func GetNormalizedVersion() string {
+	if GitSummary[1:] == Version {
+		return Version
+	}
+	return "dev"
+}

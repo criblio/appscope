@@ -13,26 +13,26 @@ type ScopeLoader struct {
 }
 
 // - Setup /etc/profile.d/scope.sh on host
-// - Extract libscope.so to /usr/lib/appscope/libscope.so on host
-// - Extract filter input to /usr/lib/appscope/scope_filter on host
+// - Extract libscope.so to /usr/lib/appscope/<version>/libscope.so on host
+// - Extract filter input to /usr/lib/appscope/scope_filter or /tmp/scope_filter on host
 func (sL *ScopeLoader) ConfigureHost(filterFilePath string) (string, error) {
 	return sL.RunSubProc([]string{"--configure", filterFilePath}, os.Environ())
 }
 
 // - Setup /etc/profile.d/scope.sh in containers
-// - Extract libscope.so to /usr/lib/appscope/libscope.so in containers
-// - Extract filter input to /usr/lib/appscope/scope_filter in containers
+// - Extract libscope.so to /usr/lib/appscope/<version>/libscope.so in containers
+// - Extract filter input to /usr/lib/appscope/scope_filter or /tmp/scope_filter in containers
 func (sL *ScopeLoader) ConfigureContainer(filterFilePath string, cpid int) (string, error) {
 	return sL.RunSubProc([]string{"--configure", filterFilePath, "--namespace", strconv.Itoa(cpid)}, os.Environ())
 }
 
-// - Modify the relevant service configurations to preload /usr/lib/appscope/libscope.so on the host
+// - Modify the relevant service configurations to preload /usr/lib/appscope/<version>/libscope.so on the host
 // Add service configurations on host
 func (sL *ScopeLoader) ServiceHost(serviceName string) (string, error) {
 	return sL.RunSubProc([]string{"--service", serviceName}, os.Environ())
 }
 
-// - Modify the relevant service configurations to preload /usr/lib/appscope/libscope.so in containers
+// - Modify the relevant service configurations to preload /usr/lib/appscope/<version>/libscope.so in containers
 func (sL *ScopeLoader) ServiceContainer(serviceName string, cpid int) (string, error) {
 	return sL.RunSubProc([]string{"--service", serviceName, "--namespace", strconv.Itoa(cpid)}, os.Environ())
 }
@@ -51,8 +51,8 @@ func (sL *ScopeLoader) AttachSubProc(args []string, env []string) (string, error
 
 // Used when scope has detected that we are running the `scope start` command inside a container
 // Tell ldscope to run the `scope start` command on the host instead
-func (sL *ScopeLoader) StartHost() (string, error) {
-	return sL.RunSubProc([]string{"--starthost"}, os.Environ())
+func (sL *ScopeLoader) StartHost(filterPath string) (string, error) {
+	return sL.RunSubProc([]string{"--starthost", filterPath}, os.Environ())
 }
 
 func (sL *ScopeLoader) Run(args []string, env []string) error {

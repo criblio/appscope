@@ -4,27 +4,15 @@
 
 #include "loaderop.h"
 #include "libdir.h"
+#include "libver.h"
 #include "setup.h"
 #include "scopestdlib.h"
 
 #define BUFSIZE (4096)
 
-#define SCOPE_EXEC_PATH "/usr/lib/appscope" 
-
 #define OPENRC_DIR "/etc/rc.conf"
 #define SYSTEMD_DIR "/etc/systemd"
 #define INITD_DIR "/etc/init.d"
-
-#define SETUP_SERVICE "LD_PRELOAD=/usr/lib/appscope/libscope.so"
-
-#define SYSTEMD_CFG "[Service]\nEnvironment=LD_PRELOAD=/usr/lib/appscope/libscope.so\n"
-#define SYSTEMD_CFG_LEN (sizeof(SYSTEMD_CFG) - 1)
-
-#define INITD_CFG "LD_PRELOAD=/usr/lib/appscope/libscope.so\n"
-#define INITD_CFG_LEN (sizeof(INITD_CFG) - 1)
-
-#define OPENRC_CFG "export LD_PRELOAD=/usr/lib/appscope/libscope.so\n"
-#define OPENRC_CFG_LEN (sizeof(OPENRC_CFG) - 1)
 
 /*
  * TODO: Refactor this hardcoded path
@@ -32,11 +20,7 @@
  * further cleaning like reverse return logic in libdirExists
  */
 
-#define LIBSCOPE_LOC "/usr/lib/appscope/libscope.so"
 #define FILTER_LOC "/usr/lib/appscope/scope_filter"
-#define PROFILE_SETUP "export LD_PRELOAD=\"/usr/lib/appscope/libscope.so $LD_PRELOAD\"\n"
-#define PROFILE_SETUP_LEN (sizeof(PROFILE_SETUP)-1)
-
 
 typedef enum {
     SERVICE_CFG_ERROR,
@@ -192,6 +176,8 @@ serviceCfgStatusOpenRc(const char *serviceName) {
 static service_status_t
 newServiceCfgSystemD(const char *serviceCfgPath) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
+    char cfgEntry[BUFSIZE] = {0};
+
     FILE *fPtr = scope_fopen(serviceCfgPath, "a");
 
     if (fPtr == NULL) {
@@ -199,7 +185,9 @@ newServiceCfgSystemD(const char *serviceCfgPath) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    if (scope_fwrite(SYSTEMD_CFG, sizeof(char), SYSTEMD_CFG_LEN, fPtr) < SYSTEMD_CFG_LEN) {
+    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+    size_t size = scope_snprintf(cfgEntry, BUFSIZE, "[Service]\nEnvironment=LD_PRELOAD=/usr/lib/appscope/%s/libscope.so\n", loaderVersion);
+    if (scope_fwrite(cfgEntry, sizeof(char), size, fPtr) < size) {
         scope_perror("error: newServiceCfgSystemD, scope_fwrite failed");
         res = SERVICE_STATUS_ERROR_OTHER;
     }
@@ -217,6 +205,8 @@ newServiceCfgSystemD(const char *serviceCfgPath) {
 static service_status_t
 newServiceCfgInitD(const char *serviceCfgPath) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
+    char cfgEntry[BUFSIZE] = {0};
+
     FILE *fPtr = scope_fopen(serviceCfgPath, "a");
 
     if (fPtr == NULL) {
@@ -224,7 +214,9 @@ newServiceCfgInitD(const char *serviceCfgPath) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    if (scope_fwrite(INITD_CFG, sizeof(char), INITD_CFG_LEN, fPtr) < INITD_CFG_LEN) {
+    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+    size_t size = scope_snprintf(cfgEntry, BUFSIZE, "LD_PRELOAD=/usr/lib/appscope/%s/libscope.so\n", loaderVersion);
+    if (scope_fwrite(cfgEntry, sizeof(char), size, fPtr) < size) {
         scope_perror("error: newServiceCfgInitD, scope_fwrite failed");
         res = SERVICE_STATUS_ERROR_OTHER;
     }
@@ -242,6 +234,8 @@ newServiceCfgInitD(const char *serviceCfgPath) {
 static service_status_t
 newServiceCfgOpenRc(const char *serviceCfgPath) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
+    char cfgEntry[BUFSIZE] = {0};
+
     FILE *fPtr = scope_fopen(serviceCfgPath, "a");
 
     if (fPtr == NULL) {
@@ -249,7 +243,9 @@ newServiceCfgOpenRc(const char *serviceCfgPath) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    if (scope_fwrite(OPENRC_CFG, sizeof(char), OPENRC_CFG_LEN, fPtr) < OPENRC_CFG_LEN) {
+    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+    size_t size = scope_snprintf(cfgEntry, BUFSIZE, "export LD_PRELOAD=/usr/lib/appscope/%s/libscope.so\n", loaderVersion);
+    if (scope_fwrite(cfgEntry, sizeof(char), size, fPtr) < size) {
         scope_perror("error: newServiceCfgOpenRc, scope_fwrite failed");
         res = SERVICE_STATUS_ERROR_OTHER;
     }
@@ -276,7 +272,8 @@ isCfgFileConfigured(const char *serviceCfgPath) {
     }
 
     while(scope_fgets(buf, sizeof(buf), fPtr)) {
-        if (scope_strstr(buf, SETUP_SERVICE)) {
+        // TODO improve it to verify particular version ?
+        if (scope_strstr(buf, "/libscope.so")) {
             res = TRUE;
             break;
         }
@@ -297,6 +294,7 @@ modifyServiceCfgSystemd(const char *serviceCfgPath) {
     FILE *newFd;
     char *tempPath = "/tmp/tmpFile-XXXXXX";
     bool serviceSectionFound = FALSE;
+    char cfgEntry[BUFSIZE] = {0};
 
     if ((readFd = scope_fopen(serviceCfgPath, "r")) == NULL) {
         scope_perror("error: modifyServiceCfgSystemd, scope_fopen serviceFile failed");
@@ -309,13 +307,16 @@ modifyServiceCfgSystemd(const char *serviceCfgPath) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
+    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+    scope_snprintf(cfgEntry, BUFSIZE, "[Service]\nEnvironment=LD_PRELOAD=/usr/lib/appscope/%s/libscope.so\n", loaderVersion);
+
     while (!scope_feof(readFd)) {
         char buf[4096] = {0};
         int res = scope_fscanf(readFd, "%s", buf);
 
         if (scope_strcmp(buf, "[Service]") == 0) {
             serviceSectionFound = TRUE;
-            scope_fprintf(newFd, "%s", SYSTEMD_CFG);
+            scope_fprintf(newFd, "%s", cfgEntry);
         } else if (res == 0){
             scope_fprintf(newFd, "%s ", buf);
         }
@@ -323,7 +324,7 @@ modifyServiceCfgSystemd(const char *serviceCfgPath) {
 
     // the file was empty
     if (serviceSectionFound == FALSE) {
-        scope_fprintf(newFd, "%s", SYSTEMD_CFG);
+        scope_fprintf(newFd, "%s", cfgEntry);
     }
 
     scope_fclose(newFd);
@@ -424,7 +425,8 @@ setupService(const char *serviceName) {
  * Returns status of operation TRUE in case of success, FALSE otherwise
  */
 static bool
-setupProfile(void) {
+setupProfile(const char* libscopePath) {
+    char buf[PATH_MAX] = {0};
     int fd = scope_open("/etc/profile.d/scope.sh", O_CREAT | O_RDWR | O_TRUNC, 0644);
 
     if (fd < 0) {
@@ -432,7 +434,8 @@ setupProfile(void) {
         return FALSE;
     }
 
-    if (scope_write(fd, PROFILE_SETUP, PROFILE_SETUP_LEN) != PROFILE_SETUP_LEN) {
+    size_t len = scope_snprintf(buf, sizeof(buf), "export LD_PRELOAD=\"%s $LD_PRELOAD\"\n", libscopePath);
+    if (scope_write(fd, buf, len) != len) {
         scope_perror("scope_write failed");
         scope_close(fd);
         return FALSE;
@@ -525,23 +528,25 @@ closeFd:
  /*
  * Configure the environment
  * - setup /etc/profile.d/scope.sh
- * - extract memory to filter file /usr/lib/appscope/scope_filter
- * - extract libscope.so to /usr/lib/appscope/libscope.so if it doesn't exists
+ * - extract memory to filter file /usr/lib/appscope/scope_filter or /tmp/scope_filter
+ * - extract libscope.so to /usr/lib/appscope/<version>/libscope.so or /tmp/appscope/<version>/libscope.so if it doesn't exists
  * - patch the library
  * Returns status of operation 0 in case of success, other value otherwise
  */
 int
 setupConfigure(void *filterFileMem, size_t filterSize) {
-    // Check for presence of a /usr/lib/appscope directory; add if doesn't exist
-    // TODO: not correct, needs to be dynamic
-    DIR *dirp = scope_opendir(SCOPE_EXEC_PATH);
-    if (dirp == NULL) {
-        if (scope_mkdir(SCOPE_EXEC_PATH, 0755) == -1) {
-            scope_perror("setupConfigure: mkdir failed");
-        }
-    } else {
-        scope_closedir(dirp);
+    struct stat st = {0};
+    char path[PATH_MAX] = {0};
+
+    // Create destination directory if not exists
+    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+    scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
+    mkdir_status_t res = libverMkdirNested(path);
+    if (res == MKDIR_STATUS_OTHER_ISSUE) {
+        scope_fprintf(scope_stderr, "setupConfigure: libverMkdirNested failed\n");
+        return -1;
     }
+    scope_strncat(path, "libscope.so", sizeof("libscope.so"));
 
     // Extract the filter file to /usr/lib/appscope/scope_filter
     if (setupExtractFilterFile(filterFileMem, filterSize) == FALSE) {
@@ -567,7 +572,7 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
     }
 
     // Patch the library
-    if (loaderOpPatchLibrary(LIBSCOPE_LOC) == PATCH_FAILED) {
+    if (loaderOpPatchLibrary(path) == PATCH_FAILED) {
         scope_fprintf(scope_stderr, "patch libscope.so failed\n");
         return -1;
     }

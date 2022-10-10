@@ -7,8 +7,10 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 
+	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/run"
@@ -290,8 +292,8 @@ func startServiceContainers(allowProcs []allowProcConfig) error {
 	return nil
 }
 
-// extract extracts ldscope and scope to /tmp
-func extract() error {
+// extract extracts ldscope and scope to scope directory
+func extract(scopeDir string) error {
 	// Extract ldscope
 	perms := os.FileMode(0755)
 	b, err := run.Asset("build/ldscope")
@@ -301,19 +303,29 @@ func extract() error {
 			Msg("Error retrieving ldscope asset.")
 		return err
 	}
-	if err = ioutil.WriteFile("/tmp/ldscope", b, perms); err != nil {
+
+	scopeDirVersion := filepath.Join(scopeDir, internal.GetNormalizedVersion())
+	err = os.MkdirAll(scopeDirVersion, perms)
+	if err != nil {
 		log.Error().
 			Err(err).
-			Msg("Error writing ldscope to /tmp.")
+			Msgf("Error creating %s directory.", scopeDirVersion)
+		return err
+	}
+
+	if err = ioutil.WriteFile(filepath.Join(scopeDirVersion, "ldscope"), b, perms); err != nil {
+		log.Error().
+			Err(err).
+			Msgf("Error writing ldscope to %s.", scopeDirVersion)
 		return err
 	}
 
 	// Copy scope
-	if _, err := util.CopyFile(os.Args[0], "/tmp/scope"); err != nil {
+	if _, err := util.CopyFile(os.Args[0], filepath.Join(scopeDir, "scope")); err != nil {
 		if err != os.ErrExist {
 			log.Error().
 				Err(err).
-				Msg("Error writing scope to /tmp.")
+				Msgf("Error writing scope to %s.")
 			return err
 		}
 	}
@@ -338,14 +350,24 @@ func getStartData() []byte {
 	return startData
 }
 
-// extractFilterFile creates a filter file in /tmp
-func extractFilterFile(cfgData []byte) error {
-	f, err := os.OpenFile("/tmp/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+// createFilterFile creates a filter file in /usr/lib/appscope/scope_filter or /tmp/scope_filter
+// It returns the filter file name and status
+func createFilterFile() (*os.File, error) {
+	f, err := os.OpenFile("/usr/lib/appscope/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		f, err = os.OpenFile("/tmp/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+	}
+	return f, err
+}
+
+// extractFilterFile creates a filter file in /usr/lib/appscope/scope_filter or /tmp/scope_filter
+func extractFilterFile(cfgData []byte) (string, error) {
+	f, err := createFilterFile()
 	if err != nil {
 		log.Error().
 			Err(err).
 			Msg("Failed to create filter file.")
-		return err
+		return "", err
 	}
 	defer f.Close()
 
@@ -353,10 +375,9 @@ func extractFilterFile(cfgData []byte) error {
 		log.Error().
 			Err(err).
 			Msg("Failed to write to filter file.")
-		return err
+		return "", err
 	}
-
-	return nil
+	return f.Name(), nil
 }
 
 // Start performs setup of scope in the host and containers
@@ -387,19 +408,20 @@ func Start() error {
 		return err
 	}
 
-	if err := extractFilterFile(cfgData); err != nil {
+	filterPath, err := extractFilterFile(cfgData)
+	if err != nil {
 		return err
 	}
 
 	// If the `scope start` command is run inside a container, we should call `ldscope --starthost`
 	// which will instead run `scope start` on the host
 	if util.InContainer() {
-		if err := extract(); err != nil {
+		if err := extract(filepath.Base(filterPath)); err != nil {
 			return err
 		}
 
-		ld := loader.ScopeLoader{Path: "/tmp/ldscope"}
-		stdoutStderr, err := ld.StartHost()
+		ld := loader.ScopeLoader{Path: filepath.Join(filepath.Base(filterPath), internal.GetNormalizedVersion(), "ldscope")}
+		stdoutStderr, err := ld.StartHost(filterPath)
 		if err == nil {
 			log.Info().
 				Msgf("Start host success.")
@@ -427,11 +449,11 @@ func Start() error {
 		return err
 	}
 
-	if err := startConfigureHost("/tmp/scope_filter"); err != nil {
+	if err := startConfigureHost(filterPath); err != nil {
 		return err
 	}
 
-	if err := startConfigureContainers("/tmp/scope_filter"); err != nil {
+	if err := startConfigureContainers(filterPath); err != nil {
 		return err
 	}
 

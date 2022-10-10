@@ -24,7 +24,7 @@ to a minimum.
 
   * ... `major` when breaking changes (BCs) are made.
   * ... `minor` when we add features without BCs.
-  * ... `maintenace` for bug fixes without BCs.
+  * ... `maintenance` for bug fixes without BCs.
 
   We append `-rc#` suffixes for release candidates.
 
@@ -87,44 +87,15 @@ is run manually, and does not have any automatic triggers.
 
 ## CDN
 
-We push the built and tested `scope` binary and a TGZ package to an AWS S3
-container exposed at `https://cdn.cribl.io/dl/scope/`. Below
-that base URL we have:
+You can [download](https://appscope.dev/docs/downloading#download-as-binary) the AppScope binary from the Cribl downloads page and follow the instructions there.
 
-* `$VERSION/linux/scope`
-* `$VERSION/linux/scope.md5`
-* `$VERSION/linux/scope.tgz`
-* `$VERSION/linux/scope.tgz.md5`
-
-Starting with the `v0.7.2` release, we are building separate x86 and ARM
-versions of AppScope. The links described above still lead to the x86 files.
-We've added arch-specific links for the `x86_64` and `aarch64` files.
-
-* `$VERSION/linux/$(uname -m)/scope`
-* `$VERSION/linux/$(uname -m)/scope.md5`
-* `$VERSION/linux/$(uname -m)/scope.tgz`
-* `$VERSION/linux/$(uname -m)/scope.tgz.md5`
-
-The `$VERSION` string is a release tag without the leading `v` (e.g., `1.2.3`
-or `1.2.3-rc1`), a branch (e.g.,  `branch/bug/1234-name`) or `next` for the
-default branch. The `.md5` files are MD5 checksums of the corresponding files
-without the extension. Example URLs below.
-
-* <https://cdn.cribl.io/dl/scope/latest>
-* <https://cdn.cribl.io/dl/scope/next/linux/scope>
-* <https://cdn.cribl.io/dl/scope/0.6.1/linux/scope>
-* <https://cdn.cribl.io/dl/scope/0.7.0-rc2/linux/scope>
-* <https://cdn.cribl.io/dl/scope/0.7.2-rc1/linux/x86_64/scope>
-* <https://cdn.cribl.io/dl/scope/branch/feature/send_tls/linux/scope>
-
-We commonly use these as shown in the example below.
+Or, you can use these CLI commands to directly download the binary and make it executable:
 
 ```text
-$ LATEST=$(curl -Ls https://cdn.cribl.io/dl/scope/latest)
-$ curl -Lo scope https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope
-$ curl -Ls https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope.md5 | md5sum -c 
-$ chmod +x scope
-$ ./scope run ...
+LATEST=$(curl -Ls https://cdn.cribl.io/dl/scope/latest)
+curl -Lo scope https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope
+curl -Ls https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope.md5 | md5sum -c 
+chmod +x scope
 ```
 
 ## Container Images
@@ -143,5 +114,5 @@ docker run --rm -it cribl/scope:latest
 ```
 or
 ```text
-docker run --rm -it cribl/scope:0.7.0
+docker run --rm -it cribl/scope:1.1.3
 ```

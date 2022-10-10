@@ -69,12 +69,12 @@ We support building `x86_64` (amd64) or `aarch64` (arm64/v8) binaries by adding 
 
 On the [AppScope Website](https://appscope.dev/):
 
-- Check out the CLI [in more depth](https://appscope.dev/docs/quick-start-guide/).
+- Check out the CLI [in more depth](https://appscope.dev/docs/cli-using).
 - Get an [overview](https://appscope.dev/docs/how-works/) of AppScope beyond the CLI.
 - Discover what people are [doing](https://appscope.dev/docs/what-do-with-scope) with AppScope.
 - Review advanced [examples](https://appscope.dev/docs/examples-use-cases).
-- View the [Changelog](https://appscope.dev/docs/changelog) and [Known Issues](https://github.com/criblio/appscope/issues?q=is%3Aissue+is%3Aopen+label%3Aknown-issue).
-- See what happens when you [connect AppScope to Cribl LogStream](https://appscope.dev/docs/logstream-integration).
+- View the [Changelog](https://appscope.dev/docs/changelog) and [Known Issues](https://appscope.dev/docs/known-issues).
+- See what happens when you [connect AppScope to Cribl Stream or Cribl Edge](https://appscope.dev/docs/cribl-integration).
 
 The content on that site is built from the [website/](website/) directory in this project.
 

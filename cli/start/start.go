@@ -304,10 +304,18 @@ func extract() error {
 		return err
 	}
 	scopeDir := filepath.Join("/tmp/appscope/", internal.GetNormalizedVersion())
+	err = os.MkdirAll(scopeDir, perms)
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msgf("Error creating %s directory.", scopeDir)
+		return err
+	}
+
 	if err = ioutil.WriteFile(filepath.Join(scopeDir, "ldscope"), b, perms); err != nil {
 		log.Error().
 			Err(err).
-			Msg("Error writing ldscope to /tmp.")
+			Msgf("Error writing ldscope to %s.", scopeDir)
 		return err
 	}
 
@@ -316,7 +324,7 @@ func extract() error {
 		if err != os.ErrExist {
 			log.Error().
 				Err(err).
-				Msg("Error writing scope to /tmp.")
+				Msgf("Error writing scope to %s.")
 			return err
 		}
 	}
@@ -341,7 +349,7 @@ func getStartData() []byte {
 	return startData
 }
 
-// extractFilterFile creates a filter file in /tmp
+// extractFilterFile creates a filter file in /tmp/scope_filter
 func extractFilterFile(cfgData []byte) error {
 	f, err := os.OpenFile("/tmp/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {

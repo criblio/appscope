@@ -7,6 +7,15 @@
 #include "test.h"
 #include "scopestdlib.h"
 
+/*
+ * Define the extern offset for integration test compilation 
+ * See details in libdir.c
+ */
+unsigned char _binary_ldscopedyn_start;
+unsigned char _binary_ldscopedyn_end;
+unsigned char _binary_libscope_so_start;
+unsigned char _binary_libscope_so_end;
+
 static void
 CreateDirIfMissingWrongPathNull(void **state) {
     mkdir_status_t res = libdirCreateDirIfMissing(NULL);

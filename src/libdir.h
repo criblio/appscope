@@ -14,10 +14,11 @@ typedef enum {
 } file_t;
 
 typedef enum {
-    MKDIR_STATUS_CREATED = 0,          // Path was created
-    MKDIR_STATUS_EXISTS = 1,           // Path already points to existing directory
-    MKDIR_STATUS_NOT_ABSOLUTE_DIR = 2, // Path does not point to a directory
-    MKDIR_STATUS_OTHER_ISSUE = 3,      // Other error
+    MKDIR_STATUS_CREATED = 0,           // Path was created
+    MKDIR_STATUS_EXISTS = 1,            // Path already points to existing directory
+    MKDIR_STATUS_ERR_PERM_ISSUE = 2,    // Error: Path already points to existing directory but user can not create file there
+    MKDIR_STATUS_ERR_NOT_ABS_DIR = 3,   // Error: Path does not points to a directory
+    MKDIR_STATUS_ERR_OTHER = 4,         // Error: Other
 } mkdir_status_t;
 
 mkdir_status_t libdirCreateDirIfMissing(const char *dir);

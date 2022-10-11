@@ -19,13 +19,13 @@ unsigned char _binary_libscope_so_end;
 static void
 CreateDirIfMissingWrongPathNull(void **state) {
     mkdir_status_t res = libdirCreateDirIfMissing(NULL);
-    assert_int_equal(res, MKDIR_STATUS_NOT_ABSOLUTE_DIR);
+    assert_int_equal(res, MKDIR_STATUS_ERR_NOT_ABS_DIR);
 }
 
 static void
 CreateDirIfMissingWrongPathCurrentDir(void **state) {
     mkdir_status_t res = libdirCreateDirIfMissing(".");
-    assert_int_equal(res, MKDIR_STATUS_NOT_ABSOLUTE_DIR);
+    assert_int_equal(res, MKDIR_STATUS_ERR_NOT_ABS_DIR);
 }
 
 static void
@@ -40,7 +40,7 @@ CreateDirIfMissingWrongPathFile(void **state) {
     scope_strcat(buf, "/");
     scope_strcat(buf, fileName);
     mkdir_status_t status = libdirCreateDirIfMissing(buf);
-    assert_int_equal(status, MKDIR_STATUS_NOT_ABSOLUTE_DIR);
+    assert_int_equal(status, MKDIR_STATUS_ERR_NOT_ABS_DIR);
     res = scope_unlink(fileName);
     assert_int_equal(res, 0);
 }
@@ -48,7 +48,7 @@ CreateDirIfMissingWrongPathFile(void **state) {
 static void
 CreateDirIfMissingPermissionIssue(void **state) {
     mkdir_status_t res = libdirCreateDirIfMissing("/root/loremIpsumFile/");
-    assert_int_equal(res, MKDIR_STATUS_OTHER_ISSUE);
+    assert_int_equal(res, MKDIR_STATUS_ERR_OTHER);
 }
 
 static void
@@ -63,11 +63,17 @@ CreateDirIfMissingAlreadyExists(void **state) {
     res = scope_mkdir(buf, 0755);
     assert_int_equal(res, 0);
     mkdir_status_t status = libdirCreateDirIfMissing(dirName);
-    assert_int_equal(status, MKDIR_STATUS_NOT_ABSOLUTE_DIR);
+    assert_int_equal(status, MKDIR_STATUS_ERR_NOT_ABS_DIR);
     status = libdirCreateDirIfMissing(buf);
     assert_int_equal(status, MKDIR_STATUS_EXISTS);
     res = scope_rmdir(buf);
     assert_int_equal(res, 0);
+}
+
+static void
+CreateDirIfMissingAlreadyExistsPermIssue(void **state) {
+    mkdir_status_t status = libdirCreateDirIfMissing("/root");
+    assert_int_equal(status, MKDIR_STATUS_ERR_PERM_ISSUE);
 }
 
 static void
@@ -158,6 +164,7 @@ main(int argc, char* argv[]) {
         cmocka_unit_test(CreateDirIfMissingWrongPathCurrentDir),
         cmocka_unit_test(CreateDirIfMissingPermissionIssue),
         cmocka_unit_test(CreateDirIfMissingAlreadyExists),
+        cmocka_unit_test(CreateDirIfMissingAlreadyExistsPermIssue),
         cmocka_unit_test(CreateDirIfMissingSuccessCreated),
         cmocka_unit_test(SetBase),
         cmocka_unit_test(ExtractNewFile),

@@ -541,7 +541,7 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
     mkdir_status_t res = libdirCreateDirIfMissing(path);
-    if (res == MKDIR_STATUS_OTHER_ISSUE) {
+    if (res == MKDIR_STATUS_ERR_OTHER) {
         scope_fprintf(scope_stderr, "setupConfigure: libdirCreateDirIfMissing failed\n");
         return -1;
     }

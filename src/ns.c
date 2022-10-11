@@ -121,10 +121,10 @@ joinChildNamespace(pid_t hostPid) {
 
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
     mkdir_status_t res = libdirCreateDirIfMissing(path);
-    if (res == MKDIR_STATUS_OTHER_ISSUE) {
+    if (res == MKDIR_STATUS_ERR_OTHER) {
         scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
         mkdir_status_t res = libdirCreateDirIfMissing(path);
-        if (res == MKDIR_STATUS_OTHER_ISSUE) {
+        if (res == MKDIR_STATUS_ERR_OTHER) {
             goto cleanupMem;
         }
     }
@@ -533,7 +533,7 @@ joinHostNamespace(const char *filterPath) {
      */
     scope_snprintf(appscopePath, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
     mkdir_status_t res = libdirCreateDirIfMissing(appscopePath);
-    if (res == MKDIR_STATUS_OTHER_ISSUE) {
+    if (res == MKDIR_STATUS_ERR_OTHER) {
         scope_perror("joinHostNamespace: mkdir failed");
         goto cleanupMem;
     }

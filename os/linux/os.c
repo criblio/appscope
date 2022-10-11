@@ -366,8 +366,8 @@ int
 osGetNumFds(pid_t pid)
 {
     int nfile = 0;
-    DIR * dirp;
-    struct dirent * entry;
+    DIR *dirp;
+    struct dirent *entry;
     char buf[1024];
 
     scope_snprintf(buf, sizeof(buf), "/proc/%d/fd", pid);
@@ -390,7 +390,7 @@ int
 osGetNumChildProcs(pid_t pid)
 {
     int nchild = 0;
-    DIR * dirp;
+    DIR *dirp;
     struct dirent * entry;
     char buf[1024];
 
@@ -842,4 +842,99 @@ osFindLibrary(const char *library, pid_t pid)
 
     scope_fclose(fd);
     return addr;
+}
+
+void
+osCreateSM(proc_id_t *proc, unsigned long addr)
+{
+    export_sm_t *exaddr;
+
+    if (!proc) return;
+
+    // Create the anonymous sm
+    if ((proc->smfd = memfd_create(SM_NAME, MFD_ALLOW_SEALING)) == -1) {
+        proc->smfd = -1;
+        return;
+    }
+
+    // size is initally 0 and needs to be increased
+    if (scope_ftruncate(proc->smfd, sizeof(export_sm_t)) == -1) {
+        scope_close(proc->smfd);
+        return;
+    }
+
+    if ((exaddr = scope_mmap(NULL, sizeof(export_sm_t), PROT_READ | PROT_WRITE,
+                             MAP_SHARED, proc->smfd, 0)) == MAP_FAILED) {
+        scope_close(proc->smfd);
+        return;
+    }
+
+    proc->smaddr = addr;          // these are not currently used, useful for debug
+    exaddr->scoped = FALSE;
+    exaddr->cmdAttachAddr = addr; // this is the primary update
+
+    /*
+     * We need to unmap before setting the segment read only with seals
+     * A close here will remove the link in /proc/<pid>/fd/FD
+     * We will close when we reattach
+     */
+    scope_munmap(exaddr, sizeof(export_sm_t));   // on error, what?
+
+    /*
+     * Make this read-only for other procs
+     * It would be nice to use F_SEAL_FUTURE_WRITE here, but it is
+     * available on >= 5.1 kernels and we support older versions.
+     */
+    if (scope_fcntl(proc->smfd, F_ADD_SEALS, F_SEAL_WRITE | F_SEAL_GROW) == -1) {
+        scope_close(proc->smfd);
+    }
+}
+
+int
+osFindFd(pid_t pid, const char *fname)
+{
+    int fd = -1;
+    DIR *dirp;
+    char *cwd;
+    struct dirent *entry;
+    char buf[PATH_MAX], link[256];
+
+    if ((cwd = getcwd(NULL, 0)) == NULL) {
+        DBG(NULL);
+        return -1;
+    }
+
+    scope_snprintf(buf, sizeof(buf), "/proc/%d/fd", pid);
+
+    if (chdir(buf) == -1) {
+        free(cwd);
+        DBG(NULL);
+        return -1;
+    }
+
+    if ((dirp = scope_opendir(buf)) == NULL) {
+        free(cwd);
+        DBG(NULL);
+        return -1;
+    }
+
+    while ((entry = scope_readdir(dirp)) != NULL) {
+        if (entry->d_type != DT_DIR) {
+                if (scope_readlink(entry->d_name, link, sizeof(link)) == -1) {
+                scopeLogError("%s: can't get path to %s", __FUNCTION__, entry->d_name);
+                break;
+            }
+
+            if (scope_strstr(link, fname)) {
+                fd = scope_strtol(entry->d_name, NULL, 0);
+                if ((fd == LONG_MIN) || (fd == LONG_MAX) || (fd == 0)) fd = -1;
+                break;
+            }
+        }
+    }
+
+    chdir(cwd);
+    scope_closedir(dirp);
+    free(cwd);
+    return fd;
 }

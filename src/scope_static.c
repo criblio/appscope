@@ -534,7 +534,7 @@ showUsage(char *prog)
       "  -s, --service SERVICE        setup specified service NAME\n"
       "  -n  --namespace PID          perform service/configure operation on specified container PID\n"
       "  -p, --patch SO_FILE          patch specified libscope.so\n"
-      "  -r, --starthost FILTER_PATH execute the scope start command in a host context with FILTER_PATH\n"
+      "  -r, --starthost              execute the scope start command in a host context with (must be run in the container)\n"
       "\n"
       "Help sections are OVERVIEW, CONFIGURATION, METRICS, EVENTS, and PROTOCOLS.\n"
       "\n"
@@ -628,8 +628,7 @@ main(int argc, char **argv, char **env)
                 return (loaderOpPatchLibrary(optarg) == PATCH_SUCCESS) ? EXIT_SUCCESS : EXIT_FAILURE;
                 break;
             case 'r':
-                // TODO check if we are in the container
-                return nsHostStart(optarg);
+                return nsHostStart();
                 break;
             case ':':
                 // options missing their value end up here

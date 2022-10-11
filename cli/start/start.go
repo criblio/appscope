@@ -423,7 +423,7 @@ func Start() error {
 		}
 
 		ld := loader.ScopeLoader{Path: filepath.Join(filepath.Base(filterPath), internal.GetNormalizedVersion(), "ldscope")}
-		stdoutStderr, err := ld.StartHost(filterPath)
+		stdoutStderr, err := ld.StartHost()
 		if err == nil {
 			log.Info().
 				Msgf("Start host success.")

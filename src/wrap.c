@@ -30,6 +30,7 @@
 #include "os.h"
 #include "plattime.h"
 #include "report.h"
+#include "setup.h"
 #include "scopeelf.h"
 #include "scopetypes.h"
 #include "state.h"
@@ -1574,32 +1575,6 @@ initSigErrorHandler(void)
     }
 }
 
-/*
-* Look for a filter file
-* returns NULL if none were accessible
-*/
-static const char *
-getFilterPath(void) {
-    if (checkEnv("SCOPE_FILTER", "false") == TRUE) {
-        // Skip handling the filter file
-        return NULL;
-    }
-
-    // use the defaults
-    const char *const defaultFilterLoc[] = {
-        "/usr/lib/appscope/scope_filter",
-        "/tmp/scope_filter"
-    };
-
-    for (int i=0; i<sizeof(defaultFilterLoc)/sizeof(char*); ++i) {
-        if (!scope_access(defaultFilterLoc[i], R_OK)) {
-            return defaultFilterLoc[i];
-        }
-    }
-
-    return NULL;
-}
-
 __attribute__((constructor)) void
 init(void)
 {
@@ -1672,7 +1647,9 @@ init(void)
         scopedFlag = TRUE;
     } else {
         cfg = cfgCreateDefault();
-        filter_status_t res = cfgFilterStatus(g_proc.procname, g_proc.cmd, getFilterPath(), cfg);
+        // Ignore filer path when SCOPE_FILTER is set 
+        const char *filterPath = (checkEnv("SCOPE_FILTER", "false") == TRUE) ? NULL : setupGetFilterFilePath();
+        filter_status_t res = cfgFilterStatus(g_proc.procname, g_proc.cmd, filterPath, cfg);
         switch (res) {
             case FILTER_SCOPED:
                 scopedFlag = TRUE;

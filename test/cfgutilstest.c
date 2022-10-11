@@ -56,7 +56,7 @@ testDirPath(char *path, const char *argv0) {
     return 0;
 }
 
-// mimics behavior of getFilterPath
+// mimics behavior of setupGetFilterFilePath
 static const char*
 testAccessFilterPath(const char *filterPath) {
     return (scope_access(filterPath, R_OK) == 0) ? filterPath : NULL;

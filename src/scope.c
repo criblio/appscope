@@ -141,11 +141,12 @@ attachCmd(pid_t pid, bool attach)
      * state of the lib. The segment is deleted when a
      * first attach is performed.
      */
-    sfd = osFindFd(pid, SM_NAME);   // e.g. memfd:scope_anon
-    if (sfd > 0) {
-        first_attach = TRUE;
+    if (attach == TRUE) {
+        sfd = osFindFd(pid, SM_NAME);   // e.g. memfd:scope_anon
+        if (sfd > 0) {
+            first_attach = TRUE;
+        }
     }
-
 
     /*
      * Before executing any command, create and populate the dyn config file.

@@ -517,27 +517,6 @@ closeFd:
     return resMem;
 }
 
-/*
-* Look for an accessible filter file
-* returns NULL if none were accessible
-*/
-const char*
-setupGetFilterFilePath(void) {
-    // use the defaults
-    const char *const defaultFilterLoc[] = {
-        "/usr/lib/appscope/scope_filter",
-        "/tmp/scope_filter"
-    };
-
-    for (int i=0; i<sizeof(defaultFilterLoc)/sizeof(char*); ++i) {
-        if (!scope_access(defaultFilterLoc[i], R_OK)) {
-            return defaultFilterLoc[i];
-        }
-    }
-
-    return NULL;
-}
-
  /*
  * Configure the environment
  * - setup /etc/profile.d/scope.sh

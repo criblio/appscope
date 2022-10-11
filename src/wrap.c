@@ -1575,6 +1575,35 @@ initSigErrorHandler(void)
     }
 }
 
+/*
+* Look for an accessible filter file
+* returns NULL if none were accessible
+* TODO: this should be unified with nsGetFilterFilePath
+* the limitation is that object file which contains
+* the logic should be available for libscope.so/ldscopedyn/ldscope
+*/
+static const char*
+libGetFilterPath(void) {
+    // Ignore filter path when SCOPE_FILTER is set
+    if (checkEnv("SCOPE_FILTER", "false") == TRUE) {
+        return NULL;
+    }
+    // use the defaults
+    const char *const defaultFilterLoc[] = {
+        "/usr/lib/appscope/scope_filter",
+        "/tmp/scope_filter"
+    };
+
+    for (int i=0; i<sizeof(defaultFilterLoc)/sizeof(char*); ++i) {
+        if (!scope_access(defaultFilterLoc[i], R_OK)) {
+            return defaultFilterLoc[i];
+        }
+    }
+
+    return NULL;
+}
+
+
 __attribute__((constructor)) void
 init(void)
 {
@@ -1647,8 +1676,7 @@ init(void)
         scopedFlag = TRUE;
     } else {
         cfg = cfgCreateDefault();
-        // Ignore filer path when SCOPE_FILTER is set 
-        const char *filterPath = (checkEnv("SCOPE_FILTER", "false") == TRUE) ? NULL : setupGetFilterFilePath();
+        const char *filterPath = libGetFilterPath();
         filter_status_t res = cfgFilterStatus(g_proc.procname, g_proc.cmd, filterPath, cfg);
         switch (res) {
             case FILTER_SCOPED:

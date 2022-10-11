@@ -401,8 +401,22 @@ cmdAttach(void)
 
     g_cfg.funcs_attached = TRUE;
 
+    /*
+     * Using this as an indicator that we were not
+     * previously soping. If the smfd is not active we
+     * may have been detached and are reattaching.
+     * In that cse, the thread and transports are expected
+     * to be ready.
+     *
+     * The thread likely should be started
+     */
     if (g_proc.smfd > 0) {
-        scope_close(g_proc.smfd);
+        scope_close(g_proc.smfd);   // deletes the SM segment
+        g_proc.smfd = 0;
+
+        if (g_thread.once == FALSE) {
+            threadNow(0);
+        }
     }
 
     return TRUE;

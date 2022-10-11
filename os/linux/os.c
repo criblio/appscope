@@ -871,7 +871,7 @@ osCreateSM(proc_id_t *proc, unsigned long addr)
 
     proc->smaddr = addr;          // these are not currently used, useful for debug
     exaddr->scoped = FALSE;
-    exaddr->cmdAttachAddr = addr; // this is the central result
+    exaddr->cmdAttachAddr = addr; // this is the primary update
 
     /*
      * We need to unmap before setting the segment read only with seals
@@ -887,7 +887,6 @@ osCreateSM(proc_id_t *proc, unsigned long addr)
      */
     if (scope_fcntl(proc->smfd, F_ADD_SEALS, F_SEAL_WRITE | F_SEAL_GROW) == -1) {
         scope_close(proc->smfd);
-        return;
     }
 }
 

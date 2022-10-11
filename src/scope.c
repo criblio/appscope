@@ -31,8 +31,6 @@
 #include "inject.h"
 #include "os.h"
 
-static bool useDynConfAttach = FALSE;
-
 static void
 showUsage(char *prog)
 {
@@ -101,26 +99,149 @@ attach(pid_t pid, char *scopeLibPath)
     return ret;
 }
 
+/*
+ * Given the ability to separate lib load and interposition
+ * we enable a detach capability as well as 3 types
+ * of attach cases. 4 commands in all.
+ *
+ * Load and attach:
+ * libscope is not loaded.  This case is
+ * handled in function attach().
+ *
+ * First attach:
+ * libscope is loaded and we are not interposing
+ * functions, not scoped. This is the first time
+ * libscope will have been attached.
+ *
+ * Reattach:
+ * libscope is loaded, the process has been attached
+ * in one form at least once previously.
+ *
+ * Detach:
+ * libscope is loaded and we are interposing functions.
+ * Remove all interpositions and stop scoping.
+ */
 static int
 attachCmd(pid_t pid, bool attach)
 {
-    int sfd, mfd;
+    int fd, sfd, mfd;
+    bool first_attach = FALSE;
     export_sm_t *exaddr;
     char buf[PATH_MAX];
+    char path[PATH_MAX];
 
     /*
-     * Not sure how to handle this dual case
-     * Probably don't want to remove the code for dyn config of reattach
-     * Maybe this becomes dynamic?
+     * The SM segment is used in the first attach case where
+     * we've never been attached before. The segment is
+     * populated with state including the address of the
+     * reattach command in the lib. The segment is read
+     * only and the size of the segment can't be modified.
+     *
+     * We use the presence of the segment to idenitfy the
+     * state of the lib. The segment is deleted when a
+     * first attach is performed.
      */
-    if (useDynConfAttach == FALSE) {
-        // e.g. memfd:scope_anon
-        sfd = osFindFd(pid, SM_NAME);
-        if (sfd < 0) {
-            scope_fprintf(scope_stderr, "error: %s: osFindFd failed\n", __FUNCTION__);
+    sfd = osFindFd(pid, SM_NAME);   // e.g. memfd:scope_anon
+    if (sfd > 0) {
+        first_attach = TRUE;
+    }
+
+
+    /*
+     * Before executing any command, create and populate the dyn config file.
+     * It is used for all cases:
+     *   First attach: no attach command, include env vars, reload command
+     *   Reattach: attach command = true, include env vars, reload command
+     *   Detach: attach command = false, no env vars, no reload command
+     */
+    scope_snprintf(path, sizeof(path), "%s/%s.%d",
+                   DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, pid);
+
+    /*
+     * Unlink a possible existing file before creating a new one
+     * due to a fact that scope_open will fail if the file is
+     * sealed (still processed on library side).
+     * File sealing is supported on tmpfs - /dev/shm (DYN_CONFIG_CLI_DIR).
+     */
+    scope_unlink(path);
+    fd = scope_open(path, O_WRONLY|O_CREAT);
+    if (fd == -1) {
+        scope_perror("scope_open() of dynamic config file");
+        return EXIT_FAILURE;
+    }
+
+    if (scope_fchmod(fd, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH) == -1) {
+        scope_perror("scope_fchmod() failed");
+        return EXIT_FAILURE;
+    }
+
+    /*
+     * Ensuring that the process being operated on can remove
+     * the dyn config file being created here.
+     * In the case where a root user executes the command,
+     * we need to change ownership of dyn config file.
+     */
+
+    if (scope_getuid() == 0) {
+        uid_t euid = -1;
+        gid_t egid = -1;
+
+        if (osGetProcUidGid(pid, &euid, &egid) == -1) {
+            scope_fprintf(scope_stderr, "error: osGetProcUidGid() failed\n");
+            scope_close(fd);
             return EXIT_FAILURE;
         }
 
+        if (scope_fchown(fd, euid, egid) == -1) {
+            scope_perror("scope_fchown() failed");
+            scope_close(fd);
+            return EXIT_FAILURE;
+        }
+    }
+
+    if (first_attach == FALSE) {
+        const char *cmd = (attach == TRUE) ? "SCOPE_CMD_ATTACH=true\n" : "SCOPE_CMD_ATTACH=false\n";
+        if (scope_write(fd, cmd, scope_strlen(cmd)) <= 0) {
+            scope_perror("scope_write() failed");
+            scope_close(fd);
+            return EXIT_FAILURE;
+        }
+    }
+
+    if (attach == TRUE) {
+        int i;
+
+        for (i = 0; environ[i]; i++) {
+            if ((scope_strlen(environ[i]) > 6) && scope_strncmp(environ[i], "SCOPE_", 6) == 0) {
+                scope_dprintf(fd, "%s\n", environ[i]);
+            }
+        }
+
+        /*
+         * Reload the configuration during first attach & reattach if we want to apply
+         * config from a file &/or env vars
+         */
+        char *scopeConfReload = getenv("SCOPE_CONF_RELOAD");
+
+        if (scopeConfReload) {
+            scope_snprintf(buf, sizeof(buf), "SCOPE_CONF_RELOAD=%s\n", scopeConfReload);
+        } else {
+            scope_snprintf(buf, sizeof(buf), "SCOPE_CONF_RELOAD=TRUE\n");
+        }
+
+        if (scope_write(fd, buf, scope_strlen(buf)) <= 0) {
+            scope_perror("scope_write() failed");
+            scope_close(fd);
+            return EXIT_FAILURE;
+        }
+    }
+
+    scope_close(fd);
+
+    int rc = EXIT_SUCCESS;
+
+    if (first_attach == TRUE) {
+        // the only command we do in this case is first attach
         scope_snprintf(buf, sizeof(buf), "/proc/%d/fd/%d", pid, sfd);
         if ((mfd = scope_open(buf, O_RDONLY)) == -1) {
             scope_close(sfd);
@@ -136,8 +257,9 @@ attachCmd(pid_t pid, bool attach)
             return EXIT_FAILURE;
         }
 
-        if (injectReattach(pid, exaddr->cmdAttachAddr) == EXIT_FAILURE) {
+        if (injectFirstAttach(pid, exaddr->cmdAttachAddr) == EXIT_FAILURE) {
             scope_fprintf(scope_stderr, "error: %s: the reattach command failed\n", __FUNCTION__);
+            rc = EXIT_FAILURE;
         }
 
         //scope_fprintf(scope_stderr, "%s: %s 0x%lx\n", __FUNCTION__, buf, exaddr->cmdAttachAddr);
@@ -147,86 +269,10 @@ attachCmd(pid_t pid, bool attach)
 
         if (scope_munmap(exaddr, sizeof(export_sm_t))) {
             scope_fprintf(scope_stderr, "error: %s: unmapping in the the reattach command failed\n", __FUNCTION__);
-            return EXIT_FAILURE;
+            rc = EXIT_FAILURE;
         }
-
-        return EXIT_SUCCESS;
-    } else {
-        int fd;
-        char path[PATH_MAX];
-
-        scope_snprintf(path, sizeof(path), "%s/%s.%d",
-                       DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, pid);
-
-        /*
-         * Unlink a possible existing file before creating a new one
-         * due to a fact that scope_open will fail if the file is
-         * sealed (still processed on library side).
-         * File sealing is supported on tmpfs - /dev/shm (DYN_CONFIG_CLI_DIR).
-         */
-        scope_unlink(path);
-        fd = scope_open(path, O_WRONLY|O_CREAT);
-        if (fd == -1) {
-            scope_perror("scope_open() of dynamic config file");
-            return EXIT_FAILURE;
-        }
-
-        if (scope_fchmod(fd, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH) == -1) {
-            scope_perror("scope_fchmod() failed");
-            return EXIT_FAILURE;
-        }
-
-        /*
-         * Ensuring that the process being operated on can remove
-         * the dyn config file being created here.
-         * In the case where a root user executes the command,
-         * we need to change ownership of dyn config file.
-         */
-
-        if (scope_getuid() == 0) {
-            uid_t euid = -1;
-            gid_t egid = -1;
-
-            if (osGetProcUidGid(pid, &euid, &egid) == -1) {
-                scope_fprintf(scope_stderr, "error: osGetProcUidGid() failed\n");
-                scope_close(fd);
-                return EXIT_FAILURE;
-            }
-
-            if (scope_fchown(fd, euid, egid) == -1) {
-                scope_perror("scope_fchown() failed");
-                scope_close(fd);
-                return EXIT_FAILURE;
-            }
-        }
-
-        const char *cmd = (attach == TRUE) ? "SCOPE_CMD_ATTACH=true" : "SCOPE_CMD_ATTACH=false";
-        if (scope_write(fd, cmd, scope_strlen(cmd)) <= 0) {
-            scope_perror("scope_write() failed");
-            scope_close(fd);
-            return EXIT_FAILURE;
-        }
-
-        if (attach == TRUE) {
-            /*
-             * Reload the configuration during reattach if we want to redirect data
-             * into other place e.g via cli
-             */
-            char *scopeConfReload = getenv("SCOPE_CONF_RELOAD");
-            if (scopeConfReload) {
-                char reloadCmd[PATH_MAX] = {0};
-                scope_snprintf(reloadCmd, sizeof(reloadCmd), "\nSCOPE_CONF_RELOAD=%s", scopeConfReload);
-                if (scope_write(fd, reloadCmd, scope_strlen(reloadCmd)) <= 0) {
-                    scope_perror("scope_write() failed");
-                    scope_close(fd);
-                    return EXIT_FAILURE;
-                }
-            }
-        }
-
-        scope_close(fd);
-        return EXIT_SUCCESS;
     }
+        return rc;
 }
 
 // long aliases for short options
@@ -331,10 +377,10 @@ main(int argc, char **argv, char **env)
                 scope_fprintf(scope_stderr, "error: can't get path to executable for pid %d\n", pid);
                 ret = EXIT_FAILURE;
             } else if (rc == 0) {
-                // proc exists, libscope does not exist, a new attach
+                // proc exists, libscope does not exist, a load & attach
                 ret = attach(pid, scopeLibPath);
             } else {
-                // libscope exists, a reattach
+                // libscope exists, a first time attach or a reattach
                 scope_printf("Reattaching to pid %d\n", pid);
                 ret = attachCmd(pid, TRUE);
             }

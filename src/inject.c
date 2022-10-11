@@ -173,9 +173,9 @@ inject(pid_t pid, remote_cmd_t cmd, uint64_t remAddr, char *path, int glibc)
     int libpathLen;
     int ret = EXIT_FAILURE;
 
-    if ((cmd == REM_CMD_DLOPEN) && !path) return ret;
-
     if (cmd == REM_CMD_DLOPEN) {
+        if (!path) return ret;
+
         libpathLen = scope_strlen(path) + 1;
         if (libpathLen > SCOPE_PATH_SIZE) {
             scope_fprintf(scope_stderr, "library path %s is longer than %d, library could not be injected\n", path, SCOPE_PATH_SIZE);
@@ -230,7 +230,7 @@ inject(pid_t pid, remote_cmd_t cmd, uint64_t remAddr, char *path, int glibc)
             goto restore_app;
         }
     } else {
-        scope_fprintf(scope_stderr, "error: %s: unrecognized remote command\n", __FUNCTION__);
+        scope_fprintf(scope_stderr, "error: %s: unrecognized remote command: %d\n", __FUNCTION__, cmd);
         goto detach;
     }
 
@@ -279,8 +279,7 @@ inject(pid_t pid, remote_cmd_t cmd, uint64_t remAddr, char *path, int glibc)
             goto restore_app;
         }
 
-        uint64_t success = (cmd == REM_CMD_REATTACH) ? TRUE : 0;
-        if (RET_REG == success) {
+        if (RET_REG != 0) {
             ret = EXIT_SUCCESS;
             //printf("Appscope library injected at %p\n", (void*)RET_REG);
         } else {
@@ -361,7 +360,7 @@ injectScope(int pid, char *path)
 }
 
 int
-injectReattach(int pid, uint64_t remaddr)
+injectFirstAttach(int pid, uint64_t remaddr)
 {
     // execute the attach command in the target process
     return inject(pid, REM_CMD_REATTACH, remaddr, NULL, 0);

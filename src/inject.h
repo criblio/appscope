@@ -2,5 +2,5 @@
 #define __INJECT_H__
 
 int injectScope(int, char*);
-int injectReattach(int, uint64_t);
+int injectFirstAttach(int, uint64_t);
 #endif

@@ -229,7 +229,6 @@ starttest "Scope start empty file redirect"
 
 OUT=$(scope start -f < /opt/test-runner/empty_file 2>&1)
 RET=$?
-# Fix me
 outputs "Exiting due to start failure"
 scope logs -s | grep -q "Missing filter data"
 ERR+=$?
@@ -245,7 +244,6 @@ starttest "Scope detach by name"
 # Detach by name
 #
 run scope detach sleep
-# Fix me
 outputs "Detaching from pid ${sleep_pid}"
 returns 0
 

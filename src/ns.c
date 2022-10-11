@@ -3,23 +3,17 @@
 #include <stdlib.h>
 
 #include "ns.h"
+#include "libver.h"
+#include "libdir.h"
 #include "setup.h"
 #include "scopestdlib.h"
 
-#define LDSCOPE_IN_CHILD_NS "/tmp/ldscope"
-#define LDSCOPE_IN_HOST_NS "/usr/lib/appscope/ldscope"          // TODO
-#define LDSCOPE_CONFIG_IN_CHILD "/tmp/scope_filter"         // TODO
-#define LDSCOPE_CONFIG_IN_HOST "/usr/lib/appscope/scope_filter" // TODO
 #define SCOPE_CRONTAB "* * * * * root /tmp/scope_att.sh\n"
-#define SCOPE_CRON_SCRIPT "#! /bin/bash\ntouch /tmp/scope_test\nrm /etc/cron.d/scope_cron\n%s start -f < %s/scope_filter\n"
 #define SCOPE_CRON_PATH "/etc/cron.d/scope_cron"
 #define SCOPE_SCRIPT_PATH "/tmp/scope_att.sh"
-#define SCOPE_EXEC_PATH "/usr/lib/appscope"       // TODO: not correct, needs to be dynamic
-#define SCOPE_EXEC "/usr/lib/appscope/scope"      // TODO: not correct, needs to be dynamic
-#define SCOPE_EXEC_IN_CHILD "/tmp/scope"      // TODO: not correct, needs to be dynamic
 
 /*
- * Extract file from parent namespace into child namespace.
+ * Extract memory to specific output file.
  *
  * Returns TRUE in case of success, FALSE otherwise.
  */
@@ -27,6 +21,8 @@ static bool
 extractMemToChildNamespace(char *inputMem, size_t inputSize, const char *outFile, mode_t outPermFlag) {
     bool status = FALSE;
     int outFd;
+
+    // TODO: Check if file exists ?
 
     if ((outFd = scope_open(outFile, O_RDWR | O_CREAT, outPermFlag)) == -1) {
         scope_perror("scope_open failed");
@@ -122,12 +118,27 @@ joinChildNamespace(pid_t hostPid) {
         goto cleanupMem;
     }
 
-    status = extractMemToChildNamespace(ldscopeMem, ldscopeSize, LDSCOPE_IN_CHILD_NS, 0775);
+    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+
+    scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
+    mkdir_status_t res = libdirCreateDirIfMissing(path);
+    if (res == MKDIR_STATUS_ERR_OTHER) {
+        scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
+        mkdir_status_t res = libdirCreateDirIfMissing(path);
+        if (res == MKDIR_STATUS_ERR_OTHER) {
+            goto cleanupMem;
+        }
+    }
+
+    scope_strncat(path, "ldscope", sizeof("ldscope"));
+
+    status = extractMemToChildNamespace(ldscopeMem, ldscopeSize, path, 0775);
 
     if (scopeCfgMem) {
         char scopeCfgPath[PATH_MAX] = {0};
 
-        scope_snprintf(scopeCfgPath, sizeof(scopeCfgPath), LDSCOPE_CONFIG_IN_CHILD, hostPid);
+        // extract scope.yml configuration
+        scope_snprintf(scopeCfgPath, sizeof(scopeCfgPath), "/tmp/scope%d.yml", hostPid);
         status = extractMemToChildNamespace(scopeCfgMem, cfgSize, scopeCfgPath, 0664);
         // replace the SCOPE_CONF_PATH with namespace path
         setenv("SCOPE_CONF_PATH", scopeCfgPath, 1);
@@ -309,6 +320,8 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
         scope_fprintf(scope_stderr, "error: fork() failed\n");
         return EXIT_FAILURE;
     } else if (child == 0) {
+        char loaderInChildPath[PATH_MAX] = {0};
+
         // Child
         char *nsAttachPidStr = NULL;
         if (scope_asprintf(&nsAttachPidStr, "%d", nsPid) <= 0) {
@@ -322,11 +335,21 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
             return EXIT_FAILURE;
         }
 
-        execArgv[execArgc++] = LDSCOPE_IN_CHILD_NS;
+        const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+        scope_snprintf(loaderInChildPath, PATH_MAX, "/usr/lib/appscope/%s/ldscope", loaderVersion);
+        if (scope_access(loaderInChildPath, R_OK)) {
+            scope_snprintf(loaderInChildPath, PATH_MAX, "/tmp/appscope/%s/ldscope", loaderVersion);
+            if (scope_access(loaderInChildPath, R_OK)) {
+                scope_fprintf(scope_stderr, "error: access ldscope failed\n");
+                return EXIT_FAILURE;
+            }
+        }
+
+        execArgv[execArgc++] = loaderInChildPath;
         execArgv[execArgc++] = childOp;
         execArgv[execArgc++] = nsAttachPidStr;
 
-        return execve(LDSCOPE_IN_CHILD_NS, execArgv, environ);
+        return execve(loaderInChildPath, execArgv, environ);
     }
     // Parent
     int status;
@@ -355,7 +378,7 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
  * This should be called after the fs namespace has been switched.
  */
 static bool
-createCron(void) {
+createCron(const char *scopePath, const char* filterPath) {
     int outFd;
     char buf[1024];
     char path[PATH_MAX] = {0};
@@ -373,7 +396,8 @@ createCron(void) {
         return FALSE;
     }
 
-    if (scope_snprintf(buf, sizeof(buf), SCOPE_CRON_SCRIPT, SCOPE_EXEC, SCOPE_EXEC_PATH) < 0) {
+    // Write cron action - scope start
+    if (scope_snprintf(buf, sizeof(buf), "#! /bin/bash\ntouch /tmp/scope_test\nrm /etc/cron.d/scope_cron\n%s start -f < %s\n", scopePath, filterPath) < 0) {
         scope_perror("createCron: script: error: snprintf() failed\n");
         scope_close(outFd);
         return FALSE;
@@ -464,39 +488,78 @@ setHostNamespace(const char *ns) {
     return TRUE;
 }
 
+/*
+* Look for an accessible filter file
+* returns NULL if none were accessible
+* TODO: this should be unified with libGetFilterPath
+* the limitation is that object file which contains
+* the logic should be available for libscope.so/ldscopedyn/ldscope
+*/
+const char*
+nsGetFilterFilePath(void) {
+    // use the defaults
+    const char *const defaultFilterLoc[] = {
+        "/usr/lib/appscope/scope_filter",
+        "/tmp/scope_filter"
+    };
+
+    for (int i=0; i<sizeof(defaultFilterLoc)/sizeof(char*); ++i) {
+        if (!scope_access(defaultFilterLoc[i], R_OK)) {
+            return defaultFilterLoc[i];
+        }
+    }
+
+    return NULL;
+}
+
+/*
+ * Joins the host mount namespace.
+ * Required conditions:
+ * - scope_filter must exists
+ * - scope must exists
+ * TODO: unify it with joinChildNamespace
+ * Returns TRUE if operation was success, FALSE otherwise.
+ */
 static bool
-joinHostNamespace(void) {
+joinHostNamespace(char *hostScopePath, char *hostFilterPath) {
     bool status = FALSE;
     size_t ldscopeSize = 0;
     size_t cfgSize = 0;
     size_t scopeSize = 0;
-    DIR *dirp = NULL;
     char path[PATH_MAX] = {0};
+    char hostBasePath[PATH_MAX] = {0};
+    char *scopeFilterCfgMem = NULL;
+    char *scopeMem = NULL;
 
     if (scope_readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
         return status;
     }
 
+    // Load "ldscope" into memory
     char *ldscopeMem = setupLoadFileIntoMem(&ldscopeSize, path);
     if (ldscopeMem == NULL) {
         return status;
     }
 
-    // Configuration is optional
-    char *scopeCfgPath = NULL;
-
-    if ((scopeCfgPath = getenv("SCOPE_CONF_PATH")) == NULL) {
-        scope_snprintf(path, sizeof(path), LDSCOPE_CONFIG_IN_CHILD);
-        scopeCfgPath = path;
+    // Load "filter file" into memory
+    scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, nsGetFilterFilePath());
+    if (scopeFilterCfgMem == NULL) {
+        goto cleanupMem;
     }
 
-    char *scopeCfgMem = setupLoadFileIntoMem(&cfgSize, scopeCfgPath);
+    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+    // Load "scope" into memory
+    scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/scope", loaderVersion);
+    if (scope_access(path, R_OK)) {
+        scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/scope", loaderVersion);
+        if (scope_access(path, R_OK)) {
+            goto cleanupMem;
+        }
+    }
 
-    // Get the scope exec in addition to ldscope
-    scope_snprintf(path, sizeof(path), SCOPE_EXEC_IN_CHILD);
-    char *scopeMem = setupLoadFileIntoMem(&scopeSize, path);
+    scopeMem = setupLoadFileIntoMem(&scopeSize, path);
     if (scopeMem == NULL) {
-        return status;
+        goto cleanupMem;
     }
 
     /*
@@ -511,54 +574,86 @@ joinHostNamespace(void) {
      * At this point we are using the host fs.
      * Ensure that we have the dest dir
      */
-    if ((dirp = scope_opendir(SCOPE_EXEC_PATH)) == NULL) {
-        if (scope_mkdir(SCOPE_EXEC_PATH, 0755) == -1) {
-            scope_perror("joinHostNamespace: mkdir failed");
+    scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
+    mkdir_status_t res = libdirCreateDirIfMissing(path);
+    if (res > MKDIR_STATUS_EXISTS) {
+        scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
+        mkdir_status_t res = libdirCreateDirIfMissing(path);
+        if (res > MKDIR_STATUS_EXISTS) {
             goto cleanupMem;
         }
     }
+    // Save the host base operation path
+    scope_strncpy(hostBasePath, path, PATH_MAX);
+    scope_strncat(path, "ldscope", sizeof("ldscope"));
 
-    if ((status = extractMemToChildNamespace(ldscopeMem, ldscopeSize, LDSCOPE_IN_HOST_NS, 0775)) == FALSE) {
+    // create "ldscope" on host
+    if ((status = extractMemToChildNamespace(ldscopeMem, ldscopeSize, path, 0775)) == FALSE) {
         goto cleanupMem;
     }
 
-    if (scopeCfgMem) {
-        char scopeCfgPath[PATH_MAX] = {0};
-
-        scope_snprintf(scopeCfgPath, sizeof(scopeCfgPath), LDSCOPE_CONFIG_IN_HOST);
-        if ((status == extractMemToChildNamespace(scopeCfgMem, cfgSize, scopeCfgPath, 0664)) == FALSE) {
+    // create a "filter file" on host
+    scope_snprintf(hostFilterPath, PATH_MAX, "/usr/lib/appscope/scope_filter");
+    if ((status == extractMemToChildNamespace(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664)) == FALSE) {
+        scope_snprintf(hostFilterPath, PATH_MAX, "/tmp/scope_filter");
+        if ((status == extractMemToChildNamespace(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664)) == FALSE) {
             goto cleanupMem;
         }
-
-        // replace the SCOPE_CONF_PATH with namespace path
-        setenv("SCOPE_CONF_PATH", scopeCfgPath, 1);
     }
 
-    status = extractMemToChildNamespace(scopeMem, scopeSize, SCOPE_EXEC, 0775);
+    // create a "scope" on host
+    scope_snprintf(hostFilterPath, PATH_MAX, "%s/scope", hostBasePath);
+    status = extractMemToChildNamespace(scopeMem, scopeSize, hostFilterPath, 0775);
 
 cleanupMem:
 
     scope_munmap(ldscopeMem, ldscopeSize);
 
-    if (scopeCfgMem) scope_munmap(scopeCfgMem, cfgSize);
+    if (scopeFilterCfgMem) {
+        scope_munmap(scopeFilterCfgMem, cfgSize);
+    }
 
-    scope_munmap(scopeMem, scopeSize);
-
-    if (dirp) scope_closedir(dirp);
+    if (scopeMem) {
+        scope_munmap(scopeMem, scopeSize);
+    }
 
     return status;
 }
 
+ /*
+ * Verify if current running process runs in the container.
+ * Returns TRUE if process runs in the container FALSE otherwise
+ */
+static bool
+isRunningInContainer(void) {
+    struct stat st = {0};
+    return (scope_stat("/proc/2/comm", &st) != 0) ? TRUE : FALSE;
+}
+
+ /*
+ * Perform ldsope host start operation - this operation begins from container namespace.
+ *
+ * - switch namespace to host
+ * - create cron entry with filter file
+ *
+ * Returns exit code of operation
+ */
 int
 nsHostStart(void) {
+     if (isRunningInContainer() == FALSE) {
+        scope_fprintf(scope_stderr, "error: nsHostStart failed process is running on host\n");
+        return EXIT_FAILURE;
+    }
+    char scopePath[PATH_MAX] = {0};
+    char filterPath[PATH_MAX] = {0};
     scope_fprintf(scope_stdout, "Executing from a container, run the start command from the host\n");
 
-    if (joinHostNamespace() == FALSE) {
+    if (joinHostNamespace(scopePath, filterPath) == FALSE) {
         scope_fprintf(scope_stderr, "error: joinHostNamespace failed\n");
         return EXIT_FAILURE;
     }
 
-    createCron();
+    createCron(scopePath, filterPath);
 
     return EXIT_SUCCESS;
 }

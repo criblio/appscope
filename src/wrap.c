@@ -30,6 +30,7 @@
 #include "os.h"
 #include "plattime.h"
 #include "report.h"
+#include "setup.h"
 #include "scopeelf.h"
 #include "scopetypes.h"
 #include "state.h"
@@ -1594,11 +1595,19 @@ initSigErrorHandler(void)
 }
 
 /*
-* Look for a filter file in default locations
+* Look for an accessible filter file
 * returns NULL if none were accessible
+* TODO: this should be unified with nsGetFilterFilePath
+* the limitation is that object file which contains
+* the logic should be available for libscope.so/ldscopedyn/ldscope
 */
-static const char *
-getFilterPath(void) {
+static const char*
+libGetFilterPath(void) {
+    // Ignore filter path when SCOPE_FILTER is set
+    if (checkEnv("SCOPE_FILTER", "false") == TRUE) {
+        return NULL;
+    }
+    // use the defaults
     const char *const defaultFilterLoc[] = {
         "/usr/lib/appscope/scope_filter",
         "/tmp/scope_filter"
@@ -1612,6 +1621,7 @@ getFilterPath(void) {
 
     return NULL;
 }
+
 
 __attribute__((constructor)) void
 init(void)
@@ -1684,7 +1694,8 @@ init(void)
         scopedFlag = TRUE;
     } else {
         cfg = cfgCreateDefault();
-        filter_status_t res = cfgFilterStatus(g_proc.procname, g_proc.cmd, getFilterPath(), cfg);
+        const char *filterPath = libGetFilterPath();
+        filter_status_t res = cfgFilterStatus(g_proc.procname, g_proc.cmd, filterPath, cfg);
         switch (res) {
             case FILTER_SCOPED:
                 scopedFlag = TRUE;

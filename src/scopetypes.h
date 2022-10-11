@@ -192,11 +192,14 @@ typedef struct
 // Unpublished scope env vars that are not processed by config:
 //    SCOPE_APP_TYPE                 internal use only
 //    SCOPE_EXEC_TYPE                internal use only
+//    SCOPE_FILTER                   "false" disables handling the filter file
+//                                   TODO: add handling other values as a path to a filter file
 //    SCOPE_EXECVE                   "false" disables scope of child procs
 //    SCOPE_EXEC_PATH                specifies path to ldscope executable
 //    SCOPE_CRIBL_NO_BREAKER         adds breaker property to process start message
 //    SCOPE_LIB_PATH                 specifies path to libscope.so library
 //    SCOPE_GO_STRUCT_PATH           for internal testing
+//    SCOPE_CLI_SKIP_START_HOST      for internal testing (when set skip the start host operation from container)
 //    SCOPE_HTTP_SERIALIZE_ENABLE    "true" adds guard for race condition
 //    SCOPE_NO_SIGNAL                if defined, timer for USR2 is not set
 //    SCOPE_PERF_PRESERVE            "true" processes at 10s instead of 1ms
@@ -206,7 +209,6 @@ typedef struct
 //    SCOPE_ALLOW_CONSTRUCT_DBG      allows debug inside the constructor
 //    SCOPE_ERROR_SIGNAL_HANDLER     allows to register SIGSEGV&SIGBUS handler
 //    SCOPE_QUEUE_LENGTH             override default circular buffer sizes
-
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"
 

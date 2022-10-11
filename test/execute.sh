@@ -4,23 +4,6 @@ NUM=0
 INFOLIST=""
 ENVVARS=""
 
-#######################################
-# Check for existence of filter files
-#######################################
-check_filter_existence() {
-    declare -a default_filter_loc=(
-        "/usr/lib/appscope/scope_filter"
-        "/tmp/scope_filter"
-    )
-    for filter_loc in "${default_filter_loc[@]}"
-    do
-        if [ -f "$filter_loc" ]; then
-            echo "filter file $filter_loc exists to run AppScope tests. Please remove the $filter_loc file"
-            exit 1
-        fi
-    done
-}
-
 accumulate_coverage() {
     # This function accumulates coverage info (gcda files) from test
     # to test.  It merges new coverage info (current dir) into coverage
@@ -58,9 +41,6 @@ run_test() {
 
 CWD="$(pwd)"
 
-# verify the test environment
-check_filter_existence
-
 if [ -d $CWD/coverage ]; then
     rm -rf $CWD/coverage
 fi
@@ -83,6 +63,8 @@ fi
 declare -i ERR=0
 
 run_test test/${OS}/vdsotest
+run_test test/${OS}/libvertest
+run_test test/${OS}/libdirtest
 run_test test/${OS}/strsettest
 run_test test/${OS}/cfgutilstest
 run_test test/${OS}/cfgtest
@@ -110,7 +92,7 @@ run_test test/${OS}/selfinterposetest
 
 if [ "${OS}" = "linux" ]; then
     SAVEVARS=$ENVARS
-    ENVVARS=$ENVVARS"LD_PRELOAD=./lib/linux/$(uname -m)/libscope.so ""SCOPE_CRIBL_ENABLE=false ""SCOPE_METRIC_DEST=file:///tmp/dnstest.log ""SCOPE_METRIC_VERBOSITY=9 ""SCOPE_SUMMARY_PERIOD=1 "
+    ENVVARS=$ENVVARS"LD_PRELOAD=./lib/linux/$(uname -m)/libscope.so ""SCOPE_FILTER=false ""SCOPE_CRIBL_ENABLE=false ""SCOPE_METRIC_DEST=file:///tmp/dnstest.log ""SCOPE_METRIC_VERBOSITY=9 ""SCOPE_SUMMARY_PERIOD=1 "
     run_test test/${OS}/dnstest
     ENVARS=$SAVEVARS
     rm -f "/tmp/dnstest.log"

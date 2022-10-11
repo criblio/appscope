@@ -183,14 +183,28 @@ returns 0
 endtest
 
 #
+# Scope start no force
+#
+starttest "Scope start no force"
+
+# Scope start
+run scope start
+outputs "If you wish to proceed, run again with the -f flag."
+returns 0
+
+endtest
+
+#
 # Scope start no input
 #
 starttest "Scope start no input"
 
 # Scope start
-run scope start
-outputs "missing filter data"
+run scope start -f
+outputs "Exiting due to start failure"
 returns 1
+scope logs -s | grep -q "Missing filter data"
+ERR+=$?
 
 endtest
 
@@ -199,10 +213,29 @@ endtest
 #
 starttest "Scope start empty file pipeline"
 
-OUT=$(cat /opt/test-runner/empty_file | scope start 2>/dev/null)
+OUT=$(cat /opt/test-runner/empty_file | scope start -f 2>&1)
 RET=$?
-outputs "missing filter data"
+outputs "Exiting due to start failure"
 returns 1
+scope logs -s | grep -q "Missing filter data"
+ERR+=$?
+
+endtest
+
+#
+# Scope start empty file redirect
+#
+starttest "Scope start empty file redirect"
+
+OUT=$(scope start -f < /opt/test-runner/empty_file 2>&1)
+RET=$?
+outputs "Exiting due to start failure"
+scope logs -s | grep -q "Missing filter data"
+ERR+=$?
+returns 1
+
+endtest
+
 # Scope detach by name
 #
 starttest "Scope detach by name"
@@ -230,18 +263,6 @@ starttest "Scope reattach by name"
 run scope attach sleep
 outputs "Reattaching to pid ${sleep_pid}"
 returns 0
-
-endtest
-
-#
-# Scope start empty file redirect
-#
-starttest "Scope start empty file redirect"
-
-OUT=$(scope start < /opt/test-runner/empty_file 2>/dev/null)
-RET=$?
-outputs "missing filter data"
-returns 1
 
 endtest
 

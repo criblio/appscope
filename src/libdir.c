@@ -79,46 +79,6 @@ typedef struct
 // Internal
 // ----------------------------------------------------------------------------
 
-// Get version directory name
-// - Sets global ver
-static const char *
-libdirGetVer()
-{
-    if (!g_libdir_info.ver[0])
-    {
-        char *ver = SCOPE_VER;
-        char *dash;
-        size_t verlen;
-
-        if (*ver == 'v')
-        {
-            ++ver;
-        }
-
-        if ((dash = scope_strchr(ver, '-')))
-        {
-            verlen = dash - ver;
-        }
-        else
-        {
-            verlen = scope_strlen(ver);
-        }
-
-        if (verlen > PATH_MAX - 1)
-        { // -1 for \0
-            scope_fprintf(scope_stderr, "error: libdir too long\n");
-            return 0;
-        }
-
-        const char *version = libverNormalizedVersion(ver);
-
-        scope_strncpy(g_libdir_info.ver, version, scope_strlen(version));
-        g_libdir_info.ver[verlen] = '\0';
-    }
-
-    return g_libdir_info.ver;
-}
-
 static note_t *
 libdirGetNote(file_t file)
 {
@@ -366,16 +326,10 @@ end:
     return res;
 }
 
-// Set custom base directory of library
+// Set custom base directory of the library
 // - Sets global base
-int libdirSetBase(file_t file, const char *base)
+int libdirSetLibraryBase(const char *base)
 {
-    g_libdir_info.ver[0] = 0;
-    g_libdir_info.lib_base[0] = 0;
-    g_libdir_info.lib_path[0] = 0;
-    g_libdir_info.ld_base[0] = 0;
-    g_libdir_info.ld_path[0] = 0;
-
     if (base)
     {
         if (scope_strlen(base) >= PATH_MAX)
@@ -383,16 +337,8 @@ int libdirSetBase(file_t file, const char *base)
             scope_fprintf(scope_stderr, "error: libdir base path too long.\n");
             return -1;
         }
-        if (file == LOADER_FILE)
-        {
-            scope_strncpy(g_libdir_info.ld_base, base, sizeof(g_libdir_info.ld_base));
-            return 0;
-        }
-        else
-        {
-            scope_strncpy(g_libdir_info.lib_base, base, sizeof(g_libdir_info.lib_base));
-            return 0;
-        }
+        scope_strncpy(g_libdir_info.lib_base, base, sizeof(g_libdir_info.lib_base));
+        return 0;
     }
 
     return -1;
@@ -403,7 +349,7 @@ int libdirSetBase(file_t file, const char *base)
 const char *
 libdirGetPath(file_t file)
 {
-    const char *ver = libdirGetVer();
+    const char *ver = libverNormalizedVersion(SCOPE_VER);
     char tmp_path[PATH_MAX];
     ;
     char *path;
@@ -434,12 +380,12 @@ libdirGetPath(file_t file)
         if (pathLen < 0)
         {
             scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
-            return 0;
+            return NULL;
         }
         if (pathLen >= PATH_MAX)
         {
             scope_fprintf(scope_stderr, "error: path too long.\n");
-            return 0;
+            return NULL;
         }
         if (!scope_access(tmp_path, R_OK))
         {
@@ -453,12 +399,12 @@ libdirGetPath(file_t file)
     if (pathLen < 0)
     {
         scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
-        return 0;
+        return NULL;
     }
     if (pathLen >= PATH_MAX)
     {
         scope_fprintf(scope_stderr, "error: path too long.\n");
-        return 0;
+        return NULL;
     }
     if (!scope_access(tmp_path, R_OK))
     {
@@ -471,12 +417,12 @@ libdirGetPath(file_t file)
     if (pathLen < 0)
     {
         scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
-        return 0;
+        return NULL;
     }
     if (pathLen >= PATH_MAX)
     {
         scope_fprintf(scope_stderr, "error: path too long.\n");
-        return 0;
+        return NULL;
     }
     if (!scope_access(tmp_path, R_OK))
     {
@@ -484,10 +430,11 @@ libdirGetPath(file_t file)
         return path;
     }
 
-    return 0;
+    return NULL;
 }
 
-// Does not extract to a custom base
+// Extract file to the filesystem
+// Will not extract files to a custom base
 // - Sets global base
 // - Sets global path
 int libdirExtract(file_t file)
@@ -503,7 +450,7 @@ int libdirExtract(file_t file)
         }
     }
 
-    const char *ver = libdirGetVer();
+    const char *ver = libverNormalizedVersion(SCOPE_VER);
     char tmp_dir[PATH_MAX];
     char tmp_path[PATH_MAX];
     char *filename;

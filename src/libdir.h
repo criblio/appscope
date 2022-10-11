@@ -22,8 +22,8 @@ typedef enum {
 } mkdir_status_t;
 
 mkdir_status_t libdirCreateDirIfMissing(const char *dir);
-int libdirSetBase(file_t file, const char *base);         // Override default base dir i.e. /tmp
-int libdirExtract(file_t file);                           // Extracts file to default path
-const char *libdirGetPath(file_t file);                   // Get full path to existing file
+int libdirSetLibraryBase(const char *base); // Override default library base dir i.e. /tmp
+int libdirExtract(file_t file);             // Extracts file to default path
+const char *libdirGetPath(file_t file);     // Get full path to existing file
 
 #endif // _SCOPE_LIBDIR_H

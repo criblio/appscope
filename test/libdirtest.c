@@ -98,7 +98,11 @@ CreateDirIfMissingSuccessCreated(void **state) {
 }
 
 static void
-SetBase(void **state) {
+SetLibraryBaseValid(void **state) {
+}
+
+static void
+SetLibraryBaseNull(void **state) {
 }
 
 static void
@@ -107,6 +111,10 @@ ExtractNewFile(void **state) {
 
 static void
 ExtractFileExists(void **state) {
+}
+
+static void
+ExtractFileNoPerms(void **state) {
 }
 
 static void
@@ -122,35 +130,11 @@ GetPathNoFile(void **state) {
 }
 
 static void
-CheckIfDirExistsDirExists(void **state) {
-}
-
-static void
-CheckIfDirExistsNoDir(void **state) {
-}
-
-static void
 CreateFileIfMissingNewFile(void **state) {
 }
 
 static void
 CreateFileIfMissingFileExists(void **state) {
-}
-
-static void
-CheckNoteBadNote(void **state) {
-}
-
-static void
-CheckNoteGoodNote(void **state) {
-}
-
-static void
-GetNote(void **state) {
-}
-
-static void
-GetVer(void **state) {
 }
 
 

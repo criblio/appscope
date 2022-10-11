@@ -433,6 +433,13 @@ libdirGetPath(file_t file)
     return NULL;
 }
 
+// Save libscope.so in specified path.
+// Returns 0 if file was successfully created or if file already exists, -1 in case of failure
+int
+libdirSaveLibraryFile(const char *libraryPath) {
+    return libdirCreateFileIfMissing(LIBRARY_FILE, libraryPath);
+}
+
 // Extract file to the filesystem
 // Will not extract files to a custom base
 // - Sets global base

@@ -25,5 +25,6 @@ mkdir_status_t libdirCreateDirIfMissing(const char *dir);
 int libdirSetLibraryBase(const char *base); // Override default library base dir i.e. /tmp
 int libdirExtract(file_t file);             // Extracts file to default path
 const char *libdirGetPath(file_t file);     // Get full path to existing file
+int libdirSaveLibraryFile(const char *);    // Save libscope.so to specified path
 
 #endif // _SCOPE_LIBDIR_H

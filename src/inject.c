@@ -258,7 +258,7 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
             ret = EXIT_SUCCESS;
             //printf("Appscope library injected at %p\n", (void*)RET_REG);
         } else {
-            scope_fprintf(scope_stderr, "error: dlopen() failed, library could not be injected\n");
+            scope_fprintf(scope_stderr, "error: dlopen() failed, library could not be injected pid: %d path: %s\n", pid, path);
         }
 
     } else {

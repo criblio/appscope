@@ -14,14 +14,6 @@
 #define SYSTEMD_DIR "/etc/systemd"
 #define INITD_DIR "/etc/init.d"
 
-/*
- * TODO: Refactor this hardcoded path
- * This can be consolidated with libdir.c but required
- * further cleaning like reverse return logic in libdirExists
- */
-
-#define FILTER_LOC "/usr/lib/appscope/scope_filter"
-
 typedef enum {
     SERVICE_CFG_ERROR,
     SERVICE_CFG_NEW,
@@ -450,16 +442,16 @@ setupProfile(const char* libscopePath) {
 }
 
  /*
- * Extract memory to filter file /usr/lib/appscope/scope_filter
+ * Extract memory to specific filter path file
  *
  * Returns status of operation TRUE in case of success, FALSE otherwise
  */
 static bool
-setupExtractFilterFile(void *filterFileMem, size_t filterSize) {
+setupExtractFilterFile(void *filterFileMem, size_t filterSize, const char *outputFilterPath) {
     int filterFd;
     bool status = FALSE;
 
-    if ((filterFd = scope_open(FILTER_LOC, O_RDWR | O_CREAT, 0664)) == -1) {
+    if ((filterFd = scope_open(outputFilterPath, O_RDWR | O_CREAT, 0664)) == -1) {
         scope_perror("scope_open failed");
         return status;
     }
@@ -560,40 +552,42 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
 
     // Create destination directory if not exists
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+ 
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
     mkdir_status_t res = libdirCreateDirIfMissing(path);
-    if (res == MKDIR_STATUS_ERR_OTHER) {
-        scope_fprintf(scope_stderr, "setupConfigure: libdirCreateDirIfMissing failed\n");
-        return -1;
+    if (res > MKDIR_STATUS_EXISTS) {
+        scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
+        mkdir_status_t res = libdirCreateDirIfMissing(path);
+        if (res > MKDIR_STATUS_EXISTS) {
+            scope_fprintf(scope_stderr, "setupConfigure: libdirCreateDirIfMissing failed\n");
+            return -1;
+        }
     }
     scope_strncat(path, "libscope.so", sizeof("libscope.so"));
 
-    // Extract the filter file to /usr/lib/appscope/scope_filter
-    if (setupExtractFilterFile(filterFileMem, filterSize) == FALSE) {
-        scope_fprintf(scope_stderr, "setup filter file failed\n");
-        return -1;
+    // Extract[create] the filter file to filter location
+    if (setupExtractFilterFile(filterFileMem, filterSize, "/usr/lib/appscope/scope_filter") == FALSE) {
+        if (setupExtractFilterFile(filterFileMem, filterSize, "/tmp/scope_filter") == FALSE) {
+            scope_fprintf(scope_stderr, "setupConfigure: setup filter file failed\n");
+            return -1;
+        }
     }
 
     // Setup /etc/profile.d/scope.sh
     if (setupProfile(path) == FALSE) {
-        scope_fprintf(scope_stderr, "setupProfile failed\n");
+        scope_fprintf(scope_stderr, "setupConfigure: setupProfile failed\n");
         return -1;
     }
 
-    // Extract libscope.so to /usr/lib/appscope/libscope.so (and ldscopedyn)
-    // Creates /usr/lib/appscope if it doesn't exist, and we're root
-    if (libdirExtract(LIBRARY_FILE)) {
-        scope_fprintf(scope_stderr, "extract libscope.so failed\n");
-        return -1;
-    }
-    if (scope_strcmp(libdirGetPath(LIBRARY_FILE), path)) {
-        scope_fprintf(scope_stderr, "extract libscope.so failed: unwanted location\n");
+    // Extract libscope.so
+    if (libdirSaveLibraryFile(path)) {
+        scope_fprintf(scope_stderr, "setupConfigure: saving %s failed\n", path);
         return -1;
     }
 
     // Patch the library
     if (loaderOpPatchLibrary(path) == PATCH_FAILED) {
-        scope_fprintf(scope_stderr, "patch libscope.so failed\n");
+        scope_fprintf(scope_stderr, "setupConfigure: patch %s failed\n, path");
         return -1;
     }
 

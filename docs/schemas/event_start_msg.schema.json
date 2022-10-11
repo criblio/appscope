@@ -4,7 +4,7 @@
   "type": "object",
   "title": "AppScope Start message",
   "description": "Structure of the start message",
-  "examples": [{"format":"ndjson","info":{"process":{"libscopever":"v1.1.0","pid":35673,"ppid":3390,"gid":1000,"groupname":"test_user","uid":1000,"username":"test_user","hostname":"test_user","procname":"ls","cmd":"ls --color=auto","id":"test_user-ls-ls --color=auto","machine_id":"a1e2ada5a5b1b273b4b5c0c2c1c4f5d1","uuid":"da845a9b-a55d-4c42-893d-08b54ee6e999"},"configuration":{"current":{"metric":{"enable":"true","transport":{"type":"udp","host":"127.0.0.1","port":"8125","tls":{"enable":"false","validateserver":"true","cacertpath":""}},"format":{"type":"statsd","statsdprefix":"","statsdmaxlen":512,"verbosity":4},"watch":[{"type":"fs"},{"type":"net"},{"type":"http"},{"type":"dns"},{"type":"process"},{"type":"statsd"}]},"libscope":{"log":{"level":"info","transport":{"type":"file","path":"/tmp/scope.log","buffering":"line"}},"configevent":"true","summaryperiod":10,"commanddir":"/tmp"},"event":{"enable":"true","transport":{"type":"tcp","host":"127.0.0.1","port":"9109","tls":{"enable":"false","validateserver":"true","cacertpath":""}},"format":{"type":"ndjson","maxeventpersec":10000,"enhancefs":"true"},"watch":[{"type":"file","name":"(\\/logs?\\/)|(\\.log$)|(\\.log[.\\d])","field":".*","value":".*"},{"type":"console","name":"(stdout)|(stderr)","field":".*","value":".*","allowbinary":"true"},{"type":"http","name":".*","field":".*","value":".*","headers":[]},{"type":"net","name":".*","field":".*","value":".*"},{"type":"fs","name":".*","field":".*","value":".*"},{"type":"dns","name":".*","field":".*","value":".*"}]},"payload":{"enable":"false","dir":"/tmp"},"tags":{},"protocol":[],"cribl":{"enable":"false","transport":{"type":"edge"},"authtoken":""}}},"environment":{}}}],
+  "examples": [{"format":"ndjson","info":{"process":{"libscopever":"v1.1.0","pid":35673,"ppid":3390,"gid":1000,"groupname":"test_user","uid":1000,"username":"test_user","hostname":"test_user","procname":"ls","cmd":"ls --color=auto","id":"test_user-ls-ls --color=auto","cgroup":"9:cpuset:/","machine_id":"a1e2ada5a5b1b273b4b5c0c2c1c4f5d1","uuid":"da845a9b-a55d-4c42-893d-08b54ee6e999"},"configuration":{"current":{"metric":{"enable":"true","transport":{"type":"udp","host":"127.0.0.1","port":"8125","tls":{"enable":"false","validateserver":"true","cacertpath":""}},"format":{"type":"statsd","statsdprefix":"","statsdmaxlen":512,"verbosity":4},"watch":[{"type":"fs"},{"type":"net"},{"type":"http"},{"type":"dns"},{"type":"process"},{"type":"statsd"}]},"libscope":{"log":{"level":"info","transport":{"type":"file","path":"/tmp/scope.log","buffering":"line"}},"configevent":"true","summaryperiod":10,"commanddir":"/tmp"},"event":{"enable":"true","transport":{"type":"tcp","host":"127.0.0.1","port":"9109","tls":{"enable":"false","validateserver":"true","cacertpath":""}},"format":{"type":"ndjson","maxeventpersec":10000,"enhancefs":"true"},"watch":[{"type":"file","name":"(\\/logs?\\/)|(\\.log$)|(\\.log[.\\d])","field":".*","value":".*"},{"type":"console","name":"(stdout)|(stderr)","field":".*","value":".*","allowbinary":"true"},{"type":"http","name":".*","field":".*","value":".*","headers":[]},{"type":"net","name":".*","field":".*","value":".*"},{"type":"fs","name":".*","field":".*","value":".*"},{"type":"dns","name":".*","field":".*","value":".*"}]},"payload":{"enable":"false","dir":"/tmp"},"tags":{},"protocol":[],"cribl":{"enable":"false","transport":{"type":"edge"},"authtoken":""}}},"environment":{}}}],
   "required": [
     "format",
     "info"
@@ -45,6 +45,7 @@
             "procname",
             "cmd",
             "id",
+            "cgroup",
             "machine_id",
             "uuid"
           ],
@@ -81,6 +82,9 @@
             },
             "id": {
               "$ref": "definitions/data.schema.json#/$defs/id"
+            },
+            "cgroup": {
+              "$ref": "definitions/data.schema.json#/$defs/cgroup"
             },
             "machine_id": {
               "$ref": "definitions/data.schema.json#/$defs/machine_id"

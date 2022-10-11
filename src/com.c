@@ -173,6 +173,7 @@ jsonProcessObject(proc_id_t *proc)
         if (!(cJSON_AddStringToObjLN(root, "cmd", proc->cmd))) goto err;
     }
     if (!(cJSON_AddStringToObjLN(root, "id", proc->id))) goto err;
+    if (!(cJSON_AddStringToObjLN(root, "cgroup", proc->cgroup))) goto err;
     if (!(cJSON_AddStringToObjLN(root, "machine_id", proc->machine_id))) goto err;
     if (!(cJSON_AddStringToObjLN(root, "uuid", proc->uuid))) goto err;
  

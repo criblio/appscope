@@ -178,11 +178,13 @@ libdirCheckNote(file_t file, const char *path)
     return cmp; // 0 if notes match
 }
 
+
+// 
 static int
-libdirCreateFileIfMissing(file_t file, const char *path)
+libdirCreateFileIfMissing(file_t file, const char *path, bool overwrite)
 {
     // Check if file exists
-    if (!scope_access(path, R_OK))
+    if (!scope_access(path, R_OK) && !overwrite)
     {
         return 0; // File exists
     }
@@ -307,7 +309,7 @@ libdirInit(const char *installBase, const char *tmpBase)
         }
         else
         {
-            scope_strncpy(g_libdir_info.tmp_base, tmpBase, scope_strlen(tmpBase));
+            scope_strncpy(g_libdir_info.tmp_base, tmpBase, len);
         }
     }
     return err;
@@ -485,8 +487,8 @@ libdirGetPath(file_t file)
 // Save libscope.so in specified path.
 // Returns 0 if file was successfully created or if file already exists, -1 in case of failure
 int
-libdirSaveLibraryFile(const char *libraryPath) {
-    return libdirCreateFileIfMissing(LIBRARY_FILE, libraryPath);
+libdirSaveLibraryFile(const char *libraryPath, bool overwrite) {
+    return libdirCreateFileIfMissing(LIBRARY_FILE, libraryPath, overwrite);
 }
 
 // Extract file to the filesystem
@@ -549,7 +551,7 @@ int libdirExtract(file_t file)
             scope_fprintf(scope_stderr, "error: path too long.\n");
             return -1;
         }
-        if (!libdirCreateFileIfMissing(file, tmp_path))
+        if (!libdirCreateFileIfMissing(file, tmp_path, libverIsNormVersionDev(ver)))
         {
             scope_strncpy(path, tmp_path, PATH_MAX);
             scope_strncpy(base, g_libdir_info.install_base, PATH_MAX);
@@ -581,7 +583,7 @@ int libdirExtract(file_t file)
             scope_fprintf(scope_stderr, "error: path too long.\n");
             return -1;
         }
-        if (!libdirCreateFileIfMissing(file, tmp_path))
+        if (!libdirCreateFileIfMissing(file, tmp_path, libverIsNormVersionDev(ver)))
         {
             scope_strncpy(path, tmp_path, PATH_MAX);
             scope_strncpy(base, g_libdir_info.tmp_base, PATH_MAX);

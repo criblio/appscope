@@ -5,18 +5,23 @@
 #include <string.h>
 #include "libver.h"
 #include "test.h"
+#include "scopetypes.h"
 #include "scopestdlib.h"
 
 static void
 normalizedVersionOfficialTest(void **state) {
     const char *version = libverNormalizedVersion("v1.2.0");
     assert_string_equal(version, "1.2.0");
+    bool status = libverIsNormVersionDev(version);
+    assert_int_equal(status, FALSE);
 }
 
 static void
 normalizedVersionDevTest(void **state) {
     const char *version = libverNormalizedVersion("web-1.1.3-239-g2dfb6670bc1f");
     assert_string_equal(version, "dev");
+    bool status = libverIsNormVersionDev(version);
+    assert_int_equal(status, TRUE);
 }
 
 static void

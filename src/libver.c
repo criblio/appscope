@@ -34,3 +34,12 @@ libverNormalizedVersion(const char *version) {
     }
     return version;
 }
+
+/*
+ * Check if normalized version is a dev version
+ * Returns TRUE if it is a dev version other values if not
+ */
+bool
+libverIsNormVersionDev(const char *normVersion) {
+    return !scope_strncmp(normVersion, "dev", sizeof("dev"));
+}

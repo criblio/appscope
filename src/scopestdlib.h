@@ -107,6 +107,7 @@ void* scope_memcpy(void *, const void *, size_t);
 int   scope_mlock(const void *, size_t);
 int   scope_msync(void *, size_t, int);
 int   scope_mincore(void *, size_t, unsigned char *);
+int   scope_memfd_create(const char *, unsigned int);
 
 // File handling operations
 FILE*          scope_fopen(const char *, const char *);

@@ -7,6 +7,8 @@
 #ifndef _SCOPE_LIBDIR_H
 #define _SCOPE_LIBDIR_H 1
 
+#include <linux/limits.h>
+
 // File types
 typedef enum {
     LIBRARY_FILE, // libscope.so
@@ -21,10 +23,11 @@ typedef enum {
     MKDIR_STATUS_ERR_OTHER = 4,         // Error: Other
 } mkdir_status_t;
 
+int libdirInit(const char *installBase, const char *tmpBase); // Override defaults
 mkdir_status_t libdirCreateDirIfMissing(const char *dir);
-int libdirSetLibraryBase(const char *base); // Override default library base dir i.e. /tmp
-int libdirExtract(file_t file);             // Extracts file to default path
-const char *libdirGetPath(file_t file);     // Get full path to existing file
-int libdirSaveLibraryFile(const char *);    // Save libscope.so to specified path
+int libdirSetLibraryBase(const char *base);                   // Override default library base search dir i.e. /tmp
+int libdirExtract(file_t file);                               // Extracts file to default path
+const char *libdirGetPath(file_t file);                       // Get full path to existing file
+int libdirSaveLibraryFile(const char *);                      // Save libscope.so to specified path
 
 #endif // _SCOPE_LIBDIR_H

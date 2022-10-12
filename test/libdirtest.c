@@ -4,8 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include "libdir.h"
+#include "libver.h"
 #include "test.h"
 #include "scopestdlib.h"
+
+#define TEST_INSTALL_BASE "/tmp/appscope-test/install"
+#define TEST_TMP_BASE "/tmp/appscope-test/tmp"
 
 /*
  * Define the extern offset for integration test compilation 
@@ -98,45 +102,84 @@ CreateDirIfMissingSuccessCreated(void **state) {
 }
 
 static void
-SetLibraryBaseValid(void **state) {
+SetLibraryBaseInvalid(void **state) {
+    int res = libdirSetLibraryBase("/does_not_exist");
+    assert_int_equal(res, -1);
 }
 
 static void
 SetLibraryBaseNull(void **state) {
+    int res = libdirSetLibraryBase("");
+    assert_int_equal(res, -1);
 }
 
 static void
 ExtractNewFile(void **state) {
+    libdirInit(TEST_INSTALL_BASE, TEST_TMP_BASE);
+    const char *ver = libverNormalizedVersion(SCOPE_VER);
+    char expected_location[PATH_MAX];
+    struct stat dirStat = {0};
+
+    int res = libdirExtract(LIBRARY_FILE);
+    assert_int_equal(res, 0);
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, ver, "libscope.so");
+    res = scope_stat(expected_location, &dirStat);
+    assert_int_equal(res, 0);
+    // scope_remove(expected_location);
+    
+    res = libdirExtract(LOADER_FILE);
+    assert_int_equal(res, 0);
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, ver, "ldscopedyn");
+    res = scope_stat(expected_location, &dirStat);
+    assert_int_equal(res, 0);
+    // scope_remove(expected_location);
 }
 
+// depends on ExtractNewFile
 static void
 ExtractFileExists(void **state) {
+    libdirInit(TEST_INSTALL_BASE, TEST_TMP_BASE);
+    const char *ver = libverNormalizedVersion(SCOPE_VER);
+    char expected_location[PATH_MAX];
+    struct stat dirStat = {0};
+
+    int res = libdirExtract(LIBRARY_FILE);
+    assert_int_equal(res, 0);
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, ver, "libscope.so");
+    res = scope_stat(expected_location, &dirStat);
+    assert_int_equal(res, 0);
+    scope_remove(expected_location);
+    
+    res = libdirExtract(LOADER_FILE);
+    assert_int_equal(res, 0);
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, ver, "ldscopedyn");
+    res = scope_stat(expected_location, &dirStat);
+    assert_int_equal(res, 0);
+    scope_remove(expected_location);
 }
 
+// depends on ExtractNewFile
 static void
-ExtractFileNoPerms(void **state) {
-}
+GetPath(void **state) {
+    const char *ver = libverNormalizedVersion(SCOPE_VER);
+    char expected_location[PATH_MAX];
 
-static void
-GetPathInstallPath(void **state) {
-}
-
-static void
-GetPathTmpPath(void **state) {
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, ver, "ldscopedyn");
+    const char *path = libdirGetPath(LOADER_FILE);
+    int res = scope_strcmp(expected_location, path);
+    assert_int_equal(res, 0);
 }
 
 static void
 GetPathNoFile(void **state) {
-}
+    libdirInit(TEST_INSTALL_BASE, TEST_TMP_BASE);
 
-static void
-CreateFileIfMissingNewFile(void **state) {
-}
+    const char *loader_path = libdirGetPath(LOADER_FILE);
+    assert_int_equal(loader_path, NULL);
 
-static void
-CreateFileIfMissingFileExists(void **state) {
+    const char *library_path = libdirGetPath(LIBRARY_FILE);
+    assert_int_equal(library_path, NULL);
 }
-
 
 int
 main(int argc, char* argv[]) {
@@ -150,20 +193,12 @@ main(int argc, char* argv[]) {
         cmocka_unit_test(CreateDirIfMissingAlreadyExists),
         cmocka_unit_test(CreateDirIfMissingAlreadyExistsPermIssue),
         cmocka_unit_test(CreateDirIfMissingSuccessCreated),
-        cmocka_unit_test(SetBase),
+        cmocka_unit_test(SetLibraryBaseInvalid),
+        cmocka_unit_test(SetLibraryBaseNull),
         cmocka_unit_test(ExtractNewFile),
         cmocka_unit_test(ExtractFileExists),
-        cmocka_unit_test(GetPathInstallPath),
-        cmocka_unit_test(GetPathTmpPath),
+        cmocka_unit_test(GetPath),
         cmocka_unit_test(GetPathNoFile),
-        cmocka_unit_test(CheckIfDirExistsDirExists),
-        cmocka_unit_test(CheckIfDirExistsNoDir),
-        cmocka_unit_test(CreateFileIfMissingNewFile),
-        cmocka_unit_test(CreateFileIfMissingFileExists),
-        cmocka_unit_test(CheckNoteBadNote),
-        cmocka_unit_test(CheckNoteGoodNote),
-        cmocka_unit_test(GetNote),
-        cmocka_unit_test(GetVer),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

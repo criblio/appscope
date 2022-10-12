@@ -144,18 +144,12 @@ outputs "missing required value for -l option"
 returns 1
 
 run ./bin/linux/${ARCH}/ldscope -l /does_not_exist echo 
-outputs "No such file or directory"
-outputs "failed to extract"
 returns 1
 
 run ./bin/linux/${ARCH}/ldscope --libbasedir /does_not_exist echo 
-outputs "No such file or directory"
-outputs "failed to extract"
 returns 1
 
 run ./bin/linux/${ARCH}/ldscope -f /does_not_exist echo 
-outputs "No such file or directory"
-outputs "failed to extract"
 returns 1
 
 run ./bin/linux/${ARCH}/ldscope -a 

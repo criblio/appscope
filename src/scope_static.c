@@ -622,7 +622,10 @@ main(int argc, char **argv, char **env)
             case 'f':
                 // accept -f as alias for -l for BC
             case 'l':
-                libdirSetLibraryBase(optarg);
+                if (libdirSetLibraryBase(optarg))
+                {
+                    return EXIT_FAILURE;
+                }
                 break;
             case 'p':
                 return (loaderOpPatchLibrary(optarg) == PATCH_SUCCESS) ? EXIT_SUCCESS : EXIT_FAILURE;

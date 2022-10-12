@@ -36,23 +36,20 @@
 #define SCOPE_LIBSCOPE_SO "libscope.so"
 #endif
 
-#ifndef SCOPE_TEMP_BASE
-#define SCOPE_TEMP_BASE "/tmp/appscope"
-#endif
-
-#ifndef SCOPE_INSTALL_BASE
-#define SCOPE_INSTALL_BASE "/usr/lib/appscope"
-#endif
-
 // private global state
 static struct
 {
-    char ver[PATH_MAX];      // name of the subdirectory under base i.e. 1.0.0
-    char lib_base[PATH_MAX]; // full path to the library base directory i.e. /tmp/appscope or /usr/lib/appscope
-    char lib_path[PATH_MAX]; // full path to the library file
-    char ld_base[PATH_MAX];  // full path to the loader base directory i.e. /tmp/appscope or /usr/lib/appscope
-    char ld_path[PATH_MAX];  // full path to the loader file
-} g_libdir_info;
+    char ver[PATH_MAX];          // name of the subdirectory under base i.e. 1.0.0
+    char lib_base[PATH_MAX];     // full path to the actual library base directory i.e. /tmp/appscope or /usr/lib/appscope
+    char lib_path[PATH_MAX];     // full path to the actual library file
+    char ld_base[PATH_MAX];      // full path to the actual loader base directory i.e. /tmp/appscope or /usr/lib/appscope
+    char ld_path[PATH_MAX];      // full path to the actual loader file
+    char install_base[PATH_MAX]; // full path to the desired install base directory
+    char tmp_base[PATH_MAX];     // full path to the desired tmp base directory
+} g_libdir_info = {
+    .install_base = "/usr/lib/appscope", // default install base
+    .tmp_base = "/tmp/appscope",         // default tmp base
+};
 
 // We use `objcopy` in the Makefile to get `ldscopedyn` into an object we then
 // link into the `ldscope` binary. These globals them point to the start and
@@ -275,6 +272,47 @@ libdirCheckIfDirExists(const char *absDirPath)
 // External
 // ----------------------------------------------------------------------------
 
+int
+libdirInit(const char *installBase, const char *tmpBase)
+{
+    g_libdir_info.ver[0] = 0;
+    g_libdir_info.lib_base[0] = 0;
+    g_libdir_info.lib_path[0] = 0;
+    g_libdir_info.ld_base[0] = 0;
+    g_libdir_info.ld_path[0] = 0;
+    g_libdir_info.install_base[0] = 0;
+    g_libdir_info.tmp_base[0] = 0;
+                                              
+    int err = 0;
+    if (installBase)
+    {
+        int len = scope_strlen(installBase);
+        if (len >= PATH_MAX)
+        {
+            scope_fprintf(scope_stderr, "error: installBase path too long.\n");
+            err -= 1;
+        }
+        else
+        {
+            scope_strncpy(g_libdir_info.install_base, installBase, len);
+        }
+    }
+    if (tmpBase)
+    {
+        int len = scope_strlen(tmpBase);
+        if (len >= PATH_MAX)
+        {
+            scope_fprintf(scope_stderr, "error: tmpBase path too long.\n");
+            err -= 1;
+        }
+        else
+        {
+            scope_strncpy(g_libdir_info.tmp_base, tmpBase, scope_strlen(tmpBase));
+        }
+    }
+    return err;
+}
+
 // Create a directory in following absolute path creating any intermediate directories as necessary
 // Returns operation status
 mkdir_status_t
@@ -330,15 +368,27 @@ end:
 // - Sets global base
 int libdirSetLibraryBase(const char *base)
 {
-    if (base)
+    const char *ver = libverNormalizedVersion(SCOPE_VER);
+    char tmp_path[PATH_MAX];
+    
+    if (base[0])
     {
-        if (scope_strlen(base) >= PATH_MAX)
+        int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", base, ver, SCOPE_LIBSCOPE_SO);
+        if (pathLen < 0)
         {
-            scope_fprintf(scope_stderr, "error: libdir base path too long.\n");
+            scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
             return -1;
         }
-        scope_strncpy(g_libdir_info.lib_base, base, sizeof(g_libdir_info.lib_base));
-        return 0;
+        if (pathLen >= PATH_MAX)
+        {
+            scope_fprintf(scope_stderr, "error: path too long.\n");
+            return -1;
+        }
+        if (!scope_access(tmp_path, R_OK))
+        {
+            scope_strncpy(g_libdir_info.lib_base, base, PATH_MAX);
+            return 0;
+        }
     }
 
     return -1;
@@ -351,7 +401,6 @@ libdirGetPath(file_t file)
 {
     const char *ver = libverNormalizedVersion(SCOPE_VER);
     char tmp_path[PATH_MAX];
-    ;
     char *path;
     char *base;
     char *filename;
@@ -395,7 +444,7 @@ libdirGetPath(file_t file)
     }
 
     // Check install base next
-    int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", SCOPE_INSTALL_BASE, ver, filename);
+    int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", g_libdir_info.install_base, ver, filename);
     if (pathLen < 0)
     {
         scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
@@ -413,7 +462,7 @@ libdirGetPath(file_t file)
     }
 
     // Check temp base next
-    pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", SCOPE_TEMP_BASE, ver, filename);
+    pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", g_libdir_info.tmp_base, ver, filename);
     if (pathLen < 0)
     {
         scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
@@ -476,7 +525,7 @@ int libdirExtract(file_t file)
         base = g_libdir_info.lib_base;
     }
 
-    int pathLen = scope_snprintf(tmp_dir, PATH_MAX, "%s/%s", SCOPE_INSTALL_BASE, ver);
+    int pathLen = scope_snprintf(tmp_dir, PATH_MAX, "%s/%s", g_libdir_info.install_base, ver);
     if (pathLen < 0)
     {
         scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
@@ -503,12 +552,12 @@ int libdirExtract(file_t file)
         if (!libdirCreateFileIfMissing(file, tmp_path))
         {
             scope_strncpy(path, tmp_path, PATH_MAX);
-            scope_strncpy(base, SCOPE_INSTALL_BASE, PATH_MAX);
+            scope_strncpy(base, g_libdir_info.install_base, PATH_MAX);
             return 0;
         }
     }
 
-    pathLen = scope_snprintf(tmp_dir, PATH_MAX, "%s/%s", SCOPE_TEMP_BASE, ver);
+    pathLen = scope_snprintf(tmp_dir, PATH_MAX, "%s/%s", g_libdir_info.tmp_base, ver);
     if (pathLen < 0)
     {
         scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
@@ -535,7 +584,7 @@ int libdirExtract(file_t file)
         if (!libdirCreateFileIfMissing(file, tmp_path))
         {
             scope_strncpy(path, tmp_path, PATH_MAX);
-            scope_strncpy(base, SCOPE_TEMP_BASE, PATH_MAX);
+            scope_strncpy(base, g_libdir_info.tmp_base, PATH_MAX);
             return 0;
         }
     }

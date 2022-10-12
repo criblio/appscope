@@ -799,18 +799,18 @@ main(int argc, char **argv, char **env)
     }
 
     // extract to the library directory
-    if (libdirExtract(LOADER_FILE)) {
+    if (libdirExtract(LOADER_FILE, SCOPE_VER)) {
         scope_fprintf(scope_stderr, "error: failed to extract loader\n");
         return EXIT_FAILURE;
     }
 
-    if (libdirExtract(LIBRARY_FILE)) {
+    if (libdirExtract(LIBRARY_FILE, SCOPE_VER)) {
         scope_fprintf(scope_stderr, "error: failed to extract library\n");
         return EXIT_FAILURE;
     }
 
     // setup for musl libc if detected
-    char *loader = (char *)libdirGetPath(LOADER_FILE);
+    char *loader = (char *)libdirGetPath(LOADER_FILE, SCOPE_VER);
     if (!loader) {
         scope_fprintf(scope_stderr, "error: failed to get a loader path\n");
         return EXIT_FAILURE;
@@ -847,7 +847,7 @@ main(int argc, char **argv, char **env)
         }
 
         // add the env vars we want in the library
-        scope_dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetPath(LIBRARY_FILE));
+        scope_dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetPath(LIBRARY_FILE, SCOPE_VER));
 
         int i;
         for (i = 0; environ[i]; i++) {
@@ -868,7 +868,7 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
-    execArgv[execArgc++] = (char *) libdirGetPath(LOADER_FILE);
+    execArgv[execArgc++] = (char *) libdirGetPath(LOADER_FILE, SCOPE_VER);
 
     if (attachArg) {
         if (attachType == 'a') {
@@ -886,7 +886,7 @@ main(int argc, char **argv, char **env)
     execArgv[execArgc++] = NULL;
 
     // pass SCOPE_LIB_PATH in environment
-    if (setenv("SCOPE_LIB_PATH", libdirGetPath(LIBRARY_FILE), 1)) {
+    if (setenv("SCOPE_LIB_PATH", libdirGetPath(LIBRARY_FILE, SCOPE_VER), 1)) {
         scope_perror("setenv(SCOPE_LIB_PATH) failed");
         return EXIT_FAILURE;
     }
@@ -899,7 +899,7 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
-    execve(libdirGetPath(LOADER_FILE), execArgv, environ);
+    execve(libdirGetPath(LOADER_FILE, SCOPE_VER), execArgv, environ);
 
     scope_free(execArgv);
     scope_perror("execve failed");

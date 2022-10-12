@@ -14,7 +14,7 @@
 typedef enum {
     LIBRARY_FILE, // libscope.so
     LOADER_FILE   // ldscopedyn
-} file_t;
+} libdirfile_t;
 
 typedef enum {
     MKDIR_STATUS_CREATED = 0,           // Path was created
@@ -24,11 +24,11 @@ typedef enum {
     MKDIR_STATUS_ERR_OTHER = 4,         // Error: Other
 } mkdir_status_t;
 
-int libdirInit(const char *installBase, const char *tmpBase); // Override defaults
-mkdir_status_t libdirCreateDirIfMissing(const char *dir);
-int libdirSetLibraryBase(const char *base);                   // Override default library base search dir i.e. /tmp
-int libdirExtract(file_t file);                               // Extracts file to default path
-const char *libdirGetPath(file_t file);                       // Get full path to existing file
-int libdirSaveLibraryFile(const char *, bool);                 // Save libscope.so to specified path overwrite
+int libdirInit(const char *, const char *);                   // Override defaults
+mkdir_status_t libdirCreateDirIfMissing(const char *);
+int libdirSetLibraryBase(const char *);                       // Override default library base search dir i.e. /tmp
+int libdirExtract(libdirfile_t, const char *);                // Extracts file to default path
+const char *libdirGetPath(libdirfile_t, const char *);        // Get full path to existing file
+int libdirSaveLibraryFile(const char *, bool);                // Save libscope.so to specified path overwrite
 
 #endif // _SCOPE_LIBDIR_H

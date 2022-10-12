@@ -18,11 +18,14 @@
  * Returns TRUE in case of success, FALSE otherwise.
  */
 static bool
-extractMemToChildNamespace(char *inputMem, size_t inputSize, const char *outFile, mode_t outPermFlag) {
+extractMemToChildNamespace(char *inputMem, size_t inputSize, const char *outFile, mode_t outPermFlag, bool overwrite) {
     bool status = FALSE;
     int outFd;
 
-    // TODO: Check if file exists ?
+    if (!scope_access(outFile, R_OK) && !overwrite)
+    {
+        return TRUE;
+    }
 
     if ((outFd = scope_open(outFile, O_RDWR | O_CREAT, outPermFlag)) == -1) {
         scope_perror("scope_open failed");
@@ -119,27 +122,28 @@ joinChildNamespace(pid_t hostPid) {
     }
 
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+    bool isDevVersion = libverIsNormVersionDev(loaderVersion);
 
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
     mkdir_status_t res = libdirCreateDirIfMissing(path);
-    if (res == MKDIR_STATUS_ERR_OTHER) {
+    if ((res > MKDIR_STATUS_EXISTS) || (isDevVersion)) {
         scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
         mkdir_status_t res = libdirCreateDirIfMissing(path);
-        if (res == MKDIR_STATUS_ERR_OTHER) {
+        if (res > MKDIR_STATUS_EXISTS) {
             goto cleanupMem;
         }
     }
 
     scope_strncat(path, "ldscope", sizeof("ldscope"));
 
-    status = extractMemToChildNamespace(ldscopeMem, ldscopeSize, path, 0775);
+    status = extractMemToChildNamespace(ldscopeMem, ldscopeSize, path, 0775, isDevVersion);
 
     if (scopeCfgMem) {
         char scopeCfgPath[PATH_MAX] = {0};
 
         // extract scope.yml configuration
         scope_snprintf(scopeCfgPath, sizeof(scopeCfgPath), "/tmp/scope%d.yml", hostPid);
-        status = extractMemToChildNamespace(scopeCfgMem, cfgSize, scopeCfgPath, 0664);
+        status = extractMemToChildNamespace(scopeCfgMem, cfgSize, scopeCfgPath, 0664, TRUE);
         // replace the SCOPE_CONF_PATH with namespace path
         setenv("SCOPE_CONF_PATH", scopeCfgPath, 1);
     }   
@@ -336,8 +340,10 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
         }
 
         const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+        bool isDevVersion = libverIsNormVersionDev(loaderVersion);
+
         scope_snprintf(loaderInChildPath, PATH_MAX, "/usr/lib/appscope/%s/ldscope", loaderVersion);
-        if (scope_access(loaderInChildPath, R_OK)) {
+        if (scope_access(loaderInChildPath, R_OK) || isDevVersion) {
             scope_snprintf(loaderInChildPath, PATH_MAX, "/tmp/appscope/%s/ldscope", loaderVersion);
             if (scope_access(loaderInChildPath, R_OK)) {
                 scope_fprintf(scope_stderr, "error: access ldscope failed\n");
@@ -548,9 +554,10 @@ joinHostNamespace(char *hostScopePath, char *hostFilterPath) {
     }
 
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+    bool isDevVersion = libverIsNormVersionDev(loaderVersion);
     // Load "scope" into memory
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/scope", loaderVersion);
-    if (scope_access(path, R_OK)) {
+    if ((scope_access(path, R_OK)) || (isDevVersion)) {
         scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/scope", loaderVersion);
         if (scope_access(path, R_OK)) {
             goto cleanupMem;
@@ -576,7 +583,7 @@ joinHostNamespace(char *hostScopePath, char *hostFilterPath) {
      */
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
     mkdir_status_t res = libdirCreateDirIfMissing(path);
-    if (res > MKDIR_STATUS_EXISTS) {
+    if ((res > MKDIR_STATUS_EXISTS) || (isDevVersion)) {
         scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
         mkdir_status_t res = libdirCreateDirIfMissing(path);
         if (res > MKDIR_STATUS_EXISTS) {
@@ -588,22 +595,22 @@ joinHostNamespace(char *hostScopePath, char *hostFilterPath) {
     scope_strncat(path, "ldscope", sizeof("ldscope"));
 
     // create "ldscope" on host
-    if ((status = extractMemToChildNamespace(ldscopeMem, ldscopeSize, path, 0775)) == FALSE) {
+    if ((status = extractMemToChildNamespace(ldscopeMem, ldscopeSize, path, 0775, isDevVersion)) == FALSE) {
         goto cleanupMem;
     }
 
     // create a "filter file" on host
     scope_snprintf(hostFilterPath, PATH_MAX, "/usr/lib/appscope/scope_filter");
-    if ((status == extractMemToChildNamespace(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664)) == FALSE) {
+    if ((status == extractMemToChildNamespace(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664, TRUE)) == FALSE) {
         scope_snprintf(hostFilterPath, PATH_MAX, "/tmp/scope_filter");
-        if ((status == extractMemToChildNamespace(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664)) == FALSE) {
+        if ((status == extractMemToChildNamespace(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664, TRUE)) == FALSE) {
             goto cleanupMem;
         }
     }
 
     // create a "scope" on host
     scope_snprintf(hostFilterPath, PATH_MAX, "%s/scope", hostBasePath);
-    status = extractMemToChildNamespace(scopeMem, scopeSize, hostFilterPath, 0775);
+    status = extractMemToChildNamespace(scopeMem, scopeSize, hostFilterPath, 0775, isDevVersion);
 
 cleanupMem:
 

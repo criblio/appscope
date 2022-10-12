@@ -23,8 +23,8 @@ typedef enum {
 struct service_ops {
     bool (*isServiceInstalled)(const char *serviceName);
     service_cfg_status_t (*serviceCfgStatus)(const char *serviceCfgPath);
-    service_status_t (*newServiceCfg)(const char *serviceCfgPath);
-    service_status_t (*modifyServiceCfg)(const char *serviceCfgPath);
+    service_status_t (*newServiceCfg)(const char *serviceCfgPath, const char *libscopePath);
+    service_status_t (*modifyServiceCfg)(const char *serviceCfgPath, const char *libscopePath);
 };
 
 /*
@@ -166,7 +166,7 @@ serviceCfgStatusOpenRc(const char *serviceName) {
  * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
 static service_status_t
-newServiceCfgSystemD(const char *serviceCfgPath) {
+newServiceCfgSystemD(const char *serviceCfgPath, const char *libscopePath) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
     char cfgEntry[BUFSIZE] = {0};
 
@@ -177,8 +177,7 @@ newServiceCfgSystemD(const char *serviceCfgPath) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
-    size_t size = scope_snprintf(cfgEntry, BUFSIZE, "[Service]\nEnvironment=LD_PRELOAD=/usr/lib/appscope/%s/libscope.so\n", loaderVersion);
+    size_t size = scope_snprintf(cfgEntry, BUFSIZE, "[Service]\nEnvironment=LD_PRELOAD=%s\n", libscopePath);
     if (scope_fwrite(cfgEntry, sizeof(char), size, fPtr) < size) {
         scope_perror("error: newServiceCfgSystemD, scope_fwrite failed");
         res = SERVICE_STATUS_ERROR_OTHER;
@@ -195,7 +194,7 @@ newServiceCfgSystemD(const char *serviceCfgPath) {
  * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
 static service_status_t
-newServiceCfgInitD(const char *serviceCfgPath) {
+newServiceCfgInitD(const char *serviceCfgPath, const char *libscopePath) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
     char cfgEntry[BUFSIZE] = {0};
 
@@ -206,8 +205,7 @@ newServiceCfgInitD(const char *serviceCfgPath) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
-    size_t size = scope_snprintf(cfgEntry, BUFSIZE, "LD_PRELOAD=/usr/lib/appscope/%s/libscope.so\n", loaderVersion);
+    size_t size = scope_snprintf(cfgEntry, BUFSIZE, "LD_PRELOAD=%s\n", libscopePath);
     if (scope_fwrite(cfgEntry, sizeof(char), size, fPtr) < size) {
         scope_perror("error: newServiceCfgInitD, scope_fwrite failed");
         res = SERVICE_STATUS_ERROR_OTHER;
@@ -224,7 +222,7 @@ newServiceCfgInitD(const char *serviceCfgPath) {
  * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
 static service_status_t
-newServiceCfgOpenRc(const char *serviceCfgPath) {
+newServiceCfgOpenRc(const char *serviceCfgPath, const char *libscopePath) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
     char cfgEntry[BUFSIZE] = {0};
 
@@ -235,8 +233,7 @@ newServiceCfgOpenRc(const char *serviceCfgPath) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
-    size_t size = scope_snprintf(cfgEntry, BUFSIZE, "export LD_PRELOAD=/usr/lib/appscope/%s/libscope.so\n", loaderVersion);
+    size_t size = scope_snprintf(cfgEntry, BUFSIZE, "export LD_PRELOAD=%s\n", libscopePath);
     if (scope_fwrite(cfgEntry, sizeof(char), size, fPtr) < size) {
         scope_perror("error: newServiceCfgOpenRc, scope_fwrite failed");
         res = SERVICE_STATUS_ERROR_OTHER;
@@ -281,7 +278,7 @@ isCfgFileConfigured(const char *serviceCfgPath) {
  * Returns SERVICE_STATUS_SUCCESS if service was modified correctly, other values in case of failure.
  */
 static service_status_t
-modifyServiceCfgSystemd(const char *serviceCfgPath) {
+modifyServiceCfgSystemd(const char *serviceCfgPath, const char *libscopePath) {
     FILE *readFd;
     FILE *newFd;
     char *tempPath = "/tmp/tmpFile-XXXXXX";
@@ -299,8 +296,7 @@ modifyServiceCfgSystemd(const char *serviceCfgPath) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
-    scope_snprintf(cfgEntry, BUFSIZE, "[Service]\nEnvironment=LD_PRELOAD=/usr/lib/appscope/%s/libscope.so\n", loaderVersion);
+    scope_snprintf(cfgEntry, BUFSIZE, "[Service]\nEnvironment=LD_PRELOAD=%s\n", libscopePath);
 
     while (!scope_feof(readFd)) {
         char buf[4096] = {0};
@@ -362,6 +358,7 @@ setupService(const char *serviceName) {
     struct service_ops *service;
 
     char serviceCfgPath[PATH_MAX] = {0};
+    char libscopePath[PATH_MAX] = {0};
 
     service_status_t status;
 
@@ -393,15 +390,27 @@ setupService(const char *serviceName) {
         return SERVICE_STATUS_NOT_INSTALLED;
     }
 
-    service_cfg_status_t cfgStatus =  service->serviceCfgStatus(serviceName);
+    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+    bool isDevVersion = libverIsNormVersionDev(loaderVersion);
+
+    scope_snprintf(libscopePath, PATH_MAX, "/usr/lib/appscope/%s/libscope.so", loaderVersion);
+    if (scope_access(libscopePath, R_OK) || isDevVersion) {
+        scope_snprintf(libscopePath, PATH_MAX, "/tmp/appscope/%s/libscope", loaderVersion);
+        if (scope_access(libscopePath, R_OK)) {
+            scope_fprintf(scope_stderr, "error: libscope is not available %s\n", libscopePath);
+            return SERVICE_STATUS_ERROR_OTHER;
+        }
+    }
+
+    service_cfg_status_t cfgStatus = service->serviceCfgStatus(serviceName);
     if (cfgStatus == SERVICE_CFG_ERROR) {
         return SERVICE_STATUS_ERROR_OTHER;
     } else if (cfgStatus == SERVICE_CFG_NEW) {
         // Fresh configuration
-        status = service->newServiceCfg(serviceCfgPath);
+        status = service->newServiceCfg(serviceCfgPath, libscopePath);
     } else if (isCfgFileConfigured(serviceCfgPath) == FALSE) {
         // Modification of configuration file
-        status = service->modifyServiceCfg(serviceCfgPath);
+        status = service->modifyServiceCfg(serviceCfgPath, libscopePath);
     } else {
         // Service was already setup correctly
         return SERVICE_STATUS_SUCCESS;
@@ -532,6 +541,7 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
     // Create destination directory if not exists
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
     bool isDevVersion = libverIsNormVersionDev(loaderVersion);
+
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
     mkdir_status_t res = libdirCreateDirIfMissing(path);
     if ((res > MKDIR_STATUS_EXISTS) || (isDevVersion)) {

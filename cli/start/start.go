@@ -292,8 +292,8 @@ func startServiceContainers(allowProcs []allowProcConfig) error {
 	return nil
 }
 
-// extract extracts ldscope and scope to scope directory
-func extract(scopeDir string) error {
+// extract extracts ldscope and scope to scope version directory
+func extract(scopeDirVersion string) error {
 	// Extract ldscope
 	perms := os.FileMode(0755)
 	b, err := run.Asset("build/ldscope")
@@ -304,7 +304,6 @@ func extract(scopeDir string) error {
 		return err
 	}
 
-	scopeDirVersion := filepath.Join(scopeDir, internal.GetNormalizedVersion())
 	err = os.MkdirAll(scopeDirVersion, perms)
 	if err != nil {
 		log.Error().
@@ -351,8 +350,13 @@ func getStartData() []byte {
 }
 
 // createFilterFile creates a filter file in /usr/lib/appscope/scope_filter or /tmp/scope_filter
-// It returns the filter file name and status
+// It returns the filter file and status
 func createFilterFile() (*os.File, error) {
+	// Try to create AppScope directory in /usr/lib if it not exists yet
+	if _, err := os.Stat("/usr/lib/appscope/"); os.IsNotExist(err) {
+		os.MkdirAll("/usr/lib/appscope/", 0755)
+	}
+
 	f, err := os.OpenFile("/usr/lib/appscope/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
 		f, err = os.OpenFile("/tmp/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
@@ -360,7 +364,35 @@ func createFilterFile() (*os.File, error) {
 	return f, err
 }
 
+// getAppScopeVerDir return the directory path which will be used for handling ldscope and scope files
+// /usr/lib/appscope/<version>/
+// or
+// /tmp/appscope/<version>/
+func getAppScopeVerDir() (string, error) {
+	version := internal.GetNormalizedVersion()
+	var appscopeVersionPath string
+
+	// Check /usr/lib/appscope only for official version
+	if !internal.IsVersionDev() {
+		appscopeVersionPath = filepath.Join("/usr/lib/appscope/", version)
+		if _, err := os.Stat(appscopeVersionPath); err != nil {
+			err := os.MkdirAll(appscopeVersionPath, 0755)
+			return appscopeVersionPath, err
+		}
+		return appscopeVersionPath, nil
+	}
+
+	appscopeVersionPath = filepath.Join("/tmp/appscope/", version)
+	if _, err := os.Stat(appscopeVersionPath); err != nil {
+		err := os.MkdirAll(appscopeVersionPath, 0755)
+		return appscopeVersionPath, err
+	}
+	return appscopeVersionPath, nil
+
+}
+
 // extractFilterFile creates a filter file in /usr/lib/appscope/scope_filter or /tmp/scope_filter
+// It returns the filter file name and status
 func extractFilterFile(cfgData []byte) (string, error) {
 	f, err := createFilterFile()
 	if err != nil {
@@ -413,16 +445,23 @@ func Start() error {
 		return err
 	}
 
+	scopeDirVersion, err := getAppScopeVerDir()
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("Error Access AppScope version directory")
+		return err
+	}
 	// If the `scope start` command is run inside a container, we should call `ldscope --starthost`
 	// which will instead run `scope start` on the host
 	// SCOPE_CLI_SKIP_START_HOST allows to run scope start in docker environment (integration tests)
 	_, skipHostCfg := os.LookupEnv("SCOPE_CLI_SKIP_START_HOST")
 	if util.InContainer() && !skipHostCfg {
-		if err := extract(filepath.Base(filterPath)); err != nil {
+		if err := extract(scopeDirVersion); err != nil {
 			return err
 		}
 
-		ld := loader.ScopeLoader{Path: filepath.Join(filepath.Base(filterPath), internal.GetNormalizedVersion(), "ldscope")}
+		ld := loader.ScopeLoader{Path: filepath.Join(scopeDirVersion, "ldscope")}
 		stdoutStderr, err := ld.StartHost()
 		if err == nil {
 			log.Info().

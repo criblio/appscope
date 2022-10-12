@@ -77,7 +77,7 @@ typedef struct
 // ----------------------------------------------------------------------------
 
 static note_t *
-libdirGetNote(file_t file)
+libdirGetNote(libdirfile_t file)
 {
     unsigned char *buf;
     if (file == LOADER_FILE)
@@ -126,7 +126,7 @@ libdirGetNote(file_t file)
 }
 
 static int
-libdirCheckNote(file_t file, const char *path)
+libdirCheckNote(libdirfile_t file, const char *path)
 {
     note_t *note = libdirGetNote(file);
     if (!note)
@@ -181,7 +181,7 @@ libdirCheckNote(file_t file, const char *path)
 
 // 
 static int
-libdirCreateFileIfMissing(file_t file, const char *path, bool overwrite)
+libdirCreateFileIfMissing(libdirfile_t file, const char *path, bool overwrite)
 {
     // Check if file exists
     if (!scope_access(path, R_OK) && !overwrite)
@@ -399,9 +399,9 @@ int libdirSetLibraryBase(const char *base)
 // Get path of existing file
 // - Sets global path (if file found)
 const char *
-libdirGetPath(file_t file)
+libdirGetPath(libdirfile_t file, const char *version)
 {
-    const char *ver = libverNormalizedVersion(SCOPE_VER);
+    const char *normVer = libverNormalizedVersion(version);
     char tmp_path[PATH_MAX];
     char *path;
     char *base;
@@ -427,7 +427,7 @@ libdirGetPath(file_t file)
     // Check custom base first
     if (base[0])
     {
-        int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", base, ver, filename);
+        int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", base, normVer, filename);
         if (pathLen < 0)
         {
             scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
@@ -446,7 +446,7 @@ libdirGetPath(file_t file)
     }
 
     // Check install base next
-    int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", g_libdir_info.install_base, ver, filename);
+    int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", g_libdir_info.install_base, normVer, filename);
     if (pathLen < 0)
     {
         scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
@@ -464,7 +464,7 @@ libdirGetPath(file_t file)
     }
 
     // Check temp base next
-    pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", g_libdir_info.tmp_base, ver, filename);
+    pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", g_libdir_info.tmp_base, normVer, filename);
     if (pathLen < 0)
     {
         scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
@@ -495,9 +495,9 @@ libdirSaveLibraryFile(const char *libraryPath, bool overwrite) {
 // Will not extract files to a custom base
 // - Sets global base
 // - Sets global path
-int libdirExtract(file_t file)
+int libdirExtract(libdirfile_t file, const char *version)
 {
-    const char *existing_path = libdirGetPath(file);
+    const char *existing_path = libdirGetPath(file, version);
     if (existing_path)
     {
         // file exists
@@ -508,12 +508,15 @@ int libdirExtract(file_t file)
         }
     }
 
-    const char *ver = libverNormalizedVersion(SCOPE_VER);
+    const char *normVer = libverNormalizedVersion(version);
+    bool isDevVersion = libverIsNormVersionDev(normVer);
+
     char tmp_dir[PATH_MAX];
     char tmp_path[PATH_MAX];
     char *filename;
     char *path;
     char *base;
+    int  pathLen;
     if (file == LOADER_FILE)
     {
         filename = SCOPE_LDSCOPEDYN;
@@ -527,20 +530,9 @@ int libdirExtract(file_t file)
         base = g_libdir_info.lib_base;
     }
 
-    int pathLen = scope_snprintf(tmp_dir, PATH_MAX, "%s/%s", g_libdir_info.install_base, ver);
-    if (pathLen < 0)
-    {
-        scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
-        return -1;
-    }
-    if (pathLen >= PATH_MAX)
-    {
-        scope_fprintf(scope_stderr, "error: path too long.\n");
-        return -1;
-    }
-    if (libdirCreateDirIfMissing(tmp_dir) <= MKDIR_STATUS_EXISTS)
-    {
-        int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s", tmp_dir, filename);
+    // Handle only tmp_base for dev version
+    if (isDevVersion == FALSE) {
+        pathLen = scope_snprintf(tmp_dir, PATH_MAX, "%s/%s", g_libdir_info.install_base, normVer);
         if (pathLen < 0)
         {
             scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
@@ -551,15 +543,29 @@ int libdirExtract(file_t file)
             scope_fprintf(scope_stderr, "error: path too long.\n");
             return -1;
         }
-        if (!libdirCreateFileIfMissing(file, tmp_path, libverIsNormVersionDev(ver)))
-        {
-            scope_strncpy(path, tmp_path, PATH_MAX);
-            scope_strncpy(base, g_libdir_info.install_base, PATH_MAX);
-            return 0;
-        }
-    }
 
-    pathLen = scope_snprintf(tmp_dir, PATH_MAX, "%s/%s", g_libdir_info.tmp_base, ver);
+        if (libdirCreateDirIfMissing(tmp_dir) <= MKDIR_STATUS_EXISTS)
+        {
+            int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s", tmp_dir, filename);
+            if (pathLen < 0)
+            {
+                scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
+                return -1;
+            }
+            if (pathLen >= PATH_MAX)
+            {
+                scope_fprintf(scope_stderr, "error: path too long.\n");
+                return -1;
+            }
+            if (!libdirCreateFileIfMissing(file, tmp_path, isDevVersion))
+            {
+                scope_strncpy(path, tmp_path, PATH_MAX);
+                scope_strncpy(base, g_libdir_info.install_base, PATH_MAX);
+                return 0;
+            }
+        }
+    }
+    pathLen = scope_snprintf(tmp_dir, PATH_MAX, "%s/%s", g_libdir_info.tmp_base, normVer);
     if (pathLen < 0)
     {
         scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
@@ -583,7 +589,7 @@ int libdirExtract(file_t file)
             scope_fprintf(scope_stderr, "error: path too long.\n");
             return -1;
         }
-        if (!libdirCreateFileIfMissing(file, tmp_path, libverIsNormVersionDev(ver)))
+        if (!libdirCreateFileIfMissing(file, tmp_path, isDevVersion))
         {
             scope_strncpy(path, tmp_path, PATH_MAX);
             scope_strncpy(base, g_libdir_info.tmp_base, PATH_MAX);

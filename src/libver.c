@@ -37,7 +37,7 @@ libverNormalizedVersion(const char *version) {
 
 /*
  * Check if normalized version is a dev version
- * Returns TRUE if it is a dev version other values if not
+ * Returns TRUE if it is a dev version FALSE if not
  */
 bool
 libverIsNormVersionDev(const char *normVersion) {

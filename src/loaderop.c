@@ -420,7 +420,7 @@ do_musl(char *exld, char *ldscope)
     }
 
     set_loader(ldscope);
-    loaderOpSetLibrary(libdirGetPath(LIBRARY_FILE));
+    loaderOpSetLibrary(libdirGetPath(LIBRARY_FILE, SCOPE_VER));
 
     if (ldso) scope_free(ldso);
     if (lpath) scope_free(lpath);

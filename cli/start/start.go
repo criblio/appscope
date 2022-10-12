@@ -321,11 +321,11 @@ func extract(scopeDir string) error {
 	}
 
 	// Copy scope
-	if _, err := util.CopyFile(os.Args[0], filepath.Join(scopeDir, "scope")); err != nil {
+	if _, err := util.CopyFile(os.Args[0], filepath.Join(scopeDirVersion, "scope")); err != nil {
 		if err != os.ErrExist {
 			log.Error().
 				Err(err).
-				Msgf("Error writing scope to %s.")
+				Msgf("Error writing scope to %s.", scopeDirVersion)
 			return err
 		}
 	}

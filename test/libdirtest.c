@@ -148,14 +148,12 @@ ExtractFileExists(void **state) {
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, ver, "libscope.so");
     res = scope_stat(expected_location, &dirStat);
     assert_int_equal(res, 0);
-    scope_remove(expected_location);
     
     res = libdirExtract(LOADER_FILE);
     assert_int_equal(res, 0);
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, ver, "ldscopedyn");
     res = scope_stat(expected_location, &dirStat);
     assert_int_equal(res, 0);
-    scope_remove(expected_location);
 }
 
 // depends on ExtractNewFile
@@ -164,10 +162,17 @@ GetPath(void **state) {
     const char *ver = libverNormalizedVersion(SCOPE_VER);
     char expected_location[PATH_MAX];
 
-    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, ver, "ldscopedyn");
-    const char *path = libdirGetPath(LOADER_FILE);
-    int res = scope_strcmp(expected_location, path);
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, ver, "libscope.so");
+    const char *library_path = libdirGetPath(LIBRARY_FILE);
+    int res = scope_strcmp(expected_location, library_path);
     assert_int_equal(res, 0);
+    scope_remove(expected_location);
+
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, ver, "ldscopedyn");
+    const char *loader_path = libdirGetPath(LOADER_FILE);
+    res = scope_strcmp(expected_location, loader_path);
+    assert_int_equal(res, 0);
+    scope_remove(expected_location);
 }
 
 static void

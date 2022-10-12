@@ -495,30 +495,6 @@ setHostNamespace(const char *ns) {
 }
 
 /*
-* Look for an accessible filter file
-* returns NULL if none were accessible
-* TODO: this should be unified with libGetFilterPath
-* the limitation is that object file which contains
-* the logic should be available for libscope.so/ldscopedyn/ldscope
-*/
-const char*
-nsGetFilterFilePath(void) {
-    // use the defaults
-    const char *const defaultFilterLoc[] = {
-        "/usr/lib/appscope/scope_filter",
-        "/tmp/scope_filter"
-    };
-
-    for (int i=0; i<sizeof(defaultFilterLoc)/sizeof(char*); ++i) {
-        if (!scope_access(defaultFilterLoc[i], R_OK)) {
-            return defaultFilterLoc[i];
-        }
-    }
-
-    return NULL;
-}
-
-/*
  * Joins the host mount namespace.
  * Required conditions:
  * - scope_filter must exists
@@ -547,8 +523,37 @@ joinHostNamespace(char *hostScopePath, char *hostFilterPath) {
         return status;
     }
 
+    // Handle the example filter file 
+    const char *const defaultFilterLoc[] = {
+        "/usr/lib/appscope/scope_filter",
+        "/tmp/scope_filter"
+    };
+    // First try to use env variable
+    char *filterPath = NULL;
+    char *envFilterVal = getenv("SCOPE_FILTER");
+    if (envFilterVal) {
+        /*
+        * If filter env was defined and wasn't disable 
+        * the filter handling, try path interpretation
+        */
+        size_t envFilterLen = scope_strlen(envFilterVal);
+        if (scope_strncmp(envFilterVal, "false", envFilterLen) && (!scope_access(envFilterVal, R_OK))) {
+            filterPath = envFilterVal;
+        }
+    } else {
+        /*
+        * Try to use defaults
+        */
+        for (int i=0; i<sizeof(defaultFilterLoc)/sizeof(char*); ++i) {
+            if (!scope_access(defaultFilterLoc[i], R_OK)) {
+                filterPath = (char*)defaultFilterLoc[i];
+                break;
+            }
+        }
+    }
+
     // Load "filter file" into memory
-    scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, nsGetFilterFilePath());
+    scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, filterPath);
     if (scopeFilterCfgMem == NULL) {
         goto cleanupMem;
     }

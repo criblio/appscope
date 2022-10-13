@@ -398,7 +398,7 @@ setupService(const char *serviceName) {
     scope_snprintf(libscopePath, PATH_MAX, "/usr/lib/appscope/%s/libscope.so", loaderVersion);
     if (scope_access(libscopePath, R_OK) || isDevVersion) {
         scope_memset(libscopePath, 0, PATH_MAX);
-        scope_snprintf(libscopePath, PATH_MAX, "/tmp/appscope/%s/libscope", loaderVersion);
+        scope_snprintf(libscopePath, PATH_MAX, "/tmp/appscope/%s/libscope.so", loaderVersion);
         if (scope_access(libscopePath, R_OK)) {
             scope_fprintf(scope_stderr, "error: libscope is not available %s\n", libscopePath);
             return SERVICE_STATUS_ERROR_OTHER;

@@ -1661,7 +1661,7 @@ init(void)
     bool skipReadCfg = FALSE;
     const char *const defaultFilterLoc[] = {
         "/usr/lib/appscope/scope_filter",
-        "/tmp/scope_filter"
+        "/tmp/appscope/scope_filter"
     };
 
     if (attachedFlag) {

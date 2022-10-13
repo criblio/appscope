@@ -349,7 +349,7 @@ func getStartData() []byte {
 	return startData
 }
 
-// createFilterFile creates a filter file in /usr/lib/appscope/scope_filter or /tmp/scope_filter
+// createFilterFile creates a filter file in /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter
 // It returns the filter file and status
 func createFilterFile() (*os.File, error) {
 	// Try to create AppScope directory in /usr/lib if it not exists yet
@@ -359,7 +359,10 @@ func createFilterFile() (*os.File, error) {
 
 	f, err := os.OpenFile("/usr/lib/appscope/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
-		f, err = os.OpenFile("/tmp/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+		if _, err := os.Stat("/tmp/appscope"); os.IsNotExist(err) {
+			os.MkdirAll("/tmp/appscope", 0755)
+		}
+		f, err = os.OpenFile("/tmp/appscope", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	}
 	return f, err
 }
@@ -391,7 +394,7 @@ func getAppScopeVerDir() (string, error) {
 
 }
 
-// extractFilterFile creates a filter file in /usr/lib/appscope/scope_filter or /tmp/scope_filter
+// extractFilterFile creates a filter file in /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter
 // It returns the filter file name and status
 func extractFilterFile(cfgData []byte) (string, error) {
 	f, err := createFilterFile()

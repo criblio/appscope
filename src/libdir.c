@@ -528,12 +528,11 @@ int libdirExtract(libdirfile_t file) {
     bool isDevVersion = libverIsNormVersionDev(normVer);
     const char *existing_path = libdirGetPath(file);
 
-    // if the file exists and it is official version do not overwrite it
-    if ((existing_path) && (isDevVersion == FALSE)) {
-        if (!libdirCheckNote(file, existing_path)) {
-            // note is ok
-            return 0;
-        }
+    /*
+    * If note match to existing path do not try to overwrite it
+    */
+    if ((existing_path) && (!libdirCheckNote(file, existing_path))) {
+        return 0;
     }
 
     char tmp_dir[PATH_MAX] = {0};
@@ -545,7 +544,9 @@ int libdirExtract(libdirfile_t file) {
         return -1;
     }
 
-    // Handle only tmp_base for dev version
+    /*
+    * Try to use the install base only for official version
+    */
     if (isDevVersion == FALSE) {
         pathLen = scope_snprintf(tmp_dir, PATH_MAX, "%s/%s", g_libdir_info.install_base, normVer);
         if (pathLen < 0) {

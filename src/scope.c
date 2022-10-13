@@ -137,7 +137,7 @@ attachCmd(pid_t pid, bool attach)
      * reattach command in the lib. The segment is read
      * only and the size of the segment can't be modified.
      *
-     * We use the presence of the segment to idenitfy the
+     * We use the presence of the segment to identify the
      * state of the lib. The segment is deleted when a
      * first attach is performed.
      */

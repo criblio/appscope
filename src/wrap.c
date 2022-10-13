@@ -2734,8 +2734,8 @@ prctl(int option, ...)
     return g_fn.prctl(option, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2], fArgs.arg[3]);
 }
 
-static char*
-getLdscopeExec(const char* pathname)
+static char *
+getLdscopeExec(const char *pathname)
 {
     char *scopexec = NULL;
     bool isstat = FALSE, isgo = FALSE;

@@ -1,4 +1,6 @@
 #define _GNU_SOURCE
+#define _XOPEN_SOURCE 500
+#include <ftw.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,8 +10,27 @@
 #include "test.h"
 #include "scopestdlib.h"
 
+#define TEST_BASE_DIR "/tmp/appscope-test/"
 #define TEST_INSTALL_BASE "/tmp/appscope-test/install"
+#define TEST_INSTALL_BASE_NOT_REACHABLE "/root/base/appscope"
 #define TEST_TMP_BASE "/tmp/appscope-test/tmp"
+#define TEST_TMP_BASE_NOT_REACHALBE "/root/tmp/appscope"
+
+static int
+rm_callback(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {
+    return (remove(fpath) < 0) ? -1 : 0;
+}
+
+static int
+rm_recursive(char *path) {
+    return nftw(path, rm_callback, 64, FTW_DEPTH | FTW_PHYS);
+}
+
+static int
+teardownlibdirTest(void **state) {
+     rm_recursive(TEST_BASE_DIR);
+     return 0;
+}
 
 /*
  * Define the extern offset for integration test compilation 
@@ -70,7 +91,7 @@ CreateDirIfMissingAlreadyExists(void **state) {
     assert_int_equal(status, MKDIR_STATUS_ERR_NOT_ABS_DIR);
     status = libdirCreateDirIfMissing(buf);
     assert_int_equal(status, MKDIR_STATUS_EXISTS);
-    res = scope_rmdir(buf);
+    res = rm_recursive(buf);
     assert_int_equal(res, 0);
 }
 
@@ -97,118 +118,224 @@ CreateDirIfMissingSuccessCreated(void **state) {
     res = scope_stat(buf, &dirStat);
     assert_int_equal(res, 0);
     assert_int_equal(S_ISDIR(dirStat.st_mode), 1);
-    res = scope_rmdir(buf);
+    res = rm_recursive(buf);
     assert_int_equal(res, 0);
 }
 
 static void
 SetLibraryBaseInvalid(void **state) {
+    libdirInitTest(TEST_INSTALL_BASE, TEST_TMP_BASE, "dev");
     int res = libdirSetLibraryBase("/does_not_exist");
     assert_int_equal(res, -1);
 }
 
 static void
+SetLibrarySuccessDev(void **state) {
+    libdirInitTest(TEST_INSTALL_BASE, TEST_TMP_BASE, "dev");
+    // Create dummy file
+    mkdir_status_t mkres = libdirCreateDirIfMissing("/tmp/appscope-test/success/dev");
+    assert_in_range(mkres, MKDIR_STATUS_CREATED, MKDIR_STATUS_EXISTS);
+    FILE *fp = scope_fopen("/tmp/appscope-test/success/dev/libscope.so", "w");
+    assert_non_null(fp);
+    scope_fclose(fp);
+    int res = libdirSetLibraryBase("/tmp/appscope-test/success");
+    assert_int_equal(res, 0);
+}
+
+static void
 SetLibraryBaseNull(void **state) {
+    libdirInitTest(NULL, NULL, NULL);
     int res = libdirSetLibraryBase("");
     assert_int_equal(res, -1);
 }
 
 static void
 ExtractNewFileDev(void **state) {
-    libdirInit(TEST_INSTALL_BASE, TEST_TMP_BASE);
+    libdirInitTest(TEST_INSTALL_BASE, TEST_TMP_BASE, "dev");
     const char *normVer = libverNormalizedVersion("dev");
-    char expected_location[PATH_MAX];
+    char expected_location[PATH_MAX] = {0};
     struct stat dirStat = {0};
 
-    int res = libdirExtract(LIBRARY_FILE, "dev");
+    // TEST_TMP_BASE will be used
+    int res = libdirExtract(LIBRARY_FILE);
     assert_int_equal(res, 0);
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "libscope.so");
     res = scope_stat(expected_location, &dirStat);
     assert_int_equal(res, 0);
+    scope_memset(expected_location, 0, PATH_MAX);
     
-    res = libdirExtract(LOADER_FILE, "dev");
+    res = libdirExtract(LOADER_FILE);
     assert_int_equal(res, 0);
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "ldscopedyn");
     res = scope_stat(expected_location, &dirStat);
     assert_int_equal(res, 0);
-    // Clean it up
-    scope_rmdir(TEST_INSTALL_BASE);
-    scope_rmdir(TEST_TMP_BASE);
+}
+
+static void
+ExtractNewFileDevAlternative(void **state) {
+    libdirInitTest(TEST_INSTALL_BASE, TEST_TMP_BASE_NOT_REACHALBE, "dev");
+    const char *normVer = libverNormalizedVersion("dev");
+    char expected_location[PATH_MAX] = {0};
+    struct stat dirStat = {0};
+
+    // Extract will fail because second path is not accessbile
+    int res = libdirExtract(LIBRARY_FILE);
+    assert_int_not_equal(res, 0);
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "libscope.so");
+    res = scope_stat(expected_location, &dirStat);
+    assert_int_not_equal(res, 0);
+    scope_memset(expected_location, 0, PATH_MAX);
+    
+    res = libdirExtract(LOADER_FILE);
+    assert_int_not_equal(res, 0);
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "ldscopedyn");
+    res = scope_stat(expected_location, &dirStat);
+    assert_int_not_equal(res, 0);
 }
 
 static void
 ExtractNewFileOfficial(void **state) {
-    libdirInit(TEST_INSTALL_BASE, TEST_TMP_BASE);
+    libdirInitTest(TEST_INSTALL_BASE, TEST_TMP_BASE, "v1.1.0");
     const char *normVer = libverNormalizedVersion("v1.1.0");
-    char expected_location[PATH_MAX];
+    char expected_location[PATH_MAX] = {0};
     struct stat dirStat = {0};
 
-    int res = libdirExtract(LIBRARY_FILE, "v1.1.0");
+    // TEST_INSTALL_BASE will be used
+    int res = libdirExtract(LIBRARY_FILE);
     assert_int_equal(res, 0);
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, normVer, "libscope.so");
     res = scope_stat(expected_location, &dirStat);
     assert_int_equal(res, 0);
     scope_remove(expected_location);
+    scope_memset(expected_location, 0, PATH_MAX);
     
-    res = libdirExtract(LOADER_FILE, "v1.1.0");
+    res = libdirExtract(LOADER_FILE);
     assert_int_equal(res, 0);
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, normVer, "ldscopedyn");
     res = scope_stat(expected_location, &dirStat);
     assert_int_equal(res, 0);
-    // Clean it up
-    scope_rmdir(TEST_INSTALL_BASE);
-    scope_rmdir(TEST_TMP_BASE);
 }
 
-// static void
-// ExtractFileExists(void **state) {
-//     libdirInit(TEST_INSTALL_BASE, TEST_TMP_BASE);
-//     const char *ver = libverNormalizedVersion(SCOPE_VER);
-//     char expected_location[PATH_MAX];
-//     struct stat dirStat = {0};
+static void
+ExtractNewFileOfficialAlternative(void **state) {
+    libdirInitTest(TEST_INSTALL_BASE_NOT_REACHABLE, TEST_TMP_BASE, "v1.1.0");
+    const char *normVer = libverNormalizedVersion("v1.1.0");
+    char expected_location[PATH_MAX] = {0};
+    struct stat dirStat = {0};
 
-//     int res = libdirExtract(LIBRARY_FILE);
-//     assert_int_equal(res, 0);
-//     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, ver, "libscope.so");
-//     res = scope_stat(expected_location, &dirStat);
-//     assert_int_equal(res, 0);
+    // TEST_TMP_BASE will be used
+    int res = libdirExtract(LIBRARY_FILE);
+    assert_int_equal(res, 0);
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "libscope.so");
+    res = scope_stat(expected_location, &dirStat);
+    assert_int_equal(res, 0);
+    scope_remove(expected_location);
+    scope_memset(expected_location, 0, PATH_MAX);
+    
+    res = libdirExtract(LOADER_FILE);
+    assert_int_equal(res, 0);
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "ldscopedyn");
+    res = scope_stat(expected_location, &dirStat);
+    assert_int_equal(res, 0);
+}
 
-//     res = libdirExtract(LOADER_FILE);
-//     assert_int_equal(res, 0);
-//     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, ver, "ldscopedyn");
-//     res = scope_stat(expected_location, &dirStat);
-//     assert_int_equal(res, 0);
-// }
+static void
+ExtractFileExistsOfficial(void **state) {
+    libdirInitTest(TEST_INSTALL_BASE, TEST_TMP_BASE, "v1.1.0");
+    const char *normVer = libverNormalizedVersion("v1.1.0");
+    char expected_location[PATH_MAX] = {0};
+    struct stat firstStat = {0};
+    struct stat secondStat = {0};
 
-// static void
-// GetPath(void **state) {
-//     const char *ver = libverNormalizedVersion(SCOPE_VER);
-//     char expected_location[PATH_MAX];
-//     const char *testBase = (libverIsNormVersionDev(ver) == TRUE) ? TEST_TMP_BASE : TEST_INSTALL_BASE;
-//     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", testBase, ver, "libscope.so");
-//     const char *library_path = libdirGetPath(LIBRARY_FILE, SCOPE_VER);
-//     int res = scope_strcmp(expected_location, library_path);
-//     assert_int_equal(res, 0);
-//     scope_remove(expected_location);
-//     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", testBase, ver, "ldscopedyn");
-//     const char *loader_path = libdirGetPath(LOADER_FILE, SCOPE_VER);
-//     res = scope_strcmp(expected_location, loader_path);
-//     assert_int_equal(res, 0);
-//     // Clean it up
-//     scope_rmdir(TEST_INSTALL_BASE);
-//     scope_rmdir(TEST_TMP_BASE);
-// }
+    int res = libdirExtract(LIBRARY_FILE);
+    assert_int_equal(res, 0);
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, normVer, "libscope.so");
+    res = scope_stat(expected_location, &firstStat);
+    assert_int_equal(res, 0);
 
-// static void
-// GetPathNoFile(void **state) {
-//     libdirInit(TEST_INSTALL_BASE, TEST_TMP_BASE);
+    res = libdirExtract(LIBRARY_FILE);
+    assert_int_equal(res, 0);
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, normVer, "libscope.so");
+    res = scope_stat(expected_location, &secondStat);
+    assert_int_equal(res, 0);
+    assert_int_equal(firstStat.st_ctim.tv_sec, secondStat.st_ctim.tv_sec);
+    assert_int_equal(firstStat.st_ctim.tv_nsec, secondStat.st_ctim.tv_nsec);
+}
 
-//     const char *loader_path = libdirGetPath(LOADER_FILE, SCOPE_VER);
-//     assert_int_equal(loader_path, NULL);
+static void
+GetPathDev(void **state) {
+    libdirInitTest(TEST_INSTALL_BASE, TEST_TMP_BASE, "dev");
+    const char *normVer = libverNormalizedVersion("dev");
+    char expected_location[PATH_MAX] = {0};
+    // Create dummy directory
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/", TEST_TMP_BASE, normVer);
+    mkdir_status_t mkres = libdirCreateDirIfMissing(expected_location);
+    assert_in_range(mkres, MKDIR_STATUS_CREATED, MKDIR_STATUS_EXISTS);
+    // Create dummy file
+    scope_memset(expected_location, 0, PATH_MAX);
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "libscope.so");
+    FILE *fp = scope_fopen(expected_location, "w");
+    assert_non_null(fp);
+    scope_fclose(fp);
 
-//     const char *library_path = libdirGetPath(LIBRARY_FILE, SCOPE_VER);
-//     assert_int_equal(library_path, NULL);
-// }
+    const char *library_path = libdirGetPath(LIBRARY_FILE);
+    int res = scope_strcmp(expected_location, library_path);
+    assert_int_equal(res, 0);
+    scope_remove(expected_location);
+    // Create dummy file
+    scope_memset(expected_location, 0, PATH_MAX);
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "ldscopedyn");
+    fp = scope_fopen(expected_location, "w");
+    assert_non_null(fp);
+    scope_fclose(fp);
+
+    const char *loader_path = libdirGetPath(LOADER_FILE);
+    res = scope_strcmp(expected_location, loader_path);
+    assert_int_equal(res, 0);
+}
+
+static void
+GetPathOfficial(void **state) {
+    libdirInitTest(TEST_INSTALL_BASE, TEST_TMP_BASE, "v1.1.0");
+    const char *normVer = libverNormalizedVersion("v1.1.0");
+    char expected_location[PATH_MAX] = {0};
+    // Create dummy directory
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/", TEST_INSTALL_BASE, normVer);
+    mkdir_status_t mkres = libdirCreateDirIfMissing(expected_location);
+    assert_in_range(mkres, MKDIR_STATUS_CREATED, MKDIR_STATUS_EXISTS);
+    // Create dummy file
+    scope_memset(expected_location, 0, PATH_MAX);
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, normVer, "libscope.so");
+    FILE *fp = scope_fopen(expected_location, "w");
+    assert_non_null(fp);
+    scope_fclose(fp);
+
+    const char *library_path = libdirGetPath(LIBRARY_FILE);
+    int res = scope_strcmp(expected_location, library_path);
+    assert_int_equal(res, 0);
+    scope_remove(expected_location);
+    // Create dummy file
+    scope_memset(expected_location, 0, PATH_MAX);
+    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, normVer, "ldscopedyn");
+    fp = scope_fopen(expected_location, "w");
+    assert_non_null(fp);
+    scope_fclose(fp);
+
+    const char *loader_path = libdirGetPath(LOADER_FILE);
+    res = scope_strcmp(expected_location, loader_path);
+    assert_int_equal(res, 0);
+}
+
+static void
+GetPathNoFile(void **state) {
+    libdirInitTest(TEST_INSTALL_BASE, TEST_TMP_BASE, "v1.1.0");
+
+    const char *loader_path = libdirGetPath(LOADER_FILE);
+    assert_int_equal(loader_path, NULL);
+
+    const char *library_path = libdirGetPath(LIBRARY_FILE);
+    assert_int_equal(library_path, NULL);
+}
 
 int
 main(int argc, char* argv[]) {
@@ -222,13 +349,17 @@ main(int argc, char* argv[]) {
         cmocka_unit_test(CreateDirIfMissingAlreadyExists),
         cmocka_unit_test(CreateDirIfMissingAlreadyExistsPermIssue),
         cmocka_unit_test(CreateDirIfMissingSuccessCreated),
-        cmocka_unit_test(SetLibraryBaseInvalid),
-        cmocka_unit_test(SetLibraryBaseNull),
-        cmocka_unit_test(ExtractNewFileDev),
-        cmocka_unit_test(ExtractNewFileOfficial),
-        // cmocka_unit_test(ExtractNewFileExists),
-        // cmocka_unit_test(GetPath),
-        // cmocka_unit_test(GetPathNoFile),
+        cmocka_unit_test_teardown(SetLibraryBaseInvalid, teardownlibdirTest),
+        cmocka_unit_test_teardown(SetLibraryBaseNull, teardownlibdirTest),
+        cmocka_unit_test_teardown(SetLibrarySuccessDev, teardownlibdirTest),
+        cmocka_unit_test_teardown(ExtractNewFileDev, teardownlibdirTest),
+        cmocka_unit_test_teardown(ExtractNewFileDevAlternative, teardownlibdirTest),
+        cmocka_unit_test_teardown(ExtractNewFileOfficial, teardownlibdirTest),
+        cmocka_unit_test_teardown(ExtractNewFileOfficialAlternative, teardownlibdirTest),
+        cmocka_unit_test_teardown(ExtractFileExistsOfficial, teardownlibdirTest),
+        cmocka_unit_test_teardown(GetPathDev, teardownlibdirTest),  
+        cmocka_unit_test_teardown(GetPathOfficial, teardownlibdirTest),
+        cmocka_unit_test_teardown(GetPathNoFile, teardownlibdirTest),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

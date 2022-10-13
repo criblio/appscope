@@ -370,12 +370,14 @@ setupService(const char *serviceName) {
         }
     } else if (scope_stat(SYSTEMD_DIR, &sb) == 0) {
         service = &SystemDService;
+        scope_memset(serviceCfgPath, 0, PATH_MAX);
         if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/systemd/system/%s.service.d/env.conf", serviceName) < 0) {
             scope_perror("error: setupService, scope_snprintf SystemD failed");
             return SERVICE_STATUS_ERROR_OTHER;
         }
     } else if (scope_stat(INITD_DIR, &sb) == 0) {
         service = &InitDService;
+        scope_memset(serviceCfgPath, 0, PATH_MAX);
         if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/sysconfig/%s", serviceName) < 0) {
             scope_perror("error: setupService, scope_snprintf InitD failed");
             return SERVICE_STATUS_ERROR_OTHER;
@@ -395,6 +397,7 @@ setupService(const char *serviceName) {
 
     scope_snprintf(libscopePath, PATH_MAX, "/usr/lib/appscope/%s/libscope.so", loaderVersion);
     if (scope_access(libscopePath, R_OK) || isDevVersion) {
+        scope_memset(libscopePath, 0, PATH_MAX);
         scope_snprintf(libscopePath, PATH_MAX, "/tmp/appscope/%s/libscope", loaderVersion);
         if (scope_access(libscopePath, R_OK)) {
             scope_fprintf(scope_stderr, "error: libscope is not available %s\n", libscopePath);
@@ -529,7 +532,7 @@ closeFd:
  /*
  * Configure the environment
  * - setup /etc/profile.d/scope.sh
- * - extract memory to filter file /usr/lib/appscope/scope_filter or /tmp/scope_filter
+ * - extract memory to filter file /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter
  * - extract libscope.so to /usr/lib/appscope/<version>/libscope.so or /tmp/appscope/<version>/libscope.so if it doesn't exists
  * - patch the library
  * Returns status of operation 0 in case of success, other value otherwise
@@ -545,6 +548,7 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
     mkdir_status_t res = libdirCreateDirIfMissing(path);
     if ((res > MKDIR_STATUS_EXISTS) || (isDevVersion)) {
+        scope_memset(path, 0, PATH_MAX);
         scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
         mkdir_status_t res = libdirCreateDirIfMissing(path);
         if (res > MKDIR_STATUS_EXISTS) {
@@ -557,7 +561,7 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
 
     // Extract[create] the filter file to filter location
     if (setupExtractFilterFile(filterFileMem, filterSize, "/usr/lib/appscope/scope_filter") == FALSE) {
-        if (setupExtractFilterFile(filterFileMem, filterSize, "/tmp/scope_filter") == FALSE) {
+        if (setupExtractFilterFile(filterFileMem, filterSize, "/tmp/appscope/scope_filter") == FALSE) {
             scope_fprintf(scope_stderr, "setupConfigure: setup filter file failed\n");
             return -1;
         }

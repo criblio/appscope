@@ -573,9 +573,10 @@ int libdirExtract(libdirfile_t file) {
                 return 0;
             }
         }
-        scope_memset(tmp_path, 0, PATH_MAX);
     }
-
+    // Clean the buffers
+    scope_memset(tmp_path, 0, PATH_MAX);
+    scope_memset(tmp_dir, 0, PATH_MAX);
     pathLen = scope_snprintf(tmp_dir, PATH_MAX, "%s/%s", g_libdir_info.tmp_base, normVer);
     if (pathLen < 0) {
         scope_fprintf(scope_stderr, "error: snprintf() failed.\n");

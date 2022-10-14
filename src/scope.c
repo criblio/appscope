@@ -152,7 +152,10 @@ attachCmd(pid_t pid, bool attach)
      * will never be deleted until attached and then causes an
      * unintended detach.
      */
-    if ((attach == FALSE) && (first_attach == TRUE)) EXIT_SUCCESS;
+    if ((attach == FALSE) && (first_attach == TRUE)) {
+        scope_printf("Already detached from pid %d\n", pid);
+        return EXIT_SUCCESS;
+    }
 
     /*
      * Before executing any command, create and populate the dyn config file.
@@ -218,7 +221,6 @@ attachCmd(pid_t pid, bool attach)
     if (attach == TRUE) {
         int i;
 
-
         if (first_attach == TRUE) {
             scope_printf("First attach to pid %d\n", pid);
         } else {
@@ -248,6 +250,8 @@ attachCmd(pid_t pid, bool attach)
             scope_close(fd);
             return EXIT_FAILURE;
         }
+    } else {
+        scope_printf("Detaching from pid %d\n", pid);
     }
 
     scope_close(fd);
@@ -412,7 +416,6 @@ main(int argc, char **argv, char **env)
                 scope_fprintf(scope_stderr, "error: pid %d has never been attached\n", pid);
                 return EXIT_FAILURE;
             }
-            scope_printf("Detaching from pid %d\n", pid);
             return attachCmd(pid, FALSE);
         } else {
             scope_fprintf(scope_stderr, "error: attach or detach with invalid option\n");

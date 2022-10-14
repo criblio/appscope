@@ -129,7 +129,7 @@ ptraceAttach(pid_t target) {
     int waitpidstatus;
 
     if(scope_ptrace(PTRACE_ATTACH, target, NULL, NULL) == -1) {
-        scope_perror("ptrace(PTRACE_ATTACH) failed");
+        //scope_perror("ptrace(PTRACE_ATTACH) failed");
         return EXIT_FAILURE;
     }
 

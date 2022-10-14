@@ -141,12 +141,18 @@ attachCmd(pid_t pid, bool attach)
      * state of the lib. The segment is deleted when a
      * first attach is performed.
      */
-    if (attach == TRUE) {
-        sfd = osFindFd(pid, SM_NAME);   // e.g. memfd:scope_anon
-        if (sfd > 0) {
-            first_attach = TRUE;
-        }
+    sfd = osFindFd(pid, SM_NAME);   // e.g. memfd:scope_anon
+    if (sfd > 0) {
+        first_attach = TRUE;
     }
+
+    /*
+     * On command detach if the SM segment exists, we have never been
+     * attached. Return and do not create the command file as it
+     * will never be deleted until attached and then causes an
+     * unintended detach.
+     */
+    if ((attach == FALSE) && (first_attach == TRUE)) EXIT_SUCCESS;
 
     /*
      * Before executing any command, create and populate the dyn config file.
@@ -212,6 +218,13 @@ attachCmd(pid_t pid, bool attach)
     if (attach == TRUE) {
         int i;
 
+
+        if (first_attach == TRUE) {
+            scope_printf("First attach to pid %d\n", pid);
+        } else {
+            scope_printf("Reattaching to pid %d\n", pid);
+        }
+
         for (i = 0; environ[i]; i++) {
             if ((scope_strlen(environ[i]) > 6) && scope_strncmp(environ[i], "SCOPE_", 6) == 0) {
                 scope_dprintf(fd, "%s\n", environ[i]);
@@ -259,7 +272,7 @@ attachCmd(pid_t pid, bool attach)
         }
 
         if (injectFirstAttach(pid, exaddr->cmdAttachAddr) == EXIT_FAILURE) {
-            scope_fprintf(scope_stderr, "error: %s: the reattach command failed\n", __FUNCTION__);
+            scope_fprintf(scope_stderr, "error: %s: you must have administrator privileges to run this command\n", __FUNCTION__);
             rc = EXIT_FAILURE;
         }
 
@@ -382,7 +395,6 @@ main(int argc, char **argv, char **env)
                 ret = attach(pid, scopeLibPath);
             } else {
                 // libscope exists, a first time attach or a reattach
-                scope_printf("Reattaching to pid %d\n", pid);
                 ret = attachCmd(pid, TRUE);
             }
 

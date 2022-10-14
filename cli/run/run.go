@@ -43,6 +43,9 @@ func (rc *Config) Run(args []string) {
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
 	env := os.Environ()
+	// Disable detection of a scope filter file with this command
+	env = append(env, "SCOPE_FILTER=false")
+
 	if rc.NoBreaker {
 		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
 	}

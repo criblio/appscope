@@ -1659,39 +1659,33 @@ init(void)
     */
     bool scopedFlag = FALSE;
     bool skipReadCfg = FALSE;
-    const char *const defaultFilterLoc[] = {
-        "/usr/lib/appscope/scope_filter",
-        "/tmp/appscope/scope_filter"
-    };
 
     if (attachedFlag) {
         scopedFlag = TRUE;
     } else {
         cfg = cfgCreateDefault();
         // First try to use env variable
-        char *filterPath = NULL;
         char *envFilterVal = getenv("SCOPE_FILTER");
-
+        filter_status_t res = FILTER_SCOPED;
         if (envFilterVal) {
             /*
             * If filter env was defined and wasn't disable 
             * the filter handling, try path interpretation
             */
-            if ((checkEnv("SCOPE_FILTER", "false") == FALSE) && (!scope_access(envFilterVal, R_OK))) {
-                filterPath = envFilterVal;
+            size_t envFilterLen = scope_strlen(envFilterVal);
+            if ((scope_strncmp(envFilterVal, "false", envFilterLen)) && (!scope_access(envFilterVal, R_OK))) {
+                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, envFilterVal, cfg);
             }
         } else {
             /*
             * Try to use defaults
             */
-            for (int i=0; i<sizeof(defaultFilterLoc)/sizeof(char*); ++i) {
-                if (!scope_access(defaultFilterLoc[i], R_OK)) {
-                    filterPath = (char*)defaultFilterLoc[i];
-                    break;
-                }
+            if (!scope_access(SCOPE_FILTER_USR_PATH, R_OK)) {
+                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, SCOPE_FILTER_USR_PATH, cfg);
+            } else if (!scope_access(SCOPE_FILTER_TMP_PATH, R_OK)) {
+                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, SCOPE_FILTER_TMP_PATH, cfg);
             }
         }
-        filter_status_t res = cfgFilterStatus(g_proc.procname, g_proc.cmd, filterPath, cfg);
         switch (res) {
             case FILTER_SCOPED:
                 scopedFlag = TRUE;

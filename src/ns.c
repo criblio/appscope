@@ -526,13 +526,7 @@ joinHostNamespace(char *hostScopePath, char *hostFilterPath) {
         return status;
     }
 
-    // Handle the example filter file 
-    const char *const defaultFilterLoc[] = {
-        "/usr/lib/appscope/scope_filter",
-        "/tmp/appscope/scope_filter"
-    };
     // First try to use env variable
-    char *filterPath = NULL;
     char *envFilterVal = getenv("SCOPE_FILTER");
     if (envFilterVal) {
         /*
@@ -541,22 +535,22 @@ joinHostNamespace(char *hostScopePath, char *hostFilterPath) {
         */
         size_t envFilterLen = scope_strlen(envFilterVal);
         if (scope_strncmp(envFilterVal, "false", envFilterLen) && (!scope_access(envFilterVal, R_OK))) {
-            filterPath = envFilterVal;
+            scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, envFilterVal);
         }
     } else {
         /*
         * Try to use defaults
         */
-        for (int i=0; i<sizeof(defaultFilterLoc)/sizeof(char*); ++i) {
-            if (!scope_access(defaultFilterLoc[i], R_OK)) {
-                filterPath = (char*)defaultFilterLoc[i];
-                break;
-            }
+
+        if (!scope_access(SCOPE_FILTER_USR_PATH, R_OK)) {
+            scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, SCOPE_FILTER_USR_PATH);
+        } else if (!scope_access(SCOPE_FILTER_TMP_PATH, R_OK)) {
+            scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, SCOPE_FILTER_TMP_PATH);
         }
     }
 
     // Load "filter file" into memory
-    scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, filterPath);
+    
     if (scopeFilterCfgMem == NULL) {
         goto cleanupMem;
     }
@@ -612,10 +606,10 @@ joinHostNamespace(char *hostScopePath, char *hostFilterPath) {
     }
 
     // create a "filter file" on host
-    scope_snprintf(hostFilterPath, PATH_MAX, "/usr/lib/appscope/scope_filter");
+    scope_snprintf(hostFilterPath, PATH_MAX, SCOPE_FILTER_USR_PATH);
     if ((status == extractMemToFile(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664, TRUE)) == FALSE) {
         scope_memset(hostFilterPath, 0, PATH_MAX);
-        scope_snprintf(hostFilterPath, PATH_MAX, "/tmp/appscope/scope_filter");
+        scope_snprintf(hostFilterPath, PATH_MAX, SCOPE_FILTER_TMP_PATH);
         if ((status == extractMemToFile(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664, TRUE)) == FALSE) {
             goto cleanupMem;
         }

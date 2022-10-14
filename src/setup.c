@@ -560,8 +560,8 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
     scope_strncat(path, "libscope.so", sizeof("libscope.so"));
 
     // Extract[create] the filter file to filter location
-    if (setupExtractFilterFile(filterFileMem, filterSize, "/usr/lib/appscope/scope_filter") == FALSE) {
-        if (setupExtractFilterFile(filterFileMem, filterSize, "/tmp/appscope/scope_filter") == FALSE) {
+    if (setupExtractFilterFile(filterFileMem, filterSize, SCOPE_FILTER_USR_PATH) == FALSE) {
+        if (setupExtractFilterFile(filterFileMem, filterSize, SCOPE_FILTER_TMP_PATH) == FALSE) {
             scope_fprintf(scope_stderr, "setupConfigure: setup filter file failed\n");
             return -1;
         }

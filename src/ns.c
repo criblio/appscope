@@ -11,6 +11,7 @@
 #define SCOPE_CRONTAB "* * * * * root /tmp/scope_att.sh\n"
 #define SCOPE_CRON_PATH "/etc/cron.d/scope_cron"
 #define SCOPE_SCRIPT_PATH "/tmp/scope_att.sh"
+#define SCOPE_START_SCRIPT "#! /bin/bash\nrm /etc/cron.d/scope_cron\n%s start -f < %s\nrm -- $0\n"
 
 /*
  * Extract memory to specific output file.
@@ -406,7 +407,7 @@ createCron(const char *scopePath, const char* filterPath) {
     }
 
     // Write cron action - scope start
-    if (scope_snprintf(buf, sizeof(buf), "#! /bin/bash\ntouch /tmp/scope_test\nrm /etc/cron.d/scope_cron\n%s start -f < %s\n", scopePath, filterPath) < 0) {
+    if (scope_snprintf(buf, sizeof(buf), SCOPE_START_SCRIPT, scopePath, filterPath) < 0) {
         scope_perror("createCron: script: error: snprintf() failed\n");
         scope_close(outFd);
         return FALSE;

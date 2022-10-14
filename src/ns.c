@@ -601,8 +601,10 @@ joinHostNamespace(void) {
     }
 
     /*
-     * Save the host base operation path. 
-     * Path is already ended with /
+     * Save the absolute path for binaries on host:
+     * - scope - in hostScopePath
+     * - ldscope - in path
+     * Note: path is already ended with /
      */
     scope_snprintf(hostScopePath, PATH_MAX, "%sscope", path);
     scope_strncat(path, "ldscope", sizeof("ldscope"));

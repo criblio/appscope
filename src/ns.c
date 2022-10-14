@@ -425,6 +425,7 @@ createCron(const char *scopePath, const char* filterPath) {
         return FALSE;
     }
 
+    scope_memset(path, 0, PATH_MAX);
     // Create the cron entry
     if (scope_snprintf(path, sizeof(path), SCOPE_CRON_PATH) < 0) {
         scope_perror("createCron: cron: error: snprintf() failed\n");
@@ -432,6 +433,7 @@ createCron(const char *scopePath, const char* filterPath) {
         return FALSE;
     }
 
+    scope_memset(buf, 0, 1024);
     if (scope_snprintf(buf, sizeof(buf), SCOPE_CRONTAB) < 0) {
         scope_perror("createCron: cron: error: snprintf() failed\n");
         scope_fprintf(scope_stderr, "path: %s\n", path);

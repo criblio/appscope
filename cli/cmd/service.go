@@ -4,6 +4,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+/* Args Matrix (X disallows)
+ *                 force user
+ * force           -
+ * user                  -
+ */
+
 // serviceCmd represents the service command
 var serviceCmd = &cobra.Command{
 	Use:     "service SERVICE [flags]",
@@ -16,8 +22,7 @@ var serviceCmd = &cobra.Command{
 		force, _ := cmd.Flags().GetBool("force")
 		// TODO add handle user parameter
 		user, _ := cmd.Flags().GetString("user")
-		serviceName := args[0]
-		rc.Service(serviceName, user, force)
+		rc.Service(args[0], user, force)
 	},
 }
 

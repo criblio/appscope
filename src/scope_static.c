@@ -534,6 +534,7 @@ showUsage(char *prog)
       "  -s, --service SERVICE        setup specified service NAME\n"
       "  -n  --namespace PID          perform service/configure operation on specified container PID\n"
       "  -p, --patch SO_FILE          patch specified libscope.so\n"
+      "  -r, --starthost              execute the scope start command in a host context with (must be run in the container)\n"
       "\n"
       "Help sections are OVERVIEW, CONFIGURATION, METRICS, EVENTS, and PROTOCOLS.\n"
       "\n"
@@ -560,6 +561,7 @@ static struct option opts[] = {
     { "service",    required_argument,    0, 's' },
     { "libbasedir", required_argument,    0, 'l' },
     { "patch",      required_argument,    0, 'p' },
+    { "starthost",  no_argument,          0, 'r' },
     { 0, 0, 0, 0 }
 };
 
@@ -585,7 +587,7 @@ main(int argc, char **argv, char **env)
         // The initial `:` lets us handle options with optional values like
         // `-h` and `-h SECTION`.
         //
-        int opt = getopt_long(argc, argv, "+:uh:a:d:n:l:f:p:c:s:", opts, &index);
+        int opt = getopt_long(argc, argv, "+:uh:a:d:n:l:f:p:c:s:r", opts, &index);
         if (opt == -1) {
             break;
         }
@@ -620,10 +622,16 @@ main(int argc, char **argv, char **env)
             case 'f':
                 // accept -f as alias for -l for BC
             case 'l':
-                libdirSetBase(optarg);
+                if (libdirSetLibraryBase(optarg))
+                {
+                    return EXIT_FAILURE;
+                }
                 break;
             case 'p':
                 return (loaderOpPatchLibrary(optarg) == PATCH_SUCCESS) ? EXIT_SUCCESS : EXIT_FAILURE;
+                break;
+            case 'r':
+                return nsHostStart();
                 break;
             case ':':
                 // options missing their value end up here
@@ -791,18 +799,18 @@ main(int argc, char **argv, char **env)
     }
 
     // extract to the library directory
-    if (libdirExtractLoader()) {
+    if (libdirExtract(LOADER_FILE)) {
         scope_fprintf(scope_stderr, "error: failed to extract loader\n");
         return EXIT_FAILURE;
     }
 
-    if (libdirExtractLibrary()) {
+    if (libdirExtract(LIBRARY_FILE)) {
         scope_fprintf(scope_stderr, "error: failed to extract library\n");
         return EXIT_FAILURE;
     }
 
     // setup for musl libc if detected
-    char *loader = (char *)libdirGetLoader();
+    char *loader = (char *)libdirGetPath(LOADER_FILE);
     if (!loader) {
         scope_fprintf(scope_stderr, "error: failed to get a loader path\n");
         return EXIT_FAILURE;
@@ -839,7 +847,7 @@ main(int argc, char **argv, char **env)
         }
 
         // add the env vars we want in the library
-        scope_dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetLibrary());
+        scope_dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetPath(LIBRARY_FILE));
 
         int i;
         for (i = 0; environ[i]; i++) {
@@ -860,7 +868,7 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
-    execArgv[execArgc++] = (char *) libdirGetLoader();
+    execArgv[execArgc++] = (char *) libdirGetPath(LOADER_FILE);
 
     if (attachArg) {
         if (attachType == 'a') {
@@ -878,7 +886,7 @@ main(int argc, char **argv, char **env)
     execArgv[execArgc++] = NULL;
 
     // pass SCOPE_LIB_PATH in environment
-    if (setenv("SCOPE_LIB_PATH", libdirGetLibrary(), 1)) {
+    if (setenv("SCOPE_LIB_PATH", libdirGetPath(LIBRARY_FILE), 1)) {
         scope_perror("setenv(SCOPE_LIB_PATH) failed");
         return EXIT_FAILURE;
     }
@@ -891,7 +899,7 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
-    execve(libdirGetLoader(), execArgv, environ);
+    execve(libdirGetPath(LOADER_FILE), execArgv, environ);
 
     scope_free(execArgv);
     scope_perror("execve failed");

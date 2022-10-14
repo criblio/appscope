@@ -3,6 +3,9 @@
 
 #include "scopetypes.h"
 
+#define SCOPE_FILTER_USR_PATH ("/usr/lib/appscope/scope_filter")
+#define SCOPE_FILTER_TMP_PATH ("/tmp/appscope/scope_filter")
+
 service_status_t setupService(const char *);
 int setupConfigure(void *, size_t);
 char *setupLoadFileIntoMem(size_t *, const char *);

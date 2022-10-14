@@ -31,6 +31,7 @@ extern void*  scopelibc_memcpy(void *, const void *, size_t);
 extern int    scopelibc_mlock(const void *, size_t);
 extern int    scopelibc_msync(void *, size_t, int);
 extern int    scopelibc_mincore(void *, size_t, unsigned char *);
+extern int    scopelibc_memfd_create(const char *, unsigned int);
 
 // File handling operations
 extern FILE*          scopelibc_fopen(const char *, const char *);
@@ -147,6 +148,7 @@ extern uint16_t        scopelibc_htons(uint16_t);
 extern int           scopelibc_atoi(const char *);
 extern int           scopelibc_isspace(int);
 extern int           scopelibc_isprint(int);
+extern int           scopelibc_isdigit(int);
 extern void          scopelibc_perror(const char*);
 extern int           scopelibc_gettimeofday(struct timeval *, struct timezone *);
 extern int           scopelibc_timer_create(clockid_t, struct sigevent *, timer_t *);
@@ -323,6 +325,11 @@ scope_mlock(const void *addr, size_t len) {
 int
 scope_msync(void *addr, size_t length, int flags) {
     return scopelibc_msync(addr, length, flags);
+}
+
+int
+scope_memfd_create(const char *name, unsigned int flags) {
+    return scopelibc_memfd_create(name, flags);
 }
 
 int
@@ -875,6 +882,11 @@ scope_isspace(int c) {
 int
 scope_isprint(int c) {
     return scopelibc_isprint(c);
+}
+
+int
+scope_isdigit(int c) {
+    return scopelibc_isdigit(c);
 }
 
 void

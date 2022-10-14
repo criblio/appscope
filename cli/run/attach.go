@@ -59,13 +59,16 @@ func (rc *Config) Attach(args []string) error {
 	}
 
 	// Create ldscope
-	if err := createLdscope(); err != nil {
+	if err := CreateLdscope(); err != nil {
 		return errCreateLdscope
 	}
 	// Normal operational, not passthrough, create directory for this run
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
 	env := os.Environ()
+	// Disable detection of a scope filter file with this command
+	env = append(env, "SCOPE_FILTER=false")
+
 	if rc.NoBreaker {
 		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
 	}
@@ -86,7 +89,7 @@ func (rc *Config) Attach(args []string) error {
 		env = append(env, "SCOPE_CONF_RELOAD="+filepath.Join(rc.WorkDir, "scope.yml"))
 	}
 
-	ld := loader.ScopeLoader{Path: ldscopePath()}
+	ld := loader.ScopeLoader{Path: LdscopePath()}
 	if !rc.Subprocess {
 		return ld.Attach(args, env)
 	}
@@ -110,11 +113,11 @@ func (rc *Config) Detach(args []string) error {
 	env := os.Environ()
 
 	// Create ldscope
-	if err := createLdscope(); err != nil {
+	if err := CreateLdscope(); err != nil {
 		return errCreateLdscope
 	}
 
-	ld := loader.ScopeLoader{Path: ldscopePath()}
+	ld := loader.ScopeLoader{Path: LdscopePath()}
 	if !rc.Subprocess {
 		return ld.Detach(args, env)
 	}

@@ -107,6 +107,7 @@ void* scope_memcpy(void *, const void *, size_t);
 int   scope_mlock(const void *, size_t);
 int   scope_msync(void *, size_t, int);
 int   scope_mincore(void *, size_t, unsigned char *);
+int   scope_memfd_create(const char *, unsigned int);
 
 // File handling operations
 FILE*          scope_fopen(const char *, const char *);
@@ -223,6 +224,7 @@ uint16_t        scope_htons(uint16_t);
 int           scope_atoi(const char *);
 int           scope_isspace(int);
 int           scope_isprint(int);
+int           scope_isdigit(int);
 void          scope_perror(const char *);
 int           scope_gettimeofday(struct timeval *, struct timezone *);
 int           scope_timer_create(clockid_t, struct sigevent *, timer_t *);

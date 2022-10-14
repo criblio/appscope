@@ -50,7 +50,7 @@ Available Subcommands:
   ps          List processes currently being scoped
   run         Executes a scoped command
   service     Configure a systemd/OpenRC service to be scoped
-  start       Start a scoped process list
+  start       Start scoping a filtered selection of processes and services
   version     Display scope version
   watch       Executes a scoped command on an interval
 
@@ -542,14 +542,14 @@ scope service cribl -c tls://in.my-instance.cribl.cloud:10090
 ### start
 ---
 
-Perform a scope start operation based on the filter input.
+Start scoping a filtered selection of processes and services on the host and in all relevant containers.
 
-Following actions will be performed:
-- extraction libscope.so to /tmp/libscope.so on the host and on the containers
-- extraction filter input to /tmp/scope_filter on the host and on the containers
-- setup etc/profile script to use LD_PRELOAD=/tmp/libscope.so on the host and on the containers
-- setup the services which meet the allow list conditions on the host and on the containers
-- attach to the processes which meet the allow list conditions on the host and on the containers
+The following actions will be performed on the host and in all relevant containers:
+- Extraction of libscope.so to /usr/lib/appscope/<version>/ or /tmp/appscope/<version>/
+- Extraction of the filter input to /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter
+- Attach to all existing "allowed" processes defined in the filter file
+- Install etc/profile.d/scope.sh script to preload /usr/lib/appscope/<version>/libscope.so or /tmp/appscope/<version>/libscope.so
+- Modify the relevant service configurations to preload /usr/lib/appscope/<version>/libscope.so or /tmp/appscope/<version>/libscope.so
 
 #### Usage
 
@@ -565,6 +565,7 @@ cat example_filter.json | scope start
 #### Flags
 
 ```
+  -f, --force   Use this flag when you're sure you want to run scope start
   -h, --help    help for start
 ```
 

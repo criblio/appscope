@@ -389,19 +389,19 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
 static bool
 createCron(const char *scopePath, const char* filterPath) {
     int outFd;
-    char buf[1024];
+    char buf[1024] = {0};
     char path[PATH_MAX] = {0};
 
     // Create the script to be executed by cron
     if (scope_snprintf(path, sizeof(path), SCOPE_SCRIPT_PATH) < 0) {
         scope_perror("createCron: script path: error: snprintf() failed\n");
-        scope_fprintf(scope_stdout, "path: %s\n", path);
+        scope_fprintf(scope_stderr, "path: %s\n", path);
         return FALSE;
     }
 
     if ((outFd = scope_open(path, O_RDWR | O_CREAT, 0775)) == -1) {
         scope_perror("createCron: script path: scope_open failed");
-        scope_fprintf(scope_stdout, "path: %s\n", path);
+        scope_fprintf(scope_stderr, "path: %s\n", path);
         return FALSE;
     }
 
@@ -414,47 +414,49 @@ createCron(const char *scopePath, const char* filterPath) {
 
     if (scope_write(outFd, buf, scope_strlen(buf)) == -1) {
         scope_perror("createCron: script: scope_write failed");
-        scope_fprintf(scope_stdout, "path: %s\n", path);
+        scope_fprintf(scope_stderr, "path: %s\n", path);
         scope_close(outFd);
         return FALSE;
     }
 
     if (scope_close(outFd) == -1) {
         scope_perror("createCron: script: scope_close failed");
-        scope_fprintf(scope_stdout, "path: %s\n", path);
+        scope_fprintf(scope_stderr, "path: %s\n", path);
         return FALSE;
     }
 
+    scope_memset(path, 0, PATH_MAX);
     // Create the cron entry
     if (scope_snprintf(path, sizeof(path), SCOPE_CRON_PATH) < 0) {
         scope_perror("createCron: cron: error: snprintf() failed\n");
-        scope_fprintf(scope_stdout, "path: %s\n", path);
+        scope_fprintf(scope_stderr, "path: %s\n", path);
         return FALSE;
     }
 
+    scope_memset(buf, 0, 1024);
     if (scope_snprintf(buf, sizeof(buf), SCOPE_CRONTAB) < 0) {
         scope_perror("createCron: cron: error: snprintf() failed\n");
-        scope_fprintf(scope_stdout, "path: %s\n", path);
+        scope_fprintf(scope_stderr, "path: %s\n", path);
         return FALSE;
     }
 
     if ((outFd = scope_open(path, O_RDWR | O_CREAT, 0775)) == -1) {
         scope_perror("createCron: cron: scope_open failed");
-        scope_fprintf(scope_stdout, "path: %s\n", path);
+        scope_fprintf(scope_stderr, "path: %s\n", path);
         return FALSE;
     }
 
     // crond will detect this file entry and run on its' next cycle
     if (scope_write(outFd, buf, scope_strlen(buf)) == -1) {
         scope_perror("createCron: cron: scope_write failed");
-        scope_fprintf(scope_stdout, "path: %s\n", path);
+        scope_fprintf(scope_stderr, "path: %s\n", path);
         scope_close(outFd);
         return FALSE;
     }
 
     if (scope_close(outFd) == -1) {
         scope_perror("createCron: cron: scope_close failed");
-        scope_fprintf(scope_stdout, "path: %s\n", path);
+        scope_fprintf(scope_stderr, "path: %s\n", path);
         return FALSE;
     }
 
@@ -506,13 +508,14 @@ setHostNamespace(const char *ns) {
  * Returns TRUE if operation was success, FALSE otherwise.
  */
 static bool
-joinHostNamespace(char *hostScopePath, char *hostFilterPath) {
+joinHostNamespace(void) {
     bool status = FALSE;
     size_t ldscopeSize = 0;
     size_t cfgSize = 0;
     size_t scopeSize = 0;
     char path[PATH_MAX] = {0};
-    char hostBasePath[PATH_MAX] = {0};
+    char hostFilterPath[PATH_MAX] = {0};
+    char hostScopePath[PATH_MAX] = {0};
     char *scopeFilterCfgMem = NULL;
     char *scopeMem = NULL;
 
@@ -596,8 +599,14 @@ joinHostNamespace(char *hostScopePath, char *hostFilterPath) {
             goto cleanupMem;
         }
     }
-    // Save the host base operation path
-    scope_strncpy(hostBasePath, path, PATH_MAX);
+
+    /*
+     * Save the absolute path for binaries on host:
+     * - scope - in hostScopePath
+     * - ldscope - in path
+     * Note: path is already ended with /
+     */
+    scope_snprintf(hostScopePath, PATH_MAX, "%sscope", path);
     scope_strncat(path, "ldscope", sizeof("ldscope"));
 
     // create "ldscope" on host
@@ -616,9 +625,11 @@ joinHostNamespace(char *hostScopePath, char *hostFilterPath) {
     }
 
     // create a "scope" on host
-    scope_memset(hostFilterPath, 0, PATH_MAX);
-    scope_snprintf(hostFilterPath, PATH_MAX, "%s/scope", hostBasePath);
-    status = extractMemToFile(scopeMem, scopeSize, hostFilterPath, 0775, isDevVersion);
+    if (extractMemToFile(scopeMem, scopeSize, hostScopePath, 0775, isDevVersion) == FALSE) {
+        goto cleanupMem;
+    }
+
+    status = createCron(hostScopePath, hostFilterPath);
 
 cleanupMem:
 
@@ -659,16 +670,12 @@ nsHostStart(void) {
         scope_fprintf(scope_stderr, "error: nsHostStart failed process is running on host\n");
         return EXIT_FAILURE;
     }
-    char scopePath[PATH_MAX] = {0};
-    char filterPath[PATH_MAX] = {0};
     scope_fprintf(scope_stdout, "Executing from a container, run the start command from the host\n");
 
-    if (joinHostNamespace(scopePath, filterPath) == FALSE) {
+    if (joinHostNamespace() == FALSE) {
         scope_fprintf(scope_stderr, "error: joinHostNamespace failed\n");
         return EXIT_FAILURE;
     }
-
-    createCron(scopePath, filterPath);
 
     return EXIT_SUCCESS;
 }

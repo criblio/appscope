@@ -389,7 +389,7 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
 static bool
 createCron(const char *scopePath, const char* filterPath) {
     int outFd;
-    char buf[1024];
+    char buf[1024] = {0};
     char path[PATH_MAX] = {0};
 
     // Create the script to be executed by cron

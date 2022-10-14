@@ -506,13 +506,14 @@ setHostNamespace(const char *ns) {
  * Returns TRUE if operation was success, FALSE otherwise.
  */
 static bool
-joinHostNamespace(char *hostScopePath, char *hostFilterPath) {
+joinHostNamespace(void) {
     bool status = FALSE;
     size_t ldscopeSize = 0;
     size_t cfgSize = 0;
     size_t scopeSize = 0;
     char path[PATH_MAX] = {0};
-    char hostBasePath[PATH_MAX] = {0};
+    char hostFilterPath[PATH_MAX] = {0};
+    char hostScopePath[PATH_MAX] = {0};
     char *scopeFilterCfgMem = NULL;
     char *scopeMem = NULL;
 
@@ -596,8 +597,12 @@ joinHostNamespace(char *hostScopePath, char *hostFilterPath) {
             goto cleanupMem;
         }
     }
-    // Save the host base operation path
-    scope_strncpy(hostBasePath, path, PATH_MAX);
+
+    /*
+     * Save the host base operation path. 
+     * Path is already ended with /
+     */
+    scope_snprintf(hostScopePath, PATH_MAX, "%sscope", path);
     scope_strncat(path, "ldscope", sizeof("ldscope"));
 
     // create "ldscope" on host
@@ -616,9 +621,11 @@ joinHostNamespace(char *hostScopePath, char *hostFilterPath) {
     }
 
     // create a "scope" on host
-    scope_memset(hostFilterPath, 0, PATH_MAX);
-    scope_snprintf(hostFilterPath, PATH_MAX, "%s/scope", hostBasePath);
-    status = extractMemToFile(scopeMem, scopeSize, hostFilterPath, 0775, isDevVersion);
+    if (extractMemToFile(scopeMem, scopeSize, hostScopePath, 0775, isDevVersion) == FALSE) {
+        goto cleanupMem;
+    }
+
+    status = createCron(hostScopePath, hostFilterPath);
 
 cleanupMem:
 
@@ -659,16 +666,12 @@ nsHostStart(void) {
         scope_fprintf(scope_stderr, "error: nsHostStart failed process is running on host\n");
         return EXIT_FAILURE;
     }
-    char scopePath[PATH_MAX] = {0};
-    char filterPath[PATH_MAX] = {0};
     scope_fprintf(scope_stdout, "Executing from a container, run the start command from the host\n");
 
-    if (joinHostNamespace(scopePath, filterPath) == FALSE) {
+    if (joinHostNamespace() == FALSE) {
         scope_fprintf(scope_stderr, "error: joinHostNamespace failed\n");
         return EXIT_FAILURE;
     }
-
-    createCron(scopePath, filterPath);
 
     return EXIT_SUCCESS;
 }

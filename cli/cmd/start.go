@@ -45,7 +45,7 @@ var startCmd = &cobra.Command{
 			os.Exit(0)
 		}
 		if err := start.Start(); err != nil {
-			util.ErrAndExit("Exiting due to start failure. See the logs for more info.")
+			util.ErrAndExit("Exiting due to start failure: %v", err)
 		}
 	},
 }

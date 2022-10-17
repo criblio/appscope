@@ -13,6 +13,8 @@
 #define OPENRC_DIR "/etc/rc.conf"
 #define SYSTEMD_DIR "/etc/systemd"
 #define INITD_DIR "/etc/init.d"
+#define PROFILE_SCRIPT "#! /bin/bash\nlib_found=0\nfilter_found=0\nif test -f /usr/lib/appscope/*/libscope.so; then\n    lib_found=1\nfi\nif test -f /usr/lib/appscope/scope_filter; then\n    filter_found=1\nelif test -f /tmp/appscope/scope_filter; then\n    filter_found=1\nfi\nif [ $lib_found == 1 ] && [ $filter_found == 1 ]; then\n    export LD_PRELOAD=\"%s $LD_PRELOAD\"\nfi\n"
+//#define PROFILE_SCRIPT "export LD_PRELOAD=\"%s $LD_PRELOAD\"\n"
 
 typedef enum {
     SERVICE_CFG_ERROR,
@@ -429,7 +431,16 @@ setupService(const char *serviceName) {
  * Returns status of operation TRUE in case of success, FALSE otherwise
  */
 static bool
-setupProfile(const char* libscopePath) {
+setupProfile(const char *libscopePath) {
+
+    /*
+     * If the env var is set to anything, return.
+     * Should use the utils func for this. However, it
+     * requires libscope specifics that we don't want here.
+     * Should fix that.
+     */
+    if (scope_getenv("SCOPE_START_NOPROFILE")) return TRUE;
+
     char buf[PATH_MAX] = {0};
     int fd = scope_open("/etc/profile.d/scope.sh", O_CREAT | O_RDWR | O_TRUNC, 0644);
 
@@ -438,7 +449,7 @@ setupProfile(const char* libscopePath) {
         return FALSE;
     }
 
-    size_t len = scope_snprintf(buf, sizeof(buf), "export LD_PRELOAD=\"%s $LD_PRELOAD\"\n", libscopePath);
+    size_t len = scope_snprintf(buf, sizeof(buf), PROFILE_SCRIPT, libscopePath);
     if (scope_write(fd, buf, len) != len) {
         scope_perror("scope_write failed");
         scope_close(fd);
@@ -545,9 +556,15 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
     bool isDevVersion = libverIsNormVersionDev(loaderVersion);
 
+    /*
+     * A profile will not be configured with a dev version value.
+     * Force a profile update if the env var is present.
+     */
+    char *forcep = getenv("SCOPE_START_FORCE_PROFILE");
+
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
     mkdir_status_t res = libdirCreateDirIfMissing(path);
-    if ((res > MKDIR_STATUS_EXISTS) || (isDevVersion)) {
+    if ((res > MKDIR_STATUS_EXISTS) || (isDevVersion && !forcep)) {
         scope_memset(path, 0, PATH_MAX);
         scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
         mkdir_status_t res = libdirCreateDirIfMissing(path);
@@ -567,10 +584,15 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
         }
     }
 
-    // Setup /etc/profile.d/scope.sh
-    if (setupProfile(path) == FALSE) {
-        scope_fprintf(scope_stderr, "setupConfigure: setupProfile failed\n");
-        return -1;
+    /*
+     * Setup /etc/profile.d/scope.sh
+     * Only update the profile if we are using the system dir.
+     */
+    if (scope_strstr(path, "/usr/lib")) {
+        if (setupProfile(path) == FALSE) {
+            scope_fprintf(scope_stderr, "setupConfigure: setupProfile failed\n");
+            return -1;
+        }
     }
 
     // Extract libscope.so

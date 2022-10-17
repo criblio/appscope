@@ -209,6 +209,8 @@ typedef struct
 //    SCOPE_ALLOW_CONSTRUCT_DBG      allows debug inside the constructor
 //    SCOPE_ERROR_SIGNAL_HANDLER     allows to register SIGSEGV&SIGBUS handler
 //    SCOPE_QUEUE_LENGTH             override default circular buffer sizes
+//    SCOPE_START_NOPROFILE          cause the start command to ignore updates to /etc/profile.d
+//    SCOPE_START_FORCE_PROFILE      force the start command to update profile.d with a dev version
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"
 

@@ -11,7 +11,7 @@
 #define SCOPE_CRONTAB "* * * * * root /tmp/scope_att.sh\n"
 #define SCOPE_CRON_PATH "/etc/cron.d/scope_cron"
 #define SCOPE_SCRIPT_PATH "/tmp/scope_att.sh"
-#define SCOPE_START_SCRIPT "#! /bin/bash\nrm /etc/cron.d/scope_cron\n%s start -f < %s\nrm -- $0\n"
+#define SCOPE_START_SCRIPT "#! /bin/bash\nrm /etc/cron.d/scope_cron\n%s start %s -f < %s\nrm -- $0\n"
 
 /*
  * Extract memory to specific output file.
@@ -246,7 +246,7 @@ nsConfigure(pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize) {
         return EXIT_FAILURE;
     }
 
-    if (setupConfigure(scopeCfgFilterMem, filterFileSize)) {
+    if (setupConfigure(scopeCfgFilterMem, filterFileSize, TRUE)) {
         scope_fprintf(scope_stderr, "setup child namespace failed\n");
         return EXIT_FAILURE;
     }
@@ -388,10 +388,11 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
  * This should be called after the fs namespace has been switched.
  */
 static bool
-createCron(const char *scopePath, const char* filterPath) {
+createCron(const char *scopePath, const char *filterPath, bool etcSetup) {
     int outFd;
     char buf[1024] = {0};
     char path[PATH_MAX] = {0};
+    const char *setupProfileOpt = etcSetup ? "" : "--noprofile";
 
     // Create the script to be executed by cron
     if (scope_snprintf(path, sizeof(path), SCOPE_SCRIPT_PATH) < 0) {
@@ -407,7 +408,7 @@ createCron(const char *scopePath, const char* filterPath) {
     }
 
     // Write cron action - scope start
-    if (scope_snprintf(buf, sizeof(buf), SCOPE_START_SCRIPT, scopePath, filterPath) < 0) {
+    if (scope_snprintf(buf, sizeof(buf), SCOPE_START_SCRIPT, scopePath, setupProfileOpt, filterPath) < 0) {
         scope_perror("createCron: script: error: snprintf() failed\n");
         scope_close(outFd);
         return FALSE;
@@ -509,7 +510,7 @@ setHostNamespace(const char *ns) {
  * Returns TRUE if operation was success, FALSE otherwise.
  */
 static bool
-joinHostNamespace(void) {
+joinHostNamespace(bool etcSetup) {
     bool status = FALSE;
     size_t ldscopeSize = 0;
     size_t cfgSize = 0;
@@ -630,7 +631,7 @@ joinHostNamespace(void) {
         goto cleanupMem;
     }
 
-    status = createCron(hostScopePath, hostFilterPath);
+    status = createCron(hostScopePath, hostFilterPath, etcSetup);
 
 cleanupMem:
 
@@ -666,14 +667,14 @@ isRunningInContainer(void) {
  * Returns exit code of operation
  */
 int
-nsHostStart(void) {
+nsHostStart(bool etcSetup) {
      if (isRunningInContainer() == FALSE) {
         scope_fprintf(scope_stderr, "error: nsHostStart failed process is running on host\n");
         return EXIT_FAILURE;
     }
     scope_fprintf(scope_stdout, "Executing from a container, run the start command from the host\n");
 
-    if (joinHostNamespace() == FALSE) {
+    if (joinHostNamespace(etcSetup) == FALSE) {
         scope_fprintf(scope_stderr, "error: joinHostNamespace failed\n");
         return EXIT_FAILURE;
     }

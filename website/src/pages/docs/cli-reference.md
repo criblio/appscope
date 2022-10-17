@@ -565,8 +565,9 @@ cat example_filter.json | scope start
 #### Flags
 
 ```
-  -f, --force   Use this flag when you're sure you want to run scope start
-  -h, --help    help for start
+  -f, --force       Use this flag when you're sure you want to run scope start
+  -h, --help        help for start
+  -n, --noprofile   Skip install preload script in etc/profile.d/scope.sh
 ```
 
 ### version

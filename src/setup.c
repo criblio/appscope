@@ -531,14 +531,14 @@ closeFd:
 
  /*
  * Configure the environment
- * - setup /etc/profile.d/scope.sh
+ * - setup /etc/profile.d/scope.sh (depending on etcSetup)
  * - extract memory to filter file /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter
  * - extract libscope.so to /usr/lib/appscope/<version>/libscope.so or /tmp/appscope/<version>/libscope.so if it doesn't exists
  * - patch the library
  * Returns status of operation 0 in case of success, other value otherwise
  */
 int
-setupConfigure(void *filterFileMem, size_t filterSize) {
+setupConfigure(void *filterFileMem, size_t filterSize, bool etcSetup) {
     char path[PATH_MAX] = {0};
 
     // Create destination directory if not exists
@@ -568,7 +568,7 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
     }
 
     // Setup /etc/profile.d/scope.sh
-    if (setupProfile(path) == FALSE) {
+    if (etcSetup && (setupProfile(path) == FALSE)) {
         scope_fprintf(scope_stderr, "setupConfigure: setupProfile failed\n");
         return -1;
     }

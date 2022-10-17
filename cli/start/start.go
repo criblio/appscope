@@ -153,9 +153,9 @@ func startAttach(allowProcs []allowProcConfig) error {
 }
 
 // for the host
-func startConfigureHost(filename string) error {
+func startConfigureHost(filename string, noProfile bool) error {
 	sL := loader.ScopeLoader{Path: run.LdscopePath()}
-	stdoutStderr, err := sL.ConfigureHost(filename)
+	stdoutStderr, err := sL.ConfigureHost(filename, noProfile)
 	if err != nil {
 		log.Warn().
 			Err(err).
@@ -416,7 +416,8 @@ func extractFilterFile(cfgData []byte) (string, error) {
 }
 
 // Start performs setup of scope in the host and containers
-func Start() error {
+// optionally disable setup /etc/profile script
+func Start(noProfile bool) error {
 	// Create a history directory for logs
 	createWorkDir()
 
@@ -465,7 +466,7 @@ func Start() error {
 		}
 
 		ld := loader.ScopeLoader{Path: filepath.Join(scopeDirVersion, "ldscope")}
-		stdoutStderr, err := ld.StartHost()
+		stdoutStderr, err := ld.StartHost(noProfile)
 		if err == nil {
 			log.Info().
 				Msgf("Start host success.")
@@ -493,7 +494,7 @@ func Start() error {
 		return err
 	}
 
-	if err := startConfigureHost(filterPath); err != nil {
+	if err := startConfigureHost(filterPath, noProfile); err != nil {
 		return err
 	}
 

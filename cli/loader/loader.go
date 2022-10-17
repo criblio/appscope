@@ -12,11 +12,15 @@ type ScopeLoader struct {
 	Path string
 }
 
-// - Setup /etc/profile.d/scope.sh on host
+// - Setup /etc/profile.d/scope.sh on host (depending on noProfile arg)
 // - Extract libscope.so to /usr/lib/appscope/<version>/libscope.so /tmp/appscope/<version>/libscope.so on host
 // - Extract filter input to /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter on host
-func (sL *ScopeLoader) ConfigureHost(filterFilePath string) (string, error) {
-	return sL.RunSubProc([]string{"--configure", filterFilePath}, os.Environ())
+func (sL *ScopeLoader) ConfigureHost(filterFilePath string, noProfile bool) (string, error) {
+	cfgArgs := []string{"--configure", filterFilePath}
+	if noProfile {
+		cfgArgs = append(cfgArgs, "--noprofile")
+	}
+	return sL.RunSubProc(cfgArgs, os.Environ())
 }
 
 // - Setup /etc/profile.d/scope.sh in containers
@@ -51,8 +55,12 @@ func (sL *ScopeLoader) AttachSubProc(args []string, env []string) (string, error
 
 // Used when scope has detected that we are running the `scope start` command inside a container
 // Tell ldscope to run the `scope start` command on the host instead
-func (sL *ScopeLoader) StartHost() (string, error) {
-	return sL.RunSubProc([]string{"--starthost"}, os.Environ())
+func (sL *ScopeLoader) StartHost(noProfile bool) (string, error) {
+	startHostArgs := []string{"--starthost"}
+	if noProfile {
+		startHostArgs = append(startHostArgs, "--noprofile")
+	}
+	return sL.RunSubProc(startHostArgs, os.Environ())
 }
 
 func (sL *ScopeLoader) Run(args []string, env []string) error {

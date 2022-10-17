@@ -44,7 +44,8 @@ var startCmd = &cobra.Command{
 			fmt.Println("\nIf you wish to proceed, run again with the -f flag.")
 			os.Exit(0)
 		}
-		if err := start.Start(); err != nil {
+		noProfile, _ := cmd.Flags().GetBool("noprofile")
+		if err := start.Start(noProfile); err != nil {
 			util.ErrAndExit("Exiting due to start failure: %v", err)
 		}
 	},
@@ -52,6 +53,7 @@ var startCmd = &cobra.Command{
 
 func init() {
 	startCmd.Flags().BoolP("force", "f", false, "Use this flag when you're sure you want to run scope start")
+	startCmd.Flags().BoolP("noprofile", "n", false, "Skip install preload script in etc/profile.d/scope.sh")
 
 	RootCmd.AddCommand(startCmd)
 }

@@ -534,6 +534,7 @@ showUsage(char *prog)
       "  -s, --service SERVICE        setup specified service NAME\n"
       "  -n  --namespace PID          perform service/configure operation on specified container PID\n"
       "  -p, --patch SO_FILE          patch specified libscope.so\n"
+      "  -m, --noprofile              skip any modifications in /etc/profile.d/\n"
       "  -r, --starthost              execute the scope start command in a host context with (must be run in the container)\n"
       "\n"
       "Help sections are OVERVIEW, CONFIGURATION, METRICS, EVENTS, and PROTOCOLS.\n"
@@ -561,6 +562,7 @@ static struct option opts[] = {
     { "service",    required_argument,    0, 's' },
     { "libbasedir", required_argument,    0, 'l' },
     { "patch",      required_argument,    0, 'p' },
+    { "noprofile",  no_argument,          0, 'm' },
     { "starthost",  no_argument,          0, 'r' },
     { 0, 0, 0, 0 }
 };
@@ -575,7 +577,8 @@ main(int argc, char **argv, char **env)
     char path[PATH_MAX] = {0};
     int pid = -1;
     char attachType = 'u';
-
+    bool etcSetup = TRUE;
+    bool startHostOp = FALSE;
     // process command line
     for (;;) {
         int index = 0;
@@ -587,7 +590,7 @@ main(int argc, char **argv, char **env)
         // The initial `:` lets us handle options with optional values like
         // `-h` and `-h SECTION`.
         //
-        int opt = getopt_long(argc, argv, "+:uh:a:d:n:l:f:p:c:s:r", opts, &index);
+        int opt = getopt_long(argc, argv, "+:uh:a:d:n:l:f:p:c:s:rm", opts, &index);
         if (opt == -1) {
             break;
         }
@@ -622,8 +625,7 @@ main(int argc, char **argv, char **env)
             case 'f':
                 // accept -f as alias for -l for BC
             case 'l':
-                if (libdirSetLibraryBase(optarg))
-                {
+                if (libdirSetLibraryBase(optarg)) {
                     return EXIT_FAILURE;
                 }
                 break;
@@ -631,7 +633,10 @@ main(int argc, char **argv, char **env)
                 return (loaderOpPatchLibrary(optarg) == PATCH_SUCCESS) ? EXIT_SUCCESS : EXIT_FAILURE;
                 break;
             case 'r':
-                return nsHostStart();
+                startHostOp = TRUE;
+                break;
+            case 'm':
+                etcSetup = FALSE;
                 break;
             case ':':
                 // options missing their value end up here
@@ -652,6 +657,10 @@ main(int argc, char **argv, char **env)
                 showUsage(scope_basename(argv[0]));
                 return EXIT_FAILURE;
         }
+    }
+
+    if (startHostOp) {
+        return nsHostStart(etcSetup);
     }
 
     // either --attach, --detach, --configure, --service or a command are required
@@ -751,7 +760,7 @@ main(int argc, char **argv, char **env)
 
         if (pid == -1) {
             // Configure on Host
-            status = setupConfigure(confgFilterMem, configFilterSize);
+            status = setupConfigure(confgFilterMem, configFilterSize, etcSetup);
         } else {
             // Configure on Container
             pid_t nsContainerPid = 0;

@@ -340,8 +340,8 @@ func getStartData() []byte {
 		return startData
 	}
 
-	// Verify size of data for mode other than a pipe
-	if stdinFs.Size() == 0 && stdinFs.Mode()&os.ModeNamedPipe == 0 {
+	// Avoid waiting for input from terminal when no data was provided
+	if stdinFs.Mode()&os.ModeCharDevice != 0 && stdinFs.Size() == 0 {
 		return startData
 	}
 

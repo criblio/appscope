@@ -14,7 +14,6 @@
 #define SYSTEMD_DIR "/etc/systemd"
 #define INITD_DIR "/etc/init.d"
 #define PROFILE_SCRIPT "#! /bin/bash\nlib_found=0\nfilter_found=0\nif test -f /usr/lib/appscope/*/libscope.so; then\n    lib_found=1\nfi\nif test -f /usr/lib/appscope/scope_filter; then\n    filter_found=1\nelif test -f /tmp/appscope/scope_filter; then\n    filter_found=1\nfi\nif [ $lib_found == 1 ] && [ $filter_found == 1 ]; then\n    export LD_PRELOAD=\"%s $LD_PRELOAD\"\nfi\n"
-//#define PROFILE_SCRIPT "export LD_PRELOAD=\"%s $LD_PRELOAD\"\n"
 
 typedef enum {
     SERVICE_CFG_ERROR,

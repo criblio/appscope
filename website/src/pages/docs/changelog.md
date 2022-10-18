@@ -30,11 +30,11 @@ AppScope 1.2.0 introduces substantial new functionality:
 - To attach to or detach from a process running in a container, it is no longer necessary to run AppScope within the container. You can just scope the container processes from the host.  Related issues: [#1061](https://github.com/criblio/appscope/issues/1061),
 [#1119](https://github.com/criblio/appscope/issues/1119).
 
-- Support for executables built with Go 1.19. (This release also removes support for executables built with Go 1.8.) Related issues: [#1073](https://github.com/criblio/appscope/issues/1073).
+- Support for executables built with Go 1.19. (This release also removes support for executables built with Go 1.8.) Related issue: [#1073](https://github.com/criblio/appscope/issues/1073).
 
 - Integration with Cribl Edge and Cribl Stream.
 
-This release also improves the `scope ps` command, which now lists all scoped processes rather than listing all processes into which the library was loaded. Related issues: [#1097](https://github.com/criblio/appscope/issues/1097).
+This release also improves the `scope ps` command, which now lists all scoped processes rather than listing all processes into which the library was loaded. Related issue: [#1097](https://github.com/criblio/appscope/issues/1097).
 
 ## AppScope 1.1.3
 

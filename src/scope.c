@@ -226,28 +226,31 @@ attachCmd(pid_t pid, bool attach)
             scope_printf("Reattaching to pid %d\n", pid);
         }
 
-        for (i = 0; environ[i]; i++) {
-            if ((scope_strlen(environ[i]) > 6) && scope_strncmp(environ[i], "SCOPE_", 6) == 0) {
-                scope_dprintf(fd, "%s\n", environ[i]);
-            }
-        }
-
         /*
-         * Reload the configuration during first attach & reattach if we want to apply
-         * config from a file &/or env vars
-         */
+        * Reload the configuration during first attach & reattach if we want to apply
+        * config from a environment variable
+        * Handle SCOPE_CONF_RELOAD in first order because of "processReloadConfig" logic
+        * is done in two steps:
+        * - first - create a configuration based on path (default one or custom one)
+        * - second - process env variables existing in the process (cfgProcessEnvironment)
+        * We append rest of the SCOPE_ variables after since in this way we ovewrite the ones
+        * which was set by cfgProcessEnvironment in second step.
+        * TODO: Handle the file and env variables
+        */
         char *scopeConfReload = getenv("SCOPE_CONF_RELOAD");
-        scope_memset(buf, 0, PATH_MAX);
-        if (scopeConfReload) {
-            scope_snprintf(buf, sizeof(buf), "SCOPE_CONF_RELOAD=%s\n", scopeConfReload);
+        if (!scopeConfReload) {
+            scope_dprintf(fd, "SCOPE_CONF_RELOAD=TRUE\n");
         } else {
-            scope_snprintf(buf, sizeof(buf), "SCOPE_CONF_RELOAD=TRUE\n");
+            scope_dprintf(fd, "SCOPE_CONF_RELOAD=%s\n", scopeConfReload);
         }
 
-        if (scope_write(fd, buf, scope_strlen(buf)) <= 0) {
-            scope_perror("scope_write() failed");
-            scope_close(fd);
-            return EXIT_FAILURE;
+        for (i = 0; environ[i]; ++i) {
+            size_t envLen = scope_strlen(environ[i]);
+            if ((envLen > 6) &&
+                (scope_strncmp(environ[i], "SCOPE_", 6) == 0) &&
+                (!scope_strstr(environ[i], "SCOPE_CONF_RELOAD"))) {
+                    scope_dprintf(fd, "%s\n", environ[i]);
+            }
         }
     } else {
         scope_printf("Detaching from pid %d\n", pid);

@@ -19,7 +19,7 @@ Assets are available via Docker and the Cribl CDN at the links below.
 
 AppScope 1.2.0 introduces substantial new functionality:
 
-- A new usage model that decouples AppScope's two fundamental actions: (1) loading its library into a process, and (2) interposing the process' functions. Loading the library must happen first, and by itself does not constitute "scoping." When the library is loaded **and** functions are being interposed, we say the process is "scoped."
+- A new usage model that decouples AppScope's two fundamental actions: (1) loading its library into a process, and (2) interposing the process' functions. Loading the library must happen first, and by itself does not constitute "scoping." We say a process is "scoped" when AppScope has loaded the library **and** is interposing functions. 
 
 - The new `scope start` command. This command supports the new usage model: it can either just load the library into a process, or both load the library and start interposing functions.
 

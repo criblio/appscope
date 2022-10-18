@@ -21,7 +21,7 @@ func getStartUsage(version string) string {
 	- Extraction of libscope.so to /usr/lib/appscope/%s/ or /tmp/appscope/%s/
 	- Extraction of the filter input to /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter
 	- Attach to all existing "allowed" processes defined in the filter file
-	- Install etc/profile.d/scope.sh script to preload /usr/lib/appscope/%s/libscope.so or /tmp/appscope/%s/libscope.so
+	- Install etc/profile.d/scope.sh script to preload /usr/lib/appscope/%s/libscope.so if it exists
 	- Modify the relevant service configurations to preload /usr/lib/appscope/%s/libscope.so or /tmp/appscope/%s/libscope.so`, version, version, version, version, version, version)
 }
 

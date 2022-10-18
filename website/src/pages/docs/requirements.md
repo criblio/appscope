@@ -36,12 +36,11 @@ The distros that AppScope supports all require the use of `/tmp`, `/dev/shm`, an
 
 **Only** these runtimes are supported: 
 
-- Open JVM 7 and later, Oracle JVM 7 and later, go1.8 through go1.18.
+- Open JVM 7 and later, Oracle JVM 7 and later, go1.9 through go1.19.
 
 AppScope cannot:
 
 - Unload the libscope library, once loaded.
-- Unattach/detach from a running process, once attached.
 - Instrument static executables that are not written in Go.
 - Instrument Go executables on ARM.
 - Attach to any static application.

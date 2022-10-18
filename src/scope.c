@@ -127,8 +127,7 @@ attachCmd(pid_t pid, bool attach)
     int fd, sfd, mfd;
     bool first_attach = FALSE;
     export_sm_t *exaddr;
-    char buf[PATH_MAX];
-    char path[PATH_MAX];
+    char buf[PATH_MAX] = {0};
 
     /*
      * The SM segment is used in the first attach case where
@@ -164,7 +163,7 @@ attachCmd(pid_t pid, bool attach)
      *   Reattach: attach command = true, include env vars, reload command
      *   Detach: attach command = false, no env vars, no reload command
      */
-    scope_snprintf(path, sizeof(path), "%s/%s.%d",
+    scope_snprintf(buf, sizeof(buf), "%s/%s.%d",
                    DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, pid);
 
     /*
@@ -173,8 +172,8 @@ attachCmd(pid_t pid, bool attach)
      * sealed (still processed on library side).
      * File sealing is supported on tmpfs - /dev/shm (DYN_CONFIG_CLI_DIR).
      */
-    scope_unlink(path);
-    fd = scope_open(path, O_WRONLY|O_CREAT);
+    scope_unlink(buf);
+    fd = scope_open(buf, O_WRONLY|O_CREAT);
     if (fd == -1) {
         scope_perror("scope_open() of dynamic config file");
         return EXIT_FAILURE;
@@ -238,7 +237,7 @@ attachCmd(pid_t pid, bool attach)
          * config from a file &/or env vars
          */
         char *scopeConfReload = getenv("SCOPE_CONF_RELOAD");
-
+        scope_memset(buf, 0, PATH_MAX);
         if (scopeConfReload) {
             scope_snprintf(buf, sizeof(buf), "SCOPE_CONF_RELOAD=%s\n", scopeConfReload);
         } else {
@@ -259,6 +258,7 @@ attachCmd(pid_t pid, bool attach)
     int rc = EXIT_SUCCESS;
 
     if (first_attach == TRUE) {
+        scope_memset(buf, 0, PATH_MAX);
         // the only command we do in this case is first attach
         scope_snprintf(buf, sizeof(buf), "/proc/%d/fd/%d", pid, sfd);
         if ((mfd = scope_open(buf, O_RDONLY)) == -1) {

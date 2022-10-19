@@ -10,7 +10,7 @@
  * Returns normalized version string
  * - "dev" for unofficial release
  * - "%d.%d.%d" for official release (e.g. "1.3.0" for "v1.3.0")
- * - "%d.%d.%d%s" for candidate release (e.g. "1.3.0-rc0" for "v1.3.0-rc0")
+ * - "%d.%d.%d-%s%d" for candidate release (e.g. "1.3.0-rc0" for "v1.3.0-rc0")
  */
 const char *
 libverNormalizedVersion(const char *version) {

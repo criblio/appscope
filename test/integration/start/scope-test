@@ -4,6 +4,8 @@ DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
 FAILED_TEST_LIST=""
 FAILED_TEST_COUNT=0
 
+SCOPE_VERSION_TYPE="dev"
+
 fail() { ERR+=1; echo >&2 "fail:" $@; }
 
 starttest(){
@@ -31,14 +33,37 @@ endtest(){
     echo "*************** $CURRENT_TEST $RESULT ***************"
     echo ""
     echo ""
-
 }
+
+cleanupAfterStart() {
+if [ -f "/etc/profile.d/scope.sh" ] ; then
+    rm "/etc/profile.d/scope.sh"
+fi
+
+if [ -d "/usr/lib/appscope" ] ; then
+    rm -r "/usr/lib/appscope"
+fi
+
+if [ -d "/tmp/appscope" ] ; then
+    rm -r "/tmp/appscope"
+fi
+}
+
+#Identify if version used in this test is official or not
+SCOPE_VERSION=$(scope version --summary)
+rx='^v([0-9]+\.){0,2}(\*|[0-9]+)$'
+if [[ $SCOPE_VERSION =~ $rx ]]; then
+    SCOPE_VERSION_TYPE="official"
+    echo "INFO: Scope version $SCOPE_VERSION will be tested as an official version."
+else
+    echo "INFO: Scope version $SCOPE_VERSION will be tested as a developer version."
+fi
 
 #
 # scope start
 #
 
-starttest scope_start
+starttest scope_start_basic
 
 # Star processses
 memcached -u root &
@@ -69,15 +94,21 @@ if [ ! -f $LIBSCOPE_PATH ]; then
     fail "missing $LIBSCOPE_PATH"
 fi
 
-# check if etc/profile.d was updated
-if [ ! -f /etc/profile.d/scope.sh ]; then
-    fail "missing /etc/profile.d/scope.sh"
-fi
+# check if etc/profile.d was update for official version and not in case of dev version
+if [ $SCOPE_VERSION_TYPE = "official" ]; then
+    if [ ! -f /etc/profile.d/scope.sh ]; then
+        fail "missing /etc/profile.d/scope.sh for official version"
+    fi
 
-# check the content of etc/profile.d/scope.sh
-grep -q "export LD_PRELOAD=$libscopePath" /etc/profile.d/scope.sh
-if [ $? -ne "0" ]; then
-    fail "missing export LD_PRELOAD in /etc/profile.d/scope.sh"
+    # check the content of etc/profile.d/scope.sh
+    count=$(grep "$LIBSCOPE_PATH" "/etc/profile.d/scope.sh" | wc -l)
+    if [ $count -ne 2 ] ; then
+        fail "missing $LIBSCOPE_PATH in /etc/profile.d/scope.sh"
+    fi
+else
+    if [ -f /etc/profile.d/scope.sh ]; then
+        fail "/etc/profile.d/scope.sh should not be present by default for dev version"
+    fi
 fi
 
 curl localhost:80
@@ -90,7 +121,7 @@ if [ ! -f /tmp/redis_events.log ]; then
 fi
 
 # check the content of redis_events.log
-grep -q '"cmd":"redis-server' /tmp/redis_events.log
+grep -q '"cmd":"redis-server' "/tmp/redis_events.log"
 if [ $? -ne "0" ]; then
     fail "missing redis-server cmd in /tmp/redis_events.log"
 fi
@@ -108,7 +139,7 @@ if [ ! -f /tmp/nginx_events.log ]; then
     fail "missing /tmp/nginx_events.log"
 fi
 
-grep -q '"cmd":"nginx: worker process"' /tmp/nginx_events.log
+grep -q '"cmd":"nginx: worker process"' "/tmp/nginx_events.log"
 if [ $? -ne "0" ]; then
     fail "missing nginx: worker process cmd in /tmp/nginx_events.log"
 fi
@@ -132,7 +163,63 @@ if [ $? -ne "0" ]; then
     fail "mismatch /usr/lib/appscope/scope_filter and scope_filter2.yml"
 fi
 
+cleanupAfterStart
+pkill -9 memcached
+pkill -9 redis-server &
+pkill -9 nginx &
+
+sleep 3
+
 endtest
+
+starttest scope_start_dev_env_force_setup_profile
+
+if [ $SCOPE_VERSION_TYPE = "dev" ]; then
+    SCOPE_START_FORCE_PROFILE=1 scope start -f < /opt/test-runner/scope_filter1.yml
+    if [ $? -ne "0" ]; then
+        fail "scope start failed"
+    fi
+    SCOPE_LIB_DEV_PATH="/usr/lib/appscope/dev/libscope.so"
+
+    if [ ! -f $SCOPE_LIB_DEV_PATH ]; then
+        fail "missing $SCOPE_LIB_DEV_PATH for SCOPE_START_FORCE_PROFILE"
+    fi
+
+    if [ ! -f /etc/profile.d/scope.sh ]; then
+        fail "/etc/profile.d/scope.sh should be created when SCOPE_START_FORCE_PROFILE was used"
+    fi
+
+    # check the content of etc/profile.d/scope.sh
+    # Should be two entries first one for check second one for setup LD_PRELOAD
+    count=$(grep "$SCOPE_LIB_DEV_PATH" "/etc/profile.d/scope.sh" | wc -l)
+    if [ $count -ne 2 ] ; then
+        fail "missing $SCOPE_LIB_DEV_PATH in /etc/profile.d/scope.sh for SCOPE_START_FORCE_PROFILE"
+    fi
+else
+    echo "INFO: Skip $CURRENT_TEST for the official version"
+fi
+cleanupAfterStart
+
+endtest
+
+starttest scope_start_official_env_skip_setup_profile
+
+if [ $SCOPE_VERSION_TYPE = "official" ]; then
+    SCOPE_START_NOPROFILE=1 scope start -f < /opt/test-runner/scope_filter1.yml
+    if [ $? -ne "0" ]; then
+        fail "scope start failed"
+    fi
+    if [ -f /etc/profile.d/scope.sh ]; then
+        fail "/etc/profile.d/scope.sh should not be created when SCOPE_START_NOPROFILE was used"
+    fi
+else
+    echo "INFO: Skip $CURRENT_TEST test for the dev version"
+fi
+
+cleanupAfterStart
+
+endtest
+
 
 
 if (( $FAILED_TEST_COUNT == 0 )); then

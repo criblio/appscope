@@ -438,7 +438,9 @@ setupProfile(const char *libscopePath, const char *loaderVersion) {
      * requires libscope specifics that we don't want here.
      * Should fix that.
      */
-    if (scope_getenv("SCOPE_START_NOPROFILE")) return TRUE;
+    if (getenv("SCOPE_START_NOPROFILE")) {
+        return TRUE;
+    }
 
     char buf[PATH_MAX] = {0};
     int fd = scope_open("/etc/profile.d/scope.sh", O_CREAT | O_RDWR | O_TRUNC, 0644);

@@ -6,6 +6,8 @@ import (
 	"net/http"
 )
 
+const maxScanTokenSize = 1024 * 1024
+
 func main() {
 
 	resp, err := http.Get("https://cribl.io")
@@ -17,6 +19,9 @@ func main() {
 	fmt.Println("Response status:", resp.Status)
 
 	scanner := bufio.NewScanner(resp.Body)
+	buf := make([]byte, 0, bufio.MaxScanTokenSize)
+	scanner.Buffer(buf, maxScanTokenSize)
+
 	for i := 0; scanner.Scan() && i < 5; i++ {
 		fmt.Println(scanner.Text())
 	}

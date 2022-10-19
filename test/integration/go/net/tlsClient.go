@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -18,15 +19,20 @@ func main() {
 
 	fmt.Println("Response status:", resp.Status)
 
-	scanner := bufio.NewScanner(resp.Body)
-	buf := make([]byte, 0, bufio.MaxScanTokenSize)
-	scanner.Buffer(buf, maxScanTokenSize)
+	reader := bufio.NewReaderSize(resp.Body, maxScanTokenSize)
 
-	for i := 0; scanner.Scan() && i < 5; i++ {
-		fmt.Println(scanner.Text())
-	}
-	if err := scanner.Err(); err != nil {
-		panic(err)
+	for {
+		token, _, err := reader.ReadLine()
+		if len(token) > 0 {
+			fmt.Println(string(token))
+		}
+		if err != nil {
+			if err == io.EOF {
+				break
+			} else {
+				panic(err)
+			}
+		}
 	}
 
 	// force close the connection to produce a net.close event

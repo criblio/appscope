@@ -36,7 +36,7 @@ static bool
 isServiceInstalledSystemD(const char *serviceName) {
 
     /*
-    * List of directories which can contain service configruation file.
+    * List of directories which can contain service configuration file.
     */
     const char *const servicePrefixList[] = {
         "/etc/systemd/system/",

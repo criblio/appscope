@@ -438,7 +438,7 @@ remoteConfig()
     scope_memset(&fds, 0x0, sizeof(fds));
 
     // We want to accept incoming requests on TCP, unix, and edge.
-    // However, we don't currently support receving on TLS connections.
+    // However, we don't currently support receiving on TLS connections.
     int acceptRequests = transportSupportsCommandControl(ctlTransport(g_ctl, CFG_CTL));
     fds.events = (acceptRequests) ? POLLIN : 0;
 

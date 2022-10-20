@@ -49,10 +49,11 @@ if [ -d "/tmp/appscope" ] ; then
 fi
 }
 
-#Identify if version used in this test is official or not
+# Identify if version used in this test is official or not
+# based on IsVersionDev method -> version.go
 SCOPE_VERSION=$(scope version --summary)
-rx='^v([0-9]+\.){0,2}(\*|[0-9]+)$'
-if [[ $SCOPE_VERSION =~ $rx ]]; then
+SCOPE_TAG=$(scope version --tag)
+if [ "${SCOPE_VERSION:1}" = "$SCOPE_TAG" ]; then
     SCOPE_VERSION_TYPE="official"
     echo "INFO: Scope version $SCOPE_VERSION will be tested as an official version."
 else

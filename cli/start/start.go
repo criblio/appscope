@@ -347,12 +347,18 @@ func createFilterFile() (*os.File, error) {
 	// Try to create AppScope directory in /usr/lib if it not exists yet
 	if _, err := os.Stat("/usr/lib/appscope/"); os.IsNotExist(err) {
 		os.MkdirAll("/usr/lib/appscope/", 0755)
+		if err := os.Chmod("/usr/lib/appscope/", 0755); err != nil {
+			return nil, err
+		}
 	}
 
 	f, err := os.OpenFile("/usr/lib/appscope/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
 		if _, err := os.Stat("/tmp/appscope"); os.IsNotExist(err) {
 			os.MkdirAll("/tmp/appscope", 0777)
+			if err := os.Chmod("/tmp/appscope/", 0777); err != nil {
+				return f, err
+			}
 		}
 		f, err = os.OpenFile("/tmp/appscope/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	}

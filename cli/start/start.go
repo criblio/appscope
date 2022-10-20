@@ -360,7 +360,7 @@ func createFilterFile() (*os.File, error) {
 	f, err := os.OpenFile("/usr/lib/appscope/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
 		if _, err := os.Stat("/tmp/appscope"); os.IsNotExist(err) {
-			os.MkdirAll("/tmp/appscope", 0755)
+			os.MkdirAll("/tmp/appscope", 0777)
 		}
 		f, err = os.OpenFile("/tmp/appscope", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	}
@@ -387,7 +387,7 @@ func getAppScopeVerDir() (string, error) {
 
 	appscopeVersionPath = filepath.Join("/tmp/appscope/", version)
 	if _, err := os.Stat(appscopeVersionPath); err != nil {
-		err := os.MkdirAll(appscopeVersionPath, 0755)
+		err := os.MkdirAll(appscopeVersionPath, 0777)
 		return appscopeVersionPath, err
 	}
 	return appscopeVersionPath, nil

@@ -304,14 +304,6 @@ func extract(scopeDirVersion string) error {
 		return err
 	}
 
-	err = os.MkdirAll(scopeDirVersion, perms)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Msgf("Error creating %s directory.", scopeDirVersion)
-		return err
-	}
-
 	if err = ioutil.WriteFile(filepath.Join(scopeDirVersion, "ldscope"), b, perms); err != nil {
 		log.Error().
 			Err(err).

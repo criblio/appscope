@@ -552,6 +552,7 @@ closeFd:
 int
 setupConfigure(void *filterFileMem, size_t filterSize) {
     char path[PATH_MAX] = {0};
+    mode_t mode = 0755;
 
     // Create destination directory if not exists
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
@@ -565,11 +566,12 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
     if (getenv("SCOPE_START_FORCE_PROFILE")) isDevVersion = FALSE;
 
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
-    mkdir_status_t res = libdirCreateDirIfMissing(path);
+    mkdir_status_t res = libdirCreateDirIfMissing(path, mode);
     if ((res > MKDIR_STATUS_EXISTS) || isDevVersion) {
+        mode = 0777;
         scope_memset(path, 0, PATH_MAX);
         scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
-        mkdir_status_t res = libdirCreateDirIfMissing(path);
+        mkdir_status_t res = libdirCreateDirIfMissing(path, mode);
         if (res > MKDIR_STATUS_EXISTS) {
             scope_fprintf(scope_stderr, "setupConfigure: libdirCreateDirIfMissing failed\n");
             return -1;
@@ -598,7 +600,7 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
     }
 
     // Extract libscope.so
-    if (libdirSaveLibraryFile(path, overwrite)) {
+    if (libdirSaveLibraryFile(path, overwrite, mode)) {
         scope_fprintf(scope_stderr, "setupConfigure: saving %s failed\n", path);
         return -1;
     }

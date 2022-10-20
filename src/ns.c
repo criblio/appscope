@@ -127,11 +127,11 @@ joinChildNamespace(pid_t hostPid) {
 
     scope_memset(path, 0, PATH_MAX);
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
-    mkdir_status_t res = libdirCreateDirIfMissing(path);
+    mkdir_status_t res = libdirCreateDirIfMissing(path, 0755);
     if ((res > MKDIR_STATUS_EXISTS) || (isDevVersion)) {
         scope_memset(path, 0, PATH_MAX);
         scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
-        mkdir_status_t res = libdirCreateDirIfMissing(path);
+        mkdir_status_t res = libdirCreateDirIfMissing(path, 0777);
         if (res > MKDIR_STATUS_EXISTS) {
             goto cleanupMem;
         }
@@ -591,11 +591,11 @@ joinHostNamespace(void) {
      */
     scope_memset(path, 0, PATH_MAX);
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
-    mkdir_status_t res = libdirCreateDirIfMissing(path);
+    mkdir_status_t res = libdirCreateDirIfMissing(path, 0755);
     if ((res > MKDIR_STATUS_EXISTS) || (isDevVersion)) {
         scope_memset(path, 0, PATH_MAX);
         scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
-        mkdir_status_t res = libdirCreateDirIfMissing(path);
+        mkdir_status_t res = libdirCreateDirIfMissing(path, 0777);
         if (res > MKDIR_STATUS_EXISTS) {
             goto cleanupMem;
         }

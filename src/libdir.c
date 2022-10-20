@@ -383,6 +383,11 @@ libdirCreateDirIfMissing(const char *dir, mode_t mode) {
         goto end;
     }
 
+    /* We ensure that we setup correct mode regarding umask settings */
+    if (scope_chmod(tempPath, mode)) {
+        goto end;
+    }
+
     res = MKDIR_STATUS_CREATED;
 
 end:

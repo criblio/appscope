@@ -371,7 +371,10 @@ func getAppScopeVerDir() (string, error) {
 	if !internal.IsVersionDev() {
 		appscopeVersionPath = filepath.Join("/usr/lib/appscope/", version)
 		if _, err := os.Stat(appscopeVersionPath); err != nil {
-			err := os.MkdirAll(appscopeVersionPath, 0755)
+			if err := os.MkdirAll(appscopeVersionPath, 0755); err != nil {
+				return appscopeVersionPath, err
+			}
+			err := os.Chmod(appscopeVersionPath, 0755)
 			return appscopeVersionPath, err
 		}
 		return appscopeVersionPath, nil
@@ -379,7 +382,10 @@ func getAppScopeVerDir() (string, error) {
 
 	appscopeVersionPath = filepath.Join("/tmp/appscope/", version)
 	if _, err := os.Stat(appscopeVersionPath); err != nil {
-		err := os.MkdirAll(appscopeVersionPath, 0777)
+		if err := os.MkdirAll(appscopeVersionPath, 0777); err != nil {
+			return appscopeVersionPath, err
+		}
+		err := os.Chmod(appscopeVersionPath, 0777)
 		return appscopeVersionPath, err
 	}
 	return appscopeVersionPath, nil

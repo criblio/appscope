@@ -362,7 +362,7 @@ func createFilterFile() (*os.File, error) {
 		if _, err := os.Stat("/tmp/appscope"); os.IsNotExist(err) {
 			os.MkdirAll("/tmp/appscope", 0777)
 		}
-		f, err = os.OpenFile("/tmp/appscope", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+		f, err = os.OpenFile("/tmp/appscope/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	}
 	return f, err
 }

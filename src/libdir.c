@@ -378,7 +378,7 @@ libdirCreateDirIfMissing(const char *dir, mode_t mode) {
 
     /* last element */
     scope_errno = 0;
-    mkdirRes = scope_mkdir(tempPath, 0755);
+    mkdirRes = scope_mkdir(tempPath, mode);
     if (mkdirRes && (scope_errno != EEXIST)) {
         goto end;
     }

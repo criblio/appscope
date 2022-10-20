@@ -113,11 +113,21 @@ CreateDirIfMissingSuccessCreated(void **state) {
     scope_strcat(buf, dirName);
     res = scope_stat(buf, &dirStat);
     assert_int_not_equal(res, 0);
-    mkdir_status_t status = libdirCreateDirIfMissing(buf, 0777);
+    // TODO add test for 0777
+    mkdir_status_t status = libdirCreateDirIfMissing(buf, 0775);
     assert_int_equal(status, MKDIR_STATUS_CREATED);
     res = scope_stat(buf, &dirStat);
     assert_int_equal(res, 0);
     assert_int_equal(S_ISDIR(dirStat.st_mode), 1);
+    assert_int_not_equal(dirStat.st_mode & S_IRUSR, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IWUSR, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IXUSR, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IRGRP, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IWGRP, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IXGRP, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IROTH, 0);
+    assert_int_equal(dirStat.st_mode & S_IWOTH, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IXOTH, 0);
     res = rm_recursive(buf);
     assert_int_equal(res, 0);
 }

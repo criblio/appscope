@@ -8,7 +8,10 @@
 
     - name: Working With AppScope
       path: /docs/working-with
-      
+
+    - name: Events and Metrics in AppScope
+      path: /docs/events-and-metrics
+
     - name: Cool, but What Can I Do with It?
       path: /docs/what-do-with-scope
 

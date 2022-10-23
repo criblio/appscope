@@ -304,14 +304,6 @@ func extract(scopeDirVersion string) error {
 		return err
 	}
 
-	err = os.MkdirAll(scopeDirVersion, perms)
-	if err != nil {
-		log.Error().
-			Err(err).
-			Msgf("Error creating %s directory.", scopeDirVersion)
-		return err
-	}
-
 	if err = ioutil.WriteFile(filepath.Join(scopeDirVersion, "ldscope"), b, perms); err != nil {
 		log.Error().
 			Err(err).
@@ -355,14 +347,20 @@ func createFilterFile() (*os.File, error) {
 	// Try to create AppScope directory in /usr/lib if it not exists yet
 	if _, err := os.Stat("/usr/lib/appscope/"); os.IsNotExist(err) {
 		os.MkdirAll("/usr/lib/appscope/", 0755)
+		if err := os.Chmod("/usr/lib/appscope/", 0755); err != nil {
+			return nil, err
+		}
 	}
 
 	f, err := os.OpenFile("/usr/lib/appscope/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	if err != nil {
 		if _, err := os.Stat("/tmp/appscope"); os.IsNotExist(err) {
-			os.MkdirAll("/tmp/appscope", 0755)
+			os.MkdirAll("/tmp/appscope", 0777)
+			if err := os.Chmod("/tmp/appscope/", 0777); err != nil {
+				return f, err
+			}
 		}
-		f, err = os.OpenFile("/tmp/appscope", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+		f, err = os.OpenFile("/tmp/appscope/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
 	}
 	return f, err
 }
@@ -379,7 +377,10 @@ func getAppScopeVerDir() (string, error) {
 	if !internal.IsVersionDev() {
 		appscopeVersionPath = filepath.Join("/usr/lib/appscope/", version)
 		if _, err := os.Stat(appscopeVersionPath); err != nil {
-			err := os.MkdirAll(appscopeVersionPath, 0755)
+			if err := os.MkdirAll(appscopeVersionPath, 0755); err != nil {
+				return appscopeVersionPath, err
+			}
+			err := os.Chmod(appscopeVersionPath, 0755)
 			return appscopeVersionPath, err
 		}
 		return appscopeVersionPath, nil
@@ -387,7 +388,10 @@ func getAppScopeVerDir() (string, error) {
 
 	appscopeVersionPath = filepath.Join("/tmp/appscope/", version)
 	if _, err := os.Stat(appscopeVersionPath); err != nil {
-		err := os.MkdirAll(appscopeVersionPath, 0755)
+		if err := os.MkdirAll(appscopeVersionPath, 0777); err != nil {
+			return appscopeVersionPath, err
+		}
+		err := os.Chmod(appscopeVersionPath, 0777)
 		return appscopeVersionPath, err
 	}
 	return appscopeVersionPath, nil

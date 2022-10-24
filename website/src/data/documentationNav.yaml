@@ -54,6 +54,9 @@
     - name: Config File
       path: /docs/config-file
 
+    - name: Filter File
+      path: /docs/filter-file
+
     - name: CLI Reference
       path: /docs/cli-reference
 

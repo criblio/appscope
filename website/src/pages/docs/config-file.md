@@ -4,7 +4,9 @@ title: "Config File"
 
 ## Config File
 
-`scope.yml` is the sole library configuration file in AppScope. 
+`scope.yml` is the sole library configuration file in AppScope.
+
+In Cribl Edge or Cribl Stream, you can use the AppScope Config Editor to create your own variants of `scope.yml` and save them in the AppScope Config Library.
 
 The contents of the now-eliminated `scope_protocol.yml` configuration file reside in the `protocol` section of `scope.yml`.
 

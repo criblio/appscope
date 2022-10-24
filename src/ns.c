@@ -83,12 +83,12 @@ setNamespace(pid_t pid, const char *ns) {
 }
 
 /*
- * Joins the child PID and mount namespace.
+ * Joins the child PID (optionally) and mount namespace (mandatory).
  *
  * Returns TRUE if operation was success, FALSE otherwise.
  */
 static bool
-joinChildNamespace(pid_t hostPid) {
+joinChildNamespace(pid_t hostPid, bool joinPidNs) {
     bool status = FALSE;
     size_t ldscopeSize = 0;
     size_t cfgSize = 0;
@@ -111,13 +111,14 @@ joinChildNamespace(pid_t hostPid) {
     * Reassociate current process to the "child namespace"
     * - PID namespace - allows to "child process" of the calling process 
     *   be created in separate namespace
-    *   In other words the calling process will not change it's ownPID
+    *   In other words the calling process will not change it's own PID
     *   namespace
     * - mount namespace - allows to copy file(s) into a "child namespace"
     */
-    if (setNamespace(hostPid, "pid") == FALSE) {
+    if (joinPidNs && setNamespace(hostPid, "pid") == FALSE) {
         goto cleanupMem;
     }
+
     if (setNamespace(hostPid, "mnt") == FALSE) {
         goto cleanupMem;
     }
@@ -160,6 +161,39 @@ cleanupMem:
     }
 
     return status;
+}
+
+/*
+ * Check for if the specified process exists in same mnt namespace as current process.
+ *
+ * Returns TRUE if specified process exists in same mnt namespace as current process, FALSE otherwise.
+ */
+bool
+nsIsPidInSameMntNs(pid_t pid) {
+    char path[PATH_MAX] = {0};
+    struct stat selfStat = {0};
+    struct stat targetStat = {0};
+
+    if (scope_stat("/proc/self/ns/mnt", &selfStat) != 0) {
+        scope_perror("scope_stat(/proc/self/ns/mnt) failed");
+        return TRUE;
+    }
+
+    if (scope_snprintf(path, sizeof(path), "/proc/%d/ns/mnt", pid) < 0) {
+        scope_perror("scope_snprintf(/proc/<pid>>/ns/mnt) failed");
+        return TRUE;
+    }
+
+    if (scope_stat(path, &targetStat) != 0) {
+        scope_perror("scope_stat(/proc/<pid>>/ns/mnt) failed");
+        return TRUE;
+    }
+
+    /*
+    * If two processes are in the same mount namespace, then the device IDs and
+    * inode numbers of their /proc/[pid]/ns/mnt symbolic links will be the same.
+    */
+    return (selfStat.st_dev == targetStat.st_dev) && (selfStat.st_ino == targetStat.st_ino);
 }
 
 /*
@@ -288,8 +322,9 @@ isLibScopeLoaded(pid_t pid)
  
  /*
  * Perform fork and exec which cause that direct children
- * effectively will join a new PID namespace.
+ * effectively will join a new PID namespace(optionally) and mount namespace.
  *
+ * Note:
  * Reassociating the PID namespace (setns CLONE_NEWPID) has somewhat different from 
  * other namespace types. Reassociating the calling thread with a PID namespace
  * changes only the PID namespace that subsequently created child processes of
@@ -317,7 +352,7 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
     * also check the pid namespace
     */
 
-    if (joinChildNamespace(parentPid) == FALSE) {
+    if (joinChildNamespace(parentPid, parentPid != nsPid) == FALSE) {
         scope_fprintf(scope_stderr, "error: join_namespace failed\n");
         return EXIT_FAILURE; 
     }

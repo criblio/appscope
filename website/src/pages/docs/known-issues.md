@@ -10,7 +10,7 @@ title: Known Issues
 
 As of this AppScope release, known issues include:
 
-- [#1055](https://github.com/criblio/appscope/issues/1055) AppScope cannot attach to a process unless both mount and PID namespaces are different. Although AppScope **can** attach when **both** the mount and PID namespaces are different (as expected when AppScope runs in a host and the target process runs in a container), we have found two scenarios when attach will fail. One is when AppScope is on a host and the target process is in a container, making the mount namespaces different, but the process was started with `pid=host`, making the PID namespaces the same. Another is when both AppScope and the target process are on a host, making the PID namespaces the same, but the process is [configured](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#PrivateTmp=) as a service with `PrivateTmp` set to `true`, making the mount namespaces different.
+- [#1055](https://github.com/criblio/appscope/issues/1055) With certain combinations of mount and PID namespaces, AppScope fails to attach to a process. We have found two scenarios when attach will fail. One is when AppScope is on a host and the target process is in a container, making the mount namespaces different, but the process was started with `pid=host`, making the PID namespaces the same. Another is when both AppScope and the target process are on a host, making the PID namespaces the same, but the process is [configured](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#PrivateTmp=) as a service with `PrivateTmp` set to `true`, making the mount namespaces different.
   - **Fix:** Planned for 1.2.1
 
 ## AppScope 1.1.0

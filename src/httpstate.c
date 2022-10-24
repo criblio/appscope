@@ -206,7 +206,7 @@ setHttpId(httpId_t *httpId, net_info *net, int sockfd, uint64_t id, metric_t src
 
     /*
      * If we have an fd, use the uid/channel value as it's unique
-     * else we are likley using TLS, so default to the session ID
+     * else we are likely using TLS, so default to the session ID
      */
     if (net) {
         httpId->uid = net->uid;

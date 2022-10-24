@@ -8,6 +8,29 @@ AppScope provides the fine-grained observability of a proxy/service mesh, withou
 
 It’s like [strace](https://github.com/strace/strace) meets [tcpdump](https://www.tcpdump.org/) – but with consumable output for events like file access, DNS, and network activity, and StatsD-style metrics for applications. AppScope can also look inside encrypted payloads, offering WAF-like visibility without proxying traffic.
 
+<br />
+<br />
+
+```mermaid
+graph LR
+    A[Application] --> B[libscope]
+    A[Application]--> C[libgnutls]
+    A[Application]--> D[libc]
+    C --> D
+    B --> D
+    B --> C
+    D --> I[Kernel]
+    B --> E[In-memory Queue]
+    E -.-> F[Reporting Thread]
+    F --> G[Network Destination]
+    F --> H[File System Destination]
+    style B fill:#f3ffec,stroke:#89db70
+    style E fill:#fafafa,stroke:#a6a6a6
+    style F fill:#fafafa,stroke:#a6a6a6
+    style G fill:#fafafa,stroke:#a6a6a6
+    style H fill:#fafafa,stroke:#a6a6a6
+```
+
 ## Get Started
 
 Before you begin, make sure that your environment meets AppScope [requirements](https://appscope.dev/docs/requirements).

@@ -43,13 +43,13 @@ unsigned char _binary_libscope_so_end;
 
 static void
 CreateDirIfMissingWrongPathNull(void **state) {
-    mkdir_status_t res = libdirCreateDirIfMissing(NULL);
+    mkdir_status_t res = libdirCreateDirIfMissing(NULL, 0777);
     assert_int_equal(res, MKDIR_STATUS_ERR_NOT_ABS_DIR);
 }
 
 static void
 CreateDirIfMissingWrongPathCurrentDir(void **state) {
-    mkdir_status_t res = libdirCreateDirIfMissing(".");
+    mkdir_status_t res = libdirCreateDirIfMissing(".", 0777);
     assert_int_equal(res, MKDIR_STATUS_ERR_NOT_ABS_DIR);
 }
 
@@ -64,7 +64,7 @@ CreateDirIfMissingWrongPathFile(void **state) {
     assert_non_null(scope_getcwd(buf, PATH_MAX));
     scope_strcat(buf, "/");
     scope_strcat(buf, fileName);
-    mkdir_status_t status = libdirCreateDirIfMissing(buf);
+    mkdir_status_t status = libdirCreateDirIfMissing(buf, 0777);
     assert_int_equal(status, MKDIR_STATUS_ERR_NOT_ABS_DIR);
     res = scope_unlink(fileName);
     assert_int_equal(res, 0);
@@ -72,7 +72,7 @@ CreateDirIfMissingWrongPathFile(void **state) {
 
 static void
 CreateDirIfMissingPermissionIssue(void **state) {
-    mkdir_status_t res = libdirCreateDirIfMissing("/root/loremIpsumFile/");
+    mkdir_status_t res = libdirCreateDirIfMissing("/root/loremIpsumFile/", 0777);
     assert_int_equal(res, MKDIR_STATUS_ERR_OTHER);
 }
 
@@ -87,9 +87,9 @@ CreateDirIfMissingAlreadyExists(void **state) {
     scope_strcat(buf, dirName);
     res = scope_mkdir(buf, 0755);
     assert_int_equal(res, 0);
-    mkdir_status_t status = libdirCreateDirIfMissing(dirName);
+    mkdir_status_t status = libdirCreateDirIfMissing(dirName, 0777);
     assert_int_equal(status, MKDIR_STATUS_ERR_NOT_ABS_DIR);
-    status = libdirCreateDirIfMissing(buf);
+    status = libdirCreateDirIfMissing(buf, 0777);
     assert_int_equal(status, MKDIR_STATUS_EXISTS);
     res = rm_recursive(buf);
     assert_int_equal(res, 0);
@@ -97,7 +97,7 @@ CreateDirIfMissingAlreadyExists(void **state) {
 
 static void
 CreateDirIfMissingAlreadyExistsPermIssue(void **state) {
-    mkdir_status_t status = libdirCreateDirIfMissing("/root");
+    mkdir_status_t status = libdirCreateDirIfMissing("/root", 0777);
     assert_int_equal(status, MKDIR_STATUS_ERR_PERM_ISSUE);
 }
 
@@ -113,11 +113,36 @@ CreateDirIfMissingSuccessCreated(void **state) {
     scope_strcat(buf, dirName);
     res = scope_stat(buf, &dirStat);
     assert_int_not_equal(res, 0);
-    mkdir_status_t status = libdirCreateDirIfMissing(buf);
+    mkdir_status_t status = libdirCreateDirIfMissing(buf, 0777);
     assert_int_equal(status, MKDIR_STATUS_CREATED);
     res = scope_stat(buf, &dirStat);
     assert_int_equal(res, 0);
     assert_int_equal(S_ISDIR(dirStat.st_mode), 1);
+    assert_int_not_equal(dirStat.st_mode & S_IRUSR, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IWUSR, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IXUSR, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IRGRP, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IWGRP, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IXGRP, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IROTH, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IWOTH, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IXOTH, 0);
+    res = rm_recursive(buf);
+    assert_int_equal(res, 0);
+     status = libdirCreateDirIfMissing(buf, 0755);
+    assert_int_equal(status, MKDIR_STATUS_CREATED);
+    res = scope_stat(buf, &dirStat);
+    assert_int_equal(res, 0);
+    assert_int_equal(S_ISDIR(dirStat.st_mode), 1);
+    assert_int_not_equal(dirStat.st_mode & S_IRUSR, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IWUSR, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IXUSR, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IRGRP, 0);
+    assert_int_equal(dirStat.st_mode & S_IWGRP, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IXGRP, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IROTH, 0);
+    assert_int_equal(dirStat.st_mode & S_IWOTH, 0);
+    assert_int_not_equal(dirStat.st_mode & S_IXOTH, 0);
     res = rm_recursive(buf);
     assert_int_equal(res, 0);
 }
@@ -133,7 +158,7 @@ static void
 SetLibrarySuccessDev(void **state) {
     libdirInitTest(TEST_INSTALL_BASE, TEST_TMP_BASE, "dev");
     // Create dummy file
-    mkdir_status_t mkres = libdirCreateDirIfMissing("/tmp/appscope-test/success/dev");
+    mkdir_status_t mkres = libdirCreateDirIfMissing("/tmp/appscope-test/success/dev", 0777);
     assert_in_range(mkres, MKDIR_STATUS_CREATED, MKDIR_STATUS_EXISTS);
     FILE *fp = scope_fopen("/tmp/appscope-test/success/dev/libscope.so", "w");
     assert_non_null(fp);
@@ -269,7 +294,7 @@ GetPathDev(void **state) {
     char expected_location[PATH_MAX] = {0};
     // Create dummy directory
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/", TEST_TMP_BASE, normVer);
-    mkdir_status_t mkres = libdirCreateDirIfMissing(expected_location);
+    mkdir_status_t mkres = libdirCreateDirIfMissing(expected_location, 0777);
     assert_in_range(mkres, MKDIR_STATUS_CREATED, MKDIR_STATUS_EXISTS);
     // Create dummy file
     scope_memset(expected_location, 0, PATH_MAX);
@@ -301,7 +326,7 @@ GetPathOfficial(void **state) {
     char expected_location[PATH_MAX] = {0};
     // Create dummy directory
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/", TEST_INSTALL_BASE, normVer);
-    mkdir_status_t mkres = libdirCreateDirIfMissing(expected_location);
+    mkdir_status_t mkres = libdirCreateDirIfMissing(expected_location, 0777);
     assert_in_range(mkres, MKDIR_STATUS_CREATED, MKDIR_STATUS_EXISTS);
     // Create dummy file
     scope_memset(expected_location, 0, PATH_MAX);

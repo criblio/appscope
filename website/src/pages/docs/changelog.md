@@ -7,7 +7,7 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 
 ## AppScope 1.2.0
 
-2022-11-09 - Minor Release
+2022-11-09 - Feature Release
 
 Assets are available via Docker and the Cribl CDN at the links below.
 
@@ -19,20 +19,16 @@ Assets are available via Docker and the Cribl CDN at the links below.
 
 AppScope 1.2.0 introduces substantial new functionality:
 
-- A new usage model that decouples AppScope's two fundamental actions: (1) loading its library into a process, and (2) interposing the process' functions. Loading the library must happen first, and by itself does not constitute "scoping." We say a process is "scoped" when AppScope has loaded the library **and** is interposing functions. 
+- The new `scope start` command, which takes a **filter list** as an argument. In the allowlist section of the filter list, you specify which processes to scope and the configuration for AppScope to use when scoping particular processes. Optionally, in the denylist section, you specify which processes **not** to scope. Apart from the `scope start` command, `LD_PRELOAD` looks for a filter list, but the `scope run` and `scope attach` commands do not. Related issues: [#987](https://github.com/criblio/appscope/issues/987),[#1027](https://github.com/criblio/appscope/issues/1027),[#1038](https://github.com/criblio/appscope/issues/1038),[#1069](https://github.com/criblio/appscope/issues/1069).
 
-- The new `scope start` command. This command supports the new usage model: it can either just load the library into a process, or both load the library and start interposing functions.
-
-- Support for a **filter list** where you specify which processes to scope and optionally, which not to scope. The filter list is an argument to the `scope start` command. In its allowlist section, you specify the configuration for AppScope to use when scoping particular processes. Apart from the `scope start` command, `LD_PRELOAD` looks for a filter list, but the `scope run` and `scope attach` commands do not. Related issues: [#987](https://github.com/criblio/appscope/issues/987),[#1027](https://github.com/criblio/appscope/issues/1027),[#1038](https://github.com/criblio/appscope/issues/1038),[#1069](https://github.com/criblio/appscope/issues/1069).
+- Integration with Cribl Edge and Cribl Stream version 4.0, whose built-in AppScope Source now supports creating filters (equivalent to editing the filter list described above). Cribl Edge and Cribl Stream also now provide an AppScope Config Editor so that you can create AppScope config files (variants of `scope.yml`) and store them in an AppScope Config Library.  
 
 - The new `scope detach` command, which enables you to stop scoping a process without terminating the process. Note: constraints inherent in the dynamic loader require that the `scope detach` command leave the library loaded. Related issues: [#370](https://github.com/criblio/appscope/issues/370),[#1039](https://github.com/criblio/appscope/issues/1039),[#1085](https://github.com/criblio/appscope/issues/1085),[#1087](https://github.com/criblio/appscope/issues/1087),[#1088](https://github.com/criblio/appscope/issues/1088),[#1089](https://github.com/criblio/appscope/issues/1089),[#1094](https://github.com/criblio/appscope/issues/1094),[#1107](https://github.com/criblio/appscope/issues/1107),[#1129](https://github.com/criblio/appscope/issues/1129).
 
-- To attach to or detach from a process running in a container, it is no longer necessary to run AppScope within the container. You can just scope the container processes from the host.  Related issues: [#1061](https://github.com/criblio/appscope/issues/1061),
+- To attach to or detach from a process running in a container, it is no longer necessary to run AppScope within the container. You can just scope the container processes from the host. Related issues: [#1061](https://github.com/criblio/appscope/issues/1061),
 [#1119](https://github.com/criblio/appscope/issues/1119).
 
 - Support for executables built with Go 1.19. (This release also removes support for executables built with Go 1.8.) Related issue: [#1073](https://github.com/criblio/appscope/issues/1073).
-
-- Integration with Cribl Edge and Cribl Stream.
 
 This release also improves the `scope ps` command, which now lists all scoped processes rather than listing all processes into which the library was loaded. Related issue: [#1097](https://github.com/criblio/appscope/issues/1097).
 

@@ -4,6 +4,15 @@ title: Known Issues
 
 # Known Issues
 
+## AppScope 1.2.0
+
+2022-11-09 - Feature Release
+
+As of this AppScope release, known issues include:
+
+- [#1055](https://github.com/criblio/appscope/issues/1055) <description TBD>.
+  - **Fix:** Planned for 1.2.1
+
 ## AppScope 1.1.0
 
 2022-06-29 - Maintenance Release

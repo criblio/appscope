@@ -86,7 +86,7 @@ Details of the `ps` application's execution are emitted to the configured transp
 LD_PRELOAD=./libscope.so SCOPE_METRIC_VERBOSITY=5 ps -ef
 ```
 
-This again executes the `ps` command using the AppScope library. But it also defines the verbosity for metric extraction as level `5`. (This verbosity setting overrides any config-file setting, as well as the default value.)
+This again executes the `ps` command using the AppScope library. But it also defines the [verbosity](/docs/events-and-metrics#metrics) for metric extraction as level `5`. (This verbosity setting overrides any config-file setting, as well as the default value.)
 
 #### `LD_PRELOAD` with a Config File
 

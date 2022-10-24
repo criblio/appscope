@@ -19,7 +19,7 @@ Assets are available via Docker and the Cribl CDN at the links below.
 
 AppScope 1.2.0 introduces substantial new functionality:
 
-- The new `scope start` command, which takes a **filter list** as an argument. The filter list has an allowlist section for specifying which processes to scope, and an optional denylist section for specifying which processes **not** to scope. Related issues: [#987](https://github.com/criblio/appscope/issues/987),[#1027](https://github.com/criblio/appscope/issues/1027),[#1038](https://github.com/criblio/appscope/issues/1038),[#1069](https://github.com/criblio/appscope/issues/1069).
+- The new `scope start` command, which takes a **filter list** as an argument. The filter list has an allowlist section for specifying which processes to scope (along with desired configs), and an optional denylist section for specifying which processes **not** to scope. Related issues: [#987](https://github.com/criblio/appscope/issues/987),[#1027](https://github.com/criblio/appscope/issues/1027),[#1038](https://github.com/criblio/appscope/issues/1038),[#1069](https://github.com/criblio/appscope/issues/1069).
 
 - Integration with Cribl Edge and Cribl Stream version 4.0, whose built-in AppScope Source now supports creating filters (equivalent to editing the filter list described above). Cribl Edge and Cribl Stream also now provide an AppScope Config Editor for creating AppScope config files (variants of `scope.yml`) and storing them in an AppScope Config Library.  
 

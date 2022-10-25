@@ -121,7 +121,7 @@ $ sudo scope attach cribl
 Found multiple processes matching that name...
 ID  PID   USER    SCOPED  COMMAND
 1   1820  ubuntu  false   /home/ubuntu/someusername/cribl/4.0.0/m/cribl/bin/cribl server
-2   1838  ubuntu  false   /home/ubuntu/someusername/cribl/4.0.0/m/cribl/bin/cribl /home/ubuntu/someusername/cribl/3.5.1/m/cribl/bin/cribl.js server -r CONFIG_HELPER
+2   1838  ubuntu  false   /home/ubuntu/someusername/cribl/4.0.0/m/cribl/bin/cribl /home/ubuntu/someusername/cribl/4.0.0/m/cribl/bin/cribl.js server -r CONFIG_HELPER
 Select an ID from the list:
 2
 WARNING: Session history will be stored in /home/ubuntu/.scope/history and owned by root

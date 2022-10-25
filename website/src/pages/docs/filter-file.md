@@ -6,7 +6,7 @@ title: "Filter File"
 
 The `scope start` command requires a filter file, whose purpose is to specify processes to scope along with configs to apply to those processes, and, optionally, processes **not** to scope.
 
-The AppScope repo provides an example filter file in the `conf` directory, and reproduced below.
+The AppScope repo provides both a JSON and a YAML version of an example filter file in the `conf` directory. The YAML version is reproduced below.
 
 In Cribl Edge and Cribl Scope, instead of editing files, you create filters in the AppScope Source UI.
 

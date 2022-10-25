@@ -2,152 +2,93 @@ allow:
 - procname: nginx
   arg: 
   config:
-    cribl:
-      enable: false
+    metric:
+      enable: true
+      format:
+        statsdmaxlen: 512
+        statsdprefix: null
+        type: statsd
+        verbosity: 4
+      watch:
+      - type: statsd
+      - type: fs
+      - type: net
+      - type: http
+      - type: dns
+      - type: process
       transport:
+        type: udp
         host: 127.0.0.1
-        port: 10090
+        port: 8125
         tls:
           cacertpath: ''
           enable: false
           validateserver: true
-        type: edge
     event:
       enable: true
       format:
         enhancefs: true
         maxeventpersec: 10000
         type: ndjson
+      watch:
+      - type: file
+        name: (\/logs?\/)|(\.log$)|(\.log[.\d])
+        value: .*
+      - type: console
+        name: (stdout)|(stderr)
+        value: .*
+        allowbinary: true
+      - type: net
+        name: .*
+        field: .*
+        value: .*
+      - type: fs
+        name: .*
+        field: .*
+        value: .*
+      - type: dns
+        name: .*
+        field: .*
+        value: .*
+      - type: http
+        name: .*
+        field: .*
+        value: .*
+        headers:
       transport:
+        type: tcp
         host: 127.0.0.1
         port: 9109
         tls:
           cacertpath: ''
           enable: false
           validateserver: true
-        type: tcp
-      watch:
-      - name: (\/logs?\/)|(\.log$)|(\.log[.\d])
-        type: file
-        value: .*
-      - allowbinary: true
-        name: (stdout)|(stderr)
-        type: console
-        value: .*
-      - field: .*
-        name: .*
-        type: net
-        value: .*
-      - field: .*
-        name: .*
-        type: fs
-        value: .*
-      - field: .*
-        name: .*
-        type: dns
-        value: .*
-      - field: .*
-        headers: null
-        name: .*
-        type: http
-        value: .*
+    payload:
+      dir: /tmp
+      enable: false
     libscope:
-      commanddir: /tmp
       configevent: true
+      summaryperiod: 10
+      commanddir: /tmp
       log:
         level: warning
         transport:
           buffer: line
           path: /tmp/scope.log
           type: file
-      summaryperiod: 10
-    metric:
-      enable: true
-      format:
-        statsdmaxlen: 512
-        statsdprefix: null
-        type: statsd
-        verbosity: 4
-      transport:
-        host: 127.0.0.1
-        port: 8125
-        tls:
-          cacertpath: ''
-          enable: false
-          validateserver: true
-        type: udp
-      watch:
-      - type: statsd
-      - type: fs
-      - type: net
-      - type: http
-      - type: dns
-      - type: process
-    payload:
-      dir: /tmp
-      enable: false
-- procname: redis
-  arg: redis-server
-  config:
     cribl:
       enable: true
       transport:
+        type: edge
         host: 127.0.0.1
         port: 10090
         tls:
           cacertpath: ''
           enable: false
           validateserver: true
-        type: edge
-    event:
-      enable: true
-      format:
-        enhancefs: true
-        maxeventpersec: 10000
-        type: ndjson
-      transport:
-        host: 127.0.0.1
-        port: 9109
-        tls:
-          cacertpath: ''
-          enable: false
-          validateserver: true
-        type: tcp
-      watch:
-      - name: (\/logs?\/)|(\.log$)|(\.log[.\d])
-        type: file
-        value: .*
-      - allowbinary: true
-        name: (stdout)|(stderr)
-        type: console
-        value: .*
-      - field: .*
-        name: .*
-        type: net
-        value: .*
-      - field: .*
-        name: .*
-        type: fs
-        value: .*
-      - field: .*
-        name: .*
-        type: dns
-        value: .*
-      - field: .*
-        headers: null
-        name: .*
-        type: http
-        value: .*
-    libscope:
-      commanddir: /tmp
-      configevent: true
-      log:
-        level: warning
-        transport:
-          buffer: line
-          path: /tmp/scope2.log
-          type: file
-      summaryperiod: 10
+- procname: 
+  arg: redis-server
+  config:
     metric:
       enable: true
       format:
@@ -155,14 +96,6 @@ allow:
         statsdprefix: null
         type: statsd
         verbosity: 4
-      transport:
-        host: 127.0.0.1
-        port: 8125
-        tls:
-          cacertpath: ''
-          enable: false
-          validateserver: true
-        type: udp
       watch:
       - type: statsd
       - type: fs
@@ -170,8 +103,75 @@ allow:
       - type: http
       - type: dns
       - type: process
+      transport:
+        type: udp
+        host: 127.0.0.1
+        port: 8125
+        tls:
+          cacertpath: ''
+          enable: false
+          validateserver: true
+    event:
+      enable: true
+      format:
+        enhancefs: true
+        maxeventpersec: 10000
+        type: ndjson
+      watch:
+      - type: file
+        name: (\/logs?\/)|(\.log$)|(\.log[.\d])
+        value: .*
+      - type: console
+        name: (stdout)|(stderr)
+        value: .*
+        allowbinary: true
+      - type: net
+        name: .*
+        field: .*
+        value: .*
+      - type: fs
+        name: .*
+        field: .*
+        value: .*
+      - type: dns
+        name: .*
+        field: .*
+        value: .*
+      - type: http
+        name: .*
+        field: .*
+        value: .*
+        headers:
+      transport:
+        type: tcp
+        host: 127.0.0.1
+        port: 9109
+        tls:
+          cacertpath: ''
+          enable: false
+          validateserver: true
     payload:
       dir: /tmp
       enable: false
+    libscope:
+      configevent: true
+      summaryperiod: 10
+      commanddir: /tmp
+      log:
+        level: warning
+        transport:
+          buffer: line
+          path: /tmp/scope2.log
+          type: file
+    cribl:
+      enable: true
+      transport:
+        type: edge
+        host: 127.0.0.1
+        port: 10090
+        tls:
+          cacertpath: ''
+          enable: false
+          validateserver: true
 deny:
 - procname: git

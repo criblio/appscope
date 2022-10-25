@@ -99,8 +99,26 @@ sleep_pid=$!
 run scope attach $sleep_pid
 returns 0
 
-# Wait for attach to execute, then end sleep process
+# Wait for attach to execute
 sleep 2
+
+# Detach to sleep process by PID
+run scope detach $sleep_pid
+outputs "Detaching from pid ${sleep_pid}"
+returns 0
+
+# Wait for detach to execute
+sleep 3
+
+# Reattach to sleep process by PID
+run scope attach $sleep_pid
+outputs "Reattaching to pid ${sleep_pid}"
+returns 0
+
+# Wait for reattach to execute
+sleep 3
+
+# End sleep process
 kill $sleep_pid
 
 # Assert .scope directory exists
@@ -112,14 +130,17 @@ is_dir /tmp/${sleep_pid}*
 # Assert sleep config file exists
 is_file /tmp/${sleep_pid}*/scope.yml
 
-# Compare sleep config.yml with expected.yml
-cat /tmp/${sleep_pid}*/scope.yml | sed -e "s/${sleep_pid}_1_[0-9][0-9]*_[0-9]*/SESSIONPATH/" | diff - /expected.yml
-if [ $? -eq 0 ]; then
-	echo "PASS: Scope sleep config as expected"
-else
-	echo "FAIL: Scope sleep config not as expected"
-	ERR+=1
-fi
+# Compare sleep config.yml files (attach and reattach) with expected.yml
+for scopedirpath in /tmp/${sleep_pid}_*; do
+    scopedir=$(basename "$scopedirpath")
+    cat $scopedirpath/scope.yml | sed -e "s/$scopedir/SESSIONPATH/" | diff - /expected.yml
+    if [ $? -eq 0 ]; then
+        echo "PASS: Scope sleep config as expected"
+    else
+        echo "FAIL: Scope sleep config not as expected"
+        ERR+=1
+    fi
+done
 
 endtest
 
@@ -162,14 +183,28 @@ returns 0
 endtest
 
 #
+# Scope start no force
+#
+starttest "Scope start no force"
+
+# Scope start
+run scope start
+outputs "If you wish to proceed, run again with the -f flag."
+returns 0
+
+endtest
+
+#
 # Scope start no input
 #
 starttest "Scope start no input"
 
 # Scope start
-run scope start
-outputs "missing filter data"
+run scope start -f
+outputs "Exiting due to start failure"
 returns 1
+scope logs -s | grep -q "Missing filter data"
+ERR+=$?
 
 endtest
 
@@ -178,11 +213,12 @@ endtest
 #
 starttest "Scope start empty file pipeline"
 
-OUT=$(cat /opt/test-runner/empty_file | scope start 2>/dev/null)
+OUT=$(cat /opt/test-runner/empty_file | scope start -f 2>&1)
 RET=$?
-outputs "missing filter data"
+outputs "Exiting due to start failure"
 returns 1
-
+scope logs -s | grep -q "Missing filter data"
+ERR+=$?
 
 endtest
 
@@ -191,10 +227,42 @@ endtest
 #
 starttest "Scope start empty file redirect"
 
-OUT=$(scope start < /opt/test-runner/empty_file 2>/dev/null)
+OUT=$(scope start -f < /opt/test-runner/empty_file 2>&1)
 RET=$?
-outputs "missing filter data"
+outputs "Exiting due to start failure"
+scope logs -s | grep -q "Missing filter data"
+ERR+=$?
 returns 1
+
+endtest
+
+# Scope detach by name
+#
+starttest "Scope detach by name"
+
+#
+# Detach by name
+#
+run scope detach sleep
+outputs "Detaching from pid ${sleep_pid}"
+returns 0
+
+endtest
+
+# Give time to consume configuration file (without sleep)
+timeout 4s tail -f /dev/null
+
+#
+# Scope reattach by name
+#
+starttest "Scope reattach by name"
+
+#
+# reattach by name
+#
+run scope attach sleep
+outputs "Reattaching to pid ${sleep_pid}"
+returns 0
 
 endtest
 

@@ -347,7 +347,7 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr phad
     // create a stack (void *)ROUND_UP(laddr + pgsz + HEAP_SIZE, pgsz)  | MAP_FIXED
     if ((sp = scope_mmap(NULL, STACK_SIZE,
                    PROT_READ | PROT_WRITE,
-                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN,
+                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN | MAP_STACK,
                    -1, (off_t)NULL)) == MAP_FAILED) {
         scopeLogError("set_go:scope_mmap");
         return -1;

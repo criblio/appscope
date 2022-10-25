@@ -32,6 +32,7 @@ var (
 	errReadProc       = errors.New("cannot read from proc directory")
 	errGetProcStatus  = errors.New("error getting process status")
 	errGetProcCmdLine = errors.New("error getting process command line")
+	errGetProcTask    = errors.New("error getting process task")
 	errMissingUser    = errors.New("unable to find user")
 )
 
@@ -55,10 +56,10 @@ func searchPidByCmdLine(pid int, inputArg string) bool {
 	return strings.Contains(cmdLine, inputArg)
 }
 
-type searchFun func(int, string) bool
+type searchFunc func(int, string) bool
 
-// pidScopeMapSearch returns an map of processes that met conditions in searchFun
-func pidScopeMapSearch(inputArg string, sF searchFun) (PidScopeMapState, error) {
+// pidScopeMapSearch returns an map of processes that met conditions in searchFunc
+func pidScopeMapSearch(inputArg string, sF searchFunc) (PidScopeMapState, error) {
 	pidMap := make(PidScopeMapState)
 
 	procDir, err := os.Open("/proc")
@@ -97,7 +98,7 @@ func PidScopeMapByProcessName(procname string) (PidScopeMapState, error) {
 	return pidScopeMapSearch(procname, searchPidByProcName)
 }
 
-// PidScopeMapByArg returns an map of processes that are found by cmdLine submatch
+// PidScopeMapByCmdLine returns an map of processes that are found by cmdLine submatch
 func PidScopeMapByCmdLine(cmdLine string) (PidScopeMapState, error) {
 	return pidScopeMapSearch(cmdLine, searchPidByCmdLine)
 }
@@ -236,22 +237,44 @@ func PidUser(pid int) (string, error) {
 
 // PidScoped checks if a process specified by PID is being scoped
 func PidScoped(pid int) bool {
+
+	// Look for libscope in /proc maps
 	pidMapFile, err := ioutil.ReadFile(fmt.Sprintf("/proc/%v/maps", pid))
 	if err != nil {
 		return false
 	}
-
-	// Look for libscope in map
 	pidMap := string(pidMapFile)
-	if strings.Contains(pidMap, "libscope") {
-		command, err := PidCommand(pid)
-		if err != nil {
-			return false
-		}
-		return command != "ldscopedyn"
+	if !strings.Contains(pidMap, "libscope") {
+		return false
 	}
 
-	return false
+	// Ignore ldscope process
+	command, err := PidCommand(pid)
+	if err != nil {
+		return false
+	}
+	if command == "ldscopedyn" {
+		return false
+	}
+
+	// Check shmem does not exist (if scope_anon does not exist the proc is scoped)
+	files, err := ioutil.ReadDir(fmt.Sprintf("/proc/%v/fd", pid))
+	if err != nil {
+		return false
+	}
+
+	for _, file := range files {
+		filePath := fmt.Sprintf("/proc/%v/fd/%s", pid, file.Name())
+		resolvedFileName, err := os.Readlink(filePath)
+		if err != nil {
+			continue
+		}
+		if strings.Contains(resolvedFileName, "scope_anon") {
+			return false
+		}
+	}
+
+	return true
 }
 
 // PidCommand gets the command used to start the process specified by PID
@@ -274,6 +297,23 @@ func PidCmdline(pid int) (string, error) {
 	}
 
 	return cmdline, nil
+}
+
+// PidThreadsPids gets the all the thread PIDs specified by PID
+func PidThreadsPids(pid int) ([]int, error) {
+	files, err := ioutil.ReadDir(fmt.Sprintf("/proc/%v/task", pid))
+	if err != nil {
+		return nil, errGetProcTask
+	}
+
+	threadPids := make([]int, len(files))
+
+	for _, file := range files {
+		tid, _ := strconv.Atoi(file.Name())
+		threadPids = append(threadPids, tid)
+	}
+
+	return threadPids, nil
 }
 
 // PidExists checks if a PID is valid

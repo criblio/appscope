@@ -22,7 +22,7 @@ ldscope --help configuration | grep TLS
 
 ## Using TLS in Cribl.Cloud
 
-AppScope uses TLS by default to communicate with Cribl Stream on Cribl.Cloud. Cribl Stream has an AppScope Source ready to use out-of-the-box.
+AppScope uses TLS by default to communicate with Cribl Stream over TCP on Cribl.Cloud. Cribl Stream has an AppScope Source ready to use out-of-the-box.
 
 Within Cribl.Cloud, a front-end load balancer (reverse proxy) handles the encrypted TLS traffic and relays it to the AppScope Source port in Cribl Stream. The connection from the load balancer to Cribl Stream does **not** use TLS, and you should not enable TLS on the [AppScope Source](https://docs.cribl.io/docs/sources-appscope) in Cribl Stream. No changes in Cribl Stream configuration are needed.
 

@@ -30,6 +30,7 @@
 #include "os.h"
 #include "plattime.h"
 #include "report.h"
+#include "setup.h"
 #include "scopeelf.h"
 #include "scopetypes.h"
 #include "state.h"
@@ -400,6 +401,25 @@ cmdAttach(void)
     hookMain(filter);
 
     g_cfg.funcs_attached = TRUE;
+
+    /*
+     * Using this as an indicator that we were not
+     * previously soping. If the smfd is not active we
+     * may have been detached and are reattaching.
+     * In that cse, the thread and transports are expected
+     * to be ready.
+     *
+     * The thread likely should be started
+     */
+    if (g_proc.smfd > 0) {
+        scope_close(g_proc.smfd);   // deletes the SM segment
+        g_proc.smfd = 0;
+
+        if (g_thread.once == FALSE) {
+            threadNow(0);
+        }
+    }
+
     return TRUE;
 }
 
@@ -418,7 +438,7 @@ remoteConfig()
     scope_memset(&fds, 0x0, sizeof(fds));
 
     // We want to accept incoming requests on TCP, unix, and edge.
-    // However, we don't currently support receving on TLS connections.
+    // However, we don't currently support receiving on TLS connections.
     int acceptRequests = transportSupportsCommandControl(ctlTransport(g_ctl, CFG_CTL));
     fds.events = (acceptRequests) ? POLLIN : 0;
 
@@ -664,11 +684,12 @@ dynConfig(void)
     // Modify the static config from the command file
     cfgProcessCommands(g_staticfg, fs);
 
+    scope_fclose(fs);
+    scope_unlink(path);
+
     // Apply the config
     doConfig(g_staticfg);
 
-    scope_fclose(fs);
-    scope_unlink(path);
     return 0;
 }
 
@@ -872,6 +893,8 @@ doReset()
 static void
 reportPeriodicStuff(void)
 {
+    if (g_cfg.funcs_attached == FALSE) return;
+
     // aggregate and send http metrics
     doHttpAgg();
 
@@ -1192,13 +1215,6 @@ static ssize_t internal_recvfrom(int, void *, size_t, int, struct sockaddr *, so
 static size_t __stdio_write(struct MUSL_IO_FILE *, const unsigned char *, size_t);
 static long wrap_scope_syscall(long, ...);
 
-static bool
-filterProc(const char *proc)
-{
-    // does this process pass the the allow filter?
-    return TRUE;
-}
-
 static int 
 findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
 {
@@ -1283,13 +1299,12 @@ hookInject()
 }
 
 static void
-initHook(int attachedFlag)
+initHook(int attachedFlag, bool scopedFlag)
 {
     int rc;
     bool should_we_patch = FALSE;
     char *full_path = NULL;
     elf_buf_t *ebuf = NULL;
-    bool filter;
     funchook_t *funchook;
 
     // env vars are not always set as needed, be explicit here
@@ -1333,12 +1348,10 @@ initHook(int attachedFlag)
     if (attachedFlag) {
         // responding to the inject command
         hookInject();
-        filter = TRUE;
     } else {
         // GOT hooking all interposed funcs
-        filter = filterProc(full_path);
-        dl_iterate_phdr(hookAll, &filter);
-        hookMain(filter);
+        dl_iterate_phdr(hookAll, &scopedFlag);
+        hookMain(scopedFlag);
     }
 
     // libmusl
@@ -1367,7 +1380,7 @@ initHook(int attachedFlag)
     }
 
     // if we are not hooking all, then we're done
-    if (filter == FALSE) return;
+    if (scopedFlag == FALSE) return;
 
     if (dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *handle = g_fn.dlopen(full_path, RTLD_NOW);
@@ -1584,6 +1597,8 @@ initSigErrorHandler(void)
 __attribute__((constructor)) void
 init(void)
 {
+    config_t *cfg = NULL;
+    char *path = NULL;
     scope_init_vdso_ehdr();
     // Bootstrapping...  we need to know if we're in musl so we can
     // call the right initFn function...
@@ -1618,7 +1633,6 @@ init(void)
 
     setProcId(&g_proc);
     setPidEnv(g_proc.pid);
-
     setMachineID(g_proc.machine_id);
     setUUID(g_proc.uuid);
 
@@ -1637,9 +1651,65 @@ init(void)
     g_nsslist = lstCreate(freeNssEntry);
 
     initTime();
+    /*
+    * We scope application in following cases:
+    * - when we are attaching
+    * - when the filter file does not exists
+    * - when process match the allow list
+    */
+    bool scopedFlag = FALSE;
+    bool skipReadCfg = FALSE;
 
-    char *path = cfgPath();
-    config_t *cfg = cfgRead(path);
+    if (attachedFlag) {
+        scopedFlag = TRUE;
+    } else {
+        cfg = cfgCreateDefault();
+        // First try to use env variable
+        char *envFilterVal = getenv("SCOPE_FILTER");
+        filter_status_t res = FILTER_SCOPED;
+        if (envFilterVal) {
+            /*
+            * If filter env was defined and wasn't disable 
+            * the filter handling, try path interpretation
+            */
+            size_t envFilterLen = scope_strlen(envFilterVal);
+            if ((scope_strncmp(envFilterVal, "false", envFilterLen)) && (!scope_access(envFilterVal, R_OK))) {
+                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, envFilterVal, cfg);
+            }
+        } else {
+            /*
+            * Try to use defaults
+            */
+            if (!scope_access(SCOPE_FILTER_USR_PATH, R_OK)) {
+                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, SCOPE_FILTER_USR_PATH, cfg);
+            } else if (!scope_access(SCOPE_FILTER_TMP_PATH, R_OK)) {
+                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, SCOPE_FILTER_TMP_PATH, cfg);
+            }
+        }
+        switch (res) {
+            case FILTER_SCOPED:
+                scopedFlag = TRUE;
+                break;
+            case FILTER_SCOPED_WITH_CFG:
+                scopedFlag = TRUE;
+                skipReadCfg = TRUE;
+                break;
+            case FILTER_NOT_SCOPED:
+                scopedFlag = FALSE;
+                break;
+            case FILTER_ERROR:
+            default:
+                scopedFlag = FALSE;
+                DBG(NULL);
+                break;
+        }
+    }
+    if (skipReadCfg == FALSE) {
+        path = cfgPath();
+        if (cfg) cfgDestroy(&cfg);
+        cfg = cfgRead(path);
+    }
+
     cfgProcessEnvironment(cfg);
 
     doConfig(cfg);
@@ -1648,29 +1718,50 @@ init(void)
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
 
-    g_cfg.funcs_attached = TRUE;
+    g_cfg.funcs_attached = scopedFlag;
     g_cfg.staticfg = g_staticfg;
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
-
-    reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
-    doProcStartMetric();
 
     // replaces atexit(handleExit);  Allows events to be reported before
     // the TLS destructors are run.  This mechanism is used regardless
     // of whether TLS is actually configured on any transport.
     transportRegisterForExitNotification(handleExit);
 
-    initHook(attachedFlag);
+    initHook(attachedFlag, scopedFlag);
     
-    if (checkEnv("SCOPE_APP_TYPE", "go")) {
-        threadNow(0);
-    } else if (g_ismusl == FALSE) {
-        // The check here is meant to be temporary.
-        // The behavior of timer_delete() in musl libc
-        // is different than that of gnu libc.
-        // Therefore, until that is investigated we don't
-        // enable a timer/signal.
-        threadInit();
+    /*
+     * If we are interposing (scoping) this process, then proceed
+     * with start messages. Else, we need the periodic thread to
+     * remain mute.
+     *
+     * We start the thread for now so that we can respond to
+     * dynamic and remote commands. This allows a re-attach
+     * command, for example, to be executed on a process that
+     * was previously not scoped.
+     */
+    if (g_cfg.funcs_attached == TRUE) {
+        reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
+        doProcStartMetric();
+
+        if (checkEnv("SCOPE_APP_TYPE", "go")) {
+            threadNow(0);
+        } else if (g_ismusl == FALSE) {
+            /*
+             * The check here is meant to be temporary.
+             * The behavior of timer_delete() in musl libc
+             * is different than that of gnu libc.
+             * Therefore, until that is investigated we don't
+             * enable a timer/signal.
+             */
+            threadInit();
+        }
+    } else {
+        /*
+         * When libscope is loaded and we are not interposing
+         * we don't start the thread. Rather, we create the
+         * SM segment to enable a reattach command.
+         */
+        osCreateSM(&g_proc, (unsigned long)cmdAttach);
     }
 
     osInitJavaAgent();
@@ -2637,8 +2728,8 @@ prctl(int option, ...)
     return g_fn.prctl(option, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2], fArgs.arg[3]);
 }
 
-static char*
-getLdscopeExec(const char* pathname)
+static char *
+getLdscopeExec(const char *pathname)
 {
     char *scopexec = NULL;
     bool isstat = FALSE, isgo = FALSE;
@@ -3938,8 +4029,10 @@ __stdio_write(struct MUSL_IO_FILE *stream, const unsigned char *buf, size_t len)
         }
     }
 
-    if (dothis == 1) doWrite(stream->fd, initialTime, (rc != -1),
-                             iov, rc, "__stdio_write", IOV, iovcnt);
+    if ((dothis == 1) && (g_cfg.funcs_attached == TRUE)) {
+        doWrite(stream->fd, initialTime, (rc != -1), iov, rc, "__stdio_write", IOV, iovcnt);
+    }
+
     return rc;
 }
 

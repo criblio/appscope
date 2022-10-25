@@ -36,13 +36,16 @@ type Config struct {
 
 // Run executes a scoped command
 func (rc *Config) Run(args []string) {
-	if err := createLdscope(); err != nil {
+	if err := CreateLdscope(); err != nil {
 		util.ErrAndExit("error creating ldscope: %v", err)
 	}
 	// Normal operational, not passthrough, create directory for this run
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
 	env := os.Environ()
+	// Disable detection of a scope filter file with this command
+	env = append(env, "SCOPE_FILTER=false")
+
 	if rc.NoBreaker {
 		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
 	}
@@ -59,7 +62,7 @@ func (rc *Config) Run(args []string) {
 		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
-	sL := loader.ScopeLoader{Path: ldscopePath()}
+	sL := loader.ScopeLoader{Path: LdscopePath()}
 	if !rc.Subprocess {
 		sL.Run(args, env)
 	}

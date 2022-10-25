@@ -81,7 +81,6 @@ declare -a curl_net_events=(
 
 declare -a curl_http_metrics=(
 "http.req:"
-"http.resp.content_length:"
 "http.duration.client:"
 )
 

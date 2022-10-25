@@ -99,19 +99,83 @@ attach(pid_t pid, char *scopeLibPath)
     return ret;
 }
 
+/*
+ * Given the ability to separate lib load and interposition
+ * we enable a detach capability as well as 3 types
+ * of attach cases. 4 commands in all.
+ *
+ * Load and attach:
+ * libscope is not loaded.  This case is
+ * handled in function attach().
+ *
+ * First attach:
+ * libscope is loaded and we are not interposing
+ * functions, not scoped. This is the first time
+ * libscope will have been attached.
+ *
+ * Reattach:
+ * libscope is loaded, the process has been attached
+ * in one form at least once previously.
+ *
+ * Detach:
+ * libscope is loaded and we are interposing functions.
+ * Remove all interpositions and stop scoping.
+ */
 static int
-attachCmd(pid_t pid, const char *on_off)
+attachCmd(pid_t pid, bool attach)
 {
-    int fd;
-    char path[PATH_MAX];
-    char cmd[64];
+    int fd, sfd, mfd;
+    bool first_attach = FALSE;
+    export_sm_t *exaddr;
+    char buf[PATH_MAX] = {0};
 
-    scope_snprintf(path, sizeof(path), "%s/%s.%d",
+    /*
+     * The SM segment is used in the first attach case where
+     * we've never been attached before. The segment is
+     * populated with state including the address of the
+     * reattach command in the lib. The segment is read
+     * only and the size of the segment can't be modified.
+     *
+     * We use the presence of the segment to identify the
+     * state of the lib. The segment is deleted when a
+     * first attach is performed.
+     */
+    sfd = osFindFd(pid, SM_NAME);   // e.g. memfd:scope_anon
+    if (sfd > 0) {
+        first_attach = TRUE;
+    }
+
+    /*
+     * On command detach if the SM segment exists, we have never been
+     * attached. Return and do not create the command file as it
+     * will never be deleted until attached and then causes an
+     * unintended detach.
+     */
+    if ((attach == FALSE) && (first_attach == TRUE)) {
+        scope_printf("Already detached from pid %d\n", pid);
+        return EXIT_SUCCESS;
+    }
+
+    /*
+     * Before executing any command, create and populate the dyn config file.
+     * It is used for all cases:
+     *   First attach: no attach command, include env vars, reload command
+     *   Reattach: attach command = true, include env vars, reload command
+     *   Detach: attach command = false, no env vars, no reload command
+     */
+    scope_snprintf(buf, sizeof(buf), "%s/%s.%d",
                    DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, pid);
 
-    fd = scope_open(path, O_RDWR|O_CREAT);
+    /*
+     * Unlink a possible existing file before creating a new one
+     * due to a fact that scope_open will fail if the file is
+     * sealed (still processed on library side).
+     * File sealing is supported on tmpfs - /dev/shm (DYN_CONFIG_CLI_DIR).
+     */
+    scope_unlink(buf);
+    fd = scope_open(buf, O_WRONLY|O_CREAT);
     if (fd == -1) {
-        scope_perror("open() of dynamic config file");
+        scope_perror("scope_open() of dynamic config file");
         return EXIT_FAILURE;
     }
 
@@ -144,15 +208,92 @@ attachCmd(pid_t pid, const char *on_off)
         }
     }
 
-    scope_snprintf(cmd, sizeof(cmd), "SCOPE_CMD_ATTACH=%s", on_off);
-    if (scope_write(fd, cmd, scope_strlen(cmd)) <= 0) {
-        scope_perror("scope_write() failed");
-        scope_close(fd);
-        return EXIT_FAILURE;
+    if (first_attach == FALSE) {
+        const char *cmd = (attach == TRUE) ? "SCOPE_CMD_ATTACH=true\n" : "SCOPE_CMD_ATTACH=false\n";
+        if (scope_write(fd, cmd, scope_strlen(cmd)) <= 0) {
+            scope_perror("scope_write() failed");
+            scope_close(fd);
+            return EXIT_FAILURE;
+        }
+    }
+
+    if (attach == TRUE) {
+        int i;
+
+        if (first_attach == TRUE) {
+            scope_printf("First attach to pid %d\n", pid);
+        } else {
+            scope_printf("Reattaching to pid %d\n", pid);
+        }
+
+        /*
+        * Reload the configuration during first attach & reattach if we want to apply
+        * config from a environment variable
+        * Handle SCOPE_CONF_RELOAD in first order because of "processReloadConfig" logic
+        * is done in two steps:
+        * - first - create a configuration based on path (default one or custom one)
+        * - second - process env variables existing in the process (cfgProcessEnvironment)
+        * We append rest of the SCOPE_ variables after since in this way we ovewrite the ones
+        * which was set by cfgProcessEnvironment in second step.
+        * TODO: Handle the file and env variables
+        */
+        char *scopeConfReload = getenv("SCOPE_CONF_RELOAD");
+        if (!scopeConfReload) {
+            scope_dprintf(fd, "SCOPE_CONF_RELOAD=TRUE\n");
+        } else {
+            scope_dprintf(fd, "SCOPE_CONF_RELOAD=%s\n", scopeConfReload);
+        }
+
+        for (i = 0; environ[i]; ++i) {
+            size_t envLen = scope_strlen(environ[i]);
+            if ((envLen > 6) &&
+                (scope_strncmp(environ[i], "SCOPE_", 6) == 0) &&
+                (!scope_strstr(environ[i], "SCOPE_CONF_RELOAD"))) {
+                    scope_dprintf(fd, "%s\n", environ[i]);
+            }
+        }
+    } else {
+        scope_printf("Detaching from pid %d\n", pid);
     }
 
     scope_close(fd);
-    return EXIT_SUCCESS;
+
+    int rc = EXIT_SUCCESS;
+
+    if (first_attach == TRUE) {
+        scope_memset(buf, 0, PATH_MAX);
+        // the only command we do in this case is first attach
+        scope_snprintf(buf, sizeof(buf), "/proc/%d/fd/%d", pid, sfd);
+        if ((mfd = scope_open(buf, O_RDONLY)) == -1) {
+            scope_close(sfd);
+            scope_perror("open");
+            return EXIT_FAILURE;
+        }
+
+        if ((exaddr = scope_mmap(NULL, sizeof(export_sm_t), PROT_READ,
+                                 MAP_SHARED, mfd, 0)) == MAP_FAILED) {
+            scope_close(sfd);
+            scope_close(mfd);
+            scope_perror("mmap");
+            return EXIT_FAILURE;
+        }
+
+        if (injectFirstAttach(pid, exaddr->cmdAttachAddr) == EXIT_FAILURE) {
+            scope_fprintf(scope_stderr, "error: %s: you must have administrator privileges to run this command\n", __FUNCTION__);
+            rc = EXIT_FAILURE;
+        }
+
+        //scope_fprintf(scope_stderr, "%s: %s 0x%lx\n", __FUNCTION__, buf, exaddr->cmdAttachAddr);
+
+        scope_close(sfd);
+        scope_close(mfd);
+
+        if (scope_munmap(exaddr, sizeof(export_sm_t))) {
+            scope_fprintf(scope_stderr, "error: %s: unmapping in the the reattach command failed\n", __FUNCTION__);
+            rc = EXIT_FAILURE;
+        }
+    }
+        return rc;
 }
 
 // long aliases for short options
@@ -257,12 +398,11 @@ main(int argc, char **argv, char **env)
                 scope_fprintf(scope_stderr, "error: can't get path to executable for pid %d\n", pid);
                 ret = EXIT_FAILURE;
             } else if (rc == 0) {
-                // proc exists, libscope does not exist, a new attach
+                // proc exists, libscope does not exist, a load & attach
                 ret = attach(pid, scopeLibPath);
             } else {
-                // libscope exists, a reattach
-                scope_printf("Reattaching to pid %d\n", pid);
-                ret = attachCmd(pid, "true");
+                // libscope exists, a first time attach or a reattach
+                ret = attachCmd(pid, TRUE);
             }
 
             // remove the env var file
@@ -279,8 +419,7 @@ main(int argc, char **argv, char **env)
                 scope_fprintf(scope_stderr, "error: pid %d has never been attached\n", pid);
                 return EXIT_FAILURE;
             }
-            scope_printf("Detaching from pid %d\n", pid);
-            return attachCmd(pid, "false");
+            return attachCmd(pid, FALSE);
         } else {
             scope_fprintf(scope_stderr, "error: attach or detach with invalid option\n");
             showUsage(scope_basename(argv[0]));

@@ -139,6 +139,18 @@ func TestPidCmdline(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// TestPidThreadsPids
+// Assertions:
+// - Current process id is one of the element in thread
+// - No error is returned
+func TestPidThreadsPids(t *testing.T) {
+	// Current process command
+	pid := os.Getpid()
+	threadPids, err := PidThreadsPids(pid)
+	assert.Contains(t, threadPids, pid)
+	assert.NoError(t, err)
+}
+
 // TestPidExists
 // Assertions:
 // - The expected boolean value is returned

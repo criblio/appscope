@@ -84,7 +84,7 @@ c_handler:
     // r13 is c_func address
     // r14 is the caller g
     // Note: r14 is not set in the case where a stack switch isn't needed
-    //       It's ok here becasue we don't use it to restore the g
+    //       It's ok here because we don't use it to restore the g
     //       However, don't rely on r14 in C code
     // Returns:
     // r13 is the trampoline address

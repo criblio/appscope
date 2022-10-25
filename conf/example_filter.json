@@ -1,8 +1,8 @@
 {
   "allow": [
     {
-      "procname": "redis",
-      "arg": "start",
+      "procname": "nginx",
+      "arg": "",
       "config": {
         "metric": {
           "enable": true,
@@ -132,8 +132,8 @@
       }
     },
     {
-      "procname": "nginx",
-      "arg": "start",
+      "procname": "redis",
+      "arg": "redis-server",
       "config": {
         "metric": {
           "enable": true,

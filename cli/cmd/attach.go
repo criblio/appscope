@@ -21,7 +21,7 @@ import (
  * userconfig      X         X            X          X         X         X         X           X         X        X                    -
  */
 
-// attachCmd represents the run command
+// attachCmd represents the attach command
 var attachCmd = &cobra.Command{
 	Use:   "attach [flags] PID | <process_name>",
 	Short: "Scope a currently-running process",

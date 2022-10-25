@@ -29,6 +29,17 @@ void cfgProcessEnvironment(config_t *);
 // modify cfg per environment variable syntax in a file
 void cfgProcessCommands(config_t *, FILE *);
 
+typedef enum {
+    FILTER_ERROR,           // error with filter operation
+    FILTER_SCOPED,          // process will be scoped
+    FILTER_SCOPED_WITH_CFG, // process will be scoped with cfg from the filter file
+    FILTER_NOT_SCOPED       // process will not be scoped
+} filter_status_t;
+
+// Filter Handling
+// parse filter file nd optionally reads a cfg from filter file
+filter_status_t cfgFilterStatus(const char *, const char *, const char *, config_t *);
+
 log_t * initLog(config_t *);
 mtc_t * initMtc(config_t *);
 evt_fmt_t * initEvtFormat(config_t *);

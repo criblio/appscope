@@ -331,3 +331,39 @@ func InterfaceToString(i interface{}) string {
 		return fmt.Sprintf("%v", v)
 	}
 }
+
+// Confirm allows a user to confirm y/n with stdin
+func Confirm(s string) bool {
+	fmt.Printf("%s [y/n]: ", s)
+
+	var in string
+	_, err := fmt.Scan(&in)
+	CheckErrSprintf(err, "error: confirm failed; %v", err)
+
+	in = strings.TrimSpace(in)
+	in = strings.ToLower(in)
+
+	if in == "y" || in == "yes" {
+		return true
+	}
+
+	return false
+}
+
+// CopyFile copies a file from a source to a destination
+func CopyFile(src, dst string) (int64, error) {
+	source, err := os.Open(src)
+	if err != nil {
+		return 0, err
+	}
+	defer source.Close()
+
+	destination, err := os.Create(dst)
+	if err != nil {
+		return 0, err
+	}
+	defer destination.Close()
+
+	nBytes, err := io.Copy(destination, source)
+	return nBytes, err
+}

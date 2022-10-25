@@ -3,8 +3,11 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net/http"
 )
+
+const maxScanTokenSize = 1024 * 1024
 
 func main() {
 
@@ -16,12 +19,20 @@ func main() {
 
 	fmt.Println("Response status:", resp.Status)
 
-	scanner := bufio.NewScanner(resp.Body)
-	for i := 0; scanner.Scan() && i < 5; i++ {
-		fmt.Println(scanner.Text())
-	}
-	if err := scanner.Err(); err != nil {
-		panic(err)
+	reader := bufio.NewReaderSize(resp.Body, maxScanTokenSize)
+
+	for {
+		token, _, err := reader.ReadLine()
+		if len(token) > 0 {
+			fmt.Println(string(token))
+		}
+		if err != nil {
+			if err == io.EOF {
+				break
+			} else {
+				panic(err)
+			}
+		}
 	}
 
 	// force close the connection to produce a net.close event

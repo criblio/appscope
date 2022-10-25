@@ -36,7 +36,14 @@ var logsCmd = &cobra.Command{
 
 		// Open log file
 		logFile, err := os.Open(logPath)
-		util.CheckErrSprintf(err, "%v", err)
+		if err != nil {
+			if scopeLog {
+				fmt.Println("No log file present for the CLI. If you want to see the ldscope logs, try running without -s")
+			} else {
+				fmt.Println("No log file present for ldscope. If you want to see the CLI logs, try running with -s")
+			}
+			os.Exit(1)
+		}
 
 		offset, err := util.FindReverseLineMatchOffset(lastN, logFile, util.MatchAny())
 		if offset < 0 {

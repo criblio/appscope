@@ -37,6 +37,7 @@ Available Subcommands:
   attach      Scope a currently-running process
   completion  Generate completion code for specified shell
   dash        Display scope dashboard
+  detach      Unscope a currently-running process
   events      Outputs events for a session
   extract     Output instrumentary library files to <dir>
   flows       Observed flows from the session, potentially including payloads
@@ -49,7 +50,7 @@ Available Subcommands:
   ps          List processes currently being scoped
   run         Executes a scoped command
   service     Configure a systemd/OpenRC service to be scoped
-  start       Start a scoped process list
+  start       Start scoping a filtered selection of processes and services
   version     Display scope version
   watch       Executes a scoped command on an interval
 
@@ -100,6 +101,29 @@ scope attach --payloads 2000
   -p, --payloads              Capture payloads of network transactions
   -u, --userconfig string     Run ldscope with a user specified config file; overrides all other settings
   -v, --verbosity int         Set scope metric verbosity (default 4)
+
+```
+
+### detach
+---
+
+Unscopes a currently-running process identified by PID or ProcessName.
+
+#### Usage
+
+`scope detach [flags] PID | <process_name>`
+
+#### Examples
+
+```
+scope detach 1000
+scope detach firefox
+```
+
+#### Flags
+
+```
+  -h, --help                  Help for detach
 
 ```
 
@@ -436,6 +460,10 @@ Negative arguments are not allowed.
 ### ps
 ---
 
+Lists all scoped processes. This means processes whose functions AppScope is interposing (which means that the AppScope library was loaded, and the AppScope reporting thread is running, in those processes, too).
+
+Before AppScope 1.2.0:		
+
 Lists all processes into which the libscope library is injected.
 
 #### Usage
@@ -518,14 +546,14 @@ scope service cribl -c tls://in.my-instance.cribl.cloud:10090
 ### start
 ---
 
-Perform a scope start operation based on the filter input.
+Start scoping a filtered selection of processes and services on the host and in all relevant containers. See the example [filter file](/docs/filter-file).
 
-Following actions will be performed:
-- extraction libscope.so to /tmp/libscope.so on the host and on the containers
-- extraction filter input to /tmp/scope_filter.yml on the host and on the containers
-- setup etc/profile script to use LD_PRELOAD=/tmp/libscope.so on the host and on the containers
-- setup the services which meet the allow list conditions on the host and on the containers
-- attach to the processes which meet the allow list conditions on the host and on the containers
+`scope start` does the following on the host and in all relevant containers:
+- Extract `libscope.so` to `/usr/lib/appscope/<version>/` when AppScope is run as root; otherwise extract to `/tmp/appscope/<version>/`.
+- Extract the filter input to `/usr/lib/appscope/scope_filter` when AppScope is run as root; otherwise extract to `/tmp/appscope/scope_filter`.
+- Attach to all existing allowed processes defined in the filter file.
+- Install the `etc/profile.d/scope.sh` script, to preload `/usr/lib/appscope/<version>/libscope.so` if it exists.
+- Modify the relevant service configurations to preload `/usr/lib/appscope/<version>/libscope.so` when AppScope is run as root; otherwise preload `/tmp/appscope/<version>/libscope.so`.
 
 #### Usage
 
@@ -533,14 +561,22 @@ Following actions will be performed:
 
 #### Examples
 
+You can use a redirect:
+
 ```
 scope start < example_filter.yml
+```
+
+Alternatively, you can use a pipe:
+
+```
 cat example_filter.json | scope start
 ```
 
 #### Flags
 
 ```
+  -f, --force   Use this flag when you're sure you want to run scope start
   -h, --help    help for start
 ```
 

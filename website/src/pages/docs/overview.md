@@ -4,6 +4,8 @@ title: Overview
 
 ## What Is AppScope?
 
+AppScope is a tool that unlocks 100% application observability with near-zero overhead, including for applications and processes whose data is otherwise hard to obtain.
+
 AppScope is an open source, runtime-agnostic instrumentation utility for any Linux command or application. It helps users explore, understand, and gain visibility with **no code modification**. 
 
 AppScope provides the fine-grained observability of a proxy/service mesh, without the latency of a sidecar. It emits APM-like metric and event data, in open formats, to existing log and metric tools.

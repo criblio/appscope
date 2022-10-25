@@ -21,70 +21,54 @@ var (
 	errPidInvalid       = errors.New("invalid PID")
 	errPidMissing       = errors.New("PID does not exist")
 	errCreateLdscope    = errors.New("error creating ldscope")
-	errAlreadyScope     = errors.New("attach failed. This process is already being scoped")
+	errNotScoped        = errors.New("detach failed. This process is not being scoped")
 	errLibraryNotExist  = errors.New("library Path does not exist")
 	errInvalidSelection = errors.New("invalid Selection")
 )
 
 // Attach scopes an existing PID
 func (rc *Config) Attach(args []string) error {
-	// Validate user has root permissions
-	if err := util.UserVerifyRootPerm(); err != nil {
+	pid, err := handleInputArg(args[0])
+	if err != nil {
 		return err
 	}
-	// Validate PTRACE capability
-	c, err := capability.NewPid2(0)
-	if err != nil {
-		return errGetLinuxCap
-	}
-	err = c.Load()
-	if err != nil {
-		return errLoadLinuxCap
-	}
-	if !c.Get(capability.EFFECTIVE, capability.CAP_SYS_PTRACE) {
-		return errMissingPtrace
-	}
-	// Get PID by name if non-numeric, otherwise validate/use args[0]
-	var pid int
-	if !util.IsNumeric(args[0]) {
-		procs, err := util.ProcessesByName(args[0])
-		if err != nil {
+	args[0] = fmt.Sprint(pid)
+	var reattach bool
+	// Check PID is not already being scoped
+	if !util.PidScoped(pid) {
+		// Validate user has root permissions
+		if err := util.UserVerifyRootPerm(); err != nil {
 			return err
 		}
-		if len(procs) == 1 {
-			pid = procs[0].Pid
-		} else if len(procs) > 1 {
-			fmt.Println("Found multiple processes matching that name...")
-			pid, err = choosePid(procs)
-			if err != nil {
-				return err
-			}
-		} else {
-			return errMissingProc
-		}
-		args[0] = fmt.Sprint(pid)
-	} else {
-		pid, err = strconv.Atoi(args[0])
+		// Validate PTRACE capability
+		c, err := capability.NewPid2(0)
 		if err != nil {
-			return errPidInvalid
+			return errGetLinuxCap
 		}
+
+		if err = c.Load(); err != nil {
+			return errLoadLinuxCap
+		}
+
+		if !c.Get(capability.EFFECTIVE, capability.CAP_SYS_PTRACE) {
+			return errMissingPtrace
+		}
+	} else {
+		// Reattach because process contains our library
+		reattach = true
 	}
-	// Check PID exists
-	if !util.PidExists(pid) {
-		return errPidMissing
-	}
-	// Check PID is not already being scoped
-	if util.PidScoped(pid) {
-		return errAlreadyScope
-	}
+
 	// Create ldscope
-	if err := createLdscope(); err != nil {
+	if err := CreateLdscope(); err != nil {
 		return errCreateLdscope
 	}
 	// Normal operational, not passthrough, create directory for this run
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
 	env := os.Environ()
+	// Disable detection of a scope filter file with this command
+	env = append(env, "SCOPE_FILTER=false")
+
 	if rc.NoBreaker {
 		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
 	}
@@ -101,30 +85,91 @@ func (rc *Config) Attach(args []string) error {
 		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
-	sL := loader.ScopeLoader{Path: ldscopePath()}
-	if !rc.Subprocess {
-		return sL.Attach(args, env)
+	if reattach {
+		env = append(env, "SCOPE_CONF_RELOAD="+filepath.Join(rc.WorkDir, "scope.yml"))
 	}
-	_, err = sL.AttachSubProc(args, env)
+
+	ld := loader.ScopeLoader{Path: LdscopePath()}
+	if !rc.Subprocess {
+		return ld.Attach(args, env)
+	}
+	_, err = ld.AttachSubProc(args, env)
 	return err
 }
 
-// choosePid presents a user interface for selecting a PID
-func choosePid(procs util.Processes) (int, error) {
-	util.PrintObj([]util.ObjField{
-		{Name: "ID", Field: "id"},
-		{Name: "Pid", Field: "pid"},
-		{Name: "User", Field: "user"},
-		{Name: "Scoped", Field: "scoped"},
-		{Name: "Command", Field: "command"},
-	}, procs)
-	fmt.Println("Select an ID from the list:")
-	var selection string
-	fmt.Scanln(&selection)
-	i, err := strconv.ParseUint(selection, 10, 32)
-	i--
-	if err != nil || i >= uint64(len(procs)) {
-		return -1, errInvalidSelection
+// Detach unscopes an existing PID
+func (rc *Config) Detach(args []string) error {
+	pid, err := handleInputArg(args[0])
+	if err != nil {
+		return err
 	}
-	return procs[i].Pid, nil
+	args[0] = fmt.Sprint(pid)
+
+	// Check PID is already being scoped
+	if !util.PidScoped(pid) {
+		return errNotScoped
+	}
+
+	env := os.Environ()
+
+	// Create ldscope
+	if err := CreateLdscope(); err != nil {
+		return errCreateLdscope
+	}
+
+	ld := loader.ScopeLoader{Path: LdscopePath()}
+	if !rc.Subprocess {
+		return ld.Detach(args, env)
+	}
+	_, err = ld.DetachSubProc(args, env)
+	return err
+}
+
+// handleInputArg handles the input argument (process id/name)
+func handleInputArg(InputArg string) (int, error) {
+	// Get PID by name if non-numeric, otherwise validate/use InputArg
+	var pid int
+	var err error
+	if !util.IsNumeric(InputArg) {
+		procs, err := util.ProcessesByName(InputArg)
+		if err != nil {
+			return -1, err
+		}
+		if len(procs) == 1 {
+			pid = procs[0].Pid
+		} else if len(procs) > 1 {
+			// user interface for selecting a PID
+			fmt.Println("Found multiple processes matching that name...")
+			util.PrintObj([]util.ObjField{
+				{Name: "ID", Field: "id"},
+				{Name: "Pid", Field: "pid"},
+				{Name: "User", Field: "user"},
+				{Name: "Scoped", Field: "scoped"},
+				{Name: "Command", Field: "command"},
+			}, procs)
+			fmt.Println("Select an ID from the list:")
+			var selection string
+			fmt.Scanln(&selection)
+			i, err := strconv.ParseUint(selection, 10, 32)
+			i--
+			if err != nil || i >= uint64(len(procs)) {
+				return -1, errInvalidSelection
+			}
+			pid = procs[i].Pid
+		} else {
+			return -1, errMissingProc
+		}
+	} else {
+		pid, err = strconv.Atoi(InputArg)
+		if err != nil {
+			return -1, errPidInvalid
+		}
+	}
+
+	// Check PID exists
+	if !util.PidExists(pid) {
+		return -1, errPidMissing
+	}
+
+	return pid, nil
 }

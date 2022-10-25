@@ -4,7 +4,13 @@ title: Other Resources
 
 To learn more about AppScope, see these resources from Cribl.
 
-# Blog Posts
+## Videos
+
+- See Clint Sharp, one of the original contributors to the AppScope project (and Cribl CEO and Co-Founder) [discuss and demo](https://vimeo.com/730488487) AppScope.
+
+- For a view of the bigger observability picture, check out Cribl's [videos](https://cribl.io/resources/?category=videos).
+
+## Blog Posts
 
 Learn why the team created AppScope:
 
@@ -25,6 +31,3 @@ See how AppScope addresses use cases that are relevant for you:
 
 You can find all of Cribl's blog posts about AppScope [here](https://cribl.io/blog/?s=appscope).
 
-## Videos
-
-For a view of the bigger observability picture, check out Cribl's [videos](https://cribl.io/resources/?category=videos).

@@ -460,6 +460,10 @@ Negative arguments are not allowed.
 ### ps
 ---
 
+Lists all scoped processes. This means processes whose functions AppScope is interposing (which means that the AppScope library was loaded, and the AppScope reporting thread is running, in those processes, too).
+
+Before AppScope 1.2.0:		
+
 Lists all processes into which the libscope library is injected.
 
 #### Usage
@@ -542,14 +546,14 @@ scope service cribl -c tls://in.my-instance.cribl.cloud:10090
 ### start
 ---
 
-Start scoping a filtered selection of processes and services on the host and in all relevant containers.
+Start scoping a filtered selection of processes and services on the host and in all relevant containers. See the example [filter file](/docs/filter-file).
 
-The following actions will be performed on the host and in all relevant containers:
-- Extraction of libscope.so to /usr/lib/appscope/<version>/ or /tmp/appscope/<version>/
-- Extraction of the filter input to /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter
-- Attach to all existing "allowed" processes defined in the filter file
-- Install etc/profile.d/scope.sh script to preload /usr/lib/appscope/<version>/libscope.so if it exists
-- Modify the relevant service configurations to preload /usr/lib/appscope/<version>/libscope.so or /tmp/appscope/<version>/libscope.so
+`scope start` does the following on the host and in all relevant containers:
+- Extract `libscope.so` to `/usr/lib/appscope/<version>/` when AppScope is run as root; otherwise extract to `/tmp/appscope/<version>/`.
+- Extract the filter input to `/usr/lib/appscope/scope_filter` when AppScope is run as root; otherwise extract to `/tmp/appscope/scope_filter`.
+- Attach to all existing allowed processes defined in the filter file.
+- Install the `etc/profile.d/scope.sh` script, to preload `/usr/lib/appscope/<version>/libscope.so` if it exists.
+- Modify the relevant service configurations to preload `/usr/lib/appscope/<version>/libscope.so` when AppScope is run as root; otherwise preload `/tmp/appscope/<version>/libscope.so`.
 
 #### Usage
 
@@ -557,8 +561,15 @@ The following actions will be performed on the host and in all relevant containe
 
 #### Examples
 
+You can use a redirect:
+
 ```
 scope start < example_filter.yml
+```
+
+Alternatively, you can use a pipe:
+
+```
 cat example_filter.json | scope start
 ```
 

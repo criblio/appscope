@@ -86,7 +86,7 @@ Details of the `ps` application's execution are emitted to the configured transp
 LD_PRELOAD=./libscope.so SCOPE_METRIC_VERBOSITY=5 ps -ef
 ```
 
-This again executes the `ps` command using the AppScope library. But it also defines the verbosity for metric extraction as level `5`. (This verbosity setting overrides any config-file setting, as well as the default value.)
+This again executes the `ps` command using the AppScope library. But it also defines the [verbosity](/docs/events-and-metrics#metrics) for metric extraction as level `5`. (This verbosity setting overrides any config-file setting, as well as the default value.)
 
 #### `LD_PRELOAD` with a Config File
 
@@ -139,7 +139,10 @@ Assuming that you have [created](https://aws.amazon.com/lambda/getting-started/)
 
 #### Adding an AppScope AWS Lambda Layer
 
-1. Start with one of the AWS Lambda Layers for AppScope that Cribl provides. You can obtain the AWS Lambda Layers and their MD5 checksums from the Cribl CDN, or via Docker. See the Cribl [downloads page](https://cribl.io/download/#tab-1). 
+1. Start with one of the AWS Lambda Layers for AppScope that Cribl provides. You can obtain the AWS Lambda Layers and their MD5 checksums from the Cribl CDN.
+    - `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.2.0/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.0/linux/x86_64/aws-lambda-layer.zip)
+    - `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.2.0/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.0/linux/aarch64/aws-lambda-layer.zip)
+    - To obtain the MD5 checksum for either file above, add `.md5` to the file path.
 2. Complete the procedure for creating a layer described in the [AWS docs](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html#configuration-layers-create), uploading your AppScope AWS Lambda Layer ZIP file in the **upload your layer code** step, and choosing `x86_64` or `ARM64`, as appropriate, for **Compatible architectures**.
 3. After you click **Create**, note the **Version ARN** shown for your newly-created layer.
 4. Navigate to **Lambda** > **Layers** > **Add layer**, and in the **Choose a layer** section, select **Specify an ARN**. 

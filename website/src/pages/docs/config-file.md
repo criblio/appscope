@@ -4,11 +4,11 @@ title: "Config File"
 
 ## Config File
 
-`scope.yml` is the sole library configuration file in AppScope. 
+`scope.yml` is the sole library configuration file in AppScope.
+
+In Cribl Edge or Cribl Stream, you can use the AppScope Config Editor to create your own variants of `scope.yml` and save them in the AppScope Config Library.
 
 The contents of the now-eliminated `scope_protocol.yml` configuration file reside in the `protocol` section of `scope.yml`.
-
-
 
 ### scope.yml Config File
 
@@ -376,8 +376,8 @@ event:
     # $SCOPE_EVENT_LOGFILE_NAME and $SCOPE_EVENT_LOGFILE_VALUE.
     #
     - type: file
-      name: (\/logs?\/)|(\.log$)|(\.log[.\d])
-      value: .*
+      name: (\/logs?\/)|(\.log$)|(\.log[.\d]) # matches the filename
+      value: .*                               # matches data read or written
 
     # The console category includes writes to standard out and error and is
     # intended for monitoring console output, especially in containerized
@@ -393,8 +393,8 @@ event:
     # emitting binary data for console events.
     #
     - type: console
-      name: (stdout)|(stderr)
-      value: .*
+      name: (stdout)|(stderr) # matches the output stream
+      value: .*               # matches data written
       allowbinary: true
 
     # The net category includes open and close events on network connections.
@@ -456,10 +456,12 @@ event:
     # a single entry in the `headers` array.
     #
     - type: http
-      name: .*
-      field: .*
-      value: .*
-      headers: .*                 # yes, this should be singular but it's not.
+      name: .*         # event name; http.req or http.resp
+      field: .*        # matches field names; duration, http_status, etc
+      value: .*        # matches field values
+      headers:         # list of filters matched against header names
+        #- (?i)Accept                # example of case-insensitive filter
+        #- "x-content-type-.*: no.*" # example of required quotes
 
     # The metric category is very seldom used.
     # If turned on, AppScope sends non-aggregated metrics out the event channel.
@@ -970,7 +972,6 @@ protocol:
   #  binary: true
   #  len: 5
 
-
 # Custom configs
 #
 custom:
@@ -1061,4 +1062,5 @@ custom:
   #          enable: true
 
 # EOF
+
 ```

@@ -2,11 +2,27 @@
 title: Updating
 ---
 
-## Updating
+# Updating
 
-Changes in AppScope 1.0 affect some metric and event definitions, environment variables, and content (including default settings) in the `scope.yml` config file.
+You can update AppScope in place. First, download a fresh version of the binary. (This example assumes that you are running AppScope from `/opt/appscope`, as described [here](/docs/downloading#where-from). If you're running AppScope from a different location, adapt the command accordingly.) 
+
+```
+curl -Lo /opt/appscope https://s3-us-west-2.amazonaws.com/io.cribl.cdn/dl/scope/cli/linux/scope && chmod 755 /opt/appscope
+```
+
+Then, to confirm the overwrite, verify AppScope's version and build date:
+
+```
+scope version
+```
+
+## Updating from Pre-Release Versions
+
+You can skip this section unless you are updating a Maintenance Pre-Release (version 0.8.1 or older) to version 1.0 or newer.
 
 **Note**: By "version 1.0," we mean version 1.0.1 or newer. The AppScope team recommends using a version above 1.0.0, which contained an incomplete feature set.
+
+Changes in AppScope 1.0 affect some metric and event definitions, environment variables, and content (including default settings) in the `scope.yml` config file.
 
 To update a Maintenance Pre-Release (version 0.8.1 or older) to version 1.0, follow this general procedure:
 
@@ -25,20 +41,6 @@ To update a Maintenance Pre-Release (version 0.8.1 or older) to version 1.0, fol
   * Configure any destinations to which you're sending data from AppScope, or scripts that operate on the data, to work with the changed event and/or metrics.
 
 Then, go ahead and update!
-
-### Performing the Update
-
-You can update AppScope in place. First, download a fresh version of the binary. (This example assumes that you are running AppScope from `/opt/appscope`, as described [here](/docs/downloading#where-from). If you're running AppScope from a different location, adapt the command accordingly.) 
-
-```
-curl -Lo /opt/appscope https://s3-us-west-2.amazonaws.com/io.cribl.cdn/dl/scope/cli/linux/scope && chmod 755 /opt/appscope
-```
-
-Then, to confirm the overwrite, verify AppScope's version and build date:
-
-```
-scope version
-```
 
 <span id="summary-of-changes"> </span>
 

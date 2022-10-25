@@ -135,9 +135,7 @@ To attach AppScope to a running process:
 
 1. You must run `scope` as root, or with `sudo`.
 1. If you attach to a shell, AppScope does not automatically scope its child processes.
-1. You can attach to a process that is executing within a container context by running `scope attach` **inside** that container.
-  - However:
-    You **cannot** attach to a process that is executing within a container context by running `scope attach` **outside** that container (for example, in the host OS, or in a different container).
+1. You can attach to a process that is executing within a container context by running `scope attach` **inside** that container or from the host.
 
 When you attach AppScope to a process, its child processes are not automatically scoped.
 

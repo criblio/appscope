@@ -14,8 +14,8 @@ In Cribl Edge and Cribl Scope, instead of editing files, you create filters in t
 
 The allowlist is under the `allow` heading. To scope anything, AppScope requires the allowlist to include a `procname`, an `arg`, or both.
 
-- Use `procname` to match an actual process name, e.g., `redis`.
-- Use `arg` to perform a substring match on the entire command that starts a process. For example, `redis-server` could match some processes whose name is not `redis`, but which are started by commands that include `redis-server`.
+- Use `procname` to match an actual process name, e.g., `redis-server`.
+- Use `arg` to perform a substring match on the entire command that starts a process. For example, `redis` will match all processes whose starting command includes `redis`, even if the process name itself does not.
 
 The allowlist allows all processes which match **either** a `procname` or an `arg`.
 

@@ -15,7 +15,7 @@ As of this AppScope release, known issues include:
 
 ## AppScope 1.1.0
 
-2022-06-29 - Maintenance Release
+2022-06-29 - Feaature Release
 
 As of this AppScope release, known issues include:
 

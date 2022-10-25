@@ -14,6 +14,12 @@ Assets are available via Docker and the Cribl CDN at the links below.
 - `Docker`: `cribl/scope:1.2.0`
 - `x86`: [https://cdn.cribl.io/dl/scope/1.2.0/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.2.0/linux/x86_64/scope)
 - `ARM`: [https://cdn.cribl.io/dl/scope/1.2.0/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.2.0/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.2.0/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.0/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.2.0/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.0/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.2.0`.
 
 ### New Features and Improvements
 

@@ -4,6 +4,8 @@ title: Working With AppScope
 
 # Working With AppScope
 
+These docs explain how to "drive" AppScope directly. You can also "drive" AppScope from Cribl Stream or Cribl Edge: see Cribl's documentation about the [AppScope Source](https://docs.cribl.io/stream/sources-appscope) and the [AppScope Config Editor](https://docs.cribl.io/stream/4.0/appscope-configs).
+
 There are three main things to know to work effectively with AppScope:
 
 * Your [overall approach](#ad-hoc-vs-planned) can be either spontaneous or more planned-out.

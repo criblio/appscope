@@ -10,6 +10,17 @@ The AppScope repo provides an example filter file in the `conf` directory, and r
 
 In Cribl Edge and Cribl Scope, instead of editing files, you create filters in the AppScope Source UI.
 
+### How Filter Files Work
+
+The allowlist is under the `allow` heading. To scope anything, AppScope requires the allowlist to include a `procname`, an `arg`, or both.
+
+- Use `procname` to match an actual process name, e.g., `redis`.
+- Use `arg` to perform a substring match on the entire command that starts a process. For example, `redis-server` could match some processes whose name is not `redis`, but which are started by commands that include `redis-server`.
+
+The allowlist allows all processes which match **either** a `procname` or an `arg`.
+
+Denylists also use `procname` and `arg`. Only allowlists have `config` elements. When a process matches an allowlist, AppScope applies the specified `config` when scoping that process.
+
 ### Example Filter File
 
 Here are the contents of `example_filter.yml`:

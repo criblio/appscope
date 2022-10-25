@@ -460,6 +460,10 @@ Negative arguments are not allowed.
 ### ps
 ---
 
+Lists all scoped processes. This means processes whose functions AppScope is interposing (which means that the AppScope library was loaded, and the AppScope reporting thread is running, in those processes, too).
+
+Before AppScope 1.2.0:		
+
 Lists all processes into which the libscope library is injected.
 
 #### Usage

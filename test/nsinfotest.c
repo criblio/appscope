@@ -2,33 +2,25 @@
 
 #include <sys/wait.h>
 
-#include "ns.h"
+#include "nsinfo.h"
 #include "test.h"
 #include "scopestdlib.h"
 
-/*
- * Define the extern offset for integration test compilation 
- * See details in libdir.c
- */
-unsigned char _binary_ldscopedyn_start;
-unsigned char _binary_ldscopedyn_end;
-unsigned char _binary_libscope_so_start;
-unsigned char _binary_libscope_so_end;
 
 static void
-nsIsPidInSameMntNsSameProcess(void **state) {
+nsInfoIsPidInSameMntNsSameProcess(void **state) {
     pid_t pid = scope_getpid();
-    bool status = nsIsPidInSameMntNs(pid);
+    bool status = nsInfoIsPidInSameMntNs(pid);
     assert_int_equal(status, TRUE);
 }
 
 static void
-nsIsPidInSameMntNsChildProcess(void **state) {
+nsInfoIsPidInSameMntNsChildProcess(void **state) {
     pid_t parentPid = scope_getpid();
     pid_t pid = fork();
     assert_int_not_equal(pid, -1);
     if (pid == 0) {
-        bool status = nsIsPidInSameMntNs(parentPid);
+        bool status = nsInfoIsPidInSameMntNs(parentPid);
         assert_int_equal(status, TRUE);
     } else {
         int status = -1;
@@ -37,13 +29,22 @@ nsIsPidInSameMntNsChildProcess(void **state) {
     }
 }
 
+static void
+nsInfoIsPidGotSecondPidNsSameProcess(void **state) {
+    pid_t nsPid = 0;
+    pid_t pid = scope_getpid();
+    bool status = nsInfoIsPidGotSecondPidNs(pid, &nsPid);
+    assert_int_equal(status, FALSE);
+}
+
 int
 main(int argc, char* argv[]) {
     printf("running %s\n", argv[0]);
 
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(nsIsPidInSameMntNsSameProcess),
-        cmocka_unit_test(nsIsPidInSameMntNsChildProcess),
+        cmocka_unit_test(nsInfoIsPidInSameMntNsSameProcess),
+        cmocka_unit_test(nsInfoIsPidInSameMntNsChildProcess),
+        cmocka_unit_test(nsInfoIsPidGotSecondPidNsSameProcess),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

@@ -54,15 +54,15 @@ jobs:
         id: tag
         run: |
           if [ -z "${GITHUB_REF%%refs/tags/v*}" -a "true" = "${{ steps.version.outputs.is-semver }}" ]; then
-              echo "::set-output name=tag::${{ steps.version.outputs.version-without-v }}"
-              echo "::set-output name=push::true"
+              echo "tag=${{ steps.version.outputs.version-without-v }}" >> $GITHUB_OUTPUT
+              echo "push=true" >> "${GITHUB_OUTPUT}"
           else
-            echo "::set-output name=branch::${GITHUB_REF#*refs/heads/}"
+            echo "branch=${GITHUB_REF#*refs/heads/}"
             if [ "refs/heads/main" = "${GITHUB_REF}" -o "refs/heads/master" = "${GITHUB_REF}" ]; then
-              echo "::set-output name=tag::next"
-              echo "::set-output name=push::true"
+              echo "tag=next" >> "${GITHUB_OUTPUT}"
+              echo "push=true" >> "${GITHUB_OUTPUT}"
             else
-              echo "::set-output name=tag::unreleased"
+              echo "tag=unreleased" >> "${GITHUB_OUTPUT}"
             fi
           fi
 
@@ -168,7 +168,7 @@ jobs:
             echo "::group::home"
             ls -la $HOME
             echo "::endgroup::"
-            echo "::set-output name=arch::$(uname -m)"
+            echo "arch=$(uname -m)" >> "${GITHUB_OUTPUT}"
 
       # Clone the repos
       - name: Checkout Repository
@@ -316,7 +316,7 @@ jobs:
       # This is just being done to reduce the workflow time duration.
       - name: List Integration Tests
         id: tests
-        run: echo "::set-output name=tests-${{ steps.env.outputs.arch }}::$(make -s -C test/integration tests | egrep -v '.*java(9|1[023456])$' | sort -V | jq -ncR '[inputs]')"
+        run: echo "tests-${{ steps.env.outputs.arch }}=$(make -s -C test/integration tests | egrep -v '.*java(9|1[023456])$' | sort -V | jq -ncR '[inputs]')" >> "${GITHUB_OUTPUT}"
 
       - name: Print size of Binaries
         run: |

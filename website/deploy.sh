@@ -1,9 +1,10 @@
 #!/bin/bash -ex
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-
 cd ${DIR}
 
+
+### Build Gatsby Static Docs ###
 # nvm is provided by the runner, but needs to be setup for this shell env
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
@@ -22,12 +23,24 @@ echo "npm and node versions we're going to use..."
 npm --version
 node --version
 
+# the algolia plugin will create/update/delete indices
+GATSBY_ALGOLIA_APP_ID=STAGING_GATSBY_ALGOLIA_APP_ID
+GATSBY_ALGOLIA_SEARCH_KEY=STAGING_GATSBY_ALGOLIA_SEARCH_KEY
+GATSBY_ALGOLIA_WRITE_KEY=STAGING_GATSBY_ALGOLIA_WRITE_KEY
+if [[ $GITHUB_REF == refs/tags/web* ]]; then
+    GATSBY_ALGOLIA_APP_ID=PROD_GATSBY_ALGOLIA_APP_ID
+    GATSBY_ALGOLIA_SEARCH_KEY=PROD_GATSBY_ALGOLIA_SEARCH_KEY
+    GATSBY_ALGOLIA_WRITE_KEY=PROD_GATSBY_ALGOLIA_WRITE_KEY
+fi
+
+# build static docs
 npm ci
 npx gatsby build
 
+
+### Push Docs to AWS S3 ###
 BUCKET=io.appscope.staging
 DISTRIBUTION_ID=E2O0IS8RABQ4AT
-
 if [[ $GITHUB_REF == refs/tags/web* ]]; then
     BUCKET=io.appscope
     DISTRIBUTION_ID=E3CI6UPKUT68NJ

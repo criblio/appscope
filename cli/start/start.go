@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -304,7 +303,7 @@ func extract(scopeDirVersion string) error {
 		return err
 	}
 
-	if err = ioutil.WriteFile(filepath.Join(scopeDirVersion, "ldscope"), b, perms); err != nil {
+	if err = os.WriteFile(filepath.Join(scopeDirVersion, "ldscope"), b, perms); err != nil {
 		log.Error().
 			Err(err).
 			Msgf("Error writing ldscope to %s.", scopeDirVersion)

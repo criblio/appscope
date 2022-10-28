@@ -755,7 +755,8 @@ main(int argc, char **argv, char **env)
         } else {
             // Configure on Container
             pid_t nsContainerPid = 0;
-            if (nsIsPidInChildNs(pid, &nsContainerPid) == TRUE) {
+            if ((nsIsPidInChildNs(pid, &nsContainerPid) == TRUE) ||
+                (nsIsPidInSameMntNs(pid) == FALSE)) {
                 status = nsConfigure(pid, confgFilterMem, configFilterSize);
             }
         }
@@ -779,14 +780,14 @@ main(int argc, char **argv, char **env)
 
 
         /*
-        * If the expected process exists in different namespace (container)
+        * If the expected process exists in different PID namespace (container)
         * we do a following switch context sequence:
         * - load static loader file into memory
         * - [optionally] save the configuration file pointed by SCOPE_CONF_PATH into memory
         * - switch the namespace from parent
         * - save previously loaded static loader into new namespace
         * - [optionally] save previously loaded configuration file into new namespace
-        * - fork & execute static loader attach one more time with update PID
+        * - fork & execute static loader attach one more time with updated PID
         */
         if (nsIsPidInChildNs(pid, &nsAttachPid) == TRUE) {
             // must be root to switch namespace
@@ -795,6 +796,18 @@ main(int argc, char **argv, char **env)
                 return EXIT_FAILURE;
             }
             return nsForkAndExec(pid, nsAttachPid, attachType);
+        /*
+        * Process can exists in same PID namespace but in different mnt namespace
+        * we do a simillar sequecne like above but without switching PID namespace
+        * and updating PID.
+        */
+        } else if (nsIsPidInSameMntNs(pid) == FALSE) {
+            // must be root to switch namespace
+            if (scope_getuid()) {
+                scope_printf("error: --attach requires root\n");
+                return EXIT_FAILURE;
+            }
+            return nsForkAndExec(pid, pid, attachType);
         }
     }
 

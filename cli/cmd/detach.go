@@ -29,6 +29,7 @@ scope detach --all`,
 		}
 
 		if all {
+			rc.Subprocess = true
 			return rc.DetachAll(args)
 		}
 		return rc.DetachSingle(args)

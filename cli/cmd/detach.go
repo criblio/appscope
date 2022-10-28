@@ -18,17 +18,20 @@ var detachCmd = &cobra.Command{
 	Example: `scope detach 1000
 scope detach firefox
 scope detach --all`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		internal.InitConfig()
-
 		all, _ := cmd.Flags().GetBool("all")
 
-		if all {
-
+		// Disallow bad argument combinations (see Arg Matrix at top of file)
+		if !all && len(args) == 0 {
+			helpErrAndExit(cmd, "Must specify a pid, process name, or --all")
 		}
 
-		return rc.Detach(args)
+		if all {
+			return rc.DetachAll(args)
+		}
+		return rc.DetachSingle(args)
 	},
 }
 

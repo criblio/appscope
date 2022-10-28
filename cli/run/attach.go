@@ -14,16 +14,18 @@ import (
 )
 
 var (
-	errGetLinuxCap      = errors.New("unable to get linux capabilities for current process")
-	errLoadLinuxCap     = errors.New("unable to load linux capabilities for current process")
-	errMissingPtrace    = errors.New("missing PTRACE capabilities to attach to a process")
-	errMissingProc      = errors.New("no process found matching that name")
-	errPidInvalid       = errors.New("invalid PID")
-	errPidMissing       = errors.New("PID does not exist")
-	errCreateLdscope    = errors.New("error creating ldscope")
-	errNotScoped        = errors.New("detach failed. This process is not being scoped")
-	errLibraryNotExist  = errors.New("library Path does not exist")
-	errInvalidSelection = errors.New("invalid Selection")
+	errGetLinuxCap       = errors.New("unable to get linux capabilities for current process")
+	errLoadLinuxCap      = errors.New("unable to load linux capabilities for current process")
+	errMissingPtrace     = errors.New("missing PTRACE capabilities to attach to a process")
+	errMissingProc       = errors.New("no process found matching that name")
+	errPidInvalid        = errors.New("invalid PID")
+	errPidMissing        = errors.New("PID does not exist")
+	errCreateLdscope     = errors.New("error creating ldscope")
+	errNotScoped         = errors.New("detach failed. This process is not being scoped")
+	errLibraryNotExist   = errors.New("library Path does not exist")
+	errInvalidSelection  = errors.New("invalid Selection")
+	errNoScopedProcs     = errors.New("no scoped processes found")
+	errDetachingMultiple = errors.New("at least one error found when detaching from all. See logs")
 )
 
 // Attach scopes an existing PID
@@ -97,32 +99,92 @@ func (rc *Config) Attach(args []string) error {
 	return err
 }
 
-// Detach unscopes an existing PID
-func (rc *Config) Detach(args []string) error {
+// DetachAll provides the option to detach from all Scoped processes
+func (rc *Config) DetachAll(args []string) error {
+	adminStatus := true
+	err := util.UserVerifyRootPerm()
+	if errors.Is(err, util.ErrGetCurrentUser) {
+		util.ErrAndExit("Unable to get current user: %v", err)
+	}
+	if errors.Is(err, util.ErrMissingAdmPriv) {
+		adminStatus = false
+	}
 
+	procs, err := util.ProcessesScoped()
+	if err != nil {
+		return err
+	}
+	if len(procs) > 0 {
+		if !adminStatus {
+			fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
+		}
+
+		// user interface for selecting a PID
+		util.PrintObj([]util.ObjField{
+			{Name: "ID", Field: "id"},
+			{Name: "Pid", Field: "pid"},
+			{Name: "User", Field: "user"},
+			{Name: "Command", Field: "command"},
+		}, procs)
+
+		if !util.Confirm("Are your sure you want to detach from all of these processes?") {
+			util.ErrAndExit("info: canceled")
+		}
+	} else {
+		if !adminStatus {
+			fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
+		}
+		return errNoScopedProcs
+	}
+
+	if err := CreateLdscope(); err != nil {
+		return errCreateLdscope
+	}
+
+	args = append([]string{"placeholder"}, args...)
+	errorsDetachingMultiple := false
+	for _, proc := range procs {
+		args[0] = fmt.Sprint(proc.Pid)
+		if err := rc.Detach(args, proc.Pid); err != nil {
+			log.Error().Err(err)
+			errorsDetachingMultiple = true
+		}
+	}
+	if errorsDetachingMultiple {
+		return errDetachingMultiple
+	}
+
+	return nil
+}
+
+// DetachSingle unscopes an existing PID
+func (rc *Config) DetachSingle(args []string) error {
 	pid, err := handleInputArg(args[0])
 	if err != nil {
 		return err
 	}
 	args[0] = fmt.Sprint(pid)
 
+	if err := CreateLdscope(); err != nil {
+		return errCreateLdscope
+	}
+
+	return rc.Detach(args, pid)
+}
+
+func (rc *Config) Detach(args []string, pid int) error {
 	// Check PID is already being scoped
 	if !util.PidScoped(pid) {
 		return errNotScoped
 	}
 
 	env := os.Environ()
-
-	// Create ldscope
-	if err := CreateLdscope(); err != nil {
-		return errCreateLdscope
-	}
-
 	ld := loader.ScopeLoader{Path: LdscopePath()}
 	if !rc.Subprocess {
 		return ld.Detach(args, env)
 	}
-	_, err = ld.DetachSubProc(args, env)
+	_, err := ld.DetachSubProc(args, env)
+
 	return err
 }
 
@@ -137,11 +199,6 @@ func handleInputArg(InputArg string) (int, error) {
 			return -1, errPidInvalid
 		}
 	} else {
-		procs, err := util.ProcessesByName(InputArg)
-		if err != nil {
-			return -1, err
-		}
-
 		adminStatus := true
 		err = util.UserVerifyRootPerm()
 		if errors.Is(err, util.ErrGetCurrentUser) {
@@ -151,6 +208,10 @@ func handleInputArg(InputArg string) (int, error) {
 			adminStatus = false
 		}
 
+		procs, err := util.ProcessesByName(InputArg)
+		if err != nil {
+			return -1, err
+		}
 		if len(procs) == 1 {
 			pid = procs[0].Pid
 		} else if len(procs) > 1 {

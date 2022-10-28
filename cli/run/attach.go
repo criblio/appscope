@@ -99,6 +99,7 @@ func (rc *Config) Attach(args []string) error {
 
 // Detach unscopes an existing PID
 func (rc *Config) Detach(args []string) error {
+
 	pid, err := handleInputArg(args[0])
 	if err != nil {
 		return err
@@ -130,14 +131,33 @@ func handleInputArg(InputArg string) (int, error) {
 	// Get PID by name if non-numeric, otherwise validate/use InputArg
 	var pid int
 	var err error
-	if !util.IsNumeric(InputArg) {
+	if util.IsNumeric(InputArg) {
+		pid, err = strconv.Atoi(InputArg)
+		if err != nil {
+			return -1, errPidInvalid
+		}
+	} else {
 		procs, err := util.ProcessesByName(InputArg)
 		if err != nil {
 			return -1, err
 		}
+
+		adminStatus := true
+		err = util.UserVerifyRootPerm()
+		if errors.Is(err, util.ErrGetCurrentUser) {
+			util.ErrAndExit("Unable to get current user: %v", err)
+		}
+		if errors.Is(err, util.ErrMissingAdmPriv) {
+			adminStatus = false
+		}
+
 		if len(procs) == 1 {
 			pid = procs[0].Pid
 		} else if len(procs) > 1 {
+			if !adminStatus {
+				fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
+			}
+
 			// user interface for selecting a PID
 			fmt.Println("Found multiple processes matching that name...")
 			util.PrintObj([]util.ObjField{
@@ -157,12 +177,10 @@ func handleInputArg(InputArg string) (int, error) {
 			}
 			pid = procs[i].Pid
 		} else {
+			if !adminStatus {
+				fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
+			}
 			return -1, errMissingProc
-		}
-	} else {
-		pid, err = strconv.Atoi(InputArg)
-		if err != nil {
-			return -1, errPidInvalid
 		}
 	}
 

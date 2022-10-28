@@ -125,6 +125,13 @@ func ProcessesByName(name string) (Processes, error) {
 			continue
 		}
 
+		// Skip if no permission to read the fd directory
+		procFdDir, err := os.Open("/proc/" + p + "/fd")
+		procFdDir.Close()
+		if err != nil {
+			continue
+		}
+
 		// Convert directory name to integer
 		pid, err := strconv.Atoi(p)
 		if err != nil {

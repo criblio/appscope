@@ -102,12 +102,12 @@ func (rc *Config) Attach(args []string) error {
 // DetachAll provides the option to detach from all Scoped processes
 func (rc *Config) DetachAll(args []string) error {
 	adminStatus := true
-	err := util.UserVerifyRootPerm()
-	if errors.Is(err, util.ErrGetCurrentUser) {
-		util.ErrAndExit("Unable to get current user: %v", err)
-	}
-	if errors.Is(err, util.ErrMissingAdmPriv) {
-		adminStatus = false
+	if err := util.UserVerifyRootPerm(); err != nil {
+		if errors.Is(err, util.ErrMissingAdmPriv) {
+			adminStatus = false
+		} else {
+			return err
+		}
 	}
 
 	procs, err := util.ProcessesScoped()
@@ -128,7 +128,8 @@ func (rc *Config) DetachAll(args []string) error {
 		}, procs)
 
 		if !util.Confirm("Are your sure you want to detach from all of these processes?") {
-			util.ErrAndExit("info: canceled")
+			fmt.Println("info: canceled")
+			return nil
 		}
 	} else {
 		if !adminStatus {
@@ -141,11 +142,10 @@ func (rc *Config) DetachAll(args []string) error {
 		return errCreateLdscope
 	}
 
-	args = append([]string{"placeholder"}, args...)
 	errorsDetachingMultiple := false
 	for _, proc := range procs {
-		args[0] = fmt.Sprint(proc.Pid)
-		if err := rc.Detach(args, proc.Pid); err != nil {
+		tmpArgs := append([]string{fmt.Sprint(proc.Pid)}, args...)
+		if err := rc.detach(tmpArgs, proc.Pid); err != nil {
 			log.Error().Err(err)
 			errorsDetachingMultiple = true
 		}
@@ -169,10 +169,10 @@ func (rc *Config) DetachSingle(args []string) error {
 		return errCreateLdscope
 	}
 
-	return rc.Detach(args, pid)
+	return rc.detach(args, pid)
 }
 
-func (rc *Config) Detach(args []string, pid int) error {
+func (rc *Config) detach(args []string, pid int) error {
 	// Check PID is already being scoped
 	if !util.PidScoped(pid) {
 		return errNotScoped
@@ -201,12 +201,12 @@ func handleInputArg(InputArg string) (int, error) {
 		}
 	} else {
 		adminStatus := true
-		err = util.UserVerifyRootPerm()
-		if errors.Is(err, util.ErrGetCurrentUser) {
-			util.ErrAndExit("Unable to get current user: %v", err)
-		}
-		if errors.Is(err, util.ErrMissingAdmPriv) {
-			adminStatus = false
+		if err := util.UserVerifyRootPerm(); err != nil {
+			if errors.Is(err, util.ErrMissingAdmPriv) {
+				adminStatus = false
+			} else {
+				return -1, err
+			}
 		}
 
 		procs, err := util.ProcessesByName(InputArg)

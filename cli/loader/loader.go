@@ -55,6 +55,12 @@ func (sL *ScopeLoader) StartHost() (string, error) {
 	return sL.RunSubProc([]string{"--starthost"}, os.Environ())
 }
 
+// Used when scope has detected that we are running the `scope stop` command inside a container
+// Tell ldscope to run the `scope stop` command on the host instead
+func (sL *ScopeLoader) StopHost() (string, error) {
+	return sL.RunSubProc([]string{"--stophost"}, os.Environ())
+}
+
 func (sL *ScopeLoader) Run(args []string, env []string) error {
 	args = append([]string{"ldscope"}, args...)
 	return syscall.Exec(sL.Path, args, env)

@@ -31,9 +31,8 @@ var stopCmd = &cobra.Command{
 	Long: `Stop scoping a filtered selection of processes and services on the host and in all relevant containers.
 
 ` + getStopUsage("<version>"),
-	Example: `  scope stop
-  cat example_filter.json | scope stop`,
-	Args: cobra.NoArgs,
+	Example: `  scope stop`,
+	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
 

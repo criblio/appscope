@@ -12,11 +12,41 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+var (
+	errRemovingFiles = errors.New("error removing start files. See logs for details")
+)
+
 // remove /etc/profile.d/scope.sh
 // remove /usr/lib/appscope/scope_filter
 // remove /tmp/appscope/scope_filter
 func removeStartFiles() error {
 
+	errors := false
+
+	if err := os.Remove("/etc/profile.d/scope.sh"); err != nil {
+		log.Error().
+			Err(err).
+			Msg("Error removing /etc/profile.d/scope.sh")
+		errors = true
+	}
+
+	if err := os.Remove("/usr/lib/appscope/scope_filter"); err != nil {
+		log.Error().
+			Err(err).
+			Msg("Error removing /usr/lib/appscope/scope_filter")
+		errors = true
+	}
+
+	if err := os.Remove("/tmp/appscope/scope_filter"); err != nil {
+		log.Error().
+			Err(err).
+			Msg("Error removing /tmp/appscope/scope_filter")
+		errors = true
+	}
+
+	if errors {
+		return errRemovingFiles
+	}
 	return nil
 }
 

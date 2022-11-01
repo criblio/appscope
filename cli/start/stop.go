@@ -7,17 +7,43 @@ import (
 	"path/filepath"
 
 	"github.com/criblio/scope/loader"
+	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
 )
 
-func Stop() error {
+// remove /etc/profile.d/scope.sh
+// remove /usr/lib/appscope/scope_filter
+// remove /tmp/appscope/scope_filter
+func removeStartFiles() error {
 
+	return nil
+}
+
+// update service configs to remove LD_PRELOAD of libscope
+func updateServiceConfigs() error {
+
+	return nil
+}
+
+func Stop() error {
 	// Validate user has root permissions
 	if err := util.UserVerifyRootPerm(); err != nil {
 		log.Error().
 			Msg("Scope stop requires administrator privileges")
 		return err
+	}
+
+	if err := removeStartFiles(); err != nil {
+		log.Error().
+			Err(err).
+			Msg("Error removing start files")
+	}
+
+	if err := updateServiceConfigs(); err != nil {
+		log.Error().
+			Err(err).
+			Msg("Error updating service configurations")
 	}
 
 	scopeDirVersion, err := getAppScopeVerDir()
@@ -57,6 +83,15 @@ func Stop() error {
 			}
 		}
 		return nil
+	}
+
+	rc := run.Config{
+		Verbosity: 4, // Default
+	}
+	if err := rc.DetachAll([]string{}, false); err != nil {
+		log.Error().
+			Err(err).
+			Msg("Error detaching from all Scoped processes")
 	}
 
 	return nil

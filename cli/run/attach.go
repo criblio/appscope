@@ -100,7 +100,7 @@ func (rc *Config) Attach(args []string) error {
 }
 
 // DetachAll provides the option to detach from all Scoped processes
-func (rc *Config) DetachAll(args []string) error {
+func (rc *Config) DetachAll(args []string, prompt bool) error {
 	adminStatus := true
 	if err := util.UserVerifyRootPerm(); err != nil {
 		if errors.Is(err, util.ErrMissingAdmPriv) {
@@ -127,9 +127,11 @@ func (rc *Config) DetachAll(args []string) error {
 			{Name: "Command", Field: "command"},
 		}, procs)
 
-		if !util.Confirm("Are your sure you want to detach from all of these processes?") {
-			fmt.Println("info: canceled")
-			return nil
+		if prompt {
+			if !util.Confirm("Are your sure you want to detach from all of these processes?") {
+				fmt.Println("info: canceled")
+				return nil
+			}
 		}
 	} else {
 		if !adminStatus {

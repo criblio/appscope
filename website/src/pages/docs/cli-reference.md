@@ -582,6 +582,31 @@ cat example_filter.json | scope start
   -h, --help    help for start
 ```
 
+### stop
+---
+Stop scoping a filtered selection of processes and services on the host and in all relevant containers.
+
+The following actions will be performed on the host and in all relevant containers:
+	- Removal of filter files `/usr/lib/appscope/scope_filter` and `/tmp/appscope/scope_filter`
+	- Detach from all existing scoped processes
+	- Removal of `etc/profile.d/scope.sh` script
+	- Update the relevant service configurations to not LD_PRELOAD libscope if already doing so
+
+#### Usage
+
+`scope stop [flags]`
+
+#### Examples
+
+`scope stop`
+
+#### Flags
+
+```
+  -f, --force   Use this flag when you're sure you want to run scope stop
+  -h, --help    help for start
+```
+
 ### version
 ----
 

@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/criblio/scope/internal"
+	"github.com/criblio/scope/start"
+	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
 )
 
@@ -41,9 +43,9 @@ var stopCmd = &cobra.Command{
 			fmt.Println("\nIf you wish to proceed, run again with the -f flag.")
 			os.Exit(0)
 		}
-		//		if err := start.Stop(); err != nil {
-		//			util.ErrAndExit("Exiting due to stop failure: %v", err)
-		//		}
+		if err := start.Stop(); err != nil {
+			util.ErrAndExit("Exiting due to stop failure: %v", err)
+		}
 	},
 }
 

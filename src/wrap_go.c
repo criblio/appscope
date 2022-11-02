@@ -226,24 +226,6 @@ go_schema_t go_17_schema = {
     },
 };
 
-void
-go_hook_die(void)
-{
-    return;
-}
-
-void
-go_hook_exit(void)
-{
-    return;
-}
-
-void
-go_hook_reg_syscall(void)
-{
-    return;
-}
-
 static void
 adjustGoStructOffsetsForVersion()
 {

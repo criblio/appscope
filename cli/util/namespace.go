@@ -37,15 +37,18 @@ func GetLXCPids() ([]int, error) {
 	if err != nil {
 		return nil, err
 	}
-	containers, err := c.GetContainersFull()
-
-	pids := make([]int, len(containers))
-
+	containers, err := c.GetContainers()
 	if err != nil {
 		return nil, err
 	}
+	pids := make([]int, len(containers))
+
 	for indx, container := range containers {
-		pids[indx] = int(container.State.Pid)
+		state, _, err := c.GetContainerState(container.Name)
+		if err != nil {
+			return nil, err
+		}
+		pids[indx] = int(state.Pid)
 	}
 	return pids, nil
 }

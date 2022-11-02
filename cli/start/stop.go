@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 
 	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/run"
@@ -16,43 +17,126 @@ var (
 	errRemovingFiles = errors.New("error removing start files. See logs for details")
 )
 
-// remove /etc/profile.d/scope.sh
-// remove /usr/lib/appscope/scope_filter
-// remove /tmp/appscope/scope_filter
-func removeStartFiles() error {
+// for the host
+func stopConfigureHost() error {
+	sL := loader.ScopeLoader{Path: run.LdscopePath()}
 
-	errors := false
-
-	if err := os.Remove("/etc/profile.d/scope.sh"); err != nil {
-		log.Error().
+	stdoutStderr, err := sL.UnconfigureHost()
+	if err != nil {
+		log.Warn().
 			Err(err).
-			Msg("Error removing /etc/profile.d/scope.sh")
-		errors = true
+			Str("loaderDetails", stdoutStderr).
+			Msg("Unconfigure host failed.")
+	} else {
+		log.Info().
+			Msg("Unconfigure host success.")
 	}
 
-	if err := os.Remove("/usr/lib/appscope/scope_filter"); err != nil {
-		log.Error().
-			Err(err).
-			Msg("Error removing /usr/lib/appscope/scope_filter")
-		errors = true
+	return nil
+}
+
+// for all containers
+func stopConfigureContainers() error {
+	sL := loader.ScopeLoader{Path: run.LdscopePath()}
+
+	// Discover all containers
+	cPids, err := util.GetDockerPids()
+	if err != nil {
+		switch {
+		case errors.Is(err, util.ErrDockerNotAvailable):
+			log.Warn().
+				Msgf("Unconfigure containers skipped. Docker is not available")
+		default:
+			log.Error().
+				Err(err).
+				Msg("Unconfigure containers failed.")
+		}
+		return nil
 	}
 
-	if err := os.Remove("/tmp/appscope/scope_filter"); err != nil {
-		log.Error().
-			Err(err).
-			Msg("Error removing /tmp/appscope/scope_filter")
-		errors = true
+	// Iterate over all containers
+	for _, cPid := range cPids {
+		stdoutStderr, err := sL.UnconfigureContainer(cPid)
+		if err != nil {
+			log.Warn().
+				Err(err).
+				Str("pid", strconv.Itoa(cPid)).
+				Str("loaderDetails", stdoutStderr).
+				Msgf("Unconfigure containers failed. Container %v failed.", cPid)
+		} else {
+			log.Info().
+				Str("pid", strconv.Itoa(cPid)).
+				Msgf("Unconfigure containers success. Container %v success.", cPid)
+		}
 	}
 
-	if errors {
-		return errRemovingFiles
+	return nil
+}
+
+// for the host
+func stopServiceHost() error {
+	sL := loader.ScopeLoader{Path: run.LdscopePath()}
+
+	stdoutStderr, err := sL.UnserviceHost()
+	if err == nil {
+		log.Info().
+			Msgf("Unservice %v host success.")
+	} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
+		if ee.ExitCode() == 1 {
+			log.Warn().
+				Err(err).
+				Str("loaderDetails", stdoutStderr).
+				Msgf("Unservice %v host failed.")
+		} else {
+			log.Warn().
+				Str("loaderDetails", stdoutStderr).
+				Msgf("Unervice %v host failed.")
+		}
 	}
 	return nil
 }
 
-// update service configs to remove LD_PRELOAD of libscope
-func updateServiceConfigs() error {
+// for all containers
+func stopServiceContainers() error {
+	ld := loader.ScopeLoader{Path: run.LdscopePath()}
 
+	// Discover all containers
+	cPids, err := util.GetDockerPids()
+	if err != nil {
+		switch {
+		case errors.Is(err, util.ErrDockerNotAvailable):
+			log.Warn().
+				Msgf("Unservice containers skipped. Docker is not available")
+		default:
+			log.Warn().
+				Err(err).
+				Msg("Unservice containers failed.")
+		}
+		return nil
+	}
+
+	// Iterate over all containers
+	for _, cPid := range cPids {
+		stdoutStderr, err := ld.UnserviceContainer(cPid)
+		if err == nil {
+			log.Info().
+				Str("pid", strconv.Itoa(cPid)).
+				Msgf("Unservice container %v success.", cPid)
+		} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
+			if ee.ExitCode() == 1 {
+				log.Warn().
+					Err(err).
+					Str("pid", strconv.Itoa(cPid)).
+					Str("loaderDetails", stdoutStderr).
+					Msgf("Unservice container %v failed.", cPid)
+			} else {
+				log.Warn().
+					Str("pid", strconv.Itoa(cPid)).
+					Str("loaderDetails", stdoutStderr).
+					Msgf("Unservice container %v failed", cPid)
+			}
+		}
+	}
 	return nil
 }
 
@@ -62,18 +146,6 @@ func Stop() error {
 		log.Error().
 			Msg("Scope stop requires administrator privileges")
 		return err
-	}
-
-	if err := removeStartFiles(); err != nil {
-		log.Error().
-			Err(err).
-			Msg("Error removing start files")
-	}
-
-	if err := updateServiceConfigs(); err != nil {
-		log.Error().
-			Err(err).
-			Msg("Error updating service configurations")
 	}
 
 	scopeDirVersion, err := getAppScopeVerDir()
@@ -122,6 +194,29 @@ func Stop() error {
 		log.Error().
 			Err(err).
 			Msg("Error detaching from all Scoped processes")
+	}
+
+	if err := run.CreateLdscope(); err != nil {
+		log.Error().
+			Err(err).
+			Msg("Create ldscope failed.")
+		return err
+	}
+
+	if err := stopConfigureHost(); err != nil {
+		return err
+	}
+
+	if err := stopConfigureContainers(); err != nil {
+		return err
+	}
+
+	if err := stopServiceHost(); err != nil {
+		return err
+	}
+
+	if err := stopServiceContainers(); err != nil {
+		return err
 	}
 
 	return nil

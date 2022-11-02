@@ -2,6 +2,7 @@ package start
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -11,7 +12,118 @@ import (
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
+	"github.com/rs/zerolog/log"
 )
+
+// extract extracts ldscope and scope to scope version directory
+func extract(scopeDirVersion string) error {
+	// Extract ldscope
+	perms := os.FileMode(0755)
+	b, err := run.Asset("build/ldscope")
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("Error retrieving ldscope asset.")
+		return err
+	}
+
+	if err = ioutil.WriteFile(filepath.Join(scopeDirVersion, "ldscope"), b, perms); err != nil {
+		log.Error().
+			Err(err).
+			Msgf("Error writing ldscope to %s.", scopeDirVersion)
+		return err
+	}
+
+	// Copy scope
+	if _, err := util.CopyFile(os.Args[0], filepath.Join(scopeDirVersion, "scope")); err != nil {
+		if err != os.ErrExist {
+			log.Error().
+				Err(err).
+				Msgf("Error writing scope to %s.", scopeDirVersion)
+			return err
+		}
+	}
+
+	return nil
+}
+
+// createFilterFile creates a filter file in /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter
+// It returns the filter file and status
+func createFilterFile() (*os.File, error) {
+	// Try to create AppScope directory in /usr/lib if it not exists yet
+	if _, err := os.Stat("/usr/lib/appscope/"); os.IsNotExist(err) {
+		os.MkdirAll("/usr/lib/appscope/", 0755)
+		if err := os.Chmod("/usr/lib/appscope/", 0755); err != nil {
+			return nil, err
+		}
+	}
+
+	f, err := os.OpenFile("/usr/lib/appscope/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+	if err != nil {
+		if _, err := os.Stat("/tmp/appscope"); os.IsNotExist(err) {
+			os.MkdirAll("/tmp/appscope", 0777)
+			if err := os.Chmod("/tmp/appscope/", 0777); err != nil {
+				return f, err
+			}
+		}
+		f, err = os.OpenFile("/tmp/appscope/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
+	}
+	return f, err
+}
+
+// getAppScopeVerDir return the directory path which will be used for handling ldscope and scope files
+// /usr/lib/appscope/<version>/
+// or
+// /tmp/appscope/<version>/
+func getAppScopeVerDir() (string, error) {
+	version := internal.GetNormalizedVersion()
+	var appscopeVersionPath string
+
+	// Check /usr/lib/appscope only for official version
+	if !internal.IsVersionDev() {
+		appscopeVersionPath = filepath.Join("/usr/lib/appscope/", version)
+		if _, err := os.Stat(appscopeVersionPath); err != nil {
+			if err := os.MkdirAll(appscopeVersionPath, 0755); err != nil {
+				return appscopeVersionPath, err
+			}
+			err := os.Chmod(appscopeVersionPath, 0755)
+			return appscopeVersionPath, err
+		}
+		return appscopeVersionPath, nil
+	}
+
+	appscopeVersionPath = filepath.Join("/tmp/appscope/", version)
+	if _, err := os.Stat(appscopeVersionPath); err != nil {
+		if err := os.MkdirAll(appscopeVersionPath, 0777); err != nil {
+			return appscopeVersionPath, err
+		}
+		err := os.Chmod(appscopeVersionPath, 0777)
+		return appscopeVersionPath, err
+	}
+	return appscopeVersionPath, nil
+
+}
+
+// extractFilterFile creates a filter file in /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter
+// It returns the filter file name and status
+func extractFilterFile(cfgData []byte) (string, error) {
+	f, err := createFilterFile()
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("Failed to create filter file.")
+		return "", err
+	}
+	defer f.Close()
+
+	if _, err = f.Write(cfgData); err != nil {
+		log.Error().
+			Err(err).
+			Msg("Failed to write to filter file.")
+		return "", err
+	}
+	return f.Name(), nil
+}
 
 func createWorkDir() {
 	// Directories named CMD_SESSIONID_PID_TIMESTAMP

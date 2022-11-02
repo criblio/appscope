@@ -56,13 +56,18 @@ RUN apt-get update && \
         strace \
         sudo \
         tzdata \
-        upx \
         vim \
         && \
     dpkg-reconfigure --frontend noninteractive tzdata && \
     apt-get clean
+ARG UPX_VERSION=4.0.0
 
-RUN useradd -d /home/builder -m builder && \
+RUN arch=$(arch | sed s/aarch64/arm64/ | sed s/x86_64/amd64/) && \
+    curl -Ls https://github.com/upx/upx/releases/download/v${UPX_VERSION}/upx-${UPX_VERSION}-${arch}_linux.tar.xz -o - | tar xvJf - -C /tmp && \
+    cp /tmp/upx-${UPX_VERSION}-${arch}_linux/upx /usr/local/bin/ && \
+    chmod +x /usr/local/bin/upx && \
+    \
+    useradd -d /home/builder -m builder && \
     useradd -d /home/builder -m builder1 && \
     \
     echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/builder && \

@@ -211,7 +211,7 @@ fi
 #      cmake version 3.13.5
 #      lcov: LCOV version 1.13
 #      go1.15.5
-#      upx 3.96
+#      upx 4.0.0
 #
 
 PKG_MGR="unknown"
@@ -397,7 +397,7 @@ yum_go_install() {
     fi
 }
 
-yum_upx_exists() {
+upx_exists() {
     if upx --version &>/dev/null; then
         echo "upx is already installed; doing nothing for upx."
     else
@@ -406,16 +406,13 @@ yum_upx_exists() {
     fi
 }
 
-yum_upx_install() {
-    echo "Installing upx."
-    sudo yum -y install epel-release
-    sudo yum -y install upx
-    if [ $? = 0 ]; then
-        echo "Installation of upx successful."
-    else
-        echo "Installation of upx failed."
-        FAILED=1
-    fi
+upx_install() {
+    upxVersion=4.0.0
+    arch=$(arch | sed s/aarch64/arm64/ | sed s/x86_64/amd64/) 
+    curl -Ls https://github.com/upx/upx/releases/download/v${upxVersion}/upx-${upxVersion}-${arch}_linux.tar.xz -o - | tar xvJf - -C /tmp
+    cp /tmp/upx-${upxVersion}-${arch}_linux/upx /usr/local/bin/
+    chmod +x /usr/local/bin/upx
+    echo "Installation of upx successful."
 }
 
 
@@ -469,8 +466,8 @@ yum_install() {
     if ! yum_go_exists; then
         yum_go_install
     fi
-    if ! yum_upx_exists; then
-        yum_upx_install
+    if ! upx_exists; then
+        upx_install
     fi
 
 
@@ -643,26 +640,6 @@ apt_go_install() {
     fi
 }
 
-apt_upx_exists() {
-    if upx --version &>/dev/null; then
-        echo "upx is already installed; doing nothing for upx."
-    else
-        echo "upx is not already installed."
-        return 1
-    fi
-}
-
-apt_upx_install() {
-    echo "Installing upx."
-    sudo apt-get install -y upx
-    if [ $? = 0 ]; then
-        echo "Installation of upx successful."
-    else
-        echo "Installation of upx failed."
-        FAILED=1
-    fi
-}
-
 apt_dump_versions() {
     # The crazy sed stuff at the end of each just provides indention.
     if lsb_release -d &>/dev/null; then
@@ -705,8 +682,8 @@ apt_install() {
     if ! apt_go_exists; then
         apt_go_install
     fi
-    if ! apt_upx_exists; then
-        apt_upx_install
+    if ! upx_exists; then
+        upx_install
     fi
 
 

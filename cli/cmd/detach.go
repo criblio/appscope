@@ -29,6 +29,9 @@ scope detach --all`,
 		}
 
 		if all {
+			if len(args) != 0 {
+				helpErrAndExit(cmd, "--all flag is mutual exclusive with PID or <process_name>")
+			}
 			rc.Subprocess = true
 			return rc.DetachAll(args, true)
 		}

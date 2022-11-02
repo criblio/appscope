@@ -145,9 +145,6 @@ done
 endtest
 
 
-
-
-
 #
 # Attach by name
 #
@@ -165,9 +162,6 @@ returns 0
 endtest
 
 
-
-
-
 #
 # Scope ps
 #
@@ -179,8 +173,8 @@ outputs "ID	PID	USER	COMMAND
 1	${sleep_pid} 	root	sleep 1000"
 returns 0
 
-
 endtest
+
 
 #
 # Scope start no force
@@ -193,6 +187,7 @@ outputs "If you wish to proceed, run again with the -f flag."
 returns 0
 
 endtest
+
 
 #
 # Scope start no input
@@ -208,6 +203,7 @@ ERR+=$?
 
 endtest
 
+
 #
 # Scope start empty file pipeline
 #
@@ -221,6 +217,7 @@ scope logs -s | grep -q "Missing filter data"
 ERR+=$?
 
 endtest
+
 
 #
 # Scope start empty file redirect
@@ -236,9 +233,11 @@ returns 1
 
 endtest
 
+
 # Scope detach by name
 #
 starttest "Scope detach by name"
+
 
 #
 # Detach by name
@@ -252,19 +251,50 @@ endtest
 # Give time to consume configuration file (without sleep)
 timeout 4s tail -f /dev/null
 
+
 #
 # Scope reattach by name
 #
 starttest "Scope reattach by name"
 
-#
 # reattach by name
-#
 run scope attach sleep
 outputs "Reattaching to pid ${sleep_pid}"
 returns 0
 
+# Kill sleep process
+kill $sleep_pid
+
 endtest
+
+
+#
+# Scope detach all
+#
+starttest "Scope detach all"
+
+# Run sleep
+sleep 1000 & 
+sleep_pid1=$!
+
+# Run another sleep
+sleep 1000 & 
+sleep_pid2=$!
+
+# Attach to sleep processes
+run scope attach $sleep_pid1
+returns 0
+run scope attach $sleep_pid2
+returns 0
+
+# Wait for attach to execute
+sleep 2
+
+# Detach from sleep processes
+yes | scope detach --all 2>&1
+RET=$?
+returns 0
+
 
 ################# END TESTS ################# 
 

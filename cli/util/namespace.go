@@ -7,11 +7,48 @@ import (
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
+	lxd "github.com/lxc/lxd/client"
 )
 
 var (
-	ErrDockerNotAvailable = errors.New("docker daemon is not available")
+	ErrDockerNotAvailable    = errors.New("docker daemon is not available")
+	ErrLXDSocketNotAvailable = errors.New("LXD socket is not available")
 )
+
+// Get the LXD server unix socket
+func getLXDServerSocket() string {
+	socketPaths := []string{"/var/lib/lxd/unix.socket", "/var/snap/lxd/common/lxd/unix.socket"}
+	for _, path := range socketPaths {
+		if _, err := os.Stat(path); err == nil {
+			return path
+		}
+	}
+	return ""
+}
+
+// Get the List of PID(s) related to LXC container
+func GetLXCPids() ([]int, error) {
+	lxdUnixPath := getLXDServerSocket()
+	if lxdUnixPath == "" {
+		return nil, ErrLXDSocketNotAvailable
+	}
+
+	c, err := lxd.ConnectLXDUnix(lxdUnixPath, nil)
+	if err != nil {
+		return nil, err
+	}
+	containers, err := c.GetContainersFull()
+
+	pids := make([]int, len(containers))
+
+	if err != nil {
+		return nil, err
+	}
+	for indx, container := range containers {
+		pids[indx] = int(container.State.Pid)
+	}
+	return pids, nil
+}
 
 // Get the List of PID(s) related to Docker container
 func GetDockerPids() ([]int, error) {

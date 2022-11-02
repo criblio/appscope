@@ -7,9 +7,9 @@
 
 #ifdef __linux__
 #include <sys/prctl.h>
-#ifdef __GO__
-#include <asm/prctl.h>
-#endif
+//#ifdef __GO__
+//#include <asm/prctl.h>
+//#endif
 #endif
 #include <sys/syscall.h>
 #include <sys/stat.h>
@@ -1315,6 +1315,8 @@ initHook(int attachedFlag, bool scopedFlag)
 #ifdef __GO__
         initGoHook(ebuf);
         threadNow(0);
+
+#if defined(__x86_64__)
         if (scope_arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
             scopeLogError("initHook:arch_prctl");
         }
@@ -1326,7 +1328,12 @@ initHook(int attachedFlag, bool scopedFlag)
             :
             : "%r11"                      //clobbered register
             );
-
+#elif defined(__aarch64__)
+        //scope_stack = 0;
+        scope_fs = 0;
+#else
+   #error Bad arch defined
+#endif
         if (full_path) scope_free(full_path);
         if (ebuf) freeElf(ebuf->buf, ebuf->len);
         return;

@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
 #include <sys/mman.h>
-#include <asm/prctl.h>
+//#include <asm/prctl.h>
 #include <sys/prctl.h>
 #include <signal.h>
 
@@ -28,12 +28,22 @@
 #define PRI_STR_LEN sizeof(PRI_STR)
 #define UNDEF_OFFSET (-1)
 
+#if defined (__x86_64__)
+   #define END_INST "int3"
+   #define SYSCALL_INST "syscall"
+#elif defined (__aarch64__)
+   #define END_INST "ret"
+   #define SYSCALL_INST "svc"
+#else
+   #error Bad arch defined
+#endif
+
 // compile-time control for debugging
-#define NEEDEVNULL 1
-//#define funcprint sysprint
-#define funcprint devnull
-//#define patchprint sysprint
-#define patchprint devnull
+//#define NEEDEVNULL 1
+#define funcprint sysprint
+//#define funcprint devnull
+#define patchprint sysprint
+//#define patchprint devnull
 
 int g_go_minor_ver = UNKNOWN_GO_VER;
 int g_go_maint_ver = UNKNOWN_GO_VER;
@@ -52,6 +62,8 @@ devnull(const char* fmt, ...)
 #endif
 
 enum index_hook_t {
+    INDEX_HOOK_EXIT,
+    INDEX_HOOK_DIE,
     INDEX_HOOK_SYSCALL,
     INDEX_HOOK_RAWSYSCALL,
     INDEX_HOOK_SYSCALL6,
@@ -64,8 +76,8 @@ enum index_hook_t {
     INDEX_HOOK_HTTP2_SERVER_READ,
     INDEX_HOOK_HTTP2_SERVER_WRITE,
     INDEX_HOOK_HTTP2_SERVER_PREFACE,
-    INDEX_HOOK_EXIT,
-    INDEX_HOOK_DIE,
+//    INDEX_HOOK_EXIT,
+//    INDEX_HOOK_DIE,
     INDEX_HOOK_MAX,
 };
 
@@ -122,6 +134,7 @@ go_schema_t go_9_schema = {
         .sc_to_conn=0x10,
     },
     .tap = {
+#if 0
         [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",                         go_hook_reg_syscall,          NULL, 0},
         [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",                      go_hook_reg_rawsyscall,       NULL, 0},
         [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",                        go_hook_reg_syscall6,         NULL, 0},
@@ -136,6 +149,7 @@ go_schema_t go_9_schema = {
         [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
         [INDEX_HOOK_EXIT]                 = {"runtime.exit",                            go_hook_exit,                 NULL, 0},
         [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal",                   go_hook_die,                  NULL, 0},
+#endif
         [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                         NULL, 0}
     },
 };
@@ -193,6 +207,7 @@ go_schema_t go_17_schema = {
     },
     .tap = {
         [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",       /* .abi0 */       go_hook_reg_syscall,              NULL, 0},
+#if 0
         [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",    /* .abi0 */       go_hook_reg_rawsyscall,           NULL, 0},
         [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",      /* .abi0 */       go_hook_reg_syscall6,             NULL, 0},
         [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_hook_reg_tls_client_read,      NULL, 0},
@@ -204,11 +219,30 @@ go_schema_t go_17_schema = {
         [INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_hook_reg_http2_server_read,    NULL, 0},
         [INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_hook_reg_http2_server_write,   NULL, 0},
         [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
+#endif
         [INDEX_HOOK_EXIT]                 = {"runtime.exit",          /* .abi0 */       go_hook_exit,                     NULL, 0},
         [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal", /* .abi0 */       go_hook_die,                      NULL, 0},
         [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                             NULL, 0}
     },
 };
+
+void
+go_hook_die(void)
+{
+    return;
+}
+
+void
+go_hook_exit(void)
+{
+    return;
+}
+
+void
+go_hook_reg_syscall(void)
+{
+    return;
+}
 
 static void
 adjustGoStructOffsetsForVersion()
@@ -558,6 +592,7 @@ getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
 static bool
 looks_like_first_inst_of_go_func(cs_insn* asm_inst)
 {
+#if defined(__x86_64__)
     return (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
             !scope_strcmp((const char*)asm_inst->op_str, "rcx, qword ptr fs:[0xfffffffffffffff8]")) ||
             // -buildmode=pie compiles to this:
@@ -570,8 +605,15 @@ looks_like_first_inst_of_go_func(cs_insn* asm_inst)
             (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
             !scope_strcmp((const char*)asm_inst->op_str, "r10, rsi")) ||
             (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
-            !scope_strcmp((const char*)asm_inst->op_str, "edi, dword ptr [rsp + 8]"))
-            ;
+            !scope_strcmp((const char*)asm_inst->op_str, "edi, dword ptr [rsp + 8]"));
+#elif defined(__aarch64__)
+   return ((!scope_strcmp((const char*)asm_inst->mnemonic, "str") &&
+            scope_strstr((const char*)asm_inst->op_str, "[sp,")) ||
+           (!scope_strcmp((const char*)asm_inst->mnemonic, "ldrsw") &&
+            scope_strstr((const char*)asm_inst->op_str, "[sp,"))); 
+#else
+   #error Bad arch defined
+#endif
 }
 
 // Calculate the value to be added/subtracted at an add/sub instruction
@@ -628,7 +670,7 @@ patch_addrs(funchook_t *funchook,
 
         // Stop when it looks like we've hit another goroutine
         if (i > 0 && (looks_like_first_inst_of_go_func(&asm_inst[i]) ||
-            (!scope_strcmp((const char*)asm_inst[i].mnemonic, "int3") &&
+            (!scope_strcmp((const char*)asm_inst[i].mnemonic, END_INST) &&
             asm_inst[i].size == 1 ))) {
             break;
         }
@@ -658,7 +700,7 @@ patch_addrs(funchook_t *funchook,
         }
 
         // PATCH SYSCALLS
-        if (!scope_strcmp((const char*)asm_inst[i].mnemonic, "syscall")) {
+        if (!scope_strcmp((const char*)asm_inst[i].mnemonic, SYSCALL_INST)) {
 
             // In the "syscall" case, we want to patch the instruction directly 
             void *pre_patch_addr = (void*)asm_inst[i].address;
@@ -1048,7 +1090,6 @@ do_cfunc(char *stackptr, void *cfunc, void *gfunc)
 {
     if (g_cfg.funcs_attached == FALSE) return return_addr(gfunc);
 
-    uint64_t rc;
     char *sys_stack = stackptr;  
     char *g_stack = (char *)*(uint64_t *)(sys_stack + 0x50); 
 
@@ -1067,6 +1108,8 @@ do_cfunc(char *stackptr, void *cfunc, void *gfunc)
         g_stack += frame_offset;
     }
 
+#if defined (__x86_64__)
+    uint64_t rc;
     // Call the C handler
     __asm__ volatile (
         "mov %1, %%rdi  \n"
@@ -1076,7 +1119,11 @@ do_cfunc(char *stackptr, void *cfunc, void *gfunc)
         : "r"(sys_stack), "r"(g_stack), "r"(cfunc)    // inputs
         :                                             // clobbered register
         );
-
+#elif defined (__aarch64__)
+    // TODO
+#else
+   #error Bad arch defined
+#endif
     return return_addr(gfunc);
 }
 
@@ -1560,6 +1607,7 @@ extern void handleExit(void);
 static void
 c_exit(char *sys_stack)
 {
+#if defined (__x86_64__)
     /*
      * Need to extend the system stack size when calling handleExit().
      * We see that the stack is exceeded now that we are using an internal libc.
@@ -1580,6 +1628,11 @@ c_exit(char *sys_stack)
         : "m"(tstack), "m"(gstack)   // input
         :                            // clobbered register
         );
+#elif defined (__aarch64__)
+    // TODO
+#else
+   #error Bad arch defined
+#endif
 
     // don't use stackaddr; patch_first_instruction() does not provide
     // frame_size, so stackaddr isn't usable
@@ -1599,6 +1652,7 @@ c_exit(char *sys_stack)
     sigSafeNanosleep(&ts);
 
     // Switch stack back to the original stack
+#if defined (__x86_64__)
     __asm__ volatile (
         "mov %1, %%rsp \n"
         : "=r"(arc)                       // output
@@ -1607,6 +1661,11 @@ c_exit(char *sys_stack)
         );
 
     scope_free(exit_stack);
+#elif defined (__aarch64__)
+    // TODO
+#else
+   #error Bad arch defined
+#endif
 }
 
 EXPORTON void *

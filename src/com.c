@@ -296,7 +296,7 @@ pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
         return pcre2_match(re, data, size, startoffset, options, match_data, mcontext);
     }
 
-#ifdef __GO__
+#if defined (__GO__ ) && defined (__x86_64__)
     int rc, arc;
     char *pcre_stack, *tstack, *gstack;
     if ((pcre_stack = scope_malloc(PCRE_STACK_SIZE)) == NULL) {
@@ -327,10 +327,10 @@ pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
 
     if (pcre_stack) scope_free(pcre_stack);
     return rc;
-#else
+
+#else  // __GO__
     return pcre2_match(re, data, size, startoffset, options, match_data, mcontext);
 #endif
-
 }
 
 int
@@ -341,7 +341,7 @@ regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
         return regexec(preg, string, nmatch, pmatch, eflags);
     }
 
-#ifdef __GO__
+#if defined (__GO__ ) && defined (__x86_64__)
     int rc, arc;
     char *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
 
@@ -361,7 +361,7 @@ regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
         :                            // clobbered register
         );
 
-    rc = regexec(preg, string, nmatch, pmatch, eflags);
+    rc = regexec(preg, string, nmatch, pmatch, eflags);    
 
     // Switch stack back to the original stack
     __asm__ volatile (

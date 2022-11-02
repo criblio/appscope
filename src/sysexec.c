@@ -9,7 +9,7 @@
 #include <elf.h>
 #include <sys/auxv.h>
 #include <sys/syscall.h>
-#include <asm/prctl.h>
+//#include <asm/prctl.h>
 #include <sys/prctl.h>
 #include <pthread.h>
 #include <dlfcn.h>
@@ -22,7 +22,7 @@
 #include "state.h"
 #include "gocontext.h"
 
-#define SYSPRINT_CONSOLE 0
+#define SYSPRINT_CONSOLE 1
 #define PRINT_BUF_SIZE 1024
 #define HEAP_SIZE (size_t)(500 * 1024)
 // 1Mb + an 8kb guard
@@ -338,6 +338,7 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
 static int
 set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr phaddr)
 {
+#if defined (__x86_64__)
     uint64_t res = 0;
     char *sp;
     Elf64_Addr start;
@@ -375,7 +376,7 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr phad
         : "r"(start), "r"(sp), "r"(rtld_fini)
         : "%r11"                      //clobbered register
     );
-
+#endif
     return 0;
 }
 

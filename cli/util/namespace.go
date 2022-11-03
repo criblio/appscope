@@ -3,16 +3,20 @@ package util
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/namespaces"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	lxd "github.com/lxc/lxd/client"
 )
 
 var (
-	ErrDockerNotAvailable    = errors.New("docker daemon is not available")
-	ErrLXDSocketNotAvailable = errors.New("LXD socket is not available")
+	ErrContainerDNotAvailable = errors.New("ContainerD is not available")
+	ErrDockerNotAvailable     = errors.New("docker daemon is not available")
+	ErrLXDSocketNotAvailable  = errors.New("LXD socket is not available")
 )
 
 // Get the LXD server unix socket
@@ -33,23 +37,60 @@ func GetLXCPids() ([]int, error) {
 		return nil, ErrLXDSocketNotAvailable
 	}
 
-	c, err := lxd.ConnectLXDUnix(lxdUnixPath, nil)
+	cli, err := lxd.ConnectLXDUnix(lxdUnixPath, nil)
 	if err != nil {
 		return nil, err
 	}
-	containers, err := c.GetContainers()
+	containers, err := cli.GetContainers()
 	if err != nil {
 		return nil, err
 	}
 	pids := make([]int, len(containers))
 
 	for indx, container := range containers {
-		state, _, err := c.GetContainerState(container.Name)
+		state, _, err := cli.GetContainerState(container.Name)
 		if err != nil {
 			return nil, err
 		}
 		pids[indx] = int(state.Pid)
 	}
+	return pids, nil
+}
+
+// Get the List of PID(s) related to containerd container
+func GetContainerDPids() ([]int, error) {
+	ctx := context.Background()
+	cli, err := containerd.New("/run/containerd/containerd.sock")
+	if err != nil {
+		return nil, ErrContainerDNotAvailable
+	}
+	defer cli.Close()
+
+	// TODO: replace GetDockerPids with the API here and namespace "moby"
+	cdctx := namespaces.WithNamespace(ctx, "default")
+	containers, err := cli.Containers(cdctx)
+
+	if err != nil {
+		return nil, err
+	}
+	pids := make([]int, 0, len(containers))
+
+	for _, container := range containers {
+		task, err := container.Task(cdctx, nil)
+		if err != nil {
+			fmt.Printf("\nSkipped container %v, task error: %v", container, err)
+			continue
+		}
+		status, err := task.Status(cdctx)
+		if err != nil {
+			fmt.Printf("\nSkipped task %v, container %v, status error: %v", task, container, err)
+			continue
+		}
+		if status.Status == containerd.Running {
+			pids = append(pids, int(task.Pid()))
+		}
+	}
+
 	return pids, nil
 }
 

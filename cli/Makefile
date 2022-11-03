@@ -62,10 +62,10 @@ clean:
 	$(RM) -r build/*
 	$(RM) run/bundle.go $(SCOPE)
 	$(RM) coverage.out coverage.html
-	rm -rf -- .gocache/*/
-	rm -rf -- .gomod/*/
-	rm -rf -- .gobin/x86_64/go*
-	rm -rf -- .gobin/aarch64/go*
+	$(RM) -rf -- .gocache/*/
+	$(RM) -rf -- .gomod/*/
+	$(RM) -rf -- .gobin/x86_64/go*
+	$(RM) -rf -- .gobin/aarch64/go*
 
 ## deps: install dependencies
 deps: $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT)

@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 
+#include "nsfile.h"
 #include "loaderop.h"
 #include "libdir.h"
 #include "libver.h"
@@ -23,9 +24,9 @@ typedef enum {
 
 struct service_ops {
     bool (*isServiceInstalled)(const char *serviceName);
-    service_cfg_status_t (*serviceCfgStatus)(const char *serviceCfgPath, uid_t uid, gid_t gid);
-    service_status_t (*newServiceCfg)(const char *serviceCfgPath, const char *libscopePath);
-    service_status_t (*modifyServiceCfg)(const char *serviceCfgPath, const char *libscopePath);
+    service_cfg_status_t (*serviceCfgStatus)(const char *serviceCfgPath, uid_t nsUid, gid_t nsGid);
+    service_status_t (*newServiceCfg)(const char *serviceCfgPath, const char *libscopePath, uid_t nsUid, gid_t nsGid);
+    service_status_t (*modifyServiceCfg)(const char *serviceCfgPath, const char *libscopePath, uid_t nsUid, gid_t nsGid);
 };
 
 /*
@@ -96,11 +97,10 @@ serviceCfgStatusSystemD(const char *serviceName, uid_t uid, gid_t gid) {
 
     // create service.d directory if it does not exists.
     if (scope_stat(cfgScript, &st) != 0) {
-        if (scope_mkdir(cfgScript, 0755) != 0) {
+        if (nsFileMkdir(cfgScript, 0755, uid, gid, scope_geteuid(), scope_getegid()) != 0) {
             scope_perror("error: serviceCfgStatusSystemD, scope_mkdir failed");
             return ret;
         }
-        scope_chown(cfgScript, uid, gid);
     }
 
     scope_strncat(cfgScript, "env.conf", sizeof("env.conf") - 1);
@@ -168,14 +168,13 @@ serviceCfgStatusOpenRc(const char *serviceName, uid_t uid, gid_t gid) {
  * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
 static service_status_t
-newServiceCfgSystemD(const char *serviceCfgPath, const char *libscopePath) {
+newServiceCfgSystemD(const char *serviceCfgPath, const char *libscopePath, uid_t uid, gid_t gid) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
     char cfgEntry[BUFSIZE] = {0};
 
-    FILE *fPtr = scope_fopen(serviceCfgPath, "a");
-
+    FILE *fPtr = nsFileFopen(serviceCfgPath, "a", uid, gid, scope_geteuid(), scope_getegid());
     if (fPtr == NULL) {
-        scope_perror("error: newServiceCfgSystemD, scope_fopen failed");
+        scope_fprintf(scope_stderr, "\nerror: newServiceCfgSystemD, scope_fopen failed");
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
@@ -196,14 +195,14 @@ newServiceCfgSystemD(const char *serviceCfgPath, const char *libscopePath) {
  * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
 static service_status_t
-newServiceCfgInitD(const char *serviceCfgPath, const char *libscopePath) {
+newServiceCfgInitD(const char *serviceCfgPath, const char *libscopePath, uid_t uid, gid_t gid) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
     char cfgEntry[BUFSIZE] = {0};
 
-    FILE *fPtr = scope_fopen(serviceCfgPath, "a");
+    FILE *fPtr = nsFileFopen(serviceCfgPath, "a", uid, gid, scope_geteuid(), scope_getegid());
 
     if (fPtr == NULL) {
-        scope_perror("error: newServiceCfgInitD, scope_fopen failed");
+        scope_fprintf(scope_stderr, "\nerror: newServiceCfgInitD, scope_fopen failed");
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
@@ -224,14 +223,14 @@ newServiceCfgInitD(const char *serviceCfgPath, const char *libscopePath) {
  * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
 static service_status_t
-newServiceCfgOpenRc(const char *serviceCfgPath, const char *libscopePath) {
+newServiceCfgOpenRc(const char *serviceCfgPath, const char *libscopePath, uid_t uid, gid_t gid) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
     char cfgEntry[BUFSIZE] = {0};
 
-    FILE *fPtr = scope_fopen(serviceCfgPath, "a");
+    FILE *fPtr = nsFileFopen(serviceCfgPath, "a", uid, gid, scope_geteuid(), scope_getegid());
 
     if (fPtr == NULL) {
-        scope_perror("error: newServiceCfgOpenRc, scope_fopen failed");
+        scope_fprintf(scope_stderr, "\nerror: newServiceCfgOpenRc, scope_fopen failed");
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
@@ -281,7 +280,7 @@ isCfgFileConfigured(const char *serviceCfgPath) {
  * Returns SERVICE_STATUS_SUCCESS if service was modified correctly, other values in case of failure.
  */
 static service_status_t
-modifyServiceCfgSystemd(const char *serviceCfgPath, const char *libscopePath) {
+modifyServiceCfgSystemd(const char *serviceCfgPath, const char *libscopePath, uid_t nsEuid, gid_t nsEgid) {
     FILE *readFd;
     FILE *newFd;
     char *tempPath = "/tmp/tmpFile-XXXXXX";
@@ -293,8 +292,11 @@ modifyServiceCfgSystemd(const char *serviceCfgPath, const char *libscopePath) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    if ((newFd = scope_fopen(tempPath, "w+")) == NULL) {
-        scope_perror("error: modifyServiceCfgSystemd, scope_fopen tempFile failed");
+    uid_t eUid = scope_geteuid();
+    gid_t eGid = scope_getegid();
+
+    if ((newFd = nsFileFopen(tempPath, "w+", nsEuid, nsEgid, eUid, eGid)) == NULL) {
+        scope_fprintf(scope_stderr, "\nerror: modifyServiceCfgSystemd, nsFileFopen tempFile failed");
         scope_fclose(readFd);
         return SERVICE_STATUS_ERROR_OTHER;
     }
@@ -321,8 +323,8 @@ modifyServiceCfgSystemd(const char *serviceCfgPath, const char *libscopePath) {
     scope_fclose(newFd);
     scope_fclose(readFd);
 
-    if (scope_rename(tempPath, serviceCfgPath)) {
-        scope_perror("error: modifyServiceCfgSystemd, scope_rename failed");
+    if (nsFileRename(tempPath, serviceCfgPath, nsEuid ,nsEgid, eUid, eGid)) {
+        scope_fprintf(scope_stderr, "\nerror: modifyServiceCfgSystemd, nsFileRename failed");
     }
     scope_unlink(tempPath);
 
@@ -356,7 +358,7 @@ static struct service_ops OpenRcService = {
  * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
 service_status_t
-setupService(const char *serviceName, uid_t uid, gid_t gid) {
+setupService(const char *serviceName, uid_t nsUid, gid_t nsGid) {
     struct stat sb = {0};
     struct service_ops *service;
 
@@ -408,15 +410,15 @@ setupService(const char *serviceName, uid_t uid, gid_t gid) {
         }
     }
 
-    service_cfg_status_t cfgStatus = service->serviceCfgStatus(serviceName, uid, gid);
+    service_cfg_status_t cfgStatus = service->serviceCfgStatus(serviceName, nsUid, nsGid);
     if (cfgStatus == SERVICE_CFG_ERROR) {
         return SERVICE_STATUS_ERROR_OTHER;
     } else if (cfgStatus == SERVICE_CFG_NEW) {
         // Fresh configuration
-        status = service->newServiceCfg(serviceCfgPath, libscopePath);
+        status = service->newServiceCfg(serviceCfgPath, libscopePath, nsUid, nsGid);
     } else if (isCfgFileConfigured(serviceCfgPath) == FALSE) {
         // Modification of configuration file
-        status = service->modifyServiceCfg(serviceCfgPath, libscopePath);
+        status = service->modifyServiceCfg(serviceCfgPath, libscopePath, nsUid, nsGid);
     } else {
         // Service was already setup correctly
         return SERVICE_STATUS_SUCCESS;
@@ -424,7 +426,6 @@ setupService(const char *serviceName, uid_t uid, gid_t gid) {
 
     // Change permission and ownership if modify or create was success
     if (status == SERVICE_STATUS_SUCCESS ) {
-        scope_chown(serviceCfgPath, uid, gid);
         scope_chmod(serviceCfgPath, 0644);
     }
     
@@ -437,7 +438,7 @@ setupService(const char *serviceName, uid_t uid, gid_t gid) {
  * Returns status of operation TRUE in case of success, FALSE otherwise
  */
 static bool
-setupProfile(const char *libscopePath, const char *loaderVersion, uid_t uid, gid_t gid) {
+setupProfile(const char *libscopePath, const char *loaderVersion, uid_t nsUid, gid_t nsGid) {
 
     /*
      * If the env var is set to anything, return.
@@ -450,10 +451,8 @@ setupProfile(const char *libscopePath, const char *loaderVersion, uid_t uid, gid
     }
 
     char buf[PATH_MAX] = {0};
-    int fd = scope_open("/etc/profile.d/scope.sh", O_CREAT | O_RDWR | O_TRUNC, 0644);
-
+    int fd = nsFileOpenWithMode("/etc/profile.d/scope.sh", O_CREAT | O_RDWR | O_TRUNC, 0644, nsUid, nsGid, scope_geteuid(), scope_getegid());
     if (fd < 0) {
-        scope_perror("scope_fopen failed");
         return FALSE;
     }
 
@@ -469,8 +468,6 @@ setupProfile(const char *libscopePath, const char *loaderVersion, uid_t uid, gid
         return FALSE;
     }
 
-    scope_chown("/etc/profile.d/scope.sh", uid, gid);
-
     return TRUE;
 }
 
@@ -480,12 +477,11 @@ setupProfile(const char *libscopePath, const char *loaderVersion, uid_t uid, gid
  * Returns status of operation TRUE in case of success, FALSE otherwise
  */
 static bool
-setupExtractFilterFile(void *filterFileMem, size_t filterSize, const char *outputFilterPath, uid_t uid, gid_t gid) {
+setupExtractFilterFile(void *filterFileMem, size_t filterSize, const char *outputFilterPath, uid_t nsUid, gid_t nsGid) {
     int filterFd;
     bool status = FALSE;
 
-    if ((filterFd = scope_open(outputFilterPath, O_RDWR | O_CREAT, 0664)) == -1) {
-        scope_perror("scope_open failed");
+    if ((filterFd = nsFileOpenWithMode(outputFilterPath, O_RDWR | O_CREAT, 0664, nsUid, nsGid, scope_geteuid(), scope_getegid())) == -1) {
         return status;
     }
 
@@ -505,8 +501,6 @@ setupExtractFilterFile(void *filterFileMem, size_t filterSize, const char *outpu
 cleanupDestFd:
 
     scope_close(filterFd);
-
-    scope_chown(outputFilterPath, uid, gid);
 
     return status;
 }
@@ -561,7 +555,7 @@ closeFd:
  * Returns status of operation 0 in case of success, other value otherwise
  */
 int
-setupConfigure(void *filterFileMem, size_t filterSize, uid_t uid, gid_t gid) {
+setupConfigure(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid) {
     char path[PATH_MAX] = {0};
     mode_t mode = 0755;
 
@@ -577,12 +571,12 @@ setupConfigure(void *filterFileMem, size_t filterSize, uid_t uid, gid_t gid) {
     if (getenv("SCOPE_START_FORCE_PROFILE")) isDevVersion = FALSE;
 
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
-    mkdir_status_t res = libdirCreateDirIfMissing(path, mode, uid, gid);
+    mkdir_status_t res = libdirCreateDirIfMissing(path, mode, nsUid, nsGid);
     if ((res > MKDIR_STATUS_EXISTS) || isDevVersion) {
         mode = 0777;
         scope_memset(path, 0, PATH_MAX);
         scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
-        mkdir_status_t res = libdirCreateDirIfMissing(path, mode, uid, gid);
+        mkdir_status_t res = libdirCreateDirIfMissing(path, mode, nsUid, nsGid);
         if (res > MKDIR_STATUS_EXISTS) {
             scope_fprintf(scope_stderr, "setupConfigure: libdirCreateDirIfMissing failed\n");
             return -1;
@@ -592,8 +586,8 @@ setupConfigure(void *filterFileMem, size_t filterSize, uid_t uid, gid_t gid) {
     scope_strncat(path, "libscope.so", sizeof("libscope.so"));
 
     // Extract[create] the filter file to filter location
-    if (setupExtractFilterFile(filterFileMem, filterSize, SCOPE_FILTER_USR_PATH, uid, gid) == FALSE) {
-        if (setupExtractFilterFile(filterFileMem, filterSize, SCOPE_FILTER_TMP_PATH, uid, gid) == FALSE) {
+    if (setupExtractFilterFile(filterFileMem, filterSize, SCOPE_FILTER_USR_PATH, nsUid, nsGid) == FALSE) {
+        if (setupExtractFilterFile(filterFileMem, filterSize, SCOPE_FILTER_TMP_PATH, nsUid, nsGid) == FALSE) {
             scope_fprintf(scope_stderr, "setupConfigure: setup filter file failed\n");
             return -1;
         }
@@ -604,14 +598,14 @@ setupConfigure(void *filterFileMem, size_t filterSize, uid_t uid, gid_t gid) {
      * Only update the profile if we are using the system dir.
      */
     if (scope_strstr(path, "/usr/lib")) {
-        if (setupProfile(path, loaderVersion, uid, gid) == FALSE) {
+        if (setupProfile(path, loaderVersion, nsUid, nsGid) == FALSE) {
             scope_fprintf(scope_stderr, "setupConfigure: setupProfile failed\n");
             return -1;
         }
     }
 
     // Extract libscope.so
-    if (libdirSaveLibraryFile(path, overwrite, mode, uid, gid)) {
+    if (libdirSaveLibraryFile(path, overwrite, mode, nsUid, nsGid)) {
         scope_fprintf(scope_stderr, "setupConfigure: saving %s failed\n", path);
         return -1;
     }

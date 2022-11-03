@@ -4,6 +4,7 @@
 
 #include "ns.h"
 #include "nsinfo.h"
+#include "nsfile.h"
 #include "libver.h"
 #include "libdir.h"
 #include "setup.h"
@@ -20,7 +21,7 @@
  * Returns TRUE in case of success, FALSE otherwise.
  */
 static bool
-extractMemToFile(char *inputMem, size_t inputSize, const char *outFile, mode_t outPermFlag, bool overwrite) {
+extractMemToFile(char *inputMem, size_t inputSize, const char *outFile, mode_t outPermFlag, bool overwrite, uid_t nsUid, gid_t nsGid) {
     bool status = FALSE;
     int outFd;
 
@@ -28,8 +29,7 @@ extractMemToFile(char *inputMem, size_t inputSize, const char *outFile, mode_t o
         return TRUE;
     }
 
-    if ((outFd = scope_open(outFile, O_RDWR | O_CREAT, outPermFlag)) == -1) {
-        scope_perror("scope_open failed");
+    if ((outFd = nsFileOpenWithMode(outFile, O_RDWR | O_CREAT, outPermFlag, nsUid, nsGid, scope_geteuid(), scope_getegid())) == -1) {
         return status;
     }
 
@@ -150,16 +150,14 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
 
     scope_strncat(path, "ldscope", sizeof("ldscope"));
 
-    status = extractMemToFile(ldscopeMem, ldscopeSize, path, 0775, isDevVersion);
-    scope_chown(path, nsUid, nsGid);
+    status = extractMemToFile(ldscopeMem, ldscopeSize, path, 0775, isDevVersion, nsUid, nsGid);
 
     if (scopeCfgMem) {
         char scopeCfgPath[PATH_MAX] = {0};
 
         // extract scope.yml configuration
         scope_snprintf(scopeCfgPath, sizeof(scopeCfgPath), "/tmp/scope%d.yml", hostPid);
-        status = extractMemToFile(scopeCfgMem, cfgSize, scopeCfgPath, 0664, TRUE);
-        scope_chown(scopeCfgPath, nsUid, nsGid);
+        status = extractMemToFile(scopeCfgMem, cfgSize, scopeCfgPath, 0664, TRUE, nsUid, nsGid);
         // replace the SCOPE_CONF_PATH with namespace path
         setenv("SCOPE_CONF_PATH", scopeCfgPath, 1);
     }   
@@ -283,7 +281,7 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
     */
 
     if (joinChildNamespace(parentPid, parentPid != nsPid) == FALSE) {
-        scope_fprintf(scope_stderr, "error: join_namespace failed\n");
+        scope_fprintf(scope_stderr, "error: joinChildNamespace failed\n");
         return EXIT_FAILURE; 
     }
 
@@ -452,7 +450,7 @@ setHostNamespace(const char *ns) {
     scope_strncat(nsPath, procPath, sizeof(procPath) - 1);
 
     if ((nsFd = scope_open(nsPath, O_RDONLY)) == -1) {
-        scope_perror("setHostNamespace: scope_open failed: host fs is not mounted:");
+        scope_perror("setHostNamespace: scope_open failed: host fs is not mounted");
         return FALSE;
     }
 
@@ -551,17 +549,20 @@ joinHostNamespace(void) {
         goto cleanupMem;
     }
 
+    uid_t eUid = scope_geteuid();
+    gid_t eGid = scope_getegid();
+
     /*
      * At this point we are using the host fs.
      * Ensure that we have the dest dir
      */
     scope_memset(path, 0, PATH_MAX);
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
-    mkdir_status_t res = libdirCreateDirIfMissing(path, 0755, scope_getuid(), scope_getgid());
+    mkdir_status_t res = libdirCreateDirIfMissing(path, 0755, eUid, eGid);
     if ((res > MKDIR_STATUS_EXISTS) || (isDevVersion)) {
         scope_memset(path, 0, PATH_MAX);
         scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
-        mkdir_status_t res = libdirCreateDirIfMissing(path, 0777, scope_getuid(), scope_getgid());
+        mkdir_status_t res = libdirCreateDirIfMissing(path, 0777, eUid, eGid);
         if (res > MKDIR_STATUS_EXISTS) {
             goto cleanupMem;
         }
@@ -577,22 +578,22 @@ joinHostNamespace(void) {
     scope_strncat(path, "ldscope", sizeof("ldscope"));
 
     // create "ldscope" on host
-    if ((status = extractMemToFile(ldscopeMem, ldscopeSize, path, 0775, isDevVersion)) == FALSE) {
+    if ((status = extractMemToFile(ldscopeMem, ldscopeSize, path, 0775, isDevVersion, eUid, eGid)) == FALSE) {
         goto cleanupMem;
     }
 
     // create a "filter file" on host
     scope_snprintf(hostFilterPath, PATH_MAX, SCOPE_FILTER_USR_PATH);
-    if ((status == extractMemToFile(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664, TRUE)) == FALSE) {
+    if ((status == extractMemToFile(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664, TRUE, eUid, eGid)) == FALSE) {
         scope_memset(hostFilterPath, 0, PATH_MAX);
         scope_snprintf(hostFilterPath, PATH_MAX, SCOPE_FILTER_TMP_PATH);
-        if ((status == extractMemToFile(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664, TRUE)) == FALSE) {
+        if ((status == extractMemToFile(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664, TRUE, eUid, eGid)) == FALSE) {
             goto cleanupMem;
         }
     }
 
     // create a "scope" on host
-    if (extractMemToFile(scopeMem, scopeSize, hostScopePath, 0775, isDevVersion) == FALSE) {
+    if (extractMemToFile(scopeMem, scopeSize, hostScopePath, 0775, isDevVersion, eUid, eGid) == FALSE) {
         goto cleanupMem;
     }
 
@@ -633,7 +634,7 @@ isRunningInContainer(void) {
  */
 int
 nsHostStart(void) {
-     if (isRunningInContainer() == FALSE) {
+    if (isRunningInContainer() == FALSE) {
         scope_fprintf(scope_stderr, "error: nsHostStart failed process is running on host\n");
         return EXIT_FAILURE;
     }

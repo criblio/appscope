@@ -1,0 +1,34 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt update \
+    && apt install -y \
+      curl \
+      git \
+      htop \
+      netcat \
+      nginx \
+      memcached \
+      redis \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+ENV SCOPE_CLI_SKIP_START_HOST=true
+COPY scope-profile.sh /etc/profile.d/scope_profile.sh
+COPY gdbinit /root/.gdbinit
+
+RUN  mkdir /usr/local/scope && \
+     mkdir /usr/local/scope/bin && \
+     mkdir /usr/local/scope/lib && \
+     mkdir -p /opt/test-runner/logs/ && \
+     ln -s /opt/appscope/bin/linux/$(uname -m)/scope /usr/local/scope/bin/scope && \
+     ln -s /opt/appscope/bin/linux/$(uname -m)/ldscope /usr/local/scope/bin/ldscope && \
+     ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
+
+COPY start/scope-test /usr/local/scope/scope-test
+COPY start/scope_filter1.yml /opt/test-runner/scope_filter1.yml
+COPY start/scope_filter2.yml /opt/test-runner/scope_filter2.yml
+
+COPY docker-entrypoint.sh /
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["test"]

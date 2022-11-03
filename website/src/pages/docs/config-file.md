@@ -4,11 +4,11 @@ title: "Config File"
 
 ## Config File
 
-`scope.yml` is the sole library configuration file in AppScope. 
+`scope.yml` is the sole library configuration file in AppScope.
+
+In Cribl Edge or Cribl Stream, you can use the AppScope Config Editor to create your own variants of `scope.yml` and save them in the AppScope Config Library.
 
 The contents of the now-eliminated `scope_protocol.yml` configuration file reside in the `protocol` section of `scope.yml`.
-
-
 
 ### scope.yml Config File
 
@@ -25,7 +25,7 @@ Below are the default contents of `scope.yml`:
 # After loading defaults, the library looks for a config in the following
 # places in the order shown. The first readable file found is used and the rest
 # are ignored. Entries in the config file override the defaults.
-# 
+#
 #   1. $SCOPE_CONF_PATH
 #   2. $SCOPE_HOME/conf/scope.yml
 #   3. $SCOPE_HOME/scope.yml
@@ -56,7 +56,7 @@ Below are the default contents of `scope.yml`:
 # Use the command below to get a stripped-down version of this config.
 #
 #   egrep -v '^ *#.*$' scope.yml | sed '/^$/d' >scope-minimal.yml
-# 
+#
 
 # Settings for metrics
 #
@@ -114,7 +114,7 @@ metric:
     # can be added to provide additional detail on the measurement. The library
     # adds expanded Statsd tags depending on the value of this setting as
     # described below. These affect the cardinality of the metrics data.
-    #   
+    #
     #   0  none
     #   1  adds data and unit
     #   2  adds class and proto
@@ -182,7 +182,7 @@ metric:
     #   Override: $SCOPE_METRIC_HTTP
     #
     - type: http
-  
+
     # Metric dns
     #   Type:     string
     #   Values:   dns
@@ -190,7 +190,7 @@ metric:
     #   Override: $SCOPE_METRIC_DNS
     #
     - type: dns
-  
+
     # Metric process
     #   Type:     string
     #   Values:   process
@@ -305,7 +305,7 @@ metric:
       #
       # Leave this blank when validateserver is set to true and the local
       # OS-provided trusted CA certificates are used to validate the server's
-      # certificate. To use a PEM certificate file instead, specify its 
+      # certificate. To use a PEM certificate file instead, specify its
       # full path; useful with self-signed certificates.
       #
       # Only applies if the connection type is tcp and TLS is enabled.
@@ -376,8 +376,8 @@ event:
     # $SCOPE_EVENT_LOGFILE_NAME and $SCOPE_EVENT_LOGFILE_VALUE.
     #
     - type: file
-      name: (\/logs?\/)|(\.log$)|(\.log[.\d])
-      value: .*
+      name: (\/logs?\/)|(\.log$)|(\.log[.\d]) # matches the filename
+      value: .*                               # matches data read or written
 
     # The console category includes writes to standard out and error and is
     # intended for monitoring console output, especially in containerized
@@ -393,8 +393,8 @@ event:
     # emitting binary data for console events.
     #
     - type: console
-      name: (stdout)|(stderr)
-      value: .*
+      name: (stdout)|(stderr) # matches the output stream
+      value: .*               # matches data written
       allowbinary: true
 
     # The net category includes open and close events on network connections.
@@ -456,10 +456,12 @@ event:
     # a single entry in the `headers` array.
     #
     - type: http
-      name: .*
-      field: .*
-      value: .*
-      headers: .*                 # yes, this should be singular but it's not.
+      name: .*         # event name; http.req or http.resp
+      field: .*        # matches field names; duration, http_status, etc
+      value: .*        # matches field values
+      headers:         # list of filters matched against header names
+        #- (?i)Accept                # example of case-insensitive filter
+        #- "x-content-type-.*: no.*" # example of required quotes
 
     # The metric category is very seldom used.
     # If turned on, AppScope sends non-aggregated metrics out the event channel.
@@ -586,7 +588,7 @@ event:
       #
       # Leave this blank when validateserver is set to true and the local
       # OS-provided trusted CA certificates are used to validate the server's
-      # certificate. To use a PEM certificate file instead, specify its 
+      # certificate. To use a PEM certificate file instead, specify its
       # full path; useful with self-signed certificates.
       #
       # Only applies if the connection type is tcp and TLS is enabled.
@@ -647,7 +649,7 @@ libscope:
   #
   summaryperiod : 10
 
-  # Command directory 
+  # Command directory
   #   Type:     string
   #   Values:   (directory path)
   #   Default:  /tmp
@@ -697,7 +699,7 @@ libscope:
       #
       # Note: tls:// is not an option here. For TLS/SSL, use tcp://host:port and
       # set the $SCOPE_LOG_TLS_* variables.
-  
+
       # Connection type
       #   Type:     string
       #   Values:   udp, tcp, unix, file, and edge
@@ -712,7 +714,7 @@ libscope:
       #   Default:  (none)
       #   Override: the host token in the $SCOPE_LOG_DEST URL
       #
-      #host: 
+      #host:
 
       # Connection port
       #   Type:     integer or string
@@ -720,7 +722,7 @@ libscope:
       #   Default:  (none)
       #   Override: the port token in the $SCOPE_LOG_DEST URL
       #
-      #port: 
+      #port:
 
       # File path / unix domain socket path
       #   Type:     string
@@ -815,8 +817,8 @@ cribl:
     #   Override: the port token in the $SCOPE_CRIBL or $SCOPE_CRIBL_CLOUD URL
     #
     # Defaults to 10090, which is the TCP port on the AppScope Source
-    # in Cribl Stream or Cribl Edge. If you are using the cloud version, 
-    # 10090 is the TLS port on the client-facing load balancer which is 
+    # in Cribl Stream or Cribl Edge. If you are using the cloud version,
+    # 10090 is the TLS port on the client-facing load balancer which is
     # proxied to the cloud instance's TCP:10090 port, without TLS.
     #
     # Use 10091 here if you need to connect to Cribl.Cloud without TLS and
@@ -870,7 +872,7 @@ cribl:
       #
       # Leave this blank when validateserver is set to true and the local
       # OS-provided trusted CA certificates are used to validate the server's
-      # certificate. To use a PEM certificate file instead, specify its 
+      # certificate. To use a PEM certificate file instead, specify its
       # full path; useful with self-signed certificates.
       #
       # Only applies if the connection type is tcp and TLS is enabled.
@@ -895,7 +897,7 @@ tags:
   #
   #user: $USER
   #service: eg
-  
+
 # Protocol detection and handling
 #
 protocol:
@@ -923,9 +925,9 @@ protocol:
   # options here are ignored.
   #
   # Warning: The `name` value is currently inserted into the JSON header for
-  # payloads sent to Cribl Stream or Cribl Edge, so it cannot contain double 
-  # quotes or backslashes without breaking the JSON. It needs to be kept fairly 
-  # short, too, so the header doesn't exceed the 1k limit. If this becomes a 
+  # payloads sent to Cribl Stream or Cribl Edge, so it cannot contain double
+  # quotes or backslashes without breaking the JSON. It needs to be kept fairly
+  # short, too, so the header doesn't exceed the 1k limit. If this becomes a
   # problem, we'll consider adding logging and validation.
   #
 
@@ -970,7 +972,6 @@ protocol:
   #  binary: true
   #  len: 5
 
-
 # Custom configs
 #
 custom:
@@ -1003,12 +1004,12 @@ custom:
   #
   #     Matches if the given string value matches the hostname of the machine
   #     where the scoped process is running.
-  #     
+  #
   #   username: string
   #
   #     Matches if the given string value matches the username for the scoped
   #     process's UID.
-  #     
+  #
   #   env: string
   #
   #     The string value is the name of an environment variable alone (i.e.
@@ -1024,7 +1025,7 @@ custom:
   # the filter matches. Entries under `config` use the same schema as the
   # top-level entries (without `custom`).
   #
-  
+
   # Increase metric verbosity for processes owned by the "eg" user and running
   # on the "eg1" host.
   #
@@ -1042,7 +1043,7 @@ custom:
   # Enable the Cribl Stream destination for Nginx
   # processes. Both this entry and the `example` entry above would
   # apply if both filters match – so the service tag here would
-  # override the one above. In this example, we use a Cribl.Cloud-managed 
+  # override the one above. In this example, we use a Cribl.Cloud-managed
   # Cribl Stream instance.
   #
   #nginx:
@@ -1061,4 +1062,5 @@ custom:
   #          enable: true
 
 # EOF
+
 ```

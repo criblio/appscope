@@ -12,10 +12,11 @@ import (
 // TestProcessesByName
 // Assertions:
 // - The expected process array is returned
+// - No error is returned
 func TestProcessesByName(t *testing.T) {
 	// Current process
 	name := "util.test"
-	result := ProcessesByName(name)
+	result, err := ProcessesByName(name)
 	user, _ := user.Current()
 	exp := Processes{
 		Process{
@@ -27,11 +28,71 @@ func TestProcessesByName(t *testing.T) {
 		},
 	}
 	assert.Equal(t, exp, result)
+	assert.NoError(t, err)
+}
+
+// TestPidScopeMapByProcessName
+// Assertions:
+// - The process map with single entry is returned
+// - No error is returned
+func TestPidScopeMapByProcessName(t *testing.T) {
+	currentProcessName, err := PidCommand(os.Getpid())
+	assert.NoError(t, err)
+	pidMap, err := PidScopeMapByProcessName(currentProcessName)
+	assert.NoError(t, err)
+	assert.Len(t, pidMap, 1)
+	assert.Contains(t, pidMap, os.Getpid())
+	assert.Equal(t, pidMap[os.Getpid()], false)
+}
+
+// TestPidScopeMapByProcessName
+// Assertions:
+// - Empty Map is returned
+// - No error is returned
+func TestPidScopeMapByProcessNameCharShorter(t *testing.T) {
+	currentProcName, err := PidCommand(os.Getpid())
+	assert.NoError(t, err)
+	modProcName := currentProcName[:len(currentProcName)-1]
+
+	pidMap, err := PidScopeMapByProcessName(modProcName)
+	assert.NoError(t, err)
+	assert.Len(t, pidMap, 0)
+}
+
+// TestPidScopeMapByCmdLine
+// Assertions:
+// - The expected process map is returned
+// - No error is returned
+func TestPidScopeMapByCmdLine(t *testing.T) {
+	currentProcCmdLine, err := PidCmdline(os.Getpid())
+	assert.NoError(t, err)
+	pidMap, err := PidScopeMapByCmdLine(currentProcCmdLine)
+	assert.NoError(t, err)
+	assert.Len(t, pidMap, 1)
+	assert.Contains(t, pidMap, os.Getpid())
+	assert.Equal(t, pidMap[os.Getpid()], false)
+}
+
+// TestPidScopeMapByCmdLineCharShorter
+// Assertions:
+// - The expected process map is returned
+// - No error is returned
+func TestPidScopeMapByCmdLineCharShorter(t *testing.T) {
+	currentProcCmdLine, err := PidCmdline(os.Getpid())
+	assert.NoError(t, err)
+	modProcCmdLine := currentProcCmdLine[:len(currentProcCmdLine)-1]
+
+	pidMap, err := PidScopeMapByCmdLine(modProcCmdLine)
+	assert.NoError(t, err)
+	assert.Len(t, pidMap, 1)
+	assert.Contains(t, pidMap, os.Getpid())
+	assert.Equal(t, pidMap[os.Getpid()], false)
 }
 
 // TestPidUser
 // Assertions:
 // - The expected user value is returned
+// - No error is returned
 func TestPidUser(t *testing.T) {
 	/*
 		 * Disabled since we run as "builder" for `make docker-build`.
@@ -49,28 +110,45 @@ func TestPidUser(t *testing.T) {
 	}
 	username := currentUser.Username
 	pid := os.Getpid()
-	result := PidUser(pid)
+	result, err := PidUser(pid)
 	assert.Equal(t, username, result)
+	assert.NoError(t, err)
 }
 
 // TestPidCommand
 // Assertions:
 // - The expected command value is returned
+// - No error is returned
 func TestPidCommand(t *testing.T) {
 	// Current process command
 	pid := os.Getpid()
-	result := PidCommand(pid)
+	result, err := PidCommand(pid)
 	assert.Equal(t, "util.test", result)
+	assert.NoError(t, err)
 }
 
 // TestPidCmdline
 // Assertions:
 // - The expected cmdline value is returned
+// - No error is returned
 func TestPidCmdline(t *testing.T) {
 	// Current process command
 	pid := os.Getpid()
-	result := PidCmdline(pid)
+	result, err := PidCmdline(pid)
 	assert.Equal(t, strings.Join(os.Args[:], " "), result)
+	assert.NoError(t, err)
+}
+
+// TestPidThreadsPids
+// Assertions:
+// - Current process id is one of the element in thread
+// - No error is returned
+func TestPidThreadsPids(t *testing.T) {
+	// Current process command
+	pid := os.Getpid()
+	threadPids, err := PidThreadsPids(pid)
+	assert.Contains(t, threadPids, pid)
+	assert.NoError(t, err)
 }
 
 // TestPidExists

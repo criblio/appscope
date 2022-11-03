@@ -17,13 +17,13 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func ldscopePath() string {
+func LdscopePath() string {
 	return filepath.Join(util.ScopeHome(), "ldscope")
 }
 
-// createLdscope creates ldscope in $SCOPE_HOME
-func createLdscope() error {
-	ldscope := ldscopePath()
+// CreateLdscope creates ldscope in $SCOPE_HOME
+func CreateLdscope() error {
+	ldscope := LdscopePath()
 	ldscopeInfo, _ := AssetInfo("build/ldscope")
 
 	// If it exists, don't create
@@ -142,7 +142,7 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 	// Directories named CMD_SESSIONID_PID_TIMESTAMP
 	ts := strconv.FormatInt(rc.now().UTC().UnixNano(), 10)
 	pid := strconv.Itoa(os.Getpid())
-	sessionID := getSessionID()
+	sessionID := GetSessionID()
 	tmpDirName := path.Base(args[0]) + "_" + sessionID + "_" + pid + "_" + ts
 
 	// Create History directory
@@ -186,8 +186,6 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 	payloadsDir := filepath.Join(rc.WorkDir, "payloads")
 	err = os.MkdirAll(payloadsDir, dirPerms)
 	util.CheckErrSprintf(err, "error creating payloads dir: %v", err)
-
-	log.Info().Str("workDir", rc.WorkDir).Msg("created working directory")
 }
 
 func (rc *Config) populateWorkDir(args []string, attach bool) {
@@ -257,7 +255,7 @@ func (rc *Config) populateWorkDir(args []string, attach bool) {
 
 // Open to race conditions, but having a duplicate ID is only a UX bug rather than breaking
 // so keeping it simple and avoiding locking etc
-func getSessionID() string {
+func GetSessionID() string {
 	countFile := filepath.Join(util.ScopeHome(), "count")
 	lastSessionID := 0
 	lastSessionBytes, err := ioutil.ReadFile(countFile)

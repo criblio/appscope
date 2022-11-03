@@ -46,7 +46,6 @@ int doSetAddrs(int);
 int doAddNewSock(int);
 int getDNSName(int, void *, int);
 bool getDNSAnswer(int, char *, size_t, src_data_t);
-int doURL(int, const void *, size_t, metric_t);
 int doRecv(int, ssize_t, const void *, size_t, src_data_t);
 int doSend(int, ssize_t, const void *, size_t, src_data_t);
 void doAccept(int, int, struct sockaddr *, socklen_t *, char *);

@@ -294,6 +294,11 @@
       "type": "string",
       "enum": ["debug", "info", "warning", "error", "none"]
     },
+    "cgroup" : {
+      "title": "cgroup",
+      "description": "The cgroup for the process.",
+      "type": "string",
+    },
     "machine_id" : {
       "title": "machine_id",
       "description": "A unique identifier for a machine.",

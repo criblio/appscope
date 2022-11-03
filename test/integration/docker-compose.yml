@@ -273,4 +273,22 @@ services:
       context: .
       dockerfile: ./sshd/Dockerfile
     <<: *scope-common
+
+  start-glibc:
+    image: ghcr.io/criblio/appscope-test-start-glibc:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from: 
+        - ghcr.io/criblio/appscope-test-start-glibc:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./start/Dockerfile.glibc
+    <<: *scope-common
+
+  start-musl:
+    image: ghcr.io/criblio/appscope-test-start-musl:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from: 
+        - ghcr.io/criblio/appscope-test-start-musl:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./start/Dockerfile.musl
+    <<: *scope-common
 # vim: ts=2 sw=2 et :

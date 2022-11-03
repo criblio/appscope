@@ -236,6 +236,53 @@ osGetProcname(char *pname, int len)
 }
 
 int
+osGetProcUidGid(pid_t pid, uid_t *uid, gid_t *gid)
+{
+    char path[PATH_MAX] = {0};
+    char buffer[4096];
+    uid_t eUid = -1;
+    gid_t eGid = -1;
+
+    if (scope_snprintf(path, sizeof(path), "/proc/%d/status", pid) < 0) return -1;
+
+    FILE *fstream = scope_fopen(path, "r");
+    if (fstream == NULL) {
+        return -1;
+    }
+
+    while (scope_fgets(buffer, sizeof(buffer), fstream)) {
+        const char delimiters[] = ": \t";
+        if (scope_strstr(buffer, "Uid:")) {
+            char *entry, *last;
+            // Skip Uid string
+            entry = scope_strtok_r(buffer, delimiters, &last);
+            // Get real Uid value
+            entry = scope_strtok_r(NULL, delimiters, &last);
+            eUid = scope_atoi(entry);
+        }
+
+        if (scope_strstr(buffer, "Gid:")) {
+            char *entry, *last;
+            // Skip Gid string
+            entry = scope_strtok_r(buffer, delimiters, &last);
+            // Get real Gid value
+            entry = scope_strtok_r(NULL, delimiters, &last);
+            eGid = scope_atoi(entry);
+        }
+    }
+
+    scope_fclose(fstream);
+
+    if (eUid != -1 && eGid != -1) {
+        *uid = eUid;
+        *gid = eGid;
+        return 0;
+    }
+
+    return -1;
+}
+
+int
 osGetProcMemory(pid_t pid)
 {
     int fd;
@@ -319,8 +366,8 @@ int
 osGetNumFds(pid_t pid)
 {
     int nfile = 0;
-    DIR * dirp;
-    struct dirent * entry;
+    DIR *dirp;
+    struct dirent *entry;
     char buf[1024];
 
     scope_snprintf(buf, sizeof(buf), "/proc/%d/fd", pid);
@@ -343,7 +390,7 @@ int
 osGetNumChildProcs(pid_t pid)
 {
     int nchild = 0;
-    DIR * dirp;
+    DIR *dirp;
     struct dirent * entry;
     char buf[1024];
 
@@ -455,7 +502,7 @@ osInitTimer(platform_time_t *cfg)
 }
 
 int
-osIsFilePresent(pid_t pid, const char *path)
+osIsFilePresent(const char *path)
 {
     struct stat sb = {0};
 
@@ -604,16 +651,15 @@ osGetPageProt(uint64_t addr)
 
     while (scope_getline(&buf, &len, fstream) != -1) {
         char *end = NULL;
-        scope_errno = 0;
         uint64_t addr1 = scope_strtoull(buf, &end, 0x10);
-        if ((addr1 == 0) || (scope_errno != 0)) {
+        if ((addr1 == 0) || (addr1 == ULLONG_MAX)) {
             if (buf) scope_free(buf);
             scope_fclose(fstream);
             return -1;
         }
 
         uint64_t addr2 = scope_strtoull(end + 1, &end, 0x10);
-        if ((addr2 == 0) || (scope_errno != 0)) {
+        if ((addr2 == 0) || (addr2 == ULLONG_MAX)) {
             if (buf) scope_free(buf);
             scope_fclose(fstream);
             return -1;
@@ -771,4 +817,124 @@ osGetProcCPU(void) {
     return
         (((long long)ruse.ru_utime.tv_sec + (long long)ruse.ru_stime.tv_sec) * 1000 * 1000) +
         ((long long)ruse.ru_utime.tv_usec + (long long)ruse.ru_stime.tv_usec);
+}
+
+uint64_t
+osFindLibrary(const char *library, pid_t pid)
+{
+    char filename[PATH_MAX];
+    char buffer[9076];
+    FILE *fd;
+    uint64_t addr = 0;
+
+    scope_snprintf(filename, sizeof(filename), "/proc/%d/maps", pid);
+    if ((fd = scope_fopen(filename, "r")) == NULL) {
+        // return no proc found as opposed to no libscope found
+        return -1;
+    }
+
+    while(scope_fgets(buffer, sizeof(buffer), fd)) {
+        if (scope_strstr(buffer, library)) {
+            addr = scope_strtoull(buffer, NULL, 16);
+            break;
+        }
+    }
+
+    scope_fclose(fd);
+    return addr;
+}
+
+void
+osCreateSM(proc_id_t *proc, unsigned long addr)
+{
+    export_sm_t *exaddr;
+
+    if (!proc) return;
+
+    // Create the anonymous sm
+    if ((proc->smfd = scope_memfd_create(SM_NAME, MFD_ALLOW_SEALING)) == -1) {
+        proc->smfd = -1;
+        return;
+    }
+
+    // size is initally 0 and needs to be increased
+    if (scope_ftruncate(proc->smfd, sizeof(export_sm_t)) == -1) {
+        scope_close(proc->smfd);
+        return;
+    }
+
+    if ((exaddr = scope_mmap(NULL, sizeof(export_sm_t), PROT_READ | PROT_WRITE,
+                             MAP_SHARED, proc->smfd, 0)) == MAP_FAILED) {
+        scope_close(proc->smfd);
+        return;
+    }
+
+    proc->smaddr = addr;          // these are not currently used, useful for debug
+    exaddr->scoped = FALSE;
+    exaddr->cmdAttachAddr = addr; // this is the primary update
+
+    /*
+     * We need to unmap before setting the segment read only with seals
+     * A close here will remove the link in /proc/<pid>/fd/FD
+     * We will close when we reattach
+     */
+    scope_munmap(exaddr, sizeof(export_sm_t));   // on error, what?
+
+    /*
+     * Make this read-only for other procs
+     * It would be nice to use F_SEAL_FUTURE_WRITE here, but it is
+     * available on >= 5.1 kernels and we support older versions.
+     */
+    if (scope_fcntl(proc->smfd, F_ADD_SEALS, F_SEAL_WRITE | F_SEAL_GROW) == -1) {
+        scope_close(proc->smfd);
+    }
+}
+
+int
+osFindFd(pid_t pid, const char *fname)
+{
+    int fd = -1;
+    DIR *dirp;
+    char *cwd;
+    struct dirent *entry;
+    char buf[PATH_MAX], link[256];
+
+    if ((cwd = getcwd(NULL, 0)) == NULL) {
+        DBG(NULL);
+        return -1;
+    }
+
+    scope_snprintf(buf, sizeof(buf), "/proc/%d/fd", pid);
+
+    if (chdir(buf) == -1) {
+        free(cwd);
+        DBG(NULL);
+        return -1;
+    }
+
+    if ((dirp = scope_opendir(buf)) == NULL) {
+        free(cwd);
+        DBG(NULL);
+        return -1;
+    }
+
+    while ((entry = scope_readdir(dirp)) != NULL) {
+        if (entry->d_type != DT_DIR) {
+                if (scope_readlink(entry->d_name, link, sizeof(link)) == -1) {
+                scopeLogError("%s: can't get path to %s", __FUNCTION__, entry->d_name);
+                break;
+            }
+
+            if (scope_strstr(link, fname)) {
+                fd = scope_strtol(entry->d_name, NULL, 0);
+                if ((fd == LONG_MIN) || (fd == LONG_MAX) || (fd == 0)) fd = -1;
+                break;
+            }
+        }
+    }
+
+    chdir(cwd);
+    scope_closedir(dirp);
+    free(cwd);
+    return fd;
 }

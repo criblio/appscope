@@ -2,12 +2,11 @@ package run
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/criblio/scope/libscope"
+	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
 )
@@ -37,13 +36,16 @@ type Config struct {
 
 // Run executes a scoped command
 func (rc *Config) Run(args []string) {
-	if err := createLdscope(); err != nil {
+	if err := CreateLdscope(); err != nil {
 		util.ErrAndExit("error creating ldscope: %v", err)
 	}
 	// Normal operational, not passthrough, create directory for this run
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
 	env := os.Environ()
+	// Disable detection of a scope filter file with this command
+	env = append(env, "SCOPE_FILTER=false")
+
 	if rc.NoBreaker {
 		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
 	}
@@ -60,12 +62,9 @@ func (rc *Config) Run(args []string) {
 		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
+	sL := loader.ScopeLoader{Path: LdscopePath()}
 	if !rc.Subprocess {
-		syscall.Exec(ldscopePath(), append([]string{"ldscope"}, args...), env)
+		sL.Run(args, env)
 	}
-	cmd := exec.Command(ldscopePath(), args...)
-	cmd.Env = env
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Run()
+	sL.RunSubProc(args, env)
 }

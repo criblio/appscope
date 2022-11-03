@@ -6,6 +6,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
@@ -45,7 +46,8 @@ scope extract --metricdest tcp://some.host:8125 --eventdest tcp://other.host:100
 			err = rc.WriteScopeConfig(path.Join(outPath, "scope.yml"), 0644)
 			util.CheckErrSprintf(err, "error writing scope.yml: %v", err)
 		}
-		rc.Patch(outPath)
+		sL := loader.ScopeLoader{Path: path.Join(outPath, "ldscope")}
+		sL.Patch(path.Join(outPath, "libscope.so"))
 		fmt.Printf("Successfully extracted to %s.\n", outPath)
 	},
 }

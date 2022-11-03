@@ -10,6 +10,7 @@
 #include "fn.h"
 #include "dbg.h"
 #include "runtimecfg.h"
+#include "plattime.h"
 
 #define MAC_ADDR_LEN 17
 #define ZERO_MACHINE_ID "00000000000000000000000000000000"
@@ -201,12 +202,15 @@ int
 sigSafeNanosleep(const struct timespec *req)
 {
     struct timespec time = *req;
+    uint64_t ctime = getTime();
+    uint64_t elapsed;
     int rv;
 
     // If we're interrupted, sleep again for whatever time remains
     do {
         rv = scope_nanosleep(&time, &time);
-    } while (rv && (scope_errno == EINTR));
+        elapsed = getDuration(ctime);
+    } while (rv && (elapsed < req->tv_nsec));
 
     return rv;
 }

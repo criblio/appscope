@@ -1,12 +1,13 @@
 package run
 
 import (
-	"bufio"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"syscall"
 
+	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/util"
 )
 
@@ -57,21 +58,6 @@ func (rc *Config) Service(serviceName string, user string, force bool) {
 	os.Exit(0)
 }
 
-func confirm(s string) bool {
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		fmt.Printf("%s [y/n]: ", s)
-		resp, err := reader.ReadString('\n')
-		util.CheckErrSprintf(err, "error: confirm failed; %v", err)
-		resp = strings.ToLower(strings.TrimSpace(resp))
-		if resp == "y" || resp == "yes" {
-			return true
-		} else if resp == "n" || resp == "no" {
-			return false
-		}
-	}
-}
-
 func (rc *Config) installScope(serviceName string, unameMachine string, unameSysname string, libcName string) string {
 	// determine the library directory
 	libraryDir := fmt.Sprintf("/usr/lib/%s-%s-%s", unameMachine, unameSysname, libcName)
@@ -100,7 +86,8 @@ func (rc *Config) installScope(serviceName string, unameMachine string, unameSys
 	loaderPath := libraryDir + "/ldscope"
 	err = os.WriteFile(loaderPath, asset, 0755)
 	util.CheckErrSprintf(err, "error: failed to extract loader; %v", err)
-	rc.Patch(libraryDir)
+	ld := loader.ScopeLoader{Path: loaderPath}
+	ld.Patch(path.Join(libraryDir, "libscope.so"))
 	err = os.Remove(loaderPath)
 	util.CheckErrSprintf(err, "error: failed to remove loader; %v", err)
 
@@ -176,8 +163,8 @@ func (rc *Config) installSystemd(serviceName string, unameMachine string, unameS
 		fmt.Printf("  - create /etc/scope/%s/scope.yml\n", serviceName)
 		fmt.Printf("  - create /var/log/scope/\n")
 		fmt.Printf("  - create /var/run/scope/\n")
-		if !confirm("Ready to proceed?") {
-			util.ErrAndExit("info: canceled")
+		if !util.Confirm("Ready to proceed?") {
+			util.ErrAndExit("Cancelled")
 		}
 	}
 
@@ -239,7 +226,7 @@ func (rc *Config) installInitd(serviceName string, unameMachine string, unameSys
 		fmt.Printf("  - create /etc/scope/%s/scope.yml\n", serviceName)
 		fmt.Printf("  - create /var/log/scope/\n")
 		fmt.Printf("  - create /var/run/scope/\n")
-		if !confirm("Ready to proceed?") {
+		if !util.Confirm("Ready to proceed?") {
 			util.ErrAndExit("info: canceled")
 		}
 	}
@@ -293,7 +280,7 @@ func (rc *Config) installOpenRc(serviceName string, unameMachine string, unameSy
 		fmt.Printf("  - create /etc/scope/%s/scope.yml\n", serviceName)
 		fmt.Printf("  - create /var/log/scope/\n")
 		fmt.Printf("  - create /var/run/scope/\n")
-		if !confirm("Ready to proceed?") {
+		if !util.Confirm("Ready to proceed?") {
 			util.ErrAndExit("info: canceled")
 		}
 	}

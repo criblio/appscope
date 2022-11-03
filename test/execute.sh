@@ -65,7 +65,7 @@ declare -i ERR=0
 run_test test/${OS}/vdsotest
 run_test test/${OS}/libvertest
 run_test test/${OS}/libdirtest
-run_test test/${OS}/nstest
+run_test test/${OS}/nsinfotest
 run_test test/${OS}/strsettest
 run_test test/${OS}/cfgutilstest
 run_test test/${OS}/cfgtest

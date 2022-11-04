@@ -5,6 +5,7 @@
 #define g_sched_pc 0x40
 #define g_sched_ret 0x58
 #define g_sched_bp 0x68
+#define g_sched_lr 0x60
 #define m_g0_sched_sp 0x38 //0x40 in 8
 
 /*
@@ -35,7 +36,9 @@
     mov dst, src Move (register) copies the value in a source register to the destination register.
     cbz cbnz Compare and Branch on Nonzero and Compare and Branch on Zero compare the value in a register with zero, and conditionally branch forward a constant value
     ldr This instruction loads a SIMD&FP register from memory.
-    
+    adrp The ADRP instruction shifts a signed, 21-bit immediate left by 12 bits, adds it to the value of the program counter with the bottom 12 bits cleared to zero, and then writes the result to a general-purpose register.
+    bl address branch to address (link register x30 updated)
+    blr register branch to address in register (link register x30 updated)
  */
 .macro interpose_system_stack a_func, c_func, s_func
 .global \a_func
@@ -45,115 +48,151 @@
     cbz  x28, 1f
 
     // Is this g m->gsignal? If so, already on the system stack
-    mov	 x4, x28                                   // save g in x4
-    ldr	 x8, [x28, #g_m]                           // load g_m -> x8
-    ldr	 x3, [x8, #m_gsignal]                      // load m_gsignal -> x3
-    cmp	 x28, x3                                   // is this g m_gsignal?
+    //mov	 x17, x28                                  // save g in x17
+    ldr	 x17, [x28, #g_m]                          // g_m -> x18
+    ldr	 x17, [x17, #m_gsignal]                    // m_gsignal -> x17
+    cmp	 x28, x17                                  // is this g m_gsignal?
     b.eq 1f                                        // already on the sys stack
 
-/*
-    mov  %fs:0xfffffffffffffff8, %r12   // g
-    cmp  $0x0, %r12
-    je   1f
-
-    // Is this g m->gsignal? If so, already on the system stack
-    mov  g_m(%r12), %r13                // g->m
-    mov  m_gsignal(%r13), %r13          // m->gsignal
-    cmp  %r12, %r13
-    je   1f
-
     // Is this g g->m->g0 (new thread)? If so, already on the system stack
-    mov  g_m(%r12), %r13                // g->m
-    mov  (%r13), %r13                   // m->g0
-    cmp  %r12, %r13
-    je   1f
+    ldr	 x17, [x28, #g_m]                          // g_m -> x17
+    ldr  x17, [x17]                                // m_g0 -> x17
+    cmp  x28, x17                                  // is this g m->g0?
+    b.eq 1f                                        // already on the sys stack
 
     // Else switch to system stack
     // Set g state to use system stack
-    lea  go_systemstack_switch@GOTPCREL(%rip), %r13
-    mov  %r13, g_sched_pc(%r12)         // Store addr of system stack switch in g->sched.pc
-    lea  0x8(%rsp), %r13
-    mov  %r13, g_sched_sp(%r12)         // Store g stack in g->sched.sp
-    movq $0x0, g_sched_ret(%r12)        // Store NULL in g->sched.ret
-    mov  %rbp, g_sched_bp(%r12)         // Store g frame pointer in g->sched.bp
+    mov  x10, sp                                   // save caller stack in x10. should be safe across C ABI
+    adrp x17, go_systemstack_switch
+    str  x17, [x28, #g_sched_pc]
+    mov  x17, sp
+    str	 x17, [x28, #g_sched_sp]                   // sp -> g_sched_sp
+    str	 x29, [x28, #g_sched_bp]                   // fp -> g_sched_bp
+    str	 xzr, [x28, #g_sched_lr]                   // 0 -> g_sched_lr
+    str	 xzr, [x28, #g_sched_ret]                  // 0 -> g_sched_ret
 
-    mov  g_m(%r12), %r13                // g->m
-    mov  (%r13), %r13                   // m->g0
+    mov  x9, x28                                   // save current g in x9. should be safe across C ABI
+    ldr	 x17, [x28, #g_m]                          // g_m -> x17
+    ldr  x17, [x17]                                // m_g0 -> x17
+    mov  x28, x17                                  // m_g0 becomes the current g
 
-    // The system stack switch
-    mov  %fs:0xfffffffffffffff8, %r14   // Ensure r14 points to g in all versions
-    mov  %rsp, %r12                     // r12 is g_stack (note: if making callbacks, use offset instead)
-    mov  %r13, %fs:0xfffffffffffffff8   // Make current g m->g0 (The context switch)
-    mov  m_g0_sched_sp(%r13), %rsp      // m->g0->sched.sp (The stack switch)
+    // add iscgo check here?
 
-    lea  \c_func@GOTPCREL(%rip), %r13 
-    mov  (%r13), %r13
-    call \s_func                        // Safe to call a C func now that we are on the system stack
-                                        // Registers are saved & restored in c_handler
-	mov %r14, %fs:0xfffffffffffffff8    // Restore the g
-	mov %r12, %rsp                      // Restore the g_stack
+    ldr	 x17, [x28, #g_sched_sp]                  // g_sched_sp -> x17
+    mov  sp, x17                                  // bang: change to the system stack
+    ldr  x29, [x28, #g_sched_bp]                  // g_sched_bp -> frame pointer
 
-    jmp *%r13                           // Return through the trampoline
-*/
+    adrp x17, \c_func                             // pass address of c_func to s_func
+
+    // do we need to save the link register here?
+    bl   \s_func
+
+    mov  x28, x9                                 // restore caller g
+
+    // add iscgo check here?
+
+    mov  sp, x10                                 // restore caller stack
+    br   x17
 1:
     // The current g is using the system stack, don't switch stacks
-/*
-    mov  %rsp, %r12                     // save g stack for use in the C func
-    lea \c_func@GOTPCREL(%rip), %r13
-    mov  (%r13), %r13
-    call \s_func
-    jmp  *%r13
-*/
+    mov  x10, sp                                 // save g stack for use in the C func
+    adrp x17, \c_func                            // pass address of c_func to s_func
+    // do we need to save the link register here?
+    bl   \s_func
+    br  x17
 .endm
 
 .text
+.global go_hook_exit
+go_hook_exit:
+    // Is g valid?
+    cbz  x28, 1f
+
+    // Is this g m->gsignal? If so, already on the system stack
+    //mov	 x17, x28                                  // save g in x17
+    ldr	 x17, [x28, #g_m]                          // g_m -> x18
+    ldr	 x17, [x17, #m_gsignal]                    // m_gsignal -> x17
+    cmp	 x28, x17                                  // is this g m_gsignal?
+    b.eq 1f                                        // already on the sys stack
+
+    // Is this g g->m->g0 (new thread)? If so, already on the system stack
+    ldr	 x17, [x28, #g_m]                          // g_m -> x17
+    ldr  x17, [x17]                                // m_g0 -> x17
+    cmp  x28, x17                                  // is this g m->g0?
+    b.eq 1f                                        // already on the sys stack
+
+    // Else switch to system stack
+    // Set g state to use system stack
+    mov  x10, sp                                   // save caller stack in x10. should be safe across C ABI
+    adrp x17, go_systemstack_switch
+    str  x17, [x28, #g_sched_pc]
+    //mov  x17, sp *** x10 ***
+    str	 x10, [x28, #g_sched_sp]                   // sp -> g_sched_sp
+    str	 x29, [x28, #g_sched_bp]                   // fp -> g_sched_bp
+    str	 xzr, [x28, #g_sched_lr]                   // 0 -> g_sched_lr
+    str	 xzr, [x28, #g_sched_ret]                  // 0 -> g_sched_ret
+
+    mov  x9, x28                                   // save current g in x9. should be safe across C ABI
+    ldr	 x17, [x28, #g_m]                          // g_m -> x17
+    ldr  x17, [x17]                                // m_g0 -> x17
+    mov  x28, x17                                  // m_g0 becomes the current g
+
+    // add iscgo check here?
+
+    ldr	 x17, [x28, #g_sched_sp]                  // g_sched_sp -> x17
+    mov  sp, x17                                  // bang: change to the system stack
+    ldr  x29, [x28, #g_sched_bp]                  // g_sched_bp -> frame pointer
+
+    ldr  x17, =go_exit                            // pass address of c_func to s_func
+
+    // do we need to save the link register here?
+    bl   c_handler
+
+    mov  x28, x9                                 // restore caller g
+
+    // add iscgo check here?
+
+    mov  sp, x10                                 // restore caller stack
+    br   x17
+1:
+    // The current g is using the system stack, don't switch stacks
+    mov  x10, sp                                 // save g stack for use in the C func
+    ldr  x17, =go_exit                            // pass address of c_func to s_func
+    // do we need to save the link register here?
+    bl   c_handler
+    br   x17
+
+
 c_handler:
-    // Inputs:
-    // r12 is the caller stack
-    // r13 is c_func address
-    // r14 is the caller g
-    // Note: r14 is not set in the case where a stack switch isn't needed
-    //       It's ok here because we don't use it to restore the g
-    //       However, don't rely on r14 in C code
-    // Returns:
-    // r13 is the trampoline address
-
+    /*
+     * Inputs:
+     * x17 is c_func address
+     *
+     * Returns:
+     * x17 is the trampoline address
+    */
     // Save regs on the stack
-/*
-    push %r14                            // g
-    push %r12                            // gstack
-    push %r11
-    push %r10
-    push %r9     
-    push %r8    
-    push %rsi  
-    push %rdi 
-    push %rdx
-    push %rcx
-    push %rbx
-    push %rax 
+    stp  x0, x1, [sp, #-16]!                     // “!” implies adding the offset after the load or store
+    stp  x2, x3, [sp, #-16]!
+    stp  x4, x5, [sp, #-16]!
+    stp  x6, x7, [sp, #-16]!
+    stp  x8, x9, [sp, #-16]!
+    stp  x10, x11, [sp, #-16]!
+    stp  x29, x30, [sp, #-16]!
 
-    mov  %rsp, %rdi                      // C func param
-    call *%r13
+    mov  x0, sp
+    blr  x17
+    mov  x17, x0                                 // return value
 
-    // Handle return state and restore stack
-    // Save the return through trampoline addr from the C func
-    mov %rax, %r13
-
-    // Restore saved registers
-    pop  %rax
-	pop  %rbx
-	pop  %rcx
-	pop  %rdx
-    pop  %rdi
-    pop  %rsi
-    pop  %r8
-    pop  %r9
-    pop  %r10
-    pop  %r11
-    pop  %r12                            // g stack
-    pop  %r14                            // g
-*/
+    // Restore regs
+    sub  sp, sp, #16                             // TODO: why is this needed?
+    ldp  x29, x30, [sp, #16]!
+    ldp  x10, x11, [sp, #16]!
+    ldp  x8, x9, [sp, #16]!
+    ldp  x6, x7, [sp, #16]!
+    ldp  x4, x5, [sp, #16]!
+    ldp  x2, x3, [sp, #16]!
+    ldp  x0, x1, [sp, #16]!
     ret
  
 c_syscall_handler:
@@ -220,5 +259,5 @@ c_syscall_handler:
     interpose_system_stack go_hook_reg_http2_server_preface  go_http2_server_preface c_handler
     interpose_system_stack go_hook_reg_http2_client_read     go_http2_client_read    c_handler
     interpose_system_stack go_hook_reg_http2_client_write    go_http2_client_write   c_handler
-    interpose_system_stack go_hook_exit                      go_exit                 c_handler
+    //interpose_system_stack go_hook_exit                      go_exit                 c_handler
     interpose_system_stack go_hook_die                       go_die                  c_handler

@@ -206,8 +206,8 @@ go_schema_t go_17_schema = {
         .sc_to_conn=0x10,
     },
     .tap = {
-        [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",       /* .abi0 */       go_hook_reg_syscall,              NULL, 0},
 #if 0
+        [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",       /* .abi0 */       go_hook_reg_syscall,              NULL, 0},
         [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",    /* .abi0 */       go_hook_reg_rawsyscall,           NULL, 0},
         [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",      /* .abi0 */       go_hook_reg_syscall6,             NULL, 0},
         [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_hook_reg_tls_client_read,      NULL, 0},

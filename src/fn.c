@@ -334,7 +334,6 @@ initFn(void)
     GETADDR(g_fn.semtimedop, "semtimedop");
     GETADDR(g_fn.clock_nanosleep, "clock_nanosleep");
     GETADDR(g_fn.usleep, "usleep");
-    GETADDR(g_fn.io_getevents, "io_getevents");
     GETADDR(g_fn.setenv, "setenv");
     g_fn.app_setenv = dlsym(RTLD_DEFAULT, "setenv");
     GETADDR(g_fn.uv__read, "uv__read");

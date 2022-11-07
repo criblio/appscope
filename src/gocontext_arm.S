@@ -48,7 +48,6 @@
     cbz  x28, 1f
 
     // Is this g m->gsignal? If so, already on the system stack
-    //mov	 x17, x28                                  // save g in x17
     ldr	 x17, [x28, #g_m]                          // g_m -> x18
     ldr	 x17, [x17, #m_gsignal]                    // m_gsignal -> x17
     cmp	 x28, x17                                  // is this g m_gsignal?
@@ -65,10 +64,9 @@
     mov  x10, sp                                   // save caller stack in x10. should be safe across C ABI
     adrp x17, go_systemstack_switch
     str  x17, [x28, #g_sched_pc]
-    mov  x17, sp
-    str	 x17, [x28, #g_sched_sp]                   // sp -> g_sched_sp
+    str	 x10, [x28, #g_sched_sp]                   // sp -> g_sched_sp
     str	 x29, [x28, #g_sched_bp]                   // fp -> g_sched_bp
-    str	 xzr, [x28, #g_sched_lr]                   // 0 -> g_sched_lr
+    str	 x30, [x28, #g_sched_lr]                   // save link register -> g_sched_lr
     str	 xzr, [x28, #g_sched_ret]                  // 0 -> g_sched_ret
 
     mov  x9, x28                                   // save current g in x9. should be safe across C ABI
@@ -82,87 +80,31 @@
     mov  sp, x17                                  // bang: change to the system stack
     ldr  x29, [x28, #g_sched_bp]                  // g_sched_bp -> frame pointer
 
-    adrp x17, \c_func                             // pass address of c_func to s_func
+    ldr  x17, =\c_func                            // pass address of c_func to s_func
 
-    // do we need to save the link register here?
+    // link register is saved in the g
     bl   \s_func
 
     mov  x28, x9                                 // restore caller g
+    ldr  x30, [x28, #g_sched_lr]                 // restore the link register from the saved g ***
 
     // add iscgo check here?
 
     mov  sp, x10                                 // restore caller stack
     br   x17
+
 1:
     // The current g is using the system stack, don't switch stacks
     mov  x10, sp                                 // save g stack for use in the C func
-    adrp x17, \c_func                            // pass address of c_func to s_func
-    // do we need to save the link register here?
+    ldr  x17, =\c_func                           // pass address of c_func to s_func
+
+    mov  x9, x30                                 // save the link register
     bl   \s_func
-    br  x17
+    mov  x30, x9                                 // restore the link register
+    br   x17
 .endm
 
 .text
-.global go_hook_exit
-go_hook_exit:
-    // Is g valid?
-    cbz  x28, 1f
-
-    // Is this g m->gsignal? If so, already on the system stack
-    //mov	 x17, x28                                  // save g in x17
-    ldr	 x17, [x28, #g_m]                          // g_m -> x18
-    ldr	 x17, [x17, #m_gsignal]                    // m_gsignal -> x17
-    cmp	 x28, x17                                  // is this g m_gsignal?
-    b.eq 1f                                        // already on the sys stack
-
-    // Is this g g->m->g0 (new thread)? If so, already on the system stack
-    ldr	 x17, [x28, #g_m]                          // g_m -> x17
-    ldr  x17, [x17]                                // m_g0 -> x17
-    cmp  x28, x17                                  // is this g m->g0?
-    b.eq 1f                                        // already on the sys stack
-
-    // Else switch to system stack
-    // Set g state to use system stack
-    mov  x10, sp                                   // save caller stack in x10. should be safe across C ABI
-    adrp x17, go_systemstack_switch
-    str  x17, [x28, #g_sched_pc]
-    //mov  x17, sp *** x10 ***
-    str	 x10, [x28, #g_sched_sp]                   // sp -> g_sched_sp
-    str	 x29, [x28, #g_sched_bp]                   // fp -> g_sched_bp
-    str	 xzr, [x28, #g_sched_lr]                   // 0 -> g_sched_lr
-    str	 xzr, [x28, #g_sched_ret]                  // 0 -> g_sched_ret
-
-    mov  x9, x28                                   // save current g in x9. should be safe across C ABI
-    ldr	 x17, [x28, #g_m]                          // g_m -> x17
-    ldr  x17, [x17]                                // m_g0 -> x17
-    mov  x28, x17                                  // m_g0 becomes the current g
-
-    // add iscgo check here?
-
-    ldr	 x17, [x28, #g_sched_sp]                  // g_sched_sp -> x17
-    mov  sp, x17                                  // bang: change to the system stack
-    ldr  x29, [x28, #g_sched_bp]                  // g_sched_bp -> frame pointer
-
-    ldr  x17, =go_exit                            // pass address of c_func to s_func
-
-    // do we need to save the link register here?
-    bl   c_handler
-
-    mov  x28, x9                                 // restore caller g
-
-    // add iscgo check here?
-
-    mov  sp, x10                                 // restore caller stack
-    br   x17
-1:
-    // The current g is using the system stack, don't switch stacks
-    mov  x10, sp                                 // save g stack for use in the C func
-    ldr  x17, =go_exit                            // pass address of c_func to s_func
-    // do we need to save the link register here?
-    bl   c_handler
-    br   x17
-
-
 c_handler:
     /*
      * Inputs:
@@ -196,56 +138,42 @@ c_handler:
     ret
  
 c_syscall_handler:
-    // Inputs:
-    // r12 is the caller stack
-    // r13 is c_func address
-    // r14 is the caller g
-    // Returns:
-    // r13 is the trampoline address
+    /*
+     * Inputs:
+     * x17 is c_func address
+     * x10 is the g stack
+     *
+     * Returns:
+     * x17 is the trampoline address
+    */
+
+    svc  #0                                      // system call - syscall number is in x8
 
     // Save regs on the stack
-/*
-    push %rax                            // linux syscall num
-    push %r14                            // g
-    push %r12                            // g stack
-    push %r11
-    push %r10
-    push %r9                             // linux 6th param
-    push %r8                             // linux 5th param
-    push %rsi                            // linux 2nd param
-    push %rdi                            // linux 1st param
-    push %rdx                            // linux 3rd param
-    push %rcx                            // linux 4th param
-    push %rbx
+    stp  x0, x1, [sp, #-16]!                     // “!” implies adding the offset after the load or store
+    stp  x2, x3, [sp, #-16]!
+    stp  x4, x5, [sp, #-16]!
+    stp  x6, x7, [sp, #-16]!
+    stp  x8, x9, [sp, #-16]!
+    stp  x10, x11, [sp, #-16]!
+    stp  x29, x30, [sp, #-16]!
 
-    syscall
-    push %rax                            // rc
+    mov  x0, x10
+    blr  x17
+    mov  x17, x0                                 // return value
+    add  x17, x17, #4                            // don't re-execute the syscall
 
-    mov  %rsp, %rdi                      // C func param
-    call *%r13
-
-    // Handle return state and restore stack
-    // Save the return through trampoline addr from the C func
-    mov %rax, %r13
-
-    // Restore saved registers
-    pop  %rax
-	pop  %rbx
-	pop  %rcx
-	pop  %rdx
-    pop  %rdi
-    pop  %rsi
-    pop  %r8
-    pop  %r9
-    pop  %r10
-    pop  %r11
-    pop  %r12                            // g stack
-    pop  %r14                            // g
-    add $0x8, %rsp                       // Adjust the stack for pushing rax twice
-
-    add $0x2, %r13                       // Skip the syscall instruction
-*/
+    // Restore regs
+    sub  sp, sp, #16                             // TODO: why is this needed?
+    ldp  x29, x30, [sp, #16]!
+    ldp  x10, x11, [sp, #16]!
+    ldp  x8, x9, [sp, #16]!
+    ldp  x6, x7, [sp, #16]!
+    ldp  x4, x5, [sp, #16]!
+    ldp  x2, x3, [sp, #16]!
+    ldp  x0, x1, [sp, #16]!
     ret
+
 
     interpose_system_stack go_hook_reg_syscall               go_syscall              c_syscall_handler
     interpose_system_stack go_hook_reg_rawsyscall            go_rawsyscall           c_syscall_handler
@@ -259,5 +187,69 @@ c_syscall_handler:
     interpose_system_stack go_hook_reg_http2_server_preface  go_http2_server_preface c_handler
     interpose_system_stack go_hook_reg_http2_client_read     go_http2_client_read    c_handler
     interpose_system_stack go_hook_reg_http2_client_write    go_http2_client_write   c_handler
-    //interpose_system_stack go_hook_exit                      go_exit                 c_handler
+    interpose_system_stack go_hook_exit                      go_exit                 c_handler
     interpose_system_stack go_hook_die                       go_die                  c_handler
+
+/*
+.text
+.global go_hook_reg_syscall
+go_hook_reg_syscall:
+    // Is g valid?
+    cbz  x28, 1f
+
+    // Is this g m->gsignal? If so, already on the system stack
+    ldr	 x17, [x28, #g_m]                          // g_m -> x18
+    ldr	 x17, [x17, #m_gsignal]                    // m_gsignal -> x17
+    cmp	 x28, x17                                  // is this g m_gsignal?
+    b.eq 1f                                        // already on the sys stack
+
+    // Is this g g->m->g0 (new thread)? If so, already on the system stack
+    ldr	 x17, [x28, #g_m]                          // g_m -> x17
+    ldr  x17, [x17]                                // m_g0 -> x17
+    cmp  x28, x17                                  // is this g m->g0?
+    b.eq 1f                                        // already on the sys stack
+
+    // Else switch to system stack
+    // Set g state to use system stack
+    mov  x10, sp                                   // save caller stack in x10. should be safe across C ABI
+    // saved in the g ***
+    adrp x17, go_systemstack_switch
+    str  x17, [x28, #g_sched_pc]
+    str	 x10, [x28, #g_sched_sp]                   // sp -> g_sched_sp
+    str	 x29, [x28, #g_sched_bp]                   // fp -> g_sched_bp
+    str	 x30, [x28, #g_sched_lr]                   // save link register -> g_sched_lr   ***
+    str	 xzr, [x28, #g_sched_ret]                  // 0 -> g_sched_ret
+
+    mov  x9, x28                                   // save current g in x9. should be safe across C ABI
+    ldr	 x17, [x28, #g_m]                          // g_m -> x17
+    ldr  x17, [x17]                                // m_g0 -> x17
+    mov  x28, x17                                  // m_g0 becomes the current g
+
+    // add iscgo check here?
+
+    ldr	 x17, [x28, #g_sched_sp]                  // g_sched_sp -> x17
+    mov  sp, x17                                  // bang: change to the system stack
+    ldr  x29, [x28, #g_sched_bp]                  // g_sched_bp -> frame pointer
+
+    ldr  x17, =go_syscall                         // pass address of c_func to s_func
+
+    // link register saved in the g   ***
+    bl   c_syscall_handler
+
+    mov  x28, x9                                 // restore caller g
+    ldr  x30, [x28, #g_sched_lr]                 // restore the link register from the saved g ***
+
+    // add iscgo check here?
+
+    mov  sp, x10                                 // restore caller stack
+    br   x17
+1:
+    // The current g is using the system stack, don't switch stacks
+    mov  x10, sp                                 // save g stack for use in the C func
+    ldr  x17, =go_syscall                        // pass address of c_func to s_func
+
+    mov  x9, x30                                 // save the link register
+    bl   c_syscall_handler
+    mov  x30, x9                                 // restore the link register
+    br   x17
+*/

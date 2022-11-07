@@ -156,6 +156,7 @@ go_schema_t go_9_schema = {
 
 go_schema_t go_17_schema = {
     .arg_offsets = {
+#if defined(__x86_64__)
         .c_syscall_rc=0x0,
         .c_syscall_num=0x60,
         .c_syscall_p1=0x20,
@@ -182,6 +183,36 @@ go_schema_t go_17_schema = {
         .c_http2_client_write_tcpConn=0x40,
         .c_http2_client_write_buf=0x8,
         .c_http2_client_write_rc=0x10,
+#elif defined(__aarch64__)
+        .c_syscall_rc=0x10,
+        .c_syscall_num=0x08,
+        .c_syscall_p1=0x10,
+        .c_syscall_p2=0x18,
+        .c_syscall_p3=0x20,
+        .c_syscall_p4=0x28,
+        .c_syscall_p5=0x30,
+        .c_syscall_p6=0x38,
+        .c_tls_server_read_connReader=0x50,
+        .c_tls_server_read_buf=0x8,
+        .c_tls_server_read_rc=0x28,
+        .c_tls_server_write_conn=0x30,
+        .c_tls_server_write_buf=0x8,
+        .c_tls_server_write_rc=0x10,
+        .c_tls_client_read_pc=0x28,
+        .c_tls_client_write_w_pc=0x20,
+        .c_tls_client_write_buf=0x8,
+        .c_tls_client_write_rc=0x10,
+        .c_http2_server_read_sc=0xd0,
+        .c_http2_server_write_sc=0x40,
+        .c_http2_server_preface_sc=0xd0,
+        .c_http2_server_preface_rc=0x58,
+        .c_http2_client_read_cc=0x68,
+        .c_http2_client_write_tcpConn=0x40,
+        .c_http2_client_write_buf=0x8,
+        .c_http2_client_write_rc=0x10,
+#else
+   #error Bad arch defined
+#endif
     },
     .struct_offsets = {
         .g_to_m=0x30,
@@ -206,10 +237,11 @@ go_schema_t go_17_schema = {
         .sc_to_conn=0x10,
     },
     .tap = {
-#if 0
+
         [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",       /* .abi0 */       go_hook_reg_syscall,              NULL, 0},
         [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",    /* .abi0 */       go_hook_reg_rawsyscall,           NULL, 0},
         [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",      /* .abi0 */       go_hook_reg_syscall6,             NULL, 0},
+#if 0
         [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_hook_reg_tls_client_read,      NULL, 0},
         [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_hook_reg_tls_client_write,     NULL, 0},
         [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_hook_reg_tls_server_read,      NULL, 0},
@@ -693,7 +725,7 @@ patch_addrs(funchook_t *funchook,
                 continue;
             }
 
-            patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
+            patchprint("patched 0x%p with frame size 0x%x in func %s\n", pre_patch_addr, add_arg, (char *)tap->func_name);
             tap->return_addr = patch_addr;
             tap->frame_size = add_arg;
 
@@ -1103,6 +1135,8 @@ do_cfunc(char *stackptr, void *cfunc, void *gfunc)
         );
 #elif defined (__aarch64__)
     // TODO
+    void (*chandler)(char *sstack, char *gstack) = (void (*)(char *, char *))cfunc;
+    chandler(sys_stack, g_stack);
 #else
    #error Bad arch defined
 #endif
@@ -1611,7 +1645,7 @@ c_exit(char *sys_stack)
         :                            // clobbered register
         );
 #elif defined (__aarch64__)
-    // TODO
+    // TODO stack??
 #else
    #error Bad arch defined
 #endif

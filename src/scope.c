@@ -414,7 +414,7 @@ main(int argc, char **argv, char **env)
             return EXIT_FAILURE;
         }
 
-        uint64_t rc = osFindLibrary("libscope.so", pid);
+        uint64_t rc = osFindLibrary("libscope.so", pid, FALSE);
 
         if (attachType == 'a') {
             int ret;

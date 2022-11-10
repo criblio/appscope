@@ -3,6 +3,7 @@
 //#include <asm/prctl.h>
 #include <sys/prctl.h>
 #include <signal.h>
+#include <syscall.h>
 
 #include "com.h"
 #include "dbg.h"
@@ -184,14 +185,14 @@ go_schema_t go_17_schema = {
         .c_http2_client_write_buf=0x8,
         .c_http2_client_write_rc=0x10,
 #elif defined(__aarch64__)
-        .c_syscall_rc=0x10,
-        .c_syscall_num=0x08,
-        .c_syscall_p1=0x10,
-        .c_syscall_p2=0x18,
-        .c_syscall_p3=0x20,
-        .c_syscall_p4=0x28,
-        .c_syscall_p5=0x30,
-        .c_syscall_p6=0x38,
+        .c_syscall_rc=0x00,
+        .c_syscall_num=0x20,
+        .c_syscall_p1=0x60,
+        .c_syscall_p2=0x68,
+        .c_syscall_p3=0x50,
+        .c_syscall_p4=0x58,
+        .c_syscall_p5=0x40,
+        .c_syscall_p6=0x48,
         .c_tls_server_read_connReader=0x50,
         .c_tls_server_read_buf=0x8,
         .c_tls_server_read_rc=0x28,
@@ -1104,8 +1105,10 @@ do_cfunc(char *stackptr, void *cfunc, void *gfunc)
 {
     if (g_cfg.funcs_attached == FALSE) return return_addr(gfunc);
 
-    char *sys_stack = stackptr;  
-    char *g_stack = (char *)*(uint64_t *)(sys_stack + 0x50); 
+    char *sys_stack = stackptr;
+    // TODO
+    //char *g_stack = (char *)*(uint64_t *)(sys_stack + 0x50);
+    char *g_stack = (char *)*(uint64_t *)(sys_stack + 0x10);
 
     /*
      * In <= Go 1.16 we must rely on the caller stack for tls_ and http2_ functions
@@ -1180,7 +1183,7 @@ c_syscall(char *sys_stack, char *g_stack)
     if(rc < 0) rc = -1; // kernel syscalls can return values < -1
 
     switch(syscall_num) {
-    case 1: // write
+    case SYS_write: //1: // write
         {
             uint64_t fd = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
             char *buf   = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
@@ -1190,7 +1193,7 @@ c_syscall(char *sys_stack, char *g_stack)
             doWrite(fd, initialTime, (rc != -1), buf, rc, "go_write", BUF, 0);
         }
         break;
-    case 257: // openat
+    case SYS_openat: //257: // openat
         {
             char *path = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
             if (!path) {
@@ -1225,7 +1228,7 @@ c_syscall(char *sys_stack, char *g_stack)
             doRead(dirfd, initialTime, (rc != -1), NULL, rc, "go_getdents", BUF, 0);
         }
         break;
-    case 41: // socket
+    case SYS_socket: //41: // socket
         {
             if (rc == -1) return;
 
@@ -1248,7 +1251,7 @@ c_syscall(char *sys_stack, char *g_stack)
             doAccept(fd, rc, addr, addrlen, "go_accept4");
         }
         break;
-    case 0: // read
+    case SYS_read: //0: // read
         {
             uint64_t fd = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
             char *buf   = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
@@ -1258,7 +1261,7 @@ c_syscall(char *sys_stack, char *g_stack)
             doRead(fd, initialTime, (rc >= 0), buf, rc, "go_read", BUF, 0);
         } 
         break;
-    case 3: // close
+    case SYS_close: //3: // close
         {
             uint64_t fd = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
 

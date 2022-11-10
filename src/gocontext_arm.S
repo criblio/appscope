@@ -19,7 +19,7 @@
  * RAX, RBX, RCX, RDI, RSI, R8, R9, R10, R11
  * Note that X15 is defined to be always a fixed value of zero
  *
- * Register usage:
+ * Register usage with the Go ARM64 ABI:
  *    x28 == g
  *    x16 == scratch (stack check)
  *    x17 == scratch (ugh. defined as scratch, but not always)
@@ -39,6 +39,9 @@
     adrp The ADRP instruction shifts a signed, 21-bit immediate left by 12 bits, adds it to the value of the program counter with the bottom 12 bits cleared to zero, and then writes the result to a general-purpose register.
     bl address branch to address (link register x30 updated)
     blr register branch to address in register (link register x30 updated)
+
+On the other end, svc #0 leaves a return value in x0. However, if the system call failed, then x0 doesn't contain -1 but rather the negative of the errno code that should be returned (between -1 and -4095 inclusive). This test is the same as checking whether the return value, as an unsigned value, is higher than -4096. And when this happens, normally you want to set errno to -x0 and then set x0 to -1 (so that -1 is returned from the syscall function).
+
  */
 .macro interpose_system_stack a_func, c_func, s_func
 .global \a_func
@@ -147,8 +150,6 @@ c_syscall_handler:
      * x17 is the trampoline address
     */
 
-    svc  #0                                      // system call - syscall number is in x8
-
     // Save regs on the stack
     stp  x0, x1, [sp, #-16]!                     // “!” implies adding the offset after the load or store
     stp  x2, x3, [sp, #-16]!
@@ -158,7 +159,12 @@ c_syscall_handler:
     stp  x10, x11, [sp, #-16]!
     stp  x29, x30, [sp, #-16]!
 
-    mov  x0, x10
+    svc  #0                                      // system call - syscall number is in x8
+
+    mov  x18, x0
+    str  x0, [sp, #0]
+
+    mov  x0, sp
     blr  x17
     mov  x17, x0                                 // return value
     add  x17, x17, #4                            // don't re-execute the syscall
@@ -172,6 +178,7 @@ c_syscall_handler:
     ldp  x4, x5, [sp, #16]!
     ldp  x2, x3, [sp, #16]!
     ldp  x0, x1, [sp, #16]!
+    mov  x0, x18
     ret
 
 

@@ -2600,24 +2600,26 @@ filterEmptyProcName(void **state) {
     assert_null(cfg);
 }
 
-/*
- * Note: a NULL filter path implies use default paths.
- * We have not configured defaults. So, there is no
- * filter file found. With no filter file we assume
- * all files are to be scoped. Look for a SCOPED return value.
- */
 static void
 filterEmptyProcCmdLine(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("foo", NULL, NULL, cfg);
-    assert_int_equal(res, FILTER_SCOPED);
+    filter_status_t res = cfgFilterStatus("foo", NULL, testAccessFilterPath(path), cfg);
+    assert_int_equal(res, FILTER_ERROR);
     dbgInit(); // reset dbg for the rest of the tests
     // cleanup
     cfgDestroy(&cfg);
     assert_null(cfg);
 }
 
+/*
+ * Note: a NULL filter path implies use default paths.
+ * We have not configured defaults. So, there is no
+ * filter file found. With no filter file we assume
+ * all files are to be scoped. Look for a SCOPED return value.
+ */
 static void
 filterNullFilterPath(void **state) {
     config_t* cfg = cfgCreateDefault();
@@ -2639,6 +2641,8 @@ filterNullCfg(void **state) {
     dbgInit(); // reset dbg for the rest of the tests
 }
 
+// This is really testing testAccessFilterPath(), but it still captures
+// what the desired system behavior is...
 static void
 filterNonExistingFilterFile(void **state) {
     char path[PATH_MAX] = {0};    
@@ -2658,7 +2662,7 @@ filterProcNameAllowListPresent(void **state) {
     scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("redis", "redis", testAccessFilterPath(path), cfg);
+    filter_status_t res = cfgFilterStatus("redis", "", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
     // cleanup
     cfgDestroy(&cfg);
@@ -2671,7 +2675,7 @@ filterProcNameDenyListPresent(void **state) {
     scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("git", "git", testAccessFilterPath(path), cfg);
+    filter_status_t res = cfgFilterStatus("git", "", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_NOT_SCOPED);
     // cleanup
     cfgDestroy(&cfg);
@@ -2681,10 +2685,10 @@ filterProcNameDenyListPresent(void **state) {
 static void
 filterArgAllowListPresent(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter_1.yml", dirPath);
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("redis", "redis", testAccessFilterPath(path), cfg);
+    filter_status_t res = cfgFilterStatus("", "redis arg1", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
     // cleanup
     cfgDestroy(&cfg);
@@ -2694,10 +2698,10 @@ filterArgAllowListPresent(void **state) {
 static void
 filterArgDenyListPresent(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter_1.yml", dirPath);
     config_t* cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("git", "git", testAccessFilterPath(path), cfg);
+    filter_status_t res = cfgFilterStatus("", "git arg1", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_NOT_SCOPED);
     // cleanup
     cfgDestroy(&cfg);

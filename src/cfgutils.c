@@ -3155,7 +3155,7 @@ cleanup_filter_file:
 filter_status_t
 cfgFilterStatus(const char *procName, const char *procCmdLine, const char *filterPath, config_t *cfg)
 {
-    if ((procName == NULL) || (cfg == NULL)) {
+    if ((!procName) || (!procCmdLine) || (!cfg)) {
         DBG(NULL);
         return FILTER_ERROR;
     }

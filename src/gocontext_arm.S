@@ -31,17 +31,6 @@
  *    x0-x6 == params
  *    x0 == return value from syscalls
  *    xzr == zero register
-    str register to memory
-    stur Store Register (unscaled) calculates an address from a base register value and an immediate offset, and stores a 32-bit word or a 64-bit doubleword to the calculated address, from a register.
-    mov dst, src Move (register) copies the value in a source register to the destination register.
-    cbz cbnz Compare and Branch on Nonzero and Compare and Branch on Zero compare the value in a register with zero, and conditionally branch forward a constant value
-    ldr This instruction loads a SIMD&FP register from memory.
-    adrp The ADRP instruction shifts a signed, 21-bit immediate left by 12 bits, adds it to the value of the program counter with the bottom 12 bits cleared to zero, and then writes the result to a general-purpose register.
-    bl address branch to address (link register x30 updated)
-    blr register branch to address in register (link register x30 updated)
-
-On the other end, svc #0 leaves a return value in x0. However, if the system call failed, then x0 doesn't contain -1 but rather the negative of the errno code that should be returned (between -1 and -4095 inclusive). This test is the same as checking whether the return value, as an unsigned value, is higher than -4096. And when this happens, normally you want to set errno to -x0 and then set x0 to -1 (so that -1 is returned from the syscall function).
-
  */
 .macro interpose_system_stack a_func, c_func, s_func
 .global \a_func

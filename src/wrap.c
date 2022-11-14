@@ -7,9 +7,9 @@
 
 #ifdef __linux__
 #include <sys/prctl.h>
-//#ifdef __GO__
-//#include <asm/prctl.h>
-//#endif
+#ifdef __x86_64__
+#include <asm/prctl.h>
+#endif
 #endif
 #include <sys/syscall.h>
 #include <sys/stat.h>

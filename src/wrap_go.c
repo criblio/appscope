@@ -38,7 +38,7 @@ enum go_arch_t {
 #if defined (__x86_64__)
    #define END_INST "int3"
    #define SYSCALL_INST "syscall"
-   #define CS_ARCH CS_ARCH_x86
+   #define CS_ARCH CS_ARCH_X86
    #define CS_MODE CS_MODE_64
    #define C_SYSCALL_RC 0x0
    #define C_SYSCALL_NUM 0x60

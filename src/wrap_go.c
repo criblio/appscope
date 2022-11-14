@@ -22,7 +22,6 @@
 #define GOPCLNTAB_MAGIC_116 0xfffffffa
 #define GOPCLNTAB_MAGIC_118 0xfffffff0
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
-#define EXIT_STACK_SIZE (32 * 1024)
 #define UNKNOWN_GO_VER (-1)
 #define MIN_SUPPORTED_GO_VER (9)
 #define MAX_SUPPORTED_GO_VER (19)
@@ -31,12 +30,39 @@
 #define PRI_STR_LEN sizeof(PRI_STR)
 #define UNDEF_OFFSET (-1)
 
+enum go_arch_t {
+    X86_64,
+    AARCH64
+};
+
 #if defined (__x86_64__)
    #define END_INST "int3"
    #define SYSCALL_INST "syscall"
+   #define CS_ARCH CS_ARCH_x86
+   #define CS_MODE CS_MODE_64
+   #define C_SYSCALL_RC 0x0
+   #define C_SYSCALL_NUM 0x60
+   #define C_SYSCALL_P1 0x20
+   #define C_SYSCALL_P2 0x28
+   #define C_SYSCALL_P3 0x18
+   #define C_SYSCALL_P4 0x10
+   #define C_SYSCALL_P5 0x30
+   #define C_SYSCALL_P6 0x38
+   #define ARCH X86_64
 #elif defined (__aarch64__)
    #define END_INST "ret"
    #define SYSCALL_INST "svc"
+   #define CS_ARCH CS_ARCH_ARM64
+   #define CS_MODE CS_MODE_LITTLE_ENDIAN
+   #define C_SYSCALL_RC 0x0
+   #define C_SYSCALL_NUM 0x20
+   #define C_SYSCALL_P1 0x60
+   #define C_SYSCALL_P2 0x68
+   #define C_SYSCALL_P3 0x50
+   #define C_SYSCALL_P4 0x58
+   #define C_SYSCALL_P5 0x40
+   #define C_SYSCALL_P6 0x48
+   #define ARCH AARCH64
 #else
    #error Bad arch defined
 #endif
@@ -50,6 +76,7 @@
 
 int g_go_minor_ver = UNKNOWN_GO_VER;
 int g_go_maint_ver = UNKNOWN_GO_VER;
+int g_arch = ARCH;
 static char g_go_build_ver[7];
 static char g_ReadFrame_addr[sizeof(void *)];
 go_schema_t *g_go_schema = &go_9_schema; // overridden if later version
@@ -159,15 +186,14 @@ go_schema_t go_9_schema = {
 
 go_schema_t go_17_schema = {
     .arg_offsets = {
-#if defined(__x86_64__)
-        .c_syscall_rc=0x0,
-        .c_syscall_num=0x60,
-        .c_syscall_p1=0x20,
-        .c_syscall_p2=0x28,
-        .c_syscall_p3=0x18,
-        .c_syscall_p4=0x10,
-        .c_syscall_p5=0x30,
-        .c_syscall_p6=0x38,
+        .c_syscall_rc=C_SYSCALL_RC,
+        .c_syscall_num=C_SYSCALL_NUM,
+        .c_syscall_p1=C_SYSCALL_P1,
+        .c_syscall_p2=C_SYSCALL_P2,
+        .c_syscall_p3=C_SYSCALL_P3,
+        .c_syscall_p4=C_SYSCALL_P4,
+        .c_syscall_p5=C_SYSCALL_P5,
+        .c_syscall_p6=C_SYSCALL_P6,
         .c_tls_server_read_connReader=0x50,
         .c_tls_server_read_buf=0x8,
         .c_tls_server_read_rc=0x28,
@@ -186,36 +212,6 @@ go_schema_t go_17_schema = {
         .c_http2_client_write_tcpConn=0x40,
         .c_http2_client_write_buf=0x8,
         .c_http2_client_write_rc=0x10,
-#elif defined(__aarch64__)
-        .c_syscall_rc=0x00,
-        .c_syscall_num=0x20,
-        .c_syscall_p1=0x60,
-        .c_syscall_p2=0x68,
-        .c_syscall_p3=0x50,
-        .c_syscall_p4=0x58,
-        .c_syscall_p5=0x40,
-        .c_syscall_p6=0x48,
-        .c_tls_server_read_connReader=0x50,
-        .c_tls_server_read_buf=0x8,
-        .c_tls_server_read_rc=0x28,
-        .c_tls_server_write_conn=0x30,
-        .c_tls_server_write_buf=0x8,
-        .c_tls_server_write_rc=0x10,
-        .c_tls_client_read_pc=0x28,
-        .c_tls_client_write_w_pc=0x20,
-        .c_tls_client_write_buf=0x8,
-        .c_tls_client_write_rc=0x10,
-        .c_http2_server_read_sc=0xd0,
-        .c_http2_server_write_sc=0x40,
-        .c_http2_server_preface_sc=0xd0,
-        .c_http2_server_preface_rc=0x58,
-        .c_http2_client_read_cc=0x68,
-        .c_http2_client_write_tcpConn=0x40,
-        .c_http2_client_write_buf=0x8,
-        .c_http2_client_write_rc=0x10,
-#else
-   #error Bad arch defined
-#endif
     },
     .struct_offsets = {
         .g_to_m=0x30,
@@ -416,15 +412,8 @@ match_assy_instruction(void *addr, char *mnemonic)
     uint64_t size = 32;
     bool rc = FALSE;
 
-#if defined(__aarch64__)
-    arch = CS_ARCH_ARM64;
-    mode = CS_MODE_LITTLE_ENDIAN;
-#elif defined(__x86_64__)
-    arch = CS_ARCH_X86;
-    mode = CS_MODE_64;
-#else
-    return FALSE;
-#endif
+    arch = CS_ARCH;
+    mode = CS_MODE;
 
     if (cs_open(arch, mode, &dhandle) != CS_ERR_OK) return FALSE;
 
@@ -609,9 +598,9 @@ getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
 static bool
 looks_like_first_inst_of_go_func(cs_insn* asm_inst)
 {
-#if defined(__x86_64__)
-    return (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
-            !scope_strcmp((const char*)asm_inst->op_str, "rcx, qword ptr fs:[0xfffffffffffffff8]")) ||
+    if (g_arch == X86_64) {
+        return (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
+                !scope_strcmp((const char*)asm_inst->op_str, "rcx, qword ptr fs:[0xfffffffffffffff8]")) ||
             // -buildmode=pie compiles to this:
             (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
             !scope_strcmp((const char*)asm_inst->op_str, "rcx, -8")) || 
@@ -623,14 +612,14 @@ looks_like_first_inst_of_go_func(cs_insn* asm_inst)
             !scope_strcmp((const char*)asm_inst->op_str, "r10, rsi")) ||
             (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
             !scope_strcmp((const char*)asm_inst->op_str, "edi, dword ptr [rsp + 8]"));
-#elif defined(__aarch64__)
-   return ((!scope_strcmp((const char*)asm_inst->mnemonic, "str") &&
-            scope_strstr((const char*)asm_inst->op_str, "[sp,")) ||
-           (!scope_strcmp((const char*)asm_inst->mnemonic, "ldrsw") &&
-            scope_strstr((const char*)asm_inst->op_str, "[sp,"))); 
-#else
-   #error Bad arch defined
-#endif
+    } else if (g_arch == AARCH64) {
+        return ((!scope_strcmp((const char*)asm_inst->mnemonic, "str") &&
+                 scope_strstr((const char*)asm_inst->op_str, "[sp,")) ||
+                (!scope_strcmp((const char*)asm_inst->mnemonic, "ldrsw") &&
+                 scope_strstr((const char*)asm_inst->op_str, "[sp,"))); 
+    } else {
+        return FALSE;
+    }
 }
 
 // Calculate the value to be added/subtracted at an add/sub instruction
@@ -985,15 +974,10 @@ initGoHook(elf_buf_t *ebuf)
     csh disass_handle = 0;
     cs_arch arch;
     cs_mode mode;
-#if defined(__aarch64__)
-    arch = CS_ARCH_ARM64;
-    mode = CS_MODE_LITTLE_ENDIAN;
-#elif defined(__x86_64__)
-    arch = CS_ARCH_X86;
-    mode = CS_MODE_64;
-#else
-    return;
-#endif
+
+    arch = CS_ARCH;
+    mode = CS_MODE;
+
     if (cs_open(arch, mode, &disass_handle) != CS_ERR_OK) return;
 
     cs_insn *asm_inst = NULL;
@@ -1127,24 +1111,9 @@ do_cfunc(char *stackptr, void *cfunc, void *gfunc)
         g_stack += frame_offset;
     }
 
-#if defined (__x86_64__)
-    uint64_t rc;
-    // Call the C handler
-    __asm__ volatile (
-        "mov %1, %%rdi  \n"
-        "mov %2, %%rsi  \n"
-        "callq *%3  \n"
-        : "=r"(rc)                                    // output
-        : "r"(sys_stack), "r"(g_stack), "r"(cfunc)    // inputs
-        :                                             // clobbered register
-        );
-#elif defined (__aarch64__)
-    // TODO
     void (*chandler)(char *sstack, char *gstack) = (void (*)(char *, char *))cfunc;
     chandler(sys_stack, g_stack);
-#else
-   #error Bad arch defined
-#endif
+
     return return_addr(gfunc);
 }
 
@@ -1628,33 +1597,6 @@ extern void handleExit(void);
 static void
 c_exit(char *sys_stack)
 {
-#if defined (__x86_64__)
-    /*
-     * Need to extend the system stack size when calling handleExit().
-     * We see that the stack is exceeded now that we are using an internal libc.
-     */
-    int arc;
-    char *exit_stack, *tstack, *gstack;
-    if ((exit_stack = scope_malloc(EXIT_STACK_SIZE)) == NULL) {
-        return;
-    }
-
-    tstack = exit_stack + EXIT_STACK_SIZE;
-
-    // save the original stack, switch to the tstack
-    __asm__ volatile (
-        "mov %%rsp, %2 \n"
-        "mov %1, %%rsp \n"
-        : "=r"(arc)                  // output
-        : "m"(tstack), "m"(gstack)   // input
-        :                            // clobbered register
-        );
-#elif defined (__aarch64__)
-    // TODO stack??
-#else
-   #error Bad arch defined
-#endif
-
     // don't use stackaddr; patch_first_instruction() does not provide
     // frame_size, so stackaddr isn't usable
     funcprint("c_exit\n");
@@ -1671,22 +1613,6 @@ c_exit(char *sys_stack)
     handleExit();
     // flush the data
     sigSafeNanosleep(&ts);
-
-    // Switch stack back to the original stack
-#if defined (__x86_64__)
-    __asm__ volatile (
-        "mov %1, %%rsp \n"
-        : "=r"(arc)                       // output
-        : "r"(gstack)                     // inputs
-        :                                 // clobbered register
-        );
-
-    scope_free(exit_stack);
-#elif defined (__aarch64__)
-    // TODO
-#else
-   #error Bad arch defined
-#endif
 }
 
 EXPORTON void *

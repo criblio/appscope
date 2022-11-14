@@ -18,4 +18,6 @@ $(LIBSCOPE): src/wrap.c src/state.c src/httpstate.c src/metriccapture.c src/repo
 	$(RM) -r ./test/selfinterpose && \
 		mkdir ./test/selfinterpose && \
 		mv *.o ./test/selfinterpose/
+	    $(RM) ./test/selfinterpose/wrap_go.o
+	    $(RM) ./test/selfinterpose/gocontext_arm.o
 	@[ -z "$(CI)" ] || echo "::endgroup::"

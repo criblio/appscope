@@ -161,7 +161,7 @@ c_syscall_handler:
 
     svc  #0                                      // system call - syscall number is in x8
 
-    mov  x18, x0
+    mov  x18, x0                                 // TODO: push to stack
     str  x0, [sp, #0]
 
     mov  x0, sp

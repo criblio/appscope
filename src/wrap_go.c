@@ -1,6 +1,8 @@
 #define _GNU_SOURCE
 #include <sys/mman.h>
-//#include <asm/prctl.h>
+#ifdef __x86_64__
+#include <asm/prctl.h>
+#endif
 #include <sys/prctl.h>
 #include <signal.h>
 #include <syscall.h>

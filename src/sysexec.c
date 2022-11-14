@@ -9,7 +9,9 @@
 #include <elf.h>
 #include <sys/auxv.h>
 #include <sys/syscall.h>
-//#include <asm/prctl.h>
+#ifdef __x86_64__
+#include <asm/prctl.h>
+#endif
 #include <sys/prctl.h>
 #include <pthread.h>
 #include <dlfcn.h>

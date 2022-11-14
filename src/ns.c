@@ -99,6 +99,7 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
     bool status = FALSE;
     size_t ldscopeSize = 0;
     size_t cfgSize = 0;
+    mkdir_status_t dirRes = MKDIR_STATUS_ERR_OTHER;
 
     char path[PATH_MAX] = {0};
 
@@ -136,21 +137,32 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
     bool isDevVersion = libverIsNormVersionDev(loaderVersion);
 
-    scope_memset(path, 0, PATH_MAX);
-    scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
-    mkdir_status_t res = libdirCreateDirIfMissing(path, 0755, nsUid, nsGid);
-    if ((res > MKDIR_STATUS_EXISTS) || (isDevVersion)) {
+    /* For official version try to use /usr/lib/appscope */
+    if (isDevVersion == FALSE) {
         scope_memset(path, 0, PATH_MAX);
-        scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
-        mkdir_status_t res = libdirCreateDirIfMissing(path, 0777, nsUid, nsGid);
-        if (res > MKDIR_STATUS_EXISTS) {
-            goto cleanupMem;
+        scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
+        dirRes = libdirCreateDirIfMissing(path, 0755, nsUid, nsGid);
+        if (dirRes <= MKDIR_STATUS_EXISTS) {
+            scope_strncat(path, "ldscope", sizeof("ldscope"));
+            status = extractMemToFile(ldscopeMem, ldscopeSize, path, 0775, isDevVersion, nsUid, nsGid);
         }
     }
 
-    scope_strncat(path, "ldscope", sizeof("ldscope"));
+    /* For dev version or if extract for official version try to use /tmp/appscope path */
+    if (status == FALSE) {
+        scope_memset(path, 0, PATH_MAX);
+        scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
+        dirRes = libdirCreateDirIfMissing(path, 0777, nsUid, nsGid);
+        if (dirRes <= MKDIR_STATUS_EXISTS) {
+            scope_strncat(path, "ldscope", sizeof("ldscope"));
+            status = extractMemToFile(ldscopeMem, ldscopeSize, path, 0775, isDevVersion, nsUid, nsGid);
+        }
+    }
 
-    status = extractMemToFile(ldscopeMem, ldscopeSize, path, 0775, isDevVersion, nsUid, nsGid);
+    /* Cleanup if extraction of ldscope fails */
+    if (status == FALSE) {
+        goto cleanupMem;
+    }
 
     if (scopeCfgMem) {
         char scopeCfgPath[PATH_MAX] = {0};

@@ -2827,6 +2827,97 @@ filterConfigIsProcessedAfterProcName(void **state)
     assert_null(cfg);
 }
 
+static void
+filterMatchAllInAllow(void **state)
+{
+    // Verify that _MatchAll_ in allow matches all processes
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter_5.yml", dirPath);
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+    filter_status_t res = cfgFilterStatus("blue", "", testAccessFilterPath(path), cfg);
+    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    res = cfgFilterStatus("red", "", testAccessFilterPath(path), cfg);
+    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    res = cfgFilterStatus("green", "", testAccessFilterPath(path), cfg);
+    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    res = cfgFilterStatus("htop", "", testAccessFilterPath(path), cfg);
+    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    // cleanup
+    cfgDestroy(&cfg);
+    assert_null(cfg);
+}
+
+static void
+filterMatchAllInAllowCanBeDenied(void **state)
+{
+    // Verify that _MatchAll_ in allow is overriden by a match in deny
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter_5.yml", dirPath);
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+    filter_status_t res = cfgFilterStatus("redis", "", testAccessFilterPath(path), cfg);
+    assert_int_equal(res, FILTER_NOT_SCOPED);
+    // cleanup
+    cfgDestroy(&cfg);
+    assert_null(cfg);
+}
+
+static void
+filterVerifyMatchAllMergedConfig(void **state)
+{
+    // Verify that matches (including _MatchAll_) are applied in order
+    // And that matches can be "merged" w.r.t. configuration
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter_5.yml", dirPath);
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+
+    // green only matches _MatchAll_
+    // verify that the log level and log path agree with _MatchAll_
+    filter_status_t res = cfgFilterStatus("green", "", testAccessFilterPath(path), cfg);
+    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    assert_int_equal(cfgLogLevel(cfg), CFG_LOG_ERROR);
+    assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/match.log");
+    cfgDestroy(&cfg);
+
+    // htop matches _MatchAll_, then matches procname: htop
+    // verify that the log level is specified by _MatchAll_
+    //   and that log path is specified by htop
+    cfg = cfgCreateDefault();
+    res = cfgFilterStatus("htop", "", testAccessFilterPath(path), cfg);
+    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    assert_int_equal(cfgLogLevel(cfg), CFG_LOG_ERROR);
+    assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/htop.log");
+
+    // cleanup
+    cfgDestroy(&cfg);
+    assert_null(cfg);
+}
+
+static void
+filterMatchAllInDeny(void **state)
+{
+    // Verify that _MatchAll_ in deny denies all processes
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter_6.yml", dirPath);
+    config_t* cfg = cfgCreateDefault();
+    assert_non_null(cfg);
+    filter_status_t res = cfgFilterStatus("blue", "", testAccessFilterPath(path), cfg);
+    assert_int_equal(res, FILTER_NOT_SCOPED);
+    res = cfgFilterStatus("red", "", testAccessFilterPath(path), cfg);
+    assert_int_equal(res, FILTER_NOT_SCOPED);
+    res = cfgFilterStatus("green", "", testAccessFilterPath(path), cfg);
+    assert_int_equal(res, FILTER_NOT_SCOPED);
+    res = cfgFilterStatus("htop", "", testAccessFilterPath(path), cfg);
+    assert_int_equal(res, FILTER_NOT_SCOPED);
+    // cleanup
+    cfgDestroy(&cfg);
+    assert_null(cfg);
+
+}
+
+
 // Defined in src/cfgutils.c
 // This is not a proper test, it just exists to make valgrind output
 // more readable when analyzing this test, by deallocating the compiled
@@ -2924,6 +3015,10 @@ main(int argc, char* argv[])
         cmocka_unit_test(filterVerifyCfg),
         cmocka_unit_test(filterDenyIsProcessedAfterAllow),
         cmocka_unit_test(filterConfigIsProcessedAfterProcName),
+        cmocka_unit_test(filterMatchAllInAllow),
+        cmocka_unit_test(filterMatchAllInAllowCanBeDenied),
+        cmocka_unit_test(filterVerifyMatchAllMergedConfig),
+        cmocka_unit_test(filterMatchAllInDeny),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
         cmocka_unit_test(cfgReadProtocol),
         cmocka_unit_test(cfgReadCustomEmptyFilter),

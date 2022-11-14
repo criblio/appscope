@@ -2920,6 +2920,8 @@ destroyProtEntry(void *data)
 #define DENY_PROCNAME_NODE    "procname"
 #define DENY_ARG_NODE         "arg"
 
+#define MATCH_ALL_VAL       "_MatchAll_"
+
 typedef enum {
     PROC_NOT_FOUND,
     PROC_ALLOWED,
@@ -2971,7 +2973,9 @@ static void
 processAllowProcNameScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
     if (node->type != YAML_SCALAR_NODE) return;
 
-    if (!scope_strcmp(fCfg->procName, ((const char*) node->data.scalar.value))) {
+    const char *procname = (const char *)node->data.scalar.value;
+    if (!scope_strcmp(fCfg->procName, procname) ||
+        !scope_strcmp(MATCH_ALL_VAL, procname)) {
         fCfg->status = PROC_ALLOWED;
         fCfg->filterMatch = TRUE;
     }
@@ -2984,8 +2988,10 @@ static void
 processAllowProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
     if (node->type != YAML_SCALAR_NODE) return;
 
-    if (node->data.scalar.value && (scope_strlen((char *)node->data.scalar.value) > 0) &&
-        scope_strstr(fCfg->procCmdLine, ((const char*) node->data.scalar.value)) != NULL) {
+    const char *cmdline = (const char *)node->data.scalar.value;
+    if (cmdline && (scope_strlen(cmdline) > 0) &&
+        (scope_strstr(fCfg->procCmdLine, cmdline)
+         || !scope_strcmp(MATCH_ALL_VAL, cmdline))) {
         fCfg->status = PROC_ALLOWED;
         fCfg->filterMatch = TRUE;
     }
@@ -3047,7 +3053,9 @@ static void
 processDenyProcNameScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
     if (node->type != YAML_SCALAR_NODE) return;
 
-    if (!scope_strcmp(fCfg->procName, ((const char*) node->data.scalar.value))) {
+    const char *procname = (const char *)node->data.scalar.value;
+    if (!scope_strcmp(fCfg->procName, procname) ||
+        !scope_strcmp(MATCH_ALL_VAL, procname)) {
         fCfg->status = PROC_DENIED;
     }
 }
@@ -3059,7 +3067,10 @@ static void
 processDenyProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
     if (node->type != YAML_SCALAR_NODE) return;
 
-    if (scope_strstr(fCfg->procCmdLine, ((const char*) node->data.scalar.value)) != NULL) {
+    const char *cmdline = (const char *)node->data.scalar.value;
+    if (cmdline && (scope_strlen(cmdline) > 0) &&
+        (scope_strstr(fCfg->procCmdLine, cmdline)
+          || !scope_strcmp(MATCH_ALL_VAL, cmdline))) {
         fCfg->status = PROC_DENIED;
     }
 }

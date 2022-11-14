@@ -3011,9 +3011,12 @@ static void
 processAllowSeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
     if (node->type != YAML_SEQUENCE_NODE) return;
 
-    parse_filter_table_t t[] = {
+    parse_filter_table_t filters[] = {
         {YAML_SCALAR_NODE,  ALLOW_PROCNAME_NODE, processAllowProcNameScalar},
         {YAML_SCALAR_NODE,  ALLOW_ARG_NODE,      processAllowProcCmdLineScalar},
+        {YAML_NO_NODE,      NULL,                NULL}
+    };
+    parse_filter_table_t config[] = {
         {YAML_MAPPING_NODE, ALLOW_CONFIG_NODE,   processAllowConfig},
         {YAML_NO_NODE,      NULL,                NULL}
     };
@@ -3026,8 +3029,12 @@ processAllowSeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
         if (nodeMap->type != YAML_MAPPING_NODE) return;
 
         yaml_node_pair_t *pair;
+        // processs the filters first (before the config)
         foreach(pair, nodeMap->data.mapping.pairs) {
-            processKeyValuePairFilter(doc, pair, t, fCfg);
+            processKeyValuePairFilter(doc, pair, filters, fCfg);
+        }
+        foreach(pair, nodeMap->data.mapping.pairs) {
+            processKeyValuePairFilter(doc, pair, config, fCfg);
         }
     }
 
@@ -3094,15 +3101,23 @@ processFilterRootNode(yaml_document_t *doc, filter_cfg_t *fCfg) {
         return;
     }
 
-    parse_filter_table_t t[] = {
+    yaml_node_pair_t *pair;
+    // process allow before deny so deny "overrides" allow
+    // if a process appears in both, it should not be scoped
+    parse_filter_table_t allow[] = {
         {YAML_SEQUENCE_NODE, ALLOW_NODE, processAllowSeq},
+        {YAML_NO_NODE,       NULL,       NULL}
+    };
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairFilter(doc, pair, allow, fCfg);
+    }
+
+    parse_filter_table_t deny[] = {
         {YAML_SEQUENCE_NODE, DENY_NODE,  processDenySeq},
         {YAML_NO_NODE,       NULL,       NULL}
     };
-
-    yaml_node_pair_t *pair;
     foreach(pair, node->data.mapping.pairs) {
-        processKeyValuePairFilter(doc, pair, t, fCfg);
+        processKeyValuePairFilter(doc, pair, deny, fCfg);
     }
 }
 

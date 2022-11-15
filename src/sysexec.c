@@ -40,9 +40,6 @@
 
 #define EXPORTON __attribute__((visibility("default")))
 
-uint64_t scope_stack;
-unsigned long scope_fs;
-
 void
 sysprint(const char* fmt, ...)
 {
@@ -340,12 +337,10 @@ copy_strings(char *buf, uint64_t sp, int argc, const char **argv, const char **e
 static int
 set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr phaddr)
 {
-#if defined (__x86_64__)
     uint64_t res = 0;
     char *sp;
     Elf64_Addr start;
     Elf64_Ehdr *ehdr = (Elf64_Ehdr *)buf;
-    char *rtld_fini = NULL;
 
     // create a stack (void *)ROUND_UP(laddr + pgsz + HEAP_SIZE, pgsz)  | MAP_FIXED
     if ((sp = scope_mmap(NULL, STACK_SIZE,
@@ -360,16 +355,11 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr phad
     copy_strings(buf, (uint64_t)sp, argc, argv, env, phaddr);
     start = ehdr->e_entry;
 
-    if (scope_arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
-        scopeLogError("set_go:arch_prctl");
-        return -1;
-    }
-
     unmap_all(buf, argv);
 
+#if defined (__x86_64__)
+    char *rtld_fini = NULL;
     __asm__ volatile (
-        "lea scope_stack(%%rip), %%r11 \n"
-        "mov %%rsp, (%%r11)  \n"
         "mov %1, %%r11 \n"
         "mov %2, %%rsp \n"
         "mov %3, %%rdx \n"
@@ -378,6 +368,18 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr phad
         : "r"(start), "r"(sp), "r"(rtld_fini)
         : "%r11"                      //clobbered register
     );
+#elif defined(__aarch64__)
+    __asm__ volatile (
+        "mov sp, %2 \n"
+        "mov x0, xzr \n"
+        "mov x17, %1 \n"
+        "br  x17 \n"
+        : "=r"(res)                   //output
+        : "r"(start), "r"(sp)
+        : "x17"                      //clobbered register
+    );
+#else
+   #error Bad arch defined
 #endif
     return 0;
 }

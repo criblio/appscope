@@ -118,11 +118,13 @@ Unscopes a currently-running process identified by PID or ProcessName.
 ```
 scope detach 1000
 scope detach firefox
+scope detach --all
 ```
 
 #### Flags
 
 ```
+  -a, --all                   Detach from all processes
   -h, --help                  Help for detach
 
 ```

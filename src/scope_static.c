@@ -19,6 +19,7 @@
 #include "scopetypes.h"
 #include "libdir.h"
 #include "loaderop.h"
+#include "nsinfo.h"
 #include "ns.h"
 #include "setup.h"
 
@@ -575,7 +576,10 @@ main(int argc, char **argv, char **env)
     char path[PATH_MAX] = {0};
     int pid = -1;
     char attachType = 'u';
-
+    uid_t uid = scope_getuid();
+    gid_t gid = scope_getgid();
+    uid_t nsUid = uid;
+    uid_t nsGid = gid;
     // process command line
     for (;;) {
         int index = 0;
@@ -698,7 +702,7 @@ main(int argc, char **argv, char **env)
 
     if (serviceName) {
         // must be root
-        if (scope_getuid()) {
+        if (uid) {
             scope_printf("error: --service requires root\n");
             return EXIT_FAILURE;
         }
@@ -714,11 +718,12 @@ main(int argc, char **argv, char **env)
 
         if (pid == -1) {
             // Service on Host
-            return setupService(serviceName);
+            return setupService(serviceName, uid, gid);
         } else {
             // Service on Container
             pid_t nsContainerPid = 0;
-            if (nsIsPidInChildNs(pid, &nsContainerPid) == TRUE) {
+            if ((nsInfoIsPidGotSecondPidNs(pid, &nsContainerPid) == TRUE) ||
+                (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
                 return nsService(pid, serviceName);
             }
         }
@@ -728,7 +733,7 @@ main(int argc, char **argv, char **env)
     if (configFilterPath) {
         int status = EXIT_FAILURE;
         // must be root
-        if (scope_getuid()) {
+        if (uid) {
             scope_printf("error: --configure requires root\n");
             return EXIT_FAILURE;
         }
@@ -751,11 +756,12 @@ main(int argc, char **argv, char **env)
 
         if (pid == -1) {
             // Configure on Host
-            status = setupConfigure(confgFilterMem, configFilterSize);
+            status = setupConfigure(confgFilterMem, configFilterSize, uid, gid);
         } else {
             // Configure on Container
             pid_t nsContainerPid = 0;
-            if (nsIsPidInChildNs(pid, &nsContainerPid) == TRUE) {
+            if ((nsInfoIsPidGotSecondPidNs(pid, &nsContainerPid) == TRUE) ||
+                (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
                 status = nsConfigure(pid, confgFilterMem, configFilterSize);
             }
         }
@@ -777,34 +783,56 @@ main(int argc, char **argv, char **env)
 
         pid_t nsAttachPid = 0;
 
+        scope_snprintf(path, sizeof(path), "/proc/%d", pid);
+        if (scope_access(path, F_OK)) {
+            scope_printf("error: --attach, --detach PID not a current process: %d\n", pid);
+            return EXIT_FAILURE;
+        }
 
         /*
-        * If the expected process exists in different namespace (container)
+        * If the expected process exists in different PID namespace (container)
         * we do a following switch context sequence:
         * - load static loader file into memory
         * - [optionally] save the configuration file pointed by SCOPE_CONF_PATH into memory
         * - switch the namespace from parent
         * - save previously loaded static loader into new namespace
         * - [optionally] save previously loaded configuration file into new namespace
-        * - fork & execute static loader attach one more time with update PID
+        * - fork & execute static loader attach one more time with updated PID
         */
-        if (nsIsPidInChildNs(pid, &nsAttachPid) == TRUE) {
+        if (nsInfoIsPidGotSecondPidNs(pid, &nsAttachPid) == TRUE) {
             // must be root to switch namespace
-            if (scope_getuid()) {
+            if (uid) {
                 scope_printf("error: --attach requires root\n");
                 return EXIT_FAILURE;
             }
             return nsForkAndExec(pid, nsAttachPid, attachType);
+        /*
+        * Process can exists in same PID namespace but in different mnt namespace
+        * we do a simillar sequecne like above but without switching PID namespace
+        * and updating PID.
+        */
+        } else if (nsInfoIsPidInSameMntNs(pid) == FALSE) {
+            // must be root to switch namespace
+            if (uid) {
+                scope_printf("error: --attach requires root\n");
+                return EXIT_FAILURE;
+            }
+            return nsForkAndExec(pid, pid, attachType);
         }
     }
 
+    if (pid != -1) {
+        nsUid = nsInfoTranslateUid(pid);
+        nsGid = nsInfoTranslateGid(pid);
+    }
+
     // extract to the library directory
-    if (libdirExtract(LOADER_FILE)) {
+    if (libdirExtract(LOADER_FILE, nsUid, nsGid)) {
         scope_fprintf(scope_stderr, "error: failed to extract loader\n");
         return EXIT_FAILURE;
     }
 
-    if (libdirExtract(LIBRARY_FILE)) {
+    if (libdirExtract(LIBRARY_FILE, nsUid, nsGid)) {
         scope_fprintf(scope_stderr, "error: failed to extract library\n");
         return EXIT_FAILURE;
     }
@@ -828,16 +856,11 @@ main(int argc, char **argv, char **env)
         setenv("SCOPE_EXEC_PATH", execPath, 0);
     }
 
-    if (attachArg) {
-        scope_snprintf(path, sizeof(path), "/proc/%d", pid);
-        if (scope_access(path, F_OK)) {
-            scope_printf("error: --attach, --detach PID not a current process: %d\n", pid);
-            return EXIT_FAILURE;
-        }
-    }
-
     // create /dev/shm/scope_${PID}.env when attaching
     if (attachArg && (attachType == 'a')) {
+        scope_setegid(nsGid);
+        scope_seteuid(nsUid);
+
         // create .env file for the library to load
         scope_snprintf(path, sizeof(path), "/scope_attach_%d.env", pid);
         int fd = scope_shm_open(path, O_RDWR|O_CREAT, S_IRUSR|S_IRGRP|S_IROTH);
@@ -845,6 +868,9 @@ main(int argc, char **argv, char **env)
             scope_perror("shm_open() failed");
             return EXIT_FAILURE;
         }
+
+        scope_seteuid(uid);
+        scope_setegid(gid);
 
         // add the env vars we want in the library
         scope_dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetPath(LIBRARY_FILE));

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "ns.h"
+#include "nsinfo.h"
 #include "libver.h"
 #include "libdir.h"
 #include "setup.h"
@@ -23,8 +24,7 @@ extractMemToFile(char *inputMem, size_t inputSize, const char *outFile, mode_t o
     bool status = FALSE;
     int outFd;
 
-    if (!scope_access(outFile, R_OK) && !overwrite)
-    {
+    if (!scope_access(outFile, R_OK) && !overwrite) {
         return TRUE;
     }
 
@@ -50,6 +50,8 @@ extractMemToFile(char *inputMem, size_t inputSize, const char *outFile, mode_t o
 
 cleanupDestFd:
 
+    scope_fchmod(outFd, outPermFlag);
+
     scope_close(outFd);
 
     return status;
@@ -65,35 +67,43 @@ setNamespace(pid_t pid, const char *ns) {
     char nsPath[PATH_MAX] = {0};
     int nsFd;
     if (scope_snprintf(nsPath, sizeof(nsPath), "/proc/%d/ns/%s", pid, ns) < 0) {
-        scope_perror("scope_snprintf failed");
+        scope_perror("setNamespace: scope_snprintf failed");
         return FALSE;
     }
 
     if ((nsFd = scope_open(nsPath, O_RDONLY)) == -1) {
-        scope_perror("scope_open failed");
+        scope_perror("setNamespace: scope_open failed");
         return FALSE;
     }
 
     if (scope_setns(nsFd, 0) != 0) {
-        scope_perror("setns failed");
+        scope_perror("setNamespace: setns failed");
+        scope_close(nsFd);
         return FALSE;
     }
+
+    scope_close(nsFd);
 
     return TRUE;
 }
 
 /*
- * Joins the child PID and mount namespace.
+ * Joins the namespaces:
+ * - child PID (optionally)
+ * - mount namespace (mandatory).
  *
  * Returns TRUE if operation was success, FALSE otherwise.
  */
 static bool
-joinChildNamespace(pid_t hostPid) {
+joinChildNamespace(pid_t hostPid, bool joinPidNs) {
     bool status = FALSE;
     size_t ldscopeSize = 0;
     size_t cfgSize = 0;
 
     char path[PATH_MAX] = {0};
+
+    uid_t nsUid = nsInfoTranslateUid(hostPid);
+    gid_t nsGid = nsInfoTranslateGid(hostPid);
 
     if (scope_readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
         return status;
@@ -111,13 +121,14 @@ joinChildNamespace(pid_t hostPid) {
     * Reassociate current process to the "child namespace"
     * - PID namespace - allows to "child process" of the calling process 
     *   be created in separate namespace
-    *   In other words the calling process will not change it's ownPID
+    *   In other words the calling process will not change it's own PID
     *   namespace
     * - mount namespace - allows to copy file(s) into a "child namespace"
     */
-    if (setNamespace(hostPid, "pid") == FALSE) {
+    if (joinPidNs && setNamespace(hostPid, "pid") == FALSE) {
         goto cleanupMem;
     }
+
     if (setNamespace(hostPid, "mnt") == FALSE) {
         goto cleanupMem;
     }
@@ -127,11 +138,11 @@ joinChildNamespace(pid_t hostPid) {
 
     scope_memset(path, 0, PATH_MAX);
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
-    mkdir_status_t res = libdirCreateDirIfMissing(path, 0755);
+    mkdir_status_t res = libdirCreateDirIfMissing(path, 0755, nsUid, nsGid);
     if ((res > MKDIR_STATUS_EXISTS) || (isDevVersion)) {
         scope_memset(path, 0, PATH_MAX);
         scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
-        mkdir_status_t res = libdirCreateDirIfMissing(path, 0777);
+        mkdir_status_t res = libdirCreateDirIfMissing(path, 0777, nsUid, nsGid);
         if (res > MKDIR_STATUS_EXISTS) {
             goto cleanupMem;
         }
@@ -140,6 +151,7 @@ joinChildNamespace(pid_t hostPid) {
     scope_strncat(path, "ldscope", sizeof("ldscope"));
 
     status = extractMemToFile(ldscopeMem, ldscopeSize, path, 0775, isDevVersion);
+    scope_chown(path, nsUid, nsGid);
 
     if (scopeCfgMem) {
         char scopeCfgPath[PATH_MAX] = {0};
@@ -147,6 +159,7 @@ joinChildNamespace(pid_t hostPid) {
         // extract scope.yml configuration
         scope_snprintf(scopeCfgPath, sizeof(scopeCfgPath), "/tmp/scope%d.yml", hostPid);
         status = extractMemToFile(scopeCfgMem, cfgSize, scopeCfgPath, 0664, TRUE);
+        scope_chown(scopeCfgPath, nsUid, nsGid);
         // replace the SCOPE_CONF_PATH with namespace path
         setenv("SCOPE_CONF_PATH", scopeCfgPath, 1);
     }   
@@ -162,74 +175,22 @@ cleanupMem:
     return status;
 }
 
-/*
- * Check for PID in the child namespace.
- *
- * Returns TRUE if specific process contains two namespaces FALSE otherwise.
- */
-bool
-nsIsPidInChildNs(pid_t pid, pid_t *nsPid) {
-    const int validNsDepth = 2;
-    char path[PATH_MAX] = {0};
-    char buffer[4096];
-    bool status = FALSE;
-    int lastNsPid = 0;
-    int nsDepth = 0;
-
-    if (scope_snprintf(path, sizeof(path), "/proc/%d/status", pid) < 0) {
-        return FALSE;
-    }
-
-    FILE *fstream = scope_fopen(path, "r");
-
-    if (fstream == NULL) {
-        return FALSE;
-    }
-
-    while (scope_fgets(buffer, sizeof(buffer), fstream)) {
-        if (scope_strstr(buffer, "NSpid:")) {
-            const char delimiters[] = ": \t";
-            char *entry, *last;
-
-            entry = scope_strtok_r(buffer, delimiters, &last);
-            // Skip NsPid string
-            entry = scope_strtok_r(NULL, delimiters, &last);
-            // Iterate over NsPids values
-            while (entry != NULL) {
-                lastNsPid = scope_atoi(entry);
-                entry = scope_strtok_r(NULL, delimiters, &last);
-                nsDepth++;
-            }
-            break;
-        }
-    }
-
-    /*
-    * TODO: we currently tested nesting depth 
-    * equals validNsDepth, check more depth level
-    */
-    if (nsDepth == validNsDepth) {
-        status = TRUE;
-        *nsPid = lastNsPid;
-    }
-
-    scope_fclose(fstream);
-
-    return status;
-}
 
  /*
  * Setup the service for specified child process
  * Returns status of operation SERVICE_STATUS_SUCCESS in case of success, other values in case of failure
  */
 service_status_t
-nsService(pid_t pid, const char *serviceName) {
+nsService(pid_t hostPid, const char *serviceName) {
 
-    if (setNamespace(pid, "mnt") == FALSE) {
+    uid_t nsUid = nsInfoTranslateUid(hostPid);
+    gid_t nsGid = nsInfoTranslateGid(hostPid);
+
+    if (setNamespace(hostPid, "mnt") == FALSE) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    return setupService(serviceName);
+    return setupService(serviceName, nsUid, nsGid);
 }
 
  
@@ -241,12 +202,15 @@ nsService(pid_t pid, const char *serviceName) {
  */
 int
 nsConfigure(pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize) {
+    uid_t nsUid = nsInfoTranslateUid(pid);
+    gid_t nsGid = nsInfoTranslateGid(pid);
+
     if (setNamespace(pid, "mnt") == FALSE) {
         scope_fprintf(scope_stderr, "setNamespace mnt failed\n");
         return EXIT_FAILURE;
     }
 
-    if (setupConfigure(scopeCfgFilterMem, filterFileSize)) {
+    if (setupConfigure(scopeCfgFilterMem, filterFileSize, nsUid, nsGid)) {
         scope_fprintf(scope_stderr, "setup child namespace failed\n");
         return EXIT_FAILURE;
     }
@@ -288,8 +252,9 @@ isLibScopeLoaded(pid_t pid)
  
  /*
  * Perform fork and exec which cause that direct children
- * effectively will join a new PID namespace.
+ * effectively will join a new PID namespace(optionally) and mount namespace.
  *
+ * Note:
  * Reassociating the PID namespace (setns CLONE_NEWPID) has somewhat different from 
  * other namespace types. Reassociating the calling thread with a PID namespace
  * changes only the PID namespace that subsequently created child processes of
@@ -311,13 +276,13 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
         scope_fprintf(scope_stderr, "error: PID: %d has never been attached\n", parentPid);
         return EXIT_FAILURE; 
     }
-     /*
+    /*
     * TODO In case of Reattach/Detach - when libLoaded = TRUE
     * We only need the mount namespace to /dev/shm but currently ldscopedyn
     * also check the pid namespace
     */
 
-    if (joinChildNamespace(parentPid) == FALSE) {
+    if (joinChildNamespace(parentPid, parentPid != nsPid) == FALSE) {
         scope_fprintf(scope_stderr, "error: join_namespace failed\n");
         return EXIT_FAILURE; 
     }
@@ -385,7 +350,7 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
  * run the start command in the context of the host. It should run once and
  * then clean up after itself.
  *
- * This should be called after the fs namespace has been switched.
+ * This should be called after the mnt namespace has been switched.
  */
 static bool
 createCron(const char *scopePath, const char* filterPath) {
@@ -496,7 +461,8 @@ setHostNamespace(const char *ns) {
         return FALSE;
     }
 
-    // TODO: should we close here?
+    scope_close(nsFd);
+
     return TRUE;
 }
 
@@ -591,11 +557,11 @@ joinHostNamespace(void) {
      */
     scope_memset(path, 0, PATH_MAX);
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
-    mkdir_status_t res = libdirCreateDirIfMissing(path, 0755);
+    mkdir_status_t res = libdirCreateDirIfMissing(path, 0755, scope_getuid(), scope_getgid());
     if ((res > MKDIR_STATUS_EXISTS) || (isDevVersion)) {
         scope_memset(path, 0, PATH_MAX);
         scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
-        mkdir_status_t res = libdirCreateDirIfMissing(path, 0777);
+        mkdir_status_t res = libdirCreateDirIfMissing(path, 0777, scope_getuid(), scope_getgid());
         if (res > MKDIR_STATUS_EXISTS) {
             goto cleanupMem;
         }

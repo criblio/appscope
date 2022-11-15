@@ -23,7 +23,7 @@ typedef enum {
 
 struct service_ops {
     bool (*isServiceInstalled)(const char *serviceName);
-    service_cfg_status_t (*serviceCfgStatus)(const char *serviceCfgPath);
+    service_cfg_status_t (*serviceCfgStatus)(const char *serviceCfgPath, uid_t uid, gid_t gid);
     service_status_t (*newServiceCfg)(const char *serviceCfgPath, const char *libscopePath);
     service_status_t (*modifyServiceCfg)(const char *serviceCfgPath, const char *libscopePath);
 };
@@ -40,10 +40,10 @@ isServiceInstalledSystemD(const char *serviceName) {
     * List of directories which can contain service configuration file.
     */
     const char *const servicePrefixList[] = {
-        "/etc/systemd/system/",
-        "/lib/systemd/system/",
-        "/run/systemd/system/",
-        "/usr/lib/systemd/system/"
+        "/etc/systemd/system",
+        "/lib/systemd/system",
+        "/run/systemd/system",
+        "/usr/lib/systemd/system"
     };
 
     for (int i = 0; i < sizeof(servicePrefixList)/sizeof(char*); ++i) {
@@ -84,7 +84,7 @@ isServiceInstalledInitDOpenRc(const char *serviceName) {
  * Returns status of the Service file.
  */
 static service_cfg_status_t
-serviceCfgStatusSystemD(const char *serviceName) {
+serviceCfgStatusSystemD(const char *serviceName, uid_t uid, gid_t gid) {
     char cfgScript[PATH_MAX] = {0};
     struct stat st = {0};
     service_cfg_status_t ret = SERVICE_CFG_ERROR;
@@ -96,10 +96,11 @@ serviceCfgStatusSystemD(const char *serviceName) {
 
     // create service.d directory if it does not exists.
     if (scope_stat(cfgScript, &st) != 0) {
-        if (scope_mkdir(cfgScript, 0644) != 0) {
+        if (scope_mkdir(cfgScript, 0755) != 0) {
             scope_perror("error: serviceCfgStatusSystemD, scope_mkdir failed");
             return ret;
-        }   
+        }
+        scope_chown(cfgScript, uid, gid);
     }
 
     scope_strncat(cfgScript, "env.conf", sizeof("env.conf") - 1);
@@ -119,7 +120,7 @@ serviceCfgStatusSystemD(const char *serviceName) {
  * Returns status of the Service file.
  */
 static service_cfg_status_t
-serviceCfgStatusInitD(const char *serviceName) {
+serviceCfgStatusInitD(const char *serviceName, uid_t uid, gid_t gid) {
     char cfgScript[PATH_MAX] = {0};
     struct stat st = {0};
     service_cfg_status_t ret = SERVICE_CFG_ERROR;
@@ -143,7 +144,7 @@ serviceCfgStatusInitD(const char *serviceName) {
  * Returns status of the Service file.
  */
 static service_cfg_status_t
-serviceCfgStatusOpenRc(const char *serviceName) {
+serviceCfgStatusOpenRc(const char *serviceName, uid_t uid, gid_t gid) {
     char cfgScript[PATH_MAX] = {0};
     struct stat st = {0};
     service_cfg_status_t ret = SERVICE_CFG_ERROR;
@@ -185,7 +186,7 @@ newServiceCfgSystemD(const char *serviceCfgPath, const char *libscopePath) {
     }
 
     scope_fclose(fPtr);
-    
+
     return res;
 }
 
@@ -270,6 +271,7 @@ isCfgFileConfigured(const char *serviceCfgPath) {
     }
 
     scope_fclose(fPtr);
+
     return res;
 }
 
@@ -354,7 +356,7 @@ static struct service_ops OpenRcService = {
  * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
 service_status_t
-setupService(const char *serviceName) {
+setupService(const char *serviceName, uid_t uid, gid_t gid) {
     struct stat sb = {0};
     struct service_ops *service;
 
@@ -406,7 +408,7 @@ setupService(const char *serviceName) {
         }
     }
 
-    service_cfg_status_t cfgStatus = service->serviceCfgStatus(serviceName);
+    service_cfg_status_t cfgStatus = service->serviceCfgStatus(serviceName, uid, gid);
     if (cfgStatus == SERVICE_CFG_ERROR) {
         return SERVICE_STATUS_ERROR_OTHER;
     } else if (cfgStatus == SERVICE_CFG_NEW) {
@@ -419,7 +421,12 @@ setupService(const char *serviceName) {
         // Service was already setup correctly
         return SERVICE_STATUS_SUCCESS;
     }
-    scope_chmod(serviceCfgPath, 0644);
+
+    // Change permission and ownership if modify or create was success
+    if (status == SERVICE_STATUS_SUCCESS ) {
+        scope_chown(serviceCfgPath, uid, gid);
+        scope_chmod(serviceCfgPath, 0644);
+    }
     
     return status;
 }
@@ -430,7 +437,7 @@ setupService(const char *serviceName) {
  * Returns status of operation TRUE in case of success, FALSE otherwise
  */
 static bool
-setupProfile(const char *libscopePath, const char *loaderVersion) {
+setupProfile(const char *libscopePath, const char *loaderVersion, uid_t uid, gid_t gid) {
 
     /*
      * If the env var is set to anything, return.
@@ -462,6 +469,8 @@ setupProfile(const char *libscopePath, const char *loaderVersion) {
         return FALSE;
     }
 
+    scope_chown("/etc/profile.d/scope.sh", uid, gid);
+
     return TRUE;
 }
 
@@ -471,7 +480,7 @@ setupProfile(const char *libscopePath, const char *loaderVersion) {
  * Returns status of operation TRUE in case of success, FALSE otherwise
  */
 static bool
-setupExtractFilterFile(void *filterFileMem, size_t filterSize, const char *outputFilterPath) {
+setupExtractFilterFile(void *filterFileMem, size_t filterSize, const char *outputFilterPath, uid_t uid, gid_t gid) {
     int filterFd;
     bool status = FALSE;
 
@@ -496,6 +505,8 @@ setupExtractFilterFile(void *filterFileMem, size_t filterSize, const char *outpu
 cleanupDestFd:
 
     scope_close(filterFd);
+
+    scope_chown(outputFilterPath, uid, gid);
 
     return status;
 }
@@ -550,7 +561,7 @@ closeFd:
  * Returns status of operation 0 in case of success, other value otherwise
  */
 int
-setupConfigure(void *filterFileMem, size_t filterSize) {
+setupConfigure(void *filterFileMem, size_t filterSize, uid_t uid, gid_t gid) {
     char path[PATH_MAX] = {0};
     mode_t mode = 0755;
 
@@ -566,12 +577,12 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
     if (getenv("SCOPE_START_FORCE_PROFILE")) isDevVersion = FALSE;
 
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
-    mkdir_status_t res = libdirCreateDirIfMissing(path, mode);
+    mkdir_status_t res = libdirCreateDirIfMissing(path, mode, uid, gid);
     if ((res > MKDIR_STATUS_EXISTS) || isDevVersion) {
         mode = 0777;
         scope_memset(path, 0, PATH_MAX);
         scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
-        mkdir_status_t res = libdirCreateDirIfMissing(path, mode);
+        mkdir_status_t res = libdirCreateDirIfMissing(path, mode, uid, gid);
         if (res > MKDIR_STATUS_EXISTS) {
             scope_fprintf(scope_stderr, "setupConfigure: libdirCreateDirIfMissing failed\n");
             return -1;
@@ -581,8 +592,8 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
     scope_strncat(path, "libscope.so", sizeof("libscope.so"));
 
     // Extract[create] the filter file to filter location
-    if (setupExtractFilterFile(filterFileMem, filterSize, SCOPE_FILTER_USR_PATH) == FALSE) {
-        if (setupExtractFilterFile(filterFileMem, filterSize, SCOPE_FILTER_TMP_PATH) == FALSE) {
+    if (setupExtractFilterFile(filterFileMem, filterSize, SCOPE_FILTER_USR_PATH, uid, gid) == FALSE) {
+        if (setupExtractFilterFile(filterFileMem, filterSize, SCOPE_FILTER_TMP_PATH, uid, gid) == FALSE) {
             scope_fprintf(scope_stderr, "setupConfigure: setup filter file failed\n");
             return -1;
         }
@@ -593,14 +604,14 @@ setupConfigure(void *filterFileMem, size_t filterSize) {
      * Only update the profile if we are using the system dir.
      */
     if (scope_strstr(path, "/usr/lib")) {
-        if (setupProfile(path, loaderVersion) == FALSE) {
+        if (setupProfile(path, loaderVersion, uid, gid) == FALSE) {
             scope_fprintf(scope_stderr, "setupConfigure: setupProfile failed\n");
             return -1;
         }
     }
 
     // Extract libscope.so
-    if (libdirSaveLibraryFile(path, overwrite, mode)) {
+    if (libdirSaveLibraryFile(path, overwrite, mode, uid, gid)) {
         scope_fprintf(scope_stderr, "setupConfigure: saving %s failed\n", path);
         return -1;
     }

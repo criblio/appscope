@@ -28,7 +28,7 @@ Here are the contents of `example_filter.yml`:
 ```
 allow:
 - procname: nginx
-  arg: 
+  arg:
   config:
     metric:
       enable: true
@@ -114,7 +114,7 @@ allow:
           cacertpath: ''
           enable: false
           validateserver: true
-- procname: 
+- procname:
   arg: redis-server
   config:
     metric:

@@ -3,7 +3,6 @@ package util
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/user"
 	"strconv"
@@ -246,7 +245,7 @@ func PidUser(pid int) (string, error) {
 func PidScoped(pid int) bool {
 
 	// Look for libscope in /proc maps
-	pidMapFile, err := ioutil.ReadFile(fmt.Sprintf("/proc/%v/maps", pid))
+	pidMapFile, err := os.ReadFile(fmt.Sprintf("/proc/%v/maps", pid))
 	if err != nil {
 		return false
 	}

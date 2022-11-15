@@ -371,8 +371,8 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr phad
 #elif defined(__aarch64__)
     __asm__ volatile (
         "mov sp, %2 \n"
-        "mov x0, xzr \n"
         "mov x17, %1 \n"
+        "mov x0, xzr \n"              // passing NULL as p1
         "br  x17 \n"
         : "=r"(res)                   //output
         : "r"(start), "r"(sp)

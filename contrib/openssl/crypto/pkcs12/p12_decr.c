@@ -1,5 +1,5 @@
 /*
- * Copyright 1999-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1999-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -43,15 +43,15 @@ unsigned char *PKCS12_pbe_crypt_ex(const X509_ALGOR *algor,
      * It's appended to encrypted text on encrypting
      * MAC should be processed on decrypting separately from plain text
      */
-    max_out_len = inlen + EVP_CIPHER_CTX_block_size(ctx);
-    if ((EVP_CIPHER_flags(EVP_CIPHER_CTX_get0_cipher(ctx))
+    max_out_len = inlen + EVP_CIPHER_CTX_get_block_size(ctx);
+    if ((EVP_CIPHER_get_flags(EVP_CIPHER_CTX_get0_cipher(ctx))
                 & EVP_CIPH_FLAG_CIPHER_WITH_MAC) != 0) {
         if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_TLS1_AAD, 0, &mac_len) < 0) {
             ERR_raise(ERR_LIB_PKCS12, ERR_R_INTERNAL_ERROR);
             goto err;
         }
 
-        if (EVP_CIPHER_CTX_encrypting(ctx)) {
+        if (EVP_CIPHER_CTX_is_encrypting(ctx)) {
             max_out_len += mac_len;
         } else {
             if (inlen < mac_len) {
@@ -89,11 +89,13 @@ unsigned char *PKCS12_pbe_crypt_ex(const X509_ALGOR *algor,
         goto err;
     }
     outlen += i;
-    if ((EVP_CIPHER_flags(EVP_CIPHER_CTX_get0_cipher(ctx))
+    if ((EVP_CIPHER_get_flags(EVP_CIPHER_CTX_get0_cipher(ctx))
                 & EVP_CIPH_FLAG_CIPHER_WITH_MAC) != 0) {
-        if (EVP_CIPHER_CTX_encrypting(ctx)) {
+        if (EVP_CIPHER_CTX_is_encrypting(ctx)) {
             if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_AEAD_GET_TAG,
                 (int)mac_len, out+outlen) < 0) {
+                OPENSSL_free(out);
+                out = NULL;
                 ERR_raise(ERR_LIB_PKCS12, ERR_R_INTERNAL_ERROR);
                 goto err;
             }

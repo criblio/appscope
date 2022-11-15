@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -147,21 +147,6 @@ FILE *__iob_func();
 #     define stdin  (&__iob_func()[0])
 #     define stdout (&__iob_func()[1])
 #     define stderr (&__iob_func()[2])
-#    elif _MSC_VER<1300 && defined(I_CAN_LIVE_WITH_LNK4049)
-#     undef stdin
-#     undef stdout
-#     undef stderr
-         /*
-          * pre-1300 has __p__iob(), but it's available only in msvcrt.lib,
-          * or in other words with /MD. Declaring implicit import, i.e. with
-          * _imp_ prefix, works correctly with all compiler options, but
-          * without /MD results in LINK warning LNK4049: 'locally defined
-          * symbol "__iob" imported'.
-          */
-extern FILE *_imp___iob;
-#     define stdin  (&_imp___iob[0])
-#     define stdout (&_imp___iob[1])
-#     define stderr (&_imp___iob[2])
 #    endif
 #   endif
 #  endif
@@ -264,8 +249,6 @@ extern FILE *_imp___iob;
 /***********************************************/
 
 # if defined(OPENSSL_SYS_WINDOWS)
-#  define strcasecmp _stricmp
-#  define strncasecmp _strnicmp
 #  if (_MSC_VER >= 1310) && !defined(_WIN32_WCE)
 #   define open _open
 #   define fdopen _fdopen
@@ -302,6 +285,54 @@ struct servent *getservbyname(const char *name, const char *proto);
 
 # endif
 /* end vxworks */
+
+/* system-specific variants defining ossl_sleep() */
+#if defined(OPENSSL_SYS_UNIX) || defined(__DJGPP__)
+# include <unistd.h>
+static ossl_inline void ossl_sleep(unsigned long millis)
+{
+# ifdef OPENSSL_SYS_VXWORKS
+    struct timespec ts;
+    ts.tv_sec = (long int) (millis / 1000);
+    ts.tv_nsec = (long int) (millis % 1000) * 1000000ul;
+    nanosleep(&ts, NULL);
+# elif defined(__TANDEM)
+#  if !defined(_REENTRANT)
+#   include <cextdecs.h(PROCESS_DELAY_)>
+    /* HPNS does not support usleep for non threaded apps */
+    PROCESS_DELAY_(millis * 1000);
+#  elif defined(_SPT_MODEL_)
+#   include <spthread.h>
+#   include <spt_extensions.h>
+    usleep(millis * 1000);
+#  else
+    usleep(millis * 1000);
+#  endif
+# else
+    usleep(millis * 1000);
+# endif
+}
+#elif defined(_WIN32)
+# include <windows.h>
+static ossl_inline void ossl_sleep(unsigned long millis)
+{
+    Sleep(millis);
+}
+#else
+/* Fallback to a busy wait */
+static ossl_inline void ossl_sleep(unsigned long millis)
+{
+    struct timeval start, now;
+    unsigned long elapsedms;
+
+    gettimeofday(&start, NULL);
+    do {
+        gettimeofday(&now, NULL);
+        elapsedms = (((now.tv_sec - start.tv_sec) * 1000000)
+                     + now.tv_usec - start.tv_usec) / 1000;
+    } while (elapsedms < millis);
+}
+#endif /* defined OPENSSL_SYS_UNIX */
 
 /* ----------------------------- HP NonStop -------------------------------- */
 /* Required to support platform variant without getpid() and pid_t. */
@@ -376,6 +407,26 @@ inline int nssgetpid();
 #   else
 #     define OPENSSL_NO_SECURE_MEMORY
 #   endif
+# endif
+
+/*
+ * str[n]casecmp_l is defined in POSIX 2008-01. Value is taken accordingly
+ * https://www.gnu.org/software/libc/manual/html_node/Feature-Test-Macros.html
+ * There are also equivalent functions on Windows.
+ * There is no locale_t on NONSTOP.
+ */
+# if defined(OPENSSL_SYS_WINDOWS)
+#  define locale_t _locale_t
+#  define freelocale _free_locale
+#  define strcasecmp_l _stricmp_l
+#  define strncasecmp_l _strnicmp_l
+#  define strcasecmp _stricmp
+#  define strncasecmp _strnicmp
+# elif !defined(_POSIX_C_SOURCE) || _POSIX_C_SOURCE < 200809L \
+     || defined(OPENSSL_SYS_TANDEM)
+#  ifndef OPENSSL_NO_LOCALE
+#   define OPENSSL_NO_LOCALE
+#  endif
 # endif
 
 #endif

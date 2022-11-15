@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2016-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -331,6 +331,7 @@ int run_tests(const char *test_prog_name)
             test_flush_tapout();
         } else if (all_tests[i].num == -1) {
             set_test_title(all_tests[i].test_case_name);
+            ERR_clear_error();
             verdict = all_tests[i].test_fn();
             finalize(verdict != 0);
             test_verdict(verdict, "%d - %s", test_case_count + 1, test_title);
@@ -338,8 +339,6 @@ int run_tests(const char *test_prog_name)
                 num_failed++;
             test_case_count++;
         } else {
-            int num_failed_inner = 0;
-
             verdict = TEST_SKIP_CODE;
             set_test_title(all_tests[i].test_case_name);
             if (all_tests[i].subtest) {
@@ -367,10 +366,10 @@ int run_tests(const char *test_prog_name)
                 j = (j + jstep) % all_tests[i].num;
                 if (single_iter != -1 && ((jj + 1) != single_iter))
                     continue;
+                ERR_clear_error();
                 v = all_tests[i].param_test_fn(j);
 
                 if (v == 0) {
-                    ++num_failed_inner;
                     verdict = 0;
                 } else if (v != TEST_SKIP_CODE && verdict != 0) {
                     verdict = 1;
@@ -436,13 +435,37 @@ char *test_mk_file_path(const char *dir, const char *file)
     const char *sep = "/";
 # else
     const char *sep = "";
+    char *dir_end;
+    char dir_end_sep;
 # endif
-    size_t len = strlen(dir) + strlen(sep) + strlen(file) + 1;
+    size_t dirlen = dir != NULL ? strlen(dir) : 0;
+    size_t len = dirlen + strlen(sep) + strlen(file) + 1;
     char *full_file = OPENSSL_zalloc(len);
 
     if (full_file != NULL) {
-        OPENSSL_strlcpy(full_file, dir, len);
-        OPENSSL_strlcat(full_file, sep, len);
+        if (dir != NULL && dirlen > 0) {
+            OPENSSL_strlcpy(full_file, dir, len);
+# ifdef OPENSSL_SYS_VMS
+            /*
+             * If |file| contains a directory spec, we need to do some
+             * careful merging.
+             * "vol:[dir.dir]" + "[.certs]sm2-root.crt" should become
+             * "vol:[dir.dir.certs]sm2-root.crt"
+             */
+            dir_end = &full_file[strlen(full_file) - 1];
+            dir_end_sep = *dir_end;
+            if ((dir_end_sep == ']' || dir_end_sep == '>')
+                && (file[0] == '[' || file[0] == '<')) {
+                file++;
+                if (file[0] == '.')
+                    *dir_end = '\0';
+                else
+                    *dir_end = '.';
+            }
+#else
+            OPENSSL_strlcat(full_file, sep, len);
+#endif
+        }
         OPENSSL_strlcat(full_file, file, len);
     }
 

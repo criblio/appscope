@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2020-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -88,7 +88,7 @@ int ossl_store_handle_load_result(const OSSL_PARAM params[], void *arg)
     OSSL_STORE_INFO **v = &cbdata->v;
     OSSL_STORE_CTX *ctx = cbdata->ctx;
     const OSSL_PROVIDER *provider =
-        OSSL_STORE_LOADER_provider(ctx->fetched_loader);
+        OSSL_STORE_LOADER_get0_provider(ctx->fetched_loader);
     OSSL_LIB_CTX *libctx = ossl_provider_libctx(provider);
     const char *propq = ctx->properties;
     const OSSL_PARAM *p;
@@ -191,13 +191,15 @@ static EVP_PKEY *try_key_ref(struct extracted_param_data_st *data,
     EVP_PKEY *pk = NULL;
     EVP_KEYMGMT *keymgmt = NULL;
     void *keydata = NULL;
+    int try_fallback = 2;
 
     /* If we have an object reference, we must have a data type */
     if (data->data_type == NULL)
         return 0;
 
     keymgmt = EVP_KEYMGMT_fetch(libctx, data->data_type, propq);
-    if (keymgmt != NULL) {
+    ERR_set_mark();
+    while (keymgmt != NULL && keydata == NULL && try_fallback-- > 0) {
         /*
          * There are two possible cases
          *
@@ -206,7 +208,9 @@ static EVP_PKEY *try_key_ref(struct extracted_param_data_st *data,
          * 2.  The keymgmt is from another provider, then we must
          *     do the export/import dance.
          */
-        if (EVP_KEYMGMT_provider(keymgmt) == provider) {
+        if (EVP_KEYMGMT_get0_provider(keymgmt) == provider) {
+            /* no point trying fallback here */
+            try_fallback = 0;
             keydata = evp_keymgmt_load(keymgmt, data->ref, data->ref_size);
         } else {
             struct evp_keymgmt_util_try_import_data_st import_data;
@@ -230,9 +234,23 @@ static EVP_PKEY *try_key_ref(struct extracted_param_data_st *data,
 
             keydata = import_data.keydata;
         }
+
+        if (keydata == NULL && try_fallback > 0) {
+            EVP_KEYMGMT_free(keymgmt);
+            keymgmt = evp_keymgmt_fetch_from_prov((OSSL_PROVIDER *)provider,
+                                                  data->data_type, propq);
+            if (keymgmt != NULL) {
+                ERR_pop_to_mark();
+                ERR_set_mark();
+            }
+        }
     }
-    if (keydata != NULL)
+    if (keydata != NULL) {
+        ERR_pop_to_mark();
         pk = evp_keymgmt_util_make_pkey(keymgmt, keydata);
+    } else {
+        ERR_clear_last_mark();
+    }
     EVP_KEYMGMT_free(keymgmt);
 
     return pk;
@@ -268,7 +286,7 @@ static EVP_PKEY *try_key_value(struct extracted_param_data_st *data,
     }
 
     decoderctx =
-        OSSL_DECODER_CTX_new_for_pkey(&pk, "DER", data->data_structure,
+        OSSL_DECODER_CTX_new_for_pkey(&pk, NULL, data->data_structure,
                                       data->data_type, selection, libctx,
                                       propq);
     (void)OSSL_DECODER_CTX_set_passphrase_cb(decoderctx, cb, cbarg);
@@ -399,8 +417,6 @@ static int try_key(struct extracted_param_data_st *data, OSSL_STORE_INFO **v,
              * engine provided legacy key.
              * This is the same as der2key_decode() does, but in a limited
              * way and within the walls of libcrypto.
-             *
-             * TODO Remove this when #legacy keys are gone
              */
             if (pk == NULL)
                 pk = try_key_value_legacy(data, &store_info_new, ctx,
@@ -442,8 +458,6 @@ static int try_cert(struct extracted_param_data_st *data, OSSL_STORE_INFO **v,
 {
     if (data->object_type == OSSL_OBJECT_UNKNOWN
         || data->object_type == OSSL_OBJECT_CERT) {
-        X509 *cert;
-
         /*
          * In most cases, we can try to interpret the serialized
          * data as a trusted cert (X509 + X509_AUX) and fall back
@@ -454,31 +468,32 @@ static int try_cert(struct extracted_param_data_st *data, OSSL_STORE_INFO **v,
          * or not (0).
          */
         int ignore_trusted = 1;
+        X509 *cert = X509_new_ex(libctx, propq);
+
+        if (cert == NULL)
+            return 0;
 
         /* If we have a data type, it should be a PEM name */
         if (data->data_type != NULL
-            && (strcasecmp(data->data_type, PEM_STRING_X509_TRUSTED) == 0))
+            && (OPENSSL_strcasecmp(data->data_type, PEM_STRING_X509_TRUSTED) == 0))
             ignore_trusted = 0;
 
-        cert = d2i_X509_AUX(NULL, (const unsigned char **)&data->octet_data,
-                            data->octet_data_size);
-        if (cert == NULL && ignore_trusted)
-            cert = d2i_X509(NULL, (const unsigned char **)&data->octet_data,
-                            data->octet_data_size);
-
-        if (cert != NULL)
-            /* We determined the object type */
-            data->object_type = OSSL_OBJECT_CERT;
-
-        if (cert != NULL && !ossl_x509_set0_libctx(cert, libctx, propq)) {
+        if (d2i_X509_AUX(&cert, (const unsigned char **)&data->octet_data,
+                         data->octet_data_size) == NULL
+            && (!ignore_trusted
+                || d2i_X509(&cert, (const unsigned char **)&data->octet_data,
+                            data->octet_data_size) == NULL)) {
             X509_free(cert);
             cert = NULL;
         }
 
-        if (cert != NULL)
+        if (cert != NULL) {
+            /* We determined the object type */
+            data->object_type = OSSL_OBJECT_CERT;
             *v = OSSL_STORE_INFO_new_CERT(cert);
-        if (*v == NULL)
-            X509_free(cert);
+            if (*v == NULL)
+                X509_free(cert);
+        }
     }
 
     return 1;
@@ -528,7 +543,7 @@ static int try_pkcs12(struct extracted_param_data_st *data, OSSL_STORE_INFO **v,
 
         if (p12 != NULL) {
             char *pass = NULL;
-            char tpass[PEM_BUFSIZE];
+            char tpass[PEM_BUFSIZE + 1];
             size_t tpass_len;
             EVP_PKEY *pkey = NULL;
             X509 *cert = NULL;
@@ -550,17 +565,23 @@ static int try_pkcs12(struct extracted_param_data_st *data, OSSL_STORE_INFO **v,
                     OSSL_PARAM_END
                 };
 
-                if (!ossl_pw_get_passphrase(tpass, sizeof(tpass), &tpass_len,
+                if (!ossl_pw_get_passphrase(tpass, sizeof(tpass) - 1,
+                                            &tpass_len,
                                             pw_params, 0, &ctx->pwdata)) {
                     ERR_raise(ERR_LIB_OSSL_STORE,
                               OSSL_STORE_R_PASSPHRASE_CALLBACK_ERROR);
                     goto p12_end;
                 }
                 pass = tpass;
-                if (!PKCS12_verify_mac(p12, pass, strlen(pass))) {
+                /*
+                 * ossl_pw_get_passphrase() does not NUL terminate but
+                 * we must do it for PKCS12_parse()
+                 */
+                pass[tpass_len] = '\0';
+                if (!PKCS12_verify_mac(p12, pass, tpass_len)) {
                     ERR_raise_data(ERR_LIB_OSSL_STORE,
                                    OSSL_STORE_R_ERROR_VERIFYING_PKCS12_MAC,
-                                   strlen(pass) == 0 ? "empty password" :
+                                   tpass_len == 0 ? "empty password" :
                                    "maybe wrong password");
                     goto p12_end;
                 }
@@ -616,9 +637,10 @@ static int try_pkcs12(struct extracted_param_data_st *data, OSSL_STORE_INFO **v,
                 }
                 ctx->cached_info = infos;
             }
+         p12_end:
+            OPENSSL_cleanse(tpass, sizeof(tpass));
+            PKCS12_free(p12);
         }
-     p12_end:
-        PKCS12_free(p12);
         *v = sk_OSSL_STORE_INFO_shift(ctx->cached_info);
     }
 

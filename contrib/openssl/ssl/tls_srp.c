@@ -1,5 +1,5 @@
 /*
- * Copyright 2004-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2004-2022 The OpenSSL Project Authors. All Rights Reserved.
  * Copyright (c) 2004, EdelKey Project. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
@@ -203,7 +203,7 @@ int ssl_srp_server_param_with_username_intern(SSL *s, int *ad)
         (s->srp_ctx.s == NULL) || (s->srp_ctx.v == NULL))
         return SSL3_AL_FATAL;
 
-    if (RAND_priv_bytes_ex(s->ctx->libctx, b, sizeof(b)) <= 0)
+    if (RAND_priv_bytes_ex(s->ctx->libctx, b, sizeof(b), 0) <= 0)
         return SSL3_AL_FATAL;
     s->srp_ctx.b = BN_bin2bn(b, sizeof(b), NULL);
     OPENSSL_cleanse(b, sizeof(b));
@@ -238,7 +238,7 @@ int SSL_set_srp_server_param_pw(SSL *s, const char *user, const char *pass,
     BN_clear_free(s->srp_ctx.s);
     s->srp_ctx.s = NULL;
     if (!SRP_create_verifier_BN_ex(user, pass, &s->srp_ctx.s, &s->srp_ctx.v,
-                                   GN->N, GN->g, s->ctx->libctx,
+                                   s->srp_ctx.N, s->srp_ctx.g, s->ctx->libctx,
                                    s->ctx->propq))
         return -1;
 
@@ -301,7 +301,7 @@ int SSL_set_srp_server_param(SSL *s, const BIGNUM *N, const BIGNUM *g,
 int srp_generate_server_master_secret(SSL *s)
 {
     BIGNUM *K = NULL, *u = NULL;
-    int ret = -1, tmp_len = 0;
+    int ret = 0, tmp_len = 0;
     unsigned char *tmp = NULL;
 
     if (!SRP_Verify_A_mod_N(s->srp_ctx.A, s->srp_ctx.N))
@@ -331,7 +331,7 @@ int srp_generate_server_master_secret(SSL *s)
 int srp_generate_client_master_secret(SSL *s)
 {
     BIGNUM *x = NULL, *u = NULL, *K = NULL;
-    int ret = -1, tmp_len = 0;
+    int ret = 0, tmp_len = 0;
     char *passwd = NULL;
     unsigned char *tmp = NULL;
 
@@ -420,7 +420,7 @@ int ssl_srp_calc_a_param_intern(SSL *s)
 {
     unsigned char rnd[SSL_MAX_MASTER_KEY_LENGTH];
 
-    if (RAND_priv_bytes_ex(s->ctx->libctx, rnd, sizeof(rnd)) <= 0)
+    if (RAND_priv_bytes_ex(s->ctx->libctx, rnd, sizeof(rnd), 0) <= 0)
         return 0;
     s->srp_ctx.a = BN_bin2bn(rnd, sizeof(rnd), s->srp_ctx.a);
     OPENSSL_cleanse(rnd, sizeof(rnd));

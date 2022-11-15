@@ -51,7 +51,7 @@ int X509_print_ex(BIO *bp, X509 *x, unsigned long nmflags,
     long l;
     int ret = 0, i;
     char *m = NULL, mlch = ' ';
-    int nmindent = 0;
+    int nmindent = 0, printok = 0;
     EVP_PKEY *pkey = NULL;
     const char *neg;
 
@@ -60,8 +60,10 @@ int X509_print_ex(BIO *bp, X509 *x, unsigned long nmflags,
         nmindent = 12;
     }
 
-    if (nmflags == X509_FLAG_COMPAT)
+    if (nmflags == X509_FLAG_COMPAT) {
         nmindent = 16;
+        printok = 1;
+    }
 
     if (!(cflag & X509_FLAG_NO_HEADER)) {
         if (BIO_write(bp, "Certificate:\n", 13) <= 0)
@@ -130,7 +132,7 @@ int X509_print_ex(BIO *bp, X509 *x, unsigned long nmflags,
         if (BIO_printf(bp, "        Issuer:%c", mlch) <= 0)
             goto err;
         if (X509_NAME_print_ex(bp, X509_get_issuer_name(x), nmindent, nmflags)
-            < 0)
+            < printok)
             goto err;
         if (BIO_write(bp, "\n", 1) <= 0)
             goto err;
@@ -140,11 +142,11 @@ int X509_print_ex(BIO *bp, X509 *x, unsigned long nmflags,
             goto err;
         if (BIO_write(bp, "            Not Before: ", 24) <= 0)
             goto err;
-        if (ossl_asn1_time_print_ex(bp, X509_get0_notBefore(x)) == 0)
+        if (ossl_asn1_time_print_ex(bp, X509_get0_notBefore(x), ASN1_DTFLGS_RFC822) == 0)
             goto err;
         if (BIO_write(bp, "\n            Not After : ", 25) <= 0)
             goto err;
-        if (ossl_asn1_time_print_ex(bp, X509_get0_notAfter(x)) == 0)
+        if (ossl_asn1_time_print_ex(bp, X509_get0_notAfter(x), ASN1_DTFLGS_RFC822) == 0)
             goto err;
         if (BIO_write(bp, "\n", 1) <= 0)
             goto err;
@@ -153,7 +155,7 @@ int X509_print_ex(BIO *bp, X509 *x, unsigned long nmflags,
         if (BIO_printf(bp, "        Subject:%c", mlch) <= 0)
             goto err;
         if (X509_NAME_print_ex
-            (bp, X509_get_subject_name(x), nmindent, nmflags) < 0)
+            (bp, X509_get_subject_name(x), nmindent, nmflags) < printok)
             goto err;
         if (BIO_write(bp, "\n", 1) <= 0)
             goto err;
@@ -378,9 +380,9 @@ int X509_aux_print(BIO *out, X509 *x, int indent)
         BIO_puts(out, "\n");
     } else
         BIO_printf(out, "%*sNo Rejected Uses.\n", indent, "");
-    alias = X509_alias_get0(x, NULL);
+    alias = X509_alias_get0(x, &i);
     if (alias)
-        BIO_printf(out, "%*sAlias: %s\n", indent, "", alias);
+        BIO_printf(out, "%*sAlias: %.*s\n", indent, "", i, alias);
     keyid = X509_keyid_get0(x, &keyidlen);
     if (keyid) {
         BIO_printf(out, "%*sKey Id: ", indent, "");
@@ -522,12 +524,6 @@ int X509_STORE_CTX_print_verify_cb(int ok, X509_STORE_CTX *ctx)
         ERR_add_error_mem_bio("\n", bio);
         BIO_free(bio);
     }
-
-    /*
-     * TODO we could check policies here too, e.g.:
-     * if (cert_error == X509_V_OK && ok == 2)
-     *     policies_print(NULL, ctx);
-     */
 
     return ok;
 }

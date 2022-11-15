@@ -265,7 +265,7 @@ func PidScoped(pid int) bool {
 	}
 
 	// Check shmem does not exist (if scope_anon does not exist the proc is scoped)
-	files, err := ioutil.ReadDir(fmt.Sprintf("/proc/%v/fd", pid))
+	files, err := os.ReadDir(fmt.Sprintf("/proc/%v/fd", pid))
 	if err != nil {
 		return false
 	}
@@ -308,7 +308,7 @@ func PidCmdline(pid int) (string, error) {
 
 // PidThreadsPids gets the all the thread PIDs specified by PID
 func PidThreadsPids(pid int) ([]int, error) {
-	files, err := ioutil.ReadDir(fmt.Sprintf("/proc/%v/task", pid))
+	files, err := os.ReadDir(fmt.Sprintf("/proc/%v/task", pid))
 	if err != nil {
 		return nil, errGetProcTask
 	}

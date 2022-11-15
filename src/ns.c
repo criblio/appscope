@@ -10,6 +10,7 @@
 #include "scopestdlib.h"
 
 #define SCOPE_CRONTAB "* * * * * root /tmp/scope_att.sh\n"
+#define SCOPE_CRON_DIR  "/etc/cron.d"
 #define SCOPE_CRON_PATH "/etc/cron.d/scope_cron"
 #define SCOPE_SCRIPT_PATH "/tmp/scope_att.sh"
 #define SCOPE_START_SCRIPT "#! /bin/bash\nrm /etc/cron.d/scope_cron\n%s start -f < %s\nrm -- $0\n"
@@ -357,6 +358,11 @@ createCron(const char *scopePath, const char* filterPath) {
     int outFd;
     char buf[1024] = {0};
     char path[PATH_MAX] = {0};
+
+    if (scope_access(SCOPE_CRON_DIR, R_OK)) {
+        scope_fprintf(scope_stderr, "createCron: error %s does not exist\n", SCOPE_CRON_DIR);
+        return FALSE;
+    }
 
     // Create the script to be executed by cron
     if (scope_snprintf(path, sizeof(path), SCOPE_SCRIPT_PATH) < 0) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2020-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -47,8 +47,6 @@ struct keytype_desc_st {
 };
 
 static OSSL_FUNC_decoder_freectx_fn msblob2key_freectx;
-static OSSL_FUNC_decoder_gettable_params_fn msblob2key_gettable_params;
-static OSSL_FUNC_decoder_get_params_fn msblob2key_get_params;
 static OSSL_FUNC_decoder_decode_fn msblob2key_decode;
 static OSSL_FUNC_decoder_export_object_fn msblob2key_export_object;
 
@@ -58,6 +56,8 @@ static OSSL_FUNC_decoder_export_object_fn msblob2key_export_object;
 struct msblob2key_ctx_st {
     PROV_CTX *provctx;
     const struct keytype_desc_st *desc;
+    /* The selection that is passed to msblob2key_decode() */
+    int selection;
 };
 
 static struct msblob2key_ctx_st *
@@ -79,27 +79,6 @@ static void msblob2key_freectx(void *vctx)
     OPENSSL_free(ctx);
 }
 
-static const OSSL_PARAM *msblob2key_gettable_params(ossl_unused void *provctx)
-{
-    static const OSSL_PARAM gettables[] = {
-        { OSSL_DECODER_PARAM_INPUT_TYPE, OSSL_PARAM_UTF8_PTR, NULL, 0, 0 },
-        OSSL_PARAM_END,
-    };
-
-    return gettables;
-}
-
-static int msblob2key_get_params(OSSL_PARAM params[])
-{
-    OSSL_PARAM *p;
-
-    p = OSSL_PARAM_locate(params, OSSL_DECODER_PARAM_INPUT_TYPE);
-    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, "MSBLOB"))
-        return 0;
-
-    return 1;
-}
-
 static int msblob2key_decode(void *vctx, OSSL_CORE_BIO *cin, int selection,
                              OSSL_CALLBACK *data_cb, void *data_cbarg,
                              OSSL_PASSPHRASE_CALLBACK *pw_cb, void *pw_cbarg)
@@ -114,6 +93,9 @@ static int msblob2key_decode(void *vctx, OSSL_CORE_BIO *cin, int selection,
     void *key = NULL;
     int ok = 0;
 
+    if (in == NULL)
+        return 0;
+
     if (BIO_read(in, hdr_buf, 16) != 16) {
         ERR_raise(ERR_LIB_PEM, PEM_R_KEYBLOB_TOO_SHORT);
         goto next;
@@ -125,6 +107,7 @@ static int msblob2key_decode(void *vctx, OSSL_CORE_BIO *cin, int selection,
     if (!ok)
         goto next;
 
+    ctx->selection = selection;
     ok = 0;                      /* Assume that we fail */
 
     if ((isdss && ctx->desc->type != EVP_PKEY_DSA)
@@ -231,8 +214,7 @@ msblob2key_export_object(void *vctx,
         /* The contents of the reference is the address to our object */
         keydata = *(void **)reference;
 
-        return export(keydata, OSSL_KEYMGMT_SELECT_ALL,
-                      export_cb, export_cbarg);
+        return export(keydata, ctx->selection, export_cb, export_cbarg);
     }
     return 0;
 }
@@ -278,10 +260,6 @@ static void rsa_adjust(void *key, struct msblob2key_ctx_st *ctx)
           (void (*)(void))msblob2##keytype##_newctx },                  \
         { OSSL_FUNC_DECODER_FREECTX,                                    \
           (void (*)(void))msblob2key_freectx },                         \
-        { OSSL_FUNC_DECODER_GETTABLE_PARAMS,                            \
-          (void (*)(void))msblob2key_gettable_params },                 \
-        { OSSL_FUNC_DECODER_GET_PARAMS,                                 \
-          (void (*)(void))msblob2key_get_params },                      \
         { OSSL_FUNC_DECODER_DECODE,                                     \
           (void (*)(void))msblob2key_decode },                          \
         { OSSL_FUNC_DECODER_EXPORT_OBJECT,                              \

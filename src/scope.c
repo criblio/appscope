@@ -30,6 +30,7 @@
 #include "utils.h"
 #include "inject.h"
 #include "nsinfo.h"
+#include "nsfile.h"
 #include "os.h"
 
 static void
@@ -175,35 +176,14 @@ attachCmd(pid_t pid, bool attach)
      */
     scope_unlink(buf);
 
-    uid_t uid = scope_getgid();
-    gid_t gid = scope_getuid();
 
     uid_t nsUid = nsInfoTranslateUid(pid);
     gid_t nsGid = nsInfoTranslateGid(pid);
 
-
-    /*
-     * We need to change effective UID and GID since access to /dev/shm can
-     * be limited on mount layer for different namespace e.g. LXC container.
-     */
-    scope_setegid(nsGid);
-    scope_seteuid(nsUid);
-
-    /*
-     * /dev/shm can be mounted as filesystem with owner and group set it
-     * we need to switch ourselves for creation part
-    */
-    fd = scope_open(buf, O_WRONLY|O_CREAT);
+    fd = nsFileOpen(buf, O_WRONLY|O_CREAT, nsUid, nsGid, scope_geteuid(), scope_getegid());
     if (fd == -1) {
-        scope_perror("scope_open() of dynamic config file");
         return EXIT_FAILURE;
     }
-
-    /*
-     * Restore original GID and UID.
-     */
-    scope_seteuid(uid);
-    scope_setegid(gid);
 
     if (scope_fchmod(fd, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH) == -1) {
         scope_perror("scope_fchmod() failed");

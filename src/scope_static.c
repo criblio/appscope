@@ -20,6 +20,7 @@
 #include "libdir.h"
 #include "loaderop.h"
 #include "nsinfo.h"
+#include "nsfile.h"
 #include "ns.h"
 #include "setup.h"
 
@@ -578,10 +579,10 @@ main(int argc, char **argv, char **env)
     char path[PATH_MAX] = {0};
     int pid = -1;
     char attachType = 'u';
-    uid_t uid = scope_getuid();
-    gid_t gid = scope_getgid();
-    uid_t nsUid = uid;
-    uid_t nsGid = gid;
+    uid_t eUid = scope_geteuid();
+    gid_t eGid = scope_getegid();
+    uid_t nsUid = eUid;
+    uid_t nsGid = eGid;
     // process command line
     for (;;) {
         int index = 0;
@@ -707,7 +708,7 @@ main(int argc, char **argv, char **env)
 
     if (serviceName) {
         // must be root
-        if (uid) {
+        if (eUid) {
             scope_printf("error: --service requires root\n");
             return EXIT_FAILURE;
         }
@@ -723,7 +724,7 @@ main(int argc, char **argv, char **env)
 
         if (pid == -1) {
             // Service on Host
-            return setupService(serviceName, uid, gid);
+            return setupService(serviceName, eUid, eGid);
         } else {
             // Service on Container
             pid_t nsContainerPid = 0;
@@ -738,7 +739,7 @@ main(int argc, char **argv, char **env)
     if (configFilterPath) {
         int status = EXIT_FAILURE;
         // must be root
-        if (uid) {
+        if (eUid) {
             scope_printf("error: --configure requires root\n");
             return EXIT_FAILURE;
         }
@@ -761,7 +762,7 @@ main(int argc, char **argv, char **env)
 
         if (pid == -1) {
             // Configure on Host
-            status = setupConfigure(confgFilterMem, configFilterSize, uid, gid);
+            status = setupConfigure(confgFilterMem, configFilterSize, eUid, eGid);
         } else {
             // Configure on Container
             pid_t nsContainerPid = 0;
@@ -806,7 +807,7 @@ main(int argc, char **argv, char **env)
         */
         if (nsInfoIsPidGotSecondPidNs(pid, &nsAttachPid) == TRUE) {
             // must be root to switch namespace
-            if (uid) {
+            if (eUid) {
                 scope_printf("error: --attach requires root\n");
                 return EXIT_FAILURE;
             }
@@ -818,7 +819,7 @@ main(int argc, char **argv, char **env)
         */
         } else if (nsInfoIsPidInSameMntNs(pid) == FALSE) {
             // must be root to switch namespace
-            if (uid) {
+            if (eUid) {
                 scope_printf("error: --attach requires root\n");
                 return EXIT_FAILURE;
             }
@@ -863,20 +864,14 @@ main(int argc, char **argv, char **env)
 
     // create /dev/shm/scope_${PID}.env when attaching
     if (attachArg && (attachType == 'a')) {
-        scope_setegid(nsGid);
-        scope_seteuid(nsUid);
 
         // create .env file for the library to load
         scope_snprintf(path, sizeof(path), "/scope_attach_%d.env", pid);
-        int fd = scope_shm_open(path, O_RDWR|O_CREAT, S_IRUSR|S_IRGRP|S_IROTH);
+        int fd = nsFileShmOpen(path, O_RDWR|O_CREAT, S_IRUSR|S_IRGRP|S_IROTH, nsUid, nsGid, eUid, eGid);
         if (fd == -1) {
-            scope_perror("shm_open() failed");
+            scope_fprintf(scope_stderr, "nsFileShmOpen failed\n");
             return EXIT_FAILURE;
         }
-
-        scope_seteuid(uid);
-        scope_setegid(gid);
-
         // add the env vars we want in the library
         scope_dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetPath(LIBRARY_FILE));
 

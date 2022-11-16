@@ -22,6 +22,7 @@
 
 #include "scopestdlib.h"
 #include "scopetypes.h" // for ROUND_UP()
+#include "nsfile.h"
 #include "libver.h"
 
 #ifndef SCOPE_VER
@@ -205,7 +206,7 @@ libdirCheckNote(libdirfile_t objFileType, const char *path)
 }
 
 static int
-libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overwrite, mode_t mode, uid_t uid, gid_t gid)
+libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overwrite, mode_t mode, uid_t nsEuid, gid_t nsEgid)
 {
     // Check if file exists
     if (!scope_access(path, R_OK) && !overwrite) {
@@ -241,7 +242,11 @@ libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overw
         scope_fprintf(scope_stderr, "error: extract temp too long.\n");
         return -1;
     }
-    if ((fd = scope_mkstemp(temp)) < 1) {
+
+    uid_t currentEuid = scope_geteuid();
+    gid_t currentEgid = scope_getegid();
+
+    if ((fd = nsFileMksTemp(temp, nsEuid, nsEgid, currentEuid, currentEgid)) < 1) {
         // No permission
         scope_unlink(temp);
         return -1;
@@ -261,14 +266,9 @@ libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overw
     }
 
     scope_close(fd);
-    if (scope_rename(temp, path)) {
+    if (nsFileRename(temp, path, nsEuid, nsEgid, currentEuid, currentEgid)) {
         scope_unlink(temp);
         scope_perror("libdirCreateFileIfMissing: scope_rename() failed");
-        return -1;
-    }
-
-    if (scope_chown(path, uid, gid)) {
-        scope_perror("libdirCreateFileIfMissing: scope_chown() failed");
         return -1;
     }
 
@@ -278,14 +278,14 @@ libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overw
 // Verify if following absolute path points to directory
 // Returns operation status
 static mkdir_status_t
-libdirCheckIfDirExists(const char *absDirPath)
+libdirCheckIfDirExists(const char *absDirPath, uid_t uid, gid_t gid)
 {
     struct stat st = {0};
     if (!scope_stat(absDirPath, &st)) {
         if (S_ISDIR(st.st_mode)) {      
             // Check for file creation abilities in directory  
-            if (((st.st_uid == scope_getuid()) && (st.st_mode & S_IWUSR)) ||
-                ((st.st_gid == scope_getgid()) && (st.st_mode & S_IWGRP)) ||
+            if (((st.st_uid == uid) && (st.st_mode & S_IWUSR)) ||
+                ((st.st_gid == gid) && (st.st_mode & S_IWGRP)) ||
                 (st.st_mode & S_IWOTH)) {
                 return MKDIR_STATUS_EXISTS;
             }
@@ -348,14 +348,14 @@ libdirInitTest(const char *installBase, const char *tmpBase, const char *rawVers
 // Create a directory in following absolute path creating any intermediate directories as necessary
 // Returns operation status
 mkdir_status_t
-libdirCreateDirIfMissing(const char *dir, mode_t mode, uid_t uid, gid_t gid) {
+libdirCreateDirIfMissing(const char *dir, mode_t mode, uid_t nsEuid, gid_t nsEgid) {
     int mkdirRes = -1;
     /* Operate only on absolute path */
     if (dir == NULL || *dir != '/') {
         return MKDIR_STATUS_ERR_NOT_ABS_DIR;
     }
 
-    mkdir_status_t res = libdirCheckIfDirExists(dir);
+    mkdir_status_t res = libdirCheckIfDirExists(dir, nsEuid, nsEgid);
 
     /* exit if path exists */
     if (res != MKDIR_STATUS_ERR_OTHER) {
@@ -367,45 +367,44 @@ libdirCreateDirIfMissing(const char *dir, mode_t mode, uid_t uid, gid_t gid) {
         goto end;
     }
 
+    uid_t euid = scope_geteuid();
+    gid_t egid = scope_getegid();
+
     /* traverse the full path */
     for (char *p = tempPath + 1; *p; p++) {
         if (*p == '/') {
             /* Temporarily truncate */
             *p = '\0';
             scope_errno = 0;
-            mkdirRes = scope_mkdir(tempPath, mode);
-            if (!mkdirRes) {
-                /* We ensure that we setup correct mode regarding umask settings */
-                if (scope_chmod(tempPath, mode)) {
-                    goto end;
-                }
 
-                /* We ensure that we setup correct permissions regarding potential namespace switch */
-                if (scope_chown(tempPath, uid, gid)) {
+            struct stat st = {0};
+            if (scope_stat(tempPath, &st)) {
+                mkdirRes = nsFileMkdir(tempPath, mode, nsEuid, nsEgid, euid, egid);
+                if (!mkdirRes) {
+                    /* We ensure that we setup correct mode regarding umask settings */
+                    if (scope_chmod(tempPath, mode)) {
+                        goto end;
+                    }
+                } else {
+                    /* nsFileMkdir fails */
                     goto end;
                 }
-            } else if (scope_errno != EEXIST) {
-                /* scope_mkdir fails with error other than directory exists */
-                goto end;
             }
+
             *p = '/';
         }
     }
-
-    /* last element */
-    scope_errno = 0;
-    mkdirRes = scope_mkdir(tempPath, mode);
-    if (mkdirRes && (scope_errno != EEXIST)) {
-        goto end;
+    struct stat st = {0};
+    if (scope_stat(tempPath, &st)) {
+        /* if last element was not created in the loop above */
+        mkdirRes = nsFileMkdir(tempPath, mode, nsEuid, nsEgid, euid, egid);
+        if (mkdirRes) {
+            goto end;
+        }
     }
 
     /* We ensure that we setup correct mode regarding umask settings */
     if (scope_chmod(tempPath, mode)) {
-        goto end;
-    }
-
-    /* We ensure that we setup correct permissions regarding potential namespace switch */
-    if (scope_chown(tempPath, uid, gid)) {
         goto end;
     }
 

@@ -106,6 +106,22 @@ static int x509_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it,
                 return 0;
         }
         break;
+    case ASN1_OP_GET0_LIBCTX:
+        {
+            OSSL_LIB_CTX **libctx = exarg;
+
+            *libctx = ret->libctx;
+        }
+        break;
+
+    case ASN1_OP_GET0_PROPQ:
+        {
+            const char **propq = exarg;
+
+            *propq = ret->propq;
+        }
+        break;
+
     default:
         break;
     }
@@ -119,29 +135,8 @@ ASN1_SEQUENCE_ref(X509, x509_cb) = {
         ASN1_EMBED(X509, signature, ASN1_BIT_STRING)
 } ASN1_SEQUENCE_END_ref(X509, X509)
 
-IMPLEMENT_ASN1_ALLOC_FUNCTIONS_fname(X509, X509, X509)
+IMPLEMENT_ASN1_FUNCTIONS(X509)
 IMPLEMENT_ASN1_DUP_FUNCTION(X509)
-
-X509 *d2i_X509(X509 **a, const unsigned char **in, long len)
-{
-    X509 *cert = NULL;
-    int free_on_error = a != NULL && *a == NULL;
-
-    cert = (X509 *)ASN1_item_d2i((ASN1_VALUE **)a, in, len, (X509_it()));
-    /* Only cache the extensions if the cert object was passed in */
-    if (cert != NULL && a != NULL) { /* then cert == *a */
-        if (!ossl_x509v3_cache_extensions(cert)) {
-            if (free_on_error)
-                X509_free(cert);
-            cert = NULL;
-        }
-    }
-    return cert;
-}
-int i2d_X509(const X509 *a, unsigned char **out)
-{
-    return ASN1_item_i2d((const ASN1_VALUE *)a, out, (X509_it()));
-}
 
 /*
  * This should only be used if the X509 object was embedded inside another
@@ -167,7 +162,7 @@ X509 *X509_new_ex(OSSL_LIB_CTX *libctx, const char *propq)
 {
     X509 *cert = NULL;
 
-    cert = (X509 *)ASN1_item_new((X509_it()));
+    cert = (X509 *)ASN1_item_new_ex(X509_it(), libctx, propq);
     if (!ossl_x509_set0_libctx(cert, libctx, propq)) {
         X509_free(cert);
         cert = NULL;

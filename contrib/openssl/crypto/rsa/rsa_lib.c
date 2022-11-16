@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -15,7 +15,9 @@
 
 #include <openssl/crypto.h>
 #include <openssl/core_names.h>
-#include <openssl/engine.h>
+#ifndef FIPS_MODULE
+# include <openssl/engine.h>
+#endif
 #include <openssl/evp.h>
 #include <openssl/param_build.h>
 #include "internal/cryptlib.h"
@@ -312,21 +314,30 @@ uint16_t ossl_ifc_ffc_compute_security_bits(int n)
 {
     uint64_t x;
     uint32_t lx;
-    uint16_t y;
+    uint16_t y, cap;
 
-    /* Look for common values as listed in SP 800-56B rev 2 Appendix D */
+    /*
+     * Look for common values as listed in standards.
+     * These values are not exactly equal to the results from the formulae in
+     * the standards but are defined to be canonical.
+     */
     switch (n) {
-    case 2048:
+    case 2048:      /* SP 800-56B rev 2 Appendix D and FIPS 140-2 IG 7.5 */
         return 112;
-    case 3072:
+    case 3072:      /* SP 800-56B rev 2 Appendix D and FIPS 140-2 IG 7.5 */
         return 128;
-    case 4096:
+    case 4096:      /* SP 800-56B rev 2 Appendix D */
         return 152;
-    case 6144:
+    case 6144:      /* SP 800-56B rev 2 Appendix D */
         return 176;
-    case 8192:
+    case 7680:      /* FIPS 140-2 IG 7.5 */
+        return 192;
+    case 8192:      /* SP 800-56B rev 2 Appendix D */
         return 200;
+    case 15360:     /* FIPS 140-2 IG 7.5 */
+        return 256;
     }
+
     /*
      * The first incorrect result (i.e. not accurate or off by one low) occurs
      * for n = 699668.  The true value here is 1200.  Instead of using this n
@@ -338,11 +349,26 @@ uint16_t ossl_ifc_ffc_compute_security_bits(int n)
     if (n < 8)
         return 0;
 
+    /*
+     * To ensure that the output is non-decreasing with respect to n,
+     * a cap needs to be applied to the two values where the function over
+     * estimates the strength (according to the above fast path).
+     */
+    if (n <= 7680)
+        cap = 192;
+    else if (n <= 15360)
+        cap = 256;
+    else
+        cap = 1200;
+
     x = n * (uint64_t)log_2;
     lx = ilog_e(x);
     y = (uint16_t)((mul2(c1_923, icbrt64(mul2(mul2(x, lx), lx))) - c4_690)
                    / log_2);
-    return (y + 4) & ~7;
+    y = (y + 4) & ~7;
+    if (y > cap)
+        y = cap;
+    return y;
 }
 
 
@@ -927,7 +953,6 @@ static int int_get_rsa_md_name(EVP_PKEY_CTX *ctx,
 /*
  * This one is currently implemented as an EVP_PKEY_CTX_ctrl() wrapper,
  * simply because that's easier.
- * TODO(3.0) Should this be deprecated?
  */
 int EVP_PKEY_CTX_set_rsa_padding(EVP_PKEY_CTX *ctx, int pad_mode)
 {
@@ -938,7 +963,6 @@ int EVP_PKEY_CTX_set_rsa_padding(EVP_PKEY_CTX *ctx, int pad_mode)
 /*
  * This one is currently implemented as an EVP_PKEY_CTX_ctrl() wrapper,
  * simply because that's easier.
- * TODO(3.0) Should this be deprecated?
  */
 int EVP_PKEY_CTX_get_rsa_padding(EVP_PKEY_CTX *ctx, int *pad_mode)
 {
@@ -949,7 +973,6 @@ int EVP_PKEY_CTX_get_rsa_padding(EVP_PKEY_CTX *ctx, int *pad_mode)
 /*
  * This one is currently implemented as an EVP_PKEY_CTX_ctrl() wrapper,
  * simply because that's easier.
- * TODO(3.0) Should this be deprecated in favor of passing a name?
  */
 int EVP_PKEY_CTX_set_rsa_pss_keygen_md(EVP_PKEY_CTX *ctx, const EVP_MD *md)
 {
@@ -969,7 +992,6 @@ int EVP_PKEY_CTX_set_rsa_pss_keygen_md_name(EVP_PKEY_CTX *ctx,
 /*
  * This one is currently implemented as an EVP_PKEY_CTX_ctrl() wrapper,
  * simply because that's easier.
- * TODO(3.0) Should this be deprecated in favor of passing a name?
  */
 int EVP_PKEY_CTX_set_rsa_oaep_md(EVP_PKEY_CTX *ctx, const EVP_MD *md)
 {
@@ -997,7 +1019,6 @@ int EVP_PKEY_CTX_get_rsa_oaep_md_name(EVP_PKEY_CTX *ctx, char *name,
 /*
  * This one is currently implemented as an EVP_PKEY_CTX_ctrl() wrapper,
  * simply because that's easier.
- * TODO(3.0) Should this be deprecated in favor of getting a name?
  */
 int EVP_PKEY_CTX_get_rsa_oaep_md(EVP_PKEY_CTX *ctx, const EVP_MD **md)
 {
@@ -1008,7 +1029,6 @@ int EVP_PKEY_CTX_get_rsa_oaep_md(EVP_PKEY_CTX *ctx, const EVP_MD **md)
 /*
  * This one is currently implemented as an EVP_PKEY_CTX_ctrl() wrapper,
  * simply because that's easier.
- * TODO(3.0) Should this be deprecated in favor of passing a name?
  */
 int EVP_PKEY_CTX_set_rsa_mgf1_md(EVP_PKEY_CTX *ctx, const EVP_MD *md)
 {
@@ -1036,7 +1056,6 @@ int EVP_PKEY_CTX_get_rsa_mgf1_md_name(EVP_PKEY_CTX *ctx, char *name,
 /*
  * This one is currently implemented as an EVP_PKEY_CTX_ctrl() wrapper,
  * simply because that's easier.
- * TODO(3.0) Should this be deprecated in favor of passing a name?
  */
 int EVP_PKEY_CTX_set_rsa_pss_keygen_mgf1_md(EVP_PKEY_CTX *ctx, const EVP_MD *md)
 {
@@ -1055,7 +1074,6 @@ int EVP_PKEY_CTX_set_rsa_pss_keygen_mgf1_md_name(EVP_PKEY_CTX *ctx,
 /*
  * This one is currently implemented as an EVP_PKEY_CTX_ctrl() wrapper,
  * simply because that's easier.
- * TODO(3.0) Should this be deprecated in favor of getting a name?
  */
 int EVP_PKEY_CTX_get_rsa_mgf1_md(EVP_PKEY_CTX *ctx, const EVP_MD **md)
 {
@@ -1066,6 +1084,7 @@ int EVP_PKEY_CTX_get_rsa_mgf1_md(EVP_PKEY_CTX *ctx, const EVP_MD **md)
 int EVP_PKEY_CTX_set0_rsa_oaep_label(EVP_PKEY_CTX *ctx, void *label, int llen)
 {
     OSSL_PARAM rsa_params[2], *p = rsa_params;
+    int ret;
 
     if (ctx == NULL || !EVP_PKEY_CTX_IS_ASYM_CIPHER_OP(ctx)) {
         ERR_raise(ERR_LIB_EVP, EVP_R_COMMAND_NOT_SUPPORTED);
@@ -1082,8 +1101,9 @@ int EVP_PKEY_CTX_set0_rsa_oaep_label(EVP_PKEY_CTX *ctx, void *label, int llen)
                                              (void *)label, (size_t)llen);
     *p++ = OSSL_PARAM_construct_end();
 
-    if (!evp_pkey_ctx_set_params_strict(ctx, rsa_params))
-        return 0;
+    ret = evp_pkey_ctx_set_params_strict(ctx, rsa_params);
+    if (ret <= 0)
+        return ret;
 
     /* Ownership is supposed to be transfered to the callee. */
     OPENSSL_free(label);
@@ -1226,8 +1246,11 @@ int EVP_PKEY_CTX_set1_rsa_keygen_pubexp(EVP_PKEY_CTX *ctx, BIGNUM *pubexp)
      * When we're dealing with a provider, there's no need to duplicate
      * pubexp, as it gets copied when transforming to an OSSL_PARAM anyway.
      */
-    if (evp_pkey_ctx_is_legacy(ctx))
+    if (evp_pkey_ctx_is_legacy(ctx)) {
         pubexp = BN_dup(pubexp);
+        if (pubexp == NULL)
+            return 0;
+    }
     ret = EVP_PKEY_CTX_ctrl(ctx, EVP_PKEY_RSA, EVP_PKEY_OP_KEYGEN,
                             EVP_PKEY_CTRL_RSA_KEYGEN_PUBEXP, 0, pubexp);
     if (evp_pkey_ctx_is_legacy(ctx) && ret <= 0)

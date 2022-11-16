@@ -8,18 +8,18 @@
  */
 uid_t
 nsInfoTranslateUid(pid_t hostPid) {
-    uid_t uid = scope_getuid();
+    uid_t eUid = scope_geteuid();
     char uidPath[PATH_MAX] = {0};
     char buffer[4096] = {0};
     FILE *fd;
 
     if (scope_snprintf(uidPath, sizeof(uidPath), "/proc/%d/uid_map", hostPid) < 0) {
         scope_perror("scope_snprintf uid_map failed");
-        return uid;
+        return eUid;
     }
     if ((fd = scope_fopen(uidPath, "r")) == NULL) {
         scope_perror("fopen(/proc/<PID>/uid_map) failed");
-        return uid;
+        return eUid;
     }
 
     while (scope_fgets(buffer, sizeof(buffer), fd)) {
@@ -32,13 +32,13 @@ nsInfoTranslateUid(pid_t hostPid) {
         entry = scope_strtok_r(NULL, delimiters, &last);
         uid_t uidOutsideNs = scope_atoi(entry);
         if ((uidInsideNs == 0) && (uidInsideNs != uidOutsideNs)) {
-            uid = uidOutsideNs;
+            eUid = uidOutsideNs;
             break;
         }
     }
     scope_fclose(fd);
 
-    return uid;
+    return eUid;
 }
 
 /*

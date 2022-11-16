@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2002-2022 The OpenSSL Project Authors. All Rights Reserved.
  * Copyright (c) 2002, Oracle and/or its affiliates. All rights reserved
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
@@ -100,7 +100,7 @@ int ecparam_main(int argc, char **argv)
     OSSL_ENCODER_CTX *ectx_key = NULL, *ectx_params = NULL;
     OSSL_DECODER_CTX *dctx_params = NULL;
     ENGINE *e = NULL;
-    BIO *in = NULL, *out = NULL;
+    BIO *out = NULL;
     char *curve_name = NULL;
     char *asn1_encoding = NULL;
     char *point_format = NULL;
@@ -195,9 +195,6 @@ int ecparam_main(int argc, char **argv)
 
     private = genkey ? 1 : 0;
 
-    in = bio_open_default(infile, 'r', informat);
-    if (in == NULL)
-        goto end;
     out = bio_open_owner(outfile, outformat, private);
     if (out == NULL)
         goto end;
@@ -231,7 +228,13 @@ int ecparam_main(int argc, char **argv)
                        OSSL_PKEY_PARAM_EC_POINT_CONVERSION_FORMAT,
                        point_format, 0);
         *p = OSSL_PARAM_construct_end();
-        gctx_params = EVP_PKEY_CTX_new_from_name(NULL, "ec", NULL);
+
+        if (OPENSSL_strcasecmp(curve_name, "SM2") == 0)
+            gctx_params = EVP_PKEY_CTX_new_from_name(app_get0_libctx(), "sm2",
+                                                     app_get0_propq());
+        else
+            gctx_params = EVP_PKEY_CTX_new_from_name(app_get0_libctx(), "ec",
+                                                     app_get0_propq());
         if (gctx_params == NULL
             || EVP_PKEY_keygen_init(gctx_params) <= 0
             || EVP_PKEY_CTX_set_params(gctx_params, params) <= 0
@@ -282,8 +285,9 @@ int ecparam_main(int argc, char **argv)
                 BIO_printf(bio_err, "unable to set check_type\n");
                 goto end;
         }
-        pctx = EVP_PKEY_CTX_new_from_pkey(NULL, params_key, NULL);
-        if (pctx == NULL || !EVP_PKEY_param_check(pctx)) {
+        pctx = EVP_PKEY_CTX_new_from_pkey(app_get0_libctx(), params_key,
+                                          app_get0_propq());
+        if (pctx == NULL || EVP_PKEY_param_check(pctx) <= 0) {
             BIO_printf(bio_err, "failed\n");
             goto end;
         }
@@ -312,7 +316,8 @@ int ecparam_main(int argc, char **argv)
          *    EVP_PKEY_CTX_set_group_name(gctx, curvename);
          *    EVP_PKEY_keygen(gctx, &key) <= 0)
          */
-        gctx_key = EVP_PKEY_CTX_new_from_pkey(NULL, params_key, NULL);
+        gctx_key = EVP_PKEY_CTX_new_from_pkey(app_get0_libctx(), params_key,
+                                              app_get0_propq());
         if (EVP_PKEY_keygen_init(gctx_key) <= 0
             || EVP_PKEY_keygen(gctx_key, &key) <= 0) {
             BIO_printf(bio_err, "unable to generate key\n");
@@ -342,7 +347,6 @@ end:
     OSSL_DECODER_CTX_free(dctx_params);
     OSSL_ENCODER_CTX_free(ectx_params);
     OSSL_ENCODER_CTX_free(ectx_key);
-    BIO_free(in);
     BIO_free_all(out);
     return ret;
 }

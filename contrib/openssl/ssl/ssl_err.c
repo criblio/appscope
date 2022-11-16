@@ -237,6 +237,8 @@ static const ERR_STRING_DATA SSL_str_reasons[] = {
     "missing ecdsa signing cert"},
     {ERR_PACK(ERR_LIB_SSL, 0, SSL_R_MISSING_FATAL), "missing fatal"},
     {ERR_PACK(ERR_LIB_SSL, 0, SSL_R_MISSING_PARAMETERS), "missing parameters"},
+    {ERR_PACK(ERR_LIB_SSL, 0, SSL_R_MISSING_PSK_KEX_MODES_EXTENSION),
+    "missing psk kex modes extension"},
     {ERR_PACK(ERR_LIB_SSL, 0, SSL_R_MISSING_RSA_CERTIFICATE),
     "missing rsa certificate"},
     {ERR_PACK(ERR_LIB_SSL, 0, SSL_R_MISSING_RSA_ENCRYPTING_CERT),
@@ -557,7 +559,7 @@ static const ERR_STRING_DATA SSL_str_reasons[] = {
 
 #endif
 
-int err_load_SSL_strings_int(void)
+int ossl_err_load_SSL_strings(void)
 {
 #ifndef OPENSSL_NO_ERR
     if (ERR_reason_error_string(SSL_str_reasons[0].error) == NULL)

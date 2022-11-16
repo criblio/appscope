@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2007-2022 The OpenSSL Project Authors. All Rights Reserved.
  * Copyright Nokia 2007-2019
  * Copyright Siemens AG 2015-2019
  *
@@ -101,8 +101,8 @@ const char *ossl_cmp_log_parse_metadata(const char *buf,
                     *file = OPENSSL_strndup(p_file, p_line - 1 - p_file);
                     /* no real problem if OPENSSL_strndup() returns NULL */
                     *line = (int)line_number;
-                    msg = strchr(p_level, ':') + 1;
-                    if (*msg == ' ')
+                    msg = strchr(p_level, ':');
+                    if (msg != NULL && *++msg == ' ')
                         msg++;
                 }
             }
@@ -221,7 +221,7 @@ int ossl_cmp_X509_STORE_add1_certs(X509_STORE *store, STACK_OF(X509) *certs,
 }
 
 int ossl_cmp_sk_ASN1_UTF8STRING_push_str(STACK_OF(ASN1_UTF8STRING) *sk,
-                                         const char *text)
+                                         const char *text, int len)
 {
     ASN1_UTF8STRING *utf8string;
 
@@ -229,7 +229,7 @@ int ossl_cmp_sk_ASN1_UTF8STRING_push_str(STACK_OF(ASN1_UTF8STRING) *sk,
         return 0;
     if ((utf8string = ASN1_UTF8STRING_new()) == NULL)
         return 0;
-    if (!ASN1_STRING_set(utf8string, text, -1))
+    if (!ASN1_STRING_set(utf8string, text, len))
         goto err;
     if (!sk_ASN1_UTF8STRING_push(sk, utf8string))
         goto err;

@@ -35,7 +35,7 @@ func extract(scopeDirVersion string) error {
 	}
 
 	// Copy scope
-	if _, err := util.CopyFile(os.Args[0], filepath.Join(scopeDirVersion, "scope")); err != nil {
+	if _, err := util.CopyFile(os.Args[0], filepath.Join(scopeDirVersion, "scope"), perms); err != nil {
 		if err != os.ErrExist {
 			log.Error().
 				Err(err).

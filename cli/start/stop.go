@@ -36,23 +36,8 @@ func stopConfigureHost() error {
 }
 
 // for all containers
-func stopConfigureContainers() error {
+func stopConfigureContainers(cPids []int) error {
 	sL := loader.ScopeLoader{Path: run.LdscopePath()}
-
-	// Discover all containers
-	cPids, err := util.GetDockerPids()
-	if err != nil {
-		switch {
-		case errors.Is(err, util.ErrDockerNotAvailable):
-			log.Warn().
-				Msgf("Unconfigure containers skipped. Docker is not available")
-		default:
-			log.Error().
-				Err(err).
-				Msg("Unconfigure containers failed.")
-		}
-		return nil
-	}
 
 	// Iterate over all containers
 	for _, cPid := range cPids {
@@ -97,23 +82,8 @@ func stopServiceHost() error {
 }
 
 // for all containers
-func stopServiceContainers() error {
+func stopServiceContainers(cPids []int) error {
 	ld := loader.ScopeLoader{Path: run.LdscopePath()}
-
-	// Discover all containers
-	cPids, err := util.GetDockerPids()
-	if err != nil {
-		switch {
-		case errors.Is(err, util.ErrDockerNotAvailable):
-			log.Warn().
-				Msgf("Unservice containers skipped. Docker is not available")
-		default:
-			log.Warn().
-				Err(err).
-				Msg("Unservice containers failed.")
-		}
-		return nil
-	}
 
 	// Iterate over all containers
 	for _, cPid := range cPids {
@@ -203,11 +173,14 @@ func Stop() error {
 		return err
 	}
 
+	// Discover all container PIDs
+	cPids := getContainersPids()
+
 	if err := stopConfigureHost(); err != nil {
 		return err
 	}
 
-	if err := stopConfigureContainers(); err != nil {
+	if err := stopConfigureContainers(cPids); err != nil {
 		return err
 	}
 
@@ -215,7 +188,7 @@ func Stop() error {
 		return err
 	}
 
-	if err := stopServiceContainers(); err != nil {
+	if err := stopServiceContainers(cPids); err != nil {
 		return err
 	}
 

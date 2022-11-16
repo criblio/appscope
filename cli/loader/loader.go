@@ -33,7 +33,7 @@ func (sL *ScopeLoader) UnconfigureHost() (string, error) {
 }
 
 // - Remove /etc/profile.d/scope.sh in containers
-// - Remove filter input to /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter in containers
+// - Remove filter input from /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter in containers
 func (sL *ScopeLoader) UnconfigureContainer(cpid int) (string, error) {
 	return sL.RunSubProc([]string{"--unconfigure", "--namespace", strconv.Itoa(cpid)}, os.Environ())
 }

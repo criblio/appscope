@@ -25,11 +25,11 @@ typedef enum {
     MKDIR_STATUS_ERR_OTHER = 4,         // Error: Other
 } mkdir_status_t;
 
-mkdir_status_t libdirCreateDirIfMissing(const char *, mode_t);
-int libdirSetLibraryBase(const char *);                       // Override default library base search dir i.e. /tmp
-int libdirExtract(libdirfile_t);                              // Extracts file to default path
-const char *libdirGetPath(libdirfile_t);                      // Get full path to existing file
-int libdirSaveLibraryFile(const char *, bool, mode_t);        // Save libscope.so to specified path overwrite
+mkdir_status_t libdirCreateDirIfMissing(const char *, mode_t, uid_t, gid_t);
+int libdirSetLibraryBase(const char *);                                      // Override default library base search dir i.e. /tmp
+int libdirExtract(libdirfile_t, uid_t, gid_t);                               // Extracts file to default path
+const char *libdirGetPath(libdirfile_t);                                     // Get full path to existing file
+int libdirSaveLibraryFile(const char *, bool, mode_t, uid_t, gid_t);         // Save libscope.so to specified path overwrite
 
 // Unit Test helper
 int libdirInitTest(const char *, const char *, const char *); // Override defaults

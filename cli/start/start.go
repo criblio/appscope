@@ -40,6 +40,45 @@ var (
 	errMissingData = errors.New("missing filter data")
 )
 
+// get the list of PID(s) related to containers
+func getContainersPids() []int {
+	cPids := []int{}
+
+	dockerPids, err := util.GetDockerPids()
+	if err != nil {
+		switch {
+		case errors.Is(err, util.ErrDockerNotAvailable):
+			log.Warn().
+				Msgf("Setup Docker containers skipped. Docker is not available")
+		default:
+			log.Error().
+				Err(err).
+				Msg("Discover Docker containers failed.")
+		}
+	}
+	if dockerPids != nil {
+		cPids = append(cPids, dockerPids...)
+	}
+
+	lxcPids, err := util.GetLXCPids()
+	if err != nil {
+		switch {
+		case errors.Is(err, util.ErrLXDSocketNotAvailable):
+			log.Warn().
+				Msgf("Setup LXC containers skipped. LXD is not available")
+		default:
+			log.Error().
+				Err(err).
+				Msg("Discover LXC containers failed.")
+		}
+	}
+	if lxcPids != nil {
+		cPids = append(cPids, lxcPids...)
+	}
+
+	return cPids
+}
+
 // TODO: the file creation steps here might not be needed because a filter file should be present
 // and libscope.so should detect it (when that functionality is complete)
 // startAttachSingleProcess attach to the the specific process identifed by pid with configuration pass in cfgData.
@@ -87,7 +126,6 @@ func startAttachSingleProcess(pid string, cfgData []byte) error {
 // for all containers
 // for all allowed proc OR arg
 func startAttach(allowProcs []allowProcConfig) error {
-
 	// Iterate over all allowed processses
 	for _, process := range allowProcs {
 		pidsToAttach := make(util.PidScopeMapState)
@@ -150,23 +188,6 @@ func startAttach(allowProcs []allowProcConfig) error {
 	return nil
 }
 
-// getStartData reads data from Stdin
-func getStartData() []byte {
-	var startData []byte
-	stdinFs, err := os.Stdin.Stat()
-	if err != nil {
-		return startData
-	}
-
-	// Avoid waiting for input from terminal when no data was provided
-	if stdinFs.Mode()&os.ModeCharDevice != 0 && stdinFs.Size() == 0 {
-		return startData
-	}
-
-	startData, _ = io.ReadAll(os.Stdin)
-	return startData
-}
-
 // for the host
 func startConfigureHost(filename string) error {
 	sL := loader.ScopeLoader{Path: run.LdscopePath()}
@@ -185,27 +206,11 @@ func startConfigureHost(filename string) error {
 }
 
 // for all containers
-func startConfigureContainers(filename string) error {
-	// Discover all containers
-	cPids, err := util.GetDockerPids()
-	if err != nil {
-		switch {
-		case errors.Is(err, util.ErrDockerNotAvailable):
-			log.Warn().
-				Msgf("Configure containers skipped. Docker is not available")
-		default:
-			log.Error().
-				Err(err).
-				Msg("Configure containers failed.")
-		}
-		return nil
-	}
-
-	sL := loader.ScopeLoader{Path: run.LdscopePath()}
-
+func startConfigureContainers(filename string, cPids []int) error {
 	// Iterate over all containers
 	for _, cPid := range cPids {
-		stdoutStderr, err := sL.ConfigureContainer(filename, cPid)
+		ld := loader.ScopeLoader{Path: run.LdscopePath()}
+		stdoutStderr, err := ld.ConfigureContainer(filename, cPid)
 		if err != nil {
 			log.Warn().
 				Err(err).
@@ -256,29 +261,13 @@ func startServiceHost(allowProcs []allowProcConfig) error {
 
 // for all containers
 // for all allowed proc
-func startServiceContainers(allowProcs []allowProcConfig) error {
-	// Discover all containers
-	cPids, err := util.GetDockerPids()
-	if err != nil {
-		switch {
-		case errors.Is(err, util.ErrDockerNotAvailable):
-			log.Warn().
-				Msgf("Setup container services skipped. Docker is not available")
-		default:
-			log.Warn().
-				Err(err).
-				Msg("Setup container services failed.")
-		}
-		return nil
-	}
-
-	ld := loader.ScopeLoader{Path: run.LdscopePath()}
-
+func startServiceContainers(allowProcs []allowProcConfig, cPids []int) error {
 	// Iterate over all allowed processses
 	for _, process := range allowProcs {
 		if process.Procname != "" {
 			// Iterate over all containers
 			for _, cPid := range cPids {
+				ld := loader.ScopeLoader{Path: run.LdscopePath()}
 				stdoutStderr, err := ld.ServiceContainer(process.Procname, cPid)
 				if err == nil {
 					log.Info().
@@ -305,6 +294,23 @@ func startServiceContainers(allowProcs []allowProcConfig) error {
 		}
 	}
 	return nil
+}
+
+// getStartData reads data from Stdin
+func getStartData() []byte {
+	var startData []byte
+	stdinFs, err := os.Stdin.Stat()
+	if err != nil {
+		return startData
+	}
+
+	// Avoid waiting for input from terminal when no data was provided
+	if stdinFs.Mode()&os.ModeCharDevice != 0 && stdinFs.Size() == 0 {
+		return startData
+	}
+
+	startData, _ = io.ReadAll(os.Stdin)
+	return startData
 }
 
 // Start performs setup of scope in the host and containers
@@ -385,11 +391,14 @@ func Start() error {
 		return err
 	}
 
+	// Discover all container PIDs
+	cPids := getContainersPids()
+
 	if err := startConfigureHost(filterPath); err != nil {
 		return err
 	}
 
-	if err := startConfigureContainers(filterPath); err != nil {
+	if err := startConfigureContainers(filterPath, cPids); err != nil {
 		return err
 	}
 
@@ -397,7 +406,7 @@ func Start() error {
 		return err
 	}
 
-	if err := startServiceContainers(startCfg.AllowProc); err != nil {
+	if err := startServiceContainers(startCfg.AllowProc, cPids); err != nil {
 		return err
 	}
 

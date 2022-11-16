@@ -2073,8 +2073,8 @@ io_getevents(io_context_t ctx_id, long min_nr, long nr,
              struct io_event *events, struct timespec *timeout)
 {
     stopTimer();
-    WRAP_CHECK(io_getevents, -1);
-    return g_fn.io_getevents(ctx_id, min_nr, nr, events, timeout);
+    WRAP_CHECK(syscall, -1);
+    return g_fn.syscall(__NR_io_getevents, ctx_id, min_nr, nr, events, timeout);
 }
 
 EXPORTOFF int
@@ -5466,7 +5466,6 @@ static got_list_t inject_hook_list[] = {
     {"semtimedop",  semtimedop, &g_fn.semtimedop},
     {"clock_nanosleep", clock_nanosleep, &g_fn.clock_nanosleep},
     {"usleep", usleep, &g_fn.usleep},
-    {"io_getevents", io_getevents, &g_fn.io_getevents},
     {"open64", open64, &g_fn.open64},
     {"openat64", openat64, &g_fn.openat64},
     {"__open_2", __open_2, &g_fn.__open_2},

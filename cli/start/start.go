@@ -45,6 +45,22 @@ var (
 func getContainersPids() []int {
 	cPids := []int{}
 
+	ctrDPids, err := util.GetContainerDPids()
+	if err != nil {
+		switch {
+		case errors.Is(err, util.ErrContainerDNotAvailable):
+			log.Warn().
+				Msgf("Setup ContainerD containers skipped. ContainerD is not available")
+		default:
+			log.Error().
+				Err(err).
+				Msg("Discover ContainerD failed.")
+		}
+	}
+	if ctrDPids != nil {
+		cPids = append(cPids, ctrDPids...)
+	}
+
 	dockerPids, err := util.GetDockerPids()
 	if err != nil {
 		switch {

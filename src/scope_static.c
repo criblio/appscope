@@ -535,7 +535,8 @@ showUsage(char *prog)
       "  -s, --service SERVICE        setup specified service NAME\n"
       "  -n  --namespace PID          perform service/configure operation on specified container PID\n"
       "  -p, --patch SO_FILE          patch specified libscope.so\n"
-      "  -r, --starthost              execute the scope start command in a host context with (must be run in the container)\n"
+      "  -r, --starthost              execute the scope start command in a host context (must be run in the container)\n"
+      "  -x, --stophost               execute the scope stop command in a host context (must be run in the container)\n"
       "\n"
       "Help sections are OVERVIEW, CONFIGURATION, METRICS, EVENTS, and PROTOCOLS.\n"
       "\n"
@@ -563,6 +564,7 @@ static struct option opts[] = {
     { "libbasedir", required_argument,    0, 'l' },
     { "patch",      required_argument,    0, 'p' },
     { "starthost",  no_argument,          0, 'r' },
+    { "stophost",   no_argument,          0, 'x' },
     { 0, 0, 0, 0 }
 };
 
@@ -636,6 +638,9 @@ main(int argc, char **argv, char **env)
                 break;
             case 'r':
                 return nsHostStart();
+                break;
+            case 'x':
+                return nsHostStop();
                 break;
             case ':':
                 // options missing their value end up here

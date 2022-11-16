@@ -13,6 +13,7 @@
 #define SCOPE_CRON_PATH "/etc/cron.d/scope_cron"
 #define SCOPE_SCRIPT_PATH "/tmp/scope_att.sh"
 #define SCOPE_START_SCRIPT "#! /bin/bash\nrm /etc/cron.d/scope_cron\n%s start -f < %s\nrm -- $0\n"
+#define SCOPE_STOP_SCRIPT "#! /bin/bash\nrm /etc/cron.d/scope_cron\n%s stop -f\nrm -- $0\n"
 
 /*
  * Extract memory to specific output file.
@@ -353,7 +354,7 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
  * This should be called after the mnt namespace has been switched.
  */
 static bool
-createCron(const char *scopePath, const char* filterPath) {
+createCron(const char *scopePath, const char *filterPath, const char *script) {
     int outFd;
     char buf[1024] = {0};
     char path[PATH_MAX] = {0};
@@ -372,7 +373,7 @@ createCron(const char *scopePath, const char* filterPath) {
     }
 
     // Write cron action - scope start
-    if (scope_snprintf(buf, sizeof(buf), SCOPE_START_SCRIPT, scopePath, filterPath) < 0) {
+    if (scope_snprintf(buf, sizeof(buf), script, scopePath, filterPath) < 0) {
         scope_perror("createCron: script: error: snprintf() failed\n");
         scope_close(outFd);
         return FALSE;
@@ -475,7 +476,7 @@ setHostNamespace(const char *ns) {
  * Returns TRUE if operation was success, FALSE otherwise.
  */
 static bool
-joinHostNamespace(void) {
+joinHostNamespace(ns_action_t action) {
     bool status = FALSE;
     size_t ldscopeSize = 0;
     size_t cfgSize = 0;
@@ -485,6 +486,7 @@ joinHostNamespace(void) {
     char hostScopePath[PATH_MAX] = {0};
     char *scopeFilterCfgMem = NULL;
     char *scopeMem = NULL;
+    const char *script;
 
     if (scope_readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
         return status;
@@ -496,38 +498,9 @@ joinHostNamespace(void) {
         return status;
     }
 
-    // First try to use env variable
-    char *envFilterVal = getenv("SCOPE_FILTER");
-    if (envFilterVal) {
-        /*
-        * If filter env was defined and wasn't disable 
-        * the filter handling, try path interpretation
-        */
-        size_t envFilterLen = scope_strlen(envFilterVal);
-        if (scope_strncmp(envFilterVal, "false", envFilterLen) && (!scope_access(envFilterVal, R_OK))) {
-            scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, envFilterVal);
-        }
-    } else {
-        /*
-        * Try to use defaults
-        */
-
-        if (!scope_access(SCOPE_FILTER_USR_PATH, R_OK)) {
-            scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, SCOPE_FILTER_USR_PATH);
-        } else if (!scope_access(SCOPE_FILTER_TMP_PATH, R_OK)) {
-            scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, SCOPE_FILTER_TMP_PATH);
-        }
-    }
-
-    // Load "filter file" into memory
-    
-    if (scopeFilterCfgMem == NULL) {
-        goto cleanupMem;
-    }
-
+    // Load "scope" into memory
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
     bool isDevVersion = libverIsNormVersionDev(loaderVersion);
-    // Load "scope" into memory
     scope_memset(path, 0, PATH_MAX);
     scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/scope", loaderVersion);
     if ((scope_access(path, R_OK)) || (isDevVersion)) {
@@ -537,10 +510,38 @@ joinHostNamespace(void) {
             goto cleanupMem;
         }
     }
-
     scopeMem = setupLoadFileIntoMem(&scopeSize, path);
     if (scopeMem == NULL) {
         goto cleanupMem;
+    }
+
+    if (action == START) {
+        // Load "filter file" into memory
+        // First try to use env variable
+        char *envFilterVal = getenv("SCOPE_FILTER");
+        if (envFilterVal) {
+            /*
+            * If filter env was defined and wasn't disable 
+            * the filter handling, try path interpretation
+            */
+            size_t envFilterLen = scope_strlen(envFilterVal);
+            if (scope_strncmp(envFilterVal, "false", envFilterLen) && (!scope_access(envFilterVal, R_OK))) {
+                scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, envFilterVal);
+            }
+        } else {
+            /*
+            * Try to use defaults
+            */
+
+            if (!scope_access(SCOPE_FILTER_USR_PATH, R_OK)) {
+                scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, SCOPE_FILTER_USR_PATH);
+            } else if (!scope_access(SCOPE_FILTER_TMP_PATH, R_OK)) {
+                scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, SCOPE_FILTER_TMP_PATH);
+            }
+        }
+        if (scopeFilterCfgMem == NULL) {
+            goto cleanupMem;
+        }
     }
 
     /*
@@ -581,22 +582,27 @@ joinHostNamespace(void) {
         goto cleanupMem;
     }
 
-    // create a "filter file" on host
-    scope_snprintf(hostFilterPath, PATH_MAX, SCOPE_FILTER_USR_PATH);
-    if ((status == extractMemToFile(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664, TRUE)) == FALSE) {
-        scope_memset(hostFilterPath, 0, PATH_MAX);
-        scope_snprintf(hostFilterPath, PATH_MAX, SCOPE_FILTER_TMP_PATH);
-        if ((status == extractMemToFile(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664, TRUE)) == FALSE) {
-            goto cleanupMem;
-        }
-    }
-
     // create a "scope" on host
     if (extractMemToFile(scopeMem, scopeSize, hostScopePath, 0775, isDevVersion) == FALSE) {
         goto cleanupMem;
     }
 
-    status = createCron(hostScopePath, hostFilterPath);
+    if (action == START) {
+        // create a "filter file" on host
+        scope_snprintf(hostFilterPath, PATH_MAX, SCOPE_FILTER_USR_PATH);
+        if ((status == extractMemToFile(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664, TRUE)) == FALSE) {
+            scope_memset(hostFilterPath, 0, PATH_MAX);
+            scope_snprintf(hostFilterPath, PATH_MAX, SCOPE_FILTER_TMP_PATH);
+            if ((status == extractMemToFile(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664, TRUE)) == FALSE) {
+                goto cleanupMem;
+            }
+        }
+        script = SCOPE_START_SCRIPT;
+    } else {
+        script = SCOPE_STOP_SCRIPT;
+    }
+
+    status = createCron(hostScopePath, hostFilterPath, script);
 
 cleanupMem:
 
@@ -624,7 +630,7 @@ isRunningInContainer(void) {
 }
 
  /*
- * Perform ldsope host start operation - this operation begins from container namespace.
+ * Perform ldscope host start operation - this operation begins from container namespace.
  *
  * - switch namespace to host
  * - create cron entry with filter file
@@ -639,7 +645,31 @@ nsHostStart(void) {
     }
     scope_fprintf(scope_stdout, "Executing from a container, run the start command from the host\n");
 
-    if (joinHostNamespace() == FALSE) {
+    if (joinHostNamespace(START) == FALSE) {
+        scope_fprintf(scope_stderr, "error: joinHostNamespace failed\n");
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+ /*
+ * Perform ldscope host stop operation - this operation begins from container namespace.
+ *
+ * - switch namespace to host
+ * - create cron entry with filter file
+ *
+ * Returns exit code of operation
+ */
+int
+nsHostStop(void) {
+     if (isRunningInContainer() == FALSE) {
+        scope_fprintf(scope_stderr, "error: nsHostStart failed process is running on host\n");
+        return EXIT_FAILURE;
+    }
+    scope_fprintf(scope_stdout, "Executing from a container, run the stop command from the host\n");
+
+    if (joinHostNamespace(STOP) == FALSE) {
         scope_fprintf(scope_stderr, "error: joinHostNamespace failed\n");
         return EXIT_FAILURE;
     }

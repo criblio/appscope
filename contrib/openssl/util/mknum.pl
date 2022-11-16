@@ -22,6 +22,7 @@ my $symhacks_file = undef;      # a symbol hacking file (optional)
 my $version = undef;            # the version to use for added symbols
 my $checkexist = 0;             # (unsure yet)
 my $warnings = 1;
+my $renumber = 0;
 my $verbose = 0;
 my $debug = 0;
 
@@ -29,6 +30,7 @@ GetOptions('ordinals=s' => \$ordinals_file,
            'symhacks=s' => \$symhacks_file,
            'version=s'  => \$version,
            'exist'      => \$checkexist,
+           'renumber'   => \$renumber,
            'warnings!'  => \$warnings,
            'verbose'    => \$verbose,
            'debug'      => \$debug)
@@ -88,12 +90,7 @@ foreach my $f (($symhacks_file // (), @ARGV)) {
     close IN;
 }
 
-# As long as we're running in development or alpha releases, we can have
-# symbols without specific numbers assigned.  When in beta or final release,
-# all symbols MUST have an assigned number.
-if ($version !~ m/^\d+\.\d+\.\d+(?:[a-z]+)?-(?:dev|alpha)/) {
-    $ordinals->renumber();
-}
+$ordinals->renumber() if $renumber;
 
 if ($checkexist) {
     my %new_names = map { $_->name() => 1 }
@@ -139,6 +136,7 @@ if ($checkexist) {
     if ($dropped) {
         print STDERR "${ordinals_file}: Dropped $dropped new symbols\n";
     }
+    $stats{unassigned} = 0 unless defined $stats{unassigned};
     $unassigned = $stats{unassigned} - $dropped;
     if ($unassigned) {
         my $symbol = $unassigned == 1 ? "symbol" : "symbols";

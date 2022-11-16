@@ -195,26 +195,39 @@ genpc() {
 	 -set_serial 2 -days "${DAYS}"
 }
 
-# Usage: $0 geneealt keyname certname eekeyname eecertname alt1 alt2 ...
+geneeconfig() {
+    local key=$1; shift
+    local cert=$1; shift
+    local cakey=$1; shift
+    local ca=$1; shift
+    local conf=$1; shift
+
+    exts=$(printf "%s\n%s\n%s\n%s\n" \
+        "subjectKeyIdentifier = hash" \
+        "authorityKeyIdentifier = keyid" \
+        "basicConstraints = CA:false"; \
+        echo "$conf")
+
+    cert "$cert" "$exts" -CA "${ca}.pem" -CAkey "${cakey}.pem" \
+        -set_serial 2 -days "${DAYS}"
+}
+
+# Usage: $0 geneealt keyname certname cakeyname cacertname alt1 alt2 ...
 #
 # Note: takes csr on stdin, so must be used with $0 req like this:
 #
-# $0 req keyname dn | $0 geneealt keyname certname eekeyname eecertname alt ...
+# $0 req keyname dn | $0 geneealt keyname certname cakeyname cacertname alt ...
 geneealt() {
     local key=$1; shift
     local cert=$1; shift
     local cakey=$1; shift
     local ca=$1; shift
 
-    exts=$(printf "%s\n%s\n%s\n%s\n" \
-	    "subjectKeyIdentifier = hash" \
-	    "authorityKeyIdentifier = keyid" \
-	    "basicConstraints = CA:false" \
-	    "subjectAltName = @alts";
+    conf=$(echo "subjectAltName = @alts"
            echo "[alts]";
-           for x in "$@"; do echo $x; done)
-    cert "$cert" "$exts" -CA "${ca}.pem" -CAkey "${cakey}.pem" \
-	 -set_serial 2 -days "${DAYS}"
+           for x in "$@"; do echo "$x"; done)
+
+    geneeconfig $key $cert $cakey $ca "$conf"
 }
 
 genee() {

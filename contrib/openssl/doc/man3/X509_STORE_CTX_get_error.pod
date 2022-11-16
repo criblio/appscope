@@ -142,7 +142,7 @@ The signature of the certificate is invalid.
 
 =item B<X509_V_ERR_CRL_SIGNATURE_FAILURE: CRL signature failure>
 
-The signature of the certificate is invalid.
+The signature of the CRL is invalid.
 
 =item B<X509_V_ERR_CERT_NOT_YET_VALID: certificate is not yet valid>
 
@@ -212,7 +212,7 @@ and it is not self-signed and the B<X509_V_FLAG_PARTIAL_CHAIN> flag is not set.
 
 =item B<X509_V_ERR_CERT_CHAIN_TOO_LONG: certificate chain too long>
 
-The certificate chain length is greater than the supplied maximum depth. Unused.
+The certificate chain length is greater than the supplied maximum depth.
 
 =item B<X509_V_ERR_CERT_REVOKED: certificate revoked>
 
@@ -250,7 +250,6 @@ authority and subject key identifier mismatch>
 The current candidate issuer certificate was rejected because its subject key
 identifier was present and did not match the authority key identifier current
 certificate.
-Not used as of OpenSSL 1.1.0.
 
 =item B<X509_V_ERR_AKID_ISSUER_SERIAL_MISMATCH:
 authority and issuer serial number mismatch>
@@ -258,14 +257,12 @@ authority and issuer serial number mismatch>
 The current candidate issuer certificate was rejected because its issuer name
 and serial number was present and did not match the authority key identifier of
 the current certificate.
-Not used as of OpenSSL 1.1.0.
 
 =item B<X509_V_ERR_KEYUSAGE_NO_CERTSIGN:
 key usage does not include certificate signing>
 
 The current candidate issuer certificate was rejected because its C<keyUsage>
 extension does not permit certificate signing.
-Not used as of OpenSSL 1.1.0.
 
 =item B<X509_V_ERR_INVALID_EXTENSION:
 invalid or inconsistent certificate extension>
@@ -398,11 +395,11 @@ This error is only possible in L<openssl-s_client(1)>.
 
 EE certificate key too weak.
 
-=item B<X509_ERR_CA_KEY_TOO_SMALL: CA certificate key too weak>
+=item B<X509_V_ERR_CA_KEY_TOO_SMALL: CA certificate key too weak>
 
 CA certificate key too weak.
 
-=item B<X509_ERR_CA_MD_TOO_WEAK: CA signature digest algorithm too weak>
+=item B<X509_V_ERR_CA_MD_TOO_WEAK: CA signature digest algorithm too weak>
 
 CA signature digest algorithm too weak.
 
@@ -435,11 +432,11 @@ Returned by the verify callback to indicate OCSP verification failed.
 Returned by the verify callback to indicate that the certificate is not
 recognized by the OCSP responder.
 
-=item B<509_V_ERROR_NO_ISSUER_PUBLI_KEY, issuer certificate doesn't have a public key>
+=item B<X509_V_ERR_NO_ISSUER_PUBLIC_KEY: issuer certificate doesn't have a public key>
 
 The issuer certificate does not have a public key.
 
-=item B<X509_V_ERROR_SIGNATURE_ALGORITHM_MISMATCH, Subject signature algorithm and issuer public key algorithm mismatch>
+=item B<X509_V_ERR_SIGNATURE_ALGORITHM_MISMATCH: subject signature algorithm and issuer public key algorithm mismatch>
 
 The issuer's public key is not of the type required by the signature in
 the subject's certificate.
@@ -460,6 +457,12 @@ If an unrecognised error code is passed to X509_verify_cert_error_string() the
 numerical value of the unknown code is returned in a static buffer. This is not
 thread safe but will never happen unless an invalid code is passed.
 
+=head1 BUGS
+
+Previous versions of this documentation swapped the meaning of the
+B<X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT> and
+B<X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY> error codes.
+
 =head1 SEE ALSO
 
 L<X509_verify_cert(3)>, L<X509_STORE_CTX_verify(3)>,
@@ -468,7 +471,7 @@ L<X509_free(3)>.
 
 =head1 COPYRIGHT
 
-Copyright 2009-2021 The OpenSSL Project Authors. All Rights Reserved.
+Copyright 2009-2022 The OpenSSL Project Authors. All Rights Reserved.
 
 Licensed under the Apache License 2.0 (the "License").  You may not use
 this file except in compliance with the License.  You can obtain a copy

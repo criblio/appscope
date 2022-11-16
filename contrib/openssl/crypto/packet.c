@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2020 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2015-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -9,7 +9,7 @@
 
 #include "internal/cryptlib.h"
 #include "internal/packet.h"
-#include <openssl/sslerr.h>
+#include <openssl/err.h>
 
 #define DEFAULT_BUF_SIZE    256
 
@@ -105,7 +105,7 @@ static int wpacket_intern_init_len(WPACKET *pkt, size_t lenbytes)
     pkt->written = 0;
 
     if ((pkt->subs = OPENSSL_zalloc(sizeof(*pkt->subs))) == NULL) {
-        ERR_raise(ERR_LIB_SSL, ERR_R_MALLOC_FAILURE);
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_MALLOC_FAILURE);
         return 0;
     }
 
@@ -207,7 +207,7 @@ int WPACKET_set_flags(WPACKET *pkt, unsigned int flags)
 }
 
 /* Store the |value| of length |len| at location |data| */
-static int put_value(unsigned char *data, size_t value, size_t len)
+static int put_value(unsigned char *data, uint64_t value, size_t len)
 {
     if (data == NULL)
         return 1;
@@ -352,7 +352,7 @@ int WPACKET_start_sub_packet_len__(WPACKET *pkt, size_t lenbytes)
         return 0;
 
     if ((sub = OPENSSL_zalloc(sizeof(*sub))) == NULL) {
-        ERR_raise(ERR_LIB_SSL, ERR_R_MALLOC_FAILURE);
+        ERR_raise(ERR_LIB_CRYPTO, ERR_R_MALLOC_FAILURE);
         return 0;
     }
 
@@ -379,12 +379,12 @@ int WPACKET_start_sub_packet(WPACKET *pkt)
     return WPACKET_start_sub_packet_len__(pkt, 0);
 }
 
-int WPACKET_put_bytes__(WPACKET *pkt, unsigned int val, size_t size)
+int WPACKET_put_bytes__(WPACKET *pkt, uint64_t val, size_t size)
 {
     unsigned char *data;
 
     /* Internal API, so should not fail */
-    if (!ossl_assert(size <= sizeof(unsigned int))
+    if (!ossl_assert(size <= sizeof(uint64_t))
             || !WPACKET_allocate_bytes(pkt, size, &data)
             || !put_value(data, val, size))
         return 0;

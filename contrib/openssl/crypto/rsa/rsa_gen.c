@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -426,20 +426,22 @@ static int rsa_keygen(OSSL_LIB_CTX *libctx, RSA *rsa, int bits, int primes,
 {
     int ok = 0;
 
+#ifdef FIPS_MODULE
+    ok = ossl_rsa_sp800_56b_generate_key(rsa, bits, e_value, cb);
+    pairwise_test = 1; /* FIPS MODE needs to always run the pairwise test */
+#else
     /*
-     * Only multi-prime keys or insecure keys with a small key length will use
-     * the older rsa_multiprime_keygen().
+     * Only multi-prime keys or insecure keys with a small key length or a
+     * public exponent <= 2^16 will use the older rsa_multiprime_keygen().
      */
-    if (primes == 2 && bits >= 2048)
+    if (primes == 2
+            && bits >= 2048
+            && (e_value == NULL || BN_num_bits(e_value) > 16))
         ok = ossl_rsa_sp800_56b_generate_key(rsa, bits, e_value, cb);
-#ifndef FIPS_MODULE
     else
         ok = rsa_multiprime_keygen(rsa, bits, primes, e_value, cb);
 #endif /* FIPS_MODULE */
 
-#ifdef FIPS_MODULE
-    pairwise_test = 1; /* FIPS MODE needs to always run the pairwise test */
-#endif
     if (pairwise_test && ok > 0) {
         OSSL_CALLBACK *stcb = NULL;
         void *stcbarg = NULL;
@@ -479,7 +481,7 @@ static int rsa_keygen_pairwise_test(RSA *rsa, OSSL_CALLBACK *cb, void *cbarg)
     unsigned int ciphertxt_len;
     unsigned char *ciphertxt = NULL;
     const unsigned char plaintxt[16] = {0};
-    unsigned char decoded[256];
+    unsigned char *decoded = NULL;
     unsigned int decoded_len;
     unsigned int plaintxt_len = (unsigned int)sizeof(plaintxt_len);
     int padding = RSA_PKCS1_PADDING;
@@ -492,9 +494,14 @@ static int rsa_keygen_pairwise_test(RSA *rsa, OSSL_CALLBACK *cb, void *cbarg)
                            OSSL_SELF_TEST_DESC_PCT_RSA_PKCS1);
 
     ciphertxt_len = RSA_size(rsa);
-    ciphertxt = OPENSSL_zalloc(ciphertxt_len);
+    /*
+     * RSA_private_encrypt() and RSA_private_decrypt() requires the 'to'
+     * parameter to be a maximum of RSA_size() - allocate space for both.
+     */
+    ciphertxt = OPENSSL_zalloc(ciphertxt_len * 2);
     if (ciphertxt == NULL)
         goto err;
+    decoded = ciphertxt + ciphertxt_len;
 
     ciphertxt_len = RSA_public_encrypt(plaintxt_len, plaintxt, ciphertxt, rsa,
                                        padding);

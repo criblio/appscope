@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2002-2022 The OpenSSL Project Authors. All Rights Reserved.
  * Copyright (c) 2002, Oracle and/or its affiliates. All rights reserved
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
@@ -46,7 +46,7 @@ static int fbytes(unsigned char *buf, size_t num, ossl_unused const char *name,
         || !TEST_true(BN_hex2bn(&tmp, numbers[fbytes_counter]))
         /* tmp might need leading zeros so pad it out */
         || !TEST_int_le(BN_num_bytes(tmp), num)
-        || !TEST_true(BN_bn2binpad(tmp, buf, num)))
+        || !TEST_int_gt(BN_bn2binpad(tmp, buf, num), 0))
         goto err;
 
     fbytes_counter = (fbytes_counter + 1) % OSSL_NELEM(numbers);
@@ -179,7 +179,7 @@ static int set_sm2_id(EVP_MD_CTX *mctx, EVP_PKEY *pkey)
     static const char sm2_id[] = { 1, 2, 3, 4, 'l', 'e', 't', 't', 'e', 'r' };
     EVP_PKEY_CTX *pctx;
 
-    if (!TEST_ptr(pctx = EVP_MD_CTX_pkey_ctx(mctx))
+    if (!TEST_ptr(pctx = EVP_MD_CTX_get_pkey_ctx(mctx))
         || !TEST_int_gt(EVP_PKEY_CTX_set1_id(pctx, sm2_id, sizeof(sm2_id)), 0))
         return 0;
     return 1;
@@ -223,7 +223,7 @@ static int test_builtin(int n, int as)
 
     if (!TEST_ptr(mctx = EVP_MD_CTX_new())
         /* get some random message data */
-        || !TEST_true(RAND_bytes(tbs, sizeof(tbs)))
+        || !TEST_int_gt(RAND_bytes(tbs, sizeof(tbs)), 0)
         /* real key */
         || !TEST_ptr(eckey = EC_KEY_new_by_curve_name(nid))
         || !TEST_true(EC_KEY_generate_key(eckey))

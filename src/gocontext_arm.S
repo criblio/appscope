@@ -100,7 +100,8 @@
 c_handler:
     /*
      * Inputs:
-     * x17 is c_func address
+     * x17 is the c_func address
+     * x10 is the g stack
      *
      * Returns:
      * x17 is the trampoline address

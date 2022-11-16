@@ -49,8 +49,9 @@ enum go_arch_t {
    #define C_SYSCALL_P5 0x30
    #define C_SYSCALL_P6 0x38
    #define ARCH X86_64
+   #define RET_SIZE 1
 #elif defined (__aarch64__)
-   #define END_INST "ret"
+   #define END_INST "udf"
    #define SYSCALL_INST "svc"
    #define CS_ARCH CS_ARCH_ARM64
    #define CS_MODE CS_MODE_LITTLE_ENDIAN
@@ -63,6 +64,7 @@ enum go_arch_t {
    #define C_SYSCALL_P5 0x40
    #define C_SYSCALL_P6 0x48
    #define ARCH AARCH64
+   #define RET_SIZE 4
 #else
    #error Bad arch defined
 #endif
@@ -201,9 +203,9 @@ go_schema_t go_17_schema = {
         .c_tls_server_write_buf=0x8,
         .c_tls_server_write_rc=0x10,
         .c_tls_client_read_pc=0x28,
-        .c_tls_client_write_w_pc=0x20,
-        .c_tls_client_write_buf=0x8,
-        .c_tls_client_write_rc=0x10,
+        .c_tls_client_write_w_pc=0x30, //0x20,
+        .c_tls_client_write_buf=0x50,  //0x8,
+        .c_tls_client_write_rc=0x18,   //0x10,
         .c_http2_server_read_sc=0xd0,
         .c_http2_server_write_sc=0x40,
         .c_http2_server_preface_sc=0xd0,
@@ -236,11 +238,9 @@ go_schema_t go_17_schema = {
         .sc_to_conn=0x10,
     },
     .tap = {
-
         [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",       /* .abi0 */       go_hook_reg_syscall,              NULL, 0},
         [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",    /* .abi0 */       go_hook_reg_rawsyscall,           NULL, 0},
         [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",      /* .abi0 */       go_hook_reg_syscall6,             NULL, 0},
-#if 0
         [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_hook_reg_tls_client_read,      NULL, 0},
         [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_hook_reg_tls_client_write,     NULL, 0},
         [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_hook_reg_tls_server_read,      NULL, 0},
@@ -250,7 +250,6 @@ go_schema_t go_17_schema = {
         [INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_hook_reg_http2_server_read,    NULL, 0},
         [INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_hook_reg_http2_server_write,   NULL, 0},
         [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
-#endif
         [INDEX_HOOK_EXIT]                 = {"runtime.exit",          /* .abi0 */       go_hook_exit,                     NULL, 0},
         [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal", /* .abi0 */       go_hook_die,                      NULL, 0},
         [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                             NULL, 0}
@@ -319,7 +318,7 @@ adjustGoStructOffsetsForVersion()
     }
 
     if (g_go_minor_ver == 19) {
-        g_go_schema->arg_offsets.c_tls_client_read_pc=0x80;
+        g_go_schema->arg_offsets.c_tls_client_read_pc=0x98; //0x80;
         g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
 
         g_go_schema->tap[INDEX_HOOK_SYSCALL].func_name = "runtime/internal/syscall.Syscall6";
@@ -613,10 +612,8 @@ looks_like_first_inst_of_go_func(cs_insn* asm_inst)
             (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
             !scope_strcmp((const char*)asm_inst->op_str, "edi, dword ptr [rsp + 8]"));
     } else if (g_arch == AARCH64) {
-        return ((!scope_strcmp((const char*)asm_inst->mnemonic, "str") &&
-                 scope_strstr((const char*)asm_inst->op_str, "[sp,")) ||
-                (!scope_strcmp((const char*)asm_inst->mnemonic, "ldrsw") &&
-                 scope_strstr((const char*)asm_inst->op_str, "[sp,"))); 
+        return ((!scope_strcmp((const char*)asm_inst->mnemonic, "ldr") &&
+                 scope_strstr((const char*)asm_inst->op_str, "[x28, #")));
     } else {
         return FALSE;
     }
@@ -707,7 +704,6 @@ patch_addrs(funchook_t *funchook,
 
         // PATCH SYSCALLS
         if (!scope_strcmp((const char*)asm_inst[i].mnemonic, SYSCALL_INST)) {
-
             // In the "syscall" case, we want to patch the instruction directly 
             void *pre_patch_addr = (void*)asm_inst[i].address;
             void *patch_addr = (void*)asm_inst[i].address;
@@ -750,17 +746,15 @@ patch_addrs(funchook_t *funchook,
                 break; // Done patching
             }
         }
-
         // PATCH JUST BEFORE RET INSTRUCTION
         // If the current instruction is a RET
         // and previous inst is add or sub, then get the stack frame size.
         // Or, if the current inst is xorps then proceed without a stack frame size.
         else if ((!scope_strcmp((const char*)asm_inst[i].mnemonic, "ret")) &&
-            (asm_inst[i].size == 1) &&
-            ((!scope_strcmp((const char*)asm_inst[i-1].mnemonic, "add")) ||
-            (!scope_strcmp((const char*)asm_inst[i-1].mnemonic, "sub"))) &&
-            (add_arg = add_argument(&asm_inst[i-1]))) {
-
+                 (asm_inst[i].size == RET_SIZE) &&
+                 ((!scope_strcmp((const char*)asm_inst[i-1].mnemonic, "add")) ||
+                 (!scope_strcmp((const char*)asm_inst[i-1].mnemonic, "sub"))) &&
+                (add_arg = add_argument(&asm_inst[i-1]))) {
             // In the "ret" case, we want to patch previous instruction (to maintain the callee stack context)
             void *pre_patch_addr = (void*)asm_inst[i-1].address;
             void *patch_addr = (void*)asm_inst[i-1].address;
@@ -777,6 +771,7 @@ patch_addrs(funchook_t *funchook,
             patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
             tap->return_addr = patch_addr;
             tap->frame_size = add_arg;
+            // Note: no break here so as to locate multiple return instructions
         }
     }
     patchprint("\n\n");
@@ -1154,7 +1149,7 @@ c_syscall(char *sys_stack, char *g_stack)
     if(rc < 0) rc = -1; // kernel syscalls can return values < -1
 
     switch(syscall_num) {
-    case SYS_write: //1: // write
+    case SYS_write:
         {
             uint64_t fd = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
             char *buf   = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
@@ -1164,7 +1159,7 @@ c_syscall(char *sys_stack, char *g_stack)
             doWrite(fd, initialTime, (rc != -1), buf, rc, "go_write", BUF, 0);
         }
         break;
-    case SYS_openat: //257: // openat
+    case SYS_openat:
         {
             char *path = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
             if (!path) {
@@ -1178,7 +1173,7 @@ c_syscall(char *sys_stack, char *g_stack)
             doOpen(rc, path, FD, "open");
         }
         break;
-    case 263: // unlinkat
+    case SYS_unlinkat:
         {
             if (rc) return;
 
@@ -1190,7 +1185,7 @@ c_syscall(char *sys_stack, char *g_stack)
             doDelete(pathname, "go_unlinkat");
         }
         break;
-    case 217: // getdents64
+    case SYS_getdents64:
         {
             uint64_t dirfd = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
             uint64_t initialTime = getTime();
@@ -1199,7 +1194,7 @@ c_syscall(char *sys_stack, char *g_stack)
             doRead(dirfd, initialTime, (rc != -1), NULL, rc, "go_getdents", BUF, 0);
         }
         break;
-    case SYS_socket: //41: // socket
+    case SYS_socket:
         {
             if (rc == -1) return;
 
@@ -1210,7 +1205,7 @@ c_syscall(char *sys_stack, char *g_stack)
             addSock(rc, type, domain); // Creates a net object
         }
         break;
-    case 288: // accept4
+    case SYS_accept4:
         {
             if (rc == -1) return;
 
@@ -1222,7 +1217,7 @@ c_syscall(char *sys_stack, char *g_stack)
             doAccept(fd, rc, addr, addrlen, "go_accept4");
         }
         break;
-    case SYS_read: //0: // read
+    case SYS_read:
         {
             uint64_t fd = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
             char *buf   = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
@@ -1232,7 +1227,7 @@ c_syscall(char *sys_stack, char *g_stack)
             doRead(fd, initialTime, (rc >= 0), buf, rc, "go_read", BUF, 0);
         } 
         break;
-    case SYS_close: //3: // close
+    case SYS_close:
         {
             uint64_t fd = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
 

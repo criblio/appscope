@@ -66,7 +66,7 @@ fi
 
 starttest scope_start_basic
 
-# Star processses
+# Start processes
 memcached -u root &
 redis-server &
 nginx &
@@ -173,6 +173,102 @@ sleep 3
 
 endtest
 
+
+#
+# scope stop
+#
+
+starttest scope_stop_basic
+
+# Start processes
+memcached -u root &
+redis-server &
+nginx &
+
+cd /opt/
+SCOPE_START_FORCE_PROFILE=1 scope start -f < /opt/test-runner/scope_filter1.yml
+if [ $? -ne "0" ]; then
+    fail "scope start failed"
+fi
+
+# Allow scope start to run and attach to all procs
+sleep 5
+
+scope stop -f 
+if [ $? -ne "0" ]; then
+    fail "scope stop failed"
+fi
+
+# Check filter files are removed
+if [ -f /tmp/appscope/scope_filter ]; then
+    fail "/tmp/appscope/scope_filter still present"
+fi
+if [ -f /usr/lib/appscope/scope_filter ]; then
+    fail "/usr/lib/appscope/scope_filter still present"
+fi
+
+# Check service configurations are removed
+if [ -f /etc/systemd/system/nginx.service.d/env.conf ]; then
+    # Check the content of /etc/systemd/system/nginx.service.d/env.conf
+    count=$(grep "libscope.so" "/etc/systemd/nginx.service.d/env.conf" | wc -l)
+    if [ $count -gt 0 ] ; then
+        fail "LD_PRELOAD still set in /etc/systemd/nginx.service.d/env.conf"
+    fi
+fi
+
+# Check /etc/profile.d/scope.sh has been removed
+if [ -f /etc/profile.d/scope.sh ]; then
+    fail "/etc/profile.d/scope.sh should not be present after scope stop is run"
+fi
+
+# Check data has stopped flowing indicating process is detached
+# Delete scope output files then check for their presence
+rm -rf /tmp/redis_events.log
+rm -rf /tmp/redis_metrics.log
+rm -rf /tmp/redis_scope.log
+rm -rf /tmp/nginx_events.log
+rm -rf /tmp/nginx_metrics.log
+rm -rf /tmp/nginx_scope.log
+
+curl localhost:80
+# Dummy sleep to ensure that data will be in the nginx file
+sleep 2
+
+# Check if scope is detached from redis-server 
+if [ -f /tmp/redis_events.log ]; then
+    fail "/tmp/redis_events.log present"
+fi
+if [ -f /tmp/redis_metrics.log ]; then
+    fail "/tmp/redis_metrics.log present"
+fi
+if [ -f /tmp/redis_scope.log ]; then
+    fail "/tmp/redis_scope.log present"
+fi
+
+# Check if scope is detached from nginx
+if [ -f /tmp/nginx_events.log ]; then
+    fail "/tmp/nginx_events.log present"
+fi
+if [ -f /tmp/nginx_metrics.log ]; then
+    fail "/tmp/nginx_metrics.log present"
+fi
+if [ -f /tmp/nginx_scope.log ]; then
+    fail "/tmp/nginx_scope.log present"
+fi
+
+# (TODO when supported) Check scope ps shows no processes scoped
+
+cleanupAfterStart
+pkill -9 memcached
+pkill -9 redis-server &
+pkill -9 nginx &
+
+sleep 3
+
+endtest
+
+
+// Check profile setup is not skipped
 starttest scope_start_dev_env_force_setup_profile
 
 if [ $SCOPE_VERSION_TYPE = "dev" ]; then
@@ -203,6 +299,8 @@ cleanupAfterStart
 
 endtest
 
+
+// Check profile setup is skipped
 starttest scope_start_official_env_skip_setup_profile
 
 if [ $SCOPE_VERSION_TYPE = "official" ]; then
@@ -220,7 +318,6 @@ fi
 cleanupAfterStart
 
 endtest
-
 
 
 if (( $FAILED_TEST_COUNT == 0 )); then

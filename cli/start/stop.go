@@ -65,17 +65,17 @@ func stopServiceHost() error {
 	stdoutStderr, err := sL.UnserviceHost()
 	if err == nil {
 		log.Info().
-			Msgf("Unservice %v host success.")
+			Msgf("Unservice host success.")
 	} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
 		if ee.ExitCode() == 1 {
 			log.Warn().
 				Err(err).
 				Str("loaderDetails", stdoutStderr).
-				Msgf("Unservice %v host failed.")
+				Msgf("Unservice host failed.")
 		} else {
 			log.Warn().
 				Str("loaderDetails", stdoutStderr).
-				Msgf("Unervice %v host failed.")
+				Msgf("Unservice host failed.")
 		}
 	}
 	return nil

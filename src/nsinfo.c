@@ -4,7 +4,7 @@
 #include "scopestdlib.h"
 
 /*
- * Return uid of current user inside the namespace for specified pid.
+ * Return effective uid of current user inside the namespace for specified pid.
  */
 uid_t
 nsInfoTranslateUid(pid_t hostPid) {
@@ -42,11 +42,11 @@ nsInfoTranslateUid(pid_t hostPid) {
 }
 
 /*
- * Return gid of current user inside the namespace for specified pid.
+ * Return effective gid of current user inside the namespace for specified pid.
  */
 gid_t
 nsInfoTranslateGid(pid_t hostPid) {
-    gid_t gid = scope_getgid();
+    gid_t gid = scope_getegid();
     char gidPath[PATH_MAX] = {0};
     char buffer[4096] = {0};
     FILE *fd;

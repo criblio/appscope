@@ -11,6 +11,7 @@
 #include "scopestdlib.h"
 
 #define SCOPE_CRONTAB "* * * * * root /tmp/scope_att.sh\n"
+#define SCOPE_CRON_DIR  "/etc/cron.d"
 #define SCOPE_CRON_PATH "/etc/cron.d/scope_cron"
 #define SCOPE_SCRIPT_PATH "/tmp/scope_att.sh"
 #define SCOPE_START_SCRIPT "#! /bin/bash\nrm /etc/cron.d/scope_cron\n%s start -f < %s\nrm -- $0\n"
@@ -368,6 +369,11 @@ createCron(const char *scopePath, const char* filterPath) {
     char buf[1024] = {0};
     char path[PATH_MAX] = {0};
 
+    if (scope_access(SCOPE_CRON_DIR, R_OK)) {
+        scope_fprintf(scope_stderr, "createCron: error %s does not exist\n", SCOPE_CRON_DIR);
+        return FALSE;
+    }
+
     // Create the script to be executed by cron
     if (scope_snprintf(path, sizeof(path), SCOPE_SCRIPT_PATH) < 0) {
         scope_perror("createCron: script path: error: snprintf() failed\n");
@@ -401,38 +407,24 @@ createCron(const char *scopePath, const char* filterPath) {
         return FALSE;
     }
 
-    scope_memset(path, 0, PATH_MAX);
     // Create the cron entry
-    if (scope_snprintf(path, sizeof(path), SCOPE_CRON_PATH) < 0) {
-        scope_perror("createCron: cron: error: snprintf() failed\n");
-        scope_fprintf(scope_stderr, "path: %s\n", path);
-        return FALSE;
-    }
-
-    scope_memset(buf, 0, 1024);
-    if (scope_snprintf(buf, sizeof(buf), SCOPE_CRONTAB) < 0) {
-        scope_perror("createCron: cron: error: snprintf() failed\n");
-        scope_fprintf(scope_stderr, "path: %s\n", path);
-        return FALSE;
-    }
-
-    if ((outFd = scope_open(path, O_RDWR | O_CREAT, 0775)) == -1) {
+    if ((outFd = scope_open(SCOPE_CRON_PATH, O_RDWR | O_CREAT, 0775)) == -1) {
         scope_perror("createCron: cron: scope_open failed");
-        scope_fprintf(scope_stderr, "path: %s\n", path);
+        scope_fprintf(scope_stderr, "path: %s\n", SCOPE_CRON_PATH);
         return FALSE;
     }
 
     // crond will detect this file entry and run on its' next cycle
-    if (scope_write(outFd, buf, scope_strlen(buf)) == -1) {
+    if (scope_write(outFd, SCOPE_CRONTAB, sizeof(SCOPE_CRONTAB) - 1) == -1) {
         scope_perror("createCron: cron: scope_write failed");
-        scope_fprintf(scope_stderr, "path: %s\n", path);
+        scope_fprintf(scope_stderr, "path: %s\n", SCOPE_CRON_PATH);
         scope_close(outFd);
         return FALSE;
     }
 
     if (scope_close(outFd) == -1) {
         scope_perror("createCron: cron: scope_close failed");
-        scope_fprintf(scope_stderr, "path: %s\n", path);
+        scope_fprintf(scope_stderr, "path: %s\n", SCOPE_CRON_PATH);
         return FALSE;
     }
 

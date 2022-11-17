@@ -186,8 +186,7 @@ cleanupMem:
     return status;
 }
 
-
- /*
+/*
  * Setup the service for specified child process
  * Returns status of operation SERVICE_STATUS_SUCCESS in case of success, other values in case of failure
  */
@@ -204,6 +203,22 @@ nsService(pid_t hostPid, const char *serviceName) {
     return setupService(serviceName, nsUid, nsGid);
 }
 
+/*
+ * Remove scope from all services in a given namespace
+ * Returns status of operation SERVICE_STATUS_SUCCESS in case of success, other values in case of failure
+ */
+service_status_t
+nsUnservice(pid_t hostPid) {
+
+    uid_t nsUid = nsInfoTranslateUid(hostPid);
+    gid_t nsGid = nsInfoTranslateGid(hostPid);
+
+    if (setNamespace(hostPid, "mnt") == FALSE) {
+        return SERVICE_STATUS_ERROR_OTHER;
+    }
+
+    return setupUnservice(nsUid, nsGid);
+}
  
  /*
  * Configure the child mount namespace

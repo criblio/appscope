@@ -535,6 +535,7 @@ showUsage(char *prog)
       "  -c, --configure FILTER_PATH  configure scope environment with FILTER_PATH\n"
       "  -w, --unconfigure            unconfigure scope environment\n"
       "  -s, --service SERVICE        setup specified service NAME\n"
+      "  -v, --unservice              remove scope from all service configurations\n"
       "  -n  --namespace PID          perform service/configure operation on specified container PID\n"
       "  -p, --patch SO_FILE          patch specified libscope.so\n"
       "  -r, --starthost              execute the scope start command in a host context (must be run in the container)\n"
@@ -564,6 +565,7 @@ static struct option opts[] = {
     { "configure",   required_argument, 0, 'c' },
     { "unconfigure", no_argument,       0, 'w' },
     { "service",     required_argument, 0, 's' },
+    { "unservice",   no_argument,       0, 'v' },
     { "libbasedir",  required_argument, 0, 'l' },
     { "patch",       required_argument, 0, 'p' },
     { "starthost",   no_argument,       0, 'r' },
@@ -586,6 +588,7 @@ main(int argc, char **argv, char **env)
     uid_t nsUid = eUid;
     uid_t nsGid = eGid;
     bool unconfigure = FALSE;
+    bool unservice = FALSE;
     // process command line
     for (;;) {
         int index = 0;
@@ -632,6 +635,9 @@ main(int argc, char **argv, char **env)
             case 's':
                 serviceName = optarg;
                 break;
+            case 'v':
+                unservice = TRUE;
+                break;
             case 'f':
                 // accept -f as alias for -l for BC
             case 'l':
@@ -670,15 +676,15 @@ main(int argc, char **argv, char **env)
         }
     }
 
-    // either --attach, --detach, --configure, --unconfigure, --service or a command are required
-    if (!attachArg && !configFilterPath && !unconfigure && !serviceName && optind >= argc) {
-        scope_fprintf(scope_stderr, "error: missing --attach, --detach, --configure, --unconfigure, --service option or EXECUTABLE argument\n");
+    // either --attach, --detach, --configure, --unconfigure, --service, --unservice or a command are required
+    if (!attachArg && !configFilterPath && !unconfigure && !serviceName && !unservice && optind >= argc) {
+        scope_fprintf(scope_stderr, "error: missing --attach, --detach, --configure, --unconfigure, --service, --unservice option or EXECUTABLE argument\n");
         showUsage(scope_basename(argv[0]));
         return EXIT_FAILURE;
     }
 
-    if (attachArg && serviceName) {
-        scope_fprintf(scope_stderr, "error: --attach/--detach and --service cannot be used together\n");
+    if (attachArg && (serviceName || unservice)) {
+        scope_fprintf(scope_stderr, "error: --attach/--detach and --service/--unservice cannot be used together\n");
         showUsage(scope_basename(argv[0]));
         return EXIT_FAILURE;
     }
@@ -689,26 +695,26 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
-    if ((configFilterPath || unconfigure) && serviceName) {
-        scope_fprintf(scope_stderr, "error: --configure/--unconfigure and --service cannot be used together\n");
+    if ((configFilterPath || unconfigure) && (serviceName || unservice)) {
+        scope_fprintf(scope_stderr, "error: --configure/--unconfigure and --service/--unservice cannot be used together\n");
         showUsage(scope_basename(argv[0]));
         return EXIT_FAILURE;
     }
 
-    if (nsPidArg && ((configFilterPath == NULL && !unconfigure) && (serviceName == NULL))) {
-        scope_fprintf(scope_stderr, "error: --namespace option required --configure/--unconfigure or --service option\n");
+    if (nsPidArg && ((configFilterPath == NULL && !unconfigure) && (serviceName == NULL || unservice))) {
+        scope_fprintf(scope_stderr, "error: --namespace option required --configure/--unconfigure or --service/--unservice option\n");
         showUsage(scope_basename(argv[0]));
         return EXIT_FAILURE;
     }
 
-    // use --attach, --detach, --configure, --unconfigure, --service ignore executable and args
+    // use --attach, --detach, --configure, --unconfigure, --service, --unservice ignore executable and args
     if (optind < argc) {
         if (attachArg) {
             scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --attach, --detach option\n");
         } else if (configFilterPath || unconfigure) {
             scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --configure/--unconfigure option\n");
         } else if (serviceName) {
-            scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --service option\n");
+            scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --service/--unservice option\n");
         }
     }
 
@@ -727,7 +733,6 @@ main(int argc, char **argv, char **env)
                 return EXIT_FAILURE;
             }
         }
-
         if (pid == -1) {
             // Service on Host
             return setupService(serviceName, eUid, eGid);
@@ -737,6 +742,35 @@ main(int argc, char **argv, char **env)
             if ((nsInfoIsPidGotSecondPidNs(pid, &nsContainerPid) == TRUE) ||
                 (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
                 return nsService(pid, serviceName);
+            }
+        }
+        return EXIT_FAILURE;
+    }
+
+    if (unservice) {
+        // must be root
+        if (eUid) {
+            scope_printf("error: --unservice requires root\n");
+            return EXIT_FAILURE;
+        }
+
+        pid_t pid = -1;
+        if (nsPidArg) {
+            pid = scope_atoi(nsPidArg);
+            if (pid < 1) {
+                scope_fprintf(scope_stderr, "error: invalid --namespace PID: %s\n", nsPidArg);
+                return EXIT_FAILURE;
+            }
+        }
+        if (pid == -1) {
+            // Service on Host
+            return setupUnservice(eUid, eGid);
+        } else {
+            // Service on Container
+            pid_t nsContainerPid = 0;
+            if ((nsInfoIsPidGotSecondPidNs(pid, &nsContainerPid) == TRUE) ||
+                (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
+                return nsUnservice(pid);
             }
         }
         return EXIT_FAILURE;

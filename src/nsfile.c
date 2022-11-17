@@ -74,6 +74,17 @@ int nsFileRename(const char *oldpath, const char *newpath, uid_t nsUid, gid_t ns
     return res;
 }
 
+int nsFileRemove(const char *path, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gid_t restoreGid) {
+    scope_setegid(nsGid);
+    scope_seteuid(nsUid);
+
+    int res = scope_remove(path);
+
+    scope_seteuid(restoreUid);
+    scope_setegid(restoreGid);
+    return res;
+}
+
 FILE *nsFileFopen(const char *restrict pathname, const char *restrict mode, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gid_t restoreGid) {
     scope_setegid(nsGid);
     scope_seteuid(nsUid);

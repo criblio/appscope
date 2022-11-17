@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <fcntl.h>
 #include <stdlib.h>
+#include <errno.h>
 
 #include "nsfile.h"
 #include "loaderop.h"
@@ -546,7 +547,7 @@ closeFd:
     return resMem;
 }
 
- /*
+/*
  * Configure the environment
  * - setup /etc/profile.d/scope.sh
  * - extract memory to filter file /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter
@@ -614,6 +615,40 @@ setupConfigure(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
     if (loaderOpPatchLibrary(path) == PATCH_FAILED) {
         scope_fprintf(scope_stderr, "setupConfigure: patch %s failed\n, path");
         return -1;
+    }
+
+    return 0;
+}
+
+/*
+ * Unconfigure the environment
+ * - remove /etc/profile.d/scope.sh
+ * - remove filter file/s from /usr/lib/appscope/scope_filter and /tmp/appscope/scope_filter
+ * Returns status of operation 0 in case of success, other value otherwise
+ * If files do not exist, no error will be reported
+ */
+int
+setupUnconfigure(uid_t nsUid, gid_t nsGid) {
+    // Remove /etc/profile.d/scope.sh
+    if (nsFileRemove("/etc/profile.d/scope.sh", nsUid, nsGid, scope_geteuid(), scope_getegid())) {
+        if (scope_errno != ENOENT) {
+            scope_fprintf(scope_stderr, "setupUnconfigure: remove /etc/profile.d/scope.sh failed\n");
+            return -1;
+        }
+    }
+
+    // Remove scope_filter
+    if (nsFileRemove(SCOPE_FILTER_USR_PATH, nsUid, nsGid, scope_geteuid(), scope_getegid())) {
+        if (scope_errno != ENOENT) {
+            scope_fprintf(scope_stderr, "setupUnconfigure: remove %s failed\n", SCOPE_FILTER_USR_PATH);
+            return -1;
+        }
+    }
+    if (nsFileRemove(SCOPE_FILTER_TMP_PATH, nsUid, nsGid, scope_geteuid(), scope_getegid())) {
+        if (scope_errno != ENOENT) {
+            scope_fprintf(scope_stderr, "setupUnconfigure: remove %s failed\n", SCOPE_FILTER_TMP_PATH);
+            return -1;
+        }
     }
 
     return 0;

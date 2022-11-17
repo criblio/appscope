@@ -30,6 +30,7 @@ int nsFileOpenWithMode(const char *, int, mode_t, uid_t, gid_t, uid_t, gid_t);
 int nsFileMkdir(const char *, mode_t, uid_t, gid_t, uid_t, gid_t);
 int nsFileMksTemp(char *, uid_t, gid_t, uid_t, gid_t);
 int nsFileRename(const char *, const char *, uid_t, gid_t, uid_t, gid_t);
+int nsFileRemove(const char *, uid_t, gid_t, uid_t, gid_t);
 FILE *nsFileFopen(const char *, const char *, uid_t, gid_t, uid_t, gid_t);
 
 #endif // __NSFILE_H__

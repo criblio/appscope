@@ -8,6 +8,7 @@
 
 service_status_t setupService(const char *, uid_t, gid_t);
 int setupConfigure(void *, size_t, uid_t, gid_t);
+int setupUnconfigure(uid_t, gid_t);
 char *setupLoadFileIntoMem(size_t *, const char *);
 
 #endif // __SETUP_H__

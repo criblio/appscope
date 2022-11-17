@@ -230,6 +230,30 @@ nsConfigure(pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize) {
 }
 
  /*
+ * Unconfigure the child mount namespace
+ * - switch the mount namespace to child
+ * - unconfigure the setup
+ * Returns status of operation 0 in case of success, other values in case of failure
+ */
+int
+nsUnconfigure(pid_t pid) {
+    uid_t nsUid = nsInfoTranslateUid(pid);
+    gid_t nsGid = nsInfoTranslateGid(pid);
+
+    if (setNamespace(pid, "mnt") == FALSE) {
+        scope_fprintf(scope_stderr, "setNamespace mnt failed\n");
+        return EXIT_FAILURE;
+    }
+
+    if (setupUnconfigure(nsUid, nsGid)) {
+        scope_fprintf(scope_stderr, "setup child namespace failed\n");
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+ /*
  * Check if libscope.so is loaded in specified PID
  * Returns TRUE if library is loaded, FALSE otherwise.
  */

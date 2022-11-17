@@ -33,7 +33,7 @@ static void
 nsInfoIsPidGotNestedPidNsSameProcess(void **state) {
     pid_t nsPid = 0;
     pid_t pid = scope_getpid();
-    bool status = nsInfoIsPidGotNestedPidNs(pid, &nsPid);
+    bool status = nsInfoGetPidNs(pid, &nsPid);
     assert_int_equal(status, FALSE);
 }
 

@@ -119,7 +119,7 @@ nsInfoIsPidInSameMntNs(pid_t pid) {
  * PID from the last PID namespace in lastNsPid argument, FALSE otherwise.
  */
 bool
-nsInfoIsPidGotNestedPidNs(pid_t pid, pid_t *lastNsPid) {
+nsInfoGetPidNs(pid_t pid, pid_t *lastNsPid) {
     char path[PATH_MAX] = {0};
     char buffer[4096];
     bool status = FALSE;

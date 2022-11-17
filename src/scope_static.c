@@ -723,7 +723,7 @@ main(int argc, char **argv, char **env)
         } else {
             // Service on Container
             pid_t nsContainerPid = 0;
-            if ((nsInfoIsPidGotNestedPidNs(pid, &nsContainerPid) == TRUE) ||
+            if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
                 (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
                 return nsService(pid, serviceName);
             }
@@ -761,7 +761,7 @@ main(int argc, char **argv, char **env)
         } else {
             // Configure on Container
             pid_t nsContainerPid = 0;
-            if ((nsInfoIsPidGotNestedPidNs(pid, &nsContainerPid) == TRUE) ||
+            if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
                 (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
                 status = nsConfigure(pid, confgFilterMem, configFilterSize);
             }
@@ -800,7 +800,7 @@ main(int argc, char **argv, char **env)
         * - [optionally] save previously loaded configuration file into new namespace
         * - fork & execute static loader attach one more time with updated PID
         */
-        if (nsInfoIsPidGotNestedPidNs(pid, &nsAttachPid) == TRUE) {
+        if (nsInfoGetPidNs(pid, &nsAttachPid) == TRUE) {
             // must be root to switch namespace
             if (eUid) {
                 scope_printf("error: --attach requires root\n");

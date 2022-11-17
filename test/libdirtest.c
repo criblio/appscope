@@ -326,7 +326,7 @@ GetPathOfficial(void **state) {
     char expected_location[PATH_MAX] = {0};
     // Create dummy directory
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/", TEST_INSTALL_BASE, normVer);
-    mkdir_status_t mkres = libdirCreateDirIfMissing(expected_location, 0777, scope_getuid(), scope_getegid());
+    mkdir_status_t mkres = libdirCreateDirIfMissing(expected_location, 0777, scope_geteuid(), scope_getegid());
     assert_in_range(mkres, MKDIR_STATUS_CREATED, MKDIR_STATUS_EXISTS);
     // Create dummy file
     scope_memset(expected_location, 0, PATH_MAX);

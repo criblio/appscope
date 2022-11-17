@@ -2910,7 +2910,65 @@ destroyProtEntry(void *data)
     scope_free(pre);
 }
 
-// Filter Configuration part
+// Filter Configuration
+
+/*
+These rules describe which (if any) filter file is used.
+In order described here, the first true statement wins.
+- If the env variable SCOPE_FILTER exists, and it's value is a path to a
+    file that can be read
+- If the file /usr/lib/appscope/scope_filter exists and can be read
+- If /the file tmp/appscope/scope_filter exists and can be read
+
+Rules regarding the filter file:
+o) If the filter file exists, but contains any invalid (unparseable) yaml,
+   no processes will be scoped by the filter feature
+o) if the env variable SCOPE_FILTER exists with a value of "false",
+   no processes will be scoped by the filter feature
+o) If a filter file is not found,
+   no processes will be scoped by the filter feature
+
+Rules regarding some of the content of the filter file:
+o) The allow list and deny list are made of a ordered sequence of filters
+o) For the allow list, each filter has these fields: procname, arg, and config
+o) For the deny list, each filter has a procname and arg field
+o) Extra valid (parseable) yaml is allowed anywhere in the filter file,
+   but will be ignored by AppScope
+
+Definition of what it means to match a filter:
+o) By “the process matches the filter", we mean that the one or more
+   of these conditions is true:
+- the value of the procname field is an exact match of the process name
+  (is case-sensitive)
+- the value of the arg field appears somewhere in the process name and
+  arguments. (is case-sensitive)
+- the value of the procname or arg field is the literal string _MatchAll_
+
+When a valid, parseable filter file is found, it controls which processes
+will be scoped:
+o) If a process does not match any allow list filter,
+   it will not be scoped by the filter feature
+o) If a process matches any filter in the deny list,
+   it will not be scoped by the filter feature
+o) If a process matches any filter in the allow list, and
+   does not match any filter in the deny list,
+   it will be scoped by the filter feature.
+o) For clarity, if a process matches both the allow list and deny list,
+   it will not be scoped by the filter feature.
+
+How configuration is determined:
+o) Default values are used for initial values of the configuration
+o) Filters of an allow list are processed in order. The process always
+   evaluates all filters.
+o) For each filter that matches, the config fields are applied to the process.
+o) A config field can have any number of child elements. Empty configurations,
+   partial configurations, and complete configurations are all allowed.
+o) For clarity, when filters match, all config fields defined by that filter
+   overwrite any earlier config values whether the value is a default value
+   or from an earlier matching filter.
+*/
+
+
 
 #define ALLOW_NODE          "allow"
 #define ALLOW_PROCNAME_NODE   "procname"
@@ -2989,7 +3047,7 @@ processAllowProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cf
     if (node->type != YAML_SCALAR_NODE) return;
 
     const char *cmdline = (const char *)node->data.scalar.value;
-    if (cmdline && (scope_strlen(cmdline) > 0) &&
+    if ((scope_strlen(cmdline) > 0) &&
         (scope_strstr(fCfg->procCmdLine, cmdline)
          || !scope_strcmp(MATCH_ALL_VAL, cmdline))) {
         fCfg->status = PROC_ALLOWED;
@@ -3068,7 +3126,7 @@ processDenyProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg
     if (node->type != YAML_SCALAR_NODE) return;
 
     const char *cmdline = (const char *)node->data.scalar.value;
-    if (cmdline && (scope_strlen(cmdline) > 0) &&
+    if ((scope_strlen(cmdline) > 0) &&
         (scope_strstr(fCfg->procCmdLine, cmdline)
           || !scope_strcmp(MATCH_ALL_VAL, cmdline))) {
         fCfg->status = PROC_DENIED;

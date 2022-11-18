@@ -60,7 +60,7 @@ RUN apt-get update && \
         && \
     dpkg-reconfigure --frontend noninteractive tzdata && \
     apt-get clean
-ARG UPX_VERSION=4.0.0
+ARG UPX_VERSION=4.0.1
 
 RUN arch=$(arch | sed s/aarch64/arm64/ | sed s/x86_64/amd64/) && \
     curl -Ls https://github.com/upx/upx/releases/download/v${UPX_VERSION}/upx-${UPX_VERSION}-${arch}_linux.tar.xz -o - | tar xvJf - -C /tmp && \

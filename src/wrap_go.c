@@ -37,6 +37,7 @@ enum go_arch_t {
 
 #if defined (__x86_64__)
    #define END_INST "int3"
+   #define CALL_INST "call"
    #define SYSCALL_INST "syscall"
    #define CS_ARCH CS_ARCH_X86
    #define CS_MODE CS_MODE_64
@@ -50,8 +51,11 @@ enum go_arch_t {
    #define C_SYSCALL_P6 0x38
    #define ARCH X86_64
    #define RET_SIZE 1
+   #define CALL_SIZE 5
+   #define G_STACK 0x50
 #elif defined (__aarch64__)
    #define END_INST "udf"
+   #define CALL_INST "bl"
    #define SYSCALL_INST "svc"
    #define CS_ARCH CS_ARCH_ARM64
    #define CS_MODE CS_MODE_LITTLE_ENDIAN
@@ -65,6 +69,8 @@ enum go_arch_t {
    #define C_SYSCALL_P6 0x48
    #define ARCH AARCH64
    #define RET_SIZE 4
+   #define CALL_SIZE 4
+   #define G_STACK 0x10
 #else
    #error Bad arch defined
 #endif
@@ -196,24 +202,24 @@ go_schema_t go_17_schema = {
         .c_syscall_p4=C_SYSCALL_P4,
         .c_syscall_p5=C_SYSCALL_P5,
         .c_syscall_p6=C_SYSCALL_P6,
-        .c_tls_server_read_connReader=0x50,
-        .c_tls_server_read_buf=0x8,
-        .c_tls_server_read_rc=0x28,
-        .c_tls_server_write_conn=0x30,
-        .c_tls_server_write_buf=0x8,
-        .c_tls_server_write_rc=0x10,
-        .c_tls_client_read_pc=0x28,
-        .c_tls_client_write_w_pc=0x30, //0x20,
-        .c_tls_client_write_buf=0x50,  //0x8,
-        .c_tls_client_write_rc=0x18,   //0x10,
-        .c_http2_server_read_sc=0xd0,
-        .c_http2_server_write_sc=0x40,
-        .c_http2_server_preface_sc=0xd0,
-        .c_http2_server_preface_rc=0x58,
-        .c_http2_client_read_cc=0x68,
-        .c_http2_client_write_tcpConn=0x40,
-        .c_http2_client_write_buf=0x8,
-        .c_http2_client_write_rc=0x10,
+        .c_tls_server_read_connReader=0x68,   //0x50,
+        .c_tls_server_read_buf=0x70,          //0x8,
+        .c_tls_server_read_rc=0x38,           //0x28,
+        .c_tls_server_write_conn=0x38,        //0x30,
+        .c_tls_server_write_buf=0x60,         //0x8,
+        .c_tls_server_write_rc=0x18,          //0x10,
+        .c_tls_client_read_pc=0x28,           // modified per version
+        .c_tls_client_write_w_pc=0x30,        //0x20,
+        .c_tls_client_write_buf=0x50,         //0x8,
+        .c_tls_client_write_rc=0x18,          //0x10,
+        .c_http2_server_read_sc=0xd8,         //0xd0,
+        .c_http2_server_write_sc=0x58,        //0x40,
+        .c_http2_server_preface_sc=0xd8,      //0xd0,
+        .c_http2_server_preface_rc=0x60,      //0x58,
+        .c_http2_client_read_cc=0x70,         //0x68,
+        .c_http2_client_write_tcpConn=0x40,   // modified per version
+        .c_http2_client_write_buf=0x10,       //0x8,
+        .c_http2_client_write_rc=0x30,        //0x10,
     },
     .struct_offsets = {
         .g_to_m=0x30,
@@ -319,7 +325,7 @@ adjustGoStructOffsetsForVersion()
 
     if (g_go_minor_ver == 19) {
         g_go_schema->arg_offsets.c_tls_client_read_pc=0x98; //0x80;
-        g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
+        g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x80; //0x48;
 
         g_go_schema->tap[INDEX_HOOK_SYSCALL].func_name = "runtime/internal/syscall.Syscall6";
         g_go_schema->tap[INDEX_HOOK_RAWSYSCALL].func_name = "";
@@ -658,7 +664,7 @@ add_argument(cs_insn* asm_inst)
 // Patch all intended addresses
 static void
 patch_addrs(funchook_t *funchook,
-                   cs_insn* asm_inst, unsigned int asm_count, tap_t* tap)
+            cs_insn* asm_inst, unsigned int asm_count, tap_t* tap)
 {
     if (!funchook || !asm_inst || !asm_count || !tap) return;
 
@@ -720,16 +726,20 @@ patch_addrs(funchook_t *funchook,
             break; // Done patching
         }
 
-        // PATCH SPECIAL CALL INSTRUCTION
-        // In the case of some functions, we want to patch just after a "call" instruction.
-        // Note: We don't need a frame size here.
+        /*
+         * PATCH SPECIAL CALL INSTRUCTION
+         * In the case of some functions, we want to patch just after a "call/bl" instruction.
+         *
+         * We do this because we need to get the read buffer after the read is performed.
+         *
+         * Note: We don't need a frame size here.
+         */
         if ((!scope_strcmp(tap->func_name, "net/http.(*http2serverConn).readFrames")) || 
             (!scope_strcmp(tap->func_name, "net/http.(*http2clientConnReadLoop).run"))) {
-            if (
-            (!scope_strcmp((const char*)asm_inst[i].mnemonic, "call")) &&
-            (scope_strstr(g_ReadFrame_addr, (const char*)asm_inst[i].op_str)) &&
-            (asm_inst[i].size == 5)) {
-
+            if ((!scope_strcmp((const char*)asm_inst[i].mnemonic, CALL_INST)) &&
+                (scope_strstr(g_ReadFrame_addr, (const char*)asm_inst[i].op_str + 1)) &&
+                (asm_inst[i].size == CALL_SIZE)) {
+                // TODO: why the + 1?
                 // In the "call" case, we want to patch the instruction after the call
                 void *pre_patch_addr = (void*)asm_inst[i+1].address;
                 void *patch_addr = (void*)asm_inst[i+1].address;
@@ -954,6 +964,7 @@ initGoHook(elf_buf_t *ebuf)
         ((ReadFrame_addr = getGoSymbol(ebuf->buf, "net/http.(*http2Framer).ReadFrame", NULL, NULL)) == 0)) {
         sysprint("WARN: can't get the address for net/http.(*http2Framer).ReadFrame\n");
     }
+
     ReadFrame_addr = (uint64_t *)((uint64_t)ReadFrame_addr + base);
     scope_sprintf(g_ReadFrame_addr, "%p\n", ReadFrame_addr);
 
@@ -994,7 +1005,7 @@ initGoHook(elf_buf_t *ebuf)
             asm_count = 0;
         }
 
-        void* orig_func;
+        void *orig_func;
         // Look for the symbol in the ELF symbol table
         if (((orig_func = getSymbol(ebuf->buf, tap->func_name)) == NULL) &&
         // Otherwise look in the .gopclntab section
@@ -1020,9 +1031,8 @@ initGoHook(elf_buf_t *ebuf)
         }
 
         patchprint ("********************************\n");
-        patchprint ("** %s  %s 0x%p **\n", go_runtime_version, tap->func_name, orig_func);
+        patchprint ("** %s  %s %p **\n", go_runtime_version, tap->func_name, orig_func);
         patchprint ("********************************\n");
-
         patch_addrs(funchook, asm_inst, asm_count, tap);
     }
 
@@ -1089,7 +1099,7 @@ do_cfunc(char *stackptr, void *cfunc, void *gfunc)
     char *sys_stack = stackptr;
     // TODO
     //char *g_stack = (char *)*(uint64_t *)(sys_stack + 0x50);
-    char *g_stack = (char *)*(uint64_t *)(sys_stack + 0x10);
+    char *g_stack = (char *)*(uint64_t *)(sys_stack + G_STACK);
 
     /*
      * In <= Go 1.16 we must rely on the caller stack for tls_ and http2_ functions

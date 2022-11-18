@@ -1,5 +1,5 @@
 /* Capstone Disassembly Engine */
-/* By Nguyen Anh Quynh <aquynh@gmail.com>, 2015 */
+/* By Nguyen Anh Quynh <aquynh@gmail.com>, 2015-2019 */
 
 // This sample code demonstrates the option CS_OPT_MNEMONIC
 // to customize instruction mnemonic.
@@ -52,8 +52,11 @@ static void test()
 
 	err = cs_open(CS_ARCH_X86, CS_MODE_32, &handle);
 	if (err) {
-		printf("Failed on cs_open() with error returned: %u\n", err);
-		abort();
+		if (cs_support(CS_ARCH_X86)) {
+			printf("Failed on cs_open() with error returned: %u\n", err);
+			abort();
+		} else
+			return;
 	}
 
 	// 1. Print out the instruction in default setup.

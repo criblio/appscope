@@ -53,6 +53,24 @@ enum go_arch_t {
    #define RET_SIZE 1
    #define CALL_SIZE 5
    #define G_STACK 0x50
+   #define TLS_SERVER_READ_CONNREADER 0x50
+   #define TLS_SERVER_READ_BUF 0x08
+   #define TLS_SERVER_READ_RC 0x28
+   #define TLS_SERVER_WRITE_CONN 0x30
+   #define TLS_SERVER_WRITE_BUF 0x08
+   #define TLS_SERVER_WRITE_RC 0x10
+   #define TLS_CLIENT_READ_PC 0x80
+   #define TLS_CLIENT_WRITE_W_PC 0x20
+   #define TLS_CLIENT_WRITE_BUF 0x08
+   #define TLS_CLIENT_WRITE_RC 0x10
+   #define HTTP2_SERVER_READ_SC 0xd0
+   #define HTTP2_SERVER_WRITE_SC 0x40
+   #define HTTP2_SERVER_PREFACE_SC 0xd0
+   #define HTTP2_SERVER_PREFACE_RC 0x58
+   #define HTTP2_CLIENT_READ_CC 0x68
+   #define HTTP2_CLIENT_WRITE_TCPCONN 0x48
+   #define HTTP2_CLIENT_WRITE_BUF 0x08
+   #define HTTP2_CLIENT_WRITE_RC 0x10
 #elif defined (__aarch64__)
    #define END_INST "udf"
    #define CALL_INST "bl"
@@ -71,6 +89,24 @@ enum go_arch_t {
    #define RET_SIZE 4
    #define CALL_SIZE 4
    #define G_STACK 0x10
+   #define TLS_SERVER_READ_CONNREADER 0x68
+   #define TLS_SERVER_READ_BUF 0x70
+   #define TLS_SERVER_READ_RC 0x38
+   #define TLS_SERVER_WRITE_CONN 0x38
+   #define TLS_SERVER_WRITE_BUF 0x60
+   #define TLS_SERVER_WRITE_RC 0x18
+   #define TLS_CLIENT_READ_PC 0x98
+   #define TLS_CLIENT_WRITE_W_PC 0x30
+   #define TLS_CLIENT_WRITE_BUF 0x50
+   #define TLS_CLIENT_WRITE_RC 0x18
+   #define HTTP2_SERVER_READ_SC 0xd8
+   #define HTTP2_SERVER_WRITE_SC 0x58
+   #define HTTP2_SERVER_PREFACE_SC 0xd8
+   #define HTTP2_SERVER_PREFACE_RC 0x60
+   #define HTTP2_CLIENT_READ_CC 0x70
+   #define HTTP2_CLIENT_WRITE_TCPCONN 0x80
+   #define HTTP2_CLIENT_WRITE_BUF 0x10
+   #define HTTP2_CLIENT_WRITE_RC 0x30
 #else
    #error Bad arch defined
 #endif
@@ -172,7 +208,6 @@ go_schema_t go_9_schema = {
         .sc_to_conn=0x10,
     },
     .tap = {
-#if 0
         [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",                         go_hook_reg_syscall,          NULL, 0},
         [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",                      go_hook_reg_rawsyscall,       NULL, 0},
         [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",                        go_hook_reg_syscall6,         NULL, 0},
@@ -187,7 +222,6 @@ go_schema_t go_9_schema = {
         [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
         [INDEX_HOOK_EXIT]                 = {"runtime.exit",                            go_hook_exit,                 NULL, 0},
         [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal",                   go_hook_die,                  NULL, 0},
-#endif
         [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                         NULL, 0}
     },
 };
@@ -201,25 +235,25 @@ go_schema_t go_17_schema = {
         .c_syscall_p3=C_SYSCALL_P3,
         .c_syscall_p4=C_SYSCALL_P4,
         .c_syscall_p5=C_SYSCALL_P5,
-        .c_syscall_p6=C_SYSCALL_P6,
-        .c_tls_server_read_connReader=0x68,   //0x50,
-        .c_tls_server_read_buf=0x70,          //0x8,
-        .c_tls_server_read_rc=0x38,           //0x28,
-        .c_tls_server_write_conn=0x38,        //0x30,
-        .c_tls_server_write_buf=0x60,         //0x8,
-        .c_tls_server_write_rc=0x18,          //0x10,
-        .c_tls_client_read_pc=0x28,           // modified per version
-        .c_tls_client_write_w_pc=0x30,        //0x20,
-        .c_tls_client_write_buf=0x50,         //0x8,
-        .c_tls_client_write_rc=0x18,          //0x10,
-        .c_http2_server_read_sc=0xd8,         //0xd0,
-        .c_http2_server_write_sc=0x58,        //0x40,
-        .c_http2_server_preface_sc=0xd8,      //0xd0,
-        .c_http2_server_preface_rc=0x60,      //0x58,
-        .c_http2_client_read_cc=0x70,         //0x68,
-        .c_http2_client_write_tcpConn=0x40,   // modified per version
-        .c_http2_client_write_buf=0x10,       //0x8,
-        .c_http2_client_write_rc=0x30,        //0x10,
+        .c_syscall_p6=C_SYSCALL_P6,                                  //ARM64   x86_64
+        .c_tls_server_read_connReader=   TLS_SERVER_READ_CONNREADER, //0x68,   //0x50,
+        .c_tls_server_read_buf=          TLS_SERVER_READ_BUF,        //0x70,   //0x8,
+        .c_tls_server_read_rc=           TLS_SERVER_READ_RC,         //0x38,   //0x28,
+        .c_tls_server_write_conn=        TLS_SERVER_WRITE_CONN,      //0x38,   //0x30,
+        .c_tls_server_write_buf=         TLS_SERVER_WRITE_BUF,       //0x60,   //0x8,
+        .c_tls_server_write_rc=          TLS_SERVER_WRITE_RC,        //0x18,   //0x10,
+        .c_tls_client_read_pc=           0x28,                       // modified per version
+        .c_tls_client_write_w_pc=        TLS_CLIENT_WRITE_W_PC,      //0x30,   //0x20,
+        .c_tls_client_write_buf=         TLS_CLIENT_WRITE_BUF,       //0x50,   //0x8,
+        .c_tls_client_write_rc=          TLS_CLIENT_WRITE_RC,        //0x18,   //0x10,
+        .c_http2_server_read_sc=         HTTP2_SERVER_READ_SC,       //0xd8,   //0xd0,
+        .c_http2_server_write_sc=        HTTP2_SERVER_WRITE_SC,      //0x58,   //0x40,
+        .c_http2_server_preface_sc=      HTTP2_SERVER_PREFACE_SC,    //0xd8,   //0xd0,
+        .c_http2_server_preface_rc=      HTTP2_SERVER_PREFACE_RC,    //0x60,   //0x58,
+        .c_http2_client_read_cc=         HTTP2_CLIENT_READ_CC,       //0x70,   //0x68,
+        .c_http2_client_write_tcpConn=   0x40,                       // modified per version
+        .c_http2_client_write_buf=       HTTP2_CLIENT_WRITE_BUF,     //0x10,   //0x8,
+        .c_http2_client_write_rc=        HTTP2_CLIENT_WRITE_RC,      //0x30,   //0x10,
     },
     .struct_offsets = {
         .g_to_m=0x30,
@@ -324,8 +358,8 @@ adjustGoStructOffsetsForVersion()
     }
 
     if (g_go_minor_ver == 19) {
-        g_go_schema->arg_offsets.c_tls_client_read_pc=0x98; //0x80;
-        g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x80; //0x48;
+        g_go_schema->arg_offsets.c_tls_client_read_pc=TLS_CLIENT_READ_PC; //0x98; //0x80;
+        g_go_schema->arg_offsets.c_http2_client_write_tcpConn=HTTP2_CLIENT_WRITE_TCPCONN; //0x80; //0x48;
 
         g_go_schema->tap[INDEX_HOOK_SYSCALL].func_name = "runtime/internal/syscall.Syscall6";
         g_go_schema->tap[INDEX_HOOK_RAWSYSCALL].func_name = "";
@@ -1097,8 +1131,6 @@ do_cfunc(char *stackptr, void *cfunc, void *gfunc)
     if (g_cfg.funcs_attached == FALSE) return return_addr(gfunc);
 
     char *sys_stack = stackptr;
-    // TODO
-    //char *g_stack = (char *)*(uint64_t *)(sys_stack + 0x50);
     char *g_stack = (char *)*(uint64_t *)(sys_stack + G_STACK);
 
     /*

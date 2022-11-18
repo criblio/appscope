@@ -354,8 +354,7 @@ static struct service_ops OpenRcService = {
 };
 
 /*
- * Setup specific service.
- *
+ * Setup a specific service
  * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
 service_status_t
@@ -433,6 +432,81 @@ setupService(const char *serviceName, uid_t nsUid, gid_t nsGid) {
     return status;
 }
 
+// Remove any lines containing "/libscope.so" from service configs
+// Reads and Writes characters one at a time to avoid the requirement for a sized buffer
+int
+removeScopeServiceCfg(const char *filePath) {
+    FILE *f1, *f2;
+    char c;
+    char *tempPath = "/tmp/tmpFile-XXXXXX";
+    bool newline = FALSE;
+    char line_buf[128];
+     
+    f1 = scope_fopen(filePath, "r");
+    f2 = scope_fopen(tempPath, "w");
+
+    while (1) {
+        long file_pos = scope_ftell(f1); // Save file position
+        c = scope_getc(f1);
+        if (c == EOF) break;
+        if (c == '\n') {
+            scope_putc(c, f2);
+            newline = TRUE;
+            continue;
+        }
+        if (newline) {
+            scope_fgets(line_buf, sizeof(line_buf), f1);
+            if (scope_strstr(line_buf, "/libscope.so")) {
+                // Skip over this line, effectively removing it from the new file
+                newline = FALSE;
+                continue;
+            }
+            scope_fseek(f1, file_pos, SEEK_SET); // Rewind file position to beginning of line
+        }
+        putc(c, f2);
+        newline = FALSE;
+    }
+
+    scope_fclose(f1);
+    scope_fclose(f2);
+    scope_remove(filePath);
+    scope_rename(tempPath, filePath);
+
+    return 0;
+}
+
+/*
+ * Remove scope from all service configurations
+ * Returns SERVICE_STATUS_SUCCESS on success
+ */
+service_status_t
+setupUnservice(uid_t nsUid, gid_t nsGid) {
+
+    // Change namespace
+    // ??
+
+    // Remove scope from SystemD service configs
+    const char *const systemDPrefixList[] = {
+        "/etc/systemd/system",
+        "/lib/systemd/system",
+        "/run/systemd/system",
+        "/usr/lib/systemd/system"
+    };
+    // for all those directories iterate through their subdirs
+    // check subdir ends with .service.d
+    // create filepath string from [dir path] + /env.conf
+    // removeScopeServiceCfg(filepath) // and check err
+
+    // Remove scope from init.d/openRC service configs
+    // for all files in /etc/init.d/
+    // create a filepath
+    // removeScopeServiceCfg(filepath) // and check err
+
+    // Restore namespace
+    // ??
+
+    return SERVICE_STATUS_SUCCESS;
+}
 
  /*
  * Setup the /etc/profile scope startup script

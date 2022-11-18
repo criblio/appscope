@@ -44,7 +44,6 @@ RUN apt-get update && \
         $GOLANG \
         autoconf \
         automake \
-        cmake \
         curl \
         emacs \
         gdb \
@@ -58,10 +57,20 @@ RUN apt-get update && \
         tzdata \
         upx \
         vim \
+        wget \
         && \
     dpkg-reconfigure --frontend noninteractive tzdata && \
     apt-get clean
 
+ARG CMAKE_VERSION=3.24.3
+
+RUN arch=$(arch) && \
+   curl -SL https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-Linux-${arch}.sh -o /tmp/cmake-install.sh && \
+   chmod u+x /tmp/cmake-install.sh && \
+   mkdir /usr/bin/cmake && \
+   /tmp/cmake-install.sh --skip-license && \
+   rm /tmp/cmake-install.sh
+    
 RUN useradd -d /home/builder -m builder && \
     useradd -d /home/builder -m builder1 && \
     \

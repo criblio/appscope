@@ -1168,8 +1168,7 @@ scope_ftruncate(int fildes, off_t length) {
 }
 
 int
-scope___snprintf_chk(char *str, size_t maxlen, int flag, size_t slen, const char * format, ...)
-{
+scope___snprintf_chk(char *str, size_t maxlen, int flag, size_t slen, const char * format, ...) {
     int ret;
     va_list ap;
     va_start(ap, format);
@@ -1179,14 +1178,12 @@ scope___snprintf_chk(char *str, size_t maxlen, int flag, size_t slen, const char
 }
 
 int
-scope___vfprintf_chk(FILE *fp, int flag, const char *format, va_list ap)
-{
+scope___vfprintf_chk(FILE *fp, int flag, const char *format, va_list ap) {
     return scope_vfprintf(fp, format, ap);
 }
 
 int
-scope___vsnprintf_chk(char *s, size_t maxlen, int flag, size_t slen, const char *format, va_list args)
-{
+scope___vsnprintf_chk(char *s, size_t maxlen, int flag, size_t slen, const char *format, va_list args) {
     return scope_vsnprintf(s, slen, format, args);
 }
 
@@ -1197,8 +1194,7 @@ scope___strcpy_chk(char *dest, const char *src, size_t destlen)
 }
 
 int
-scope__iso99_sscanf(const char *restrict s, const char *restrict fmt, ...)
-{
+scope__iso99_sscanf(const char *restrict s, const char *restrict fmt, ...) {
     int ret;
     va_list ap;
     va_start(ap, fmt);
@@ -1208,32 +1204,27 @@ scope__iso99_sscanf(const char *restrict s, const char *restrict fmt, ...)
 }
 
 unsigned short **
-scope___ctype_b_loc (void)
-{
+scope___ctype_b_loc (void) {
     return scopelibc___ctype_b_loc();
 }
 
 int32_t **
-scope___ctype_tolower_loc(void)
-{
+scope___ctype_tolower_loc(void) {
     return scopelibc___ctype_tolower_loc();
 }
 
 int
-scope_rand(void)
-{
+scope_rand(void) {
     return scopelibc_rand();
 }
 
 void
-scope_srand(unsigned int seed)
-{
+scope_srand(unsigned int seed) {
     scopelibc_srand(seed);
 }
 
 int
-scope_setns(int fd, int nstype)
-{
+scope_setns(int fd, int nstype) {
     return scopelibc_setns(fd, nstype);
 }
 

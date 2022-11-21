@@ -51,15 +51,24 @@ func GetLXCPids() ([]int, error) {
 
 // Get the List of PID(s) related to containerd container
 func GetContainerDPids() ([]int, error) {
+	return getContainerRuntimePids("containerd-shim")
+}
 
-	shimPids, err := PidScopeMapByProcessName("containerd-shim")
+// Get the List of PID(s) related to Podman container
+func GetPodmanPids() ([]int, error) {
+	return getContainerRuntimePids("conmon")
+}
+
+// Get the List of PID(s) related to specific container runtime
+func getContainerRuntimePids(runtimeProc string) ([]int, error) {
+	runtimeContPids, err := PidScopeMapByProcessName(runtimeProc)
 	if err != nil {
 		return nil, err
 	}
-	pids := make([]int, 0, len(shimPids))
+	pids := make([]int, 0, len(runtimeContPids))
 
-	for shimPid := range shimPids {
-		childrenPids, err := PidChildren(shimPid)
+	for runtimeContPid := range runtimeContPids {
+		childrenPids, err := PidChildren(runtimeContPid)
 		if err != nil {
 			return nil, err
 		}

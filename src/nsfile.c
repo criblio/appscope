@@ -88,3 +88,18 @@ nsFileFopen(const char *restrict pathname, const char *restrict mode, uid_t nsUi
     scope_setegid(restoreGid);
     return fp;
 }
+
+int
+nsFileSymlink(const char *target, const char *linkpath, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gid_t restoreGid, int *errnoVal) {
+    scope_setegid(nsGid);
+    scope_seteuid(nsUid);
+
+    int res = scope_symlink(target, linkpath);
+    if (res == -1) {
+        *errnoVal = scope_errno;
+    }
+
+    scope_seteuid(restoreUid);
+    scope_setegid(restoreGid);
+    return res;
+}

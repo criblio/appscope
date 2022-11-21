@@ -2814,12 +2814,13 @@ initCtl(config_t *cfg)
  * and the config file to:
  *
  * - use a single IP:port/UNIX socket for events, metrics & remote commands
- * - set metrics to use ndjson
  * - use a separate connection over the single IP:port/UNIX socket for payloads
  * - include the abbreviated json header for payloads
- * - watch types enabled for files, console, net, fs, http, dns
- * - log level warning
- * - all else uses defaults
+ * - set metrics to use ndjson
+ * - increase log level to warning if set to none or error
+ * - set configevent (SCOPE_CONFIG_EVENT) to true
+ *
+ * all else reflects the filter file, config file, and env vars
  */
 int
 cfgLogStreamDefault(config_t *cfg)

@@ -212,6 +212,11 @@ extern int           scopelibc_fchown(int, uid_t, gid_t);
 extern int           scopelibc_getc(FILE *);
 extern int           scopelibc_putc(int, FILE *);
 extern int           scopelibc_symlink(const char *, const char *);
+extern int           scopelibc_mq_close(mqd_t);
+extern int           scopelibc_mq_send(mqd_t, const char *, size_t, unsigned int);
+extern ssize_t       scopelibc_mq_receive(mqd_t, char *, size_t, unsigned int *);
+extern int           scopelibc_mq_unlink(const char *);
+extern int           scopelibc_mq_getattr(mqd_t, struct mq_attr *);
 
 static int g_go_static;
 
@@ -1251,4 +1256,29 @@ scope_putc(int c, FILE *stream) {
 int
 scope_symlink(const char *target, const char *linkpath) {
     return scopelibc_symlink(target, linkpath);
+}
+
+int
+scope_mq_close(mqd_t mqdes) {
+    return scopelibc_mq_close(mqdes);
+}
+
+int
+scope_mq_send(mqd_t mqdes, const char *msg_ptr, size_t msg_len, unsigned int msg_prio) {
+    return scopelibc_mq_send(mqdes, msg_ptr, msg_len, msg_prio);
+}
+
+ssize_t
+scope_mq_receive(mqd_t mqdes, char *msg_ptr, size_t msg_len, unsigned int *msg_prio) {
+    return scopelibc_mq_receive(mqdes, msg_ptr, msg_len, msg_prio);
+}
+
+int
+scope_mq_unlink(const char *name) {
+    return scopelibc_mq_unlink(name);
+}
+
+int
+scope_mq_getattr(mqd_t mqd, struct mq_attr *attr) {
+    return scopelibc_mq_getattr(mqd, attr);
 }

@@ -17,6 +17,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
+#include <mqueue.h>
 #include <netdb.h>
 #include <poll.h>
 #include <pthread.h>
@@ -38,6 +39,7 @@ extern int  scopelibc_sscanf(const char *, const char *, ...);
 extern int  scopelibc_fscanf(FILE *, const char *, ...);
 extern int  scopelibc_sprintf(char *, const char *, ...);
 extern int  scopelibc_asprintf(char **, const char *, ...);
+extern int  scopelibc_mq_open(const char *, int, ...);
 extern int  scopelibc_errno_val;
 extern FILE scopelibc___stdin_FILE;
 extern FILE scopelibc___stdout_FILE;
@@ -56,6 +58,7 @@ extern int32_t ** scopelibc___ctype_tolower_loc(void);
 #define scope_fscanf   scopelibc_fscanf
 #define scope_sprintf  scopelibc_sprintf
 #define scope_asprintf scopelibc_asprintf
+#define scope_mq_open  scopelibc_mq_open
 #define scope_errno    scopelibc_errno_val
 #define scope_stdin    (&scopelibc___stdin_FILE)
 #define scope_stdout   (&scopelibc___stdout_FILE)
@@ -287,6 +290,11 @@ int           scope_fchown(int, uid_t, gid_t);
 int           scope_getc(FILE *);
 int           scope_putc(int, FILE *);
 int           scope_symlink(const char *, const char *);
+int           scope_mq_close(mqd_t);
+int           scope_mq_send(mqd_t, const char *, size_t, unsigned int);
+ssize_t       scope_mq_receive(mqd_t, char *, size_t, unsigned int *);
+int           scope_mq_unlink(const char *);
+int           scope_mq_getattr(mqd_t, struct mq_attr *);
 
 
 #endif // __SCOPE_STDLIB_H__

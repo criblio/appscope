@@ -55,6 +55,16 @@ func getContainersPids() []int {
 		cPids = append(cPids, ctrDPids...)
 	}
 
+	podmanPids, err := util.GetPodmanPids()
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("Discover Podman containers failed.")
+	}
+	if podmanPids != nil {
+		cPids = append(cPids, podmanPids...)
+	}
+
 	lxcPids, err := util.GetLXCPids()
 	if err != nil {
 		switch {

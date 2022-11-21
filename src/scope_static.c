@@ -845,7 +845,7 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
-    loaderOpSetupLoader(loader);
+    loaderOpSetupLoader(loader, nsUid, nsGid);
 
     // set SCOPE_EXEC_PATH to path to `ldscope` if not set already
     if (getenv("SCOPE_EXEC_PATH") == 0) {

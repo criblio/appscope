@@ -41,7 +41,8 @@ nsFileOpenWithMode(const char *pathname, int flags, mode_t mode, uid_t nsUid, gi
     return fd;
 }
 
-int nsFileMkdir(const char *pathname, mode_t mode, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gid_t restoreGid) {
+int
+nsFileMkdir(const char *pathname, mode_t mode, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gid_t restoreGid) {
     scope_setegid(nsGid);
     scope_seteuid(nsUid);
 
@@ -52,7 +53,8 @@ int nsFileMkdir(const char *pathname, mode_t mode, uid_t nsUid, gid_t nsGid, uid
     return res;
 }
 
-int nsFileMksTemp(char *template, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gid_t restoreGid) {
+int
+nsFileMksTemp(char *template, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gid_t restoreGid) {
     scope_setegid(nsGid);
     scope_seteuid(nsUid);
 
@@ -63,7 +65,8 @@ int nsFileMksTemp(char *template, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gi
     return res;
 }
 
-int nsFileRename(const char *oldpath, const char *newpath, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gid_t restoreGid) {
+int
+nsFileRename(const char *oldpath, const char *newpath, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gid_t restoreGid) {
     scope_setegid(nsGid);
     scope_seteuid(nsUid);
 
@@ -74,7 +77,8 @@ int nsFileRename(const char *oldpath, const char *newpath, uid_t nsUid, gid_t ns
     return res;
 }
 
-FILE *nsFileFopen(const char *restrict pathname, const char *restrict mode, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gid_t restoreGid) {
+FILE *
+nsFileFopen(const char *restrict pathname, const char *restrict mode, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gid_t restoreGid) {
     scope_setegid(nsGid);
     scope_seteuid(nsUid);
 

@@ -1498,12 +1498,14 @@ transportFlush(transport_t* t)
 uint64_t
 transportConnectAttempts(transport_t* t)
 {
+    if (!t) return 0;
     return t->net.connect_attempts;
 }
 
 net_fail_t
 transportFailureReason(transport_t *t)
 {
+    if (!t) return NO_FAIL;
     return t->net.failure_reason;
 }
 

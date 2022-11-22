@@ -2780,8 +2780,11 @@ initCtl(config_t *cfg)
     ctlTransportSet(ctl, trans, CFG_CTL);
 
     // We'll create a dedicated payload channel, conditionally.
-    if (cfgLogStreamEnable(cfg)
-            && (cfgPayEnable(cfg) || protocolDefinitionsUsePayloads())) {
+    int payloadFeatureEnabled = cfgPayEnable(cfg) ||
+                                  protocolDefinitionsUsePayloads();
+    int sendPayloadsToStream = cfgLogStreamEnable(cfg) &&
+                                 !checkEnv(SCOPE_PAYLOAD_TO_DISK_ENV, "true");
+    if (payloadFeatureEnabled && sendPayloadsToStream) {
         transport_t *trans = initTransport(cfg, CFG_LS);
         if (!trans) {
             ctlDestroy(&ctl);

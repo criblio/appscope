@@ -3,6 +3,8 @@
 
 #include <time.h>
 
+#define ENV_NOT_CHECKED (-1)
+
 typedef struct {
     const char *str;
     unsigned val;

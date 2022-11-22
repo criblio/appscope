@@ -4,7 +4,7 @@
 #include "scopestdlib.h"
 
 /*
- * Return uid of current user inside the namespace for specified pid.
+ * Return effective uid of current user inside the namespace for specified pid.
  */
 uid_t
 nsInfoTranslateUid(pid_t hostPid) {
@@ -42,11 +42,11 @@ nsInfoTranslateUid(pid_t hostPid) {
 }
 
 /*
- * Return gid of current user inside the namespace for specified pid.
+ * Return effective gid of current user inside the namespace for specified pid.
  */
 gid_t
 nsInfoTranslateGid(pid_t hostPid) {
-    gid_t gid = scope_getgid();
+    gid_t gid = scope_getegid();
     char gidPath[PATH_MAX] = {0};
     char buffer[4096] = {0};
     FILE *fd;
@@ -113,18 +113,17 @@ nsInfoIsPidInSameMntNs(pid_t pid) {
 }
 
 /*
- * Check if the specified process contains second nested PID namespaces. 
+ * Check if the specified process contains nested PID namespaces. 
  *
- * Returns TRUE if specific process contains two PID namespaces with
- * second PID namespace in nspid argument, FALSE otherwise.
+ * Returns TRUE if specific process contains nested PID namespaces with
+ * PID from the last PID namespace in lastNsPid argument, FALSE otherwise.
  */
 bool
-nsInfoIsPidGotSecondPidNs(pid_t pid, pid_t *nsPid) {
-    const int validNsDepth = 2;
+nsInfoGetPidNs(pid_t pid, pid_t *lastNsPid) {
     char path[PATH_MAX] = {0};
     char buffer[4096];
     bool status = FALSE;
-    int lastNsPid = 0;
+    int tempNsPid = 0;
     int nsDepth = 0;
 
     if (scope_snprintf(path, sizeof(path), "/proc/%d/status", pid) < 0) {
@@ -147,7 +146,7 @@ nsInfoIsPidGotSecondPidNs(pid_t pid, pid_t *nsPid) {
             entry = scope_strtok_r(NULL, delimiters, &last);
             // Iterate over NsPids values
             while (entry != NULL) {
-                lastNsPid = scope_atoi(entry);
+                tempNsPid = scope_atoi(entry);
                 entry = scope_strtok_r(NULL, delimiters, &last);
                 nsDepth++;
             }
@@ -155,13 +154,9 @@ nsInfoIsPidGotSecondPidNs(pid_t pid, pid_t *nsPid) {
         }
     }
 
-    /*
-    * TODO: we currently tested nesting depth 
-    * equals validNsDepth, check more depth level
-    */
-    if (nsDepth == validNsDepth) {
+    if (nsDepth > 1) {
         status = TRUE;
-        *nsPid = lastNsPid;
+        *lastNsPid = tempNsPid;
     }
 
     scope_fclose(fstream);

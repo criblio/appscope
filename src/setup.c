@@ -27,7 +27,7 @@ typedef enum {
  * Helper function to check if specified service is already configured to preload scope.
  * Returns TRUE if service is already configured FALSE otherwise.
  */
-static bool
+bool
 isCfgFileConfigured(const char *serviceCfgPath) {
     FILE *fPtr;
     int res = FALSE;
@@ -55,20 +55,20 @@ isCfgFileConfigured(const char *serviceCfgPath) {
  * Helper function to remove any lines containing "/libscope.so" from service configs
  * Reads and Writes characters one at a time to avoid the requirement for a fixed size buffer
  */
-static int
+int
 removeScopeCfgFile(const char *filePath) {
     FILE *f1, *f2;
     char c;
     char *tempPath = "/tmp/tmpFile-XXXXXX";
-    bool newline = FALSE;
+    bool newline = TRUE;
     char line_buf[128];
      
     f1 = scope_fopen(filePath, "r");
     f2 = scope_fopen(tempPath, "w");
 
     while (1) {
-        long file_pos = scope_ftell(f1); // Save file position
         c = scope_getc(f1);
+        long file_pos = scope_ftell(f1); // Save file position 
         if (c == EOF) break;
         if (c == '\n') {
             scope_putc(c, f2);
@@ -76,13 +76,14 @@ removeScopeCfgFile(const char *filePath) {
             continue;
         }
         if (newline) {
+            scope_fseek(f1, file_pos - 1, SEEK_SET); // Rewind file position to beginning of line
             scope_fgets(line_buf, sizeof(line_buf), f1);
             if (scope_strstr(line_buf, "/libscope.so")) {
                 // Skip over this line, effectively removing it from the new file
-                newline = FALSE;
+                newline = TRUE;
                 continue;
             }
-            scope_fseek(f1, file_pos, SEEK_SET); // Rewind file position to beginning of line
+            scope_fseek(f1, file_pos, SEEK_SET); // Rewind file position previous point
         }
         scope_putc(c, f2);
         newline = FALSE;

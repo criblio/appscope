@@ -71,6 +71,7 @@ enum go_arch_t {
    #define HTTP2_CLIENT_WRITE_TCPCONN 0x48
    #define HTTP2_CLIENT_WRITE_BUF 0x08
    #define HTTP2_CLIENT_WRITE_RC 0x10
+   #define EXIT_STACK_SIZE (32 * 1024)
 #elif defined (__aarch64__)
    #define END_INST "udf"
    #define CALL_INST "bl"
@@ -1634,6 +1635,25 @@ extern void handleExit(void);
 static void
 c_exit(char *sys_stack)
 {
+#ifdef __x86_64__
+    int arc;
+    char *exit_stack, *tstack, *gstack;
+    if ((exit_stack = scope_malloc(EXIT_STACK_SIZE)) == NULL) {
+        return;
+    }
+
+    tstack = exit_stack + EXIT_STACK_SIZE;
+
+    // save the original stack, switch to the tstack
+    __asm__ volatile (
+        "mov %%rsp, %2 \n"
+        "mov %1, %%rsp \n"
+        : "=r"(arc)                  // output
+        : "m"(tstack), "m"(gstack)   // input
+        :                            // clobbered register
+        );
+#endif
+
     // don't use stackaddr; patch_first_instruction() does not provide
     // frame_size, so stackaddr isn't usable
     funcprint("c_exit\n");
@@ -1650,6 +1670,17 @@ c_exit(char *sys_stack)
     handleExit();
     // flush the data
     sigSafeNanosleep(&ts);
+#ifdef __x86_64__
+    // Switch stack back to the original stack
+    __asm__ volatile (
+        "mov %1, %%rsp \n"
+        : "=r"(arc)                       // output
+        : "r"(gstack)                     // inputs
+        :                                 // clobbered register
+        );
+
+    scope_free(exit_stack);
+#endif
 }
 
 EXPORTON void *

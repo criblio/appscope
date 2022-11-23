@@ -42,6 +42,7 @@ create_file(const char *file_path, const char* file_contents) {
 /*
  * Assertions:
  * Function does not return an error
+ * Function returns 0 (no changes made)
  * File size does not change
  */
 static void
@@ -73,6 +74,7 @@ removeScopeCfgFile0Changes(void **state) {
 /*
  * Assertions:
  * Function does not return an error
+ * Function returns 1 (1 change made)
  * File size decreases by correct amount
  * "/libscope.so" cannot be found in the file
  */
@@ -92,7 +94,7 @@ removeScopeCfgFile1Change(void **state) {
     orig_file_size = st.st_size;
 
     res = removeScopeCfgFile(file_path);
-    assert_int_equal(res, 0);
+    assert_int_equal(res, 1);
 
     // Check for presence of "/libscope.so"
     res = isCfgFileConfigured(file_path);
@@ -109,6 +111,7 @@ removeScopeCfgFile1Change(void **state) {
 /*
  * Assertions:
  * Function does not return an error
+ * Function returns 2 (2 changes made)
  * File size decreases by correct amount
  * "/libscope.so" cannot be found in the file
  */
@@ -128,7 +131,7 @@ removeScopeCfgFile2Changes(void **state) {
     orig_file_size = st.st_size;
 
     res = removeScopeCfgFile(file_path);
-    assert_int_equal(res, 0);
+    assert_int_equal(res, 2);
 
     // Check for presence of "/libscope.so"
     res = isCfgFileConfigured(file_path);

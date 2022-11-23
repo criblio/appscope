@@ -8,6 +8,7 @@
 #include "libdir.h"
 #include "libver.h"
 #include "setup.h"
+#include "dbg.h"
 #include "scopestdlib.h"
 
 #define BUFSIZE (4096)
@@ -54,6 +55,7 @@ isCfgFileConfigured(const char *serviceCfgPath) {
 /*
  * Helper function to remove any lines containing "/libscope.so" from service configs
  * Reads and Writes characters one at a time to avoid the requirement for a fixed size buffer
+ * Returns number of lines modified ; 0 if no file was modified; -1 on error
  */
 int
 removeScopeCfgFile(const char *filePath) {
@@ -62,9 +64,17 @@ removeScopeCfgFile(const char *filePath) {
     char *tempPath = "/tmp/tmpFile-XXXXXX";
     bool newline = TRUE;
     char line_buf[128];
+    int count = 0;
      
     f1 = scope_fopen(filePath, "r");
+    if (!f1) {
+        return -1;
+    }
     f2 = scope_fopen(tempPath, "w");
+    if (!f2) {
+        scope_fclose(f1);
+        return -1;
+    }
 
     while (1) {
         c = scope_getc(f1);
@@ -80,6 +90,7 @@ removeScopeCfgFile(const char *filePath) {
             scope_fgets(line_buf, sizeof(line_buf), f1);
             if (scope_strstr(line_buf, "/libscope.so")) {
                 // Skip over this line, effectively removing it from the new file
+                count++;
                 newline = TRUE;
                 continue;
             }
@@ -91,10 +102,17 @@ removeScopeCfgFile(const char *filePath) {
 
     scope_fclose(f1);
     scope_fclose(f2);
-    scope_remove(filePath);
-    scope_rename(tempPath, filePath);
 
-    return 0;
+    if (scope_remove(filePath)) {
+        scopeLogError("ERROR: Removing original service file %s", filePath);
+        return -1;
+    }
+    if (scope_rename(tempPath, filePath)) {
+        scopeLogError("ERROR: Moving newly created service file %s", filePath);
+        return -1;
+    }
+
+    return count;
 }
 
 /*
@@ -372,6 +390,7 @@ modifyServiceCfgSystemd(const char *serviceCfgPath, const char *libscopePath, ui
 
 static service_status_t
 removeServiceCfgsSystemd(uid_t nsEuid, gid_t nsEgid) {
+    service_status_t res = SERVICE_STATUS_SUCCESS;
     char cfgScript[PATH_MAX] = {0};
     struct stat st = {0};
     DIR *d;
@@ -393,12 +412,15 @@ removeServiceCfgsSystemd(uid_t nsEuid, gid_t nsEgid) {
                 // Look for the presence of an env.conf file
                 if (scope_snprintf(cfgScript, sizeof(cfgScript), "%s/env.conf", dir->d_name) < 0) {
                     scope_perror("error: setupUnservice, scope_snprintf failed");
-                    return SERVICE_STATUS_ERROR_OTHER;
+                    res = SERVICE_STATUS_ERROR_OTHER;
+                    continue;
                 }
                 if (scope_stat(cfgScript, &st) == 0) {
                     // If a service is configured with scope, remove scope from it
                     if (isCfgFileConfigured(cfgScript)) {
-                        removeScopeCfgFile(cfgScript);
+                        if (removeScopeCfgFile(cfgScript) <= 0) {
+                            res = SERVICE_STATUS_ERROR_OTHER;
+                        }
                     }
                 }
             }
@@ -406,11 +428,12 @@ removeServiceCfgsSystemd(uid_t nsEuid, gid_t nsEgid) {
         }
     }
 
-    return SERVICE_STATUS_SUCCESS;
+    return res;
 }
 
 static service_status_t
 removeServiceCfgsInitD(uid_t nsEuid, gid_t nsEgid) {
+    service_status_t res = SERVICE_STATUS_SUCCESS;
     char cfgScript[PATH_MAX] = {0};
     DIR *d;
     struct dirent *dir;
@@ -422,17 +445,20 @@ removeServiceCfgsInitD(uid_t nsEuid, gid_t nsEgid) {
         while ((dir = scope_readdir(d)) != NULL) {
             // If a service is configured with scope, remove scope from it
             if (isCfgFileConfigured(dir->d_name)) {
-                removeScopeCfgFile(cfgScript);
+                if (removeScopeCfgFile(cfgScript) <= 0) {
+                    res = SERVICE_STATUS_ERROR_OTHER;
+                }
             }
         }
         scope_closedir(d);
     }
     
-    return SERVICE_STATUS_SUCCESS;
+    return res;
 }
 
 static service_status_t
 removeServiceCfgsOpenRC(uid_t nsEuid, gid_t nsEgid) {
+    service_status_t res = SERVICE_STATUS_SUCCESS;
     char cfgScript[PATH_MAX] = {0};
     DIR *d;
     struct dirent *dir;
@@ -444,13 +470,15 @@ removeServiceCfgsOpenRC(uid_t nsEuid, gid_t nsEgid) {
         while ((dir = scope_readdir(d)) != NULL) {
             // If a service is configured with scope, remove scope from it
             if (isCfgFileConfigured(dir->d_name)) {
-                removeScopeCfgFile(cfgScript);
+                if (removeScopeCfgFile(cfgScript) <= 0) {
+                    res = SERVICE_STATUS_ERROR_OTHER;
+                }
             }
         }
         scope_closedir(d);
     }
     
-    return SERVICE_STATUS_SUCCESS;
+    return res;
 }
 
 // Service manager base class
@@ -572,7 +600,7 @@ setupService(const char *serviceName, uid_t nsUid, gid_t nsGid) {
  */
 service_status_t
 setupUnservice(uid_t nsUid, gid_t nsGid) {
-    service_status_t res;
+    service_status_t res = SERVICE_STATUS_SUCCESS;
     struct service_ops serviceMgrs[] = {SystemD, InitD, OpenRc};
 
     for (int i = 0; i < sizeof(serviceMgrs); i++) {
@@ -581,7 +609,7 @@ setupUnservice(uid_t nsUid, gid_t nsGid) {
         }
     }
 
-    return SERVICE_STATUS_SUCCESS;
+    return res;
 }
 
  /*

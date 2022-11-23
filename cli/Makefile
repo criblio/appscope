@@ -62,6 +62,10 @@ clean:
 	$(RM) -r build/*
 	$(RM) run/bundle.go $(SCOPE)
 	$(RM) coverage.out coverage.html
+	$(RM) -rf -- .gocache/*/
+	$(RM) -rf -- .gomod/*/
+	$(RM) -rf -- .gobin/x86_64/go*
+	$(RM) -rf -- .gobin/aarch64/go*
 
 ## deps: install dependencies
 deps: $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT)
@@ -97,9 +101,7 @@ $(SCOPE): run/bundle.go $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -
 	       	-o $(SCOPE)
 
 compressscope: $(SCOPE) require-upx
-	if [ "$(ARCH)" = "x86_64" ]; then \
-	  upx -l $(SCOPE) >/dev/null 2>&1 || upx -9 $(SCOPE); \
-	fi
+	upx -l $(SCOPE) >/dev/null 2>&1 || upx -9 $(SCOPE); \
 
 ## test: run unit tests
 test:

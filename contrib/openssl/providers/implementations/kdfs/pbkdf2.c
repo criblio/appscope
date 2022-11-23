@@ -126,13 +126,15 @@ static int pbkdf2_set_membuf(unsigned char **buffer, size_t *buflen,
                              const OSSL_PARAM *p)
 {
     OPENSSL_clear_free(*buffer, *buflen);
+    *buffer = NULL;
+    *buflen = 0;
+
     if (p->data_size == 0) {
         if ((*buffer = OPENSSL_malloc(1)) == NULL) {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             return 0;
         }
     } else if (p->data != NULL) {
-        *buffer = NULL;
         if (!OSSL_PARAM_get_octet_string(p, (void **)buffer, 0, buflen))
             return 0;
     }
@@ -281,7 +283,7 @@ static int pbkdf2_derive(const char *pass, size_t passlen,
     unsigned long i = 1;
     HMAC_CTX *hctx_tpl = NULL, *hctx = NULL;
 
-    mdlen = EVP_MD_size(digest);
+    mdlen = EVP_MD_get_size(digest);
     if (mdlen <= 0)
         return 0;
 

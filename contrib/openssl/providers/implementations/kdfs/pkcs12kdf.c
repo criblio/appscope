@@ -62,9 +62,9 @@ static int pkcs12kdf_derive(const unsigned char *pass, size_t passlen,
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
         goto end;
     }
-    vi = EVP_MD_block_size(md_type);
-    ui = EVP_MD_size(md_type);
-    if (ui < 0 || vi <= 0) {
+    vi = EVP_MD_get_block_size(md_type);
+    ui = EVP_MD_get_size(md_type);
+    if (ui <= 0 || vi <= 0) {
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_DIGEST_SIZE);
         goto end;
     }
@@ -182,13 +182,15 @@ static int pkcs12kdf_set_membuf(unsigned char **buffer, size_t *buflen,
                              const OSSL_PARAM *p)
 {
     OPENSSL_clear_free(*buffer, *buflen);
+    *buffer = NULL;
+    *buflen = 0;
+
     if (p->data_size == 0) {
         if ((*buffer = OPENSSL_malloc(1)) == NULL) {
             ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
             return 0;
         }
     } else if (p->data != NULL) {
-        *buffer = NULL;
         if (!OSSL_PARAM_get_octet_string(p, (void **)buffer, 0, buflen))
             return 0;
     }

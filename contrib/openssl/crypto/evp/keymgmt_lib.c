@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2019-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -11,7 +11,6 @@
 #include "internal/cryptlib.h"
 #include "internal/nelem.h"
 #include "crypto/evp.h"
-#include "crypto/asn1.h"
 #include "internal/core.h"
 #include "internal/provider.h"
 #include "evp_local.h"
@@ -22,7 +21,7 @@
  */
 static int match_type(const EVP_KEYMGMT *keymgmt1, const EVP_KEYMGMT *keymgmt2)
 {
-    const char *name2 = EVP_KEYMGMT_name(keymgmt2);
+    const char *name2 = EVP_KEYMGMT_get0_name(keymgmt2);
 
     return EVP_KEYMGMT_is_a(keymgmt1, name2);
 }
@@ -107,8 +106,16 @@ void *evp_keymgmt_util_export_to_provider(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt)
     if (pk->keydata == NULL)
         return NULL;
 
-    /* If |keymgmt| matches the "origin" |keymgmt|, no more to do */
-    if (pk->keymgmt == keymgmt)
+    /*
+     * If |keymgmt| matches the "origin" |keymgmt|, there is no more to do.
+     * The "origin" is determined by the |keymgmt| pointers being identical
+     * or when the provider and the name ID match.  The latter case handles the
+     * situation where the fetch cache is flushed and a "new" key manager is
+     * created.
+     */
+    if (pk->keymgmt == keymgmt
+        || (pk->keymgmt->name_id == keymgmt->name_id
+            && pk->keymgmt->prov == keymgmt->prov))
         return pk->keydata;
 
     if (!CRYPTO_THREAD_read_lock(pk->lock))
@@ -190,6 +197,7 @@ void *evp_keymgmt_util_export_to_provider(EVP_PKEY *pk, EVP_KEYMGMT *keymgmt)
 
     /* Add the new export to the operation cache */
     if (!evp_keymgmt_util_cache_keydata(pk, keymgmt, import_data.keydata)) {
+        CRYPTO_THREAD_unlock(pk->lock);
         evp_keymgmt_freedata(keymgmt, import_data.keydata);
         return NULL;
     }
@@ -278,7 +286,7 @@ void evp_keymgmt_util_cache_keyinfo(EVP_PKEY *pk)
     /*
      * Cache information about the provider "origin" key.
      *
-     * This services functions like EVP_PKEY_size, EVP_PKEY_bits, etc
+     * This services functions like EVP_PKEY_get_size, EVP_PKEY_get_bits, etc
      */
     if (pk->keydata != NULL) {
         int bits = 0;
@@ -362,7 +370,7 @@ int evp_keymgmt_util_match(EVP_PKEY *pk1, EVP_PKEY *pk2, int selection)
          * but also to determine if we should attempt a cross export
          * the other way.  There's no point doing it both ways.
          */
-        int ok = 1;
+        int ok = 0;
 
         /* Complex case, where the keymgmt differ */
         if (keymgmt1 != NULL
@@ -553,4 +561,23 @@ int evp_keymgmt_util_get_deflt_digest_name(EVP_KEYMGMT *keymgmt,
     if (rv > 0)
         OPENSSL_strlcpy(mdname, result, mdname_sz);
     return rv;
+}
+
+/*
+ * If |keymgmt| has the method function |query_operation_name|, use it to get
+ * the name of a supported operation identity.  Otherwise, return the keytype,
+ * assuming that it works as a default operation name.
+ */
+const char *evp_keymgmt_util_query_operation_name(EVP_KEYMGMT *keymgmt,
+                                                  int op_id)
+{
+    const char *name = NULL;
+
+    if (keymgmt != NULL) {
+        if (keymgmt->query_operation_name != NULL)
+            name = keymgmt->query_operation_name(op_id);
+        if (name == NULL)
+            name = EVP_KEYMGMT_get0_name(keymgmt);
+    }
+    return name;
 }

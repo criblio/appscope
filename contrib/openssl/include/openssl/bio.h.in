@@ -1,7 +1,7 @@
 /*
  * {- join("\n * ", @autowarntext) -}
  *
- * Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -174,9 +174,9 @@ extern "C" {
 
 # ifndef OPENSSL_NO_KTLS
 #  define BIO_get_ktls_send(b)         \
-     BIO_ctrl(b, BIO_CTRL_GET_KTLS_SEND, 0, NULL)
+     (BIO_ctrl(b, BIO_CTRL_GET_KTLS_SEND, 0, NULL) > 0)
 #  define BIO_get_ktls_recv(b)         \
-     BIO_ctrl(b, BIO_CTRL_GET_KTLS_RECV, 0, NULL)
+     (BIO_ctrl(b, BIO_CTRL_GET_KTLS_RECV, 0, NULL) > 0)
 # else
 #  define BIO_get_ktls_send(b)  (0)
 #  define BIO_get_ktls_recv(b)  (0)
@@ -208,6 +208,8 @@ extern "C" {
 # define BIO_FLAGS_MEM_RDONLY    0x200
 # define BIO_FLAGS_NONCLEAR_RST  0x400
 # define BIO_FLAGS_IN_EOF        0x800
+
+/* the BIO FLAGS values 0x1000 to 0x4000 are reserved for internal KTLS flags */
 
 typedef union bio_addr_st BIO_ADDR;
 typedef struct bio_addrinfo_st BIO_ADDRINFO;
@@ -271,16 +273,23 @@ void BIO_clear_flags(BIO *b, int flags);
 # define BIO_cb_pre(a)   (!((a)&BIO_CB_RETURN))
 # define BIO_cb_post(a)  ((a)&BIO_CB_RETURN)
 
+# ifndef OPENSSL_NO_DEPRECATED_3_0
 typedef long (*BIO_callback_fn)(BIO *b, int oper, const char *argp, int argi,
                                 long argl, long ret);
+OSSL_DEPRECATEDIN_3_0 BIO_callback_fn BIO_get_callback(const BIO *b);
+OSSL_DEPRECATEDIN_3_0 void BIO_set_callback(BIO *b, BIO_callback_fn callback);
+OSSL_DEPRECATEDIN_3_0 long BIO_debug_callback(BIO *bio, int cmd,
+                                               const char *argp, int argi,
+                                               long argl, long ret);
+# endif
+
 typedef long (*BIO_callback_fn_ex)(BIO *b, int oper, const char *argp,
                                    size_t len, int argi,
                                    long argl, int ret, size_t *processed);
-BIO_callback_fn BIO_get_callback(const BIO *b);
-void BIO_set_callback(BIO *b, BIO_callback_fn callback);
-
 BIO_callback_fn_ex BIO_get_callback_ex(const BIO *b);
 void BIO_set_callback_ex(BIO *b, BIO_callback_fn_ex callback);
+long BIO_debug_callback_ex(BIO *bio, int oper, const char *argp, size_t len,
+                           int argi, long argl, int ret, size_t *processed);
 
 char *BIO_get_callback_arg(const BIO *b);
 void BIO_set_callback_arg(BIO *b, char *arg);
@@ -609,6 +618,7 @@ int BIO_up_ref(BIO *a);
 int BIO_read(BIO *b, void *data, int dlen);
 int BIO_read_ex(BIO *b, void *data, size_t dlen, size_t *readbytes);
 int BIO_gets(BIO *bp, char *buf, int size);
+int BIO_get_line(BIO *bio, char *buf, int size);
 int BIO_write(BIO *b, const void *data, int dlen);
 int BIO_write_ex(BIO *b, const void *data, size_t dlen, size_t *written);
 int BIO_puts(BIO *bp, const char *buf);
@@ -632,9 +642,6 @@ int BIO_nread0(BIO *bio, char **buf);
 int BIO_nread(BIO *bio, char **buf, int num);
 int BIO_nwrite0(BIO *bio, char **buf);
 int BIO_nwrite(BIO *bio, char **buf, int num);
-
-long BIO_debug_callback(BIO *bio, int cmd, const char *argp, int argi,
-                        long argl, long ret);
 
 const BIO_METHOD *BIO_s_mem(void);
 const BIO_METHOD *BIO_s_secmem(void);
@@ -789,6 +796,7 @@ void BIO_copy_next_retry(BIO *b);
 
 # define ossl_bio__attr__(x)
 # if defined(__GNUC__) && defined(__STDC_VERSION__) \
+    && !defined(__MINGW32__) && !defined(__MINGW64__) \
     && !defined(__APPLE__)
     /*
      * Because we support the 'z' modifier, which made its appearance in C99,

@@ -1,11 +1,14 @@
 /*
- * Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
  * in the file LICENSE in the source distribution or at
  * https://www.openssl.org/source/license.html
  */
+
+/* Necessary for legacy RSA public key export */
+#define OPENSSL_SUPPRESS_DEPRECATED
 
 #include <openssl/opensslconf.h>
 
@@ -25,7 +28,7 @@
 #include <openssl/encoder.h>
 
 /*
- * TODO: This include is to get OSSL_KEYMGMT_SELECT_*, which feels a bit
+ * This include is to get OSSL_KEYMGMT_SELECT_*, which feels a bit
  * much just for those macros...  they might serve better as EVP macros.
  */
 #include <openssl/core_dispatch.h>
@@ -58,7 +61,7 @@ const OPTIONS rsa_options[] = {
 
     OPT_SECTION("Input"),
     {"in", OPT_IN, 's', "Input file"},
-    {"inform", OPT_INFORM, 'f', "Input format (DER/PEM/P12/ENGINE"},
+    {"inform", OPT_INFORM, 'f', "Input format (DER/PEM/P12/ENGINE)"},
     {"pubin", OPT_PUBIN, '-', "Expect a public key in input file"},
     {"RSAPublicKey_in", OPT_RSAPUBKEY_IN, '-', "Input is an RSAPublicKey"},
     {"passin", OPT_PASSIN, 's', "Input file pass phrase source"},
@@ -85,6 +88,36 @@ const OPTIONS rsa_options[] = {
     OPT_PROV_OPTIONS,
     {NULL}
 };
+
+static int try_legacy_encoding(EVP_PKEY *pkey, int outformat, int pubout,
+                               BIO *out)
+{
+    int ret = 0;
+#ifndef OPENSSL_NO_DEPRECATED_3_0
+    const RSA *rsa = EVP_PKEY_get0_RSA(pkey);
+
+    if (rsa == NULL)
+        return 0;
+
+    if (outformat == FORMAT_ASN1) {
+        if (pubout == 2)
+            ret = i2d_RSAPublicKey_bio(out, rsa) > 0;
+        else
+            ret = i2d_RSA_PUBKEY_bio(out, rsa) > 0;
+    } else if (outformat == FORMAT_PEM) {
+        if (pubout == 2)
+            ret = PEM_write_bio_RSAPublicKey(out, rsa) > 0;
+        else
+            ret = PEM_write_bio_RSA_PUBKEY(out, rsa) > 0;
+# ifndef OPENSSL_NO_DSA
+    } else if (outformat == FORMAT_MSBLOB || outformat == FORMAT_PVK) {
+        ret = i2b_PublicKey_bio(out, pkey) > 0;
+# endif
+    }
+#endif
+
+    return ret;
+}
 
 int rsa_main(int argc, char **argv)
 {
@@ -224,7 +257,7 @@ int rsa_main(int argc, char **argv)
         ERR_print_errors(bio_err);
         goto end;
     }
-    if (!EVP_PKEY_is_a(pkey, "RSA")) {
+    if (!EVP_PKEY_is_a(pkey, "RSA") && !EVP_PKEY_is_a(pkey, "RSA-PSS")) {
         BIO_printf(bio_err, "Not an RSA key\n");
         goto end;
     }
@@ -271,7 +304,7 @@ int rsa_main(int argc, char **argv)
         } else if (r == 0) {
             BIO_printf(bio_err, "RSA key not ok\n");
             ERR_print_errors(bio_err);
-        } else if (r == -1) {
+        } else if (r < 0) {
             ERR_print_errors(bio_err);
             goto end;
         }
@@ -322,7 +355,7 @@ int rsa_main(int argc, char **argv)
             if (traditional)
                 output_structure = "pkcs1"; /* "type-specific" would work too */
             else
-                output_structure = "pkcs8";
+                output_structure = "PrivateKeyInfo";
         }
     }
 
@@ -331,13 +364,17 @@ int rsa_main(int argc, char **argv)
                                          output_type, output_structure,
                                          NULL);
     if (OSSL_ENCODER_CTX_get_num_encoders(ectx) == 0) {
-        BIO_printf(bio_err, "%s format not supported\n", output_type);
+        if ((!pubout && !pubin)
+            || !try_legacy_encoding(pkey, outformat, pubout, out))
+            BIO_printf(bio_err, "%s format not supported\n", output_type);
+        else
+            ret = 0;
         goto end;
     }
 
     /* Passphrase setup */
     if (enc != NULL)
-        OSSL_ENCODER_CTX_set_cipher(ectx, EVP_CIPHER_name(enc), NULL);
+        OSSL_ENCODER_CTX_set_cipher(ectx, EVP_CIPHER_get0_name(enc), NULL);
 
     /* Default passphrase prompter */
     if (enc != NULL || outformat == FORMAT_PVK) {

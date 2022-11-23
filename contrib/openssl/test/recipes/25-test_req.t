@@ -1,5 +1,5 @@
 #! /usr/bin/env perl
-# Copyright 2015-2021 The OpenSSL Project Authors. All Rights Reserved.
+# Copyright 2015-2022 The OpenSSL Project Authors. All Rights Reserved.
 #
 # Licensed under the Apache License 2.0 (the "License").  You may not use
 # this file except in compliance with the License.  You can obtain a copy
@@ -15,7 +15,7 @@ use OpenSSL::Test qw/:DEFAULT srctop_file/;
 
 setup("test_req");
 
-plan tests => 43;
+plan tests => 44;
 
 require_ok(srctop_file('test', 'recipes', 'tconversion.pl'));
 
@@ -31,8 +31,13 @@ if (disabled("rsa")) {
     note("There should not be more that at most 80 per line");
 }
 
+# Prevent MSys2 filename munging for arguments that look like file paths but
+# aren't
+$ENV{MSYS2_ARG_CONV_EXCL} = "/CN=";
+
 # Check for duplicate -addext parameters, and one "working" case.
 my @addext_args = ( "openssl", "req", "-new", "-out", "testreq.pem",
+                    "-key",  srctop_file("test", "certs", "ee-key.pem"),
     "-config", srctop_file("test", "test.cnf"), @req_new );
 my $val = "subjectAltName=DNS:example.com";
 my $val2 = " " . $val;
@@ -43,6 +48,11 @@ ok(!run(app([@addext_args, "-addext", $val, "-addext", $val])));
 ok(!run(app([@addext_args, "-addext", $val, "-addext", $val2])));
 ok(!run(app([@addext_args, "-addext", $val, "-addext", $val3])));
 ok(!run(app([@addext_args, "-addext", $val2, "-addext", $val3])));
+
+# If a CSR is provided with neither of -key or -CA/-CAkey, this should fail.
+ok(!run(app(["openssl", "req", "-x509",
+                "-in", srctop_file(@certs, "x509-check.csr"),
+                "-out", "testreq.pem"])));
 
 subtest "generating alt certificate requests with RSA" => sub {
     plan tests => 3;
@@ -73,7 +83,7 @@ subtest "generating alt certificate requests with RSA" => sub {
 
 
 subtest "generating certificate requests with RSA" => sub {
-    plan tests => 3;
+    plan tests => 8;
 
     SKIP: {
         skip "RSA is not supported by this OpenSSL build", 2
@@ -97,6 +107,34 @@ subtest "generating certificate requests with RSA" => sub {
                     "-config", srctop_file("test", "test.cnf"),
                     "-verify", "-in", "testreq-rsa.pem", "-noout"])),
            "Verifying signature on request");
+
+        ok(run(app(["openssl", "req",
+                    "-config", srctop_file("test", "test.cnf"),
+                    "-modulus", "-in", "testreq-rsa.pem", "-noout"])),
+           "Printing a modulus of the request key");
+
+        ok(run(app(["openssl", "req",
+                    "-config", srctop_file("test", "test.cnf"),
+                    "-new", "-out", "testreq_withattrs_pem.pem", "-utf8",
+                    "-key", srctop_file("test", "testrsa_withattrs.pem")])),
+           "Generating request from a key with extra attributes - PEM");
+
+        ok(run(app(["openssl", "req",
+                    "-config", srctop_file("test", "test.cnf"),
+                    "-verify", "-in", "testreq_withattrs_pem.pem", "-noout"])),
+           "Verifying signature on request from a key with extra attributes - PEM");
+
+        ok(run(app(["openssl", "req",
+                    "-config", srctop_file("test", "test.cnf"),
+                    "-new", "-out", "testreq_withattrs_der.pem", "-utf8",
+                    "-key", srctop_file("test", "testrsa_withattrs.der"),
+                    "-keyform", "DER"])),
+           "Generating request from a key with extra attributes - PEM");
+
+        ok(run(app(["openssl", "req",
+                    "-config", srctop_file("test", "test.cnf"),
+                    "-verify", "-in", "testreq_withattrs_der.pem", "-noout"])),
+           "Verifying signature on request from a key with extra attributes - PEM");
     }
 };
 
@@ -265,6 +303,7 @@ subtest "generating certificate requests" => sub {
     plan tests => 2;
 
     ok(run(app(["openssl", "req", "-config", srctop_file("test", "test.cnf"),
+                "-key", srctop_file("test", "certs", "ee-key.pem"),
                 @req_new, "-out", "testreq.pem"])),
        "Generating request");
 
@@ -348,8 +387,9 @@ sub generate_cert {
     my $cn = $is_ca ? "CA" : "EE";
     my $ca_key = srctop_file(@certs, "ca-key.pem");
     my $key = $is_ca ? $ca_key : srctop_file(@certs, "ee-key.pem");
-    my @cmd = ("openssl", "req", "-config", "\"\"", "-x509",
-               "-key", $key, "-subj", "/CN=$cn", @_, "-out", $cert);
+    my @cmd = ("openssl", "req", "-config", "", "-x509",
+               "-subj", "/CN=$cn", @_, "-out", $cert);
+    push(@cmd, ("-key", $key)) if $ss;
     push(@cmd, ("-CA", $ca_cert, "-CAkey", $ca_key)) unless $ss;
     ok(run(app([@cmd])), "generate $cert");
 }
@@ -399,7 +439,7 @@ cert_ext_has_n_different_lines($cert, 0, $SKID_AKID); # no SKID and no AKID
 
 $cert = "self-signed_v3_CA_both_KIDs.pem";
 generate_cert($cert, @v3_ca, "-addext", "subjectKeyIdentifier = hash",
-            "-addext", "authorityKeyIdentifier = keyid");
+            "-addext", "authorityKeyIdentifier = keyid:always");
 cert_ext_has_n_different_lines($cert, 3, $SKID_AKID); # SKID == AKID
 strict_verify($cert, 1);
 
@@ -408,12 +448,14 @@ generate_cert($cert, "-addext", "keyUsage = keyCertSign");
 #TODO strict_verify($cert, 1); # should be accepted because RFC 5280 does not apply
 
 $cert = "v3_EE_default_KIDs.pem";
-generate_cert($cert, "-addext", "keyUsage = dataEncipherment");
+generate_cert($cert, "-addext", "keyUsage = dataEncipherment",
+              "-key", srctop_file(@certs, "ee-key.pem"));
 cert_ext_has_n_different_lines($cert, 4, $SKID_AKID); # SKID != AKID
 strict_verify($cert, 1, $ca_cert);
 
 $cert = "v3_EE_no_AKID.pem";
-generate_cert($cert, "-addext", "authorityKeyIdentifier = none");
+generate_cert($cert, "-addext", "authorityKeyIdentifier = none",
+              "-key", srctop_file(@certs, "ee-key.pem"));
 has_SKID($cert, 1);
 has_AKID($cert, 0);
 strict_verify($cert, 0, $ca_cert);

@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -22,31 +22,33 @@
 #include <openssl/err.h>
 #include <openssl/objects.h>
 #include <openssl/evp.h>
-#include <openssl/x509.h>
 #include <openssl/rsa.h>
 #include <openssl/dsa.h>
 #include <openssl/dh.h>
 #include <openssl/ec.h>
 #include <openssl/cmac.h>
-#include <openssl/engine.h>
+#ifndef FIPS_MODULE
+# include <openssl/engine.h>
+#endif
 #include <openssl/params.h>
 #include <openssl/param_build.h>
 #include <openssl/encoder.h>
 #include <openssl/core_names.h>
 
+#include "internal/numbers.h"   /* includes SIZE_MAX */
 #include "internal/ffc.h"
-#include "crypto/asn1.h"
 #include "crypto/evp.h"
 #include "crypto/dh.h"
 #include "crypto/dsa.h"
 #include "crypto/ec.h"
 #include "crypto/ecx.h"
 #include "crypto/rsa.h"
-#include "crypto/x509.h"
+#ifndef FIPS_MODULE
+# include "crypto/asn1.h"
+# include "crypto/x509.h"
+#endif
 #include "internal/provider.h"
 #include "evp_local.h"
-
-#include "e_os.h"                /* strcasecmp on Windows */
 
 static int pkey_set_type(EVP_PKEY *pkey, ENGINE *e, int type, const char *str,
                          int len, EVP_KEYMGMT *keymgmt);
@@ -57,7 +59,7 @@ static void evp_pkey_free_it(EVP_PKEY *key);
 /* The type of parameters selected in key parameter functions */
 # define SELECT_PARAMETERS OSSL_KEYMGMT_SELECT_DOMAIN_PARAMETERS
 
-int EVP_PKEY_bits(const EVP_PKEY *pkey)
+int EVP_PKEY_get_bits(const EVP_PKEY *pkey)
 {
     int size = 0;
 
@@ -69,7 +71,7 @@ int EVP_PKEY_bits(const EVP_PKEY *pkey)
     return size < 0 ? 0 : size;
 }
 
-int EVP_PKEY_security_bits(const EVP_PKEY *pkey)
+int EVP_PKEY_get_security_bits(const EVP_PKEY *pkey)
 {
     int size = 0;
 
@@ -337,9 +339,16 @@ int EVP_PKEY_eq(const EVP_PKEY *a, const EVP_PKEY *b)
     if (a == NULL || b == NULL)
         return 0;
 
-    if (a->keymgmt != NULL || b->keymgmt != NULL)
-        return evp_pkey_cmp_any(a, b, (SELECT_PARAMETERS
-                                       | OSSL_KEYMGMT_SELECT_PUBLIC_KEY));
+    if (a->keymgmt != NULL || b->keymgmt != NULL) {
+        int selection = SELECT_PARAMETERS;
+
+        if (evp_keymgmt_util_has((EVP_PKEY *)a, OSSL_KEYMGMT_SELECT_PUBLIC_KEY)
+            && evp_keymgmt_util_has((EVP_PKEY *)b, OSSL_KEYMGMT_SELECT_PUBLIC_KEY))
+            selection |= OSSL_KEYMGMT_SELECT_PUBLIC_KEY;
+        else
+            selection |= OSSL_KEYMGMT_SELECT_KEYPAIR;
+        return evp_pkey_cmp_any(a, b, selection);
+    }
 
     /* All legacy keys */
     if (a->type != b->type)
@@ -525,12 +534,14 @@ static int get_raw_key_details(const OSSL_PARAM params[], void *arg)
         if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PRIV_KEY))
                 != NULL)
             return OSSL_PARAM_get_octet_string(p, (void **)raw_key->key,
-                                               SIZE_MAX, raw_key->len);
+                                               raw_key->key == NULL ? 0 : *raw_key->len,
+                                               raw_key->len);
     } else if (raw_key->selection == OSSL_KEYMGMT_SELECT_PUBLIC_KEY) {
         if ((p = OSSL_PARAM_locate_const(params, OSSL_PKEY_PARAM_PUB_KEY))
                 != NULL)
             return OSSL_PARAM_get_octet_string(p, (void **)raw_key->key,
-                                               SIZE_MAX, raw_key->len);
+                                               raw_key->key == NULL ? 0 : *raw_key->len,
+                                               raw_key->len);
     }
 
     return 0;
@@ -615,7 +626,7 @@ static EVP_PKEY *new_cmac_key_int(const unsigned char *priv, size_t len,
     EVP_PKEY_CTX *ctx;
 
     if (cipher != NULL)
-        cipher_name = EVP_CIPHER_name(cipher);
+        cipher_name = EVP_CIPHER_get0_name(cipher);
 
     if (cipher_name == NULL) {
         ERR_raise(ERR_LIB_EVP, EVP_R_KEY_SETUP_FAILED);
@@ -626,7 +637,7 @@ static EVP_PKEY *new_cmac_key_int(const unsigned char *priv, size_t len,
     if (ctx == NULL)
         goto err;
 
-    if (!EVP_PKEY_fromdata_init(ctx)) {
+    if (EVP_PKEY_fromdata_init(ctx) <= 0) {
         ERR_raise(ERR_LIB_EVP, EVP_R_KEY_SETUP_FAILED);
         goto err;
     }
@@ -645,7 +656,7 @@ static EVP_PKEY *new_cmac_key_int(const unsigned char *priv, size_t len,
 #  endif
     *p = OSSL_PARAM_construct_end();
 
-    if (!EVP_PKEY_fromdata(ctx, &pkey, EVP_PKEY_KEYPAIR, params)) {
+    if (EVP_PKEY_fromdata(ctx, &pkey, EVP_PKEY_KEYPAIR, params) <= 0) {
         ERR_raise(ERR_LIB_EVP, EVP_R_KEY_SETUP_FAILED);
         goto err;
     }
@@ -864,7 +875,7 @@ DSA *EVP_PKEY_get1_DSA(EVP_PKEY *pkey)
 # ifndef OPENSSL_NO_EC
 static const ECX_KEY *evp_pkey_get0_ECX_KEY(const EVP_PKEY *pkey, int type)
 {
-    if (EVP_PKEY_base_id(pkey) != type) {
+    if (EVP_PKEY_get_base_id(pkey) != type) {
         ERR_raise(ERR_LIB_EVP, EVP_R_EXPECTING_A_ECX_KEY);
         return NULL;
     }
@@ -969,12 +980,12 @@ int EVP_PKEY_type(int type)
     return ret;
 }
 
-int EVP_PKEY_id(const EVP_PKEY *pkey)
+int EVP_PKEY_get_id(const EVP_PKEY *pkey)
 {
     return pkey->type;
 }
 
-int EVP_PKEY_base_id(const EVP_PKEY *pkey)
+int EVP_PKEY_get_base_id(const EVP_PKEY *pkey)
 {
     return EVP_PKEY_type(pkey->type);
 }
@@ -1012,7 +1023,7 @@ int evp_pkey_name2type(const char *name)
     size_t i;
 
     for (i = 0; i < OSSL_NELEM(standard_name2type); i++) {
-        if (strcasecmp(name, standard_name2type[i].ptr) == 0)
+        if (OPENSSL_strcasecmp(name, standard_name2type[i].ptr) == 0)
             return (int)standard_name2type[i].id;
     }
 
@@ -1035,11 +1046,10 @@ const char *evp_pkey_type2name(int type)
 
 int EVP_PKEY_is_a(const EVP_PKEY *pkey, const char *name)
 {
-    if (pkey->keymgmt == NULL) {
-        int type = evp_pkey_name2type(name);
-
-        return pkey->type == type;
-    }
+    if (pkey == NULL)
+        return 0;
+    if (pkey->keymgmt == NULL)
+        return pkey->type == evp_pkey_name2type(name);
     return EVP_KEYMGMT_is_a(pkey->keymgmt, name);
 }
 
@@ -1051,7 +1061,7 @@ int EVP_PKEY_type_names_do_all(const EVP_PKEY *pkey,
         return 0;
 
     if (!evp_pkey_is_provided(pkey)) {
-        const char *name = OBJ_nid2sn(EVP_PKEY_id(pkey));
+        const char *name = OBJ_nid2sn(EVP_PKEY_get_id(pkey));
 
         fn(name, data);
         return 1;
@@ -1062,7 +1072,7 @@ int EVP_PKEY_type_names_do_all(const EVP_PKEY *pkey,
 int EVP_PKEY_can_sign(const EVP_PKEY *pkey)
 {
     if (pkey->keymgmt == NULL) {
-        switch (EVP_PKEY_base_id(pkey)) {
+        switch (EVP_PKEY_get_base_id(pkey)) {
         case EVP_PKEY_RSA:
             return 1;
 # ifndef OPENSSL_NO_DSA
@@ -1080,12 +1090,12 @@ int EVP_PKEY_can_sign(const EVP_PKEY *pkey)
             break;
         }
     } else {
-        const OSSL_PROVIDER *prov = EVP_KEYMGMT_provider(pkey->keymgmt);
+        const OSSL_PROVIDER *prov = EVP_KEYMGMT_get0_provider(pkey->keymgmt);
         OSSL_LIB_CTX *libctx = ossl_provider_libctx(prov);
         const char *supported_sig =
             pkey->keymgmt->query_operation_name != NULL
             ? pkey->keymgmt->query_operation_name(OSSL_OP_SIGNATURE)
-            : EVP_KEYMGMT_name(pkey->keymgmt);
+            : EVP_KEYMGMT_get0_name(pkey->keymgmt);
         EVP_SIGNATURE *signature = NULL;
 
         signature = EVP_SIGNATURE_fetch(libctx, supported_sig, NULL);
@@ -1119,8 +1129,11 @@ static int print_set_indent(BIO **out, int *pop_f_prefix, long *saved_indent,
 
         *saved_indent =  (i < 0 ? 0 : i);
         if (BIO_set_indent(*out, indent) <= 0) {
-            if ((*out = BIO_push(BIO_new(BIO_f_prefix()), *out)) == NULL)
+            BIO *prefbio = BIO_new(BIO_f_prefix());
+
+            if (prefbio == NULL)
                 return 0;
+            *out = BIO_push(prefbio, *out);
             *pop_f_prefix = 1;
         }
         if (BIO_set_indent(*out, indent) <= 0) {
@@ -1267,9 +1280,14 @@ static int legacy_asn1_ctrl_to_param(EVP_PKEY *pkey, int op,
                 int mdnum;
                 OSSL_LIB_CTX *libctx = ossl_provider_libctx(pkey->keymgmt->prov);
                 /* Make sure the MD is in the namemap if available */
-                EVP_MD *md = EVP_MD_fetch(libctx, mdname, NULL);
-                OSSL_NAMEMAP *namemap = ossl_namemap_stored(libctx);
+                EVP_MD *md;
+                OSSL_NAMEMAP *namemap;
                 int nid = NID_undef;
+
+                (void)ERR_set_mark();
+                md = EVP_MD_fetch(libctx, mdname, NULL);
+                (void)ERR_pop_to_mark();
+                namemap = ossl_namemap_stored(libctx);
 
                 /*
                  * The only reason to fetch the MD was to make sure it is in the
@@ -1335,23 +1353,21 @@ int EVP_PKEY_get_group_name(const EVP_PKEY *pkey, char *gname, size_t gname_sz,
                                           gname, gname_sz, gname_len);
 }
 
-int EVP_PKEY_supports_digest_nid(EVP_PKEY *pkey, int nid)
+int EVP_PKEY_digestsign_supports_digest(EVP_PKEY *pkey, OSSL_LIB_CTX *libctx,
+                                        const char *name, const char *propq)
 {
-    int rv, default_nid;
+    int rv;
+    EVP_MD_CTX *ctx = NULL;
 
-    rv = evp_pkey_asn1_ctrl(pkey, ASN1_PKEY_CTRL_SUPPORTS_MD_NID, nid, NULL);
-    if (rv == -2) {
-        /*
-         * If there is a mandatory default digest and this isn't it, then
-         * the answer is 'no'.
-         */
-        rv = EVP_PKEY_get_default_digest_nid(pkey, &default_nid);
-        if (rv == 2)
-            return (nid == default_nid);
-        /* zero is an error from EVP_PKEY_get_default_digest_nid() */
-        if (rv == 0)
-            return -1;
-    }
+    if ((ctx = EVP_MD_CTX_new()) == NULL)
+        return -1;
+
+    ERR_set_mark();
+    rv = EVP_DigestSignInit_ex(ctx, NULL, name, libctx,
+                               propq, pkey, NULL);
+    ERR_pop_to_mark();
+
+    EVP_MD_CTX_free(ctx);
     return rv;
 }
 
@@ -1379,6 +1395,7 @@ size_t EVP_PKEY_get1_encoded_public_key(EVP_PKEY *pkey, unsigned char **ppub)
 
     if (pkey != NULL && evp_pkey_is_provided(pkey)) {
         size_t return_size = OSSL_PARAM_UNMODIFIED;
+        unsigned char *buf;
 
         /*
          * We know that this is going to fail, but it will give us a size
@@ -1390,14 +1407,18 @@ size_t EVP_PKEY_get1_encoded_public_key(EVP_PKEY *pkey, unsigned char **ppub)
         if (return_size == OSSL_PARAM_UNMODIFIED)
             return 0;
 
-        *ppub = OPENSSL_malloc(return_size);
-        if (*ppub == NULL)
+        *ppub = NULL;
+        buf = OPENSSL_malloc(return_size);
+        if (buf == NULL)
             return 0;
 
         if (!EVP_PKEY_get_octet_string_param(pkey,
                                              OSSL_PKEY_PARAM_ENCODED_PUBLIC_KEY,
-                                             *ppub, return_size, NULL))
+                                             buf, return_size, NULL)) {
+            OPENSSL_free(buf);
             return 0;
+        }
+        *ppub = buf;
         return return_size;
     }
 
@@ -1547,7 +1568,6 @@ static int pkey_set_type(EVP_PKEY *pkey, ENGINE *e, int type, const char *str,
          */
         if (keymgmt == NULL)
             pkey->ameth = ameth;
-        pkey->engine = e;
 
         /*
          * The EVP_PKEY_ASN1_METHOD |pkey_id| retains its legacy key purpose
@@ -1563,6 +1583,13 @@ static int pkey_set_type(EVP_PKEY *pkey, ENGINE *e, int type, const char *str,
         } else {
             pkey->type = EVP_PKEY_KEYMGMT;
         }
+# ifndef OPENSSL_NO_ENGINE
+        if (eptr == NULL && e != NULL && !ENGINE_init(e)) {
+            ERR_raise(ERR_LIB_EVP, EVP_R_INITIALIZATION_ERROR);
+            return 0;
+        }
+# endif
+        pkey->engine = e;
 #endif
     }
     return 1;
@@ -1763,7 +1790,7 @@ void EVP_PKEY_free(EVP_PKEY *x)
     OPENSSL_free(x);
 }
 
-int EVP_PKEY_size(const EVP_PKEY *pkey)
+int EVP_PKEY_get_size(const EVP_PKEY *pkey)
 {
     int size = 0;
 
@@ -1777,7 +1804,7 @@ int EVP_PKEY_size(const EVP_PKEY *pkey)
     return size < 0 ? 0 : size;
 }
 
-const char *EVP_PKEY_description(const EVP_PKEY *pkey)
+const char *EVP_PKEY_get0_description(const EVP_PKEY *pkey)
 {
     if (!evp_pkey_is_assigned(pkey))
         return NULL;
@@ -1835,7 +1862,9 @@ void *evp_pkey_export_to_provider(EVP_PKEY *pk, OSSL_LIB_CTX *libctx,
     if (tmp_keymgmt == NULL) {
         EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_from_pkey(libctx, pk, propquery);
 
-        tmp_keymgmt = ctx->keymgmt;
+        if (ctx == NULL)
+            goto end;
+        allocated_keymgmt = tmp_keymgmt = ctx->keymgmt;
         ctx->keymgmt = NULL;
         EVP_PKEY_CTX_free(ctx);
     }
@@ -1879,7 +1908,8 @@ void *evp_pkey_export_to_provider(EVP_PKEY *pk, OSSL_LIB_CTX *libctx,
         if ((keydata = evp_keymgmt_newdata(tmp_keymgmt)) == NULL)
             goto end;
 
-        if (!pk->ameth->export_to(pk, keydata, tmp_keymgmt, libctx, propquery)) {
+        if (!pk->ameth->export_to(pk, keydata, tmp_keymgmt->import,
+                                  libctx, propquery)) {
             evp_keymgmt_freedata(tmp_keymgmt, keydata);
             keydata = NULL;
             goto end;
@@ -1947,8 +1977,10 @@ void *evp_pkey_export_to_provider(EVP_PKEY *pk, OSSL_LIB_CTX *libctx,
     if (keydata == NULL)
         tmp_keymgmt = NULL;
 
-    if (keymgmt != NULL)
+    if (keymgmt != NULL && tmp_keymgmt != NULL) {
         *keymgmt = tmp_keymgmt;
+        allocated_keymgmt = NULL;
+    }
 
     EVP_KEYMGMT_free(allocated_keymgmt);
     return keydata;
@@ -1957,6 +1989,8 @@ void *evp_pkey_export_to_provider(EVP_PKEY *pk, OSSL_LIB_CTX *libctx,
 #ifndef FIPS_MODULE
 int evp_pkey_copy_downgraded(EVP_PKEY **dest, const EVP_PKEY *src)
 {
+    EVP_PKEY *allocpkey = NULL;
+
     if (!ossl_assert(dest != NULL))
         return 0;
 
@@ -1966,7 +2000,7 @@ int evp_pkey_copy_downgraded(EVP_PKEY **dest, const EVP_PKEY *src)
         int type = src->type;
         const char *keytype = NULL;
 
-        keytype = EVP_KEYMGMT_name(keymgmt);
+        keytype = EVP_KEYMGMT_get0_name(keymgmt);
 
         /*
          * If the type is EVP_PKEY_NONE, then we have a problem somewhere
@@ -1987,7 +2021,7 @@ int evp_pkey_copy_downgraded(EVP_PKEY **dest, const EVP_PKEY *src)
 
         /* Make sure we have a clean slate to copy into */
         if (*dest == NULL) {
-            *dest = EVP_PKEY_new();
+            allocpkey = *dest = EVP_PKEY_new();
             if (*dest == NULL) {
                 ERR_raise(ERR_LIB_EVP, ERR_R_MALLOC_FAILURE);
                 return 0;
@@ -2036,6 +2070,10 @@ int evp_pkey_copy_downgraded(EVP_PKEY **dest, const EVP_PKEY *src)
         }
     }
 
+    if (allocpkey != NULL) {
+        EVP_PKEY_free(allocpkey);
+        *dest = NULL;
+    }
     return 0;
 }
 
@@ -2068,7 +2106,7 @@ void *evp_pkey_get_legacy(EVP_PKEY *pk)
         return ret;
 
     if (!evp_pkey_copy_downgraded(&tmp_copy, pk))
-        return NULL;
+        goto err;
 
     if (!CRYPTO_THREAD_write_lock(pk->lock))
         goto err;
@@ -2137,7 +2175,7 @@ err:
 
 int EVP_PKEY_get_octet_string_param(const EVP_PKEY *pkey, const char *key_name,
                                     unsigned char *buf, size_t max_buf_sz,
-                                    size_t *out_sz)
+                                    size_t *out_len)
 {
     OSSL_PARAM params[2];
     int ret1 = 0, ret2 = 0;
@@ -2149,14 +2187,14 @@ int EVP_PKEY_get_octet_string_param(const EVP_PKEY *pkey, const char *key_name,
     params[1] = OSSL_PARAM_construct_end();
     if ((ret1 = EVP_PKEY_get_params(pkey, params)))
         ret2 = OSSL_PARAM_modified(params);
-    if (ret2 && out_sz != NULL)
-        *out_sz = params[0].return_size;
+    if (ret2 && out_len != NULL)
+        *out_len = params[0].return_size;
     return ret1 && ret2;
 }
 
 int EVP_PKEY_get_utf8_string_param(const EVP_PKEY *pkey, const char *key_name,
                                     char *str, size_t max_buf_sz,
-                                    size_t *out_sz)
+                                    size_t *out_len)
 {
     OSSL_PARAM params[2];
     int ret1 = 0, ret2 = 0;
@@ -2168,8 +2206,16 @@ int EVP_PKEY_get_utf8_string_param(const EVP_PKEY *pkey, const char *key_name,
     params[1] = OSSL_PARAM_construct_end();
     if ((ret1 = EVP_PKEY_get_params(pkey, params)))
         ret2 = OSSL_PARAM_modified(params);
-    if (ret2 && out_sz != NULL)
-        *out_sz = params[0].return_size;
+    if (ret2 && out_len != NULL)
+        *out_len = params[0].return_size;
+
+    if (ret2 && params[0].return_size == max_buf_sz)
+        /* There was no space for a NUL byte */
+        return 0;
+    /* Add a terminating NUL byte for good measure */
+    if (ret2 && str != NULL)
+        str[params[0].return_size] = '\0';
+
     return ret1 && ret2;
 }
 
@@ -2319,10 +2365,10 @@ int EVP_PKEY_get_params(const EVP_PKEY *pkey, OSSL_PARAM params[])
 {
     if (pkey != NULL) {
         if (evp_pkey_is_provided(pkey))
-            return evp_keymgmt_get_params(pkey->keymgmt, pkey->keydata, params);
+            return evp_keymgmt_get_params(pkey->keymgmt, pkey->keydata, params) > 0;
 #ifndef FIPS_MODULE
         else if (evp_pkey_is_legacy(pkey))
-            return evp_pkey_get_params_to_ctrl(pkey, params);
+            return evp_pkey_get_params_to_ctrl(pkey, params) > 0;
 #endif
     }
     ERR_raise(ERR_LIB_EVP, EVP_R_INVALID_KEY);

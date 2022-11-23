@@ -29,6 +29,8 @@
 #include "scopetypes.h"
 #include "utils.h"
 #include "inject.h"
+#include "nsinfo.h"
+#include "nsfile.h"
 #include "os.h"
 
 static void
@@ -66,7 +68,7 @@ attach(pid_t pid, char *scopeLibPath)
     char *exe_path = NULL;
     elf_buf_t *ebuf;
 
-    if (scope_getuid()) {
+    if (scope_geteuid()) {
         scope_printf("error: --attach requires root\n");
         return EXIT_FAILURE;
     }
@@ -173,9 +175,13 @@ attachCmd(pid_t pid, bool attach)
      * File sealing is supported on tmpfs - /dev/shm (DYN_CONFIG_CLI_DIR).
      */
     scope_unlink(buf);
-    fd = scope_open(buf, O_WRONLY|O_CREAT);
+
+
+    uid_t nsUid = nsInfoTranslateUid(pid);
+    gid_t nsGid = nsInfoTranslateGid(pid);
+
+    fd = nsFileOpen(buf, O_WRONLY|O_CREAT, nsUid, nsGid, scope_geteuid(), scope_getegid());
     if (fd == -1) {
-        scope_perror("scope_open() of dynamic config file");
         return EXIT_FAILURE;
     }
 
@@ -191,7 +197,7 @@ attachCmd(pid_t pid, bool attach)
      * we need to change ownership of dyn config file.
      */
 
-    if (scope_getuid() == 0) {
+    if (scope_geteuid() == 0) {
         uid_t euid = -1;
         gid_t egid = -1;
 
@@ -388,7 +394,7 @@ main(int argc, char **argv, char **env)
             return EXIT_FAILURE;
         }
 
-        uint64_t rc = osFindLibrary("libscope.so", pid);
+        uint64_t rc = osFindLibrary("libscope.so", pid, FALSE);
 
         if (attachType == 'a') {
             int ret;

@@ -6,9 +6,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+
+#include "dbg.h"
 #include "setup.h"
-#include "test.h"
 #include "scopestdlib.h"
+#include "test.h"
 
 /*
  * Define the extern offset for integration test compilation 

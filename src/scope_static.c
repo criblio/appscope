@@ -768,7 +768,7 @@ main(int argc, char **argv, char **env)
         } else {
             // Service on Container
             pid_t nsContainerPid = 0;
-            if ((nsInfoIsPidGotSecondPidNs(pid, &nsContainerPid) == TRUE) ||
+            if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
                 (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
                 return nsUnservice(pid);
             }
@@ -840,7 +840,7 @@ main(int argc, char **argv, char **env)
         } else {
             // Configure on Container
             pid_t nsContainerPid = 0;
-            if ((nsInfoIsPidGotSecondPidNs(pid, &nsContainerPid) == TRUE) ||
+            if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
                 (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
                 status = nsUnconfigure(pid);
             }

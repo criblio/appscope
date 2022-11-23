@@ -3,12 +3,12 @@
 #include <stdlib.h>
 #include <errno.h>
 
-#include "nsfile.h"
+#include "dbg.h"
 #include "loaderop.h"
 #include "libdir.h"
 #include "libver.h"
+#include "nsfile.h"
 #include "setup.h"
-#include "dbg.h"
 #include "scopestdlib.h"
 
 #define BUFSIZE (4096)

@@ -68,7 +68,7 @@ attach(pid_t pid, char *scopeLibPath)
     char *exe_path = NULL;
     elf_buf_t *ebuf;
 
-    if (scope_getuid()) {
+    if (scope_geteuid()) {
         scope_printf("error: --attach requires root\n");
         return EXIT_FAILURE;
     }
@@ -197,7 +197,7 @@ attachCmd(pid_t pid, bool attach)
      * we need to change ownership of dyn config file.
      */
 
-    if (scope_getuid() == 0) {
+    if (scope_geteuid() == 0) {
         uid_t euid = -1;
         gid_t egid = -1;
 

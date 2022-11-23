@@ -46,34 +46,22 @@ func getContainersPids() []int {
 
 	ctrDPids, err := util.GetContainerDPids()
 	if err != nil {
-		switch {
-		case errors.Is(err, util.ErrContainerDNotAvailable):
-			log.Warn().
-				Msgf("Setup ContainerD containers skipped. ContainerD is not available")
-		default:
-			log.Error().
-				Err(err).
-				Msg("Discover ContainerD failed.")
-		}
+		log.Error().
+			Err(err).
+			Msg("Discover ContainerD containers failed.")
 	}
 	if ctrDPids != nil {
 		cPids = append(cPids, ctrDPids...)
 	}
 
-	dockerPids, err := util.GetDockerPids()
+	podmanPids, err := util.GetPodmanPids()
 	if err != nil {
-		switch {
-		case errors.Is(err, util.ErrDockerNotAvailable):
-			log.Warn().
-				Msgf("Setup Docker containers skipped. Docker is not available")
-		default:
-			log.Error().
-				Err(err).
-				Msg("Discover Docker containers failed.")
-		}
+		log.Error().
+			Err(err).
+			Msg("Discover Podman containers failed.")
 	}
-	if dockerPids != nil {
-		cPids = append(cPids, dockerPids...)
+	if podmanPids != nil {
+		cPids = append(cPids, podmanPids...)
 	}
 
 	lxcPids, err := util.GetLXCPids()

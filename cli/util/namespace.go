@@ -1,22 +1,14 @@
 package util
 
 import (
-	"context"
 	"errors"
-	"fmt"
 	"os"
 
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/namespaces"
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
 	lxd "github.com/lxc/lxd/client"
 )
 
 var (
-	ErrContainerDNotAvailable = errors.New("ContainerD is not available")
-	ErrDockerNotAvailable     = errors.New("docker daemon is not available")
-	ErrLXDSocketNotAvailable  = errors.New("LXD socket is not available")
+	ErrLXDSocketNotAvailable = errors.New("LXD socket is not available")
 )
 
 // Get the LXD server unix socket
@@ -59,66 +51,37 @@ func GetLXCPids() ([]int, error) {
 
 // Get the List of PID(s) related to containerd container
 func GetContainerDPids() ([]int, error) {
-	ctx := context.Background()
-	cli, err := containerd.New("/run/containerd/containerd.sock")
-	if err != nil {
-		return nil, ErrContainerDNotAvailable
-	}
-	defer cli.Close()
-
-	// TODO: replace GetDockerPids with the API here and namespace "moby"
-	cdctx := namespaces.WithNamespace(ctx, "default")
-	containers, err := cli.Containers(cdctx)
-
-	if err != nil {
-		return nil, err
-	}
-	pids := make([]int, 0, len(containers))
-
-	for _, container := range containers {
-		task, err := container.Task(cdctx, nil)
-		if err != nil {
-			fmt.Printf("\nSkipped container %v, task error: %v", container, err)
-			continue
-		}
-		status, err := task.Status(cdctx)
-		if err != nil {
-			fmt.Printf("\nSkipped task %v, container %v, status error: %v", task, container, err)
-			continue
-		}
-		if status.Status == containerd.Running {
-			pids = append(pids, int(task.Pid()))
-		}
-	}
-
-	return pids, nil
+	return getContainerRuntimePids("containerd-shim")
 }
 
-// Get the List of PID(s) related to Docker container
-func GetDockerPids() ([]int, error) {
-	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+// Get the List of PID(s) related to Podman container
+func GetPodmanPids() ([]int, error) {
+	return getContainerRuntimePids("conmon")
+}
+
+// Get the List of PID(s) related to specific container runtime
+func getContainerRuntimePids(runtimeProc string) ([]int, error) {
+	runtimeContPids, err := PidScopeMapByProcessName(runtimeProc)
 	if err != nil {
 		return nil, err
 	}
+	pids := make([]int, 0, len(runtimeContPids))
 
-	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
-	if err != nil {
-		if client.IsErrConnectionFailed(err) {
-			return nil, ErrDockerNotAvailable
-		}
-		return nil, err
-	}
-
-	pids := make([]int, len(containers))
-
-	for indx, container := range containers {
-		ins, err := cli.ContainerInspect(ctx, container.ID)
+	for runtimeContPid := range runtimeContPids {
+		childrenPids, err := PidChildren(runtimeContPid)
 		if err != nil {
 			return nil, err
 		}
-		pids[indx] = ins.State.Pid
+
+		// Iterate over all the children to found container init process
+		for _, childPid := range childrenPids {
+			status, _ := PidInitContainer(childPid)
+			if status {
+				pids = append(pids, childPid)
+			}
+		}
 	}
+
 	return pids, nil
 }
 

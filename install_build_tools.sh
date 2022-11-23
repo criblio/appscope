@@ -211,7 +211,7 @@ fi
 #      cmake version 3.13.5
 #      lcov: LCOV version 1.13
 #      go1.15.5
-#      upx 4.0.0
+#      upx 4.0.1
 #
 
 PKG_MGR="unknown"
@@ -407,7 +407,7 @@ upx_exists() {
 }
 
 upx_install() {
-    upxVersion=4.0.0
+    upxVersion=4.0.1
     arch=$(arch | sed s/aarch64/arm64/ | sed s/x86_64/amd64/) 
     curl -Ls https://github.com/upx/upx/releases/download/v${upxVersion}/upx-${upxVersion}-${arch}_linux.tar.xz -o - | tar xvJf - -C /tmp
     cp /tmp/upx-${upxVersion}-${arch}_linux/upx /usr/local/bin/

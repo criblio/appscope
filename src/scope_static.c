@@ -739,7 +739,7 @@ main(int argc, char **argv, char **env)
         } else {
             // Service on Container
             pid_t nsContainerPid = 0;
-            if ((nsInfoIsPidGotSecondPidNs(pid, &nsContainerPid) == TRUE) ||
+            if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
                 (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
                 return nsService(pid, serviceName);
             }
@@ -806,7 +806,7 @@ main(int argc, char **argv, char **env)
         } else {
             // Configure on Container
             pid_t nsContainerPid = 0;
-            if ((nsInfoIsPidGotSecondPidNs(pid, &nsContainerPid) == TRUE) ||
+            if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
                 (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
                 status = nsConfigure(pid, confgFilterMem, configFilterSize);
             }
@@ -875,7 +875,7 @@ main(int argc, char **argv, char **env)
         * - [optionally] save previously loaded configuration file into new namespace
         * - fork & execute static loader attach one more time with updated PID
         */
-        if (nsInfoIsPidGotSecondPidNs(pid, &nsAttachPid) == TRUE) {
+        if (nsInfoGetPidNs(pid, &nsAttachPid) == TRUE) {
             // must be root to switch namespace
             if (eUid) {
                 scope_printf("error: --attach requires root\n");
@@ -920,7 +920,7 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
-    loaderOpSetupLoader(loader);
+    loaderOpSetupLoader(loader, nsUid, nsGid);
 
     // set SCOPE_EXEC_PATH to path to `ldscope` if not set already
     if (getenv("SCOPE_EXEC_PATH") == 0) {

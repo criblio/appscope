@@ -211,6 +211,7 @@ typedef struct
 //    SCOPE_QUEUE_LENGTH             override default circular buffer sizes
 //    SCOPE_START_NOPROFILE          cause the start command to ignore updates to /etc/profile.d
 //    SCOPE_START_FORCE_PROFILE      force the start command to update profile.d with a dev version
+//    CRIBL_EDGE_FS_ROOT             define the location of the host root path inside the Cribl Edge container
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"
 

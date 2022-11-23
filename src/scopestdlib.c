@@ -209,8 +209,12 @@ extern int           scopelibc_ftruncate(int, off_t);
 extern int           scopelibc_setns(int, int);
 extern int           scopelibc_chown(const char *, uid_t, gid_t);
 extern int           scopelibc_fchown(int, uid_t, gid_t);
+<<<<<<< HEAD
 extern int           scopelibc_getc(FILE *);
 extern int           scopelibc_putc(int, FILE *);
+=======
+extern int           scopelibc_symlink(const char *, const char *);
+>>>>>>> master
 
 static int g_go_static;
 
@@ -1250,3 +1254,6 @@ scope_putc(int c, FILE *stream) {
     return scopelibc_putc(c, stream);
 }
 
+scope_symlink(const char *target, const char *linkpath) {
+    return scopelibc_symlink(target, linkpath);
+}

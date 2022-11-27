@@ -404,7 +404,7 @@ cmdAttach(void)
 
     /*
      * Using this as an indicator that we were not
-     * previously soping. If the smfd is not active we
+     * previously scoping. If the smfd is not active we
      * may have been detached and are reattaching.
      * In that cse, the thread and transports are expected
      * to be ready.

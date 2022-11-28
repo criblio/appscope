@@ -313,9 +313,9 @@ To use this feature, you first need to know the PID (process ID) of the currentl
 - The `<pid>` part of the filename is the PID of the scoped process.
 - Each line of the file consists of one configuration setting in the form `ENVIRONMENT_VARIABLE=value`.
   
-Once per reporting period, AppScope looks in its **command directory** for a `scope.<pid>` file. If it finds one where the the `<pid>` part of the filename matches the PID of the current scoped process, AppScope applies the configuration settings specified in the file, then deletes the file.
+Once per reporting period, AppScope looks in its **command directory** for a `scope.<pid>` file. If it finds one where the `<pid>` part of the filename matches the PID of the current scoped process, AppScope applies the configuration settings specified in the file, then deletes the file.
 
-The command directory defaults to `/tmp` and the reporting period (a.k.a. metric summary interval) defaults to 10 seconds. You can configure them in the `libscope` section of the config file). See the `Command directory` and `Metric summary interval` subsections, respectively.
+The command directory defaults to `/tmp` and the reporting period (a.k.a. metric summary interval) defaults to 10 seconds. You can configure them in the `libscope` section of the [config file](/docs/config-file)). See the `Command directory` and `Metric summary interval` subsections, respectively.
 
 #### Dynamic configuration example
 
@@ -323,8 +323,10 @@ Suppose your process of interest has PID `4242` and to begin your investigation,
 
 Create a file named `scope.4242` that contains two lines:
 
-`SCOPE_METRIC_VERBOSITY=9`
-`SCOPE_EVENT_HTTP=false`
+```
+SCOPE_METRIC_VERBOSITY=9
+SCOPE_EVENT_HTTP=false
+```
 
 Save the `scope.4242`  file in the command directory. 
 
@@ -332,9 +334,11 @@ AppScope will detect the file and the matching process, apply the config setting
 
 When you've seen enough of the verbose metrics, and you want to start looking at HTTP events, create a new `scope.4242` which contains the following two lines, reversing the previous config settings:
 
-`SCOPE_METRIC_VERBOSITY=3`
-`SCOPE_EVENT_HTTP=true`
+```
+SCOPE_METRIC_VERBOSITY=4
+SCOPE_EVENT_HTTP=true
+```
 
 AppScope will detect the file and the matching process, apply the config settings, then delete the file.
 
-You can continue this process iteratively, according to the needs of your investigation.
+You can iterate on this workflow depending on what you find and what more you want to discover.

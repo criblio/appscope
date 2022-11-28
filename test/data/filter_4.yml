@@ -1,5 +1,11 @@
+# same file as filter_0.yml, except:
+# 1) deny: appears before allow:
+# 2) 'procname: redis' is in both allow and deny
+# 3) for 'procname: htop', config: comes before procname:
+deny:
+- procname: redis
 allow:
-- arg: redis
+- procname: redis
   config:
     cribl:
       enable: false
@@ -10,8 +16,7 @@ allow:
           buffer: line
           path: /tmp/redis.log
           type: file
-- procname: htop
-  config:
+- config:
     cribl:
       enable: true
     libscope:
@@ -21,5 +26,4 @@ allow:
           buffer: line
           path: /tmp/htop.log
           type: file
-deny:
-- arg: git
+  procname: htop

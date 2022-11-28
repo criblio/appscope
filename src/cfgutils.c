@@ -2914,7 +2914,77 @@ destroyProtEntry(void *data)
     scope_free(pre);
 }
 
-// Filter Configuration part
+// Filter Configuration
+
+/*
+These rules describe which (if any) filter file is used.
+In order described here, the first true statement wins.
+- If the env variable SCOPE_FILTER exists, and it's value is a path to a
+    file that can be read
+- If the file /usr/lib/appscope/scope_filter exists and can be read
+- If /the file tmp/appscope/scope_filter exists and can be read
+
+Rules regarding the filter file:
+o) If the filter file exists, but contains any invalid (unparseable) yaml,
+   no processes will be scoped by the filter feature
+o) if the env variable SCOPE_FILTER exists with a value of "false",
+   no processes will be scoped by the filter feature
+o) If a filter file is not found,
+   no processes will be scoped by the filter feature
+
+Rules regarding some of the content of the filter file:
+o) The allow list and deny list are made of a ordered sequence of filters
+o) For the allow list, each filter has these fields: procname, arg, and config
+o) For the deny list, each filter has a procname and arg field
+o) Extra valid (parseable) yaml is allowed anywhere in the filter file,
+   but will be ignored by AppScope
+
+Definition of what it means to match a filter:
+o) By “the process matches the filter", we mean that the one or more
+   of these conditions is true:
+- the value of the procname field is an exact match of the process name
+  (is case-sensitive)
+- the value of the arg field appears somewhere in the process name and
+  arguments. (is case-sensitive)
+- the value of the procname or arg field is the literal string _MatchAll_
+  (See "Example of _MatchAll_ syntax" comment below)
+
+When a valid, parseable filter file is found, it controls which processes
+will be scoped:
+o) If a process does not match any allow list filter,
+   it will not be scoped by the filter feature
+o) If a process matches any filter in the deny list,
+   it will not be scoped by the filter feature
+o) If a process matches any filter in the allow list, and
+   does not match any filter in the deny list,
+   it will be scoped by the filter feature.
+o) For clarity, if a process matches both the allow list and deny list,
+   it will not be scoped by the filter feature.
+
+How configuration is determined:
+o) Default values are used for initial values of the configuration
+o) Filters of an allow list are processed in order. The process always
+   evaluates all filters.
+o) For each filter that matches, the config fields are applied to the process.
+o) A config field can have any number of child elements. Empty configurations,
+   partial configurations, and complete configurations are all allowed.
+o) For clarity, when filters match, all config fields defined by that filter
+   overwrite any earlier config values whether the value is a default value
+   or from an earlier matching filter.
+*/
+
+/*
+Example of _MatchAll_ syntax.  If the filter file contains this content,
+all processes will match, and the configuration will all be default values
+except that log level will be set to error.
+
+allow:
+- procname: _MatchAll_
+  config:
+    libscope:
+      log:
+        level: error
+*/
 
 #define ALLOW_NODE          "allow"
 #define ALLOW_PROCNAME_NODE   "procname"
@@ -2923,6 +2993,8 @@ destroyProtEntry(void *data)
 #define DENY_NODE           "deny"
 #define DENY_PROCNAME_NODE    "procname"
 #define DENY_ARG_NODE         "arg"
+
+#define MATCH_ALL_VAL       "_MatchAll_"
 
 typedef enum {
     PROC_NOT_FOUND,
@@ -2975,7 +3047,9 @@ static void
 processAllowProcNameScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
     if (node->type != YAML_SCALAR_NODE) return;
 
-    if (!scope_strcmp(fCfg->procName, ((const char*) node->data.scalar.value))) {
+    const char *procname = (const char *)node->data.scalar.value;
+    if (!scope_strcmp(fCfg->procName, procname) ||
+        !scope_strcmp(MATCH_ALL_VAL, procname)) {
         fCfg->status = PROC_ALLOWED;
         fCfg->filterMatch = TRUE;
     }
@@ -2988,8 +3062,10 @@ static void
 processAllowProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
     if (node->type != YAML_SCALAR_NODE) return;
 
-    if (node->data.scalar.value && (scope_strlen((char *)node->data.scalar.value) > 0) &&
-        scope_strstr(fCfg->procCmdLine, ((const char*) node->data.scalar.value)) != NULL) {
+    const char *cmdline = (const char *)node->data.scalar.value;
+    if ((scope_strlen(cmdline) > 0) &&
+        (scope_strstr(fCfg->procCmdLine, cmdline)
+         || !scope_strcmp(MATCH_ALL_VAL, cmdline))) {
         fCfg->status = PROC_ALLOWED;
         fCfg->filterMatch = TRUE;
     }
@@ -3015,9 +3091,12 @@ static void
 processAllowSeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
     if (node->type != YAML_SEQUENCE_NODE) return;
 
-    parse_filter_table_t t[] = {
+    parse_filter_table_t filters[] = {
         {YAML_SCALAR_NODE,  ALLOW_PROCNAME_NODE, processAllowProcNameScalar},
         {YAML_SCALAR_NODE,  ALLOW_ARG_NODE,      processAllowProcCmdLineScalar},
+        {YAML_NO_NODE,      NULL,                NULL}
+    };
+    parse_filter_table_t config[] = {
         {YAML_MAPPING_NODE, ALLOW_CONFIG_NODE,   processAllowConfig},
         {YAML_NO_NODE,      NULL,                NULL}
     };
@@ -3030,8 +3109,12 @@ processAllowSeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
         if (nodeMap->type != YAML_MAPPING_NODE) return;
 
         yaml_node_pair_t *pair;
+        // processs the filters first (before the config)
         foreach(pair, nodeMap->data.mapping.pairs) {
-            processKeyValuePairFilter(doc, pair, t, fCfg);
+            processKeyValuePairFilter(doc, pair, filters, fCfg);
+        }
+        foreach(pair, nodeMap->data.mapping.pairs) {
+            processKeyValuePairFilter(doc, pair, config, fCfg);
         }
     }
 
@@ -3044,7 +3127,9 @@ static void
 processDenyProcNameScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
     if (node->type != YAML_SCALAR_NODE) return;
 
-    if (!scope_strcmp(fCfg->procName, ((const char*) node->data.scalar.value))) {
+    const char *procname = (const char *)node->data.scalar.value;
+    if (!scope_strcmp(fCfg->procName, procname) ||
+        !scope_strcmp(MATCH_ALL_VAL, procname)) {
         fCfg->status = PROC_DENIED;
     }
 }
@@ -3056,7 +3141,10 @@ static void
 processDenyProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
     if (node->type != YAML_SCALAR_NODE) return;
 
-    if (scope_strstr(fCfg->procCmdLine, ((const char*) node->data.scalar.value)) != NULL) {
+    const char *cmdline = (const char *)node->data.scalar.value;
+    if ((scope_strlen(cmdline) > 0) &&
+        (scope_strstr(fCfg->procCmdLine, cmdline)
+          || !scope_strcmp(MATCH_ALL_VAL, cmdline))) {
         fCfg->status = PROC_DENIED;
     }
 }
@@ -3098,15 +3186,23 @@ processFilterRootNode(yaml_document_t *doc, filter_cfg_t *fCfg) {
         return;
     }
 
-    parse_filter_table_t t[] = {
+    yaml_node_pair_t *pair;
+    // process allow before deny so deny "overrides" allow
+    // if a process appears in both, it should not be scoped
+    parse_filter_table_t allow[] = {
         {YAML_SEQUENCE_NODE, ALLOW_NODE, processAllowSeq},
+        {YAML_NO_NODE,       NULL,       NULL}
+    };
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairFilter(doc, pair, allow, fCfg);
+    }
+
+    parse_filter_table_t deny[] = {
         {YAML_SEQUENCE_NODE, DENY_NODE,  processDenySeq},
         {YAML_NO_NODE,       NULL,       NULL}
     };
-
-    yaml_node_pair_t *pair;
     foreach(pair, node->data.mapping.pairs) {
-        processKeyValuePairFilter(doc, pair, t, fCfg);
+        processKeyValuePairFilter(doc, pair, deny, fCfg);
     }
 }
 
@@ -3159,7 +3255,7 @@ cleanup_filter_file:
 filter_status_t
 cfgFilterStatus(const char *procName, const char *procCmdLine, const char *filterPath, config_t *cfg)
 {
-    if ((procName == NULL) || (cfg == NULL)) {
+    if ((!procName) || (!procCmdLine) || (!cfg)) {
         DBG(NULL);
         return FILTER_ERROR;
     }

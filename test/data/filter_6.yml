@@ -1,5 +1,9 @@
+# same file as filter_5.yml, except:
+# 1) in deny:, arg: _MatchAll_ replaces procname: redis
+deny:
+- arg: _MatchAll_
 allow:
-- arg: redis
+- procname: _MatchAll_
   config:
     cribl:
       enable: false
@@ -8,18 +12,16 @@ allow:
         level: error
         transport:
           buffer: line
-          path: /tmp/redis.log
+          path: /tmp/match.log
           type: file
-- procname: htop
-  config:
+- config:
     cribl:
       enable: true
     libscope:
       log:
-        level: info
+#        level: info
         transport:
           buffer: line
           path: /tmp/htop.log
           type: file
-deny:
-- arg: git
+  procname: htop

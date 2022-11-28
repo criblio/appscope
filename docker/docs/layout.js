@@ -75,7 +75,7 @@ const tocOrder = [
 ];
 
 const tocHeaders = {
-  fs: 'File System',
+  fs: 'Filesystem',
   net: 'Network',
   http: 'HTTP',
   dns: 'DNS',

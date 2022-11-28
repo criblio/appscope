@@ -5,6 +5,35 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.2.1
+
+2022-12-07 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.2.1`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.2.1/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.2.1/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.2.1/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.2.1/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.2.1/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.1/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.2.1/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.1/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.2.1`.
+
+### New Features and Improvements
+
+AppScope 1.2.1 introduces: 
+
+- Support for attaching to processes running in [LXD and LXC containers](https://www.sumologic.com/blog/lxc-lxd-linux-containers/).
+- A new `--all` or `-a` flag for the `scope detach` [command](docs/cli-reference#detach). Running `scope detach --all` detaches AppScope from all processes.
+
+### Fixes
+
+- [#1055](https://github.com/criblio/appscope/issues/1055) AppScope now successfully attaches to processes given [certain combinations of mount and PID namespaces](/docs/known-issues#appscope-120) that previously caused attach to fail.
+- [#1192](https://github.com/criblio/appscope/issues/1192) Attempting to scope applications that use their own custom-built versions of system libraries no longer causes those applications to crash. However, scoping such applications is not supported, and AppScope will return a `failed to find libc in target process` error.
+- [#1186](https://github.com/criblio/appscope/issues/1186) Scoping a MySQL process no longer causes `mysqld` to crash.
+
 ## AppScope 1.2.0
 
 2022-11-09 - Feature Release

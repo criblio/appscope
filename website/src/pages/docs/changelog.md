@@ -25,12 +25,12 @@ Assets other than AWS Lambda Layers are available in the [Docker container](http
 
 AppScope 1.2.1 introduces: 
 
-- Support for attaching to [LXD and LXC](https://www.sumologic.com/blog/lxc-lxd-linux-containers/) containers.
+- Support for attaching to processes running in [LXD and LXC containers](https://www.sumologic.com/blog/lxc-lxd-linux-containers/).
 - A new `--all` or `-a` flag for the `scope detach` [command](docs/cli-reference#detach). Running `scope detach --all` detaches AppScope from all processes.
 
 ### Fixes
 
-- [#1055](https://github.com/criblio/appscope/issues/1055) AppScope now successfully attaches to processes given [specific combinations of mount and PID namespaces](/docs/known-issues#appscope-120) where that had not worked before.
+- [#1055](https://github.com/criblio/appscope/issues/1055) AppScope now successfully attaches to processes given [certain combinations of mount and PID namespaces](/docs/known-issues#appscope-120) that previously caused attach to fail.
 - [#1192](https://github.com/criblio/appscope/issues/1192) Attempting to scope applications that use their own custom-built versions of system libraries no longer causes those applications to crash. However, scoping such applications is not supported, and AppScope will return a `failed to find libc in target process` error.
 - [#1186](https://github.com/criblio/appscope/issues/1186) Scoping a MySQL process no longer causes `mysqld` to crash.
 

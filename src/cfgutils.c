@@ -2943,6 +2943,7 @@ o) By “the process matches the filter", we mean that the one or more
 - the value of the arg field appears somewhere in the process name and
   arguments. (is case-sensitive)
 - the value of the procname or arg field is the literal string _MatchAll_
+  (See "Example of _MatchAll_ syntax" comment below)
 
 When a valid, parseable filter file is found, it controls which processes
 will be scoped:
@@ -2968,7 +2969,18 @@ o) For clarity, when filters match, all config fields defined by that filter
    or from an earlier matching filter.
 */
 
+/*
+Example of _MatchAll_ syntax.  If the filter file contains this content,
+all processes will match, and the configuration will all be default values
+except that log level will be set to error.
 
+allow:
+- procname: _MatchAll_
+  config:
+    libscope:
+      log:
+        level: error
+*/
 
 #define ALLOW_NODE          "allow"
 #define ALLOW_PROCNAME_NODE   "procname"

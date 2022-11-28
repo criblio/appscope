@@ -2783,7 +2783,7 @@ initCtl(config_t *cfg)
     int payloadFeatureEnabled = cfgPayEnable(cfg) ||
                                   protocolDefinitionsUsePayloads();
     int sendPayloadsToStream = cfgLogStreamEnable(cfg) &&
-                                 !checkEnv(SCOPE_PAYLOAD_TO_DISK_ENV, "true");
+                                 !payloadToDiskForced();
     if (payloadFeatureEnabled && sendPayloadsToStream) {
         transport_t *trans = initTransport(cfg, CFG_LS);
         if (!trans) {

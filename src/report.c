@@ -3590,13 +3590,8 @@ doPayload()
 
             char *bdata = NULL;
 
-            // check the SCOPE_PAYLOAD_TO_DISK_ENV variable once
-            static int sendPayloadsToDisk = ENV_NOT_CHECKED;
-            if (sendPayloadsToDisk == ENV_NOT_CHECKED) {
-                sendPayloadsToDisk = checkEnv(SCOPE_PAYLOAD_TO_DISK_ENV, "true");
-            }
             int sendPayloadsToStream = cfgLogStreamEnable(g_cfg.staticfg) &&
-                                       !sendPayloadsToDisk;
+                                       !payloadToDiskForced();
             if (sendPayloadsToStream) {
                 bdata = scope_calloc(1, hlen + pinfo->len);
                 if (bdata) {

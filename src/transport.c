@@ -1505,6 +1505,8 @@ transportConnectAttempts(transport_t* t)
 net_fail_t
 transportFailureReason(transport_t *t)
 {
+    // This fn reports the most recent connection failure which
+    // is primarilly provided to help debugging of tls issues
     if (!t) return NO_FAIL;
     return t->net.failure_reason;
 }

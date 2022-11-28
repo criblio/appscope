@@ -206,12 +206,12 @@ typedef struct
 //    SCOPE_SWITCH                   for internal go debugging
 //    SCOPE_PID                      provided by library
 //    SCOPE_PAYLOAD_HEADER           write payload headers to files
+//    SCOPE_PAYLOAD_TO_DISK          if payloads are enabled, "true" forces writes to payload->dir
 //    SCOPE_ALLOW_CONSTRUCT_DBG      allows debug inside the constructor
 //    SCOPE_ERROR_SIGNAL_HANDLER     allows to register SIGSEGV&SIGBUS handler
 //    SCOPE_QUEUE_LENGTH             override default circular buffer sizes
 //    SCOPE_START_NOPROFILE          cause the start command to ignore updates to /etc/profile.d
 //    SCOPE_START_FORCE_PROFILE      force the start command to update profile.d with a dev version
-//    SCOPE_PAYLOAD_TO_DISK          "true" writes files to payload->dir, even if SCOPE_CRIBL_ENABLE=true
 //    CRIBL_EDGE_FS_ROOT             define the location of the host root path inside the Cribl Edge container
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"

@@ -305,9 +305,9 @@ Then, show only events containing the string `net_bytes`, and display the fields
 
 <span id="dynamic-configuration"></span>
 
-### Using the Command Directory for Dynamic Configuration
+### Dynamic Configuration
 
-AppScope offers a limited form of dynamic configuration. 
+AppScope offers a limited form of real-time dynamic configuration.
 
 To use this feature, you first need to know the PID (process ID) of the currently scoped process. You then create a `scope.<pid>` file, where:
 - The `<pid>` part of the filename is the PID of the scoped process.

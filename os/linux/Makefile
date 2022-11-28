@@ -93,6 +93,7 @@ coretest: export USER ?= $(shell id -u -n)
 coretest: $(C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
 	@echo "$${CI:+::group::}Building Tests"
 	$(CC) -c $(TEST_CFLAGS) $(C_FILES) $(INCLUDES) $(TEST_INCLUDES)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/ipctest ipctest.o ipc.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/vdsotest vdsotest.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/libvertest libvertest.o libver.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/libdirtest libdirtest.o libdir.o nsfile.o libver.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)

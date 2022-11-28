@@ -63,6 +63,7 @@ fi
 declare -i ERR=0
 
 run_test test/${OS}/vdsotest
+run_test test/${OS}/ipctest
 run_test test/${OS}/libvertest
 run_test test/${OS}/libdirtest
 run_test test/${OS}/setuptest

@@ -84,39 +84,21 @@ go_schema_t *g_go_schema = &go_9_schema; // overridden if later version
 uint64_t g_glibc_guard = 0LL;
 uint64_t go_systemstack_switch;
 
-enum index_hook_t {
-    INDEX_HOOK_EXIT,
-    INDEX_HOOK_DIE,
-    INDEX_HOOK_SYSCALL,
-    INDEX_HOOK_RAWSYSCALL,
-    INDEX_HOOK_SYSCALL6,
-    INDEX_HOOK_TLS_CLIENT_READ,
-    INDEX_HOOK_TLS_CLIENT_WRITE,
-    INDEX_HOOK_TLS_SERVER_READ,
-    INDEX_HOOK_TLS_SERVER_WRITE,
-    INDEX_HOOK_HTTP2_CLIENT_READ,
-    INDEX_HOOK_HTTP2_CLIENT_WRITE,
-    INDEX_HOOK_HTTP2_SERVER_READ,
-    INDEX_HOOK_HTTP2_SERVER_WRITE,
-    INDEX_HOOK_HTTP2_SERVER_PREFACE,
-    INDEX_HOOK_MAX,
-};
 tap_t g_tap[] = {
-    [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",       /* .abi0 */       go_hook_reg_syscall,              NULL, 0},
-    [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",    /* .abi0 */       go_hook_reg_rawsyscall,           NULL, 0},
-    [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",      /* .abi0 */       go_hook_reg_syscall6,             NULL, 0},
-    [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_hook_reg_tls_client_read,      NULL, 0},
-    [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_hook_reg_tls_client_write,     NULL, 0},
-    [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_hook_reg_tls_server_read,      NULL, 0},
-    [INDEX_HOOK_TLS_SERVER_WRITE]     = {"net/http.checkConnErrorWriter.Write",     go_hook_reg_tls_server_write,     NULL, 0},
-    [INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_hook_reg_http2_client_read,    NULL, 0},
-    [INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_hook_reg_http2_client_write,   NULL, 0},
-    [INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_hook_reg_http2_server_read,    NULL, 0},
-    [INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_hook_reg_http2_server_write,   NULL, 0},
-    [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
-    [INDEX_HOOK_EXIT]                 = {"runtime.exit",          /* .abi0 */       go_hook_exit,                     NULL, 0},
-    [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal", /* .abi0 */       go_hook_die,                      NULL, 0},
-    [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                             NULL, 0}
+    {tap_syscall,              "syscall.Syscall",       /* .abi0 */       go_hook_reg_syscall,              NULL, 0},
+    {tap_rawsyscall,           "syscall.RawSyscall",    /* .abi0 */       go_hook_reg_rawsyscall,           NULL, 0},
+    {tap_syscall6,             "syscall.Syscall6",      /* .abi0 */       go_hook_reg_syscall6,             NULL, 0},
+    {tap_tls_client_read,      "net/http.(*persistConn).readResponse",    go_hook_reg_tls_client_read,      NULL, 0},
+    {tap_tls_client_write,     "net/http.persistConnWriter.Write",        go_hook_reg_tls_client_write,     NULL, 0},
+    {tap_tls_server_read,      "net/http.(*connReader).Read",             go_hook_reg_tls_server_read,      NULL, 0},
+    {tap_tls_server_write,     "net/http.checkConnErrorWriter.Write",     go_hook_reg_tls_server_write,     NULL, 0},
+    {tap_http2_client_read,    "net/http.(*http2clientConnReadLoop).run", go_hook_reg_http2_client_read,    NULL, 0},
+    {tap_http2_client_write,   "net/http.http2stickyErrWriter.Write",     go_hook_reg_http2_client_write,   NULL, 0},
+    {tap_http2_server_read,    "net/http.(*http2serverConn).readFrames",  go_hook_reg_http2_server_read,    NULL, 0},
+    {tap_http2_server_write,   "net/http.(*http2serverConn).Flush",       go_hook_reg_http2_server_write,   NULL, 0},
+    {tap_http2_server_preface, "net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
+    {tap_exit,                 "runtime.exit",          /* .abi0 */       go_hook_exit,                     NULL, 0},
+    {tap_die,                  "runtime.dieFromSignal", /* .abi0 */       go_hook_die,                      NULL, 0},
 };
 
 go_schema_t go_9_schema = {
@@ -228,6 +210,7 @@ go_schema_t go_17_schema_x86 = {
     .tap = g_tap,
 };
 
+// TODO: This schema works for 19 on arm. Does it work for 17 and 18?
 go_schema_t go_17_schema_arm = {
     .arg_offsets = {
         .c_syscall_rc=                 0x0,
@@ -281,6 +264,17 @@ go_schema_t go_17_schema_arm = {
     },
     .tap = g_tap,
 };
+
+tap_t *
+tap_entry(enum tap_name name) {
+    for (tap_t *tap = g_go_schema->tap; tap->assembly_fn; tap++) {
+        if (tap->name == name) {
+            return tap;
+        }
+    }
+    // TODO exit and crash if not found
+    return NULL;
+}
 
 static void
 adjustGoStructOffsetsForVersion()
@@ -344,20 +338,19 @@ adjustGoStructOffsetsForVersion()
     }
 
     if (g_go_minor_ver == 19) {
-
-#if defined (__x86_64__)
-        g_go_schema->arg_offsets.c_tls_client_read_pc=0x80;
-        g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
-#elif defined (__aarch64__)
-        g_go_schema->arg_offsets.c_tls_client_read_pc=0x98;
-        g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x80;
-#else
-   #error Bad arch defined
-#endif
-
-        g_go_schema->tap[INDEX_HOOK_SYSCALL].func_name = "runtime/internal/syscall.Syscall6";
-        g_go_schema->tap[INDEX_HOOK_RAWSYSCALL].func_name = "";
-        g_go_schema->tap[INDEX_HOOK_SYSCALL6].func_name = "";
+        if (g_arch == X86_64) {
+            g_go_schema->arg_offsets.c_tls_client_read_pc=0x80;
+            g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
+        } else if (g_arch == AARCH64) {
+            g_go_schema->arg_offsets.c_tls_client_read_pc=0x98;
+            g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x80;
+        } else {
+            scopeLogWarn("Architecture not supported. Not adjusting schema offsets.");
+            return;
+        }
+        tap_entry(tap_syscall)->func_name = "runtime/internal/syscall.Syscall6";
+        tap_entry(tap_rawsyscall)->func_name = "";
+        tap_entry(tap_syscall6)->func_name = "";
     }
 }
 
@@ -1019,13 +1012,14 @@ initGoHook(elf_buf_t *ebuf)
 
     if (g_go_minor_ver >= 17) {
         // The Go 17 schema works for 1.17-1.19 and possibly future versions
-#if defined (__x86_64__)
-        g_go_schema = &go_17_schema_x86;
-#elif defined (__aarch64__)
-        g_go_schema = &go_17_schema_arm;
-#else
-   #error Bad arch defined
-#endif
+        if (g_arch == X86_64) {
+            g_go_schema = &go_17_schema_x86;
+        } else if (g_arch == AARCH64) {
+            g_go_schema = &go_17_schema_arm;
+        } else {
+            scopeLogWarn("Architecture not supported. Continuing without AppScope.");
+            return;
+        }
     }
     // Update the schema to suit the current version
     adjustGoStructOffsetsForVersion();
@@ -1285,19 +1279,19 @@ c_syscall(char *sys_stack, char *g_stack)
 EXPORTON void *
 go_syscall(char *stackptr)
 {
-    return do_cfunc(stackptr, c_syscall, g_go_schema->tap[INDEX_HOOK_SYSCALL].assembly_fn);
+    return do_cfunc(stackptr, c_syscall, tap_entry(tap_syscall)->assembly_fn);
 }
 
 EXPORTON void *
 go_rawsyscall(char *stackptr)
 {
-    return do_cfunc(stackptr, c_syscall, g_go_schema->tap[INDEX_HOOK_RAWSYSCALL].assembly_fn);
+    return do_cfunc(stackptr, c_syscall, tap_entry(tap_rawsyscall)->assembly_fn);
 }
 
 EXPORTON void *
 go_syscall6(char *stackptr)
 {
-    return do_cfunc(stackptr, c_syscall, g_go_schema->tap[INDEX_HOOK_SYSCALL6].assembly_fn);
+    return do_cfunc(stackptr, c_syscall, tap_entry(tap_syscall6)->assembly_fn);
 }
 
 // Extract data from net/http.(*connReader).Read (tls server read)
@@ -1334,7 +1328,7 @@ c_tls_server_read(char *sys_stack, char *g_stack)
 EXPORTON void *
 go_tls_server_read(char *stackptr)
 {
-    return do_cfunc(stackptr, c_tls_server_read, g_go_schema->tap[INDEX_HOOK_TLS_SERVER_READ].assembly_fn);
+    return do_cfunc(stackptr, c_tls_server_read, tap_entry(tap_tls_server_read)->assembly_fn);
 }
 
 // Extract data from net/http.checkConnErrorWriter.Write (tls server write)
@@ -1363,7 +1357,7 @@ c_tls_server_write(char *sys_stack, char *g_stack)
 EXPORTON void *
 go_tls_server_write(char *stackptr)
 {
-    return do_cfunc(stackptr, c_tls_server_write, g_go_schema->tap[INDEX_HOOK_TLS_SERVER_WRITE].assembly_fn);
+    return do_cfunc(stackptr, c_tls_server_write, tap_entry(tap_tls_server_write)->assembly_fn);
 }
 
 // Extract data from net/http.(*persistConn).readResponse (tls client read)
@@ -1399,7 +1393,7 @@ c_tls_client_read(char *sys_stack, char *g_stack)
 EXPORTON void *
 go_tls_client_read(char *stackptr)
 {
-    return do_cfunc(stackptr, c_tls_client_read, g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_READ].assembly_fn);
+    return do_cfunc(stackptr, c_tls_client_read, tap_entry(tap_tls_client_read)->assembly_fn);
 }
 
 // Extract data from net/http.persistConnWriter.Write (tls client write)
@@ -1427,7 +1421,7 @@ c_tls_client_write(char *sys_stack, char *g_stack)
 EXPORTON void *
 go_tls_client_write(char *stackptr)
 {
-    return do_cfunc(stackptr, c_tls_client_write, g_go_schema->tap[INDEX_HOOK_TLS_CLIENT_WRITE].assembly_fn);
+    return do_cfunc(stackptr, c_tls_client_write, tap_entry(tap_tls_client_write)->assembly_fn);
 }
 
 // Extract data from net/http.(*http2serverConn).readFrames (tls http2 server read)
@@ -1472,7 +1466,7 @@ c_http2_server_read(char *sys_stack, char *g_stack)
 EXPORTON void *
 go_http2_server_read(char *stackptr)
 {
-    return do_cfunc(stackptr, c_http2_server_read, g_go_schema->tap[INDEX_HOOK_HTTP2_SERVER_READ].assembly_fn);
+    return do_cfunc(stackptr, c_http2_server_read, tap_entry(tap_http2_server_read)->assembly_fn);
 }
 
 // Extract data from net/http.(*http2serverConn).Flush (tls http2 server write)
@@ -1520,7 +1514,7 @@ c_http2_server_write(char *sys_stack, char *g_stack)
 EXPORTON void *
 go_http2_server_write(char *stackptr)
 {
-    return do_cfunc(stackptr, c_http2_server_write, g_go_schema->tap[INDEX_HOOK_HTTP2_SERVER_WRITE].assembly_fn);
+    return do_cfunc(stackptr, c_http2_server_write, tap_entry(tap_http2_server_write)->assembly_fn);
 }
 
 // Extract data from net/http.(*http2serverConn).readPreface (tls http2 server write)
@@ -1551,7 +1545,7 @@ c_http2_server_preface(char *sys_stack, char *g_stack)
 EXPORTON void *
 go_http2_server_preface(char *stackptr)
 {
-    return do_cfunc(stackptr, c_http2_server_preface, g_go_schema->tap[INDEX_HOOK_HTTP2_SERVER_PREFACE].assembly_fn);
+    return do_cfunc(stackptr, c_http2_server_preface, tap_entry(tap_http2_server_preface)->assembly_fn);
 }
 
 /*
@@ -1604,7 +1598,7 @@ c_http2_client_read(char *sys_stack, char *g_stack)
 EXPORTON void *
 go_http2_client_read(char *stackptr)
 {
-    return do_cfunc(stackptr, c_http2_client_read, g_go_schema->tap[INDEX_HOOK_HTTP2_CLIENT_READ].assembly_fn);
+    return do_cfunc(stackptr, c_http2_client_read, tap_entry(tap_http2_client_read)->assembly_fn);
 }
 
 // Extract data from net/http.http2stickyErrWriter.Write (tls http2 client write)
@@ -1627,7 +1621,7 @@ c_http2_client_write(char *sys_stack, char *g_stack)
 EXPORTON void *
 go_http2_client_write(char *stackptr)
 {
-    return do_cfunc(stackptr, c_http2_client_write, g_go_schema->tap[INDEX_HOOK_HTTP2_CLIENT_WRITE].assembly_fn);
+    return do_cfunc(stackptr, c_http2_client_write, tap_entry(tap_http2_client_write)->assembly_fn);
 }
 
 extern void handleExit(void);
@@ -1685,11 +1679,11 @@ c_exit(char *sys_stack)
 EXPORTON void *
 go_exit(char *stackptr)
 {
-    return do_cfunc(stackptr, c_exit, g_go_schema->tap[INDEX_HOOK_EXIT].assembly_fn);
+    return do_cfunc(stackptr, c_exit, tap_entry(tap_exit)->assembly_fn);
 }
 
 EXPORTON void *
 go_die(char *stackptr)
 {
-    return do_cfunc(stackptr, c_exit, g_go_schema->tap[INDEX_HOOK_DIE].assembly_fn);
+    return do_cfunc(stackptr, c_exit, tap_entry(tap_die)->assembly_fn);
 }

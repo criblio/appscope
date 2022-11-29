@@ -30,6 +30,11 @@
 #define PRI_STR_LEN sizeof(PRI_STR)
 #define UNDEF_OFFSET (-1)
 
+enum go_arch_t {
+    X86_64,
+    AARCH64
+};
+
 #if defined (__x86_64__)
    #define END_INST "int3"
    #define CALL_INST "call"
@@ -79,10 +84,6 @@ go_schema_t *g_go_schema = &go_9_schema; // overridden if later version
 uint64_t g_glibc_guard = 0LL;
 uint64_t go_systemstack_switch;
 
-enum go_arch_t {
-    X86_64,
-    AARCH64
-};
 enum index_hook_t {
     INDEX_HOOK_EXIT,
     INDEX_HOOK_DIE,

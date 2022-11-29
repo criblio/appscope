@@ -60,7 +60,7 @@ isCfgFileConfigured(const char *serviceCfgPath) {
 int
 removeScopeCfgFile(const char *filePath) {
     FILE *f1, *f2;
-    char c;
+    int c;
     char *tempPath = "/tmp/tmpFile-XXXXXX";
     bool newline = TRUE;
     char line_buf[128];

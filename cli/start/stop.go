@@ -13,10 +13,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var (
-	errRemovingFiles = errors.New("error removing start files. See logs for details")
-)
-
 // for the host
 func stopConfigureHost() error {
 	sL := loader.ScopeLoader{Path: run.LdscopePath()}
@@ -128,8 +124,8 @@ func Stop() error {
 
 	// If the `scope stop` command is run inside a container, we should call `ldscope --stophost`
 	// which will also run `scope stop` on the host
-	// SCOPE_CLI_SKIP_STOP_HOST allows to run scope stop in docker environment (integration tests)
-	_, skipHostCfg := os.LookupEnv("SCOPE_CLI_SKIP_STOP_HOST")
+	// SCOPE_CLI_SKIP_HOST allows to run scope stop in docker environment (integration tests)
+	_, skipHostCfg := os.LookupEnv("SCOPE_CLI_SKIP_HOST")
 	if util.InContainer() && !skipHostCfg {
 		if err := extract(scopeDirVersion); err != nil {
 			return err

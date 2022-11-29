@@ -584,7 +584,7 @@ cat example_filter.json | scope start
 
 ### stop
 ---
-Stop scoping a filtered selection of processes and services on the host and in all relevant containers.
+Stop scoping all processes and services on the host and in all relevant containers.
 
 The following actions will be performed on the host and in all relevant containers:
 	- Removal of filter files `/usr/lib/appscope/scope_filter` and `/tmp/appscope/scope_filter`

@@ -77,11 +77,12 @@ nsFileRename(const char *oldpath, const char *newpath, uid_t nsUid, gid_t nsGid,
     return res;
 }
 
-int nsFileRemove(const char *path, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gid_t restoreGid) {
+int nsFileRemove(const char *path, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gid_t restoreGid, int *errnoVal) {
     scope_setegid(nsGid);
     scope_seteuid(nsUid);
 
     int res = scope_remove(path);
+    *errnoVal = scope_errno;
 
     scope_seteuid(restoreUid);
     scope_setegid(restoreGid);

@@ -15,8 +15,7 @@ import (
  * force           -
  */
 
-// TODO: Handle stop usage depending on version value ? when dev we will use /tmp
-func getStopUsage(version string) string {
+func getStopUsage() string {
 	return fmt.Sprintf(`The following actions will be performed on the host and in all relevant containers:
 	- Removal of filter files /usr/lib/appscope/scope_filter and /tmp/appscope/scope_filter
 	- Detach from all existing scoped processes
@@ -27,10 +26,10 @@ func getStopUsage(version string) string {
 // stopCmd represents the stop command
 var stopCmd = &cobra.Command{
 	Use:   "stop",
-	Short: "Stop scoping a filtered selection of processes and services",
-	Long: `Stop scoping a filtered selection of processes and services on the host and in all relevant containers.
+	Short: "Stop scoping all scoped processes and services",
+	Long: `Stop scoping all processes and services on the host and in all relevant containers.
 
-` + getStopUsage("<version>"),
+` + getStopUsage(),
 	Example: `  scope stop`,
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -38,7 +37,7 @@ var stopCmd = &cobra.Command{
 
 		force, _ := cmd.Flags().GetBool("force")
 		if !force {
-			fmt.Println(getStopUsage(internal.GetNormalizedVersion()))
+			fmt.Println(getStopUsage())
 			fmt.Println("\nIf you wish to proceed, run again with the -f flag.")
 			os.Exit(0)
 		}

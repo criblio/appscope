@@ -359,8 +359,8 @@ func Start() error {
 	}
 	// If the `scope start` command is run inside a container, we should call `ldscope --starthost`
 	// which will instead run `scope start` on the host
-	// SCOPE_CLI_SKIP_START_HOST allows to run scope start in docker environment (integration tests)
-	_, skipHostCfg := os.LookupEnv("SCOPE_CLI_SKIP_START_HOST")
+	// SCOPE_CLI_SKIP_HOST allows to run scope start in docker environment (integration tests)
+	_, skipHostCfg := os.LookupEnv("SCOPE_CLI_SKIP_HOST")
 	if util.InContainer() && !skipHostCfg {
 		if err := extract(scopeDirVersion); err != nil {
 			return err

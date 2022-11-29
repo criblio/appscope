@@ -14,6 +14,12 @@
 #define SCOPE_START_SCRIPT "#! /bin/bash\nrm /etc/cron.d/scope_cron\n%s start -f < %s\nrm -- $0\n"
 #define SCOPE_STOP_SCRIPT "#! /bin/bash\nrm /etc/cron.d/scope_cron\n%s stop -f\nrm -- $0\n"
 
+// NS Action types
+typedef enum {
+    START = 0,
+    STOP = 1,
+} ns_action_t;
+
 /*
  * Extract memory to specific output file.
  *
@@ -539,10 +545,10 @@ setHostMntNs(const char *hostFsPrefix) {
 }
 
 /*
- * Joins the host mount namespace.
+ * Joins the host mount namespace to perform a Start or Stop action.
  * Required conditions:
- * - scope_filter must exists
- * - scope must exists
+ * - scope_filter must exist (if action is Start)
+ * - scope must exist
  * TODO: unify it with joinChildNamespace
  * Returns TRUE if operation was success, FALSE otherwise.
  */
@@ -765,7 +771,7 @@ nsHostStart(void) {
 int
 nsHostStop(void) {
      if (isRunningInContainer() == FALSE) {
-        scope_fprintf(scope_stderr, "error: nsHostStart failed process is running on host\n");
+        scope_fprintf(scope_stderr, "error: nsHostStop failed process is running on host\n");
         return EXIT_FAILURE;
     }
     scope_fprintf(scope_stdout, "Executing from a container, run the stop command from the host\n");

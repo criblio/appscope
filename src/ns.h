@@ -3,12 +3,6 @@
 
 #include "scopetypes.h"
 
-// NS Action types
-typedef enum {
-    START = 0,
-    STOP = 1,
-} ns_action_t;
-
 // Operation performed from host to container
 int nsForkAndExec(pid_t, pid_t, char);
 int nsConfigure(pid_t, void *, size_t);

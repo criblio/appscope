@@ -76,10 +76,8 @@ removeScopeCfgFile(const char *filePath) {
         return -1;
     }
 
-    while (1) {
-        c = scope_getc(f1);
+    while ((c = scope_getc(f1)) != EOF) {
         long file_pos = scope_ftell(f1); // Save file position 
-        if (c == EOF) break;
         if (c == '\n') {
             scope_putc(c, f2);
             newline = TRUE;
@@ -487,7 +485,7 @@ struct service_ops {
     service_cfg_status_t (*serviceCfgStatus)(const char *serviceCfgPath, uid_t nsUid, gid_t nsGid);
     service_status_t (*newServiceCfg)(const char *serviceCfgPath, const char *libscopePath, uid_t nsUid, gid_t nsGid);
     service_status_t (*modifyServiceCfg)(const char *serviceCfgPath, const char *libscopePath, uid_t nsUid, gid_t nsGid);
-    service_status_t (*removeScopeAll)(uid_t nsUid, gid_t nsGid);
+    service_status_t (*removeAllScopeServiceCfg)(uid_t nsUid, gid_t nsGid);
 };
 
 static struct service_ops SystemD = {
@@ -495,7 +493,7 @@ static struct service_ops SystemD = {
     .serviceCfgStatus = serviceCfgStatusSystemD,
     .newServiceCfg = newServiceCfgSystemD,
     .modifyServiceCfg = modifyServiceCfgSystemd,
-    .removeScopeAll = removeServiceCfgsSystemd,
+    .removeAllScopeServiceCfg = removeServiceCfgsSystemd,
 };
 
 static struct service_ops InitD = {
@@ -503,7 +501,7 @@ static struct service_ops InitD = {
     .serviceCfgStatus = serviceCfgStatusInitD,
     .newServiceCfg = newServiceCfgInitD,
     .modifyServiceCfg = newServiceCfgInitD,
-    .removeScopeAll = removeServiceCfgsInitD,
+    .removeAllScopeServiceCfg = removeServiceCfgsInitD,
 };
 
 static struct service_ops OpenRc = {
@@ -511,7 +509,7 @@ static struct service_ops OpenRc = {
     .serviceCfgStatus = serviceCfgStatusOpenRc,
     .newServiceCfg = newServiceCfgOpenRc,
     .modifyServiceCfg = newServiceCfgOpenRc,
-    .removeScopeAll = removeServiceCfgsOpenRC,
+    .removeAllScopeServiceCfg = removeServiceCfgsOpenRC,
 };
 
 /*
@@ -604,7 +602,7 @@ setupUnservice(uid_t nsUid, gid_t nsGid) {
     struct service_ops serviceMgrs[] = {SystemD, InitD, OpenRc};
 
     for (int i = 0; i < sizeof(serviceMgrs); i++) {
-        if ((res = serviceMgrs[i].removeScopeAll(nsUid, nsGid)) != SERVICE_STATUS_SUCCESS) {
+        if ((res = serviceMgrs[i].removeAllScopeServiceCfg(nsUid, nsGid)) != SERVICE_STATUS_SUCCESS) {
             return res;
         }
     }
@@ -807,25 +805,20 @@ setupConfigure(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
  */
 int
 setupUnconfigure(uid_t nsUid, gid_t nsGid) {
-    // Remove /etc/profile.d/scope.sh
-    if (nsFileRemove("/etc/profile.d/scope.sh", nsUid, nsGid, scope_geteuid(), scope_getegid())) {
-        if (scope_errno != ENOENT) {
-            scope_fprintf(scope_stderr, "setupUnconfigure: remove /etc/profile.d/scope.sh failed\n");
-            return -1;
-        }
-    }
+    int errnoVal;
 
-    // Remove scope_filter
-    if (nsFileRemove(SCOPE_FILTER_USR_PATH, nsUid, nsGid, scope_geteuid(), scope_getegid())) {
-        if (scope_errno != ENOENT) {
-            scope_fprintf(scope_stderr, "setupUnconfigure: remove %s failed\n", SCOPE_FILTER_USR_PATH);
-            return -1;
-        }
-    }
-    if (nsFileRemove(SCOPE_FILTER_TMP_PATH, nsUid, nsGid, scope_geteuid(), scope_getegid())) {
-        if (scope_errno != ENOENT) {
-            scope_fprintf(scope_stderr, "setupUnconfigure: remove %s failed\n", SCOPE_FILTER_TMP_PATH);
-            return -1;
+    const char* const fileRemoveList[] = {
+        "/etc/profile.d/scope.sh",
+        SCOPE_FILTER_USR_PATH,
+        SCOPE_FILTER_TMP_PATH,
+    };
+
+    for (int i=0; i<sizeof(fileRemoveList)/sizeof(char*); ++i) {
+        if (nsFileRemove(fileRemoveList[i], nsUid, nsGid, scope_geteuid(), scope_getegid(), &errnoVal)) {
+            if (errnoVal != ENOENT) {
+                scope_fprintf(scope_stderr, "setupUnconfigure: remove %s failed\n", fileRemoveList[i]);
+                return -1;
+            }
         }
     }
 

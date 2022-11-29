@@ -418,6 +418,5 @@ func Start() error {
 		return err
 	}
 
-	// TODO: Deny list actions (Detach?/Deservice?)
 	return nil
 }

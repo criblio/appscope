@@ -407,7 +407,7 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
  * This should be called after the mnt namespace has been switched.
  */
 static bool
-createCron(const char *scopePathOnHost, const char *filterPathOnHost, const char *hostPrefixPath, const char *script) {
+createCron(const char *hostPrefixPath, const char *script) {
     int outFd;
     char buf[1024] = {0};
     char path[PATH_MAX] = {0};
@@ -438,7 +438,7 @@ createCron(const char *scopePathOnHost, const char *filterPathOnHost, const char
     }
 
     // Write cron action - scope start
-    if (scope_snprintf(buf, sizeof(buf), script, scopePathOnHost, filterPathOnHost) < 0) {
+    if (scope_snprintf(buf, sizeof(buf), script) < 0) {
         scope_perror("createCron: script: error: snprintf() failed\n");
         scope_close(outFd);
         return FALSE;
@@ -564,7 +564,7 @@ joinHostNamespace(ns_action_t action) {
     char hostScopePath[PATH_MAX] = {0};
     char *scopeFilterCfgMem = NULL;
     char *scopeMem = NULL;
-    const char *script;
+    char script[1024];
 
     if (scope_readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
         return status;
@@ -702,15 +702,19 @@ joinHostNamespace(ns_action_t action) {
         } else {
             scope_strcpy(hostFilterPath, "/usr/lib/appscope/scope_filter");
         }
-        script = SCOPE_START_SCRIPT;
-    } else {
-        script = SCOPE_STOP_SCRIPT;
-    }
 
-    /*
-     * Create a "cron script" on the host
-     */
-    status = createCron(hostScopePath, hostFilterPath, hostPrefixPath, script);
+        /*
+         * Create a "cron script" on the host
+         */
+        scope_snprintf(script, sizeof(script), SCOPE_START_SCRIPT, hostScopePath, hostFilterPath);
+        status = createCron(hostPrefixPath, script);
+    } else {
+        /*
+         * Create a "cron script" on the host
+         */
+        scope_snprintf(script, sizeof(script), SCOPE_STOP_SCRIPT, hostScopePath);
+        status = createCron(hostPrefixPath, script);
+    }
 
 cleanupMem:
     scope_munmap(ldscopeMem, ldscopeSize);

@@ -30,47 +30,16 @@
 #define PRI_STR_LEN sizeof(PRI_STR)
 #define UNDEF_OFFSET (-1)
 
-enum go_arch_t {
-    X86_64,
-    AARCH64
-};
-
 #if defined (__x86_64__)
    #define END_INST "int3"
    #define CALL_INST "call"
    #define SYSCALL_INST "syscall"
    #define CS_ARCH CS_ARCH_X86
    #define CS_MODE CS_MODE_64
-   #define C_SYSCALL_RC 0x0
-   #define C_SYSCALL_NUM 0x60
-   #define C_SYSCALL_P1 0x20
-   #define C_SYSCALL_P2 0x28
-   #define C_SYSCALL_P3 0x18
-   #define C_SYSCALL_P4 0x10
-   #define C_SYSCALL_P5 0x30
-   #define C_SYSCALL_P6 0x38
    #define ARCH X86_64
    #define RET_SIZE 1
    #define CALL_SIZE 5
    #define G_STACK 0x50
-   #define TLS_SERVER_READ_CONNREADER 0x50
-   #define TLS_SERVER_READ_BUF 0x08
-   #define TLS_SERVER_READ_RC 0x28
-   #define TLS_SERVER_WRITE_CONN 0x30
-   #define TLS_SERVER_WRITE_BUF 0x08
-   #define TLS_SERVER_WRITE_RC 0x10
-   #define TLS_CLIENT_READ_PC 0x80
-   #define TLS_CLIENT_WRITE_W_PC 0x20
-   #define TLS_CLIENT_WRITE_BUF 0x08
-   #define TLS_CLIENT_WRITE_RC 0x10
-   #define HTTP2_SERVER_READ_SC 0xd0
-   #define HTTP2_SERVER_WRITE_SC 0x40
-   #define HTTP2_SERVER_PREFACE_SC 0xd0
-   #define HTTP2_SERVER_PREFACE_RC 0x58
-   #define HTTP2_CLIENT_READ_CC 0x68
-   #define HTTP2_CLIENT_WRITE_TCPCONN 0x48
-   #define HTTP2_CLIENT_WRITE_BUF 0x08
-   #define HTTP2_CLIENT_WRITE_RC 0x10
    #define EXIT_STACK_SIZE (32 * 1024)
 #elif defined (__aarch64__)
    #define END_INST "udf"
@@ -78,36 +47,10 @@ enum go_arch_t {
    #define SYSCALL_INST "svc"
    #define CS_ARCH CS_ARCH_ARM64
    #define CS_MODE CS_MODE_LITTLE_ENDIAN
-   #define C_SYSCALL_RC 0x0
-   #define C_SYSCALL_NUM 0x20
-   #define C_SYSCALL_P1 0x60
-   #define C_SYSCALL_P2 0x68
-   #define C_SYSCALL_P3 0x50
-   #define C_SYSCALL_P4 0x58
-   #define C_SYSCALL_P5 0x40
-   #define C_SYSCALL_P6 0x48
    #define ARCH AARCH64
    #define RET_SIZE 4
    #define CALL_SIZE 4
    #define G_STACK 0x10
-   #define TLS_SERVER_READ_CONNREADER 0x68
-   #define TLS_SERVER_READ_BUF 0x70
-   #define TLS_SERVER_READ_RC 0x38
-   #define TLS_SERVER_WRITE_CONN 0x38
-   #define TLS_SERVER_WRITE_BUF 0x60
-   #define TLS_SERVER_WRITE_RC 0x18
-   #define TLS_CLIENT_READ_PC 0x98
-   #define TLS_CLIENT_WRITE_W_PC 0x30
-   #define TLS_CLIENT_WRITE_BUF 0x50
-   #define TLS_CLIENT_WRITE_RC 0x18
-   #define HTTP2_SERVER_READ_SC 0xd8
-   #define HTTP2_SERVER_WRITE_SC 0x58
-   #define HTTP2_SERVER_PREFACE_SC 0xd8
-   #define HTTP2_SERVER_PREFACE_RC 0x60
-   #define HTTP2_CLIENT_READ_CC 0x70
-   #define HTTP2_CLIENT_WRITE_TCPCONN 0x80
-   #define HTTP2_CLIENT_WRITE_BUF 0x10
-   #define HTTP2_CLIENT_WRITE_RC 0x30
 #else
    #error Bad arch defined
 #endif
@@ -119,6 +62,14 @@ enum go_arch_t {
 #define patchprint sysprint
 //#define patchprint devnull
 
+#if NEEDEVNULL > 0
+static void
+devnull(const char* fmt, ...)
+{
+    return;
+}
+#endif
+
 int g_go_minor_ver = UNKNOWN_GO_VER;
 int g_go_maint_ver = UNKNOWN_GO_VER;
 int g_arch = ARCH;
@@ -128,14 +79,10 @@ go_schema_t *g_go_schema = &go_9_schema; // overridden if later version
 uint64_t g_glibc_guard = 0LL;
 uint64_t go_systemstack_switch;
 
-#if NEEDEVNULL > 0
-static void
-devnull(const char* fmt, ...)
-{
-    return;
-}
-#endif
-
+enum go_arch_t {
+    X86_64,
+    AARCH64
+};
 enum index_hook_t {
     INDEX_HOOK_EXIT,
     INDEX_HOOK_DIE,
@@ -151,150 +98,187 @@ enum index_hook_t {
     INDEX_HOOK_HTTP2_SERVER_READ,
     INDEX_HOOK_HTTP2_SERVER_WRITE,
     INDEX_HOOK_HTTP2_SERVER_PREFACE,
-//    INDEX_HOOK_EXIT,
-//    INDEX_HOOK_DIE,
     INDEX_HOOK_MAX,
+};
+tap_t g_tap[] = {
+    [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",       /* .abi0 */       go_hook_reg_syscall,              NULL, 0},
+    [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",    /* .abi0 */       go_hook_reg_rawsyscall,           NULL, 0},
+    [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",      /* .abi0 */       go_hook_reg_syscall6,             NULL, 0},
+    [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_hook_reg_tls_client_read,      NULL, 0},
+    [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_hook_reg_tls_client_write,     NULL, 0},
+    [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_hook_reg_tls_server_read,      NULL, 0},
+    [INDEX_HOOK_TLS_SERVER_WRITE]     = {"net/http.checkConnErrorWriter.Write",     go_hook_reg_tls_server_write,     NULL, 0},
+    [INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_hook_reg_http2_client_read,    NULL, 0},
+    [INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_hook_reg_http2_client_write,   NULL, 0},
+    [INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_hook_reg_http2_server_read,    NULL, 0},
+    [INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_hook_reg_http2_server_write,   NULL, 0},
+    [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
+    [INDEX_HOOK_EXIT]                 = {"runtime.exit",          /* .abi0 */       go_hook_exit,                     NULL, 0},
+    [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal", /* .abi0 */       go_hook_die,                      NULL, 0},
+    [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                             NULL, 0}
 };
 
 go_schema_t go_9_schema = {
     .arg_offsets = {
-        .c_syscall_rc=0x0,
-        .c_syscall_num=0x60,
-        .c_syscall_p1=0x20,
-        .c_syscall_p2=0x28,
-        .c_syscall_p3=0x18,
-        .c_syscall_p4=0x10,
-        .c_syscall_p5=0x30,
-        .c_syscall_p6=0x38,
-        .c_tls_server_read_connReader=0x8,
-        .c_tls_server_read_buf=0x10,
-        .c_tls_server_read_rc=0x28,
-        .c_tls_server_write_conn=0x8,
-        .c_tls_server_write_buf=0x10,
-        .c_tls_server_write_rc=0x28,
-        .c_tls_client_read_pc=0x8,
-        .c_tls_client_write_w_pc=0x8,
-        .c_tls_client_write_buf=0x10,
-        .c_tls_client_write_rc=0x28,
-        .c_http2_server_read_sc=0x188,
-        .c_http2_server_write_sc=0x8,
+        .c_syscall_rc=                 0x0,
+        .c_syscall_num=                0x60,
+        .c_syscall_p1=                 0x20,
+        .c_syscall_p2=                 0x28,
+        .c_syscall_p3=                 0x18,
+        .c_syscall_p4=                 0x10,
+        .c_syscall_p5=                 0x30,
+        .c_syscall_p6=                 0x38,
+        .c_tls_server_read_connReader= 0x8,
+        .c_tls_server_read_buf=        0x10,
+        .c_tls_server_read_rc=         0x28,
+        .c_tls_server_write_conn=      0x8,
+        .c_tls_server_write_buf=       0x10,
+        .c_tls_server_write_rc=        0x28,
+        .c_tls_client_read_pc=         0x8,
+        .c_tls_client_write_w_pc=      0x8,
+        .c_tls_client_write_buf=       0x10,
+        .c_tls_client_write_rc=        0x28,
+        .c_http2_server_read_sc=       0x188,
+        .c_http2_server_write_sc=      0x8,
         .c_http2_server_preface_callee=0x108,
-        .c_http2_server_preface_sc=0x110,
-        .c_http2_server_preface_rc=0x120,
-        .c_http2_client_read_cc=0x78,
-        .c_http2_client_write_tcpConn=0x10,
-        .c_http2_client_write_buf=0x68,
-        .c_http2_client_write_rc=0x28,
+        .c_http2_server_preface_sc=    0x110,
+        .c_http2_server_preface_rc=    0x120,
+        .c_http2_client_read_cc=       0x78,
+        .c_http2_client_write_tcpConn= 0x10,
+        .c_http2_client_write_buf=     0x68,
+        .c_http2_client_write_rc=      0x28,
     },
     .struct_offsets = {
-        .g_to_m=0x30,
-        .m_to_tls=0x88,
-        .connReader_to_conn=0x0,
-        .persistConn_to_conn=0x50,
-        .persistConn_to_bufrd=0x68,
-        .iface_data=0x8,
-        .netfd_to_pd=0x0,
-        .pd_to_fd=0x10,
-        .netfd_to_sysfd=UNDEF_OFFSET,
-        .bufrd_to_buf=0x0,
-        .conn_to_rwc=0x10,
-        .conn_to_tlsState=0x30,
-        .persistConn_to_tlsState=0x60,
-        .fr_to_readBuf=0x50,
-        .fr_to_writeBuf=0x80,
-        .fr_to_headerBuf=0x38,
-        .cc_to_fr=0xc8,
-        .cc_to_tconn=0x8,
-        .sc_to_fr=0x48,
-        .sc_to_conn=0x10,
+        .g_to_m=                       0x30,
+        .m_to_tls=                     0x88,
+        .connReader_to_conn=           0x0,
+        .persistConn_to_conn=          0x50,
+        .persistConn_to_bufrd=         0x68,
+        .iface_data=                   0x8,
+        .netfd_to_pd=                  0x0,
+        .pd_to_fd=                     0x10,
+        .netfd_to_sysfd=               UNDEF_OFFSET,
+        .bufrd_to_buf=                 0x0,
+        .conn_to_rwc=                  0x10,
+        .conn_to_tlsState=             0x30,
+        .persistConn_to_tlsState=      0x60,
+        .fr_to_readBuf=                0x50,
+        .fr_to_writeBuf=               0x80,
+        .fr_to_headerBuf=              0x38,
+        .cc_to_fr=                     0xc8,
+        .cc_to_tconn=                  0x8,
+        .sc_to_fr=                     0x48,
+        .sc_to_conn=                   0x10,
     },
-    .tap = {
-        [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",                         go_hook_reg_syscall,          NULL, 0},
-        [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",                      go_hook_reg_rawsyscall,       NULL, 0},
-        [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",                        go_hook_reg_syscall6,         NULL, 0},
-        [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_hook_reg_tls_client_read,      NULL, 0}, 
-        [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_hook_reg_tls_client_write,     NULL, 0},
-        [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_hook_reg_tls_server_read,      NULL, 0},
-        [INDEX_HOOK_TLS_SERVER_WRITE]     = {"net/http.checkConnErrorWriter.Write",     go_hook_reg_tls_server_write,     NULL, 0},
-        [INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_hook_reg_http2_client_read,    NULL, 0},
-        [INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_hook_reg_http2_client_write,   NULL, 0},
-        [INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_hook_reg_http2_server_read,    NULL, 0},
-        [INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_hook_reg_http2_server_write,   NULL, 0},
-        [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
-        [INDEX_HOOK_EXIT]                 = {"runtime.exit",                            go_hook_exit,                 NULL, 0},
-        [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal",                   go_hook_die,                  NULL, 0},
-        [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                         NULL, 0}
-    },
+    .tap = g_tap,
 };
 
-go_schema_t go_17_schema = {
+go_schema_t go_17_schema_x86 = {
     .arg_offsets = {
-        .c_syscall_rc=C_SYSCALL_RC,
-        .c_syscall_num=C_SYSCALL_NUM,
-        .c_syscall_p1=C_SYSCALL_P1,
-        .c_syscall_p2=C_SYSCALL_P2,
-        .c_syscall_p3=C_SYSCALL_P3,
-        .c_syscall_p4=C_SYSCALL_P4,
-        .c_syscall_p5=C_SYSCALL_P5,
-        .c_syscall_p6=C_SYSCALL_P6,                                  //ARM64   x86_64
-        .c_tls_server_read_connReader=   TLS_SERVER_READ_CONNREADER, //0x68,   //0x50,
-        .c_tls_server_read_buf=          TLS_SERVER_READ_BUF,        //0x70,   //0x8,
-        .c_tls_server_read_rc=           TLS_SERVER_READ_RC,         //0x38,   //0x28,
-        .c_tls_server_write_conn=        TLS_SERVER_WRITE_CONN,      //0x38,   //0x30,
-        .c_tls_server_write_buf=         TLS_SERVER_WRITE_BUF,       //0x60,   //0x8,
-        .c_tls_server_write_rc=          TLS_SERVER_WRITE_RC,        //0x18,   //0x10,
-        .c_tls_client_read_pc=           0x28,                       // modified per version
-        .c_tls_client_write_w_pc=        TLS_CLIENT_WRITE_W_PC,      //0x30,   //0x20,
-        .c_tls_client_write_buf=         TLS_CLIENT_WRITE_BUF,       //0x50,   //0x8,
-        .c_tls_client_write_rc=          TLS_CLIENT_WRITE_RC,        //0x18,   //0x10,
-        .c_http2_server_read_sc=         HTTP2_SERVER_READ_SC,       //0xd8,   //0xd0,
-        .c_http2_server_write_sc=        HTTP2_SERVER_WRITE_SC,      //0x58,   //0x40,
-        .c_http2_server_preface_sc=      HTTP2_SERVER_PREFACE_SC,    //0xd8,   //0xd0,
-        .c_http2_server_preface_rc=      HTTP2_SERVER_PREFACE_RC,    //0x60,   //0x58,
-        .c_http2_client_read_cc=         HTTP2_CLIENT_READ_CC,       //0x70,   //0x68,
-        .c_http2_client_write_tcpConn=   0x40,                       // modified per version
-        .c_http2_client_write_buf=       HTTP2_CLIENT_WRITE_BUF,     //0x10,   //0x8,
-        .c_http2_client_write_rc=        HTTP2_CLIENT_WRITE_RC,      //0x30,   //0x10,
+        .c_syscall_rc=                 0x0,
+        .c_syscall_num=                0x60,
+        .c_syscall_p1=                 0x20,
+        .c_syscall_p2=                 0x28,
+        .c_syscall_p3=                 0x18,
+        .c_syscall_p4=                 0x10,
+        .c_syscall_p5=                 0x30,
+        .c_syscall_p6=                 0x38,                   
+        .c_tls_server_read_connReader= 0x50,
+        .c_tls_server_read_buf=        0x8, 
+        .c_tls_server_read_rc=         0x28,
+        .c_tls_server_write_conn=      0x30,
+        .c_tls_server_write_buf=       0x8, 
+        .c_tls_server_write_rc=        0x10,
+        .c_tls_client_read_pc=         0x28,
+        .c_tls_client_write_w_pc=      0x20,
+        .c_tls_client_write_buf=       0x8, 
+        .c_tls_client_write_rc=        0x10,
+        .c_http2_server_read_sc=       0xd0,
+        .c_http2_server_write_sc=      0x40,
+        .c_http2_server_preface_sc=    0xd0,
+        .c_http2_server_preface_rc=    0x58,
+        .c_http2_client_read_cc=       0x68,
+        .c_http2_client_write_tcpConn= 0x40,
+        .c_http2_client_write_buf=     0x8,
+        .c_http2_client_write_rc=      0x10,
     },
     .struct_offsets = {
-        .g_to_m=0x30,
-        .m_to_tls=0x88,
-        .connReader_to_conn=0x0,
-        .persistConn_to_conn=0x50,
-        .persistConn_to_bufrd=0x68,
-        .iface_data=0x8,
-        .netfd_to_pd=0x0,
-        .pd_to_fd=0x10,
-        .netfd_to_sysfd=UNDEF_OFFSET,
-        .bufrd_to_buf=0x0,
-        .conn_to_rwc=0x10,
-        .conn_to_tlsState=0x30,
-        .persistConn_to_tlsState=0x60,
-        .fr_to_readBuf=0x58,
-        .fr_to_writeBuf=0x88,
-        .fr_to_headerBuf=0x40,
-        .cc_to_fr=0x130,
-        .cc_to_tconn=0x8,
-        .sc_to_fr=0x48,
-        .sc_to_conn=0x10,
+        .g_to_m=                       0x30,
+        .m_to_tls=                     0x88,
+        .connReader_to_conn=           0x0,
+        .persistConn_to_conn=          0x50,
+        .persistConn_to_bufrd=         0x68,
+        .iface_data=                   0x8,
+        .netfd_to_pd=                  0x0,
+        .pd_to_fd=                     0x10,
+        .netfd_to_sysfd=               UNDEF_OFFSET,
+        .bufrd_to_buf=                 0x0,
+        .conn_to_rwc=                  0x10,
+        .conn_to_tlsState=             0x30,
+        .persistConn_to_tlsState=      0x60,
+        .fr_to_readBuf=                0x58,
+        .fr_to_writeBuf=               0x88,
+        .fr_to_headerBuf=              0x40,
+        .cc_to_fr=                     0x130,
+        .cc_to_tconn=                  0x8,
+        .sc_to_fr=                     0x48,
+        .sc_to_conn=                   0x10,
     },
-    .tap = {
-        [INDEX_HOOK_SYSCALL]              = {"syscall.Syscall",       /* .abi0 */       go_hook_reg_syscall,              NULL, 0},
-        [INDEX_HOOK_RAWSYSCALL]           = {"syscall.RawSyscall",    /* .abi0 */       go_hook_reg_rawsyscall,           NULL, 0},
-        [INDEX_HOOK_SYSCALL6]             = {"syscall.Syscall6",      /* .abi0 */       go_hook_reg_syscall6,             NULL, 0},
-        [INDEX_HOOK_TLS_CLIENT_READ]      = {"net/http.(*persistConn).readResponse",    go_hook_reg_tls_client_read,      NULL, 0},
-        [INDEX_HOOK_TLS_CLIENT_WRITE]     = {"net/http.persistConnWriter.Write",        go_hook_reg_tls_client_write,     NULL, 0},
-        [INDEX_HOOK_TLS_SERVER_READ]      = {"net/http.(*connReader).Read",             go_hook_reg_tls_server_read,      NULL, 0},
-        [INDEX_HOOK_TLS_SERVER_WRITE]     = {"net/http.checkConnErrorWriter.Write",     go_hook_reg_tls_server_write,     NULL, 0},
-        [INDEX_HOOK_HTTP2_CLIENT_READ]    = {"net/http.(*http2clientConnReadLoop).run", go_hook_reg_http2_client_read,    NULL, 0},
-        [INDEX_HOOK_HTTP2_CLIENT_WRITE]   = {"net/http.http2stickyErrWriter.Write",     go_hook_reg_http2_client_write,   NULL, 0},
-        [INDEX_HOOK_HTTP2_SERVER_READ]    = {"net/http.(*http2serverConn).readFrames",  go_hook_reg_http2_server_read,    NULL, 0},
-        [INDEX_HOOK_HTTP2_SERVER_WRITE]   = {"net/http.(*http2serverConn).Flush",       go_hook_reg_http2_server_write,   NULL, 0},
-        [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
-        [INDEX_HOOK_EXIT]                 = {"runtime.exit",          /* .abi0 */       go_hook_exit,                     NULL, 0},
-        [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal", /* .abi0 */       go_hook_die,                      NULL, 0},
-        [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                             NULL, 0}
+    .tap = g_tap,
+};
+
+go_schema_t go_17_schema_arm = {
+    .arg_offsets = {
+        .c_syscall_rc=                 0x0,
+        .c_syscall_num=                0x20,
+        .c_syscall_p1=                 0x60,
+        .c_syscall_p2=                 0x68,
+        .c_syscall_p3=                 0x50,
+        .c_syscall_p4=                 0x58,
+        .c_syscall_p5=                 0x40,
+        .c_syscall_p6=                 0x48,    
+        .c_tls_server_read_connReader= 0x68,
+        .c_tls_server_read_buf=        0x70,
+        .c_tls_server_read_rc=         0x38,
+        .c_tls_server_write_conn=      0x38,
+        .c_tls_server_write_buf=       0x60,
+        .c_tls_server_write_rc=        0x18,
+        .c_tls_client_read_pc=         0x98,
+        .c_tls_client_write_w_pc=      0x30,
+        .c_tls_client_write_buf=       0x50,
+        .c_tls_client_write_rc=        0x18,
+        .c_http2_server_read_sc=       0xd8,
+        .c_http2_server_write_sc=      0x58,
+        .c_http2_server_preface_sc=    0xd8,
+        .c_http2_server_preface_rc=    0x60,
+        .c_http2_client_read_cc=       0x70,
+        .c_http2_client_write_tcpConn= 0x80,
+        .c_http2_client_write_buf=     0x10,
+        .c_http2_client_write_rc=      0x30,
     },
+    .struct_offsets = {
+        .g_to_m=                       0x30,
+        .m_to_tls=                     0x88,
+        .connReader_to_conn=           0x0,
+        .persistConn_to_conn=          0x50,
+        .persistConn_to_bufrd=         0x68,
+        .iface_data=                   0x8,
+        .netfd_to_pd=                  0x0,
+        .pd_to_fd=                     0x10,
+        .netfd_to_sysfd=               UNDEF_OFFSET,
+        .bufrd_to_buf=                 0x0,
+        .conn_to_rwc=                  0x10,
+        .conn_to_tlsState=             0x30,
+        .persistConn_to_tlsState=      0x60,
+        .fr_to_readBuf=                0x58,
+        .fr_to_writeBuf=               0x88,
+        .fr_to_headerBuf=              0x40,
+        .cc_to_fr=                     0x130,
+        .cc_to_tconn=                  0x8,
+        .sc_to_fr=                     0x48,
+        .sc_to_conn=                   0x10,
+    },
+    .tap = g_tap,
 };
 
 static void
@@ -359,8 +343,16 @@ adjustGoStructOffsetsForVersion()
     }
 
     if (g_go_minor_ver == 19) {
-        g_go_schema->arg_offsets.c_tls_client_read_pc=TLS_CLIENT_READ_PC; //0x98; //0x80;
-        g_go_schema->arg_offsets.c_http2_client_write_tcpConn=HTTP2_CLIENT_WRITE_TCPCONN; //0x80; //0x48;
+
+#if defined (__x86_64__)
+        g_go_schema->arg_offsets.c_tls_client_read_pc=0x80;
+        g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
+#elif defined (__aarch64__)
+        g_go_schema->arg_offsets.c_tls_client_read_pc=0x98;
+        g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x80;
+#else
+   #error Bad arch defined
+#endif
 
         g_go_schema->tap[INDEX_HOOK_SYSCALL].func_name = "runtime/internal/syscall.Syscall6";
         g_go_schema->tap[INDEX_HOOK_RAWSYSCALL].func_name = "";
@@ -1026,7 +1018,13 @@ initGoHook(elf_buf_t *ebuf)
 
     if (g_go_minor_ver >= 17) {
         // The Go 17 schema works for 1.17-1.19 and possibly future versions
-        g_go_schema = &go_17_schema;
+#if defined (__x86_64__)
+        g_go_schema = &go_17_schema_x86;
+#elif defined (__aarch64__)
+        g_go_schema = &go_17_schema_arm;
+#else
+   #error Bad arch defined
+#endif
     }
     // Update the schema to suit the current version
     adjustGoStructOffsetsForVersion();

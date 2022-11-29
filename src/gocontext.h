@@ -70,7 +70,7 @@ typedef struct {
 typedef struct {
     go_arg_offsets_t arg_offsets;
     go_struct_offsets_t struct_offsets;
-    tap_t tap[];
+    tap_t *tap;
 } go_schema_t;
 
 // Go strings are not null delimited like c strings.
@@ -84,7 +84,8 @@ typedef void (*assembly_fn)(void);
 
 extern go_schema_t *g_go_schema;
 extern go_schema_t go_9_schema;
-extern go_schema_t go_17_schema;
+extern go_schema_t go_17_schema_x86;
+extern go_schema_t go_17_schema_arm;
 extern go_arg_offsets_t g_go_arg;
 extern go_struct_offsets_t g_go_struct;
 extern tap_t g_go_tap[];

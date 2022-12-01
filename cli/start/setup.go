@@ -34,7 +34,14 @@ func extract(scopeDirVersion string) error {
 	}
 
 	// Copy scope
-	if _, err := util.CopyFile(os.Args[0], filepath.Join(scopeDirVersion, "scope"), perms); err != nil {
+	exPath, err := os.Executable()
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msgf("Error getting executable path")
+		return err
+	}
+	if _, err := util.CopyFile(exPath, filepath.Join(scopeDirVersion, "scope"), perms); err != nil {
 		if err != os.ErrExist {
 			log.Error().
 				Err(err).

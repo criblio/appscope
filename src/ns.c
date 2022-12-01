@@ -754,7 +754,7 @@ nsHostStart(void) {
         scope_fprintf(scope_stderr, "error: nsHostStart failed process is running on host\n");
         return EXIT_FAILURE;
     }
-    scope_fprintf(scope_stdout, "Executing from a container, run the start command from the host\n");
+    scope_fprintf(scope_stdout, "Executing from a container, running the start command from the host\n");
 
     if (joinHostNamespace(START) == FALSE) {
         scope_fprintf(scope_stderr, "error: joinHostNamespace failed\n");
@@ -778,7 +778,7 @@ nsHostStop(void) {
         scope_fprintf(scope_stderr, "error: nsHostStop failed process is running on host\n");
         return EXIT_FAILURE;
     }
-    scope_fprintf(scope_stdout, "Executing from a container, run the stop command from the host\n");
+    scope_fprintf(scope_stdout, "Executing from a container, running the stop command from the host\n");
 
     if (joinHostNamespace(STOP) == FALSE) {
         scope_fprintf(scope_stderr, "error: joinHostNamespace failed\n");

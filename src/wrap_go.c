@@ -71,7 +71,6 @@ enum go_arch_t {
    #define HTTP2_CLIENT_WRITE_TCPCONN 0x48
    #define HTTP2_CLIENT_WRITE_BUF 0x08
    #define HTTP2_CLIENT_WRITE_RC 0x10
-   #define EXIT_STACK_SIZE (32 * 1024)
 #elif defined (__aarch64__)
    #define END_INST "udf"
    #define CALL_INST "bl"
@@ -113,11 +112,11 @@ enum go_arch_t {
 #endif
 
 // compile-time control for debugging
-//#define NEEDEVNULL 1
-#define funcprint sysprint
-//#define funcprint devnull
-#define patchprint sysprint
-//#define patchprint devnull
+#define NEEDEVNULL 1
+//#define funcprint sysprint
+#define funcprint devnull
+//#define patchprint sysprint
+#define patchprint devnull
 
 int g_go_minor_ver = UNKNOWN_GO_VER;
 int g_go_maint_ver = UNKNOWN_GO_VER;
@@ -137,8 +136,6 @@ devnull(const char* fmt, ...)
 #endif
 
 enum index_hook_t {
-    INDEX_HOOK_EXIT,
-    INDEX_HOOK_DIE,
     INDEX_HOOK_SYSCALL,
     INDEX_HOOK_RAWSYSCALL,
     INDEX_HOOK_SYSCALL6,
@@ -151,8 +148,8 @@ enum index_hook_t {
     INDEX_HOOK_HTTP2_SERVER_READ,
     INDEX_HOOK_HTTP2_SERVER_WRITE,
     INDEX_HOOK_HTTP2_SERVER_PREFACE,
-//    INDEX_HOOK_EXIT,
-//    INDEX_HOOK_DIE,
+    INDEX_HOOK_EXIT,
+    INDEX_HOOK_DIE,
     INDEX_HOOK_MAX,
 };
 
@@ -293,7 +290,7 @@ go_schema_t go_17_schema = {
         [INDEX_HOOK_HTTP2_SERVER_PREFACE] = {"net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
         [INDEX_HOOK_EXIT]                 = {"runtime.exit",          /* .abi0 */       go_hook_exit,                     NULL, 0},
         [INDEX_HOOK_DIE]                  = {"runtime.dieFromSignal", /* .abi0 */       go_hook_die,                      NULL, 0},
-        [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                             NULL, 0}
+        [INDEX_HOOK_MAX]                  = {"TAP_TABLE_END",                           NULL,                             NULL, 0},
     },
 };
 
@@ -1635,25 +1632,6 @@ extern void handleExit(void);
 static void
 c_exit(char *sys_stack)
 {
-#ifdef __x86_64__
-    int arc;
-    char *exit_stack, *tstack, *gstack;
-    if ((exit_stack = scope_malloc(EXIT_STACK_SIZE)) == NULL) {
-        return;
-    }
-
-    tstack = exit_stack + EXIT_STACK_SIZE;
-
-    // save the original stack, switch to the tstack
-    __asm__ volatile (
-        "mov %%rsp, %2 \n"
-        "mov %1, %%rsp \n"
-        : "=r"(arc)                  // output
-        : "m"(tstack), "m"(gstack)   // input
-        :                            // clobbered register
-        );
-#endif
-
     // don't use stackaddr; patch_first_instruction() does not provide
     // frame_size, so stackaddr isn't usable
     funcprint("c_exit\n");
@@ -1670,17 +1648,6 @@ c_exit(char *sys_stack)
     handleExit();
     // flush the data
     sigSafeNanosleep(&ts);
-#ifdef __x86_64__
-    // Switch stack back to the original stack
-    __asm__ volatile (
-        "mov %1, %%rsp \n"
-        : "=r"(arc)                       // output
-        : "r"(gstack)                     // inputs
-        :                                 // clobbered register
-        );
-
-    scope_free(exit_stack);
-#endif
 }
 
 EXPORTON void *

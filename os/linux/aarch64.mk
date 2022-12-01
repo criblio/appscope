@@ -1,4 +1,4 @@
-ARCH_CFLAGS=-D__GO__ 
+ARCH_CFLAGS=-D__GO__ -ffixed-x28 
 ARCH_LD_FLAGS=-lcapstone
 ARCH_BINARY=elf64-littleaarch64
 ARCH_OBJ=$(ARCH)

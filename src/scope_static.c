@@ -701,7 +701,7 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
-    if (nsPidArg && ((configFilterPath == NULL && !unconfigure) && (serviceName == NULL || unservice))) {
+    if (nsPidArg && ((configFilterPath == NULL && !unconfigure) && (serviceName == NULL && !unservice))) {
         scope_fprintf(scope_stderr, "error: --namespace option required --configure/--unconfigure or --service/--unservice option\n");
         showUsage(scope_basename(argv[0]));
         return EXIT_FAILURE;

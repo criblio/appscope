@@ -408,7 +408,8 @@ removeServiceCfgsSystemd(uid_t nsEuid, gid_t nsEgid) {
             // For each service directory
             while ((dir = scope_readdir(d)) != NULL) {
                 // Look for the presence of an env.conf file
-                if (scope_snprintf(cfgScript, sizeof(cfgScript), "%s/env.conf", dir->d_name) < 0) {
+                if (scope_snprintf(cfgScript, sizeof(cfgScript), "%s/%s/env.conf", 
+                            systemDPrefixList[i], dir->d_name) < 0) {
                     scope_perror("error: setupUnservice, scope_snprintf failed");
                     res = SERVICE_STATUS_ERROR_OTHER;
                     continue;
@@ -441,8 +442,13 @@ removeServiceCfgsInitD(uid_t nsEuid, gid_t nsEgid) {
     if (d) {
         // For each service file
         while ((dir = scope_readdir(d)) != NULL) {
+            if (scope_snprintf(cfgScript, sizeof(cfgScript), "/etc/sysconfig/%s", dir->d_name) < 0) {
+                scope_perror("error: removeServiceCfgsInitD, scope_snprintf failed");
+                res = SERVICE_STATUS_ERROR_OTHER;
+                continue;
+            }
             // If a service is configured with scope, remove scope from it
-            if (isCfgFileConfigured(dir->d_name)) {
+            if (isCfgFileConfigured(cfgScript)) {
                 if (removeScopeCfgFile(cfgScript) <= 0) {
                     res = SERVICE_STATUS_ERROR_OTHER;
                 }
@@ -466,8 +472,13 @@ removeServiceCfgsOpenRC(uid_t nsEuid, gid_t nsEgid) {
     if (d) {
         // For each service file
         while ((dir = scope_readdir(d)) != NULL) {
+            if (scope_snprintf(cfgScript, sizeof(cfgScript), "/etc/init.d/%s", dir->d_name) < 0) {
+                scope_perror("error: removeServiceCfgsOpenRC, scope_snprintf failed");
+                res = SERVICE_STATUS_ERROR_OTHER;
+                continue;
+            }
             // If a service is configured with scope, remove scope from it
-            if (isCfgFileConfigured(dir->d_name)) {
+            if (isCfgFileConfigured(cfgScript)) {
                 if (removeScopeCfgFile(cfgScript) <= 0) {
                     res = SERVICE_STATUS_ERROR_OTHER;
                 }
@@ -601,7 +612,7 @@ setupUnservice(uid_t nsUid, gid_t nsGid) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
     struct service_ops serviceMgrs[] = {SystemD, InitD, OpenRc};
 
-    for (int i = 0; i < sizeof(serviceMgrs); i++) {
+    for (int i = 0; i < (sizeof(serviceMgrs) / sizeof(struct service_ops)); i++) {
         if ((res = serviceMgrs[i].removeAllScopeServiceCfg(nsUid, nsGid)) != SERVICE_STATUS_SUCCESS) {
             return res;
         }

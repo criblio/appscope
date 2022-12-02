@@ -183,7 +183,7 @@ func (rc *Config) detach(args []string, pid int) error {
 		return ld.Detach(args, env)
 	}
 	out, err := ld.DetachSubProc(args, env)
-	fmt.Println(out)
+	fmt.Print(out)
 
 	return err
 }

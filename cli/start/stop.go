@@ -2,6 +2,7 @@ package start
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,6 +25,7 @@ func stopConfigureHost() error {
 			Str("loaderDetails", stdoutStderr).
 			Msg("Unconfigure host failed.")
 	} else {
+		fmt.Print(stdoutStderr)
 		log.Info().
 			Msg("Unconfigure host success.")
 	}
@@ -45,6 +47,7 @@ func stopConfigureContainers(cPids []int) error {
 				Str("loaderDetails", stdoutStderr).
 				Msgf("Unconfigure containers failed. Container %v failed.", cPid)
 		} else {
+			fmt.Print(stdoutStderr)
 			log.Info().
 				Str("pid", strconv.Itoa(cPid)).
 				Msgf("Unconfigure containers success. Container %v success.", cPid)
@@ -60,6 +63,7 @@ func stopServiceHost() error {
 
 	stdoutStderr, err := sL.UnserviceHost()
 	if err == nil {
+		fmt.Print(stdoutStderr)
 		log.Info().
 			Msgf("Unservice host success.")
 	} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
@@ -85,6 +89,7 @@ func stopServiceContainers(cPids []int) error {
 	for _, cPid := range cPids {
 		stdoutStderr, err := ld.UnserviceContainer(cPid)
 		if err == nil {
+			fmt.Print(stdoutStderr)
 			log.Info().
 				Str("pid", strconv.Itoa(cPid)).
 				Msgf("Unservice container %v success.", cPid)

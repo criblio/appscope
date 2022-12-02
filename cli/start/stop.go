@@ -157,7 +157,8 @@ func Stop() error {
 	}
 
 	rc := run.Config{
-		Verbosity: 4, // Default
+		Subprocess: true,
+		Verbosity:  4, // Default
 	}
 	if err := rc.DetachAll([]string{}, false); err != nil {
 		log.Error().

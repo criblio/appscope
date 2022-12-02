@@ -210,15 +210,15 @@ fi
 # Check service configurations are removed
 if [ -f /etc/systemd/system/nginx.service.d/env.conf ]; then
     # Check the content of /etc/systemd/system/nginx.service.d/env.conf
-    count=$(grep "libscope.so" "/etc/systemd/nginx.service.d/env.conf" | wc -l)
+    count=$(grep "libscope.so" "/etc/systemd/system/nginx.service.d/env.conf" | wc -l)
     if [ $count -gt 0 ] ; then
-        fail "LD_PRELOAD still set in /etc/systemd/nginx.service.d/env.conf"
+        fail "LD_PRELOAD still set in /etc/systemd/system/nginx.service.d/env.conf"
     fi
 fi
 
 # Check /etc/profile.d/scope.sh has been removed
 if [ -f /etc/profile.d/scope.sh ]; then
-    fail "/etc/profile.d/scope.sh should not be present after scope stop is run"
+    fail "/etc/profile.d/scope.sh still present"
 fi
 
 # Check data has stopped flowing indicating process is detached

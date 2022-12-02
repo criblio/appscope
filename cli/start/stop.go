@@ -108,7 +108,7 @@ func stopServiceContainers(cPids []int) error {
 
 func Stop() error {
 	// Create a history directory for logs
-	createWorkDir()
+	createWorkDir("stop")
 
 	// Validate user has root permissions
 	if err := util.UserVerifyRootPerm(); err != nil {

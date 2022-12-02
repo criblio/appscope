@@ -40,49 +40,6 @@ var (
 	errMissingData = errors.New("missing filter data")
 )
 
-// get the list of PID(s) related to containers
-func getContainersPids() []int {
-	cPids := []int{}
-
-	ctrDPids, err := util.GetContainerDPids()
-	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("Discover ContainerD containers failed.")
-	}
-	if ctrDPids != nil {
-		cPids = append(cPids, ctrDPids...)
-	}
-
-	podmanPids, err := util.GetPodmanPids()
-	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("Discover Podman containers failed.")
-	}
-	if podmanPids != nil {
-		cPids = append(cPids, podmanPids...)
-	}
-
-	lxcPids, err := util.GetLXCPids()
-	if err != nil {
-		switch {
-		case errors.Is(err, util.ErrLXDSocketNotAvailable):
-			log.Warn().
-				Msgf("Setup LXC containers skipped. LXD is not available")
-		default:
-			log.Error().
-				Err(err).
-				Msg("Discover LXC containers failed.")
-		}
-	}
-	if lxcPids != nil {
-		cPids = append(cPids, lxcPids...)
-	}
-
-	return cPids
-}
-
 // TODO: the file creation steps here might not be needed because a filter file should be present
 // and libscope.so should detect it (when that functionality is complete)
 // startAttachSingleProcess attach to the the specific process identifed by pid with configuration pass in cfgData.
@@ -320,7 +277,7 @@ func getStartData() []byte {
 // Start performs setup of scope in the host and containers
 func Start() error {
 	// Create a history directory for logs
-	createWorkDir()
+	createWorkDir("start")
 
 	// Validate user has root permissions
 	if err := util.UserVerifyRootPerm(); err != nil {

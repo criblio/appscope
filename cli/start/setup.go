@@ -1,6 +1,7 @@
 package start
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -13,6 +14,49 @@ import (
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
 )
+
+// get the list of PID(s) related to containers
+func getContainersPids() []int {
+	cPids := []int{}
+
+	ctrDPids, err := util.GetContainerDPids()
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("Discover ContainerD containers failed.")
+	}
+	if ctrDPids != nil {
+		cPids = append(cPids, ctrDPids...)
+	}
+
+	podmanPids, err := util.GetPodmanPids()
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("Discover Podman containers failed.")
+	}
+	if podmanPids != nil {
+		cPids = append(cPids, podmanPids...)
+	}
+
+	lxcPids, err := util.GetLXCPids()
+	if err != nil {
+		switch {
+		case errors.Is(err, util.ErrLXDSocketNotAvailable):
+			log.Warn().
+				Msgf("Discover LXC containers skipped. LXD is not available")
+		default:
+			log.Error().
+				Err(err).
+				Msg("Discover LXC containers failed.")
+		}
+	}
+	if lxcPids != nil {
+		cPids = append(cPids, lxcPids...)
+	}
+
+	return cPids
+}
 
 // extract extracts ldscope and scope to scope version directory
 func extract(scopeDirVersion string) error {
@@ -131,12 +175,12 @@ func extractFilterFile(cfgData []byte) (string, error) {
 	return f.Name(), nil
 }
 
-func createWorkDir() {
+func createWorkDir(cmd string) {
 	// Directories named CMD_SESSIONID_PID_TIMESTAMP
 	ts := strconv.FormatInt(time.Now().UTC().UnixNano(), 10)
 	pid := strconv.Itoa(os.Getpid())
 	sessionID := run.GetSessionID()
-	tmpDirName := path.Base("start" + "_" + sessionID + "_" + pid + "_" + ts)
+	tmpDirName := path.Base(cmd + "_" + sessionID + "_" + pid + "_" + ts)
 
 	// Create History directory
 	histDir := run.HistoryDir()

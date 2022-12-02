@@ -17,6 +17,7 @@ var (
 	errGetLinuxCap       = errors.New("unable to get linux capabilities for current process")
 	errLoadLinuxCap      = errors.New("unable to load linux capabilities for current process")
 	errMissingPtrace     = errors.New("missing PTRACE capabilities to attach to a process")
+	errMissingScopedProc = errors.New("no scoped process found matching that name")
 	errMissingProc       = errors.New("no process found matching that name")
 	errPidInvalid        = errors.New("invalid PID")
 	errPidMissing        = errors.New("PID does not exist")
@@ -30,14 +31,19 @@ var (
 
 // Attach scopes an existing PID
 func (rc *Config) Attach(args []string) error {
-	pid, err := handleInputArg(args[0])
+	pid, err := handleInputArg(args[0], true)
 	if err != nil {
 		return err
 	}
 	args[0] = fmt.Sprint(pid)
 	var reattach bool
 	// Check PID is not already being scoped
-	if !util.PidScoped(pid) {
+	status, err := util.PidScopeStatus(pid)
+	if err != nil {
+		return err
+	}
+
+	if status == util.Disable || status == util.Setup {
 		// Validate user has root permissions
 		if err := util.UserVerifyRootPerm(); err != nil {
 			return err
@@ -113,7 +119,7 @@ func (rc *Config) DetachAll(args []string, prompt bool) error {
 		fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
 	}
 
-	procs, err := util.ProcessesScoped()
+	procs, err := util.ProcessesToDetach()
 	if err != nil {
 		return err
 	}
@@ -158,7 +164,7 @@ func (rc *Config) DetachAll(args []string, prompt bool) error {
 
 // DetachSingle unscopes an existing PID
 func (rc *Config) DetachSingle(args []string) error {
-	pid, err := handleInputArg(args[0])
+	pid, err := handleInputArg(args[0], false)
 	if err != nil {
 		return err
 	}
@@ -173,7 +179,10 @@ func (rc *Config) DetachSingle(args []string) error {
 
 func (rc *Config) detach(args []string, pid int) error {
 	// Check PID is already being scoped
-	if !util.PidScoped(pid) {
+	status, err := util.PidScopeStatus(pid)
+	if err != nil {
+		return err
+	} else if status != util.Active {
 		return errNotScoped
 	}
 
@@ -189,10 +198,11 @@ func (rc *Config) detach(args []string, pid int) error {
 }
 
 // handleInputArg handles the input argument (process id/name)
-func handleInputArg(InputArg string) (int, error) {
+func handleInputArg(InputArg string, toAttach bool) (int, error) {
 	// Get PID by name if non-numeric, otherwise validate/use InputArg
 	var pid int
 	var err error
+	var procs util.Processes
 	if util.IsNumeric(InputArg) {
 		pid, err = strconv.Atoi(InputArg)
 		if err != nil {
@@ -208,7 +218,12 @@ func handleInputArg(InputArg string) (int, error) {
 			}
 		}
 
-		procs, err := util.ProcessesByName(InputArg)
+		if toAttach {
+			procs, err = util.ProcessesByNameToAttach(InputArg)
+		} else {
+			procs, err = util.ProcessesByNameToDetach(InputArg)
+		}
+
 		if err != nil {
 			return -1, err
 		}
@@ -241,7 +256,10 @@ func handleInputArg(InputArg string) (int, error) {
 			if !adminStatus {
 				fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
 			}
-			return -1, errMissingProc
+			if toAttach {
+				return -1, errMissingProc
+			}
+			return -1, errMissingScopedProc
 		}
 	}
 

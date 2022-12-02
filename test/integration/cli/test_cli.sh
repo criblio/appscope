@@ -1,5 +1,6 @@
 #! /bin/bash
 export SCOPE_EVENT_DEST=file:///opt/test/logs/events.log
+DUMMY_FILTER_FILE="/opt/test-runner/dummy_filter"
 
 DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
 FAILED_TEST_LIST=""
@@ -172,6 +173,34 @@ run scope ps
 outputs "ID	PID	USER	COMMAND
 1	${sleep_pid} 	root	sleep 1000"
 returns 0
+
+endtest
+
+#
+# Scope ps
+#
+starttest "Scope ipc all states"
+
+# Prepare Same process in all states
+python3 -m http.server 9090 &
+python3_disabled=$!
+SCOPE_FILTER="/opt/test-runner/dummy_filter" ldscope -- python3 -m http.server 9091 &
+python3_setup=$!
+python3 -m http.server 9092 &
+python3_active=$!
+scope attach $python3_active
+python3 -m http.server 9093 &
+python3_latent=$!
+scope attach $python3_latent
+scope detach $python3_latent
+
+# Scope ps
+run scope attach python3
+outputs "ID	PID	USER	   SCOPED COMMAND
+1	${python3_disabled} 	root	false	python3 -m http.server 9090
+2	${python3_disabled} 	root	true	python3 -m http.server 9091
+3	${python3_disabled} 	root	true	python3 -m http.server 9092
+4	${python3_disabled} 	root	false	python3 -m http.server 9093"
 
 endtest
 

@@ -2,9 +2,12 @@ package util
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"syscall"
 
 	lxd "github.com/lxc/lxd/client"
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -83,6 +86,40 @@ func getContainerRuntimePids(runtimeProc string) ([]int, error) {
 	}
 
 	return pids, nil
+}
+
+// namespaceSameIpc compare own IPC namespace with specified pid
+func namespaceSameIpc(pid int) (bool, error) {
+	selfFi, err := os.Stat("/proc/self/ns/ipc")
+	if err != nil {
+		return false, err
+	}
+
+	pidFi, err := os.Stat(fmt.Sprintf("/proc/%v/ns/ipc", pid))
+	if err != nil {
+		return false, err
+	}
+	return os.SameFile(selfFi, pidFi), nil
+}
+
+// namespaceSwitchIPC switch IPC namespace to the specified pid
+func namespaceSwitchIPC(pid int) error {
+	fd, err := os.Open(fmt.Sprintf("/proc/%v/ns/ipc", pid))
+	if err != nil {
+		return err
+	}
+	defer fd.Close()
+	return unix.Setns(int(fd.Fd()), syscall.CLONE_NEWIPC)
+}
+
+// namespaceRestoreIPC restore IPC namespace to the one specified in PID
+func namespaceRestoreIPC() error {
+	fd, err := os.Open("/proc/self/ns/ipc")
+	if err != nil {
+		return err
+	}
+	defer fd.Close()
+	return unix.Setns(int(fd.Fd()), syscall.CLONE_NEWIPC)
 }
 
 /*

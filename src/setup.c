@@ -101,14 +101,14 @@ removeScopeCfgFile(const char *filePath) {
     scope_fclose(f1);
     scope_fclose(f2);
 
-    scope_printf("info: Modifying service file %s\n", filePath);
+    scope_fprintf(scope_stderr, "info: Modifying service file %s\n", filePath);
 
     if (scope_remove(filePath)) {
-        scope_printf("error: Removing original service file %s\n", filePath);
+        scope_fprintf(scope_stderr, "error: Removing original service file %s\n", filePath);
         return -1;
     }
     if (scope_rename(tempPath, filePath)) {
-        scope_printf("error: Moving newly created service file %s\n", filePath);
+        scope_fprintf(scope_stderr, "error: Moving newly created service file %s\n", filePath);
         return -1;
     }
 
@@ -834,7 +834,7 @@ setupUnconfigure(uid_t nsUid, gid_t nsGid) {
                 return -1;
             }
         } else {
-            scope_printf("info: Removed file %s\n", fileRemoveList[i]);
+            scope_fprintf(scope_stderr, "info: Removed file %s\n", fileRemoveList[i]);
         }
     }
 

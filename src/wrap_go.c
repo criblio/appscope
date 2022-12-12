@@ -23,7 +23,6 @@
 #define GOPCLNTAB_MAGIC_118 0xfffffff0
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 #define UNKNOWN_GO_VER (-1)
-#define MIN_SUPPORTED_GO_VER (9)
 #define MAX_SUPPORTED_GO_VER (19)
 #define HTTP2_FRAME_HEADER_LEN (9)
 #define PRI_STR "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
@@ -36,6 +35,7 @@ enum go_arch_t {
 };
 
 #if defined (__x86_64__)
+   #define MIN_SUPPORTED_GO_VER (9)
    #define END_INST "int3"
    #define CALL_INST "call"
    #define SYSCALL_INST "syscall"
@@ -72,6 +72,7 @@ enum go_arch_t {
    #define HTTP2_CLIENT_WRITE_BUF 0x08
    #define HTTP2_CLIENT_WRITE_RC 0x10
 #elif defined (__aarch64__)
+   #define MIN_SUPPORTED_GO_VER (19)
    #define END_INST "udf"
    #define CALL_INST "bl"
    #define SYSCALL_INST "svc"
@@ -981,7 +982,8 @@ initGoHook(elf_buf_t *ebuf)
             // Don't expect to get here, but try to be clear if we do.
             scopeLogWarn("%s is not a go application.  Continuing without AppScope.", ebuf->cmd);
         } else if (go_runtime_version) {
-            scopeLogWarn("%s was compiled with go version `%s`.  AppScope can only instrument go1.%d or newer.  Continuing without AppScope.", ebuf->cmd, go_runtime_version, MIN_SUPPORTED_GO_VER);
+            scopeLogWarn("%s was compiled with go version `%s`.  AppScope can only instrument go1.%d or newer on %s.  Continuing without AppScope.",
+                         ebuf->cmd, go_runtime_version, MIN_SUPPORTED_GO_VER, g_arch == AARCH64 ? "ARM64" : "x86_64");
         } else {
             scopeLogWarn("%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.%d or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd, MIN_SUPPORTED_GO_VER);
         }

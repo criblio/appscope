@@ -236,7 +236,7 @@ Type field is unexpected value:
     { "type": "blahblahblah", "req": "Switch", "reqId": 4, "body": "attach" }
     { "type": "resp",          "req": "Switch", "reqId": 4, "status": 400, "message": "Type was not request, required fields were missing or of wrong type"}
 
-Required fields are missing (here: reqId):
+Required fields are missing (reqId):
 
     { "type": "req", "req": "Switch", "body": "attach" }
     { "type": "resp", "reqId": 0, "status": 400, "message": "Type was not request, required fields were missing or of wrong type"}
@@ -246,7 +246,7 @@ Req field is unexpected value:
     { "type": "req", "req": "unknown_request", "reqId": 4, "body": "attach" }
     { "type": "resp", "req": "unknown_request", "reqId": 4, "status": 400, "message": "Req field was not expected value"}
 
-Required fields are missing, based on req field:
+Required fields are missing, based on req field (body field):
 
     { "type": "req", "req": "Switch", "reqId": 4}
     { "type": "resp", "req": "Switch", "reqId": 4, "status": 400, "message": "Based on the req field, expected fields were missing"}

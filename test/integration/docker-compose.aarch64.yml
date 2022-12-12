@@ -6,7 +6,17 @@ x-scope-common: &scope-common
   working_dir: /opt/appscope
   privileged: true
 
-#services:
+services:
 
   # These tests run only on aarch64
 
+  go_19:
+    image: ghcr.io/criblio/appscope-test-go_19:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-go_19:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./go/Dockerfile
+      args:
+        GO_IMAGE_VER: golang:1.19
+    <<: *scope-common

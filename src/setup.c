@@ -818,7 +818,7 @@ setupConfigure(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
  */
 int
 setupUnconfigure(uid_t nsUid, gid_t nsGid) {
-    int errnoVal;
+    int errnoVal = 0;
 
     const char* const fileRemoveList[] = {
         "/etc/profile.d/scope.sh",

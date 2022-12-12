@@ -82,7 +82,9 @@ int nsFileRemove(const char *path, uid_t nsUid, gid_t nsGid, uid_t restoreUid, g
     scope_seteuid(nsUid);
 
     int res = scope_remove(path);
-    *errnoVal = scope_errno;
+    if (res == -1) {
+        *errnoVal = scope_errno;
+    }
 
     scope_seteuid(restoreUid);
     scope_setegid(restoreGid);

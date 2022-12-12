@@ -836,7 +836,7 @@ main(int argc, char **argv, char **env)
         }
         if (pid == -1) {
             // Configure on Host
-            status = setupUnconfigure(eUid, eGid);
+            status = setupUnconfigure();
         } else {
             // Configure on Container
             pid_t nsContainerPid = 0;

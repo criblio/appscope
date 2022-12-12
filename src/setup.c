@@ -817,9 +817,7 @@ setupConfigure(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
  * If files do not exist, no error will be reported
  */
 int
-setupUnconfigure(uid_t nsUid, gid_t nsGid) {
-    int errnoVal = 0;
-
+setupUnconfigure() {
     const char* const fileRemoveList[] = {
         "/etc/profile.d/scope.sh",
         SCOPE_FILTER_USR_PATH,
@@ -827,9 +825,8 @@ setupUnconfigure(uid_t nsUid, gid_t nsGid) {
     };
 
     for (int i=0; i<sizeof(fileRemoveList)/sizeof(char*); ++i) {
-
-        if (nsFileRemove(fileRemoveList[i], nsUid, nsGid, scope_geteuid(), scope_getegid(), &errnoVal)) {
-            if (errnoVal != ENOENT) {
+        if (scope_remove(fileRemoveList[i])) {
+            if (scope_errno != ENOENT) {
                 scope_fprintf(scope_stderr, "setupUnconfigure: remove %s failed\n", fileRemoveList[i]);
                 return -1;
             }

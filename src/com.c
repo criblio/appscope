@@ -362,7 +362,7 @@ regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
         return regexec(preg, string, nmatch, pmatch, eflags);
     }
 
-    int rc, arc;
+    int rc;
     char *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
 
      if ((pcre_stack = scope_malloc(PCRE_STACK_SIZE)) == NULL) {
@@ -374,6 +374,8 @@ regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
 
     // save the original stack, switch to the tstack
 #if defined (__x86_64__)
+    int arc;
+
     __asm__ volatile (
         "mov %%rsp, %2 \n"
         "mov %1, %%rsp \n"
@@ -381,25 +383,9 @@ regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
         : "m"(tstack), "m"(gstack)      // input
         :                               // clobbered register
         );
-#elif defined (__aarch64__)
-    __asm__ volatile (
-        "mov x15, sp \n"
-        "str x15, %2 \n"                // save the stack pointer
-        "ldr x15, %1 \n"
-        "mov sp, x15 \n"                // increase stack size
-        "stp x29, x30, [sp, #-16]! \n"
-        : "=&m"(rc)                     // output
-        : "m"(tstack), "m"(gstack)      // input
-        :                               // clobbered register
-        );
-#else
-   #error Bad arch defined
-#endif
 
     rc = regexec(preg, string, nmatch, pmatch, eflags);
 
-    // Switch stack back to the original stack
-#if defined (__x86_64__)
     __asm__ volatile (
         "mov %1, %%rsp \n"
         : "=r"(arc)                       // output
@@ -408,12 +394,25 @@ regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
         );
 #elif defined (__aarch64__)
     __asm__ volatile (
-        "ldp x29, x30, [sp], #16 \n"
-        "ldr x15, %1 \n"
-        "mov sp, x15 \n"
-        : "=&r"(arc)                      // output
-        : "m"(gstack)                     // inputs
-        :                                 // clobbered register
+        "ldr  x0, %3 \n"                 // get params from the stack before switching
+        "ldr  x1, %4 \n"
+        "ldr  x2, %5 \n"
+        "ldr  x3, %6 \n"
+        "ldr  w4, %7 \n"
+        "mov  x14, sp \n"
+        "str  x14, %2 \n"
+        "ldr  x15, %1 \n"
+        "mov  sp, x15 \n"                // increase stack size
+
+        "str  x14, [sp, #-16]! \n"
+
+        "bl   pcre2_regexec \n"          // call the regexec function
+        "ldr x15, [sp, #0] \n"
+        "mov  sp, x15 \n"
+        "str  w0, %0 \n"                 // save the return value
+        : "=&m"(rc)                      // output
+        : "m"(tstack), "m"(gstack), "m" (preg), "m" (string),"m" (nmatch), "m" (pmatch), "m" (eflags)
+        :                               // clobbered register
         );
 #else
    #error Bad arch defined

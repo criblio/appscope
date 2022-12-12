@@ -12,7 +12,7 @@ All configuration environment variables can be specified in this file. Values an
 
 There are also a few environment variables that are unique to the Dynamic Configuration interface; they do not directly change configuration.  These act more like commands, and are listed here with brief descriptions:
 * SCOPE_CMD_DBG_PATH - Can be used to dump limited debug information by specifying an absolute path.  The file will be created if necessary, if path describes an existing file, new data will be appended to the end of the file. In the first of these cases, the directory in which the file is to be created must already exist.
-* SCOPE_CMD_ATTACH - "false" unscopes the process, stopping function interposition](https://appscope.dev/docs/how-works#how-appscope-works).  "true" reestablishes function interposition.
+* SCOPE_CMD_ATTACH - "false" unscopes the process, stopping [function interposition](https://appscope.dev/docs/how-works#how-appscope-works).  "true" reestablishes function interposition.
 * SCOPE_CONF_RELOAD - Can be used to change the configuration by supplying an absolute file path to a [scope.yml](https://appscope.dev/docs/config-file/#scopeyml-config-file) file. There is no requirement for all configuration fields to be supplied, though library defaults will be used for each field which is omitted.
 
 ## Socket Interface
@@ -42,9 +42,9 @@ The value of "status" will be an integer - 200 indicates success, 400 indicates 
 * "req" field was not an expected value
 * Based on the "req" field, expected fields were missing
 
-The whenever the request can be parsed, the value of the field "req" will be equal to whatever value of "req" was provided in the request.
+Whenever the request can be parsed, the value of the field "req" will be equal to whatever value of "req" was provided in the request.
 
-### Example Requests
+### Examples of Successful Requests / Responses
 
 GetCfg request:
 
@@ -53,6 +53,86 @@ GetCfg request:
         "req": "GetCfg",
         "reqId": 2
     }
+
+GetCfg response:
+
+    {
+        "type": "resp",
+        "req": "GetCfg",
+        "reqId": 2,
+        "status": 200,
+        "body": {
+            "current": {
+                "metric": {
+                    "enable": "true",
+                    "transport": {
+                        "type": "file",
+                        "path": "/home/ubuntu/.scope/history/top_62_4856_1670867817643836286/metrics.json",
+                        "buffering": "line"
+                    },
+                    "format": {
+                        "type": "ndjson",
+                        "statsdprefix": "",
+                        "statsdmaxlen": 512,
+                        "verbosity": 4
+                    }
+                },
+                "libscope": {
+                    "log": {
+                        "level": "warning",
+                        "transport": {
+                            "type": "file",
+                            "path": "/home/ubuntu/.scope/history/top_62_4856_1670867817643836286/ldscope.log",
+                            "buffering": "line"
+                        }
+                    },
+                    "configevent": "false",
+                    "summaryperiod": 10,
+                    "commanddir": "/home/ubuntu/.scope/history/top_62_4856_1670867817643836286/cmd"
+                },
+                "event": {
+                    "enable": "true",
+                    "transport": {
+                        "type": "tcp",
+                        "host": "127.0.0.1",
+                        "port": "9109",
+                        "tls": {
+                            "enable": "false",
+                            "validateserver": "false",
+                            "cacertpath": ""
+                        }
+                    },
+                    "format": {
+                        "type": "ndjson",
+                        "maxeventpersec": 10000,
+                        "enhancefs": "true"
+                    },
+                    "watch": [
+                        {
+                            "type": "file",
+                            "name": "(\\/logs?\\/)|(\\.log$)|(\\.log[.\\d])"
+                        },
+                        {
+                            "type": "console"
+                        },
+                        {
+                            "type": "http"
+                        },
+                        {
+                            "type": "net"
+                        },
+                        {
+                            "type": "fs"
+                        },
+                        {
+                            "type": "dns"
+                        }
+                    ]
+                }
+            }
+        }
+    }
+
 
 SetCfg request:
 
@@ -117,6 +197,15 @@ SetCfg request:
         }
     }
 
+SetCfg response:
+
+    {
+        "type":"resp",
+        "req":"SetCfg",
+        "reqId":3,
+        "status":200
+    }
+
 Switch request:
 
     {
@@ -125,3 +214,40 @@ Switch request:
         "reqId": 4,
         "body": "attach"
     }
+
+Switch response:
+
+    {
+        "type":"resp",
+        "req":"Switch",
+        "reqId":4,
+        "status":200
+    }
+
+### Examples of Invalid Requests / Responses
+
+Request is not parseable json (missing colons):
+
+    { "type" "req", "req" "Switch", "reqId" 4, "body" "attach" }
+    { "type": "resp", "reqId": 0, "status": 400, "message": "Request could not be parsed as a json object"}
+
+Type field is unexpected value:
+
+    { "type": "blahblahblah", "req": "Switch", "reqId": 4, "body": "attach" }
+    { "type": "resp",          "req": "Switch", "reqId": 4, "status": 400, "message": "Type was not request, required fields were missing or of wrong type"}
+
+Required fields are missing (here: reqId):
+
+    { "type": "req", "req": "Switch", "body": "attach" }
+    { "type": "resp", "reqId": 0, "status": 400, "message": "Type was not request, required fields were missing or of wrong type"}
+
+Req field is unexpected value:
+
+    { "type": "req", "req": "unknown_request", "reqId": 4, "body": "attach" }
+    { "type": "resp", "req": "unknown_request", "reqId": 4, "status": 400, "message": "Req field was not expected value"}
+
+Required fields are missing, based on req field:
+
+    { "type": "req", "req": "Switch", "reqId": 4}
+    { "type": "resp", "req": "Switch", "reqId": 4, "status": 400, "message": "Based on the req field, expected fields were missing"}
+

@@ -12,10 +12,6 @@
 #include "scopestdlib.h"
 
 #define BUFSIZE (4096)
-
-#define OPENRC_DIR "/etc/rc.conf"
-#define SYSTEMD_DIR "/etc/systemd"
-#define INITD_DIR "/etc/init.d"
 #define PROFILE_SCRIPT "#! /bin/bash\nlib_found=0\nfilter_found=0\nif test -f /usr/lib/appscope/%s/libscope.so; then\n    lib_found=1\nfi\nif test -f /usr/lib/appscope/scope_filter; then\n    filter_found=1\nelif test -f /tmp/appscope/scope_filter; then\n    filter_found=1\nfi\nif [ $lib_found == 1 ] && [ $filter_found == 1 ]; then\n    export LD_PRELOAD=\"%s $LD_PRELOAD\"\nfi\n"
 
 typedef enum {
@@ -499,6 +495,8 @@ struct service_ops {
     service_status_t (*newServiceCfg)(const char *serviceCfgPath, const char *libscopePath, uid_t nsUid, gid_t nsGid);
     service_status_t (*modifyServiceCfg)(const char *serviceCfgPath, const char *libscopePath, uid_t nsUid, gid_t nsGid);
     service_status_t (*removeAllScopeServiceCfg)(uid_t nsUid, gid_t nsGid);
+    char manager_dir[PATH_MAX];
+    char service_path[PATH_MAX];
 };
 
 static struct service_ops SystemD = {
@@ -507,6 +505,8 @@ static struct service_ops SystemD = {
     .newServiceCfg = newServiceCfgSystemD,
     .modifyServiceCfg = modifyServiceCfgSystemd,
     .removeAllScopeServiceCfg = removeServiceCfgsSystemd,
+    .manager_dir = "/etc/systemd",
+    .service_path = "/etc/systemd/system/%s.service.d/env.conf"
 };
 
 static struct service_ops InitD = {
@@ -515,6 +515,8 @@ static struct service_ops InitD = {
     .newServiceCfg = newServiceCfgInitD,
     .modifyServiceCfg = newServiceCfgInitD,
     .removeAllScopeServiceCfg = removeServiceCfgsInitD,
+    .manager_dir = "/etc/init.d",
+    .service_path = "/etc/sysconfig/%s"
 };
 
 static struct service_ops OpenRc = {
@@ -523,55 +525,27 @@ static struct service_ops OpenRc = {
     .newServiceCfg = newServiceCfgOpenRc,
     .modifyServiceCfg = newServiceCfgOpenRc,
     .removeAllScopeServiceCfg = removeServiceCfgsOpenRC,
+    .manager_dir = "/etc/rc.conf",
+    .service_path = "/etc/conf.d/%s"
 };
 
 /*
- * Setup a specific service
+ * Setup all existing service managers
  * Returns SERVICE_STATUS_SUCCESS if service was setup correctly, other values in case of failure.
  */
 service_status_t
 setupService(const char *serviceName, uid_t nsUid, gid_t nsGid) {
     struct stat sb = {0};
-    struct service_ops *service;
 
     char serviceCfgPath[PATH_MAX] = {0};
     char libscopePath[PATH_MAX] = {0};
 
-    service_status_t status;
+    service_status_t res = SERVICE_STATUS_SUCCESS;
+    int configured_count = 0;
 
-    if (scope_stat(OPENRC_DIR, &sb) == 0) {
-        service = &OpenRc;
-        if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/conf.d/%s", serviceName) < 0) {
-            scope_perror("error: setupService, scope_snprintf OpenRc failed");
-            return SERVICE_STATUS_ERROR_OTHER;
-        }
-    } else if (scope_stat(SYSTEMD_DIR, &sb) == 0) {
-        service = &SystemD;
-        scope_memset(serviceCfgPath, 0, PATH_MAX);
-        if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/systemd/system/%s.service.d/env.conf", serviceName) < 0) {
-            scope_perror("error: setupService, scope_snprintf SystemD failed");
-            return SERVICE_STATUS_ERROR_OTHER;
-        }
-    } else if (scope_stat(INITD_DIR, &sb) == 0) {
-        service = &InitD;
-        scope_memset(serviceCfgPath, 0, PATH_MAX);
-        if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/sysconfig/%s", serviceName) < 0) {
-            scope_perror("error: setupService, scope_snprintf InitD failed");
-            return SERVICE_STATUS_ERROR_OTHER;
-        }
-    } else {
-        scope_fprintf(scope_stderr, "error: unknown boot system\n");
-        return SERVICE_STATUS_ERROR_OTHER;
-    }
-
-    if (service->isServiceInstalled(serviceName) == FALSE) {
-        scope_fprintf(scope_stderr, "info: service %s is not installed\n", serviceName);
-        return SERVICE_STATUS_NOT_INSTALLED;
-    }
-
+    // Check libscope.so is installed and obtain it's path
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
     bool isDevVersion = libverIsNormVersionDev(loaderVersion);
-
     scope_snprintf(libscopePath, PATH_MAX, "/usr/lib/appscope/%s/libscope.so", loaderVersion);
     if (scope_access(libscopePath, R_OK) || isDevVersion) {
         scope_memset(libscopePath, 0, PATH_MAX);
@@ -582,27 +556,53 @@ setupService(const char *serviceName, uid_t nsUid, gid_t nsGid) {
         }
     }
 
-    service_cfg_status_t cfgStatus = service->serviceCfgStatus(serviceName, nsUid, nsGid);
-    if (cfgStatus == SERVICE_CFG_ERROR) {
-        return SERVICE_STATUS_ERROR_OTHER;
-    } else if (cfgStatus == SERVICE_CFG_NEW) {
-        // Fresh configuration
-        status = service->newServiceCfg(serviceCfgPath, libscopePath, nsUid, nsGid);
-    } else if (isCfgFileConfigured(serviceCfgPath) == FALSE) {
-        // Modification of configuration file
-        status = service->modifyServiceCfg(serviceCfgPath, libscopePath, nsUid, nsGid);
-    } else {
-        // Service was already setup correctly
-        return SERVICE_STATUS_SUCCESS;
-    }
+    struct service_ops serviceMgrs[] = {SystemD, InitD, OpenRc};
+    for (int i = 0; i < (sizeof(serviceMgrs) / sizeof(struct service_ops)); i++) {
+        // Check service manager exists
+        if (scope_stat(serviceMgrs[i].manager_dir, &sb) != 0) {
+            continue;
+        }
 
-    // Change permission and ownership if modify or create was success
-    if (status == SERVICE_STATUS_SUCCESS ) {
-        scope_chmod(serviceCfgPath, 0644);
-    }
+        // Full path to service directory
+        scope_memset(serviceCfgPath, 0, PATH_MAX);
+        if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), serviceMgrs[i].service_path, serviceName) < 0) {
+            scope_perror("error: setupService, scope_snprintf failed");
+            return SERVICE_STATUS_ERROR_OTHER;
+        }
+
+        // Check service is installed
+        if (serviceMgrs[i].isServiceInstalled(serviceName) == FALSE) {
+            continue;
+        }
+
+        // Configure service to load libscope.so
+        service_cfg_status_t cfgStatus = serviceMgrs[i].serviceCfgStatus(serviceName, nsUid, nsGid);
+        if (cfgStatus == SERVICE_CFG_ERROR) {
+            continue;
+        } else if (cfgStatus == SERVICE_CFG_NEW) {
+            // Fresh configuration
+            res = serviceMgrs[i].newServiceCfg(serviceCfgPath, libscopePath, nsUid, nsGid);
+        } else if (isCfgFileConfigured(serviceCfgPath) == FALSE) {
+            // Modification of configuration file
+            res = serviceMgrs[i].modifyServiceCfg(serviceCfgPath, libscopePath, nsUid, nsGid);
+        } else {
+            // Service was already setup correctly
+            res = SERVICE_STATUS_SUCCESS;
+        }
+
+        // Change permission and ownership if modify or create was success
+        if (res == SERVICE_STATUS_SUCCESS ) {
+            scope_chmod(serviceCfgPath, 0644);
+        }
     
-    return status;
+        configured_count++;
+    }
 
+    if (configured_count == 0) {
+        return SERVICE_STATUS_NOT_INSTALLED;
+    }
+
+    return res;
 }
 
 /*
@@ -612,8 +612,8 @@ setupService(const char *serviceName, uid_t nsUid, gid_t nsGid) {
 service_status_t
 setupUnservice(uid_t nsUid, gid_t nsGid) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
-    struct service_ops serviceMgrs[] = {SystemD, InitD, OpenRc};
 
+    struct service_ops serviceMgrs[] = {SystemD, InitD, OpenRc};
     for (int i = 0; i < (sizeof(serviceMgrs) / sizeof(struct service_ops)); i++) {
         if ((res = serviceMgrs[i].removeAllScopeServiceCfg(nsUid, nsGid)) != SERVICE_STATUS_SUCCESS) {
             return res;

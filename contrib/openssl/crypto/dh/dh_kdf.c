@@ -1,5 +1,5 @@
 /*
- * Copyright 2013-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2013-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -21,8 +21,8 @@
 #include <openssl/evp.h>
 #include <openssl/asn1.h>
 #include <openssl/kdf.h>
-#include <internal/provider.h>
-#include <crypto/dh.h>
+#include "internal/provider.h"
+#include "crypto/dh.h"
 
 /* Key derivation function from X9.63/SECG */
 int ossl_dh_kdf_X9_42_asn1(unsigned char *out, size_t outlen,
@@ -36,9 +36,11 @@ int ossl_dh_kdf_X9_42_asn1(unsigned char *out, size_t outlen,
     EVP_KDF_CTX *kctx = NULL;
     EVP_KDF *kdf = NULL;
     OSSL_PARAM params[5], *p = params;
-    const char *mdname = EVP_MD_name(md);
+    const char *mdname = EVP_MD_get0_name(md);
 
     kdf = EVP_KDF_fetch(libctx, OSSL_KDF_NAME_X942KDF_ASN1, propq);
+    if (kdf == NULL)
+        return 0;
     kctx = EVP_KDF_CTX_new(kdf);
     if (kctx == NULL)
         goto err;
@@ -67,10 +69,10 @@ int DH_KDF_X9_42(unsigned char *out, size_t outlen,
                  const unsigned char *ukm, size_t ukmlen, const EVP_MD *md)
 {
     char key_alg[OSSL_MAX_NAME_SIZE];
-    const OSSL_PROVIDER *prov = EVP_MD_provider(md);
+    const OSSL_PROVIDER *prov = EVP_MD_get0_provider(md);
     OSSL_LIB_CTX *libctx = ossl_provider_libctx(prov);
 
-    if (!OBJ_obj2txt(key_alg, sizeof(key_alg), key_oid, 0))
+    if (OBJ_obj2txt(key_alg, sizeof(key_alg), key_oid, 0) <= 0)
         return 0;
 
     return ossl_dh_kdf_X9_42_asn1(out, outlen, Z, Zlen, key_alg,

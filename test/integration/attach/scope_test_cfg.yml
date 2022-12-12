@@ -1,0 +1,84 @@
+metric:
+  enable: true
+  format:
+    type: statsd
+    statsdprefix:
+    statsdmaxlen: 512
+    verbosity : 4
+  watch:
+    - type: statsd
+    - type: fs
+    - type: net
+    - type: http
+    - type: dns
+    - type: process
+  transport:
+    type: udp
+    host: 127.0.0.1
+    port: 8125
+    tls:
+      enable: false
+      validateserver: true
+      cacertpath: ''
+event:
+  enable: true
+  format:
+    type: ndjson
+    maxeventpersec: 10000
+    enhancefs: true
+  watch:
+    - type: file
+      name: (\/logs?\/)|(\.log$)|(\.log[.\d]) # matches the filename
+      value: .*                               # matches data read or written
+    - type: console
+      name: (stdout)|(stderr) # matches the output stream
+      value: .*               # matches data written
+      allowbinary: true
+    - type: net
+      name: .*
+      field: .*
+      value: .*
+    - type: fs
+      name: .*
+      field: .*
+      value: .*
+    - type: dns
+      name: .*
+      field: .*
+      value: .*
+    - type: http
+      name: .*         # event name; http.req or http.resp
+      field: .*        # matches field names; duration, http_status, etc
+      value: .*        # matches field values
+      headers:         # list of filters matched against header names
+  transport:
+    type: file
+    path: '/opt/test-runner/logs/events_from_cfg.log'
+payload:
+  enable: false
+  dir: '/tmp'
+libscope:
+  configevent: true
+  summaryperiod : 10
+  commanddir : '/tmp'
+  log:
+    level: warning
+    transport:
+      type: file
+      path: '/tmp/scope.log'
+      buffer: line
+cribl:
+  enable: false
+  transport:
+    type: edge
+    host: 127.0.0.1
+    port: 10090
+    tls:
+      enable: false
+      validateserver: true
+      cacertpath: ''
+tags:
+  
+protocol:
+custom:
+  

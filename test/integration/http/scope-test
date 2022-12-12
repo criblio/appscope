@@ -2,10 +2,11 @@
 
 #set -x
 
-# This is the URL for a file on a server that supports various HTTP/1.x and
-# HTTP/2 requests. We found it in the tests for WireShark.
-URL=http://nghttp2.org/robots.txt
-URL_HTTPS=https://nghttp2.org/robots.txt
+# Some sites support HTTP2, others HTTP1
+H2_URL=http://nghttp2.org/robots.txt
+H2_URL_HTTPS=https://nghttp2.org/robots.txt
+H1_URL=http://google.com
+H1_URL_HTTPS=https://google.com
 
 # LogStream will be configured to dump NDJSON output files here.
 DEST=/tmp/out/appscope:in_appscope
@@ -80,14 +81,10 @@ sleep 30
 # AppScope source. Logstream is setup to dump data sent to that source to NDJSON
 # files in ${DEST} named CriblOut-*.json.
 
-# When AppScope is configured to connect to LogStream, it should automatically
-# relay HTTP payloads and LogStream should be able to parse them into HTTP
-# request and response events.
-
 # Should get HTTP events from HTTP/1.x traffic
 starttest "HTTP/1.1"
 rm -rf ${DEST}
-scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http1.1 $URL
+scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http1.1 $H1_URL
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
     if grep '"source":"http.req"' ${DEST}/CriblOut-*.json >/dev/null; then
         echo "PASS: http.req found"
@@ -110,7 +107,7 @@ endtest
 # Should still work when ALL payloads are enabled.
 starttest "HTTP/1.1 + Payloads"
 rm -rf ${DEST}
-scope run -p -c tcp://localhost:10090 -- curl -Lso /dev/null --http1.1 $URL
+scope run -p -c tcp://localhost:10090 -- curl -Lso /dev/null --http1.1 $H1_URL
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
     if grep '"source":"http.req"' ${DEST}/CriblOut-*.json >/dev/null; then
         echo "PASS: http.req found"
@@ -133,7 +130,7 @@ endtest
 # Should get HTTP events from HTTP/2 traffic
 starttest "HTTP/2"
 rm -rf ${DEST}
-scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http2-prior-knowledge $URL
+scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http2-prior-knowledge $H2_URL
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
     if grep '"source":"http.req"' ${DEST}/CriblOut-*.json >/dev/null; then
         echo "PASS: http.req found"
@@ -156,7 +153,7 @@ endtest
 # Should still work when ALL payloads are enabled.
 starttest "HTTP/2 + Payloads"
 rm -rf ${DEST}
-scope run -p -c tcp://localhost:10090 -- curl -Lso /dev/null --http2-prior-knowledge $URL
+scope run -p -c tcp://localhost:10090 -- curl -Lso /dev/null --http2-prior-knowledge $H2_URL
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
     if grep '"source":"http.req"' ${DEST}/CriblOut-*.json >/dev/null; then
         echo "PASS: http.req found"
@@ -183,7 +180,7 @@ starttest "HTTP/2, payload:false"
 rm -rf ${DEST}
 SCOPE_HOME=/opt/test/conf_1 \
 LD_PRELOAD=/usr/local/scope/lib/libscope.so \
-curl -Lso /dev/null --http2-prior-knowledge $URL
+curl -Lso /dev/null --http2-prior-knowledge $H2_URL
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
     if grep '"source":"http.req"' ${DEST}/CriblOut-*.json >/dev/null; then
         echo "FAIL: http.req found"
@@ -209,7 +206,7 @@ starttest "HTTP/2, busted regex"
 rm -rf ${DEST}
 SCOPE_HOME=/opt/test/conf_2 \
 LD_PRELOAD=/usr/local/scope/lib/libscope.so \
-curl -Lso /dev/null --http2-prior-knowledge $URL
+curl -Lso /dev/null --http2-prior-knowledge $H2_URL
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
     if grep '"source":"http.req"' ${DEST}/CriblOut-*.json >/dev/null; then
         echo "FAIL: http.req found"
@@ -232,7 +229,7 @@ endtest
 # Should get HTTP events from HTTP/1.x traffic via HTTPS
 starttest "HTTP/1.1 + HTTPS"
 rm -rf ${DEST}
-scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http1.1 $URL_HTTPS
+scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http1.1 $H1_URL_HTTPS
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
     if grep '"source":"http.req"' ${DEST}/CriblOut-*.json >/dev/null; then
         echo "PASS: http.req found"
@@ -255,7 +252,7 @@ endtest
 # Should get HTTP events from HTTP/2 traffic via HTTPS
 starttest "HTTP/2 + HTTPS"
 rm -rf ${DEST}
-scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http2-prior-knowledge $URL_HTTPS
+scope run -c tcp://localhost:10090 -- curl -Lso /dev/null --http2-prior-knowledge $H2_URL_HTTPS
 if [ "$(wait_for_files "${DEST}/CriblOut-*.json")" ]; then
     if grep '"source":"http.req"' ${DEST}/CriblOut-*.json >/dev/null; then
         echo "PASS: http.req found"

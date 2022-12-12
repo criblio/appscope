@@ -1,6 +1,6 @@
 FROM amazonlinux:2
 
-RUN yum install -y tar gzip
+RUN yum install -y tar gzip pcre-tools
 
 RUN ARCH=$(uname -m | sed -e 's/x86_64/x64/' -e 's/aarch64/arm64/') \
  && curl -Lo /tmp/cribl.tgz https://cdn.cribl.io/dl/3.1.0/cribl-3.1.0-f765e418-linux-${ARCH}.tgz \
@@ -22,7 +22,7 @@ RUN  mkdir /usr/local/scope && \
      ln -s /opt/appscope/bin/linux/$(uname -m)/ldscope /usr/local/scope/bin/ldscope && \
      ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
-COPY service/scope-test.initd /usr/local/scope/scope-test
+COPY service/scope-test.initd.sh /usr/local/scope/scope-test
 
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]

@@ -54,20 +54,15 @@ jobs:
         id: tag
         run: |
           if [ -z "${GITHUB_REF%%refs/tags/v*}" -a "true" = "${{ steps.version.outputs.is-semver }}" ]; then
-              echo "::set-output name=tag::${{ steps.version.outputs.version-without-v }}"
-              echo "::set-output name=push::true"
-              if [ -z "${{ steps.version.outputs.prerelease }}" ]; then
-                if [ "${{ steps.version.outputs.version }}" = "$(git tag -l v* | sort -V | tail -1)" ]; then
-                  echo "::set-output name=latest::true"
-                fi
-              fi
+              echo "tag=${{ steps.version.outputs.version-without-v }}" >> $GITHUB_OUTPUT
+              echo "push=true" >> "${GITHUB_OUTPUT}"
           else
-            echo "::set-output name=branch::${GITHUB_REF#*refs/heads/}"
+            echo "branch=${GITHUB_REF#*refs/heads/}"
             if [ "refs/heads/main" = "${GITHUB_REF}" -o "refs/heads/master" = "${GITHUB_REF}" ]; then
-              echo "::set-output name=tag::next"
-              echo "::set-output name=push::true"
+              echo "tag=next" >> "${GITHUB_OUTPUT}"
+              echo "push=true" >> "${GITHUB_OUTPUT}"
             else
-              echo "::set-output name=tag::unreleased"
+              echo "tag=unreleased" >> "${GITHUB_OUTPUT}"
             fi
           fi
 
@@ -82,7 +77,6 @@ jobs:
           echo "build=\"${{ steps.version.outputs.build }}\""
           echo "is-semver=\"${{ steps.version.outputs.is-semver }}\""
           echo "tag=\"${{ steps.tag.outputs.tag }}\""
-          echo "latest=\"${{ steps.tag.outputs.latest }}\""
           echo "push=\"${{ steps.tag.outputs.push }}\""
           echo "branch=\"${{ steps.tag.outputs.branch }}\""
 
@@ -116,7 +110,6 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       is-semver: ${{ steps.version.outputs.is-semver }}
       tag: ${{ steps.tag.outputs.tag }}
-      latest: ${{ steps.tag.outputs.latest }}
       push: ${{ steps.tag.outputs.push }}
       branch: ${{ steps.tag.outputs.branch }}
 
@@ -175,7 +168,7 @@ jobs:
             echo "::group::home"
             ls -la $HOME
             echo "::endgroup::"
-            echo "::set-output name=arch::$(uname -m)"
+            echo "arch=$(uname -m)" >> "${GITHUB_OUTPUT}"
 
       # Clone the repos
       - name: Checkout Repository
@@ -202,7 +195,7 @@ jobs:
       # We'll tell BuildX to `--cache-from` this folder to speed up the build
       # of our `appscope-builder` image. 
       - name: Setup Docker Cache
-        uses: actions/cache@v3.0.3
+        uses: actions/cache@v3.0.11
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-buildx-${{ github.sha }}
@@ -210,7 +203,7 @@ jobs:
 
       # Cache downloaded Go dependencies.
       - name: Setup Go Cache
-        uses: actions/cache@v3.0.3
+        uses: actions/cache@v3.0.11
         with:
           path: |
             ~/.cache/go-build
@@ -224,7 +217,7 @@ jobs:
       # Cache the cmocka build. Use a key based on a hash of all the files used
       # in the build.
       - name: Setup cmocka Cache
-        uses: actions/cache@v3.0.3
+        uses: actions/cache@v3.0.11
         with:
           path: contrib/build/cmocka
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-cmocka-${{ hashFiles('contrib/Makefile', 'contrib/cmocka/**') }}
@@ -233,7 +226,7 @@ jobs:
       # Cache the funchook build. Use a key based on a hash of all the files
       # used in the build.
       - name: Setup funchook Cache
-        uses: actions/cache@v3.0.3
+        uses: actions/cache@v3.0.11
         with:
           path: contrib/build/funchook
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-funchook-${{ hashFiles('contrib/Makefile', 'contrib/funchook/**') }}
@@ -242,7 +235,7 @@ jobs:
       # Cache the funchook build. Use a key based on a hash of all the files
       # used in the build.
       - name: Setup pcre2 Cache
-        uses: actions/cache@v3.0.3
+        uses: actions/cache@v3.0.11
         with:
           path: contrib/build/pcre2
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-pcre2-${{ hashFiles('contrib/Makefile', 'contrib/cpre2/**') }}
@@ -251,7 +244,7 @@ jobs:
       # Cache the openssl build. Use a key based on a hash of all the files
       # used in the build.
       - name: Setup openssl Cache
-        uses: actions/cache@v3.0.3
+        uses: actions/cache@v3.0.11
         with:
           path: contrib/build/openssl
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-openssl-${{ hashFiles('contrib/Makefile', 'contrib/openssl/**') }}
@@ -260,7 +253,7 @@ jobs:
       # Cache the ls-hpack build. Use a key based on a hash of all the files
       # used in the build.
       - name: Setup ls-hpack Cache
-        uses: actions/cache@v3.0.3
+        uses: actions/cache@v3.0.11
         with:
           path: contrib/build/ls-hpack
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-ls-hpack-${{ hashFiles('contrib/Makefile', 'contrib/ls-hpack/**') }}
@@ -269,7 +262,7 @@ jobs:
       # Cache the musl build. Use a key based on a hash of all the files
       # used in the build.
       - name: Setup musl Cache
-        uses: actions/cache@v3.0.3
+        uses: actions/cache@v3.0.11
         with:
           path: contrib/build/musl
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-musl-${{ hashFiles('contrib/Makefile', 'contrib/musl/**') }}
@@ -278,7 +271,7 @@ jobs:
       # Cache the libunwind build. Use a key based on a hash of all the files
       # used in the build.
       - name: Setup libunwind Cache
-        uses: actions/cache@v3.0.3
+        uses: actions/cache@v3.0.11
         with:
           path: contrib/build/libunwind
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-libunwind-${{ hashFiles('contrib/Makefile', 'contrib/libunwind/**') }}
@@ -323,7 +316,7 @@ jobs:
       # This is just being done to reduce the workflow time duration.
       - name: List Integration Tests
         id: tests
-        run: echo "::set-output name=tests-${{ steps.env.outputs.arch }}::$(make -s -C test/integration tests | egrep -v '.*java(9|1[023456])$' | sort -V | jq -ncR '[inputs]')"
+        run: echo "tests-${{ steps.env.outputs.arch }}=$(make -s -C test/integration tests | egrep -v '.*java(9|1[023456])$' | sort -V | jq -ncR '[inputs]')" >> "${GITHUB_OUTPUT}"
 
       - name: Print size of Binaries
         run: |
@@ -402,36 +395,49 @@ jobs:
 
           echo "::group::Prep Content"
           mkdir ${TMPDIR}/scope
+          mkdir ${TMPDIR}/lib
 
           cp conf/scope.yml ${TMPDIR}/scope
           for ARCH in x86_64 aarch64; do
             cp bin/linux/${ARCH}/{scope,ldscope} ${TMPDIR}/scope
             cp lib/linux/${ARCH}/libscope.so ${TMPDIR}/scope
+            # Create tgz and tgz.md5 of binaries and config (for each arch)
             (cd ${TMPDIR} && tar cfz scope.tgz scope)
             (cd ${TMPDIR} && md5sum scope.tgz > scope-${ARCH}.tgz.md5)
             (cd ${TMPDIR} && mv scope.tgz scope-${ARCH}.tgz)
+            # Copy scope binary and create scope.md5 (for each arch)
             (cd ${TMPDIR}/scope && md5sum scope > ../scope-${ARCH}.md5)
             cp ${TMPDIR}/scope/scope ${TMPDIR}/scope-${ARCH}
+          done
+
+          cp conf/scope.yml ${TMPDIR}/lib
+          for ARCH in x86_64 aarch64; do
+            cp bin/linux/${ARCH}/ldscope ${TMPDIR}/lib
+            cp lib/linux/${ARCH}/libscope.so ${TMPDIR}/lib
+            # Create zip and zip.md5 of binaries and config (for each arch)
+            (cd ${TMPDIR} && zip -r aws-lambda-layer.zip ./lib)
+            (cd ${TMPDIR} && md5sum aws-lambda-layer.zip > aws-lambda-layer-${ARCH}.zip.md5)
+            (cd ${TMPDIR} && mv aws-lambda-layer.zip aws-lambda-layer-${ARCH}.zip)
           done
           ls -laR ${TMPDIR}
           echo "::endgroup::"
 
           echo "::group::Deploy to https://cdn.cribl.io/dl/scope/${VERSION}"
-          if [ -n "${{ needs.info.outputs.latest }}" ]; then
-            echo "${{ needs.info.outputs.tag }}" > ${TMPDIR}/latest
-            aws s3 cp ${TMPDIR}/latest ${S3_SCOPE}/latest
-          fi
-          aws s3 cp ${TMPDIR}/scope-x86_64         ${S3_SCOPE}/${VERSION}/linux/scope
-          aws s3 cp ${TMPDIR}/scope-x86_64.md5     ${S3_SCOPE}/${VERSION}/linux/scope.md5
-          aws s3 cp ${TMPDIR}/scope-x86_64.tgz     ${S3_SCOPE}/${VERSION}/linux/scope.tgz
-          aws s3 cp ${TMPDIR}/scope-x86_64.tgz.md5 ${S3_SCOPE}/${VERSION}/linux/scope.tgz.md5
+          aws s3 cp ${TMPDIR}/scope-x86_64                    ${S3_SCOPE}/${VERSION}/linux/scope
+          aws s3 cp ${TMPDIR}/scope-x86_64.md5                ${S3_SCOPE}/${VERSION}/linux/scope.md5
+          aws s3 cp ${TMPDIR}/scope-x86_64.tgz                ${S3_SCOPE}/${VERSION}/linux/scope.tgz
+          aws s3 cp ${TMPDIR}/scope-x86_64.tgz.md5            ${S3_SCOPE}/${VERSION}/linux/scope.tgz.md5
+          aws s3 cp ${TMPDIR}/aws-lambda-layer-x86_64.zip     ${S3_SCOPE}/${VERSION}/linux/aws-lambda-layer.zip
+          aws s3 cp ${TMPDIR}/aws-lambda-layer-x86_64.zip.md5 ${S3_SCOPE}/${VERSION}/linux/aws-lambda-layer.zip.md5
           for ARCH in x86_64 aarch64; do
-            aws s3 cp ${TMPDIR}/scope-${ARCH}         ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope
-            aws s3 cp ${TMPDIR}/scope-${ARCH}.md5     ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.md5
-            aws s3 cp ${TMPDIR}/scope-${ARCH}.tgz     ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.tgz
-            aws s3 cp ${TMPDIR}/scope-${ARCH}.tgz.md5 ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.tgz.md5
+            aws s3 cp ${TMPDIR}/scope-${ARCH}                    ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope
+            aws s3 cp ${TMPDIR}/scope-${ARCH}.md5                ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.md5
+            aws s3 cp ${TMPDIR}/scope-${ARCH}.tgz                ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.tgz
+            aws s3 cp ${TMPDIR}/scope-${ARCH}.tgz.md5            ${S3_SCOPE}/${VERSION}/linux/${ARCH}/scope.tgz.md5
+            aws s3 cp ${TMPDIR}/aws-lambda-layer-${ARCH}.zip     ${S3_SCOPE}/${VERSION}/linux/${ARCH}/aws-lambda-layer.zip
+            aws s3 cp ${TMPDIR}/aws-lambda-layer-${ARCH}.zip.md5 ${S3_SCOPE}/${VERSION}/linux/${ARCH}/aws-lambda-layer.zip.md5
           done
-          aws cloudfront create-invalidation --distribution-id ${CF_DISTRIBUTION_ID} --paths '/dl/scope/'"$VERSION"'/*' '/dl/scope/latest'
+          aws cloudfront create-invalidation --distribution-id ${CF_DISTRIBUTION_ID} --paths '/dl/scope/'"$VERSION"'/*'
           echo "::endgroup::"
 
           if [ "unreleased" != "${{ needs.info.outputs.tag }}" -a "next" != "${{ needs.info.outputs.tag }}" ]; then
@@ -441,6 +447,8 @@ jobs:
               gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}.md5"
               gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}.tgz"
               gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/scope-${ARCH}.tgz.md5"
+              gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/aws-lambda-layer-${ARCH}.zip"
+              gh release upload ${{ needs.info.outputs.version }} "${TMPDIR}/aws-lambda-layer-${ARCH}.zip.md5"
             done
             echo "::endgroup::"
           fi
@@ -579,7 +587,6 @@ jobs:
       - name: Build Image
         env:
           VERSION: ${{ needs.info.outputs.tag }}
-          LATEST: ${{ needs.info.outputs.latest }}
           PUSH: ${{ needs.info.outputs.push }}
         run: |
           # TODO only if needs.test-*.results == 'success'
@@ -593,7 +600,6 @@ jobs:
           docker buildx build \
                 --builder ${{ steps.buildx.outputs.name }} \
                 --tag cribl/scope:${VERSION} \
-                ${LATEST:+--tag cribl/scope:latest} \
                 --platform linux/amd64,linux/arm64/v8 \
                 --output type=${TYPE} \
                 --file docker/base/Dockerfile \

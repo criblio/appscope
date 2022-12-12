@@ -12,8 +12,7 @@ import (
 var watchCmd = &cobra.Command{
 	Use:   "watch [flags]",
 	Short: "Executes a scoped command on an interval",
-	Long: `Watch executes a scoped command on an interval. Note, when calling the watch subcommand you should call it 
-like scope watch -- <command>, to avoid scope attempting to parse flags passed to the executed command.`,
+	Long: `Executes a scoped command on an interval. Must be called with the -- flag, e.g., 'scope watch -- <command>', to prevent AppScope from attempting to parse flags passed to the executed command.`,
 	Example: `scope watch -i 5s -- /bin/echo "foo"
 scope watch --interval=1m-- perl -e 'print "foo\n"'
 scope watch --interval=5s --payloads -- nc -lp 10001

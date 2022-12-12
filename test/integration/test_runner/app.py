@@ -6,7 +6,6 @@ from datetime import datetime
 import cribl
 import elastic
 import kafka_test
-import nginx
 import splunk
 import syscalls
 from reporting import print_summary, store_results_to_file
@@ -20,7 +19,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
     parser.add_argument("-t", "--target", help="target application to test",
-                        choices=["nginx", "splunk", "cribl", "syscalls", "elastic", "kafka"],
+                        choices=["splunk", "cribl", "syscalls", "elastic", "kafka"],
                         required=True)
     parser.add_argument("-id", "--execution_id", help="execution id")
     parser.add_argument("-l", "--logs_path", help="path to store the execution results and logs", default="/tmp/")
@@ -56,8 +55,6 @@ def main():
         try:
             runner = Runner(test_watcher, scope_data_collector)
             runner.add_test_set_validators(default_test_set_validators)
-            if args.target == 'nginx':
-                nginx.configure(runner, args)
             if args.target == 'splunk':
                 splunk.configure(runner, args)
             if args.target == 'cribl':

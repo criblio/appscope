@@ -19,7 +19,8 @@ COPY ./cli/expected.yml /
 RUN mkdir /opt/test-runner && \
     mkdir -p /var/run/appscope/ && \
     mkdir -p /opt/cribl/state/ && \
-    mkdir -p /opt/cribl/home/state
+    mkdir -p /opt/cribl/home/state && \
+    touch /opt/test-runner/empty_file
 
 ENV SCOPE_CRIBL_ENABLE=false
 ENV SCOPE_LOG_LEVEL=error
@@ -28,6 +29,8 @@ ENV SCOPE_EVENT_LOGFILE=true
 ENV SCOPE_EVENT_CONSOLE=true
 ENV SCOPE_EVENT_METRIC=true
 ENV SCOPE_EVENT_HTTP=true
+ENV SCOPE_CLI_SKIP_START_HOST=true
+ENV SCOPE_FILTER=false
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 COPY scope-profile.sh /etc/profile.d/scope.sh

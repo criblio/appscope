@@ -32,15 +32,28 @@ typedef enum {CFG_MTC_FS,
               CFG_MTC_PROC, 
               CFG_MTC_STATSD} metric_watch_t;
 
+typedef enum {
+    SERVICE_STATUS_SUCCESS = 0,         // service operation was success
+    SERVICE_STATUS_ERROR_OTHER = 1,     // service was not installed
+    SERVICE_STATUS_NOT_INSTALLED = 2,   // service operation was failed
+} service_status_t;
+
 #define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 
 #define MAX_HOSTNAME 255
 #define MAX_PROCNAME 128
+#define MACHINE_ID_LEN 32
+#define UUID_LEN 36
 #define DEFAULT_CMD_SIZE 32
 #define MAX_ID 512
 #define MAX_CGROUP 512
 #define MODE_STR 16
+#define SM_NAME "scope_anon"
+
+#ifndef bool
+typedef unsigned int bool;
+#endif
 
 typedef struct
 {
@@ -48,6 +61,8 @@ typedef struct
     pid_t ppid;
     uid_t uid;
     gid_t gid;
+    int smfd;
+    unsigned long smaddr;
     char hostname[MAX_HOSTNAME];
     char procname[MAX_PROCNAME];
     char *cmd;
@@ -55,14 +70,18 @@ typedef struct
     char cgroup[MAX_CGROUP];
     char *username;
     char *groupname;
+    char machine_id[MACHINE_ID_LEN + 1];
+    char uuid[UUID_LEN + 1];
 } proc_id_t;
+
+typedef struct
+{
+    unsigned long cmdAttachAddr;
+    bool scoped;
+} export_sm_t;
 
 #define TRUE 1
 #define FALSE 0
-
-#ifndef bool
-typedef unsigned int bool;
-#endif
 
 #define CFG_MAX_VERBOSITY 9
 #define CFG_FILE_NAME "scope.yml"
@@ -112,6 +131,7 @@ typedef unsigned int bool;
 #define DEFAULT_SRC_NET_NAME ".*"
 #define DEFAULT_SRC_FS_NAME ".*"
 #define DEFAULT_SRC_DNS_NAME ".*"
+#define DEFAULT_ALLOW_BINARY_CONSOLE TRUE
 #define DEFAULT_MTC_IPPORT_VERBOSITY 1
 
 #define DEFAULT_SRC_FILE TRUE
@@ -172,24 +192,30 @@ typedef unsigned int bool;
 // Unpublished scope env vars that are not processed by config:
 //    SCOPE_APP_TYPE                 internal use only
 //    SCOPE_EXEC_TYPE                internal use only
+//    SCOPE_FILTER                   "false" disables handling the filter file
+//                                   other values are interpreted a path to a filter file
 //    SCOPE_EXECVE                   "false" disables scope of child procs
 //    SCOPE_EXEC_PATH                specifies path to ldscope executable
 //    SCOPE_CRIBL_NO_BREAKER         adds breaker property to process start message
 //    SCOPE_LIB_PATH                 specifies path to libscope.so library
 //    SCOPE_GO_STRUCT_PATH           for internal testing
+//    SCOPE_CLI_SKIP_START_HOST      for internal testing (when set skip the start host operation from container)
 //    SCOPE_HTTP_SERIALIZE_ENABLE    "true" adds guard for race condition
 //    SCOPE_NO_SIGNAL                if defined, timer for USR2 is not set
 //    SCOPE_PERF_PRESERVE            "true" processes at 10s instead of 1ms
 //    SCOPE_SWITCH                   for internal go debugging
 //    SCOPE_PID                      provided by library
 //    SCOPE_PAYLOAD_HEADER           write payload headers to files
+//    SCOPE_PAYLOAD_TO_DISK          if payloads are enabled, "true" forces writes to payload->dir
 //    SCOPE_ALLOW_CONSTRUCT_DBG      allows debug inside the constructor
 //    SCOPE_ERROR_SIGNAL_HANDLER     allows to register SIGSEGV&SIGBUS handler
 //    SCOPE_QUEUE_LENGTH             override default circular buffer sizes
-//    SCOPE_ALLOW_BINARY_CONSOLE     "true" outputs all console data, always
-
+//    SCOPE_START_NOPROFILE          cause the start command to ignore updates to /etc/profile.d
+//    SCOPE_START_FORCE_PROFILE      force the start command to update profile.d with a dev version
+//    CRIBL_EDGE_FS_ROOT             define the location of the host root path inside the Cribl Edge container
 #define SCOPE_PID_ENV "SCOPE_PID"
 #define PRESERVE_PERF_REPORTING "SCOPE_PERF_PRESERVE"
+#define SCOPE_PAYLOAD_TO_DISK_ENV "SCOPE_PAYLOAD_TO_DISK"
 
 // TLS protocol refs that have been useful:
 //   https://tools.ietf.org/html/rfc5246
@@ -244,6 +270,10 @@ typedef unsigned int bool;
 // establishTlsSession() process...  this helps ensure we won't hang
 // processes forever while waiting for a single connection to complete.
 #define MAX_TLS_CONNECT_SECONDS 5
+
+// The dynamic config file location used by the CLI
+#define DYN_CONFIG_CLI_DIR "/dev/shm"
+#define DYN_CONFIG_CLI_PREFIX "scope_dconf"
 
 #endif // __SCOPETYPES_H__
 

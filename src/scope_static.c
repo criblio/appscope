@@ -18,446 +18,11 @@
 #include "scopestdlib.h"
 #include "scopetypes.h"
 #include "libdir.h"
-
-/*
- * This code exists solely to support the ability to
- * build a libscope and an ldscope on a glibc distro
- * that will execute on both a glibc distro and a
- * musl distro.
- *
- * This code is used to create a static exec that will
- * execute on both glibc and musl distros.
- *
- * The process:
- * 1) extract the ldscopedyn dynamic exec and libscope.so
- *    dynamic lib from this object.
- * 2) open an executable file on the current FS and
- *    read the loader string from the .interp section.
- * 3) if it uses a musl ld.so then do musl
- * 4) for musl; create a dir and in that dir create a
- *    soft link to ld-musl.so from ld.linux.so (the
- *    glibc loader).
- * 5) for musl; create or add to the ld lib path
- *    env var to point to the dir created above.
- * 6) for musl; modify the loader string in .interp
- *    of ldscope to ld-musl.so.
- * 7) execve the extracted ldscopedyn passing args
- *    from this command line.
- */
-
-#define EXE_TEST_FILE "/bin/cat"
-#define LIBMUSL "musl"
-
-static int g_debug = 0;
-
-static int
-get_dir(const char *path, char *fres, size_t len)
-{
-    DIR *dirp;
-    struct dirent *entry;
-    char *dcopy, *pcopy, *dname, *fname;
-    int res = -1;
-
-    if (!path || !fres || (len <= 0)) return res;
-
-    pcopy = scope_strdup(path);
-    dname = scope_dirname(pcopy);
-
-    if ((dirp = scope_opendir(dname)) == NULL) {
-        scope_perror("get_dir:opendir");
-        if (pcopy) scope_free(pcopy);
-        return res;
-    }
-
-    dcopy = scope_strdup(path);
-    fname = scope_basename(dcopy);
-
-    while ((entry = scope_readdir(dirp)) != NULL) {
-        if ((entry->d_type != DT_DIR) &&
-            (scope_strstr(entry->d_name, fname))) {
-            scope_strncpy(fres, entry->d_name, len);
-            res = 0;
-            break;
-        }
-    }
-
-    scope_closedir(dirp);
-    if (pcopy) scope_free(pcopy);
-    if (dcopy) scope_free(dcopy);
-    return res;
-}
-
-static void
-setEnvVariable(char *env, char *value)
-{
-    char *cur_val = getenv(env);
-
-    // If env is not set
-    if (!cur_val) {
-        if (setenv(env, value, 1)) {
-            perror("setEnvVariable:setenv");
-        }
-        return;
-    }
-
-    // env is set. try to append
-    char *new_val = NULL;
-    if ((scope_asprintf(&new_val, "%s:%s", cur_val, value) == -1)) {
-        scope_perror("setEnvVariable:asprintf");
-        return;
-    }
-
-    if (g_debug) scope_printf("%s:%d %s to %s\n", __FUNCTION__, __LINE__, env, new_val);
-    if (setenv(env, new_val, 1)) {
-        perror("setEnvVariable:setenv");
-    }
-
-    if (new_val) scope_free(new_val);
-}
-
-// modify NEEDED entries in libscope.so to avoid dependencies
-static int
-set_library(const char *libpath)
-{
-    int i, fd, found, name;
-    struct stat sbuf;
-    char *buf;
-    Elf64_Ehdr *elf;
-    Elf64_Shdr *sections;
-    Elf64_Dyn *dyn;
-    const char *section_strtab = NULL;
-    const char *strtab = NULL;
-    const char *sec_name = NULL;
-
-    if (libpath == NULL)
-        return -1;
-
-    if ((fd = scope_open(libpath, O_RDONLY)) == -1) {
-        scope_perror("set_library:open");
-        return -1;
-    }
-
-    if (scope_fstat(fd, &sbuf) == -1) {
-        scope_perror("set_library:fstat");
-        scope_close(fd);
-        return -1;
-    }
-
-    buf = scope_mmap(NULL, ROUND_UP(sbuf.st_size, scope_sysconf(_SC_PAGESIZE)),
-               PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, (off_t)NULL);
-    if (buf == MAP_FAILED) {
-        scope_perror("set_loader:scope_mmap");
-        scope_close(fd);
-        return -1;
-    }
-
-    // get the elf header, section table and string table
-    elf = (Elf64_Ehdr *)buf;
-
-    if (elf->e_ident[EI_MAG0] != ELFMAG0
-        || elf->e_ident[EI_MAG1] != ELFMAG1
-        || elf->e_ident[EI_MAG2] != ELFMAG2
-        || elf->e_ident[EI_MAG3] != ELFMAG3
-        || elf->e_ident[EI_VERSION] != EV_CURRENT) {
-        scope_fprintf(scope_stderr, "ERROR:%s: is not valid ELF file", libpath);
-        scope_close(fd);
-        scope_munmap(buf, sbuf.st_size);
-        return -1;
-    }
-
-    sections = (Elf64_Shdr *)((char *)buf + elf->e_shoff);
-    section_strtab = (char *)buf + sections[elf->e_shstrndx].sh_offset;
-    found = name = 0;
-
-    // locate the .dynstr section
-    for (i = 0; i < elf->e_shnum; i++) {
-        sec_name = section_strtab + sections[i].sh_name;
-        if (sections[i].sh_type == SHT_STRTAB && scope_strcmp(sec_name, ".dynstr") == 0) {
-            strtab = (const char *)(buf + sections[i].sh_offset);
-        }
-    }
-
-    if (strtab == NULL) {
-        scope_fprintf(scope_stderr, "ERROR:%s: did not locate the .dynstr from %s", __FUNCTION__, libpath);
-        scope_close(fd);
-        scope_munmap(buf, sbuf.st_size);
-        return -1;
-    }
-
-    // locate the .dynamic section
-    for (i = 0; i < elf->e_shnum; i++) {
-        if (sections[i].sh_type == SHT_DYNAMIC) {
-            for (dyn = (Elf64_Dyn *)((char *)buf + sections[i].sh_offset); dyn != NULL && dyn->d_tag != DT_NULL; dyn++) {
-                if (dyn->d_tag == DT_NEEDED) {
-                    char *depstr = (char *)(strtab + dyn->d_un.d_val);
-                    if (depstr && scope_strstr(depstr, "ld-linux")) {
-                        char newdep[PATH_MAX];
-                        size_t newdep_len;
-                        if (get_dir("/lib/ld-musl", newdep, sizeof(newdep)) == -1) break;
-                        newdep_len = scope_strlen(newdep);
-                        if (scope_strlen(depstr) >= newdep_len) {
-                            scope_strncpy(depstr, newdep, newdep_len + 1);
-                            found = 1;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        if (found == 1) break;
-    }
-
-    if (found) {
-        if (scope_close(fd) == -1) {
-            scope_munmap(buf, sbuf.st_size);
-            return -1;
-        }
-
-        if ((fd = scope_open(libpath, O_RDWR)) == -1) {
-            scope_perror("set_library:open write");
-            scope_munmap(buf, sbuf.st_size);
-            return -1;
-        }
-
-        int rc = scope_write(fd, buf, sbuf.st_size);
-        if (rc < sbuf.st_size) {
-            scope_perror("set_library:write");
-        }
-    }
-
-    scope_close(fd);
-    scope_munmap(buf, sbuf.st_size);
-    return (found - 1);
-}
-
-// modify the loader string in the .interp section of ldscope
-static int
-set_loader(char *exe)
-{
-    int i, fd, found, name;
-    struct stat sbuf;
-    char *buf;
-    Elf64_Ehdr *elf;
-    Elf64_Phdr *phead;
-
-    if (!exe) return -1;
-
-    if ((fd = scope_open(exe, O_RDONLY)) == -1) {
-        scope_perror("set_loader:open");
-        return -1;
-    }
-
-    if (scope_fstat(fd, &sbuf) == -1) {
-        scope_perror("set_loader:fstat");
-        scope_close(fd);
-        return -1;
-    }
-
-    buf = scope_mmap(NULL, ROUND_UP(sbuf.st_size, scope_sysconf(_SC_PAGESIZE)),
-               PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, (off_t)NULL);
-    if (buf == MAP_FAILED) {
-        scope_perror("set_loader:scope_mmap");
-        scope_close(fd);
-        return -1;
-    }
-
-    elf = (Elf64_Ehdr *)buf;
-    phead  = (Elf64_Phdr *)&buf[elf->e_phoff];
-    found = name = 0;
-
-    for (i = 0; i < elf->e_phnum; i++) {
-        if ((phead[i].p_type == PT_INTERP)) {
-            char *exld = (char *)&buf[phead[i].p_offset];
-            DIR *dirp;
-            struct dirent *entry;
-            char dir[PATH_MAX];
-            size_t dir_len;
-
-            if (scope_strstr(exld, "ld-musl") != NULL) {
-                scope_close(fd);
-                scope_munmap(buf, sbuf.st_size);
-                return 0;
-            }
-
-            scope_snprintf(dir, sizeof(dir), "/lib/");
-            if ((dirp = scope_opendir(dir)) == NULL) {
-                scope_perror("set_loader:opendir");
-                break;
-            }
-
-            while ((entry = scope_readdir(dirp)) != NULL) {
-                if ((entry->d_type != DT_DIR) &&
-                    (scope_strstr(entry->d_name, "ld-musl"))) {
-                    scope_strncat(dir, entry->d_name, scope_strlen(entry->d_name) + 1);
-                    name = 1;
-                    break;
-                }
-            }
-
-            scope_closedir(dirp);
-            dir_len = scope_strlen(dir);
-            if (name && (scope_strlen(exld) >= dir_len)) {
-                if (g_debug) scope_printf("%s:%d exe ld.so: %s to %s\n", __FUNCTION__, __LINE__, exld, dir);
-                scope_strncpy(exld, dir, dir_len + 1);
-                found = 1;
-                break;
-            }
-        }
-    }
-
-    if (found) {
-        if (scope_close(fd) == -1) {
-            scope_munmap(buf, sbuf.st_size);
-            return -1;
-        }
-
-        if ((fd = scope_open(exe, O_RDWR)) == -1) {
-            scope_perror("set_loader:open write");
-            scope_munmap(buf, sbuf.st_size);
-            return -1;
-        }
-
-        int rc = scope_write(fd, buf, sbuf.st_size);
-        if (rc < sbuf.st_size) {
-            scope_perror("set_loader:write");
-        }
-    } else {
-        scope_fprintf(scope_stderr, "WARNING: can't locate or set the loader string in %s\n", exe);
-    }
-
-    scope_close(fd);
-    scope_munmap(buf, sbuf.st_size);
-    return (found - 1);
-}
-
-static char *
-get_loader(char *exe)
-{
-    int i, fd;
-    struct stat sbuf;
-    char *buf, *ldso = NULL;
-    Elf64_Ehdr *elf;
-    Elf64_Phdr *phead;
-
-    if (!exe) return NULL;
-
-    if ((fd = scope_open(exe, O_RDONLY)) == -1) {
-        scope_perror("get_loader:open");
-        return NULL;
-    }
-
-    if (scope_fstat(fd, &sbuf) == -1) {
-        scope_perror("get_loader:fstat");
-        scope_close(fd);
-        return NULL;
-    }
-
-    buf = scope_mmap(NULL, ROUND_UP(sbuf.st_size, scope_sysconf(_SC_PAGESIZE)),
-               PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
-    if (buf == MAP_FAILED) {
-        scope_perror("get_loader:scope_mmap");
-        scope_close(fd);
-        return NULL;
-    }
-
-    scope_close(fd);
-
-    elf = (Elf64_Ehdr *)buf;
-    phead  = (Elf64_Phdr *)&buf[elf->e_phoff];
-
-    for (i = 0; i < elf->e_phnum; i++) {
-        if ((phead[i].p_type == PT_INTERP)) {
-            char * exld = (char *)&buf[phead[i].p_offset];
-            if (g_debug) scope_printf("%s:%d exe ld.so: %s\n", __FUNCTION__, __LINE__, exld);
-
-            ldso = scope_strdup(exld);
-
-            break;
-        }
-    }
-
-    scope_munmap(buf, sbuf.st_size);
-    return ldso;
-}
-
-static void
-do_musl(char *exld, char *ldscope)
-{
-    char *lpath = NULL;
-    char *ldso = NULL;
-    char *path;
-    char dir[scope_strlen(ldscope) + 2];
-
-    // always set the env var
-    scope_strncpy(dir, ldscope, scope_strlen(ldscope) + 1);
-    path = scope_dirname(dir);
-    setEnvVariable(LD_LIB_ENV, path);
-
-    // does a link to the musl ld.so exist?
-    // if so, we assume the symlink exists as well.
-    if ((ldso = get_loader(ldscope)) == NULL) return;
-
-    // Avoid creating ld-musl-x86_64.so.1 -> /lib/ld-musl-x86_64.so.1
-    if (scope_strstr(ldso, "musl")) return;
-
-    if (scope_asprintf(&lpath, "%s/%s", path, basename(ldso)) == -1) {
-        scope_perror("do_musl:asprintf");
-        if (ldso) scope_free(ldso);
-        return;
-    }
-
-    // dir is expected to exist here, not creating one
-    if ((symlink((const char *)exld, lpath) == -1) &&
-        (errno != EEXIST)) {
-        scope_perror("do_musl:symlink");
-        if (ldso) scope_free(ldso);
-        if (lpath) scope_free(lpath);
-        return;
-    }
-
-    set_loader(ldscope);
-    set_library(libdirGetLibrary());
-
-    if (ldso) scope_free(ldso);
-    if (lpath) scope_free(lpath);
-}
-
-/*
- * Check for and handle the extra steps needed to run under musl libc.
- *
- * Returns 0 if musl was not detected and 1 if it was.
- */
-static int
-setup_loader(char *ldscope)
-{
-    int ret = 0; // not musl
-
-    char *ldso = NULL;
-
-    if (((ldso = get_loader(EXE_TEST_FILE)) != NULL) &&
-        (scope_strstr(ldso, LIBMUSL) != NULL)) {
-            // we are using the musl ld.so
-            do_musl(ldso, ldscope);
-            ret = 1; // detected musl
-    }
-
-    if (ldso) scope_free(ldso);
-
-    return ret;
-}
-
-static int
-patch_library(const char *so_path) {
-    int result = EXIT_FAILURE;
-
-    char *ldso = get_loader(EXE_TEST_FILE);
-    if (ldso && scope_strstr(ldso, LIBMUSL) != NULL) {
-        result = set_library(optarg);
-    }
-    scope_free(ldso);
-
-    return result;
-}
+#include "loaderop.h"
+#include "nsinfo.h"
+#include "nsfile.h"
+#include "ns.h"
+#include "setup.h"
 
 /* 
  * This avoids a segfault when code using shm_open() is compiled statically.
@@ -779,6 +344,24 @@ static const char scope_help_configuration[] =
 "        configuration to match the new settings, and deletes the\n"
 "        scope.<pid> file when it's complete.\n"
 "\n"
+"        While every environment variable defined here can be changed via\n"
+"        Dynamic Configuration, there are a few environment variable-style\n"
+"        commands that are only accepted during Dynamic Configuration.\n"
+"        These will be ignored if specified as actual environment variables.\n"
+"        They are listed here:\n"
+"            SCOPE_CMD_ATTACH\n"
+"                Flag that controls whether interposed functions are\n"
+"                processed by AppScope (true), or not (false).\n"
+"            SCOPE_CMD_DBG_PATH\n"
+"                Causes AppScope to write debug information to the\n"
+"                specified file path. Absolute paths are recommended.\n"
+"            SCOPE_CONF_RELOAD\n"
+"                Causes AppScope to reload its configuration file. If\n"
+"                the value is \"true\", it is reloaded according to the\n"
+"                Config File Resolution above. If any other value is\n"
+"                specified, it is handled like SCOPE_CONF_PATH, but without\n"
+"                the \"Used only at start time\" limitation.\n"
+"\n"
 "    Certificate Authority Resolution\n"
 "        If SCOPE_*_TLS_ENABLE and SCOPE_*_TLS_VALIDATE_SERVER are true then\n"
 "        AppScope performs TLS server validation. For this to be successful\n"
@@ -938,14 +521,22 @@ showUsage(char *prog)
       "\n"
       "usage: %s [OPTIONS] [--] EXECUTABLE [ARGS...]\n"
       "       %s [OPTIONS] --attach PID\n"
+      "       %s [OPTIONS] --detach PID\n"
+      "       %s [OPTIONS] --configure FILTER_PATH --namespace PID\n"
+      "       %s [OPTIONS] --service SERVICE --namespace PID\n"
       "\n"
       "options:\n"
-      "  -u, --usage           display this info\n"
-      "  -h, --help [SECTION]  display all or the specified help section\n"
-      "  -l, --libbasedir DIR  specify parent for the library directory (default: /tmp)\n"
-      "  -f DIR                alias for \"-l DIR\" for backward compatibility\n"
-      "  -a, --attach PID      attach to the specified process ID\n"
-      "  -p, --patch SO_FILE   patch specified libscope.so \n"
+      "  -u, --usage                  display this info\n"
+      "  -h, --help [SECTION]         display all or the specified help section\n"
+      "  -l, --libbasedir DIR         specify parent for the library directory (default: /tmp)\n"
+      "  -f DIR                       alias for \"-l DIR\" for backward compatibility\n"
+      "  -a, --attach PID             attach to the specified process ID\n"
+      "  -d, --detach PID             detach from the specified process ID\n"
+      "  -c, --configure FILTER_PATH  configure scope environment with FILTER_PATH\n"
+      "  -s, --service SERVICE        setup specified service NAME\n"
+      "  -n  --namespace PID          perform service/configure operation on specified container PID\n"
+      "  -p, --patch SO_FILE          patch specified libscope.so\n"
+      "  -r, --starthost              execute the scope start command in a host context with (must be run in the container)\n"
       "\n"
       "Help sections are OVERVIEW, CONFIGURATION, METRICS, EVENTS, and PROTOCOLS.\n"
       "\n"
@@ -956,27 +547,40 @@ showUsage(char *prog)
       "https://github.com/criblio/appscope. Please direct feature requests and\n"
       "defect reports there.\n"
       "\n",
-      SCOPE_VER, prog, prog
+      SCOPE_VER, prog, prog, prog, prog, prog
     );
     scope_fflush(scope_stdout);
 }
 
 // long aliases for short options
 static struct option opts[] = {
-    { "usage",      no_argument,       0, 'u'},
-    { "help",       optional_argument, 0, 'h' },
-    { "attach",     required_argument, 0, 'a' },
-    { "libbasedir", required_argument, 0, 'l' },
-    { "patch",      required_argument, 0, 'p' },
+    { "usage",      no_argument,          0, 'u'},
+    { "help",       optional_argument,    0, 'h' },
+    { "attach",     required_argument,    0, 'a' },
+    { "detach",     required_argument,    0, 'd' },
+    { "namespace",  required_argument,    0, 'n' },
+    { "configure",  required_argument,    0, 'c' },
+    { "service",    required_argument,    0, 's' },
+    { "libbasedir", required_argument,    0, 'l' },
+    { "patch",      required_argument,    0, 'p' },
+    { "starthost",  no_argument,          0, 'r' },
     { 0, 0, 0, 0 }
 };
 
 int
 main(int argc, char **argv, char **env)
 {
-    char *attachArg = 0;
+    char *attachArg = NULL;
+    char *configFilterPath = NULL;
+    char *serviceName = NULL;
+    char *nsPidArg = NULL; 
     char path[PATH_MAX] = {0};
-
+    int pid = -1;
+    char attachType = 'u';
+    uid_t eUid = scope_geteuid();
+    gid_t eGid = scope_getegid();
+    uid_t nsUid = eUid;
+    uid_t nsGid = eGid;
     // process command line
     for (;;) {
         int index = 0;
@@ -988,7 +592,7 @@ main(int argc, char **argv, char **env)
         // The initial `:` lets us handle options with optional values like
         // `-h` and `-h SECTION`.
         //
-        int opt = getopt_long(argc, argv, "+:uh:a:l:f:p:", opts, &index);
+        int opt = getopt_long(argc, argv, "+:uh:a:d:n:l:f:p:c:s:r", opts, &index);
         if (opt == -1) {
             break;
         }
@@ -1005,14 +609,35 @@ main(int argc, char **argv, char **env)
                 return EXIT_SUCCESS;
             case 'a':
                 attachArg = optarg;
+                attachType = 'a';
+                break;
+            case 'd':
+                attachArg = optarg;
+                attachType = 'd';
+                break;
+            case 'n':
+                nsPidArg = optarg;
+                break;
+            case 'c':
+                configFilterPath = optarg;
+                break;
+            case 's':
+                serviceName = optarg;
                 break;
             case 'f':
                 // accept -f as alias for -l for BC
             case 'l':
-                libdirSetBase(optarg);
+                if (libdirSetLibraryBase(optarg))
+                {
+                    return EXIT_FAILURE;
+                }
                 break;
             case 'p':
-                return patch_library(optarg);
+                return (loaderOpPatchLibrary(optarg) == PATCH_SUCCESS) ? EXIT_SUCCESS : EXIT_FAILURE;
+                break;
+            case 'r':
+                return nsHostStart();
+                break;
             case ':':
                 // options missing their value end up here
                 switch (optopt) {
@@ -1034,36 +659,193 @@ main(int argc, char **argv, char **env)
         }
     }
 
-    // either --attach or a command are required
-    if (!attachArg && optind >= argc) {
-        scope_fprintf(scope_stderr, "error: missing --attach option or EXECUTABLE argument\n");
+    // either --attach, --detach, --configure, --service or a command are required
+    if (!attachArg && !configFilterPath && !serviceName && optind >= argc) {
+        scope_fprintf(scope_stderr, "error: missing --attach, --detach, --configure, --service option or EXECUTABLE argument\n");
         showUsage(scope_basename(argv[0]));
         return EXIT_FAILURE;
     }
 
-    // use --attach, ignore executable and args
-    if (attachArg && optind < argc) {
-        scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --attach option\n");
+    if (attachArg && serviceName) {
+        scope_fprintf(scope_stderr, "error: --attach/--detach and --service cannot be used together\n");
+        showUsage(scope_basename(argv[0]));
+        return EXIT_FAILURE;
+    }
+
+    if (attachArg && configFilterPath) {
+        scope_fprintf(scope_stderr, "error: --attach/--detach and --configure cannot be used together\n");
+        showUsage(scope_basename(argv[0]));
+        return EXIT_FAILURE;
+    }
+
+    if (configFilterPath && serviceName) {
+        scope_fprintf(scope_stderr, "error: --configure and --service cannot be used together\n");
+        showUsage(scope_basename(argv[0]));
+        return EXIT_FAILURE;
+    }
+
+    if (nsPidArg && ((configFilterPath == NULL) && (serviceName == NULL))) {
+        scope_fprintf(scope_stderr, "error: --namespace option required --configure or --service option\n");
+        showUsage(scope_basename(argv[0]));
+        return EXIT_FAILURE;
+    }
+
+    // use --attach, --detach, --configure, --service ignore executable and args
+    if (optind < argc) {
+        if (attachArg) {
+            scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --attach, --detach option\n");
+        } else if (configFilterPath) {
+            scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --configure option\n");
+        } else if (serviceName) {
+            scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --service option\n");
+        }
+    }
+
+    if (serviceName) {
+        // must be root
+        if (eUid) {
+            scope_printf("error: --service requires root\n");
+            return EXIT_FAILURE;
+        }
+
+        pid_t pid = -1;
+        if (nsPidArg) {
+            pid = scope_atoi(nsPidArg);
+            if (pid < 1) {
+                scope_fprintf(scope_stderr, "error: invalid --namespace PID: %s\n", nsPidArg);
+                return EXIT_FAILURE;
+            }
+        }
+
+        if (pid == -1) {
+            // Service on Host
+            return setupService(serviceName, eUid, eGid);
+        } else {
+            // Service on Container
+            pid_t nsContainerPid = 0;
+            if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
+                (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
+                return nsService(pid, serviceName);
+            }
+        }
+        return EXIT_FAILURE;
+    }
+
+    if (configFilterPath) {
+        int status = EXIT_FAILURE;
+        // must be root
+        if (eUid) {
+            scope_printf("error: --configure requires root\n");
+            return EXIT_FAILURE;
+        }
+
+        pid_t pid = -1;
+        if (nsPidArg) {
+            pid = scope_atoi(nsPidArg);
+            if (pid < 1) {
+                scope_fprintf(scope_stderr, "error: invalid --namespace PID: %s\n", nsPidArg);
+                return EXIT_FAILURE;
+            }
+        }
+
+        size_t configFilterSize = 0;
+        void *confgFilterMem = setupLoadFileIntoMem(&configFilterSize, configFilterPath);
+        if (confgFilterMem == NULL) {
+            scope_fprintf(scope_stderr, "error: Load filter file into memory %s\n", configFilterPath);
+            return EXIT_FAILURE;
+        }
+
+        if (pid == -1) {
+            // Configure on Host
+            status = setupConfigure(confgFilterMem, configFilterSize, eUid, eGid);
+        } else {
+            // Configure on Container
+            pid_t nsContainerPid = 0;
+            if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
+                (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
+                status = nsConfigure(pid, confgFilterMem, configFilterSize);
+            }
+        }
+        if (confgFilterMem) {
+            scope_munmap(confgFilterMem, configFilterSize);
+        }
+
+        return status;
+    }
+
+    // perform namespace switch if required
+    if (attachArg) {
+        // target process must exist
+        pid = scope_atoi(attachArg);
+        if (pid < 1) {
+            scope_printf("error: invalid --attach, --detach PID: %s\n", attachArg);
+            return EXIT_FAILURE;
+        }
+
+        pid_t nsAttachPid = 0;
+
+        scope_snprintf(path, sizeof(path), "/proc/%d", pid);
+        if (scope_access(path, F_OK)) {
+            scope_printf("error: --attach, --detach PID not a current process: %d\n", pid);
+            return EXIT_FAILURE;
+        }
+
+        /*
+        * If the expected process exists in different PID namespace (container)
+        * we do a following switch context sequence:
+        * - load static loader file into memory
+        * - [optionally] save the configuration file pointed by SCOPE_CONF_PATH into memory
+        * - switch the namespace from parent
+        * - save previously loaded static loader into new namespace
+        * - [optionally] save previously loaded configuration file into new namespace
+        * - fork & execute static loader attach one more time with updated PID
+        */
+        if (nsInfoGetPidNs(pid, &nsAttachPid) == TRUE) {
+            // must be root to switch namespace
+            if (eUid) {
+                scope_printf("error: --attach requires root\n");
+                return EXIT_FAILURE;
+            }
+            return nsForkAndExec(pid, nsAttachPid, attachType);
+        /*
+        * Process can exists in same PID namespace but in different mnt namespace
+        * we do a simillar sequecne like above but without switching PID namespace
+        * and updating PID.
+        */
+        } else if (nsInfoIsPidInSameMntNs(pid) == FALSE) {
+            // must be root to switch namespace
+            if (eUid) {
+                scope_printf("error: --attach requires root\n");
+                return EXIT_FAILURE;
+            }
+            return nsForkAndExec(pid, pid, attachType);
+        }
+    }
+
+    if (pid != -1) {
+        nsUid = nsInfoTranslateUid(pid);
+        nsGid = nsInfoTranslateGid(pid);
     }
 
     // extract to the library directory
-    if (libdirExtractLoader()) {
+    if (libdirExtract(LOADER_FILE, nsUid, nsGid)) {
         scope_fprintf(scope_stderr, "error: failed to extract loader\n");
         return EXIT_FAILURE;
     }
 
-    if (libdirExtractLibrary()) {
+    if (libdirExtract(LIBRARY_FILE, nsUid, nsGid)) {
         scope_fprintf(scope_stderr, "error: failed to extract library\n");
         return EXIT_FAILURE;
     }
 
     // setup for musl libc if detected
-    char *loader = (char *)libdirGetLoader();
+    char *loader = (char *)libdirGetPath(LOADER_FILE);
     if (!loader) {
         scope_fprintf(scope_stderr, "error: failed to get a loader path\n");
         return EXIT_FAILURE;
     }
-    setup_loader(loader);
+
+    loaderOpSetupLoader(loader, nsUid, nsGid);
 
     // set SCOPE_EXEC_PATH to path to `ldscope` if not set already
     if (getenv("SCOPE_EXEC_PATH") == 0) {
@@ -1076,35 +858,17 @@ main(int argc, char **argv, char **env)
     }
 
     // create /dev/shm/scope_${PID}.env when attaching
-    if (attachArg) {
-        // must be root
-        if (scope_getuid()) {
-            scope_printf("error: --attach requires root\n");
-            return EXIT_FAILURE;
-        }
-
-        // target process must exist
-        int pid = scope_atoi(attachArg);
-        if (pid < 1) {
-            scope_printf("error: invalid --attach PID: %s\n", attachArg);
-            return EXIT_FAILURE;
-        }
-        scope_snprintf(path, sizeof(path), "/proc/%d", pid);
-        if (scope_access(path, F_OK)) {
-            scope_printf("error: --attach PID not a current process: %d\n", pid);
-            return EXIT_FAILURE;
-        }
+    if (attachArg && (attachType == 'a')) {
 
         // create .env file for the library to load
         scope_snprintf(path, sizeof(path), "/scope_attach_%d.env", pid);
-        int fd = scope_shm_open(path, O_RDWR|O_CREAT, S_IRUSR|S_IRGRP|S_IROTH);
+        int fd = nsFileShmOpen(path, O_RDWR|O_CREAT, S_IRUSR|S_IRGRP|S_IROTH, nsUid, nsGid, eUid, eGid);
         if (fd == -1) {
-            scope_perror("shm_open() failed");
+            scope_fprintf(scope_stderr, "nsFileShmOpen failed\n");
             return EXIT_FAILURE;
         }
-
         // add the env vars we want in the library
-        scope_dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetLibrary());
+        scope_dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetPath(LIBRARY_FILE));
 
         int i;
         for (i = 0; environ[i]; i++) {
@@ -1125,10 +889,14 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
-    execArgv[execArgc++] = (char *) libdirGetLoader();
+    execArgv[execArgc++] = (char *) libdirGetPath(LOADER_FILE);
 
     if (attachArg) {
-        execArgv[execArgc++] = "-a";
+        if (attachType == 'a') {
+            execArgv[execArgc++] = "-a";
+        } else {
+            execArgv[execArgc++] = "-d";
+        }
         execArgv[execArgc++] = attachArg;
     } else {
         while (optind < argc) {
@@ -1139,7 +907,7 @@ main(int argc, char **argv, char **env)
     execArgv[execArgc++] = NULL;
 
     // pass SCOPE_LIB_PATH in environment
-    if (setenv("SCOPE_LIB_PATH", libdirGetLibrary(), 1)) {
+    if (setenv("SCOPE_LIB_PATH", libdirGetPath(LIBRARY_FILE), 1)) {
         scope_perror("setenv(SCOPE_LIB_PATH) failed");
         return EXIT_FAILURE;
     }
@@ -1152,7 +920,7 @@ main(int argc, char **argv, char **env)
         return EXIT_FAILURE;
     }
 
-    execve(libdirGetLoader(), execArgv, environ);
+    execve(libdirGetPath(LOADER_FILE), execArgv, environ);
 
     scope_free(execArgv);
     scope_perror("execve failed");

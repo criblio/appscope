@@ -12,22 +12,33 @@ name: Deploy Website
 on:
   push:
     branches:
-      - master
+      - 'master'
     tags:
       - 'web*'
     paths:
       - 'website/**'
+      - 'docker/docs/layout.js'
+      - 'docker/docs/schema2md.js'
+      - 'docs/schemas/**'
 jobs:
   website:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - name: "Checkout Repository"
+        uses: actions/checkout@v3
+
+      - name: "Build schema-reference.md"
+        run: make docs-generate
+
       - name: "Website Deploy"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
-          GATSBY_ALGOLIA_APP_ID: ${{ secrets.GATSBY_ALGOLIA_APP_ID }}
-          GATSBY_ALGOLIA_SEARCH_KEY: ${{ secrets.GATSBY_ALGOLIA_SEARCH_KEY }}
-          ALGOLIA_ADMIN_KEY: ${{ secrets.ALGOLIA_ADMIN_KEY }}
+          STAGING_GATSBY_ALGOLIA_APP_ID: ${{ secrets.STAGING_GATSBY_ALGOLIA_APP_ID }}
+          STAGING_GATSBY_ALGOLIA_SEARCH_KEY: ${{ secrets.STAGING_GATSBY_ALGOLIA_SEARCH_KEY }}
+          STAGING_GATSBY_ALGOLIA_WRITE_KEY: ${{ secrets.STAGING_GATSBY_ALGOLIA_WRITE_KEY }}
+          PROD_GATSBY_ALGOLIA_APP_ID: ${{ secrets.PROD_GATSBY_ALGOLIA_APP_ID }}
+          PROD_GATSBY_ALGOLIA_SEARCH_KEY: ${{ secrets.PROD_GATSBY_ALGOLIA_SEARCH_KEY }}
+          PROD_GATSBY_ALGOLIA_WRITE_KEY: ${{ secrets.PROD_GATSBY_ALGOLIA_WRITE_KEY }}
         run: ./website/deploy.sh

@@ -465,6 +465,13 @@ Java_sun_security_ssl_SSLEngineImpl_unwrap(JNIEnv *jni, jobject obj, jobject src
     initJniGlobals(jni);
     initSSLEngineImplGlobals(jni);
 
+    if (g_cfg.funcs_attached == FALSE) {
+        //call the original method
+        jobject res = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl___unwrap, src, dsts, offset, len);
+        clearJniException(jni);
+        return res;
+    }
+
     jint fdVal = (uint64_t) (*jni)->GetIntField(jni, src, g_java.fid_ByteBuffer___fd);
     if (fdVal) {
         fd = fdVal;
@@ -541,6 +548,13 @@ Java_sun_security_ssl_SSLEngineImpl_wrap(JNIEnv *jni, jobject obj, jobjectArray 
     initJniGlobals(jni);
     initSSLEngineImplGlobals(jni);
 
+    if (g_cfg.funcs_attached == FALSE) {
+        //call the original method
+        jobject res = (*jni)->CallObjectMethod(jni, obj, g_java.mid_SSLEngineImpl___wrap, srcs, offset, len, dst);
+        clearJniException(jni);
+        return res;
+    }
+
     jint fdVal = (uint64_t) (*jni)->GetIntField(jni, dst, g_java.fid_ByteBuffer___fd);
     if (fdVal) {
         fd = fdVal;
@@ -611,6 +625,13 @@ Java_sun_security_ssl_AppOutputStream_write(JNIEnv *jni, jobject obj, jbyteArray
     initJniGlobals(jni);
     initAppOutputStreamGlobals(jni);
 
+    if (g_cfg.funcs_attached == FALSE) {
+        //call the original method
+        (*jni)->CallVoidMethod(jni, obj, g_java.mid_AppOutputStream___write, buf, offset, len);
+        clearJniException(jni);
+        return;
+    }
+
     jobject session;
     if (g_java.fid_AppOutputStream_socket != NULL) {
         jobject socket  = (*jni)->GetObjectField(jni, obj, g_java.fid_AppOutputStream_socket);
@@ -653,6 +674,13 @@ Java_sun_security_ssl_AppInputStream_read(JNIEnv *jni, jobject obj, jbyteArray b
 
     initJniGlobals(jni);
     initAppInputStreamGlobals(jni);
+
+    if (g_cfg.funcs_attached == FALSE) {
+        //call the original method
+        jint res = (*jni)->CallIntMethod(jni, obj, g_java.mid_AppInputStream___read, buf, offset, len);
+        clearJniException(jni);
+        return res;
+    }
 
     jobject session;
     if (g_java.fid_AppInputStream_socket != NULL) {
@@ -702,7 +730,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved)
     }
 
     jvmtiCapabilities capabilities;
-    memset(&capabilities,0, sizeof(capabilities));
+    scope_memset(&capabilities,0, sizeof(capabilities));
 
     capabilities.can_generate_all_class_hook_events = 1;
     error = (*env)->AddCapabilities(env, &capabilities);
@@ -718,7 +746,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved)
     }
    
     jvmtiEventCallbacks callbacks;
-    memset(&callbacks, 0, sizeof(callbacks));
+    scope_memset(&callbacks, 0, sizeof(callbacks));
     callbacks.ClassFileLoadHook = &ClassFileLoadHook;
     error = (*env)->SetEventCallbacks(env, &callbacks, sizeof(callbacks));
     if (error != JVMTI_ERROR_NONE) {

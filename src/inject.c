@@ -19,6 +19,13 @@
 #include "scopestdlib.h"
 #include "dbg.h"
 #include "inject.h"
+#include "os.h"
+
+typedef enum {
+    REM_CMD_DLOPEN,
+    REM_CMD_REATTACH,
+    REM_CMD_MAX
+} remote_cmd_t;
 
 #define __RTLD_DLOPEN	0x80000000
 
@@ -50,33 +57,8 @@ typedef struct {
     #define DBG_TRAP "brk #0 \n"
 #endif
 
-static uint64_t
-findLibrary(const char *library, pid_t pid)
-{
-    char filename[PATH_MAX];
-    char buffer[9076];
-    FILE *fd;
-    uint64_t addr = 0;
-
-    scope_snprintf(filename, sizeof(filename), "/proc/%d/maps", pid);
-    if ((fd = scope_fopen(filename, "r")) == NULL) {
-        scope_perror("fopen(/proc/PID/maps) failed");
-        return 0;
-    }
-
-    while(scope_fgets(buffer, sizeof(buffer), fd)) {
-        if (scope_strstr(buffer, library)) {
-            addr = scope_strtoull(buffer, NULL, 16);
-            break;
-        }
-    }
-
-    scope_fclose(fd);
-    return addr;
-}
-
 static int
-freeSpaceAddr(pid_t pid, uint64_t* addr_begin, uint64_t* free_size)
+freeSpaceAddr(pid_t pid, uint64_t *addr_begin, uint64_t *free_size)
 {
     FILE *fd;
     char filename[PATH_MAX];
@@ -147,7 +129,7 @@ ptraceAttach(pid_t target) {
     int waitpidstatus;
 
     if(scope_ptrace(PTRACE_ATTACH, target, NULL, NULL) == -1) {
-        scope_perror("ptrace(PTRACE_ATTACH) failed");
+        //scope_perror("ptrace(PTRACE_ATTACH) failed");
         return EXIT_FAILURE;
     }
 
@@ -160,7 +142,7 @@ ptraceAttach(pid_t target) {
 }
 
 static void
-call_dlopen(void)
+call_remfunc(void)
 {
 #ifdef __x86_64__
     asm(
@@ -176,10 +158,10 @@ call_dlopen(void)
 #endif
 }
 
-static void call_dlopen_end() {}
+static void call_remfunc_end() {}
 
 static int
-inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
+inject(pid_t pid, remote_cmd_t cmd, uint64_t remAddr, char *path, int glibc)
 {
     struct iovec my_iovec;
     struct user_regs_struct oldregs, regs;
@@ -188,14 +170,19 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
     int status;
     uint64_t freeAddr, codeAddr, freeAddrSize;
     char libpath[SCOPE_PATH_SIZE] = {0};
-    int libpathLen = scope_strlen(path) + 1;
+    int libpathLen;
     int ret = EXIT_FAILURE;
 
-    if (libpathLen > SCOPE_PATH_SIZE) {
-        scope_fprintf(scope_stderr, "library path %s is longer than %d, library could not be injected\n", path, SCOPE_PATH_SIZE);
-        goto exit;
+    if (cmd == REM_CMD_DLOPEN) {
+        if (!path) return ret;
+
+        libpathLen = scope_strlen(path) + 1;
+        if (libpathLen > SCOPE_PATH_SIZE) {
+            scope_fprintf(scope_stderr, "library path %s is longer than %d, library could not be injected\n", path, SCOPE_PATH_SIZE);
+            goto exit;
+        }
+        scope_strncpy(libpath, path, libpathLen);
     }
-    scope_strncpy(libpath, path, libpathLen);
 
     if (ptraceAttach(pid)) {
         goto exit;
@@ -226,25 +213,38 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
         goto detach;
     }
 
-    // write the path to the library 
-    if (ptraceWrite(pid, freeAddr, &libpath, SCOPE_PATH_SIZE)) {
-        goto restore_app;
-    }
+    // write the path to the library
+    if (cmd == REM_CMD_DLOPEN) {
+        if (ptraceWrite(pid, freeAddr, &libpath, SCOPE_PATH_SIZE)) {
+            goto restore_app;
+        }
 
-    // inject the code after offset the library path
-    codeAddr = freeAddr + SCOPE_PATH_SIZE + PATH_CODE_OFFSET;
-    if (ptraceWrite(pid, codeAddr, &call_dlopen, call_dlopen_end - call_dlopen)) {
-        goto restore_app;
+        // inject the code after offset the library path
+        codeAddr = freeAddr + SCOPE_PATH_SIZE + PATH_CODE_OFFSET;
+        if (ptraceWrite(pid, codeAddr, &call_remfunc, call_remfunc_end - call_remfunc)) {
+            goto restore_app;
+        }
+    } else if (cmd == REM_CMD_REATTACH) {
+        codeAddr = freeAddr;
+        if (ptraceWrite(pid, codeAddr, &call_remfunc, call_remfunc_end - call_remfunc)) {
+            goto restore_app;
+        }
+    } else {
+        scope_fprintf(scope_stderr, "error: %s: unrecognized remote command: %d\n", __FUNCTION__, cmd);
+        goto detach;
     }
 
     // set instruction pointer to point to the injected code
     IP_REG = codeAddr;
-    FUNC_REG = dlopenAddr;               // address of dlopen
-    FIRST_ARG_REG = freeAddr;            // dlopen's first arg - path to the library
-    SECOND_ARG_REG = RTLD_NOW;
-    // GNU ld.so uses a custom flag
-    if (glibc == TRUE) {
-        SECOND_ARG_REG |= __RTLD_DLOPEN;
+    FUNC_REG = remAddr;                      // address of remote function to call
+
+    if (cmd == REM_CMD_DLOPEN) {
+        FIRST_ARG_REG = freeAddr;            // dlopen's first arg - path to the library
+        SECOND_ARG_REG = RTLD_NOW;
+        // GNU ld.so uses a custom flag
+        if (glibc == TRUE) {
+            SECOND_ARG_REG |= __RTLD_DLOPEN;
+        }
     }
 
     my_iovec.iov_base = &regs;
@@ -278,16 +278,18 @@ inject(pid_t pid, uint64_t dlopenAddr, char *path, int glibc)
             scope_fprintf(scope_stderr, "error: ptrace get register(), library could not be injected\n");
             goto restore_app;
         }
-        if (RET_REG != 0x0) {
+
+        if (RET_REG != 0) {
             ret = EXIT_SUCCESS;
             //printf("Appscope library injected at %p\n", (void*)RET_REG);
         } else {
-            scope_fprintf(scope_stderr, "error: dlopen() failed, library could not be injected\n");
+            scope_fprintf(scope_stderr, "error: %s: remote function failed\n", __FUNCTION__);
         }
 
     } else {
         scope_fprintf(scope_stderr, "error: target process stopped with signal %d\n", WSTOPSIG(status));
     }
+
 restore_app:
     //restore the app's state
     ptraceWrite(pid, freeAddr, oldcode, INJECTED_CODE_SIZE_LEN);
@@ -319,7 +321,7 @@ findLib(struct dl_phdr_info *info, size_t size, void *data)
 }
 
 int 
-injectScope(int pid, char* path)
+injectScope(int pid, char *path)
 {
     uint64_t remoteLib, localLib;
     void *dlopenAddr = NULL;
@@ -344,8 +346,8 @@ injectScope(int pid, char* path)
     }
 
     // find the base address of libc in the target process
-    remoteLib = findLibrary(info.path, pid);
-    if (!remoteLib) {
+    remoteLib = osFindLibrary(info.path, pid, TRUE);
+    if ((remoteLib == 0) || (remoteLib == -1)) {
         scope_fprintf(scope_stderr, "error: failed to find libc in target process\n");
         return EXIT_FAILURE;
     }
@@ -354,6 +356,12 @@ injectScope(int pid, char* path)
     dlopenAddr = remoteLib + (dlopenAddr - localLib);
 
     // inject libscope.so into the target process
-    return inject(pid, (uint64_t) dlopenAddr, path, glibc);
+    return inject(pid, REM_CMD_DLOPEN, (uint64_t) dlopenAddr, path, glibc);
 }
 
+int
+injectFirstAttach(int pid, uint64_t remaddr)
+{
+    // execute the attach command in the target process
+    return inject(pid, REM_CMD_REATTACH, remaddr, NULL, 0);
+}

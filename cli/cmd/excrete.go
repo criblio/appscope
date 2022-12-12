@@ -6,6 +6,7 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
@@ -16,14 +17,10 @@ var excreteCmd = &cobra.Command{
 	Use:     "extract [flags] <dir>",
 	Aliases: []string{"excrete", "expunge", "extricate", "exorcise"},
 	Short:   "Output instrumentary library files to <dir>",
-	Long: `Extract outputs ldscope, libscope.so, and scope.yml to the provided directory. These files can configured
-to instrument any application and output the data to any existing tool using simple TCP protocols. With --metricdest and --eventdest, 
-scope.yml can be preconfigured for outputting to specific destinations. 
+	Long: `Outputs ldscope, libscope.so, and scope.yml to the provided directory. You can configure these files to instrument any application, and to output the data to any existing tool using simple TCP protocols.
 
 The --*dest flags accept file names like /tmp/scope.log or URLs like file:///tmp/scope.log. They may also
-be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.
-
-Libscope can easily be used with any dynamic or static application, regardless of the runtime.`,
+be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
 	Example: `scope extract /opt/libscope
 scope extract --metricdest tcp://some.host:8125 --eventdest tcp://other.host:10070 .
 `,
@@ -49,7 +46,8 @@ scope extract --metricdest tcp://some.host:8125 --eventdest tcp://other.host:100
 			err = rc.WriteScopeConfig(path.Join(outPath, "scope.yml"), 0644)
 			util.CheckErrSprintf(err, "error writing scope.yml: %v", err)
 		}
-		rc.Patch(outPath)
+		sL := loader.ScopeLoader{Path: path.Join(outPath, "ldscope")}
+		sL.Patch(path.Join(outPath, "libscope.so"))
 		fmt.Printf("Successfully extracted to %s.\n", outPath)
 	},
 }

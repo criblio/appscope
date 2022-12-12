@@ -80,7 +80,7 @@ void X509_ALGOR_set_md(X509_ALGOR *alg, const EVP_MD *md)
     else
         param_type = V_ASN1_NULL;
 
-    X509_ALGOR_set0(alg, OBJ_nid2obj(EVP_MD_type(md)), param_type, NULL);
+    X509_ALGOR_set0(alg, OBJ_nid2obj(EVP_MD_get_type(md)), param_type, NULL);
 
 }
 
@@ -98,7 +98,7 @@ int X509_ALGOR_cmp(const X509_ALGOR *a, const X509_ALGOR *b)
 int X509_ALGOR_copy(X509_ALGOR *dest, const X509_ALGOR *src)
 {
     if (src == NULL || dest == NULL)
-	return 0;
+        return 0;
 
     if (dest->algorithm)
          ASN1_OBJECT_free(dest->algorithm);
@@ -110,7 +110,7 @@ int X509_ALGOR_copy(X509_ALGOR *dest, const X509_ALGOR *src)
 
     if (src->algorithm)
         if ((dest->algorithm = OBJ_dup(src->algorithm)) == NULL)
-	    return 0;
+            return 0;
 
     if (src->parameter != NULL) {
         dest->parameter = ASN1_TYPE_new();
@@ -120,9 +120,9 @@ int X509_ALGOR_copy(X509_ALGOR *dest, const X509_ALGOR *src)
         /* Assuming this is also correct for a BOOL.
          * set does copy as a side effect.
          */
-        if (ASN1_TYPE_set1(dest->parameter, 
-              src->parameter->type, src->parameter->value.ptr) == 0)
-	    return 0;
+        if (ASN1_TYPE_set1(dest->parameter, src->parameter->type,
+                           src->parameter->value.ptr) == 0)
+            return 0;
     }
 
     return 1;

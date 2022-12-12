@@ -8,6 +8,29 @@ AppScope provides the fine-grained observability of a proxy/service mesh, withou
 
 It’s like [strace](https://github.com/strace/strace) meets [tcpdump](https://www.tcpdump.org/) – but with consumable output for events like file access, DNS, and network activity, and StatsD-style metrics for applications. AppScope can also look inside encrypted payloads, offering WAF-like visibility without proxying traffic.
 
+<br />
+<br />
+
+```mermaid
+graph LR
+    A[Application] --> B[libscope]
+    A[Application]--> C[libgnutls]
+    A[Application]--> D[libc]
+    C --> D
+    B --> D
+    B --> C
+    D --> I[Kernel]
+    B --> E[In-memory Queue]
+    E -.-> F[Reporting Thread]
+    F --> G[Network Destination]
+    F --> H[File System Destination]
+    style B fill:#f3ffec,stroke:#89db70
+    style E fill:#fafafa,stroke:#a6a6a6
+    style F fill:#fafafa,stroke:#a6a6a6
+    style G fill:#fafafa,stroke:#a6a6a6
+    style H fill:#fafafa,stroke:#a6a6a6
+```
+
 ## Get Started
 
 Before you begin, make sure that your environment meets AppScope [requirements](https://appscope.dev/docs/requirements).
@@ -69,12 +92,12 @@ We support building `x86_64` (amd64) or `aarch64` (arm64/v8) binaries by adding 
 
 On the [AppScope Website](https://appscope.dev/):
 
-- Check out the CLI [in more depth](https://appscope.dev/docs/quick-start-guide/).
+- Check out the CLI [in more depth](https://appscope.dev/docs/cli-using).
 - Get an [overview](https://appscope.dev/docs/how-works/) of AppScope beyond the CLI.
 - Discover what people are [doing](https://appscope.dev/docs/what-do-with-scope) with AppScope.
 - Review advanced [examples](https://appscope.dev/docs/examples-use-cases).
-- View the [Changelog](https://appscope.dev/docs/changelog) and [Known Issues](https://github.com/criblio/appscope/issues?q=is%3Aissue+is%3Aopen+label%3Aknown-issue).
-- See what happens when you [connect AppScope to Cribl LogStream](https://appscope.dev/docs/logstream-integration).
+- View the [Changelog](https://appscope.dev/docs/changelog) and [Known Issues](https://appscope.dev/docs/known-issues).
+- See what happens when you [connect AppScope to Cribl Stream or Cribl Edge](https://appscope.dev/docs/cribl-integration).
 
 The content on that site is built from the [website/](website/) directory in this project.
 

@@ -4,6 +4,27 @@ title: Known Issues
 
 # Known Issues
 
+## AppScope 1.2.0
+
+2022-11-09 - Feature Release
+
+As of this AppScope release, known issues include:
+
+- [#1153](https://github.com/criblio/appscope/issues/1153) After AppScope detaches from a process, `scope ps` still shows the process as scoped.
+  - **Fix:** Planned for 1.3 or sooner
+
+- [#1055](https://github.com/criblio/appscope/issues/1055) With certain combinations of mount and PID namespaces, AppScope fails to attach to a process. We have found two scenarios when attach will fail. One is when AppScope is on a host and the target process is in a container, making the mount namespaces different, but the process was started with `pid=host`, making the PID namespaces the same. Another is when both AppScope and the target process are on a host, making the PID namespaces the same, but the process is [configured](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#PrivateTmp=) as a service with `PrivateTmp` set to `true`, making the mount namespaces different.
+  - **Fix:** 1.2.1
+
+## AppScope 1.1.0
+
+2022-06-29 - Feaature Release
+
+As of this AppScope release, known issues include:
+
+- [#1017](https://github.com/criblio/appscope/issues/1017) **Updated description**: AppScope incorrectly handles the "peek" flag in interposed functions that receive network data. When a server "peeks" at the first byte of data, AppScope counts that byte twice, which breaks protocol detection. AppScope then fails to correctly produce HTTP events.
+  - **Fix:** 1.1.1, in [#1018](https://github.com/criblio/appscope/issues/1018)
+
 ## AppScope 1.0.3
 
 2022-04-12 - Maintenance Release
@@ -68,7 +89,7 @@ As of this AppScope pre-release, known issues include:
 - [#10](https://github.com/criblio/appscope/issues/10), [#165,](https://github.com/criblio/appscope/issues/165) Scoping the Docker executable is problematic.
   - **Fix:** 0.7
 
-- [#119](https://github.com/criblio/appscope/issues/119) HTTP 2 metrics and headers can be viewed only with [Cribl LogStream](https://cribl.io/product/).
+- [#119](https://github.com/criblio/appscope/issues/119) HTTP 2 metrics and headers can be viewed only with [Cribl LogStream](https://cribl.io/product/).
 
   - **Fix:** 0.8.0, in [#543](https://github.com/criblio/appscope/issues/543) 
 

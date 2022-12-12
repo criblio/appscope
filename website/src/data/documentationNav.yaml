@@ -8,7 +8,10 @@
 
     - name: Working With AppScope
       path: /docs/working-with
-      
+
+    - name: Events and Metrics in AppScope
+      path: /docs/events-and-metrics
+
     - name: Cool, but What Can I Do with It?
       path: /docs/what-do-with-scope
 
@@ -37,6 +40,9 @@
     - name: Using TLS for Secure Connections 
       path: /docs/tls
 
+    - name: Further Examples
+      path: /docs/examples-use-cases
+
     - name: Data Routing
       path: /docs/data-routing
 
@@ -47,6 +53,9 @@
   child: 
     - name: Config File
       path: /docs/config-file
+
+    - name: Filter File
+      path: /docs/filter-file
 
     - name: CLI Reference
       path: /docs/cli-reference

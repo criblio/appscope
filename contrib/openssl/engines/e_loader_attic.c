@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2016-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -9,10 +9,11 @@
 
 /* THIS ENGINE IS FOR TESTING PURPOSES ONLY. */
 
+/* This file has quite some overlap with providers/implementations/storemgmt/file_store.c */
+
 /* We need to use some engine deprecated APIs */
 #define OPENSSL_SUPPRESS_DEPRECATED
 
-/* #include "e_os.h" */
 #include <string.h>
 #include <sys/stat.h>
 #include <ctype.h>
@@ -33,6 +34,7 @@
 #include "internal/asn1.h"       /* For asn1_d2i_read_bio */
 #include "internal/o_dir.h"
 #include "internal/cryptlib.h"
+#include "crypto/ctype.h"        /* For ossl_isdigit */
 #include "crypto/pem.h"          /* For PVK and "blob" PEM headers */
 
 #include "e_loader_attic_err.c"
@@ -41,7 +43,6 @@ DEFINE_STACK_OF(OSSL_STORE_INFO)
 
 #ifdef _WIN32
 # define stat _stat
-# define strncasecmp _strnicmp
 #endif
 
 #ifndef S_ISDIR
@@ -72,8 +73,8 @@ static char *file_get_pass(const UI_METHOD *ui_method, char *pass,
     if ((prompt = UI_construct_prompt(ui, desc, info)) == NULL) {
         ATTICerr(0, ERR_R_MALLOC_FAILURE);
         pass = NULL;
-    } else if (!UI_add_input_string(ui, prompt, UI_INPUT_FLAG_DEFAULT_PWD,
-                                    pass, 0, maxsize - 1)) {
+    } else if (UI_add_input_string(ui, prompt, UI_INPUT_FLAG_DEFAULT_PWD,
+                                    pass, 0, maxsize - 1) <= 0) {
         ATTICerr(0, ERR_R_UI_LIB);
         pass = NULL;
     } else {
@@ -199,6 +200,7 @@ static OSSL_STORE_INFO *new_EMBEDDED(const char *new_pem_name,
         return NULL;
     }
 
+    data->blob = embedded;
     data->pem_name =
         new_pem_name == NULL ? NULL : OPENSSL_strdup(new_pem_name);
 
@@ -207,7 +209,6 @@ static OSSL_STORE_INFO *new_EMBEDDED(const char *new_pem_name,
         store_info_free(info);
         info = NULL;
     }
-    data->blob = embedded;
 
     return info;
 }
@@ -968,12 +969,12 @@ static OSSL_STORE_LOADER_CTX *file_open_ex
      * There's a special case if the URI also contains an authority, then
      * the full URI shouldn't be used as a path anywhere.
      */
-    if (strncasecmp(uri, "file:", 5) == 0) {
+    if (OPENSSL_strncasecmp(uri, "file:", 5) == 0) {
         const char *p = &uri[5];
 
         if (strncmp(&uri[5], "//", 2) == 0) {
             path_data_n--;           /* Invalidate using the full URI */
-            if (strncasecmp(&uri[7], "localhost/", 10) == 0) {
+            if (OPENSSL_strncasecmp(&uri[7], "localhost/", 10) == 0) {
                 p = &uri[16];
             } else if (uri[7] == '/') {
                 p = &uri[7];
@@ -1351,8 +1352,8 @@ static OSSL_STORE_INFO *file_try_read_msblob(BIO *bp, int *matchcount)
 
         if (BIO_buffer_peek(bp, peekbuf, sizeof(peekbuf)) <= 0)
             return 0;
-        if (!ossl_do_blob_header(&p, sizeof(peekbuf), &magic, &bitlen,
-                                 &isdss, &ispub))
+        if (ossl_do_blob_header(&p, sizeof(peekbuf), &magic, &bitlen,
+                                 &isdss, &ispub) <= 0)
             return 0;
     }
 
@@ -1448,6 +1449,7 @@ static int file_name_to_uri(OSSL_STORE_LOADER_CTX *ctx, const char *name,
 static int file_name_check(OSSL_STORE_LOADER_CTX *ctx, const char *name)
 {
     const char *p = NULL;
+    size_t len = strlen(ctx->_.dir.search_name);
 
     /* If there are no search criteria, all names are accepted */
     if (ctx->_.dir.search_name[0] == '\0')
@@ -1462,11 +1464,10 @@ static int file_name_check(OSSL_STORE_LOADER_CTX *ctx, const char *name)
     /*
      * First, check the basename
      */
-    if (strncasecmp(name, ctx->_.dir.search_name,
-                    sizeof(ctx->_.dir.search_name) - 1) != 0
-        || name[sizeof(ctx->_.dir.search_name) - 1] != '.')
+    if (OPENSSL_strncasecmp(name, ctx->_.dir.search_name, len) != 0
+        || name[len] != '.')
         return 0;
-    p = &name[sizeof(ctx->_.dir.search_name)];
+    p = &name[len + 1];
 
     /*
      * Then, if the expected type is a CRL, check that the extension starts

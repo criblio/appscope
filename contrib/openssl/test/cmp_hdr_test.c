@@ -161,22 +161,32 @@ static int test_HDR_set1_recipient(void)
 
 static int execute_HDR_update_messageTime_test(CMP_HDR_TEST_FIXTURE *fixture)
 {
-    struct tm hdrtm;
+    struct tm hdrtm, tmptm;
     time_t hdrtime, before, after, now;
 
     now = time(NULL);
-    before = mktime(gmtime(&now));
+    /*
+     * Trial and error reveals that passing the return value from gmtime
+     * directly to mktime in a mingw 32 bit build gives unexpected results. To
+     * work around this we take a copy of the return value first.
+     */
+    tmptm = *gmtime(&now);
+    before = mktime(&tmptm);
+
     if (!TEST_true(ossl_cmp_hdr_update_messageTime(fixture->hdr)))
         return 0;
     if (!TEST_true(ASN1_TIME_to_tm(fixture->hdr->messageTime, &hdrtm)))
         return 0;
 
     hdrtime = mktime(&hdrtm);
-    if (!TEST_true(before <= hdrtime))
+
+    if (!TEST_time_t_le(before, hdrtime))
         return 0;
     now = time(NULL);
-    after = mktime(gmtime(&now));
-    return TEST_true(hdrtime <= after);
+    tmptm = *gmtime(&now);
+    after = mktime(&tmptm);
+
+    return TEST_time_t_le(hdrtime, after);
 }
 
 static int test_HDR_update_messageTime(void)
@@ -480,10 +490,5 @@ int setup_tests(void)
     /* also tests internal function ossl_cmp_hdr_get_pvno(): */
     ADD_TEST(test_HDR_init_with_ref);
     ADD_TEST(test_HDR_init_with_subject);
-    /*
-     *  TODO make sure that total number of tests (here currently 24) is shown,
-     *  also for other cmp_*text.c. Currently the test drivers always show 1.
-     */
-
     return 1;
 }

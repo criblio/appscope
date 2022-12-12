@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2020-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -39,30 +39,33 @@ static int write_msblob(struct key2ms_ctx_st *ctx, OSSL_CORE_BIO *cout,
                         EVP_PKEY *pkey, int ispub)
 {
     BIO *out = ossl_bio_new_from_core_bio(ctx->provctx, cout);
-    int ret =
-        ispub ? i2b_PublicKey_bio(out, pkey) : i2b_PrivateKey_bio(out, pkey);
+    int ret;
+
+    if (out == NULL)
+        return 0;
+    ret = ispub ? i2b_PublicKey_bio(out, pkey) : i2b_PrivateKey_bio(out, pkey);
 
     BIO_free(out);
     return ret;
 }
 
 static int write_pvk(struct key2ms_ctx_st *ctx, OSSL_CORE_BIO *cout,
-                     EVP_PKEY *pkey,
-                     OSSL_PASSPHRASE_CALLBACK *pw_cb, void *pw_cbarg)
+                     EVP_PKEY *pkey)
 {
     BIO *out = NULL;
-    int ret = 0;
+    int ret;
+    OSSL_LIB_CTX *libctx = PROV_LIBCTX_OF(ctx->provctx);
 
     out = ossl_bio_new_from_core_bio(ctx->provctx, cout);
-    ret = i2b_PVK_bio(out, pkey, ctx->pvk_encr_level,
-                      ossl_pw_pem_password, &ctx->pwdata);
+    if (out == NULL)
+        return 0;
+    ret = i2b_PVK_bio_ex(out, pkey, ctx->pvk_encr_level,
+                         ossl_pw_pvk_password, &ctx->pwdata, libctx, NULL);
     BIO_free(out);
-
     return ret;
 }
 
 static OSSL_FUNC_encoder_freectx_fn key2ms_freectx;
-static OSSL_FUNC_encoder_gettable_params_fn key2ms_gettable_params;
 static OSSL_FUNC_encoder_does_selection_fn key2ms_does_selection;
 
 static struct key2ms_ctx_st *key2ms_newctx(void *provctx)
@@ -81,39 +84,8 @@ static void key2ms_freectx(void *vctx)
 {
     struct key2ms_ctx_st *ctx = vctx;
 
+    ossl_pw_clear_passphrase_data(&ctx->pwdata);
     OPENSSL_free(ctx);
-}
-
-static const OSSL_PARAM *key2ms_gettable_params(ossl_unused void *provctx)
-{
-    static const OSSL_PARAM gettables[] = {
-        { OSSL_ENCODER_PARAM_OUTPUT_TYPE, OSSL_PARAM_UTF8_PTR, NULL, 0, 0 },
-        OSSL_PARAM_END,
-    };
-
-    return gettables;
-}
-
-static int key2msblob_get_params(OSSL_PARAM params[])
-{
-    OSSL_PARAM *p;
-
-    p = OSSL_PARAM_locate(params, OSSL_ENCODER_PARAM_OUTPUT_TYPE);
-    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, "MSBLOB"))
-        return 0;
-
-    return 1;
-}
-
-static int key2pvk_get_params(OSSL_PARAM params[])
-{
-    OSSL_PARAM *p;
-
-    p = OSSL_PARAM_locate(params, OSSL_ENCODER_PARAM_OUTPUT_TYPE);
-    if (p != NULL && !OSSL_PARAM_set_utf8_ptr(p, "PVK"))
-        return 0;
-
-    return 1;
 }
 
 static const OSSL_PARAM *key2pvk_settable_ctx_params(ossl_unused void *provctx)
@@ -186,8 +158,10 @@ static int key2pvk_encode(void *vctx, const void *key, int selection,
     if ((selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) == 0)
         return 0;                /* Error */
 
-    if ((pkey = EVP_PKEY_new()) != NULL && set1_key(pkey, key))
-        ok = write_pvk(ctx, cout, pkey, pw_cb, pw_cbarg);
+    if ((pkey = EVP_PKEY_new()) != NULL && set1_key(pkey, key)
+        && (pw_cb == NULL
+            || ossl_pw_set_ossl_passphrase_cb(&ctx->pwdata, pw_cb, pw_cbarg)))
+        ok = write_pvk(ctx, cout, pkey);
     EVP_PKEY_free(pkey);
     return ok;
 }
@@ -239,10 +213,6 @@ static int key2pvk_encode(void *vctx, const void *key, int selection,
           (void (*)(void))key2ms_newctx },                                    \
         { OSSL_FUNC_ENCODER_FREECTX,                                          \
           (void (*)(void))key2ms_freectx },                                   \
-        { OSSL_FUNC_ENCODER_GETTABLE_PARAMS,                                  \
-          (void (*)(void))key2ms_gettable_params },                           \
-        { OSSL_FUNC_ENCODER_GET_PARAMS,                                       \
-          (void (*)(void))key2##output##_get_params },                        \
         output##_set_params                                                   \
         { OSSL_FUNC_ENCODER_DOES_SELECTION,                                   \
           (void (*)(void))key2ms_does_selection },                            \

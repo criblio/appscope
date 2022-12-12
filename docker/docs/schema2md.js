@@ -50,7 +50,7 @@ function parseProperties({ name, properties = {}, required = [], baseProps = fal
     ];
     if (value.enum) {
       description.push(
-        '**Possible values:**<ul>' + value.enum.map(v => `<li>\`${v}\`</li>`).join('') + '</ul>'
+        `**Possible values:**<ul style="column-count: ${Math.ceil(value.enum.length / 20)};">${value.enum.map(v => `<li>\`${v}\`</li>`).join('')}</ul>`
       );
     }
     if (value.const) {

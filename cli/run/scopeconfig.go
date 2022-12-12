@@ -31,6 +31,26 @@ func (c *Config) SetDefault() error {
 				Path:          filepath.Join(c.WorkDir, "metrics.json"),
 				Buffering:     "line",
 			},
+			Watch: []libscope.ScopeMetricWatchConfig{
+				{
+					WatchType: "fs",
+				},
+				{
+					WatchType: "net",
+				},
+				{
+					WatchType: "http",
+				},
+				{
+					WatchType: "dns",
+				},
+				{
+					WatchType: "process",
+				},
+				{
+					WatchType: "statsd",
+				},
+			},
 		},
 		Event: libscope.ScopeEventConfig{
 			Enable: true,
@@ -42,16 +62,17 @@ func (c *Config) SetDefault() error {
 				Path:          filepath.Join(c.WorkDir, "events.json"),
 				Buffering:     "line",
 			},
-			Watch: []libscope.ScopeWatchConfig{
+			Watch: []libscope.ScopeEventWatchConfig{
 				{
 					WatchType: "file",
 					Name:      scopeLogRegex(),
 					Value:     ".*",
 				},
 				{
-					WatchType: "console",
-					Name:      "(stdout|stderr)",
-					Value:     ".*",
+					WatchType:   "console",
+					Name:        "(stdout|stderr)",
+					Value:       ".*",
+					AllowBinary: "false",
 				},
 				{
 					WatchType: "net",
@@ -245,6 +266,17 @@ func (c *Config) configFromRunOpts() error {
 		if err != nil {
 			return err
 		}
+	}
+
+	if c.LogDest != "" {
+		err := parseDest(&c.sc.Libscope.Log.Transport, c.LogDest)
+		if err != nil {
+			return err
+		}
+	}
+
+	if c.CommandDir != "" {
+		c.sc.Libscope.CommandDir = c.CommandDir
 	}
 
 	// Add AuthToken to config regardless of cribldest being set

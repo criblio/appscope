@@ -1,5 +1,5 @@
 #! /usr/bin/env perl
-# Copyright 2015-2021 The OpenSSL Project Authors. All Rights Reserved.
+# Copyright 2015-2022 The OpenSSL Project Authors. All Rights Reserved.
 #
 # Licensed under the Apache License 2.0 (the "License").  You may not use
 # this file except in compliance with the License.  You can obtain a copy
@@ -11,7 +11,8 @@ use strict;
 use warnings;
 
 use File::Spec::Functions qw/canonpath/;
-use OpenSSL::Test qw/:DEFAULT srctop_file ok_nofips/;
+use File::Copy;
+use OpenSSL::Test qw/:DEFAULT srctop_file bldtop_dir ok_nofips with/;
 use OpenSSL::Test::Utils;
 
 setup("test_verify");
@@ -28,7 +29,7 @@ sub verify {
     run(app([@args]));
 }
 
-plan tests => 155;
+plan tests => 163;
 
 # Canonical success
 ok(verify("ee-cert", "sslserver", ["root-cert"], ["ca-cert"]),
@@ -308,6 +309,35 @@ SKIP: {
               ["ca-cert-ec-named"]),
         "accept named curve leaf with named curve intermediate");
 }
+# Same as above but with base provider used for decoding
+SKIP: {
+    my $no_fips = disabled('fips') || ($ENV{NO_FIPS} // 0);
+    my $provconf = srctop_file("test", "fips-and-base.cnf");
+    my $provpath = bldtop_dir("providers");
+    my @prov = ("-provider-path", $provpath);
+
+    skip "EC is not supported or FIPS is disabled", 3
+        if disabled("ec") || $no_fips;
+
+    run(test(["fips_version_test", "-config", $provconf, ">3.0.0"]),
+             capture => 1, statusvar => \my $exit);
+    skip "FIPS provider version is too old", 3
+        if !$exit;
+
+    $ENV{OPENSSL_CONF} = $provconf;
+
+    ok(!verify("ee-cert-ec-explicit", "", ["root-cert"],
+               ["ca-cert-ec-named"], @prov),
+        "reject explicit curve leaf with named curve intermediate w/fips");
+    ok(!verify("ee-cert-ec-named-explicit", "", ["root-cert"],
+               ["ca-cert-ec-explicit"], @prov),
+        "reject named curve leaf with explicit curve intermediate w/fips");
+    ok(verify("ee-cert-ec-named-named", "", ["root-cert"],
+              ["ca-cert-ec-named"], @prov),
+        "accept named curve leaf with named curve intermediate w/fips");
+
+    delete $ENV{OPENSSL_CONF};
+}
 
 # Depth tests, note the depth limit bounds the number of CA certificates
 # between the trust-anchor and the leaf, so, for example, with a root->ca->leaf
@@ -335,6 +365,9 @@ ok(verify("alt3-cert", "", ["root-cert"], ["ncca1-cert", "ncca3-cert"], ),
 
 ok(verify("goodcn1-cert", "", ["root-cert"], ["ncca1-cert"], ),
    "Name Constraints CNs permitted");
+
+ok(verify("goodcn2-cert", "", ["root-cert"], ["ncca1-cert"], ),
+   "Name Constraints CNs permitted - no SAN extension");
 
 ok(!verify("badcn1-cert", "", ["root-cert"], ["ncca1-cert"], ),
    "Name Constraints CNs not permitted");
@@ -369,6 +402,14 @@ ok(!verify("badalt9-cert", "", ["root-cert"], ["ncca1-cert", "ncca3-cert"], ),
 ok(!verify("badalt10-cert", "", ["root-cert"], ["ncca1-cert", "ncca3-cert"], ),
    "Name constraints nested DNS name excluded");
 
+#Check that we get the expected failure return code
+with({ exit_checker => sub { return shift == 2; } },
+     sub {
+         ok(verify("bad-othername-namec", "", ["bad-othername-namec-inter"], [],
+                   "-partial_chain", "-attime", "1623060000"),
+            "Name constraints bad othername name constraint");
+     });
+
 ok(verify("ee-pss-sha1-cert", "", ["root-cert"], ["ca-cert"], "-auth_level", "0"),
     "Accept PSS signature using SHA1 at auth level 0");
 
@@ -402,12 +443,14 @@ ok(verify("some-names2", "", ["many-constraints"], ["many-constraints"], ),
 ok(verify("root-cert-rsa2", "", ["root-cert-rsa2"], [], "-check_ss_sig"),
     "Public Key Algorithm rsa instead of rsaEncryption");
 
-ok(verify("ee-self-signed", "", ["ee-self-signed"], []),
+ok(verify("ee-self-signed", "", ["ee-self-signed"], [], "-attime", "1593565200"),
    "accept trusted self-signed EE cert excluding key usage keyCertSign");
+ok(verify("ee-ss-with-keyCertSign", "", ["ee-ss-with-keyCertSign"], []),
+   "accept trusted self-signed EE cert with key usage keyCertSign also when strict");
 
 SKIP: {
     skip "Ed25519 is not supported by this OpenSSL build", 6
-	      if disabled("ec");
+        if disabled("ec");
 
     # ED25519 certificate from draft-ietf-curdle-pkix-04
     ok(verify("ee-ed25519", "", ["root-ed25519"], []),
@@ -437,4 +480,36 @@ SKIP: {
        "SM2 ID test");
    ok_nofips(verify("sm2", "", ["sm2-ca-cert"], [], "-vfyopt", "hexdistid:31323334353637383132333435363738"),
        "SM2 hex ID test");
+}
+
+# Mixed content tests
+my $cert_file = srctop_file('test', 'certs', 'root-cert.pem');
+my $rsa_file = srctop_file('test', 'certs', 'key-pass-12345.pem');
+
+SKIP: {
+    my $certplusrsa_file = 'certplusrsa.pem';
+    my $certplusrsa;
+
+    skip "Couldn't create certplusrsa.pem", 1
+        unless ( open $certplusrsa, '>', $certplusrsa_file
+                 and copy($cert_file, $certplusrsa)
+                 and copy($rsa_file, $certplusrsa)
+                 and close $certplusrsa );
+
+    ok(run(app([ qw(openssl verify -trusted), $certplusrsa_file, $cert_file ])),
+       'Mixed cert + key file test');
+}
+
+SKIP: {
+    my $rsapluscert_file = 'rsapluscert.pem';
+    my $rsapluscert;
+
+    skip "Couldn't create rsapluscert.pem", 1
+        unless ( open $rsapluscert, '>', $rsapluscert_file
+                 and copy($rsa_file, $rsapluscert)
+                 and copy($cert_file, $rsapluscert)
+                 and close $rsapluscert );
+
+    ok(run(app([ qw(openssl verify -trusted), $rsapluscert_file, $cert_file ])),
+       'Mixed key + cert file test');
 }

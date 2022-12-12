@@ -40,7 +40,39 @@ echo "    Command Line Options Test"
 echo "================================="
 
 run ./bin/linux/${ARCH}/ldscope
-outputs "error: missing --attach option or EXECUTABLE"
+outputs "error: missing --attach, --detach, --configure, --service option or EXECUTABLE argument"
+outputs "Cribl AppScope"
+returns 1
+
+run ./bin/linux/${ARCH}/ldscope -n
+outputs "missing required value for -n option"
+returns 1
+
+run ./bin/linux/${ARCH}/ldscope -n 1 ls
+outputs "error: --namespace option required --configure or --service option"
+outputs "Cribl AppScope"
+returns 1
+
+run ./bin/linux/${ARCH}/ldscope -c
+outputs "missing required value for -c option"
+returns 1
+
+run ./bin/linux/${ARCH}/ldscope -s
+outputs "missing required value for -s option"
+returns 1
+
+run ./bin/linux/${ARCH}/ldscope -s dummy_service_value -c dummy_filter_value
+outputs "error: --configure and --service cannot be used together"
+outputs "Cribl AppScope"
+returns 1
+
+run ./bin/linux/${ARCH}/ldscope -a dummy_service_value -s 1
+outputs "error: --attach/--detach and --service cannot be used together"
+outputs "Cribl AppScope"
+returns 1
+
+run ./bin/linux/${ARCH}/ldscope -c dummy_filter_value -a 1
+outputs "error: --attach/--detach and --configure cannot be used together"
 outputs "Cribl AppScope"
 returns 1
 
@@ -112,18 +144,12 @@ outputs "missing required value for -l option"
 returns 1
 
 run ./bin/linux/${ARCH}/ldscope -l /does_not_exist echo 
-outputs "No such file or directory"
-outputs "failed to extract"
 returns 1
 
 run ./bin/linux/${ARCH}/ldscope --libbasedir /does_not_exist echo 
-outputs "No such file or directory"
-outputs "failed to extract"
 returns 1
 
 run ./bin/linux/${ARCH}/ldscope -f /does_not_exist echo 
-outputs "No such file or directory"
-outputs "failed to extract"
 returns 1
 
 run ./bin/linux/${ARCH}/ldscope -a 
@@ -133,21 +159,22 @@ returns 1
 if [ "0" == "$(id -u)" ]; then
 
     run ./bin/linux/${ARCH}/ldscope -a not_a_pid
-    outputs "invalid --attach PID"
+    outputs "invalid --attach, --detach PID"
     returns 1
 
     run ./bin/linux/${ARCH}/ldscope -a -999
-    outputs "invalid --attach PID"
+    outputs "invalid --attach, --detach PID"
     returns 1
 
     run ./bin/linux/${ARCH}/ldscope -a 999999999
-    outputs "error: --attach PID not a current process"
+    outputs "error: --attach, --detach PID not a current process"
     returns 1
 
 else 
 
+    # we don't require root unless the pid exists and libscope is not present in the maps file
     run ./bin/linux/${ARCH}/ldscope -a 999999999
-    outputs "error: --attach requires root"
+    outputs "error: --attach, --detach PID not a current process"
     returns 1
 
 fi
@@ -157,7 +184,7 @@ outputs foo
 returns 0
 
 run ./bin/linux/${ARCH}/ldscopedyn
-outputs "missing --attach or EXECUTABLE"
+outputs "missing --attach, --detach or EXECUTABLE"
 returns 1
 
 run ./bin/linux/${ARCH}/ldscopedyn -z 
@@ -195,7 +222,7 @@ export -n SCOPE_LIB_PATH
 
 export SCOPE_LIB_PATH=./lib/linux/${ARCH}/libscope.so
 run ./bin/linux/${ARCH}/ldscopedyn -a 999999999 echo
-outputs "ignoring EXECUTABLE argument with --attach option"
+outputs "ignoring EXECUTABLE argument with --attach, --detach option"
 returns 1
 export -n SCOPE_LIB_PATH
 

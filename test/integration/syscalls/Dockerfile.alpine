@@ -1,4 +1,4 @@
-FROM alpine:3.15
+FROM alpine:3.16.1
 
 RUN apk add bash python3 py3-pip wget patch
 RUN pip3 install virtualenv
@@ -17,7 +17,7 @@ RUN cd /opt/test && \
       patch -p1 < /opt/test/ltp_p1.patch && \
       make autotools && \
       ./configure && \
-      make -j
+      make -j"$(nproc)"
 
 RUN virtualenv -p python3 /opt/test-runner/
 
@@ -31,7 +31,7 @@ ENV SCOPE_EVENT_METRIC=true
 ENV SCOPE_EVENT_HTTP=true
 
 COPY ./syscalls/altp /opt/test/altp
-RUN cd /opt/test/altp && make -j
+RUN cd /opt/test/altp && make -j"$(nproc)"
 
 COPY ./test_runner/requirements.txt /opt/test-runner/requirements.txt
 RUN /opt/test-runner/bin/pip install -r /opt/test-runner/requirements.txt
@@ -40,7 +40,7 @@ COPY ./test_runner /opt/test-runner/
 COPY ./syscalls/syscall_tests_conf.json /opt/test-runner/syscall_tests_conf.json
 
 # # # Switching to Python 3.8 required this hack. Not sure where the kafka packages are coming from.
-RUN sed -i 's/\basync\b/is_async/g' /opt/test-runner/lib/python3.9/site-packages/kafka/producer/*.py
+RUN sed -i 's/\basync\b/is_async/g' /opt/test-runner/lib/python3.10/site-packages/kafka/producer/*.py
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
 COPY scope-profile.sh /etc/profile.d/scope.sh

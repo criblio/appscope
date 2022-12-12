@@ -31,6 +31,7 @@ extern void*  scopelibc_memcpy(void *, const void *, size_t);
 extern int    scopelibc_mlock(const void *, size_t);
 extern int    scopelibc_msync(void *, size_t, int);
 extern int    scopelibc_mincore(void *, size_t, unsigned char *);
+extern int    scopelibc_memfd_create(const char *, unsigned int);
 
 // File handling operations
 extern FILE*          scopelibc_fopen(const char *, const char *);
@@ -54,6 +55,7 @@ extern int            scopelibc_access(const char *, int);
 extern FILE*          scopelibc_fmemopen(void *, size_t, const char *);
 extern long           scopelibc_ftell(FILE *);
 extern int            scopelibc_fseek(FILE *, long, int);
+extern off_t          scopelibc_lseek(int, off_t, int);
 extern int            scopelibc_unlink(const char *);
 extern int            scopelibc_dup2(int, int);
 extern char*          scopelibc_basename(char *);
@@ -146,6 +148,7 @@ extern uint16_t        scopelibc_htons(uint16_t);
 extern int           scopelibc_atoi(const char *);
 extern int           scopelibc_isspace(int);
 extern int           scopelibc_isprint(int);
+extern int           scopelibc_isdigit(int);
 extern void          scopelibc_perror(const char*);
 extern int           scopelibc_gettimeofday(struct timeval *, struct timezone *);
 extern int           scopelibc_timer_create(clockid_t, struct sigevent *, timer_t *);
@@ -171,6 +174,10 @@ extern int           scopelibc_getpwuid_r(uid_t, struct passwd *, char *, size_t
 extern pid_t         scopelibc_getpid(void);
 extern pid_t         scopelibc_getppid(void);
 extern uid_t         scopelibc_getuid(void);
+extern uid_t         scopelibc_geteuid(void);
+extern gid_t         scopelibc_getegid(void);
+extern int           scopelibc_seteuid(uid_t);
+extern int           scopelibc_setegid(gid_t);
 extern gid_t         scopelibc_getgid(void);
 extern void*         scopelibc_dlopen(const char *, int);
 extern int           scopelibc_dlclose(void *);
@@ -198,6 +205,13 @@ extern int           scopelibc_shmget(key_t, size_t, int);
 extern int           scopelibc_sched_getcpu(void);
 extern long          scopelibc_random(void);
 extern void          scopelibc_srandom(unsigned int);
+extern int           scopelibc_rand(void);
+extern void          scopelibc_srand(unsigned int);
+extern int           scopelibc_ftruncate(int, off_t);
+extern int           scopelibc_setns(int, int);
+extern int           scopelibc_chown(const char *, uid_t, gid_t);
+extern int           scopelibc_fchown(int, uid_t, gid_t);
+extern int           scopelibc_symlink(const char *, const char *);
 
 static int g_go_static;
 
@@ -317,6 +331,11 @@ scope_msync(void *addr, size_t length, int flags) {
 }
 
 int
+scope_memfd_create(const char *name, unsigned int flags) {
+    return scopelibc_memfd_create(name, flags);
+}
+
+int
 scope_mincore(void *addr, size_t length, unsigned char *vec) {
     return scopelibc_mincore(addr, length, vec);
 }
@@ -424,6 +443,11 @@ scope_ftell(FILE *stream) {
 int
 scope_fseek(FILE *stream, long offset, int whence) {
     return scopelibc_fseek(stream, offset, whence);
+}
+
+off_t
+scope_lseek(int fd, off_t offset, int whence) {
+    return scopelibc_lseek(fd, offset, whence);
 }
 
 int
@@ -863,6 +887,11 @@ scope_isprint(int c) {
     return scopelibc_isprint(c);
 }
 
+int
+scope_isdigit(int c) {
+    return scopelibc_isdigit(c);
+}
+
 void
 scope_perror(const char *s) {
     scopelibc_perror(s);
@@ -981,6 +1010,26 @@ scope_getppid(void) {
 uid_t
 scope_getuid(void) {
     return scopelibc_getuid();
+}
+
+uid_t
+scope_geteuid(void) {
+    return scopelibc_geteuid();
+}
+
+gid_t
+scope_getegid(void) {
+    return scopelibc_getegid();
+}
+
+int
+scope_seteuid(uid_t euid) {
+    return scopelibc_seteuid(euid);
+}
+
+int
+scope_setegid(gid_t egid) {
+    return scopelibc_setegid(egid);
 }
 
 gid_t
@@ -1124,6 +1173,44 @@ scope_srandom(unsigned int seed) {
 }
 
 int
+scope_rand(void)
+{
+    return scopelibc_rand();
+}
+
+void
+scope_srand(unsigned int seed)
+{
+    scopelibc_srand(seed);
+}
+
+int
+scope_ftruncate(int fildes, off_t length) {
+    return scopelibc_ftruncate(fildes, length);
+}
+
+int
+scope_setns(int fd, int nstype)
+{
+    return scopelibc_setns(fd, nstype);
+}
+
+int
+scope_chown(const char *pathname, uid_t owner, gid_t group) {
+    return scopelibc_chown(pathname, owner, group);
+}
+
+int
+scope_fchown(int fd, uid_t owner, gid_t group) {
+    return scopelibc_fchown(fd, owner, group);
+}
+
+int
+scope_symlink(const char *target, const char *linkpath) {
+    return scopelibc_symlink(target, linkpath);
+}
+
+int
 scope___snprintf_chk(char *str, size_t maxlen, int flag, size_t slen, const char * format, ...)
 {
     int ret;
@@ -1156,3 +1243,17 @@ scope__iso99_sscanf(const char *restrict s, const char *restrict fmt, ...)
     va_end(ap);
     return ret;
 }
+
+unsigned short **
+scope___ctype_b_loc (void)
+{
+    return scopelibc___ctype_b_loc();
+}
+
+int32_t **
+scope___ctype_tolower_loc(void)
+{
+    return scopelibc___ctype_tolower_loc();
+}
+
+

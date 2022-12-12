@@ -173,8 +173,10 @@ jsonProcessObject(proc_id_t *proc)
         if (!(cJSON_AddStringToObjLN(root, "cmd", proc->cmd))) goto err;
     }
     if (!(cJSON_AddStringToObjLN(root, "id", proc->id))) goto err;
-    // starttime
-
+    if (!(cJSON_AddStringToObjLN(root, "cgroup", proc->cgroup))) goto err;
+    if (!(cJSON_AddStringToObjLN(root, "machine_id", proc->machine_id))) goto err;
+    if (!(cJSON_AddStringToObjLN(root, "uuid", proc->uuid))) goto err;
+ 
     return root;
 err:
     if (root) cJSON_Delete(root);
@@ -203,9 +205,20 @@ err:
 static cJSON *
 jsonEnvironmentObject()
 {
-    return cJSON_CreateObject();
-    // config file???
-    // env variables???
+    cJSON* root = NULL;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    char *env_cribl_k8s_pod = getenv("CRIBL_K8S_POD");
+    if (env_cribl_k8s_pod) {
+        if (!cJSON_AddStringToObjLN(root, "CRIBL_K8S_POD",
+                                        env_cribl_k8s_pod)) goto err;
+    }
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
 }
 
 void

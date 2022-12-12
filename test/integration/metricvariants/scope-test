@@ -81,7 +81,6 @@ declare -a curl_net_events=(
 
 declare -a curl_http_metrics=(
 "http.req:"
-"http.resp.content_length:"
 "http.duration.client:"
 )
 
@@ -225,7 +224,7 @@ endtest
 
 starttest disable_all_metrics_with_variants
 
-SCOPE_EVENT_ENABLE=false SCOPE_METRIC_FS=false SCOPE_METRIC_NET=false SCOPE_METRIC_HTTP=false SCOPE_METRIC_PROC=false ldscope -- curl https://cribl.io -o /dev/null
+SCOPE_EVENT_ENABLE=false SCOPE_METRIC_FS=false SCOPE_METRIC_NET=false SCOPE_METRIC_HTTP=false SCOPE_METRIC_PROC=false SCOPE_METRIC_DNS=false ldscope -- curl https://cribl.io -o /dev/null
 ERR+=$?
 
 # check if metric file is empty

@@ -99,8 +99,8 @@ typedef struct {
 } switch_map_t;
 
 static switch_map_t switch_map[] = {
-    {"redirect-on",      URL_REDIRECT_ON},
-    {"redirect-off",     URL_REDIRECT_OFF},
+    {"detach",           FUNC_DETACH},
+    {"attach",           FUNC_ATTACH},
     {NULL,               NO_ACTION}
 };
 
@@ -610,7 +610,7 @@ ctlCreate()
     }
 
     ctl->enhancefs = DEFAULT_ENHANCE_FS;
-    ctl->allow_binary_console = checkEnv("SCOPE_ALLOW_BINARY_CONSOLE", "true");
+    ctl->allow_binary_console = DEFAULT_ALLOW_BINARY_CONSOLE;
 
     ctl->payload.enable = DEFAULT_PAYLOAD_ENABLE;
     ctl->payload.dir = (DEFAULT_PAYLOAD_DIR) ? scope_strdup(DEFAULT_PAYLOAD_DIR) : NULL;
@@ -1126,7 +1126,7 @@ ctlNeedsConnection(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportNeedsConnection(ctl->paytrans) :
         transportNeedsConnection(ctl->transport);
 }
@@ -1136,7 +1136,7 @@ ctlConnection(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportConnection(ctl->paytrans) :
         transportConnection(ctl->transport);
 }
@@ -1145,7 +1145,8 @@ int
 ctlConnect(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+
+    return (who == CFG_LS) ?
         transportConnect(ctl->paytrans) :
         transportConnect(ctl->transport);
 }
@@ -1155,7 +1156,7 @@ ctlConnectAttempts(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportConnectAttempts(ctl->paytrans) :
         transportConnectAttempts(ctl->transport);
 }
@@ -1165,7 +1166,7 @@ ctlDisconnect(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportDisconnect(ctl->paytrans) :
         transportDisconnect(ctl->transport);
 }
@@ -1175,7 +1176,7 @@ ctlReconnect(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportReconnect(ctl->paytrans) :
         transportReconnect(ctl->transport);
 }
@@ -1185,7 +1186,7 @@ ctlTransportFailureReason(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportFailureReason(ctl->paytrans) :
         transportFailureReason(ctl->transport);
 }
@@ -1218,7 +1219,7 @@ ctlTransportType(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return (cfg_transport_t)-1;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportType(ctl->paytrans) :
         transportType(ctl->transport);
 }
@@ -1294,6 +1295,13 @@ ctlPayDirSet(ctl_t *ctl, const char *dir)
     }
 
     ctl->payload.dir = scope_strdup(dir);
+}
+
+void
+ctlAllowBinaryConsoleSet(ctl_t *ctl, unsigned val)
+{
+    if (!ctl || val < 0 || val > 1) return;
+    ctl->allow_binary_console = val;
 }
 
 

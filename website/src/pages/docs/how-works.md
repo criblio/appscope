@@ -20,4 +20,4 @@ AppScope collects data with, at most, around 2% CPU overhead, and **minimal** la
 
 The AppScope library (`libscope`) is the core component that resides in application processes, extracting data as an application executes. You have fine-grained control of the library's behavior, using environment variables or a [configuration file](/docs/config-file).
 
-When you work with AppScope, you use the library either directly, through the AppScope CLI, or (rarely) through the `ldscope` utility.
+Whenever you work with AppScope, you are always using the `libscope` library. You can control the library directly using environment variables and/or the AppScope config file. Or, you can use the AppScope CLI (or, rarely, the `ldscope` utility), which both communicate with the library.

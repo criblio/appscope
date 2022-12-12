@@ -6,7 +6,7 @@ title: Using TLS for Secure Connections
 
 AppScope supports TLS over TCP connections. Here's how that works:
 
-- AppScope can use TLS when connecting to LogStream or another application (including its events and metrics destinations). 
+- AppScope can use TLS when connecting to Cribl Stream or another application (including its events and metrics destinations). 
 - Once AppScope establishes the connection, data can flow over that connection **in both directions**. 
 - This means that when you tell AppScope to connect using TLS, the connection is secured by TLS in both directions.
 
@@ -22,11 +22,11 @@ ldscope --help configuration | grep TLS
 
 ## Using TLS in Cribl.Cloud
 
-AppScope uses TLS by default to communicate with LogStream Cloud (that is, LogStream in Cribl.Cloud). LogStream has an AppScope Source ready to use out-of-the-box.
+AppScope uses TLS by default to communicate with Cribl Stream over TCP on Cribl.Cloud. Cribl Stream has an AppScope Source ready to use out-of-the-box.
 
-Within Cribl.Cloud, a front-end load balancer (reverse proxy) handles the encrypted TLS traffic and relays it to the AppScope Source port in LogStream. The connection from the load balancer to LogStream does **not** use TLS, and you should not enable TLS on the [AppScope Source](https://docs.cribl.io/docs/sources-appscope) in LogStream. No changes in LogStream configuration are needed.
+Within Cribl.Cloud, a front-end load balancer (reverse proxy) handles the encrypted TLS traffic and relays it to the AppScope Source port in Cribl Stream. The connection from the load balancer to Cribl Stream does **not** use TLS, and you should not enable TLS on the [AppScope Source](https://docs.cribl.io/docs/sources-appscope) in Cribl Stream. No changes in Cribl Stream configuration are needed.
 
-AppScope connects to your Cribl.Cloud Ingest Endpoint on port 10090. The Ingest Endpoint URL is always the same except for the Cribl.Cloud Organization ID, which LogStream uses in the hostname portion, in the following way:
+AppScope connects to your Cribl.Cloud Ingest Endpoint on port 10090. The Ingest Endpoint URL is always the same except for the Cribl.Cloud Organization ID, which Cribl Stream uses in the hostname portion, in the following way:
 
 ```
 https://in.logstream.<organization-ID>.cribl.cloud:10090
@@ -36,15 +36,15 @@ If you **disable** TLS, the port is 10091.
 
 ### CLI usage
 
-Use `scope run` with the `-c` option:
+Use `scope run` with the `-c` option (in this example, we're scoping `ps -ef`):
 
 ```
-scope run -c tls://host:10090
+scope run -c tls://host:10090 -- ps -ef
 ```
 
 ### Configuration for `LD_PRELOAD` or `ldscope`
 
-To connect AppScope to a LogStream Cloud instance using TLS: 
+To connect AppScope to a Cribl.Cloud-managed instance of Cribl Stream using TLS: 
 
 1. Enable the `transport : tls : enable` element in `scope.yml`.
 1. Connect to port 10090 on your Cribl.Cloud Ingest Endpoint.
@@ -66,6 +66,6 @@ cribl:
 
 ## Scoping Without TLS
 
-If you prefer to connect to LogStream Cloud without encryption, connect to port 10091 instead of port 10090, and disable the `tls` element in `scope.yml`.
+If you prefer to connect to Cribl Stream on Cribl.Cloud without encryption, connect to port 10091 instead of port 10090, and disable the `tls` element in `scope.yml`.
 
-No changes in LogStream configuration are needed.
+No changes in Cribl Stream configuration are needed.

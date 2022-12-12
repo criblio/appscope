@@ -5,6 +5,11 @@ ifeq (,$(GO))
 $(error "error: \`go\` not in PATH; install or set GO to it's path")
 endif
 
+GO_MAJOR_VERSION = $(shell $(GO) version | cut -c 14- | cut -d' ' -f1 | cut -d'.' -f1)
+GO_MINOR_VERSION = $(shell $(GO) version | cut -c 14- | cut -d' ' -f1 | cut -d'.' -f2)
+MIN_REQ_GO_MAJOR_VERSION = 1
+MIN_REQ_GO_MINOR_VERSION = 18
+
 # cache downloaded modules and binaries locally
 export GOBIN := $(shell pwd)/.gobin/$(ARCH)
 export GOCACHE := $(shell pwd)/.gocache
@@ -24,6 +29,18 @@ GO_BINDATA := $(GOBIN)/go-bindata
 GOVVV := $(GOBIN)/govvv
 GOLANGCI_LINT := $(GOBIN)/golangci-lint
 
+# fail if of Go is not meet version requirements
+require-go-version:
+	@if [ $(GO_MAJOR_VERSION) -gt $(MIN_REQ_GO_MAJOR_VERSION) ]; then \
+		exit 0 ;\
+	elif [ $(GO_MAJOR_VERSION) -lt $(MIN_REQ_GO_MAJOR_VERSION) ]; then \
+		echo 'error: minimum supported version of Go is $(MIN_REQ_GO_MAJOR_VERSION).$(MIN_REQ_GO_MINOR_VERSION), detected is $(GO_MAJOR_VERSION).$(GO_MINOR_VERSION)';\
+		exit 1; \
+	elif [ $(GO_MINOR_VERSION) -lt $(MIN_REQ_GO_MINOR_VERSION) ] ; then \
+		echo 'error: minimum supported version of Go is $(MIN_REQ_GO_MAJOR_VERSION).$(MIN_REQ_GO_MINOR_VERSION), detected is $(GO_MAJOR_VERSION).$(GO_MINOR_VERSION)';\
+		exit 1; \
+	fi
+
 ## build: build all (default)
 build: all
 
@@ -38,13 +55,17 @@ genflowtest:
 	./flows/gen_flow_test.sh
 
 ## all: build and compress \`scope\`
-all: scope compressscope
+all: scope compressscope require-go-version
 
 ## clean: remove the built binary
 clean:
 	$(RM) -r build/*
 	$(RM) run/bundle.go $(SCOPE)
 	$(RM) coverage.out coverage.html
+	$(RM) -rf -- .gocache/*/
+	$(RM) -rf -- .gomod/*/
+	$(RM) -rf -- .gobin/x86_64/go*
+	$(RM) -rf -- .gobin/aarch64/go*
 
 ## deps: install dependencies
 deps: $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT)
@@ -80,8 +101,8 @@ $(SCOPE): run/bundle.go $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -
 	       	-o $(SCOPE)
 
 compressscope: $(SCOPE) require-upx
-	if [ "$(ARCH)" = "x86_64" ]; then \
-	  upx -l $(SCOPE) >/dev/null 2>&1 || upx -9 $(SCOPE); \
+	@if [ -z $(SCOPE_NOCOMPRESS) ] ; then \
+		upx -l $(SCOPE) >/dev/null 2>&1 || upx -9 $(SCOPE); \
 	fi
 
 ## test: run unit tests

@@ -29,12 +29,13 @@ typedef uint64_t fpos64_t;
 #endif
 
 extern int osGetProcname(char *, size_t);
+extern int osGetProcUidGid(pid_t, uid_t *, gid_t *);
 extern int osGetNumThreads(pid_t);
 extern int osGetNumFds(pid_t);
 extern int osGetNumChildProcs(pid_t);
 extern int osInitTSC(platform_time_t *);
 extern int osGetProcMemory(pid_t);
-extern int osIsFilePresent(pid_t, const char *);
+extern int osIsFilePresent(const char *);
 extern int osGetCmdline(pid_t, char **);
 extern bool osThreadInit(void(*handler)(int), unsigned);
 extern int osUnixSockPeer(ino_t);
@@ -46,3 +47,4 @@ extern char *osGetFileMode(mode_t);
 extern int osNeedsConnect(int);
 extern const char *osGetUserName(unsigned);
 extern const char *osGetGroupName(unsigned);
+extern long long osGetProcCPU(void);

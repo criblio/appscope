@@ -1,76 +1,76 @@
 package run
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"os/user"
 	"path/filepath"
 	"strconv"
-	"syscall"
 
+	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
 	"github.com/syndtr/gocapability/capability"
 )
 
+var (
+	errGetLinuxCap       = errors.New("unable to get linux capabilities for current process")
+	errLoadLinuxCap      = errors.New("unable to load linux capabilities for current process")
+	errMissingPtrace     = errors.New("missing PTRACE capabilities to attach to a process")
+	errMissingProc       = errors.New("no process found matching that name")
+	errPidInvalid        = errors.New("invalid PID")
+	errPidMissing        = errors.New("PID does not exist")
+	errCreateLdscope     = errors.New("error creating ldscope")
+	errNotScoped         = errors.New("detach failed. This process is not being scoped")
+	errLibraryNotExist   = errors.New("library Path does not exist")
+	errInvalidSelection  = errors.New("invalid Selection")
+	errNoScopedProcs     = errors.New("no scoped processes found")
+	errDetachingMultiple = errors.New("at least one error found when detaching from all. See logs")
+)
+
 // Attach scopes an existing PID
-func (rc *Config) Attach(args []string) {
-	// Validate user has root permissions
-	user, err := user.Current()
+func (rc *Config) Attach(args []string) error {
+	pid, err := handleInputArg(args[0])
 	if err != nil {
-		util.ErrAndExit("Unable to get current user: %v", err)
+		return err
 	}
-	if user.Uid != "0" {
-		util.ErrAndExit("You must have administrator privileges to attach to a process")
-	}
-	// Validate PTRACE capability
-	c, err := capability.NewPid2(0)
-	if err != nil {
-		util.ErrAndExit("Unable to get linux capabilities for current process: %v", err)
-	}
-	err = c.Load()
-	if err != nil {
-		util.ErrAndExit("Unable to load linux capabilities: %v", err)
-	}
-	if !c.Get(capability.EFFECTIVE, capability.CAP_SYS_PTRACE) {
-		util.ErrAndExit("You must have PTRACE capabilities to attach to a process")
-	}
-	// Get PID by name if non-numeric, otherwise validate/use args[0]
-	var pid int
-	if !util.IsNumeric(args[0]) {
-		procs := util.ProcessesByName(args[0])
-		if len(procs) == 1 {
-			pid = procs[0].Pid
-		} else if len(procs) > 1 {
-			fmt.Println("Found multiple processes matching that name...")
-			pid = choosePid(procs)
-		} else {
-			util.ErrAndExit("No process found matching that name")
-		}
-		args[0] = fmt.Sprint(pid)
-	} else {
-		pid, err = strconv.Atoi(args[0])
-		if err != nil {
-			util.ErrAndExit("Invalid PID: %s", err)
-		}
-	}
-	// Check PID exists
-	if !util.PidExists(pid) {
-		util.ErrAndExit("PID does not exist: \"%v\"", pid)
-	}
+	args[0] = fmt.Sprint(pid)
+	var reattach bool
 	// Check PID is not already being scoped
-	if util.PidScoped(pid) {
-		util.ErrAndExit("Attach failed. This process is already being scoped")
+	if !util.PidScoped(pid) {
+		// Validate user has root permissions
+		if err := util.UserVerifyRootPerm(); err != nil {
+			return err
+		}
+		// Validate PTRACE capability
+		c, err := capability.NewPid2(0)
+		if err != nil {
+			return errGetLinuxCap
+		}
+
+		if err = c.Load(); err != nil {
+			return errLoadLinuxCap
+		}
+
+		if !c.Get(capability.EFFECTIVE, capability.CAP_SYS_PTRACE) {
+			return errMissingPtrace
+		}
+	} else {
+		// Reattach because process contains our library
+		reattach = true
 	}
+
 	// Create ldscope
-	if err := createLdscope(); err != nil {
-		util.ErrAndExit("error creating ldscope: %v", err)
+	if err := CreateLdscope(); err != nil {
+		return errCreateLdscope
 	}
 	// Normal operational, not passthrough, create directory for this run
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
 	env := os.Environ()
+	// Disable detection of a scope filter file with this command
+	env = append(env, "SCOPE_FILTER=false")
+
 	if rc.NoBreaker {
 		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
 	}
@@ -82,39 +82,174 @@ func (rc *Config) Attach(args []string) {
 	if len(rc.LibraryPath) > 0 {
 		// Validate path exists
 		if !util.CheckDirExists(rc.LibraryPath) {
-			util.ErrAndExit("Library Path does not exist: \"%s\"", rc.LibraryPath)
+			return errLibraryNotExist
 		}
 		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
-	// Prepend "--attach" to args
-	args = append([]string{"--attach"}, args...)
-	if !rc.Subprocess {
-		syscall.Exec(ldscopePath(), append([]string{"ldscope"}, args...), env)
+	if reattach {
+		env = append(env, "SCOPE_CONF_RELOAD="+filepath.Join(rc.WorkDir, "scope.yml"))
 	}
-	cmd := exec.Command(ldscopePath(), args...)
-	cmd.Env = env
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Run()
+
+	ld := loader.ScopeLoader{Path: LdscopePath()}
+	if !rc.Subprocess {
+		return ld.Attach(args, env)
+	}
+	_, err = ld.AttachSubProc(args, env)
+	return err
 }
 
-// choosePid presents a user interface for selecting a PID
-func choosePid(procs util.Processes) int {
-	util.PrintObj([]util.ObjField{
-		{Name: "ID", Field: "id"},
-		{Name: "Pid", Field: "pid"},
-		{Name: "User", Field: "user"},
-		{Name: "Scoped", Field: "scoped"},
-		{Name: "Command", Field: "command"},
-	}, procs)
-	fmt.Println("Select an ID from the list:")
-	var selection string
-	fmt.Scanln(&selection)
-	i, err := strconv.Atoi(selection)
-	i--
-	if err != nil || i < 0 || i > len(procs) {
-		util.ErrAndExit("Invalid Selection")
+// DetachAll provides the option to detach from all Scoped processes
+func (rc *Config) DetachAll(args []string) error {
+	adminStatus := true
+	if err := util.UserVerifyRootPerm(); err != nil {
+		if errors.Is(err, util.ErrMissingAdmPriv) {
+			adminStatus = false
+		} else {
+			return err
+		}
 	}
-	return procs[i].Pid
+
+	procs, err := util.ProcessesScoped()
+	if err != nil {
+		return err
+	}
+	if len(procs) > 0 {
+		if !adminStatus {
+			fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
+		}
+
+		// user interface for selecting a PID
+		util.PrintObj([]util.ObjField{
+			{Name: "ID", Field: "id"},
+			{Name: "Pid", Field: "pid"},
+			{Name: "User", Field: "user"},
+			{Name: "Command", Field: "command"},
+		}, procs)
+
+		if !util.Confirm("Are your sure you want to detach from all of these processes?") {
+			fmt.Println("info: canceled")
+			return nil
+		}
+	} else {
+		if !adminStatus {
+			fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
+		}
+		return errNoScopedProcs
+	}
+
+	if err := CreateLdscope(); err != nil {
+		return errCreateLdscope
+	}
+
+	errorsDetachingMultiple := false
+	for _, proc := range procs {
+		tmpArgs := append([]string{fmt.Sprint(proc.Pid)}, args...)
+		if err := rc.detach(tmpArgs, proc.Pid); err != nil {
+			log.Error().Err(err)
+			errorsDetachingMultiple = true
+		}
+	}
+	if errorsDetachingMultiple {
+		return errDetachingMultiple
+	}
+
+	return nil
+}
+
+// DetachSingle unscopes an existing PID
+func (rc *Config) DetachSingle(args []string) error {
+	pid, err := handleInputArg(args[0])
+	if err != nil {
+		return err
+	}
+	args[0] = fmt.Sprint(pid)
+
+	if err := CreateLdscope(); err != nil {
+		return errCreateLdscope
+	}
+
+	return rc.detach(args, pid)
+}
+
+func (rc *Config) detach(args []string, pid int) error {
+	// Check PID is already being scoped
+	if !util.PidScoped(pid) {
+		return errNotScoped
+	}
+
+	env := os.Environ()
+	ld := loader.ScopeLoader{Path: LdscopePath()}
+	if !rc.Subprocess {
+		return ld.Detach(args, env)
+	}
+	out, err := ld.DetachSubProc(args, env)
+	fmt.Println(out)
+
+	return err
+}
+
+// handleInputArg handles the input argument (process id/name)
+func handleInputArg(InputArg string) (int, error) {
+	// Get PID by name if non-numeric, otherwise validate/use InputArg
+	var pid int
+	var err error
+	if util.IsNumeric(InputArg) {
+		pid, err = strconv.Atoi(InputArg)
+		if err != nil {
+			return -1, errPidInvalid
+		}
+	} else {
+		adminStatus := true
+		if err := util.UserVerifyRootPerm(); err != nil {
+			if errors.Is(err, util.ErrMissingAdmPriv) {
+				adminStatus = false
+			} else {
+				return -1, err
+			}
+		}
+
+		procs, err := util.ProcessesByName(InputArg)
+		if err != nil {
+			return -1, err
+		}
+		if len(procs) == 1 {
+			pid = procs[0].Pid
+		} else if len(procs) > 1 {
+			if !adminStatus {
+				fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
+			}
+
+			// user interface for selecting a PID
+			fmt.Println("Found multiple processes matching that name...")
+			util.PrintObj([]util.ObjField{
+				{Name: "ID", Field: "id"},
+				{Name: "Pid", Field: "pid"},
+				{Name: "User", Field: "user"},
+				{Name: "Scoped", Field: "scoped"},
+				{Name: "Command", Field: "command"},
+			}, procs)
+			fmt.Println("Select an ID from the list:")
+			var selection string
+			fmt.Scanln(&selection)
+			i, err := strconv.ParseUint(selection, 10, 32)
+			i--
+			if err != nil || i >= uint64(len(procs)) {
+				return -1, errInvalidSelection
+			}
+			pid = procs[i].Pid
+		} else {
+			if !adminStatus {
+				fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
+			}
+			return -1, errMissingProc
+		}
+	}
+
+	// Check PID exists
+	if !util.PidExists(pid) {
+		return -1, errPidMissing
+	}
+
+	return pid, nil
 }

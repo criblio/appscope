@@ -21,12 +21,11 @@ import (
  * userconfig      X         X            X          X         X         X         X           X         X        X                    -
  */
 
-// attachCmd represents the run command
+// attachCmd represents the attach command
 var attachCmd = &cobra.Command{
-	Use:   "attach [flags] [PID/Process]",
-	Short: "Scope an existing process",
-	Long: `Attach scopes an existing process. Scope allows for additional arguments to be passed to attach to capture payloads or to up metric 
-verbosity. 
+	Use:   "attach [flags] PID | <process_name>",
+	Short: "Scope a currently-running process",
+	Long: `Scopes a currently-running process identified by PID or <process_name>.
 
 The --*dest flags accept file names like /tmp/scope.log or URLs like file:///tmp/scope.log. They may also
 be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
@@ -34,7 +33,7 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 scope attach firefox 
 scope attach --payloads 2000`,
 	Args: cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		internal.InitConfig()
 
 		// Disallow bad argument combinations (see Arg Matrix at top of file)
@@ -78,7 +77,7 @@ scope attach --payloads 2000`,
 			helpErrAndExit(cmd, "Cannot specify --loglevel and --userconfig")
 		}
 
-		rc.Attach(args)
+		return rc.Attach(args)
 	},
 }
 

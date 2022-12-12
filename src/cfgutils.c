@@ -65,6 +65,7 @@
 #define FIELD_NODE                   "field"
 #define VALUE_NODE                   "value"
 #define EX_HEADERS                   "headers"
+#define ALLOW_BINARY_NODE            "allowbinary"
 
 #define PAYLOAD_NODE         "payload"
 #define ENABLE_NODE              "enable"
@@ -169,6 +170,7 @@ void cfgEvtEnableSetFromStr(config_t*, const char*);
 void cfgEventFormatSetFromStr(config_t*, const char*);
 void cfgEvtRateLimitSetFromStr(config_t*, const char*);
 void cfgEnhanceFsSetFromStr(config_t*, const char*);
+void cfgAllowBinaryConsoleSetFromStr(config_t *, const char *);
 void cfgEvtFormatValueFilterSetFromStr(config_t*, watch_t, const char*);
 void cfgEvtFormatFieldFilterSetFromStr(config_t*, watch_t, const char*);
 void cfgEvtFormatNameFilterSetFromStr(config_t*, watch_t, const char*);
@@ -428,6 +430,25 @@ processReloadConfig(config_t *cfg, const char* value)
     }
 }
 
+extern bool cmdDetach(void);
+extern bool cmdAttach(void);
+
+static void
+processAttach(const char* value)
+{
+    if (!value) return;
+    unsigned int attach = strToVal(boolMap, value);
+
+    switch (attach) {
+        case FALSE:
+            cmdDetach();
+            break;
+        case TRUE:
+            cmdAttach();
+            break;
+    }
+}
+
 //
 // An example of this format: SCOPE_STATSD_MAXLEN=1024
 //
@@ -503,6 +524,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         processCmdDebug(value);
     } else if (!scope_strcmp(env_name, "SCOPE_CONF_RELOAD")) {
         processReloadConfig(cfg, value);
+    } else if (!scope_strcmp(env_name, "SCOPE_CMD_ATTACH")) {
+        processAttach(value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_DEST")) {
         cfgTransportSetFromStr(cfg, CFG_CTL, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_TLS_ENABLE")) {
@@ -519,6 +542,8 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgEvtRateLimitSetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_ENHANCE_FS")) {
         cfgEnhanceFsSetFromStr(cfg, value);
+    } else if (!scope_strcmp(env_name, "SCOPE_ALLOW_BINARY_CONSOLE")) {
+        cfgAllowBinaryConsoleSetFromStr(cfg, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_LOGFILE_NAME")) {
         cfgEvtFormatNameFilterSetFromStr(cfg, CFG_SRC_FILE, value);
     } else if (!scope_strcmp(env_name, "SCOPE_EVENT_CONSOLE_NAME")) {
@@ -627,6 +652,7 @@ cfgProcessEnvironment(config_t* cfg)
         // Some things should only be processed as commands, not as
         // environment variables.  Skip them here.
         if (startsWith(e, "SCOPE_CMD_DBG_PATH")) continue;
+        if (startsWith(e, "SCOPE_CMD_ATTACH")) continue;
         if (startsWith(e, "SCOPE_CONF_RELOAD")) continue;
 
         // Process everything else.
@@ -751,6 +777,13 @@ cfgEnhanceFsSetFromStr(config_t* cfg, const char* value)
 {
     if (!cfg || !value) return;
     cfgEnhanceFsSet(cfg, strToVal(boolMap, value));
+}
+
+void
+cfgAllowBinaryConsoleSetFromStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgEvtAllowBinaryConsoleSet(cfg, strToVal(boolMap, value));
 }
 
 void
@@ -1411,6 +1444,16 @@ processEvtWatchHeader(config_t *config, yaml_document_t *doc, yaml_node_t *node)
     }
 }
 
+static void
+processEvtWatchBinary(config_t *config, yaml_document_t *doc, yaml_node_t *node){
+    // watch binary is only valid for console
+    if (node->type != YAML_SCALAR_NODE || watch_context!= CFG_SRC_CONSOLE) return;
+
+    char* value = stringVal(node);
+    cfgAllowBinaryConsoleSetFromStr(config, value);
+    if (value) scope_free(value);
+}
+
 static int
 isWatchType(yaml_document_t* doc, yaml_node_pair_t* pair)
 {
@@ -1430,6 +1473,7 @@ processSource(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    FIELD_NODE,           processEvtWatchField},
         {YAML_SCALAR_NODE,    VALUE_NODE,           processEvtWatchValue},
         {YAML_SEQUENCE_NODE,  EX_HEADERS,           processEvtWatchHeader},
+        {YAML_SCALAR_NODE,    ALLOW_BINARY_NODE,    processEvtWatchBinary},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -2343,12 +2387,15 @@ createWatchObjectJson(config_t *cfg, watch_t src)
             for (i = 0; i < numhead; i++) {
                 char *hstr = (char *)cfgEvtFormatHeader(cfg, i);
                 if (hstr) {
-                    cJSON_AddStringToObjLN(headers, "headers", hstr);
+                    cJSON_AddStringToObjLN(headers, EX_HEADERS, hstr);
                 }
             }
         }
 
-        cJSON_AddItemToObject(root, "headers", headers);
+        cJSON_AddItemToObject(root, EX_HEADERS, headers);
+    } else if (src == CFG_SRC_CONSOLE) {
+    if (!cJSON_AddStringToObjLN(root, ALLOW_BINARY_NODE,
+                                  valToStr(boolMap, cfgEvtAllowBinaryConsole(cfg)))) goto err;
     }
 
     return root;
@@ -2733,8 +2780,11 @@ initCtl(config_t *cfg)
     ctlTransportSet(ctl, trans, CFG_CTL);
 
     // We'll create a dedicated payload channel, conditionally.
-    if (cfgLogStreamEnable(cfg)
-            && (cfgPayEnable(cfg) || protocolDefinitionsUsePayloads())) {
+    int payloadFeatureEnabled = cfgPayEnable(cfg) ||
+                                  protocolDefinitionsUsePayloads();
+    int sendPayloadsToStream = cfgLogStreamEnable(cfg) &&
+                                 !payloadToDiskForced();
+    if (payloadFeatureEnabled && sendPayloadsToStream) {
         transport_t *trans = initTransport(cfg, CFG_LS);
         if (!trans) {
             ctlDestroy(&ctl);
@@ -2756,6 +2806,7 @@ initCtl(config_t *cfg)
     ctlEnhanceFsSet(ctl, cfgEnhanceFs(cfg));
     ctlPayEnableSet(ctl, cfgPayEnable(cfg));
     ctlPayDirSet(ctl,    cfgPayDir(cfg));
+    ctlAllowBinaryConsoleSet(ctl, cfgEvtAllowBinaryConsole(cfg));
 
     return ctl;
 }
@@ -2766,12 +2817,13 @@ initCtl(config_t *cfg)
  * and the config file to:
  *
  * - use a single IP:port/UNIX socket for events, metrics & remote commands
- * - set metrics to use ndjson
  * - use a separate connection over the single IP:port/UNIX socket for payloads
  * - include the abbreviated json header for payloads
- * - watch types enabled for files, console, net, fs, http, dns
- * - log level warning
- * - all else uses defaults
+ * - set metrics to use ndjson
+ * - increase log level to warning if set to none or error
+ * - set configevent (SCOPE_CONFIG_EVENT) to true
+ *
+ * all else reflects the filter file, config file, and env vars
  */
 int
 cfgLogStreamDefault(config_t *cfg)
@@ -2860,4 +2912,379 @@ destroyProtEntry(void *data)
     if (pre->regex) scope_free(pre->regex);
     if (pre->protname) scope_free(pre->protname);
     scope_free(pre);
+}
+
+// Filter Configuration
+
+/*
+These rules describe which (if any) filter file is used.
+In order described here, the first true statement wins.
+- If the env variable SCOPE_FILTER exists, and it's value is a path to a
+    file that can be read
+- If the file /usr/lib/appscope/scope_filter exists and can be read
+- If /the file tmp/appscope/scope_filter exists and can be read
+
+Rules regarding the filter file:
+o) If the filter file exists, but contains any invalid (unparseable) yaml,
+   no processes will be scoped by the filter feature
+o) if the env variable SCOPE_FILTER exists with a value of "false",
+   no processes will be scoped by the filter feature
+o) If a filter file is not found,
+   no processes will be scoped by the filter feature
+
+Rules regarding some of the content of the filter file:
+o) The allow list and deny list are made of a ordered sequence of filters
+o) For the allow list, each filter has these fields: procname, arg, and config
+o) For the deny list, each filter has a procname and arg field
+o) Extra valid (parseable) yaml is allowed anywhere in the filter file,
+   but will be ignored by AppScope
+
+Definition of what it means to match a filter:
+o) By “the process matches the filter", we mean that the one or more
+   of these conditions is true:
+- the value of the procname field is an exact match of the process name
+  (is case-sensitive)
+- the value of the arg field appears somewhere in the process name and
+  arguments. (is case-sensitive)
+- the value of the procname or arg field is the literal string _MatchAll_
+  (See "Example of _MatchAll_ syntax" comment below)
+
+When a valid, parseable filter file is found, it controls which processes
+will be scoped:
+o) If a process does not match any allow list filter,
+   it will not be scoped by the filter feature
+o) If a process matches any filter in the deny list,
+   it will not be scoped by the filter feature
+o) If a process matches any filter in the allow list, and
+   does not match any filter in the deny list,
+   it will be scoped by the filter feature.
+o) For clarity, if a process matches both the allow list and deny list,
+   it will not be scoped by the filter feature.
+
+How configuration is determined:
+o) Default values are used for initial values of the configuration
+o) Filters of an allow list are processed in order. The process always
+   evaluates all filters.
+o) For each filter that matches, the config fields are applied to the process.
+o) A config field can have any number of child elements. Empty configurations,
+   partial configurations, and complete configurations are all allowed.
+o) For clarity, when filters match, all config fields defined by that filter
+   overwrite any earlier config values whether the value is a default value
+   or from an earlier matching filter.
+*/
+
+/*
+Example of _MatchAll_ syntax.  If the filter file contains this content,
+all processes will match, and the configuration will all be default values
+except that log level will be set to error.
+
+allow:
+- procname: _MatchAll_
+  config:
+    libscope:
+      log:
+        level: error
+*/
+
+#define ALLOW_NODE          "allow"
+#define ALLOW_PROCNAME_NODE   "procname"
+#define ALLOW_ARG_NODE        "arg"
+#define ALLOW_CONFIG_NODE     "config"
+#define DENY_NODE           "deny"
+#define DENY_PROCNAME_NODE    "procname"
+#define DENY_ARG_NODE         "arg"
+
+#define MATCH_ALL_VAL       "_MatchAll_"
+
+typedef enum {
+    PROC_NOT_FOUND,
+    PROC_ALLOWED,
+    PROC_DENIED,
+} proc_status;
+
+typedef struct {
+    const char *procName;    // process name which be searched in the filter file
+    const char *procCmdLine; // process command line which be searched in the filter file
+    proc_status  status;     // status describes the presence of the process on list
+    config_t *cfg;           // configuration for the scope list
+    bool filterMatch;        // flag indicate that cfg should be parsed for the process
+} filter_cfg_t;
+
+typedef void (*node_filter_fn)(yaml_document_t *, yaml_node_t *, filter_cfg_t *);
+
+typedef struct {
+    yaml_node_type_t type;
+    const char *key;
+    node_filter_fn fn;
+} parse_filter_table_t;
+
+/*
+* Process key value pair filter
+*/
+static void
+processKeyValuePairFilter(yaml_document_t *doc, yaml_node_pair_t *pair, const parse_filter_table_t *fEntry, filter_cfg_t *fCfg) {
+    yaml_node_t *nodeKey = yaml_document_get_node(doc, pair->key);
+    yaml_node_t *nodeValue = yaml_document_get_node(doc, pair->value);
+
+    if (nodeKey->type != YAML_SCALAR_NODE) return;
+
+    /*
+    * Check if specific Node value is present and call proper function if exists
+    */
+    for (int i = 0; fEntry[i].type != YAML_NO_NODE; ++i) {
+        if ((nodeValue->type == fEntry[i].type) &&
+            (!scope_strcmp((char*)nodeKey->data.scalar.value, fEntry[i].key))) {
+            fEntry[i].fn(doc, nodeValue, fCfg);
+            break;
+        }
+    }
+}
+
+/*
+* Process allow process name Scalar Node
+*/
+static void
+processAllowProcNameScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    const char *procname = (const char *)node->data.scalar.value;
+    if (!scope_strcmp(fCfg->procName, procname) ||
+        !scope_strcmp(MATCH_ALL_VAL, procname)) {
+        fCfg->status = PROC_ALLOWED;
+        fCfg->filterMatch = TRUE;
+    }
+}
+
+/*
+* Process allow process command line Scalar Node
+*/
+static void
+processAllowProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    const char *cmdline = (const char *)node->data.scalar.value;
+    if ((scope_strlen(cmdline) > 0) &&
+        (scope_strstr(fCfg->procCmdLine, cmdline)
+         || !scope_strcmp(MATCH_ALL_VAL, cmdline))) {
+        fCfg->status = PROC_ALLOWED;
+        fCfg->filterMatch = TRUE;
+    }
+}
+
+/*
+* Process allow configuration Node
+*/
+static void
+processAllowConfig(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    if (fCfg->filterMatch) {
+        processRoot(fCfg->cfg, doc, node);
+        fCfg->filterMatch = FALSE;
+    }
+}
+
+/*
+* Process allow sequence list
+*/
+static void
+processAllowSeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+    if (node->type != YAML_SEQUENCE_NODE) return;
+
+    parse_filter_table_t filters[] = {
+        {YAML_SCALAR_NODE,  ALLOW_PROCNAME_NODE, processAllowProcNameScalar},
+        {YAML_SCALAR_NODE,  ALLOW_ARG_NODE,      processAllowProcCmdLineScalar},
+        {YAML_NO_NODE,      NULL,                NULL}
+    };
+    parse_filter_table_t config[] = {
+        {YAML_MAPPING_NODE, ALLOW_CONFIG_NODE,   processAllowConfig},
+        {YAML_NO_NODE,      NULL,                NULL}
+    };
+
+
+    yaml_node_item_t *seqItem;
+    foreach(seqItem, node->data.sequence.items) {
+        yaml_node_t *nodeMap = yaml_document_get_node(doc, *seqItem);
+
+        if (nodeMap->type != YAML_MAPPING_NODE) return;
+
+        yaml_node_pair_t *pair;
+        // processs the filters first (before the config)
+        foreach(pair, nodeMap->data.mapping.pairs) {
+            processKeyValuePairFilter(doc, pair, filters, fCfg);
+        }
+        foreach(pair, nodeMap->data.mapping.pairs) {
+            processKeyValuePairFilter(doc, pair, config, fCfg);
+        }
+    }
+
+}
+
+/*
+* Process deny process name Scalar Node
+*/
+static void
+processDenyProcNameScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    const char *procname = (const char *)node->data.scalar.value;
+    if (!scope_strcmp(fCfg->procName, procname) ||
+        !scope_strcmp(MATCH_ALL_VAL, procname)) {
+        fCfg->status = PROC_DENIED;
+    }
+}
+
+/*
+* Process deny process command line Scalar Node
+*/
+static void
+processDenyProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    const char *cmdline = (const char *)node->data.scalar.value;
+    if ((scope_strlen(cmdline) > 0) &&
+        (scope_strstr(fCfg->procCmdLine, cmdline)
+          || !scope_strcmp(MATCH_ALL_VAL, cmdline))) {
+        fCfg->status = PROC_DENIED;
+    }
+}
+
+/*
+* Process deny sequence list
+*/
+static void
+processDenySeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+    if (node->type != YAML_SEQUENCE_NODE) return;
+
+    parse_filter_table_t t[] = {
+        {YAML_SCALAR_NODE, DENY_PROCNAME_NODE, processDenyProcNameScalar},
+        {YAML_SCALAR_NODE, DENY_ARG_NODE,      processDenyProcCmdLineScalar},
+        {YAML_NO_NODE,     NULL,               NULL}
+    };
+
+    yaml_node_item_t *seqItem;
+    foreach(seqItem, node->data.sequence.items) {
+        yaml_node_t *nodeMap = yaml_document_get_node(doc, *seqItem);
+
+        if (nodeMap->type != YAML_MAPPING_NODE) return;
+
+        yaml_node_pair_t *pair;
+        foreach(pair, nodeMap->data.mapping.pairs) {
+            processKeyValuePairFilter(doc, pair, t, fCfg);
+        }
+    }
+}
+
+/*
+* Process Filter Root node (starting point)
+*/
+static void
+processFilterRootNode(yaml_document_t *doc, filter_cfg_t *fCfg) {
+    yaml_node_t *node = yaml_document_get_root_node(doc);
+
+    if ((node == NULL) || (node->type != YAML_MAPPING_NODE)) {
+        return;
+    }
+
+    yaml_node_pair_t *pair;
+    // process allow before deny so deny "overrides" allow
+    // if a process appears in both, it should not be scoped
+    parse_filter_table_t allow[] = {
+        {YAML_SEQUENCE_NODE, ALLOW_NODE, processAllowSeq},
+        {YAML_NO_NODE,       NULL,       NULL}
+    };
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairFilter(doc, pair, allow, fCfg);
+    }
+
+    parse_filter_table_t deny[] = {
+        {YAML_SEQUENCE_NODE, DENY_NODE,  processDenySeq},
+        {YAML_NO_NODE,       NULL,       NULL}
+    };
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairFilter(doc, pair, deny, fCfg);
+    }
+}
+
+/*
+ * Parse scope filter file
+ *
+ * Returns TRUE if filter file was successfully parsed, FALSE otherwise
+ */
+static bool
+filterParseFile(const char* filterPath, filter_cfg_t *fCfg) {
+    FILE *fs;
+    bool status = FALSE;
+    yaml_parser_t parser;
+    yaml_document_t doc;
+
+    if ((fs = scope_fopen(filterPath, "rb")) == NULL) {
+        return status;
+    }
+
+    int res = yaml_parser_initialize(&parser);
+    if (!res) {
+        goto cleanup_filter_file;
+    }
+
+    yaml_parser_set_input_file(&parser, fs);
+
+    res = yaml_parser_load(&parser, &doc);
+    if (!res) {
+        goto cleanup_parser;
+    }
+
+    processFilterRootNode(&doc, fCfg);
+
+    status = TRUE;
+
+    yaml_document_delete(&doc);
+
+cleanup_parser:
+    yaml_parser_delete(&parser);
+
+cleanup_filter_file:
+    scope_fclose(fs);
+
+    return status;
+}
+
+/*
+ * Verify against filter file if specifc process command should be scoped.
+ */
+filter_status_t
+cfgFilterStatus(const char *procName, const char *procCmdLine, const char *filterPath, config_t *cfg)
+{
+    if ((!procName) || (!procCmdLine) || (!cfg)) {
+        DBG(NULL);
+        return FILTER_ERROR;
+    }
+
+    /*
+    *  If the filter file is missing (NULL) we scope every process
+    */
+    if (filterPath == NULL) {
+        return FILTER_SCOPED;
+    }
+
+    filter_cfg_t fCfg = {.procName = procName,
+                         .procCmdLine = procCmdLine,
+                         .status = PROC_NOT_FOUND,
+                         .filterMatch = FALSE,
+                         .cfg = cfg};
+    bool res = filterParseFile(filterPath, &fCfg);
+    if (res == FALSE) {
+        return FILTER_ERROR;
+    }
+
+    switch (fCfg.status) {
+        case PROC_NOT_FOUND:
+        case PROC_DENIED:
+            return FILTER_NOT_SCOPED;
+        case PROC_ALLOWED:
+            return FILTER_SCOPED_WITH_CFG;
+    }
+
+    DBG(NULL);
+    return FILTER_ERROR;
 }

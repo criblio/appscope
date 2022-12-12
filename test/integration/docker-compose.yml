@@ -201,6 +201,15 @@ services:
       dockerfile: ./service/Dockerfile.systemd
     <<: *scope-common
 
+  service-openrc:
+    image: ghcr.io/criblio/appscope-test-service-openrc:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-service-openrc:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./service/Dockerfile.openrc
+    <<: *scope-common
+
   console:
     image: ghcr.io/criblio/appscope-test-console:${TAG:?Missing TAG environment variable}
     build:
@@ -254,6 +263,51 @@ services:
       context: .
       dockerfile: ./cli/Dockerfile
     privileged: true
+    <<: *scope-common
+
+  sshd:
+    image: ghcr.io/criblio/appscope-test-sshd:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-sshd:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./sshd/Dockerfile
+    <<: *scope-common
+
+  start-glibc:
+    image: ghcr.io/criblio/appscope-test-start-glibc:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from: 
+        - ghcr.io/criblio/appscope-test-start-glibc:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./start/Dockerfile.glibc
+    <<: *scope-common
+
+  start-musl:
+    image: ghcr.io/criblio/appscope-test-start-musl:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from: 
+        - ghcr.io/criblio/appscope-test-start-musl:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./start/Dockerfile.musl
+    <<: *scope-common
+
+  payload-glibc:
+    image: ghcr.io/criblio/appscope-test-payload-glibc:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-payload-glibc:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./payload/Dockerfile.glibc
+    <<: *scope-common
+
+  payload-musl:
+    image: ghcr.io/criblio/appscope-test-payload-musl:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-payload-musl:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./payload/Dockerfile.musl
     <<: *scope-common
 
 # vim: ts=2 sw=2 et :

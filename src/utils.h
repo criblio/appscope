@@ -21,4 +21,7 @@ int endsWith(const char *string, const char *substring);
 
 int sigSafeNanosleep(const struct timespec *req);
 
+void setUUID(char *string);
+void setMachineID(char *string);
+
 #endif // __UTILS_H__

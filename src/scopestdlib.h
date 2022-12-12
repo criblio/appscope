@@ -35,12 +35,15 @@ extern int  scopelibc_dprintf(int, const char *, ...);
 extern int  scopelibc_fprintf(FILE *, const char *, ...);
 extern int  scopelibc_snprintf(char *, size_t, const char *, ...);
 extern int  scopelibc_sscanf(const char *, const char *, ...);
+extern int  scopelibc_fscanf(FILE *, const char *, ...);
 extern int  scopelibc_sprintf(char *, const char *, ...);
 extern int  scopelibc_asprintf(char **, const char *, ...);
 extern int  scopelibc_errno_val;
 extern FILE scopelibc___stdin_FILE;
 extern FILE scopelibc___stdout_FILE;
 extern FILE scopelibc___stderr_FILE;
+extern unsigned short ** scopelibc___ctype_b_loc(void);
+extern int32_t ** scopelibc___ctype_tolower_loc(void);
 
 #define scope_fcntl    scopelibc_fcntl
 #define scope_open     scopelibc_open
@@ -50,6 +53,7 @@ extern FILE scopelibc___stderr_FILE;
 #define scope_fprintf  scopelibc_fprintf
 #define scope_snprintf scopelibc_snprintf
 #define scope_sscanf   scopelibc_sscanf
+#define scope_fscanf   scopelibc_fscanf
 #define scope_sprintf  scopelibc_sprintf
 #define scope_asprintf scopelibc_asprintf
 #define scope_errno    scopelibc_errno_val
@@ -57,6 +61,25 @@ extern FILE scopelibc___stderr_FILE;
 #define scope_stdout   (&scopelibc___stdout_FILE)
 #define scope_stderr   (&scopelibc___stderr_FILE)
 
+/*
+ * Notes on the use of errno.
+ * There are 2 errno values; errno and scope_errno.
+ *
+ * errno is set by the application. It should be
+ * used, for the most part, by interposed functions where
+ * results of application behavior needs to be checked. It
+ * should only ever be set by libscope in specific cases.
+ *
+ * scope_errno is used by the internal libc.
+ * This value is not thread specific, thread safe, as we avoid the
+ * use of the %fs register and TLS behavior with the internal libc.
+ *
+ * Use scope_errno only for functions called from the periodic
+ * thread, during libscope constructor, from ldscope or from ldscopedyn.
+ *
+ * Other functions, primarily those called from interposed functions, can
+ * not safely reference scope_errno.
+ */
 // Other
 extern void scopeSetGoAppStateStatic(int);
 extern int scopeGetGoAppStateStatic(void);
@@ -84,6 +107,7 @@ void* scope_memcpy(void *, const void *, size_t);
 int   scope_mlock(const void *, size_t);
 int   scope_msync(void *, size_t, int);
 int   scope_mincore(void *, size_t, unsigned char *);
+int   scope_memfd_create(const char *, unsigned int);
 
 // File handling operations
 FILE*          scope_fopen(const char *, const char *);
@@ -107,6 +131,7 @@ int            scope_access(const char *, int);
 FILE*          scope_fmemopen(void *, size_t, const char *);
 long           scope_ftell(FILE *);
 int            scope_fseek(FILE *, long, int);
+off_t          scope_lseek(int, off_t, int);
 int            scope_unlink(const char *);
 int            scope_dup2(int, int);
 char*          scope_basename(char *);
@@ -199,6 +224,7 @@ uint16_t        scope_htons(uint16_t);
 int           scope_atoi(const char *);
 int           scope_isspace(int);
 int           scope_isprint(int);
+int           scope_isdigit(int);
 void          scope_perror(const char *);
 int           scope_gettimeofday(struct timeval *, struct timezone *);
 int           scope_timer_create(clockid_t, struct sigevent *, timer_t *);
@@ -223,6 +249,10 @@ int           scope_getpwuid_r(uid_t, struct passwd *, char *, size_t, struct pa
 pid_t         scope_getpid(void);
 pid_t         scope_getppid(void);
 uid_t         scope_getuid(void);
+uid_t         scope_geteuid(void);
+gid_t         scope_getegid(void);
+int           scope_seteuid(uid_t);
+int           scope_setegid(gid_t);
 gid_t         scope_getgid(void);
 void*         scope_dlopen(const char *, int);
 void*         scope_dlsym(void *, const char *);
@@ -250,5 +280,13 @@ int           scope_shmget(key_t, size_t, int);
 int           scope_sched_getcpu(void);
 long          scope_random(void);
 void          scope_srandom(unsigned int);
+int           scope_rand(void);
+void          scope_srand(unsigned int);
+int           scope_ftruncate(int, off_t);
+int           scope_setns(int, int);
+int           scope_chown(const char *, uid_t, gid_t);
+int           scope_fchown(int, uid_t, gid_t);
+int           scope_symlink(const char *, const char *);
+
 
 #endif // __SCOPE_STDLIB_H__

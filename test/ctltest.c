@@ -421,28 +421,38 @@ ctlParseRxMsgSwitch(void** state)
         // if body isn't present, there's nothing to do
         { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 0}",
           .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
-        // body with these specific strings should work
+        // body with these specific strings worked through AppScope v1.1.2
+        // (for a canned demo) but have since been disabled.
         { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 1,\"body\":\"redirect-on\"}",
-          .cmd = REQ_SWITCH, .action = URL_REDIRECT_ON},
+          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
         { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 2,\"body\":\"redirect-off\"}",
-          .cmd = REQ_SWITCH, .action = URL_REDIRECT_OFF},
+          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        // body with "detach", "attach"
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 3,\"body\":\"detach\"}",
+          .cmd = REQ_SWITCH, .action = FUNC_DETACH},
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 4,\"body\":\"attach\"}",
+          .cmd = REQ_SWITCH, .action = FUNC_ATTACH},
         // body of other json types should do nothing
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 3,\"body\":0}",
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 5,\"body\":0}",
           .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 4,\"body\":{\"huh\":\"what\"}}",
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 6,\"body\":{\"huh\":\"what\"}}",
           .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 5,\"body\":[ 1, 2, 3 ]}",
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 7,\"body\":[ 1, 2, 3 ]}",
           .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 6,\"body\":true}",
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 8,\"body\":true}",
           .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 7,\"body\":false}",
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 9,\"body\":false}",
           .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 8,\"body\":null}",
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\":10,\"body\":null}",
           .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
         // body with strings of the wrong case should do nothing
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\": 9,\"body\":\"Redirect-On\"}",
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\":11,\"body\":\"Redirect-On\"}",
           .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
-        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\":10,\"body\":\"REDIRECT-ON\"}",
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\":12,\"body\":\"REDIRECT-ON\"}",
+          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\":13,\"body\":\"Detach\"}",
+          .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
+        { .req = "{ \"type\": \"req\", \"req\": \"Switch\",\"reqId\":14,\"body\":\"ATTACH\"}",
           .cmd = REQ_PARAM_ERR, .action = NO_ACTION},
     };
 
@@ -774,6 +784,8 @@ ctlSendLogConsoleNoneAsciiData(void **state)
     assert_non_null(ctl);
     bool b_res = ctlEvtSourceEnabled(ctl, CFG_SRC_CONSOLE);
     assert_true(b_res);
+    // with ALLOW_BINARY false, verify that the binary_data_event_msg appears.
+    ctlAllowBinaryConsoleSet(ctl, FALSE);
     allow_copy_buf_data(TRUE);
 
     ctlSendLog(ctl, STDOUT_FILENO, console_path, non_basic_ascii_text, strlen(non_basic_ascii_text), 0, &proc);
@@ -787,7 +799,7 @@ ctlSendLogConsoleNoneAsciiData(void **state)
     // and verify that the binary_data_event_msg does *not* appear.
     memset(cbuf_data, '\0', sizeof(cbuf_data));
 
-    setenv("SCOPE_ALLOW_BINARY_CONSOLE", "true", 1);
+    ctlAllowBinaryConsoleSet(ctl, TRUE);
     ctl = ctlCreate();
     assert_non_null(ctl);
     b_res = ctlEvtSourceEnabled(ctl, CFG_SRC_CONSOLE);
@@ -798,7 +810,6 @@ ctlSendLogConsoleNoneAsciiData(void **state)
     assert_string_not_equal(binary_data_event_msg, val);
     assert_string_equal(non_basic_ascii_text, val);
     ctlDestroy(&ctl);
-    unsetenv("SCOPE_ALLOW_BINARY_CONSOLE");
 
     scope_free(non_basic_ascii_text);
     allow_copy_buf_data(FALSE);

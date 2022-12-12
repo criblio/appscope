@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -343,6 +343,7 @@ static int add_provider_groups(const OSSL_PARAM params[], void *data)
      * it.
      */
     ret = 1;
+    ERR_set_mark();
     keymgmt = EVP_KEYMGMT_fetch(ctx->libctx, ginf->algorithm, ctx->propq);
     if (keymgmt != NULL) {
         /*
@@ -357,19 +358,20 @@ static int add_provider_groups(const OSSL_PARAM params[], void *data)
          * assumption to make (in which case perhaps we should document this
          * behaviour)?
          */
-        if (EVP_KEYMGMT_provider(keymgmt) == provider) {
+        if (EVP_KEYMGMT_get0_provider(keymgmt) == provider) {
             /* We have a match - so we will use this group */
             ctx->group_list_len++;
             ginf = NULL;
         }
         EVP_KEYMGMT_free(keymgmt);
     }
+    ERR_pop_to_mark();
  err:
     if (ginf != NULL) {
         OPENSSL_free(ginf->tlsname);
         OPENSSL_free(ginf->realname);
         OPENSSL_free(ginf->algorithm);
-        ginf->tlsname = ginf->realname = NULL;
+        ginf->algorithm = ginf->tlsname = ginf->realname = NULL;
     }
     return ret;
 }
@@ -723,8 +725,11 @@ static int gid_cb(const char *elem, int len, void *arg)
     etmp[len] = 0;
 
     gid = tls1_group_name2id(garg->ctx, etmp);
-    if (gid == 0)
+    if (gid == 0) {
+        ERR_raise_data(ERR_LIB_SSL, ERR_R_PASSED_INVALID_ARGUMENT,
+                       "group '%s' cannot be set", etmp);
         return 0;
+    }
     for (i = 0; i < garg->gidcnt; i++)
         if (garg->gid_arr[i] == gid)
             return 0;
@@ -1235,7 +1240,7 @@ int tls1_lookup_md(SSL_CTX *ctx, const SIGALG_LOOKUP *lu, const EVP_MD **pmd)
  * SHA512 has a hash length of 64 bytes, which is incompatible
  * with a 128 byte (1024 bit) key.
  */
-#define RSA_PSS_MINIMUM_KEY_SIZE(md) (2 * EVP_MD_size(md) + 2)
+#define RSA_PSS_MINIMUM_KEY_SIZE(md) (2 * EVP_MD_get_size(md) + 2)
 static int rsa_pss_check_min_key_size(SSL_CTX *ctx, const EVP_PKEY *pkey,
                                       const SIGALG_LOOKUP *lu)
 {
@@ -1245,7 +1250,7 @@ static int rsa_pss_check_min_key_size(SSL_CTX *ctx, const EVP_PKEY *pkey,
         return 0;
     if (!tls1_lookup_md(ctx, lu, &md) || md == NULL)
         return 0;
-    if (EVP_PKEY_size(pkey) < RSA_PSS_MINIMUM_KEY_SIZE(md))
+    if (EVP_PKEY_get_size(pkey) < RSA_PSS_MINIMUM_KEY_SIZE(md))
         return 0;
     return 1;
 }
@@ -1267,6 +1272,8 @@ static const SIGALG_LOOKUP *tls1_get_legacy_sigalg(const SSL *s, int idx)
             for (i = 0; i < SSL_PKEY_NUM; i++) {
                 const SSL_CERT_LOOKUP *clu = ssl_cert_lookup_by_idx(i);
 
+                if (clu == NULL)
+                    continue;
                 if (clu->amask & s->s3.tmp.new_cipher->algorithm_auth) {
                     idx = i;
                     break;
@@ -1418,10 +1425,10 @@ static int sigalg_security_bits(SSL_CTX *ctx, const SIGALG_LOOKUP *lu)
         return 0;
     if (md != NULL)
     {
-        int md_type = EVP_MD_type(md);
+        int md_type = EVP_MD_get_type(md);
 
         /* Security bits: half digest bits */
-        secbits = EVP_MD_size(md) * 4;
+        secbits = EVP_MD_get_size(md) * 4;
         /*
          * SHA1 and MD5 are known to be broken. Reduce security bits so that
          * they're no longer accepted at security level 1. The real values don't
@@ -1431,7 +1438,7 @@ static int sigalg_security_bits(SSL_CTX *ctx, const SIGALG_LOOKUP *lu)
          * SHA1 at 2^63.4 and MD5+SHA1 at 2^67.2
          * https://documents.epfl.ch/users/l/le/lenstra/public/papers/lat.pdf
          * puts a chosen-prefix attack for MD5 at 2^39.
-	 */
+         */
         if (md_type == NID_sha1)
             secbits = 64;
         else if (md_type == NID_md5_sha1)
@@ -1463,7 +1470,7 @@ int tls12_check_peer_sigalg(SSL *s, uint16_t sig, EVP_PKEY *pkey)
     const SIGALG_LOOKUP *lu;
     int secbits = 0;
 
-    pkeyid = EVP_PKEY_id(pkey);
+    pkeyid = EVP_PKEY_get_id(pkey);
     /* Should never happen */
     if (pkeyid == -1)
         return -1;
@@ -1490,7 +1497,7 @@ int tls12_check_peer_sigalg(SSL *s, uint16_t sig, EVP_PKEY *pkey)
         return 0;
     }
     /* Check the sigalg is consistent with the key OID */
-    if (!ssl_cert_lookup_by_nid(EVP_PKEY_id(pkey), &cidx)
+    if (!ssl_cert_lookup_by_nid(EVP_PKEY_get_id(pkey), &cidx)
             || lu->sig_idx != (int)cidx) {
         SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_WRONG_SIGNATURE_TYPE);
         return 0;
@@ -1560,7 +1567,7 @@ int tls12_check_peer_sigalg(SSL *s, uint16_t sig, EVP_PKEY *pkey)
     secbits = sigalg_security_bits(s->ctx, lu);
     if (secbits == 0 ||
         !ssl_security(s, SSL_SECOP_SIGALG_CHECK, secbits,
-                      md != NULL ? EVP_MD_type(md) : NID_undef,
+                      md != NULL ? EVP_MD_get_type(md) : NID_undef,
                       (void *)sigalgstr)) {
         SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, SSL_R_WRONG_SIGNATURE_TYPE);
         return 0;
@@ -1778,7 +1785,7 @@ SSL_TICKET_STATUS tls_decrypt_ticket(SSL *s, const unsigned char *etick,
     SSL_SESSION *sess = NULL;
     unsigned char *sdec;
     const unsigned char *p;
-    int slen, renew_ticket = 0, declen;
+    int slen, ivlen, renew_ticket = 0, declen;
     SSL_TICKET_STATUS ret = SSL_TICKET_FATAL_ERR_OTHER;
     size_t mlen;
     unsigned char tick_hmac[EVP_MAX_MD_SIZE];
@@ -1891,9 +1898,14 @@ SSL_TICKET_STATUS tls_decrypt_ticket(SSL *s, const unsigned char *etick,
         goto end;
     }
 
+    ivlen = EVP_CIPHER_CTX_get_iv_length(ctx);
+    if (ivlen < 0) {
+        ret = SSL_TICKET_FATAL_ERR_OTHER;
+        goto end;
+    }
+
     /* Sanity check ticket length: must exceed keyname + IV + HMAC */
-    if (eticklen <=
-        TLSEXT_KEYNAME_LENGTH + EVP_CIPHER_CTX_iv_length(ctx) + mlen) {
+    if (eticklen <= TLSEXT_KEYNAME_LENGTH + ivlen + mlen) {
         ret = SSL_TICKET_NO_DECRYPT;
         goto end;
     }
@@ -1911,8 +1923,8 @@ SSL_TICKET_STATUS tls_decrypt_ticket(SSL *s, const unsigned char *etick,
     }
     /* Attempt to decrypt session data */
     /* Move p after IV to start of encrypted ticket, update length */
-    p = etick + TLSEXT_KEYNAME_LENGTH + EVP_CIPHER_CTX_iv_length(ctx);
-    eticklen -= TLSEXT_KEYNAME_LENGTH + EVP_CIPHER_CTX_iv_length(ctx);
+    p = etick + TLSEXT_KEYNAME_LENGTH + ivlen;
+    eticklen -= TLSEXT_KEYNAME_LENGTH + ivlen;
     sdec = OPENSSL_malloc(eticklen);
     if (sdec == NULL || EVP_DecryptUpdate(ctx, sdec, &slen, p,
                                           (int)eticklen) <= 0) {
@@ -2813,22 +2825,20 @@ int tls1_check_chain(SSL *s, X509 *x, EVP_PKEY *pk, STACK_OF(X509) *chain,
 
         ca_dn = s->s3.tmp.peer_ca_names;
 
-        if (!sk_X509_NAME_num(ca_dn))
+        if (ca_dn == NULL
+            || sk_X509_NAME_num(ca_dn) == 0
+            || ssl_check_ca_name(ca_dn, x))
             rv |= CERT_PKEY_ISSUER_NAME;
-
-        if (!(rv & CERT_PKEY_ISSUER_NAME)) {
-            if (ssl_check_ca_name(ca_dn, x))
-                rv |= CERT_PKEY_ISSUER_NAME;
-        }
-        if (!(rv & CERT_PKEY_ISSUER_NAME)) {
+        else
             for (i = 0; i < sk_X509_num(chain); i++) {
                 X509 *xtmp = sk_X509_value(chain, i);
+
                 if (ssl_check_ca_name(ca_dn, xtmp)) {
                     rv |= CERT_PKEY_ISSUER_NAME;
                     break;
                 }
             }
-        }
+
         if (!check_flags && !(rv & CERT_PKEY_ISSUER_NAME))
             goto end;
     } else
@@ -2884,7 +2894,7 @@ EVP_PKEY *ssl_get_auto_dh(SSL *s)
 {
     EVP_PKEY *dhp = NULL;
     BIGNUM *p;
-    int dh_secbits = 80;
+    int dh_secbits = 80, sec_level_bits;
     EVP_PKEY_CTX *pctx = NULL;
     OSSL_PARAM_BLD *tmpl = NULL;
     OSSL_PARAM *params = NULL;
@@ -2898,9 +2908,14 @@ EVP_PKEY *ssl_get_auto_dh(SSL *s)
         } else {
             if (s->s3.tmp.cert == NULL)
                 return NULL;
-            dh_secbits = EVP_PKEY_security_bits(s->s3.tmp.cert->privatekey);
+            dh_secbits = EVP_PKEY_get_security_bits(s->s3.tmp.cert->privatekey);
         }
     }
+
+    /* Do not pick a prime that is too weak for the current security level */
+    sec_level_bits = ssl_get_security_level_bits(s, NULL, NULL);
+    if (dh_secbits < sec_level_bits)
+        dh_secbits = sec_level_bits;
 
     if (dh_secbits >= 192)
         p = BN_get_rfc3526_prime_8192(NULL);
@@ -2950,7 +2965,7 @@ static int ssl_security_cert_key(SSL *s, SSL_CTX *ctx, X509 *x, int op)
          * reject keys which omit parameters but this only affects DSA and
          * omission of parameters is never (?) done in practice.
          */
-        secbits = EVP_PKEY_security_bits(pkey);
+        secbits = EVP_PKEY_get_security_bits(pkey);
     }
     if (s)
         return ssl_security(s, op, secbits, 0, x);
@@ -3003,6 +3018,8 @@ int ssl_security_cert_chain(SSL *s, STACK_OF(X509) *sk, X509 *x, int vfy)
     int rv, start_idx, i;
     if (x == NULL) {
         x = sk_X509_value(sk, 0);
+        if (x == NULL)
+            return ERR_R_INTERNAL_ERROR;
         start_idx = 1;
     } else
         start_idx = 0;
@@ -3052,15 +3069,18 @@ static int check_cert_usable(SSL *s, const SIGALG_LOOKUP *sig, X509 *x,
     const SIGALG_LOOKUP *lu;
     int mdnid, pknid, supported;
     size_t i;
+    const char *mdname = NULL;
 
     /*
-     * If the given EVP_PKEY cannot supporting signing with this sigalg,
+     * If the given EVP_PKEY cannot support signing with this digest,
      * the answer is simply 'no'.
      */
-    ERR_set_mark();
-    supported = EVP_PKEY_supports_digest_nid(pkey, sig->hash);
-    ERR_pop_to_mark();
-    if (supported == 0)
+    if (sig->hash != NID_undef)
+        mdname = OBJ_nid2sn(sig->hash);
+    supported = EVP_PKEY_digestsign_supports_digest(pkey, s->ctx->libctx,
+                                                    mdname,
+                                                    s->ctx->propq);
+    if (supported <= 0)
         return 0;
 
     /*
@@ -3076,7 +3096,7 @@ static int check_cert_usable(SSL *s, const SIGALG_LOOKUP *sig, X509 *x,
                 continue;
 
             /*
-             * TODO this does not differentiate between the
+             * This does not differentiate between the
              * rsa_pss_pss_* and rsa_pss_rsae_* schemes since we do not
              * have a chain here that lets us look at the key OID in the
              * signing certificate.
@@ -3294,7 +3314,7 @@ int tls_choose_sigalg(SSL *s, int fatalerrs)
                 if ((lu = tls1_get_legacy_sigalg(s, -1)) == NULL) {
                     if (!fatalerrs)
                         return 1;
-                    SSLfatal(s, SSL_AD_INTERNAL_ERROR,
+                    SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE,
                              SSL_R_NO_SUITABLE_SIGNATURE_ALGORITHM);
                     return 0;
                 }
@@ -3309,7 +3329,7 @@ int tls_choose_sigalg(SSL *s, int fatalerrs)
                 if (i == sent_sigslen) {
                     if (!fatalerrs)
                         return 1;
-                    SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER,
+                    SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE,
                              SSL_R_WRONG_SIGNATURE_TYPE);
                     return 0;
                 }
@@ -3466,4 +3486,23 @@ int ssl_get_EC_curve_nid(const EVP_PKEY *pkey)
         return OBJ_txt2nid(gname);
 
     return NID_undef;
+}
+
+__owur int tls13_set_encoded_pub_key(EVP_PKEY *pkey,
+                                     const unsigned char *enckey,
+                                     size_t enckeylen)
+{
+    if (EVP_PKEY_is_a(pkey, "DH")) {
+        int bits = EVP_PKEY_get_bits(pkey);
+
+        if (bits <= 0 || enckeylen != (size_t)bits / 8)
+            /* the encoded key must be padded to the length of the p */
+            return 0;
+    } else if (EVP_PKEY_is_a(pkey, "EC")) {
+        if (enckeylen < 3 /* point format and at least 1 byte for x and y */
+            || enckey[0] != 0x04)
+            return 0;
+    }
+
+    return EVP_PKEY_set1_encoded_public_key(pkey, enckey, enckeylen);
 }

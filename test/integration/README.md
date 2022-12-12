@@ -60,7 +60,7 @@ AppScope Integration Test Runner
   `make (test)-shell` - run a shell in the test's container
   `make (test)-exec` - run a shell in the existing test's container
   `make (test)-build` - build the test's image
-Tests: alpine attach-glibc attach-musl awsnuke bash cli console detect_proto elastic glibc gogen go_2 go_3 go_4 go_5 go_6 go_7 go_8 go_9 go_10 go_11 go_12 go_13 go_14 go_15 go_16 go_17 http java7 java8 java9 java10 java11 java12 java13 java14 kafka logstream nginx oracle-java7 oracle-java8 oracle-java9 oracle-java10 oracle-java11 musl oracle-java12 oracle-java13 oracle-java14 service-initd service-systemd splunk syscalls syscalls-alpine terraform tls transport
+Tests: alpine attach-glibc attach-musl awsnuke bash cli console detect_proto elastic glibc gogen go_2 go_3 go_4 go_5 go_6 go_7 go_8 go_9 go_10 go_11 go_12 go_13 go_14 go_15 go_16 go_17 http java7 java8 java9 java10 java11 java12 java13 java14 kafka logstream nginx oracle-java7 oracle-java8 oracle-java9 oracle-java10 oracle-java11 musl oracle-java12 oracle-java13 oracle-java14 service-initd service-openrc service-systemd splunk sshd start-glibc start-musl syscalls syscalls-alpine terraform tls transport
 ```
 
 Developers can run tests locally pretty easily with this setup. We use it for
@@ -95,11 +95,6 @@ This test is explicitly using `LD_PRELOAD` while other tests are using a mix of
 `scope` and `ldscope` and `LD_PRELOAD`. We have been removing use of
 `LD_PRELOAD` from some other tests to speed them up but we'll keep it here to
 make sure that startup scheme is getting wrung out.
-
-### `nginx`
-
-Tests Nginx web server using Apache Benchmark tool.
-
 
 ## `test-runner` Framework
 

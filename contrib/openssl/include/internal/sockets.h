@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -7,10 +7,11 @@
  * https://www.openssl.org/source/license.html
  */
 
-
 #ifndef OSSL_INTERNAL_SOCKETS_H
 # define OSSL_INTERNAL_SOCKETS_H
 # pragma once
+
+# include <openssl/opensslconf.h>
 
 # if defined(OPENSSL_SYS_VXWORKS) || defined(OPENSSL_SYS_UEFI)
 #  define NO_SYS_PARAM_H
@@ -27,10 +28,14 @@
 
 # elif defined(OPENSSL_SYS_WINDOWS) || defined(OPENSSL_SYS_MSDOS)
 #  if defined(__DJGPP__)
+#   define WATT32
+#   define WATT32_NO_OLDIES
 #   include <sys/socket.h>
 #   include <sys/un.h>
 #   include <tcp.h>
 #   include <netdb.h>
+#   include <arpa/inet.h>
+#   include <netinet/tcp.h>
 #  elif defined(_WIN32_WCE) && _WIN32_WCE<410
 #   define getservbyname _masked_declaration_getservbyname
 #  endif
@@ -131,8 +136,6 @@ struct servent *PASCAL getservbyname(const char *, const char *);
 #  define readsocket(s,b,n)       recv((s),(b),(n),0)
 #  define writesocket(s,b,n)      send((s),(b),(n),0)
 # elif defined(__DJGPP__)
-#  define WATT32
-#  define WATT32_NO_OLDIES
 #  define closesocket(s)          close_s(s)
 #  define readsocket(s,b,n)       read_s(s,b,n)
 #  define writesocket(s,b,n)      send(s,b,n,0)

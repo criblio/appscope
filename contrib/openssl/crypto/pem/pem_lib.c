@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -323,14 +323,14 @@ int PEM_ASN1_write_bio(i2d_of_void *i2d, const char *name, BIO *bp,
     unsigned char iv[EVP_MAX_IV_LENGTH];
 
     if (enc != NULL) {
-        objstr = EVP_CIPHER_name(enc);
-        if (objstr == NULL || EVP_CIPHER_iv_length(enc) == 0
-                || EVP_CIPHER_iv_length(enc) > (int)sizeof(iv)
+        objstr = EVP_CIPHER_get0_name(enc);
+        if (objstr == NULL || EVP_CIPHER_get_iv_length(enc) == 0
+                || EVP_CIPHER_get_iv_length(enc) > (int)sizeof(iv)
                    /*
                     * Check "Proc-Type: 4,Encrypted\nDEK-Info: objstr,hex-iv\n"
                     * fits into buf
                     */
-                || (strlen(objstr) + 23 + 2 * EVP_CIPHER_iv_length(enc) + 13)
+                || strlen(objstr) + 23 + 2 * EVP_CIPHER_get_iv_length(enc) + 13
                    > sizeof(buf)) {
             ERR_raise(ERR_LIB_PEM, PEM_R_UNSUPPORTED_CIPHER);
             goto err;
@@ -368,7 +368,8 @@ int PEM_ASN1_write_bio(i2d_of_void *i2d, const char *name, BIO *bp,
 #endif
             kstr = (unsigned char *)buf;
         }
-        if (RAND_bytes(iv, EVP_CIPHER_iv_length(enc)) <= 0) /* Generate a salt */
+        /* Generate a salt */
+        if (RAND_bytes(iv, EVP_CIPHER_get_iv_length(enc)) <= 0)
             goto err;
         /*
          * The 'iv' is used as the iv and as a salt.  It is NOT taken from
@@ -382,7 +383,7 @@ int PEM_ASN1_write_bio(i2d_of_void *i2d, const char *name, BIO *bp,
 
         buf[0] = '\0';
         PEM_proc_type(buf, PEM_TYPE_ENCRYPTED);
-        PEM_dek_info(buf, objstr, EVP_CIPHER_iv_length(enc), (char *)iv);
+        PEM_dek_info(buf, objstr, EVP_CIPHER_get_iv_length(enc), (char *)iv);
         /* k=strlen(buf); */
 
         ret = 1;
@@ -548,7 +549,7 @@ int PEM_get_EVP_CIPHER_INFO(char *header, EVP_CIPHER_INFO *cipher)
         ERR_raise(ERR_LIB_PEM, PEM_R_UNSUPPORTED_ENCRYPTION);
         return 0;
     }
-    ivlen = EVP_CIPHER_iv_length(enc);
+    ivlen = EVP_CIPHER_get_iv_length(enc);
     if (ivlen > 0 && *header++ != ',') {
         ERR_raise(ERR_LIB_PEM, PEM_R_MISSING_DEK_IV);
         return 0;
@@ -557,7 +558,7 @@ int PEM_get_EVP_CIPHER_INFO(char *header, EVP_CIPHER_INFO *cipher)
         return 0;
     }
 
-    if (!load_iv(&header, cipher->iv, EVP_CIPHER_iv_length(enc)))
+    if (!load_iv(&header, cipher->iv, EVP_CIPHER_get_iv_length(enc)))
         return 0;
 
     return 1;
@@ -626,7 +627,7 @@ int PEM_write_bio(BIO *bp, const char *name, const char *header,
         (BIO_write(bp, "-----\n", 6) != 6))
         goto err;
 
-    i = strlen(header);
+    i = header != NULL ? strlen(header) : 0;
     if (i > 0) {
         if ((BIO_write(bp, header, i) != i) || (BIO_write(bp, "\n", 1) != 1))
             goto err;
@@ -809,7 +810,7 @@ static int get_header_and_data(BIO *bp, BIO **header, BIO **data, char *name,
 {
     BIO *tmp = *header;
     char *linebuf, *p;
-    int len, line, ret = 0, end = 0, prev_partial_line_read = 0, partial_line_read = 0;
+    int len, ret = 0, end = 0, prev_partial_line_read = 0, partial_line_read = 0;
     /* 0 if not seen (yet), 1 if reading header, 2 if finished header */
     enum header_status got_header = MAYBE_HEADER;
     unsigned int flags_mask;
@@ -823,7 +824,7 @@ static int get_header_and_data(BIO *bp, BIO **header, BIO **data, char *name,
         return 0;
     }
 
-    for (line = 0; ; line++) {
+    while(1) {
         flags_mask = ~0u;
         len = BIO_gets(bp, linebuf, LINESIZE);
         if (len <= 0) {
@@ -973,19 +974,22 @@ int PEM_read_bio_ex(BIO *bp, char **name_out, char **header,
     headerlen = BIO_get_mem_data(headerB, NULL);
     *header = pem_malloc(headerlen + 1, flags);
     *data = pem_malloc(len, flags);
-    if (*header == NULL || *data == NULL) {
-        pem_free(*header, flags, 0);
-        pem_free(*data, flags, 0);
-        goto end;
-    }
-    BIO_read(headerB, *header, headerlen);
+    if (*header == NULL || *data == NULL)
+        goto out_free;
+    if (headerlen != 0 && BIO_read(headerB, *header, headerlen) != headerlen)
+        goto out_free;
     (*header)[headerlen] = '\0';
-    BIO_read(dataB, *data, len);
+    if (BIO_read(dataB, *data, len) != len)
+        goto out_free;
     *len_out = len;
     *name_out = name;
     name = NULL;
     ret = 1;
+    goto end;
 
+out_free:
+    pem_free(*header, flags, 0);
+    pem_free(*data, flags, 0);
 end:
     EVP_ENCODE_CTX_free(ctx);
     pem_free(name, flags, 0);

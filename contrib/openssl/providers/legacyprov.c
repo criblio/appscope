@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2019-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -95,8 +95,8 @@ static const OSSL_ALGORITHM legacy_ciphers[] = {
 #ifndef OPENSSL_NO_BF
     ALG(PROV_NAMES_BF_ECB, ossl_blowfish128ecb_functions),
     ALG(PROV_NAMES_BF_CBC, ossl_blowfish128cbc_functions),
-    ALG(PROV_NAMES_BF_OFB, ossl_blowfish64ofb64_functions),
-    ALG(PROV_NAMES_BF_CFB, ossl_blowfish64cfb64_functions),
+    ALG(PROV_NAMES_BF_OFB, ossl_blowfish128ofb64_functions),
+    ALG(PROV_NAMES_BF_CFB, ossl_blowfish128cfb64_functions),
 #endif /* OPENSSL_NO_BF */
 #ifndef OPENSSL_NO_IDEA
     ALG(PROV_NAMES_IDEA_ECB, ossl_idea128ecb_functions),
@@ -143,6 +143,11 @@ static const OSSL_ALGORITHM legacy_ciphers[] = {
     { NULL, NULL, NULL }
 };
 
+static const OSSL_ALGORITHM legacy_kdfs[] = {
+    ALG(PROV_NAMES_PBKDF1, ossl_kdf_pbkdf1_functions),
+    { NULL, NULL, NULL }
+};
+
 static const OSSL_ALGORITHM *legacy_query(void *provctx, int operation_id,
                                           int *no_cache)
 {
@@ -152,6 +157,8 @@ static const OSSL_ALGORITHM *legacy_query(void *provctx, int operation_id,
         return legacy_digests;
     case OSSL_OP_CIPHER:
         return legacy_ciphers;
+    case OSSL_OP_KDF:
+        return legacy_kdfs;
     }
     return NULL;
 }
@@ -178,13 +185,8 @@ int OSSL_provider_init(const OSSL_CORE_HANDLE *handle,
 {
     OSSL_LIB_CTX *libctx = NULL;
 
-    /*
-     * We do not need to use any up-calls provided by libcrypto, so we ignore
-     * the "in" dispatch table.
-     */
-
     if ((*provctx = ossl_prov_ctx_new()) == NULL
-        || (libctx = OSSL_LIB_CTX_new()) == NULL) {
+        || (libctx = OSSL_LIB_CTX_new_child(handle, in)) == NULL) {
         OSSL_LIB_CTX_free(libctx);
         legacy_teardown(*provctx);
         *provctx = NULL;

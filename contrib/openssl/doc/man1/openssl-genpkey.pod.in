@@ -15,6 +15,7 @@ B<openssl> B<genpkey>
 [B<-help>]
 [B<-out> I<filename>]
 [B<-outform> B<DER>|B<PEM>]
+[B<-quiet>]
 [B<-pass> I<arg>]
 [B<-I<cipher>>]
 [B<-paramfile> I<file>]
@@ -24,8 +25,6 @@ B<openssl> B<genpkey>
 [B<-text>]
 {- $OpenSSL::safe::opt_engine_synopsis -}{- $OpenSSL::safe::opt_provider_synopsis -}
 {- $OpenSSL::safe::opt_config_synopsis -}
-
-=for openssl ifdef engine
 
 =head1 DESCRIPTION
 
@@ -50,6 +49,10 @@ The output format, except when B<-genparam> is given; the default is B<PEM>.
 See L<openssl-format-options(1)> for details.
 
 When B<-genparam> is given, B<-outform> is ignored.
+
+=item B<-quiet>
+
+Do not output "status dots" while generating keys.
 
 =item B<-pass> I<arg>
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2001-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2001-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -51,18 +51,18 @@ static int ocsp_verify_signer(X509 *signer, int response,
             && X509_get_ext_by_NID(signer, NID_id_pkix_OCSP_noCheck, -1) >= 0)
         /*
          * Locally disable revocation status checking for OCSP responder cert.
-         * Done here for CRLs; TODO should be done also for OCSP-based checks.
+         * Done here for CRLs; should be done also for OCSP-based checks.
          */
         X509_VERIFY_PARAM_clear_flags(vp, X509_V_FLAG_CRL_CHECK);
     X509_STORE_CTX_set_purpose(ctx, X509_PURPOSE_OCSP_HELPER);
     X509_STORE_CTX_set_trust(ctx, X509_TRUST_OCSP_REQUEST);
-    /* TODO: why is X509_TRUST_OCSP_REQUEST set? Seems to get ignored. */
 
     ret = X509_verify_cert(ctx);
     if (ret <= 0) {
-        ret = X509_STORE_CTX_get_error(ctx);
+        int err = X509_STORE_CTX_get_error(ctx);
+
         ERR_raise_data(ERR_LIB_OCSP, OCSP_R_CERTIFICATE_VERIFY_ERROR,
-                       "Verify error: %s", X509_verify_cert_error_string(ret));
+                       "Verify error: %s", X509_verify_cert_error_string(err));
         goto end;
     }
     if (chain != NULL)
@@ -327,7 +327,7 @@ static int ocsp_match_issuerid(X509 *cert, OCSP_CERTID *cid,
         }
         (void)ERR_pop_to_mark();
 
-        mdlen = EVP_MD_size(dgst);
+        mdlen = EVP_MD_get_size(dgst);
         if (mdlen < 0) {
             ERR_raise(ERR_LIB_OCSP, OCSP_R_DIGEST_SIZE_ERR);
             goto end;

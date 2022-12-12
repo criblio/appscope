@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include "apps.h"
 #include <time.h>
 #include <string.h>
 #include "apps.h"
@@ -146,7 +147,7 @@ int dsaparam_main(int argc, char **argv)
     if (out == NULL)
         goto end;
 
-    ctx = EVP_PKEY_CTX_new_from_name(NULL, "DSA", NULL);
+    ctx = EVP_PKEY_CTX_new_from_name(app_get0_libctx(), "DSA", app_get0_propq());
     if (ctx == NULL) {
         BIO_printf(bio_err,
                    "Error, DSA parameter generation context allocation failed\n");
@@ -171,15 +172,12 @@ int dsaparam_main(int argc, char **argv)
                        "Error, DSA key generation paramgen init failed\n");
             goto end;
         }
-        if (!EVP_PKEY_CTX_set_dsa_paramgen_bits(ctx, num)) {
+        if (EVP_PKEY_CTX_set_dsa_paramgen_bits(ctx, num) <= 0) {
             BIO_printf(bio_err,
                        "Error, DSA key generation setting bit length failed\n");
             goto end;
         }
-        if (EVP_PKEY_paramgen(ctx, &params) <= 0) {
-            BIO_printf(bio_err, "Error, DSA key generation failed\n");
-            goto end;
-        }
+        params = app_paramgen(ctx, "DSA");
     } else {
         params = load_keyparams(infile, informat, 1, "DSA", "DSA parameters");
     }
@@ -207,21 +205,19 @@ int dsaparam_main(int argc, char **argv)
     }
     if (genkey) {
         EVP_PKEY_CTX_free(ctx);
-        ctx = EVP_PKEY_CTX_new(params, NULL);
+        ctx = EVP_PKEY_CTX_new_from_pkey(app_get0_libctx(), params,
+                app_get0_propq());
         if (ctx == NULL) {
             BIO_printf(bio_err,
                        "Error, DSA key generation context allocation failed\n");
             goto end;
         }
-        if (!EVP_PKEY_keygen_init(ctx)) {
+        if (EVP_PKEY_keygen_init(ctx) <= 0) {
             BIO_printf(bio_err,
                        "Error, unable to initialise for key generation\n");
             goto end;
         }
-        if (!EVP_PKEY_keygen(ctx, &pkey)) {
-            BIO_printf(bio_err, "Error, unable to generate key\n");
-            goto end;
-        }
+        pkey = app_keygen(ctx, "DSA", numbits, verbose);
         assert(private);
         if (outformat == FORMAT_ASN1)
             i = i2d_PrivateKey_bio(out, pkey);

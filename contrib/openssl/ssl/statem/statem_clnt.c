@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
  * Copyright (c) 2002, Oracle and/or its affiliates. All rights reserved
  * Copyright 2005 Nokia. All rights reserved.
  *
@@ -26,7 +26,7 @@
 #include <openssl/trace.h>
 #include <openssl/core_names.h>
 #include <openssl/param_build.h>
-#include <internal/cryptlib.h>
+#include "internal/cryptlib.h"
 
 static MSG_PROCESS_RETURN tls_process_as_hello_retry_request(SSL *s, PACKET *pkt);
 static MSG_PROCESS_RETURN tls_process_encrypted_extensions(SSL *s, PACKET *pkt);
@@ -168,7 +168,8 @@ static int ossl_statem_client13_read_transition(SSL *s, int mt)
         }
         if (mt == SSL3_MT_CERTIFICATE_REQUEST) {
 #if DTLS_MAX_VERSION_INTERNAL != DTLS1_2_VERSION
-# error TODO(DTLS1.3): Restore digest for PHA before adding message.
+            /* Restore digest for PHA before adding message.*/
+# error Internal DTLS version error
 #endif
             if (!SSL_IS_DTLS(s) && s->post_handshake_auth == SSL_PHA_EXT_SENT) {
                 s->post_handshake_auth = SSL_PHA_REQUESTED;
@@ -995,7 +996,8 @@ size_t ossl_statem_client_max_message_size(SSL *s)
         return CCS_MAX_LENGTH;
 
     case TLS_ST_CR_SESSION_TICKET:
-        return SSL3_RT_MAX_PLAIN_LENGTH;
+        return (SSL_IS_TLS13(s)) ? SESSION_TICKET_MAX_LENGTH_TLS13
+                                 : SESSION_TICKET_MAX_LENGTH_TLS12;
 
     case TLS_ST_CR_FINISHED:
         return FINISHED_MAX_LENGTH;
@@ -1191,7 +1193,7 @@ int tls_construct_client_hello(SSL *s, WPACKET *pkt)
             session_id = s->tmp_session_id;
             if (s->hello_retry_request == SSL_HRR_NONE
                     && RAND_bytes_ex(s->ctx->libctx, s->tmp_session_id,
-                                     sess_id_len) <= 0) {
+                                     sess_id_len, 0) <= 0) {
                 SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
                 return 0;
             }
@@ -1344,12 +1346,14 @@ static int set_client_ciphersuite(SSL *s, const unsigned char *cipherchars)
         s->session->cipher_id = s->session->cipher->id;
     if (s->hit && (s->session->cipher_id != c->id)) {
         if (SSL_IS_TLS13(s)) {
+            const EVP_MD *md = ssl_md(s->ctx, c->algorithm2);
+
             /*
              * In TLSv1.3 it is valid for the server to select a different
              * ciphersuite as long as the hash is the same.
              */
-            if (ssl_md(s->ctx, c->algorithm2)
-                    != ssl_md(s->ctx, s->session->cipher->algorithm2)) {
+            if (md == NULL
+                    || md != ssl_md(s->ctx, s->session->cipher->algorithm2)) {
                 SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER,
                          SSL_R_CIPHERSUITE_DIGEST_HAS_CHANGED);
                 return 0;
@@ -1393,6 +1397,10 @@ MSG_PROCESS_RETURN tls_process_server_hello(SSL *s, PACKET *pkt)
             && sversion == TLS1_2_VERSION
             && PACKET_remaining(pkt) >= SSL3_RANDOM_SIZE
             && memcmp(hrrrandom, PACKET_data(pkt), SSL3_RANDOM_SIZE) == 0) {
+        if (s->hello_retry_request != SSL_HRR_NONE) {
+            SSLfatal(s, SSL_AD_UNEXPECTED_MESSAGE, SSL_R_UNEXPECTED_MESSAGE);
+            goto err;
+        }
         s->hello_retry_request = SSL_HRR_PENDING;
         hrr = 1;
         if (!PACKET_forward(pkt, SSL3_RANDOM_SIZE)) {
@@ -1567,7 +1575,7 @@ MSG_PROCESS_RETURN tls_process_server_hello(SSL *s, PACKET *pkt)
          * overwritten if the server refuses resumption.
          */
         if (s->session->session_id_length > 0) {
-            tsan_counter(&s->session_ctx->stats.sess_miss);
+            ssl_tsan_counter(s->session_ctx, &s->session_ctx->stats.sess_miss);
             if (!ssl_get_new_session(s, 0)) {
                 /* SSLfatal() already called */
                 goto err;
@@ -1857,9 +1865,10 @@ WORK_STATE tls_post_process_server_certificate(SSL *s, WORK_STATE wst)
     size_t certidx;
     int i;
 
+    if (s->rwstate == SSL_RETRY_VERIFY)
+        s->rwstate = SSL_NOTHING;
     i = ssl_verify_cert_chain(s, s->session->peer_chain);
-    if (i == -1) {
-        s->rwstate = SSL_RETRY_VERIFY;
+    if (i > 0 && s->rwstate == SSL_RETRY_VERIFY) {
         return WORK_MORE_A;
     }
     /*
@@ -1882,10 +1891,6 @@ WORK_STATE tls_post_process_server_certificate(SSL *s, WORK_STATE wst)
         return WORK_ERROR;
     }
     ERR_clear_error();          /* but we keep s->verify_result */
-    if (i > 1) {
-        SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, i);
-        return WORK_ERROR;
-    }
 
     /*
      * Inconsistency alert: cert_chain does include the peer's certificate,
@@ -1985,7 +1990,6 @@ static int tls_process_ske_srp(SSL *s, PACKET *pkt, EVP_PKEY **pkey)
         return 0;
     }
 
-    /* TODO(size_t): Convert BN_bin2bn() calls */
     if ((s->srp_ctx.N =
          BN_bin2bn(PACKET_data(&prime),
                    (int)PACKET_remaining(&prime), NULL)) == NULL
@@ -2035,7 +2039,6 @@ static int tls_process_ske_dhe(SSL *s, PACKET *pkt, EVP_PKEY **pkey)
         return 0;
     }
 
-    /* TODO(size_t): Convert these calls */
     p = BN_bin2bn(PACKET_data(&prime), (int)PACKET_remaining(&prime), NULL);
     g = BN_bin2bn(PACKET_data(&generator), (int)PACKET_remaining(&generator),
                   NULL);
@@ -2083,7 +2086,8 @@ static int tls_process_ske_dhe(SSL *s, PACKET *pkt, EVP_PKEY **pkey)
         goto err;
     }
 
-    if (!ssl_security(s, SSL_SECOP_TMP_DH, EVP_PKEY_security_bits(peer_tmp),
+    if (!ssl_security(s, SSL_SECOP_TMP_DH,
+                      EVP_PKEY_get_security_bits(peer_tmp),
                       0, peer_tmp)) {
         SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE, SSL_R_DH_KEY_TOO_SMALL);
         goto err;
@@ -2167,6 +2171,8 @@ static int tls_process_ske_ecdhe(SSL *s, PACKET *pkt, EVP_PKEY **pkey)
         *pkey = X509_get0_pubkey(s->session->peer);
     /* else anonymous ECDH, so no certificate or pkey. */
 
+    /* Cache the agreed upon group in the SSL_SESSION */
+    s->session->kex_group = curve_id;
     return 1;
 }
 
@@ -2256,7 +2262,7 @@ MSG_PROCESS_RETURN tls_process_key_exchange(SSL *s, PACKET *pkt)
         }
         if (SSL_USE_SIGALGS(s))
             OSSL_TRACE1(TLS, "USING TLSv1.2 HASH %s\n",
-                        md == NULL ? "n/a" : EVP_MD_name(md));
+                        md == NULL ? "n/a" : EVP_MD_get0_name(md));
 
         if (!PACKET_get_length_prefixed_2(pkt, &signature)
             || PACKET_remaining(pkt) != 0) {
@@ -2271,7 +2277,7 @@ MSG_PROCESS_RETURN tls_process_key_exchange(SSL *s, PACKET *pkt)
         }
 
         if (EVP_DigestVerifyInit_ex(md_ctx, &pctx,
-                                    md == NULL ? NULL : EVP_MD_name(md),
+                                    md == NULL ? NULL : EVP_MD_get0_name(md),
                                     s->ctx->libctx, s->ctx->propq, pkey,
                                     NULL) <= 0) {
             SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB);
@@ -2508,11 +2514,8 @@ MSG_PROCESS_RETURN tls_process_new_session_ticket(SSL *s, PACKET *pkt)
         s->session = new_sess;
     }
 
-    /*
-     * Technically the cast to long here is not guaranteed by the C standard -
-     * but we use it elsewhere, so this should be ok.
-     */
-    s->session->time = (long)time(NULL);
+    s->session->time = time(NULL);
+    ssl_session_calculate_timeout(s->session);
 
     OPENSSL_free(s->session->ext.tick);
     s->session->ext.tick = NULL;
@@ -2570,7 +2573,7 @@ MSG_PROCESS_RETURN tls_process_new_session_ticket(SSL *s, PACKET *pkt)
         goto err;
     }
     /*
-     * TODO(size_t): we use sess_len here because EVP_Digest expects an int
+     * We use sess_len here because EVP_Digest expects an int
      * but s->session->session_id_length is a size_t
      */
     if (!EVP_Digest(s->session->ext.tick, ticklen,
@@ -2587,7 +2590,7 @@ MSG_PROCESS_RETURN tls_process_new_session_ticket(SSL *s, PACKET *pkt)
     /* This is a standalone message in TLSv1.3, so there is no more to read */
     if (SSL_IS_TLS13(s)) {
         const EVP_MD *md = ssl_handshake_md(s);
-        int hashleni = EVP_MD_size(md);
+        int hashleni = EVP_MD_get_size(md);
         size_t hashlen;
         static const unsigned char nonce_label[] = "resumption";
 
@@ -2850,8 +2853,7 @@ static int tls_construct_cke_rsa(SSL *s, WPACKET *pkt)
 
     pms[0] = s->client_version >> 8;
     pms[1] = s->client_version & 0xff;
-    /* TODO(size_t): Convert this function */
-    if (RAND_bytes_ex(s->ctx->libctx, pms + 2, (int)(pmslen - 2)) <= 0) {
+    if (RAND_bytes_ex(s->ctx->libctx, pms + 2, pmslen - 2, 0) <= 0) {
         SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_MALLOC_FAILURE);
         goto err;
     }
@@ -2931,7 +2933,7 @@ static int tls_construct_cke_dhe(SSL *s, WPACKET *pkt)
     encoded_pub_len = EVP_PKEY_get1_encoded_public_key(ckey, &encoded_pub);
     if (encoded_pub_len == 0) {
         SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
-        EVP_PKEY_free(skey);
+        EVP_PKEY_free(ckey);
         return EXT_RETURN_FAIL;
     }
 
@@ -2940,7 +2942,7 @@ static int tls_construct_cke_dhe(SSL *s, WPACKET *pkt)
      * stack, we need to zero pad the DHE pub key to the same length
      * as the prime.
      */
-    prime_len = EVP_PKEY_size(ckey);
+    prime_len = EVP_PKEY_get_size(ckey);
     pad_len = prime_len - encoded_pub_len;
     if (pad_len > 0) {
         if (!WPACKET_sub_allocate_bytes_u16(pkt, pad_len, &keybytes)) {
@@ -3056,9 +3058,8 @@ static int tls_construct_cke_gost(SSL *s, WPACKET *pkt)
 
     if (EVP_PKEY_encrypt_init(pkey_ctx) <= 0
         /* Generate session key
-         * TODO(size_t): Convert this function
          */
-        || RAND_bytes_ex(s->ctx->libctx, pms, (int)pmslen) <= 0) {
+        || RAND_bytes_ex(s->ctx->libctx, pms, pmslen, 0) <= 0) {
         SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
         goto err;
     };
@@ -3080,7 +3081,7 @@ static int tls_construct_cke_gost(SSL *s, WPACKET *pkt)
     EVP_MD_CTX_free(ukm_hash);
     ukm_hash = NULL;
     if (EVP_PKEY_CTX_ctrl(pkey_ctx, -1, EVP_PKEY_OP_ENCRYPT,
-                          EVP_PKEY_CTRL_SET_IV, 8, shared_ukm) < 0) {
+                          EVP_PKEY_CTRL_SET_IV, 8, shared_ukm) <= 0) {
         SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_LIBRARY_BUG);
         goto err;
     }
@@ -3157,7 +3158,8 @@ static int tls_construct_cke_gost18(SSL *s, WPACKET *pkt)
 {
 #ifndef OPENSSL_NO_GOST
     /* GOST 2018 key exchange message creation */
-    unsigned char rnd_dgst[32], tmp[255];
+    unsigned char rnd_dgst[32];
+    unsigned char *encdata = NULL;
     EVP_PKEY_CTX *pkey_ctx = NULL;
     X509 *peer_cert;
     unsigned char *pms = NULL;
@@ -3183,7 +3185,7 @@ static int tls_construct_cke_gost18(SSL *s, WPACKET *pkt)
         goto err;
     }
 
-    if (RAND_bytes_ex(s->ctx->libctx, pms, (int)pmslen) <= 0) {
+    if (RAND_bytes_ex(s->ctx->libctx, pms, pmslen, 0) <= 0) {
         SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
         goto err;
     }
@@ -3193,7 +3195,7 @@ static int tls_construct_cke_gost18(SSL *s, WPACKET *pkt)
     if (peer_cert == NULL) {
         SSLfatal(s, SSL_AD_HANDSHAKE_FAILURE,
                  SSL_R_NO_GOST_CERTIFICATE_SENT_BY_PEER);
-        return 0;
+        goto err;
     }
 
     pkey_ctx = EVP_PKEY_CTX_new_from_pkey(s->ctx->libctx,
@@ -3201,7 +3203,7 @@ static int tls_construct_cke_gost18(SSL *s, WPACKET *pkt)
                                           s->ctx->propq);
     if (pkey_ctx == NULL) {
         SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_MALLOC_FAILURE);
-        return 0;
+        goto err;
     }
 
     if (EVP_PKEY_encrypt_init(pkey_ctx) <= 0 ) {
@@ -3211,29 +3213,30 @@ static int tls_construct_cke_gost18(SSL *s, WPACKET *pkt)
 
     /* Reuse EVP_PKEY_CTRL_SET_IV, make choice in engine code */
     if (EVP_PKEY_CTX_ctrl(pkey_ctx, -1, EVP_PKEY_OP_ENCRYPT,
-                          EVP_PKEY_CTRL_SET_IV, 32, rnd_dgst) < 0) {
+                          EVP_PKEY_CTRL_SET_IV, 32, rnd_dgst) <= 0) {
         SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_LIBRARY_BUG);
         goto err;
     }
 
     if (EVP_PKEY_CTX_ctrl(pkey_ctx, -1, EVP_PKEY_OP_ENCRYPT,
-                          EVP_PKEY_CTRL_CIPHER, cipher_nid, NULL) < 0) {
+                          EVP_PKEY_CTRL_CIPHER, cipher_nid, NULL) <= 0) {
         SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_LIBRARY_BUG);
         goto err;
     }
 
-    msglen = 255;
-    if (EVP_PKEY_encrypt(pkey_ctx, tmp, &msglen, pms, pmslen) <= 0) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_LIBRARY_BUG);
+    if (EVP_PKEY_encrypt(pkey_ctx, NULL, &msglen, pms, pmslen) <= 0) {
+        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB);
         goto err;
     }
 
-    if (!WPACKET_memcpy(pkt, tmp, msglen)) {
-        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
+    if (!WPACKET_allocate_bytes(pkt, msglen, &encdata)
+            || EVP_PKEY_encrypt(pkey_ctx, encdata, &msglen, pms, pmslen) <= 0) {
+        SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_EVP_LIB);
         goto err;
     }
 
     EVP_PKEY_CTX_free(pkey_ctx);
+    pkey_ctx = NULL;
     s->s3.tmp.pms = pms;
     s->s3.tmp.pmslen = pmslen;
 

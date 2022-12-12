@@ -1,5 +1,5 @@
 /*
- * Copyright 2007-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2007-2022 The OpenSSL Project Authors. All Rights Reserved.
  * Copyright Nokia 2007-2019
  * Copyright Siemens AG 2015-2019
  *
@@ -90,7 +90,7 @@ ASN1_BIT_STRING *ossl_cmp_calc_protection(const OSSL_CMP_CTX *ctx,
             goto end;
 
         if ((prot = ASN1_BIT_STRING_new()) == NULL)
-            return NULL;
+            goto end;
         /* OpenSSL defaults all bit strings to be encoded as ASN.1 NamedBitList */
         prot->flags &= ~(ASN1_STRING_FLAG_BITS_LEFT | 0x07);
         prot->flags |= ASN1_STRING_FLAG_BITS_LEFT;
@@ -195,7 +195,7 @@ static int set_pbmac_algor(const OSSL_CMP_CTX *ctx, X509_ALGOR **alg)
         return 0;
 
     pbm = OSSL_CRMF_pbmp_new(ctx->libctx, ctx->pbm_slen,
-                             EVP_MD_type(ctx->pbm_owf), ctx->pbm_itercnt,
+                             EVP_MD_get_type(ctx->pbm_owf), ctx->pbm_itercnt,
                              ctx->pbm_mac);
     pbm_str = ASN1_STRING_new();
     if (pbm == NULL || pbm_str == NULL)
@@ -227,8 +227,8 @@ static int set_sig_algor(const OSSL_CMP_CTX *ctx, X509_ALGOR **alg)
     int nid = 0;
     ASN1_OBJECT *algo = NULL;
 
-    if (!OBJ_find_sigid_by_algs(&nid, EVP_MD_type(ctx->digest),
-                                EVP_PKEY_id(ctx->pkey))) {
+    if (!OBJ_find_sigid_by_algs(&nid, EVP_MD_get_type(ctx->digest),
+                                EVP_PKEY_get_id(ctx->pkey))) {
         ERR_raise(ERR_LIB_CMP, CMP_R_UNSUPPORTED_KEY_TYPE);
         return 0;
     }
@@ -258,7 +258,6 @@ int ossl_cmp_msg_protect(OSSL_CMP_CTX *ctx, OSSL_CMP_MSG *msg)
 
     /*
      * For the case of re-protection remove pre-existing protection.
-     * TODO: Consider also removing any pre-existing extraCerts.
      */
     X509_ALGOR_free(msg->header->protectionAlg);
     msg->header->protectionAlg = NULL;

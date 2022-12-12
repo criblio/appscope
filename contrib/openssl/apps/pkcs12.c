@@ -1,5 +1,5 @@
 /*
- * Copyright 1999-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1999-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -143,7 +143,7 @@ const OPTIONS pkcs12_options[] = {
      "Encrypt output with 3DES (default PBES2 with PBKDF2 and AES-256 CBC)"},
 #endif
     {"macalg", OPT_MACALG, 's',
-     "Digest algorithm to use in MAC (default SHA1)"},
+     "Digest algorithm to use in MAC (default SHA256)"},
     {"iter", OPT_ITER, 'p', "Specify the iteration count for encryption and MAC"},
     {"noiter", OPT_NOITER, '-', "Don't use encryption iteration"},
     {"nomaciter", OPT_NOMACITER, '-', "Don't use MAC iteration)"},
@@ -364,7 +364,7 @@ int pkcs12_main(int argc, char **argv)
         goto end;
 
     if (ciphername != NULL) {
-        if (!opt_cipher(ciphername, &enc))
+        if (!opt_cipher_any(ciphername, &enc))
             goto opthelp;
     }
     if (export_pkcs12) {
@@ -571,8 +571,6 @@ int pkcs12_main(int argc, char **argv)
                                infile);
                     goto export_end;
                 }
-            } else {
-                ee_cert = X509_dup(sk_X509_value(certs, 0)); /* take 1st cert */
             }
         }
 
@@ -588,8 +586,13 @@ int pkcs12_main(int argc, char **argv)
             int vret;
             STACK_OF(X509) *chain2;
             X509_STORE *store;
+            X509 *ee_cert_tmp = ee_cert;
 
-            if (ee_cert == NULL) {
+            /* Assume the first cert if we haven't got anything else */
+            if (ee_cert_tmp == NULL && certs != NULL)
+                ee_cert_tmp = sk_X509_value(certs, 0);
+
+            if (ee_cert_tmp == NULL) {
                 BIO_printf(bio_err,
                            "No end entity certificate to check with -chain\n");
                 goto export_end;
@@ -600,7 +603,7 @@ int pkcs12_main(int argc, char **argv)
                     == NULL)
                 goto export_end;
 
-            vret = get_cert_chain(ee_cert, store, untrusted_certs, &chain2);
+            vret = get_cert_chain(ee_cert_tmp, store, untrusted_certs, &chain2);
             X509_STORE_free(store);
 
             if (vret == X509_V_OK) {
@@ -763,7 +766,8 @@ int pkcs12_main(int argc, char **argv)
     if (macver) {
         EVP_KDF *pkcs12kdf;
 
-        pkcs12kdf = EVP_KDF_fetch(NULL, "PKCS12KDF", NULL);
+        pkcs12kdf = EVP_KDF_fetch(app_get0_libctx(), "PKCS12KDF",
+                                  app_get0_propq());
         if (pkcs12kdf == NULL) {
             BIO_printf(bio_err, "Error verifying PKCS12 MAC; no PKCS12KDF support.\n");
             BIO_printf(bio_err, "Use -nomacver if MAC verification is not required.\n");
@@ -1138,7 +1142,8 @@ void print_attribute(BIO *out, const ASN1_TYPE *av)
         break;
 
     case V_ASN1_UTF8STRING:
-        BIO_printf(out, "%s\n", av->value.utf8string->data);
+        BIO_printf(out, "%.*s\n", av->value.utf8string->length,
+                   av->value.utf8string->data);
         break;
 
     case V_ASN1_OCTET_STRING:

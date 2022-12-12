@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -41,6 +40,49 @@ type allowProcConfig struct {
 var (
 	errMissingData = errors.New("missing filter data")
 )
+
+// get the list of PID(s) related to containers
+func getContainersPids() []int {
+	cPids := []int{}
+
+	ctrDPids, err := util.GetContainerDPids()
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("Discover ContainerD containers failed.")
+	}
+	if ctrDPids != nil {
+		cPids = append(cPids, ctrDPids...)
+	}
+
+	podmanPids, err := util.GetPodmanPids()
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("Discover Podman containers failed.")
+	}
+	if podmanPids != nil {
+		cPids = append(cPids, podmanPids...)
+	}
+
+	lxcPids, err := util.GetLXCPids()
+	if err != nil {
+		switch {
+		case errors.Is(err, util.ErrLXDSocketNotAvailable):
+			log.Warn().
+				Msgf("Setup LXC containers skipped. LXD is not available")
+		default:
+			log.Error().
+				Err(err).
+				Msg("Discover LXC containers failed.")
+		}
+	}
+	if lxcPids != nil {
+		cPids = append(cPids, lxcPids...)
+	}
+
+	return cPids
+}
 
 // TODO: the file creation steps here might not be needed because a filter file should be present
 // and libscope.so should detect it (when that functionality is complete)
@@ -170,26 +212,10 @@ func startConfigureHost(filename string) error {
 }
 
 // for all containers
-func startConfigureContainers(filename string) error {
-	// Discover all containers
-	cPids, err := util.GetDockerPids()
-	if err != nil {
-		switch {
-		case errors.Is(err, util.ErrDockerNotAvailable):
-			log.Warn().
-				Msgf("Configure containers skipped. Docker is not available")
-		default:
-			log.Error().
-				Err(err).
-				Msg("Configure containers failed.")
-		}
-		return nil
-	}
-
-	ld := loader.ScopeLoader{Path: run.LdscopePath()}
-
+func startConfigureContainers(filename string, cPids []int) error {
 	// Iterate over all containers
 	for _, cPid := range cPids {
+		ld := loader.ScopeLoader{Path: run.LdscopePath()}
 		stdoutStderr, err := ld.ConfigureContainer(filename, cPid)
 		if err != nil {
 			log.Warn().
@@ -241,29 +267,13 @@ func startServiceHost(allowProcs []allowProcConfig) error {
 
 // for all containers
 // for all allowed proc
-func startServiceContainers(allowProcs []allowProcConfig) error {
-	// Discover all containers
-	cPids, err := util.GetDockerPids()
-	if err != nil {
-		switch {
-		case errors.Is(err, util.ErrDockerNotAvailable):
-			log.Warn().
-				Msgf("Setup container services skipped. Docker is not available")
-		default:
-			log.Warn().
-				Err(err).
-				Msg("Setup container services failed.")
-		}
-		return nil
-	}
-
-	ld := loader.ScopeLoader{Path: run.LdscopePath()}
-
+func startServiceContainers(allowProcs []allowProcConfig, cPids []int) error {
 	// Iterate over all allowed processses
 	for _, process := range allowProcs {
 		if process.Procname != "" {
 			// Iterate over all containers
 			for _, cPid := range cPids {
+				ld := loader.ScopeLoader{Path: run.LdscopePath()}
 				stdoutStderr, err := ld.ServiceContainer(process.Procname, cPid)
 				if err == nil {
 					log.Info().
@@ -304,7 +314,7 @@ func extract(scopeDirVersion string) error {
 		return err
 	}
 
-	if err = ioutil.WriteFile(filepath.Join(scopeDirVersion, "ldscope"), b, perms); err != nil {
+	if err = os.WriteFile(filepath.Join(scopeDirVersion, "ldscope"), b, perms); err != nil {
 		log.Error().
 			Err(err).
 			Msgf("Error writing ldscope to %s.", scopeDirVersion)
@@ -312,7 +322,7 @@ func extract(scopeDirVersion string) error {
 	}
 
 	// Copy scope
-	if _, err := util.CopyFile(os.Args[0], filepath.Join(scopeDirVersion, "scope")); err != nil {
+	if _, err := util.CopyFile(os.Args[0], filepath.Join(scopeDirVersion, "scope"), perms); err != nil {
 		if err != os.ErrExist {
 			log.Error().
 				Err(err).
@@ -501,7 +511,10 @@ func Start() error {
 		return err
 	}
 
-	if err := startConfigureContainers(filterPath); err != nil {
+	// Discover all container PID(s)
+	cPids := getContainersPids()
+
+	if err := startConfigureContainers(filterPath, cPids); err != nil {
 		return err
 	}
 
@@ -509,7 +522,7 @@ func Start() error {
 		return err
 	}
 
-	if err := startServiceContainers(startCfg.AllowProc); err != nil {
+	if err := startServiceContainers(startCfg.AllowProc, cPids); err != nil {
 		return err
 	}
 

@@ -16,7 +16,6 @@
 # include <openssl/opensslconf.h>
 # include <openssl/evp.h>
 
-const char *ossl_ec_curve_nid2name(int nid);
 int ossl_ec_curve_name2nid(const char *name);
 const char *ossl_ec_curve_nid2nist_int(int nid);
 int ossl_ec_curve_nist2nid_int(const char *name);
@@ -25,7 +24,6 @@ int evp_pkey_ctx_set_ec_param_enc_prov(EVP_PKEY_CTX *ctx, int param_enc);
 # ifndef OPENSSL_NO_EC
 #  include <openssl/core.h>
 #  include <openssl/ec.h>
-#  include <openssl/x509.h>
 #  include "crypto/types.h"
 
 /*-
@@ -81,6 +79,7 @@ int ossl_ec_key_fromdata(EC_KEY *ecx, const OSSL_PARAM params[],
 int ossl_ec_key_otherparams_fromdata(EC_KEY *ec, const OSSL_PARAM params[]);
 int ossl_ec_key_is_foreign(const EC_KEY *ec);
 EC_KEY *ossl_ec_key_dup(const EC_KEY *key, int selection);
+int ossl_x509_algor_is_sm2(const X509_ALGOR *palg);
 EC_KEY *ossl_ec_key_param_from_x509_algor(const X509_ALGOR *palg,
                                           OSSL_LIB_CTX *libctx,
                                           const char *propq);

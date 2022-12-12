@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2016-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -16,21 +16,17 @@
 #include "ssl_test_ctx.h"
 #include "../testutil.h"
 
-#ifdef OPENSSL_SYS_WINDOWS
-# define strcasecmp _stricmp
-#endif
-
 static const int default_app_data_size = 256;
 /* Default set to be as small as possible to exercise fragmentation. */
 static const int default_max_fragment_size = 512;
 
 static int parse_boolean(const char *value, int *result)
 {
-    if (strcasecmp(value, "Yes") == 0) {
+    if (OPENSSL_strcasecmp(value, "Yes") == 0) {
         *result = 1;
         return 1;
     }
-    else if (strcasecmp(value, "No") == 0) {
+    else if (OPENSSL_strcasecmp(value, "No") == 0) {
         *result = 0;
         return 1;
     }
@@ -124,6 +120,7 @@ static const test_enum ssl_alerts[] = {
     {"UnknownCA", SSL_AD_UNKNOWN_CA},
     {"HandshakeFailure", SSL_AD_HANDSHAKE_FAILURE},
     {"UnrecognizedName", SSL_AD_UNRECOGNIZED_NAME},
+    {"NoRenegotiation", SSL_AD_NO_RENEGOTIATION},
     {"BadCertificate", SSL_AD_BAD_CERTIFICATE},
     {"NoApplicationProtocol", SSL_AD_NO_APPLICATION_PROTOCOL},
     {"CertificateRequired", SSL_AD_CERTIFICATE_REQUIRED},

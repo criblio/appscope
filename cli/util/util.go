@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"math/rand"
 	"os"
@@ -350,8 +351,8 @@ func Confirm(s string) bool {
 	return false
 }
 
-// CopyFile copies a file from a source to a destination
-func CopyFile(src, dst string) (int64, error) {
+// CopyFile copies a file from a source to a destination with specific permissions
+func CopyFile(src, dst string, mode fs.FileMode) (int64, error) {
 	source, err := os.Open(src)
 	if err != nil {
 		return 0, err
@@ -363,6 +364,10 @@ func CopyFile(src, dst string) (int64, error) {
 		return 0, err
 	}
 	defer destination.Close()
+
+	if err := os.Chmod(dst, mode); err != nil {
+		return 0, err
+	}
 
 	nBytes, err := io.Copy(destination, source)
 	return nBytes, err

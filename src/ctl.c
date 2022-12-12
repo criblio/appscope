@@ -1126,7 +1126,7 @@ ctlNeedsConnection(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportNeedsConnection(ctl->paytrans) :
         transportNeedsConnection(ctl->transport);
 }
@@ -1136,7 +1136,7 @@ ctlConnection(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportConnection(ctl->paytrans) :
         transportConnection(ctl->transport);
 }
@@ -1146,7 +1146,7 @@ ctlConnect(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportConnect(ctl->paytrans) :
         transportConnect(ctl->transport);
 }
@@ -1156,7 +1156,7 @@ ctlConnectAttempts(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportConnectAttempts(ctl->paytrans) :
         transportConnectAttempts(ctl->transport);
 }
@@ -1166,7 +1166,7 @@ ctlDisconnect(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportDisconnect(ctl->paytrans) :
         transportDisconnect(ctl->transport);
 }
@@ -1176,7 +1176,7 @@ ctlReconnect(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportReconnect(ctl->paytrans) :
         transportReconnect(ctl->transport);
 }
@@ -1186,7 +1186,7 @@ ctlTransportFailureReason(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return 0;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportFailureReason(ctl->paytrans) :
         transportFailureReason(ctl->transport);
 }
@@ -1219,7 +1219,7 @@ ctlTransportType(ctl_t *ctl, which_transport_t who)
 {
     if (!ctl) return (cfg_transport_t)-1;
 
-    return ((who == CFG_LS) && (ctl->paytrans)) ?
+    return (who == CFG_LS) ?
         transportType(ctl->paytrans) :
         transportType(ctl->transport);
 }

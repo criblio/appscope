@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2019-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -116,7 +116,7 @@ ret:
     /* Otherwise use default. */
     if (rc == -1)
         rc = ossl_ec_wNAF_mul(group, r, scalar, num, points, scalars, ctx);
-    OPENSSL_cleanse(param + S390X_OFF_SCALAR(len), len);
+    OPENSSL_cleanse(param, sizeof(param));
     BN_CTX_end(ctx);
     BN_CTX_free(new_ctx);
     return rc;
@@ -173,6 +173,10 @@ static ECDSA_SIG *ecdsa_s390x_nistp_sign_sig(const unsigned char *dgst,
     }
 
     if (r == NULL || kinv == NULL) {
+        if (len < 0) {
+            ERR_raise(ERR_LIB_EC, EC_R_INVALID_LENGTH);
+            goto ret;
+        }
         /*
          * Generate random k and copy to param param block. RAND_priv_bytes_ex
          * is used instead of BN_priv_rand_range or BN_generate_dsa_nonce
@@ -180,7 +184,7 @@ static ECDSA_SIG *ecdsa_s390x_nistp_sign_sig(const unsigned char *dgst,
          * internally implementing counter-measures for RNG weakness.
          */
          if (RAND_priv_bytes_ex(eckey->libctx, param + S390X_OFF_RN(len),
-                                len) != 1) {
+                                (size_t)len, 0) != 1) {
              ERR_raise(ERR_LIB_EC, EC_R_RANDOM_NUMBER_GENERATION_FAILED);
              goto ret;
          }
@@ -208,7 +212,7 @@ static ECDSA_SIG *ecdsa_s390x_nistp_sign_sig(const unsigned char *dgst,
 
     ok = 1;
 ret:
-    OPENSSL_cleanse(param + S390X_OFF_K(len), 2 * len);
+    OPENSSL_cleanse(param, sizeof(param));
     if (ok != 1) {
         ECDSA_SIG_free(sig);
         sig = NULL;

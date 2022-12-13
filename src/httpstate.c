@@ -812,6 +812,15 @@ doHttpBuffer(http_state_t states[HTTP_NUM], net_info *net, char *buf, size_t len
 }
 
 bool
+detectHttp(void *buf, size_t len)
+{
+    if ((len >= HTTP2_MAGIC_LEN && !scope_strncmp(buf, HTTP2_MAGIC, HTTP2_MAGIC_LEN)) ||
+        (searchExec(g_http_start, buf, len) != -1)) return TRUE;
+
+    return FALSE;
+}
+
+bool
 doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t src, src_data_t dtype)
 {
     if (!buf || !len) {

@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include "log.h"
 #include "scopetypes.h"
+#include "state.h"
 
 typedef struct _dbg_t dbg_t;
 
@@ -73,6 +74,7 @@ extern bool g_ismusl;
 void scopeLog(cfg_log_level_t, const char *, ...) PRINTF_FORMAT(2,3);
 void scopeLogHex(cfg_log_level_t, const void *, size_t, const char *, ...) PRINTF_FORMAT(4,5);
 void scopeBacktrace(cfg_log_level_t);
+void scopeHexDump(cfg_log_level_t, src_data_t, void *, size_t);
 
 #define scopeLogError(...) scopeLog(CFG_LOG_ERROR, __VA_ARGS__)
 #define scopeLogWarn(...)  scopeLog(CFG_LOG_WARN,  __VA_ARGS__)

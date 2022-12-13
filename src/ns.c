@@ -213,15 +213,11 @@ nsService(pid_t hostPid, const char *serviceName) {
  */
 service_status_t
 nsUnservice(pid_t hostPid) {
-
-    uid_t nsUid = nsInfoTranslateUid(hostPid);
-    gid_t nsGid = nsInfoTranslateGid(hostPid);
-
     if (setNamespace(hostPid, "mnt") == FALSE) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    return setupUnservice(nsUid, nsGid);
+    return setupUnservice();
 }
  
  /*
@@ -256,15 +252,12 @@ nsConfigure(pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize) {
  */
 int
 nsUnconfigure(pid_t pid) {
-    uid_t nsUid = nsInfoTranslateUid(pid);
-    gid_t nsGid = nsInfoTranslateGid(pid);
-
     if (setNamespace(pid, "mnt") == FALSE) {
         scope_fprintf(scope_stderr, "setNamespace mnt failed\n");
         return EXIT_FAILURE;
     }
 
-    if (setupUnconfigure(nsUid, nsGid)) {
+    if (setupUnconfigure()) {
         scope_fprintf(scope_stderr, "setup child namespace failed\n");
         return EXIT_FAILURE;
     }

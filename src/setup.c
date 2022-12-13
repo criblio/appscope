@@ -389,7 +389,7 @@ modifyServiceCfgSystemd(const char *serviceCfgPath, const char *libscopePath, ui
 }
 
 static service_status_t
-removeServiceCfgsSystemd(uid_t nsEuid, gid_t nsEgid) {
+removeServiceCfgsSystemd(void) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
     char cfgScript[PATH_MAX] = {0};
     struct stat st = {0};
@@ -433,7 +433,7 @@ removeServiceCfgsSystemd(uid_t nsEuid, gid_t nsEgid) {
 }
 
 static service_status_t
-removeServiceCfgsInitD(uid_t nsEuid, gid_t nsEgid) {
+removeServiceCfgsInitD(void) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
     char cfgScript[PATH_MAX] = {0};
     DIR *d;
@@ -463,7 +463,7 @@ removeServiceCfgsInitD(uid_t nsEuid, gid_t nsEgid) {
 }
 
 static service_status_t
-removeServiceCfgsOpenRC(uid_t nsEuid, gid_t nsEgid) {
+removeServiceCfgsOpenRC(void) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
     char cfgScript[PATH_MAX] = {0};
     DIR *d;
@@ -498,7 +498,7 @@ struct service_ops {
     service_cfg_status_t (*serviceCfgStatus)(const char *serviceCfgPath, uid_t nsUid, gid_t nsGid);
     service_status_t (*newServiceCfg)(const char *serviceCfgPath, const char *libscopePath, uid_t nsUid, gid_t nsGid);
     service_status_t (*modifyServiceCfg)(const char *serviceCfgPath, const char *libscopePath, uid_t nsUid, gid_t nsGid);
-    service_status_t (*removeAllScopeServiceCfg)(uid_t nsUid, gid_t nsGid);
+    service_status_t (*removeAllScopeServiceCfg)(void);
 };
 
 static struct service_ops SystemD = {
@@ -610,12 +610,12 @@ setupService(const char *serviceName, uid_t nsUid, gid_t nsGid) {
  * Returns SERVICE_STATUS_SUCCESS on success
  */
 service_status_t
-setupUnservice(uid_t nsUid, gid_t nsGid) {
+setupUnservice(void) {
     service_status_t res = SERVICE_STATUS_SUCCESS;
     struct service_ops serviceMgrs[] = {SystemD, InitD, OpenRc};
 
     for (int i = 0; i < (sizeof(serviceMgrs) / sizeof(struct service_ops)); i++) {
-        if ((res = serviceMgrs[i].removeAllScopeServiceCfg(nsUid, nsGid)) != SERVICE_STATUS_SUCCESS) {
+        if ((res = serviceMgrs[i].removeAllScopeServiceCfg()) != SERVICE_STATUS_SUCCESS) {
             return res;
         }
     }
@@ -817,7 +817,7 @@ setupConfigure(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
  * If files do not exist, no error will be reported
  */
 int
-setupUnconfigure() {
+setupUnconfigure(void) {
     const char* const fileRemoveList[] = {
         "/etc/profile.d/scope.sh",
         SCOPE_FILTER_USR_PATH,

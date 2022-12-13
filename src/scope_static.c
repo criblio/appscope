@@ -764,7 +764,7 @@ main(int argc, char **argv, char **env)
         }
         if (pid == -1) {
             // Service on Host
-            return setupUnservice(eUid, eGid);
+            return setupUnservice();
         } else {
             // Service on Container
             pid_t nsContainerPid = 0;

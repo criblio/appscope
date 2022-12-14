@@ -1,6 +1,7 @@
 package main
 
 /*
+#cgo LDFLAGS: -L../lib/linux/x86_64 -lloader
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,7 +25,7 @@ __attribute__((constructor)) void enter_namespace(int argc, char **argv) {
         }
         switch (opt) {
             case 'l':
-                loader(argc, argv);
+                loader(argc, argv, NULL);
 				exit(EXIT_SUCCESS);
             default:
 				break;

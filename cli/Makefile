@@ -23,6 +23,7 @@ CONFDIR := ../conf
 SCOPE := $(BINDIR)/scope
 LDSCOPE := $(BINDIR)/ldscope
 LIBSCOPE := $(LIBDIR)/libscope.so
+LIBLOADER := $(LIBDIR)/libloader.a
 CONF_YML := $(CONFDIR)/scope.yml
 
 GO_BINDATA := $(GOBIN)/go-bindata
@@ -79,7 +80,7 @@ $(GOLANGCI_LINT):
 
 rebuild: clean build 
 
-run/bundle.go: $(GO_BINDATA) $(LDSCOPE) $(LIBSCOPE) $(CONF_YML)
+run/bundle.go: $(GO_BINDATA) $(LDSCOPE) $(LIBSCOPE) $(LIBLOADER) $(CONF_YML)
 	$(RM) -r build/*
 	cp $(LDSCOPE) $(LIBSCOPE) $(CONF_YML) build/
 	$(GO_BINDATA) -o $@ -pkg run build
@@ -89,6 +90,8 @@ $(LDSCOPE):
 	@$(MAKE) -C .. bin/linux/$(ARCH)/ldscope
 $(LIBSCOPE):
 	@$(MAKE) -C .. lib/linux/$(ARCH)/libscope.so
+$(LIBLOADER):
+	@$(MAKE) -C .. lib/linux/$(ARCH)/libloader.a
 
 scope: $(SCOPE)
 

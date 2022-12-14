@@ -576,6 +576,9 @@ static struct option opts[] = {
 int
 loader(int argc, char **argv, char **env)
 {
+    printf("loader called\n");
+    exit(0);
+#if 0
     char *attachArg = NULL;
     char *configFilterPath = NULL;
     char *serviceName = NULL;
@@ -1000,4 +1003,5 @@ loader(int argc, char **argv, char **env)
     scope_free(execArgv);
     scope_perror("execve failed");
     return EXIT_FAILURE;
+#endif
 }

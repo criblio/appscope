@@ -26,10 +26,11 @@ TEST_LD_FLAGS=-Lcontrib/build/cmocka/src -lcmocka -ldl -lresolv -lrt -lpthread
 ARCH=$(shell uname -m)
 
 LIBSCOPE=lib/$(OS)/$(ARCH)/libscope.so
+LIBLOADER=lib/$(OS)/$(ARCH)/libloader.a
 LDSCOPE=bin/$(OS)/$(ARCH)/ldscope
 LDSCOPEDYN=bin/$(OS)/$(ARCH)/ldscopedyn
 
-coreall: $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN)
+coreall: $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN) $(LIBLOADER)
 
 corerebuild:
 	@$(RM) $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN)
@@ -74,8 +75,15 @@ $(LDSCOPE): src/scope_static.c src/dbg.c src/libdir.c src/scopestdlib.c src/ns.c
 	$(RM) $(LDSCOPEDYN).o $(LIBSCOPE:.so=.o)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
+$(LIBLOADER): src/loader/loader.c src/loader/nsinfo.c src/loader/nsfile.c os/$(OS)/os.c src/loader/loaderelf.c src/loader/loaderutils.c src/loader/inject.c src/loader/libdir.c src/loader/ns.c src/loader/setup.c src/loader/loaderop.c src/loader/libver.c
+	@echo "$${CI:+::group::}Building $@"
+	$(CC) -c $(CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) -I./src $(INCLUDES) $^
+	ar rcs $@ *.o
+	$(RM) *.o
+	@[ -z "$(CI)" ] || echo "::endgroup::"
+
 coreclean:
-	$(RM) $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN)
+	$(RM) $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN) $(LIBLOADER)
 
 SRC_C_FILES:=$(wildcard src/*.c)
 SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))

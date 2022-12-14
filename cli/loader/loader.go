@@ -5,11 +5,26 @@ import (
 	"os/exec"
 	"strconv"
 	"syscall"
+
+	"github.com/criblio/scope/util"
 )
 
 // Loader represents ldscope object
 type ScopeLoader struct {
 	Path string
+}
+
+// Initialize the loader
+func New() ScopeLoader {
+	// Get path to this scope executable
+	exPath, err := os.Executable()
+	if err != nil {
+		util.ErrAndExit("error getting executable path, %v", err)
+	}
+
+	return ScopeLoader{
+		Path: exPath,
+	}
 }
 
 // - Setup /etc/profile.d/scope.sh on host
@@ -83,11 +98,13 @@ func (sL *ScopeLoader) StopHost() (string, error) {
 }
 
 func (sL *ScopeLoader) Run(args []string, env []string) error {
-	args = append([]string{"ldscope"}, args...)
+	args = append([]string{"--loader"}, args...)
+	args = append([]string{"scope"}, args...)
 	return syscall.Exec(sL.Path, args, env)
 }
 
 func (sL *ScopeLoader) RunSubProc(args []string, env []string) (string, error) {
+	args = append([]string{"--loader"}, args...)
 	cmd := exec.Command(sL.Path, args...)
 	cmd.Env = env
 	stdoutStderr, err := cmd.CombinedOutput()

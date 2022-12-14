@@ -91,7 +91,7 @@ func (rc *Config) Attach(args []string) error {
 		env = append(env, "SCOPE_CONF_RELOAD="+filepath.Join(rc.WorkDir, "scope.yml"))
 	}
 
-	ld := loader.ScopeLoader{Path: LdscopePath()}
+	ld := loader.New()
 	if !rc.Subprocess {
 		return ld.Attach(args, env)
 	}
@@ -178,7 +178,7 @@ func (rc *Config) detach(args []string, pid int) error {
 	}
 
 	env := os.Environ()
-	ld := loader.ScopeLoader{Path: LdscopePath()}
+	ld := loader.New()
 	if !rc.Subprocess {
 		return ld.Detach(args, env)
 	}

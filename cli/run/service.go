@@ -86,7 +86,7 @@ func (rc *Config) installScope(serviceName string, unameMachine string, unameSys
 	loaderPath := libraryDir + "/ldscope"
 	err = os.WriteFile(loaderPath, asset, 0755)
 	util.CheckErrSprintf(err, "error: failed to extract loader; %v", err)
-	ld := loader.ScopeLoader{Path: loaderPath}
+	ld := loader.New()
 	ld.Patch(path.Join(libraryDir, "libscope.so"))
 	err = os.Remove(loaderPath)
 	util.CheckErrSprintf(err, "error: failed to remove loader; %v", err)

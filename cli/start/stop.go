@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 
 	"github.com/criblio/scope/loader"
@@ -16,9 +15,9 @@ import (
 
 // for the host
 func stopConfigureHost() error {
-	sL := loader.ScopeLoader{Path: run.LdscopePath()}
+	ld := loader.New()
 
-	stdoutStderr, err := sL.UnconfigureHost()
+	stdoutStderr, err := ld.UnconfigureHost()
 	if err != nil {
 		log.Warn().
 			Err(err).
@@ -35,11 +34,11 @@ func stopConfigureHost() error {
 
 // for all containers
 func stopConfigureContainers(cPids []int) error {
-	sL := loader.ScopeLoader{Path: run.LdscopePath()}
+	ld := loader.New()
 
 	// Iterate over all containers
 	for _, cPid := range cPids {
-		stdoutStderr, err := sL.UnconfigureContainer(cPid)
+		stdoutStderr, err := ld.UnconfigureContainer(cPid)
 		if err != nil {
 			log.Warn().
 				Err(err).
@@ -59,9 +58,9 @@ func stopConfigureContainers(cPids []int) error {
 
 // for the host
 func stopServiceHost() error {
-	sL := loader.ScopeLoader{Path: run.LdscopePath()}
+	ld := loader.New()
 
-	stdoutStderr, err := sL.UnserviceHost()
+	stdoutStderr, err := ld.UnserviceHost()
 	if err == nil {
 		fmt.Print(stdoutStderr)
 		log.Info().
@@ -83,7 +82,7 @@ func stopServiceHost() error {
 
 // for all containers
 func stopServiceContainers(cPids []int) error {
-	ld := loader.ScopeLoader{Path: run.LdscopePath()}
+	ld := loader.New()
 
 	// Iterate over all containers
 	for _, cPid := range cPids {
@@ -139,7 +138,7 @@ func Stop() error {
 			return err
 		}
 
-		ld := loader.ScopeLoader{Path: filepath.Join(scopeDirVersion, "ldscope")}
+		ld := loader.New()
 		stdoutStderr, err := ld.StopHost()
 		if err == nil {
 			log.Info().

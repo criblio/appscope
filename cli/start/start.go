@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 
 	"github.com/criblio/scope/libscope"
@@ -64,8 +63,8 @@ func startAttachSingleProcess(pid string, cfgData []byte) error {
 	}
 
 	env := append(os.Environ(), "SCOPE_CONF_PATH="+tmpFile.Name())
-	sL := loader.ScopeLoader{Path: run.LdscopePath()}
-	stdoutStderr, err := sL.AttachSubProc([]string{pid}, env)
+	ld := loader.New()
+	stdoutStderr, err := ld.AttachSubProc([]string{pid}, env)
 	if err != nil {
 		log.Error().
 			Err(err).
@@ -151,8 +150,8 @@ func startAttach(allowProcs []allowProcConfig) error {
 
 // for the host
 func startConfigureHost(filename string) error {
-	sL := loader.ScopeLoader{Path: run.LdscopePath()}
-	stdoutStderr, err := sL.ConfigureHost(filename)
+	ld := loader.New()
+	stdoutStderr, err := ld.ConfigureHost(filename)
 	if err != nil {
 		log.Warn().
 			Err(err).
@@ -170,7 +169,7 @@ func startConfigureHost(filename string) error {
 func startConfigureContainers(filename string, cPids []int) error {
 	// Iterate over all containers
 	for _, cPid := range cPids {
-		ld := loader.ScopeLoader{Path: run.LdscopePath()}
+		ld := loader.New()
 		stdoutStderr, err := ld.ConfigureContainer(filename, cPid)
 		if err != nil {
 			log.Warn().
@@ -191,12 +190,12 @@ func startConfigureContainers(filename string, cPids []int) error {
 // for the host
 // for all allowed proc
 func startServiceHost(allowProcs []allowProcConfig) error {
-	sL := loader.ScopeLoader{Path: run.LdscopePath()}
+	ld := loader.New()
 
 	// Iterate over all allowed processses
 	for _, process := range allowProcs {
 		if process.Procname != "" {
-			stdoutStderr, err := sL.ServiceHost(process.Procname)
+			stdoutStderr, err := ld.ServiceHost(process.Procname)
 			if err == nil {
 				log.Info().
 					Str("service", process.Procname).
@@ -228,7 +227,7 @@ func startServiceContainers(allowProcs []allowProcConfig, cPids []int) error {
 		if process.Procname != "" {
 			// Iterate over all containers
 			for _, cPid := range cPids {
-				ld := loader.ScopeLoader{Path: run.LdscopePath()}
+				ld := loader.New()
 				stdoutStderr, err := ld.ServiceContainer(process.Procname, cPid)
 				if err == nil {
 					log.Info().
@@ -323,7 +322,7 @@ func Start() error {
 			return err
 		}
 
-		ld := loader.ScopeLoader{Path: filepath.Join(scopeDirVersion, "ldscope")}
+		ld := loader.New()
 		stdoutStderr, err := ld.StartHost()
 		if err == nil {
 			log.Info().

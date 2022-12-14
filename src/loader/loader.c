@@ -570,6 +570,7 @@ static struct option opts[] = {
     { "patch",       required_argument, 0, 'p' },
     { "starthost",   no_argument,       0, 'r' },
     { "stophost",    no_argument,       0, 'x' },
+    { "loader",      no_argument,       0, 'z' },
     { 0, 0, 0, 0 }
 };
 
@@ -603,7 +604,7 @@ loader(int argc, char **argv, char **env)
         // The initial `:` lets us handle options with optional values like
         // `-h` and `-h SECTION`.
         //
-        int opt = getopt_long(argc, argv, "+:uh:a:d:n:l:f:p:c:s:r", opts, &index);
+        int opt = getopt_long(argc, argv, "+:uh:a:d:n:l:f:p:c:s:rz", opts, &index);
         if (opt == -1) {
             break;
         }
@@ -657,6 +658,9 @@ loader(int argc, char **argv, char **env)
                 break;
             case 'x':
                 return nsHostStop();
+                break;
+            case 'z':
+                // Ignore
                 break;
             case ':':
                 // options missing their value end up here

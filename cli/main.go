@@ -1,13 +1,13 @@
 package main
 
 /*
+#if defined(__aarch64__)
+#cgo LDFLAGS: -L../lib/linux/aarch64 -lloader
+#else
 #cgo LDFLAGS: -L../lib/linux/x86_64 -lloader
-#define _GNU_SOURCE
+#endif
 #include <stdio.h>
 #include <stdlib.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sched.h>
 #include <getopt.h>
 #include "../src/loader/loader.h"
 // long aliases for short options
@@ -19,12 +19,12 @@ __attribute__((constructor)) void enter_namespace(int argc, char **argv) {
 	int index;
     for (;;) {
 		index = 0;
-        int opt = getopt_long(argc, argv, "+:l", opts, &index);
+        int opt = getopt_long(argc, argv, "+:z", opts, &index);
         if (opt == -1) {
             break;
         }
         switch (opt) {
-            case 'l':
+            case 'z':
                 loader(argc, argv, NULL);
 				exit(EXIT_SUCCESS);
             default:

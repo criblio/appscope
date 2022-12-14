@@ -10,22 +10,37 @@ package main
 #include <stdlib.h>
 #include <getopt.h>
 #include "../src/loader/loader.h"
+
 // long aliases for short options
 static struct option opts[] = {
-    {"loader",    no_argument,    0,  'l'},
-    {0,           0,              0,   0 }
+    { "usage",       no_argument,       0, 'u'},
+    { "help",        optional_argument, 0, 'h' },
+    { "attach",      required_argument, 0, 'a' },
+    { "detach",      required_argument, 0, 'd' },
+    { "namespace",   required_argument, 0, 'n' },
+    { "configure",   required_argument, 0, 'c' },
+    { "unconfigure", no_argument,       0, 'w' },
+    { "service",     required_argument, 0, 's' },
+    { "unservice",   no_argument,       0, 'v' },
+    { "libbasedir",  required_argument, 0, 'l' },
+    { "patch",       required_argument, 0, 'p' },
+    { "starthost",   no_argument,       0, 'r' },
+    { "stophost",    no_argument,       0, 'x' },
+    { "loader",      no_argument,       0, 'z' },
+    { 0, 0, 0, 0 }
 };
-__attribute__((constructor)) void enter_namespace(int argc, char **argv) {
+
+__attribute__((constructor)) void enter_namespace(int argc, char **argv, char **env) {
 	int index;
     for (;;) {
 		index = 0;
-        int opt = getopt_long(argc, argv, "+:z", opts, &index);
+        int opt = getopt_long(argc, argv, "+:uh:a:d:n:l:f:p:c:s:rz", opts, &index);
         if (opt == -1) {
             break;
         }
         switch (opt) {
             case 'z':
-                loader(argc, argv, NULL);
+                loader(argc, argv, env);
 				exit(EXIT_SUCCESS);
             default:
 				break;

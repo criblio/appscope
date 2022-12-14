@@ -284,6 +284,8 @@ void          scope_srand(unsigned int);
 int           scope_setns(int, int);
 int           scope_chown(const char *, uid_t, gid_t);
 int           scope_fchown(int, uid_t, gid_t);
+int           scope_getc(FILE *);
+int           scope_putc(int, FILE *);
 int           scope_symlink(const char *, const char *);
 
 

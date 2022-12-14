@@ -57,7 +57,7 @@ $(LDSCOPEDYN): src/fn.c src/scopestdlib.c src/nsinfo.c src/nsfile.c os/$(OS)/os.
 		-ldl -lrt -o $@ ${MUSL_AR} ${UNWIND_AR} -I./os/$(OS) $(INCLUDES)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
-$(LDSCOPE): src/scope_static.c src/libdir.c src/scopestdlib.c src/ns.c src/nsinfo.c src/nsfile.c src/setup.c src/loaderop.c src/libver.c $(LDSCOPEDYN) $(LIBSCOPE)
+$(LDSCOPE): src/scope_static.c src/dbg.c src/libdir.c src/scopestdlib.c src/ns.c src/nsinfo.c src/nsfile.c src/setup.c src/loaderop.c src/libver.c $(LDSCOPEDYN) $(LIBSCOPE)
 	@echo "$${CI:+::group::}Building $@"
 	cd $(dir $(LDSCOPEDYN)) && objcopy \
 		-I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) \
@@ -67,7 +67,7 @@ $(LDSCOPE): src/scope_static.c src/libdir.c src/scopestdlib.c src/ns.c src/nsinf
 		$(notdir $(LIBSCOPE)) $(notdir $(LIBSCOPE:.so=.o))
 	gcc -Wall -static -g $(ARCH_CFLAGS) $(DISTRO_FLAGS) \
 		-DSCOPE_VER=\"$(SCOPE_VER)\" \
-		src/scope_static.c src/scopestdlib.c src/libdir.c src/ns.c src/nsinfo.c src/nsfile.c src/setup.c src/loaderop.c src/libver.c \
+		src/scope_static.c src/dbg.c src/scopestdlib.c src/libdir.c src/ns.c src/nsinfo.c src/nsfile.c src/setup.c src/loaderop.c src/libver.c \
 		$(INCLUDES) \
 		$(LDSCOPEDYN).o $(LIBSCOPE:.so=.o) \
 		-lrt -lpthread -o $@ ${MUSL_AR} ${UNWIND_AR}
@@ -96,6 +96,7 @@ coretest: $(C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/vdsotest vdsotest.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/libvertest libvertest.o libver.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/libdirtest libdirtest.o libdir.o nsfile.o libver.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/setuptest setuptest.o setup.o loaderop.o libdir.o nsfile.o libver.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/nsinfotest nsinfotest.o nsinfo.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/strsettest strsettest.o strset.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgutilstest cfgutilstest.o cfgutils.o cfg.o mtc.o log.o evtformat.o ctl.o transport.o mtcformat.o strset.o com.o scopestdlib.o dbg.o circbuf.o linklist.o fn.o utils.o os.o test.o report.o search.o httpagg.o state.o httpstate.o metriccapture.o plattime.o $(TEST_AR) $(TEST_LD_FLAGS)

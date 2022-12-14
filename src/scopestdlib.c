@@ -209,6 +209,8 @@ extern int           scopelibc_ftruncate(int, off_t);
 extern int           scopelibc_setns(int, int);
 extern int           scopelibc_chown(const char *, uid_t, gid_t);
 extern int           scopelibc_fchown(int, uid_t, gid_t);
+extern int           scopelibc_getc(FILE *);
+extern int           scopelibc_putc(int, FILE *);
 extern int           scopelibc_symlink(const char *, const char *);
 
 static int g_go_static;
@@ -1237,6 +1239,16 @@ scope_chown(const char *pathname, uid_t owner, gid_t group) {
 int
 scope_fchown(int fd, uid_t owner, gid_t group) {
     return scopelibc_fchown(fd, owner, group);
+}
+
+int
+scope_getc(FILE *stream) {
+    return scopelibc_getc(stream);
+}
+
+int
+scope_putc(int c, FILE *stream) {
+    return scopelibc_putc(c, stream);
 }
 
 int

@@ -1,7 +1,6 @@
 /**
  * Cribl AppScope - Library Directory Implementation
  */
-
 #include "libdir.h"
 
 #define _XOPEN_SOURCE 500 // for FTW
@@ -139,7 +138,7 @@ libdirGetNote(libdirfile_t objFileType) {
             if (note->nhdr.n_type == NT_GNU_BUILD_ID &&
                 note->nhdr.n_descsz != 0 &&
                 note->nhdr.n_namesz == 4 &&
-                scope_memcmp(note->name, "GNU", 4) == 0)
+                memcmp(note->name, "GNU", 4) == 0)
             {
                 return note;
             }
@@ -168,39 +167,39 @@ libdirCheckNote(libdirfile_t objFileType, const char *path)
     }
 
     // open & mmap the file to get its note
-    int fd = scope_open(path, O_RDONLY);
+    int fd = open(path, O_RDONLY);
     if (fd == -1) {
-        scope_perror("open() failed");
+        perror("open() failed");
         return -1;
     }
 
     struct stat s;
-    if (scope_fstat(fd, &s) == -1) {
-        scope_close(fd);
-        scope_perror("fstat failed");
+    if (fstat(fd, &s) == -1) {
+        close(fd);
+        perror("fstat failed");
         return -1;
     }
 
-    void *buf = scope_mmap(NULL, ROUND_UP(s.st_size, scope_sysconf(_SC_PAGESIZE)),
+    void *buf = mmap(NULL, ROUND_UP(s.st_size, sysconf(_SC_PAGESIZE)),
                            PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
     if (buf == MAP_FAILED) {
-        scope_close(fd);
-        scope_perror("scope_mmap() failed");
+        close(fd);
+        perror("mmap() failed");
         return -1;
     }
 
-    scope_close(fd);
+    close(fd);
 
     // compare the notes
     int cmp = -1;
     note_t *pathNote = libdirGetNote(objFileType);
     if (pathNote) {
         if (note->nhdr.n_descsz == pathNote->nhdr.n_descsz) {
-            cmp = scope_memcmp(note->build_id, pathNote->build_id, note->nhdr.n_descsz);
+            cmp = memcmp(note->build_id, pathNote->build_id, note->nhdr.n_descsz);
         }
     }
 
-    scope_munmap(buf, s.st_size);
+    munmap(buf, s.st_size);
 
     return cmp; // 0 if notes match
 }
@@ -209,7 +208,7 @@ static int
 libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overwrite, mode_t mode, uid_t nsEuid, gid_t nsEgid)
 {
     // Check if file exists
-    if (!scope_access(path, R_OK) && !overwrite) {
+    if (!access(path, R_OK) && !overwrite) {
         return 0; // File exists
     }
 
@@ -233,42 +232,42 @@ libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overw
     }
 
     // Write file
-    int tempLen = scope_snprintf(temp, PATH_MAX, "%s.XXXXXX", path);
+    int tempLen = snprintf(temp, PATH_MAX, "%s.XXXXXX", path);
     if (tempLen < 0) {
-        scope_fprintf(scope_stderr, "error: snprintf(0 failed.\n");
+        fprintf(stderr, "error: snprintf(0 failed.\n");
         return -1;
     }
     if (tempLen >= PATH_MAX) {
-        scope_fprintf(scope_stderr, "error: extract temp too long.\n");
+        fprintf(stderr, "error: extract temp too long.\n");
         return -1;
     }
 
-    uid_t currentEuid = scope_geteuid();
-    gid_t currentEgid = scope_getegid();
+    uid_t currentEuid = geteuid();
+    gid_t currentEgid = getegid();
 
     if ((fd = nsFileMksTemp(temp, nsEuid, nsEgid, currentEuid, currentEgid)) < 1) {
         // No permission
-        scope_unlink(temp);
+        unlink(temp);
         return -1;
     }
     size_t len = end - start;
-    if (scope_write(fd, start, len) != len) {
-        scope_close(fd);
-        scope_unlink(temp);
-        scope_perror("libdirCreateFileIfMissing: scope_write() failed");
+    if (write(fd, start, len) != len) {
+        close(fd);
+        unlink(temp);
+        perror("libdirCreateFileIfMissing: write() failed");
         return -1;
     }
-    if (scope_fchmod(fd, mode)) {
-        scope_close(fd);
-        scope_unlink(temp);
-        scope_perror("libdirCreateFileIfMissing: scope_fchmod() failed");
+    if (fchmod(fd, mode)) {
+        close(fd);
+        unlink(temp);
+        perror("libdirCreateFileIfMissing: fchmod() failed");
         return -1;
     }
 
-    scope_close(fd);
+    close(fd);
     if (nsFileRename(temp, path, nsEuid, nsEgid, currentEuid, currentEgid)) {
-        scope_unlink(temp);
-        scope_perror("libdirCreateFileIfMissing: scope_rename() failed");
+        unlink(temp);
+        perror("libdirCreateFileIfMissing: rename() failed");
         return -1;
     }
 
@@ -281,7 +280,7 @@ static mkdir_status_t
 libdirCheckIfDirExists(const char *absDirPath, uid_t uid, gid_t gid)
 {
     struct stat st = {0};
-    if (!scope_stat(absDirPath, &st)) {
+    if (!stat(absDirPath, &st)) {
         if (S_ISDIR(st.st_mode)) {      
             // Check for file creation abilities in directory  
             if (((st.st_uid == uid) && (st.st_mode & S_IWUSR)) ||
@@ -303,43 +302,43 @@ libdirCheckIfDirExists(const char *absDirPath, uid_t uid, gid_t gid)
 // Override default values (function is used only for unit test)
 int
 libdirInitTest(const char *installBase, const char *tmpBase, const char *rawVersion) {
-    scope_memset(&g_libdir_info, 0, sizeof(g_libdir_info));
-    scope_memset(&libscopeState, 0, sizeof(libscopeState));
-    scope_memset(&ldscopeDynState, 0, sizeof(ldscopeDynState));
-    scope_strcpy(ldscopeDynState.binaryName, SCOPE_LDSCOPEDYN);
-    scope_strcpy(libscopeState.binaryName, SCOPE_LIBSCOPE_SO);
+    memset(&g_libdir_info, 0, sizeof(g_libdir_info));
+    memset(&libscopeState, 0, sizeof(libscopeState));
+    memset(&ldscopeDynState, 0, sizeof(ldscopeDynState));
+    strcpy(ldscopeDynState.binaryName, SCOPE_LDSCOPEDYN);
+    strcpy(libscopeState.binaryName, SCOPE_LIBSCOPE_SO);
           
     if (installBase) {
-        int len = scope_strlen(installBase);
+        int len = strlen(installBase);
         if (len >= PATH_MAX) {
-            scope_fprintf(scope_stderr, "error: installBase path too long.\n");
+            fprintf(stderr, "error: installBase path too long.\n");
             return -1;
         }
-        scope_strncpy(g_libdir_info.install_base, installBase, len);
+        strncpy(g_libdir_info.install_base, installBase, len);
     } else {
-        scope_strcpy(g_libdir_info.install_base, "/usr/lib/appscope");
+        strcpy(g_libdir_info.install_base, "/usr/lib/appscope");
     }
 
     if (tmpBase) {
-        int len = scope_strlen(tmpBase);
+        int len = strlen(tmpBase);
         if (len >= PATH_MAX){
-            scope_fprintf(scope_stderr, "error: tmpBase path too long.\n");
+            fprintf(stderr, "error: tmpBase path too long.\n");
             return -1;
         }
-        scope_strncpy(g_libdir_info.tmp_base, tmpBase, len);
+        strncpy(g_libdir_info.tmp_base, tmpBase, len);
     } else {
-        scope_strcpy(g_libdir_info.tmp_base, "/tmp/appscope");
+        strcpy(g_libdir_info.tmp_base, "/tmp/appscope");
     }
 
     if (rawVersion) {
-        int len = scope_strlen(rawVersion);
+        int len = strlen(rawVersion);
         if (len >= PATH_MAX){
-            scope_fprintf(scope_stderr, "error: rawVersion too long.\n");
+            fprintf(stderr, "error: rawVersion too long.\n");
             return -1;
         }
-        scope_strncpy(g_libdir_info.ver, rawVersion, len);
+        strncpy(g_libdir_info.ver, rawVersion, len);
     } else {
-        scope_strcpy(g_libdir_info.ver, SCOPE_VER);
+        strcpy(g_libdir_info.ver, SCOPE_VER);
     }
 
     return 0;
@@ -362,27 +361,27 @@ libdirCreateDirIfMissing(const char *dir, mode_t mode, uid_t nsEuid, gid_t nsEgi
         return res;
     }
 
-    char *tempPath = scope_strdup(dir);
+    char *tempPath = strdup(dir);
     if (tempPath == NULL) {
         goto end;
     }
 
-    uid_t euid = scope_geteuid();
-    gid_t egid = scope_getegid();
+    uid_t euid = geteuid();
+    gid_t egid = getegid();
 
     /* traverse the full path */
     for (char *p = tempPath + 1; *p; p++) {
         if (*p == '/') {
             /* Temporarily truncate */
             *p = '\0';
-            scope_errno = 0;
+            errno = 0;
 
             struct stat st = {0};
-            if (scope_stat(tempPath, &st)) {
+            if (stat(tempPath, &st)) {
                 mkdirRes = nsFileMkdir(tempPath, mode, nsEuid, nsEgid, euid, egid);
                 if (!mkdirRes) {
                     /* We ensure that we setup correct mode regarding umask settings */
-                    if (scope_chmod(tempPath, mode)) {
+                    if (chmod(tempPath, mode)) {
                         goto end;
                     }
                 } else {
@@ -395,7 +394,7 @@ libdirCreateDirIfMissing(const char *dir, mode_t mode, uid_t nsEuid, gid_t nsEgi
         }
     }
     struct stat st = {0};
-    if (scope_stat(tempPath, &st)) {
+    if (stat(tempPath, &st)) {
         /* if last element was not created in the loop above */
         mkdirRes = nsFileMkdir(tempPath, mode, nsEuid, nsEgid, euid, egid);
         if (mkdirRes) {
@@ -404,14 +403,14 @@ libdirCreateDirIfMissing(const char *dir, mode_t mode, uid_t nsEuid, gid_t nsEgi
     }
 
     /* We ensure that we setup correct mode regarding umask settings */
-    if (scope_chmod(tempPath, mode)) {
+    if (chmod(tempPath, mode)) {
         goto end;
     }
 
     res = MKDIR_STATUS_CREATED;
 
 end:
-    scope_free(tempPath);
+    free(tempPath);
     return res;
 }
 
@@ -435,18 +434,18 @@ libdirSetLibraryBase(const char *base) {
     char tmp_path[PATH_MAX] = {0};
 
 
-    int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", base, normVer, SCOPE_LIBSCOPE_SO);
+    int pathLen = snprintf(tmp_path, PATH_MAX, "%s/%s/%s", base, normVer, SCOPE_LIBSCOPE_SO);
     if (pathLen < 0) {
-        scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
+        fprintf(stderr, "error: snprintf() failed.\n");
         return -1;
     }
     if (pathLen >= PATH_MAX) {
-        scope_fprintf(scope_stderr, "error: path too long.\n");
+        fprintf(stderr, "error: path too long.\n");
         return -1;
     }
 
-    if (!scope_access(tmp_path, R_OK)) {
-        scope_strncpy(libscopeState.binaryBasepath, base, PATH_MAX);
+    if (!access(tmp_path, R_OK)) {
+        strncpy(libscopeState.binaryBasepath, base, PATH_MAX);
         return 0;
     }
 
@@ -474,18 +473,18 @@ libdirGetPath(libdirfile_t file) {
     if (state->binaryBasepath[0]) {
         // Check custom base first
         char tmp_path[PATH_MAX] = {0};
-        int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", state->binaryBasepath, normVer, state->binaryName);
+        int pathLen = snprintf(tmp_path, PATH_MAX, "%s/%s/%s", state->binaryBasepath, normVer, state->binaryName);
         if (pathLen < 0) {
-            scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
+            fprintf(stderr, "error: snprintf() failed.\n");
             return NULL;
         }
         if (pathLen >= PATH_MAX) {
-            scope_fprintf(scope_stderr, "error: path too long.\n");
+            fprintf(stderr, "error: path too long.\n");
             return NULL;
         }
 
-        if (!scope_access(tmp_path, R_OK)) {
-            scope_strncpy(state->binaryPath, tmp_path, PATH_MAX);
+        if (!access(tmp_path, R_OK)) {
+            strncpy(state->binaryPath, tmp_path, PATH_MAX);
             return state->binaryPath;
         }
     }
@@ -493,17 +492,17 @@ libdirGetPath(libdirfile_t file) {
     if (g_libdir_info.install_base[0]) {
         // Check install base next
         char tmp_path[PATH_MAX] = {0};
-        int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", g_libdir_info.install_base, normVer, state->binaryName);
+        int pathLen = snprintf(tmp_path, PATH_MAX, "%s/%s/%s", g_libdir_info.install_base, normVer, state->binaryName);
         if (pathLen < 0) {
-            scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
+            fprintf(stderr, "error: snprintf() failed.\n");
             return NULL;
         }
         if (pathLen >= PATH_MAX) {
-            scope_fprintf(scope_stderr, "error: path too long.\n");
+            fprintf(stderr, "error: path too long.\n");
             return NULL;
         }
-        if (!scope_access(tmp_path, R_OK)) {
-            scope_strncpy(state->binaryPath, tmp_path, PATH_MAX);
+        if (!access(tmp_path, R_OK)) {
+            strncpy(state->binaryPath, tmp_path, PATH_MAX);
             return state->binaryPath;
         }
     }
@@ -511,17 +510,17 @@ libdirGetPath(libdirfile_t file) {
     if (g_libdir_info.tmp_base[0]) {
         // Check temp base next
         char tmp_path[PATH_MAX] = {0};
-        int pathLen = scope_snprintf(tmp_path, PATH_MAX, "%s/%s/%s", g_libdir_info.tmp_base, normVer, state->binaryName);
+        int pathLen = snprintf(tmp_path, PATH_MAX, "%s/%s/%s", g_libdir_info.tmp_base, normVer, state->binaryName);
         if (pathLen < 0) {
-            scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
+            fprintf(stderr, "error: snprintf() failed.\n");
             return NULL;
         }
         if (pathLen >= PATH_MAX) {
-            scope_fprintf(scope_stderr, "error: path too long.\n");
+            fprintf(stderr, "error: path too long.\n");
             return NULL;
         }
-        if (!scope_access(tmp_path, R_OK)) {
-            scope_strncpy(state->binaryPath, tmp_path, PATH_MAX);
+        if (!access(tmp_path, R_OK)) {
+            strncpy(state->binaryPath, tmp_path, PATH_MAX);
             return state->binaryPath;
         }
     }
@@ -572,59 +571,59 @@ int libdirExtract(libdirfile_t file, uid_t uid, gid_t gid) {
     */
     mode_t mode = 0755;
     if (isDevVersion == FALSE) {
-        pathLen = scope_snprintf(dir, PATH_MAX, "%s/%s", g_libdir_info.install_base, normVer);
+        pathLen = snprintf(dir, PATH_MAX, "%s/%s", g_libdir_info.install_base, normVer);
         if (pathLen < 0) {
-            scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
+            fprintf(stderr, "error: snprintf() failed.\n");
             return -1;
         }
         if (pathLen >= PATH_MAX) {
-            scope_fprintf(scope_stderr, "error: path too long.\n");
+            fprintf(stderr, "error: path too long.\n");
             return -1;
         }
 
         if (libdirCreateDirIfMissing(dir, mode, uid, gid) <= MKDIR_STATUS_EXISTS) {
-            int pathLen = scope_snprintf(path, PATH_MAX, "%s/%s", dir, state->binaryName);
+            int pathLen = snprintf(path, PATH_MAX, "%s/%s", dir, state->binaryName);
             if (pathLen < 0) {
-                scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
+                fprintf(stderr, "error: snprintf() failed.\n");
                 return -1;
             }
             if (pathLen >= PATH_MAX) {
-                scope_fprintf(scope_stderr, "error: path too long.\n");
+                fprintf(stderr, "error: path too long.\n");
                 return -1;
             }
             if (!libdirCreateFileIfMissing(file, path, isDevVersion, mode, uid, gid)) {
-                scope_strncpy(state->binaryPath, path, PATH_MAX);
-                scope_strncpy(state->binaryBasepath, g_libdir_info.install_base, PATH_MAX);
+                strncpy(state->binaryPath, path, PATH_MAX);
+                strncpy(state->binaryBasepath, g_libdir_info.install_base, PATH_MAX);
                 return 0;
             }
         }
     }
     // Clean the buffers
-    scope_memset(path, 0, PATH_MAX);
-    scope_memset(dir, 0, PATH_MAX);
+    memset(path, 0, PATH_MAX);
+    memset(dir, 0, PATH_MAX);
     mode = 0777;
-    pathLen = scope_snprintf(dir, PATH_MAX, "%s/%s", g_libdir_info.tmp_base, normVer);
+    pathLen = snprintf(dir, PATH_MAX, "%s/%s", g_libdir_info.tmp_base, normVer);
     if (pathLen < 0) {
-        scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
+        fprintf(stderr, "error: snprintf() failed.\n");
         return -1;
     }
     if (pathLen >= PATH_MAX) {
-        scope_fprintf(scope_stderr, "error: path too long.\n");
+        fprintf(stderr, "error: path too long.\n");
         return -1;
     }
     if (libdirCreateDirIfMissing(dir, mode, uid, gid) <= MKDIR_STATUS_EXISTS) {
-        int pathLen = scope_snprintf(path, PATH_MAX, "%s/%s", dir, state->binaryName);
+        int pathLen = snprintf(path, PATH_MAX, "%s/%s", dir, state->binaryName);
         if (pathLen < 0) {
-            scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
+            fprintf(stderr, "error: snprintf() failed.\n");
             return -1;
         }
         if (pathLen >= PATH_MAX) {
-            scope_fprintf(scope_stderr, "error: path too long.\n");
+            fprintf(stderr, "error: path too long.\n");
             return -1;
         }
         if (!libdirCreateFileIfMissing(file, path, isDevVersion, mode, uid, gid)) {
-            scope_strncpy(state->binaryPath, path, PATH_MAX);
-            scope_strncpy(state->binaryBasepath, g_libdir_info.tmp_base, PATH_MAX);
+            strncpy(state->binaryPath, path, PATH_MAX);
+            strncpy(state->binaryBasepath, g_libdir_info.tmp_base, PATH_MAX);
             return 0;
         }
     }

@@ -1,4 +1,6 @@
 #define _GNU_SOURCE
+#include <string.h>
+#include <stdlib.h>
 
 #include "nsinfo.h"
 #include "scopestdlib.h"
@@ -8,35 +10,35 @@
  */
 uid_t
 nsInfoTranslateUid(pid_t hostPid) {
-    uid_t eUid = scope_geteuid();
+    uid_t eUid = geteuid();
     char uidPath[PATH_MAX] = {0};
     char buffer[4096] = {0};
     FILE *fd;
 
-    if (scope_snprintf(uidPath, sizeof(uidPath), "/proc/%d/uid_map", hostPid) < 0) {
-        scope_perror("scope_snprintf uid_map failed");
+    if (snprintf(uidPath, sizeof(uidPath), "/proc/%d/uid_map", hostPid) < 0) {
+        perror("snprintf uid_map failed");
         return eUid;
     }
-    if ((fd = scope_fopen(uidPath, "r")) == NULL) {
-        scope_perror("fopen(/proc/<PID>/uid_map) failed");
+    if ((fd = fopen(uidPath, "r")) == NULL) {
+        perror("fopen(/proc/<PID>/uid_map) failed");
         return eUid;
     }
 
-    while (scope_fgets(buffer, sizeof(buffer), fd)) {
+    while (fgets(buffer, sizeof(buffer), fd)) {
         const char delimiters[] = " \t";
         char *last;
 
-        char *entry = scope_strtok_r(buffer, delimiters, &last);
-        uid_t uidInsideNs = scope_atoi(entry);
+        char *entry = strtok_r(buffer, delimiters, &last);
+        uid_t uidInsideNs = atoi(entry);
 
-        entry = scope_strtok_r(NULL, delimiters, &last);
-        uid_t uidOutsideNs = scope_atoi(entry);
+        entry = strtok_r(NULL, delimiters, &last);
+        uid_t uidOutsideNs = atoi(entry);
         if ((uidInsideNs == 0) && (uidInsideNs != uidOutsideNs)) {
             eUid = uidOutsideNs;
             break;
         }
     }
-    scope_fclose(fd);
+    fclose(fd);
 
     return eUid;
 }
@@ -46,35 +48,35 @@ nsInfoTranslateUid(pid_t hostPid) {
  */
 gid_t
 nsInfoTranslateGid(pid_t hostPid) {
-    gid_t gid = scope_getegid();
+    gid_t gid = getegid();
     char gidPath[PATH_MAX] = {0};
     char buffer[4096] = {0};
     FILE *fd;
 
-    if (scope_snprintf(gidPath, sizeof(gidPath), "/proc/%d/gid_map", hostPid) < 0) {
-        scope_perror("scope_snprintf gid_map failed");
+    if (snprintf(gidPath, sizeof(gidPath), "/proc/%d/gid_map", hostPid) < 0) {
+        perror("snprintf gid_map failed");
         return gid;
     }
-    if ((fd = scope_fopen(gidPath, "r")) == NULL) {
-        scope_perror("fopen(/proc/<PID>/gid_map) failed");
+    if ((fd = fopen(gidPath, "r")) == NULL) {
+        perror("fopen(/proc/<PID>/gid_map) failed");
         return gid;
     }
 
-    while (scope_fgets(buffer, sizeof(buffer), fd)) {
+    while (fgets(buffer, sizeof(buffer), fd)) {
         const char delimiters[] = " \t";
         char *last;
 
-        char *entry = scope_strtok_r(buffer, delimiters, &last);
-        gid_t gidInsideNs = scope_atoi(entry);
+        char *entry = strtok_r(buffer, delimiters, &last);
+        gid_t gidInsideNs = atoi(entry);
 
-        entry = scope_strtok_r(NULL, delimiters, &last);
-        gid_t gidOutsideNs = scope_atoi(entry);
+        entry = strtok_r(NULL, delimiters, &last);
+        gid_t gidOutsideNs = atoi(entry);
         if ((gidInsideNs == 0) && (gidInsideNs != gidOutsideNs)) {
             gid = gidOutsideNs;
             break;
         }
     }
-    scope_fclose(fd);
+    fclose(fd);
 
     return gid;
 }
@@ -90,18 +92,18 @@ nsInfoIsPidInSameMntNs(pid_t pid) {
     struct stat selfStat = {0};
     struct stat targetStat = {0};
 
-    if (scope_stat("/proc/self/ns/mnt", &selfStat) != 0) {
-        scope_perror("scope_stat(/proc/self/ns/mnt) failed");
+    if (stat("/proc/self/ns/mnt", &selfStat) != 0) {
+        perror("stat(/proc/self/ns/mnt) failed");
         return TRUE;
     }
 
-    if (scope_snprintf(path, sizeof(path), "/proc/%d/ns/mnt", pid) < 0) {
-        scope_perror("scope_snprintf(/proc/<pid>/ns/mnt) failed");
+    if (snprintf(path, sizeof(path), "/proc/%d/ns/mnt", pid) < 0) {
+        perror("snprintf(/proc/<pid>/ns/mnt) failed");
         return TRUE;
     }
 
-    if (scope_stat(path, &targetStat) != 0) {
-        scope_perror("scope_stat(/proc/<pid>/ns/mnt) failed");
+    if (stat(path, &targetStat) != 0) {
+        perror("stat(/proc/<pid>/ns/mnt) failed");
         return TRUE;
     }
 
@@ -126,28 +128,28 @@ nsInfoGetPidNs(pid_t pid, pid_t *lastNsPid) {
     int tempNsPid = 0;
     int nsDepth = 0;
 
-    if (scope_snprintf(path, sizeof(path), "/proc/%d/status", pid) < 0) {
+    if (snprintf(path, sizeof(path), "/proc/%d/status", pid) < 0) {
         return FALSE;
     }
 
-    FILE *fstream = scope_fopen(path, "r");
+    FILE *fstream = fopen(path, "r");
 
     if (fstream == NULL) {
         return FALSE;
     }
 
-    while (scope_fgets(buffer, sizeof(buffer), fstream)) {
-        if (scope_strstr(buffer, "NSpid:")) {
+    while (fgets(buffer, sizeof(buffer), fstream)) {
+        if (strstr(buffer, "NSpid:")) {
             const char delimiters[] = ": \t";
             char *entry, *last;
 
-            entry = scope_strtok_r(buffer, delimiters, &last);
+            entry = strtok_r(buffer, delimiters, &last);
             // Skip NsPid string
-            entry = scope_strtok_r(NULL, delimiters, &last);
+            entry = strtok_r(NULL, delimiters, &last);
             // Iterate over NsPids values
             while (entry != NULL) {
-                tempNsPid = scope_atoi(entry);
-                entry = scope_strtok_r(NULL, delimiters, &last);
+                tempNsPid = atoi(entry);
+                entry = strtok_r(NULL, delimiters, &last);
                 nsDepth++;
             }
             break;
@@ -159,7 +161,7 @@ nsInfoGetPidNs(pid_t pid, pid_t *lastNsPid) {
         *lastNsPid = tempNsPid;
     }
 
-    scope_fclose(fstream);
+    fclose(fstream);
 
     return status;
 }

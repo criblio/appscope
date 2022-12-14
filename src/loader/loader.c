@@ -43,11 +43,11 @@ static const char  shm_mount[] = SHM_MOUNT;
 const char *__shm_directory(size_t *len)
 {
     if (len)
-        *len = scope_strlen(shm_mount);
+        *len = strlen(shm_mount);
     return shm_mount;
 }
 
-static const char scope_help_overview[] =
+static const char help_overview[] =
 "  OVERVIEW:\n"
 "    The Scope library supports extraction of data from within applications.\n"
 "    As a general rule, applications consist of one or more processes.\n"
@@ -72,7 +72,7 @@ static const char scope_help_overview[] =
 "    verbosity level. The default verbosity setting is level 4, and the\n"
 "    default destination is the file `/tmp/scope.log`.\n";
 
-static const char scope_help_configuration[] =
+static const char help_configuration[] =
 "  CONFIGURATION:\n"
 "    Configuration File:\n"
 "        A YAML config file (named scope.yml) enables control of all available\n"
@@ -384,7 +384,7 @@ static const char scope_help_configuration[] =
 "            /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem\n"
 "            /etc/ssl/cert.pem\n";
 
-static const char scope_help_metrics[] =
+static const char help_metrics[] =
 "  METRICS:\n"
 "    Metrics can be enabled or disabled with a single config element\n"
 "    (metric: enable: true|false). Specific types of metrics, and specific \n"
@@ -417,7 +417,7 @@ static const char scope_help_metrics[] =
 "    enabled as an event. The http.status metric is not controlled with\n"
 "    summarization settings.\n";
 
-static const char scope_help_events[] =
+static const char help_events[] =
 "  EVENTS:\n"
 "    All events can be enabled or disabled with a single config element\n"
 "    (event: enable: true|false). Unlike metrics, event content is not \n"
@@ -461,7 +461,7 @@ static const char scope_help_events[] =
 "        The event provides the domain name being resolved. On DNS response,\n"
 "        the event provides the duration of the DNS operation.\n";
 
-static const char scope_help_protocol[] =
+static const char help_protocol[] =
 "  PROTOCOL DETECTION:\n"
 "    Scope can detect any defined network protocol. You provide protocol\n"
 "    definitions in the \"protocol\" section of the config file. You describe \n"
@@ -482,7 +482,7 @@ static const char scope_help_protocol[] =
 static int
 showHelp(const char *section)
 {
-    scope_printf(
+    printf(
       "Cribl AppScope Static Loader %s\n"
       "\n"
       "AppScope is a general-purpose observable application telemetry system.\n"
@@ -490,34 +490,34 @@ showHelp(const char *section)
       SCOPE_VER
     );
 
-    if (!section || !scope_strcasecmp(section, "all")) {
-        scope_puts(scope_help_overview);
-        scope_puts(scope_help_configuration);
-        scope_puts(scope_help_metrics);
-        scope_puts(scope_help_events);
-        scope_puts(scope_help_protocol);
-    } else if (!scope_strcasecmp(section, "overview")) {
-        scope_puts(scope_help_overview);
-    } else if (!scope_strcasecmp(section, "configuration") || !scope_strcasecmp(section, "config")) {
-        scope_puts(scope_help_configuration);
-    } else if (!scope_strcasecmp(section, "metrics")) {
-        scope_puts(scope_help_metrics);
-    } else if (!scope_strcasecmp(section, "events")) {
-        scope_puts(scope_help_events);
-    } else if (!scope_strcasecmp(section, "protocols")) {
-        scope_puts(scope_help_protocol);
+    if (!section || !strcasecmp(section, "all")) {
+        puts(help_overview);
+        puts(help_configuration);
+        puts(help_metrics);
+        puts(help_events);
+        puts(help_protocol);
+    } else if (!strcasecmp(section, "overview")) {
+        puts(help_overview);
+    } else if (!strcasecmp(section, "configuration") || !strcasecmp(section, "config")) {
+        puts(help_configuration);
+    } else if (!strcasecmp(section, "metrics")) {
+        puts(help_metrics);
+    } else if (!strcasecmp(section, "events")) {
+        puts(help_events);
+    } else if (!strcasecmp(section, "protocols")) {
+        puts(help_protocol);
     } else {
-        scope_fprintf(scope_stderr, "error: invalid help section\n\n");
+        fprintf(stderr, "error: invalid help section\n\n");
         return -1;
     }
-    scope_fflush(scope_stdout);
+    fflush(stdout);
     return 0;
 }
 
 static void
 showUsage(char *prog)
 {
-    scope_printf(
+    printf(
       "\n"
       "Cribl AppScope Static Loader %s\n" 
       "\n"
@@ -556,7 +556,7 @@ showUsage(char *prog)
       "\n",
       SCOPE_VER, prog, prog, prog, prog, prog
     );
-    scope_fflush(scope_stdout);
+    fflush(stdout);
 }
 
 // long aliases for short options
@@ -590,8 +590,8 @@ loader(int argc, char **argv, char **env)
     char path[PATH_MAX] = {0};
     int pid = -1;
     char attachType = 'u';
-    uid_t eUid = scope_geteuid();
-    gid_t eGid = scope_getegid();
+    uid_t eUid = geteuid();
+    gid_t eGid = getegid();
     uid_t nsUid = eUid;
     uid_t nsGid = eGid;
     bool unconfigure = FALSE;
@@ -613,12 +613,12 @@ loader(int argc, char **argv, char **env)
         }
         switch (opt) {
             case 'u':
-                showUsage(scope_basename(argv[0]));
+                showUsage(basename(argv[0]));
                 return EXIT_SUCCESS;
             case 'h':
                 // handle `-h SECTION`
                 if (showHelp(optarg)) {
-                    showUsage(scope_basename(argv[0]));
+                    showUsage(basename(argv[0]));
                     return EXIT_FAILURE;
                 }
                 return EXIT_SUCCESS;
@@ -673,73 +673,73 @@ loader(int argc, char **argv, char **env)
                         showHelp(0);
                         return EXIT_SUCCESS;
                     default: 
-                        scope_fprintf(scope_stderr, "error: missing required value for -%c option\n", optopt);
-                        showUsage(scope_basename(argv[0]));
+                        fprintf(stderr, "error: missing required value for -%c option\n", optopt);
+                        showUsage(basename(argv[0]));
                         return EXIT_FAILURE;
                 }
                 break;
             case '?':
             default:
-                scope_fprintf(scope_stderr, "error: invalid option: -%c\n", optopt);
-                showUsage(scope_basename(argv[0]));
+                fprintf(stderr, "error: invalid option: -%c\n", optopt);
+                showUsage(basename(argv[0]));
                 return EXIT_FAILURE;
         }
     }
 
     // either --attach, --detach, --configure, --unconfigure, --service, --unservice or a command are required
     if (!attachArg && !configFilterPath && !unconfigure && !serviceName && !unservice && optind >= argc) {
-        scope_fprintf(scope_stderr, "error: missing --attach, --detach, --configure, --unconfigure, --service, --unservice option or EXECUTABLE argument\n");
-        showUsage(scope_basename(argv[0]));
+        fprintf(stderr, "error: missing --attach, --detach, --configure, --unconfigure, --service, --unservice option or EXECUTABLE argument\n");
+        showUsage(basename(argv[0]));
         return EXIT_FAILURE;
     }
 
     if (attachArg && (serviceName || unservice)) {
-        scope_fprintf(scope_stderr, "error: --attach/--detach and --service/--unservice cannot be used together\n");
-        showUsage(scope_basename(argv[0]));
+        fprintf(stderr, "error: --attach/--detach and --service/--unservice cannot be used together\n");
+        showUsage(basename(argv[0]));
         return EXIT_FAILURE;
     }
 
     if (attachArg && (configFilterPath || unconfigure)) {
-        scope_fprintf(scope_stderr, "error: --attach/--detach and --configure/--unconfigure cannot be used together\n");
-        showUsage(scope_basename(argv[0]));
+        fprintf(stderr, "error: --attach/--detach and --configure/--unconfigure cannot be used together\n");
+        showUsage(basename(argv[0]));
         return EXIT_FAILURE;
     }
 
     if ((configFilterPath || unconfigure) && (serviceName || unservice)) {
-        scope_fprintf(scope_stderr, "error: --configure/--unconfigure and --service/--unservice cannot be used together\n");
-        showUsage(scope_basename(argv[0]));
+        fprintf(stderr, "error: --configure/--unconfigure and --service/--unservice cannot be used together\n");
+        showUsage(basename(argv[0]));
         return EXIT_FAILURE;
     }
 
     if (nsPidArg && ((configFilterPath == NULL && !unconfigure) && (serviceName == NULL && !unservice))) {
-        scope_fprintf(scope_stderr, "error: --namespace option required --configure/--unconfigure or --service/--unservice option\n");
-        showUsage(scope_basename(argv[0]));
+        fprintf(stderr, "error: --namespace option required --configure/--unconfigure or --service/--unservice option\n");
+        showUsage(basename(argv[0]));
         return EXIT_FAILURE;
     }
 
     // use --attach, --detach, --configure, --unconfigure, --service, --unservice ignore executable and args
     if (optind < argc) {
         if (attachArg) {
-            scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --attach, --detach option\n");
+            fprintf(stderr, "warning: ignoring EXECUTABLE argument with --attach, --detach option\n");
         } else if (configFilterPath || unconfigure) {
-            scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --configure/--unconfigure option\n");
+            fprintf(stderr, "warning: ignoring EXECUTABLE argument with --configure/--unconfigure option\n");
         } else if (serviceName) {
-            scope_fprintf(scope_stderr, "warning: ignoring EXECUTABLE argument with --service/--unservice option\n");
+            fprintf(stderr, "warning: ignoring EXECUTABLE argument with --service/--unservice option\n");
         }
     }
 
     if (serviceName) {
         // must be root
         if (eUid) {
-            scope_printf("error: --service requires root\n");
+            printf("error: --service requires root\n");
             return EXIT_FAILURE;
         }
 
         pid_t pid = -1;
         if (nsPidArg) {
-            pid = scope_atoi(nsPidArg);
+            pid = atoi(nsPidArg);
             if (pid < 1) {
-                scope_fprintf(scope_stderr, "error: invalid --namespace PID: %s\n", nsPidArg);
+                fprintf(stderr, "error: invalid --namespace PID: %s\n", nsPidArg);
                 return EXIT_FAILURE;
             }
         }
@@ -760,15 +760,15 @@ loader(int argc, char **argv, char **env)
     if (unservice) {
         // must be root
         if (eUid) {
-            scope_printf("error: --unservice requires root\n");
+            printf("error: --unservice requires root\n");
             return EXIT_FAILURE;
         }
 
         pid_t pid = -1;
         if (nsPidArg) {
-            pid = scope_atoi(nsPidArg);
+            pid = atoi(nsPidArg);
             if (pid < 1) {
-                scope_fprintf(scope_stderr, "error: invalid --namespace PID: %s\n", nsPidArg);
+                fprintf(stderr, "error: invalid --namespace PID: %s\n", nsPidArg);
                 return EXIT_FAILURE;
             }
         }
@@ -790,15 +790,15 @@ loader(int argc, char **argv, char **env)
         int status = EXIT_FAILURE;
         // must be root
         if (eUid) {
-            scope_printf("error: --configure requires root\n");
+            printf("error: --configure requires root\n");
             return EXIT_FAILURE;
         }
 
         pid_t pid = -1;
         if (nsPidArg) {
-            pid = scope_atoi(nsPidArg);
+            pid = atoi(nsPidArg);
             if (pid < 1) {
-                scope_fprintf(scope_stderr, "error: invalid --namespace PID: %s\n", nsPidArg);
+                fprintf(stderr, "error: invalid --namespace PID: %s\n", nsPidArg);
                 return EXIT_FAILURE;
             }
         }
@@ -806,7 +806,7 @@ loader(int argc, char **argv, char **env)
         size_t configFilterSize = 0;
         void *confgFilterMem = setupLoadFileIntoMem(&configFilterSize, configFilterPath);
         if (confgFilterMem == NULL) {
-            scope_fprintf(scope_stderr, "error: Load filter file into memory %s\n", configFilterPath);
+            fprintf(stderr, "error: Load filter file into memory %s\n", configFilterPath);
             return EXIT_FAILURE;
         }
 
@@ -822,7 +822,7 @@ loader(int argc, char **argv, char **env)
             }
         }
         if (confgFilterMem) {
-            scope_munmap(confgFilterMem, configFilterSize);
+            munmap(confgFilterMem, configFilterSize);
         }
 
         return status;
@@ -832,15 +832,15 @@ loader(int argc, char **argv, char **env)
         int status = EXIT_FAILURE;
         // must be root
         if (eUid) {
-            scope_printf("error: --unconfigure requires root\n");
+            printf("error: --unconfigure requires root\n");
             return EXIT_FAILURE;
         }
 
         pid_t pid = -1;
         if (nsPidArg) {
-            pid = scope_atoi(nsPidArg);
+            pid = atoi(nsPidArg);
             if (pid < 1) {
-                scope_fprintf(scope_stderr, "error: invalid --namespace PID: %s\n", nsPidArg);
+                fprintf(stderr, "error: invalid --namespace PID: %s\n", nsPidArg);
                 return EXIT_FAILURE;
             }
         }
@@ -861,17 +861,17 @@ loader(int argc, char **argv, char **env)
     // perform namespace switch if required
     if (attachArg) {
         // target process must exist
-        pid = scope_atoi(attachArg);
+        pid = atoi(attachArg);
         if (pid < 1) {
-            scope_printf("error: invalid --attach, --detach PID: %s\n", attachArg);
+            printf("error: invalid --attach, --detach PID: %s\n", attachArg);
             return EXIT_FAILURE;
         }
 
         pid_t nsAttachPid = 0;
 
-        scope_snprintf(path, sizeof(path), "/proc/%d", pid);
-        if (scope_access(path, F_OK)) {
-            scope_printf("error: --attach, --detach PID not a current process: %d\n", pid);
+        snprintf(path, sizeof(path), "/proc/%d", pid);
+        if (access(path, F_OK)) {
+            printf("error: --attach, --detach PID not a current process: %d\n", pid);
             return EXIT_FAILURE;
         }
 
@@ -888,7 +888,7 @@ loader(int argc, char **argv, char **env)
         if (nsInfoGetPidNs(pid, &nsAttachPid) == TRUE) {
             // must be root to switch namespace
             if (eUid) {
-                scope_printf("error: --attach requires root\n");
+                printf("error: --attach requires root\n");
                 return EXIT_FAILURE;
             }
             return nsForkAndExec(pid, nsAttachPid, attachType);
@@ -900,7 +900,7 @@ loader(int argc, char **argv, char **env)
         } else if (nsInfoIsPidInSameMntNs(pid) == FALSE) {
             // must be root to switch namespace
             if (eUid) {
-                scope_printf("error: --attach requires root\n");
+                printf("error: --attach requires root\n");
                 return EXIT_FAILURE;
             }
             return nsForkAndExec(pid, pid, attachType);
@@ -914,19 +914,19 @@ loader(int argc, char **argv, char **env)
 
     // extract to the library directory
     if (libdirExtract(LOADER_FILE, nsUid, nsGid)) {
-        scope_fprintf(scope_stderr, "error: failed to extract loader\n");
+        fprintf(stderr, "error: failed to extract loader\n");
         return EXIT_FAILURE;
     }
 
     if (libdirExtract(LIBRARY_FILE, nsUid, nsGid)) {
-        scope_fprintf(scope_stderr, "error: failed to extract library\n");
+        fprintf(stderr, "error: failed to extract library\n");
         return EXIT_FAILURE;
     }
 
     // setup for musl libc if detected
     char *loader = (char *)libdirGetPath(LOADER_FILE);
     if (!loader) {
-        scope_fprintf(scope_stderr, "error: failed to get a loader path\n");
+        fprintf(stderr, "error: failed to get a loader path\n");
         return EXIT_FAILURE;
     }
 
@@ -935,42 +935,42 @@ loader(int argc, char **argv, char **env)
     // set SCOPE_EXEC_PATH to path to `ldscope` if not set already
     if (getenv("SCOPE_EXEC_PATH") == 0) {
         char execPath[PATH_MAX];
-        if (scope_readlink("/proc/self/exe", execPath, sizeof(execPath) - 1) == -1) {
-            scope_perror("readlink(/proc/self/exe) failed");
+        if (readlink("/proc/self/exe", execPath, sizeof(execPath) - 1) == -1) {
+            perror("readlink(/proc/self/exe) failed");
             return EXIT_FAILURE;
         }
         setenv("SCOPE_EXEC_PATH", execPath, 0);
     }
 
-    // create /dev/shm/scope_${PID}.env when attaching
+    // create /dev/shm/${PID}.env when attaching
     if (attachArg && (attachType == 'a')) {
 
         // create .env file for the library to load
-        scope_snprintf(path, sizeof(path), "/scope_attach_%d.env", pid);
+        snprintf(path, sizeof(path), "/attach_%d.env", pid);
         int fd = nsFileShmOpen(path, O_RDWR|O_CREAT, S_IRUSR|S_IRGRP|S_IROTH, nsUid, nsGid, eUid, eGid);
         if (fd == -1) {
-            scope_fprintf(scope_stderr, "nsFileShmOpen failed\n");
+            fprintf(stderr, "nsFileShmOpen failed\n");
             return EXIT_FAILURE;
         }
         // add the env vars we want in the library
-        scope_dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetPath(LIBRARY_FILE));
+        dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetPath(LIBRARY_FILE));
 
         int i;
         for (i = 0; environ[i]; i++) {
-            if (scope_strlen(environ[i]) > 6 && scope_strncmp(environ[i], "SCOPE_", 6) == 0) {
-                scope_dprintf(fd, "%s\n", environ[i]);
+            if (strlen(environ[i]) > 6 && strncmp(environ[i], "SCOPE_", 6) == 0) {
+                dprintf(fd, "%s\n", environ[i]);
             }
         }
 
         // done
-        scope_close(fd);
+        close(fd);
     }
 
     // build exec args
     int execArgc = 0;
-    char **execArgv = scope_calloc(argc + 4, sizeof(char *));
+    char **execArgv = calloc(argc + 4, sizeof(char *));
     if (!execArgv) {
-        scope_perror("scope_calloc");
+        perror("calloc");
         return EXIT_FAILURE;
     }
 
@@ -993,21 +993,21 @@ loader(int argc, char **argv, char **env)
 
     // pass SCOPE_LIB_PATH in environment
     if (setenv("SCOPE_LIB_PATH", libdirGetPath(LIBRARY_FILE), 1)) {
-        scope_perror("setenv(SCOPE_LIB_PATH) failed");
+        perror("setenv(SCOPE_LIB_PATH) failed");
         return EXIT_FAILURE;
     }
 
     // exec the dynamic ldscope
     struct utsname ubuf;
 
-    if (scope_uname(&ubuf) != 0) {
-        scope_perror("uname");
+    if (uname(&ubuf) != 0) {
+        perror("uname");
         return EXIT_FAILURE;
     }
 
     execve(libdirGetPath(LOADER_FILE), execArgv, environ);
 
-    scope_free(execArgv);
-    scope_perror("execve failed");
+    free(execArgv);
+    perror("execve failed");
     return EXIT_FAILURE;
 }

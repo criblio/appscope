@@ -77,8 +77,22 @@ $(LDSCOPE): src/scope_static.c src/dbg.c src/libdir.c src/scopestdlib.c src/ns.c
 
 $(LIBLOADER): src/loader/loader.c src/loader/nsinfo.c src/loader/nsfile.c os/$(OS)/os.c src/loader/loaderutils.c src/loader/inject.c src/loader/libdir.c src/loader/ns.c src/loader/setup.c src/loader/loaderop.c src/loader/libver.c
 	@echo "$${CI:+::group::}Building $@"
-	$(CC) -c $(CFLAGS) -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) -I./src $(INCLUDES) $^
+	$(CC) -c $(CFLAGS) -Wno-format-security -Wno-format-truncation -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) -I./src $(INCLUDES) $^
 	ar rcs $@ *.o
+	cd $(dir $(LDSCOPEDYN)) && objcopy \
+		-I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) \
+		$(notdir $(LDSCOPEDYN)) $(notdir $(LDSCOPEDYN)).o && \
+		ar rcs ../../../$@ $(notdir $(LDSCOPEDYN)).o && \
+		$(RM) $(notdir $(LDSCOPEDYN)).o
+	cd $(dir $(LIBSCOPE)) && objcopy \
+		-I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) \
+		$(notdir $(LIBSCOPE)) $(notdir $(LIBSCOPE:.so=.o)) && \
+		ar rcs ../../../$@ $(notdir $(LIBSCOPE:.so=.o)) && \
+		$(RM) $(notdir $(LIBSCOPE:.so=.o))
+	cd $(dir $(LIBLOADER)) && objcopy \
+		-I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) \
+		$(notdir $(LIBLOADER)) $(notdir $(LIBLOADER:.a=.o)) && \
+		ar rcs ../../../$@ $(notdir $(LIBLOADER:.a=.o))
 	$(RM) *.o
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 

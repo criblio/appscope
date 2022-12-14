@@ -3,6 +3,9 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
+#include <libgen.h>
+
 #include "libdir.h"
 #include "loaderop.h"
 #include "nsfile.h"
@@ -29,17 +32,17 @@ setEnvVariable(char *env, char *value)
 
     // env is set. try to append
     char *new_val = NULL;
-    if ((scope_asprintf(&new_val, "%s:%s", cur_val, value) == -1)) {
-        scope_perror("setEnvVariable:asprintf");
+    if ((asprintf(&new_val, "%s:%s", cur_val, value) == -1)) {
+        perror("setEnvVariable:asprintf");
         return;
     }
 
-    if (g_debug) scope_printf("%s:%d %s to %s\n", __FUNCTION__, __LINE__, env, new_val);
+    if (g_debug) printf("%s:%d %s to %s\n", __FUNCTION__, __LINE__, env, new_val);
     if (setenv(env, new_val, 1)) {
         perror("setEnvVariable:setenv");
     }
 
-    if (new_val) scope_free(new_val);
+    if (new_val) free(new_val);
 }
 
 /*
@@ -77,30 +80,30 @@ get_dir(const char *path, char *fres, size_t len) {
 
     if (!path || !fres || (len <= 0)) return res;
 
-    pcopy = scope_strdup(path);
-    dname = scope_dirname(pcopy);
+    pcopy = strdup(path);
+    dname = dirname(pcopy);
 
-    if ((dirp = scope_opendir(dname)) == NULL) {
-        scope_perror("get_dir:opendir");
-        if (pcopy) scope_free(pcopy);
+    if ((dirp = opendir(dname)) == NULL) {
+        perror("get_dir:opendir");
+        if (pcopy) free(pcopy);
         return res;
     }
 
-    dcopy = scope_strdup(path);
-    fname = scope_basename(dcopy);
+    dcopy = strdup(path);
+    fname = basename(dcopy);
 
-    while ((entry = scope_readdir(dirp)) != NULL) {
+    while ((entry = readdir(dirp)) != NULL) {
         if ((entry->d_type != DT_DIR) &&
-            (scope_strstr(entry->d_name, fname))) {
-            scope_strncpy(fres, entry->d_name, len);
+            (strstr(entry->d_name, fname))) {
+            strncpy(fres, entry->d_name, len);
             res = 0;
             break;
         }
     }
 
-    scope_closedir(dirp);
-    if (pcopy) scope_free(pcopy);
-    if (dcopy) scope_free(dcopy);
+    closedir(dirp);
+    if (pcopy) free(pcopy);
+    if (dcopy) free(dcopy);
     return res;
 }
 
@@ -114,26 +117,26 @@ loaderOpGetLoader(const char *exe) {
 
     if (!exe) return NULL;
 
-    if ((fd = scope_open(exe, O_RDONLY)) == -1) {
-        scope_perror("loaderOpGetLoader:open");
+    if ((fd = open(exe, O_RDONLY)) == -1) {
+        perror("loaderOpGetLoader:open");
         return NULL;
     }
 
-    if (scope_fstat(fd, &sbuf) == -1) {
-        scope_perror("loaderOpGetLoader:fstat");
-        scope_close(fd);
+    if (fstat(fd, &sbuf) == -1) {
+        perror("loaderOpGetLoader:fstat");
+        close(fd);
         return NULL;
     }
 
-    buf = scope_mmap(NULL, ROUND_UP(sbuf.st_size, scope_sysconf(_SC_PAGESIZE)),
+    buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
                PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
     if (buf == MAP_FAILED) {
-        scope_perror("loaderOpGetLoader:scope_mmap");
-        scope_close(fd);
+        perror("loaderOpGetLoader:mmap");
+        close(fd);
         return NULL;
     }
 
-    scope_close(fd);
+    close(fd);
 
     elf = (Elf64_Ehdr *)buf;
     phead  = (Elf64_Phdr *)&buf[elf->e_phoff];
@@ -141,15 +144,15 @@ loaderOpGetLoader(const char *exe) {
     for (i = 0; i < elf->e_phnum; i++) {
         if ((phead[i].p_type == PT_INTERP)) {
             char * exld = (char *)&buf[phead[i].p_offset];
-            if (g_debug) scope_printf("%s:%d exe ld.so: %s\n", __FUNCTION__, __LINE__, exld);
+            if (g_debug) printf("%s:%d exe ld.so: %s\n", __FUNCTION__, __LINE__, exld);
 
-            ldso = scope_strdup(exld);
+            ldso = strdup(exld);
 
             break;
         }
     }
 
-    scope_munmap(buf, sbuf.st_size);
+    munmap(buf, sbuf.st_size);
     return ldso;
 }
 
@@ -169,22 +172,22 @@ loaderOpSetLibrary(const char *libpath) {
     if (libpath == NULL)
         return -1;
 
-    if ((fd = scope_open(libpath, O_RDONLY)) == -1) {
-        scope_perror("loaderOpSetLibrary:open");
+    if ((fd = open(libpath, O_RDONLY)) == -1) {
+        perror("loaderOpSetLibrary:open");
         return -1;
     }
 
-    if (scope_fstat(fd, &sbuf) == -1) {
-        scope_perror("loaderOpSetLibrary:fstat");
-        scope_close(fd);
+    if (fstat(fd, &sbuf) == -1) {
+        perror("loaderOpSetLibrary:fstat");
+        close(fd);
         return -1;
     }
 
-    buf = scope_mmap(NULL, ROUND_UP(sbuf.st_size, scope_sysconf(_SC_PAGESIZE)),
+    buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
                PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, (off_t)NULL);
     if (buf == MAP_FAILED) {
-        scope_perror("loaderOpSetLibrary:scope_mmap");
-        scope_close(fd);
+        perror("loaderOpSetLibrary:mmap");
+        close(fd);
         return -1;
     }
 
@@ -196,9 +199,9 @@ loaderOpSetLibrary(const char *libpath) {
         || elf->e_ident[EI_MAG2] != ELFMAG2
         || elf->e_ident[EI_MAG3] != ELFMAG3
         || elf->e_ident[EI_VERSION] != EV_CURRENT) {
-        scope_fprintf(scope_stderr, "ERROR:%s: is not valid ELF file", libpath);
-        scope_close(fd);
-        scope_munmap(buf, sbuf.st_size);
+        fprintf(stderr, "ERROR:%s: is not valid ELF file", libpath);
+        close(fd);
+        munmap(buf, sbuf.st_size);
         return -1;
     }
 
@@ -209,15 +212,15 @@ loaderOpSetLibrary(const char *libpath) {
     // locate the .dynstr section
     for (i = 0; i < elf->e_shnum; i++) {
         sec_name = section_strtab + sections[i].sh_name;
-        if (sections[i].sh_type == SHT_STRTAB && scope_strcmp(sec_name, ".dynstr") == 0) {
+        if (sections[i].sh_type == SHT_STRTAB && strcmp(sec_name, ".dynstr") == 0) {
             strtab = (const char *)(buf + sections[i].sh_offset);
         }
     }
 
     if (strtab == NULL) {
-        scope_fprintf(scope_stderr, "ERROR:%s: did not locate the .dynstr from %s", __FUNCTION__, libpath);
-        scope_close(fd);
-        scope_munmap(buf, sbuf.st_size);
+        fprintf(stderr, "ERROR:%s: did not locate the .dynstr from %s", __FUNCTION__, libpath);
+        close(fd);
+        munmap(buf, sbuf.st_size);
         return -1;
     }
 
@@ -227,13 +230,13 @@ loaderOpSetLibrary(const char *libpath) {
             for (dyn = (Elf64_Dyn *)((char *)buf + sections[i].sh_offset); dyn != NULL && dyn->d_tag != DT_NULL; dyn++) {
                 if (dyn->d_tag == DT_NEEDED) {
                     char *depstr = (char *)(strtab + dyn->d_un.d_val);
-                    if (depstr && scope_strstr(depstr, "ld-linux")) {
+                    if (depstr && strstr(depstr, "ld-linux")) {
                         char newdep[PATH_MAX];
                         size_t newdep_len;
                         if (get_dir("/lib/ld-musl", newdep, sizeof(newdep)) == -1) break;
-                        newdep_len = scope_strlen(newdep);
-                        if (scope_strlen(depstr) >= newdep_len) {
-                            scope_strncpy(depstr, newdep, newdep_len + 1);
+                        newdep_len = strlen(newdep);
+                        if (strlen(depstr) >= newdep_len) {
+                            strncpy(depstr, newdep, newdep_len + 1);
                             found = 1;
                             break;
                         }
@@ -245,25 +248,25 @@ loaderOpSetLibrary(const char *libpath) {
     }
 
     if (found) {
-        if (scope_close(fd) == -1) {
-            scope_munmap(buf, sbuf.st_size);
+        if (close(fd) == -1) {
+            munmap(buf, sbuf.st_size);
             return -1;
         }
 
-        if ((fd = scope_open(libpath, O_RDWR)) == -1) {
-            scope_perror("loaderOpSetLibrary:open write");
-            scope_munmap(buf, sbuf.st_size);
+        if ((fd = open(libpath, O_RDWR)) == -1) {
+            perror("loaderOpSetLibrary:open write");
+            munmap(buf, sbuf.st_size);
             return -1;
         }
 
-        int rc = scope_write(fd, buf, sbuf.st_size);
+        int rc = write(fd, buf, sbuf.st_size);
         if (rc < sbuf.st_size) {
-            scope_perror("loaderOpSetLibrary:write");
+            perror("loaderOpSetLibrary:write");
         }
     }
 
-    scope_close(fd);
-    scope_munmap(buf, sbuf.st_size);
+    close(fd);
+    munmap(buf, sbuf.st_size);
     return (found - 1);
 }
 
@@ -272,7 +275,7 @@ loaderOpPatchLibrary(const char *so_path) {
     patch_status_t patch_res = PATCH_NO_OP;
 
     char *ldso = loaderOpGetLoader(EXE_TEST_FILE);
-    if (ldso && scope_strstr(ldso, LIBMUSL) != NULL) {
+    if (ldso && strstr(ldso, LIBMUSL) != NULL) {
         if (!loaderOpSetLibrary(so_path)) {
             patch_res = PATCH_SUCCESS;
         } else {
@@ -280,7 +283,7 @@ loaderOpPatchLibrary(const char *so_path) {
         }
     }
 
-    scope_free(ldso);
+    free(ldso);
 
     return patch_res;
 }
@@ -297,22 +300,22 @@ set_loader(char *exe)
 
     if (!exe) return -1;
 
-    if ((fd = scope_open(exe, O_RDONLY)) == -1) {
-        scope_perror("set_loader:open");
+    if ((fd = open(exe, O_RDONLY)) == -1) {
+        perror("set_loader:open");
         return -1;
     }
 
-    if (scope_fstat(fd, &sbuf) == -1) {
-        scope_perror("set_loader:fstat");
-        scope_close(fd);
+    if (fstat(fd, &sbuf) == -1) {
+        perror("set_loader:fstat");
+        close(fd);
         return -1;
     }
 
-    buf = scope_mmap(NULL, ROUND_UP(sbuf.st_size, scope_sysconf(_SC_PAGESIZE)),
+    buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
                PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, (off_t)NULL);
     if (buf == MAP_FAILED) {
-        scope_perror("set_loader:scope_mmap");
-        scope_close(fd);
+        perror("set_loader:mmap");
+        close(fd);
         return -1;
     }
 
@@ -328,32 +331,32 @@ set_loader(char *exe)
             char dir[PATH_MAX];
             size_t dir_len;
 
-            if (scope_strstr(exld, "ld-musl") != NULL) {
-                scope_close(fd);
-                scope_munmap(buf, sbuf.st_size);
+            if (strstr(exld, "ld-musl") != NULL) {
+                close(fd);
+                munmap(buf, sbuf.st_size);
                 return 0;
             }
 
-            scope_snprintf(dir, sizeof(dir), "/lib/");
-            if ((dirp = scope_opendir(dir)) == NULL) {
-                scope_perror("set_loader:opendir");
+            snprintf(dir, sizeof(dir), "/lib/");
+            if ((dirp = opendir(dir)) == NULL) {
+                perror("set_loader:opendir");
                 break;
             }
 
-            while ((entry = scope_readdir(dirp)) != NULL) {
+            while ((entry = readdir(dirp)) != NULL) {
                 if ((entry->d_type != DT_DIR) &&
-                    (scope_strstr(entry->d_name, "ld-musl"))) {
-                    scope_strncat(dir, entry->d_name, scope_strlen(entry->d_name) + 1);
+                    (strstr(entry->d_name, "ld-musl"))) {
+                    strncat(dir, entry->d_name, strlen(entry->d_name) + 1);
                     name = 1;
                     break;
                 }
             }
 
-            scope_closedir(dirp);
-            dir_len = scope_strlen(dir);
-            if (name && (scope_strlen(exld) >= dir_len)) {
-                if (g_debug) scope_printf("%s:%d exe ld.so: %s to %s\n", __FUNCTION__, __LINE__, exld, dir);
-                scope_strncpy(exld, dir, dir_len + 1);
+            closedir(dirp);
+            dir_len = strlen(dir);
+            if (name && (strlen(exld) >= dir_len)) {
+                if (g_debug) printf("%s:%d exe ld.so: %s to %s\n", __FUNCTION__, __LINE__, exld, dir);
+                strncpy(exld, dir, dir_len + 1);
                 found = 1;
                 break;
             }
@@ -361,27 +364,27 @@ set_loader(char *exe)
     }
 
     if (found) {
-        if (scope_close(fd) == -1) {
-            scope_munmap(buf, sbuf.st_size);
+        if (close(fd) == -1) {
+            munmap(buf, sbuf.st_size);
             return -1;
         }
 
-        if ((fd = scope_open(exe, O_RDWR)) == -1) {
-            scope_perror("set_loader:open write");
-            scope_munmap(buf, sbuf.st_size);
+        if ((fd = open(exe, O_RDWR)) == -1) {
+            perror("set_loader:open write");
+            munmap(buf, sbuf.st_size);
             return -1;
         }
 
-        int rc = scope_write(fd, buf, sbuf.st_size);
+        int rc = write(fd, buf, sbuf.st_size);
         if (rc < sbuf.st_size) {
-            scope_perror("set_loader:write");
+            perror("set_loader:write");
         }
     } else {
-        scope_fprintf(scope_stderr, "WARNING: can't locate or set the loader string in %s\n", exe);
+        fprintf(stderr, "WARNING: can't locate or set the loader string in %s\n", exe);
     }
 
-    scope_close(fd);
-    scope_munmap(buf, sbuf.st_size);
+    close(fd);
+    munmap(buf, sbuf.st_size);
     return (found - 1);
 }
 
@@ -392,11 +395,11 @@ do_musl(char *exld, char *ldscope, uid_t nsUid, gid_t nsGid)
     char *lpath = NULL;
     char *ldso = NULL;
     char *path;
-    char dir[scope_strlen(ldscope) + 2];
+    char dir[strlen(ldscope) + 2];
 
     // always set the env var
-    scope_strncpy(dir, ldscope, scope_strlen(ldscope) + 1);
-    path = scope_dirname(dir);
+    strncpy(dir, ldscope, strlen(ldscope) + 1);
+    path = dirname(dir);
     setEnvVariable(LD_LIB_ENV, path);
 
     // does a link to the musl ld.so exist?
@@ -404,28 +407,28 @@ do_musl(char *exld, char *ldscope, uid_t nsUid, gid_t nsGid)
     if ((ldso = loaderOpGetLoader(ldscope)) == NULL) return;
 
     // Avoid creating ld-musl-x86_64.so.1 -> /lib/ld-musl-x86_64.so.1
-    if (scope_strstr(ldso, "musl")) return;
+    if (strstr(ldso, "musl")) return;
 
-    if (scope_asprintf(&lpath, "%s/%s", path, scope_basename(ldso)) == -1) {
-        scope_perror("do_musl:asprintf");
-        if (ldso) scope_free(ldso);
+    if (asprintf(&lpath, "%s/%s", path, basename(ldso)) == -1) {
+        perror("do_musl:asprintf");
+        if (ldso) free(ldso);
         return;
     }
 
     // dir is expected to exist here, not creating one
-    if ((nsFileSymlink((const char *)exld, lpath, nsUid, nsGid, scope_geteuid(), scope_getegid(), &symlinkErr) == -1) &&
+    if ((nsFileSymlink((const char *)exld, lpath, nsUid, nsGid, geteuid(), getegid(), &symlinkErr) == -1) &&
         (symlinkErr != EEXIST)) {
-        scope_perror("do_musl:symlink");
-        if (ldso) scope_free(ldso);
-        if (lpath) scope_free(lpath);
+        perror("do_musl:symlink");
+        if (ldso) free(ldso);
+        if (lpath) free(lpath);
         return;
     }
 
     set_loader(ldscope);
     loaderOpSetLibrary(libdirGetPath(LIBRARY_FILE));
 
-    if (ldso) scope_free(ldso);
-    if (lpath) scope_free(lpath);
+    if (ldso) free(ldso);
+    if (lpath) free(lpath);
 }
 
 
@@ -442,13 +445,13 @@ loaderOpSetupLoader(char *ldscope, uid_t nsUid, gid_t nsGid)
     char *ldso = NULL;
 
     if (((ldso = loaderOpGetLoader(EXE_TEST_FILE)) != NULL) &&
-        (scope_strstr(ldso, LIBMUSL) != NULL)) {
+        (strstr(ldso, LIBMUSL) != NULL)) {
             // we are using the musl ld.so
             do_musl(ldso, ldscope, nsUid, nsGid);
             ret = 1; // detected musl
     }
 
-    if (ldso) scope_free(ldso);
+    if (ldso) free(ldso);
 
     return ret;
 }

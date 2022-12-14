@@ -1,6 +1,8 @@
 #define _GNU_SOURCE
 #include <fcntl.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/wait.h>
 
 #include "ns.h"
 #include "nsinfo.h"
@@ -10,9 +12,9 @@
 #include "setup.h"
 #include "scopestdlib.h"
 
-#define SCOPE_CRONTAB "* * * * * root /tmp/scope_att.sh\n"
-#define SCOPE_START_SCRIPT "#! /bin/bash\nrm /etc/cron.d/scope_cron\n%s start -f < %s\nrm -- $0\n"
-#define SCOPE_STOP_SCRIPT "#! /bin/bash\nrm /etc/cron.d/scope_cron\n%s stop -f\nrm -- $0\n"
+#define SCOPE_CRONTAB "* * * * * root /tmp/att.sh\n"
+#define SCOPE_START_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s start -f < %s\nrm -- $0\n"
+#define SCOPE_STOP_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s stop -f\nrm -- $0\n"
 
 // NS Action types
 typedef enum {
@@ -30,34 +32,34 @@ extractMemToFile(char *inputMem, size_t inputSize, const char *outFile, mode_t o
     bool status = FALSE;
     int outFd;
 
-    if (!scope_access(outFile, R_OK) && !overwrite) {
+    if (!access(outFile, R_OK) && !overwrite) {
         return TRUE;
     }
 
-    if ((outFd = nsFileOpenWithMode(outFile, O_RDWR | O_CREAT, outPermFlag, nsUid, nsGid, scope_geteuid(), scope_getegid())) == -1) {
+    if ((outFd = nsFileOpenWithMode(outFile, O_RDWR | O_CREAT, outPermFlag, nsUid, nsGid, geteuid(), getegid())) == -1) {
         return status;
     }
 
-    if (scope_ftruncate(outFd, inputSize) != 0) {
+    if (ftruncate(outFd, inputSize) != 0) {
         goto cleanupDestFd;
     }
 
-    char *dest = scope_mmap(NULL, inputSize, PROT_READ | PROT_WRITE, MAP_SHARED, outFd, 0);
+    char *dest = mmap(NULL, inputSize, PROT_READ | PROT_WRITE, MAP_SHARED, outFd, 0);
     if (dest == MAP_FAILED) {
         goto cleanupDestFd;
     }
 
-    scope_memcpy(dest, inputMem, inputSize);
+    memcpy(dest, inputMem, inputSize);
 
-    scope_munmap(dest, inputSize);
+    munmap(dest, inputSize);
 
     status = TRUE;
 
 cleanupDestFd:
 
-    scope_fchmod(outFd, outPermFlag);
+    fchmod(outFd, outPermFlag);
 
-    scope_close(outFd);
+    close(outFd);
 
     return status;
 }
@@ -71,23 +73,23 @@ static bool
 setNamespace(pid_t pid, const char *ns) {
     char nsPath[PATH_MAX] = {0};
     int nsFd;
-    if (scope_snprintf(nsPath, sizeof(nsPath), "/proc/%d/ns/%s", pid, ns) < 0) {
-        scope_perror("setNamespace: scope_snprintf failed");
+    if (snprintf(nsPath, sizeof(nsPath), "/proc/%d/ns/%s", pid, ns) < 0) {
+        perror("setNamespace: snprintf failed");
         return FALSE;
     }
 
-    if ((nsFd = scope_open(nsPath, O_RDONLY)) == -1) {
-        scope_perror("setNamespace: scope_open failed");
+    if ((nsFd = open(nsPath, O_RDONLY)) == -1) {
+        perror("setNamespace: open failed");
         return FALSE;
     }
 
-    if (scope_setns(nsFd, 0) != 0) {
-        scope_perror("setNamespace: setns failed");
-        scope_close(nsFd);
+    if (setns(nsFd, 0) != 0) {
+        perror("setNamespace: setns failed");
+        close(nsFd);
         return FALSE;
     }
 
-    scope_close(nsFd);
+    close(nsFd);
 
     return TRUE;
 }
@@ -111,7 +113,7 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
     uid_t nsUid = nsInfoTranslateUid(hostPid);
     gid_t nsGid = nsInfoTranslateGid(hostPid);
 
-    if (scope_readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
+    if (readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
         return status;
     }
 
@@ -144,22 +146,22 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
 
     /* For official version try to use /usr/lib/appscope */
     if (isDevVersion == FALSE) {
-        scope_memset(path, 0, PATH_MAX);
-        scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
+        memset(path, 0, PATH_MAX);
+        snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
         dirRes = libdirCreateDirIfMissing(path, 0755, nsUid, nsGid);
         if (dirRes <= MKDIR_STATUS_EXISTS) {
-            scope_strncat(path, "ldscope", sizeof("ldscope"));
+            strncat(path, "ldscope", sizeof(path) - 1);
             status = extractMemToFile(ldscopeMem, ldscopeSize, path, 0775, isDevVersion, nsUid, nsGid);
         }
     }
 
     /* For dev version or if extract for official version try to use /tmp/appscope path */
     if (status == FALSE) {
-        scope_memset(path, 0, PATH_MAX);
-        scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
+        memset(path, 0, PATH_MAX);
+        snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
         dirRes = libdirCreateDirIfMissing(path, 0777, nsUid, nsGid);
         if (dirRes <= MKDIR_STATUS_EXISTS) {
-            scope_strncat(path, "ldscope", sizeof("ldscope"));
+            strncat(path, "ldscope", sizeof(path) - 1);
             status = extractMemToFile(ldscopeMem, ldscopeSize, path, 0775, isDevVersion, nsUid, nsGid);
         }
     }
@@ -173,7 +175,7 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
         char scopeCfgPath[PATH_MAX] = {0};
 
         // extract scope.yml configuration
-        scope_snprintf(scopeCfgPath, sizeof(scopeCfgPath), "/tmp/scope%d.yml", hostPid);
+        snprintf(scopeCfgPath, sizeof(scopeCfgPath), "/tmp/scope%d.yml", hostPid);
         status = extractMemToFile(scopeCfgMem, cfgSize, scopeCfgPath, 0664, TRUE, nsUid, nsGid);
         // replace the SCOPE_CONF_PATH with namespace path
         setenv("SCOPE_CONF_PATH", scopeCfgPath, 1);
@@ -181,10 +183,10 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
 
 cleanupMem:
 
-    scope_munmap(ldscopeMem, ldscopeSize);
+    munmap(ldscopeMem, ldscopeSize);
 
     if (scopeCfgMem) {
-        scope_munmap(scopeCfgMem, cfgSize);
+        munmap(scopeCfgMem, cfgSize);
     }
 
     return status;
@@ -232,12 +234,12 @@ nsConfigure(pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize) {
     gid_t nsGid = nsInfoTranslateGid(pid);
 
     if (setNamespace(pid, "mnt") == FALSE) {
-        scope_fprintf(scope_stderr, "setNamespace mnt failed\n");
+        fprintf(stderr, "setNamespace mnt failed\n");
         return EXIT_FAILURE;
     }
 
     if (setupConfigure(scopeCfgFilterMem, filterFileSize, nsUid, nsGid)) {
-        scope_fprintf(scope_stderr, "setup child namespace failed\n");
+        fprintf(stderr, "setup child namespace failed\n");
         return EXIT_FAILURE;
     }
 
@@ -253,12 +255,12 @@ nsConfigure(pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize) {
 int
 nsUnconfigure(pid_t pid) {
     if (setNamespace(pid, "mnt") == FALSE) {
-        scope_fprintf(scope_stderr, "setNamespace mnt failed\n");
+        fprintf(stderr, "setNamespace mnt failed\n");
         return EXIT_FAILURE;
     }
 
     if (setupUnconfigure()) {
-        scope_fprintf(scope_stderr, "setup child namespace failed\n");
+        fprintf(stderr, "setup child namespace failed\n");
         return EXIT_FAILURE;
     }
 
@@ -277,22 +279,22 @@ isLibScopeLoaded(pid_t pid)
     FILE *fd;
     bool status = FALSE;
 
-    if (scope_snprintf(mapsPath, sizeof(mapsPath), "/proc/%d/maps", pid) < 0) {
+    if (snprintf(mapsPath, sizeof(mapsPath), "/proc/%d/maps", pid) < 0) {
         return status;
     }
 
-    if ((fd = scope_fopen(mapsPath, "r")) == NULL) {
+    if ((fd = fopen(mapsPath, "r")) == NULL) {
         return status;
     }
 
-    while (scope_fgets(buffer, sizeof(buffer), fd)) {
-        if (scope_strstr(buffer, "libscope.so")) {
+    while (fgets(buffer, sizeof(buffer), fd)) {
+        if (strstr(buffer, "libscope.so")) {
             status = TRUE;
             break;
         }
     }
 
-    scope_fclose(fd);
+    fclose(fd);
     return status;
 }
 
@@ -320,7 +322,7 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
         childOp = "-a";
         opStatus = (libLoaded == FALSE) ? "Attach" : "Reattach";
     } else if (libLoaded == FALSE) {
-        scope_fprintf(scope_stderr, "error: PID: %d has never been attached\n", parentPid);
+        fprintf(stderr, "error: PID: %d has never been attached\n", parentPid);
         return EXIT_FAILURE; 
     }
     /*
@@ -330,39 +332,39 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
     */
 
     if (joinChildNamespace(parentPid, parentPid != nsPid) == FALSE) {
-        scope_fprintf(scope_stderr, "error: joinChildNamespace failed\n");
+        fprintf(stderr, "error: joinChildNamespace failed\n");
         return EXIT_FAILURE; 
     }
 
     pid_t child = fork();
     if (child < 0) {
-        scope_fprintf(scope_stderr, "error: fork() failed\n");
+        fprintf(stderr, "error: fork() failed\n");
         return EXIT_FAILURE;
     } else if (child == 0) {
         char loaderInChildPath[PATH_MAX] = {0};
 
         // Child
         char *nsAttachPidStr = NULL;
-        if (scope_asprintf(&nsAttachPidStr, "%d", nsPid) <= 0) {
-            scope_perror("error: asprintf() failed\n");
+        if (asprintf(&nsAttachPidStr, "%d", nsPid) <= 0) {
+            perror("error: asprintf() failed\n");
             return EXIT_FAILURE;
         }
         int execArgc = 0;
-        char **execArgv = scope_calloc(4, sizeof(char *));
+        char **execArgv = calloc(4, sizeof(char *));
         if (!execArgv) {
-            scope_fprintf(scope_stderr, "error: calloc() failed\n");
+            fprintf(stderr, "error: calloc() failed\n");
             return EXIT_FAILURE;
         }
 
         const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
         bool isDevVersion = libverIsNormVersionDev(loaderVersion);
 
-        scope_snprintf(loaderInChildPath, PATH_MAX, "/usr/lib/appscope/%s/ldscope", loaderVersion);
-        if (scope_access(loaderInChildPath, R_OK) || isDevVersion) {
-            scope_memset(loaderInChildPath, 0, PATH_MAX);
-            scope_snprintf(loaderInChildPath, PATH_MAX, "/tmp/appscope/%s/ldscope", loaderVersion);
-            if (scope_access(loaderInChildPath, R_OK)) {
-                scope_fprintf(scope_stderr, "error: access ldscope failed\n");
+        snprintf(loaderInChildPath, PATH_MAX, "/usr/lib/appscope/%s/ldscope", loaderVersion);
+        if (access(loaderInChildPath, R_OK) || isDevVersion) {
+            memset(loaderInChildPath, 0, PATH_MAX);
+            snprintf(loaderInChildPath, PATH_MAX, "/tmp/appscope/%s/ldscope", loaderVersion);
+            if (access(loaderInChildPath, R_OK)) {
+                fprintf(stderr, "error: access ldscope failed\n");
                 return EXIT_FAILURE;
             }
         }
@@ -375,17 +377,17 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
     }
     // Parent
     int status;
-    scope_waitpid(child, &status, 0);
+    waitpid(child, &status, 0);
     if (WIFEXITED(status)) {
         int exitChildStatus = WEXITSTATUS(status);
         if (exitChildStatus == 0) {
-            scope_fprintf(scope_stderr, "%s to process %d in child process succeeded\n", opStatus, parentPid);
+            fprintf(stderr, "%s to process %d in child process succeeded\n", opStatus, parentPid);
         } else {
-            scope_fprintf(scope_stderr, "%s to process %d in child process failed\n", opStatus, parentPid);
+            fprintf(stderr, "%s to process %d in child process failed\n", opStatus, parentPid);
         }
         return exitChildStatus;
     }
-    scope_fprintf(scope_stderr, "error: %s failed() failed\n", opStatus);
+    fprintf(stderr, "error: %s failed() failed\n", opStatus);
     return EXIT_FAILURE;
 }
 
@@ -406,75 +408,75 @@ createCron(const char *hostPrefixPath, const char *script) {
     char path[PATH_MAX] = {0};
 
     // Check access to cron.d directory
-    if (scope_snprintf(path, sizeof(path), "%s/etc/cron.d", hostPrefixPath) < 0) {
-        scope_perror("createCron: /etc/cron.d error: snprintf() failed\n");
+    if (snprintf(path, sizeof(path), "%s/etc/cron.d", hostPrefixPath) < 0) {
+        perror("createCron: /etc/cron.d error: snprintf() failed\n");
         return FALSE;
     }
 
-    if (scope_access(path, R_OK)) {
-        scope_fprintf(scope_stderr, "createCron: error %s does not exist\n", path);
+    if (access(path, R_OK)) {
+        fprintf(stderr, "createCron: error %s does not exist\n", path);
         return FALSE;
     }
 
     // Create the script to be executed by cron
-    scope_memset(path, 0, PATH_MAX);
-    if (scope_snprintf(path, sizeof(path), "%s/tmp/scope_att.sh", hostPrefixPath) < 0) {
-        scope_perror("createCron: /tmp/scope_att.sh error: snprintf() failed\n");
-        scope_fprintf(scope_stderr, "path: %s\n", path);
+    memset(path, 0, PATH_MAX);
+    if (snprintf(path, sizeof(path), "%s/tmp/att.sh", hostPrefixPath) < 0) {
+        perror("createCron: /tmp/att.sh error: snprintf() failed\n");
+        fprintf(stderr, "path: %s\n", path);
         return FALSE;
     }
 
-    if ((outFd = scope_open(path, O_RDWR | O_CREAT, 0775)) == -1) {
-        scope_perror("createCron: script path: scope_open failed");
-        scope_fprintf(scope_stderr, "path: %s\n", path);
+    if ((outFd = open(path, O_RDWR | O_CREAT, 0775)) == -1) {
+        perror("createCron: script path: open failed");
+        fprintf(stderr, "path: %s\n", path);
         return FALSE;
     }
 
     // Write cron action - scope start
-    if (scope_snprintf(buf, sizeof(buf), script) < 0) {
-        scope_perror("createCron: script: error: snprintf() failed\n");
-        scope_close(outFd);
+    if (snprintf(buf, sizeof(buf), script) < 0) {
+        perror("createCron: script: error: snprintf() failed\n");
+        close(outFd);
         return FALSE;
     }
 
-    if (scope_write(outFd, buf, scope_strlen(buf)) == -1) {
-        scope_perror("createCron: script: scope_write failed");
-        scope_fprintf(scope_stderr, "path: %s\n", path);
-        scope_close(outFd);
+    if (write(outFd, buf, strlen(buf)) == -1) {
+        perror("createCron: script: write failed");
+        fprintf(stderr, "path: %s\n", path);
+        close(outFd);
         return FALSE;
     }
 
-    if (scope_close(outFd) == -1) {
-        scope_perror("createCron: script: scope_close failed");
-        scope_fprintf(scope_stderr, "path: %s\n", path);
+    if (close(outFd) == -1) {
+        perror("createCron: script: close failed");
+        fprintf(stderr, "path: %s\n", path);
         return FALSE;
     }
 
     // Create the cron entry
-    scope_memset(path, 0, PATH_MAX);
-    if (scope_snprintf(path, sizeof(path), "%s/etc/cron.d/scope_cron", hostPrefixPath) < 0) {
-        scope_perror("createCron: /etc/cron.d/scope_cron error: snprintf() failed\n");
-        scope_fprintf(scope_stderr, "path: %s\n", path);
+    memset(path, 0, PATH_MAX);
+    if (snprintf(path, sizeof(path), "%s/etc/cron.d/cron", hostPrefixPath) < 0) {
+        perror("createCron: /etc/cron.d/cron error: snprintf() failed\n");
+        fprintf(stderr, "path: %s\n", path);
         return FALSE;
     }
 
-    if ((outFd = scope_open(path, O_RDWR | O_CREAT, 0775)) == -1) {
-        scope_perror("createCron: cron: scope_open failed");
-        scope_fprintf(scope_stderr, "path: %s\n", path);
+    if ((outFd = open(path, O_RDWR | O_CREAT, 0775)) == -1) {
+        perror("createCron: cron: open failed");
+        fprintf(stderr, "path: %s\n", path);
         return FALSE;
     }
 
     // crond will detect this file entry and run on its' next cycle
-    if (scope_write(outFd, SCOPE_CRONTAB, sizeof(SCOPE_CRONTAB) - 1) == -1) {
-        scope_perror("createCron: cron: scope_write failed");
-        scope_fprintf(scope_stderr, "path: %s\n", path);
-        scope_close(outFd);
+    if (write(outFd, SCOPE_CRONTAB, sizeof(SCOPE_CRONTAB) - 1) == -1) {
+        perror("createCron: cron: write failed");
+        fprintf(stderr, "path: %s\n", path);
+        close(outFd);
         return FALSE;
     }
 
-    if (scope_close(outFd) == -1) {
-        scope_perror("createCron: cron: scope_close failed");
-        scope_fprintf(scope_stderr, "path: %s\n", path);
+    if (close(outFd) == -1) {
+        perror("createCron: cron: close failed");
+        fprintf(stderr, "path: %s\n", path);
         return FALSE;
     }
 
@@ -496,11 +498,11 @@ switchMntNsRequired(const char *hostFsPrefix) {
 
     for (int i = 0; i < sizeof(hostDir)/sizeof(char*); ++i) {
         char path[PATH_MAX] = {0};
-        if (scope_snprintf(path, sizeof(path), "%s%s", hostFsPrefix, hostDir[i]) < 0) {
-            scope_perror("switchMntNsRequired: scope_snprintf failed");
+        if (snprintf(path, sizeof(path), "%s%s", hostFsPrefix, hostDir[i]) < 0) {
+            perror("switchMntNsRequired: snprintf failed");
             return TRUE;
         }
-        if (scope_access(path, W_OK)) {
+        if (access(path, W_OK)) {
             return TRUE;
         }
     }
@@ -517,22 +519,22 @@ setHostMntNs(const char *hostFsPrefix) {
     int nsFd;
     char nsPath[PATH_MAX] = {0};
 
-    if (scope_snprintf(nsPath, sizeof(nsPath), "%s/proc/1/ns/mnt", hostFsPrefix) < 0) {
-        scope_perror("setHostMntNs: scope_snprintf CRIBL_EDGE_FS_ROOT failed");
+    if (snprintf(nsPath, sizeof(nsPath), "%s/proc/1/ns/mnt", hostFsPrefix) < 0) {
+        perror("setHostMntNs: snprintf CRIBL_EDGE_FS_ROOT failed");
         return FALSE;
     }
 
-    if ((nsFd = scope_open(nsPath, O_RDONLY)) == -1) {
-        scope_perror("setHostMntNs: scope_open failed: host fs is not mounted");
+    if ((nsFd = open(nsPath, O_RDONLY)) == -1) {
+        perror("setHostMntNs: open failed: host fs is not mounted");
         return FALSE;
     }
 
-    if (scope_setns(nsFd, CLONE_NEWNS) != 0) {
-        scope_perror("setHostMntNs: setns failed");
+    if (setns(nsFd, CLONE_NEWNS) != 0) {
+        perror("setHostMntNs: setns failed");
         return FALSE;
     }
 
-    scope_close(nsFd);
+    close(nsFd);
 
     return TRUE;
 }
@@ -540,7 +542,7 @@ setHostMntNs(const char *hostFsPrefix) {
 /*
  * Joins the host mount namespace to perform a Start or Stop action.
  * Required conditions:
- * - scope_filter must exist (if action is Start)
+ * - filter must exist (if action is Start)
  * - scope must exist
  * TODO: unify it with joinChildNamespace
  * Returns TRUE if operation was success, FALSE otherwise.
@@ -559,7 +561,7 @@ joinHostNamespace(ns_action_t action) {
     char *scopeMem = NULL;
     char script[1024];
 
-    if (scope_readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
+    if (readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
         return status;
     }
 
@@ -572,12 +574,12 @@ joinHostNamespace(ns_action_t action) {
     // Load "scope" into memory
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
     bool isDevVersion = libverIsNormVersionDev(loaderVersion);
-    scope_memset(path, 0, PATH_MAX);
-    scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/scope", loaderVersion);
-    if ((scope_access(path, R_OK)) || (isDevVersion)) {
-        scope_memset(path, 0, PATH_MAX);
-        scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/scope", loaderVersion);
-        if (scope_access(path, R_OK)) {
+    memset(path, 0, PATH_MAX);
+    snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/scope", loaderVersion);
+    if ((access(path, R_OK)) || (isDevVersion)) {
+        memset(path, 0, PATH_MAX);
+        snprintf(path, PATH_MAX, "/tmp/appscope/%s/scope", loaderVersion);
+        if (access(path, R_OK)) {
             goto cleanupMem;
         }
     }
@@ -595,17 +597,17 @@ joinHostNamespace(ns_action_t action) {
             * If filter env was defined and wasn't disable 
             * the filter handling, try path interpretation
             */
-            size_t envFilterLen = scope_strlen(envFilterVal);
-            if (scope_strncmp(envFilterVal, "false", envFilterLen) && (!scope_access(envFilterVal, R_OK))) {
+            size_t envFilterLen = strlen(envFilterVal);
+            if (strncmp(envFilterVal, "false", envFilterLen) && (!access(envFilterVal, R_OK))) {
                 scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, envFilterVal);
             }
         } else {
             /*
             * Try to use defaults
             */
-            if (!scope_access(SCOPE_FILTER_USR_PATH, R_OK)) {
+            if (!access(SCOPE_FILTER_USR_PATH, R_OK)) {
                 scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, SCOPE_FILTER_USR_PATH);
-            } else if (!scope_access(SCOPE_FILTER_TMP_PATH, R_OK)) {
+            } else if (!access(SCOPE_FILTER_TMP_PATH, R_OK)) {
                 scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, SCOPE_FILTER_TMP_PATH);
             }
         }
@@ -617,13 +619,13 @@ joinHostNamespace(ns_action_t action) {
     // Get root fs path
     char *envFsRootVal = getenv("CRIBL_EDGE_FS_ROOT");
     if (envFsRootVal) {
-        scope_snprintf(hostPrefixPath, PATH_MAX, "%s", envFsRootVal);
+        snprintf(hostPrefixPath, PATH_MAX, "%s", envFsRootVal);
     } else {
-        scope_strncpy(hostPrefixPath, "/hostfs", sizeof("/hostfs"));
+        strncpy(hostPrefixPath, "/hostfs", sizeof(hostPrefixPath));
     }
 
     // Verify access to host filesystem inside the container
-    if (scope_access(hostPrefixPath, R_OK)) {
+    if (access(hostPrefixPath, R_OK)) {
         goto cleanupMem;
     }
 
@@ -636,36 +638,36 @@ joinHostNamespace(ns_action_t action) {
             goto cleanupMem;
         }
         // if we switch mount namespace we do not use hostfs prefix
-        scope_strcpy(hostPrefixPath, "");
+        strcpy(hostPrefixPath, "");
     }
 
     // At this point we are using the host fs
     
-    uid_t eUid = scope_geteuid();
-    gid_t eGid = scope_getegid();
+    uid_t eUid = geteuid();
+    gid_t eGid = getegid();
 
     /*
      * Ensure that we have the correct dest dir
      */
-    scope_memset(path, 0, PATH_MAX);
-    scope_snprintf(path, PATH_MAX, "%s/usr/lib/appscope/%s/", hostPrefixPath ,loaderVersion);
+    memset(path, 0, PATH_MAX);
+    snprintf(path, PATH_MAX, "%s/usr/lib/appscope/%s/", hostPrefixPath, loaderVersion);
     mkdir_status_t res = libdirCreateDirIfMissing(path, 0755, eUid, eGid);
     if ((res > MKDIR_STATUS_EXISTS) || (isDevVersion)) {
-        scope_memset(path, 0, PATH_MAX);
-        scope_snprintf(path, PATH_MAX, "%s/tmp/appscope/%s/", hostPrefixPath, loaderVersion);
+        memset(path, 0, PATH_MAX);
+        snprintf(path, PATH_MAX, "%s/tmp/appscope/%s/", hostPrefixPath, loaderVersion);
         mkdir_status_t res = libdirCreateDirIfMissing(path, 0777, eUid, eGid);
         if (res > MKDIR_STATUS_EXISTS) {
             goto cleanupMem;
         }
-        scope_snprintf(hostScopePath, PATH_MAX, "/tmp/appscope/%s/scope", loaderVersion);
+        snprintf(hostScopePath, PATH_MAX, "/tmp/appscope/%s/scope", loaderVersion);
     } else {
-        scope_snprintf(hostScopePath, PATH_MAX, "/usr/lib/appscope/%s/scope", loaderVersion);
+        snprintf(hostScopePath, PATH_MAX, "/usr/lib/appscope/%s/scope", loaderVersion);
     }
 
     /*
      * Create a "ldscope" on the host
      */
-    scope_strncat(path, "ldscope", sizeof("ldscope"));
+    strncat(path, "ldscope", sizeof(path) - 1);
     if ((status = extractMemToFile(ldscopeMem, ldscopeSize, path, 0775, isDevVersion, eUid, eGid)) == FALSE) {
         goto cleanupMem;
     }
@@ -673,8 +675,8 @@ joinHostNamespace(ns_action_t action) {
     /*
      * Create a "scope" on the host
      */
-    scope_memset(path, 0, PATH_MAX);
-    scope_snprintf(path, PATH_MAX, "%s%s", hostPrefixPath, hostScopePath);
+    memset(path, 0, PATH_MAX);
+    snprintf(path, PATH_MAX, "%s%s", hostPrefixPath, hostScopePath);
     if (extractMemToFile(scopeMem, scopeSize, path, 0775, isDevVersion, eUid, eGid) == FALSE) {
         goto cleanupMem;
     }
@@ -683,41 +685,41 @@ joinHostNamespace(ns_action_t action) {
         /*
          * Create a "filter file" on the host
          */
-        scope_memset(path, 0, PATH_MAX);
-        scope_snprintf(path, PATH_MAX, "%s/usr/lib/appscope/scope_filter", hostPrefixPath);
+        memset(path, 0, PATH_MAX);
+        snprintf(path, PATH_MAX, "%s/usr/lib/appscope/filter", hostPrefixPath);
         if ((status == extractMemToFile(scopeFilterCfgMem, cfgSize, path, 0664, TRUE, eUid, eGid)) == FALSE) {
-            scope_memset(path, 0, PATH_MAX);
-            scope_snprintf(path, PATH_MAX, "%s/tmp/appscope/scope_filter", hostPrefixPath);
+            memset(path, 0, PATH_MAX);
+            snprintf(path, PATH_MAX, "%s/tmp/appscope/filter", hostPrefixPath);
             if ((status == extractMemToFile(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664, TRUE, eUid, eGid)) == FALSE) {
                 goto cleanupMem;
             }
-            scope_strcpy(hostFilterPath, "/tmp/appscope/scope_filter");
+            strcpy(hostFilterPath, "/tmp/appscope/filter");
         } else {
-            scope_strcpy(hostFilterPath, "/usr/lib/appscope/scope_filter");
+            strcpy(hostFilterPath, "/usr/lib/appscope/filter");
         }
 
         /*
          * Create a "cron script" on the host
          */
-        scope_snprintf(script, sizeof(script), SCOPE_START_SCRIPT, hostScopePath, hostFilterPath);
+        snprintf(script, sizeof(script), SCOPE_START_SCRIPT, hostScopePath, hostFilterPath);
         status = createCron(hostPrefixPath, script);
     } else {
         /*
          * Create a "cron script" on the host
          */
-        scope_snprintf(script, sizeof(script), SCOPE_STOP_SCRIPT, hostScopePath);
+        snprintf(script, sizeof(script), SCOPE_STOP_SCRIPT, hostScopePath);
         status = createCron(hostPrefixPath, script);
     }
 
 cleanupMem:
-    scope_munmap(ldscopeMem, ldscopeSize);
+    munmap(ldscopeMem, ldscopeSize);
 
     if (scopeFilterCfgMem) {
-        scope_munmap(scopeFilterCfgMem, cfgSize);
+        munmap(scopeFilterCfgMem, cfgSize);
     }
 
     if (scopeMem) {
-        scope_munmap(scopeMem, scopeSize);
+        munmap(scopeMem, scopeSize);
     }
 
     return status;
@@ -730,7 +732,7 @@ cleanupMem:
 static bool
 isRunningInContainer(void) {
     struct stat st = {0};
-    return (scope_stat("/proc/2/comm", &st) != 0) ? TRUE : FALSE;
+    return (stat("/proc/2/comm", &st) != 0) ? TRUE : FALSE;
 }
 
  /*
@@ -744,13 +746,13 @@ isRunningInContainer(void) {
 int
 nsHostStart(void) {
     if (isRunningInContainer() == FALSE) {
-        scope_fprintf(scope_stderr, "error: nsHostStart failed process is running on host\n");
+        fprintf(stderr, "error: nsHostStart failed process is running on host\n");
         return EXIT_FAILURE;
     }
-    scope_fprintf(scope_stdout, "Executing from a container, running the start command from the host\n");
+    fprintf(stdout, "Executing from a container, running the start command from the host\n");
 
     if (joinHostNamespace(START) == FALSE) {
-        scope_fprintf(scope_stderr, "error: joinHostNamespace failed\n");
+        fprintf(stderr, "error: joinHostNamespace failed\n");
         return EXIT_FAILURE;
     }
 
@@ -768,13 +770,13 @@ nsHostStart(void) {
 int
 nsHostStop(void) {
      if (isRunningInContainer() == FALSE) {
-        scope_fprintf(scope_stderr, "error: nsHostStop failed process is running on host\n");
+        fprintf(stderr, "error: nsHostStop failed process is running on host\n");
         return EXIT_FAILURE;
     }
-    scope_fprintf(scope_stdout, "Executing from a container, running the stop command from the host\n");
+    fprintf(stdout, "Executing from a container, running the stop command from the host\n");
 
     if (joinHostNamespace(STOP) == FALSE) {
-        scope_fprintf(scope_stderr, "error: joinHostNamespace failed\n");
+        fprintf(stderr, "error: joinHostNamespace failed\n");
         return EXIT_FAILURE;
     }
 

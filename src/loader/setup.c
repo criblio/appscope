@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
 
 #include "dbg.h"
 #include "loaderop.h"
@@ -16,7 +17,7 @@
 #define OPENRC_DIR "/etc/rc.conf"
 #define SYSTEMD_DIR "/etc/systemd"
 #define INITD_DIR "/etc/init.d"
-#define PROFILE_SCRIPT "#! /bin/bash\nlib_found=0\nfilter_found=0\nif test -f /usr/lib/appscope/%s/libscope.so; then\n    lib_found=1\nfi\nif test -f /usr/lib/appscope/scope_filter; then\n    filter_found=1\nelif test -f /tmp/appscope/scope_filter; then\n    filter_found=1\nfi\nif [ $lib_found == 1 ] && [ $filter_found == 1 ]; then\n    export LD_PRELOAD=\"%s $LD_PRELOAD\"\nfi\n"
+#define PROFILE_SCRIPT "#! /bin/bash\nlib_found=0\nfilter_found=0\nif test -f /usr/lib/appscope/%s/libscope.so; then\n    lib_found=1\nfi\nif test -f /usr/lib/appscope/filter; then\n    filter_found=1\nelif test -f /tmp/appscope/filter; then\n    filter_found=1\nfi\nif [ $lib_found == 1 ] && [ $filter_found == 1 ]; then\n    export LD_PRELOAD=\"%s $LD_PRELOAD\"\nfi\n"
 
 typedef enum {
     SERVICE_CFG_ERROR,
@@ -34,20 +35,20 @@ isCfgFileConfigured(const char *serviceCfgPath) {
     int res = FALSE;
     char buf[BUFSIZE] = {0};
 
-    if ((fPtr = scope_fopen(serviceCfgPath, "r")) == NULL) {
-        scope_perror("isCfgFileConfigured scope_fopen failed");
+    if ((fPtr = fopen(serviceCfgPath, "r")) == NULL) {
+        perror("isCfgFileConfigured fopen failed");
         return res;
     }
 
-    while(scope_fgets(buf, sizeof(buf), fPtr)) {
+    while(fgets(buf, sizeof(buf), fPtr)) {
         // TODO improve it to verify particular version ?
-        if (scope_strstr(buf, "/libscope.so")) {
+        if (strstr(buf, "/libscope.so")) {
             res = TRUE;
             break;
         }
     }
 
-    scope_fclose(fPtr);
+    fclose(fPtr);
 
     return res;
 }
@@ -66,49 +67,49 @@ removeScopeCfgFile(const char *filePath) {
     char line_buf[128];
     int count = 0;
      
-    f1 = scope_fopen(filePath, "r");
+    f1 = fopen(filePath, "r");
     if (!f1) {
         return -1;
     }
-    f2 = scope_fopen(tempPath, "w");
+    f2 = fopen(tempPath, "w");
     if (!f2) {
-        scope_fclose(f1);
+        fclose(f1);
         return -1;
     }
 
-    while ((c = scope_getc(f1)) != EOF) {
-        long file_pos = scope_ftell(f1); // Save file position 
+    while ((c = getc(f1)) != EOF) {
+        long file_pos = ftell(f1); // Save file position 
         if (c == '\n') {
-            scope_putc(c, f2);
+            putc(c, f2);
             newline = TRUE;
             continue;
         }
         if (newline) {
-            scope_fseek(f1, file_pos - 1, SEEK_SET); // Rewind file position to beginning of line
-            scope_fgets(line_buf, sizeof(line_buf), f1);
-            if (scope_strstr(line_buf, "/libscope.so")) {
+            fseek(f1, file_pos - 1, SEEK_SET); // Rewind file position to beginning of line
+            fgets(line_buf, sizeof(line_buf), f1);
+            if (strstr(line_buf, "/libscope.so")) {
                 // Skip over this line, effectively removing it from the new file
                 count++;
                 newline = TRUE;
                 continue;
             }
-            scope_fseek(f1, file_pos, SEEK_SET); // Rewind file position previous point
+            fseek(f1, file_pos, SEEK_SET); // Rewind file position previous point
         }
-        scope_putc(c, f2);
+        putc(c, f2);
         newline = FALSE;
     }
 
-    scope_fclose(f1);
-    scope_fclose(f2);
+    fclose(f1);
+    fclose(f2);
 
-    scope_fprintf(scope_stderr, "info: Modifying service file %s\n", filePath);
+    fprintf(stderr, "info: Modifying service file %s\n", filePath);
 
-    if (scope_remove(filePath)) {
-        scope_fprintf(scope_stderr, "error: Removing original service file %s\n", filePath);
+    if (remove(filePath)) {
+        fprintf(stderr, "error: Removing original service file %s\n", filePath);
         return -1;
     }
-    if (scope_rename(tempPath, filePath)) {
-        scope_fprintf(scope_stderr, "error: Moving newly created service file %s\n", filePath);
+    if (rename(tempPath, filePath)) {
+        fprintf(stderr, "error: Moving newly created service file %s\n", filePath);
         return -1;
     }
 
@@ -136,12 +137,12 @@ isServiceInstalledSystemD(const char *serviceName) {
     for (int i = 0; i < sizeof(servicePrefixList)/sizeof(char*); ++i) {
         char cfgPath[PATH_MAX] = {0};
         struct stat st = {0};
-        if (scope_snprintf(cfgPath, sizeof(cfgPath), "%s/%s.service", servicePrefixList[i], serviceName) < 0) {
-            scope_perror("error: isServiceInstalledSystemD, scope_snprintf failed");
+        if (snprintf(cfgPath, sizeof(cfgPath), "%s/%s.service", servicePrefixList[i], serviceName) < 0) {
+            perror("error: isServiceInstalledSystemD, snprintf failed");
             return FALSE;
         }
 
-        if (scope_stat(cfgPath, &st) == 0) {
+        if (stat(cfgPath, &st) == 0) {
             return TRUE;
         }
     }
@@ -157,12 +158,12 @@ static bool
 isServiceInstalledInitDOpenRc(const char *serviceName) {
     char cfgPath[PATH_MAX] = {0};
     struct stat st = {0};
-    if (scope_snprintf(cfgPath, sizeof(cfgPath), "/etc/init.d/%s", serviceName) < 0) {
-        scope_perror("error: isServiceInstalledInitDOpenRc, scope_snprintf failed");
+    if (snprintf(cfgPath, sizeof(cfgPath), "/etc/init.d/%s", serviceName) < 0) {
+        perror("error: isServiceInstalledInitDOpenRc, snprintf failed");
         return FALSE;
     }
 
-    return (scope_stat(cfgPath, &st) == 0) ? TRUE : FALSE;
+    return (stat(cfgPath, &st) == 0) ? TRUE : FALSE;
 }
 
 /*
@@ -176,22 +177,22 @@ serviceCfgStatusSystemD(const char *serviceName, uid_t uid, gid_t gid) {
     struct stat st = {0};
     service_cfg_status_t ret = SERVICE_CFG_ERROR;
 
-    if (scope_snprintf(cfgScript, sizeof(cfgScript), "/etc/systemd/system/%s.service.d/", serviceName) < 0) {
-        scope_perror("error: serviceCfgStatusSystemD, scope_snprintf failed");
+    if (snprintf(cfgScript, sizeof(cfgScript), "/etc/systemd/system/%s.service.d/", serviceName) < 0) {
+        perror("error: serviceCfgStatusSystemD, snprintf failed");
         return ret;
     }
 
     // create service.d directory if it does not exists.
-    if (scope_stat(cfgScript, &st) != 0) {
-        if (nsFileMkdir(cfgScript, 0755, uid, gid, scope_geteuid(), scope_getegid()) != 0) {
-            scope_perror("error: serviceCfgStatusSystemD, scope_mkdir failed");
+    if (stat(cfgScript, &st) != 0) {
+        if (nsFileMkdir(cfgScript, 0755, uid, gid, geteuid(), getegid()) != 0) {
+            perror("error: serviceCfgStatusSystemD, mkdir failed");
             return ret;
         }
     }
 
-    scope_strncat(cfgScript, "env.conf", sizeof("env.conf") - 1);
+    strncat(cfgScript, "env.conf", sizeof(cfgScript) - 1);
 
-    if (scope_stat(cfgScript, &st) == 0) {
+    if (stat(cfgScript, &st) == 0) {
         ret = SERVICE_CFG_EXIST;
     } else {
         ret = SERVICE_CFG_NEW;
@@ -211,12 +212,12 @@ serviceCfgStatusInitD(const char *serviceName, uid_t uid, gid_t gid) {
     struct stat st = {0};
     service_cfg_status_t ret = SERVICE_CFG_ERROR;
 
-    if (scope_snprintf(cfgScript, sizeof(cfgScript), "/etc/sysconfig/%s", serviceName) < 0) {
-        scope_perror("error: serviceCfgStatusInitD, scope_snprintf failed");
+    if (snprintf(cfgScript, sizeof(cfgScript), "/etc/sysconfig/%s", serviceName) < 0) {
+        perror("error: serviceCfgStatusInitD, snprintf failed");
         return ret;
     }
 
-    if (scope_stat(cfgScript, &st) == 0) {
+    if (stat(cfgScript, &st) == 0) {
         ret = SERVICE_CFG_EXIST;
     } else {
         ret = SERVICE_CFG_NEW;
@@ -235,12 +236,12 @@ serviceCfgStatusOpenRc(const char *serviceName, uid_t uid, gid_t gid) {
     struct stat st = {0};
     service_cfg_status_t ret = SERVICE_CFG_ERROR;
 
-    if (scope_snprintf(cfgScript, sizeof(cfgScript), "/etc/conf.d/%s", serviceName) < 0) {
-        scope_perror("error: serviceCfgStatusOpenRc, scope_snprintf failed");
+    if (snprintf(cfgScript, sizeof(cfgScript), "/etc/conf.d/%s", serviceName) < 0) {
+        perror("error: serviceCfgStatusOpenRc, snprintf failed");
         return ret;
     }
 
-    if (scope_stat(cfgScript, &st) == 0) {
+    if (stat(cfgScript, &st) == 0) {
         ret = SERVICE_CFG_EXIST;
     } else {
         ret = SERVICE_CFG_NEW;
@@ -258,19 +259,19 @@ newServiceCfgSystemD(const char *serviceCfgPath, const char *libscopePath, uid_t
     service_status_t res = SERVICE_STATUS_SUCCESS;
     char cfgEntry[BUFSIZE] = {0};
 
-    FILE *fPtr = nsFileFopen(serviceCfgPath, "a", uid, gid, scope_geteuid(), scope_getegid());
+    FILE *fPtr = nsFileFopen(serviceCfgPath, "a", uid, gid, geteuid(), getegid());
     if (fPtr == NULL) {
-        scope_fprintf(scope_stderr, "\nerror: newServiceCfgSystemD, scope_fopen failed");
+        fprintf(stderr, "\nerror: newServiceCfgSystemD, fopen failed");
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    size_t size = scope_snprintf(cfgEntry, BUFSIZE, "[Service]\nEnvironment=LD_PRELOAD=%s\n", libscopePath);
-    if (scope_fwrite(cfgEntry, sizeof(char), size, fPtr) < size) {
-        scope_perror("error: newServiceCfgSystemD, scope_fwrite failed");
+    size_t size = snprintf(cfgEntry, BUFSIZE, "[Service]\nEnvironment=LD_PRELOAD=%s\n", libscopePath);
+    if (fwrite(cfgEntry, sizeof(char), size, fPtr) < size) {
+        perror("error: newServiceCfgSystemD, fwrite failed");
         res = SERVICE_STATUS_ERROR_OTHER;
     }
 
-    scope_fclose(fPtr);
+    fclose(fPtr);
 
     return res;
 }
@@ -285,20 +286,20 @@ newServiceCfgInitD(const char *serviceCfgPath, const char *libscopePath, uid_t u
     service_status_t res = SERVICE_STATUS_SUCCESS;
     char cfgEntry[BUFSIZE] = {0};
 
-    FILE *fPtr = nsFileFopen(serviceCfgPath, "a", uid, gid, scope_geteuid(), scope_getegid());
+    FILE *fPtr = nsFileFopen(serviceCfgPath, "a", uid, gid, geteuid(), getegid());
 
     if (fPtr == NULL) {
-        scope_fprintf(scope_stderr, "\nerror: newServiceCfgInitD, scope_fopen failed");
+        fprintf(stderr, "\nerror: newServiceCfgInitD, fopen failed");
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    size_t size = scope_snprintf(cfgEntry, BUFSIZE, "LD_PRELOAD=%s\n", libscopePath);
-    if (scope_fwrite(cfgEntry, sizeof(char), size, fPtr) < size) {
-        scope_perror("error: newServiceCfgInitD, scope_fwrite failed");
+    size_t size = snprintf(cfgEntry, BUFSIZE, "LD_PRELOAD=%s\n", libscopePath);
+    if (fwrite(cfgEntry, sizeof(char), size, fPtr) < size) {
+        perror("error: newServiceCfgInitD, fwrite failed");
         res = SERVICE_STATUS_ERROR_OTHER;
     }
 
-    scope_fclose(fPtr);
+    fclose(fPtr);
 
     return res;
 }
@@ -313,20 +314,20 @@ newServiceCfgOpenRc(const char *serviceCfgPath, const char *libscopePath, uid_t 
     service_status_t res = SERVICE_STATUS_SUCCESS;
     char cfgEntry[BUFSIZE] = {0};
 
-    FILE *fPtr = nsFileFopen(serviceCfgPath, "a", uid, gid, scope_geteuid(), scope_getegid());
+    FILE *fPtr = nsFileFopen(serviceCfgPath, "a", uid, gid, geteuid(), getegid());
 
     if (fPtr == NULL) {
-        scope_fprintf(scope_stderr, "\nerror: newServiceCfgOpenRc, scope_fopen failed");
+        fprintf(stderr, "\nerror: newServiceCfgOpenRc, fopen failed");
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    size_t size = scope_snprintf(cfgEntry, BUFSIZE, "export LD_PRELOAD=%s\n", libscopePath);
-    if (scope_fwrite(cfgEntry, sizeof(char), size, fPtr) < size) {
-        scope_perror("error: newServiceCfgOpenRc, scope_fwrite failed");
+    size_t size = snprintf(cfgEntry, BUFSIZE, "export LD_PRELOAD=%s\n", libscopePath);
+    if (fwrite(cfgEntry, sizeof(char), size, fPtr) < size) {
+        perror("error: newServiceCfgOpenRc, fwrite failed");
         res = SERVICE_STATUS_ERROR_OTHER;
     }
 
-    scope_fclose(fPtr);
+    fclose(fPtr);
 
     return res;
 }
@@ -344,46 +345,46 @@ modifyServiceCfgSystemd(const char *serviceCfgPath, const char *libscopePath, ui
     bool serviceSectionFound = FALSE;
     char cfgEntry[BUFSIZE] = {0};
 
-    if ((readFd = scope_fopen(serviceCfgPath, "r")) == NULL) {
-        scope_perror("error: modifyServiceCfgSystemd, scope_fopen serviceFile failed");
+    if ((readFd = fopen(serviceCfgPath, "r")) == NULL) {
+        perror("error: modifyServiceCfgSystemd, fopen serviceFile failed");
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    uid_t eUid = scope_geteuid();
-    gid_t eGid = scope_getegid();
+    uid_t eUid = geteuid();
+    gid_t eGid = getegid();
 
     if ((newFd = nsFileFopen(tempPath, "w+", nsEuid, nsEgid, eUid, eGid)) == NULL) {
-        scope_fprintf(scope_stderr, "\nerror: modifyServiceCfgSystemd, nsFileFopen tempFile failed");
-        scope_fclose(readFd);
+        fprintf(stderr, "\nerror: modifyServiceCfgSystemd, nsFileFopen tempFile failed");
+        fclose(readFd);
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
-    scope_snprintf(cfgEntry, BUFSIZE, "[Service]\nEnvironment=LD_PRELOAD=%s\n", libscopePath);
+    snprintf(cfgEntry, BUFSIZE, "[Service]\nEnvironment=LD_PRELOAD=%s\n", libscopePath);
 
-    while (!scope_feof(readFd)) {
+    while (!feof(readFd)) {
         char buf[4096] = {0};
-        int res = scope_fscanf(readFd, "%s", buf);
+        int res = fscanf(readFd, "%s", buf);
 
-        if (scope_strcmp(buf, "[Service]") == 0) {
+        if (strcmp(buf, "[Service]") == 0) {
             serviceSectionFound = TRUE;
-            scope_fprintf(newFd, "%s", cfgEntry);
+            fprintf(newFd, "%s", cfgEntry);
         } else if (res == 0){
-            scope_fprintf(newFd, "%s ", buf);
+            fprintf(newFd, "%s ", buf);
         }
     }
 
     // the file was empty
     if (serviceSectionFound == FALSE) {
-        scope_fprintf(newFd, "%s", cfgEntry);
+        fprintf(newFd, "%s", cfgEntry);
     }
 
-    scope_fclose(newFd);
-    scope_fclose(readFd);
+    fclose(newFd);
+    fclose(readFd);
 
     if (nsFileRename(tempPath, serviceCfgPath, nsEuid ,nsEgid, eUid, eGid)) {
-        scope_fprintf(scope_stderr, "\nerror: modifyServiceCfgSystemd, nsFileRename failed");
+        fprintf(stderr, "\nerror: modifyServiceCfgSystemd, nsFileRename failed");
     }
-    scope_unlink(tempPath);
+    unlink(tempPath);
 
     return SERVICE_STATUS_SUCCESS;
 }
@@ -405,18 +406,18 @@ removeServiceCfgsSystemd(void) {
     };
     // For each systemd dir location
     for (int i = 0; i < sizeof(systemDPrefixList)/sizeof(char*); ++i) {
-        d = scope_opendir(systemDPrefixList[i]);
+        d = opendir(systemDPrefixList[i]);
         if (d) {
             // For each service directory
-            while ((dir = scope_readdir(d)) != NULL) {
+            while ((dir = readdir(d)) != NULL) {
                 // Look for the presence of an env.conf file
-                if (scope_snprintf(cfgScript, sizeof(cfgScript), "%s/%s/env.conf", 
+                if (snprintf(cfgScript, sizeof(cfgScript), "%s/%s/env.conf", 
                             systemDPrefixList[i], dir->d_name) < 0) {
-                    scope_perror("error: setupUnservice, scope_snprintf failed");
+                    perror("error: setupUnservice, snprintf failed");
                     res = SERVICE_STATUS_ERROR_OTHER;
                     continue;
                 }
-                if (scope_stat(cfgScript, &st) == 0) {
+                if (stat(cfgScript, &st) == 0) {
                     // If a service is configured with scope, remove scope from it
                     if (isCfgFileConfigured(cfgScript)) {
                         if (removeScopeCfgFile(cfgScript) <= 0) {
@@ -425,7 +426,7 @@ removeServiceCfgsSystemd(void) {
                     }
                 }
             }
-            scope_closedir(d);
+            closedir(d);
         }
     }
 
@@ -440,12 +441,12 @@ removeServiceCfgsInitD(void) {
     struct dirent *dir;
 
     // Open the the openrc dir location
-    d = scope_opendir("/etc/sysconfig");
+    d = opendir("/etc/sysconfig");
     if (d) {
         // For each service file
-        while ((dir = scope_readdir(d)) != NULL) {
-            if (scope_snprintf(cfgScript, sizeof(cfgScript), "/etc/sysconfig/%s", dir->d_name) < 0) {
-                scope_perror("error: removeServiceCfgsInitD, scope_snprintf failed");
+        while ((dir = readdir(d)) != NULL) {
+            if (snprintf(cfgScript, sizeof(cfgScript), "/etc/sysconfig/%s", dir->d_name) < 0) {
+                perror("error: removeServiceCfgsInitD, snprintf failed");
                 res = SERVICE_STATUS_ERROR_OTHER;
                 continue;
             }
@@ -456,7 +457,7 @@ removeServiceCfgsInitD(void) {
                 }
             }
         }
-        scope_closedir(d);
+        closedir(d);
     }
     
     return res;
@@ -470,12 +471,12 @@ removeServiceCfgsOpenRC(void) {
     struct dirent *dir;
 
     // Open the the initd dir location
-    d = scope_opendir("/etc/init.d");
+    d = opendir("/etc/init.d");
     if (d) {
         // For each service file
-        while ((dir = scope_readdir(d)) != NULL) {
-            if (scope_snprintf(cfgScript, sizeof(cfgScript), "/etc/init.d/%s", dir->d_name) < 0) {
-                scope_perror("error: removeServiceCfgsOpenRC, scope_snprintf failed");
+        while ((dir = readdir(d)) != NULL) {
+            if (snprintf(cfgScript, sizeof(cfgScript), "/etc/init.d/%s", dir->d_name) < 0) {
+                perror("error: removeServiceCfgsOpenRC, snprintf failed");
                 res = SERVICE_STATUS_ERROR_OTHER;
                 continue;
             }
@@ -486,7 +487,7 @@ removeServiceCfgsOpenRC(void) {
                 }
             }
         }
-        scope_closedir(d);
+        closedir(d);
     }
     
     return res;
@@ -539,45 +540,45 @@ setupService(const char *serviceName, uid_t nsUid, gid_t nsGid) {
 
     service_status_t status;
 
-    if (scope_stat(OPENRC_DIR, &sb) == 0) {
+    if (stat(OPENRC_DIR, &sb) == 0) {
         service = &OpenRc;
-        if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/conf.d/%s", serviceName) < 0) {
-            scope_perror("error: setupService, scope_snprintf OpenRc failed");
+        if (snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/conf.d/%s", serviceName) < 0) {
+            perror("error: setupService, snprintf OpenRc failed");
             return SERVICE_STATUS_ERROR_OTHER;
         }
-    } else if (scope_stat(SYSTEMD_DIR, &sb) == 0) {
+    } else if (stat(SYSTEMD_DIR, &sb) == 0) {
         service = &SystemD;
-        scope_memset(serviceCfgPath, 0, PATH_MAX);
-        if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/systemd/system/%s.service.d/env.conf", serviceName) < 0) {
-            scope_perror("error: setupService, scope_snprintf SystemD failed");
+        memset(serviceCfgPath, 0, PATH_MAX);
+        if (snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/systemd/system/%s.service.d/env.conf", serviceName) < 0) {
+            perror("error: setupService, snprintf SystemD failed");
             return SERVICE_STATUS_ERROR_OTHER;
         }
-    } else if (scope_stat(INITD_DIR, &sb) == 0) {
+    } else if (stat(INITD_DIR, &sb) == 0) {
         service = &InitD;
-        scope_memset(serviceCfgPath, 0, PATH_MAX);
-        if (scope_snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/sysconfig/%s", serviceName) < 0) {
-            scope_perror("error: setupService, scope_snprintf InitD failed");
+        memset(serviceCfgPath, 0, PATH_MAX);
+        if (snprintf(serviceCfgPath, sizeof(serviceCfgPath), "/etc/sysconfig/%s", serviceName) < 0) {
+            perror("error: setupService, snprintf InitD failed");
             return SERVICE_STATUS_ERROR_OTHER;
         }
     } else {
-        scope_fprintf(scope_stderr, "error: unknown boot system\n");
+        fprintf(stderr, "error: unknown boot system\n");
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
     if (service->isServiceInstalled(serviceName) == FALSE) {
-        scope_fprintf(scope_stderr, "info: service %s is not installed\n", serviceName);
+        fprintf(stderr, "info: service %s is not installed\n", serviceName);
         return SERVICE_STATUS_NOT_INSTALLED;
     }
 
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
     bool isDevVersion = libverIsNormVersionDev(loaderVersion);
 
-    scope_snprintf(libscopePath, PATH_MAX, "/usr/lib/appscope/%s/libscope.so", loaderVersion);
-    if (scope_access(libscopePath, R_OK) || isDevVersion) {
-        scope_memset(libscopePath, 0, PATH_MAX);
-        scope_snprintf(libscopePath, PATH_MAX, "/tmp/appscope/%s/libscope.so", loaderVersion);
-        if (scope_access(libscopePath, R_OK)) {
-            scope_fprintf(scope_stderr, "error: libscope is not available %s\n", libscopePath);
+    snprintf(libscopePath, PATH_MAX, "/usr/lib/appscope/%s/libscope.so", loaderVersion);
+    if (access(libscopePath, R_OK) || isDevVersion) {
+        memset(libscopePath, 0, PATH_MAX);
+        snprintf(libscopePath, PATH_MAX, "/tmp/appscope/%s/libscope.so", loaderVersion);
+        if (access(libscopePath, R_OK)) {
+            fprintf(stderr, "error: libscope is not available %s\n", libscopePath);
             return SERVICE_STATUS_ERROR_OTHER;
         }
     }
@@ -598,7 +599,7 @@ setupService(const char *serviceName, uid_t nsUid, gid_t nsGid) {
 
     // Change permission and ownership if modify or create was success
     if (status == SERVICE_STATUS_SUCCESS ) {
-        scope_chmod(serviceCfgPath, 0644);
+        chmod(serviceCfgPath, 0644);
     }
     
     return status;
@@ -641,20 +642,20 @@ setupProfile(const char *libscopePath, const char *loaderVersion, uid_t nsUid, g
     }
 
     char buf[PATH_MAX] = {0};
-    int fd = nsFileOpenWithMode("/etc/profile.d/scope.sh", O_CREAT | O_RDWR | O_TRUNC, 0644, nsUid, nsGid, scope_geteuid(), scope_getegid());
+    int fd = nsFileOpenWithMode("/etc/profile.d/scope.sh", O_CREAT | O_RDWR | O_TRUNC, 0644, nsUid, nsGid, geteuid(), getegid());
     if (fd < 0) {
         return FALSE;
     }
 
-    size_t len = scope_snprintf(buf, sizeof(buf), PROFILE_SCRIPT, loaderVersion, libscopePath);
-    if (scope_write(fd, buf, len) != len) {
-        scope_perror("scope_write failed");
-        scope_close(fd);
+    size_t len = snprintf(buf, sizeof(buf), PROFILE_SCRIPT, loaderVersion, libscopePath);
+    if (write(fd, buf, len) != len) {
+        perror("write failed");
+        close(fd);
         return FALSE;
     }
 
-    if (scope_close(fd) != 0) {
-        scope_perror("scope_fopen failed");
+    if (close(fd) != 0) {
+        perror("fopen failed");
         return FALSE;
     }
 
@@ -671,26 +672,26 @@ setupExtractFilterFile(void *filterFileMem, size_t filterSize, const char *outpu
     int filterFd;
     bool status = FALSE;
 
-    if ((filterFd = nsFileOpenWithMode(outputFilterPath, O_RDWR | O_CREAT, 0664, nsUid, nsGid, scope_geteuid(), scope_getegid())) == -1) {
+    if ((filterFd = nsFileOpenWithMode(outputFilterPath, O_RDWR | O_CREAT, 0664, nsUid, nsGid, geteuid(), getegid())) == -1) {
         return status;
     }
 
-    if (scope_ftruncate(filterFd, filterSize) != 0) {
+    if (ftruncate(filterFd, filterSize) != 0) {
         goto cleanupDestFd;
     }
 
-    char *dest = scope_mmap(NULL, filterSize, PROT_READ | PROT_WRITE, MAP_SHARED, filterFd, 0);
+    char *dest = mmap(NULL, filterSize, PROT_READ | PROT_WRITE, MAP_SHARED, filterFd, 0);
     if (dest == MAP_FAILED) {
         goto cleanupDestFd;
     }
 
-    scope_memcpy(dest, filterFileMem, filterSize);
+    memcpy(dest, filterFileMem, filterSize);
 
     status = TRUE;
 
 cleanupDestFd:
 
-    scope_close(filterFd);
+    close(filterFd);
 
     return status;
 }
@@ -711,27 +712,27 @@ setupLoadFileIntoMem(size_t *size, const char *path)
         return resMem;
     }
 
-    if ((fd = scope_open(path, O_RDONLY)) == -1) {
-        scope_perror("scope_open failed");
+    if ((fd = open(path, O_RDONLY)) == -1) {
+        perror("open failed");
         goto closeFd;
     }
 
-    *size = scope_lseek(fd, 0, SEEK_END);
+    *size = lseek(fd, 0, SEEK_END);
     if (*size == (off_t)-1) {
-        scope_perror("scope_lseek failed");
+        perror("lseek failed");
         goto closeFd;
     }
 
-    resMem = scope_mmap(NULL, *size, PROT_READ, MAP_PRIVATE, fd, 0);
+    resMem = mmap(NULL, *size, PROT_READ, MAP_PRIVATE, fd, 0);
     if (resMem == MAP_FAILED) {
-        scope_perror("scope_mmap failed");
+        perror("mmap failed");
         resMem = NULL;
         goto closeFd;
     }
 
 closeFd:
 
-    scope_close(fd);
+    close(fd);
 
     return resMem;
 }
@@ -739,7 +740,7 @@ closeFd:
 /*
  * Configure the environment
  * - setup /etc/profile.d/scope.sh
- * - extract memory to filter file /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter
+ * - extract memory to filter file /usr/lib/appscope/filter or /tmp/appscope/filter
  * - extract libscope.so to /usr/lib/appscope/<version>/libscope.so or /tmp/appscope/<version>/libscope.so if it doesn't exists
  * - patch the library
  * Returns status of operation 0 in case of success, other value otherwise
@@ -760,25 +761,25 @@ setupConfigure(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
      */
     if (getenv("SCOPE_START_FORCE_PROFILE")) isDevVersion = FALSE;
 
-    scope_snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
+    snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
     mkdir_status_t res = libdirCreateDirIfMissing(path, mode, nsUid, nsGid);
     if ((res > MKDIR_STATUS_EXISTS) || isDevVersion) {
         mode = 0777;
-        scope_memset(path, 0, PATH_MAX);
-        scope_snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
+        memset(path, 0, PATH_MAX);
+        snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
         mkdir_status_t res = libdirCreateDirIfMissing(path, mode, nsUid, nsGid);
         if (res > MKDIR_STATUS_EXISTS) {
-            scope_fprintf(scope_stderr, "setupConfigure: libdirCreateDirIfMissing failed\n");
+            fprintf(stderr, "setupConfigure: libdirCreateDirIfMissing failed\n");
             return -1;
         }
     }
 
-    scope_strncat(path, "libscope.so", sizeof("libscope.so"));
+    strncat(path, "libscope.so", sizeof(path) - 1);
 
     // Extract[create] the filter file to filter location
     if (setupExtractFilterFile(filterFileMem, filterSize, SCOPE_FILTER_USR_PATH, nsUid, nsGid) == FALSE) {
         if (setupExtractFilterFile(filterFileMem, filterSize, SCOPE_FILTER_TMP_PATH, nsUid, nsGid) == FALSE) {
-            scope_fprintf(scope_stderr, "setupConfigure: setup filter file failed\n");
+            fprintf(stderr, "setupConfigure: setup filter file failed\n");
             return -1;
         }
     }
@@ -787,22 +788,22 @@ setupConfigure(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
      * Setup /etc/profile.d/scope.sh
      * Only update the profile if we are using the system dir.
      */
-    if (scope_strstr(path, "/usr/lib")) {
+    if (strstr(path, "/usr/lib")) {
         if (setupProfile(path, loaderVersion, nsUid, nsGid) == FALSE) {
-            scope_fprintf(scope_stderr, "setupConfigure: setupProfile failed\n");
+            fprintf(stderr, "setupConfigure: setupProfile failed\n");
             return -1;
         }
     }
 
     // Extract libscope.so
     if (libdirSaveLibraryFile(path, overwrite, mode, nsUid, nsGid)) {
-        scope_fprintf(scope_stderr, "setupConfigure: saving %s failed\n", path);
+        fprintf(stderr, "setupConfigure: saving %s failed\n", path);
         return -1;
     }
 
     // Patch the library
     if (loaderOpPatchLibrary(path) == PATCH_FAILED) {
-        scope_fprintf(scope_stderr, "setupConfigure: patch %s failed\n, path");
+        fprintf(stderr, "setupConfigure: patch %s failed\n", path);
         return -1;
     }
 
@@ -812,7 +813,7 @@ setupConfigure(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
 /*
  * Unconfigure the environment
  * - remove /etc/profile.d/scope.sh
- * - remove filter file/s from /usr/lib/appscope/scope_filter and /tmp/appscope/scope_filter
+ * - remove filter file/s from /usr/lib/appscope/filter and /tmp/appscope/filter
  * Returns status of operation 0 in case of success, other value otherwise
  * If files do not exist, no error will be reported
  */
@@ -825,13 +826,13 @@ setupUnconfigure(void) {
     };
 
     for (int i=0; i<sizeof(fileRemoveList)/sizeof(char*); ++i) {
-        if (scope_remove(fileRemoveList[i])) {
-            if (scope_errno != ENOENT) {
-                scope_fprintf(scope_stderr, "setupUnconfigure: remove %s failed\n", fileRemoveList[i]);
+        if (remove(fileRemoveList[i])) {
+            if (errno != ENOENT) {
+                fprintf(stderr, "setupUnconfigure: remove %s failed\n", fileRemoveList[i]);
                 return -1;
             }
         } else {
-            scope_fprintf(scope_stderr, "info: Removed file %s\n", fileRemoveList[i]);
+            fprintf(stderr, "info: Removed file %s\n", fileRemoveList[i]);
         }
     }
 

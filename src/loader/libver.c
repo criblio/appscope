@@ -1,6 +1,8 @@
 #define _GNU_SOURCE
 
 #include <errno.h>
+#include <string.h>
+#include <ctype.h>
 
 #include "libver.h"
 #include "scopestdlib.h"
@@ -19,18 +21,18 @@ libverNormalizedVersion(const char *version) {
         return "dev";
     }
     ++version;
-    size_t versionSize = scope_strlen(version);
+    size_t versionSize = strlen(version);
 
     for (int i = 0; i < versionSize; ++i) {
         // Only digit and "." are accepted
-        if ((scope_isdigit(version[i]) == 0) && version[i] != '.' &&
+        if ((isdigit(version[i]) == 0) && version[i] != '.' &&
             version[i] != '-' && version[i] != 't' && version[i] != 'c' &&
             version[i] != 'r') {
             return "dev"; 
         }
         if (i == 0 || i == versionSize) {
             // First and last character must be number
-            if (scope_isdigit(version[i]) == 0) {
+            if (isdigit(version[i]) == 0) {
                 return "dev";
             }
         }
@@ -44,5 +46,5 @@ libverNormalizedVersion(const char *version) {
  */
 bool
 libverIsNormVersionDev(const char *normVersion) {
-    return !scope_strncmp(normVersion, "dev", sizeof("dev"));
+    return !strncmp(normVersion, "dev", sizeof("dev"));
 }

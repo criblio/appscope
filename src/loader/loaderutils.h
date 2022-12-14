@@ -1,27 +1,26 @@
-#ifndef __UTILS_H__
-#define __UTILS_H__
+#ifndef __LOADERUTILS_H__
+#define __LOADERUTILS_H__
 
-#include <time.h>
+#ifdef __linux__
+
+#include <elf.h>
+#include <link.h>
 
 typedef struct {
-    const char *str;
-    unsigned val;
-} enum_map_t;
+    char *cmd;
+    char *buf;
+    int len;
+    unsigned char *text_addr;
+    uint64_t       text_len;
+} elf_buf_t;
 
-unsigned int strToVal(enum_map_t[], const char*);
-const char* valToStr(enum_map_t[], unsigned int);
-
-int checkEnv(char *, char *);
-int fullSetenv(const char *, const char *, int);
+void freeElf(char *, size_t);
+elf_buf_t * getElf(char *);
+bool is_static(char *);
+bool is_go(char *);
 void setPidEnv(int);
 char *getpath(const char *);
 
-int startsWith(const char *string, const char *substring);
-int endsWith(const char *string, const char *substring);
+#endif // __linux__
 
-int sigSafeNanosleep(const struct timespec *req);
-
-void setUUID(char *string);
-void setMachineID(char *string);
-
-#endif // __UTILS_H__
+#endif // __LOADERUTILS_H__

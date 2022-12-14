@@ -23,6 +23,10 @@
 #include "nsfile.h"
 #include "ns.h"
 #include "setup.h"
+#include "loader.h"
+ 
+// maybe set this from a cmd line switch?
+int g_log_level = CFG_LOG_WARN;
 
 /* 
  * This avoids a segfault when code using shm_open() is compiled statically.

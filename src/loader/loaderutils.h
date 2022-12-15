@@ -20,7 +20,10 @@ bool is_static(char *);
 bool is_go(char *);
 void setPidEnv(int);
 char *getpath(const char *);
-
+uint64_t findLibrary(const char *, pid_t, bool);
+int getExePath(pid_t, char **);
+int findFd(pid_t, const char *);
+int getProcUidGid(pid_t, uid_t *, gid_t *);
+    
 #endif // __linux__
-
 #endif // __LOADERUTILS_H__

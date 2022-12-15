@@ -6,6 +6,9 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <limits.h>
+#include <sys/types.h>
+#include <dirent.h>
 
 #include "scopetypes.h"
 #include "loader.h"
@@ -262,3 +265,160 @@ out:
     if (path_env) free(path_env);
     return ret_val;
 }
+
+uint64_t
+findLibrary(const char *library, pid_t pid, bool matchLibraryExactly)
+{
+    char filename[PATH_MAX];
+    char line[1024];
+    FILE *fd;
+    uint64_t addr = 0;
+
+    snprintf(filename, sizeof(filename), "/proc/%d/maps", pid);
+    if ((fd = fopen(filename, "r")) == NULL) {
+        // return no proc found as opposed to no libscope found
+        return -1;
+    }
+
+    if (matchLibraryExactly) { // pathFromLine string == library string
+        char pathFromLine[512];
+        while(fgets(line, sizeof(line), fd)) {
+            //7ff775e88000-7ff77606f000 r-xp 00000000 ca:01 17348 /lib/x86_64-linux-gnu/libc-2.27.so
+            if ((sscanf(line, "%*x-%*x %*s %*x %*s %*d %512s", pathFromLine) == 1)
+                && !strcmp(pathFromLine, library)) {
+                addr = strtoull(line, NULL, 16);
+                break;
+            }
+        }
+    } else {                   // line *contains* library string
+        while(fgets(line, sizeof(line), fd)) {
+            if (strstr(line, library)) {
+                addr = strtoull(line, NULL, 16);
+                break;
+            }
+        }
+    }
+
+    fclose(fd);
+    return addr;
+}
+
+int
+getExePath(pid_t pid, char **path)
+{
+    if (!path) return -1;
+    char *buf = *path;
+    char pidpath[PATH_MAX];
+
+    if (!(buf = calloc(1, PATH_MAX))) {
+        fprintf(stderr, "ERROR:calloc in osGetExePath");
+        return -1;
+    }
+
+    snprintf(pidpath, PATH_MAX, "/proc/%d/exe", pid);
+
+    if (readlink(pidpath, buf, PATH_MAX - 1) == -1) {
+        fprintf(stderr, "osGetExePath: can't get path to pid %d exe", pid);
+        free(buf);
+        return -1;
+    }
+
+    *path = buf;
+    return 0;
+}
+
+int
+findFd(pid_t pid, const char *fname)
+{
+    int fd = -1;
+    DIR *dirp;
+    char *cwd;
+    struct dirent *entry;
+    char buf[PATH_MAX], link[256];
+
+    if ((cwd = getcwd(NULL, 0)) == NULL) {
+        perror("getcwd");
+        return -1;
+    }
+
+    snprintf(buf, sizeof(buf), "/proc/%d/fd", pid);
+
+    if (chdir(buf) == -1) {
+        free(cwd);
+        return -1;
+    }
+
+    if ((dirp = opendir(buf)) == NULL) {
+        free(cwd);
+        perror("opendir");
+        return -1;
+    }
+
+    while ((entry = readdir(dirp)) != NULL) {
+        if (entry->d_type != DT_DIR) {
+                if (readlink(entry->d_name, link, sizeof(link)) == -1) {
+                    fprintf(stderr, "%s: can't get path to %s", __FUNCTION__, entry->d_name);
+                break;
+            }
+
+            if (strstr(link, fname)) {
+                fd = strtol(entry->d_name, NULL, 0);
+                if ((fd == LONG_MIN) || (fd == LONG_MAX) || (fd == 0)) fd = -1;
+                break;
+            }
+        }
+    }
+
+    chdir(cwd);
+    closedir(dirp);
+    free(cwd);
+    return fd;
+}
+
+int
+getProcUidGid(pid_t pid, uid_t *uid, gid_t *gid)
+{
+    char path[PATH_MAX] = {0};
+    char buffer[4096];
+    uid_t eUid = -1;
+    gid_t eGid = -1;
+
+    if (snprintf(path, sizeof(path), "/proc/%d/status", pid) < 0) return -1;
+
+    FILE *fstream = fopen(path, "r");
+    if (fstream == NULL) {
+        return -1;
+    }
+
+    while (fgets(buffer, sizeof(buffer), fstream)) {
+        const char delimiters[] = ": \t";
+        if (strstr(buffer, "Uid:")) {
+            char *entry, *last;
+            // Skip Uid string
+            entry = strtok_r(buffer, delimiters, &last);
+            // Get real Uid value
+            entry = strtok_r(NULL, delimiters, &last);
+            eUid = atoi(entry);
+        }
+
+        if (strstr(buffer, "Gid:")) {
+            char *entry, *last;
+            // Skip Gid string
+            entry = strtok_r(buffer, delimiters, &last);
+            // Get real Gid value
+            entry = strtok_r(NULL, delimiters, &last);
+            eGid = atoi(entry);
+        }
+    }
+
+    fclose(fstream);
+
+    if (eUid != -1 && eGid != -1) {
+        *uid = eUid;
+        *gid = eGid;
+        return 0;
+    }
+
+    return -1;
+}
+

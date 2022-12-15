@@ -165,12 +165,12 @@ go_schema_t go_17_schema_x86 = {
         .c_syscall_p3=                 0x18,
         .c_syscall_p4=                 0x10,
         .c_syscall_p5=                 0x30,
-        .c_syscall_p6=                 0x38,                   
+        .c_syscall_p6=                 0x38,
         .c_tls_server_read_connReader= 0x50,
-        .c_tls_server_read_buf=        0x8, 
+        .c_tls_server_read_buf=        0x8,
         .c_tls_server_read_rc=         0x28,
         .c_tls_server_write_conn=      0x30,
-        .c_tls_server_write_buf=       0x8, 
+        .c_tls_server_write_buf=       0x8,
         .c_tls_server_write_rc=        0x10,
         .c_tls_client_read_pc=         0x28,
         .c_tls_client_write_w_pc=      0x20,
@@ -266,9 +266,9 @@ go_schema_t go_17_schema_arm = {
 };
 
 tap_t *
-tap_entry(enum tap_name name) {
+tap_entry(enum tap_id id) {
     for (tap_t *tap = g_go_schema->tap; tap->assembly_fn; tap++) {
-        if (tap->name == name) {
+        if (tap->id == id) {
             return tap;
         }
     }

@@ -210,7 +210,7 @@ endtest
 # socat receives over a tls session and writes to $EVT_FILE
 #cat /usr/local/scope/key.pem /usr/local/scope/cert.pem >> /tmp/appscope.pem
 #socat OPENSSL-LISTEN:9109,reuseaddr,cert=/tmp/appscope.pem,cafile=/tmp/appscope.pem,fork,verify=0 $EVT_FILE &
-
+# sleep 1
 # run ldscope with a ton of env vars to send over tls session
 #  SCOPE_EVENT_DEST=tcp://127.0.0.1:9109 \
 #  SCOPE_EVENT_TLS_ENABLE=true \

@@ -65,7 +65,7 @@ extern int osNeedsConnect(int);
 extern char *osGetUserName(unsigned);
 extern char *osGetGroupName(unsigned);
 extern long long osGetProcCPU(void);
-extern uint64_t osFindLibrary(const char *, pid_t);
+extern uint64_t osFindLibrary(const char *, pid_t, bool);
 extern int osFindFd(pid_t, const char *);
 extern void osCreateSM(proc_id_t *, unsigned long);
 

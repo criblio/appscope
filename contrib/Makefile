@@ -77,7 +77,7 @@ build/openssl/libssl.a build/openssl/libcrypto.a:
 	@echo "$${CI:+::group::}Building openssl"
 	@$(RM) -r build/openssl
 	@mkdir build/openssl
-	cd build/openssl && ../../openssl/Configure no-engine no-async no-tests no-unit-test no-threads && make -j8
+	cd build/openssl && ../../openssl/Configure no-engine no-async no-tests no-unit-test no-threads && make -j$(nproc)
 	# Yuck.  Avoids naming conflict between our wrap.c and libssl.a
 	objcopy --redefine-sym SSL_read=SCOPE_SSL_read build/openssl/libssl.a
 	objcopy --redefine-sym SSL_write=SCOPE_SSL_write build/openssl/libssl.a
@@ -119,7 +119,7 @@ build/musl/lib/libc.a:
 	@$(RM) -r build/musl
 	@mkdir build/musl
 # To enable debug please add below --enable-debug --enable-optimize=no
-	cd build/musl && ../../musl/configure --disable-shared --disable-wrapper && $(MAKE)
+	cd build/musl && ../../musl/configure --disable-shared --disable-wrapper CFLAGS=-ffixed-x28 && $(MAKE)
 	cp build/musl/lib/libc.a build/musl/lib/libc_orig.a
 	objcopy --prefix-symbols=scopelibc_ build/musl/lib/libc.a
 # TODO verify if the code below be done via mfloat-abi=soft not sure if aarch64 support soft though

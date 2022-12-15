@@ -43,13 +43,13 @@ unsigned char _binary_libscope_so_end;
 
 static void
 CreateDirIfMissingWrongPathNull(void **state) {
-    mkdir_status_t res = libdirCreateDirIfMissing(NULL, 0777);
+    mkdir_status_t res = libdirCreateDirIfMissing(NULL, 0777, scope_geteuid(), scope_getegid());
     assert_int_equal(res, MKDIR_STATUS_ERR_NOT_ABS_DIR);
 }
 
 static void
 CreateDirIfMissingWrongPathCurrentDir(void **state) {
-    mkdir_status_t res = libdirCreateDirIfMissing(".", 0777);
+    mkdir_status_t res = libdirCreateDirIfMissing(".", 0777, scope_geteuid(), scope_getegid());
     assert_int_equal(res, MKDIR_STATUS_ERR_NOT_ABS_DIR);
 }
 
@@ -64,7 +64,7 @@ CreateDirIfMissingWrongPathFile(void **state) {
     assert_non_null(scope_getcwd(buf, PATH_MAX));
     scope_strcat(buf, "/");
     scope_strcat(buf, fileName);
-    mkdir_status_t status = libdirCreateDirIfMissing(buf, 0777);
+    mkdir_status_t status = libdirCreateDirIfMissing(buf, 0777, scope_geteuid(), scope_getegid());
     assert_int_equal(status, MKDIR_STATUS_ERR_NOT_ABS_DIR);
     res = scope_unlink(fileName);
     assert_int_equal(res, 0);
@@ -72,7 +72,7 @@ CreateDirIfMissingWrongPathFile(void **state) {
 
 static void
 CreateDirIfMissingPermissionIssue(void **state) {
-    mkdir_status_t res = libdirCreateDirIfMissing("/root/loremIpsumFile/", 0777);
+    mkdir_status_t res = libdirCreateDirIfMissing("/root/loremIpsumFile/", 0777, scope_geteuid(), scope_getegid());
     assert_int_equal(res, MKDIR_STATUS_ERR_OTHER);
 }
 
@@ -87,9 +87,9 @@ CreateDirIfMissingAlreadyExists(void **state) {
     scope_strcat(buf, dirName);
     res = scope_mkdir(buf, 0755);
     assert_int_equal(res, 0);
-    mkdir_status_t status = libdirCreateDirIfMissing(dirName, 0777);
+    mkdir_status_t status = libdirCreateDirIfMissing(dirName, 0777, scope_geteuid(), scope_getegid());
     assert_int_equal(status, MKDIR_STATUS_ERR_NOT_ABS_DIR);
-    status = libdirCreateDirIfMissing(buf, 0777);
+    status = libdirCreateDirIfMissing(buf, 0777, scope_geteuid(), scope_getegid());
     assert_int_equal(status, MKDIR_STATUS_EXISTS);
     res = rm_recursive(buf);
     assert_int_equal(res, 0);
@@ -97,7 +97,7 @@ CreateDirIfMissingAlreadyExists(void **state) {
 
 static void
 CreateDirIfMissingAlreadyExistsPermIssue(void **state) {
-    mkdir_status_t status = libdirCreateDirIfMissing("/root", 0777);
+    mkdir_status_t status = libdirCreateDirIfMissing("/root", 0777, scope_geteuid(), scope_getegid());
     assert_int_equal(status, MKDIR_STATUS_ERR_PERM_ISSUE);
 }
 
@@ -113,7 +113,7 @@ CreateDirIfMissingSuccessCreated(void **state) {
     scope_strcat(buf, dirName);
     res = scope_stat(buf, &dirStat);
     assert_int_not_equal(res, 0);
-    mkdir_status_t status = libdirCreateDirIfMissing(buf, 0777);
+    mkdir_status_t status = libdirCreateDirIfMissing(buf, 0777, scope_geteuid(), scope_getegid());
     assert_int_equal(status, MKDIR_STATUS_CREATED);
     res = scope_stat(buf, &dirStat);
     assert_int_equal(res, 0);
@@ -129,7 +129,7 @@ CreateDirIfMissingSuccessCreated(void **state) {
     assert_int_not_equal(dirStat.st_mode & S_IXOTH, 0);
     res = rm_recursive(buf);
     assert_int_equal(res, 0);
-     status = libdirCreateDirIfMissing(buf, 0755);
+     status = libdirCreateDirIfMissing(buf, 0755, scope_geteuid(), scope_getegid());
     assert_int_equal(status, MKDIR_STATUS_CREATED);
     res = scope_stat(buf, &dirStat);
     assert_int_equal(res, 0);
@@ -158,7 +158,7 @@ static void
 SetLibrarySuccessDev(void **state) {
     libdirInitTest(TEST_INSTALL_BASE, TEST_TMP_BASE, "dev");
     // Create dummy file
-    mkdir_status_t mkres = libdirCreateDirIfMissing("/tmp/appscope-test/success/dev", 0777);
+    mkdir_status_t mkres = libdirCreateDirIfMissing("/tmp/appscope-test/success/dev", 0777, scope_geteuid(), scope_getegid());
     assert_in_range(mkres, MKDIR_STATUS_CREATED, MKDIR_STATUS_EXISTS);
     FILE *fp = scope_fopen("/tmp/appscope-test/success/dev/libscope.so", "w");
     assert_non_null(fp);
@@ -182,14 +182,14 @@ ExtractNewFileDev(void **state) {
     struct stat dirStat = {0};
 
     // TEST_TMP_BASE will be used
-    int res = libdirExtract(LIBRARY_FILE);
+    int res = libdirExtract(LIBRARY_FILE, scope_geteuid(), scope_getegid());
     assert_int_equal(res, 0);
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "libscope.so");
     res = scope_stat(expected_location, &dirStat);
     assert_int_equal(res, 0);
     scope_memset(expected_location, 0, PATH_MAX);
     
-    res = libdirExtract(LOADER_FILE);
+    res = libdirExtract(LOADER_FILE, scope_geteuid(), scope_getegid());
     assert_int_equal(res, 0);
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "ldscopedyn");
     res = scope_stat(expected_location, &dirStat);
@@ -204,14 +204,14 @@ ExtractNewFileDevAlternative(void **state) {
     struct stat dirStat = {0};
 
     // Extract will fail because second path is not accessbile
-    int res = libdirExtract(LIBRARY_FILE);
+    int res = libdirExtract(LIBRARY_FILE, scope_geteuid(), scope_getegid());
     assert_int_not_equal(res, 0);
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "libscope.so");
     res = scope_stat(expected_location, &dirStat);
     assert_int_not_equal(res, 0);
     scope_memset(expected_location, 0, PATH_MAX);
     
-    res = libdirExtract(LOADER_FILE);
+    res = libdirExtract(LOADER_FILE, scope_geteuid(), scope_getegid());
     assert_int_not_equal(res, 0);
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "ldscopedyn");
     res = scope_stat(expected_location, &dirStat);
@@ -226,7 +226,7 @@ ExtractNewFileOfficial(void **state) {
     struct stat dirStat = {0};
 
     // TEST_INSTALL_BASE will be used
-    int res = libdirExtract(LIBRARY_FILE);
+    int res = libdirExtract(LIBRARY_FILE, scope_geteuid(), scope_getegid());
     assert_int_equal(res, 0);
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, normVer, "libscope.so");
     res = scope_stat(expected_location, &dirStat);
@@ -234,7 +234,7 @@ ExtractNewFileOfficial(void **state) {
     scope_remove(expected_location);
     scope_memset(expected_location, 0, PATH_MAX);
     
-    res = libdirExtract(LOADER_FILE);
+    res = libdirExtract(LOADER_FILE, scope_geteuid(), scope_getegid());
     assert_int_equal(res, 0);
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, normVer, "ldscopedyn");
     res = scope_stat(expected_location, &dirStat);
@@ -249,7 +249,7 @@ ExtractNewFileOfficialAlternative(void **state) {
     struct stat dirStat = {0};
 
     // TEST_TMP_BASE will be used
-    int res = libdirExtract(LIBRARY_FILE);
+    int res = libdirExtract(LIBRARY_FILE, scope_geteuid(), scope_getegid());
     assert_int_equal(res, 0);
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "libscope.so");
     res = scope_stat(expected_location, &dirStat);
@@ -257,7 +257,7 @@ ExtractNewFileOfficialAlternative(void **state) {
     scope_remove(expected_location);
     scope_memset(expected_location, 0, PATH_MAX);
     
-    res = libdirExtract(LOADER_FILE);
+    res = libdirExtract(LOADER_FILE, scope_geteuid(), scope_getegid());
     assert_int_equal(res, 0);
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "ldscopedyn");
     res = scope_stat(expected_location, &dirStat);
@@ -272,13 +272,13 @@ ExtractFileExistsOfficial(void **state) {
     struct stat firstStat = {0};
     struct stat secondStat = {0};
 
-    int res = libdirExtract(LIBRARY_FILE);
+    int res = libdirExtract(LIBRARY_FILE, scope_geteuid(), scope_getegid());
     assert_int_equal(res, 0);
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, normVer, "libscope.so");
     res = scope_stat(expected_location, &firstStat);
     assert_int_equal(res, 0);
 
-    res = libdirExtract(LIBRARY_FILE);
+    res = libdirExtract(LIBRARY_FILE, scope_geteuid(), scope_getegid());
     assert_int_equal(res, 0);
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, normVer, "libscope.so");
     res = scope_stat(expected_location, &secondStat);
@@ -294,7 +294,7 @@ GetPathDev(void **state) {
     char expected_location[PATH_MAX] = {0};
     // Create dummy directory
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/", TEST_TMP_BASE, normVer);
-    mkdir_status_t mkres = libdirCreateDirIfMissing(expected_location, 0777);
+    mkdir_status_t mkres = libdirCreateDirIfMissing(expected_location, 0777, scope_geteuid(), scope_getegid());
     assert_in_range(mkres, MKDIR_STATUS_CREATED, MKDIR_STATUS_EXISTS);
     // Create dummy file
     scope_memset(expected_location, 0, PATH_MAX);
@@ -326,7 +326,7 @@ GetPathOfficial(void **state) {
     char expected_location[PATH_MAX] = {0};
     // Create dummy directory
     scope_snprintf(expected_location, PATH_MAX, "%s/%s/", TEST_INSTALL_BASE, normVer);
-    mkdir_status_t mkres = libdirCreateDirIfMissing(expected_location, 0777);
+    mkdir_status_t mkres = libdirCreateDirIfMissing(expected_location, 0777, scope_geteuid(), scope_getegid());
     assert_in_range(mkres, MKDIR_STATUS_CREATED, MKDIR_STATUS_EXISTS);
     // Create dummy file
     scope_memset(expected_location, 0, PATH_MAX);

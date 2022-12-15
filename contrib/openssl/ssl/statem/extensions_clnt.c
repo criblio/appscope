@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2016-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -629,7 +629,7 @@ static int add_key_share(SSL *s, WPACKET *pkt, unsigned int curve_id)
     }
 
     /*
-     * TODO(TLS1.3): When changing to send more than one key_share we're
+     * When changing to send more than one key_share we're
      * going to need to be able to save more than one EVP_PKEY. For now
      * we reuse the existing tmp.pkey
      */
@@ -668,8 +668,8 @@ EXT_RETURN tls_construct_ctos_key_share(SSL *s, WPACKET *pkt,
     tls1_get_supported_groups(s, &pgroups, &num_groups);
 
     /*
-     * TODO(TLS1.3): Make the number of key_shares sent configurable. For
-     * now, just send one
+     * Make the number of key_shares sent configurable. For
+     * now, we just send one
      */
     if (s->s3.group_id != 0) {
         curve_id = s->s3.group_id;
@@ -677,6 +677,10 @@ EXT_RETURN tls_construct_ctos_key_share(SSL *s, WPACKET *pkt,
         for (i = 0; i < num_groups; i++) {
 
             if (!tls_group_allowed(s, pgroups[i], SSL_SECOP_CURVE_SUPPORTED))
+                continue;
+
+            if (!tls_valid_group(s, pgroups[i], TLS1_3_VERSION, TLS1_3_VERSION,
+                                 0, NULL))
                 continue;
 
             curve_id = pgroups[i];
@@ -937,7 +941,7 @@ EXT_RETURN tls_construct_ctos_padding(SSL *s, WPACKET *pkt,
              * length.
              */
             hlen +=  PSK_PRE_BINDER_OVERHEAD + s->session->ext.ticklen
-                     + EVP_MD_size(md);
+                     + EVP_MD_get_size(md);
         }
     }
 
@@ -974,7 +978,7 @@ EXT_RETURN tls_construct_ctos_psk(SSL *s, WPACKET *pkt, unsigned int context,
                                   X509 *x, size_t chainidx)
 {
 #ifndef OPENSSL_NO_TLS1_3
-    uint32_t now, agesec, agems = 0;
+    uint32_t agesec, agems = 0;
     size_t reshashsize = 0, pskhashsize = 0, binderoffset, msglen;
     unsigned char *resbinder = NULL, *pskbinder = NULL, *msgstart = NULL;
     const EVP_MD *handmd = NULL, *mdres = NULL, *mdpsk = NULL;
@@ -1030,8 +1034,7 @@ EXT_RETURN tls_construct_ctos_psk(SSL *s, WPACKET *pkt, unsigned int context,
          * this in multiple places in the code, so portability shouldn't be an
          * issue.
          */
-        now = (uint32_t)time(NULL);
-        agesec = now - (uint32_t)s->session->time;
+        agesec = (uint32_t)(time(NULL) - s->session->time);
         /*
          * We calculate the age in seconds but the server may work in ms. Due to
          * rounding errors we could overestimate the age by up to 1s. It is
@@ -1068,7 +1071,7 @@ EXT_RETURN tls_construct_ctos_psk(SSL *s, WPACKET *pkt, unsigned int context,
          */
         agems += s->session->ext.tick_age_add;
 
-        reshashsize = EVP_MD_size(mdres);
+        reshashsize = EVP_MD_get_size(mdres);
         s->ext.tick_identity++;
         dores = 1;
     }
@@ -1097,7 +1100,7 @@ EXT_RETURN tls_construct_ctos_psk(SSL *s, WPACKET *pkt, unsigned int context,
             return EXT_RETURN_FAIL;
         }
 
-        pskhashsize = EVP_MD_size(mdpsk);
+        pskhashsize = EVP_MD_get_size(mdpsk);
     }
 
     /* Create the extension, but skip over the binder for now */
@@ -1387,7 +1390,6 @@ int tls_parse_stoc_status_request(SSL *s, PACKET *pkt, unsigned int context,
 {
     if (context == SSL_EXT_TLS1_3_CERTIFICATE_REQUEST) {
         /* We ignore this if the server sends a CertificateRequest */
-        /* TODO(TLS1.3): Add support for this */
         return 1;
     }
 
@@ -1429,7 +1431,6 @@ int tls_parse_stoc_sct(SSL *s, PACKET *pkt, unsigned int context, X509 *x,
 {
     if (context == SSL_EXT_TLS1_3_CERTIFICATE_REQUEST) {
         /* We ignore this if the server sends it in a CertificateRequest */
-        /* TODO(TLS1.3): Add support for this */
         return 1;
     }
 
@@ -1680,7 +1681,11 @@ int tls_parse_stoc_etm(SSL *s, PACKET *pkt, unsigned int context, X509 *x,
     /* Ignore if inappropriate ciphersuite */
     if (!(s->options & SSL_OP_NO_ENCRYPT_THEN_MAC)
             && s->s3.tmp.new_cipher->algorithm_mac != SSL_AEAD
-            && s->s3.tmp.new_cipher->algorithm_enc != SSL_RC4)
+            && s->s3.tmp.new_cipher->algorithm_enc != SSL_RC4
+            && s->s3.tmp.new_cipher->algorithm_enc != SSL_eGOST2814789CNT
+            && s->s3.tmp.new_cipher->algorithm_enc != SSL_eGOST2814789CNT12
+            && s->s3.tmp.new_cipher->algorithm_enc != SSL_MAGMA
+            && s->s3.tmp.new_cipher->algorithm_enc != SSL_KUZNYECHIK)
         s->ext.use_etm = 1;
 
     return 1;
@@ -1774,7 +1779,9 @@ int tls_parse_stoc_key_share(SSL *s, PACKET *pkt, unsigned int context, X509 *x,
                 break;
         }
         if (i >= num_groups
-                || !tls_group_allowed(s, group_id, SSL_SECOP_CURVE_SUPPORTED)) {
+                || !tls_group_allowed(s, group_id, SSL_SECOP_CURVE_SUPPORTED)
+                || !tls_valid_group(s, group_id, TLS1_3_VERSION, TLS1_3_VERSION,
+                                    0, NULL)) {
             SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_KEY_SHARE);
             return 0;
         }
@@ -1793,6 +1800,28 @@ int tls_parse_stoc_key_share(SSL *s, PACKET *pkt, unsigned int context, X509 *x,
         SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_KEY_SHARE);
         return 0;
     }
+    /* Retain this group in the SSL_SESSION */
+    if (!s->hit) {
+        s->session->kex_group = group_id;
+    } else if (group_id != s->session->kex_group) {
+        /*
+         * If this is a resumption but changed what group was used, we need
+         * to record the new group in the session, but the session is not
+         * a new session and could be in use by other threads.  So, make
+         * a copy of the session to record the new information so that it's
+         * useful for any sessions resumed from tickets issued on this
+         * connection.
+         */
+        SSL_SESSION *new_sess;
+
+        if ((new_sess = ssl_session_dup(s->session, 0)) == NULL) {
+            SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_MALLOC_FAILURE);
+            return 0;
+        }
+        SSL_SESSION_free(s->session);
+        s->session = new_sess;
+        s->session->kex_group = group_id;
+    }
 
     if ((ginf = tls1_group_id_lookup(s->ctx, group_id)) == NULL) {
         SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_KEY_SHARE);
@@ -1810,11 +1839,12 @@ int tls_parse_stoc_key_share(SSL *s, PACKET *pkt, unsigned int context, X509 *x,
         skey = EVP_PKEY_new();
         if (skey == NULL || EVP_PKEY_copy_parameters(skey, ckey) <= 0) {
             SSLfatal(s, SSL_AD_INTERNAL_ERROR, SSL_R_COPY_PARAMETERS_FAILED);
+            EVP_PKEY_free(skey);
             return 0;
         }
 
-        if (EVP_PKEY_set1_encoded_public_key(skey, PACKET_data(&encoded_pt),
-                                             PACKET_remaining(&encoded_pt)) <= 0) {
+        if (tls13_set_encoded_pub_key(skey, PACKET_data(&encoded_pt),
+                                      PACKET_remaining(&encoded_pt)) <= 0) {
             SSLfatal(s, SSL_AD_ILLEGAL_PARAMETER, SSL_R_BAD_ECPOINT);
             EVP_PKEY_free(skey);
             return 0;
@@ -1836,6 +1866,7 @@ int tls_parse_stoc_key_share(SSL *s, PACKET *pkt, unsigned int context, X509 *x,
             return 0;
         }
     }
+    s->s3.did_kex = 1;
 #endif
 
     return 1;

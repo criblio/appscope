@@ -291,14 +291,12 @@ pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
                     PCRE2_SIZE startoffset, uint32_t options,
                     pcre2_match_data *match_data, pcre2_match_context *mcontext)
 {
-
     if (g_need_stack_expand == FALSE) {
         return pcre2_match(re, data, size, startoffset, options, match_data, mcontext);
     }
 
-#if defined (__GO__ ) && defined (__x86_64__)
-    int rc, arc;
-    char *pcre_stack, *tstack, *gstack;
+    int rc;
+    char *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
     if ((pcre_stack = scope_malloc(PCRE_STACK_SIZE)) == NULL) {
         scopeLogError("ERROR; pcre2_match_wrapper: scope_malloc");
         return -1;
@@ -307,42 +305,67 @@ pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
     tstack = pcre_stack + PCRE_STACK_SIZE;
 
     // save the original stack, switch to the tstack
+#if defined (__x86_64__)
+    int arc;
+
     __asm__ volatile (
         "mov %%rsp, %2 \n"
         "mov %1, %%rsp \n"
-        : "=r"(arc)                  // output
-        : "m"(tstack), "m"(gstack)   // input
-        :                            // clobbered register
+        : "=r"(arc)                     // output
+        : "m"(tstack), "m"(gstack)      // input
+        :                               // clobbered register
         );
 
     rc = pcre2_match(re, data, size, startoffset, options, match_data, mcontext);
 
-    // Switch stack back to the original stack
     __asm__ volatile (
         "mov %1, %%rsp \n"
         : "=r"(arc)                       // output
         : "r"(gstack)                     // inputs
         :                                 // clobbered register
         );
+#elif defined (__aarch64__)
+    __asm__ volatile (
+        "ldr  x0, %3 \n"                 // get params from the stack before switching
+        "ldr  x1, %4 \n"
+        "ldr  x2, %5 \n"
+        "ldr  x3, %6 \n"
+        "ldr  w4, %7 \n"
+        "ldr  x5, %8 \n"
+        "ldr  x6, %9 \n"
+        "mov  x14, sp \n"
+        "str  x14, %2 \n"
+        "ldr  x15, %1 \n"
+        "mov  sp, x15 \n"                // increase stack size
+
+        "str  x14, [sp, #-16]! \n"
+
+        // Note: the symbol name below may need to change if the pcre2 lib is updated
+        "bl   pcre2_match_8 \n"          // call the regexec function
+        "ldr x15, [sp, #0] \n"
+        "mov  sp, x15 \n"
+        "str  w0, %0 \n"                 // save the return value
+        : "=&m"(rc)                      // output
+        : "m"(tstack), "m"(gstack), "m" (re), "m" (data),"m" (size), "m" (startoffset), "m" (options), "m" (match_data), "m" (mcontext)
+        :                               // clobbered register
+        );
+#else
+   #error Bad arch defined
+#endif
 
     if (pcre_stack) scope_free(pcre_stack);
     return rc;
-
-#else  // __GO__
-    return pcre2_match(re, data, size, startoffset, options, match_data, mcontext);
-#endif
 }
 
 int
 regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
                 regmatch_t *pmatch, int eflags)
 {
-   if (g_need_stack_expand == FALSE) {
+    if (g_need_stack_expand == FALSE) {
         return regexec(preg, string, nmatch, pmatch, eflags);
     }
 
-#if defined (__GO__ ) && defined (__x86_64__)
-    int rc, arc;
+    int rc;
     char *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
 
      if ((pcre_stack = scope_malloc(PCRE_STACK_SIZE)) == NULL) {
@@ -353,29 +376,53 @@ regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
     tstack = pcre_stack + PCRE_STACK_SIZE;
 
     // save the original stack, switch to the tstack
+#if defined (__x86_64__)
+    int arc;
+
     __asm__ volatile (
         "mov %%rsp, %2 \n"
         "mov %1, %%rsp \n"
-        : "=r"(arc)                   // output
-        : "m"(tstack), "m"(gstack)   // input
-        :                            // clobbered register
+        : "=r"(arc)                     // output
+        : "m"(tstack), "m"(gstack)      // input
+        :                               // clobbered register
         );
 
-    rc = regexec(preg, string, nmatch, pmatch, eflags);    
+    rc = regexec(preg, string, nmatch, pmatch, eflags);
 
-    // Switch stack back to the original stack
     __asm__ volatile (
         "mov %1, %%rsp \n"
-        : "=r"(arc)                        // output
+        : "=r"(arc)                       // output
         : "r"(gstack)                     // inputs
         :                                 // clobbered register
         );
+#elif defined (__aarch64__)
+    __asm__ volatile (
+        "ldr  x0, %3 \n"                 // get params from the stack before switching
+        "ldr  x1, %4 \n"
+        "ldr  x2, %5 \n"
+        "ldr  x3, %6 \n"
+        "ldr  w4, %7 \n"
+        "mov  x14, sp \n"
+        "str  x14, %2 \n"
+        "ldr  x15, %1 \n"
+        "mov  sp, x15 \n"                // increase stack size
+
+        "str  x14, [sp, #-16]! \n"
+
+        "bl   pcre2_regexec \n"          // call the regexec function
+        "ldr x15, [sp, #0] \n"
+        "mov  sp, x15 \n"
+        "str  w0, %0 \n"                 // save the return value
+        : "=&m"(rc)                      // output
+        : "m"(tstack), "m"(gstack), "m" (preg), "m" (string),"m" (nmatch), "m" (pmatch), "m" (eflags)
+        :                               // clobbered register
+        );
+#else
+   #error Bad arch defined
+#endif
 
     if (pcre_stack) scope_free(pcre_stack);
     return rc;
-#else
-    return regexec(preg, string, nmatch, pmatch, eflags);
-#endif
 }
 
 bool

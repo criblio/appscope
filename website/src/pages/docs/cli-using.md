@@ -302,3 +302,43 @@ Then, show only events containing the string `net_bytes`, and display the fields
 # scope events --fields net_bytes_sent,net_bytes_recv --match net_bytes
 [e91] Jul 12 02:15:41 curl net net.close net_bytes_sent:71 net_bytes_recv:8773
 ```
+
+<span id="dynamic-configuration"></span>
+
+### Dynamic Configuration
+
+AppScope offers a limited form of real-time dynamic configuration.
+
+To use this feature, you first need to know the PID (process ID) of the currently scoped process. You then create a `scope.<pid>` file, where:
+- The `<pid>` part of the filename is the PID of the scoped process.
+- Each line of the file consists of one configuration setting in the form `ENVIRONMENT_VARIABLE=value`.
+  
+Once per reporting period, AppScope looks in its **command directory** for a `scope.<pid>` file. If it finds one where the `<pid>` part of the filename matches the PID of the current scoped process, AppScope applies the configuration settings specified in the file, then deletes the file.
+
+The command directory defaults to `/tmp` and the reporting period (a.k.a. metric summary interval) defaults to 10 seconds. You can configure them in the `libscope` section of the [config file](/docs/config-file)). See the `Command directory` and `Metric summary interval` subsections, respectively.
+
+#### Dynamic configuration example
+
+Suppose your process of interest has PID `4242` and to begin your investigation, you want to bump metric verbosity up to 9 while muting all HTTP events. 
+
+Create a file named `scope.4242` that contains two lines:
+
+```
+SCOPE_METRIC_VERBOSITY=9
+SCOPE_EVENT_HTTP=false
+```
+
+Save the `scope.4242`  file in the command directory. 
+
+AppScope will detect the file and the matching process, apply the config settings, then delete the file.
+
+When you've seen enough of the verbose metrics, and you want to start looking at HTTP events, create a new `scope.4242` which contains the following two lines, reversing the previous config settings:
+
+```
+SCOPE_METRIC_VERBOSITY=4
+SCOPE_EVENT_HTTP=true
+```
+
+AppScope will detect the file and the matching process, apply the config settings, then delete the file.
+
+You can iterate on this workflow depending on what you find and what more you want to discover.

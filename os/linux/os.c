@@ -820,10 +820,10 @@ osGetProcCPU(void) {
 }
 
 uint64_t
-osFindLibrary(const char *library, pid_t pid)
+osFindLibrary(const char *library, pid_t pid, bool matchLibraryExactly)
 {
     char filename[PATH_MAX];
-    char buffer[9076];
+    char line[1024];
     FILE *fd;
     uint64_t addr = 0;
 
@@ -833,10 +833,22 @@ osFindLibrary(const char *library, pid_t pid)
         return -1;
     }
 
-    while(scope_fgets(buffer, sizeof(buffer), fd)) {
-        if (scope_strstr(buffer, library)) {
-            addr = scope_strtoull(buffer, NULL, 16);
-            break;
+    if (matchLibraryExactly) { // pathFromLine string == library string
+        char pathFromLine[512];
+        while(scope_fgets(line, sizeof(line), fd)) {
+            //7ff775e88000-7ff77606f000 r-xp 00000000 ca:01 17348 /lib/x86_64-linux-gnu/libc-2.27.so
+            if ((scope_sscanf(line, "%*x-%*x %*s %*x %*s %*d %512s", pathFromLine) == 1)
+                && !scope_strcmp(pathFromLine, library)) {
+                addr = scope_strtoull(line, NULL, 16);
+                break;
+            }
+        }
+    } else {                   // line *contains* library string
+        while(scope_fgets(line, sizeof(line), fd)) {
+            if (scope_strstr(line, library)) {
+                addr = scope_strtoull(line, NULL, 16);
+                break;
+            }
         }
     }
 

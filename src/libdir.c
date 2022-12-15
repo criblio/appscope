@@ -22,6 +22,7 @@
 
 #include "scopestdlib.h"
 #include "scopetypes.h" // for ROUND_UP()
+#include "nsfile.h"
 #include "libver.h"
 
 #ifndef SCOPE_VER
@@ -205,7 +206,7 @@ libdirCheckNote(libdirfile_t objFileType, const char *path)
 }
 
 static int
-libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overwrite, mode_t mode)
+libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overwrite, mode_t mode, uid_t nsEuid, gid_t nsEgid)
 {
     // Check if file exists
     if (!scope_access(path, R_OK) && !overwrite) {
@@ -241,7 +242,11 @@ libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overw
         scope_fprintf(scope_stderr, "error: extract temp too long.\n");
         return -1;
     }
-    if ((fd = scope_mkstemp(temp)) < 1) {
+
+    uid_t currentEuid = scope_geteuid();
+    gid_t currentEgid = scope_getegid();
+
+    if ((fd = nsFileMksTemp(temp, nsEuid, nsEgid, currentEuid, currentEgid)) < 1) {
         // No permission
         scope_unlink(temp);
         return -1;
@@ -250,19 +255,20 @@ libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overw
     if (scope_write(fd, start, len) != len) {
         scope_close(fd);
         scope_unlink(temp);
-        scope_perror("write() failed");
+        scope_perror("libdirCreateFileIfMissing: scope_write() failed");
         return -1;
     }
     if (scope_fchmod(fd, mode)) {
         scope_close(fd);
         scope_unlink(temp);
-        scope_perror("fchmod() failed");
+        scope_perror("libdirCreateFileIfMissing: scope_fchmod() failed");
         return -1;
     }
+
     scope_close(fd);
-    if (scope_rename(temp, path)) {
+    if (nsFileRename(temp, path, nsEuid, nsEgid, currentEuid, currentEgid)) {
         scope_unlink(temp);
-        scope_perror("rename() failed");
+        scope_perror("libdirCreateFileIfMissing: scope_rename() failed");
         return -1;
     }
 
@@ -272,14 +278,14 @@ libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overw
 // Verify if following absolute path points to directory
 // Returns operation status
 static mkdir_status_t
-libdirCheckIfDirExists(const char *absDirPath)
+libdirCheckIfDirExists(const char *absDirPath, uid_t uid, gid_t gid)
 {
     struct stat st = {0};
     if (!scope_stat(absDirPath, &st)) {
         if (S_ISDIR(st.st_mode)) {      
             // Check for file creation abilities in directory  
-            if (((st.st_uid == scope_getuid()) && (st.st_mode & S_IWUSR)) ||
-                ((st.st_gid == scope_getgid()) && (st.st_mode & S_IWGRP)) ||
+            if (((st.st_uid == uid) && (st.st_mode & S_IWUSR)) ||
+                ((st.st_gid == gid) && (st.st_mode & S_IWGRP)) ||
                 (st.st_mode & S_IWOTH)) {
                 return MKDIR_STATUS_EXISTS;
             }
@@ -342,14 +348,14 @@ libdirInitTest(const char *installBase, const char *tmpBase, const char *rawVers
 // Create a directory in following absolute path creating any intermediate directories as necessary
 // Returns operation status
 mkdir_status_t
-libdirCreateDirIfMissing(const char *dir, mode_t mode) {
+libdirCreateDirIfMissing(const char *dir, mode_t mode, uid_t nsEuid, gid_t nsEgid) {
     int mkdirRes = -1;
     /* Operate only on absolute path */
     if (dir == NULL || *dir != '/') {
         return MKDIR_STATUS_ERR_NOT_ABS_DIR;
     }
 
-    mkdir_status_t res = libdirCheckIfDirExists(dir);
+    mkdir_status_t res = libdirCheckIfDirExists(dir, nsEuid, nsEgid);
 
     /* exit if path exists */
     if (res != MKDIR_STATUS_ERR_OTHER) {
@@ -361,26 +367,40 @@ libdirCreateDirIfMissing(const char *dir, mode_t mode) {
         goto end;
     }
 
+    uid_t euid = scope_geteuid();
+    gid_t egid = scope_getegid();
+
     /* traverse the full path */
     for (char *p = tempPath + 1; *p; p++) {
         if (*p == '/') {
             /* Temporarily truncate */
             *p = '\0';
             scope_errno = 0;
-            mkdirRes = scope_mkdir(tempPath, mode);
-            /* scope_mkdir fails with error other than directory exists */
-            if (mkdirRes && (scope_errno != EEXIST)) {
-                goto end;
+
+            struct stat st = {0};
+            if (scope_stat(tempPath, &st)) {
+                mkdirRes = nsFileMkdir(tempPath, mode, nsEuid, nsEgid, euid, egid);
+                if (!mkdirRes) {
+                    /* We ensure that we setup correct mode regarding umask settings */
+                    if (scope_chmod(tempPath, mode)) {
+                        goto end;
+                    }
+                } else {
+                    /* nsFileMkdir fails */
+                    goto end;
+                }
             }
+
             *p = '/';
         }
     }
-
-    /* last element */
-    scope_errno = 0;
-    mkdirRes = scope_mkdir(tempPath, mode);
-    if (mkdirRes && (scope_errno != EEXIST)) {
-        goto end;
+    struct stat st = {0};
+    if (scope_stat(tempPath, &st)) {
+        /* if last element was not created in the loop above */
+        mkdirRes = nsFileMkdir(tempPath, mode, nsEuid, nsEgid, euid, egid);
+        if (mkdirRes) {
+            goto end;
+        }
     }
 
     /* We ensure that we setup correct mode regarding umask settings */
@@ -511,12 +531,12 @@ libdirGetPath(libdirfile_t file) {
 }
 
 /*
-* Save libscope.so in specified path.
+* Save libscope.so with specified permissions and ownership in specified path.
 * Returns 0 if file was successfully created or if file already exists, -1 in case of failure.
 */
 int
-libdirSaveLibraryFile(const char *libraryPath, bool overwrite, mode_t mode) {
-    return libdirCreateFileIfMissing(LIBRARY_FILE, libraryPath, overwrite, mode);
+libdirSaveLibraryFile(const char *libraryPath, bool overwrite, mode_t mode, uid_t uid, gid_t gid) {
+    return libdirCreateFileIfMissing(LIBRARY_FILE, libraryPath, overwrite, mode, uid, gid);
 }
 
 /*
@@ -526,7 +546,7 @@ libdirSaveLibraryFile(const char *libraryPath, bool overwrite, mode_t mode) {
 * - if the custom path was specified before by `libdirSetLibraryBase`
 * Returns 0 in case of success, other values in case of failure.
 */
-int libdirExtract(libdirfile_t file) {
+int libdirExtract(libdirfile_t file, uid_t uid, gid_t gid) {
     const char *normVer = libverNormalizedVersion(g_libdir_info.ver);
     bool isDevVersion = libverIsNormVersionDev(normVer);
     const char *existing_path = libdirGetPath(file);
@@ -562,7 +582,7 @@ int libdirExtract(libdirfile_t file) {
             return -1;
         }
 
-        if (libdirCreateDirIfMissing(dir, mode) <= MKDIR_STATUS_EXISTS) {
+        if (libdirCreateDirIfMissing(dir, mode, uid, gid) <= MKDIR_STATUS_EXISTS) {
             int pathLen = scope_snprintf(path, PATH_MAX, "%s/%s", dir, state->binaryName);
             if (pathLen < 0) {
                 scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
@@ -572,7 +592,7 @@ int libdirExtract(libdirfile_t file) {
                 scope_fprintf(scope_stderr, "error: path too long.\n");
                 return -1;
             }
-            if (!libdirCreateFileIfMissing(file, path, isDevVersion, mode)) {
+            if (!libdirCreateFileIfMissing(file, path, isDevVersion, mode, uid, gid)) {
                 scope_strncpy(state->binaryPath, path, PATH_MAX);
                 scope_strncpy(state->binaryBasepath, g_libdir_info.install_base, PATH_MAX);
                 return 0;
@@ -592,7 +612,7 @@ int libdirExtract(libdirfile_t file) {
         scope_fprintf(scope_stderr, "error: path too long.\n");
         return -1;
     }
-    if (libdirCreateDirIfMissing(dir, mode) <= MKDIR_STATUS_EXISTS) {
+    if (libdirCreateDirIfMissing(dir, mode, uid, gid) <= MKDIR_STATUS_EXISTS) {
         int pathLen = scope_snprintf(path, PATH_MAX, "%s/%s", dir, state->binaryName);
         if (pathLen < 0) {
             scope_fprintf(scope_stderr, "error: snprintf() failed.\n");
@@ -602,7 +622,7 @@ int libdirExtract(libdirfile_t file) {
             scope_fprintf(scope_stderr, "error: path too long.\n");
             return -1;
         }
-        if (!libdirCreateFileIfMissing(file, path, isDevVersion, mode)) {
+        if (!libdirCreateFileIfMissing(file, path, isDevVersion, mode, uid, gid)) {
             scope_strncpy(state->binaryPath, path, PATH_MAX);
             scope_strncpy(state->binaryBasepath, g_libdir_info.tmp_base, PATH_MAX);
             return 0;

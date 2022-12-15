@@ -1,9 +1,9 @@
 package util
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/user"
 	"strconv"
@@ -28,12 +28,14 @@ type PidScopeMapState map[int]bool
 type Processes []Process
 
 var (
-	errOpenProc       = errors.New("cannot open proc directory")
-	errReadProc       = errors.New("cannot read from proc directory")
-	errGetProcStatus  = errors.New("error getting process status")
-	errGetProcCmdLine = errors.New("error getting process command line")
-	errGetProcTask    = errors.New("error getting process task")
-	errMissingUser    = errors.New("unable to find user")
+	errOpenProc        = errors.New("cannot open proc directory")
+	errReadProc        = errors.New("cannot read from proc directory")
+	errGetProcStatus   = errors.New("error getting process status")
+	errGetProcCmdLine  = errors.New("error getting process command line")
+	errGetProcTask     = errors.New("error getting process task")
+	errGetProcChildren = errors.New("error getting process children")
+	errGetNsPid        = errors.New("error getting namespace PID")
+	errMissingUser     = errors.New("unable to find user")
 )
 
 // searchPidByProcName check if specified inputProcName fully match the pid's process name
@@ -124,6 +126,13 @@ func ProcessesByName(name string) (Processes, error) {
 		if !IsNumeric(p) {
 			continue
 		}
+
+		// Skip if no permission to read the fd directory
+		procFdDir, err := os.Open("/proc/" + p + "/fd")
+		if err != nil {
+			continue
+		}
+		procFdDir.Close()
 
 		// Convert directory name to integer
 		pid, err := strconv.Atoi(p)
@@ -239,7 +248,7 @@ func PidUser(pid int) (string, error) {
 func PidScoped(pid int) bool {
 
 	// Look for libscope in /proc maps
-	pidMapFile, err := ioutil.ReadFile(fmt.Sprintf("/proc/%v/maps", pid))
+	pidMapFile, err := os.ReadFile(fmt.Sprintf("/proc/%v/maps", pid))
 	if err != nil {
 		return false
 	}
@@ -258,7 +267,7 @@ func PidScoped(pid int) bool {
 	}
 
 	// Check shmem does not exist (if scope_anon does not exist the proc is scoped)
-	files, err := ioutil.ReadDir(fmt.Sprintf("/proc/%v/fd", pid))
+	files, err := os.ReadDir(fmt.Sprintf("/proc/%v/fd", pid))
 	if err != nil {
 		return false
 	}
@@ -299,9 +308,55 @@ func PidCmdline(pid int) (string, error) {
 	return cmdline, nil
 }
 
+// PidInitContainer verify if specific PID is the init PID in the container
+func PidInitContainer(pid int) (bool, error) {
+	// TODO: goprocinfo does not support all the status parameters (NsPid)
+	// handle procfs by ourselves ?
+	file, err := os.Open(fmt.Sprintf("/proc/%v/status", pid))
+	if err != nil {
+		return false, errGetProcStatus
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	scanner.Split(bufio.ScanLines)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "NSpid:") {
+			// Skip Nspid
+			nsPidString := strings.Fields(line)[1:]
+			// Check for nested PID namespace and the init PID in namespace (it should be equals 1)
+			if (len(nsPidString) > 1) && (nsPidString[len(nsPidString)-1] == "1") {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+// PidChildren retrieves the children PID's for the main process specified by the PID
+func PidChildren(pid int) ([]int, error) {
+	file, err := os.Open(fmt.Sprintf("/proc/%v/task/%v/children", pid, pid))
+	if err != nil {
+		return nil, errGetProcChildren
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	scanner.Split(bufio.ScanWords)
+	var childrenPids []int
+	for scanner.Scan() {
+		childPid, err := strconv.Atoi(scanner.Text())
+		if err != nil {
+			return nil, errGetProcChildren
+		}
+		childrenPids = append(childrenPids, childPid)
+	}
+	return childrenPids, nil
+}
+
 // PidThreadsPids gets the all the thread PIDs specified by PID
 func PidThreadsPids(pid int) ([]int, error) {
-	files, err := ioutil.ReadDir(fmt.Sprintf("/proc/%v/task", pid))
+	files, err := os.ReadDir(fmt.Sprintf("/proc/%v/task", pid))
 	if err != nil {
 		return nil, errGetProcTask
 	}

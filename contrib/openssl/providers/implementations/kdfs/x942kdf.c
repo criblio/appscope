@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2019-2022 The OpenSSL Project Authors. All Rights Reserved.
  * Copyright (c) 2019, Oracle and/or its affiliates.  All rights reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
@@ -281,7 +281,7 @@ static int x942kdf_hash_kdm(const EVP_MD *kdf_md,
         return 0;
     }
 
-    hlen = EVP_MD_size(kdf_md);
+    hlen = EVP_MD_get_size(kdf_md);
     if (hlen <= 0)
         return 0;
     out_len = (size_t)hlen;
@@ -332,10 +332,12 @@ static void *x942kdf_new(void *provctx)
     KDF_X942 *ctx;
 
     if (!ossl_prov_is_running())
-        return 0;
+        return NULL;
 
-    if ((ctx = OPENSSL_zalloc(sizeof(*ctx))) == NULL)
+    if ((ctx = OPENSSL_zalloc(sizeof(*ctx))) == NULL) {
         ERR_raise(ERR_LIB_PROV, ERR_R_MALLOC_FAILURE);
+        return NULL;
+    }
     ctx->provctx = provctx;
     ctx->use_keybits = 1;
     return ctx;
@@ -388,7 +390,7 @@ static size_t x942kdf_size(KDF_X942 *ctx)
         ERR_raise(ERR_LIB_PROV, PROV_R_MISSING_MESSAGE_DIGEST);
         return 0;
     }
-    len = EVP_MD_size(md);
+    len = EVP_MD_get_size(md);
     return (len <= 0) ? 0 : (size_t)len;
 }
 

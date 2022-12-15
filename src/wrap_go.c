@@ -23,12 +23,12 @@
 #define GOPCLNTAB_MAGIC_118 0xfffffff0
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 #define UNKNOWN_GO_VER (-1)
-#define MIN_SUPPORTED_GO_VER (9)
 #define MAX_SUPPORTED_GO_VER (19)
 #define HTTP2_FRAME_HEADER_LEN (9)
 #define PRI_STR "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 #define PRI_STR_LEN sizeof(PRI_STR)
 #define UNDEF_OFFSET (-1)
+#define EXIT_STACK_SIZE (32 * 1024)
 
 enum go_arch_t {
     X86_64,
@@ -36,6 +36,7 @@ enum go_arch_t {
 };
 
 #if defined (__x86_64__)
+   #define MIN_SUPPORTED_GO_VER (9)
    #define END_INST "int3"
    #define CALL_INST "call"
    #define SYSCALL_INST "syscall"
@@ -45,8 +46,8 @@ enum go_arch_t {
    #define RET_SIZE 1
    #define CALL_SIZE 5
    #define G_STACK 0x50
-   #define EXIT_STACK_SIZE (32 * 1024)
 #elif defined (__aarch64__)
+   #define MIN_SUPPORTED_GO_VER (19)
    #define END_INST "udf"
    #define CALL_INST "bl"
    #define SYSCALL_INST "svc"
@@ -61,11 +62,11 @@ enum go_arch_t {
 #endif
 
 // compile-time control for debugging
-//#define NEEDEVNULL 1
-#define funcprint sysprint
-//#define funcprint devnull
-#define patchprint sysprint
-//#define patchprint devnull
+#define NEEDEVNULL 1
+//#define funcprint sysprint
+#define funcprint devnull
+//#define patchprint sysprint
+#define patchprint devnull
 
 #if NEEDEVNULL > 0
 static void
@@ -172,7 +173,7 @@ go_schema_t go_17_schema_x86 = {
         .c_tls_server_write_conn=      0x30,
         .c_tls_server_write_buf=       0x8,
         .c_tls_server_write_rc=        0x10,
-        .c_tls_client_read_pc=         0x28,
+        .c_tls_client_read_pc=         0x28, // for 18/19 this is 0x80. is it actually 0x80 here too?
         .c_tls_client_write_w_pc=      0x20,
         .c_tls_client_write_buf=       0x8, 
         .c_tls_client_write_rc=        0x10,
@@ -181,7 +182,7 @@ go_schema_t go_17_schema_x86 = {
         .c_http2_server_preface_sc=    0xd0,
         .c_http2_server_preface_rc=    0x58,
         .c_http2_client_read_cc=       0x68,
-        .c_http2_client_write_tcpConn= 0x40,
+        .c_http2_client_write_tcpConn= 0x40, // for 18/19 this is 0x48. is it actually 0x48 here too?
         .c_http2_client_write_buf=     0x8,
         .c_http2_client_write_rc=      0x10,
     },
@@ -970,7 +971,8 @@ initGoHook(elf_buf_t *ebuf)
             // Don't expect to get here, but try to be clear if we do.
             scopeLogWarn("%s is not a go application.  Continuing without AppScope.", ebuf->cmd);
         } else if (go_runtime_version) {
-            scopeLogWarn("%s was compiled with go version `%s`.  AppScope can only instrument go1.%d or newer.  Continuing without AppScope.", ebuf->cmd, go_runtime_version, MIN_SUPPORTED_GO_VER);
+            scopeLogWarn("%s was compiled with go version `%s`.  AppScope can only instrument go1.%d or newer on %s.  Continuing without AppScope.",
+                         ebuf->cmd, go_runtime_version, MIN_SUPPORTED_GO_VER, g_arch == AARCH64 ? "ARM64" : "x86_64");
         } else {
             scopeLogWarn("%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.%d or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd, MIN_SUPPORTED_GO_VER);
         }
@@ -1629,6 +1631,10 @@ static void
 c_exit(char *sys_stack)
 {
 #ifdef __x86_64__
+    /*
+     * Need to extend the system stack size when calling handleExit().
+     * We see that the stack is exceeded now that we are using an internal libc.
+     */
     int arc;
     char *exit_stack, *tstack, *gstack;
     if ((exit_stack = scope_malloc(EXIT_STACK_SIZE)) == NULL) {
@@ -1646,7 +1652,6 @@ c_exit(char *sys_stack)
         :                            // clobbered register
         );
 #endif
-
     // don't use stackaddr; patch_first_instruction() does not provide
     // frame_size, so stackaddr isn't usable
     funcprint("c_exit\n");
@@ -1664,7 +1669,7 @@ c_exit(char *sys_stack)
     // flush the data
     sigSafeNanosleep(&ts);
 #ifdef __x86_64__
-    // Switch stack back to the original stack
+   // Switch stack back to the original stack
     __asm__ volatile (
         "mov %1, %%rsp \n"
         : "=r"(arc)                       // output

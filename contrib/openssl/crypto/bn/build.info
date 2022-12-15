@@ -16,7 +16,7 @@ IF[{- !$disabled{asm} -}]
   # All variables are named in such a way that they can be "indexed" with
   # $target{asm_arch}
 
-  $BNASM_x86=bn-586.s co-586.s x86-mont.s x86-gf2m.s
+  $BNASM_x86=bn-586.S co-586.S x86-mont.S x86-gf2m.S
   # bn-586 is the only one implementing bn_*_part_words
   # => OPENSSL_BN_ASM_PART_WORDS
   $BNDEF_x86=OPENSSL_BN_ASM_PART_WORDS OPENSSL_BN_ASM_MONT OPENSSL_BN_ASM_GF2m
@@ -40,7 +40,7 @@ IF[{- !$disabled{asm} -}]
   ENDIF
 
   $BNASM_sparcv9=asm/sparcv8plus.S sparcv9-mont.S sparcv9a-mont.S vis3-mont.S \
-          sparct4-mont.S
+          sparct4-mont.S bn_sparc.c
   $BNDEF_sparcv9=OPENSSL_BN_ASM_MONT
   $BNASM_sparcv9_ec2m=sparcv9-gf2m.S
   $BNDEF_sparcv9_ec2m=OPENSSL_BN_ASM_GF2m
@@ -77,7 +77,7 @@ IF[{- !$disabled{asm} -}]
   $BNASM_parisc20_64=$BNASM_parisc11
   $BNDEF_parisc20_64=$BNDEF_parisc11
 
-  $BNASM_ppc32=bn-ppc.s ppc-mont.s
+  $BNASM_ppc32=bn_ppc.c bn-ppc.s ppc-mont.s
   $BNDEF_ppc32=OPENSSL_BN_ASM_MONT
   $BNASM_ppc64=$BNASM_ppc32
   $BNDEF_ppc64=$BNDEF_ppc32
@@ -108,8 +108,11 @@ $COMMON=bn_add.c bn_div.c bn_exp.c bn_lib.c bn_ctx.c bn_mul.c \
         bn_intern.c bn_dh.c bn_rsa_fips186_4.c bn_const.c
 SOURCE[../../libcrypto]=$COMMON $BNASM bn_print.c bn_err.c bn_srp.c
 DEFINE[../../libcrypto]=$BNDEF
+IF[{- !$disabled{'deprecated-0.9.8'} -}]
+  SOURCE[../../libcrypto]=bn_depr.c
+ENDIF
 IF[{- !$disabled{'deprecated-3.0'} -}]
-  SOURCE[../../libcrypto]=bn_depr.c bn_x931p.c
+  SOURCE[../../libcrypto]=bn_x931p.c
 ENDIF
 SOURCE[../../providers/libfips.a]=$COMMON $BNASM
 DEFINE[../../providers/libfips.a]=$BNDEF
@@ -120,19 +123,18 @@ SOURCE[../../providers/liblegacy.a]=$BNASM
 DEFINE[../../providers/liblegacy.a]=$BNDEF
 # Implementations are now spread across several libraries, so the defines
 # need to be applied to all affected libraries and modules.
-DEFINE[../../providers/libimplementations.a]=$BNDEF
 DEFINE[../../providers/libcommon.a]=$BNDEF
 
 INCLUDE[bn_exp.o]=..
 
-GENERATE[bn-586.s]=asm/bn-586.pl
-DEPEND[bn-586.s]=../perlasm/x86asm.pl
-GENERATE[co-586.s]=asm/co-586.pl
-DEPEND[co-586.s]=../perlasm/x86asm.pl
-GENERATE[x86-mont.s]=asm/x86-mont.pl
-DEPEND[x86-mont.s]=../perlasm/x86asm.pl
-GENERATE[x86-gf2m.s]=asm/x86-gf2m.pl
-DEPEND[x86-gf2m.s]=../perlasm/x86asm.pl
+GENERATE[bn-586.S]=asm/bn-586.pl
+DEPEND[bn-586.S]=../perlasm/x86asm.pl
+GENERATE[co-586.S]=asm/co-586.pl
+DEPEND[co-586.S]=../perlasm/x86asm.pl
+GENERATE[x86-mont.S]=asm/x86-mont.pl
+DEPEND[x86-mont.S]=../perlasm/x86asm.pl
+GENERATE[x86-gf2m.S]=asm/x86-gf2m.pl
+DEPEND[x86-gf2m.S]=../perlasm/x86asm.pl
 
 GENERATE[sparcv9a-mont.S]=asm/sparcv9a-mont.pl
 INCLUDE[sparcv9a-mont.o]=..
@@ -177,3 +179,4 @@ INCLUDE[armv4-mont.o]=..
 GENERATE[armv4-gf2m.S]=asm/armv4-gf2m.pl
 INCLUDE[armv4-gf2m.o]=..
 GENERATE[armv8-mont.S]=asm/armv8-mont.pl
+INCLUDE[armv8-mont.o]=..

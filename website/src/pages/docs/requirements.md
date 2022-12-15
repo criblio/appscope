@@ -32,6 +32,10 @@ This restriction is imposed to make the resulting executable more portable.
 
 The distros that AppScope supports all require the use of `/tmp`, `/dev/shm`, and `/proc`. You should avoid custom filesystem configuration that interferes with AppScope's ability to use these directories.
 
+### Cross-Compatibility with Cribl Suite
+
+AppScope 1.2, Cribl Stream 4.0, Cribl Edge 4.0, and Cribl Search 1.0 are mutually compatible. If you integrate any of these products with earlier versions of peer products, some or all features will be unavailable.
+
 ### Known Limitations
 
 **Only** these runtimes are supported: 

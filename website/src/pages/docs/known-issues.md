@@ -10,8 +10,11 @@ title: Known Issues
 
 As of this AppScope release, known issues include:
 
+- [#1153](https://github.com/criblio/appscope/issues/1153) After AppScope detaches from a process, `scope ps` still shows the process as scoped.
+  - **Fix:** Planned for 1.3 or sooner
+
 - [#1055](https://github.com/criblio/appscope/issues/1055) With certain combinations of mount and PID namespaces, AppScope fails to attach to a process. We have found two scenarios when attach will fail. One is when AppScope is on a host and the target process is in a container, making the mount namespaces different, but the process was started with `pid=host`, making the PID namespaces the same. Another is when both AppScope and the target process are on a host, making the PID namespaces the same, but the process is [configured](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#PrivateTmp=) as a service with `PrivateTmp` set to `true`, making the mount namespaces different.
-  - **Fix:** Planned for 1.2.1
+  - **Fix:** 1.2.1
 
 ## AppScope 1.1.0
 

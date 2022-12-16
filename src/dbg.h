@@ -72,6 +72,7 @@ extern bool g_ismusl;
 
 void scopeLog(cfg_log_level_t, const char *, ...) PRINTF_FORMAT(2,3);
 void scopeLogHex(cfg_log_level_t, const void *, size_t, const char *, ...) PRINTF_FORMAT(4,5);
+void scopeLogDropItOnTheFloor();
 void scopeBacktrace(cfg_log_level_t);
 
 #define scopeLogError(...) scopeLog(CFG_LOG_ERROR, __VA_ARGS__)
@@ -81,8 +82,8 @@ void scopeBacktrace(cfg_log_level_t);
 #define scopeLogDebug(...) scopeLog(CFG_LOG_DEBUG, __VA_ARGS__)
 #define scopeLogTrace(...) scopeLog(CFG_LOG_TRACE, __VA_ARGS__)
 #else
-#define scopeLogDebug(...)
-#define scopeLogTrace(...)
+#define scopeLogDebug(...) scopeLogDropItOnTheFloor( __VA_ARGS__)
+#define scopeLogTrace(...) scopeLogDropItOnTheFloor( __VA_ARGS__)
 #endif
 
 #define scopeLogHexError(...) scopeLogHex(CFG_LOG_ERROR, __VA_ARGS__)
@@ -92,8 +93,8 @@ void scopeBacktrace(cfg_log_level_t);
 #define scopeLogHexDebug(...) scopeLogHex(CFG_LOG_DEBUG, __VA_ARGS__)
 #define scopeLogHexTrace(...) scopeLogHex(CFG_LOG_TRACE, __VA_ARGS__)
 #else
-#define scopeLogHexDebug(...)
-#define scopeLogHexTrace(...)
+#define scopeLogHexDebug(...) scopeLogDropItOnTheFloor ( __VA_ARGS__)
+#define scopeLogHexTrace(...) scopeLogDropItOnTheFloor ( __VA_ARGS__)
 #endif
 
 // Bit operations

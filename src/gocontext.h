@@ -88,8 +88,6 @@ extern go_schema_t go_17_schema;
 extern go_arg_offsets_t g_go_arg;
 extern go_struct_offsets_t g_go_struct;
 extern tap_t g_go_tap[];
-extern unsigned long scope_fs;
-extern uint64_t scope_stack;
 
 extern int arch_prctl(int, unsigned long);
 extern void initGoHook(elf_buf_t*);

@@ -5,6 +5,7 @@ __isoc99_sscanf scope__iso99_sscanf
 __snprintf_chk scope___snprintf_chk
 __vfprintf_chk scope___vfprintf_chk
 __vsnprintf_chk scope___vsnprintf_chk
+__strcpy_chk scope___strcpy_chk
 accept scopelibc_accept
 bind scopelibc_bind
 calloc scopelibc_calloc

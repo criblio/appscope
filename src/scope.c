@@ -442,18 +442,10 @@ main(int argc, char **argv, char **env)
     ebuf = getElf(inferior_command);
 
     if (ebuf && (is_go(ebuf->buf) == TRUE)) {
-
-#if defined(__aarch64__)
-    // We don't support go on ARM right now.
-    // make sure it runs as if we were never here.
-    execve(argv[optind], &argv[optind], environ);
-#endif
-
         if (setenv("SCOPE_APP_TYPE", "go", 1) == -1) {
             perror("setenv");
             goto err;
         }
-
     } else {
         if (setenv("SCOPE_APP_TYPE", "native", 1) == -1) {
             perror("setenv");

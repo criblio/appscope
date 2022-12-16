@@ -81,15 +81,8 @@ func (rc *Config) installScope(serviceName string, unameMachine string, unameSys
 	}
 
 	// patch the library
-	asset, err := Asset("build/ldscope")
-	util.CheckErrSprintf(err, "error: failed to find ldscope asset; %v", err)
-	loaderPath := libraryDir + "/ldscope"
-	err = os.WriteFile(loaderPath, asset, 0755)
-	util.CheckErrSprintf(err, "error: failed to extract loader; %v", err)
 	ld := loader.New()
 	ld.Patch(path.Join(libraryDir, "libscope.so"))
-	err = os.Remove(loaderPath)
-	util.CheckErrSprintf(err, "error: failed to remove loader; %v", err)
 
 	// create the config directory
 	configBaseDir := "/etc/scope"
@@ -119,7 +112,7 @@ func (rc *Config) installScope(serviceName string, unameMachine string, unameSys
 
 	// extract scope.yml
 	configPath := fmt.Sprintf("/etc/scope/%s/scope.yml", serviceName)
-	asset, err = Asset("build/scope.yml")
+	asset, err := Asset("build/scope.yml")
 	util.CheckErrSprintf(err, "error: failed to find scope.yml asset; %v", err)
 	err = os.WriteFile(configPath, asset, 0644)
 	util.CheckErrSprintf(err, "error: failed to extract scope.yml; %v", err)

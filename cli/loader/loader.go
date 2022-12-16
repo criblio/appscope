@@ -9,7 +9,7 @@ import (
 	"github.com/criblio/scope/util"
 )
 
-// Loader represents ldscope object
+// Loader represents scope loader object
 type ScopeLoader struct {
 	Path string
 }
@@ -86,13 +86,13 @@ func (sL *ScopeLoader) AttachSubProc(args []string, env []string) (string, error
 }
 
 // Used when scope has detected that we are running the `scope start` command inside a container
-// Tell ldscope to run the `scope start` command on the host instead
+// Tell scope to run the `scope start` command on the host instead
 func (sL *ScopeLoader) StartHost() (string, error) {
 	return sL.RunSubProc([]string{"--starthost"}, os.Environ())
 }
 
 // Used when scope has detected that we are running the `scope stop` command inside a container
-// Tell ldscope to run the `scope stop` command on the host instead
+// Tell scope to run the `scope stop` command on the host instead
 func (sL *ScopeLoader) StopHost() (string, error) {
 	return sL.RunSubProc([]string{"--stophost"}, os.Environ())
 }
@@ -115,13 +115,13 @@ func (sL *ScopeLoader) Patch(libraryPath string) (string, error) {
 	return sL.RunSubProc([]string{"--patch", libraryPath}, os.Environ())
 }
 
-// Detach transforms the calling process into a ldscope detach operation
+// Detach transforms the calling process into a scope detach operation
 func (sL *ScopeLoader) Detach(args []string, env []string) error {
 	args = append([]string{"--detach"}, args...)
 	return sL.Run(args, env)
 }
 
-// DetachSubProc runs a ldscope detach as a seperate process
+// DetachSubProc runs a scope detach as a seperate process
 func (sL *ScopeLoader) DetachSubProc(args []string, env []string) (string, error) {
 	args = append([]string{"--detach"}, args...)
 	return sL.RunSubProc(args, env)

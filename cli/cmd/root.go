@@ -30,7 +30,7 @@ func Execute() {
 				}
 			}
 
-			// If we're not a known command, exec ldscope
+			// If not a known command, scope run by default
 			internal.InitConfig()
 			rc := run.Config{}
 			rc.Run(os.Args[1:])

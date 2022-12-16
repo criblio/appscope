@@ -113,7 +113,7 @@ func (c *Config) SetDefault() error {
 				Level: "warning",
 				Transport: libscope.ScopeTransport{
 					TransportType: "file",
-					Path:          filepath.Join(c.WorkDir, "ldscope.log"),
+					Path:          filepath.Join(c.WorkDir, "libscope.log"),
 					Buffering:     "line",
 				},
 			},

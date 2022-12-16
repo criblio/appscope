@@ -20,7 +20,6 @@ var (
 	errMissingProc       = errors.New("no process found matching that name")
 	errPidInvalid        = errors.New("invalid PID")
 	errPidMissing        = errors.New("PID does not exist")
-	errCreateLdscope     = errors.New("error creating ldscope")
 	errNotScoped         = errors.New("detach failed. This process is not being scoped")
 	errLibraryNotExist   = errors.New("library Path does not exist")
 	errInvalidSelection  = errors.New("invalid Selection")
@@ -60,10 +59,6 @@ func (rc *Config) Attach(args []string) error {
 		reattach = true
 	}
 
-	// Create ldscope
-	if err := CreateLdscope(); err != nil {
-		return errCreateLdscope
-	}
 	// Normal operational, not passthrough, create directory for this run
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
@@ -137,10 +132,6 @@ func (rc *Config) DetachAll(args []string, prompt bool) error {
 		return errNoScopedProcs
 	}
 
-	if err := CreateLdscope(); err != nil {
-		return errCreateLdscope
-	}
-
 	errorsDetachingMultiple := false
 	for _, proc := range procs {
 		tmpArgs := append([]string{fmt.Sprint(proc.Pid)}, args...)
@@ -163,10 +154,6 @@ func (rc *Config) DetachSingle(args []string) error {
 		return err
 	}
 	args[0] = fmt.Sprint(pid)
-
-	if err := CreateLdscope(); err != nil {
-		return errCreateLdscope
-	}
 
 	return rc.detach(args, pid)
 }

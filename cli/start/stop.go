@@ -129,7 +129,7 @@ func Stop() error {
 		return err
 	}
 
-	// If the `scope stop` command is run inside a container, we should call `ldscope --stophost`
+	// If the `scope stop` command is run inside a container, we should call `scope -z --stophost`
 	// which will also run `scope stop` on the host
 	// SCOPE_CLI_SKIP_HOST allows to run scope stop in docker environment (integration tests)
 	_, skipHostCfg := os.LookupEnv("SCOPE_CLI_SKIP_HOST")
@@ -168,13 +168,6 @@ func Stop() error {
 		log.Error().
 			Err(err).
 			Msg("Error detaching from all Scoped processes")
-	}
-
-	if err := run.CreateLdscope(); err != nil {
-		log.Error().
-			Err(err).
-			Msg("Create ldscope failed.")
-		return err
 	}
 
 	// Discover all container PIDs

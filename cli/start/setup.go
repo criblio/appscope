@@ -58,26 +58,10 @@ func getContainersPids() []int {
 	return cPids
 }
 
-// extract extracts ldscope and scope to scope version directory
+// extract extracts scope to the scope version directory
 func extract(scopeDirVersion string) error {
-	// Extract ldscope
-	perms := os.FileMode(0755)
-	b, err := run.Asset("build/ldscope")
-	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("Error retrieving ldscope asset.")
-		return err
-	}
-
-	if err = os.WriteFile(filepath.Join(scopeDirVersion, "ldscope"), b, perms); err != nil {
-		log.Error().
-			Err(err).
-			Msgf("Error writing ldscope to %s.", scopeDirVersion)
-		return err
-	}
-
 	// Copy scope
+	perms := os.FileMode(0755)
 	exPath, err := os.Executable()
 	if err != nil {
 		log.Error().
@@ -121,7 +105,7 @@ func createFilterFile() (*os.File, error) {
 	return f, err
 }
 
-// getAppScopeVerDir return the directory path which will be used for handling ldscope and scope files
+// getAppScopeVerDir return the directory path which will be used for handling the scope file
 // /usr/lib/appscope/<version>/
 // or
 // /tmp/appscope/<version>/

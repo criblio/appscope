@@ -10,7 +10,6 @@ import (
 
 	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/loader"
-	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v2"
@@ -313,7 +312,7 @@ func Start() error {
 			Msg("Error Access AppScope version directory")
 		return err
 	}
-	// If the `scope start` command is run inside a container, we should call `ldscope --starthost`
+	// If the `scope start` command is run inside a container, we should call `scope -z --starthost`
 	// which will instead run `scope start` on the host
 	// SCOPE_CLI_SKIP_HOST allows to run scope start in docker environment (integration tests)
 	_, skipHostCfg := os.LookupEnv("SCOPE_CLI_SKIP_HOST")
@@ -342,13 +341,6 @@ func Start() error {
 			}
 		}
 		return nil
-	}
-
-	if err := run.CreateLdscope(); err != nil {
-		log.Error().
-			Err(err).
-			Msg("Create ldscope failed.")
-		return err
 	}
 
 	// Discover all container PIDs

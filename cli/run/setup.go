@@ -14,46 +14,7 @@ import (
 
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/util"
-	"github.com/rs/zerolog/log"
 )
-
-func LdscopePath() string {
-	return filepath.Join(util.ScopeHome(), "ldscope")
-}
-
-// CreateLdscope creates ldscope in $SCOPE_HOME
-func CreateLdscope() error {
-	ldscope := LdscopePath()
-	ldscopeInfo, _ := AssetInfo("build/ldscope")
-
-	// If it exists, don't create
-	if stat, err := os.Stat(ldscope); err == nil {
-		if stat.ModTime() == ldscopeInfo.ModTime() {
-			return nil
-		}
-	}
-
-	b, err := Asset("build/ldscope")
-	if err != nil {
-		return err
-	}
-
-	err = os.MkdirAll(util.ScopeHome(), 0755)
-	if err != nil {
-		return err
-	}
-
-	err = ioutil.WriteFile(ldscope, b, 0755)
-	if err != nil {
-		return err
-	}
-	err = os.Chtimes(ldscope, ldscopeInfo.ModTime(), ldscopeInfo.ModTime())
-	if err != nil {
-		return err
-	}
-	log.Info().Str("ldscope", ldscope).Msg("created ldscope")
-	return nil
-}
 
 func environNoScope() []string {
 	env := []string{}
@@ -67,7 +28,7 @@ func environNoScope() []string {
 
 // CreateAll outputs all bundled files to a given path
 func CreateAll(path string) error {
-	files := []string{"ldscope", "libscope.so", "scope.yml"}
+	files := []string{"libscope.so", "scope.yml"}
 	perms := []os.FileMode{0755, 0755, 0644}
 	for i, f := range files {
 		b, err := Asset(fmt.Sprintf("build/%s", f))

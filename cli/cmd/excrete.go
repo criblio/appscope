@@ -17,7 +17,7 @@ var excreteCmd = &cobra.Command{
 	Use:     "extract [flags] <dir>",
 	Aliases: []string{"excrete", "expunge", "extricate", "exorcise"},
 	Short:   "Output instrumentary library files to <dir>",
-	Long: `Outputs ldscope, libscope.so, and scope.yml to the provided directory. You can configure these files to instrument any application, and to output the data to any existing tool using simple TCP protocols.
+	Long: `Outputs libscope.so, and scope.yml to the provided directory. You can configure these files to instrument any application, and to output the data to any existing tool using simple TCP protocols.
 
 The --*dest flags accept file names like /tmp/scope.log or URLs like file:///tmp/scope.log. They may also
 be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,

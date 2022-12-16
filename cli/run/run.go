@@ -36,9 +36,6 @@ type Config struct {
 
 // Run executes a scoped command
 func (rc *Config) Run(args []string) {
-	if err := CreateLdscope(); err != nil {
-		util.ErrAndExit("error creating ldscope: %v", err)
-	}
 	// Normal operational, not passthrough, create directory for this run
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.

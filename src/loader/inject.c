@@ -16,10 +16,12 @@
 #include <dlfcn.h>
 #include <stddef.h>
 #include <inttypes.h>
+
 #include "scopestdlib.h"
 #include "dbg.h"
 #include "inject.h"
 #include "os.h"
+#include "loaderutils.h"
 
 typedef enum {
     REM_CMD_DLOPEN,
@@ -346,7 +348,7 @@ injectScope(int pid, char *path)
     }
 
     // find the base address of libc in the target process
-    remoteLib = osFindLibrary(info.path, pid, TRUE);
+    remoteLib = findLibrary(info.path, pid, TRUE);
     if ((remoteLib == 0) || (remoteLib == -1)) {
         fprintf(stderr, "error: failed to find libc in target process\n");
         return EXIT_FAILURE;

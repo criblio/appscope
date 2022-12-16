@@ -75,7 +75,7 @@ $(LDSCOPE): src/scope_static.c src/dbg.c src/libdir.c src/scopestdlib.c src/ns.c
 	$(RM) $(LDSCOPEDYN).o $(LIBSCOPE:.so=.o)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
-$(LIBLOADER): src/loader/loader.c src/loader/nsinfo.c src/loader/nsfile.c os/$(OS)/os.c src/loader/loaderutils.c src/loader/inject.c src/loader/libdir.c src/loader/ns.c src/loader/setup.c src/loader/loaderop.c src/loader/libver.c
+$(LIBLOADER): src/loader/loader.c src/loader/nsinfo.c src/loader/nsfile.c src/loader/loaderutils.c src/loader/inject.c src/loader/libdir.c src/loader/ns.c src/loader/setup.c src/loader/loaderop.c src/loader/libver.c
 	@echo "$${CI:+::group::}Building $@"
 	$(CC) -c $(CFLAGS) -Wno-format-security -Wno-format-truncation -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) -I./src $(INCLUDES) $^
 	ar rcs $@ *.o

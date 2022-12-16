@@ -38,19 +38,13 @@ AppScope 1.2, Cribl Stream 4.0, Cribl Edge 4.0, and Cribl Search 1.0 are mutuall
 
 ### Known Limitations
 
-**Only** these runtimes are supported: 
-
-- Open JVM 7 and later, Oracle JVM 7 and later, go1.9 through go1.19.
-
 AppScope cannot:
 
 - Unload the libscope library, once loaded.
 - Instrument static executables that are not written in Go.
 - Instrument Go executables on ARM.
-- Attach to any static application.
+- Instrument Go executables built with go 1.8 and earlier.
+- Instrument static stripped Go executables built with go1.12 and earlier.
+- Instrument Java executables that use Open JVM 6 and earlier, Oracle JVM 6 and earlier.
 
 When an executable that's being scoped has been [stripped](https://en.wikipedia.org/wiki/Strip_(Unix)), it is not possible for `libscope.so` to obtain a file descriptor for an SSL session, and in turn, AppScope cannot include IP and port number fields in HTTP events.
-
-Static executables can be scoped only if they are written in Go.
-
-Static stripped Go executables can be scoped only when built with go1.13 or newer.

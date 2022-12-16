@@ -73,6 +73,7 @@ enum tap_id {
     tap_http2_server_preface,
     tap_exit,
     tap_die,
+    tap_end,
 };
 
 typedef struct {

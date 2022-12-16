@@ -100,6 +100,7 @@ tap_t g_tap[] = {
     {tap_http2_server_preface, "net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
     {tap_exit,                 "runtime.exit",          /* .abi0 */       go_hook_exit,                     NULL, 0},
     {tap_die,                  "runtime.dieFromSignal", /* .abi0 */       go_hook_die,                      NULL, 0},
+    {tap_end,                  "",                                        NULL,                             NULL, 0},
 };
 
 go_schema_t go_9_schema = {

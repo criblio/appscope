@@ -21,7 +21,6 @@ LIBDIR := ../lib/linux/$(ARCH)
 CONFDIR := ../conf
 
 SCOPE := $(BINDIR)/scope
-LDSCOPE := $(BINDIR)/ldscope
 LIBSCOPE := $(LIBDIR)/libscope.so
 LIBLOADER := $(LIBDIR)/libloader.a
 CONF_YML := $(CONFDIR)/scope.yml
@@ -80,14 +79,12 @@ $(GOLANGCI_LINT):
 
 rebuild: clean build 
 
-run/bundle.go: $(GO_BINDATA) $(LDSCOPE) $(LIBSCOPE) $(LIBLOADER) $(CONF_YML)
+run/bundle.go: $(GO_BINDATA) $(LIBSCOPE) $(LIBLOADER) $(CONF_YML)
 	$(RM) -r build/*
-	cp $(LDSCOPE) $(LIBSCOPE) $(CONF_YML) build/
+	cp $(LIBSCOPE) $(CONF_YML) build/
 	$(GO_BINDATA) -o $@ -pkg run build
 
 # in case someone is building here before the C code is built
-$(LDSCOPE):
-	@$(MAKE) -C .. bin/linux/$(ARCH)/ldscope
 $(LIBSCOPE):
 	@$(MAKE) -C .. lib/linux/$(ARCH)/libscope.so
 $(LIBLOADER):

@@ -27,13 +27,11 @@ ARCH=$(shell uname -m)
 
 LIBSCOPE=lib/$(OS)/$(ARCH)/libscope.so
 LIBLOADER=lib/$(OS)/$(ARCH)/libloader.a
-LDSCOPE=bin/$(OS)/$(ARCH)/ldscope
-LDSCOPEDYN=bin/$(OS)/$(ARCH)/ldscopedyn
 
-coreall: $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN) $(LIBLOADER)
+coreall: $(LIBSCOPE) $(LIBLOADER)
 
 corerebuild:
-	@$(RM) $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN)
+	@$(RM) $(LIBSCOPE) 
 	@$(MAKE) coreall
 
 include os/linux/$(ARCH).mk
@@ -50,40 +48,10 @@ $(OPENSSL_AR):
 $(PCRE2_AR):
 	@$(MAKE) -C contrib pcre2
 
-$(LDSCOPEDYN): src/fn.c src/scopestdlib.c src/nsinfo.c src/nsfile.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c src/plattime.c
-	@echo "$${CI:+::group::}Building $@"
-	gcc -Wall -g $(ARCH_CFLAGS) $(DISTRO_FLAGS) \
-		-DSCOPE_VER=\"$(SCOPE_VER)\" \
-		src/fn.c src/scopestdlib.c src/nsinfo.c src/nsfile.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c src/plattime.c \
-		-ldl -lrt -o $@ ${MUSL_AR} ${UNWIND_AR} -I./os/$(OS) $(INCLUDES)
-	@[ -z "$(CI)" ] || echo "::endgroup::"
-
-$(LDSCOPE): src/scope_static.c src/dbg.c src/libdir.c src/scopestdlib.c src/ns.c src/nsinfo.c src/nsfile.c src/setup.c src/loaderop.c src/libver.c $(LDSCOPEDYN) $(LIBSCOPE)
-	@echo "$${CI:+::group::}Building $@"
-	cd $(dir $(LDSCOPEDYN)) && objcopy \
-		-I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) \
-		$(notdir $(LDSCOPEDYN)) $(notdir $(LDSCOPEDYN)).o
-	cd $(dir $(LIBSCOPE)) && objcopy \
-		-I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) \
-		$(notdir $(LIBSCOPE)) $(notdir $(LIBSCOPE:.so=.o))
-	gcc -Wall -static -g $(ARCH_CFLAGS) $(DISTRO_FLAGS) \
-		-DSCOPE_VER=\"$(SCOPE_VER)\" \
-		src/scope_static.c src/dbg.c src/scopestdlib.c src/libdir.c src/ns.c src/nsinfo.c src/nsfile.c src/setup.c src/loaderop.c src/libver.c \
-		$(INCLUDES) \
-		$(LDSCOPEDYN).o $(LIBSCOPE:.so=.o) \
-		-lrt -lpthread -o $@ ${MUSL_AR} ${UNWIND_AR}
-	$(RM) $(LDSCOPEDYN).o $(LIBSCOPE:.so=.o)
-	@[ -z "$(CI)" ] || echo "::endgroup::"
-
 $(LIBLOADER): src/loader/loader.c src/loader/nsinfo.c src/loader/nsfile.c src/loader/loaderutils.c src/loader/inject.c src/loader/libdir.c src/loader/ns.c src/loader/setup.c src/loader/loaderop.c src/loader/libver.c
 	@echo "$${CI:+::group::}Building $@"
 	$(CC) -c $(CFLAGS) -Wno-format-security -Wno-format-truncation -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) -I./src $(INCLUDES) $^
 	ar rcs $@ *.o
-	cd $(dir $(LDSCOPEDYN)) && objcopy \
-		-I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) \
-		$(notdir $(LDSCOPEDYN)) $(notdir $(LDSCOPEDYN)).o && \
-		ar rcs ../../../$@ $(notdir $(LDSCOPEDYN)).o && \
-		$(RM) $(notdir $(LDSCOPEDYN)).o
 	cd $(dir $(LIBSCOPE)) && objcopy \
 		-I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) \
 		$(notdir $(LIBSCOPE)) $(notdir $(LIBSCOPE:.so=.o)) && \
@@ -97,7 +65,7 @@ $(LIBLOADER): src/loader/loader.c src/loader/nsinfo.c src/loader/nsfile.c src/lo
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 coreclean:
-	$(RM) $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN) $(LIBLOADER)
+	$(RM) $(LIBSCOPE) $(LIBLOADER)
 
 SRC_C_FILES:=$(wildcard src/*.c)
 SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))

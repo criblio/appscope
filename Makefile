@@ -80,7 +80,7 @@ clean:
 	@$(MAKE) coreclean
 	@$(MAKE) -C cli clean
 	@$(MAKE) -C contrib clean
-	@$(RM) bin/*/*/scope bin/*/*/ldscope bin/*/*/ldscopedyn lib/*/*/libscope.so
+	@$(RM) bin/*/*/scope lib/*/*/libscope.so
 	@$(RM) -rf newdir testtempdir1 testtempdir2 coverage go .bash_history .cache .viminfo scope.log *.gcda
 
 # target architecture and OS/ARCH-specific Makefile

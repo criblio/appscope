@@ -30,6 +30,28 @@
 #undef SSL_read
 #undef SSL_write
 
+typedef enum {
+    NO_FAIL, // No known failures
+    CONN_FAIL, // Connection failure
+    TLS_CERT_FAIL, // TLS certificate failure
+    TLS_CONN_FAIL, // TLS connection failure
+    TLS_CONTEXT_FAIL, // TLS context failure
+    TLS_SESSION_FAIL, // TLS session failure
+    TLS_SOCKET_FAIL, // TLS socket failure
+    TLS_VERIFY_FAIL, // TLS verification failure
+} net_fail_t;
+
+char *netFailMap[] = {
+    "n/a",
+    "Socket connection failure",
+    "TLS Failure: error accessing peer certificate",
+    "TLS Failure: error establishing connection",
+    "TLS Failure: error creating context",
+    "TLS Failure: error creating session",
+    "TLS Failure: error setting tls on socket",
+    "TLS Failure: server validation failed"
+};
+
 struct _transport_t
 {
     cfg_transport_t type;
@@ -39,11 +61,12 @@ struct _transport_t
     int (*origGetaddrinfo)(const char *, const char *,
                            const struct addrinfo *,
                            struct addrinfo **);
+    uint64_t connect_attempts;
+
     union {
         struct {
             int sock;
             int pending_connect;
-            uint64_t connect_attempts;
             net_fail_t failure_reason;
             char *host;
             char *port;
@@ -713,9 +736,6 @@ checkPendingSocketStatus(transport_t *trans)
         return 0;
     }
 
-    // We have a connection
-    scopeLogInfo("fd:%d connect successful", trans->net.pending_connect);
-
     // Move this descriptor up out of the way
     trans->net.sock = placeDescriptor(trans->net.pending_connect, trans);
 
@@ -744,10 +764,6 @@ checkPendingSocketStatus(transport_t *trans)
     }
 #endif
 
-    // We have a connected socket!  Woot!
-    trans->net.connect_attempts = 0;
-    trans->net.failure_reason = NO_FAIL;
-    
     // Do the tls stuff for this connection as needed.
     if (trans->net.tls.enable) {
         // when successful, we'll have a connected tls socket.
@@ -762,6 +778,11 @@ checkPendingSocketStatus(transport_t *trans)
     if ((trans->type == CFG_TCP) && !setSocketBlocking(trans, trans->net.sock, TRUE)) {
         DBG("%d %s %s", trans->net.sock, trans->net.host, trans->net.port);
     }
+
+    // We have a connected socket!  Woot!
+    scopeLogInfo("fd:%d connect to %s:%s was successful", trans->net.sock, trans->net.host, trans->net.port);
+    trans->connect_attempts = 0;
+    trans->net.failure_reason = NO_FAIL;
 
     return 1;
 }
@@ -835,7 +856,7 @@ getNextAddressListEntry(transport_t *trans)
 static int
 socketConnectionStart(transport_t *trans)
 {
-    trans->net.connect_attempts++;
+    trans->connect_attempts++;
 
     // Get a list of addresses to try if we don't have a current list
     // or have exhausted the entries in a current list.
@@ -907,11 +928,13 @@ socketConnectionStart(transport_t *trans)
 
 
         if (trans->type == CFG_UDP) {
-            scopeLogInfo("fd:%d connect to %s:%d was successful", sock, addrstr, port);
-
             // connect on udp sockets normally succeeds immediately.
             trans->net.sock = placeDescriptor(sock, trans);
             if (trans->net.sock != -1) break;
+
+            scopeLogInfo("fd:%d connect to %s:%d was successful", trans->net.sock, addrstr, port);
+            trans->connect_attempts = 0;
+            trans->net.failure_reason = NO_FAIL;
         } else {
             DBG(NULL); // with non-blocking tcp sockets, we always expect -1
         }
@@ -1031,11 +1054,15 @@ transportConnect(transport_t *trans)
         case CFG_FILE:
             return transportConnectFile(trans);
         case CFG_EDGE:
+            trans->connect_attempts++;
+
             // Edge path needs to be recomputed on every connection attempt.
             if (trans->local.path) scope_free(trans->local.path);
             trans->local.path = edgePath();
-            if (!trans->local.path) return 0;
-
+            if (!trans->local.path) {
+                scopeLogInfo("edge connect failed: edge socket not found");
+                return 0;
+            }
             int pathlen = scope_strlen(trans->local.path);
             if (pathlen >= sizeof(trans->local.addr.sun_path)) return 0;
 
@@ -1047,6 +1074,8 @@ transportConnect(transport_t *trans)
             // Keep going!  (no break or return here!)
             // CFG_EDGE uses CFG_UNIX's connection logic.
         case CFG_UNIX:
+            if (trans->type == CFG_UNIX) trans->connect_attempts++;
+
             if ((trans->local.sock = scope_socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
                 DBG("%d %s", trans->local.sock, trans->local.path);
                 return 0;
@@ -1066,12 +1095,14 @@ transportConnect(transport_t *trans)
                 return 0;
             }
 
-            // We have a connection
-            scopeLogInfo("fd:%d connect successful", trans->local.sock);
-
             // Move this descriptor up out of the way
             trans->local.sock = placeDescriptor(trans->local.sock, trans);
+
+            // We have a connection
+            scopeLogInfo("fd:%d (%s) connect successful", trans->local.sock, trans->local.path);
+            trans->connect_attempts = 0;
             break;
+
         default:
             DBG(NULL);
     }
@@ -1495,19 +1526,38 @@ transportFlush(transport_t* t)
     return 0;
 }
 
-uint64_t
-transportConnectAttempts(transport_t* t)
+void
+transportLogConnectionStatus(transport_t *trans, const char *name)
 {
-    if (!t) return 0;
-    return t->net.connect_attempts;
-}
+    if (!trans || !name) {
+        DBG(NULL);
+        return;
+    }
 
-net_fail_t
-transportFailureReason(transport_t *t)
-{
-    // This fn reports the most recent connection failure which
-    // is primarilly provided to help debugging of tls issues
-    if (!t) return NO_FAIL;
-    return t->net.failure_reason;
-}
+    switch (trans->type) {
+        case CFG_TCP:
+            scopeLog(CFG_LOG_WARN, "%s destination (%s:%s) not connected. messages dropped: "
+                "%"PRIu64 " connection attempts: %"PRIu64 " reason for failure: %s",
+                name, trans->net.host, trans->net.port, g_cbuf_drop_count,
+                trans->connect_attempts, netFailMap[trans->net.failure_reason]);
+            break;
+        case CFG_UNIX:
+            scopeLog(CFG_LOG_WARN, "%s destination (%s) not connected. messages dropped: "
+                 "%"PRIu64 " connection attempts: %"PRIu64, name, trans->local.path,
+                 g_cbuf_drop_count, trans->connect_attempts);
+            break;
+        case CFG_EDGE:
+            scopeLog(CFG_LOG_WARN, "%s destination (%s) not connected. messages dropped: "
+                 "%"PRIu64 " connection attempts: %"PRIu64, name, "edge",
+                 g_cbuf_drop_count, trans->connect_attempts);
+            break;
+        case CFG_UDP:
+        case CFG_FILE:
+        case CFG_SYSLOG:
+        case CFG_SHM:
+            // Nothing to report here
+            break;
+    }
 
+
+}

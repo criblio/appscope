@@ -56,7 +56,6 @@ RUN apt-get update && \
         sudo \
         tzdata \
         vim \
-        wget \
         && \
     dpkg-reconfigure --frontend noninteractive tzdata && \
     apt-get clean

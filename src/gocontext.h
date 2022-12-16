@@ -58,8 +58,27 @@ typedef struct {                  // Structure                  Field
     int sc_to_conn;               // "net/http.http2serverConn" "conn"
 } go_struct_offsets_t;
 
+enum tap_id {
+    tap_syscall,
+    tap_rawsyscall,
+    tap_syscall6,
+    tap_tls_client_read,
+    tap_tls_client_write,
+    tap_tls_server_read,
+    tap_tls_server_write,
+    tap_http2_client_read,
+    tap_http2_client_write,
+    tap_http2_server_read,
+    tap_http2_server_write,
+    tap_http2_server_preface,
+    tap_exit,
+    tap_die,
+    tap_end,
+};
+
 typedef struct {
     // These are constants at build time
+    enum tap_id id;    // tap id
     char *   func_name;    // name of go function
     void *   assembly_fn;  // scope handler function (in assembly)
     // These are set at runtime.
@@ -70,7 +89,7 @@ typedef struct {
 typedef struct {
     go_arg_offsets_t arg_offsets;
     go_struct_offsets_t struct_offsets;
-    tap_t tap[];
+    tap_t *tap;
 } go_schema_t;
 
 // Go strings are not null delimited like c strings.
@@ -84,7 +103,8 @@ typedef void (*assembly_fn)(void);
 
 extern go_schema_t *g_go_schema;
 extern go_schema_t go_9_schema;
-extern go_schema_t go_17_schema;
+extern go_schema_t go_17_schema_x86;
+extern go_schema_t go_17_schema_arm;
 extern go_arg_offsets_t g_go_arg;
 extern go_struct_offsets_t g_go_struct;
 extern tap_t g_go_tap[];

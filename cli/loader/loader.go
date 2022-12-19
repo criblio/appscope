@@ -98,13 +98,13 @@ func (sL *ScopeLoader) StopHost() (string, error) {
 }
 
 func (sL *ScopeLoader) Run(args []string, env []string) error {
-	args = append([]string{"--loader"}, args...)
+	args = append([]string{"--passthrough"}, args...)
 	args = append([]string{"scope"}, args...)
 	return syscall.Exec(sL.Path, args, env)
 }
 
 func (sL *ScopeLoader) RunSubProc(args []string, env []string) (string, error) {
-	args = append([]string{"--loader"}, args...)
+	args = append([]string{"--passthrough"}, args...)
 	cmd := exec.Command(sL.Path, args...)
 	cmd.Env = env
 	stdoutStderr, err := cmd.CombinedOutput()

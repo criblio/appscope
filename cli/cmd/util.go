@@ -56,11 +56,13 @@ func metricAndEventDestFlags(cmd *cobra.Command, rc *run.Config) {
 }
 
 func runCmdFlags(cmd *cobra.Command, rc *run.Config) {
-	cmd.Flags().BoolVar(&rc.Passthrough, "passthrough", false, "Scope an application with current environment & no config.")
 	cmd.Flags().IntVarP(&rc.Verbosity, "verbosity", "v", 4, "Set scope metric verbosity")
 	cmd.Flags().BoolVarP(&rc.Payloads, "payloads", "p", false, "Capture payloads of network transactions")
 	cmd.Flags().StringVar(&rc.Loglevel, "loglevel", "", "Set scope library log level (debug, warning, info, error, none)")
 	cmd.Flags().StringVarP(&rc.LibraryPath, "librarypath", "l", "", "Set path for dynamic libraries")
 	cmd.Flags().StringVarP(&rc.UserConfig, "userconfig", "u", "", "Scope an application with a user specified config file; overrides all other settings.")
 	metricAndEventDestFlags(cmd, rc)
+
+	// Constructor flags
+	cmd.Flags().BoolP("passthrough", "z", false, "Scope an application with current environment & no config.")
 }

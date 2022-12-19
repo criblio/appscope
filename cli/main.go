@@ -26,7 +26,7 @@ static struct option opts[] = {
     { "patch",       required_argument, 0, 'p' },
     { "starthost",   no_argument,       0, 'r' },
     { "stophost",    no_argument,       0, 'x' },
-    { "loader",      no_argument,       0, 'z' },
+    { "passthrough", no_argument,       0, 'z' },
     { 0, 0, 0, 0 }
 };
 

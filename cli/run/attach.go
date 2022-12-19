@@ -59,29 +59,30 @@ func (rc *Config) Attach(args []string) error {
 		reattach = true
 	}
 
-	// Normal operational, not passthrough, create directory for this run
-	// Directory contains scope.yml which is configured to output to that
-	// directory and has a command directory configured in that directory.
 	env := os.Environ()
+
 	// Disable detection of a scope filter file with this command
 	env = append(env, "SCOPE_FILTER=false")
 
+	// Disable cribl event breaker with this command
 	if rc.NoBreaker {
 		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
 	}
-	if !rc.Passthrough {
-		rc.setupWorkDir(args, true)
-		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
-		log.Info().Bool("passthrough", rc.Passthrough).Strs("args", args).Msg("calling syscall.Exec")
-	}
+
+	// Normal operational, create a directory for this run.
+	// Directory contains scope.yml which is configured to output to that
+	// directory and has a command directory configured in that directory.
+	rc.setupWorkDir(args, true)
+	env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
+
+	// Handle custom library path
 	if len(rc.LibraryPath) > 0 {
-		// Validate path exists
 		if !util.CheckDirExists(rc.LibraryPath) {
 			return errLibraryNotExist
 		}
-		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
+
 	if reattach {
 		env = append(env, "SCOPE_CONF_RELOAD="+filepath.Join(rc.WorkDir, "scope.yml"))
 	}

@@ -50,6 +50,8 @@ typedef enum {
 #define MAX_CGROUP 512
 #define MODE_STR 16
 #define SM_NAME "scope_anon"
+#define SCOPE_FILTER_USR_PATH ("/usr/lib/appscope/scope_filter")
+#define SCOPE_FILTER_TMP_PATH ("/tmp/appscope/scope_filter")
 
 #ifndef bool
 typedef unsigned int bool;

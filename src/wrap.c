@@ -30,7 +30,6 @@
 #include "os.h"
 #include "plattime.h"
 #include "report.h"
-#include "setup.h"
 #include "scopeelf.h"
 #include "scopetypes.h"
 #include "state.h"
@@ -38,7 +37,6 @@
 #include "wrap.h"
 #include "runtimecfg.h"
 #include "javaagent.h"
-#include "inject.h"
 #include "scopestdlib.h"
 #include "../contrib/libmusl/musl.h"
 

@@ -3,9 +3,6 @@
 
 #include "scopetypes.h"
 
-#define SCOPE_FILTER_USR_PATH ("/usr/lib/appscope/scope_filter")
-#define SCOPE_FILTER_TMP_PATH ("/tmp/appscope/scope_filter")
-
 bool isCfgFileConfigured(const char *);
 int removeScopeCfgFile(const char *);
 service_status_t setupService(const char *, uid_t, gid_t);

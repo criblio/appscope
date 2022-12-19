@@ -11,6 +11,27 @@ package main
 #include <getopt.h>
 #include "../src/loader/loader.h"
 
+// Usage:
+// scope [OPTIONS] [--] EXECUTABLE [ARGS...]
+// scope [OPTIONS] --attach PID
+// scope [OPTIONS] --detach PID
+// scope [OPTIONS] --configure FILTER_PATH --namespace PID
+// scope [OPTIONS] --service SERVICE --namespace PID
+//
+// Options:
+// -l, --libbasedir DIR         specify parent for the library directory (default: /tmp)
+// -f DIR                       alias for \"-l DIR\" for backward compatibility
+// -a, --attach PID             attach to the specified process ID
+// -d, --detach PID             detach from the specified process ID
+// -c, --configure FILTER_PATH  configure scope environment with FILTER_PATH
+// -w, --unconfigure            unconfigure scope environment
+// -s, --service SERVICE        setup specified service NAME
+// -v, --unservice              remove scope from all service configurations
+// -n  --namespace PID          perform service/configure operation on specified container PID
+// -p, --patch SO_FILE          patch specified libscope.so
+// -r, --starthost              execute the scope start command in a host context (must be run in the container)
+// -x, --stophost               execute the scope stop command in a host context (must be run in the container)
+
 // long aliases for short options
 static struct option opts[] = {
     { "usage",       no_argument,       0, 'u'},

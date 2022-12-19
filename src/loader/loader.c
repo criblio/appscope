@@ -845,7 +845,7 @@ loader(int argc, char **argv, char **env)
         int index = 0;
         //
         // The `+` here enables POSIX mode where the first non-option found
-        // stops option processing so `ldscope foo -a 123` will not process the
+        // stops option processing so `scope foo -a 123` will not process the
         // `-a 123` here and instead pass it through.
         //
         // The initial `:` lets us handle options with optional values like

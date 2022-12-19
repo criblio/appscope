@@ -197,7 +197,7 @@ typedef struct
 //    SCOPE_FILTER                   "false" disables handling the filter file
 //                                   other values are interpreted a path to a filter file
 //    SCOPE_EXECVE                   "false" disables scope of child procs
-//    SCOPE_EXEC_PATH                specifies path to ldscope executable
+//    SCOPE_EXEC_PATH                specifies path to scope executable
 //    SCOPE_CRIBL_NO_BREAKER         adds breaker property to process start message
 //    SCOPE_LIB_PATH                 specifies path to libscope.so library
 //    SCOPE_GO_STRUCT_PATH           for internal testing

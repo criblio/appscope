@@ -75,7 +75,7 @@ extern int32_t ** scopelibc___ctype_tolower_loc(void);
  * use of the %fs register and TLS behavior with the internal libc.
  *
  * Use scope_errno only for functions called from the periodic
- * thread, during libscope constructor, from ldscope or from ldscopedyn.
+ * thread, during libscope constructor, or from scope.
  *
  * Other functions, primarily those called from interposed functions, can
  * not safely reference scope_errno.

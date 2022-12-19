@@ -33,8 +33,6 @@ The resulting binaries are listed below. `$ARCH` will be `x86_64` or `aarch64`.
 
 * `lib/linux/$ARCH/libscope.so`
 * `bin/linux/$ARCH/scope`
-* `bin/linux/$ARCH/ldscope`
-* `bin/linux/$ARCH/ldscopedyn`
 
 ### `make run`
 

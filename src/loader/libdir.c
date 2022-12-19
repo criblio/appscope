@@ -29,10 +29,6 @@
 #error "Missing SCOPE_VER"
 #endif
 
-#ifndef SCOPE_LDSCOPEDYN
-#define SCOPE_LDSCOPEDYN "ldscopedyn"
-#endif
-
 #ifndef SCOPE_LIBSCOPE_SO
 #define SCOPE_LIBSCOPE_SO "libscope.so"
 #endif
@@ -56,11 +52,6 @@ struct scope_obj_state{
     char binaryName[SCOPE_NAME_SIZE];    // name of the binary
     char binaryBasepath[PATH_MAX];       // full path to the actual binary base directory i.e. /tmp/appscope or /usr/lib/appscope
     char binaryPath[PATH_MAX];           // full path to the actual binary file i.e. /tmp/appscope/dev/libscope.so
-};
-
-// internal state for dynamic loader
-static struct scope_obj_state ldscopeDynState = {
-    .binaryName = SCOPE_LDSCOPEDYN,
 };
 
 // internal state for library
@@ -290,8 +281,6 @@ int
 libdirInitTest(const char *installBase, const char *tmpBase, const char *rawVersion) {
     memset(&g_libdir_info, 0, sizeof(g_libdir_info));
     memset(&libscopeState, 0, sizeof(libscopeState));
-    memset(&ldscopeDynState, 0, sizeof(ldscopeDynState));
-    strcpy(ldscopeDynState.binaryName, SCOPE_LDSCOPEDYN);
     strcpy(libscopeState.binaryName, SCOPE_LIBSCOPE_SO);
           
     if (installBase) {
@@ -440,7 +429,7 @@ libdirSetLibraryBase(const char *base) {
 
 
 /*
-* Retrieve the full absolute path of the specified binary (ldscopedyn/libscope.so).
+* Retrieve the full absolute path of the specified binary (libscope.so).
 * Returns path for the specified binary, NULL in case of failure.
 */
 const char *

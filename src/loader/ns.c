@@ -104,7 +104,7 @@ setNamespace(pid_t pid, const char *ns) {
 static bool
 joinChildNamespace(pid_t hostPid, bool joinPidNs) {
     bool status = FALSE;
-    size_t ldscopeSize = 0;
+    size_t scopeSize = 0;
     size_t cfgSize = 0;
     mkdir_status_t dirRes = MKDIR_STATUS_ERR_OTHER;
 
@@ -117,8 +117,8 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
         return status;
     }
 
-    char *ldscopeMem = setupLoadFileIntoMem(&ldscopeSize, path);
-    if (ldscopeMem == NULL) {
+    char *scopeMem = setupLoadFileIntoMem(&scopeSize, path);
+    if (scopeMem == NULL) {
         return status;
     }
 
@@ -150,8 +150,8 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
         snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
         dirRes = libdirCreateDirIfMissing(path, 0755, nsUid, nsGid);
         if (dirRes <= MKDIR_STATUS_EXISTS) {
-            strncat(path, "ldscope", sizeof(path) - 1);
-            status = extractMemToFile(ldscopeMem, ldscopeSize, path, 0775, isDevVersion, nsUid, nsGid);
+            strncat(path, "scope", sizeof(path) - 1);
+            status = extractMemToFile(scopeMem, scopeSize, path, 0775, isDevVersion, nsUid, nsGid);
         }
     }
 
@@ -161,12 +161,12 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
         snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
         dirRes = libdirCreateDirIfMissing(path, 0777, nsUid, nsGid);
         if (dirRes <= MKDIR_STATUS_EXISTS) {
-            strncat(path, "ldscope", sizeof(path) - 1);
-            status = extractMemToFile(ldscopeMem, ldscopeSize, path, 0775, isDevVersion, nsUid, nsGid);
+            strncat(path, "scope", sizeof(path) - 1);
+            status = extractMemToFile(scopeMem, scopeSize, path, 0775, isDevVersion, nsUid, nsGid);
         }
     }
 
-    /* Cleanup if extraction of ldscope fails */
+    /* Cleanup if extraction of scope fails */
     if (status == FALSE) {
         goto cleanupMem;
     }
@@ -183,7 +183,7 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
 
 cleanupMem:
 
-    munmap(ldscopeMem, ldscopeSize);
+    munmap(scopeMem, scopeSize);
 
     if (scopeCfgMem) {
         munmap(scopeCfgMem, cfgSize);
@@ -327,7 +327,7 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
     }
     /*
     * TODO In case of Reattach/Detach - when libLoaded = TRUE
-    * We only need the mount namespace to /dev/shm but currently ldscopedyn
+    * We only need the mount namespace to /dev/shm but currently scope
     * also check the pid namespace
     */
 
@@ -359,12 +359,12 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
         const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
         bool isDevVersion = libverIsNormVersionDev(loaderVersion);
 
-        snprintf(loaderInChildPath, PATH_MAX, "/usr/lib/appscope/%s/ldscope", loaderVersion);
+        snprintf(loaderInChildPath, PATH_MAX, "/usr/lib/appscope/%s/scope", loaderVersion);
         if (access(loaderInChildPath, R_OK) || isDevVersion) {
             memset(loaderInChildPath, 0, PATH_MAX);
-            snprintf(loaderInChildPath, PATH_MAX, "/tmp/appscope/%s/ldscope", loaderVersion);
+            snprintf(loaderInChildPath, PATH_MAX, "/tmp/appscope/%s/scope", loaderVersion);
             if (access(loaderInChildPath, R_OK)) {
-                fprintf(stderr, "error: access ldscope failed\n");
+                fprintf(stderr, "error: access scope failed\n");
                 return EXIT_FAILURE;
             }
         }
@@ -550,9 +550,8 @@ setHostMntNs(const char *hostFsPrefix) {
 static bool
 joinHostNamespace(ns_action_t action) {
     bool status = FALSE;
-    size_t ldscopeSize = 0;
-    size_t cfgSize = 0;
     size_t scopeSize = 0;
+    size_t cfgSize = 0;
     char path[PATH_MAX] = {0};
     char hostPrefixPath[PATH_MAX] = {0};
     char hostFilterPath[PATH_MAX] = {0};
@@ -565,9 +564,9 @@ joinHostNamespace(ns_action_t action) {
         return status;
     }
 
-    // Load "ldscope" into memory
-    char *ldscopeMem = setupLoadFileIntoMem(&ldscopeSize, path);
-    if (ldscopeMem == NULL) {
+    // Load "scope" into memory
+    scopeMem = setupLoadFileIntoMem(&scopeSize, path);
+    if (scopeMem == NULL) {
         return status;
     }
 
@@ -665,14 +664,6 @@ joinHostNamespace(ns_action_t action) {
     }
 
     /*
-     * Create a "ldscope" on the host
-     */
-    strncat(path, "ldscope", sizeof(path) - 1);
-    if ((status = extractMemToFile(ldscopeMem, ldscopeSize, path, 0775, isDevVersion, eUid, eGid)) == FALSE) {
-        goto cleanupMem;
-    }
-
-    /*
      * Create a "scope" on the host
      */
     memset(path, 0, PATH_MAX);
@@ -712,8 +703,6 @@ joinHostNamespace(ns_action_t action) {
     }
 
 cleanupMem:
-    munmap(ldscopeMem, ldscopeSize);
-
     if (scopeFilterCfgMem) {
         munmap(scopeFilterCfgMem, cfgSize);
     }
@@ -736,7 +725,7 @@ isRunningInContainer(void) {
 }
 
  /*
- * Perform ldscope host start operation - this operation begins from container namespace.
+ * Perform scope host start operation - this operation begins from container namespace.
  *
  * - switch namespace to host
  * - create cron entry with filter file
@@ -760,7 +749,7 @@ nsHostStart(void) {
 }
 
  /*
- * Perform ldscope host stop operation - this operation begins from container namespace.
+ * Perform scope host stop operation - this operation begins from container namespace.
  *
  * - switch namespace to host
  * - create cron entry with filter file

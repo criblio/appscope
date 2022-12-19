@@ -326,9 +326,6 @@ jobs:
           echo "::group::scope"
           stat -c %s bin/linux/${{ steps.env.outputs.arch }}/scope
           echo "::endgroup::"
-          echo "::group::ldscope"
-          stat -c %s bin/linux/${{ steps.env.outputs.arch }}/ldscope
-          echo "::endgroup::"
 
       # Upload the built binaries for use by later stages. We specify the same
       # artifact name for this job as well as the other job for ARM. The result
@@ -340,7 +337,6 @@ jobs:
           path: |
             lib/linux/${{ steps.env.outputs.arch }}/libscope.so
             bin/linux/${{ steps.env.outputs.arch }}/scope
-            bin/linux/${{ steps.env.outputs.arch }}/ldscope
 
       # To prevent the cache from growing uncbounded, we used `--cache-to` a
       # different folder that the `--cache-from`. This moves the results of the
@@ -399,7 +395,7 @@ jobs:
 
           cp conf/scope.yml ${TMPDIR}/scope
           for ARCH in x86_64 aarch64; do
-            cp bin/linux/${ARCH}/{scope,ldscope} ${TMPDIR}/scope
+            cp bin/linux/${ARCH}/{scope} ${TMPDIR}/scope
             cp lib/linux/${ARCH}/libscope.so ${TMPDIR}/scope
             # Create tgz and tgz.md5 of binaries and config (for each arch)
             (cd ${TMPDIR} && tar cfz scope.tgz scope)
@@ -412,7 +408,7 @@ jobs:
 
           cp conf/scope.yml ${TMPDIR}/lib
           for ARCH in x86_64 aarch64; do
-            cp bin/linux/${ARCH}/ldscope ${TMPDIR}/lib
+            cp bin/linux/${ARCH}/scope ${TMPDIR}/lib
             cp lib/linux/${ARCH}/libscope.so ${TMPDIR}/lib
             # Create zip and zip.md5 of binaries and config (for each arch)
             (cd ${TMPDIR} && zip -r aws-lambda-layer.zip ./lib)

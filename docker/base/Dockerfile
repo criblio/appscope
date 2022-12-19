@@ -7,7 +7,6 @@ RUN apt update -y && \
 
 ARG TARGETARCH
 COPY bin/linux/${TARGETARCH}/scope       /usr/local/bin/scope
-COPY bin/linux/${TARGETARCH}/ldscope     /usr/local/bin/ldscope
 COPY lib/linux/${TARGETARCH}/libscope.so /usr/local/lib/libscope.so
 
 RUN mkdir /usr/local/scope /usr/local/scope/x86_64 /usr/local/scope/aarch64 \

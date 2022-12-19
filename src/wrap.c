@@ -1612,7 +1612,7 @@ init(void)
 
         g_ismusl =
             ((osGetExePath(scope_getpid(), &full_path) != -1) &&
-            !scope_strstr(full_path, "ldscope") &&
+// TODO : Test this removal!  // !scope_strstr(full_path, "scope") && 
             ((ebuf = getElf(full_path))) &&
             !is_static(ebuf->buf) &&
             !is_go(ebuf->buf) &&
@@ -2727,13 +2727,13 @@ prctl(int option, ...)
 }
 
 static char *
-getLdscopeExec(const char *pathname)
+getScopeExec(const char *pathname)
 {
     char *scopexec = NULL;
     bool isstat = FALSE, isgo = FALSE;
     elf_buf_t *ebuf;
 
-    if (scope_strstr(g_proc.procname, "ldscope") ||
+    if (scope_strstr(g_proc.procname, "scope") ||
         checkEnv("SCOPE_EXECVE", "false")) {
         return NULL;
     }
@@ -2748,7 +2748,7 @@ getLdscopeExec(const char *pathname)
 
     /*
      * Note: the isgo check is strictly for Go dynamic execs.
-     * In this case we use ldscope only to force the use of HTTP 1.1.
+     * In this case we use scope only to force the use of HTTP 1.1.
      */
     if (getenv("LD_PRELOAD") && (isstat == FALSE) && (isgo == FALSE)) {
         return NULL;
@@ -2756,7 +2756,7 @@ getLdscopeExec(const char *pathname)
 
     scopexec = getenv("SCOPE_EXEC_PATH");
     if (((scopexec = getpath(scopexec)) == NULL) &&
-        ((scopexec = getpath("ldscope")) == NULL)) {
+        ((scopexec = getpath("scope")) == NULL)) {
 
         // can't find the scope executable
         scopeLogWarn("can't find a scope executable for %s", pathname);
@@ -2775,7 +2775,7 @@ execv(const char *pathname, char *const argv[])
 
     WRAP_CHECK(execv, -1);
 
-    scopexec = getLdscopeExec(pathname);
+    scopexec = getScopeExec(pathname);
     if (scopexec == NULL) {
         return g_fn.execv(pathname, argv);
     }
@@ -2811,7 +2811,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 
     WRAP_CHECK(execve, -1);
 
-    scopexec = getLdscopeExec(pathname);
+    scopexec = getScopeExec(pathname);
     if (scopexec == NULL) {
         return g_fn.execve(pathname, argv, envp);
     }

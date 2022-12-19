@@ -84,7 +84,7 @@ If you are on a platform other than Ubuntu 18.04, or prefer not to install the d
 make build
 ```
 
-Either way, the resulting binaries will be in `lib/linux/$(uname -m)/libscope.so`, `bin/linux/$(uname -m)/scope`, and `bin/linux/$(uname -m)/ldscope`.
+Either way, the resulting binaries will be in `lib/linux/$(uname -m)/libscope.so` and `bin/linux/$(uname -m)/scope`.
 
 We support building `x86_64` (amd64) or `aarch64` (arm64/v8) binaries by adding `ARCH=x86_64` or `ARCH=aarch64` to the `make build` command. See the [BUILD](docs/BUILD.md) doc for details.
 

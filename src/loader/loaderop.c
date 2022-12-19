@@ -47,7 +47,7 @@ setEnvVariable(char *env, char *value)
 
 /*
  * This code exists solely to support the ability to
- * build a libscope and an ldscope on a glibc distro
+ * build a libscope and a scope on a glibc distro
  * that will execute on both a glibc distro and a
  * musl distro.
  *
@@ -55,7 +55,7 @@ setEnvVariable(char *env, char *value)
  * execute on both glibc and musl distros.
  *
  * The process:
- * 1) extract the ldscopedyn dynamic exec and libscope.so
+ * 1) extract the scope exec and libscope.so
  *    dynamic lib from this object.
  * 2) open an executable file on the current FS and
  *    read the loader string from the .interp section.
@@ -66,8 +66,8 @@ setEnvVariable(char *env, char *value)
  * 5) for musl; create or add to the ld lib path
  *    env var to point to the dir created above.
  * 6) for musl; modify the loader string in .interp
- *    of ldscope to ld-musl.so.
- * 7) execve the extracted ldscopedyn passing args
+ *    of scope to ld-musl.so.
+ * 7) execve the extracted scope passing args
  *    from this command line.
  */
 
@@ -288,7 +288,7 @@ loaderOpPatchLibrary(const char *so_path) {
     return patch_res;
 }
 
-// modify the loader string in the .interp section of ldscope
+// modify the loader string in the .interp section of scope
 static int
 set_loader(char *exe)
 {
@@ -389,22 +389,22 @@ set_loader(char *exe)
 }
 
 static void
-do_musl(char *exld, char *ldscope, uid_t nsUid, gid_t nsGid)
+do_musl(char *exld, char *scope, uid_t nsUid, gid_t nsGid)
 {
     int symlinkErr = 0;
     char *lpath = NULL;
     char *ldso = NULL;
     char *path;
-    char dir[strlen(ldscope) + 2];
+    char dir[strlen(scope) + 2];
 
     // always set the env var
-    strncpy(dir, ldscope, strlen(ldscope) + 1);
+    strncpy(dir, scope, strlen(scope) + 1);
     path = dirname(dir);
     setEnvVariable(LD_LIB_ENV, path);
 
     // does a link to the musl ld.so exist?
     // if so, we assume the symlink exists as well.
-    if ((ldso = loaderOpGetLoader(ldscope)) == NULL) return;
+    if ((ldso = loaderOpGetLoader(scope)) == NULL) return;
 
     // Avoid creating ld-musl-x86_64.so.1 -> /lib/ld-musl-x86_64.so.1
     if (strstr(ldso, "musl")) return;
@@ -424,7 +424,7 @@ do_musl(char *exld, char *ldscope, uid_t nsUid, gid_t nsGid)
         return;
     }
 
-    set_loader(ldscope);
+    set_loader(scope);
     loaderOpSetLibrary(libdirGetPath(LIBRARY_FILE));
 
     if (ldso) free(ldso);
@@ -438,7 +438,7 @@ do_musl(char *exld, char *ldscope, uid_t nsUid, gid_t nsGid)
  * Returns 0 if musl was not detected and 1 if it was.
  */
 int
-loaderOpSetupLoader(char *ldscope, uid_t nsUid, gid_t nsGid)
+loaderOpSetupLoader(char *scope, uid_t nsUid, gid_t nsGid)
 {
     int ret = 0; // not musl
 
@@ -447,7 +447,7 @@ loaderOpSetupLoader(char *ldscope, uid_t nsUid, gid_t nsGid)
     if (((ldso = loaderOpGetLoader(EXE_TEST_FILE)) != NULL) &&
         (strstr(ldso, LIBMUSL) != NULL)) {
             // we are using the musl ld.so
-            do_musl(ldso, ldscope, nsUid, nsGid);
+            do_musl(ldso, scope, nsUid, nsGid);
             ret = 1; // detected musl
     }
 

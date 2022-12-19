@@ -9,12 +9,12 @@
 
 #include <linux/limits.h>
 #include <sys/stat.h>
+#include <stdbool.h>
 #include "scopetypes.h"
 
 // File types
 typedef enum {
     LIBRARY_FILE, // libscope.so
-    LOADER_FILE   // ldscopedyn
 } libdirfile_t;
 
 typedef enum {

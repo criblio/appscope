@@ -18,6 +18,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 #include "scopestdlib.h"
 #include "scopetypes.h" // for ROUND_UP()
@@ -67,12 +68,6 @@ static struct scope_obj_state libscopeState = {
     .binaryName = SCOPE_LIBSCOPE_SO,
 };
 
-// We use `objcopy` in the Makefile to get `ldscopedyn` into an object we then
-// link into the `ldscope` binary. These globals them point to the start and
-// end of the binary bytes for those files.
-extern unsigned char _binary_ldscopedyn_start;
-extern unsigned char _binary_ldscopedyn_end;
-
 // Same as above for `libscope.so`.
 extern unsigned char _binary_libscope_so_start;
 extern unsigned char _binary_libscope_so_end;
@@ -95,8 +90,6 @@ typedef struct
 static struct scope_obj_state *
 getObjState(libdirfile_t objFileType) {
     switch (objFileType) {
-        case LOADER_FILE:
-            return &ldscopeDynState;
         case LIBRARY_FILE:
             return &libscopeState;
     }
@@ -110,9 +103,6 @@ libdirGetNote(libdirfile_t objFileType) {
     unsigned char *buf;
 
     switch (objFileType) {
-        case LOADER_FILE:
-            buf = &_binary_ldscopedyn_start;
-            break;
         case LIBRARY_FILE:
             buf = &_binary_libscope_so_start;
             break;
@@ -218,10 +208,6 @@ libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overw
     unsigned char *end;
 
     switch (objFileType) {
-        case LOADER_FILE:
-            start = &_binary_ldscopedyn_start;
-            end = &_binary_ldscopedyn_end;
-            break;
         case LIBRARY_FILE:
             start = &_binary_libscope_so_start;
             end = &_binary_libscope_so_end;

@@ -289,279 +289,111 @@ attachCmd(pid_t pid, bool attach)
         return rc;
 }
 
-// long aliases for short options
-static struct option opts[] = {
-    { "attach",      required_argument, 0, 'a' },
-    { "detach",      required_argument, 0, 'd' },
-    { "namespace",   required_argument, 0, 'n' },
-    { "configure",   required_argument, 0, 'c' },
-    { "unconfigure", no_argument,       0, 'w' },
-    { "service",     required_argument, 0, 's' },
-    { "unservice",   no_argument,       0, 'v' },
-    { "libbasedir",  required_argument, 0, 'l' },
-    { "patch",       required_argument, 0, 'p' },
-    { "starthost",   no_argument,       0, 'r' },
-    { "stophost",    no_argument,       0, 'x' },
-    { "passthrough", no_argument,       0, 'z' },
-    { 0, 0, 0, 0 }
-};
+int
+cmdService(char *serviceName, pid_t pid)
+{
+    if (!serviceName) {
+        return EXIT_FAILURE;
+    }
+
+    if (pid == -1) {
+        // Service on Host
+        return setupService(serviceName, eUid, eGid);
+    } else {
+        // Service on Container
+        pid_t nsContainerPid = 0;
+        if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
+            (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
+            return nsService(pid, serviceName);
+        }
+    }
+
+    return EXIT_FAILURE;
+}
 
 int
-loader(int argc, char **argv, char **env)
+cmdUnservice(pid_t pid)
 {
-    //printf("loader called\n");
+    if (pid == -1) {
+        // Service on Host
+        return setupUnservice();
+    } else {
+        // Service on Container
+        pid_t nsContainerPid = 0;
+        if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
+            (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
+            return nsUnservice(pid);
+        }
+    }
 
-    char *attachArg = NULL;
-    char *configFilterPath = NULL;
-    char *serviceName = NULL;
-    char *nsPidArg = NULL;
-    char *scopeLibPath = NULL;
+    return EXIT_FAILURE;
+}
+
+int
+cmdConfigure(char *configFilterPath, pid_t pid)
+{
+    int status = EXIT_FAILURE;
+
+    if (!configFilterPath) {
+        return EXIT_FAILURE;
+    }
+
+    size_t configFilterSize = 0;
+    void *confgFilterMem = setupLoadFileIntoMem(&configFilterSize, configFilterPath);
+    if (confgFilterMem == NULL) {
+        fprintf(stderr, "error: Load filter file into memory %s\n", configFilterPath);
+        return EXIT_FAILURE;
+    }
+
+    if (pid == -1) {
+        // Configure on Host
+        status = setupConfigure(confgFilterMem, configFilterSize, eUid, eGid);
+    } else {
+        // Configure on Container
+        pid_t nsContainerPid = 0;
+        if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
+            (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
+            status = nsConfigure(pid, confgFilterMem, configFilterSize);
+        }
+    }
+
+    if (confgFilterMem) {
+        munmap(confgFilterMem, configFilterSize);
+    }
+
+    return status;
+}
+
+int
+cmdUnconfigure(pid_t pid)
+{
+    int status = EXIT_FAILURE;
+
+    if (pid == -1) {
+        // Configure on Host
+        status = setupUnconfigure();
+    } else {
+        // Configure on Container
+        pid_t nsContainerPid = 0;
+        if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
+            (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
+            status = nsUnconfigure(pid);
+        }
+    }
+
+    return status;
+}
+
+// Handle run, attach, detach commands.
+// TODO: Split this up?
+int
+cmdRun(bool ldattach, bool lddetach, pid_t pid)
+{
     char path[PATH_MAX] = {0};
-    pid_t pid = -1;
-    char attachType = 'u';
     uid_t eUid = geteuid();
     gid_t eGid = getegid();
     uid_t nsUid = eUid;
     uid_t nsGid = eGid;
-    bool unconfigure = FALSE;
-    bool unservice = FALSE;
-
-    // process command line
-    for (;;) {
-        int index = 0;
-        //
-        // The `+` here enables POSIX mode where the first non-option found
-        // stops option processing so `scope foo -a 123` will not process the
-        // `-a 123` here and instead pass it through.
-        //
-        // The initial `:` lets us handle options with optional values like
-        // `-h` and `-h SECTION`.
-        //
-        int opt = getopt_long(argc, argv, "+:a:d:n:l:f:p:c:s:rz", opts, &index);
-        if (opt == -1) {
-            break;
-        }
-        switch (opt) {
-            case 'a':
-                attachArg = optarg;
-                attachType = 'a';
-                break;
-            case 'd':
-                attachArg = optarg;
-                attachType = 'd';
-                break;
-            case 'n':
-                nsPidArg = optarg;
-                break;
-            case 'c':
-                configFilterPath = optarg;
-                break;
-            case 'w':
-                unconfigure = TRUE;
-                break;
-            case 's':
-                serviceName = optarg;
-                break;
-            case 'v':
-                unservice = TRUE;
-                break;
-            case 'f':
-                // accept -f as alias for -l for BC
-            case 'l':
-                if (libdirSetLibraryBase(optarg))
-                {
-                    return EXIT_FAILURE;
-                }
-                break;
-            case 'p':
-                return (loaderOpPatchLibrary(optarg) == PATCH_SUCCESS) ? EXIT_SUCCESS : EXIT_FAILURE;
-                break;
-            case 'r':
-                return nsHostStart();
-                break;
-            case 'x':
-                return nsHostStop();
-                break;
-            case 'z':
-                // Passthrough
-                break;
-            case ':':
-                // options missing their value end up here
-                switch (optopt) {
-                    default: 
-                        fprintf(stderr, "error: missing required value for -%c option\n", optopt);
-                        return EXIT_FAILURE;
-                }
-                break;
-            case '?':
-            default:
-                fprintf(stderr, "error: invalid option: -%c\n", optopt);
-                return EXIT_FAILURE;
-        }
-    }
-
-    // either --attach, --detach, --configure, --unconfigure, --service, --unservice or a command are required
-    if (!attachArg && !configFilterPath && !unconfigure && !serviceName && !unservice && optind >= argc) {
-        fprintf(stderr, "error: missing --attach, --detach, --configure, --unconfigure, --service, --unservice option or EXECUTABLE argument\n");
-        return EXIT_FAILURE;
-    }
-
-    if (attachArg && (serviceName || unservice)) {
-        fprintf(stderr, "error: --attach/--detach and --service/--unservice cannot be used together\n");
-        return EXIT_FAILURE;
-    }
-
-    if (attachArg && (configFilterPath || unconfigure)) {
-        fprintf(stderr, "error: --attach/--detach and --configure/--unconfigure cannot be used together\n");
-        return EXIT_FAILURE;
-    }
-
-    if ((configFilterPath || unconfigure) && (serviceName || unservice)) {
-        fprintf(stderr, "error: --configure/--unconfigure and --service/--unservice cannot be used together\n");
-        return EXIT_FAILURE;
-    }
-
-    if (nsPidArg && ((configFilterPath == NULL && !unconfigure) && (serviceName == NULL && !unservice))) {
-        fprintf(stderr, "error: --namespace option required --configure/--unconfigure or --service/--unservice option\n");
-        return EXIT_FAILURE;
-    }
-
-    // use --attach, --detach, --configure, --unconfigure, --service, --unservice ignore executable and args
-    if (optind < argc) {
-        if (attachArg) {
-            fprintf(stderr, "warning: ignoring EXECUTABLE argument with --attach, --detach option\n");
-        } else if (configFilterPath || unconfigure) {
-            fprintf(stderr, "warning: ignoring EXECUTABLE argument with --configure/--unconfigure option\n");
-        } else if (serviceName) {
-            fprintf(stderr, "warning: ignoring EXECUTABLE argument with --service/--unservice option\n");
-        }
-    }
-
-    if (serviceName) {
-        // must be root
-        if (eUid) {
-            printf("error: --service requires root\n");
-            return EXIT_FAILURE;
-        }
-
-        if (nsPidArg) {
-            pid = atoi(nsPidArg);
-            if (pid < 1) {
-                fprintf(stderr, "error: invalid --namespace PID: %s\n", nsPidArg);
-                return EXIT_FAILURE;
-            }
-        }
-        if (pid == -1) {
-            // Service on Host
-            return setupService(serviceName, eUid, eGid);
-        } else {
-            // Service on Container
-            pid_t nsContainerPid = 0;
-            if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
-                (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
-                return nsService(pid, serviceName);
-            }
-        }
-        return EXIT_FAILURE;
-    }
-
-    if (unservice) {
-        // must be root
-        if (eUid) {
-            printf("error: --unservice requires root\n");
-            return EXIT_FAILURE;
-        }
-
-        if (nsPidArg) {
-            pid = atoi(nsPidArg);
-            if (pid < 1) {
-                fprintf(stderr, "error: invalid --namespace PID: %s\n", nsPidArg);
-                return EXIT_FAILURE;
-            }
-        }
-        if (pid == -1) {
-            // Service on Host
-            return setupUnservice();
-        } else {
-            // Service on Container
-            pid_t nsContainerPid = 0;
-            if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
-                (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
-                return nsUnservice(pid);
-            }
-        }
-        return EXIT_FAILURE;
-    }
-
-    if (configFilterPath) {
-        int status = EXIT_FAILURE;
-        // must be root
-        if (eUid) {
-            printf("error: --configure requires root\n");
-            return EXIT_FAILURE;
-        }
-
-        if (nsPidArg) {
-            pid = atoi(nsPidArg);
-            if (pid < 1) {
-                fprintf(stderr, "error: invalid --namespace PID: %s\n", nsPidArg);
-                return EXIT_FAILURE;
-            }
-        }
-
-        size_t configFilterSize = 0;
-        void *confgFilterMem = setupLoadFileIntoMem(&configFilterSize, configFilterPath);
-        if (confgFilterMem == NULL) {
-            fprintf(stderr, "error: Load filter file into memory %s\n", configFilterPath);
-            return EXIT_FAILURE;
-        }
-
-        if (pid == -1) {
-            // Configure on Host
-            status = setupConfigure(confgFilterMem, configFilterSize, eUid, eGid);
-        } else {
-            // Configure on Container
-            pid_t nsContainerPid = 0;
-            if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
-                (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
-                status = nsConfigure(pid, confgFilterMem, configFilterSize);
-            }
-        }
-        if (confgFilterMem) {
-            munmap(confgFilterMem, configFilterSize);
-        }
-
-        return status;
-    }
-
-    if (unconfigure) {
-        int status = EXIT_FAILURE;
-        // must be root
-        if (eUid) {
-            printf("error: --unconfigure requires root\n");
-            return EXIT_FAILURE;
-        }
-
-        if (nsPidArg) {
-            pid = atoi(nsPidArg);
-            if (pid < 1) {
-                fprintf(stderr, "error: invalid --namespace PID: %s\n", nsPidArg);
-                return EXIT_FAILURE;
-            }
-        }
-        if (pid == -1) {
-            // Configure on Host
-            status = setupUnconfigure();
-        } else {
-            // Configure on Container
-            pid_t nsContainerPid = 0;
-            if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
-                (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
-                status = nsUnconfigure(pid);
-            }
-        }
-        return status;
-    }
 
     // Extract the library
     if (pid != -1) {

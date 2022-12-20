@@ -73,6 +73,8 @@ __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **
 	char *arg_patch;
 
 	int index;
+	pid_t pid = -1;
+
     for (;;) {
 		index = 0;
         int opt = getopt_long(argc, argv, "+:uh:a:d:n:l:f:p:c:s:rz", opts, &index);
@@ -128,7 +130,7 @@ __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **
 			switch (optopt) {
 			default:
 				fprintf(stderr, "error: missing required value for -%c option\n", optopt);
-				return EXIT_FAILURE;
+				exit(EXIT_FAILURE);
 			}
 			break;
 		default:
@@ -139,56 +141,69 @@ __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **
 	// Handle potential argument conflicts
 	if (opt_ldattach && opt_lddetach) {
         fprintf(stderr, "error: --ldattach and --lddetach cannot be used together\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
 	}
 	if (opt_service && opt_unservice) {
         fprintf(stderr, "error: --service and --unservice cannot be used together\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
 	}
 	if (opt_configure && opt_unconfigure) {
         fprintf(stderr, "error: --configure/--unconfigure cannot be used together\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
 	}
     if ((opt_ldattach || opt_lddetach) && (opt_service || opt_unservice)) {
         fprintf(stderr, "error: --ldattach/--lddetach and --service/--unservice cannot be used together\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     if ((opt_ldattach || opt_lddetach) && (opt_configure || opt_unconfigure)) {
         fprintf(stderr, "error: --ldattach/--lddetach and --configure/--unconfigure cannot be used together\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     if ((opt_configure || unconfigure) && (opt_service || opt_unservice)) {
         fprintf(stderr, "error: --configure/--unconfigure and --service/--unservice cannot be used together\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
     if (opt_namespace && (!opt_configure && !opt_unconfigure && !opt_service && !opt_unservice)) {
         fprintf(stderr, "error: --namespace option requires --configure/--unconfigure or --service/--unservice option\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 	if (opt_passthrough) && (opt_ldattach || opt_lddetach || opt_namespace ||
 		opt_service || opt_unservice || opt_configure || opt_unconfigure) {
         fprintf(stderr, "error: --passthrough cannot be used with --ldattach/--lddetach or --namespace or --service/--unservice or --configure/--unconfigure\n");
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
+	}
+
+	// Handle potential permissions issues
+	if (eUid && (opt_configure || opt_unconfigure || opt_service || opt_unservice)) {
+        fprintf(stderr, "error: command requires root\n");
+        exit(EXIT_FAILURE);
 	}
 
 	// Process options for use with commands
 	if (opt_libbasedir) {
 		if (libdirSetLibraryBase(arg_libbasedir)) {
+			exit(EXIT_FAILURE);
+		}
+	}
+	if (opt_namespace) {
+		pid = atoi(arg_namespace);
+		if (pid < 1) {
+			fprintf(stderr, "error: invalid --namespace PID: %s\n", nsPidArg);
 			return EXIT_FAILURE;
 		}
 	}
 
 	// Execute commands
-	if (opt_ldattach) cmdRun(opt_ldattach, FALSE); // Will exit
-	if (opt_lddetach) cmdRun(FALSE, opt_lddetach); // Will exit
-	if (opt_configure) exit(cmdConfigure());
-	if (opt_unconfigure) exit(cmdUnconfigure());
-	if (opt_service) exit(cmdService());
-	if (opt_unservice) exit(cmdUnservice());
-	if (opt_patch) exit(loaderOpPatchLibrary(optarg) == PATCH_SUCCESS);
-	if (opt_starthost) return nsHostStart();
-	if (opt_stophost) return nsHostStop();
-	if (opt_passthrough) cmdRun(FALSE, FALSE); // Will exit
+	if (opt_ldattach) exit(cmdRun(opt_ldattach, FALSE, pid));
+	if (opt_lddetach) exit(cmdRun(FALSE, opt_lddetach, pid));
+	if (opt_configure) exit(cmdConfigure(arg_configure, pid));
+	if (opt_unconfigure) exit(cmdUnconfigure(pid));
+	if (opt_service) exit(cmdService(arg_service), pid);
+	if (opt_unservice) exit(cmdUnservice(pid));
+	if (opt_patch) exit(loaderOpPatchLibrary(arg_patch) == PATCH_SUCCESS);
+	if (opt_starthost) exit(nsHostStart());
+	if (opt_stophost) exit(nsHostStop());
+	if (opt_passthrough) exit(cmdRun(FALSE, FALSE, pid));
 
 	// No constructor command executed.
 	// Continue to regular CLI usage.

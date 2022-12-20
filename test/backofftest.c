@@ -76,6 +76,50 @@ backoffAlgoAllowsConnectIsInRange(void **state)
         assert_in_range(ms, lower_bound_ms, upper_bound_ms);
     }
 
+    backoffDestroy(&backoff);
+}
+
+static void
+backoffResetNullDoesntCrash(void **state)
+{
+    backoffReset(NULL);
+}
+
+static void
+backoffResetReinitializesState(void **state)
+{
+    backoff_t *backoff = backoffCreate();
+
+    // iterate through half of the expanding windows.
+    int i;
+    for (i=0; i<num_values/2; i++) {
+        unsigned lower_bound_ms = values[i] * 1000;
+        unsigned upper_bound_ms = lower_bound_ms + 1000;
+
+        int ms = 0;
+        while (!backoffAlgoAllowsConnect(backoff)) ms++;
+
+        //printf("ms = %d, lower_bound_ms = %d, upper_bound_ms = %d\n",
+        //       ms, lower_bound_ms, upper_bound_ms);
+        assert_in_range(ms, lower_bound_ms, upper_bound_ms);
+    }
+
+    // Call reset
+    backoffReset(backoff);
+
+    // repeat the above starting at values[0] again.
+    // This shows backoffReset() had the desired effect.
+    for (i=0; i<num_values; i++) {
+        unsigned lower_bound_ms = values[i] * 1000;
+        unsigned upper_bound_ms = lower_bound_ms + 1000;
+
+        int ms = 0;
+        while (!backoffAlgoAllowsConnect(backoff)) ms++;
+
+        //printf("ms = %d, lower_bound_ms = %d, upper_bound_ms = %d\n",
+        //       ms, lower_bound_ms, upper_bound_ms);
+        assert_in_range(ms, lower_bound_ms, upper_bound_ms);
+    }
 
     backoffDestroy(&backoff);
 }
@@ -92,6 +136,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(backoffAlgoAllowsConnectHandlesNullWithoutCrashing),
         cmocka_unit_test(backoffAlgoAllowsConnectFirstTime),
         cmocka_unit_test(backoffAlgoAllowsConnectIsInRange),
+        cmocka_unit_test(backoffResetNullDoesntCrash),
+        cmocka_unit_test(backoffResetReinitializesState),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

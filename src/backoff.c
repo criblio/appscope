@@ -26,15 +26,22 @@ backoffCreate(void)
         return NULL;
     }
 
-    backoff->backoff_seconds = 1;
-    backoff->backoff_ms = 1;
-    backoff->ms_count = 0;
+    backoffReset(backoff);
 
     scope_srand(scope_getpid());
 
     return backoff;
 }
 
+void
+backoffReset(backoff_t *backoff)
+{
+    if (!backoff) return;
+
+    backoff->backoff_seconds = 1;
+    backoff->backoff_ms = 1;
+    backoff->ms_count = 0;
+}
 
 void
 backoffDestroy(backoff_t **backoff)

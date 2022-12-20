@@ -787,6 +787,7 @@ checkPendingSocketStatus(transport_t *trans)
     scopeLogInfo("fd:%d connect to %s:%s was successful", trans->net.sock, trans->net.host, trans->net.port);
     trans->connect_attempts = 0;
     trans->net.failure_reason = NO_FAIL;
+    backoffReset(trans->backoff);
 
     return 1;
 }
@@ -939,6 +940,7 @@ socketConnectionStart(transport_t *trans)
             scopeLogInfo("fd:%d connect to %s:%d was successful", trans->net.sock, addrstr, port);
             trans->connect_attempts = 0;
             trans->net.failure_reason = NO_FAIL;
+            backoffReset(trans->backoff);
         } else {
             DBG(NULL); // with non-blocking tcp sockets, we always expect -1
         }
@@ -950,13 +952,15 @@ socketConnectionStart(transport_t *trans)
 static int
 transportConnectFile(transport_t *t)
 {
+    t->connect_attempts++;
+
     // if stdout/stderr, set stream and skip everything else in the function.
     if (t->file.stdout) {
         t->file.stream = scope_stdout;
-        return 1;
+        goto out;
     } else if (t->file.stderr) {
         t->file.stream = scope_stderr;
-        return 1;
+        goto out;
     }
 
     int fd;
@@ -1003,7 +1007,18 @@ transportConnectFile(transport_t *t)
         DBG(NULL);
     }
 
-    return (t->file.stream != NULL);
+out:
+    // successful attempt!
+    {
+        char *path = t->file.path;
+        if (t->file.stdout) path = "stdout";
+        if (t->file.stderr) path = "stderr";
+        scopeLogInfo("fd:%d (%s) connect successful", scope_fileno(t->file.stream), path);
+    }
+    t->connect_attempts = 0;
+    backoffReset(t->backoff);
+
+    return 1;
 }
 
 #define EDGE_PATH_DOCKER "/var/run/appscope/appscope.sock"
@@ -1119,6 +1134,7 @@ transportConnect(transport_t *trans)
             // We have a connection
             scopeLogInfo("fd:%d (%s) connect successful", trans->local.sock, trans->local.path);
             trans->connect_attempts = 0;
+            backoffReset(trans->backoff);
             break;
 
         default:

@@ -51,6 +51,10 @@ static struct option opts[] = {
     { 0, 0, 0, 0 }
 };
 
+// This is the constructor for the Go application.
+// Code here executes before the Go Runtime starts.
+// We execute loader-specific commands here, because we can perform namespace switches while meeting
+// the OS requirement of being in a single-threaded process to do so.
 __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **env) {
 	bool opt_ldattach = FALSE;
 	bool opt_lddetach = FALSE;

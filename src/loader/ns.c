@@ -312,13 +312,13 @@ isLibScopeLoaded(pid_t pid)
  * Returns status of operation
  */
 int
-nsForkAndExec(pid_t parentPid, pid_t nsPid, char attachType)
+nsForkAndExec(pid_t parentPid, pid_t nsPid, bool ldattach)
 {
     char *opStatus = "Detach";
     char *childOp = "-d";
     bool libLoaded = isLibScopeLoaded(parentPid);
 
-    if (attachType == 'a') {
+    if (ldattach) {
         childOp = "-a";
         opStatus = (libLoaded == FALSE) ? "Attach" : "Reattach";
     } else if (libLoaded == FALSE) {

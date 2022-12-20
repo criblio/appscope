@@ -10,7 +10,7 @@
 #include <linux/limits.h>
 #include <sys/stat.h>
 #include <stdbool.h>
-#include "scopetypes.h"
+#include "../scopetypes.h"
 
 // File types
 typedef enum {

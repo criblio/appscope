@@ -290,21 +290,24 @@ attachCmd(pid_t pid, bool attach)
 }
 
 int
-cmdService(char *serviceName, pid_t pid)
+cmdService(char *serviceName, pid_t nspid)
 {
+    uid_t eUid = geteuid();
+    gid_t eGid = getegid();
+
     if (!serviceName) {
         return EXIT_FAILURE;
     }
 
-    if (pid == -1) {
+    if (nspid == -1) {
         // Service on Host
         return setupService(serviceName, eUid, eGid);
     } else {
         // Service on Container
         pid_t nsContainerPid = 0;
-        if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
-            (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
-            return nsService(pid, serviceName);
+        if ((nsInfoGetPidNs(nspid, &nsContainerPid) == TRUE) ||
+            (nsInfoIsPidInSameMntNs(nspid) == FALSE)) {
+            return nsService(nspid, serviceName);
         }
     }
 
@@ -312,17 +315,17 @@ cmdService(char *serviceName, pid_t pid)
 }
 
 int
-cmdUnservice(pid_t pid)
+cmdUnservice(pid_t nspid)
 {
-    if (pid == -1) {
+    if (nspid == -1) {
         // Service on Host
         return setupUnservice();
     } else {
         // Service on Container
         pid_t nsContainerPid = 0;
-        if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
-            (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
-            return nsUnservice(pid);
+        if ((nsInfoGetPidNs(nspid, &nsContainerPid) == TRUE) ||
+            (nsInfoIsPidInSameMntNs(nspid) == FALSE)) {
+            return nsUnservice(nspid);
         }
     }
 
@@ -330,8 +333,10 @@ cmdUnservice(pid_t pid)
 }
 
 int
-cmdConfigure(char *configFilterPath, pid_t pid)
+cmdConfigure(char *configFilterPath, pid_t nspid)
 {
+    uid_t eUid = geteuid();
+    gid_t eGid = getegid();
     int status = EXIT_FAILURE;
 
     if (!configFilterPath) {
@@ -345,15 +350,15 @@ cmdConfigure(char *configFilterPath, pid_t pid)
         return EXIT_FAILURE;
     }
 
-    if (pid == -1) {
+    if (nspid == -1) {
         // Configure on Host
         status = setupConfigure(confgFilterMem, configFilterSize, eUid, eGid);
     } else {
         // Configure on Container
         pid_t nsContainerPid = 0;
-        if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
-            (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
-            status = nsConfigure(pid, confgFilterMem, configFilterSize);
+        if ((nsInfoGetPidNs(nspid, &nsContainerPid) == TRUE) ||
+            (nsInfoIsPidInSameMntNs(nspid) == FALSE)) {
+            status = nsConfigure(nspid, confgFilterMem, configFilterSize);
         }
     }
 
@@ -365,19 +370,19 @@ cmdConfigure(char *configFilterPath, pid_t pid)
 }
 
 int
-cmdUnconfigure(pid_t pid)
+cmdUnconfigure(pid_t nspid)
 {
     int status = EXIT_FAILURE;
 
-    if (pid == -1) {
+    if (nspid == -1) {
         // Configure on Host
         status = setupUnconfigure();
     } else {
         // Configure on Container
         pid_t nsContainerPid = 0;
-        if ((nsInfoGetPidNs(pid, &nsContainerPid) == TRUE) ||
-            (nsInfoIsPidInSameMntNs(pid) == FALSE)) {
-            status = nsUnconfigure(pid);
+        if ((nsInfoGetPidNs(nspid, &nsContainerPid) == TRUE) ||
+            (nsInfoIsPidInSameMntNs(nspid) == FALSE)) {
+            status = nsUnconfigure(nspid);
         }
     }
 
@@ -385,10 +390,11 @@ cmdUnconfigure(pid_t pid)
 }
 
 // Handle run, attach, detach commands.
-// TODO: Split this up?
+// TODO: Split this up? Remove the argc/argv/env?
 int
-cmdRun(bool ldattach, bool lddetach, pid_t pid)
+cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **argv, char **env)
 {
+    char *scopeLibPath;
     char path[PATH_MAX] = {0};
     uid_t eUid = geteuid();
     gid_t eGid = getegid();
@@ -396,9 +402,9 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid)
     uid_t nsGid = eGid;
 
     // Extract the library
-    if (pid != -1) {
-        nsUid = nsInfoTranslateUid(pid);
-        nsGid = nsInfoTranslateGid(pid);
+    if (nspid != -1) {
+        nsUid = nsInfoTranslateUid(nspid);
+        nsGid = nsInfoTranslateGid(nspid);
     }
 
     if (libdirExtract(LIBRARY_FILE, nsUid, nsGid)) {
@@ -432,14 +438,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid)
      * Attach using ptrace or a dynamic command, depending on lib presence
      * Return at end of the operation
      */
-    if (attachArg) {
-        // target process must exist
-        pid = atoi(attachArg);
-        if (pid < 1) {
-            printf("error: invalid --attach, --detach PID: %s\n", attachArg);
-            return EXIT_FAILURE;
-        }
-
+    if (ldattach || lddetach) {
         pid_t nsAttachPid = 0;
 
         snprintf(path, sizeof(path), "/proc/%d", pid);
@@ -466,7 +465,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid)
                 printf("error: --attach requires root\n");
                 return EXIT_FAILURE;
             }
-            return nsForkAndExec(pid, nsAttachPid, attachType);
+            return nsForkAndExec(pid, nsAttachPid, ldattach);
         /*
         * Process can exists in same PID namespace but in different mnt namespace
         * we do a simillar sequecne like above but without switching PID namespace
@@ -478,11 +477,10 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid)
                 printf("error: --attach requires root\n");
                 return EXIT_FAILURE;
             }
-            return nsForkAndExec(pid, pid, attachType);
+            return nsForkAndExec(pid, pid, ldattach);
         }
 
-        // This is an attach command
-        if (attachType == 'a') {
+        if (ldattach) {
             int ret;
             uint64_t rc;
             char path[PATH_MAX];
@@ -508,12 +506,6 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid)
             // done
             close(fd);
 
-            pid = atoi(attachArg);
-            if (pid < 1) {
-                fprintf(stderr, "error: invalid PID for --attach, --detach\n");
-                return EXIT_FAILURE;
-            }
-
             rc = findLibrary("libscope.so", pid, FALSE);
             if (rc == -1) {
                 fprintf(stderr, "error: can't get path to executable for pid %d\n", pid);
@@ -530,7 +522,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid)
             snprintf(path, sizeof(path), "/attach_%d.env", pid);
             shm_unlink(path);
             return ret;
-        } else if (attachType == 'd') {
+        } else if (lddetach) {
             // pid & libscope need to exist before moving forward
             if (rc == -1) {
                 fprintf(stderr, "error: pid %d does not exist\n", pid);

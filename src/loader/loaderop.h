@@ -1,7 +1,7 @@
 #ifndef __LOADEROP_H__
 #define __LOADEROP_H__
 
-#include "scopetypes.h"
+#include "../scopetypes.h"
 
 typedef enum {
     PATCH_FAILED,   // patch operation was failed

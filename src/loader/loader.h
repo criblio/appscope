@@ -8,6 +8,6 @@ int cmdService(char *, pid_t);
 int cmdUnservice(pid_t);
 int cmdConfigure(char *, pid_t);
 int cmdUnconfigure(pid_t);
-int cmdRun(bool, bool, pid_t);
+int cmdRun(bool, bool, pid_t, pid_t, int, char **, char **);
 
 #endif // __LOADER_H__

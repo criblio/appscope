@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <sys/un.h>
 
+#include "backoff.h"
 #include "dbg.h"
 #include "scopetypes.h"
 #include "os.h"
@@ -62,6 +63,7 @@ struct _transport_t
                            const struct addrinfo *,
                            struct addrinfo **);
     uint64_t connect_attempts;
+    backoff_t *backoff;
 
     union {
         struct {
@@ -122,6 +124,8 @@ newTransport()
 
     t->getaddrinfo = scope_getaddrinfo;
     t->origGetaddrinfo = t->getaddrinfo;  // store a copy
+
+    t->backoff = backoffCreate();
     return t;
 }
 
@@ -1041,6 +1045,20 @@ transportConnect(transport_t *trans)
     // We're already connected.  Do nothing.
     if (!transportNeedsConnection(trans)) return 1;
 
+    if (!backoffAlgoAllowsConnect(trans->backoff)) {
+        // only network types can be in a "connect pending" state
+        // which needs to be checked for completion on an ongoing basis
+        switch (trans->type) {
+            case CFG_UDP:
+            case CFG_TCP:
+                if (socketConnectIsPending(trans)) {
+                    return checkPendingSocketStatus(trans);
+                }
+            default:
+                return 0;
+        }
+    }
+
     switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
@@ -1318,6 +1336,9 @@ transportDestroy(transport_t **transport)
         default:
             DBG("%d", trans->type);
     }
+
+    backoffDestroy(&trans->backoff);
+
     scope_free(trans);
     *transport = NULL;
 }

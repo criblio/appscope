@@ -70,6 +70,7 @@ run_test test/${OS}/strsettest
 run_test test/${OS}/cfgutilstest
 run_test test/${OS}/cfgtest
 run_test test/${OS}/transporttest
+run_test test/${OS}/backofftest
 run_test test/${OS}/logtest
 run_test test/${OS}/utilstest
 run_test test/${OS}/mtctest

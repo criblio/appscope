@@ -88,7 +88,7 @@ __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **
 	uid_t eUid = geteuid();
 
     for (;;) {
-	    index = 0;
+        index = 0;
         int opt = getopt_long(argc, argv, "+:uh:a:d:n:l:f:p:c:s:rz", opts, &index);
         if (opt == -1) {
             break;

@@ -75,13 +75,13 @@ func (sL *ScopeLoader) UnserviceContainer(cpid int) (string, error) {
 
 // - Attach to a process on the host or in containers
 func (sL *ScopeLoader) Attach(args []string, env []string) error {
-	args = append([]string{"--attach"}, args...)
+	args = append([]string{"--ldattach"}, args...)
 	return sL.Run(args, env)
 }
 
 // - Attach to a process on the host or in containers
 func (sL *ScopeLoader) AttachSubProc(args []string, env []string) (string, error) {
-	args = append([]string{"--attach"}, args...)
+	args = append([]string{"--ldattach"}, args...)
 	return sL.RunSubProc(args, env)
 }
 
@@ -117,12 +117,12 @@ func (sL *ScopeLoader) Patch(libraryPath string) (string, error) {
 
 // Detach transforms the calling process into a scope detach operation
 func (sL *ScopeLoader) Detach(args []string, env []string) error {
-	args = append([]string{"--detach"}, args...)
+	args = append([]string{"--lddetach"}, args...)
 	return sL.Run(args, env)
 }
 
 // DetachSubProc runs a scope detach as a seperate process
 func (sL *ScopeLoader) DetachSubProc(args []string, env []string) (string, error) {
-	args = append([]string{"--detach"}, args...)
+	args = append([]string{"--lddetach"}, args...)
 	return sL.RunSubProc(args, env)
 }

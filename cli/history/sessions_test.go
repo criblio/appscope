@@ -1,23 +1,7 @@
 package history
 
-import (
-	"errors"
-	"fmt"
-	"io/ioutil"
-	"os"
-	"os/exec"
-	"regexp"
-	"strconv"
-	"strings"
-	"testing"
-	"time"
-
-	"github.com/criblio/scope/internal"
-	"github.com/criblio/scope/run"
-	"github.com/criblio/scope/util"
-	"github.com/stretchr/testify/assert"
-)
-
+/*
+ * TODO: Make these tests integ tests
 func TestMain(m *testing.M) {
 	// Borrowed from http://cs-guy.com/blog/2015/01/test-main/
 	switch os.Getenv("TEST_MAIN") {
@@ -227,3 +211,4 @@ func TestSessionArgs(t *testing.T) {
 	assert.Len(t, r, 1)
 	assert.Equal(t, []string{"/bin/echo", "true"}, r[0].Args)
 }
+*/

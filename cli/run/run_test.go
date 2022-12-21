@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,6 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+/*
+ * TODO: Make TestRun an integ test
 func TestMain(m *testing.M) {
 	// Borrowed from http://cs-guy.com/blog/2015/01/test-main/
 	switch os.Getenv("TEST_MAIN") {
@@ -69,6 +70,7 @@ func TestRun(t *testing.T) {
 	cmdDirExists := util.CheckFileExists(filepath.Join(wd, "cmd"))
 	assert.True(t, cmdDirExists)
 }
+*/
 
 func TestSubprocess(t *testing.T) {
 	os.RemoveAll(".test")

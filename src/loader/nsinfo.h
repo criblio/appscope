@@ -1,7 +1,7 @@
 #ifndef __NSINFO_H__
 #define __NSINFO_H__
 
-#include "scopetypes.h"
+#include "../scopetypes.h"
 
 // Retrieve namespace information
 

@@ -542,7 +542,7 @@ setHostMntNs(const char *hostFsPrefix) {
 /*
  * Joins the host mount namespace to perform a Start or Stop action.
  * Required conditions:
- * - filter must exist (if action is Start)
+ * - scope_filter must exist (if action is Start)
  * - scope must exist
  * TODO: unify it with joinChildNamespace
  * Returns TRUE if operation was success, FALSE otherwise.
@@ -677,16 +677,16 @@ joinHostNamespace(ns_action_t action) {
          * Create a "filter file" on the host
          */
         memset(path, 0, PATH_MAX);
-        snprintf(path, PATH_MAX, "%s/usr/lib/appscope/filter", hostPrefixPath);
+        snprintf(path, PATH_MAX, "%s/usr/lib/appscope/scope_filter", hostPrefixPath);
         if ((status == extractMemToFile(scopeFilterCfgMem, cfgSize, path, 0664, TRUE, eUid, eGid)) == FALSE) {
             memset(path, 0, PATH_MAX);
-            snprintf(path, PATH_MAX, "%s/tmp/appscope/filter", hostPrefixPath);
+            snprintf(path, PATH_MAX, "%s/tmp/appscope/scope_filter", hostPrefixPath);
             if ((status == extractMemToFile(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664, TRUE, eUid, eGid)) == FALSE) {
                 goto cleanupMem;
             }
-            strcpy(hostFilterPath, "/tmp/appscope/filter");
+            strcpy(hostFilterPath, "/tmp/appscope/scope_filter");
         } else {
-            strcpy(hostFilterPath, "/usr/lib/appscope/filter");
+            strcpy(hostFilterPath, "/usr/lib/appscope/scope_filter");
         }
 
         /*

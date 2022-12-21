@@ -60,7 +60,7 @@ func (rc *Config) Run(args []string) {
 
 	ld := loader.New()
 	if !rc.Subprocess {
-		ld.Run(args, env)
+		ld.Passthrough(args, env)
 	}
-	ld.RunSubProc(args, env)
+	ld.PassthroughSubProc(args, env)
 }

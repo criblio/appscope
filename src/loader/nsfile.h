@@ -1,8 +1,8 @@
 #ifndef __NSFILE_H__
 #define __NSFILE_H__
 
-#include "scopestdlib.h"
-#include "scopetypes.h"
+#include "../scopestdlib.h"
+#include "../scopetypes.h"
 
 
 /*

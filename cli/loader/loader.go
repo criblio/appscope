@@ -97,20 +97,6 @@ func (sL *ScopeLoader) StopHost() (string, error) {
 	return sL.RunSubProc([]string{"--stophost"}, os.Environ())
 }
 
-func (sL *ScopeLoader) Run(args []string, env []string) error {
-	args = append([]string{"--passthrough"}, args...)
-	args = append([]string{"scope"}, args...)
-	return syscall.Exec(sL.Path, args, env)
-}
-
-func (sL *ScopeLoader) RunSubProc(args []string, env []string) (string, error) {
-	args = append([]string{"--passthrough"}, args...)
-	cmd := exec.Command(sL.Path, args...)
-	cmd.Env = env
-	stdoutStderr, err := cmd.CombinedOutput()
-	return string(stdoutStderr[:]), err
-}
-
 func (sL *ScopeLoader) Patch(libraryPath string) (string, error) {
 	return sL.RunSubProc([]string{"--patch", libraryPath}, os.Environ())
 }
@@ -125,4 +111,28 @@ func (sL *ScopeLoader) Detach(args []string, env []string) error {
 func (sL *ScopeLoader) DetachSubProc(args []string, env []string) (string, error) {
 	args = append([]string{"--lddetach"}, args...)
 	return sL.RunSubProc(args, env)
+}
+
+// Passthrough scopes a process
+func (sL *ScopeLoader) Passthrough(args []string, env []string) error {
+	args = append([]string{"--passthrough"}, args...)
+	return sL.Run(args, env)
+}
+
+// PassthroughSubProc scopes a process as a seperate process
+func (sL *ScopeLoader) PassthroughSubProc(args []string, env []string) (string, error) {
+	args = append([]string{"--passthrough"}, args...)
+	return sL.RunSubProc(args, env)
+}
+
+func (sL *ScopeLoader) Run(args []string, env []string) error {
+	args = append([]string{"scope"}, args...)
+	return syscall.Exec(sL.Path, args, env)
+}
+
+func (sL *ScopeLoader) RunSubProc(args []string, env []string) (string, error) {
+	cmd := exec.Command(sL.Path, args...)
+	cmd.Env = env
+	stdoutStderr, err := cmd.CombinedOutput()
+	return string(stdoutStderr[:]), err
 }

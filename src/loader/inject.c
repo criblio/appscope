@@ -17,7 +17,7 @@
 #include <stddef.h>
 #include <inttypes.h>
 
-#include "scopestdlib.h"
+#include "../scopestdlib.h"
 #include "dbg.h"
 #include "inject.h"
 #include "os.h"

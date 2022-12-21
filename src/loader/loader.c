@@ -14,9 +14,10 @@
 #include <dirent.h>
 #include <getopt.h>
 #include <sys/utsname.h>
+#include <dlfcn.h>
 
-#include "scopestdlib.h"
-#include "scopetypes.h"
+#include "../scopestdlib.h"
+#include "../scopetypes.h"
 #include "libdir.h"
 #include "loaderop.h"
 #include "nsinfo.h"

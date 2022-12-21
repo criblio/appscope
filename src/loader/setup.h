@@ -1,7 +1,7 @@
 #ifndef __SETUP_H__
 #define __SETUP_H__
 
-#include "scopetypes.h"
+#include "../scopetypes.h"
 
 bool isCfgFileConfigured(const char *);
 int removeScopeCfgFile(const char *);

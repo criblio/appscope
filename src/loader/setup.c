@@ -17,7 +17,7 @@
 #define OPENRC_DIR "/etc/rc.conf"
 #define SYSTEMD_DIR "/etc/systemd"
 #define INITD_DIR "/etc/init.d"
-#define PROFILE_SCRIPT "#! /bin/bash\nlib_found=0\nfilter_found=0\nif test -f /usr/lib/appscope/%s/libscope.so; then\n    lib_found=1\nfi\nif test -f /usr/lib/appscope/filter; then\n    filter_found=1\nelif test -f /tmp/appscope/filter; then\n    filter_found=1\nfi\nif [ $lib_found == 1 ] && [ $filter_found == 1 ]; then\n    export LD_PRELOAD=\"%s $LD_PRELOAD\"\nfi\n"
+#define PROFILE_SCRIPT "#! /bin/bash\nlib_found=0\nfilter_found=0\nif test -f /usr/lib/appscope/%s/libscope.so; then\n    lib_found=1\nfi\nif test -f /usr/lib/appscope/scope_filter; then\n    filter_found=1\nelif test -f /tmp/appscope/scope_filter; then\n    filter_found=1\nfi\nif [ $lib_found == 1 ] && [ $filter_found == 1 ]; then\n    export LD_PRELOAD=\"%s $LD_PRELOAD\"\nfi\n"
 
 typedef enum {
     SERVICE_CFG_ERROR,
@@ -740,7 +740,7 @@ closeFd:
 /*
  * Configure the environment
  * - setup /etc/profile.d/scope.sh
- * - extract memory to filter file /usr/lib/appscope/filter or /tmp/appscope/filter
+ * - extract memory to filter file /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter
  * - extract libscope.so to /usr/lib/appscope/<version>/libscope.so or /tmp/appscope/<version>/libscope.so if it doesn't exists
  * - patch the library
  * Returns status of operation 0 in case of success, other value otherwise
@@ -813,7 +813,7 @@ setupConfigure(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
 /*
  * Unconfigure the environment
  * - remove /etc/profile.d/scope.sh
- * - remove filter file/s from /usr/lib/appscope/filter and /tmp/appscope/filter
+ * - remove filter file/s from /usr/lib/appscope/scope_filter and /tmp/appscope/scope_filter
  * Returns status of operation 0 in case of success, other value otherwise
  * If files do not exist, no error will be reported
  */

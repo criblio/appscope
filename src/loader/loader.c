@@ -57,7 +57,7 @@ attach(pid_t pid, char *scopeLibPath)
     elf_buf_t *ebuf;
 
     if (geteuid()) {
-        printf("error: --attach requires root\n");
+        printf("error: --ldattach requires root\n");
         return EXIT_FAILURE;
     }
 
@@ -444,7 +444,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
 
         snprintf(path, sizeof(path), "/proc/%d", pid);
         if (access(path, F_OK)) {
-            printf("error: --attach, --detach PID not a current process: %d\n", pid);
+            printf("error: --ldattach, --lddetach PID not a current process: %d\n", pid);
             return EXIT_FAILURE;
         }
 
@@ -463,7 +463,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         if (nsInfoGetPidNs(pid, &nsAttachPid) == TRUE) {
             // must be root to switch namespace
             if (eUid) {
-                printf("error: --attach requires root\n");
+                printf("error: --ldattach requires root\n");
                 return EXIT_FAILURE;
             }
             return nsForkAndExec(pid, nsAttachPid, ldattach);
@@ -475,7 +475,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         } else if (nsInfoIsPidInSameMntNs(pid) == FALSE) {
             // must be root to switch namespace
             if (eUid) {
-                printf("error: --attach requires root\n");
+                printf("error: --ldattach requires root\n");
                 return EXIT_FAILURE;
             }
             return nsForkAndExec(pid, pid, ldattach);

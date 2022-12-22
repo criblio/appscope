@@ -9,6 +9,7 @@
 #include "libver.h"
 #include "test.h"
 #include "scopestdlib.h"
+#include "scopetypes.h"
 
 #define TEST_BASE_DIR "/tmp/appscope-test/"
 #define TEST_INSTALL_BASE "/tmp/appscope-test/install"
@@ -188,12 +189,6 @@ ExtractNewFileDev(void **state) {
     res = scope_stat(expected_location, &dirStat);
     assert_int_equal(res, 0);
     scope_memset(expected_location, 0, PATH_MAX);
-    
-    res = libdirExtract(LOADER_FILE, scope_geteuid(), scope_getegid());
-    assert_int_equal(res, 0);
-    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "ldscopedyn");
-    res = scope_stat(expected_location, &dirStat);
-    assert_int_equal(res, 0);
 }
 
 static void
@@ -210,12 +205,6 @@ ExtractNewFileDevAlternative(void **state) {
     res = scope_stat(expected_location, &dirStat);
     assert_int_not_equal(res, 0);
     scope_memset(expected_location, 0, PATH_MAX);
-    
-    res = libdirExtract(LOADER_FILE, scope_geteuid(), scope_getegid());
-    assert_int_not_equal(res, 0);
-    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "ldscopedyn");
-    res = scope_stat(expected_location, &dirStat);
-    assert_int_not_equal(res, 0);
 }
 
 static void
@@ -233,12 +222,6 @@ ExtractNewFileOfficial(void **state) {
     assert_int_equal(res, 0);
     scope_remove(expected_location);
     scope_memset(expected_location, 0, PATH_MAX);
-    
-    res = libdirExtract(LOADER_FILE, scope_geteuid(), scope_getegid());
-    assert_int_equal(res, 0);
-    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, normVer, "ldscopedyn");
-    res = scope_stat(expected_location, &dirStat);
-    assert_int_equal(res, 0);
 }
 
 static void
@@ -256,12 +239,6 @@ ExtractNewFileOfficialAlternative(void **state) {
     assert_int_equal(res, 0);
     scope_remove(expected_location);
     scope_memset(expected_location, 0, PATH_MAX);
-    
-    res = libdirExtract(LOADER_FILE, scope_geteuid(), scope_getegid());
-    assert_int_equal(res, 0);
-    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "ldscopedyn");
-    res = scope_stat(expected_location, &dirStat);
-    assert_int_equal(res, 0);
 }
 
 static void
@@ -307,16 +284,6 @@ GetPathDev(void **state) {
     int res = scope_strcmp(expected_location, library_path);
     assert_int_equal(res, 0);
     scope_remove(expected_location);
-    // Create dummy file
-    scope_memset(expected_location, 0, PATH_MAX);
-    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "ldscopedyn");
-    fp = scope_fopen(expected_location, "w");
-    assert_non_null(fp);
-    scope_fclose(fp);
-
-    const char *loader_path = libdirGetPath(LOADER_FILE);
-    res = scope_strcmp(expected_location, loader_path);
-    assert_int_equal(res, 0);
 }
 
 static void
@@ -339,24 +306,11 @@ GetPathOfficial(void **state) {
     int res = scope_strcmp(expected_location, library_path);
     assert_int_equal(res, 0);
     scope_remove(expected_location);
-    // Create dummy file
-    scope_memset(expected_location, 0, PATH_MAX);
-    scope_snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, normVer, "ldscopedyn");
-    fp = scope_fopen(expected_location, "w");
-    assert_non_null(fp);
-    scope_fclose(fp);
-
-    const char *loader_path = libdirGetPath(LOADER_FILE);
-    res = scope_strcmp(expected_location, loader_path);
-    assert_int_equal(res, 0);
 }
 
 static void
 GetPathNoFile(void **state) {
     libdirInitTest(TEST_INSTALL_BASE, TEST_TMP_BASE, "v1.1.0");
-
-    const char *loader_path = libdirGetPath(LOADER_FILE);
-    assert_int_equal(loader_path, NULL);
 
     const char *library_path = libdirGetPath(LIBRARY_FILE);
     assert_int_equal(library_path, NULL);

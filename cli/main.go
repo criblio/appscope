@@ -207,14 +207,14 @@ __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **
 	if (opt_ldattach) {
 		pid = atoi(arg_ldattach);
 		if (pid < 1) {
-			fprintf(stderr, "error: invalid --attach PID: %s\n", arg_ldattach);
+			fprintf(stderr, "error: invalid --ldattach PID: %s\n", arg_ldattach);
 			exit(EXIT_FAILURE);
 		}
 	}
 	if (opt_lddetach) {
 		pid = atoi(arg_lddetach);
 		if (pid < 1) {
-			fprintf(stderr, "error: invalid --attach/--detach PID: %s\n", arg_lddetach);
+			fprintf(stderr, "error: invalid --ldattach/--lddetach PID: %s\n", arg_lddetach);
 			exit(EXIT_FAILURE);
 		}
 	}

@@ -20,7 +20,7 @@ UNWIND_AR=contrib/build/libunwind/src/.libs/libunwind.a
 TEST_AR=$(MUSL_AR) ${UNWIND_AR} $(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR} $(LS_HPACK_AR)
 #TEST_LIB=contrib/build/cmocka/src/libcmocka.dylib
 TEST_LIB=contrib/build/cmocka/src/libcmocka.so
-TEST_INCLUDES=-I./src -I./contrib/cmocka/include -I contrib/ls-hpack
+TEST_INCLUDES=-I./src -I./src/loader -I./contrib/cmocka/include -I contrib/ls-hpack
 TEST_LD_FLAGS=-Lcontrib/build/cmocka/src -lcmocka -ldl -lresolv -lrt -lpthread
 
 ARCH=$(shell uname -m)
@@ -72,9 +72,10 @@ SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))
 SRC_C_FILES:=$(filter-out src/sysexec.c, $(SRC_C_FILES))
 SRC_C_FILES:=$(filter-out src/wrap_go.c, $(SRC_C_FILES))
 SRC_C_FILES:=$(filter-out src/scope_static.c, $(SRC_C_FILES))
+LOADER_C_FILES:=$(wildcard src/loader/*.c)
 TEST_C_FILES:=$(wildcard test/*.c)
 TEST_C_FILES:=$(filter-out test/wraptest.c, $(TEST_C_FILES))
-C_FILES:=$(SRC_C_FILES) $(TEST_C_FILES) os/$(OS)/os.c
+C_FILES:=$(SRC_C_FILES) $(LOADER_C_FILES) $(TEST_C_FILES) os/$(OS)/os.c
 O_FILES:=$(C_FILES:.c=.o)
 CACHE_FILES:=$(shell find . -name CMakeCache.txt)
 

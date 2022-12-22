@@ -2364,7 +2364,7 @@ doClose(int fd, const char *func)
     // report everything before the info is lost
     reportFD(fd, EVENT_BASED);
 
-    if (ninfo) scope_memset(ninfo, 0, sizeof(struct net_info_t));
+    if (ninfo) ninfo->active = FALSE;
     if (fsinfo) scope_memset(fsinfo, 0, sizeof(struct fs_info_t));
 
     if (guard_enabled) while (!atomicCasU64(&g_http_guard[fd], 1ULL, 0ULL));

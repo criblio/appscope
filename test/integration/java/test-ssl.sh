@@ -239,7 +239,7 @@ endtest
 
 # TODO: Java9 fails see issue #630
 # remove if condition below after fixing the issue
-if [[ -z "${SKIP_LDSCOPE_TEST}" ]]; then
+if [[ -z "${SKIP_SCOPE_TEST}" ]]; then
 starttest java_http_ldscope
 
 cd /opt/java_http

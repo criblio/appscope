@@ -49,7 +49,7 @@ endtest(){
 starttest sshd_scope
 
 cd /opt/test-runner
-ldscope -- /usr/sbin/sshd -o "SetEnv PATH=$PATH SCOPE_CRIBL_ENABLE=$SCOPE_CRIBL_ENABLE SCOPE_EVENT_DEST=$SCOPE_EVENT_DEST SCOPE_LOG_DEST=$SCOPE_LOG_DEST"
+scope -z -- /usr/sbin/sshd -o "SetEnv PATH=$PATH SCOPE_CRIBL_ENABLE=$SCOPE_CRIBL_ENABLE SCOPE_EVENT_DEST=$SCOPE_EVENT_DEST SCOPE_LOG_DEST=$SCOPE_LOG_DEST"
 ERR+=$?
 
 sleep 2

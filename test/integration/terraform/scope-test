@@ -56,7 +56,7 @@ starttest terraform
 cd /opt/terraform
 
 for i in $(seq $LOOP_LIMIT); do
-   ldscope -- /bin/terraform init
+   scope -z -- /bin/terraform init
    if [ $? -ne 0 ]; then
         ERR+=1
    fi
@@ -65,7 +65,7 @@ for i in $(seq $LOOP_LIMIT); do
         ERR+=1
    fi
 
-   ldscope -- /bin/terraform apply -auto-approve
+   scope -z -- /bin/terraform apply -auto-approve
    if [ $? -ne 0 ]; then
         ERR+=1
    fi
@@ -75,7 +75,7 @@ for i in $(seq $LOOP_LIMIT); do
         ERR+=1
    fi
 
-   ldscope -- /bin/terraform destroy -auto-approve
+   scope -z -- /bin/terraform destroy -auto-approve
    if [ $? -ne 0 ]; then
         ERR+=1
    fi

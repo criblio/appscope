@@ -91,7 +91,7 @@ endtest
 
 starttest detachNotScopedProcessLibLoaded
 
-SCOPE_FILTER=$DUMMY_FILTER_FILE ldscope top -b -d 1 > /dev/null &
+SCOPE_FILTER=$DUMMY_FILTER_FILE scope -z top -b -d 1 > /dev/null &
 sleep 1
 TOP_PID=`pidof top`
 
@@ -139,7 +139,7 @@ endtest
 
 starttest attachNotScopedProcessFirstAttach
 
-SCOPE_FILTER=$DUMMY_FILTER_FILE ldscope top -b -d 1 > /dev/null &
+SCOPE_FILTER=$DUMMY_FILTER_FILE scope -z top -b -d 1 > /dev/null &
 sleep 1
 TOP_PID=`pidof top`
 

@@ -56,7 +56,7 @@ starttest aws-nuke
 
 cd /opt/awsnuke
 for i in $(seq $LOOP_LIMIT); do
-    ldscope -- /usr/local/bin/aws-nuke -v -c /opt/awsnuke/example.yaml
+    scope -z -- /usr/local/bin/aws-nuke -v -c /opt/awsnuke/example.yaml
     if [ $? -ne $EXPECTED_AWS_NUKE_EXIT_CODE ]; then
         ERR+=1
     fi

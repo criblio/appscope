@@ -128,7 +128,7 @@ cd /opt/test-runner
 
 starttest all_metrics_and_events_enabled
 
-ldscope -- curl https://cribl.io -o /dev/null
+scope -z -- curl https://cribl.io -o /dev/null
 ERR+=$?
 
 allow_list_data curl_fs_metrics $METRIC_FILE
@@ -144,7 +144,7 @@ endtest
 
 starttest all_metrics_and_events_enabled_http_disabled
 
-SCOPE_EVENT_HTTP=false ldscope -- curl https://cribl.io -o /dev/null
+SCOPE_EVENT_HTTP=false scope -z -- curl https://cribl.io -o /dev/null
 ERR+=$?
 
 allow_list_data curl_fs_metrics $METRIC_FILE
@@ -160,7 +160,7 @@ endtest
 
 starttest fs_disable_event_disable
 
-SCOPE_EVENT_ENABLE=false SCOPE_METRIC_FS=false ldscope -- curl https://cribl.io -o /dev/null
+SCOPE_EVENT_ENABLE=false SCOPE_METRIC_FS=false scope -z -- curl https://cribl.io -o /dev/null
 ERR+=$?
 
 deny_list_data curl_fs_metrics $METRIC_FILE
@@ -176,7 +176,7 @@ endtest
 
 starttest network_disable_event_disable
 
-SCOPE_EVENT_ENABLE=false SCOPE_METRIC_NET=false ldscope -- curl https://cribl.io -o /dev/null
+SCOPE_EVENT_ENABLE=false SCOPE_METRIC_NET=false scope -z -- curl https://cribl.io -o /dev/null
 ERR+=$?
 
 allow_list_data curl_fs_metrics $METRIC_FILE
@@ -192,7 +192,7 @@ endtest
 
 starttest http_disable_event_disable
 
-SCOPE_EVENT_ENABLE=false SCOPE_METRIC_HTTP=false ldscope -- curl https://cribl.io -o /dev/null
+SCOPE_EVENT_ENABLE=false SCOPE_METRIC_HTTP=false scope -z -- curl https://cribl.io -o /dev/null
 ERR+=$?
 
 allow_list_data curl_fs_metrics $METRIC_FILE
@@ -208,7 +208,7 @@ endtest
 
 starttest proc_disable_event_disable
 
-SCOPE_EVENT_ENABLE=false SCOPE_METRIC_PROC=false ldscope -- curl https://cribl.io -o /dev/null
+SCOPE_EVENT_ENABLE=false SCOPE_METRIC_PROC=false scope -z -- curl https://cribl.io -o /dev/null
 ERR+=$?
 
 allow_list_data curl_fs_metrics $METRIC_FILE
@@ -224,7 +224,7 @@ endtest
 
 starttest disable_all_metrics_with_variants
 
-SCOPE_EVENT_ENABLE=false SCOPE_METRIC_FS=false SCOPE_METRIC_NET=false SCOPE_METRIC_HTTP=false SCOPE_METRIC_PROC=false SCOPE_METRIC_DNS=false ldscope -- curl https://cribl.io -o /dev/null
+SCOPE_EVENT_ENABLE=false SCOPE_METRIC_FS=false SCOPE_METRIC_NET=false SCOPE_METRIC_HTTP=false SCOPE_METRIC_PROC=false SCOPE_METRIC_DNS=false scope -z -- curl https://cribl.io -o /dev/null
 ERR+=$?
 
 # check if metric file is empty

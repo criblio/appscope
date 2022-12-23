@@ -100,7 +100,7 @@ evalInternalEvents(){
 }
 
 starttest Tomcat
-ldscope /opt/tomcat/bin/catalina.sh run &
+scope -z /opt/tomcat/bin/catalina.sh run &
 evaltest
 
 CURL_MAX_RETRY=10
@@ -137,7 +137,7 @@ endtest
 
 starttest SSLSocketClient
 cd /opt/javassl
-ldscope java -Djavax.net.ssl.trustStore=/opt/tomcat/certs/tomcat.p12 -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=pkcs12 SSLSocketClient > /dev/null
+scope -z java -Djavax.net.ssl.trustStore=/opt/tomcat/certs/tomcat.p12 -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=pkcs12 SSLSocketClient > /dev/null
 evaltest
 grep http.req $EVT_FILE > /dev/null
 ERR+=$?
@@ -243,7 +243,7 @@ if [[ -z "${SKIP_SCOPE_TEST}" ]]; then
 starttest java_http_scope
 
 cd /opt/java_http
-ldscope java SimpleHttpServer 2> /dev/null &
+scope -z java SimpleHttpServer 2> /dev/null &
 HTTP_SERVER_PID=$!
 evaltest
 sleep 1

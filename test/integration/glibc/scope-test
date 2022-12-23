@@ -114,7 +114,7 @@ endtest
 #
 starttest timestamp_verify
 
-SCOPE_LOG_LEVEL=debug ldscope ls >/dev/null
+SCOPE_LOG_LEVEL=debug scope -z ls >/dev/null
 
 timestamp=$(grep 'Constructor' $SCOPE_LOG_FILE | grep -Po "(?<=\[).*?(?=\])")
 if [[ $timestamp =~ [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{3}(Z|\+[0-9]{4})$ ]]; then
@@ -132,7 +132,7 @@ endtest
 starttest errno_verify
 cd /opt/errno_test/
 
-ldscope ./errno_test
+scope -z ./errno_test
 
 if [ $? -ne 0 ]; then
     ERR+=1
@@ -148,7 +148,7 @@ starttest fault_test_read_only_mem
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 0
+SCOPE_ERROR_SIGNAL_HANDLER=true scope -z -- ./fault_test 0
 
 grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
 ERR+=$?
@@ -174,7 +174,7 @@ starttest fault_test_not_mapped_mem
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 1
+SCOPE_ERROR_SIGNAL_HANDLER=true scope -z -- ./fault_test 1
 
 grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
 ERR+=$?
@@ -200,7 +200,7 @@ starttest fault_test_bus_error
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 2
+SCOPE_ERROR_SIGNAL_HANDLER=true scope -z -- ./fault_test 2
 
 grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
 ERR+=$?

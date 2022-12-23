@@ -89,7 +89,7 @@ evalPayload(){
 starttest syscalls_unlinkat
 cd /go/syscalls
 
-ldscope ./unlinkat
+scope -z ./unlinkat
 
 evaltest
 
@@ -104,7 +104,7 @@ endtest
 starttest opfalse
 cd /go/syscalls
 
-ldscope ./opfalse
+scope -z ./opfalse
 
 evaltest
 
@@ -126,7 +126,7 @@ endtest
 starttest syscalls_readdir
 cd /go/syscalls
 
-ldscope ./readdir
+scope -z ./readdir
 
 evaltest
 
@@ -144,7 +144,7 @@ starttest plainServerDynamic
 cd /go/net
 PORT=80
 
-ldscope ./plainServerDynamic ${PORT} &
+scope -z ./plainServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -195,7 +195,7 @@ starttest plainServerDynamicPie
 cd /go/net
 PORT=80
 
-ldscope ./plainServerDynamicPie ${PORT} &
+scope -z ./plainServerDynamicPie ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -245,7 +245,7 @@ endtest
 starttest plainServerStatic
 cd /go/net
 PORT=81
-ldscope ./plainServerStatic ${PORT} &
+scope -z ./plainServerStatic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -295,7 +295,7 @@ endtest
 starttest tlsServerDynamic
 cd /go/net
 PORT=4430
-ldscope ./tlsServerDynamic ${PORT} &
+scope -z ./tlsServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -346,7 +346,7 @@ starttest tlsServerStatic
 cd /go/net
 PORT=4431
 STRUCT_PATH=/go/net/go_offsets.txt
-SCOPE_GO_STRUCT_PATH=$STRUCT_PATH ldscope ./tlsServerStatic ${PORT} &
+SCOPE_GO_STRUCT_PATH=$STRUCT_PATH scope -z ./tlsServerStatic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -394,7 +394,7 @@ endtest
 #
 starttest plainClientDynamic
 cd /go/net
-ldscope ./plainClientDynamic
+scope -z ./plainClientDynamic
 ERR+=$?
 
 # this sleep gives plainClientDynamic a chance to report its events on exit
@@ -435,7 +435,7 @@ endtest
 #
 starttest plainClientStatic
 cd /go/net
-ldscope ./plainClientStatic
+scope -z ./plainClientStatic
 ERR+=$?
 
 # this sleep gives plainClientStatic a chance to report its events on exit
@@ -476,7 +476,7 @@ endtest
 #
 starttest plainClientStaticStripped
 cd /go/net
-ldscope ./plainClientStaticStripped
+scope -z ./plainClientStaticStripped
 ERR+=$?
 
 # this sleep gives plainClientStaticStripped a chance to report its events on exit
@@ -523,7 +523,7 @@ endtest
 #
 starttest tlsClientDynamic
 cd /go/net
-ldscope ./tlsClientDynamic
+scope -z ./tlsClientDynamic
 ERR+=$?
 
 # this sleep gives tlsClientDynamic a chance to report its events on exit
@@ -564,7 +564,7 @@ endtest
 #
 starttest tlsClientStatic
 cd /go/net
-SCOPE_GO_STRUCT_PATH=$STRUCT_PATH ldscope ./tlsClientStatic
+SCOPE_GO_STRUCT_PATH=$STRUCT_PATH scope -z ./tlsClientStatic
 ERR+=$?
 
 # this sleep gives tlsClientStatic a chance to report its events on exit
@@ -605,7 +605,7 @@ endtest
 #
 starttest tlsClientDynamicHTTP1
 cd /go/net
-GODEBUG=http2client=0,http2server=0 ldscope ./tlsClientDynamic
+GODEBUG=http2client=0,http2server=0 scope -z ./tlsClientDynamic
 ERR+=$?
 
 # this sleep gives tlsClientDynamic a chance to report its events on exit
@@ -647,7 +647,7 @@ endtest
 starttest tlsServerDynamicHTTP1
 cd /go/net
 PORT=4430
-GODEBUG=http2client=0,http2server=0 ldscope ./tlsServerDynamic ${PORT} &
+GODEBUG=http2client=0,http2server=0 scope -z ./tlsServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -726,7 +726,7 @@ endtest
 #
 starttest fileThread
 cd /go/thread
-ldscope ./fileThread
+scope -z ./fileThread
 ERR+=$?
 evaltest
 
@@ -744,7 +744,7 @@ endtest
 #
 starttest signalHandlerDynamic
 cd /go/signals
-ldscope ./signalHandlerDynamic 2>${ERR_FILE}&
+scope -z ./signalHandlerDynamic 2>${ERR_FILE}&
 SCOPE_PID=$!
 ERR+=$?
 
@@ -774,7 +774,7 @@ endtest
 #
 starttest signalHandlerStatic
 cd /go/signals
-ldscope ./signalHandlerStatic 2>${ERR_FILE}&
+scope -z ./signalHandlerStatic 2>${ERR_FILE}&
 SCOPE_PID=$!
 ERR+=$?
 
@@ -804,7 +804,7 @@ endtest
 #
 starttest signalHandlerStaticStripped
 cd /go/signals
-ldscope ./signalHandlerStatic 2>${ERR_FILE}&
+scope -z ./signalHandlerStatic 2>${ERR_FILE}&
 SCOPE_PID=$!
 ERR+=$?
 
@@ -834,7 +834,7 @@ endtest
 #
 starttest cgoDynamic
 cd /go/cgo
-LD_LIBRARY_PATH=. ldscope ./cgoDynamic
+LD_LIBRARY_PATH=. scope -z ./cgoDynamic
 ERR+=$?
 evaltest
 
@@ -852,7 +852,7 @@ endtest
 #
 starttest cgoStatic
 cd /go/cgo
-ldscope ./cgoStatic
+scope -z ./cgoStatic
 ERR+=$?
 evaltest
 
@@ -874,9 +874,9 @@ influx_start_server() {
     rm -f /go/influx/db/*.event
 
     if (( $influx_verbose )); then
-        SCOPE_EVENT_DEST=file:///go/influx/db/influxd.event ldscope $1 &
+        SCOPE_EVENT_DEST=file:///go/influx/db/influxd.event scope -z $1 &
     else
-        SCOPE_EVENT_DEST=file:///go/influx/db/influxd.event ldscope $1 2>/dev/null &
+        SCOPE_EVENT_DEST=file:///go/influx/db/influxd.event scope -z $1 2>/dev/null &
     fi
 
     until test -e "$dbfile" ; do
@@ -947,7 +947,7 @@ starttest influx_static_stress
 
 influx_start_server "/go/influx/influxd_stat --config /go/influx/influxdb.conf"
 
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/stress_test insert -n 1000000 -f
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/stress_test insert -n 1000000 -f
 
 influx_eval 50 scope
 
@@ -963,14 +963,14 @@ starttest influx_static_tls
 influx_start_server "/go/influx/influxd_stat --config /go/influx/influxdb_ssl.conf"
 
 SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event /go/influx/influx_stat -ssl -unsafeSsl -host localhost -execute 'CREATE DATABASE goats'
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_stat -ssl -unsafeSsl -host localhost -execute 'SHOW DATABASES'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_stat -ssl -unsafeSsl -host localhost -execute 'SHOW DATABASES'
 
 if (test $influx_verbose -eq 0); then
     sleep 1
 fi
 
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_stat -ssl -unsafeSsl -host localhost -import -path=/go/influx/data.txt -precision=s
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_stat -ssl -unsafeSsl -host localhost -execute 'SHOW DATABASES'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_stat -ssl -unsafeSsl -host localhost -import -path=/go/influx/data.txt -precision=s
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_stat -ssl -unsafeSsl -host localhost -execute 'SHOW DATABASES'
 
 influx_eval 2 scope
 
@@ -983,8 +983,8 @@ starttest influx_dynamic_tls
 
 influx_start_server "/go/influx/influxd_dyn --config /go/influx/influxdb_ssl.conf"
 
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_dyn -ssl -unsafeSsl -host localhost -execute 'CREATE DATABASE goats'
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_dyn -ssl -unsafeSsl -host localhost -execute 'SHOW DATABASES'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_dyn -ssl -unsafeSsl -host localhost -execute 'CREATE DATABASE goats'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_dyn -ssl -unsafeSsl -host localhost -execute 'SHOW DATABASES'
 
 influx_eval 2 influxd
 
@@ -996,8 +996,8 @@ starttest influx_static_clear
 
 influx_start_server "/go/influx/influxd_stat --config /go/influx/influxdb.conf"
 
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_stat -host localhost -execute 'CREATE DATABASE sheep'
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_stat -host localhost -execute 'SHOW DATABASES'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_stat -host localhost -execute 'CREATE DATABASE sheep'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_stat -host localhost -execute 'SHOW DATABASES'
 
 influx_eval 2 scope
 
@@ -1010,16 +1010,16 @@ starttest influx_dynamic_clear
 
 influx_start_server "/go/influx/influxd_dyn --config /go/influx/influxdb.conf"
 
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_dyn -host localhost -execute 'CREATE DATABASE sheep'
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_dyn -host localhost -execute 'SHOW DATABASES'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_dyn -host localhost -execute 'CREATE DATABASE sheep'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_dyn -host localhost -execute 'SHOW DATABASES'
 
 if (test $influx_verbose -eq 0); then
     sleep 1
 fi
 
 
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_dyn -import -path=/go/influx/data.txt -precision=s
-SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_dyn -host localhost -execute 'SHOW DATABASES'
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_dyn -import -path=/go/influx/data.txt -precision=s
+SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/influx_dyn -host localhost -execute 'SHOW DATABASES'
 
 influx_eval 2 influxd
 

@@ -173,7 +173,7 @@ java SimpleHttpServer 2> /dev/null &
 HTTP_SERVER_PID=$!
 sleep 1
 evaltest
-ldscope --attach ${HTTP_SERVER_PID}
+scope --ldattach ${HTTP_SERVER_PID}
 curl http://localhost:8000/status
 sleep 5
 
@@ -212,7 +212,7 @@ HTTP_SERVER_PID=$!
 sleep 1
 evaltest
 curl http://localhost:8000/status
-ldscope --attach ${HTTP_SERVER_PID}
+scope --ldattach ${HTTP_SERVER_PID}
 curl http://localhost:8000/status
 sleep 5
 
@@ -240,7 +240,7 @@ endtest
 # TODO: Java9 fails see issue #630
 # remove if condition below after fixing the issue
 if [[ -z "${SKIP_SCOPE_TEST}" ]]; then
-starttest java_http_ldscope
+starttest java_http_scope
 
 cd /opt/java_http
 ldscope java SimpleHttpServer 2> /dev/null &

@@ -68,12 +68,11 @@ fi
 endtest
 
 #
-# ldscope patch
+# scope patch
 #
 starttest patch_on_glibc
 
 cp /usr/local/scope/lib/libscope.so /opt/patch_libscope
-cp /usr/local/scope/bin/ldscope /opt/patch_libscope
 
 md5_before_patch=$(md5sum /opt/patch_libscope/libscope.so)
 
@@ -82,7 +81,7 @@ if [ $count -ne 1 ] ; then
     ERR+=1
 fi
 
-/opt/patch_libscope/ldscope --patch /opt/patch_libscope/libscope.so
+/opt/patch_libscope/scope --patch /opt/patch_libscope/libscope.so
 if [ $? -eq 0 ]; then
     ERR+=1
 fi
@@ -103,7 +102,7 @@ endtest
 starttest patch_on_glibc_dummy_file
 
 echo "Lorem ipsum" >> /opt/patch_libscope/dummy_file
-/opt/patch_libscope/ldscope --patch /opt/patch_libscope/dummy_file
+/opt/patch_libscope/scope --patch /opt/patch_libscope/dummy_file
 if [ $? -eq 0 ]; then
     ERR+=1
 fi

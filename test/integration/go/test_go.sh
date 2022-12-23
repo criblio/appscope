@@ -949,7 +949,7 @@ influx_start_server "/go/influx/influxd_stat --config /go/influx/influxdb.conf"
 
 SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/stress_test insert -n 1000000 -f
 
-influx_eval 50 ldscope
+influx_eval 50 scope
 
 unset SCOPE_HTTP_SERIALIZE_ENABLE
 export SCOPE_PAYLOAD_ENABLE=true
@@ -972,7 +972,7 @@ fi
 SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_stat -ssl -unsafeSsl -host localhost -import -path=/go/influx/data.txt -precision=s
 SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_stat -ssl -unsafeSsl -host localhost -execute 'SHOW DATABASES'
 
-influx_eval 2 ldscope
+influx_eval 2 scope
 
 
 #
@@ -999,7 +999,7 @@ influx_start_server "/go/influx/influxd_stat --config /go/influx/influxdb.conf"
 SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_stat -host localhost -execute 'CREATE DATABASE sheep'
 SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event ldscope /go/influx/influx_stat -host localhost -execute 'SHOW DATABASES'
 
-influx_eval 2 ldscope
+influx_eval 2 scope
 
 
 #

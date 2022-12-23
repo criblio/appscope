@@ -71,7 +71,7 @@ starttest detachNotScopedProcess
 top -b -d 1 > /dev/null &
 sleep 1
 TOP_PID=`pidof top`
-ldscope --detach $TOP_PID 2> $TEMP_OUTPUT_FILE
+scope --lddetach $TOP_PID 2> $TEMP_OUTPUT_FILE
 if [ $? -eq 0 ]; then
     ERR+=1
 fi
@@ -107,7 +107,7 @@ if [ $? -ne 0 ]; then
     ERR+=1
 fi
 
-ldscope --detach $TOP_PID > $TEMP_OUTPUT_FILE
+scope --lddetach $TOP_PID > $TEMP_OUTPUT_FILE
 if [ $? -ne 0 ]; then
     ERR+=1
 fi
@@ -150,7 +150,7 @@ if [ $THREAD_NO -ne 1 ]; then
 fi
 
 # first attach
-ldscope --attach $TOP_PID > $TEMP_OUTPUT_FILE
+scope --ldattach $TOP_PID > $TEMP_OUTPUT_FILE
 if [ $? -ne 0 ]; then
     ERR+=1
 fi
@@ -167,7 +167,7 @@ if [ $THREAD_NO -ne 2 ]; then
 fi
 
 # Reattach
-ldscope --attach $TOP_PID > $TEMP_OUTPUT_FILE
+scope --ldattach $TOP_PID > $TEMP_OUTPUT_FILE
 grep "Reattaching to pid $TOP_PID" $TEMP_OUTPUT_FILE > /dev/null
 if [ $? -ne 0 ]; then
     ERR+=1
@@ -192,7 +192,7 @@ starttest Top
 top -b -d 1 > /dev/null &
 sleep 1
 TOP_PID=`pidof top`
-ldscope --attach $TOP_PID
+scope --ldattach $TOP_PID
 sleep 1
 evaltest
 
@@ -209,7 +209,7 @@ if [ $START_MSG_NO -ne 1 ]; then
 fi
 
 # detach
-ldscope --detach $TOP_PID
+scope --lddetach $TOP_PID
 if [ $? -ne 0 ]; then
     ERR+=1
 fi
@@ -224,7 +224,7 @@ if [ $START_MSG_NO -ne 2 ]; then
 fi
 
 # reattach
-ldscope --attach $TOP_PID
+scope --ldattach $TOP_PID
 if [ $? -ne 0 ]; then
     echo "Attach wrong status"
     ERR+=1
@@ -257,7 +257,7 @@ python3 -m http.server 2> /dev/null &
 sleep 1
 PYTHON_PID=`pidof python3`
 
-ldscope --attach $PYTHON_PID
+scope --ldattach $PYTHON_PID
 curl http://localhost:8000
 sleep 1
 evaltest
@@ -271,7 +271,7 @@ ERR+=$?
 grep -q http.resp $EVT_FILE > /dev/null
 ERR+=$?
 
-ldscope --detach $PYTHON_PID
+scope --lddetach $PYTHON_PID
 ERR+=$?
 sleep 10
 
@@ -287,7 +287,7 @@ fi
 EVENT_DEST_NEW="/opt/test-runner/logs/events_new.log"
 
 unset SCOPE_EVENT_DEST
-SCOPE_EVENT_DEST=file://$EVENT_DEST_NEW ldscope --attach $PYTHON_PID
+SCOPE_EVENT_DEST=file://$EVENT_DEST_NEW scope --ldattach $PYTHON_PID
 export SCOPE_EVENT_DEST=file://$EVT_FILE
 
 sleep 10
@@ -319,7 +319,7 @@ cd /opt/java_http
 java SimpleHttpServer 2> /dev/null &
 sleep 1
 JAVA_PID=`pidof java`
-ldscope --attach $JAVA_PID
+scope --ldattach $JAVA_PID
 curl http://localhost:8000/status
 sleep 1
 evaltest
@@ -345,7 +345,7 @@ ERR+=$?
 grep -q net.close $EVT_FILE > /dev/null
 ERR+=$?
 
-ldscope --detach $JAVA_PID
+scope --lddetach $JAVA_PID
 ERR+=$?
 sleep 10
 
@@ -362,7 +362,7 @@ sleep 10
 # EVENT_DEST_NEW="/opt/test-runner/logs/events_from_cfg.log"
 
 # unset SCOPE_EVENT_DEST
-# SCOPE_CONF_RELOAD=$CONF_NEW ldscope --attach $JAVA_PID
+# SCOPE_CONF_RELOAD=$CONF_NEW scope --ldattach $JAVA_PID
 # export SCOPE_EVENT_DEST=file://$EVT_FILE
 
 # sleep 10
@@ -398,7 +398,7 @@ cd /opt/exec_test/
 wait_for_proc_start "exec_test"
 EXEC_TEST_PID=`pidof exec_test`
 
-ldscope --attach ${EXEC_TEST_PID}
+scope --ldattach ${EXEC_TEST_PID}
 if [ $? -ne 0 ]; then
     echo "attach failed"
     ERR+=1
@@ -428,7 +428,7 @@ cd /opt/exec_test/
 wait_for_proc_start "exec_test"
 EXEC_TEST_PID=`pidof exec_test`
 
-ldscope --attach ${EXEC_TEST_PID}
+scope --ldattach ${EXEC_TEST_PID}
 if [ $? -ne 0 ]; then
     echo "attach failed"
     ERR+=1

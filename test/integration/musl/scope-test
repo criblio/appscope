@@ -68,7 +68,7 @@ fi
 endtest
 
 #
-# ldscope patch
+# scope patch
 #
 starttest patch_on_musl
 cp /usr/local/scope/lib/libscope.so /opt/patch_libscope
@@ -79,7 +79,7 @@ if [ $count -ne 1 ] ; then
     ERR+=1
 fi
 
-/opt/patch_libscope/ldscope -p /opt/patch_libscope/libscope.so
+/opt/patch_libscope/scope -p /opt/patch_libscope/libscope.so
 ERR+=$?
 
 md5_after_first_patch=$(md5sum /opt/patch_libscope/libscope.so)
@@ -89,7 +89,7 @@ if [ $count -ne 1 ] ; then
     ERR+=1
 fi
 
-/opt/patch_libscope/ldscope -p /opt/patch_libscope/libscope.so
+/opt/patch_libscope/scope -p /opt/patch_libscope/libscope.so
 if [ $? -eq 0 ]; then
     ERR+=1
 fi

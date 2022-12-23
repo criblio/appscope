@@ -14,7 +14,7 @@ Each test has a corresponding _service_ in `docker-compose.yml`. They have a
 corresponding subdirectory with their `Dockerfile` along with any additional
 content that needs to be included in the image. When run, we top-level working
 directory (i.e `../../` from here) is mounted at `/opt/appscope` so the built
-binaries (i.e. `scope`, `ldscope`, and `libscope.so`) are accessible in the
+binaries (i.e. `scope` and `libscope.so`) are accessible in the
 container. Since they're in subdirectories in the mount, they can be rebuilt
 and the container will have access to the updated versions without having to
 restart - handy when debugging.
@@ -32,7 +32,7 @@ from each one.
 * As mentioned above, the top working directory is mounted at `/opt/appscope`.
   The Dockerfiles setup softlinks in `/usr/local/scope/bin` and `.../lib` that
   point to the built binaries in `/opt/appscope`. We add the `bin/` folder to
-  the path too so `scope` and `ldscope` are accessible anywhere.
+  the path too so `scope` is accessible anywhere.
 
 * ENTRYPOINT is always `/docker-entrypoint.sh` and CMD defaults to `test`. If
   an alternate CMD is not specified when the container is run, this causes the
@@ -92,7 +92,7 @@ Some unit tests provided by [LTP Project][LTP]; others are custom C tests
 located in [syscalls/altp folder](syscalls/altp).
 
 This test is explicitly using `LD_PRELOAD` while other tests are using a mix of
-`scope` and `ldscope` and `LD_PRELOAD`. We have been removing use of
+`scope` and `LD_PRELOAD`. We have been removing use of
 `LD_PRELOAD` from some other tests to speed them up but we'll keep it here to
 make sure that startup scheme is getting wrung out.
 

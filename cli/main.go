@@ -39,6 +39,7 @@ package main
 // -x, --stophost               execute the scope stop command in a host context (must be run in the container)
 
 // Long aliases for short options
+// NOTE: Be sure to align these with the options listed in the call to getopt_long
 // NOTE: These must not conflict with the cli options specified in the cmd/ package
 static struct option opts[] = {
     { "ldattach",    required_argument, 0, 'a' },
@@ -89,7 +90,7 @@ __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **
 
     for (;;) {
         index = 0;
-        int opt = getopt_long(argc, argv, "+:uh:a:d:n:l:f:p:c:s:rz", opts, &index);
+        int opt = getopt_long(argc, argv, "+:a:d:n:l:p:c:s:rxvwz", opts, &index);
         if (opt == -1) {
             break;
         }
@@ -160,7 +161,7 @@ __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **
         exit(EXIT_FAILURE);
 	}
 	if (opt_configure && opt_unconfigure) {
-        fprintf(stderr, "error: --configure/--unconfigure cannot be used together\n");
+        fprintf(stderr, "error: --configure and --unconfigure cannot be used together\n");
         exit(EXIT_FAILURE);
 	}
     if ((opt_ldattach || opt_lddetach) && (opt_service || opt_unservice)) {
@@ -214,7 +215,7 @@ __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **
 	if (opt_lddetach) {
 		pid = atoi(arg_lddetach);
 		if (pid < 1) {
-			fprintf(stderr, "error: invalid --ldattach/--lddetach PID: %s\n", arg_lddetach);
+			fprintf(stderr, "error: invalid --lddetach PID: %s\n", arg_lddetach);
 			exit(EXIT_FAILURE);
 		}
 	}

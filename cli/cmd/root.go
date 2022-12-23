@@ -39,3 +39,8 @@ func Execute() {
 		os.Exit(1)
 	}
 }
+
+func init() {
+	// Constructor flags (for help only)
+	RootCmd.Flags().BoolP("passthrough", "z", false, "Scope an application with current environment & no config.")
+}

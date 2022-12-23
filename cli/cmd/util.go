@@ -62,7 +62,4 @@ func runCmdFlags(cmd *cobra.Command, rc *run.Config) {
 	cmd.Flags().StringVarP(&rc.LibraryPath, "librarypath", "l", "", "Set path for dynamic libraries")
 	cmd.Flags().StringVarP(&rc.UserConfig, "userconfig", "u", "", "Scope an application with a user specified config file; overrides all other settings.")
 	metricAndEventDestFlags(cmd, rc)
-
-	// Constructor flags
-	cmd.Flags().BoolP("passthrough", "z", false, "Scope an application with current environment & no config.")
 }

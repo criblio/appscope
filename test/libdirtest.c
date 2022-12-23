@@ -37,8 +37,6 @@ teardownlibdirTest(void **state) {
  * Define the extern offset for integration test compilation 
  * See details in libdir.c
  */
-unsigned char _binary_ldscopedyn_start;
-unsigned char _binary_ldscopedyn_end;
 unsigned char _binary_libscope_so_start;
 unsigned char _binary_libscope_so_end;
 

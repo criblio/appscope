@@ -1,4 +1,4 @@
-package util
+package ipc
 
 import (
 	"os"
@@ -11,7 +11,7 @@ import (
 
 func TestCompareSelfIpcNs(t *testing.T) {
 	selfPid := os.Getpid()
-	sameIPC, err := namespaceSameIpc(selfPid)
+	sameIPC, err := ipcNsIsSame(selfPid)
 	assert.NoError(t, err)
 	assert.True(t, sameIPC)
 }
@@ -26,7 +26,7 @@ func TestCompareDiffIpcNs(t *testing.T) {
 	cmd.Stderr = os.Stderr
 	err := cmd.Start()
 	assert.NoError(t, err)
-	sameIPC, err := namespaceSameIpc(cmd.Process.Pid)
+	sameIPC, err := ipcNsIsSame(cmd.Process.Pid)
 	assert.NoError(t, err)
 	assert.False(t, sameIPC)
 	err = cmd.Wait()

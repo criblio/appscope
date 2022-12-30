@@ -3,8 +3,6 @@
 ERR=0
 /opt/test/bin/test_cli.sh
 ERR+=$?
-/opt/test/bin/test_cli_ipc.sh
-ERR+=$?
 /opt/test/bin/test_cli_dest.sh
 ERR+=$?
 /opt/test/bin/test_edge.sh

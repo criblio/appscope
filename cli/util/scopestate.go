@@ -1,7 +1,7 @@
 package util
 
 import (
-	"bytes"
+	"github.com/criblio/scope/ipc"
 )
 
 // ScopeStatus represents the process status in context of libscope.so
@@ -34,15 +34,22 @@ func (state ScopeStatus) String() string {
 	return []string{"Disable", "Setup", "Active", "Latent"}[state]
 }
 
-// getScopeStatus retreive sinformation about Scope status from IPC
+// getScopeStatus retreives information about Scope status using IPC
 func getScopeStatus(pid int) ScopeStatus {
-	bresp, err := ipcGetScopeStatus(pid)
+	cmd := ipc.CmdGetScopeStatus{}
+	resp, err := cmd.Request(pid)
 	if err != nil {
-		return Setup
+		return Disable
 	}
-	if bytes.Equal(bresp, []byte("true")) {
-		return Active
-	} else if bytes.Equal(bresp, []byte("false")) {
+	err = cmd.UnmarshalResp(resp.ResponseScopeMsgData)
+	if err != nil {
+		return Disable
+	}
+
+	if cmd.Response.Status == ipc.ResponseOK {
+		if cmd.Response.Scoped {
+			return Active
+		}
 		return Latent
 	}
 	return Disable

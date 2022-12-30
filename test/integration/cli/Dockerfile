@@ -14,7 +14,6 @@ RUN apt update \
 COPY ./cli/test_cli.sh /opt/test/bin/test_cli.sh
 COPY ./cli/test_cli_dest.sh /opt/test/bin/test_cli_dest.sh
 COPY ./cli/test_edge.sh /opt/test/bin/test_edge.sh
-COPY ./cli/dummy_filter /opt/test/dummy_filter
 COPY ./cli/expected.yml /
 
 RUN mkdir /opt/test-runner && \

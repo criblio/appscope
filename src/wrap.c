@@ -56,7 +56,6 @@ static const char *g_cmddir;
 static list_t *g_nsslist;
 static uint64_t reentrancy_guard = 0ULL;
 static rlim_t g_max_fds = 0;
-static mqd_t g_app_msg_q = (mqd_t) -1;
 
 typedef int (*ssl_rdfunc_t)(SSL *, void *, int);
 typedef int (*ssl_wrfunc_t)(SSL *, const void *, int);
@@ -94,6 +93,18 @@ enum_map_t netFailMap[] = {
     {"TLS Failure: server validation failed",          TLS_VERIFY_FAIL},
     {NULL,                                             -1}
 };
+
+void
+doAndReplaceConfig(void *data) {
+    config_t * cfg = (config_t *) data;
+    doConfig(cfg);
+    if (g_staticfg) {
+        cfgDestroy(&g_staticfg);
+        g_staticfg = NULL;
+    }
+    g_staticfg = cfg;
+    g_cfg.staticfg = g_staticfg;
+}
 
 // When used with dl_iterate_phdr(), this has a similar result to
 // scope_dlsym(RTLD_NEXT, ).  But, unlike scope_dlsym(RTLD_NEXT, )
@@ -430,47 +441,69 @@ cmdAttach(void)
  */
 static void
 ipcCommunication(void) {
+    size_t appMqSize = -1;
+    long msgCount = -1;
+    char name[256] = {0};
 
     /*
-    * Handle request
+    * Handle incoming message queue
+    * - check if it exists
+    * - check if there are message request on it
     */
-    size_t appMqSize;
-    // check if application message queue exists
-    if (ipcIsActive(g_app_msg_q, &appMqSize) == FALSE) {
+    scope_snprintf(name, sizeof(name), "/ScopeIPCIn.%d", g_proc.pid);
+    mqd_t mqRequestDesc  = ipcOpenReadConnection(name);
+
+    if (ipcIsActive(mqRequestDesc, &appMqSize, &msgCount) == FALSE) {
         return;
     }
 
-    // check if there is a message on application message queue
-    long msgCount = ipcInfoMsgCount(g_app_msg_q);
     if (msgCount <= 0) {
-        return;
+        goto cleanupReqMq;
     }
 
-    // parse request from application message queue
-    ipc_cmd_t cmd = -1;
-    if (ipcRequestMsgHandler(g_app_msg_q, appMqSize, &cmd) == FALSE) {
-        return;
+    size_t cliMqSize = -1;
+    /*
+    * Handle output message queue
+    * - check if it exists
+    */
+    scope_memset(name, 0, sizeof(name));
+    scope_snprintf(name, sizeof(name), "/ScopeIPCOut.%d", g_proc.pid);
+
+    mqd_t mqResponseDesc = ipcOpenWriteConnection(name);
+    if (ipcIsActive(mqResponseDesc, &cliMqSize, &msgCount) == FALSE) {
+        scopeLogError("%s is not active.", name);
+        goto cleanupReqMq;
     }
 
     /*
-    * Handle response
+    * Handle incoming message queue request (all frames or till first error)
     */
+    req_parse_status_t parseStatus = REQ_PARSE_GENERIC_ERROR;
+    int uniqReq = -1;
+    void *scopeReq = ipcRequestHandler(mqRequestDesc, appMqSize, &parseStatus, &uniqReq);
 
-    size_t cliMqSize;
-    char name[256];
-    scope_snprintf(name, sizeof(name), "/ScopeIPCOut.%d", g_proc.pid);
-    mqd_t cliMqDes = ipcOpenWriteConnection(name);
-    // check if client message queue exists
-    if (ipcIsActive(cliMqDes, &cliMqSize) == FALSE) {
-        scopeLogError("%s is missing.", name);
-        return;
+    /*
+    * Handle outcoming message queue response (all frames or till first error)
+    */
+    ipc_resp_result_t res;
+    if (parseStatus == REQ_PARSE_OK) {
+        res = ipcSendResponseWithScopeData(mqResponseDesc, cliMqSize, scopeReq, uniqReq);
+    } else {
+        res = ipcSendResponseOnly(mqResponseDesc, cliMqSize, parseStatus, uniqReq);
     }
 
-    if (ipcResponseMsgHandler(cliMqDes, cliMqSize, cmd) == FALSE) {
-        scopeLogError("Error: with sending answet to %s for cmd %d", name, cmd);
+    if (res != RESP_RESULT_OK) {
+        scopeLogError("ipcCommunication Error sending response to %s failed %d, parseStatus %d, uniqReq %d", name, res, parseStatus, uniqReq);
     }
 
-    ipcCloseConnection(cliMqDes);
+    scope_free(scopeReq);
+    
+    // scopeLogError("OK: Sending answer to %s for cmd %d", name, cmd);
+
+    ipcCloseConnection(mqResponseDesc);
+
+cleanupReqMq:
+    ipcCloseConnection(mqRequestDesc);
 }
 
 static void
@@ -765,11 +798,6 @@ threadNow(int sig)
         return;
     }
 
-    // Create IPC connection message queue
-    char name[256];
-    scope_snprintf(name, sizeof(name), "/ScopeIPCIn.%d", g_proc.pid);
-    g_app_msg_q = ipcCreateNonBlockReadConnection(name);
-
     g_thread.once = TRUE;
 
     // Restore a handler if one exists
@@ -1057,14 +1085,6 @@ handleExit(void)
     ctlDisconnect(g_ctl, CFG_CTL);
     logFlush(g_log);
     logDisconnect(g_log);
-    size_t mqSize;
-    if (ipcIsActive(g_app_msg_q, &mqSize)) {
-        ipcCloseConnection(g_app_msg_q);
-        g_app_msg_q = (mqd_t) -1;
-        char name[256];
-        scope_snprintf(name, sizeof(name), "/ScopeIPCIn.%d", g_proc.pid);
-        ipcDestroyConnection(name);
-    }
 }
 
 static void *
@@ -3718,7 +3738,7 @@ _exit(int status)
     } else {
         exit(status);
     }
-    __builtin_unreachable();
+    UNREACHABLE();
 }
 
 #endif // __linux__

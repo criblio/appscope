@@ -28,7 +28,9 @@
 #define MSG_BUFFER_SIZE 8192
 
 static mqd_t readMqDesc;
+static mqd_t writeMqDesc;
 static char readerMqName[4096] = {0};
+static char writerMqName[4096] = {0};
 
 static bool
 getLastPidNamesSpace(int pid, int *lastNsPid, bool *nestedNs) {
@@ -106,6 +108,8 @@ switchIPCNamespace(int pid) {
 
 static void
 cleanupReadDesc(void) {
+    mq_close(writeMqDesc);
+    mq_unlink(writerMqName);
     mq_close(readMqDesc);
     mq_unlink(readerMqName);
 }
@@ -132,8 +136,8 @@ int main(int argc, char **argv) {
                                .mq_maxmsg = MAX_MESSAGES,
                                .mq_msgsize = MSG_BUFFER_SIZE,
                                .mq_curmsgs = 0};
+    mode_t oldMask;
     int res = EXIT_FAILURE;
-    char writerMqName[4096] = {0};
     bool ipcSwitch = false;
     bool nestedNs = false;
     int pid = -1;
@@ -176,16 +180,22 @@ int main(int argc, char **argv) {
             return res;
         }
         snprintf(writerMqName, sizeof(writerMqName), "/ScopeIPCIn.%d", nsPid);
+        snprintf(readerMqName, sizeof(readerMqName), "/ScopeIPCOut.%d", nsPid);
     } else {
         snprintf(writerMqName, sizeof(writerMqName), "/ScopeIPCIn.%d", pid);
+        snprintf(readerMqName, sizeof(readerMqName), "/ScopeIPCOut.%d", pid);
     }
 
-    mqd_t writeMqDesc;
-    
-    snprintf(readerMqName, sizeof(readerMqName), "/ScopeIPCOut.%d", pid);
-
     // Ugly hack disable umask to handle run as a root
-    mode_t oldMask = umask(0);
+    oldMask = umask(0);
+    writeMqDesc = mq_open(writerMqName, O_WRONLY | O_CREAT, 0666, &attr);
+    if (writeMqDesc == (mqd_t)-1) {
+        perror("!mq_open writeMqDesc failed");
+        return res;
+    }
+    umask(oldMask);
+    
+    oldMask = umask(0);
     readMqDesc = mq_open(readerMqName, O_RDONLY | O_CREAT, 0666, &attr);
     if (readMqDesc == (mqd_t)-1) {
         perror("!mq_open readMqDesc failed");

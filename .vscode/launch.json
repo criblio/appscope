@@ -10,7 +10,9 @@
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceFolder}/cli/main.go",
-            // "args": ["ps"]
+            "args": ["ps"]
+            // "args": ["info", "344972"]
+            // "args": ["attach", "8896"]
         },
         {
             "name": "(gdb) curl x86_64 w/preload",

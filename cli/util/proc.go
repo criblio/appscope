@@ -29,14 +29,10 @@ type Processes []Process
 
 var (
 	errOpenProc        = errors.New("cannot open proc directory")
-	errReadProc        = errors.New("cannot read from proc directory")
 	errGetProcStatus   = errors.New("error getting process status")
 	errGetProcCmdLine  = errors.New("error getting process command line")
 	errGetProcTask     = errors.New("error getting process task")
 	errGetProcChildren = errors.New("error getting process children")
-	errGetNsPid        = errors.New("error getting namespace PID")
-	errGetProcGidMap   = errors.New("error getting process gid map")
-	errGetProcUidMap   = errors.New("error getting process uid map")
 	errMissingUser     = errors.New("unable to find user")
 )
 
@@ -450,81 +446,4 @@ func PidThreadsPids(pid int) ([]int, error) {
 func PidExists(pid int) bool {
 	pidPath := fmt.Sprintf("/proc/%v", pid)
 	return CheckDirExists(pidPath)
-}
-
-// pidLastNsPid process the NsPid file for specified PID.
-// Returns status if the specified PID residents in nested PID namespace, last PID in namespace and status of operation.
-func pidLastNsPid(pid int) (bool, int, error) {
-	// TODO: goprocinfo does not support all the status parameters (NsPid)
-	// handle procfs by ourselves ?
-	file, err := os.Open(fmt.Sprintf("/proc/%v/status", pid))
-	if err != nil {
-		return false, -1, errGetProcStatus
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	scanner.Split(bufio.ScanLines)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "NSpid:") {
-			var nsNestedStatus bool
-			// Skip Nspid
-			strPids := strings.Fields(line)[1:]
-
-			strPidsSize := len(strPids)
-			if strPidsSize > 1 {
-				nsNestedStatus = true
-			}
-			nsLastPid, _ := strconv.Atoi(strPids[strPidsSize-1])
-
-			return nsNestedStatus, nsLastPid, nil
-		}
-	}
-	return false, -1, errGetProcStatus
-}
-
-// pidNsTranslateUid translate specified uid to the ID-outside-ns in specified pid.
-// See https://man7.org/linux/man-pages/man7/user_namespaces.7.html for details
-func pidNsTranslateUid(uid int, pid int) (int, error) {
-	file, err := os.Open(fmt.Sprintf("/proc/%v/uid_map", pid))
-	if err != nil {
-		return -1, errGetProcUidMap
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	scanner.Split(bufio.ScanLines)
-	for scanner.Scan() {
-		uidMapEntry := strings.Fields(scanner.Text())
-		uidInsideNs, _ := strconv.Atoi(uidMapEntry[0])
-		uidOutsideNs, _ := strconv.Atoi(uidMapEntry[1])
-		length, _ := strconv.Atoi(uidMapEntry[2])
-		if (uid >= uidInsideNs) && (uid < uidInsideNs+length) {
-			return uidOutsideNs + uid, nil
-		}
-	}
-	// unreachable
-	return -1, errGetProcUidMap
-}
-
-// pidNsTranslateGid translate specified gid to the ID-outside-ns in specified pid.
-// See https://man7.org/linux/man-pages/man7/user_namespaces.7.html for details
-func pidNsTranslateGid(gid int, pid int) (int, error) {
-	file, err := os.Open(fmt.Sprintf("/proc/%v/gid_map", pid))
-	if err != nil {
-		return -1, errGetProcGidMap
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	scanner.Split(bufio.ScanLines)
-	for scanner.Scan() {
-		gidMapEntry := strings.Fields(scanner.Text())
-		gidInsideNs, _ := strconv.Atoi(gidMapEntry[0])
-		gidOutsideNs, _ := strconv.Atoi(gidMapEntry[1])
-		length, _ := strconv.Atoi(gidMapEntry[2])
-		if (gid >= gidInsideNs) && (gid < gidInsideNs+length) {
-			return gidOutsideNs + gid, nil
-		}
-	}
-	// unreachable
-	return -1, errGetProcGidMap
 }

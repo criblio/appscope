@@ -7,12 +7,14 @@ import (
 
 	"github.com/criblio/scope/inspect"
 	"github.com/criblio/scope/internal"
+	"github.com/criblio/scope/ipc"
 	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
 )
 
 /* Args Matrix (X disallows)
  */
+var pidCtx *ipc.IpcPidCtx = &ipc.IpcPidCtx{}
 
 // inspectCmd represents the inspect command
 var inspectCmd = &cobra.Command{
@@ -36,7 +38,8 @@ var inspectCmd = &cobra.Command{
 		if err != nil {
 			util.ErrAndExit("Convert PID fails: %v", err)
 		}
-		cfg, err := inspect.InspectScopeCfg(pid)
+		pidCtx.Pid = pid
+		cfg, err := inspect.InspectScopeCfg(*pidCtx)
 		if err != nil {
 			util.ErrAndExit("Inspect PID fails: %v", err)
 		}
@@ -45,5 +48,6 @@ var inspectCmd = &cobra.Command{
 }
 
 func init() {
+	ipcCmdFlags(inspectCmd, pidCtx)
 	RootCmd.AddCommand(inspectCmd)
 }

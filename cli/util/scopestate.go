@@ -37,7 +37,7 @@ func (state ScopeStatus) String() string {
 // getScopeStatus retreives information about Scope status using IPC
 func getScopeStatus(pid int) ScopeStatus {
 	cmd := ipc.CmdGetScopeStatus{}
-	resp, err := cmd.Request(pid)
+	resp, err := cmd.Request(ipc.IpcPidCtx{Pid: pid})
 	if err != nil {
 		return Disable
 	}

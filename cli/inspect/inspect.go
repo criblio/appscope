@@ -7,9 +7,9 @@ import (
 )
 
 // InspectScopeCfg returns the configuration of scoped process
-func InspectScopeCfg(pid int) (string, error) {
+func InspectScopeCfg(pidCtx ipc.IpcPidCtx) (string, error) {
 	cmd := ipc.CmdGetScopeCfg{}
-	respData, err := cmd.Request(pid)
+	respData, err := cmd.Request(pidCtx)
 	if err != nil {
 		return "", err
 	}

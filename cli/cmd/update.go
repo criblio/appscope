@@ -12,6 +12,7 @@ import (
 )
 
 var cfgPath string
+var procfsPrefixPathUpdate string
 
 /* Args Matrix (X disallows)
  */
@@ -42,7 +43,9 @@ var updateCmd = &cobra.Command{
 			util.ErrAndExit("Convert PID fails: %v", err)
 		}
 
-		err = update.UpdateScopeCfg(pid, cfgPath)
+		pidCtx.Pid = pid
+
+		err = update.UpdateScopeCfg(*pidCtx, cfgPath)
 		if err != nil {
 			util.ErrAndExit("Update Scope configuration fails: %v", err)
 		}
@@ -51,6 +54,7 @@ var updateCmd = &cobra.Command{
 }
 
 func init() {
+	ipcCmdFlags(updateCmd, pidCtx)
 	updateCmd.Flags().StringVarP(&cfgPath, "config", "c", "", "Path to configuration file")
 	updateCmd.MarkFlagRequired("config")
 	RootCmd.AddCommand(updateCmd)

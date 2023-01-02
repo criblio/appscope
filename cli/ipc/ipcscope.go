@@ -132,7 +132,7 @@ type scopeGetStatusResponse struct {
 type scopeGetCfgResponse struct {
 	// Response status
 	Status respStatus `mapstructure:"status" json:"status" yaml:"status"`
-	// TODO: Scoped Cfg
+	// TODO:Scoped Cfg
 	// Cfg libscope.ScopeConfig `mapstructure:"cfg" json:"cfg" yaml:"cfg"`
 	// Enable should be boolString to use it
 	Cfg struct {
@@ -215,10 +215,10 @@ type CmdGetScopeStatus struct {
 	Response scopeGetStatusResponse
 }
 
-func (cmd *CmdGetScopeStatus) Request(pid int) (*IpcResponseCtx, error) {
+func (cmd *CmdGetScopeStatus) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
 	req, _ := json.Marshal(scopeRequestOnly{Req: reqCmdGetScopeStatus})
 
-	return ipcDispatcher(req, pid)
+	return ipcDispatcher(req, pidCtx)
 }
 
 func (cmd *CmdGetScopeStatus) UnmarshalResp(respData []byte) error {
@@ -229,10 +229,10 @@ type CmdGetScopeCfg struct {
 	Response scopeGetCfgResponse
 }
 
-func (cmd *CmdGetScopeCfg) Request(pid int) (*IpcResponseCtx, error) {
+func (cmd *CmdGetScopeCfg) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
 	req, _ := json.Marshal(scopeRequestOnly{Req: reqCmdGetScopeCfg})
 
-	return ipcDispatcher(req, pid)
+	return ipcDispatcher(req, pidCtx)
 }
 
 func (cmd *CmdGetScopeCfg) UnmarshalResp(respData []byte) error {
@@ -244,7 +244,7 @@ type CmdSetScopeCfg struct {
 	CfgData  []byte
 }
 
-func (cmd *CmdSetScopeCfg) Request(pid int) (*IpcResponseCtx, error) {
+func (cmd *CmdSetScopeCfg) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
 	scopeReq := scopeRequestSetCfg{Req: reqCmdSetScopeCfg}
 
 	err := yaml.Unmarshal(cmd.CfgData, &scopeReq.Cfg)
@@ -253,7 +253,7 @@ func (cmd *CmdSetScopeCfg) Request(pid int) (*IpcResponseCtx, error) {
 	}
 	req, _ := json.Marshal(scopeReq)
 
-	return ipcDispatcher(req, pid)
+	return ipcDispatcher(req, pidCtx)
 }
 
 func (cmd *CmdSetScopeCfg) UnmarshalResp(respData []byte) error {

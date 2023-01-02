@@ -11,7 +11,7 @@ import (
 
 func TestCompareSelfIpcNs(t *testing.T) {
 	selfPid := os.Getpid()
-	sameIPC, err := ipcNsIsSame(selfPid)
+	sameIPC, err := ipcNsIsSame(IpcPidCtx{Pid: selfPid})
 	assert.NoError(t, err)
 	assert.True(t, sameIPC)
 }
@@ -26,7 +26,7 @@ func TestCompareDiffIpcNs(t *testing.T) {
 	cmd.Stderr = os.Stderr
 	err := cmd.Start()
 	assert.NoError(t, err)
-	sameIPC, err := ipcNsIsSame(cmd.Process.Pid)
+	sameIPC, err := ipcNsIsSame(IpcPidCtx{Pid: cmd.Process.Pid})
 	assert.NoError(t, err)
 	assert.False(t, sameIPC)
 	err = cmd.Wait()

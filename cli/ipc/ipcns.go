@@ -19,13 +19,13 @@ var (
 )
 
 // ipcNsIsSame compare own IPC namespace with specified pid
-func ipcNsIsSame(pid int) (bool, error) {
+func ipcNsIsSame(pidCtx IpcPidCtx) (bool, error) {
 	selfFi, err := os.Stat("/proc/self/ns/ipc")
 	if err != nil {
 		return false, err
 	}
 
-	pidFi, err := os.Stat(fmt.Sprintf("/proc/%v/ns/ipc", pid))
+	pidFi, err := os.Stat(fmt.Sprintf("%v/proc/%v/ns/ipc", pidCtx.PrefixPath, pidCtx.Pid))
 	if err != nil {
 		return false, err
 	}
@@ -33,8 +33,8 @@ func ipcNsIsSame(pid int) (bool, error) {
 }
 
 // ipcNsSet sets current IPC namespace to the specified pid
-func ipcNsSet(pid int) error {
-	fd, err := os.Open(fmt.Sprintf("/proc/%v/ns/ipc", pid))
+func ipcNsSet(pidCtx IpcPidCtx) error {
+	fd, err := os.Open(fmt.Sprintf("%v/proc/%v/ns/ipc", pidCtx.PrefixPath, pidCtx.Pid))
 	if err != nil {
 		return err
 	}
@@ -54,10 +54,10 @@ func ipcNsRestore() error {
 
 // ipcNsLastPidFromPId process the NsPid file for specified PID.
 // Returns status if the specified PID residents in nested PID namespace, last PID in namespace and status of operation.
-func ipcNsLastPidFromPId(pid int) (bool, int, error) {
+func ipcNsLastPidFromPId(pidCtx IpcPidCtx) (bool, int, error) {
 	// TODO: goprocinfo does not support all the status parameters (NsPid)
 	// handle procfs by ourselves ?
-	file, err := os.Open(fmt.Sprintf("/proc/%v/status", pid))
+	file, err := os.Open(fmt.Sprintf("%v/proc/%v/status", pidCtx.PrefixPath, pidCtx.Pid))
 	if err != nil {
 		return false, -1, errGetProcStatus
 	}
@@ -85,8 +85,8 @@ func ipcNsLastPidFromPId(pid int) (bool, int, error) {
 
 // ipcNsTranslateUidFromPid translate specified uid to the ID-outside-ns based on specified pid.
 // See https://man7.org/linux/man-pages/man7/user_namespaces.7.html for details
-func ipcNsTranslateUidFromPid(uid int, pid int) (int, error) {
-	file, err := os.Open(fmt.Sprintf("/proc/%v/uid_map", pid))
+func ipcNsTranslateUidFromPid(uid int, pidCtx IpcPidCtx) (int, error) {
+	file, err := os.Open(fmt.Sprintf("%v/proc/%v/uid_map", pidCtx.PrefixPath, pidCtx.Pid))
 	if err != nil {
 		return -1, errGetProcUidMap
 	}
@@ -108,8 +108,8 @@ func ipcNsTranslateUidFromPid(uid int, pid int) (int, error) {
 
 // ipcNsTranslateGidFromPid translate specified gid to the ID-outside-ns based on specified pid.
 // See https://man7.org/linux/man-pages/man7/user_namespaces.7.html for details
-func ipcNsTranslateGidFromPid(gid int, pid int) (int, error) {
-	file, err := os.Open(fmt.Sprintf("/proc/%v/gid_map", pid))
+func ipcNsTranslateGidFromPid(gid int, pidCtx IpcPidCtx) (int, error) {
+	file, err := os.Open(fmt.Sprintf("%v/proc/%v/gid_map", pidCtx.PrefixPath, pidCtx.Pid))
 	if err != nil {
 		return -1, errGetProcGidMap
 	}

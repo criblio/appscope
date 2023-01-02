@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/criblio/scope/history"
+	"github.com/criblio/scope/ipc"
 	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
@@ -63,4 +64,8 @@ func runCmdFlags(cmd *cobra.Command, rc *run.Config) {
 	cmd.Flags().StringVarP(&rc.LibraryPath, "librarypath", "l", "", "Set path for dynamic libraries")
 	cmd.Flags().StringVarP(&rc.UserConfig, "userconfig", "u", "", "Run ldscope with a user specified config file; overrides all other settings.")
 	metricAndEventDestFlags(cmd, rc)
+}
+
+func ipcCmdFlags(cmd *cobra.Command, ipc *ipc.IpcPidCtx) {
+	cmd.Flags().StringVarP(&ipc.PrefixPath, "prefix", "p", "", "Prefix to proc filesystem")
 }

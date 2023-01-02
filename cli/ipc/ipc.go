@@ -29,10 +29,15 @@ var (
 
 const ipcComTimeout time.Duration = 100 * time.Millisecond
 
+type IpcPidCtx struct {
+	Pid        int
+	PrefixPath string
+}
+
 // ipcDispatcher dispatches IPC communication to the process specified by the pid.
 // Returns the bytes array
-func ipcDispatcher(scopeReq []byte, pid int) (*IpcResponseCtx, error) {
-	ipc, err := newIPC(pid)
+func ipcDispatcher(scopeReq []byte, pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
+	ipc, err := newIPC(pidCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +45,7 @@ func ipcDispatcher(scopeReq []byte, pid int) (*IpcResponseCtx, error) {
 
 	err = ipc.sendIpcRequest(scopeReq)
 	if err != nil {
-		return nil, fmt.Errorf("%v %v", errRequest, pid)
+		return nil, fmt.Errorf("%v %v", errRequest, pidCtx.Pid)
 	}
 	return ipc.receiveIpcResponse()
 
@@ -109,34 +114,34 @@ func nsnewMsgQReader(name string, nsUid int, nsGid int, restoreUid int, restoreG
 }
 
 // newIPC creates an IPC object designated for communication with specific PID
-func newIPC(pid int) (*ipcObj, error) {
+func newIPC(pidCtx IpcPidCtx) (*ipcObj, error) {
 	restoreGid := os.Getegid()
 	restoreUid := os.Geteuid()
 
-	ipcSame, err := ipcNsIsSame(pid)
+	ipcSame, err := ipcNsIsSame(pidCtx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Retrieve information about user and group id
-	nsUid, err := ipcNsTranslateUidFromPid(restoreUid, pid)
+	nsUid, err := ipcNsTranslateUidFromPid(restoreUid, pidCtx)
 	if err != nil {
 		return nil, err
 	}
-	nsGid, err := ipcNsTranslateGidFromPid(restoreGid, pid)
+	nsGid, err := ipcNsTranslateGidFromPid(restoreGid, pidCtx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Retrieve information about process namespace PID
-	_, ipcPid, err := ipcNsLastPidFromPId(pid)
+	_, ipcPid, err := ipcNsLastPidFromPId(pidCtx)
 	if err != nil {
 		return nil, err
 	}
 
 	// Switch IPC namespace if needed
 	if !ipcSame {
-		if err := ipcNsSet(pid); err != nil {
+		if err := ipcNsSet(pidCtx); err != nil {
 			return nil, err
 		}
 	}

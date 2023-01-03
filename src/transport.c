@@ -33,6 +33,7 @@
 
 typedef enum {
     NO_FAIL, // No known failures
+    DNS_FAIL,  // getaddrinfo failed to return anything useful
     CONN_FAIL, // Connection failure
     TLS_CERT_FAIL, // TLS certificate failure
     TLS_CONN_FAIL, // TLS connection failure
@@ -44,7 +45,8 @@ typedef enum {
 
 char *netFailMap[] = {
     "n/a",
-    "Socket connection failure",
+    "DNS lookup failed",
+    "Socket connection failed",
     "TLS Failure: error accessing peer certificate",
     "TLS Failure: error establishing connection",
     "TLS Failure: error creating context",
@@ -238,6 +240,7 @@ transportNeedsConnection(transport_t *trans)
     if (!trans) return FALSE;
     switch (trans->type) {
         case CFG_UDP:
+            return (trans->net.sock == -1);
         case CFG_TCP:
             if ((trans->net.sock == -1) ||
                 (trans->net.tls.enable && !trans->net.tls.ssl)) return TRUE;
@@ -827,12 +830,15 @@ getAddressList(transport_t *trans)
             return 0;
     }
 
-    char *type = (trans->type == CFG_UDP) ? "udp" : "tcp";
-    scopeLogInfo("getting DNS info for %s %s:%s", type, trans->net.host, trans->net.port);
-
     if (trans->getaddrinfo(trans->net.host,
                            trans->net.port,
-                           &hints, &addr_list)) return 0;
+                           &hints, &addr_list)) {
+        char *type = (trans->type == CFG_UDP) ? "udp" : "tcp";
+        scopeLogInfo("DNS lookup for %s %s:%s failed", type, trans->net.host, trans->net.port);
+        trans->net.failure_reason = DNS_FAIL;
+
+        return 0;
+    }
 
     // Count how many addrs we got back
     struct addrinfo* addr;
@@ -935,12 +941,13 @@ socketConnectionStart(transport_t *trans)
         if (trans->type == CFG_UDP) {
             // connect on udp sockets normally succeeds immediately.
             trans->net.sock = placeDescriptor(sock, trans);
-            if (trans->net.sock != -1) break;
-
-            scopeLogInfo("fd:%d connect to %s:%d was successful", trans->net.sock, addrstr, port);
-            trans->connect_attempts = 0;
-            trans->net.failure_reason = NO_FAIL;
-            backoffReset(trans->backoff);
+            if (trans->net.sock != -1) {
+                scopeLogInfo("fd:%d connect to %s:%d was successful", trans->net.sock, addrstr, port);
+                trans->connect_attempts = 0;
+                trans->net.failure_reason = NO_FAIL;
+                backoffReset(trans->backoff);
+                break;
+            }
         } else {
             DBG(NULL); // with non-blocking tcp sockets, we always expect -1
         }
@@ -966,6 +973,7 @@ transportConnectFile(transport_t *t)
     int fd;
     fd = scope_open(t->file.path, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666);
     if (fd == -1) {
+        scopeLogInfo("(%s) file create/append failed", t->file.path);
         DBG("%s", t->file.path);
         transportDisconnect(t);
         return 0;
@@ -1013,7 +1021,7 @@ out:
         char *path = t->file.path;
         if (t->file.stdout) path = "stdout";
         if (t->file.stderr) path = "stderr";
-        scopeLogInfo("fd:%d (%s) connect successful", scope_fileno(t->file.stream), path);
+        scopeLogInfo("fd:%d (%s) file connect successful", scope_fileno(t->file.stream), path);
     }
     t->connect_attempts = 0;
     backoffReset(t->backoff);
@@ -1573,6 +1581,7 @@ transportLogConnectionStatus(transport_t *trans, const char *name)
 
     switch (trans->type) {
         case CFG_TCP:
+        case CFG_UDP:
             scopeLog(CFG_LOG_WARN, "%s destination (%s:%s) not connected. messages dropped: "
                 "%"PRIu64 " connection attempts: %"PRIu64 " reason for failure: %s",
                 name, trans->net.host, trans->net.port, g_cbuf_drop_count,
@@ -1588,13 +1597,16 @@ transportLogConnectionStatus(transport_t *trans, const char *name)
                  "%"PRIu64 " connection attempts: %"PRIu64, name, "edge",
                  g_cbuf_drop_count, trans->connect_attempts);
             break;
-        case CFG_UDP:
         case CFG_FILE:
+            scopeLog(CFG_LOG_WARN, "%s destination (%s) not established. messages dropped: "
+                 "%"PRIu64 " connection attempts: %"PRIu64, name, trans->file.path,
+                 g_cbuf_drop_count, trans->connect_attempts);
+            break;
+
         case CFG_SYSLOG:
         case CFG_SHM:
             // Nothing to report here
             break;
     }
-
 
 }

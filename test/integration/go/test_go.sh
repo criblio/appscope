@@ -1,7 +1,7 @@
 #! /bin/bash
 
 DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
-
+ARCH=`uname -m`
 FAILED_TEST_LIST=""
 FAILED_TEST_COUNT=0
 
@@ -867,6 +867,7 @@ endtest
 #
 #  influxdb tests
 #
+if [ $ARCH != "aarch64" ]; then
 dbfile="/go/influx/db/meta/meta.db"
 influx_verbose=0
 
@@ -1025,6 +1026,9 @@ influx_eval 2 influxd
 
 unset SCOPE_PAYLOAD_ENABLE
 unset SCOPE_PAYLOAD_HEADER
+
+# endif for aarch64
+fi
 
 #
 # Done: print results

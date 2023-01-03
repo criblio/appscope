@@ -10,7 +10,7 @@ type BoolString string
 func (b BoolString) MarshalYAML() (interface{}, error) {
 	switch BoolString(b) {
 	case "":
-		return nil, nil
+		return false, nil
 	case "false":
 		return false, nil
 	case "true":
@@ -43,14 +43,14 @@ type ScopeConfig struct {
 
 // ScopeCriblConfig represents how to output metrics
 type ScopeCriblConfig struct {
-	Enable    bool           `mapstructure:"enable" json:"enable" yaml:"enable"`
+	Enable    BoolString     `mapstructure:"enable" json:"enable" yaml:"enable"`
 	Transport ScopeTransport `mapstructure:"transport" json:"transport" yaml:"transport"`
 	AuthToken string         `mapstructure:"authtoken" json:"authtoken" yaml:"authtoken"`
 }
 
 // ScopeMetricConfig represents how to output metrics
 type ScopeMetricConfig struct {
-	Enable    bool                     `mapstructure:"enable" json:"enable" yaml:"enable"`
+	Enable    BoolString               `mapstructure:"enable" json:"enable" yaml:"enable"`
 	Format    ScopeOutputFormat        `mapstructure:"format" json:"format" yaml:"format"`
 	Transport ScopeTransport           `mapstructure:"transport,omitempty" json:"transport,omitempty" yaml:"transport,omitempty"`
 	Watch     []ScopeMetricWatchConfig `mapstructure:"watch" json:"watch" yaml:"watch"`
@@ -58,7 +58,7 @@ type ScopeMetricConfig struct {
 
 // ScopeEventConfig represents how to output events
 type ScopeEventConfig struct {
-	Enable    bool                    `mapstructure:"enable" json:"enable" yaml:"enable"`
+	Enable    BoolString              `mapstructure:"enable" json:"enable" yaml:"enable"`
 	Format    ScopeOutputFormat       `mapstructure:"format" json:"format" yaml:"format"`
 	Transport ScopeTransport          `mapstructure:"transport,omitempty" json:"transport,omitempty" yaml:"transport,omitempty"`
 	Watch     []ScopeEventWatchConfig `mapstructure:"watch" json:"watch" yaml:"watch"`
@@ -66,8 +66,8 @@ type ScopeEventConfig struct {
 
 // ScopePayloadConfig represents how to capture payloads
 type ScopePayloadConfig struct {
-	Enable bool   `mapstructure:"enable" json:"enable" yaml:"enable"`
-	Dir    string `mapstructure:"dir" json:"dir" yaml:"dir"`
+	Enable BoolString `mapstructure:"enable" json:"enable" yaml:"enable"`
+	Dir    string     `mapstructure:"dir" json:"dir" yaml:"dir"`
 }
 
 // ScopeMetricWatchConfig represents a metric watch configuration
@@ -86,7 +86,7 @@ type ScopeEventWatchConfig struct {
 
 // ScopeLibscopeConfig represents how to configure libscope
 type ScopeLibscopeConfig struct {
-	ConfigEvent   bool           `mapstructure:"configevent" json:"configevent" yaml:"configevent"`
+	ConfigEvent   BoolString     `mapstructure:"configevent" json:"configevent" yaml:"configevent"`
 	SummaryPeriod int            `mapstructure:"summaryperiod" jaon:"summaryperiod" yaml:"summaryperiod"`
 	CommandDir    string         `mapstructure:"commanddir" json:"commanddir" yaml:"commanddir"`
 	Log           ScopeLogConfig `mapstructure:"log" json:"log" yaml:"log"`
@@ -110,7 +110,7 @@ type ScopeOutputFormat struct {
 type ScopeTransport struct {
 	TransportType string    `mapstructure:"type" json:"type" yaml:"type"`
 	Host          string    `mapstructure:"host,omitempty" json:"host,omitempty" yaml:"host,omitempty"`
-	Port          int       `mapstructure:"port,omitempty" json:"port,omitempty" yaml:"port,omitempty"`
+	Port          string    `mapstructure:"port,omitempty" json:"port,omitempty" yaml:"port,omitempty"`
 	Path          string    `mapstructure:"path,omitempty" json:"path,omitempty" yaml:"path,omitempty"`
 	Buffering     string    `mapstructure:"buffering,omitempty" json:"buffering,omitempty" yaml:"buffering,omitempty"`
 	Tls           TlsConfig `mapstructure:"tls" json:"tls" yaml:"tls"`
@@ -118,7 +118,7 @@ type ScopeTransport struct {
 
 // TlsConfig is used when
 type TlsConfig struct {
-	Enable         bool   `mapstructure:"enable" json:"enable" yaml:"enable"`
-	ValidateServer bool   `mapstructure:"validateserver" json:"validateserver" yaml:"validateserver"`
-	CaCertPath     string `mapstructure:"cacertpath" json:"cacertpath" yaml:"cacertpath"`
+	Enable         BoolString `mapstructure:"enable" json:"enable" yaml:"enable"`
+	ValidateServer BoolString `mapstructure:"validateserver" json:"validateserver" yaml:"validateserver"`
+	CaCertPath     string     `mapstructure:"cacertpath" json:"cacertpath" yaml:"cacertpath"`
 }

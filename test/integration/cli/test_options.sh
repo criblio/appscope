@@ -105,6 +105,28 @@ run ./bin/linux/${ARCH}/scope --passthrough
 outputs "could not find or execute command"
 returns 1
 
+run ./bin/linux/${ARCH}/scope -z ps
+outputs "PID"
+returns 0
+
+run ./bin/linux/${ARCH}/scope -z ps -ef
+outputs "UID"
+returns 0
+
+
+
+run ./bin/linux/${ARCH}/scope -z -- ps
+outputs "PID"
+returns 0
+
+run ./bin/linux/${ARCH}/scope -z -- ps -ef
+outputs "UID"
+returns 0
+
+
+
+
+
 run ./bin/linux/${ARCH}/scope -a -d
 outputs "error: --ldattach and --lddetach cannot be used together"
 returns 1
@@ -195,6 +217,10 @@ returns 0
 
 run ./bin/linux/${ARCH}/scope run -- echo foo
 outputs foo
+returns 0
+
+run ./bin/linux/${ARCH}/scope run -- ps -ef // doesn't work without the '--' (-ef parsed by cli instead) and never did
+outputs UID
 returns 0
 
 run ./bin/linux/${ARCH}/scope run -a some_auth_token -- echo foo

@@ -546,10 +546,10 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
     void *handle = NULL;
     char *inferior_command = NULL;
 
-    inferior_command = getpath(argv[2]);  // TODO: find the arg
+    inferior_command = getpath(argv[0]); 
     //printf("%s:%d %s\n", __FUNCTION__, __LINE__, inferior_command);
     if (!inferior_command) {
-        fprintf(stderr,"%s could not find or execute command `%s`.  Exiting.\n", argv[0], argv[optind]);
+        fprintf(stderr,"scope could not find or execute command `%s`.  Exiting.\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
@@ -567,8 +567,8 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         }
     }
 
+    // Dynamic executable path
     if ((ebuf == NULL) || (!is_static(ebuf->buf))) {
-        // Dynamic executable path
         if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
         if (setenv("LD_PRELOAD", scopeLibPath, 0) == -1) {
@@ -583,7 +583,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
 
         //printf("%s:%d %d: %s %s %s %s\n", __FUNCTION__, __LINE__,
         //       argc, argv[0], argv[1], argv[2], argv[3]);
-        execve(inferior_command, &argv[2], environ); // TODO
+        execve(inferior_command, &argv[0], environ);
         perror("execve");
         goto err;
     }
@@ -599,14 +599,14 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         execve(argv[0], argv, environ);
     }
 
-    program_invocation_short_name = basename(argv[1]);  // TODO
+    program_invocation_short_name = basename(argv[0]); 
 
     if (!is_go(ebuf->buf)) {
         // We're getting here with upx-encoded binaries
         // and any other static native apps...
         // Start here when we support more static binaries
         // than go.
-        execve(argv[optind], &argv[optind], environ);
+        execve(argv[0], &argv[0], environ);
     }
 
     if ((handle = dlopen(scopeLibPath, RTLD_LAZY)) == NULL) {
@@ -618,7 +618,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         goto err;
     }
 
-    sys_exec(ebuf, inferior_command, argc-optind, &argv[optind], env);
+    sys_exec(ebuf, inferior_command, argc, &argv[0], env);
 
     /*
      * We should not return from sys_exec unless there was an error loading the static exec.
@@ -626,7 +626,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
      * Was wondering if we should free the mapped elf image.
      * But, since we exec on failure to load, it doesn't matter.
      */
-    execve(argv[optind], &argv[optind], environ);
+    execve(argv[0], &argv[0], environ);
 
 err:
     if (ebuf) free(ebuf);

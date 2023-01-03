@@ -87,6 +87,8 @@ __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **
 	pid_t nspid = -1;
 	pid_t pid = -1;
 	uid_t eUid = geteuid();
+	int cmdArgc;
+	char **cmdArgv;
 
     for (;;) {
         index = 0;
@@ -221,8 +223,10 @@ __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **
 	}
 
 	// Execute commands
-	if (opt_ldattach) exit(cmdRun(opt_ldattach, false, pid, nspid, argc, argv, env));
-	if (opt_lddetach) exit(cmdRun(false, opt_lddetach, pid, nspid, argc, argv, env));
+	cmdArgc = argc-optind; // Argc of the program we want to scope
+	cmdArgv = &argv[optind]; // Argv of the program we want to scope
+	if (opt_ldattach) exit(cmdRun(opt_ldattach, false, pid, nspid, cmdArgc, cmdArgv, env));
+	if (opt_lddetach) exit(cmdRun(false, opt_lddetach, pid, nspid, cmdArgc, cmdArgv, env));
 	if (opt_configure) exit(cmdConfigure(arg_configure, nspid));
 	if (opt_unconfigure) exit(cmdUnconfigure(nspid));
 	if (opt_service) exit(cmdService(arg_service, nspid));
@@ -230,7 +234,7 @@ __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **
 	if (opt_patch) exit(loaderOpPatchLibrary(arg_patch) == PATCH_SUCCESS);
 	if (opt_starthost) exit(nsHostStart());
 	if (opt_stophost) exit(nsHostStop());
-	if (opt_passthrough) exit(cmdRun(false, false, pid, nspid, argc, argv, env));
+	if (opt_passthrough) exit(cmdRun(false, false, pid, nspid, cmdArgc, cmdArgv, env));
 
 	// No constructor command executed.
 	// Continue to regular CLI usage.

@@ -93,10 +93,9 @@ $(LIBLOADER):
 scope: $(SCOPE)
 
 $(SCOPE): export GOOS=linux
-$(SCOPE): export CGO_ENABLED=1
 $(SCOPE): run/bundle.go $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 	$(GO) build \
-		-ldflags="$(shell $(GOVVV) -flags) -linkmode external -extldflags -static" \
+		-ldflags="$(shell $(GOVVV) -flags)" \
 		$(BUILD_OPTS) \
 	       	-o $(SCOPE)
 

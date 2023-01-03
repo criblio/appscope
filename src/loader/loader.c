@@ -596,7 +596,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
 
     if (getenv("LD_PRELOAD") != NULL) {
         unsetenv("LD_PRELOAD");
-        execve(argv[0], argv, environ);
+        execve(inferior_command, argv, environ);
     }
 
     program_invocation_short_name = basename(argv[0]); 
@@ -606,7 +606,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         // and any other static native apps...
         // Start here when we support more static binaries
         // than go.
-        execve(argv[0], &argv[0], environ);
+        execve(inferior_command, &argv[0], environ);
     }
 
     if ((handle = dlopen(scopeLibPath, RTLD_LAZY)) == NULL) {
@@ -626,7 +626,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
      * Was wondering if we should free the mapped elf image.
      * But, since we exec on failure to load, it doesn't matter.
      */
-    execve(argv[0], &argv[0], environ);
+    execve(inferior_command, &argv[0], environ);
 
 err:
     if (ebuf) free(ebuf);

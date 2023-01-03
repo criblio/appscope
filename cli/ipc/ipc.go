@@ -25,6 +25,7 @@ var (
 	errRequest                   = errors.New("error with sending request to PID")
 	errFrameInconsistentUniqId   = errors.New("frame error inconsistent unique id during transmission")
 	errFrameInconsistentDataSize = errors.New("frame error inconsistent data size during transmssion")
+	errConsumerTimeout           = errors.New("timeout with consume the message")
 )
 
 const ipcComTimeout time.Duration = 100 * time.Millisecond
@@ -47,18 +48,13 @@ func ipcDispatcher(scopeReq []byte, pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%v %v", errRequest, pidCtx.Pid)
 	}
+
+	err = ipc.verifySendingMsg()
+	if err != nil {
+		return nil, err
+	}
+
 	return ipc.receiveIpcResponse()
-
-	// resp, ipcStatus, err := ipc.receiveIpcResponse()
-	// var prettyJSON bytes.Buffer
-	// fmt.Println("Dispatcher ipc response status", ipcStatus)
-
-	// if errDebug := json.Indent(&prettyJSON, []byte(resp), "", "    "); errDebug != nil {
-	// 	fmt.Println("Error with indent data")
-	// 	return resp, err
-	// }
-	// fmt.Println("Scope msg", prettyJSON.String())
-	// Handle message queue response from application
 }
 
 // nsnewMsgQWriter creates an IPC writer structure with switching effective uid and gid
@@ -185,6 +181,27 @@ func (ipc *ipcObj) receive() ([]byte, error) {
 // send sends the message to the process endpoint
 func (ipc *ipcObj) send(msg []byte) error {
 	return ipc.sender.send(msg, ipcComTimeout)
+}
+
+// verifies if message was consumed by the application
+func (ipc *ipcObj) verifySendingMsg() error {
+	var attr *messageQueueAttributes
+	// Ensure that message was consumed by the library
+	for i := 1; i < 5; i++ {
+		attr, err := ipc.sender.getAttributes()
+		if err != nil {
+			return err
+		}
+		if attr.CurrentMessages != 0 {
+			time.Sleep(500 * time.Millisecond)
+		} else {
+			return nil
+		}
+	}
+	if attr.CurrentMessages != 0 {
+		return errConsumerTimeout
+	}
+	return nil
 }
 
 // metadata in ipc frame

@@ -1,10 +1,13 @@
 package update
 
 import (
+	"errors"
 	"os"
 
 	"github.com/criblio/scope/ipc"
 )
+
+var errSettingCfg = errors.New("error setting cfg")
 
 // UpdateScopeCfg updates the configuration of scoped process
 func UpdateScopeCfg(pidCtx ipc.IpcPidCtx, confFile string) error {
@@ -20,6 +23,10 @@ func UpdateScopeCfg(pidCtx ipc.IpcPidCtx, confFile string) error {
 	err = cmd.UnmarshalResp(resp.ResponseScopeMsgData)
 	if err != nil {
 		return err
+	}
+
+	if resp.MetaMsgStatus != ipc.ResponseOK || cmd.Response.Status != ipc.ResponseOK {
+		return errSettingCfg
 	}
 
 	return nil

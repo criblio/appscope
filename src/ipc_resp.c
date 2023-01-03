@@ -45,7 +45,6 @@ ipcRespScopeRespStr(scopeRespWrapper *wrap) {
     return cJSON_PrintUnformatted(wrap->resp);
 }
 
-
 /*
  * Creates the wrapper for generic response (scope message and ipc message)
  * Used by following requests: IPC_CMD_UNKNOWN, IPC_CMD_SET_SCOPE_CFG
@@ -126,6 +125,11 @@ ipcRespGetScopeCfg(cJSON *unused) {
     wrap->priv = cfg;
 
     cJSON_AddItemToObjectCS(resp, "cfg", cfg);
+    
+    if (!cJSON_AddNumberToObjLN(resp, "status", IPC_RESP_OK)) {
+        goto allocFail;
+    }
+    
     return wrap;
 
 allocFail:
@@ -134,7 +138,7 @@ allocFail:
 }
 
 /*
- * Creates the wrapper for response to IPC_CMD_GET_SCOPE_CFG
+ * Creates the wrapper for response to IPC_CMD_UNKNOWN
  * TODO: use unused attribute later
  */
 scopeRespWrapper *

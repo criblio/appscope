@@ -3,8 +3,14 @@ package ipc
 import (
 	"encoding/json"
 
+	"github.com/criblio/scope/libscope"
 	"gopkg.in/yaml.v2"
 )
+
+type IpcResponseCtx struct {
+	ResponseScopeMsgData []byte     // Contains scope message response (status + message response data)
+	MetaMsgStatus        respStatus // Response status in msg metadata
+}
 
 // scopeReqCmd describes the command passed in the IPC request to library scope request
 // Must be inline with server, see: ipc_scope_req_t
@@ -28,90 +34,8 @@ type scopeRequestOnly struct {
 type scopeRequestSetCfg struct {
 	// Unique request command
 	Req scopeReqCmd `mapstructure:"req" json:"req" yaml:"req"`
-	// Configuration
-	Cfg struct {
-		Metric struct {
-			Enable bool `json:"enable"`
-			Format struct {
-				Type         string      `json:"type"`
-				Statsdprefix interface{} `json:"statsdprefix"`
-				Statsdmaxlen int         `json:"statsdmaxlen"`
-				Verbosity    int         `json:"verbosity"`
-			} `json:"format"`
-			Watch []struct {
-				Type string `json:"type"`
-			} `json:"watch"`
-			Transport struct {
-				Type string `json:"type"`
-				Host string `json:"host"`
-				Port int    `json:"port"`
-				TLS  struct {
-					Enable         bool   `json:"enable"`
-					Validateserver bool   `json:"validateserver"`
-					Cacertpath     string `json:"cacertpath"`
-				} `json:"tls"`
-			} `json:"transport"`
-		} `json:"metric"`
-		Event struct {
-			Enable bool `json:"enable"`
-			Format struct {
-				Type           string `json:"type"`
-				Maxeventpersec int    `json:"maxeventpersec"`
-				Enhancefs      bool   `json:"enhancefs"`
-			} `json:"format"`
-			Watch []struct {
-				Type        string      `json:"type"`
-				Name        string      `json:"name"`
-				Value       string      `json:"value"`
-				Allowbinary bool        `json:"allowbinary,omitempty"`
-				Field       string      `json:"field,omitempty"`
-				Headers     interface{} `json:"headers,omitempty"`
-			} `json:"watch"`
-			Transport struct {
-				Type string `json:"type"`
-				Host string `json:"host"`
-				Port int    `json:"port"`
-				TLS  struct {
-					Enable         bool   `json:"enable"`
-					Validateserver bool   `json:"validateserver"`
-					Cacertpath     string `json:"cacertpath"`
-				} `json:"tls"`
-			} `json:"transport"`
-		} `json:"event"`
-		Payload struct {
-			Enable bool   `json:"enable"`
-			Dir    string `json:"dir"`
-		} `json:"payload"`
-		Libscope struct {
-			Configevent   bool   `json:"configevent"`
-			Summaryperiod int    `json:"summaryperiod"`
-			Commanddir    string `json:"commanddir"`
-			Log           struct {
-				Level     string `json:"level"`
-				Transport struct {
-					Type   string `json:"type"`
-					Path   string `json:"path"`
-					Buffer string `json:"buffer"`
-				} `json:"transport"`
-			} `json:"log"`
-		} `json:"libscope"`
-		Cribl struct {
-			Enable    bool `json:"enable"`
-			Transport struct {
-				Type string `json:"type"`
-				Host string `json:"host"`
-				Port int    `json:"port"`
-				TLS  struct {
-					Enable         bool   `json:"enable"`
-					Validateserver bool   `json:"validateserver"`
-					Cacertpath     string `json:"cacertpath"`
-				} `json:"tls"`
-			} `json:"transport"`
-		} `json:"cribl"`
-		Tags     interface{} `json:"tags"`
-		Protocol interface{} `json:"protocol"`
-		Custom   interface{} `json:"custom"`
-	} `json:"cfg"`
+	// Scoped Cfg
+	Cfg libscope.ScopeConfig `mapstructure:"cfg" json:"cfg" yaml:"cfg"`
 }
 
 // Must be inline with server, see: ipcRespStatus
@@ -132,85 +56,13 @@ type scopeGetStatusResponse struct {
 type scopeGetCfgResponse struct {
 	// Response status
 	Status respStatus `mapstructure:"status" json:"status" yaml:"status"`
-	// TODO:Scoped Cfg
-	// Cfg libscope.ScopeConfig `mapstructure:"cfg" json:"cfg" yaml:"cfg"`
-	// Enable should be boolString to use it
-	Cfg struct {
-		Current struct {
-			Metric struct {
-				Enable    string `json:"enable"`
-				Transport struct {
-					Type      string `json:"type"`
-					Path      string `json:"path"`
-					Buffering string `json:"buffering"`
-				} `json:"transport"`
-				Format struct {
-					Type         string `json:"type"`
-					Statsdprefix string `json:"statsdprefix"`
-					Statsdmaxlen int    `json:"statsdmaxlen"`
-					Verbosity    int    `json:"verbosity"`
-				} `json:"format"`
-				Watch []struct {
-					Type string `json:"type"`
-				} `json:"watch"`
-			} `json:"metric"`
-			Libscope struct {
-				Log struct {
-					Level     string `json:"level"`
-					Transport struct {
-						Type      string `json:"type"`
-						Path      string `json:"path"`
-						Buffering string `json:"buffering"`
-					} `json:"transport"`
-				} `json:"log"`
-				Configevent   string `json:"configevent"`
-				Summaryperiod int    `json:"summaryperiod"`
-				Commanddir    string `json:"commanddir"`
-			} `json:"libscope"`
-			Event struct {
-				Enable    string `json:"enable"`
-				Transport struct {
-					Type      string `json:"type"`
-					Path      string `json:"path"`
-					Buffering string `json:"buffering"`
-				} `json:"transport"`
-				Format struct {
-					Type           string `json:"type"`
-					Maxeventpersec int    `json:"maxeventpersec"`
-					Enhancefs      string `json:"enhancefs"`
-				} `json:"format"`
-				Watch []struct {
-					Type        string        `json:"type"`
-					Name        string        `json:"name"`
-					Field       string        `json:"field"`
-					Value       string        `json:"value"`
-					Allowbinary string        `json:"allowbinary,omitempty"`
-					Headers     []interface{} `json:"headers,omitempty"`
-				} `json:"watch"`
-			} `json:"event"`
-			Payload struct {
-				Enable string `json:"enable"`
-				Dir    string `json:"dir"`
-			} `json:"payload"`
-			Tags struct {
-			} `json:"tags"`
-			Protocol []interface{} `json:"protocol"`
-			Cribl    struct {
-				Enable    string `json:"enable"`
-				Transport struct {
-					Type string `json:"type"`
-				} `json:"transport"`
-				Authtoken string `json:"authtoken"`
-			} `json:"cribl"`
-		} `json:"current"`
-	} `json:"cfg"`
+	Cfg    struct {
+		// Scoped Cfg
+		Current libscope.ScopeConfig `mapstructure:"current" json:"current" yaml:"current"`
+	} `mapstructure:"cfg" json:"cfg" yaml:"cfg"`
 }
 
-type IpcResponseCtx struct {
-	ResponseScopeMsgData []byte
-	ResponseStatus       respStatus
-}
-
+// CmdGetScopeStatus describes Get Scope Status command request and response
 type CmdGetScopeStatus struct {
 	Response scopeGetStatusResponse
 }
@@ -222,9 +74,10 @@ func (cmd *CmdGetScopeStatus) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error)
 }
 
 func (cmd *CmdGetScopeStatus) UnmarshalResp(respData []byte) error {
-	return json.Unmarshal(respData, &cmd.Response)
+	return yaml.Unmarshal(respData, &cmd.Response)
 }
 
+// CmdGetScopeCfg describes Get Scope Configuration command request and response
 type CmdGetScopeCfg struct {
 	Response scopeGetCfgResponse
 }
@@ -236,9 +89,10 @@ func (cmd *CmdGetScopeCfg) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
 }
 
 func (cmd *CmdGetScopeCfg) UnmarshalResp(respData []byte) error {
-	return json.Unmarshal(respData, &cmd.Response)
+	return yaml.Unmarshal(respData, &cmd.Response)
 }
 
+// CmdSetScopeCfg describes Set Scope Configuration command request and response
 type CmdSetScopeCfg struct {
 	Response scopeOnlyStatusResponse
 	CfgData  []byte
@@ -257,5 +111,5 @@ func (cmd *CmdSetScopeCfg) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
 }
 
 func (cmd *CmdSetScopeCfg) UnmarshalResp(respData []byte) error {
-	return json.Unmarshal(respData, &cmd.Response)
+	return yaml.Unmarshal(respData, &cmd.Response)
 }

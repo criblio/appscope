@@ -11,13 +11,14 @@ import (
 )
 
 var (
-	errEmptyMsg       = errors.New("empty message not supported")
-	errMsgQCreate     = errors.New("message queue error during create")
-	errMsgQGetAttr    = errors.New("message queue error during get attributes")
-	errMsgQUnlink     = errors.New("message queue error during unlink")
-	errMsgQSendMsg    = errors.New("message queue error during sending msg")
-	errMsgQReceiveMsg = errors.New("message queue error during receive msg")
-	ErrMsgQTimeout    = errors.New("message queue timeout")
+	errEmptyMsg           = errors.New("empty message not supported")
+	errMsgQCreate         = errors.New("message queue error during create")
+	errMsgQGetAttr        = errors.New("message queue error during get attributes")
+	errMsgQUnlink         = errors.New("message queue error during unlink")
+	errMsgQSendMsg        = errors.New("message queue error during sending msg")
+	errMsgQReceiveMsg     = errors.New("message queue error during receive msg")
+	ErrMsgQTimeoutReceive = errors.New("message queue timeout - receive")
+	ErrMsgQTimeoutSend    = errors.New("message queue timeout - send")
 )
 
 // Default values of
@@ -125,7 +126,7 @@ func msgQSend(fd int, msg []byte, timeout time.Duration) error {
 	case 0:
 		return nil
 	case syscall.ETIMEDOUT:
-		return ErrMsgQTimeout
+		return ErrMsgQTimeoutSend
 	default:
 		return fmt.Errorf("%v %v", errMsgQSendMsg, errno)
 	}
@@ -153,7 +154,7 @@ func msgQReceive(fd int, capacity int, timeout time.Duration) ([]byte, error) {
 	case 0:
 		return recvBuf[0:int(size)], nil
 	case syscall.ETIMEDOUT:
-		return nil, ErrMsgQTimeout
+		return nil, ErrMsgQTimeoutReceive
 	default:
 		return nil, fmt.Errorf("%v %v", errMsgQReceiveMsg, errno)
 	}

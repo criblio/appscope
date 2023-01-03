@@ -46,7 +46,7 @@ func getScopeStatus(pid int) ScopeStatus {
 		return Disable
 	}
 
-	if cmd.Response.Status == ipc.ResponseOK {
+	if resp.MetaMsgStatus == ipc.ResponseOK && cmd.Response.Status == ipc.ResponseOK {
 		if cmd.Response.Scoped {
 			return Active
 		}

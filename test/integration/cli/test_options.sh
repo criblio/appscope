@@ -113,8 +113,6 @@ run ./bin/linux/${ARCH}/scope -z ps -ef
 outputs "UID"
 returns 0
 
-
-
 run ./bin/linux/${ARCH}/scope -z -- ps
 outputs "PID"
 returns 0
@@ -122,10 +120,6 @@ returns 0
 run ./bin/linux/${ARCH}/scope -z -- ps -ef
 outputs "UID"
 returns 0
-
-
-
-
 
 run ./bin/linux/${ARCH}/scope -a -d
 outputs "error: --ldattach and --lddetach cannot be used together"

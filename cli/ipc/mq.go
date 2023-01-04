@@ -51,10 +51,10 @@ type receiveMessageQueue struct {
 	messageQueue
 }
 
-// msgQAttributes retrieves Message queue attributes from file descriptor
-func msgQAttributes(fd int) (*messageQueueAttributes, error) {
+// msgQCurrentMessages retrieves Message queue current messages attribute from file descriptor
+func msgQCurrentMessages(fd int) (int, error) {
 
-	attr := new(messageQueueAttributes)
+	attr := &messageQueueAttributes{}
 
 	// int syscall(SYS_mq_getsetattr, mqd_t mqdes, const struct mq_attr *newattr, struct mq_attr *oldattr)
 	// Details: https://man7.org/linux/man-pages/man2/mq_getsetattr.2.html
@@ -65,10 +65,10 @@ func msgQAttributes(fd int) (*messageQueueAttributes, error) {
 		uintptr(unsafe.Pointer(attr))) // oldattr
 
 	if errno != 0 {
-		return nil, fmt.Errorf("%v %v", errMsgQGetAttr, errno)
+		return -1, fmt.Errorf("%v %v", errMsgQGetAttr, errno)
 	}
 
-	return attr, nil
+	return attr.CurrentMessages, nil
 }
 
 // msgQOpen opens message queue with specific name and flags
@@ -212,9 +212,9 @@ func newMsgQReader(name string) (*receiveMessageQueue, error) {
 	}, nil
 }
 
-// getAttributes retrieves message queue attributes
-func (mq *messageQueue) getAttributes() (*messageQueueAttributes, error) {
-	return msgQAttributes(mq.fd)
+// size returns the current message on the queue
+func (mq *messageQueue) size() (int, error) {
+	return msgQCurrentMessages(mq.fd)
 }
 
 // destroy destroys (closes + unlinks) message queue

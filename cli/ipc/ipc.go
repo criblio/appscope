@@ -32,7 +32,6 @@ var (
 )
 
 const ipcComTimeout time.Duration = 50 * time.Microsecond
-const ipcConsumeTimeout time.Duration = 1 * time.Millisecond
 const comRetryLimit int = 50
 
 type IpcPidCtx struct {
@@ -53,7 +52,7 @@ func ipcDispatcher(scopeReq []byte, pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w %v", errRequest, pidCtx.Pid)
 	}
-
+	// ensure that process consumed this request
 	err = ipc.verifySendingMsg()
 	if err != nil {
 		return nil, err
@@ -206,12 +205,12 @@ func (ipc *ipcObj) send(msg []byte) error {
 func (ipc *ipcObj) verifySendingMsg() error {
 	// Ensure that message was consumed by the library
 	for i := 0; i < comRetryLimit; i++ {
-		attr, err := ipc.sender.getAttributes()
+		curMsg, err := ipc.sender.size()
 		if err != nil {
 			return err
 		}
-		if attr.CurrentMessages != 0 {
-			time.Sleep(ipcConsumeTimeout)
+		if curMsg != 0 {
+			time.Sleep(ipcComTimeout)
 		} else {
 			return nil
 		}

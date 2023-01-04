@@ -26,7 +26,7 @@
  */
 
 // Send message retry count
-#define RETRY_COUNT 10
+#define RETRY_COUNT 50
 #define INPUT_MSG_ALLOC_LIMIT (1024*1024) // 1 MB
 /*
  * meta_req_t describes the metadata part of ipc request command retrieves from IPC communication
@@ -94,7 +94,7 @@ ipcReceiveFrameWithRetry(mqd_t mqDes, char *mqMsgBuf, size_t mqMaxMsgSize, ssize
             return MSG_RECV_OK;
         } else if(scope_errno == EAGAIN) {
             /*
-            * Message queue is full wait 50 us and retry since
+            * Message queue is empty wait 50 us and retry since
             * the communication here is non-block
             */
             scope_nanosleep((const struct timespec[]){{0, 50000L}}, NULL);

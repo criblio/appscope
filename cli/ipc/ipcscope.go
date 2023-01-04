@@ -2,6 +2,7 @@ package ipc
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/criblio/scope/libscope"
 	"gopkg.in/yaml.v2"
@@ -41,13 +42,13 @@ type scopeRequestSetCfg struct {
 // Must be inline with server, see: ipcRespStatus
 type scopeOnlyStatusResponse struct {
 	// Response status
-	Status respStatus `mapstructure:"status" json:"status" yaml:"status"`
+	Status *respStatus `mapstructure:"status" json:"status" yaml:"status"`
 }
 
 // Must be inline with server, see: ipcRespGetScopeStatus
 type scopeGetStatusResponse struct {
 	// Response status
-	Status respStatus `mapstructure:"status" json:"status" yaml:"status"`
+	Status *respStatus `mapstructure:"status" json:"status" yaml:"status"`
 	// Scoped status
 	Scoped bool `mapstructure:"scoped" json:"scoped" yaml:"scoped"`
 }
@@ -55,7 +56,7 @@ type scopeGetStatusResponse struct {
 // Must be inline with server, see: ipcRespGetScopeCfg
 type scopeGetCfgResponse struct {
 	// Response status
-	Status respStatus `mapstructure:"status" json:"status" yaml:"status"`
+	Status *respStatus `mapstructure:"status" json:"status" yaml:"status"`
 	Cfg    struct {
 		// Scoped Cfg
 		Current libscope.ScopeConfig `mapstructure:"current" json:"current" yaml:"current"`
@@ -74,7 +75,16 @@ func (cmd *CmdGetScopeStatus) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error)
 }
 
 func (cmd *CmdGetScopeStatus) UnmarshalResp(respData []byte) error {
-	return yaml.Unmarshal(respData, &cmd.Response)
+	err := yaml.Unmarshal(respData, &cmd.Response)
+	if err != nil {
+		return err
+	}
+
+	if cmd.Response.Status == nil {
+		return fmt.Errorf("%w %v", errMissingMandatoryField, "status")
+	}
+
+	return nil
 }
 
 // CmdGetScopeCfg describes Get Scope Configuration command request and response
@@ -89,7 +99,16 @@ func (cmd *CmdGetScopeCfg) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
 }
 
 func (cmd *CmdGetScopeCfg) UnmarshalResp(respData []byte) error {
-	return yaml.Unmarshal(respData, &cmd.Response)
+	err := yaml.Unmarshal(respData, &cmd.Response)
+	if err != nil {
+		return err
+	}
+
+	if cmd.Response.Status == nil {
+		return fmt.Errorf("%w %v", errMissingMandatoryField, "status")
+	}
+
+	return nil
 }
 
 // CmdSetScopeCfg describes Set Scope Configuration command request and response
@@ -111,5 +130,14 @@ func (cmd *CmdSetScopeCfg) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
 }
 
 func (cmd *CmdSetScopeCfg) UnmarshalResp(respData []byte) error {
-	return yaml.Unmarshal(respData, &cmd.Response)
+	err := yaml.Unmarshal(respData, &cmd.Response)
+	if err != nil {
+		return err
+	}
+
+	if cmd.Response.Status == nil {
+		return fmt.Errorf("%w %v", errMissingMandatoryField, "status")
+	}
+
+	return nil
 }

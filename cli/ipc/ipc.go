@@ -26,9 +26,14 @@ var (
 	errFrameInconsistentUniqId   = errors.New("frame error inconsistent unique id during transmission")
 	errFrameInconsistentDataSize = errors.New("frame error inconsistent data size during transmssion")
 	errConsumerTimeout           = errors.New("timeout with consume the message")
+	errReceiveTimeout            = errors.New("timeout with receive the message")
+	errSendTimeout               = errors.New("timeout with sending the message")
+	errMissingMandatoryField     = errors.New("missing mandatory field in response")
 )
 
-const ipcComTimeout time.Duration = 100 * time.Millisecond
+const ipcComTimeout time.Duration = 50 * time.Microsecond
+const ipcConsumeTimeout time.Duration = 1 * time.Millisecond
+const comRetryLimit int = 50
 
 type IpcPidCtx struct {
 	Pid        int
@@ -46,7 +51,7 @@ func ipcDispatcher(scopeReq []byte, pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
 
 	err = ipc.sendIpcRequest(scopeReq)
 	if err != nil {
-		return nil, fmt.Errorf("%v %v", errRequest, pidCtx.Pid)
+		return nil, fmt.Errorf("%w %v", errRequest, pidCtx.Pid)
 	}
 
 	err = ipc.verifySendingMsg()
@@ -175,33 +180,43 @@ func (ipc *ipcObj) destroyIPC() {
 
 // receive receive the message from the process endpoint
 func (ipc *ipcObj) receive() ([]byte, error) {
-	return ipc.receiver.receive(ipcComTimeout)
+	for i := 0; i < comRetryLimit; i++ {
+		res, err := ipc.receiver.receive(0)
+		if err != errMsgQEmpty {
+			return res, err
+		}
+		time.Sleep(ipcComTimeout)
+	}
+	return nil, errReceiveTimeout
 }
 
 // send sends the message to the process endpoint
 func (ipc *ipcObj) send(msg []byte) error {
-	return ipc.sender.send(msg, ipcComTimeout)
+	for i := 0; i < comRetryLimit; i++ {
+		err := ipc.sender.send(msg, 0)
+		if err != errMsgQFull {
+			return err
+		}
+		time.Sleep(ipcComTimeout)
+	}
+	return errSendTimeout
 }
 
 // verifies if message was consumed by the application
 func (ipc *ipcObj) verifySendingMsg() error {
-	var attr *messageQueueAttributes
 	// Ensure that message was consumed by the library
-	for i := 1; i < 5; i++ {
+	for i := 0; i < comRetryLimit; i++ {
 		attr, err := ipc.sender.getAttributes()
 		if err != nil {
 			return err
 		}
 		if attr.CurrentMessages != 0 {
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(ipcConsumeTimeout)
 		} else {
 			return nil
 		}
 	}
-	if attr.CurrentMessages != 0 {
-		return errConsumerTimeout
-	}
-	return nil
+	return errConsumerTimeout
 }
 
 // metadata in ipc frame
@@ -271,26 +286,45 @@ func ipcGetMsgSeparatorIndex(msg []byte) int {
 	return bytes.Index(msg, []byte("\x00"))
 }
 
+// unmarshall meta response check presence of mandatory field
+func UnmarshalMeta(msg []byte, metaResp *ipcResponse) error {
+	err := json.Unmarshal(msg, &metaResp)
+	if err != nil {
+		return err
+	}
+
+	if metaResp.Status == nil {
+		return fmt.Errorf("%w %v", errMissingMandatoryField, "status")
+	}
+
+	if metaResp.Uniq == nil {
+		return fmt.Errorf("%w %v", errMissingMandatoryField, "uniq")
+	}
+
+	if metaResp.Remain == nil {
+		return fmt.Errorf("%w %v", errMissingMandatoryField, "remain")
+	}
+
+	return nil
+}
+
 // parseIpcFrame parses single frame in IPC communication
-// returns frame metadata, frame scopeData, error
-func (ipc *ipcObj) parseIpcFrame(msg []byte) (ipcResponse, []byte, error) {
+// returns frame metadata, scope message and error
+func parseIpcFrame(msg []byte) (ipcResponse, []byte, error) {
 	var frameResp ipcResponse
 	var err error
 
 	// Only metadata case
 	sepIndx := ipcGetMsgSeparatorIndex(msg)
 	if sepIndx == -1 {
-		err = json.Unmarshal(msg, &frameResp)
-		if err != nil {
-			return frameResp, nil, err
-		}
+		err = UnmarshalMeta(msg, &frameResp)
 		return frameResp, nil, err
 	}
 
 	metadata := msg[0:sepIndx]
-	err = json.Unmarshal(metadata, &frameResp)
+	err = UnmarshalMeta(metadata, &frameResp)
 	if err != nil {
-		return frameResp, nil, nil
+		return frameResp, nil, err
 	}
 
 	// Skip the separator
@@ -314,22 +348,22 @@ func (ipc *ipcObj) receiveIpcResponse() (*IpcResponseCtx, error) {
 			return nil, err
 		}
 
-		ipcFrameMeta, scopeFrame, err := ipc.parseIpcFrame(msg)
+		ipcFrameMeta, scopeFrame, err := parseIpcFrame(msg)
 		if err != nil {
 			return nil, err
 		}
 
 		// Validate unique identifier for transmission
-		if ipcFrameMeta.Uniq != ipc.mqUniqId {
+		if *ipcFrameMeta.Uniq != ipc.mqUniqId {
 			return nil, errFrameInconsistentUniqId
 		}
 		// Validate data remaining bytes in transmission
-		if (!firstFrame) && ipcFrameMeta.Remain > previousFrameRemainBytes {
+		if (!firstFrame) && *ipcFrameMeta.Remain > previousFrameRemainBytes {
 			return nil, errFrameInconsistentDataSize
 		}
 
-		previousFrameRemainBytes = ipcFrameMeta.Remain
-		lastRespStatus = ipcFrameMeta.Status
+		previousFrameRemainBytes = *ipcFrameMeta.Remain
+		lastRespStatus = *ipcFrameMeta.Status
 
 		// Continue to listen if we still expect data
 		if lastRespStatus != ResponseOKwithContent {

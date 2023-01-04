@@ -22,7 +22,7 @@ func InspectScopeCfg(pidCtx ipc.IpcPidCtx) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if resp.MetaMsgStatus != ipc.ResponseOK || cmd.Response.Status != ipc.ResponseOK {
+	if resp.MetaMsgStatus != ipc.ResponseOK || *cmd.Response.Status != ipc.ResponseOK {
 		return "", errInspectCfg
 	}
 	marshalToPrint, err := json.MarshalIndent(cmd.Response.Cfg.Current, "", "   ")

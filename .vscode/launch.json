@@ -10,8 +10,8 @@
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceFolder}/cli/main.go",
-            "args": ["ps"]
-            // "args": ["info", "344972"]
+            // "args": ["ps"]
+            "args": ["inspect", "665601"]
             // "args": ["attach", "8896"]
         },
         {

@@ -42,9 +42,9 @@ const (
 // Must be inline with server, see: createMetaResp
 type ipcResponse struct {
 	// Response status
-	Status respStatus `json:"status" jsonschema:"required"`
+	Status *respStatus `json:"status" jsonschema:"required"`
 	// Request Unique Identifter
-	Uniq int `json:"uniq" jsonschema:"required"`
+	Uniq *int `json:"uniq" jsonschema:"required"`
 	// Remain data
-	Remain int `json:"remain" jsonschema:"required"`
+	Remain *int `json:"remain" jsonschema:"required"`
 }

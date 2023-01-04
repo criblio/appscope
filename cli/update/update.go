@@ -25,7 +25,7 @@ func UpdateScopeCfg(pidCtx ipc.IpcPidCtx, confFile string) error {
 		return err
 	}
 
-	if resp.MetaMsgStatus != ipc.ResponseOK || cmd.Response.Status != ipc.ResponseOK {
+	if resp.MetaMsgStatus != ipc.ResponseOK || *cmd.Response.Status != ipc.ResponseOK {
 		return errSettingCfg
 	}
 

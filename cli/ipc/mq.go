@@ -11,22 +11,21 @@ import (
 )
 
 var (
-	errEmptyMsg           = errors.New("empty message not supported")
-	errMsgQCreate         = errors.New("message queue error during create")
-	errMsgQGetAttr        = errors.New("message queue error during get attributes")
-	errMsgQUnlink         = errors.New("message queue error during unlink")
-	errMsgQSendMsg        = errors.New("message queue error during sending msg")
-	errMsgQReceiveMsg     = errors.New("message queue error during receive msg")
-	ErrMsgQTimeoutReceive = errors.New("message queue timeout - receive")
-	ErrMsgQTimeoutSend    = errors.New("message queue timeout - send")
+	errEmptyMsg       = errors.New("empty message not supported")
+	errMsgQCreate     = errors.New("message queue error during create")
+	errMsgQGetAttr    = errors.New("message queue error during get attributes")
+	errMsgQUnlink     = errors.New("message queue error during unlink")
+	errMsgQSendMsg    = errors.New("message queue error during sending msg")
+	errMsgQReceiveMsg = errors.New("message queue error during receive msg")
+	errMsgQEmpty      = errors.New("message queue is empty")
+	errMsgQFull       = errors.New("message queue is full")
 )
 
-// Default values of
+// Parameters used in message quque creation
 // - maximum number of messsages in a queue
 // - maximum message size in a queue
 // Details: https://man7.org/linux/man-pages/man7/mq_overview.7.html
 const mqMaxMsgMax int = 4
-
 const mqMaxMsgSize int = 128
 
 // Message queque attribute structure
@@ -125,8 +124,8 @@ func msgQSend(fd int, msg []byte, timeout time.Duration) error {
 	switch errno {
 	case 0:
 		return nil
-	case syscall.ETIMEDOUT:
-		return ErrMsgQTimeoutSend
+	case syscall.EAGAIN:
+		return errMsgQFull
 	default:
 		return fmt.Errorf("%v %v", errMsgQSendMsg, errno)
 	}
@@ -153,8 +152,8 @@ func msgQReceive(fd int, capacity int, timeout time.Duration) ([]byte, error) {
 	switch errno {
 	case 0:
 		return recvBuf[0:int(size)], nil
-	case syscall.ETIMEDOUT:
-		return nil, ErrMsgQTimeoutReceive
+	case syscall.EAGAIN:
+		return nil, errMsgQEmpty
 	default:
 		return nil, fmt.Errorf("%v %v", errMsgQReceiveMsg, errno)
 	}
@@ -183,7 +182,8 @@ func msgQUnlink(name string) error {
 
 // newMsgQReader creates message queue with write only permissions
 func newMsgQWriter(name string) (*sendMessageQueue, error) {
-	mqfd, err := msgQOpen(name, unix.O_CREAT|unix.O_WRONLY|unix.O_EXCL)
+	// TODO: Add O_EXCL but figure it out why sometimes unlink fails with container communication
+	mqfd, err := msgQOpen(name, unix.O_CREAT|unix.O_WRONLY|unix.O_NONBLOCK)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,8 @@ func newMsgQWriter(name string) (*sendMessageQueue, error) {
 
 // newMsgQReader creates message queue with read only permissions
 func newMsgQReader(name string) (*receiveMessageQueue, error) {
-	mqfd, err := msgQOpen(name, unix.O_CREAT|unix.O_RDONLY|unix.O_EXCL)
+	// TODO: Add O_EXCL but figure it out why sometimes unlink fails with container communication
+	mqfd, err := msgQOpen(name, unix.O_CREAT|unix.O_RDONLY|unix.O_NONBLOCK)
 	if err != nil {
 		return nil, err
 	}
@@ -219,18 +220,9 @@ func (mq *messageQueue) getAttributes() (*messageQueueAttributes, error) {
 // destroy destroys (closes + unlinks) message queue
 func (mq *messageQueue) destroy() error {
 
-	err := unix.Close(int(mq.fd))
-	// This is not obvious sometimes unlink fails after first try
-	for i := 1; i < 5; i++ {
-		err = msgQUnlink(mq.name)
-		if err != nil {
-			time.Sleep(3 * time.Second)
-		} else {
-			return nil
-		}
-	}
-	return err
-
+	unix.Close(int(mq.fd))
+	// Always unlink even when closing fails
+	return msgQUnlink(mq.name)
 }
 
 // getBlockAbsTime retrieve the absolute time which the call (send/receive) will block

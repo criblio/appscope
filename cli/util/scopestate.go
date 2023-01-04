@@ -1,6 +1,8 @@
 package util
 
 import (
+	"errors"
+
 	"github.com/criblio/scope/ipc"
 )
 
@@ -34,23 +36,25 @@ func (state ScopeStatus) String() string {
 	return []string{"Disable", "Setup", "Active", "Latent"}[state]
 }
 
+var errScopeStatus = errors.New("error scope status")
+
 // getScopeStatus retreives information about Scope status using IPC
-func getScopeStatus(pid int) ScopeStatus {
+func getScopeStatus(pid int) (ScopeStatus, error) {
 	cmd := ipc.CmdGetScopeStatus{}
 	resp, err := cmd.Request(ipc.IpcPidCtx{Pid: pid})
 	if err != nil {
-		return Disable
+		return Disable, err
 	}
 	err = cmd.UnmarshalResp(resp.ResponseScopeMsgData)
 	if err != nil {
-		return Disable
+		return Disable, err
 	}
 
 	if resp.MetaMsgStatus == ipc.ResponseOK && *cmd.Response.Status == ipc.ResponseOK {
 		if cmd.Response.Scoped {
-			return Active
+			return Active, nil
 		}
-		return Latent
+		return Latent, nil
 	}
-	return Disable
+	return Disable, errScopeStatus
 }

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	linuxproc "github.com/c9s/goprocinfo/linux"
+	"github.com/criblio/scope/ipc"
 )
 
 // Process is a unix process
@@ -274,12 +275,13 @@ func ProcessesToDetach() (Processes, error) {
 			continue
 		}
 
+		// Detach the process in case the situation we are not able to retrieve the info
 		status, err := PidScopeStatus(pid)
-		if err != nil && !errors.Is(err, errMissingUser) {
+		if err != nil && !errors.Is(err, ipc.ErrConsumerTimeout) {
 			continue
 		}
 		// Add process if is is actively scoped
-		if status == Active {
+		if status == Active || errors.Is(err, ipc.ErrConsumerTimeout) {
 			processes = append(processes, Process{
 				ID:      i,
 				Pid:     pid,
@@ -354,7 +356,7 @@ func PidScopeStatus(pid int) (ScopeStatus, error) {
 	}
 
 	// Retrieve information from IPC
-	return getScopeStatus(pid), nil
+	return getScopeStatus(pid)
 }
 
 // PidCommand gets the command used to start the process specified by PID

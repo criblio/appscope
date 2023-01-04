@@ -174,10 +174,6 @@ func (rc *Config) DetachSingle(args []string) error {
 		return errCreateLdscope
 	}
 
-	return rc.detach(args, pid)
-}
-
-func (rc *Config) detach(args []string, pid int) error {
 	// Check PID is already being scoped
 	status, err := util.PidScopeStatus(pid)
 	if err != nil {
@@ -186,6 +182,10 @@ func (rc *Config) detach(args []string, pid int) error {
 		return errNotScoped
 	}
 
+	return rc.detach(args, pid)
+}
+
+func (rc *Config) detach(args []string, pid int) error {
 	env := os.Environ()
 	ld := loader.ScopeLoader{Path: LdscopePath()}
 	if !rc.Subprocess {

@@ -217,9 +217,9 @@ if [ $? -ne "0" ]; then
 fi
 
 # Allow scope start to run and attach to all procs
-sleep 20
+sleep 5
 
-scope stop -f 
+scope stop -f
 if [ $? -ne "0" ]; then
     fail "scope stop failed"
 fi

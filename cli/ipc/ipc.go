@@ -25,7 +25,7 @@ var (
 	errRequest                   = errors.New("error with sending request to PID")
 	errFrameInconsistentUniqId   = errors.New("frame error inconsistent unique id during transmission")
 	errFrameInconsistentDataSize = errors.New("frame error inconsistent data size during transmssion")
-	errConsumerTimeout           = errors.New("timeout with consume the message")
+	ErrConsumerTimeout           = errors.New("timeout with consume the message")
 	errReceiveTimeout            = errors.New("timeout with receive the message")
 	errSendTimeout               = errors.New("timeout with sending the message")
 	errMissingMandatoryField     = errors.New("missing mandatory field in response")
@@ -215,7 +215,7 @@ func (ipc *ipcObj) verifySendingMsg() error {
 			return nil
 		}
 	}
-	return errConsumerTimeout
+	return ErrConsumerTimeout
 }
 
 // metadata in ipc frame

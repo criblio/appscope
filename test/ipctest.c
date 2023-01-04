@@ -3,10 +3,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "cfgutils.h"
 #include "ipc.h"
 #include "test.h"
 #include "runtimecfg.h"
 #include "cJSON.h"
+
+static config_t * configTest;
 
 // These signatures satisfy --wrap=jsonConfigurationObject in the Makefile
 #ifdef __linux__
@@ -17,7 +20,7 @@ cJSON * __wrap_jsonConfigurationObject(config_t *cfg)
 cJSON * jsonConfigurationObject(config_t *cfg)
 #endif // __APPLE__
 {
-    return NULL;
+    return (configTest) ? __real_jsonConfigurationObject(configTest) : NULL;
 }
 
 // These signatures satisfy --wrap=doAndReplaceConfig in the Makefile
@@ -62,9 +65,6 @@ destroyIpcMessage(ipc_msg_t *ipcMsg) {
     scope_free(ipcMsg->full);
     scope_free(ipcMsg);
 }
-
-#define TEST_SCOPE_GET_STATUS_REQ ("{\"req\":0}")
-#define TEST_SCOPE_UNKNOWN_REQ ("{\"req\":9999}")
 
 static void
 ipcInactiveDesc(void **state) {
@@ -662,6 +662,97 @@ ipcHandlerScopeResponseUnknown(void **state) {
     assert_int_equal(status, 0);
 }
 
+static void
+ipcHandlerScopeResponseGetCfgSingleMsg(void **state) {
+    const char *ipcConnName = "/testConnection";
+    int status;
+    mqd_t mqReadWriteDes;
+    ipc_resp_result_t res;
+    void *buf;
+    struct mq_attr attr;
+    ssize_t dataLen;
+    int uniqueId = 5678;
+    config_t *cfgRecv = NULL;
+
+    configTest = cfgCreateDefault();
+    assert_non_null(configTest);
+    assert_int_equal(cfgLogLevel(configTest), CFG_LOG_WARN);
+    // Change default value of configuration
+    cfgLogLevelSet(configTest, CFG_LOG_TRACE);
+    assert_int_equal(cfgLogLevel(configTest), CFG_LOG_TRACE);
+
+    mqReadWriteDes = scope_mq_open(ipcConnName, O_RDWR | O_CREAT | O_CLOEXEC | O_NONBLOCK, 0666, NULL);
+    assert_int_not_equal(mqReadWriteDes, -1);
+
+    status = scope_mq_getattr(mqReadWriteDes, &attr);
+    assert_int_equal(status, 0);
+
+    ipc_msg_t *msg = createIpcMessage("{\"req\":0,\"uniq\":1234,\"remain\":128}", "{\"req\":1}");
+    res = ipcSendResponseWithScopeData(mqReadWriteDes, attr.mq_msgsize, msg->scopeData, uniqueId);
+    assert_int_equal(res, RESP_RESULT_OK);
+
+    destroyIpcMessage(msg);
+
+    status = scope_mq_getattr(mqReadWriteDes, &attr);
+    assert_int_equal(status, 0);
+    assert_int_equal(attr.mq_curmsgs, 1);
+
+    buf = scope_malloc(attr.mq_msgsize);
+    assert_non_null(buf);
+
+    dataLen = scope_mq_receive(mqReadWriteDes, buf, attr.mq_msgsize, 0);
+    assert_int_not_equal(dataLen, -1);
+
+    // Handle Single Mq Response (client side)
+    cJSON *item;
+    cJSON *itemCurrentCfg;
+    cJSON *mqResp = cJSON_Parse(buf);
+    assert_non_null(mqResp);
+    char *mqRespBytes = cJSON_PrintUnformatted(mqResp);
+    size_t mqRespLenWithNul = scope_strlen(mqRespBytes) + 1;
+
+    item = cJSON_GetObjectItemCaseSensitive(mqResp, "status");
+    assert_non_null(item);
+    assert_true(cJSON_IsNumber(item));
+    assert_int_equal(item->valueint, 200);
+    item = cJSON_GetObjectItemCaseSensitive(mqResp, "uniq");
+    assert_non_null(item);
+    assert_true(cJSON_IsNumber(item));
+    assert_int_equal(item->valueint, uniqueId);
+
+    cJSON *scopeResp = cJSON_Parse(buf + mqRespLenWithNul);
+    assert_non_null(scopeResp);
+    item = cJSON_GetObjectItemCaseSensitive(scopeResp, "status");
+    assert_non_null(item);
+    assert_true(cJSON_IsNumber(item));
+    assert_int_equal(item->valueint, 200);
+
+    item = cJSON_GetObjectItemCaseSensitive(scopeResp, "cfg");
+    assert_non_null(item);
+    assert_true(cJSON_IsObject(item));
+
+    itemCurrentCfg = cJSON_GetObjectItemCaseSensitive(item, "current");
+    assert_non_null(itemCurrentCfg);
+    assert_true(cJSON_IsObject(itemCurrentCfg));
+    char *scopeCfgBytes = cJSON_PrintUnformatted(itemCurrentCfg);
+
+    cfgRecv = cfgFromString(scopeCfgBytes);
+    assert_int_equal(cfgLogLevel(cfgRecv), CFG_LOG_TRACE);
+
+    cfgDestroy(&cfgRecv);
+
+    cJSON_Delete(scopeResp);
+    cJSON_Delete(mqResp);
+    scope_free(buf);
+
+    status = scope_mq_close(mqReadWriteDes);
+    assert_int_equal(status, 0);
+    status = scope_mq_unlink(ipcConnName);
+    assert_int_equal(status, 0);
+
+    cfgDestroy(&configTest);
+}
+
 int
 main(int argc, char* argv[]) {
     printf("running %s\n", argv[0]);
@@ -682,6 +773,7 @@ main(int argc, char* argv[]) {
         cmocka_unit_test(ipcHandlerResponseSendError),
         cmocka_unit_test(ipcHandlerScopeResponseValid),
         cmocka_unit_test(ipcHandlerScopeResponseUnknown),
+        cmocka_unit_test(ipcHandlerScopeResponseGetCfgSingleMsg),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

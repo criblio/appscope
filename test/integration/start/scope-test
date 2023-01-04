@@ -35,6 +35,31 @@ endtest(){
     echo ""
 }
 
+scopedProcessNumber() {
+    local procFound=$(($(scope ps | wc -l) - 1 ))
+
+    echo $procFound
+}
+
+# wait maximum 30 seconds
+waitForCmdscopedProcessNumber() {
+    local expScoped=$1
+    local retry=0
+    local maxRetry=30
+    local delay=1
+    until [ "$retry" -ge "$maxRetry" ]
+    do
+        count=$(scopedProcessNumber)
+        if [ "$count" -eq "$expScoped" ] ; then
+            return
+        fi
+        retry=$((retry+1)) 
+        sleep "$delay"
+    done
+    echo "FAIL: waiting for the number $expScoped scoped process $count"
+    ERR+=1
+}
+
 cleanupAfterStart() {
 if [ -f "/etc/profile.d/scope.sh" ] ; then
     rm "/etc/profile.d/scope.sh"
@@ -192,7 +217,7 @@ if [ $? -ne "0" ]; then
 fi
 
 # Allow scope start to run and attach to all procs
-sleep 5
+sleep 20
 
 scope stop -f 
 if [ $? -ne "0" ]; then
@@ -256,7 +281,8 @@ if [ -f /tmp/nginx_scope.log ]; then
     fail "/tmp/nginx_scope.log present"
 fi
 
-# (TODO when supported) Check scope ps shows no processes scoped
+# Check scope ps shows no processes scoped
+waitForCmdscopedProcessNumber 0
 
 cleanupAfterStart
 pkill -9 memcached
@@ -268,7 +294,7 @@ sleep 3
 endtest
 
 
-// Check profile setup is not skipped
+# Check profile setup is not skipped
 starttest scope_start_dev_env_force_setup_profile
 
 if [ $SCOPE_VERSION_TYPE = "dev" ]; then
@@ -300,7 +326,7 @@ cleanupAfterStart
 endtest
 
 
-// Check profile setup is skipped
+# Check profile setup is skipped
 starttest scope_start_official_env_skip_setup_profile
 
 if [ $SCOPE_VERSION_TYPE = "official" ]; then

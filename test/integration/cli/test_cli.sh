@@ -80,9 +80,30 @@ returns() {
     fi
 }
 
+scopedProcessNumber() {
+    local procFound=$(($(scope ps | wc -l) - 1 ))
 
+    echo $procFound
+}
 
-
+# wait maximum 30 seconds
+waitForCmdscopedProcessNumber() {
+    local expScoped=$1
+    local retry=0
+    local maxRetry=30
+    local delay=1
+    until [ "$retry" -ge "$maxRetry" ]
+    do
+        count=$(scopedProcessNumber)
+        if [ "$count" -eq "$expScoped" ] ; then
+            return
+        fi
+        retry=$((retry+1)) 
+        sleep "$delay"
+    done
+    echo "FAIL: waiting for the number $expScoped scoped process $count"
+    ERR+=1
+}
 
 ################# START TESTS ################# 
 
@@ -100,7 +121,7 @@ run scope attach $sleep_pid
 returns 0
 
 # Wait for attach to execute
-sleep 2
+waitForCmdscopedProcessNumber 1
 
 # Detach to sleep process by PID
 run scope detach $sleep_pid
@@ -108,7 +129,7 @@ outputs "Detaching from pid ${sleep_pid}"
 returns 0
 
 # Wait for detach to execute
-sleep 3
+waitForCmdscopedProcessNumber 0
 
 # Reattach to sleep process by PID
 run scope attach $sleep_pid
@@ -116,7 +137,7 @@ outputs "Reattaching to pid ${sleep_pid}"
 returns 0
 
 # Wait for reattach to execute
-sleep 3
+waitForCmdscopedProcessNumber 1
 
 # End sleep process
 kill $sleep_pid
@@ -166,6 +187,9 @@ endtest
 # Scope ps
 #
 starttest "Scope ps"
+
+# Wait for attach to execute
+waitForCmdscopedProcessNumber 1
 
 # Scope ps
 run scope ps
@@ -288,7 +312,7 @@ run scope attach $sleep_pid2
 returns 0
 
 # Wait for attach to execute
-sleep 2
+waitForCmdscopedProcessNumber 2
 
 # Detach from sleep processes
 yes | scope detach --all 2>&1

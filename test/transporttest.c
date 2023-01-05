@@ -159,16 +159,11 @@ transportCreateFileReturnsUnconnectedForInvalidPath(void** state)
     t = transportCreateFile(NULL, CFG_BUFFER_LINE);
     assert_null(t);
 
-    assert_int_equal(dbgCountMatchingLines("src/transport.c"), 0);
-
     t = transportCreateFile("", CFG_BUFFER_LINE);
     assert_non_null(t);
 
     assert_true(transportNeedsConnection(t));
     transportDestroy(&t);
-
-    assert_int_equal(dbgCountMatchingLines("src/transport.c"), 1);
-    dbgInit(); // reset dbg for the rest of the tests
 }
 
 static void

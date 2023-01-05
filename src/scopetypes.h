@@ -199,7 +199,7 @@ typedef struct
 //    SCOPE_CRIBL_NO_BREAKER         adds breaker property to process start message
 //    SCOPE_LIB_PATH                 specifies path to libscope.so library
 //    SCOPE_GO_STRUCT_PATH           for internal testing
-//    SCOPE_CLI_SKIP_START_HOST      for internal testing (when set skip the start host operation from container)
+//    SCOPE_CLI_SKIP_HOST            for internal testing (when set skip the start/stop host operation from container)
 //    SCOPE_HTTP_SERIALIZE_ENABLE    "true" adds guard for race condition
 //    SCOPE_NO_SIGNAL                if defined, timer for USR2 is not set
 //    SCOPE_PERF_PRESERVE            "true" processes at 10s instead of 1ms

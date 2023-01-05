@@ -122,7 +122,7 @@ CAMLprim value _cs_disasm(cs_arch arch, csh handle, const uint8_t * code, size_t
 						if (lcount > 0) {
 							array = caml_alloc(lcount, 0);
 							for (i = 0; i < lcount; i++) {
-								tmp2 = caml_alloc(6, 0);
+								tmp2 = caml_alloc(5, 0);
 								switch(insn[j-1].detail->arm.operands[i].type) {
 									case ARM_OP_REG:
 									case ARM_OP_SYSREG:
@@ -253,10 +253,9 @@ CAMLprim value _cs_disasm(cs_arch arch, csh handle, const uint8_t * code, size_t
 
 								Store_field(tmp2, 0, Val_int(insn[j-1].detail->arm64.operands[i].vector_index));
 								Store_field(tmp2, 1, Val_int(insn[j-1].detail->arm64.operands[i].vas));
-								Store_field(tmp2, 2, Val_int(insn[j-1].detail->arm64.operands[i].vess));
-								Store_field(tmp2, 3, tmp3);
-								Store_field(tmp2, 4, Val_int(insn[j-1].detail->arm64.operands[i].ext));
-								Store_field(tmp2, 5, tmp);
+								Store_field(tmp2, 2, tmp3);
+								Store_field(tmp2, 3, Val_int(insn[j-1].detail->arm64.operands[i].ext));
+								Store_field(tmp2, 4, tmp);
 
 								Store_field(array, i, tmp2);
 							}
@@ -369,15 +368,15 @@ CAMLprim value _cs_disasm(cs_arch arch, csh handle, const uint8_t * code, size_t
 							for (i = 0; i < lcount; i++) {
 								switch(insn[j-1].detail->x86.operands[i].type) {
 									case X86_OP_REG:
-										tmp = caml_alloc(5, 1);
+										tmp = caml_alloc(1, 1);
 										Store_field(tmp, 0, Val_int(insn[j-1].detail->x86.operands[i].reg));
 										break;
 									case X86_OP_IMM:
-										tmp = caml_alloc(5, 2);
+										tmp = caml_alloc(1, 2);
 										Store_field(tmp, 0, Val_int(insn[j-1].detail->x86.operands[i].imm));
 										break;
 									case X86_OP_MEM:
-										tmp = caml_alloc(5, 3);
+										tmp = caml_alloc(1, 3);
 										tmp2 = caml_alloc(5, 0);
 										Store_field(tmp2, 0, Val_int(insn[j-1].detail->x86.operands[i].mem.segment));
 										Store_field(tmp2, 1, Val_int(insn[j-1].detail->x86.operands[i].mem.base));
@@ -388,14 +387,16 @@ CAMLprim value _cs_disasm(cs_arch arch, csh handle, const uint8_t * code, size_t
 										Store_field(tmp, 0, tmp2);
 										break;
 									default:
+										tmp = caml_alloc(1, 0); // X86_OP_INVALID
 										break;
 								}
-								Store_field(tmp, 1, Val_int(insn[j-1].detail->x86.operands[i].size));
-								Store_field(tmp, 2, Val_int(insn[j-1].detail->x86.operands[i].access));
-								Store_field(tmp, 3, Val_int(insn[j-1].detail->x86.operands[i].avx_bcast));
-								Store_field(tmp, 4, Val_int(insn[j-1].detail->x86.operands[i].avx_zero_opmask));
-								tmp2 = caml_alloc(1, 0);
+
+								tmp2 = caml_alloc(5, 0);
 								Store_field(tmp2, 0, tmp);
+								Store_field(tmp2, 1, Val_int(insn[j-1].detail->x86.operands[i].size));
+								Store_field(tmp2, 2, Val_int(insn[j-1].detail->x86.operands[i].access));
+								Store_field(tmp2, 3, Val_int(insn[j-1].detail->x86.operands[i].avx_bcast));
+								Store_field(tmp2, 4, Val_int(insn[j-1].detail->x86.operands[i].avx_zero_opmask));
 								Store_field(array, i, tmp2);
 							}
 						} else	// empty array

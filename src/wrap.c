@@ -7,7 +7,7 @@
 
 #ifdef __linux__
 #include <sys/prctl.h>
-#ifdef __GO__
+#ifdef __x86_64__
 #include <asm/prctl.h>
 #endif
 #endif
@@ -1297,17 +1297,6 @@ initHook(int attachedFlag, bool scopedFlag)
 #ifdef __GO__
         initGoHook(ebuf);
         threadNow(0);
-        if (scope_arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
-            scopeLogError("initHook:arch_prctl");
-        }
-
-        __asm__ volatile (
-            "lea scope_stack(%%rip), %%r11 \n"
-            "mov %%rsp, (%%r11)  \n"
-            : "=r"(rc)                    //output
-            :
-            : "%r11"                      //clobbered register
-            );
 
         if (full_path) scope_free(full_path);
         if (ebuf) freeElf(ebuf->buf, ebuf->len);

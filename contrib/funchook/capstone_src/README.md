@@ -3,6 +3,10 @@ Capstone Engine
 
 [![Build Status](https://travis-ci.org/aquynh/capstone.svg?branch=next)](https://travis-ci.org/aquynh/capstone)
 [![Build status](https://ci.appveyor.com/api/projects/status/a4wvbn89wu3pinas/branch/next?svg=true)](https://ci.appveyor.com/project/aquynh/capstone/branch/next)
+[![pypi package](https://badge.fury.io/py/capstone.svg)](https://pypi.python.org/pypi/capstone)
+[![pypi downloads](https://pepy.tech/badge/capstone)](https://pepy.tech/project/capstone)
+[![Fuzzit Status](https://app.fuzzit.dev/badge?org_id=ANOh0D48gSLBxNZcDQMI&branch=master)](https://app.fuzzit.dev/admin/ANOh0D48gSLBxNZcDQMI/dashboard)<br/>
+[![oss-fuzz Status](https://oss-fuzz-build-logs.storage.googleapis.com/badges/capstone.svg)](https://bugs.chromium.org/p/oss-fuzz/issues/list?sort=-opened&can=1&q=proj:capstone)
 
 Capstone is a disassembly framework with the target of becoming the ultimate
 disasm engine for binary analysis and reversing in the security community.
@@ -10,8 +14,9 @@ disasm engine for binary analysis and reversing in the security community.
 Created by Nguyen Anh Quynh, then developed and maintained by a small community,
 Capstone offers some unparalleled features:
 
-- Support multiple hardware architectures: ARM, ARM64 (ARMv8), Ethereum VM, M68K,
-  Mips, PPC, Sparc, SystemZ, TMS320C64X, M680X, XCore and X86 (including X86_64).
+- Support multiple hardware architectures: ARM, ARM64 (ARMv8), BPF, Ethereum VM, Webassembly, 
+  M68K, Mips, MOS65XX, PPC, Sparc, SystemZ, TMS320C64X, M680X, XCore, RISC-V(rv32G/rv64G) 
+  and X86 (including X86_64).
 
 - Having clean/simple/lightweight/intuitive architecture-neutral API.
 
@@ -20,7 +25,7 @@ Capstone offers some unparalleled features:
 - Provide semantics of the disassembled instruction, such as list of implicit
   registers read & written.
 
-- Implemented in pure C language, with lightweight bindings for D, Clojure, F#,
+- Implemented in pure C language, with lightweight bindings for Swift, D, Clojure, F#,
   Common Lisp, Visual Basic, PHP, PowerShell, Emacs, Haskell, Perl, Python,
   Ruby, C#, NodeJS, Java, GO, C++, OCaml, Lua, Rust, Delphi, Free Pascal & Vala
   ready either in main code, or provided externally by the community).
@@ -56,6 +61,12 @@ Hack
 ----
 
 See HACK.TXT file for the structure of the source code.
+
+
+Fuzz
+----
+
+See suite/fuzz/README.md for more information.
 
 
 License

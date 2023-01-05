@@ -100,7 +100,7 @@ func (rc *Config) Attach(args []string) error {
 }
 
 // DetachAll provides the option to detach from all Scoped processes
-func (rc *Config) DetachAll(args []string) error {
+func (rc *Config) DetachAll(args []string, prompt bool) error {
 	adminStatus := true
 	if err := util.UserVerifyRootPerm(); err != nil {
 		if errors.Is(err, util.ErrMissingAdmPriv) {
@@ -109,32 +109,31 @@ func (rc *Config) DetachAll(args []string) error {
 			return err
 		}
 	}
+	if !adminStatus {
+		fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
+	}
 
 	procs, err := util.ProcessesScoped()
 	if err != nil {
 		return err
 	}
+
 	if len(procs) > 0 {
-		if !adminStatus {
-			fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
-		}
+		if prompt {
+			// user interface for selecting a PID
+			util.PrintObj([]util.ObjField{
+				{Name: "ID", Field: "id"},
+				{Name: "Pid", Field: "pid"},
+				{Name: "User", Field: "user"},
+				{Name: "Command", Field: "command"},
+			}, procs)
 
-		// user interface for selecting a PID
-		util.PrintObj([]util.ObjField{
-			{Name: "ID", Field: "id"},
-			{Name: "Pid", Field: "pid"},
-			{Name: "User", Field: "user"},
-			{Name: "Command", Field: "command"},
-		}, procs)
-
-		if !util.Confirm("Are your sure you want to detach from all of these processes?") {
-			fmt.Println("info: canceled")
-			return nil
+			if !util.Confirm("Are your sure you want to detach from all of these processes?") {
+				fmt.Println("info: canceled")
+				return nil
+			}
 		}
 	} else {
-		if !adminStatus {
-			fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
-		}
 		return errNoScopedProcs
 	}
 
@@ -184,7 +183,7 @@ func (rc *Config) detach(args []string, pid int) error {
 		return ld.Detach(args, env)
 	}
 	out, err := ld.DetachSubProc(args, env)
-	fmt.Println(out)
+	fmt.Print(out)
 
 	return err
 }

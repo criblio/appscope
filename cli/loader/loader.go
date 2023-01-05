@@ -26,8 +26,19 @@ func (sL *ScopeLoader) ConfigureContainer(filterFilePath string, cpid int) (stri
 	return sL.RunSubProc([]string{"--configure", filterFilePath, "--namespace", strconv.Itoa(cpid)}, os.Environ())
 }
 
+// - Remove /etc/profile.d/scope.sh on host
+// - Remove filter input from /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter on host
+func (sL *ScopeLoader) UnconfigureHost() (string, error) {
+	return sL.RunSubProc([]string{"--unconfigure"}, os.Environ())
+}
+
+// - Remove /etc/profile.d/scope.sh in containers
+// - Remove filter input from /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter in containers
+func (sL *ScopeLoader) UnconfigureContainer(cpid int) (string, error) {
+	return sL.RunSubProc([]string{"--unconfigure", "--namespace", strconv.Itoa(cpid)}, os.Environ())
+}
+
 // - Modify the relevant service configurations to preload /usr/lib/appscope/<version>/libscope.so or /tmp/appscope/<version>/libscope.so on the host
-// Add service configurations on host
 func (sL *ScopeLoader) ServiceHost(serviceName string) (string, error) {
 	return sL.RunSubProc([]string{"--service", serviceName}, os.Environ())
 }
@@ -35,6 +46,16 @@ func (sL *ScopeLoader) ServiceHost(serviceName string) (string, error) {
 // - Modify the relevant service configurations to preload /usr/lib/appscope/<version>/libscope.so or /tmp/appscope/<version>/libscope.so in containers
 func (sL *ScopeLoader) ServiceContainer(serviceName string, cpid int) (string, error) {
 	return sL.RunSubProc([]string{"--service", serviceName, "--namespace", strconv.Itoa(cpid)}, os.Environ())
+}
+
+// - Modify the relevant service configurations to NOT preload /usr/lib/appscope/<version>/libscope.so or /tmp/appscope/<version>/libscope.so on the host
+func (sL *ScopeLoader) UnserviceHost() (string, error) {
+	return sL.RunSubProc([]string{"--unservice"}, os.Environ())
+}
+
+// - Modify the relevant service configurations to NOT preload /usr/lib/appscope/<version>/libscope.so or /tmp/appscope/<version>/libscope.so in containers
+func (sL *ScopeLoader) UnserviceContainer(cpid int) (string, error) {
+	return sL.RunSubProc([]string{"--unservice", "--namespace", strconv.Itoa(cpid)}, os.Environ())
 }
 
 // - Attach to a process on the host or in containers
@@ -53,6 +74,12 @@ func (sL *ScopeLoader) AttachSubProc(args []string, env []string) (string, error
 // Tell ldscope to run the `scope start` command on the host instead
 func (sL *ScopeLoader) StartHost() (string, error) {
 	return sL.RunSubProc([]string{"--starthost"}, os.Environ())
+}
+
+// Used when scope has detected that we are running the `scope stop` command inside a container
+// Tell ldscope to run the `scope stop` command on the host instead
+func (sL *ScopeLoader) StopHost() (string, error) {
+	return sL.RunSubProc([]string{"--stophost"}, os.Environ())
 }
 
 func (sL *ScopeLoader) Run(args []string, env []string) error {

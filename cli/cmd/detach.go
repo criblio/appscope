@@ -33,7 +33,7 @@ scope detach --all`,
 				helpErrAndExit(cmd, "--all flag is mutual exclusive with PID or <process_name>")
 			}
 			rc.Subprocess = true
-			return rc.DetachAll(args)
+			return rc.DetachAll(args, true)
 		}
 		return rc.DetachSingle(args)
 	},

@@ -7,8 +7,29 @@
 - The message queue created by `scope` is `ScopeIPCOut.<PID>` and `ScopeIPCIn.<PID>`
 - scoped application reads from `ScopeIPCIn.<PID>` and writes to `ScopeIPCOut.<PID>`
 - `scope` reads from `ScopeIPCOut.<PID>` and writes to `ScopeIPCIn.<PID>`
+- The message queues are used in non-blocking way - both by client and server
 
 ![IPC Demo](images/ipc.gif)
+
+# Protocol
+
+Initial approach for the protocol between cli and library for IPC communicaiton was based on JSON format.
+Unfortunately we cannot use it directly since message queue size restrictions.
+
+Therefore we introduced framing mechanism into the protocol.
+
+The default message takes following form:
+
+Without framing mechanism:
+
+<METADATA_JSON><NUL><SCOPE_JSON>
+
+With framing mechanism:
+
+<METADATA_JSON><NUL><PART_OF_SCOPE_JSON>
+
+Example:
+<TODO>
 
 # IPC adding new request
 

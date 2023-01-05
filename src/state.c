@@ -562,7 +562,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
     switch (type) {
     case OPEN_PORTS:
     {
-        if (!checkNetEntry(fd)) break;
+        if (!getNetEntry(fd)) break;
         if (size < 0) {
             subFromInterfaceCounts(&g_ctrs.openPorts, labs(size));
         } else if (size > 0) {
@@ -580,7 +580,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 
     case NET_CONNECTIONS:
     {
-        if (!checkNetEntry(fd)) break;
+        if (!getNetEntry(fd)) break;
         counters_element_t* value = NULL;
 
         if (g_netinfo[fd].type == SOCK_STREAM) {
@@ -608,7 +608,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 
     case CONNECTION_DURATION:
     {
-        if (!checkNetEntry(fd)) break;
+        if (!getNetEntry(fd)) break;
         uint64_t new_duration = 0ULL;
         if (g_netinfo[fd].startTime != 0ULL) {
             new_duration = getDuration(g_netinfo[fd].startTime);
@@ -638,7 +638,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 
     case CONNECTION_OPEN:
     {
-        if (!checkNetEntry(fd)) break;
+        if (!getNetEntry(fd)) break;
         if ((ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) &&
             ((g_netinfo[fd].type != SOCK_STREAM) || ((g_netinfo[fd].addrSetRemote == TRUE) && (g_netinfo[fd].addrSetLocal == TRUE)))) {
             addToInterfaceCounts(&g_netinfo[fd].counters.netConnOpen, 1);
@@ -653,7 +653,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 
     case CONNECTION_CLOSE:
     {
-        if (!checkNetEntry(fd)) break;
+        if (!getNetEntry(fd)) break;
         if ((ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) &&
             ((g_netinfo[fd].type != SOCK_STREAM) || ((g_netinfo[fd].addrSetRemote == TRUE) && (g_netinfo[fd].addrSetLocal == TRUE)))) {
             addToInterfaceCounts(&g_netinfo[fd].counters.netConnClose, 1);
@@ -668,7 +668,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 
     case NETRX:
     {
-        if (!checkNetEntry(fd)) break;
+        if (!getNetEntry(fd)) break;
         addToInterfaceCounts(&g_netinfo[fd].numRX, 1);
         addToInterfaceCounts(&g_netinfo[fd].rxBytes, size);
         sock_summary_bucket_t bucket = getNetRxTxBucket(&g_netinfo[fd]);
@@ -685,7 +685,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
 
     case NETTX:
     {
-        if (!checkNetEntry(fd)) break;
+        if (!getNetEntry(fd)) break;
         addToInterfaceCounts(&g_netinfo[fd].numTX, 1);
         addToInterfaceCounts(&g_netinfo[fd].txBytes, size);
         sock_summary_bucket_t bucket = getNetRxTxBucket(&g_netinfo[fd]);
@@ -711,7 +711,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
             addToInterfaceCounts(&g_ctrs.numDNS, 1);
         }
 
-        if (checkNetEntry(fd)) {
+        if (getNetEntry(fd)) {
             rc = postDNSState(fd, type, &g_netinfo[fd], (uint64_t)size, pathname);
         } else {
             rc = postDNSState(fd, type, NULL, (uint64_t)size, pathname);
@@ -729,7 +729,7 @@ doUpdateState(metric_t type, int fd, ssize_t size, const char *funcop, const cha
         addToInterfaceCounts(&g_ctrs.dnsDurationNum, 1);
         addToInterfaceCounts(&g_ctrs.dnsDurationTotal, 0);
 
-        if (checkNetEntry(fd)) {
+        if (getNetEntry(fd)) {
             rc = postDNSState(fd, type, &g_netinfo[fd], size, pathname);
         } else {
             rc = postDNSState(fd, type, NULL, size, pathname);
@@ -1519,7 +1519,7 @@ doBlockConnection(int fd, const struct sockaddr *addr_arg)
     const struct sockaddr* addr;
     if (addr_arg) {
         addr = addr_arg;
-    } else if (checkNetEntry(fd)) {
+    } else if (getNetEntry(fd)) {
         addr = (struct sockaddr*)&g_netinfo[fd].localConn;
     } else {
         return 0;

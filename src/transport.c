@@ -43,7 +43,7 @@ typedef enum {
     TLS_VERIFY_FAIL, // TLS verification failure
 } net_fail_t;
 
-char *netFailMap[] = {
+static const char *netFailMap[] = {
     "n/a",
     "DNS lookup failed",
     "Socket connection failed",
@@ -974,7 +974,6 @@ transportConnectFile(transport_t *t)
     fd = scope_open(t->file.path, O_CREAT|O_WRONLY|O_APPEND|O_CLOEXEC, 0666);
     if (fd == -1) {
         scopeLogInfo("(%s) file create/append failed", t->file.path);
-        DBG("%s", t->file.path);
         transportDisconnect(t);
         return 0;
     }
@@ -1593,8 +1592,8 @@ transportLogConnectionStatus(transport_t *trans, const char *name)
                  g_cbuf_drop_count, trans->connect_attempts);
             break;
         case CFG_EDGE:
-            scopeLog(CFG_LOG_WARN, "%s destination (%s) not connected. messages dropped: "
-                 "%"PRIu64 " connection attempts: %"PRIu64, name, "edge",
+            scopeLog(CFG_LOG_WARN, "%s destination (edge) not connected. messages dropped: "
+                 "%"PRIu64 " connection attempts: %"PRIu64, name,
                  g_cbuf_drop_count, trans->connect_attempts);
             break;
         case CFG_FILE:
@@ -1607,6 +1606,8 @@ transportLogConnectionStatus(transport_t *trans, const char *name)
         case CFG_SHM:
             // Nothing to report here
             break;
+        default:
+            DBG("%d", trans->type);
     }
 
 }

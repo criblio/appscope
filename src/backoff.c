@@ -9,12 +9,13 @@
 
 
 struct _backoff_t {
-    unsigned int backoff_seconds;  // 1s, 2s, 4s, 8s, ...
-    unsigned int backoff_ms;       // current backoff in ms (includes jitter)
+    unsigned int backoff_base;     // 1000ms, 2000ms, 4000ms ...
+    unsigned int backoff_limit;    // current backoff in ms (includes jitter)
     unsigned int ms_count;         // number of ms we've waited so far
 };
 
-const unsigned int max_backoff_seconds = 64 * 4; // 4min 16s
+// 4min 16s
+#define BACKOFF_BASE_MAX ( 64 * 4 * 1000)
 
 
 backoff_t *
@@ -28,8 +29,6 @@ backoffCreate(void)
 
     backoffReset(backoff);
 
-    scope_srand(scope_getpid());
-
     return backoff;
 }
 
@@ -38,8 +37,8 @@ backoffReset(backoff_t *backoff)
 {
     if (!backoff) return;
 
-    backoff->backoff_seconds = 1;
-    backoff->backoff_ms = 1;
+    backoff->backoff_base = 1000;
+    backoff->backoff_limit = 1;
     backoff->ms_count = 0;
 }
 
@@ -54,25 +53,26 @@ backoffDestroy(backoff_t **backoff)
 }
 
 
-int
+bool
 backoffAlgoAllowsConnect(backoff_t *backoff)
 {
     // If there isn't a backoff algo, always allow the connection.
-    if (!backoff) return 1;
+    if (!backoff) return TRUE;
 
-    int allowConnect = (++backoff->ms_count % backoff->backoff_ms == 0);
+    if (++backoff->ms_count >= backoff->backoff_limit) {
 
-    if (allowConnect) {
-        // for next retry period
+        // A connetion attempt is allowed.  Init for the next retry period.
         int jitter_ms = scope_rand() % 1000;
-        backoff->backoff_ms = (backoff->backoff_seconds * 1000) + jitter_ms;
+        backoff->backoff_limit = (backoff->backoff_base) + jitter_ms;
 
-        if (backoff->backoff_seconds < max_backoff_seconds) {
-            backoff->backoff_seconds = backoff->backoff_seconds * 2;
+        if (backoff->backoff_base < BACKOFF_BASE_MAX) {
+            backoff->backoff_base = backoff->backoff_base * 2;
         }
         backoff->ms_count = 0;
+        return TRUE;
     }
 
-    return allowConnect;
+    // It's not time to allow a connection attempt
+    return FALSE;
 }
 

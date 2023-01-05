@@ -23,9 +23,9 @@ backoffDestroyNullDoesntCrash(void **state)
 }
 
 static void
-backoffAlgoAllowsConnectHandlesNullWithoutCrashing(void **state)
+backoffAlgoAllowsConnectReturnsTrueIfNull(void **state)
 {
-    backoffAlgoAllowsConnect(NULL);
+    assert_true(backoffAlgoAllowsConnect(NULL));
 }
 
 static void
@@ -133,11 +133,12 @@ main(int argc, char* argv[])
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(backoffCreateReturnsValidPtr),
         cmocka_unit_test(backoffDestroyNullDoesntCrash),
-        cmocka_unit_test(backoffAlgoAllowsConnectHandlesNullWithoutCrashing),
+        cmocka_unit_test(backoffAlgoAllowsConnectReturnsTrueIfNull),
         cmocka_unit_test(backoffAlgoAllowsConnectFirstTime),
         cmocka_unit_test(backoffAlgoAllowsConnectIsInRange),
         cmocka_unit_test(backoffResetNullDoesntCrash),
         cmocka_unit_test(backoffResetReinitializesState),
+        cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

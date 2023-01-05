@@ -1,6 +1,8 @@
 #ifndef __BACKOFF_H__
 #define __BACKOFF_H__
 
+#include <stdbool.h>
+
 // This was written to keep state of connections so we can wait
 // and appropriate amount of time between attempting connections
 // and retrying them later.
@@ -17,6 +19,6 @@ void          backoffDestroy(backoff_t **);
 
 // Accessor
 void          backoffReset(backoff_t *);
-int           backoffAlgoAllowsConnect(backoff_t *);
+bool          backoffAlgoAllowsConnect(backoff_t *);
 
 #endif // __BACKOFF_H__

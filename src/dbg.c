@@ -279,7 +279,8 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
 // scopeLogDebug and scopeLogTrace when DEBUG is not defined.  This warning
 // can happen during compilation of calling code when function arguments are
 // variables.
-void scopeLogDropItOnTheFloor()
+void
+scopeLogDropItOnTheFloor(const char *format, ...)
 {
     return;
 }

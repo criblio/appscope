@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"runtime"
 	"syscall"
 	"time"
 )
@@ -39,9 +40,25 @@ type IpcPidCtx struct {
 	PrefixPath string
 }
 
+// Ensure that IPC communication is done in same thread (see ipcNsSet/ipcNsRestore)
+// In this way we ensure msgQOpen/msgQUnlink/msgQSend/msgQReceive/msgQCurrentMessages are
+// always called in context of the thread which reassocatied IPC namespace.
+func ipcStart() {
+	runtime.LockOSThread()
+}
+
+// Ensure that IPC communication is done in same thread (see ipcNsSet/ipcNsRestore)
+// In this way we ensure msgQOpen/msgQUnlink/msgQSend/msgQReceive/msgQCurrentMessages are
+// always called in context of the thread which reassocatied IPC namespace.
+func ipcEnd() {
+	runtime.UnlockOSThread()
+}
+
 // ipcDispatcher dispatches IPC communication to the process specified by the pid.
 // Returns the bytes array
 func ipcDispatcher(scopeReq []byte, pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
+	ipcStart()
+	defer ipcEnd()
 	ipc, err := newIPC(pidCtx)
 	if err != nil {
 		return nil, err

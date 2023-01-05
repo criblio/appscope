@@ -182,8 +182,7 @@ func msgQUnlink(name string) error {
 
 // newMsgQReader creates message queue with write only permissions
 func newMsgQWriter(name string) (*sendMessageQueue, error) {
-	// TODO: Add O_EXCL but figure it out why sometimes unlink fails with container communication
-	mqfd, err := msgQOpen(name, unix.O_CREAT|unix.O_WRONLY|unix.O_NONBLOCK)
+	mqfd, err := msgQOpen(name, unix.O_CREAT|unix.O_WRONLY|unix.O_NONBLOCK|unix.O_EXCL)
 	if err != nil {
 		return nil, err
 	}
@@ -198,8 +197,7 @@ func newMsgQWriter(name string) (*sendMessageQueue, error) {
 
 // newMsgQReader creates message queue with read only permissions
 func newMsgQReader(name string) (*receiveMessageQueue, error) {
-	// TODO: Add O_EXCL but figure it out why sometimes unlink fails with container communication
-	mqfd, err := msgQOpen(name, unix.O_CREAT|unix.O_RDONLY|unix.O_NONBLOCK)
+	mqfd, err := msgQOpen(name, unix.O_CREAT|unix.O_RDONLY|unix.O_NONBLOCK|unix.O_EXCL)
 	if err != nil {
 		return nil, err
 	}

@@ -15,16 +15,15 @@ unsigned            mtcEnabled(mtc_t*);
 int                 mtcSend(mtc_t*, const char* msg);
 int                 mtcSendMetric(mtc_t*, event_t*);
 void                mtcFlush(mtc_t*);
+void                mtcLogConnectionStatus(mtc_t *);
 
 // Setters (modifies mtc_t, but does not persist modifications)
 int                 mtcNeedsConnection(mtc_t *);
 int                 mtcConnect(mtc_t *);
 int                 mtcConnection(mtc_t*);
-uint64_t            mtcConnectAttempts(mtc_t*);
 int                 mtcDisconnect(mtc_t *);
 int                 mtcReconnect(mtc_t *);
 void                mtcEnabledSet(mtc_t*, unsigned);
-net_fail_t          mtcTransportFailureReason(mtc_t *);
 void                mtcTransportSet(mtc_t*, transport_t*);
 void                mtcFormatSet(mtc_t*, mtc_fmt_t*);
 

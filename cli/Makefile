@@ -21,6 +21,7 @@ LIBDIR := ../lib/linux/$(ARCH)
 CONFDIR := ../conf
 
 SCOPE := $(BINDIR)/scope
+SCOPEDYN := $(BINDIR)/scopedyn
 LIBSCOPE := $(LIBDIR)/libscope.so
 LIBLOADER := $(LIBDIR)/libloader.a
 CONF_YML := $(CONFDIR)/scope.yml
@@ -55,12 +56,12 @@ genflowtest:
 	./flows/gen_flow_test.sh
 
 ## all: build and compress \`scope\`
-all: scope compressscope require-go-version
+all: scope scopedyn compressscope require-go-version
 
 ## clean: remove the built binary
 clean:
 	$(RM) -r build/*
-	$(RM) run/bundle.go $(SCOPE)
+	$(RM) run/bundle.go $(SCOPE) $(SCOPEDYN)
 	$(RM) coverage.out coverage.html
 	$(RM) -rf -- .gocache/*/
 	$(RM) -rf -- .gomod/*/
@@ -91,13 +92,22 @@ $(LIBLOADER):
 	@$(MAKE) -C .. lib/linux/$(ARCH)/libloader.a
 
 scope: $(SCOPE)
-
 $(SCOPE): export GOOS=linux
+$(SCOPE): export CGO_ENABLED=1
 $(SCOPE): run/bundle.go $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
+	$(GO) build \
+		-ldflags="$(shell $(GOVVV) -flags) -linkmode external -extldflags -static " \
+		$(BUILD_OPTS) \
+	       	-o $(SCOPE)
+
+
+scopedyn: $(SCOPEDYN)
+$(SCOPEDYN): export GOOS=linux
+$(SCOPEDYN): run/bundle.go $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 	$(GO) build \
 		-ldflags="$(shell $(GOVVV) -flags)" \
 		$(BUILD_OPTS) \
-	       	-o $(SCOPE)
+	       	-o $(SCOPEDYN)
 
 compressscope: $(SCOPE) require-upx
 	@if [ -z $(SCOPE_NOCOMPRESS) ] ; then \

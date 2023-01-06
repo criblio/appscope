@@ -609,16 +609,45 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         execve(inferior_command, &argv[0], environ);
     }
 
-    if ((handle = dlopen(scopeLibPath, RTLD_LAZY)) == NULL) {
-        goto err;
+
+// is scope static or dynamic?
+
+    elf_buf_t *scope_ebuf;
+    scope_ebuf = getElf("/proc/self/exe");
+    if (!scope_ebuf) {
+            perror("setenv");
+            goto err;
     }
 
-    sys_exec = dlsym(handle, "sys_exec");
-    if (!sys_exec) {
-        goto err;
-    }
+    if (is_static(scope_ebuf->buf)) {
+        // if scope is static, exec scopedyn
+        
+        char *execArgv[argc+2];
+        int execArgc = 2;
+        for (int i = 0; i < argc; i++) {
+            execArgv[execArgc++] = argv[i++];
+        }
+        execArgv[execArgc++] = NULL;
+        char *execname = "scopedyn";
+        char *execz = "-z"; //todo remove
+        execArgv[0] = execname;
+        execArgv[1] = execz;
+        execve("/home/sean/src2/appscope-dev/bin/linux/x86_64/scopedyn", &execArgv[0], environ);
+        perror("execve");
 
-    sys_exec(ebuf, inferior_command, argc, &argv[0], env);
+    } else {
+        // otherwise if scope is dynamic do this
+        if ((handle = dlopen(scopeLibPath, RTLD_LAZY)) == NULL) {
+            goto err;
+        }
+
+        sys_exec = dlsym(handle, "sys_exec");
+        if (!sys_exec) {
+            goto err;
+        }
+
+        sys_exec(ebuf, inferior_command, argc, &argv[0], env);
+    }
 
     /*
      * We should not return from sys_exec unless there was an error loading the static exec.
@@ -628,7 +657,10 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
      */
     execve(inferior_command, &argv[0], environ);
 
+
+
 err:
     if (ebuf) free(ebuf);
+    if (scope_ebuf) freeElf(scope_ebuf->buf, scope_ebuf->len);
     exit(EXIT_FAILURE);
 }

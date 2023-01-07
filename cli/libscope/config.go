@@ -87,7 +87,7 @@ type ScopeEventWatchConfig struct {
 // ScopeLibscopeConfig represents how to configure libscope
 type ScopeLibscopeConfig struct {
 	ConfigEvent   BoolString     `mapstructure:"configevent" json:"configevent" yaml:"configevent"`
-	SummaryPeriod int            `mapstructure:"summaryperiod" jaon:"summaryperiod" yaml:"summaryperiod"`
+	SummaryPeriod int            `mapstructure:"summaryperiod" json:"summaryperiod" yaml:"summaryperiod"`
 	CommandDir    string         `mapstructure:"commanddir" json:"commanddir" yaml:"commanddir"`
 	Log           ScopeLogConfig `mapstructure:"log" json:"log" yaml:"log"`
 }

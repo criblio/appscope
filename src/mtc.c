@@ -72,6 +72,14 @@ mtcFlush(mtc_t *mtc)
     transportFlush(mtc->transport);
 }
 
+void
+mtcLogConnectionStatus(mtc_t *mtc)
+{
+    if (!mtc || (cfgLogStreamEnable(g_cfg.staticfg))) return;
+
+    transportLogConnectionStatus(mtc->transport, "metric");
+}
+
 int
 mtcNeedsConnection(mtc_t *mtc)
 {
@@ -94,13 +102,6 @@ mtcConnection(mtc_t *mtc)
     return transportConnection(mtc->transport);
 }
 
-uint64_t
-mtcConnectAttempts(mtc_t *mtc)
-{
-    if (!mtc || (cfgLogStreamEnable(g_cfg.staticfg))) return -1;
-    return transportConnectAttempts(mtc->transport);
-}
-
 int
 mtcDisconnect(mtc_t *mtc)
 {
@@ -120,13 +121,6 @@ mtcEnabledSet(mtc_t *mtc, unsigned val)
 {
     if (!mtc || val > 1) return;
     mtc->enable = val;
-}
-
-net_fail_t 
-mtcTransportFailureReason(mtc_t *mtc)
-{
-    if (!mtc || (cfgLogStreamEnable(g_cfg.staticfg))) return 0;
-    return transportConnectAttempts(mtc->transport);
 }
 
 void

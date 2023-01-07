@@ -1151,16 +1151,6 @@ ctlConnect(ctl_t *ctl, which_transport_t who)
         transportConnect(ctl->transport);
 }
 
-uint64_t
-ctlConnectAttempts(ctl_t *ctl, which_transport_t who)
-{
-    if (!ctl) return 0;
-
-    return (who == CFG_LS) ?
-        transportConnectAttempts(ctl->paytrans) :
-        transportConnectAttempts(ctl->transport);
-}
-
 int
 ctlDisconnect(ctl_t *ctl, which_transport_t who)
 {
@@ -1179,16 +1169,6 @@ ctlReconnect(ctl_t *ctl, which_transport_t who)
     return (who == CFG_LS) ?
         transportReconnect(ctl->paytrans) :
         transportReconnect(ctl->transport);
-}
-
-net_fail_t
-ctlTransportFailureReason(ctl_t *ctl, which_transport_t who)
-{
-    if (!ctl) return 0;
-
-    return (who == CFG_LS) ?
-        transportFailureReason(ctl->paytrans) :
-        transportFailureReason(ctl->transport);
 }
 
 void
@@ -1239,6 +1219,17 @@ ctlEvtGet(ctl_t *ctl)
 {
     return ctl ? ctl->evt : NULL;
 }
+
+void
+ctlLogConnectionStatus(ctl_t *ctl, which_transport_t who)
+{
+    if (!ctl) return;
+
+    return (who == CFG_LS) ?
+        transportLogConnectionStatus(ctl->paytrans, "payload") :
+        transportLogConnectionStatus(ctl->transport, "event");
+}
+
 
 bool
 ctlEvtSourceEnabled(ctl_t *ctl, watch_t src)

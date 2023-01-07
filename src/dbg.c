@@ -275,6 +275,16 @@ scopeLog(cfg_log_level_t level, const char *format, ...)
     return;
 }
 
+// This is used to quiet "unused variable" compiler warnings for callers of
+// scopeLogDebug and scopeLogTrace when DEBUG is not defined.  This warning
+// can happen during compilation of calling code when function arguments are
+// variables.
+void
+scopeLogDropItOnTheFloor(const char *format, ...)
+{
+    return;
+}
+
 void
 scopeBacktrace(cfg_log_level_t level)
 {

@@ -82,18 +82,6 @@ typedef struct
     int   after_scope;
 } param_t;
 
-enum_map_t netFailMap[] = {
-    {"n/a",                                            NO_FAIL},
-    {"Connection failure",                             CONN_FAIL},
-    {"TLS Failure: error accessing peer certificate",  TLS_CERT_FAIL},
-    {"TLS Failure: error establishing connection",     TLS_CONN_FAIL},
-    {"TLS Failure: error creating context",            TLS_CONTEXT_FAIL},
-    {"TLS Failure: error creating session",            TLS_SESSION_FAIL},
-    {"TLS Failure: error setting tls on socket",       TLS_SOCKET_FAIL},
-    {"TLS Failure: server validation failed",          TLS_VERIFY_FAIL},
-    {NULL,                                             -1}
-};
-
 void
 doAndReplaceConfig(void *data) {
     config_t * cfg = (config_t *) data;
@@ -1142,16 +1130,10 @@ periodic(void *arg)
 
             if (tv.tv_sec >= logReportTime) {
                 if (ctlNeedsConnection(g_ctl, CFG_CTL)) {
-                    scopeLog(CFG_LOG_WARN, "event destination not connected. messages dropped: "
-                            "%"PRIu64 " connection attempts: %"PRIu64 " reason for failure: %s", \
-                            g_cbuf_drop_count, ctlConnectAttempts(g_ctl, CFG_CTL), \
-                            valToStr(netFailMap, ctlTransportFailureReason(g_ctl, CFG_CTL)));
+                    ctlLogConnectionStatus(g_ctl, CFG_CTL);
                 }
                 if (mtcNeedsConnection(g_mtc)) {
-                    scopeLog(CFG_LOG_WARN, "metric destination not connected. messages dropped: "
-                            "%"PRIu64 " connection attempts: %"PRIu64 " reason for failure: %s", \
-                            g_cbuf_drop_count, mtcConnectAttempts(g_mtc), \
-                            valToStr(netFailMap, mtcTransportFailureReason(g_mtc)));
+                    mtcLogConnectionStatus(g_mtc);
                 }
                 logReportTime = tv.tv_sec + CONN_LOG_INTERVAL; 
             }

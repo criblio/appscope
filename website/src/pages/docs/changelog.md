@@ -5,6 +5,32 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.2.2
+
+2023-01-18 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.2.2`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.2.2/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.2.2/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.2.2/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.2.2/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.2.2/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.2/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.2.2/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.2/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.2.2`.
+
+### New Features and Improvements
+
+AppScope 1.2.2 introduces: 
+
+- foo
+
+### Fixes
+
+- [#000](https://github.com/criblio/appscope/issues/000) Foo bar tra la la.
+
 ## AppScope 1.2.1
 
 2022-12-07 - Maintenance Release

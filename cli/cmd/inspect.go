@@ -12,8 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-/* Args Matrix (X disallows)
- */
 var pidCtx *ipc.IpcPidCtx = &ipc.IpcPidCtx{}
 
 // inspectCmd represents the inspect command

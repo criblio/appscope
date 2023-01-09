@@ -35,8 +35,8 @@
  */
 
 typedef enum {
-    META_REQ_JSON,            // Retrieves scope status of application (enabled or disabled)
-    META_REQ_JSON_PARTIAL,     // Retrieves the current configuration
+    META_REQ_JSON,            // JSON request (complete)
+    META_REQ_JSON_PARTIAL,    // JSON request (partial)
 } meta_req_t;
 
 /*

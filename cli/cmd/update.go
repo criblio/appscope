@@ -12,10 +12,6 @@ import (
 )
 
 var cfgPath string
-var procfsPrefixPathUpdate string
-
-/* Args Matrix (X disallows)
- */
 
 // updateCmd represents the info command
 var updateCmd = &cobra.Command{

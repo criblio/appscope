@@ -599,7 +599,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         execve(inferior_command, argv, environ);
     }
 
-    program_invocation_short_name = basename(argv[0]); 
+    program_invocation_short_name = basename(argv[0]);
 
     if (!is_go(ebuf->buf)) {
         // We're getting here with upx-encoded binaries
@@ -632,7 +632,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         char *execz = "-z"; //todo remove
         execArgv[0] = execname;
         execArgv[1] = execz;
-        execve("/home/sean/src2/appscope-dev/bin/linux/x86_64/scopedyn", &execArgv[0], environ);
+        execve("/home/sean/src/appscope-dev/bin/linux/x86_64/scopedyn", &execArgv[0], environ);
         perror("execve");
 
     } else {

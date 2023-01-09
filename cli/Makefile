@@ -97,6 +97,7 @@ $(SCOPE): export CGO_ENABLED=1
 $(SCOPE): run/bundle.go $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 	$(GO) build \
 		-ldflags="$(shell $(GOVVV) -flags) -linkmode external -extldflags -static " \
+		-buildmode=pie \
 		$(BUILD_OPTS) \
 	       	-o $(SCOPE)
 
@@ -106,6 +107,7 @@ $(SCOPEDYN): export GOOS=linux
 $(SCOPEDYN): run/bundle.go $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 	$(GO) build \
 		-ldflags="$(shell $(GOVVV) -flags)" \
+		-buildmode=pie \
 		$(BUILD_OPTS) \
 	       	-o $(SCOPEDYN)
 

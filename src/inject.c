@@ -19,6 +19,7 @@
 #include "scopestdlib.h"
 #include "dbg.h"
 #include "inject.h"
+#include "remotemem.h"
 #include "os.h"
 
 typedef enum {
@@ -305,58 +306,24 @@ exit:
     return ret;
 }
 
-static int 
-findLib(struct dl_phdr_info *info, size_t size, void *data)
-{
-    if (scope_strstr(info->dlpi_name, "libc.so") != NULL ||
-        scope_strstr(info->dlpi_name, "ld-musl") != NULL) {
-        char libpath[PATH_MAX];
-        if (scope_realpath(info->dlpi_name, libpath)) {
-            ((libdl_info_t *)data)->path = libpath;
-            ((libdl_info_t *)data)->addr = info->dlpi_addr;
-            return 1;
-        }
-    }
-    return 0;
-}
-
-int 
+int
 injectScope(int pid, char *path)
 {
-    uint64_t remoteLib, localLib;
-    void *dlopenAddr = NULL;
-    libdl_info_t info;
     int glibc = TRUE;
 
-    if (!dl_iterate_phdr(findLib, &info)) {
-        scope_fprintf(scope_stderr, "error: failed to find local libc\n");
-        return EXIT_FAILURE;
-    }
-
-    localLib = info.addr;
-    dlopenAddr = dlsym(RTLD_DEFAULT, "__libc_dlopen_mode");
-    if (dlopenAddr == NULL) {
-        dlopenAddr = dlsym(RTLD_DEFAULT, "dlopen");
+    uint64_t dlopenAddr = remoteProcSymbolAddr(pid, "__libc_dlopen_mode");
+    if (!dlopenAddr) {
+        dlopenAddr = remoteProcSymbolAddr(pid, "dlopen");
         glibc = FALSE;
     }
 
-    if (dlopenAddr == NULL) {
+    if (dlopenAddr == 0) {
         scope_fprintf(scope_stderr, "error: failed to find dlopen()\n");
         return EXIT_FAILURE;
     }
 
-    // find the base address of libc in the target process
-    remoteLib = osFindLibrary(info.path, pid, TRUE);
-    if ((remoteLib == 0) || (remoteLib == -1)) {
-        scope_fprintf(scope_stderr, "error: failed to find libc in target process\n");
-        return EXIT_FAILURE;
-    }
-
-    // calculate the address of dlopen in the target process
-    dlopenAddr = remoteLib + (dlopenAddr - localLib);
-
     // inject libscope.so into the target process
-    return inject(pid, REM_CMD_DLOPEN, (uint64_t) dlopenAddr, path, glibc);
+    return inject(pid, REM_CMD_DLOPEN, dlopenAddr, path, glibc);
 }
 
 int

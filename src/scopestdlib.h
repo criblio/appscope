@@ -285,6 +285,7 @@ int           scope_setns(int, int);
 int           scope_chown(const char *, uid_t, gid_t);
 int           scope_fchown(int, uid_t, gid_t);
 int           scope_symlink(const char *, const char *);
+ssize_t       scope_process_vm_readv(pid_t, const struct iovec *, unsigned long, const struct iovec *, unsigned long, unsigned long);
 
 
 #endif // __SCOPE_STDLIB_H__

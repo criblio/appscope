@@ -210,6 +210,7 @@ extern int           scopelibc_setns(int, int);
 extern int           scopelibc_chown(const char *, uid_t, gid_t);
 extern int           scopelibc_fchown(int, uid_t, gid_t);
 extern int           scopelibc_symlink(const char *, const char *);
+extern ssize_t       scopelibc_process_vm_readv(pid_t, const struct iovec *, unsigned long, const struct iovec *, unsigned long, unsigned long);
 
 static int g_go_static;
 
@@ -1242,4 +1243,9 @@ scope_fchown(int fd, uid_t owner, gid_t group) {
 int
 scope_symlink(const char *target, const char *linkpath) {
     return scopelibc_symlink(target, linkpath);
+}
+
+ssize_t
+scope_process_vm_readv(pid_t pid, const struct iovec *local_iov, unsigned long liovcnt, const struct iovec *remote_iov, unsigned long riovcnt, unsigned long flags) {
+    return scopelibc_process_vm_readv(pid, local_iov, liovcnt, remote_iov, riovcnt, flags);
 }

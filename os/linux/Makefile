@@ -49,11 +49,11 @@ $(OPENSSL_AR):
 $(PCRE2_AR):
 	@$(MAKE) -C contrib pcre2
 
-$(LDSCOPEDYN): src/fn.c src/scopestdlib.c src/nsinfo.c src/nsfile.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c src/plattime.c
+$(LDSCOPEDYN): src/fn.c src/scopestdlib.c src/nsinfo.c src/nsfile.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c src/remotemem.c src/vector.c src/plattime.c
 	@echo "$${CI:+::group::}Building $@"
 	gcc -Wall -g $(ARCH_CFLAGS) $(DISTRO_FLAGS) \
 		-DSCOPE_VER=\"$(SCOPE_VER)\" \
-		src/fn.c src/scopestdlib.c src/nsinfo.c src/nsfile.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c src/plattime.c \
+		src/fn.c src/scopestdlib.c src/nsinfo.c src/nsfile.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c src/remotemem.c src/vector.c src/plattime.c \
 		-ldl -lrt -o $@ ${MUSL_AR} ${UNWIND_AR} -I./os/$(OS) $(INCLUDES)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 

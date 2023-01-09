@@ -33,6 +33,26 @@ func TestNewMqWriter(t *testing.T) {
 	err = msgQ.destroy()
 	assert.NoError(t, err)
 }
+
+func TestNoDuplicate(t *testing.T) {
+	const mqNameR string = "goTestMqR"
+	const mqNameW string = "goTestMqW"
+
+	msgQW, err := newMsgQWriter(mqNameW)
+	assert.NoError(t, err)
+	assert.NotNil(t, msgQW)
+	msgQWNew, err := newMsgQWriter(mqNameW)
+	assert.Error(t, err)
+	assert.Nil(t, msgQWNew)
+
+	msgQR, err := newMsgQReader(mqNameR)
+	assert.NoError(t, err)
+	assert.NotNil(t, msgQR)
+	msgQRNew, err := newMsgQReader(mqNameR)
+	assert.Error(t, err)
+	assert.Nil(t, msgQRNew)
+}
+
 func TestCommunicationMqReader(t *testing.T) {
 	const mqName string = "goTestMqReader"
 	byteTestMsg := []byte("Lorem Ipsum")

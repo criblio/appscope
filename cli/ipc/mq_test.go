@@ -2,7 +2,6 @@ package ipc
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sys/unix"
@@ -66,12 +65,12 @@ func TestCommunicationMqReader(t *testing.T) {
 	assert.NotEqual(t, msgQWriteFd, -1)
 
 	// Try to read from empty queue
-	data, err := msgQReader.receive(time.Microsecond)
+	data, err := msgQReader.receive()
 	assert.Nil(t, data)
 	assert.Error(t, err)
 
 	// Empty message send to w
-	err = msgQSend(msgQWriteFd, []byte(""), time.Microsecond)
+	err = msgQSend(msgQWriteFd, []byte(""))
 	assert.Error(t, err)
 	size, err := msgQReader.size()
 	assert.NoError(t, err)
@@ -81,7 +80,7 @@ func TestCommunicationMqReader(t *testing.T) {
 	assert.Zero(t, size)
 
 	// Normal message send
-	err = msgQSend(msgQWriteFd, byteTestMsg, time.Microsecond)
+	err = msgQSend(msgQWriteFd, byteTestMsg)
 	assert.NoError(t, err)
 	size, err = msgQReader.size()
 	assert.NoError(t, err)
@@ -90,7 +89,7 @@ func TestCommunicationMqReader(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, size, 1)
 
-	data, err = msgQReader.receive(time.Microsecond)
+	data, err = msgQReader.receive()
 	assert.Equal(t, data, byteTestMsg)
 	assert.NotNil(t, data)
 	assert.NoError(t, err)
@@ -121,7 +120,7 @@ func TestCommunicationMqWriter(t *testing.T) {
 	assert.NotEqual(t, msgQReaderFd, -1)
 
 	// Empty message send to writer message queue
-	err = msgQWriter.send([]byte(""), time.Microsecond)
+	err = msgQWriter.send([]byte(""))
 	assert.Error(t, err)
 	size, err := msgQWriter.size()
 	assert.NoError(t, err)
@@ -131,7 +130,7 @@ func TestCommunicationMqWriter(t *testing.T) {
 	assert.Zero(t, size)
 
 	// Normal message send
-	err = msgQWriter.send(byteTestMsg, time.Microsecond)
+	err = msgQWriter.send(byteTestMsg)
 	assert.NoError(t, err)
 	size, err = msgQWriter.size()
 	assert.NoError(t, err)
@@ -140,7 +139,7 @@ func TestCommunicationMqWriter(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, size, 1)
 
-	data, err := msgQReceive(msgQReaderFd, 512, time.Microsecond)
+	data, err := msgQReceive(msgQReaderFd, 512)
 	assert.Equal(t, data, byteTestMsg)
 	assert.NotNil(t, data)
 	assert.NoError(t, err)

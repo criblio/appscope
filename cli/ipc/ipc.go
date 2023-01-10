@@ -197,7 +197,7 @@ func (ipc *ipcObj) destroyIPC() {
 // receive receive the message from the process endpoint
 func (ipc *ipcObj) receive() ([]byte, error) {
 	for i := 0; i < comRetryLimit; i++ {
-		res, err := ipc.receiver.receive(0)
+		res, err := ipc.receiver.receive()
 		if err != errMsgQEmpty {
 			return res, err
 		}
@@ -209,7 +209,7 @@ func (ipc *ipcObj) receive() ([]byte, error) {
 // send sends the message to the process endpoint
 func (ipc *ipcObj) send(msg []byte) error {
 	for i := 0; i < comRetryLimit; i++ {
-		err := ipc.sender.send(msg, 0)
+		err := ipc.sender.send(msg)
 		if err != errMsgQFull {
 			return err
 		}

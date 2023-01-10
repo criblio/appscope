@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"golang.org/x/sys/unix"
@@ -102,7 +101,7 @@ func msgQOpen(name string, flags int) (int, error) {
 }
 
 // msgQSend sends msg to specific msgQueue described by fd
-func msgQSend(fd int, msg []byte, timeout time.Duration) error {
+func msgQSend(fd int, msg []byte) error {
 	msgLen := len(msg)
 	if msgLen == 0 {
 		return errEmptyMsg
@@ -117,7 +116,7 @@ func msgQSend(fd int, msg []byte, timeout time.Duration) error {
 		uintptr(unsafe.Pointer(&msg[0])), // msg_ptr
 		uintptr(msgLen),                  // msg_len
 		uintptr(0),                       // msg_prio
-		getBlockAbsTime(timeout),         // abs_timeout
+		0,                                // abs_timeout
 		0,                                // unused
 	)
 
@@ -132,7 +131,7 @@ func msgQSend(fd int, msg []byte, timeout time.Duration) error {
 }
 
 // msgQReceive receive msg from specific msgQueue described by fd
-func msgQReceive(fd int, capacity int, timeout time.Duration) ([]byte, error) {
+func msgQReceive(fd int, capacity int) ([]byte, error) {
 
 	recvBuf := make([]byte, capacity)
 
@@ -145,7 +144,7 @@ func msgQReceive(fd int, capacity int, timeout time.Duration) ([]byte, error) {
 		uintptr(unsafe.Pointer(&recvBuf[0])), // msg_ptr
 		uintptr(capacity),                    // msg_len
 		uintptr(0),                           // msg_prio
-		getBlockAbsTime(timeout),             // abs_timeout
+		0,                                    // abs_timeout
 		0,                                    // unused
 	)
 
@@ -223,22 +222,12 @@ func (mq *messageQueue) destroy() error {
 	return msgQUnlink(mq.name)
 }
 
-// getBlockAbsTime retrieve the absolute time which the call (send/receive) will block
-func getBlockAbsTime(timeout time.Duration) uintptr {
-	if timeout == 0 {
-		return 0
-	}
-
-	ts := unix.NsecToTimespec(time.Now().Add(timeout).UnixNano())
-	return uintptr(unsafe.Pointer(&ts))
-}
-
 // send data to message queue
-func (mq *sendMessageQueue) send(msg []byte, timeout time.Duration) error {
-	return msgQSend(mq.fd, msg, timeout)
+func (mq *sendMessageQueue) send(msg []byte) error {
+	return msgQSend(mq.fd, msg)
 }
 
 // receive data from message queque
-func (mq *receiveMessageQueue) receive(timeout time.Duration) ([]byte, error) {
-	return msgQReceive(mq.fd, mq.cap, timeout)
+func (mq *receiveMessageQueue) receive() ([]byte, error) {
+	return msgQReceive(mq.fd, mq.cap)
 }

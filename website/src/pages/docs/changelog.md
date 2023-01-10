@@ -23,13 +23,23 @@ Assets other than AWS Lambda Layers are available in the [Docker container](http
 
 ### New Features and Improvements
 
+<strong>AppScope 1.2.2 fixes a critical security vulnerability in OpenSSL. The AppScope team and Cribl strongly recommend upgrading as soon as possible.</strong>
+
 AppScope 1.2.2 introduces: 
 
-- foo
+- Support for [OCI containers](https://opencontainers.org/) run by the [Podman](https://podman.io/) container engine. See issue [#1216](https://github.com/criblio/appscope/issues/1216).
+
+- Support for writing payloads to files on disk while simultaneously sending events and metrics to Cribl Stream or Cribl Edge. To do this, use the new environment variable `SCOPE_PAYLOAD_TO_DISK` together with existing env vars `SCOPE_CRIBL_ENABLE` and `SCOPE_PAYLOAD_ENABLE`, as described [here](/docs/data-routing). See issue [#1158](https://github.com/criblio/appscope/issues/1158).
+
+AppScope 1.2.2 also updates these software components:
+
+- OpenSSL is updated from version 3.0.0 to version 3.0.7. This fixes an OpenSSL security vulnerability, [CVE-2022-3602](https://nvd.nist.gov/vuln/detail/CVE-2022-3602). See issue [#1182](https://github.com/criblio/appscope/issues/1182).
+- The [UPX](https://upx.github.io/) executable packer is updated from version 4.0.0 to version 4.0.1. See issue [#1214](https://github.com/criblio/appscope/issues/1214).
+
 
 ### Fixes
 
-- [#000](https://github.com/criblio/appscope/issues/000) Foo bar tra la la.
+- [#1197](https://github.com/criblio/appscope/issues/1197) When run in a container that is itself inside a container (i.e., Docker in Docker), AppScope now successfully locates the host namespace.
 
 ## AppScope 1.2.1
 

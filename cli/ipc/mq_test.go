@@ -50,6 +50,10 @@ func TestNoDuplicate(t *testing.T) {
 	msgQRNew, err := newMsgQReader(mqNameR)
 	assert.Error(t, err)
 	assert.Nil(t, msgQRNew)
+	err = msgQR.destroy()
+	assert.NoError(t, err)
+	err = msgQW.destroy()
+	assert.NoError(t, err)
 }
 
 func TestCommunicationMqReader(t *testing.T) {
@@ -112,6 +116,7 @@ func TestCommunicationMqWriter(t *testing.T) {
 	byteTestMsg := []byte("Lorem Ipsum")
 
 	msgQWriter, err := newMsgQWriter(mqName)
+
 	assert.NoError(t, err)
 	assert.NotNil(t, msgQWriter)
 
@@ -139,10 +144,10 @@ func TestCommunicationMqWriter(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, size, 1)
 
-	data, err := msgQReceive(msgQReaderFd, 512)
-	assert.Equal(t, data, byteTestMsg)
-	assert.NotNil(t, data)
+	data, err := msgQReceive(msgQReaderFd, msgQWriter.cap)
 	assert.NoError(t, err)
+	assert.NotNil(t, data)
+	assert.Equal(t, data, byteTestMsg)
 	size, err = msgQWriter.size()
 	assert.NoError(t, err)
 	assert.Zero(t, size)

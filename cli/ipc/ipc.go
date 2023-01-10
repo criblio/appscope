@@ -287,7 +287,6 @@ func (ipc *ipcObj) sendIpcRequest(scopeMsg []byte) error {
 			frame = bytes.Replace(frame, []byte("req\":1"), []byte("req\":0"), 1)
 		}
 
-		// Retry mechanism ?
 		err = ipc.send(frame)
 		if err != nil {
 			return err

@@ -20,12 +20,12 @@ var (
 	errMsgQFull       = errors.New("message queue is full")
 )
 
-// Parameters used in message quque creation
+// Parameters used in message queue creation
 // - maximum number of messsages in a queue
 // - maximum message size in a queue
 // Details: https://man7.org/linux/man-pages/man7/mq_overview.7.html
-const mqMaxMsgMax int = 4
-const mqMaxMsgSize int = 128
+const mqMaxMsgMax int = 10
+const mqMaxMsgSize int = 8192
 
 // Message queque attribute structure
 // Details: https://man7.org/linux/man-pages/man3/mq_getattr.3.html

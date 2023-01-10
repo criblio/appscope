@@ -55,7 +55,7 @@ genflowtest:
 	./flows/gen_flow_test.sh
 
 ## all: build and compress \`scope\`
-all: scope compressscope require-go-version
+all: scope require-go-version
 
 ## clean: remove the built binary
 clean:

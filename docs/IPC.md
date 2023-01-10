@@ -66,7 +66,7 @@ With framing mechanism:
 
 ### Framing mechanism
 
-- value `1` in `req` field in request indicates that the request is splitted by multiple frames
+- value `1` in `req` field in request indicates that the request has more frames remaining, value `0` indicates that the frame is last in communication
 - value `206` in `status` field in response indicates that the response is splitted by multiple frames
 - in each frame in the request - `uniq` field value must be the same
 - in each following frame in the request - `remain` field must decreasing

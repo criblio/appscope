@@ -52,9 +52,9 @@ func ipcNsRestore() error {
 	return unix.Setns(int(fd.Fd()), syscall.CLONE_NEWIPC)
 }
 
-// ipcNsLastPidFromPId process the NsPid file for specified PID.
+// ipcNsLastPidFromPid process the NsPid file for specified PID.
 // Returns status if the specified PID residents in nested PID namespace, last PID in namespace and status of operation.
-func ipcNsLastPidFromPId(pidCtx IpcPidCtx) (bool, int, error) {
+func ipcNsLastPidFromPid(pidCtx IpcPidCtx) (bool, int, error) {
 	// TODO: goprocinfo does not support all the status parameters (NsPid)
 	// handle procfs by ourselves ?
 	file, err := os.Open(fmt.Sprintf("%v/proc/%v/status", pidCtx.PrefixPath, pidCtx.Pid))

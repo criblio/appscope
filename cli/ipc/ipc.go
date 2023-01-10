@@ -151,7 +151,7 @@ func newIPC(pidCtx IpcPidCtx) (*ipcObj, error) {
 	}
 
 	// Retrieve information about process namespace PID
-	_, ipcPid, err := ipcNsLastPidFromPId(pidCtx)
+	_, ipcPid, err := ipcNsLastPidFromPid(pidCtx)
 	if err != nil {
 		return nil, err
 	}

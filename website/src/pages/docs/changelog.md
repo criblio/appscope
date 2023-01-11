@@ -26,7 +26,7 @@ Assets other than AWS Lambda Layers are available in the [Docker container](http
 AppScope 1.2.1 introduces: 
 
 - Support for attaching to processes running in [LXD and LXC containers](https://www.sumologic.com/blog/lxc-lxd-linux-containers/).
-- A new `--all` or `-a` flag for the `scope detach` [command](docs/cli-reference#detach). Running `scope detach --all` detaches AppScope from all processes.
+- A new `--all` or `-a` flag for the `scope detach` [command](/docs/cli-reference#detach). Running `scope detach --all` detaches AppScope from all processes.
 
 ### Fixes
 

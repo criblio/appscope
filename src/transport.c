@@ -1611,3 +1611,86 @@ transportLogConnectionStatus(transport_t *trans, const char *name)
     }
 
 }
+
+transport_status_t
+transportConnectionStatus(transport_t *trans)
+{
+
+/*
+    My plan is to have all of these strings either be static
+    (friendlyTransportName and failureString) or constructed as
+    part of the transport at transport creation time and never
+    modified until the eventual transportDestroy (configString)
+
+    friendlyTransportName examples:
+        metric
+        event
+        log
+        payload
+
+    configString examples:
+        myhost:myport
+        /my/unix/path.sock
+        @abstractsockname
+        edge
+        /my/file/path.log
+
+    failureString examples:
+        see netFailMap above
+
+    g_cbuf_drop_count is deliberately not part of this structure...
+    it's available independently and should probably be part of
+    a status of queues (when we do this in the future) instead???
+*/
+
+    if (!trans) {
+        DBG(NULL);
+        transport_status_t status = {
+            .friendlyTransportName = NULL,
+            .configString = NULL,
+            .isConnected = false,
+            .connectAttemptCount = 0,
+            .failureString = NULL};
+
+        return status;
+    }
+
+    const char *failStr;
+    if (trans->type == CFG_TCP || trans->type == CFG_UDP) {
+        failStr = netFailMap[trans->net.failure_reason];
+    } else {
+        failStr = NULL;
+    }
+
+    const char *cfgStr;
+    switch (trans->type) {
+        case CFG_UDP:
+        case CFG_TCP:
+            cfgStr = ""; // tbd trans->net.host, trans->net.port
+            break;
+        case CFG_UNIX:
+            cfgStr = trans->local.path;
+            break;
+        case CFG_EDGE:
+            cfgStr = "edge";
+            break;
+        case CFG_FILE:
+            cfgStr = trans->file.path;
+            break;
+        case CFG_SYSLOG:
+        case CFG_SHM:
+        default:
+            cfgStr = "";
+            DBG("%d", trans->type);
+    }
+
+    transport_status_t status = {
+        .friendlyTransportName = "", // tbd trans->status.friendlyTransportName,
+        .configString = cfgStr,
+        .isConnected = !transportNeedsConnection(trans),
+        .connectAttemptCount = trans->connect_attempts,
+        .failureString = failStr
+    };
+
+    return status;
+}

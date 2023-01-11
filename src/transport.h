@@ -3,6 +3,17 @@
 #include <stdint.h>
 #include "scopetypes.h"
 
+typedef struct {
+    const char *friendlyTransportName;
+    const char *configString;
+    bool isConnected;
+
+    unsigned connectAttemptCount;   // Useful if isConnected is false
+    const char *failureString;      // may be provided when isConnected is false
+} transport_status_t;
+
+
+
 typedef struct _transport_t transport_t;
 
 // Constructors Destructors
@@ -27,6 +38,7 @@ int                 transportReconnect(transport_t *);
 cfg_transport_t     transportType(transport_t *);
 int                 transportSupportsCommandControl(transport_t *);
 void                transportLogConnectionStatus(transport_t *, const char *);
+transport_status_t  transportConnectionStatus(transport_t *);
 
 // Misc
 void                transportRegisterForExitNotification(void (*fn)(void));

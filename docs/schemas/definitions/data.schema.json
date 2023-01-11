@@ -64,7 +64,7 @@
     },
     "commanddir": {
       "title": "commanddir",
-      "description": "The directory in which the command that launched the scoped app was run.",
+      "description": "The directory AppScope polls for a `scope.<pid>` file, as explained in the Dynamic Configuration section of the Using the CLI page of the AppScope docs.",
       "type": "string"
     },
     "data": {

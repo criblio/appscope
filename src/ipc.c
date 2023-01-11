@@ -180,6 +180,7 @@ ipcParseSingleFrame(const char *msgBuf, ssize_t msgLen, req_parse_status_t *pars
     char *scopeMsg = NULL;
 
     // Verify if frame is based on JSON-format
+    // TODO: Bump the CJSON deps and use cJSON_ParseWithLength
     cJSON *msgJson = cJSON_Parse(msgBuf);
     if (!msgJson) {
         *parseStatus = REQ_PARSE_JSON_ERROR;
@@ -225,6 +226,7 @@ ipcParseSingleFrame(const char *msgBuf, ssize_t msgLen, req_parse_status_t *pars
     }
     *remainLen = remainKey->valueint;
 
+    // Calculate offset of message - skip metadata part
     char *metaData = cJSON_PrintUnformatted(msgJson);
     size_t metaDataLen = scope_strlen(metaData);
     size_t dataOffset = metaDataLen + 1;

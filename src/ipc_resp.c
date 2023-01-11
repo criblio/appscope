@@ -76,7 +76,7 @@ allocFail:
  * TODO: use unused attribute later
  */
 scopeRespWrapper *
-ipcRespGetScopeStatus(cJSON *unused) {
+ipcRespGetScopeStatus(const cJSON *unused) {
     scopeRespWrapper *wrap = respWrapperCreate();
     if (!wrap) {
         return NULL;
@@ -104,7 +104,7 @@ allocFail:
  * TODO: use unused attribute later
  */
 scopeRespWrapper *
-ipcRespGetScopeCfg(cJSON *unused) {
+ipcRespGetScopeCfg(const cJSON *unused) {
     scopeRespWrapper *wrap = respWrapperCreate();
     if (!wrap) {
         return NULL;
@@ -142,7 +142,7 @@ allocFail:
  * TODO: use unused attribute later
  */
 scopeRespWrapper *
-ipcRespStatusNotImplemented(cJSON *unused) {
+ipcRespStatusNotImplemented(const cJSON *unused) {
     return ipcRespStatus(IPC_RESP_NOT_IMPLEMENTED);
 }
 
@@ -150,7 +150,7 @@ ipcRespStatusNotImplemented(cJSON *unused) {
  * Process the request IPC_CMD_SET_SCOPE_CFG
  */
 static bool
-ipcProcessSetCfg(cJSON *scopeReq) {
+ipcProcessSetCfg(const cJSON *scopeReq) {
     bool res = FALSE;
     // Verify if scope request is based on JSON-format
     cJSON *cfgKey = cJSON_GetObjectItem(scopeReq, "cfg");
@@ -168,7 +168,7 @@ ipcProcessSetCfg(cJSON *scopeReq) {
  * Creates the wrapper for response to IPC_CMD_SET_SCOPE_CFG
  */
 scopeRespWrapper *
-ipcRespSetScopeCfg(cJSON *scopeReq) {
+ipcRespSetScopeCfg(const cJSON *scopeReq) {
     if (ipcProcessSetCfg(scopeReq)) {
         return ipcRespStatus(IPC_RESP_OK);
     }

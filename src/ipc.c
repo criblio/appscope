@@ -418,7 +418,7 @@ end:
     return res;
 }
 
-typedef scopeRespWrapper *responseProcessor(cJSON *);
+typedef scopeRespWrapper *responseProcessor(const cJSON *);
 
 static responseProcessor *supportedResp[] = {
     [IPC_CMD_GET_SCOPE_STATUS] = ipcRespGetScopeStatus,

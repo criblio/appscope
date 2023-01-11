@@ -40,10 +40,10 @@ typedef enum {
 char *ipcRespScopeRespStr(scopeRespWrapper *);
 
 // Wrapper for Scope responses
-scopeRespWrapper *ipcRespGetScopeStatus(cJSON *);
-scopeRespWrapper *ipcRespGetScopeCfg(cJSON *);
-scopeRespWrapper *ipcRespSetScopeCfg(cJSON *);
-scopeRespWrapper *ipcRespStatusNotImplemented(cJSON *);
+scopeRespWrapper *ipcRespGetScopeStatus(const cJSON *);
+scopeRespWrapper *ipcRespGetScopeCfg(const cJSON *);
+scopeRespWrapper *ipcRespSetScopeCfg(const cJSON *);
+scopeRespWrapper *ipcRespStatusNotImplemented(const cJSON *);
 scopeRespWrapper *ipcRespStatusScopeError(ipc_resp_status_t);
 
 // Wrapper destructor

@@ -189,7 +189,7 @@ ipcHandlerRequestEmptyQueue(void **state) {
     // Empty Message queue
     scopeReq = ipcRequestHandler(mqReadWriteDes, attr.mq_msgsize, &parseStatus, &uniqueId);
     assert_null(scopeReq);
-    assert_int_equal(parseStatus, REQ_PARSE_RECEIVE_ERROR);
+    assert_int_equal(parseStatus, REQ_PARSE_RECEIVE_TIMEOUT_ERROR);
     assert_int_equal(uniqueId, -1);
 
     status = scope_mq_close(mqReadWriteDes);

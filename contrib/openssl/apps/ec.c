@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2002-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -67,7 +67,7 @@ int ec_main(int argc, char **argv)
     OSSL_DECODER_CTX *dctx = NULL;
     EVP_PKEY_CTX *pctx = NULL;
     EVP_PKEY *eckey = NULL;
-    BIO *in = NULL, *out = NULL;
+    BIO *out = NULL;
     ENGINE *e = NULL;
     EVP_CIPHER *enc = NULL;
     char *infile = NULL, *outfile = NULL, *ciphername = NULL, *prog;
@@ -174,12 +174,6 @@ int ec_main(int argc, char **argv)
         goto end;
     }
 
-    if (informat != FORMAT_ENGINE) {
-        in = bio_open_default(infile, 'r', informat);
-        if (in == NULL)
-            goto end;
-    }
-
     BIO_printf(bio_err, "read EC key\n");
 
     if (pubin)
@@ -238,7 +232,7 @@ int ec_main(int argc, char **argv)
             BIO_printf(bio_err, "unable to check EC key\n");
             goto end;
         }
-        if (!EVP_PKEY_check(pctx))
+        if (EVP_PKEY_check(pctx) <= 0)
             BIO_printf(bio_err, "EC Key Invalid!\n");
         else
             BIO_printf(bio_err, "EC Key valid.\n");
@@ -266,7 +260,7 @@ int ec_main(int argc, char **argv)
                                              output_type, output_structure,
                                              NULL);
         if (enc != NULL) {
-            OSSL_ENCODER_CTX_set_cipher(ectx, EVP_CIPHER_name(enc), NULL);
+            OSSL_ENCODER_CTX_set_cipher(ectx, EVP_CIPHER_get0_name(enc), NULL);
             /* Default passphrase prompter */
             OSSL_ENCODER_CTX_set_passphrase_ui(ectx, get_ui_method(), NULL);
             if (passout != NULL)
@@ -285,7 +279,6 @@ int ec_main(int argc, char **argv)
 end:
     if (ret != 0)
         ERR_print_errors(bio_err);
-    BIO_free(in);
     BIO_free_all(out);
     EVP_PKEY_free(eckey);
     EVP_CIPHER_free(enc);

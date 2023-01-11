@@ -5,8 +5,11 @@
 ossl_provider_find, ossl_provider_new, ossl_provider_up_ref,
 ossl_provider_free,
 ossl_provider_set_fallback, ossl_provider_set_module_path,
-ossl_provider_add_parameter,
-ossl_provider_activate, ossl_provider_deactivate, ossl_provider_available,
+ossl_provider_add_parameter, ossl_provider_set_child, ossl_provider_get_parent,
+ossl_provider_up_ref_parent, ossl_provider_free_parent,
+ossl_provider_default_props_update, ossl_provider_get0_dispatch,
+ossl_provider_init_as_child, ossl_provider_deinit_child,
+ossl_provider_activate, ossl_provider_deactivate, ossl_provider_add_to_store,
 ossl_provider_ctx,
 ossl_provider_doall_activated,
 ossl_provider_name, ossl_provider_dso,
@@ -37,17 +40,28 @@ ossl_provider_get_capabilities
  int ossl_provider_add_parameter(OSSL_PROVIDER *prov, const char *name,
                                  const char *value);
 
+ /* Child Providers */
+ int ossl_provider_set_child(OSSL_PROVIDER *prov,
+                             const OSSL_CORE_HANDLE *handle);
+ const OSSL_CORE_HANDLE *ossl_provider_get_parent(OSSL_PROVIDER *prov);
+ int ossl_provider_up_ref_parent(OSSL_PROVIDER *prov, int activate);
+ int ossl_provider_free_parent(OSSL_PROVIDER *prov, int deactivate);
+ int ossl_provider_default_props_update(OSSL_LIB_CTX *libctx,
+                                        const char *props);
+
  /*
   * Activate the Provider
   * If the Provider is a module, the module will be loaded
   */
- int ossl_provider_activate(OSSL_PROVIDER *prov, int retain_fallbacks);
- int ossl_provider_deactivate(OSSL_PROVIDER *prov);
- /* Check if provider is available (activated) */
- int ossl_provider_available(OSSL_PROVIDER *prov);
+ int ossl_provider_activate(OSSL_PROVIDER *prov, int upcalls, int aschild);
+ int ossl_provider_deactivate(OSSL_PROVIDER *prov, int removechildren);
+ int ossl_provider_add_to_store(OSSL_PROVIDER *prov, OSSL_PROVIDER **actualprov,
+                                int retain_fallbacks);
 
  /* Return pointer to the provider's context */
  void *ossl_provider_ctx(const OSSL_PROVIDER *prov);
+
+ const OSSL_DISPATCH *ossl_provider_get0_dispatch(const OSSL_PROVIDER *prov);
 
  /* Iterate over all loaded providers */
  int ossl_provider_doall_activated(OSSL_LIB_CTX *,
@@ -80,6 +94,11 @@ ossl_provider_get_capabilities
  int ossl_provider_set_operation_bit(OSSL_PROVIDER *provider, size_t bitnum);
  int ossl_provider_test_operation_bit(OSSL_PROVIDER *provider, size_t bitnum,
                                       int *result);
+
+ int ossl_provider_init_as_child(OSSL_LIB_CTX *ctx,
+                                 const OSSL_CORE_HANDLE *handle,
+                                 const OSSL_DISPATCH *in);
+ void ossl_provider_deinit_child(OSSL_LIB_CTX *ctx);
 
 =head1 DESCRIPTION
 
@@ -161,6 +180,23 @@ provider will use the name to find the value it wants.
 Only text parameters can be given, and it's up to the provider to
 interpret them.
 
+ossl_provider_set_child() marks this provider as a child of a provider in the
+parent library context. I<handle> is the B<OSSL_CORE_HANDLE> object passed to
+the provider's B<OSSL_provider_init> function.
+
+ossl_provider_get_parent() obtains the handle on the parent provider.
+
+ossl_provider_up_ref_parent() increases the reference count on the parent
+provider. If I<activate> is nonzero then the parent provider is also activated.
+
+ossl_provider_free_parent() decreases the reference count on the parent
+provider. If I<deactivate> is nonzero then the parent provider is also
+deactivated.
+
+ossl_provider_default_props_update() is responsible for informing any child
+providers of an update to the default properties. The new properties are
+supplied in the I<props> string.
+
 ossl_provider_activate() "activates" the provider for the given
 provider object I<prov> by incrementing its activation count, flagging
 it as activated, and initializing it if it isn't already initialized.
@@ -182,20 +218,34 @@ be located in that module, and called.
 
 =back
 
-If I<retain_fallbacks> is zero, fallbacks are disabled.  If it is nonzero,
-fallbacks are left unchanged.
+If I<upcalls> is nonzero then, if this is a child provider, upcalls to the
+parent libctx will be made to inform it of an up-ref. If I<aschild> is nonzero
+then the provider will only be activated if it is a child provider. Otherwise
+no action is taken and ossl_provider_activate() returns success.
 
 ossl_provider_deactivate() "deactivates" the provider for the given
 provider object I<prov> by decrementing its activation count.  When
-that count reaches zero, the activation flag is cleared.
+that count reaches zero, the activation flag is cleared. If the
+I<removechildren> parameter is 0 then no attempt is made to remove any
+associated child providers.
 
-ossl_provider_available() activates all fallbacks if no provider is
-activated yet, then checks if given provider object I<prov> is
-activated.
+ossl_provider_add_to_store() adds the provider I<prov> to the provider store and
+makes it available to other threads. This will prevent future automatic loading
+of fallback providers, unless I<retain_fallbacks> is true. If a provider of the
+same name already exists in the store then it is not added but this function
+still returns success. On success the I<actualprov> value is populated with a
+pointer to the provider of the given name that is now in the store. The
+reference passed in the I<prov> argument is consumed by this function. A
+reference to the provider that should be used is passed back in the
+I<actualprov> argument.
 
 ossl_provider_ctx() returns a context created by the provider.
 Outside of the provider, it's completely opaque, but it needs to be
 passed back to some of the provider functions.
+
+ossl_provider_get0_dispatch() returns the dispatch table that the provider
+initially returned in the I<out> parameter of its B<OSSL_provider_init>
+function.
 
 ossl_provider_doall_activated() iterates over all the currently
 "activated" providers, and calls I<cb> for each of them.
@@ -245,9 +295,18 @@ that all relevant information has been copied.
 ossl_provider_set_operation_bit() registers a 1 for operation I<bitnum>
 in a bitstring that's internal to I<provider>.
 
-ossl_provider_tests_operation_bit() checks if the bit operation I<bitnum>
+ossl_provider_test_operation_bit() checks if the bit operation I<bitnum>
 is set (1) or not (0) in the internal I<provider> bitstring, and sets
-I<*result> to 1 or 0 accorddingly. 
+I<*result> to 1 or 0 accorddingly.
+
+ossl_provider_init_as_child() stores in the library context I<ctx> references to
+the necessary upcalls for managing child providers. The I<handle> and I<in>
+parameters are the B<OSSL_CORE_HANDLE> and B<OSSL_DISPATCH> pointers that were
+passed to the provider's B<OSSL_provider_init> function.
+
+ossl_provider_deinit_child() deregisters callbacks from the parent library
+context about provider creation or removal events for the child library context
+I<ctx>. Must only be called if I<ctx> is a child library context.
 
 =head1 NOTES
 
@@ -293,10 +352,8 @@ called for any activated providers.
 
 ossl_provider_set_module_path(), ossl_provider_set_fallback(),
 ossl_provider_activate(), ossl_provider_activate_leave_fallbacks() and
-ossl_provider_deactivate() return 1 on success, or 0 on error.
-
-ossl_provider_available() return 1 if the provider is available,
-otherwise 0.
+ossl_provider_deactivate(), ossl_provider_add_to_store(),
+ossl_provider_default_props_update() return 1 on success, or 0 on error.
 
 ossl_provider_name(), ossl_provider_dso(),
 ossl_provider_module_name(), and ossl_provider_module_path() return a
@@ -333,7 +390,7 @@ The functions described here were all added in OpenSSL 3.0.
 
 =head1 COPYRIGHT
 
-Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.
+Copyright 2019-2022 The OpenSSL Project Authors. All Rights Reserved.
 
 Licensed under the Apache License 2.0 (the "License").  You may not use
 this file except in compliance with the License.  You can obtain a copy

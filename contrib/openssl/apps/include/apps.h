@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -13,6 +13,7 @@
 # include "e_os.h" /* struct timeval for DTLS */
 # include "internal/nelem.h"
 # include "internal/sockets.h" /* for openssl_fdset() */
+# include "internal/cryptlib.h"  /* ossl_assert() */
 # include <assert.h>
 
 # include <stdarg.h>
@@ -37,6 +38,7 @@
 # include "fmt.h"
 # include "platform.h"
 # include "engine_loader.h"
+# include "app_libctx.h"
 
 /*
  * quick macro when you need to pass an unsigned char instead of a char.
@@ -93,13 +95,14 @@ typedef struct args_st {
 int wrap_password_callback(char *buf, int bufsiz, int verify, void *cb_data);
 
 int chopup_args(ARGS *arg, char *buf);
-int dump_cert_text(BIO *out, X509 *x);
+void dump_cert_text(BIO *out, X509 *x);
 void print_name(BIO *out, const char *title, const X509_NAME *nm);
 void print_bignum_var(BIO *, const BIGNUM *, const char*,
                       int, unsigned char *);
 void print_array(BIO *, const char *, int, const unsigned char *);
 int set_nameopt(const char *arg);
 unsigned long get_nameopt(void);
+int set_dateopt(unsigned long *dateopt, const char *arg);
 int set_cert_ex(unsigned long *flags, const char *arg);
 int set_name_ex(unsigned long *flags, const char *arg);
 int set_ext_copy(int *copy_type, const char *arg);
@@ -121,6 +124,9 @@ EVP_PKEY *load_pubkey(const char *uri, int format, int maybe_stdin,
                       const char *pass, ENGINE *e, const char *desc);
 EVP_PKEY *load_keyparams(const char *uri, int format, int maybe_stdin,
                          const char *keytype, const char *desc);
+EVP_PKEY *load_keyparams_suppress(const char *uri, int format, int maybe_stdin,
+                                  const char *keytype, const char *desc,
+                                  int suppress_decode_errors);
 char *next_item(char *opt); /* in list separated by comma and/or space */
 int load_cert_certs(const char *uri,
                     X509 **pcert, STACK_OF(X509) **pcerts,
@@ -175,10 +181,10 @@ const EVP_MD *get_digest_from_engine(const char *name);
 const EVP_CIPHER *get_cipher_from_engine(const char *name);
 
 # ifndef OPENSSL_NO_OCSP
-OCSP_RESPONSE *process_responder(OCSP_REQUEST *req,
-                                 const char *host, const char *path,
-                                 const char *port, int use_ssl,
-                                 STACK_OF(CONF_VALUE) *headers,
+OCSP_RESPONSE *process_responder(OCSP_REQUEST *req, const char *host,
+                                 const char *port, const char *path,
+                                 const char *proxy, const char *no_proxy,
+                                 int use_ssl, STACK_OF(CONF_VALUE) *headers,
                                  int req_timeout);
 # endif
 
@@ -214,12 +220,16 @@ typedef struct ca_db_st {
 
 void app_bail_out(char *fmt, ...);
 void *app_malloc(size_t sz, const char *what);
-BIGNUM *load_serial(const char *serialfile, int create, ASN1_INTEGER **retai);
-int save_serial(const char *serialfile, const char *suffix, const BIGNUM *serial,
-                ASN1_INTEGER **retai);
+
+/* load_serial, save_serial, and rotate_serial are also used for CRL numbers */
+BIGNUM *load_serial(const char *serialfile, int *exists, int create,
+                    ASN1_INTEGER **retai);
+int save_serial(const char *serialfile, const char *suffix,
+                const BIGNUM *serial, ASN1_INTEGER **retai);
 int rotate_serial(const char *serialfile, const char *new_suffix,
                   const char *old_suffix);
 int rand_serial(BIGNUM *b, ASN1_INTEGER *ai);
+
 CA_DB *load_index(const char *dbfile, DB_ATTR *dbattr);
 int index_index(CA_DB *db);
 int save_index(const char *dbfile, const char *suffix, CA_DB *db);
@@ -285,6 +295,7 @@ ASN1_VALUE *app_http_post_asn1(const char *host, const char *port,
                                const STACK_OF(CONF_VALUE) *headers,
                                const char *content_type,
                                ASN1_VALUE *req, const ASN1_ITEM *req_it,
+                               const char *expected_content_type,
                                long timeout, const ASN1_ITEM *rsp_it);
 # endif
 
@@ -325,16 +336,13 @@ typedef struct verify_options_st {
 
 extern VERIFY_CB_ARGS verify_args;
 
-OSSL_LIB_CTX *app_create_libctx(void);
-OSSL_LIB_CTX *app_get0_libctx(void);
 OSSL_PARAM *app_params_new_from_opts(STACK_OF(OPENSSL_STRING) *opts,
                                      const OSSL_PARAM *paramdefs);
 void app_params_free(OSSL_PARAM *params);
 int app_provider_load(OSSL_LIB_CTX *libctx, const char *provider_name);
 void app_providers_cleanup(void);
 
-OSSL_LIB_CTX *app_get0_libctx(void);
-int app_set_propq(const char *arg);
-const char *app_get0_propq(void);
+EVP_PKEY *app_keygen(EVP_PKEY_CTX *ctx, const char *alg, int bits, int verbose);
+EVP_PKEY *app_paramgen(EVP_PKEY_CTX *ctx, const char *alg);
 
 #endif

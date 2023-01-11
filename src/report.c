@@ -3488,8 +3488,9 @@ doPayload()
 {
     uint64_t data;
 
-    // if LS enabled, then check for a connection
-    if (cfgLogStreamEnable(g_cfg.staticfg) && ctlNeedsConnection(g_ctl, CFG_LS)) {
+    // initCtl() controls whether a CFG_LS transport exists.
+    // If it doesn't exist, ctlNeedsConnection will be FALSE.
+    if (ctlNeedsConnection(g_ctl, CFG_LS)) {
         if (ctlConnect(g_ctl, CFG_LS)) {
             reportProcessStart(g_ctl, FALSE, CFG_LS);
         } else {
@@ -3589,7 +3590,9 @@ doPayload()
 
             char *bdata = NULL;
 
-            if (cfgLogStreamEnable(g_cfg.staticfg)) {
+            int sendPayloadsToStream = cfgLogStreamEnable(g_cfg.staticfg) &&
+                                       !payloadToDiskForced();
+            if (sendPayloadsToStream) {
                 bdata = scope_calloc(1, hlen + pinfo->len);
                 if (bdata) {
                     scope_memmove(bdata, pay, hlen);

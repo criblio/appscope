@@ -24,6 +24,7 @@ B<openssl> B<x509>
 [B<-outform> B<DER>|B<PEM>]
 [B<-nocert>]
 [B<-noout>]
+[B<-dateopt>]
 [B<-text>]
 [B<-certopt> I<option>]
 [B<-fingerprint>]
@@ -78,8 +79,6 @@ B<openssl> B<x509>
 {- $OpenSSL::safe::opt_r_synopsis -}
 {- $OpenSSL::safe::opt_engine_synopsis -}{- $OpenSSL::safe::opt_provider_synopsis -}
 
-=for openssl ifdef engine subject_hash_old issuer_hash_old
-
 =head1 DESCRIPTION
 
 This command is a multi-purposes certificate handling command.
@@ -103,9 +102,11 @@ Print out a usage message.
 
 =item B<-in> I<filename>|I<uri>
 
-If the B<-req> option is not used this specifies the input
-to read a certificate from or standard input if this option is not specified.
-With the B<-req> option this specifies a certificate request file.
+This specifies the input to read a certificate from
+or the input file for reading a certificate request if the B<-req> flag is used.
+In both cases this defaults to standard input.
+
+This option cannot be combined with the B<-new> flag.
 
 =item B<-passin> I<arg>
 
@@ -119,14 +120,14 @@ Generate a certificate from scratch, not using an input certificate
 or certificate request. So the B<-in> option must not be used in this case.
 Instead, the B<-subj> option needs to be given.
 The public key to include can be given with the B<-force_pubkey> option
-and defaults to the key given with the B<-key> option,
+and defaults to the key given with the B<-key> (or B<-signkey>) option,
 which implies self-signature.
 
 =item B<-x509toreq>
 
 Output a PKCS#10 certificate request (rather than a certificate).
-The B<-key> option must be used to provide the private key for self-signing;
-the corresponding public key is placed in the subjectPKInfo field.
+The B<-key> (or B<-signkey>) option must be used to provide the private key for
+self-signing; the corresponding public key is placed in the subjectPKInfo field.
 
 X.509 extensions included in a certificate input are not copied by default.
 X.509 extensions to be added can be specified using the B<-extfile> option.
@@ -164,9 +165,12 @@ Names and values of these options are algorithm-specific.
 
 =item B<-key> I<filename>|I<uri>
 
-This option causes the new certificate or certificate request
-to be self-signed using the supplied private key.
-This cannot be used in conjunction with the B<-CA> option.
+This option provides the private key for signing a new certificate or
+certificate request.
+Unless B<-force_pubkey> is given, the corresponding public key is placed in
+the new certificate or certificate request, resulting in a self-signature.
+
+This option cannot be used in conjunction with the B<-CA> option.
 
 It sets the issuer name to the subject name (i.e., makes it self-issued)
 and changes the public key to the supplied value (unless overridden
@@ -209,6 +213,11 @@ Note: the B<-alias> and B<-purpose> options are also printing options
 but are described in the L</Trust Settings> section.
 
 =over 4
+
+=item B<-dateopt>
+
+Specify the date output format. Values are: rfc_822 and iso_8601.
+Defaults to rfc_822.
 
 =item B<-text>
 
@@ -307,9 +316,9 @@ Prints the OCSP responder address(es) if any.
 
 =item B<-purpose>
 
-This option performs tests on the certificate extensions and prints
-the results. For a more complete description see the
-L</CERTIFICATE EXTENSIONS> section.
+This option performs tests on the certificate extensions and outputs
+the results. For a more complete description see
+L<openssl-verification-options(1)/Certificate Extensions>.
 
 =item B<-pubkey>
 
@@ -351,8 +360,9 @@ Check that the certificate matches the specified IP address.
 
 =item B<-set_serial> I<n>
 
-Specifies the serial number to use. This option can be used with either
-the B<-key> or B<-CA> options. If used in conjunction with the B<-CA> option
+Specifies the serial number to use.
+This option can be used with the B<-key>, B<-signkey>, or B<-CA> options.
+If used in conjunction with the B<-CA> option
 the serial number file (as specified by the B<-CAserial> option) is not used.
 
 The serial number can be decimal or hex (if preceded by C<0x>).
@@ -396,7 +406,8 @@ or certificate request.
 =item B<-force_pubkey> I<filename>
 
 When a certificate is created set its public key to the key in I<filename>
-instead of the key contained in the input or given with the B<-key> option.
+instead of the key contained in the input
+or given with the B<-key> (or B<-signkey>) option.
 
 This option is useful for creating self-issued certificates that are not
 self-signed, for instance when the key cannot be used for signing, such as DH.
@@ -442,7 +453,7 @@ for testing.
 
 The digest to use.
 This affects any signing or printing option that uses a message
-digest, such as the B<-fingerprint>, B<-key> and B<-CA> options.
+digest, such as the B<-fingerprint>, B<-key>, and B<-CA> options.
 Any digest supported by the L<openssl-dgst(1)> command can be used.
 If not specified then SHA1 is used with B<-fingerprint> or
 the default digest for the signing algorithm is used, typically SHA256.
@@ -460,9 +471,9 @@ When present, this behaves like a "micro CA" as follows:
 The subject name of the "CA" certificate is placed as issuer name in the new
 certificate, which is then signed using the "CA" key given as detailed below.
 
-This option cannot be used in conjunction with the B<-key> option.
+This option cannot be used in conjunction with B<-key> (or B<-signkey>).
 This option is normally combined with the B<-req> option referencing a CSR.
-Without the B<-req> option the input must be a self-signed certificate
+Without the B<-req> option the input must be an existing certificate
 unless the B<-new> option is given, which generates a certificate from scratch.
 
 =item B<-CAform> B<DER>|B<PEM>|B<P12>,
@@ -485,23 +496,27 @@ See L<openssl-format-options(1)> for details.
 
 Sets the CA serial number file to use.
 
-When the B<-CA> option is used to sign a certificate it uses a serial
-number specified in a file. This file consists of one line containing
-an even number of hex digits with the serial number to use. After each
-use the serial number is incremented and written out to the file again.
+When creating a certificate with this option and with the B<-CA> option,
+the certificate serial number is stored in the given file.
+This file consists of one line containing
+an even number of hex digits with the serial number used last time.
+After reading this number, it is incremented and used, and the file is updated.
 
 The default filename consists of the CA certificate file base name with
 F<.srl> appended. For example if the CA certificate file is called
 F<mycacert.pem> it expects to find a serial number file called
 F<mycacert.srl>.
 
+If the B<-CA> option is specified and neither <-CAserial> or <-CAcreateserial>
+is given and the default serial number file does not exist,
+a random number is generated; this is the recommended practice.
+
 =item B<-CAcreateserial>
 
-With this option the CA serial number file is created if it does not exist:
-it will contain the serial number "02" and the certificate being signed will
-have the 1 as its serial number. If the B<-CA> option is specified
-and the serial number file does not exist a random number is generated;
-this is the recommended practice.
+With this option and the B<-CA> option
+the CA serial number file is created if it does not exist.
+A random number is generated, used for the certificate,
+and saved into the serial number file determined as described above.
 
 =back
 
@@ -520,7 +535,7 @@ Trust settings currently are only used with a root CA.
 They allow a finer control over the purposes the root CA can be used for.
 For example, a CA may be trusted for SSL client but not SSL server use.
 
-See the description in L<openssl-verify(1)> for more information
+See L<openssl-verification-options(1)> for more information
 on the meaning of trust settings.
 
 Future versions of OpenSSL will recognize trust settings on any
@@ -548,9 +563,8 @@ Clears all the permitted or trusted uses of the certificate.
 =item B<-addtrust> I<arg>
 
 Adds a trusted certificate use.
-Any object name can be used here but currently only B<clientAuth> (SSL client
-use), B<serverAuth> (SSL server use), B<emailProtection> (S/MIME email)
-and B<anyExtendedKeyUsage> are used.
+Any object name can be used here but currently only B<clientAuth>,
+B<serverAuth>, B<emailProtection>, and B<anyExtendedKeyUsage> are defined.
 As of OpenSSL 1.1.0, the last of these blocks all purposes when rejected or
 enables all purposes when trusted.
 Other OpenSSL applications may define additional uses.
@@ -561,7 +575,7 @@ Clears all the prohibited or rejected uses of the certificate.
 
 =item B<-addreject> I<arg>
 
-Adds a prohibited use.
+Adds a prohibited trust anchor purpose.
 It accepts the same values as the B<-addtrust> option.
 
 =back
@@ -734,119 +748,6 @@ The B<-email> option searches the subject name and the subject alternative
 name extension. Only unique email addresses will be printed out: it will
 not print the same address more than once.
 
-=head1 CERTIFICATE EXTENSIONS
-
-The B<-purpose> option checks the certificate extensions and determines
-what the certificate can be used for. The actual checks done are rather
-complex and include various hacks and workarounds to handle broken
-certificates and software.
-
-The same code is used when verifying untrusted certificates in chains
-so this section is useful if a chain is rejected by the verify code.
-
-The basicConstraints extension CA flag is used to determine whether the
-certificate can be used as a CA. If the CA flag is true then it is a CA,
-if the CA flag is false then it is not a CA. B<All> CAs should have the
-CA flag set to true.
-
-If the basicConstraints extension is absent then the certificate is
-considered to be a "possible CA" other extensions are checked according
-to the intended use of the certificate. A warning is given in this case
-because the certificate should really not be regarded as a CA: however
-it is allowed to be a CA to work around some broken software.
-
-If the certificate is a V1 certificate (and thus has no extensions) and
-it is self-signed it is also assumed to be a CA but a warning is again
-given: this is to work around the problem of Verisign roots which are V1
-self-signed certificates.
-
-If the keyUsage extension is present then additional restraints are
-made on the uses of the certificate. A CA certificate B<must> have the
-keyCertSign bit set if the keyUsage extension is present.
-
-The extended key usage extension places additional restrictions on the
-certificate uses. If this extension is present (whether critical or not)
-the key can only be used for the purposes specified.
-
-A complete description of each test is given below. The comments about
-basicConstraints and keyUsage and V1 certificates above apply to B<all>
-CA certificates.
-
-
-=over 4
-
-=item B<SSL Client>
-
-The extended key usage extension must be absent or include the "web client
-authentication" OID.  keyUsage must be absent or it must have the
-digitalSignature bit set. Netscape certificate type must be absent or it must
-have the SSL client bit set.
-
-=item B<SSL Client CA>
-
-The extended key usage extension must be absent or include the "web client
-authentication" OID. Netscape certificate type must be absent or it must have
-the SSL CA bit set: this is used as a work around if the basicConstraints
-extension is absent.
-
-=item B<SSL Server>
-
-The extended key usage extension must be absent or include the "web server
-authentication" and/or one of the SGC OIDs.  keyUsage must be absent or it
-must have the digitalSignature, the keyEncipherment set or both bits set.
-Netscape certificate type must be absent or have the SSL server bit set.
-
-=item B<SSL Server CA>
-
-The extended key usage extension must be absent or include the "web server
-authentication" and/or one of the SGC OIDs.  Netscape certificate type must
-be absent or the SSL CA bit must be set: this is used as a work around if the
-basicConstraints extension is absent.
-
-=item B<Netscape SSL Server>
-
-For Netscape SSL clients to connect to an SSL server it must have the
-keyEncipherment bit set if the keyUsage extension is present. This isn't
-always valid because some cipher suites use the key for digital signing.
-Otherwise it is the same as a normal SSL server.
-
-=item B<Common S/MIME Client Tests>
-
-The extended key usage extension must be absent or include the "email
-protection" OID. Netscape certificate type must be absent or should have the
-S/MIME bit set. If the S/MIME bit is not set in Netscape certificate type
-then the SSL client bit is tolerated as an alternative but a warning is shown:
-this is because some Verisign certificates don't set the S/MIME bit.
-
-=item B<S/MIME Signing>
-
-In addition to the common S/MIME client tests the digitalSignature bit or
-the nonRepudiation bit must be set if the keyUsage extension is present.
-
-=item B<S/MIME Encryption>
-
-In addition to the common S/MIME tests the keyEncipherment bit must be set
-if the keyUsage extension is present.
-
-=item B<S/MIME CA>
-
-The extended key usage extension must be absent or include the "email
-protection" OID. Netscape certificate type must be absent or must have the
-S/MIME CA bit set: this is used as a work around if the basicConstraints
-extension is absent.
-
-=item B<CRL Signing>
-
-The keyUsage extension must be absent or it must have the CRL signing bit
-set.
-
-=item B<CRL Signing CA>
-
-The normal CA tests apply. Except in this case the basicConstraints extension
-must be present.
-
-=back
-
 =head1 BUGS
 
 It is possible to produce invalid certificates or requests by specifying the
@@ -883,7 +784,7 @@ The B<-C> option was removed in OpenSSL 3.0.
 
 =head1 COPYRIGHT
 
-Copyright 2000-2021 The OpenSSL Project Authors. All Rights Reserved.
+Copyright 2000-2022 The OpenSSL Project Authors. All Rights Reserved.
 
 Licensed under the Apache License 2.0 (the "License").  You may not use
 this file except in compliance with the License.  You can obtain a copy

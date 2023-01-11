@@ -5,6 +5,7 @@
 #include <errno.h>
 #include "libdir.h"
 #include "loaderop.h"
+#include "nsfile.h"
 
 #include "scopestdlib.h"
 
@@ -385,8 +386,9 @@ set_loader(char *exe)
 }
 
 static void
-do_musl(char *exld, char *ldscope)
+do_musl(char *exld, char *ldscope, uid_t nsUid, gid_t nsGid)
 {
+    int symlinkErr = 0;
     char *lpath = NULL;
     char *ldso = NULL;
     char *path;
@@ -411,8 +413,8 @@ do_musl(char *exld, char *ldscope)
     }
 
     // dir is expected to exist here, not creating one
-    if ((symlink((const char *)exld, lpath) == -1) &&
-        (errno != EEXIST)) {
+    if ((nsFileSymlink((const char *)exld, lpath, nsUid, nsGid, scope_geteuid(), scope_getegid(), &symlinkErr) == -1) &&
+        (symlinkErr != EEXIST)) {
         scope_perror("do_musl:symlink");
         if (ldso) scope_free(ldso);
         if (lpath) scope_free(lpath);
@@ -433,7 +435,7 @@ do_musl(char *exld, char *ldscope)
  * Returns 0 if musl was not detected and 1 if it was.
  */
 int
-loaderOpSetupLoader(char *ldscope)
+loaderOpSetupLoader(char *ldscope, uid_t nsUid, gid_t nsGid)
 {
     int ret = 0; // not musl
 
@@ -442,7 +444,7 @@ loaderOpSetupLoader(char *ldscope)
     if (((ldso = loaderOpGetLoader(EXE_TEST_FILE)) != NULL) &&
         (scope_strstr(ldso, LIBMUSL) != NULL)) {
             // we are using the musl ld.so
-            do_musl(ldso, ldscope);
+            do_musl(ldso, ldscope, nsUid, nsGid);
             ret = 1; // detected musl
     }
 

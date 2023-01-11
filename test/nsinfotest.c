@@ -30,10 +30,10 @@ nsInfoIsPidInSameMntNsChildProcess(void **state) {
 }
 
 static void
-nsInfoIsPidGotSecondPidNsSameProcess(void **state) {
+nsInfoIsPidGotNestedPidNsSameProcess(void **state) {
     pid_t nsPid = 0;
     pid_t pid = scope_getpid();
-    bool status = nsInfoIsPidGotSecondPidNs(pid, &nsPid);
+    bool status = nsInfoGetPidNs(pid, &nsPid);
     assert_int_equal(status, FALSE);
 }
 
@@ -44,7 +44,7 @@ main(int argc, char* argv[]) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(nsInfoIsPidInSameMntNsSameProcess),
         cmocka_unit_test(nsInfoIsPidInSameMntNsChildProcess),
-        cmocka_unit_test(nsInfoIsPidGotSecondPidNsSameProcess),
+        cmocka_unit_test(nsInfoIsPidGotNestedPidNsSameProcess),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

@@ -92,13 +92,30 @@ of I<p>. This value must be saved if domain parameter validation is required.
 
 =item "hindex" (B<OSSL_PKEY_PARAM_FFC_H>) <integer>
 
-For unverifiable generation of the generator I<g> this value is output during 
+For unverifiable generation of the generator I<g> this value is output during
 generation of I<g>. Its value is the first integer larger than one that
 satisfies g = h^j mod p (where g != 1 and "j" is the cofactor).
 
 =item "j" (B<OSSL_PKEY_PARAM_FFC_COFACTOR>) <unsigned integer>
 
 An optional informational cofactor parameter that should equal to (p - 1) / q.
+
+=item "validate-pq" (B<OSSL_PKEY_PARAM_FFC_VALIDATE_PQ>) <unsigned integer>
+
+=item "validate-g" (B<OSSL_PKEY_PARAM_FFC_VALIDATE_G>) <unsigned integer>
+
+These boolean values are used during FIPS186-4 or FIPS186-2 key validation checks
+(See L<EVP_PKEY_param_check(3)>) to select validation options. By default
+I<validate-pq> and I<validate-g> are both set to 1 to check that p,q and g are
+valid. Either of these may be set to 0 to skip a test, which is mainly useful
+for testing purposes.
+
+=item "validate-legacy" (B<OSSL_PKEY_PARAM_FFC_VALIDATE_LEGACY>) <unsigned integer>
+
+This boolean value is used during key validation checks
+(See L<EVP_PKEY_param_check(3)>) to select the validation type. The default
+value of 0 selects FIPS186-4 validation. Setting this value to 1 selects
+FIPS186-2 validation.
 
 =back
 
@@ -108,7 +125,7 @@ The following key generation types are available for DSA and DHX algorithms:
 
 =over 4
 
-=item "type" (B<OSSL_PKEY_PARAM_FFC_TYPE>) <utf8_string>
+=item "type" (B<OSSL_PKEY_PARAM_FFC_TYPE>) <UTF8 string>
 
 Sets the type of parameter generation. The shared valid values are:
 
@@ -140,13 +157,13 @@ Sets the size (in bits) of the prime 'q'.
 For "fips186_4" this can be either 224 or 256.
 For "fips186_2" this has a size of 160.
 
-=item "digest" (B<OSSL_PKEY_PARAM_FFC_DIGEST>)  <utf8_string>
+=item "digest" (B<OSSL_PKEY_PARAM_FFC_DIGEST>)  <UTF8 string>
 
 Sets the Digest algorithm to be used as part of the Key Generation Function
 associated with the given Key Generation I<ctx>.
 This must also be set for key validation.
 
-=item "properties" (B<OSSL_PKEY_PARAM_FFC_DIGEST_PROPS>) <utf8_string>
+=item "properties" (B<OSSL_PKEY_PARAM_FFC_DIGEST_PROPS>) <UTF8 string>
 
 Sets properties to be used upon look up of the implementation for the selected
 Digest algorithm for the Key Generation Function associated with the given key
@@ -179,7 +196,7 @@ The following sections of SP800-56Ar3:
 
 =back
 
-The following sections of FIPS 186-4:
+The following sections of FIPS186-4:
 
 =over 4
 
@@ -205,7 +222,7 @@ L<OSSL_PROVIDER-FIPS(7)>,
 
 =head1 COPYRIGHT
 
-Copyright 2020-2021 The OpenSSL Project Authors. All Rights Reserved.
+Copyright 2020-2022 The OpenSSL Project Authors. All Rights Reserved.
 
 Licensed under the Apache License 2.0 (the "License").  You may not use
 this file except in compliance with the License.  You can obtain a copy

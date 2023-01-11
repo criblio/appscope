@@ -1,17 +1,13 @@
 package util
 
 import (
-	"context"
 	"errors"
 	"os"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
 	lxd "github.com/lxc/lxd/client"
 )
 
 var (
-	ErrDockerNotAvailable    = errors.New("docker daemon is not available")
 	ErrLXDSocketNotAvailable = errors.New("LXD socket is not available")
 )
 
@@ -33,18 +29,18 @@ func GetLXCPids() ([]int, error) {
 		return nil, ErrLXDSocketNotAvailable
 	}
 
-	c, err := lxd.ConnectLXDUnix(lxdUnixPath, nil)
+	cli, err := lxd.ConnectLXDUnix(lxdUnixPath, nil)
 	if err != nil {
 		return nil, err
 	}
-	containers, err := c.GetContainers()
+	containers, err := cli.GetContainers()
 	if err != nil {
 		return nil, err
 	}
 	pids := make([]int, len(containers))
 
 	for indx, container := range containers {
-		state, _, err := c.GetContainerState(container.Name)
+		state, _, err := cli.GetContainerState(container.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -53,31 +49,39 @@ func GetLXCPids() ([]int, error) {
 	return pids, nil
 }
 
-// Get the List of PID(s) related to Docker container
-func GetDockerPids() ([]int, error) {
-	ctx := context.Background()
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+// Get the List of PID(s) related to containerd container
+func GetContainerDPids() ([]int, error) {
+	return getContainerRuntimePids("containerd-shim")
+}
+
+// Get the List of PID(s) related to Podman container
+func GetPodmanPids() ([]int, error) {
+	return getContainerRuntimePids("conmon")
+}
+
+// Get the List of PID(s) related to specific container runtime
+func getContainerRuntimePids(runtimeProc string) ([]int, error) {
+	runtimeContPids, err := PidScopeMapByProcessName(runtimeProc)
 	if err != nil {
 		return nil, err
 	}
+	pids := make([]int, 0, len(runtimeContPids))
 
-	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
-	if err != nil {
-		if client.IsErrConnectionFailed(err) {
-			return nil, ErrDockerNotAvailable
-		}
-		return nil, err
-	}
-
-	pids := make([]int, len(containers))
-
-	for indx, container := range containers {
-		ins, err := cli.ContainerInspect(ctx, container.ID)
+	for runtimeContPid := range runtimeContPids {
+		childrenPids, err := PidChildren(runtimeContPid)
 		if err != nil {
 			return nil, err
 		}
-		pids[indx] = ins.State.Pid
+
+		// Iterate over all the children to found container init process
+		for _, childPid := range childrenPids {
+			status, _ := PidInitContainer(childPid)
+			if status {
+				pids = append(pids, childPid)
+			}
+		}
 	}
+
 	return pids, nil
 }
 

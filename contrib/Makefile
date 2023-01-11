@@ -77,7 +77,7 @@ build/openssl/libssl.a build/openssl/libcrypto.a:
 	@echo "$${CI:+::group::}Building openssl"
 	@$(RM) -r build/openssl
 	@mkdir build/openssl
-	cd build/openssl && ../../openssl/Configure no-engine no-async no-tests no-unit-test no-threads && make -j8
+	cd build/openssl && ../../openssl/Configure no-engine no-async no-tests no-unit-test no-threads && make -j$(nproc)
 	# Yuck.  Avoids naming conflict between our wrap.c and libssl.a
 	objcopy --redefine-sym SSL_read=SCOPE_SSL_read build/openssl/libssl.a
 	objcopy --redefine-sym SSL_write=SCOPE_SSL_write build/openssl/libssl.a

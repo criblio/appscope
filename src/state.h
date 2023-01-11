@@ -38,6 +38,7 @@ typedef enum {
 void initState();
 void resetState();
 
+bool payloadToDiskForced(void);
 void setVerbosity(unsigned);
 void addSock(int, int, int);
 int doBlockConnection(int, const struct sockaddr *);

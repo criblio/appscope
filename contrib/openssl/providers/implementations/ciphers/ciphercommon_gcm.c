@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2019-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -25,20 +25,26 @@ static int gcm_cipher_internal(PROV_GCM_CTX *ctx, unsigned char *out,
                                size_t *padlen, const unsigned char *in,
                                size_t len);
 
+/*
+ * Called from EVP_CipherInit when there is currently no context via
+ * the new_ctx() function
+ */
 void ossl_gcm_initctx(void *provctx, PROV_GCM_CTX *ctx, size_t keybits,
-                      const PROV_GCM_HW *hw, size_t ivlen_min)
+                      const PROV_GCM_HW *hw)
 {
     ctx->pad = 1;
     ctx->mode = EVP_CIPH_GCM_MODE;
     ctx->taglen = UNINITIALISED_SIZET;
     ctx->tls_aad_len = UNINITIALISED_SIZET;
-    ctx->ivlen_min = ivlen_min;
     ctx->ivlen = (EVP_GCM_TLS_FIXED_IV_LEN + EVP_GCM_TLS_EXPLICIT_IV_LEN);
     ctx->keylen = keybits / 8;
     ctx->hw = hw;
     ctx->libctx = PROV_LIBCTX_OF(provctx);
 }
 
+/*
+ * Called by EVP_CipherInit via the _einit and _dinit functions
+ */
 static int gcm_init(void *vctx, const unsigned char *key, size_t keylen,
                     const unsigned char *iv, size_t ivlen,
                     const OSSL_PARAM params[], int enc)
@@ -51,7 +57,7 @@ static int gcm_init(void *vctx, const unsigned char *key, size_t keylen,
     ctx->enc = enc;
 
     if (iv != NULL) {
-        if (ivlen < ctx->ivlen_min || ivlen > sizeof(ctx->iv)) {
+        if (ivlen == 0 || ivlen > sizeof(ctx->iv)) {
             ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_IV_LENGTH);
             return 0;
         }
@@ -67,6 +73,7 @@ static int gcm_init(void *vctx, const unsigned char *key, size_t keylen,
         }
         if (!ctx->hw->setkey(ctx, key, ctx->keylen))
             return 0;
+        ctx->tls_enc_records = 0;
     }
     return ossl_gcm_set_ctx_params(ctx, params);
 }
@@ -371,7 +378,7 @@ static int gcm_iv_generate(PROV_GCM_CTX *ctx, int offset)
         return 0;
 
     /* Use DRBG to generate random iv */
-    if (RAND_bytes_ex(ctx->libctx, ctx->iv + offset, sz) <= 0)
+    if (RAND_bytes_ex(ctx->libctx, ctx->iv + offset, sz, 0) <= 0)
         return 0;
     ctx->iv_state = IV_STATE_BUFFERED;
     ctx->iv_gen_rand = 1;
@@ -448,7 +455,6 @@ static int gcm_tls_init(PROV_GCM_CTX *dat, unsigned char *aad, size_t aad_len)
     buf = dat->buf;
     memcpy(buf, aad, aad_len);
     dat->tls_aad_len = aad_len;
-    dat->tls_enc_records = 0;
 
     len = buf[aad_len - 2] << 8 | buf[aad_len - 1];
     /* Correct length for explicit iv. */
@@ -485,7 +491,7 @@ static int gcm_tls_iv_set_fixed(PROV_GCM_CTX *ctx, unsigned char *iv,
     if (len > 0)
         memcpy(ctx->iv, iv, len);
     if (ctx->enc
-        && RAND_bytes_ex(ctx->libctx, ctx->iv + len, ctx->ivlen - len) <= 0)
+        && RAND_bytes_ex(ctx->libctx, ctx->iv + len, ctx->ivlen - len, 0) <= 0)
             return 0;
     ctx->iv_gen = 1;
     ctx->iv_state = IV_STATE_BUFFERED;

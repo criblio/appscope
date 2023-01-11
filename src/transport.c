@@ -1498,12 +1498,16 @@ transportFlush(transport_t* t)
 uint64_t
 transportConnectAttempts(transport_t* t)
 {
+    if (!t) return 0;
     return t->net.connect_attempts;
 }
 
 net_fail_t
 transportFailureReason(transport_t *t)
 {
+    // This fn reports the most recent connection failure which
+    // is primarilly provided to help debugging of tls issues
+    if (!t) return NO_FAIL;
     return t->net.failure_reason;
 }
 

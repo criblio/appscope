@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -316,7 +316,7 @@ static int pkcs7_ecdsa_or_dsa_sign_verify_setup(PKCS7_SIGNER_INFO *si,
         hnid = OBJ_obj2nid(alg1->algorithm);
         if (hnid == NID_undef)
             return -1;
-        if (!OBJ_find_sigid_by_algs(&snid, hnid, EVP_PKEY_id(pkey)))
+        if (!OBJ_find_sigid_by_algs(&snid, hnid, EVP_PKEY_get_id(pkey)))
             return -1;
         X509_ALGOR_set0(alg2, OBJ_nid2obj(snid), V_ASN1_UNDEF, 0);
     }
@@ -362,7 +362,7 @@ int PKCS7_SIGNER_INFO_set(PKCS7_SIGNER_INFO *p7i, X509 *x509, EVP_PKEY *pkey,
 
     /* Set the algorithms */
 
-    X509_ALGOR_set0(p7i->digest_alg, OBJ_nid2obj(EVP_MD_type(dgst)),
+    X509_ALGOR_set0(p7i->digest_alg, OBJ_nid2obj(EVP_MD_get_type(dgst)),
                     V_ASN1_NULL, NULL);
 
     if (EVP_PKEY_is_a(pkey, "EC") || EVP_PKEY_is_a(pkey, "DSA"))
@@ -402,7 +402,7 @@ PKCS7_SIGNER_INFO *PKCS7_add_signature(PKCS7 *p7, X509 *x509, EVP_PKEY *pkey,
 
     if ((si = PKCS7_SIGNER_INFO_new()) == NULL)
         goto err;
-    if (!PKCS7_SIGNER_INFO_set(si, x509, pkey, dgst))
+    if (PKCS7_SIGNER_INFO_set(si, x509, pkey, dgst) <= 0)
         goto err;
     if (!PKCS7_add_signer(p7, si))
         goto err;
@@ -560,7 +560,7 @@ PKCS7_RECIP_INFO *PKCS7_add_recipient(PKCS7 *p7, X509 *x509)
 
     if ((ri = PKCS7_RECIP_INFO_new()) == NULL)
         goto err;
-    if (!PKCS7_RECIP_INFO_set(ri, x509))
+    if (PKCS7_RECIP_INFO_set(ri, x509) <= 0)
         goto err;
     if (!PKCS7_add_recipient_info(p7, ri))
         goto err;
@@ -689,7 +689,7 @@ int PKCS7_set_cipher(PKCS7 *p7, const EVP_CIPHER *cipher)
     }
 
     /* Check cipher OID exists and has data in it */
-    i = EVP_CIPHER_type(cipher);
+    i = EVP_CIPHER_get_type(cipher);
     if (i == NID_undef) {
         ERR_raise(ERR_LIB_PKCS7, PKCS7_R_CIPHER_HAS_NO_OBJECT_IDENTIFIER);
         return 0;

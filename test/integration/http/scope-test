@@ -81,10 +81,6 @@ sleep 30
 # AppScope source. Logstream is setup to dump data sent to that source to NDJSON
 # files in ${DEST} named CriblOut-*.json.
 
-# When AppScope is configured to connect to LogStream, it should automatically
-# relay HTTP payloads and LogStream should be able to parse them into HTTP
-# request and response events.
-
 # Should get HTTP events from HTTP/1.x traffic
 starttest "HTTP/1.1"
 rm -rf ${DEST}

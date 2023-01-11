@@ -13,6 +13,9 @@
 #include <openssl/ec.h>
 #include <openssl/rand.h>
 #include <openssl/err.h>
+#ifndef FIPS_MODULE
+# include <openssl/x509.h>
+#endif
 #include "crypto/ecx.h"
 #include "ecx_backend.h"
 
@@ -67,11 +70,23 @@ int ossl_ecx_key_fromdata(ECX_KEY *ecx, const OSSL_PARAM params[],
     if (param_pub_key == NULL && param_priv_key == NULL)
         return 0;
 
-    if (param_priv_key != NULL
-        && !OSSL_PARAM_get_octet_string(param_priv_key,
-                                        (void **)&ecx->privkey, ecx->keylen,
-                                        &privkeylen))
-        return 0;
+    if (param_priv_key != NULL) {
+        if (!OSSL_PARAM_get_octet_string(param_priv_key,
+                                         (void **)&ecx->privkey, ecx->keylen,
+                                         &privkeylen))
+            return 0;
+        if (privkeylen != ecx->keylen) {
+            /*
+             * Invalid key length. We will clear what we've received now. We
+             * can't leave it to ossl_ecx_key_free() because that will call
+             * OPENSSL_secure_clear_free() and assume the correct key length
+             */
+            OPENSSL_secure_clear_free(ecx->privkey, privkeylen);
+            ecx->privkey = NULL;
+            return 0;
+        }
+    }
+
 
     pubkey = ecx->pubkey;
     if (param_pub_key != NULL
@@ -80,8 +95,7 @@ int ossl_ecx_key_fromdata(ECX_KEY *ecx, const OSSL_PARAM params[],
                                          sizeof(ecx->pubkey), &pubkeylen))
         return 0;
 
-    if ((param_pub_key != NULL && pubkeylen != ecx->keylen)
-        || (param_priv_key != NULL && privkeylen != ecx->keylen))
+    if ((param_pub_key != NULL && pubkeylen != ecx->keylen))
         return 0;
 
     if (param_pub_key == NULL && !ossl_ecx_public_from_private(ecx))
@@ -187,7 +201,7 @@ ECX_KEY *ossl_ecx_key_op(const X509_ALGOR *palg,
         }
         if (op == KEY_OP_KEYGEN) {
             if (id != EVP_PKEY_NONE) {
-                if (RAND_priv_bytes_ex(libctx, privkey, KEYLENID(id)) <= 0)
+                if (RAND_priv_bytes_ex(libctx, privkey, KEYLENID(id), 0) <= 0)
                     goto err;
                 if (id == EVP_PKEY_X25519) {
                     privkey[0] &= 248;

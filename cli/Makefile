@@ -101,7 +101,9 @@ $(SCOPE): run/bundle.go $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -
 	       	-o $(SCOPE)
 
 compressscope: $(SCOPE) require-upx
-	upx -l $(SCOPE) >/dev/null 2>&1 || upx -9 $(SCOPE); \
+	@if [ -z $(SCOPE_NOCOMPRESS) ] ; then \
+		upx -l $(SCOPE) >/dev/null 2>&1 || upx -9 $(SCOPE); \
+	fi
 
 ## test: run unit tests
 test:

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2019-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -22,6 +22,7 @@
 #include "prov/provider_util.h"
 #include "prov/seeding.h"
 #include "self_test.h"
+#include "internal/core.h"
 
 static const char FIPS_DEFAULT_PROPERTIES[] = "provider=fips,fips=yes";
 static const char FIPS_UNAPPROVED_PROPERTIES[] = "provider=fips,fips=no";
@@ -96,6 +97,7 @@ static void fips_prov_ossl_ctx_free(void *fgbl)
 }
 
 static const OSSL_LIB_CTX_METHOD fips_prov_ossl_ctx_method = {
+    OSSL_LIB_CTX_METHOD_DEFAULT_PRIORITY,
     fips_prov_ossl_ctx_new,
     fips_prov_ossl_ctx_free,
 };
@@ -345,6 +347,8 @@ static const OSSL_ALGORITHM fips_macs[] = {
 
 static const OSSL_ALGORITHM fips_kdfs[] = {
     { PROV_NAMES_HKDF, FIPS_DEFAULT_PROPERTIES, ossl_kdf_hkdf_functions },
+    { PROV_NAMES_TLS1_3_KDF, FIPS_DEFAULT_PROPERTIES,
+      ossl_kdf_tls1_3_kdf_functions },
     { PROV_NAMES_SSKDF, FIPS_DEFAULT_PROPERTIES, ossl_kdf_sskdf_functions },
     { PROV_NAMES_PBKDF2, FIPS_DEFAULT_PROPERTIES, ossl_kdf_pbkdf2_functions },
     { PROV_NAMES_SSHKDF, FIPS_DEFAULT_PROPERTIES, ossl_kdf_sshkdf_functions },
@@ -517,10 +521,26 @@ static const OSSL_DISPATCH intern_dispatch_table[] = {
     { 0, NULL }
 };
 
-int OSSL_provider_init(const OSSL_CORE_HANDLE *handle,
-                       const OSSL_DISPATCH *in,
-                       const OSSL_DISPATCH **out,
-                       void **provctx)
+/*
+ * On VMS, the provider init function name is expected to be uppercase,
+ * see the pragmas in <openssl/core.h>.  Let's do the same with this
+ * internal name.  This is how symbol names are treated by default
+ * by the compiler if nothing else is said, but since this is part
+ * of libfips, and we build our libraries with mixed case symbol names,
+ * we must switch back to this default explicitly here.
+ */
+#ifdef __VMS
+# pragma names save
+# pragma names uppercase,truncated
+#endif
+OSSL_provider_init_fn OSSL_provider_init_int;
+#ifdef __VMS
+# pragma names restore
+#endif
+int OSSL_provider_init_int(const OSSL_CORE_HANDLE *handle,
+                           const OSSL_DISPATCH *in,
+                           const OSSL_DISPATCH **out,
+                           void **provctx)
 {
     FIPS_GLOBAL *fgbl;
     OSSL_LIB_CTX *libctx = NULL;
@@ -529,7 +549,7 @@ int OSSL_provider_init(const OSSL_CORE_HANDLE *handle,
     memset(&selftest_params, 0, sizeof(selftest_params));
 
     if (!ossl_prov_seeding_from_dispatch(in))
-        return 0;
+        goto err;
     for (; in->function_id != 0; in++) {
         /*
          * We do not support the scenario of an application linked against
@@ -646,8 +666,6 @@ int OSSL_provider_init(const OSSL_CORE_HANDLE *handle,
         OSSL_LIB_CTX_free(libctx);
         goto err;
     }
-    ossl_prov_ctx_set0_libctx(*provctx, libctx);
-    ossl_prov_ctx_set0_handle(*provctx, handle);
 
     if ((fgbl = ossl_lib_ctx_get_data(libctx, OSSL_LIB_CTX_FIPS_PROV_INDEX,
                                       &fips_prov_ossl_ctx_method)) == NULL)
@@ -668,17 +686,17 @@ int OSSL_provider_init(const OSSL_CORE_HANDLE *handle,
 
     if (!fips_get_params_from_core(fgbl)) {
         /* Error already raised */
-        return 0;
+        goto err;
     }
     /*
-     * Disable the conditional error check if is disabled in the fips config
-     * file
+     * Disable the conditional error check if it's disabled in the fips config
+     * file.
      */
     if (fgbl->selftest_params.conditional_error_check != NULL
         && strcmp(fgbl->selftest_params.conditional_error_check, "0") == 0)
         SELF_TEST_disable_conditional_error_state();
 
-    /* Disable the security check if is disabled in the fips config file */
+    /* Disable the security check if it's disabled in the fips config file. */
     if (fgbl->fips_security_check_option != NULL
         && strcmp(fgbl->fips_security_check_option, "0") == 0)
         fgbl->fips_security_checks = 0;
@@ -690,10 +708,14 @@ int OSSL_provider_init(const OSSL_CORE_HANDLE *handle,
         goto err;
     }
 
+    ossl_prov_ctx_set0_libctx(*provctx, libctx);
+    ossl_prov_ctx_set0_handle(*provctx, handle);
+
     *out = fips_dispatch_table;
     return 1;
  err:
     fips_teardown(*provctx);
+    OSSL_LIB_CTX_free(libctx);
     *provctx = NULL;
     return 0;
 }

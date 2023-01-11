@@ -15,7 +15,9 @@
 
 #include <stdio.h>
 #include <openssl/bn.h>
-#include <openssl/engine.h>
+#ifndef FIPS_MODULE
+# include <openssl/engine.h>
+#endif
 #include <openssl/obj_mac.h>
 #include <openssl/core_names.h>
 #include "internal/cryptlib.h"
@@ -202,6 +204,7 @@ int DH_size(const DH *dh)
 int DH_security_bits(const DH *dh)
 {
     int N;
+
     if (dh->params.q != NULL)
         N = BN_num_bits(dh->params.q);
     else if (dh->length)

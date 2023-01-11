@@ -1,5 +1,5 @@
 /*
- * Copyright 2020-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2020-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -16,7 +16,7 @@
 #include <openssl/params.h>
 #include <openssl/err.h>
 #include <openssl/proverr.h>
-#include <crypto/sm2.h>
+#include "crypto/sm2.h"
 #include "prov/provider_ctx.h"
 #include "prov/implementations.h"
 #include "prov/provider_util.h"
@@ -110,7 +110,7 @@ static int sm2_asym_decrypt(void *vpsm2ctx, unsigned char *out, size_t *outlen,
         return 0;
 
     if (out == NULL) {
-        if (!ossl_sm2_plaintext_size(psm2ctx->key, md, inlen, outlen))
+        if (!ossl_sm2_plaintext_size(in, inlen, outlen))
             return 0;
         return 1;
     }
@@ -138,6 +138,8 @@ static void *sm2_dupctx(void *vpsm2ctx)
         return NULL;
 
     *dstctx = *srcctx;
+    memset(&dstctx->md, 0, sizeof(dstctx->md));
+
     if (dstctx->key != NULL && !EC_KEY_up_ref(dstctx->key)) {
         OPENSSL_free(dstctx);
         return NULL;
@@ -164,7 +166,7 @@ static int sm2_get_ctx_params(void *vpsm2ctx, OSSL_PARAM *params)
         const EVP_MD *md = ossl_prov_digest_md(&psm2ctx->md);
 
         if (!OSSL_PARAM_set_utf8_string(p, md == NULL ? ""
-                                                      : EVP_MD_name(md)))
+                                                      : EVP_MD_get0_name(md)))
             return 0;
     }
 

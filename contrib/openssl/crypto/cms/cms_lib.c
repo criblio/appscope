@@ -1,5 +1,5 @@
 /*
- * Copyright 2008-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2008-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -28,11 +28,17 @@ CMS_ContentInfo *d2i_CMS_ContentInfo(CMS_ContentInfo **a,
                                      const unsigned char **in, long len)
 {
     CMS_ContentInfo *ci;
+    const CMS_CTX *ctx = ossl_cms_get0_cmsctx(a == NULL ? NULL : *a);
 
-    ci = (CMS_ContentInfo *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
-                                          (CMS_ContentInfo_it()));
-    if (ci != NULL)
+    ci = (CMS_ContentInfo *)ASN1_item_d2i_ex((ASN1_VALUE **)a, in, len,
+                                          (CMS_ContentInfo_it()),
+                                          ossl_cms_ctx_get0_libctx(ctx),
+                                          ossl_cms_ctx_get0_propq(ctx));
+    if (ci != NULL) {
+        ERR_set_mark();
         ossl_cms_resolve_libctx(ci);
+        ERR_pop_to_mark();
+    }
     return ci;
 }
 
@@ -45,7 +51,8 @@ CMS_ContentInfo *CMS_ContentInfo_new_ex(OSSL_LIB_CTX *libctx, const char *propq)
 {
     CMS_ContentInfo *ci;
 
-    ci = (CMS_ContentInfo *)ASN1_item_new(ASN1_ITEM_rptr(CMS_ContentInfo));
+    ci = (CMS_ContentInfo *)ASN1_item_new_ex(ASN1_ITEM_rptr(CMS_ContentInfo),
+                                             libctx, propq);
     if (ci != NULL) {
         ci->ctx.libctx = libctx;
         ci->ctx.propq = NULL;
@@ -455,12 +462,12 @@ int ossl_cms_DigestAlgorithm_find_ctx(EVP_MD_CTX *mctx, BIO *chain,
             return 0;
         }
         BIO_get_md_ctx(chain, &mtmp);
-        if (EVP_MD_CTX_type(mtmp) == nid
+        if (EVP_MD_CTX_get_type(mtmp) == nid
             /*
              * Workaround for broken implementations that use signature
              * algorithm OID instead of digest.
              */
-            || EVP_MD_pkey_type(EVP_MD_CTX_get0_md(mtmp)) == nid)
+            || EVP_MD_get_pkey_type(EVP_MD_CTX_get0_md(mtmp)) == nid)
             return EVP_MD_CTX_copy_ex(mctx, mtmp);
         chain = BIO_next(chain);
     }

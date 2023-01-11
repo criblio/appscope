@@ -1,0 +1,150 @@
+#! /bin/bash
+
+FAILED_TEST_LIST=""
+FAILED_TEST_COUNT=0
+
+export SCOPE_PAYLOAD_DIR=/tmp/appscope/payload
+
+
+# make sure the SCOPE_PAYLOAD_DIR directory exists and is empty
+[ ! -d /tmp/appscope ] && mkdir /tmp/appscope
+[ ! -d $SCOPE_PAYLOAD_DIR ] && mkdir $SCOPE_PAYLOAD_DIR
+rm -rf $SCOPE_PAYLOAD_DIR/*
+
+
+fail() { ERR+=1; echo >&2 "fail:" $@; }
+
+starttest(){
+    CURRENT_TEST=$1
+    echo "==============================================="
+    echo "             Testing $CURRENT_TEST             "
+    echo "==============================================="
+    ERR=0
+}
+
+endtest(){
+    if [ $ERR -eq "0" ]; then
+        RESULT=PASSED
+    else
+        RESULT=FAILED
+        FAILED_TEST_LIST+=$CURRENT_TEST
+        FAILED_TEST_LIST+=" "
+        FAILED_TEST_COUNT=$(($FAILED_TEST_COUNT + 1))
+    fi
+
+    echo "*************** $CURRENT_TEST $RESULT ***************"
+    echo ""
+    echo ""
+}
+
+cleanup(){
+    rm -rf $SCOPE_PAYLOAD_DIR/*
+}
+
+#
+# This test was written to test that the payload feature creates .in and
+# .out files to disk when we expect them.  Generally, if the payload
+# feature is off or payloads are routed to cribl, then we don't expect
+# payloads to be written to disk.  The only exception: if
+# payloads are routed to cribl and SCOPE_PAYLOAD_TO_DISK=true,
+# then we expect payloads to be written to disk.
+#
+# At this time, we're not testing the *contents* of the payload files,
+# or the names of the files, just the existance of them.
+#
+
+
+starttest payload_off_1
+echo "When the payload feature is off, verify that no payload files are written to disk"
+SCOPE_PAYLOAD_ENABLE=false \
+SCOPE_CRIBL_ENABLE=true \
+scope run -- curl -Lso /dev/null https://cribl.io
+FILE_COUNT=$(compgen -G "$SCOPE_PAYLOAD_DIR/*\.out" | wc -l)
+if (( $FILE_COUNT > 0 )); then
+    fail "FAILED - expected zero payload files, but found $FILE_COUNT"
+fi
+cleanup
+endtest
+
+starttest payload_off_2
+echo "When the payload feature is off, verify that no payload files are"
+echo "  written to disk, even if SCOPE_PAYLOAD_TO_DISK=true"
+SCOPE_PAYLOAD_ENABLE=false \
+SCOPE_CRIBL_ENABLE=true \
+SCOPE_PAYLOAD_TO_DISK=true \
+scope run -- curl -Lso /dev/null https://cribl.io
+FILE_COUNT=$(compgen -G "$SCOPE_PAYLOAD_DIR/*\.out" | wc -l)
+if (( $FILE_COUNT > 0 )); then
+    fail "FAILED - expected zero payload files, but found $FILE_COUNT"
+fi
+cleanup
+endtest
+
+starttest payload_on_to_cribl
+echo "When the payload feature is on, and SCOPE_CRIBL_ENABLE=true, verify no"
+echo "  payloads are written to disk (they are sent over the cribl"
+echo "  connection)"
+SCOPE_PAYLOAD_ENABLE=true \
+SCOPE_CRIBL_ENABLE=true \
+scope run -- curl -Lso /dev/null https://cribl.io
+FILE_COUNT=$(compgen -G "$SCOPE_PAYLOAD_DIR/*\.out" | wc -l)
+if (( $FILE_COUNT > 0 )); then
+    fail "FAILED - expected zero payload files, but found $FILE_COUNT"
+fi
+cleanup
+endtest
+
+starttest payload_on_to_cribl_but_overridden_to_disk
+echo "When the payload feature is on, and SCOPE_CRIBL_ENABLE=true, verify"
+echo "  payloads are written to disk if SCOPE_PAYLOAD_TO_DISK=true"
+SCOPE_PAYLOAD_ENABLE=true \
+SCOPE_CRIBL_ENABLE=true \
+SCOPE_PAYLOAD_TO_DISK=true \
+scope run -- curl -Lso /dev/null https://cribl.io
+FILE_COUNT=$(compgen -G "$SCOPE_PAYLOAD_DIR/*\.out" | wc -l)
+if (( $FILE_COUNT == 0 )); then
+    fail "FAILED - expected payload files, but found $FILE_COUNT"
+fi
+endtest
+
+starttest payload_on_but_not_to_cribl_1
+echo "When the payload feature is on, and SCOPE_CRIBL_ENABLE=false, verify"
+echo "  payloads are written to disk.  Payloads always go to disk if"
+echo "  SCOPE_CRIBL_ENABLE=false"
+SCOPE_PAYLOAD_ENABLE=true \
+SCOPE_CRIBL_ENABLE=false \
+scope run -- curl -Lso /dev/null https://cribl.io
+FILE_COUNT=$(compgen -G "$SCOPE_PAYLOAD_DIR/*\.out" | wc -l)
+if (( $FILE_COUNT == 0 )); then
+    fail "FAILED - expected payload files, but found $FILE_COUNT"
+fi
+endtest
+
+starttest payload_on_but_not_to_cribl_2
+echo "When the payload feature is on, and SCOPE_CRIBL_ENABLE=false, verify"
+echo "  payloads are written to disk even if SCOPE_PAYLOAD_TO_DISK=false."
+echo "  Payloads always go to disk if SCOPE_CRIBL_ENABLE=false"
+SCOPE_PAYLOAD_ENABLE=true \
+SCOPE_CRIBL_ENABLE=false \
+SCOPE_PAYLOAD_TO_DISK=false \
+scope run -- curl -Lso /dev/null https://cribl.io
+FILE_COUNT=$(compgen -G "$SCOPE_PAYLOAD_DIR/*\.out" | wc -l)
+if (( $FILE_COUNT == 0 )); then
+    fail "FAILED - expected payload files, but found $FILE_COUNT"
+fi
+endtest
+
+
+
+
+if (( $FAILED_TEST_COUNT == 0 )); then
+    echo ""
+    echo ""
+    echo "*************** ALL TESTS PASSED ***************"
+else
+    echo "*************** SOME TESTS FAILED ***************"
+    echo "Failed tests: $FAILED_TEST_LIST"
+fi
+
+exit ${FAILED_TEST_COUNT}
+

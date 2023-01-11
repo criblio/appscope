@@ -43,19 +43,31 @@ static long tst_bio_core_ctrl(OSSL_CORE_BIO *bio, int cmd, long num, void *ptr)
     return BIO_ctrl(bio->bio, cmd, num, ptr);
 }
 
+static int tst_bio_core_up_ref(OSSL_CORE_BIO *bio)
+{
+    return BIO_up_ref(bio->bio);
+}
+
+static int tst_bio_core_free(OSSL_CORE_BIO *bio)
+{
+    return BIO_free(bio->bio);
+}
+
 static const OSSL_DISPATCH biocbs[] = {
     { OSSL_FUNC_BIO_READ_EX, (void (*)(void))tst_bio_core_read_ex },
     { OSSL_FUNC_BIO_WRITE_EX, (void (*)(void))tst_bio_core_write_ex },
     { OSSL_FUNC_BIO_GETS, (void (*)(void))tst_bio_core_gets },
     { OSSL_FUNC_BIO_PUTS, (void (*)(void))tst_bio_core_puts },
     { OSSL_FUNC_BIO_CTRL, (void (*)(void))tst_bio_core_ctrl },
+    { OSSL_FUNC_BIO_UP_REF, (void (*)(void))tst_bio_core_up_ref },
+    { OSSL_FUNC_BIO_FREE, (void (*)(void))tst_bio_core_free },
     { 0, NULL }
 };
 
 static int test_bio_core(void)
 {
     BIO *cbio = NULL, *cbiobad = NULL;
-    OSSL_LIB_CTX *libctx = OSSL_LIB_CTX_new_from_dispatch(biocbs);
+    OSSL_LIB_CTX *libctx = OSSL_LIB_CTX_new_from_dispatch(NULL, biocbs);
     int testresult = 0;
     OSSL_CORE_BIO corebio;
     const char *msg = "Hello world";

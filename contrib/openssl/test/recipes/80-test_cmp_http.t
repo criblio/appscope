@@ -1,5 +1,5 @@
 #! /usr/bin/env perl
-# Copyright 2007-2021 The OpenSSL Project Authors. All Rights Reserved.
+# Copyright 2007-2022 The OpenSSL Project Authors. All Rights Reserved.
 # Copyright Nokia 2007-2019
 # Copyright Siemens AG 2015-2019
 #
@@ -12,7 +12,7 @@ use strict;
 use warnings;
 
 use POSIX;
-use OpenSSL::Test qw/:DEFAULT with data_file data_dir srctop_dir bldtop_dir result_dir/;
+use OpenSSL::Test qw/:DEFAULT cmdstr data_file data_dir srctop_dir bldtop_dir result_dir/;
 use OpenSSL::Test::Utils;
 
 BEGIN {
@@ -22,21 +22,19 @@ use lib srctop_dir('Configurations');
 use lib bldtop_dir('.');
 
 plan skip_all => "These tests are not supported in a fuzz build"
-    if config('options') =~ /-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION/;
+    if config('options') =~ /-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION|enable-fuzz-afl/;
 
 plan skip_all => "These tests are not supported in a no-cmp build"
     if disabled("cmp");
 plan skip_all => "These tests are not supported in a no-ec build"
     if disabled("ec");
+plan skip_all => "These tests are not supported in a no-sock build"
+    if disabled("sock");
 
-plan skip_all => "Tests involving local HTTP server not available on Windows, AIX or VMS"
-    if $^O =~ /^(VMS|MSWin32|AIX)$/;
+plan skip_all => "Tests involving local HTTP server not available on Windows or VMS"
+    if $^O =~ /^(VMS|MSWin32|msys)$/;
 plan skip_all => "Tests involving local HTTP server not available in cross-compile builds"
     if defined $ENV{EXE_SHELL};
-plan skip_all => "Tests involving local HTTP server require 'kill' command"
-    if system("which kill >/dev/null");
-plan skip_all => "Tests involving local HTTP server require 'lsof' command"
-    if system("which lsof >/dev/null"); # this typically excludes Solaris
 
 sub chop_dblquot { # chop any leading and trailing '"' (needed for Windows)
     my $str = shift;
@@ -44,12 +42,12 @@ sub chop_dblquot { # chop any leading and trailing '"' (needed for Windows)
     return $str;
 }
 
-my $proxy = "<EMPTY>";
-$proxy = chop_dblquot($ENV{http_proxy} // $ENV{HTTP_PROXY} // $proxy);
+my $proxy = chop_dblquot($ENV{http_proxy} // $ENV{HTTP_PROXY} // "");
+$proxy = "<EMPTY>" if $proxy eq "";
 $proxy =~ s{^https?://}{}i;
 my $no_proxy = $ENV{no_proxy} // $ENV{NO_PROXY};
 
-my $app = "apps/openssl cmp";
+my @app = qw(openssl cmp);
 
 # the CMP server configuration consists of:
 my $ca_dn;      # The CA's Distinguished Name
@@ -65,6 +63,7 @@ my $pbm_ref;    # The reference for PBM
 my $pbm_secret; # The secret for PBM
 my $column;     # The column number of the expected result
 my $sleep = 0;  # The time to sleep between two requests
+my $server_fh;  # Server file handle
 
 # The local $server_name variables below are among others taken as the name of a
 # sub-directory with server-specific certs etc. and CA-specific config section.
@@ -129,21 +128,20 @@ sub test_cmp_http {
     my $i = shift;
     my $title = shift;
     my $params = shift;
-    my $expected_exit = shift;
-    my $path_app = bldtop_dir($app);
-    with({ exit_checker => sub {
-        my $actual_exit = shift;
-        my $OK = $actual_exit == $expected_exit;
-        if ($faillog && !$OK) {
+    my $expected_result = shift;
+    $params = [ '-server', "127.0.0.1:$server_port", @$params ]
+        unless grep { $_ eq '-server' } @$params;
+    my $cmd = app([@app, @$params]);
+
+    unless (is(my $actual_result = run($cmd), $expected_result, $title)) {
+        if ($faillog) {
             my $quote_spc_empty = sub { $_ eq "" ? '""' : $_ =~ m/ / ? '"'.$_.'"' : $_ };
-            my $invocation = "$path_app ".join(' ', map $quote_spc_empty->($_), @$params);
+            my $invocation = cmdstr($cmd, display => 1);
             print $faillog "$server_name $aspect \"$title\" ($i/$n)".
-                " expected=$expected_exit actual=$actual_exit\n";
+                " expected=$expected_result actual=$actual_result\n";
             print $faillog "$invocation\n\n";
         }
-        return $OK; } },
-         sub { ok(run(cmd([$path_app, @$params,])),
-                  $title); });
+    }
 }
 
 sub test_cmp_http_aspect {
@@ -172,8 +170,8 @@ sub test_cmp_http_aspect {
 # from $BLDTOP/test-runs/test_cmp_http and prepending the input files by SRCTOP.
 
 indir data_dir() => sub {
-    plan tests => @server_configurations * @all_aspects
-        + (grep(/^Mock$/, @server_configurations)
+    plan tests => 1 + @server_configurations * @all_aspects
+        - (grep(/^Mock$/, @server_configurations)
            && grep(/^certstatus$/, @all_aspects));
 
     foreach my $server_name (@server_configurations) {
@@ -185,8 +183,7 @@ indir data_dir() => sub {
             if ($server_name eq "Mock") {
                 indir "Mock" => sub {
                     $pid = start_mock_server("");
-                    skip "Cannot start or find the started CMP mock server",
-                        scalar @all_aspects unless $pid;
+                    die "Cannot start or find the started CMP mock server" unless $pid;
                 }
             }
             foreach my $aspect (@all_aspects) {
@@ -199,6 +196,7 @@ indir data_dir() => sub {
                 };
             };
             stop_mock_server($pid) if $pid;
+            ok(1, "killing mock server");
           }
         }
     };
@@ -253,40 +251,48 @@ sub load_tests {
         s/^\s+// for (@fields); # remove leading whitespace from elements
         s/\s+$// for (@fields); # remove trailing whitespace from elements
         s/^\"(\".*?\")\"$/$1/ for (@fields); # remove escaping from quotation marks from elements
-        my $expected_exit = $fields[$column];
+        my $expected_result = $fields[$column];
         my $description = 1;
         my $title = $fields[$description];
-        next LOOP if (!defined($expected_exit)
-                      || ($expected_exit ne 0 && $expected_exit ne 1));
+        next LOOP if (!defined($expected_result)
+                      || ($expected_result ne 0 && $expected_result ne 1));
         @fields = grep {$_ ne 'BLANK'} @fields[$description + 1 .. @fields - 1];
-        push @result, [$title, \@fields, $expected_exit];
+        push @result, [$title, \@fields, $expected_result];
     }
     close($data);
     return \@result;
 }
 
-sub mock_server_pid {
-    return `lsof -iTCP:$server_port` =~ m/\n\S+\s+(\d+)\s+[^\n]+LISTEN/s ? $1 : 0;
-}
-
 sub start_mock_server {
     my $args = $_[0]; # optional further CLI arguments
-    my $dir = bldtop_dir("");
-    my $cmd = "LD_LIBRARY_PATH=$dir DYLD_LIBRARY_PATH=$dir " .
-        bldtop_dir($app) . " -config server.cnf $args";
-    my $pid = mock_server_pid();
-    if ($pid) {
-        print "Mock server already running with pid=$pid\n";
-        return $pid;
-    }
+    my $cmd = cmdstr(app([@app, '-config', 'server.cnf',
+                          $args ? $args : ()]), display => 1);
     print "Current directory is ".getcwd()."\n";
-    print "Launching mock server listening on port $server_port: $cmd\n";
-    return system("$cmd &") == 0 # start in background, check for success
-        ? (sleep 1, mock_server_pid()) : 0;
+    print "Launching mock server: $cmd\n";
+    die "Invalid port: $server_port" unless $server_port =~ m/^\d+$/;
+    my $pid = open($server_fh, "$cmd|") or die "Trying to $cmd";
+    print "Pid is: $pid\n";
+    if ($server_port == 0) {
+        # Find out the actual server port
+        while (<$server_fh>) {
+            print "Server output: $_";
+            next if m/using section/;
+            s/\R$//;                # Better chomp
+            ($server_port, $pid) = ($1, $2) if /^ACCEPT\s.*:(\d+) PID=(\d+)$/;
+            last; # Do not loop further to prevent hangs on server misbehavior
+        }
+    }
+    unless ($server_port > 0) {
+        stop_mock_server($pid);
+        return 0;
+    }
+    $server_tls = $kur_port = $pbm_port = $server_port;
+    return $pid;
 }
 
 sub stop_mock_server {
     my $pid = $_[0];
     print "Killing mock server with pid=$pid\n";
-    system("kill $pid") if $pid;
+    kill('KILL', $pid);
+    waitpid($pid, 0);
 }

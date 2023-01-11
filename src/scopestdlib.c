@@ -209,6 +209,7 @@ extern int           scopelibc_ftruncate(int, off_t);
 extern int           scopelibc_setns(int, int);
 extern int           scopelibc_chown(const char *, uid_t, gid_t);
 extern int           scopelibc_fchown(int, uid_t, gid_t);
+extern int           scopelibc_symlink(const char *, const char *);
 
 static int g_go_static;
 
@@ -1238,3 +1239,7 @@ scope_fchown(int fd, uid_t owner, gid_t group) {
     return scopelibc_fchown(fd, owner, group);
 }
 
+int
+scope_symlink(const char *target, const char *linkpath) {
+    return scopelibc_symlink(target, linkpath);
+}

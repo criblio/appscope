@@ -1,5 +1,5 @@
 /*
- * Copyright 2006-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2006-2022 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -16,7 +16,9 @@
 #include <openssl/objects.h>
 #include <openssl/evp.h>
 #include "crypto/bn.h"
-#include "crypto/asn1.h"
+#ifndef FIPS_MODULE
+# include "crypto/asn1.h"
+#endif
 #include "crypto/evp.h"
 #include "evp_local.h"
 
@@ -123,10 +125,9 @@ static int ossl_callback_to_pkey_gencb(const OSSL_PARAM params[], void *arg)
     return ctx->pkey_gencb(ctx);
 }
 
-int EVP_PKEY_gen(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey)
+int EVP_PKEY_generate(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey)
 {
     int ret = 0;
-    OSSL_CALLBACK cb;
     EVP_PKEY *allocated_pkey = NULL;
     /* Legacy compatible keygen callback info, only used with provider impls */
     int gentmp[2];
@@ -199,7 +200,6 @@ int EVP_PKEY_gen(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey)
 
     /*
      * Because we still have legacy keys
-     * TODO remove this #legacy internal keys are gone
      */
     (*ppkey)->type = ctx->legacy_keytype;
 
@@ -262,7 +262,7 @@ int EVP_PKEY_paramgen(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey)
         ERR_raise(ERR_LIB_EVP, EVP_R_OPERATION_NOT_INITIALIZED);
         return -1;
     }
-    return EVP_PKEY_gen(ctx, ppkey);
+    return EVP_PKEY_generate(ctx, ppkey);
 }
 
 int EVP_PKEY_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey)
@@ -271,7 +271,7 @@ int EVP_PKEY_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey)
         ERR_raise(ERR_LIB_EVP, EVP_R_OPERATION_NOT_INITIALIZED);
         return -1;
     }
-    return EVP_PKEY_gen(ctx, ppkey);
+    return EVP_PKEY_generate(ctx, ppkey);
 }
 
 void EVP_PKEY_CTX_set_cb(EVP_PKEY_CTX *ctx, EVP_PKEY_gen_cb *cb)
@@ -364,6 +364,7 @@ int EVP_PKEY_fromdata(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey, int selection,
                       OSSL_PARAM params[])
 {
     void *keydata = NULL;
+    EVP_PKEY *allocated_pkey = NULL;
 
     if (ctx == NULL || (ctx->operation & EVP_PKEY_OP_FROMDATA) == 0) {
         ERR_raise(ERR_LIB_EVP, EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE);
@@ -374,7 +375,7 @@ int EVP_PKEY_fromdata(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey, int selection,
         return -1;
 
     if (*ppkey == NULL)
-        *ppkey = EVP_PKEY_new();
+        allocated_pkey = *ppkey = EVP_PKEY_new();
 
     if (*ppkey == NULL) {
         ERR_raise(ERR_LIB_EVP, ERR_R_MALLOC_FAILURE);
@@ -382,8 +383,13 @@ int EVP_PKEY_fromdata(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey, int selection,
     }
 
     keydata = evp_keymgmt_util_fromdata(*ppkey, ctx->keymgmt, selection, params);
-    if (keydata == NULL)
+    if (keydata == NULL) {
+        if (allocated_pkey != NULL) {
+            *ppkey = NULL;
+            EVP_PKEY_free(allocated_pkey);
+        }
         return 0;
+    }
     /* keydata is cached in *ppkey, so we need not bother with it further */
     return 1;
 }
@@ -413,8 +419,43 @@ int EVP_PKEY_todata(const EVP_PKEY *pkey, int selection, OSSL_PARAM **params)
     return EVP_PKEY_export(pkey, selection, ossl_pkey_todata_cb, params);
 }
 
+#ifndef FIPS_MODULE
+struct fake_import_data_st {
+    OSSL_CALLBACK *export_cb;
+    void *export_cbarg;
+};
+
+static OSSL_FUNC_keymgmt_import_fn pkey_fake_import;
+static int pkey_fake_import(void *fake_keydata, int ignored_selection,
+                            const OSSL_PARAM params[])
+{
+    struct fake_import_data_st *data = fake_keydata;
+
+    return data->export_cb(params, data->export_cbarg);
+}
+#endif
+
 int EVP_PKEY_export(const EVP_PKEY *pkey, int selection,
                     OSSL_CALLBACK *export_cb, void *export_cbarg)
 {
+    if (pkey == NULL) {
+        ERR_raise(ERR_LIB_EVP, ERR_R_PASSED_NULL_PARAMETER);
+        return 0;
+    }
+#ifndef FIPS_MODULE
+    if (evp_pkey_is_legacy(pkey)) {
+        struct fake_import_data_st data;
+
+        data.export_cb = export_cb;
+        data.export_cbarg = export_cbarg;
+
+        /*
+         * We don't need to care about libctx or propq here, as we're only
+         * interested in the resulting OSSL_PARAM array.
+         */
+        return pkey->ameth->export_to(pkey, &data, pkey_fake_import,
+                                      NULL, NULL);
+    }
+#endif
     return evp_keymgmt_util_export(pkey, selection, export_cb, export_cbarg);
 }

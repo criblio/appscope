@@ -10,6 +10,6 @@ typedef enum {
 } patch_status_t;
 
 patch_status_t loaderOpPatchLibrary(const char*);
-int loaderOpSetupLoader(char *);
+int loaderOpSetupLoader(char *, uid_t, gid_t);
 
 #endif // __LOADEROP_H__

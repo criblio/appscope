@@ -8,20 +8,20 @@ for f in "$@"; do
     # the '*stdin' marker to the filename preceded by a space.  See the
     # sha1sum manual for a specification of the format.
     case "$f" in
-        *.c | *.h )
+        *.c | *.c.in | *.h | *.h.in | *.inc)
             cat "$f" \
                 | $HERE/lang-compress.pl 'C' \
                 | unifdef -DFIPS_MODULE=1 \
                 | openssl sha256 -r \
                 | sed -e "s| \\*stdin|  $f|"
             ;;
-        *.pl ) 
+        *.pl )
             cat "$f" \
                 | $HERE/lang-compress.pl 'perl' \
                 | openssl sha256 -r \
                 | sed -e "s| \\*stdin|  $f|"
             ;;
-        *.S ) 
+        *.S )
             cat "$f" \
                 | $HERE/lang-compress.pl 'S' \
                 | openssl sha256 -r \

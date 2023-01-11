@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2021 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2019-2022 The OpenSSL Project Authors. All Rights Reserved.
  * Copyright 2019 Red Hat, Inc.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
@@ -46,7 +46,7 @@
 
 #include "e_os.h"
 
-#define MIN(a, b) ((a) < (b)) ? (a) : (b)
+#define ossl_min(a, b) ((a) < (b)) ? (a) : (b)
 
 typedef enum {
     COUNTER = 0,
@@ -195,7 +195,7 @@ static int derive(EVP_MAC_CTX *ctx_init, kbkdf_mode mode, unsigned char *iv,
             goto done;
 
         to_write = ko_len - written;
-        memcpy(ko + written, k_i, MIN(to_write, h));
+        memcpy(ko + written, k_i, ossl_min(to_write, h));
         written += h;
 
         k_i_len = h;
@@ -289,19 +289,20 @@ static int kbkdf_set_ctx_params(void *vctx, const OSSL_PARAM params[])
                                            NULL, NULL, libctx))
         return 0;
     else if (ctx->ctx_init != NULL
-             && !EVP_MAC_is_a(EVP_MAC_CTX_mac(ctx->ctx_init),
+             && !EVP_MAC_is_a(EVP_MAC_CTX_get0_mac(ctx->ctx_init),
                               OSSL_MAC_NAME_HMAC)
-             && !EVP_MAC_is_a(EVP_MAC_CTX_mac(ctx->ctx_init),
+             && !EVP_MAC_is_a(EVP_MAC_CTX_get0_mac(ctx->ctx_init),
                               OSSL_MAC_NAME_CMAC)) {
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MAC);
         return 0;
     }
 
     p = OSSL_PARAM_locate_const(params, OSSL_KDF_PARAM_MODE);
-    if (p != NULL && strncasecmp("counter", p->data, p->data_size) == 0) {
+    if (p != NULL
+        && OPENSSL_strncasecmp("counter", p->data, p->data_size) == 0) {
         ctx->mode = COUNTER;
     } else if (p != NULL
-               && strncasecmp("feedback", p->data, p->data_size) == 0) {
+               && OPENSSL_strncasecmp("feedback", p->data, p->data_size) == 0) {
         ctx->mode = FEEDBACK;
     } else if (p != NULL) {
         ERR_raise(ERR_LIB_PROV, PROV_R_INVALID_MODE);

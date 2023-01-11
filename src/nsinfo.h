@@ -5,7 +5,7 @@
 
 // Retrieve namespace information
 
-bool nsInfoIsPidGotSecondPidNs(pid_t, pid_t *);
+bool nsInfoGetPidNs(pid_t, pid_t *);
 bool nsInfoIsPidInSameMntNs(pid_t);
 uid_t nsInfoTranslateUid(pid_t);
 gid_t nsInfoTranslateGid(pid_t);

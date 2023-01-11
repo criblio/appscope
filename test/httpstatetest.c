@@ -13,7 +13,8 @@
 #include "test.h"
 
 
-uint64_t g_http_guard[1024];
+#define NET_ENTRIES 1024
+extern uint64_t g_http_guard[NET_ENTRIES];
 struct protocol_info_t* g_msg = NULL;
 
 

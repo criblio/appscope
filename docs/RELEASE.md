@@ -85,6 +85,10 @@ the value returned by `https://cdn.cribl.io/dl/scope/latest`, and updates
 the `latest` tag at `https://hub.docker.com/r/cribl/scope/tags`. This workflow
 is run manually, and does not have any automatic triggers.
 
+The [`update_latest_release`](../.github/workflows/update_latest_release.yml) workflow updates
+the value returned by `https://cdn.cribl.io/dl/scope/latest-release`. This workflow
+is run manually, and does not have any automatic triggers.
+
 ## CDN
 
 You can [download](https://appscope.dev/docs/downloading#download-as-binary) the AppScope binary from the Cribl downloads page and follow the instructions there.
@@ -116,3 +120,21 @@ or
 ```text
 docker run --rm -it cribl/scope:1.1.3
 ```
+
+## Tag Usage
+
+`next`
+- Users can pick up the latest master build
+- Created automatically from master
+- Available on docker
+
+`latest`
+- Users can pick up the latest release after announcement
+- Created manually on Release Day
+- Available on docker and the CDN
+
+`latest-release`
+- Cribl Edge/Stream or Users can pick up the latest release before announcement
+- Created manually on GA Ready Day
+- Available on the CDN
+ 

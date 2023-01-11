@@ -30,6 +30,7 @@ extern uint64_t g_cbuf_drop_count;
 #define DBG_FILE_AND_LINE __FILE__ ":" TOSTRING(__LINE__)
 
 #define PRINTF_FORMAT(fmt_id, arg_id) __attribute__((format(printf, (fmt_id), (arg_id))))
+#define UNREACHABLE() (__builtin_unreachable())
 
 //
 //  The DBG macro is used to keep track of unexpected/undesirable

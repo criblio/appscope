@@ -39,6 +39,7 @@
 #include "runtimecfg.h"
 #include "javaagent.h"
 #include "inject.h"
+#include "ipc.h"
 #include "scopestdlib.h"
 #include "../contrib/libmusl/musl.h"
 
@@ -80,6 +81,18 @@ typedef struct
     void *out_addr;
     int   after_scope;
 } param_t;
+
+void
+doAndReplaceConfig(void *data) {
+    config_t * cfg = (config_t *) data;
+    doConfig(cfg);
+    if (g_staticfg) {
+        cfgDestroy(&g_staticfg);
+        g_staticfg = NULL;
+    }
+    g_staticfg = cfg;
+    g_cfg.staticfg = g_staticfg;
+}
 
 // When used with dl_iterate_phdr(), this has a similar result to
 // scope_dlsym(RTLD_NEXT, ).  But, unlike scope_dlsym(RTLD_NEXT, )
@@ -392,7 +405,7 @@ cmdAttach(void)
 
     /*
      * Using this as an indicator that we were not
-     * previously soping. If the smfd is not active we
+     * previously scoping. If the smfd is not active we
      * may have been detached and are reattaching.
      * In that cse, the thread and transports are expected
      * to be ready.
@@ -409,6 +422,76 @@ cmdAttach(void)
     }
 
     return TRUE;
+}
+
+/*
+ * Handle IPC communication
+ */
+static void
+ipcCommunication(void) {
+    size_t appMqSize = -1;
+    long msgCount = -1;
+    char name[256] = {0};
+
+    /*
+    * Handle incoming message queue
+    * - check if it exists
+    * - check if there are message request on it
+    */
+    scope_snprintf(name, sizeof(name), "/ScopeIPCIn.%d", g_proc.pid);
+    mqd_t mqRequestDesc  = ipcOpenConnection(name, O_RDONLY | O_NONBLOCK);
+
+    if (ipcIsActive(mqRequestDesc, &appMqSize, &msgCount) == FALSE) {
+        return;
+    }
+
+    if (msgCount <= 0) {
+        goto cleanupReqMq;
+    }
+
+    size_t cliMqSize = -1;
+    /*
+    * Handle output message queue
+    * - check if it exists
+    */
+    scope_memset(name, 0, sizeof(name));
+    scope_snprintf(name, sizeof(name), "/ScopeIPCOut.%d", g_proc.pid);
+
+    mqd_t mqResponseDesc = ipcOpenConnection(name, O_WRONLY | O_NONBLOCK);
+    if (ipcIsActive(mqResponseDesc, &cliMqSize, &msgCount) == FALSE) {
+        scopeLogError("%s is not active.", name);
+        goto cleanupReqMq;
+    }
+
+    /*
+    * Handle incoming message queue request (all frames or till first error)
+    */
+    req_parse_status_t parseStatus = REQ_PARSE_GENERIC_ERROR;
+    int uniqReq = -1;
+    void *scopeReq = ipcRequestHandler(mqRequestDesc, appMqSize, &parseStatus, &uniqReq);
+
+    /*
+    * Handle outcoming message queue response (all frames or till first error)
+    */
+    ipc_resp_result_t res;
+    if (parseStatus == REQ_PARSE_OK) {
+        res = ipcSendSuccessfulResponse(mqResponseDesc, cliMqSize, scopeReq, uniqReq);
+    } else {
+        res = ipcSendFailedResponse(mqResponseDesc, cliMqSize, parseStatus, uniqReq);
+    }
+
+    if (res != RESP_RESULT_OK) {
+        scopeLogError("ipcCommunication Error sending response to %s failed %d, parseStatus %d, uniqReq %d", name, res, parseStatus, uniqReq);
+    }
+
+    scope_free(scopeReq);
+    
+    // scopeLogError("OK: Sending answer to %s for cmd %d", name, cmd);
+
+    ipcCloseConnection(mqResponseDesc);
+
+cleanupReqMq:
+    ipcCloseConnection(mqRequestDesc);
 }
 
 static void
@@ -1063,6 +1146,7 @@ periodic(void *arg)
             }
         }
         remoteConfig();
+        ipcCommunication();
     }
 
     return NULL;
@@ -3636,7 +3720,7 @@ _exit(int status)
     } else {
         exit(status);
     }
-    __builtin_unreachable();
+    UNREACHABLE();
 }
 
 #endif // __linux__

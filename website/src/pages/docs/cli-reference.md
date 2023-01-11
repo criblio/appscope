@@ -43,7 +43,6 @@ Available Subcommands:
   flows       Observed flows from the session, potentially including payloads
   help        Help about any subcommand
   history     List scope session history
-  inspect     Return information on scoped process
   k8s         Install scope in kubernetes
   logs        Display scope logs
   metrics     Outputs metrics for a session
@@ -52,7 +51,6 @@ Available Subcommands:
   run         Executes a scoped command
   service     Configure a systemd/OpenRC service to be scoped
   start       Start scoping a filtered selection of processes and services
-  update      Updates configuration of scoped process
   version     Display scope version
   watch       Executes a scoped command on an interval
 

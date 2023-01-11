@@ -5,6 +5,44 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.2.2
+
+2023-01-18 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.2.2`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.2.2/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.2.2/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.2.2/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.2.2/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.2.2/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.2/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.2.2/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.2.2/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.2.2`.
+
+### New Features and Improvements
+
+<strong>AppScope 1.2.2 fixes a critical security vulnerability in OpenSSL. Cribl strongly recommends upgrading as soon as possible.</strong>
+
+AppScope 1.2.2 introduces: 
+
+- Support for [OCI containers](https://opencontainers.org/) run by the [Podman](https://podman.io/) container engine. See issue [#1216](https://github.com/criblio/appscope/issues/1216).
+
+- Support for writing payloads to files on disk while simultaneously sending events and metrics to Cribl Stream or Cribl Edge. To do this, use the new environment variable `SCOPE_PAYLOAD_TO_DISK` together with existing env vars `SCOPE_CRIBL_ENABLE` and `SCOPE_PAYLOAD_ENABLE`, as described [here](/docs/data-routing). See issue [#1158](https://github.com/criblio/appscope/issues/1158).
+
+AppScope 1.2.2 also updates these software components:
+
+- OpenSSL is updated from version 3.0.0 to version 3.0.7. This fixes an OpenSSL security vulnerability, [CVE-2022-3602](https://nvd.nist.gov/vuln/detail/CVE-2022-3602). See issue [#1182](https://github.com/criblio/appscope/issues/1182).
+- The [UPX](https://upx.github.io/) executable packer is updated from version 4.0.0 to version 4.0.1. See issue [#1214](https://github.com/criblio/appscope/issues/1214).
+
+
+### Fixes
+
+- [#1258](https://github.com/criblio/appscope/issues/1258) A scoped application no longer crashes when one of its network connections is [closed](/docs/schema-reference#eventnetclose) and then an attempt is made to [send](/docs/schema-reference#eventnettx) or [receive](/docs/schema-reference#eventnetrx) data on the same connection.
+- [#1251](https://github.com/criblio/appscope/issues/1251) A scoped, running process no longer crashes when you [change](/docs/cli-using#dynamic-configuration) configurations and the new configuration defines a protocol that the old configuration also defines.
+- [#1197](https://github.com/criblio/appscope/issues/1197) When run in a container that is itself inside a container (i.e., Docker in Docker), AppScope now successfully locates the host namespace.
+
 ## AppScope 1.2.1
 
 2022-12-07 - Maintenance Release

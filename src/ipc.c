@@ -134,18 +134,11 @@ ipcSendFrameWithRetry(mqd_t mqDes, void *frame, size_t frameLen) {
 }
 
 /*
- * Opens the IPC connection for sending data as non-block IO
- */
-mqd_t ipcOpenWriteConnection(const char *name) {
-    return scope_mq_open(name, O_WRONLY | O_NONBLOCK);
-}
-
-/*
- * Open the IPC connection for receiving data as non-block IO
+ * Opens existing IPC connection
  */
 mqd_t
-ipcOpenReadConnection(const char *name) {
-    return scope_mq_open(name, O_RDONLY | O_NONBLOCK);
+ipcOpenConnection(const char *name, int oflag) {
+    return scope_mq_open(name, oflag);
 }
 
 /*

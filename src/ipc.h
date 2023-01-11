@@ -6,9 +6,10 @@
 #include "ipc_resp.h"
 
 
-// Manage Inter-process connection
-mqd_t ipcOpenReadConnection(const char *);
-mqd_t ipcOpenWriteConnection(const char *);
+/*
+ *  Manage Inter-process connection
+ */
+mqd_t ipcOpenConnection(const char *, int);
 int ipcCloseConnection(mqd_t);
 bool ipcIsActive(mqd_t, size_t *, long *);
 
@@ -24,7 +25,8 @@ typedef enum {
     RESP_RESULT_OK,                   // Response was succesfully sended
 } ipc_resp_result_t;
 
-/* IPC Request Handler
+/* 
+ * IPC Request Handler
  *
  * Handler for message queue request
  * IMPORTANT NOTE:

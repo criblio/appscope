@@ -84,7 +84,7 @@ ipcInactiveDesc(void **state) {
 
 static void
 ipcOpenNonExistingConnection(void **state) {
-    mqd_t mqDes = ipcOpenWriteConnection("/NonExistingConnection");
+    mqd_t mqDes = ipcOpenConnection("/NonExistingConnection", O_WRONLY | O_NONBLOCK);
     assert_int_equal(mqDes, -1);
 }
 
@@ -114,7 +114,7 @@ ipcCommunicationTest(void **state) {
     assert_int_equal(status, -1);
 
     // Setup write-only IPC
-    mqWriteDes = ipcOpenWriteConnection(ipcConnName);
+    mqWriteDes = ipcOpenConnection(ipcConnName, O_WRONLY | O_NONBLOCK);
     assert_int_not_equal(mqWriteDes, -1);
     res = ipcIsActive(mqWriteDes, &mqWriteSize, &msgCount);
     assert_true(res);

@@ -439,7 +439,7 @@ ipcCommunication(void) {
     * - check if there are message request on it
     */
     scope_snprintf(name, sizeof(name), "/ScopeIPCIn.%d", g_proc.pid);
-    mqd_t mqRequestDesc  = ipcOpenReadConnection(name);
+    mqd_t mqRequestDesc  = ipcOpenConnection(name, O_RDONLY | O_NONBLOCK);
 
     if (ipcIsActive(mqRequestDesc, &appMqSize, &msgCount) == FALSE) {
         return;
@@ -457,7 +457,7 @@ ipcCommunication(void) {
     scope_memset(name, 0, sizeof(name));
     scope_snprintf(name, sizeof(name), "/ScopeIPCOut.%d", g_proc.pid);
 
-    mqd_t mqResponseDesc = ipcOpenWriteConnection(name);
+    mqd_t mqResponseDesc = ipcOpenConnection(name, O_WRONLY | O_NONBLOCK);
     if (ipcIsActive(mqResponseDesc, &cliMqSize, &msgCount) == FALSE) {
         scopeLogError("%s is not active.", name);
         goto cleanupReqMq;

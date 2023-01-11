@@ -475,9 +475,9 @@ ipcCommunication(void) {
     */
     ipc_resp_result_t res;
     if (parseStatus == REQ_PARSE_OK) {
-        res = ipcSendResponseWithScopeData(mqResponseDesc, cliMqSize, scopeReq, uniqReq);
+        res = ipcSendSuccessfulResponse(mqResponseDesc, cliMqSize, scopeReq, uniqReq);
     } else {
-        res = ipcSendResponseOnly(mqResponseDesc, cliMqSize, parseStatus, uniqReq);
+        res = ipcSendFailedResponse(mqResponseDesc, cliMqSize, parseStatus, uniqReq);
     }
 
     if (res != RESP_RESULT_OK) {

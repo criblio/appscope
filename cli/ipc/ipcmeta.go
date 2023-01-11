@@ -14,8 +14,8 @@ const (
 	metaReqJsonPartial
 )
 
-// meta request - message which will be transferred in message queue the metadata part
-// Must be inline with server, see: createMetaResp
+// IPC metadata request - describes metadata part of message which will be transferred in message queue (from CLI to library)
+// Must be inline with server, see: ipcParseSingleFrame
 type metaRequest struct {
 	// Request command
 	Req metaReqCmd `json:"req" jsonschema:"required,const"`
@@ -38,9 +38,9 @@ const (
 	ResponseNotImplemented            = http.StatusNotImplemented
 )
 
-// ipcResponse describes message which will be transferred in response message queue (from library to CLI)
+// IPC metadata response - describes metatadata part of message which will be transferred in message queue (from library to CLI)
 // Must be inline with server, see: createMetaResp
-type ipcResponse struct {
+type metaResponse struct {
 	// Response status
 	Status *respStatus `json:"status" jsonschema:"required"`
 	// Request Unique Identifter

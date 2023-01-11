@@ -389,10 +389,12 @@ err:
 }
 
 /*
- * Sends mq Response status, returns status of sending operation
+ * Sends the response containing only metadata - this function is called in case of failure parsing the request.
+ *
+ * Returns status of sending operation.
  */
 ipc_resp_result_t
-ipcSendResponseOnly(mqd_t mqDes, size_t msgBufSize, req_parse_status_t parseStatus, int uniqReq) {    
+ipcSendFailedResponse(mqd_t mqDes, size_t msgBufSize, req_parse_status_t parseStatus, int uniqReq) {    
     ipc_resp_result_t res = RESP_ALLOCATION_ERROR;
     cJSON *meta = createMetaResp(translateParseStatusToResp(parseStatus), uniqReq, 0);
     if (!meta) {
@@ -472,11 +474,15 @@ errJson:
 
 }
 
+
 /*
- * Sends IPC response with scope msg, returns status of sending operation
+ * Sends the response containing metadata + message - this function is called in case of success parsing the request.
+ *
+ *
+ * Returns status of sending operation.
  */
 ipc_resp_result_t
-ipcSendResponseWithScopeData(mqd_t mqDes, size_t msgBufSize, const char *scopeDataReq, int uniqReq) {
+ipcSendSuccessfulResponse(mqd_t mqDes, size_t msgBufSize, const char *scopeDataReq, int uniqReq) {
 
     ipc_resp_result_t res = RESP_ALLOCATION_ERROR;
     // Proceed incoming scope request 

@@ -302,7 +302,7 @@ func ipcGetMsgSeparatorIndex(msg []byte) int {
 }
 
 // unmarshall meta response check presence of mandatory field
-func UnmarshalMeta(msg []byte, metaResp *ipcResponse) error {
+func UnmarshalMeta(msg []byte, metaResp *metaResponse) error {
 	err := json.Unmarshal(msg, &metaResp)
 	if err != nil {
 		return err
@@ -325,27 +325,27 @@ func UnmarshalMeta(msg []byte, metaResp *ipcResponse) error {
 
 // parseIpcFrame parses single frame in IPC communication
 // returns frame metadata, scope message and error
-func parseIpcFrame(msg []byte) (ipcResponse, []byte, error) {
-	var frameResp ipcResponse
+func parseIpcFrame(msg []byte) (metaResponse, []byte, error) {
+	var metaResp metaResponse
 	var err error
 
 	// Only metadata case
 	sepIndx := ipcGetMsgSeparatorIndex(msg)
 	if sepIndx == -1 {
-		err = UnmarshalMeta(msg, &frameResp)
-		return frameResp, nil, err
+		err = UnmarshalMeta(msg, &metaResp)
+		return metaResp, nil, err
 	}
 
 	metadata := msg[0:sepIndx]
-	err = UnmarshalMeta(metadata, &frameResp)
+	err = UnmarshalMeta(metadata, &metaResp)
 	if err != nil {
-		return frameResp, nil, err
+		return metaResp, nil, err
 	}
 
 	// Skip the separator
 	scopeData := msg[sepIndx+1:]
 
-	return frameResp, scopeData, nil
+	return metaResp, scopeData, nil
 }
 
 // receiveIpcResponse receives the whole message from process endpoint

@@ -423,7 +423,7 @@ ipcHandlerResponseQueueTooSmallForResponse(void **state) {
     ipc_msg_t *msg = createIpcMessage("{\"req\":0,\"uniq\":4567,\"remain\":128}", "{\"req\":1}");
 
     // Get Scope Status Scope message
-    res = ipcSendResponseWithScopeData(mqReadWriteDes, attr.mq_msgsize, msg->scopeData, uniqueId);
+    res = ipcSendSuccessfulResponse(mqReadWriteDes, attr.mq_msgsize, msg->scopeData, uniqueId);
     assert_int_equal(res, RESP_UNSUFFICENT_MSGBUF_ERROR);
     status = scope_mq_getattr(mqReadWriteDes, &attr);
     assert_int_equal(status, 0);
@@ -455,7 +455,7 @@ ipcHandlerResponseFailToSend(void **state) {
     ipc_msg_t *msg = createIpcMessage("", "{\"req\":1}");
 
     // Test that message can not be sended because of lack write permissons
-    res = ipcSendResponseWithScopeData(mqReadDes, attr.mq_msgsize, msg->scopeData, uniqueId);
+    res = ipcSendSuccessfulResponse(mqReadDes, attr.mq_msgsize, msg->scopeData, uniqueId);
 
     assert_int_equal(res, RESP_SEND_OTHER);
     status = scope_mq_getattr(mqReadDes, &attr);
@@ -487,7 +487,7 @@ ipcHandlerResponseSendError(void **state) {
     status = scope_mq_getattr(mqReadWriteDes, &attr);
     assert_int_equal(status, 0);
 
-    res = ipcSendResponseOnly(mqReadWriteDes, attr.mq_msgsize, REQ_PARSE_SCOPE_REQ_ERROR, uniqueId);
+    res = ipcSendFailedResponse(mqReadWriteDes, attr.mq_msgsize, REQ_PARSE_SCOPE_REQ_ERROR, uniqueId);
     assert_int_equal(res, RESP_RESULT_OK);
     status = scope_mq_getattr(mqReadWriteDes, &attr);
     assert_int_equal(status, 0);
@@ -544,7 +544,7 @@ ipcHandlerScopeResponseValid(void **state) {
 
     ipc_msg_t *msg = createIpcMessage("{\"req\":0,\"uniq\":1234,\"remain\":128}", "{\"req\":0}");
 
-    res = ipcSendResponseWithScopeData(mqReadWriteDes, attr.mq_msgsize, msg->scopeData, uniqueId);
+    res = ipcSendSuccessfulResponse(mqReadWriteDes, attr.mq_msgsize, msg->scopeData, uniqueId);
     assert_int_equal(res, RESP_RESULT_OK);
     destroyIpcMessage(msg);
     status = scope_mq_getattr(mqReadWriteDes, &attr);
@@ -619,7 +619,7 @@ ipcHandlerScopeResponseUnknown(void **state) {
 
     ipc_msg_t *msg = createIpcMessage("", "{\"req\":9999}");
 
-    res = ipcSendResponseWithScopeData(mqReadWriteDes, attr.mq_msgsize, msg->scopeData, uniqueId);
+    res = ipcSendSuccessfulResponse(mqReadWriteDes, attr.mq_msgsize, msg->scopeData, uniqueId);
     assert_int_equal(res, RESP_RESULT_OK);
 
     destroyIpcMessage(msg);
@@ -694,7 +694,7 @@ ipcHandlerScopeResponseGetCfgSingleMsg(void **state) {
     assert_int_equal(status, 0);
 
     ipc_msg_t *msg = createIpcMessage("{\"req\":0,\"uniq\":1234,\"remain\":128}", "{\"req\":1}");
-    res = ipcSendResponseWithScopeData(mqReadWriteDes, attr.mq_msgsize, msg->scopeData, uniqueId);
+    res = ipcSendSuccessfulResponse(mqReadWriteDes, attr.mq_msgsize, msg->scopeData, uniqueId);
     assert_int_equal(res, RESP_RESULT_OK);
 
     destroyIpcMessage(msg);
@@ -792,7 +792,7 @@ ipcHandlerScopeResponseSetCfgSingleMsg(void **state) {
     char *setCfgMsg = cJSON_PrintUnformatted(setCfgMsgJson);
 
     ipc_msg_t *msg = createIpcMessage("{\"req\":0,\"uniq\":1234,\"remain\":128}", setCfgMsg);
-    res = ipcSendResponseWithScopeData(mqReadWriteDes, attr.mq_msgsize, msg->scopeData, uniqueId);
+    res = ipcSendSuccessfulResponse(mqReadWriteDes, attr.mq_msgsize, msg->scopeData, uniqueId);
     assert_int_equal(res, RESP_RESULT_OK);
 
     destroyIpcMessage(msg);

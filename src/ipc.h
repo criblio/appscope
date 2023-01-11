@@ -30,7 +30,7 @@ typedef enum {
  *
  * Handler for message queue request
  * IMPORTANT NOTE:
- * Message queue request MUST be inline with client code definition: metaRequest
+ * IPC request metadata MUST be inline with client code definition: metaRequest
  * 
  * - req - number - message queue request command type
  * - uniq - number - unique identifier of message request
@@ -40,16 +40,16 @@ char *ipcRequestHandler(mqd_t, size_t, req_parse_status_t *, int *);
 
 /* IPC Response Handlers
  *
- * Handler for message queue response
+ * Handlers for message queue response
  * IMPORTANT NOTE:
- * Message queue response MUST be inline with client code definition: ipcResponse
+ * IPC response metadata MUST be inline with client code definition: metaResponse
  * 
  * - status - number - message queue response status
  * - uniq - number - unique identifier of message request
  * - remain - number - number of bytes data remaining (including present frame response)
  */
-ipc_resp_result_t ipcSendResponseOnly(mqd_t, size_t, req_parse_status_t, int);
+ipc_resp_result_t ipcSendFailedResponse(mqd_t, size_t, req_parse_status_t, int);
 
-ipc_resp_result_t ipcSendResponseWithScopeData(mqd_t, size_t, const char *, int);
+ipc_resp_result_t ipcSendSuccessfulResponse(mqd_t, size_t, const char *, int);
 
 #endif // __IPC_H__

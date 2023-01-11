@@ -806,6 +806,41 @@ ipcHandlerScopeResponseSetCfgSingleMsg(void **state) {
     cfgDestroy(&configTest);
 }
 
+static void
+ipcHandlerMultipleFrameErrorTimeoutFrame(void **state) {
+    const char *ipcConnName = "/testConnection";
+    int status;
+    mqd_t mqReadWriteDes;
+    int uniqueId = 7856;
+    req_parse_status_t parseStatus = REQ_PARSE_GENERIC_ERROR;
+    char *scopeReq;
+
+    const long maxMsgSize = 64;
+    struct mq_attr attr = {.mq_flags = 0, 
+                           .mq_maxmsg = 10,
+                           .mq_msgsize = maxMsgSize,
+                           .mq_curmsgs = 0};
+
+
+    mqReadWriteDes = scope_mq_open(ipcConnName, O_RDWR | O_CREAT | O_CLOEXEC | O_NONBLOCK, 0666, &attr);
+    assert_int_not_equal(mqReadWriteDes, -1);
+
+    // Send Incomplete request
+    ipc_msg_t *msg = createIpcMessage("{\"req\":1,\"uniq\":1234,\"remain\":128}", "{\"req\":1}");
+    status = scope_mq_send(mqReadWriteDes, msg->full, msg->fullLen, 0);
+    assert_int_equal(status, 0);
+    destroyIpcMessage(msg);
+
+    scopeReq = ipcRequestHandler(mqReadWriteDes, attr.mq_msgsize, &parseStatus, &uniqueId);
+    assert_null(scopeReq);
+    assert_int_equal(parseStatus, REQ_PARSE_RECEIVE_TIMEOUT_ERROR);
+
+    status = scope_mq_close(mqReadWriteDes);
+    assert_int_equal(status, 0);
+    status = scope_mq_unlink(ipcConnName);
+    assert_int_equal(status, 0);
+}
+
 int
 main(int argc, char* argv[]) {
     printf("running %s\n", argv[0]);
@@ -828,6 +863,7 @@ main(int argc, char* argv[]) {
         cmocka_unit_test(ipcHandlerScopeResponseUnknown),
         cmocka_unit_test(ipcHandlerScopeResponseGetCfgSingleMsg),
         cmocka_unit_test(ipcHandlerScopeResponseSetCfgSingleMsg),
+        cmocka_unit_test(ipcHandlerMultipleFrameErrorTimeoutFrame),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

@@ -12,7 +12,8 @@
 typedef enum {
     REQ_PARSE_GENERIC_ERROR,            // Error: unknown error
     REQ_PARSE_ALLOCATION_ERROR,         // Error: memory allocation fails or empty queue
-    REQ_PARSE_RECEIVE_ERROR,            // Error: during receive the message
+    REQ_PARSE_RECEIVE_ERROR,            // Error: general error during receive the message
+    REQ_PARSE_RECEIVE_TIMEOUT_ERROR,    // Error: timeout during receive the message
     REQ_PARSE_MISSING_SCOPE_DATA_ERROR, // Error: missing scope frame in request
     REQ_PARSE_JSON_ERROR,               // Error: request it not based on JSON format
     REQ_PARSE_REQ_ERROR,                // Error: msg frame issue with req field

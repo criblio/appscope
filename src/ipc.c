@@ -49,6 +49,7 @@ translateParseStatusToResp(req_parse_status_t status) {
         return IPC_RESP_OK;
     case REQ_PARSE_ALLOCATION_ERROR:
     case REQ_PARSE_RECEIVE_ERROR:
+    case REQ_PARSE_RECEIVE_TIMEOUT_ERROR:
         return IPC_RESP_SERVER_ERROR;
     case REQ_PARSE_JSON_ERROR:
     case REQ_PARSE_REQ_ERROR:
@@ -315,7 +316,7 @@ ipcRequestHandler(mqd_t mqDes, size_t mqMaxMsgSize, req_parse_status_t *parseSta
 
         ipc_receive_result recvStatus = ipcReceiveFrameWithRetry(mqDes, mqMsgBuf, mqMaxMsgSize, &mqMsgLen);
         if (recvStatus != MSG_RECV_OK) {
-            *parseStatus = REQ_PARSE_RECEIVE_ERROR;
+            *parseStatus = (recvStatus == MSG_RECV_RETRY_LIMIT) ? REQ_PARSE_RECEIVE_TIMEOUT_ERROR : REQ_PARSE_RECEIVE_ERROR;
             scope_free(mqMsgBuf);
             scope_free(msgRes);
             return NULL;

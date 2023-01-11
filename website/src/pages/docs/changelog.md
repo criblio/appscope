@@ -23,7 +23,7 @@ Assets other than AWS Lambda Layers are available in the [Docker container](http
 
 ### New Features and Improvements
 
-<strong>AppScope 1.2.2 fixes a critical security vulnerability in OpenSSL. Cribl strongly recommend upgrading as soon as possible.</strong>
+<strong>AppScope 1.2.2 fixes a critical security vulnerability in OpenSSL. Cribl strongly recommends upgrading as soon as possible.</strong>
 
 AppScope 1.2.2 introduces: 
 

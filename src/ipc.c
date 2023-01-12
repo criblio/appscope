@@ -50,6 +50,7 @@ translateParseStatusToResp(req_parse_status_t status) {
     case REQ_PARSE_ALLOCATION_ERROR:
     case REQ_PARSE_RECEIVE_ERROR:
     case REQ_PARSE_RECEIVE_TIMEOUT_ERROR:
+        DBG("%d", status);
         return IPC_RESP_SERVER_ERROR;
     case REQ_PARSE_JSON_ERROR:
     case REQ_PARSE_REQ_ERROR:
@@ -57,10 +58,11 @@ translateParseStatusToResp(req_parse_status_t status) {
     case REQ_PARSE_SCOPE_REQ_ERROR:
     case REQ_PARSE_MISSING_SCOPE_DATA_ERROR:
     case REQ_PARSE_SCOPE_SIZE_ERROR:
+        DBG("%d", status);
         return IPC_BAD_REQUEST;
     default:
         UNREACHABLE();
-        DBG(NULL);
+        DBG("%d", status);
         return IPC_RESP_SERVER_ERROR;
     }
 }

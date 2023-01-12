@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "dbg.h"
 #include "cfgutils.h"
 #include "ipc.h"
 #include "test.h"
@@ -523,6 +524,9 @@ ipcHandlerResponseSendError(void **state) {
     assert_int_equal(status, 0);
     status = scope_mq_unlink(ipcConnName);
     assert_int_equal(status, 0);
+
+    assert_int_equal(dbgCountMatchingLines("src/ipc.c"), 1);
+    dbgInit(); // reset dbg for the rest of the tests
 }
 
 static void

@@ -44,6 +44,7 @@ char *ipcRespScopeRespStr(scopeRespWrapper *);
 scopeRespWrapper *ipcRespGetScopeStatus(const cJSON *);
 scopeRespWrapper *ipcRespGetScopeCfg(const cJSON *);
 scopeRespWrapper *ipcRespSetScopeCfg(const cJSON *);
+scopeRespWrapper *ipcRespGetTransportStatus(const cJSON *);
 scopeRespWrapper *ipcRespStatusNotImplemented(const cJSON *);
 scopeRespWrapper *ipcRespStatusScopeError(ipc_resp_status_t);
 

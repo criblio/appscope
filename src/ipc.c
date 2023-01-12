@@ -68,13 +68,16 @@ translateParseStatusToResp(req_parse_status_t status) {
 /*
  * ipc_scope_req_t describes the scope request command retrieves from IPC communication
  * IMPORTANT NOTE:
- * ipc_scope_req_t must be inline with client: scopeReqCmd
+ * ipc_scope_req_t must be inline with client: scopeReqCmd (without unk)
  */
 typedef enum {
-    IPC_CMD_GET_SCOPE_STATUS, // Retrieves scope status of application (enabled or disabled)
-    IPC_CMD_GET_SCOPE_CFG,    // Retrieves the current configuration
-    IPC_CMD_SET_SCOPE_CFG,    // Update the current configuration
-    IPC_CMD_UNKNOWN,          // Should be last - points to unsupported message
+    // TODO: the first message should be get supported cmd introduced in: 1.3.0
+    IPC_CMD_GET_SCOPE_STATUS,     // Retrieves scope status of application (enabled or disabled), introduced in: 1.3.0
+    IPC_CMD_GET_SCOPE_CFG,        // Retrieves the current configuration, introduced in: 1.3.0
+    IPC_CMD_SET_SCOPE_CFG,        // Update the current configuration, introduced in: 1.3.0
+    IPC_CMD_GET_TRANSPORT_STATUS, // Retrieves the transport status, introduced in: 1.3.0
+    // Place to add new message
+    IPC_CMD_UNKNOWN,              // MUST BE LAST - points to unsupported message
 } ipc_scope_req_t;
 
 
@@ -425,6 +428,7 @@ static responseProcessor *supportedResp[] = {
     [IPC_CMD_GET_SCOPE_STATUS] = ipcRespGetScopeStatus,
     [IPC_CMD_GET_SCOPE_CFG] = ipcRespGetScopeCfg, 
     [IPC_CMD_SET_SCOPE_CFG]  =  ipcRespSetScopeCfg,
+    [IPC_CMD_GET_TRANSPORT_STATUS] = ipcRespGetTransportStatus,
     [IPC_CMD_UNKNOWN] = ipcRespStatusNotImplemented
 };
 

@@ -22,6 +22,7 @@ const (
 	reqCmdGetScopeStatus scopeReqCmd = iota
 	reqCmdGetScopeCfg
 	reqCmdSetScopeCfg
+	reqCmdGetTransportStatus
 )
 
 // Request which contains only cmd without data
@@ -53,19 +54,34 @@ type scopeGetStatusResponse struct {
 	Scoped bool `mapstructure:"scoped" json:"scoped" yaml:"scoped"`
 }
 
+type ScopeGetCfgResponseCfg struct {
+	Current libscope.ScopeConfig `mapstructure:"current" json:"current" yaml:"current"`
+}
+
 // Must be inline with server, see: ipcRespGetScopeCfg
 type scopeGetCfgResponse struct {
 	// Response status
-	Status *respStatus `mapstructure:"status" json:"status" yaml:"status"`
-	Cfg    struct {
-		// Scoped Cfg
-		Current libscope.ScopeConfig `mapstructure:"current" json:"current" yaml:"current"`
-	} `mapstructure:"cfg" json:"cfg" yaml:"cfg"`
+	Status *respStatus            `mapstructure:"status" json:"status" yaml:"status"`
+	Cfg    ScopeGetCfgResponseCfg `mapstructure:"cfg" json:"cfg" yaml:"cfg"`
 }
 
 // CmdGetScopeStatus describes Get Scope Status command request and response
 type CmdGetScopeStatus struct {
 	Response scopeGetStatusResponse
+}
+
+// ChannelDesc describes
+type ChannelDesc []struct {
+	// Name of channel
+	Name string `mapstructure:"name" json:"name" yaml:"name"`
+}
+
+// Must be inline with server, see: ipcRespGetTransportStatus
+type scopeGetTransportStatusResponse struct {
+	// Response status
+	Status *respStatus `mapstructure:"status" json:"status" yaml:"status"`
+	// Channel description
+	Channels ChannelDesc `mapstructure:"channels" json:"channels" yaml:"channels"`
 }
 
 func (cmd *CmdGetScopeStatus) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
@@ -130,6 +146,30 @@ func (cmd *CmdSetScopeCfg) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
 }
 
 func (cmd *CmdSetScopeCfg) UnmarshalResp(respData []byte) error {
+	err := yaml.Unmarshal(respData, &cmd.Response)
+	if err != nil {
+		return err
+	}
+
+	if cmd.Response.Status == nil {
+		return fmt.Errorf("%w %v", errMissingMandatoryField, "status")
+	}
+
+	return nil
+}
+
+// CmdGetTransportStatus describes Get Scope Status command request and response
+type CmdGetTransportStatus struct {
+	Response scopeGetTransportStatusResponse
+}
+
+func (cmd *CmdGetTransportStatus) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
+	req, _ := json.Marshal(scopeRequestOnly{Req: reqCmdGetTransportStatus})
+
+	return ipcDispatcher(req, pidCtx)
+}
+
+func (cmd *CmdGetTransportStatus) UnmarshalResp(respData []byte) error {
 	err := yaml.Unmarshal(respData, &cmd.Response)
 	if err != nil {
 		return err

@@ -9,6 +9,11 @@ import (
 
 var errInspectCfg = errors.New("error inspect cfg")
 
+type inspectOutput struct {
+	Cfg  ipc.ScopeGetCfgResponseCfg `mapstructure:"cfg" json:"cfg" yaml:"cfg"`
+	Desc ipc.ChannelDesc            `mapstructure:"channels" json:"channels" yaml:"channels"`
+}
+
 // InspectScopeCfg returns the configuration of scoped process
 func InspectScopeCfg(pidCtx ipc.IpcPidCtx) (string, error) {
 
@@ -25,9 +30,31 @@ func InspectScopeCfg(pidCtx ipc.IpcPidCtx) (string, error) {
 	if resp.MetaMsgStatus != ipc.ResponseOK || *cmd.Response.Status != ipc.ResponseOK {
 		return "", errInspectCfg
 	}
-	marshalToPrint, err := json.MarshalIndent(cmd.Response.Cfg.Current, "", "   ")
+
+	cmdTr := ipc.CmdGetTransportStatus{}
+	respTr, err := cmdTr.Request(pidCtx)
 	if err != nil {
 		return "", err
 	}
-	return string(marshalToPrint), nil
+
+	err = cmdTr.UnmarshalResp(respTr.ResponseScopeMsgData)
+	if err != nil {
+		return "", err
+	}
+
+	if respTr.MetaMsgStatus != ipc.ResponseOK || *cmdTr.Response.Status != ipc.ResponseOK {
+		return "", errInspectCfg
+	}
+
+	summary := inspectOutput{
+		Cfg:  cmd.Response.Cfg,
+		Desc: cmdTr.Response.Channels,
+	}
+
+	sumPrint, err := json.MarshalIndent(summary, "", "   ")
+	if err != nil {
+		return "", err
+	}
+
+	return string(sumPrint), nil
 }

@@ -175,6 +175,62 @@ ipcRespSetScopeCfg(const cJSON *scopeReq) {
     return ipcRespStatus(IPC_RESP_SERVER_ERROR);
 }
 
+struct single_dest_mockup {
+    const char *name;
+};
+
+static const struct single_dest_mockup all_dest_mockup[] = {
+    {.name = "log"},
+    {.name = "metrics"},
+    {.name = "events"},
+};
+
+#define COUNT_ITEMS_MOCKUP (sizeof(all_dest_mockup)/sizeof(all_dest_mockup[0]))
+
+/*
+ * Creates the wrapper for response to IPC_CMD_GET_TRANSPORT_STATUS
+ * TODO: use unused attribute later
+ */
+scopeRespWrapper *
+ipcRespGetTransportStatus(const cJSON *unused) {
+    scopeRespWrapper *wrap = respWrapperCreate();
+    if (!wrap) {
+        return NULL;
+    }
+    cJSON *resp = cJSON_CreateObject();
+    if (!resp) {
+        goto allocFail;
+    }
+    wrap->resp = resp;
+    if (!cJSON_AddNumberToObjLN(resp, "status", IPC_RESP_OK)) {
+        goto allocFail;
+    }
+
+    // TODO: Handle here real data
+    cJSON *channels = cJSON_CreateArray();
+    if (!channels) {
+        goto allocFail;
+    }
+    wrap->priv = channels;
+    for (int index = 0; index < COUNT_ITEMS_MOCKUP; ++index){
+        cJSON *singleChannel = cJSON_CreateObject();
+        if (!singleChannel) {
+            goto allocFail;
+        }
+
+        if (cJSON_AddStringToObject(singleChannel, "name", all_dest_mockup[index].name) == NULL) {
+            goto allocFail;
+        }
+        cJSON_AddItemToArray(channels, singleChannel);
+    }
+    cJSON_AddItemToObjectCS(resp, "channels", channels);
+    return wrap;
+
+allocFail:
+    ipcRespWrapperDestroy(wrap);
+    return NULL; 
+}
+
 /*
  * Creates the wrapper for failed case in processing scope msg
  */

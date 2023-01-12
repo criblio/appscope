@@ -76,7 +76,7 @@ To define an **unencrypted** connection to a Cribl.Cloud-managed instance of Cri
 For example:
 
 ```
-SCOPE_CRIBL=tcp://in.logstream.<cloud_instance>.cribl.cloud:10091
+SCOPE_CRIBL=tcp://in.main-default-<organization>.cribl.cloud:10091
 ```
 
 <span id="on-prem"> </span>

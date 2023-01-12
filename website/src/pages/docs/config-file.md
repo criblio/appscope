@@ -1056,7 +1056,7 @@ custom:
   #      enable: true
   #      transport:
   #        type: tcp
-  #        host: in.my-instance.logstream.cribl.cloud
+  #        host: in.main-default-<organization>.cribl.cloud
   #        port: 10090
   #        tls:
   #          enable: true

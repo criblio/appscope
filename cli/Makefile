@@ -109,7 +109,8 @@ $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"$(LIBSCOPE_SO_SIZE)\" -DSCOPEDYN_SIZE=\"$(SCOPEDYN_SIZE)\"" \
 	$(GO) build \
 		-ldflags="$(shell $(GOVVV) -flags) -linkmode external -extldflags -static " \
-		$(BUILD_OPTS)  \
+		-buildmode=pie \
+		$(BUILD_OPTS) \
 	       	-o $(SCOPE)
 
 scopedyn: $(SCOPEDYN)
@@ -121,6 +122,7 @@ $(SCOPEDYN): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'
 	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"$(LIBSCOPE_SO_SIZE)\" -DSCOPEDYN_SIZE=\"$(SCOPEDYN_SIZE)\"" \
 	$(GO) build \
 		-ldflags="$(shell $(GOVVV) -flags)" \
+		-buildmode=pie \
 		$(BUILD_OPTS) \
 	       	-o $(SCOPEDYN)
 	$(RM) run/bundle.go

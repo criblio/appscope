@@ -599,7 +599,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         execve(inferior_command, argv, environ);
     }
 
-    program_invocation_short_name = basename(argv[0]); 
+    program_invocation_short_name = basename(argv[0]);
 
     if (!is_go(ebuf->buf)) {
         // We're getting here with upx-encoded binaries

@@ -4,9 +4,9 @@ title: Known Issues
 
 # Known Issues
 
-## AppScope 1.2.0
+## AppScope 1.2.1
 
-2022-11-09 - Feature Release
+2022-11-29 - Maintenance Release
 
 As of this AppScope release, known issues include:
 
@@ -17,6 +17,12 @@ As of this AppScope release, known issues include:
 - [#1251](https://github.com/criblio/appscope/issues/1251) [Changing](/docs/cli-using#dynamic-configuration) configuration of a scoped, running process causes the process to crash when the new configuration defines a protocol that the old configuration also defines. It crashes as long as the two protocols have the same name, even if the two definitions are identical. <strong> This issue is present in all versions of AppScope prior to 1.2.2</strong>.
 
   - **Fix:** 1.2.2
+
+## AppScope 1.2.0
+
+2022-11-09 - Feature Release
+
+As of this AppScope release, known issues include:
 
 - [#1153](https://github.com/criblio/appscope/issues/1153) After AppScope detaches from a process, `scope ps` still shows the process as scoped.
   - **Fix:** Planned for 1.3 or sooner

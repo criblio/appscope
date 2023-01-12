@@ -23,13 +23,13 @@ Assets other than AWS Lambda Layers are available in the [Docker container](http
 
 ### New Features and Improvements
 
-<strong>AppScope 1.2.2 fixes a critical security vulnerability in OpenSSL. Cribl strongly recommends upgrading as soon as possible.</strong>
+<strong>AppScope 1.2.2 fixes a [critical security vulnerability](https://github.com/criblio/appscope/security/advisories/GHSA-j3cg-7mpq-v62p) in OpenSSL. Cribl strongly recommends upgrading as soon as possible.</strong>
 
-AppScope 1.2.2 introduces: 
+AppScope 1.2.2 introduces:
 
 - Support for [OCI containers](https://opencontainers.org/) run by the [Podman](https://podman.io/) container engine. See issue [#1216](https://github.com/criblio/appscope/issues/1216).
 
-- Support for writing payloads to files on disk while simultaneously sending events and metrics to Cribl Stream or Cribl Edge. To do this, use the new environment variable `SCOPE_PAYLOAD_TO_DISK` together with existing env vars `SCOPE_CRIBL_ENABLE` and `SCOPE_PAYLOAD_ENABLE`, as described [here](/docs/data-routing). See issue [#1158](https://github.com/criblio/appscope/issues/1158).
+- Support for writing payloads to files on disk while simultaneously sending events and metrics to Cribl Stream or Cribl Edge. To do this, use the new environment variable `SCOPE_PAYLOAD_TO_DISK` together with existing env vars `SCOPE_CRIBL_ENABLE` and `SCOPE_PAYLOAD_ENABLE`, as described [here](/docs/data-routing). See the relevant [security advisory](https://github.com/criblio/appscope/security/advisories/GHSA-j3cg-7mpq-v62p) and issue [#1158](https://github.com/criblio/appscope/issues/1158).
 
 AppScope 1.2.2 also updates these software components:
 

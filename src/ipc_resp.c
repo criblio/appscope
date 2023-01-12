@@ -7,6 +7,9 @@
 #include "runtimecfg.h"
 
 extern void doAndReplaceConfig(void *);
+extern log_t *g_log;
+extern mtc_t *g_mtc;
+extern ctl_t *g_ctl;
 
 // Wrapper for scope message response
 struct scopeRespWrapper{
@@ -175,17 +178,69 @@ ipcRespSetScopeCfg(const cJSON *scopeReq) {
     return ipcRespStatus(IPC_RESP_SERVER_ERROR);
 }
 
-struct single_dest_mockup {
+/*
+ * The statusFunc is function responsible to retrieve transport status for each interface
+ * TODO: this type of function should be placeholder for :transportConnectionStatus"
+ */
+typedef void (*interfaceStatusFunc)(void);
+
+/*
+ * singleInterface is structure contains the interface object
+ */
+struct singleInterface {
     const char *name;
+    interfaceStatusFunc statuscheck;
 };
 
-static const struct single_dest_mockup all_dest_mockup[] = {
-    {.name = "log"},
-    {.name = "metrics"},
-    {.name = "events"},
+/*
+ * logStatus retrieves the status of "log" interface
+ */
+static void
+logStatus(void) {
+    // TODO: provide real function for this
+    int res = logNeedsConnection(g_log);
+    (void)(res);
+}
+
+/*
+ * metricsStatus retrieves the status of "metric" interface
+ */
+static void
+metricsStatus(void) {
+    // TODO: replace this function with mtcLogConnectionStatus alternative without log :) 
+    int res = mtcNeedsConnection(g_mtc);
+    (void)(res);
+}
+
+/*
+ * eventsStatus retrieves the status of "events" interface
+ */
+static void
+eventsStatus(void) {
+    // TODO: replace this function with ctlLogConnectionStatus(g_ctl, CFG_CTL) alternative without log :) 
+    int res = ctlNeedsConnection(g_ctl, CFG_CTL);
+    (void)(res);
+}
+
+/*
+ * payloadStatus retrieves the status of "payload" interface
+ */
+static void
+payloadStatus(void) {
+    // TODO: replace this function with ctlLogConnectionStatus(g_ctl, CFG_LS) alternative without log :) 
+    int res = ctlNeedsConnection(g_ctl, CFG_LS);
+    (void)(res);
+}
+
+static const
+struct singleInterface scope_interfaces[] = {
+    {.name = "log",  .statuscheck = logStatus},
+    {.name = "metrics",.statuscheck = metricsStatus},
+    {.name = "events", .statuscheck = eventsStatus},
+    {.name = "payload", .statuscheck = payloadStatus},
 };
 
-#define COUNT_ITEMS_MOCKUP (sizeof(all_dest_mockup)/sizeof(all_dest_mockup[0]))
+#define TOTAL_INTERFACES (sizeof(scope_interfaces)/sizeof(scope_interfaces[0]))
 
 /*
  * Creates the wrapper for response to IPC_CMD_GET_TRANSPORT_STATUS
@@ -206,21 +261,24 @@ ipcRespGetTransportStatus(const cJSON *unused) {
         goto allocFail;
     }
 
-    // TODO: Handle here real data
     cJSON *channels = cJSON_CreateArray();
     if (!channels) {
         goto allocFail;
     }
     wrap->priv = channels;
-    for (int index = 0; index < COUNT_ITEMS_MOCKUP; ++index){
+    for (int index = 0; index < TOTAL_INTERFACES; ++index){
         cJSON *singleChannel = cJSON_CreateObject();
         if (!singleChannel) {
             goto allocFail;
         }
 
-        if (cJSON_AddStringToObject(singleChannel, "name", all_dest_mockup[index].name) == NULL) {
+        if (cJSON_AddStringToObject(singleChannel, "name", scope_interfaces[index].name) == NULL) {
             goto allocFail;
         }
+
+        // TODO: here should be created CJSON transport status
+        scope_interfaces[index].statuscheck();
+
         cJSON_AddItemToArray(channels, singleChannel);
     }
     cJSON_AddItemToObjectCS(resp, "channels", channels);

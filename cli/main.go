@@ -11,6 +11,8 @@ package main
 #include <stdlib.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <limits.h>
+
 #include "../src/loader/libdir.h"
 #include "../src/loader/loader.h"
 #include "../src/loader/loaderop.h"
@@ -57,6 +59,9 @@ static struct option opts[] = {
     { 0, 0, 0, 0 }
 };
 
+unsigned long g_libscopesz;
+unsigned long g_scopedynsz;
+
 // This is the constructor for the Go application.
 // Code here executes before the Go Runtime starts.
 // We execute loader-specific commands here, because we can perform namespace switches while meeting
@@ -89,6 +94,18 @@ __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **
 	uid_t eUid = geteuid();
 	int cmdArgc;
 	char **cmdArgv;
+
+    if ((g_libscopesz = strtoul(LIBSCOPE_SO_SIZE, NULL, 10)) == ULONG_MAX) {
+       perror("strtoul");
+       exit(EXIT_FAILURE);
+    }
+
+    if ((g_scopedynsz = strtoul(SCOPEDYN_SIZE, NULL, 10)) == ULONG_MAX) {
+       perror("strtoul");
+       exit(EXIT_FAILURE);
+    }
+
+    printf("%s:%d %s %ld %ld\n", __FUNCTION__, __LINE__, LIBSCOPE_SO_SIZE, g_libscopesz, g_scopedynsz);
 
     for (;;) {
         index = 0;

@@ -610,18 +610,21 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
     }
 
 
-// is scope static or dynamic?
-
+    // is scope static or dynamic?
     elf_buf_t *scope_ebuf;
     scope_ebuf = getElf("/proc/self/exe");
     if (!scope_ebuf) {
-            perror("setenv");
-            goto err;
+        perror("setenv");
+        goto err;
     }
 
     if (is_static(scope_ebuf->buf)) {
         // if scope is static, exec scopedyn
-        
+        if (libdirExtract(LOADER_FILE, nsUid, nsGid)) {
+            fprintf(stderr, "error: failed to extract a loader exec\n");
+            return EXIT_FAILURE;
+        }
+
         char *execArgv[argc+2];
         int execArgc = 2;
         for (int i = 0; i < argc; i++) {
@@ -632,7 +635,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         char *execz = "-z"; //todo remove
         execArgv[0] = execname;
         execArgv[1] = execz;
-        execve("/home/sean/src2/appscope-dev/bin/linux/x86_64/scopedyn", &execArgv[0], environ);
+        execve("/tmp/appscope/dev/scopedyn", &execArgv[0], environ);
         perror("execve");
 
     } else {

@@ -12,9 +12,13 @@
 #include <stdbool.h>
 #include "../scopetypes.h"
 
+extern unsigned long g_libscopesz;
+extern unsigned long g_scopedynsz;
+
 // File types
 typedef enum {
     LIBRARY_FILE, // libscope.so
+    LOADER_FILE,  // scopedyn
 } libdirfile_t;
 
 typedef enum {

@@ -52,15 +52,6 @@ $(LIBLOADER): src/loader/loader.c src/loader/nsinfo.c src/loader/nsfile.c src/lo
 	@echo "$${CI:+::group::}Building $@"
 	$(CC) -c $(CFLAGS) -Wno-format-security -Wno-format-truncation -DSCOPE_VER=\"$(SCOPE_VER)\" $(YAML_DEFINES) -I./src $(INCLUDES) $^
 	ar rcs $@ *.o
-	cd $(dir $(LIBSCOPE)) && objcopy \
-		-I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) \
-		$(notdir $(LIBSCOPE)) $(notdir $(LIBSCOPE:.so=.o)) && \
-		ar rcs ../../../$@ $(notdir $(LIBSCOPE:.so=.o)) && \
-		$(RM) $(notdir $(LIBSCOPE:.so=.o))
-	cd $(dir $(LIBLOADER)) && objcopy \
-		-I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) \
-		$(notdir $(LIBLOADER)) $(notdir $(LIBLOADER:.a=.o)) && \
-		ar rcs ../../../$@ $(notdir $(LIBLOADER:.a=.o))
 	$(RM) *.o
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 

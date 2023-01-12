@@ -1310,14 +1310,16 @@ initHook(int attachedFlag, bool scopedFlag)
     if ((osGetExePath(scope_getpid(), &full_path) != -1) &&
         ((ebuf = getElf(full_path))) &&
         (is_static(ebuf->buf) == FALSE) && (is_go(ebuf->buf) == TRUE)) {
-#ifdef __GO__
-        initGoHook(ebuf);
-        threadNow(0);
+
+        // Avoid running initGoHook if we are scopedyn
+        if (scope_strstr(full_path, "scopedyn") == NULL) {
+            initGoHook(ebuf);
+            threadNow(0);
+        }
 
         if (full_path) scope_free(full_path);
         if (ebuf) freeElf(ebuf->buf, ebuf->len);
         return;
-#endif  // __GO__
     }
 
     if (ebuf && ebuf->buf) {

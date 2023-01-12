@@ -29,6 +29,8 @@ CONF_YML := $(CONFDIR)/scope.yml
 GO_BINDATA := $(GOBIN)/go-bindata
 GOVVV := $(GOBIN)/govvv
 GOLANGCI_LINT := $(GOBIN)/golangci-lint
+LIBSCOPE_SO_SIZE := "$(shell du -b "../lib/linux/$(ARCH)/libscope.so" | cut -f1)"
+SCOPEDYN_SIZE := "$(shell du -b "../bin/linux/$(ARCH)/scopedyn" | cut -f1)"
 
 # fail if of Go is not meet version requirements
 require-go-version:
@@ -56,7 +58,8 @@ genflowtest:
 	./flows/gen_flow_test.sh
 
 ## all: build and compress \`scope\`
-all: scope scopedyn compressscope require-go-version
+#all: scope scopedyn compressscope require-go-version
+all: scopedyn scope require-go-version
 
 ## clean: remove the built binary
 clean:
@@ -82,8 +85,13 @@ rebuild: clean build
 
 run/bundle.go: $(GO_BINDATA) $(LIBSCOPE) $(LIBLOADER) $(CONF_YML)
 	$(RM) -r build/*
+	cp $(LIBSCOPE) $(CONF_YML) $(SCOPEDYN) build/
+	$(GO_BINDATA) -nocompress -o $@ -pkg run build
+
+bundle2: $(GO_BINDATA) $(LIBSCOPE) $(LIBLOADER) $(CONF_YML)
+	$(RM) -r build/*
 	cp $(LIBSCOPE) $(CONF_YML) build/
-	$(GO_BINDATA) -o $@ -pkg run build
+	$(GO_BINDATA) -nocompress -o $@ -pkg run build
 
 # in case someone is building here before the C code is built
 $(LIBSCOPE):
@@ -94,20 +102,28 @@ $(LIBLOADER):
 scope: $(SCOPE)
 $(SCOPE): export GOOS=linux
 $(SCOPE): export CGO_ENABLED=1
-$(SCOPE): run/bundle.go $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
+$(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
+	$(RM) -r build/*
+	cp $(LIBSCOPE) $(CONF_YML) $(SCOPEDYN) build/
+	$(GO_BINDATA) -nocompress -o run/bundle.go -pkg run build
+	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"$(LIBSCOPE_SO_SIZE)\" -DSCOPEDYN_SIZE=\"$(SCOPEDYN_SIZE)\"" \
 	$(GO) build \
 		-ldflags="$(shell $(GOVVV) -flags) -linkmode external -extldflags -static " \
-		$(BUILD_OPTS) \
+		$(BUILD_OPTS)  \
 	       	-o $(SCOPE)
-
 
 scopedyn: $(SCOPEDYN)
 $(SCOPEDYN): export GOOS=linux
-$(SCOPEDYN): run/bundle.go $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
+$(SCOPEDYN): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
+	$(RM) -r build/*
+	cp $(LIBSCOPE) $(CONF_YML) build/
+	$(GO_BINDATA) -nocompress -o run/bundle.go -pkg run build
+	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"$(LIBSCOPE_SO_SIZE)\" -DSCOPEDYN_SIZE=\"$(SCOPEDYN_SIZE)\"" \
 	$(GO) build \
 		-ldflags="$(shell $(GOVVV) -flags)" \
 		$(BUILD_OPTS) \
 	       	-o $(SCOPEDYN)
+	$(RM) run/bundle.go
 
 compressscope: $(SCOPE) require-upx
 	@if [ -z $(SCOPE_NOCOMPRESS) ] ; then \

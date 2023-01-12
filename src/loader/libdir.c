@@ -19,11 +19,14 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 #include "scopestdlib.h"
 #include "scopetypes.h" // for ROUND_UP()
 #include "nsfile.h"
 #include "libver.h"
+#include "loaderutils.h"
+#include "loader.h"
 
 #ifndef SCOPE_VER
 #error "Missing SCOPE_VER"
@@ -33,7 +36,13 @@
 #define SCOPE_LIBSCOPE_SO "libscope.so"
 #endif
 
+#ifndef SCOPE_DYN_NAME
+#define SCOPE_DYN_NAME "scopedyn"
+#endif
+
 #define SCOPE_NAME_SIZE (16)
+#define LIBSCOPE "github.com/criblio/scope/run._buildLibscopeSo"
+#define SCOPEDYN "github.com/criblio/scope/run._buildScopedyn"
 
 // private global state
 static struct
@@ -59,9 +68,10 @@ static struct scope_obj_state libscopeState = {
     .binaryName = SCOPE_LIBSCOPE_SO,
 };
 
-// Same as above for `libscope.so`.
-extern unsigned char _binary_libscope_so_start;
-extern unsigned char _binary_libscope_so_end;
+// internal state for loader
+static struct scope_obj_state scopedynState = {
+    .binaryName = SCOPE_DYN_NAME,
+};
 
 // Representation of the .note.gnu.build-id ELF segment
 typedef struct
@@ -83,23 +93,70 @@ getObjState(libdirfile_t objFileType) {
     switch (objFileType) {
         case LIBRARY_FILE:
             return &libscopeState;
+            break;
+        case LOADER_FILE:
+            return &scopedynState;
+            break;
     }
     // unreachable
     return NULL;
 }
 
+static size_t
+getAsset(libdirfile_t objFileType, unsigned char **start)
+{
+    if (!start) return -1;
+
+    size_t len = -1;
+    uint64_t *libsym;
+    unsigned char *libptr;
+    elf_buf_t *ebuf = NULL;
+
+    if ((ebuf = getElf("/proc/self/exe")) == NULL) {
+        fprintf(stderr, "error: can't read /proc/self/exe\n");
+        return -1;
+    }
+
+    switch (objFileType) {
+        case LIBRARY_FILE:
+            if ((libsym = getSymbol(ebuf->buf, LIBSCOPE))) {
+                libptr = (unsigned char *)*libsym;
+                printf("%s:%d libaddr addr %p\n", __FUNCTION__, __LINE__, libptr);
+            } else {
+                fprintf(stderr, "%s:%d no addr for _buildLibscopeSo\n", __FUNCTION__, __LINE__);
+                return -1;
+            }
+
+            *start = (unsigned char *)libptr;
+            len =  g_libscopesz;
+            break;
+
+        case LOADER_FILE:
+            if ((libsym = getSymbol(ebuf->buf, SCOPEDYN))) {
+                libptr = (unsigned char *)*libsym;
+                printf("%s:%d libaddr addr %p\n", __FUNCTION__, __LINE__, libptr);
+            } else {
+                fprintf(stderr, "%s:%d no addr for _buildScopedyn\n", __FUNCTION__, __LINE__);
+                return -1;
+            }
+
+            *start = (unsigned char *)libptr;
+            len =  g_scopedynsz;
+            break;
+
+        default:
+            break;
+    }
+
+    return len;
+}
 
 static note_t *
 libdirGetNote(libdirfile_t objFileType) {
     unsigned char *buf;
 
-    switch (objFileType) {
-        case LIBRARY_FILE:
-            buf = &_binary_libscope_so_start;
-            break;
-        default:
-            // unreachable
-            return NULL;
+    if (getAsset(objFileType, &buf) == -1) {
+        return NULL;
     }
 
     Elf64_Ehdr *elf = (Elf64_Ehdr *)buf;
@@ -185,6 +242,9 @@ libdirCheckNote(libdirfile_t objFileType, const char *path)
     return cmp; // 0 if notes match
 }
 
+/*
+ * Getting objects bundled
+ */
 static int
 libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overwrite, mode_t mode, uid_t nsEuid, gid_t nsEgid)
 {
@@ -196,22 +256,16 @@ libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overw
     int fd;
     char temp[PATH_MAX];
     unsigned char *start;
-    unsigned char *end;
+    size_t len;
 
-    switch (objFileType) {
-        case LIBRARY_FILE:
-            start = &_binary_libscope_so_start;
-            end = &_binary_libscope_so_end;
-            break;
-        default:
-            // unreachable
-            return -1;
+    if ((len = getAsset(objFileType, &start)) == -1) {
+        return -1;
     }
 
     // Write file
     int tempLen = snprintf(temp, PATH_MAX, "%s.XXXXXX", path);
     if (tempLen < 0) {
-        fprintf(stderr, "error: snprintf(0 failed.\n");
+        fprintf(stderr, "error: snprintf failed.\n");
         return -1;
     }
     if (tempLen >= PATH_MAX) {
@@ -227,13 +281,14 @@ libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overw
         unlink(temp);
         return -1;
     }
-    size_t len = end - start;
+
     if (write(fd, start, len) != len) {
         close(fd);
         unlink(temp);
         perror("libdirCreateFileIfMissing: write() failed");
         return -1;
     }
+
     if (fchmod(fd, mode)) {
         close(fd);
         unlink(temp);
@@ -242,6 +297,7 @@ libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overw
     }
 
     close(fd);
+
     if (nsFileRename(temp, path, nsEuid, nsEgid, currentEuid, currentEgid)) {
         unlink(temp);
         perror("libdirCreateFileIfMissing: rename() failed");

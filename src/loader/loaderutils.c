@@ -139,6 +139,58 @@ out:
     return ebuf;
 }
 
+void *
+getSymbol(const char *buf, char *sname)
+{
+    int i, nsyms = 0;
+    Elf64_Addr symaddr = 0;
+    Elf64_Ehdr *ehdr;
+    Elf64_Shdr *sections;
+    Elf64_Sym *symtab = NULL;
+    const char *section_strtab = NULL;
+    const char *strtab = NULL;
+    const char *sec_name = NULL;
+
+    if (!buf || !sname) return NULL;
+
+    ehdr = (Elf64_Ehdr *)buf;
+    sections = (Elf64_Shdr *)((char *)buf + ehdr->e_shoff);
+    section_strtab = (char *)buf + sections[ehdr->e_shstrndx].sh_offset;
+
+    for (i = 0; i < ehdr->e_shnum; i++) {
+        sec_name = section_strtab + sections[i].sh_name;
+
+        if (sections[i].sh_type == SHT_SYMTAB) {
+            symtab = (Elf64_Sym *)((char *)buf + sections[i].sh_offset);
+            nsyms = sections[i].sh_size / sections[i].sh_entsize;
+        } else if (sections[i].sh_type == SHT_STRTAB && strcmp(sec_name, ".strtab") == 0) {
+            strtab = (const char *)(buf + sections[i].sh_offset);
+        }
+
+        if ((strtab != NULL) && (symtab != NULL)) break;
+        /*printf("section %s type = %d flags = 0x%lx addr = 0x%lx-0x%lx, size = 0x%lx off = 0x%lx\n",
+               sec_name,
+               sections[i].sh_type,
+               sections[i].sh_flags,
+               sections[i].sh_addr,
+               sections[i].sh_addr + sections[i].sh_size,
+               sections[i].sh_size,
+               sections[i].sh_offset);*/
+    }
+
+    for (i=0; i < nsyms; i++) {
+        if (strcmp(sname, strtab + symtab[i].st_name) == 0) {
+            symaddr = symtab[i].st_value;
+            if (g_log_level <= CFG_LOG_TRACE) {
+                fprintf(stderr, "symbol found %s = 0x%08lx\n", strtab + symtab[i].st_name, symtab[i].st_value);
+            }
+            break;
+        }
+    }
+
+    return (void *)symaddr;
+}
+
 bool
 is_static(char *buf)
 {

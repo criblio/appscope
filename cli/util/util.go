@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/fatih/structs"
 )
@@ -372,3 +373,6 @@ func CopyFile(src, dst string, mode fs.FileMode) (int64, error) {
 	nBytes, err := io.Copy(destination, source)
 	return nBytes, err
 }
+
+// See util.S for implementation
+func KeepAlive(unsafe.Pointer)

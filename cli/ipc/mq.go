@@ -6,6 +6,7 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/criblio/scope/util"
 	"golang.org/x/sys/unix"
 )
 
@@ -78,20 +79,34 @@ func msgQOpen(name string, flags int) (int, error) {
 	}
 	oldmask := syscall.Umask(0)
 
+	bytes := unsafe.Pointer(unixName)
+	attrs := unsafe.Pointer(&messageQueueAttributes{
+		MaxQueueSize:   mqMaxMsgMax,
+		MaxMessageSize: mqMaxMsgSize,
+	})
+
 	// mqd_t mq_open(const char *name, int oflag, mode_t mode,struct mq_attr *attr)
 	// Details: https://man7.org/linux/man-pages/man3/mq_open.3.html
 	mqfd, _, errno := unix.Syscall6(
 		unix.SYS_MQ_OPEN,
-		uintptr(unsafe.Pointer(unixName)), // name
-		uintptr(flags),                    // oflag
-		uintptr(0666),                     // mode
-		uintptr(unsafe.Pointer(&messageQueueAttributes{
-			MaxQueueSize:   mqMaxMsgMax,
-			MaxMessageSize: mqMaxMsgSize,
-		})), // attr
-		0, // unused
-		0, // unused
+		uintptr(bytes), // name
+		uintptr(flags), // oflag
+		uintptr(0666),  // mode
+		uintptr(attrs), // attr
+		0,              // unused
+		0,              // unused
 	)
+
+	// The garbage collector can usually understand not to free Unsafe.Pointer's pointing to Go objects.
+	// But in the case of C malloc'ed objects, the garbage collector is unaware of their use.
+	// So you should use the objects after calling C code (such as Syscall package code) to ensure they aren't GC'ed
+	// while the C code is executing.
+	// If you don't do this hack, you are vulnerable to a panic/segfault caused by nil-pointer dereference.
+	// Note: the runtime package has a hack for this also "runtime.KeepAlive"
+	// https://cs.opensource.google/go/go/+/master:src/runtime/mfinal.go;drc=b2faff18ce28edad98303d2c3134dec1331fd7b5;l=483
+	util.KeepAlive(bytes)
+	util.KeepAlive(attrs)
+
 	syscall.Umask(oldmask)
 
 	if errno != 0 {

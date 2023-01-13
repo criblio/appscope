@@ -102,7 +102,7 @@ getObjState(libdirfile_t objFileType) {
     return NULL;
 }
 
-static size_t
+size_t
 getAsset(libdirfile_t objFileType, unsigned char **start)
 {
     if (!start) return -1;

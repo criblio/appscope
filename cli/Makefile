@@ -86,7 +86,7 @@ $(LIBSCOPE):
 $(LIBLOADER):
 	@$(MAKE) -C .. lib/linux/$(ARCH)/libloader.a
 
-scope: $(SCOPE)
+scope: $(LIBSCOPE) $(LIBLOADER) $(SCOPE)
 $(SCOPE): export GOOS=linux
 $(SCOPE): export CGO_ENABLED=1
 $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
@@ -100,8 +100,10 @@ $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 		-buildmode=pie \
 		$(BUILD_OPTS) \
 	       	-o $(SCOPE)
+	$(RM) -r $(SCOPEDYN)
 
-scopedyn: $(SCOPEDYN)
+
+scopedyn: $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN)
 $(SCOPEDYN): export GOOS=linux
 $(SCOPEDYN): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 	$(RM) run/bundle.go

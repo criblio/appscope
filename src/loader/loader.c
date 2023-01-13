@@ -555,6 +555,12 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
     }
 
     // Execute and scope the app
+
+
+    /*
+     * What kind of app are we trying to scope?
+     */
+
     int (*sys_exec)(elf_buf_t *, const char *, int, char **, char **);
     void *handle = NULL;
     char *inferior_command = NULL;
@@ -580,7 +586,12 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         }
     }
 
-    // Dynamic executable path
+
+    /*
+     * If the app we want to scope is Dynamic
+     * Just exec it with LD_PRELOAD and we're done
+     */
+
     if ((ebuf == NULL) || (!is_static(ebuf->buf))) {
         if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
@@ -601,7 +612,12 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         goto out;
     }
 
-    // Static executable path
+
+    /*
+     * If the app we want to scope is Static
+     * There are determinations to be made
+     */
+
     if (setenv("SCOPE_EXEC_TYPE", "static", 1) == -1) {
         perror("setenv");
         goto out;
@@ -614,6 +630,8 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
 
     program_invocation_short_name = basename(argv[0]);
 
+    // If it's not a Go app, we don't support it
+    // so just exec it without scope
     if (!is_go(ebuf->buf)) {
         // We're getting here with upx-encoded binaries
         // and any other static native apps...
@@ -622,29 +640,40 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         execve(inferior_command, &argv[0], environ);
     }
 
+    // If scope itself is static, we need to call scope dynamic
+    // because we need to use dlopen
     if (is_static(scope_ebuf->buf)) {
-        // if scope is static, exec scopedyn
-        if (libdirExtract(LOADER_FILE, nsUid, nsGid)) {
-            fprintf(stderr, "error: failed to extract a loader exec\n");
-            goto out;
+
+        // Get scopedyn from the scope executable
+        unsigned char *start; 
+        size_t len;
+        if ((len = getAsset(LOADER_FILE, &start)) == -1) {
+            return -1;
         }
 
+        // Write scopedyn to shared memory
+        char path_to_fd[PATH_MAX];
+        int fd = memfd_create("", MFD_CLOEXEC);
+        write(fd, start, len);
+
+        // Exec scopedyn from shared memory
         char *execArgv[argc+2];
         int execArgc = 2;
         for (int i = 0; i < argc; i++) {
             execArgv[execArgc++] = argv[i++];
         }
-
         execArgv[execArgc++] = NULL;
         char *execname = "scopedyn";
         char *execz = "-z"; //todo remove
         execArgv[0] = execname;
         execArgv[1] = execz;
-        execve("/tmp/appscope/dev/scopedyn", &execArgv[0], environ);
+        sprintf(path_to_fd, "/proc/self/fd/%i", fd);
+        execve(path_to_fd, &execArgv[0], environ);
         perror("execve");
 
+    // If scope itself is dynamic, dlopen libscope and sys_exec the app
+    // and we're done
     } else {
-        // otherwise if scope is dynamic do this
         if ((handle = dlopen(scopeLibPath, RTLD_LAZY)) == NULL) {
             goto out;
         }
@@ -657,14 +686,18 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         sys_exec(ebuf, inferior_command, argc, &argv[0], env);
     }
 
+
     /*
      * We should not return from sys_exec unless there was an error loading the static exec.
      * In this case, just start the exec without being scoped.
      * Was wondering if we should free the mapped elf image.
      * But, since we exec on failure to load, it doesn't matter.
      */
+
     execve(inferior_command, &argv[0], environ);
+
     res = EXIT_SUCCESS;
+
 out:
     if (ebuf) {
         freeElf(ebuf->buf, ebuf->len);

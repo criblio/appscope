@@ -29,8 +29,6 @@ CONF_YML := $(CONFDIR)/scope.yml
 GO_BINDATA := $(GOBIN)/go-bindata
 GOVVV := $(GOBIN)/govvv
 GOLANGCI_LINT := $(GOBIN)/golangci-lint
-LIBSCOPE_SO_SIZE := "$(shell du -b "../lib/linux/$(ARCH)/libscope.so" | cut -f1)"
-SCOPEDYN_SIZE := "$(shell du -b "../bin/linux/$(ARCH)/scopedyn" | cut -f1)"
 
 # fail if of Go is not meet version requirements
 require-go-version:
@@ -103,10 +101,11 @@ scope: $(SCOPE)
 $(SCOPE): export GOOS=linux
 $(SCOPE): export CGO_ENABLED=1
 $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
+	$(RM) run/bundle.go
 	$(RM) -r build/*
 	cp $(LIBSCOPE) $(CONF_YML) $(SCOPEDYN) build/
 	$(GO_BINDATA) -nocompress -o run/bundle.go -pkg run build
-	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"$(LIBSCOPE_SO_SIZE)\" -DSCOPEDYN_SIZE=\"$(SCOPEDYN_SIZE)\"" \
+	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"$(shell du -b "$(LIBSCOPE)" | cut -f1)\" -DSCOPEDYN_SIZE=\"$(shell du -b "$(SCOPEDYN)" | cut -f1)\"" \
 	$(GO) build \
 		-ldflags="$(shell $(GOVVV) -flags) -linkmode external -extldflags -static " \
 		-buildmode=pie \
@@ -116,16 +115,16 @@ $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 scopedyn: $(SCOPEDYN)
 $(SCOPEDYN): export GOOS=linux
 $(SCOPEDYN): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
+	$(RM) run/bundle.go
 	$(RM) -r build/*
-	cp $(LIBSCOPE) $(CONF_YML) build/
+#	cp $(LIBSCOPE) $(CONF_YML) build/
 	$(GO_BINDATA) -nocompress -o run/bundle.go -pkg run build
-	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"$(LIBSCOPE_SO_SIZE)\" -DSCOPEDYN_SIZE=\"$(SCOPEDYN_SIZE)\"" \
+	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"$(shell du -b "$(LIBSCOPE)" | cut -f1)\" -DSCOPEDYN_SIZE=\"$(shell du -b "$(SCOPEDYN)" | cut -f1)\"" \
 	$(GO) build \
 		-ldflags="$(shell $(GOVVV) -flags)" \
 		-buildmode=pie \
 		$(BUILD_OPTS) \
 	       	-o $(SCOPEDYN)
-	$(RM) run/bundle.go
 
 compressscope: $(SCOPE) require-upx
 	@if [ -z $(SCOPE_NOCOMPRESS) ] ; then \

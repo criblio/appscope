@@ -114,8 +114,10 @@ getAsset(libdirfile_t objFileType, unsigned char **start)
 
     if ((ebuf = getElf("/proc/self/exe")) == NULL) {
         fprintf(stderr, "error: can't read /proc/self/exe\n");
-        return -1;
+        goto out;
     }
+
+    if (is_static(ebuf->buf) == FALSE) goto out;
 
     switch (objFileType) {
         case LIBRARY_FILE:
@@ -124,7 +126,7 @@ getAsset(libdirfile_t objFileType, unsigned char **start)
                 printf("%s:%d libaddr addr %p\n", __FUNCTION__, __LINE__, libptr);
             } else {
                 fprintf(stderr, "%s:%d no addr for _buildLibscopeSo\n", __FUNCTION__, __LINE__);
-                return -1;
+                goto out;
             }
 
             *start = (unsigned char *)libptr;
@@ -137,7 +139,7 @@ getAsset(libdirfile_t objFileType, unsigned char **start)
                 printf("%s:%d libaddr addr %p\n", __FUNCTION__, __LINE__, libptr);
             } else {
                 fprintf(stderr, "%s:%d no addr for _buildScopedyn\n", __FUNCTION__, __LINE__);
-                return -1;
+                goto out;
             }
 
             *start = (unsigned char *)libptr;
@@ -148,98 +150,13 @@ getAsset(libdirfile_t objFileType, unsigned char **start)
             break;
     }
 
+  out:
+    if (ebuf) {
+        freeElf(ebuf->buf, ebuf->len);
+        free(ebuf);
+    }
+
     return len;
-}
-
-static note_t *
-libdirGetNote(libdirfile_t objFileType) {
-    unsigned char *buf;
-
-    if (getAsset(objFileType, &buf) == -1) {
-        return NULL;
-    }
-
-    Elf64_Ehdr *elf = (Elf64_Ehdr *)buf;
-    Elf64_Phdr *hdr = (Elf64_Phdr *)(buf + elf->e_phoff);
-
-    for (unsigned i = 0; i < elf->e_phnum; i++)
-    {
-        if (hdr[i].p_type != PT_NOTE)
-        {
-            continue;
-        }
-
-        note_t *note = (note_t *)(buf + hdr[i].p_offset);
-        Elf64_Off len = hdr[i].p_filesz;
-        while (len >= sizeof(note_t))
-        {
-            if (note->nhdr.n_type == NT_GNU_BUILD_ID &&
-                note->nhdr.n_descsz != 0 &&
-                note->nhdr.n_namesz == 4 &&
-                memcmp(note->name, "GNU", 4) == 0)
-            {
-                return note;
-            }
-
-            // TODO: This needs to be reviewed. It's from
-            // https://github.com/mattst88/build-id/blob/master/build-id.c but
-            // I'm not entirely sure what it's doing or why. --PDugas
-            size_t offset = sizeof(Elf64_Nhdr) +
-                            ALIGN(note->nhdr.n_namesz, 4) +
-                            ALIGN(note->nhdr.n_descsz, 4);
-            note = (note_t *)((char *)note + offset);
-            len -= offset;
-        }
-    }
-
-    return NULL;
-}
-
-static int
-libdirCheckNote(libdirfile_t objFileType, const char *path)
-{
-    note_t *note = libdirGetNote(objFileType);
-    if (!note) {
-        // no note given to compare against so we're done.
-        return -1;
-    }
-
-    // open & mmap the file to get its note
-    int fd = open(path, O_RDONLY);
-    if (fd == -1) {
-        perror("open() failed");
-        return -1;
-    }
-
-    struct stat s;
-    if (fstat(fd, &s) == -1) {
-        close(fd);
-        perror("fstat failed");
-        return -1;
-    }
-
-    void *buf = mmap(NULL, ROUND_UP(s.st_size, sysconf(_SC_PAGESIZE)),
-                           PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
-    if (buf == MAP_FAILED) {
-        close(fd);
-        perror("mmap() failed");
-        return -1;
-    }
-
-    close(fd);
-
-    // compare the notes
-    int cmp = -1;
-    note_t *pathNote = libdirGetNote(objFileType);
-    if (pathNote) {
-        if (note->nhdr.n_descsz == pathNote->nhdr.n_descsz) {
-            cmp = memcmp(note->build_id, pathNote->build_id, note->nhdr.n_descsz);
-        }
-    }
-
-    munmap(buf, s.st_size);
-
-    return cmp; // 0 if notes match
 }
 
 /*
@@ -582,9 +499,10 @@ int libdirExtract(libdirfile_t file, uid_t uid, gid_t gid) {
     const char *existing_path = libdirGetPath(file);
 
     /*
-    * If note match to existing path do not try to overwrite it
-    */
-    if ((existing_path) && (!libdirCheckNote(file, existing_path))) {
+     * If we are a dev version, always extract.
+     * If we are prod version and this version exists, don't extract.
+     */
+    if ((existing_path) && (isDevVersion == FALSE)) {
         return 0;
     }
 
@@ -607,6 +525,7 @@ int libdirExtract(libdirfile_t file, uid_t uid, gid_t gid) {
             fprintf(stderr, "error: snprintf() failed.\n");
             return -1;
         }
+
         if (pathLen >= PATH_MAX) {
             fprintf(stderr, "error: path too long.\n");
             return -1;
@@ -618,17 +537,22 @@ int libdirExtract(libdirfile_t file, uid_t uid, gid_t gid) {
                 fprintf(stderr, "error: snprintf() failed.\n");
                 return -1;
             }
+
             if (pathLen >= PATH_MAX) {
                 fprintf(stderr, "error: path too long.\n");
                 return -1;
             }
+
             if (!libdirCreateFileIfMissing(file, path, isDevVersion, mode, uid, gid)) {
                 strncpy(state->binaryPath, path, PATH_MAX);
                 strncpy(state->binaryBasepath, g_libdir_info.install_base, PATH_MAX);
                 return 0;
             }
         }
+
+        return -1;
     }
+
     // Clean the buffers
     memset(path, 0, PATH_MAX);
     memset(dir, 0, PATH_MAX);
@@ -638,20 +562,24 @@ int libdirExtract(libdirfile_t file, uid_t uid, gid_t gid) {
         fprintf(stderr, "error: snprintf() failed.\n");
         return -1;
     }
+
     if (pathLen >= PATH_MAX) {
         fprintf(stderr, "error: path too long.\n");
         return -1;
     }
+
     if (libdirCreateDirIfMissing(dir, mode, uid, gid) <= MKDIR_STATUS_EXISTS) {
         int pathLen = snprintf(path, PATH_MAX, "%s/%s", dir, state->binaryName);
         if (pathLen < 0) {
             fprintf(stderr, "error: snprintf() failed.\n");
             return -1;
         }
+
         if (pathLen >= PATH_MAX) {
             fprintf(stderr, "error: path too long.\n");
             return -1;
         }
+
         if (!libdirCreateFileIfMissing(file, path, isDevVersion, mode, uid, gid)) {
             strncpy(state->binaryPath, path, PATH_MAX);
             strncpy(state->binaryBasepath, g_libdir_info.tmp_base, PATH_MAX);

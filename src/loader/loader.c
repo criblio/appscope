@@ -395,12 +395,15 @@ cmdUnconfigure(pid_t nspid)
 int
 cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **argv, char **env)
 {
+    int res = EXIT_FAILURE;
     char *scopeLibPath;
     char path[PATH_MAX] = {0};
     uid_t eUid = geteuid();
     gid_t eGid = getegid();
     uid_t nsUid = eUid;
     uid_t nsGid = eGid;
+    elf_buf_t *scope_ebuf = NULL;
+    elf_buf_t *ebuf = NULL;
 
     // Extract the library
     if (nspid != -1) {
@@ -408,9 +411,17 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         nsGid = nsInfoTranslateGid(nspid);
     }
 
-    if (libdirExtract(LIBRARY_FILE, nsUid, nsGid)) {
+    // is scope static or dynamic?
+    scope_ebuf = getElf("/proc/self/exe");
+    if (!scope_ebuf) {
+        perror("setenv");
+        goto out;
+    }
+
+    // Extract libscope from scope static. Don't attempt to extract from scope dynamic
+    if (is_static(scope_ebuf->buf) && libdirExtract(LIBRARY_FILE, nsUid, nsGid)) {
         fprintf(stderr, "error: failed to extract library\n");
-        return EXIT_FAILURE;
+        goto out;
     }
 
     // Set SCOPE_LIB_PATH
@@ -418,12 +429,12 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
 
     if (access(scopeLibPath, R_OK|X_OK)) {
         fprintf(stderr, "error: library %s is missing, not readable, or not executable\n", scopeLibPath);
-        return EXIT_FAILURE;
+        goto out;
     }
 
     if (setenv("SCOPE_LIB_PATH", scopeLibPath, 1)) {
         perror("setenv(SCOPE_LIB_PATH) failed");
-        return EXIT_FAILURE;
+        goto out;
     }
 
     // Set SCOPE_PID_ENV
@@ -445,7 +456,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         snprintf(path, sizeof(path), "/proc/%d", pid);
         if (access(path, F_OK)) {
             printf("error: --ldattach, --lddetach PID not a current process: %d\n", pid);
-            return EXIT_FAILURE;
+            goto out;
         }
 
         uint64_t rc = findLibrary("libscope.so", pid, FALSE);
@@ -464,9 +475,11 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
             // must be root to switch namespace
             if (eUid) {
                 printf("error: --ldattach requires root\n");
-                return EXIT_FAILURE;
+                goto out;
             }
-            return nsForkAndExec(pid, nsAttachPid, ldattach);
+
+            res = nsForkAndExec(pid, nsAttachPid, ldattach);
+            goto out;
         /*
         * Process can exists in same PID namespace but in different mnt namespace
         * we do a simillar sequecne like above but without switching PID namespace
@@ -476,14 +489,14 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
             // must be root to switch namespace
             if (eUid) {
                 printf("error: --ldattach requires root\n");
-                return EXIT_FAILURE;
+                goto out;
             }
-            return nsForkAndExec(pid, pid, ldattach);
+            res =  nsForkAndExec(pid, pid, ldattach);
+            goto out;
         }
 
         if (ldattach) {
-            int ret;
-            uint64_t rc;
+            //uint64_t rc;
             char path[PATH_MAX];
 
             // create /dev/shm/${PID}.env when attaching, for the library to load
@@ -491,7 +504,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
             int fd = nsFileShmOpen(path, O_RDWR|O_CREAT, S_IRUSR|S_IRGRP|S_IROTH, nsUid, nsGid, eUid, eGid);
             if (fd == -1) {
                 fprintf(stderr, "nsFileShmOpen failed\n");
-                return EXIT_FAILURE;
+                goto out;
             }
 
             // add the env vars we want in the library
@@ -507,41 +520,41 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
             // done
             close(fd);
 
-            rc = findLibrary("libscope.so", pid, FALSE);
+            //rc = findLibrary("libscope.so", pid, FALSE);
             if (rc == -1) {
                 fprintf(stderr, "error: can't get path to executable for pid %d\n", pid);
-                ret = EXIT_FAILURE;
+                res = EXIT_FAILURE;
             } else if (rc == 0) {
                 // proc exists, libscope does not exist, a load & attach
-                ret = attach(pid, scopeLibPath);
+                res = attach(pid, scopeLibPath);
             } else {
                 // libscope exists, a first time attach or a reattach
-                ret = attachCmd(pid, TRUE);
+                res = attachCmd(pid, TRUE);
             }
 
             // remove the env var file
             snprintf(path, sizeof(path), "/attach_%d.env", pid);
             shm_unlink(path);
-            return ret;
+            goto out;
         } else if (lddetach) {
             // pid & libscope need to exist before moving forward
             if (rc == -1) {
                 fprintf(stderr, "error: pid %d does not exist\n", pid);
-                return EXIT_FAILURE;
+                goto out;
             } else if (rc == 0) {
                 // proc exists, libscope does not exist.
                 fprintf(stderr, "error: pid %d has never been attached\n", pid);
-                return EXIT_FAILURE;
+                goto out;
             }
-            return attachCmd(pid, FALSE);
+            res =  attachCmd(pid, FALSE);
+            goto out;
         } else {
             fprintf(stderr, "error: attach or detach with invalid option\n");
-            return EXIT_FAILURE;
+            goto out;
         }
     }
 
     // Execute and scope the app
-    elf_buf_t *ebuf;
     int (*sys_exec)(elf_buf_t *, const char *, int, char **, char **);
     void *handle = NULL;
     char *inferior_command = NULL;
@@ -550,7 +563,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
     //printf("%s:%d %s\n", __FUNCTION__, __LINE__, inferior_command);
     if (!inferior_command) {
         fprintf(stderr,"scope could not find or execute command `%s`.  Exiting.\n", argv[0]);
-        exit(EXIT_FAILURE);
+        goto out;
     }
 
     ebuf = getElf(inferior_command);
@@ -558,12 +571,12 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
     if (ebuf && (is_go(ebuf->buf) == TRUE)) {
         if (setenv("SCOPE_APP_TYPE", "go", 1) == -1) {
             perror("setenv");
-            goto err;
+            goto out;
         }
     } else {
         if (setenv("SCOPE_APP_TYPE", "native", 1) == -1) {
             perror("setenv");
-            goto err;
+            goto out;
         }
     }
 
@@ -573,25 +586,25 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
 
         if (setenv("LD_PRELOAD", scopeLibPath, 0) == -1) {
             perror("setenv");
-            goto err;
+            goto out;
         }
 
         if (setenv("SCOPE_EXEC_TYPE", "dynamic", 1) == -1) {
             perror("setenv");
-            goto err;
+            goto out;
         }
 
         //printf("%s:%d %d: %s %s %s %s\n", __FUNCTION__, __LINE__,
         //       argc, argv[0], argv[1], argv[2], argv[3]);
         execve(inferior_command, &argv[0], environ);
         perror("execve");
-        goto err;
+        goto out;
     }
 
     // Static executable path
     if (setenv("SCOPE_EXEC_TYPE", "static", 1) == -1) {
         perror("setenv");
-        goto err;
+        goto out;
     }
 
     if (getenv("LD_PRELOAD") != NULL) {
@@ -609,20 +622,11 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         execve(inferior_command, &argv[0], environ);
     }
 
-
-    // is scope static or dynamic?
-    elf_buf_t *scope_ebuf;
-    scope_ebuf = getElf("/proc/self/exe");
-    if (!scope_ebuf) {
-        perror("setenv");
-        goto err;
-    }
-
     if (is_static(scope_ebuf->buf)) {
         // if scope is static, exec scopedyn
         if (libdirExtract(LOADER_FILE, nsUid, nsGid)) {
             fprintf(stderr, "error: failed to extract a loader exec\n");
-            return EXIT_FAILURE;
+            goto out;
         }
 
         char *execArgv[argc+2];
@@ -630,6 +634,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         for (int i = 0; i < argc; i++) {
             execArgv[execArgc++] = argv[i++];
         }
+
         execArgv[execArgc++] = NULL;
         char *execname = "scopedyn";
         char *execz = "-z"; //todo remove
@@ -641,12 +646,12 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
     } else {
         // otherwise if scope is dynamic do this
         if ((handle = dlopen(scopeLibPath, RTLD_LAZY)) == NULL) {
-            goto err;
+            goto out;
         }
 
         sys_exec = dlsym(handle, "sys_exec");
         if (!sys_exec) {
-            goto err;
+            goto out;
         }
 
         sys_exec(ebuf, inferior_command, argc, &argv[0], env);
@@ -659,11 +664,17 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
      * But, since we exec on failure to load, it doesn't matter.
      */
     execve(inferior_command, &argv[0], environ);
+    res = EXIT_SUCCESS;
+out:
+    if (ebuf) {
+        freeElf(ebuf->buf, ebuf->len);
+        free(ebuf);
+    }
 
+    if (scope_ebuf) {
+        freeElf(scope_ebuf->buf, scope_ebuf->len);
+        free(scope_ebuf);
+    }
 
-
-err:
-    if (ebuf) free(ebuf);
-    if (scope_ebuf) freeElf(scope_ebuf->buf, scope_ebuf->len);
-    exit(EXIT_FAILURE);
+    exit(res);
 }

@@ -17,6 +17,7 @@ typedef struct {
 void freeElf(char *, size_t);
 elf_buf_t * getElf(char *);
 void *getSymbol(const char *, char *);
+void *getDynSymbol(const char *, char *);
 bool is_static(char *);
 bool is_go(char *);
 void setPidEnv(int);

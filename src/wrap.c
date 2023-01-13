@@ -1483,7 +1483,7 @@ initEnv(int *attachedFlag)
 
     // build the full path of the .env file
     char path[128];
-    int  pathLen = scope_snprintf(path, sizeof(path), "/dev/shm/scope_attach_%d.env", scope_getpid());
+    int  pathLen = scope_snprintf(path, sizeof(path), "/dev/shm/attach_%d.env", scope_getpid());
     if (pathLen < 0 || pathLen >= sizeof(path)) {
         scopeLog(CFG_LOG_DEBUG, "ERROR: snprintf(scope_attach_PID.env) failed");
         return;
@@ -1625,14 +1625,14 @@ init(void)
     setMachineID(g_proc.machine_id);
     setUUID(g_proc.uuid);
 
+    // logging inside constructor start from this line
+    g_constructor_debug_enabled = checkEnv("SCOPE_ALLOW_CONSTRUCT_DBG", "true");
+
     // initEnv() will set this TRUE if it detects `scope_attach_PID.env` in
     // `/dev/shm` with our PID indicating we were injected into a running
     // process.
     int attachedFlag = 0;
     initEnv(&attachedFlag);
-
-    // logging inside constructor start from this line
-    g_constructor_debug_enabled = checkEnv("SCOPE_ALLOW_CONSTRUCT_DBG", "true");
 
     initState();
     initSigErrorHandler();

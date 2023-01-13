@@ -307,58 +307,25 @@ exit:
     return ret;
 }
 
-static int 
-findLib(struct dl_phdr_info *info, size_t size, void *data)
-{
-    if (strstr(info->dlpi_name, "libc.so") != NULL ||
-        strstr(info->dlpi_name, "ld-musl") != NULL) {
-        char libpath[PATH_MAX];
-        if (realpath(info->dlpi_name, libpath)) {
-            ((libdl_info_t *)data)->path = libpath;
-            ((libdl_info_t *)data)->addr = info->dlpi_addr;
-            return 1;
-        }
-    }
-    return 0;
-}
-
 int 
 injectScope(int pid, char *path)
 {
-    uint64_t remoteLib, localLib;
+    int glibc = FALSE;
     void *dlopenAddr = NULL;
-    libdl_info_t info;
-    int glibc = TRUE;
+    uint64_t remLib, remAddr;
+    elf_buf_t *ebuf;
+    char remproc[PATH_MAX];
 
-    if (!dl_iterate_phdr(findLib, &info)) {
-        fprintf(stderr, "error: failed to find local libc\n");
-        return EXIT_FAILURE;
-    }
+    snprintf(remproc, sizeof(remproc), "/lib/aarch64-linux-gnu/libc.so.6");
+    ebuf = getElf(remproc);
+    dlopenAddr = getDynSymbol(ebuf->buf, "dlopen");
+    remLib = findLibrary("libc.so.6", pid, FALSE);
+    remAddr = remLib + (uint64_t)dlopenAddr;
 
-    localLib = info.addr;
-    dlopenAddr = dlsym(RTLD_DEFAULT, "__libc_dlopen_mode");
-    if (dlopenAddr == NULL) {
-        dlopenAddr = dlsym(RTLD_DEFAULT, "dlopen");
-        glibc = FALSE;
-    }
-
-    if (dlopenAddr == NULL) {
-        fprintf(stderr, "error: failed to find dlopen()\n");
-        return EXIT_FAILURE;
-    }
-
-    // find the base address of libc in the target process
-    remoteLib = findLibrary(info.path, pid, TRUE);
-    if ((remoteLib == 0) || (remoteLib == -1)) {
-        fprintf(stderr, "error: failed to find libc in target process\n");
-        return EXIT_FAILURE;
-    }
-
-    // calculate the address of dlopen in the target process
-    dlopenAddr = remoteLib + (dlopenAddr - localLib);
+    //printf("dlopen %p remLib 0x%lx remAddr 0x%lx libscope %s\n", dlopenAddr, remLib, remAddr, path);
 
     // inject libscope.so into the target process
-    return inject(pid, REM_CMD_DLOPEN, (uint64_t) dlopenAddr, path, glibc);
+    return inject(pid, REM_CMD_DLOPEN, (uint64_t)remAddr, path, glibc);
 }
 
 int

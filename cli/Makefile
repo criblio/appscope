@@ -55,9 +55,8 @@ debug:
 genflowtest:
 	./flows/gen_flow_test.sh
 
-## all: build and compress \`scope\`
-#all: scope scopedyn compressscope require-go-version
-all: scopedyn scope require-go-version
+## all:
+all: deps scopedyn scope require-go-version
 
 ## clean: remove the built binary
 clean:
@@ -80,16 +79,6 @@ $(GOLANGCI_LINT):
 		sh -s -- -b $(GOBIN) v1.42.1
 
 rebuild: clean build 
-
-run/bundle.go: $(GO_BINDATA) $(LIBSCOPE) $(LIBLOADER) $(CONF_YML)
-	$(RM) -r build/*
-	cp $(LIBSCOPE) $(CONF_YML) $(SCOPEDYN) build/
-	$(GO_BINDATA) -nocompress -o $@ -pkg run build
-
-bundle2: $(GO_BINDATA) $(LIBSCOPE) $(LIBLOADER) $(CONF_YML)
-	$(RM) -r build/*
-	cp $(LIBSCOPE) $(CONF_YML) build/
-	$(GO_BINDATA) -nocompress -o $@ -pkg run build
 
 # in case someone is building here before the C code is built
 $(LIBSCOPE):
@@ -119,17 +108,12 @@ $(SCOPEDYN): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'
 	$(RM) -r build/*
 #	cp $(LIBSCOPE) $(CONF_YML) build/
 	$(GO_BINDATA) -nocompress -o run/bundle.go -pkg run build
-	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"$(shell du -b "$(LIBSCOPE)" | cut -f1)\" -DSCOPEDYN_SIZE=\"$(shell du -b "$(SCOPEDYN)" | cut -f1)\"" \
+	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"0\" -DSCOPEDYN_SIZE=\"0\"" \
 	$(GO) build \
 		-ldflags="$(shell $(GOVVV) -flags)" \
 		-buildmode=pie \
 		$(BUILD_OPTS) \
 	       	-o $(SCOPEDYN)
-
-compressscope: $(SCOPE) require-upx
-	@if [ -z $(SCOPE_NOCOMPRESS) ] ; then \
-		upx -l $(SCOPE) >/dev/null 2>&1 || upx -9 $(SCOPE); \
-	fi
 
 ## test: run unit tests
 test:
@@ -166,4 +150,4 @@ require-upx:
 	@[ -n "$(shell which upx)" ] || \
 	  { echo >&2 "error: upx required"; exit 1; }
 
-.PHONY: build debug all clean deps rebuild scope compressscope test fmt lint vet cover check help require-upx
+.PHONY: build debug all clean deps rebuild scope test fmt lint vet cover check help

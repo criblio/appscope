@@ -1,7 +1,7 @@
 #ifndef __STRSET_H__
 #define __STRSET_H__
 
-#include <stdbool.h>
+#include "scopetypes.h"
 
 // This was written to keep track of a set of strings which should
 // not be allowed to have duplicate values.  (Originally written

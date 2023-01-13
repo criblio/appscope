@@ -51,9 +51,10 @@ typedef enum {
 #define MODE_STR 16
 #define SM_NAME "scope_anon"
 
-#ifndef bool
 typedef unsigned int bool;
-#endif
+#define TRUE 1
+#define FALSE 0
+
 
 typedef struct
 {
@@ -79,9 +80,6 @@ typedef struct
     unsigned long cmdAttachAddr;
     bool scoped;
 } export_sm_t;
-
-#define TRUE 1
-#define FALSE 0
 
 #define CFG_MAX_VERBOSITY 9
 #define CFG_FILE_NAME "scope.yml"

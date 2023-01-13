@@ -1,7 +1,7 @@
 #ifndef __BACKOFF_H__
 #define __BACKOFF_H__
 
-#include <stdbool.h>
+#include "scopetypes.h"
 
 // This was written to keep state of connections so we can wait
 // and appropriate amount of time between attempting connections

@@ -18,6 +18,7 @@ export GOFLAGS := -modcacherw
 
 BINDIR := ../bin/linux/$(ARCH)
 LIBDIR := ../lib/linux/$(ARCH)
+SRCDIR := ../src
 CONFDIR := ../conf
 
 SCOPE := $(BINDIR)/scope
@@ -25,6 +26,8 @@ SCOPEDYN := $(BINDIR)/scopedyn
 LIBSCOPE := $(LIBDIR)/libscope.so
 LIBLOADER := $(LIBDIR)/libloader.a
 CONF_YML := $(CONFDIR)/scope.yml
+LOADER_C_FILES:=$(wildcard $(SRCDIR)/loader/*.c)
+LIBRARY_C_FILES:=$(wildcard $(SRCDIR)/*.c)
 
 GO_BINDATA := $(GOBIN)/go-bindata
 GOVVV := $(GOBIN)/govvv
@@ -56,7 +59,7 @@ genflowtest:
 	./flows/gen_flow_test.sh
 
 ## all:
-all: deps scopedyn scope require-go-version
+all: deps $(SCOPEDYN) $(SCOPE) require-go-version
 
 ## clean: remove the built binary
 clean:
@@ -81,12 +84,12 @@ $(GOLANGCI_LINT):
 rebuild: clean build 
 
 # in case someone is building here before the C code is built
-$(LIBSCOPE):
+$(LIBSCOPE): $(LIBRARY_C_FILES)
 	@$(MAKE) -C .. lib/linux/$(ARCH)/libscope.so
-$(LIBLOADER):
+$(LIBLOADER): $(LOADER_C_FILES)
 	@$(MAKE) -C .. lib/linux/$(ARCH)/libloader.a
 
-scope: $(LIBSCOPE) $(LIBLOADER) $(SCOPE)
+$(SCOPE): $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN) 
 $(SCOPE): export GOOS=linux
 $(SCOPE): export CGO_ENABLED=1
 $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
@@ -103,7 +106,7 @@ $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 	$(RM) -r $(SCOPEDYN)
 
 
-scopedyn: $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN)
+$(SCOPEDYN): $(LIBSCOPE) $(LIBLOADER) 
 $(SCOPEDYN): export GOOS=linux
 $(SCOPEDYN): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 	$(RM) run/bundle.go

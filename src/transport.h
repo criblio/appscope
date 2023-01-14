@@ -4,7 +4,6 @@
 #include "scopetypes.h"
 
 typedef struct {
-    const char *friendlyTransportName;
     const char *configString;
     bool isConnected;
 
@@ -30,13 +29,13 @@ void                transportDestroy(transport_t **);
 // Accessors
 int                 transportSend(transport_t *, const char *, size_t);
 int                 transportFlush(transport_t *);
-int                 transportNeedsConnection(transport_t *);
+bool                transportNeedsConnection(transport_t *);
 int                 transportConnect(transport_t *);
 int                 transportConnection(transport_t *);
 int                 transportDisconnect(transport_t *);
 int                 transportReconnect(transport_t *);
 cfg_transport_t     transportType(transport_t *);
-int                 transportSupportsCommandControl(transport_t *);
+bool                transportSupportsCommandControl(transport_t *);
 void                transportLogConnectionStatus(transport_t *, const char *);
 transport_status_t  transportConnectionStatus(transport_t *);
 

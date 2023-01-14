@@ -17,7 +17,6 @@
 
 #include "backoff.h"
 #include "dbg.h"
-#include "scopetypes.h"
 #include "os.h"
 #include "scopestdlib.h"
 #include "fn.h"
@@ -58,6 +57,7 @@ static const char *netFailMap[] = {
 struct _transport_t
 {
     cfg_transport_t type;
+    char *configStr;
     int (*getaddrinfo)(const char *, const char *,
                        const struct addrinfo *,
                        struct addrinfo **);
@@ -185,7 +185,7 @@ transportType(transport_t *trans)
     return trans->type;
 }
 
-int
+bool
 transportSupportsCommandControl(transport_t *trans)
 {
     if (!trans) return FALSE;
@@ -234,7 +234,7 @@ transportConnection(transport_t *trans)
     return -1;
 }
 
-int
+bool
 transportNeedsConnection(transport_t *trans)
 {
     if (!trans) return FALSE;
@@ -1163,6 +1163,9 @@ transportCreateTCP(const char *host, const char *port, unsigned int enable,
     if (!trans) return trans;
 
     trans->type = CFG_TCP;
+    if (scope_asprintf(&trans->configStr, "%s:%s", host, port) < 0) {
+        trans->configStr = NULL;
+    }
     trans->net.sock = -1;
     trans->net.pending_connect = -1;
     trans->net.host = scope_strdup(host);
@@ -1171,7 +1174,7 @@ transportCreateTCP(const char *host, const char *port, unsigned int enable,
     trans->net.tls.validateserver = validateserver;
     trans->net.tls.cacertpath = (cacertpath) ? scope_strdup(cacertpath) : NULL;
 
-    if (!trans->net.host || !trans->net.port) {
+    if (!trans->configStr || !trans->net.host || !trans->net.port) {
         DBG(NULL);
         transportDestroy(&trans);
         return trans;
@@ -1193,12 +1196,15 @@ transportCreateUdp(const char* host, const char* port)
     if (!t) return t;
 
     t->type = CFG_UDP;
+    if (scope_asprintf(&t->configStr, "%s:%s", host, port) < 0) {
+        t->configStr = NULL;
+    }
     t->net.sock = -1;
     t->net.pending_connect = -1;
     t->net.host = scope_strdup(host);
     t->net.port = scope_strdup(port);
 
-    if (!t->net.host || !t->net.port) {
+    if (!t->configStr || !t->net.host || !t->net.port) {
         DBG(NULL);
         transportDestroy(&t);
         return t;
@@ -1219,8 +1225,9 @@ transportCreateFile(const char* path, cfg_buffer_t buf_policy)
     if (!t) return NULL; 
 
     t->type = CFG_FILE;
+    t->configStr = scope_strdup(path);
     t->file.path = scope_strdup(path);
-    if (!t->file.path) {
+    if (!t->configStr || !t->file.path) {
         DBG("%s", path);
         transportDestroy(&t);
         return t;
@@ -1249,6 +1256,7 @@ transportCreateUnix(const char *path)
     if (!(trans = newTransport())) goto err;
 
     trans->type = CFG_UNIX;
+    if (!(trans->configStr = scope_strdup(path))) goto err;
     trans->local.sock = -1;
     if (!(trans->local.path = scope_strdup(path))) goto err;
 
@@ -1283,6 +1291,7 @@ transportCreateEdge(void)
     if (!(trans = newTransport())) goto err;
 
     trans->type = CFG_EDGE;
+    if (!(trans->configStr = scope_strdup("edge"))) goto err;
     trans->local.sock = -1;
     trans->local.path = NULL;
 
@@ -1331,6 +1340,9 @@ transportDestroy(transport_t **transport)
     if (!transport || !*transport) return;
 
     transport_t *trans = *transport;
+
+    if (trans->configStr) scope_free(trans->configStr);
+
     switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
@@ -1618,15 +1630,9 @@ transportConnectionStatus(transport_t *trans)
 
 /*
     My plan is to have all of these strings either be static
-    (friendlyTransportName and failureString) or constructed as
-    part of the transport at transport creation time and never
-    modified until the eventual transportDestroy (configString)
-
-    friendlyTransportName examples:
-        metric
-        event
-        log
-        payload
+    (failureString) or constructed as part of the transport at
+    transport creation time and never modified until the eventual
+    transportDestroy (configString).
 
     configString examples:
         myhost:myport
@@ -1646,9 +1652,8 @@ transportConnectionStatus(transport_t *trans)
     if (!trans) {
         DBG(NULL);
         transport_status_t status = {
-            .friendlyTransportName = NULL,
             .configString = NULL,
-            .isConnected = false,
+            .isConnected = FALSE,
             .connectAttemptCount = 0,
             .failureString = NULL};
 
@@ -1662,31 +1667,8 @@ transportConnectionStatus(transport_t *trans)
         failStr = NULL;
     }
 
-    const char *cfgStr;
-    switch (trans->type) {
-        case CFG_UDP:
-        case CFG_TCP:
-            cfgStr = ""; // tbd trans->net.host, trans->net.port
-            break;
-        case CFG_UNIX:
-            cfgStr = trans->local.path;
-            break;
-        case CFG_EDGE:
-            cfgStr = "edge";
-            break;
-        case CFG_FILE:
-            cfgStr = trans->file.path;
-            break;
-        case CFG_SYSLOG:
-        case CFG_SHM:
-        default:
-            cfgStr = "";
-            DBG("%d", trans->type);
-    }
-
     transport_status_t status = {
-        .friendlyTransportName = "", // tbd trans->status.friendlyTransportName,
-        .configString = cfgStr,
+        .configString = trans->configStr,
         .isConnected = !transportNeedsConnection(trans),
         .connectAttemptCount = trans->connect_attempts,
         .failureString = failStr

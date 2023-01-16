@@ -4,6 +4,33 @@
 #include "cJSON.h"
 
 /*
+ * meta_req_t describes the metadata part of ipc request command retrieves from IPC communication
+ * IMPORTANT NOTE:
+ * meta_req_t must be inline with client: metaReqCmd
+ * Please extend `cmdMetaName` structure in ipc_resp.c
+ */
+typedef enum {
+    META_REQ_JSON,            // JSON request (complete)
+    META_REQ_JSON_PARTIAL,    // JSON request (partial)
+} meta_req_t;
+
+/*
+ * ipc_scope_req_t describes the scope request command retrieves from IPC communication
+ * IMPORTANT NOTE:
+ * ipc_scope_req_t must be inline with client: scopeReqCmd
+ * NEW VALUES MUST BE PLACED AFTER LAST SUPPORTED CMD AND BEFORE IPC_CMD_UNKNOWN
+ * Please extend `cmdScopeName` structure in ipc_resp.c
+ */
+typedef enum {
+    IPC_CMD_GET_SUPPORTED_CMD,  // Retrieves the supported commands, introduced in: 1.3.0
+    IPC_CMD_GET_SCOPE_STATUS,   // Retrieves scope status of application (enabled or disabled), introduced in: 1.3.0
+    IPC_CMD_GET_SCOPE_CFG,      // Retrieves the current configuration, introduced in: 1.3.0
+    IPC_CMD_SET_SCOPE_CFG,      // Update the current configuration, introduced in: 1.3.0
+    // Place to add new message
+    IPC_CMD_UNKNOWN,              // MUST BE LAST - points to unsupported message
+} ipc_scope_req_t;
+
+/*
  * Internal status of parsing the incoming message request, which can be:
  * - success after joining all the frames in the message
  * - error during parsing frames (processing will not wait for all frames)
@@ -41,6 +68,7 @@ typedef enum {
 char *ipcRespScopeRespStr(scopeRespWrapper *);
 
 // Wrapper for Scope responses
+scopeRespWrapper *ipcRespGetScopeCmds(const cJSON *);
 scopeRespWrapper *ipcRespGetScopeStatus(const cJSON *);
 scopeRespWrapper *ipcRespGetScopeCfg(const cJSON *);
 scopeRespWrapper *ipcRespSetScopeCfg(const cJSON *);

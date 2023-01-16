@@ -546,7 +546,7 @@ ipcHandlerScopeResponseValid(void **state) {
     status = scope_mq_getattr(mqReadWriteDes, &attr);
     assert_int_equal(status, 0);
 
-    ipc_msg_t *msg = createIpcMessage("{\"req\":0,\"uniq\":1234,\"remain\":128}", "{\"req\":0}");
+    ipc_msg_t *msg = createIpcMessage("{\"req\":0,\"uniq\":1234,\"remain\":128}", "{\"req\":1}");
 
     res = ipcSendSuccessfulResponse(mqReadWriteDes, attr.mq_msgsize, msg->scopeData, uniqueId);
     assert_int_equal(res, RESP_RESULT_OK);
@@ -697,7 +697,7 @@ ipcHandlerScopeResponseGetCfgSingleMsg(void **state) {
     status = scope_mq_getattr(mqReadWriteDes, &attr);
     assert_int_equal(status, 0);
 
-    ipc_msg_t *msg = createIpcMessage("{\"req\":0,\"uniq\":1234,\"remain\":128}", "{\"req\":1}");
+    ipc_msg_t *msg = createIpcMessage("{\"req\":0,\"uniq\":1234,\"remain\":128}", "{\"req\":2}");
     res = ipcSendSuccessfulResponse(mqReadWriteDes, attr.mq_msgsize, msg->scopeData, uniqueId);
     assert_int_equal(res, RESP_RESULT_OK);
 
@@ -830,7 +830,7 @@ ipcHandlerMultipleFrameErrorTimeoutFrame(void **state) {
     assert_int_not_equal(mqReadWriteDes, -1);
 
     // Send Incomplete request
-    ipc_msg_t *msg = createIpcMessage("{\"req\":1,\"uniq\":1234,\"remain\":128}", "{\"req\":1}");
+    ipc_msg_t *msg = createIpcMessage("{\"req\":1,\"uniq\":1234,\"remain\":128}", "{\"req\":2}");
     status = scope_mq_send(mqReadWriteDes, msg->full, msg->fullLen, 0);
     assert_int_equal(status, 0);
     destroyIpcMessage(msg);

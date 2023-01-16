@@ -6,7 +6,7 @@
  * Connect to the scoped process
  * ./ipcclient -p <scoped_PID>
  * Connect to the scoped process and switch IPC namespace
- * ./ipcclient -p <scoped_PID> -i 
+ * ./ipcclient -p <scoped_PID> -i
  */
 
 #define _GNU_SOURCE
@@ -34,6 +34,41 @@ static mqd_t readMqDesc;
 static mqd_t writeMqDesc;
 static char readerMqName[4096] = {0};
 static char writerMqName[4096] = {0};
+
+typedef struct {
+    void* full;
+    size_t fullLen;
+} ipc_msg_t;
+
+
+// Helper function to create message in format supported by IPC
+static ipc_msg_t *
+createIpcMessage(const char *metadata, const char *scopeData) {
+    ipc_msg_t * msg = malloc(sizeof(ipc_msg_t));
+    size_t metaDataLen = strlen(metadata) + 1;
+    size_t scopeDataLen = strlen(scopeData) + 1;
+    msg->fullLen = metaDataLen + scopeDataLen;
+    msg->full = calloc(1, sizeof(char) * (msg->fullLen));
+    strcpy(msg->full, metadata);
+    strcpy(msg->full + metaDataLen, scopeData);
+    return msg;
+}
+
+static void 
+destroyIpcMessage(ipc_msg_t *ipcMsg) {
+    free(ipcMsg->full);
+    free(ipcMsg);
+}
+
+static ssize_t
+msgBufGetNulIndx(const char* msgBuf, size_t msgLen) {
+    for(size_t i = 0; i < msgLen; ++i) {
+        if (!msgBuf[i]) {
+            return i;
+        }
+    }
+    return msgLen;
+}
 
 static bool
 getLastPidNamesSpace(int pid, int *lastNsPid, bool *nestedNs) {
@@ -110,7 +145,7 @@ switchIPCNamespace(int pid) {
 }
 
 static void
-cleanupReadDesc(void) {
+cleanupMqDesc(void) {
     mq_close(writeMqDesc);
     mq_unlink(writerMqName);
     mq_close(readMqDesc);
@@ -119,19 +154,41 @@ cleanupReadDesc(void) {
 
 static int
 printUsageAndExit(const char *cmd) {
-    printf("Usage: %s -p <pid_scope_process> [-i] [-r]\n", cmd);
+    printf("Usage: %s -p <pid_scope_process> [-i]\n", cmd);
+    printf("p - PID of scoped process\n");
+    printf("i - switch IPC namespace during the communication\n");
     return EXIT_FAILURE;
 }
 
-static int
-printRlimitAndExit(void) {
-    struct rlimit rlim;
-    if (!getrlimit(RLIMIT_MSGQUEUE, &rlim)) {
-        printf("Rlimit RLIMIT_MSGQUEUE: current %zu max %zu", rlim.rlim_cur, rlim.rlim_max);
-        return EXIT_SUCCESS;
+static void
+printMsgInfo(void) {
+    printf("\nChoose message, type choice to stdin\n");
+    printf("quit - stop sending\n");
+    printf("cmds - get information about supported cmd\n");
+    printf("status - get information about scope status\n");
+}
+
+static ipc_msg_t *
+msgPrepareInfo(const char *inputBuf) {
+    if(strcmp("quit\n", inputBuf) == 0) {
+        printf("Quit message %s\n", inputBuf);
+        return NULL;
+    } else if(strcmp("cmds\n", inputBuf) == 0) {
+        printf("cmd message\n");
+        return createIpcMessage("{\"req\":0,\"uniq\":1234,\"remain\":128}", "{\"req\":0}");
+    } else if(strcmp("status\n", inputBuf) == 0) {
+        printf("status message\n");
+        return createIpcMessage("{\"req\":0,\"uniq\":1234,\"remain\":128}", "{\"req\":1}");
     }
-    printf("getrlimit failed errno %d", errno);
-    return EXIT_FAILURE;
+
+    printf("Unknown message %s\n", inputBuf);
+    return NULL;
+}
+
+static char*
+msgParse(const char *buf, size_t bufSize) {
+    ssize_t indx = msgBufGetNulIndx(buf, bufSize);
+    return strdup(buf + indx + 1);
 }
 
 int main(int argc, char **argv) {
@@ -147,11 +204,8 @@ int main(int argc, char **argv) {
     int nsPid = -1;
     int c;
 
-    while ((c = getopt(argc, argv, "rip:")) != -1) {
+    while ((c = getopt(argc, argv, "ip:")) != -1) {
         switch (c) {
-            case 'r':
-                return printRlimitAndExit();
-                break;
             case 'i':
                 ipcSwitch = TRUE;
                 break;
@@ -189,6 +243,8 @@ int main(int argc, char **argv) {
         snprintf(readerMqName, sizeof(readerMqName), "/ScopeIPCOut.%d", pid);
     }
 
+    atexit(cleanupMqDesc);
+
     // Ugly hack disable umask to handle run as a root
     oldMask = umask(0);
     writeMqDesc = mq_open(writerMqName, O_WRONLY | O_CREAT, 0666, &attr);
@@ -206,50 +262,44 @@ int main(int argc, char **argv) {
     }
     umask(oldMask);
 
-    atexit(cleanupReadDesc);
-
-    writeMqDesc = mq_open(writerMqName, O_WRONLY);
-    if (writeMqDesc == (mqd_t)-1) {
-        perror("!mq_open writeMqDesc failed");
-        return res;
-    }
-
-    char Txbuf[MSG_BUFFER_SIZE] = {0};
+    char InputBuf[MSG_BUFFER_SIZE] = {0};
     char RxBuf[MSG_BUFFER_SIZE] = {0};
+    printMsgInfo();
+    while (fgets(InputBuf, MSG_BUFFER_SIZE, stdin) != NULL) {
 
-    printf("\nPass example message to stdin [type 'quit' to stop]\n");
-    while (fgets(Txbuf, MSG_BUFFER_SIZE, stdin) != NULL) {
-        if(strcmp("quit\n", Txbuf) == 0) {
+        size_t outputMsgSize;
+        ipc_msg_t *msg = msgPrepareInfo(InputBuf);
+        if (!msg) {
             break;
         }
 
         // Send message to scoped process
-        if (mq_send(writeMqDesc, Txbuf, strlen(Txbuf)-1, 0) == -1) {
+        if (mq_send(writeMqDesc, msg->full, msg->fullLen, 0) == -1) {
             perror("!mq_send writeMqDesc failed");
             goto end_iteration;
         }
 
-
+        ssize_t recvLen = mq_receive(readMqDesc, RxBuf, MSG_BUFFER_SIZE, NULL);
         // Read response
-        if (mq_receive(readMqDesc, RxBuf, MSG_BUFFER_SIZE, NULL) == -1) {
+        if (recvLen == -1) {
             perror("!mq_receive readMqDesc failed");
             goto end_iteration;
         }
 
+        char *parsedMsg = msgParse(RxBuf, recvLen);
+
         if (ipcSwitch) {
-            printf("Response from pid process %d : %s", pid, RxBuf);
+            printf("Response from pid process %d: %s", pid, parsedMsg);
         } else {
-            printf("Response from pid [%d parent process] [%d inside container] : %s", pid, nsPid, RxBuf);
+            printf("Response from pid [%d parent process] [%d inside container] : %s", pid, nsPid, parsedMsg);
         }
+
         end_iteration:
-            printf("\nPass example message to stdin [type 'quit' to stop]\n");
-            memset(Txbuf, 0, MSG_BUFFER_SIZE);
+            free(parsedMsg);
+            destroyIpcMessage(msg);
+            printMsgInfo();
+            memset(InputBuf, 0, MSG_BUFFER_SIZE);
             memset(RxBuf, 0, MSG_BUFFER_SIZE);
     }
-
-    if (mq_close(writeMqDesc) == -1) {
-        perror("!mq_close writeMqDesc failed");
-    }
-
     return EXIT_SUCCESS;
 }

@@ -15,11 +15,13 @@ type IpcResponseCtx struct {
 
 // scopeReqCmd describes the command passed in the IPC request to library scope request
 // Must be inline with server, see: ipc_scope_req_t
-
+// IMPORTANT NOTE:
+// NEW VALUES MUST BE PLACED AS A LAST
 type scopeReqCmd int
 
 const (
-	reqCmdGetScopeStatus scopeReqCmd = iota
+	reqCmdGetSupportedCmds scopeReqCmd = iota
+	reqCmdGetScopeStatus
 	reqCmdGetScopeCfg
 	reqCmdSetScopeCfg
 )
@@ -45,6 +47,24 @@ type scopeOnlyStatusResponse struct {
 	Status *respStatus `mapstructure:"status" json:"status" yaml:"status"`
 }
 
+// CmdDesc describes the message
+type CmdDesc []struct {
+	// Id of the command
+	Id int `mapstructure:"id" json:"id" yaml:"id"`
+	// Name of the command
+	Name string `mapstructure:"name" json:"name" yaml:"name"`
+}
+
+// Must be inline with server, see: ipcRespGetScopeCmds
+type scopeGetSupportedCmdsResponse struct {
+	// Response status
+	Status *respStatus `mapstructure:"status" json:"status" yaml:"status"`
+	// Meta message commands description
+	CommandsMeta CmdDesc `mapstructure:"commands_meta" json:"commands_meta" yaml:"commands_meta"`
+	// Scope message commands description
+	CommandsScope CmdDesc `mapstructure:"commands_scope" json:"commands_scope" yaml:"commands_scope"`
+}
+
 // Must be inline with server, see: ipcRespGetScopeStatus
 type scopeGetStatusResponse struct {
 	// Response status
@@ -61,6 +81,30 @@ type scopeGetCfgResponse struct {
 		// Scoped Cfg
 		Current libscope.ScopeConfig `mapstructure:"current" json:"current" yaml:"current"`
 	} `mapstructure:"cfg" json:"cfg" yaml:"cfg"`
+}
+
+// CmdGetSupportedCmds describes Get Supported Commands command request and response
+type CmdGetSupportedCmds struct {
+	Response scopeGetSupportedCmdsResponse
+}
+
+func (cmd *CmdGetSupportedCmds) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
+	req, _ := json.Marshal(scopeRequestOnly{Req: reqCmdGetSupportedCmds})
+
+	return ipcDispatcher(req, pidCtx)
+}
+
+func (cmd *CmdGetSupportedCmds) UnmarshalResp(respData []byte) error {
+	err := yaml.Unmarshal(respData, &cmd.Response)
+	if err != nil {
+		return err
+	}
+
+	if cmd.Response.Status == nil {
+		return fmt.Errorf("%w %v", errMissingMandatoryField, "status")
+	}
+
+	return nil
 }
 
 // CmdGetScopeStatus describes Get Scope Status command request and response

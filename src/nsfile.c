@@ -1,7 +1,6 @@
 #define _GNU_SOURCE
 
 #include "nsfile.h"
-#include "scopestdlib.h"
 
 int
 nsFileShmOpen(const char *name, int oflag, mode_t mode, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gid_t restoreGid) {

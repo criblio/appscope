@@ -12,8 +12,6 @@ transport_t*        transportCreateTCP(const char *, const char *,
 transport_t*        transportCreateFile(const char *, cfg_buffer_t);
 transport_t*        transportCreateUnix(const char *);
 transport_t*        transportCreateEdge(void);
-transport_t*        transportCreateSyslog(void);
-transport_t*        transportCreateShm(void);
 void                transportDestroy(transport_t **);
 
 // Accessors

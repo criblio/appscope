@@ -217,27 +217,6 @@ transportCreateEdgeReturnsValidPtrInHappyPath(void** state)
 }
 
 static void
-transportCreateSyslogReturnsValidPtrInHappyPath(void** state)
-{
-    transport_t* t = transportCreateSyslog();
-    assert_non_null(t);
-    assert_false(transportNeedsConnection(t));
-    transportDestroy(&t);
-    assert_null(t);
-
-}
-
-static void
-transportCreateShmReturnsValidPtrInHappyPath(void** state)
-{
-    transport_t* t = transportCreateShm();
-    assert_non_null(t);
-    assert_false(transportNeedsConnection(t));
-    transportDestroy(&t);
-    assert_null(t);
-}
-
-static void
 transportDestroyNullTransportDoesNothing(void** state)
 {
     transportDestroy(NULL);
@@ -263,20 +242,6 @@ transportSendForNullMessageDoesNothing(void** state)
     transportDestroy(&t);
     if (scope_unlink(path))
         fail_msg("Couldn't delete test file %s", path);
-}
-
-static void
-transportSendForUnimplementedTransportTypesIsHarmless(void** state)
-{
-    transport_t* t;
-
-    t = transportCreateSyslog();
-    transportSend(t, "blah", scope_strlen("blah"));
-    transportDestroy(&t);
-
-    t = transportCreateShm();
-    transportSend(t, "blah", scope_strlen("blah"));
-    transportDestroy(&t);
 }
 
 static void
@@ -598,16 +563,6 @@ transportTcpRemoteControlSupport(void** state)
     assert_false(transportSupportsCommandControl(t));
     transportDestroy(&t);
 
-    t = transportCreateSyslog();
-    assert_non_null(t);
-    assert_false(transportSupportsCommandControl(t));
-    transportDestroy(&t);
-
-    t = transportCreateShm();
-    assert_non_null(t);
-    assert_false(transportSupportsCommandControl(t));
-    transportDestroy(&t);
-
     t = transportCreateFile("/tmp/my.path", CFG_BUFFER_FULLY);
     assert_non_null(t);
     assert_false(transportSupportsCommandControl(t));
@@ -651,12 +606,9 @@ main(int argc, char* argv[])
         cmocka_unit_test(transportCreateUnixReturnsValidPtrInHappyPath),
         cmocka_unit_test(transportCreateUnixReturnsNullForInvalidPath),
         cmocka_unit_test(transportCreateEdgeReturnsValidPtrInHappyPath),
-        cmocka_unit_test(transportCreateSyslogReturnsValidPtrInHappyPath),
-        cmocka_unit_test(transportCreateShmReturnsValidPtrInHappyPath),
         cmocka_unit_test(transportDestroyNullTransportDoesNothing),
         cmocka_unit_test(transportSendForNullTransportDoesNothing),
         cmocka_unit_test(transportSendForNullMessageDoesNothing),
-        cmocka_unit_test(transportSendForUnimplementedTransportTypesIsHarmless),
         cmocka_unit_test(transportSendForUdpTransmitsMsg),
         cmocka_unit_test(transportSendForAbstractUnixTransmitsMsg),
         cmocka_unit_test(transportSendForFilepathUnixTransmitsMsg),

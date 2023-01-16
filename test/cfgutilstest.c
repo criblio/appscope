@@ -1273,7 +1273,7 @@ cfgReadGoodYaml(void** state)
         "    level: debug                      # debug, info, warning, error, none\n"
         "    transport:\n"
         "      buffering: full\n"
-        "      type: syslog\n"
+        "      type: edge\n"
         "tags:\n"
         "  name1: value1\n"
         "  name2: value2\n"
@@ -1324,7 +1324,7 @@ cfgReadGoodYaml(void** state)
     assert_string_equal(cfgTransportPort(config, CFG_CTL), "9009");
     assert_null(cfgTransportPath(config, CFG_CTL));
     assert_int_equal(cfgTransportBuf(config, CFG_CTL), CFG_BUFFER_LINE);
-    assert_int_equal(cfgTransportType(config, CFG_LOG), CFG_SYSLOG);
+    assert_int_equal(cfgTransportType(config, CFG_LOG), CFG_EDGE);
     assert_null(cfgTransportHost(config, CFG_LOG));
     assert_null(cfgTransportPort(config, CFG_LOG));
     assert_string_equal(cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
@@ -1391,13 +1391,9 @@ cfgReadEveryTransportType(void** state)
     const char* file_str =
         "    type: file\n"
         "    path: '/var/log/scope.log'\n";
-    const char* syslog_str =
-        "    type: syslog\n";
-    const char* shm_str =
-        "    type: shm\n";
     const char* edge_str =
         "    type: edge\n";
-    const char* transport_lines[] = {udp_str, unix_str, file_str, syslog_str, shm_str, edge_str};
+    const char* transport_lines[] = {udp_str, unix_str, file_str, edge_str};
 
     const char* path = CFG_FILE_NAME;
 
@@ -1419,10 +1415,6 @@ cfgReadEveryTransportType(void** state)
         } else if (transport_lines[i] == file_str) {
                 assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_FILE);
                 assert_string_equal(cfgTransportPath(config, CFG_MTC), "/var/log/scope.log");
-        } else if (transport_lines[i] == syslog_str) {
-                assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_SYSLOG);
-        } else if (transport_lines[i] == shm_str) {
-                assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_SHM);
         } else if (transport_lines[i] == edge_str) {
                 assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_EDGE);
         }
@@ -1513,7 +1505,7 @@ const char* jsonText =
     "    'log': {\n"
     "      'level': 'debug',\n"
     "      'transport': {\n"
-    "        'type': 'shm'\n"
+    "        'type': 'edge'\n"
     "      }\n"
     "    }\n"
     "  },\n"
@@ -1528,7 +1520,7 @@ const char* jsonText =
     "  'cribl': {\n"
     "    'enable': 'false',\n"
     "    'transport': {\n"
-    "      'type': 'shm'\n"
+    "      'type': 'edge'\n"
     "    },\n"
     "    'authtoken': 'shhdonotsharethistokenwithjustanyone'\n"
     "  }\n"
@@ -1574,7 +1566,7 @@ cfgReadGoodJson(void** state)
     assert_string_equal(cfgTransportHost(config, CFG_CTL), "127.0.0.1");
     assert_string_equal(cfgTransportPort(config, CFG_CTL), "9109");
     assert_string_equal(cfgTransportPath(config, CFG_CTL), "/var/log/event.log");
-    assert_int_equal(cfgTransportType(config, CFG_LOG), CFG_SHM);
+    assert_int_equal(cfgTransportType(config, CFG_LOG), CFG_EDGE);
     assert_null(cfgTransportHost(config, CFG_LOG));
     assert_null(cfgTransportPort(config, CFG_LOG));
     assert_string_equal(cfgTransportPath(config, CFG_LOG), "/tmp/scope.log");
@@ -1593,7 +1585,7 @@ cfgReadGoodJson(void** state)
     assert_string_equal(prot->protname, "eg1");
 
     assert_int_equal       (cfgLogStreamEnable(config), FALSE);
-    assert_int_equal       (cfgTransportType(config, CFG_LS), CFG_SHM);
+    assert_int_equal       (cfgTransportType(config, CFG_LS), CFG_EDGE);
     assert_string_equal    (cfgAuthToken(config), "shhdonotsharethistokenwithjustanyone");
 
     cfgDestroy(&config);
@@ -1715,7 +1707,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "    type : ndjson\n"
         "  enable : false\n"
         "  transport:\n"
-        "    type: syslog                    # udp, unix, file, syslog\n"
+        "    type: edge                    # udp, unix, file, edge\n"
         "    host: 127.0.0.2\n"
         "    port: 9009\n"
         "    buffering: line\n"
@@ -1766,7 +1758,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_NET), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_FS), 1);
     assert_int_equal(cfgEvtFormatSourceEnabled(config, CFG_SRC_DNS), 1);
-    assert_int_equal(cfgTransportType(config, CFG_CTL), CFG_SYSLOG);
+    assert_int_equal(cfgTransportType(config, CFG_CTL), CFG_EDGE);
     assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_UNIX);
     assert_string_equal(cfgTransportPath(config, CFG_MTC), "@scope.sock");
     assert_non_null(cfgCustomTags(config));
@@ -1955,7 +1947,7 @@ initLogReturnsPtr(void** state)
     assert_non_null(cfg);
 
     cfg_transport_t t;
-    for (t=CFG_UDP; t<=CFG_SHM; t++) {
+    for (t=CFG_UDP; t<=CFG_EDGE; t++) {
 	    switch (t) {
             case CFG_UDP:
                 cfgTransportTypeSet(cfg, CFG_LOG, t);
@@ -1968,8 +1960,6 @@ initLogReturnsPtr(void** state)
             case CFG_FILE:
 				cfgTransportPathSet(cfg, CFG_LOG, "/tmp/scope.log");
                 break;
-            case CFG_SYSLOG:
-            case CFG_SHM:
             case CFG_TCP:
             case CFG_EDGE:
                 break;
@@ -1989,7 +1979,7 @@ initMtcReturnsPtr(void** state)
     assert_non_null(cfg);
 
     cfg_transport_t t;
-    for (t=CFG_UDP; t<=CFG_SHM; t++) {
+    for (t=CFG_UDP; t<=CFG_EDGE; t++) {
         cfgTransportTypeSet(cfg, CFG_MTC, t);
         if (t == CFG_UNIX) {
             cfgTransportPathSet(cfg, CFG_MTC, "@scope.sock");

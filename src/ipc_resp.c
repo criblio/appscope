@@ -180,9 +180,8 @@ ipcRespSetScopeCfg(const cJSON *scopeReq) {
 
 /*
  * The statusFunc is function responsible to retrieve transport status for each interface
- * TODO: this type of function should be placeholder for :transportConnectionStatus"
  */
-typedef void (*interfaceStatusFunc)(void);
+typedef transport_status_t (*interfaceStatusFunc)(void);
 
 /*
  * singleInterface is structure contains the interface object
@@ -195,48 +194,40 @@ struct singleInterface {
 /*
  * logStatus retrieves the status of "log" interface
  */
-static void
+static transport_status_t
 logStatus(void) {
-    // TODO: provide real function for this
-    int res = logNeedsConnection(g_log);
-    (void)(res);
+    return logConnectionStatus(g_log);
 }
 
 /*
  * metricsStatus retrieves the status of "metric" interface
  */
-static void
+static transport_status_t
 metricsStatus(void) {
-    // TODO: replace this function with mtcLogConnectionStatus alternative without log :) 
-    int res = mtcNeedsConnection(g_mtc);
-    (void)(res);
+    return mtcConnectionStatus(g_mtc);
 }
 
 /*
  * eventsStatus retrieves the status of "events" interface
  */
-static void
+static transport_status_t
 eventsStatus(void) {
-    // TODO: replace this function with ctlLogConnectionStatus(g_ctl, CFG_CTL) alternative without log :) 
-    int res = ctlNeedsConnection(g_ctl, CFG_CTL);
-    (void)(res);
+    return ctlConnectionStatus(g_ctl, CFG_CTL);
 }
 
 /*
  * payloadStatus retrieves the status of "payload" interface
  */
-static void
+static transport_status_t
 payloadStatus(void) {
-    // TODO: replace this function with ctlLogConnectionStatus(g_ctl, CFG_LS) alternative without log :) 
-    int res = ctlNeedsConnection(g_ctl, CFG_LS);
-    (void)(res);
+    return ctlConnectionStatus(g_ctl, CFG_LS);
 }
 
 static const
 struct singleInterface scope_interfaces[] = {
-    {.name = "log",  .statuscheck = logStatus},
-    {.name = "metrics",.statuscheck = metricsStatus},
-    {.name = "events", .statuscheck = eventsStatus},
+    {.name = "log",     .statuscheck = logStatus},
+    {.name = "metrics", .statuscheck = metricsStatus},
+    {.name = "events",  .statuscheck = eventsStatus},
     {.name = "payload", .statuscheck = payloadStatus},
 };
 
@@ -272,12 +263,37 @@ ipcRespGetTransportStatus(const cJSON *unused) {
             goto allocFail;
         }
 
-        if (cJSON_AddStringToObject(singleChannel, "name", scope_interfaces[index].name) == NULL) {
+        if (!cJSON_AddStringToObject(singleChannel, "name", scope_interfaces[index].name)) {
             goto allocFail;
         }
 
-        // TODO: here should be created CJSON transport status
-        scope_interfaces[index].statuscheck();
+        transport_status_t status = scope_interfaces[index].statuscheck();
+
+        // TODO: handle this correctly - this if for payload since transport there is empty
+        if (status.configString) {
+            if (!cJSON_AddStringToObject(singleChannel, "config", status.configString)) {
+                goto allocFail;
+            }
+            if (status.isConnected == TRUE) {
+                if (!cJSON_AddTrueToObject(singleChannel, "connected")) {
+                    goto allocFail;
+                }
+            } else {
+                if (!cJSON_AddFalseToObject(singleChannel, "connected")) {
+                    goto allocFail;
+                }
+                if (!cJSON_AddNumberToObject(singleChannel, "attempts", status.connectAttemptCount)) {
+                    goto allocFail;
+                }
+
+                // TODO: Add failure string always ?
+                if (status.failureString) {
+                    if (!cJSON_AddStringToObject(singleChannel, "failure_details", status.failureString)) {
+                        goto allocFail;
+                    }
+                }
+            }
+        }
 
         cJSON_AddItemToArray(channels, singleChannel);
     }

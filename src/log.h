@@ -13,6 +13,7 @@ void                logDestroy(log_t**);
 int                 logSend(log_t*, const char* msg, cfg_log_level_t level);
 cfg_log_level_t     logLevel(log_t*);
 void                logFlush(log_t*);
+transport_status_t  logConnectionStatus(log_t *);
 
 // Setters (modifies log_t, but does not persist modifications)
 int                 logNeedsConnection(log_t*);

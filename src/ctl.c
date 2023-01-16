@@ -1230,6 +1230,11 @@ ctlLogConnectionStatus(ctl_t *ctl, which_transport_t who)
         transportLogConnectionStatus(ctl->transport, "event");
 }
 
+transport_status_t ctlConnectionStatus(ctl_t *ctl, which_transport_t who) {
+    return (who == CFG_LS) ?
+        transportConnectionStatus(ctl->paytrans) :
+        transportConnectionStatus(ctl->transport);
+}
 
 bool
 ctlEvtSourceEnabled(ctl_t *ctl, watch_t src)

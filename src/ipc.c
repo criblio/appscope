@@ -68,7 +68,7 @@ translateParseStatusToResp(req_parse_status_t status) {
 /*
  * ipc_scope_req_t describes the scope request command retrieves from IPC communication
  * IMPORTANT NOTE:
- * ipc_scope_req_t must be inline with client: scopeReqCmd (without unk)
+ * ipc_scope_req_t must be inline with client: scopeReqCmd
  */
 typedef enum {
     // TODO: the first message should be get supported cmd introduced in: 1.3.0

@@ -74,6 +74,14 @@ type CmdGetScopeStatus struct {
 type ChannelDesc []struct {
 	// Name of channel
 	Name string `mapstructure:"name" json:"name" yaml:"name"`
+	// Status of connection
+	Connected bool `mapstructure:"connected,omitempty" json:"connected,omitempty" yaml:"connected,omitempty"`
+	// Description of connection
+	Config string `mapstructure:"config,omitempty" json:"config,omitempty" yaml:"config,omitempty"`
+	// Attempts in case of failure
+	Attempts int `mapstructure:"attempts,omitempty" json:"attempts,omitempty" yaml:"attempts,omitempty"`
+	// Attempts in case of failure
+	FailureDetails string `mapstructure:"failure_details,omitempty" json:"failure_details,omitempty" yaml:"failure_details,omitempty"`
 }
 
 // Must be inline with server, see: ipcRespGetTransportStatus

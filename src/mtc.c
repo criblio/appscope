@@ -80,6 +80,11 @@ mtcLogConnectionStatus(mtc_t *mtc)
     transportLogConnectionStatus(mtc->transport, "metric");
 }
 
+transport_status_t
+mtcConnectionStatus(mtc_t *mtc) {
+    return transportConnectionStatus(mtc->transport);
+}
+
 int
 mtcNeedsConnection(mtc_t *mtc)
 {

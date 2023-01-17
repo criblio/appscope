@@ -66,7 +66,7 @@ mtcSendForNullMessageDoesntCrash(void** state)
 {
     mtc_t* mtc = mtcCreate();
     assert_non_null(mtc);
-    transport_t* t = transportCreateSyslog();
+    transport_t* t = transportCreateUnix("/var/run/scope.sock");
     assert_non_null(t);
     mtcTransportSet(mtc, t);
     assert_int_equal(mtcSend(mtc, NULL), -1);
@@ -81,14 +81,10 @@ mtcTransportSetAndMtcSend(void** state)
     assert_non_null(mtc);
     transport_t* t1 = transportCreateUdp("127.0.0.1", "12345");
     transport_t* t2 = transportCreateUnix("/var/run/scope.sock");
-    transport_t* t3 = transportCreateSyslog();
-    transport_t* t4 = transportCreateShm();
-    transport_t* t5 = transportCreateFile(file_path, CFG_BUFFER_FULLY);
+    transport_t* t3 = transportCreateFile(file_path, CFG_BUFFER_FULLY);
     mtcTransportSet(mtc, t1);
     mtcTransportSet(mtc, t2);
     mtcTransportSet(mtc, t3);
-    mtcTransportSet(mtc, t4);
-    mtcTransportSet(mtc, t5);
 
     // Test that transport is set by testing side effects of mtcSend
     // affecting the file at file_path when connected to a file transport.

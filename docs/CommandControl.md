@@ -190,7 +190,8 @@ SetCfg request:
                 "log": {
                     "level": "debug",
                     "transport": {
-                        "type": "shm"
+                        "type": "file"
+                        "path": "/tmp/scope.log"
                     }
                 }
             }

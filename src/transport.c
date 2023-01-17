@@ -223,9 +223,6 @@ transportConnection(transport_t *trans)
             } else {
                 return -1;
             }
-        case CFG_SYSLOG:
-        case CFG_SHM:
-            break;
         default:
             DBG(NULL);
     }
@@ -273,9 +270,6 @@ transportNeedsConnection(transport_t *trans)
                 return TRUE;
             }
             return FALSE;
-        case CFG_SYSLOG:
-        case CFG_SHM:
-            break;
         default:
             DBG(NULL);
     }
@@ -553,9 +547,6 @@ transportDisconnect(transport_t *trans)
                 trans->local.sock = -1;
             }
             break;
-        case CFG_SYSLOG:
-        case CFG_SHM:
-            break;
         default:
             DBG(NULL);
     }
@@ -666,8 +657,6 @@ transportReconnect(transport_t *trans)
         case CFG_UNIX:
         case CFG_UDP:
         case CFG_FILE:
-        case CFG_SYSLOG:
-        case CFG_SHM:
         case CFG_EDGE:
             // Everything else is a no-op.  These can all share
             // the parent's transport.
@@ -1296,34 +1285,6 @@ err:
 
 }
 
-transport_t*
-transportCreateSyslog(void)
-{
-    transport_t* t = scope_calloc(1, sizeof(transport_t));
-    if (!t) {
-        DBG(NULL);
-        return NULL;
-    }
-
-    t->type = CFG_SYSLOG;
-
-    return t;
-}
-
-transport_t*
-transportCreateShm()
-{
-    transport_t* t = scope_calloc(1, sizeof(transport_t));
-    if (!t) {
-        DBG(NULL);
-        return NULL;
-    }
-
-    t->type = CFG_SHM;
-
-    return t;
-}
-
 void
 transportDestroy(transport_t **transport)
 {
@@ -1350,10 +1311,6 @@ transportDestroy(transport_t **transport)
                 // if stdout/stderr, we didn't open stream, so don't close it
                 if (trans->file.stream) scope_fclose(trans->file.stream);
             }
-            break;
-        case CFG_SYSLOG:
-            break;
-        case CFG_SHM:
             break;
         default:
             DBG("%d", trans->type);
@@ -1533,9 +1490,6 @@ transportSend(transport_t *trans, const char *msg, size_t len)
                 }
             }
             break;
-        case CFG_SYSLOG:
-        case CFG_SHM:
-            return -1;
         default:
             DBG("%d", trans->type);
             return -1;
@@ -1559,8 +1513,6 @@ transportFlush(transport_t* t)
             break;
         case CFG_UNIX:
         case CFG_EDGE:
-        case CFG_SYSLOG:
-        case CFG_SHM:
             return -1;
         default:
             DBG("%d", t->type);
@@ -1599,11 +1551,6 @@ transportLogConnectionStatus(transport_t *trans, const char *name)
             scopeLog(CFG_LOG_WARN, "%s destination (%s) not established. messages dropped: "
                  "%"PRIu64 " connection attempts: %"PRIu64, name, trans->file.path,
                  g_cbuf_drop_count, trans->connect_attempts);
-            break;
-
-        case CFG_SYSLOG:
-        case CFG_SHM:
-            // Nothing to report here
             break;
         default:
             DBG("%d", trans->type);

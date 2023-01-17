@@ -181,53 +181,87 @@ ipcRespSetScopeCfg(const cJSON *scopeReq) {
  * The statusFunc is function responsible to retrieve transport status for each interface
  */
 typedef transport_status_t (*interfaceStatusFunc)(void);
-
+typedef bool               (*interfaceEnabledFunc)(void);
 /*
  * singleInterface is structure contains the interface object
  */
 struct singleInterface {
     const char *name;
-    interfaceStatusFunc statuscheck;
+    interfaceEnabledFunc enabled;
+    interfaceStatusFunc status;
 };
 
 /*
- * logStatus retrieves the status of "log" interface
+ * logTransportEnabled retrieves status if "log" interface is enabled
+ */
+static bool
+logTransportEnabled(void) {
+    return TRUE;
+}
+
+/*
+ * logTransportStatus retrieves the status of "log" interface
  */
 static transport_status_t
-logStatus(void) {
+logTransportStatus(void) {
     return logConnectionStatus(g_log);
 }
 
 /*
- * metricsStatus retrieves the status of "metric" interface
+ * metricTransportEnabled retrieves status if "mtc" interface is enabled
+ */
+static bool
+metricTransportEnabled(void) {
+    return mtcEnabled(g_mtc);
+}
+
+/*
+ * metricsTransportStatus retrieves the status of "metric" interface
  */
 static transport_status_t
-metricsStatus(void) {
+metricsTransportStatus(void) {
     return mtcConnectionStatus(g_mtc);
 }
 
 /*
- * eventsStatus retrieves the status of "events" interface
+ * eventsTransportEnabled retrieves the status of "events" interface
+ */
+static bool
+eventsTransportEnabled(void) {
+    // TODO: FIX ME
+    return TRUE;
+}
+
+/*
+ * eventsTransportStatus retrieves the status of "events" interface
  */
 static transport_status_t
-eventsStatus(void) {
+eventsTransportStatus(void) {
     return ctlConnectionStatus(g_ctl, CFG_CTL);
 }
 
 /*
- * payloadStatus retrieves the status of "payload" interface
+ * payloadTransportEnabled retrieves status if "payload" interface is enabled
+ */
+static bool
+payloadTransportEnabled(void) {
+    return ctlPayEnable(g_ctl);
+}
+
+/*
+ * payloadTransportStatus retrieves the status of "payload" interface
  */
 static transport_status_t
-payloadStatus(void) {
+payloadTransportStatus(void) {
     return ctlConnectionStatus(g_ctl, CFG_LS);
 }
 
 static const
 struct singleInterface scope_interfaces[] = {
-    {.name = "log",     .statuscheck = logStatus},
-    {.name = "metrics", .statuscheck = metricsStatus},
-    {.name = "events",  .statuscheck = eventsStatus},
-    {.name = "payload", .statuscheck = payloadStatus},
+    {.name = "log",     .enabled = logTransportEnabled,     .status = logTransportStatus},
+    {.name = "metrics", .enabled = metricTransportEnabled,  .status = metricsTransportStatus},
+    {.name = "events",  .enabled = eventsTransportEnabled,  .status = eventsTransportStatus},
+    {.name = "payload", .enabled = payloadTransportEnabled, .status = payloadTransportStatus},
 };
 
 #define TOTAL_INTERFACES (sizeof(scope_interfaces)/sizeof(scope_interfaces[0]))
@@ -257,39 +291,42 @@ ipcRespGetTransportStatus(const cJSON *unused) {
     }
     wrap->priv = channels;
     for (int index = 0; index < TOTAL_INTERFACES; ++index){
+        // Skip preparing the interface info if it is disabled 
+        if (!scope_interfaces[index].enabled()) {
+            continue;
+        }
+
         cJSON *singleChannel = cJSON_CreateObject();
         if (!singleChannel) {
             goto allocFail;
         }
 
+        transport_status_t status = scope_interfaces[index].status();
+
         if (!cJSON_AddStringToObject(singleChannel, "name", scope_interfaces[index].name)) {
             goto allocFail;
         }
 
-        transport_status_t status = scope_interfaces[index].statuscheck();
+        if (!cJSON_AddStringToObject(singleChannel, "config", status.configString)) {
+            goto allocFail;
+        }
 
-        // TODO: handle this correctly - this if for payload since transport there is empty
-        if (status.configString) {
-            if (!cJSON_AddStringToObject(singleChannel, "config", status.configString)) {
+        if (status.isConnected == TRUE) {
+            if (!cJSON_AddTrueToObject(singleChannel, "connected")) {
                 goto allocFail;
             }
-            if (status.isConnected == TRUE) {
-                if (!cJSON_AddTrueToObject(singleChannel, "connected")) {
-                    goto allocFail;
-                }
-            } else {
-                if (!cJSON_AddFalseToObject(singleChannel, "connected")) {
-                    goto allocFail;
-                }
-                if (!cJSON_AddNumberToObject(singleChannel, "attempts", status.connectAttemptCount)) {
-                    goto allocFail;
-                }
+        } else {
+            if (!cJSON_AddFalseToObject(singleChannel, "connected")) {
+                goto allocFail;
+            }
+            if (!cJSON_AddNumberToObject(singleChannel, "attempts", status.connectAttemptCount)) {
+                goto allocFail;
+            }
 
-                // TODO: Add failure string always ?
-                if (status.failureString) {
-                    if (!cJSON_AddStringToObject(singleChannel, "failure_details", status.failureString)) {
-                        goto allocFail;
-                    }
+            // TODO: Add failure string always ?
+            if (status.failureString) {
+                if (!cJSON_AddStringToObject(singleChannel, "failure_details", status.failureString)) {
+                    goto allocFail;
                 }
             }
         }

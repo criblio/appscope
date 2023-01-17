@@ -53,15 +53,15 @@ type receiveMessageQueue struct {
 // msgQCurrentMessages retrieves Message queue current messages attribute from file descriptor
 func msgQCurrentMessages(fd int) (int, error) {
 
-	attr := &messageQueueAttributes{}
+	var attr messageQueueAttributes
 
 	// int syscall(SYS_mq_getsetattr, mqd_t mqdes, const struct mq_attr *newattr, struct mq_attr *oldattr)
 	// Details: https://man7.org/linux/man-pages/man2/mq_getsetattr.2.html
 
 	_, _, errno := unix.Syscall(unix.SYS_MQ_GETSETATTR,
-		uintptr(fd),                   // mqdes
-		uintptr(0),                    // newattr
-		uintptr(unsafe.Pointer(attr))) // oldattr
+		uintptr(fd),                    // mqdes
+		uintptr(0),                     // newattr
+		uintptr(unsafe.Pointer(&attr))) // oldattr
 
 	if errno != 0 {
 		return -1, fmt.Errorf("%v %v", errMsgQGetAttr, errno)

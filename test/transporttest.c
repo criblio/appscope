@@ -604,7 +604,7 @@ transportConnectionStatusInitialValues(void ** state)
     transport_t* t = transportCreateTCP("127.0.0.1", "54321", FALSE, FALSE, NULL);
     status = transportConnectionStatus(t);
     assert_non_null(t);
-    assert_string_equal(status.configString, "127.0.0.1:54321");
+    assert_string_equal(status.configString, "tcp://127.0.0.1:54321");
     // expects nothing to be listening on this local port
     assert_false(status.isConnected);
     assert_int_equal(status.connectAttemptCount, 1);
@@ -615,7 +615,7 @@ transportConnectionStatusInitialValues(void ** state)
     t = transportCreateUdp("myhost", "12345");
     status = transportConnectionStatus(t);
     assert_non_null(t);
-    assert_string_equal(status.configString, "myhost:12345");
+    assert_string_equal(status.configString, "udp://myhost:12345");
     // expects that DNS will not resolve myhost
     assert_false(status.isConnected);
     assert_int_equal(status.connectAttemptCount, 1);
@@ -625,7 +625,7 @@ transportConnectionStatusInitialValues(void ** state)
     t = transportCreateUdp("127.0.0.1", "22222");
     status = transportConnectionStatus(t);
     assert_non_null(t);
-    assert_string_equal(status.configString, "127.0.0.1:22222");
+    assert_string_equal(status.configString, "udp://127.0.0.1:22222");
     // UDP is connectionless, isConnected will be true as long as DNS resolves
     assert_true(status.isConnected);
     assert_int_equal(status.connectAttemptCount, 0);
@@ -637,7 +637,7 @@ transportConnectionStatusInitialValues(void ** state)
     t = transportCreateFile(path, CFG_BUFFER_LINE);
     status = transportConnectionStatus(t);
     assert_non_null(t);
-    assert_string_equal(status.configString, path);
+    assert_string_equal(status.configString, "file:///tmp/nodir/abc.log");
     // File connection fails when a directory in its path does not exist
     assert_false(status.isConnected);
     assert_int_equal(status.connectAttemptCount, 1);
@@ -648,7 +648,7 @@ transportConnectionStatusInitialValues(void ** state)
     t = transportCreateFile(path2, CFG_BUFFER_LINE);
     status = transportConnectionStatus(t);
     assert_non_null(t);
-    assert_string_equal(status.configString, path2);
+    assert_string_equal(status.configString, "file:///tmp/abc.log");
     assert_true(status.isConnected);
     assert_int_equal(status.connectAttemptCount, 0);
     assert_null(status.failureString);
@@ -662,7 +662,7 @@ transportConnectionStatusInitialValues(void ** state)
     t = transportCreateUnix(sockName);
     status = transportConnectionStatus(t);
     assert_non_null(t);
-    assert_string_equal(status.configString, sockName);
+    assert_string_equal(status.configString, "unix:///tmp/abc.sock");
     // expects that this socket does not exist
     assert_false(status.isConnected);
     assert_int_equal(status.connectAttemptCount, 1);
@@ -689,7 +689,7 @@ transportConnectionStatusInitialValues(void ** state)
     t = transportCreateUnix(sockName);
     status = transportConnectionStatus(t);
     assert_non_null(t);
-    assert_string_equal(status.configString, sockName);
+    assert_string_equal(status.configString, "unix:///tmp/abc.sock");
     // now it exists
     assert_true(status.isConnected);
     assert_int_equal(status.connectAttemptCount, 0);
@@ -703,6 +703,7 @@ transportConnectionStatusInitialValues(void ** state)
     t = transportCreateEdge();
     status = transportConnectionStatus(t);
     assert_non_null(t);
+    assert_string_equal(status.configString, "edge");
     // expects that an edge socket doesn't exist
     assert_false(status.isConnected);
     assert_int_equal(status.connectAttemptCount, 1);

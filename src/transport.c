@@ -1152,7 +1152,7 @@ transportCreateTCP(const char *host, const char *port, unsigned int enable,
     if (!trans) return trans;
 
     trans->type = CFG_TCP;
-    if (scope_asprintf(&trans->configStr, "%s:%s", host, port) < 0) {
+    if (scope_asprintf(&trans->configStr, "tcp://%s:%s", host, port) < 0) {
         trans->configStr = NULL;
     }
     trans->net.sock = -1;
@@ -1185,7 +1185,7 @@ transportCreateUdp(const char* host, const char* port)
     if (!t) return t;
 
     t->type = CFG_UDP;
-    if (scope_asprintf(&t->configStr, "%s:%s", host, port) < 0) {
+    if (scope_asprintf(&t->configStr, "udp://%s:%s", host, port) < 0) {
         t->configStr = NULL;
     }
     t->net.sock = -1;
@@ -1214,7 +1214,9 @@ transportCreateFile(const char* path, cfg_buffer_t buf_policy)
     if (!t) return NULL; 
 
     t->type = CFG_FILE;
-    t->configStr = scope_strdup(path);
+    if (scope_asprintf(&t->configStr, "file://%s", path) < 0) {
+        t->configStr = NULL;
+    }
     t->file.path = scope_strdup(path);
     if (!t->configStr || !t->file.path) {
         DBG("%s", path);
@@ -1245,7 +1247,10 @@ transportCreateUnix(const char *path)
     if (!(trans = newTransport())) goto err;
 
     trans->type = CFG_UNIX;
-    if (!(trans->configStr = scope_strdup(path))) goto err;
+    if (scope_asprintf(&trans->configStr, "unix://%s", path) < 0) {
+        trans->configStr = NULL;
+        goto err;
+    }
     trans->local.sock = -1;
     if (!(trans->local.path = scope_strdup(path))) goto err;
 
@@ -1582,11 +1587,12 @@ transportConnectionStatus(transport_t *trans)
     transportDestroy (configString).
 
     configString examples:
-        myhost:myport
-        /my/unix/path.sock
-        @abstractsockname
+        tcp://myhost:myport
+        udp://myhost:myport
+        unix:///my/unix/path.sock
+        unix://@abstractsockname
         edge
-        /my/file/path.log
+        file:///my/file/path.log
 
     failureString examples:
         see netFailMap above

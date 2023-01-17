@@ -1,7 +1,6 @@
 #define _GNU_SOURCE
 
 #include "ipc.h"
-#include "ipc_resp.h"
 #include "com.h"
 
 #include "cJSON.h"
@@ -50,6 +49,7 @@ translateParseStatusToResp(req_parse_status_t status) {
     case REQ_PARSE_ALLOCATION_ERROR:
     case REQ_PARSE_RECEIVE_ERROR:
     case REQ_PARSE_RECEIVE_TIMEOUT_ERROR:
+        DBG("%d", status);
         return IPC_RESP_SERVER_ERROR;
     case REQ_PARSE_JSON_ERROR:
     case REQ_PARSE_REQ_ERROR:
@@ -57,10 +57,11 @@ translateParseStatusToResp(req_parse_status_t status) {
     case REQ_PARSE_SCOPE_REQ_ERROR:
     case REQ_PARSE_MISSING_SCOPE_DATA_ERROR:
     case REQ_PARSE_SCOPE_SIZE_ERROR:
+        DBG("%d", status);
         return IPC_BAD_REQUEST;
     default:
         UNREACHABLE();
-        DBG(NULL);
+        DBG("%d", status);
         return IPC_RESP_SERVER_ERROR;
     }
 }
@@ -175,6 +176,26 @@ ipcIsActive(mqd_t mqdes, size_t *maxMsgSize, long *msgCount) {
     return TRUE;
 }
 
+
+/*
+ * Verify if the buffer contains NUL termination character
+ * Returns status of operation
+ */
+static bool
+msgBufIsNULTermPresent(const char* msgBuf, size_t msgLen) {
+    if (msgLen == -1) {
+        DBG(NULL);
+        return FALSE;
+    }
+
+    for(size_t i = 0; i < msgLen; ++i) {
+        if (!msgBuf[i]) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
 /*
  * Parse single frame placed in message queue.
  * Returns scope data from frame, the status of parsing the frame (parseStatus) and unique identifer of message request (uniqVal)
@@ -183,8 +204,13 @@ static char *
 ipcParseSingleFrame(const char *msgBuf, ssize_t msgLen, req_parse_status_t *parseStatus, int *uniqVal, size_t *scopeFrameLen, size_t *remainLen) {
     char *scopeMsg = NULL;
 
+    // Check if there is at least one NUL terminator
+    if (msgBufIsNULTermPresent(msgBuf, msgLen) == FALSE) {
+        *parseStatus = REQ_PARSE_JSON_ERROR;
+        goto end;
+    }
+
     // Verify if frame is based on JSON-format
-    // TODO: Bump the CJSON deps and use cJSON_ParseWithLength
     cJSON *msgJson = cJSON_Parse(msgBuf);
     if (!msgJson) {
         *parseStatus = REQ_PARSE_JSON_ERROR;

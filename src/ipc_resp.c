@@ -3,7 +3,6 @@
 #include "com.h"
 #include "ipc_resp.h"
 #include "scopestdlib.h"
-#include "cJSON.h"
 #include "runtimecfg.h"
 
 extern void doAndReplaceConfig(void *);

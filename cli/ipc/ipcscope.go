@@ -75,7 +75,7 @@ type ChannelDesc []struct {
 	// Name of channel
 	Name string `mapstructure:"name" json:"name" yaml:"name"`
 	// Status of connection
-	Connected bool `mapstructure:"connected,omitempty" json:"connected,omitempty" yaml:"connected,omitempty"`
+	Connected bool `mapstructure:"connected" json:"connected" yaml:"connected"`
 	// Description of connection
 	Config string `mapstructure:"config,omitempty" json:"config,omitempty" yaml:"config,omitempty"`
 	// Attempts in case of failure

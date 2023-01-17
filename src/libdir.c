@@ -21,7 +21,6 @@
 #include <unistd.h>
 
 #include "scopestdlib.h"
-#include "scopetypes.h" // for ROUND_UP()
 #include "nsfile.h"
 #include "libver.h"
 

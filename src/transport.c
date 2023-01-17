@@ -17,7 +17,6 @@
 
 #include "backoff.h"
 #include "dbg.h"
-#include "scopetypes.h"
 #include "os.h"
 #include "scopestdlib.h"
 #include "fn.h"

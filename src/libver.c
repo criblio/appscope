@@ -4,7 +4,6 @@
 
 #include "libver.h"
 #include "scopestdlib.h"
-#include "scopetypes.h"
 
 /*
  * Returns normalized version string

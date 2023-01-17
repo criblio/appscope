@@ -1,7 +1,6 @@
 #define _GNU_SOURCE
 
 #include "ipc.h"
-#include "ipc_resp.h"
 #include "com.h"
 
 #include "cJSON.h"

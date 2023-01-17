@@ -16,13 +16,16 @@
 #include <linux/limits.h>
 #include <mqueue.h>
 #include <sched.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+typedef unsigned int bool;
+#define TRUE 1
+#define FALSE 0
 
 #define MAX_MESSAGES 10
 #define MSG_BUFFER_SIZE 8192
@@ -41,13 +44,13 @@ getLastPidNamesSpace(int pid, int *lastNsPid, bool *nestedNs) {
 
     if (snprintf(path, sizeof(path), "/proc/%d/status", pid) < 0) {
         perror("getLastPidNamesSpace: snprintf failed");
-        return false;
+        return FALSE;
     }
 
     FILE *fstream = fopen(path, "r");
     if (fstream == NULL) {
         perror("getLastPidNamesSpace: fopen failed");
-        return false;
+        return FALSE;
     }
 
     while (fgets(buffer, sizeof(buffer), fstream)) {
@@ -69,16 +72,16 @@ getLastPidNamesSpace(int pid, int *lastNsPid, bool *nestedNs) {
     }
 
     if (nsDepth > 1) {
-        *nestedNs = true;
+        *nestedNs = TRUE;
         *lastNsPid = tempNsPid;
     } else {
-        *nestedNs = false;
+        *nestedNs = FALSE;
         *lastNsPid = pid;
     }
 
     fclose(fstream);
 
-    return true;
+    return TRUE;
 }
 
 static bool
@@ -87,23 +90,23 @@ switchIPCNamespace(int pid) {
     int nsFd;
     if (snprintf(nsPath, sizeof(nsPath), "/proc/%d/ns/ipc", pid) < 0) {
         perror("setNamespace: snprintf failed");
-        return false;
+        return FALSE;
     }
 
     if ((nsFd = open(nsPath, O_RDONLY)) == -1) {
         perror("setNamespace: open failed");
-        return false;
+        return FALSE;
     }
 
     if (setns(nsFd, 0) != 0) {
         perror("setNamespace: setns failed");
         close(nsFd);
-        return false;
+        return FALSE;
     }
 
     close(nsFd);
 
-    return true;
+    return TRUE;
 }
 
 static void
@@ -138,8 +141,8 @@ int main(int argc, char **argv) {
                                .mq_curmsgs = 0};
     mode_t oldMask;
     int res = EXIT_FAILURE;
-    bool ipcSwitch = false;
-    bool nestedNs = false;
+    bool ipcSwitch = FALSE;
+    bool nestedNs = FALSE;
     int pid = -1;
     int nsPid = -1;
     int c;
@@ -150,7 +153,7 @@ int main(int argc, char **argv) {
                 return printRlimitAndExit();
                 break;
             case 'i':
-                ipcSwitch = true;
+                ipcSwitch = TRUE;
                 break;
             case 'p':
                 pid = atoi(optarg);
@@ -171,7 +174,7 @@ int main(int argc, char **argv) {
     if (pid == -1) {
         return printUsageAndExit(argv[0]);
     }
-    if (getLastPidNamesSpace(pid, &nsPid, &nestedNs) == false) {
+    if (getLastPidNamesSpace(pid, &nsPid, &nestedNs) == FALSE) {
         return printUsageAndExit(argv[0]);
     }
 

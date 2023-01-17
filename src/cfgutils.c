@@ -107,8 +107,6 @@ enum_map_t transportTypeMap[] = {
     {"tcp",                   CFG_TCP},
     {"unix",                  CFG_UNIX},
     {"file",                  CFG_FILE},
-    {"syslog",                CFG_SYSLOG},
-    {"shm",                   CFG_SHM},
     {"edge",                  CFG_EDGE},
     {NULL,                   -1}
 };
@@ -2220,8 +2218,6 @@ createTransportJson(config_t* cfg, which_transport_t trans)
             if (!cJSON_AddStringToObjLN(root, BUFFERING_NODE,
                  valToStr(bufferMap, cfgTransportBuf(cfg, trans)))) goto err;
             break;
-        case CFG_SYSLOG:
-        case CFG_SHM:
         case CFG_EDGE:
             break;
         default:
@@ -2634,9 +2630,6 @@ initTransport(config_t* cfg, which_transport_t t)
     transport_t* transport = NULL;
 
     switch (cfgTransportType(cfg, t)) {
-        case CFG_SYSLOG:
-            transport = transportCreateSyslog();
-            break;
         case CFG_FILE:
             transport = transportCreateFile(cfgTransportPath(cfg, t), cfgTransportBuf(cfg,t));
             break;
@@ -2656,9 +2649,6 @@ initTransport(config_t* cfg, which_transport_t t)
                                            cfgTransportTlsEnable(cfg, t),
                                            cfgTransportTlsValidateServer(cfg, t),
                                            cfgTransportTlsCACertPath(cfg, t));
-            break;
-        case CFG_SHM:
-            transport = transportCreateShm();
             break;
         default:
             DBG("%d", cfgTransportType(cfg, t));

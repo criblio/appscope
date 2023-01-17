@@ -1220,16 +1220,6 @@ ctlEvtGet(ctl_t *ctl)
     return ctl ? ctl->evt : NULL;
 }
 
-void
-ctlLogConnectionStatus(ctl_t *ctl, which_transport_t who)
-{
-    if (!ctl) return;
-
-    return (who == CFG_LS) ?
-        transportLogConnectionStatus(ctl->paytrans, "payload") :
-        transportLogConnectionStatus(ctl->transport, "event");
-}
-
 transport_status_t
 ctlConnectionStatus(ctl_t *ctl, which_transport_t who) {
     return (who == CFG_LS) ?

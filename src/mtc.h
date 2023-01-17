@@ -15,7 +15,6 @@ unsigned            mtcEnabled(mtc_t*);
 int                 mtcSend(mtc_t*, const char* msg);
 int                 mtcSendMetric(mtc_t*, event_t*);
 void                mtcFlush(mtc_t*);
-void                mtcLogConnectionStatus(mtc_t *);
 transport_status_t  mtcConnectionStatus(mtc_t *);
 
 // Setters (modifies mtc_t, but does not persist modifications)

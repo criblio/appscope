@@ -1539,53 +1539,11 @@ transportFlush(transport_t* t)
     return 0;
 }
 
-void
-transportLogConnectionStatus(transport_t *trans, const char *name)
-{
-    if (!trans || !name) {
-        DBG(NULL);
-        return;
-    }
-
-    switch (trans->type) {
-        case CFG_TCP:
-        case CFG_UDP:
-            scopeLog(CFG_LOG_WARN, "%s destination (%s:%s) not connected. messages dropped: "
-                "%"PRIu64 " connection attempts: %"PRIu64 " reason for failure: %s",
-                name, trans->net.host, trans->net.port, g_cbuf_drop_count,
-                trans->connect_attempts, netFailMap[trans->net.failure_reason]);
-            break;
-        case CFG_UNIX:
-            scopeLog(CFG_LOG_WARN, "%s destination (%s) not connected. messages dropped: "
-                 "%"PRIu64 " connection attempts: %"PRIu64, name, trans->local.path,
-                 g_cbuf_drop_count, trans->connect_attempts);
-            break;
-        case CFG_EDGE:
-            scopeLog(CFG_LOG_WARN, "%s destination (edge) not connected. messages dropped: "
-                 "%"PRIu64 " connection attempts: %"PRIu64, name,
-                 g_cbuf_drop_count, trans->connect_attempts);
-            break;
-        case CFG_FILE:
-            scopeLog(CFG_LOG_WARN, "%s destination (%s) not established. messages dropped: "
-                 "%"PRIu64 " connection attempts: %"PRIu64, name, trans->file.path,
-                 g_cbuf_drop_count, trans->connect_attempts);
-            break;
-        default:
-            DBG("%d", trans->type);
-    }
-
-}
-
 transport_status_t
 transportConnectionStatus(transport_t *trans)
 {
 
 /*
-    My plan is to have all of these strings either be static
-    (failureString) or constructed as part of the transport at
-    transport creation time and never modified until the eventual
-    transportDestroy (configString).
-
     configString examples:
         tcp://myhost:myport
         udp://myhost:myport
@@ -1596,10 +1554,6 @@ transportConnectionStatus(transport_t *trans)
 
     failureString examples:
         see netFailMap above
-
-    g_cbuf_drop_count is deliberately not part of this structure...
-    it's available independently and should probably be part of
-    a status of queues (when we do this in the future) instead???
 */
 
     if (!trans) {

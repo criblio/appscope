@@ -73,14 +73,6 @@ mtcFlush(mtc_t *mtc)
     transportFlush(mtc->transport);
 }
 
-void
-mtcLogConnectionStatus(mtc_t *mtc)
-{
-    if (!mtc || (cfgLogStreamEnable(g_cfg.staticfg))) return;
-
-    transportLogConnectionStatus(mtc->transport, "metric");
-}
-
 transport_status_t
 mtcConnectionStatus(mtc_t *mtc) {
     return transportConnectionStatus(mtc->transport);

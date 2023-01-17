@@ -7,7 +7,7 @@ typedef struct {
     const char *configString;
     bool isConnected;
 
-    unsigned connectAttemptCount;   // Useful if isConnected is false
+    uint64_t connectAttemptCount;   // Useful if isConnected is false
     const char *failureString;      // may be provided when isConnected is false
 } transport_status_t;
 
@@ -34,7 +34,6 @@ int                 transportDisconnect(transport_t *);
 int                 transportReconnect(transport_t *);
 cfg_transport_t     transportType(transport_t *);
 bool                transportSupportsCommandControl(transport_t *);
-void                transportLogConnectionStatus(transport_t *, const char *);
 transport_status_t  transportConnectionStatus(transport_t *);
 
 // Misc

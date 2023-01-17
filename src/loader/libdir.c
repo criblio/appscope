@@ -123,7 +123,6 @@ getAsset(libdirfile_t objFileType, unsigned char **start)
         case LIBRARY_FILE:
             if ((libsym = getSymbol(ebuf->buf, LIBSCOPE))) {
                 libptr = (unsigned char *)*libsym;
-                printf("%s:%d libaddr addr %p\n", __FUNCTION__, __LINE__, libptr);
             } else {
                 fprintf(stderr, "%s:%d no addr for _buildLibscopeSo\n", __FUNCTION__, __LINE__);
                 goto out;

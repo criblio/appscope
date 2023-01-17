@@ -105,8 +105,6 @@ __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **
        exit(EXIT_FAILURE);
     }
 
-    printf("%s:%d %s %ld %ld\n", __FUNCTION__, __LINE__, LIBSCOPE_SO_SIZE, g_libscopesz, g_scopedynsz);
-
     for (;;) {
         index = 0;
         int opt = getopt_long(argc, argv, "+:a:d:n:l:p:c:s:rxvwz", opts, &index);

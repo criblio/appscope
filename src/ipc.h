@@ -5,7 +5,6 @@
 #include "scopetypes.h"
 #include "ipc_resp.h"
 
-
 /*
  *  Manage Inter-process connection
  */

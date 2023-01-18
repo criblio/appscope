@@ -231,7 +231,7 @@ metricsTransportStatus(void) {
  */
 static bool
 eventsTransportEnabled(void) {
-    return TRUE;
+    return cfgEvtEnable(g_cfg.staticfg);
 }
 
 /*

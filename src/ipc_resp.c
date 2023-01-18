@@ -324,19 +324,28 @@ logTransportStatus(void) {
 }
 
 /*
- * metricTransportEnabled retrieves status if "mtc" interface is enabled
+ * payloadTransportEnabled retrieves status if "payload" interface is enabled
  */
 static bool
-metricTransportEnabled(void) {
-    return mtcEnabled(g_mtc);
+payloadTransportEnabled(void) {
+    return ctlPayEnable(g_ctl);
 }
 
 /*
- * metricsTransportStatus retrieves the status of "metric" interface
+ * payloadTransportStatus retrieves the status of "payload" interface
  */
 static transport_status_t
-metricsTransportStatus(void) {
-    return mtcConnectionStatus(g_mtc);
+payloadTransportStatus(void) {
+    // TODO: Fix me recognize the payload dir and payload stream
+    return ctlConnectionStatus(g_ctl, CFG_LS);
+}
+
+/*
+ * criblTransportEnabled retrieves status if "cribl" interface is enabled
+ */
+static bool
+criblTransportEnabled(void) {
+    return cfgLogStreamEnable(g_cfg.staticfg);
 }
 
 /*
@@ -356,30 +365,40 @@ eventsTransportStatus(void) {
 }
 
 /*
- * payloadTransportEnabled retrieves status if "payload" interface is enabled
+ * metricTransportEnabled retrieves status if "metric" interface is enabled
  */
 static bool
-payloadTransportEnabled(void) {
-    return ctlPayEnable(g_ctl);
+metricTransportEnabled(void) {
+    return mtcEnabled(g_mtc);
 }
 
 /*
- * payloadTransportStatus retrieves the status of "payload" interface
+ * metricsTransportStatus retrieves the status of "metric" interface
  */
 static transport_status_t
-payloadTransportStatus(void) {
-    return ctlConnectionStatus(g_ctl, CFG_LS);
+metricsTransportStatus(void) {
+    return mtcConnectionStatus(g_mtc);
 }
+
+// Used for interface indexes!  Don't change the numbers!
+enum InterfaceId {
+    INDEX_LOG     = 0,
+    INDEX_PAYLOAD = 1,
+    INDEX_CRIBL   = 2,
+    INDEX_EVENTS  = 3,
+    INDEX_METRICS = 4,
+};
 
 static const
 struct singleInterface scope_interfaces[] = {
-    {.name = "log",     .enabled = logTransportEnabled,     .status = logTransportStatus},
-    {.name = "metrics", .enabled = metricTransportEnabled,  .status = metricsTransportStatus},
-    {.name = "events",  .enabled = eventsTransportEnabled,  .status = eventsTransportStatus},
-    {.name = "payload", .enabled = payloadTransportEnabled, .status = payloadTransportStatus},
+    [INDEX_LOG]     = {.name = "log",     .enabled = logTransportEnabled,     .status = logTransportStatus},
+    [INDEX_PAYLOAD] = {.name = "payload", .enabled = payloadTransportEnabled, .status = payloadTransportStatus},
+    [INDEX_CRIBL]   = {.name = "cribl",   .enabled = criblTransportEnabled,   .status = eventsTransportStatus},
+    [INDEX_EVENTS]  = {.name = "events",  .enabled = eventsTransportEnabled,  .status = eventsTransportStatus},
+    [INDEX_METRICS] = {.name = "metrics", .enabled = metricTransportEnabled,  .status = metricsTransportStatus},
 };
 
-#define TOTAL_INTERFACES (sizeof(scope_interfaces)/sizeof(scope_interfaces[0]))
+#define INTERFACES_SIZE  (ARRAY_SIZE(scope_interfaces))
 
 /*
  * Creates the wrapper for response to IPC_CMD_GET_TRANSPORT_STATUS
@@ -405,10 +424,16 @@ ipcRespGetTransportStatus(const cJSON *unused) {
         goto allocFail;
     }
     wrap->priv[0] = interfaces;
-    for (int index = 0; index < TOTAL_INTERFACES; ++index){
+    for (int index = 0; index < INTERFACES_SIZE; ++index) {
+        int interfaceIndex = index;
         // Skip preparing the interface info if it is disabled 
-        if (!scope_interfaces[index].enabled()) {
+        if (!scope_interfaces[interfaceIndex].enabled()) {
             continue;
+        }
+
+        // if the cribl is last one there is no point to handle events and metrics
+        if (interfaceIndex == INDEX_CRIBL) {
+            index = INTERFACES_SIZE;
         }
 
         cJSON *singleInterface = cJSON_CreateObject();
@@ -416,9 +441,9 @@ ipcRespGetTransportStatus(const cJSON *unused) {
             goto allocFail;
         }
 
-        transport_status_t status = scope_interfaces[index].status();
+        transport_status_t status = scope_interfaces[interfaceIndex].status();
 
-        if (!cJSON_AddStringToObject(singleInterface, "name", scope_interfaces[index].name)) {
+        if (!cJSON_AddStringToObject(singleInterface, "name", scope_interfaces[interfaceIndex].name)) {
             goto allocFail;
         }
 
@@ -438,7 +463,6 @@ ipcRespGetTransportStatus(const cJSON *unused) {
                 goto allocFail;
             }
 
-            // TODO: Add failure string always ?
             if (status.failureString) {
                 if (!cJSON_AddStringToObject(singleInterface, "failure_details", status.failureString)) {
                     goto allocFail;

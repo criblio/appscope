@@ -30,11 +30,15 @@ jobs:
       - name: "Build schema-reference.md"
         run: make docs-generate
 
+      - name: configure AWS creds
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.APPSCOPEDEPLOYROLE }}
+          role-session-name: appscope-deploy
+          aws-region: us-west-2
+
       - name: "Website Deploy"
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
           STAGING_GATSBY_ALGOLIA_APP_ID: ${{ secrets.STAGING_GATSBY_ALGOLIA_APP_ID }}
           STAGING_GATSBY_ALGOLIA_SEARCH_KEY: ${{ secrets.STAGING_GATSBY_ALGOLIA_SEARCH_KEY }}
           STAGING_GATSBY_ALGOLIA_WRITE_KEY: ${{ secrets.STAGING_GATSBY_ALGOLIA_WRITE_KEY }}

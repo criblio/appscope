@@ -11,7 +11,7 @@ var errInspectCfg = errors.New("error inspect cfg")
 
 type inspectOutput struct {
 	Cfg  ipc.ScopeGetCfgResponseCfg `mapstructure:"cfg" json:"cfg" yaml:"cfg"`
-	Desc ipc.ChannelDesc            `mapstructure:"channels" json:"channels" yaml:"channels"`
+	Desc ipc.ScopeInterfaceDesc     `mapstructure:"interfaces" json:"interfaces" yaml:"interfaces"`
 }
 
 // InspectScopeCfg returns the configuration of scoped process
@@ -48,7 +48,7 @@ func InspectScopeCfg(pidCtx ipc.IpcPidCtx) (string, error) {
 
 	summary := inspectOutput{
 		Cfg:  cmdGetCfg.Response.Cfg,
-		Desc: cmdGetTransportStatus.Response.Channels,
+		Desc: cmdGetTransportStatus.Response.Interfaces,
 	}
 
 	sumPrint, err := json.MarshalIndent(summary, "", "   ")

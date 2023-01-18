@@ -12,7 +12,7 @@ extern ctl_t *g_ctl;
 
 // Wrapper for scope message response
 struct scopeRespWrapper{
-    cJSON *resp;        // Scope mesage response
+    cJSON *resp;        // Scope message response
     void *priv;         // Additional resource allocated to create response
 };
 
@@ -178,10 +178,13 @@ ipcRespSetScopeCfg(const cJSON *scopeReq) {
 }
 
 /*
- * The statusFunc is function responsible to retrieve transport status for each interface
+ * The interface*Func are functions accessors definitions, used to retrieve information about:
+ * - enablement of specific interface
+ * - transport status of specific interface
  */
 typedef transport_status_t (*interfaceStatusFunc)(void);
 typedef bool               (*interfaceEnabledFunc)(void);
+
 /*
  * singleInterface is structure contains the interface object
  */
@@ -228,7 +231,6 @@ metricsTransportStatus(void) {
  */
 static bool
 eventsTransportEnabled(void) {
-    // TODO: FIX ME
     return TRUE;
 }
 
@@ -285,55 +287,55 @@ ipcRespGetTransportStatus(const cJSON *unused) {
         goto allocFail;
     }
 
-    cJSON *channels = cJSON_CreateArray();
-    if (!channels) {
+    cJSON *interfaces = cJSON_CreateArray();
+    if (!interfaces) {
         goto allocFail;
     }
-    wrap->priv = channels;
+    wrap->priv = interfaces;
     for (int index = 0; index < TOTAL_INTERFACES; ++index){
         // Skip preparing the interface info if it is disabled 
         if (!scope_interfaces[index].enabled()) {
             continue;
         }
 
-        cJSON *singleChannel = cJSON_CreateObject();
-        if (!singleChannel) {
+        cJSON *singleInterface = cJSON_CreateObject();
+        if (!singleInterface) {
             goto allocFail;
         }
 
         transport_status_t status = scope_interfaces[index].status();
 
-        if (!cJSON_AddStringToObject(singleChannel, "name", scope_interfaces[index].name)) {
+        if (!cJSON_AddStringToObject(singleInterface, "name", scope_interfaces[index].name)) {
             goto allocFail;
         }
 
-        if (!cJSON_AddStringToObject(singleChannel, "config", status.configString)) {
+        if (!cJSON_AddStringToObject(singleInterface, "config", status.configString)) {
             goto allocFail;
         }
 
         if (status.isConnected == TRUE) {
-            if (!cJSON_AddTrueToObject(singleChannel, "connected")) {
+            if (!cJSON_AddTrueToObject(singleInterface, "connected")) {
                 goto allocFail;
             }
         } else {
-            if (!cJSON_AddFalseToObject(singleChannel, "connected")) {
+            if (!cJSON_AddFalseToObject(singleInterface, "connected")) {
                 goto allocFail;
             }
-            if (!cJSON_AddNumberToObject(singleChannel, "attempts", status.connectAttemptCount)) {
+            if (!cJSON_AddNumberToObject(singleInterface, "attempts", status.connectAttemptCount)) {
                 goto allocFail;
             }
 
             // TODO: Add failure string always ?
             if (status.failureString) {
-                if (!cJSON_AddStringToObject(singleChannel, "failure_details", status.failureString)) {
+                if (!cJSON_AddStringToObject(singleInterface, "failure_details", status.failureString)) {
                     goto allocFail;
                 }
             }
         }
 
-        cJSON_AddItemToArray(channels, singleChannel);
+        cJSON_AddItemToArray(interfaces, singleInterface);
     }
-    cJSON_AddItemToObjectCS(resp, "channels", channels);
+    cJSON_AddItemToObjectCS(resp, "interfaces", interfaces);
     return wrap;
 
 allocFail:

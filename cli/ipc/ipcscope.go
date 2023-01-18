@@ -70,8 +70,8 @@ type CmdGetScopeStatus struct {
 	Response scopeGetStatusResponse
 }
 
-// ChannelDesc describes
-type ChannelDesc []struct {
+// ScopeInterfaceDesc describes single scope interface (Possible interfaces are "logs"/"events"/"metrics"/"payload")
+type ScopeInterfaceDesc []struct {
 	// Name of channel
 	Name string `mapstructure:"name" json:"name" yaml:"name"`
 	// Status of connection
@@ -88,8 +88,8 @@ type ChannelDesc []struct {
 type scopeGetTransportStatusResponse struct {
 	// Response status
 	Status *respStatus `mapstructure:"status" json:"status" yaml:"status"`
-	// Channel description
-	Channels ChannelDesc `mapstructure:"channels" json:"channels" yaml:"channels"`
+	// Interface description
+	Interfaces ScopeInterfaceDesc `mapstructure:"interfaces" json:"interfaces" yaml:"interfaces"`
 }
 
 func (cmd *CmdGetScopeStatus) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error) {

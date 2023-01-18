@@ -60,6 +60,9 @@ jobs:
   update-cdn-latest:
     name: Update CDN Latest
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     needs: info
     steps:
       - name: configure AWS creds

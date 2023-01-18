@@ -383,7 +383,7 @@ jobs:
       - name: configure AWS creds
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          role-to-assume: arn:aws:iam::165926643534:role/AppScope-Deploy
+          role-to-assume: ${{ secrets.APPSCOPEDEPLOYROLE }}
           role-session-name: appscope-deploy
           aws-region: us-west-2
       - name: Deploy

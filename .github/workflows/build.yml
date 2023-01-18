@@ -360,6 +360,9 @@ jobs:
     name: Update CDN
     needs: [info,build]
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     if: ${{ github.event_name == 'push' }}
     steps:
       # Clone the repos

@@ -1,25 +1,28 @@
 #define _GNU_SOURCE
 
 #include "com.h"
+#include "dbg.h"
 #include "ipc_resp.h"
 #include "scopestdlib.h"
 #include "runtimecfg.h"
+
+#define ARRAY_SIZE(arr) ((sizeof(arr))/(sizeof(arr[0])))
 
 static const char* cmdMetaName[] = {
     [META_REQ_JSON]         = "completeRequestJson",
     [META_REQ_JSON_PARTIAL] = "incompleteRequestJson",
 };
 
-#define CMD_META_SIZE (sizeof(cmdMetaName)/sizeof(cmdMetaName[0]))
+#define CMD_META_SIZE  (ARRAY_SIZE(cmdMetaName))
 
-// TODO add static assert against IPC_CMD_UNKNOWN
 static const char* cmdScopeName[] = {
     [IPC_CMD_GET_SUPPORTED_CMD] = "getSupportedCmd",
     [IPC_CMD_GET_SCOPE_STATUS]  = "getScopeStatus",
     [IPC_CMD_GET_SCOPE_CFG]     = "getScopeCfg",
     [IPC_CMD_SET_SCOPE_CFG]     = "setScopeCfg",
-    [IPC_CMD_UNKNOWN]           = NULL,
 };
+
+#define CMD_SCOPE_SIZE  (ARRAY_SIZE(cmdScopeName))
 
 extern void doAndReplaceConfig(void *);
 
@@ -127,6 +130,8 @@ createCmdDesc(int id, const char *name) {
  */
 scopeRespWrapper *
 ipcRespGetScopeCmds(const cJSON * unused) {
+    SCOPE_BUILD_ASSERT(IPC_CMD_UNKNOWN == CMD_SCOPE_SIZE, "cmdScopeName must be inline with ipc_scope_req_t");
+
     scopeRespWrapper *wrap = respWrapperCreate();
     if (!wrap) {
         return NULL;
@@ -161,7 +166,7 @@ ipcRespGetScopeCmds(const cJSON * unused) {
     }
 
     wrap->priv[1] = scopeCmds;
-    for (int id = 0; id < IPC_CMD_UNKNOWN; ++id){
+    for (int id = 0; id < CMD_SCOPE_SIZE; ++id){
         cJSON *singleCmd = createCmdDesc(id, cmdScopeName[id]);
         if (!singleCmd) {
             goto allocFail;

@@ -5,8 +5,10 @@ RUN apt update \
     && apt install -y \
       emacs \
       gdb \
+      jq \
       lsof \
       netcat \
+      python3 \
       vim \
     && rm -rf /var/lib/apt/lists/*
 
@@ -14,6 +16,7 @@ RUN apt update \
 COPY ./cli/test_cli.sh /opt/test/bin/test_cli.sh
 COPY ./cli/test_cli_dest.sh /opt/test/bin/test_cli_dest.sh
 COPY ./cli/test_edge.sh /opt/test/bin/test_edge.sh
+COPY ./cli/test_inspect.sh /opt/test/bin/test_inspect.sh
 COPY ./cli/expected.yml /
 
 RUN mkdir /opt/test-runner && \

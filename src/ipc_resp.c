@@ -1,19 +1,41 @@
 #define _GNU_SOURCE
 
 #include "com.h"
+#include "dbg.h"
 #include "ipc_resp.h"
 #include "scopestdlib.h"
 #include "runtimecfg.h"
+
+#define ARRAY_SIZE(arr) ((sizeof(arr))/(sizeof(arr[0])))
+
+static const char* cmdMetaName[] = {
+    [META_REQ_JSON]         = "completeRequestJson",
+    [META_REQ_JSON_PARTIAL] = "incompleteRequestJson",
+};
+
+#define CMD_META_SIZE  (ARRAY_SIZE(cmdMetaName))
+
+static const char* cmdScopeName[] = {
+    [IPC_CMD_GET_SUPPORTED_CMD]    = "getSupportedCmd",
+    [IPC_CMD_GET_SCOPE_STATUS]     = "getScopeStatus",
+    [IPC_CMD_GET_SCOPE_CFG]        = "getScopeCfg",
+    [IPC_CMD_SET_SCOPE_CFG]        = "setScopeCfg",
+    [IPC_CMD_GET_TRANSPORT_STATUS] = "getTransportStatus",
+};
+
+#define CMD_SCOPE_SIZE  (ARRAY_SIZE(cmdScopeName))
 
 extern void doAndReplaceConfig(void *);
 extern log_t *g_log;
 extern mtc_t *g_mtc;
 extern ctl_t *g_ctl;
 
+#define WRAP_PRIV_SIZE (2)
+
 // Wrapper for scope message response
 struct scopeRespWrapper{
-    cJSON *resp;        // Scope message response
-    void *priv;         // Additional resource allocated to create response
+    cJSON *resp;                // Scope message response
+    void *priv[WRAP_PRIV_SIZE]; // Additional resources allocated to create response
 };
 
 /*
@@ -21,7 +43,15 @@ struct scopeRespWrapper{
  */
 static scopeRespWrapper *
 respWrapperCreate(void) {
-    return scope_calloc(1, sizeof(scopeRespWrapper)); 
+    scopeRespWrapper *wrap = scope_calloc(1, sizeof(scopeRespWrapper));
+    if (!wrap) {
+        return NULL;
+    }
+    wrap->resp = NULL;
+    for (int i = 0; i < WRAP_PRIV_SIZE; ++i) {
+        wrap->priv[i] = NULL;
+    }
+    return wrap;
 }
 
 /*
@@ -32,8 +62,10 @@ ipcRespWrapperDestroy(scopeRespWrapper *wrap) {
     if (wrap->resp) {
         cJSON_free(wrap->resp);
     }
-    if (wrap->priv) {
-        cJSON_free(wrap->priv);
+    for (int i = 0; i < WRAP_PRIV_SIZE; ++i) {
+        if (wrap->priv[i]) {
+            cJSON_free(wrap->priv[i]);
+        }  
     }
 
     scope_free(wrap);
@@ -65,6 +97,87 @@ ipcRespStatus(ipc_resp_status_t status) {
     if (!cJSON_AddNumberToObjLN(resp, "status", status)) {
         goto allocFail;
     }
+
+    return wrap;
+
+allocFail:
+    ipcRespWrapperDestroy(wrap);
+    return NULL; 
+}
+
+/*
+ * Creates descriptor for meta and scope command used in IPC_CMD_GET_SUPPORTED_CMD
+ */
+static cJSON*
+createCmdDesc(int id, const char *name) {
+    cJSON *cmdDesc = cJSON_CreateObject();
+    if (!cmdDesc) {
+        return NULL;
+    }
+
+    if (!cJSON_AddNumberToObject(cmdDesc, "id", id)) {
+        cJSON_free(cmdDesc);
+        return NULL;
+    }
+
+    if (!cJSON_AddStringToObject(cmdDesc, "name", name)) {
+        cJSON_free(cmdDesc);
+        return NULL;
+    }
+
+    return cmdDesc;
+}
+
+/*
+ * Creates the wrapper for response to IPC_CMD_GET_SUPPORTED_CMD
+ * TODO: use unused attribute later
+ */
+scopeRespWrapper *
+ipcRespGetScopeCmds(const cJSON * unused) {
+    SCOPE_BUILD_ASSERT(IPC_CMD_UNKNOWN == CMD_SCOPE_SIZE, "cmdScopeName must be inline with ipc_scope_req_t");
+
+    scopeRespWrapper *wrap = respWrapperCreate();
+    if (!wrap) {
+        return NULL;
+    }
+    cJSON *resp = cJSON_CreateObject();
+    if (!resp) {
+        goto allocFail;
+    }
+    wrap->resp = resp;
+    if (!cJSON_AddNumberToObjLN(resp, "status", IPC_RESP_OK)) {
+        goto allocFail;
+    }
+
+    cJSON *metaCmds = cJSON_CreateArray();
+    if (!metaCmds) {
+        goto allocFail;
+    }
+
+    wrap->priv[0] = metaCmds;
+    for (int id = 0; id < CMD_META_SIZE; ++id){
+        cJSON *singleCmd = createCmdDesc(id, cmdMetaName[id]);
+        if (!singleCmd) {
+            goto allocFail;
+        }
+        cJSON_AddItemToArray(metaCmds, singleCmd);
+    }
+    cJSON_AddItemToObjectCS(resp, "commands_meta", metaCmds);
+
+    cJSON *scopeCmds = cJSON_CreateArray();
+    if (!scopeCmds) {
+        goto allocFail;
+    }
+
+    wrap->priv[1] = scopeCmds;
+    for (int id = 0; id < CMD_SCOPE_SIZE; ++id){
+        cJSON *singleCmd = createCmdDesc(id, cmdScopeName[id]);
+        if (!singleCmd) {
+            goto allocFail;
+        }
+        cJSON_AddItemToArray(scopeCmds, singleCmd);
+    }
+    cJSON_AddItemToObjectCS(resp, "commands_scope", scopeCmds);
 
     return wrap;
 
@@ -124,7 +237,7 @@ ipcRespGetScopeCfg(const cJSON *unused) {
         }
         return wrap;
     }
-    wrap->priv = cfg;
+    wrap->priv[0] = cfg;
 
     cJSON_AddItemToObjectCS(resp, "cfg", cfg);
     
@@ -291,7 +404,7 @@ ipcRespGetTransportStatus(const cJSON *unused) {
     if (!interfaces) {
         goto allocFail;
     }
-    wrap->priv = interfaces;
+    wrap->priv[0] = interfaces;
     for (int index = 0; index < TOTAL_INTERFACES; ++index){
         // Skip preparing the interface info if it is disabled 
         if (!scope_interfaces[index].enabled()) {
@@ -332,7 +445,6 @@ ipcRespGetTransportStatus(const cJSON *unused) {
                 }
             }
         }
-
         cJSON_AddItemToArray(interfaces, singleInterface);
     }
     cJSON_AddItemToObjectCS(resp, "interfaces", interfaces);

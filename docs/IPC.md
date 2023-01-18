@@ -78,7 +78,8 @@ With framing mechanism:
 Depending on expected logic adding new request required adding handling both on CLI side and library side.
 
 - Adding new request, CLI: `ipcscope.go`
-- Adding new request, library: `ipc_scope_req_t` in `ipc.c`
+- Adding new request, library: `ipc_scope_req_t` in `ipc_resp.h`
+- Extending the `cmdScopeName` structure in `ipc_resp.c`
 - Adding response for the request, CLI: `ipcscope.go`
 - Adding response for the request, library: `*supportedResp` in `ipc.c`
 - (Optional) Adding processing request in the library see `ipcProcessSetCfg` as an example

@@ -27,16 +27,6 @@
 // Send message retry count
 #define RETRY_COUNT 50
 #define INPUT_MSG_ALLOC_LIMIT (1024*1024) // 1 MB
-/*
- * meta_req_t describes the metadata part of ipc request command retrieves from IPC communication
- * IMPORTANT NOTE:
- * meta_req_t must be inline with client: metaReqCmd
- */
-
-typedef enum {
-    META_REQ_JSON,            // JSON request (complete)
-    META_REQ_JSON_PARTIAL,    // JSON request (partial)
-} meta_req_t;
 
 /*
  * Translates the internal status of parsing request to the response output status
@@ -65,22 +55,6 @@ translateParseStatusToResp(req_parse_status_t status) {
         return IPC_RESP_SERVER_ERROR;
     }
 }
-
-/*
- * ipc_scope_req_t describes the scope request command retrieves from IPC communication
- * IMPORTANT NOTE:
- * ipc_scope_req_t must be inline with client: scopeReqCmd
- */
-typedef enum {
-    // TODO: the first message should be get supported cmd introduced in: 1.3.0
-    IPC_CMD_GET_SCOPE_STATUS,     // Retrieves scope status of application (enabled or disabled), introduced in: 1.3.0
-    IPC_CMD_GET_SCOPE_CFG,        // Retrieves the current configuration, introduced in: 1.3.0
-    IPC_CMD_SET_SCOPE_CFG,        // Update the current configuration, introduced in: 1.3.0
-    IPC_CMD_GET_TRANSPORT_STATUS, // Retrieves the transport status, introduced in: 1.3.0
-    // Place to add new message
-    IPC_CMD_UNKNOWN,              // MUST BE LAST - points to unsupported message
-} ipc_scope_req_t;
-
 
 typedef enum {
     MSG_RECV_RETRY_LIMIT,            // Error: receive: retry limit hit
@@ -451,11 +425,12 @@ end:
 typedef scopeRespWrapper *responseProcessor(const cJSON *);
 
 static responseProcessor *supportedResp[] = {
-    [IPC_CMD_GET_SCOPE_STATUS] = ipcRespGetScopeStatus,
-    [IPC_CMD_GET_SCOPE_CFG] = ipcRespGetScopeCfg, 
-    [IPC_CMD_SET_SCOPE_CFG]  =  ipcRespSetScopeCfg,
+    [IPC_CMD_GET_SUPPORTED_CMD]    = ipcRespGetScopeCmds,
+    [IPC_CMD_GET_SCOPE_STATUS]     = ipcRespGetScopeStatus,
+    [IPC_CMD_GET_SCOPE_CFG]        = ipcRespGetScopeCfg, 
+    [IPC_CMD_SET_SCOPE_CFG]        =  ipcRespSetScopeCfg,
     [IPC_CMD_GET_TRANSPORT_STATUS] = ipcRespGetTransportStatus,
-    [IPC_CMD_UNKNOWN] = ipcRespStatusNotImplemented
+    [IPC_CMD_UNKNOWN]              = ipcRespStatusNotImplemented
 };
 
 /* 

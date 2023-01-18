@@ -1542,7 +1542,11 @@ transportFlush(transport_t* t)
 transport_status_t
 transportConnectionStatus(transport_t *trans)
 {
-
+    transport_status_t status = {
+        .configString = NULL,
+        .isConnected = FALSE,
+        .connectAttemptCount = 0,
+        .failureString = NULL};
 /*
     configString examples:
         tcp://myhost:myport
@@ -1558,28 +1562,17 @@ transportConnectionStatus(transport_t *trans)
 
     if (!trans) {
         DBG(NULL);
-        transport_status_t status = {
-            .configString = NULL,
-            .isConnected = FALSE,
-            .connectAttemptCount = 0,
-            .failureString = NULL};
-
         return status;
     }
 
-    const char *failStr;
+    status.configString = trans->configStr;
+    status.isConnected = !transportNeedsConnection(trans);
+    status.connectAttemptCount = trans->connect_attempts;
+
     if (trans->type == CFG_TCP || trans->type == CFG_UDP) {
-        failStr = netFailMap[trans->net.failure_reason];
-    } else {
-        failStr = NULL;
+        status.failureString = netFailMap[trans->net.failure_reason];
     }
 
-    transport_status_t status = {
-        .configString = trans->configStr,
-        .isConnected = !transportNeedsConnection(trans),
-        .connectAttemptCount = trans->connect_attempts,
-        .failureString = failStr
-    };
 
     return status;
 }

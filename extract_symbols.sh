@@ -39,6 +39,7 @@ declare -a conrib_libs=(
 "./contrib/build/pcre2/libpcre2-8.a"
 "./contrib/build/ls-hpack/libls-hpack.a"
 "./contrib/build/libunwind/src/.libs/libunwind.a"
+"./contrib/build/coredumper/.libs/libcoredumper.a"
 "./contrib/build/musl/lib/libc_orig.a" ## must be last
 )
 

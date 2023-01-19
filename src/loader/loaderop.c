@@ -15,6 +15,32 @@
 #define EXE_TEST_FILE "/bin/cat"
 #define LIBMUSL "musl"
 
+/*
+ * This code exists solely to support the ability to
+ * build a libscope and a scope on a glibc distro
+ * that will execute on both a glibc distro and a
+ * musl distro.
+ *
+ * This code is used to create a static exec that will
+ * execute on both glibc and musl distros.
+ *
+ * The process:
+ * 1) extract the scope exec and libscope.so
+ *    dynamic lib from this object.
+ * 2) open an executable file on the current FS and
+ *    read the loader string from the .interp section.
+ * 3) if it uses a musl ld.so then do musl
+ * 4) for musl; create a dir and in that dir create a
+ *    soft link to ld-musl.so from ld.linux.so (the
+ *    glibc loader).
+ * 5) for musl; create or add to the ld lib path
+ *    env var to point to the dir created above.
+ * 6) for musl; modify the loader string in .interp
+ *    of scope to ld-musl.so.
+ * 7) execve the extracted scope passing args
+ *    from this command line.
+ */
+
 static int g_debug = 0;
 
 static void
@@ -44,32 +70,6 @@ setEnvVariable(char *env, char *value)
 
     if (new_val) free(new_val);
 }
-
-/*
- * This code exists solely to support the ability to
- * build a libscope and a scope on a glibc distro
- * that will execute on both a glibc distro and a
- * musl distro.
- *
- * This code is used to create a static exec that will
- * execute on both glibc and musl distros.
- *
- * The process:
- * 1) extract the scope exec and libscope.so
- *    dynamic lib from this object.
- * 2) open an executable file on the current FS and
- *    read the loader string from the .interp section.
- * 3) if it uses a musl ld.so then do musl
- * 4) for musl; create a dir and in that dir create a
- *    soft link to ld-musl.so from ld.linux.so (the
- *    glibc loader).
- * 5) for musl; create or add to the ld lib path
- *    env var to point to the dir created above.
- * 6) for musl; modify the loader string in .interp
- *    of scope to ld-musl.so.
- * 7) execve the extracted scope passing args
- *    from this command line.
- */
 
 static int
 get_dir(const char *path, char *fres, size_t len) {
@@ -107,10 +107,71 @@ get_dir(const char *path, char *fres, size_t len) {
     return res;
 }
 
-static char *
-loaderOpGetLoader_mem(const unsigned char *buf) {
+// modify the loader string in the .interp section of scope
+// return -1 on error
+static int
+set_loader(unsigned char *buf)
+{
     int i;
-    struct stat sbuf;
+    int found = 0;
+    int name = 0;
+    Elf64_Ehdr *elf;
+    Elf64_Phdr *phead;
+
+    if (!buf) return -1;
+
+    elf = (Elf64_Ehdr *)buf;
+    phead  = (Elf64_Phdr *)&buf[elf->e_phoff];
+
+    for (i = 0; i < elf->e_phnum; i++) {
+        if (phead[i].p_type == PT_INTERP) {
+            char *exld = (char *)&buf[phead[i].p_offset];
+            DIR *dirp;
+            struct dirent *entry;
+            char dir[PATH_MAX];
+            size_t dir_len;
+
+            if (strstr(exld, "ld-musl") != NULL) {
+                return 0;
+            }
+
+            snprintf(dir, sizeof(dir), "/lib/");
+            if ((dirp = opendir(dir)) == NULL) {
+                perror("set_loader:opendir");
+                break;
+            }
+
+            while ((entry = readdir(dirp)) != NULL) {
+                if ((entry->d_type != DT_DIR) &&
+                    (strstr(entry->d_name, "ld-musl"))) {
+                    strncat(dir, entry->d_name, strlen(entry->d_name) + 1);
+                    name = 1;
+                    break;
+                }
+            }
+
+            closedir(dirp);
+            dir_len = strlen(dir);
+            if (name && (strlen(exld) >= dir_len)) {
+                if (g_debug) printf("%s:%d buf ld.so: %s to %s\n", __FUNCTION__, __LINE__, exld, dir);
+                strncpy(exld, dir, dir_len + 1);
+                found = 1;
+                break;
+            }
+        }
+    }
+
+    if (!found) {
+        fprintf(stderr, "WARNING: can't locate or set the loader string in %s\n", buf);
+        return -1;
+    }
+
+    return 0;
+}
+
+static char *
+get_loader(const unsigned char *buf) {
+    int i;
     char *ldso = NULL;
     Elf64_Ehdr *elf;
     Elf64_Phdr *phead;
@@ -123,7 +184,7 @@ loaderOpGetLoader_mem(const unsigned char *buf) {
     for (i = 0; i < elf->e_phnum; i++) {
         if (phead[i].p_type == PT_INTERP) {
             char * exld = (char *)&buf[phead[i].p_offset];
-            if (g_debug) printf("%s:%d exe ld.so: %s\n", __FUNCTION__, __LINE__, exld);
+            if (g_debug) printf("%s:%d buf ld.so: %s\n", __FUNCTION__, __LINE__, exld);
             ldso = strdup(exld);
             break;
         }
@@ -133,22 +194,21 @@ loaderOpGetLoader_mem(const unsigned char *buf) {
 }
 
 static char *
-loaderOpGetLoader(const char *exe) {
-    int i, fd;
+loaderOpGetLoaderFile(const char *exe) {
+    int fd;
     struct stat sbuf;
-    char *buf, *ldso = NULL;
-    Elf64_Ehdr *elf;
-    Elf64_Phdr *phead;
+    unsigned char *buf = NULL;
+    char *ldso = NULL;
 
     if (!exe) return NULL;
 
     if ((fd = open(exe, O_RDONLY)) == -1) {
-        perror("loaderOpGetLoader:open");
+        perror("loaderOpGetLoaderFile:open");
         return NULL;
     }
 
     if (fstat(fd, &sbuf) == -1) {
-        perror("loaderOpGetLoader:fstat");
+        perror("loaderOpGetLoaderFile:fstat");
         close(fd);
         return NULL;
     }
@@ -156,34 +216,144 @@ loaderOpGetLoader(const char *exe) {
     buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
                PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
     if (buf == MAP_FAILED) {
-        perror("loaderOpGetLoader:mmap");
+        perror("loaderOpGetLoaderFile:mmap");
         close(fd);
         return NULL;
     }
 
     close(fd);
 
-    elf = (Elf64_Ehdr *)buf;
-    phead  = (Elf64_Phdr *)&buf[elf->e_phoff];
-
-    for (i = 0; i < elf->e_phnum; i++) {
-        if (phead[i].p_type == PT_INTERP) {
-            char * exld = (char *)&buf[phead[i].p_offset];
-            if (g_debug) printf("%s:%d exe ld.so: %s\n", __FUNCTION__, __LINE__, exld);
-
-            ldso = strdup(exld);
-
-            break;
-        }
-    }
+    ldso = get_loader(buf);
 
     munmap(buf, sbuf.st_size);
     return ldso;
 }
 
+// modify the loader string in the .interp section of scope
+static int
+loaderOpSetLoaderFile(const char *exe)
+{
+    int fd;
+    struct stat sbuf;
+    unsigned char *buf;
+
+    if (!exe) return -1;
+
+    if ((fd = open(exe, O_RDONLY)) == -1) {
+        perror("loaderOpSetLoaderFile:open");
+        return -1;
+    }
+
+    if (fstat(fd, &sbuf) == -1) {
+        perror("loaderOpSetLoaderFile:fstat");
+        close(fd);
+        return -1;
+    }
+
+    buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
+               PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, (off_t)NULL);
+    if (buf == MAP_FAILED) {
+        perror("loaderOpSetLoaderFile:mmap");
+        close(fd);
+        return -1;
+    }
+
+    if (set_loader(buf) == -1) {
+        if (close(fd) == -1) {
+            munmap(buf, sbuf.st_size);
+            return -1;
+        }
+
+        if ((fd = open(exe, O_RDWR)) == -1) {
+            perror("loaderOpSetLoaderFile:open");
+            munmap(buf, sbuf.st_size);
+            return -1;
+        }
+
+        int rc = write(fd, buf, sbuf.st_size);
+        if (rc < sbuf.st_size) {
+            perror("loaderOpSetLoaderFile:write");
+        }
+    } else {
+        fprintf(stderr, "WARNING: can't locate or set the loader string in %s\n", exe);
+    }
+
+    close(fd);
+    munmap(buf, sbuf.st_size);
+    return 0;
+}
+
+#if 0
+static void
+do_musl(char *exld, char *scope, uid_t nsUid, gid_t nsGid)
+{
+    int symlinkErr = 0;
+    char *lpath = NULL;
+    char *path = NULL;
+    char dir[strlen(scope) + 2];
+
+    // always set the env var
+    strncpy(dir, scope, strlen(scope) + 1);
+    path = dirname(dir);
+    setEnvVariable(LD_LIB_ENV, path);
+
+    if (asprintf(&lpath, "%s/%s", path, basename(ldso)) == -1) {
+        perror("do_musl:asprintf");
+        if (ldso) free(ldso);
+        return;
+    }
+
+    // dir is expected to exist here, not creating one
+    if ((nsFileSymlink((const char *)exld, lpath, nsUid, nsGid, geteuid(), getegid(), &symlinkErr) == -1) &&
+        (symlinkErr != EEXIST)) {
+        perror("do_musl:symlink");
+        if (ldso) free(ldso);
+        if (lpath) free(lpath);
+        return;
+    }
+
+    if (lpath) free(lpath);
+}
+#endif
+
+patch_status_t
+loaderOpPatchLoader(unsigned char *scope, uid_t nsUid, gid_t nsGid)
+{
+    patch_status_t patch_res = PATCH_NO_OP;
+    char *ldso_exe = NULL;
+    char *ldso_scope = NULL;
+
+    ldso_exe = loaderOpGetLoaderFile(EXE_TEST_FILE);
+    if (ldso_exe && strstr(ldso_exe, LIBMUSL) != NULL) {
+
+//        do_musl(ldso_exe, scope, nsUid, nsGid);
+
+        // Avoid creating ld-musl-x86_64.so.1 -> /lib/ld-musl-x86_64.so.1
+        if ((ldso_scope = get_loader(scope)) == NULL) {
+            patch_res = PATCH_FAILED;
+            goto out;
+        }
+        if (strstr(ldso_scope, "musl")) {
+            patch_res = PATCH_NO_OP;
+            goto out;
+        }
+
+        if (!set_loader(scope)) {
+            patch_res = PATCH_SUCCESS;
+        } else {
+            patch_res = PATCH_FAILED;
+        }
+    }
+
+out:
+    if (ldso_scope) free(ldso_scope);
+    if (ldso_exe) free(ldso_exe);
+    return patch_res;
+}
+
 // modify NEEDED entries in libscope.so to avoid dependencies
 static int
-loaderOpSetLibrary(const char *libpath) {
+loaderOpSetLibraryFile(const char *libpath) {
     int i, fd, found, name;
     struct stat sbuf;
     char *buf;
@@ -298,251 +468,18 @@ loaderOpSetLibrary(const char *libpath) {
 patch_status_t
 loaderOpPatchLibrary(const char *so_path) {
     patch_status_t patch_res = PATCH_NO_OP;
-
-    char *ldso = loaderOpGetLoader(EXE_TEST_FILE);
-    if (ldso && strstr(ldso, LIBMUSL) != NULL) {
-        if (!loaderOpSetLibrary(so_path)) {
+    char *ldso_exe = NULL;
+      
+    ldso_exe = loaderOpGetLoaderFile(EXE_TEST_FILE);
+    if (ldso_exe && strstr(ldso_exe, LIBMUSL) != NULL) {
+        if (!loaderOpSetLibraryFile(so_path)) {
             patch_res = PATCH_SUCCESS;
         } else {
             patch_res = PATCH_FAILED;
         }
     }
 
-    free(ldso);
+    if (ldso_exe) free(ldso_exe);
     return patch_res;
 }
 
-// modify the loader string in the .interp section of scope
-static int
-set_loader_mem(unsigned char *exe)
-{
-    int i;
-    int found = 0;
-    int name = 0;
-    Elf64_Ehdr *elf;
-    Elf64_Phdr *phead;
-
-    if (!exe) return -1;
-
-    elf = (Elf64_Ehdr *)exe;
-    phead  = (Elf64_Phdr *)&exe[elf->e_phoff];
-
-    for (i = 0; i < elf->e_phnum; i++) {
-        if (phead[i].p_type == PT_INTERP) {
-            char *exld = (char *)&exe[phead[i].p_offset];
-            DIR *dirp;
-            struct dirent *entry;
-            char dir[PATH_MAX];
-            size_t dir_len;
-
-            if (strstr(exld, "ld-musl") != NULL) {
-                return 0;
-            }
-
-            snprintf(dir, sizeof(dir), "/lib/");
-            if ((dirp = opendir(dir)) == NULL) {
-                perror("set_loader:opendir");
-                break;
-            }
-
-            while ((entry = readdir(dirp)) != NULL) {
-                if ((entry->d_type != DT_DIR) &&
-                    (strstr(entry->d_name, "ld-musl"))) {
-                    strncat(dir, entry->d_name, strlen(entry->d_name) + 1);
-                    name = 1;
-                    break;
-                }
-            }
-
-            closedir(dirp);
-            dir_len = strlen(dir);
-            if (name && (strlen(exld) >= dir_len)) {
-                if (g_debug) printf("%s:%d exe ld.so: %s to %s\n", __FUNCTION__, __LINE__, exld, dir);
-                strncpy(exld, dir, dir_len + 1);
-                found = 1;
-                break;
-            }
-        }
-    }
-
-    if (!found) {
-        fprintf(stderr, "WARNING: can't locate or set the loader string in %s\n", exe);
-        return -1;
-    }
-
-    return 0;
-}
-
-
-// modify the loader string in the .interp section of scope
-static int
-set_loader(char *exe)
-{
-    int i, fd, found, name;
-    struct stat sbuf;
-    char *buf;
-    Elf64_Ehdr *elf;
-    Elf64_Phdr *phead;
-
-    if (!exe) return -1;
-
-    if ((fd = open(exe, O_RDONLY)) == -1) {
-        perror("set_loader:open");
-        return -1;
-    }
-
-    if (fstat(fd, &sbuf) == -1) {
-        perror("set_loader:fstat");
-        close(fd);
-        return -1;
-    }
-
-    buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
-               PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, (off_t)NULL);
-    if (buf == MAP_FAILED) {
-        perror("set_loader:mmap");
-        close(fd);
-        return -1;
-    }
-
-    elf = (Elf64_Ehdr *)buf;
-    phead  = (Elf64_Phdr *)&buf[elf->e_phoff];
-    found = name = 0;
-
-    for (i = 0; i < elf->e_phnum; i++) {
-        if (phead[i].p_type == PT_INTERP) {
-            char *exld = (char *)&buf[phead[i].p_offset];
-            DIR *dirp;
-            struct dirent *entry;
-            char dir[PATH_MAX];
-            size_t dir_len;
-
-            if (strstr(exld, "ld-musl") != NULL) {
-                close(fd);
-                munmap(buf, sbuf.st_size);
-                return 0;
-            }
-
-            snprintf(dir, sizeof(dir), "/lib/");
-            if ((dirp = opendir(dir)) == NULL) {
-                perror("set_loader:opendir");
-                break;
-            }
-
-            while ((entry = readdir(dirp)) != NULL) {
-                if ((entry->d_type != DT_DIR) &&
-                    (strstr(entry->d_name, "ld-musl"))) {
-                    strncat(dir, entry->d_name, strlen(entry->d_name) + 1);
-                    name = 1;
-                    break;
-                }
-            }
-
-            closedir(dirp);
-            dir_len = strlen(dir);
-            if (name && (strlen(exld) >= dir_len)) {
-                if (g_debug) printf("%s:%d exe ld.so: %s to %s\n", __FUNCTION__, __LINE__, exld, dir);
-                strncpy(exld, dir, dir_len + 1);
-                found = 1;
-                break;
-            }
-        }
-    }
-
-    if (found) {
-        if (close(fd) == -1) {
-            munmap(buf, sbuf.st_size);
-            return -1;
-        }
-
-        if ((fd = open(exe, O_RDWR)) == -1) {
-            perror("set_loader:open write");
-            munmap(buf, sbuf.st_size);
-            return -1;
-        }
-
-        int rc = write(fd, buf, sbuf.st_size);
-        if (rc < sbuf.st_size) {
-            perror("set_loader:write");
-        }
-    } else {
-        fprintf(stderr, "WARNING: can't locate or set the loader string in %s\n", exe);
-    }
-
-    close(fd);
-    munmap(buf, sbuf.st_size);
-    return (found - 1);
-}
-
-static void
-do_musl(char *exld, unsigned char *scope, uid_t nsUid, gid_t nsGid)
-{
-    int symlinkErr = 0;
-    char *lpath = NULL;
-    char *ldso = NULL;
-    char *path = NULL;
-//    char dir[strlen(scope) + 2];
-
-    // always set the env var
-//   strncpy(dir, scope, strlen(scope) + 1);
-//    path = dirname(dir);
-//    setEnvVariable(LD_LIB_ENV, path);
-
-    // does a link to the musl ld.so exist?
-    // if so, we assume the symlink exists as well.
-    if ((ldso = loaderOpGetLoader_mem(scope)) == NULL) return;
-
-    // Avoid creating ld-musl-x86_64.so.1 -> /lib/ld-musl-x86_64.so.1
-    if (strstr(ldso, "musl")) return;
-
-//    if (asprintf(&lpath, "%s/%s", path, basename(ldso)) == -1) {
-//        perror("do_musl:asprintf");
-//        if (ldso) free(ldso);
-//        return;
-//    }
-
-//    // dir is expected to exist here, not creating one
-//    if ((nsFileSymlink((const char *)exld, lpath, nsUid, nsGid, geteuid(), getegid(), &symlinkErr) == -1) &&
-//        (symlinkErr != EEXIST)) {
-//        perror("do_musl:symlink");
-//        if (ldso) free(ldso);
-//        if (lpath) free(lpath);
-//        return;
-//    }
-
-    // set_loader(scope);
-    set_loader_mem(scope);
-
-
-//    ldso = loaderOpGetLoader_mem(scope);
-
- //   loaderOpSetLibrary(libdirGetPath(LIBRARY_FILE));
-
-    if (ldso) free(ldso);
-    if (lpath) free(lpath);
-}
-
-
-/*
- * Check for and handle the extra steps needed to run under musl libc.
- *
- * Returns 0 if musl was not detected and 1 if it was.
- */
-int
-loaderOpSetupLoader(unsigned char *scope, uid_t nsUid, gid_t nsGid)
-{
-    int ret = 0; // not musl
-
-    char *ldso = NULL;
-
-    if (((ldso = loaderOpGetLoader(EXE_TEST_FILE)) != NULL) &&
-        (strstr(ldso, LIBMUSL) != NULL)) {
-            // we are using the musl ld.so
-            do_musl(ldso, scope, nsUid, nsGid);
-            ret = 1; // detected musl
-    }
-
-    if (ldso) free(ldso);
-
-    return ret;
-}

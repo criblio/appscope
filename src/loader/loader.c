@@ -391,7 +391,7 @@ cmdUnconfigure(pid_t nspid)
 }
 
 // Handle run, attach, detach commands.
-// TODO: Split this up? Remove the argc/argv/env?
+// TODO: Split this up?
 int
 cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **argv, char **env)
 {
@@ -629,6 +629,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
     if (getenv("LD_PRELOAD") != NULL) {
         unsetenv("LD_PRELOAD");
         execve(inferior_command, argv, environ);
+        perror("execve");
     }
 
     program_invocation_short_name = basename(argv[0]);
@@ -641,6 +642,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         // Start here when we support more static binaries
         // than go.
         execve(inferior_command, &argv[0], environ);
+        perror("execve");
     }
 
     // If scope itself is static, we need to call scope dynamic
@@ -651,13 +653,17 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         unsigned char *start; 
         size_t len;
         if ((len = getAsset(LOADER_FILE, &start)) == -1) {
-            return -1;
+            fprintf(stderr, "error: failed to retrieve loader\n");
+            goto out;
         }
 
         // Patch the scopedyn executable on the heap (for musl support)
-        loaderOpSetupLoader(start, nsUid, nsGid);
+        if (loaderOpPatchLoader(start, nsUid, nsGid) == PATCH_FAILED) {
+            fprintf(stderr, "error: failed to patch loader\n");
+            goto out;
+        }
 
-#if 0   // Write scopedyn to disk for debugging
+#if 0   // Write scopedyn to /tmp for debugging
         int fd_dyn; 
         if ((fd_dyn = open("/tmp/scopedyn", O_CREAT | O_RDWR | O_TRUNC)) == -1) {
             perror("cmdRun:open");
@@ -668,6 +674,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
             perror("cmdRun:write");
             goto out;
         }
+        close(fd_dyn);
 #endif
         // Write scopedyn to shared memory
         char path_to_fd[PATH_MAX];
@@ -675,7 +682,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         write(fd, start, len);
 
         // Exec scopedyn from shared memory
-        // Append scopedyn -z to argv first
+        // Append "scopedyn" "-z" to argv first
         int execArgc = 0;
         char *execArgv[argc + 2];
         execArgv[execArgc++] = "scopedyn";
@@ -692,11 +699,13 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
     // and we're done
     } else {
         if ((handle = dlopen(scopeLibPath, RTLD_LAZY)) == NULL) {
+            perror("dlopen");
             goto out;
         }
 
         sys_exec = dlsym(handle, "sys_exec");
         if (!sys_exec) {
+            fprintf(stderr, "error: sysexec\n");
             goto out;
         }
 

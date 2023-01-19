@@ -478,9 +478,8 @@ ipcProcessRequestAndPrepareResponse(const char *scopeReq, ipc_resp_result_t *res
     return resp;
 
 errJson:
-    if (!resp) {
-        *res = RESP_PROCESSING_ERROR;
-    }
+    *res = RESP_REQUEST_ERROR;
+
     cJSON_Delete(scopeReqJson);
 
     return ipcRespStatusScopeError(translateParseStatusToResp(status));

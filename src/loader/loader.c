@@ -572,7 +572,6 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
     char *inferior_command = NULL;
 
     inferior_command = getpath(argv[0]); 
-    //printf("%s:%d %s\n", __FUNCTION__, __LINE__, inferior_command);
     if (!inferior_command) {
         fprintf(stderr,"scope could not find or execute command `%s`.  Exiting.\n", argv[0]);
         goto out;
@@ -611,8 +610,6 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
             goto out;
         }
 
-        //printf("%s:%d %d: %s %s %s %s\n", __FUNCTION__, __LINE__,
-        //       argc, argv[0], argv[1], argv[2], argv[3]);
         execve(inferior_command, &argv[0], environ);
         perror("execve");
         goto out;
@@ -657,13 +654,10 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
             return -1;
         }
 
-printf("static scope path\n");
-
         // Patch the scopedyn executable on the heap (for musl support)
         loaderOpSetupLoader(start, nsUid, nsGid);
 
-#if 0
-        // Write scopedyn to disk for debugging
+#if 0   // Write scopedyn to disk for debugging
         int fd_dyn; 
         if ((fd_dyn = open("/tmp/scopedyn", O_CREAT | O_RDWR | O_TRUNC)) == -1) {
             perror("cmdRun:open");
@@ -675,13 +669,13 @@ printf("static scope path\n");
             goto out;
         }
 #endif
-
         // Write scopedyn to shared memory
         char path_to_fd[PATH_MAX];
         int fd = memfd_create("", MFD_CLOEXEC);
         write(fd, start, len);
 
         // Exec scopedyn from shared memory
+        // Append scopedyn -z to argv first
         int execArgc = 0;
         char *execArgv[argc + 2];
         execArgv[execArgc++] = "scopedyn";
@@ -697,7 +691,6 @@ printf("static scope path\n");
     // If scope itself is dynamic, dlopen libscope and sys_exec the app
     // and we're done
     } else {
-perror("dynamic scope path\n");
         if ((handle = dlopen(scopeLibPath, RTLD_LAZY)) == NULL) {
             goto out;
         }

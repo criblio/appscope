@@ -299,13 +299,8 @@ patch_status_t
 loaderOpPatchLibrary(const char *so_path) {
     patch_status_t patch_res = PATCH_NO_OP;
 
-    printf("in loaderOpPatchLibrary\n");
-
     char *ldso = loaderOpGetLoader(EXE_TEST_FILE);
     if (ldso && strstr(ldso, LIBMUSL) != NULL) {
-
-        printf("detected musl in loaderOpPatchLibrary\n");
-
         if (!loaderOpSetLibrary(so_path)) {
             patch_res = PATCH_SUCCESS;
         } else {
@@ -314,7 +309,6 @@ loaderOpPatchLibrary(const char *so_path) {
     }
 
     free(ldso);
-
     return patch_res;
 }
 

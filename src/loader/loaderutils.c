@@ -168,14 +168,14 @@ getDynSymbol(const char *buf, char *sname)
         }
 
         if ((strtab != NULL) && (symtab != NULL)) break;
-        printf("section %s type = %d flags = 0x%lx addr = 0x%lx-0x%lx, size = 0x%lx off = 0x%lx\n",
-               sec_name,
-               sections[i].sh_type,
-               sections[i].sh_flags,
-               sections[i].sh_addr,
-               sections[i].sh_addr + sections[i].sh_size,
-               sections[i].sh_size,
-               sections[i].sh_offset);
+        //printf("section %s type = %d flags = 0x%lx addr = 0x%lx-0x%lx, size = 0x%lx off = 0x%lx\n",
+        //       sec_name,
+        //       sections[i].sh_type,
+        //       sections[i].sh_flags,
+        //       sections[i].sh_addr,
+        //       sections[i].sh_addr + sections[i].sh_size,
+        //       sections[i].sh_size,
+        //       sections[i].sh_offset);
     }
 
     for (i=0; i < nsyms; i++) {
@@ -371,12 +371,12 @@ out:
 }
 
 uint64_t
-findLibrary(const char *library, pid_t pid, bool matchLibraryExactly)
+findLibrary(const char *library, pid_t pid, bool matchLibraryExactly, char *path, size_t plen)
 {
-    char filename[PATH_MAX];
-    char line[1024];
     FILE *fd;
     uint64_t addr = 0;
+    char filename[PATH_MAX];
+    char line[1024];
 
     snprintf(filename, sizeof(filename), "/proc/%d/maps", pid);
     if ((fd = fopen(filename, "r")) == NULL) {
@@ -386,6 +386,7 @@ findLibrary(const char *library, pid_t pid, bool matchLibraryExactly)
 
     if (matchLibraryExactly) { // pathFromLine string == library string
         char pathFromLine[512];
+
         while(fgets(line, sizeof(line), fd)) {
             //7ff775e88000-7ff77606f000 r-xp 00000000 ca:01 17348 /lib/x86_64-linux-gnu/libc-2.27.so
             if ((sscanf(line, "%*x-%*x %*s %*x %*s %*d %512s", pathFromLine) == 1)
@@ -400,6 +401,13 @@ findLibrary(const char *library, pid_t pid, bool matchLibraryExactly)
                 addr = strtoull(line, NULL, 16);
                 break;
             }
+        }
+    }
+
+    // if we found the address and a path is requested
+    if (addr && path && (plen >= 512)) {
+        if (sscanf(line, "%*x-%*x %*s %*x %*s %*d %512s", path) != 1) {
+            addr = -1;
         }
     }
 

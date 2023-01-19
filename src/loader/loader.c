@@ -465,7 +465,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
             goto out;
         }
 
-        uint64_t rc = findLibrary("libscope.so", pid, FALSE);
+        uint64_t rc = findLibrary("libscope.so", pid, FALSE, NULL, 0);
 
         /*
         * If the expected process exists in different PID namespace (container)
@@ -526,7 +526,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
             // done
             close(fd);
 
-            //rc = findLibrary("libscope.so", pid, FALSE);
+            // rc from findLibrary
             if (rc == -1) {
                 fprintf(stderr, "error: can't get path to executable for pid %d\n", pid);
                 res = EXIT_FAILURE;

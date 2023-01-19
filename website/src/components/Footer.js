@@ -16,7 +16,7 @@ export default function Footer() {
             </a>
           </Col>
           <Col xs={12} md={6} className="text-right footer-right">
-            <p>Cribl, &copy; 2021</p>
+            <p>&copy;2017 – 2023 Cribl, Inc. | <a href="https://cribl.io/legal" target="_blank" rel="noopener">Legal</a></p>
             <a href="https://www.facebook.com/Cribl-258234158133458/">
               <FontAwesomeIcon icon={["fab", "facebook"]} />
             </a>

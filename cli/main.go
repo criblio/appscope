@@ -75,7 +75,7 @@ __attribute__((constructor)) void cli_constructor() {
     int c;
 	char fname[PATH_MAX];
 	int scope_pid = getpid();
-	int arg_max = 1024;
+	int arg_max = 1024; // Is this reasonable?
 	int arg_c = 0;
 	size_t size = 0;
 	char **arg_v;

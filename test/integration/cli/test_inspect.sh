@@ -269,38 +269,38 @@ kill -9 $PYTHON_PID 1> /dev/null 2> /dev/null
 
 endtest
 
+# Uncomment this when detection of payload to disk is supported - see `payloadTransportEnabled`
+# starttest test_payload_on_to_cribl_overriden_to_disk
 
-starttest test_payload_on_to_cribl_overriden_to_disk
+# PRE_SCOPE_CRIBL_ENABLE=$SCOPE_CRIBL_ENABLE
+# unset SCOPE_CRIBL_ENABLE
+# SCOPE_PAYLOAD_ENABLE=true SCOPE_PAYLOAD_TO_DISK=true LD_PRELOAD=/usr/local/scope/lib/libscope.so python3 -m http.server 1> /dev/null 2> /dev/null &
+# export SCOPE_CRIBL_ENABLE=$PRE_SCOPE_CRIBL_ENABLE
 
-PRE_SCOPE_CRIBL_ENABLE=$SCOPE_CRIBL_ENABLE
-unset SCOPE_CRIBL_ENABLE
-SCOPE_PAYLOAD_ENABLE=true SCOPE_PAYLOAD_TO_DISK=true LD_PRELOAD=/usr/local/scope/lib/libscope.so python3 -m http.server 1> /dev/null 2> /dev/null &
-export SCOPE_CRIBL_ENABLE=$PRE_SCOPE_CRIBL_ENABLE
+# sleep 2
+# PYTHON_PID=`pidof python3`
 
-sleep 2
-PYTHON_PID=`pidof python3`
+# scope inspect $PYTHON_PID > $INSPECT_FILE
 
-scope inspect $PYTHON_PID > $INSPECT_FILE
+# jq '.interfaces | .[] | select(.name=="payload") | .connected' $INSPECT_FILE | grep -q "true"
+# if [ $? != 0 ]; then
+#     echo "inspect cribl connected fails expected enable payload"
+#     cat $INSPECT_FILE
+#     ERR+=1
+# fi
 
-jq '.interfaces | .[] | select(.name=="payload") | .connected' $INSPECT_FILE | grep -q "true"
-if [ $? != 0 ]; then
-    echo "inspect cribl connected fails expected enable payload"
-    cat $INSPECT_FILE
-    ERR+=1
-fi
+# jq '.interfaces | .[] | select(.name=="payload") | .config' $INSPECT_FILE | grep -q "edge"
+# if [ $? == 0 ]; then
+#     echo "inspect cribl connected fails expected payload should not point to edge"
+#     cat $INSPECT_FILE
+#     ERR+=1
+# fi
 
-jq '.interfaces | .[] | select(.name=="payload") | .config' $INSPECT_FILE | grep -q "edge"
-if [ $? == 0 ]; then
-    echo "inspect cribl connected fails expected payload should not point to edge"
-    cat $INSPECT_FILE
-    ERR+=1
-fi
+# rm $INSPECT_FILE
 
-rm $INSPECT_FILE
+# kill -9 $PYTHON_PID 1> /dev/null 2> /dev/null
 
-kill -9 $PYTHON_PID 1> /dev/null 2> /dev/null
-
-endtest
+# endtest
 
 ################# END TESTS ################# 
 

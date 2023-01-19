@@ -328,7 +328,12 @@ logTransportStatus(void) {
  */
 static bool
 payloadTransportEnabled(void) {
-    return ctlPayEnable(g_ctl);
+    // TODO: Currently we handle the status of payload if they are send to stream
+    // handle the case when they are dumped to disk
+    if (ctlTransport(g_ctl, CFG_LS)) {
+        return TRUE;
+    }
+    return FALSE;
 }
 
 /*
@@ -336,7 +341,6 @@ payloadTransportEnabled(void) {
  */
 static transport_status_t
 payloadTransportStatus(void) {
-    // TODO: Fix me recognize the payload dir and payload stream
     return ctlConnectionStatus(g_ctl, CFG_LS);
 }
 

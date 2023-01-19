@@ -37,7 +37,7 @@ var inspectCmd = &cobra.Command{
 			util.ErrAndExit("Convert PID fails: %v", err)
 		}
 		pidCtx.Pid = pid
-		cfg, err := inspect.InspectScopeCfg(*pidCtx)
+		cfg, err := inspect.InspectProcess(*pidCtx)
 		if err != nil {
 			util.ErrAndExit("Inspect PID fails: %v", err)
 		}

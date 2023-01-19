@@ -14,8 +14,8 @@ type inspectOutput struct {
 	Desc ipc.ScopeInterfaceDesc     `mapstructure:"interfaces" json:"interfaces" yaml:"interfaces"`
 }
 
-// InspectScopeCfg returns the configuration of scoped process
-func InspectScopeCfg(pidCtx ipc.IpcPidCtx) (string, error) {
+// InspectProcess returns the configuration and status of scoped process
+func InspectProcess(pidCtx ipc.IpcPidCtx) (string, error) {
 
 	cmdGetCfg := ipc.CmdGetScopeCfg{}
 	resp, err := cmdGetCfg.Request(pidCtx)

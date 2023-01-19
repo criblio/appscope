@@ -405,27 +405,33 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
     elf_buf_t *scope_ebuf = NULL;
     elf_buf_t *ebuf = NULL;
 
-    // Extract the library
     if (nspid != -1) {
         nsUid = nsInfoTranslateUid(nspid);
         nsGid = nsInfoTranslateGid(nspid);
     }
 
-    // is scope static or dynamic?
     scope_ebuf = getElf("/proc/self/exe");
     if (!scope_ebuf) {
         perror("setenv");
         goto out;
     }
 
-    // Extract libscope from scope static. Don't attempt to extract from scope dynamic
-    if (is_static(scope_ebuf->buf) && libdirExtract(LIBRARY_FILE, nsUid, nsGid)) {
-        fprintf(stderr, "error: failed to extract library\n");
-        goto out;
-    }
+    // Extract and patch libscope from scope static. Don't attempt to extract from scope dynamic
+    if (is_static(scope_ebuf->buf)) {
+        if (libdirExtract(LIBRARY_FILE, nsUid, nsGid)) {
+            fprintf(stderr, "error: failed to extract library\n");
+            goto out;
+        }
 
-    // Set SCOPE_LIB_PATH
-    scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
+        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
+
+        if (loaderOpPatchLibrary(scopeLibPath) == PATCH_FAILED) {
+            fprintf(stderr, "error: failed to patch library\n");
+            goto out;
+        }
+    } else {
+        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
+    }
 
     if (access(scopeLibPath, R_OK|X_OK)) {
         fprintf(stderr, "error: library %s is missing, not readable, or not executable\n", scopeLibPath);
@@ -651,22 +657,39 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
             return -1;
         }
 
+printf("static scope path\n");
+
+        // Patch the scopedyn executable on the heap (for musl support)
+        loaderOpSetupLoader(start, nsUid, nsGid);
+
+#if 0
+        // Write scopedyn to disk for debugging
+        int fd_dyn; 
+        if ((fd_dyn = open("/tmp/scopedyn", O_CREAT | O_RDWR | O_TRUNC)) == -1) {
+            perror("cmdRun:open");
+            goto out;
+        }
+        int rc = write(fd_dyn, start, len);
+        if (rc < len) {
+            perror("cmdRun:write");
+            goto out;
+        }
+#endif
+
         // Write scopedyn to shared memory
         char path_to_fd[PATH_MAX];
         int fd = memfd_create("", MFD_CLOEXEC);
         write(fd, start, len);
 
         // Exec scopedyn from shared memory
-        char *execArgv[argc+2];
-        int execArgc = 2;
+        int execArgc = 0;
+        char *execArgv[argc + 2];
+        execArgv[execArgc++] = "scopedyn";
+        execArgv[execArgc++] = "-z";
         for (int i = 0; i < argc; i++) {
             execArgv[execArgc++] = argv[i++];
         }
         execArgv[execArgc++] = NULL;
-        char *execname = "scopedyn";
-        char *execz = "-z"; //todo remove
-        execArgv[0] = execname;
-        execArgv[1] = execz;
         sprintf(path_to_fd, "/proc/self/fd/%i", fd);
         execve(path_to_fd, &execArgv[0], environ);
         perror("execve");
@@ -674,6 +697,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
     // If scope itself is dynamic, dlopen libscope and sys_exec the app
     // and we're done
     } else {
+perror("dynamic scope path\n");
         if ((handle = dlopen(scopeLibPath, RTLD_LAZY)) == NULL) {
             goto out;
         }
@@ -695,7 +719,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
      */
 
     execve(inferior_command, &argv[0], environ);
-
+ 
     res = EXIT_SUCCESS;
 
 out:

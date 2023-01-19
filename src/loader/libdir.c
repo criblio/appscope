@@ -117,8 +117,6 @@ getAsset(libdirfile_t objFileType, unsigned char **start)
         goto out;
     }
 
-    if (is_static(ebuf->buf) == FALSE) goto out;
-
     switch (objFileType) {
         case LIBRARY_FILE:
             if ((libsym = getSymbol(ebuf->buf, LIBSCOPE))) {

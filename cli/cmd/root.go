@@ -30,6 +30,16 @@ func Execute() {
 				}
 			}
 
+			// Disallow bad argument combinations (see Arg Matrix at top of file)
+			passthrough, _ := RootCmd.Flags().GetBool("passthrough")
+
+			// Passthrough is a constructor command
+			// It's only included in flags for helper menu
+			// We do not support the flag in the cli proper
+			if passthrough {
+				helpErrAndExit(RootCmd, "Cannot specify --passthrough")
+			}
+
 			// If not a known command, scope run by default
 			internal.InitConfig()
 			rc := run.Config{}
@@ -42,5 +52,5 @@ func Execute() {
 
 func init() {
 	// Constructor flags (for help only)
-	RootCmd.Flags().BoolP("passthrough", "z", false, "Scope an application with current environment & no config.")
+	//	RootCmd.Flags().BoolP("passthrough", "z", false, "Scope an application with current environment & no config.")
 }

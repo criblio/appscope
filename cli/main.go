@@ -12,6 +12,8 @@ package main
 #include <stdbool.h>
 #include <unistd.h>
 #include <limits.h>
+#include <string.h>
+#include <fcntl.h>
 
 #include "../src/loader/libdir.h"
 #include "../src/loader/loader.h"
@@ -66,7 +68,55 @@ unsigned long g_scopedynsz;
 // Code here executes before the Go Runtime starts.
 // We execute loader-specific commands here, because we can perform namespace switches while meeting
 // the OS requirement of being in a single-threaded process to do so.
-__attribute__((constructor)) void cli_constructor(int argc, char **argv, char **env) {
+__attribute__((constructor)) void cli_constructor() {
+
+    FILE *f;
+    int c;
+	char fname[PATH_MAX];
+	int scope_pid = getpid();
+	int arg_max = 1024;
+	int arg_c = 0;
+	size_t size = 0;
+	char **arg_v;
+
+	// Open /proc/pid/cmdline to get args
+	snprintf(fname, sizeof fname, "/proc/%d/cmdline", scope_pid);
+    f = fopen(fname, "r");
+    if (!f) {
+        exit(EXIT_FAILURE);
+    }
+
+	// Read args delimited by null
+	arg_v = malloc(sizeof(char *) * arg_max);
+	while(getdelim(&arg_v[arg_c], &size, 0, f) != -1)
+	{
+		puts(arg_v[arg_c]);
+		arg_c++;
+	}
+	arg_v[arg_c] = NULL;
+
+    fclose(f);
+
+    if ((g_libscopesz = strtoul(LIBSCOPE_SO_SIZE, NULL, 10)) == ULONG_MAX) {
+       perror("strtoul");
+       exit(EXIT_FAILURE);
+    }
+
+    if ((g_scopedynsz = strtoul(SCOPEDYN_SIZE, NULL, 10)) == ULONG_MAX) {
+       perror("strtoul");
+       exit(EXIT_FAILURE);
+    }
+
+
+	pid_t nspid = -1;
+	pid_t pid = -1;
+	cmdRun(false, false, pid, nspid, 2, &arg_v[1], NULL);
+
+	if (arg_v) free(arg_v);
+
+	exit(EXIT_SUCCESS);
+
+#if 0
 	bool opt_ldattach = false;
 	bool opt_lddetach = false;
 	bool opt_namespace = false;
@@ -95,15 +145,6 @@ __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **
 	int cmdArgc;
 	char **cmdArgv;
 
-    if ((g_libscopesz = strtoul(LIBSCOPE_SO_SIZE, NULL, 10)) == ULONG_MAX) {
-       perror("strtoul");
-       exit(EXIT_FAILURE);
-    }
-
-    if ((g_scopedynsz = strtoul(SCOPEDYN_SIZE, NULL, 10)) == ULONG_MAX) {
-       perror("strtoul");
-       exit(EXIT_FAILURE);
-    }
 
     printf("%s:%d %s %ld %ld\n", __FUNCTION__, __LINE__, LIBSCOPE_SO_SIZE, g_libscopesz, g_scopedynsz);
 
@@ -169,6 +210,8 @@ __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **
 			break;
         }
     }
+
+    printf("%s:%d %s %ld %ld\n", __FUNCTION__, __LINE__, LIBSCOPE_SO_SIZE, g_libscopesz, g_scopedynsz);
 
 	// Handle potential argument conflicts
 	if (opt_ldattach && opt_lddetach) {
@@ -239,11 +282,21 @@ __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **
 		}
 	}
 
+    printf("%s:%d %s %ld %ld\n", __FUNCTION__, __LINE__, LIBSCOPE_SO_SIZE, g_libscopesz, g_scopedynsz);
+
+	printf("argc:  argv0:  argv1:  argv2:  \n" );
+
+//	printf("argc: %d argv0: %s argv1: %s argv2: %s \n", argc, argv[0], argv[1], argv[2]);
+//	fprintf(stderr, "argc: %d argv0: %s argv1: %s argv2: %s \n", argc, argv[0], argv[1], argv[2]);
+
 	// Execute commands
-	cmdArgc = argc-optind; // Argc of the program we want to scope
-	cmdArgv = &argv[optind]; // Argv of the program we want to scope
-	if (opt_ldattach) exit(cmdRun(opt_ldattach, false, pid, nspid, cmdArgc, cmdArgv, env));
-	if (opt_lddetach) exit(cmdRun(false, opt_lddetach, pid, nspid, cmdArgc, cmdArgv, env));
+//	cmdArgc = argc-optind; // Argc of the program we want to scope
+//	cmdArgv = &argv[optind]; // Argv of the program we want to scope
+
+//	fprintf(stderr, "argc: %d argv0: %s argv1: %s argv2: %s \n", cmdArgc, cmdArgv[0], cmdArgv[1], cmdArgv[2]);
+
+//	if (opt_ldattach) exit(cmdRun(opt_ldattach, false, pid, nspid, cmdArgc, cmdArgv, env));
+//	if (opt_lddetach) exit(cmdRun(false, opt_lddetach, pid, nspid, cmdArgc, cmdArgv, env));
 	if (opt_configure) exit(cmdConfigure(arg_configure, nspid));
 	if (opt_unconfigure) exit(cmdUnconfigure(nspid));
 	if (opt_service) exit(cmdService(arg_service, nspid));
@@ -251,11 +304,15 @@ __attribute__((constructor)) void cli_constructor(int argc, char **argv, char **
 	if (opt_patch) exit(loaderOpPatchLibrary(arg_patch) == PATCH_SUCCESS);
 	if (opt_starthost) exit(nsHostStart());
 	if (opt_stophost) exit(nsHostStop());
-	if (opt_passthrough) exit(cmdRun(false, false, pid, nspid, cmdArgc, cmdArgv, env));
+    printf("%s:%d %s %ld %ld\n", __FUNCTION__, __LINE__, LIBSCOPE_SO_SIZE, g_libscopesz, g_scopedynsz);
+//	if (opt_passthrough) exit(cmdRun(false, false, pid, nspid, cmdArgc, cmdArgv, env));
+	if (opt_passthrough) exit(cmdRun(false, false, pid, nspid, 1, cmdArgv, env));
+    printf("%s:%d %s %ld %ld\n", __FUNCTION__, __LINE__, LIBSCOPE_SO_SIZE, g_libscopesz, g_scopedynsz);
 
 	// No constructor command executed.
 	// Continue to regular CLI usage.
 	return;
+	#endif
 }
 */
 import "C"

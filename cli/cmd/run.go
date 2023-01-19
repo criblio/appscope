@@ -42,6 +42,8 @@ scope run -c edge -- top`,
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
 
+		passthrough, _ := cmd.Flags().GetBool("passthrough")
+
 		// Disallow bad argument combinations (see Arg Matrix at top of file)
 		if rc.CriblDest != "" && rc.MetricsDest != "" {
 			helpErrAndExit(cmd, "Cannot specify --cribldest and --metricdest")
@@ -63,6 +65,12 @@ scope run -c edge -- top`,
 			helpErrAndExit(cmd, "Cannot specify --payloads and --userconfig")
 		} else if rc.Loglevel != "" && rc.UserConfig != "" {
 			helpErrAndExit(cmd, "Cannot specify --loglevel and --userconfig")
+		}
+		// Passthrough is a constructor command
+		// It's only included in flags for helper menu
+		// We do not support the flag in the cli proper
+		if passthrough {
+			helpErrAndExit(cmd, "Cannot specify --passthrough")
 		}
 
 		rc.Run(args)

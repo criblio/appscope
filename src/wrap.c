@@ -481,7 +481,7 @@ ipcCommunication(void) {
     }
 
     if (res != RESP_RESULT_OK) {
-        scopeLogError("ipcCommunication Error sending response to %s failed %d, parseStatus %d, uniqReq %d", name, res, parseStatus, uniqReq);
+        scopeLogError("ipcCommunication Error sending response to %s failed res %d, parseStatus %d, uniqReq %d", name, res, parseStatus, uniqReq);
     }
 
     scope_free(scopeReq);

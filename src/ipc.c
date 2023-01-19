@@ -428,7 +428,7 @@ static responseProcessor *supportedResp[] = {
     [IPC_CMD_GET_SUPPORTED_CMD]    = ipcRespGetScopeCmds,
     [IPC_CMD_GET_SCOPE_STATUS]     = ipcRespGetScopeStatus,
     [IPC_CMD_GET_SCOPE_CFG]        = ipcRespGetScopeCfg, 
-    [IPC_CMD_SET_SCOPE_CFG]        =  ipcRespSetScopeCfg,
+    [IPC_CMD_SET_SCOPE_CFG]        = ipcRespSetScopeCfg,
     [IPC_CMD_GET_TRANSPORT_STATUS] = ipcRespGetTransportStatus,
     [IPC_CMD_UNKNOWN]              = ipcRespStatusNotImplemented
 };
@@ -442,7 +442,7 @@ static responseProcessor *supportedResp[] = {
  * Returns scope wrapper which contains the scope message respnose
  */
 static scopeRespWrapper *
-ipcProcessRequestAndPrepareResponse(const char *scopeReq) {
+ipcProcessRequestAndPrepareResponse(const char *scopeReq, ipc_resp_result_t *res) {
 
     req_parse_status_t status = REQ_PARSE_JSON_ERROR;
 
@@ -470,12 +470,17 @@ ipcProcessRequestAndPrepareResponse(const char *scopeReq) {
     }
 
     scopeRespWrapper *resp = supportedResp[supportedCmd](scopeReqJson);
-
+    if (!resp) {
+        *res = RESP_PROCESSING_ERROR;
+    }
     cJSON_Delete(scopeReqJson);
 
     return resp;
 
 errJson:
+    if (!resp) {
+        *res = RESP_PROCESSING_ERROR;
+    }
     cJSON_Delete(scopeReqJson);
 
     return ipcRespStatusScopeError(translateParseStatusToResp(status));
@@ -494,7 +499,7 @@ ipcSendSuccessfulResponse(mqd_t mqDes, size_t msgBufSize, const char *scopeDataR
 
     ipc_resp_result_t res = RESP_ALLOCATION_ERROR;
     // Proceed incoming scope request 
-    scopeRespWrapper *scopeRespWrap = ipcProcessRequestAndPrepareResponse(scopeDataReq);
+    scopeRespWrapper *scopeRespWrap = ipcProcessRequestAndPrepareResponse(scopeDataReq, &res);
     if (!scopeRespWrap) {
         return res;
     }

@@ -21,6 +21,7 @@ typedef enum {
     RESP_UNSUFFICENT_MSGBUF_ERROR,    // Error: unsufficient space in msgbuf
     RESP_SEND_RETRY_LIMIT,            // Error: sending: retry limit hit
     RESP_SEND_OTHER,                  // Error: sending: other
+    RESP_PROCESSING_ERROR,            // Error: processing request
     RESP_RESULT_OK,                   // Response was succesfully sended
 } ipc_resp_result_t;
 

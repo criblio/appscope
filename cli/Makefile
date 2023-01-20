@@ -89,6 +89,8 @@ $(LIBSCOPE): $(LIBRARY_C_FILES)
 $(LIBLOADER): $(LOADER_C_FILES)
 	@$(MAKE) -C .. lib/linux/$(ARCH)/libloader.a
 
+# Note regarding go build tags below:
+# force os/user and netgo to use go and NOT cgo because a static exec can't resolve libc calls from cgo
 $(SCOPE): $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN) 
 $(SCOPE): export GOOS=linux
 $(SCOPE): export CGO_ENABLED=1
@@ -99,6 +101,7 @@ $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 	$(GO_BINDATA) -nocompress -o run/bundle.go -pkg run build
 	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"$(shell du -b "$(LIBSCOPE)" | cut -f1)\" -DSCOPEDYN_SIZE=\"$(shell du -b "$(SCOPEDYN)" | cut -f1)\"" \
 	$(GO) build \
+		-tags "osusergo netgo" \
 		-ldflags="$(shell $(GOVVV) -flags) -linkmode external -extldflags \"-lrt -ldl -lpthread -static\" " \
 		-buildmode=pie \
 		$(BUILD_OPTS) \

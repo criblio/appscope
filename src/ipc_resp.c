@@ -295,8 +295,8 @@ ipcRespSetScopeCfg(const cJSON *scopeReq) {
  * - enablement of specific interface
  * - transport status of specific interface
  */
-typedef transport_status_t (*interfaceStatusFunc)(void);
 typedef bool               (*interfaceEnabledFunc)(void);
+typedef transport_status_t (*interfaceTransportStatusFunc)(void);
 
 /*
  * singleInterface is structure contains the interface object
@@ -304,7 +304,7 @@ typedef bool               (*interfaceEnabledFunc)(void);
 struct singleInterface {
     const char *name;
     interfaceEnabledFunc enabled;
-    interfaceStatusFunc status;
+    interfaceTransportStatusFunc status;
 };
 
 /*
@@ -328,12 +328,7 @@ logTransportStatus(void) {
  */
 static bool
 payloadTransportEnabled(void) {
-    // TODO: Currently we handle the status of payload if they are send to stream
-    // handle the case when they are dumped to disk
-    if (ctlTransport(g_ctl, CFG_LS)) {
-        return TRUE;
-    }
-    return FALSE;
+    return (ctlPayStatus(g_ctl) == PAYLOAD_STATUS_DISABLE) ? FALSE : TRUE;
 }
 
 /*
@@ -430,8 +425,8 @@ ipcRespGetTransportStatus(const cJSON *unused) {
     wrap->priv[0] = interfaces;
     for (int index = 0; index < INTERFACES_SIZE; ++index) {
         int interfaceIndex = index;
-        // Skip preparing the interface info if it is disabled 
-        if (!scope_interfaces[interfaceIndex].enabled()) {
+        // Skip preparing the interface info if it is disabled
+        if (scope_interfaces[interfaceIndex].enabled() == FALSE) {
             continue;
         }
 

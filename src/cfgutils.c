@@ -2768,12 +2768,18 @@ initCtl(config_t *cfg)
     }
     ctlTransportSet(ctl, trans, CFG_CTL);
 
-    // We'll create a dedicated payload channel, conditionally.
-    int payloadFeatureEnabled = cfgPayEnable(cfg) ||
-                                  protocolDefinitionsUsePayloads();
-    int sendPayloadsToStream = cfgLogStreamEnable(cfg) &&
-                                 !payloadToDiskForced();
-    if (payloadFeatureEnabled && sendPayloadsToStream) {
+    /*
+     * Determine the status of payload channel based on configuration
+     */
+    payload_status_t payloadStatus = PAYLOAD_STATUS_DISABLE;
+    if (cfgPayEnable(cfg) || protocolDefinitionsUsePayloads()) {
+        if (cfgLogStreamEnable(cfg) && !payloadToDiskForced() ) {
+            payloadStatus = PAYLOAD_STATUS_CRIBL;
+        } else {
+            payloadStatus = PAYLOAD_STATUS_DISK;
+        }
+    }
+    if (payloadStatus == PAYLOAD_STATUS_CRIBL) {
         transport_t *trans = initTransport(cfg, CFG_LS);
         if (!trans) {
             ctlDestroy(&ctl);
@@ -2793,7 +2799,7 @@ initCtl(config_t *cfg)
     ctlEvtSet(ctl, evt);
 
     ctlEnhanceFsSet(ctl, cfgEnhanceFs(cfg));
-    ctlPayEnableSet(ctl, cfgPayEnable(cfg));
+    ctlPayStatusSet(ctl, payloadStatus);
     ctlPayDirSet(ctl,    cfgPayDir(cfg));
     ctlAllowBinaryConsoleSet(ctl, cfgEvtAllowBinaryConsole(cfg));
 

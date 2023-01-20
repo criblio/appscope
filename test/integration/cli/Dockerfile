@@ -18,6 +18,8 @@ COPY ./cli/test_cli_dest.sh /opt/test/bin/test_cli_dest.sh
 COPY ./cli/test_edge.sh /opt/test/bin/test_edge.sh
 COPY ./cli/test_inspect.sh /opt/test/bin/test_inspect.sh
 COPY ./cli/expected.yml /
+RUN mkdir /opt/test/conf
+COPY ./cli/payload_conf.yml /opt/test/bin/payload_conf.yml
 
 RUN mkdir /opt/test-runner && \
     mkdir -p /var/run/appscope/ && \

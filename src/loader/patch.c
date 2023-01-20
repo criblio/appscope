@@ -43,34 +43,6 @@
 
 static int g_debug = 0;
 
-static void
-setEnvVariable(char *env, char *value)
-{
-    char *cur_val = getenv(env);
-
-    // If env is not set
-    if (!cur_val) {
-        if (setenv(env, value, 1)) {
-            perror("setEnvVariable:setenv");
-        }
-        return;
-    }
-
-    // env is set. try to append
-    char *new_val = NULL;
-    if ((asprintf(&new_val, "%s:%s", cur_val, value) == -1)) {
-        perror("setEnvVariable:asprintf");
-        return;
-    }
-
-    if (g_debug) printf("%s:%d %s to %s\n", __FUNCTION__, __LINE__, env, new_val);
-    if (setenv(env, new_val, 1)) {
-        perror("setEnvVariable:setenv");
-    }
-
-    if (new_val) free(new_val);
-}
-
 static int
 get_dir(const char *path, char *fres, size_t len) {
     DIR *dirp;
@@ -229,6 +201,7 @@ getLoaderFile(const char *exe) {
     return ldso;
 }
 
+#if 0
 // modify the loader string in the .interp section of scope
 static int
 setLoaderFile(const char *exe)
@@ -282,38 +255,6 @@ setLoaderFile(const char *exe)
     munmap(buf, sbuf.st_size);
     return 0;
 }
-
-#if 0
-static void
-do_musl(char *exld, char *scope, uid_t nsUid, gid_t nsGid)
-{
-    int symlinkErr = 0;
-    char *lpath = NULL;
-    char *path = NULL;
-    char dir[strlen(scope) + 2];
-
-    // always set the env var
-    strncpy(dir, scope, strlen(scope) + 1);
-    path = dirname(dir);
-    setEnvVariable(LD_LIB_ENV, path);
-
-    if (asprintf(&lpath, "%s/%s", path, basename(ldso)) == -1) {
-        perror("do_musl:asprintf");
-        if (ldso) free(ldso);
-        return;
-    }
-
-    // dir is expected to exist here, not creating one
-    if ((nsFileSymlink((const char *)exld, lpath, nsUid, nsGid, geteuid(), getegid(), &symlinkErr) == -1) &&
-        (symlinkErr != EEXIST)) {
-        perror("do_musl:symlink");
-        if (ldso) free(ldso);
-        if (lpath) free(lpath);
-        return;
-    }
-
-    if (lpath) free(lpath);
-}
 #endif
 
 patch_status_t
@@ -325,8 +266,6 @@ patchLoader(unsigned char *scope, uid_t nsUid, gid_t nsGid)
 
     ldso_exe = getLoaderFile(EXE_TEST_FILE);
     if (ldso_exe && strstr(ldso_exe, LIBMUSL) != NULL) {
-
-//        do_musl(ldso_exe, scope, nsUid, nsGid);
 
         // Avoid creating ld-musl-x86_64.so.1 -> /lib/ld-musl-x86_64.so.1
         if ((ldso_scope = get_loader(scope)) == NULL) {

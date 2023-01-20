@@ -99,7 +99,7 @@ $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 	$(GO_BINDATA) -nocompress -o run/bundle.go -pkg run build
 	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"$(shell du -b "$(LIBSCOPE)" | cut -f1)\" -DSCOPEDYN_SIZE=\"$(shell du -b "$(SCOPEDYN)" | cut -f1)\"" \
 	$(GO) build \
-		-ldflags="$(shell $(GOVVV) -flags) -linkmode external -extldflags -static " \
+		-ldflags="$(shell $(GOVVV) -flags) -linkmode external -extldflags \"-lrt -ldl -lpthread -static\" " \
 		-buildmode=pie \
 		$(BUILD_OPTS) \
 	       	-o $(SCOPE)
@@ -115,7 +115,7 @@ $(SCOPEDYN): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'
 	$(GO_BINDATA) -nocompress -o run/bundle.go -pkg run build
 	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"0\" -DSCOPEDYN_SIZE=\"0\"" \
 	$(GO) build \
-		-ldflags="$(shell $(GOVVV) -flags)" \
+		-ldflags="$(shell $(GOVVV) -flags) -linkmode external -extldflags \"-lrt -ldl\" " \
 		-buildmode=pie \
 		$(BUILD_OPTS) \
 	       	-o $(SCOPEDYN)

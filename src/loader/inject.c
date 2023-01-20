@@ -316,14 +316,19 @@ injectScope(int pid, char *path)
     elf_buf_t *ebuf;
     char remproc[PATH_MAX];
 
-    remLib = findLibrary("libc.so", pid, FALSE, remproc, sizeof(remproc));
-    if (remLib == -1) {
+    if (((remLib = findLibrary("libc.so", pid, FALSE, remproc, sizeof(remproc))) == 0) &&
+        ((remLib = findLibrary("ld-musl", pid, FALSE, remproc, sizeof(remproc))) == 0) &&
+        ((remLib = findLibrary("libc-", pid, FALSE, remproc, sizeof(remproc))) == 0)) {
         fprintf(stderr, "error: can't resolve libc.so in the remote process");
         return EXIT_FAILURE;
     }
 
     ebuf = getElf(remproc);
-    dlopenAddr = getDynSymbol(ebuf->buf, "dlopen");
+    if (((dlopenAddr = getDynSymbol(ebuf->buf, "dlopen")) == NULL) &&
+        ((dlopenAddr = getDynSymbol(ebuf->buf, "__libc_dlopen_mode")) == NULL)) {
+        return EXIT_FAILURE;
+    }
+
     remAddr = remLib + (uint64_t)dlopenAddr;
 
     //printf("dlopen %p remLib 0x%lx remAddr 0x%lx libscope %s\n", dlopenAddr, remLib, remAddr, path);

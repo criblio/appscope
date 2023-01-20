@@ -696,7 +696,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         execArgv[execArgc++] = "scopedyn";
         execArgv[execArgc++] = "-z";
         for (int i = 0; i < argc; i++) {
-            execArgv[execArgc++] = argv[i++];
+            execArgv[execArgc++] = argv[i];
         }
         execArgv[execArgc++] = NULL;
         sprintf(path_to_fd, "/proc/self/fd/%i", fd);
@@ -717,7 +717,8 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
             goto out;
         }
 
-        sys_exec(ebuf, inferior_command, argc, &argv[0], env);
+        sys_exec(ebuf, inferior_command, argc, &argv[0], environ);
+
     }
 
 

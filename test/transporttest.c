@@ -709,10 +709,6 @@ transportConnectionStatusInitialValues(void ** state)
     assert_int_equal(status.connectAttemptCount, 1);
     assert_null(status.failureString);
     transportDestroy(&t);
-
-    // Syslog
-
-    // Shm
 }
 
 int

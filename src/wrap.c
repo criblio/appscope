@@ -1095,7 +1095,6 @@ logOurConnectionStatus(transport_status_t status, const char *name)
     }
 }
 
-
 static void *
 periodic(void *arg)
 {
@@ -1171,7 +1170,6 @@ periodic(void *arg)
 
     return NULL;
 }
-
 
 // TODO; should this move to os/linux/os.c?
 void *

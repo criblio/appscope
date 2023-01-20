@@ -4,14 +4,11 @@
 #include "scopetypes.h"
 
 typedef struct {
-    const char *configString;
-    bool isConnected;
-
-    uint64_t connectAttemptCount;   // Useful if isConnected is false
-    const char *failureString;      // may be provided when isConnected is false
+    const char *configString;       // Human-readable transport representation
+    bool isConnected;               // Indicator about connection status
+    uint64_t connectAttemptCount;   // Useful if isConnected is FALSE
+    const char *failureString;      // May be provided when isConnected is FALSE
 } transport_status_t;
-
-
 
 typedef struct _transport_t transport_t;
 

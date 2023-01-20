@@ -275,8 +275,8 @@ __attribute__((constructor)) void cli_constructor() {
 	cmdArgc = arg_c-optind; // argc of the program we want to scope
 	cmdArgv = &arg_v[optind]; // argv of the program we want to scope
 
-	if (opt_ldattach) exit(cmdRun(opt_ldattach, false, pid, nspid, cmdArgc, cmdArgv, NULL));
-	if (opt_lddetach) exit(cmdRun(false, opt_lddetach, pid, nspid, cmdArgc, cmdArgv, NULL));
+	if (opt_ldattach) exit(cmdAttach(opt_ldattach, false, pid, nspid));
+	if (opt_lddetach) exit(cmdAttach(false, opt_lddetach, pid, nspid));
 	if (opt_configure) exit(cmdConfigure(arg_configure, nspid));
 	if (opt_unconfigure) exit(cmdUnconfigure(nspid));
 	if (opt_service) exit(cmdService(arg_service, nspid));
@@ -284,7 +284,7 @@ __attribute__((constructor)) void cli_constructor() {
 	if (opt_patch) exit(patchLibrary(arg_patch) == PATCH_SUCCESS);
 	if (opt_starthost) exit(nsHostStart());
 	if (opt_stophost) exit(nsHostStop());
-	if (opt_passthrough) exit(cmdRun(false, false, pid, nspid, cmdArgc, cmdArgv, NULL));
+	if (opt_passthrough) exit(cmdRun(false, false, pid, nspid, cmdArgc, cmdArgv));
 
 	// No constructor command executed.
 	// Continue to regular CLI usage.

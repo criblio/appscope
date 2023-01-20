@@ -390,10 +390,9 @@ cmdUnconfigure(pid_t nspid)
     return status;
 }
 
-// Handle run, attach, detach commands.
-// TODO: Split this up?
+// Handle attach and detach commands
 int
-cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **argv, char **env)
+cmdAttach(bool ldattach, bool lddetach, pid_t pid, pid_t nspid)
 {
     int res = EXIT_FAILURE;
     char *scopeLibPath;
@@ -559,8 +558,73 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
             goto out;
         }
     }
+out:
+    if (ebuf) {
+        freeElf(ebuf->buf, ebuf->len);
+        free(ebuf);
+    }
 
-    // Execute and scope the app
+    if (scope_ebuf) {
+        freeElf(scope_ebuf->buf, scope_ebuf->len);
+        free(scope_ebuf);
+    }
+
+    exit(res);
+}
+
+// Handle the run command
+int
+cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **argv)
+{
+    int res = EXIT_FAILURE;
+    char *scopeLibPath;
+    uid_t eUid = geteuid();
+    gid_t eGid = getegid();
+    uid_t nsUid = eUid;
+    uid_t nsGid = eGid;
+    elf_buf_t *scope_ebuf = NULL;
+    elf_buf_t *ebuf = NULL;
+
+    if (nspid != -1) {
+        nsUid = nsInfoTranslateUid(nspid);
+        nsGid = nsInfoTranslateGid(nspid);
+    }
+
+    scope_ebuf = getElf("/proc/self/exe");
+    if (!scope_ebuf) {
+        perror("setenv");
+        goto out;
+    }
+
+    // Extract and patch libscope from scope static. Don't attempt to extract from scope dynamic
+    if (is_static(scope_ebuf->buf)) {
+        if (libdirExtract(LIBRARY_FILE, nsUid, nsGid)) {
+            fprintf(stderr, "error: failed to extract library\n");
+            goto out;
+        }
+
+        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
+
+        if (patchLibrary(scopeLibPath) == PATCH_FAILED) {
+            fprintf(stderr, "error: failed to patch library\n");
+            goto out;
+        }
+    } else {
+        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
+    }
+
+    if (access(scopeLibPath, R_OK|X_OK)) {
+        fprintf(stderr, "error: library %s is missing, not readable, or not executable\n", scopeLibPath);
+        goto out;
+    }
+
+    if (setenv("SCOPE_LIB_PATH", scopeLibPath, 1)) {
+        perror("setenv(SCOPE_LIB_PATH) failed");
+        goto out;
+    }
+
+    // Set SCOPE_PID_ENV
+    setPidEnv(getpid());
 
 
     /*
@@ -717,7 +781,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
             goto out;
         }
 
-        sys_exec(ebuf, inferior_command, argc, &argv[0], env);
+        sys_exec(ebuf, inferior_command, argc, &argv[0], environ);
     }
 
 

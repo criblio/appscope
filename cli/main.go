@@ -121,11 +121,16 @@ __attribute__((constructor)) void cli_constructor() {
 	snprintf(fname, sizeof fname, "/proc/%d/cmdline", scope_pid);
     f = fopen(fname, "r");
     if (!f) {
+        perror("fopen");
         exit(EXIT_FAILURE);
     }
 
 	// Read args delimited by null
 	arg_v = malloc(sizeof(char *) * arg_max);
+	if (!arg_v) {
+		perror("malloc");
+		exit(EXIT_FAILURE);
+	}
 	while(getdelim(&arg_v[arg_c], &size, 0, f) != -1)
 	{
 		arg_c++;

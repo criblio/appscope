@@ -679,7 +679,15 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         // Write scopedyn to shared memory
         char path_to_fd[PATH_MAX];
         int fd = memfd_create("", MFD_CLOEXEC);
-        write(fd, start, len);
+        if (fd == -1) {
+            perror("memfd_create");
+            goto out;
+        }
+        ssize_t written = write(fd, start, len);
+        if (written != g_scopedynsz) {
+            fprintf(stderr, "error: failed to write loader to shm\n");
+            goto out;
+        }
 
         // Exec scopedyn from shared memory
         // Append "scopedyn" "-z" to argv first

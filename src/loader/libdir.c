@@ -482,6 +482,51 @@ libdirSaveLibraryFile(const char *libraryPath, bool overwrite, mode_t mode, uid_
     return libdirCreateFileIfMissing(LIBRARY_FILE, libraryPath, overwrite, mode, uid, gid);
 }
 
+int
+libdirCreate(char *base, mode_t mode, uid_t uid, gid_t gid, libdirfile_t file,
+        bool isDevVersion, const char *normVer)
+{
+    int pathLen;
+    char dir[PATH_MAX] = {0};
+    char path[PATH_MAX]= {0};
+    struct scope_obj_state *state;
+
+    state = getObjState(file);
+    if (!state) {
+        return -1;
+    }
+
+    pathLen = snprintf(dir, PATH_MAX, "%s/%s", base, normVer);
+    if (pathLen < 0) {
+        fprintf(stderr, "error: snprintf() failed.\n");
+        return -1;
+    }
+    if (pathLen >= PATH_MAX) {
+        fprintf(stderr, "error: path too long.\n");
+        return -1;
+    }
+
+    if (libdirCreateDirIfMissing(dir, mode, uid, gid) <= MKDIR_STATUS_EXISTS) {
+        int pathLen = snprintf(path, PATH_MAX, "%s/%s", dir, state->binaryName);
+        if (pathLen < 0) {
+            fprintf(stderr, "error: snprintf() failed.\n");
+            return -1;
+        }
+        if (pathLen >= PATH_MAX) {
+            fprintf(stderr, "error: path too long.\n");
+            return -1;
+        }
+
+        if (!libdirCreateFileIfMissing(file, path, isDevVersion, mode, uid, gid)) {
+            strncpy(state->binaryPath, path, PATH_MAX);
+            strncpy(state->binaryBasepath, base, PATH_MAX);
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
 /*
 * Extract (physically create) specified binary file to the filesystem.
 * The extraction will not be performed:
@@ -494,94 +539,19 @@ int libdirExtract(libdirfile_t file, uid_t uid, gid_t gid) {
     bool isDevVersion = libverIsNormVersionDev(normVer);
     const char *existing_path = libdirGetPath(file);
 
-    /*
-     * If we are a dev version, always extract.
-     * If we are prod version and this version exists, don't extract.
-     */
+    // If we are a dev version, always extract.
+    // If we are a prod version and this version exists, don't extract.
     if ((existing_path) && (isDevVersion == FALSE)) {
         return 0;
     }
 
-    char dir[PATH_MAX] = {0};
-    char path[PATH_MAX]= {0};
-    int  pathLen;
-
-    struct scope_obj_state *state = getObjState(file);
-    if (!state) {
-        return -1;
-    }
-
-    /*
-    * Try to use the install base only for official version
-    */
-    mode_t mode = 0755;
+    // Try to extract to the install base only for the official version
     if (isDevVersion == FALSE) {
-        pathLen = snprintf(dir, PATH_MAX, "%s/%s", g_libdir_info.install_base, normVer);
-        if (pathLen < 0) {
-            fprintf(stderr, "error: snprintf() failed.\n");
-            return -1;
-        }
-
-        if (pathLen >= PATH_MAX) {
-            fprintf(stderr, "error: path too long.\n");
-            return -1;
-        }
-
-        if (libdirCreateDirIfMissing(dir, mode, uid, gid) <= MKDIR_STATUS_EXISTS) {
-            int pathLen = snprintf(path, PATH_MAX, "%s/%s", dir, state->binaryName);
-            if (pathLen < 0) {
-                fprintf(stderr, "error: snprintf() failed.\n");
-                return -1;
-            }
-
-            if (pathLen >= PATH_MAX) {
-                fprintf(stderr, "error: path too long.\n");
-                return -1;
-            }
-
-            if (!libdirCreateFileIfMissing(file, path, isDevVersion, mode, uid, gid)) {
-                strncpy(state->binaryPath, path, PATH_MAX);
-                strncpy(state->binaryBasepath, g_libdir_info.install_base, PATH_MAX);
-                return 0;
-            }
-        }
-
-        return -1;
-    }
-
-    // Clean the buffers
-    memset(path, 0, PATH_MAX);
-    memset(dir, 0, PATH_MAX);
-    mode = 0777;
-    pathLen = snprintf(dir, PATH_MAX, "%s/%s", g_libdir_info.tmp_base, normVer);
-    if (pathLen < 0) {
-        fprintf(stderr, "error: snprintf() failed.\n");
-        return -1;
-    }
-
-    if (pathLen >= PATH_MAX) {
-        fprintf(stderr, "error: path too long.\n");
-        return -1;
-    }
-
-    if (libdirCreateDirIfMissing(dir, mode, uid, gid) <= MKDIR_STATUS_EXISTS) {
-        int pathLen = snprintf(path, PATH_MAX, "%s/%s", dir, state->binaryName);
-        if (pathLen < 0) {
-            fprintf(stderr, "error: snprintf() failed.\n");
-            return -1;
-        }
-
-        if (pathLen >= PATH_MAX) {
-            fprintf(stderr, "error: path too long.\n");
-            return -1;
-        }
-
-        if (!libdirCreateFileIfMissing(file, path, isDevVersion, mode, uid, gid)) {
-            strncpy(state->binaryPath, path, PATH_MAX);
-            strncpy(state->binaryBasepath, g_libdir_info.tmp_base, PATH_MAX);
+        if (!libdirCreate(g_libdir_info.install_base, 0755, uid, gid, file, isDevVersion, normVer)) {
             return 0;
         }
     }
 
-    return -1;
+    // If extraction to the install base fails; or we are the dev version, extract to the tmp base
+    return libdirCreate(g_libdir_info.tmp_base, 0777, uid, gid, file, isDevVersion, normVer);
 }

@@ -576,7 +576,6 @@ out:
 int
 cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **argv)
 {
-    int res = EXIT_FAILURE;
     char *scopeLibPath;
     uid_t eUid = geteuid();
     gid_t eGid = getegid();
@@ -674,8 +673,6 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
             goto out;
         }
 
-        execve(inferior_command, &argv[0], environ);
-        perror("execve");
         goto out;
     }
 
@@ -690,10 +687,10 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         goto out;
     }
 
+    // Add a comment here
     if (getenv("LD_PRELOAD") != NULL) {
         unsetenv("LD_PRELOAD");
-        execve(inferior_command, argv, environ);
-        perror("execve");
+        goto out;
     }
 
     program_invocation_short_name = basename(argv[0]);
@@ -705,8 +702,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         // and any other static native apps...
         // Start here when we support more static binaries
         // than go.
-        execve(inferior_command, &argv[0], environ);
-        perror("execve");
+        goto out;
     }
 
     // If scope itself is static, we need to call scope dynamic
@@ -782,21 +778,14 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         }
 
         sys_exec(ebuf, inferior_command, argc, &argv[0], environ);
+        fprintf(stderr, "error: sys_exec failed. Check scope.log for details\n");
     }
-
-
-    /*
-     * We should not return from sys_exec unless there was an error loading the static exec.
-     * In this case, just start the exec without being scoped.
-     * Was wondering if we should free the mapped elf image.
-     * But, since we exec on failure to load, it doesn't matter.
-     */
-
-    execve(inferior_command, &argv[0], environ);
  
-    res = EXIT_SUCCESS;
-
 out:
+    /*
+     * Cleanup and exec the user app (where possible)
+     * If there are errors, the app will run without scope
+     */
     if (ebuf) {
         freeElf(ebuf->buf, ebuf->len);
         free(ebuf);
@@ -807,5 +796,10 @@ out:
         free(scope_ebuf);
     }
 
-    exit(res);
+    if (inferior_command) {
+        execve(inferior_command, &argv[0], environ);
+        perror("execve");
+    }
+
+    exit(EXIT_FAILURE);
 }

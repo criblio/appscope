@@ -19,7 +19,7 @@
 #include "../scopestdlib.h"
 #include "../scopetypes.h"
 #include "libdir.h"
-#include "loaderop.h"
+#include "patch.h"
 #include "nsinfo.h"
 #include "nsfile.h"
 #include "ns.h"
@@ -425,7 +425,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
 
         scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
 
-        if (loaderOpPatchLibrary(scopeLibPath) == PATCH_FAILED) {
+        if (patchLibrary(scopeLibPath) == PATCH_FAILED) {
             fprintf(stderr, "error: failed to patch library\n");
             goto out;
         }
@@ -658,7 +658,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         }
 
         // Patch the scopedyn executable on the heap (for musl support)
-        if (loaderOpPatchLoader(start, nsUid, nsGid) == PATCH_FAILED) {
+        if (patchLoader(start, nsUid, nsGid) == PATCH_FAILED) {
             fprintf(stderr, "error: failed to patch loader\n");
             goto out;
         }

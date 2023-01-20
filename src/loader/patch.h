@@ -1,5 +1,5 @@
-#ifndef __LOADEROP_H__
-#define __LOADEROP_H__
+#ifndef __PATCH_H__
+#define __PATCH_H__
 
 #include "../scopetypes.h"
 
@@ -9,7 +9,7 @@ typedef enum {
     PATCH_NO_OP,    // patch operation was not performed
 } patch_status_t;
 
-patch_status_t loaderOpPatchLibrary(const char*);
-patch_status_t loaderOpPatchLoader(unsigned char *, uid_t, gid_t);
+patch_status_t patchLibrary(const char*);
+patch_status_t patchLoader(unsigned char *, uid_t, gid_t);
 
-#endif // __LOADEROP_H__
+#endif // __PATCH_H__

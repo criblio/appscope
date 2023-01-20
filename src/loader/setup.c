@@ -5,7 +5,7 @@
 #include <string.h>
 
 #include "dbg.h"
-#include "loaderop.h"
+#include "patch.h"
 #include "libdir.h"
 #include "libver.h"
 #include "nsfile.h"
@@ -802,7 +802,7 @@ setupConfigure(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
     }
 
     // Patch the library
-    if (loaderOpPatchLibrary(path) == PATCH_FAILED) {
+    if (patchLibrary(path) == PATCH_FAILED) {
         fprintf(stderr, "setupConfigure: patch %s failed\n", path);
         return -1;
     }

@@ -17,7 +17,7 @@ package main
 
 #include "../src/loader/libdir.h"
 #include "../src/loader/loader.h"
-#include "../src/loader/loaderop.h"
+#include "../src/loader/patch.h"
 #include "../src/loader/ns.h"
 
 // Example Usage:
@@ -281,7 +281,7 @@ __attribute__((constructor)) void cli_constructor() {
 	if (opt_unconfigure) exit(cmdUnconfigure(nspid));
 	if (opt_service) exit(cmdService(arg_service, nspid));
 	if (opt_unservice) exit(cmdUnservice(nspid));
-	if (opt_patch) exit(loaderOpPatchLibrary(arg_patch) == PATCH_SUCCESS);
+	if (opt_patch) exit(patchLibrary(arg_patch) == PATCH_SUCCESS);
 	if (opt_starthost) exit(nsHostStart());
 	if (opt_stophost) exit(nsHostStop());
 	if (opt_passthrough) exit(cmdRun(false, false, pid, nspid, cmdArgc, cmdArgv, NULL));

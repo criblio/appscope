@@ -7,7 +7,7 @@
 #include <libgen.h>
 
 #include "libdir.h"
-#include "loaderop.h"
+#include "patch.h"
 #include "nsfile.h"
 
 #include "scopestdlib.h"
@@ -194,7 +194,7 @@ get_loader(const unsigned char *buf) {
 }
 
 static char *
-loaderOpGetLoaderFile(const char *exe) {
+getLoaderFile(const char *exe) {
     int fd;
     struct stat sbuf;
     unsigned char *buf = NULL;
@@ -203,12 +203,12 @@ loaderOpGetLoaderFile(const char *exe) {
     if (!exe) return NULL;
 
     if ((fd = open(exe, O_RDONLY)) == -1) {
-        perror("loaderOpGetLoaderFile:open");
+        perror("getLoaderFile:open");
         return NULL;
     }
 
     if (fstat(fd, &sbuf) == -1) {
-        perror("loaderOpGetLoaderFile:fstat");
+        perror("getLoaderFile:fstat");
         close(fd);
         return NULL;
     }
@@ -216,7 +216,7 @@ loaderOpGetLoaderFile(const char *exe) {
     buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
                PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);
     if (buf == MAP_FAILED) {
-        perror("loaderOpGetLoaderFile:mmap");
+        perror("getLoaderFile:mmap");
         close(fd);
         return NULL;
     }
@@ -231,7 +231,7 @@ loaderOpGetLoaderFile(const char *exe) {
 
 // modify the loader string in the .interp section of scope
 static int
-loaderOpSetLoaderFile(const char *exe)
+setLoaderFile(const char *exe)
 {
     int fd;
     struct stat sbuf;
@@ -240,12 +240,12 @@ loaderOpSetLoaderFile(const char *exe)
     if (!exe) return -1;
 
     if ((fd = open(exe, O_RDONLY)) == -1) {
-        perror("loaderOpSetLoaderFile:open");
+        perror("setLoaderFile:open");
         return -1;
     }
 
     if (fstat(fd, &sbuf) == -1) {
-        perror("loaderOpSetLoaderFile:fstat");
+        perror("setLoaderFile:fstat");
         close(fd);
         return -1;
     }
@@ -253,7 +253,7 @@ loaderOpSetLoaderFile(const char *exe)
     buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
                PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, (off_t)NULL);
     if (buf == MAP_FAILED) {
-        perror("loaderOpSetLoaderFile:mmap");
+        perror("setLoaderFile:mmap");
         close(fd);
         return -1;
     }
@@ -265,14 +265,14 @@ loaderOpSetLoaderFile(const char *exe)
         }
 
         if ((fd = open(exe, O_RDWR)) == -1) {
-            perror("loaderOpSetLoaderFile:open");
+            perror("setLoaderFile:open");
             munmap(buf, sbuf.st_size);
             return -1;
         }
 
         int rc = write(fd, buf, sbuf.st_size);
         if (rc < sbuf.st_size) {
-            perror("loaderOpSetLoaderFile:write");
+            perror("setLoaderFile:write");
         }
     } else {
         fprintf(stderr, "WARNING: can't locate or set the loader string in %s\n", exe);
@@ -317,13 +317,13 @@ do_musl(char *exld, char *scope, uid_t nsUid, gid_t nsGid)
 #endif
 
 patch_status_t
-loaderOpPatchLoader(unsigned char *scope, uid_t nsUid, gid_t nsGid)
+patchLoader(unsigned char *scope, uid_t nsUid, gid_t nsGid)
 {
     patch_status_t patch_res = PATCH_NO_OP;
     char *ldso_exe = NULL;
     char *ldso_scope = NULL;
 
-    ldso_exe = loaderOpGetLoaderFile(EXE_TEST_FILE);
+    ldso_exe = getLoaderFile(EXE_TEST_FILE);
     if (ldso_exe && strstr(ldso_exe, LIBMUSL) != NULL) {
 
 //        do_musl(ldso_exe, scope, nsUid, nsGid);
@@ -353,7 +353,7 @@ out:
 
 // modify NEEDED entries in libscope.so to avoid dependencies
 static int
-loaderOpSetLibraryFile(const char *libpath) {
+setLibraryFile(const char *libpath) {
     int i, fd, found, name;
     struct stat sbuf;
     char *buf;
@@ -368,12 +368,12 @@ loaderOpSetLibraryFile(const char *libpath) {
         return -1;
 
     if ((fd = open(libpath, O_RDONLY)) == -1) {
-        perror("loaderOpSetLibrary:open");
+        perror("setLibrary:open");
         return -1;
     }
 
     if (fstat(fd, &sbuf) == -1) {
-        perror("loaderOpSetLibrary:fstat");
+        perror("setLibrary:fstat");
         close(fd);
         return -1;
     }
@@ -381,7 +381,7 @@ loaderOpSetLibraryFile(const char *libpath) {
     buf = mmap(NULL, ROUND_UP(sbuf.st_size, sysconf(_SC_PAGESIZE)),
                PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, (off_t)NULL);
     if (buf == MAP_FAILED) {
-        perror("loaderOpSetLibrary:mmap");
+        perror("setLibrary:mmap");
         close(fd);
         return -1;
     }
@@ -449,14 +449,14 @@ loaderOpSetLibraryFile(const char *libpath) {
         }
 
         if ((fd = open(libpath, O_RDWR)) == -1) {
-            perror("loaderOpSetLibrary:open write");
+            perror("setLibrary:open write");
             munmap(buf, sbuf.st_size);
             return -1;
         }
 
         int rc = write(fd, buf, sbuf.st_size);
         if (rc < sbuf.st_size) {
-            perror("loaderOpSetLibrary:write");
+            perror("setLibrary:write");
         }
     }
 
@@ -466,13 +466,13 @@ loaderOpSetLibraryFile(const char *libpath) {
 }
 
 patch_status_t
-loaderOpPatchLibrary(const char *so_path) {
+patchLibrary(const char *so_path) {
     patch_status_t patch_res = PATCH_NO_OP;
     char *ldso_exe = NULL;
       
-    ldso_exe = loaderOpGetLoaderFile(EXE_TEST_FILE);
+    ldso_exe = getLoaderFile(EXE_TEST_FILE);
     if (ldso_exe && strstr(ldso_exe, LIBMUSL) != NULL) {
-        if (!loaderOpSetLibraryFile(so_path)) {
+        if (!setLibraryFile(so_path)) {
             patch_res = PATCH_SUCCESS;
         } else {
             patch_res = PATCH_FAILED;

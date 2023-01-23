@@ -14,7 +14,7 @@ struct _log_t
 };
 
 log_t*
-logCreate()
+logCreate(void)
 {
     log_t* log = scope_calloc(1, sizeof(log_t));
     if (!log) {

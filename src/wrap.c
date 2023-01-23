@@ -861,7 +861,7 @@ static void
 doThread()
 {
     /*
-     * If we try to start the perioidic thread before the constructor
+     * If we try to start the periodic thread before the constructor
      * is executed and our config is not set, we are able to start the
      * thread too early. Some apps, most notably Chrome, check to
      * ensure that no extra threads are created before it is fully

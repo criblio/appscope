@@ -1,8 +1,3 @@
-/**
- * Cribl AppScope - Library Directory Implementation
- */
-#include "libdir.h"
-
 #define _XOPEN_SOURCE 500 // for FTW
 #define _GNU_SOURCE
 
@@ -10,23 +5,23 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <ftw.h>
-#include <linux/limits.h> // for PATH_MAX
+#include <linux/limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <unistd.h>
 
-#include "scopestdlib.h"
-#include "scopetypes.h" // for ROUND_UP()
-#include "nsfile.h"
+#include "libdir.h"
 #include "libver.h"
 #include "loaderutils.h"
 #include "loader.h"
+#include "nsfile.h"
+#include "scopetypes.h"
 
 #ifndef SCOPE_VER
 #error "Missing SCOPE_VER"

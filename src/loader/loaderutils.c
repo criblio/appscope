@@ -1,18 +1,21 @@
 #define _GNU_SOURCE
+
+#include <dirent.h>
 #include <dlfcn.h>
 #include <fcntl.h>
+#include <limits.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <limits.h>
 #include <sys/types.h>
-#include <dirent.h>
+#include <unistd.h>
 
-#include "scopetypes.h"
 #include "loader.h"
 #include "loaderutils.h"
+#include "scopetypes.h"
 
 void
 freeElf(char *buf, size_t len)

@@ -1,10 +1,13 @@
 #ifndef __LOADERUTILS_H__
 #define __LOADERUTILS_H__
-
 #ifdef __linux__
 
 #include <elf.h>
 #include <link.h>
+#include <stdbool.h>
+
+#define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
+#define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 
 typedef struct {
     char *cmd;

@@ -1,6 +1,7 @@
 #ifndef __LOADER_H__
 #define __LOADER_H__
-#include <sys/types.h>
+
+#include <unistd.h>
 
 extern int g_log_level;
 
@@ -11,4 +12,4 @@ int cmdUnconfigure(pid_t);
 int cmdAttach(bool, bool, pid_t, pid_t);
 int cmdRun(bool, bool, pid_t, pid_t, int, char **);
 
-#endif // __LOADER_H__
+#endif // __LOADER_H__s

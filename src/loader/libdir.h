@@ -1,16 +1,10 @@
-/**
- * Cribl AppScope - Library Directory Interface
- *
- * See docs/STARTUP.md
- */
-
 #ifndef _SCOPE_LIBDIR_H
 #define _SCOPE_LIBDIR_H 1
 
 #include <linux/limits.h>
-#include <sys/stat.h>
 #include <stdbool.h>
-#include "../scopetypes.h"
+#include <stdio.h>
+#include <sys/stat.h>
 
 extern unsigned long g_libscopesz;
 extern unsigned long g_scopedynsz;

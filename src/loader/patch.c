@@ -1,16 +1,20 @@
 #define _GNU_SOURCE
 
-#include <fcntl.h>
-#include <stdlib.h>
+#include <dirent.h>
+#include <elf.h>
 #include <errno.h>
-#include <string.h>
+#include <fcntl.h>
 #include <libgen.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 #include "libdir.h"
 #include "patch.h"
 #include "nsfile.h"
-
-#include "scopestdlib.h"
+#include "loaderutils.h"
 
 #define EXE_TEST_FILE "/bin/cat"
 #define LIBMUSL "musl"

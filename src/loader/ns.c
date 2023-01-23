@@ -1,16 +1,20 @@
 #define _GNU_SOURCE
+
 #include <fcntl.h>
+#include <sched.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/wait.h>
 
+#include "libver.h"
+#include "libdir.h"
 #include "ns.h"
 #include "nsinfo.h"
 #include "nsfile.h"
-#include "libver.h"
-#include "libdir.h"
 #include "setup.h"
-#include "scopestdlib.h"
+#include "scopetypes.h"
 
 #define SCOPE_CRONTAB "* * * * * root /tmp/att.sh\n"
 #define SCOPE_START_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s start -f < %s\nrm -- $0\n"

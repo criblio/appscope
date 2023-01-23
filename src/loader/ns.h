@@ -2,7 +2,9 @@
 #define __NS_H__
 
 #include <stdbool.h>
-#include "../scopetypes.h"
+#include <unistd.h>
+
+#include "scopetypes.h"
 
 // Operation performed from host to container
 int nsForkAndExec(pid_t, pid_t, bool);

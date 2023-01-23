@@ -1,9 +1,15 @@
 #define _GNU_SOURCE
+
+#include <limits.h>
 #include <string.h>
+#include <stdbool.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "nsinfo.h"
-#include "scopestdlib.h"
+#include "scopetypes.h"
 
 /*
  * Return effective uid of current user inside the namespace for specified pid.

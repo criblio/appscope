@@ -1,7 +1,7 @@
 #ifndef __PATCH_H__
 #define __PATCH_H__
 
-#include "../scopetypes.h"
+#include <unistd.h>
 
 typedef enum {
     PATCH_FAILED,   // patch operation was failed

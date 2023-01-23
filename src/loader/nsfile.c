@@ -1,10 +1,14 @@
 #define _GNU_SOURCE
-#include <stdlib.h>
-#include <fcntl.h>
+
 #include <errno.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "nsfile.h"
-#include "scopestdlib.h"
 
 int
 nsFileShmOpen(const char *name, int oflag, mode_t mode, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gid_t restoreGid) {

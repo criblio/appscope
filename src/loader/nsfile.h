@@ -1,9 +1,9 @@
 #ifndef __NSFILE_H__
 #define __NSFILE_H__
 
-#include "../scopestdlib.h"
-#include "../scopetypes.h"
-
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 /*
 * API in this module provides a set of wrappers which allows to perform

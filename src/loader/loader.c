@@ -1,32 +1,32 @@
 #define _GNU_SOURCE
+
+#include <dlfcn.h>
+#include <dirent.h>
+#include <errno.h>
+#include <elf.h>
+#include <fcntl.h>
+#include <getopt.h>
+#include <libgen.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <syslog.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <sys/wait.h>
-#include <errno.h>
 #include <string.h>
-#include <elf.h>
-#include <libgen.h>
-#include <dirent.h>
-#include <getopt.h>
 #include <sys/utsname.h>
-#include <dlfcn.h>
+#include <unistd.h>
 
-#include "../scopestdlib.h"
-#include "../scopetypes.h"
+#include "inject.h"
+#include "loader.h"
 #include "libdir.h"
-#include "patch.h"
+#include "loaderutils.h"
 #include "nsinfo.h"
 #include "nsfile.h"
 #include "ns.h"
+#include "patch.h"
 #include "setup.h"
-#include "loaderutils.h"
-#include "inject.h"
-#include "loader.h"
  
 // maybe set this from a cmd line switch?
 int g_log_level = CFG_LOG_WARN;

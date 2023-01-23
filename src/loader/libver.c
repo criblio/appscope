@@ -1,12 +1,11 @@
 #define _GNU_SOURCE
 
+#include <ctype.h>
 #include <errno.h>
 #include <string.h>
-#include <ctype.h>
+#include <stdbool.h>
 
 #include "libver.h"
-#include "scopestdlib.h"
-#include "scopetypes.h"
 
 /*
  * Returns normalized version string

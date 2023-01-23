@@ -1,16 +1,20 @@
 #define _GNU_SOURCE
+
+#include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
-#include <errno.h>
+#include <stdio.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
-#include "dbg.h"
-#include "patch.h"
 #include "libdir.h"
 #include "libver.h"
 #include "nsfile.h"
+#include "patch.h"
+#include "scopetypes.h"
 #include "setup.h"
-#include "scopestdlib.h"
 
 #define BUFSIZE (4096)
 

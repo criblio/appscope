@@ -1,27 +1,25 @@
-
 #define _GNU_SOURCE
+
+#include <errno.h>
+#include <dlfcn.h>
+#include <link.h>
+#include <linux/limits.h>
+#include <inttypes.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ptrace.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/uio.h>
 #include <sys/user.h>
 #include <unistd.h>
-#include <string.h>
-#include <link.h>
-#include <errno.h>
-#include <stdint.h>
-#include <linux/limits.h>
-#include <dlfcn.h>
-#include <stddef.h>
-#include <inttypes.h>
 
-#include "../scopestdlib.h"
-#include "dbg.h"
 #include "inject.h"
-#include "os.h"
 #include "loaderutils.h"
+#include "scopetypes.h"
 
 typedef enum {
     REM_CMD_DLOPEN,

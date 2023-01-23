@@ -16,12 +16,12 @@ int fullSetenv(const char *, const char *, int);
 void setPidEnv(int);
 char *getpath(const char *);
 
-int startsWith(const char *string, const char *substring);
-int endsWith(const char *string, const char *substring);
+int startsWith(const char *, const char *);
+int endsWith(const char *, const char *);
 
-int sigSafeNanosleep(const struct timespec *req);
+int sigSafeNanosleep(const struct timespec *);
 
-void setUUID(char *string);
-void setMachineID(char *string);
+void setUUID(char *);
+void setMachineID(char *);
 
 #endif // __UTILS_H__

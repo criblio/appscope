@@ -1087,6 +1087,11 @@ periodic(void *arg)
 
     sigset_t mask;
     scope_sigfillset(&mask);
+    if (checkEnv("SCOPE_ERROR_SIGNAL_HANDLER", "true")) {
+        scope_sigdelset(&mask, SIGSEGV);
+        scope_sigdelset(&mask, SIGBUS);
+    }
+
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
     bool perf;
     static time_t summaryTime, logReportTime;

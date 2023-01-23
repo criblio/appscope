@@ -1086,7 +1086,7 @@ periodic(void *arg)
     // the only reasonable solution seems to be masking the signals for this thread
 
     sigset_t mask;
-    sigfillset(&mask);
+    scope_sigfillset(&mask);
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
     bool perf;
     static time_t summaryTime, logReportTime;

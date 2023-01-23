@@ -162,6 +162,7 @@ extern int           scopelibc_usleep(useconds_t);
 extern int           scopelibc_nanosleep(const struct timespec *, struct timespec *);
 extern int           scopelibc_sigaction(int, const struct sigaction *, struct sigaction *);
 extern int           scopelibc_sigemptyset(sigset_t *);
+extern int           scopelibc_sigfillset(sigset_t *);
 extern int           scopelibc_pthread_create(pthread_t *, const pthread_attr_t *, void *(*)(void *), void *);
 extern int           scopelibc_pthread_barrier_init(pthread_barrier_t *, const pthread_barrierattr_t *, unsigned);
 extern int           scopelibc_pthread_barrier_destroy(pthread_barrier_t *);
@@ -960,6 +961,11 @@ scope_sigaction(int signum, const struct sigaction *restrict act, struct sigacti
 int
 scope_sigemptyset(sigset_t * set) {
     return scopelibc_sigemptyset(set);
+}
+
+int
+scope_sigfillset(sigset_t *set) {
+    return scopelibc_sigfillset(set);
 }
 
 int

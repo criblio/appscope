@@ -240,7 +240,7 @@ void
 dbgAddLine(const char *key, const char *fmt, ...)
 {
     // TODO verify should this be called always
-    // scopeBacktrace();
+    // scopeLogBacktrace();
 
     if (!g_dbg) return;
 

@@ -6,14 +6,10 @@
 #include "scopestdlib.h"
 #include "runtimecfg.h"
 
-#define ARRAY_SIZE(arr) ((sizeof(arr))/(sizeof(arr[0])))
-
 static const char* cmdMetaName[] = {
     [META_REQ_JSON]         = "completeRequestJson",
     [META_REQ_JSON_PARTIAL] = "incompleteRequestJson",
 };
-
-#define CMD_META_SIZE  (ARRAY_SIZE(cmdMetaName))
 
 static const char* cmdScopeName[] = {
     [IPC_CMD_GET_SUPPORTED_CMD]    = "getSupportedCmd",
@@ -134,7 +130,7 @@ createCmdDesc(int id, const char *name) {
  */
 scopeRespWrapper *
 ipcRespGetScopeCmds(const cJSON * unused) {
-    SCOPE_BUILD_ASSERT(IPC_CMD_UNKNOWN == CMD_SCOPE_SIZE, "cmdScopeName must be inline with ipc_scope_req_t");
+    SCOPE_BUILD_ASSERT(IPC_CMD_UNKNOWN == ARRAY_SIZE(cmdScopeName), "cmdScopeName must be inline with ipc_scope_req_t");
 
     scopeRespWrapper *wrap = respWrapperCreate();
     if (!wrap) {
@@ -155,7 +151,7 @@ ipcRespGetScopeCmds(const cJSON * unused) {
     }
 
     wrap->priv[0] = metaCmds;
-    for (int id = 0; id < CMD_META_SIZE; ++id){
+    for (int id = 0; id < ARRAY_SIZE(cmdMetaName); ++id){
         cJSON *singleCmd = createCmdDesc(id, cmdMetaName[id]);
         if (!singleCmd) {
             goto allocFail;
@@ -170,7 +166,7 @@ ipcRespGetScopeCmds(const cJSON * unused) {
     }
 
     wrap->priv[1] = scopeCmds;
-    for (int id = 0; id < CMD_SCOPE_SIZE; ++id){
+    for (int id = 0; id < ARRAY_SIZE(cmdScopeName); ++id){
         cJSON *singleCmd = createCmdDesc(id, cmdScopeName[id]);
         if (!singleCmd) {
             goto allocFail;
@@ -397,8 +393,6 @@ struct singleInterface scope_interfaces[] = {
     [INDEX_METRICS] = {.name = "metrics", .enabled = metricTransportEnabled,  .status = metricsTransportStatus},
 };
 
-#define INTERFACES_SIZE  (ARRAY_SIZE(scope_interfaces))
-
 /*
  * Creates the wrapper for response to IPC_CMD_GET_TRANSPORT_STATUS
  * TODO: use unused attribute later
@@ -423,7 +417,7 @@ ipcRespGetTransportStatus(const cJSON *unused) {
         goto allocFail;
     }
     wrap->priv[0] = interfaces;
-    for (int index = 0; index < INTERFACES_SIZE; ++index) {
+    for (int index = 0; index < ARRAY_SIZE(scope_interfaces); ++index) {
         int interfaceIndex = index;
         // Skip preparing the interface info if it is disabled
         if (scope_interfaces[interfaceIndex].enabled() == FALSE) {
@@ -432,7 +426,7 @@ ipcRespGetTransportStatus(const cJSON *unused) {
 
         // if the cribl is last one there is no point to handle events and metrics
         if (interfaceIndex == INDEX_CRIBL) {
-            index = INTERFACES_SIZE;
+            index = ARRAY_SIZE(scope_interfaces);
         }
 
         cJSON *singleInterface = cJSON_CreateObject();

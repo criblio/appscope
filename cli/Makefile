@@ -91,6 +91,7 @@ $(LIBLOADER): $(LOADER_C_FILES)
 
 # Note regarding go build tags below:
 # force os/user and netgo to use go and NOT cgo because a static exec can't resolve libc calls from cgo
+# the -s -w go build flags remove the symbol table, debug info, dwarf symbol table from the resulting executable
 $(SCOPE): $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN) 
 $(SCOPE): export GOOS=linux
 $(SCOPE): export CGO_ENABLED=1
@@ -102,7 +103,7 @@ $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"$(shell du -b "$(LIBSCOPE)" | cut -f1)\" -DSCOPEDYN_SIZE=\"$(shell du -b "$(SCOPEDYN)" | cut -f1)\"" \
 	$(GO) build \
 		-tags "osusergo netgo" \
-		-ldflags="$(shell $(GOVVV) -flags) -linkmode external -extldflags \"-lrt -ldl -lpthread -static\" " \
+		-ldflags="$(shell $(GOVVV) -flags) -s -w -linkmode external -extldflags \"-lrt -ldl -lpthread -static\" " \
 		-buildmode=pie \
 		$(BUILD_OPTS) \
 	       	-o $(SCOPE)
@@ -118,7 +119,7 @@ $(SCOPEDYN): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'
 	$(GO_BINDATA) -nocompress -o run/bundle.go -pkg run build
 	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"0\" -DSCOPEDYN_SIZE=\"0\"" \
 	$(GO) build \
-		-ldflags="$(shell $(GOVVV) -flags) -linkmode external -extldflags \"-lrt -ldl\" " \
+		-ldflags="$(shell $(GOVVV) -flags) -s -w -linkmode external -extldflags \"-lrt -ldl\" " \
 		-buildmode=pie \
 		$(BUILD_OPTS) \
 	       	-o $(SCOPEDYN)

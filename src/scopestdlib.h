@@ -242,6 +242,7 @@ int           scope_nanosleep(const struct timespec *, struct timespec *);
 int           scope_sigaction(int, const struct sigaction *, struct sigaction *);
 int           scope_sigemptyset(sigset_t *);
 int           scope_sigfillset(sigset_t *);
+int           scope_sigdelset(sigset_t *, int);
 int           scope_pthread_create(pthread_t *, const pthread_attr_t *, void *(*)(void *), void *);
 int           scope_pthread_barrier_init(pthread_barrier_t *, const pthread_barrierattr_t *, unsigned);
 int           scope_pthread_barrier_destroy(pthread_barrier_t *);

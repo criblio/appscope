@@ -57,6 +57,7 @@ static const char *netFailMap[] = {
 struct _transport_t
 {
     cfg_transport_t type;
+    char *configStr;
     int (*getaddrinfo)(const char *, const char *,
                        const struct addrinfo *,
                        struct addrinfo **);
@@ -184,7 +185,7 @@ transportType(transport_t *trans)
     return trans->type;
 }
 
-int
+bool
 transportSupportsCommandControl(transport_t *trans)
 {
     if (!trans) return FALSE;
@@ -230,7 +231,7 @@ transportConnection(transport_t *trans)
     return -1;
 }
 
-int
+bool
 transportNeedsConnection(transport_t *trans)
 {
     if (!trans) return FALSE;
@@ -1151,6 +1152,9 @@ transportCreateTCP(const char *host, const char *port, unsigned int enable,
     if (!trans) return trans;
 
     trans->type = CFG_TCP;
+    if (scope_asprintf(&trans->configStr, "tcp://%s:%s", host, port) < 0) {
+        trans->configStr = NULL;
+    }
     trans->net.sock = -1;
     trans->net.pending_connect = -1;
     trans->net.host = scope_strdup(host);
@@ -1159,7 +1163,7 @@ transportCreateTCP(const char *host, const char *port, unsigned int enable,
     trans->net.tls.validateserver = validateserver;
     trans->net.tls.cacertpath = (cacertpath) ? scope_strdup(cacertpath) : NULL;
 
-    if (!trans->net.host || !trans->net.port) {
+    if (!trans->configStr || !trans->net.host || !trans->net.port) {
         DBG(NULL);
         transportDestroy(&trans);
         return trans;
@@ -1181,12 +1185,15 @@ transportCreateUdp(const char* host, const char* port)
     if (!t) return t;
 
     t->type = CFG_UDP;
+    if (scope_asprintf(&t->configStr, "udp://%s:%s", host, port) < 0) {
+        t->configStr = NULL;
+    }
     t->net.sock = -1;
     t->net.pending_connect = -1;
     t->net.host = scope_strdup(host);
     t->net.port = scope_strdup(port);
 
-    if (!t->net.host || !t->net.port) {
+    if (!t->configStr || !t->net.host || !t->net.port) {
         DBG(NULL);
         transportDestroy(&t);
         return t;
@@ -1207,8 +1214,11 @@ transportCreateFile(const char* path, cfg_buffer_t buf_policy)
     if (!t) return NULL; 
 
     t->type = CFG_FILE;
+    if (scope_asprintf(&t->configStr, "file://%s", path) < 0) {
+        t->configStr = NULL;
+    }
     t->file.path = scope_strdup(path);
-    if (!t->file.path) {
+    if (!t->configStr || !t->file.path) {
         DBG("%s", path);
         transportDestroy(&t);
         return t;
@@ -1237,6 +1247,10 @@ transportCreateUnix(const char *path)
     if (!(trans = newTransport())) goto err;
 
     trans->type = CFG_UNIX;
+    if (scope_asprintf(&trans->configStr, "unix://%s", path) < 0) {
+        trans->configStr = NULL;
+        goto err;
+    }
     trans->local.sock = -1;
     if (!(trans->local.path = scope_strdup(path))) goto err;
 
@@ -1271,6 +1285,7 @@ transportCreateEdge(void)
     if (!(trans = newTransport())) goto err;
 
     trans->type = CFG_EDGE;
+    if (!(trans->configStr = scope_strdup("edge"))) goto err;
     trans->local.sock = -1;
     trans->local.path = NULL;
 
@@ -1291,6 +1306,9 @@ transportDestroy(transport_t **transport)
     if (!transport || !*transport) return;
 
     transport_t *trans = *transport;
+
+    if (trans->configStr) scope_free(trans->configStr);
+
     switch (trans->type) {
         case CFG_UDP:
         case CFG_TCP:
@@ -1521,41 +1539,42 @@ transportFlush(transport_t* t)
     return 0;
 }
 
-void
-transportLogConnectionStatus(transport_t *trans, const char *name)
+transport_status_t
+transportConnectionStatus(transport_t *trans)
 {
-    if (!trans || !name) {
+    transport_status_t status = {
+        .configString = NULL,
+        .isConnected = FALSE,
+        .connectAttemptCount = 0,
+        .failureString = NULL};
+/*
+    configString examples:
+        tcp://myhost:myport
+        udp://myhost:myport
+        unix:///my/unix/path.sock
+        unix://@abstractsockname
+        edge
+        file:///my/file/path.log
+
+    failureString examples:
+        see netFailMap above
+*/
+
+    if (!trans) {
         DBG(NULL);
-        return;
+        return status;
     }
 
-    switch (trans->type) {
-        case CFG_TCP:
-        case CFG_UDP:
-            scopeLog(CFG_LOG_WARN, "%s destination (%s:%s) not connected. messages dropped: "
-                "%"PRIu64 " connection attempts: %"PRIu64 " reason for failure: %s",
-                name, trans->net.host, trans->net.port, g_cbuf_drop_count,
-                trans->connect_attempts, netFailMap[trans->net.failure_reason]);
-            break;
-        case CFG_UNIX:
-            scopeLog(CFG_LOG_WARN, "%s destination (%s) not connected. messages dropped: "
-                 "%"PRIu64 " connection attempts: %"PRIu64, name, trans->local.path,
-                 g_cbuf_drop_count, trans->connect_attempts);
-            break;
-        case CFG_EDGE:
-            scopeLog(CFG_LOG_WARN, "%s destination (edge) not connected. messages dropped: "
-                 "%"PRIu64 " connection attempts: %"PRIu64, name,
-                 g_cbuf_drop_count, trans->connect_attempts);
-            break;
-        case CFG_FILE:
-            scopeLog(CFG_LOG_WARN, "%s destination (%s) not established. messages dropped: "
-                 "%"PRIu64 " connection attempts: %"PRIu64, name, trans->file.path,
-                 g_cbuf_drop_count, trans->connect_attempts);
-            break;
-        default:
-            DBG("%d", trans->type);
+    status.configString = trans->configStr;
+    status.isConnected = !transportNeedsConnection(trans);
+    status.connectAttemptCount = trans->connect_attempts;
+
+    if (trans->type == CFG_TCP || trans->type == CFG_UDP) {
+        status.failureString = netFailMap[trans->net.failure_reason];
     }
 
+
+    return status;
 }
 
 int

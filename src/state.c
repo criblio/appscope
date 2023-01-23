@@ -293,6 +293,7 @@ initState()
     initMetricCapture();
 
     // Some environment variables we don't want to continuously check
+    // TODO: verify if `g_force_payloads_to_disk` can be moved in cfgutils.c
     g_force_payloads_to_disk = checkEnv(SCOPE_PAYLOAD_TO_DISK_ENV, "true");
 
 
@@ -1587,7 +1588,7 @@ doSetAddrs(int sockfd)
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET) ||
         ctlEvtSourceEnabled(g_ctl, CFG_SRC_HTTP) ||
         (mtcEnabled(g_mtc) && g_mtc_addr_output) ||
-        ctlPayEnable(g_ctl);
+        (ctlPayStatus(g_ctl) != PAYLOAD_STATUS_DISABLE);
     if (!need_to_track_addrs) return 0;
 
     /*

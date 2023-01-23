@@ -3589,10 +3589,8 @@ doPayload()
             }
 
             char *bdata = NULL;
-
-            int sendPayloadsToStream = cfgLogStreamEnable(g_cfg.staticfg) &&
-                                       !payloadToDiskForced();
-            if (sendPayloadsToStream) {
+            payload_status_t payStatus = ctlPayStatus(g_ctl);
+            if (payStatus == PAYLOAD_STATUS_CRIBL) {
                 bdata = scope_calloc(1, hlen + pinfo->len);
                 if (bdata) {
                     scope_memmove(bdata, pay, hlen);
@@ -3600,7 +3598,7 @@ doPayload()
                     scope_memmove(&bdata[hlen], pinfo->data, pinfo->len);
                     cmdSendPayload(g_ctl, bdata, hlen + pinfo->len);
                 }
-            } else if (ctlPayDir(g_ctl)) {
+            } else if (payStatus == PAYLOAD_STATUS_DISK) {
                 int fd;
                 char path[PATH_MAX];
 

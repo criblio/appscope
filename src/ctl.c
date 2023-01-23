@@ -68,8 +68,9 @@ struct _ctl_t
     } log;
 
     struct {
-        unsigned int enable;
+        payload_status_t status;
         char * dir;
+        char * dirRepr;         // human-representation of dir variable: dir://<dir value> (TODO: Unify this with dir)
         cbuf_handle_t ringbuf;
     } payload;
 
@@ -612,8 +613,14 @@ ctlCreate()
     ctl->enhancefs = DEFAULT_ENHANCE_FS;
     ctl->allow_binary_console = DEFAULT_ALLOW_BINARY_CONSOLE;
 
-    ctl->payload.enable = DEFAULT_PAYLOAD_ENABLE;
+    ctl->payload.status = PAYLOAD_STATUS_DISABLE;
     ctl->payload.dir = (DEFAULT_PAYLOAD_DIR) ? scope_strdup(DEFAULT_PAYLOAD_DIR) : NULL;
+    ctl->payload.dirRepr = NULL;
+    if (DEFAULT_PAYLOAD_DIR_REPR) {
+        if (scope_asprintf(&ctl->payload.dirRepr, "dir://%s", ctl->payload.dir) < 0) {
+            ctl->payload.dirRepr = NULL;
+        }
+    }
     ctl->payload.ringbuf = cbufInit(buf_size);
 
     if (!ctl->payload.ringbuf) {
@@ -644,7 +651,13 @@ ctlDestroy(ctl_t **ctl)
     cbufFree((*ctl)->msgbuf);
     cbufFree((*ctl)->events);
 
-    if ((*ctl)->payload.dir) scope_free((*ctl)->payload.dir);
+    if ((*ctl)->payload.dir) {
+        scope_free((*ctl)->payload.dir);
+    }
+    if ((*ctl)->payload.dirRepr) {
+        scope_free((*ctl)->payload.dirRepr);
+    }
+
     cbufFree((*ctl)->payload.ringbuf);
 
     transportDestroy(&(*ctl)->transport);
@@ -1220,16 +1233,35 @@ ctlEvtGet(ctl_t *ctl)
     return ctl ? ctl->evt : NULL;
 }
 
-void
-ctlLogConnectionStatus(ctl_t *ctl, which_transport_t who)
-{
-    if (!ctl) return;
+static transport_status_t
+ctlPayConnectionStatus(ctl_t * ctl, payload_status_t payStatus) {
+    transport_status_t status = {
+        .configString = NULL,
+        .isConnected = FALSE,
+        .connectAttemptCount = 0,
+        .failureString = NULL};
 
-    return (who == CFG_LS) ?
-        transportLogConnectionStatus(ctl->paytrans, "payload") :
-        transportLogConnectionStatus(ctl->transport, "event");
+    if ((!ctl) || (payStatus != PAYLOAD_STATUS_DISK)) {
+        return status;
+    }
+
+    status.configString = ctl->payload.dirRepr;
+    status.isConnected = TRUE;
+
+    return status;
 }
 
+transport_status_t
+ctlConnectionStatus(ctl_t *ctl, which_transport_t who) {
+    if (who == CFG_LS) {
+        payload_status_t status = ctlPayStatus(ctl);
+        if (status == PAYLOAD_STATUS_CRIBL) {
+            return transportConnectionStatus(ctl->paytrans);
+        }
+        return ctlPayConnectionStatus(ctl, status);
+    }
+    return transportConnectionStatus(ctl->transport);
+}
 
 bool
 ctlEvtSourceEnabled(ctl_t *ctl, watch_t src)
@@ -1256,17 +1288,17 @@ ctlEnhanceFsSet(ctl_t *ctl, unsigned val)
     ctl->enhancefs = val;
 }
 
-unsigned int
-ctlPayEnable(ctl_t *ctl)
+payload_status_t
+ctlPayStatus(ctl_t *ctl)
 {
-    return (ctl) ? ctl->payload.enable : DEFAULT_PAYLOAD_ENABLE;
+    return (ctl) ? ctl->payload.status : PAYLOAD_STATUS_DISABLE;
 }
 
 void
-ctlPayEnableSet(ctl_t *ctl, unsigned int val)
+ctlPayStatusSet(ctl_t *ctl, payload_status_t val)
 {
     if (!ctl) return;
-    ctl->payload.enable = val;
+    ctl->payload.status = val;
 }
 
 const char *
@@ -1279,13 +1311,27 @@ void
 ctlPayDirSet(ctl_t *ctl, const char *dir)
 {
     if (!ctl) return;
-    if (ctl->payload.dir) scope_free(ctl->payload.dir);
+    if (ctl->payload.dir) {
+        scope_free(ctl->payload.dir);
+    }
+    if (ctl->payload.dirRepr) {
+        scope_free(ctl->payload.dirRepr);
+    }
     if (!dir || (dir[0] == '\0')) {
         ctl->payload.dir = (DEFAULT_PAYLOAD_DIR) ? scope_strdup(DEFAULT_PAYLOAD_DIR) : NULL;
+        ctl->payload.dirRepr = NULL;
+        if (DEFAULT_PAYLOAD_DIR_REPR) {
+            if (scope_asprintf(&ctl->payload.dirRepr, "dir://%s", ctl->payload.dir) < 0) {
+                ctl->payload.dirRepr = NULL;
+            }
+        }
         return;
     }
 
     ctl->payload.dir = scope_strdup(dir);
+    if (scope_asprintf(&ctl->payload.dirRepr, "dir://%s", ctl->payload.dir) < 0) {
+        ctl->payload.dirRepr = NULL;
+    }
 }
 
 void

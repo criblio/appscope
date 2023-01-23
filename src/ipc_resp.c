@@ -16,21 +16,25 @@ static const char* cmdMetaName[] = {
 #define CMD_META_SIZE  (ARRAY_SIZE(cmdMetaName))
 
 static const char* cmdScopeName[] = {
-    [IPC_CMD_GET_SUPPORTED_CMD] = "getSupportedCmd",
-    [IPC_CMD_GET_SCOPE_STATUS]  = "getScopeStatus",
-    [IPC_CMD_GET_SCOPE_CFG]     = "getScopeCfg",
-    [IPC_CMD_SET_SCOPE_CFG]     = "setScopeCfg",
+    [IPC_CMD_GET_SUPPORTED_CMD]    = "getSupportedCmd",
+    [IPC_CMD_GET_SCOPE_STATUS]     = "getScopeStatus",
+    [IPC_CMD_GET_SCOPE_CFG]        = "getScopeCfg",
+    [IPC_CMD_SET_SCOPE_CFG]        = "setScopeCfg",
+    [IPC_CMD_GET_TRANSPORT_STATUS] = "getTransportStatus",
 };
 
 #define CMD_SCOPE_SIZE  (ARRAY_SIZE(cmdScopeName))
 
 extern void doAndReplaceConfig(void *);
+extern log_t *g_log;
+extern mtc_t *g_mtc;
+extern ctl_t *g_ctl;
 
 #define WRAP_PRIV_SIZE (2)
 
 // Wrapper for scope message response
 struct scopeRespWrapper{
-    cJSON *resp;                // Scope mesage response
+    cJSON *resp;                // Scope message response
     void *priv[WRAP_PRIV_SIZE]; // Additional resources allocated to create response
 };
 
@@ -284,6 +288,194 @@ ipcRespSetScopeCfg(const cJSON *scopeReq) {
         return ipcRespStatus(IPC_RESP_OK);
     }
     return ipcRespStatus(IPC_RESP_SERVER_ERROR);
+}
+
+/*
+ * The interface*Func are functions accessors definitions, used to retrieve information about:
+ * - enablement of specific interface
+ * - transport status of specific interface
+ */
+typedef bool               (*interfaceEnabledFunc)(void);
+typedef transport_status_t (*interfaceTransportStatusFunc)(void);
+
+/*
+ * singleInterface is structure contains the interface object
+ */
+struct singleInterface {
+    const char *name;
+    interfaceEnabledFunc enabled;
+    interfaceTransportStatusFunc status;
+};
+
+/*
+ * logTransportEnabled retrieves status if "log" interface is enabled
+ */
+static bool
+logTransportEnabled(void) {
+    return TRUE;
+}
+
+/*
+ * logTransportStatus retrieves the status of "log" interface
+ */
+static transport_status_t
+logTransportStatus(void) {
+    return logConnectionStatus(g_log);
+}
+
+/*
+ * payloadTransportEnabled retrieves status if "payload" interface is enabled
+ */
+static bool
+payloadTransportEnabled(void) {
+    return (ctlPayStatus(g_ctl) == PAYLOAD_STATUS_DISABLE) ? FALSE : TRUE;
+}
+
+/*
+ * payloadTransportStatus retrieves the status of "payload" interface
+ */
+static transport_status_t
+payloadTransportStatus(void) {
+    return ctlConnectionStatus(g_ctl, CFG_LS);
+}
+
+/*
+ * criblTransportEnabled retrieves status if "cribl" interface is enabled
+ */
+static bool
+criblTransportEnabled(void) {
+    return cfgLogStreamEnable(g_cfg.staticfg);
+}
+
+/*
+ * eventsTransportEnabled retrieves the status of "events" interface
+ */
+static bool
+eventsTransportEnabled(void) {
+    return cfgEvtEnable(g_cfg.staticfg);
+}
+
+/*
+ * eventsTransportStatus retrieves the status of "events" interface
+ */
+static transport_status_t
+eventsTransportStatus(void) {
+    return ctlConnectionStatus(g_ctl, CFG_CTL);
+}
+
+/*
+ * metricTransportEnabled retrieves status if "metric" interface is enabled
+ */
+static bool
+metricTransportEnabled(void) {
+    return mtcEnabled(g_mtc);
+}
+
+/*
+ * metricsTransportStatus retrieves the status of "metric" interface
+ */
+static transport_status_t
+metricsTransportStatus(void) {
+    return mtcConnectionStatus(g_mtc);
+}
+
+// Used for interface indexes!  Don't change the numbers!
+enum InterfaceId {
+    INDEX_LOG     = 0,
+    INDEX_PAYLOAD = 1,
+    INDEX_CRIBL   = 2,
+    INDEX_EVENTS  = 3,
+    INDEX_METRICS = 4,
+};
+
+static const
+struct singleInterface scope_interfaces[] = {
+    [INDEX_LOG]     = {.name = "log",     .enabled = logTransportEnabled,     .status = logTransportStatus},
+    [INDEX_PAYLOAD] = {.name = "payload", .enabled = payloadTransportEnabled, .status = payloadTransportStatus},
+    [INDEX_CRIBL]   = {.name = "cribl",   .enabled = criblTransportEnabled,   .status = eventsTransportStatus},
+    [INDEX_EVENTS]  = {.name = "events",  .enabled = eventsTransportEnabled,  .status = eventsTransportStatus},
+    [INDEX_METRICS] = {.name = "metrics", .enabled = metricTransportEnabled,  .status = metricsTransportStatus},
+};
+
+#define INTERFACES_SIZE  (ARRAY_SIZE(scope_interfaces))
+
+/*
+ * Creates the wrapper for response to IPC_CMD_GET_TRANSPORT_STATUS
+ * TODO: use unused attribute later
+ */
+scopeRespWrapper *
+ipcRespGetTransportStatus(const cJSON *unused) {
+    scopeRespWrapper *wrap = respWrapperCreate();
+    if (!wrap) {
+        return NULL;
+    }
+    cJSON *resp = cJSON_CreateObject();
+    if (!resp) {
+        goto allocFail;
+    }
+    wrap->resp = resp;
+    if (!cJSON_AddNumberToObjLN(resp, "status", IPC_RESP_OK)) {
+        goto allocFail;
+    }
+
+    cJSON *interfaces = cJSON_CreateArray();
+    if (!interfaces) {
+        goto allocFail;
+    }
+    wrap->priv[0] = interfaces;
+    for (int index = 0; index < INTERFACES_SIZE; ++index) {
+        int interfaceIndex = index;
+        // Skip preparing the interface info if it is disabled
+        if (scope_interfaces[interfaceIndex].enabled() == FALSE) {
+            continue;
+        }
+
+        // if the cribl is last one there is no point to handle events and metrics
+        if (interfaceIndex == INDEX_CRIBL) {
+            index = INTERFACES_SIZE;
+        }
+
+        cJSON *singleInterface = cJSON_CreateObject();
+        if (!singleInterface) {
+            goto allocFail;
+        }
+
+        transport_status_t status = scope_interfaces[interfaceIndex].status();
+
+        if (!cJSON_AddStringToObject(singleInterface, "name", scope_interfaces[interfaceIndex].name)) {
+            goto allocFail;
+        }
+
+        if (!cJSON_AddStringToObject(singleInterface, "config", status.configString)) {
+            goto allocFail;
+        }
+
+        if (status.isConnected == TRUE) {
+            if (!cJSON_AddTrueToObject(singleInterface, "connected")) {
+                goto allocFail;
+            }
+        } else {
+            if (!cJSON_AddFalseToObject(singleInterface, "connected")) {
+                goto allocFail;
+            }
+            if (!cJSON_AddNumberToObject(singleInterface, "attempts", status.connectAttemptCount)) {
+                goto allocFail;
+            }
+
+            if (status.failureString) {
+                if (!cJSON_AddStringToObject(singleInterface, "failure_details", status.failureString)) {
+                    goto allocFail;
+                }
+            }
+        }
+        cJSON_AddItemToArray(interfaces, singleInterface);
+    }
+    cJSON_AddItemToObjectCS(resp, "interfaces", interfaces);
+    return wrap;
+
+allocFail:
+    ipcRespWrapperDestroy(wrap);
+    return NULL; 
 }
 
 /*

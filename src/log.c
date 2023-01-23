@@ -76,6 +76,12 @@ logNeedsConnection(log_t* log)
     return transportNeedsConnection(log->transport);
 }
 
+transport_status_t 
+logConnectionStatus(log_t* log)
+{
+    return transportConnectionStatus(log->transport);
+}
+
 int
 logConnect(log_t* log)
 {

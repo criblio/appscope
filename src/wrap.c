@@ -43,6 +43,10 @@
 #include "scopestdlib.h"
 #include "../contrib/libmusl/musl.h"
 
+#define UNW_LOCAL_ONLY
+#include "libunwind.h"
+#define SYMBOL_BT_NAME_LEN (256)
+
 #define SSL_FUNC_READ "SSL_read"
 #define SSL_FUNC_WRITE "SSL_write"
 
@@ -1592,53 +1596,117 @@ initEnv(int *attachedFlag)
     scope_fclose(fd);
 }
 
+static void
+scopeLogSigSafe(const char *msg, size_t msgLen) {
+    if (!g_log) {
+        return;
+    }
+    logSigSafeSendWithLen(g_log, msg, msgLen, CFG_LOG_ERROR);
+}
+
+static void
+scopeLogSigSafeNumber(long val, int base) {
+    if (!g_log) {
+        return;
+    }
+    char *bufOut = NULL;
+    char buf[32] = {0};
+    int msgLen = 0;
+    bufOut = sigSafeUtoa(val, buf, base, &msgLen);
+    logSigSafeSendWithLen(g_log, bufOut, msgLen, CFG_LOG_ERROR);
+}
+
+static void
+scopeBacktrace(void) {
+    unw_cursor_t cursor;
+    unw_context_t uc;
+    unw_word_t ip;
+
+    unw_getcontext(&uc);
+    unw_init_local(&cursor, &uc);
+    int frame_count = 0;
+    scopeLogSigSafe("--- scopeBacktrace\n", sizeof("--- scopeBacktrace\n") - 1);
+    while(unw_step(&cursor) > 0) {
+        char symbol[SYMBOL_BT_NAME_LEN];
+        unw_word_t offset;
+
+        int ret = unw_get_reg(&cursor, UNW_REG_IP, &ip);
+        if (ret) {
+            continue;
+        }
+
+        ret = unw_get_proc_name(&cursor, symbol, SYMBOL_BT_NAME_LEN, &offset);
+        scopeLogSigSafe("#", sizeof("#") - 1);
+        scopeLogSigSafeNumber(frame_count, 10);
+        scopeLogSigSafe(" 0x", sizeof(" 0x") - 1);
+        scopeLogSigSafeNumber(ip, 16);
+        if (!ret) {
+            scopeLogSigSafe(" ", sizeof(" ") - 1);
+            scopeLogSigSafe(symbol, scope_strlen(symbol));
+            scopeLogSigSafe(" + ", sizeof(" + ") - 1);
+            scopeLogSigSafeNumber(offset, 10);
+        } else {
+            scopeLogSigSafe(" ?", sizeof(" ?") - 1);
+        }
+        scopeLogSigSafe("\n", sizeof("\n") - 1);
+
+        frame_count++;
+    }
+}
+
 void
 scope_sig_handler(int sig, siginfo_t *info, void *secret)
 {
-    scopeLogError("!scope_sig_handler signal %d errno %d fault address %p, reason of fault:", info->si_signo, info->si_errno, info->si_addr);
+    scopeLogSigSafe("!scope_sig_handler signal ", sizeof("!scope_sig_handler signal ") - 1);
+    scopeLogSigSafeNumber(info->si_signo, 10);
+    scopeLogSigSafe(" errno ", sizeof(" errno ") - 1);
+    scopeLogSigSafeNumber(info->si_errno, 10);
+    scopeLogSigSafe(" fault address ", sizeof(" fault address ") - 1);
+    scopeLogSigSafeNumber((long)(info->si_addr), 16);
+    scopeLogSigSafe(", reason of fault:\n", sizeof(", reason of fault:\n") - 1);
     int sig_code = info->si_code;
 
     if (info->si_signo == SIGSEGV) {
         switch (sig_code) {
             case SEGV_MAPERR:
-                scopeLogError("Address not mapped to object");
+                scopeLogSigSafe("Address not mapped to object\n", sizeof("Address not mapped to object\n") -1);
                 break;
             case SEGV_ACCERR:
-                scopeLogError("Invalid permissions for mapped object");
+                scopeLogSigSafe("Invalid permissions for mapped object\n", sizeof("Invalid permissions for mapped object\n") - 1);
                 break;
             case SEGV_BNDERR:
-                scopeLogError("Failed address bound checks");
+                scopeLogSigSafe("Failed address bound checks\n", sizeof("Failed address bound checks\n") - 1);
                 break;
             case SEGV_PKUERR:
-                scopeLogError("Access was denied by memory protection keys");
+                scopeLogSigSafe("Access was denied by memory protection keys\n", sizeof("Access was denied by memory protection keys\n") - 1);
                 break;
             default: 
-                scopeLogError("Unknown Error");
+                scopeLogSigSafe("Unknown Error\n", sizeof("Unknown Error\n") - 1);
                 break;
         }
     } else if (info->si_signo == SIGBUS) {
         switch (sig_code) {
             case BUS_ADRALN:
-                scopeLogError("Invalid address alignment");
+                scopeLogSigSafe("Invalid address alignment\n", sizeof("Invalid address alignment\n") - 1);
                 break;
             case BUS_ADRERR:
-                scopeLogError("Nonexistent physical address");
+                scopeLogSigSafe("Nonexistent physical address\n", sizeof("Nonexistent physical address\n") - 1);
                 break;
             case BUS_OBJERR:
-                scopeLogError("Object-specific hardware error");
+                scopeLogSigSafe("Object-specific hardware error\n", sizeof("Object-specific hardware error\n") - 1);
                 break;
             case BUS_MCEERR_AR:
-                scopeLogError("Hardware memory error consumed on a machine check");
+                scopeLogSigSafe("Hardware memory error consumed on a machine check\n", sizeof("Hardware memory error consumed on a machine check\n") - 1);
                 break;
             case BUS_MCEERR_AO:
-                scopeLogError("Hardware memory error detected in process but not consumed");
+                scopeLogSigSafe("Hardware memory error detected in process but not consumed\n", sizeof("Hardware memory error detected in process but not consumed\n") - 1);
                 break;
             default: 
-                scopeLogError("Unknown Error");
+                scopeLogSigSafe("Unknown Error\n", sizeof("Unknown Error\n") - 1);
                 break;
         }
     }
-    scopeBacktrace(CFG_LOG_ERROR);
+    scopeBacktrace();
     abort();
 }
 

@@ -24,4 +24,6 @@ int sigSafeNanosleep(const struct timespec *);
 void setUUID(char *);
 void setMachineID(char *);
 
+char *sigSafeUtoa(unsigned long, char *, int, int *);
+
 #endif // __UTILS_H__

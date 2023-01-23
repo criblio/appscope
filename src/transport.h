@@ -28,4 +28,6 @@ void                transportLogConnectionStatus(transport_t *, const char *);
 
 // Misc
 void                transportRegisterForExitNotification(void (*fn)(void));
+int                 transportSigSafeSend(transport_t *, const char *, size_t);
+
 #endif // __TRANSPORT_H__

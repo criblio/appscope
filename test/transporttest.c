@@ -584,6 +584,24 @@ transportTcpRemoteControlSupport(void** state)
     transportDestroy(&t);
 }
 
+
+static void
+transportFileSigSafeSend(void** state)
+{
+    transport_t* t = NULL;
+    int res = -1;
+    t = transportCreateFile("/tmp/my.path", CFG_BUFFER_FULLY);
+    assert_non_null(t);
+
+    res = transportSigSafeSend(t, "Lorem\n", sizeof("Lorem\n"));
+    assert_int_not_equal(res, -1);
+    res = transportSigSafeSend(t, "Ipsum", sizeof("Ipsum"));
+    assert_int_not_equal(res, -1);
+
+    transportDestroy(&t);
+}
+
+
 int
 main(int argc, char* argv[])
 {
@@ -617,6 +635,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(transportSendForFileWritesToFileImmediatelyWhenLineBuffered),
         cmocka_unit_test(transportTcpReconnect),
         cmocka_unit_test(transportTcpRemoteControlSupport),
+        cmocka_unit_test(transportFileSigSafeSend),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

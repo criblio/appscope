@@ -46,7 +46,7 @@ outputs "error: missing required value for -a option"
 returns 1
 
 run ./bin/linux/${ARCH}/scope --ldattach
-outputs "error: missing required value for --ldattach option"
+outputs "error: missing required value for -a option"
 returns 1
 
 run ./bin/linux/${ARCH}/scope -d 
@@ -54,7 +54,7 @@ outputs "error: missing required value for -d option"
 returns 1
 
 run ./bin/linux/${ARCH}/scope --lddetach
-outputs "error: missing required value for --lddetach option"
+outputs "error: missing required value for -d option"
 returns 1
 
 run ./bin/linux/${ARCH}/scope -n
@@ -62,7 +62,7 @@ outputs "error: missing required value for -n option"
 returns 1
 
 run ./bin/linux/${ARCH}/scope --namespace
-outputs "error: missing required value for --namespace option"
+outputs "error: missing required value for -n option"
 returns 1
 
 run ./bin/linux/${ARCH}/scope -c
@@ -70,7 +70,7 @@ outputs "error: missing required value for -c option"
 returns 1
 
 run ./bin/linux/${ARCH}/scope --configure
-outputs "error: missing required value for --configure option"
+outputs "error: missing required value for -c option"
 returns 1
 
 run ./bin/linux/${ARCH}/scope -s
@@ -78,7 +78,7 @@ outputs "error: missing required value for -s option"
 returns 1
 
 run ./bin/linux/${ARCH}/scope --service
-outputs "error: missing required value for --service option"
+outputs "error: missing required value for -s option"
 returns 1
 
 run ./bin/linux/${ARCH}/scope -l 
@@ -86,7 +86,7 @@ outputs "error: missing required value for -l option"
 returns 1
 
 run ./bin/linux/${ARCH}/scope --libbasedir
-outputs "error: missing required value for --libbasedir option"
+outputs "error: missing required value for -l option"
 returns 1
 
 run ./bin/linux/${ARCH}/scope -p 
@@ -94,7 +94,7 @@ outputs "error: missing required value for -p option"
 returns 1
 
 run ./bin/linux/${ARCH}/scope --patch
-outputs "error: missing required value for --patch option"
+outputs "error: missing required value for -p option"
 returns 1
 
 run ./bin/linux/${ARCH}/scope -z 
@@ -121,19 +121,19 @@ run ./bin/linux/${ARCH}/scope -z -- ps -ef
 outputs "UID"
 returns 0
 
-run ./bin/linux/${ARCH}/scope -a -d
+run ./bin/linux/${ARCH}/scope -a 1 -d 1
 outputs "error: --ldattach and --lddetach cannot be used together"
 returns 1
 
-run ./bin/linux/${ARCH}/scope -s -v
+run ./bin/linux/${ARCH}/scope -s nginx -v nginx
 outputs "error: --service and --unservice cannot be used together"
 returns 1
 
-run ./bin/linux/${ARCH}/scope -c -w
+run ./bin/linux/${ARCH}/scope -c conf/example_filter.json -w
 outputs "error: --configure and --unconfigure cannot be used together"
 returns 1
 
-run ./bin/linux/${ARCH}/scope -p -a
+run ./bin/linux/${ARCH}/scope -a 1 -z echo
 outputs "error: --passthrough cannot be used with --ldattach/--lddetach or --namespace or --service/--unservice or --configure/--unconfigure"
 returns 1
 
@@ -166,11 +166,11 @@ run ./bin/linux/${ARCH}/scope -a not_a_pid
 outputs "invalid --ldattach PID: not_a_pid"
 returns 1
 
-run ./bin/linux/${arch}/scope -d not_a_pid
+run ./bin/linux/${ARCH}/scope -d not_a_pid
 outputs "invalid --lddetach PID: not_a_pid"
 returns 1
 
-run ./bin/linux/${arch}/scope -n not_a_pid
+run ./bin/linux/${ARCH}/scope -c conf/example_filter.json -n not_a_pid
 outputs "invalid --namespace PID: not_a_pid"
 returns 1
 
@@ -178,11 +178,11 @@ run ./bin/linux/${ARCH}/scope -a -999
 outputs "invalid --ldattach PID: -999"
 returns 1
 
-run ./bin/linux/${arch}/scope -d -999
+run ./bin/linux/${ARCH}/scope -d -999
 outputs "invalid --lddetach PID: -999"
 returns 1
 
-run ./bin/linux/${ARCH}/scope -n -999
+run ./bin/linux/${ARCH}/scope -c conf/example_filter.json -n -999
 outputs "invalid --namespace PID: -999"
 returns 1
 
@@ -213,7 +213,7 @@ run ./bin/linux/${ARCH}/scope run -- echo foo
 outputs foo
 returns 0
 
-run ./bin/linux/${ARCH}/scope run -- ps -ef // doesn't work without the '--' (-ef parsed by cli instead) and never did
+run ./bin/linux/${ARCH}/scope run -- ps -ef # doesn't work without the '--' (-ef parsed by cli instead) and never did
 outputs UID
 returns 0
 

@@ -89,9 +89,8 @@ $(LIBSCOPE): $(LIBRARY_C_FILES)
 $(LIBLOADER): $(LOADER_C_FILES)
 	@$(MAKE) -C .. lib/linux/$(ARCH)/libloader.a
 
-# Note regarding go build tags below:
-# force os/user and netgo to use go and NOT cgo because a static exec can't resolve libc calls from cgo
-# the -s -w go build flags remove the symbol table, debug info, dwarf symbol table from the resulting executable
+# the -w go build flags remove the dwarf symbol table from the resulting executable
+# the -tags force os/user and netgo to use go and NOT cgo because a static exec can't resolve libc calls from cgo
 $(SCOPE): $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN) 
 $(SCOPE): export GOOS=linux
 $(SCOPE): export CGO_ENABLED=1
@@ -103,19 +102,19 @@ $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"$(shell du -b "$(LIBSCOPE)" | cut -f1)\" -DSCOPEDYN_SIZE=\"$(shell du -b "$(SCOPEDYN)" | cut -f1)\"" \
 	$(GO) build \
 		-tags "osusergo netgo" \
-		-ldflags="$(shell $(GOVVV) -flags) -s -w -linkmode external -extldflags \"-lrt -ldl -lpthread -static\" " \
+		-ldflags="$(shell $(GOVVV) -flags) -w -linkmode external -extldflags \"-lrt -ldl -lpthread -static\" " \
 		-buildmode=pie \
 		$(BUILD_OPTS) \
 	       	-o $(SCOPE)
 	$(RM) -r $(SCOPEDYN)
 
-
+# libscope and conf_yml are not included in the dynamic build
+# the -s -w go build flags remove the symbol table, debug info, dwarf symbol table from the resulting executable
 $(SCOPEDYN): $(LIBSCOPE) $(LIBLOADER) 
 $(SCOPEDYN): export GOOS=linux
 $(SCOPEDYN): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 	$(RM) run/bundle.go
 	$(RM) -r build/*
-#	cp $(LIBSCOPE) $(CONF_YML) build/
 	$(GO_BINDATA) -nocompress -o run/bundle.go -pkg run build
 	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"0\" -DSCOPEDYN_SIZE=\"0\"" \
 	$(GO) build \

@@ -203,6 +203,24 @@ ERR+=$?
 endtest
 
 #
+# Illegal operand
+#
+
+starttest illegal_operand_error
+
+cd /opt/fault_test/
+
+SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 4
+
+grep -- "--- scopeLogBacktrace" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+grep "Illegal operand" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+#
 # tls
 #
 starttest tls

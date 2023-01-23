@@ -219,6 +219,42 @@ ERR+=$?
 
 endtest
 
+#
+# verify division by zero
+#
+
+starttest div_by_zero_error
+
+cd /opt/fault_test/
+
+SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 3
+
+grep -- "--- scopeLogBacktrace" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+grep "Integer divide by zero" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+#
+# Illegal operand
+#
+
+starttest illegal_operand_error
+
+cd /opt/fault_test/
+
+SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 4
+
+grep -- "--- scopeLogBacktrace" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+grep "Illegal operand" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+endtest
+
 if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""
     echo ""

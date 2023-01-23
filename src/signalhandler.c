@@ -93,7 +93,7 @@ scopeLogBacktrace(void) {
 }
 
 /*
- * Signal handler for SIGSEGV and SIGBUS.
+ * Signal handler for SIGSEGV, SIGBUS, SIGILL and SIGFPE.
  * Logs the backtrace inforamation.
  */
 void
@@ -146,7 +146,74 @@ scopeSignalHandlerBacktrace(int sig, siginfo_t *info, void *secret) {
                 scopeLogErrorSigSafeCStr("Unknown Error\n");
                 break;
         }
+    } else if (info->si_signo == SIGILL) {
+        switch (sig_code) {
+            case ILL_ILLOPC:
+                scopeLogErrorSigSafeCStr("Illegal opcode\n");
+                break;
+            case ILL_ILLOPN:
+                scopeLogErrorSigSafeCStr("Illegal operand\n");
+                break;
+            case ILL_ILLADR:
+                scopeLogErrorSigSafeCStr("Illegal addressing mode\n");
+                break;
+            case ILL_ILLTRP:
+                scopeLogErrorSigSafeCStr("Illegal trap\n");
+                break;
+            case ILL_PRVOPC:
+                scopeLogErrorSigSafeCStr("Privileged opcode\n");
+                break;
+            case ILL_PRVREG:
+                scopeLogErrorSigSafeCStr("Privileged register\n");
+                break;
+            case ILL_COPROC:
+                scopeLogErrorSigSafeCStr("Coprocessor error\n");
+                break;
+            case ILL_BADSTK:
+                scopeLogErrorSigSafeCStr("Internal stack error\n");
+                break;
+            case ILL_BADIADDR:
+                scopeLogErrorSigSafeCStr("Unimplemented instruction address\n");
+                break;
+            default: 
+                scopeLogErrorSigSafeCStr("Unknown Error\n");
+                break;
+        }
+    } else if (info->si_signo == SIGFPE) {
+        switch (sig_code) {
+            case FPE_INTDIV:
+                scopeLogErrorSigSafeCStr("Integer divide by zero\n");
+                break;
+            case FPE_INTOVF:
+                scopeLogErrorSigSafeCStr("Integer overflow\n");
+                break;
+            case FPE_FLTDIV:
+                scopeLogErrorSigSafeCStr("Floating point divide by zero\n");
+                break;
+            case FPE_FLTOVF:
+                scopeLogErrorSigSafeCStr("Floating point overflow\n");
+                break;
+            case FPE_FLTUND:
+                scopeLogErrorSigSafeCStr("Floating point underflow\n");
+                break;
+            case FPE_FLTRES:
+                scopeLogErrorSigSafeCStr("Floating point inexact result\n");
+                break;
+            case FPE_FLTINV:
+                scopeLogErrorSigSafeCStr("Floating point invalid operation\n");
+                break;
+            case FPE_FLTUNK:
+                scopeLogErrorSigSafeCStr("Undiagnosed floating-point exception\n");
+                break;
+            case FPE_CONDTRAP:
+                scopeLogErrorSigSafeCStr("Trap on condition\n");
+                break;
+            default: 
+                scopeLogErrorSigSafeCStr("Unknown Error\n");
+                break;
+        }
     }
+
     scopeLogBacktrace();
     abort();
 }

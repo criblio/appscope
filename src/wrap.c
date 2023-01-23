@@ -1096,6 +1096,26 @@ logOurConnectionStatus(transport_status_t status, const char *name)
     }
 }
 
+/*
+* List of signals used by scope error handler
+*/
+static int
+scopeErrorsSignals[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
+
+static void
+initSigErrorHandler(void)
+{
+    if (checkEnv("SCOPE_ERROR_SIGNAL_HANDLER", "true") && g_fn.sigaction) {
+        struct sigaction act = { 0 };
+        act.sa_handler = (void (*))scopeSignalHandlerBacktrace;
+        act.sa_flags = SA_RESTART | SA_SIGINFO;
+        for (int i = 0; i < ARRAY_SIZE(scopeErrorsSignals); ++i) {
+            g_fn.sigaction(scopeErrorsSignals[i], &act, NULL);
+        }
+    }
+}
+
+
 static void *
 periodic(void *arg)
 {
@@ -1109,8 +1129,9 @@ periodic(void *arg)
     sigset_t mask;
     scope_sigfillset(&mask);
     if (checkEnv("SCOPE_ERROR_SIGNAL_HANDLER", "true")) {
-        scope_sigdelset(&mask, SIGSEGV);
-        scope_sigdelset(&mask, SIGBUS);
+        for (int i = 0; i < ARRAY_SIZE(scopeErrorsSignals); ++i) {
+            scope_sigdelset(&mask, scopeErrorsSignals[i]);
+        }
     }
 
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
@@ -1610,18 +1631,6 @@ initEnv(int *attachedFlag)
 
     // done
     scope_fclose(fd);
-}
-
-static void
-initSigErrorHandler(void)
-{
-    if (checkEnv("SCOPE_ERROR_SIGNAL_HANDLER", "true") && g_fn.sigaction) {
-        struct sigaction act = { 0 };
-        act.sa_handler = (void (*))scopeSignalHandlerBacktrace;
-        act.sa_flags = SA_RESTART | SA_SIGINFO;
-        g_fn.sigaction(SIGSEGV, &act, NULL);
-        g_fn.sigaction(SIGBUS, &act, NULL);
-    }
 }
 
 __attribute__((constructor)) void

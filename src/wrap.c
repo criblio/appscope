@@ -481,7 +481,7 @@ ipcCommunication(void) {
     }
 
     if (res != RESP_RESULT_OK) {
-        scopeLogError("ipcCommunication Error sending response to %s failed %d, parseStatus %d, uniqReq %d", name, res, parseStatus, uniqReq);
+        scopeLogError("ipcCommunication Error sending response to %s failed res %d, parseStatus %d, uniqReq %d", name, res, parseStatus, uniqReq);
     }
 
     scope_free(scopeReq);
@@ -1075,6 +1075,26 @@ handleExit(void)
     logDisconnect(g_log);
 }
 
+static void
+logOurConnectionStatus(transport_status_t status, const char *name)
+{
+    // We want to be quiet if connections seem to be ok.
+    if (status.isConnected) return;
+
+    // Output reason for failure if we're able.
+    if (status.failureString) {
+        scopeLog(CFG_LOG_WARN, "%s destination (%s) not connected. messages dropped: "
+            "%"PRIu64 " connection attempts: %"PRIu64 " reason for failure: %s",
+            name, status.configString, g_cbuf_drop_count,
+            status.connectAttemptCount, status.failureString);
+    } else {
+        scopeLog(CFG_LOG_WARN, "%s destination (%s) not connected. messages dropped: "
+            "%"PRIu64 " connection attempts: %"PRIu64,
+            name, status.configString, g_cbuf_drop_count,
+            status.connectAttemptCount);
+    }
+}
+
 static void *
 periodic(void *arg)
 {
@@ -1129,12 +1149,11 @@ periodic(void *arg)
             summaryTime = tv.tv_sec + g_thread.interval;
 
             if (tv.tv_sec >= logReportTime) {
-                if (ctlNeedsConnection(g_ctl, CFG_CTL)) {
-                    ctlLogConnectionStatus(g_ctl, CFG_CTL);
-                }
-                if (mtcNeedsConnection(g_mtc)) {
-                    mtcLogConnectionStatus(g_mtc);
-                }
+                transport_status_t ctlStatus = ctlConnectionStatus(g_ctl, CFG_CTL);
+                logOurConnectionStatus(ctlStatus, "event");
+                transport_status_t mtcStatus = mtcConnectionStatus(g_mtc);
+                logOurConnectionStatus(mtcStatus, "metric");
+
                 logReportTime = tv.tv_sec + CONN_LOG_INTERVAL; 
             }
 

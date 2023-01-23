@@ -12,6 +12,7 @@
 #include "fn.h"
 #include "dbg.h"
 #include "scopestdlib.h"
+#include "scopetypes.h"
 #include "transport.h"
 #include "test.h"
 
@@ -584,6 +585,132 @@ transportTcpRemoteControlSupport(void** state)
     transportDestroy(&t);
 }
 
+static void
+transportConnectionStatusInitialValues(void ** state)
+{
+    transport_status_t status;
+
+    // Null
+    assert_int_equal(dbgCountMatchingLines("src/transport.c"), 0);
+    status = transportConnectionStatus(NULL);
+    assert_null(status.configString);
+    assert_false(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 0);
+    assert_null(status.failureString);
+    assert_int_equal(dbgCountMatchingLines("src/transport.c"), 1);
+    dbgInit(); // reset dbg for the rest of the tests
+
+    // Tcp
+    transport_t* t = transportCreateTCP("127.0.0.1", "54321", FALSE, FALSE, NULL);
+    status = transportConnectionStatus(t);
+    assert_non_null(t);
+    assert_string_equal(status.configString, "tcp://127.0.0.1:54321");
+    // expects nothing to be listening on this local port
+    assert_false(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 1);
+    assert_string_equal(status.failureString, "Socket connection failed");
+    transportDestroy(&t);
+
+    // Udp
+    t = transportCreateUdp("myhost", "12345");
+    status = transportConnectionStatus(t);
+    assert_non_null(t);
+    assert_string_equal(status.configString, "udp://myhost:12345");
+    // expects that DNS will not resolve myhost
+    assert_false(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 1);
+    assert_string_equal(status.failureString, "DNS lookup failed");
+    transportDestroy(&t);
+
+    t = transportCreateUdp("127.0.0.1", "22222");
+    status = transportConnectionStatus(t);
+    assert_non_null(t);
+    assert_string_equal(status.configString, "udp://127.0.0.1:22222");
+    // UDP is connectionless, isConnected will be true as long as DNS resolves
+    assert_true(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 0);
+    assert_string_equal(status.failureString, "n/a");
+    transportDestroy(&t);
+
+    // File
+    const char* path = "/tmp/nodir/abc.log";
+    t = transportCreateFile(path, CFG_BUFFER_LINE);
+    status = transportConnectionStatus(t);
+    assert_non_null(t);
+    assert_string_equal(status.configString, "file:///tmp/nodir/abc.log");
+    // File connection fails when a directory in its path does not exist
+    assert_false(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 1);
+    assert_null(status.failureString); // currently, only for TCP/UDP
+    transportDestroy(&t);
+
+    const char* path2 = "/tmp/abc.log";
+    t = transportCreateFile(path2, CFG_BUFFER_LINE);
+    status = transportConnectionStatus(t);
+    assert_non_null(t);
+    assert_string_equal(status.configString, "file:///tmp/abc.log");
+    assert_true(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 0);
+    assert_null(status.failureString);
+    transportDestroy(&t);
+    if (scope_unlink(path2))
+        fail_msg("Couldn't delete test file %s", path2);
+
+
+    // Unix
+    const char *sockName = "/tmp/abc.sock";
+    t = transportCreateUnix(sockName);
+    status = transportConnectionStatus(t);
+    assert_non_null(t);
+    assert_string_equal(status.configString, "unix:///tmp/abc.sock");
+    // expects that this socket does not exist
+    assert_false(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 1);
+    assert_null(status.failureString);
+    transportDestroy(&t);
+
+    // This time create the socket to connect to
+    struct sockaddr_un addr;
+    addr.sun_family = AF_UNIX;
+    scope_memset(addr.sun_path, 0, sizeof(addr.sun_path));
+    scope_strncpy(addr.sun_path, sockName, scope_strlen(sockName));
+    int addr_len = sizeof(sa_family_t) + scope_strlen(sockName) + 1;
+
+    int sd = scope_socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sd == -1) {
+        fail_msg("Couldn't create socket");
+    }
+    if (scope_bind(sd, (const struct sockaddr *)&addr, addr_len) == -1) {
+        fail_msg("Couldn't bind socket");
+    }
+    if (scope_listen(sd, 10) == -1) {
+        fail_msg("Couldn't listen on socket");
+    }
+    t = transportCreateUnix(sockName);
+    status = transportConnectionStatus(t);
+    assert_non_null(t);
+    assert_string_equal(status.configString, "unix:///tmp/abc.sock");
+    // now it exists
+    assert_true(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 0);
+    assert_null(status.failureString);
+    transportDestroy(&t);
+    scope_close(sd);
+    scope_unlink(sockName);
+
+
+    // Edge
+    t = transportCreateEdge();
+    status = transportConnectionStatus(t);
+    assert_non_null(t);
+    assert_string_equal(status.configString, "edge");
+    // expects that an edge socket doesn't exist
+    assert_false(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 1);
+    assert_null(status.failureString);
+    transportDestroy(&t);
+}
+
 int
 main(int argc, char* argv[])
 {
@@ -617,6 +744,7 @@ main(int argc, char* argv[])
         cmocka_unit_test(transportSendForFileWritesToFileImmediatelyWhenLineBuffered),
         cmocka_unit_test(transportTcpReconnect),
         cmocka_unit_test(transportTcpRemoteControlSupport),
+        cmocka_unit_test(transportConnectionStatusInitialValues),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

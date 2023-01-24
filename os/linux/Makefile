@@ -18,6 +18,7 @@ OPENSSL_AR=contrib/build/openssl/libssl.a contrib/build/openssl/libcrypto.a
 LS_HPACK_AR=contrib/build/ls-hpack/libls-hpack.a
 MUSL_AR=contrib/build/musl/lib/libc.a
 UNWIND_AR=contrib/build/libunwind/src/.libs/libunwind.a
+COREDUMPER_AR=contrib/build/coredumper/.libs/libcoredumper.a
 TEST_AR=$(MUSL_AR) ${UNWIND_AR} $(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR} $(LS_HPACK_AR)
 #TEST_LIB=contrib/build/cmocka/src/libcmocka.dylib
 TEST_LIB=contrib/build/cmocka/src/libcmocka.so
@@ -49,6 +50,9 @@ $(MUSL_AR):
 
 $(UNWIND_AR):
 	@$(MAKE) -C contrib libunwind
+
+${COREDUMPER_AR}:
+	@$(MAKE) -C contrib coredumper
 
 $(OPENSSL_AR):
 	@$(MAKE) -C contrib openssl

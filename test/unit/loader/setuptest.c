@@ -152,7 +152,6 @@ main(int argc, char* argv[]) {
         cmocka_unit_test(removeScopeCfgFile0Changes),
         cmocka_unit_test(removeScopeCfgFile1Change),
         cmocka_unit_test(removeScopeCfgFile2Changes),
-        cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

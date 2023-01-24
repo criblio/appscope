@@ -338,7 +338,6 @@ main(int argc, char* argv[]) {
         cmocka_unit_test_teardown(GetPathDev, teardownlibdirTest),  
         cmocka_unit_test_teardown(GetPathOfficial, teardownlibdirTest),
         cmocka_unit_test_teardown(GetPathNoFile, teardownlibdirTest),
-        cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

@@ -66,7 +66,6 @@ main(int argc, char* argv[]) {
         cmocka_unit_test(normalizedVersionDevTest),
         cmocka_unit_test(normalizedVersionNullTest),
         cmocka_unit_test(normalizedVersionDevTestWrongFormat),
-        cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

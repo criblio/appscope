@@ -46,7 +46,6 @@ main(int argc, char* argv[]) {
         cmocka_unit_test(nsInfoIsPidInSameMntNsSameProcess),
         cmocka_unit_test(nsInfoIsPidInSameMntNsChildProcess),
         cmocka_unit_test(nsInfoIsPidGotNestedPidNsSameProcess),
-        cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

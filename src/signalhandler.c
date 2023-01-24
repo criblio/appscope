@@ -98,6 +98,9 @@ scopeLogBacktrace(void) {
  */
 void
 scopeSignalHandlerBacktrace(int sig, siginfo_t *info, void *secret) {
+    scopeLogErrorSigSafeCStr("Scope Version: "); 
+    scopeLogErrorSigSafeCStr(SCOPE_VER);
+    scopeLogErrorSigSafeCStr("\n");
     scopeLogErrorSigSafeCStr("!scopeSignalHandlerBacktrace signal ");
     scopeLogSigSafeNumber(info->si_signo, 10);
     scopeLogErrorSigSafeCStr(" errno ");

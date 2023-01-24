@@ -10,6 +10,6 @@
  *  https://man7.org/linux/man-pages/man7/signal-safety.7.html
  */
 
-void scopeSignalHandlerBacktrace(int , siginfo_t *, void *);
+void scopeSignalHandlerBacktrace(int, siginfo_t *, void *);
 
 #endif // __SIGNALHANDLER_H__

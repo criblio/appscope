@@ -31,7 +31,7 @@ scopeLogSigSafe(const char *msg, size_t msgLen) {
  * scopeLogErrorSigSafeStr - logs the string with unknown length
  *
  */
-#define scopeLogErrorSigSafeCStr(s) scopeLogSigSafe(s, sizeof(s) - 1)
+#define scopeLogErrorSigSafeCStr(s) scopeLogSigSafe(s, C_STRLEN(s))
 #define scopeLogErrorSigSafeStr(s) scopeLogSigSafe(s, (scope_strlen(s)))
 
 /*

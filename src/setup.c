@@ -189,7 +189,7 @@ serviceCfgStatusSystemD(const char *serviceName, uid_t uid, gid_t gid) {
         }
     }
 
-    scope_strncat(cfgScript, "env.conf", sizeof("env.conf") - 1);
+    scope_strncat(cfgScript, "env.conf", C_STRLEN("env.conf"));
 
     if (scope_stat(cfgScript, &st) == 0) {
         ret = SERVICE_CFG_EXIST;

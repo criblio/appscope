@@ -913,7 +913,7 @@ ctlSendLog(ctl_t *ctl, int fd, const char *path, const void *buf, size_t count, 
         // Report only first event of binary data, drop and ignore rest
         if (cur_data_content == FS_CONTENT_BINARY) {
             if (prev_data_content != FS_CONTENT_BINARY) {
-                logevent = createInternalLogEvent(fd, path, BINARY_DATA_MSG, sizeof(BINARY_DATA_MSG) - 1, uid, proc, logType, filter);
+                logevent = createInternalLogEvent(fd, path, BINARY_DATA_MSG, C_STRLEN(BINARY_DATA_MSG), uid, proc, logType, filter);
             } else {
                 return -1;
             }

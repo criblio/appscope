@@ -1,0 +1,29 @@
+libcoredumper (1.2.1-1) unstable; urgency=low
+
+  * Upgraded to version 1.2.1.
+
+ -- Google Inc. <opensource@google.com>  Fri,  4 Apr 2008 09:41:51 -0800
+
+libcoredumper (1.1-1) unstable; urgency=low
+
+  * Upgraded to version 1.1.
+
+ -- Google Inc. <opensource@google.com>  Tue, 20 Feb 2007 15:07:03 -0800
+
+libcoredumper (1.0-1) unstable; urgency=low
+
+  * Upgraded to version 1.0.
+
+ -- Google Inc. <opensource@google.com>  Wed, 15 Feb 2007 16:24:32 -0800
+
+libcoredumper (0.3-1) unstable; urgency=low
+
+  * Upgraded to version 0.3.
+
+ -- Google Inc. <opensource@google.com>  Wed, 14 Feb 2007 14:44:40 -0800
+
+libcoredumper (0.1-1) unstable; urgency=low
+
+  * Initial release.
+
+ -- Google Inc. <opensource@google.com>  Thu, 17 Feb 2005 09:15:32 -0800

@@ -151,7 +151,7 @@ cd /opt/fault_test/
 
 SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 0
 
-grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
+grep -- "--- scopeLogBacktrace" $SCOPE_LOG_FILE > /dev/null
 ERR+=$?
 
 if [ "x86_64" = "$(uname -m)" ]; then
@@ -177,7 +177,7 @@ cd /opt/fault_test/
 
 SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 1
 
-grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
+grep -- "--- scopeLogBacktrace" $SCOPE_LOG_FILE > /dev/null
 ERR+=$?
 
 if [ "x86_64" = "$(uname -m)" ]; then
@@ -203,7 +203,7 @@ cd /opt/fault_test/
 
 SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 2
 
-grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
+grep -- "--- scopeLogBacktrace" $SCOPE_LOG_FILE > /dev/null
 ERR+=$?
 
 if [ "x86_64" = "$(uname -m)" ]; then
@@ -215,6 +215,50 @@ if [ "x86_64" = "$(uname -m)" ]; then
 fi
 
 grep "Nonexistent physical address" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+#
+# verify division by zero
+#
+
+if [ "x86_64" = "$(uname -m)" ]; then
+
+starttest div_by_zero_error
+
+cd /opt/fault_test/
+
+SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 3
+
+grep -- "--- scopeLogBacktrace" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+grep "Integer divide by zero" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+endtest
+
+fi
+
+#
+# Illegal operand/opcode
+#
+
+starttest illegal_op_error
+
+cd /opt/fault_test/
+
+SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 4
+
+grep -- "--- scopeLogBacktrace" $SCOPE_LOG_FILE > /dev/null
+ERR+=$?
+
+if [ "x86_64" = "$(uname -m)" ]; then
+    grep "Illegal operand" $SCOPE_LOG_FILE > /dev/null
+else
+    grep "Illegal opcode" $SCOPE_LOG_FILE > /dev/null
+fi
 ERR+=$?
 
 endtest

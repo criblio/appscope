@@ -14,7 +14,7 @@ struct _log_t
 };
 
 log_t*
-logCreate()
+logCreate(void)
 {
     log_t* log = scope_calloc(1, sizeof(log_t));
     if (!log) {
@@ -45,6 +45,15 @@ logSend(log_t* log, const char* msg, cfg_log_level_t mlevel)
     if ((log->level == CFG_LOG_NONE) || (log->level > mlevel)) return 0;
     
     return transportSend(log->transport, msg, scope_strlen(msg));
+}
+
+int
+logSigSafeSendWithLen(log_t *log, const char *msg, size_t msgLen, cfg_log_level_t mlevel) {
+    if (!log || !msg) return -1;
+
+    if ((log->level == CFG_LOG_NONE) || (log->level > mlevel)) return 0;
+
+    return transportSigSafeSend(log->transport, msg, msgLen);
 }
 
 cfg_log_level_t

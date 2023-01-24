@@ -54,7 +54,7 @@ $(LDSCOPEDYN): src/fn.c src/scopestdlib.c src/nsinfo.c src/nsfile.c os/$(OS)/os.
 	gcc -Wall -g $(ARCH_CFLAGS) $(DISTRO_FLAGS) \
 		-DSCOPE_VER=\"$(SCOPE_VER)\" \
 		src/fn.c src/scopestdlib.c src/nsinfo.c src/nsfile.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c src/plattime.c \
-		-ldl -lrt -o $@ ${MUSL_AR} ${UNWIND_AR} -I./os/$(OS) $(INCLUDES)
+		-ldl -lrt -o $@ ${MUSL_AR} -I./os/$(OS) $(INCLUDES)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 $(LDSCOPE): src/scope_static.c src/dbg.c src/libdir.c src/scopestdlib.c src/ns.c src/nsinfo.c src/nsfile.c src/setup.c src/loaderop.c src/libver.c $(LDSCOPEDYN) $(LIBSCOPE)
@@ -70,7 +70,7 @@ $(LDSCOPE): src/scope_static.c src/dbg.c src/libdir.c src/scopestdlib.c src/ns.c
 		src/scope_static.c src/dbg.c src/scopestdlib.c src/libdir.c src/ns.c src/nsinfo.c src/nsfile.c src/setup.c src/loaderop.c src/libver.c \
 		$(INCLUDES) \
 		$(LDSCOPEDYN).o $(LIBSCOPE:.so=.o) \
-		-lrt -lpthread -o $@ ${MUSL_AR} ${UNWIND_AR}
+		-lrt -lpthread -o $@ ${MUSL_AR}
 	$(RM) $(LDSCOPEDYN).o $(LIBSCOPE:.so=.o)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 

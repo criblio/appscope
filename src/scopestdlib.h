@@ -28,6 +28,13 @@
 #include <time.h>
 #include <unistd.h>
 
+/*
+* Following macro is commonly used in several places
+* Note: If the set of common used macro used will grow
+* please consider moving these macros to separate file
+*/
+#define ARRAY_SIZE(a) (sizeof(a)/sizeof((a)[0]))
+
 extern int  scopelibc_fcntl(int, int, ... /* arg */);
 extern int  scopelibc_open(const char *, int, ...);
 extern long scopelibc_syscall(long, ...);
@@ -241,6 +248,8 @@ int           scope_usleep(useconds_t);
 int           scope_nanosleep(const struct timespec *, struct timespec *);
 int           scope_sigaction(int, const struct sigaction *, struct sigaction *);
 int           scope_sigemptyset(sigset_t *);
+int           scope_sigfillset(sigset_t *);
+int           scope_sigdelset(sigset_t *, int);
 int           scope_pthread_create(pthread_t *, const pthread_attr_t *, void *(*)(void *), void *);
 int           scope_pthread_barrier_init(pthread_barrier_t *, const pthread_barrierattr_t *, unsigned);
 int           scope_pthread_barrier_destroy(pthread_barrier_t *);

@@ -31,7 +31,7 @@ openssl: build/openssl/libssl.a build/openssl/libcrypto.a
 pcre2: build/pcre2/libpcre2-posix.a build/pcre2/libpcre2-8.a
 ls-hpack: build/ls-hpack/libls-hpack.a
 musl: build/musl/lib/libc.a
-.PHONY: cJSON cmocka funchook libyaml openssl pcre2 ls-hpack musl
+.PHONY: cJSON cmocka funchook libyaml openssl pcre2 ls-hpack musl libunwind
 
 # Pro Tip: add these to `cmake` commands to be able to debug the resulting libraries
 #

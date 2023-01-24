@@ -40,6 +40,7 @@
 #include "javaagent.h"
 #include "inject.h"
 #include "ipc.h"
+#include "signalhandler.h"
 #include "scopestdlib.h"
 #include "../contrib/libmusl/musl.h"
 
@@ -860,7 +861,7 @@ static void
 doThread()
 {
     /*
-     * If we try to start the perioidic thread before the constructor
+     * If we try to start the periodic thread before the constructor
      * is executed and our config is not set, we are able to start the
      * thread too early. Some apps, most notably Chrome, check to
      * ensure that no extra threads are created before it is fully
@@ -1095,6 +1096,26 @@ logOurConnectionStatus(transport_status_t status, const char *name)
     }
 }
 
+/*
+* List of signals used by scope error handler
+*/
+static int
+scopeErrorsSignals[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
+
+static void
+initSigErrorHandler(void)
+{
+    if (checkEnv("SCOPE_ERROR_SIGNAL_HANDLER", "true") && g_fn.sigaction) {
+        struct sigaction act = { 0 };
+        act.sa_handler = (void (*))scopeSignalHandlerBacktrace;
+        act.sa_flags = SA_RESTART | SA_SIGINFO;
+        for (int i = 0; i < ARRAY_SIZE(scopeErrorsSignals); ++i) {
+            g_fn.sigaction(scopeErrorsSignals[i], &act, NULL);
+        }
+    }
+}
+
+
 static void *
 periodic(void *arg)
 {
@@ -1106,7 +1127,13 @@ periodic(void *arg)
     // the only reasonable solution seems to be masking the signals for this thread
 
     sigset_t mask;
-    sigfillset(&mask);
+    scope_sigfillset(&mask);
+    if (checkEnv("SCOPE_ERROR_SIGNAL_HANDLER", "true")) {
+        for (int i = 0; i < ARRAY_SIZE(scopeErrorsSignals); ++i) {
+            scope_sigdelset(&mask, scopeErrorsSignals[i]);
+        }
+    }
+
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
     bool perf;
     static time_t summaryTime, logReportTime;
@@ -1604,68 +1631,6 @@ initEnv(int *attachedFlag)
 
     // done
     scope_fclose(fd);
-}
-
-void
-scope_sig_handler(int sig, siginfo_t *info, void *secret)
-{
-    scopeLogError("!scope_sig_handler signal %d errno %d fault address %p, reason of fault:", info->si_signo, info->si_errno, info->si_addr);
-    int sig_code = info->si_code;
-
-    if (info->si_signo == SIGSEGV) {
-        switch (sig_code) {
-            case SEGV_MAPERR:
-                scopeLogError("Address not mapped to object");
-                break;
-            case SEGV_ACCERR:
-                scopeLogError("Invalid permissions for mapped object");
-                break;
-            case SEGV_BNDERR:
-                scopeLogError("Failed address bound checks");
-                break;
-            case SEGV_PKUERR:
-                scopeLogError("Access was denied by memory protection keys");
-                break;
-            default: 
-                scopeLogError("Unknown Error");
-                break;
-        }
-    } else if (info->si_signo == SIGBUS) {
-        switch (sig_code) {
-            case BUS_ADRALN:
-                scopeLogError("Invalid address alignment");
-                break;
-            case BUS_ADRERR:
-                scopeLogError("Nonexistent physical address");
-                break;
-            case BUS_OBJERR:
-                scopeLogError("Object-specific hardware error");
-                break;
-            case BUS_MCEERR_AR:
-                scopeLogError("Hardware memory error consumed on a machine check");
-                break;
-            case BUS_MCEERR_AO:
-                scopeLogError("Hardware memory error detected in process but not consumed");
-                break;
-            default: 
-                scopeLogError("Unknown Error");
-                break;
-        }
-    }
-    scopeBacktrace(CFG_LOG_ERROR);
-    abort();
-}
-
-static void
-initSigErrorHandler(void)
-{
-    if (checkEnv("SCOPE_ERROR_SIGNAL_HANDLER", "true") && g_fn.sigaction) {
-        struct sigaction act = { 0 };
-        act.sa_handler = (void (*))scope_sig_handler;
-        act.sa_flags = SA_RESTART | SA_SIGINFO;
-        g_fn.sigaction(SIGSEGV, &act, NULL);
-        g_fn.sigaction(SIGBUS, &act, NULL);
-    }
 }
 
 __attribute__((constructor)) void

@@ -28,14 +28,14 @@ scopeLogSigSafe(const char *msg, size_t msgLen) {
  * Helper functions for signal safe logging
  *
  * scopeLogErrorSigSafeCStr - logs the const string
- * scopeLogErrorSigSafeStr - logs the const string 
+ * scopeLogErrorSigSafeStr - logs the string with unknown length
  *
  */
 #define scopeLogErrorSigSafeCStr(s) scopeLogSigSafe(s, sizeof(s) - 1)
 #define scopeLogErrorSigSafeStr(s) scopeLogSigSafe(s, (scope_strlen(s)))
 
 /*
- * Converts the specifc value using base for conversion to msg and
+ * Converts the specific value using base for conversion to msg and
  * logging it with error level in signal safe way
  */
 static void
@@ -94,7 +94,7 @@ scopeLogBacktrace(void) {
 
 /*
  * Signal handler for SIGSEGV, SIGBUS, SIGILL and SIGFPE.
- * Logs the backtrace inforamation.
+ * Logs the backtrace information.
  */
 void
 scopeSignalHandlerBacktrace(int sig, siginfo_t *info, void *secret) {

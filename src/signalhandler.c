@@ -3,6 +3,7 @@
 #include "scopestdlib.h"
 #include "log.h"
 #include "utils.h"
+#include "scopecoredump.h"
 
 #define UNW_LOCAL_ONLY
 #include "libunwind.h"
@@ -92,13 +93,9 @@ scopeLogBacktrace(void) {
     }
 }
 
-/*
- * Signal handler for SIGSEGV, SIGBUS, SIGILL and SIGFPE.
- * Logs the backtrace information.
- */
-void
-scopeSignalHandlerBacktrace(int sig, siginfo_t *info, void *secret) {
-    scopeLogErrorSigSafeCStr("Scope Version: "); 
+static inline void
+logBacktraceInfo(siginfo_t *info) {
+    scopeLogErrorSigSafeCStr("Scope Version: ");
     scopeLogErrorSigSafeCStr(SCOPE_VER);
     scopeLogErrorSigSafeCStr("\n");
     scopeLogErrorSigSafeCStr("Unix Time: ");
@@ -118,7 +115,6 @@ scopeSignalHandlerBacktrace(int sig, siginfo_t *info, void *secret) {
     scopeLogSigSafeNumber((long)(info->si_addr), 16);
     scopeLogErrorSigSafeCStr(", reason of fault:\n");
     int sig_code = info->si_code;
-
     if (info->si_signo == SIGSEGV) {
         switch (sig_code) {
             case SEGV_MAPERR:
@@ -216,7 +212,38 @@ scopeSignalHandlerBacktrace(int sig, siginfo_t *info, void *secret) {
                 break;
         }
     }
-
     scopeLogBacktrace();
+}
+
+/*
+ * Signal handler which logs the backtrace information.
+ */
+void
+scopeSignalHandlerBacktrace(int sig, siginfo_t *info, void *secret) {
+    logBacktraceInfo(info);
+    abort();
+}
+
+/*
+ * Signal handler which generates core dump.
+ */
+void
+scopeSignalHandlerCoreDump(int sig, siginfo_t *info, void *secret) {
+    scopeCoreDumpGenerate(scope_getpid());
+    abort();
+}
+
+/*
+ * Signal handler which logs the backtrace information and generates core dump.
+ */
+void
+scopeSignalHandlerFull(int sig, siginfo_t *info, void *secret) {
+    logBacktraceInfo(info);
+    scopeLogErrorSigSafeCStr("Core dump generation status: ");
+    if (scopeCoreDumpGenerate(scope_getpid()) == TRUE) {
+        scopeLogErrorSigSafeCStr("success\n");
+    } else {
+        scopeLogErrorSigSafeCStr("failure\n");
+    }
     abort();
 }

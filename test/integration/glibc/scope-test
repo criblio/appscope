@@ -170,7 +170,7 @@ starttest fault_test_read_only_mem
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true scope -z -- ./fault_test 0
+SCOPE_ERROR_SIGNAL_HANDLER=log scope -z -- ./fault_test 0
 
 if [ "x86_64" = "$(uname -m)" ]; then
     grep "read_only_area_error" $SCOPE_LOG_FILE > /dev/null
@@ -192,7 +192,7 @@ starttest fault_test_not_mapped_mem
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true scope -z -- ./fault_test 1
+SCOPE_ERROR_SIGNAL_HANDLER=log scope -z -- ./fault_test 1
 
 if [ "x86_64" = "$(uname -m)" ]; then
     grep "not_mapped_address_error" $SCOPE_LOG_FILE > /dev/null
@@ -214,7 +214,7 @@ starttest fault_test_bus_error
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true scope -z -- ./fault_test 2
+SCOPE_ERROR_SIGNAL_HANDLER=log scope -z -- ./fault_test 2
 
 if [ "x86_64" = "$(uname -m)" ]; then
     grep "bus_error" $SCOPE_LOG_FILE > /dev/null
@@ -238,7 +238,7 @@ starttest div_by_zero_error
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true scope -z ./fault_test 3
+SCOPE_ERROR_SIGNAL_HANDLER=log scope -z ./fault_test 3
 
 verifyBacktrace "Integer divide by zero"
 
@@ -254,7 +254,7 @@ starttest illegal_op_error
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true scope -z ./fault_test 4
+SCOPE_ERROR_SIGNAL_HANDLER=log scope -z ./fault_test 4
 
 if [ "x86_64" = "$(uname -m)" ]; then
     verifyBacktrace "Illegal operand"

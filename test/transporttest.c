@@ -589,9 +589,10 @@ transportTcpRemoteControlSupport(void** state)
 static void
 transportFileSigSafeSend(void** state)
 {
+    const char* filePath = "/tmp/my.path";
     transport_t* t = NULL;
     int res = -1;
-    t = transportCreateFile("/tmp/my.path", CFG_BUFFER_FULLY);
+    t = transportCreateFile(filePath, CFG_BUFFER_FULLY);
     assert_non_null(t);
 
     res = transportSigSafeSend(t, "Lorem\n", sizeof("Lorem\n"));
@@ -600,6 +601,7 @@ transportFileSigSafeSend(void** state)
     assert_int_not_equal(res, -1);
 
     transportDestroy(&t);
+    scope_unlink(filePath);
 }
 
 static void

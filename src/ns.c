@@ -494,7 +494,7 @@ switchMntNsRequired(const char *hostFsPrefix) {
         "/tmp/",
     };
 
-    for (int i = 0; i < sizeof(hostDir)/sizeof(char*); ++i) {
+    for (int i = 0; i < ARRAY_SIZE(hostDir); ++i) {
         char path[PATH_MAX] = {0};
         if (scope_snprintf(path, sizeof(path), "%s%s", hostFsPrefix, hostDir[i]) < 0) {
             scope_perror("switchMntNsRequired: scope_snprintf failed");

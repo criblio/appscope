@@ -16,7 +16,7 @@ ifeq ("aarch64", "$(ARCH)")
 	DISABLE_X28=-ffixed-x28
 endif
 
-all: cJSON cmocka funchook libyaml openssl pcre2 ls-hpack musl libunwind
+all: cJSON cmocka funchook libyaml openssl pcre2 ls-hpack musl libunwind coredumper
 clean:
 	-@$(MAKE) -C cJSON clean
 	-@$(RM) -r build/*
@@ -27,11 +27,12 @@ cmocka: build/cmocka/src/libcmocka.so
 funchook: build/funchook/libfunchook.a
 libyaml: build/libyaml/src/.libs/libyaml.a
 libunwind: build/libunwind/src/.libs/libunwind.a
+coredumper: build/coredumper/.libs/libcoredumper.a
 openssl: build/openssl/libssl.a build/openssl/libcrypto.a
 pcre2: build/pcre2/libpcre2-posix.a build/pcre2/libpcre2-8.a
 ls-hpack: build/ls-hpack/libls-hpack.a
 musl: build/musl/lib/libc.a
-.PHONY: cJSON cmocka funchook libyaml openssl pcre2 ls-hpack musl libunwind
+.PHONY: cJSON cmocka funchook libyaml openssl pcre2 ls-hpack musl libunwind coredumper
 
 # Pro Tip: add these to `cmake` commands to be able to debug the resulting libraries
 #
@@ -116,6 +117,14 @@ build/libunwind/src/.libs/libunwind.a:
 	if [ "x86_64" = "$(ARCH)" ]; then \
 		objcopy --redefine-sym dl_iterate_phdr=SCOPE_DlIteratePhdr build/libunwind/src/.libs/libunwind.a; \
 	fi
+	@[ -z "$(CI)" ] || echo "::endgroup::"
+
+ build/coredumper/.libs/libcoredumper.a:
+	@echo "$${CI:+::group::}Building coredumper"
+	@$(RM) -r build/coredumper
+	@mkdir build/coredumper
+	cd build/coredumper && autoreconf -fvi ../../coredumper && ../../coredumper/configure && $(MAKE)
+	objcopy --redefine-syms redefine_syms.lst build/coredumper/.libs/libcoredumper.a
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
 build/musl/lib/libc.a:

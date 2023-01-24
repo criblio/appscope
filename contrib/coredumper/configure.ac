@@ -3,7 +3,7 @@
 ##    % aclocal -I `pwd`/../autoconf && autoconf && autoheader && automake
 
 # make sure we're interpreted by some minimal autoconf
-AC_PREREQ([2.71])
+AC_PREREQ([2.69])
 
 AC_INIT([coredumper],[1.3.1],[opensource@google.com])
 # The argument here is just something that should be in the current directory

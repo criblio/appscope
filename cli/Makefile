@@ -125,6 +125,7 @@ $(SCOPEDYN): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'
 
 ## test: run unit tests
 test:
+	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"0\" -DSCOPEDYN_SIZE=\"0\"" \
 	$(GO) test -v -p 1 -failfast -timeout 600s -coverprofile coverage.out ./...
 
 ## fmt: format all Go files

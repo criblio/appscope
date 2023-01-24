@@ -109,4 +109,6 @@ func TestSubprocess(t *testing.T) {
 
 	cmdDirExists := util.CheckFileExists(filepath.Join(wd, "cmd"))
 	assert.True(t, cmdDirExists)
+
+	os.Unsetenv("SCOPE_HOME")
 }

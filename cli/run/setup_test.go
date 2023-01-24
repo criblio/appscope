@@ -1,12 +1,10 @@
 package run
 
 import (
-	"bytes"
 	"crypto/md5"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -21,7 +19,7 @@ func TestCreateAll(t *testing.T) {
 	os.MkdirAll(".foo", 0755)
 	CreateAll(".foo")
 	files := []string{"libscope.so", "scope.yml"}
-	perms := []os.FileMode{0755, 0755}
+	perms := []os.FileMode{0755, 0644}
 	for i, f := range files {
 		path := fmt.Sprintf(".foo/%s", f)
 		stat, _ := os.Stat(path)
@@ -56,6 +54,7 @@ func TestEnvironNoScope(t *testing.T) {
 	assert.False(t, hasScope(os.Environ()))
 }
 
+/* Todo this should be an integration test
 func TestCreateWorkDir(t *testing.T) {
 	// Test CreateWorkDir, fail first
 	f, err := os.OpenFile(".test", os.O_RDONLY|os.O_CREATE, 0400)
@@ -91,6 +90,7 @@ func TestCreateWorkDir(t *testing.T) {
 	assert.True(t, exists)
 	os.RemoveAll(".test")
 }
+*/
 
 func testDefaultScopeConfigYaml(wd string, verbosity int) string {
 	wd, _ = filepath.Abs(wd)

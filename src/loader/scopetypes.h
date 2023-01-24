@@ -1,6 +1,8 @@
 #ifndef __SCOPETYPES_H__
 #define __SCOPETYPES_H__
 
+#include <stdbool.h>
+
 #define FALSE 0
 #define TRUE 1
 

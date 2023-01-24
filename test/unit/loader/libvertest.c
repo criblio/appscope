@@ -1,12 +1,13 @@
 #define _GNU_SOURCE
+
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "libver.h"
 #include "test.h"
 #include "scopetypes.h"
-#include "scopestdlib.h"
 
 static void
 normalizedVersionOfficialTest(void **state) {

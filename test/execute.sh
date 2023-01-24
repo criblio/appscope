@@ -62,6 +62,7 @@ fi
 # if any errors occurred.  ERR maintains this state.
 declare -i ERR=0
 
+# Library tests
 run_test test/${OS}/vdsotest
 run_test test/${OS}/libvertest
 run_test test/${OS}/libdirtest
@@ -91,6 +92,9 @@ if [ "${OS}" = "linux" ]; then
 fi
 run_test test/${OS}/httpaggtest
 run_test test/${OS}/selfinterposetest
+
+# Loader tests
+
 
 if [ "${OS}" = "linux" ]; then
     SAVEVARS=$ENVARS

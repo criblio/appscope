@@ -72,7 +72,9 @@ all:
 
 # run unit tests
 test:
-	@$(MAKE) coretest
+	@$(MAKE) libtest
+	@$(MAKE) loadertest
+	@$(MAKE) runtests
 	@$(MAKE) -C cli test
 
 # remove built content

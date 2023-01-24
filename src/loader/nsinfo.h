@@ -1,6 +1,7 @@
 #ifndef __NSINFO_H__
 #define __NSINFO_H__
 
+#include <stdbool.h>
 #include <unistd.h>
 
 // Retrieve namespace information

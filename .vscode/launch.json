@@ -4,15 +4,44 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        { 
+            "name": "(gdb) Attach to running process",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "/usr/bin/python3",
+            "processId": "${command:pickProcess}",
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
         {
-            "name": "(go) scope command",
+            "name": "(go) scope inspect command",
             "type": "go",
             "request": "launch",
             "mode": "debug",
             "program": "${workspaceFolder}/cli/main.go",
-            // "args": ["ps"]
-            "args": ["inspect", "665601"]
-            // "args": ["attach", "8896"]
+            "args": ["inspect", "${command:pickProcess}"]
+        },
+        {
+            "name": "(go) scope attach command",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cli/main.go",
+            "args": ["attach", "${command:pickProcess}"]
+        },
+        {
+            "name": "(go) scope ps command",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cli/main.go",
+            "args": ["ps"]
         },
         {
             "name": "(gdb) curl x86_64 w/preload",

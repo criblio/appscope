@@ -1387,7 +1387,7 @@ initHook(int attachedFlag, bool scopedFlag)
 
     // We're funchooking __write in both libc.so and libpthread.so
     // curl didn't work unless we funchook'd libc.
-    // test/linux/unixpeer didn't work unless we funchook'd pthread.
+    // test/linux/unixpeertest didn't work unless we funchook'd pthread.
     find_sym_t libc__write = {.library="libc.so",
                               .symbol="__write",
                               .out_addr = (void*)&g_fn.__write_libc};

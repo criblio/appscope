@@ -11,7 +11,7 @@ echo "================================="
 echo "      UNIX Socket Peer Test      "
 echo "================================="
 
-./test/linux/unixpeer -v -f /tmp/pass.pipe
+./test/linux/unixpeertest -v -f /tmp/pass.pipe
 ERR+=$?
 
 if [ $ERR -eq "0" ]; then

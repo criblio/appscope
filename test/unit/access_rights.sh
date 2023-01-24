@@ -11,16 +11,16 @@ echo "================================="
 echo "      Access Rights Test         "
 echo "================================="
 
-./test/linux/passfd -f /tmp/pass.pipe -1
+./test/linux/passfdtest -f /tmp/pass.pipe -1
 ERR+=$?
 
-./test/linux/passfd -f /tmp/pass.pipe -2
+./test/linux/passfdtest -f /tmp/pass.pipe -2
 ERR+=$?
 
-./test/linux/passfd -f /tmp/pass.pipe -3
+./test/linux/passfdtest -f /tmp/pass.pipe -3
 ERR+=$?
 
-./test/linux/passfd -f /tmp/pass.pipe -4
+./test/linux/passfdtest -f /tmp/pass.pipe -4
 ERR+=$?
 
 if [ $ERR -eq "0" ]; then

@@ -105,13 +105,13 @@ if [ "${OS}" = "linux" ]; then
     ENVARS=$SAVEVARS
     rm -f "/tmp/dnstest.log"
 
-    test/access_rights.sh 2>&1
+    test/unit/access_rights.sh 2>&1
     ERR+=$?
 
-    test/unixpeer.sh 2>&1
+    test/unit/unixpeer.sh 2>&1
     ERR+=$?
 
-    test/undefined_sym.sh 2>&1
+    test/unit/undefined_sym.sh 2>&1
     ERR+=$?
 fi
 

@@ -95,6 +95,7 @@ $(SCOPE): $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN)
 $(SCOPE): export GOOS=linux
 $(SCOPE): export CGO_ENABLED=1
 $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
+	@echo "$${CI:+::group::}Building scope"
 	$(RM) run/bundle.go
 	$(RM) -r build/*
 	cp $(LIBSCOPE) $(CONF_YML) $(SCOPEDYN) build/
@@ -113,6 +114,7 @@ $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 $(SCOPEDYN): $(LIBSCOPE) $(LIBLOADER) 
 $(SCOPEDYN): export GOOS=linux
 $(SCOPEDYN): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
+	@echo "$${CI:+::group::}Building scopedyn"
 	$(RM) run/bundle.go
 	$(RM) -r build/*
 	$(GO_BINDATA) -nocompress -o run/bundle.go -pkg run build

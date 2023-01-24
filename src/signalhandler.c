@@ -175,9 +175,6 @@ scopeSignalHandlerBacktrace(int sig, siginfo_t *info, void *secret) {
             case ILL_BADSTK:
                 scopeLogErrorSigSafeCStr("Internal stack error\n");
                 break;
-            case ILL_BADIADDR:
-                scopeLogErrorSigSafeCStr("Unimplemented instruction address\n");
-                break;
             default: 
                 scopeLogErrorSigSafeCStr("Unknown Error\n");
                 break;
@@ -204,12 +201,6 @@ scopeSignalHandlerBacktrace(int sig, siginfo_t *info, void *secret) {
                 break;
             case FPE_FLTINV:
                 scopeLogErrorSigSafeCStr("Floating point invalid operation\n");
-                break;
-            case FPE_FLTUNK:
-                scopeLogErrorSigSafeCStr("Undiagnosed floating-point exception\n");
-                break;
-            case FPE_CONDTRAP:
-                scopeLogErrorSigSafeCStr("Trap on condition\n");
                 break;
             default: 
                 scopeLogErrorSigSafeCStr("Unknown Error\n");

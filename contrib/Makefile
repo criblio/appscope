@@ -123,7 +123,7 @@ build/libunwind/src/.libs/libunwind.a:
 	@echo "$${CI:+::group::}Building coredumper"
 	@$(RM) -r build/coredumper
 	@mkdir build/coredumper
-	cd build/coredumper && autoreconf -fvi ../../coredumper && ../../coredumper/configure && $(MAKE)
+	cd build/coredumper && autoreconf -fvi ../../coredumper && ../../coredumper/configure CFLAGS=-fPIC && $(MAKE)
 	objcopy --redefine-syms redefine_syms.lst build/coredumper/.libs/libcoredumper.a
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 

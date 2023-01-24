@@ -66,6 +66,11 @@ testSigSafeUtoa(void **state) {
     assert_string_equal(bufOut, "567");
     assert_ptr_equal(bufOut, buf);
     assert_int_equal(len, 3);
+    scope_memset(buf, 0, sizeof(buf));
+    bufOut = sigSafeUtoa(10, buf, 16, &len);
+    assert_string_equal(bufOut, "a");
+    assert_ptr_equal(bufOut, buf);
+    assert_int_equal(len, 1);
 }
 
 int

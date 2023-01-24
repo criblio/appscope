@@ -39,7 +39,13 @@ void divide_by_zero_error(void) {
 }
 
 void illegal_operand_error(void) {
+#if defined __aarch64__
+   asm("hvc 0");
+#elif defined __x86_64__
    asm("ud2");
+#else
+# error "Unsupported arch"
+#endif
 }
 
 void test_function(int variant) {

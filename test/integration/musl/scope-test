@@ -203,10 +203,10 @@ ERR+=$?
 endtest
 
 #
-# Illegal operand
+# Illegal operand/opcode
 #
 
-starttest illegal_operand_error
+starttest illegal_op_error
 
 cd /opt/fault_test/
 
@@ -215,8 +215,11 @@ SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 4
 grep -- "--- scopeLogBacktrace" $SCOPE_LOG_FILE > /dev/null
 ERR+=$?
 
-grep "Illegal operand" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
+if [ "x86_64" = "$(uname -m)" ]; then
+    grep "Illegal operand" $SCOPE_LOG_FILE > /dev/null
+else
+    grep "Illegal opcode" $SCOPE_LOG_FILE > /dev/null
+fi
 
 endtest
 

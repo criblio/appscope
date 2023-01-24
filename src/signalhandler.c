@@ -3,6 +3,7 @@
 #include "scopestdlib.h"
 #include "log.h"
 #include "utils.h"
+#include "coredump.h"
 
 #define UNW_LOCAL_ONLY
 #include "libunwind.h"
@@ -10,6 +11,10 @@
 #include <stdlib.h>
 
 #define SYMBOL_BT_NAME_LEN (256)
+
+// Prefix for core dump file
+#define CORE_PREFIX "/tmp/scope_core."
+#define CORE_PREFIX_LEN  C_STRLEN(CORE_PREFIX)
 
 extern log_t *g_log;
 extern proc_id_t g_proc;
@@ -92,13 +97,9 @@ scopeLogBacktrace(void) {
     }
 }
 
-/*
- * Signal handler for SIGSEGV, SIGBUS, SIGILL and SIGFPE.
- * Logs the backtrace information.
- */
-void
-scopeSignalHandlerBacktrace(int sig, siginfo_t *info, void *secret) {
-    scopeLogErrorSigSafeCStr("Scope Version: "); 
+static inline void
+logBacktraceInfo(siginfo_t *info) {
+    scopeLogErrorSigSafeCStr("Scope Version: ");
     scopeLogErrorSigSafeCStr(SCOPE_VER);
     scopeLogErrorSigSafeCStr("\n");
     scopeLogErrorSigSafeCStr("Unix Time: ");
@@ -118,7 +119,6 @@ scopeSignalHandlerBacktrace(int sig, siginfo_t *info, void *secret) {
     scopeLogSigSafeNumber((long)(info->si_addr), 16);
     scopeLogErrorSigSafeCStr(", reason of fault:\n");
     int sig_code = info->si_code;
-
     if (info->si_signo == SIGSEGV) {
         switch (sig_code) {
             case SEGV_MAPERR:
@@ -216,7 +216,38 @@ scopeSignalHandlerBacktrace(int sig, siginfo_t *info, void *secret) {
                 break;
         }
     }
-
     scopeLogBacktrace();
+}
+
+/*
+ * Signal handler which logs the backtrace information.
+ */
+void
+scopeSignalHandlerBacktrace(int sig, siginfo_t *info, void *secret) {
+    logBacktraceInfo(info);
+    abort();
+}
+
+/*
+ * Signal handler which generates core dump.
+ */
+void
+scopeSignalHandlerCoreDump(int sig, siginfo_t *info, void *secret) {
+    coreDumpGenerate(CORE_PREFIX, CORE_PREFIX_LEN, scope_getpid());
+    abort();
+}
+
+/*
+ * Signal handler which logs the backtrace information and generates core dump.
+ */
+void
+scopeSignalHandlerFull(int sig, siginfo_t *info, void *secret) {
+    logBacktraceInfo(info);
+    scopeLogErrorSigSafeCStr("Core dump generation status: ");
+    if (coreDumpGenerate(CORE_PREFIX, CORE_PREFIX_LEN, scope_getpid()) == TRUE) {
+        scopeLogErrorSigSafeCStr("success\n");
+    } else {
+        scopeLogErrorSigSafeCStr("failure\n");
+    }
     abort();
 }

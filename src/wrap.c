@@ -1100,12 +1100,42 @@ logOurConnectionStatus(transport_status_t status, const char *name)
 static int
 scopeErrorsSignals[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
 
+static bool scopeSignalHandlerEnable = FALSE;
+
+typedef void (*scopeSignalHandler)(int, siginfo_t *, void *);
+
+/*
+* Get Scope Signal Handler
+*/
+static scopeSignalHandler
+getScopeSignalHandler(void) {
+    char *estr = getenv("SCOPE_ERROR_SIGNAL_HANDLER");
+    if (!estr) {
+        return NULL;
+    }
+    if (scope_strncmp(estr, "log", scope_strlen(estr)) == 0) {
+        scopeSignalHandlerEnable = TRUE;
+        return scopeSignalHandlerBacktrace;
+    } else if (scope_strncmp(estr, "coredump", scope_strlen(estr)) == 0) {
+        scopeSignalHandlerEnable = TRUE;
+        return scopeSignalHandlerCoreDump;
+    } else if (scope_strncmp(estr, "full", scope_strlen(estr)) == 0) {
+        scopeSignalHandlerEnable = TRUE;
+        return scopeSignalHandlerFull;
+    }
+    // nothing matches
+    return NULL;
+}
+
+/*
+* Register the AppScope signal handler
+*/
 static void
-initSigErrorHandler(void)
-{
-    if (checkEnv("SCOPE_ERROR_SIGNAL_HANDLER", "true") && g_fn.sigaction) {
+initSigErrorHandler(void) {
+    scopeSignalHandler handler = getScopeSignalHandler();
+    if ((handler != NULL) && (g_fn.sigaction)) {
         struct sigaction act = { 0 };
-        act.sa_handler = (void (*))scopeSignalHandlerBacktrace;
+        act.sa_handler = (void (*))handler;
         act.sa_flags = SA_RESTART | SA_SIGINFO;
         for (int i = 0; i < ARRAY_SIZE(scopeErrorsSignals); ++i) {
             g_fn.sigaction(scopeErrorsSignals[i], &act, NULL);
@@ -1126,7 +1156,7 @@ periodic(void *arg)
 
     sigset_t mask;
     scope_sigfillset(&mask);
-    if (checkEnv("SCOPE_ERROR_SIGNAL_HANDLER", "true")) {
+    if (scopeSignalHandlerEnable == TRUE) {
         for (int i = 0; i < ARRAY_SIZE(scopeErrorsSignals); ++i) {
             scope_sigdelset(&mask, scopeErrorsSignals[i]);
         }

@@ -33,7 +33,7 @@ var (
 )
 
 const ipcComTimeout time.Duration = 50 * time.Microsecond
-const comRetryLimit int = 50
+const comRetryLimit int = 5000000
 
 type IpcPidCtx struct {
 	Pid        int

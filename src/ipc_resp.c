@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 
+#include "scopecoredump.h"
 #include "com.h"
 #include "dbg.h"
 #include "ipc_resp.h"
@@ -17,6 +18,7 @@ static const char* cmdScopeName[] = {
     [IPC_CMD_GET_SCOPE_CFG]        = "getScopeCfg",
     [IPC_CMD_SET_SCOPE_CFG]        = "setScopeCfg",
     [IPC_CMD_GET_TRANSPORT_STATUS] = "getTransportStatus",
+    [IPC_CMD_CORE_DUMP]            = "triggerCoreDump"
 };
 
 #define CMD_SCOPE_SIZE  (ARRAY_SIZE(cmdScopeName))
@@ -477,5 +479,14 @@ allocFail:
  */
 scopeRespWrapper *
 ipcRespStatusScopeError(ipc_resp_status_t status) {
+    return ipcRespStatus(status);
+}
+
+/*
+ * Creates the wrapper for response to IPC_CMD_CORE_DUMP
+ */
+scopeRespWrapper *
+ipcRespCoreDumpTrigger(const cJSON *scopeReq) {
+    ipc_resp_status_t status = scopeCoreDumpGenerate(scope_getpid()) == TRUE ? IPC_RESP_OK : IPC_RESP_SERVER_ERROR;
     return ipcRespStatus(status);
 }

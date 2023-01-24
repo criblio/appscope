@@ -430,6 +430,7 @@ static responseProcessor supportedResp[] = {
     [IPC_CMD_GET_SCOPE_CFG]        = ipcRespGetScopeCfg, 
     [IPC_CMD_SET_SCOPE_CFG]        = ipcRespSetScopeCfg,
     [IPC_CMD_GET_TRANSPORT_STATUS] = ipcRespGetTransportStatus,
+    [IPC_CMD_CORE_DUMP]            = ipcRespCoreDumpTrigger,
     [IPC_CMD_UNKNOWN]              = ipcRespStatusNotImplemented
 };
 

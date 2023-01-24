@@ -25,6 +25,7 @@ const (
 	reqCmdGetScopeCfg
 	reqCmdSetScopeCfg
 	reqCmdGetTransportStatus
+	reqCmdCoreDump
 )
 
 // Request which contains only cmd without data
@@ -222,6 +223,30 @@ func (cmd *CmdGetTransportStatus) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, er
 }
 
 func (cmd *CmdGetTransportStatus) UnmarshalResp(respData []byte) error {
+	err := yaml.Unmarshal(respData, &cmd.Response)
+	if err != nil {
+		return err
+	}
+
+	if cmd.Response.Status == nil {
+		return fmt.Errorf("%w %v", errMissingMandatoryField, "status")
+	}
+
+	return nil
+}
+
+// CmdCoreDump describes Generate core dump command request and response
+type CmdCoreDump struct {
+	Response scopeOnlyStatusResponse
+}
+
+func (cmd *CmdCoreDump) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
+	req, _ := json.Marshal(scopeRequestOnly{Req: reqCmdCoreDump})
+
+	return ipcDispatcher(req, pidCtx)
+}
+
+func (cmd *CmdCoreDump) UnmarshalResp(respData []byte) error {
 	err := yaml.Unmarshal(respData, &cmd.Response)
 	if err != nil {
 		return err

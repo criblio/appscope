@@ -5,6 +5,16 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "(go) scope command",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cli/main.go",
+            // "args": ["ps"]
+            "args": ["inspect", "665601"]
+            // "args": ["attach", "8896"]
+        },
+        {
             "name": "(gdb) curl x86_64 w/preload",
             "type": "cppdbg",
             "request": "launch",

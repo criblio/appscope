@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include "log.h"
 
+#include "scopestdlib.h"
 #include "fn.h"
 #include "test.h"
 
@@ -29,17 +30,33 @@ logSendForNullLogDoesntCrash(void** state)
 {
     const char* msg = "Hey, this is cool!\n";
     assert_int_equal(logSend(NULL, msg, DEFAULT_LOG_LEVEL), -1);
+    assert_int_equal(logSigSafeSendWithLen(NULL, msg, scope_strlen(msg), DEFAULT_LOG_LEVEL), -1);
 }
 
 static void
-logSendForNullMessageDoesntCrash(void** state)
+logSendForNullMessageDoesntCrashUnix(void** state)
 {
     log_t* log = logCreate();
     assert_non_null(log);
-    transport_t* t = transportCreateSyslog();
+    transport_t* t = transportCreateUnix("/var/run/scope.sock");
     assert_non_null(t);
     logTransportSet(log, t);
     assert_int_equal(logSend(log, NULL, DEFAULT_LOG_LEVEL), -1);
+    // logSigSafeSendWithLen is not supported by UNIX transport
+    assert_int_equal(logSigSafeSendWithLen(log, NULL, 0, DEFAULT_LOG_LEVEL), -1);
+    logDestroy(&log);
+}
+
+static void
+logSendSigSafeForNullMessageDoesntCrash(void** state)
+{
+    log_t* log = logCreate();
+    assert_non_null(log);
+    const char* file_path = "/tmp/my.path";
+    transport_t* t = transportCreateFile(file_path, CFG_BUFFER_FULLY);
+    assert_non_null(t);
+    logTransportSet(log, t);
+    assert_int_equal(logSigSafeSendWithLen(log, NULL, 0, DEFAULT_LOG_LEVEL), -1);
     logDestroy(&log);
 }
 
@@ -70,14 +87,10 @@ logTranportSetAndLogSend(void** state)
     assert_non_null(log);
     transport_t* t1 = transportCreateUdp("127.0.0.1", "12345");
     transport_t* t2 = transportCreateUnix("/var/run/scope.sock");
-    transport_t* t3 = transportCreateSyslog();
-    transport_t* t4 = transportCreateShm();
-    transport_t* t5 = transportCreateFile(file_path, CFG_BUFFER_FULLY);
+    transport_t* t3 = transportCreateFile(file_path, CFG_BUFFER_FULLY);
     logTransportSet(log, t1);
     logTransportSet(log, t2);
     logTransportSet(log, t3);
-    logTransportSet(log, t4);
-    logTransportSet(log, t5);
 
     // Test that transport is set by testing side effects of logSend
     // affecting the file at file_path when connected to a file transport.
@@ -175,7 +188,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(logCreateReturnsValidPtr),
         cmocka_unit_test(logDestroyNullLogDoesntCrash),
         cmocka_unit_test(logSendForNullLogDoesntCrash),
-        cmocka_unit_test(logSendForNullMessageDoesntCrash),
+        cmocka_unit_test(logSendForNullMessageDoesntCrashUnix),
+        cmocka_unit_test(logSendSigSafeForNullMessageDoesntCrash),
         cmocka_unit_test(logLevelVerifyDefaultLevel),
         cmocka_unit_test(logLevelSetAndGet),
         cmocka_unit_test(logTranportSetAndLogSend),

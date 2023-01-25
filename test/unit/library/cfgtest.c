@@ -488,10 +488,6 @@ cfgTransportTypeSetAndGet(void** state)
     assert_int_equal(cfgTransportType(config, t), CFG_UNIX);
     cfgTransportTypeSet(config, t, CFG_FILE);
     assert_int_equal(cfgTransportType(config, t), CFG_FILE);
-    cfgTransportTypeSet(config, t, CFG_SYSLOG);
-    assert_int_equal(cfgTransportType(config, t), CFG_SYSLOG);
-    cfgTransportTypeSet(config, t, CFG_SHM);
-    assert_int_equal(cfgTransportType(config, t), CFG_SHM);
     cfgTransportTypeSet(config, t, CFG_EDGE);
     assert_int_equal(cfgTransportType(config, t), CFG_EDGE);
     cfgDestroy(&config);

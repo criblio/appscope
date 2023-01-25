@@ -5,7 +5,7 @@
  * options: -t, --tls       use TLSv1.3
  *
  * requires: libssl-dev
- * build: gcc -g test/manual/tcpclient.c -lpthread -lssl -lcrypto -o tcpclient
+ * build: gcc -g test/manual/tcpclient.c -Icontrib/build/openssl/include -Icontrib/openssl/include -L contrib/build/openssl -lpthread -lssl -lcrypto -o tcpclient
  *
  */
 #define _POSIX_C_SOURCE 1
@@ -23,7 +23,10 @@
 #include <signal.h>
 #include <strings.h>
 #include <getopt.h>
-#include <stdbool.h>
+
+typedef unsigned int bool;
+#define TRUE 1
+#define FALSE 0
 
 // Forward declarations
 int socket_setup(int);
@@ -48,7 +51,7 @@ main(int argc, char *argv[])
 {
     int opt = -1;
     int option_index = 0;
-    bool tls = false;
+    bool tls = FALSE;
 
     // get options
     while (1) {
@@ -58,7 +61,7 @@ main(int argc, char *argv[])
         }
         switch (opt) {
         case 't':
-            tls = true;
+            tls = TRUE;
             break;
         default: /* '?' */
             showUsage();

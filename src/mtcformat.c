@@ -6,10 +6,8 @@
 #include <string.h>
 #include <sys/time.h>
 #include <inttypes.h>
-#include "cJSON.h"
 #include "dbg.h"
 #include "mtcformat.h"
-#include "scopetypes.h"
 #include "strset.h"
 #include "com.h"
 #include "scopestdlib.h"

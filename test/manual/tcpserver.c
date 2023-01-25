@@ -5,10 +5,7 @@
  * options: -t, --tls       use TLSv1.3
  *
  * Build Dynamically: (requires: libssl-dev)
- * gcc -g test/manual/tcpserver.c -Icontrib/build/openssl/include -Icontrib/openssl/include -L contrib/build/openssl -Wl,-R$PWD/contrib/build/openssl -lpthread -lssl -lcrypto -o tcpserver
- *
- * Build Statically:
- * gcc -g -DSSL_write=SCOPE_SSL_write -DSSL_read=SCOPE_SSL_read test/manual/tcpserver.c -Icontrib/openssl/include -Icontrib/build/openssl/include contrib/build/openssl/libssl.a contrib/build/openssl/libcrypto.a -lpthread -ldl -o tcpserver
+ * gcc -g test/manual/tcpserver.c -DSCOPE_SSL_write=SSL_write -Icontrib/build/openssl/include -Icontrib/openssl/include -L contrib/build/openssl -Wl,-R$PWD/contrib/build/openssl -lpthread -lssl -lcrypto -o tcpserver
  *
  * generate unencrypted TLS key and certificate:
  * openssl req -nodes -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem
@@ -31,12 +28,15 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/poll.h>
-#include <stdbool.h>
 #include <getopt.h>
 #include <sys/wait.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <signal.h>
+
+typedef unsigned int bool;
+#define TRUE 1
+#define FALSE 0
 
 #define BUFSIZE 4096
 #define MAXFDS 500
@@ -79,7 +79,7 @@ main(int argc, char *argv[])
 
     int opt = -1;
     int option_index = 0;
-    bool tls = false;
+    bool tls = FALSE;
 
     // get options
     while (1) {
@@ -89,7 +89,7 @@ main(int argc, char *argv[])
         }
         switch (opt) {
         case 't':
-            tls = true;
+            tls = TRUE;
             break;
         default: /* '?' */
             showUsage();

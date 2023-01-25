@@ -12,6 +12,7 @@
 #include "fn.h"
 #include "dbg.h"
 #include "scopestdlib.h"
+#include "scopetypes.h"
 #include "transport.h"
 #include "test.h"
 
@@ -159,16 +160,11 @@ transportCreateFileReturnsUnconnectedForInvalidPath(void** state)
     t = transportCreateFile(NULL, CFG_BUFFER_LINE);
     assert_null(t);
 
-    assert_int_equal(dbgCountMatchingLines("src/transport.c"), 0);
-
     t = transportCreateFile("", CFG_BUFFER_LINE);
     assert_non_null(t);
 
     assert_true(transportNeedsConnection(t));
     transportDestroy(&t);
-
-    assert_int_equal(dbgCountMatchingLines("src/transport.c"), 1);
-    dbgInit(); // reset dbg for the rest of the tests
 }
 
 static void
@@ -222,27 +218,6 @@ transportCreateEdgeReturnsValidPtrInHappyPath(void** state)
 }
 
 static void
-transportCreateSyslogReturnsValidPtrInHappyPath(void** state)
-{
-    transport_t* t = transportCreateSyslog();
-    assert_non_null(t);
-    assert_false(transportNeedsConnection(t));
-    transportDestroy(&t);
-    assert_null(t);
-
-}
-
-static void
-transportCreateShmReturnsValidPtrInHappyPath(void** state)
-{
-    transport_t* t = transportCreateShm();
-    assert_non_null(t);
-    assert_false(transportNeedsConnection(t));
-    transportDestroy(&t);
-    assert_null(t);
-}
-
-static void
 transportDestroyNullTransportDoesNothing(void** state)
 {
     transportDestroy(NULL);
@@ -268,20 +243,6 @@ transportSendForNullMessageDoesNothing(void** state)
     transportDestroy(&t);
     if (scope_unlink(path))
         fail_msg("Couldn't delete test file %s", path);
-}
-
-static void
-transportSendForUnimplementedTransportTypesIsHarmless(void** state)
-{
-    transport_t* t;
-
-    t = transportCreateSyslog();
-    transportSend(t, "blah", scope_strlen("blah"));
-    transportDestroy(&t);
-
-    t = transportCreateShm();
-    transportSend(t, "blah", scope_strlen("blah"));
-    transportDestroy(&t);
 }
 
 static void
@@ -603,16 +564,6 @@ transportTcpRemoteControlSupport(void** state)
     assert_false(transportSupportsCommandControl(t));
     transportDestroy(&t);
 
-    t = transportCreateSyslog();
-    assert_non_null(t);
-    assert_false(transportSupportsCommandControl(t));
-    transportDestroy(&t);
-
-    t = transportCreateShm();
-    assert_non_null(t);
-    assert_false(transportSupportsCommandControl(t));
-    transportDestroy(&t);
-
     t = transportCreateFile("/tmp/my.path", CFG_BUFFER_FULLY);
     assert_non_null(t);
     assert_false(transportSupportsCommandControl(t));
@@ -631,6 +582,151 @@ transportTcpRemoteControlSupport(void** state)
     t = transportCreateEdge();
     assert_non_null(t);
     assert_true(transportSupportsCommandControl(t));
+    transportDestroy(&t);
+}
+
+
+static void
+transportFileSigSafeSend(void** state)
+{
+    const char* filePath = "/tmp/my.path";
+    transport_t* t = NULL;
+    int res = -1;
+    t = transportCreateFile(filePath, CFG_BUFFER_FULLY);
+    assert_non_null(t);
+
+    res = transportSigSafeSend(t, "Lorem\n", sizeof("Lorem\n"));
+    assert_int_not_equal(res, -1);
+    res = transportSigSafeSend(t, "Ipsum", sizeof("Ipsum"));
+    assert_int_not_equal(res, -1);
+
+    transportDestroy(&t);
+    scope_unlink(filePath);
+}
+
+static void
+transportConnectionStatusInitialValues(void ** state)
+{
+    transport_status_t status;
+
+    // Null
+    assert_int_equal(dbgCountMatchingLines("src/transport.c"), 0);
+    status = transportConnectionStatus(NULL);
+    assert_null(status.configString);
+    assert_false(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 0);
+    assert_null(status.failureString);
+    assert_int_equal(dbgCountMatchingLines("src/transport.c"), 1);
+    dbgInit(); // reset dbg for the rest of the tests
+
+    // Tcp
+    transport_t* t = transportCreateTCP("127.0.0.1", "54321", FALSE, FALSE, NULL);
+    status = transportConnectionStatus(t);
+    assert_non_null(t);
+    assert_string_equal(status.configString, "tcp://127.0.0.1:54321");
+    // expects nothing to be listening on this local port
+    assert_false(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 1);
+    assert_string_equal(status.failureString, "Socket connection failed");
+    transportDestroy(&t);
+
+    // Udp
+    t = transportCreateUdp("myhost", "12345");
+    status = transportConnectionStatus(t);
+    assert_non_null(t);
+    assert_string_equal(status.configString, "udp://myhost:12345");
+    // expects that DNS will not resolve myhost
+    assert_false(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 1);
+    assert_string_equal(status.failureString, "DNS lookup failed");
+    transportDestroy(&t);
+
+    t = transportCreateUdp("127.0.0.1", "22222");
+    status = transportConnectionStatus(t);
+    assert_non_null(t);
+    assert_string_equal(status.configString, "udp://127.0.0.1:22222");
+    // UDP is connectionless, isConnected will be true as long as DNS resolves
+    assert_true(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 0);
+    assert_string_equal(status.failureString, "n/a");
+    transportDestroy(&t);
+
+    // File
+    const char* path = "/tmp/nodir/abc.log";
+    t = transportCreateFile(path, CFG_BUFFER_LINE);
+    status = transportConnectionStatus(t);
+    assert_non_null(t);
+    assert_string_equal(status.configString, "file:///tmp/nodir/abc.log");
+    // File connection fails when a directory in its path does not exist
+    assert_false(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 1);
+    assert_null(status.failureString); // currently, only for TCP/UDP
+    transportDestroy(&t);
+
+    const char* path2 = "/tmp/abc.log";
+    t = transportCreateFile(path2, CFG_BUFFER_LINE);
+    status = transportConnectionStatus(t);
+    assert_non_null(t);
+    assert_string_equal(status.configString, "file:///tmp/abc.log");
+    assert_true(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 0);
+    assert_null(status.failureString);
+    transportDestroy(&t);
+    if (scope_unlink(path2))
+        fail_msg("Couldn't delete test file %s", path2);
+
+
+    // Unix
+    const char *sockName = "/tmp/abc.sock";
+    t = transportCreateUnix(sockName);
+    status = transportConnectionStatus(t);
+    assert_non_null(t);
+    assert_string_equal(status.configString, "unix:///tmp/abc.sock");
+    // expects that this socket does not exist
+    assert_false(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 1);
+    assert_null(status.failureString);
+    transportDestroy(&t);
+
+    // This time create the socket to connect to
+    struct sockaddr_un addr;
+    addr.sun_family = AF_UNIX;
+    scope_memset(addr.sun_path, 0, sizeof(addr.sun_path));
+    scope_strncpy(addr.sun_path, sockName, scope_strlen(sockName));
+    int addr_len = sizeof(sa_family_t) + scope_strlen(sockName) + 1;
+
+    int sd = scope_socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sd == -1) {
+        fail_msg("Couldn't create socket");
+    }
+    if (scope_bind(sd, (const struct sockaddr *)&addr, addr_len) == -1) {
+        fail_msg("Couldn't bind socket");
+    }
+    if (scope_listen(sd, 10) == -1) {
+        fail_msg("Couldn't listen on socket");
+    }
+    t = transportCreateUnix(sockName);
+    status = transportConnectionStatus(t);
+    assert_non_null(t);
+    assert_string_equal(status.configString, "unix:///tmp/abc.sock");
+    // now it exists
+    assert_true(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 0);
+    assert_null(status.failureString);
+    transportDestroy(&t);
+    scope_close(sd);
+    scope_unlink(sockName);
+
+
+    // Edge
+    t = transportCreateEdge();
+    status = transportConnectionStatus(t);
+    assert_non_null(t);
+    assert_string_equal(status.configString, "edge");
+    // expects that an edge socket doesn't exist
+    assert_false(status.isConnected);
+    assert_int_equal(status.connectAttemptCount, 1);
+    assert_null(status.failureString);
     transportDestroy(&t);
 }
 
@@ -656,12 +752,9 @@ main(int argc, char* argv[])
         cmocka_unit_test(transportCreateUnixReturnsValidPtrInHappyPath),
         cmocka_unit_test(transportCreateUnixReturnsNullForInvalidPath),
         cmocka_unit_test(transportCreateEdgeReturnsValidPtrInHappyPath),
-        cmocka_unit_test(transportCreateSyslogReturnsValidPtrInHappyPath),
-        cmocka_unit_test(transportCreateShmReturnsValidPtrInHappyPath),
         cmocka_unit_test(transportDestroyNullTransportDoesNothing),
         cmocka_unit_test(transportSendForNullTransportDoesNothing),
         cmocka_unit_test(transportSendForNullMessageDoesNothing),
-        cmocka_unit_test(transportSendForUnimplementedTransportTypesIsHarmless),
         cmocka_unit_test(transportSendForUdpTransmitsMsg),
         cmocka_unit_test(transportSendForAbstractUnixTransmitsMsg),
         cmocka_unit_test(transportSendForFilepathUnixTransmitsMsg),
@@ -670,6 +763,8 @@ main(int argc, char* argv[])
         cmocka_unit_test(transportSendForFileWritesToFileImmediatelyWhenLineBuffered),
         cmocka_unit_test(transportTcpReconnect),
         cmocka_unit_test(transportTcpRemoteControlSupport),
+        cmocka_unit_test(transportConnectionStatusInitialValues),
+        cmocka_unit_test(transportFileSigSafeSend),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

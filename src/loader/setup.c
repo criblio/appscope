@@ -194,7 +194,7 @@ serviceCfgStatusSystemD(const char *serviceName, uid_t uid, gid_t gid) {
         }
     }
 
-    strncat(cfgScript, "env.conf", sizeof(cfgScript) - 1);
+    strncat(cfgScript, "env.conf", C_STRLEN("env.conf"));
 
     if (stat(cfgScript, &st) == 0) {
         ret = SERVICE_CFG_EXIST;

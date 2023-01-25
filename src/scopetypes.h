@@ -10,7 +10,7 @@
 typedef enum {CFG_FMT_STATSD,
               CFG_FMT_NDJSON,
               CFG_FORMAT_MAX} cfg_mtc_format_t;
-typedef enum {CFG_UDP, CFG_UNIX, CFG_FILE, CFG_SYSLOG, CFG_SHM, CFG_TCP, CFG_EDGE} cfg_transport_t;
+typedef enum {CFG_UDP, CFG_UNIX, CFG_FILE, CFG_TCP, CFG_EDGE} cfg_transport_t;
 typedef enum {CFG_MTC, CFG_CTL, CFG_LOG, CFG_LS, CFG_WHICH_MAX} which_transport_t;
 typedef enum {CFG_LOG_TRACE,
               CFG_LOG_DEBUG,
@@ -51,9 +51,10 @@ typedef enum {CFG_MTC_FS,
 #define SCOPE_FILTER_USR_PATH ("/usr/lib/appscope/scope_filter")
 #define SCOPE_FILTER_TMP_PATH ("/tmp/appscope/scope_filter")
 
-#ifndef bool
 typedef unsigned int bool;
-#endif
+#define TRUE 1
+#define FALSE 0
+
 
 typedef struct
 {
@@ -79,9 +80,6 @@ typedef struct
     unsigned long cmdAttachAddr;
     bool scoped;
 } export_sm_t;
-
-#define TRUE 1
-#define FALSE 0
 
 #define CFG_MAX_VERBOSITY 9
 #define CFG_FILE_NAME "scope.yml"
@@ -150,6 +148,7 @@ typedef struct
 #define DEFAULT_PROCESS_START_MSG TRUE
 #define DEFAULT_PAYLOAD_ENABLE FALSE
 #define DEFAULT_PAYLOAD_DIR "/tmp"
+#define DEFAULT_PAYLOAD_DIR_REPR "dir:///tmp"
 
 #define DEFAULT_MTC_TYPE CFG_UDP
 #define DEFAULT_MTC_HOST "127.0.0.1"
@@ -208,7 +207,7 @@ typedef struct
 //    SCOPE_PAYLOAD_HEADER           write payload headers to files
 //    SCOPE_PAYLOAD_TO_DISK          if payloads are enabled, "true" forces writes to payload->dir
 //    SCOPE_ALLOW_CONSTRUCT_DBG      allows debug inside the constructor
-//    SCOPE_ERROR_SIGNAL_HANDLER     allows to register SIGSEGV&SIGBUS handler
+//    SCOPE_ERROR_SIGNAL_HANDLER     allows to register signal error handler for following signals: SIGSEGV, SIGBUS, SIGILL and SIGFPE
 //    SCOPE_QUEUE_LENGTH             override default circular buffer sizes
 //    SCOPE_START_NOPROFILE          cause the start command to ignore updates to /etc/profile.d
 //    SCOPE_START_FORCE_PROFILE      force the start command to update profile.d with a dev version

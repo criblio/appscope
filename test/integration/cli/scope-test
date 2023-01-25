@@ -9,4 +9,6 @@ ERR+=$?
 ERR+=$?
 /opt/test/bin/test_options.sh
 ERR+=$?
+/opt/test/bin/test_inspect.sh
+ERR+=$?
 exit ${ERR}

@@ -9,14 +9,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestProcessesByName
+// TestProcessesByNameToAttach
 // Assertions:
 // - The expected process array is returned
 // - No error is returned
-func TestProcessesByName(t *testing.T) {
+func TestProcessesByNameToAttach(t *testing.T) {
 	// Current process
 	name := "util.test"
-	result, err := ProcessesByName(name)
+	result, err := ProcessesByNameToAttach(name)
 	user, _ := user.Current()
 	exp := Processes{
 		Process{

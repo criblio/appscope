@@ -47,6 +47,28 @@ endtest(){
     rm -f $SCOPE_LOG_FILE
 }
 
+#check the backtrace
+verifyBacktrace() {
+    local expMsg=$1
+    # The following preamble is common for all backtrace
+    grep -a "Scope Version:" $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+    grep -a "Unix Time: " $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+    grep -a "PID: " $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+    grep -a "Process name" $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+    grep -a -- "--- scopeLogBacktrace" $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+    grep -a "$expMsg" $SCOPE_LOG_FILE > /dev/null
+    if [ $? != 0 ]; then
+        ERR+=$?
+        echo "verifyBacktrace fails, params: $expMsg"
+        cat $SCOPE_LOG_FILE
+    fi
+}
+
 #
 # extract on glibc
 #
@@ -150,9 +172,6 @@ cd /opt/fault_test/
 
 SCOPE_ERROR_SIGNAL_HANDLER=true scope -z -- ./fault_test 0
 
-grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
-
 if [ "x86_64" = "$(uname -m)" ]; then
     grep "read_only_area_error" $SCOPE_LOG_FILE > /dev/null
     ERR+=$?
@@ -161,8 +180,7 @@ if [ "x86_64" = "$(uname -m)" ]; then
     ERR+=$?
 fi
 
-grep "Invalid permissions for mapped object" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
+verifyBacktrace "Invalid permissions for mapped object"
 
 endtest
 
@@ -176,9 +194,6 @@ cd /opt/fault_test/
 
 SCOPE_ERROR_SIGNAL_HANDLER=true scope -z -- ./fault_test 1
 
-grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
-
 if [ "x86_64" = "$(uname -m)" ]; then
     grep "not_mapped_address_error" $SCOPE_LOG_FILE > /dev/null
     ERR+=$?
@@ -187,8 +202,7 @@ if [ "x86_64" = "$(uname -m)" ]; then
     ERR+=$?
 fi
 
-grep "Address not mapped to object" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
+verifyBacktrace "Address not mapped to object"
 
 endtest
 
@@ -202,9 +216,6 @@ cd /opt/fault_test/
 
 SCOPE_ERROR_SIGNAL_HANDLER=true scope -z -- ./fault_test 2
 
-grep -- "--- scopeBacktrace" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
-
 if [ "x86_64" = "$(uname -m)" ]; then
     grep "bus_error" $SCOPE_LOG_FILE > /dev/null
     ERR+=$?
@@ -213,8 +224,43 @@ if [ "x86_64" = "$(uname -m)" ]; then
     ERR+=$?
 fi
 
-grep "Nonexistent physical address" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
+verifyBacktrace "Nonexistent physical address"
+
+endtest
+
+#
+# verify division by zero
+#
+
+if [ "x86_64" = "$(uname -m)" ]; then
+
+starttest div_by_zero_error
+
+cd /opt/fault_test/
+
+SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 3
+
+verifyBacktrace "Integer divide by zero"
+
+endtest
+
+fi
+
+#
+# Illegal operand/opcode
+#
+
+starttest illegal_op_error
+
+cd /opt/fault_test/
+
+SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 4
+
+if [ "x86_64" = "$(uname -m)" ]; then
+    verifyBacktrace "Illegal operand"
+else
+    verifyBacktrace "Illegal opcode"
+fi
 
 endtest
 

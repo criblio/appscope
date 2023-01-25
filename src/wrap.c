@@ -37,6 +37,9 @@
 #include "wrap.h"
 #include "runtimecfg.h"
 #include "javaagent.h"
+#include "inject.h"
+#include "ipc.h"
+#include "signalhandler.h"
 #include "scopestdlib.h"
 #include "../contrib/libmusl/musl.h"
 
@@ -79,17 +82,17 @@ typedef struct
     int   after_scope;
 } param_t;
 
-enum_map_t netFailMap[] = {
-    {"n/a",                                            NO_FAIL},
-    {"Connection failure",                             CONN_FAIL},
-    {"TLS Failure: error accessing peer certificate",  TLS_CERT_FAIL},
-    {"TLS Failure: error establishing connection",     TLS_CONN_FAIL},
-    {"TLS Failure: error creating context",            TLS_CONTEXT_FAIL},
-    {"TLS Failure: error creating session",            TLS_SESSION_FAIL},
-    {"TLS Failure: error setting tls on socket",       TLS_SOCKET_FAIL},
-    {"TLS Failure: server validation failed",          TLS_VERIFY_FAIL},
-    {NULL,                                             -1}
-};
+void
+doAndReplaceConfig(void *data) {
+    config_t * cfg = (config_t *) data;
+    doConfig(cfg);
+    if (g_staticfg) {
+        cfgDestroy(&g_staticfg);
+        g_staticfg = NULL;
+    }
+    g_staticfg = cfg;
+    g_cfg.staticfg = g_staticfg;
+}
 
 // When used with dl_iterate_phdr(), this has a similar result to
 // scope_dlsym(RTLD_NEXT, ).  But, unlike scope_dlsym(RTLD_NEXT, )
@@ -402,7 +405,7 @@ cmdAttach(void)
 
     /*
      * Using this as an indicator that we were not
-     * previously soping. If the smfd is not active we
+     * previously scoping. If the smfd is not active we
      * may have been detached and are reattaching.
      * In that cse, the thread and transports are expected
      * to be ready.
@@ -419,6 +422,76 @@ cmdAttach(void)
     }
 
     return TRUE;
+}
+
+/*
+ * Handle IPC communication
+ */
+static void
+ipcCommunication(void) {
+    size_t appMqSize = -1;
+    long msgCount = -1;
+    char name[256] = {0};
+
+    /*
+    * Handle incoming message queue
+    * - check if it exists
+    * - check if there are message request on it
+    */
+    scope_snprintf(name, sizeof(name), "/ScopeIPCIn.%d", g_proc.pid);
+    mqd_t mqRequestDesc  = ipcOpenConnection(name, O_RDONLY | O_NONBLOCK);
+
+    if (ipcIsActive(mqRequestDesc, &appMqSize, &msgCount) == FALSE) {
+        return;
+    }
+
+    if (msgCount <= 0) {
+        goto cleanupReqMq;
+    }
+
+    size_t cliMqSize = -1;
+    /*
+    * Handle output message queue
+    * - check if it exists
+    */
+    scope_memset(name, 0, sizeof(name));
+    scope_snprintf(name, sizeof(name), "/ScopeIPCOut.%d", g_proc.pid);
+
+    mqd_t mqResponseDesc = ipcOpenConnection(name, O_WRONLY | O_NONBLOCK);
+    if (ipcIsActive(mqResponseDesc, &cliMqSize, &msgCount) == FALSE) {
+        scopeLogError("%s is not active.", name);
+        goto cleanupReqMq;
+    }
+
+    /*
+    * Handle incoming message queue request (all frames or till first error)
+    */
+    req_parse_status_t parseStatus = REQ_PARSE_GENERIC_ERROR;
+    int uniqReq = -1;
+    void *scopeReq = ipcRequestHandler(mqRequestDesc, appMqSize, &parseStatus, &uniqReq);
+
+    /*
+    * Handle outcoming message queue response (all frames or till first error)
+    */
+    ipc_resp_result_t res;
+    if (parseStatus == REQ_PARSE_OK) {
+        res = ipcSendSuccessfulResponse(mqResponseDesc, cliMqSize, scopeReq, uniqReq);
+    } else {
+        res = ipcSendFailedResponse(mqResponseDesc, cliMqSize, parseStatus, uniqReq);
+    }
+
+    if (res != RESP_RESULT_OK) {
+        scopeLogError("ipcCommunication Error sending response to %s failed res %d, parseStatus %d, uniqReq %d", name, res, parseStatus, uniqReq);
+    }
+
+    scope_free(scopeReq);
+    
+    // scopeLogError("OK: Sending answer to %s for cmd %d", name, cmd);
+
+    ipcCloseConnection(mqResponseDesc);
+
+cleanupReqMq:
+    ipcCloseConnection(mqRequestDesc);
 }
 
 static void
@@ -787,7 +860,7 @@ static void
 doThread()
 {
     /*
-     * If we try to start the perioidic thread before the constructor
+     * If we try to start the periodic thread before the constructor
      * is executed and our config is not set, we are able to start the
      * thread too early. Some apps, most notably Chrome, check to
      * ensure that no extra threads are created before it is fully
@@ -1002,6 +1075,46 @@ handleExit(void)
     logDisconnect(g_log);
 }
 
+static void
+logOurConnectionStatus(transport_status_t status, const char *name)
+{
+    // We want to be quiet if connections seem to be ok.
+    if (status.isConnected) return;
+
+    // Output reason for failure if we're able.
+    if (status.failureString) {
+        scopeLog(CFG_LOG_WARN, "%s destination (%s) not connected. messages dropped: "
+            "%"PRIu64 " connection attempts: %"PRIu64 " reason for failure: %s",
+            name, status.configString, g_cbuf_drop_count,
+            status.connectAttemptCount, status.failureString);
+    } else {
+        scopeLog(CFG_LOG_WARN, "%s destination (%s) not connected. messages dropped: "
+            "%"PRIu64 " connection attempts: %"PRIu64,
+            name, status.configString, g_cbuf_drop_count,
+            status.connectAttemptCount);
+    }
+}
+
+/*
+* List of signals used by scope error handler
+*/
+static int
+scopeErrorsSignals[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
+
+static void
+initSigErrorHandler(void)
+{
+    if (checkEnv("SCOPE_ERROR_SIGNAL_HANDLER", "true") && g_fn.sigaction) {
+        struct sigaction act = { 0 };
+        act.sa_handler = (void (*))scopeSignalHandlerBacktrace;
+        act.sa_flags = SA_RESTART | SA_SIGINFO;
+        for (int i = 0; i < ARRAY_SIZE(scopeErrorsSignals); ++i) {
+            g_fn.sigaction(scopeErrorsSignals[i], &act, NULL);
+        }
+    }
+}
+
+
 static void *
 periodic(void *arg)
 {
@@ -1013,7 +1126,13 @@ periodic(void *arg)
     // the only reasonable solution seems to be masking the signals for this thread
 
     sigset_t mask;
-    sigfillset(&mask);
+    scope_sigfillset(&mask);
+    if (checkEnv("SCOPE_ERROR_SIGNAL_HANDLER", "true")) {
+        for (int i = 0; i < ARRAY_SIZE(scopeErrorsSignals); ++i) {
+            scope_sigdelset(&mask, scopeErrorsSignals[i]);
+        }
+    }
+
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
     bool perf;
     static time_t summaryTime, logReportTime;
@@ -1056,18 +1175,11 @@ periodic(void *arg)
             summaryTime = tv.tv_sec + g_thread.interval;
 
             if (tv.tv_sec >= logReportTime) {
-                if (ctlNeedsConnection(g_ctl, CFG_CTL)) {
-                    scopeLog(CFG_LOG_WARN, "event destination not connected. messages dropped: "
-                            "%"PRIu64 " connection attempts: %"PRIu64 " reason for failure: %s", \
-                            g_cbuf_drop_count, ctlConnectAttempts(g_ctl, CFG_CTL), \
-                            valToStr(netFailMap, ctlTransportFailureReason(g_ctl, CFG_CTL)));
-                }
-                if (mtcNeedsConnection(g_mtc)) {
-                    scopeLog(CFG_LOG_WARN, "metric destination not connected. messages dropped: "
-                            "%"PRIu64 " connection attempts: %"PRIu64 " reason for failure: %s", \
-                            g_cbuf_drop_count, mtcConnectAttempts(g_mtc), \
-                            valToStr(netFailMap, mtcTransportFailureReason(g_mtc)));
-                }
+                transport_status_t ctlStatus = ctlConnectionStatus(g_ctl, CFG_CTL);
+                logOurConnectionStatus(ctlStatus, "event");
+                transport_status_t mtcStatus = mtcConnectionStatus(g_mtc);
+                logOurConnectionStatus(mtcStatus, "metric");
+
                 logReportTime = tv.tv_sec + CONN_LOG_INTERVAL; 
             }
 
@@ -1079,6 +1191,7 @@ periodic(void *arg)
             }
         }
         remoteConfig();
+        ipcCommunication();
     }
 
     return NULL;
@@ -1519,68 +1632,6 @@ initEnv(int *attachedFlag)
 
     // done
     scope_fclose(fd);
-}
-
-void
-scope_sig_handler(int sig, siginfo_t *info, void *secret)
-{
-    scopeLogError("!scope_sig_handler signal %d errno %d fault address %p, reason of fault:", info->si_signo, info->si_errno, info->si_addr);
-    int sig_code = info->si_code;
-
-    if (info->si_signo == SIGSEGV) {
-        switch (sig_code) {
-            case SEGV_MAPERR:
-                scopeLogError("Address not mapped to object");
-                break;
-            case SEGV_ACCERR:
-                scopeLogError("Invalid permissions for mapped object");
-                break;
-            case SEGV_BNDERR:
-                scopeLogError("Failed address bound checks");
-                break;
-            case SEGV_PKUERR:
-                scopeLogError("Access was denied by memory protection keys");
-                break;
-            default: 
-                scopeLogError("Unknown Error");
-                break;
-        }
-    } else if (info->si_signo == SIGBUS) {
-        switch (sig_code) {
-            case BUS_ADRALN:
-                scopeLogError("Invalid address alignment");
-                break;
-            case BUS_ADRERR:
-                scopeLogError("Nonexistent physical address");
-                break;
-            case BUS_OBJERR:
-                scopeLogError("Object-specific hardware error");
-                break;
-            case BUS_MCEERR_AR:
-                scopeLogError("Hardware memory error consumed on a machine check");
-                break;
-            case BUS_MCEERR_AO:
-                scopeLogError("Hardware memory error detected in process but not consumed");
-                break;
-            default: 
-                scopeLogError("Unknown Error");
-                break;
-        }
-    }
-    scopeBacktrace(CFG_LOG_ERROR);
-    abort();
-}
-
-static void
-initSigErrorHandler(void)
-{
-    if (checkEnv("SCOPE_ERROR_SIGNAL_HANDLER", "true") && g_fn.sigaction) {
-        struct sigaction act = { 0 };
-        act.sa_handler = (void (*))scope_sig_handler;
-        act.sa_flags = SA_RESTART | SA_SIGINFO;
-        g_fn.sigaction(SIGSEGV, &act, NULL);
-        g_fn.sigaction(SIGBUS, &act, NULL);
-    }
 }
 
 __attribute__((constructor)) void
@@ -3654,7 +3705,7 @@ _exit(int status)
     } else {
         exit(status);
     }
-    __builtin_unreachable();
+    UNREACHABLE();
 }
 
 #endif // __linux__

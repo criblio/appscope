@@ -107,8 +107,6 @@ enum_map_t transportTypeMap[] = {
     {"tcp",                   CFG_TCP},
     {"unix",                  CFG_UNIX},
     {"file",                  CFG_FILE},
-    {"syslog",                CFG_SYSLOG},
-    {"shm",                   CFG_SHM},
     {"edge",                  CFG_EDGE},
     {NULL,                   -1}
 };
@@ -287,7 +285,7 @@ processCustomTag(config_t* cfg, const char* e, const char* value)
     char name_buf[1024];
     scope_strncpy(name_buf, e, sizeof(name_buf));
 
-    char* name = name_buf + (sizeof("SCOPE_TAG_") - 1);
+    char* name = name_buf + C_STRLEN("SCOPE_TAG_");
 
     // convert the "=" to a null delimiter for the name
     char* end = scope_strchr(name, '=');
@@ -845,7 +843,7 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         char value_cpy[1024];
         scope_strncpy(value_cpy, value, sizeof(value_cpy));
 
-        char *host = value_cpy + (sizeof("udp://") - 1);
+        char *host = value_cpy + C_STRLEN("udp://");
 
         // convert the ':' to a null delimiter for the host
         // and move port past the null
@@ -864,7 +862,7 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         char value_cpy[1024];
         scope_strncpy(value_cpy, value, sizeof(value_cpy));
 
-        char *host = value_cpy + (sizeof("tcp://") - 1);
+        char *host = value_cpy + C_STRLEN("tcp://");
 
         // convert the ':' to a null delimiter for the host
         // and move port past the null
@@ -878,14 +876,14 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         cfgTransportPortSet(cfg, t, port);
 
     } else if (value == scope_strstr(value, "file://")) {
-        const char *path = value + (sizeof("file://") - 1);
+        const char *path = value + C_STRLEN("file://");
         cfgTransportTypeSet(cfg, t, CFG_FILE);
         cfgTransportPathSet(cfg, t, path);
     } else if (value == scope_strstr(value, "unix://")) {
-        const char *path = value + (sizeof("unix://") - 1);
+        const char *path = value + C_STRLEN("unix://");
         cfgTransportTypeSet(cfg, t, CFG_UNIX);
         cfgTransportPathSet(cfg, t, path);
-    } else if (scope_strncmp(value, "edge", sizeof("edge") - 1) == 0) {
+    } else if (scope_strncmp(value, "edge", C_STRLEN("edge")) == 0) {
         cfgTransportTypeSet(cfg, t, CFG_EDGE);
     }
 }
@@ -2221,8 +2219,6 @@ createTransportJson(config_t* cfg, which_transport_t trans)
             if (!cJSON_AddStringToObjLN(root, BUFFERING_NODE,
                  valToStr(bufferMap, cfgTransportBuf(cfg, trans)))) goto err;
             break;
-        case CFG_SYSLOG:
-        case CFG_SHM:
         case CFG_EDGE:
             break;
         default:
@@ -2635,9 +2631,6 @@ initTransport(config_t* cfg, which_transport_t t)
     transport_t* transport = NULL;
 
     switch (cfgTransportType(cfg, t)) {
-        case CFG_SYSLOG:
-            transport = transportCreateSyslog();
-            break;
         case CFG_FILE:
             transport = transportCreateFile(cfgTransportPath(cfg, t), cfgTransportBuf(cfg,t));
             break;
@@ -2657,9 +2650,6 @@ initTransport(config_t* cfg, which_transport_t t)
                                            cfgTransportTlsEnable(cfg, t),
                                            cfgTransportTlsValidateServer(cfg, t),
                                            cfgTransportTlsCACertPath(cfg, t));
-            break;
-        case CFG_SHM:
-            transport = transportCreateShm();
             break;
         default:
             DBG("%d", cfgTransportType(cfg, t));
@@ -2779,12 +2769,18 @@ initCtl(config_t *cfg)
     }
     ctlTransportSet(ctl, trans, CFG_CTL);
 
-    // We'll create a dedicated payload channel, conditionally.
-    int payloadFeatureEnabled = cfgPayEnable(cfg) ||
-                                  protocolDefinitionsUsePayloads();
-    int sendPayloadsToStream = cfgLogStreamEnable(cfg) &&
-                                 !payloadToDiskForced();
-    if (payloadFeatureEnabled && sendPayloadsToStream) {
+    /*
+     * Determine the status of payload channel based on configuration
+     */
+    payload_status_t payloadStatus = PAYLOAD_STATUS_DISABLE;
+    if (cfgPayEnable(cfg) || protocolDefinitionsUsePayloads()) {
+        if (cfgLogStreamEnable(cfg) && !payloadToDiskForced() ) {
+            payloadStatus = PAYLOAD_STATUS_CRIBL;
+        } else {
+            payloadStatus = PAYLOAD_STATUS_DISK;
+        }
+    }
+    if (payloadStatus == PAYLOAD_STATUS_CRIBL) {
         transport_t *trans = initTransport(cfg, CFG_LS);
         if (!trans) {
             ctlDestroy(&ctl);
@@ -2804,7 +2800,7 @@ initCtl(config_t *cfg)
     ctlEvtSet(ctl, evt);
 
     ctlEnhanceFsSet(ctl, cfgEnhanceFs(cfg));
-    ctlPayEnableSet(ctl, cfgPayEnable(cfg));
+    ctlPayStatusSet(ctl, payloadStatus);
     ctlPayDirSet(ctl,    cfgPayDir(cfg));
     ctlAllowBinaryConsoleSet(ctl, cfgEvtAllowBinaryConsole(cfg));
 

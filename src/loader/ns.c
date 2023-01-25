@@ -471,7 +471,7 @@ createCron(const char *hostPrefixPath, const char *script) {
     }
 
     // crond will detect this file entry and run on its' next cycle
-    if (write(outFd, SCOPE_CRONTAB, sizeof(SCOPE_CRONTAB) - 1) == -1) {
+    if (write(outFd, SCOPE_CRONTAB, C_STRLEN(SCOPE_CRONTAB)) == -1) {
         perror("createCron: cron: write failed");
         fprintf(stderr, "path: %s\n", path);
         close(outFd);
@@ -500,7 +500,7 @@ switchMntNsRequired(const char *hostFsPrefix) {
         "/tmp/",
     };
 
-    for (int i = 0; i < sizeof(hostDir)/sizeof(char*); ++i) {
+    for (int i = 0; i < ARRAY_SIZE(hostDir); ++i) {
         char path[PATH_MAX] = {0};
         if (snprintf(path, sizeof(path), "%s%s", hostFsPrefix, hostDir[i]) < 0) {
             perror("switchMntNsRequired: snprintf failed");

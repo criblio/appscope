@@ -364,17 +364,15 @@ getMacAddr(char *string)
 
 /*
  * Convert unsigned long to a non-null terminated string.
- *
- * Returns a buf.
  */
-char *
+void
 sigSafeUtoa(unsigned long val, char *buf, int base, int *len) {
     int i = 0;
 
     if (val == 0) {
         buf[0] = '0';
         *len = 1;
-        return buf;
+        return;
     }
 
     // Process each digit
@@ -392,6 +390,6 @@ sigSafeUtoa(unsigned long val, char *buf, int base, int *len) {
         buf[*len - i - 1] = temp;  
     }  
 
-    return buf;
+    return;
 }
 

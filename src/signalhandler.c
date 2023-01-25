@@ -43,11 +43,11 @@ scopeLogSigSafeNumber(long val, int base) {
     if (!g_log) {
         return;
     }
-    char *bufOut = NULL;
+
     char buf[32] = {0};
     int msgLen = 0;
-    bufOut = sigSafeUtoa(val, buf, base, &msgLen);
-    logSigSafeSendWithLen(g_log, bufOut, msgLen, CFG_LOG_ERROR);
+    sigSafeUtoa(val, buf, base, &msgLen);
+    logSigSafeSendWithLen(g_log, buf, msgLen, CFG_LOG_ERROR);
 }
 
 /*

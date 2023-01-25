@@ -12,7 +12,7 @@
 #define SYMBOL_BT_NAME_LEN (256)
 
 extern log_t *g_log;
-
+extern proc_id_t g_proc;
 /*
  * Logs the specific message with error level in signal safe way
  */
@@ -100,6 +100,12 @@ void
 scopeSignalHandlerBacktrace(int sig, siginfo_t *info, void *secret) {
     scopeLogErrorSigSafeCStr("Scope Version: "); 
     scopeLogErrorSigSafeCStr(SCOPE_VER);
+    scopeLogErrorSigSafeCStr("\n");
+    scopeLogErrorSigSafeCStr("PID: ");
+    scopeLogSigSafeNumber(g_proc.pid, 10);
+    scopeLogErrorSigSafeCStr("\n");
+    scopeLogErrorSigSafeCStr("Process name: ");
+    scopeLogErrorSigSafeStr(g_proc.procname);
     scopeLogErrorSigSafeCStr("\n");
     scopeLogErrorSigSafeCStr("!scopeSignalHandlerBacktrace signal ");
     scopeLogSigSafeNumber(info->si_signo, 10);

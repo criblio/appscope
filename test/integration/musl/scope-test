@@ -47,6 +47,26 @@ endtest(){
     rm -f $SCOPE_LOG_FILE
 }
 
+#check the backtrace
+verifyBacktrace() {
+    local expMsg=$1
+    # The following preamble is common for all backtrace
+    grep -a "Scope Version:" $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+    grep -a "PID: " $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+    grep -a "Process name" $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+    grep -a -- "--- scopeLogBacktrace" $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
+    grep -a "$expMsg" $SCOPE_LOG_FILE > /dev/null
+    if [ $? != 0 ]; then
+        ERR+=$?
+        echo "verifyBacktrace fails, params: $expMsg"
+        cat $SCOPE_LOG_FILE
+    fi
+}
+
 #
 # extract on musl
 #
@@ -143,16 +163,12 @@ cd /opt/fault_test/
 
 SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 0
 
-grep -- "--- scopeLogBacktrace" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
-
 if [ "x86_64" = "$(uname -m)" ]; then
     grep "test_function" $SCOPE_LOG_FILE > /dev/null
     ERR+=$?
 fi
 
-grep "Invalid permissions for mapped object" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
+verifyBacktrace "Invalid permissions for mapped object"
 
 endtest
 
@@ -166,16 +182,12 @@ cd /opt/fault_test/
 
 SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 1
 
-grep -- "--- scopeLogBacktrace" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
-
 if [ "x86_64" = "$(uname -m)" ]; then
     grep "test_function" $SCOPE_LOG_FILE > /dev/null
     ERR+=$?
 fi
 
-grep "Address not mapped to object" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
+verifyBacktrace "Address not mapped to object"
 
 endtest
 
@@ -189,16 +201,12 @@ cd /opt/fault_test/
 
 SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 2
 
-grep -- "--- scopeLogBacktrace" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
-
 if [ "x86_64" = "$(uname -m)" ]; then
     grep "test_function" $SCOPE_LOG_FILE > /dev/null
     ERR+=$?
 fi
 
-grep "Nonexistent physical address" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
+verifyBacktrace "Nonexistent physical address"
 
 endtest
 
@@ -212,13 +220,10 @@ cd /opt/fault_test/
 
 SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 4
 
-grep -- "--- scopeLogBacktrace" $SCOPE_LOG_FILE > /dev/null
-ERR+=$?
-
 if [ "x86_64" = "$(uname -m)" ]; then
-    grep "Illegal operand" $SCOPE_LOG_FILE > /dev/null
+    verifyBacktrace "Illegal operand"
 else
-    grep "Illegal opcode" $SCOPE_LOG_FILE > /dev/null
+    verifyBacktrace "Illegal opcode"
 fi
 
 endtest

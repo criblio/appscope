@@ -128,6 +128,7 @@ loadertest: $(LOADER_C_FILES) $(LOADER_TEST_C_FILES) $(YAML_AR) $(JSON_AR) $(TES
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/nsinfotest nsinfotest.o nsinfo.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
+runtests: export USER ?= $(shell id -u -n)
 runtests:
 	@echo "$${CI:+::group::}Running Tests and Generating Test Coverage"
 	test/unit/execute.sh

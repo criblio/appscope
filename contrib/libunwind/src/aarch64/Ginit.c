@@ -46,12 +46,40 @@ unw_addr_space_t unw_local_addr_space = &local_addr_space;
 static inline void *
 uc_addr (unw_tdep_context_t *uc, int reg)
 {
-  if (reg >= UNW_AARCH64_X0 && reg < UNW_AARCH64_V0)
+  if (reg == UNW_AARCH64_VG)
+    {
+      /*
+       * Support for saving the vector length in the context needs to be
+       * added to get_context() for this path to work.
+       */
+      Debug(1, "Accessing VG register from context is not supported\n");
+      return NULL;
+    }
+#ifdef __FreeBSD__
+  if (reg >= UNW_AARCH64_X0 && reg < UNW_AARCH64_X30)
+    return &uc->uc_mcontext.mc_gpregs.gp_x[reg];
+  else if (reg == UNW_AARCH64_X30)
+    return &uc->uc_mcontext.mc_gpregs.gp_lr;
+  else if (reg == UNW_AARCH64_SP)
+    return &uc->uc_mcontext.mc_gpregs.gp_sp;
+  else if (reg == UNW_AARCH64_PC)
+    return &uc->uc_mcontext.mc_gpregs.gp_elr;
+  else if (reg >= UNW_AARCH64_V0 && reg <= UNW_AARCH64_V31)
+    return &GET_FPCTX(uc)->uc_mcontext.mc_fpregs.fp_q[reg - UNW_AARCH64_V0];
+  else
+    return NULL;
+#else /* __FreeBSD__ */
+  if (reg >= UNW_AARCH64_X0 && reg <= UNW_AARCH64_X30)
     return &uc->uc_mcontext.regs[reg];
+  else if (reg == UNW_AARCH64_SP)
+    return &uc->uc_mcontext.sp;
+  else if (reg == UNW_AARCH64_PC)
+    return &uc->uc_mcontext.pc;
   else if (reg >= UNW_AARCH64_V0 && reg <= UNW_AARCH64_V31)
     return &GET_FPCTX(uc)->vregs[reg - UNW_AARCH64_V0];
   else
     return NULL;
+#endif /* __FreeBSD__ */
 }
 
 # ifdef UNW_LOCAL_ONLY
@@ -84,8 +112,6 @@ get_dyn_info_list_addr (unw_addr_space_t as, unw_word_t *dyn_info_list_addr,
   return 0;
 }
 
-#define PAGE_SIZE 4096
-#define PAGE_START(a)   ((a) & ~(PAGE_SIZE-1))
 
 static int mem_validate_pipe[2] = {-1, -1};
 
@@ -197,11 +223,14 @@ tdep_init_mem_validate (void)
 
 #ifdef HAVE_MINCORE
   unsigned char present = 1;
-  unw_word_t addr = PAGE_START((unw_word_t)&present);
+  size_t len = unw_page_size;
+  unw_word_t addr = uwn_page_start((unw_word_t)&present);
   unsigned char mvec[1];
   int ret;
-  while ((ret = mincore ((void*)addr, PAGE_SIZE, (unsigned char *)mvec)) == -1 &&
-         errno == EAGAIN) {}
+  while ((ret = mincore((void *)addr, len, (unsigned char *)mvec)) == -1 &&
+         errno == EAGAIN)
+  {
+  }
   if (ret == 0)
     {
       Debug(1, "using mincore to validate memory\n");
@@ -295,12 +324,8 @@ validate_mem (unw_word_t addr)
 {
   size_t len;
 
-  if (PAGE_START(addr + sizeof (unw_word_t) - 1) == PAGE_START(addr))
-    len = PAGE_SIZE;
-  else
-    len = PAGE_SIZE * 2;
-
-  addr = PAGE_START(addr);
+  len = unw_page_size;
+  addr = uwn_page_start(addr);
 
   if (addr == 0)
     return -1;
@@ -411,6 +436,11 @@ get_static_proc_name (unw_addr_space_t as, unw_word_t ip,
   return _Uelf64_get_proc_name (as, getpid (), ip, buf, buf_len, offp);
 }
 
+static unw_word_t empty_ptrauth_mask(unw_addr_space_t addr_space_unused, void *as_arg_unused)
+{
+  return 0;
+}
+
 HIDDEN void
 aarch64_local_addr_space_init (void)
 {
@@ -424,6 +454,7 @@ aarch64_local_addr_space_init (void)
   local_addr_space.acc.access_fpreg = access_fpreg;
   local_addr_space.acc.resume = aarch64_local_resume;
   local_addr_space.acc.get_proc_name = get_static_proc_name;
+  local_addr_space.acc.ptrauth_insn_mask = empty_ptrauth_mask;
   local_addr_space.big_endian = target_is_big_endian();
   unw_flush_cache (&local_addr_space, 0, 0);
 }

@@ -465,7 +465,7 @@ createCron(const char *hostPrefixPath, const char *script) {
     }
 
     // crond will detect this file entry and run on its' next cycle
-    if (scope_write(outFd, SCOPE_CRONTAB, sizeof(SCOPE_CRONTAB) - 1) == -1) {
+    if (scope_write(outFd, SCOPE_CRONTAB, C_STRLEN(SCOPE_CRONTAB)) == -1) {
         scope_perror("createCron: cron: scope_write failed");
         scope_fprintf(scope_stderr, "path: %s\n", path);
         scope_close(outFd);
@@ -494,7 +494,7 @@ switchMntNsRequired(const char *hostFsPrefix) {
         "/tmp/",
     };
 
-    for (int i = 0; i < sizeof(hostDir)/sizeof(char*); ++i) {
+    for (int i = 0; i < ARRAY_SIZE(hostDir); ++i) {
         char path[PATH_MAX] = {0};
         if (scope_snprintf(path, sizeof(path), "%s%s", hostFsPrefix, hostDir[i]) < 0) {
             scope_perror("switchMntNsRequired: scope_snprintf failed");

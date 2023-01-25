@@ -48,28 +48,23 @@ testSetMachineID(void **state)
 
 static void
 testSigSafeUtoa(void **state) {
-    char *bufOut = NULL;
     int len = 0;
     char buf[32] = {0};
 
-    bufOut = sigSafeUtoa(0, buf, 10, &len);
-    assert_string_equal(bufOut, "0");
-    assert_ptr_equal(bufOut, buf);
+    sigSafeUtoa(0, buf, 10, &len);
+    assert_string_equal(buf, "0");
     assert_int_equal(len, 1);
     scope_memset(buf, 0, sizeof(buf));
-    bufOut = sigSafeUtoa(1234, buf, 10, &len);
-    assert_string_equal(bufOut, "1234");
-    assert_ptr_equal(bufOut, buf);
+    sigSafeUtoa(1234, buf, 10, &len);
+    assert_string_equal(buf, "1234");
     assert_int_equal(len, 4);
     scope_memset(buf, 0, sizeof(buf));
-    bufOut = sigSafeUtoa(567, buf, 10, &len);
-    assert_string_equal(bufOut, "567");
-    assert_ptr_equal(bufOut, buf);
+    sigSafeUtoa(567, buf, 10, &len);
+    assert_string_equal(buf, "567");
     assert_int_equal(len, 3);
     scope_memset(buf, 0, sizeof(buf));
-    bufOut = sigSafeUtoa(10, buf, 16, &len);
-    assert_string_equal(bufOut, "a");
-    assert_ptr_equal(bufOut, buf);
+    sigSafeUtoa(10, buf, 16, &len);
+    assert_string_equal(buf, "a");
     assert_int_equal(len, 1);
 }
 

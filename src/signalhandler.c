@@ -12,7 +12,7 @@
 #define SYMBOL_BT_NAME_LEN (256)
 
 extern log_t *g_log;
-
+extern proc_id_t g_proc;
 /*
  * Logs the specific message with error level in signal safe way
  */
@@ -31,7 +31,7 @@ scopeLogSigSafe(const char *msg, size_t msgLen) {
  * scopeLogErrorSigSafeStr - logs the string with unknown length
  *
  */
-#define scopeLogErrorSigSafeCStr(s) scopeLogSigSafe(s, sizeof(s) - 1)
+#define scopeLogErrorSigSafeCStr(s) scopeLogSigSafe(s, C_STRLEN(s))
 #define scopeLogErrorSigSafeStr(s) scopeLogSigSafe(s, (scope_strlen(s)))
 
 /*
@@ -43,11 +43,11 @@ scopeLogSigSafeNumber(long val, int base) {
     if (!g_log) {
         return;
     }
-    char *bufOut = NULL;
+
     char buf[32] = {0};
     int msgLen = 0;
-    bufOut = sigSafeUtoa(val, buf, base, &msgLen);
-    logSigSafeSendWithLen(g_log, bufOut, msgLen, CFG_LOG_ERROR);
+    sigSafeUtoa(val, buf, base, &msgLen);
+    logSigSafeSendWithLen(g_log, buf, msgLen, CFG_LOG_ERROR);
 }
 
 /*
@@ -101,11 +101,20 @@ scopeSignalHandlerBacktrace(int sig, siginfo_t *info, void *secret) {
     scopeLogErrorSigSafeCStr("Scope Version: "); 
     scopeLogErrorSigSafeCStr(SCOPE_VER);
     scopeLogErrorSigSafeCStr("\n");
+    scopeLogErrorSigSafeCStr("Unix Time: ");
+    scopeLogSigSafeNumber(scope_time(NULL), 10);
+    scopeLogErrorSigSafeCStr(" sec\n");
+    scopeLogErrorSigSafeCStr("PID: ");
+    scopeLogSigSafeNumber(g_proc.pid, 10);
+    scopeLogErrorSigSafeCStr("\n");
+    scopeLogErrorSigSafeCStr("Process name: ");
+    scopeLogErrorSigSafeStr(g_proc.procname);
+    scopeLogErrorSigSafeCStr("\n");
     scopeLogErrorSigSafeCStr("!scopeSignalHandlerBacktrace signal ");
     scopeLogSigSafeNumber(info->si_signo, 10);
     scopeLogErrorSigSafeCStr(" errno ");
     scopeLogSigSafeNumber(info->si_errno, 10);
-    scopeLogErrorSigSafeCStr(" fault address ");
+    scopeLogErrorSigSafeCStr(" fault address 0x");
     scopeLogSigSafeNumber((long)(info->si_addr), 16);
     scopeLogErrorSigSafeCStr(", reason of fault:\n");
     int sig_code = info->si_code;

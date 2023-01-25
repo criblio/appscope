@@ -6,6 +6,8 @@ As of today, AppScope has one mechanism to report debugging information in the e
 
 There are three things that we expect to be common with any approach to debugging crashes. Firstly, there has to be a way to **detect** that there is a problem. Secondly, we have to take a **snapshot** of pertinent information while the problem exists. Lastly, we need to **preserve** the snapshot so the debugging can take place at a later time. At this time we will not consider the additional steps of notifying developers or transferring the snapshot to the developers.
 
+![Crash Flow](images/crashflow.jpeg)
+
 Among other things, the discussion that follows tries to address pros and cons of performing these steps from inside the crashing process vs from outside the crashing process.  What coordination is needed between the two?
 
 ## Detect that the process is crashing

@@ -53,6 +53,8 @@ verifyBacktrace() {
     # The following preamble is common for all backtrace
     grep -a "Scope Version:" $SCOPE_LOG_FILE > /dev/null
     ERR+=$?
+    grep -a "Unix Time: " $SCOPE_LOG_FILE > /dev/null
+    ERR+=$?
     grep -a "PID: " $SCOPE_LOG_FILE > /dev/null
     ERR+=$?
     grep -a "Process name" $SCOPE_LOG_FILE > /dev/null

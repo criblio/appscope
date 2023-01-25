@@ -101,6 +101,9 @@ scopeSignalHandlerBacktrace(int sig, siginfo_t *info, void *secret) {
     scopeLogErrorSigSafeCStr("Scope Version: "); 
     scopeLogErrorSigSafeCStr(SCOPE_VER);
     scopeLogErrorSigSafeCStr("\n");
+    scopeLogErrorSigSafeCStr("Unix Time: ");
+    scopeLogSigSafeNumber(scope_time(NULL), 10);
+    scopeLogErrorSigSafeCStr(" sec\n");
     scopeLogErrorSigSafeCStr("PID: ");
     scopeLogSigSafeNumber(g_proc.pid, 10);
     scopeLogErrorSigSafeCStr("\n");

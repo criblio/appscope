@@ -87,7 +87,7 @@ $(LIBLOADER): src/loader/loader.c src/loader/nsinfo.c src/loader/nsfile.c src/lo
 ########## Tests ##########
 # ensure $USER is available since some of the tests expect it
 libtest: export USER ?= $(shell id -u -n)
-libtest: $(LIBRARY_C_FILES) $(LIBRARY_TEST_C_FILES) $(L $(YAML_AR) $(JSON_AR) $(TEST_LIB)
+libtest: $(LIBRARY_C_FILES) $(LIBRARY_TEST_C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
 	@echo "$${CI:+::group::}Building Library Tests"
 	$(CC) -c $(TEST_CFLAGS) $(LIBRARY_C_FILES) $(LIBRARY_INCLUDES) $(LIBRARY_TEST_C_FILES) $(INCLUDES) $(CMOCKA_INCLUDES) $(OS_C_FILES)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/vdsotest vdsotest.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)

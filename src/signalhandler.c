@@ -105,7 +105,7 @@ scopeSignalHandlerBacktrace(int sig, siginfo_t *info, void *secret) {
     scopeLogSigSafeNumber(info->si_signo, 10);
     scopeLogErrorSigSafeCStr(" errno ");
     scopeLogSigSafeNumber(info->si_errno, 10);
-    scopeLogErrorSigSafeCStr(" fault address ");
+    scopeLogErrorSigSafeCStr(" fault address 0x");
     scopeLogSigSafeNumber((long)(info->si_addr), 16);
     scopeLogErrorSigSafeCStr(", reason of fault:\n");
     int sig_code = info->si_code;

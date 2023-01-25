@@ -36,6 +36,7 @@ fwrite scopelibc_fwrite
 gai_strerror scopelibc_gai_strerror
 getaddrinfo scopelibc_getaddrinfo
 getentropy scopelibc_getentropy
+getpgrp scopelibc_getpgrp
 gethostbyname scopelibc_gethostbyname
 getnameinfo scopelibc_getnameinfo
 getpagesize scopelibc_getpagesize

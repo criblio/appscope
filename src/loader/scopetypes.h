@@ -3,6 +3,10 @@
 
 #include <stdbool.h>
 
+/***********************************************************************
+ * Consider updating src/scopetypes.h if you make changes to this file *
+ ***********************************************************************/
+
 #define FALSE 0
 #define TRUE 1
 

@@ -17,6 +17,10 @@
 #include "loaderutils.h"
 #include "scopetypes.h"
 
+/*********************************************************************
+ * Consider updating src/scopeelf.c if you make changes to this file *
+ *********************************************************************/
+
 void
 freeElf(char *buf, size_t len)
 {

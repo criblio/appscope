@@ -3,6 +3,10 @@
 
 #include <unistd.h>
 
+/******************************************************************************
+ * Consider updating src/loader/scopetypes.h if you make changes to this file *
+ ******************************************************************************/
+
 typedef enum {CFG_FMT_STATSD,
               CFG_FMT_NDJSON,
               CFG_FORMAT_MAX} cfg_mtc_format_t;

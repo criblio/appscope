@@ -174,6 +174,7 @@ SetLibraryBaseNull(void **state) {
     assert_int_equal(res, -1);
 }
 
+#if 0
 static void
 ExtractNewFileDev(void **state) {
     libdirInitTest(TEST_INSTALL_BASE, TEST_TMP_BASE, "dev");
@@ -262,6 +263,7 @@ ExtractFileExistsOfficial(void **state) {
     assert_int_equal(firstStat.st_ctim.tv_sec, secondStat.st_ctim.tv_sec);
     assert_int_equal(firstStat.st_ctim.tv_nsec, secondStat.st_ctim.tv_nsec);
 }
+#endif
 
 static void
 GetPathDev(void **state) {

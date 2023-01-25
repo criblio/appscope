@@ -43,18 +43,18 @@ static void
 dbgMacroIdentifiesFileAndLine(void** state)
 {
     dbgInit();
-    DBG(NULL);                        // test/dbgtest.c:46
-    DBG("blah");                      // test/dbgtest.c:47
-    DBG("%s", "something");           // test/dbgtest.c:48
-    DBG("%d%s", 314159, "something"); // test/dbgtest.c:49
+    DBG(NULL);                        // test/unit/library/dbgtest.c:46
+    DBG("blah");                      // test/unit/library/dbgtest.c:47
+    DBG("%s", "something");           // test/unit/library/dbgtest.c:48
+    DBG("%d%s", 314159, "something"); // test/unit/library/dbgtest.c:49
 
     char buf[4096] = {0};
     dbgDumpAllToBuffer(buf, sizeof(buf));
 
-    assert_non_null(scope_strstr(buf, "test/dbgtest.c:46"));
-    assert_non_null(scope_strstr(buf, "test/dbgtest.c:47"));
-    assert_non_null(scope_strstr(buf, "test/dbgtest.c:48"));
-    assert_non_null(scope_strstr(buf, "test/dbgtest.c:49"));
+    assert_non_null(scope_strstr(buf, "test/unit/library/dbgtest.c:46"));
+    assert_non_null(scope_strstr(buf, "test/unit/library/dbgtest.c:47"));
+    assert_non_null(scope_strstr(buf, "test/unit/library/dbgtest.c:48"));
+    assert_non_null(scope_strstr(buf, "test/unit/library/dbgtest.c:49"));
     assert_int_equal(4, dbgCountAllLines());
 }
 

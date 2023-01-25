@@ -79,6 +79,7 @@ shmat scopelibc_shmat
 shmdt scopelibc_shmdt
 shmget scopelibc_shmget
 shutdown scopelibc_shutdown
+snprintf scopelibc_snprintf
 socket scopelibc_socket
 sprintf scopelibc_sprintf
 sscanf scopelibc_sscanf

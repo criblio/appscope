@@ -7,6 +7,9 @@
  * Consider updating src/scopetypes.h if you make changes to this file *
  ***********************************************************************/
 
+#define ARRAY_SIZE(a) (sizeof(a)/sizeof((a)[0]))
+#define C_STRLEN(a)  (sizeof(a) - 1)
+
 #define FALSE 0
 #define TRUE 1
 

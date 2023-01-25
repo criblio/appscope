@@ -37,7 +37,6 @@
 #include "wrap.h"
 #include "runtimecfg.h"
 #include "javaagent.h"
-#include "inject.h"
 #include "ipc.h"
 #include "signalhandler.h"
 #include "scopestdlib.h"

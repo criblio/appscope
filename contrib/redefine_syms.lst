@@ -76,6 +76,8 @@ select scopelibc_select
 sendto scopelibc_sendto
 setbuf scopelibc_setbuf
 setsockopt scopelibc_setsockopt
+sigdelset scopelibc_sigdelset
+sigfillset scopelibc_sigfillset
 shmat scopelibc_shmat
 shmdt scopelibc_shmdt
 shmget scopelibc_shmget

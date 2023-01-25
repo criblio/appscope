@@ -25,6 +25,10 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.  */
 
+#ifdef HAVE_ASM_VSYSCALL_H
+#include <asm/vsyscall.h>
+#endif
+
 #include "libunwind_i.h"
 #include "unwind_i.h"
 #include <signal.h>
@@ -51,6 +55,20 @@ is_plt_entry (struct dwarf_cursor *c)
 
   Debug (14, "ip=0x%lx => 0x%016lx 0x%016lx, ret = %d\n", c->ip, w0, w1, ret);
   return ret;
+}
+
+static int
+is_vsyscall (struct dwarf_cursor *c)
+{
+#if defined(VSYSCALL_START) && defined(VSYSCALL_END)
+  return c->ip >= VSYSCALL_START && c->ip < VSYSCALL_END;
+#elif defined(VSYSCALL_ADDR)
+  /* Linux 3.16 removes `VSYSCALL_START` and `VSYSCALL_END`.  Assume
+     a single page is mapped for vsyscalls.  */
+  return c->ip >= VSYSCALL_ADDR && c->ip < VSYSCALL_ADDR + sysconf(_SC_PAGESIZE);
+#else
+  return 0;
+#endif
 }
 
 int
@@ -112,7 +130,7 @@ unw_step (unw_cursor_t *cursor)
 
       unw_word_t invalid_prev_rip = 0;
       unw_word_t prev_ip = c->dwarf.ip, prev_cfa = c->dwarf.cfa;
-      struct dwarf_loc rbp_loc, rsp_loc, rip_loc;
+      struct dwarf_loc rbp_loc = DWARF_NULL_LOC, rsp_loc = DWARF_NULL_LOC, rip_loc = DWARF_NULL_LOC;
 
       /* We could get here because of missing/bad unwind information.
          Validate all addresses before dereferencing. */
@@ -138,6 +156,15 @@ unw_step (unw_cursor_t *cursor)
           c->frame_info.cfa_reg_offset = 8;
           c->frame_info.cfa_reg_rsp = -1;
           c->frame_info.frame_type = UNW_X86_64_FRAME_STANDARD;
+          c->dwarf.loc[RIP] = DWARF_LOC (c->dwarf.cfa, 0);
+          c->dwarf.cfa += 8;
+        }
+      else if (is_vsyscall (&c->dwarf))
+        {
+          Debug (2, "in vsyscall region\n");
+          c->frame_info.cfa_reg_offset = 8;
+          c->frame_info.cfa_reg_rsp = -1;
+          c->frame_info.frame_type = UNW_X86_64_FRAME_GUESSED;
           c->dwarf.loc[RIP] = DWARF_LOC (c->dwarf.cfa, 0);
           c->dwarf.cfa += 8;
         }
@@ -223,7 +250,7 @@ unw_step (unw_cursor_t *cursor)
                   Debug (2, "RIP fixup didn't work, falling back\n");
                   unw_word_t rbp1 = 0;
                   rbp_loc = DWARF_LOC(rbp, 0);
-                  rsp_loc = DWARF_NULL_LOC;
+                  rsp_loc = DWARF_VAL_LOC(c, rbp + 16);
                   rip_loc = DWARF_LOC (rbp + 8, 0);
                   ret = dwarf_get (&c->dwarf, rbp_loc, &rbp1);
                   Debug (1, "[RBP=0x%lx] = 0x%lx (cfa = 0x%lx) -> 0x%lx\n",
@@ -253,7 +280,7 @@ unw_step (unw_cursor_t *cursor)
             }
           /* Mark all registers unsaved */
           for (i = 0; i < DWARF_NUM_PRESERVED_REGS; ++i)
-          c->dwarf.loc[i] = DWARF_NULL_LOC;
+            c->dwarf.loc[i] = DWARF_NULL_LOC;
 
           c->dwarf.loc[RBP] = rbp_loc;
           c->dwarf.loc[RSP] = rsp_loc;

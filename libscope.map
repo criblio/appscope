@@ -25,6 +25,7 @@
     _Ux86_64_*;    # hides libunwind symbols
     _ULx86_64_*;   # hides libunwind symbols
     _ULaarch64_*;  # hides libunwind symbols
+    unw_scope_getcontext;
     SCOPE_DlIteratePhdr;
     ACCESS_*;
     ADMISSIONS_*;

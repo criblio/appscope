@@ -112,9 +112,7 @@ if [ $count -ne 1 ] ; then
 fi
 
 /opt/patch_libscope/scope -p /opt/patch_libscope/libscope.so
-if [ $? -eq 0 ]; then
-    ERR+=1
-fi
+ERR+=$?
 
 md5_after_second_patch=$(md5sum /opt/patch_libscope/libscope.so)
 

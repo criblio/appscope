@@ -277,7 +277,6 @@ patchLoader(unsigned char *scope, uid_t nsUid, gid_t nsGid)
             goto out;
         }
         if (strstr(ldso_scope, "musl")) {
-            patch_res = PATCH_NO_OP;
             goto out;
         }
 
@@ -368,13 +367,19 @@ setLibraryFile(const char *libpath) {
             for (dyn = (Elf64_Dyn *)((char *)buf + sections[i].sh_offset); dyn != NULL && dyn->d_tag != DT_NULL; dyn++) {
                 if (dyn->d_tag == DT_NEEDED) {
                     char *depstr = (char *)(strtab + dyn->d_un.d_val);
-                    if (depstr && strstr(depstr, "ld-linux")) {
-                        char newdep[PATH_MAX];
-                        size_t newdep_len;
-                        if (get_dir("/lib/ld-musl", newdep, sizeof(newdep)) == -1) break;
-                        newdep_len = strlen(newdep);
-                        if (strlen(depstr) >= newdep_len) {
-                            strncpy(depstr, newdep, newdep_len + 1);
+                    if (depstr) {
+                        if (strstr(depstr, "ld-linux")) {
+                            char newdep[PATH_MAX];
+                            size_t newdep_len;
+                            if (get_dir("/lib/ld-musl", newdep, sizeof(newdep)) == -1) break;
+                            newdep_len = strlen(newdep);
+                            if (strlen(depstr) >= newdep_len) {
+                                strncpy(depstr, newdep, newdep_len + 1);
+                                found = 1;
+                                break;
+                            }
+                        } else if (strstr(depstr, "ld-musl")) {
+                            // already patched
                             found = 1;
                             break;
                         }

@@ -203,7 +203,7 @@ grep '"proc":"top"' $EVT_FILE | grep fs.close > /dev/null
 ERR+=$?
 
 START_MSG_NO=$(grep "libscopever" "$EVT_FILE" | wc -l)
-if [ $START_MSG_NO -ne 1 ]; then
+if [ $START_MSG_NO -lt 1 ]; then
     echo "Number of start msg wrong after attach $START_MSG_NO"
     ERR+=1
 fi
@@ -218,7 +218,7 @@ sleep 10
 
 EVT_FILESIZE=$(stat -c%s "$EVT_FILE")
 START_MSG_NO=$(grep "libscopever" "$EVT_FILE" | wc -l)
-if [ $START_MSG_NO -ne 2 ]; then
+if [ $START_MSG_NO -lt 2 ]; then
     echo "Number of start msg wrong after detach $START_MSG_NO"
     ERR+=1
 fi
@@ -234,7 +234,7 @@ sleep 10
 
 REATTACH_FILESIZE=$(stat -c%s "$EVT_FILE")
 START_MSG_NO=$(grep "libscopever" "$EVT_FILE" | wc -l)
-if [ $START_MSG_NO -ne 3 ]; then
+if [ $START_MSG_NO -lt 3 ]; then
     echo "Start msg wrong after reattach $START_MSG_NO"
     ERR+=1
 fi

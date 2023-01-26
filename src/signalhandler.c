@@ -61,7 +61,7 @@ scopeLogBacktrace(void) {
     unw_context_t uc;
     unw_word_t ip;
 
-    unw_getcontext(&uc);
+    unw_scope_getcontext(&uc);
     unw_init_local(&cursor, &uc);
     int frame_count = 0;
     scopeLogErrorSigSafeCStr("--- scopeLogBacktrace\n");

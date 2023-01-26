@@ -94,7 +94,7 @@ endtest
 #
 starttest patch_on_musl
 cp /usr/local/scope/lib/libscope.so /opt/patch_libscope
-cp /usr/local/scope/bin/scope -z /opt/patch_libscope
+cp /usr/local/scope/bin/scope /opt/patch_libscope
 
 count=$(readelf -d /opt/patch_libscope/libscope.so | grep 'Shared library:.*ld-linux' | wc -l)
 if [ $count -ne 1 ] ; then

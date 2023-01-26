@@ -1,10 +1,10 @@
 #ifndef __NSINFO_H__
 #define __NSINFO_H__
 
-#include "scopetypes.h"
+#include <stdbool.h>
+#include <unistd.h>
 
 // Retrieve namespace information
-
 bool nsInfoGetPidNs(pid_t, pid_t *);
 bool nsInfoIsPidInSameMntNs(pid_t);
 uid_t nsInfoTranslateUid(pid_t);

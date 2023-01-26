@@ -67,7 +67,6 @@ RUN  mkdir /usr/local/scope && \
      mkdir /usr/local/scope/bin && \
      mkdir /usr/local/scope/lib && \
      ln -s /opt/appscope/bin/linux/scope /usr/local/scope/bin/scope && \
-     ln -s /opt/appscope/bin/linux/ldscope /usr/local/scope/bin/ldscope && \
      ln -s /opt/appscope/lib/linux/libscope.so /usr/local/scope/lib/libscope.so
 
 COPY go/unsupported/scope-test /usr/local/scope/scope-test

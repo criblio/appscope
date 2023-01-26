@@ -3,7 +3,7 @@
 // args.json
 // event_dest
 // events.json
-// ldscope.log
+// libscope.log
 // metric_dest
 // metric_format
 // metrics.json
@@ -238,22 +238,22 @@ func eventsJson() (*asset, error) {
 	return a, nil
 }
 
-var _ldscopeLog = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x01\x00\x00\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00")
+var _libscopeLog = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x01\x00\x00\xff\xff\x00\x00\x00\x00\x00\x00\x00\x00")
 
-func ldscopeLogBytes() ([]byte, error) {
+func libscopeLogBytes() ([]byte, error) {
 	return bindataRead(
-		_ldscopeLog,
-		"ldscope.log",
+		_libscopeLog,
+		"libscope.log",
 	)
 }
 
-func ldscopeLog() (*asset, error) {
-	bytes, err := ldscopeLogBytes()
+func libscopeLog() (*asset, error) {
+	bytes, err := libscopeLogBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "ldscope.log", size: 0, mode: os.FileMode(438), modTime: time.Unix(1643663685, 0)}
+	info := bindataFileInfo{name: "libscope.log", size: 0, mode: os.FileMode(438), modTime: time.Unix(1643663685, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -513,7 +513,7 @@ var _bindata = map[string]func() (*asset, error){
 	"args.json":                                                 argsJson,
 	"event_dest":                                                event_dest,
 	"events.json":                                               eventsJson,
-	"ldscope.log":                                               ldscopeLog,
+	"libscope.log":                                              libscopeLog,
 	"metric_dest":                                               metric_dest,
 	"metric_format":                                             metric_format,
 	"metrics.json":                                              metricsJson,
@@ -570,7 +570,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 	"args.json":     &bintree{argsJson, map[string]*bintree{}},
 	"event_dest":    &bintree{event_dest, map[string]*bintree{}},
 	"events.json":   &bintree{eventsJson, map[string]*bintree{}},
-	"ldscope.log":   &bintree{ldscopeLog, map[string]*bintree{}},
+	"libscope.log":   &bintree{libscopeLog, map[string]*bintree{}},
 	"metric_dest":   &bintree{metric_dest, map[string]*bintree{}},
 	"metric_format": &bintree{metric_format, map[string]*bintree{}},
 	"metrics.json":  &bintree{metricsJson, map[string]*bintree{}},

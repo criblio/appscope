@@ -3,6 +3,10 @@
 
 #include <unistd.h>
 
+/******************************************************************************
+ * Consider updating src/loader/scopetypes.h if you make changes to this file *
+ ******************************************************************************/
+
 typedef enum {CFG_FMT_STATSD,
               CFG_FMT_NDJSON,
               CFG_FORMAT_MAX} cfg_mtc_format_t;
@@ -32,12 +36,6 @@ typedef enum {CFG_MTC_FS,
               CFG_MTC_PROC, 
               CFG_MTC_STATSD} metric_watch_t;
 
-typedef enum {
-    SERVICE_STATUS_SUCCESS = 0,         // service operation was success
-    SERVICE_STATUS_ERROR_OTHER = 1,     // service was not installed
-    SERVICE_STATUS_NOT_INSTALLED = 2,   // service operation was failed
-} service_status_t;
-
 #define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 
@@ -50,6 +48,8 @@ typedef enum {
 #define MAX_CGROUP 512
 #define MODE_STR 16
 #define SM_NAME "scope_anon"
+#define SCOPE_FILTER_USR_PATH ("/usr/lib/appscope/scope_filter")
+#define SCOPE_FILTER_TMP_PATH ("/tmp/appscope/scope_filter")
 
 typedef unsigned int bool;
 #define TRUE 1
@@ -194,7 +194,7 @@ typedef struct
 //    SCOPE_FILTER                   "false" disables handling the filter file
 //                                   other values are interpreted a path to a filter file
 //    SCOPE_EXECVE                   "false" disables scope of child procs
-//    SCOPE_EXEC_PATH                specifies path to ldscope executable
+//    SCOPE_EXEC_PATH                specifies path to scope executable
 //    SCOPE_CRIBL_NO_BREAKER         adds breaker property to process start message
 //    SCOPE_LIB_PATH                 specifies path to libscope.so library
 //    SCOPE_GO_STRUCT_PATH           for internal testing

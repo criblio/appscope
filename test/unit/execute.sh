@@ -62,12 +62,10 @@ fi
 # if any errors occurred.  ERR maintains this state.
 declare -i ERR=0
 
+# Library tests
+echo "Running Library Tests"
 run_test test/${OS}/vdsotest
 run_test test/${OS}/ipctest
-run_test test/${OS}/libvertest
-run_test test/${OS}/libdirtest
-run_test test/${OS}/setuptest
-run_test test/${OS}/nsinfotest
 run_test test/${OS}/strsettest
 run_test test/${OS}/cfgutilstest
 run_test test/${OS}/cfgtest
@@ -94,6 +92,14 @@ fi
 run_test test/${OS}/httpaggtest
 run_test test/${OS}/selfinterposetest
 
+# Loader tests
+echo "Running Loader Tests"
+run_test test/${OS}/libvertest
+run_test test/${OS}/libdirtest
+run_test test/${OS}/setuptest
+run_test test/${OS}/nsinfotest
+
+
 if [ "${OS}" = "linux" ]; then
     SAVEVARS=$ENVARS
     ENVVARS=$ENVVARS"LD_PRELOAD=./lib/linux/$(uname -m)/libscope.so ""SCOPE_FILTER=false ""SCOPE_CRIBL_ENABLE=false ""SCOPE_METRIC_DEST=file:///tmp/dnstest.log ""SCOPE_METRIC_VERBOSITY=9 ""SCOPE_SUMMARY_PERIOD=1 "
@@ -101,18 +107,15 @@ if [ "${OS}" = "linux" ]; then
     ENVARS=$SAVEVARS
     rm -f "/tmp/dnstest.log"
 
-    test/access_rights.sh 2>&1
+    test/unit/access_rights.sh 2>&1
     ERR+=$?
 
-    test/unixpeer.sh 2>&1
+    test/unit/unixpeer.sh 2>&1
     ERR+=$?
 
-    test/undefined_sym.sh 2>&1
+    test/unit/undefined_sym.sh 2>&1
     ERR+=$?
 fi
-
-test/options.sh 2>&1
-ERR+=$?
 
 #                ^
 #                |

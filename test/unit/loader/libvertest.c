@@ -1,12 +1,13 @@
 #define _GNU_SOURCE
+
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "libver.h"
 #include "test.h"
 #include "scopetypes.h"
-#include "scopestdlib.h"
 
 static void
 normalizedVersionOfficialTest(void **state) {
@@ -65,7 +66,6 @@ main(int argc, char* argv[]) {
         cmocka_unit_test(normalizedVersionDevTest),
         cmocka_unit_test(normalizedVersionNullTest),
         cmocka_unit_test(normalizedVersionDevTestWrongFormat),
-        cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

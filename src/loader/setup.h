@@ -1,10 +1,9 @@
 #ifndef __SETUP_H__
 #define __SETUP_H__
 
-#include "scopetypes.h"
+#include <unistd.h>
 
-#define SCOPE_FILTER_USR_PATH ("/usr/lib/appscope/scope_filter")
-#define SCOPE_FILTER_TMP_PATH ("/tmp/appscope/scope_filter")
+#include "scopetypes.h"
 
 bool isCfgFileConfigured(const char *);
 int removeScopeCfgFile(const char *);

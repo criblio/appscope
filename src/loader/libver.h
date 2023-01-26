@@ -1,7 +1,7 @@
 #ifndef __LIBVER_H__
 #define __LIBVER_H__
 
-#include "scopetypes.h"
+#include <stdbool.h>
 
 const char * libverNormalizedVersion(const char *);
 bool libverIsNormVersionDev(const char *);

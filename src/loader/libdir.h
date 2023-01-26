@@ -1,20 +1,18 @@
-/**
- * Cribl AppScope - Library Directory Interface
- *
- * See docs/STARTUP.md
- */
-
 #ifndef _SCOPE_LIBDIR_H
 #define _SCOPE_LIBDIR_H 1
 
 #include <linux/limits.h>
+#include <stdbool.h>
+#include <stdio.h>
 #include <sys/stat.h>
-#include "scopetypes.h"
+
+extern unsigned long g_libscopesz;
+extern unsigned long g_scopedynsz;
 
 // File types
 typedef enum {
     LIBRARY_FILE, // libscope.so
-    LOADER_FILE   // ldscopedyn
+    LOADER_FILE,  // scopedyn
 } libdirfile_t;
 
 typedef enum {
@@ -30,6 +28,7 @@ int libdirSetLibraryBase(const char *);                                      // 
 int libdirExtract(libdirfile_t, uid_t, gid_t);                               // Extracts file to default path
 const char *libdirGetPath(libdirfile_t);                                     // Get full path to existing file
 int libdirSaveLibraryFile(const char *, bool, mode_t, uid_t, gid_t);         // Save libscope.so to specified path overwrite
+size_t getAsset(libdirfile_t, unsigned char **);
 
 // Unit Test helper
 int libdirInitTest(const char *, const char *, const char *); // Override defaults

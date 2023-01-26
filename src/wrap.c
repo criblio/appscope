@@ -30,7 +30,6 @@
 #include "os.h"
 #include "plattime.h"
 #include "report.h"
-#include "setup.h"
 #include "scopeelf.h"
 #include "scopetypes.h"
 #include "state.h"
@@ -38,7 +37,6 @@
 #include "wrap.h"
 #include "runtimecfg.h"
 #include "javaagent.h"
-#include "inject.h"
 #include "ipc.h"
 #include "signalhandler.h"
 #include "scopestdlib.h"
@@ -1424,14 +1422,16 @@ initHook(int attachedFlag, bool scopedFlag)
     if ((osGetExePath(scope_getpid(), &full_path) != -1) &&
         ((ebuf = getElf(full_path))) &&
         (is_static(ebuf->buf) == FALSE) && (is_go(ebuf->buf) == TRUE)) {
-#ifdef __GO__
-        initGoHook(ebuf);
-        threadNow(0);
+
+        // Avoid running initGoHook if we are scopedyn
+        if (scope_strstr(full_path, "scopedyn") == NULL) {
+            initGoHook(ebuf);
+            threadNow(0);
+        }
 
         if (full_path) scope_free(full_path);
         if (ebuf) freeElf(ebuf->buf, ebuf->len);
         return;
-#endif  // __GO__
     }
 
     if (ebuf && ebuf->buf) {
@@ -1499,7 +1499,7 @@ initHook(int attachedFlag, bool scopedFlag)
 
     // We're funchooking __write in both libc.so and libpthread.so
     // curl didn't work unless we funchook'd libc.
-    // test/linux/unixpeer didn't work unless we funchook'd pthread.
+    // test/linux/unixpeertest didn't work unless we funchook'd pthread.
     find_sym_t libc__write = {.library="libc.so",
                               .symbol="__write",
                               .out_addr = (void*)&g_fn.__write_libc};
@@ -1595,7 +1595,7 @@ initEnv(int *attachedFlag)
 
     // build the full path of the .env file
     char path[128];
-    int  pathLen = scope_snprintf(path, sizeof(path), "/dev/shm/scope_attach_%d.env", scope_getpid());
+    int  pathLen = scope_snprintf(path, sizeof(path), "/dev/shm/attach_%d.env", scope_getpid());
     if (pathLen < 0 || pathLen >= sizeof(path)) {
         scopeLog(CFG_LOG_DEBUG, "ERROR: snprintf(scope_attach_PID.env) failed");
         return;
@@ -1653,7 +1653,7 @@ init(void)
 
         g_ismusl =
             ((osGetExePath(scope_getpid(), &full_path) != -1) &&
-            !scope_strstr(full_path, "ldscope") &&
+// TODO : Test this removal!  // !scope_strstr(full_path, "scope") && 
             ((ebuf = getElf(full_path))) &&
             !is_static(ebuf->buf) &&
             !is_go(ebuf->buf) &&
@@ -1675,14 +1675,14 @@ init(void)
     setMachineID(g_proc.machine_id);
     setUUID(g_proc.uuid);
 
+    // logging inside constructor start from this line
+    g_constructor_debug_enabled = checkEnv("SCOPE_ALLOW_CONSTRUCT_DBG", "true");
+
     // initEnv() will set this TRUE if it detects `scope_attach_PID.env` in
     // `/dev/shm` with our PID indicating we were injected into a running
     // process.
     int attachedFlag = 0;
     initEnv(&attachedFlag);
-
-    // logging inside constructor start from this line
-    g_constructor_debug_enabled = checkEnv("SCOPE_ALLOW_CONSTRUCT_DBG", "true");
 
     initState();
     initSigErrorHandler();
@@ -2768,13 +2768,13 @@ prctl(int option, ...)
 }
 
 static char *
-getLdscopeExec(const char *pathname)
+getScopeExec(const char *pathname)
 {
     char *scopexec = NULL;
     bool isstat = FALSE, isgo = FALSE;
     elf_buf_t *ebuf;
 
-    if (scope_strstr(g_proc.procname, "ldscope") ||
+    if (scope_strstr(g_proc.procname, "scope") ||
         checkEnv("SCOPE_EXECVE", "false")) {
         return NULL;
     }
@@ -2789,7 +2789,7 @@ getLdscopeExec(const char *pathname)
 
     /*
      * Note: the isgo check is strictly for Go dynamic execs.
-     * In this case we use ldscope only to force the use of HTTP 1.1.
+     * In this case we use scope only to force the use of HTTP 1.1.
      */
     if (getenv("LD_PRELOAD") && (isstat == FALSE) && (isgo == FALSE)) {
         return NULL;
@@ -2797,7 +2797,7 @@ getLdscopeExec(const char *pathname)
 
     scopexec = getenv("SCOPE_EXEC_PATH");
     if (((scopexec = getpath(scopexec)) == NULL) &&
-        ((scopexec = getpath("ldscope")) == NULL)) {
+        ((scopexec = getpath("scope")) == NULL)) {
 
         // can't find the scope executable
         scopeLogWarn("can't find a scope executable for %s", pathname);
@@ -2816,7 +2816,7 @@ execv(const char *pathname, char *const argv[])
 
     WRAP_CHECK(execv, -1);
 
-    scopexec = getLdscopeExec(pathname);
+    scopexec = getScopeExec(pathname);
     if (scopexec == NULL) {
         return g_fn.execv(pathname, argv);
     }
@@ -2852,7 +2852,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 
     WRAP_CHECK(execve, -1);
 
-    scopexec = getLdscopeExec(pathname);
+    scopexec = getScopeExec(pathname);
     if (scopexec == NULL) {
         return g_fn.execve(pathname, argv, envp);
     }

@@ -1,10 +1,13 @@
 #ifndef __NS_H__
 #define __NS_H__
 
+#include <stdbool.h>
+#include <unistd.h>
+
 #include "scopetypes.h"
 
 // Operation performed from host to container
-int nsForkAndExec(pid_t, pid_t, char);
+int nsForkAndExec(pid_t, pid_t, bool);
 int nsConfigure(pid_t, void *, size_t);
 int nsUnconfigure(pid_t);
 service_status_t nsService(pid_t, const char *);

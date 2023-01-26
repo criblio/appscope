@@ -90,18 +90,18 @@ fi
 endtest
 
 #
-# ldscope patch
+# scope patch
 #
 starttest patch_on_musl
 cp /usr/local/scope/lib/libscope.so /opt/patch_libscope
-cp /usr/local/scope/bin/ldscope /opt/patch_libscope
+cp /usr/local/scope/bin/scope /opt/patch_libscope
 
 count=$(readelf -d /opt/patch_libscope/libscope.so | grep 'Shared library:.*ld-linux' | wc -l)
 if [ $count -ne 1 ] ; then
     ERR+=1
 fi
 
-/opt/patch_libscope/ldscope -p /opt/patch_libscope/libscope.so
+/opt/patch_libscope/scope -p /opt/patch_libscope/libscope.so
 ERR+=$?
 
 md5_after_first_patch=$(md5sum /opt/patch_libscope/libscope.so)
@@ -111,10 +111,8 @@ if [ $count -ne 1 ] ; then
     ERR+=1
 fi
 
-/opt/patch_libscope/ldscope -p /opt/patch_libscope/libscope.so
-if [ $? -eq 0 ]; then
-    ERR+=1
-fi
+/opt/patch_libscope/scope -p /opt/patch_libscope/libscope.so
+ERR+=$?
 
 md5_after_second_patch=$(md5sum /opt/patch_libscope/libscope.so)
 
@@ -129,7 +127,7 @@ endtest
 #
 starttest fwrite
 
-ldscope /opt/fwrite/fwrite
+scope -z /opt/fwrite/fwrite
 ERR+=$?
 
 sleep 0.5
@@ -163,7 +161,7 @@ starttest fault_test_read_only_mem
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 0
+SCOPE_ERROR_SIGNAL_HANDLER=true scope -z -- ./fault_test 0
 
 if [ "x86_64" = "$(uname -m)" ]; then
     grep "test_function" $SCOPE_LOG_FILE > /dev/null
@@ -182,7 +180,7 @@ starttest fault_test_not_mapped_mem
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 1
+SCOPE_ERROR_SIGNAL_HANDLER=true scope -z -- ./fault_test 1
 
 if [ "x86_64" = "$(uname -m)" ]; then
     grep "test_function" $SCOPE_LOG_FILE > /dev/null
@@ -201,7 +199,7 @@ starttest fault_test_bus_error
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 2
+SCOPE_ERROR_SIGNAL_HANDLER=true scope -z -- ./fault_test 2
 
 if [ "x86_64" = "$(uname -m)" ]; then
     grep "test_function" $SCOPE_LOG_FILE > /dev/null
@@ -220,7 +218,7 @@ starttest illegal_op_error
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 4
+SCOPE_ERROR_SIGNAL_HANDLER=true scope -z ./fault_test 4
 
 if [ "x86_64" = "$(uname -m)" ]; then
     verifyBacktrace "Illegal operand"
@@ -242,12 +240,12 @@ socat OPENSSL-LISTEN:9109,reuseaddr,cert=/tmp/appscope.pem,cafile=/tmp/appscope.
 # give socat a moment to get up and running
 sleep 1
 
-# run ldscope with a ton of env vars to send over tls session
+# run scope with a ton of env vars to send over tls session
   SCOPE_EVENT_DEST=tcp://127.0.0.1:9109 \
   SCOPE_EVENT_TLS_ENABLE=true \
   SCOPE_EVENT_METRIC=true \
   SCOPE_EVENT_TLS_CA_CERT_PATH=/tmp/appscope.pem \
-  ldscope ps -ef
+  scope -z ps -ef
 retval=$?
 
 evaltest

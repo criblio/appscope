@@ -2,7 +2,7 @@
  * passfd.c - Test to see that Scope is handling the passing of fd access
  * rights between processes correctly
  *
- * gcc -g -Wall test/manual/passfd.c -lpthread -o test/linux/passfd
+ * gcc -g -Wall test/manual/passfd.c -lpthread -o test/linux/passfdtest
  *
  * 1) passfd is a parent that sends access rights to a child process over a UNIX socket.
  *

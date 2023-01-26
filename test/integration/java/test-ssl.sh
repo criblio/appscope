@@ -100,7 +100,7 @@ evalInternalEvents(){
 }
 
 starttest Tomcat
-ldscope /opt/tomcat/bin/catalina.sh run &
+scope -z /opt/tomcat/bin/catalina.sh run &
 evaltest
 
 CURL_MAX_RETRY=10
@@ -137,7 +137,7 @@ endtest
 
 starttest SSLSocketClient
 cd /opt/javassl
-ldscope java -Djavax.net.ssl.trustStore=/opt/tomcat/certs/tomcat.p12 -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=pkcs12 SSLSocketClient > /dev/null
+scope -z java -Djavax.net.ssl.trustStore=/opt/tomcat/certs/tomcat.p12 -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=pkcs12 SSLSocketClient > /dev/null
 evaltest
 grep http.req $EVT_FILE > /dev/null
 ERR+=$?
@@ -173,7 +173,7 @@ java SimpleHttpServer 2> /dev/null &
 HTTP_SERVER_PID=$!
 sleep 1
 evaltest
-ldscope --attach ${HTTP_SERVER_PID}
+scope --ldattach ${HTTP_SERVER_PID}
 curl http://localhost:8000/status
 sleep 5
 
@@ -212,7 +212,7 @@ HTTP_SERVER_PID=$!
 sleep 1
 evaltest
 curl http://localhost:8000/status
-ldscope --attach ${HTTP_SERVER_PID}
+scope --ldattach ${HTTP_SERVER_PID}
 curl http://localhost:8000/status
 sleep 5
 
@@ -239,11 +239,11 @@ endtest
 
 # TODO: Java9 fails see issue #630
 # remove if condition below after fixing the issue
-if [[ -z "${SKIP_LDSCOPE_TEST}" ]]; then
-starttest java_http_ldscope
+if [[ -z "${SKIP_SCOPE_TEST}" ]]; then
+starttest java_http_scope
 
 cd /opt/java_http
-ldscope java SimpleHttpServer 2> /dev/null &
+scope -z java SimpleHttpServer 2> /dev/null &
 HTTP_SERVER_PID=$!
 evaltest
 sleep 1

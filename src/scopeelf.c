@@ -11,6 +11,10 @@
 #include "fn.h"
 #include "scopeelf.h"
 
+/*******************************************************************************
+ * Consider updating src/loader/loaderutils.c if you make changes to this file *
+ *******************************************************************************/
+
 void
 freeElf(char *buf, size_t len)
 {

@@ -90,12 +90,11 @@ fi
 endtest
 
 #
-# ldscope patch
+# scope patch
 #
 starttest patch_on_glibc
 
 cp /usr/local/scope/lib/libscope.so /opt/patch_libscope
-cp /usr/local/scope/bin/ldscope /opt/patch_libscope
 
 md5_before_patch=$(md5sum /opt/patch_libscope/libscope.so)
 
@@ -104,7 +103,7 @@ if [ $count -ne 1 ] ; then
     ERR+=1
 fi
 
-/opt/patch_libscope/ldscope --patch /opt/patch_libscope/libscope.so
+/opt/patch_libscope/scope --patch /opt/patch_libscope/libscope.so
 if [ $? -eq 0 ]; then
     ERR+=1
 fi
@@ -125,7 +124,7 @@ endtest
 starttest patch_on_glibc_dummy_file
 
 echo "Lorem ipsum" >> /opt/patch_libscope/dummy_file
-/opt/patch_libscope/ldscope --patch /opt/patch_libscope/dummy_file
+/opt/patch_libscope/scope --patch /opt/patch_libscope/dummy_file
 if [ $? -eq 0 ]; then
     ERR+=1
 fi
@@ -137,7 +136,7 @@ endtest
 #
 starttest timestamp_verify
 
-SCOPE_LOG_LEVEL=debug ldscope ls >/dev/null
+SCOPE_LOG_LEVEL=debug scope -z ls >/dev/null
 
 timestamp=$(grep 'Constructor' $SCOPE_LOG_FILE | grep -Po "(?<=\[).*?(?=\])")
 if [[ $timestamp =~ [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}.[0-9]{3}(Z|\+[0-9]{4})$ ]]; then
@@ -155,7 +154,7 @@ endtest
 starttest errno_verify
 cd /opt/errno_test/
 
-ldscope ./errno_test
+scope -z ./errno_test
 
 if [ $? -ne 0 ]; then
     ERR+=1
@@ -171,7 +170,7 @@ starttest fault_test_read_only_mem
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 0
+SCOPE_ERROR_SIGNAL_HANDLER=true scope -z -- ./fault_test 0
 
 if [ "x86_64" = "$(uname -m)" ]; then
     grep "read_only_area_error" $SCOPE_LOG_FILE > /dev/null
@@ -193,7 +192,7 @@ starttest fault_test_not_mapped_mem
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 1
+SCOPE_ERROR_SIGNAL_HANDLER=true scope -z -- ./fault_test 1
 
 if [ "x86_64" = "$(uname -m)" ]; then
     grep "not_mapped_address_error" $SCOPE_LOG_FILE > /dev/null
@@ -215,7 +214,7 @@ starttest fault_test_bus_error
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 2
+SCOPE_ERROR_SIGNAL_HANDLER=true scope -z -- ./fault_test 2
 
 if [ "x86_64" = "$(uname -m)" ]; then
     grep "bus_error" $SCOPE_LOG_FILE > /dev/null
@@ -239,7 +238,7 @@ starttest div_by_zero_error
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 3
+SCOPE_ERROR_SIGNAL_HANDLER=true scope -z ./fault_test 3
 
 verifyBacktrace "Integer divide by zero"
 
@@ -255,7 +254,7 @@ starttest illegal_op_error
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 4
+SCOPE_ERROR_SIGNAL_HANDLER=true scope -z ./fault_test 4
 
 if [ "x86_64" = "$(uname -m)" ]; then
     verifyBacktrace "Illegal operand"

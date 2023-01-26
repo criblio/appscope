@@ -5,11 +5,26 @@ import (
 	"os/exec"
 	"strconv"
 	"syscall"
+
+	"github.com/criblio/scope/util"
 )
 
-// Loader represents ldscope object
+// Loader represents scope loader object
 type ScopeLoader struct {
 	Path string
+}
+
+// Initialize the loader
+func New() ScopeLoader {
+	// Get path to this scope executable
+	exPath, err := os.Executable()
+	if err != nil {
+		util.ErrAndExit("error getting executable path, %v", err)
+	}
+
+	return ScopeLoader{
+		Path: exPath,
+	}
 }
 
 // - Setup /etc/profile.d/scope.sh on host
@@ -60,30 +75,58 @@ func (sL *ScopeLoader) UnserviceContainer(cpid int) (string, error) {
 
 // - Attach to a process on the host or in containers
 func (sL *ScopeLoader) Attach(args []string, env []string) error {
-	args = append([]string{"--attach"}, args...)
+	args = append([]string{"--ldattach"}, args...)
 	return sL.Run(args, env)
 }
 
 // - Attach to a process on the host or in containers
 func (sL *ScopeLoader) AttachSubProc(args []string, env []string) (string, error) {
-	args = append([]string{"--attach"}, args...)
+	args = append([]string{"--ldattach"}, args...)
 	return sL.RunSubProc(args, env)
 }
 
 // Used when scope has detected that we are running the `scope start` command inside a container
-// Tell ldscope to run the `scope start` command on the host instead
+// Tell scope to run the `scope start` command on the host instead
 func (sL *ScopeLoader) StartHost() (string, error) {
 	return sL.RunSubProc([]string{"--starthost"}, os.Environ())
 }
 
 // Used when scope has detected that we are running the `scope stop` command inside a container
-// Tell ldscope to run the `scope stop` command on the host instead
+// Tell scope to run the `scope stop` command on the host instead
 func (sL *ScopeLoader) StopHost() (string, error) {
 	return sL.RunSubProc([]string{"--stophost"}, os.Environ())
 }
 
+func (sL *ScopeLoader) Patch(libraryPath string) (string, error) {
+	return sL.RunSubProc([]string{"--patch", libraryPath}, os.Environ())
+}
+
+// Detach transforms the calling process into a scope detach operation
+func (sL *ScopeLoader) Detach(args []string, env []string) error {
+	args = append([]string{"--lddetach"}, args...)
+	return sL.Run(args, env)
+}
+
+// DetachSubProc runs a scope detach as a seperate process
+func (sL *ScopeLoader) DetachSubProc(args []string, env []string) (string, error) {
+	args = append([]string{"--lddetach"}, args...)
+	return sL.RunSubProc(args, env)
+}
+
+// Passthrough scopes a process
+func (sL *ScopeLoader) Passthrough(args []string, env []string) error {
+	args = append([]string{"--passthrough"}, args...)
+	return sL.Run(args, env)
+}
+
+// PassthroughSubProc scopes a process as a seperate process
+func (sL *ScopeLoader) PassthroughSubProc(args []string, env []string) (string, error) {
+	args = append([]string{"--passthrough"}, args...)
+	return sL.RunSubProc(args, env)
+}
+
 func (sL *ScopeLoader) Run(args []string, env []string) error {
-	args = append([]string{"ldscope"}, args...)
+	args = append([]string{"scope"}, args...)
 	return syscall.Exec(sL.Path, args, env)
 }
 
@@ -92,20 +135,4 @@ func (sL *ScopeLoader) RunSubProc(args []string, env []string) (string, error) {
 	cmd.Env = env
 	stdoutStderr, err := cmd.CombinedOutput()
 	return string(stdoutStderr[:]), err
-}
-
-func (sL *ScopeLoader) Patch(libraryPath string) (string, error) {
-	return sL.RunSubProc([]string{"--patch", libraryPath}, os.Environ())
-}
-
-// Detach transforms the calling process into a ldscope detach operation
-func (sL *ScopeLoader) Detach(args []string, env []string) error {
-	args = append([]string{"--detach"}, args...)
-	return sL.Run(args, env)
-}
-
-// DetachSubProc runs a ldscope detach as a seperate process
-func (sL *ScopeLoader) DetachSubProc(args []string, env []string) (string, error) {
-	args = append([]string{"--detach"}, args...)
-	return sL.RunSubProc(args, env)
 }

@@ -1,12 +1,13 @@
 # Note: Please see `gcc -dM -E - < /dev/null` for what the compiler already defines automatically before adding things.
 
+########## Definitions ##########
 CWD = $(shell pwd)
 OS=linux
 CC=gcc
-CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations -Werror=implicit-function-declaration -Werror=override-init -I contrib/ls-hpack $(if $(DEBUG),-DDEBUG)
 SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tags)"
-TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage
-TEST_CFLAGS+=-DSCOPE_VER=\"$(SCOPE_VER)\"
+LIBRARY_CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations -Werror=implicit-function-declaration -Werror=override-init -I contrib/ls-hpack $(if $(DEBUG),-DDEBUG) -DSCOPE_VER=\"$(SCOPE_VER)\"
+LOADER_CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations -Werror=implicit-function-declaration -Werror=override-init -Wno-format-security -Wno-format-truncation -I contrib/ls-hpack $(if $(DEBUG),-DDEBUG) -DSCOPE_VER=\"$(SCOPE_VER)\" 
+TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage -Wno-format-security -Wno-format-truncation -DSCOPE_VER=\"$(SCOPE_VER)\"
 YAML_DEFINES=-DYAML_VERSION_MAJOR="0" -DYAML_VERSION_MINOR="2" -DYAML_VERSION_PATCH="2" -DYAML_VERSION_STRING="\"0.2.2\""
 CJSON_DEFINES=-DENABLE_LOCALES
 YAML_SRC=$(wildcard contrib/libyaml/src/*.c)
@@ -20,23 +21,29 @@ UNWIND_AR=contrib/build/libunwind/src/.libs/libunwind.a
 TEST_AR=$(MUSL_AR) ${UNWIND_AR} $(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR} $(LS_HPACK_AR)
 #TEST_LIB=contrib/build/cmocka/src/libcmocka.dylib
 TEST_LIB=contrib/build/cmocka/src/libcmocka.so
-TEST_INCLUDES=-I./src -I./contrib/cmocka/include -I contrib/ls-hpack
 TEST_LD_FLAGS=-Lcontrib/build/cmocka/src -lcmocka -ldl -lresolv -lrt -lpthread
-
+LIBRARY_INCLUDES=-I./src
+LOADER_INCLUDES=-I./src/loader
+CMOCKA_INCLUDES=-I./contrib/cmocka/include -I contrib/ls-hpack
+LIBRARY_C_FILES:=$(wildcard src/*.c)
+LIBRARY_C_FILES:=$(filter-out src/wrap.c, $(LIBRARY_C_FILES))
+LIBRARY_C_FILES:=$(filter-out src/sysexec.c, $(LIBRARY_C_FILES))
+LIBRARY_C_FILES:=$(filter-out src/wrap_go.c, $(LIBRARY_C_FILES))
+LOADER_C_FILES:=$(wildcard src/loader/*.c)
+LIBRARY_TEST_C_FILES:=$(wildcard test/unit/library/*.c)
+LIBRARY_TEST_C_FILES:=$(filter-out test/unit/library/wraptest.c, $(LIBRARY_TEST_C_FILES))
+LOADER_TEST_C_FILES:=$(wildcard test/unit/loader/*.c)
+LOADER_TEST_C_FILES:=$(filter-out test/unit/loader/wraptest.c, $(LOADER_TEST_C_FILES))
+OS_C_FILES:=os/$(OS)/os.c
 ARCH=$(shell uname -m)
-
 LIBSCOPE=lib/$(OS)/$(ARCH)/libscope.so
-LDSCOPE=bin/$(OS)/$(ARCH)/ldscope
-LDSCOPEDYN=bin/$(OS)/$(ARCH)/ldscopedyn
-
-coreall: $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN)
-
-corerebuild:
-	@$(RM) $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN)
-	@$(MAKE) coreall
+LIBLOADER=lib/$(OS)/$(ARCH)/libloader.a
+SCOPEDYN=bin/$(OS)/$(ARCH)/scopedyn
 
 include os/linux/$(ARCH).mk
 
+
+########## Contrib ##########
 $(MUSL_AR):
 	@$(MAKE) -C contrib musl
 
@@ -49,56 +56,47 @@ $(OPENSSL_AR):
 $(PCRE2_AR):
 	@$(MAKE) -C contrib pcre2
 
-$(LDSCOPEDYN): src/fn.c src/scopestdlib.c src/nsinfo.c src/nsfile.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c src/plattime.c
-	@echo "$${CI:+::group::}Building $@"
-	gcc -Wall -g $(ARCH_CFLAGS) $(DISTRO_FLAGS) \
-		-DSCOPE_VER=\"$(SCOPE_VER)\" \
-		src/fn.c src/scopestdlib.c src/nsinfo.c src/nsfile.c os/$(OS)/os.c src/dbg.c src/scopeelf.c src/scope.c src/utils.c src/inject.c src/plattime.c \
-		-ldl -lrt -o $@ ${MUSL_AR} -I./os/$(OS) $(INCLUDES)
-	@[ -z "$(CI)" ] || echo "::endgroup::"
+$(YAML_AR): $(YAML_SRC)
+	@$(MAKE) -C contrib libyaml
 
-$(LDSCOPE): src/scope_static.c src/dbg.c src/libdir.c src/scopestdlib.c src/ns.c src/nsinfo.c src/nsfile.c src/setup.c src/loaderop.c src/libver.c $(LDSCOPEDYN) $(LIBSCOPE)
-	@echo "$${CI:+::group::}Building $@"
-	cd $(dir $(LDSCOPEDYN)) && objcopy \
-		-I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) \
-		$(notdir $(LDSCOPEDYN)) $(notdir $(LDSCOPEDYN)).o
-	cd $(dir $(LIBSCOPE)) && objcopy \
-		-I binary -O $(ARCH_BINARY) -B $(ARCH_OBJ) \
-		$(notdir $(LIBSCOPE)) $(notdir $(LIBSCOPE:.so=.o))
-	gcc -Wall -static -g $(ARCH_CFLAGS) $(DISTRO_FLAGS) \
-		-DSCOPE_VER=\"$(SCOPE_VER)\" \
-		src/scope_static.c src/dbg.c src/scopestdlib.c src/libdir.c src/ns.c src/nsinfo.c src/nsfile.c src/setup.c src/loaderop.c src/libver.c \
-		$(INCLUDES) \
-		$(LDSCOPEDYN).o $(LIBSCOPE:.so=.o) \
-		-lrt -lpthread -o $@ ${MUSL_AR}
-	$(RM) $(LDSCOPEDYN).o $(LIBSCOPE:.so=.o)
-	@[ -z "$(CI)" ] || echo "::endgroup::"
+$(JSON_AR): contrib/cJSON/cJSON.c
+	@$(MAKE) -C contrib cJSON
+
+$(TEST_LIB):
+	@$(MAKE) -C contrib cmocka
+
+
+########## Core ##########
+coreall: $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN)
+
+corerebuild:
+	@$(RM) $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN)
+	@$(MAKE) coreall
 
 coreclean:
-	$(RM) $(LIBSCOPE) $(LDSCOPE) $(LDSCOPEDYN)
+	$(RM) $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN)
+	$(RM) test/linux/*test
 
-SRC_C_FILES:=$(wildcard src/*.c)
-SRC_C_FILES:=$(filter-out src/wrap.c, $(SRC_C_FILES))
-SRC_C_FILES:=$(filter-out src/sysexec.c, $(SRC_C_FILES))
-SRC_C_FILES:=$(filter-out src/wrap_go.c, $(SRC_C_FILES))
-SRC_C_FILES:=$(filter-out src/scope_static.c, $(SRC_C_FILES))
-TEST_C_FILES:=$(wildcard test/*.c)
-TEST_C_FILES:=$(filter-out test/wraptest.c, $(TEST_C_FILES))
-C_FILES:=$(SRC_C_FILES) $(TEST_C_FILES) os/$(OS)/os.c
-O_FILES:=$(C_FILES:.c=.o)
-CACHE_FILES:=$(shell find . -name CMakeCache.txt)
+$(LIBLOADER): src/loader/loader.c src/loader/nsinfo.c src/loader/nsfile.c src/loader/loaderutils.c src/loader/inject.c src/loader/libdir.c src/loader/ns.c src/loader/setup.c src/loader/patch.c src/loader/libver.c
+	@echo "$${CI:+::group::}Building $@"
+	$(CC) -c $(LOADER_CFLAGS) $(YAML_DEFINES) -I./src $(INCLUDES) $^
+	ar rcs $@ *.o
+	$(RM) *.o
+	@[ -z "$(CI)" ] || echo "::endgroup::"
 
-# ensure $USER is available since some of the tests expect it
-coretest: export USER ?= $(shell id -u -n)
-coretest: $(C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
-	@echo "$${CI:+::group::}Building Tests"
-	$(CC) -c $(TEST_CFLAGS) $(C_FILES) $(INCLUDES) $(TEST_INCLUDES)
+$(SCOPEDYN): src/loader/scopedyn.c src/loader/loaderutils.c src/loader/libdir.c src/loader/libver.c src/loader/ns.c src/loader/nsinfo.c src/loader/setup.c src/loader/patch.c src/loader/nsfile.c
+	@echo "$${CI:+::group::}Building $@"
+	gcc -Wall -g $(LOADER_CFLAGS) \
+	src/loader/scopedyn.c src/loader/loaderutils.c src/loader/libdir.c src/loader/libver.c src/loader/ns.c src/loader/nsinfo.c src/loader/setup.c src/loader/patch.c src/loader/nsfile.c \
+	-ldl -lrt -o $@ -I./os/$(OS) $(INCLUDES)
+	@[ -z "$(CI)" ] || echo "::endgroup::"
+
+########## Tests ##########
+libtest: $(LIBRARY_C_FILES) $(LIBRARY_TEST_C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
+	@echo "$${CI:+::group::}Building Library Tests"
+	$(CC) -c $(TEST_CFLAGS) $(LIBRARY_C_FILES) $(LIBRARY_INCLUDES) $(LIBRARY_TEST_C_FILES) $(INCLUDES) $(CMOCKA_INCLUDES) $(OS_C_FILES)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/ipctest ipctest.o ipc.o ipc_resp.o cfgutils.o cfg.o mtc.o log.o evtformat.o ctl.o transport.o backoff.o mtcformat.o strset.o com.o scopestdlib.o dbg.o circbuf.o linklist.o fn.o utils.o os.o test.o report.o search.o httpagg.o state.o httpstate.o metriccapture.o plattime.o $(TEST_AR) $(TEST_LD_FLAGS) -Wl,--wrap=jsonConfigurationObject -Wl,--wrap=doAndReplaceConfig
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/vdsotest vdsotest.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/libvertest libvertest.o libver.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/libdirtest libdirtest.o libdir.o nsfile.o libver.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/setuptest setuptest.o setup.o loaderop.o libdir.o nsfile.o libver.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/nsinfotest nsinfotest.o nsinfo.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/strsettest strsettest.o strset.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgutilstest cfgutilstest.o cfgutils.o cfg.o mtc.o log.o evtformat.o ctl.o transport.o backoff.o mtcformat.o strset.o com.o scopestdlib.o dbg.o circbuf.o linklist.o fn.o utils.o os.o test.o report.o search.o httpagg.o state.o httpstate.o metriccapture.o plattime.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgtest cfgtest.o cfg.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
@@ -123,21 +121,26 @@ coretest: $(C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/dnstest dnstest.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/javabcitest javabcitest.o javabci.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/searchtest searchtest.o search.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) test/manual/passfd.c -lpthread -o test/$(OS)/passfd
-	$(CC) $(TEST_CFLAGS) test/manual/unixpeer.c -lpthread -o test/$(OS)/unixpeer
+	$(CC) $(TEST_CFLAGS) test/manual/passfd.c -lpthread -o test/$(OS)/passfdtest
+	$(CC) $(TEST_CFLAGS) test/manual/unixpeer.c -lpthread -o test/$(OS)/unixpeertest
 	@[ -z "$(CI)" ] || echo "::endgroup::"
+
+loadertest: $(LOADER_C_FILES) $(LOADER_TEST_C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
+	@echo "$${CI:+::group::}Building Loader Tests"
+	$(CC) -c $(TEST_CFLAGS) $(LOADER_C_FILES) $(LOADER_INCLUDES) $(LOADER_TEST_C_FILES) $(INCLUDES) $(CMOCKA_INCLUDES) 
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/libvertest libvertest.o libver.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/libdirtest libdirtest.o libdir.o nsfile.o libver.o loaderutils.o loader.o patch.o nsinfo.o ns.o inject.o setup.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/setuptest setuptest.o setup.o patch.o libdir.o nsfile.o libver.o loaderutils.o loader.o nsinfo.o ns.o inject.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/nsinfotest nsinfotest.o nsinfo.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	@[ -z "$(CI)" ] || echo "::endgroup::"
+
+# ensure $USER is available since some of the tests expect it
+runtests: export USER ?= $(shell id -u -n)
+runtests:
 	@echo "$${CI:+::group::}Running Tests and Generating Test Coverage"
-	test/execute.sh
+	test/unit/execute.sh
 	@[ -z "$(CI)" ] || echo "::endgroup::"
-# see file:///Users/cribl/scope/coverage/index.html
+	# see file:///Users/cribl/scope/coverage/index.html
 
-$(YAML_AR): $(YAML_SRC)
-	@$(MAKE) -C contrib libyaml
 
-$(JSON_AR): contrib/cJSON/cJSON.c
-	@$(MAKE) -C contrib cJSON
-
-$(TEST_LIB):
-	@$(MAKE) -C contrib cmocka
-
-.PHONY: coreall coreclean coretest corerebuild
+.PHONY: coreall coreclean libtest loadertest runtests corerebuild

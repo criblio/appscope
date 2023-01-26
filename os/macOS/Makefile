@@ -67,7 +67,7 @@ test: $(C_FILES)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/dnstest dnstest.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/searchtest searchtest.o search.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	@echo "Running Tests and Generating Test Coverage"
-	test/execute.sh
+	test/unit/execute.sh
 # see file:///Users/cribl/scope/coverage/index.html
 
 $(YAML_AR): $(YAML_SRC)

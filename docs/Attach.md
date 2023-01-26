@@ -106,14 +106,14 @@ To transit between other states presented below we are use dynamic configuration
 ### Container awareness
 
 With release 1.2.0 we introduce container awarnesss to attach functionality. We are able to attach to the process from host into container.
-`ldscope` is able to identify that desired process which we want to attach exists in different Linux namespace(s), in other words exists in a container.
-When the situation above happened it is detected and we reassociate currently running thread in `ldscope` with container `pid` and `mnt` namespaces.
-`mnt` namespace is required to copy `ldscope` from host to container, because container do not have access to host mount namespace. We also required to switch `PID` namespace which we cover later in this paragraph.
-After switching namespace we perform `fork` & `exec` operation to run `ldscope` which was previously copied. The new process will run in container context with modified the PID argument compared to original ran in host context.
+`scope` is able to identify that desired process which we want to attach exists in different Linux namespace(s), in other words exists in a container.
+When the situation above happened it is detected and we reassociate currently running thread in `scope` with container `pid` and `mnt` namespaces.
+`mnt` namespace is required to copy `scope` from host to container, because container do not have access to host mount namespace. We also required to switch `PID` namespace which we cover later in this paragraph.
+After switching namespace we perform `fork` & `exec` operation to run `scope` which was previously copied. The new process will run in container context with modified the PID argument compared to original ran in host context.
 From container we are not able to see host `pid` namespace so we are required to translate PID to the value visible in the container (`pid` namespace).
 
 The detach/reattach operations are supported as well.
 
-We are able to pass desired configuration file via `SCOPE_CONF_PATH`. What this means is that in addition to copying `ldscope` we are able to copy desired scope configuration from host to container.
+We are able to pass desired configuration file via `SCOPE_CONF_PATH`. What this means is that in addition to copying `scope` we are able to copy desired scope configuration from host to container.
 
-We are able to perform attach to host process /other container process by `ldscope starthost` operation.
+We are able to perform attach to host process /other container process by `scope --starthost` operation.

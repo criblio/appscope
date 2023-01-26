@@ -327,13 +327,12 @@ func PidScopeStatus(pid int) (ScopeStatus, error) {
 		return Disable, nil
 	}
 
-	// Ignore ldscope process
+	// Ignore scope process // TODO: Still Needed?
 	command, err := PidCommand(pid)
 	if err != nil {
 		return Disable, nil
 	}
-
-	if command == "ldscopedyn" {
+	if command == "scopedyn" {
 		return Disable, nil
 	}
 

@@ -21,7 +21,6 @@ var (
 	errMissingProc       = errors.New("no process found matching that name")
 	errPidInvalid        = errors.New("invalid PID")
 	errPidMissing        = errors.New("PID does not exist")
-	errCreateLdscope     = errors.New("error creating ldscope")
 	errNotScoped         = errors.New("detach failed. This process is not being scoped")
 	errLibraryNotExist   = errors.New("library Path does not exist")
 	errInvalidSelection  = errors.New("invalid Selection")
@@ -66,38 +65,35 @@ func (rc *Config) Attach(args []string) error {
 		reattach = true
 	}
 
-	// Create ldscope
-	if err := CreateLdscope(); err != nil {
-		return errCreateLdscope
-	}
-	// Normal operational, not passthrough, create directory for this run
-	// Directory contains scope.yml which is configured to output to that
-	// directory and has a command directory configured in that directory.
 	env := os.Environ()
+
 	// Disable detection of a scope filter file with this command
 	env = append(env, "SCOPE_FILTER=false")
 
+	// Disable cribl event breaker with this command
 	if rc.NoBreaker {
 		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
 	}
-	if !rc.Passthrough {
-		rc.setupWorkDir(args, true)
-		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
-		log.Info().Bool("passthrough", rc.Passthrough).Strs("args", args).Msg("calling syscall.Exec")
-	}
+
+	// Normal operational, create a directory for this run.
+	// Directory contains scope.yml which is configured to output to that
+	// directory and has a command directory configured in that directory.
+	rc.setupWorkDir(args, true)
+	env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
+
+	// Handle custom library path
 	if len(rc.LibraryPath) > 0 {
-		// Validate path exists
 		if !util.CheckDirExists(rc.LibraryPath) {
 			return errLibraryNotExist
 		}
-		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
+
 	if reattach {
 		env = append(env, "SCOPE_CONF_RELOAD="+filepath.Join(rc.WorkDir, "scope.yml"))
 	}
 
-	ld := loader.ScopeLoader{Path: LdscopePath()}
+	ld := loader.New()
 	if !rc.Subprocess {
 		return ld.Attach(args, env)
 	}
@@ -143,10 +139,6 @@ func (rc *Config) DetachAll(args []string, prompt bool) error {
 		return errNoScopedProcs
 	}
 
-	if err := CreateLdscope(); err != nil {
-		return errCreateLdscope
-	}
-
 	errorsDetachingMultiple := false
 	for _, proc := range procs {
 		tmpArgs := append([]string{fmt.Sprint(proc.Pid)}, args...)
@@ -170,10 +162,6 @@ func (rc *Config) DetachSingle(args []string) error {
 	}
 	args[0] = fmt.Sprint(pid)
 
-	if err := CreateLdscope(); err != nil {
-		return errCreateLdscope
-	}
-
 	// Check PID is already being scoped
 	status, err := util.PidScopeStatus(pid)
 	if err != nil {
@@ -187,7 +175,7 @@ func (rc *Config) DetachSingle(args []string) error {
 
 func (rc *Config) detach(args []string, pid int) error {
 	env := os.Environ()
-	ld := loader.ScopeLoader{Path: LdscopePath()}
+	ld := loader.New()
 	if !rc.Subprocess {
 		return ld.Detach(args, env)
 	}

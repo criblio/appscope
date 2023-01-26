@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #define _XOPEN_SOURCE 500
+
 #include <ftw.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -7,17 +8,13 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "dbg.h"
 #include "setup.h"
-#include "scopestdlib.h"
 #include "test.h"
 
 /*
  * Define the extern offset for integration test compilation 
  * See details in libdir.c
  */
-unsigned char _binary_ldscopedyn_start;
-unsigned char _binary_ldscopedyn_end;
 unsigned char _binary_libscope_so_start;
 unsigned char _binary_libscope_so_end;
 
@@ -25,18 +22,18 @@ static int
 create_file(const char *file_path, const char* file_contents) {
     FILE *f;
 
-    f = scope_fopen(file_path, "w");
+    f = fopen(file_path, "w");
     if (!f) {
         return -1;
     }
 
-    for (int i = 0; i < scope_strlen(file_contents); i++) {
-        if (scope_putc(file_contents[i], f) == EOF) {
-            scope_fclose(f);
+    for (int i = 0; i < strlen(file_contents); i++) {
+        if (putc(file_contents[i], f) == EOF) {
+            fclose(f);
             return -1;
         }
     }
-    scope_fclose(f);
+    fclose(f);
 
     return 0;
 }
@@ -59,16 +56,16 @@ removeScopeCfgFile0Changes(void **state) {
         fail_msg("Couldn't create file %s", file_path);
     }
 
-    scope_stat(file_path, &st);
+    stat(file_path, &st);
     orig_file_size = st.st_size;
 
     res = removeScopeCfgFile(file_path);
     assert_int_equal(res, 0);
 
-    scope_stat(file_path, &st);
+    stat(file_path, &st);
     assert_int_equal(orig_file_size, st.st_size);
 
-    if (scope_remove(file_path)) {
+    if (remove(file_path)) {
         fail_msg("Couldn't remove file %s", file_path);
     }
 }
@@ -92,7 +89,7 @@ removeScopeCfgFile1Change(void **state) {
         fail_msg("Couldn't create file %s", file_path);
     }
 
-    scope_stat(file_path, &st);
+    stat(file_path, &st);
     orig_file_size = st.st_size;
 
     res = removeScopeCfgFile(file_path);
@@ -102,10 +99,10 @@ removeScopeCfgFile1Change(void **state) {
     res = isCfgFileConfigured(file_path);
     assert_int_equal(res, 0);
 
-    scope_stat(file_path, &st);
+    stat(file_path, &st);
     assert_int_equal(orig_file_size - 41, st.st_size);
 
-    if (scope_remove(file_path)) {
+    if (remove(file_path)) {
         fail_msg("Couldn't remove file %s", file_path);
     }
 }
@@ -129,7 +126,7 @@ removeScopeCfgFile2Changes(void **state) {
         fail_msg("Couldn't create file %s", file_path);
     }
 
-    scope_stat(file_path, &st);
+    stat(file_path, &st);
     orig_file_size = st.st_size;
 
     res = removeScopeCfgFile(file_path);
@@ -139,10 +136,10 @@ removeScopeCfgFile2Changes(void **state) {
     res = isCfgFileConfigured(file_path);
     assert_int_equal(res, 0);
 
-    scope_stat(file_path, &st);
+    stat(file_path, &st);
     assert_int_equal(orig_file_size - 82, st.st_size);
 
-    if (scope_remove(file_path)) {
+    if (remove(file_path)) {
         fail_msg("Couldn't remove file %s", file_path);
     }
 }
@@ -155,7 +152,6 @@ main(int argc, char* argv[]) {
         cmocka_unit_test(removeScopeCfgFile0Changes),
         cmocka_unit_test(removeScopeCfgFile1Change),
         cmocka_unit_test(removeScopeCfgFile2Changes),
-        cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

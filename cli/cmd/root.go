@@ -30,7 +30,7 @@ func Execute() {
 				}
 			}
 
-			// If we're not a known command, exec ldscope
+			// If not a known command, scope run by default
 			internal.InitConfig()
 			rc := run.Config{}
 			rc.Run(os.Args[1:])
@@ -38,4 +38,9 @@ func Execute() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+func init() {
+	// Constructor flags (for help only)
+	RootCmd.Flags().BoolP("passthrough", "z", false, "Scope an application with current environment & no config.")
 }

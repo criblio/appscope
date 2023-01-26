@@ -238,7 +238,7 @@ starttest div_by_zero_error
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 3
+SCOPE_ERROR_SIGNAL_HANDLER=true scope -z ./fault_test 3
 
 verifyBacktrace "Integer divide by zero"
 
@@ -254,7 +254,7 @@ starttest illegal_op_error
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 4
+SCOPE_ERROR_SIGNAL_HANDLER=true scope -z ./fault_test 4
 
 if [ "x86_64" = "$(uname -m)" ]; then
     verifyBacktrace "Illegal operand"

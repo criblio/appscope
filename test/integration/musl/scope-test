@@ -220,7 +220,7 @@ starttest illegal_op_error
 
 cd /opt/fault_test/
 
-SCOPE_ERROR_SIGNAL_HANDLER=true ldscope -- ./fault_test 4
+SCOPE_ERROR_SIGNAL_HANDLER=true scope -z ./fault_test 4
 
 if [ "x86_64" = "$(uname -m)" ]; then
     verifyBacktrace "Illegal operand"
@@ -242,7 +242,7 @@ socat OPENSSL-LISTEN:9109,reuseaddr,cert=/tmp/appscope.pem,cafile=/tmp/appscope.
 # give socat a moment to get up and running
 sleep 1
 
-# run ldscope with a ton of env vars to send over tls session
+# run scope with a ton of env vars to send over tls session
   SCOPE_EVENT_DEST=tcp://127.0.0.1:9109 \
   SCOPE_EVENT_TLS_ENABLE=true \
   SCOPE_EVENT_METRIC=true \

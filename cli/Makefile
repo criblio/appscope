@@ -59,7 +59,7 @@ genflowtest:
 	./flows/gen_flow_test.sh
 
 ## all:
-all: deps $(SCOPEDYN) $(SCOPE) require-go-version
+all: deps $(SCOPE) require-go-version
 
 ## clean: remove the built binary
 clean:
@@ -88,10 +88,12 @@ $(LIBSCOPE): $(LIBRARY_C_FILES)
 	@$(MAKE) -C .. lib/linux/$(ARCH)/libscope.so
 $(LIBLOADER): $(LOADER_C_FILES)
 	@$(MAKE) -C .. lib/linux/$(ARCH)/libloader.a
+$(SCOPEDYN): $(LOADER_C_FILES)
+	@$(MAKE) -C .. bin/linux/$(ARCH)/scopedyn
 
 # the -w go build flags remove the dwarf symbol table from the resulting executable
 # the -tags force os/user and netgo to use go and NOT cgo because a static exec can't resolve libc calls from cgo
-$(SCOPE): $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN) 
+$(SCOPE): $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN)
 $(SCOPE): export GOOS=linux
 $(SCOPE): export CGO_ENABLED=1
 $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
@@ -108,22 +110,6 @@ $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 		$(BUILD_OPTS) \
 	       	-o $(SCOPE)
 	$(RM) -r $(SCOPEDYN)
-
-# libscope and conf_yml are not included in the dynamic build
-# the -s -w go build flags remove the symbol table, debug info, dwarf symbol table from the resulting executable
-$(SCOPEDYN): $(LIBSCOPE) $(LIBLOADER) 
-$(SCOPEDYN): export GOOS=linux
-$(SCOPEDYN): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
-	@echo "$${CI:+::group::}Building scopedyn"
-	$(RM) run/bundle.go
-	$(RM) -r build/*
-	$(GO_BINDATA) -nocompress -o run/bundle.go -pkg run build
-	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"0\" -DSCOPEDYN_SIZE=\"0\"" \
-	$(GO) build \
-		-ldflags="$(shell $(GOVVV) -flags) -s -w -linkmode external -extldflags \"-lrt -ldl\" " \
-		-buildmode=pie \
-		$(BUILD_OPTS) \
-	       	-o $(SCOPEDYN)
 
 ## test: run unit tests
 test:

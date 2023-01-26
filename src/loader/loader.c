@@ -28,7 +28,6 @@
 #include "patch.h"
 #include "setup.h"
  
-// maybe set this from a cmd line switch?
 int g_log_level = CFG_LOG_WARN;
 
 /* 
@@ -630,8 +629,6 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
      * What kind of app are we trying to scope?
      */
 
-    int (*sys_exec)(elf_buf_t *, const char *, int, char **, char **);
-    void *handle = NULL;
     char *inferior_command = NULL;
 
     inferior_command = getpath(argv[0]); 
@@ -750,11 +747,10 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
         }
 
         // Exec scopedyn from shared memory
-        // Append "scopedyn" "-z" to argv first
+        // Append "scopedyn" to argv first
         int execArgc = 0;
-        char *execArgv[argc + 2];
+        char *execArgv[argc + 1];
         execArgv[execArgc++] = "scopedyn";
-        execArgv[execArgc++] = "-z";
         for (int i = 0; i < argc; i++) {
             execArgv[execArgc++] = argv[i];
         }
@@ -766,19 +762,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
     // If scope itself is dynamic, dlopen libscope and sys_exec the app
     // and we're done
     } else {
-        if ((handle = dlopen(scopeLibPath, RTLD_LAZY)) == NULL) {
-            perror("dlopen");
-            goto out;
-        }
-
-        sys_exec = dlsym(handle, "sys_exec");
-        if (!sys_exec) {
-            fprintf(stderr, "error: sysexec\n");
-            goto out;
-        }
-
-        sys_exec(ebuf, inferior_command, argc, &argv[0], environ);
-        fprintf(stderr, "error: sys_exec failed. Check scope.log for details\n");
+        // we should never be here. we dont run scope dynamic.
     }
  
 out:

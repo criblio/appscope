@@ -242,6 +242,7 @@
     X9_*;
     xor128_decrypt_n_pad;
     xor128_encrypt_n_pad;
+    WriteCoreDump;
     ZINT32_it;
     ZINT64_it;
     ZLONG_it;

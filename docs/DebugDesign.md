@@ -1,6 +1,6 @@
 # AppScope Debug Design
 
-When a process crashes it can be a challenge to get enough information to help developers troubleshoot the situation. Some examples of the difficulties... it can be hard to reproduce the crash outside the environment where the crash was first seen. Container environments are typically very transient so it can be tough to obtain shell access. Container storage that might give clues many not persist after the container has exited. Installation of debugging tools may be challenging or undesirable. Even outside of containers the procedure to turn on kernel-provided core dumps often varies by linux distro and can be a security liability (particularly with DOS attacks). It can even be challenging to know whether AppScope is playing a role in the crash itself.
+When a process crashes it can be a challenge to get enough information to help developers troubleshoot the situation. Some examples of the difficulties... it can be hard to reproduce the crash outside the environment where the crash was first seen. Container environments are typically very transient so it can be tough to obtain shell access. Container storage that might give clues may not persist after the container has exited. Installation of debugging tools may be challenging or undesirable. Even outside of containers the procedure to turn on kernel-provided core dumps often varies by linux distro and can be a security liability (particularly with DOS attacks). It can even be challenging to know whether AppScope is playing a role in the crash itself.
 
 ## Perceived Requirements
 
@@ -34,6 +34,8 @@ To talk about snapshotting from our library inside a process: we have libunwind 
 
 For snapshots taken from outside the library: from the discussion above about crash detection, it would require some help from the library to freeze the process (aka "stop the world") in a state where we can snapshot it from outside the process. Anything done from outside the crashing process has the clear benefit of being free of the severe signal-safe constraints. We don't yet know if there are existing go libraries that may allow us to generate a core dump from userspace (perform an operation equivalent to gcore or gdb's "generate-core-file" functionality). Without knowing about applicable go libraries, it's possible that it might be challenging to perform this function. Bundling one of these utilities is not super attractive, but is a possibility.
 
+[Looking ahead, what's in a snapshot?](#ok-but-what-is-in-this-snapshot-thing)
+
 A note to keep in mind about core dumps: without external information for context, core dumps are of limited use. To make full use of a core file the elf files of the application and it's dynamic dependencies are needed... it's unclear how much of this contextual information to capture. On one end of the spectrum we could choose to include the application and all dependencies in the snapshot. On the other end we could try to convert predefined parts of the corefile into text while in the environment where the core dump is taken. The first option here is large but very usable, the second is small but looses some fidelity. If it helps this discussion, stack traces are an example of the second (textual) capture where we can see the nesting of functions in text, but have lost the values of arguments associated with each function call.
 
 ## Preserve the snapshot for future debugging
@@ -42,10 +44,11 @@ To preserve the snapshot it seems like it will take cooperation of the library a
 
 After the snapshot is retrieved by the cli, then we ideally want the scoped process to resume its signal handling. When the cli is done gathering the snapshot, it could send a SIGCONT to the crashing process to "un-stop the world". Admittedly, this seems fragile because it requires that we have the cli running as a service or daemon for it's role in this scheme. As another important comment, it's unclear if delays we add to process termination could cause problems with container orchestration tools. It also seems like we would have to be careful to call any preexisting crash handling that the host process might have been trying to do. We want our library to be as transparent as possible w.r.t. termination behavior.
 
+We need to define how the library conveys information it has gathered to the cli. Above, we've mentioned that the library could write data to /tmp or /dev/shm. Well-known directories under these mount points may do the job well enough. This approach has the advantage of not requiring communication between the library and cli, only the prior agreement about where the information should be written to/read from. As a proposal, how about /tmp/appscope/crash/<pid>/? This would be created by the library; the directory would be read from and ultimately deleted by the cli. We propose that we can ignore the potential problems of pid reuse and disk capacity for now.
 
 ## Ok, but what is in this snapshot thing?
 
-Despite the way we've talked about snapshots above, we want to collect more than a simple stack trace and/or core dump. And we may collect this information from more than one source. For one snapshot, some information may be collected by the Cli, while other information could be collected by the AppScope library. Here are initial thoughts on what Debug Information we would like to include in a snapshot for MVP. The second column describes where (which source) we may use to capture that Debug Information. A "-" in the second column means we do not plan to include this information in the initial (MVP) release.
+Despite the way we've talked about snapshots above, we want to collect more than a simple stack trace and/or core dump. And we may collect this information from more than one source. For one snapshot, some information may be collected by the cli, while other information could be collected by the AppScope library. Here are initial thoughts on what Debug Information we would like to include in a snapshot for MVP. The second column describes where (which source) we may use to capture that Debug Information. A "-" in the second column means we do not plan to include this information in the initial (MVP) release.
 
 | Debug Information | MVP |
 | --- | --- |
@@ -89,13 +92,32 @@ Despite the way we've talked about snapshots above, we want to collect more than
 | Go version (if go) | cli |
 | Static or Dynamically linked(?) | cli |
 |  |  |
-| Network inferface status? | - |
+| Network interface status? | - |
 | ownership/permissions on pertinent files/unix sockets | - |
 | dns on pertinent host names | - |
 
-> Consider:
->    Attach?
->    Arch?
->    Musl?
->    Where is snapshot captured?
->    Is a listener (daemon) **required** to get stack traces?
+## Security concerns
+
+We need to consider the Debug Information listed above from a security perspective. Core dumps will almost certainly have the potential to leak information. Capture of stack traces, environment variables, and process arguments should be considered in a similar light. We plan to have the snapshot capability built into AppScope. This said, we will certainly provide a way to control if the feature will be enabled. Maybe the debug feature should be disabled by default, requiring a user action to explicitly enable the feature.
+
+## Some simplifying assumptions for an MVP
+
+Above, we stated that it is a requirement to allow the AppScope library and AppScope cli to operate independently so that users are not required to run both. Whenever containers are involved, the cli is required to be able to retrieve and persist the snapshot. And, as was discussed above, the library must be involved to ensure that coredumps or stack traces can be retrieved (even if the only involvement is to stop the world). Since it appears that we need both, we're proposing not to have this as a requirement in the MVP solution.
+
+Assuming that we can accept that both the cli and library will be required and that we want to make the most use of work done during technical feasibility, the MVP solution may look like this. This assumes the debug feature has been enabled.
+  - User runs a cli command to start a daemon on the host that uses eBPF to detect signals
+  - a scoped process is configured with the debug feature enabled
+  - the library registers for signals that will be fatal to the process
+  - a scoped process receives a SIGSEGV
+  - the library writes its portion of [Debug Information](#ok-but-what-is-in-this-snapshot-thing) to a well-known directory
+  - the library sends sends a SIGSTOP to its own process
+  - The cli sees the SIGSEGV on a scoped process and waits for a SIGSTOP on the same process
+  - The cli retrieves the library's Debug Information from the well-known directory
+  - The cli generates it's portion of [Debug Information](#ok-but-what-is-in-this-snapshot-thing)
+  - The cli writes all Debug Information (from library and cli) to a location on the host (tgz'd?)
+  - The cli sends a SIGCONT to the crashing scoped process
+  - The library calls any signal handlers it may have previously overwritten
+
+These simplifying assumptions require that:
+  - we have access to the host where AppScope is installed
+  - it is allowable for the library to stop it's process indefinately if a cli daemon is not running

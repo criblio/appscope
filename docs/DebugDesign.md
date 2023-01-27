@@ -45,9 +45,57 @@ After the snapshot is retrieved by the cli, then we ideally want the scoped proc
 
 ## Ok, but what is in this snapshot thing?
 
+Despite the way we've talked about snapshots above, we want to collect more than a simple stack trace and/or core dump. And we may collect this information from more than one source. For one snapshot, some information may be collected by the Cli, while other information could be collected by the AppScope library. Here are initial thoughts on what Debug Information we would like to include in a snapshot for MVP. The second column describes where (which source) we may use to capture that Debug Information. A "-" in the second column means we do not plan to include this information in the initial (MVP) release.
+
+| Debug Information | MVP |
+| --- | --- |
+| Time of Snapshot | cli |
+| AppScope Lib Version | lib |
+| AppScope Cli Version | cli |
+| Process Name | cli |
+| Process Arguments | cli |
+| PID, PPID | cli |
+| User ID/ Group ID | cli |
+| Username/ Groupname | cli |
+|  |  |
+| AppScope configuration | lib |
+| Environment Variables | cli |
+|  |  |
+| Signal number | cli |
+| Signal handler | cli |
+| Error number | cli |
+|  |  |
+| Machine Arch | cli |
+| Distro, Distro version | cli |
+| Kernel version | cli |
+| Hostname | cli |
+| Namespace Id's | cli |
+| Container Impl (docker, podman...) | - |
+| Container Name/Version(?) | - |
+| SELinux or AppArmor enforcing? | - |
+| Unix Capabilities...  PTRACE?... | - |
+|  |  |
+| AppScope Log Output | if possible |
+| scope ps output | cli |
+| scope history output | cli |
+|  |  |
+| Stack Trace (offending thread) | if possible |
+| Stack Traces (all threads) | lib |
+| Memory (stacks, heap) | lib |
+| Registers | lib |
+|  |  |
+| Application version(?) | - |
+| JRE version (if java) | cli |
+| Go version (if go) | cli |
+| Static or Dynamically linked(?) | cli |
+|  |  |
+| Network inferface status? | - |
+| ownership/permissions on pertinent files/unix sockets | - |
+| dns on pertinent host names | - |
+
 > Consider:
 >    Attach?
 >    Arch?
 >    Musl?
->    What more than core/stack traces?  When to capture more?  Where is this captured?
+>    Where is snapshot captured?
 >    Is a listener (daemon) **required** to get stack traces?

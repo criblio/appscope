@@ -1,7 +1,7 @@
-package main
+package sigdel
 
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target bpfel -cc clang gen_sigdel ./sigdel.bpf.c -- -I/usr/include/bpf -I.
-
+import "C"
 import (
 	"bytes"
 	"encoding/binary"
@@ -32,7 +32,7 @@ func setlimit() {
 	}
 }
 
-func main() {
+func Sigdel() {
 	setlimit()
 
 	objs := gen_sigdelObjects{}

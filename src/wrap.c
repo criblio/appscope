@@ -1599,6 +1599,7 @@ initHook(int attachedFlag, bool scopedFlag)
         if (rc != 0) {
             scopeLogError("ERROR: failed to install funchook. (%s)\n",
                         funchook_error_message(funchook));
+            funchook_destroy(funchook);
             return;
         }
     }

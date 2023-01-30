@@ -1597,7 +1597,7 @@ initHook(int attachedFlag, bool scopedFlag)
         // hook 'em
         rc = funchook_install(funchook, 0);
         if (rc != 0) {
-            scopeLogError("ERROR: failed to install SSL_read hook. (%s)\n",
+            scopeLogError("ERROR: failed to install funchook. (%s)\n",
                         funchook_error_message(funchook));
             return;
         }

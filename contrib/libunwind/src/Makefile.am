@@ -61,6 +61,7 @@ libunwind_coredump_la_SOURCES = \
 	coredump/_UCD_find_proc_info.c \
 	coredump/_UCD_get_proc_name.c \
 	coredump/_UCD_corefile_elf.c \
+	coredump/ucd_file_table.c \
 	\
 	coredump/_UPT_elf.c \
 	coredump/_UPT_access_fpreg.c \
@@ -70,7 +71,9 @@ libunwind_coredump_la_SOURCES = \
 libunwind_coredump_la_LDFLAGS = $(COMMON_SO_LDFLAGS) \
 				-version-info $(COREDUMP_SO_VERSION)
 libunwind_coredump_la_LIBADD = $(LIBLZMA) $(LIBZ)
-noinst_HEADERS += coredump/_UCD_internal.h coredump/_UCD_lib.h
+noinst_HEADERS += coredump/_UCD_internal.h \
+                  coredump/_UCD_lib.h \
+                  coredump/ucd_file_table.h
 
 ### libunwind-setjmp:
 libunwind_setjmp_la_LDFLAGS		= $(COMMON_SO_LDFLAGS)		     \
@@ -107,6 +110,7 @@ libunwind_la_SOURCES_generic =						\
 	mi/Gdyn-extract.c mi/Gdyn-remote.c mi/Gfind_dynamic_proc_info.c	\
 	mi/Gget_accessors.c						\
 	mi/Gget_proc_info_by_ip.c mi/Gget_proc_name.c			\
+	mi/Gget_proc_info_in_range.c					\
 	mi/Gput_dynamic_unwind_info.c mi/Gdestroy_addr_space.c		\
 	mi/Gget_reg.c mi/Gset_reg.c					\
 	mi/Gget_fpreg.c mi/Gset_fpreg.c					\
@@ -136,6 +140,7 @@ libunwind_la_SOURCES_local_nounwind =					\
 	mi/Ldyn-extract.c mi/Lfind_dynamic_proc_info.c			\
 	mi/Lget_accessors.c						\
 	mi/Lget_proc_info_by_ip.c mi/Lget_proc_name.c			\
+	mi/Lget_proc_info_in_range.c					\
 	mi/Lput_dynamic_unwind_info.c mi/Ldestroy_addr_space.c		\
 	mi/Lget_reg.c   mi/Lset_reg.c					\
 	mi/Lget_fpreg.c mi/Lset_fpreg.c					\
@@ -359,6 +364,31 @@ libunwind_riscv_la_SOURCES_riscv = $(libunwind_la_SOURCES_riscv_common)	    \
 	riscv/Gcreate_addr_space.c riscv/Gget_proc_info.c riscv/Gget_save_loc.c   \
 	riscv/Gglobal.c riscv/Ginit.c riscv/Ginit_local.c riscv/Ginit_remote.c	    \
 	riscv/Gis_signal_frame.c riscv/Gregs.c riscv/Gresume.c riscv/Gstep.c
+
+# The list of files that go info libunwind and libunwind-loongarch64:
+noinst_HEADERS += loongarch64/init.h loongarch64/offsets.h loongarch64/unwind_i.h
+libunwind_la_SOURCES_loongarch64_common = $(libunwind_la_SOURCES_common)       \
+	loongarch64/is_fpreg.c loongarch64/regname.c
+
+# The list of files that go into libunwind:
+libunwind_la_SOURCES_loongarch64 = $(libunwind_la_SOURCES_loongarch64_common)  \
+	$(libunwind_la_SOURCES_local)                                           \
+	loongarch64/getcontext.S                                                \
+	loongarch64/Lapply_reg_state.c loongarch64/Lreg_states_iterate.c	\
+	loongarch64/Lcreate_addr_space.c loongarch64/Lget_proc_info.c           \
+	loongarch64/Lget_save_loc.c loongarch64/Lglobal.c loongarch64/Linit.c   \
+	loongarch64/Linit_local.c loongarch64/Linit_remote.c                    \
+	loongarch64/Lis_signal_frame.c loongarch64/Lregs.c                      \
+	loongarch64/Lresume.c loongarch64/Lstep.c
+
+libunwind_loongarch64_la_SOURCES_loongarch64 = $(libunwind_la_SOURCES_loongarch64_common) \
+	$(libunwind_la_SOURCES_generic)                                         \
+	loongarch64/Gapply_reg_state.c loongarch64/Greg_states_iterate.c	\
+	loongarch64/Gcreate_addr_space.c loongarch64/Gget_proc_info.c           \
+	loongarch64/Gget_save_loc.c loongarch64/Gglobal.c loongarch64/Ginit.c   \
+	loongarch64/Ginit_local.c loongarch64/Ginit_remote.c                    \
+	loongarch64/Gis_signal_frame.c loongarch64/Gregs.c                      \
+	loongarch64/Gresume.c loongarch64/Gstep.c
 
 # The list of files that go both into libunwind and libunwind-x86:
 noinst_HEADERS += x86/init.h x86/offsets.h x86/unwind_i.h
@@ -674,6 +704,18 @@ if !REMOTE_ONLY
 endif
  libunwind_setjmp_la_SOURCES += riscv/siglongjmp.S
 else
+if ARCH_LOONGARCH64
+ lib_LTLIBRARIES += libunwind-loongarch64.la
+ libunwind_la_SOURCES = $(libunwind_la_SOURCES_loongarch64)
+ libunwind_loongarch64_la_SOURCES = $(libunwind_loongarch64_la_SOURCES_loongarch64)
+ libunwind_loongarch64_la_LDFLAGS = $(COMMON_SO_LDFLAGS) -version-info $(SOVERSION)
+ libunwind_loongarch64_la_LIBADD = libunwind-dwarf-generic.la
+ libunwind_loongarch64_la_LIBADD += libunwind-elf64.la
+if !REMOTE_ONLY
+ libunwind_loongarch64_la_LIBADD += libunwind.la -lc
+endif
+ libunwind_setjmp_la_SOURCES += loongarch64/siglongjmp.S
+else
 if ARCH_X86
  lib_LTLIBRARIES += libunwind-x86.la
  libunwind_la_SOURCES = $(libunwind_la_SOURCES_x86) $(libunwind_x86_la_SOURCES_os)
@@ -751,6 +793,7 @@ endif # ARCH_PPC64
 endif # ARCH_PPC32
 endif # ARCH_X86_64
 endif # ARCH_X86
+endif # ARCH_LOONGARCH64
 endif # ARCH_RISCV
 endif # ARCH_TILEGX
 endif # ARCH_MIPS

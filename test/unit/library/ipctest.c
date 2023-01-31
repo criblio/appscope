@@ -353,6 +353,7 @@ ipcHandlerRequestKnown(void **state) {
     assert_int_equal(parseStatus, REQ_PARSE_OK);
     assert_string_equal(scopeReq, msg->scopeData);
     assert_int_equal(uniqueId, 1234);
+    scope_free(scopeReq);
 
     destroyIpcMessage(msg);
 
@@ -389,6 +390,7 @@ ipcHandlerRequestUnknown(void **state) {
     assert_int_equal(parseStatus, REQ_PARSE_OK);
     assert_string_equal(scopeReq, msg->scopeData);
     assert_int_equal(uniqueId, 4567);
+    scope_free(scopeReq);
 
     destroyIpcMessage(msg);
 
@@ -570,6 +572,7 @@ ipcHandlerScopeResponseValid(void **state) {
     assert_non_null(mqResp);
     char *mqRespBytes = cJSON_PrintUnformatted(mqResp);
     size_t mqRespLenWithNul = scope_strlen(mqRespBytes) + 1;
+    scope_free(mqRespBytes);
 
     item = cJSON_GetObjectItemCaseSensitive(mqResp, "status");
     assert_non_null(item);
@@ -644,6 +647,7 @@ ipcHandlerScopeResponseUnknown(void **state) {
     assert_non_null(mqResp);
     char *mqRespBytes = cJSON_PrintUnformatted(mqResp);
     size_t mqRespLenWithNul = scope_strlen(mqRespBytes) + 1;
+    scope_free(mqRespBytes);
 
     item = cJSON_GetObjectItemCaseSensitive(mqResp, "status");
     assert_non_null(item);
@@ -720,6 +724,7 @@ ipcHandlerScopeResponseGetCfgSingleMsg(void **state) {
     assert_non_null(mqResp);
     char *mqRespBytes = cJSON_PrintUnformatted(mqResp);
     size_t mqRespLenWithNul = scope_strlen(mqRespBytes) + 1;
+    scope_free(mqRespBytes);
 
     item = cJSON_GetObjectItemCaseSensitive(mqResp, "status");
     assert_non_null(item);
@@ -745,8 +750,8 @@ ipcHandlerScopeResponseGetCfgSingleMsg(void **state) {
     assert_non_null(itemCurrentCfg);
     assert_true(cJSON_IsObject(itemCurrentCfg));
     char *scopeCfgBytes = cJSON_PrintUnformatted(itemCurrentCfg);
-
     cfgRecv = cfgFromString(scopeCfgBytes);
+    scope_free(scopeCfgBytes);
     assert_int_equal(cfgLogLevel(cfgRecv), CFG_LOG_TRACE);
 
     cfgDestroy(&cfgRecv);
@@ -796,6 +801,8 @@ ipcHandlerScopeResponseSetCfgSingleMsg(void **state) {
     char *setCfgMsg = cJSON_PrintUnformatted(setCfgMsgJson);
 
     ipc_msg_t *msg = createIpcMessage("{\"req\":0,\"uniq\":1234,\"remain\":128}", setCfgMsg);
+    scope_free(setCfgMsg);
+
     res = ipcSendSuccessfulResponse(mqReadWriteDes, attr.mq_msgsize, msg->scopeData, uniqueId);
     assert_int_equal(res, RESP_RESULT_OK);
 

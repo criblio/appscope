@@ -869,7 +869,7 @@ osCreateSM(proc_id_t *proc, unsigned long addr)
         return;
     }
 
-    // size is initally 0 and needs to be increased
+    // size is initially 0 and needs to be increased
     if (scope_ftruncate(proc->smfd, sizeof(export_sm_t)) == -1) {
         scope_close(proc->smfd);
         return;

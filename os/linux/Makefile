@@ -19,7 +19,7 @@ LS_HPACK_AR=contrib/build/ls-hpack/libls-hpack.a
 MUSL_AR=contrib/build/musl/lib/libc.a
 UNWIND_AR=contrib/build/libunwind/src/.libs/libunwind.a
 COREDUMPER_AR=contrib/build/coredumper/.libs/libcoredumper.a
-TEST_AR=$(MUSL_AR) ${UNWIND_AR} $(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR} $(LS_HPACK_AR)
+TEST_AR=$(MUSL_AR) ${COREDUMPER_AR} ${UNWIND_AR} $(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR} $(LS_HPACK_AR)
 #TEST_LIB=contrib/build/cmocka/src/libcmocka.dylib
 TEST_LIB=contrib/build/cmocka/src/libcmocka.so
 TEST_LD_FLAGS=-Lcontrib/build/cmocka/src -lcmocka -ldl -lresolv -lrt -lpthread
@@ -99,8 +99,9 @@ $(SCOPEDYN): src/loader/scopedyn.c src/loader/loaderutils.c src/loader/libdir.c 
 libtest: $(LIBRARY_C_FILES) $(LIBRARY_TEST_C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
 	@echo "$${CI:+::group::}Building Library Tests"
 	$(CC) -c $(TEST_CFLAGS) $(LIBRARY_C_FILES) $(LIBRARY_INCLUDES) $(LIBRARY_TEST_C_FILES) $(INCLUDES) $(CMOCKA_INCLUDES) $(OS_C_FILES)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/ipctest ipctest.o ipc.o ipc_resp.o cfgutils.o cfg.o mtc.o log.o evtformat.o ctl.o transport.o backoff.o mtcformat.o strset.o com.o scopestdlib.o dbg.o circbuf.o linklist.o fn.o utils.o os.o test.o report.o search.o httpagg.o state.o httpstate.o metriccapture.o plattime.o $(TEST_AR) $(TEST_LD_FLAGS) -Wl,--wrap=jsonConfigurationObject -Wl,--wrap=doAndReplaceConfig
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/vdsotest vdsotest.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/coredumptest coredumptest.o coredump.o scopestdlib.o dbg.o utils.o fn.o plattime.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/ipctest ipctest.o ipc.o ipc_resp.o cfgutils.o cfg.o mtc.o log.o evtformat.o ctl.o transport.o backoff.o mtcformat.o strset.o com.o scopestdlib.o dbg.o circbuf.o linklist.o fn.o utils.o os.o test.o report.o search.o httpagg.o state.o httpstate.o metriccapture.o plattime.o $(TEST_AR) $(TEST_LD_FLAGS) -Wl,--wrap=jsonConfigurationObject -Wl,--wrap=doAndReplaceConfig
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/strsettest strsettest.o strset.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgutilstest cfgutilstest.o cfgutils.o cfg.o mtc.o log.o evtformat.o ctl.o transport.o backoff.o mtcformat.o strset.o com.o scopestdlib.o dbg.o circbuf.o linklist.o fn.o utils.o os.o test.o report.o search.o httpagg.o state.o httpstate.o metriccapture.o plattime.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgtest cfgtest.o cfg.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)

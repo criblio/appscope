@@ -5,6 +5,56 @@
 #include "dbg.h"
 #include "test.h"
 
+/*
+* Following part of code is required to use memory sanitizers during unit tests
+* To correct instrument code we redirect allocations from our internal
+* library to allocator from standard library.
+* See details in:
+* https://github.com/google/sanitizers/wiki/AddressSanitizerIncompatiblity
+*
+*   make FSAN=1 libtest allows to instrument library unit test code
+*
+* The memory leak instrumentation is done by "-fsanitize=address"
+*/
+
+/*
+* In GCC sanitize address is defined when -fsanitize=address is used
+* In Clang the code below is recommended way to check this feature
+*/
+#if defined(__has_feature)
+# if __has_feature(address_sanitizer)
+#  define __SANITIZE_ADDRESS__ 1
+# endif
+#endif
+
+#ifdef __SANITIZE_ADDRESS__
+#include <stdlib.h>
+void * __real_scopelibc_malloc(size_t);
+void * __wrap_scopelibc_malloc(size_t size)
+{
+    return malloc(size);
+}
+
+void __real_scopelibc_free(void *);
+void __wrap_scopelibc_free(void * ptr)
+{
+    return free(ptr);
+}
+
+void * __real_scopelibc_calloc(size_t, size_t);
+void * __wrap_scopelibc_calloc(size_t nelem, size_t size)
+{
+    return calloc(nelem, size);
+}
+
+void * __real_scopelibc_realloc(void *, size_t);
+void * __wrap_scopelibc_realloc(void * ptr, size_t size)
+{
+    return realloc(ptr, size);
+}
+#endif
+
+
 int
 groupSetup(void** state)
 {

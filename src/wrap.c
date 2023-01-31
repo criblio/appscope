@@ -1541,6 +1541,22 @@ initHook(int attachedFlag, bool scopedFlag)
     if (should_we_patch || g_fn.__write_libc || g_fn.__write_pthread ||
         ((g_ismusl == FALSE) && g_fn.sendmmsg) ||
         ((g_ismusl == TRUE) && (g_fn.sendto || g_fn.recvfrom))) {
+
+        /*
+        * Check if we have proper permission to install hook function
+        * We need to have abilites to change permission of region memory
+        * using (PROT_WRITE + PROT_EXEC) flags
+        */
+        size_t testSize = 16;
+        void *ptr = scope_malloc(testSize);
+        if (osMemPermAllow(ptr, testSize, PROT_READ | PROT_WRITE, PROT_EXEC) == FALSE) {
+            scope_free(ptr);
+            scopeLogError("Interpose functions are limited (DNS, Console I/O). Please verify the MemoryDenyWriteExecute setting for following service: %s", g_proc.procname);
+            return;
+        }
+        scope_free(ptr);
+
+
         funchook = funchook_create();
 
         if (logLevel(g_log) <= CFG_LOG_TRACE) {

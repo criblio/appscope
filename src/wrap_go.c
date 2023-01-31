@@ -818,9 +818,11 @@ patchClone()
         size_t pageSize = scope_getpagesize();
         void *addr = (void *)((ptrdiff_t) clone & ~(pageSize - 1));
 
-        // set write perms on the page
-        if (scope_mprotect(addr, pageSize, PROT_WRITE | PROT_READ | PROT_EXEC)) {
-            scopeLogError("ERROR: patchCLone: mprotect failed\n");
+        const int perm = PROT_READ | PROT_EXEC;
+
+        // Add write permission on the page
+        if (osMemPermAllow(addr, pageSize, perm, PROT_WRITE) == FALSE) {
+            scopeLogError("ERROR: patchClone: osMemPermAllow failed\n");
             return;
         }
 
@@ -832,9 +834,9 @@ patchClone()
 
         scopeLog(CFG_LOG_DEBUG, "patchClone: CLONE PATCHED\n");
 
-        // restore perms to the page
-        if (scope_mprotect(addr, pageSize, PROT_READ | PROT_EXEC)) {
-            scopeLogError("ERROR: patchCLone: mprotect restore failed\n");
+        // restore original permission to the page
+        if (osMemPermRestore(addr, pageSize, perm) == FALSE) {
+            scopeLogError("ERROR: patchClone: osMemPermRestore failed\n");
             return;
         }
     }

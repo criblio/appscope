@@ -950,3 +950,25 @@ osFindFd(pid_t pid, const char *fname)
     free(cwd);
     return fd;
 }
+
+/*
+ * Change protection for specified memory region using 
+ * specified combintation flags and extraflags.
+ * Returns TRUE in case of operation success, FALSE otherwise
+ * Note: in case of success the `osMemPermRestore` should be called later
+ * with flags argument
+ */
+bool
+osMemPermAllow(void *addr, size_t len, int flags, int extraflags) {
+    return scope_mprotect(addr, len, flags | extraflags) == 0;
+}
+
+/*
+ * Restore permission for specified memory region.
+ * Returns TRUE in case of operation success, FALSE otherwise
+ * Note: This function should be called in case of success of `osMemPermAllow`
+ */
+bool
+osMemPermRestore(void *addr, size_t len, int flags) {
+    return scope_mprotect(addr, len, flags) == 0;
+}

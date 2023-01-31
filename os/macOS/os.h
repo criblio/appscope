@@ -48,3 +48,5 @@ extern int osNeedsConnect(int);
 extern const char *osGetUserName(unsigned);
 extern const char *osGetGroupName(unsigned);
 extern long long osGetProcCPU(void);
+extern bool osMemPermAllow(void *, size_t, int, int);
+extern bool osMemPermRestore(void *, size_t, int);

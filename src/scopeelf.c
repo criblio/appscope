@@ -201,9 +201,9 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
 
             if (prot != -1) {
                 if ((prot & PROT_WRITE) == 0) {
-                    // mprotect if write perms are not set
-                    if (scope_mprotect((void *)saddr, (size_t)16, PROT_WRITE | prot) == -1) {
-                        scopeLog(CFG_LOG_DEBUG, "doGotcha: mprotect failed");
+                    // allow for write permission it write permission are not set
+                    if (osMemPermAllow((void *)saddr, 16, prot, PROT_WRITE) == FALSE) {
+                        scopeLog(CFG_LOG_DEBUG, "doGotcha: osMemPermAllow add write protection flag failed");
                         return -1;
                     }
                 }
@@ -239,8 +239,8 @@ doGotcha(struct link_map *lm, got_list_t *hook, Elf64_Rela *rel, Elf64_Sym *sym,
 
             if ((prot & PROT_WRITE) == 0) {
                 // if we didn't mod above leave prot settings as is
-                if (scope_mprotect((void *)saddr, (size_t)16, prot) == -1) {
-                    scopeLog(CFG_LOG_DEBUG, "doGotcha: mprotect failed");
+                if (osMemPermRestore((void *)saddr, 16, prot) == FALSE) {
+                    scopeLog(CFG_LOG_DEBUG, "doGotcha: osMemPermRestore remove write memory protection flags failed");
                     return -1;
                 }
             }

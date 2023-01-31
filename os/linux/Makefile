@@ -8,6 +8,9 @@ SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tag
 LIBRARY_CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations -Werror=implicit-function-declaration -Werror=override-init -I contrib/ls-hpack $(if $(DEBUG),-DDEBUG) -DSCOPE_VER=\"$(SCOPE_VER)\"
 LOADER_CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations -Werror=implicit-function-declaration -Werror=override-init -Wno-format-security -Wno-format-truncation -I contrib/ls-hpack $(if $(DEBUG),-DDEBUG) -DSCOPE_VER=\"$(SCOPE_VER)\" 
 TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage -Wno-format-security -Wno-format-truncation -DSCOPE_VER=\"$(SCOPE_VER)\"
+ifdef FSAN
+TEST_CFLAGS+=-fsanitize=address
+endif
 YAML_DEFINES=-DYAML_VERSION_MAJOR="0" -DYAML_VERSION_MINOR="2" -DYAML_VERSION_PATCH="2" -DYAML_VERSION_STRING="\"0.2.2\""
 CJSON_DEFINES=-DENABLE_LOCALES
 YAML_SRC=$(wildcard contrib/libyaml/src/*.c)
@@ -22,6 +25,9 @@ TEST_AR=$(MUSL_AR) ${UNWIND_AR} $(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR} 
 #TEST_LIB=contrib/build/cmocka/src/libcmocka.dylib
 TEST_LIB=contrib/build/cmocka/src/libcmocka.so
 TEST_LD_FLAGS=-Lcontrib/build/cmocka/src -lcmocka -ldl -lresolv -lrt -lpthread
+ifdef FSAN
+TEST_LD_FLAGS+=-Wl,--wrap=scopelibc_malloc -Wl,--wrap=scopelibc_free -Wl,--wrap=scopelibc_calloc -Wl,--wrap=scopelibc_realloc
+endif
 LIBRARY_INCLUDES=-I./src
 LOADER_INCLUDES=-I./src/loader
 CMOCKA_INCLUDES=-I./contrib/cmocka/include -I contrib/ls-hpack

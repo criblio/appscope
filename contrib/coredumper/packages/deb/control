@@ -1,0 +1,25 @@
+Source: libcoredumper
+Priority: optional
+Maintainer: Google Inc. <opensource@google.com>
+Build-Depends: debhelper (>= 4.0.0), binutils
+Standards-Version: 3.6.1
+
+Package: libcoredumper-dev
+Section: libdevel
+Architecture: any
+Depends: libcoredumper1 (= ${Source-Version})
+Description: library for generating on-the-fly snapshot core files
+ Libcoredumper can be compiled into applications to create core dumps of
+ the running program, without having to terminate them. It supports both
+ single and multi-threaded core dumps, even if the kernel does not have
+ native support for multi-threaded core files.
+
+Package: libcoredumper1
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}
+Description: library for generating on-the-fly snapshot core files
+ Libcoredumper can be compiled into applications to create core dumps of
+ the running program, without having to terminate them. It supports both
+ single and multi-threaded core dumps, even if the kernel does not have
+ native support for multi-threaded core files.

@@ -277,6 +277,15 @@ jobs:
           key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-libunwind-${{ hashFiles('contrib/*', 'contrib/libunwind/**') }}
           upload-chunk-size: 1000000
 
+      # Cache the coredumper build. Use a key based on a hash of all the files
+      # used in the build.
+      - name: Setup coredumper Cache
+        uses: actions/cache@v3.2.3
+        with:
+          path: contrib/build/coredumper
+          key: ${{ runner.os }}-${{ steps.env.outputs.arch }}-coredumper-${{ hashFiles('contrib/*', 'contrib/coredumper/**') }}
+          upload-chunk-size: 1000000
+
       - name: Login to Dockerhub
         uses: docker/login-action@v2
         with:

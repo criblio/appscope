@@ -35,6 +35,7 @@ package main
 // -d, --lddetach PID           detach from the specified process ID
 // -c, --configure FILTER_PATH  configure scope environment with FILTER_PATH
 // -w, --unconfigure            unconfigure scope environment
+// -g, --getfile                get a file from a specified container PID
 // -s, --service SERVICE        setup specified service NAME
 // -v, --unservice              remove scope from all service configurations
 // -n  --namespace PID          perform service/configure operation on specified container PID
@@ -51,6 +52,7 @@ static struct option opts[] = {
     { "namespace",   required_argument, 0, 'n' },
     { "configure",   required_argument, 0, 'c' },
     { "unconfigure", no_argument,       0, 'w' },
+    { "getfile",     required_argument, 0, 'g' },
     { "service",     required_argument, 0, 's' },
     { "unservice",   no_argument,       0, 'v' },
     { "libbasedir",  required_argument, 0, 'l' },
@@ -91,6 +93,7 @@ __attribute__((constructor)) void cli_constructor() {
 	bool opt_namespace = false;
 	bool opt_configure = false;
 	bool opt_unconfigure = false;
+	bool opt_getfile = false;
 	bool opt_service = false;
 	bool opt_unservice = false;
 	bool opt_libbasedir = false;
@@ -102,6 +105,7 @@ __attribute__((constructor)) void cli_constructor() {
 	char *arg_ldattach;
 	char *arg_lddetach;
 	char *arg_configure;
+	char *arg_getfile;
 	char *arg_service;
 	char *arg_namespace;
 	char *arg_libbasedir;
@@ -141,7 +145,7 @@ __attribute__((constructor)) void cli_constructor() {
 
     for (;;) {
         index = 0;
-        int opt = getopt_long(arg_c, arg_v, "+:a:d:n:l:p:c:s:rxvwz", opts, &index);
+        int opt = getopt_long(arg_c, arg_v, "+:a:d:n:l:p:c:g:s:rxvwz", opts, &index);
         if (opt == -1) {
             break;
         }
@@ -164,6 +168,10 @@ __attribute__((constructor)) void cli_constructor() {
 			break;
 		case 'w':
 			opt_unconfigure = true;
+			break;
+		case 'g':
+			opt_getfile = true;
+			arg_getfile = optarg;
 			break;
 		case 's':
 			opt_service = true;
@@ -227,18 +235,18 @@ __attribute__((constructor)) void cli_constructor() {
         fprintf(stderr, "error: --configure/--unconfigure and --service/--unservice cannot be used together\n");
         exit(EXIT_FAILURE);
     }
-    if (opt_namespace && (!opt_configure && !opt_unconfigure && !opt_service && !opt_unservice)) {
-        fprintf(stderr, "error: --namespace option requires --configure/--unconfigure or --service/--unservice option\n");
+    if (opt_namespace && (!opt_configure && !opt_unconfigure && !opt_service && !opt_unservice && !opt_getfile)) {
+        fprintf(stderr, "error: --namespace option requires --configure/--unconfigure or --service/--unservice or --getfile option\n");
         exit(EXIT_FAILURE);
     }
 	if (opt_passthrough && (opt_ldattach || opt_lddetach || opt_namespace ||
-		opt_service || opt_unservice || opt_configure || opt_unconfigure)) {
-        fprintf(stderr, "error: --passthrough cannot be used with --ldattach/--lddetach or --namespace or --service/--unservice or --configure/--unconfigure\n");
+		opt_service || opt_unservice || opt_configure || opt_unconfigure || opt_getfile)) {
+        fprintf(stderr, "error: --passthrough cannot be used with --ldattach/--lddetach or --namespace or --service/--unservice or --configure/--unconfigure or --getfile\n");
         exit(EXIT_FAILURE);
 	}
 
 	// Handle potential permissions issues
-	if (eUid && (opt_configure || opt_unconfigure || opt_service || opt_unservice)) {
+	if (eUid && (opt_configure || opt_unconfigure || opt_service || opt_unservice || opt_getfile)) {
         fprintf(stderr, "error: command requires root\n");
         exit(EXIT_FAILURE);
 	}
@@ -279,6 +287,7 @@ __attribute__((constructor)) void cli_constructor() {
 	if (opt_lddetach) exit(cmdAttach(false, opt_lddetach, pid, nspid));
 	if (opt_configure) exit(cmdConfigure(arg_configure, nspid));
 	if (opt_unconfigure) exit(cmdUnconfigure(nspid));
+	if (opt_getfile) exit(cmdGetFile(arg_getfile, nspid));
 	if (opt_service) exit(cmdService(arg_service, nspid));
 	if (opt_unservice) exit(cmdUnservice(nspid));
 	if (opt_patch) exit(patchLibrary(arg_patch) == PATCH_FAILED);

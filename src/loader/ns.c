@@ -98,6 +98,23 @@ setNamespace(pid_t pid, const char *ns) {
     return TRUE;
 }
 
+static int
+getSelfNamespaceFd(const char *ns) {
+    char nsPath[PATH_MAX] = {0};
+    int nsFd = -1;
+    if (snprintf(nsPath, sizeof(nsPath), "/proc/self/ns/%s", ns) < 0) {
+        perror("setNamespace: snprintf failed");
+        return FALSE;
+    }
+
+    if ((nsFd = open(nsPath, O_RDONLY)) == -1) {
+        perror("setNamespace: open failed");
+        return FALSE;
+    }
+
+    return nsFd;
+}
+
 /*
  * Joins the namespaces:
  * - child PID (optionally)
@@ -269,6 +286,83 @@ nsUnconfigure(pid_t pid) {
     }
 
     return EXIT_SUCCESS;
+}
+
+int
+nsGetFile(char *path, pid_t pid) {
+    pid_t ns_fd = -1;
+    int read_fd = -1;
+    int write_fd = -1;
+    char *buf = NULL;
+    int bytes;
+
+    // Save host ns magic link
+    ns_fd = getSelfNamespaceFd("mnt");
+    if (ns_fd == -1) {
+        fprintf(stderr, "error: failed to get host magic link\n");
+        goto err;
+    }
+
+    // Change to namespace
+    if (setNamespace(pid, "mnt") == FALSE) {
+        fprintf(stderr, "error: setNamespace mnt failed\n");
+        goto err;
+    }
+
+    // Read the file into memory
+    struct stat st;
+    if (stat(path, &st)) {
+        fprintf(stderr, "error: file not found\n");
+        goto err;
+    }
+
+    buf = (char *)malloc(st.st_size);
+    if (!buf) {
+        perror("malloc");
+        goto err;
+    }
+
+    read_fd = open(path, O_RDONLY);
+    if (read_fd == -1) {
+        perror("open");
+        goto err;
+    }
+
+    if ((bytes = read(read_fd, buf, 100)) != st.st_size) {
+        perror("read");
+        goto err;
+    }
+
+    // Return to host ns
+    if (setns(ns_fd, 0) != 0) {
+        perror("setns");
+        close(ns_fd);
+        goto err;
+    }
+
+    // Write the file to disk
+    write_fd = open(path, O_RDWR | O_CREAT);
+    if (write_fd == -1) {
+        perror("open");
+        goto err;
+    }
+
+    if (write(write_fd, buf, bytes) != st.st_size) {
+        perror("write");
+        goto err;
+    }
+
+    free(buf);
+    close(read_fd);
+    close(write_fd);
+    close(ns_fd);
+    return EXIT_SUCCESS;
+err:
+    if (buf) free(buf);
+    if (read_fd > -1) close(read_fd);
+    if (write_fd > -1) close(write_fd);
+    if (ns_fd > -1) close(ns_fd);
+    return EXIT_FAILURE;
 }
 
  /*

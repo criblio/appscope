@@ -389,6 +389,25 @@ cmdUnconfigure(pid_t nspid)
     return status;
 }
 
+int
+cmdGetFile(char *path, pid_t nspid)
+{
+    pid_t nsContainerPid = 0;
+
+    if (nspid == -1) {
+        fprintf(stderr, "error: getfile requires a namespace pid\n");
+        return EXIT_FAILURE;
+    }
+
+    if ((nsInfoGetPidNs(nspid, &nsContainerPid) == FALSE) ||
+        (nsInfoIsPidInSameMntNs(nspid) == TRUE)) {
+        fprintf(stderr, "error: invalid namespace\n");
+        return EXIT_FAILURE;
+    }
+
+    return nsGetFile(path, nspid);
+}
+
 // Handle attach and detach commands
 int
 cmdAttach(bool ldattach, bool lddetach, pid_t pid, pid_t nspid)

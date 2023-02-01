@@ -26,7 +26,7 @@ AC_SUBST(LIBTOOL_DEPS)
 
 AC_CHECK_HEADERS([elf.h errno.h fcntl.h linux/unistd.h pthread.h signal.h     \
                   stdlib.h string.h sys/prctl.h sys/ptrace.h sys/resource.h   \
-                  sys/socket.h sys/stat.h sys/sysctl.h sys/time.h sys/types.h \
+                  sys/socket.h sys/stat.h sys/time.h sys/types.h \
                   sys/uio.h sys/wait.h unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics

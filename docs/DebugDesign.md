@@ -69,9 +69,9 @@ Despite the way we've talked about snapshots above, we want to collect more than
 | AppScope configuration | lib |
 | Environment Variables | cli |
 |  |  |
-| Signal number | cli |
-| Signal handler | cli |
-| Error number | cli |
+| Signal number | cli (eBPF) |
+| Signal handler | cli (eBPF) |
+| Error number | cli (eBPF) |
 |  |  |
 | Machine Arch | cli |
 | Distro, Distro version | cli |
@@ -104,7 +104,9 @@ Despite the way we've talked about snapshots above, we want to collect more than
 
 ### Some simplifying assumptions for an MVP Implementation
 
-Ideally our implementation would allow the AppScope library and AppScope cli to operate independently so that users are not required to run both. However, whenever containers are involved, the cli is required to be able to retrieve and persist the snapshot. And, as was discussed above, the library must be involved to stop the world so that coredumps or stack traces can be retrieved. Since it appears that we need both, we're proposing to not to provide for independent operation of the AppScope library and AppScope cli.
+Ideally our implementation would allow the AppScope library and AppScope cli to operate independently so that users are not required to run both. From a cli perspective, much of its snapshot information does not require that a process has crashed. Also from a cli perspective, eBPF may be able to expose all kinds of useful information independent of whether a user is trying to debug a crash. From a library perspective, when containers are not involved a user could access library output without a cli.
+
+However, whenever containers are involved, the cli is required to be able to retrieve and persist the snapshot. And, as was discussed above, the library must be involved to stop the world so that coredumps or stack traces can be retrieved. Since it appears that we need both, we're proposing to not to provide for independent operation of the AppScope library and AppScope cli.
 
 Assuming that we can accept that both the cli and library will be required and that we want to make the most use of work done during technical feasibility, the MVP solution may look like this. This assumes the debug feature has been enabled.
   - User runs a cli command to start a daemon on the host that uses eBPF to detect signals

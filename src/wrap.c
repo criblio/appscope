@@ -610,9 +610,8 @@ remoteConfig()
                     break;
                 case REQ_SET_CFG:
                     if (req->cfg) {
-                        // Apply the config
-                        doConfig(req->cfg);
-                        g_staticfg = req->cfg;
+                        // Replace the config
+                        doAndReplaceConfig(req->cfg);
                     } else {
                         DBG(NULL);
                     }
@@ -759,6 +758,7 @@ dynConfig(void)
 
     // Apply the config
     doConfig(g_staticfg);
+    g_cfg.staticfg = g_staticfg;
 
     return 0;
 }

@@ -91,6 +91,8 @@ doAndReplaceConfig(void *data) {
     }
     g_staticfg = cfg;
     g_cfg.staticfg = g_staticfg;
+    scope_free(g_cfg.cfgStr);
+    g_cfg.cfgStr = jsonStringFromCfg(g_staticfg);
 }
 
 // When used with dl_iterate_phdr(), this has a similar result to
@@ -759,6 +761,8 @@ dynConfig(void)
     // Apply the config
     doConfig(g_staticfg);
     g_cfg.staticfg = g_staticfg;
+    scope_free(g_cfg.cfgStr);
+    g_cfg.cfgStr = jsonStringFromCfg(g_staticfg);
 
     return 0;
 }
@@ -1789,6 +1793,7 @@ init(void)
 
     g_cfg.funcs_attached = scopedFlag;
     g_cfg.staticfg = g_staticfg;
+    g_cfg.cfgStr = jsonStringFromCfg(g_staticfg);
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
     // replaces atexit(handleExit);  Allows events to be reported before

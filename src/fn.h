@@ -183,6 +183,7 @@ typedef struct {
     int (*prctl)(int, unsigned long, unsigned long, unsigned long, unsigned long);
     sighandler_t (*signal)(int, sighandler_t);
     int (*sigaction)(int, const struct sigaction *, struct sigaction *);
+    int (*raise)(int);
     void (*_exit)(int);
     int (*SSL_read)(SSL *, void *, int);
     int (*SSL_write)(SSL *, const void *, int);

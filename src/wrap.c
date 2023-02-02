@@ -38,7 +38,7 @@
 #include "runtimecfg.h"
 #include "javaagent.h"
 #include "ipc.h"
-#include "signalhandler.h"
+#include "snapshot.h"
 #include "scopestdlib.h"
 #include "../contrib/libmusl/musl.h"
 
@@ -1099,36 +1099,21 @@ logOurConnectionStatus(transport_status_t status, const char *name)
 }
 
 /*
-* List of signals used by scope error handler
+* List of signals used by snapshot error handler
 */
 static int
-scopeErrorsSignals[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
+snapshotErrorsSignals[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
 
-static bool scopeSignalHandlerEnable = FALSE;
-
-typedef void (*scopeSignalHandler)(int, siginfo_t *, void *);
+static bool snapshotEnabled = FALSE;
 
 /*
-* Get Scope Signal Handler
+* Determine if the snapshot feature is enabled
 */
-static scopeSignalHandler
-getScopeSignalHandler(void) {
-    char *estr = getenv("SCOPE_ERROR_SIGNAL_HANDLER");
-    if (!estr) {
-        return NULL;
-    }
-    if (scope_strncmp(estr, "log", scope_strlen(estr)) == 0) {
-        scopeSignalHandlerEnable = TRUE;
-        return scopeSignalHandlerBacktrace;
-    } else if (scope_strncmp(estr, "coredump", scope_strlen(estr)) == 0) {
-        scopeSignalHandlerEnable = TRUE;
-        return scopeSignalHandlerCoreDump;
-    } else if (scope_strncmp(estr, "full", scope_strlen(estr)) == 0) {
-        scopeSignalHandlerEnable = TRUE;
-        return scopeSignalHandlerFull;
-    }
-    // nothing matches
-    return NULL;
+static bool
+isSnapshotEnabled(void) {
+    // TODO: Here we must perform a decision based on configuration setting
+    snapshotEnabled = TRUE;
+    return snapshotEnabled;
 }
 
 /*
@@ -1136,13 +1121,13 @@ getScopeSignalHandler(void) {
 */
 static void
 initSigErrorHandler(void) {
-    scopeSignalHandler handler = getScopeSignalHandler();
-    if ((handler != NULL) && (g_fn.sigaction)) {
+    isSnapshotEnabled();
+    if (snapshotEnabled && (g_fn.sigaction)) {
         struct sigaction act = { 0 };
-        act.sa_handler = (void (*))handler;
+        act.sa_handler = (void (*))snapshotSignalHandler;
         act.sa_flags = SA_RESTART | SA_SIGINFO;
-        for (int i = 0; i < ARRAY_SIZE(scopeErrorsSignals); ++i) {
-            g_fn.sigaction(scopeErrorsSignals[i], &act, NULL);
+        for (int i = 0; i < ARRAY_SIZE(snapshotErrorsSignals); ++i) {
+            g_fn.sigaction(snapshotErrorsSignals[i], &act, NULL);
         }
     }
 }
@@ -1160,9 +1145,9 @@ periodic(void *arg)
 
     sigset_t mask;
     scope_sigfillset(&mask);
-    if (scopeSignalHandlerEnable == TRUE) {
-        for (int i = 0; i < ARRAY_SIZE(scopeErrorsSignals); ++i) {
-            scope_sigdelset(&mask, scopeErrorsSignals[i]);
+    if (snapshotEnabled == TRUE) {
+        for (int i = 0; i < ARRAY_SIZE(snapshotErrorsSignals); ++i) {
+            scope_sigdelset(&mask, snapshotErrorsSignals[i]);
         }
     }
 
@@ -1719,7 +1704,6 @@ init(void)
     initEnv(&attachedFlag);
 
     initState();
-    initSigErrorHandler();
 
     g_nsslist = lstCreate(freeNssEntry);
 
@@ -1786,6 +1770,10 @@ init(void)
     cfgProcessEnvironment(cfg);
 
     doConfig(cfg);
+
+    // Initialize Signal Handler right after processing configuration
+    initSigErrorHandler(); 
+
     g_staticfg = cfg;
     if (path) scope_free(path);
     if (!g_dbg) dbgInit();

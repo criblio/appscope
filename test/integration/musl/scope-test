@@ -161,6 +161,7 @@ starttest fault_test_read_only_mem
 
 cd /opt/fault_test/
 
+# TODO use the configuration for snapshot
 SCOPE_ERROR_SIGNAL_HANDLER=log scope -z -- ./fault_test 0
 
 if [ "x86_64" = "$(uname -m)" ]; then
@@ -180,6 +181,7 @@ starttest fault_test_not_mapped_mem
 
 cd /opt/fault_test/
 
+# TODO use the configuration for snapshot
 SCOPE_ERROR_SIGNAL_HANDLER=log scope -z -- ./fault_test 1
 
 if [ "x86_64" = "$(uname -m)" ]; then
@@ -199,6 +201,7 @@ starttest fault_test_bus_error
 
 cd /opt/fault_test/
 
+# TODO use the configuration for snapshot
 SCOPE_ERROR_SIGNAL_HANDLER=log scope -z -- ./fault_test 2
 
 if [ "x86_64" = "$(uname -m)" ]; then
@@ -218,6 +221,7 @@ starttest illegal_op_error
 
 cd /opt/fault_test/
 
+# TODO use the configuration for snapshot
 SCOPE_ERROR_SIGNAL_HANDLER=log scope -z ./fault_test 4
 
 if [ "x86_64" = "$(uname -m)" ]; then

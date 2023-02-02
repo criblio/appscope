@@ -15,6 +15,15 @@
 #define MAC_ADDR_LEN 17
 #define ZERO_MACHINE_ID "00000000000000000000000000000000"
 
+// TODO verify if we need to recognize all theste states here
+typedef enum {
+    INT_MKDIR_STATUS_CREATED         = 0,    // Path was created
+    INT_MKDIR_STATUS_EXISTS          = 1,    // Path already points to existing directory
+    INT_MKDIR_STATUS_ERR_PERM_ISSUE  = 2,    // Error: Path already points to existing directory but user can not create file there
+    INT_MKDIR_STATUS_ERR_NOT_ABS_DIR = 3,    // Error: Path does not points to a directory
+    INT_MKDIR_STATUS_ERR_OTHER       = 4,    // Error: Other
+} internal_mkdir_status_t;
+
 static int createMachineID(char *string);
 static int getMacAddr(char *string);
 
@@ -363,7 +372,7 @@ getMacAddr(char *string)
 }
 
 /*
- * Convert unsigned long to a non-null terminated string.
+ * Convert unsigned long to a non-null terminated string (signal safe API)
  */
 void
 sigSafeUtoa(unsigned long val, char *buf, int base, int *len) {
@@ -393,3 +402,103 @@ sigSafeUtoa(unsigned long val, char *buf, int base, int *len) {
     return;
 }
 
+/*
+ * Verify if following absolute path points to directory (signal safe API)
+ */
+static internal_mkdir_status_t
+sigSafeCheckIfDirExists(const char *absDirPath, uid_t uid, gid_t gid) {
+    struct stat st = {0};
+    if (!scope_stat(absDirPath, &st)) {
+        if (S_ISDIR(st.st_mode)) {      
+            // Check for file creation abilities in directory
+            if (((st.st_uid == uid) && (st.st_mode & S_IWUSR)) ||
+                ((st.st_gid == gid) && (st.st_mode & S_IWGRP)) ||
+                (st.st_mode & S_IWOTH)) {
+                return INT_MKDIR_STATUS_EXISTS;
+            }
+            return INT_MKDIR_STATUS_ERR_PERM_ISSUE;
+        }
+        return INT_MKDIR_STATUS_ERR_NOT_ABS_DIR;
+    }
+    return INT_MKDIR_STATUS_ERR_OTHER;
+}
+
+/*
+ * Create directory recursive (signal safe API)
+ */
+bool
+sigSafeMkdirRecursive(const char *dirPath) {
+    char tempPath[PATH_MAX] = {0};
+    int mkdirRes = -1;
+    /* Operate only on absolute path */
+    if (dirPath == NULL || *dirPath != '/') {
+        return FALSE;
+    }
+
+    uid_t euid = geteuid();
+    gid_t egid = getegid();
+
+    internal_mkdir_status_t res = sigSafeCheckIfDirExists(dirPath, euid, egid);
+    /* exit if path exists */
+    if (res != INT_MKDIR_STATUS_ERR_OTHER) {
+        return TRUE;
+    }
+    scope_strcpy(tempPath, dirPath);
+
+    /* traverse the full path */
+    for (char *p = tempPath + 1; *p; p++) {
+        if (*p == '/') {
+            /* Temporarily truncate */
+            *p = '\0';
+            scope_errno = 0;
+
+            struct stat st = {0};
+            if (scope_stat(tempPath, &st)) {
+                mkdirRes = scope_mkdir(tempPath, 0755);
+                if (!mkdirRes) {
+                    /* We ensure that we setup correct mode regarding umask settings */
+                    if (scope_chmod(tempPath, 0755)) {
+                        return FALSE;
+                    }
+                } else {
+                    /* scope_mkdir fails */
+                   return FALSE;
+                }
+            }
+
+            *p = '/';
+        }
+    }
+    struct stat st = {0};
+    if (scope_stat(tempPath, &st)) {
+        /* if last element was not created in the loop above */
+        mkdirRes = scope_mkdir(tempPath, 0755);
+        if (mkdirRes) {
+            return FALSE;
+        }
+    }
+
+    /* We ensure that we setup correct mode regarding umask settings */
+    return (scope_chmod(tempPath, 0755) == 0) ? TRUE : FALSE;
+}
+
+/*
+ * Writes to specified file descriptor (signal safe API)
+ */
+ssize_t 
+sigSafeWrite(int fd, const void *buf, size_t count) {
+    return scope_write(fd, buf ,count);
+}
+
+
+/*
+ * Converts the specific value using base for conversion and
+ * drites to specified file descriptor (signal safe API)
+ */
+ssize_t 
+sigSafeWriteNumber(int fd, long val, int base) {
+    char buf[32] = {0};
+    int msgLen = 0;
+    sigSafeUtoa(val, buf, base, &msgLen);
+    return scope_write(fd, buf ,msgLen);
+}

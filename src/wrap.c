@@ -1110,8 +1110,8 @@ snapshotErrorsSignals[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
 */
 static void
 enableSnapshot(config_t *cfg) {
-    snapshotSetCoredump(cfgDebugCoredumpEnable(cfg));
-    snapshotSetStacktrace(cfgDebugStacktraceEnable(cfg));
+    snapshotSetCoredump(cfgSnapshotCoredumpEnable(cfg));
+    snapshotSetBacktrace(cfgSnapshotBacktraceEnable(cfg));
     if (!snapshotIsEnabled()) {
         return;
     }

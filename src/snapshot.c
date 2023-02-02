@@ -54,7 +54,7 @@ struct snapshotAction {
     actionExecute execute;
 };
 
-// Curent snapshotOpt
+// Current snapshotOpt
 static unsigned snapshotOpt = 0;
 
 /*
@@ -62,7 +62,7 @@ static unsigned snapshotOpt = 0;
  * Do not change the order
  */
 #define SNP_OPT_COREDUMP     0
-#define SNP_OPT_STACKTRACE   1
+#define SNP_OPT_BACKTRACE    1
 
 /*
  * Always enable specific snapshot action
@@ -125,7 +125,7 @@ snapConfig(const char *dirPath, siginfo_t *unused) {
  */
 static bool
 snapActionBacktraceEnabled(void) {
-    return SCOPE_BIT_CHECK(snapshotOpt, SNP_OPT_STACKTRACE);
+    return SCOPE_BIT_CHECK(snapshotOpt, SNP_OPT_BACKTRACE);
 }
 
 /*
@@ -246,7 +246,7 @@ snapBacktrace(const char *dirPath, siginfo_t *info) {
         }
     }
 
-    // Analyze and print stacktrace logic 
+    // Analyze and print backtrace logic 
     unw_cursor_t cursor;
     unw_context_t uc;
     unw_word_t ip;
@@ -316,7 +316,6 @@ struct snapshotAction allSnapshotActions[] = {
     {.enabled = snapActionCoredumpEnabled,  .execute = snapCoreDump},
 };
 
-
 /*
  * Enable/Disable core dump snapshot option
  */
@@ -326,11 +325,11 @@ snapshotSetCoredump(bool val) {
 }
 
 /*
- * Enable/Disable stacktrace snapshot option
+ * Enable/Disable backtrace snapshot option
  */
 void
-snapshotSetStacktrace(bool val) {
-    SCOPE_BIT_SET_VAR(snapshotOpt, SNP_OPT_STACKTRACE, val);
+snapshotSetBacktrace(bool val) {
+    SCOPE_BIT_SET_VAR(snapshotOpt, SNP_OPT_BACKTRACE, val);
 }
 
 /*

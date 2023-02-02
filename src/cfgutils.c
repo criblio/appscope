@@ -52,9 +52,9 @@
 #define SUMMARYPERIOD_NODE       "summaryperiod"
 #define COMMANDDIR_NODE          "commanddir"
 #define CFGEVENT_NODE            "configevent"
-#define DEBUG_NODE               "debug"
+#define SNAPSHOT_NODE            "snapshot"
 #define COREDUMP_NODE                "coredump"
-#define STACKTRACE_NODE              "stacktrace"
+#define BACKTRACE_NODE               "backtrace"
 
 #define EVENT_NODE           "event"
 #define TRANSPORT_NODE           "transport"
@@ -188,8 +188,8 @@ void cfgPayDirSetFromStr(config_t*, const char*);
 void cfgAuthTokenSetFromStr(config_t*, const char*);
 void cfgEvtFormatHeaderSetFromStr(config_t *, const char *);
 void cfgCriblEnableSetFromStr(config_t *, const char *);
-void cfgDebugCoredumpEnableSetFomStr(config_t *, const char *);
-void cfgDebugStacktraceEnableSetFomStr(config_t *, const char *);
+void cfgSnapShotCoredumpEnableSetFomStr(config_t *, const char *);
+void cfgSnapshotBacktraceEnableSetFomStr(config_t *, const char *);
 static void cfgSetFromFile(config_t *, const char *);
 
 static void processRoot(config_t *, yaml_document_t *, yaml_node_t *);
@@ -631,10 +631,10 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgAuthTokenSetFromStr(cfg, value);
     } else if (startsWith(env_name, "SCOPE_TAG_")) {
         processCustomTag(cfg, env_line, value);
-    } else if (startsWith(env_name, "SCOPE_DEBUG_COREDUMP")) {
-        cfgDebugCoredumpEnableSetFomStr(cfg, value);
-    }  else if (startsWith(env_name, "SCOPE_DEBUG_STACKTRACE")) {
-        cfgDebugStacktraceEnableSetFomStr(cfg, value);
+    } else if (startsWith(env_name, "SCOPE_SNAPSHOT_COREDUMP")) {
+        cfgSnapShotCoredumpEnableSetFomStr(cfg, value);
+    }  else if (startsWith(env_name, "SCOPE_SNAPSHOT_BACKTRACE")) {
+        cfgSnapshotBacktraceEnableSetFomStr(cfg, value);
     }
 
 cleanup:
@@ -963,17 +963,17 @@ cfgAuthTokenSetFromStr(config_t *cfg, const char *value)
 }
 
 void
-cfgDebugCoredumpEnableSetFomStr(config_t *cfg, const char *value)
+cfgSnapShotCoredumpEnableSetFomStr(config_t *cfg, const char *value)
 {
     if (!cfg || !value) return;
-    cfgDebugCoredumpSet(cfg, strToVal(boolMap, value));
+    cfgSnapshotCoredumpSet(cfg, strToVal(boolMap, value));
 }
 
 void
-cfgDebugStacktraceEnableSetFomStr(config_t *cfg, const char *value)
+cfgSnapshotBacktraceEnableSetFomStr(config_t *cfg, const char *value)
 {
     if (!cfg || !value) return;
-    cfgDebugStacktraceSet(cfg, strToVal(boolMap, value));
+    cfgSnapshotBacktraceSet(cfg, strToVal(boolMap, value));
 }
 
 #ifndef NO_YAML
@@ -1180,26 +1180,26 @@ static void
 processCoredump(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     char* value = stringVal(node);
-    cfgDebugCoredumpEnableSetFomStr(config, value);
+    cfgSnapShotCoredumpEnableSetFomStr(config, value);
     if (value) scope_free(value);
 }
 
 static void
-processStacktrace(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+processBacktrace(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     char* value = stringVal(node);
-    cfgDebugStacktraceEnableSetFomStr(config, value);
+    cfgSnapshotBacktraceEnableSetFomStr(config, value);
     if (value) scope_free(value);
 }
 
 static void
-processDebug(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+processSnapshot(config_t *config, yaml_document_t *doc, yaml_node_t *node)
 {
     if (node->type != YAML_MAPPING_NODE) return;
     
     parse_table_t t[] = {
         {YAML_SCALAR_NODE,    COREDUMP_NODE,        processCoredump},
-        {YAML_SCALAR_NODE,    STACKTRACE_NODE,      processStacktrace},
+        {YAML_SCALAR_NODE,    BACKTRACE_NODE,       processBacktrace},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1602,7 +1602,7 @@ processLibscope(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    SUMMARYPERIOD_NODE,   processSummaryPeriod},
         {YAML_SCALAR_NODE,    COMMANDDIR_NODE,      processCommandDir},
         {YAML_SCALAR_NODE,    CFGEVENT_NODE,        processConfigEvent},
-        {YAML_MAPPING_NODE,   DEBUG_NODE,           processDebug},
+        {YAML_MAPPING_NODE,   SNAPSHOT_NODE,        processSnapshot},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -2308,18 +2308,18 @@ err:
 }
 
 static cJSON*
-createDebugJson(config_t *cfg)
+createSnapshotJson(config_t *cfg)
 {
     cJSON* root = NULL;
 
     if (!(root = cJSON_CreateObject())) goto err;
 
     if (!cJSON_AddStringToObjLN(root, COREDUMP_NODE,
-         valToStr(boolMap, cfgDebugCoredumpEnable(cfg)))) goto err;
+         valToStr(boolMap, cfgSnapshotCoredumpEnable(cfg)))) goto err;
 
     if (!(root = cJSON_CreateObject())) goto err;
-    if (!cJSON_AddStringToObjLN(root, STACKTRACE_NODE,
-         valToStr(boolMap, cfgDebugStacktraceEnable(cfg)))) goto err;
+    if (!cJSON_AddStringToObjLN(root, BACKTRACE_NODE,
+         valToStr(boolMap, cfgSnapshotBacktraceEnable(cfg)))) goto err;
 
     return root;
 err:
@@ -2566,15 +2566,15 @@ createLibscopeJson(config_t* cfg)
 {
     cJSON *root = NULL;
     cJSON *log;
-    cJSON *debug;
+    cJSON *snapshot;
 
     if (!(root = cJSON_CreateObject())) goto err;
 
     if (!(log = createLogJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(root, LOG_NODE, log);
 
-    if (!(debug = createDebugJson(cfg))) goto err;
-    cJSON_AddItemToObjectCS(root, DEBUG_NODE, debug);
+    if (!(snapshot = createSnapshotJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(root, SNAPSHOT_NODE, snapshot);
 
     if (!cJSON_AddStringToObjLN(root, CFGEVENT_NODE,
                  valToStr(boolMap, cfgSendProcessStartMsg(cfg)))) goto err;

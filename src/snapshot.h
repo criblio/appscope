@@ -16,7 +16,7 @@
 
 void snapshotSignalHandler(int, siginfo_t *, void *);
 void snapshotSetCoredump(bool);
-void snapshotSetStacktrace(bool);
+void snapshotSetBacktrace(bool);
 bool snapshotIsEnabled(void);
 
 #endif // __SNAPSHOT_H__

@@ -75,8 +75,8 @@ struct _config_t
 
     struct {
         char coredump;      // TODO: this can be probably stored as a single var - see mtc categories
-        char stacktrace; 
-    } debug;
+        char backtrace; 
+    } snapshot;
 
     // CFG_MTC, CFG_CTL, or CFG_LOG
     transport_struct_t transport[CFG_WHICH_MAX]; 
@@ -242,8 +242,8 @@ cfgCreateDefault()
     c->logstream.enable = DEFAULT_LOGSTREAM_ENABLE;
     c->logstream.cloud = DEFAULT_LOGSTREAM_CLOUD;
 
-    c->debug.coredump = DEFAULT_COREDUMP_ENABLE;
-    c->debug.stacktrace = DEFAULT_STACKTRACE_ENABLE;
+    c->snapshot.coredump = DEFAULT_COREDUMP_ENABLE;
+    c->snapshot.backtrace = DEFAULT_BACKTRACE_ENABLE;
 
     return c;
 }
@@ -1048,23 +1048,23 @@ cfgAuthTokenSet(config_t * cfg, const char * authtoken)
 }
 
 unsigned
-cfgDebugCoredumpEnable(config_t *cfg) {
-    return (cfg) ? cfg->debug.coredump : DEFAULT_COREDUMP_ENABLE;
+cfgSnapshotCoredumpEnable(config_t *cfg) {
+    return (cfg) ? cfg->snapshot.coredump : DEFAULT_COREDUMP_ENABLE;
 }
 
 unsigned
-cfgDebugStacktraceEnable(config_t *cfg) {
-    return (cfg) ? cfg->debug.stacktrace : DEFAULT_STACKTRACE_ENABLE;
+cfgSnapshotBacktraceEnable(config_t *cfg) {
+    return (cfg) ? cfg->snapshot.backtrace : DEFAULT_BACKTRACE_ENABLE;
 }
 
 void
-cfgDebugCoredumpSet(config_t *cfg, unsigned val) {
+cfgSnapshotCoredumpSet(config_t *cfg, unsigned val) {
     if (!cfg || val > 1) return;
-    cfg->debug.coredump = val;
+    cfg->snapshot.coredump = val;
 }
 
 void
-cfgDebugStacktraceSet(config_t *cfg, unsigned val) {
+cfgSnapshotBacktraceSet(config_t *cfg, unsigned val) {
     if (!cfg || val > 1) return;
-    cfg->debug.stacktrace = val;
+    cfg->snapshot.backtrace = val;
 }

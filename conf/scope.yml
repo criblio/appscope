@@ -731,25 +731,25 @@ libscope:
       #
       buffer: line
 
-  # debug section describes the snapshot section
+  # snapshot section describes the crash analysis section
   #
-  debug:
+  snapshot:
 
     # Enable generating coredump
     #   Type:     boolean
     #   Values:   true, false
     #   Default:  false
-    #   Override: $SCOPE_DEBUG_COREDUMP
+    #   Override: $SCOPE_SNAPSHOT_COREDUMP
     #
     coredump: false
 
-    # Enable generating stacktrace
+    # Enable generating backtrace
     #   Type:     boolean
     #   Values:   true, false
     #   Default:  false
-    #   Override: $SCOPE_DEBUG_STACKTRACE
+    #   Override: $SCOPE_SNAPSHOT_BACKTRACE
     #
-    stacktrace: false
+    backtrace: false
 
 # Settings for the `cribl` backend
 #

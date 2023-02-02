@@ -179,7 +179,7 @@ typedef struct
 #define DEFAULT_LOGSTREAM_LOGMSG "The following settings have been overridden by a LogStream connection: event, metric and payload transport, "
 
 #define DEFAULT_COREDUMP_ENABLE FALSE
-#define DEFAULT_STACKTRACE_ENABLE FALSE
+#define DEFAULT_BACKTRACE_ENABLE FALSE
 
 /*
  * This calculation is not what we need in the long run.

@@ -37,7 +37,7 @@ snapshotSigSegvTest(void **state)
         siginfo_t info = {.si_signo = SIGSEGV, .si_code = SEGV_MAPERR};
         signal(SIGSEGV, SIG_IGN);
         snapshotSetCoredump(TRUE);
-        snapshotSetStacktrace(TRUE);
+        snapshotSetBacktrace(TRUE);
         snapshotSignalHandler(-1, &info, NULL);
         exit(EXIT_SUCCESS);
     } else {

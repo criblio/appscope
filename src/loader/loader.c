@@ -389,10 +389,22 @@ cmdUnconfigure(pid_t nspid)
     return status;
 }
 
+// Handle getfile command
 int
-cmdGetFile(char *path, pid_t nspid)
+cmdGetFile(char *paths, pid_t nspid)
 {
+    char *src_path;
+    char *dest_path;
     pid_t nsContainerPid = 0;
+
+    if ((src_path = strtok(paths, ",")) == NULL) {
+        fprintf(stderr, "error: no source file path\n");
+        return EXIT_FAILURE;
+    }
+    if ((dest_path = strtok(NULL, ",")) == NULL) {
+        fprintf(stderr, "error: no destination file path\n");
+        return EXIT_FAILURE;
+    }
 
     if (nspid == -1) {
         fprintf(stderr, "error: getfile requires a namespace pid\n");
@@ -405,7 +417,7 @@ cmdGetFile(char *path, pid_t nspid)
         return EXIT_FAILURE;
     }
 
-    return nsGetFile(path, nspid);
+    return nsGetFile(src_path, dest_path, nspid);
 }
 
 // Handle attach and detach commands

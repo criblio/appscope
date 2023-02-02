@@ -98,18 +98,21 @@ setNamespace(pid_t pid, const char *ns) {
     return TRUE;
 }
 
+/*
+ * Get the magic link for the namespace you are currently in
+ */
 static int
-getSelfNamespaceFd(const char *ns) {
+getSelfNamespace(const char *ns) {
     char nsPath[PATH_MAX] = {0};
     int nsFd = -1;
     if (snprintf(nsPath, sizeof(nsPath), "/proc/self/ns/%s", ns) < 0) {
-        perror("setNamespace: snprintf failed");
-        return FALSE;
+        perror("getSelfNamespace: snprintf failed");
+        return nsFd;
     }
 
     if ((nsFd = open(nsPath, O_RDONLY)) == -1) {
-        perror("setNamespace: open failed");
-        return FALSE;
+        perror("getSelfNamespace: open failed");
+        return nsFd;
     }
 
     return nsFd;
@@ -288,16 +291,20 @@ nsUnconfigure(pid_t pid) {
     return EXIT_SUCCESS;
 }
 
+/*
+ * Get a file from src_path from a child mount namespace
+ * and write it to a file at dest_path in the host namespace
+ */
 int
-nsGetFile(char *path, pid_t pid) {
-    pid_t ns_fd = -1;
+nsGetFile(char *src_path, char *dest_path, pid_t pid) {
+    int ns_fd = -1;
     int read_fd = -1;
     int write_fd = -1;
     char *buf = NULL;
     int bytes;
 
     // Save host ns magic link
-    ns_fd = getSelfNamespaceFd("mnt");
+    ns_fd = getSelfNamespace("mnt");
     if (ns_fd == -1) {
         fprintf(stderr, "error: failed to get host magic link\n");
         goto err;
@@ -311,8 +318,8 @@ nsGetFile(char *path, pid_t pid) {
 
     // Read the file into memory
     struct stat st;
-    if (stat(path, &st)) {
-        fprintf(stderr, "error: file not found\n");
+    if (stat(src_path, &st)) {
+        fprintf(stderr, "error: src file not found\n");
         goto err;
     }
 
@@ -322,13 +329,13 @@ nsGetFile(char *path, pid_t pid) {
         goto err;
     }
 
-    read_fd = open(path, O_RDONLY);
+    read_fd = open(src_path, O_RDONLY);
     if (read_fd == -1) {
         perror("open");
         goto err;
     }
 
-    if ((bytes = read(read_fd, buf, 100)) != st.st_size) {
+    if ((bytes = read(read_fd, buf, st.st_size)) != st.st_size) {
         perror("read");
         goto err;
     }
@@ -336,12 +343,11 @@ nsGetFile(char *path, pid_t pid) {
     // Return to host ns
     if (setns(ns_fd, 0) != 0) {
         perror("setns");
-        close(ns_fd);
         goto err;
     }
 
     // Write the file to disk
-    write_fd = open(path, O_RDWR | O_CREAT);
+    write_fd = open(dest_path, O_RDWR | O_CREAT);
     if (write_fd == -1) {
         perror("open");
         goto err;
@@ -395,7 +401,6 @@ isLibScopeLoaded(pid_t pid)
     fclose(fd);
     return status;
 }
-
  
  /*
  * Perform fork and exec which cause that direct children

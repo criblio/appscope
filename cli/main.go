@@ -29,19 +29,19 @@ package main
 // scope [OPTIONS] --patch SO_FILE
 //
 // Options:
-// -l, --libbasedir DIR         specify parent for the library directory (default: /tmp)
-// -f DIR                       alias for \"-l DIR\" for backward compatibility
-// -a, --ldattach PID           attach to the specified process ID
-// -d, --lddetach PID           detach from the specified process ID
-// -c, --configure FILTER_PATH  configure scope environment with FILTER_PATH
-// -w, --unconfigure            unconfigure scope environment
-// -g, --getfile                get a file from a specified container PID
-// -s, --service SERVICE        setup specified service NAME
-// -v, --unservice              remove scope from all service configurations
-// -n  --namespace PID          perform service/configure operation on specified container PID
-// -p, --patch SO_FILE          patch specified libscope.so
-// -r, --starthost              execute the scope start command in a host context (must be run in the container)
-// -x, --stophost               execute the scope stop command in a host context (must be run in the container)
+// -l, --libbasedir DIR              specify parent for the library directory (default: /tmp)
+// -f DIR                            alias for \"-l DIR\" for backward compatibility
+// -a, --ldattach PID                attach to the specified process ID
+// -d, --lddetach PID                detach from the specified process ID
+// -c, --configure FILTER_PATH       configure scope environment with FILTER_PATH
+// -w, --unconfigure                 unconfigure scope environment
+// -g, --getfile SRC_FILE,DEST_FILE  get a file from SRC_FILE and put it in DEST_FILE
+// -s, --service SERVICE             setup specified service NAME
+// -v, --unservice                   remove scope from all service configurations
+// -n  --namespace PID               perform operation on specified container PID
+// -p, --patch SO_FILE               patch specified libscope.so
+// -r, --starthost                   execute the scope start command in a host context (must be run in the container)
+// -x, --stophost                    execute the scope stop command in a host context (must be run in the container)
 
 // Long aliases for short options
 // NOTE: Be sure to align these with the options listed in the call to getopt_long

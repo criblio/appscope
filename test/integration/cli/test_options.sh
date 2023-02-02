@@ -73,6 +73,14 @@ run ./bin/linux/${ARCH}/scope --configure
 outputs "error: missing required value for -c option"
 returns 1
 
+run ./bin/linux/${ARCH}/scope -g
+outputs "error: missing required value for -g option"
+returns 1
+
+run ./bin/linux/${ARCH}/scope --getfile
+outputs "error: missing required value for -g option"
+returns 1
+
 run ./bin/linux/${ARCH}/scope -s
 outputs "error: missing required value for -s option"
 returns 1
@@ -188,6 +196,18 @@ returns 1
 
 run ./bin/linux/${ARCH}/scope -a 999999999
 outputs "error: --ldattach, --lddetach PID not a current process"
+returns 1
+
+run ./bin/linux/${ARCH}/scope -g ,
+outputs "error: no source file path"
+returns 1
+
+run ./bin/linux/${ARCH}/scope -g somefile
+outputs "error: no destination file path"
+returns 1
+
+run ./bin/linux/${ARCH}/scope -g somefile,
+outputs "error: no destination file path"
 returns 1
 
 export SCOPE_LIB_PATH=./lib/linux/${ARCH}/libscope.so

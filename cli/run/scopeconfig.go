@@ -116,6 +116,10 @@ func (c *Config) SetDefault() error {
 					Buffering:     "line",
 				},
 			},
+			Debug: libscope.ScopeDebugConfig{
+				Coredump:   "false",
+				Stacktrace: "false",
+			},
 		},
 	}
 

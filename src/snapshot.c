@@ -5,6 +5,7 @@
 #include "utils.h"
 #include "coredump.h"
 #include "runtimecfg.h"
+#include "dbg.h"
 
 #define UNW_LOCAL_ONLY
 #include "libunwind.h"
@@ -44,7 +45,6 @@ extern rtconfig g_cfg;
 #define snapshotWriteNumberHex(fd, val) sigSafeWriteNumber(fd, val, 16)
 
 
-// TODO: Below probably need support some argument in case of optional action g_cfg ?
 typedef bool               (*actionEnabledFunc)(void);
 typedef bool               (*actionExecute)(const char *, siginfo_t *);
 
@@ -52,6 +52,16 @@ struct snapshotAction {
     actionEnabledFunc enabled;
     actionExecute execute;
 };
+
+// Curent snapshotOpt
+static unsigned snapshotOpt = 0;
+
+/*
+ * We use the bit information about enabled option
+ * Do not change the order
+ */
+#define SNP_OPT_COREDUMP     0
+#define SNP_OPT_STACKTRACE   1
 
 /*
  * Always enable specific snapshot action
@@ -114,8 +124,7 @@ snapConfig(const char *dirPath, siginfo_t *unused) {
  */
 static bool
 snapActionBacktraceEnabled(void) {
-    // TODO: handle configuration here
-    return TRUE;
+    return SCOPE_BIT_CHECK(snapshotOpt, SNP_OPT_STACKTRACE);
 }
 
 /*
@@ -281,8 +290,7 @@ snapBacktrace(const char *dirPath, siginfo_t *info) {
  */
 static bool
 snapActionCoredumpEnabled(void) {
-    // TODO: handle configuration here
-    return TRUE;
+    return SCOPE_BIT_CHECK(snapshotOpt, SNP_OPT_COREDUMP);
 }
 
 /*
@@ -307,6 +315,30 @@ struct snapshotAction allSnapshotActions[] = {
     {.enabled = snapActionCoredumpEnabled,  .execute = snapCoreDump},
 };
 
+
+/*
+ * Enable/Disable core dump snapshot option
+ */
+void
+snapshotSetCoredump(bool val) {
+    SCOPE_BIT_SET_VAR(snapshotOpt, SNP_OPT_COREDUMP, val);
+}
+
+/*
+ * Enable/Disable stacktrace snapshot option
+ */
+void
+snapshotSetStacktrace(bool val) {
+    SCOPE_BIT_SET_VAR(snapshotOpt, SNP_OPT_STACKTRACE, val);
+}
+
+/*
+ * Check if snapshot feature is enabled
+ */
+bool
+snapshotIsEnabled(void) {
+    return snapshotOpt ? TRUE : FALSE;
+}
 /*
  * Signal handler responsible for snapshot
  */
@@ -324,7 +356,7 @@ snapshotSignalHandler(int sig, siginfo_t *info, void *secret) {
     sigSafeUtoa(scope_getpid(), pidBuf, 10, &msgLen);
     currentOffset += msgLen + 1;
     if (currentOffset> PATH_MAX) {
-        // This should never happened
+        DBG(NULL);
         return;
     }
     scope_memcpy(snapPidDirPath + SNAPSHOT_DIR_LEN, pidBuf, msgLen);
@@ -339,6 +371,8 @@ snapshotSignalHandler(int sig, siginfo_t *info, void *secret) {
             act.execute(snapPidDirPath, info);
         }
     }
-
+    // Stop the world - give the time to consume generated files
     raise(SIGSTOP);
+
+    // Call the old handler
 }

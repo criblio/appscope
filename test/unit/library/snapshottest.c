@@ -33,6 +33,8 @@ snapshotSigSegvTest(void **state)
         * - SIGCONT delivered from parent will allow child process to continu
         */
         siginfo_t info = {.si_signo = SIGSEGV, .si_code = SEGV_MAPERR};
+        snapshotSetCoredump(TRUE);
+        snapshotSetStacktrace(TRUE);
         snapshotSignalHandler(-1, &info, NULL);
         exit(EXIT_SUCCESS);
     } else {

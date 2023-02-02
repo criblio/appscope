@@ -86,10 +86,11 @@ type ScopeEventWatchConfig struct {
 
 // ScopeLibscopeConfig represents how to configure libscope
 type ScopeLibscopeConfig struct {
-	ConfigEvent   BoolString     `mapstructure:"configevent" json:"configevent" yaml:"configevent"`
-	SummaryPeriod int            `mapstructure:"summaryperiod" json:"summaryperiod" yaml:"summaryperiod"`
-	CommandDir    string         `mapstructure:"commanddir" json:"commanddir" yaml:"commanddir"`
-	Log           ScopeLogConfig `mapstructure:"log" json:"log" yaml:"log"`
+	ConfigEvent   BoolString       `mapstructure:"configevent" json:"configevent" yaml:"configevent"`
+	SummaryPeriod int              `mapstructure:"summaryperiod" json:"summaryperiod" yaml:"summaryperiod"`
+	CommandDir    string           `mapstructure:"commanddir" json:"commanddir" yaml:"commanddir"`
+	Log           ScopeLogConfig   `mapstructure:"log" json:"log" yaml:"log"`
+	Debug         ScopeDebugConfig `mapstructure:"debug" json:"debug" yaml:"debug"`
 }
 
 // ScopeLogConfig represents how to configure libscope logs
@@ -114,6 +115,12 @@ type ScopeTransport struct {
 	Path          string    `mapstructure:"path,omitempty" json:"path,omitempty" yaml:"path,omitempty"`
 	Buffering     string    `mapstructure:"buffering,omitempty" json:"buffering,omitempty" yaml:"buffering,omitempty"`
 	Tls           TlsConfig `mapstructure:"tls" json:"tls" yaml:"tls"`
+}
+
+// ScopeDebugConfig represents debug configuration in libscope
+type ScopeDebugConfig struct {
+	Coredump   BoolString `mapstructure:"coredump" json:"coredump" yaml:"coredump"`
+	Stacktrace BoolString `mapstructure:"stacktrace" json:"stacktrace" yaml:"stacktrace"`
 }
 
 // TlsConfig is used when

@@ -2,7 +2,7 @@
 #define __SNAPSHOT_H__
 
 #include <signal.h>
-
+#include "scopetypes.h"
 /*
  *  Manage snapshot
  *  IMPORTANT NOTE:
@@ -14,6 +14,9 @@
  * Signal handler for snapshot (SIGSEGV, SIGBUS, SIGILL and SIGFPE)
  */
 
-void snapshotSignalHandler(int, siginfo_t *, void *);;
+void snapshotSignalHandler(int, siginfo_t *, void *);
+void snapshotSetCoredump(bool);
+void snapshotSetStacktrace(bool);
+bool snapshotIsEnabled(void);
 
 #endif // __SNAPSHOT_H__

@@ -1104,25 +1104,19 @@ logOurConnectionStatus(transport_status_t status, const char *name)
 static int
 snapshotErrorsSignals[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
 
-static bool snapshotEnabled = FALSE;
-
 /*
-* Determine if the snapshot feature is enabled
-*/
-static bool
-isSnapshotEnabled(void) {
-    // TODO: Here we must perform a decision based on configuration setting
-    snapshotEnabled = TRUE;
-    return snapshotEnabled;
-}
-
-/*
-* Register the AppScope signal handler
+* Determine if the snapshot feature is enabled and
+* register the AppScope signal handler if it is enabled
 */
 static void
-initSigErrorHandler(void) {
-    isSnapshotEnabled();
-    if (snapshotEnabled && (g_fn.sigaction)) {
+enableSnapshot(config_t *cfg) {
+    snapshotSetCoredump(cfgDebugCoredumpEnable(cfg));
+    snapshotSetStacktrace(cfgDebugStacktraceEnable(cfg));
+    if (!snapshotIsEnabled()) {
+        return;
+    }
+
+    if (g_fn.sigaction) {
         struct sigaction act = { 0 };
         act.sa_handler = (void (*))snapshotSignalHandler;
         act.sa_flags = SA_RESTART | SA_SIGINFO;
@@ -1145,7 +1139,7 @@ periodic(void *arg)
 
     sigset_t mask;
     scope_sigfillset(&mask);
-    if (snapshotEnabled == TRUE) {
+    if (snapshotIsEnabled() == TRUE) {
         for (int i = 0; i < ARRAY_SIZE(snapshotErrorsSignals); ++i) {
             scope_sigdelset(&mask, snapshotErrorsSignals[i]);
         }
@@ -1771,8 +1765,9 @@ init(void)
 
     doConfig(cfg);
 
-    // Initialize Signal Handler right after processing configuration
-    initSigErrorHandler(); 
+    // Currently we enable snapshot feature only in case of constructor
+    // TODO: if we update the configuration via IPC it will not be updated
+    enableSnapshot(cfg);
 
     g_staticfg = cfg;
     if (path) scope_free(path);
@@ -1839,7 +1834,7 @@ signal(int signum, sighandler_t handler) {
      * Condition below must be inline with `snapshotErrorsSignals` array
      * TODO: Backup the previous signal handler
      */
-    if (snapshotEnabled && (
+    if ((snapshotIsEnabled() == TRUE) && (
         signum == SIGSEGV ||
         signum == SIGBUS ||
         signum == SIGILL ||
@@ -1875,7 +1870,7 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
      * Condition below must be inline with `snapshotErrorsSignals` array
      * TODO: Backup the previous signal handler
      */
-    if (snapshotEnabled && (
+    if ((snapshotIsEnabled() == TRUE) && (
         signum == SIGSEGV ||
         signum == SIGBUS ||
         signum == SIGILL ||

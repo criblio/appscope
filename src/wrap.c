@@ -1112,16 +1112,20 @@ static void
 enableSnapshot(config_t *cfg) {
     snapshotSetCoredump(cfgSnapshotCoredumpEnable(cfg));
     snapshotSetBacktrace(cfgSnapshotBacktraceEnable(cfg));
-    if (!snapshotIsEnabled()) {
+    if (snapshotIsEnabled() == FALSE) {
         return;
     }
 
     if (g_fn.sigaction) {
         struct sigaction act = { 0 };
+
         act.sa_handler = (void (*))snapshotSignalHandler;
         act.sa_flags = SA_RESTART | SA_SIGINFO;
         for (int i = 0; i < ARRAY_SIZE(snapshotErrorsSignals); ++i) {
-            g_fn.sigaction(snapshotErrorsSignals[i], &act, NULL);
+            struct sigaction oldact = { 0 };
+            int sig = snapshotErrorsSignals[i];
+            g_fn.sigaction(sig, &act, &oldact);
+            saveAppSigHandler(sig, oldact);
         }
     }
 }
@@ -1832,14 +1836,12 @@ signal(int signum, sighandler_t handler) {
     /*
      * Prevent the situation to override our handler when it is enabled.
      * Condition below must be inline with `snapshotErrorsSignals` array
-     * TODO: Backup the previous signal handler
      */
-    if ((snapshotIsEnabled() == TRUE) && (
-        signum == SIGSEGV ||
-        signum == SIGBUS ||
-        signum == SIGILL ||
-        signum == SIGFPE)) {
-        return 0;
+    if (snapshotIsEnabled() == TRUE) {
+        struct sigaction act = {.sa_handler = handler, .sa_flags = SA_RESTART};
+        if (saveAppSigHandler(signum, act) == TRUE) {
+            return handler;
+        }
     }
 
     return g_fn.signal(signum, handler);
@@ -1848,6 +1850,12 @@ signal(int signum, sighandler_t handler) {
 EXPORTOFF int
 siginterrupt(int sig, int flag) {
     WRAP_CHECK(siginterrupt, -1);
+
+    if (snapshotIsEnabled() == TRUE) {
+        if (modifyAppSigHandler(sig, flag) == TRUE) {
+            return 0;
+        }
+    }
 
     return g_fn.siginterrupt(sig, flag);
 }
@@ -1875,14 +1883,12 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
     /*
      * Prevent the situation to override our handler when it is enabled.
      * Condition below must be inline with `snapshotErrorsSignals` array
-     * TODO: Backup the previous signal handler
      */
-    if ((snapshotIsEnabled() == TRUE) && (
-        signum == SIGSEGV ||
-        signum == SIGBUS ||
-        signum == SIGILL ||
-        signum == SIGFPE) && (act != NULL)) {
-        return 0;
+    if ((snapshotIsEnabled() == TRUE) && (act != NULL)) {
+        struct sigaction actValue = {.sa_handler = act->sa_handler, .sa_flags = act->sa_flags};
+        if (saveAppSigHandler(signum, actValue) == TRUE) {
+            return 0;
+        }
     }
 
     return g_fn.sigaction(signum, act, oldact);

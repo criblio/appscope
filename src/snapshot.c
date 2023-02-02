@@ -54,7 +54,7 @@ struct snapshotAction {
     actionExecute execute;
 };
 
-// Current snapshotOpt
+// Current snapshot option
 static unsigned snapshotOpt = 0;
 
 /*
@@ -70,6 +70,64 @@ static unsigned snapshotOpt = 0;
 static bool
 snapActionAlwaysEnabled(void) {
     return TRUE;
+}
+
+/*
+ * Application signal action
+ */
+static struct sigaction appSigSegvAction;
+static struct sigaction appSigBusAction;
+static struct sigaction appSigIllAction;
+static struct sigaction appSigFpeAction;
+
+/*
+ * Save application signal handler
+ * Returns TRUE in case of sig is a signal supported by snapshot
+ */
+bool
+saveAppSigHandler(int sig, struct sigaction act) {
+    if (sig == SIGSEGV) {
+        appSigSegvAction = act;
+        return TRUE;
+    } else if (sig == SIGBUS) {
+        appSigBusAction = act;
+        return TRUE;
+    } else if (sig == SIGILL) {
+        appSigIllAction = act;
+        return TRUE;
+    } else if (sig == SIGFPE) {
+        appSigFpeAction = act;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+/*
+ * Modify application handler flag
+ * Returns TRUE in case of sig is a signal supported by snapshot
+ */
+bool
+modifyAppSigHandler(int sig, int flag) {
+    bool res = TRUE;
+    struct sigaction *actptr = NULL;
+    if (sig == SIGSEGV) {
+        *actptr = appSigSegvAction;
+    } else if (sig == SIGBUS) {
+        *actptr = appSigBusAction;
+    } else if (sig == SIGILL) {
+        *actptr = appSigIllAction;
+    } else if (sig == SIGFPE) {
+        *actptr = appSigFpeAction;
+    } else {
+        return FALSE;
+    }
+
+    if (flag) {
+        (*actptr).sa_flags &= ~SA_RESTART;
+    } else {
+        (*actptr).sa_flags |= SA_RESTART;
+    }
+    return res;
 }
 
 /*
@@ -374,27 +432,33 @@ snapshotSignalHandler(int sig, siginfo_t *info, void *secret) {
     // Stop the world - give the time to consume generated files
     g_fn.raise(SIGSTOP);
 
-    // TODO: add logic to call old signal handler if there was one
+    // Restore application signal handler
+    struct sigaction appAct;
     switch (sig) {
         case SIGSEGV:
-            g_fn.signal(SIGSEGV, SIG_DFL);
-            g_fn.raise(SIGSEGV);
+            appAct = appSigSegvAction;
             break;
         case SIGBUS:
-            g_fn.signal(SIGBUS, SIG_DFL);
-            g_fn.raise(SIGBUS);
+            appAct = appSigBusAction;
             break;
         case SIGILL:
-            g_fn.signal(SIGILL, SIG_DFL);
-            g_fn.raise(SIGILL);
+            appAct = appSigIllAction;
             break;
         case SIGFPE:
-            g_fn.signal(SIGFPE, SIG_DFL);
-            g_fn.raise(SIGFPE);
+            appAct = appSigFpeAction;
             break;
         default:
             DBG(NULL);
+            _exit(1);
             break;
     }
 
+    // htop bug
+    // g_fn.signal(SIGTTOU, SIG_IGN);
+    
+    if (g_fn.sigaction(sig, &appAct, NULL) < 0) {
+      _exit(1);
+    }
+    // Raise the signal again and left the handling to application
+    g_fn.raise(sig);
 }

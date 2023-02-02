@@ -19,4 +19,11 @@ void snapshotSetCoredump(bool);
 void snapshotSetBacktrace(bool);
 bool snapshotIsEnabled(void);
 
+/*
+ * API to handle application signal handler
+ */
+
+bool saveAppSigHandler(int, struct sigaction);
+bool modifyAppSigHandler(int, int);
+
 #endif // __SNAPSHOT_H__

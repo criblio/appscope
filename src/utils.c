@@ -493,7 +493,7 @@ sigSafeWrite(int fd, const void *buf, size_t count) {
 
 /*
  * Converts the specific value using base for conversion and
- * drites to specified file descriptor (signal safe API)
+ * writes to specified file descriptor (signal safe API)
  */
 ssize_t 
 sigSafeWriteNumber(int fd, long val, int base) {

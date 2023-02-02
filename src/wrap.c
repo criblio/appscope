@@ -1834,6 +1834,19 @@ EXPORTOFF sighandler_t
 signal(int signum, sighandler_t handler) {
     WRAP_CHECK(signal, NULL);
 
+    /*
+     * Prevent the situation to override our handler when it is enabled.
+     * Condition below must be inline with `snapshotErrorsSignals` array
+     * TODO: Backup the previous signal handler
+     */
+    if (snapshotEnabled && (
+        signum == SIGSEGV ||
+        signum == SIGBUS ||
+        signum == SIGILL ||
+        signum == SIGFPE)) {
+        return 0;
+    }
+
     return g_fn.signal(signum, handler);
 }
 
@@ -1854,6 +1867,19 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
      */
     if ((signum == SIGUSR2) && (act != NULL)) {
         g_thread.act = act; 
+        return 0;
+    }
+
+    /*
+     * Prevent the situation to override our handler when it is enabled.
+     * Condition below must be inline with `snapshotErrorsSignals` array
+     * TODO: Backup the previous signal handler
+     */
+    if (snapshotEnabled && (
+        signum == SIGSEGV ||
+        signum == SIGBUS ||
+        signum == SIGILL ||
+        signum == SIGFPE) && (act != NULL)) {
         return 0;
     }
 

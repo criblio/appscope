@@ -1,7 +1,8 @@
 package sigdel
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target bpfel -cc clang gen_sigdel ./sigdel.bpf.c -- -I/usr/include/bpf -I.
 import "C"
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target bpfel -cc clang gen_sigdel ./sigdel.bpf.c -- -I/usr/include/bpf -I.
+
 import (
 	"bytes"
 	"encoding/binary"
@@ -13,7 +14,7 @@ import (
 	"os"
 )
 
-type sigdel_data_t struct {
+type Sigdel_data_t struct {
 	Pid     uint32
     Sig     uint32
     Errno   uint32
@@ -58,7 +59,7 @@ func Sigdel() {
 
 		b_arr := bytes.NewBuffer(ev.RawSample)
 
-		var data sigdel_data_t
+		var data Sigdel_data_t
 		if err := binary.Read(b_arr, binary.LittleEndian, &data); err != nil {
 			log.Printf("parsing perf event: %s", err)
 			continue

@@ -2,6 +2,19 @@
 #include <bpf/bpf_helpers.h>
 
 #define COMM_LEN 128
+#define LAST_32_BITS(x) x & 0xFFFFFFFF
+#define FIRST_32_BITS(x) x >> 32
+
+/*
+ * Note: the original SEC macro defined in bpf_helpers.h
+ * includes pragmas that enable a compiler warning when
+ * the attribute is defined. The current go build has an
+ * issue with the use of pragmas in this context. Removing
+ * the pragmas allows go build to function properly.
+ * It does not appear to have any issue so far.
+ */
+#define SEC_GO(name) __attribute__((section(name), used))
+
 struct sigdel_data_t {
     int pid;
     int sig;
@@ -18,7 +31,7 @@ struct {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
 	__uint(key_size, sizeof(u32));
 	__uint(value_size, sizeof(u32));
-} events SEC(".maps");
+} events SEC_GO(".maps");
 
 struct sigdel_args_t {
     unsigned short type;
@@ -32,10 +45,7 @@ struct sigdel_args_t {
     unsigned long sa_flags;
 };
 
-#define LAST_32_BITS(x) x & 0xFFFFFFFF
-#define FIRST_32_BITS(x) x >> 32
-
-SEC("tracepoint/signal/signal_deliver")
+SEC_GO("tracepoint/signal/signal_deliver")
 int sig_deliver(struct sigdel_args_t *args)
 {
 	struct sigdel_data_t sigdel_data = {};
@@ -58,4 +68,4 @@ int sig_deliver(struct sigdel_args_t *args)
 	return 0;
 }
 
-char LICENSE[] SEC("license") = "GPL";
+char LICENSE[] SEC_GO("license") = "GPL";

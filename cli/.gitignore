@@ -5,3 +5,5 @@ coverage.out
 demo/demo-scripts/willsee.txt
 demo/demo-scripts/wontsee.log
 VERSION
+bpf/vmlinux.h
+bpf/sigdel/gen_sigdel_bpfel.go

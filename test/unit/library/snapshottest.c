@@ -3,6 +3,7 @@
 #include "test.h"
 #include "scopestdlib.h"
 #include "scopetypes.h"
+#include "fn.h"
 #include <ftw.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -29,10 +30,12 @@ snapshotSigSegvTest(void **state)
         /*
         * Child process will perform following operations:
         *
+        * - ignore SIGSEGV signal
         * - perform `snapshotSignalHandler` function which will stop the process using SIGSTOP 
-        * - SIGCONT delivered from parent will allow child process to continu
+        * - SIGCONT delivered from parent will allow child process to continue
         */
         siginfo_t info = {.si_signo = SIGSEGV, .si_code = SEGV_MAPERR};
+        signal(SIGSEGV, SIG_IGN);
         snapshotSetCoredump(TRUE);
         snapshotSetStacktrace(TRUE);
         snapshotSignalHandler(-1, &info, NULL);
@@ -50,6 +53,7 @@ snapshotSigSegvTest(void **state)
         if (wpid == -1) {
             exit(EXIT_FAILURE);
         }
+
         if (WIFSTOPPED(wstatus)) {
             kill(cpid, SIGCONT);
             wpid = waitpid(cpid, &wstatus, WCONTINUED);
@@ -84,6 +88,7 @@ int
 main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
+    initFn();
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(snapshotSigSegvTest),

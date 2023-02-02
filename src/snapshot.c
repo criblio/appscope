@@ -5,6 +5,7 @@
 #include "utils.h"
 #include "coredump.h"
 #include "runtimecfg.h"
+#include "fn.h"
 #include "dbg.h"
 
 #define UNW_LOCAL_ONLY
@@ -372,7 +373,29 @@ snapshotSignalHandler(int sig, siginfo_t *info, void *secret) {
         }
     }
     // Stop the world - give the time to consume generated files
-    raise(SIGSTOP);
+    g_fn.raise(SIGSTOP);
 
-    // Call the old handler
+    // TODO: add logic to call old signal handler if there was one
+    switch (sig) {
+        case SIGSEGV:
+            g_fn.signal(SIGSEGV, SIG_DFL);
+            g_fn.raise(SIGSEGV);
+            break;
+        case SIGBUS:
+            g_fn.signal(SIGBUS, SIG_DFL);
+            g_fn.raise(SIGBUS);
+            break;
+        case SIGILL:
+            g_fn.signal(SIGILL, SIG_DFL);
+            g_fn.raise(SIGILL);
+            break;
+        case SIGFPE:
+            g_fn.signal(SIGFPE, SIG_DFL);
+            g_fn.raise(SIGFPE);
+            break;
+        default:
+            DBG(NULL);
+            break;
+    }
+
 }

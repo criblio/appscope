@@ -240,6 +240,7 @@ initFn(void)
     GETADDR(g_fn.gethostbyname, "gethostbyname");
     GETADDR(g_fn.gethostbyname2, "gethostbyname2");
     GETADDR(g_fn.getaddrinfo, "getaddrinfo");
+    GETADDR(g_fn.signal, "signal");
     GETADDR(g_fn.sigaction, "sigaction");
     GETADDR(g_fn.execve, "execve");
     GETADDR(g_fn.execv, "execv");

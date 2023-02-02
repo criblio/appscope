@@ -1830,6 +1830,13 @@ init(void)
 
 }
 
+EXPORTOFF sighandler_t
+signal(int signum, sighandler_t handler) {
+    WRAP_CHECK(signal, NULL);
+
+    return g_fn.signal(signum, handler);
+}
+
 EXPORTOFF int
 sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 {
@@ -5505,6 +5512,7 @@ wrap_scope_dlsym(void *handle, const char *name, void *who)
 
 static got_list_t inject_hook_list[] = {
     {"sigaction",   sigaction, &g_fn.sigaction},
+    {"signal",      signal, &g_fn.signal},
     {"open",        open, &g_fn.open},
     {"openat",      openat, &g_fn.openat},
     {"fopen",       fopen, &g_fn.fopen},

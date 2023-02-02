@@ -97,7 +97,7 @@ $(SCOPEDYN): $(LOADER_C_FILES)
 
 # the -w go build flags remove the dwarf symbol table from the resulting executable
 # the -tags force os/user and netgo to use go and NOT cgo because a static exec can't resolve libc calls from cgo
-$(SCOPE): $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN) $(SIGDEL) $(SYSHEADER)
+$(SCOPE): $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN) $(SIGDEL)
 $(SCOPE): export GOOS=linux
 $(SCOPE): export CGO_ENABLED=1
 $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
@@ -115,7 +115,7 @@ $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 	       	-o $(SCOPE)
 	$(RM) -r $(SCOPEDYN)
 
-$(SIGDEL): bpf/sigdel/sigdel.bpf.c
+$(SIGDEL): bpf/sigdel/sigdel.bpf.c $(SYSHEADER)
 	go generate bpf/sigdel/*.go
 
 $(SYSHEADER):

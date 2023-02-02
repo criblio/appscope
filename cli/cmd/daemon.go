@@ -1,25 +1,33 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/criblio/scope/bpf/sigdel"
 	"github.com/spf13/cobra"
 )
 
-var daemonSummary bool
-var daemonDate bool
-var daemonTag bool
-
 // daemonCmd represents the daemon command
 var daemonCmd = &cobra.Command{
-	Use:   "daemon [flags]",
-	Short: "Handle system behavior",
-	Long:  `Listem and respond to system events.`,
-	Example: `scope daemon
-scope daemon`,
-	Args: cobra.NoArgs,
+	Use:     "daemon [flags]",
+	Short:   "Handle system behavior",
+	Long:    `Listen and respond to system events.`,
+	Example: `scope daemon`,
+	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		sigEventChan := make(chan sigdel.SigEvent)
+		go sigdel.Sigdel(sigEventChan)
 
-		sigdel.Sigdel()
+		for {
+			select {
+			case sigEvent := <-sigEventChan:
+				fmt.Printf("Signal CPU: %02d signal %d errno %d handler 0x%x pid: %d app %s\n",
+					sigEvent.CPU, sigEvent.Sig, sigEvent.Errno, sigEvent.Handler,
+					sigEvent.Pid, sigEvent.Comm)
+
+				// TODO: Do something interesting
+			}
+		}
 	},
 }
 

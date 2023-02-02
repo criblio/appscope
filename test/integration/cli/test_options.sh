@@ -146,7 +146,7 @@ outputs "error: --passthrough cannot be used with --ldattach/--lddetach or --nam
 returns 1
 
 run ./bin/linux/${ARCH}/scope -n 1 ls
-outputs "error: --namespace option requires --configure/--unconfigure or --service/--unservice option"
+outputs "error: --namespace option requires --configure/--unconfigure or --service/--unservice or --getfile option"
 returns 1
 
 run ./bin/linux/${ARCH}/scope -s dummy_service_value -c dummy_filter_value

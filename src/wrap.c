@@ -1846,6 +1846,13 @@ signal(int signum, sighandler_t handler) {
 }
 
 EXPORTOFF int
+siginterrupt(int sig, int flag) {
+    WRAP_CHECK(siginterrupt, -1);
+
+    return g_fn.siginterrupt(sig, flag);
+}
+
+EXPORTOFF int
 raise(int sig) {
     WRAP_CHECK(raise, -1);
 
@@ -5542,6 +5549,7 @@ static got_list_t inject_hook_list[] = {
     {"sigaction",   sigaction, &g_fn.sigaction},
     {"signal",      signal, &g_fn.signal},
     {"raise",       raise, &g_fn.raise},
+    {"siginterrupt", siginterrupt, &g_fn.siginterrupt},
     {"open",        open, &g_fn.open},
     {"openat",      openat, &g_fn.openat},
     {"fopen",       fopen, &g_fn.fopen},

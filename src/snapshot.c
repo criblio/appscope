@@ -111,13 +111,13 @@ snapshotBackupAppSignalHandler(int sig, sighandler_t act) {
  */
 static void inline
 appSignalHandler(int sig, siginfo_t *info, void *secret) {
-    if (sig == SIGSEGV) {
+    if (sig == SIGSEGV && appSigSegvAction) {
         appSigSegvAction(sig, info, secret);
-    } else if (sig == SIGBUS) {
+    } else if (sig == SIGBUS && appSigBusAction) {
         appSigBusAction(sig, info, secret);
-    } else if (sig == SIGILL) {
+    } else if (sig == SIGILL && appSigIllAction) {
         appSigIllAction(sig, info, secret);
-    } else if (sig == SIGFPE) {
+    } else if (sig == SIGFPE && appSigFpeAction) {
         appSigFpeAction(sig, info, secret);
     }
 }

@@ -10,7 +10,7 @@ The files will be placed in folllowing locations:
 `/tmp/appscope/<PID>/`
 
 `/tmp/appscope/<PID>/info`
-This file is generated always when snapshot feature is enabled.
+This file is generated when the snapshot feature is enabled.
 
 Example content:
 ```
@@ -21,7 +21,7 @@ Process name: htop
 ```
 
 `/tmp/appscope/<PID>/cfg`
-This file is generated always when snapshot feature is enabled.
+This file is generated when the snapshot feature is enabled.
 
 Example content:
 ```
@@ -29,10 +29,10 @@ Example content:
 ```
 
 `/tmp/appscope/<PID>/coredump`
-This file is generated when coredump feature is enabled.
+This file is generated when the coredump feature is enabled.
 Contains the coredump generated during crash.
-You can use it during further investigation with [gdb](https://sourceware.org/gdb/onlinedocs/gdb/Core-File-Generation.html)
+For further detail: [gdb](https://sourceware.org/gdb/onlinedocs/gdb/Core-File-Generation.html)
 
 `/tmp/appscope/<PID>/backtrace`
-This file is generated when backtrace feature is enabled.
+This file is generated when the backtrace feature is enabled.
 Contains the backtrace captured during crash.

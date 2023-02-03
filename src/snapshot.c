@@ -32,12 +32,12 @@ extern rtconfig g_cfg;
 /*
  * snapshotWriteConstStr - write the string with known length
  */
-#define snapshotWriteConstStr(fd, s) sigSafeWrite(fd, s, C_STRLEN(s))
+#define snapshotWriteConstStr(fd, s) scope_write(fd, s, C_STRLEN(s))
 
 /*
  * snapshotWriteStr - write the string with unknown length
  */
-#define snapshotWriteStr(fd, s) sigSafeWrite(fd, s, (scope_strlen(s)))
+#define snapshotWriteStr(fd, s) scope_write(fd, s, (scope_strlen(s)))
 
 /*
  * snapshotWriteNumber - convert specific number and writes it

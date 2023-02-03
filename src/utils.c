@@ -483,15 +483,6 @@ sigSafeMkdirRecursive(const char *dirPath) {
 }
 
 /*
- * Writes to specified file descriptor (signal safe API)
- */
-ssize_t 
-sigSafeWrite(int fd, const void *buf, size_t count) {
-    return scope_write(fd, buf ,count);
-}
-
-
-/*
  * Converts the specific value using base for conversion and
  * writes to specified file descriptor (signal safe API)
  */

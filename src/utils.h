@@ -27,7 +27,6 @@ void setMachineID(char *);
 int sigSafeNanosleep(const struct timespec *);
 void sigSafeUtoa(unsigned long, char *, int, int *);
 bool sigSafeMkdirRecursive(const char *);
-ssize_t sigSafeWrite(int , const void *, size_t);
 ssize_t sigSafeWriteNumber(int , long, int);
 
 #endif // __UTILS_H__

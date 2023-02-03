@@ -1551,7 +1551,7 @@ initHook(int attachedFlag, bool scopedFlag)
         void *ptr = scope_malloc(testSize);
         if (osMemPermAllow(ptr, testSize, PROT_READ | PROT_WRITE, PROT_EXEC) == FALSE) {
             scope_free(ptr);
-            scopeLogError("Interpose functions are limited (DNS, Console I/O). Please verify the MemoryDenyWriteExecute setting for following service: %s", g_proc.procname);
+            scopeLogError("The system is not allowing processes related to DNS or console I/O to be scoped. Try setting MemoryDenyWriteExecute to false for the %s service.", g_proc.procname);
             return;
         }
         scope_free(ptr);

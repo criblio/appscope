@@ -811,7 +811,7 @@ patch_addrs(funchook_t *funchook,
 }
 
 static void
-patchClone()
+patchClone(void)
 {
     void *clone = dlsym(RTLD_DEFAULT, "__clone");
     if (clone) {
@@ -822,7 +822,7 @@ patchClone()
 
         // Add write permission on the page
         if (osMemPermAllow(addr, pageSize, perm, PROT_WRITE) == FALSE) {
-            scopeLogError("ERROR: patchClone: osMemPermAllow failed\n");
+            scopeLogError("The system is not allowing processes to be scoped. Try setting MemoryDenyWriteExecute to false for the Go service.");
             return;
         }
 

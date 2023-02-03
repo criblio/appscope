@@ -35,53 +35,50 @@ func GenFiles(pid, sig, errno uint32) error {
 // GenSnapshotFile generates the snapshot file for a given pid
 func GenSnapshotFile(pid uint32, dir string) error {
 
-	//Debug Information 	MVP
-	//Time of Snapshot 	cli
-	//AppScope Lib Version 	lib
-	//AppScope Cli Version 	cli
-	//Process Name 	cli
-	//Process Arguments 	cli
-	//PID, PPID 	cli
-	//User ID/ Group ID 	cli
-	//Username/ Groupname 	cli
-	//
-	//AppScope configuration 	lib
-	//Environment Variables 	cli
-	//
-	//Signal number 	cli (eBPF)
-	//Signal handler 	cli (eBPF)
-	//Error number 	cli (eBPF)
-	//
-	//Machine Arch 	cli
-	//Distro, Distro version 	cli
-	//Kernel version 	cli
-	//Hostname 	cli
-	//Namespace Id's 	cli
-	//Container Impl (docker, podman...) 	-
-	//Container Name/Version(?) 	-
-	//SELinux or AppArmor enforcing? 	-
-	//Unix Capabilities... PTRACE?... 	-
-	//
-	//AppScope Log Output 	if possible
-	//scope ps output 	cli
-	//scope history output 	cli
-	//
-	//Backtrace (offending thread) 	if possible
-	//Backtraces (all threads) 	lib
-	//Memory (stacks, heap) 	lib
-	//Registers 	lib
-	//Application and .so elf files 	-
-	//
-	//Application version(?) 	-
-	//JRE version (if java) 	cli
-	//Go version (if go) 	cli
-	//Static or Dynamically linked(?) 	cli
-	//
-	//Network interface status? 	-
-	//ownership/permissions on pertinent files/unix sockets 	-
-	//dns on pertinent host names 	-
+	// Source: self (mostly via eBPF)
 
-	//write file to dir
+	// Time of Snapshot
+	// AppScope Cli Version
+	// Signal number
+	// Signal handler
+	// Error number
+	// Process Name
+	// Process Arguments
+	// PID, PPID
+	// User ID/ Group ID
+
+	// Source: /proc or linux
+
+	// Username/ Groupname  	// ebpf later?
+	// Environment Variables
+	// Machine Arch
+	// Kernel version
+
+	// Source: namespace
+
+	// Distro, Distro version
+	// Hostname
+
+	/* Maybe later:
+	// JRE version (if java)
+	// Go version (if go)
+	// Static or Dynamically linked(?)
+	// Application version(?)
+	// Application and .so elf files
+	// AppScope Log Output
+	// scope ps output
+	// scope history output
+	// Container Impl (docker, podman...)
+	// Container Name/Version?
+	// SELinux or AppArmor enforcing?
+	// Unix Capabilities... PTRACE?...
+	// Namespace Id's
+	// Network interface status?
+	// ownership/permissions on pertinent files/unix sockets
+	// dns on pertinent host names
+	*/
+
+	// Open and Write file to dir
 
 	return nil
 }

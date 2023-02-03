@@ -1125,7 +1125,7 @@ enableSnapshot(config_t *cfg) {
             struct sigaction oldact = { 0 };
             int sig = snapshotErrorsSignals[i];
             g_fn.sigaction(sig, &act, &oldact);
-            saveAppSigHandler(sig, oldact);
+            snapshotBackupAppSignalHandler(sig, oldact.sa_handler);
         }
     }
 }
@@ -1838,26 +1838,12 @@ signal(int signum, sighandler_t handler) {
      * Condition below must be inline with `snapshotErrorsSignals` array
      */
     if (snapshotIsEnabled() == TRUE) {
-        struct sigaction act = {.sa_handler = handler, .sa_flags = SA_RESTART};
-        if (saveAppSigHandler(signum, act) == TRUE) {
+        if (snapshotBackupAppSignalHandler(signum, handler) == TRUE) {
             return handler;
         }
     }
 
     return g_fn.signal(signum, handler);
-}
-
-EXPORTOFF int
-siginterrupt(int sig, int flag) {
-    WRAP_CHECK(siginterrupt, -1);
-
-    if (snapshotIsEnabled() == TRUE) {
-        if (modifyAppSigHandler(sig, flag) == TRUE) {
-            return 0;
-        }
-    }
-
-    return g_fn.siginterrupt(sig, flag);
 }
 
 EXPORTOFF int
@@ -1885,8 +1871,7 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
      * Condition below must be inline with `snapshotErrorsSignals` array
      */
     if ((snapshotIsEnabled() == TRUE) && (act != NULL)) {
-        struct sigaction actValue = {.sa_handler = act->sa_handler, .sa_flags = act->sa_flags};
-        if (saveAppSigHandler(signum, actValue) == TRUE) {
+        if (snapshotBackupAppSignalHandler(signum, act->sa_handler) == TRUE) {
             return 0;
         }
     }
@@ -5555,7 +5540,6 @@ static got_list_t inject_hook_list[] = {
     {"sigaction",   sigaction, &g_fn.sigaction},
     {"signal",      signal, &g_fn.signal},
     {"raise",       raise, &g_fn.raise},
-    {"siginterrupt", siginterrupt, &g_fn.siginterrupt},
     {"open",        open, &g_fn.open},
     {"openat",      openat, &g_fn.openat},
     {"fopen",       fopen, &g_fn.fopen},

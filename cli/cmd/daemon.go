@@ -25,7 +25,13 @@ var daemonCmd = &cobra.Command{
 					sigEvent.CPU, sigEvent.Sig, sigEvent.Errno, sigEvent.Handler,
 					sigEvent.Pid, sigEvent.Comm)
 
-				// TODO: Do something interesting
+				/*
+					if err := crash.GenFiles(sigEvent.Pid, sigEvent.Sig, sigEvent.Errno); err != nil {
+						log.Error().Err(err)
+						util.ErrAndExit("error generating crash files")
+					}
+				*/
+
 			}
 		}
 	},

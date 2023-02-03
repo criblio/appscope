@@ -53,7 +53,7 @@ func Sigdel() {
 		}
 
 		if ev.LostSamples != 0 {
-			log.Printf("perf event ring buffer full, dropped %d samples", ev.LostSamples)
+			fmt.Println("*** perf event ring buffer full, dropped %d samples ****", ev.LostSamples)
 			continue
 		}
 
@@ -61,12 +61,12 @@ func Sigdel() {
 
 		var data Sigdel_data_t
 		if err := binary.Read(b_arr, binary.LittleEndian, &data); err != nil {
-			log.Printf("parsing perf event: %s", err)
+			fmt.Println("parsing perf event: %s", err)
 			continue
 		}
 
 		fmt.Printf("Signal CPU: %02d signal %d errno %d handler 0x%x pid: %d app %s\n",
-        			ev.CPU, data.Sig, data.Errno, data.Handler,
+			        ev.CPU, data.Sig, data.Errno, data.Handler,
                     data.Pid, data.Comm)
 	}
 }

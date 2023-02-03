@@ -74,6 +74,7 @@ clean:
 	$(RM) -rf -- .gobin/aarch64/go*
 	$(RM) -rf -- bpf/sigdel/gen_sigdel_bpfel.go
 	$(RM) -rf -- bpf/sigdel/*.o
+	$(RM) -rf -- bpf/vmlinux.h
 
 ## deps: install dependencies
 deps: $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT)

@@ -1,39 +1,50 @@
 package sigdel
 
 import "C"
+
 //go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target bpfel -cc clang gen_sigdel ./sigdel.bpf.c -- -I/usr/include/bpf -I.
 
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"os"
+
+	"github.com/rs/zerolog/log"
+
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
 	"golang.org/x/sys/unix"
-	"log"
-	"os"
 )
 
-type Sigdel_data_t struct {
+type sigdel_data_t struct {
 	Pid     uint32
-    Sig     uint32
-    Errno   uint32
-    Code    uint32
+	Sig     uint32
+	Errno   uint32
+	Code    uint32
 	Handler uint64
-    Flags   uint64
-    Comm   [32]byte
+	Flags   uint64
+	Comm    [32]byte
 }
 
-func setlimit() {
-	if err := unix.Setrlimit(unix.RLIMIT_MEMLOCK, &unix.Rlimit {
-    			Cur: unix.RLIM_INFINITY,
-	            Max: unix.RLIM_INFINITY,
-		}); err != nil {
-		log.Fatalf("failed to set temporary rlimit: %v", err)
+type SigEvent struct {
+	sigdel_data_t
+	CPU int
+}
+
+func setlimit() error {
+	if err := unix.Setrlimit(unix.RLIMIT_MEMLOCK, &unix.Rlimit{
+		Cur: unix.RLIM_INFINITY,
+		Max: unix.RLIM_INFINITY,
+	}); err != nil {
+		log.Error().Err(err)
+		return errors.New(fmt.Sprintf("failed to set temporary rlimit: %v", err))
 	}
+	return nil
 }
 
-func Sigdel() {
+func Sigdel(sigEventChan chan SigEvent) error {
 	setlimit()
 
 	objs := gen_sigdelObjects{}
@@ -43,13 +54,15 @@ func Sigdel() {
 
 	rd, err := perf.NewReader(objs.Events, os.Getpagesize())
 	if err != nil {
-		log.Fatalf("reader err")
+		log.Error().Err(err)
+		return errors.New("reader err")
 	}
 
 	for {
 		ev, err := rd.Read()
 		if err != nil {
-			log.Fatalf("Read fail")
+			log.Error().Err(err)
+			return errors.New("Read fail error")
 		}
 
 		if ev.LostSamples != 0 {
@@ -59,14 +72,20 @@ func Sigdel() {
 
 		b_arr := bytes.NewBuffer(ev.RawSample)
 
-		var data Sigdel_data_t
+		var data sigdel_data_t
 		if err := binary.Read(b_arr, binary.LittleEndian, &data); err != nil {
 			fmt.Println("parsing perf event: %s", err)
 			continue
 		}
 
+
 		fmt.Printf("Signal CPU: %02d signal %d errno %d handler 0x%x pid: %d app %s\n",
 			        ev.CPU, data.Sig, data.Errno, data.Handler,
                     data.Pid, data.Comm)
+
+		sigEventChan <- SigEvent{
+			data,
+			ev.CPU,
+		}
 	}
 }

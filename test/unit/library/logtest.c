@@ -30,9 +30,7 @@ logSendForNullLogDoesntCrash(void** state)
 {
     const char* msg = "Hey, this is cool!\n";
     assert_int_equal(logSend(NULL, msg, DEFAULT_LOG_LEVEL), -1);
-    assert_int_equal(logSigSafeSendWithLen(NULL, msg, scope_strlen(msg), DEFAULT_LOG_LEVEL), -1);
 }
-
 static void
 logSendForNullMessageDoesntCrashUnix(void** state)
 {
@@ -42,21 +40,6 @@ logSendForNullMessageDoesntCrashUnix(void** state)
     assert_non_null(t);
     logTransportSet(log, t);
     assert_int_equal(logSend(log, NULL, DEFAULT_LOG_LEVEL), -1);
-    // logSigSafeSendWithLen is not supported by UNIX transport
-    assert_int_equal(logSigSafeSendWithLen(log, NULL, 0, DEFAULT_LOG_LEVEL), -1);
-    logDestroy(&log);
-}
-
-static void
-logSendSigSafeForNullMessageDoesntCrash(void** state)
-{
-    log_t* log = logCreate();
-    assert_non_null(log);
-    const char* file_path = "/tmp/my.path";
-    transport_t* t = transportCreateFile(file_path, CFG_BUFFER_FULLY);
-    assert_non_null(t);
-    logTransportSet(log, t);
-    assert_int_equal(logSigSafeSendWithLen(log, NULL, 0, DEFAULT_LOG_LEVEL), -1);
     logDestroy(&log);
 }
 
@@ -189,7 +172,6 @@ main(int argc, char* argv[])
         cmocka_unit_test(logDestroyNullLogDoesntCrash),
         cmocka_unit_test(logSendForNullLogDoesntCrash),
         cmocka_unit_test(logSendForNullMessageDoesntCrashUnix),
-        cmocka_unit_test(logSendSigSafeForNullMessageDoesntCrash),
         cmocka_unit_test(logLevelVerifyDefaultLevel),
         cmocka_unit_test(logLevelSetAndGet),
         cmocka_unit_test(logTranportSetAndLogSend),

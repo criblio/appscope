@@ -78,11 +78,6 @@ func Sigdel(sigEventChan chan SigEvent) error {
 			continue
 		}
 
-
-		fmt.Printf("Signal CPU: %02d signal %d errno %d handler 0x%x pid: %d app %s\n",
-			        ev.CPU, data.Sig, data.Errno, data.Handler,
-                    data.Pid, data.Comm)
-
 		sigEventChan <- SigEvent{
 			data,
 			ev.CPU,

@@ -99,7 +99,7 @@ setNamespace(pid_t pid, const char *ns) {
 }
 
 /*
- * Get the magic link for the namespace you are currently in
+ * Get the namespace file descriptor for the namespace you are currently in
  */
 static int
 getSelfNamespace(const char *ns) {
@@ -296,17 +296,23 @@ nsUnconfigure(pid_t pid) {
  * and write it to a file at dest_path in the host namespace
  */
 int
-nsGetFile(char *src_path, char *dest_path, pid_t pid) {
+nsGetFile(const char *src_path, const char *dest_path, pid_t pid) {
     int ns_fd = -1;
     int read_fd = -1;
     int write_fd = -1;
     char *buf = NULL;
-    int bytes;
+    char host_wd[PATH_MAX];
 
-    // Save host ns magic link
+    // Save host current working directory
+    if (!getcwd(host_wd, PATH_MAX)) {
+        perror("getcwd");
+        goto err;
+    }
+
+    // Save host mount namespace file descriptor
     ns_fd = getSelfNamespace("mnt");
     if (ns_fd == -1) {
-        fprintf(stderr, "error: failed to get host magic link\n");
+        fprintf(stderr, "error: getSelfNamespace failed\n");
         goto err;
     }
 
@@ -335,7 +341,7 @@ nsGetFile(char *src_path, char *dest_path, pid_t pid) {
         goto err;
     }
 
-    if ((bytes = read(read_fd, buf, st.st_size)) != st.st_size) {
+    if (read(read_fd, buf, st.st_size) != st.st_size) {
         perror("read");
         goto err;
     }
@@ -346,14 +352,20 @@ nsGetFile(char *src_path, char *dest_path, pid_t pid) {
         goto err;
     }
 
+    // Return to host current working directory
+    if (chdir(host_wd) == -1) {
+        perror("chdir");
+        goto err;
+    }
+
     // Write the file to disk
-    write_fd = open(dest_path, O_RDWR | O_CREAT);
+    write_fd = open(dest_path, O_WRONLY | O_CREAT);
     if (write_fd == -1) {
         perror("open");
         goto err;
     }
 
-    if (write(write_fd, buf, bytes) != st.st_size) {
+    if (write(write_fd, buf, st.st_size) != st.st_size) {
         perror("write");
         goto err;
     }

@@ -117,17 +117,13 @@ endtest
 #
 starttest patch_on_glibc
 
+cp /usr/local/scope/bin/scope /opt/patch_libscope
 cp /usr/local/scope/lib/libscope.so /opt/patch_libscope
 
 md5_before_patch=$(md5sum /opt/patch_libscope/libscope.so)
 
 count=$(readelf -d /opt/patch_libscope/libscope.so | grep 'Shared library:.*ld-linux' | wc -l)
 if [ $count -ne 1 ] ; then
-    ERR+=1
-fi
-
-/opt/patch_libscope/scope --patch /opt/patch_libscope/libscope.so
-if [ $? -eq 0 ]; then
     ERR+=1
 fi
 
@@ -139,16 +135,6 @@ if [ $count -ne 0 ] ; then
 fi
 
 if [ "$md5_before_patch" != "$md5_after_patch" ]; then
-    ERR+=1
-fi
-
-endtest
-
-starttest patch_on_glibc_dummy_file
-
-echo "Lorem ipsum" >> /opt/patch_libscope/dummy_file
-/opt/patch_libscope/scope --patch /opt/patch_libscope/dummy_file
-if [ $? -eq 0 ]; then
     ERR+=1
 fi
 

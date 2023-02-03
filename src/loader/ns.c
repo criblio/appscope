@@ -99,6 +99,26 @@ setNamespace(pid_t pid, const char *ns) {
 }
 
 /*
+ * Get the namespace file descriptor for the namespace you are currently in
+ */
+static int
+getSelfNamespace(const char *ns) {
+    char nsPath[PATH_MAX] = {0};
+    int nsFd = -1;
+    if (snprintf(nsPath, sizeof(nsPath), "/proc/self/ns/%s", ns) < 0) {
+        perror("getSelfNamespace: snprintf failed");
+        return nsFd;
+    }
+
+    if ((nsFd = open(nsPath, O_RDONLY)) == -1) {
+        perror("getSelfNamespace: open failed");
+        return nsFd;
+    }
+
+    return nsFd;
+}
+
+/*
  * Joins the namespaces:
  * - child PID (optionally)
  * - mount namespace (mandatory).
@@ -271,6 +291,98 @@ nsUnconfigure(pid_t pid) {
     return EXIT_SUCCESS;
 }
 
+/*
+ * Get a file from src_path from a child mount namespace
+ * and write it to a file at dest_path in the host namespace
+ */
+int
+nsGetFile(const char *src_path, const char *dest_path, pid_t pid) {
+    int ns_fd = -1;
+    int read_fd = -1;
+    int write_fd = -1;
+    char *buf = NULL;
+    char host_wd[PATH_MAX];
+
+    // Save host current working directory
+    if (!getcwd(host_wd, PATH_MAX)) {
+        perror("getcwd");
+        goto err;
+    }
+
+    // Save host mount namespace file descriptor
+    ns_fd = getSelfNamespace("mnt");
+    if (ns_fd == -1) {
+        fprintf(stderr, "error: getSelfNamespace failed\n");
+        goto err;
+    }
+
+    // Change to namespace
+    if (setNamespace(pid, "mnt") == FALSE) {
+        fprintf(stderr, "error: setNamespace mnt failed\n");
+        goto err;
+    }
+
+    // Read the file into memory
+    struct stat st;
+    if (stat(src_path, &st)) {
+        fprintf(stderr, "error: src file not found\n");
+        goto err;
+    }
+
+    buf = (char *)malloc(st.st_size);
+    if (!buf) {
+        perror("malloc");
+        goto err;
+    }
+
+    read_fd = open(src_path, O_RDONLY);
+    if (read_fd == -1) {
+        perror("open");
+        goto err;
+    }
+
+    if (read(read_fd, buf, st.st_size) != st.st_size) {
+        perror("read");
+        goto err;
+    }
+
+    // Return to host ns
+    if (setns(ns_fd, 0) != 0) {
+        perror("setns");
+        goto err;
+    }
+
+    // Return to host current working directory
+    if (chdir(host_wd) == -1) {
+        perror("chdir");
+        goto err;
+    }
+
+    // Write the file to disk
+    write_fd = open(dest_path, O_WRONLY | O_CREAT);
+    if (write_fd == -1) {
+        perror("open");
+        goto err;
+    }
+
+    if (write(write_fd, buf, st.st_size) != st.st_size) {
+        perror("write");
+        goto err;
+    }
+
+    free(buf);
+    close(read_fd);
+    close(write_fd);
+    close(ns_fd);
+    return EXIT_SUCCESS;
+err:
+    if (buf) free(buf);
+    if (read_fd > -1) close(read_fd);
+    if (write_fd > -1) close(write_fd);
+    if (ns_fd > -1) close(ns_fd);
+    return EXIT_FAILURE;
+}
+
  /*
  * Check if libscope.so is loaded in specified PID
  * Returns TRUE if library is loaded, FALSE otherwise.
@@ -301,7 +413,6 @@ isLibScopeLoaded(pid_t pid)
     fclose(fd);
     return status;
 }
-
  
  /*
  * Perform fork and exec which cause that direct children

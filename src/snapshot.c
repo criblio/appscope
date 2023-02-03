@@ -119,6 +119,9 @@ appSignalHandler(int sig, siginfo_t *info, void *secret) {
         appSigIllAction(sig, info, secret);
     } else if (sig == SIGFPE && appSigFpeAction) {
         appSigFpeAction(sig, info, secret);
+    } else {
+        // If there was no application handler just abort
+        abort();
     }
 }
 

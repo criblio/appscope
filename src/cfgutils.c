@@ -2317,7 +2317,6 @@ createSnapshotJson(config_t *cfg)
     if (!cJSON_AddStringToObjLN(root, COREDUMP_NODE,
          valToStr(boolMap, cfgSnapshotCoredumpEnable(cfg)))) goto err;
 
-    if (!(root = cJSON_CreateObject())) goto err;
     if (!cJSON_AddStringToObjLN(root, BACKTRACE_NODE,
          valToStr(boolMap, cfgSnapshotBacktraceEnable(cfg)))) goto err;
 

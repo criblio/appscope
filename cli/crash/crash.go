@@ -174,24 +174,6 @@ func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler, procName, pro
 	// TODO: Distro, Distro version
 	// TODO: Hostname
 
-	// Maybe later:
-	// JRE version (if java)
-	// Go version (if go)
-	// Static or Dynamically linked(?)
-	// Application version(?)
-	// Application and .so elf files
-	// AppScope Log Output
-	// scope ps output
-	// scope history output
-	// Container Impl (docker, podman...)
-	// Container Name/Version?
-	// SELinux or AppArmor enforcing?
-	// Unix Capabilities... PTRACE?...
-	// Namespace Id's
-	// Network interface status?
-	// ownership/permissions on pertinent files/unix sockets
-	// dns on pertinent host names
-
 	// Create json structure
 	jsonSnapshot, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {

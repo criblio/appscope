@@ -1,6 +1,56 @@
 package crash
 
-import "github.com/rs/zerolog/log"
+import (
+	"encoding/json"
+	"io/ioutil"
+	"time"
+
+	"github.com/rs/zerolog/log"
+)
+
+type snapshot struct {
+	// Source: self (mostly via eBPF)
+	time          time.Time // Time of Snapshot
+	version       string    // AppScope Cli Version
+	signalNumber  int       // Signal number
+	signalHandler string    // Signal handler
+	errno         int       // Error number
+	processName   string    // Process Name
+	processArgs   string    // Process Arguments
+	pid           int       // PID
+	uid           int       // User ID
+	gid           int       // Group ID
+
+	// Source: /proc or linux
+	username    string // Username  	// ebpf later?
+	groupname   string // Groupname  	// ebpf later?
+	environment string // Environment Variables
+	arch        string // Machine Arch
+	kernel      string // Kernel version
+
+	// Source: namespace
+	distro        string // Distro
+	distroVersion string // Distro version
+	hostname      string // Hostname
+
+	// Maybe later:
+	// JRE version (if java)
+	// Go version (if go)
+	// Static or Dynamically linked(?)
+	// Application version(?)
+	// Application and .so elf files
+	// AppScope Log Output
+	// scope ps output
+	// scope history output
+	// Container Impl (docker, podman...)
+	// Container Name/Version?
+	// SELinux or AppArmor enforcing?
+	// Unix Capabilities... PTRACE?...
+	// Namespace Id's
+	// Network interface status?
+	// ownership/permissions on pertinent files/unix sockets
+	// dns on pertinent host names
+}
 
 // GenFiles creates the following files for a given pid
 // - snapshot
@@ -35,9 +85,11 @@ func GenFiles(pid, sig, errno uint32) error {
 // GenSnapshotFile generates the snapshot file for a given pid
 func GenSnapshotFile(pid uint32, dir string) error {
 
+	var s snapshot
+
 	// Source: self (mostly via eBPF)
 
-	// Time of Snapshot
+	s.time = time.Now()
 	// AppScope Cli Version
 	// Signal number
 	// Signal handler
@@ -59,7 +111,7 @@ func GenSnapshotFile(pid uint32, dir string) error {
 	// Distro, Distro version
 	// Hostname
 
-	/* Maybe later:
+	// Maybe later:
 	// JRE version (if java)
 	// Go version (if go)
 	// Static or Dynamically linked(?)
@@ -76,9 +128,12 @@ func GenSnapshotFile(pid uint32, dir string) error {
 	// Network interface status?
 	// ownership/permissions on pertinent files/unix sockets
 	// dns on pertinent host names
-	*/
+
+	// Create json structure
+	jsonSnapshot, _ := json.MarshalIndent(s, "", " ")
 
 	// Open and Write file to dir
+	_ = ioutil.WriteFile(dir+"/test.json", jsonSnapshot, 0644)
 
 	return nil
 }

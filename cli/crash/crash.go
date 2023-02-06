@@ -145,6 +145,10 @@ func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler, procName, pro
 
 	// Source: /proc or linux
 	p, err := process.NewProcess(int32(pid))
+	if err != nil {
+		log.Error().Err(err).Msgf("error getting process for pid %d", pid)
+		return err
+	}
 	s.Username, err = p.Username()
 	if err != nil {
 		log.Error().Err(err).Msgf("error getting username for pid %d", pid)
@@ -205,7 +209,13 @@ func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler, procName, pro
 	return nil
 }
 
-// Resume sends a signal to the process allowing it to resume
-func Resume(pid uint32) {
-	// TODO
+// Resume sends a SIGCONT signal to the process allowing it to resume
+func Resume(pid uint32) error {
+	p, err := process.NewProcess(int32(pid))
+	if err != nil {
+		log.Error().Err(err).Msgf("error getting process for pid %d", pid)
+		return err
+	}
+
+	return p.SendSignal(18)
 }

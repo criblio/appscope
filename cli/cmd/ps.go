@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/criblio/scope/crash"
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
@@ -40,8 +39,6 @@ var psCmd = &cobra.Command{
 			{Name: "User", Field: "user"},
 			{Name: "Command", Field: "command"},
 		}, procs)
-
-		crash.GenFiles(7, 1, 1, 0, 0, "0x88453234", "top", "--refresh")
 	},
 }
 

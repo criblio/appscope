@@ -1,6 +1,7 @@
 #include "../vmlinux.h"
 #include <bpf/bpf_helpers.h>
 
+#define FILTER_SIGS 1
 #define COMM_LEN 128
 #define LAST_32_BITS(x) x & 0xFFFFFFFF
 #define FIRST_32_BITS(x) x >> 32
@@ -10,6 +11,9 @@
  * readers about signals that are likley to cause a crash
  * in an application. At this point the signals we pass are:
  * SIGSEGV, SIGBUS, SIGILL and SIGFPE
+ *
+ * bpf_printk output:
+ * sudo cat /sys/kernel/tracing/trace_pipe
  */
 
 /*
@@ -36,14 +40,6 @@ struct sigdel_data_t {
     unsigned char comm[COMM_LEN];
 };
 
-struct sigdel_data_t _edt = {0};
-
-struct {
-	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-	__uint(key_size, sizeof(u32));
-	__uint(value_size, sizeof(u32));
-} events SEC_GO(".maps");
-
 struct sigdel_args_t {
     unsigned short type;
     unsigned char flags;
@@ -56,15 +52,28 @@ struct sigdel_args_t {
     unsigned long sa_flags;
 };
 
+char LICENSE[] SEC_GO("license") = "GPL";
+
+struct {
+	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+	__uint(key_size, sizeof(u32));
+	__uint(value_size, sizeof(u32));
+} events SEC_GO(".maps");
+
 SEC_GO("tracepoint/signal/signal_deliver")
 int sig_deliver(struct sigdel_args_t *args)
 {
+#if FILTER_SIGS > 0
     // SIGSEGV, SIGBUS, SIGILL and SIGFPE
     if ((args->sig != 11) && (args->sig != 7) &&
-        (args->sig != 4) && (args->sig != 8)) return -1;
-
+        (args->sig != 4) && (args->sig != 8)) {
+        return 1;
+    }
+#endif
 	struct sigdel_data_t sigdel_data = {};
 	u64 pid_tgid;
+
+    //bpf_printk("sigdel started: %d\n", args->sig);
 
 	pid_tgid = bpf_get_current_pid_tgid();
 	sigdel_data.pid = LAST_32_BITS(pid_tgid);
@@ -106,5 +115,3 @@ int sig_deliver(struct sigdel_args_t *args)
 
 	return 0;
 }
-
-char LICENSE[] SEC_GO("license") = "GPL";

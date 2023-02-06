@@ -50,13 +50,26 @@ func Sigdel(sigEventChan chan SigEvent) error {
 	objs := gen_sigdelObjects{}
 
 	loadGen_sigdelObjects(&objs, nil)
-	link.Tracepoint("signal", "signal_deliver", objs.SigDeliver, nil)
+
+	/*
+     * Trace events/types are described in /sys/kernel/debug/tracing/events
+     * This must be consistent with the .maps section name in C code.
+     */
+	lnk, err := link.Tracepoint("signal", "signal_deliver", objs.SigDeliver, nil)
+	if err != nil {
+		fmt.Println("*** ERROR: Set Tracepoint ***")
+		return err
+	}
 
 	rd, err := perf.NewReader(objs.Events, os.Getpagesize())
 	if err != nil {
 		log.Error().Err(err)
 		return errors.New("reader err")
 	}
+
+	defer objs.SigDeliver.Close()
+	defer objs.Events.Close()
+	defer lnk.Close()
 
 	for {
 		ev, err := rd.Read()

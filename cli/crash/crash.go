@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/criblio/scope/internal"
+	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/v3/host"
@@ -64,10 +65,8 @@ type snapshot struct {
 // - cfg (where available)
 // - backtrace (where available)
 func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs string) error {
-
-	// where are we putting this stuff
-	// if session directory exists, write to sessiondir/snapshot/
-	// if not, write to /tmp/appscope/pid/
+	// TODO: If session directory exists, write to sessiondir/snapshot/
+	// If not, write to /tmp/appscope/pid/
 	dir := fmt.Sprintf("/tmp/appscope/%d", pid)
 	if !util.CheckDirExists(dir) {
 		if err := os.Mkdir(dir, os.ModePerm); err != nil {
@@ -76,31 +75,49 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs s
 		}
 	}
 
-	// retrieve info file
+	ld := loader.New()
+
+	// Retrieve info file if it doesn't exist
 	infoFile := fmt.Sprintf("%s/info", dir)
 	if !util.CheckFileExists(infoFile) {
-		// try to get from namespace?
+		// Try to get from namespace
+		_, err := ld.GetFile(infoFile, infoFile, int(pid))
+		if err != nil {
+			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", infoFile, pid)
+		}
 	}
 
-	// retrieve coredump file
+	// Retrieve coredump file if it doesn't exist
 	coreFile := fmt.Sprintf("%s/core", dir)
 	if !util.CheckFileExists(coreFile) {
-		// try to get from namespace?
+		// Try to get from namespace
+		_, err := ld.GetFile(coreFile, coreFile, int(pid))
+		if err != nil {
+			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", coreFile, pid)
+		}
 	}
 
-	// retrieve cfg file
+	// Retrieve cfg file if it doesn't exist
 	cfgFile := fmt.Sprintf("%s/cfg", dir)
 	if !util.CheckFileExists(cfgFile) {
-		// try to get from namespace?
+		// Try to get from namespace
+		_, err := ld.GetFile(cfgFile, cfgFile, int(pid))
+		if err != nil {
+			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", cfgFile, pid)
+		}
 	}
 
-	// retrieve backtrace file
+	// Retrieve backtrace file if it doesn't exist
 	backtraceFile := fmt.Sprintf("%s/backtrace", dir)
 	if !util.CheckFileExists(backtraceFile) {
-		// try to get from namespace?
+		// Try to get from namespace
+		_, err := ld.GetFile(backtraceFile, backtraceFile, int(pid))
+		if err != nil {
+			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", backtraceFile, pid)
+		}
 	}
 
-	// create snapshot file
+	// Create snapshot file
 	snapshotFile := fmt.Sprintf("%s/snapshot", dir)
 	if err := GenSnapshotFile(sig, errno, pid, uid, gid, sigHandler, procName, procArgs, snapshotFile); err != nil {
 		log.Error().Err(err).Msgf("error generating snapshot file")
@@ -150,8 +167,8 @@ func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler, procName, pro
 	}
 
 	// Source: namespace
-	// Distro, Distro version
-	// Hostname
+	// TODO: Distro, Distro version
+	// TODO: Hostname
 
 	// Maybe later:
 	// JRE version (if java)
@@ -186,4 +203,9 @@ func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler, procName, pro
 	}
 
 	return nil
+}
+
+// Resume sends a signal to the process allowing it to resume
+func Resume(pid uint32) {
+	// TODO
 }

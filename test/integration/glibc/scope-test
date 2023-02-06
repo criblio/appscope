@@ -249,6 +249,65 @@ fi
 
 endtest
 
+
+#
+# attach_...
+#   Tests that libscope.so calls the the signal handler of the
+#   test application (./sighandler) after calling libscope.so's handler.
+#   In this attach case, it proves we're able to figure out what test app
+#   handlers to call after the test app has already registered them.
+#
+cd /opt/sig_test
+
+for SIGNAL in SIGILL SIGBUS SIGFPE SIGSEGV
+do
+  for FUNCTION in signal sigaction
+  do
+    starttest attach_${SIGNAL}_using_${FUNCTION}
+    ./sighandler $FUNCTION > standardout.txt &
+    PID=`echo $!`
+    SCOPE_SNAPSHOT_COREDUMP=true scope attach $PID
+    sleep 1
+    kill -s $SIGNAL $PID
+    sleep 1
+    kill -s SIGCONT $PID
+    sleep 0.5
+    grep "Handling $SIGNAL from ./sighandler" standardout.txt
+    ERR+=$?
+    rm standardout.txt
+    endtest
+  done
+done
+
+
+#
+# preloaded_...
+#   Tests that libscope.so calls the the signal handler of the
+#   test application (./sighandler) after calling libscope.so's handler.
+#   In this preloaded case, it proves we're interposing "signal()"
+#   and "sigaction()" correctly.
+#
+cd /opt/sig_test
+
+for SIGNAL in SIGILL SIGBUS SIGFPE SIGSEGV
+do
+  for FUNCTION in signal sigaction
+  do
+    starttest preloaded_${SIGNAL}_using_${FUNCTION}
+    SCOPE_SNAPSHOT_COREDUMP=true scope run --passthrough -- ./sighandler $FUNCTION > standardout.txt &
+    PID=`echo $!`
+    sleep 1
+    kill -s $SIGNAL $PID
+    sleep 1
+    kill -s SIGCONT $PID
+    sleep 0.5
+    grep "Handling $SIGNAL from ./sighandler" standardout.txt
+    ERR+=$?
+    rm standardout.txt
+    endtest
+  done
+done
+
 if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""
     echo ""

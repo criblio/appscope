@@ -67,6 +67,7 @@ echo "Running Library Tests"
 run_test test/${OS}/vdsotest
 run_test test/${OS}/coredumptest
 run_test test/${OS}/ipctest
+run_test test/${OS}/snapshottest
 run_test test/${OS}/strsettest
 run_test test/${OS}/cfgutilstest
 run_test test/${OS}/cfgtest

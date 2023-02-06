@@ -3,6 +3,6 @@
 
 #include "scopetypes.h"
 
-bool coreDumpGenerate(const char *, size_t, pid_t);
+bool coreDumpGenerate(const char *);
 
 #endif // __COREDUMP_H__

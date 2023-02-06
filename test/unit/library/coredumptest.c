@@ -8,17 +8,6 @@
 
 #include "test.h"
 
-static char *
-generateLongFileName(size_t max){
-    char *ptr = scope_calloc(1, sizeof(char) * (max + 1));
-    ptr[0] = '/';
-    for (int i = 1; i < max ;++i) {
-        ptr[i] = 'a';
-    }
-
-    return ptr;
-}
-
 // Basic check if file specified in path is a core file
 static bool
 checkIfElfCoreFile(const char* path) {
@@ -68,16 +57,6 @@ end:
 }
 
 static void
-coreDumpFailureTooLongPath(void** state) {
-    char *path = generateLongFileName(PATH_MAX);
-    pid_t pid = scope_getpid();
-
-    bool coreRes = coreDumpGenerate(path, scope_strlen(path), pid);
-    assert_false(coreRes);
-    scope_free(path);
-}
-
-static void
 coreDumpSuccess(void** state) {
     char *prefix = "/tmp/scope_core.";
     bool res;
@@ -87,7 +66,7 @@ coreDumpSuccess(void** state) {
     pid_t pid = scope_getpid();
     scope_snprintf(pathBuf, sizeof(pathBuf), "%s%d", prefix, pid);
 
-    res = coreDumpGenerate(prefix, scope_strlen(prefix), pid);
+    res = coreDumpGenerate(pathBuf);
     assert_true(res);
 
     res = checkIfElfCoreFile(pathBuf);
@@ -102,7 +81,6 @@ main(int argc, char* argv[]) {
     printf("running %s\n", argv[0]);
 
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(coreDumpFailureTooLongPath),
         cmocka_unit_test(coreDumpSuccess),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };

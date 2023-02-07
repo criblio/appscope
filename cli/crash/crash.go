@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/criblio/scope/internal"
+	"github.com/criblio/scope/ipc"
 	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
@@ -68,11 +69,15 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs s
 	// TODO: If session directory exists, write to sessiondir/snapshot/
 	// If not, write to /tmp/appscope/pid/
 	dir := fmt.Sprintf("/tmp/appscope/%d", pid)
-	if !util.CheckDirExists(dir) {
-		if err := os.Mkdir(dir, os.ModePerm); err != nil {
-			log.Error().Err(err).Msgf("error creating snapshot directory")
-			return err
-		}
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		log.Error().Err(err).Msgf("error creating snapshot directory")
+		return err
+	}
+
+	// Get pid of process inside namespace
+	_, nsPid, err := ipc.IpcNsLastPidFromPid(ipc.IpcPidCtx{Pid: int(pid), PrefixPath: ""})
+	if err != nil {
+		log.Warn().Err(err).Msgf("Unable to get nspid for pid %d", pid)
 	}
 
 	ld := loader.New()
@@ -81,7 +86,8 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs s
 	infoFile := fmt.Sprintf("%s/info", dir)
 	if !util.CheckFileExists(infoFile) {
 		// Try to get from namespace
-		_, err := ld.GetFile(infoFile, infoFile, int(pid))
+		infoFileNs := fmt.Sprintf("/tmp/appscope/%d/info", nsPid)
+		_, err := ld.GetFile(infoFileNs, infoFile, int(pid))
 		if err != nil {
 			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", infoFile, pid)
 		}
@@ -91,7 +97,8 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs s
 	coreFile := fmt.Sprintf("%s/core", dir)
 	if !util.CheckFileExists(coreFile) {
 		// Try to get from namespace
-		_, err := ld.GetFile(coreFile, coreFile, int(pid))
+		coreFileNs := fmt.Sprintf("/tmp/appscope/%d/info", nsPid)
+		_, err := ld.GetFile(coreFileNs, coreFile, int(pid))
 		if err != nil {
 			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", coreFile, pid)
 		}
@@ -101,7 +108,8 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs s
 	cfgFile := fmt.Sprintf("%s/cfg", dir)
 	if !util.CheckFileExists(cfgFile) {
 		// Try to get from namespace
-		_, err := ld.GetFile(cfgFile, cfgFile, int(pid))
+		cfgFileNs := fmt.Sprintf("/tmp/appscope/%d/info", nsPid)
+		_, err := ld.GetFile(cfgFileNs, cfgFile, int(pid))
 		if err != nil {
 			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", cfgFile, pid)
 		}
@@ -111,7 +119,8 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs s
 	backtraceFile := fmt.Sprintf("%s/backtrace", dir)
 	if !util.CheckFileExists(backtraceFile) {
 		// Try to get from namespace
-		_, err := ld.GetFile(backtraceFile, backtraceFile, int(pid))
+		backtraceFileNs := fmt.Sprintf("/tmp/appscope/%d/info", nsPid)
+		_, err := ld.GetFile(backtraceFileNs, backtraceFile, int(pid))
 		if err != nil {
 			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", backtraceFile, pid)
 		}

@@ -74,6 +74,13 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs s
 		return err
 	}
 
+	// Where are we; Where is the pid?
+	// Host ; Host
+	// Host ; Container
+	// Container ; This Container
+	// Container ; Host
+	// Container ; Another Container
+
 	// Get pid of process inside namespace
 	_, nsPid, err := ipc.IpcNsLastPidFromPid(ipc.IpcPidCtx{Pid: int(pid), PrefixPath: ""})
 	if err != nil {

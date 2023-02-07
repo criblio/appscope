@@ -21,9 +21,9 @@ var daemonCmd = &cobra.Command{
 		for {
 			select {
 			case sigEvent := <-sigEventChan:
-				fmt.Printf("Signal CPU: %02d signal %d errno %d handler 0x%x pid: %d app %s\n",
+				fmt.Printf("Signal CPU: %02d signal %d errno %d handler 0x%x pid: %d uid: %d gid: %d app %s\n",
 					sigEvent.CPU, sigEvent.Sig, sigEvent.Errno, sigEvent.Handler,
-					sigEvent.Pid, sigEvent.Comm)
+					sigEvent.Pid, sigEvent.Uid, sigEvent.Gid, sigEvent.Comm)
 
 				/*
 					if err := crash.GenFiles(sigEvent.Pid, sigEvent.Sig, sigEvent.Errno); err != nil {

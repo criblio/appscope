@@ -23,6 +23,8 @@ type sigdel_data_t struct {
 	Sig     uint32
 	Errno   uint32
 	Code    uint32
+	Uid     uint32
+	Gid     uint32
 	Handler uint64
 	Flags   uint64
 	Comm    [32]byte

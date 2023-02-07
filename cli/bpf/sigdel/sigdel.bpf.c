@@ -35,6 +35,8 @@ struct sigdel_data_t {
     int sig;
     int errno;
     int code;
+    int uid;
+    int gid;
     unsigned long sa_handler;
     unsigned long sa_flags;
     unsigned char comm[COMM_LEN];
@@ -71,12 +73,17 @@ int sig_deliver(struct sigdel_args_t *args)
     }
 #endif
 	struct sigdel_data_t sigdel_data = {};
-	u64 pid_tgid;
+	u64 pid_tgid, uid_gid;;
 
     //bpf_printk("sigdel started: %d\n", args->sig);
 
 	pid_tgid = bpf_get_current_pid_tgid();
 	sigdel_data.pid = LAST_32_BITS(pid_tgid);
+
+    uid_gid = bpf_get_current_uid_gid();
+    sigdel_data.uid = LAST_32_BITS(uid_gid);
+    sigdel_data.gid = FIRST_32_BITS(uid_gid);
+
 
     if (bpf_probe_read(&sigdel_data.sig, sizeof(sigdel_data.sig), &args->sig) != 0) {
         bpf_printk("ERROR:sigdel:bpf_probe_read:sig number\n");

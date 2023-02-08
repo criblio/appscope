@@ -18,26 +18,26 @@ import (
 )
 
 type snapshot struct {
-	// Source: self (mostly via eBPF)
-	Time          time.Time // Time of Snapshot
-	Version       string    // AppScope Cli Version
-	SignalNumber  uint32    // Signal number
-	SignalHandler string    // Signal handler
-	Errno         uint32    // Error number
-	ProcessName   string    // Process Name
-	ProcessArgs   string    // Process Arguments
-	Pid           uint32    // PID
-	Uid           uint32    // User ID
-	Gid           uint32    // Group ID
+	// Source: self
+	Time    time.Time
+	Version string // AppScope Cli Version
 
-	// Source: /proc or linux
-	Username    string   // Username  	// ebpf later?
-	Environment []string // Environment Variables
-	Arch        string   // Machine Arch
-	Kernel      string   // Kernel version
+	// Source: /proc or linux (or eBPF signal)
+	Username      string
+	Environment   []string
+	Arch          string
+	Kernel        string
+	SignalNumber  uint32
+	SignalHandler string
+	Errno         uint32
+	ProcessName   string
+	ProcessArgs   string
+	Pid           uint32
+	Uid           uint32
+	Gid           uint32
 
 	// Source: namespace
-	Hostname string `json:",omitempty"` // Hostname
+	Hostname string `json:",omitempty"`
 
 	// Maybe later:
 	// Distro Version
@@ -76,86 +76,124 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs s
 		log.Error().Err(err).Msgf("error creating snapshot directory")
 		return err
 	}
-
-	// Where are we; Where is the pid?
-	// Host ; Host
-	// Host ; Container
-	// Container ; This Container
-	// Container ; Host
-	// Container ; Another Container
-
-	// Get pid of process inside namespace
-	_, nsPid, err := ipc.IpcNsLastPidFromPid(ipc.IpcPidCtx{Pid: int(pid), PrefixPath: ""})
-	if err != nil {
-		log.Warn().Err(err).Msgf("Unable to get nspid for pid %d", pid)
-	}
-
-	ld := loader.New()
-
-	// Retrieve info file if it doesn't exist
 	infoFile := fmt.Sprintf("%s/info", dir)
-	if !util.CheckFileExists(infoFile) {
-		// Try to get from namespace
-		infoFileNs := fmt.Sprintf("/tmp/appscope/%d/info", nsPid)
-		_, err := ld.GetFile(infoFileNs, infoFile, int(pid))
-		if err != nil {
-			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", infoFileNs, pid)
-		}
-	}
-
-	// Retrieve coredump file if it doesn't exist
 	coreFile := fmt.Sprintf("%s/core", dir)
-	if !util.CheckFileExists(coreFile) {
-		// Try to get from namespace
-		coreFileNs := fmt.Sprintf("/tmp/appscope/%d/core", nsPid)
-		_, err := ld.GetFile(coreFileNs, coreFile, int(pid))
-		if err != nil {
-			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", coreFileNs, pid)
-		}
-	}
-
-	// Retrieve cfg file if it doesn't exist
 	cfgFile := fmt.Sprintf("%s/cfg", dir)
-	if !util.CheckFileExists(cfgFile) {
-		// Try to get from namespace
-		cfgFileNs := fmt.Sprintf("/tmp/appscope/%d/cfg", nsPid)
-		_, err := ld.GetFile(cfgFileNs, cfgFile, int(pid))
-		if err != nil {
-			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", cfgFileNs, pid)
-		}
-	}
-
-	// Retrieve backtrace file if it doesn't exist
 	backtraceFile := fmt.Sprintf("%s/backtrace", dir)
-	if !util.CheckFileExists(backtraceFile) {
-		// Try to get from namespace
-		backtraceFileNs := fmt.Sprintf("/tmp/appscope/%d/backtrace", nsPid)
-		_, err := ld.GetFile(backtraceFileNs, backtraceFile, int(pid))
-		if err != nil {
-			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", backtraceFileNs, pid)
-		}
-	}
-
-	// Retrieve hostname file if it doesn't exist
-	// TODO: delete it after snapshot file created
 	hostnameFile := fmt.Sprintf("/etc/hostname")
-	hostnameFileDest := fmt.Sprintf("/etc/hostname")
-	if !util.CheckFileExists(hostnameFile) {
-		// Try to get from namespace
-		hostnameFileNs := fmt.Sprintf("/etc/hostname")
-		hostnameFileDest = fmt.Sprintf("%s/hostname", dir)
-		_, err := ld.GetFile(hostnameFileNs, hostnameFileDest, int(pid))
-		if err != nil {
-			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", hostnameFileNs, pid)
-		}
-	}
-
-	// Create snapshot file
 	snapshotFile := fmt.Sprintf("%s/snapshot", dir)
-	if err := GenSnapshotFile(sig, errno, pid, uid, gid, sigHandler, procName, procArgs, hostnameFileDest, snapshotFile); err != nil {
-		log.Error().Err(err).Msgf("error generating snapshot file")
+
+	// Is the pid provided in this container/this host?
+	pidInThisNs, err := ipc.IpcNsIsSame(ipc.IpcPidCtx{Pid: int(pid), PrefixPath: ""})
+	if err != nil {
+		log.Error().Err(err).Msgf("error determining namespace")
 		return err
 	}
+
+	// If process is in this container/this host (i.e. in this namespace) // proc/pid is visible
+	//		(pid provided must be of this container/this host's perspective)
+	//		crash files in place - do nothing here
+	//		hostname file in place - do nothing here
+	//		generate snapshot - call gensnapshot
+	//			get process username,environ - from /proc
+	if pidInThisNs {
+		// Info file
+		if !util.CheckFileExists(infoFile) {
+			log.Warn().Err(err).Msgf("Unable to find %s file for pid %d", infoFile, pid)
+		}
+
+		// Coredump file
+		if !util.CheckFileExists(coreFile) {
+			log.Warn().Err(err).Msgf("Unable to find %s file for pid %d", coreFile, pid)
+		}
+
+		// Cfg file
+		if !util.CheckFileExists(cfgFile) {
+			log.Warn().Err(err).Msgf("Unable to find %s file for pid %d", cfgFile, pid)
+		}
+
+		// Backtrace file
+		if !util.CheckFileExists(backtraceFile) {
+			log.Warn().Err(err).Msgf("Unable to find %s file for pid %d", backtraceFile, pid)
+		}
+
+		// Hostname file
+		if !util.CheckFileExists(hostnameFile) {
+			log.Warn().Err(err).Msgf("Unable to find %s file for pid %d", hostnameFile, pid)
+		}
+
+		// Snapshot file
+		if err := GenSnapshotFile(sig, errno, pid, uid, gid, sigHandler, procName, procArgs, hostnameFile, snapshotFile); err != nil {
+			log.Error().Err(err).Msgf("error generating snapshot file")
+			return err
+		}
+	}
+
+	// If process is in a container below us (i.e. in a below namespace) // proc/pid is visible
+	// 		(pid provided must be of this container/this host's perspective)
+	// 		get crash files - use --getfiles
+	// 		get hostname file - use --getfiles
+	// 		generate snapshot - call gensnapshot
+	// 			get process username,environ - from /proc
+	if !pidInThisNs {
+		// Get pid of process inside namespace
+		_, nsPid, err := ipc.IpcNsLastPidFromPid(ipc.IpcPidCtx{Pid: int(pid), PrefixPath: ""})
+		if err != nil {
+			log.Warn().Err(err).Msgf("Unable to get nspid for pid %d", pid)
+		}
+
+		nsDir := fmt.Sprintf("/tmp/appscope/%d", nsPid)
+		nsInfoFile := fmt.Sprintf("%s/info", nsDir)
+		nsCoreFile := fmt.Sprintf("%s/core", nsDir)
+		nsCfgFile := fmt.Sprintf("%s/cfg", nsDir)
+		nsBacktraceFile := fmt.Sprintf("%s/backtrace", nsDir)
+		nsHostnameFile := fmt.Sprintf("/etc/hostname")
+
+		ld := loader.New()
+
+		// Info file
+		if _, err = ld.GetFile(nsInfoFile, infoFile, int(pid)); err != nil {
+			log.Warn().Err(err).Msgf("Unable to get %s file from namespace for pid %d", nsInfoFile, pid)
+		}
+
+		// Coredump file
+		if _, err = ld.GetFile(nsCoreFile, coreFile, int(pid)); err != nil {
+			log.Warn().Err(err).Msgf("Unable to get %s file from namespace for pid %d", nsCoreFile, pid)
+		}
+
+		// Cfg file
+		if _, err = ld.GetFile(nsCfgFile, cfgFile, int(pid)); err != nil {
+			log.Warn().Err(err).Msgf("Unable to get %s file from namespace for pid %d", nsCfgFile, pid)
+		}
+
+		// Backtrace file
+		if _, err = ld.GetFile(nsBacktraceFile, backtraceFile, int(pid)); err != nil {
+			log.Warn().Err(err).Msgf("Unable to get %s file from namespace for pid %d", nsBacktraceFile, pid)
+		}
+
+		// Hostname file
+		if _, err = ld.GetFile(nsHostnameFile, hostnameFile, int(pid)); err != nil {
+			log.Warn().Err(err).Msgf("Unable to get %s file from namespace for pid %d", nsHostnameFile, pid)
+		}
+
+		// Snapshot file
+		if err := GenSnapshotFile(sig, errno, pid, uid, gid, sigHandler, procName, procArgs, hostnameFile, snapshotFile); err != nil {
+			log.Error().Err(err).Msgf("error generating snapshot file")
+			return err
+		}
+
+		// TODO delete hostname file
+	}
+
+	// If process is in a parallel container or a host above (i.e. in an above / parallel namespace) // proc/pid not visible unless hostfs
+	//		(pid provided must be of the hosts perspective)
+	//		(requires --privileged flag)
+	//		get crash files - use --getfiles
+	//		get hostname file - use --getfiles
+	//		generate snapshot - call gensnapshot
+	//			get process username,environ - from /proc using --getfiles
+
+	// Unsupported at this time.
 
 	return nil
 }
@@ -164,19 +202,23 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs s
 func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs, hostnameFilePath, filePath string) error {
 	var s snapshot
 
-	// Source: self (mostly via eBPF)
+	// Source: self
 	s.Time = time.Now()
 	s.Version = internal.GetVersion()
-	s.SignalNumber = sig
-	s.SignalHandler = sigHandler
-	s.Errno = errno
-	s.ProcessName = procName
-	s.ProcessArgs = procArgs
 	s.Pid = pid
-	s.Uid = uid
-	s.Gid = gid
 
-	// Source: /proc or linux
+	// Source: /proc or linux (or eBPF signal)
+	var err error
+	s.Arch, err = host.KernelArch()
+	if err != nil {
+		log.Error().Err(err).Msgf("error getting kernel arch")
+		return err
+	}
+	s.Kernel, err = host.KernelVersion()
+	if err != nil {
+		log.Error().Err(err).Msgf("error getting kernel version")
+		return err
+	}
 	p, err := process.NewProcess(int32(pid))
 	if err != nil {
 		log.Error().Err(err).Msgf("error getting process for pid %d", pid)
@@ -192,15 +234,37 @@ func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler, procName, pro
 		log.Error().Err(err).Msgf("error getting environment for pid %d", pid)
 		return err
 	}
-	s.Arch, err = host.KernelArch()
-	if err != nil {
-		log.Error().Err(err).Msgf("error getting kernel arch")
-		return err
-	}
-	s.Kernel, err = host.KernelVersion()
-	if err != nil {
-		log.Error().Err(err).Msgf("error getting kernel version")
-		return err
+	if sig == 0 { // Initiated by snapshot command, need to get these values ourselves
+		uids, err := p.Uids()
+		if err != nil {
+			log.Error().Err(err).Msgf("error getting uid for pid %d", pid)
+			util.ErrAndExit(err.Error())
+		}
+		s.Uid = uint32(uids[0])
+		gids, err := p.Gids()
+		if err != nil {
+			log.Error().Err(err).Msgf("error getting gid for pid %d", pid)
+			util.ErrAndExit(err.Error())
+		}
+		s.Gid = uint32(gids[0])
+		s.ProcessName, err = p.Name()
+		if err != nil {
+			log.Error().Err(err).Msgf("error getting name for pid %d", pid)
+			util.ErrAndExit(err.Error())
+		}
+		s.ProcessArgs, err = p.Cmdline()
+		if err != nil {
+			log.Error().Err(err).Msgf("error getting args for pid %d", pid)
+			util.ErrAndExit(err.Error())
+		}
+	} else { // Initiated by signal, we know these values
+		s.SignalNumber = sig
+		s.SignalHandler = sigHandler
+		s.Errno = errno
+		s.Uid = uid
+		s.Gid = gid
+		s.ProcessName = procName
+		s.ProcessArgs = procArgs
 	}
 
 	// Source: namespace

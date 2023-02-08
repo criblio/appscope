@@ -135,7 +135,7 @@ func newIPC(pidCtx IpcPidCtx) (*ipcObj, error) {
 	restoreGid := os.Getegid()
 	restoreUid := os.Geteuid()
 
-	ipcSame, err := ipcNsIsSame(pidCtx)
+	ipcSame, err := IpcNsIsSame(pidCtx)
 	if err != nil {
 		return nil, err
 	}

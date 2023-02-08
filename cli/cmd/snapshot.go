@@ -7,8 +7,6 @@ import (
 	"github.com/criblio/scope/crash"
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/util"
-	"github.com/rs/zerolog/log"
-	"github.com/shirou/gopsutil/v3/process"
 	"github.com/spf13/cobra"
 )
 
@@ -37,34 +35,7 @@ var snapshotCmd = &cobra.Command{
 			util.ErrAndExit("error parsing PID argument")
 		}
 
-		// Get process properties
-		p, err := process.NewProcess(int32(pid))
-		if err != nil {
-			log.Error().Err(err).Msgf("error getting process for pid %d", pid)
-			util.ErrAndExit(err.Error())
-		}
-		uids, err := p.Uids()
-		if err != nil {
-			log.Error().Err(err).Msgf("error getting uid for pid %d", pid)
-			util.ErrAndExit(err.Error())
-		}
-		gids, err := p.Gids()
-		if err != nil {
-			log.Error().Err(err).Msgf("error getting gid for pid %d", pid)
-			util.ErrAndExit(err.Error())
-		}
-		procName, err := p.Name()
-		if err != nil {
-			log.Error().Err(err).Msgf("error getting name for pid %d", pid)
-			util.ErrAndExit(err.Error())
-		}
-		procArgs, err := p.Cmdline()
-		if err != nil {
-			log.Error().Err(err).Msgf("error getting args for pid %d", pid)
-			util.ErrAndExit(err.Error())
-		}
-
-		err = crash.GenFiles(0, 0, uint32(pid), uint32(uids[0]), uint32(gids[0]), "", procName, procArgs)
+		err = crash.GenFiles(0, 0, uint32(pid), 0, 0, "", "", "")
 		if err != nil {
 			util.ErrAndExit(err.Error())
 		}

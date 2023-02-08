@@ -18,8 +18,8 @@ var (
 	errGetProcUidMap = errors.New("error getting process uid map")
 )
 
-// ipcNsIsSame compare own IPC namespace with specified pid
-func ipcNsIsSame(pidCtx IpcPidCtx) (bool, error) {
+// IpcNsIsSame compare own IPC namespace with specified pid
+func IpcNsIsSame(pidCtx IpcPidCtx) (bool, error) {
 	selfFi, err := os.Stat("/proc/self/ns/ipc")
 	if err != nil {
 		return false, err

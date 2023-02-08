@@ -640,6 +640,34 @@ apt_go_install() {
     fi
 }
 
+apt_bpf_exists() {
+    if bpftool version &>/dev/null; then
+        echo "bpf appears to be installed; doing nothing for bpf."
+    else
+        echo "bpf is not currently installed."
+        return 1
+    fi
+}
+
+apt_bpf_install() {
+    echo "Installing bpf."
+    sudo apt update
+    sudo apt install -y libbpf-dev linux-tools-`uname -r`
+    if [ $? = 0 ]; then
+        echo "Installation of bpf was successful."
+    else
+        echo "Installation of bpf failed."
+        FAILED=1
+    fi
+    sudo ln -s /usr/lib/llvm-*/bin/llvm-strip /usr/bin/llvm-strip
+    if [ $? = 0 ]; then
+        echo "Link of required executables for bpf was successful."
+    else
+        echo "Link of required executables for bpf  failed."
+        FAILED=1
+    fi
+}
+
 apt_dump_versions() {
     # The crazy sed stuff at the end of each just provides indention.
     if lsb_release -d &>/dev/null; then
@@ -684,6 +712,9 @@ apt_install() {
     fi
     if ! upx_exists; then
         upx_install
+    fi
+    if ! apt_bpf_exists; then
+        apt_bpf_install
     fi
 
 

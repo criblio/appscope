@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/criblio/scope/internal"
@@ -36,11 +37,10 @@ type snapshot struct {
 	Kernel      string   // Kernel version
 
 	// Source: namespace
-	Distro        string // Distro
-	DistroVersion string // Distro version
-	Hostname      string // Hostname
+	Hostname string `json:",omitempty"` // Hostname
 
 	// Maybe later:
+	// Distro Version
 	// JRE version (if java)
 	// Go version (if go)
 	// Static or Dynamically linked(?)
@@ -66,6 +66,9 @@ type snapshot struct {
 // - cfg (where available)
 // - backtrace (where available)
 func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs string) error {
+	// Create a history directory for logs
+	createWorkDir("snapshot")
+
 	// TODO: If session directory exists, write to sessiondir/snapshot/
 	// If not, write to /tmp/appscope/pid/
 	dir := fmt.Sprintf("/tmp/appscope/%d", pid)
@@ -96,7 +99,7 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs s
 		infoFileNs := fmt.Sprintf("/tmp/appscope/%d/info", nsPid)
 		_, err := ld.GetFile(infoFileNs, infoFile, int(pid))
 		if err != nil {
-			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", infoFile, pid)
+			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", infoFileNs, pid)
 		}
 	}
 
@@ -104,10 +107,10 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs s
 	coreFile := fmt.Sprintf("%s/core", dir)
 	if !util.CheckFileExists(coreFile) {
 		// Try to get from namespace
-		coreFileNs := fmt.Sprintf("/tmp/appscope/%d/info", nsPid)
+		coreFileNs := fmt.Sprintf("/tmp/appscope/%d/core", nsPid)
 		_, err := ld.GetFile(coreFileNs, coreFile, int(pid))
 		if err != nil {
-			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", coreFile, pid)
+			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", coreFileNs, pid)
 		}
 	}
 
@@ -115,10 +118,10 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs s
 	cfgFile := fmt.Sprintf("%s/cfg", dir)
 	if !util.CheckFileExists(cfgFile) {
 		// Try to get from namespace
-		cfgFileNs := fmt.Sprintf("/tmp/appscope/%d/info", nsPid)
+		cfgFileNs := fmt.Sprintf("/tmp/appscope/%d/cfg", nsPid)
 		_, err := ld.GetFile(cfgFileNs, cfgFile, int(pid))
 		if err != nil {
-			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", cfgFile, pid)
+			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", cfgFileNs, pid)
 		}
 	}
 
@@ -126,16 +129,30 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs s
 	backtraceFile := fmt.Sprintf("%s/backtrace", dir)
 	if !util.CheckFileExists(backtraceFile) {
 		// Try to get from namespace
-		backtraceFileNs := fmt.Sprintf("/tmp/appscope/%d/info", nsPid)
+		backtraceFileNs := fmt.Sprintf("/tmp/appscope/%d/backtrace", nsPid)
 		_, err := ld.GetFile(backtraceFileNs, backtraceFile, int(pid))
 		if err != nil {
-			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", backtraceFile, pid)
+			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", backtraceFileNs, pid)
+		}
+	}
+
+	// Retrieve hostname file if it doesn't exist
+	// TODO: delete it after snapshot file created
+	hostnameFile := fmt.Sprintf("/etc/hostname")
+	hostnameFileDest := fmt.Sprintf("/etc/hostname")
+	if !util.CheckFileExists(hostnameFile) {
+		// Try to get from namespace
+		hostnameFileNs := fmt.Sprintf("/etc/hostname")
+		hostnameFileDest = fmt.Sprintf("%s/hostname", dir)
+		_, err := ld.GetFile(hostnameFileNs, hostnameFileDest, int(pid))
+		if err != nil {
+			log.Warn().Err(err).Msgf("Unable to get %s file from namespace pid %d", hostnameFileNs, pid)
 		}
 	}
 
 	// Create snapshot file
 	snapshotFile := fmt.Sprintf("%s/snapshot", dir)
-	if err := GenSnapshotFile(sig, errno, pid, uid, gid, sigHandler, procName, procArgs, snapshotFile); err != nil {
+	if err := GenSnapshotFile(sig, errno, pid, uid, gid, sigHandler, procName, procArgs, hostnameFileDest, snapshotFile); err != nil {
 		log.Error().Err(err).Msgf("error generating snapshot file")
 		return err
 	}
@@ -144,7 +161,7 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs s
 }
 
 // GenSnapshotFile generates the snapshot file for a given pid
-func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs string, filePath string) error {
+func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs, hostnameFilePath, filePath string) error {
 	var s snapshot
 
 	// Source: self (mostly via eBPF)
@@ -187,8 +204,10 @@ func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler, procName, pro
 	}
 
 	// Source: namespace
-	// TODO: Distro, Distro version
-	// TODO: Hostname
+	hfBytes, err := ioutil.ReadFile(hostnameFilePath)
+	if err == nil {
+		s.Hostname = strings.TrimSpace(string(hfBytes))
+	}
 
 	// Create json structure
 	jsonSnapshot, err := json.MarshalIndent(s, "", "  ")

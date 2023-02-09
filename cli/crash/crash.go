@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/criblio/scope/internal"
@@ -72,6 +73,7 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs s
 	// TODO: If session directory exists, write to sessiondir/snapshot/
 	// If not, write to /tmp/appscope/pid/
 	dir := fmt.Sprintf("/tmp/appscope/%d", pid)
+	syscall.Umask(0)
 	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 		log.Error().Err(err).Msgf("error creating snapshot directory")
 		return err

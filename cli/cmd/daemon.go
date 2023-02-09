@@ -8,8 +8,9 @@ import (
 )
 
 /* Args Matrix (X disallows)
- *                 filedest
+ *                 filedest 	sendcore
  * filedest        -
+ * sendcore                     -
  */
 
 // daemonCmd represents the daemon command
@@ -21,14 +22,9 @@ var daemonCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		filedest, _ := cmd.Flags().GetString("filedest")
+		sendcore, _ := cmd.Flags().GetBool("sendcore")
 
-		// Example usage
-		if filedest != "" {
-			if err := daemon.SendFiles("/tmp/appscope/1", filedest); err != nil {
-				log.Error().Err(err)
-				util.ErrAndExit("error sending files to %s", filedest)
-			}
-		}
+		d := daemon.New(filedest)
 
 		/*
 			sigEventChan := make(chan sigdel.SigEvent)
@@ -49,19 +45,40 @@ var daemonCmd = &cobra.Command{
 					}
 
 					// If a network destination is specified, send crash files
-					if filedest != "" {
-						if err := daemon.SendFiles("/tmp/appscope/1", filedest); err != nil {
-							log.Error().Err(err)
-							util.ErrAndExit("error sending files to %s", filedest)
-						}
-					}
+					// See below example usage
 				}
 			}
 		*/
+
+		// Example usage
+		if filedest != "" {
+			if err := d.Connect(); err != nil {
+				log.Error().Err(err)
+				util.ErrAndExit("error starting daemon")
+			}
+			defer d.Disconnect()
+
+			files := []string{
+				"/tmp/appscope/150811/snapshot",
+				"/tmp/appscope/150811/backtrace",
+				"/tmp/appscope/150811/info",
+				"/tmp/appscope/150811/cfg",
+			}
+			if sendcore {
+				files = append(files, "/tmp/appscope/150811/core")
+			}
+
+			if err := d.SendFiles(files); err != nil {
+				log.Error().Err(err)
+				util.ErrAndExit("error sending files to %s", filedest)
+			}
+		}
+
 	},
 }
 
 func init() {
 	daemonCmd.Flags().StringP("filedest", "f", "", "Set destination for files (host:port defaults to tls://)")
+	daemonCmd.Flags().BoolP("sendcore", "s", false, "Include core file when sending files to network destination")
 	RootCmd.AddCommand(daemonCmd)
 }

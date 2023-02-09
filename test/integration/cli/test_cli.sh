@@ -327,6 +327,7 @@ starttest "Scope snapshot"
 
 top -b -d 1 > /dev/null &
 top_pid=$!
+sleep 2
 
 SCOPE_SNAPSHOT_COREDUMP=true SCOPE_SNAPSHOT_BACKTRACE=true scope --ldattach $top_pid
 returns 0

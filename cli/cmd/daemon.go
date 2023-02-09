@@ -56,7 +56,6 @@ var daemonCmd = &cobra.Command{
 				log.Error().Err(err)
 				util.ErrAndExit("error starting daemon")
 			}
-			defer d.Disconnect()
 
 			files := []string{
 				"/tmp/appscope/150811/snapshot",
@@ -72,6 +71,8 @@ var daemonCmd = &cobra.Command{
 				log.Error().Err(err)
 				util.ErrAndExit("error sending files to %s", filedest)
 			}
+
+			d.Disconnect()
 		}
 
 	},

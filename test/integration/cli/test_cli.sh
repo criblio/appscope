@@ -116,6 +116,8 @@ starttest "Attach by pid"
 sleep 1000 & 
 sleep_pid=$!
 
+sleep 1
+
 # Attach to sleep process
 run scope attach $sleep_pid
 returns 0

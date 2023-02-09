@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"github.com/criblio/scope/daemon"
+	"github.com/criblio/scope/util"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
 
@@ -12,7 +15,7 @@ import (
 // daemonCmd represents the daemon command
 var daemonCmd = &cobra.Command{
 	Use:     "daemon [flags]",
-	Short:   "Handle system behavior",
+	Short:   "Run the scope daemon",
 	Long:    `Listen and respond to system events.`,
 	Example: `scope daemon`,
 	Args:    cobra.NoArgs,
@@ -22,7 +25,8 @@ var daemonCmd = &cobra.Command{
 		// Example usage
 		if filedest != "" {
 			if err := daemon.SendFiles("/tmp/appscope/1", filedest); err != nil {
-				return err
+				log.Error().Err(err)
+				util.ErrAndExit("error sending files to %s", filedest)
 			}
 		}
 
@@ -47,7 +51,8 @@ var daemonCmd = &cobra.Command{
 					// If a network destination is specified, send crash files
 					if filedest != "" {
 						if err := daemon.SendFiles("/tmp/appscope/1", filedest); err != nil {
-							return err
+							log.Error().Err(err)
+							util.ErrAndExit("error sending files to %s", filedest)
 						}
 					}
 				}

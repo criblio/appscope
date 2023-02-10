@@ -250,10 +250,6 @@ fi
 endtest
 
 
-# debugging...  on some systems attach of SIGILL always fails...
-# (attach of all other signals is fine)  is kernel version involved?
-uname -a
-
 #
 # attach_...
 #   Tests that libscope.so calls the the signal handler of the

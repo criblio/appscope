@@ -1765,6 +1765,11 @@ init(void)
         cfg = cfgRead(path);
     }
 
+    // on aarch64, the crypto subsystem installs handlers for SIGILL
+    // (contrib/openssl/crypto/armcap.c) to determine which version of
+    // ARM processor we're on.  Do this before enableSnapshot() below.
+    transportInit();
+
     cfgProcessEnvironment(cfg);
 
     doConfig(cfg);
@@ -1871,7 +1876,11 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
      * Condition below must be inline with `snapshotErrorsSignals` array
      */
     if ((snapshotIsEnabled() == TRUE) && (act != NULL)) {
+        // if signum is part of the snapshotErrorsSignals, save the handler
+        // and set oldact, then return (without changing away from the
+        // snapshot handler)
         if (snapshotBackupAppSignalHandler(signum, act->sa_handler) == TRUE) {
+            oldact->sa_handler = act->sa_handler; // equivalent to signal above
             return 0;
         }
     }

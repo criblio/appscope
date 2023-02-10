@@ -341,6 +341,13 @@ shutdownTlsSession(transport_t *trans)
     }
 }
 
+
+void
+transportInit(void)
+{
+    OPENSSL_init_ssl(OPENSSL_INIT_NO_ATEXIT, NULL);
+}
+
 static void
 handle_tls_destroy(void)
 {
@@ -409,12 +416,6 @@ establishTlsSession(transport_t *trans)
 {
     if (!trans || trans->net.sock == -1) return FALSE;
     scopeLogInfo("fd:%d establishing tls session", trans->net.sock);
-
-    static int init_called = FALSE;
-    if (!init_called) {
-        OPENSSL_init_ssl(OPENSSL_INIT_NO_ATEXIT, NULL);
-        init_called = TRUE;
-    }
 
     trans->net.tls.ctx = SSL_CTX_new(TLS_method());
     if (!trans->net.tls.ctx) {

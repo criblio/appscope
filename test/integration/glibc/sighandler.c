@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 const char *progname;
@@ -42,6 +43,7 @@ handleit(char *signame)
     toStdout(" from ");
     toStdout(progname);
     toStdout("\n");
+    fsync(STDOUT_FILENO);
 }
 
 void handleIll(int signum) {handleit("SIGILL");}
@@ -124,7 +126,8 @@ main(int argc, char *argv[])
     registerSigHandlers(function);
 
     // wait a while for signal from the outside
-    sleep(30);
+    struct timespec time = {.tv_sec = 90, .tv_nsec = 0};
+    nanosleep(&time, NULL);
 
     printf("Ending execution of %s\n", progname);
     return 0;

@@ -34,6 +34,7 @@ bool                transportSupportsCommandControl(transport_t *);
 transport_status_t  transportConnectionStatus(transport_t *);
 
 // Misc
+void                transportInit(void);
 void                transportRegisterForExitNotification(void (*fn)(void));
 
 #endif // __TRANSPORT_H__

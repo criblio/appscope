@@ -259,7 +259,7 @@ endtest
 #
 cd /opt/sig_test
 
-for SIGNAL in SIGBUS SIGFPE SIGSEGV SIGILL
+for SIGNAL in SIGBUS SIGFPE SIGSEGV SIGILL SIGUSR2
 do
   for FUNCTION in signal sigaction
   do
@@ -268,11 +268,11 @@ do
     PID=`echo $!`
     sleep 1
     SCOPE_SNAPSHOT_COREDUMP=true scope attach $PID
-    sleep 2
-    kill -s $SIGNAL $PID
-    sleep 2
-    kill -s SIGCONT $PID
     sleep 1
+    kill -s $SIGNAL $PID
+    sleep 1
+    kill -s SIGCONT $PID
+    sleep 0.5
     grep "Handling $SIGNAL from ./sighandler" standardout.txt
     ERR+=$?
     rm standardout.txt
@@ -290,7 +290,7 @@ done
 #
 cd /opt/sig_test
 
-for SIGNAL in SIGBUS SIGFPE SIGSEGV SIGILL
+for SIGNAL in SIGBUS SIGFPE SIGSEGV SIGILL SIGUSR2
 do
   for FUNCTION in signal sigaction
   do

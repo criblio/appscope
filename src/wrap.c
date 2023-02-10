@@ -1819,7 +1819,9 @@ init(void)
              * Therefore, until that is investigated we don't
              * enable a timer/signal.
              */
-            threadInit();
+            if (!attachedFlag) {
+                threadInit();
+            }
         }
     } else {
         /*
@@ -1863,12 +1865,11 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 {
     WRAP_CHECK(sigaction, -1);
     /*
-     * If there is a handler being installed, just save it.
+     * If there is a handler being installed save it as it's installed.
      * If no handler, they may just be checking for the current handler.
      */
     if ((signum == SIGUSR2) && (act != NULL)) {
         g_thread.act = act; 
-        return 0;
     }
 
     /*

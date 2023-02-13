@@ -6,6 +6,12 @@
 #define LAST_32_BITS(x) x & 0xFFFFFFFF
 #define FIRST_32_BITS(x) x >> 32
 
+// Build on ubuntu 18
+#ifndef BPF_F_CURRENT_CPU
+#define BPF_F_INDEX_MASK 0xffffffffULL
+#define BPF_F_CURRENT_CPU BPF_F_INDEX_MASK
+#endif
+
 /*
  * Signals are filtered. We want to inform any user mode
  * readers about signals that are likley to cause a crash
@@ -80,13 +86,19 @@ int sig_deliver(struct sigdel_args_t *args)
     struct upid upid;
     struct ns_common ns;
 
-    task = bpf_get_current_task_btf();
-    if (!task) {
+    /*
+     * Note that we are not using bpf_probe_read_kernel_btf
+     * here as it does not work on older distros. So, an
+     * extra step is required to get the task.
+     */
+    u64 taskadd = bpf_get_current_task();
+    if (!taskadd) {
         bpf_printk("ERROR:%d:sigdel:get current task\n", __LINE__);
         return 0;
     }
 
     // TODO: add error checking
+    bpf_probe_read_kernel(&task, sizeof(task), &taskadd);
     bpf_probe_read_kernel(&pid, sizeof(pid), &task->thread_pid);
     bpf_probe_read_kernel(&level, sizeof(level), &pid->level);
     bpf_probe_read_kernel(&upid, sizeof(upid), &pid->numbers[level]);

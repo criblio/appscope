@@ -178,6 +178,9 @@ typedef struct
 #define DEFAULT_LOGSTREAM_CLOUD  FALSE
 #define DEFAULT_LOGSTREAM_LOGMSG "The following settings have been overridden by a LogStream connection: event, metric and payload transport, "
 
+#define DEFAULT_COREDUMP_ENABLE FALSE
+#define DEFAULT_BACKTRACE_ENABLE FALSE
+
 /*
  * This calculation is not what we need in the long run.
  * Not all events are rate limited; only metric events at this point.
@@ -207,7 +210,6 @@ typedef struct
 //    SCOPE_PAYLOAD_HEADER           write payload headers to files
 //    SCOPE_PAYLOAD_TO_DISK          if payloads are enabled, "true" forces writes to payload->dir
 //    SCOPE_ALLOW_CONSTRUCT_DBG      allows debug inside the constructor
-//    SCOPE_ERROR_SIGNAL_HANDLER     allows to register signal error handler for following signals: SIGSEGV, SIGBUS, SIGILL and SIGFPE
 //    SCOPE_QUEUE_LENGTH             override default circular buffer sizes
 //    SCOPE_START_NOPROFILE          cause the start command to ignore updates to /etc/profile.d
 //    SCOPE_START_FORCE_PROFILE      force the start command to update profile.d with a dev version

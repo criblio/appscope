@@ -77,3 +77,6 @@ libscope:
         enable: false
         validateserver: false
         cacertpath: ""
+  snapshot:
+    coredump: false
+    backtrace: false

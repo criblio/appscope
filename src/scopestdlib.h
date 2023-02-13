@@ -275,6 +275,7 @@ gid_t         scope_getegid(void);
 int           scope_seteuid(uid_t);
 int           scope_setegid(gid_t);
 gid_t         scope_getgid(void);
+pid_t         scope_getpgrp(void);
 void*         scope_dlopen(const char *, int);
 void*         scope_dlsym(void *, const char *);
 int           scope_dlclose(void *);

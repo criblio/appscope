@@ -35,6 +35,5 @@ transport_status_t  transportConnectionStatus(transport_t *);
 
 // Misc
 void                transportRegisterForExitNotification(void (*fn)(void));
-int                 transportSigSafeSend(transport_t *, const char *, size_t);
 
 #endif // __TRANSPORT_H__

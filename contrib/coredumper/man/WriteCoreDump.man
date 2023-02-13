@@ -1,0 +1,113 @@
+'\" t
+.TH WRITECOREDUMP 3 "Feb 15, 2007"
+.SH NAME
+WriteCoreDump, WriteCoreDumpWith, WriteCoreDumpLimited,
+WriteCoreDumpLimitedByPriority,  WriteCompressedCoreDump \- writes a snapshot of the
+current process
+.SH SYNOPSIS
+.ad l
+.PP
+.B "#include \*(lqgoogle/coredumper.h\*(rq"
+.PP
+.BI int\~WriteCoreDump(const\~char\~* file_name );
+.PP
+.BI int\~WriteCoreDumpWith(const\~char\ \:* file_name ,\ \:const\~struct\~Core\%Dump\%Parameters\ \:* params );
+.PP
+.BI int\~WriteCoreDumpLimited(const\~char\ \:* file_name ,\ \:size_t\~ \
+    \:max_length );
+.PP
+.BI int\~WriteCoreDumpLimitedByPriority(const\~char\ \:* file_name ,\ \:size_t\~ \
+    \:max_length );
+.HP 28
+.BI int\~Write\%Compressed\%Core\%Dump(const\~char\ \:* file_name \
+    ,\ \:size_t\ \: max_length ,\ \:const\~struct\~Coredumper\%Compressor\ \
+    \:compressors [],\ \:struct\~Coredumper\%Compressor\ \:** \
+    selected_compressor );
+.PP
+.ad b
+.SH DESCRIPTION
+The \fBWriteCoreDump\fP() function writes a core file to
+.IR file_name .
+The calling process continues running after the file has been
+written. This is a convenience wrapper for \fBWriteCoreDumpWith\fP() using the
+default parameters.
+.PP
+The \fBWriteCoreDumpWith\fP() function writes a core file to
+.IR file_name
+using the parameters specified in the
+\fBCoreDumpParameters\fP() structure. This allows for various combinations of
+configurations.
+.PP
+The \fBWriteCoreDumpLimited\fP() function restricts the maximum length
+of the written file. This is similar to what setting calling
+.BR setrlimit (2)
+does for system-generated core files. This is a convenience wrapper for
+\fBWriteCoreDumpWith\fP().
+.PP
+The \fBWriteCoreDumpLimitedByPriority\fP() function restricts the maximum length
+of the written file, however it does so by prioritizing smaller memory
+segments. This means that the core file is not truncated at the end of the
+file, as in
+\fBWriteCoreDumpLimited\fP(), but individual memory segments in the core file
+are truncated with the largest segments truncated first. This is a convenience
+wrapper for \fBWriteCoreDumpWith\fP().
+.PP
+The \fBWriteCompressedCoreDump\fP() function attempts to compress the
+core file on the fly, if a suitable
+.I compressor
+could be located.
+.PP
+If
+.IR selected_compressor
+is non-NULL, it will be set to the actual
+.I CoredumperCompressor
+object used.
+.PP
+The
+.I filename
+automatically has a suitable suffix appended to it. Normally this
+would be \*(lq.bz2\*(rq for
+.BR bzip2 (1)
+compression, \*(lq.gz\*(rq for
+.BR gzip (1)
+compression, or \*(lq.Z\*(rq for
+.BR compress (1)
+compression. This behavior can be changed by defining custom
+.I CoredumperCompressor
+descriptions. This is a convenience wrapper for \fBWriteCoreDumpWith\fP(). See
+the manual page for
+.BR GetCoreDump (3)
+for more details.
+.SH RETURN VALUE
+\fBWriteCoreDump\fP(), \fBWriteCoreDumpWith\fP(), \fBWriteCoreDumpLimited\fP(),
+\fBWriteCoreDumpLimitedByPriority\fP(), and
+\fBWriteCompressedCoreDump\fP() return zero on success and \-1 on
+failure. In case of failure,
+.I errno
+will be set appropriately.
+.SH ERRORS
+The most common reason for failure is for another process to already
+use the debugging API that is needed to generate the core
+files. This could, for instance, be
+.BR gdb (1),
+or
+.BR strace(1).
+.SH NOTES
+The coredumper functions momentarily suspend all threads, while
+creating a COW (copy-on-write) copy of the process's address space.
+.PP
+The functions are neither reentrant nor async signal safe. Callers
+should wrap a mutex around their invocation, if necessary.
+.PP
+The current implementation tries very hard to behave reasonably when
+called from a signal handler, but no guarantees are made that this
+will always work. Most importantly, it is the caller's responsibility
+to make sure that there are never more than one instance of functions
+from the \fBGetCoreDump\fP() or \fBWriteCoreDump\fP() family executing
+concurrently.
+.SH "SEE ALSO"
+.BR GetCoreDump (3),
+.BR GetCoreDumpWith (3),
+.BR GetCompressedCoreDump(3),
+and
+.BR CoreDumpParameters (3).

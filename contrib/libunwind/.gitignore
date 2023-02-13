@@ -8,6 +8,7 @@ bin
 
 .libs/
 .deps/
+m4/
 
 .dirstamp
 Makefile

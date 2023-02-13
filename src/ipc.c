@@ -237,7 +237,7 @@ ipcParseSingleFrame(const char *msgBuf, ssize_t msgLen, req_parse_status_t *pars
     // There is no scope data
     if (msgLen <= dataOffset) {
         *parseStatus = REQ_PARSE_MISSING_SCOPE_DATA_ERROR;
-        goto cleanJson;
+        goto cleanMetadata;
     }
     // Calculate the scope data length
     size_t dataLen = msgLen - dataOffset;
@@ -245,7 +245,7 @@ ipcParseSingleFrame(const char *msgBuf, ssize_t msgLen, req_parse_status_t *pars
     scopeMsg = scope_calloc(1, sizeof(char) * dataLen);
     if (!scopeMsg) {
         *parseStatus = REQ_PARSE_ALLOCATION_ERROR;
-        goto cleanJson;
+        goto cleanMetadata;
     }
     // Skip NUL char separator
     scope_memcpy(scopeMsg, msgBuf + dataOffset, dataLen);
@@ -254,6 +254,9 @@ ipcParseSingleFrame(const char *msgBuf, ssize_t msgLen, req_parse_status_t *pars
     if (reqKey->valueint == META_REQ_JSON_PARTIAL ) {
         *parseStatus = REQ_PARSE_PARTIAL;
     } 
+
+cleanMetadata:
+    scope_free(metaData);
 
 cleanJson:
     cJSON_Delete(msgJson);
@@ -418,6 +421,7 @@ ipcSendFailedResponse(mqd_t mqDes, size_t msgBufSize, req_parse_status_t parseSt
     res = ipcSendFrameWithRetry(mqDes, metadataBytes, metadataLen);
 
 end:
+    scope_free(metadataBytes);
     cJSON_Delete(meta);
     return res;
 }
@@ -502,13 +506,16 @@ ipcSendSuccessfulResponse(mqd_t mqDes, size_t msgBufSize, const char *scopeDataR
         return res;
     }
     char *scopeRespBytes = ipcRespScopeRespStr(scopeRespWrap);
+    if (!scopeRespBytes) {
+        goto destroyWrap;
+    }
     size_t scopeDataRemainLen = scope_strlen(scopeRespBytes);
     size_t scopeDataOffset = 0;
 
     // Allocate buffer to send out
     void *frame = scope_malloc(msgBufSize * sizeof(char));
     if (!frame) {
-        goto destroyWrap;
+        goto destroyScopeRespStr;
     }
 
     while (scopeDataRemainLen) {
@@ -524,6 +531,7 @@ ipcSendSuccessfulResponse(mqd_t mqDes, size_t msgBufSize, const char *scopeDataR
         // There is not sufficient place to use msg buffer 
         if (metadataLen >= msgBufSize) {
             res = RESP_UNSUFFICENT_MSGBUF_ERROR;
+            scope_free(metadataBytes);
             cJSON_Delete(metadataJson);
             goto destroyFrame;
         }
@@ -549,6 +557,7 @@ ipcSendSuccessfulResponse(mqd_t mqDes, size_t msgBufSize, const char *scopeDataR
         }
 
         scope_memcpy(frame, metadataBytes, metadataLen);
+        scope_free(metadataBytes);
         cJSON_Delete(metadataJson);
 
         // Copy the scope frame data
@@ -566,6 +575,9 @@ ipcSendSuccessfulResponse(mqd_t mqDes, size_t msgBufSize, const char *scopeDataR
 
 destroyFrame:
     scope_free(frame);
+
+destroyScopeRespStr:
+    scope_free(scopeRespBytes);
 
 destroyWrap:
     ipcRespWrapperDestroy(scopeRespWrap);

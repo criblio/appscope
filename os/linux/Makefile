@@ -8,6 +8,9 @@ SCOPE_VER:="$(shell git --no-pager describe --abbrev=12 --dirty=+ --always --tag
 LIBRARY_CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations -Werror=implicit-function-declaration -Werror=override-init -I contrib/ls-hpack $(if $(DEBUG),-DDEBUG) -DSCOPE_VER=\"$(SCOPE_VER)\"
 LOADER_CFLAGS=-fPIC -g -Wall -Wno-nonnull -Wno-deprecated-declarations -Werror=implicit-function-declaration -Werror=override-init -Wno-format-security -Wno-format-truncation -I contrib/ls-hpack $(if $(DEBUG),-DDEBUG) -DSCOPE_VER=\"$(SCOPE_VER)\" 
 TEST_CFLAGS=-g -Wall -Wno-nonnull -O0 -coverage -Wno-format-security -Wno-format-truncation -DSCOPE_VER=\"$(SCOPE_VER)\"
+ifdef FSAN
+TEST_CFLAGS+=-fsanitize=address
+endif
 YAML_DEFINES=-DYAML_VERSION_MAJOR="0" -DYAML_VERSION_MINOR="2" -DYAML_VERSION_PATCH="2" -DYAML_VERSION_STRING="\"0.2.2\""
 CJSON_DEFINES=-DENABLE_LOCALES
 YAML_SRC=$(wildcard contrib/libyaml/src/*.c)
@@ -18,10 +21,14 @@ OPENSSL_AR=contrib/build/openssl/libssl.a contrib/build/openssl/libcrypto.a
 LS_HPACK_AR=contrib/build/ls-hpack/libls-hpack.a
 MUSL_AR=contrib/build/musl/lib/libc.a
 UNWIND_AR=contrib/build/libunwind/src/.libs/libunwind.a
-TEST_AR=$(MUSL_AR) ${UNWIND_AR} $(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR} $(LS_HPACK_AR)
+COREDUMPER_AR=contrib/build/coredumper/.libs/libcoredumper.a
+TEST_AR=$(MUSL_AR) ${COREDUMPER_AR} ${UNWIND_AR} $(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR} $(LS_HPACK_AR)
 #TEST_LIB=contrib/build/cmocka/src/libcmocka.dylib
 TEST_LIB=contrib/build/cmocka/src/libcmocka.so
 TEST_LD_FLAGS=-Lcontrib/build/cmocka/src -lcmocka -ldl -lresolv -lrt -lpthread
+ifdef FSAN
+TEST_LD_FLAGS+=-Wl,--wrap=scopelibc_malloc -Wl,--wrap=scopelibc_free -Wl,--wrap=scopelibc_calloc -Wl,--wrap=scopelibc_realloc
+endif
 LIBRARY_INCLUDES=-I./src
 LOADER_INCLUDES=-I./src/loader
 CMOCKA_INCLUDES=-I./contrib/cmocka/include -I contrib/ls-hpack
@@ -49,6 +56,9 @@ $(MUSL_AR):
 
 $(UNWIND_AR):
 	@$(MAKE) -C contrib libunwind
+
+${COREDUMPER_AR}:
+	@$(MAKE) -C contrib coredumper
 
 $(OPENSSL_AR):
 	@$(MAKE) -C contrib openssl
@@ -86,7 +96,7 @@ $(LIBLOADER): src/loader/loader.c src/loader/nsinfo.c src/loader/nsfile.c src/lo
 
 $(SCOPEDYN): src/loader/scopedyn.c src/loader/loaderutils.c src/loader/libdir.c src/loader/libver.c src/loader/ns.c src/loader/nsinfo.c src/loader/setup.c src/loader/patch.c src/loader/nsfile.c
 	@echo "$${CI:+::group::}Building $@"
-	gcc -Wall -g $(LOADER_CFLAGS) \
+	$(CC) -Wall -g $(LOADER_CFLAGS) \
 	src/loader/scopedyn.c src/loader/loaderutils.c src/loader/libdir.c src/loader/libver.c src/loader/ns.c src/loader/nsinfo.c src/loader/setup.c src/loader/patch.c src/loader/nsfile.c \
 	-ldl -lrt -o $@ -I./os/$(OS) $(INCLUDES)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
@@ -95,8 +105,11 @@ $(SCOPEDYN): src/loader/scopedyn.c src/loader/loaderutils.c src/loader/libdir.c 
 libtest: $(LIBRARY_C_FILES) $(LIBRARY_TEST_C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
 	@echo "$${CI:+::group::}Building Library Tests"
 	$(CC) -c $(TEST_CFLAGS) $(LIBRARY_C_FILES) $(LIBRARY_INCLUDES) $(LIBRARY_TEST_C_FILES) $(INCLUDES) $(CMOCKA_INCLUDES) $(OS_C_FILES)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/ipctest ipctest.o ipc.o ipc_resp.o cfgutils.o cfg.o mtc.o log.o evtformat.o ctl.o transport.o backoff.o mtcformat.o strset.o com.o scopestdlib.o dbg.o circbuf.o linklist.o fn.o utils.o os.o test.o report.o search.o httpagg.o state.o httpstate.o metriccapture.o plattime.o $(TEST_AR) $(TEST_LD_FLAGS) -Wl,--wrap=jsonConfigurationObject -Wl,--wrap=doAndReplaceConfig
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/vdsotest vdsotest.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/coredumptest coredumptest.o coredump.o scopestdlib.o dbg.o utils.o fn.o plattime.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/ipctest ipctest.o ipc.o ipc_resp.o cfgutils.o cfg.o mtc.o log.o evtformat.o ctl.o transport.o backoff.o mtcformat.o strset.o com.o scopestdlib.o dbg.o circbuf.o linklist.o fn.o utils.o os.o test.o report.o search.o httpagg.o state.o httpstate.o metriccapture.o plattime.o $(TEST_AR) $(TEST_LD_FLAGS) -Wl,--wrap=jsonConfigurationObject -Wl,--wrap=doAndReplaceConfig
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/snapshottest snapshottest.o snapshot.o coredump.o scopestdlib.o dbg.o utils.o fn.o plattime.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/ostest ostest.o scopestdlib.o dbg.o fn.o utils.o plattime.o os.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/strsettest strsettest.o strset.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgutilstest cfgutilstest.o cfgutils.o cfg.o mtc.o log.o evtformat.o ctl.o transport.o backoff.o mtcformat.o strset.o com.o scopestdlib.o dbg.o circbuf.o linklist.o fn.o utils.o os.o test.o report.o search.o httpagg.o state.o httpstate.o metriccapture.o plattime.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/cfgtest cfgtest.o cfg.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS)

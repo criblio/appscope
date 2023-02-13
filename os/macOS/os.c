@@ -193,3 +193,13 @@ long long
 osGetProcCPU(void) {
     return -1;
 }
+
+bool
+osMemPermAllow(void *addr, size_t len, int flags, int extraflags) {
+    return FALSE;
+}
+
+bool
+osMemPermRestore(void *addr, size_t len, int flags) {
+    return FALSE;
+}

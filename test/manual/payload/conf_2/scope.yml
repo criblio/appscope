@@ -665,6 +665,26 @@ libscope:
       #
       buffer: line
 
+  # snapshot section describes the crash analysis section
+  #
+  snapshot:
+
+    # Enable generating coredump
+    #   Type:     boolean
+    #   Values:   true, false
+    #   Default:  false
+    #   Override: $SCOPE_SNAPSHOT_COREDUMP
+    #
+    coredump: false
+
+    # Enable generating backtrace
+    #   Type:     boolean
+    #   Values:   true, false
+    #   Default:  false
+    #   Override: $SCOPE_SNAPSHOT_BACKTRACE
+    #
+    backtrace: false
+
 # Settings for the `cribl` backend
 #
 cribl:

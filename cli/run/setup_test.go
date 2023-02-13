@@ -173,6 +173,9 @@ libscope:
         enable: false
         validateserver: false
         cacertpath: ""
+  snapshot:
+    coredump: false
+    backtrace: false
 `
 
 	expectedYaml = strings.Replace(expectedYaml, "VERBOSITY", strconv.Itoa(verbosity), 1)

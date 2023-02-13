@@ -181,6 +181,7 @@ extern gid_t           scopelibc_getegid(void);
 extern int             scopelibc_seteuid(uid_t);
 extern int             scopelibc_setegid(gid_t);
 extern gid_t           scopelibc_getgid(void);
+extern pid_t           scopelibc_getpgrp(void);
 extern void *          scopelibc_dlopen(const char *, int);
 extern int             scopelibc_dlclose(void *);
 extern void *          scopelibc_dlsym(void *, const char *);
@@ -1052,6 +1053,11 @@ scope_setegid(gid_t egid) {
 gid_t
 scope_getgid(void) {
     return scopelibc_getgid();
+}
+
+pid_t
+scope_getpgrp(void) {
+    return scopelibc_getpgrp();
 }
 
 void *

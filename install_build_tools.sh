@@ -247,6 +247,26 @@ yum_sudo_install() {
     fi
 }
 
+yum_curl_exists() {
+    if curl --version &>/dev/null; then
+        echo "curl is already installed; doing nothing for curl."
+    else
+        echo "curl is not already installed."
+        return 1
+    fi
+}
+
+yum_curl_install() {
+    echo "Installing curl."
+    yum install curl
+    if [ $? = 0 ]; then
+        echo "Installation of curl successful."
+    else
+        echo "Installation of curl failed."
+        FAILED=1
+    fi
+}
+
 yum_autoconf_exists() {
     if autoconf --version &>/dev/null; then
         echo "autoconf is already installed; doing nothing for autoconf."
@@ -429,6 +449,7 @@ yum_dump_versions() {
     fi
     yum --version | head -n1 | sed 's/^/      yum /'
     sudo --version | head -n1 | sed 's/^/      /'
+    curl --version | head -n1 | sed 's/^/      /'
     autoconf --version | head -n1 | sed 's/^/      /'
     make --version | head -n1 | sed 's/^/      /'
     automake --version | head -n1 | sed 's/^/      /'
@@ -444,6 +465,9 @@ yum_install() {
 
     if ! yum_sudo_exists; then
         yum_sudo_install
+    fi
+    if ! yum_curl_exists; then
+        yum_curl_install
     fi
     if ! yum_autoconf_exists; then
         yum_autoconf_install
@@ -511,6 +535,26 @@ apt_sudo_install() {
         echo "Installation of sudo successful."
     else
         echo "Installation of sudo failed."
+        FAILED=1
+    fi
+}
+
+apt_curl_exists() {
+    if curl --version &>/dev/null; then
+        echo "curl is already installed; doing nothing for curl."
+    else
+        echo "curl is not already installed."
+        return 1
+    fi
+}
+
+apt_curl_install() {
+    echo "Installing curl."
+    apt-get update && apt-get install curl
+    if [ $? = 0 ]; then
+        echo "Installation of curl successful."
+    else
+        echo "Installation of curl failed."
         FAILED=1
     fi
 }
@@ -685,6 +729,7 @@ apt_dump_versions() {
     fi
     apt-get --version | head -n1 | sed 's/^/      /'
     sudo --version | head -n1 | sed 's/^/      /'
+    curl --version | head -n1 | sed 's/^/      /'
     make --version | head -n1 | sed 's/^/      /'
     autoconf --version | head -n1 | sed 's/^/      /'
     libtool --version | head -n1 | sed 's/^/      /'
@@ -699,6 +744,9 @@ apt_install() {
 
     if ! apt_sudo_exists; then
         apt_sudo_install
+    fi
+    if ! apt_curl_exists; then
+        apt_curl_install
     fi
     if ! apt_make_exists; then
         apt_make_install

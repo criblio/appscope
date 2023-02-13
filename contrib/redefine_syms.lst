@@ -36,6 +36,7 @@ fwrite scopelibc_fwrite
 gai_strerror scopelibc_gai_strerror
 getaddrinfo scopelibc_getaddrinfo
 getentropy scopelibc_getentropy
+getpgrp scopelibc_getpgrp
 gethostbyname scopelibc_gethostbyname
 getnameinfo scopelibc_getnameinfo
 getpagesize scopelibc_getpagesize
@@ -79,6 +80,7 @@ shmat scopelibc_shmat
 shmdt scopelibc_shmdt
 shmget scopelibc_shmget
 shutdown scopelibc_shutdown
+snprintf scopelibc_snprintf
 socket scopelibc_socket
 sprintf scopelibc_sprintf
 sscanf scopelibc_sscanf

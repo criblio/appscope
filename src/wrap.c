@@ -38,7 +38,7 @@
 #include "runtimecfg.h"
 #include "javaagent.h"
 #include "ipc.h"
-#include "signalhandler.h"
+#include "snapshot.h"
 #include "scopestdlib.h"
 #include "../contrib/libmusl/musl.h"
 
@@ -91,6 +91,8 @@ doAndReplaceConfig(void *data) {
     }
     g_staticfg = cfg;
     g_cfg.staticfg = g_staticfg;
+    scope_free(g_cfg.cfgStr);
+    g_cfg.cfgStr = jsonStringFromCfg(g_staticfg);
 }
 
 // When used with dl_iterate_phdr(), this has a similar result to
@@ -610,9 +612,8 @@ remoteConfig()
                     break;
                 case REQ_SET_CFG:
                     if (req->cfg) {
-                        // Apply the config
-                        doConfig(req->cfg);
-                        g_staticfg = req->cfg;
+                        // Replace the config
+                        doAndReplaceConfig(req->cfg);
                     } else {
                         DBG(NULL);
                     }
@@ -759,6 +760,9 @@ dynConfig(void)
 
     // Apply the config
     doConfig(g_staticfg);
+    g_cfg.staticfg = g_staticfg;
+    scope_free(g_cfg.cfgStr);
+    g_cfg.cfgStr = jsonStringFromCfg(g_staticfg);
 
     return 0;
 }
@@ -1095,20 +1099,33 @@ logOurConnectionStatus(transport_status_t status, const char *name)
 }
 
 /*
-* List of signals used by scope error handler
+* List of signals used by snapshot error handler
 */
 static int
-scopeErrorsSignals[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
+snapshotErrorsSignals[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
 
+/*
+* Determine if the snapshot feature is enabled and
+* register the AppScope signal handler if it is enabled
+*/
 static void
-initSigErrorHandler(void)
-{
-    if (checkEnv("SCOPE_ERROR_SIGNAL_HANDLER", "true") && g_fn.sigaction) {
+enableSnapshot(config_t *cfg) {
+    snapshotSetCoredump(cfgSnapshotCoredumpEnable(cfg));
+    snapshotSetBacktrace(cfgSnapshotBacktraceEnable(cfg));
+    if (snapshotIsEnabled() == FALSE) {
+        return;
+    }
+
+    if (g_fn.sigaction) {
         struct sigaction act = { 0 };
-        act.sa_handler = (void (*))scopeSignalHandlerBacktrace;
+
+        act.sa_handler = (void (*))snapshotSignalHandler;
         act.sa_flags = SA_RESTART | SA_SIGINFO;
-        for (int i = 0; i < ARRAY_SIZE(scopeErrorsSignals); ++i) {
-            g_fn.sigaction(scopeErrorsSignals[i], &act, NULL);
+        for (int i = 0; i < ARRAY_SIZE(snapshotErrorsSignals); ++i) {
+            struct sigaction oldact = { 0 };
+            int sig = snapshotErrorsSignals[i];
+            g_fn.sigaction(sig, &act, &oldact);
+            snapshotBackupAppSignalHandler(sig, oldact.sa_handler);
         }
     }
 }
@@ -1126,9 +1143,9 @@ periodic(void *arg)
 
     sigset_t mask;
     scope_sigfillset(&mask);
-    if (checkEnv("SCOPE_ERROR_SIGNAL_HANDLER", "true")) {
-        for (int i = 0; i < ARRAY_SIZE(scopeErrorsSignals); ++i) {
-            scope_sigdelset(&mask, scopeErrorsSignals[i]);
+    if (snapshotIsEnabled() == TRUE) {
+        for (int i = 0; i < ARRAY_SIZE(snapshotErrorsSignals); ++i) {
+            scope_sigdelset(&mask, snapshotErrorsSignals[i]);
         }
     }
 
@@ -1524,6 +1541,22 @@ initHook(int attachedFlag, bool scopedFlag)
     if (should_we_patch || g_fn.__write_libc || g_fn.__write_pthread ||
         ((g_ismusl == FALSE) && g_fn.sendmmsg) ||
         ((g_ismusl == TRUE) && (g_fn.sendto || g_fn.recvfrom))) {
+
+        /*
+        * Check if we have proper permission to install hook function
+        * We need to have abilites to change permission of region memory
+        * using (PROT_WRITE + PROT_EXEC) flags
+        */
+        size_t testSize = 16;
+        void *ptr = scope_malloc(testSize);
+        if (osMemPermAllow(ptr, testSize, PROT_READ | PROT_WRITE, PROT_EXEC) == FALSE) {
+            scope_free(ptr);
+            scopeLogError("The system is not allowing processes related to DNS or console I/O to be scoped. Try setting MemoryDenyWriteExecute to false for the %s service.", g_proc.procname);
+            return;
+        }
+        scope_free(ptr);
+
+
         funchook = funchook_create();
 
         if (logLevel(g_log) <= CFG_LOG_TRACE) {
@@ -1580,8 +1613,9 @@ initHook(int attachedFlag, bool scopedFlag)
         // hook 'em
         rc = funchook_install(funchook, 0);
         if (rc != 0) {
-            scopeLogError("ERROR: failed to install SSL_read hook. (%s)\n",
+            scopeLogError("ERROR: failed to install funchook. (%s)\n",
                         funchook_error_message(funchook));
+            funchook_destroy(funchook);
             return;
         }
     }
@@ -1685,7 +1719,6 @@ init(void)
     initEnv(&attachedFlag);
 
     initState();
-    initSigErrorHandler();
 
     g_nsslist = lstCreate(freeNssEntry);
 
@@ -1752,6 +1785,11 @@ init(void)
     cfgProcessEnvironment(cfg);
 
     doConfig(cfg);
+
+    // Currently we enable snapshot feature only in case of constructor
+    // TODO: if we update the configuration via IPC it will not be updated
+    enableSnapshot(cfg);
+
     g_staticfg = cfg;
     if (path) scope_free(path);
     if (!g_dbg) dbgInit();
@@ -1759,6 +1797,7 @@ init(void)
 
     g_cfg.funcs_attached = scopedFlag;
     g_cfg.staticfg = g_staticfg;
+    g_cfg.cfgStr = jsonStringFromCfg(g_staticfg);
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
     // replaces atexit(handleExit);  Allows events to be reported before
@@ -1807,6 +1846,30 @@ init(void)
 
 }
 
+EXPORTOFF sighandler_t
+signal(int signum, sighandler_t handler) {
+    WRAP_CHECK(signal, NULL);
+
+    /*
+     * Prevent the situation to override our handler when it is enabled.
+     * Condition below must be inline with `snapshotErrorsSignals` array
+     */
+    if (snapshotIsEnabled() == TRUE) {
+        if (snapshotBackupAppSignalHandler(signum, handler) == TRUE) {
+            return handler;
+        }
+    }
+
+    return g_fn.signal(signum, handler);
+}
+
+EXPORTOFF int
+raise(int sig) {
+    WRAP_CHECK(raise, -1);
+
+    return g_fn.raise(sig);
+}
+
 EXPORTOFF int
 sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 {
@@ -1818,6 +1881,16 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
     if ((signum == SIGUSR2) && (act != NULL)) {
         g_thread.act = act; 
         return 0;
+    }
+
+    /*
+     * Prevent the situation to override our handler when it is enabled.
+     * Condition below must be inline with `snapshotErrorsSignals` array
+     */
+    if ((snapshotIsEnabled() == TRUE) && (act != NULL)) {
+        if (snapshotBackupAppSignalHandler(signum, act->sa_handler) == TRUE) {
+            return 0;
+        }
     }
 
     return g_fn.sigaction(signum, act, oldact);
@@ -5482,6 +5555,8 @@ wrap_scope_dlsym(void *handle, const char *name, void *who)
 
 static got_list_t inject_hook_list[] = {
     {"sigaction",   sigaction, &g_fn.sigaction},
+    {"signal",      signal, &g_fn.signal},
+    {"raise",       raise, &g_fn.raise},
     {"open",        open, &g_fn.open},
     {"openat",      openat, &g_fn.openat},
     {"fopen",       fopen, &g_fn.fopen},

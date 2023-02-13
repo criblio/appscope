@@ -26,12 +26,10 @@ extern log_t *g_log;
 extern mtc_t *g_mtc;
 extern ctl_t *g_ctl;
 
-#define WRAP_PRIV_SIZE (2)
-
 // Wrapper for scope message response
+// TODO: replace scopeRespWrapper with cJSON
 struct scopeRespWrapper{
     cJSON *resp;                // Scope message response
-    void *priv[WRAP_PRIV_SIZE]; // Additional resources allocated to create response
 };
 
 /*
@@ -44,9 +42,6 @@ respWrapperCreate(void) {
         return NULL;
     }
     wrap->resp = NULL;
-    for (int i = 0; i < WRAP_PRIV_SIZE; ++i) {
-        wrap->priv[i] = NULL;
-    }
     return wrap;
 }
 
@@ -56,12 +51,7 @@ respWrapperCreate(void) {
 void
 ipcRespWrapperDestroy(scopeRespWrapper *wrap) {
     if (wrap->resp) {
-        cJSON_free(wrap->resp);
-    }
-    for (int i = 0; i < WRAP_PRIV_SIZE; ++i) {
-        if (wrap->priv[i]) {
-            cJSON_free(wrap->priv[i]);
-        }  
+        cJSON_Delete(wrap->resp);
     }
 
     scope_free(wrap);
@@ -112,12 +102,12 @@ createCmdDesc(int id, const char *name) {
     }
 
     if (!cJSON_AddNumberToObject(cmdDesc, "id", id)) {
-        cJSON_free(cmdDesc);
+        cJSON_Delete(cmdDesc);
         return NULL;
     }
 
     if (!cJSON_AddStringToObject(cmdDesc, "name", name)) {
-        cJSON_free(cmdDesc);
+        cJSON_Delete(cmdDesc);
         return NULL;
     }
 
@@ -150,11 +140,10 @@ ipcRespGetScopeCmds(const cJSON * unused) {
         goto allocFail;
     }
 
-    wrap->priv[0] = metaCmds;
     for (int id = 0; id < ARRAY_SIZE(cmdMetaName); ++id){
         cJSON *singleCmd = createCmdDesc(id, cmdMetaName[id]);
         if (!singleCmd) {
-            goto allocFail;
+            goto metaCmdFail;
         }
         cJSON_AddItemToArray(metaCmds, singleCmd);
     }
@@ -162,20 +151,25 @@ ipcRespGetScopeCmds(const cJSON * unused) {
 
     cJSON *scopeCmds = cJSON_CreateArray();
     if (!scopeCmds) {
-        goto allocFail;
+        goto metaCmdFail;
     }
 
-    wrap->priv[1] = scopeCmds;
     for (int id = 0; id < ARRAY_SIZE(cmdScopeName); ++id){
         cJSON *singleCmd = createCmdDesc(id, cmdScopeName[id]);
         if (!singleCmd) {
-            goto allocFail;
+            goto scopeCmdFail;
         }
         cJSON_AddItemToArray(scopeCmds, singleCmd);
     }
     cJSON_AddItemToObjectCS(resp, "commands_scope", scopeCmds);
 
     return wrap;
+
+metaCmdFail:
+    cJSON_Delete(metaCmds);
+
+scopeCmdFail:
+    cJSON_Delete(scopeCmds);
 
 allocFail:
     ipcRespWrapperDestroy(wrap);
@@ -233,7 +227,6 @@ ipcRespGetScopeCfg(const cJSON *unused) {
         }
         return wrap;
     }
-    wrap->priv[0] = cfg;
 
     cJSON_AddItemToObjectCS(resp, "cfg", cfg);
     
@@ -271,6 +264,7 @@ ipcProcessSetCfg(const cJSON *scopeReq) {
     char *cfgStr = cJSON_PrintUnformatted(cfgKey);
     config_t *cfg = cfgFromString(cfgStr);
     doAndReplaceConfig(cfg);
+    scope_free(cfgStr);
     res = TRUE;
     return res;
 }
@@ -416,7 +410,7 @@ ipcRespGetTransportStatus(const cJSON *unused) {
     if (!interfaces) {
         goto allocFail;
     }
-    wrap->priv[0] = interfaces;
+
     for (int index = 0; index < ARRAY_SIZE(scope_interfaces); ++index) {
         int interfaceIndex = index;
         // Skip preparing the interface info if it is disabled
@@ -431,34 +425,40 @@ ipcRespGetTransportStatus(const cJSON *unused) {
 
         cJSON *singleInterface = cJSON_CreateObject();
         if (!singleInterface) {
-            goto allocFail;
+            goto interfaceFail;
         }
 
         transport_status_t status = scope_interfaces[interfaceIndex].status();
 
         if (!cJSON_AddStringToObject(singleInterface, "name", scope_interfaces[interfaceIndex].name)) {
-            goto allocFail;
+            cJSON_Delete(singleInterface);
+            goto interfaceFail;
         }
 
         if (!cJSON_AddStringToObject(singleInterface, "config", status.configString)) {
-            goto allocFail;
+            cJSON_Delete(singleInterface);
+            goto interfaceFail;
         }
 
         if (status.isConnected == TRUE) {
             if (!cJSON_AddTrueToObject(singleInterface, "connected")) {
-                goto allocFail;
+                cJSON_Delete(singleInterface);
+                goto interfaceFail;
             }
         } else {
             if (!cJSON_AddFalseToObject(singleInterface, "connected")) {
-                goto allocFail;
+                cJSON_Delete(singleInterface);
+                goto interfaceFail;
             }
             if (!cJSON_AddNumberToObject(singleInterface, "attempts", status.connectAttemptCount)) {
-                goto allocFail;
+                cJSON_Delete(singleInterface);
+                goto interfaceFail;
             }
 
             if (status.failureString) {
                 if (!cJSON_AddStringToObject(singleInterface, "failure_details", status.failureString)) {
-                    goto allocFail;
+                    cJSON_Delete(singleInterface);
+                    goto interfaceFail;
                 }
             }
         }
@@ -466,6 +466,9 @@ ipcRespGetTransportStatus(const cJSON *unused) {
     }
     cJSON_AddItemToObjectCS(resp, "interfaces", interfaces);
     return wrap;
+
+interfaceFail:
+    cJSON_Delete(interfaces);
 
 allocFail:
     ipcRespWrapperDestroy(wrap);

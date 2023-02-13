@@ -64,13 +64,19 @@ var daemonCmd = &cobra.Command{
 						fmt.Sprintf("/tmp/appscope/%d/info", pid),
 						fmt.Sprintf("/tmp/appscope/%d/cfg", pid),
 					}
-					if sendcore {
-						files = append(files, fmt.Sprintf("/tmp/appscope/%d/core", pid))
-					}
-
-					if err := d.SendFiles(files); err != nil {
+					if err := d.SendFiles(files, true); err != nil {
 						log.Error().Err(err)
 						util.ErrAndExit("error sending files to %s", filedest)
+					}
+
+					if sendcore {
+						files = []string{
+							fmt.Sprintf("/tmp/appscope/%d/core", pid),
+						}
+						if err := d.SendFiles(files, false); err != nil {
+							log.Error().Err(err)
+							util.ErrAndExit("error sending core file to %s", filedest)
+						}
 					}
 
 					d.Disconnect()

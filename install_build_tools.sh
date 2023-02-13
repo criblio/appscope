@@ -661,12 +661,20 @@ apt_bpf_install() {
     fi
     sudo ln -s /usr/lib/llvm-*/bin/llvm-strip /usr/bin/llvm-strip
     if [ $? = 0 ]; then
-        echo "Link of required executables for bpf was successful."
+        echo "Link of llvm executables for bpf was successful."
     else
-        echo "Link of required executables for bpf  failed."
+        echo "Link of llvm executables for bpf  failed."
+        FAILED=1
+    fi
+    sudo ln -s /usr/lib/linux-tools/`uname -r`/bpftool /usr/bin/bpftool
+    if [ $? = 0 ]; then
+        echo "Link of bpftool executables for bpf was successful."
+    else
+        echo "Link of bpftool executables for bpf  failed."
         FAILED=1
     fi
 }
+
 
 apt_dump_versions() {
     # The crazy sed stuff at the end of each just provides indention.

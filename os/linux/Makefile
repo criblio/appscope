@@ -25,7 +25,7 @@ COREDUMPER_AR=contrib/build/coredumper/.libs/libcoredumper.a
 TEST_AR=$(MUSL_AR) ${COREDUMPER_AR} ${UNWIND_AR} $(YAML_AR) $(JSON_AR) $(PCRE2_AR) ${OPENSSL_AR} $(LS_HPACK_AR)
 #TEST_LIB=contrib/build/cmocka/src/libcmocka.dylib
 TEST_LIB=contrib/build/cmocka/src/libcmocka.so
-TEST_LD_FLAGS=-Lcontrib/build/cmocka/src -lcmocka -ldl -lresolv -lrt -lpthread
+TEST_LD_FLAGS=-Lcontrib/build/cmocka/src -lcmocka -ldl -lresolv -lrt -lpthread -lz
 ifdef FSAN
 TEST_LD_FLAGS+=-Wl,--wrap=scopelibc_malloc -Wl,--wrap=scopelibc_free -Wl,--wrap=scopelibc_calloc -Wl,--wrap=scopelibc_realloc
 endif

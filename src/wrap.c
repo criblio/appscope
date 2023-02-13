@@ -1819,7 +1819,9 @@ init(void)
              * Therefore, until that is investigated we don't
              * enable a timer/signal.
              */
-            if (!attachedFlag) {
+            if (attachedFlag) {
+                threadNow(0);
+            } else {
                 threadInit();
             }
         }

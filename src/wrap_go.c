@@ -811,16 +811,18 @@ patch_addrs(funchook_t *funchook,
 }
 
 static void
-patchClone()
+patchClone(void)
 {
     void *clone = dlsym(RTLD_DEFAULT, "__clone");
     if (clone) {
         size_t pageSize = scope_getpagesize();
         void *addr = (void *)((ptrdiff_t) clone & ~(pageSize - 1));
 
-        // set write perms on the page
-        if (scope_mprotect(addr, pageSize, PROT_WRITE | PROT_READ | PROT_EXEC)) {
-            scopeLogError("ERROR: patchCLone: mprotect failed\n");
+        const int perm = PROT_READ | PROT_EXEC;
+
+        // Add write permission on the page
+        if (osMemPermAllow(addr, pageSize, perm, PROT_WRITE) == FALSE) {
+            scopeLogError("The system is not allowing processes to be scoped. Try setting MemoryDenyWriteExecute to false for the Go service.");
             return;
         }
 
@@ -832,9 +834,9 @@ patchClone()
 
         scopeLog(CFG_LOG_DEBUG, "patchClone: CLONE PATCHED\n");
 
-        // restore perms to the page
-        if (scope_mprotect(addr, pageSize, PROT_READ | PROT_EXEC)) {
-            scopeLogError("ERROR: patchCLone: mprotect restore failed\n");
+        // restore original permission to the page
+        if (osMemPermRestore(addr, pageSize, perm) == FALSE) {
+            scopeLogError("ERROR: patchClone: osMemPermRestore failed\n");
             return;
         }
     }
@@ -938,6 +940,7 @@ initGoHook(elf_buf_t *ebuf)
     if (ehdr->e_type == ET_DYN && (scopeGetGoAppStateStatic() == FALSE)) {
         if (getBaseAddress(&base) != 0) {
             sysprint("ERROR: can't get the base address\n");
+            funchook_destroy(funchook);
             return; // don't install our hooks
         }
         Elf64_Shdr* textSec = getElfSection(ebuf->buf, ".text");
@@ -977,9 +980,11 @@ initGoHook(elf_buf_t *ebuf)
         } else {
             scopeLogWarn("%s was either compiled with a version of go older than go1.4, or symbols have been stripped.  AppScope can only instrument go1.%d or newer, and requires symbols if compiled with a version of go older than go1.13.  Continuing without AppScope.", ebuf->cmd, MIN_SUPPORTED_GO_VER);
         }
+        funchook_destroy(funchook);
         return; // don't install our hooks
     } else if (g_go_minor_ver > MAX_SUPPORTED_GO_VER) {
         scopeLogWarn("%s was compiled with go version `%s`. Versions newer than Go 1.%d are not yet supported. Continuing without AppScope.", ebuf->cmd, go_runtime_version, MAX_SUPPORTED_GO_VER);
+        funchook_destroy(funchook);
         return; // don't install our hooks
     } 
 
@@ -1021,6 +1026,7 @@ initGoHook(elf_buf_t *ebuf)
             g_go_schema = &go_17_schema_arm;
         } else {
             scopeLogWarn("Architecture not supported. Continuing without AppScope.");
+            funchook_destroy(funchook);
             return;
         }
     }
@@ -1077,7 +1083,7 @@ initGoHook(elf_buf_t *ebuf)
     if (rc != 0) {
         sysprint("ERROR: funchook_install failed.  (%s)\n",
                 funchook_error_message(funchook));
-        return;
+        funchook_destroy(funchook);
     }
 }
 

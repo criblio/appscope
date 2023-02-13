@@ -68,5 +68,7 @@ extern long long osGetProcCPU(void);
 extern uint64_t osFindLibrary(const char *, pid_t, bool);
 extern int osFindFd(pid_t, const char *);
 extern void osCreateSM(proc_id_t *, unsigned long);
+extern bool osMemPermAllow(void *, size_t, int, int);
+extern bool osMemPermRestore(void *, size_t, int);
 
 #endif  //__OS_H__

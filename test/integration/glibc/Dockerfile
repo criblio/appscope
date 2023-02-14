@@ -15,6 +15,10 @@ RUN gcc -o /opt/errno_test/errno_test /opt/errno_test/hello_errno.c
 COPY ./glibc/hello_fault.c /opt/fault_test/hello_fault.c
 RUN gcc -O0 -g -o /opt/fault_test/fault_test /opt/fault_test/hello_fault.c -lrt
 
+RUN mkdir -p /opt/sig_test
+COPY ./glibc/sighandler.c /opt/sig_test/sighandler.c
+RUN gcc -g -o /opt/sig_test/sighandler /opt/sig_test/sighandler.c
+
 RUN mkdir -p /opt/extract_scope && \
     mkdir -p /opt/patch_libscope
 

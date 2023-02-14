@@ -62,6 +62,8 @@ func runCmdFlags(cmd *cobra.Command, rc *run.Config) {
 	cmd.Flags().StringVar(&rc.Loglevel, "loglevel", "", "Set scope library log level (debug, warning, info, error, none)")
 	cmd.Flags().StringVarP(&rc.LibraryPath, "librarypath", "l", "", "Set path for dynamic libraries")
 	cmd.Flags().StringVarP(&rc.UserConfig, "userconfig", "u", "", "Scope an application with a user specified config file; overrides all other settings.")
+	cmd.Flags().BoolVarP(&rc.Coredump, "coredump", "d", false, "Enable core dump file generation when an application crashes.")
+	cmd.Flags().BoolVarP(&rc.Backtrace, "backtrace", "b", false, "Enable backtrace file generation when an application crashes.")
 	metricAndEventDestFlags(cmd, rc)
 }
 

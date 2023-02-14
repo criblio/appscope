@@ -27,6 +27,8 @@ type Config struct {
 	AuthToken     string
 	UserConfig    string
 	CommandDir    string
+	Coredump      bool
+	Backtrace     bool
 
 	now func() time.Time
 	sc  *libscope.ScopeConfig

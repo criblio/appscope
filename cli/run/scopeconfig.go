@@ -274,6 +274,13 @@ func (c *Config) configFromRunOpts() error {
 	// To support mixing of config and environment variables
 	c.sc.Cribl.AuthToken = c.AuthToken
 
+	if c.Backtrace {
+		c.sc.Libscope.Snapshot.Backtrace = "true"
+	}
+	if c.Coredump {
+		c.sc.Libscope.Snapshot.Coredump = "true"
+	}
+
 	if c.CriblDest != "" {
 		err := parseDest(&c.sc.Cribl.Transport, c.CriblDest)
 		if err != nil {

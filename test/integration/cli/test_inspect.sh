@@ -42,7 +42,7 @@ interface_prop_check() {
     local expected_state=$3
     jq '.interfaces[] | select(.name=='\"$interface_name\"') | .'$interface_prop'' $INSPECT_FILE  | grep -q "$expected_state"
     if [ $? != 0 ]; then
-        echo "interface_check fails, params: $interface_name $interface_prop $interface_expected_state"
+        echo "interface_check fails, params: $interface_name $interface_prop $expected_state"
         cat $INSPECT_FILE
         ERR+=1
     fi
@@ -100,7 +100,7 @@ nc -lU $CRIBL_SOCKET 1> /dev/null 2> /dev/null &
 NC_PID=`pidof nc`
 
 # Give time to connect
-sleep 5
+sleep 6
 inspect_file_redirect_to_file $PYTHON_PID
 
 interface_prop_check "log" "connected" "true"
@@ -136,7 +136,7 @@ nc -l -p 9109 1> /dev/null 2> /dev/null &
 NC_PID=`pidof nc`
 
 # # Give time to connect
-sleep 5
+sleep 6
 
 inspect_file_redirect_to_file $PYTHON_PID
 

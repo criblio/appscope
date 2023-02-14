@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
@@ -111,6 +112,12 @@ func (sL *ScopeLoader) Detach(args []string, env []string) error {
 func (sL *ScopeLoader) DetachSubProc(args []string, env []string) (string, error) {
 	args = append([]string{"--lddetach"}, args...)
 	return sL.RunSubProc(args, env)
+}
+
+// GetFile gets a file from a remote container and stores it
+func (sL *ScopeLoader) GetFile(source, dest string, cpid int) (string, error) {
+	srcdest := fmt.Sprintf("%s,%s", source, dest)
+	return sL.RunSubProc([]string{"--getfile", srcdest, "--namespace", strconv.Itoa(cpid)}, os.Environ())
 }
 
 // Passthrough scopes a process

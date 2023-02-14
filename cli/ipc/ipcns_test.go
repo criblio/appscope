@@ -9,7 +9,7 @@ import (
 
 func TestCompareSelfIpcNs(t *testing.T) {
 	selfPid := os.Getpid()
-	sameIPC, err := ipcNsIsSame(IpcPidCtx{Pid: selfPid})
+	sameIPC, err := IpcNsIsSame(IpcPidCtx{Pid: selfPid})
 	assert.NoError(t, err)
 	assert.True(t, sameIPC)
 }

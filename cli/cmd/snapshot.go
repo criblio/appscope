@@ -35,7 +35,7 @@ var snapshotCmd = &cobra.Command{
 			util.ErrAndExit("error parsing PID argument")
 		}
 
-		err = crash.GenFiles(0, 0, uint32(pid), 0, 0, "", "", "")
+		err = crash.GenFiles(0, 0, uint32(pid), 0, 0, 0, "", "")
 		if err != nil {
 			util.ErrAndExit(err.Error())
 		}

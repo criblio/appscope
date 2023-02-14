@@ -28,9 +28,9 @@ type snapshot struct {
 	Environment   []string
 	Arch          string
 	Kernel        string
-	SignalNumber  uint32
-	SignalHandler string
-	Errno         uint32
+	SignalNumber  uint32 `json:",omitempty"`
+	SignalHandler uint64 `json:",omitempty"`
+	Errno         uint32 `json:",omitempty"`
 	ProcessName   string
 	ProcessArgs   string
 	Pid           uint32
@@ -66,7 +66,7 @@ type snapshot struct {
 // - coredump (where available)
 // - cfg (where available)
 // - backtrace (where available)
-func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs string) error {
+func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, procArgs string) error {
 	// Create a history directory for logs
 	createWorkDir("snapshot")
 
@@ -201,7 +201,7 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs s
 }
 
 // GenSnapshotFile generates the snapshot file for a given pid
-func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler, procName, procArgs, hostnameFilePath, filePath string) error {
+func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, procArgs, hostnameFilePath, filePath string) error {
 	var s snapshot
 
 	// Source: self

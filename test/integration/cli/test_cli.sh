@@ -260,14 +260,11 @@ returns 1
 endtest
 
 
+#
 # Scope detach by name
 #
 starttest "Scope detach by name"
 
-
-#
-# Detach by name
-#
 run scope detach sleep
 outputs "Detaching from pid ${sleep_pid}"
 returns 0
@@ -320,6 +317,57 @@ waitForCmdscopedProcessNumber 2
 yes | scope detach --all 2>&1
 RET=$?
 returns 0
+
+endtest
+
+
+#
+# Scope daemon
+#
+starttest "Scope daemon"
+
+# Create example crash files
+mkdir -p /tmp/appscope/150811/
+touch /tmp/appscope/150811/snapshot
+touch /tmp/appscope/150811/info
+touch /tmp/appscope/150811/cfg
+touch /tmp/appscope/150811/backtrace
+echo "example snapshot" >> /tmp/appscope/150811/snapshot
+echo "example info" >> /tmp/appscope/150811/info
+echo "example cfg" >> /tmp/appscope/150811/cfg
+echo "example backtrace" >> /tmp/appscope/150811/backtrace
+
+# Start a netcat listener
+nc -l -p 9109 > crash.out &
+sleep 1
+
+# Start the scope daemon
+run scope daemon --filedest localhost:9109 &
+daemon_pid=$!
+sleep 2
+
+# Check files were received by listener
+count=$(grep 'example snapshot' crash.out | wc -l)
+if [ $count -eq 0 ] ; then
+    ERR+=1
+fi
+count=$(grep 'example info' crash.out | wc -l)
+if [ $count -eq 0 ] ; then
+    ERR+=1
+fi
+count=$(grep 'example cfg' crash.out | wc -l)
+if [ $count -eq 0 ] ; then
+    ERR+=1
+fi
+count=$(grep 'example backtrace' crash.out | wc -l)
+if [ $count -eq 0 ] ; then
+    ERR+=1
+fi
+
+# Kill scope daemon process
+kill $daemon_pid
+
+endtest
 
 
 #

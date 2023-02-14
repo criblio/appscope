@@ -73,13 +73,14 @@ int sig_deliver(struct sigdel_args_t *args)
 {
 #if FILTER_SIGS > 0
     // SIGSEGV, SIGBUS, SIGILL and SIGFPE
-    if ((args->sig != 11) && (args->sig != 7) &&
-        (args->sig != 4) && (args->sig != 8)) {
+    if ((args->sa_handler == 0) ||
+        ((args->sig != 11) && (args->sig != 7) &&
+         (args->sig != 4) && (args->sig != 8))) {
         return 1;
     }
 #endif
-	struct sigdel_data_t sigdel_data = {};
-	u64 pid_tgid, uid_gid;
+    struct sigdel_data_t sigdel_data = {};
+    u64 pid_tgid, uid_gid;
     struct task_struct *task;
     struct pid *pid;
     unsigned int level, nr;
@@ -105,7 +106,7 @@ int sig_deliver(struct sigdel_args_t *args)
     bpf_probe_read_kernel(&ns, sizeof(ns), &upid.ns->ns);
     bpf_probe_read_kernel(&nr, sizeof(nr), &upid.nr);
 
-    bpf_printk("sigdel: %s: ino %u nr %u\n", task->comm, ns.inum, nr);
+    //bpf_printk("sigdel: %s: ino %u nr %u\n", task->comm, ns.inum, nr);
 
     sigdel_data.pid = nr;
 
@@ -113,7 +114,7 @@ int sig_deliver(struct sigdel_args_t *args)
     sigdel_data.uid = LAST_32_BITS(uid_gid);
     sigdel_data.gid = FIRST_32_BITS(uid_gid);
 
-	if (bpf_get_current_comm(sigdel_data.comm, sizeof(sigdel_data.comm)) != 0) {
+    if (bpf_get_current_comm(sigdel_data.comm, sizeof(sigdel_data.comm)) != 0) {
         bpf_printk("ERROR:sigdel:bpf_get_current_comm\n");
         sigdel_data.comm[0] = 'X';
         sigdel_data.comm[1] = 'Y';
@@ -126,7 +127,7 @@ int sig_deliver(struct sigdel_args_t *args)
     sigdel_data.code = args->code;
     sigdel_data.sa_handler = args->sa_handler;
 
-	if (bpf_perf_event_output(args, &events, BPF_F_CURRENT_CPU,
+    if (bpf_perf_event_output(args, &events, BPF_F_CURRENT_CPU,
                               &sigdel_data, sizeof(sigdel_data)) != 0) {
         bpf_printk("ERROR:sigdel:bpf_perf_event_output\n");
     }

@@ -59,7 +59,7 @@ func Sigdel(sigEventChan chan SigEvent) error {
      */
 	lnk, err := link.Tracepoint("signal", "signal_deliver", objs.SigDeliver, nil)
 	if err != nil {
-		fmt.Println("*** ERROR: Set Tracepoint ***")
+		log.Error().Msgf("*** ERROR: Set Tracepoint ***")
 		return err
 	}
 
@@ -81,7 +81,7 @@ func Sigdel(sigEventChan chan SigEvent) error {
 		}
 
 		if ev.LostSamples != 0 {
-			fmt.Printf("*** perf event ring buffer full, dropped %d samples ****", ev.LostSamples)
+			log.Warn().Msgf("*** The perf event array buffer is full, dropped %d samples ****", ev.LostSamples)
 			continue
 		}
 
@@ -89,7 +89,7 @@ func Sigdel(sigEventChan chan SigEvent) error {
 
 		var data sigdel_data_t
 		if err := binary.Read(b_arr, binary.LittleEndian, &data); err != nil {
-			fmt.Printf("parsing perf event: %s", err)
+			log.Warn().Msgf("parsing perf event: %s", err)
 			continue
 		}
 

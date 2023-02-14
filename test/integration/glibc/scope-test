@@ -259,7 +259,7 @@ endtest
 #
 cd /opt/sig_test
 
-for SIGNAL in SIGBUS SIGFPE SIGSEGV SIGILL SIGUSR2
+for SIGNAL in SIGBUS SIGFPE SIGSEGV SIGILL
 do
   for FUNCTION in signal sigaction
   do
@@ -290,7 +290,7 @@ done
 #
 cd /opt/sig_test
 
-for SIGNAL in SIGBUS SIGFPE SIGSEGV SIGILL SIGUSR2
+for SIGNAL in SIGBUS SIGFPE SIGSEGV SIGILL
 do
   for FUNCTION in signal sigaction
   do

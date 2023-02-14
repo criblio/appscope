@@ -1884,11 +1884,12 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 {
     WRAP_CHECK(sigaction, -1);
     /*
-     * If there is a handler being installed save it as it's installed.
+     * If there is a handler being installed, just save it.
      * If no handler, they may just be checking for the current handler.
      */
     if ((signum == SIGUSR2) && (act != NULL)) {
         g_thread.act = act; 
+        return 0;
     }
 
     /*

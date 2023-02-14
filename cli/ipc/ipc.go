@@ -135,7 +135,7 @@ func newIPC(pidCtx IpcPidCtx) (*ipcObj, error) {
 	restoreGid := os.Getegid()
 	restoreUid := os.Geteuid()
 
-	ipcSame, err := ipcNsIsSame(pidCtx)
+	ipcSame, err := IpcNsIsSame(pidCtx)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ func newIPC(pidCtx IpcPidCtx) (*ipcObj, error) {
 	}
 
 	// Retrieve information about process namespace PID
-	_, ipcPid, err := ipcNsLastPidFromPid(pidCtx)
+	_, ipcPid, err := IpcNsLastPidFromPid(pidCtx)
 	if err != nil {
 		return nil, err
 	}

@@ -25,6 +25,8 @@ SCOPE := $(BINDIR)/scope
 SCOPEDYN := $(BINDIR)/scopedyn
 LIBSCOPE := $(LIBDIR)/libscope.so
 LIBLOADER := $(LIBDIR)/libloader.a
+SIGDEL := bpf/sigdel/gen_sigdel_bpfel.go
+SYSHEADER := bpf/vmlinux.h
 CONF_YML := $(CONFDIR)/scope.yml
 LOADER_C_FILES:=$(wildcard $(SRCDIR)/loader/*.c)
 LIBRARY_C_FILES:=$(wildcard $(SRCDIR)/*.c)
@@ -70,6 +72,9 @@ clean:
 	$(RM) -rf -- .gomod/*/
 	$(RM) -rf -- .gobin/x86_64/go*
 	$(RM) -rf -- .gobin/aarch64/go*
+	$(RM) -rf -- bpf/sigdel/gen_sigdel_bpfel.go
+	$(RM) -rf -- bpf/sigdel/*.o
+	$(RM) -rf -- bpf/vmlinux.h
 
 ## deps: install dependencies
 deps: $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT)
@@ -93,7 +98,7 @@ $(SCOPEDYN): $(LOADER_C_FILES)
 
 # the -w go build flags remove the dwarf symbol table from the resulting executable
 # the -tags force os/user and netgo to use go and NOT cgo because a static exec can't resolve libc calls from cgo
-$(SCOPE): $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN)
+$(SCOPE): $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN) $(SIGDEL)
 $(SCOPE): export GOOS=linux
 $(SCOPE): export CGO_ENABLED=1
 $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
@@ -110,6 +115,12 @@ $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 		$(BUILD_OPTS) \
 	       	-o $(SCOPE)
 	$(RM) -r $(SCOPEDYN)
+
+$(SIGDEL): bpf/sigdel/sigdel.bpf.c $(SYSHEADER)
+	go generate bpf/sigdel/*.go
+
+$(SYSHEADER):
+	bpftool btf dump file /sys/kernel/btf/vmlinux format c > bpf/vmlinux.h
 
 ## test: run unit tests
 test:

@@ -36,7 +36,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 # dependencies (i.e. tzdata) are installed.
 #
 RUN apt-get update && \
-    apt-get install -y software-properties-common gpg apt-utils && \
+    apt-get install -y software-properties-common gpg apt-utils libelf-dev llvm-10 clang-10 && \
     add-apt-repository ppa:longsleep/golang-backports && \
     apt-get update && \
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 52B59B1571A79DBC054901C0F6BC817356A3D45E && \
@@ -58,7 +58,9 @@ RUN apt-get update && \
         vim \
         && \
     dpkg-reconfigure --frontend noninteractive tzdata && \
-    apt-get clean
+    apt-get clean && \
+    ln -s /usr/lib/llvm-10/bin/llvm-strip /usr/bin/llvm-strip && \
+    ln -s /usr/bin/clang-10 /usr/bin/clang
 ARG UPX_VERSION=4.0.1
 ARG CMAKE_VERSION=3.24.3
 
@@ -91,6 +93,9 @@ RUN arch=$(arch | sed s/aarch64/arm64/ | sed s/x86_64/amd64/) && \
     echo "set directories /home/builder/appscope" >> /home/builder/.gdbinit && \
     \
     mkdir /home/builder/appscope
+
+RUN git clone https://github.com/libbpf/libbpf.git && cd libbpf/src && make && make install
+RUN git clone --recurse-submodules https://github.com/libbpf/bpftool.git && cd bpftool/src && make && make install
 
 # ---
 # The local git clone of the project is mounted as /home/builder/appscope. See Makefile.

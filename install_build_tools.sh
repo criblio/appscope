@@ -696,7 +696,7 @@ apt_bpf_exists() {
 apt_bpf_install() {
     echo "Installing bpf."
     sudo apt update
-    sudo apt install -y libbpf-dev linux-tools-`uname -r`
+    sudo apt install -y libbpf-dev llvm clang linux-tools-`uname -r`
     if [ $? = 0 ]; then
         echo "Installation of bpf was successful."
     else

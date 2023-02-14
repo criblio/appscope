@@ -116,6 +116,8 @@ starttest "Attach by pid"
 sleep 1000 & 
 sleep_pid=$!
 
+sleep 1
+
 # Attach to sleep process
 run scope attach $sleep_pid
 returns 0
@@ -318,6 +320,38 @@ waitForCmdscopedProcessNumber 2
 yes | scope detach --all 2>&1
 RET=$?
 returns 0
+
+
+#
+# Scope snapshot (same namespace)
+#
+starttest "Scope snapshot"
+
+top -b -d 1 > /dev/null &
+top_pid=$!
+sleep 2
+
+SCOPE_SNAPSHOT_COREDUMP=true SCOPE_SNAPSHOT_BACKTRACE=true scope --ldattach $top_pid
+returns 0
+sleep 2
+
+kill -s SIGSEGV $top_pid
+sleep 2
+
+run scope snapshot $top_pid
+returns 0
+sleep 2
+
+is_file /tmp/appscope/${top_pid}/snapshot
+is_file /tmp/appscope/${top_pid}/info
+is_file /tmp/appscope/${top_pid}/core
+is_file /tmp/appscope/${top_pid}/cfg
+is_file /tmp/appscope/${top_pid}/backtrace
+
+# Kill sleep process
+kill $top_pid
+
+endtest
 
 
 ################# END TESTS ################# 

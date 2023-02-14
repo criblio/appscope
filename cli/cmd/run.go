@@ -9,7 +9,7 @@ import (
 )
 
 /* Args Matrix (X disallows)
- *                 cribldest metricformat metricdest eventdest nobreaker authtoken verbosity payloads loglevel librarypath userconfig
+ *                 cribldest metricformat metricdest eventdest nobreaker authtoken verbosity payloads loglevel librarypath userconfig coredump backtrace
  * cribldest       -                      X          X                                                                     X
  * metricformat              -                                                                                             X
  * metricdest      X                      -                                                                                X
@@ -20,7 +20,9 @@ import (
  * payloads                                                                                  -                             X
  * loglevel                                                                                           -                    X
  * librarypath                                                                                                 -
- * userconfig      X         X            X          X         X         X         X         X        X                    -
+ * userconfig      X         X            X          X         X         X         X         X        X                    -          X         X
+ * coredump     																										   X		  -
+ * backtrace  																											   X				    -
  */
 
 var rc *run.Config = &run.Config{}
@@ -63,6 +65,10 @@ scope run -c edge -- top`,
 			helpErrAndExit(cmd, "Cannot specify --payloads and --userconfig")
 		} else if rc.Loglevel != "" && rc.UserConfig != "" {
 			helpErrAndExit(cmd, "Cannot specify --loglevel and --userconfig")
+		} else if rc.Backtrace && rc.UserConfig != "" {
+			helpErrAndExit(cmd, "Cannot specify --backtrace and --userconfig")
+		} else if rc.Coredump && rc.UserConfig != "" {
+			helpErrAndExit(cmd, "Cannot specify --coredump and --userconfig")
 		}
 
 		rc.Run(args)

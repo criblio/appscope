@@ -38,6 +38,7 @@
  */
 struct sigdel_data_t {
     int pid;
+    int nspid;
     int sig;
     int errno;
     int code;
@@ -83,7 +84,7 @@ int sig_deliver(struct sigdel_args_t *args)
     u64 pid_tgid, uid_gid;
     struct task_struct *task;
     struct pid *pid;
-    unsigned int level, nr;
+    unsigned int level, nr, hostpid;
     struct upid upid;
     struct ns_common ns;
 
@@ -105,10 +106,12 @@ int sig_deliver(struct sigdel_args_t *args)
     bpf_probe_read_kernel(&upid, sizeof(upid), &pid->numbers[level]);
     bpf_probe_read_kernel(&ns, sizeof(ns), &upid.ns->ns);
     bpf_probe_read_kernel(&nr, sizeof(nr), &upid.nr);
+    bpf_probe_read_kernel(&hostpid, sizeof(hostpid), &task->pid);
 
     //bpf_printk("sigdel: %s: ino %u nr %u\n", task->comm, ns.inum, nr);
 
-    sigdel_data.pid = nr;
+    sigdel_data.nspid = nr;
+    sigdel_data.pid = hostpid;
 
     uid_gid = bpf_get_current_uid_gid();
     sigdel_data.uid = LAST_32_BITS(uid_gid);

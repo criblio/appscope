@@ -29,7 +29,7 @@ type snapshot struct {
 	Arch          string
 	Kernel        string
 	SignalNumber  uint32 `json:",omitempty"`
-	SignalHandler uint64 `json:",omitempty"`
+	SignalHandler string `json:",omitempty"`
 	Errno         uint32 `json:",omitempty"`
 	ProcessName   string
 	ProcessArgs   string
@@ -258,11 +258,11 @@ func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler uint64, procNa
 		}
 	} else { // Initiated by signal, we know these values
 		s.SignalNumber = sig
-		s.SignalHandler = sigHandler
+		s.SignalHandler = fmt.Sprintf("0x%x", sigHandler)
 		s.Errno = errno
 		s.Uid = uid
 		s.Gid = gid
-		s.ProcessName = procName
+		s.ProcessName = strings.Trim(procName, "\x00")
 		s.ProcessArgs = procArgs
 	}
 

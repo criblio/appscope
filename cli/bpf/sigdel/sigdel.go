@@ -20,6 +20,7 @@ import (
 
 type sigdel_data_t struct {
 	Pid     uint32
+	NsPid   uint32
 	Sig     uint32
 	Errno   uint32
 	Code    uint32
@@ -54,9 +55,9 @@ func Sigdel(sigEventChan chan SigEvent) error {
 	loadGen_sigdelObjects(&objs, nil)
 
 	/*
-     * Trace events/types are described in /sys/kernel/debug/tracing/events
-     * This must be consistent with the .maps section name in C code.
-     */
+	 * Trace events/types are described in /sys/kernel/debug/tracing/events
+	 * This must be consistent with the .maps section name in C code.
+	 */
 	lnk, err := link.Tracepoint("signal", "signal_deliver", objs.SigDeliver, nil)
 	if err != nil {
 		log.Error().Msgf("*** ERROR: Set Tracepoint ***")

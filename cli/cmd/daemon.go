@@ -28,6 +28,9 @@ var daemonCmd = &cobra.Command{
 		filedest, _ := cmd.Flags().GetString("filedest")
 		sendcore, _ := cmd.Flags().GetBool("sendcore")
 
+		// Create a history directory for logs
+		crash.CreateWorkDir("daemon")
+
 		// Buffered Channel (non-blocking until full)
 		sigEventChan := make(chan sigdel.SigEvent, 128)
 		go sigdel.Sigdel(sigEventChan)
@@ -40,6 +43,12 @@ var daemonCmd = &cobra.Command{
 				log.Info().Msgf("Signal CPU: %02d signal %d errno %d handler 0x%x pid: %d uid: %d gid: %d app %s\n",
 					sigEvent.CPU, sigEvent.Sig, sigEvent.Errno, sigEvent.Handler,
 					sigEvent.Pid, sigEvent.Uid, sigEvent.Gid, sigEvent.Comm)
+
+				fmt.Println("sig received")
+				// Filter out expected signals from libscope
+				// get proc/pid/maps from ns
+				// iterate through, find libscope and get range
+				// is signal handler address in libscopeStart-libscopeEnd range
 
 				// Generate/retrieve crash files
 				if err := crash.GenFiles(sigEvent.Sig, sigEvent.Errno, sigEvent.Pid, sigEvent.Uid, sigEvent.Gid, sigEvent.Handler, string(sigEvent.Comm[:]), ""); err != nil {

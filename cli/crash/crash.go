@@ -67,9 +67,6 @@ type snapshot struct {
 // - cfg (where available)
 // - backtrace (where available)
 func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, procArgs string) error {
-	// Create a history directory for logs
-	createWorkDir("snapshot")
-
 	// TODO: If session directory exists, write to sessiondir/snapshot/
 	// If not, write to /tmp/appscope/pid/
 	dir := fmt.Sprintf("/tmp/appscope/%d", pid)

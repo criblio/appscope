@@ -14,7 +14,7 @@ import (
 )
 
 // Copy of start/setup.go createWorkDir
-func createWorkDir(cmd string) {
+func CreateWorkDir(cmd string) {
 	// Directories named CMD_SESSIONID_PID_TIMESTAMP
 	ts := strconv.FormatInt(time.Now().UTC().UnixNano(), 10)
 	pid := strconv.Itoa(os.Getpid())

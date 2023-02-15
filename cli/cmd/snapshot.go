@@ -35,6 +35,9 @@ var snapshotCmd = &cobra.Command{
 			util.ErrAndExit("error parsing PID argument")
 		}
 
+		// Create a history directory for logs
+		crash.CreateWorkDir("snapshot")
+
 		err = crash.GenFiles(0, 0, uint32(pid), 0, 0, 0, "", "")
 		if err != nil {
 			util.ErrAndExit(err.Error())

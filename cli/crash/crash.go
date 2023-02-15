@@ -24,15 +24,15 @@ type snapshot struct {
 	Version string // AppScope Cli Version
 
 	// Source: /proc or linux (or eBPF signal)
-	Username      string
-	Environment   []string
-	Arch          string
-	Kernel        string
-	SignalNumber  uint32 `json:",omitempty"`
-	SignalHandler string `json:",omitempty"`
-	Errno         uint32 `json:",omitempty"`
-	ProcessName   string
-	ProcessArgs   string
+	Username      string   `json:",omitempty"`
+	Environment   []string `json:",omitempty"`
+	Arch          string   `json:",omitempty"`
+	Kernel        string   `json:",omitempty"`
+	SignalNumber  uint32   `json:",omitempty"`
+	SignalHandler string   `json:",omitempty"`
+	Errno         uint32   `json:",omitempty"`
+	ProcessName   string   `json:",omitempty"`
+	ProcessArgs   string   `json:",omitempty"`
 	Pid           uint32
 	Uid           uint32
 	Gid           uint32
@@ -210,13 +210,11 @@ func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler uint64, procNa
 	var err error
 	s.Arch, err = host.KernelArch()
 	if err != nil {
-		log.Error().Err(err).Msgf("error getting kernel arch")
-		return err
+		log.Warn().Err(err).Msgf("unable to get kernel arch")
 	}
 	s.Kernel, err = host.KernelVersion()
 	if err != nil {
-		log.Error().Err(err).Msgf("error getting kernel version")
-		return err
+		log.Warn().Err(err).Msgf("unable to get kernel version")
 	}
 	p, err := process.NewProcess(int32(pid))
 	if err != nil {
@@ -225,36 +223,30 @@ func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler uint64, procNa
 	}
 	s.Username, err = p.Username()
 	if err != nil {
-		log.Error().Err(err).Msgf("error getting username for pid %d", pid)
-		return err
+		log.Warn().Err(err).Msgf("unable to get username for pid %d", pid)
 	}
 	s.Environment, err = p.Environ()
 	if err != nil {
-		log.Error().Err(err).Msgf("error getting environment for pid %d", pid)
-		return err
+		log.Warn().Err(err).Msgf("unable to get environment for pid %d", pid)
 	}
 	if sig == 0 { // Initiated by snapshot command, need to get these values ourselves
 		uids, err := p.Uids()
 		if err != nil {
-			log.Error().Err(err).Msgf("error getting uid for pid %d", pid)
-			util.ErrAndExit(err.Error())
+			log.Warn().Err(err).Msgf("unable to get uid for pid %d", pid)
 		}
 		s.Uid = uint32(uids[0])
 		gids, err := p.Gids()
 		if err != nil {
-			log.Error().Err(err).Msgf("error getting gid for pid %d", pid)
-			util.ErrAndExit(err.Error())
+			log.Warn().Err(err).Msgf("unable to get gid for pid %d", pid)
 		}
 		s.Gid = uint32(gids[0])
 		s.ProcessName, err = p.Name()
 		if err != nil {
-			log.Error().Err(err).Msgf("error getting name for pid %d", pid)
-			util.ErrAndExit(err.Error())
+			log.Warn().Err(err).Msgf("unable to get name for pid %d", pid)
 		}
 		s.ProcessArgs, err = p.Cmdline()
 		if err != nil {
-			log.Error().Err(err).Msgf("error getting args for pid %d", pid)
-			util.ErrAndExit(err.Error())
+			log.Warn().Err(err).Msgf("unable to get args for pid %d", pid)
 		}
 	} else { // Initiated by signal, we know these values
 		s.SignalNumber = sig

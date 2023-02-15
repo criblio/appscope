@@ -44,8 +44,7 @@ var daemonCmd = &cobra.Command{
 					sigEvent.CPU, sigEvent.Sig, sigEvent.Errno, sigEvent.Handler,
 					sigEvent.Pid, sigEvent.Uid, sigEvent.Gid, sigEvent.Comm)
 
-				fmt.Println("sig received")
-				// Filter out expected signals from libscope
+				// TODO Filter out expected signals from libscope
 				// get proc/pid/maps from ns
 				// iterate through, find libscope and get range
 				// is signal handler address in libscopeStart-libscopeEnd range

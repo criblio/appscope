@@ -75,12 +75,6 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, pro
 		log.Error().Err(err).Msgf("error creating snapshot directory")
 		return err
 	}
-	infoFile := fmt.Sprintf("%s/info", dir)
-	coreFile := fmt.Sprintf("%s/core", dir)
-	cfgFile := fmt.Sprintf("%s/cfg", dir)
-	backtraceFile := fmt.Sprintf("%s/backtrace", dir)
-	hostnameFile := fmt.Sprintf("/etc/hostname")
-	snapshotFile := fmt.Sprintf("%s/snapshot", dir)
 
 	// Is the pid provided in this container/this host?
 	pidInThisNs, err := ipc.IpcNsIsSame(ipc.IpcPidCtx{Pid: int(pid), PrefixPath: ""})
@@ -96,6 +90,14 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, pro
 	//		generate snapshot - call gensnapshot
 	//			get process username,environ - from /proc
 	if pidInThisNs {
+		// File destinations and origins
+		infoFile := fmt.Sprintf("%s/info", dir)
+		coreFile := fmt.Sprintf("%s/core", dir)
+		cfgFile := fmt.Sprintf("%s/cfg", dir)
+		backtraceFile := fmt.Sprintf("%s/backtrace", dir)
+		hostnameFile := fmt.Sprintf("/etc/hostname")
+		snapshotFile := fmt.Sprintf("%s/snapshot", dir)
+
 		// Info file
 		if !util.CheckFileExists(infoFile) {
 			log.Warn().Err(err).Msgf("Unable to find %s file for pid %d", infoFile, pid)
@@ -135,12 +137,21 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, pro
 	// 		generate snapshot - call gensnapshot
 	// 			get process username,environ - from /proc
 	if !pidInThisNs {
+		// File destinations
+		infoFile := fmt.Sprintf("%s/info", dir)
+		coreFile := fmt.Sprintf("%s/core", dir)
+		cfgFile := fmt.Sprintf("%s/cfg", dir)
+		backtraceFile := fmt.Sprintf("%s/backtrace", dir)
+		hostnameFile := fmt.Sprintf("/%s/hostname", dir)
+		snapshotFile := fmt.Sprintf("%s/snapshot", dir)
+
 		// Get pid of process inside namespace
 		_, nsPid, err := ipc.IpcNsLastPidFromPid(ipc.IpcPidCtx{Pid: int(pid), PrefixPath: ""})
 		if err != nil {
 			log.Warn().Err(err).Msgf("Unable to get nspid for pid %d", pid)
 		}
 
+		// File origins
 		nsDir := fmt.Sprintf("/tmp/appscope/%d", nsPid)
 		nsInfoFile := fmt.Sprintf("%s/info", nsDir)
 		nsCoreFile := fmt.Sprintf("%s/core", nsDir)

@@ -10,6 +10,7 @@ RUN apt update \
       netcat \
       python3 \
       vim \
+      libbpf0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Tests

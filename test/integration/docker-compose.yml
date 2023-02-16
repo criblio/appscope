@@ -263,6 +263,9 @@ services:
       context: .
       dockerfile: ./cli/Dockerfile
     privileged: true
+    volumes:
+      - /sys/kernel/debug:/sys/kernel/debug
+      - ../..:/opt/appscope
     <<: *scope-common
 
   sshd:

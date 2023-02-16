@@ -92,7 +92,7 @@ cd /go/syscalls
 scope -z ./unlinkat
 
 evaltest
-
+sleep 1
 grep unlinkat $EVT_FILE | grep fs.delete > /dev/null
 ERR+=$?
 
@@ -947,8 +947,9 @@ unset SCOPE_PAYLOAD_ENABLE
 starttest influx_static_stress
 
 influx_start_server "/go/influx/influxd_stat --config /go/influx/influxdb.conf"
-
+sleep 3
 SCOPE_EVENT_DEST=file:///go/influx/db/influxc.event scope -z /go/influx/stress_test insert -n 1000000 -f
+
 
 influx_eval 50 scope
 

@@ -40,3 +40,30 @@ In turn, to access a scalar object within an object read directly:
 [![](https://mermaid.ink/img/pako:eNp1Uk1PwzAM_SuRTyBtf6AHJLaWG6ft1qDKJGat1iRVPkBo23_HSweZppFD8my_96wkPoBymqCCncepF9taWsHruQ3RJxVFxLDvZiylnQbN-6XEgYi9J9QdwzexXD6J1UMpMlOM9EljkaSzxibzTj48zp1WWXfcfrmjWLdXPFZZ_2-3WbzO4rotnM6ioTChoquugXzJ51DYUOo2dMoZ4yyji3GdjZv2rgMrE3cyODHa_aGbu95xbbLrS3vLYNHAr8KHcsnGzIYFGPIGB82fczhnJMSeDEmoGGr0ewnSnpiXJo2RGj1E56Fib1oApug231b9xjOnHpD_2UD1gWPgLGXN6zwBeRBOPwXmvKk?type=png)](https://mermaid.live/edit#pako:eNp1Uk1PwzAM_SuRTyBtf6AHJLaWG6ft1qDKJGat1iRVPkBo23_HSweZppFD8my_96wkPoBymqCCncepF9taWsHruQ3RJxVFxLDvZiylnQbN-6XEgYi9J9QdwzexXD6J1UMpMlOM9EljkaSzxibzTj48zp1WWXfcfrmjWLdXPFZZ_2-3WbzO4rotnM6ioTChoquugXzJ51DYUOo2dMoZ4yyji3GdjZv2rgMrE3cyODHa_aGbu95xbbLrS3vLYNHAr8KHcsnGzIYFGPIGB82fczhnJMSeDEmoGGr0ewnSnpiXJo2RGj1E56Fib1oApug231b9xjOnHpD_2UD1gWPgLGXN6zwBeRBOPwXmvKk)
 
 
+### Scope Daemon in a Container
+The scope daemon command installs an eBPF module and listens for events on a corresponding eBPF map. There are a couple of requirements needed to utilize eBPF in a container. A libbpf package needs to be installed and a mount point is required when the container is started.
+
+#### Example Dockerfile for Ubuntu 20 & 22:
+
+`FROM ubuntu:latest`
+
+`RUN apt update && apt install -y libbpf0`
+
+#### Example Dockerfile for Ubuntu 18
+The libbpf tools are not available as packages for Ubuntu 18. Therefore, we have pulled the repo and built from source. This approach is used in the build container and seems to work.
+
+`FROM ubuntu:18.04`
+
+`RUN git clone https://github.com/libbpf/libbpf.git && cd libbpf/src && make && make install`
+
+
+#### Example Docker build command:
+
+`docker build . -t bpfcon`
+
+
+#### Example docker run command:
+
+`docker run -d -it --rm --cap-add=SYS_ADMIN -v <path_where_scope_exists>/:/opt/appscope --name bcon -v /sys/kernel/debug:/sys/kernel/debug:ro bpfcon /opt/appscope/scope daemon`
+
+In the example run command a path where the scope executable exists is used. Not required. Just makes it easier.

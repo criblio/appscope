@@ -52,7 +52,7 @@ The scope daemon command installs an eBPF module and listens for events on a cor
 #### Example Dockerfile for Ubuntu 18
 The libbpf tools are not available as packages for Ubuntu 18. Therefore, we have pulled the repo and built from source. This approach is used in the build container and seems to work.
 
-`FROM ubuntu:latest`
+`FROM ubuntu:18.04`
 
 `RUN git clone https://github.com/libbpf/libbpf.git && cd libbpf/src && make && make install`
 

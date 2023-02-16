@@ -429,7 +429,10 @@ snapshotSignalHandler(int sig, siginfo_t *info, void *secret) {
     * Stop the world
     * - give a time to consume the snapshot files
     */
-    g_fn.raise(SIGSTOP);
+    // raise of SIGSTOP wasn't working when running as pid 1 in a container...
+    // tbd: try sleep instead???
+    //g_fn.raise(SIGSTOP);
+    sleep(5);
 
     appSignalHandler(sig, info, secret);
 }

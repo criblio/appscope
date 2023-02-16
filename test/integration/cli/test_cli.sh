@@ -321,53 +321,65 @@ returns 0
 endtest
 
 
-##
-## Scope daemon
-##
-#starttest "Scope daemon"
 #
-## Create example crash files
-#mkdir -p /tmp/appscope/150811/
-#touch /tmp/appscope/150811/snapshot
-#touch /tmp/appscope/150811/info
-#touch /tmp/appscope/150811/cfg
-#touch /tmp/appscope/150811/backtrace
-#echo "example snapshot" >> /tmp/appscope/150811/snapshot
-#echo "example info" >> /tmp/appscope/150811/info
-#echo "example cfg" >> /tmp/appscope/150811/cfg
-#echo "example backtrace" >> /tmp/appscope/150811/backtrace
+# Scope daemon
 #
-## Start a netcat listener
-#nc -l -p 9109 > crash.out &
-#sleep 1
-#
-## Start the scope daemon
-#run scope daemon --filedest localhost:9109 &
-#daemon_pid=$!
-#sleep 2
-#
-## Check files were received by listener
-#count=$(grep 'example snapshot' crash.out | wc -l)
-#if [ $count -eq 0 ] ; then
-#    ERR+=1
-#fi
-#count=$(grep 'example info' crash.out | wc -l)
-#if [ $count -eq 0 ] ; then
-#    ERR+=1
-#fi
-#count=$(grep 'example cfg' crash.out | wc -l)
-#if [ $count -eq 0 ] ; then
-#    ERR+=1
-#fi
-#count=$(grep 'example backtrace' crash.out | wc -l)
-#if [ $count -eq 0 ] ; then
-#    ERR+=1
-#fi
-#
-## Kill scope daemon process
-#kill $daemon_pid
-#
-#endtest
+starttest "Scope daemon"
+
+# Start a netcat listener
+nc -l -p 9109 > crash.out &
+sleep 1
+
+# Start the scope daemon
+run scope daemon --filedest localhost:9109 &
+daemon_pid=$!
+sleep 2
+
+# Run top
+top -b -d 1 > /dev/null &
+top_pid=$!
+sleep 1
+
+# Attach to top
+run scope attach --backtrace --coredump $top_pid
+sleep 1
+
+# Crash top
+kill -s SIGSEGV $top_pid
+sleep 5
+
+# Check crash and snapshot files exist
+is_file /tmp/appscope/${top_pid}/snapshot
+is_file /tmp/appscope/${top_pid}/info
+is_file /tmp/appscope/${top_pid}/core
+is_file /tmp/appscope/${top_pid}/cfg
+is_file /tmp/appscope/${top_pid}/backtrace
+
+# Check files were received by listener
+count=$(grep 'snapshot' crash.out | wc -l)
+if [ $count -eq 0 ] ; then
+    ERR+=1
+fi
+count=$(grep 'info' crash.out | wc -l)
+if [ $count -eq 0 ] ; then
+    ERR+=1
+fi
+count=$(grep 'cfg' crash.out | wc -l)
+if [ $count -eq 0 ] ; then
+    ERR+=1
+fi
+count=$(grep 'backtrace' crash.out | wc -l)
+if [ $count -eq 0 ] ; then
+    ERR+=1
+fi
+
+# Kill top process
+kill $top_pid
+
+# Kill scope daemon process
+kill $daemon_pid
+
+endtest
 
 
 #

@@ -5,9 +5,9 @@ import (
 	"os"
 
 	"github.com/criblio/scope/bpf/sigdel"
-	"github.com/criblio/scope/crash"
 	"github.com/criblio/scope/daemon"
 	"github.com/criblio/scope/ipc"
+	"github.com/criblio/scope/snapshot"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -31,7 +31,7 @@ var daemonCmd = &cobra.Command{
 		sendcore, _ := cmd.Flags().GetBool("sendcore")
 
 		// Create a history directory for logs
-		crash.CreateWorkDir("daemon")
+		snapshot.CreateWorkDir("daemon")
 
 		// Validate user has root permissions
 		if err := util.UserVerifyRootPerm(); err != nil {
@@ -71,8 +71,8 @@ var daemonCmd = &cobra.Command{
 					pid = sigEvent.Pid
 				}
 
-				// Generate/retrieve crash files
-				if err := crash.GenFiles(sigEvent.Sig, sigEvent.Errno, pid, sigEvent.Uid, sigEvent.Gid, sigEvent.Handler, string(sigEvent.Comm[:]), ""); err != nil {
+				// Generate/retrieve snapshot files
+				if err := snapshot.GenFiles(sigEvent.Sig, sigEvent.Errno, pid, sigEvent.Uid, sigEvent.Gid, sigEvent.Handler, string(sigEvent.Comm[:]), ""); err != nil {
 					log.Error().Err(err)
 					util.ErrAndExit("error generating crash files")
 				}

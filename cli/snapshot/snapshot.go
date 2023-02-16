@@ -1,4 +1,4 @@
-package crash
+package snapshot
 
 import (
 	"encoding/json"

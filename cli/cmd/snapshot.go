@@ -4,8 +4,8 @@ import (
 	"errors"
 	"strconv"
 
-	"github.com/criblio/scope/crash"
 	"github.com/criblio/scope/internal"
+	"github.com/criblio/scope/snapshot"
 	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
 )
@@ -36,9 +36,9 @@ var snapshotCmd = &cobra.Command{
 		}
 
 		// Create a history directory for logs
-		crash.CreateWorkDir("snapshot")
+		snapshot.CreateWorkDir("snapshot")
 
-		err = crash.GenFiles(0, 0, uint32(pid), 0, 0, 0, "", "")
+		err = snapshot.GenFiles(0, 0, uint32(pid), 0, 0, 0, "", "")
 		if err != nil {
 			util.ErrAndExit(err.Error())
 		}

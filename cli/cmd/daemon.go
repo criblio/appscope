@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/criblio/scope/bpf/sigdel"
 	"github.com/criblio/scope/daemon"
@@ -63,6 +64,9 @@ var daemonCmd = &cobra.Command{
 				} else {
 					pid = sigEvent.Pid
 				}
+
+				// Wait for libscope to generate crash files (if the app was scoped)
+				time.Sleep(1 * time.Second) // TODO Is this long enough? Too long? Check for files instead?
 
 				// Generate/retrieve snapshot files
 				if err := snapshot.GenFiles(sigEvent.Sig, sigEvent.Errno, pid, sigEvent.Uid, sigEvent.Gid, sigEvent.Handler, string(sigEvent.Comm[:]), ""); err != nil {

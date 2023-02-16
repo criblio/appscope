@@ -2,11 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/criblio/scope/bpf/sigdel"
 	"github.com/criblio/scope/daemon"
-	"github.com/criblio/scope/ipc"
 	"github.com/criblio/scope/snapshot"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
@@ -59,13 +57,8 @@ var daemonCmd = &cobra.Command{
 
 				// If the daemon is running on the host, use the pid(hostpid) to get the crash files
 				// If the daemon is running in a container, use the nspid to get the crash files
-				daemonInNs, _, err := ipc.IpcNsLastPidFromPid(ipc.IpcPidCtx{Pid: os.Getpid()})
-				if err != nil {
-					log.Error().Err(err)
-					util.ErrAndExit("error determining if daemon is in container")
-				}
 				var pid uint32
-				if daemonInNs {
+				if util.InContainer() {
 					pid = sigEvent.NsPid
 				} else {
 					pid = sigEvent.Pid

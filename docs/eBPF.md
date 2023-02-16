@@ -43,11 +43,19 @@ In turn, to access a scalar object within an object read directly:
 ### Scope Daemon in a Container
 The scope daemon command installs an eBPF module and listens for events on a corresponding eBPF map. There are a couple of requirements needed to utilize eBPF in a container. A libbpf package needs to be installed and a mount point is required when the container is started.
 
-#### Example Dockerfile:
+#### Example Dockerfile for Ubuntu 20 & 22:
 
 `FROM ubuntu:latest`
 
 `RUN apt update && apt install -y libbpf0`
+
+#### Example Dockerfile for Ubuntu 18
+The libbpf tools are not available as packages for Ubuntu 18. Therefore, we have pulled the repo and built from source. This approach is used in the build container and seems to work.
+
+`FROM ubuntu:latest`
+
+`RUN git clone https://github.com/libbpf/libbpf.git && cd libbpf/src && make && make install`
+
 
 #### Example Docker build command:
 

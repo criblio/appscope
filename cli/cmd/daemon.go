@@ -66,15 +66,14 @@ var daemonCmd = &cobra.Command{
 
 				// Generate/retrieve snapshot files
 				if err := snapshot.GenFiles(sigEvent.Sig, sigEvent.Errno, pid, sigEvent.Uid, sigEvent.Gid, sigEvent.Handler, string(sigEvent.Comm[:]), ""); err != nil {
-					log.Error().Err(err)
-					util.ErrAndExit("error generating crash files")
+					log.Error().Err(err).Msgf("error generating crash files")
 				}
 
 				// If a network destination is specified, send crash files
 				if filedest != "" {
 					if err := d.Connect(); err != nil {
-						log.Error().Err(err)
-						util.ErrAndExit("error starting daemon")
+						log.Error().Err(err).Msgf("error connecting to %s", filedest)
+						continue
 					}
 
 					files := []string{
@@ -84,8 +83,7 @@ var daemonCmd = &cobra.Command{
 						fmt.Sprintf("/tmp/appscope/%d/cfg", pid),
 					}
 					if err := d.SendFiles(files, true); err != nil {
-						log.Error().Err(err)
-						util.ErrAndExit("error sending files to %s", filedest)
+						log.Error().Err(err).Msgf("error sending files to %s", filedest)
 					}
 
 					if sendcore {
@@ -93,8 +91,7 @@ var daemonCmd = &cobra.Command{
 							fmt.Sprintf("/tmp/appscope/%d/core", pid),
 						}
 						if err := d.SendFiles(files, false); err != nil {
-							log.Error().Err(err)
-							util.ErrAndExit("error sending core file to %s", filedest)
+							log.Error().Err(err).Msgf("error sending core file to %s", filedest)
 						}
 					}
 

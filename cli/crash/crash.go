@@ -11,7 +11,6 @@ import (
 
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/ipc"
-	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/v3/host"
@@ -85,8 +84,8 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, pro
 
 	// If process is in this container/this host (i.e. in this namespace) // proc/pid is visible
 	//		(pid provided must be of this container/this host's perspective)
-	//		crash files in place - do nothing here
-	//		hostname file in place - do nothing here
+	//		crash files in place - do nothing here, just check they exist
+	//		hostname file in place - do nothing here, just check it exists
 	//		generate snapshot - call gensnapshot
 	//			get process username,environ - from /proc
 	if pidInThisNs {
@@ -132,8 +131,8 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, pro
 
 	// If process is in a container below us (i.e. in a below namespace) // proc/pid is visible
 	// 		(pid provided must be of this container/this host's perspective)
-	// 		get crash files - use --getfiles
-	// 		get hostname file - use --getfiles
+	// 		get crash files - use /proc/pid/root
+	// 		get hostname file - use /proc/pid/root
 	// 		generate snapshot - call gensnapshot
 	// 			get process username,environ - from /proc
 	if !pidInThisNs {
@@ -152,37 +151,35 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, pro
 		}
 
 		// File origins
-		nsDir := fmt.Sprintf("/tmp/appscope/%d", nsPid)
+		nsDir := fmt.Sprintf("/proc/%d/root/tmp/appscope/%d", pid, nsPid)
 		nsInfoFile := fmt.Sprintf("%s/info", nsDir)
 		nsCoreFile := fmt.Sprintf("%s/core", nsDir)
 		nsCfgFile := fmt.Sprintf("%s/cfg", nsDir)
 		nsBacktraceFile := fmt.Sprintf("%s/backtrace", nsDir)
-		nsHostnameFile := fmt.Sprintf("/etc/hostname")
-
-		ld := loader.New()
+		nsHostnameFile := fmt.Sprintf("/proc/%d/root/etc/hostname", pid)
 
 		// Info file
-		if _, err = ld.GetFile(nsInfoFile, infoFile, int(pid)); err != nil {
+		if _, err = util.CopyFile2(nsInfoFile, infoFile); err != nil {
 			log.Warn().Err(err).Msgf("Unable to get %s file from namespace for pid %d", nsInfoFile, pid)
 		}
 
 		// Coredump file
-		if _, err = ld.GetFile(nsCoreFile, coreFile, int(pid)); err != nil {
+		if _, err = util.CopyFile2(nsCoreFile, coreFile); err != nil {
 			log.Warn().Err(err).Msgf("Unable to get %s file from namespace for pid %d", nsCoreFile, pid)
 		}
 
 		// Cfg file
-		if _, err = ld.GetFile(nsCfgFile, cfgFile, int(pid)); err != nil {
+		if _, err = util.CopyFile2(nsCfgFile, cfgFile); err != nil {
 			log.Warn().Err(err).Msgf("Unable to get %s file from namespace for pid %d", nsCfgFile, pid)
 		}
 
 		// Backtrace file
-		if _, err = ld.GetFile(nsBacktraceFile, backtraceFile, int(pid)); err != nil {
+		if _, err = util.CopyFile2(nsBacktraceFile, backtraceFile); err != nil {
 			log.Warn().Err(err).Msgf("Unable to get %s file from namespace for pid %d", nsBacktraceFile, pid)
 		}
 
 		// Hostname file
-		if _, err = ld.GetFile(nsHostnameFile, hostnameFile, int(pid)); err != nil {
+		if _, err = util.CopyFile2(nsHostnameFile, hostnameFile); err != nil {
 			log.Warn().Err(err).Msgf("Unable to get %s file from namespace for pid %d", nsHostnameFile, pid)
 		}
 
@@ -197,9 +194,9 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, pro
 
 	// If process is in a parallel container or a host above (i.e. in an above / parallel namespace) // proc/pid not visible unless hostfs
 	//		(pid provided must be of the hosts perspective)
-	//		(requires --privileged flag)
-	//		get crash files - use --getfiles
-	//		get hostname file - use --getfiles
+	//		(requires --privileged flag? or mounted hostfs?)
+	//		get crash files - use /proc/pid/root or --getfiles
+	//		get hostname file - use /proc/pid/root or --getfiles
 	//		generate snapshot - call gensnapshot
 	//			get process username,environ - from /proc using --getfiles
 

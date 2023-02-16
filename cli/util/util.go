@@ -396,3 +396,13 @@ func CopyFile2(src, dst string) (int64, error) {
 	nBytes, err := io.Copy(destination, source)
 	return nBytes, err
 }
+
+func RemoveEmptyStrings(s []string) []string {
+	var ret []string
+	for _, str := range s {
+		if str != "" {
+			ret = append(ret, str)
+		}
+	}
+	return ret
+}

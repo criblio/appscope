@@ -233,10 +233,11 @@ func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler uint64, procNa
 	if err != nil {
 		log.Warn().Err(err).Msgf("unable to get username for pid %d", pid)
 	}
-	s.Environment, err = p.Environ()
+	env, err := p.Environ()
 	if err != nil {
 		log.Warn().Err(err).Msgf("unable to get environment for pid %d", pid)
 	}
+	s.Environment = util.RemoveEmptyStrings(env)
 	if sig == 0 { // Initiated by snapshot command, need to get these values ourselves
 		uids, err := p.Uids()
 		if err != nil {

@@ -31,8 +31,7 @@ snapshotSigSegvTest(void **state)
         * Child process will perform following operations:
         *
         * - ignore SIGSEGV signal
-        * - perform `snapshotSignalHandler` function which will stop the process using SIGSTOP 
-        * - SIGCONT delivered from parent will allow child process to continue
+        * - perform `snapshotSignalHandler` function which will stop the process for 5 seconds
         */
         siginfo_t info = {.si_signo = SIGSEGV, .si_code = SEGV_MAPERR};
         signal(SIGSEGV, SIG_IGN);
@@ -45,23 +44,12 @@ snapshotSigSegvTest(void **state)
         * Parent process will perform following operations:
         *
         * - will suspends execution of itself until if detects that child process was stopped (`snapshotSignalHandler`)
-        * - send SIGCONT signal to child process allowing to continue
         */
         int wstatus;
         pid_t wpid;
         wpid = waitpid(cpid, &wstatus, WUNTRACED);
         if (wpid == -1) {
             exit(EXIT_FAILURE);
-        }
-
-        if (WIFSTOPPED(wstatus)) {
-            kill(cpid, SIGCONT);
-            wpid = waitpid(cpid, &wstatus, WCONTINUED);
-            if (wpid == -1) {
-                exit(EXIT_FAILURE);
-            }
-        } else {
-            assert_non_null(NULL);
         }
     }
     scope_snprintf(dirPath, sizeof(dirPath), "/tmp/appscope/%d/", cpid);

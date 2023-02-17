@@ -270,12 +270,11 @@ do
     SCOPE_SNAPSHOT_COREDUMP=true scope attach $PID
     sleep 1
     kill -s $SIGNAL $PID
-    sleep 1
-    kill -s SIGCONT $PID
-    sleep 0.5
+    sleep 10
     grep "Handling $SIGNAL from ./sighandler" standardout.txt
     ERR+=$?
     rm standardout.txt
+    kill $PID
     endtest
   done
 done
@@ -299,12 +298,11 @@ do
     PID=`echo $!`
     sleep 1
     kill -s $SIGNAL $PID
-    sleep 1
-    kill -s SIGCONT $PID
-    sleep 0.5
+    sleep 10
     grep "Handling $SIGNAL from ./sighandler" standardout.txt
     ERR+=$?
     rm standardout.txt
+    kill $PID
     endtest
   done
 done

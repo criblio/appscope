@@ -182,14 +182,13 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, pro
 		if _, err = util.CopyFile2(nsHostnameFile, hostnameFile); err != nil {
 			log.Warn().Err(err).Msgf("Unable to get %s file from namespace for pid %d", nsHostnameFile, pid)
 		}
+		defer os.Remove(hostnameFile)
 
 		// Snapshot file
 		if err := GenSnapshotFile(sig, errno, pid, uid, gid, sigHandler, procName, procArgs, hostnameFile, snapshotFile); err != nil {
 			log.Error().Err(err).Msgf("error generating snapshot file")
 			return err
 		}
-
-		// TODO delete hostname file
 	}
 
 	// If process is in a parallel container or a host above (i.e. in an above / parallel namespace) // proc/pid not visible unless hostfs

@@ -288,14 +288,3 @@ func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler uint64, procNa
 
 	return nil
 }
-
-// Resume sends a SIGCONT signal to the process allowing it to resume
-func Resume(pid uint32) error {
-	p, err := process.NewProcess(int32(pid))
-	if err != nil {
-		log.Error().Err(err).Msgf("error getting process for pid %d", pid)
-		return err
-	}
-
-	return p.SendSignal(18)
-}

@@ -3,7 +3,6 @@ package snapshot
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"syscall"
@@ -267,7 +266,7 @@ func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler uint64, procNa
 	}
 
 	// Source: namespace
-	hfBytes, err := ioutil.ReadFile(hostnameFilePath)
+	hfBytes, err := os.ReadFile(hostnameFilePath)
 	if err == nil {
 		s.Hostname = strings.TrimSpace(string(hfBytes))
 	}
@@ -280,7 +279,7 @@ func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler uint64, procNa
 	}
 
 	// Open and Write file to dir
-	err = ioutil.WriteFile(filePath, jsonSnapshot, 0644)
+	err = os.WriteFile(filePath, jsonSnapshot, 0644)
 	if err != nil {
 		log.Error().Err(err).Msgf("error writing snapshot file")
 		return err

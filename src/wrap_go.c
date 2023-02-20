@@ -1697,5 +1697,6 @@ go_exit(char *stackptr)
 EXPORTON void *
 go_die(char *stackptr)
 {
+    // handle signals
     return do_cfunc(stackptr, c_exit, tap_entry(tap_die)->assembly_fn);
 }

@@ -1446,10 +1446,13 @@ initHook(int attachedFlag, bool scopedFlag)
     // this is duplicated if we were started from the scope exec
     if (g_isstatic == FALSE && g_isgo == TRUE) {
 
-        // Avoid running initGoHook if we are scopedyn
-        if (scope_strstr(full_path, "scopedyn") == NULL) {
-            initGoHook(ebuf);
-            threadNow(0);
+        if (osGetExePath(scope_getpid(), &full_path) != -1) {
+            // Avoid running initGoHook if we are scopedyn
+            if (scope_strstr(full_path, "scopedyn") == NULL) {
+                initGoHook(ebuf);
+                threadNow(0);
+            }
+            if (full_path) scope_free(full_path);
         }
 
         return;

@@ -1434,27 +1434,20 @@ hookInject()
 }
 
 static void
-initHook(int attachedFlag, bool scopedFlag)
+initHook(int attachedFlag, bool scopedFlag, elf_buf_t *ebuf, char *full_path)
 {
     int rc;
     bool should_we_patch = FALSE;
-    char *full_path = NULL;
-    elf_buf_t *ebuf = NULL;
     funchook_t *funchook;
 
     // env vars are not always set as needed, be explicit here
     // this is duplicated if we were started from the scope exec
     if (g_isstatic == FALSE && g_isgo == TRUE) {
-
-        if (osGetExePath(scope_getpid(), &full_path) != -1) {
-            // Avoid running initGoHook if we are scopedyn
-            if (scope_strstr(full_path, "scopedyn") == NULL) {
-                initGoHook(ebuf);
-                threadNow(0);
-            }
-            if (full_path) scope_free(full_path);
+        // Avoid running initGoHook if we are scopedyn
+        if (scope_strstr(full_path, "scopedyn") == NULL) {
+            initGoHook(ebuf);
+            threadNow(0);
         }
-
         return;
     }
 
@@ -1668,27 +1661,18 @@ init(void)
     config_t *cfg = NULL;
     char *path = NULL;
     scope_init_vdso_ehdr();
+    char *full_path = NULL;
+    elf_buf_t *ebuf = NULL;
+
     // Bootstrapping...  we need to know if we're in musl so we can
     // call the right initFn function...
-    {
-        char *full_path = NULL;
-        elf_buf_t *ebuf = NULL;
-
-        // Needed for getElf()
-        g_fn.open = dlsym(RTLD_NEXT, "open");
-        if (!g_fn.open) g_fn.open = dlsym(RTLD_DEFAULT, "open");
-        g_fn.close = dlsym(RTLD_NEXT, "close");
-        if (!g_fn.close) g_fn.close = dlsym(RTLD_DEFAULT, "close");
-
-        if (osGetExePath(scope_getpid(), &full_path) != -1) {
-            if ((ebuf = getElf(full_path))) {
-                g_isgo = is_go(ebuf->buf);   
-                g_isstatic = is_static(ebuf->buf);
-                g_ismusl = is_musl(ebuf->buf);
-                if (ebuf) freeElf(ebuf->buf, ebuf->len);
-            }
+    
+    if (osGetExePath(scope_getpid(), &full_path) != -1) {
+        if ((ebuf = getElf(full_path))) {
+            g_isgo = is_go(ebuf->buf);   
+            g_isstatic = is_static(ebuf->buf);
+            g_ismusl = is_musl(ebuf->buf);
         }
-        if (full_path) scope_free(full_path);
     }
 
     initFn();
@@ -1799,7 +1783,7 @@ init(void)
     // of whether TLS is actually configured on any transport.
     transportRegisterForExitNotification(handleExit);
 
-    initHook(attachedFlag, scopedFlag);
+    initHook(attachedFlag, scopedFlag, ebuf, full_path);
     
     /*
      * If we are interposing (scoping) this process, then proceed
@@ -1842,6 +1826,8 @@ init(void)
 
     osInitJavaAgent();
 
+    if (ebuf) freeElf(ebuf->buf, ebuf->len);
+    if (full_path) scope_free(full_path);
 }
 
 EXPORTOFF sighandler_t

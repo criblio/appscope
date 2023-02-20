@@ -1120,7 +1120,7 @@ enableSnapshot(config_t *cfg) {
     // We have an interposition in place that is called when the app
     // is about to die from a signal that allows us to avoid registering
     // our own signal handler; and doing any forwarding.
-    if g_isgo {
+    if (g_isgo) {
         return;
     }
 
@@ -1444,7 +1444,7 @@ initHook(int attachedFlag, bool scopedFlag)
 
     // env vars are not always set as needed, be explicit here
     // this is duplicated if we were started from the scope exec
-    if (g_isstatic == FALSE) && g_isgo == TRUE) {
+    if (g_isstatic == FALSE && g_isgo == TRUE) {
 
         // Avoid running initGoHook if we are scopedyn
         if (scope_strstr(full_path, "scopedyn") == NULL) {
@@ -1678,9 +1678,9 @@ init(void)
         if (!g_fn.close) g_fn.close = dlsym(RTLD_DEFAULT, "close");
 
         if (osGetExePath(scope_getpid(), &full_path) != -1) {
-            if (ebuf = getElf(full_path)) {
+            if ((ebuf = getElf(full_path))) {
                 g_isgo = is_go(ebuf->buf);   
-                g_isstatic = is_static(ebuf->buf)
+                g_isstatic = is_static(ebuf->buf);
                 g_ismusl = is_musl(ebuf->buf);
                 if (ebuf) freeElf(ebuf->buf, ebuf->len);
             }
@@ -1812,7 +1812,7 @@ init(void)
         reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
         doProcStartMetric();
 
-        if (g_isgo)) {
+        if (g_isgo) {
             threadNow(0);
         } else if (g_ismusl == FALSE) {
             /*

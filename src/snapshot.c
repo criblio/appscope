@@ -436,7 +436,7 @@ snapshotSignalHandler(int sig, siginfo_t *info, void *secret) {
 
     // We don't need to run the app's signal handler if we're dealing with a Go app
     // since we are hooked just before die ; and after any application-level signal handling
-    if !g_isgo {
+    if (!g_isgo) {
         appSignalHandler(sig, info, secret);
     }
 }

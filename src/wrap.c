@@ -1116,6 +1116,14 @@ enableSnapshot(config_t *cfg) {
         return;
     }
 
+    // We don't want to do this when we're dealing with a Go app.
+    // We have an interposition in place that is called when the app
+    // is about to die from a signal that allows us to avoid registering
+    // our own signal handler; and doing any forwarding.
+    if g_isgo {
+        return;
+    }
+
     if (g_fn.sigaction) {
         struct sigaction act = { 0 };
 
@@ -1436,9 +1444,7 @@ initHook(int attachedFlag, bool scopedFlag)
 
     // env vars are not always set as needed, be explicit here
     // this is duplicated if we were started from the scope exec
-    if ((osGetExePath(scope_getpid(), &full_path) != -1) &&
-        ((ebuf = getElf(full_path))) &&
-        (is_static(ebuf->buf) == FALSE) && (is_go(ebuf->buf) == TRUE)) {
+    if (g_isstatic == FALSE) && g_isgo == TRUE) {
 
         // Avoid running initGoHook if we are scopedyn
         if (scope_strstr(full_path, "scopedyn") == NULL) {
@@ -1446,20 +1452,17 @@ initHook(int attachedFlag, bool scopedFlag)
             threadNow(0);
         }
 
-        if (full_path) scope_free(full_path);
-        if (ebuf) freeElf(ebuf->buf, ebuf->len);
         return;
     }
 
-    if (ebuf && ebuf->buf) {
-
+    if ((osGetExePath(scope_getpid(), &full_path) != -1) &&
+        ((ebuf = getElf(full_path))) && ebuf->buf) {
         // This is in support of a libuv specific extension to map an SSL ID to a fd.
         // The symbol uv__read is not public. Therefore, we don't resolve it with dlsym.
         // So, while we have the exec open, we look to see if we can dig it out.
         g_fn.uv__read = getSymbol(ebuf->buf, "uv__read");
         scopeLog(CFG_LOG_TRACE, "%s:%d uv__read at %p", __FUNCTION__, __LINE__, g_fn.uv__read);
     }
-
     if (full_path) scope_free(full_path);
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
@@ -1685,16 +1688,15 @@ init(void)
         g_fn.close = dlsym(RTLD_NEXT, "close");
         if (!g_fn.close) g_fn.close = dlsym(RTLD_DEFAULT, "close");
 
-        g_ismusl =
-            ((osGetExePath(scope_getpid(), &full_path) != -1) &&
-// TODO : Test this removal!  // !scope_strstr(full_path, "scope") && 
-            ((ebuf = getElf(full_path))) &&
-            !is_static(ebuf->buf) &&
-            !is_go(ebuf->buf) &&
-            is_musl(ebuf->buf));
-
+        if (osGetExePath(scope_getpid(), &full_path) != -1) {
+            if (ebuf = getElf(full_path)) {
+                g_isgo = is_go(ebuf->buf);   
+                g_isstatic = is_static(ebuf->buf)
+                g_ismusl = is_musl(ebuf->buf);
+                if (ebuf) freeElf(ebuf->buf, ebuf->len);
+            }
+        }
         if (full_path) scope_free(full_path);
-        if (ebuf) freeElf(ebuf->buf, ebuf->len);
     }
 
     // Use dlsym to get addresses for everything in g_fn
@@ -1826,7 +1828,7 @@ init(void)
         reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
         doProcStartMetric();
 
-        if (checkEnv("SCOPE_APP_TYPE", "go")) {
+        if (g_isgo)) {
             threadNow(0);
         } else if (g_ismusl == FALSE) {
             /*

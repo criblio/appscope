@@ -1455,17 +1455,6 @@ initHook(int attachedFlag, bool scopedFlag)
         return;
     }
 
-    if ((osGetExePath(scope_getpid(), &full_path) != -1) &&
-        ((ebuf = getElf(full_path))) && ebuf->buf) {
-        // This is in support of a libuv specific extension to map an SSL ID to a fd.
-        // The symbol uv__read is not public. Therefore, we don't resolve it with dlsym.
-        // So, while we have the exec open, we look to see if we can dig it out.
-        g_fn.uv__read = getSymbol(ebuf->buf, "uv__read");
-        scopeLog(CFG_LOG_TRACE, "%s:%d uv__read at %p", __FUNCTION__, __LINE__, g_fn.uv__read);
-    }
-    if (full_path) scope_free(full_path);
-    if (ebuf) freeElf(ebuf->buf, ebuf->len);
-
     if (attachedFlag) {
         // responding to the inject command
         hookInject();

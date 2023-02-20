@@ -1688,12 +1688,7 @@ init(void)
         if (full_path) scope_free(full_path);
     }
 
-    // Use dlsym to get addresses for everything in g_fn
-    if (g_ismusl) {
-        initFn_musl();
-    } else {
-        initFn();
-    }
+    initFn();
 
     setProcId(&g_proc);
     setPidEnv(g_proc.pid);

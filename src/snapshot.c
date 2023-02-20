@@ -47,7 +47,7 @@ extern rtconfig g_cfg;
 
 
 typedef bool               (*actionEnabledFunc)(void);
-typedef bool               (*actionExecute)(const char *, siginfo_t *);
+typedef bool               (*actionExecute)(const char *, const char *, siginfo_t *);
 
 struct snapshotAction {
     actionEnabledFunc enabled;
@@ -71,7 +71,6 @@ static bool
 snapActionAlwaysEnabled(void) {
     return TRUE;
 }
-
 
 
 /*
@@ -129,10 +128,11 @@ appSignalHandler(int sig, siginfo_t *info, void *secret) {
  * Snapshot info
  */
 static bool
-snapInfo(const char *dirPath, siginfo_t *unused) {
+snapInfo(const char *dirPath, const char *epochStr, siginfo_t *unused) {
     char filePath[PATH_MAX] = {0};
     scope_strcpy(filePath, dirPath);
-    scope_strcat(filePath, "info");
+    scope_strcat(filePath, "info_");
+    scope_strcat(filePath, epochStr);
     int fd = scope_open(filePath, O_CREAT | S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
     if (!fd) {
         return FALSE;
@@ -140,7 +140,7 @@ snapInfo(const char *dirPath, siginfo_t *unused) {
     snapshotWriteConstStr(fd, "Scope Version: ");
     snapshotWriteConstStr(fd, SCOPE_VER);
     snapshotWriteConstStr(fd, "\nUnix Time: ");
-    snapshotWriteNumberDec(fd, scope_time(NULL));
+    snapshotWriteConstStr(fd, epochStr);
     snapshotWriteConstStr(fd, " sec\nPID: ");
     snapshotWriteNumberDec(fd, g_proc.pid);
     snapshotWriteConstStr(fd ,"\nProcess name: ");
@@ -155,14 +155,15 @@ snapInfo(const char *dirPath, siginfo_t *unused) {
  * Snapshot configuration
  */
 static bool
-snapConfig(const char *dirPath, siginfo_t *unused) {
+snapConfig(const char *dirPath, const char *epochStr, siginfo_t *unused) {
     if (!g_cfg.cfgStr) {
         // should be unreachable
         return FALSE;
     }
     char filePath[PATH_MAX] = {0};
     scope_strcpy(filePath, dirPath);
-    scope_strcat(filePath, "cfg");
+    scope_strcat(filePath, "cfg_");
+    scope_strcat(filePath, epochStr);
     int fd = scope_open(filePath, O_CREAT | S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
     if (!fd) {
         return FALSE;
@@ -185,10 +186,11 @@ snapActionBacktraceEnabled(void) {
  * Snapshot backtrace
  */
 static bool
-snapBacktrace(const char *dirPath, siginfo_t *info) {
+snapBacktrace(const char *dirPath, const char *epochStr, siginfo_t *info) {
     char filePath[PATH_MAX] = {0};
     scope_strcpy(filePath, dirPath);
-    scope_strcat(filePath, "backtrace");
+    scope_strcat(filePath, "backtrace_");
+    scope_strcat(filePath, epochStr);
     int fd = scope_open(filePath, O_CREAT | S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
     if (!fd) {
         return FALSE;
@@ -351,10 +353,11 @@ snapActionCoredumpEnabled(void) {
  * Snapshot coredump
  */
 static bool
-snapCoreDump(const char *dirPath, siginfo_t *unused) {
+snapCoreDump(const char *dirPath, const char *epochStr, siginfo_t *unused) {
     char filePath[PATH_MAX] = {0};
     scope_strcpy(filePath, dirPath);
-    scope_strcat(filePath, "core");
+    scope_strcat(filePath, "core_");
+    scope_strcat(filePath, epochStr);
     return coreDumpGenerate(filePath);
 }
 
@@ -408,7 +411,7 @@ snapshotSignalHandler(int sig, siginfo_t *info, void *secret) {
     // Append PID to path
     sigSafeUtoa(scope_getpid(), pidBuf, 10, &msgLen);
     currentOffset += msgLen + 1;
-    if (currentOffset> PATH_MAX) {
+    if (currentOffset > PATH_MAX) {
         DBG(NULL);
         return;
     }
@@ -417,11 +420,17 @@ snapshotSignalHandler(int sig, siginfo_t *info, void *secret) {
     // Create the base PID directory
     sigSafeMkdirRecursive(snapPidDirPath);
 
+    // Snapshot Timestamp
+    char timeBuf[1024] = {0};
+    msgLen = 0;
+    // Convert epoch to string
+    sigSafeUtoa(scope_time(NULL), timeBuf, 10, &msgLen);
+
     // Perform all snapshot actions which are enabled
     for (int index = 0; index < ARRAY_SIZE(allSnapshotActions); ++index) {
         struct snapshotAction act = allSnapshotActions[index];
         if (act.enabled() == TRUE) {
-            act.execute(snapPidDirPath, info);
+            act.execute(snapPidDirPath, timeBuf, info);
         }
     }
 

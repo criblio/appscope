@@ -9,7 +9,7 @@ Snapshot file details
 The files will be placed in folllowing locations:
 `/tmp/appscope/<PID>/`
 
-`/tmp/appscope/<PID>/info`
+`/tmp/appscope/<PID>/info_<timestamp>`
 This file is generated when the snapshot feature is enabled.
 
 Example content:
@@ -20,7 +20,7 @@ PID: 1370399
 Process name: htop
 ```
 
-`/tmp/appscope/<PID>/cfg`
+`/tmp/appscope/<PID>/cfg_<timestamp>`
 This file is generated when the snapshot feature is enabled.
 
 Example content:
@@ -28,11 +28,11 @@ Example content:
 {"metric":{"enable":"true","transport":{"type":"file","path":"/home/testuser/.scope/history/htop_4_1370399_1675350868661357625/metrics.json","buffering":"line"},"format":{"type":"ndjson","statsdprefix":"","statsdmaxlen":512,"verbosity":4},"watch":[{"type":"fs"},{"type":"net"},{"type":"http"},{"type":"dns"},{"type":"process"},{"type":"statsd"}]},"libscope":{"log":{"level":"warning","transport":{"type":"file","path":"/home/testuser/.scope/history/htop_4_1370399_1675350868661357625/libscope.log","buffering":"line"}},"snapshot":{"backtrace":"false"},"configevent":"false","summaryperiod":10,"commanddir":"/home/testuser/.scope/history/htop_4_1370399_1675350868661357625/cmd"},"event":{"enable":"true","transport":{"type":"file","path":"/home/testuser/.scope/history/htop_4_1370399_1675350868661357625/events.json","buffering":"line"},"format":{"type":"ndjson","maxeventpersec":10000,"enhancefs":"true"},"watch":[{"type":"file","name":"(\\/logs?\\/)|(\\.log$)|(\\.log[.\\d])","field":".*","value":".*"},{"type":"console","name":"(stdout|stderr)","field":".*","value":".*","allowbinary":"false"},{"type":"http","name":".*","field":".*","value":".*","headers":[]},{"type":"net","name":".*","field":".*","value":".*"},{"type":"fs","name":".*","field":".*","value":".*"},{"type":"dns","name":".*","field":".*","value":".*"}]},"payload":{"enable":"false","dir":"/tmp"},"tags":{},"protocol":[],"cribl":{"enable":"false","transport":{"type":"edge"},"authtoken":""}}
 ```
 
-`/tmp/appscope/<PID>/coredump`
+`/tmp/appscope/<PID>/coredump_<timestamp>`
 This file is generated when the coredump feature is enabled.
 Contains the coredump generated during crash.
 For further detail: [gdb](https://sourceware.org/gdb/onlinedocs/gdb/Core-File-Generation.html)
 
-`/tmp/appscope/<PID>/backtrace`
+`/tmp/appscope/<PID>/backtrace_<timestamp>`
 This file is generated when the backtrace feature is enabled.
 Contains the backtrace captured during crash.

@@ -19,11 +19,20 @@ rm_recursive(char *path) {
     return nftw(path, rm_callback, 64, FTW_DEPTH | FTW_PHYS);
 }
 
+struct snap_prefix {
+    char name[64];
+    bool present;
+};
+
+#define PREFIX_NO 3
+
 static void
 snapshotSigSegvTest(void **state)
 {
     char dirPath[PATH_MAX] = {0};
     struct stat fileState;
+    DIR *dirp;
+    struct dirent *entry;
     pid_t cpid = fork();
     assert_int_not_equal(-1, cpid);
     if (cpid == 0){
@@ -59,14 +68,31 @@ snapshotSigSegvTest(void **state)
     assert_int_equal(res, 0);
     assert_true(S_ISDIR(fileState.st_mode));
     // cfg is missing becase  g_cfg.cfgstr is not initialized
-    char *snapFileNames[] = {"info", "backtrace", "core"};
-    for (int i = 0; i < sizeof(snapFileNames)/ sizeof(snapFileNames[0]); ++i) {
-        char filePath[PATH_MAX] = {0};
-        scope_snprintf(filePath, sizeof(filePath), "%s%s", dirPath, snapFileNames[i]);
-        int res = scope_stat(filePath, &fileState);
-        assert_int_equal(res, 0);
-        assert_true(S_ISREG(fileState.st_mode));
+    struct snap_prefix snapFilePrefixes[PREFIX_NO] = {
+                                                {"info_", FALSE},
+                                                {"backtrace_", FALSE},
+                                                {"core_", FALSE}
+                                            };
+
+
+    dirp = scope_opendir(dirPath);
+    assert_non_null(dirp);
+
+    while ((entry = scope_readdir(dirp)) != NULL) {
+        if (entry->d_type == DT_REG) {
+            for (int i = 0; i < PREFIX_NO; ++i) {
+                if (scope_strstr(entry->d_name, snapFilePrefixes[i].name)) {
+                    snapFilePrefixes[i].present = TRUE;
+                }
+            }
+        }
     }
+    scope_closedir(dirp);
+
+    for (int i = 0; i < PREFIX_NO; ++i) {
+        assert_true(snapFilePrefixes[i].present);
+    }
+
     // clean it up
     res = rm_recursive(dirPath);
     assert_int_equal(res, 0);

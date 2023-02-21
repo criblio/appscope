@@ -96,6 +96,7 @@
     mov  x9, x30                                 // save the link register
     bl   \s_func
     mov  x30, x9                                 // restore the link register
+    add  sp, sp, #16
     br   x17
 .endm
 
@@ -189,6 +190,7 @@ c_syscall_handler:
     interpose_system_stack go_hook_reg_http2_client_write    go_http2_client_write   c_handler
     interpose_system_stack go_hook_exit                      go_exit                 c_handler
     interpose_system_stack go_hook_die                       go_die                  c_handler
+    interpose_system_stack go_hook_sighandler                go_sighandler           c_handler
 
 /*
 .text

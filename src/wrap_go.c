@@ -17,6 +17,7 @@
 #include "fn.h"
 #include "capstone/capstone.h"
 #include "scopestdlib.h"
+#include "snapshot.h"
 
 #define GOPCLNTAB_MAGIC_112 0xfffffffb
 #define GOPCLNTAB_MAGIC_116 0xfffffffa
@@ -100,6 +101,7 @@ tap_t g_tap[] = {
     {tap_http2_server_preface, "net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
     {tap_exit,                 "runtime.exit",          /* .abi0 */       go_hook_exit,                     NULL, 0},
     {tap_die,                  "runtime.dieFromSignal", /* .abi0 */       go_hook_die,                      NULL, 0},
+    {tap_sighandler,           "runtime.sighandler",    /* .abi0 */       go_hook_sighandler,               NULL, 0},
     {tap_end,                  "",                                        NULL,                             NULL, 0},
 };
 
@@ -713,7 +715,8 @@ patch_addrs(funchook_t *funchook,
         // conventions that other go functions do.
         // We also patch syscalls at the first (and last) instruction.
         if (i == 0 && ((tap->assembly_fn == go_hook_exit) ||
-            (tap->assembly_fn == go_hook_die))) {
+                       (tap->assembly_fn == go_hook_die) ||
+                       (tap->assembly_fn == go_hook_sighandler))) {
 
             // In this case we want to patch the instruction directly
             void *pre_patch_addr = (void*)asm_inst[i].address;
@@ -1697,6 +1700,24 @@ go_exit(char *stackptr)
 EXPORTON void *
 go_die(char *stackptr)
 {
-    // handle signals
     return do_cfunc(stackptr, c_exit, tap_entry(tap_die)->assembly_fn);
+}
+
+static void
+c_sighandler(char *sys_stack, char *g_stack)
+{
+    if (snapshotIsEnabled() == FALSE) return;
+
+    int sig = *(int *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
+    siginfo_t *info = (siginfo_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
+
+    if ((sig == SIGILL) || (sig == SIGSEGV) || (sig == SIGBUS) || (sig == SIGFPE)) {
+        snapshotSignalHandler(sig, info, NULL);
+    }
+}
+
+EXPORTON void *
+go_sighandler(char *stackptr)
+{
+    return do_cfunc(stackptr, c_sighandler, tap_entry(tap_sighandler)->assembly_fn);
 }

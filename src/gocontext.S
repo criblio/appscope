@@ -190,3 +190,4 @@ c_syscall_handler:
     interpose_system_stack go_hook_reg_http2_client_write    go_http2_client_write   c_handler
     interpose_system_stack go_hook_exit                      go_exit                 c_handler
     interpose_system_stack go_hook_die                       go_die                  c_handler
+    interpose_system_stack go_hook_sighandler                go_sighandler           c_handler

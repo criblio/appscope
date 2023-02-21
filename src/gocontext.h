@@ -73,6 +73,7 @@ enum tap_id {
     tap_http2_server_preface,
     tap_exit,
     tap_die,
+    tap_sighandler,
     tap_end,
 };
 
@@ -128,5 +129,6 @@ extern void go_hook_reg_http2_client_read(void);
 extern void go_hook_reg_http2_client_write(void);
 extern void go_hook_exit(void);
 extern void go_hook_die(void);
+extern void go_hook_sighandler(void);
 
 #endif // __GOTCONTEXT_H__

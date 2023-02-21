@@ -69,13 +69,13 @@
     },
     "coredump": {
       "title": "coredump",
-      "description": "When true, AppScope captures a core dump when a fatal signal is received. See `scope.yml`.",
+      "description": "When true, AppScope captures a core dump whenever the kernel sends the scoped app a fatal signal (i.e., illegal instruction, bus error, segmentation fault, or floating point exception).",
       "type": "string",
       "enum": ["true", "false"]
     },
     "backtrace": {
       "title": "backtrace",
-      "description": "When true, AppScope captures a stack trace when a fatal signal is received. See `scope.yml`.",
+      "description": "When true, AppScope captures a backtrace (a.k.a. stack trace) whenever the kernel sends the scoped app a fatal signal (i.e., illegal instruction, bus error, segmentation fault, or floating point exception).",
       "type": "string",
       "enum": ["true", "false"]
     },

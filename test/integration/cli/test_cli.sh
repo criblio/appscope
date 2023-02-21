@@ -86,6 +86,19 @@ scopedProcessNumber() {
     echo $procFound
 }
 
+wordPresentInFile() {
+    local word=$1
+    local fileName=$2
+
+    count=$(grep $word $fileName | wc -l)
+    if [ $count -eq 0 ] ; then
+        echo "FAIL: Value $1 is not present int $2"
+        ERR+=1
+    else
+	    echo "PASS: Value $1 present in $2"
+    fi
+}
+
 # wait maximum 30 seconds
 waitForCmdscopedProcessNumber() {
     local expScoped=$1
@@ -356,22 +369,10 @@ is_file /tmp/appscope/${top_pid}/cfg_*
 is_file /tmp/appscope/${top_pid}/backtrace_*
 
 # Check files were received by listener
-count=$(grep 'snapshot' crash.out | wc -l)
-if [ $count -eq 0 ] ; then
-    ERR+=1
-fi
-count=$(grep 'info' crash.out | wc -l)
-if [ $count -eq 0 ] ; then
-    ERR+=1
-fi
-count=$(grep 'cfg' crash.out | wc -l)
-if [ $count -eq 0 ] ; then
-    ERR+=1
-fi
-count=$(grep 'backtrace' crash.out | wc -l)
-if [ $count -eq 0 ] ; then
-    ERR+=1
-fi
+wordPresentInFile "snapshot_" "crash.out"
+wordPresentInFile "info_" "crash.out"
+wordPresentInFile "cfg_" "crash.out"
+wordPresentInFile "backtrace_" "crash.out"
 
 # Kill scope daemon process
 kill $daemon_pid

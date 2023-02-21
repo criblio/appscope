@@ -79,26 +79,7 @@ var daemonCmd = &cobra.Command{
 						log.Error().Err(err).Msgf("error connecting to %s", filedest)
 						continue
 					}
-
-					files := []string{
-						fmt.Sprintf("/tmp/appscope/%d/snapshot", pid),
-						fmt.Sprintf("/tmp/appscope/%d/backtrace", pid),
-						fmt.Sprintf("/tmp/appscope/%d/info", pid),
-						fmt.Sprintf("/tmp/appscope/%d/cfg", pid),
-					}
-					if err := d.SendFiles(files, true); err != nil {
-						log.Error().Err(err).Msgf("error sending files to %s", filedest)
-					}
-
-					if sendcore {
-						files = []string{
-							fmt.Sprintf("/tmp/appscope/%d/core", pid),
-						}
-						if err := d.SendFiles(files, false); err != nil {
-							log.Error().Err(err).Msgf("error sending core file to %s", filedest)
-						}
-					}
-
+					d.SendSnapshotFiles(fmt.Sprintf("/tmp/appscope/%d/", pid), sendcore)
 					d.Disconnect()
 				}
 			}

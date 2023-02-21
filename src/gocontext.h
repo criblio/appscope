@@ -32,6 +32,8 @@ typedef struct {
     int c_http2_client_write_tcpConn;
     int c_http2_client_write_buf;
     int c_http2_client_write_rc;
+    int c_signal_sig;
+    int c_signal_info;
 } go_arg_offsets_t;
 
 typedef struct {                  // Structure                  Field      

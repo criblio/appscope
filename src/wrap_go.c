@@ -134,6 +134,8 @@ go_schema_t go_9_schema = {
         .c_http2_client_write_tcpConn= 0x10,
         .c_http2_client_write_buf=     0x68,
         .c_http2_client_write_rc=      0x28,
+        .c_signal_sig=                 0x0,
+        .c_signal_info=                0x8,
     },
     .struct_offsets = {
         .g_to_m=                       0x30,
@@ -188,6 +190,8 @@ go_schema_t go_17_schema_x86 = {
         .c_http2_client_write_tcpConn= 0x40,
         .c_http2_client_write_buf=     0x8,
         .c_http2_client_write_rc=      0x10,
+        .c_signal_sig=                 0x0,
+        .c_signal_info=                0x8,
     },
     .struct_offsets = {
         .g_to_m=                       0x30,
@@ -243,6 +247,8 @@ go_schema_t go_17_schema_arm = {
         .c_http2_client_write_tcpConn= 0x80,
         .c_http2_client_write_buf=     0x10,
         .c_http2_client_write_rc=      0x30,
+        .c_signal_sig=                 0x60,
+        .c_signal_info=                0x68,
     },
     .struct_offsets = {
         .g_to_m=                       0x30,
@@ -1708,8 +1714,8 @@ c_sighandler(char *sys_stack, char *g_stack)
 {
     if (snapshotIsEnabled() == FALSE) return;
 
-    int sig = *(int *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
-    siginfo_t *info = (siginfo_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
+    int sig = *(int *)(sys_stack + g_go_schema->arg_offsets.c_signal_sig);
+    siginfo_t *info = (siginfo_t *)(sys_stack + g_go_schema->arg_offsets.c_signal_info);
 
     if ((sig == SIGILL) || (sig == SIGSEGV) || (sig == SIGBUS) || (sig == SIGFPE)) {
         snapshotSignalHandler(sig, info, NULL);

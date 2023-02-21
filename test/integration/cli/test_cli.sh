@@ -349,11 +349,11 @@ kill -s SIGSEGV $top_pid
 sleep 5
 
 # Check crash and snapshot files exist
-is_file /tmp/appscope/${top_pid}/snapshot
-is_file /tmp/appscope/${top_pid}/info
-is_file /tmp/appscope/${top_pid}/core
-is_file /tmp/appscope/${top_pid}/cfg
-is_file /tmp/appscope/${top_pid}/backtrace
+is_file /tmp/appscope/${top_pid}/snapshot_*
+is_file /tmp/appscope/${top_pid}/info_*
+is_file /tmp/appscope/${top_pid}/core_*
+is_file /tmp/appscope/${top_pid}/cfg_*
+is_file /tmp/appscope/${top_pid}/backtrace_*
 
 # Check files were received by listener
 count=$(grep 'snapshot' crash.out | wc -l)
@@ -372,9 +372,6 @@ count=$(grep 'backtrace' crash.out | wc -l)
 if [ $count -eq 0 ] ; then
     ERR+=1
 fi
-
-# Kill top process
-kill $top_pid
 
 # Kill scope daemon process
 kill $daemon_pid
@@ -402,14 +399,11 @@ run scope snapshot $top_pid
 returns 0
 sleep 2
 
-is_file /tmp/appscope/${top_pid}/snapshot
-is_file /tmp/appscope/${top_pid}/info
-is_file /tmp/appscope/${top_pid}/core
-is_file /tmp/appscope/${top_pid}/cfg
-is_file /tmp/appscope/${top_pid}/backtrace
-
-# Kill sleep process
-kill $top_pid
+is_file /tmp/appscope/${top_pid}/snapshot_*
+is_file /tmp/appscope/${top_pid}/info_*
+is_file /tmp/appscope/${top_pid}/core_*
+is_file /tmp/appscope/${top_pid}/cfg_*
+is_file /tmp/appscope/${top_pid}/backtrace_*
 
 endtest
 

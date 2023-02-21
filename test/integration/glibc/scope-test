@@ -67,8 +67,8 @@ verifySnapshot() {
     sleep 1
 
     local snapshot_dir="/tmp/appscope/$fault_pid"
-    local info_file_path="$snapshot_dir/info"
-    local backtrace_file_path="$snapshot_dir/backtrace"
+    local info_file_path="$snapshot_dir/info*"
+    local backtrace_file_path="$snapshot_dir/backtrace*"
 
     # The following preamble is common for all backtrace
     grep -a "Scope Version:" $info_file_path > /dev/null

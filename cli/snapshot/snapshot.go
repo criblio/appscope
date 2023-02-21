@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -80,6 +81,7 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, pro
 		log.Error().Err(err).Msgf("error determining namespace")
 		return err
 	}
+	snapshotFile := fmt.Sprintf("%s/snapshot_%d", dir, time.Now().Unix())
 
 	// If process is in this container/this host (i.e. in this namespace) // proc/pid is visible
 	//		(pid provided must be of this container/this host's perspective)
@@ -88,32 +90,38 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, pro
 	//		generate snapshot - call gensnapshot
 	//			get process username,environ - from /proc
 	if pidInThisNs {
-		// File destinations and origins
-		infoFile := fmt.Sprintf("%s/info", dir)
-		coreFile := fmt.Sprintf("%s/core", dir)
-		cfgFile := fmt.Sprintf("%s/cfg", dir)
-		backtraceFile := fmt.Sprintf("%s/backtrace", dir)
-		hostnameFile := fmt.Sprintf("/etc/hostname")
-		snapshotFile := fmt.Sprintf("%s/snapshot", dir)
+		// Host Name and snapshot
+		hostnameFile := "/etc/hostname"
 
-		// Info file
-		if !util.CheckFileExists(infoFile) {
-			log.Warn().Err(err).Msgf("Unable to find %s file for pid %d", infoFile, pid)
+		files, err := os.ReadDir(dir)
+		if err != nil {
+			log.Warn().Err(err).Msgf("Unable to read %s directory for pid %d", dir, pid)
 		}
 
-		// Coredump file
-		if !util.CheckFileExists(coreFile) {
-			log.Warn().Err(err).Msgf("Unable to find %s file for pid %d", coreFile, pid)
+		var libSnapFilesPrefixes = map[string]bool{
+			"info_":      false,
+			"core_":      false,
+			"cfg_":       false,
+			"backtrace_": false,
 		}
 
-		// Cfg file
-		if !util.CheckFileExists(cfgFile) {
-			log.Warn().Err(err).Msgf("Unable to find %s file for pid %d", cfgFile, pid)
+		// Iterate over files
+		for _, file := range files {
+			if !file.Type().IsRegular() {
+				continue
+			}
+
+			for libSnapPrefix := range libSnapFilesPrefixes {
+				if strings.HasPrefix(file.Name(), libSnapPrefix) {
+					libSnapFilesPrefixes[libSnapPrefix] = true
+				}
+			}
 		}
 
-		// Backtrace file
-		if !util.CheckFileExists(backtraceFile) {
-			log.Warn().Err(err).Msgf("Unable to find %s file for pid %d", backtraceFile, pid)
+		for libSnapPrefix, val := range libSnapFilesPrefixes {
+			if !val {
+				log.Warn().Msgf("Unable to find %s file for pid %d", filepath.Join(dir, libSnapPrefix), pid)
+			}
 		}
 
 		// Hostname file
@@ -126,22 +134,15 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, pro
 			log.Error().Err(err).Msgf("error generating snapshot file")
 			return err
 		}
-	}
-
-	// If process is in a container below us (i.e. in a below namespace) // proc/pid is visible
-	// 		(pid provided must be of this container/this host's perspective)
-	// 		get crash files - use /proc/pid/root
-	// 		get hostname file - use /proc/pid/root
-	// 		generate snapshot - call gensnapshot
-	// 			get process username,environ - from /proc
-	if !pidInThisNs {
-		// File destinations
-		infoFile := fmt.Sprintf("%s/info", dir)
-		coreFile := fmt.Sprintf("%s/core", dir)
-		cfgFile := fmt.Sprintf("%s/cfg", dir)
-		backtraceFile := fmt.Sprintf("%s/backtrace", dir)
+	} else {
+		// If process is in a container below us (i.e. in a below namespace) // proc/pid is visible
+		// 		(pid provided must be of this container/this host's perspective)
+		// 		get crash files - use /proc/pid/root
+		// 		get hostname file - use /proc/pid/root
+		// 		generate snapshot - call gensnapshot
+		// 			get process username,environ - from /proc
+		// Host Name and snapshot
 		hostnameFile := fmt.Sprintf("/%s/hostname", dir)
-		snapshotFile := fmt.Sprintf("%s/snapshot", dir)
 
 		// Get pid of process inside namespace
 		_, nsPid, err := ipc.IpcNsLastPidFromPid(ipc.IpcPidCtx{Pid: int(pid), PrefixPath: ""})
@@ -151,30 +152,31 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, pro
 
 		// File origins
 		nsDir := fmt.Sprintf("/proc/%d/root/tmp/appscope/%d", pid, nsPid)
-		nsInfoFile := fmt.Sprintf("%s/info", nsDir)
-		nsCoreFile := fmt.Sprintf("%s/core", nsDir)
-		nsCfgFile := fmt.Sprintf("%s/cfg", nsDir)
-		nsBacktraceFile := fmt.Sprintf("%s/backtrace", nsDir)
 		nsHostnameFile := fmt.Sprintf("/proc/%d/root/etc/hostname", pid)
 
-		// Info file
-		if _, err = util.CopyFile2(nsInfoFile, infoFile); err != nil {
-			log.Warn().Err(err).Msgf("Unable to get %s file from namespace for pid %d", nsInfoFile, pid)
+		files, err := os.ReadDir(nsDir)
+		if err != nil {
+			log.Warn().Err(err).Msgf("Unable to read %s namespace directory for pid %d", nsDir, pid)
 		}
 
-		// Coredump file
-		if _, err = util.CopyFile2(nsCoreFile, coreFile); err != nil {
-			log.Warn().Err(err).Msgf("Unable to get %s file from namespace for pid %d", nsCoreFile, pid)
-		}
+		libSnapFilesPrefixes := []string{"info_", "core_", "cfg_", "backtrace_"}
 
-		// Cfg file
-		if _, err = util.CopyFile2(nsCfgFile, cfgFile); err != nil {
-			log.Warn().Err(err).Msgf("Unable to get %s file from namespace for pid %d", nsCfgFile, pid)
-		}
+		// Iterate over files
+		for _, file := range files {
+			if !file.Type().IsRegular() {
+				continue
+			}
 
-		// Backtrace file
-		if _, err = util.CopyFile2(nsBacktraceFile, backtraceFile); err != nil {
-			log.Warn().Err(err).Msgf("Unable to get %s file from namespace for pid %d", nsBacktraceFile, pid)
+			for _, libSnapPrefix := range libSnapFilesPrefixes {
+				fileName := file.Name()
+				if strings.HasPrefix(fileName, libSnapPrefix) {
+					libSnapSrcFile := filepath.Join(nsDir, fileName)
+					libSnapDestFile := filepath.Join(dir, fileName)
+					if _, err = util.CopyFile2(libSnapSrcFile, libSnapDestFile); err != nil {
+						log.Warn().Err(err).Msgf("Unable to get %s file from namespace for pid %d", libSnapSrcFile, pid)
+					}
+				}
+			}
 		}
 
 		// Hostname file

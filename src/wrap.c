@@ -1444,7 +1444,10 @@ initHook(int attachedFlag, bool scopedFlag, elf_buf_t *ebuf, char *full_path)
     // this is duplicated if we were started from the scope exec
     if (g_isstatic == FALSE && g_isgo == TRUE) {
         // Avoid running initGoHook if we are scopedyn
-        if (scope_strstr(full_path, "scopedyn") == NULL) {
+        // Note: g_isgo is true for scopedyn but we don't want to call initGoHook
+        // Because we now execute scopedyn from memory it's path is memfd:...
+        // If executed from the filesystem it's path will be scopedyn
+        if ((scope_strstr(full_path, "scopedyn") == NULL) && (scope_strstr(full_path, "memfd") == NULL)) {
             initGoHook(ebuf);
             threadNow(0);
         }
@@ -1669,7 +1672,9 @@ init(void)
     
     if (osGetExePath(scope_getpid(), &full_path) != -1) {
         if ((ebuf = getElf(full_path))) {
-            g_isgo = is_go(ebuf->buf);   
+            // SCOPE_APP_TYPE will be set by scopedyn
+            // Therefore we are setting isgo to TRUE if we are a go app OR we are scopedyn (not actually a go app)
+            g_isgo = (is_go(ebuf->buf) || (checkEnv("SCOPE_APP_TYPE", "go") == TRUE));
             g_isstatic = is_static(ebuf->buf);
             g_ismusl = is_musl(ebuf->buf);
         }

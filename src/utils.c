@@ -493,3 +493,52 @@ sigSafeWriteNumber(int fd, long val, int base) {
     sigSafeUtoa(val, buf, base, &msgLen);
     return scope_write(fd, buf ,msgLen);
 }
+
+int
+findFd(pid_t pid, const char *fname)
+{
+    int fd = -1;
+    DIR *dirp;
+    char *cwd;
+    struct dirent *entry;
+    char buf[PATH_MAX], link[256];
+
+    if ((cwd = getcwd(NULL, 0)) == NULL) {
+        perror("getcwd");
+        return -1;
+    }
+
+    snprintf(buf, sizeof(buf), "/proc/%d/fd", pid);
+
+    if (chdir(buf) == -1) {
+        free(cwd);
+        return -1;
+    }
+
+    if ((dirp = opendir(buf)) == NULL) {
+        free(cwd);
+        perror("opendir");
+        return -1;
+    }
+
+    while ((entry = readdir(dirp)) != NULL) {
+        if (entry->d_type != DT_DIR) {
+                if (readlink(entry->d_name, link, sizeof(link)) == -1) {
+                    fprintf(stderr, "%s: can't get path to %s", __FUNCTION__, entry->d_name);
+                break;
+            }
+
+            if (strstr(link, fname)) {
+                fd = strtol(entry->d_name, NULL, 0);
+                if ((fd == LONG_MIN) || (fd == LONG_MAX) || (fd == 0)) fd = -1;
+                break;
+            }
+        }
+    }
+
+    chdir(cwd);
+    closedir(dirp);
+    free(cwd);
+    return fd;
+}
+

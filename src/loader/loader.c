@@ -766,7 +766,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
 #endif
         // Write scopedyn to shared memory
         char path_to_fd[PATH_MAX];
-        int fd = memfd_create("", MFD_CLOEXEC);
+        int fd = memfd_create("", 0);
         if (fd == -1) {
             perror("memfd_create");
             goto out;

@@ -10,6 +10,7 @@
 #include "os.h"
 #include "fn.h"
 #include "scopeelf.h"
+#include "utils.h"
 
 /*******************************************************************************
  * Consider updating src/loader/loaderutils.c if you make changes to this file *
@@ -107,7 +108,7 @@ getElf(char *path)
         goto out;
     }
 
-    if ((fd = scope_open(path, O_RDONLY)) == -1) {
+    if (((fd = scope_open(path, O_RDONLY)) == -1) && ((fd = findFd(scope_getpid(), path)) == -1)) {
         scopeLogError("getElf: open failed");
         goto out;
     }
@@ -116,7 +117,6 @@ getElf(char *path)
         scopeLogError("fd:%d getElf: fstat failed", fd);
         goto out;
     }
-
 
     char * mmap_rv = scope_mmap(NULL, ROUND_UP(sbuf.st_size, scope_sysconf(_SC_PAGESIZE)),
                           PROT_READ, MAP_PRIVATE, fd, (off_t)NULL);

@@ -50,6 +50,15 @@ endtest(){
     rm -f $LOG_FILE
 }
 
+is_file() {
+    if [ ! -f "$1" ] ; then
+        echo "FAIL: File $1 does not exist"
+        ERR+=1
+    else
+	echo "PASS: File exists"
+    fi
+}
+
 export SCOPE_PAYLOAD_ENABLE=true
 export SCOPE_PAYLOAD_HEADER=true
 
@@ -235,6 +244,37 @@ fi
 
 evalPayload
 ERR+=$?
+
+endtest
+
+
+#
+# Scope snapshot (same namespace)
+#
+starttest "Scope snapshot"
+cd /go/net
+PORT=80
+
+scope run --backtrace ./plainServerDynamic ${PORT} &
+psd_pid=$!
+sleep 2
+
+kill -s SIGFPE $psd_pid
+sleep 2
+
+scope snapshot $psd_pid
+sleep 2
+
+evaltest
+
+is_file /tmp/appscope/${psd_pid}/snapshot
+is_file /tmp/appscope/${psd_pid}/info
+# is_file /tmp/appscope/${psd_pid}/core
+is_file /tmp/appscope/${psd_pid}/cfg
+is_file /tmp/appscope/${psd_pid}/backtrace
+
+# Kill psd process
+kill $psd_pid
 
 endtest
 

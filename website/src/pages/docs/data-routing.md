@@ -15,6 +15,8 @@ For each of these operations, the CLI has command-line options, the config file 
 
 If you plan to use the config file, do take time to [read it all the way through](/docs/config-file) - then this page will make more sense!
 
+If you want to run Cribl Edge in a container along with AppScope, see [these](#container-with-edge) instructions.
+
 ### Routing to Cribl Edge {#routing-to-edge}
 
 In a single operation, you can route both events and metrics to Cribl Edge. 
@@ -151,3 +153,53 @@ Complete these steps, paying particular attention to the sub-elements of `metric
 * Set `cribl > enable` to `false` to disable the `cribl` backend.
 * Set `metric > enable` to `true` to enable the metrics backend.
 * Specify desired values for the rest of the `metric` elements, namely `format`, `transport`, and optionally, `watch`.
+
+### Running AppScope and Cribl Edge in a Container {#container-with-edge}
+
+There are three ways to start Cribl Edge in a container, then scope any and all apps that run on the container's host. In the examples below, we use `/hostfs` to specify the root filesystem mount point; alternatively, you could use a path defined by the environment variable `CRIBL_EDGE_FS_ROOT`. 
+
+
+
+<!--
+
+Clarify the requiredness of privilege; also why there is no -v in the first option; also what's going on with the rest of the commands.
+
+-->
+
+Mount the host filesystem read-only. The `privileged` flag is required.
+
+```
+/:/hostfs:ro --privileged.
+```
+
+Mount the host filesystem read-only; the three mount points used by `scope start` are specified individually; the `privileged` flag is not needed.
+
+```
+-v /:/hostfs:ro -v /etc/cron.d/:/hostfs/etc/cron.d/ -v /tmp/:/hostfs/tmp/ -v /usr/lib/:/hostfs/usr/lib/
+```
+
+Mount the host filesystem without the read-only restriction; the `privileged` flag is not needed.
+
+```
+-v /:/hostfs no privileged required
+```
+
+Complete example commands:
+
+Mount the host filesystem read-only:
+
+```
+docker run -d -e CRIBL_EDGE=1 -p 9420:9420 -v /var/run/appscope:/var/run/appscope -v /var/run/docker.sock:/var/run/docker.sock -v /:/hostfs:ro  --privileged --restart unless-stopped --name cribl-edge cribl/cribl:4.0.4
+```
+
+Mount the host filesystem read-only and `scope start` mount points are specified individually:
+
+```
+docker run -d -e CRIBL_EDGE=1 -p 9420:9420 -v /var/run/appscope:/var/run/appscope -v /var/run/docker.sock:/var/run/docker.sock -v /:/hostfs:ro -v /etc/cron.d/:/hostfs/etc/cron.d/ -v /tmp/:/hostfs/tmp/ -v /usr/lib/:/hostfs/usr/lib/ --restart unless-stopped --name cribl-edge cribl/cribl:4.0.4
+```
+
+Mount the host filesystem without the read-only restriction:
+
+```
+docker run -d -e CRIBL_EDGE=1 -p 9420:9420 -v /var/run/appscope:/var/run/appscope -v /var/run/docker.sock:/var/run/docker.sock -v /:/hostfs  --restart unless-stopped --name cribl-edge cribl/cribl:4.0.4
+```

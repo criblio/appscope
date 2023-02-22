@@ -36,14 +36,12 @@ Here's a decision tree to help you determine whether to use the CLI or the libra
 
 ![CLI vs. Library Decision Tree](./images/appscope_tree@2x.jpg)
 
-## The Config File, Env Vars, Flags, and `ldscope` {#config-file-etc}
+## The Config File, Env Vars, and Flags {#config-file-etc}
 
 AppScope's ease of use stems from its flexible set of controls:
 
 * AppScope's configuration file, `scope.yml`, can be invoked from either the CLI or the library.
 
 * The AppScope library provides an extensive set of environment variables, which control settings like metric verbosity and event destinations. Environment variables override config file settings.
-
-* Finally, AppScope provides the `ldscope` utility, whose uses include loading the AppScope library into Go executables.
 
 Check out the [CLI](/docs/cli-using) and [library](/docs/library-using) pages to see how it's done.

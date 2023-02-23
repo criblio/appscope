@@ -81,6 +81,16 @@ func (rc *Config) Attach(args []string) error {
 	rc.setupWorkDir(args, true)
 	env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
 
+	// Check the attached process mnt namespace.
+	// If it is different from the CLI mnt namespace:
+	// - create working directory in the attached process mnt namespace
+	// - replace the working directory in the CLI mnt namespace with symbolic
+	//   link to working directory created in previous step
+	refNsPid := util.PidGetRefPidForMntNamespace(pid)
+	if refNsPid != -1 {
+		env = append(env, "SCOPE_HOST_WORKDIR_PATH="+rc.WorkDir)
+	}
+
 	// Handle custom library path
 	if len(rc.LibraryPath) > 0 {
 		if !util.CheckDirExists(rc.LibraryPath) {
@@ -95,9 +105,19 @@ func (rc *Config) Attach(args []string) error {
 
 	ld := loader.New()
 	if !rc.Subprocess {
-		return ld.Attach(args, env)
+		err = ld.Attach(args, env)
+	} else {
+		_, err = ld.AttachSubProc(args, env)
 	}
-	_, err = ld.AttachSubProc(args, env)
+
+	// Replace the working directory with symbolic link in case of successful attach
+	if err == nil {
+		if refNsPid != -1 {
+			os.RemoveAll(rc.WorkDir)
+			os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", rc.WorkDir), rc.WorkDir)
+		}
+	}
+
 	return err
 }
 

@@ -194,6 +194,8 @@ typedef struct
 // Unpublished scope env vars that are not processed by config:
 //    SCOPE_APP_TYPE                 internal use only
 //    SCOPE_EXEC_TYPE                internal use only
+//    SCOPE_HOST_WORKDIR_PATH        internal use - informs the attached process in container to create working directory
+//                                   in container mnt namespace, which allows to access data during attach operation initialized from host
 //    SCOPE_FILTER                   "false" disables handling the filter file
 //                                   other values are interpreted a path to a filter file
 //    SCOPE_EXECVE                   "false" disables scope of child procs

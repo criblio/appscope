@@ -67,6 +67,18 @@
       "description": "The directory AppScope polls for a `scope.<pid>` file, as explained in the Dynamic Configuration section of the Using the CLI page of the AppScope docs.",
       "type": "string"
     },
+    "coredump": {
+      "title": "coredump",
+      "description": "When true, AppScope captures a core dump whenever the kernel sends the scoped app a fatal signal (i.e., illegal instruction, bus error, segmentation fault, or floating point exception).",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
+    "backtrace": {
+      "title": "backtrace",
+      "description": "When true, AppScope captures a backtrace (a.k.a. stack trace) whenever the kernel sends the scoped app a fatal signal (i.e., illegal instruction, bus error, segmentation fault, or floating point exception).",
+      "type": "string",
+      "enum": ["true", "false"]
+    },
     "data": {
       "title": "data",
       "description": "Specifies whether data was unencrypted (clear) or encrypted (SSL).",

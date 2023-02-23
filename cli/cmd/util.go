@@ -28,7 +28,7 @@ func sessionByID(id int) history.SessionList {
 }
 
 func promptClean(sl history.SessionList) {
-	fmt.Println("Invalid session, likely an invalid command was scoped or a session file was modified. Would you like to delete this session? (y/yes)")
+	fmt.Println("Invalid session, likely an invalid command was scoped / a session file was modified / a container session has ended. Would you like to delete this session? (y/yes)")
 	in := bufio.NewScanner(os.Stdin)
 	in.Scan()
 	response := in.Text()

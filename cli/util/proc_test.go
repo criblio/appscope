@@ -165,3 +165,13 @@ func TestPidExists(t *testing.T) {
 	result = PidExists(pid)
 	assert.Equal(t, false, result)
 }
+
+// TestPidGetRefPidForMntNamespace
+// Assertions:
+// - The expected boolean value is returned
+// - No error is returned
+func TestPidGetRefPidForMntNamespace(t *testing.T) {
+	pid := os.Getpid()
+	result := PidGetRefPidForMntNamespace(pid)
+	assert.Equal(t, -1, result)
+}

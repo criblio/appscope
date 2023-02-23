@@ -145,6 +145,8 @@ func (sL *ScopeLoader) ForkAndRun(args []string, env []string) error {
 		Files: []uintptr{uintptr(syscall.Stdin),
 			uintptr(syscall.Stdout),
 			uintptr(syscall.Stderr)}})
+
+	// Child has exec'ed. Below is the Parent path
 	if err != nil {
 		return err
 	}

@@ -448,3 +448,54 @@ func PidExists(pid int) bool {
 	pidPath := fmt.Sprintf("/proc/%v", pid)
 	return CheckDirExists(pidPath)
 }
+
+// containerPids returns list of PID's of currently running containers
+func containerPids() []int {
+	cPids := []int{}
+	ctrFuncs := []func() ([]int, error){GetContainerDPids, GetPodmanPids, GetLXCPids}
+
+	for _, ctrFunc := range ctrFuncs {
+		ctrPids, err := ctrFunc()
+		if err != nil {
+			continue
+		}
+		cPids = append(cPids, ctrPids...)
+	}
+
+	return cPids
+}
+
+// PidGetRefPidForMntNamespace returns reference PID of mnt namespace,
+// Returns -1 if the refrence PID is the same as the scope client PID
+func PidGetRefPidForMntNamespace(targetPid int) int {
+	targetInfo, err := os.Readlink(fmt.Sprintf("/proc/%d/ns/mnt", targetPid))
+	if err != nil {
+		return -1
+	}
+
+	// First check if the namespace used by process is the same namespace as CLI
+	nsInfo, err := os.Readlink("/proc/self/ns/mnt")
+	if err != nil {
+		return -1
+	}
+
+	if nsInfo == targetInfo {
+		return -1
+	}
+
+	// Check if the namespace used by process belongs to one of the detected containers
+	ctrPids := containerPids()
+	for _, nsPid := range ctrPids {
+		nsInfo, err := os.Readlink(fmt.Sprintf("/proc/%d/ns/mnt", nsPid))
+		if err != nil {
+			continue
+		}
+
+		if nsInfo == targetInfo {
+			return nsPid
+		}
+	}
+
+	// Assume that target process do not exists in the container but have seperated mount namespace
+	return targetPid
+}

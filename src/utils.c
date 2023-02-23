@@ -503,42 +503,43 @@ findFd(pid_t pid, const char *fname)
     struct dirent *entry;
     char buf[PATH_MAX], link[256];
 
-    if ((cwd = getcwd(NULL, 0)) == NULL) {
-        perror("getcwd");
+    if ((cwd = scope_getcwd(NULL, 0)) == NULL) {
+        scope_perror("getcwd");
         return -1;
     }
 
-    snprintf(buf, sizeof(buf), "/proc/%d/fd", pid);
+    scope_snprintf(buf, sizeof(buf), "/proc/%d/fd", pid);
 
-    if (chdir(buf) == -1) {
-        free(cwd);
+    if (scope_chdir(buf) == -1) {
+        scope_free(cwd);
         return -1;
     }
 
-    if ((dirp = opendir(buf)) == NULL) {
-        free(cwd);
-        perror("opendir");
+    if ((dirp = scope_opendir(buf)) == NULL) {
+        scope_perror("opendir");
+        scope_chdir(cwd);
+        scope_free(cwd);
         return -1;
     }
 
-    while ((entry = readdir(dirp)) != NULL) {
+    while ((entry = scope_readdir(dirp)) != NULL) {
         if (entry->d_type != DT_DIR) {
-                if (readlink(entry->d_name, link, sizeof(link)) == -1) {
-                    fprintf(stderr, "%s: can't get path to %s", __FUNCTION__, entry->d_name);
+                if (scope_readlink(entry->d_name, link, sizeof(link)) == -1) {
+                    scope_fprintf(stderr, "%s: can't get path to %s", __FUNCTION__, entry->d_name);
                 break;
             }
 
-            if (strstr(link, fname)) {
-                fd = strtol(entry->d_name, NULL, 0);
+            if (scope_strstr(link, fname)) {
+                fd = scope_strtol(entry->d_name, NULL, 0);
                 if ((fd == LONG_MIN) || (fd == LONG_MAX) || (fd == 0)) fd = -1;
                 break;
             }
         }
     }
 
-    chdir(cwd);
-    closedir(dirp);
-    free(cwd);
+    scope_chdir(cwd);
+    scope_closedir(dirp);
+    scope_free(cwd);
     return fd;
 }
 

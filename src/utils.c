@@ -494,6 +494,7 @@ sigSafeWriteNumber(int fd, long val, int base) {
     return scope_write(fd, buf ,msgLen);
 }
 
+// Get the file descriptor of an open file from the file name and pid 
 int
 findFd(pid_t pid, const char *fname)
 {

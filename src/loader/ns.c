@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 
 #include <fcntl.h>
+#include <libgen.h>
 #include <sched.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -165,6 +166,17 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
         goto cleanupMem;
     }
 
+    char *workdirPath = getenv("SCOPE_HOST_WORKDIR_PATH");
+    if (workdirPath) {
+        memset(path, 0, PATH_MAX);
+        libdirCreateDirIfMissing(workdirPath, 0777, nsUid, nsGid);
+        snprintf(path, PATH_MAX, "%s/%s", workdirPath, "payloads");
+        libdirCreateDirIfMissing(path, 0777, nsUid, nsGid);
+        memset(path, 0, PATH_MAX);
+        snprintf(path, PATH_MAX, "%s/%s", workdirPath, "cmd");
+        libdirCreateDirIfMissing(path, 0777, nsUid, nsGid);
+    }
+
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
     bool isDevVersion = libverIsNormVersionDev(loaderVersion);
 
@@ -199,7 +211,11 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
         char scopeCfgPath[PATH_MAX] = {0};
 
         // extract scope.yml configuration
-        snprintf(scopeCfgPath, sizeof(scopeCfgPath), "/tmp/scope%d.yml", hostPid);
+        if (workdirPath) {
+            snprintf(scopeCfgPath, sizeof(scopeCfgPath), "%s/scope.yml", workdirPath);
+        } else {
+            snprintf(scopeCfgPath, sizeof(scopeCfgPath), "/tmp/scope%d.yml", hostPid);
+        }
         status = extractMemToFile(scopeCfgMem, cfgSize, scopeCfgPath, 0664, TRUE, nsUid, nsGid);
         // replace the SCOPE_CONF_PATH with namespace path
         setenv("SCOPE_CONF_PATH", scopeCfgPath, 1);

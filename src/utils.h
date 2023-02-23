@@ -29,6 +29,4 @@ void sigSafeUtoa(unsigned long, char *, int, int *);
 bool sigSafeMkdirRecursive(const char *);
 ssize_t sigSafeWriteNumber(int , long, int);
 
-int findFd(pid_t, const char *);
-
 #endif // __UTILS_H__

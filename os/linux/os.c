@@ -911,21 +911,21 @@ osFindFd(pid_t pid, const char *fname)
     struct dirent *entry;
     char buf[PATH_MAX], link[256];
 
-    if ((cwd = getcwd(NULL, 0)) == NULL) {
+    if ((cwd = scope_getcwd(NULL, 0)) == NULL) {
         DBG(NULL);
         return -1;
     }
 
     scope_snprintf(buf, sizeof(buf), "/proc/%d/fd", pid);
 
-    if (chdir(buf) == -1) {
-        free(cwd);
+    if (scope_chdir(buf) == -1) {
+        scope_free(cwd);
         DBG(NULL);
         return -1;
     }
 
     if ((dirp = scope_opendir(buf)) == NULL) {
-        free(cwd);
+        scope_free(cwd);
         DBG(NULL);
         return -1;
     }
@@ -945,9 +945,9 @@ osFindFd(pid_t pid, const char *fname)
         }
     }
 
-    chdir(cwd);
+    scope_chdir(cwd);
     scope_closedir(dirp);
-    free(cwd);
+    scope_free(cwd);
     return fd;
 }
 

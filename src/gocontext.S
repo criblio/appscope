@@ -204,9 +204,9 @@ c_syscall_handler:
     add $0x2, %r13                       // Skip the syscall instruction
     ret
 
-    interpose_system_stack syscall                           go_syscall              c_syscall_handler
-    interpose_system_stack rawsyscall                        go_rawsyscall           c_syscall_handler
-    interpose_system_stack syscall6                          go_syscall6             c_syscall_handler
+    interpose_system_stack hook_syscall                      go_syscall              c_syscall_handler
+    interpose_system_stack hook_rawsyscall                   go_rawsyscall           c_syscall_handler
+    interpose_system_stack hook_syscall6                     go_syscall6             c_syscall_handler
     interpose_system_stack go_hook_reg_tls_server_read       go_tls_server_read      c_handler
     interpose_system_stack go_hook_reg_tls_server_write      go_tls_server_write     c_handler
     interpose_system_stack go_hook_reg_tls_client_read       go_tls_client_read      c_handler
@@ -220,6 +220,6 @@ c_syscall_handler:
     interpose_system_stack go_hook_die                       go_die                  c_handler
     interpose_system_stack go_hook_sighandler                go_sighandler           c_handler
 
-    syscall_filter go_hook_reg_syscall    syscall    g_syscall_return
-    syscall_filter go_hook_reg_rawsyscall rawsyscall g_rawsyscall_return
-    syscall_filter go_hook_reg_syscall6   syscall6   g_syscall6_return
+    syscall_filter go_hook_reg_syscall    hook_syscall    g_syscall_return
+    syscall_filter go_hook_reg_rawsyscall hook_rawsyscall g_rawsyscall_return
+    syscall_filter go_hook_reg_syscall6   hook_syscall6   g_syscall6_return

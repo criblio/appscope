@@ -249,9 +249,9 @@ endtest
 
 
 #
-# Scope snapshot (same namespace)
+# scope snapshot (same namespace)
 #
-starttest "Scope snapshot"
+starttest "scope_snapshot"
 cd /go/net
 PORT=80
 

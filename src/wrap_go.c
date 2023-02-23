@@ -134,8 +134,8 @@ go_schema_t go_9_schema = {
         .c_http2_client_write_tcpConn= 0x10,
         .c_http2_client_write_buf=     0x68,
         .c_http2_client_write_rc=      0x28,
-        .c_signal_sig=                 0x0,
-        .c_signal_info=                0x8,
+        .c_signal_sig=                 0x20,
+        .c_signal_info=                0x28,
     },
     .struct_offsets = {
         .g_to_m=                       0x30,
@@ -301,6 +301,11 @@ adjustGoStructOffsetsForVersion()
         g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
         g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
         g_go_schema->struct_offsets.cc_to_fr=0xd0;
+    }
+
+    if (g_go_minor_ver < 11) {
+        g_go_schema->arg_offsets.c_signal_sig=0x8;
+        g_go_schema->arg_offsets.c_signal_info=0x10;
     }
 
     if (g_go_minor_ver < 12) {
@@ -935,7 +940,7 @@ initGoHook(elf_buf_t *ebuf)
     // default to a dynamic app?
     if (checkEnv("SCOPE_EXEC_TYPE", "static")) {
         scopeSetGoAppStateStatic(TRUE);
-        patchClone();
+        //patchClone();
         sysprint("This is a static app\n");
     } else {
         scopeSetGoAppStateStatic(FALSE);

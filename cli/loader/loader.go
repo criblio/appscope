@@ -77,7 +77,7 @@ func (sL *ScopeLoader) UnserviceContainer(cpid int) (string, error) {
 // - Attach to a process on the host or in containers
 func (sL *ScopeLoader) Attach(args []string, env []string) error {
 	args = append([]string{"--ldattach"}, args...)
-	return sL.Run(args, env)
+	return sL.ForkAndRun(args, env)
 }
 
 // - Attach to a process on the host or in containers
@@ -135,6 +135,29 @@ func (sL *ScopeLoader) PassthroughSubProc(args []string, env []string) (string, 
 func (sL *ScopeLoader) Run(args []string, env []string) error {
 	args = append([]string{"scope"}, args...)
 	return syscall.Exec(sL.Path, args, env)
+}
+
+func (sL *ScopeLoader) ForkAndRun(args []string, env []string) error {
+	args = append([]string{"scope"}, args...)
+
+	pid, err := syscall.ForkExec(sL.Path, args, &syscall.ProcAttr{
+		Env: env,
+		Files: []uintptr{uintptr(syscall.Stdin),
+			uintptr(syscall.Stdout),
+			uintptr(syscall.Stderr)}})
+	if err != nil {
+		return err
+	}
+	proc, suberr := os.FindProcess(pid)
+	if suberr != nil {
+		return err
+	}
+	_, suberr = proc.Wait()
+	if suberr != nil {
+		return err
+	}
+
+	return err
 }
 
 func (sL *ScopeLoader) RunSubProc(args []string, env []string) (string, error) {

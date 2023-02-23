@@ -95,9 +95,11 @@ func (rc *Config) Attach(args []string) error {
 
 	ld := loader.New()
 	if !rc.Subprocess {
-		return ld.Attach(args, env)
-	}
+		err = ld.Attach(args, env)
+	} else {
 	_, err = ld.AttachSubProc(args, env)
+	}
+
 	return err
 }
 

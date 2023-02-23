@@ -85,6 +85,9 @@ static char g_ReadFrame_addr[sizeof(void *)];
 go_schema_t *g_go_schema = &go_9_schema; // overridden if later version
 uint64_t g_glibc_guard = 0LL;
 uint64_t go_systemstack_switch;
+uint64_t g_syscall_return = 0;
+uint64_t g_rawsyscall_return = 0;
+uint64_t g_syscall6_return = 0;
 
 tap_t g_tap[] = {
     {tap_syscall,              "syscall.Syscall",       /* .abi0 */       go_hook_reg_syscall,              NULL, 0},
@@ -741,7 +744,6 @@ patch_addrs(funchook_t *funchook,
             patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
             tap->return_addr = patch_addr;
             tap->frame_size = add_arg;
-
             break; // Done patching
         }
 
@@ -759,6 +761,18 @@ patch_addrs(funchook_t *funchook,
             patchprint("patched 0x%p with frame size 0x%x in func %s\n", pre_patch_addr, add_arg, (char *)tap->func_name);
             tap->return_addr = patch_addr;
             tap->frame_size = add_arg;
+
+            /*
+             * Initialize return addrs for the syscall functions.
+             * The assy stub will use these when we filter syscalls.
+             */
+            if (tap->assembly_fn == go_hook_reg_syscall) {
+                g_syscall_return = (uint64_t)tap->return_addr;
+            } else if (tap->assembly_fn == go_hook_reg_rawsyscall) {
+                g_rawsyscall_return = (uint64_t)tap->return_addr;
+            } else if (tap->assembly_fn == go_hook_reg_syscall6) {
+                g_syscall6_return = (uint64_t)tap->return_addr;
+            }
 
             break; // Done patching
         }
@@ -824,6 +838,7 @@ patch_addrs(funchook_t *funchook,
     patchprint("\n\n");
 }
 
+#if 0
 static void
 patchClone(void)
 {
@@ -855,6 +870,7 @@ patchClone(void)
         }
     }
 }
+#endif
 
 // Get the Go Version numbers from a complete version string
 // Stores the minor and maintenance version numbers in global variables

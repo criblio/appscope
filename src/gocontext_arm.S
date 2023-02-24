@@ -1,3 +1,5 @@
+#include <sys/syscall.h>
+
 #define g_m 0x30
 #define m_g0 0x0
 #define m_gsignal 0x50
@@ -100,6 +102,34 @@
     br   x17
 .endm
 
+.macro syscall_filter a_func, b_func, retptr
+.global \a_func
+\a_func:
+    cmp  x8, #SYS_write
+    b.eq 2f
+    cmp  x8, #SYS_openat
+    b.eq 2f
+    cmp  x8, #SYS_unlinkat
+    b.eq 2f
+    cmp  x8, #SYS_getdents64
+    b.eq 2f
+    cmp  x8, #SYS_socket
+    b.eq 2f
+    cmp  x8, #SYS_accept4
+    b.eq 2f
+    cmp  x8, #SYS_read
+    b.eq 2f
+    cmp  x8, #SYS_close
+    b.eq 2f
+
+    ldr  x17, =\retptr
+    ldr  x17, [x17]
+    br   x17
+2:
+    b    \b_func
+
+.endm
+
 .text
 c_handler:
     /*
@@ -176,9 +206,9 @@ c_syscall_handler:
     ret
 
 
-    interpose_system_stack go_hook_reg_syscall               go_syscall              c_syscall_handler
-    interpose_system_stack go_hook_reg_rawsyscall            go_rawsyscall           c_syscall_handler
-    interpose_system_stack go_hook_reg_syscall6              go_syscall6             c_syscall_handler
+    interpose_system_stack hook_syscall                      go_syscall              c_syscall_handler
+    interpose_system_stack hook_rawsyscall                   go_rawsyscall           c_syscall_handler
+    interpose_system_stack hook_syscall6                     go_syscall6             c_syscall_handler
     interpose_system_stack go_hook_reg_tls_server_read       go_tls_server_read      c_handler
     interpose_system_stack go_hook_reg_tls_server_write      go_tls_server_write     c_handler
     interpose_system_stack go_hook_reg_tls_client_read       go_tls_client_read      c_handler
@@ -191,6 +221,10 @@ c_syscall_handler:
     interpose_system_stack go_hook_exit                      go_exit                 c_handler
     interpose_system_stack go_hook_die                       go_die                  c_handler
     interpose_system_stack go_hook_sighandler                go_sighandler           c_handler
+
+    syscall_filter         go_hook_reg_syscall               hook_syscall            g_syscall_return
+    syscall_filter         go_hook_reg_rawsyscall            hook_rawsyscall         g_rawsyscall_return
+    syscall_filter         go_hook_reg_syscall6              hook_syscall6           g_syscall6_return
 
 /*
 .text

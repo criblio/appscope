@@ -256,8 +256,8 @@ cd /go/net
 PORT=82
 
 scope run --backtrace ./plainServerDynamic ${PORT} &
-psd_pid=$!
 sleep 2
+psd_pid=`pidof plainServerDynamic`
 
 kill -s SIGFPE $psd_pid
 sleep 2

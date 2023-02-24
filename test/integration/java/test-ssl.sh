@@ -282,6 +282,50 @@ fi
 
 fi # x86_64 only
 
+
+starttest java_crash_analysis
+
+cd /opt/java_http
+
+# if we crash java, verify that we capture a backtrace & coredump
+scope run -p --backtrace --coredump -- java SimpleHttpServer 2> /dev/null &
+HTTP_SERVER_PID=$!
+sleep 1
+
+evaltest
+
+# we'll send a signal to act like a java crash
+kill -s SIGBUS $HTTP_SERVER_PID
+sleep 1
+
+grep -q '"proc":"java"' $EVT_FILE > /dev/null
+ERR+=$?
+
+# test that the expected files have been produced
+snapshot_dir="/tmp/appscope/$HTTP_SERVER_PID"
+ls $snapshot_dir/info* 1>/dev/null
+ERR+=$?
+ls $snapshot_dir/cfg* 1>/dev/null
+ERR+=$?
+ls $snapshot_dir/backtrace* 1>/dev/null
+ERR+=$?
+ls $snapshot_dir/core* 1>/dev/null
+ERR+=$?
+
+# test that the SimpleHttpServer has been terminated by the SIGBUS.
+# kill -0 allows us to check if the pid is still running.
+if kill -0 $HTTP_SERVER_PID; then
+    ERR+=1
+fi
+
+# if it is still running, kill it
+kill -9 $HTTP_SERVER_PID
+
+endtest
+
+
+ls -al $snapshot_dir
+
 unset SCOPE_PAYLOAD_ENABLE
 unset SCOPE_PAYLOAD_HEADER
 

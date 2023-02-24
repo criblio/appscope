@@ -1447,7 +1447,8 @@ initHook(int attachedFlag, bool scopedFlag, elf_buf_t *ebuf, char *full_path)
         // Note: g_isgo is true for scopedyn but we don't want to call initGoHook
         // Because we now execute scopedyn from memory it's path is memfd:...
         // If executed from the filesystem it's path will be scopedyn
-        if ((scope_strstr(full_path, "scopedyn") == NULL) && (scope_strstr(full_path, "memfd") == NULL)) {
+        if (full_path && (scope_strstr(full_path, "scopedyn") == NULL) && (scope_strstr(full_path, "memfd") == NULL)) {
+            if (!ebuf) return;
             initGoHook(ebuf);
             threadNow(0);
         }
@@ -1491,7 +1492,7 @@ initHook(int attachedFlag, bool scopedFlag, elf_buf_t *ebuf, char *full_path)
     // if we are not hooking all, then we're done
     if (scopedFlag == FALSE) return;
 
-    if (dl_iterate_phdr(findLibscopePath, &full_path)) {
+    if (full_path && dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *handle = g_fn.dlopen(full_path, RTLD_NOW);
         if (handle == NULL) {
             return;

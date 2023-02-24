@@ -23,6 +23,6 @@ bool snapshotIsEnabled(void);
  * API to handle application signal handler
  */
 
-bool snapshotBackupAppSignalHandler(int, sighandler_t);
+bool snapshotBackupAppSignalHandler(int, const struct sigaction*);
 
 #endif // __SNAPSHOT_H__

@@ -1125,7 +1125,7 @@ enableSnapshot(config_t *cfg) {
             struct sigaction oldact = { 0 };
             int sig = snapshotErrorsSignals[i];
             g_fn.sigaction(sig, &act, &oldact);
-            snapshotBackupAppSignalHandler(sig, oldact.sa_handler);
+            snapshotBackupAppSignalHandler(sig, &oldact);
         }
     }
 }
@@ -1864,7 +1864,11 @@ signal(int signum, sighandler_t handler) {
      * Condition below must be inline with `snapshotErrorsSignals` array
      */
     if (snapshotIsEnabled() == TRUE) {
-        if (snapshotBackupAppSignalHandler(signum, handler) == TRUE) {
+        struct sigaction oldact = { 0 };
+        oldact.sa_handler = handler;
+
+        if (snapshotBackupAppSignalHandler(signum, &oldact) == TRUE) {
+            // JRC TBD
             return handler;
         }
     }
@@ -1900,7 +1904,8 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
         // if signum is part of the snapshotErrorsSignals, save the handler
         // and set oldact, then return (without changing away from the
         // snapshot handler)
-        if (snapshotBackupAppSignalHandler(signum, act->sa_handler) == TRUE) {
+        if (snapshotBackupAppSignalHandler(signum, act) == TRUE) {
+            // JRC TBD
             oldact->sa_handler = act->sa_handler; // equivalent to signal above
             return 0;
         }

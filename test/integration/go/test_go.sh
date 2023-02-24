@@ -255,9 +255,9 @@ starttest "scope_snapshot"
 cd /go/net
 PORT=82
 
-scope run --backtrace ./plainServerDynamic ${PORT} &
+scope run --backtrace -- ./plainServerStatic ${PORT} &
 sleep 2
-psd_pid=`pidof plainServerDynamic`
+psd_pid=`pidof scopedyn`
 
 kill -s SIGFPE $psd_pid
 sleep 2

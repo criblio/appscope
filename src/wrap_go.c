@@ -1736,7 +1736,7 @@ c_sighandler(char *sys_stack, char *g_stack)
     if (snapshotIsEnabled() == FALSE) return;
 
     int sig = *(int *)(sys_stack + g_go_schema->arg_offsets.c_signal_sig);
-    siginfo_t *info = (siginfo_t *)(sys_stack + g_go_schema->arg_offsets.c_signal_info);
+    siginfo_t *info = (siginfo_t *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_signal_info);
 
     if ((sig == SIGILL) || (sig == SIGSEGV) || (sig == SIGBUS) || (sig == SIGFPE)) {
         snapshotSignalHandler(sig, info, NULL);

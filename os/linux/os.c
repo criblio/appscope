@@ -902,6 +902,9 @@ osCreateSM(proc_id_t *proc, unsigned long addr)
     }
 }
 
+/*
+ * Get the file descriptor from the filename for a given pid
+ */
 int
 osFindFd(pid_t pid, const char *fname)
 {
@@ -925,6 +928,7 @@ osFindFd(pid_t pid, const char *fname)
     }
 
     if ((dirp = scope_opendir(buf)) == NULL) {
+        scope_chdir(cwd);
         scope_free(cwd);
         DBG(NULL);
         return -1;

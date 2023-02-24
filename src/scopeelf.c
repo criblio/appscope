@@ -108,7 +108,7 @@ getElf(char *path)
         goto out;
     }
 
-    if (((fd = scope_open(path, O_RDONLY)) == -1) && ((fd = findFd(scope_getpid(), path)) == -1)) {
+    if (((fd = scope_open(path, O_RDONLY)) == -1) && ((fd = osFindFd(scope_getpid(), path)) == -1)) {
         scopeLogError("getElf: open failed");
         goto out;
     }

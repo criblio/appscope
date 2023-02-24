@@ -202,7 +202,7 @@ endtest
 #
 starttest plainServerDynamicPie
 cd /go/net
-PORT=80
+PORT=81
 
 scope -z ./plainServerDynamicPie ${PORT} &
 
@@ -253,11 +253,11 @@ endtest
 #
 starttest "scope_snapshot"
 cd /go/net
-PORT=80
+PORT=82
 
-scope run --backtrace ./plainServerDynamic ${PORT} &
-psd_pid=$!
+scope run --backtrace -- ./plainServerStatic ${PORT} &
 sleep 2
+psd_pid=`pidof scopedyn`
 
 kill -s SIGFPE $psd_pid
 sleep 2
@@ -284,7 +284,7 @@ endtest
 #
 starttest plainServerStatic
 cd /go/net
-PORT=81
+PORT=83
 scope -z ./plainServerStatic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
@@ -686,7 +686,7 @@ endtest
 #
 starttest tlsServerDynamicHTTP1
 cd /go/net
-PORT=4430
+PORT=4433
 GODEBUG=http2client=0,http2server=0 scope -z ./tlsServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port

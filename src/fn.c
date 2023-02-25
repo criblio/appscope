@@ -10,8 +10,6 @@
 #include "utils.h"
 #include "fn.h"
 
-static int g_fn_ismusl = FALSE;
-
 /*
  * We need to adjust to how ld.so, libdl, dlopen, dlsym together
  * resolve symbols. Several use cases have revealed different
@@ -94,7 +92,7 @@ static int g_fn_ismusl = FALSE;
     } else if ((val = dlsym(RTLD_NEXT, sym))) {          \
         DBG(NULL);                                       \
         /* musl ld.so when attaching */                  \
-    } else if (g_fn_ismusl && (val = dlsym(RTLD_DEFAULT, sym))) {       \
+    } else if (g_ismusl && (val = dlsym(RTLD_DEFAULT, sym))) {       \
         DBG(NULL);                                       \
     } else {                                             \
         val = NULL;                                      \
@@ -132,15 +130,6 @@ getAddr(struct dl_phdr_info *info, size_t size, void *data)
     // We found the symbol in a lib that is not libscope
     ares->out_addr = addr;
     return 1;
-}
-
-void
-initFn_musl(void)
-{
-    // For use in GETADDR macro...
-    g_fn_ismusl = TRUE;
-
-    initFn();
 }
 
 void

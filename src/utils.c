@@ -493,3 +493,4 @@ sigSafeWriteNumber(int fd, long val, int base) {
     sigSafeUtoa(val, buf, base, &msgLen);
     return scope_write(fd, buf ,msgLen);
 }
+

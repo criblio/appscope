@@ -402,6 +402,10 @@ void
 snapshotSignalHandler(int sig, siginfo_t *info, void *secret) {
     char snapPidDirPath[PATH_MAX] = {0};
     int currentOffset = SNAPSHOT_DIR_LEN;
+
+    // Define that we are in a signal handler
+    g_issighandler = TRUE;
+
     // Start with create a prefix path
     scope_memcpy(snapPidDirPath, SNAPSHOT_DIR_PREFIX, SNAPSHOT_DIR_LEN);
 
@@ -413,6 +417,7 @@ snapshotSignalHandler(int sig, siginfo_t *info, void *secret) {
     currentOffset += msgLen + 1;
     if (currentOffset > PATH_MAX) {
         DBG(NULL);
+        g_issighandler = FALSE;
         return;
     }
     scope_memcpy(snapPidDirPath + SNAPSHOT_DIR_LEN, pidBuf, msgLen);
@@ -443,5 +448,11 @@ snapshotSignalHandler(int sig, siginfo_t *info, void *secret) {
     //g_fn.raise(SIGSTOP);
     sleep(5);
 
-    appSignalHandler(sig, info, secret);
+    // We don't need to run the app's signal handler if we're dealing with a Go app
+    // since we are hooked just before die ; and after any application-level signal handling
+    if (!g_isgo) {
+        appSignalHandler(sig, info, secret);
+    }
+
+    g_issighandler = FALSE;
 }

@@ -36,6 +36,9 @@ proc_id_t g_proc = {0};
 bool g_constructor_debug_enabled;
 uint64_t g_cbuf_drop_count = 0;
 bool g_ismusl = FALSE;
+bool g_isstatic = FALSE;
+bool g_isgo = FALSE;
+bool g_issighandler = FALSE;
 
 void
 dbgInit()

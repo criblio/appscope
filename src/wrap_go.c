@@ -17,6 +17,7 @@
 #include "fn.h"
 #include "capstone/capstone.h"
 #include "scopestdlib.h"
+#include "snapshot.h"
 
 #define GOPCLNTAB_MAGIC_112 0xfffffffb
 #define GOPCLNTAB_MAGIC_116 0xfffffffa
@@ -84,6 +85,9 @@ static char g_ReadFrame_addr[sizeof(void *)];
 go_schema_t *g_go_schema = &go_9_schema; // overridden if later version
 uint64_t g_glibc_guard = 0LL;
 uint64_t go_systemstack_switch;
+uint64_t g_syscall_return = 0;
+uint64_t g_rawsyscall_return = 0;
+uint64_t g_syscall6_return = 0;
 
 tap_t g_tap[] = {
     {tap_syscall,              "syscall.Syscall",       /* .abi0 */       go_hook_reg_syscall,              NULL, 0},
@@ -100,6 +104,7 @@ tap_t g_tap[] = {
     {tap_http2_server_preface, "net/http.(*http2serverConn).readPreface", go_hook_reg_http2_server_preface, NULL, 0},
     {tap_exit,                 "runtime.exit",          /* .abi0 */       go_hook_exit,                     NULL, 0},
     {tap_die,                  "runtime.dieFromSignal", /* .abi0 */       go_hook_die,                      NULL, 0},
+    {tap_sighandler,           "runtime.sighandler",    /* .abi0 */       go_hook_sighandler,               NULL, 0},
     {tap_end,                  "",                                        NULL,                             NULL, 0},
 };
 
@@ -132,6 +137,8 @@ go_schema_t go_9_schema = {
         .c_http2_client_write_tcpConn= 0x10,
         .c_http2_client_write_buf=     0x68,
         .c_http2_client_write_rc=      0x28,
+        .c_signal_sig=                 0x20,
+        .c_signal_info=                0x28,
     },
     .struct_offsets = {
         .g_to_m=                       0x30,
@@ -186,6 +193,8 @@ go_schema_t go_17_schema_x86 = {
         .c_http2_client_write_tcpConn= 0x40,
         .c_http2_client_write_buf=     0x8,
         .c_http2_client_write_rc=      0x10,
+        .c_signal_sig=                 0x0,
+        .c_signal_info=                0x8,
     },
     .struct_offsets = {
         .g_to_m=                       0x30,
@@ -241,6 +250,8 @@ go_schema_t go_17_schema_arm = {
         .c_http2_client_write_tcpConn= 0x80,
         .c_http2_client_write_buf=     0x10,
         .c_http2_client_write_rc=      0x30,
+        .c_signal_sig=                 0x60,
+        .c_signal_info=                0x68,
     },
     .struct_offsets = {
         .g_to_m=                       0x30,
@@ -293,6 +304,11 @@ adjustGoStructOffsetsForVersion()
         g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
         g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
         g_go_schema->struct_offsets.cc_to_fr=0xd0;
+    }
+
+    if (g_go_minor_ver < 11) {
+        g_go_schema->arg_offsets.c_signal_sig=0x8;
+        g_go_schema->arg_offsets.c_signal_info=0x10;
     }
 
     if (g_go_minor_ver < 12) {
@@ -713,7 +729,8 @@ patch_addrs(funchook_t *funchook,
         // conventions that other go functions do.
         // We also patch syscalls at the first (and last) instruction.
         if (i == 0 && ((tap->assembly_fn == go_hook_exit) ||
-            (tap->assembly_fn == go_hook_die))) {
+                       (tap->assembly_fn == go_hook_die) ||
+                       (tap->assembly_fn == go_hook_sighandler))) {
 
             // In this case we want to patch the instruction directly
             void *pre_patch_addr = (void*)asm_inst[i].address;
@@ -727,7 +744,6 @@ patch_addrs(funchook_t *funchook,
             patchprint("patched 0x%p with frame size 0x%x\n", pre_patch_addr, add_arg);
             tap->return_addr = patch_addr;
             tap->frame_size = add_arg;
-
             break; // Done patching
         }
 
@@ -745,6 +761,18 @@ patch_addrs(funchook_t *funchook,
             patchprint("patched 0x%p with frame size 0x%x in func %s\n", pre_patch_addr, add_arg, (char *)tap->func_name);
             tap->return_addr = patch_addr;
             tap->frame_size = add_arg;
+
+            /*
+             * Initialize return addrs for the syscall functions.
+             * The assy stub will use these when we filter syscalls.
+             */
+            if (tap->assembly_fn == go_hook_reg_syscall) {
+                g_syscall_return = (uint64_t)tap->return_addr;
+            } else if (tap->assembly_fn == go_hook_reg_rawsyscall) {
+                g_rawsyscall_return = (uint64_t)tap->return_addr;
+            } else if (tap->assembly_fn == go_hook_reg_syscall6) {
+                g_syscall6_return = (uint64_t)tap->return_addr;
+            }
 
             break; // Done patching
         }
@@ -810,6 +838,7 @@ patch_addrs(funchook_t *funchook,
     patchprint("\n\n");
 }
 
+#if 0
 static void
 patchClone(void)
 {
@@ -841,6 +870,7 @@ patchClone(void)
         }
     }
 }
+#endif
 
 // Get the Go Version numbers from a complete version string
 // Stores the minor and maintenance version numbers in global variables
@@ -926,7 +956,7 @@ initGoHook(elf_buf_t *ebuf)
     // default to a dynamic app?
     if (checkEnv("SCOPE_EXEC_TYPE", "static")) {
         scopeSetGoAppStateStatic(TRUE);
-        patchClone();
+        //patchClone();
         sysprint("This is a static app\n");
     } else {
         scopeSetGoAppStateStatic(FALSE);
@@ -1698,4 +1728,23 @@ EXPORTON void *
 go_die(char *stackptr)
 {
     return do_cfunc(stackptr, c_exit, tap_entry(tap_die)->assembly_fn);
+}
+
+static void
+c_sighandler(char *sys_stack, char *g_stack)
+{
+    if (snapshotIsEnabled() == FALSE) return;
+
+    int sig = *(int *)(sys_stack + g_go_schema->arg_offsets.c_signal_sig);
+    siginfo_t *info = (siginfo_t *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_signal_info);
+
+    if ((sig == SIGILL) || (sig == SIGSEGV) || (sig == SIGBUS) || (sig == SIGFPE)) {
+        snapshotSignalHandler(sig, info, NULL);
+    }
+}
+
+EXPORTON void *
+go_sighandler(char *stackptr)
+{
+    return do_cfunc(stackptr, c_sighandler, tap_entry(tap_sighandler)->assembly_fn);
 }

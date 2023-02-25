@@ -50,6 +50,15 @@ endtest(){
     rm -f $LOG_FILE
 }
 
+is_file() {
+    if [ ! -f "$1" ] ; then
+        echo "FAIL: File $1 does not exist"
+        ERR+=1
+    else
+	echo "PASS: File exists"
+    fi
+}
+
 export SCOPE_PAYLOAD_ENABLE=true
 export SCOPE_PAYLOAD_HEADER=true
 
@@ -193,7 +202,7 @@ endtest
 #
 starttest plainServerDynamicPie
 cd /go/net
-PORT=80
+PORT=81
 
 scope -z ./plainServerDynamicPie ${PORT} &
 
@@ -239,12 +248,44 @@ ERR+=$?
 endtest
 
 
+# Commented out for now, unable to repro test failures only seen in CI
+##
+## scope snapshot (same namespace)
+##
+#starttest "scope_snapshot"
+#cd /go/net
+#PORT=82
+#
+#scope run --backtrace -- ./plainServerStatic ${PORT} &
+#sleep 2
+#psd_pid=`pidof scopedyn`
+#
+#kill -s SIGFPE $psd_pid
+#sleep 2
+#
+#scope snapshot $psd_pid
+#sleep 2
+#
+#evaltest
+#
+#is_file /tmp/appscope/${psd_pid}/snapshot
+#is_file /tmp/appscope/${psd_pid}/info
+## is_file /tmp/appscope/${psd_pid}/core
+#is_file /tmp/appscope/${psd_pid}/cfg
+#is_file /tmp/appscope/${psd_pid}/backtrace
+#
+## Kill psd process
+#kill $psd_pid
+#
+#endtest
+
+
 #
 # plainServerStatic
 #
 starttest plainServerStatic
 cd /go/net
-PORT=81
+PORT=83
 scope -z ./plainServerStatic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
@@ -646,7 +687,7 @@ endtest
 #
 starttest tlsServerDynamicHTTP1
 cd /go/net
-PORT=4430
+PORT=4433
 GODEBUG=http2client=0,http2server=0 scope -z ./tlsServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port

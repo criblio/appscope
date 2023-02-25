@@ -1,3 +1,5 @@
+#include <sys/syscall.h>
+
 #define g_m 0x30
 #define m_g0 0x0
 #define m_gsignal 0x50
@@ -16,14 +18,12 @@
  * From: https://go.googlesource.com/go/+/refs/heads/dev.regabi/src/cmd/compile/internal-abi.md
  * The following registers are used for integer arguments and results:
  * RAX, RBX, RCX, RDI, RSI, R8, R9, R10, R11
- * Note that X15 is defined to be always a fixed value of zero
  */
 .macro interpose_system_stack a_func, c_func, s_func
 .global \a_func
 .hidden \c_func
 \a_func:
     endbr64
-
     // Is g valid?
     mov  %fs:0xfffffffffffffff8, %r12   // g
     cmp  $0x0, %r12
@@ -77,6 +77,34 @@
     jmp  *%r13
 .endm
 
+.macro syscall_filter a_func, b_func, retptr
+.global \a_func
+\a_func:
+    cmp  $SYS_write, %eax
+    je   2f
+    cmp  $SYS_openat, %eax
+    je   2f
+    cmp  $SYS_unlinkat, %eax
+    je   2f
+    cmp  $SYS_getdents64, %eax
+    je   2f
+    cmp  $SYS_socket, %eax
+    je   2f
+    cmp  $SYS_accept4, %eax
+    je   2f
+    cmp  $SYS_read, %eax
+    je   2f
+    cmp  $SYS_close, %eax
+    je   2f
+
+    lea  \retptr@GOTPCREL(%rip), %r13
+    mov  (%r13), %r13
+    mov  (%r13), %r13
+    jmp  *%r13
+2:
+    jmp \b_func
+.endm
+
 .text
 c_handler:
     // Inputs:
@@ -125,7 +153,7 @@ c_handler:
     pop  %r14                            // g
 
     ret
- 
+
 c_syscall_handler:
     // Inputs:
     // r12 is the caller stack
@@ -176,9 +204,9 @@ c_syscall_handler:
     add $0x2, %r13                       // Skip the syscall instruction
     ret
 
-    interpose_system_stack go_hook_reg_syscall               go_syscall              c_syscall_handler
-    interpose_system_stack go_hook_reg_rawsyscall            go_rawsyscall           c_syscall_handler
-    interpose_system_stack go_hook_reg_syscall6              go_syscall6             c_syscall_handler
+    interpose_system_stack hook_syscall                      go_syscall              c_syscall_handler
+    interpose_system_stack hook_rawsyscall                   go_rawsyscall           c_syscall_handler
+    interpose_system_stack hook_syscall6                     go_syscall6             c_syscall_handler
     interpose_system_stack go_hook_reg_tls_server_read       go_tls_server_read      c_handler
     interpose_system_stack go_hook_reg_tls_server_write      go_tls_server_write     c_handler
     interpose_system_stack go_hook_reg_tls_client_read       go_tls_client_read      c_handler
@@ -190,3 +218,8 @@ c_syscall_handler:
     interpose_system_stack go_hook_reg_http2_client_write    go_http2_client_write   c_handler
     interpose_system_stack go_hook_exit                      go_exit                 c_handler
     interpose_system_stack go_hook_die                       go_die                  c_handler
+    interpose_system_stack go_hook_sighandler                go_sighandler           c_handler
+
+    syscall_filter go_hook_reg_syscall    hook_syscall    g_syscall_return
+    syscall_filter go_hook_reg_rawsyscall hook_rawsyscall g_rawsyscall_return
+    syscall_filter go_hook_reg_syscall6   hook_syscall6   g_syscall6_return

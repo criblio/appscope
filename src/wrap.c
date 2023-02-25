@@ -1116,6 +1116,14 @@ enableSnapshot(config_t *cfg) {
         return;
     }
 
+    // We don't want to do this when we're dealing with a Go app.
+    // We have an interposition in place that is called when the app
+    // is about to die from a signal that allows us to avoid registering
+    // our own signal handler; and doing any forwarding.
+    if (g_isgo) {
+        return;
+    }
+
     if (g_fn.sigaction) {
         struct sigaction act = { 0 };
 
@@ -1426,42 +1434,26 @@ hookInject()
 }
 
 static void
-initHook(int attachedFlag, bool scopedFlag)
+initHook(int attachedFlag, bool scopedFlag, elf_buf_t *ebuf, char *full_path)
 {
     int rc;
     bool should_we_patch = FALSE;
-    char *full_path = NULL;
-    elf_buf_t *ebuf = NULL;
     funchook_t *funchook;
 
     // env vars are not always set as needed, be explicit here
     // this is duplicated if we were started from the scope exec
-    if ((osGetExePath(scope_getpid(), &full_path) != -1) &&
-        ((ebuf = getElf(full_path))) &&
-        (is_static(ebuf->buf) == FALSE) && (is_go(ebuf->buf) == TRUE)) {
-
+    if (g_isstatic == FALSE && g_isgo == TRUE) {
         // Avoid running initGoHook if we are scopedyn
-        if (scope_strstr(full_path, "scopedyn") == NULL) {
+        // Note: g_isgo is true for scopedyn but we don't want to call initGoHook
+        // Because we now execute scopedyn from memory it's path is memfd:...
+        // If executed from the filesystem it's path will be scopedyn
+        if (full_path && (scope_strstr(full_path, "scopedyn") == NULL) && (scope_strstr(full_path, "memfd") == NULL)) {
+            if (!ebuf) return;
             initGoHook(ebuf);
             threadNow(0);
         }
-
-        if (full_path) scope_free(full_path);
-        if (ebuf) freeElf(ebuf->buf, ebuf->len);
         return;
     }
-
-    if (ebuf && ebuf->buf) {
-
-        // This is in support of a libuv specific extension to map an SSL ID to a fd.
-        // The symbol uv__read is not public. Therefore, we don't resolve it with dlsym.
-        // So, while we have the exec open, we look to see if we can dig it out.
-        g_fn.uv__read = getSymbol(ebuf->buf, "uv__read");
-        scopeLog(CFG_LOG_TRACE, "%s:%d uv__read at %p", __FUNCTION__, __LINE__, g_fn.uv__read);
-    }
-
-    if (full_path) scope_free(full_path);
-    if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
     if (attachedFlag) {
         // responding to the inject command
@@ -1500,7 +1492,7 @@ initHook(int attachedFlag, bool scopedFlag)
     // if we are not hooking all, then we're done
     if (scopedFlag == FALSE) return;
 
-    if (dl_iterate_phdr(findLibscopePath, &full_path)) {
+    if (full_path && dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *handle = g_fn.dlopen(full_path, RTLD_NOW);
         if (handle == NULL) {
             return;
@@ -1673,35 +1665,29 @@ init(void)
     config_t *cfg = NULL;
     char *path = NULL;
     scope_init_vdso_ehdr();
+    char *full_path = NULL;
+    elf_buf_t *ebuf = NULL;
+
     // Bootstrapping...  we need to know if we're in musl so we can
     // call the right initFn function...
-    {
-        char *full_path = NULL;
-        elf_buf_t *ebuf = NULL;
-
-        // Needed for getElf()
-        g_fn.open = dlsym(RTLD_NEXT, "open");
-        if (!g_fn.open) g_fn.open = dlsym(RTLD_DEFAULT, "open");
-        g_fn.close = dlsym(RTLD_NEXT, "close");
-        if (!g_fn.close) g_fn.close = dlsym(RTLD_DEFAULT, "close");
-
-        g_ismusl =
-            ((osGetExePath(scope_getpid(), &full_path) != -1) &&
-// TODO : Test this removal!  // !scope_strstr(full_path, "scope") && 
-            ((ebuf = getElf(full_path))) &&
-            !is_static(ebuf->buf) &&
-            !is_go(ebuf->buf) &&
-            is_musl(ebuf->buf));
-
-        if (full_path) scope_free(full_path);
-        if (ebuf) freeElf(ebuf->buf, ebuf->len);
+    
+    if (osGetExePath(scope_getpid(), &full_path) != -1) {
+        if ((ebuf = getElf(full_path))) {
+            // SCOPE_APP_TYPE will be set by scopedyn
+            // Therefore we are setting isgo to TRUE if we are a go app OR we are scopedyn (not actually a go app)
+            g_isgo = (is_go(ebuf->buf) || (checkEnv("SCOPE_APP_TYPE", "go") == TRUE));
+            g_isstatic = is_static(ebuf->buf);
+            g_ismusl = is_musl(ebuf->buf);
+        }
     }
 
-    // Use dlsym to get addresses for everything in g_fn
-    if (g_ismusl) {
-        initFn_musl();
-    } else {
-        initFn();
+    initFn();
+    if (ebuf && ebuf->buf) {
+        // This is in support of a libuv specific extension to map an SSL ID to a fd.
+        // The symbol uv__read is not public. Therefore, we don't resolve it with dlsym.
+        // So, while we have the exec open, we look to see if we can dig it out.
+        g_fn.uv__read = getSymbol(ebuf->buf, "uv__read");
+        scopeLog(CFG_LOG_TRACE, "%s:%d uv__read at %p", __FUNCTION__, __LINE__, g_fn.uv__read);
     }
 
     setProcId(&g_proc);
@@ -1810,7 +1796,7 @@ init(void)
     // of whether TLS is actually configured on any transport.
     transportRegisterForExitNotification(handleExit);
 
-    initHook(attachedFlag, scopedFlag);
+    initHook(attachedFlag, scopedFlag, ebuf, full_path);
     
     /*
      * If we are interposing (scoping) this process, then proceed
@@ -1826,7 +1812,7 @@ init(void)
         reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
         doProcStartMetric();
 
-        if (checkEnv("SCOPE_APP_TYPE", "go")) {
+        if (g_isgo) {
             threadNow(0);
         } else if (g_ismusl == FALSE) {
             /*
@@ -1853,6 +1839,8 @@ init(void)
 
     osInitJavaAgent();
 
+    if (ebuf) freeElf(ebuf->buf, ebuf->len);
+    if (full_path) scope_free(full_path);
 }
 
 EXPORTOFF sighandler_t

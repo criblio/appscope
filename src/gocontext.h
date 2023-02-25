@@ -32,6 +32,8 @@ typedef struct {
     int c_http2_client_write_tcpConn;
     int c_http2_client_write_buf;
     int c_http2_client_write_rc;
+    int c_signal_sig;
+    int c_signal_info;
 } go_arg_offsets_t;
 
 typedef struct {                  // Structure                  Field      
@@ -73,6 +75,7 @@ enum tap_id {
     tap_http2_server_preface,
     tap_exit,
     tap_die,
+    tap_sighandler,
     tap_end,
 };
 
@@ -128,5 +131,6 @@ extern void go_hook_reg_http2_client_read(void);
 extern void go_hook_reg_http2_client_write(void);
 extern void go_hook_exit(void);
 extern void go_hook_die(void);
+extern void go_hook_sighandler(void);
 
 #endif // __GOTCONTEXT_H__

@@ -468,8 +468,9 @@ findFd(pid_t pid, const char *fname)
     }
 
     if ((dirp = opendir(buf)) == NULL) {
-        free(cwd);
         perror("opendir");
+        chdir(cwd);
+        free(cwd);
         return -1;
     }
 

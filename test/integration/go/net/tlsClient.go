@@ -23,8 +23,8 @@ func main() {
 
 	for {
 		token, _, err := reader.ReadLine()
-		if len(token) > 0 {
-			fmt.Println(string(token))
+		if len(token) <= 0 {
+			fmt.Println("bad token")
 		}
 		if err != nil {
 			if err == io.EOF {

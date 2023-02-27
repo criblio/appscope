@@ -24,5 +24,6 @@ bool snapshotIsEnabled(void);
  */
 
 bool snapshotBackupAppSignalHandler(int, const struct sigaction*);
+bool snapshotRetrieveAppSignalHandler(int, struct sigaction * const);
 
 #endif // __SNAPSHOT_H__

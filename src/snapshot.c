@@ -103,6 +103,24 @@ snapshotBackupAppSignalHandler(int sig, const struct sigaction *act) {
     return FALSE;
 }
 
+bool
+snapshotRetrieveAppSignalHandler(int sig, struct sigaction *const act) {
+    if (sig == SIGSEGV) {
+        *act = appSigSegvAction;
+        return TRUE;
+    } else if (sig == SIGBUS) {
+        *act = appSigBusAction;
+        return TRUE;
+    } else if (sig == SIGILL) {
+        *act = appSigIllAction;
+        return TRUE;
+    } else if (sig == SIGFPE) {
+        *act = appSigFpeAction;
+        return TRUE;
+    }
+    return FALSE;
+}
+
 static bool
 handlerWasSaved(struct sigaction *act)
 {

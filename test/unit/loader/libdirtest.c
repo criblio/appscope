@@ -281,7 +281,7 @@ GetPathDev(void **state) {
     assert_non_null(fp);
     fclose(fp);
 
-    const char *library_path = libdirGetPath(LIBRARY_FILE);
+    const char *library_path = libdirGetPath();
     int res = strcmp(expected_location, library_path);
     assert_int_equal(res, 0);
     remove(expected_location);
@@ -303,7 +303,7 @@ GetPathOfficial(void **state) {
     assert_non_null(fp);
     fclose(fp);
 
-    const char *library_path = libdirGetPath(LIBRARY_FILE);
+    const char *library_path = libdirGetPath();
     int res = strcmp(expected_location, library_path);
     assert_int_equal(res, 0);
     remove(expected_location);
@@ -313,7 +313,7 @@ static void
 GetPathNoFile(void **state) {
     libdirInitTest(TEST_INSTALL_BASE, TEST_TMP_BASE, "v1.1.0");
 
-    const char *library_path = libdirGetPath(LIBRARY_FILE);
+    const char *library_path = libdirGetPath();
     assert_int_equal(library_path, NULL);
 }
 

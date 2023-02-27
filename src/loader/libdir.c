@@ -393,14 +393,14 @@ libdirSetLibraryBase(const char *base) {
 
 
 /*
-* Retrieve the full absolute path of the specified binary (libscope.so).
+* Retrieve the full absolute path of the specified binary libscope.so.
 * Returns path for the specified binary, NULL in case of failure.
 */
 const char *
-libdirGetPath(libdirfile_t file) {
+libdirGetPath(void) {
     const char *normVer = libverNormalizedVersion(g_libdir_info.ver);
 
-    struct scope_obj_state *state = getObjState(file);
+    struct scope_obj_state *state = getObjState(LIBRARY_FILE);
     if (!state) {
         return NULL;
     }
@@ -532,7 +532,7 @@ libdirCreate(char *base, mode_t mode, uid_t uid, gid_t gid, libdirfile_t file,
 int libdirExtract(libdirfile_t file, uid_t uid, gid_t gid) {
     const char *normVer = libverNormalizedVersion(g_libdir_info.ver);
     bool isDevVersion = libverIsNormVersionDev(normVer);
-    const char *existing_path = libdirGetPath(file);
+    const char *existing_path = libdirGetPath();
 
     // If we are a dev version, always extract.
     // If we are a prod version and this version exists, don't extract.

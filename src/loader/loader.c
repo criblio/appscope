@@ -452,14 +452,14 @@ cmdAttach(bool ldattach, bool lddetach, pid_t pid, pid_t nspid)
             goto out;
         }
 
-        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
+        scopeLibPath = (char *)libdirGetPath();
 
         if (patchLibrary(scopeLibPath) == PATCH_FAILED) {
             fprintf(stderr, "error: failed to patch library\n");
             goto out;
         }
     } else {
-        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
+        scopeLibPath = (char *)libdirGetPath();
     }
 
     if (access(scopeLibPath, R_OK|X_OK)) {
@@ -543,7 +543,7 @@ cmdAttach(bool ldattach, bool lddetach, pid_t pid, pid_t nspid)
             }
 
             // add the env vars we want in the library
-            dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetPath(LIBRARY_FILE));
+            dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetPath());
 
             int i;
             for (i = 0; environ[i]; i++) {
@@ -632,14 +632,14 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
             goto out;
         }
 
-        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
+        scopeLibPath = (char *)libdirGetPath();
 
         if (patchLibrary(scopeLibPath) == PATCH_FAILED) {
             fprintf(stderr, "error: failed to patch library\n");
             goto out;
         }
     } else {
-        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
+        scopeLibPath = (char *)libdirGetPath();
     }
 
     if (access(scopeLibPath, R_OK|X_OK)) {

@@ -61,15 +61,16 @@ The command above enables:
 - [access Edge UI](http://localhost:9420/)
 - Share the AppScope source listening socket: `/var/run/appscope/appscope.sock` between host and Edge container
 
-## Docker container
+## [Docker](https://github.com/docker) container
 
 ```console
 docker run --privileged --rm -p 6379:6379 --name redisAlpine -v /var/run/appscope:/var/run/appscope redis:alpine
 ```
 
-## Podman container
+## [Podman])(https://github.com/containers/podman) container
 
 ```console
+podman pull docker.io/redis
 podman run -d --name redisPodman -p 6379:6379 -v /var/run/appscope:/var/run/appscope redis:latest
 ```
 
@@ -83,19 +84,20 @@ lxc config device add lxc-example appscopeSocket disk source=/run/appscope path=
 lxc exec lxc-example bash
 ```
 
-### Containerd - [ctr](https://github.com/containerd/containerd)
+#### Containerd - [ctr](https://github.com/containerd/containerd)
 
 ```console
+sudo ctr image pull docker.io/library/redis:latest
 sudo ctr run -d --mount type=bind,src=/var/run/appscope/,dst=/var/run/appscope/,options=rbind:rw docker.io/library/redis:alpine ctr_redis
 ```
 
-### Containerd - [nerdctl](https://github.com/containerd/nerdctl.git) as root
+#### Containerd - [nerdctl](https://github.com/containerd/nerdctl.git) as root
 
 ```console
 sudo nerdctl run -d -v /var/run/appscope/:/var/run/appscope/ --name nerdctl_root_redis redis:7.0.5
 ```
 
-### Useful links
+## Useful links
 
 [Namespaces Overview](https://lwn.net/Articles/531114/)
 [User namespace](https://lwn.net/Articles/532593/)

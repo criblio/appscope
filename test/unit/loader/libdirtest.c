@@ -183,7 +183,7 @@ ExtractNewFileDev(void **state) {
     struct stat dirStat = {0};
 
     // TEST_TMP_BASE will be used
-    int res = libdirExtract(LIBRARY_FILE, geteuid(), getegid());
+    int res = libdirExtract(geteuid(), getegid());
     assert_int_equal(res, 0);
     snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "libscope.so");
     res = stat(expected_location, &dirStat);
@@ -199,7 +199,7 @@ ExtractNewFileDevAlternative(void **state) {
     struct stat dirStat = {0};
 
     // Extract will fail because second path is not accessbile
-    int res = libdirExtract(LIBRARY_FILE, geteuid(), getegid());
+    int res = libdirExtract(geteuid(), getegid());
     assert_int_not_equal(res, 0);
     snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "libscope.so");
     res = stat(expected_location, &dirStat);
@@ -215,7 +215,7 @@ ExtractNewFileOfficial(void **state) {
     struct stat dirStat = {0};
 
     // TEST_INSTALL_BASE will be used
-    int res = libdirExtract(LIBRARY_FILE, geteuid(), getegid());
+    int res = libdirExtract(geteuid(), getegid());
     assert_int_equal(res, 0);
     snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, normVer, "libscope.so");
     res = stat(expected_location, &dirStat);
@@ -232,7 +232,7 @@ ExtractNewFileOfficialAlternative(void **state) {
     struct stat dirStat = {0};
 
     // TEST_TMP_BASE will be used
-    int res = libdirExtract(LIBRARY_FILE, geteuid(), getegid());
+    int res = libdirExtract(geteuid(), getegid());
     assert_int_equal(res, 0);
     snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_TMP_BASE, normVer, "libscope.so");
     res = stat(expected_location, &dirStat);
@@ -249,13 +249,13 @@ ExtractFileExistsOfficial(void **state) {
     struct stat firstStat = {0};
     struct stat secondStat = {0};
 
-    int res = libdirExtract(LIBRARY_FILE, geteuid(), getegid());
+    int res = libdirExtract(geteuid(), getegid());
     assert_int_equal(res, 0);
     snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, normVer, "libscope.so");
     res = stat(expected_location, &firstStat);
     assert_int_equal(res, 0);
 
-    res = libdirExtract(LIBRARY_FILE, geteuid(), getegid());
+    res = libdirExtract(geteuid(), getegid());
     assert_int_equal(res, 0);
     snprintf(expected_location, PATH_MAX, "%s/%s/%s", TEST_INSTALL_BASE, normVer, "libscope.so");
     res = stat(expected_location, &secondStat);

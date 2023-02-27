@@ -523,13 +523,13 @@ libdirCreate(char *base, mode_t mode, uid_t uid, gid_t gid, libdirfile_t file,
 }
 
 /*
-* Extract (physically create) specified binary file to the filesystem.
+* Extract (physically create) libscope.so to the filesystem.
 * The extraction will not be performed:
 * - if the file is present and it is official version
 * - if the custom path was specified before by `libdirSetLibraryBase`
 * Returns 0 in case of success, other values in case of failure.
 */
-int libdirExtract(libdirfile_t file, uid_t uid, gid_t gid) {
+int libdirExtract(uid_t uid, gid_t gid) {
     const char *normVer = libverNormalizedVersion(g_libdir_info.ver);
     bool isDevVersion = libverIsNormVersionDev(normVer);
     const char *existing_path = libdirGetPath();

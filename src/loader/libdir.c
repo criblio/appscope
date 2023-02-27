@@ -154,8 +154,7 @@ getAsset(libdirfile_t objFileType, unsigned char **start)
  * Getting objects bundled
  */
 static int
-libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overwrite, mode_t mode, uid_t nsEuid, gid_t nsEgid)
-{
+libdirCreateFileIfMissing(const char *path, bool overwrite, mode_t mode, uid_t nsEuid, gid_t nsEgid) {
     // Check if file exists
     if (!access(path, R_OK) && !overwrite) {
         return 0; // File exists
@@ -166,7 +165,7 @@ libdirCreateFileIfMissing(libdirfile_t objFileType, const char *path, bool overw
     unsigned char *start;
     size_t len;
 
-    if ((len = getAsset(objFileType, &start)) == -1) {
+    if ((len = getAsset(LIBRARY_FILE, &start)) == -1) {
         return -1;
     }
 
@@ -474,19 +473,17 @@ libdirGetPath(void) {
 */
 int
 libdirSaveLibraryFile(const char *libraryPath, bool overwrite, mode_t mode, uid_t uid, gid_t gid) {
-    return libdirCreateFileIfMissing(LIBRARY_FILE, libraryPath, overwrite, mode, uid, gid);
+    return libdirCreateFileIfMissing(libraryPath, overwrite, mode, uid, gid);
 }
 
 int
-libdirCreate(char *base, mode_t mode, uid_t uid, gid_t gid, libdirfile_t file,
-        bool isDevVersion, const char *normVer)
-{
+libdirCreate(char *base, mode_t mode, uid_t uid, gid_t gid, bool isDevVersion, const char *normVer) {
     int pathLen;
     char dir[PATH_MAX] = {0};
     char path[PATH_MAX]= {0};
     struct scope_obj_state *state;
 
-    state = getObjState(file);
+    state = getObjState(LIBRARY_FILE);
     if (!state) {
         return -1;
     }
@@ -512,7 +509,7 @@ libdirCreate(char *base, mode_t mode, uid_t uid, gid_t gid, libdirfile_t file,
             return -1;
         }
 
-        if (!libdirCreateFileIfMissing(file, path, isDevVersion, mode, uid, gid)) {
+        if (!libdirCreateFileIfMissing(path, isDevVersion, mode, uid, gid)) {
             strncpy(state->binaryPath, path, PATH_MAX);
             strncpy(state->binaryBasepath, base, PATH_MAX);
             return 0;
@@ -542,11 +539,11 @@ int libdirExtract(uid_t uid, gid_t gid) {
 
     // Try to extract to the install base only for the official version
     if (isDevVersion == FALSE) {
-        if (!libdirCreate(g_libdir_info.install_base, 0755, uid, gid, file, isDevVersion, normVer)) {
+        if (!libdirCreate(g_libdir_info.install_base, 0755, uid, gid, isDevVersion, normVer)) {
             return 0;
         }
     }
 
     // If extraction to the install base fails; or we are the dev version, extract to the tmp base
-    return libdirCreate(g_libdir_info.tmp_base, 0777, uid, gid, file, isDevVersion, normVer);
+    return libdirCreate(g_libdir_info.tmp_base, 0777, uid, gid, isDevVersion, normVer);
 }

@@ -130,11 +130,16 @@ handlerWasSaved(struct sigaction *act)
     return act->sa_handler != NULL;
 }
 
-void
+static void
 callSavedHandler(struct sigaction *handler, int sig, siginfo_t *info, void *secret)
 {
     if (!handlerWasSaved(handler)) return;
 
+    // from the man page on sigaction:
+    //   If SA_SIGINFO is specified in sa_flags, then sa_sigaction
+    //     (instead of sa_handler) specifies the signal-handling function
+    //     for signum.  This function receives three arguments, as described
+    //     below.
     if (handler->sa_flags & SA_SIGINFO) {
         handler->sa_sigaction(sig, info, secret);
     } else {

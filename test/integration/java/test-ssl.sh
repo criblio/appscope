@@ -296,7 +296,7 @@ evaltest
 
 # we'll send a signal to act like a java crash
 kill -s SIGBUS $HTTP_SERVER_PID
-sleep 1
+sleep 2
 
 grep -q '"proc":"java"' $EVT_FILE > /dev/null
 ERR+=$?

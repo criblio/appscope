@@ -67,7 +67,7 @@ The command above enables:
 docker run --privileged --rm -p 6379:6379 --name redisAlpine -v /var/run/appscope:/var/run/appscope redis:alpine
 ```
 
-## [Podman])(https://github.com/containers/podman) container
+## [Podman](https://github.com/containers/podman) container
 
 ```console
 podman pull docker.io/redis
@@ -100,4 +100,5 @@ sudo nerdctl run -d -v /var/run/appscope/:/var/run/appscope/ --name nerdctl_root
 ## Useful links
 
 [Namespaces Overview](https://lwn.net/Articles/531114/)
+
 [User namespace](https://lwn.net/Articles/532593/)

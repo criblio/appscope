@@ -22,6 +22,7 @@ Scope logs to a configurable destination, at a configurable
 verbosity level. The default verbosity setting is level 4, and the
 default destination is the file `/tmp/scope.log`.
 
+```
 CONFIGURATION:
 Configuration File:
     A YAML config file (named scope.yml) enables control of all available
@@ -424,3 +425,4 @@ Payloads are emitted in binary. No formatting is applied to the data.
 Payloads are emitted to either a local file or the LogStream channel.
 Configuration elements for libscope support defining a path for payload
 data.
+```

@@ -312,6 +312,7 @@ ERR+=$?
 ls $snapshot_dir/core* 1>/dev/null
 ERR+=$?
 
+sleep 5
 # test that the SimpleHttpServer has been terminated by the SIGBUS.
 # kill -0 allows us to check if the pid is still running.
 if kill -0 $HTTP_SERVER_PID; then

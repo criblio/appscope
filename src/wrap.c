@@ -1903,7 +1903,19 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
      * Prevent the situation to override our handler when it is enabled.
      * Condition below must be inline with `snapshotErrorsSignals` array
      */
-    if ((snapshotIsEnabled() == TRUE) && (act != NULL)) {
+    if (snapshotIsEnabled() == TRUE) {
+
+        // When act is NULL, return the saved applisction handler
+        // but *do not* run snapshotBackupAppSignalHandler().
+        // i.e., don't save the NULL as the latest application handler
+        if (act == NULL) {
+            struct sigaction old = { 0 };
+            snapshotRetrieveAppSignalHandler(signum, &old);
+            *oldact = old;
+            return 0;
+
+        }
+
         // if signum is part of the snapshotErrorsSignals, save the handler
         // and set oldact, then return (without changing away from the
         // snapshot handler)

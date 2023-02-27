@@ -156,13 +156,15 @@ Complete these steps, paying particular attention to the sub-elements of `metric
 
 ### Running AppScope and Cribl Edge in a Container {#container-with-edge}
 
+This section describes one of many possible scenarios involving AppScope, Cribl Edge, and containers. If you are interested in doing something different (e.g., where the scoped apps, AppScope, and Cribl Edge are not necessarily inside the same container) let us know via the `#appscope` channel of Cribl's [Community Slack](https://cribl‑community.slack.com/).
+
 You can start Cribl Edge and AppScope together in a container, then use Cribl Edge's [AppScope Source](https://docs.cribl.io/edge/sources-appscope/) to "drive" AppScope. You'll decide what apps to scope, and work with the resulting events and metrics in Cribl Edge.
 
 To do this, you can use the `docker run` command, choosing options based on considerations including whether to mount the host filesystem in read-only or read-write mode. By default, the `-v` or `--volume` mounts in read-write mode, for example `-v /:/hostfs`. For read-only mode, add `:ro`, for example `-v /:/hostfs:ro`.
 
 In the examples below, we use `/hostfs` to specify the root filesystem mount point; alternatively, you could use a path defined by the environment variable `CRIBL_EDGE_FS_ROOT`.
 
-The examples progress from most to least "locked down."  
+The examples progress from most to least "locked down."
 
 #### Example 1: Mount the Host Filesystem Read-only
 

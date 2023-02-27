@@ -1922,7 +1922,9 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
         struct sigaction old = { 0 };
         snapshotRetrieveAppSignalHandler(signum, &old);
         if (snapshotBackupAppSignalHandler(signum, act) == TRUE) {
-            *oldact = old;
+            if (oldact) {
+                *oldact = old;
+            }
             return 0;
         }
     }

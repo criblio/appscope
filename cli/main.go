@@ -283,8 +283,8 @@ __attribute__((constructor)) void cli_constructor() {
 	cmdArgc = arg_c-optind; // argc of the program we want to scope
 	cmdArgv = &arg_v[optind]; // argv of the program we want to scope
 
-	if (opt_ldattach) exit(cmdAttach(opt_ldattach, false, pid, nspid));
-	if (opt_lddetach) exit(cmdAttach(false, opt_lddetach, pid, nspid));
+	if (opt_ldattach) exit(cmdAttach(true, pid));
+	if (opt_lddetach) exit(cmdAttach(false, pid));
 	if (opt_configure) exit(cmdConfigure(arg_configure, nspid));
 	if (opt_unconfigure) exit(cmdUnconfigure(nspid));
 	if (opt_getfile) exit(cmdGetFile(arg_getfile, nspid));

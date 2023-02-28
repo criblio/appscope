@@ -34,7 +34,7 @@ var inspectCmd = &cobra.Command{
 
 		pid, err := strconv.Atoi(args[0])
 		if err != nil {
-			util.ErrAndExit("Convert PID fails: %v", err)
+			util.ErrAndExit("error parsing PID argument")
 		}
 		pidCtx.Pid = pid
 		cfg, err := inspect.InspectProcess(*pidCtx)

@@ -17,8 +17,8 @@ var pidCtx *ipc.IpcPidCtx = &ipc.IpcPidCtx{}
 // inspectCmd represents the inspect command
 var inspectCmd = &cobra.Command{
 	Use:     "inspect",
-	Short:   "Returns information of scoped process",
-	Long:    `Returns information of scoped process identified by PID.`,
+	Short:   "Returns information about scoped process",
+	Long:    `Returns information about scoped process identified by PID.`,
 	Example: `scope inspect 1000`,
 	Args:    cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -39,7 +39,7 @@ var inspectCmd = &cobra.Command{
 
 		status, _ := util.PidScopeLibInMaps(pid)
 		if !status {
-			util.ErrAndExit("Unable to communicate with %v - process doesn't contains libscope.so library", pid)
+			util.ErrAndExit("Unable to communicate with %v - process is not scoped", pid)
 		}
 
 		pidCtx.Pid = pid

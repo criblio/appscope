@@ -16,8 +16,8 @@ var cfgPath string
 // updateCmd represents the info command
 var updateCmd = &cobra.Command{
 	Use:     "update",
-	Short:   "Updates configuration of scoped process",
-	Long:    `Updates configuration of scoped process identified by PID.`,
+	Short:   "Updates the configuration of a scoped process",
+	Long:    `Updates the configuration of a scoped process identified by PID.`,
 	Example: `scope update 1000 --config test_cfg.yml`,
 	Args:    cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -41,7 +41,7 @@ var updateCmd = &cobra.Command{
 
 		status, _ := util.PidScopeLibInMaps(pid)
 		if !status {
-			util.ErrAndExit("Unable to communicate with %v - process doesn't contains libscope.so library", pid)
+			util.ErrAndExit("Unable to communicate with %v - process is not scoped", pid)
 		}
 
 		pidCtx.Pid = pid

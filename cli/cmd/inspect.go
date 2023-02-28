@@ -17,8 +17,8 @@ var pidCtx *ipc.IpcPidCtx = &ipc.IpcPidCtx{}
 // inspectCmd represents the inspect command
 var inspectCmd = &cobra.Command{
 	Use:     "inspect",
-	Short:   "Return information on scoped process",
-	Long:    `Return information on scoped process identified by PID.`,
+	Short:   "Returns information of scoped process",
+	Long:    `Returns information of scoped process identified by PID.`,
 	Example: `scope inspect 1000`,
 	Args:    cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {

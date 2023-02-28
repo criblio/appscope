@@ -774,8 +774,8 @@ libscope:
     backtrace: false
 
 # Settings for the `cribl` feature.
-# When you enable this feature, AppScope does sends both events and metrics over 
-# the same transport and connection, in NDJSON format, with log level set to warning
+# When you enable this feature, AppScope sends both events and metrics over the
+# same transport and connection, in NDJSON format, with log level set to warning
 # and configevent set to true, overriding previously-defined settings.
 #
 cribl:

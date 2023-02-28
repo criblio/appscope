@@ -136,7 +136,7 @@ func TestPrintEvents(t *testing.T) {
 			buf := &bytes.Buffer{}
 			util.SetOut(buf)
 
-			PrintEvents(in, tc.fields, tc.sortField, tc.eval, tc.json, tc.reverse, tc.allFields, tc.forceColor, tc.width)
+			PrintEvents(in, tc.fields, tc.sortField, tc.eval, tc.json, tc.reverse, tc.allFields, tc.forceColor, tc.width, false)
 
 			rows := strings.Split(buf.String(), "\n")
 			assert.Equal(t, tc.expOutput, rows[0])

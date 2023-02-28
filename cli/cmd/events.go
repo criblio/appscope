@@ -36,7 +36,7 @@ import (
 var eventsCmd = &cobra.Command{
 	Use:   "events [flags] ([eventId])",
 	Short: "Outputs events for a session",
-	Long: `Outputs events for a session. You can obtain detailed information about each event by inputting the Event ID as a positional parameter. (By default, the Event ID appears in blue in []'s at the left.) You can provide filters to narrow down by name (e.g., http, net, fs, console), or by field (e.g., fs.open, stdout, or net.open). You can use JavaScript expressions to further refine the query, and to express logic.`,
+	Long:  `Outputs events for a session. You can obtain detailed information about each event by inputting the Event ID as a positional parameter. (By default, the Event ID appears in blue in []'s at the left.) You can provide filters to narrow down by name (e.g., http, net, fs, console), or by field (e.g., fs.open, stdout, or net.open). You can use JavaScript expressions to further refine the query, and to express logic.`,
 	Example: `scope events
 scope events m61
 scope events --sourcetype http
@@ -152,7 +152,7 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 		if len(args) > 0 {
 			events.PrintEvent(out, jsonOut)
 		} else {
-			events.PrintEvents(out, fields, sortField, eval, jsonOut, sortReverse, allFields, forceColor, termWidth)
+			events.PrintEvents(out, fields, sortField, eval, jsonOut, sortReverse, allFields, forceColor, termWidth, follow)
 		}
 	},
 }

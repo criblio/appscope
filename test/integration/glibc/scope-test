@@ -68,6 +68,7 @@ verifySnapshot() {
 
     local snapshot_dir="/tmp/appscope/$fault_pid"
     local info_file_path="$snapshot_dir/info*"
+    local cfg_file_path="$snapshot_dir/cfg**"
     local backtrace_file_path="$snapshot_dir/backtrace*"
 
     # The following preamble is common for all backtrace
@@ -79,6 +80,9 @@ verifySnapshot() {
     ERR+=$?
     grep -a "Process name: $process_name" $info_file_path > /dev/null
     ERR+=$?
+    if [ ! -f $cfg_file_path ]; then
+        ERR+=1
+    fi
     grep -a -- "--- backtrace" $backtrace_file_path > /dev/null
     ERR+=$?
     grep -a "$backtrace_msg" $backtrace_file_path > /dev/null
@@ -86,6 +90,7 @@ verifySnapshot() {
         ERR+=$?
         echo "verifySnapshot fails, params: $1 $2"
         cat $info_file_path
+        cat $cfg_file_path
         cat $backtrace_file_path
     fi
     # clean it up

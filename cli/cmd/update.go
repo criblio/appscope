@@ -39,6 +39,11 @@ var updateCmd = &cobra.Command{
 			util.ErrAndExit("error parsing PID argument")
 		}
 
+		status, _ := util.PidScopeLibInMaps(pid)
+		if !status {
+			util.ErrAndExit("Unable to communicate with %v - process doesn't contains libscope.so library", pid)
+		}
+
 		pidCtx.Pid = pid
 
 		err = update.UpdateScopeCfg(*pidCtx, cfgPath)

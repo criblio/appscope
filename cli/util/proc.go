@@ -313,7 +313,19 @@ func PidUser(pid int) (string, error) {
 	return user.Username, nil
 }
 
-// // PidScopeStatus checks a Scope Status if a process specified by PID.
+// PidScopeLibInMaps checks if a process specified by PID contains libscope in memory mappings.
+func PidScopeLibInMaps(pid int) (bool, error) {
+	pidMapFile, err := os.ReadFile(fmt.Sprintf("/proc/%v/maps", pid))
+	if err != nil {
+		// Process or do not exist or we do not have permissions to read a map file
+		return false, err
+	}
+
+	pidMap := string(pidMapFile)
+	return strings.Contains(pidMap, "libscope"), nil
+}
+
+// PidScopeStatus checks a Scope Status if a process specified by PID.
 func PidScopeStatus(pid int) (ScopeStatus, error) {
 	pidMapFile, err := os.ReadFile(fmt.Sprintf("/proc/%v/maps", pid))
 	if err != nil {

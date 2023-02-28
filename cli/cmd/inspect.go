@@ -17,8 +17,8 @@ var pidCtx *ipc.IpcPidCtx = &ipc.IpcPidCtx{}
 // inspectCmd represents the inspect command
 var inspectCmd = &cobra.Command{
 	Use:     "inspect",
-	Short:   "Return information on scoped process",
-	Long:    `Return information on scoped process identified by PID.`,
+	Short:   "Returns information about scoped process",
+	Long:    `Returns information about scoped process identified by PID.`,
 	Example: `scope inspect 1000`,
 	Args:    cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
@@ -34,8 +34,14 @@ var inspectCmd = &cobra.Command{
 
 		pid, err := strconv.Atoi(args[0])
 		if err != nil {
-			util.ErrAndExit("Convert PID fails: %v", err)
+			util.ErrAndExit("error parsing PID argument")
 		}
+
+		status, _ := util.PidScopeLibInMaps(pid)
+		if !status {
+			util.ErrAndExit("Unable to communicate with %v - process is not scoped", pid)
+		}
+
 		pidCtx.Pid = pid
 		cfg, err := inspect.InspectProcess(*pidCtx)
 		if err != nil {

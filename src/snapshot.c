@@ -187,7 +187,6 @@ snapInfo(const char *dirPath, const char *epochStr, siginfo_t *unused) {
     snapshotWriteNumberDec(fd, g_proc.pid);
     snapshotWriteConstStr(fd ,"\nProcess name: ");
     snapshotWriteStr(fd, g_proc.procname);
-    snapshotWriteConstStr(fd, "\n");
 
     scope_close(fd);
     return (scope_chmod(filePath, 0755) == 0) ? TRUE : FALSE;

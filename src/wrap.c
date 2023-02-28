@@ -1893,7 +1893,7 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
      */
     if (snapshotIsEnabled() == TRUE) {
 
-        // When act is NULL, return the saved applisction handler
+        // When act is NULL, return the saved application handler
         // but *do not* run snapshotBackupAppSignalHandler().
         // i.e., don't save the NULL as the latest application handler
         if (act == NULL) {

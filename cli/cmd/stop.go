@@ -16,11 +16,11 @@ import (
  */
 
 func getStopUsage() string {
-	return fmt.Sprintf(`The following actions will be performed on the host and in all relevant containers:
+	return `The following actions will be performed on the host and in all relevant containers:
 	- Removal of filter files /usr/lib/appscope/scope_filter and /tmp/appscope/scope_filter
 	- Detach from all existing scoped processes
 	- Removal of etc/profile.d/scope.sh script 
-	- Update the relevant service configurations to not LD_PRELOAD libscope if already doing so`)
+	- Update the relevant service configurations to not LD_PRELOAD libscope if already doing so`
 }
 
 // stopCmd represents the stop command

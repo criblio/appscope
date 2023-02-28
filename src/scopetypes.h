@@ -3,10 +3,14 @@
 
 #include <unistd.h>
 
+/******************************************************************************
+ * Consider updating src/loader/scopetypes.h if you make changes to this file *
+ ******************************************************************************/
+
 typedef enum {CFG_FMT_STATSD,
               CFG_FMT_NDJSON,
               CFG_FORMAT_MAX} cfg_mtc_format_t;
-typedef enum {CFG_UDP, CFG_UNIX, CFG_FILE, CFG_SYSLOG, CFG_SHM, CFG_TCP, CFG_EDGE} cfg_transport_t;
+typedef enum {CFG_UDP, CFG_UNIX, CFG_FILE, CFG_TCP, CFG_EDGE} cfg_transport_t;
 typedef enum {CFG_MTC, CFG_CTL, CFG_LOG, CFG_LS, CFG_WHICH_MAX} which_transport_t;
 typedef enum {CFG_LOG_TRACE,
               CFG_LOG_DEBUG,
@@ -32,12 +36,6 @@ typedef enum {CFG_MTC_FS,
               CFG_MTC_PROC, 
               CFG_MTC_STATSD} metric_watch_t;
 
-typedef enum {
-    SERVICE_STATUS_SUCCESS = 0,         // service operation was success
-    SERVICE_STATUS_ERROR_OTHER = 1,     // service was not installed
-    SERVICE_STATUS_NOT_INSTALLED = 2,   // service operation was failed
-} service_status_t;
-
 #define ROUND_DOWN(num, unit) ((num) & ~((unit) - 1))
 #define ROUND_UP(num, unit) (((num) + (unit) - 1) & ~((unit) - 1))
 
@@ -50,10 +48,13 @@ typedef enum {
 #define MAX_CGROUP 512
 #define MODE_STR 16
 #define SM_NAME "scope_anon"
+#define SCOPE_FILTER_USR_PATH ("/usr/lib/appscope/scope_filter")
+#define SCOPE_FILTER_TMP_PATH ("/tmp/appscope/scope_filter")
 
-#ifndef bool
 typedef unsigned int bool;
-#endif
+#define TRUE 1
+#define FALSE 0
+
 
 typedef struct
 {
@@ -79,9 +80,6 @@ typedef struct
     unsigned long cmdAttachAddr;
     bool scoped;
 } export_sm_t;
-
-#define TRUE 1
-#define FALSE 0
 
 #define CFG_MAX_VERBOSITY 9
 #define CFG_FILE_NAME "scope.yml"
@@ -150,6 +148,7 @@ typedef struct
 #define DEFAULT_PROCESS_START_MSG TRUE
 #define DEFAULT_PAYLOAD_ENABLE FALSE
 #define DEFAULT_PAYLOAD_DIR "/tmp"
+#define DEFAULT_PAYLOAD_DIR_REPR "dir:///tmp"
 
 #define DEFAULT_MTC_TYPE CFG_UDP
 #define DEFAULT_MTC_HOST "127.0.0.1"
@@ -179,6 +178,9 @@ typedef struct
 #define DEFAULT_LOGSTREAM_CLOUD  FALSE
 #define DEFAULT_LOGSTREAM_LOGMSG "The following settings have been overridden by a LogStream connection: event, metric and payload transport, "
 
+#define DEFAULT_COREDUMP_ENABLE FALSE
+#define DEFAULT_BACKTRACE_ENABLE FALSE
+
 /*
  * This calculation is not what we need in the long run.
  * Not all events are rate limited; only metric events at this point.
@@ -192,14 +194,16 @@ typedef struct
 // Unpublished scope env vars that are not processed by config:
 //    SCOPE_APP_TYPE                 internal use only
 //    SCOPE_EXEC_TYPE                internal use only
+//    SCOPE_HOST_WORKDIR_PATH        internal use - informs the attached process in container to create working directory
+//                                   in container mnt namespace, which allows to access data during attach operation initialized from host
 //    SCOPE_FILTER                   "false" disables handling the filter file
 //                                   other values are interpreted a path to a filter file
 //    SCOPE_EXECVE                   "false" disables scope of child procs
-//    SCOPE_EXEC_PATH                specifies path to ldscope executable
+//    SCOPE_EXEC_PATH                specifies path to scope executable
 //    SCOPE_CRIBL_NO_BREAKER         adds breaker property to process start message
 //    SCOPE_LIB_PATH                 specifies path to libscope.so library
 //    SCOPE_GO_STRUCT_PATH           for internal testing
-//    SCOPE_CLI_SKIP_START_HOST      for internal testing (when set skip the start host operation from container)
+//    SCOPE_CLI_SKIP_HOST            for internal testing (when set skip the start/stop host operation from container)
 //    SCOPE_HTTP_SERIALIZE_ENABLE    "true" adds guard for race condition
 //    SCOPE_NO_SIGNAL                if defined, timer for USR2 is not set
 //    SCOPE_PERF_PRESERVE            "true" processes at 10s instead of 1ms
@@ -208,7 +212,6 @@ typedef struct
 //    SCOPE_PAYLOAD_HEADER           write payload headers to files
 //    SCOPE_PAYLOAD_TO_DISK          if payloads are enabled, "true" forces writes to payload->dir
 //    SCOPE_ALLOW_CONSTRUCT_DBG      allows debug inside the constructor
-//    SCOPE_ERROR_SIGNAL_HANDLER     allows to register SIGSEGV&SIGBUS handler
 //    SCOPE_QUEUE_LENGTH             override default circular buffer sizes
 //    SCOPE_START_NOPROFILE          cause the start command to ignore updates to /etc/profile.d
 //    SCOPE_START_FORCE_PROFILE      force the start command to update profile.d with a dev version

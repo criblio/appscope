@@ -50,13 +50,19 @@ endtest(){
 #
 # test terraform
 #
-
+# TODO: the grep's below need to start from a clean file
+#       the plan command needs a grep test.
 starttest terraform
 
 cd /opt/terraform
+TF_FILE="main.tf"
+   echo 'resource "random_integer" "renewal" {' > $TF_FILE
+   echo '  min = -15' >> $TF_FILE
+   echo '  max = 15' >> $TF_FILE
+   echo '}' >> $TF_FILE
 
 for i in $(seq $LOOP_LIMIT); do
-   ldscope -- /bin/terraform init
+   scope -z -- /bin/terraform init
    if [ $? -ne 0 ]; then
         ERR+=1
    fi
@@ -65,7 +71,12 @@ for i in $(seq $LOOP_LIMIT); do
         ERR+=1
    fi
 
-   ldscope -- /bin/terraform apply -auto-approve
+   scope -z -- /bin/terraform plan
+   if [ $? -ne 0 ]; then
+        ERR+=1
+   fi
+
+   scope -z -- /bin/terraform apply -auto-approve
    if [ $? -ne 0 ]; then
         ERR+=1
    fi
@@ -75,7 +86,7 @@ for i in $(seq $LOOP_LIMIT); do
         ERR+=1
    fi
 
-   ldscope -- /bin/terraform destroy -auto-approve
+   scope -z -- /bin/terraform destroy -auto-approve
    if [ $? -ne 0 ]; then
         ERR+=1
    fi

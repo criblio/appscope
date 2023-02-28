@@ -100,7 +100,7 @@ evalInternalEvents(){
 }
 
 starttest Tomcat
-ldscope /opt/tomcat/bin/catalina.sh run &
+scope -z /opt/tomcat/bin/catalina.sh run &
 evaltest
 
 CURL_MAX_RETRY=10
@@ -137,7 +137,7 @@ endtest
 
 starttest SSLSocketClient
 cd /opt/javassl
-ldscope java -Djavax.net.ssl.trustStore=/opt/tomcat/certs/tomcat.p12 -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=pkcs12 SSLSocketClient > /dev/null
+scope -z java -Djavax.net.ssl.trustStore=/opt/tomcat/certs/tomcat.p12 -Djavax.net.ssl.trustStorePassword=changeit -Djavax.net.ssl.trustStoreType=pkcs12 SSLSocketClient > /dev/null
 evaltest
 grep http.req $EVT_FILE > /dev/null
 ERR+=$?
@@ -173,7 +173,7 @@ java SimpleHttpServer 2> /dev/null &
 HTTP_SERVER_PID=$!
 sleep 1
 evaltest
-ldscope --attach ${HTTP_SERVER_PID}
+scope --ldattach ${HTTP_SERVER_PID}
 curl http://localhost:8000/status
 sleep 5
 
@@ -212,7 +212,7 @@ HTTP_SERVER_PID=$!
 sleep 1
 evaltest
 curl http://localhost:8000/status
-ldscope --attach ${HTTP_SERVER_PID}
+scope --ldattach ${HTTP_SERVER_PID}
 curl http://localhost:8000/status
 sleep 5
 
@@ -239,11 +239,11 @@ endtest
 
 # TODO: Java9 fails see issue #630
 # remove if condition below after fixing the issue
-if [[ -z "${SKIP_LDSCOPE_TEST}" ]]; then
-starttest java_http_ldscope
+if [[ -z "${SKIP_SCOPE_TEST}" ]]; then
+starttest java_http_scope
 
 cd /opt/java_http
-ldscope java SimpleHttpServer 2> /dev/null &
+scope -z java SimpleHttpServer 2> /dev/null &
 HTTP_SERVER_PID=$!
 evaltest
 sleep 1
@@ -281,6 +281,51 @@ endtest
 fi
 
 fi # x86_64 only
+
+
+#starttest java_crash_analysis
+#
+#cd /opt/java_http
+#
+## if we crash java, verify that we capture a backtrace & coredump
+#scope run -p --backtrace --coredump -- java SimpleHttpServer 2> /dev/null &
+#HTTP_SERVER_PID=$!
+#sleep 1
+#
+#evaltest
+#
+## we'll send a signal to act like a java crash
+#kill -s SIGBUS $HTTP_SERVER_PID
+#sleep 2
+#
+#grep -q '"proc":"java"' $EVT_FILE > /dev/null
+#ERR+=$?
+#
+## test that the expected files have been produced
+#snapshot_dir="/tmp/appscope/$HTTP_SERVER_PID"
+#ls $snapshot_dir/info* 1>/dev/null
+#ERR+=$?
+#ls $snapshot_dir/cfg* 1>/dev/null
+#ERR+=$?
+#ls $snapshot_dir/backtrace* 1>/dev/null
+#ERR+=$?
+#ls $snapshot_dir/core* 1>/dev/null
+#ERR+=$?
+#
+#sleep 5
+## test that the SimpleHttpServer has been terminated by the SIGBUS.
+## kill -0 allows us to check if the pid is still running.
+#if kill -0 $HTTP_SERVER_PID; then
+#    ERR+=1
+#fi
+#
+## if it is still running, kill it
+#kill -9 $HTTP_SERVER_PID
+#
+#endtest
+#
+#
+#ls -al $snapshot_dir
 
 unset SCOPE_PAYLOAD_ENABLE
 unset SCOPE_PAYLOAD_HEADER

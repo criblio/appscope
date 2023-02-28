@@ -7,6 +7,7 @@ typedef struct rtconfig_t {
     bool funcs_attached;       // TRUE when functions are interposed, FALSE otherwise
     int blockconn;
     config_t *staticfg;
+    char *cfgStr;              // String representation of `staticfg` field
 } rtconfig;
 
 extern rtconfig g_cfg;

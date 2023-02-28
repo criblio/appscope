@@ -53,6 +53,8 @@ unsigned            cfgLogStreamCloud(config_t *);
 size_t              cfgEvtFormatNumHeaders(config_t *);
 regex_t *           cfgEvtFormatHeaderRe(config_t *, int);
 const char *        cfgAuthToken(config_t *);
+unsigned            cfgSnapshotCoredumpEnable(config_t *);
+unsigned            cfgSnapshotBacktraceEnable(config_t *);
 
 // Setters (modifies config_t, but does not persist modifications)
 void                cfgMtcEnableSet(config_t*, unsigned);
@@ -89,5 +91,7 @@ void                cfgEvtAllowBinaryConsoleSet(config_t *, unsigned);
 void                cfgLogStreamEnableSet(config_t *, unsigned);
 void                cfgLogStreamCloudSet(config_t *, unsigned);
 void                cfgAuthTokenSet(config_t *, const char *);
+void                cfgSnapshotCoredumpSet(config_t *, unsigned);
+void                cfgSnapshotBacktraceSet(config_t *, unsigned);
 
 #endif // __CFG_H__

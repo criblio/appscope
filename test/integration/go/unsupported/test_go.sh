@@ -49,7 +49,7 @@ endtest(){
 starttest plainServerDynamic
 cd /go/net
 PORT=80
-ldscope ./plainServerDynamic ${PORT} &
+scope -z ./plainServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -77,7 +77,7 @@ endtest
 starttest plainServerStatic
 cd /go/net
 PORT=81
-ldscope ./plainServerStatic ${PORT} &
+scope -z ./plainServerStatic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -105,7 +105,7 @@ endtest
 starttest tlsServerDynamic
 cd /go/net
 PORT=4430
-ldscope ./tlsServerDynamic ${PORT} &
+scope -z ./tlsServerDynamic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -133,7 +133,7 @@ endtest
 starttest tlsServerStatic
 cd /go/net
 PORT=4431
-ldscope ./tlsServerStatic ${PORT} &
+scope -z ./tlsServerStatic ${PORT} &
 
 # this sleep gives the server a chance to bind to the port
 # before we try to hit it with curl
@@ -160,7 +160,7 @@ endtest
 #
 starttest plainClientDynamic
 cd /go/net
-ldscope ./plainClientDynamic
+scope -z ./plainClientDynamic
 ERR+=$?
 
 # this sleep gives plainClientDynamic a chance to report its events on exit
@@ -179,7 +179,7 @@ endtest
 #
 starttest plainClientStatic
 cd /go/net
-ldscope ./plainClientStatic
+scope -z ./plainClientStatic
 ERR+=$?
 
 # this sleep gives plainClientStatic a chance to report its events on exit
@@ -198,7 +198,7 @@ endtest
 #
 starttest tlsClientDynamic
 cd /go/net
-ldscope ./tlsClientDynamic
+scope -z ./tlsClientDynamic
 ERR+=$?
 
 # this sleep gives tlsClientDynamic a chance to report its events on exit
@@ -217,7 +217,7 @@ endtest
 #
 starttest tlsClientStatic
 cd /go/net
-ldscope ./tlsClientStatic
+scope -z ./tlsClientStatic
 ERR+=$?
 
 # this sleep gives tlsClientStatic a chance to report its events on exit
@@ -236,7 +236,7 @@ endtest
 #
 starttest fileThread
 cd /go/thread
-ldscope ./fileThread
+scope -z ./fileThread
 ERR+=$?
 evaltest
 
@@ -251,7 +251,7 @@ endtest
 #
 starttest cgoDynamic
 cd /go/cgo
-LD_LIBRARY_PATH=. ldscope ./cgoDynamic
+LD_LIBRARY_PATH=. scope -z ./cgoDynamic
 ERR+=$?
 evaltest
 
@@ -266,7 +266,7 @@ endtest
 #
 starttest cgoStatic
 cd /go/cgo
-ldscope ./cgoStatic
+scope -z ./cgoStatic
 ERR+=$?
 
 evaltest

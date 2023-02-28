@@ -2,8 +2,9 @@
 # AppScope Runtime Configuration
 #
 # The AppScope library (`libscope.so`) starts with default configs that are
-# mimicked here in this file; meaning, run with no config, or with the stock
-# version of this config, and the results are the same.
+# mimicked here in this file. This means that if you run AppScope with the
+# stock version of this config, you get the same results as if you run without
+# any config.
 #
 # After loading defaults, the library looks for a config in the following
 # places in the order shown. The first readable file found is used and the rest
@@ -26,12 +27,12 @@
 # the config file or the $SCOPE_CRIBL/$SCOPE_CRIBL_CLOUD environment variable,
 # the library forces the following:
 #
-#   - `metric > transport` is redirected to the `cribl` backend
+#   - `metric > transport` is superseded by the `cribl` transport
 #   - `metric > enable` is set to true
 #   - `metric > format` is set to ndjson
-#   - `event > transport` is redirected to the `cribl` backend
+#   - `event > transport` is superseded by the `cribl` transport
 #   - `event > enable` is set to true
-#   - `libscope > log > level` is set to warn
+#   - `libscope > log > level` is set to warning
 #   - `libscope > configevent` is set to true
 #
 # Use the `scope extract` command to get a copy of the default `scope.yml`.
@@ -41,11 +42,11 @@
 #   egrep -v '^ *#.*$' scope.yml | sed '/^$/d' >scope-minimal.yml
 #
 
-# Settings for metrics
+# Settings for the `metrics` feature
 #
 metric:
 
-  # Enable the metrics backend
+  # Enable the `metrics` feature
   #   Type:     boolean
   #   Values:   true, false
   #   Default:  true
@@ -63,11 +64,11 @@ metric:
     #   Default:  statsd
     #   Override: $SCOPE_METRIC_FORMAT
     #
-    # When the `cribl` backend is enabled, this is forced to ndjson.
+    # When the `cribl` feature is enabled, this is forced to ndjson.
     #
     type: statsd
 
-    # Prefix for statsd metrics; ignored if type isn't statsd
+    # Prefix for StatsD metrics; ignored if type isn't statsd
     #   Type:     string
     #   Values:   (and string)
     #   Default:  (none)
@@ -75,7 +76,7 @@ metric:
     #
     statsdprefix:
 
-    # Maximum length of formatted statsd metrics; ignored unless type is statsd
+    # Maximum length of formatted StatsD metrics; ignored unless type is statsd
     #   Type:     integer
     #   Values:   (greater than zero)
     #   Default:  512
@@ -95,7 +96,7 @@ metric:
     #
     # Metrics have at a minimum name, value, and type properties. Optional tags
     # can be added to provide additional detail on the measurement. The library
-    # adds expanded Statsd tags depending on the value of this setting as
+    # adds expanded StatsD tags depending on the value of this setting as
     # described below. These affect the cardinality of the metrics data.
     #
     #   0  none
@@ -128,21 +129,22 @@ metric:
   # categories of metrics. Their `type` property specifies the category.
   # Comment out an array entry to disable the category. If you comment
   # out `metric > watch` entirely, AppScope will use the default metric
-  # watch list, which has all categories enabled.
+  # watch list, which enables all categories.
   #
   watch:
-    # The statsd category creates metrics from statsd network traffic that is
+    # The statsd category creates metrics from StatsD network traffic that is
     # sent from or received by the scoped process. This includes extended
-    # statsd, where dimensions will be included in the metrics produced.
-    # See the STATSD protocol detector for more info about how
-    # network traffic is determined to contain stastd metric data.
-    #
-    # Set $SCOPE_METRIC_STATSD to true or false to enable or disable this
-    # category.
+    # StatsD, where dimensions will be included in the metrics produced.
+    # See the STATSD protocol detector for more info about how AppScope
+    # determines whether network traffic contains StatsD metric data.
+    # Set $SCOPE_METRIC_STATSD to true or false to enable or disable
+    # this category.
     #
     - type: statsd
 
-    # Metric file system
+    # The filesystem category creates metrics from the scoped process' file reads,
+    # writes, opens, closes, etc.
+    #
     #   Type:     string
     #   Values:   fs
     #   Default:  fs
@@ -150,7 +152,9 @@ metric:
     #
     - type: fs
 
-    # Metric network
+    # The network category creates metrics from the scoped process' network sends,
+    # receives, socket opens, socket closes, etc.
+    #
     #   Type:     string
     #   Values:   net
     #   Default:  net
@@ -158,7 +162,8 @@ metric:
     #
     - type: net
 
-    # Metric http
+    # The HTTP category creates metrics from the scoped process' HTTP requests and
+    # responses, including their timing, content length, etc.
     #   Type:     string
     #   Values:   http
     #   Default:  http
@@ -166,7 +171,7 @@ metric:
     #
     - type: http
 
-    # Metric dns
+    # The DNS category creates metrics from the scoped process' network DNS requests.
     #   Type:     string
     #   Values:   dns
     #   Default:  dns
@@ -174,7 +179,10 @@ metric:
     #
     - type: dns
 
-    # Metric process
+    # The process category creates metrics from the state of the scoped process,
+    # e.g., number of open file descriptors, number of running threads,
+    # memory usage, etc.
+    #
     #   Type:     string
     #   Values:   process
     #   Default:  process
@@ -182,10 +190,10 @@ metric:
     #
     - type: process
 
-  # Backend connection for metrics
+  # Settings for the `metrics` transport
   #
-  # When the `cribl` backend is enabled, these settings are ignored and metrics
-  # are instead sent to the `cribl` backend.
+  # When the `cribl` feature is enabled, these settings are ignored,
+  # and AppScope sends metrics via the `cribl` transport rather than this one.
   #
   transport:
 
@@ -226,11 +234,11 @@ metric:
     #   Default:  8125
     #   Override: the port token in the $SCOPE_METRIC_DEST URL
     #
-    # The default 8125 is for normal statsd services.
+    # The default 8125 is for normal StatsD services.
     #
     port: 8125
 
-    # File path / unix domain socket path
+    # File path / UNIX domain socket path
     #   Type:     string
     #   Values:   (directory path, or socket path)
     #   Default:  (none)
@@ -257,7 +265,7 @@ metric:
     # TLS connection settings
     tls:
 
-      # Enable TLS for the metrics backend
+      # Enable TLS for the `metrics` transport
       #   Type:     boolean
       #   Values:   true, false
       #   Default:  false
@@ -280,7 +288,7 @@ metric:
       #
       validateserver: true
 
-      # CA Certificate Path
+      # CA certification path
       #   Type:     string
       #   Values:   (file path)
       #   Default:  (none)
@@ -295,11 +303,11 @@ metric:
       #
       cacertpath: ''
 
-# Settings for events
+# Settings for the `events` feature
 #
 event:
 
-  # Enable the events backend
+  # Enable the `events` feature
   #   Type:     boolean
   #   Values:   true, false
   #   Default:  true
@@ -344,7 +352,7 @@ event:
   # categories of events. Their `type` property specifies the category.
   # Comment out an array entry to disable the category. If you comment
   # out `event > watch` entirely, AppScope will use the default event
-  # watch list, which has all categories except metric enabled.
+  # watch list, which enables all categories except metric.
   #
   watch:
 
@@ -467,10 +475,10 @@ event:
     #  field: .*
     #  value: .*
 
-  # Backend connection for events
+  # Settings for the `events` transport
   #
-  # When the `cribl` backend is enabled, these settings are ignored and events
-  # are instead sent to the `cribl` backend.
+  # When the `cribl` feature is enabled, these settings are ignored,
+  # and AppScope sends events via the `cribl` transport rather than this one.
   #
   transport:
 
@@ -513,7 +521,7 @@ event:
     #
     port: 9109
 
-    # File path / unix domain socket path
+    # File path / UNIX domain socket path
     #   Type:     string
     #   Values:   (directory path, or socket path)
     #   Default:  (none)
@@ -540,7 +548,7 @@ event:
     # TLS connection settings
     tls:
 
-      # Enable TLS for the events backend
+      # Enable TLS for the `events` transport
       #   Type:     boolean
       #   Values:   true, false
       #   Default:  false
@@ -563,7 +571,7 @@ event:
       #
       validateserver: true
 
-      # CA Certificate Path
+      # CA certification path
       #   Type:     string
       #   Values:   (file path)
       #   Default:  (none)
@@ -578,7 +586,7 @@ event:
       #
       cacertpath: ''
 
-# Settings for payloads
+# Settings for the `payloads` feature
 #
 payload:
 
@@ -606,11 +614,11 @@ payload:
   #
   dir: '/tmp'
 
-# Setting up the library
+# Setting up the AppScope library
 #
 libscope:
 
-  # Enable the config-event message on the event or `cribl` backend
+  # Enable the config-event message
   #   Type:     boolean
   #   Values:   true, false
   #   Default:  true
@@ -646,6 +654,7 @@ libscope:
   #   SCOPE_EVENT_HTTP=false
   #
   # The given variables are applied to the running config just like startup.
+  # This entire mechanism is what the AppScope docs call Dynamic Configuration.
   #
   commanddir : '/tmp'
 
@@ -660,11 +669,15 @@ libscope:
     #   Default:  warning
     #   Override: $SCOPE_LOG_LEVEL
     #
-    # When the `cribl` backend is enabled, this is forced to warning.
+    # When the `cribl` feature is enabled, this is forced to warning.
     #
     level: warning
 
-    # Backend connection for logs
+    # Connection settings for the `logs` transport
+    #
+    # The `logs` transport is independent of all other transports, because
+    # AppScope log data (which is in neither JSON nor StatsD format) should normally
+    # be sent to a different destination than events or metrics.
     #
     transport:
 
@@ -707,7 +720,7 @@ libscope:
       #
       #port:
 
-      # File path / unix domain socket path
+      # File path / UNIX domain socket path
       #   Type:     string
       #   Values:   (directory path, or socket path)
       #   Default:  '/tmp/scope.log'
@@ -731,11 +744,43 @@ libscope:
       #
       buffer: line
 
-# Settings for the `cribl` backend
+  # Settings for the `crash analysis` feature, which writes a snapshot to
+  # the snapshot directory, which is /tmp/appscope/<pid>/.
+  # The snapshot consists of either a core dump, a backtrace (i.e., stack trace),
+  # or both.
+  # - If SCOPE_SNAPSHOT_COREDUMP=true, AppScope generates a core dump and writes
+  # it to the snapshot directory as core_<timestamp>.
+  # - If SCOPE_SNAPSHOT_BACKTRACE=true, AppScope generates a core dump and writes
+  # it to the snapshot directory as backtrace_<timestamp>.
+  # - In either case, AppScope writes two additional files to the snapshot directory,
+  # namely info_<timestamp> and cfg_<timestamp>.
+  #
+  snapshot:
+
+    # Enable core dump generation
+    #   Type:     boolean
+    #   Values:   true, false
+    #   Default:  false
+    #   Override: $SCOPE_SNAPSHOT_COREDUMP
+    #
+    coredump: false
+
+    # Enable backtrace generation
+    #   Type:     boolean
+    #   Values:   true, false
+    #   Default:  false
+    #   Override: $SCOPE_SNAPSHOT_BACKTRACE
+    #
+    backtrace: false
+
+# Settings for the `cribl` feature.
+# When you enable this feature, AppScope sends both events and metrics over the
+# same transport and connection, in NDJSON format, with log level set to warning
+# and configevent set to true, overriding previously-defined settings.
 #
 cribl:
 
-  # Enable the `cribl` backend
+  # Enable the `cribl` feature
   #   Type:     boolean
   #   Values:   true, false
   #   Default:  true
@@ -754,7 +799,7 @@ cribl:
   #
   #authtoken:
 
-  # Backend connection for cribl
+  # Connection settings for the `cribl` transport
   #
   transport:
 
@@ -824,7 +869,7 @@ cribl:
     # TLS connection settings
     tls:
 
-      # Enable TLS for the metrics backend
+      # Enable TLS for the `cribl` transport
       #   Type:     boolean
       #   Values:   true, false
       #   Default:  false
@@ -847,7 +892,7 @@ cribl:
       #
       validateserver: true
 
-      # CA Certificate Path
+      # CA certification path
       #   Type:     string
       #   Values:   (file path)
       #   Default:  (none)
@@ -935,8 +980,8 @@ protocol:
   #- name: HTTP
   #  regex: "HTTP\\/1\\.[0-2]|PRI \\* HTTP\\/2\\.0\r\n\r\nSM\r\n\r\n"
 
-  # AppScope uses an internally defined protocol detector for STATSD like the
-  # example below by default.
+  # By default, AppScope uses an internally-defined protocol detector for
+  # StatsD, similar to the example below.
   #
   # Uncomment this and adjust as needed to override the defaults.
   #
@@ -956,6 +1001,9 @@ protocol:
   #  len: 5
 
 # Custom configs
+# Use this area of the config file to specify settings to override,
+# and what new settings to override them with, for processes that match
+# criteria you define as filters.
 #
 custom:
   # Each custom entry has a name, a `filter` element, and a `config` element.

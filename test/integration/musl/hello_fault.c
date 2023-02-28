@@ -4,9 +4,11 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#define READ_ONLY_VAR  0
-#define NOT_MAPPED_VAR 1
-#define BUS_ERROR_VAR  2
+#define READ_ONLY_VAR        0
+#define NOT_MAPPED_VAR       1
+#define BUS_ERROR_VAR        2
+#define DIVIDE_ZERO_VAR      3
+#define ILLEGAL_OPERAND      4
 
 void read_only_area_error(void) {
     char *s = "Hello goat";
@@ -29,6 +31,23 @@ void bus_error(void) {
     *map = 0;
 }
 
+void divide_by_zero_error(void) {
+   int x, y;
+   y = 0;
+   x = 1 / y;
+   fprintf(stderr, "%d", y);
+}
+
+void illegal_operand_error(void) {
+#if defined __aarch64__
+   asm("hvc 0");
+#elif defined __x86_64__
+   asm("ud2");
+#else
+# error "Unsupported arch"
+#endif
+}
+
 void test_function(int variant) {
    switch (variant){
       case READ_ONLY_VAR:
@@ -39,6 +58,12 @@ void test_function(int variant) {
          break;
       case BUS_ERROR_VAR:
          bus_error();
+         break;
+      case DIVIDE_ZERO_VAR:
+         divide_by_zero_error();
+         break;
+      case ILLEGAL_OPERAND:
+         illegal_operand_error();
          break;
       default:
          exit(EXIT_SUCCESS);

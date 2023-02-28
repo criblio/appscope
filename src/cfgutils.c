@@ -52,6 +52,9 @@
 #define SUMMARYPERIOD_NODE       "summaryperiod"
 #define COMMANDDIR_NODE          "commanddir"
 #define CFGEVENT_NODE            "configevent"
+#define SNAPSHOT_NODE            "snapshot"
+#define COREDUMP_NODE                "coredump"
+#define BACKTRACE_NODE               "backtrace"
 
 #define EVENT_NODE           "event"
 #define TRANSPORT_NODE           "transport"
@@ -107,8 +110,6 @@ enum_map_t transportTypeMap[] = {
     {"tcp",                   CFG_TCP},
     {"unix",                  CFG_UNIX},
     {"file",                  CFG_FILE},
-    {"syslog",                CFG_SYSLOG},
-    {"shm",                   CFG_SHM},
     {"edge",                  CFG_EDGE},
     {NULL,                   -1}
 };
@@ -187,6 +188,8 @@ void cfgPayDirSetFromStr(config_t*, const char*);
 void cfgAuthTokenSetFromStr(config_t*, const char*);
 void cfgEvtFormatHeaderSetFromStr(config_t *, const char *);
 void cfgCriblEnableSetFromStr(config_t *, const char *);
+void cfgSnapShotCoredumpEnableSetFomStr(config_t *, const char *);
+void cfgSnapshotBacktraceEnableSetFomStr(config_t *, const char *);
 static void cfgSetFromFile(config_t *, const char *);
 
 static void processRoot(config_t *, yaml_document_t *, yaml_node_t *);
@@ -287,7 +290,7 @@ processCustomTag(config_t* cfg, const char* e, const char* value)
     char name_buf[1024];
     scope_strncpy(name_buf, e, sizeof(name_buf));
 
-    char* name = name_buf + (sizeof("SCOPE_TAG_") - 1);
+    char* name = name_buf + C_STRLEN("SCOPE_TAG_");
 
     // convert the "=" to a null delimiter for the name
     char* end = scope_strchr(name, '=');
@@ -628,6 +631,10 @@ processEnvStyleInput(config_t *cfg, const char *env_line)
         cfgAuthTokenSetFromStr(cfg, value);
     } else if (startsWith(env_name, "SCOPE_TAG_")) {
         processCustomTag(cfg, env_line, value);
+    } else if (startsWith(env_name, "SCOPE_SNAPSHOT_COREDUMP")) {
+        cfgSnapShotCoredumpEnableSetFomStr(cfg, value);
+    }  else if (startsWith(env_name, "SCOPE_SNAPSHOT_BACKTRACE")) {
+        cfgSnapshotBacktraceEnableSetFomStr(cfg, value);
     }
 
 cleanup:
@@ -845,7 +852,7 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         char value_cpy[1024];
         scope_strncpy(value_cpy, value, sizeof(value_cpy));
 
-        char *host = value_cpy + (sizeof("udp://") - 1);
+        char *host = value_cpy + C_STRLEN("udp://");
 
         // convert the ':' to a null delimiter for the host
         // and move port past the null
@@ -864,7 +871,7 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         char value_cpy[1024];
         scope_strncpy(value_cpy, value, sizeof(value_cpy));
 
-        char *host = value_cpy + (sizeof("tcp://") - 1);
+        char *host = value_cpy + C_STRLEN("tcp://");
 
         // convert the ':' to a null delimiter for the host
         // and move port past the null
@@ -878,14 +885,14 @@ cfgTransportSetFromStr(config_t *cfg, which_transport_t t, const char *value)
         cfgTransportPortSet(cfg, t, port);
 
     } else if (value == scope_strstr(value, "file://")) {
-        const char *path = value + (sizeof("file://") - 1);
+        const char *path = value + C_STRLEN("file://");
         cfgTransportTypeSet(cfg, t, CFG_FILE);
         cfgTransportPathSet(cfg, t, path);
     } else if (value == scope_strstr(value, "unix://")) {
-        const char *path = value + (sizeof("unix://") - 1);
+        const char *path = value + C_STRLEN("unix://");
         cfgTransportTypeSet(cfg, t, CFG_UNIX);
         cfgTransportPathSet(cfg, t, path);
-    } else if (scope_strncmp(value, "edge", sizeof("edge") - 1) == 0) {
+    } else if (scope_strncmp(value, "edge", C_STRLEN("edge")) == 0) {
         cfgTransportTypeSet(cfg, t, CFG_EDGE);
     }
 }
@@ -953,6 +960,20 @@ cfgAuthTokenSetFromStr(config_t *cfg, const char *value)
 {
     if (!cfg || !value) return;
     cfgAuthTokenSet(cfg, value);
+}
+
+void
+cfgSnapShotCoredumpEnableSetFomStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgSnapshotCoredumpSet(cfg, strToVal(boolMap, value));
+}
+
+void
+cfgSnapshotBacktraceEnableSetFomStr(config_t *cfg, const char *value)
+{
+    if (!cfg || !value) return;
+    cfgSnapshotBacktraceSet(cfg, strToVal(boolMap, value));
 }
 
 #ifndef NO_YAML
@@ -1146,6 +1167,39 @@ processLogging(config_t* config, yaml_document_t* doc, yaml_node_t* node)
     parse_table_t t[] = {
         {YAML_SCALAR_NODE,    LEVEL_NODE,           processLevel},
         {YAML_MAPPING_NODE,   TRANSPORT_NODE,       processTransportLog},
+        {YAML_NO_NODE,        NULL,                 NULL}
+    };
+
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePair(t, pair, config, doc);
+    }
+}
+
+static void
+processCoredump(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    char* value = stringVal(node);
+    cfgSnapShotCoredumpEnableSetFomStr(config, value);
+    if (value) scope_free(value);
+}
+
+static void
+processBacktrace(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    char* value = stringVal(node);
+    cfgSnapshotBacktraceEnableSetFomStr(config, value);
+    if (value) scope_free(value);
+}
+
+static void
+processSnapshot(config_t *config, yaml_document_t *doc, yaml_node_t *node)
+{
+    if (node->type != YAML_MAPPING_NODE) return;
+    
+    parse_table_t t[] = {
+        {YAML_SCALAR_NODE,    COREDUMP_NODE,        processCoredump},
+        {YAML_SCALAR_NODE,    BACKTRACE_NODE,       processBacktrace},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1548,6 +1602,7 @@ processLibscope(config_t* config, yaml_document_t* doc, yaml_node_t* node)
         {YAML_SCALAR_NODE,    SUMMARYPERIOD_NODE,   processSummaryPeriod},
         {YAML_SCALAR_NODE,    COMMANDDIR_NODE,      processCommandDir},
         {YAML_SCALAR_NODE,    CFGEVENT_NODE,        processConfigEvent},
+        {YAML_MAPPING_NODE,   SNAPSHOT_NODE,        processSnapshot},
         {YAML_NO_NODE,        NULL,                 NULL}
     };
 
@@ -1762,6 +1817,7 @@ processProtocolEntry(config_t* config, yaml_document_t* doc, yaml_node_t* node)
                 DBG(NULL);
             }
             protocol_context = NULL;
+            destroyProtEntry(found);
             break;
         }
     }
@@ -2220,8 +2276,6 @@ createTransportJson(config_t* cfg, which_transport_t trans)
             if (!cJSON_AddStringToObjLN(root, BUFFERING_NODE,
                  valToStr(bufferMap, cfgTransportBuf(cfg, trans)))) goto err;
             break;
-        case CFG_SYSLOG:
-        case CFG_SHM:
         case CFG_EDGE:
             break;
         default:
@@ -2246,6 +2300,25 @@ createLogJson(config_t* cfg)
 
     if (!(transport = createTransportJson(cfg, CFG_LOG))) goto err;
     cJSON_AddItemToObjectCS(root, TRANSPORT_NODE, transport);
+
+    return root;
+err:
+    if (root) cJSON_Delete(root);
+    return NULL;
+}
+
+static cJSON*
+createSnapshotJson(config_t *cfg)
+{
+    cJSON* root = NULL;
+
+    if (!(root = cJSON_CreateObject())) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, COREDUMP_NODE,
+         valToStr(boolMap, cfgSnapshotCoredumpEnable(cfg)))) goto err;
+
+    if (!cJSON_AddStringToObjLN(root, BACKTRACE_NODE,
+         valToStr(boolMap, cfgSnapshotBacktraceEnable(cfg)))) goto err;
 
     return root;
 err:
@@ -2490,13 +2563,17 @@ err:
 static cJSON*
 createLibscopeJson(config_t* cfg)
 {
-    cJSON* root = NULL;
+    cJSON *root = NULL;
     cJSON *log;
+    cJSON *snapshot;
 
     if (!(root = cJSON_CreateObject())) goto err;
 
     if (!(log = createLogJson(cfg))) goto err;
     cJSON_AddItemToObjectCS(root, LOG_NODE, log);
+
+    if (!(snapshot = createSnapshotJson(cfg))) goto err;
+    cJSON_AddItemToObjectCS(root, SNAPSHOT_NODE, snapshot);
 
     if (!cJSON_AddStringToObjLN(root, CFGEVENT_NODE,
                  valToStr(boolMap, cfgSendProcessStartMsg(cfg)))) goto err;
@@ -2634,9 +2711,6 @@ initTransport(config_t* cfg, which_transport_t t)
     transport_t* transport = NULL;
 
     switch (cfgTransportType(cfg, t)) {
-        case CFG_SYSLOG:
-            transport = transportCreateSyslog();
-            break;
         case CFG_FILE:
             transport = transportCreateFile(cfgTransportPath(cfg, t), cfgTransportBuf(cfg,t));
             break;
@@ -2656,9 +2730,6 @@ initTransport(config_t* cfg, which_transport_t t)
                                            cfgTransportTlsEnable(cfg, t),
                                            cfgTransportTlsValidateServer(cfg, t),
                                            cfgTransportTlsCACertPath(cfg, t));
-            break;
-        case CFG_SHM:
-            transport = transportCreateShm();
             break;
         default:
             DBG("%d", cfgTransportType(cfg, t));
@@ -2778,12 +2849,18 @@ initCtl(config_t *cfg)
     }
     ctlTransportSet(ctl, trans, CFG_CTL);
 
-    // We'll create a dedicated payload channel, conditionally.
-    int payloadFeatureEnabled = cfgPayEnable(cfg) ||
-                                  protocolDefinitionsUsePayloads();
-    int sendPayloadsToStream = cfgLogStreamEnable(cfg) &&
-                                 !payloadToDiskForced();
-    if (payloadFeatureEnabled && sendPayloadsToStream) {
+    /*
+     * Determine the status of payload channel based on configuration
+     */
+    payload_status_t payloadStatus = PAYLOAD_STATUS_DISABLE;
+    if (cfgPayEnable(cfg) || protocolDefinitionsUsePayloads()) {
+        if (cfgLogStreamEnable(cfg) && !payloadToDiskForced() ) {
+            payloadStatus = PAYLOAD_STATUS_CRIBL;
+        } else {
+            payloadStatus = PAYLOAD_STATUS_DISK;
+        }
+    }
+    if (payloadStatus == PAYLOAD_STATUS_CRIBL) {
         transport_t *trans = initTransport(cfg, CFG_LS);
         if (!trans) {
             ctlDestroy(&ctl);
@@ -2803,7 +2880,7 @@ initCtl(config_t *cfg)
     ctlEvtSet(ctl, evt);
 
     ctlEnhanceFsSet(ctl, cfgEnhanceFs(cfg));
-    ctlPayEnableSet(ctl, cfgPayEnable(cfg));
+    ctlPayStatusSet(ctl, payloadStatus);
     ctlPayDirSet(ctl,    cfgPayDir(cfg));
     ctlAllowBinaryConsoleSet(ctl, cfgEvtAllowBinaryConsole(cfg));
 

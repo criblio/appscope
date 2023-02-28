@@ -17,10 +17,10 @@ var (
 	errGetLinuxCap       = errors.New("unable to get linux capabilities for current process")
 	errLoadLinuxCap      = errors.New("unable to load linux capabilities for current process")
 	errMissingPtrace     = errors.New("missing PTRACE capabilities to attach to a process")
+	errMissingScopedProc = errors.New("no scoped process found matching that name")
 	errMissingProc       = errors.New("no process found matching that name")
 	errPidInvalid        = errors.New("invalid PID")
 	errPidMissing        = errors.New("PID does not exist")
-	errCreateLdscope     = errors.New("error creating ldscope")
 	errNotScoped         = errors.New("detach failed. This process is not being scoped")
 	errLibraryNotExist   = errors.New("library Path does not exist")
 	errInvalidSelection  = errors.New("invalid Selection")
@@ -30,14 +30,19 @@ var (
 
 // Attach scopes an existing PID
 func (rc *Config) Attach(args []string) error {
-	pid, err := handleInputArg(args[0])
+	pid, err := handleInputArg(args[0], true)
 	if err != nil {
 		return err
 	}
 	args[0] = fmt.Sprint(pid)
 	var reattach bool
 	// Check PID is not already being scoped
-	if !util.PidScoped(pid) {
+	status, err := util.PidScopeStatus(pid)
+	if err != nil {
+		return err
+	}
+
+	if status == util.Disable || status == util.Setup {
 		// Validate user has root permissions
 		if err := util.UserVerifyRootPerm(); err != nil {
 			return err
@@ -60,47 +65,64 @@ func (rc *Config) Attach(args []string) error {
 		reattach = true
 	}
 
-	// Create ldscope
-	if err := CreateLdscope(); err != nil {
-		return errCreateLdscope
-	}
-	// Normal operational, not passthrough, create directory for this run
-	// Directory contains scope.yml which is configured to output to that
-	// directory and has a command directory configured in that directory.
 	env := os.Environ()
+
 	// Disable detection of a scope filter file with this command
 	env = append(env, "SCOPE_FILTER=false")
 
+	// Disable cribl event breaker with this command
 	if rc.NoBreaker {
 		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
 	}
-	if !rc.Passthrough {
-		rc.setupWorkDir(args, true)
-		env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
-		log.Info().Bool("passthrough", rc.Passthrough).Strs("args", args).Msg("calling syscall.Exec")
+
+	// Normal operational, create a directory for this run.
+	// Directory contains scope.yml which is configured to output to that
+	// directory and has a command directory configured in that directory.
+	rc.setupWorkDir(args, true)
+	env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
+
+	// Check the attached process mnt namespace.
+	// If it is different from the CLI mnt namespace:
+	// - create working directory in the attached process mnt namespace
+	// - replace the working directory in the CLI mnt namespace with symbolic
+	//   link to working directory created in previous step
+	refNsPid := util.PidGetRefPidForMntNamespace(pid)
+	if refNsPid != -1 {
+		env = append(env, "SCOPE_HOST_WORKDIR_PATH="+rc.WorkDir)
 	}
+
+	// Handle custom library path
 	if len(rc.LibraryPath) > 0 {
-		// Validate path exists
 		if !util.CheckDirExists(rc.LibraryPath) {
 			return errLibraryNotExist
 		}
-		// Prepend "-f" [PATH] to args
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
+
 	if reattach {
 		env = append(env, "SCOPE_CONF_RELOAD="+filepath.Join(rc.WorkDir, "scope.yml"))
 	}
 
-	ld := loader.ScopeLoader{Path: LdscopePath()}
+	ld := loader.New()
 	if !rc.Subprocess {
-		return ld.Attach(args, env)
+		err = ld.Attach(args, env)
+	} else {
+		_, err = ld.AttachSubProc(args, env)
 	}
-	_, err = ld.AttachSubProc(args, env)
+
+	// Replace the working directory with symbolic link in case of successful attach
+	if err == nil {
+		if refNsPid != -1 {
+			os.RemoveAll(rc.WorkDir)
+			os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", rc.WorkDir), rc.WorkDir)
+		}
+	}
+
 	return err
 }
 
 // DetachAll provides the option to detach from all Scoped processes
-func (rc *Config) DetachAll(args []string) error {
+func (rc *Config) DetachAll(args []string, prompt bool) error {
 	adminStatus := true
 	if err := util.UserVerifyRootPerm(); err != nil {
 		if errors.Is(err, util.ErrMissingAdmPriv) {
@@ -109,37 +131,32 @@ func (rc *Config) DetachAll(args []string) error {
 			return err
 		}
 	}
+	if !adminStatus {
+		fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
+	}
 
-	procs, err := util.ProcessesScoped()
+	procs, err := util.ProcessesToDetach()
 	if err != nil {
 		return err
 	}
+
 	if len(procs) > 0 {
-		if !adminStatus {
-			fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
-		}
+		if prompt {
+			// user interface for selecting a PID
+			util.PrintObj([]util.ObjField{
+				{Name: "ID", Field: "id"},
+				{Name: "Pid", Field: "pid"},
+				{Name: "User", Field: "user"},
+				{Name: "Command", Field: "command"},
+			}, procs)
 
-		// user interface for selecting a PID
-		util.PrintObj([]util.ObjField{
-			{Name: "ID", Field: "id"},
-			{Name: "Pid", Field: "pid"},
-			{Name: "User", Field: "user"},
-			{Name: "Command", Field: "command"},
-		}, procs)
-
-		if !util.Confirm("Are your sure you want to detach from all of these processes?") {
-			fmt.Println("info: canceled")
-			return nil
+			if !util.Confirm("Are your sure you want to detach from all of these processes?") {
+				fmt.Println("info: canceled")
+				return nil
+			}
 		}
 	} else {
-		if !adminStatus {
-			fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
-		}
 		return errNoScopedProcs
-	}
-
-	if err := CreateLdscope(); err != nil {
-		return errCreateLdscope
 	}
 
 	errorsDetachingMultiple := false
@@ -159,41 +176,41 @@ func (rc *Config) DetachAll(args []string) error {
 
 // DetachSingle unscopes an existing PID
 func (rc *Config) DetachSingle(args []string) error {
-	pid, err := handleInputArg(args[0])
+	pid, err := handleInputArg(args[0], false)
 	if err != nil {
 		return err
 	}
 	args[0] = fmt.Sprint(pid)
 
-	if err := CreateLdscope(); err != nil {
-		return errCreateLdscope
+	// Check PID is already being scoped
+	status, err := util.PidScopeStatus(pid)
+	if err != nil {
+		return err
+	} else if status != util.Active {
+		return errNotScoped
 	}
 
 	return rc.detach(args, pid)
 }
 
 func (rc *Config) detach(args []string, pid int) error {
-	// Check PID is already being scoped
-	if !util.PidScoped(pid) {
-		return errNotScoped
-	}
-
 	env := os.Environ()
-	ld := loader.ScopeLoader{Path: LdscopePath()}
+	ld := loader.New()
 	if !rc.Subprocess {
 		return ld.Detach(args, env)
 	}
 	out, err := ld.DetachSubProc(args, env)
-	fmt.Println(out)
+	fmt.Print(out)
 
 	return err
 }
 
 // handleInputArg handles the input argument (process id/name)
-func handleInputArg(InputArg string) (int, error) {
+func handleInputArg(InputArg string, toAttach bool) (int, error) {
 	// Get PID by name if non-numeric, otherwise validate/use InputArg
 	var pid int
 	var err error
+	var procs util.Processes
 	if util.IsNumeric(InputArg) {
 		pid, err = strconv.Atoi(InputArg)
 		if err != nil {
@@ -209,7 +226,12 @@ func handleInputArg(InputArg string) (int, error) {
 			}
 		}
 
-		procs, err := util.ProcessesByName(InputArg)
+		if toAttach {
+			procs, err = util.ProcessesByNameToAttach(InputArg)
+		} else {
+			procs, err = util.ProcessesByNameToDetach(InputArg)
+		}
+
 		if err != nil {
 			return -1, err
 		}
@@ -242,7 +264,10 @@ func handleInputArg(InputArg string) (int, error) {
 			if !adminStatus {
 				fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
 			}
-			return -1, errMissingProc
+			if toAttach {
+				return -1, errMissingProc
+			}
+			return -1, errMissingScopedProc
 		}
 	}
 

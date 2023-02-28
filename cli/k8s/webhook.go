@@ -178,7 +178,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			})
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
 				Name:  "SCOPE_EXEC_PATH",
-				Value: "/scope/ldscope",
+				Value: "/scope/scope",
 			})
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
 				Name:  "LD_LIBRARY_PATH",

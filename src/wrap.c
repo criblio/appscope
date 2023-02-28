@@ -7,7 +7,7 @@
 
 #ifdef __linux__
 #include <sys/prctl.h>
-#ifdef __GO__
+#ifdef __x86_64__
 #include <asm/prctl.h>
 #endif
 #endif
@@ -30,7 +30,6 @@
 #include "os.h"
 #include "plattime.h"
 #include "report.h"
-#include "setup.h"
 #include "scopeelf.h"
 #include "scopetypes.h"
 #include "state.h"
@@ -38,7 +37,8 @@
 #include "wrap.h"
 #include "runtimecfg.h"
 #include "javaagent.h"
-#include "inject.h"
+#include "ipc.h"
+#include "snapshot.h"
 #include "scopestdlib.h"
 #include "../contrib/libmusl/musl.h"
 
@@ -81,17 +81,19 @@ typedef struct
     int   after_scope;
 } param_t;
 
-enum_map_t netFailMap[] = {
-    {"n/a",                                            NO_FAIL},
-    {"Connection failure",                             CONN_FAIL},
-    {"TLS Failure: error accessing peer certificate",  TLS_CERT_FAIL},
-    {"TLS Failure: error establishing connection",     TLS_CONN_FAIL},
-    {"TLS Failure: error creating context",            TLS_CONTEXT_FAIL},
-    {"TLS Failure: error creating session",            TLS_SESSION_FAIL},
-    {"TLS Failure: error setting tls on socket",       TLS_SOCKET_FAIL},
-    {"TLS Failure: server validation failed",          TLS_VERIFY_FAIL},
-    {NULL,                                             -1}
-};
+void
+doAndReplaceConfig(void *data) {
+    config_t * cfg = (config_t *) data;
+    doConfig(cfg);
+    if (g_staticfg) {
+        cfgDestroy(&g_staticfg);
+        g_staticfg = NULL;
+    }
+    g_staticfg = cfg;
+    g_cfg.staticfg = g_staticfg;
+    scope_free(g_cfg.cfgStr);
+    g_cfg.cfgStr = jsonStringFromCfg(g_staticfg);
+}
 
 // When used with dl_iterate_phdr(), this has a similar result to
 // scope_dlsym(RTLD_NEXT, ).  But, unlike scope_dlsym(RTLD_NEXT, )
@@ -404,7 +406,7 @@ cmdAttach(void)
 
     /*
      * Using this as an indicator that we were not
-     * previously soping. If the smfd is not active we
+     * previously scoping. If the smfd is not active we
      * may have been detached and are reattaching.
      * In that cse, the thread and transports are expected
      * to be ready.
@@ -421,6 +423,76 @@ cmdAttach(void)
     }
 
     return TRUE;
+}
+
+/*
+ * Handle IPC communication
+ */
+static void
+ipcCommunication(void) {
+    size_t appMqSize = -1;
+    long msgCount = -1;
+    char name[256] = {0};
+
+    /*
+    * Handle incoming message queue
+    * - check if it exists
+    * - check if there are message request on it
+    */
+    scope_snprintf(name, sizeof(name), "/ScopeIPCIn.%d", g_proc.pid);
+    mqd_t mqRequestDesc  = ipcOpenConnection(name, O_RDONLY | O_NONBLOCK);
+
+    if (ipcIsActive(mqRequestDesc, &appMqSize, &msgCount) == FALSE) {
+        return;
+    }
+
+    if (msgCount <= 0) {
+        goto cleanupReqMq;
+    }
+
+    size_t cliMqSize = -1;
+    /*
+    * Handle output message queue
+    * - check if it exists
+    */
+    scope_memset(name, 0, sizeof(name));
+    scope_snprintf(name, sizeof(name), "/ScopeIPCOut.%d", g_proc.pid);
+
+    mqd_t mqResponseDesc = ipcOpenConnection(name, O_WRONLY | O_NONBLOCK);
+    if (ipcIsActive(mqResponseDesc, &cliMqSize, &msgCount) == FALSE) {
+        scopeLogError("%s is not active.", name);
+        goto cleanupReqMq;
+    }
+
+    /*
+    * Handle incoming message queue request (all frames or till first error)
+    */
+    req_parse_status_t parseStatus = REQ_PARSE_GENERIC_ERROR;
+    int uniqReq = -1;
+    void *scopeReq = ipcRequestHandler(mqRequestDesc, appMqSize, &parseStatus, &uniqReq);
+
+    /*
+    * Handle outcoming message queue response (all frames or till first error)
+    */
+    ipc_resp_result_t res;
+    if (parseStatus == REQ_PARSE_OK) {
+        res = ipcSendSuccessfulResponse(mqResponseDesc, cliMqSize, scopeReq, uniqReq);
+    } else {
+        res = ipcSendFailedResponse(mqResponseDesc, cliMqSize, parseStatus, uniqReq);
+    }
+
+    if (res != RESP_RESULT_OK) {
+        scopeLogError("ipcCommunication Error sending response to %s failed res %d, parseStatus %d, uniqReq %d", name, res, parseStatus, uniqReq);
+    }
+
+    scope_free(scopeReq);
+    
+    // scopeLogError("OK: Sending answer to %s for cmd %d", name, cmd);
+
+    ipcCloseConnection(mqResponseDesc);
+
+cleanupReqMq:
+    ipcCloseConnection(mqRequestDesc);
 }
 
 static void
@@ -540,9 +612,8 @@ remoteConfig()
                     break;
                 case REQ_SET_CFG:
                     if (req->cfg) {
-                        // Apply the config
-                        doConfig(req->cfg);
-                        g_staticfg = req->cfg;
+                        // Replace the config
+                        doAndReplaceConfig(req->cfg);
                     } else {
                         DBG(NULL);
                     }
@@ -689,6 +760,9 @@ dynConfig(void)
 
     // Apply the config
     doConfig(g_staticfg);
+    g_cfg.staticfg = g_staticfg;
+    scope_free(g_cfg.cfgStr);
+    g_cfg.cfgStr = jsonStringFromCfg(g_staticfg);
 
     return 0;
 }
@@ -789,7 +863,7 @@ static void
 doThread()
 {
     /*
-     * If we try to start the perioidic thread before the constructor
+     * If we try to start the periodic thread before the constructor
      * is executed and our config is not set, we are able to start the
      * thread too early. Some apps, most notably Chrome, check to
      * ensure that no extra threads are created before it is fully
@@ -1004,6 +1078,67 @@ handleExit(void)
     logDisconnect(g_log);
 }
 
+static void
+logOurConnectionStatus(transport_status_t status, const char *name)
+{
+    // We want to be quiet if connections seem to be ok.
+    if (status.isConnected) return;
+
+    // Output reason for failure if we're able.
+    if (status.failureString) {
+        scopeLog(CFG_LOG_WARN, "%s destination (%s) not connected. messages dropped: "
+            "%"PRIu64 " connection attempts: %"PRIu64 " reason for failure: %s",
+            name, status.configString, g_cbuf_drop_count,
+            status.connectAttemptCount, status.failureString);
+    } else {
+        scopeLog(CFG_LOG_WARN, "%s destination (%s) not connected. messages dropped: "
+            "%"PRIu64 " connection attempts: %"PRIu64,
+            name, status.configString, g_cbuf_drop_count,
+            status.connectAttemptCount);
+    }
+}
+
+/*
+* List of signals used by snapshot error handler
+*/
+static int
+snapshotErrorsSignals[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
+
+/*
+* Determine if the snapshot feature is enabled and
+* register the AppScope signal handler if it is enabled
+*/
+static void
+enableSnapshot(config_t *cfg) {
+    snapshotSetCoredump(cfgSnapshotCoredumpEnable(cfg));
+    snapshotSetBacktrace(cfgSnapshotBacktraceEnable(cfg));
+    if (snapshotIsEnabled() == FALSE) {
+        return;
+    }
+
+    // We don't want to do this when we're dealing with a Go app.
+    // We have an interposition in place that is called when the app
+    // is about to die from a signal that allows us to avoid registering
+    // our own signal handler; and doing any forwarding.
+    if (g_isgo) {
+        return;
+    }
+
+    if (g_fn.sigaction) {
+        struct sigaction act = { 0 };
+
+        act.sa_handler = (void (*))snapshotSignalHandler;
+        act.sa_flags = SA_RESTART | SA_SIGINFO;
+        for (int i = 0; i < ARRAY_SIZE(snapshotErrorsSignals); ++i) {
+            struct sigaction oldact = { 0 };
+            int sig = snapshotErrorsSignals[i];
+            g_fn.sigaction(sig, &act, &oldact);
+            snapshotBackupAppSignalHandler(sig, &oldact);
+        }
+    }
+}
+
+
 static void *
 periodic(void *arg)
 {
@@ -1015,7 +1150,13 @@ periodic(void *arg)
     // the only reasonable solution seems to be masking the signals for this thread
 
     sigset_t mask;
-    sigfillset(&mask);
+    scope_sigfillset(&mask);
+    if (snapshotIsEnabled() == TRUE) {
+        for (int i = 0; i < ARRAY_SIZE(snapshotErrorsSignals); ++i) {
+            scope_sigdelset(&mask, snapshotErrorsSignals[i]);
+        }
+    }
+
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
     bool perf;
     static time_t summaryTime, logReportTime;
@@ -1058,18 +1199,11 @@ periodic(void *arg)
             summaryTime = tv.tv_sec + g_thread.interval;
 
             if (tv.tv_sec >= logReportTime) {
-                if (ctlNeedsConnection(g_ctl, CFG_CTL)) {
-                    scopeLog(CFG_LOG_WARN, "event destination not connected. messages dropped: "
-                            "%"PRIu64 " connection attempts: %"PRIu64 " reason for failure: %s", \
-                            g_cbuf_drop_count, ctlConnectAttempts(g_ctl, CFG_CTL), \
-                            valToStr(netFailMap, ctlTransportFailureReason(g_ctl, CFG_CTL)));
-                }
-                if (mtcNeedsConnection(g_mtc)) {
-                    scopeLog(CFG_LOG_WARN, "metric destination not connected. messages dropped: "
-                            "%"PRIu64 " connection attempts: %"PRIu64 " reason for failure: %s", \
-                            g_cbuf_drop_count, mtcConnectAttempts(g_mtc), \
-                            valToStr(netFailMap, mtcTransportFailureReason(g_mtc)));
-                }
+                transport_status_t ctlStatus = ctlConnectionStatus(g_ctl, CFG_CTL);
+                logOurConnectionStatus(ctlStatus, "event");
+                transport_status_t mtcStatus = mtcConnectionStatus(g_mtc);
+                logOurConnectionStatus(mtcStatus, "metric");
+
                 logReportTime = tv.tv_sec + CONN_LOG_INTERVAL; 
             }
 
@@ -1081,6 +1215,7 @@ periodic(void *arg)
             }
         }
         remoteConfig();
+        ipcCommunication();
     }
 
     return NULL;
@@ -1299,51 +1434,26 @@ hookInject()
 }
 
 static void
-initHook(int attachedFlag, bool scopedFlag)
+initHook(int attachedFlag, bool scopedFlag, elf_buf_t *ebuf, char *full_path)
 {
     int rc;
     bool should_we_patch = FALSE;
-    char *full_path = NULL;
-    elf_buf_t *ebuf = NULL;
     funchook_t *funchook;
 
     // env vars are not always set as needed, be explicit here
     // this is duplicated if we were started from the scope exec
-    if ((osGetExePath(scope_getpid(), &full_path) != -1) &&
-        ((ebuf = getElf(full_path))) &&
-        (is_static(ebuf->buf) == FALSE) && (is_go(ebuf->buf) == TRUE)) {
-#ifdef __GO__
-        initGoHook(ebuf);
-        threadNow(0);
-        if (scope_arch_prctl(ARCH_GET_FS, (unsigned long)&scope_fs) == -1) {
-            scopeLogError("initHook:arch_prctl");
+    if (g_isstatic == FALSE && g_isgo == TRUE) {
+        // Avoid running initGoHook if we are scopedyn
+        // Note: g_isgo is true for scopedyn but we don't want to call initGoHook
+        // Because we now execute scopedyn from memory it's path is memfd:...
+        // If executed from the filesystem it's path will be scopedyn
+        if (full_path && (scope_strstr(full_path, "scopedyn") == NULL) && (scope_strstr(full_path, "memfd") == NULL)) {
+            if (!ebuf) return;
+            initGoHook(ebuf);
+            threadNow(0);
         }
-
-        __asm__ volatile (
-            "lea scope_stack(%%rip), %%r11 \n"
-            "mov %%rsp, (%%r11)  \n"
-            : "=r"(rc)                    //output
-            :
-            : "%r11"                      //clobbered register
-            );
-
-        if (full_path) scope_free(full_path);
-        if (ebuf) freeElf(ebuf->buf, ebuf->len);
         return;
-#endif  // __GO__
     }
-
-    if (ebuf && ebuf->buf) {
-
-        // This is in support of a libuv specific extension to map an SSL ID to a fd.
-        // The symbol uv__read is not public. Therefore, we don't resolve it with dlsym.
-        // So, while we have the exec open, we look to see if we can dig it out.
-        g_fn.uv__read = getSymbol(ebuf->buf, "uv__read");
-        scopeLog(CFG_LOG_TRACE, "%s:%d uv__read at %p", __FUNCTION__, __LINE__, g_fn.uv__read);
-    }
-
-    if (full_path) scope_free(full_path);
-    if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
     if (attachedFlag) {
         // responding to the inject command
@@ -1382,7 +1492,7 @@ initHook(int attachedFlag, bool scopedFlag)
     // if we are not hooking all, then we're done
     if (scopedFlag == FALSE) return;
 
-    if (dl_iterate_phdr(findLibscopePath, &full_path)) {
+    if (full_path && dl_iterate_phdr(findLibscopePath, &full_path)) {
         void *handle = g_fn.dlopen(full_path, RTLD_NOW);
         if (handle == NULL) {
             return;
@@ -1398,7 +1508,7 @@ initHook(int attachedFlag, bool scopedFlag)
 
     // We're funchooking __write in both libc.so and libpthread.so
     // curl didn't work unless we funchook'd libc.
-    // test/linux/unixpeer didn't work unless we funchook'd pthread.
+    // test/linux/unixpeertest didn't work unless we funchook'd pthread.
     find_sym_t libc__write = {.library="libc.so",
                               .symbol="__write",
                               .out_addr = (void*)&g_fn.__write_libc};
@@ -1423,6 +1533,22 @@ initHook(int attachedFlag, bool scopedFlag)
     if (should_we_patch || g_fn.__write_libc || g_fn.__write_pthread ||
         ((g_ismusl == FALSE) && g_fn.sendmmsg) ||
         ((g_ismusl == TRUE) && (g_fn.sendto || g_fn.recvfrom))) {
+
+        /*
+        * Check if we have proper permission to install hook function
+        * We need to have abilites to change permission of region memory
+        * using (PROT_WRITE + PROT_EXEC) flags
+        */
+        size_t testSize = 16;
+        void *ptr = scope_malloc(testSize);
+        if (osMemPermAllow(ptr, testSize, PROT_READ | PROT_WRITE, PROT_EXEC) == FALSE) {
+            scope_free(ptr);
+            scopeLogError("The system is not allowing processes related to DNS or console I/O to be scoped. Try setting MemoryDenyWriteExecute to false for the %s service.", g_proc.procname);
+            return;
+        }
+        scope_free(ptr);
+
+
         funchook = funchook_create();
 
         if (logLevel(g_log) <= CFG_LOG_TRACE) {
@@ -1479,8 +1605,9 @@ initHook(int attachedFlag, bool scopedFlag)
         // hook 'em
         rc = funchook_install(funchook, 0);
         if (rc != 0) {
-            scopeLogError("ERROR: failed to install SSL_read hook. (%s)\n",
+            scopeLogError("ERROR: failed to install funchook. (%s)\n",
                         funchook_error_message(funchook));
+            funchook_destroy(funchook);
             return;
         }
     }
@@ -1494,7 +1621,7 @@ initEnv(int *attachedFlag)
 
     // build the full path of the .env file
     char path[128];
-    int  pathLen = scope_snprintf(path, sizeof(path), "/dev/shm/scope_attach_%d.env", scope_getpid());
+    int  pathLen = scope_snprintf(path, sizeof(path), "/dev/shm/attach_%d.env", scope_getpid());
     if (pathLen < 0 || pathLen >= sizeof(path)) {
         scopeLog(CFG_LOG_DEBUG, "ERROR: snprintf(scope_attach_PID.env) failed");
         return;
@@ -1532,103 +1659,35 @@ initEnv(int *attachedFlag)
     scope_fclose(fd);
 }
 
-void
-scope_sig_handler(int sig, siginfo_t *info, void *secret)
-{
-    scopeLogError("!scope_sig_handler signal %d errno %d fault address %p, reason of fault:", info->si_signo, info->si_errno, info->si_addr);
-    int sig_code = info->si_code;
-
-    if (info->si_signo == SIGSEGV) {
-        switch (sig_code) {
-            case SEGV_MAPERR:
-                scopeLogError("Address not mapped to object");
-                break;
-            case SEGV_ACCERR:
-                scopeLogError("Invalid permissions for mapped object");
-                break;
-            case SEGV_BNDERR:
-                scopeLogError("Failed address bound checks");
-                break;
-            case SEGV_PKUERR:
-                scopeLogError("Access was denied by memory protection keys");
-                break;
-            default: 
-                scopeLogError("Unknown Error");
-                break;
-        }
-    } else if (info->si_signo == SIGBUS) {
-        switch (sig_code) {
-            case BUS_ADRALN:
-                scopeLogError("Invalid address alignment");
-                break;
-            case BUS_ADRERR:
-                scopeLogError("Nonexistent physical address");
-                break;
-            case BUS_OBJERR:
-                scopeLogError("Object-specific hardware error");
-                break;
-            case BUS_MCEERR_AR:
-                scopeLogError("Hardware memory error consumed on a machine check");
-                break;
-            case BUS_MCEERR_AO:
-                scopeLogError("Hardware memory error detected in process but not consumed");
-                break;
-            default: 
-                scopeLogError("Unknown Error");
-                break;
-        }
-    }
-    scopeBacktrace(CFG_LOG_ERROR);
-    abort();
-}
-
-static void
-initSigErrorHandler(void)
-{
-    if (checkEnv("SCOPE_ERROR_SIGNAL_HANDLER", "true") && g_fn.sigaction) {
-        struct sigaction act = { 0 };
-        act.sa_handler = (void (*))scope_sig_handler;
-        act.sa_flags = SA_RESTART | SA_SIGINFO;
-        g_fn.sigaction(SIGSEGV, &act, NULL);
-        g_fn.sigaction(SIGBUS, &act, NULL);
-    }
-}
-
 __attribute__((constructor)) void
 init(void)
 {
     config_t *cfg = NULL;
     char *path = NULL;
     scope_init_vdso_ehdr();
+    char *full_path = NULL;
+    elf_buf_t *ebuf = NULL;
+
     // Bootstrapping...  we need to know if we're in musl so we can
     // call the right initFn function...
-    {
-        char *full_path = NULL;
-        elf_buf_t *ebuf = NULL;
-
-        // Needed for getElf()
-        g_fn.open = dlsym(RTLD_NEXT, "open");
-        if (!g_fn.open) g_fn.open = dlsym(RTLD_DEFAULT, "open");
-        g_fn.close = dlsym(RTLD_NEXT, "close");
-        if (!g_fn.close) g_fn.close = dlsym(RTLD_DEFAULT, "close");
-
-        g_ismusl =
-            ((osGetExePath(scope_getpid(), &full_path) != -1) &&
-            !scope_strstr(full_path, "ldscope") &&
-            ((ebuf = getElf(full_path))) &&
-            !is_static(ebuf->buf) &&
-            !is_go(ebuf->buf) &&
-            is_musl(ebuf->buf));
-
-        if (full_path) scope_free(full_path);
-        if (ebuf) freeElf(ebuf->buf, ebuf->len);
+    
+    if (osGetExePath(scope_getpid(), &full_path) != -1) {
+        if ((ebuf = getElf(full_path))) {
+            // SCOPE_APP_TYPE will be set by scopedyn
+            // Therefore we are setting isgo to TRUE if we are a go app OR we are scopedyn (not actually a go app)
+            g_isgo = (is_go(ebuf->buf) || (checkEnv("SCOPE_APP_TYPE", "go") == TRUE));
+            g_isstatic = is_static(ebuf->buf);
+            g_ismusl = is_musl(ebuf->buf);
+        }
     }
 
-    // Use dlsym to get addresses for everything in g_fn
-    if (g_ismusl) {
-        initFn_musl();
-    } else {
-        initFn();
+    initFn();
+    if (ebuf && ebuf->buf) {
+        // This is in support of a libuv specific extension to map an SSL ID to a fd.
+        // The symbol uv__read is not public. Therefore, we don't resolve it with dlsym.
+        // So, while we have the exec open, we look to see if we can dig it out.
+        g_fn.uv__read = getSymbol(ebuf->buf, "uv__read");
+        scopeLog(CFG_LOG_TRACE, "%s:%d uv__read at %p", __FUNCTION__, __LINE__, g_fn.uv__read);
     }
 
     setProcId(&g_proc);
@@ -1636,17 +1695,16 @@ init(void)
     setMachineID(g_proc.machine_id);
     setUUID(g_proc.uuid);
 
+    // logging inside constructor start from this line
+    g_constructor_debug_enabled = checkEnv("SCOPE_ALLOW_CONSTRUCT_DBG", "true");
+
     // initEnv() will set this TRUE if it detects `scope_attach_PID.env` in
     // `/dev/shm` with our PID indicating we were injected into a running
     // process.
     int attachedFlag = 0;
     initEnv(&attachedFlag);
 
-    // logging inside constructor start from this line
-    g_constructor_debug_enabled = checkEnv("SCOPE_ALLOW_CONSTRUCT_DBG", "true");
-
     initState();
-    initSigErrorHandler();
 
     g_nsslist = lstCreate(freeNssEntry);
 
@@ -1710,9 +1768,19 @@ init(void)
         cfg = cfgRead(path);
     }
 
+    // on aarch64, the crypto subsystem installs handlers for SIGILL
+    // (contrib/openssl/crypto/armcap.c) to determine which version of
+    // ARM processor we're on.  Do this before enableSnapshot() below.
+    transportInit();
+
     cfgProcessEnvironment(cfg);
 
     doConfig(cfg);
+
+    // Currently we enable snapshot feature only in case of constructor
+    // TODO: if we update the configuration via IPC it will not be updated
+    enableSnapshot(cfg);
+
     g_staticfg = cfg;
     if (path) scope_free(path);
     if (!g_dbg) dbgInit();
@@ -1720,6 +1788,7 @@ init(void)
 
     g_cfg.funcs_attached = scopedFlag;
     g_cfg.staticfg = g_staticfg;
+    g_cfg.cfgStr = jsonStringFromCfg(g_staticfg);
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
 
     // replaces atexit(handleExit);  Allows events to be reported before
@@ -1727,7 +1796,7 @@ init(void)
     // of whether TLS is actually configured on any transport.
     transportRegisterForExitNotification(handleExit);
 
-    initHook(attachedFlag, scopedFlag);
+    initHook(attachedFlag, scopedFlag, ebuf, full_path);
     
     /*
      * If we are interposing (scoping) this process, then proceed
@@ -1743,7 +1812,7 @@ init(void)
         reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
         doProcStartMetric();
 
-        if (checkEnv("SCOPE_APP_TYPE", "go")) {
+        if (g_isgo) {
             threadNow(0);
         } else if (g_ismusl == FALSE) {
             /*
@@ -1753,7 +1822,11 @@ init(void)
              * Therefore, until that is investigated we don't
              * enable a timer/signal.
              */
-            threadInit();
+            if (attachedFlag) {
+                threadNow(0);
+            } else {
+                threadInit();
+            }
         }
     } else {
         /*
@@ -1766,6 +1839,39 @@ init(void)
 
     osInitJavaAgent();
 
+    if (ebuf) freeElf(ebuf->buf, ebuf->len);
+    if (full_path) scope_free(full_path);
+}
+
+EXPORTOFF sighandler_t
+signal(int signum, sighandler_t handler) {
+    WRAP_CHECK(signal, NULL);
+
+    /*
+     * Prevent the situation to override our handler when it is enabled.
+     * Condition below must be inline with `snapshotErrorsSignals` array
+     */
+    if (snapshotIsEnabled() == TRUE) {
+        // grab the old
+        struct sigaction oldact = { 0 };
+        snapshotRetrieveAppSignalHandler(signum, &oldact);
+
+        // save the new
+        struct sigaction newact = { 0 };
+        newact.sa_handler = handler;
+        if (snapshotBackupAppSignalHandler(signum, &newact) == TRUE) {
+            return oldact.sa_handler;
+        }
+    }
+
+    return g_fn.signal(signum, handler);
+}
+
+EXPORTOFF int
+raise(int sig) {
+    WRAP_CHECK(raise, -1);
+
+    return g_fn.raise(sig);
 }
 
 EXPORTOFF int
@@ -1779,6 +1885,36 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
     if ((signum == SIGUSR2) && (act != NULL)) {
         g_thread.act = act; 
         return 0;
+    }
+
+    /*
+     * Prevent the situation to override our handler when it is enabled.
+     * Condition below must be inline with `snapshotErrorsSignals` array
+     */
+    if (snapshotIsEnabled() == TRUE) {
+
+        // When act is NULL, return the saved application handler
+        // but *do not* run snapshotBackupAppSignalHandler().
+        // i.e., don't save the NULL as the latest application handler
+        if (act == NULL) {
+            struct sigaction old = { 0 };
+            snapshotRetrieveAppSignalHandler(signum, &old);
+            *oldact = old;
+            return 0;
+
+        }
+
+        // if signum is part of the snapshotErrorsSignals, save the handler
+        // and set oldact, then return (without changing away from the
+        // snapshot handler)
+        struct sigaction old = { 0 };
+        snapshotRetrieveAppSignalHandler(signum, &old);
+        if (snapshotBackupAppSignalHandler(signum, act) == TRUE) {
+            if (oldact) {
+                *oldact = old;
+            }
+            return 0;
+        }
     }
 
     return g_fn.sigaction(signum, act, oldact);
@@ -2729,13 +2865,13 @@ prctl(int option, ...)
 }
 
 static char *
-getLdscopeExec(const char *pathname)
+getScopeExec(const char *pathname)
 {
     char *scopexec = NULL;
     bool isstat = FALSE, isgo = FALSE;
     elf_buf_t *ebuf;
 
-    if (scope_strstr(g_proc.procname, "ldscope") ||
+    if (scope_strstr(g_proc.procname, "scope") ||
         checkEnv("SCOPE_EXECVE", "false")) {
         return NULL;
     }
@@ -2750,7 +2886,7 @@ getLdscopeExec(const char *pathname)
 
     /*
      * Note: the isgo check is strictly for Go dynamic execs.
-     * In this case we use ldscope only to force the use of HTTP 1.1.
+     * In this case we use scope only to force the use of HTTP 1.1.
      */
     if (getenv("LD_PRELOAD") && (isstat == FALSE) && (isgo == FALSE)) {
         return NULL;
@@ -2758,7 +2894,7 @@ getLdscopeExec(const char *pathname)
 
     scopexec = getenv("SCOPE_EXEC_PATH");
     if (((scopexec = getpath(scopexec)) == NULL) &&
-        ((scopexec = getpath("ldscope")) == NULL)) {
+        ((scopexec = getpath("scope")) == NULL)) {
 
         // can't find the scope executable
         scopeLogWarn("can't find a scope executable for %s", pathname);
@@ -2777,7 +2913,7 @@ execv(const char *pathname, char *const argv[])
 
     WRAP_CHECK(execv, -1);
 
-    scopexec = getLdscopeExec(pathname);
+    scopexec = getScopeExec(pathname);
     if (scopexec == NULL) {
         return g_fn.execv(pathname, argv);
     }
@@ -2813,7 +2949,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 
     WRAP_CHECK(execve, -1);
 
-    scopexec = getLdscopeExec(pathname);
+    scopexec = getScopeExec(pathname);
     if (scopexec == NULL) {
         return g_fn.execve(pathname, argv, envp);
     }
@@ -3665,7 +3801,7 @@ _exit(int status)
     } else {
         exit(status);
     }
-    __builtin_unreachable();
+    UNREACHABLE();
 }
 
 #endif // __linux__
@@ -5443,6 +5579,8 @@ wrap_scope_dlsym(void *handle, const char *name, void *who)
 
 static got_list_t inject_hook_list[] = {
     {"sigaction",   sigaction, &g_fn.sigaction},
+    {"signal",      signal, &g_fn.signal},
+    {"raise",       raise, &g_fn.raise},
     {"open",        open, &g_fn.open},
     {"openat",      openat, &g_fn.openat},
     {"fopen",       fopen, &g_fn.fopen},

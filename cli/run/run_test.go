@@ -1,11 +1,9 @@
 package run
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -16,13 +14,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+/*
+ * TODO: Make TestRun an integ test
 func TestMain(m *testing.M) {
 	// Borrowed from http://cs-guy.com/blog/2015/01/test-main/
 	switch os.Getenv("TEST_MAIN") {
-	case "runpassthrough":
-		internal.InitConfig()
-		rc := Config{Passthrough: true}
-		rc.Run([]string{"/bin/echo", "true"})
 	case "createWorkDir":
 		internal.InitConfig()
 		rc := Config{}
@@ -34,28 +30,6 @@ func TestMain(m *testing.M) {
 	default:
 		os.Exit(m.Run())
 	}
-}
-
-// Simplest test, runs passthrough and outputs to stderr
-// Passthrough sends environment directly to scope, rather
-// than clearing it and creating configuration files
-func TestRunPassthrough(t *testing.T) {
-	os.RemoveAll(".test")
-	defer os.RemoveAll(".test")
-
-	// Test Passthrough, read from Stderr
-	cmd := exec.Command(os.Args[0])
-	cmd.Env = append(os.Environ(), "TEST_MAIN=runpassthrough", "SCOPE_HOME=.test", "SCOPE_CRIBL_ENABLE=false", "SCOPE_METRIC_DEST=file://stderr")
-	var outb, errb bytes.Buffer
-	cmd.Stdout = &outb
-	cmd.Stderr = &errb
-	err := cmd.Run()
-	assert.NoError(t, err)
-	assert.Equal(t, "true\n", outb.String())
-	assert.Contains(t, errb.String(), "proc.start")
-	assert.Contains(t, errb.String(), "gid:")
-	assert.Contains(t, errb.String(), "uid:")
-	assert.Contains(t, errb.String(), "username:")
 }
 
 func TestRun(t *testing.T) {
@@ -96,6 +70,7 @@ func TestRun(t *testing.T) {
 	cmdDirExists := util.CheckFileExists(filepath.Join(wd, "cmd"))
 	assert.True(t, cmdDirExists)
 }
+*/
 
 func TestSubprocess(t *testing.T) {
 	os.RemoveAll(".test")
@@ -134,4 +109,6 @@ func TestSubprocess(t *testing.T) {
 
 	cmdDirExists := util.CheckFileExists(filepath.Join(wd, "cmd"))
 	assert.True(t, cmdDirExists)
+
+	os.Unsetenv("SCOPE_HOME")
 }

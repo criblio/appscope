@@ -348,7 +348,7 @@ services:
     <<: *scope-common
   oracle-java9:
     environment:
-        SKIP_LDSCOPE_TEST: 'true'
+        SKIP_SCOPE_TEST: 'true'
     image: ghcr.io/criblio/appscope-test-oracle-java9:${TAG:?Missing TAG environment variable}
     build:
       cache_from:

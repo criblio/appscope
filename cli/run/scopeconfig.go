@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/criblio/scope/libscope"
@@ -21,7 +20,7 @@ func (c *Config) SetDefault() error {
 	c.sc = &libscope.ScopeConfig{
 		Cribl: libscope.ScopeCriblConfig{},
 		Metric: libscope.ScopeMetricConfig{
-			Enable: true,
+			Enable: "true",
 			Format: libscope.ScopeOutputFormat{
 				FormatType: "ndjson",
 				Verbosity:  4,
@@ -53,7 +52,7 @@ func (c *Config) SetDefault() error {
 			},
 		},
 		Event: libscope.ScopeEventConfig{
-			Enable: true,
+			Enable: "true",
 			Format: libscope.ScopeOutputFormat{
 				FormatType: "ndjson",
 			},
@@ -108,14 +107,18 @@ func (c *Config) SetDefault() error {
 		Libscope: libscope.ScopeLibscopeConfig{
 			SummaryPeriod: 10,
 			CommandDir:    filepath.Join(c.WorkDir, "cmd"),
-			ConfigEvent:   false,
+			ConfigEvent:   "false",
 			Log: libscope.ScopeLogConfig{
 				Level: "warning",
 				Transport: libscope.ScopeTransport{
 					TransportType: "file",
-					Path:          filepath.Join(c.WorkDir, "ldscope.log"),
+					Path:          filepath.Join(c.WorkDir, "libscope.log"),
 					Buffering:     "line",
 				},
+			},
+			Snapshot: libscope.ScopeSnapshotConfig{
+				Coredump:  "false",
+				Backtrace: "false",
 			},
 		},
 	}
@@ -151,7 +154,7 @@ func (c *Config) configFromRunOpts() error {
 
 	if c.Payloads {
 		c.sc.Payload = libscope.ScopePayloadConfig{
-			Enable: true,
+			Enable: "true",
 			Dir:    filepath.Join(c.WorkDir, "payloads"),
 		}
 	}
@@ -202,14 +205,10 @@ func (c *Config) configFromRunOpts() error {
 				if m[0][3] == "" {
 					return fmt.Errorf("Missing :port at the end of %s", dest)
 				}
-				port, err := strconv.Atoi(m[0][3])
-				if err != nil {
-					return fmt.Errorf("Cannot parse port from %s: %s", dest, m[0][3])
-				}
-				t.Port = port
+				t.Port = m[0][3]
 				t.Path = ""
-				t.Tls.Enable = false
-				t.Tls.ValidateServer = true
+				t.Tls.Enable = "false"
+				t.Tls.ValidateServer = "true"
 			} else if proto == "tls" {
 				// encrypted socket
 				t.TransportType = "tcp"
@@ -217,14 +216,10 @@ func (c *Config) configFromRunOpts() error {
 				if m[0][3] == "" {
 					return fmt.Errorf("Missing :port at the end of %s", dest)
 				}
-				port, err := strconv.Atoi(m[0][3])
-				if err != nil {
-					return fmt.Errorf("Cannot parse port from %s: %s", dest, m[0][3])
-				}
-				t.Port = port
+				t.Port = m[0][3]
 				t.Path = ""
-				t.Tls.Enable = true
-				t.Tls.ValidateServer = true
+				t.Tls.Enable = "true"
+				t.Tls.ValidateServer = "true"
 			} else if proto == "file" || proto == "unix" {
 				t.TransportType = proto
 				t.Path = m[0][2]
@@ -235,14 +230,10 @@ func (c *Config) configFromRunOpts() error {
 			// got "something:port", assume tls://
 			t.TransportType = "tcp"
 			t.Host = m[0][2]
-			port, err := strconv.Atoi(m[0][3])
-			if err != nil {
-				return fmt.Errorf("Cannot parse port from %s: %s", dest, m[0][3])
-			}
-			t.Port = port
+			t.Port = m[0][3]
 			t.Path = ""
-			t.Tls.Enable = true
-			t.Tls.ValidateServer = true
+			t.Tls.Enable = "true"
+			t.Tls.ValidateServer = "true"
 		} else if m[0][0] == "edge" {
 			t.TransportType = m[0][0]
 		} else {
@@ -283,16 +274,23 @@ func (c *Config) configFromRunOpts() error {
 	// To support mixing of config and environment variables
 	c.sc.Cribl.AuthToken = c.AuthToken
 
+	if c.Backtrace {
+		c.sc.Libscope.Snapshot.Backtrace = "true"
+	}
+	if c.Coredump {
+		c.sc.Libscope.Snapshot.Coredump = "true"
+	}
+
 	if c.CriblDest != "" {
 		err := parseDest(&c.sc.Cribl.Transport, c.CriblDest)
 		if err != nil {
 			return err
 		}
-		c.sc.Cribl.Enable = true
+		c.sc.Cribl.Enable = "true"
 		// If we're outputting to Cribl, disable metrics and event outputs
 		c.sc.Metric.Transport = libscope.ScopeTransport{}
 		c.sc.Event.Transport = libscope.ScopeTransport{}
-		c.sc.Libscope.ConfigEvent = true
+		c.sc.Libscope.ConfigEvent = "true"
 	}
 
 	if c.Loglevel != "" {

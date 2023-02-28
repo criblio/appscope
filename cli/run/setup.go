@@ -3,7 +3,6 @@ package run
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -14,46 +13,7 @@ import (
 
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/util"
-	"github.com/rs/zerolog/log"
 )
-
-func LdscopePath() string {
-	return filepath.Join(util.ScopeHome(), "ldscope")
-}
-
-// CreateLdscope creates ldscope in $SCOPE_HOME
-func CreateLdscope() error {
-	ldscope := LdscopePath()
-	ldscopeInfo, _ := AssetInfo("build/ldscope")
-
-	// If it exists, don't create
-	if stat, err := os.Stat(ldscope); err == nil {
-		if stat.ModTime() == ldscopeInfo.ModTime() {
-			return nil
-		}
-	}
-
-	b, err := Asset("build/ldscope")
-	if err != nil {
-		return err
-	}
-
-	err = os.MkdirAll(util.ScopeHome(), 0755)
-	if err != nil {
-		return err
-	}
-
-	err = ioutil.WriteFile(ldscope, b, 0755)
-	if err != nil {
-		return err
-	}
-	err = os.Chtimes(ldscope, ldscopeInfo.ModTime(), ldscopeInfo.ModTime())
-	if err != nil {
-		return err
-	}
-	log.Info().Str("ldscope", ldscope).Msg("created ldscope")
-	return nil
-}
 
 func environNoScope() []string {
 	env := []string{}
@@ -67,14 +27,14 @@ func environNoScope() []string {
 
 // CreateAll outputs all bundled files to a given path
 func CreateAll(path string) error {
-	files := []string{"ldscope", "libscope.so", "scope.yml"}
-	perms := []os.FileMode{0755, 0755, 0644}
+	files := []string{"libscope.so", "scope.yml"}
+	perms := []os.FileMode{0755, 0644}
 	for i, f := range files {
 		b, err := Asset(fmt.Sprintf("build/%s", f))
 		if err != nil {
 			return err
 		}
-		err = ioutil.WriteFile(filepath.Join(path, f), b, perms[i])
+		err = os.WriteFile(filepath.Join(path, f), b, perms[i])
 		if err != nil {
 			return err
 		}
@@ -218,16 +178,16 @@ func (rc *Config) populateWorkDir(args []string, attach bool) {
 	}
 
 	// Create event_dest file
-	err := ioutil.WriteFile(filepath.Join(rc.WorkDir, "event_dest"), []byte(rc.buildEventsDest()), filePerms)
+	err := os.WriteFile(filepath.Join(rc.WorkDir, "event_dest"), []byte(rc.buildEventsDest()), filePerms)
 	util.CheckErrSprintf(err, "error writing event_dest: %v", err)
 
 	// Create metrics_dest file
-	err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_dest"), []byte(rc.buildMetricsDest()), filePerms)
+	err = os.WriteFile(filepath.Join(rc.WorkDir, "metric_dest"), []byte(rc.buildMetricsDest()), filePerms)
 	util.CheckErrSprintf(err, "error writing metric_dest: %v", err)
 
 	// Create metrics_format file
 	if rc.MetricsFormat != "" {
-		err = ioutil.WriteFile(filepath.Join(rc.WorkDir, "metric_format"), []byte(rc.MetricsFormat), filePerms)
+		err = os.WriteFile(filepath.Join(rc.WorkDir, "metric_format"), []byte(rc.MetricsFormat), filePerms)
 		util.CheckErrSprintf(err, "error writing metric_format: %v", err)
 	}
 
@@ -237,11 +197,11 @@ func (rc *Config) populateWorkDir(args []string, attach bool) {
 		err := rc.WriteScopeConfig(scYamlPath, filePerms)
 		util.CheckErrSprintf(err, "%v", err)
 	} else {
-		input, err := ioutil.ReadFile(rc.UserConfig)
+		input, err := os.ReadFile(rc.UserConfig)
 		if err != nil {
 			util.ErrAndExit("cannot read file %s: %v", rc.UserConfig, err)
 		}
-		if err = ioutil.WriteFile(scYamlPath, input, 0644); err != nil {
+		if err = os.WriteFile(scYamlPath, input, 0644); err != nil {
 			util.ErrAndExit("failed to write file to %s: %v", scYamlPath, err)
 		}
 	}
@@ -250,7 +210,7 @@ func (rc *Config) populateWorkDir(args []string, attach bool) {
 	argsJSONPath := filepath.Join(rc.WorkDir, "args.json")
 	argsBytes, err := json.Marshal(args)
 	util.CheckErrSprintf(err, "error marshaling JSON: %v", err)
-	err = ioutil.WriteFile(argsJSONPath, argsBytes, filePerms)
+	err = os.WriteFile(argsJSONPath, argsBytes, filePerms)
 }
 
 // Open to race conditions, but having a duplicate ID is only a UX bug rather than breaking
@@ -258,7 +218,7 @@ func (rc *Config) populateWorkDir(args []string, attach bool) {
 func GetSessionID() string {
 	countFile := filepath.Join(util.ScopeHome(), "count")
 	lastSessionID := 0
-	lastSessionBytes, err := ioutil.ReadFile(countFile)
+	lastSessionBytes, err := os.ReadFile(countFile)
 	if err == nil {
 		lastSessionID, err = strconv.Atoi(string(lastSessionBytes))
 		if err != nil {
@@ -266,7 +226,7 @@ func GetSessionID() string {
 		}
 	}
 	sessionID := strconv.Itoa(lastSessionID + 1)
-	_ = ioutil.WriteFile(countFile, []byte(sessionID), 0644)
+	_ = os.WriteFile(countFile, []byte(sessionID), 0644)
 	return sessionID
 }
 
@@ -277,7 +237,7 @@ func HistoryDir() string {
 
 func (rc *Config) buildMetricsDest() string {
 	var dest string
-	if rc.sc.Cribl.Enable == true {
+	if rc.sc.Cribl.Enable == "true" {
 		if rc.sc.Cribl.Transport.TransportType == "unix" || rc.sc.Cribl.Transport.TransportType == "file" {
 			dest = rc.sc.Cribl.Transport.TransportType + "://" + rc.sc.Cribl.Transport.Path
 		} else {
@@ -295,7 +255,7 @@ func (rc *Config) buildMetricsDest() string {
 
 func (rc *Config) buildEventsDest() string {
 	var dest string
-	if rc.sc.Cribl.Enable == true {
+	if rc.sc.Cribl.Enable == "true" {
 		if rc.sc.Cribl.Transport.TransportType == "unix" || rc.sc.Cribl.Transport.TransportType == "file" {
 			dest = rc.sc.Cribl.Transport.TransportType + "://" + rc.sc.Cribl.Transport.Path
 		} else {

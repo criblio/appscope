@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/criblio/scope/history"
+	"github.com/criblio/scope/ipc"
 	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
@@ -27,7 +28,7 @@ func sessionByID(id int) history.SessionList {
 }
 
 func promptClean(sl history.SessionList) {
-	fmt.Println("Invalid session, likely an invalid command was scoped or a session file was modified. Would you like to delete this session? (y/yes)")
+	fmt.Println("Invalid session, likely an invalid command was scoped / a session file was modified / a container session has ended. Would you like to delete this session? (y/yes)")
 	in := bufio.NewScanner(os.Stdin)
 	in.Scan()
 	response := in.Text()
@@ -56,11 +57,16 @@ func metricAndEventDestFlags(cmd *cobra.Command, rc *run.Config) {
 }
 
 func runCmdFlags(cmd *cobra.Command, rc *run.Config) {
-	cmd.Flags().BoolVar(&rc.Passthrough, "passthrough", false, "Runs ldscope with current environment & no config.")
 	cmd.Flags().IntVarP(&rc.Verbosity, "verbosity", "v", 4, "Set scope metric verbosity")
 	cmd.Flags().BoolVarP(&rc.Payloads, "payloads", "p", false, "Capture payloads of network transactions")
-	cmd.Flags().StringVar(&rc.Loglevel, "loglevel", "", "Set ldscope log level (debug, warning, info, error, none)")
+	cmd.Flags().StringVar(&rc.Loglevel, "loglevel", "", "Set scope library log level (debug, warning, info, error, none)")
 	cmd.Flags().StringVarP(&rc.LibraryPath, "librarypath", "l", "", "Set path for dynamic libraries")
-	cmd.Flags().StringVarP(&rc.UserConfig, "userconfig", "u", "", "Run ldscope with a user specified config file; overrides all other settings.")
+	cmd.Flags().StringVarP(&rc.UserConfig, "userconfig", "u", "", "Scope an application with a user specified config file; overrides all other settings.")
+	cmd.Flags().BoolVarP(&rc.Coredump, "coredump", "d", false, "Enable core dump file generation when an application crashes.")
+	cmd.Flags().BoolVarP(&rc.Backtrace, "backtrace", "b", false, "Enable backtrace file generation when an application crashes.")
 	metricAndEventDestFlags(cmd, rc)
+}
+
+func ipcCmdFlags(cmd *cobra.Command, ipc *ipc.IpcPidCtx) {
+	cmd.Flags().StringVarP(&ipc.PrefixPath, "prefix", "p", "", "Prefix to proc filesystem")
 }

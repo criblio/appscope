@@ -1,6 +1,7 @@
 #ifndef __DBG_H__
 #define __DBG_H__
 
+#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include "log.h"
@@ -30,7 +31,13 @@ extern uint64_t g_cbuf_drop_count;
 #define DBG_FILE_AND_LINE __FILE__ ":" TOSTRING(__LINE__)
 
 #define PRINTF_FORMAT(fmt_id, arg_id) __attribute__((format(printf, (fmt_id), (arg_id))))
+#define UNREACHABLE() (__builtin_unreachable())
 
+#ifdef static_assert
+#define SCOPE_BUILD_ASSERT(cond, msg) ({static_assert(cond, msg);})
+#else
+#define SCOPE_BUILD_ASSERT(cond, msg)
+#endif
 //
 //  The DBG macro is used to keep track of unexpected/undesirable
 //  conditions as instrumented with DBG in the source code.  This is done
@@ -69,10 +76,13 @@ extern log_t *g_log;
 extern proc_id_t g_proc;
 extern bool g_constructor_debug_enabled;
 extern bool g_ismusl;
+extern bool g_isstatic;
+extern bool g_isgo;
+extern bool g_issighandler;
 
 void scopeLog(cfg_log_level_t, const char *, ...) PRINTF_FORMAT(2,3);
 void scopeLogHex(cfg_log_level_t, const void *, size_t, const char *, ...) PRINTF_FORMAT(4,5);
-void scopeBacktrace(cfg_log_level_t);
+void scopeLogDropItOnTheFloor(const char *, ...);
 
 #define scopeLogError(...) scopeLog(CFG_LOG_ERROR, __VA_ARGS__)
 #define scopeLogWarn(...)  scopeLog(CFG_LOG_WARN,  __VA_ARGS__)
@@ -81,8 +91,8 @@ void scopeBacktrace(cfg_log_level_t);
 #define scopeLogDebug(...) scopeLog(CFG_LOG_DEBUG, __VA_ARGS__)
 #define scopeLogTrace(...) scopeLog(CFG_LOG_TRACE, __VA_ARGS__)
 #else
-#define scopeLogDebug(...)
-#define scopeLogTrace(...)
+#define scopeLogDebug(...) scopeLogDropItOnTheFloor(__VA_ARGS__)
+#define scopeLogTrace(...) scopeLogDropItOnTheFloor(__VA_ARGS__)
 #endif
 
 #define scopeLogHexError(...) scopeLogHex(CFG_LOG_ERROR, __VA_ARGS__)
@@ -92,8 +102,8 @@ void scopeBacktrace(cfg_log_level_t);
 #define scopeLogHexDebug(...) scopeLogHex(CFG_LOG_DEBUG, __VA_ARGS__)
 #define scopeLogHexTrace(...) scopeLogHex(CFG_LOG_TRACE, __VA_ARGS__)
 #else
-#define scopeLogHexDebug(...)
-#define scopeLogHexTrace(...)
+#define scopeLogHexDebug(...) scopeLogDropItOnTheFloor (__VA_ARGS__)
+#define scopeLogHexTrace(...) scopeLogDropItOnTheFloor (__VA_ARGS__)
 #endif
 
 // Bit operations

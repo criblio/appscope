@@ -869,7 +869,7 @@ osCreateSM(proc_id_t *proc, unsigned long addr)
         return;
     }
 
-    // size is initally 0 and needs to be increased
+    // size is initially 0 and needs to be increased
     if (scope_ftruncate(proc->smfd, sizeof(export_sm_t)) == -1) {
         scope_close(proc->smfd);
         return;
@@ -902,6 +902,9 @@ osCreateSM(proc_id_t *proc, unsigned long addr)
     }
 }
 
+/*
+ * Get the file descriptor from the filename for a given pid
+ */
 int
 osFindFd(pid_t pid, const char *fname)
 {
@@ -911,21 +914,22 @@ osFindFd(pid_t pid, const char *fname)
     struct dirent *entry;
     char buf[PATH_MAX], link[256];
 
-    if ((cwd = getcwd(NULL, 0)) == NULL) {
+    if ((cwd = scope_getcwd(NULL, 0)) == NULL) {
         DBG(NULL);
         return -1;
     }
 
     scope_snprintf(buf, sizeof(buf), "/proc/%d/fd", pid);
 
-    if (chdir(buf) == -1) {
-        free(cwd);
+    if (scope_chdir(buf) == -1) {
+        scope_free(cwd);
         DBG(NULL);
         return -1;
     }
 
     if ((dirp = scope_opendir(buf)) == NULL) {
-        free(cwd);
+        scope_chdir(cwd);
+        scope_free(cwd);
         DBG(NULL);
         return -1;
     }
@@ -945,8 +949,30 @@ osFindFd(pid_t pid, const char *fname)
         }
     }
 
-    chdir(cwd);
+    scope_chdir(cwd);
     scope_closedir(dirp);
-    free(cwd);
+    scope_free(cwd);
     return fd;
+}
+
+/*
+ * Change protection for specified memory region using 
+ * specified combintation flags and extraflags.
+ * Returns TRUE in case of operation success, FALSE otherwise
+ * Note: in case of success the `osMemPermRestore` should be called later
+ * with flags argument
+ */
+bool
+osMemPermAllow(void *addr, size_t len, int flags, int extraflags) {
+    return scope_mprotect(addr, len, flags | extraflags) == 0;
+}
+
+/*
+ * Restore permission for specified memory region.
+ * Returns TRUE in case of operation success, FALSE otherwise
+ * Note: This function should be called in case of success of `osMemPermAllow`
+ */
+bool
+osMemPermRestore(void *addr, size_t len, int flags) {
+    return scope_mprotect(addr, len, flags) == 0;
 }

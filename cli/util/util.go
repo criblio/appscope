@@ -372,3 +372,37 @@ func CopyFile(src, dst string, mode fs.FileMode) (int64, error) {
 	nBytes, err := io.Copy(destination, source)
 	return nBytes, err
 }
+
+// CopyFile copies a file from a source to a destination with original permissions
+func CopyFile2(src, dst string) (int64, error) {
+	source, err := os.Open(src)
+	if err != nil {
+		return 0, err
+	}
+	defer source.Close()
+
+	destination, err := os.Create(dst)
+	if err != nil {
+		return 0, err
+	}
+
+	defer func() {
+		c := destination.Close()
+		if c != nil && err == nil {
+			err = c
+		}
+	}()
+
+	nBytes, err := io.Copy(destination, source)
+	return nBytes, err
+}
+
+func RemoveEmptyStrings(s []string) []string {
+	var ret []string
+	for _, str := range s {
+		if str != "" {
+			ret = append(ret, str)
+		}
+	}
+	return ret
+}

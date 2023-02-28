@@ -6,13 +6,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 
-	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/loader"
-	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v2"
@@ -41,49 +38,6 @@ var (
 	errMissingData = errors.New("missing filter data")
 )
 
-// get the list of PID(s) related to containers
-func getContainersPids() []int {
-	cPids := []int{}
-
-	ctrDPids, err := util.GetContainerDPids()
-	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("Discover ContainerD containers failed.")
-	}
-	if ctrDPids != nil {
-		cPids = append(cPids, ctrDPids...)
-	}
-
-	podmanPids, err := util.GetPodmanPids()
-	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("Discover Podman containers failed.")
-	}
-	if podmanPids != nil {
-		cPids = append(cPids, podmanPids...)
-	}
-
-	lxcPids, err := util.GetLXCPids()
-	if err != nil {
-		switch {
-		case errors.Is(err, util.ErrLXDSocketNotAvailable):
-			log.Warn().
-				Msgf("Setup LXC containers skipped. LXD is not available")
-		default:
-			log.Error().
-				Err(err).
-				Msg("Discover LXC containers failed.")
-		}
-	}
-	if lxcPids != nil {
-		cPids = append(cPids, lxcPids...)
-	}
-
-	return cPids
-}
-
 // TODO: the file creation steps here might not be needed because a filter file should be present
 // and libscope.so should detect it (when that functionality is complete)
 // startAttachSingleProcess attach to the the specific process identifed by pid with configuration pass in cfgData.
@@ -108,8 +62,8 @@ func startAttachSingleProcess(pid string, cfgData []byte) error {
 	}
 
 	env := append(os.Environ(), "SCOPE_CONF_PATH="+tmpFile.Name())
-	sL := loader.ScopeLoader{Path: run.LdscopePath()}
-	stdoutStderr, err := sL.AttachSubProc([]string{pid}, env)
+	ld := loader.New()
+	stdoutStderr, err := ld.AttachSubProc([]string{pid}, env)
 	if err != nil {
 		log.Error().
 			Err(err).
@@ -131,7 +85,6 @@ func startAttachSingleProcess(pid string, cfgData []byte) error {
 // for all containers
 // for all allowed proc OR arg
 func startAttach(allowProcs []allowProcConfig) error {
-
 	// Iterate over all allowed processses
 	for _, process := range allowProcs {
 		pidsToAttach := make(util.PidScopeMapState)
@@ -196,8 +149,8 @@ func startAttach(allowProcs []allowProcConfig) error {
 
 // for the host
 func startConfigureHost(filename string) error {
-	sL := loader.ScopeLoader{Path: run.LdscopePath()}
-	stdoutStderr, err := sL.ConfigureHost(filename)
+	ld := loader.New()
+	stdoutStderr, err := ld.ConfigureHost(filename)
 	if err != nil {
 		log.Warn().
 			Err(err).
@@ -215,7 +168,7 @@ func startConfigureHost(filename string) error {
 func startConfigureContainers(filename string, cPids []int) error {
 	// Iterate over all containers
 	for _, cPid := range cPids {
-		ld := loader.ScopeLoader{Path: run.LdscopePath()}
+		ld := loader.New()
 		stdoutStderr, err := ld.ConfigureContainer(filename, cPid)
 		if err != nil {
 			log.Warn().
@@ -236,12 +189,12 @@ func startConfigureContainers(filename string, cPids []int) error {
 // for the host
 // for all allowed proc
 func startServiceHost(allowProcs []allowProcConfig) error {
-	sL := loader.ScopeLoader{Path: run.LdscopePath()}
+	ld := loader.New()
 
 	// Iterate over all allowed processses
 	for _, process := range allowProcs {
 		if process.Procname != "" {
-			stdoutStderr, err := sL.ServiceHost(process.Procname)
+			stdoutStderr, err := ld.ServiceHost(process.Procname)
 			if err == nil {
 				log.Info().
 					Str("service", process.Procname).
@@ -273,7 +226,7 @@ func startServiceContainers(allowProcs []allowProcConfig, cPids []int) error {
 		if process.Procname != "" {
 			// Iterate over all containers
 			for _, cPid := range cPids {
-				ld := loader.ScopeLoader{Path: run.LdscopePath()}
+				ld := loader.New()
 				stdoutStderr, err := ld.ServiceContainer(process.Procname, cPid)
 				if err == nil {
 					log.Info().
@@ -302,38 +255,6 @@ func startServiceContainers(allowProcs []allowProcConfig, cPids []int) error {
 	return nil
 }
 
-// extract extracts ldscope and scope to scope version directory
-func extract(scopeDirVersion string) error {
-	// Extract ldscope
-	perms := os.FileMode(0755)
-	b, err := run.Asset("build/ldscope")
-	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("Error retrieving ldscope asset.")
-		return err
-	}
-
-	if err = os.WriteFile(filepath.Join(scopeDirVersion, "ldscope"), b, perms); err != nil {
-		log.Error().
-			Err(err).
-			Msgf("Error writing ldscope to %s.", scopeDirVersion)
-		return err
-	}
-
-	// Copy scope
-	if _, err := util.CopyFile(os.Args[0], filepath.Join(scopeDirVersion, "scope"), perms); err != nil {
-		if err != os.ErrExist {
-			log.Error().
-				Err(err).
-				Msgf("Error writing scope to %s.", scopeDirVersion)
-			return err
-		}
-	}
-
-	return nil
-}
-
 // getStartData reads data from Stdin
 func getStartData() []byte {
 	var startData []byte
@@ -351,88 +272,10 @@ func getStartData() []byte {
 	return startData
 }
 
-// createFilterFile creates a filter file in /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter
-// It returns the filter file and status
-func createFilterFile() (*os.File, error) {
-	// Try to create AppScope directory in /usr/lib if it not exists yet
-	if _, err := os.Stat("/usr/lib/appscope/"); os.IsNotExist(err) {
-		os.MkdirAll("/usr/lib/appscope/", 0755)
-		if err := os.Chmod("/usr/lib/appscope/", 0755); err != nil {
-			return nil, err
-		}
-	}
-
-	f, err := os.OpenFile("/usr/lib/appscope/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
-	if err != nil {
-		if _, err := os.Stat("/tmp/appscope"); os.IsNotExist(err) {
-			os.MkdirAll("/tmp/appscope", 0777)
-			if err := os.Chmod("/tmp/appscope/", 0777); err != nil {
-				return f, err
-			}
-		}
-		f, err = os.OpenFile("/tmp/appscope/scope_filter", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0755)
-	}
-	return f, err
-}
-
-// getAppScopeVerDir return the directory path which will be used for handling ldscope and scope files
-// /usr/lib/appscope/<version>/
-// or
-// /tmp/appscope/<version>/
-func getAppScopeVerDir() (string, error) {
-	version := internal.GetNormalizedVersion()
-	var appscopeVersionPath string
-
-	// Check /usr/lib/appscope only for official version
-	if !internal.IsVersionDev() {
-		appscopeVersionPath = filepath.Join("/usr/lib/appscope/", version)
-		if _, err := os.Stat(appscopeVersionPath); err != nil {
-			if err := os.MkdirAll(appscopeVersionPath, 0755); err != nil {
-				return appscopeVersionPath, err
-			}
-			err := os.Chmod(appscopeVersionPath, 0755)
-			return appscopeVersionPath, err
-		}
-		return appscopeVersionPath, nil
-	}
-
-	appscopeVersionPath = filepath.Join("/tmp/appscope/", version)
-	if _, err := os.Stat(appscopeVersionPath); err != nil {
-		if err := os.MkdirAll(appscopeVersionPath, 0777); err != nil {
-			return appscopeVersionPath, err
-		}
-		err := os.Chmod(appscopeVersionPath, 0777)
-		return appscopeVersionPath, err
-	}
-	return appscopeVersionPath, nil
-
-}
-
-// extractFilterFile creates a filter file in /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter
-// It returns the filter file name and status
-func extractFilterFile(cfgData []byte) (string, error) {
-	f, err := createFilterFile()
-	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("Failed to create filter file.")
-		return "", err
-	}
-	defer f.Close()
-
-	if _, err = f.Write(cfgData); err != nil {
-		log.Error().
-			Err(err).
-			Msg("Failed to write to filter file.")
-		return "", err
-	}
-	return f.Name(), nil
-}
-
 // Start performs setup of scope in the host and containers
 func Start() error {
 	// Create a history directory for logs
-	createWorkDir()
+	createWorkDir("start")
 
 	// Validate user has root permissions
 	if err := util.UserVerifyRootPerm(); err != nil {
@@ -469,16 +312,16 @@ func Start() error {
 			Msg("Error Access AppScope version directory")
 		return err
 	}
-	// If the `scope start` command is run inside a container, we should call `ldscope --starthost`
+	// If the `scope start` command is run inside a container, we should call `scope -z --starthost`
 	// which will instead run `scope start` on the host
-	// SCOPE_CLI_SKIP_START_HOST allows to run scope start in docker environment (integration tests)
-	_, skipHostCfg := os.LookupEnv("SCOPE_CLI_SKIP_START_HOST")
+	// SCOPE_CLI_SKIP_HOST allows to run scope start in docker environment (integration tests)
+	_, skipHostCfg := os.LookupEnv("SCOPE_CLI_SKIP_HOST")
 	if util.InContainer() && !skipHostCfg {
 		if err := extract(scopeDirVersion); err != nil {
 			return err
 		}
 
-		ld := loader.ScopeLoader{Path: filepath.Join(scopeDirVersion, "ldscope")}
+		ld := loader.New()
 		stdoutStderr, err := ld.StartHost()
 		if err == nil {
 			log.Info().
@@ -500,19 +343,12 @@ func Start() error {
 		return nil
 	}
 
-	if err := run.CreateLdscope(); err != nil {
-		log.Error().
-			Err(err).
-			Msg("Create ldscope failed.")
-		return err
-	}
+	// Discover all container PIDs
+	cPids := getContainersPids()
 
 	if err := startConfigureHost(filterPath); err != nil {
 		return err
 	}
-
-	// Discover all container PID(s)
-	cPids := getContainersPids()
 
 	if err := startConfigureContainers(filterPath, cPids); err != nil {
 		return err
@@ -530,6 +366,5 @@ func Start() error {
 		return err
 	}
 
-	// TODO: Deny list actions (Detach?/Deservice?)
 	return nil
 }

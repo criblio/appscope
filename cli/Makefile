@@ -18,12 +18,18 @@ export GOFLAGS := -modcacherw
 
 BINDIR := ../bin/linux/$(ARCH)
 LIBDIR := ../lib/linux/$(ARCH)
+SRCDIR := ../src
 CONFDIR := ../conf
 
 SCOPE := $(BINDIR)/scope
-LDSCOPE := $(BINDIR)/ldscope
+SCOPEDYN := $(BINDIR)/scopedyn
 LIBSCOPE := $(LIBDIR)/libscope.so
+LIBLOADER := $(LIBDIR)/libloader.a
+SIGDEL := bpf/sigdel/gen_sigdel_bpfel.go
+SYSHEADER := bpf/vmlinux.h
 CONF_YML := $(CONFDIR)/scope.yml
+LOADER_C_FILES:=$(wildcard $(SRCDIR)/loader/*.c)
+LIBRARY_C_FILES:=$(wildcard $(SRCDIR)/*.c)
 
 GO_BINDATA := $(GOBIN)/go-bindata
 GOVVV := $(GOBIN)/govvv
@@ -54,18 +60,21 @@ debug:
 genflowtest:
 	./flows/gen_flow_test.sh
 
-## all: build and compress \`scope\`
-all: scope compressscope require-go-version
+## all:
+all: deps $(SCOPE) require-go-version
 
 ## clean: remove the built binary
 clean:
 	$(RM) -r build/*
-	$(RM) run/bundle.go $(SCOPE)
+	$(RM) run/bundle.go $(SCOPE) $(SCOPEDYN)
 	$(RM) coverage.out coverage.html
 	$(RM) -rf -- .gocache/*/
 	$(RM) -rf -- .gomod/*/
 	$(RM) -rf -- .gobin/x86_64/go*
 	$(RM) -rf -- .gobin/aarch64/go*
+	$(RM) -rf -- bpf/sigdel/gen_sigdel_bpfel.go
+	$(RM) -rf -- bpf/sigdel/*.o
+	$(RM) -rf -- bpf/vmlinux.h
 
 ## deps: install dependencies
 deps: $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT)
@@ -79,34 +88,43 @@ $(GOLANGCI_LINT):
 
 rebuild: clean build 
 
-run/bundle.go: $(GO_BINDATA) $(LDSCOPE) $(LIBSCOPE) $(CONF_YML)
-	$(RM) -r build/*
-	cp $(LDSCOPE) $(LIBSCOPE) $(CONF_YML) build/
-	$(GO_BINDATA) -o $@ -pkg run build
-
 # in case someone is building here before the C code is built
-$(LDSCOPE):
-	@$(MAKE) -C .. bin/linux/$(ARCH)/ldscope
-$(LIBSCOPE):
+$(LIBSCOPE): $(LIBRARY_C_FILES)
 	@$(MAKE) -C .. lib/linux/$(ARCH)/libscope.so
+$(LIBLOADER): $(LOADER_C_FILES)
+	@$(MAKE) -C .. lib/linux/$(ARCH)/libloader.a
+$(SCOPEDYN): $(LOADER_C_FILES)
+	@$(MAKE) -C .. bin/linux/$(ARCH)/scopedyn
 
-scope: $(SCOPE)
-
+# the -w go build flags remove the dwarf symbol table from the resulting executable
+# the -tags force os/user and netgo to use go and NOT cgo because a static exec can't resolve libc calls from cgo
+$(SCOPE): $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN) $(SIGDEL)
 $(SCOPE): export GOOS=linux
-$(SCOPE): export CGO_ENABLED=0
-$(SCOPE): run/bundle.go $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
+$(SCOPE): export CGO_ENABLED=1
+$(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
+	@echo "$${CI:+::group::}Building scope"
+	$(RM) run/bundle.go
+	$(RM) -r build/*
+	cp $(LIBSCOPE) $(CONF_YML) $(SCOPEDYN) build/
+	$(GO_BINDATA) -nocompress -o run/bundle.go -pkg run build
+	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"$(shell du -b "$(LIBSCOPE)" | cut -f1)\" -DSCOPEDYN_SIZE=\"$(shell du -b "$(SCOPEDYN)" | cut -f1)\"" \
 	$(GO) build \
-		-ldflags="$(shell $(GOVVV) -flags)" \
+		-tags "osusergo netgo" \
+		-ldflags="$(shell $(GOVVV) -flags) -w -linkmode external -extldflags \"-lrt -ldl -lpthread -static\" " \
+		-buildmode=pie \
 		$(BUILD_OPTS) \
 	       	-o $(SCOPE)
+	$(RM) -r $(SCOPEDYN)
 
-compressscope: $(SCOPE) require-upx
-	@if [ -z $(SCOPE_NOCOMPRESS) ] ; then \
-		upx -l $(SCOPE) >/dev/null 2>&1 || upx -9 $(SCOPE); \
-	fi
+$(SIGDEL): bpf/sigdel/sigdel.bpf.c $(SYSHEADER)
+	go generate bpf/sigdel/*.go
+
+$(SYSHEADER):
+	bpftool btf dump file /sys/kernel/btf/vmlinux format c > bpf/vmlinux.h
 
 ## test: run unit tests
 test:
+	CGO_CFLAGS="-DLIBSCOPE_SO_SIZE=\"0\" -DSCOPEDYN_SIZE=\"0\"" \
 	$(GO) test -v -p 1 -failfast -timeout 600s -coverprofile coverage.out ./...
 
 ## fmt: format all Go files
@@ -140,4 +158,4 @@ require-upx:
 	@[ -n "$(shell which upx)" ] || \
 	  { echo >&2 "error: upx required"; exit 1; }
 
-.PHONY: build debug all clean deps rebuild scope compressscope test fmt lint vet cover check help require-upx
+.PHONY: build debug all clean deps rebuild scope test fmt lint vet cover check help

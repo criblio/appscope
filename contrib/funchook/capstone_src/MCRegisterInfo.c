@@ -12,7 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 /* Capstone Disassembly Engine */
-/* By Nguyen Anh Quynh <aquynh@gmail.com>, 2013-2015 */
+/* By Nguyen Anh Quynh <aquynh@gmail.com>, 2013-2019 */
 
 #include "MCRegisterInfo.h"
 
@@ -133,6 +133,11 @@ const MCRegisterClass* MCRegisterInfo_getRegClass(const MCRegisterInfo *RI, unsi
 
 bool MCRegisterClass_contains(const MCRegisterClass *c, unsigned Reg)
 {
+	// Make sure that MCRegisterInfo_getRegClass didn't return 0
+	// (for calls to GETREGCLASS_CONTAIN0)
+	if(!c)
+		return false;
+
 	unsigned InByte = Reg % 8;
 	unsigned Byte = Reg / 8;
 

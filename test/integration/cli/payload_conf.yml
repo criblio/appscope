@@ -1,0 +1,16 @@
+payload:
+  enable: false
+cribl:
+  enable: false
+  transport:
+    type: tcp
+    host: 127.0.0.1
+    port: 12345
+    tls:
+      enable: true
+      validateserver: true
+      cacertpath: '/tmp/appscope.crt'
+protocol:
+  - name: Redis
+    regex: .*
+    payload: true

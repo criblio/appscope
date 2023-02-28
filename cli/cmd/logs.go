@@ -30,7 +30,7 @@ var logsCmd = &cobra.Command{
 			if scopeLog {
 				logPath = sessions[0].ScopeLogPath
 			} else {
-				logPath = sessions[0].LdscopeLogPath
+				logPath = sessions[0].LibscopeLogPath
 			}
 		}
 
@@ -38,9 +38,9 @@ var logsCmd = &cobra.Command{
 		logFile, err := os.Open(logPath)
 		if err != nil {
 			if scopeLog {
-				fmt.Println("No log file present for the CLI. If you want to see the ldscope logs, try running without -s")
+				fmt.Println("No log file present for the CLI. If you want to see the library logs, try running without -s")
 			} else {
-				fmt.Println("No log file present for ldscope. If you want to see the CLI logs, try running with -s")
+				fmt.Println("No log file present for the library. If you want to see the CLI logs, try running with -s")
 			}
 			os.Exit(1)
 		}
@@ -65,7 +65,7 @@ var logsCmd = &cobra.Command{
 func init() {
 	logsCmd.Flags().IntP("id", "i", -1, "Display logs from specific from session ID")
 	logsCmd.Flags().IntP("last", "n", 20, "Show last <n> lines")
-	logsCmd.Flags().BoolP("scope", "s", false, "Show scope.log (from CLI) instead of ldscope.log (from library)")
+	logsCmd.Flags().BoolP("scope", "s", false, "Show scope.log (from CLI) instead of libscope.log (from library)")
 	logsCmd.Flags().StringP("service", "S", "", "Display logs from a Systemd service instead of a session)")
 	RootCmd.AddCommand(logsCmd)
 }

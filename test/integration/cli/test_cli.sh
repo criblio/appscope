@@ -80,9 +80,43 @@ returns() {
     fi
 }
 
+scopedProcessNumber() {
+    local procFound=$(($(scope ps | wc -l) - 1 ))
 
+    echo $procFound
+}
 
+wordPresentInFile() {
+    local word=$1
+    local fileName=$2
 
+    count=$(grep $word $fileName | wc -l)
+    if [ $count -eq 0 ] ; then
+        echo "FAIL: Value $1 is not present int $2"
+        ERR+=1
+    else
+	    echo "PASS: Value $1 present in $2"
+    fi
+}
+
+# wait maximum 30 seconds
+waitForCmdscopedProcessNumber() {
+    local expScoped=$1
+    local retry=0
+    local maxRetry=30
+    local delay=1
+    until [ "$retry" -ge "$maxRetry" ]
+    do
+        count=$(scopedProcessNumber)
+        if [ "$count" -eq "$expScoped" ] ; then
+            return
+        fi
+        retry=$((retry+1)) 
+        sleep "$delay"
+    done
+    echo "FAIL: waiting for the number $expScoped scoped process $count"
+    ERR+=1
+}
 
 ################# START TESTS ################# 
 
@@ -95,12 +129,14 @@ starttest "Attach by pid"
 sleep 1000 & 
 sleep_pid=$!
 
+sleep 1
+
 # Attach to sleep process
 run scope attach $sleep_pid
 returns 0
 
 # Wait for attach to execute
-sleep 2
+waitForCmdscopedProcessNumber 1
 
 # Detach to sleep process by PID
 run scope detach $sleep_pid
@@ -108,7 +144,7 @@ outputs "Detaching from pid ${sleep_pid}"
 returns 0
 
 # Wait for detach to execute
-sleep 3
+waitForCmdscopedProcessNumber 0
 
 # Reattach to sleep process by PID
 run scope attach $sleep_pid
@@ -116,7 +152,7 @@ outputs "Reattaching to pid ${sleep_pid}"
 returns 0
 
 # Wait for reattach to execute
-sleep 3
+waitForCmdscopedProcessNumber 1
 
 # End sleep process
 kill $sleep_pid
@@ -166,6 +202,9 @@ endtest
 # Scope ps
 #
 starttest "Scope ps"
+
+# Wait for attach to execute
+waitForCmdscopedProcessNumber 1
 
 # Scope ps
 run scope ps
@@ -234,14 +273,11 @@ returns 1
 endtest
 
 
+#
 # Scope detach by name
 #
 starttest "Scope detach by name"
 
-
-#
-# Detach by name
-#
 run scope detach sleep
 outputs "Detaching from pid ${sleep_pid}"
 returns 0
@@ -288,12 +324,89 @@ run scope attach $sleep_pid2
 returns 0
 
 # Wait for attach to execute
-sleep 2
+waitForCmdscopedProcessNumber 2
 
 # Detach from sleep processes
 yes | scope detach --all 2>&1
 RET=$?
 returns 0
+
+endtest
+
+
+#
+# Scope daemon
+#
+starttest "Scope daemon"
+
+# Start a netcat listener
+nc -l -p 9109 > crash.out &
+sleep 1
+
+# Start the scope daemon
+run scope daemon --filedest localhost:9109 &
+daemon_pid=$!
+sleep 2
+
+# Run top
+top -b -d 1 > /dev/null &
+top_pid=$!
+sleep 1
+
+# Attach to top
+run scope attach --backtrace --coredump $top_pid
+sleep 1
+
+# Crash top
+kill -s SIGSEGV $top_pid
+sleep 5
+
+# Check crash and snapshot files exist
+is_file /tmp/appscope/${top_pid}/snapshot_*
+is_file /tmp/appscope/${top_pid}/info_*
+is_file /tmp/appscope/${top_pid}/core_*
+is_file /tmp/appscope/${top_pid}/cfg_*
+is_file /tmp/appscope/${top_pid}/backtrace_*
+
+# Check files were received by listener
+wordPresentInFile "snapshot_" "crash.out"
+wordPresentInFile "info_" "crash.out"
+wordPresentInFile "cfg_" "crash.out"
+wordPresentInFile "backtrace_" "crash.out"
+
+# Kill scope daemon process
+kill $daemon_pid
+
+endtest
+
+
+#
+# Scope snapshot (same namespace)
+#
+starttest "Scope snapshot"
+
+top -b -d 1 > /dev/null &
+top_pid=$!
+sleep 2
+
+SCOPE_SNAPSHOT_COREDUMP=true SCOPE_SNAPSHOT_BACKTRACE=true scope --ldattach $top_pid
+returns 0
+sleep 2
+
+kill -s SIGSEGV $top_pid
+sleep 2
+
+run scope snapshot $top_pid
+returns 0
+sleep 2
+
+is_file /tmp/appscope/${top_pid}/snapshot_*
+is_file /tmp/appscope/${top_pid}/info_*
+is_file /tmp/appscope/${top_pid}/core_*
+is_file /tmp/appscope/${top_pid}/cfg_*
+is_file /tmp/appscope/${top_pid}/backtrace_*
+
+endtest
 
 
 ################# END TESTS ################# 

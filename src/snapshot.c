@@ -76,33 +76,75 @@ snapActionAlwaysEnabled(void) {
 /*
  * Application signal action
  */
-typedef void (*signalHandlerFunc)(int, siginfo_t *, void *);
-
-static signalHandlerFunc appSigSegvAction;
-static signalHandlerFunc appSigBusAction;
-static signalHandlerFunc appSigIllAction;
-static signalHandlerFunc appSigFpeAction;
+static struct sigaction appSigSegvAction;
+static struct sigaction appSigBusAction;
+static struct sigaction appSigIllAction;
+static struct sigaction appSigFpeAction;
 
 /*
  * Save application signal handler
  * Returns TRUE in case of sig is a signal supported by snapshot
  */
 bool
-snapshotBackupAppSignalHandler(int sig, sighandler_t act) {
+snapshotBackupAppSignalHandler(int sig, const struct sigaction *act) {
     if (sig == SIGSEGV) {
-        appSigSegvAction = (signalHandlerFunc) act;
+        appSigSegvAction = *act;
         return TRUE;
     } else if (sig == SIGBUS) {
-        appSigBusAction = (signalHandlerFunc) act;
+        appSigBusAction = *act;
         return TRUE;
     } else if (sig == SIGILL) {
-        appSigIllAction = (signalHandlerFunc) act;
+        appSigIllAction = *act;
         return TRUE;
     } else if (sig == SIGFPE) {
-        appSigFpeAction = (signalHandlerFunc) act;
+        appSigFpeAction = *act;
         return TRUE;
     }
     return FALSE;
+}
+
+bool
+snapshotRetrieveAppSignalHandler(int sig, struct sigaction *const act) {
+    if (sig == SIGSEGV) {
+        *act = appSigSegvAction;
+        return TRUE;
+    } else if (sig == SIGBUS) {
+        *act = appSigBusAction;
+        return TRUE;
+    } else if (sig == SIGILL) {
+        *act = appSigIllAction;
+        return TRUE;
+    } else if (sig == SIGFPE) {
+        *act = appSigFpeAction;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static bool
+handlerWasSaved(struct sigaction *act)
+{
+    if (act->sa_flags & SA_SIGINFO) {
+        return act->sa_sigaction != NULL;
+    }
+    return act->sa_handler != NULL;
+}
+
+static void
+callSavedHandler(struct sigaction *handler, int sig, siginfo_t *info, void *secret)
+{
+    if (!handlerWasSaved(handler)) return;
+
+    // from the man page on sigaction:
+    //   If SA_SIGINFO is specified in sa_flags, then sa_sigaction
+    //     (instead of sa_handler) specifies the signal-handling function
+    //     for signum.  This function receives three arguments, as described
+    //     below.
+    if (handler->sa_flags & SA_SIGINFO) {
+        handler->sa_sigaction(sig, info, secret);
+    } else {
+        handler->sa_handler(sig);
+    }
 }
 
 /*
@@ -110,14 +152,14 @@ snapshotBackupAppSignalHandler(int sig, sighandler_t act) {
  */
 static void inline
 appSignalHandler(int sig, siginfo_t *info, void *secret) {
-    if (sig == SIGSEGV && appSigSegvAction) {
-        appSigSegvAction(sig, info, secret);
-    } else if (sig == SIGBUS && appSigBusAction) {
-        appSigBusAction(sig, info, secret);
-    } else if (sig == SIGILL && appSigIllAction) {
-        appSigIllAction(sig, info, secret);
-    } else if (sig == SIGFPE && appSigFpeAction) {
-        appSigFpeAction(sig, info, secret);
+    if (sig == SIGSEGV && handlerWasSaved(&appSigSegvAction)) {
+        callSavedHandler(&appSigSegvAction, sig, info, secret);
+    } else if (sig == SIGBUS && handlerWasSaved(&appSigBusAction)) {
+        callSavedHandler(&appSigBusAction, sig, info, secret);
+    } else if (sig == SIGILL && handlerWasSaved(&appSigIllAction)) {
+        callSavedHandler(&appSigIllAction, sig, info, secret);
+    } else if (sig == SIGFPE && handlerWasSaved(&appSigFpeAction)) {
+        callSavedHandler(&appSigFpeAction, sig, info, secret);
     } else {
         // If there was no application handler just abort
         abort();

@@ -354,6 +354,9 @@ snapActionCoredumpEnabled(void) {
  */
 static bool
 snapCoreDump(const char *dirPath, const char *epochStr, siginfo_t *unused) {
+    // The current implementation of coredump does not support Go
+    if (g_isgo) return TRUE;
+
     char filePath[PATH_MAX] = {0};
     scope_strcpy(filePath, dirPath);
     scope_strcat(filePath, "core_");

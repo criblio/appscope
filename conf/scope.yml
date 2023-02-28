@@ -137,7 +137,7 @@ metric:
     # StatsD, where dimensions will be included in the metrics produced.
     # See the STATSD protocol detector for more info about how AppScope
     # determines whether network traffic contains StatsD metric data.
-    # Set $SCOPE_METRIC_STATSD to true or false to enable or disable 
+    # Set $SCOPE_METRIC_STATSD to true or false to enable or disable
     # this category.
     #
     - type: statsd
@@ -162,8 +162,8 @@ metric:
     #
     - type: net
 
-    # The HTTP category creates metrics from the scoped process' HTTP requests and 
-    # responses, including their timing, content length, etc. 
+    # The HTTP category creates metrics from the scoped process' HTTP requests and
+    # responses, including their timing, content length, etc.
     #   Type:     string
     #   Values:   http
     #   Default:  http
@@ -180,8 +180,8 @@ metric:
     - type: dns
 
     # The process category creates metrics from the state of the scoped process,
-    # e.g., number of open file descriptors, number of running threads, 
-    # memory usage, etc. 
+    # e.g., number of open file descriptors, number of running threads,
+    # memory usage, etc.
     #
     #   Type:     string
     #   Values:   process
@@ -192,7 +192,7 @@ metric:
 
   # Settings for the `metrics` transport
   #
-  # When the `cribl` feature is enabled, these settings are ignored, 
+  # When the `cribl` feature is enabled, these settings are ignored,
   # and AppScope sends metrics via the `cribl` transport rather than this one.
   #
   transport:
@@ -477,8 +477,8 @@ event:
 
   # Settings for the `events` transport
   #
-  # When the `cribl` transport is enabled, these settings are ignored, 
-  # and AppScope sends metrics via the `cribl` transport rather than this one.
+  # When the `cribl` feature is enabled, these settings are ignored,
+  # and AppScope sends events via the `cribl` transport rather than this one.
   #
   transport:
 
@@ -655,7 +655,7 @@ libscope:
   #
   # The given variables are applied to the running config just like startup.
   # This entire mechanism is what the AppScope docs call Dynamic Configuration.
-  # 
+  #
   commanddir : '/tmp'
 
 
@@ -669,16 +669,16 @@ libscope:
     #   Default:  warning
     #   Override: $SCOPE_LOG_LEVEL
     #
-    # When the `cribl` transport is enabled, this is forced to warning.
+    # When the `cribl` feature is enabled, this is forced to warning.
     #
     level: warning
 
     # Connection settings for the `logs` transport
     #
-    # The `logs` transport is independent of all other transports, because 
+    # The `logs` transport is independent of all other transports, because
     # AppScope log data (which is in neither JSON nor StatsD format) should normally
     # be sent to a different destination than events or metrics.
-    # 
+    #
     transport:
 
       # Set $SCOPE_LOG_DEST to override the type, host, port, and path configs
@@ -744,13 +744,13 @@ libscope:
       #
       buffer: line
 
-  # Settings for the `crash analysis` feature, which writes a snapshot to 
-  # the snapshot directory, which is /tmp/appscope/<pid>/. 
-  # The snapshot consists of either a core dump, a backtrace (i.e., stack trace), 
+  # Settings for the `crash analysis` feature, which writes a snapshot to
+  # the snapshot directory, which is /tmp/appscope/<pid>/.
+  # The snapshot consists of either a core dump, a backtrace (i.e., stack trace),
   # or both.
-  # - If SCOPE_SNAPSHOT_COREDUMP=true, AppScope generates a core dump and writes 
+  # - If SCOPE_SNAPSHOT_COREDUMP=true, AppScope generates a core dump and writes
   # it to the snapshot directory as core_<timestamp>.
-  # - If SCOPE_SNAPSHOT_BACKTRACE=true, AppScope generates a core dump and writes 
+  # - If SCOPE_SNAPSHOT_BACKTRACE=true, AppScope generates a core dump and writes
   # it to the snapshot directory as backtrace_<timestamp>.
   # - In either case, AppScope writes two additional files to the snapshot directory,
   # namely info_<timestamp> and cfg_<timestamp>.
@@ -774,8 +774,8 @@ libscope:
     backtrace: false
 
 # Settings for the `cribl` feature.
-# When you enable this feature, AppScope does sends both events and metrics over 
-# the same transport and connection, in NDJSON format, with log level set to warning
+# When you enable this feature, AppScope sends both events and metrics over the
+# same transport and connection, in NDJSON format, with log level set to warning
 # and configevent set to true, overriding previously-defined settings.
 #
 cribl:
@@ -869,7 +869,7 @@ cribl:
     # TLS connection settings
     tls:
 
-      # Enable TLS for the `metrics` transport
+      # Enable TLS for the `cribl` transport
       #   Type:     boolean
       #   Values:   true, false
       #   Default:  false
@@ -1001,7 +1001,7 @@ protocol:
   #  len: 5
 
 # Custom configs
-# Use this area of the config file to specify settings to override, 
+# Use this area of the config file to specify settings to override,
 # and what new settings to override them with, for processes that match
 # criteria you define as filters.
 #

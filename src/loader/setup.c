@@ -21,7 +21,7 @@
 #define OPENRC_DIR "/etc/rc.conf"
 #define SYSTEMD_DIR "/etc/systemd"
 #define INITD_DIR "/etc/init.d"
-#define PROFILE_SCRIPT "#! /bin/bash\nlib_found=0\nfilter_found=0\nif test -f /usr/lib/appscope/%s/libscope.so; then\n    lib_found=1\nfi\nif test -f /usr/lib/appscope/scope_filter; then\n    filter_found=1\nelif test -f /tmp/appscope/scope_filter; then\n    filter_found=1\nfi\nif [ $lib_found == 1 ] && [ $filter_found == 1 ]; then\n    export LD_PRELOAD=\"%s $LD_PRELOAD\"\nfi\n"
+#define PROFILE_SCRIPT "#! /bin/bash\nlib_found=0\nfilter_found=0\nif test -f /usr/lib/appscope/%s/libscope.so; then\n    lib_found=1\nfi\nif test -f /usr/lib/appscope/scope_filter; then\n    filter_found=1\nelif test -f /tmp/appscope/scope_filter; then\n    filter_found=1\nfi\nif [ $lib_found == 1 ] && [ $filter_found == 1 ]; then\n    export LD_PRELOAD=\"%s %s\"\nfi\n"
 
 typedef enum {
     SERVICE_CFG_ERROR,
@@ -628,6 +628,40 @@ setupUnservice(void) {
     return res;
 }
 
+static char *
+removeFromStr(char *envstr, char *remove, char *delim)
+{
+    char *local = NULL, *actual = NULL, *cdir = NULL, *ndir = NULL;
+
+    if (!envstr || !remove || !delim) return NULL;
+
+    // a copy helps
+    local = strdup(envstr);
+
+    if ((cdir = strtok(local, delim))) {
+        size_t len = strlen(envstr);
+
+        if ((actual = malloc(len)) == NULL) return NULL;
+
+        strncpy(actual, "", len);
+
+        if (strstr(cdir, remove) == NULL) {
+            strncat(actual, cdir, len);
+            strncat(actual, " ", len);
+        }
+
+        while ((ndir = strtok(NULL, delim))) {
+            if (strstr(ndir, remove) == NULL) {
+                strncat(actual, ndir, len);
+                strncat(actual, " ", len);
+            }
+        }
+    }
+
+    free(local);
+    return actual;
+}
+
  /*
  * Setup the /etc/profile scope startup script
  * Returns status of operation TRUE in case of success, FALSE otherwise
@@ -645,13 +679,29 @@ setupProfile(const char *libscopePath, const char *loaderVersion, uid_t nsUid, g
         return TRUE;
     }
 
+    /*
+     * Get the current LD_PRELOAD and copy every entry
+     * that does not contain libscope. An LD_PRELOAD
+     * list can have a space or colon delimiter.
+     */
+    char *sactual = NULL, *cactual = NULL;
+    char *ldpreload = getenv("LD_PRELOAD_TEST");
+    if (ldpreload && strstr(ldpreload, "libscope")) {
+        sactual = removeFromStr(ldpreload, "libscope", " ");
+        cactual = removeFromStr(ldpreload, "libscope", ":");
+        if (cactual && sactual) strncat(sactual, cactual, strlen(ldpreload));
+    } else {
+        sactual = "";
+        cactual = "";
+    }
+
     char buf[PATH_MAX] = {0};
     int fd = nsFileOpenWithMode("/etc/profile.d/scope.sh", O_CREAT | O_RDWR | O_TRUNC, 0644, nsUid, nsGid, geteuid(), getegid());
     if (fd < 0) {
         return FALSE;
     }
 
-    size_t len = snprintf(buf, sizeof(buf), PROFILE_SCRIPT, loaderVersion, libscopePath);
+    size_t len = snprintf(buf, sizeof(buf), PROFILE_SCRIPT, loaderVersion, libscopePath, sactual);
     if (write(fd, buf, len) != len) {
         perror("write failed");
         close(fd);
@@ -663,6 +713,8 @@ setupProfile(const char *libscopePath, const char *loaderVersion, uid_t nsUid, g
         return FALSE;
     }
 
+    if (sactual && (strlen(sactual) > 1)) free(sactual);
+    if (cactual && (strlen(cactual) > 1)) free(cactual);
     return TRUE;
 }
 

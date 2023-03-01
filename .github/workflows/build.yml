@@ -365,6 +365,9 @@ jobs:
     name: Update CDN
     needs: [info,build]
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     if: ${{ github.event_name == 'push' }}
     steps:
       # Clone the repos
@@ -382,11 +385,14 @@ jobs:
         run: chmod +x lib/linux/*/* bin/linux/*/*
 
       # Deploy to the CDN
+      - name: configure AWS creds
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.APPSCOPEDEPLOYROLE }}
+          role-session-name: appscope-deploy
+          aws-region: us-west-2
       - name: Deploy
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
           CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

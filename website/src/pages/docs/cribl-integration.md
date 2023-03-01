@@ -46,7 +46,7 @@ To define a TLS-encrypted connection to Cribl Stream on Cribl.Cloud, just set th
 For example:
 
 ```
-SCOPE_CRIBL_CLOUD=tcp://in.logstream.<cloud_instance>.cribl.cloud:10090
+SCOPE_CRIBL_CLOUD=tcp://in.main-default-<organization>.cribl.cloud:10090
 ```
 
 By default, Cribl.Cloud-managed instances of Cribl Stream have port `10090` configured to use [TLS](/docs/tls) over TCP, and a built-in AppScope Source to receive data from AppScope. You can change the [AppScope Source configuration](https://docs.cribl.io/docs/sources-appscope), or create additional AppScope Sources, as needed.
@@ -76,7 +76,7 @@ To define an **unencrypted** connection to a Cribl.Cloud-managed instance of Cri
 For example:
 
 ```
-SCOPE_CRIBL=tcp://in.logstream.<cloud_instance>.cribl.cloud:10091
+SCOPE_CRIBL=tcp://in.main-default-<organization>.cribl.cloud:10091
 ```
 
 <span id="on-prem"> </span>

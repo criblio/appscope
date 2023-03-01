@@ -63,7 +63,7 @@ This usage works with `scope run`, `scope attach`, `scope watch`, `scope k8s`, a
 Use the `SCOPE_CRIBL_CLOUD` environment variable to define a TLS-encrypted connection to Cribl.Cloud. Specify a transport type, a host name or IPv4 address, and a port number, for example:
 
 ```
-LD_PRELOAD=./libscope.so SCOPE_CRIBL_CLOUD=tcp://in.logstream.<cloud_instance>.cribl.cloud:10090 ls -al
+LD_PRELOAD=./libscope.so SCOPE_CRIBL_CLOUD=tcp://in.main-default-<organization>.cribl.cloud:10090 ls -al
 ```
 
 As a convenience, when you set `SCOPE_CRIBL_CLOUD`, AppScope automatically overrides the defaults of three other environment variables, setting them to the values that Cribl.Cloud via TLS requires. That produces these (and a few [other](/docs/cribl-integration#parameter-overrides)) settings:

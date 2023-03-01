@@ -240,7 +240,7 @@ SCOPE_DlIteratePhdr(int (*callback) (struct dl_phdr_info *info, size_t size, voi
 {
     // If we are in a signal handler don't call dl_iterate_phdr.
     // It is not async safe.
-    if (g_issighandler == TRUE) return 0;
+    if (g_issighandler == TRUE && g_isgo) return 0;
 
     // TODO provide implementation for static GO
     // We cannot use dl_iterate_phdr since it uses TLS

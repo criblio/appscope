@@ -367,7 +367,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
-      contents: read
+      contents: write
     if: ${{ github.event_name == 'push' }}
     steps:
       # Clone the repos

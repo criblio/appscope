@@ -484,13 +484,15 @@ snapshotSignalHandler(int sig, siginfo_t *info, void *secret) {
     }
 
     /*
-    * Stop the world
-    * - give a time to consume the snapshot files
+    * This sleep is a fragile way to give the scope daemon time to read
+    * the snapshot output files before this process exits (think: containerized
+    * process). At the time this was written, after the daemon sees the signal
+    * it just waits one second before grabbing these files. The coredump
+    * is the last file we create, and while the coredump file creation
+    * is *normally* less than a second it can take 60s (only seen on java7).
+    * In short this is easy but needs improvement.
     */
-    // raise of SIGSTOP wasn't working when running as pid 1 in a container...
-    // tbd: try sleep instead???
-    //g_fn.raise(SIGSTOP);
-    sleep(5);
+    sleep(2);
 
     // We don't need to run the app's signal handler if we're dealing with a Go app
     // since we are hooked just before die ; and after any application-level signal handling

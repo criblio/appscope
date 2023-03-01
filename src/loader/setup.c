@@ -685,7 +685,7 @@ setupProfile(const char *libscopePath, const char *loaderVersion, uid_t nsUid, g
      * list can have a space or colon delimiter.
      */
     char *sactual = NULL, *cactual = NULL;
-    char *ldpreload = getenv("LD_PRELOAD_TEST");
+    char *ldpreload = getenv("LD_PRELOAD");
     if (ldpreload && strstr(ldpreload, "libscope")) {
         sactual = removeFromStr(ldpreload, "libscope", " ");
         cactual = removeFromStr(ldpreload, "libscope", ":");

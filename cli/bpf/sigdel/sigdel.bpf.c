@@ -64,9 +64,9 @@ struct sigdel_args_t {
 char LICENSE[] SEC_GO("license") = "GPL";
 
 struct {
-	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-	__uint(key_size, sizeof(u32));
-	__uint(value_size, sizeof(u32));
+    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+    __uint(key_size, sizeof(u32));
+    __uint(value_size, sizeof(u32));
 } events SEC_GO(".maps");
 
 SEC_GO("tracepoint/signal/signal_deliver")
@@ -135,5 +135,5 @@ int sig_deliver(struct sigdel_args_t *args)
         bpf_printk("ERROR:sigdel:bpf_perf_event_output\n");
     }
 
-	return 0;
+    return 0;
 }

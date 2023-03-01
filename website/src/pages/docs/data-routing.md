@@ -156,7 +156,7 @@ Complete these steps, paying particular attention to the sub-elements of `metric
 
 ### Running AppScope and Cribl Edge in a Container {#container-with-edge}
 
-This section describes one of many possible scenarios involving AppScope, Cribl Edge, and containers. If you are interested in doing something different (e.g., AppScope and Cribl Edge are in different containers, or one is in a container and the other is on the host) let us know via the `#appscope` channel of Cribl's [Community Slack](https://cribl‑community.slack.com/).
+This section describes one of many possible scenarios involving AppScope, Cribl Edge, and containers. If you are interested in doing something different (e.g., AppScope and Cribl Edge are in different containers, or one is in a container and the other is on the host) let us know via the `#appscope` channel of Cribl's [Community Slack](https://cribl-community.slack.com/).
 
 You can start Cribl Edge and AppScope together in a container, then use Cribl Edge's [AppScope Source](https://docs.cribl.io/edge/sources-appscope/) to "drive" AppScope. You'll decide what apps to scope, and work with the resulting events and metrics in Cribl Edge.
 

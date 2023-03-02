@@ -1,0 +1,7 @@
+version: "3"
+
+services:
+  oomdemo-1:
+    build: oomdemo
+    mem_limit: 2000m
+    restart: always

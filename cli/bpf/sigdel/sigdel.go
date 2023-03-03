@@ -2,7 +2,7 @@ package sigdel
 
 import "C"
 
-//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target bpfel -cc clang gen_sigdel ./sigdel.bpf.c -- -I/usr/include/bpf -I.
+//go:generate go run github.com/cilium/ebpf/cmd/bpf2go -target $GOARCH -cc clang gen_sigdel ./sigdel.bpf.c -- -I/usr/include/bpf -I.
 
 import (
 	"bytes"

@@ -6,4 +6,4 @@ demo/demo-scripts/willsee.txt
 demo/demo-scripts/wontsee.log
 VERSION
 bpf/vmlinux.h
-bpf/sigdel/gen_sigdel_bpfel.*
+bpf/sigdel/gen_sigdel_bpfel_*.go

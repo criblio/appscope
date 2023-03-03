@@ -16,6 +16,8 @@ export GOCACHE := $(shell pwd)/.gocache
 export GOMODCACHE := $(shell pwd)/.gomod
 export GOFLAGS := -modcacherw
 
+GOARCH := $(subst aarch64,arm64,$(subst x86_64,amd64,$(ARCH)))
+
 BINDIR := ../bin/linux/$(ARCH)
 LIBDIR := ../lib/linux/$(ARCH)
 SRCDIR := ../src
@@ -25,7 +27,7 @@ SCOPE := $(BINDIR)/scope
 SCOPEDYN := $(BINDIR)/scopedyn
 LIBSCOPE := $(LIBDIR)/libscope.so
 LIBLOADER := $(LIBDIR)/libloader.a
-SIGDEL := bpf/sigdel/gen_sigdel_bpfel.go
+SIGDEL := bpf/sigdel/gen_sigdel_bpfel_$(GOARCH).go
 SYSHEADER := bpf/vmlinux.h
 CONF_YML := $(CONFDIR)/scope.yml
 LOADER_C_FILES:=$(wildcard $(SRCDIR)/loader/*.c)
@@ -72,7 +74,7 @@ clean:
 	$(RM) -rf -- .gomod/*/
 	$(RM) -rf -- .gobin/x86_64/go*
 	$(RM) -rf -- .gobin/aarch64/go*
-	$(RM) -rf -- bpf/sigdel/gen_sigdel_bpfel.go
+	$(RM) -rf -- bpf/sigdel/gen_sigdel_bpfel_*.go
 	$(RM) -rf -- bpf/sigdel/*.o
 	$(RM) -rf -- bpf/vmlinux.h
 

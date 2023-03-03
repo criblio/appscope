@@ -70,7 +70,7 @@ As noted just above, to see a specific subcommand's help or its required paramet
 `./scope <subcommand> -h` 
 
 …or: 
-`./scope help <subcommand> [flags]`.
+`./scope help <subcommand>`.
 
 ---
 
@@ -330,7 +330,7 @@ Displays help content for any AppScope subcommand. Just type `scope help [subcom
 
 #### Usage
 
-`scope help [subcommand] [flags]`
+`scope help [subcommand]`
 
 #### Examples
 
@@ -389,7 +389,8 @@ Returns information on scoped process identified by PID.
 
 ```
   -h, --help            help for inspect
-  -p, --prefix string   Prefix to /proc filesystem
+  -p, --prefix string   When running AppScope in a container, and scoping an app that's running outside the container, 
+--prefix is the path to host filesystem of the scoped app
 ```
 
 ### k8s
@@ -508,20 +509,16 @@ Negative arguments are not allowed.
 
 ```
   -a, --all          Delete all sessions
-  -d, --delete int   Delete last <delete> sessions
+  -d, --delete int   Delete last <n> sessions
   -f, --force        Do not prompt for confirmation
   -h, --help         Help for prune
-  -k, --keep int     Keep last <keep> sessions, delete all others
+  -k, --keep int     Keep last <n> sessions, delete all others
 ```
 
 ### ps
 ---
 
 Lists all scoped processes. This means processes whose functions AppScope is interposing (which means that the AppScope library was loaded, and the AppScope reporting thread is running, in those processes, too).
-
-Before AppScope 1.2.0:		
-
-Lists all processes into which the libscope library is injected.
 
 #### Usage
 
@@ -658,7 +655,7 @@ Stop scoping all processes and services on the host and in all relevant containe
   - Remove filter files `/usr/lib/appscope/scope_filter` and `/tmp/appscope/scope_filter`.
 	- Detach from all existing scoped processes.
 	- Remove the `etc/profile.d/scope.sh` script.
-	- Update the relevant service configurations to not `LD_PRELOAD` libscope if already doing so.
+	- Delete any lines that `LD_PRELOAD` libscope from any relevant service configurations.
 
 #### Usage
 

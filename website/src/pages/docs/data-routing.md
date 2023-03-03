@@ -15,6 +15,8 @@ For each of these operations, the CLI has command-line options, the config file 
 
 If you plan to use the config file, do take time to [read it all the way through](/docs/config-file) - then this page will make more sense!
 
+If you want to run Cribl Edge and AppScope in a container, and/or scope apps that are running in containers, see [these](#container-with-edge) instructions.
+
 ### Routing to Cribl Edge {#routing-to-edge}
 
 In a single operation, you can route both events and metrics to Cribl Edge. 
@@ -151,3 +153,41 @@ Complete these steps, paying particular attention to the sub-elements of `metric
 * Set `cribl > enable` to `false` to disable the `cribl` backend.
 * Set `metric > enable` to `true` to enable the metrics backend.
 * Specify desired values for the rest of the `metric` elements, namely `format`, `transport`, and optionally, `watch`.
+
+### Running AppScope and Cribl Edge in a Container {#container-with-edge}
+
+This section describes one of many possible scenarios involving AppScope, Cribl Edge, and containers. If you are interested in doing something different let us know via the `#appscope` channel of Cribl's [Community Slack](https://cribl-community.slack.com/).
+
+You can start Cribl Edge and AppScope together in a container, then use Cribl Edge's [AppScope Source](https://docs.cribl.io/edge/sources-appscope/) to "drive" AppScope. You'll decide what apps to scope, and work with the resulting events and metrics in Cribl Edge.
+
+To do this, you can use the `docker run` command, choosing options based on considerations including whether to mount the host filesystem in read-only or read-write mode. By default, the `-v` or `--volume` mounts in read-write mode, for example `-v /:/hostfs`. For read-only mode, add `:ro`, for example `-v /:/hostfs:ro`.
+
+In the examples below, we use `/hostfs` to specify the root filesystem mount point; alternatively, you could use a path defined by the environment variable `CRIBL_EDGE_FS_ROOT`.
+
+The examples progress from most to least "locked down."
+
+#### Example 1: Mount the Host Filesystem Read-only
+
+The command below mounts the overall host filesystem read-only. It then mounts the `scope start` command's three mount points in read-write mode, which is required for `scope start` to work, even when the overall filesystem is read-only.
+
+```
+docker run -d -e CRIBL_EDGE=1 -p 9420:9420 -v /var/run/appscope:/var/run/appscope -v /var/run/docker.sock:/var/run/docker.sock -v /:/hostfs:ro -v /etc/cron.d/:/hostfs/etc/cron.d/ -v /tmp/:/hostfs/tmp/ -v /usr/lib/:/hostfs/usr/lib/ --restart unless-stopped --name cribl-edge cribl/cribl:4.0.4
+```
+
+#### Example 2: Mount the Host Filesystem Read-Only With the `--privileged` flag
+
+The command below mounts the overall host filesystem read-only, but by adding the `--privileged` flag, [gives the container access](https://docs.docker.com/engine/reference/run/#runtime-privilege-and-linux-capabilities) to processes running outside containers on the host. With this usage, there's no need to specify the `scope start` mount points.
+
+```
+docker run -d -e CRIBL_EDGE=1 -p 9420:9420 -v /var/run/appscope:/var/run/appscope -v /var/run/docker.sock:/var/run/docker.sock -v /:/hostfs:ro  --privileged --restart unless-stopped --name cribl-edge cribl/cribl:4.0.4
+```
+
+The `--privileged` flag should be used with care, because it bestows Linux capabilities – including ptrace, the ability to read the `/proc` filesystem, and more – on whatever apps run in the container.
+
+#### Example 3: Mount the Host Filesystem Read-Write
+
+The command below mounts the overall host filesystem read-write. With this usage, there's no need to specify the `scope start` mount points or to add the `--privileged` flag.
+
+```
+docker run -d -e CRIBL_EDGE=1 -p 9420:9420 -v /var/run/appscope:/var/run/appscope -v /var/run/docker.sock:/var/run/docker.sock -v /:/hostfs  --restart unless-stopped --name cribl-edge cribl/cribl:4.0.4
+```

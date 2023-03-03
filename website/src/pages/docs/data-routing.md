@@ -15,7 +15,7 @@ For each of these operations, the CLI has command-line options, the config file 
 
 If you plan to use the config file, do take time to [read it all the way through](/docs/config-file) - then this page will make more sense!
 
-If you want to run Cribl Edge in a container along with AppScope, see [these](#container-with-edge) instructions.
+If you want to run Cribl Edge and AppScope in a container, and/or scope apps that are running in containers, see [these](#container-with-edge) instructions.
 
 ### Routing to Cribl Edge {#routing-to-edge}
 
@@ -156,7 +156,7 @@ Complete these steps, paying particular attention to the sub-elements of `metric
 
 ### Running AppScope and Cribl Edge in a Container {#container-with-edge}
 
-This section describes one of many possible scenarios involving AppScope, Cribl Edge, and containers. If you are interested in doing something different (e.g., AppScope and Cribl Edge are in different containers, or one is in a container and the other is on the host) let us know via the `#appscope` channel of Cribl's [Community Slack](https://cribl-community.slack.com/).
+This section describes one of many possible scenarios involving AppScope, Cribl Edge, and containers. If you are interested in doing something different let us know via the `#appscope` channel of Cribl's [Community Slack](https://cribl-community.slack.com/).
 
 You can start Cribl Edge and AppScope together in a container, then use Cribl Edge's [AppScope Source](https://docs.cribl.io/edge/sources-appscope/) to "drive" AppScope. You'll decide what apps to scope, and work with the resulting events and metrics in Cribl Edge.
 

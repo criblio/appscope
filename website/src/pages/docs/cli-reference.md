@@ -31,18 +31,20 @@ AppScope is a general-purpose observable application telemetry system.
 Running `scope` with no subcommands will execute the `scope run` command.
 
 Usage:
-  scope [subcommand]
+  scope [command]
 
-Available Subcommands:
+Available Commands:
   attach      Scope a currently-running process
   completion  Generate completion code for specified shell
-  dash        Display scope dashboard
+  daemon      Run the scope daemon
+  dash        Display scope dashboard for a previous or active session
   detach      Unscope a currently-running process
   events      Outputs events for a session
   extract     Output instrumentary library files to <dir>
   flows       Observed flows from the session, potentially including payloads
-  help        Help about any subcommand
+  help        Help about any command
   history     List scope session history
+  inspect     Return information on scoped process
   k8s         Install scope in kubernetes
   logs        Display scope logs
   metrics     Outputs metrics for a session
@@ -50,21 +52,25 @@ Available Subcommands:
   ps          List processes currently being scoped
   run         Executes a scoped command
   service     Configure a systemd/OpenRC service to be scoped
+  snapshot    Create a snapshot for a process
   start       Start scoping a filtered selection of processes and services
+  stop        Stop scoping all scoped processes and services
+  update      Updates configuration of scoped process
   version     Display scope version
   watch       Executes a scoped command on an interval
 
 Flags:
-  -h, --help   Help for scope
+  -h, --help          help for scope
+  -z, --passthrough   Scope an application with current environment & no config.
 
-Use "scope [subcommand] --help" for more information about a subcommand.
+Use "scope [command] --help" for more information about a command.
 ```
 
 As noted just above, to see a specific subcommand's help or its required parameters, enter: 
 `./scope <subcommand> -h` 
 
 …or: 
-`./scope help <subcommand> [flags]`.
+`./scope help <subcommand>`.
 
 ---
 
@@ -72,6 +78,9 @@ As noted just above, to see a specific subcommand's help or its required paramet
 ---
 
 Scopes a currently-running process identified by PID or ProcessName.
+
+The `--*dest` flags accept file names like `/tmp/scope.log` or URLs like `file:///tmp/scope.log`. They may also
+be set to sockets with `unix:///var/run/mysock`, `tcp://hostname:port`, `udp://hostname:port`, or `tls://hostname:port`.
 
 #### Usage
 
@@ -88,20 +97,83 @@ scope attach --payloads 2000
 #### Flags
 
 ```
-  -a, --authtoken string      Set AuthToken for Cribl Stream
-  -c, --cribldest string      Set Cribl Stream destination for metrics & events (host:port defaults to tls://)
+  -a, --authtoken string      Set AuthToken for Cribl
+  -b, --backtrace             Enable backtrace file generation when an application crashes.
+  -d, --coredump              Enable core dump file generation when an application crashes.
+  -c, --cribldest string      Set Cribl destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
-  -h, --help                  Help for attach
+  -h, --help                  help for attach
   -l, --librarypath string    Set path for dynamic libraries
-      --loglevel string       Set ldscope log level (debug, warning, info, error, none)
+      --loglevel string       Set scope library log level (debug, warning, info, error, none)
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
-      --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
-  -n, --nobreaker             Set Cribl Stream to not break streams into events
-      --passthrough           Runs ldscope with current environment & no config
+      --metricformat string   Set format of metrics output (statsd|ndjson) (default "ndjson")
+  -n, --nobreaker             Set Cribl to not break streams into events.
   -p, --payloads              Capture payloads of network transactions
-  -u, --userconfig string     Run ldscope with a user specified config file; overrides all other settings
+  -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.
   -v, --verbosity int         Set scope metric verbosity (default 4)
+```
 
+### completion
+---
+
+Generates completion code for specified shell.
+
+#### Usage
+
+`scope completion [flags] [bash|zsh]`
+
+#### Examples
+
+```
+scope completion bash > /etc/bash_completion.d/scope # Generate and install scope autocompletion for bash
+source <(scope completion bash)                      # Generate and load scope autocompletion for bash
+```
+
+#### Flags
+
+```
+  -h, --help   help for completion
+```
+
+### daemon
+---
+
+Listen and respond to system events.
+
+#### Usage
+
+`scope daemon [flags]`
+
+#### Examples
+
+`scope daemon`
+
+#### Flags
+
+```
+  -f, --filedest string   Set destination for files (host:port defaults to tcp://)
+  -h, --help              help for daemon
+  -s, --sendcore          Include core file when sending files to network destination
+```
+
+### dash
+---
+
+Displays an interactive dashboard with an overview of what's happening with the selected session.
+
+#### Usage
+
+`scope dash [flags]`
+
+#### Examples
+
+`scope dash`
+
+#### Flags
+
+```
+  -h, --help     help for dash
+  -i, --id int   Display info from specific from session ID (default -1)
 ```
 
 ### detach
@@ -127,50 +199,6 @@ scope detach --all
   -a, --all                   Detach from all processes
   -h, --help                  Help for detach
 
-```
-
-### completion
----
-
-Generates completion code for specified shell.
-
-#### Usage
-
-`scope completion [flags] [bash|zsh]`
-
-#### Examples
-
-```
-scope completion bash > /etc/bash_completion.d/scope  # Generates and installs scope autocompletion for bash
-source <(scope completion bash)                       # Generates and loads scope autocompletion for bash
-```
-
-#### Flags
-
-```
-  -h, --help   Help for completion
-  
-```
-
-
-### dash
----
-
-Displays an interactive dashboard with an overview of what's happening with the selected session.
-
-#### Usage
-
-`scope dash [flags]`
-
-#### Examples
-
-`scope dash`
-
-#### Flags
-
-```
-  -h, --help     Help for dash
-  -i, --id int   Display info from specific from session ID (default -1)
 ```
 
 ### events
@@ -223,7 +251,10 @@ scope events -n 1000 -e 'sourcetype!="console" && source.indexOf("cribl.log") ==
 
 ### extract
 ---
-Outputs `ldscope`, `libscope.so`, and `scope.yml` to the provided directory. You can configure these files to instrument any application, and to output the data to any existing tool via simple TCP protocols.
+Outputs `libscope.so` and `scope.yml` to the provided directory. You can configure these files to instrument any application, and to output the data to any existing tool using simple TCP protocols.
+
+The `--*dest` flags accept file names like `/tmp/scope.log` or URLs like `file:///tmp/scope.log`. They may also
+be set to sockets with `unix:///var/run/mysock`, `tcp://hostname:port`, `udp://hostname:port`, or `tls://hostname:port`.
 
 #### Usage
 
@@ -231,10 +262,10 @@ Outputs `ldscope`, `libscope.so`, and `scope.yml` to the provided directory. You
 
   `scope extract [flags] (<dir>)`
 
-#### Aliases:
+#### Aliases
   `extract`, `excrete`, `expunge`, `extricate`, `exorcise`
 
-#### Examples:
+#### Examples
 
 ```
 scope extract
@@ -242,16 +273,16 @@ scope extract /opt/libscope
 scope extract --metricdest tcp://some.host:8125 --eventdest tcp://other.host:10070 .
 ```
 
-#### Flags:
+#### Flags
  
 ```
-  -a, --authtoken string      Set AuthToken for Cribl Stream
-  -c, --cribldest string      Set Cribl Stream destination for metrics & events (host:port defaults to tls://)
+  -a, --authtoken string      Set AuthToken for Cribl
+  -c, --cribldest string      Set Cribl destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
   -h, --help                  Help for extract
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
-  -n, --nobreaker             Set Cribl Stream to not break streams into events
+  -n, --nobreaker             Set Cribl to not break streams into events
 ```
 
 ### flows
@@ -341,6 +372,27 @@ cat $(scope hist -d)/args.json   # Outputs contents of args.json in the scope hi
   -r, --running    List running sessions
 ```
 
+### inspect
+---
+
+Returns information on scoped process identified by PID.
+
+#### Usage
+
+`scope inspect [flags]`
+
+#### Examples
+
+`scope inspect 1000`
+
+#### Flags
+
+```
+  -h, --help            help for inspect
+  -p, --prefix string   When running AppScope in a container, and scoping an app that's running outside the container, 
+--prefix is the path to host filesystem of the scoped app
+```
+
 ### k8s
 ---
 
@@ -417,7 +469,11 @@ Outputs metrics for a session.
 
 #### Examples
 
-`scope metrics`
+```
+scope metrics
+scope metrics -m net.error,fs.error
+scope metrics -m net.tx -g
+```
 
 #### Flags
 
@@ -453,20 +509,16 @@ Negative arguments are not allowed.
 
 ```
   -a, --all          Delete all sessions
-  -d, --delete int   Delete last <delete> sessions
+  -d, --delete int   Delete last <n> sessions
   -f, --force        Do not prompt for confirmation
   -h, --help         Help for prune
-  -k, --keep int     Keep last <keep> sessions, delete all others
+  -k, --keep int     Keep last <n> sessions, delete all others
 ```
 
 ### ps
 ---
 
 Lists all scoped processes. This means processes whose functions AppScope is interposing (which means that the AppScope library was loaded, and the AppScope reporting thread is running, in those processes, too).
-
-Before AppScope 1.2.0:		
-
-Lists all processes into which the libscope library is injected.
 
 #### Usage
 
@@ -499,20 +551,20 @@ scope run -c edge -- top
 #### Flags
 
 ```
-  -a, --authtoken string      Set AuthToken for Cribl Stream
-  -c, --cribldest string      Set Cribl Stream destination for metrics & events (host:port defaults to tls://)
+  -a, --authtoken string      Set AuthToken for Cribl
+  -b, --backtrace             Enable backtrace file generation when an application crashes.
+  -d, --coredump              Enable core dump file generation when an application crashes.
+  -c, --cribldest string      Set Cribl destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
-  -h, --help                  Help for run
+  -h, --help                  help for run
   -l, --librarypath string    Set path for dynamic libraries
-      --loglevel string       Set ldscope log level (debug, warning, info, error, none)
+      --loglevel string       Set scope library log level (debug, warning, info, error, none)
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
-      --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
-  -n, --nobreaker             Set Cribl Stream to not break streams into events
-      --passthrough           Run ldscope with current environment & no config
+      --metricformat string   Set format of metrics output (statsd|ndjson) (default "ndjson")
+  -n, --nobreaker             Set Cribl to not break streams into events.
   -p, --payloads              Capture payloads of network transactions
-  -u, --userconfig string     Run ldscope with a user specified config file; overrides all other settings
+  -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.
   -v, --verbosity int         Set scope metric verbosity (default 4)
-
 ```
 
 ### service
@@ -544,6 +596,19 @@ scope service cribl -c tls://in.my-instance.cribl.cloud:10090
   -u, --user string           Specify owner username
   
 ```
+
+### snapshot
+---
+
+Create a snapshot for a process. Snapshot file/s will be created in `/tmp/appscope/[PID]/`.
+
+#### Usage
+
+`scope snapshot [PID] [flags]`
+
+#### Flags
+
+`  -h, --help   help for snapshot`
 
 ### start
 ---
@@ -586,11 +651,11 @@ cat example_filter.json | scope start
 ---
 Stop scoping all processes and services on the host and in all relevant containers.
 
-The following actions will be performed on the host and in all relevant containers:
-	- Removal of filter files `/usr/lib/appscope/scope_filter` and `/tmp/appscope/scope_filter`
-	- Detach from all existing scoped processes
-	- Removal of `etc/profile.d/scope.sh` script
-	- Update the relevant service configurations to not LD_PRELOAD libscope if already doing so
+`scope stop` does the following on the host and in all relevant containers:
+  - Remove filter files `/usr/lib/appscope/scope_filter` and `/tmp/appscope/scope_filter`.
+	- Detach from all existing scoped processes.
+	- Remove the `etc/profile.d/scope.sh` script.
+	- Delete any lines that `LD_PRELOAD` libscope from any relevant service configurations.
 
 #### Usage
 
@@ -605,6 +670,28 @@ The following actions will be performed on the host and in all relevant containe
 ```
   -f, --force   Use this flag when you're sure you want to run scope stop
   -h, --help    help for start
+```
+
+### update
+---
+
+Updates configuration of scoped process identified by PID.
+
+#### Usage
+
+`scope update [flags]`
+
+#### Examples
+
+`scope update 1000 --config test_cfg.yml`
+
+#### Flags
+
+```
+Flags:
+  -c, --config string   Path to configuration file
+  -h, --help            help for update
+  -p, --prefix string   Prefix to /proc filesystem
 ```
 
 ### version
@@ -656,19 +743,19 @@ scope watch --interval=10s -- curl https://wttr.in/94105
 #### Flags
 
 ```
-  -a, --authtoken string      Set AuthToken for Cribl Stream
-  -c, --cribldest string      Set Cribl Stream destination for metrics & events (host:port defaults to tls://)
+  -a, --authtoken string      Set AuthToken for Cribl
+  -b, --backtrace             Enable backtrace file generation when an application crashes.
+  -d, --coredump              Enable core dump file generation when an application crashes.
+  -c, --cribldest string      Set Cribl destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
-  -h, --help                  Help for watch
+  -h, --help                  help for watch
   -i, --interval string       Run every <x>(s|m|h)
   -l, --librarypath string    Set path for dynamic libraries
-      --loglevel string       Set ldscope log level (debug, warning, info, error, none)
+      --loglevel string       Set scope library log level (debug, warning, info, error, none)
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
-      --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
-  -n, --nobreaker             Set Cribl Stream to not break streams into events
-      --passthrough           Run ldscope with current environment & no config
+      --metricformat string   Set format of metrics output (statsd|ndjson) (default "ndjson")
+  -n, --nobreaker             Set Cribl to not break streams into events.
   -p, --payloads              Capture payloads of network transactions
-  -u, --userconfig string     Run ldscope with a user specified config file. Overrides all other settings.
+  -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.
   -v, --verbosity int         Set scope metric verbosity (default 4)
-  
 ```

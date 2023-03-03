@@ -75,8 +75,8 @@ scope prune -d 1`,
 
 func init() {
 	RootCmd.AddCommand(pruneCmd)
-	pruneCmd.Flags().IntP("keep", "k", 0, "Keep last <keep> sessions")
-	pruneCmd.Flags().IntP("delete", "d", 0, "Delete last <delete> sessions")
+	pruneCmd.Flags().IntP("keep", "k", 0, "Keep last <n> sessions")
+	pruneCmd.Flags().IntP("delete", "d", 0, "Delete last <n> sessions")
 	pruneCmd.Flags().BoolP("all", "a", false, "Delete all sessions")
 	pruneCmd.Flags().BoolP("force", "f", false, "Do not prompt for confirmation")
 }

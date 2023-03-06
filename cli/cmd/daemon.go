@@ -54,7 +54,7 @@ var daemonCmd = &cobra.Command{
 			select {
 			case oomEvent := <-oomEventChan:
 				// oomEvent received
-				log.Info().Msgf("Out of memory pid: %d app %s\n", oomEvent.Pid, oomEvent.Comm)
+				log.Info().Msgf("Out of memory pid: %d, app: %s, cgroup max memory: %d, type: %s\n", oomEvent.Pid, oomEvent.Comm, oomEvent.CgroupMemLimit, oomEvent.OomInfo)
 				// write to /tmp/appscope/pid/
 				// TODO: unify the handling directory
 				dir := fmt.Sprintf("/tmp/appscope/%d", oomEvent.Pid)
@@ -64,7 +64,7 @@ var daemonCmd = &cobra.Command{
 				}
 
 				filepath := fmt.Sprintf("%s/oomcrash_%d", dir, time.Now().Unix())
-				if err := snapshot.GenSnapshotOOmFile(oomEvent.Pid, strings.Trim(string(oomEvent.Comm[:]), "\x00"), filepath); err != nil {
+				if err := snapshot.GenSnapshotOOmFile(oomEvent.Pid, strings.Trim(string(oomEvent.Comm[:]), "\x00"), oomEvent.OomInfo.String(), oomEvent.CgroupMemLimit, filepath); err != nil {
 					log.Error().Err(err).Msgf("error generating OOM snapshot file")
 				}
 

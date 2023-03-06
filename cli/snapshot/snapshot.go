@@ -22,8 +22,10 @@ type oomCrashInfo struct {
 	Time    time.Time
 	Version string
 	// Source: eBPF
-	Pid         uint32
-	ProcessName string `json:",omitempty"`
+	Pid            uint32
+	ProcessName    string `json:",omitempty"`
+	OomType        string `json:",omitempty"`
+	CgroupMemLimit uint64 `json:",omitempty"`
 }
 type snapshot struct {
 	// Source: self
@@ -299,13 +301,17 @@ func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler uint64, procNa
 }
 
 // GenSnapshotOOmFile generates the OOM file for a given pid
-func GenSnapshotOOmFile(pid uint32, procName, filepath string) error {
+func GenSnapshotOOmFile(pid uint32, procName string, oomType string, memlimit uint64, filepath string) error {
 	var ooms oomCrashInfo
 
 	ooms.Time = time.Now()
 	ooms.Version = internal.GetVersion()
 	ooms.Pid = pid
-	ooms.ProcessName = strings.Trim(procName, "\x00")
+	ooms.ProcessName = procName
+	ooms.OomType = oomType
+	if oomType == "cgroup" {
+		ooms.CgroupMemLimit = uint64(os.Getpagesize()) * memlimit
+	}
 
 	// Create json structure
 	jsonOomSnapshot, err := json.MarshalIndent(ooms, "", "  ")

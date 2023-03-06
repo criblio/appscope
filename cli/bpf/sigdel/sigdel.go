@@ -103,9 +103,32 @@ func Sigdel(sigEventChan chan SigEvent) error {
 	}
 }
 
+type OomType byte
+
+const (
+	OomGlobal OomType = 0
+	OomCgroup OomType = 1
+)
+
+func (o OomType) String() string {
+	switch o {
+	case OomGlobal:
+		return "global"
+	case OomCgroup:
+		return "cgroup"
+	}
+	return "unknown"
+}
+
+// OomEvent is corresponding to oom_data_t structure
+// IMPORTANT:
+// The follow structure is used in binary.Read so please consider
+// padding. See details in https://github.com/cilium/ebpf/issues/821
 type OomEvent struct {
-	Pid  uint32
-	Comm [16]byte
+	CgroupMemLimit uint64
+	Comm           [16]byte
+	Pid            uint32
+	OomInfo        OomType
 }
 
 func OOMProc(oomEventChan chan<- OomEvent) error {

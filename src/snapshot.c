@@ -76,33 +76,75 @@ snapActionAlwaysEnabled(void) {
 /*
  * Application signal action
  */
-typedef void (*signalHandlerFunc)(int, siginfo_t *, void *);
-
-static signalHandlerFunc appSigSegvAction;
-static signalHandlerFunc appSigBusAction;
-static signalHandlerFunc appSigIllAction;
-static signalHandlerFunc appSigFpeAction;
+static struct sigaction appSigSegvAction;
+static struct sigaction appSigBusAction;
+static struct sigaction appSigIllAction;
+static struct sigaction appSigFpeAction;
 
 /*
  * Save application signal handler
  * Returns TRUE in case of sig is a signal supported by snapshot
  */
 bool
-snapshotBackupAppSignalHandler(int sig, sighandler_t act) {
+snapshotBackupAppSignalHandler(int sig, const struct sigaction *act) {
     if (sig == SIGSEGV) {
-        appSigSegvAction = (signalHandlerFunc) act;
+        appSigSegvAction = *act;
         return TRUE;
     } else if (sig == SIGBUS) {
-        appSigBusAction = (signalHandlerFunc) act;
+        appSigBusAction = *act;
         return TRUE;
     } else if (sig == SIGILL) {
-        appSigIllAction = (signalHandlerFunc) act;
+        appSigIllAction = *act;
         return TRUE;
     } else if (sig == SIGFPE) {
-        appSigFpeAction = (signalHandlerFunc) act;
+        appSigFpeAction = *act;
         return TRUE;
     }
     return FALSE;
+}
+
+bool
+snapshotRetrieveAppSignalHandler(int sig, struct sigaction *const act) {
+    if (sig == SIGSEGV) {
+        *act = appSigSegvAction;
+        return TRUE;
+    } else if (sig == SIGBUS) {
+        *act = appSigBusAction;
+        return TRUE;
+    } else if (sig == SIGILL) {
+        *act = appSigIllAction;
+        return TRUE;
+    } else if (sig == SIGFPE) {
+        *act = appSigFpeAction;
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static bool
+handlerWasSaved(struct sigaction *act)
+{
+    if (act->sa_flags & SA_SIGINFO) {
+        return act->sa_sigaction != NULL;
+    }
+    return act->sa_handler != NULL;
+}
+
+static void
+callSavedHandler(struct sigaction *handler, int sig, siginfo_t *info, void *secret)
+{
+    if (!handlerWasSaved(handler)) return;
+
+    // from the man page on sigaction:
+    //   If SA_SIGINFO is specified in sa_flags, then sa_sigaction
+    //     (instead of sa_handler) specifies the signal-handling function
+    //     for signum.  This function receives three arguments, as described
+    //     below.
+    if (handler->sa_flags & SA_SIGINFO) {
+        handler->sa_sigaction(sig, info, secret);
+    } else {
+        handler->sa_handler(sig);
+    }
 }
 
 /*
@@ -110,14 +152,14 @@ snapshotBackupAppSignalHandler(int sig, sighandler_t act) {
  */
 static void inline
 appSignalHandler(int sig, siginfo_t *info, void *secret) {
-    if (sig == SIGSEGV && appSigSegvAction) {
-        appSigSegvAction(sig, info, secret);
-    } else if (sig == SIGBUS && appSigBusAction) {
-        appSigBusAction(sig, info, secret);
-    } else if (sig == SIGILL && appSigIllAction) {
-        appSigIllAction(sig, info, secret);
-    } else if (sig == SIGFPE && appSigFpeAction) {
-        appSigFpeAction(sig, info, secret);
+    if (sig == SIGSEGV && handlerWasSaved(&appSigSegvAction)) {
+        callSavedHandler(&appSigSegvAction, sig, info, secret);
+    } else if (sig == SIGBUS && handlerWasSaved(&appSigBusAction)) {
+        callSavedHandler(&appSigBusAction, sig, info, secret);
+    } else if (sig == SIGILL && handlerWasSaved(&appSigIllAction)) {
+        callSavedHandler(&appSigIllAction, sig, info, secret);
+    } else if (sig == SIGFPE && handlerWasSaved(&appSigFpeAction)) {
+        callSavedHandler(&appSigFpeAction, sig, info, secret);
     } else {
         // If there was no application handler just abort
         abort();
@@ -145,7 +187,6 @@ snapInfo(const char *dirPath, const char *epochStr, siginfo_t *unused) {
     snapshotWriteNumberDec(fd, g_proc.pid);
     snapshotWriteConstStr(fd ,"\nProcess name: ");
     snapshotWriteStr(fd, g_proc.procname);
-    snapshotWriteConstStr(fd, "\n");
 
     scope_close(fd);
     return (scope_chmod(filePath, 0755) == 0) ? TRUE : FALSE;
@@ -443,13 +484,15 @@ snapshotSignalHandler(int sig, siginfo_t *info, void *secret) {
     }
 
     /*
-    * Stop the world
-    * - give a time to consume the snapshot files
+    * This sleep is a fragile way to give the scope daemon time to read
+    * the snapshot output files before this process exits (think: containerized
+    * process). At the time this was written, after the daemon sees the signal
+    * it just waits one second before grabbing these files. The coredump
+    * is the last file we create, and while the coredump file creation
+    * is *normally* less than a second it can take 60s (only seen on java7).
+    * In short this is easy but needs improvement.
     */
-    // raise of SIGSTOP wasn't working when running as pid 1 in a container...
-    // tbd: try sleep instead???
-    //g_fn.raise(SIGSTOP);
-    sleep(5);
+    sleep(2);
 
     // We don't need to run the app's signal handler if we're dealing with a Go app
     // since we are hooked just before die ; and after any application-level signal handling

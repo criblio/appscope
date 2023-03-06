@@ -20,11 +20,12 @@ import (
 
 // daemonCmd represents the daemon command
 var daemonCmd = &cobra.Command{
-	Use:     "daemon [flags]",
-	Short:   "Run the scope daemon",
-	Long:    `Listen and respond to system events.`,
-	Example: `scope daemon`,
-	Args:    cobra.NoArgs,
+	Use:   "daemon [flags]",
+	Short: "Run the scope daemon",
+	Long:  `Listen and respond to system events.`,
+	Example: `scope daemon
+	scope daemon --filedest localhost:10089`,
+	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		filedest, _ := cmd.Flags().GetString("filedest")
 		sendcore, _ := cmd.Flags().GetBool("sendcore")

@@ -81,7 +81,7 @@ int g_go_minor_ver = UNKNOWN_GO_VER;
 int g_go_maint_ver = UNKNOWN_GO_VER;
 int g_arch = ARCH;
 static char g_go_build_ver[7];
-static char g_ReadFrame_addr[sizeof(void *)];
+static char g_ReadFrame_addr[20];
 go_schema_t *g_go_schema = &go_9_schema; // overridden if later version
 uint64_t g_glibc_guard = 0LL;
 uint64_t go_systemstack_switch;
@@ -1025,7 +1025,7 @@ initGoHook(elf_buf_t *ebuf)
     }
 
     ReadFrame_addr = (uint64_t *)((uint64_t)ReadFrame_addr + base);
-    scope_sprintf(g_ReadFrame_addr, "%p\n", ReadFrame_addr);
+    scope_snprintf(g_ReadFrame_addr, sizeof(g_ReadFrame_addr), "%p\n", ReadFrame_addr);
 
     char gosave[30] = "gosave";
     if (g_go_minor_ver >= 17) scope_strcpy(gosave, "gosave_systemstack_switch");

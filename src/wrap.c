@@ -1133,7 +1133,7 @@ enableSnapshot(config_t *cfg) {
             struct sigaction oldact = { 0 };
             int sig = snapshotErrorsSignals[i];
             g_fn.sigaction(sig, &act, &oldact);
-            snapshotBackupAppSignalHandler(sig, oldact.sa_handler);
+            snapshotBackupAppSignalHandler(sig, &oldact);
         }
     }
 }
@@ -1852,8 +1852,15 @@ signal(int signum, sighandler_t handler) {
      * Condition below must be inline with `snapshotErrorsSignals` array
      */
     if (snapshotIsEnabled() == TRUE) {
-        if (snapshotBackupAppSignalHandler(signum, handler) == TRUE) {
-            return handler;
+        // grab the old
+        struct sigaction oldact = { 0 };
+        snapshotRetrieveAppSignalHandler(signum, &oldact);
+
+        // save the new
+        struct sigaction newact = { 0 };
+        newact.sa_handler = handler;
+        if (snapshotBackupAppSignalHandler(signum, &newact) == TRUE) {
+            return oldact.sa_handler;
         }
     }
 
@@ -1884,12 +1891,28 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
      * Prevent the situation to override our handler when it is enabled.
      * Condition below must be inline with `snapshotErrorsSignals` array
      */
-    if ((snapshotIsEnabled() == TRUE) && (act != NULL)) {
+    if (snapshotIsEnabled() == TRUE) {
+
+        // When act is NULL, return the saved application handler
+        // but *do not* run snapshotBackupAppSignalHandler().
+        // i.e., don't save the NULL as the latest application handler
+        if (act == NULL) {
+            struct sigaction old = { 0 };
+            snapshotRetrieveAppSignalHandler(signum, &old);
+            *oldact = old;
+            return 0;
+
+        }
+
         // if signum is part of the snapshotErrorsSignals, save the handler
         // and set oldact, then return (without changing away from the
         // snapshot handler)
-        if (snapshotBackupAppSignalHandler(signum, act->sa_handler) == TRUE) {
-            oldact->sa_handler = act->sa_handler; // equivalent to signal above
+        struct sigaction old = { 0 };
+        snapshotRetrieveAppSignalHandler(signum, &old);
+        if (snapshotBackupAppSignalHandler(signum, act) == TRUE) {
+            if (oldact) {
+                *oldact = old;
+            }
             return 0;
         }
     }

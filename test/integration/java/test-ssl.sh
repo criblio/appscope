@@ -282,6 +282,61 @@ fi
 
 fi # x86_64 only
 
+
+starttest java_crash_analysis
+
+cd /opt/java_http
+
+# if we crash java, verify that we capture a backtrace & coredump
+scope run -p --backtrace --coredump -- java SimpleHttpServer 2> /dev/null &
+HTTP_SERVER_PID=$!
+sleep 1
+
+evaltest
+
+# we'll send a signal to act like a java crash
+kill -s SIGBUS $HTTP_SERVER_PID
+sleep 2
+
+grep -q '"proc":"java"' $EVT_FILE > /dev/null
+ERR+=$?
+
+# test that the expected files have been produced
+snapshot_dir="/tmp/appscope/$HTTP_SERVER_PID"
+ls $snapshot_dir/info* 1>/dev/null
+ERR+=$?
+ls $snapshot_dir/cfg* 1>/dev/null
+ERR+=$?
+ls $snapshot_dir/backtrace* 1>/dev/null
+ERR+=$?
+ls $snapshot_dir/core* 1>/dev/null
+ERR+=$?
+
+# test that the SimpleHttpServer has been terminated by the SIGBUS.
+# kill -0 allows us to check if the pid is still running.
+wait_seconds=0
+wait_limit=120
+while [[ $wait_seconds -lt $wait_limit ]]; do
+    if ! kill -0 $HTTP_SERVER_PID &>/dev/null; then
+        echo "As expected, SimpleHttpServer isn't executing after the SIGBUS."
+        echo "  it took roughly $wait_seconds seconds to terminate."
+        break;
+    fi
+    ((wait_seconds++))
+    sleep 1
+done
+if [[ $wait_seconds -eq $wait_limit ]]; then
+    echo "SimpleHttpServer was expected to terminate after the SIGBUS"
+    echo "  but hasn't after $wait_seconds seconds.  Timing out."
+    ERR+=1
+    kill -9 $HTTP_SERVER_PID
+fi
+
+endtest
+ls -al $snapshot_dir
+
+
+
 unset SCOPE_PAYLOAD_ENABLE
 unset SCOPE_PAYLOAD_HEADER
 

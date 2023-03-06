@@ -9,7 +9,7 @@ import (
 
 var errSettingCfg = errors.New("error setting cfg")
 
-// UpdateScopeCfg updates the configuration of scoped process
+// UpdateScopeCfg updates the configuration of a scoped process
 func UpdateScopeCfg(pidCtx ipc.IpcPidCtx, confFile string) error {
 	content, err := os.ReadFile(confFile)
 	if err != nil {

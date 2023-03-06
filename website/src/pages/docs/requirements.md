@@ -38,6 +38,8 @@ AppScope 1.2, Cribl Stream 4.0, Cribl Edge 4.0, and Cribl Search 1.0 are mutuall
 
 ### Known Limitations
 
+<!-- TBD add coredump is not supported in go apps or musl environments-->
+
 AppScope can instrument static executables only when they are written in Go.
 
 AppScope cannot:

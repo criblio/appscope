@@ -25,7 +25,7 @@ Assets other than AWS Lambda Layers are available in the [Docker container](http
 
 In AppScope 1.3.0: 
 
-The new **crash analysis** feature enables you to configure AppScope to create a **snapshot** – consisting of a core dump, a backtrace (i.e., stack trace), or both – whenever a scoped app crashes. Under the hood, this feature relies on AppScope's first-ever use of [eBPF](https://ebpf.io/). 
+Whenever a scoped app crashes, the new **crash analysis** feature can obtain a core dump, a backtrace (i.e., stack trace), or both, while capturing supplemental information in text files. AppScope can even generate one of these files (the **snapshot**, which records TBD) for apps that are **not** being scoped. Under the hood, this feature relies on AppScope's first-ever use of [eBPF](https://ebpf.io/).
 
 AppScope now uses inter-process communication ([IPC](https://tldp.org/LDP/tlk/ipc/ipc.html)) to interact with processes in new ways:
 - tell whether the process is scoped or not

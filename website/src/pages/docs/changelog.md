@@ -5,6 +5,74 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.3.0
+
+2023-03-21 - Feature Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.3.0`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.3.0/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.3.0/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.3.0/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.3.0/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.3.0/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.0/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.3.0/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.0/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.3.0`.
+
+### New Features and Improvements
+
+In AppScope 1.3.0: 
+
+The new **crash analysis** feature enables you to configure AppScope to create a **snapshot** – consisting of a core dump, a backtrace (i.e., stack trace), or both – whenever a scoped app crashes. Under the hood, this feature relies on AppScope's first-ever use of [eBPF](https://ebpf.io/). 
+
+AppScope now uses inter-process communication ([IPC](https://tldp.org/LDP/tlk/ipc/ipc.html)) to interact with processes in new ways:
+- tell whether the process is scoped or not
+- retrieve the AppScope config currently in effect for a scoped process
+- update the AppScope config for a scoped process
+- retrieve connection status for a scoped process – useful for troubleshooting "Why am I getting no events or metrics?" scenarios
+
+Backoff algorithm for connections:
+- If you try to connect to a remote destination that rejects the connection, or is not available, AppScope slows down the rate of connection attempts to avoid creating excess network traffic and log entries.
+
+The `ldscope` utility no longer exists, and the AppScope team recommends using CLI commands instead; `ldscope.log` has been renamed as `libscope.log`.
+
+Enhancements to the AppScope CLI include:
+- `scope start` can now attach to processes running in rootless and nested containers.
+- `scope detach --all` is a new flag allowing you to detach from all processes at once.
+- `scope stop` is a new command that runs `scope detach --all` and undoes the effects of the `scope start` command, namely removing `scope` from service configurations; and, removing the filter file from the system.
+- When `scope start` or `scope service` are finished, remove lines <!-- where was wording? -->
+- `scope what` to write payloads to files <!-- config file too i presume? -->
+- `scope --passthrough` replaces `scope run --passthrough`, which is no longer available.
+- Filter files now support keywords, e.g., foo bar.
+- `scope daemon`
+- `scope snapshot`
+
+AppScope 1.3.0 introduces support for: 
+
+- Instrumenting Go executables on ARM.
+- Scoping apps running in [LXC](https://github.com/lxc/lxc) and [LXD](https://linuxcontainers.org/lxd/introduction/) containers.
+
+### Fixes
+
+- [#1328](https://github.com/criblio/appscope/issues/1328) Scoping Terraform – e.g., `scope terraform plan` – no longer causes Terraform to crash. 
+- [#1310](https://github.com/criblio/appscope/issues/1310) Follow mode – i.e., running `scope events -f` to see the scoped app's events scrolling – works correctly again, fixing a regression in recent versions of AppScope.
+- [#1293](https://github.com/criblio/appscope/issues/1293) AppScope no longer causes Redis to crash when Redis (running as a service, and scoped) receives a `GET` or `SET` command.
+- [#1252](https://github.com/criblio/appscope/issues/1252) AppScope no longer uses the [UPX](https://upx.github.io/) executable file compressor, avoiding scenarios where some Java applications crashed when scoped.
+- [#1153](https://github.com/criblio/appscope/issues/1153) The `scope ps` command no longer erroneously reports that a process is scoped even after `scope detach` has been run for that process.
+
+<!--
+
+are there any? ask Sean
+
+### Security Fixes
+
+Upgrade OpenSSL from 3.0.0 to 3.0.7 - already fixed in 1.2.2
+
+-->
+
+
 ## AppScope 1.2.2
 
 2023-01-18 - Maintenance Release

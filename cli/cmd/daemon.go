@@ -54,7 +54,7 @@ var daemonCmd = &cobra.Command{
 			select {
 			case oomEvent := <-oomEventChan:
 				// oomEvent received
-				// fmt.Printf("OOM PID %d Name %s\n", oomEvent.Pid, oomEvent.Comm)
+				log.Info().Msgf("Out of memory pid: %d app %s\n", oomEvent.Pid, oomEvent.Comm)
 				// write to /tmp/appscope/pid/
 				// TODO: unify the handling directory
 				dir := fmt.Sprintf("/tmp/appscope/%d", oomEvent.Pid)

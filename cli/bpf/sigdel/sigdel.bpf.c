@@ -1,5 +1,7 @@
 #include "../vmlinux.h"
 #include <bpf/bpf_helpers.h>
+#include <bpf/bpf_tracing.h>
+#include <bpf/bpf_core_read.h>
 
 #define FILTER_SIGS 1
 #define COMM_LEN 128
@@ -10,6 +12,10 @@
 #ifndef BPF_F_CURRENT_CPU
 #define BPF_F_INDEX_MASK 0xffffffffULL
 #define BPF_F_CURRENT_CPU BPF_F_INDEX_MASK
+#endif
+
+#ifndef TASK_COMM_LEN
+#define TASK_COMM_LEN 16
 #endif
 
 /*
@@ -59,6 +65,11 @@ struct sigdel_args_t {
     int code;
     unsigned long sa_handler;
     unsigned long sa_flags;
+};
+
+struct oom_data_t {
+    u32 pid;
+    unsigned char comm[TASK_COMM_LEN];
 };
 
 char LICENSE[] SEC_GO("license") = "GPL";
@@ -134,6 +145,52 @@ int sig_deliver(struct sigdel_args_t *args)
                               &sigdel_data, sizeof(sigdel_data)) != 0) {
         bpf_printk("ERROR:sigdel:bpf_perf_event_output\n");
     }
+
+    return 0;
+}
+
+struct {
+	__uint(type, BPF_MAP_TYPE_RINGBUF);
+	__uint(max_entries, 1 << 24);
+} oom_events SEC_GO(".maps");
+
+
+SEC_GO("kprobe/oom_kill_process")
+int kprobe__oom_kill_process(struct pt_regs *ctx)
+{   
+    struct oom_control *oc = (struct oom_control*) PT_REGS_PARM1(ctx);
+    struct oom_data_t *oom_data = NULL;
+
+    struct task_struct *chosen;
+    if (bpf_probe_read_kernel(&chosen, sizeof(chosen), &oc->chosen) != 0) {
+        bpf_printk("ERROR:oom_kill_process:bpf_probe_read_kernel oc chosen read fails\n");
+        return 0;
+    }
+
+    u32 pid;
+    if (bpf_probe_read_kernel(&pid, sizeof(pid), &chosen->pid) != 0) {
+        bpf_printk("ERROR:oom_kill_process:bpf_probe_read_kernel pid read fails\n");
+        return 0;
+    }
+
+    unsigned char chosencomm[TASK_COMM_LEN];
+    if (bpf_probe_read_kernel(&chosencomm, sizeof(chosencomm), &chosen->comm) != 0) {
+        bpf_printk("ERROR:oom_kill_process:bpf_probe_read_kernel comm read fails\n");
+        return 0;
+    }
+
+    oom_data = bpf_ringbuf_reserve(&oom_events, sizeof(struct oom_data_t), 0);
+    if (!oom_data) {
+        bpf_printk("ERROR:oom_kill_process:reserve fails\n");
+        return 0;
+    }
+
+    oom_data->pid = pid;
+    for (int i = 0; i < TASK_COMM_LEN; ++i ){
+        oom_data->comm[i] = chosencomm[i];
+    }
+
+    bpf_ringbuf_submit(oom_data, 0);
 
     return 0;
 }

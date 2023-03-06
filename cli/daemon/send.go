@@ -70,7 +70,7 @@ func (d *Daemon) SendSnapshotFiles(dirPath string, sendCore bool) error {
 			fileName := file.Name()
 			if strings.HasPrefix(fileName, snapshotFileObj.prefixName) && snapshotFileObj.enabled {
 				fullFilePath := filepath.Join(dirPath, fileName)
-				if err := d.sendFile(fullFilePath, snapshotFileObj.useJson); err != nil {
+				if err := d.SendFile(fullFilePath, snapshotFileObj.useJson); err != nil {
 					log.Error().Err(err).Msgf("error sending file %s to %s", fullFilePath, d.filedest)
 				}
 			}
@@ -80,9 +80,9 @@ func (d *Daemon) SendSnapshotFiles(dirPath string, sendCore bool) error {
 	return nil
 }
 
-// sendFile attempts to send file to the daemon network destination
+// SendFile attempts to send file to the daemon network destination
 // The useJson argument allows the user to embed the file contents in a json object
-func (d *Daemon) sendFile(path string, useJson bool) error {
+func (d *Daemon) SendFile(path string, useJson bool) error {
 	var msg []byte
 
 	// Read file from dir

@@ -17,6 +17,14 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 )
 
+type oomCrashInfo struct {
+	// Source: self
+	Time    time.Time
+	Version string
+	// Source: eBPF
+	Pid         uint32
+	ProcessName string `json:",omitempty"`
+}
 type snapshot struct {
 	// Source: self
 	Time    time.Time
@@ -287,5 +295,30 @@ func GenSnapshotFile(sig, errno, pid, uid, gid uint32, sigHandler uint64, procNa
 		return err
 	}
 
+	return nil
+}
+
+// GenSnapshotOOmFile generates the OOM file for a given pid
+func GenSnapshotOOmFile(pid uint32, procName, filepath string) error {
+	var ooms oomCrashInfo
+
+	ooms.Time = time.Now()
+	ooms.Version = internal.GetVersion()
+	ooms.Pid = pid
+	ooms.ProcessName = strings.Trim(procName, "\x00")
+
+	// Create json structure
+	jsonOomSnapshot, err := json.MarshalIndent(ooms, "", "  ")
+	if err != nil {
+		log.Error().Err(err).Msgf("error marshaling OOM snapshot to json")
+		return err
+	}
+
+	// Open and Write file to dir
+	err = os.WriteFile(filepath, jsonOomSnapshot, 0644)
+	if err != nil {
+		log.Error().Err(err).Msgf("error writing OOM snapshot file")
+		return err
+	}
 	return nil
 }

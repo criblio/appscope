@@ -15,6 +15,8 @@ import (
 
 	"github.com/cilium/ebpf/link"
 	"github.com/cilium/ebpf/perf"
+	"github.com/cilium/ebpf/ringbuf"
+	"github.com/cilium/ebpf/rlimit"
 	"golang.org/x/sys/unix"
 )
 
@@ -98,5 +100,57 @@ func Sigdel(sigEventChan chan SigEvent) error {
 			data,
 			ev.CPU,
 		}
+	}
+}
+
+type OomEvent struct {
+	Pid  uint32
+	Comm [16]byte
+}
+
+func OOMProc(oomEventChan chan<- OomEvent) error {
+	// Allow the current process to lock memory for eBPF resources.
+	if err := rlimit.RemoveMemlock(); err != nil {
+		log.Error().Err(err)
+		return err
+	}
+
+	objs := gen_sigdelObjects{}
+	if err := loadGen_sigdelObjects(&objs, nil); err != nil {
+		log.Error().Err(err)
+		return err
+	}
+	defer objs.Close()
+
+	kp, err := link.Kprobe("oom_kill_process", objs.KprobeOomKillProcess, nil)
+	if err != nil {
+		log.Error().Err(err)
+		return err
+	}
+	defer kp.Close()
+
+	rd, err := ringbuf.NewReader(objs.OomEvents)
+	if err != nil {
+		log.Error().Err(err)
+		return err
+	}
+
+	defer rd.Close()
+	for {
+		record, err := rd.Read()
+		if err != nil {
+			if errors.Is(err, ringbuf.ErrClosed) {
+				log.Error().Err(err)
+				return err
+			}
+			continue
+		}
+
+		var event OomEvent
+		if err := binary.Read(bytes.NewBuffer(record.RawSample), binary.LittleEndian, &event); err != nil {
+			continue
+		}
+
+		oomEventChan <- event
 	}
 }

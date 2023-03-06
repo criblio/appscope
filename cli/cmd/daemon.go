@@ -2,9 +2,13 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"strings"
+	"syscall"
 	"time"
 
 	"github.com/criblio/scope/bpf/sigdel"
+
 	"github.com/criblio/scope/daemon"
 	"github.com/criblio/scope/snapshot"
 	"github.com/criblio/scope/util"
@@ -38,14 +42,41 @@ var daemonCmd = &cobra.Command{
 			log.Error().Err(err)
 			util.ErrAndExit("scope daemon requires administrator privileges")
 		}
-
-		// Buffered Channel (non-blocking until full)
-		sigEventChan := make(chan sigdel.SigEvent, 128)
-		go sigdel.Sigdel(sigEventChan)
-
 		d := daemon.New(filedest)
+
+		// Buffered Channels (non-blocking until full)
+		sigEventChan := make(chan sigdel.SigEvent, 128)
+		oomEventChan := make(chan sigdel.OomEvent, 32)
+
+		go sigdel.Sigdel(sigEventChan)
+		go sigdel.OOMProc(oomEventChan)
 		for {
 			select {
+			case oomEvent := <-oomEventChan:
+				// oomEvent received
+				// fmt.Printf("OOM PID %d Name %s\n", oomEvent.Pid, oomEvent.Comm)
+				// write to /tmp/appscope/pid/
+				// TODO: unify the handling directory
+				dir := fmt.Sprintf("/tmp/appscope/%d", oomEvent.Pid)
+				syscall.Umask(0)
+				if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+					log.Error().Err(err).Msgf("error creating OOM Pid directory")
+				}
+
+				filepath := fmt.Sprintf("%s/oomcrash_%d", dir, time.Now().Unix())
+				if err := snapshot.GenSnapshotOOmFile(oomEvent.Pid, strings.Trim(string(oomEvent.Comm[:]), "\x00"), filepath); err != nil {
+					log.Error().Err(err).Msgf("error generating OOM snapshot file")
+				}
+
+				// If a network destination is specified, send oom file
+				if filedest != "" {
+					if err := d.Connect(); err != nil {
+						log.Error().Err(err).Msgf("error connecting to %s", filedest)
+						continue
+					}
+					d.SendFile(filepath, true)
+					d.Disconnect()
+				}
 			case sigEvent := <-sigEventChan:
 				// Signal received
 				log.Info().Msgf("Signal CPU: %02d signal %d errno %d handler 0x%x pid: %d nspid: %d uid: %d gid: %d app %s\n",

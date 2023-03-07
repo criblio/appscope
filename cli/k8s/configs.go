@@ -172,7 +172,7 @@ spec:
       volumes:
         - name: certs
           secret:
-            secretName: {{ .App }}-secret 
+            secretName: {{ .App }}-secret
 ---
 apiVersion: v1
 kind: Service
@@ -187,7 +187,7 @@ spec:
       port: 443
       targetPort: {{ .Port }}
   selector:
-    app: {{ .App }} 
+    app: {{ .App }}
 ---
 apiVersion: v1
 kind: ConfigMap

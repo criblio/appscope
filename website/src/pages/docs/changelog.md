@@ -25,29 +25,27 @@ Assets other than AWS Lambda Layers are available in the [Docker container](http
 
 In AppScope 1.3.0: 
 
-Whenever a scoped app crashes, the new **crash analysis** feature can obtain a core dump, a backtrace (i.e., stack trace), or both, while capturing supplemental information in text files. AppScope can even generate one of these files (the **snapshot**, which records TBD) for apps that are **not** being scoped. Under the hood, this feature relies on AppScope's first-ever use of [eBPF](https://ebpf.io/).
+Whenever a scoped app crashes, the new **crash analysis** feature can obtain a core dump, a backtrace (i.e., stack trace), or both, while capturing supplemental information in text files. AppScope can even generate one of these – the **snapshot** debug file – for apps that are **not** being scoped and/or are running normally.
 
-AppScope now uses inter-process communication ([IPC](https://tldp.org/LDP/tlk/ipc/ipc.html)) to interact with processes in new ways:
-- tell whether the process is scoped or not
-- retrieve the AppScope config currently in effect for a scoped process
-- update the AppScope config for a scoped process
-- retrieve connection status for a scoped process – useful for troubleshooting "Why am I getting no events or metrics?" scenarios
+Under the hood, it is AppScope's first-ever use of [eBPF](https://ebpf.io/) that generates the **snapshot** file.
 
-Backoff algorithm for connections:
-- If you try to connect to a remote destination that rejects the connection, or is not available, AppScope slows down the rate of connection attempts to avoid creating excess network traffic and log entries.
+AppScope now uses **inter-process communication** ([IPC](https://tldp.org/LDP/tlk/ipc/ipc.html)) to interact with processes in new ways. These include determining whether the process is scoped or not. If the process is scoped, AppScope can:
+- Determine the status of the transport AppScope is trying to use to convey events and metrics to a destination. This helps troubleshoot "Why am I getting no events or metrics?" scenarios.
+- Retrieve or update (modify) the AppScope config currently in effect.
+
+A **backoff algorithm** for connections helps AppScope avoid creating excessive network traffic and log entries. When a remote destination that AppScope tries to connect to rejects the connection or is not available, AppScope now retries the connection at a progressively slower rate.
 
 The `ldscope` utility no longer exists, and the AppScope team recommends using CLI commands instead; `ldscope.log` has been renamed as `libscope.log`.
 
-Enhancements to the AppScope CLI include:
+The AppScope CLI is enhanced in the following ways:
 - `scope start` can now attach to processes running in rootless and nested containers.
-- `scope detach --all` is a new flag allowing you to detach from all processes at once.
-- `scope stop` is a new command that runs `scope detach --all` and undoes the effects of the `scope start` command, namely removing `scope` from service configurations; and, removing the filter file from the system.
-- When `scope start` or `scope service` are finished, remove lines <!-- where was wording? -->
-- `scope what` to write payloads to files <!-- config file too i presume? -->
+- `scope detach`, when run with the new `--all` flag, detaches from all processes at once.
+- `scope stop`, a new command, runs `scope detach --all` and undoes the effects of the `scope start` command – that is, it removes the filter file from the system, and removes `scope` from service configurations. 
+<!-- `scope service` does part of what scope start does says John, check with Sean -->
+- `scope daemon` runs the AppScope daemon, enabling the eBPF mechanism that detects a fatal signal (i.e., illegal instruction, bus error, segmentation fault, or floating point exception) from the kernel to a scoped app, then runs `scope snapshot` which in turn generates a **snapshot** file.
+- `scope snapshot` obtains debug information about a running or crashing process, regardless of whether or not the process is scoped or the AppScope daemon is running.
 - `scope --passthrough` replaces `scope run --passthrough`, which is no longer available.
-- Filter files now support keywords, e.g., foo bar.
-- `scope daemon`
-- `scope snapshot`
+- When the **payloads** feature is enabled, setting `SCOPE_PAYLOAD_TO_DISK` to `true` now guarantees that AppScope will write payloads to the local directory specified in `SCOPE_PAYLOAD_DIR`.
 
 AppScope 1.3.0 introduces support for: 
 

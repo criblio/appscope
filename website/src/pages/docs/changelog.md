@@ -67,6 +67,11 @@ The AppScope CLI is enhanced in the following ways:
 - `scope snapshot` obtains debug information about a running or crashing process, regardless of whether or not the process is scoped or the AppScope daemon is running.
 - `scope --passthrough` replaces `scope run --passthrough`.
 
+Three commands use IPC, which is new in AppScope 1.3.0. `scope inspect` and `scope update` are completely new, while `scope ps` has new capabilities thanks to IPC.
+- `scope inspect` retrieves the AppScope config currently in effect and determines the status of the transport AppScope is trying to use.
+- `scope update` modifies the current AppScope config.
+- `scope ps` now determines whether the processes it lists are scoped or not.
+
 ### Fixes
 
 - [#1328](https://github.com/criblio/appscope/issues/1328) Scoping Terraform – e.g., `scope terraform plan` – no longer causes Terraform to crash. 

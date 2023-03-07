@@ -16,7 +16,11 @@ Then, to confirm the overwrite, verify AppScope's version and build date:
 scope version
 ```
 
+<!-- 
+
 ## Updating from Pre-Release Versions
+
+(Checking with PM and Eng – this whole section can either be deleted, or moved to a Reference page)
 
 You can skip this section unless you are updating a Maintenance Pre-Release (version 0.8.1 or older) to version 1.0 or newer.
 
@@ -125,3 +129,5 @@ Pre-GA | 1.0.1
 `net.dns.duration` | `dns.duration`
 `net.conn.duration` | `net.duration`
 `net.conn_duration` | `net.duration`
+
+-->

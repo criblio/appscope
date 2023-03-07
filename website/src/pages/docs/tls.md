@@ -14,11 +14,15 @@ For security's sake, AppScope never opens ports, nor does it listen for or allow
 
 To enable TLS: In the `scope.yml` [config file](/docs/config-file), set the `transport : tls : enable` element to `true`.
 
+<!-- 
+
 To see the TLS-related environment variables, run the command: 
 
 ```
 ldscope --help configuration | grep TLS
 ```
+
+-->
 
 ## Using TLS in Cribl.Cloud
 
@@ -42,7 +46,7 @@ Use `scope run` with the `-c` option (in this example, we're scoping `ps -ef`):
 scope run -c tls://host:10090 -- ps -ef
 ```
 
-### Configuration for `LD_PRELOAD` or `ldscope`
+### Configuration for `LD_PRELOAD`
 
 To connect AppScope to a Cribl.Cloud-managed instance of Cribl Stream using TLS: 
 

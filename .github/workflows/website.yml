@@ -34,7 +34,7 @@ jobs:
         run: make docs-generate
 
       - name: configure AWS creds
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: ${{ secrets.APPSCOPEDEPLOYROLE }}
           role-session-name: appscope-deploy

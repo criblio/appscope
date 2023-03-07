@@ -30,15 +30,11 @@ AppScope 1.3.0 introduces support for:
 - Instrumenting Go executables on ARM.
 - Scoping apps running in [LXC](https://github.com/lxc/lxc) and [LXD](https://linuxcontainers.org/lxd/introduction/) containers.
 
-#### The Crash Analysis Feature
+#### The Crash Analysis, Snapshot, and Daemon Features
 
 Whenever a scoped app crashes, AppScope can obtain a core dump, a backtrace (i.e., stack trace), or both, while capturing supplemental information in text files. 
 
-#### The Snapshot Feature
-
 AppScope can generate a **snapshot** file containing debug information about processes that are running normally or crashing, unscoped or scoped.
-
-#### The Daemon Feature
 
 AppScope now has its own daemon that can detect fatal signals sent to an application, whether scoped or not. This is made possible by AppScope's first-ever use of [eBPF](https://ebpf.io/) technology.
 
@@ -65,8 +61,7 @@ The `ldscope` utility no longer exists, and you can use CLI commands instead; `l
 The AppScope CLI is enhanced in the following ways:
 - `scope start` can now attach to processes running in rootless and nested containers.
 - `scope detach`, when run with the new `--all` flag, detaches from all processes at once.
-- `scope stop`, a new command, runs `scope detach --all` and undoes the effects of the `scope start` command – that is, it removes the filter file from the system, and removes `scope` from service configurations. 
-<!-- `scope service` does part of what scope start does says John, check with Sean -->
+- `scope stop`, a new command, runs `scope detach --all`, removes the filter file from the system, and removes `scope` from service configurations. This undoes the effects of the `scope attach`, `scope start`, and/or `scope service` commands.
 - `scope daemon` runs the AppScope daemon, enabling the eBPF mechanism that detects a fatal signal (i.e., illegal instruction, bus error, segmentation fault, or floating point exception) from the kernel to a scoped app, then runs `scope snapshot` which in turn generates a **snapshot** file.
 - `scope snapshot` obtains debug information about a running or crashing process, regardless of whether or not the process is scoped or the AppScope daemon is running.
 - `scope --passthrough` replaces `scope run --passthrough`.
@@ -83,17 +78,6 @@ Three commands use IPC, which is new in AppScope 1.3.0. `scope inspect` and `sco
 - [#1293](https://github.com/criblio/appscope/issues/1293) AppScope no longer causes Redis to crash when Redis (running as a service, and scoped) receives a `GET` or `SET` command.
 - [#1252](https://github.com/criblio/appscope/issues/1252) AppScope no longer uses the [UPX](https://upx.github.io/) executable file compressor, avoiding scenarios where some Java applications crashed when scoped.
 - [#1153](https://github.com/criblio/appscope/issues/1153) The `scope ps` command no longer erroneously reports that a process is scoped even after `scope detach` has been run for that process.
-
-<!--
-
-are there any? ask Sean
-
-### Security Fixes
-
-Upgrade OpenSSL from 3.0.0 to 3.0.7 - already fixed in 1.2.2
-
--->
-
 
 ## AppScope 1.2.2
 

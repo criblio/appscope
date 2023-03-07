@@ -42,18 +42,6 @@ How the library is loaded depends on the type of executable. A dynamic loader ca
 
 ### The Config File
 
-<!--
-
-(Waiting to hear if there's an equivalent command in 1.3; if so will add here.)
-
-To see the full set of library environment variables, run the following command:
-
-```
-/opt/appscope/ldscope --help | egrep "^[[:space:]]{8}SCOPE_"
-```
-
--->
-
 For the default settings in the sample `scope.yml` configuration file, see [Config File](/docs/config-file), or inspect the most-recent file on [GitHub](https://github.com/criblio/appscope/blob/master/conf/scope.yml).
 
 To see the config file with comments omitted, run the following command:
@@ -161,23 +149,17 @@ The AWS docs [explain](https://docs.aws.amazon.com/lambda/latest/dg/configuratio
 
     - `LD_PRELOAD=libscope.so`
 
-<!--
+2. `SCOPE_EXEC_PATH` is required for static executables (like the Go runtime).
 
-(Commenting this out pending word from Eng on deleting or rewriting)
+    - `SCOPE_EXEC_PATH=/opt/appscope/scope`
 
-1. `SCOPE_EXEC_PATH` is required for static executables (like the Go runtime).
-
-    - `SCOPE_EXEC_PATH=/lib/ldscope`
-
--->
-
-2. To tell AppScope where to deliver events, the required environment variable depends on your desired [Data Routing](/docs/data-routing).
+3. To tell AppScope where to deliver events, the required environment variable depends on your desired [Data Routing](/docs/data-routing).
 
     - For example, `SCOPE_CRIBL_CLOUD` is required for an [AppScope Source](https://docs.cribl.io/stream/sources-appscope) in a Cribl.Cloud-managed instance of Cribl Stream. (Substitute your host and port values for the placeholders.)
 
     - `SCOPE_CRIBL_CLOUD=tcp://<host>:<port>`
 
-3. Optionally, set additional environment variables as desired. 
+4. Optionally, set additional environment variables as desired. 
 
     - For example, `SCOPE_CONF_PATH` ensures that your Lambda function uses AppScope with the correct config file. (Edit the path if yours is different.)
 

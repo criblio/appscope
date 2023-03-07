@@ -23,7 +23,7 @@ Assets other than AWS Lambda Layers are available in the [Docker container](http
 
 ### New Features and Improvements
 
-AppScope 1.3.0 introduces features that support analyzing crashes, obtaining snapshots of processes, troubleshooting transports, and dynamically managing configs. Meanwhile, AppScope's architecture, connection and payload handling, and CLI are all improved. 
+AppScope 1.3.0 introduces features that support analyzing crashes, obtaining snapshots of processes, troubleshooting transports, and dynamically managing configs. Meanwhile, AppScope's architecture, connection and payload handling, container-awareness, and CLI are all improved.
 
 AppScope 1.3.0 introduces support for: 
 

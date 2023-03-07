@@ -78,7 +78,7 @@ rules:
     verbs: ["get"]
   - apiGroups: ["certificates.k8s.io"]
     resources: ["signers"]
-    resourceNames: ["kubernetes.io/legacy-unknown"]
+    resourceNames: ["kubernetes.io/kubelet-serving"]
     verbs: ["approve"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

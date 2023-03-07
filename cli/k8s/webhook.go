@@ -182,7 +182,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			})
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
 				Name:  "LD_LIBRARY_PATH",
-				Value: fmt.Sprintf("/tmp/libscope-%s", ver[0]),
+				Value: fmt.Sprintf("/tmp/appscope/%s/", ver[0]),
 			})
 			// Get some metadata pushed into scope from the K8S downward API
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{

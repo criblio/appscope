@@ -30,13 +30,17 @@ AppScope 1.3.0 introduces support for:
 - Instrumenting Go executables on ARM.
 - Scoping apps running in [LXC](https://github.com/lxc/lxc) and [LXD](https://linuxcontainers.org/lxd/introduction/) containers.
 
-#### The **Crash Analysis** Feature
+#### The Crash Analysis Feature
 
 Whenever a scoped app crashes, AppScope can obtain a core dump, a backtrace (i.e., stack trace), or both, while capturing supplemental information in text files. 
 
-#### The **Snapshot** Feature
+#### The Snapshot Feature
 
-AppScope can generate a **snapshot** file containing debug information about processes that are running normally or crashing, unscoped or scoped. This is made possible by AppScope's first-ever use of [eBPF](https://ebpf.io/) technology.
+AppScope can generate a **snapshot** file containing debug information about processes that are running normally or crashing, unscoped or scoped.
+
+#### The Daemon Feature
+
+AppScope now has its own daemon that can detect fatal signals sent to an application, whether scoped or not. This is made possible by AppScope's first-ever use of [eBPF](https://ebpf.io/) technology.
 
 #### Troubleshooting Transports and Dynamically Managing Configs  
 

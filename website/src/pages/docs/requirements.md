@@ -43,9 +43,9 @@ AppScope can instrument static executables only when they are written in Go.
 AppScope cannot:
 
 - Unload the libscope library, once loaded.
-- Instrument Go executables on ARM.
 - Instrument Go executables built with go1.8 or earlier.
 - Instrument static stripped Go executables built with go1.12 or earlier.
 - Instrument Java executables that use Open JVM 6 or earlier, or Oracle JVM 6 or earlier.
+- Obtain a core dump either (a) for a Go executable, or (b) in a musl libc environment.
 
 When an executable that's being scoped has been [stripped](https://en.wikipedia.org/wiki/Strip_(Unix)), it is not possible for `libscope.so` to obtain a file descriptor for an SSL session, and in turn, AppScope cannot include IP and port number fields in HTTP events.

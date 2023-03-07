@@ -60,13 +60,19 @@ jobs:
   update-cdn-latest:
     name: Update CDN Latest
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     needs: info
     steps:
+      - name: configure AWS creds
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.APPSCOPEDEPLOYROLE }}
+          role-session-name: appscope-deploy
+          aws-region: us-west-2
       - name: Update dl/scope/latest
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
           CF_DISTRIBUTION_ID: ${{ secrets.CF_DISTRIBUTION_ID }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -93,7 +99,7 @@ jobs:
           password: ${{ secrets.SCOPECI_TOKEN }}
 
       - name: Setup Crane
-        uses: imjasonh/setup-crane@v0.2
+        uses: imjasonh/setup-crane@v0.3
 
       - name: Update the Latest Tag
         run: |

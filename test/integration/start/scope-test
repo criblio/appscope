@@ -315,7 +315,7 @@ if [ $SCOPE_VERSION_TYPE = "dev" ]; then
     # check the content of etc/profile.d/scope.sh
     # Should be two entries first one for check second one for setup LD_PRELOAD
     count=$(grep "$SCOPE_LIB_DEV_PATH" "/etc/profile.d/scope.sh" | wc -l)
-    if [ $count -ne 2 ] ; then
+    if [ $count -lt 2 ] ; then
         fail "missing $SCOPE_LIB_DEV_PATH in /etc/profile.d/scope.sh for SCOPE_START_FORCE_PROFILE"
     fi
 else

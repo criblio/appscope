@@ -21,7 +21,7 @@
 #define OPENRC_DIR "/etc/rc.conf"
 #define SYSTEMD_DIR "/etc/systemd"
 #define INITD_DIR "/etc/init.d"
-#define PROFILE_SCRIPT "#! /bin/bash\nlib_found=0\nfilter_found=0\nif test -f /usr/lib/appscope/%s/libscope.so; then\n    lib_found=1\nfi\nif test -f /usr/lib/appscope/scope_filter; then\n    filter_found=1\nelif test -f /tmp/appscope/scope_filter; then\n    filter_found=1\nfi\nif [ $lib_found == 1 ] && [ $filter_found == 1 ]; then\n    export LD_PRELOAD=\"%s $LD_PRELOAD\"\nfi\n"
+#define PROFILE_SCRIPT "#! /bin/bash\nlib_found=0\nfilter_found=0\nldpreload=`printenv LD_PRELOAD`\nif test -f /usr/lib/appscope/%s/libscope.so; then\n    lib_found=1\nfi\nif test -f /usr/lib/appscope/scope_filter; then\n    filter_found=1\nelif test -f /tmp/appscope/scope_filter; then\n    filter_found=1\nfi\nif [ $lib_found == 1 ] && [ $filter_found == 1 ]; then\n    if [ -n \"$ldpreload\" ]; then\n        if [[ $ldpreload == *\"libscope.so\"* ]]; then\n            if [[ $ldpreload == *\":\"* ]]; then\n                delim=\":\"\n                libscope=`echo  $ldpreload | awk -F':' '{for(i=1;i<=NF;i++) if($i~\"libscope.so\") print substr($i, 1, length($i))}'`\n            else\n                delim=\" \"\n                libscope=`echo $ldpreload | awk -F' ' '{for(i=1;i<=NF;i++) if($i~\"libscope.so\") print substr($i, 1, length($i))}'`\n            fi\n            nolibscope=${ldpreload//$libscope}\n            export LD_PRELOAD=\"%s$delim$nolibscope\"\n        fi\n    else\n        export LD_PRELOAD=\"%s\"\n    fi\nfi\n"
 
 typedef enum {
     SERVICE_CFG_ERROR,
@@ -651,7 +651,7 @@ setupProfile(const char *libscopePath, const char *loaderVersion, uid_t nsUid, g
         return FALSE;
     }
 
-    size_t len = snprintf(buf, sizeof(buf), PROFILE_SCRIPT, loaderVersion, libscopePath);
+    size_t len = snprintf(buf, sizeof(buf), PROFILE_SCRIPT, loaderVersion, libscopePath, libscopePath);
     if (write(fd, buf, len) != len) {
         perror("write failed");
         close(fd);

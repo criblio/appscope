@@ -258,8 +258,6 @@ be set to sockets with `unix:///var/run/mysock`, `tcp://hostname:port`, `udp://h
 
 #### Usage
 
-<!-- Do we have the arguments in correct order? John's notes reverse them. -->
-
   `scope extract [flags] (<dir>)`
 
 #### Aliases
@@ -292,7 +290,7 @@ Displays observed flows from the given session. If run with payload capture on, 
 
 #### Usage
 
-<!-- How should we notate ID arguments? see also scope events -->
+<!-- TO-DO How should we notate ID arguments? see also scope events -->
 
 `scope flows [flags] <sessionId>`
 

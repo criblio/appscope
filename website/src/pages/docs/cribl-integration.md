@@ -67,6 +67,8 @@ Any configuration override is logged to AppScope's default log file.
 
 If you have events or metrics enabled (or disabled), they retain this setting. (Before v.1.0.0, both would be set to enabled, as an override). You still have control via environment variables or the config file.
 
+When the **payloads** feature is enabled, setting `SCOPE_PAYLOAD_TO_DISK` to `true` guarantees that AppScope will write payloads to the local directory specified in `SCOPE_PAYLOAD_DIR`.
+
 <span id="cloud-unencrypted"> </span>
 
 ### Connecting to Cribl Stream on Cribl.Cloud, Unencrypted 

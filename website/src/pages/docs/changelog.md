@@ -23,19 +23,40 @@ Assets other than AWS Lambda Layers are available in the [Docker container](http
 
 ### New Features and Improvements
 
-In AppScope 1.3.0: 
+AppScope 1.3.0 introduces features that support analyzing crashes, obtaining snapshots of processes, troubleshooting transports, and dynamically managing configs. Meanwhile, AppScope's architecture, connection and payload handling, and CLI are all improved. 
 
-Whenever a scoped app crashes, the new **crash analysis** feature can obtain a core dump, a backtrace (i.e., stack trace), or both, while capturing supplemental information in text files. AppScope can even generate one of these – the **snapshot** debug file – for apps that are **not** being scoped and/or are running normally.
+AppScope 1.3.0 introduces support for: 
 
-Under the hood, it is AppScope's first-ever use of [eBPF](https://ebpf.io/) that generates the **snapshot** file.
+- Instrumenting Go executables on ARM.
+- Scoping apps running in [LXC](https://github.com/lxc/lxc) and [LXD](https://linuxcontainers.org/lxd/introduction/) containers.
+
+#### The **Crash Analysis** Feature
+
+Whenever a scoped app crashes, AppScope can obtain a core dump, a backtrace (i.e., stack trace), or both, while capturing supplemental information in text files. 
+
+#### The **Snapshot** Feature
+
+AppScope can generate a **snapshot** file containing debug information about processes that are running normally or crashing, unscoped or scoped. This is made possible by AppScope's first-ever use of [eBPF](https://ebpf.io/) technology.
+
+#### Troubleshooting Transports and Dynamically Managing Configs  
 
 AppScope now uses **inter-process communication** ([IPC](https://tldp.org/LDP/tlk/ipc/ipc.html)) to interact with processes in new ways. These include determining whether the process is scoped or not. If the process is scoped, AppScope can:
 - Determine the status of the transport AppScope is trying to use to convey events and metrics to a destination. This helps troubleshoot "Why am I getting no events or metrics?" scenarios.
-- Retrieve or update (modify) the AppScope config currently in effect.
+- Retrieve or dynamically update (modify) the AppScope config currently in effect.
 
-A **backoff algorithm** for connections helps AppScope avoid creating excessive network traffic and log entries. When a remote destination that AppScope tries to connect to rejects the connection or is not available, AppScope now retries the connection at a progressively slower rate.
+#### Improved Handling of Connections
 
-The `ldscope` utility no longer exists, and the AppScope team recommends using CLI commands instead; `ldscope.log` has been renamed as `libscope.log`.
+AppScope now uses a **backoff algorithm** for connections to avoid creating excessive network traffic and log entries. When a remote destination that AppScope tries to connect to rejects the connection or is not available, AppScope retries the connection at a progressively slower rate.
+
+#### Improved Handling of Payloads
+
+When the **payloads** feature is enabled, setting `SCOPE_PAYLOAD_TO_DISK` to `true` now guarantees that AppScope will write payloads to the local directory specified in `SCOPE_PAYLOAD_DIR`.
+
+#### Simplified Architecture
+
+The `ldscope` utility no longer exists, and you can use CLI commands instead; `ldscope.log` has been renamed as `libscope.log`.
+
+#### CLI Improvements
 
 The AppScope CLI is enhanced in the following ways:
 - `scope start` can now attach to processes running in rootless and nested containers.
@@ -44,13 +65,7 @@ The AppScope CLI is enhanced in the following ways:
 <!-- `scope service` does part of what scope start does says John, check with Sean -->
 - `scope daemon` runs the AppScope daemon, enabling the eBPF mechanism that detects a fatal signal (i.e., illegal instruction, bus error, segmentation fault, or floating point exception) from the kernel to a scoped app, then runs `scope snapshot` which in turn generates a **snapshot** file.
 - `scope snapshot` obtains debug information about a running or crashing process, regardless of whether or not the process is scoped or the AppScope daemon is running.
-- `scope --passthrough` replaces `scope run --passthrough`, which is no longer available.
-- When the **payloads** feature is enabled, setting `SCOPE_PAYLOAD_TO_DISK` to `true` now guarantees that AppScope will write payloads to the local directory specified in `SCOPE_PAYLOAD_DIR`.
-
-AppScope 1.3.0 introduces support for: 
-
-- Instrumenting Go executables on ARM.
-- Scoping apps running in [LXC](https://github.com/lxc/lxc) and [LXD](https://linuxcontainers.org/lxd/introduction/) containers.
+- `scope --passthrough` replaces `scope run --passthrough`.
 
 ### Fixes
 

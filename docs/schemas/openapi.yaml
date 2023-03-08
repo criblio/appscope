@@ -1,0 +1,1440 @@
+openapi: 3.0.3
+
+info:
+  title: AppScope REST API 1.0
+  description: |-
+    This is the AppScope REST API based on the OpenAPI 3.0 specification. Use this API specification to understand how to interact with an AppScope server.
+
+    You can find out more about AppScope on the [AppScope Website](https://appscope.dev).
+
+    You can find out more about OpenAPI/Swagger at [https://swagger.io](https://swagger.io).
+  license:
+    name: Apache 2.0 License applies
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  version: 1.0.0
+
+servers:
+  - url: https://localhost:8000/api/v1
+
+tags:
+  - name: processes
+    description: Interact with current processes
+    externalDocs:
+      description: Find out more
+      url: http://appscope.dev
+  - name: sessions
+    description: Retrieve data from a current, or previous scope session
+    externalDocs:
+      description: Find out more
+      url: http://appscope.dev
+  - name: targets
+    description: Scope a current, or future, process or service
+    externalDocs:
+      description: Find out more
+      url: http://appscope.dev
+  - name: rules
+    description: Define a set of rules that determine which processes or services will be scoped
+    externalDocs:
+      description: Find out more
+      url: http://appscope.dev
+
+paths:
+  /processes:
+    get:
+      tags:
+        - processes
+      summary: Get a list of all running processes
+      description: ''
+      operationId: get_processes
+      parameters:
+        - name: scoped
+          in: query
+          description: Only return scoped processes
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/process'
+        '405':
+          description: Invalid input
+    post:
+      tags:
+        - processes
+      summary: Attach (or re-attach) scope to all running processes
+      description: ''
+      operationId: post_processes
+      parameters:
+        - name: authtoken
+          in: query
+          schema:
+            type: string
+        - name: backtrace
+          in: query
+          schema:
+            type: boolean
+        - name: coredump
+          in: query
+          schema:
+            type: boolean
+        - name: cribldest
+          in: query
+          schema:
+            type: string
+        - name: eventdest
+          in: query
+          schema:
+            type: string
+        - name: librarypath
+          in: query
+          schema:
+            type: string
+        - name: metricdest
+          in: query
+          schema:
+            type: string
+        - name: metricformat
+          in: query
+          schema:
+            type: string
+        - name: nobreaker
+          in: query
+          schema:
+            type: boolean
+        - name: payloads
+          in: query
+          schema:
+            type: boolean
+        - name: userconfig
+          in: query
+          description: (overrides all other parameters)
+          schema:
+            $ref: '#/components/schemas/configuration'
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+    delete:
+      tags:
+        - processes
+      summary: Detach scope from all running, scoped processes
+      description: ''
+      operationId: delete_processes
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+    patch:
+      tags:
+        - processes
+      summary: Update the scope config of all running, scoped processes
+      description: ''
+      operationId: patch_processes
+      parameters:
+        - name: config
+          in: query
+          schema:
+            $ref: '#/components/schemas/configuration'
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+  /processes/{pid}:
+    get:
+      tags:
+        - processes
+      summary: Retrieve information about a running process
+      description: ''
+      operationId: get_processes_pid
+      parameters:
+        - name: pid
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/process'
+        '405':
+          description: Invalid input
+    post:
+      tags:
+        - processes
+      summary: Attach (or re-attach) scope to a running process
+      description: ''
+      operationId: post_processes_pid
+      parameters:
+        - name: pid
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: authtoken
+          in: query
+          schema:
+            type: string
+        - name: backtrace
+          in: query
+          schema:
+            type: boolean
+        - name: coredump
+          in: query
+          schema:
+            type: boolean
+        - name: cribldest
+          in: query
+          schema:
+            type: string
+        - name: eventdest
+          in: query
+          schema:
+            type: string
+        - name: librarypath
+          in: query
+          schema:
+            type: string
+        - name: metricdest
+          in: query
+          schema:
+            type: string
+        - name: metricformat
+          in: query
+          schema:
+            type: string
+        - name: nobreaker
+          in: query
+          schema:
+            type: boolean
+        - name: payloads
+          in: query
+          schema:
+            type: boolean
+        - name: userconfig
+          in: query
+          description: (overrides all other parameters)
+          schema:
+            $ref: '#/components/schemas/configuration'
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+    delete:
+      tags:
+        - processes
+      summary: Detach scope from a running, scoped process
+      description: ''
+      operationId: delete_processes_pid
+      parameters:
+        - name: pid
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+    patch:
+      tags:
+        - processes
+      summary: Update the scope config of a running, scoped process
+      description: ''
+      operationId: patch_processes_pid
+      parameters:
+        - name: pid
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: config
+          in: query
+          schema:
+            $ref: '#/components/schemas/configuration'
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+  /sessions:
+    get:
+      tags:
+        - sessions
+      summary: Retrieve a history of all sessions
+      description: ''
+      operationId: get_sessions
+      parameters:
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+    delete:
+      tags:
+        - sessions
+      summary: Delete the history of all sessions
+      description: ''
+      operationId: delete_sessions
+      parameters:
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+  /sessions/{id}:
+    get:
+      tags:
+        - sessions
+      summary: Retrieve all available data from a session
+      description: ''
+      operationId: get_sessions_id
+      parameters:
+        - name: id
+          in: path
+          description: ID of pet that needs to be updated
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+    delete:
+      tags:
+        - sessions
+      summary: Remove a session from the history
+      description: ''
+      operationId: delete_sessions_id
+      parameters:
+        - name: id
+          in: path
+          description: ID of pet that needs to be updated
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+  /sessions/{id}/logs:
+    get:
+      tags:
+        - sessions
+      summary: Retrieve the scope logs from a session
+      description: ''
+      operationId: get_sessions_id_logs
+      parameters:
+        - name: id
+          in: path
+          description: ID of pet that needs to be updated
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+  /sessions/{id}/events:
+    get:
+      tags:
+        - sessions
+      summary: Retrieve the scope events from a session
+      description: ''
+      operationId: get_sessions_id_events
+      parameters:
+        - name: id
+          in: path
+          description: ID of pet that needs to be updated
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+  /sessions/{id}/metrics:
+    get:
+      tags:
+        - sessions
+      summary: Retrieve the scope metrics from a session
+      description: ''
+      operationId: get_sessions_id_metrics
+      parameters:
+        - name: id
+          in: path
+          description: ID of pet that needs to be updated
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+  /sessions/{id}/payloads:
+    get:
+      tags:
+        - sessions
+      summary: Retrieve the payloads from a session
+      description: ''
+      operationId: get_sessions_id_payloads
+      parameters:
+        - name: id
+          in: path
+          description: ID of pet that needs to be updated
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+  /sessions/{id}/flows:
+    get:
+      tags:
+        - sessions
+      summary: Retrieve the network flows from a session
+      description: ''
+      operationId: get_sessions_id_flows
+      parameters:
+        - name: id
+          in: path
+          description: ID of pet that needs to be updated
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+  /sessions/{id}/snapshots:
+    get:
+      tags:
+        - sessions
+      summary: Retrieve the snapshot data from a session
+      description: ''
+      operationId: get_sessions_id_snapshots
+      parameters:
+        - name: id
+          in: path
+          description: ID of pet that needs to be updated
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+  /targets:
+    get:
+      tags:
+        - targets
+      summary: Retrieve a list of all targets to be scoped
+      description: ''
+      operationId: get_targets
+      parameters:
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+    post:
+      tags:
+        - targets
+      summary: Create a set of targets (attaches by default). Wildcard operator targets all processes.
+      description: ''
+      operationId: post_targets
+      parameters:
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+    delete:
+      tags:
+        - targets
+      summary: Delete all targets (with the option to detach)
+      description: ''
+      operationId: delete_targets
+      parameters:
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+    patch:
+      tags:
+        - targets
+      summary: Add to the set of targets (attaches by default)
+      description: ''
+      operationId: put_targets
+      parameters:
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+    put:
+      tags:
+        - targets
+      summary: Replace the set of targets (attaches by default)
+      description: ''
+      operationId: put_targets
+      parameters:
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+  /targets/excludes:
+    patch:
+      tags:
+        - targets
+      summary: Add a set of exclusions
+      description: ''
+      operationId: post_targets_excludes
+      parameters:
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+  /rules:
+    get:
+      tags:
+        - rules
+      summary: Retrieve a list of the current rules
+      description: ''
+      operationId: get_rules
+      parameters:
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+    post:
+      tags:
+        - rules
+      summary: Define a set of the processes and services you want to scope. Wildcard operator targets all processes.
+      description: ''
+      operationId: post_rules
+      parameters:
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+    delete:
+      tags:
+        - rules
+      summary: Delete all rules
+      description: ''
+      operationId: delete_rules
+      parameters:
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+    patch:
+      tags:
+        - rules
+      summary: Add to the set of rules
+      description: ''
+      operationId: put_rules
+      parameters:
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+    put:
+      tags:
+        - rules
+      summary: Replace the set of rules
+      description: ''
+      operationId: put_rules
+      parameters:
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+  /rules/excludes:
+    patch:
+      tags:
+        - rules
+      summary: Add a set of exclusions
+      description: ''
+      operationId: post_rules_excludes
+      parameters:
+        - name: name
+          in: query
+          description: Name of pet that needs to be updated
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Status of pet that needs to be updated
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+        '405':
+          description: Invalid input
+
+components:
+  schemas:
+    configuration:
+      title: configuration
+      description: An AppScope configuration
+      type: object
+      properties:
+            metric:
+              title: metric
+              description: Settings for metrics. See `scope.yml`.
+              type: object
+              properties:
+                enable:
+                  $ref: '#/components/schemas/enable'
+                transport:
+                  title: transport
+                  description: Backend connection for metrics or events. See `scope.yml`.
+                  type: object
+                  properties:
+                    type:
+                      $ref: '#/components/schemas/transport_type'
+                    host:
+                      $ref: '#/components/schemas/host'
+                    port:
+                      $ref: '#/components/schemas/port_str'
+                    path:
+                      $ref: '#/components/schemas/path'
+                    buffering:
+                      $ref: '#/components/schemas/buffering'
+                    tls:
+                      title: tls
+                      description: TLS connection settings. See `scope.yml`.
+                      type: object
+                      properties:
+                        enable:
+                          $ref: '#/components/schemas/enable'
+                        validateserver:
+                          $ref: '#/components/schemas/validateserver'
+                        cacertpath:
+                          $ref: '#/components/schemas/cacertpath'
+                format:
+                  title: format
+                  description: Settings for the format of metric data. See `scope.yml`.
+                  type: object
+                  properties:
+                    type:
+                      $ref: '#/components/schemas/format_type'
+                    statsdprefix:
+                      $ref: '#/components/schemas/statsdprefix'
+                    statsdmaxlen:
+                      $ref: '#/components/schemas/statsdmaxlen'
+                    verbosity:
+                      $ref: '#/components/schemas/verbosity'
+                watch:
+                  title: watch
+                  description: Array containing objects that enable different categories
+                    of metrics. See `scope.yml`.
+                  type: array
+                  items:
+                  - type: object
+                    properties:
+                      type:
+                        $ref: '#/components/schemas/watch_type_metric_fs'
+                  - type: object
+                    properties:
+                      type:
+                        $ref: '#/components/schemas/watch_type_metric_net'
+                  - type: object
+                    properties:
+                      type:
+                        $ref: '#/components/schemas/watch_type_metric_http'
+                  - type: object
+                    properties:
+                      type:
+                        $ref: '#/components/schemas/watch_type_metric_dns'
+                  - type: object
+                    properties:
+                      type:
+                        $ref: '#/components/schemas/watch_type_metric_proc'
+                  - type: object
+                    properties:
+                      type:
+                        $ref: '#/components/schemas/watch_type_metric_statsd'
+            libscope:
+              title: libscope
+              description: Specifies how to set up the AppScope library. See `scope.yml`.
+              type: object
+              properties:
+                log:
+                  title: log
+                  description: Logging settings for the AppScope library. See `scope.yml`.
+                  type: object
+                  properties:
+                    level:
+                      $ref: '#/components/schemas/log_level'
+                    transport:
+                      title: transport
+                      description: Backend connection for AppScope library logging. See
+                        `scope.yml`.
+                      type: object
+                      properties:
+                        type:
+                          $ref: '#/components/schemas/transport_type'
+                        host:
+                          $ref: '#/components/schemas/host'
+                        port:
+                          $ref: '#/components/schemas/port_str'
+                        path:
+                          $ref: '#/components/schemas/path'
+                        buffering:
+                          $ref: '#/components/schemas/buffering'
+                        tls:
+                          title: tls
+                          description: TLS settings for backend used by the AppScope library.
+                            See `scope.yml.`
+                          type: object
+                          properties:
+                            enable:
+                              $ref: '#/components/schemas/enable'
+                            validateserver:
+                              $ref: '#/components/schemas/validateserver'
+                            cacertpath:
+                              $ref: '#/components/schemas/cacertpath'
+                configevent:
+                  $ref: '#/components/schemas/configevent'
+                summaryperiod:
+                  $ref: '#/components/schemas/summaryperiod'
+                commanddir:
+                  $ref: '#/components/schemas/commanddir'
+                snapshot:
+                  title: snapshot
+                  description: Settings to specify content of the snapshot AppScope creates
+                    for crash analysis.
+                  type: object
+                  properties:
+                    coredump:
+                      $ref: '#/components/schemas/coredump'
+                    backtrace:
+                      $ref: '#/components/schemas/backtrace'
+            event:
+              title: event
+              description: Settings for events. See `scope.yml`.
+              type: object
+              properties:
+                enable:
+                  $ref: '#/components/schemas/enable'
+                transport:
+                  title: transport
+                  description: Backend connection for events. See `scope.yml`.
+                  type: object
+                  properties:
+                    type:
+                      $ref: '#/components/schemas/transport_type'
+                    host:
+                      $ref: '#/components/schemas/host'
+                    port:
+                      $ref: '#/components/schemas/port_str'
+                    path:
+                      $ref: '#/components/schemas/path'
+                    buffering:
+                      $ref: '#/components/schemas/buffering'
+                    tls:
+                      title: tls
+                      description: Specifies whether to enable TLS for the metrics backend.
+                        See `scope.yml`.
+                      type: object
+                      properties:
+                        enable:
+                          $ref: '#/components/schemas/enable'
+                        validateserver:
+                          $ref: '#/components/schemas/validateserver'
+                        cacertpath:
+                          $ref: '#/components/schemas/cacertpath'
+                format:
+                  title: format
+                  description: Settings for the format of event data. See `scope.yml`.
+                  type: object
+                  properties:
+                    type:
+                      $ref: '#/components/schemas/format_type'
+                    maxeventpersec:
+                      $ref: '#/components/schemas/maxeventpersec'
+                    enhancefs:
+                      $ref: '#/components/schemas/enhancefs'
+                watch:
+                  title: watch
+                  description: Array containing objects that enable different categories
+                    of events. See `scope.yml`.
+                  type: array
+                  items:
+                  - type: object
+                    properties:
+                      type:
+                        $ref: '#/components/schemas/watch_type_event_file'
+                      name:
+                        $ref: '#/components/schemas/name'
+                      field:
+                        $ref: '#/components/schemas/field'
+                      value:
+                        $ref: '#/components/schemas/value'
+                  - type: object
+                    properties:
+                      type:
+                        $ref: '#/components/schemas/watch_type_event_console'
+                      name:
+                        $ref: '#/components/schemas/name'
+                      field:
+                        $ref: '#/components/schemas/field'
+                      value:
+                        $ref: '#/components/schemas/value'
+                      allowbinary:
+                        $ref: '#/components/schemas/allowbinary'
+                  - type: object
+                    properties:
+                      type:
+                        $ref: '#/components/schemas/watch_type_event_http'
+                      name:
+                        $ref: '#/components/schemas/name'
+                      field:
+                        $ref: '#/components/schemas/field'
+                      value:
+                        $ref: '#/components/schemas/value'
+                  - type: object
+                    properties:
+                      type:
+                        $ref: '#/components/schemas/watch_type_event_net'
+                      name:
+                        $ref: '#/components/schemas/name'
+                      field:
+                        $ref: '#/components/schemas/field'
+                      value:
+                        $ref: '#/components/schemas/value'
+                  - type: object
+                    properties:
+                      type:
+                        $ref: '#/components/schemas/watch_type_event_fs'
+                      name:
+                        $ref: '#/components/schemas/name'
+                      field:
+                        $ref: '#/components/schemas/field'
+                      value:
+                        $ref: '#/components/schemas/value'
+                  - type: object
+                    properties:
+                      type:
+                        $ref: '#/components/schemas/watch_type_event_dns'
+                      name:
+                        $ref: '#/components/schemas/name'
+                      field:
+                        $ref: '#/components/schemas/field'
+                      value:
+                        $ref: '#/components/schemas/value'
+            payload:
+              title: payload
+              description: Settings for enabling and storing payloads. See `scope.yml`.
+              type: object
+              properties:
+                enable:
+                  $ref: '#/components/schemas/enable'
+                dir:
+                  $ref: '#/components/schemas/dir'
+            tags:
+              title: tags
+              description: User-defined tags which become fields in generated events and
+                metrics. See `scope.yml`.
+              type: object
+            protocol:
+              title: protocol
+              description: List whose entries define protocols that AppScope should detect
+                in network payloads, and how to handle matches. See `scope.yml`.
+              type: array
+              items:
+              - type: object
+                properties:
+                  name:
+                    $ref: '#/components/schemas/name'
+                  regex:
+                    $ref: '#/components/schemas/regex'
+                  binary:
+                    $ref: '#/components/schemas/binary'
+                  len:
+                    $ref: '#/components/schemas/len'
+                  detect:
+                    $ref: '#/components/schemas/detect'
+                  payload:
+                    $ref: '#/components/schemas/payload'
+            cribl:
+              title: cribl
+              description: Settings for the `cribl` backend. See `scope.yml`.
+              type: object
+              properties:
+                enable:
+                  $ref: '#/components/schemas/enable'
+                transport:
+                  title: transport
+                  description: Backend connection to Cribl Edge or Stream. See `scope.yml`.
+                  type: object
+                  properties:
+                    type:
+                      $ref: '#/components/schemas/transport_type'
+                    host:
+                      $ref: '#/components/schemas/host'
+                    port:
+                      $ref: '#/components/schemas/port_str'
+                    path:
+                      $ref: '#/components/schemas/path'
+                    buffering:
+                      $ref: '#/components/schemas/buffering'
+                    tls:
+                      title: tls
+                      description: TLS settings for the Cribl backend. See `scope.yml`.
+                      type: object
+                      properties:
+                        enable:
+                          $ref: '#/components/schemas/enable'
+                        validateserver:
+                          $ref: '#/components/schemas/validateserver'
+                        cacertpath:
+                          $ref: '#/components/schemas/cacertpath'
+                authtoken:
+                  $ref: '#/components/schemas/authtoken'
+    process:
+      title: process
+      description: A process
+      type: object
+      properties:
+        pid:
+          $ref: '#/components/schemas/pid'
+        scoped:
+          $ref: '#/components/schemas/scoped'
+        name:
+          $ref: '#/components/schemas/name'
+        user:
+          $ref: '#/components/schemas/user'
+        config:
+          $ref: '#/components/schemas/configuration'
+    allowbinary:
+      title: allowbinary
+      description: When false, AppScope attempts to omit any console writes that contain
+        non-printable characters, while adding 'binary data ignored' to the console event
+        data.
+      type: string
+      enum:
+      - 'true'
+      - 'false'
+    authtoken:
+      title: authtoken
+      description: Token used for authenticating to Cribl Edge or Stream.
+      type: string
+    binary:
+      title: binary
+      description: When true, the regex in protocol detection operates on data after its
+        conversion to hex-string representation. See `scope.yml`.
+      type: string
+      enum:
+      - 'true'
+      - 'false'
+    buffering:
+      title: buffering
+      description: File buffering. See `scope.yml`.
+      type: string
+      enum:
+      - line
+      - full
+    cacertpath:
+      title: cacertpath
+      description: CA Certificate Path. See `scope.yml`.
+      type: string
+    configevent:
+      title: configevent
+      description: When enabled, AppScope guarantees that a process start message is the
+        first event sent over the current connection.
+      type: string
+      enum:
+      - 'true'
+      - 'false'
+    commanddir:
+      title: commanddir
+      description: The directory AppScope polls for a `scope.<pid>` file, as explained
+        in the Dynamic Configuration section of the Using the CLI page of the AppScope
+        docs.
+      type: string
+    coredump:
+      title: coredump
+      description: When true, AppScope captures a core dump whenever the kernel sends
+        the scoped app a fatal signal (i.e., illegal instruction, bus error, segmentation
+        fault, or floating point exception).
+      type: string
+      enum:
+      - 'true'
+      - 'false'
+    backtrace:
+      title: backtrace
+      description: When true, AppScope captures a backtrace (a.k.a. stack trace) whenever
+        the kernel sends the scoped app a fatal signal (i.e., illegal instruction, bus
+        error, segmentation fault, or floating point exception).
+      type: string
+      enum:
+      - 'true'
+      - 'false'
+    detect:
+      title: detect
+      description: When true, AppScope sends a `net.app` event when a protocol has been
+        detected. See `scope.yml`.
+      type: string
+      enum:
+      - 'true'
+      - 'false'
+    dir:
+      title: dir
+      description: Specifies director where payload data should be written. Applies only
+        when payloads are enabled and a backend other than `cribl` is used. See `scope.yml`.
+      type: string
+    enable:
+      title: enable
+      description: Specifies whether a feature or some functionality is enabled or disabled
+        overall.
+      type: string
+      enum:
+      - 'true'
+      - 'false'
+    enhancefs:
+      title: enhancefs
+      description: Specifies whether to display full information about `fs` events.
+      type: string
+      enum:
+      - 'true'
+      - 'false'
+    field:
+      title: field
+      description: Regex to match events containing the specified field. See `scope.yml`.
+      type: string
+    format_type:
+      title: type
+      description: 'Specifies the format of metric data. See `scope.yml`. '
+      type: string
+      enum:
+      - statsd
+      - ndjson
+    host:
+      title: host
+      description: Hostname for the host on which the scoped app was run.
+      type: string
+    len:
+      title: len
+      description: Number of bytes to convert to hex when `binary` is true. See `scope.yml`.
+      type: integer
+    log_level:
+      title: level
+      description: Specifies log level. See `scope.yml`.
+      type: string
+      enum:
+      - debug
+      - info
+      - warning
+      - error
+      - none
+    maxeventpersec:
+      title: maxeventpersec
+      description: Specifies a rate limit for events. See `scope.yml`.
+      type: integer
+    name:
+      title: name
+      type: string
+    path:
+      title: path
+      description: File or UNIX domain socket path. See `scope.yml`.
+      type: string
+    payload:
+      title: payload
+      description: Specifies whether to emit network payloads. See `scope.yml`.
+      type: string
+      enum:
+      - 'true'
+      - 'false'
+    pid:
+      title: pid
+      description: Process identifier
+      type: integer
+    port_str:
+      title: port
+      description: Connection port. See `scope.yml`.
+      type: string
+    regex:
+      title: regex
+      description: Specifies the regular expression that AppScope should use to detect
+        a protocol. See `scope.yml`.
+      type: string
+    scoped:
+      title: scoped
+      description: The scope status of a process.
+      type: boolean
+    statsdprefix:
+      title: statsdprefix
+      description: Specifies a prefix to prepend the metric name. See `scope.yml`.
+      type: string
+    statsdmaxlen:
+      title: statsdmaxlen
+      description: Specifies the maximum length for a string that expresses a StatsD metric.
+        See `scope.yml`.
+      type: integer
+    summaryperiod:
+      title: summaryperiod
+      description: Time interval over which to perform aggregation. See `scope.yml`.
+      type: integer
+    transport_type:
+      title: type
+      description: Specifies the transport mechanism on which to send and/or receive data.
+        See `scope.yml`.
+      type: string
+      enum:
+      - tcp
+      - udp
+      - unix
+      - file
+      - edge
+    user:
+      title: user
+      description: Username.
+      type: string
+    validateserver:
+      title: validateserver
+      description: Specifies whether to validate the TLS server certificate. See `scope.yml`.
+      type: string
+      enum:
+      - 'true'
+      - 'false'
+    value:
+      title: value
+      description: Regex to match events where any field has the specified value. See
+        `scope.yml`.
+      type: string
+    verbosity:
+      title: verbosity
+      description: Controls the tag cardinality and aggregation of a metric. See `scope.yml`.
+      type: integer
+      minimum: 0
+      maximum: 9
+    watch_type_event_console:
+      title: type
+      description: If present, AppScope will capture and emit console events.
+      type: string
+      enum:
+      - console
+    watch_type_event_dns:
+      title: type
+      description: If present, AppScope will capture and emit DNS events.
+      type: string
+      enum:
+      - dns
+    watch_type_event_file:
+      title: type
+      description: If present, AppScope will capture and emit logfile events.
+      type: string
+      enum:
+      - file
+    watch_type_event_fs:
+      title: type
+      description: If present, AppScope will capture and emit filesystem events.
+      type: string
+      enum:
+      - fs
+    watch_type_event_http:
+      title: type
+      description: If present, AppScope will capture and emit HTTP events.
+      type: string
+      enum:
+      - http
+    watch_type_event_net:
+      title: type
+      description: If present, AppScope will capture and emit network events.
+      type: string
+      enum:
+      - net
+    watch_type_metric_fs:
+      title: type
+      description: If present, AppScope will capture and emit filesystem metrics.
+      type: string
+      enum:
+      - fs
+    watch_type_metric_net:
+      title: type
+      description: If present, AppScope will capture and emit network metrics.
+      type: string
+      enum:
+      - net
+    watch_type_metric_http:
+      title: type
+      description: If present, AppScope will capture and emit HTTP metrics.
+      type: string
+      enum:
+      - http
+    watch_type_metric_dns:
+      title: type
+      description: If present, AppScope will capture and emit DNS metrics.
+      type: string
+      enum:
+      - dns
+    watch_type_metric_proc:
+      title: type
+      description: If present, AppScope will capture and emit process metrics.
+      type: string
+      enum:
+      - process
+    watch_type_metric_statsd:
+      title: type
+      description: If present, AppScope will capture metrics from the scoped app, and
+        emit them as events.
+      type: string
+      enum:
+      - statsd
+

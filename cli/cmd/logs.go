@@ -66,6 +66,6 @@ func init() {
 	logsCmd.Flags().IntP("id", "i", -1, "Display logs from specific from session ID")
 	logsCmd.Flags().IntP("last", "n", 20, "Show last <n> lines")
 	logsCmd.Flags().BoolP("scope", "s", false, "Show scope.log (from CLI) instead of libscope.log (from library)")
-	logsCmd.Flags().StringP("service", "S", "", "Display logs from a Systemd service instead of a session)")
+	logsCmd.Flags().StringP("service", "S", "", "Display logs from a Systemd service instead of a session")
 	RootCmd.AddCommand(logsCmd)
 }

@@ -452,7 +452,7 @@ scope logs
   -i, --id int           Display logs from specific from session ID (default -1)
   -n, --last int         Show last <n> lines (default 20)
   -s, --scope            Show scope.log (from CLI) instead of ldscope.log (from library)
-  -S, --service string   Display logs from a systemd service instead of a session)
+  -S, --service string   Display logs from a systemd service instead of a session
  
 ```
 

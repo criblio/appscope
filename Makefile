@@ -196,7 +196,7 @@ docs-generate: require-docker-buildx-builder
 	@echo AppScope docs generator finished: website/src/pages/docs/schema-reference.md is updated
 
 k8s-test: require-kind require-kubectl image
-	docker tag cribl/scope:dev-x86_64 cribl/scope:$(VERSION)
+	docker tag cribl/scope:dev-$(ARCH) cribl/scope:$(VERSION)
 	kind delete cluster
 	kind create cluster
 	kind load docker-image cribl/scope:$(VERSION)

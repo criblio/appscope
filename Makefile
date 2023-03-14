@@ -192,7 +192,7 @@ docs-generate: require-docker-buildx-builder
 	@echo Running the AppScope docs generator
 	@docker run \
 		-v $(shell pwd):/home/node/appscope \
-		--rm cribl/scope:docs-$(ARCH) 
+		--rm $(TAG)
 	@echo AppScope docs generator finished: website/src/pages/docs/schema-reference.md is updated
 
 k8s-test: require-kind require-kubectl image

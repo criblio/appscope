@@ -61,7 +61,7 @@ struct sigdel_args_t {
     unsigned long sa_flags;
 };
 
-char LICENSE[] SEC_GO("license") = "GPL";
+char LICENSE[] SEC_GO("license") = "Apache-2.0";
 
 struct {
 	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);

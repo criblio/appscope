@@ -36,7 +36,6 @@ Usage:
 Available Commands:
   attach      Scope a currently-running process
   completion  Generate completion code for specified shell
-  daemon      Run the scope daemon
   dash        Display scope dashboard for a previous or active session
   detach      Unscope a currently-running process
   events      Outputs events for a session
@@ -133,27 +132,6 @@ source <(scope completion bash)                      # Generate and load scope a
 
 ```
   -h, --help   help for completion
-```
-
-### daemon
----
-
-Listen and respond to system events.
-
-#### Usage
-
-`scope daemon [flags]`
-
-#### Examples
-
-`scope daemon`
-
-#### Flags
-
-```
-  -f, --filedest string   Set destination for files (host:port defaults to tcp://)
-  -h, --help              help for daemon
-  -s, --sendcore          Include core file when sending files to network destination
 ```
 
 ### dash

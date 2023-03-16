@@ -30,13 +30,11 @@ AppScope 1.3.0 introduces support for:
 - Instrumenting Go executables on ARM.
 - Scoping apps running in [LXC](https://github.com/lxc/lxc) and [LXD](https://linuxcontainers.org/lxd/introduction/) containers.
 
-#### The Crash Analysis, Snapshot, and Daemon Features
+#### The Crash Analysis and Snapshot Features
 
 Whenever a scoped app crashes, AppScope can obtain a core dump, a backtrace (i.e., stack trace), or both, while capturing supplemental information in text files. 
 
 AppScope can generate a **snapshot** file containing debug information about processes that are running normally or crashing, unscoped or scoped.
-
-AppScope now has its own daemon that can detect fatal signals sent to an application, whether scoped or not. This is made possible by AppScope's first-ever use of [eBPF](https://ebpf.io/) technology.
 
 #### Troubleshooting Transports and Dynamically Managing Configs  
 
@@ -62,8 +60,7 @@ The AppScope CLI is enhanced in the following ways:
 - `scope start` can now attach to processes running in rootless and nested containers.
 - `scope detach`, when run with the new `--all` flag, detaches from all processes at once.
 - `scope stop`, a new command, runs `scope detach --all`, removes the filter file from the system, and removes `scope` from service configurations. This undoes the effects of the `scope attach`, `scope start`, and/or `scope service` commands.
-- `scope daemon` runs the AppScope daemon, enabling the eBPF mechanism that detects a fatal signal (i.e., illegal instruction, bus error, segmentation fault, or floating point exception) from the kernel to a scoped app, then runs `scope snapshot` which in turn generates a **snapshot** file.
-- `scope snapshot` obtains debug information about a running or crashing process, regardless of whether or not the process is scoped or the AppScope daemon is running.
+- `scope snapshot` obtains debug information about a running or crashing process, regardless of whether or not the process is scoped.
 - `scope --passthrough` replaces `scope run --passthrough`.
 
 Three commands use IPC, which is new in AppScope 1.3.0. `scope inspect` and `scope update` are completely new, while `scope ps` has new capabilities thanks to IPC.

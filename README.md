@@ -66,7 +66,7 @@ git clone https://github.com/criblio/appscope.git
 cd appscope
 ```
 
-If you are on Ubuntu 18.04, install the build dependencies with:
+If you are on Ubuntu, install the build dependencies with:
 
 ```text
 ./install_build_tools.sh
@@ -78,7 +78,7 @@ Then, build and test the code with:
 make all test
 ```
 
-If you are on a platform other than Ubuntu 18.04, or prefer not to install the dependencies, ensure that [Docker], [BuildX], and `make` are installed, then build in a container with:
+If you aren't on Ubuntu, or would prefer not to install the dependencies, ensure that [Docker], [BuildX], and `make` are installed, then build in a container with:
 
 ```text
 make build
@@ -92,7 +92,7 @@ We support building `x86_64` (amd64) or `aarch64` (arm64/v8) binaries by adding 
 
 On the [AppScope Website](https://appscope.dev/):
 
-- Check out the CLI [in more depth](https://appscope.dev/docs/cli-using).
+- Learn about the CLI commands [in more depth](https://appscope.dev/docs/cli-using).
 - Get an [overview](https://appscope.dev/docs/how-works/) of AppScope beyond the CLI.
 - Discover what people are [doing](https://appscope.dev/docs/what-do-with-scope) with AppScope.
 - Review advanced [examples](https://appscope.dev/docs/examples-use-cases).
@@ -104,10 +104,17 @@ The content on that site is built from the [website/](website/) directory in thi
 Elsewhere, you can:
 
 - Complete the [AppScope Fundamentals sandbox](https://sandbox.cribl.io/course/appscope), a tutorial that takes about 30 minutes.
-- See our Design Docs in the [docs/](./docs/) directory in this repo if you're thinking about contributing to this project, or if you just want to understand the internal logic of AppScope.
 - Join the [Cribl Community](https://cribl.io/community/) on Slack. The `#appscope` channel is where you'll find developers who contribute to this project.
- 
-Please submit any feature requests and defect reports at <https://github.com/criblio/appscope>.
+
+If you're interested in contributing to the project, you can:
+
+- Take a look at current [discussions](https://github.com/criblio/appscope/discussions) and [issues](https://github.com/criblio/appscope/issues) in GitHub.
+- See our developer guides in the [docs/](./docs/) directory in this repository.
+- Submit any feature requests and defect reports at <https://github.com/criblio/appscope>.
+
+## License
+
+AppScope is licensed under the Apache License, Version 2.0. 
 
 [Docker]: https://docs.docker.com/engine/install/
 [BuildX]: https://docs.docker.com/buildx/working-with-buildx/

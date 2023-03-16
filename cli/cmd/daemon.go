@@ -1,5 +1,6 @@
 package cmd
 
+/*
 import (
 	"fmt"
 	"time"
@@ -12,11 +13,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-/* Args Matrix (X disallows)
+ * Args Matrix (X disallows)
  *                 filedest 	sendcore
  * filedest        -
  * sendcore                     -
- */
+ *
 
 // daemonCmd represents the daemon command
 var daemonCmd = &cobra.Command{
@@ -93,3 +94,4 @@ func init() {
 	daemonCmd.Flags().BoolP("sendcore", "s", false, "Include core file when sending files to network destination")
 	RootCmd.AddCommand(daemonCmd)
 }
+*/

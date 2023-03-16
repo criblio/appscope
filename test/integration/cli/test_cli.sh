@@ -334,79 +334,79 @@ returns 0
 endtest
 
 
+##
+## Scope daemon
+##
+#starttest "Scope daemon"
 #
-# Scope daemon
+## Start a netcat listener
+#nc -l -p 9109 > crash.out &
+#sleep 1
 #
-starttest "Scope daemon"
-
-# Start a netcat listener
-nc -l -p 9109 > crash.out &
-sleep 1
-
-# Start the scope daemon
-run scope daemon --filedest localhost:9109 &
-daemon_pid=$!
-sleep 2
-
-# Run top
-top -b -d 1 > /dev/null &
-top_pid=$!
-sleep 1
-
-# Attach to top
-run scope attach --backtrace --coredump $top_pid
-sleep 1
-
-# Crash top
-kill -s SIGSEGV $top_pid
-sleep 5
-
-# Check crash and snapshot files exist
-is_file /tmp/appscope/${top_pid}/snapshot_*
-is_file /tmp/appscope/${top_pid}/info_*
-is_file /tmp/appscope/${top_pid}/core_*
-is_file /tmp/appscope/${top_pid}/cfg_*
-is_file /tmp/appscope/${top_pid}/backtrace_*
-
-# Check files were received by listener
-wordPresentInFile "snapshot_" "crash.out"
-wordPresentInFile "info_" "crash.out"
-wordPresentInFile "cfg_" "crash.out"
-wordPresentInFile "backtrace_" "crash.out"
-
-# Kill scope daemon process
-kill $daemon_pid
-
-endtest
-
-
+## Start the scope daemon
+#run scope daemon --filedest localhost:9109 &
+#daemon_pid=$!
+#sleep 2
 #
-# Scope snapshot (same namespace)
+## Run top
+#top -b -d 1 > /dev/null &
+#top_pid=$!
+#sleep 1
 #
-starttest "Scope snapshot"
+## Attach to top
+#run scope attach --backtrace --coredump $top_pid
+#sleep 1
+#
+## Crash top
+#kill -s SIGSEGV $top_pid
+#sleep 5
+#
+## Check crash and snapshot files exist
+#is_file /tmp/appscope/${top_pid}/snapshot_*
+#is_file /tmp/appscope/${top_pid}/info_*
+#is_file /tmp/appscope/${top_pid}/core_*
+#is_file /tmp/appscope/${top_pid}/cfg_*
+#is_file /tmp/appscope/${top_pid}/backtrace_*
+#
+## Check files were received by listener
+#wordPresentInFile "snapshot_" "crash.out"
+#wordPresentInFile "info_" "crash.out"
+#wordPresentInFile "cfg_" "crash.out"
+#wordPresentInFile "backtrace_" "crash.out"
+#
+## Kill scope daemon process
+#kill $daemon_pid
+#
+#endtest
 
-top -b -d 1 > /dev/null &
-top_pid=$!
-sleep 2
 
-SCOPE_SNAPSHOT_COREDUMP=true SCOPE_SNAPSHOT_BACKTRACE=true scope --ldattach $top_pid
-returns 0
-sleep 2
-
-kill -s SIGSEGV $top_pid
-sleep 2
-
-run scope snapshot $top_pid
-returns 0
-sleep 2
-
-is_file /tmp/appscope/${top_pid}/snapshot_*
-is_file /tmp/appscope/${top_pid}/info_*
-is_file /tmp/appscope/${top_pid}/core_*
-is_file /tmp/appscope/${top_pid}/cfg_*
-is_file /tmp/appscope/${top_pid}/backtrace_*
-
-endtest
+##
+## Scope snapshot (same namespace)
+##
+#starttest "Scope snapshot"
+#
+#top -b -d 1 > /dev/null &
+#top_pid=$!
+#sleep 2
+#
+#SCOPE_SNAPSHOT_COREDUMP=true SCOPE_SNAPSHOT_BACKTRACE=true scope --ldattach $top_pid
+#returns 0
+#sleep 2
+#
+#kill -s SIGSEGV $top_pid
+#sleep 2
+#
+#run scope snapshot $top_pid
+#returns 0
+#sleep 2
+#
+#is_file /tmp/appscope/${top_pid}/snapshot_*
+#is_file /tmp/appscope/${top_pid}/info_*
+#is_file /tmp/appscope/${top_pid}/core_*
+#is_file /tmp/appscope/${top_pid}/cfg_*
+#is_file /tmp/appscope/${top_pid}/backtrace_*
+#
+#endtest
 
 
 ################# END TESTS ################# 

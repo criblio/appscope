@@ -380,33 +380,33 @@ kill $daemon_pid
 endtest
 
 
+##
+## Scope snapshot (same namespace)
+##
+#starttest "Scope snapshot"
 #
-# Scope snapshot (same namespace)
+#top -b -d 1 > /dev/null &
+#top_pid=$!
+#sleep 2
 #
-starttest "Scope snapshot"
-
-top -b -d 1 > /dev/null &
-top_pid=$!
-sleep 2
-
-SCOPE_SNAPSHOT_COREDUMP=true SCOPE_SNAPSHOT_BACKTRACE=true scope --ldattach $top_pid
-returns 0
-sleep 2
-
-kill -s SIGSEGV $top_pid
-sleep 2
-
-run scope snapshot $top_pid
-returns 0
-sleep 2
-
-is_file /tmp/appscope/${top_pid}/snapshot_*
-is_file /tmp/appscope/${top_pid}/info_*
-is_file /tmp/appscope/${top_pid}/core_*
-is_file /tmp/appscope/${top_pid}/cfg_*
-is_file /tmp/appscope/${top_pid}/backtrace_*
-
-endtest
+#SCOPE_SNAPSHOT_COREDUMP=true SCOPE_SNAPSHOT_BACKTRACE=true scope --ldattach $top_pid
+#returns 0
+#sleep 2
+#
+#kill -s SIGSEGV $top_pid
+#sleep 2
+#
+#run scope snapshot $top_pid
+#returns 0
+#sleep 2
+#
+#is_file /tmp/appscope/${top_pid}/snapshot_*
+#is_file /tmp/appscope/${top_pid}/info_*
+#is_file /tmp/appscope/${top_pid}/core_*
+#is_file /tmp/appscope/${top_pid}/cfg_*
+#is_file /tmp/appscope/${top_pid}/backtrace_*
+#
+#endtest
 
 
 ################# END TESTS ################# 

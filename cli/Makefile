@@ -34,6 +34,7 @@ LIBRARY_C_FILES:=$(wildcard $(SRCDIR)/*.c)
 GO_BINDATA := $(GOBIN)/go-bindata
 GOVVV := $(GOBIN)/govvv
 GOLANGCI_LINT := $(GOBIN)/golangci-lint
+TRIVY := $(GOBIN)/trivy
 
 # fail if of Go is not meet version requirements
 require-go-version:
@@ -77,7 +78,7 @@ clean:
 	$(RM) -rf -- bpf/vmlinux.h
 
 ## deps: install dependencies
-deps: $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT)
+deps: $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT) $(TRIVY)
 $(GO_BINDATA):
 	$(GO) install github.com/go-bindata/go-bindata/...
 $(GOVVV):
@@ -85,6 +86,9 @@ $(GOVVV):
 $(GOLANGCI_LINT):
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
 		sh -s -- -b $(GOBIN) v1.42.1
+$(TRIVY):
+	curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | \
+		sh -s -- -b $(GOBIN) v0.38.3
 
 rebuild: clean build 
 
@@ -145,6 +149,10 @@ cover:
 
 ## check: format, vet, lint and test all Go files
 check: fmt vet lint test
+
+## trivy: 
+trivy:
+	$(TRIVY) fs . --ignore-unfixed --skip-dirs .gomod
 
 help: Makefile
 	@echo

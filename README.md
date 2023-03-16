@@ -114,7 +114,7 @@ If you're interested in contributing to the project, you can:
 
 ## License
 
-AppScope is licensed under the Apache License, Version 2.0. The BPF code in `./cli/bpf` is licensed under the General Public License, Version 2.0.
+AppScope is licensed under the Apache License, Version 2.0. 
 
 [Docker]: https://docs.docker.com/engine/install/
 [BuildX]: https://docs.docker.com/buildx/working-with-buildx/

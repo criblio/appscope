@@ -7,7 +7,7 @@
         <span style="margin-top:15px; 
         padding: 6px; 
         border-radius; 2px;
-        background-color: #1890FF"><a href="" id="route" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Route</a></span> 
+        background-color: #1890FF"><a href="" id="route" class="pipeline-name" target="_blank" rel="noreferrer noopener" style="color: #fff; text-decoration: none">Cribl Pipeline: Route</a></span> 
         </p>
       <p>
         Splunk's forwarder is the best and most mature log data gathering technology, but until now it's only been able to deliver data to Splunk. For many of our customers and prospects, they've expressed a desire to be able to send some data they're gathering to Splunk and send some of their data to third party systems, like S3, NFS, Hadoop, or other file stores. Cribl makes this possible.

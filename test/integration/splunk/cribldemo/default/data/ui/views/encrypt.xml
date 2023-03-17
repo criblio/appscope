@@ -16,7 +16,7 @@
         <span style="margin-top:15px; 
         padding: 6px; 
         border-radius; 2px;
-        background-color: #1890FF"><a href="" id="masking" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Masking</a></span> 
+        background-color: #1890FF"><a href="" id="masking" class="pipeline-name" target="_blank" rel="noreferrer noopener" style="color: #fff; text-decoration: none">Cribl Pipeline: Masking</a></span> 
         </p>
       <p>Obfuscation (see <a href="pii">PII</a>) is a tried and true way of ensuring sensitive information isn't seen by someone downstream. But, what if some people need to see the data and other people do not? cribl provides the ability to encrypt and decrypt data based on role. Cribl allows for multiple levels and clearances, so that you can manage what level of sensitivity exists in your data. Lastly, this data can easily be at a <i>sub-field</i> level, meaning we can encrypt any part of a message including <code>_raw</code> and decrypt that on the fly.</p>
       <p>In the below example, we've taken a sensitive ID, the ESN, and now we've encrypted it, and on the right hand side we have decrypted it. Feel free to play with this yourself by drilling into the searches, or running these searches:</p>

@@ -943,9 +943,6 @@ initGoHook(elf_buf_t *ebuf)
     char *go_ver;
     char *go_runtime_version = NULL;
 
-    // A go app may need to expand stacks for some C functions
-    g_need_stack_expand = TRUE;
-
     funchook = funchook_create();
 
     if (logLevel(g_log) <= CFG_LOG_DEBUG) {

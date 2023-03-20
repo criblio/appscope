@@ -19,7 +19,7 @@ pid_t gettid(void)
     return syscall(SYS_gettid);
 }
 
-#define CHILD_STACK_BYTES 50000
+#define CHILD_STACK_BYTES 5000
 static char child_stack[CHILD_STACK_BYTES];
 
 int child_fn(void* arg) {

@@ -7,7 +7,6 @@
 #include "utils.h"
 #include "scopestdlib.h"
 
-bool g_need_stack_expand = FALSE;
 unsigned g_sendprocessstart = 0;
 bool g_exitdone = FALSE;
 
@@ -291,10 +290,6 @@ pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
                     PCRE2_SIZE startoffset, uint32_t options,
                     pcre2_match_data *match_data, pcre2_match_context *mcontext)
 {
-    if (g_need_stack_expand == FALSE) {
-        return pcre2_match(re, data, size, startoffset, options, match_data, mcontext);
-    }
-
     int rc;
     char *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
     if ((pcre_stack = scope_malloc(PCRE_STACK_SIZE)) == NULL) {
@@ -361,10 +356,6 @@ int
 regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
                 regmatch_t *pmatch, int eflags)
 {
-    if (g_need_stack_expand == FALSE) {
-        return regexec(preg, string, nmatch, pmatch, eflags);
-    }
-
     int rc;
     char *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
 

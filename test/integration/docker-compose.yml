@@ -324,4 +324,15 @@ services:
         GO_IMAGE_VER: golang:1.19
     <<: *scope-common
 
+  go_20:
+    image: ghcr.io/criblio/appscope-test-go_20:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-go_20:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./go/Dockerfile
+      args:
+        GO_IMAGE_VER: golang:1.20
+    <<: *scope-common
+
 # vim: ts=2 sw=2 et :

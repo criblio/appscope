@@ -8,7 +8,7 @@ endif
 GO_MAJOR_VERSION = $(shell $(GO) version | cut -c 14- | cut -d' ' -f1 | cut -d'.' -f1)
 GO_MINOR_VERSION = $(shell $(GO) version | cut -c 14- | cut -d' ' -f1 | cut -d'.' -f2)
 MIN_REQ_GO_MAJOR_VERSION = 1
-MIN_REQ_GO_MINOR_VERSION = 20
+MIN_REQ_GO_MINOR_VERSION = 18
 
 # cache downloaded modules and binaries locally
 export GOBIN := $(shell pwd)/.gobin/$(ARCH)

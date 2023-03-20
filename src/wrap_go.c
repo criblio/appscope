@@ -64,8 +64,8 @@ enum go_arch_t {
 
 // compile-time control for debugging
 #define NEEDEVNULL 1
-//#define funcprint sysprint
-#define funcprint devnull
+#define funcprint sysprint
+//#define funcprint devnull
 //#define patchprint sysprint
 #define patchprint devnull
 
@@ -367,6 +367,22 @@ adjustGoStructOffsetsForVersion()
             return;
         }
         tap_entry(tap_syscall)->func_name = "runtime/internal/syscall.Syscall6";
+        tap_entry(tap_rawsyscall)->func_name = "";
+        tap_entry(tap_syscall6)->func_name = "";
+    }
+
+    if (g_go_minor_ver == 20) {
+        if (g_arch == X86_64) {
+            g_go_schema->arg_offsets.c_tls_client_read_pc=0x80;
+            g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
+        } else if (g_arch == AARCH64) {
+            g_go_schema->arg_offsets.c_tls_client_read_pc=0x98;
+            g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x80;
+        } else {
+            scopeLogWarn("Architecture not supported. Not adjusting schema offsets.");
+            return;
+        }
+        tap_entry(tap_syscall)->func_name = "runtime/internal/syscall.Syscall6.abi0";
         tap_entry(tap_rawsyscall)->func_name = "";
         tap_entry(tap_syscall6)->func_name = "";
     }

@@ -6,7 +6,9 @@ title: Using the CLI
 
 As soon as you [download](/docs/downloading) AppScope, you can start using the CLI to explore and gain insight into application behavior. No installation or configuration is required.
 
-The CLI provides a rich set of capabilities for capturing and managing data from single applications. Data is captured in the local filesystem.
+The CLI provides a rich set of capabilities for capturing and managing data from single applications. Data is captured in the local filesystem by default, and you can [specify](#invoke-config) a different destination.
+
+<!-- TBD say something about containers? -->
 
 By default, the AppScope CLI redacts binary data from console output. Although in most situations, the default behaviors of the AppScope CLI and library are the same, they differ for binary data: it's omitted in the CLI, and allowed when using the library. To change this, use the `allowbinary=true` flag. The equivalent environment variable is `SCOPE_ALLOW_BINARY_CONSOLE`. In the config file, `allowbinary` is an attribute of the `console` watch type for events. 
 
@@ -78,6 +80,7 @@ scope curl --header "X-Appscope: Brazil" wttr.in/riodejaneiro
 
 In the resulting AppScope events, the `body` > `data` element would include an `"x-appscope"` field whose value would be the country named in the request's `X-Appscope` header.
 
+<span id="invoke-config"></span>
 
 #### Invoke a Config File While Scoping a New Process
 
@@ -93,7 +96,7 @@ scope run -u cloud.yml -- echo foo
 
 ### Scoping a Running Process
 
-You attach AppScope to a process using either a process ID or a process name.
+You [attach](/docs/cli-reference#attach) AppScope to a process using either a process ID or a process name.
 
 #### Attaching by Process ID
 
@@ -129,35 +132,41 @@ Attaching to process 1838
 
 ```
 
+#### Detaching from a Process
+
+You can also [detach](/docs/cli-reference#detach) AppScope from a process.
+
+<!-- TBD TO-DO explain about the library -->
+
 #### More About Scoping Running Processes
 
 To attach AppScope to a running process:
 
 1. You must run `scope` as root, or with `sudo`.
-1. If you attach to a shell, AppScope does not automatically scope its child processes.
+1. If you attach to a shell, AppScope does not automatically scope its child processes. <!-- TBD correct? -->
 1. You can attach to a process that is executing within a container context by running `scope attach` **inside** that container or from the host.
 
 When you attach AppScope to a process, its child processes are not automatically scoped.
 
 You cannot attach to a static executable's process.
 
-No HTTP/1.1 events and headers are emitted when AppScope attaches to a Go process that uses the `azure-sdk-for-go` package.
+No HTTP/1.1 events and headers are emitted when AppScope attaches to a Go process that uses the `azure-sdk-for-go` package. <!-- TBD still true? -->
 
 No events are emitted from files or sockets that exist before AppScope attaches to a process.
 
+- AppScope events will be produced only for sockets opened **after** AppScope is attached.
+
 - After AppScope attaches to a process, AppScope will not report any **new** activity on file or socket descriptors that the process had already opened.
-
+  
   - For example, suppose a process opens a socket descriptor before AppScope is attached. Subsequent sends and receives on this socket will not produce AppScope events.
-
-   - AppScope events will be produced only for sockets opened **after** AppScope is attached.
 
 <span id="explore-captured"></span>
 
 ### Exploring Captured Data
 
-You can scope apps that generate large data sets, and then use AppScope CLI sub-commands and options to monitor and visualize the data.
+You can scope apps that generate large data sets, and then use AppScope CLI subcommands and options to monitor and visualize the data. The following extended example introduces this technique.
 
-Run the following command and then we'll explore how to monitor and visualize the results of the session:
+Start by scoping the `ps` command:
 
 ```
 scope run -- ps -ef

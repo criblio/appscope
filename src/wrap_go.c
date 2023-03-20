@@ -22,6 +22,7 @@
 #define GOPCLNTAB_MAGIC_112 0xfffffffb
 #define GOPCLNTAB_MAGIC_116 0xfffffffa
 #define GOPCLNTAB_MAGIC_118 0xfffffff0
+#define GOPCLNTAB_MAGIC_120 0xfffffff1
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 #define UNKNOWN_GO_VER (-1)
 #define MAX_SUPPORTED_GO_VER (20)
@@ -611,7 +612,7 @@ getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
 
                     symtab_addr += 16;
                 }
-            } else if (magic == GOPCLNTAB_MAGIC_118) {
+            } else if ((magic == GOPCLNTAB_MAGIC_118) || (magic == GOPCLNTAB_MAGIC_120)) {
                 uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
                 // In go 1.18 the funcname table and the pcln table are stored in the text section
                 uint64_t text_start = *((const uint64_t *)(pclntab_addr + (3 * 8)));

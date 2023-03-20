@@ -10,7 +10,7 @@ There are three main things to know to work effectively with AppScope:
 
 * Your [overall approach](#ad-hoc-vs-planned) can be either spontaneous or more planned-out.
 * You can [control](#config-file-etc) AppScope by means of the config file, environment variables, or a combination of the two.
-* The results you get from AppScope will be in the form of [events and metrics](/docs/events-and-metrics). When yuo scope HTTP applications, you can get payloads, too.
+* The results you get from AppScope will be in the form of [events and metrics](/docs/events-and-metrics). When you scope HTTP applications, you can get payloads, too.
 
 ## Ad Hoc Versus Planned-out {#ad-hoc-vs-planned}
 

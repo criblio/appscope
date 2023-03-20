@@ -14,9 +14,16 @@ On the other hand, you can [troubleshoot AppScope itself](#troubleshoot-appscope
 
 - AppScope can determine the status of the transport it's trying to use to convey events and metrics to a destination. This helps troubleshoot "Why am I getting no events or metrics?" scenarios.
 
+
+<span id="troubleshoot-application"></span>
+
+## Troubleshooting an Application
+
+Intro sentence here.
+
 <span id="crash-analysis"></span>
 
-## Crash Analysis
+### Crash Analysis
 
 The `scope snapshot` command obtains debug information about a running or crashing process, regardless of whether or not the process is scoped.
 
@@ -45,6 +52,8 @@ AppScope offers many options for sending data to other applications (Cribl Strea
 <span id="dynamic-configuration"></span>
 
 ### Dynamic Configuration Via the Command Directory
+
+<!-- add in team recommends ...  -->
 
 Separately from the `scope update` command, AppScope offers another way to do dynamic configuration in real time, via the **command directory**.
 

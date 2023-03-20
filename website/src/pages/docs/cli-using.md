@@ -8,9 +8,7 @@ As soon as you [download](/docs/downloading) AppScope, you can start using the C
 
 The CLI provides a rich set of capabilities for capturing and managing data from single applications. Data is captured in the local filesystem by default, and you can [specify](#invoke-config) a different destination.
 
-<!-- TBD say something about containers? -->
-
-By default, the AppScope CLI redacts binary data from console output. Although in most situations, the default behaviors of the AppScope CLI and library are the same, they differ for binary data: it's omitted in the CLI, and allowed when using the library. To change this, use the `allowbinary=true` flag. The equivalent environment variable is `SCOPE_ALLOW_BINARY_CONSOLE`. In the config file, `allowbinary` is an attribute of the `console` watch type for events. 
+By default, the AppScope CLI redacts binary data from console output. Although in most situations, the default behaviors of the AppScope CLI and library are the same, they differ for binary data: it's omitted in the CLI, and allowed when using the library. To change this, use the `allowbinary=true` flag. The equivalent environment variable is `SCOPE_ALLOW_BINARY_CONSOLE`. In the config file, `allowbinary` is an attribute of the `console` watch type for events.
 
 To learn more, see the [CLI Reference](/docs/cli-reference), and/or run `scope --help` or `scope -h`. And check out the [Further Examples](/docs/examples-use-cases), which include both CLI and library use cases.
 
@@ -129,7 +127,6 @@ Select an ID from the list:
 2
 WARNING: Session history will be stored in /home/ubuntu/.scope/history and owned by root
 Attaching to process 1838
-
 ```
 
 #### Detaching from Processes
@@ -138,27 +135,31 @@ You can also [detach](/docs/cli-reference#detach) AppScope from a process.
 
 Furthermore, if you want to undo the effects of the `scope attach`, `scope start`, and/or `scope service` commands, run the `scope stop` [command](/docs/cli-reference#stop). This runs `scope detach --all`, removes the filter file from the system, and removes `scope` from service configurations.
 
-<!-- TBD TO-DO explain about the library -->
+When you detach from a process, AppScope:
+
+- Stops emitting events and metrics for the process.
+- Closes relevant connections.
+- Removes its interpositions from the process' functions, and/or unhooks from the process' functions, as relevant.
+
+What AppScope does **not** do is unload its library.
 
 #### More About Scoping Running Processes
 
 To attach AppScope to a running process:
 
 1. You must run `scope` as root, or with `sudo`.
-1. If you attach to a shell, AppScope does not automatically scope its child processes. <!-- TBD correct? -->
+1. If you attach to a shell, AppScope does not automatically scope its child processes. <!-- TBD correct? ask Donn -->
 1. You can attach to a process that is executing within a container context by running `scope attach` **inside** that container or from the host.
 
 When you attach AppScope to a process, its child processes are not automatically scoped.
 
 You cannot attach to a static executable's process.
 
-No HTTP/1.1 events and headers are emitted when AppScope attaches to a Go process that uses the `azure-sdk-for-go` package. <!-- TBD still true? -->
+No HTTP/1.1 events and headers are emitted when AppScope attaches to a Go process that uses the `azure-sdk-for-go` package. <!-- TBD still true? ask John  -->
 
 No events are emitted from files or sockets that exist before AppScope attaches to a process.
 
-- AppScope events will be produced only for sockets opened **after** AppScope is attached.
-
-- After AppScope attaches to a process, AppScope will not report any **new** activity on file or socket descriptors that the process had already opened.
+- AppScope events will be produced only for file or socket descriptors opened **after** AppScope is attached.
   
   - For example, suppose a process opens a socket descriptor before AppScope is attached. Subsequent sends and receives on this socket will not produce AppScope events.
 
@@ -322,42 +323,3 @@ Then, show only events containing the string `net_bytes`, and display the fields
 [e91] Jul 12 02:15:41 curl net net.close net_bytes_sent:71 net_bytes_recv:8773
 ```
 
-<span id="dynamic-configuration"></span>
-
-### Dynamic Configuration
-
-AppScope offers a limited form of real-time dynamic configuration.
-
-To use this feature, you first need to know the PID (process ID) of the currently scoped process. You then create a `scope.<pid>` file, where:
-- The `<pid>` part of the filename is the PID of the scoped process.
-- Each line of the file consists of one configuration setting in the form `ENVIRONMENT_VARIABLE=value`.
-  
-Once per reporting period, AppScope looks in its **command directory** for a `scope.<pid>` file. If it finds one where the `<pid>` part of the filename matches the PID of the current scoped process, AppScope applies the configuration settings specified in the file, then deletes the file.
-
-The command directory defaults to `/tmp` and the reporting period (a.k.a. metric summary interval) defaults to 10 seconds. You can configure them in the `libscope` section of the [config file](/docs/config-file)). See the `Command directory` and `Metric summary interval` subsections, respectively.
-
-#### Dynamic configuration example
-
-Suppose your process of interest has PID `4242` and to begin your investigation, you want to bump metric verbosity up to 9 while muting all HTTP events. 
-
-Create a file named `scope.4242` that contains two lines:
-
-```
-SCOPE_METRIC_VERBOSITY=9
-SCOPE_EVENT_HTTP=false
-```
-
-Save the `scope.4242`  file in the command directory. 
-
-AppScope will detect the file and the matching process, apply the config settings, then delete the file.
-
-When you've seen enough of the verbose metrics, and you want to start looking at HTTP events, create a new `scope.4242` which contains the following two lines, reversing the previous config settings:
-
-```
-SCOPE_METRIC_VERBOSITY=4
-SCOPE_EVENT_HTTP=true
-```
-
-AppScope will detect the file and the matching process, apply the config settings, then delete the file.
-
-You can iterate on this workflow depending on what you find and what more you want to discover.

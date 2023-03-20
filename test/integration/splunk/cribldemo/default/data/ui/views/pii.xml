@@ -16,7 +16,7 @@
         <span style="margin-top:15px; 
         padding: 6px; 
         border-radius; 2px;
-        background-color: #1890FF"><a href="" id="masking" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Masking</a></span> 
+        background-color: #1890FF"><a href="" id="masking" class="pipeline-name" target="_blank" rel="noreferrer noopener" style="color: #fff; text-decoration: none">Cribl Pipeline: Masking</a></span> 
         </p>
         <p>
         Cribl can easily help us obfuscate sensitive information in our logs. First, lets look at an example where we have a social security number. Social Security numbers are hard because, intentionally, there is not an easy way to validate whether a given number is a social security number. It's just a string of 9 digits. For that reason, we need to configure cribl to look for something more than just a text string. In this case, we configured Cribl to look for a regex of <code>social=[0-9]{3}-?[0-9]{2}-?[0-9]{4}</code>. This is possible in Splunk today by modifying props and transforms, and is relatively simple and straightforward.

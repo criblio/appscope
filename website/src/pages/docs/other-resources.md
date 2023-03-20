@@ -29,5 +29,5 @@ See how AppScope addresses use cases that are relevant for you:
 - [How AppScope helped resolve a DNS problem](https://cribl.io/blog/how-appscope-helped-resolve-a-dns-problem/)
 - [AppScope: Postgres SQL Observability](https://cribl.io/blog/appscope-postgres-sql-observability/)
 
-You can find all of Cribl's blog posts about AppScope [here](https://cribl.io/blog/?s=appscope).
+Visit Cribl's [blog](https://cribl.io/blog/?s=appscope) and search on "AppScope" to discover more blog posts and podcasts.
 

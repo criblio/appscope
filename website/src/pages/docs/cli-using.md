@@ -132,9 +132,11 @@ Attaching to process 1838
 
 ```
 
-#### Detaching from a Process
+#### Detaching from Processes
 
 You can also [detach](/docs/cli-reference#detach) AppScope from a process.
+
+Furthermore, if you want to undo the effects of the `scope attach`, `scope start`, and/or `scope service` commands, run the `scope stop` [command](/docs/cli-reference#stop). This runs `scope detach --all`, removes the filter file from the system, and removes `scope` from service configurations.
 
 <!-- TBD TO-DO explain about the library -->
 
@@ -159,6 +161,14 @@ No events are emitted from files or sockets that exist before AppScope attaches 
 - After AppScope attaches to a process, AppScope will not report any **new** activity on file or socket descriptors that the process had already opened.
   
   - For example, suppose a process opens a socket descriptor before AppScope is attached. Subsequent sends and receives on this socket will not produce AppScope events.
+
+<span id="payloads"></span>
+
+### Working with HTTP Payloads
+
+When you scope an app that produces HTTP traffic, you can capture the payloads using the `-p` or `--payloads` option. This is AppScope's  **payloads** feature (see the `payload` section in the AppScope [config file](/docs/config)), which is disabled by default, because it can create large amounts of data, and because it captures payloads unencrypted.
+
+When the **payloads** feature is enabled, setting `SCOPE_PAYLOAD_TO_DISK` to `true` guarantees that AppScope will write payloads to the local directory specified in `SCOPE_PAYLOAD_DIR`.
 
 <span id="explore-captured"></span>
 

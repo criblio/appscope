@@ -24,7 +24,7 @@
 #define GOPCLNTAB_MAGIC_118 0xfffffff0
 #define SCOPE_STACK_SIZE (size_t)(32 * 1024)
 #define UNKNOWN_GO_VER (-1)
-#define MAX_SUPPORTED_GO_VER (19)
+#define MAX_SUPPORTED_GO_VER (20)
 #define HTTP2_FRAME_HEADER_LEN (9)
 #define PRI_STR "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 #define PRI_STR_LEN sizeof(PRI_STR)

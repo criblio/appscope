@@ -49,7 +49,7 @@
     - name: Integrating with Cribl
       path: /docs/cribl-integration
 
-    - name: Troubleshooting and Crash Analysis
+    - name: Troubleshooting
       path: /docs/troubleshooting
 
 - name: Reference

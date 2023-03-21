@@ -127,7 +127,7 @@ AppScope 1.2.2 also updates the [UPX](https://upx.github.io/) executable packer 
 ### Fixes
 
 - [#1258](https://github.com/criblio/appscope/issues/1258) A scoped application no longer crashes when one of its network connections is [closed](/docs/schema-reference#eventnetclose) and then an attempt is made to [send](/docs/schema-reference#eventnettx) or [receive](/docs/schema-reference#eventnetrx) data on the same connection.
-- [#1251](https://github.com/criblio/appscope/issues/1251) A scoped, running process no longer crashes when you [change](/docs/cli-using#dynamic-configuration) configurations and the new configuration defines a protocol that the old configuration also defines.
+- [#1251](https://github.com/criblio/appscope/issues/1251) A scoped, running process no longer crashes when you [change](/docs/troubleshooting#dynamic-configuration) configurations and the new configuration defines a protocol that the old configuration also defines.
 - [#1197](https://github.com/criblio/appscope/issues/1197) When run in a container that is itself inside a container (i.e., Docker in Docker), AppScope now successfully locates the host namespace.
 
 ### Security Fixes

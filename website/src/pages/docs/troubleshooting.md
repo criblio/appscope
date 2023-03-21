@@ -1,6 +1,10 @@
 ---
-title: Troubleshooting and Crash Analysis
+title: Troubleshooting
 ---
+
+<span id="troubleshoot-all"></span>
+
+# Reasons to Troubleshoot
 
 You can use AppScope to [troubleshoot an application](#crash-analysis) that's behaving problematically:
 
@@ -14,12 +18,13 @@ On the other hand, you can [troubleshoot AppScope itself](#troubleshoot-appscope
 
 - AppScope can determine the status of the transport it's trying to use to convey events and metrics to a destination. This helps troubleshoot "Why am I getting no events or metrics?" scenarios.
 
-
 <span id="troubleshoot-application"></span>
 
 ## Troubleshooting an Application
 
-Intro sentence here.
+The AppScope team considers it good practice to keep the **snapshot** feature turned on when scoping applications. That way, if a scoped app crashes, you'll always have either a stacktrace or a coredump or both (depending on how you configure AppScope) as a starting point for your crash analysis.
+
+When an application you're **not** scoping is crashing or otherwise behaving in unexpected ways, try scoping it with the **snapshot** feature turned on. Then you can explore the app's metrics and events while it's running, or analyze a coredump and/or stacktrace if it crashes. 
 
 <span id="crash-analysis"></span>
 
@@ -27,33 +32,36 @@ Intro sentence here.
 
 The `scope snapshot` command obtains debug information about a running or crashing process, regardless of whether or not the process is scoped.
 
-Whenever the kernel sends the scoped app a fatal signal (i.e., illegal instruction, bus error, segmentation fault, or floating point exception), AppScope will capture either a coredump, a stacktrace, or both, depending on what you have configured or the command-line options you choose.
+Whenever the kernel sends the scoped app a fatal signal (i.e., illegal instruction, bus error, segmentation fault, or floating point exception), AppScope will capture either a coredump, a stacktrace, or both, depending on what you have configured or the command-line options you choose. (You might want to keep coredump capture turned off if the relatively large size of coredump files would be problematic in your environment.) 
 
 - See the `snapshot` section of the [config file](/docs/config-file).
 
-- The `scope attach`, `scope run`, and `scope watch` commands can all take the `-b`/`backtrace` and `-c`/`--coredump` options.  
+- The `scope attach`, `scope run`, and `scope watch` commands can all take the `-b`/`--backtrace` and `-c`/`--coredump` options.  
 
 The `snapshot` [field](/docs/schema-reference/#eventstartmsginfoconfigurationcurrentlibscopesnapshot) in the process-start message records whether capturing coredumps and backtraces are enabled or not.
+
+Apart from coredumps and stacktraces, AppScope always writes two additional files to the snapshot directory:
+- `info_<timestamp>` provides basic information about the process.
+- `cfg_<timestamp>` records the AppScope configuration in effect when the application crashed.
 
 <span id="troubleshoot-appscope"></span>
 
 ## Troubleshooting AppScope itself
+
+<!-- TBD talk about AppScope crashing -->
 
 AppScope offers many options for sending data to other applications (Cribl Stream, Cribl Edge, or any other application that receives data over TCP or UNIX sockets). If data does not show up at the destination, you can use the CLI to troubleshoot the transport AppScope is trying to use:
 
 - `scope inspect` retrieves the AppScope config currently in effect and determines the status of the transport AppScope is trying to use.
 - `scope update` modifies the current AppScope config.
 - `scope ps` now determines whether the processes it lists are scoped or not.
+- `scope logs` retrieves AppScope's own log files, which may contain errors or warnings useful for troubleshooting.
 
-<!-- TBD talk about AppScope crashing -->
-
-<!-- TBD fix links since this moved -->
+The AppScope team recommends using `scope update` to perform dynamic configuration. For completeness, though, we're including the following section about an alternative method for dynamic configuration.
 
 <span id="dynamic-configuration"></span>
 
 ### Dynamic Configuration Via the Command Directory
-
-<!-- add in team recommends ...  -->
 
 Separately from the `scope update` command, AppScope offers another way to do dynamic configuration in real time, via the **command directory**.
 

@@ -16,7 +16,7 @@
         <span style="margin-top:15px; 
         padding: 6px; 
         border-radius; 2px;
-        background-color: #1890FF"><a href="" id="sample_and_filter" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Sample and Filter</a></span> 
+        background-color: #1890FF"><a href="" id="sample_and_filter" class="pipeline-name" target="_blank" rel="noreferrer noopener" style="color: #fff; text-decoration: none">Cribl Pipeline: Sample and Filter</a></span> 
         </p>
       <p>Many data sources are a mixed bag of value. In fact, many data sources simply never make it into Splunk because they present a dubious value proposition, like firewall logs, netflow logs, or web access logs. They may contain messages you absolutely have to have, and some which are significantly less valuable. <b>Cribl's smart sampling enables you to finally bring in high volume, low value data sources.</b>
         </p>     

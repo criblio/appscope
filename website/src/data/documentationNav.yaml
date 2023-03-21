@@ -49,6 +49,9 @@
     - name: Integrating with Cribl
       path: /docs/cribl-integration
 
+    - name: Troubleshooting
+      path: /docs/troubleshooting
+
 - name: Reference
   child: 
     - name: Config File

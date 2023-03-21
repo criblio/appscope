@@ -6,7 +6,7 @@ AppScope provides two mechanisms to affect the behavior of a running process. Th
 
 This feature provides an "environment variable-like" interface that can be used to alter the current configuration of a running process.
 
-[This page](https://appscope.dev/docs/cli-using#dynamic-configuration) has a nice description of this file-based mechanism with examples for using this feature and what the "environment variable" format looks like.  The library provides no success or failure response when using the Dynamic Configuration mechanism, though the library will delete the scope.<pid> file after it's completed processing the file.
+[This page](https://appscope.dev/docs/troubleshooting#dynamic-configuration) has a nice description of this file-based mechanism with examples for using this feature and what the "environment variable" format looks like.  The library provides no success or failure response when using the Dynamic Configuration mechanism, though the library will delete the scope.<pid> file after it's completed processing the file.
 
 All configuration environment variables can be specified in this file. Values and names of the configuration environment variables can be found [here](https://appscope.dev/docs/config-file/#scopeyml-config-file) in comments "Values:" and "Override:" respectively.  By our own convention, all environment variable names used by AppScope start with "SCOPE_".
 

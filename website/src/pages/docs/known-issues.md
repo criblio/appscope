@@ -14,7 +14,7 @@ As of this AppScope release, known issues include:
 
   - **Fix:** 1.2.2
 
-- [#1251](https://github.com/criblio/appscope/issues/1251) [Changing](/docs/cli-using#dynamic-configuration) configuration of a scoped, running process causes the process to crash when the new configuration defines a protocol that the old configuration also defines. It crashes as long as the two protocols have the same name, even if the two definitions are identical. <strong> This issue is present in all versions of AppScope prior to 1.2.2</strong>.
+- [#1251](https://github.com/criblio/appscope/issues/1251) [Changing](/docs/troubleshooting#dynamic-configuration) configuration of a scoped, running process causes the process to crash when the new configuration defines a protocol that the old configuration also defines. It crashes as long as the two protocols have the same name, even if the two definitions are identical. <strong> This issue is present in all versions of AppScope prior to 1.2.2</strong>.
 
   - **Fix:** 1.2.2
 

@@ -65,8 +65,8 @@ enum go_arch_t {
 
 // compile-time control for debugging
 #define NEEDEVNULL 1
-#define funcprint sysprint
-//#define funcprint devnull
+//#define funcprint sysprint
+#define funcprint devnull
 //#define patchprint sysprint
 #define patchprint devnull
 

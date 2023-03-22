@@ -232,7 +232,7 @@ go_schema_t go_17_schema_arm = {
         .c_syscall_p3=                 0x50,
         .c_syscall_p4=                 0x58,
         .c_syscall_p5=                 0x40,
-        .c_syscall_p6=                 0x48,    
+        .c_syscall_p6=                 0x48,
         .c_tls_server_read_connReader= 0x68,
         .c_tls_server_read_buf=        0x70,
         .c_tls_server_read_rc=         0x38,
@@ -345,7 +345,7 @@ adjustGoStructOffsetsForVersion()
         g_go_schema->struct_offsets.fr_to_readBuf=0x50;
         g_go_schema->struct_offsets.fr_to_writeBuf=0x80;
         g_go_schema->struct_offsets.fr_to_headerBuf=0x38;
-        
+
         if (g_go_maint_ver < 3) {
             g_go_schema->struct_offsets.cc_to_fr=0xd0;
         }
@@ -451,7 +451,7 @@ go_str(void *go_str)
     return c_str;
 }
 
-/* 
+/*
 static void
 free_go_str(char *str) {
     // Go 17 and higher use "c style" null terminated strings instead of a string and a length
@@ -504,7 +504,7 @@ getGoVersionAddr(const char* buf)
     section_strtab = (char *)buf + sections[ehdr->e_shstrndx].sh_offset;
     const char magic[0xe] = "\xff Go buildinf:";
     void *go_build_ver_addr = NULL;
- 
+
     for (i = 0; i < ehdr->e_shnum; i++) {
         sec_name = section_strtab + sections[i].sh_name;
         sec_data = (const char *)buf + sections[i].sh_offset;
@@ -664,7 +664,7 @@ looks_like_first_inst_of_go_func(cs_insn* asm_inst)
                 !scope_strcmp((const char*)asm_inst->op_str, "rcx, qword ptr fs:[0xfffffffffffffff8]")) ||
             // -buildmode=pie compiles to this:
             (!scope_strcmp((const char*)asm_inst->mnemonic, "mov") &&
-            !scope_strcmp((const char*)asm_inst->op_str, "rcx, -8")) || 
+            !scope_strcmp((const char*)asm_inst->op_str, "rcx, -8")) ||
             (!scope_strcmp((const char*)asm_inst->mnemonic, "cmp") &&
             !scope_strcmp((const char*)asm_inst->op_str, "rsp, qword ptr [r14 + 0x10]")) ||
             (!scope_strcmp((const char*)asm_inst->mnemonic, "lea") &&
@@ -766,7 +766,7 @@ patch_addrs(funchook_t *funchook,
 
         // PATCH SYSCALLS
         if (!scope_strcmp((const char*)asm_inst[i].mnemonic, SYSCALL_INST)) {
-            // In the "syscall" case, we want to patch the instruction directly 
+            // In the "syscall" case, we want to patch the instruction directly
             void *pre_patch_addr = (void*)asm_inst[i].address;
             void *patch_addr = (void*)asm_inst[i].address;
 
@@ -802,7 +802,7 @@ patch_addrs(funchook_t *funchook,
          *
          * Note: We don't need a frame size here.
          */
-        if ((!scope_strcmp(tap->func_name, "net/http.(*http2serverConn).readFrames")) || 
+        if ((!scope_strcmp(tap->func_name, "net/http.(*http2serverConn).readFrames")) ||
             (!scope_strcmp(tap->func_name, "net/http.(*http2clientConnReadLoop).run"))) {
             if ((!scope_strcmp((const char*)asm_inst[i].mnemonic, CALL_INST)) &&
                 (scope_strstr(g_ReadFrame_addr, (const char*)asm_inst[i].op_str + 1)) &&
@@ -1010,7 +1010,7 @@ initGoHook(elf_buf_t *ebuf)
     } else {
         go_ver = go_str((void *)((uint64_t)go_ver_sym + base));
     }
-    
+
     if (go_ver && (go_runtime_version = go_ver)) {
         sysprint("go_runtime_version = %s\n", go_runtime_version);
         go_version_numbers(go_runtime_version);
@@ -1033,7 +1033,7 @@ initGoHook(elf_buf_t *ebuf)
         scopeLogWarn("%s was compiled with go version `%s`. Versions newer than Go 1.%d are not yet supported. Continuing without AppScope.", ebuf->cmd, go_runtime_version, MAX_SUPPORTED_GO_VER);
         funchook_destroy(funchook);
         return; // don't install our hooks
-    } 
+    }
 
     uint64_t *ReadFrame_addr;
     if (((ReadFrame_addr = getSymbol(ebuf->buf, "net/http.(*http2Framer).ReadFrame")) == 0) &&
@@ -1221,13 +1221,13 @@ getFDFromConn(uint64_t tcpConn) {
     uint64_t netFD = *(uint64_t *)(tcpConn + g_go_schema->struct_offsets.iface_data);
     if (!netFD) return -1;
 
-    if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) { 
-        uint64_t pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd); 
+    if (g_go_schema->struct_offsets.netfd_to_sysfd == UNDEF_OFFSET) {
+        uint64_t pfd = *(uint64_t *)(netFD + g_go_schema->struct_offsets.netfd_to_pd);
         if (!pfd) return -1;
 
-        return *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd); 
+        return *(int *)(pfd + g_go_schema->struct_offsets.pd_to_fd);
     } else {
-        return *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd); 
+        return *(int *)(netFD + g_go_schema->struct_offsets.netfd_to_sysfd);
     }
     return -1;
 }
@@ -1317,7 +1317,7 @@ c_syscall(char *sys_stack, char *g_stack)
 
             funcprint("Scope: read of %ld rc %ld\n", fd, rc);
             doRead(fd, initialTime, (rc >= 0), buf, rc, "go_read", BUF, 0);
-        } 
+        }
         break;
     case SYS_close:
         {
@@ -1354,7 +1354,7 @@ go_syscall6(char *stackptr)
 static void
 c_tls_server_read(char *sys_stack, char *g_stack)
 {
-    uint64_t connReader = *(uint64_t *)(g_stack + g_go_schema->arg_offsets.c_tls_server_read_connReader); 
+    uint64_t connReader = *(uint64_t *)(g_stack + g_go_schema->arg_offsets.c_tls_server_read_connReader);
     if (!connReader) return;   // protect from dereferencing null
     char *buf           = (char *)*(uint64_t *)(g_stack + g_go_schema->arg_offsets.c_tls_server_read_buf);
     uint64_t rc         = *(uint64_t *)(g_stack + g_go_schema->arg_offsets.c_tls_server_read_rc);
@@ -1371,7 +1371,7 @@ c_tls_server_read(char *sys_stack, char *g_stack)
     if (!cr_conn_rwc_if) return;
     uint64_t tls   = *(uint64_t *)(conn + g_go_schema->struct_offsets.conn_to_tlsState);
     if (!tls) return;
-   
+
     uint64_t tcpConn = *(uint64_t *)(cr_conn_rwc_if + g_go_schema->struct_offsets.iface_data);
     if (!tcpConn) return;
 
@@ -1420,7 +1420,7 @@ go_tls_server_write(char *stackptr)
 static void
 c_tls_client_read(char *sys_stack, char *g_stack)
 {
-    uint64_t pc = *(uint64_t *)(g_stack + g_go_schema->arg_offsets.c_tls_client_read_pc); 
+    uint64_t pc = *(uint64_t *)(g_stack + g_go_schema->arg_offsets.c_tls_client_read_pc);
     if (!pc) return;
 
     uint64_t pc_conn_if = (pc + g_go_schema->struct_offsets.persistConn_to_conn);
@@ -1461,16 +1461,16 @@ c_tls_client_write(char *sys_stack, char *g_stack)
     uint64_t rc   = *(uint64_t *)(g_stack + g_go_schema->arg_offsets.c_tls_client_write_rc);
     if (rc < 1) return;
 
-    uint64_t pc_conn_if = (w_pc + g_go_schema->struct_offsets.persistConn_to_conn); 
+    uint64_t pc_conn_if = (w_pc + g_go_schema->struct_offsets.persistConn_to_conn);
     if (!pc_conn_if) return;
-    uint64_t tls =  *(uint64_t*)(w_pc + g_go_schema->struct_offsets.persistConn_to_tlsState); 
+    uint64_t tls =  *(uint64_t*)(w_pc + g_go_schema->struct_offsets.persistConn_to_tlsState);
     if (!tls) return;
 
-    uint64_t tcpConn = *(uint64_t *)(pc_conn_if + g_go_schema->struct_offsets.iface_data); 
+    uint64_t tcpConn = *(uint64_t *)(pc_conn_if + g_go_schema->struct_offsets.iface_data);
     if (!tcpConn) return;
 
     int fd = getFDFromConn(tcpConn);
-    
+
     doProtocol((uint64_t)0, fd, buf, rc, TLSTX, BUF);
 }
 
@@ -1492,12 +1492,12 @@ c_http2_server_read(char *sys_stack, char *g_stack)
     if (!buf) return;
     char *readBuf = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_readBuf);
     if (!readBuf) return;
-    uint64_t conn_if = (sc + g_go_schema->struct_offsets.sc_to_conn); 
+    uint64_t conn_if = (sc + g_go_schema->struct_offsets.sc_to_conn);
     if (!conn_if) return;
-    uint64_t tcpConn = *(uint64_t *)(conn_if + g_go_schema->struct_offsets.iface_data); 
+    uint64_t tcpConn = *(uint64_t *)(conn_if + g_go_schema->struct_offsets.iface_data);
     if (!tcpConn) return;
 
-    uint8_t *newbuf = (uint8_t *)buf; 
+    uint8_t *newbuf = (uint8_t *)buf;
     uint32_t rc = 0;
     rc += newbuf[0] << 16;
     rc += newbuf[1] << 8;
@@ -1532,12 +1532,12 @@ c_http2_server_write(char *sys_stack, char *g_stack)
     uint64_t sc      = *(uint64_t *)(g_stack + g_go_schema->arg_offsets.c_http2_server_write_sc);
     if (!sc) return;
     uint64_t fr      = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_fr);
-    if (!fr) return;  
+    if (!fr) return;
     char *writeBuf   = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_writeBuf);
     if (!writeBuf) return;
-    uint64_t conn_if = (sc + g_go_schema->struct_offsets.sc_to_conn); 
+    uint64_t conn_if = (sc + g_go_schema->struct_offsets.sc_to_conn);
     if (!conn_if) return;
-    uint64_t tcpConn = *(uint64_t *)(conn_if + g_go_schema->struct_offsets.iface_data); 
+    uint64_t tcpConn = *(uint64_t *)(conn_if + g_go_schema->struct_offsets.iface_data);
     if (!tcpConn) return;
 
     int fd = getFDFromConn(tcpConn);
@@ -1550,7 +1550,7 @@ c_http2_server_write(char *sys_stack, char *g_stack)
      */
     if (isProtocolSet(fd) == FALSE) return;
 
-    uint8_t *newbuf = (uint8_t *)writeBuf; 
+    uint8_t *newbuf = (uint8_t *)writeBuf;
     uint32_t rc = 0;
     rc += newbuf[0] << 16;
     rc += newbuf[1] << 8;
@@ -1587,9 +1587,9 @@ c_http2_server_preface(char *sys_stack, char *g_stack)
     if (!sc) return;
     uint64_t fr      = *(uint64_t *)(sc + g_go_schema->struct_offsets.sc_to_fr);
     if (!fr) return;
-    uint64_t conn_if = (sc + g_go_schema->struct_offsets.sc_to_conn); 
+    uint64_t conn_if = (sc + g_go_schema->struct_offsets.sc_to_conn);
     if (!conn_if) return;
-    uint64_t tcpConn = *(uint64_t *)(conn_if + g_go_schema->struct_offsets.iface_data); 
+    uint64_t tcpConn = *(uint64_t *)(conn_if + g_go_schema->struct_offsets.iface_data);
     if (!tcpConn) return;
 
     int fd = getFDFromConn(tcpConn);
@@ -1609,7 +1609,7 @@ go_http2_server_preface(char *stackptr)
   Our variable    Memory loc        Go variable
   cc              stackaddr + 68    cc
   fr              sc + 0x130        cc.fr
-  buf             fr + 0x40         cc.fr.headerBuf 
+  buf             fr + 0x40         cc.fr.headerBuf
   readBuf         fr + 0x58         cc.fr.readBuf
   tcpConn         sc + 0x10         cc.conn
  */
@@ -1625,14 +1625,14 @@ c_http2_client_read(char *sys_stack, char *g_stack)
     if (!buf) return;
     char *readBuf       = (char *)*(uint64_t *)(fr + g_go_schema->struct_offsets.fr_to_readBuf);
     if (!readBuf) return;
-    uint64_t conn_if = (cc + g_go_schema->struct_offsets.cc_to_tconn); 
+    uint64_t conn_if = (cc + g_go_schema->struct_offsets.cc_to_tconn);
     if (!conn_if) return;
-    uint64_t tcpConn    = *(uint64_t *)(conn_if + g_go_schema->struct_offsets.iface_data); 
+    uint64_t tcpConn    = *(uint64_t *)(conn_if + g_go_schema->struct_offsets.iface_data);
     if (!tcpConn) return;
 
     int fd = getFDFromConn(tcpConn);
 
-    uint8_t *newbuf = (uint8_t *)buf; 
+    uint8_t *newbuf = (uint8_t *)buf;
     uint32_t rc = 0;
     rc += newbuf[0] << 16;
     rc += newbuf[1] << 8;
@@ -1669,7 +1669,7 @@ c_http2_client_write(char *sys_stack, char *g_stack)
     if (rc < 1) return;
 
     int fd = getFDFromConn(tcpConn);
-    
+
     doProtocol((uint64_t)0, fd, buf, rc, TLSTX, BUF);
     funcprint("Scope: c_http2_client_write of %d\n", fd);
 }

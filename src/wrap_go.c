@@ -375,6 +375,7 @@ adjustGoStructOffsetsForVersion()
     if (g_go_minor_ver == 20) {
         if (g_arch == X86_64) {
             g_go_schema->struct_offsets.cc_to_fr=0x138;
+            g_go_schema->arg_offsets.c_http2_client_read_cc=0x58;
             g_go_schema->arg_offsets.c_tls_client_read_pc=0x80;
             g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
         } else if (g_arch == AARCH64) {

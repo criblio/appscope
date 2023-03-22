@@ -378,6 +378,7 @@ adjustGoStructOffsetsForVersion()
             g_go_schema->arg_offsets.c_tls_client_read_pc=0x80;
             g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x48;
         } else if (g_arch == AARCH64) {
+            g_go_schema->arg_offsets.c_http2_client_read_cc=0x60;
             g_go_schema->arg_offsets.c_tls_client_read_pc=0x98;
             g_go_schema->arg_offsets.c_http2_client_write_tcpConn=0x80;
         } else {

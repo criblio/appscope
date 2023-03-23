@@ -41,5 +41,8 @@ func GetNormalizedVersion() string {
 
 // IsVersionDev returns TRUE if used version is a developer version
 func IsVersionDev() bool {
-	return GitSummary[1:] != Version
+	if len(GitSummary) > 1 {
+		return GitSummary[1:] != Version
+	}
+	return false
 }

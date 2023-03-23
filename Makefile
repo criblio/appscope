@@ -172,7 +172,7 @@ builder: require-docker-buildx-builder
 		--file docker/builder/Dockerfile.$(DIST) \
 		.
 
-image: TAG := cribl/scope:dev-$(ARCH)
+image: TAG := cribl/scope:dev
 image: require-qemu-binfmt
 	@docker buildx build \
 		--tag $(TAG) \
@@ -196,7 +196,7 @@ docs-generate: require-docker-buildx-builder
 	@echo AppScope docs generator finished: website/src/pages/docs/schema-reference.md is updated
 
 k8s-test: require-kind require-kubectl image
-	docker tag cribl/scope:dev-$(ARCH) cribl/scope:$(VERSION)
+	docker tag cribl/scope:dev cribl/scope:$(VERSION)
 	kind delete cluster
 	kind create cluster
 	kind load docker-image cribl/scope:$(VERSION)

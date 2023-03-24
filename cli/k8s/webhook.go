@@ -105,12 +105,12 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// InitContainer are splitted by 2 phases (scope-pod-init, scopeextract)
+		// InitContainer are splitted by 2 phases (scope-pod-init, scope-pod-extract)
 		// scope-pod-init: copy scope from cribl:/scope to shared volume /scope/scope
-		// scopeextract: create extraction directory (/scope/scope/<id>/) and perform
+		// scope-pod-extract: create extraction directory (/scope/scope/<id>/) and perform
 		// extract operation there
 		//
-		// Note: scopeextract is performed in context of application container
+		// Note: scope-pod-extract is performed in context of application container
 		// therefore we are able to detect proper loader used in application container
 
 		// scope-pod-init container will copy the scope binary
@@ -141,7 +141,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 
 		// add volume mount to all containers in the pod
 		for i := 0; i < len(pod.Spec.Containers); i++ {
-			// scopeextract container(s) will extract the scope files (library and config files)
+			// scope-pod-extract container(s) will extract the scope files (library and config files)
 			scopeDirPath := fmt.Sprintf("/scope/%d", i)
 			cmd := []string{
 				"/bin/sh",
@@ -173,7 +173,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			cmdStr = append(cmdStr, scopeDirPath)
 			cmd = append(cmd, strings.Join(cmdStr, " "))
 			pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
-				Name:    fmt.Sprintf("scopeextract%d", i),
+				Name:    fmt.Sprintf("scope-pod-extract-%d", i),
 				Image:   pod.Spec.Containers[i].Image,
 				Command: cmd,
 				VolumeMounts: []corev1.VolumeMount{{

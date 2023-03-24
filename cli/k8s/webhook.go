@@ -105,17 +105,17 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// InitContainer are splitted by 2 phases (scopeinit, scopeextract)
-		// scopeinit: copy scope from cribl:/scope to shared volume /scope/scope
+		// InitContainer are splitted by 2 phases (scope-pod-init, scopeextract)
+		// scope-pod-init: copy scope from cribl:/scope to shared volume /scope/scope
 		// scopeextract: create extraction directory (/scope/scope/<id>/) and perform
 		// extract operation there
 		//
 		// Note: scopeextract is performed in context of application container
 		// therefore we are able to detect proper loader used in application container
 
-		// scopeinit container will copy the scope binary
+		// scope-pod-init container will copy the scope binary
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
-			Name:    "scopeinit",
+			Name:    "scope-pod-init",
 			Image:   fmt.Sprintf("cribl/scope:%s", internal.GetNormalizedVersion()),
 			Command: []string{"cp", "/usr/local/bin/scope", "/scope/scope"},
 			VolumeMounts: []corev1.VolumeMount{{

@@ -116,7 +116,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 		// scope-pod-init container will copy the scope binary
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
 			Name:    "scope-pod-init",
-			Image:   fmt.Sprintf("cribl/scope:%s", internal.GetNormalizedVersion()),
+			Image:   fmt.Sprintf("cribl/scope:%s", ver),
 			Command: []string{"cp", "/usr/local/bin/scope", "/scope/scope"},
 			VolumeMounts: []corev1.VolumeMount{{
 				Name:      "scope",

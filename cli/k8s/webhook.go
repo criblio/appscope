@@ -47,7 +47,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 		shouldModify = false
 	}
 
-	ver := strings.Split(internal.GetVersion(), "-")
+	ver := internal.GetNormalizedVersion()
 
 	patch := []JSONPatchEntry{}
 	if shouldModify {
@@ -105,31 +105,19 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		cmd := []string{
-			"/usr/local/bin/scope",
-			"excrete",
-		}
-		if len(app.CriblDest) > 0 {
-			cmd = append(cmd,
-				"--cribldest",
-				app.CriblDest,
-			)
-		} else {
-			cmd = append(cmd,
-				"--metricdest",
-				app.MetricDest,
-				"--metricformat",
-				app.MetricFormat,
-				"--eventdest",
-				app.EventDest,
-			)
-		}
-		cmd = append(cmd, "/scope")
-		// Scope initcontainer will output the scope binary and scope library in the scope volume
+		// InitContainer are splitted by 2 phases (scope-pod-init, scope-pod-extract)
+		// scope-pod-init: copy scope from cribl:/scope to shared volume /scope/scope
+		// scope-pod-extract: create extraction directory (/scope/scope/<id>/) and perform
+		// extract operation there
+		//
+		// Note: scope-pod-extract is performed in context of application container
+		// therefore we are able to detect proper loader used in application container
+
+		// scope-pod-init container will copy the scope binary
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
-			Name:    "scope",
-			Image:   fmt.Sprintf("cribl/scope:%s", internal.GetVersion()),
-			Command: cmd,
+			Name:    "scope-pod-init",
+			Image:   fmt.Sprintf("cribl/scope:%s", ver),
+			Command: []string{"cp", "/usr/local/bin/scope", "/scope/scope"},
 			VolumeMounts: []corev1.VolumeMount{{
 				Name:      "scope",
 				MountPath: "/scope",
@@ -153,6 +141,47 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 
 		// add volume mount to all containers in the pod
 		for i := 0; i < len(pod.Spec.Containers); i++ {
+			// scope-pod-extract container(s) will extract the scope files (library and config files)
+			scopeDirPath := fmt.Sprintf("/scope/%d", i)
+			cmd := []string{
+				"/bin/sh",
+				"-c",
+			}
+			cmdStr := []string{
+				"mkdir",
+				scopeDirPath,
+				"&&",
+				"/scope/scope",
+				"excrete",
+			}
+			if len(app.CriblDest) > 0 {
+				cmdStr = append(cmdStr,
+					"--cribldest",
+					app.CriblDest,
+				)
+			} else {
+				cmdStr = append(cmdStr,
+					"--metricdest",
+					app.MetricDest,
+					"--metricformat",
+					app.MetricFormat,
+					"--eventdest",
+					app.EventDest,
+				)
+			}
+
+			cmdStr = append(cmdStr, scopeDirPath)
+			cmd = append(cmd, strings.Join(cmdStr, " "))
+			pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
+				Name:    fmt.Sprintf("scope-pod-extract-%d", i),
+				Image:   pod.Spec.Containers[i].Image,
+				Command: cmd,
+				VolumeMounts: []corev1.VolumeMount{{
+					Name:      "scope",
+					MountPath: "/scope",
+				}},
+			})
+
 			pod.Spec.Containers[i].VolumeMounts = append(pod.Spec.Containers[i].VolumeMounts, corev1.VolumeMount{
 				Name:      "scope",
 				MountPath: "/scope",
@@ -170,11 +199,11 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			// Add environment variables to configure scope
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
 				Name:  "LD_PRELOAD",
-				Value: "/scope/libscope.so",
+				Value: fmt.Sprintf("%s/libscope.so", scopeDirPath),
 			})
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
 				Name:  "SCOPE_CONF_PATH",
-				Value: "/scope/scope.yml",
+				Value: fmt.Sprintf("%s/scope.yml", scopeDirPath),
 			})
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
 				Name:  "SCOPE_EXEC_PATH",
@@ -182,7 +211,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			})
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{
 				Name:  "LD_LIBRARY_PATH",
-				Value: fmt.Sprintf("/tmp/libscope-%s", ver[0]),
+				Value: fmt.Sprintf("/tmp/appscope/%s/", ver),
 			})
 			// Get some metadata pushed into scope from the K8S downward API
 			pod.Spec.Containers[i].Env = append(pod.Spec.Containers[i].Env, corev1.EnvVar{

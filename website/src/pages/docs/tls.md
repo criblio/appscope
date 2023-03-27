@@ -63,3 +63,7 @@ cribl:
 If you prefer to connect to Cribl Stream on Cribl.Cloud without encryption, connect to port 10091 instead of port 10090, and disable the `tls` element in `scope.yml`.
 
 No changes in Cribl Stream configuration are needed.
+
+## Backoff Algorithm
+
+AppScope uses a **backoff algorithm** for connections to avoid creating excessive network traffic and log entries. When a remote destination that AppScope tries to connect to rejects the connection or is not available, AppScope retries the connection at a progressively slower rate.

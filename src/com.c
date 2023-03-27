@@ -303,20 +303,20 @@ msgEventGet(ctl_t *ctl)
 #define POOL_MAX 48
 typedef struct {
     uint64_t used;
-    void *addr;
+    char *addr;
 } pool_t;
 
-pool_t g_stack_pool[POOL_MAX] = {0};
+static pool_t g_stack_pool[POOL_MAX] = {0};
 
 static bool
 grab_unused(pool_t *entry)
 {
-    // Done atomically so two concurrnet threads will never try
+    // Done atomically so two concurrent threads will never try
     // to use a stack at one time.
     return atomicCasU64(&entry->used, (uint64_t)FALSE, (uint64_t)TRUE);
 }
 
-static void *
+static char *
 get_stack(void)
 {
     int i;
@@ -332,9 +332,10 @@ get_stack(void)
             entry->addr = scope_malloc(PCRE_STACK_SIZE);
             if (entry->addr) return entry->addr;
 
-            // We got a spot, but our malloc failed.
-            // Put the spot back into the unused pool.
-            // Stop looping if this happens.
+            // We got a spot, but our malloc failed. Put the spot back
+            // into the unused pool. Stop looping if this happens.
+            // grab_unused() guarantees that only one thread at a time
+            // can get here; so this doen't need to ba an atomic operation.
             entry->used = FALSE;
             break;
         }
@@ -347,7 +348,7 @@ get_stack(void)
 }
 
 static void
-free_stack(void *addr)
+free_stack(char *addr)
 {
     int i;
     for (i=0; i<POOL_MAX; i++) {
@@ -355,8 +356,9 @@ free_stack(void *addr)
 
         if (entry->addr == addr) {
 
-            // Addr is in the pool.  Don't free it, but
-            // set used to false to allow reuse.
+            // Addr is in the pool. Don't free addr, but set used to false
+            // to allow reuse. Only one thread can use a stack entry at a
+            // time so an atomic operation is unnecessary here.
             entry->used = FALSE;
             return;
         }
@@ -374,7 +376,7 @@ pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
                     pcre2_match_data *match_data, pcre2_match_context *mcontext)
 {
     int rc;
-    void *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
+    char *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
     if ((pcre_stack = get_stack()) == NULL) {
         scopeLogError("ERROR; pcre2_match_wrapper: get_stack");
         return -1;
@@ -440,7 +442,7 @@ regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
                 regmatch_t *pmatch, int eflags)
 {
     int rc;
-    void *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
+    char *pcre_stack = NULL, *tstack = NULL, *gstack = NULL;
 
      if ((pcre_stack = get_stack()) == NULL) {
         scopeLogError("ERROR; regexec_wrapper: get_stack");

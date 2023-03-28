@@ -820,21 +820,23 @@ SCOPE_PID=$!
 ERR+=$?
 
 sleep 1
-kill -SIGCHLD ${SCOPE_PID} &
+kill -SIGCHLD ${SCOPE_PID}
 
 # verify that process still exists
-if ! ps -p ${SCOPE_PID} > /dev/null; then
+if ! ps -p ${SCOPE_PID}; then
     echo "$SCOPE_PID ps first fail signalHandlerStatic"
     ERR+=1
 fi
 
-while kill -0 ${SCOPE_PID} &> /dev/null; do
+while kill -0 ${SCOPE_PID}; do
   kill -SIGKILL ${SCOPE_PID}
   sleep 1
 done
 
 count=$(grep 'bad g' $ERR_FILE | wc -l)
 if [ $count -ne 0 ] ; then
+    echo "$SCOPE_PID bad g seen in $ERR_FILE"
+    cat $ERR_FILE
     ERR+=1
 fi
 
@@ -850,21 +852,23 @@ SCOPE_PID=$!
 ERR+=$?
 
 sleep 1
-kill -SIGCHLD ${SCOPE_PID} &
+kill -SIGCHLD ${SCOPE_PID}
 
 # verify that process still exists
-if ! ps -p ${SCOPE_PID} > /dev/null; then
+if ! ps -p ${SCOPE_PID}; then
     echo "$SCOPE_PID ps first fail signalHandlerStaticStripped"
     ERR+=1
 fi
 
-while kill -0 ${SCOPE_PID} &> /dev/null; do
+while kill -0 ${SCOPE_PID}; do
   kill -SIGKILL ${SCOPE_PID}
   sleep 1
 done
 
 count=$(grep 'bad g' $ERR_FILE | wc -l)
 if [ $count -ne 0 ] ; then
+    echo "$SCOPE_PID bad g seen in $ERR_FILE"
+    cat $ERR_FILE
     ERR+=1
 fi
 

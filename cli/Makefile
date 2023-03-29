@@ -117,7 +117,7 @@ $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 		-ldflags="$(shell $(GOVVV) -flags) -w -linkmode external -extldflags \"-lrt -ldl -lpthread -static\" " \
 		-buildmode=pie \
 		$(BUILD_OPTS) \
-	       	-o $(SCOPE)
+		-o $(SCOPE)
 	$(RM) -r $(SCOPEDYN)
 
 $(SIGDEL): bpf/sigdel/sigdel.bpf.c $(SYSHEADER)

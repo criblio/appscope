@@ -27,6 +27,15 @@ func genOpenCloseLoop(f_name string) {
 	}
 }
 
+func genConsoleOutput() {
+    for i :=1; i < LoopLimit; i++ {
+        fmt.Printf(" %d ", i)
+        if i % 6 == 0 {
+            fmt.Println("")
+        }
+    }
+}
+
 func main() {
 
 	sig_channel := make(chan os.Signal, 1)
@@ -63,6 +72,10 @@ func main() {
 	go func() {
 		genOpenCloseLoop(tmpfile.Name())
 	}()
+
+    go func() {
+        genConsoleOutput();
+    }()
 
 	<-quit_channel
 	fmt.Println("Exiting")

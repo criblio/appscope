@@ -334,9 +334,9 @@ get_stack(void)
 
             // We got a spot, but our malloc failed. Put the spot back
             // into the unused pool. Stop looping if this happens.
-            // grab_unused() guarantees that only one thread at a time
-            // can get here; so this doen't need to ba an atomic operation.
-            entry->used = FALSE;
+            if (!atomicCasU64(&entry->used, (uint64_t)TRUE, (uint64_t)FALSE)) {
+                 scopeLogError("get_stack failed to set used to FALSE");
+            }
             break;
         }
     }
@@ -357,9 +357,10 @@ free_stack(char *addr)
         if (entry->addr == addr) {
 
             // Addr is in the pool. Don't free addr, but set used to false
-            // to allow reuse. Only one thread can use a stack entry at a
-            // time so an atomic operation is unnecessary here.
-            entry->used = FALSE;
+            // to allow reuse.
+            if (!atomicCasU64(&entry->used, (uint64_t)TRUE, (uint64_t)FALSE)) {
+                 scopeLogError("free_stack failed to set used to FALSE");
+            }
             return;
         }
     }

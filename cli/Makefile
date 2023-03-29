@@ -113,7 +113,7 @@ $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 		-ldflags="$(shell $(GOVVV) -flags) -w -linkmode external -extldflags \"-lrt -ldl -lpthread -static\" " \
 		-buildmode=pie \
 		$(BUILD_OPTS) \
-	       	-o $(SCOPE)
+		-o $(SCOPE)
 	$(RM) -r $(SCOPEDYN)
 
 ## test: run unit tests

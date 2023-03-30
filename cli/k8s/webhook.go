@@ -173,9 +173,10 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			cmdStr = append(cmdStr, scopeDirPath)
 			cmd = append(cmd, strings.Join(cmdStr, " "))
 			pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
-				Name:    fmt.Sprintf("scope-pod-extract-%d", i),
-				Image:   pod.Spec.Containers[i].Image,
-				Command: cmd,
+				Name:            fmt.Sprintf("scope-pod-extract-%d", i),
+				Image:           pod.Spec.Containers[i].Image,
+				ImagePullPolicy: pod.Spec.Containers[i].ImagePullPolicy,
+				Command:         cmd,
 				VolumeMounts: []corev1.VolumeMount{{
 					Name:      "scope",
 					MountPath: "/scope",

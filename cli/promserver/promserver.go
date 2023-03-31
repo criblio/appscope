@@ -7,26 +7,34 @@ import (
 	"os"
 )
 
-const pelement1 = "/"
+const pelement1 = "/hostfs"
 const pelement2 = "proc/"
 const pelement3 = "root/"
-const pelement4 = "tmp/"
+const pelement4 = "scope/"
 const pelement5 = "metrics/"
 const pelement6 = "metrics.json"
+
+func faccess(path string) (bool) {
+    if _, err := os.Stat(path); err != nil {
+       return false
+    }
+
+    return true
+}
 
 func Handler(rwrite http.ResponseWriter, req *http.Request) {
 	path := filepath.Join(pelement1, pelement2)
 	fmt.Println("checking dir: ", path)
 	dir, err := os.ReadDir(path)
 	if err != nil {
-        fmt.Println("Error readdir: ", path)
+        fmt.Println(err)
 		return
     }
 
 	path = filepath.Join(os.TempDir(), "appm")
 	tempf, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
-		fmt.Println("Error open temp file: ", path)
+		fmt.Println(err)
 		return
 	}
 
@@ -35,37 +43,58 @@ func Handler(rwrite http.ResponseWriter, req *http.Request) {
 
 	for _, entry := range dir {
 		if entry.IsDir() {
-			dname :=entry.Name()
+			dname := entry.Name()
 
-			path := filepath.Join(pelement1, pelement2, dname,	pelement3,
-				pelement4, pelement5, dname, pelement6)
+            // /hostfs/proc/dname/root/scope/metrics/
+			path := filepath.Join(pelement1, pelement2, dname,	pelement3, pelement4, pelement5)
+            if faccess(path) == true {
+               metricd, err := os.Open(path)
+               if err != nil {
+                  fmt.Println(err)
+                  return
+               }
 
-			metricf, err := os.Open(path)
-			if err != nil {
-				continue
-			}
+               mdname, _ := metricd.Readdirnames(0)
+               for _, ename := range mdname {
+                     // /hostfs/proc/dname/root/scope/metrics/mdname/metrics.json
+                     path := filepath.Join(pelement1, pelement2, dname,	pelement3,
+                          pelement4, pelement5, ename, pelement6)
 
-			fmt.Println("found pid: ", dname, "file: ", path)
+                     fmt.Println(err, path, mdname)
+                     metricf, err := os.Open(path)
+                     if err != nil {
+                        continue
+			         }
 
-			metrici, err := metricf.Stat()
-			metricbuf := make([]byte, metrici.Size())
-			metricd, err := metricf.Read(metricbuf)
-			if err != nil {
-				continue
-			}
+			         fmt.Println("found pid: ", dname, "file: ", path)
 
-			fmt.Println("read ", metricd, " bytes")
+			         metrici, err := metricf.Stat()
+                     if err != nil {
+				        continue
+			         }
 
-			if _, err := tempf.Write(metricbuf); err != nil {
-				continue
-			}
+                     metricbuf := make([]byte, metrici.Size())
+			         metricd, err := metricf.Read(metricbuf)
+			         if err != nil {
+				        continue
+			         }
 
-			metricf.Close()
-		}
+			         fmt.Println("read ", metricd, " bytes")
+
+			         if _, err := tempf.Write(metricbuf); err != nil {
+				        continue
+			         }
+
+			         metricf.Close()
+		       }
+
+               metricd.Close()
+            }
+        }
     }
 
 	if _, err := tempf.Seek(0, 0); err != nil {
-		fmt.Println("Error seek")
+		fmt.Println(err)
 		return
 	}
 
@@ -73,7 +102,7 @@ func Handler(rwrite http.ResponseWriter, req *http.Request) {
 	tempbuf := make([]byte, tempi.Size())
 	tempd, err := tempf.Read(tempbuf)
 	if err != nil {
-		fmt.Println("Error read results")
+		fmt.Println(err)
 		rwrite.Write([]byte("This is an example server.\n"))
 		return
 	}

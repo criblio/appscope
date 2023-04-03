@@ -36,6 +36,7 @@ const pelement4 = "scope/"
 const pelement5 = "metrics/"
 const pelement6 = "metrics.json"
 
+// Set to > 0 to enable console messages
 var msgs = 1
 
 func pmsg(msg ...interface{}) {

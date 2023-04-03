@@ -16,11 +16,11 @@ import (
  * hostfs read-only mount point to the host FS.
  *
  * The handler searches /hostfs/proc/<pid> for a root/scope/metrics
- * entry. Where /scope at a k8s pod level is defined by a
- * scope k8s command. It then walks subdirs, intended to include
+ * entry. Where /scope, at a k8s pod level, is defined by a
+ * scope k8s command. It then walks subdirs intended to include
  * process specific metrics. An HTTP response is sent with all
  * available metrics. The intent is that all application metrics
- * emitted from libscope for all scoped apps will be accesible.
+ * emitted from libscope for all scoped apps will be accessible.
  * 
  * The paths used are currently hard coded. At least the start point
  * for a search should probably be passed as command line options.

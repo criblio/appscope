@@ -1,0 +1,22 @@
+kind load docker-image prom-exporter:latest
+
+kubectl apply -f exporter.yml
+kubectl run redis --image=redis:alpine
+
+kubectl exec -it redis -- ash
+% mkdir =p /scope/metrics/1
+% mkdir =p /scope/metrics/2
+# copy paste mertrics data
+% vi /scope/metrics/1/metrics.json
+% vi /scope/metrics/2/metrics.json
+
+kubectl cp ./bin/linux/aarch64/scope default/prom-exporter-deployment-75f4c9c78d-5pfcg:/usr/local/bin/.
+
+kubectl exec -it prom-exporter-deployment-75f4c9c78d-5pfcg -- bash
+% scope prom --port 9100
+
+kubectl exec -i prom-exporter-deployment-75f4c9c78d-5pfcg -- curl localhost:9100/metrics
+
+
+ *export*
+Dockerfile.exporter exporter.txt  exporter.yml 

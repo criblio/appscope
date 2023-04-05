@@ -1304,3 +1304,8 @@ int
 scope_mq_getattr(mqd_t mqd, struct mq_attr *attr) {
     return scopelibc_mq_getattr(mqd, attr);
 }
+
+char *
+scope_secure_getenv(const char *name) {
+    return getenv(name);
+}

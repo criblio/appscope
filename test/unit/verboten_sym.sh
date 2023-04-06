@@ -5,6 +5,7 @@ SCOPE_LIB=./lib/linux/$(uname -m)/libscope.so
 # List of forbidden symbols
 declare -a verboten_syms=(
 "secure_getenv"
+"setenv"
 )
 
 declare -i EXIT_STATUS=0
@@ -23,6 +24,8 @@ done
 
 if (( "$EXIT_STATUS" == 0 )); then
     echo "Success"
+else
+    echo "Failed"
 fi
 
 exit ${EXIT_STATUS}

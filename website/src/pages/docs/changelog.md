@@ -23,7 +23,7 @@ Assets other than AWS Lambda Layers are available in the [Docker container](http
 
 ### New Features and Improvements
 
-AppScope 1.3.2 introduces support for [Go version 1.2](https://go.dev/doc/go1.2).
+AppScope 1.3.2 introduces support for [Go version 1.20](https://go.dev/doc/go1.20).
 
 ### Fixes
 

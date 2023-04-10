@@ -5,6 +5,33 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.3.2
+
+2023-04-12 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.3.2`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.3.2/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.3.2/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.3.2/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.3.2/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.3.2/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.2/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.3.2/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.2/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.3.2`.
+
+### New Features and Improvements
+
+AppScope 1.3.2 introduces support for [Go version 1.2](https://go.dev/doc/go1.2).
+
+### Fixes
+
+- [#1409](https://github.com/criblio/appscope/issues/1409) The `scope k8s` command now preloads the application image into the k8s cluster, avoiding `failed to call webhook` errors.
+- [#1408](https://github.com/criblio/appscope/issues/1408) On older (pre-1.1.24)versions of Alpine and other distributions based on musl libc, the `scope run` command now works as expected, and no longer encounters `secure_getenv: symbol not found` errors.
+- [#1365](https://github.com/criblio/appscope/issues/1365) The `scope k8s` command is now consistently able to obtain a signed certificate from the k8s Certificate Authority. This was failing with newer versions of k8s; updating a k8s library in AppScope fixed the problem. 
+- [#1170](https://github.com/criblio/appscope/issues/1170) The way AppScope runs `pcre2` functions internally is now improved, avoiding various problems including Go crashing under certain conditions.
+
 ## AppScope 1.3.1
 
 2023-03-21 - Maintenance Release

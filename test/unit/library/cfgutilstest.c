@@ -251,6 +251,10 @@ cfgProcessEnvironmentMtcFormat(void** state)
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_STATSD);
 
+    assert_int_equal(setenv("SCOPE_METRIC_FORMAT", "prometheus", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_PROMETHEUS);
+
     assert_int_equal(setenv("SCOPE_METRIC_FORMAT", "ndjson", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_NDJSON);
@@ -503,6 +507,10 @@ cfgProcessEnvironmentEventFormat(void** state)
     assert_int_equal(cfgEventFormat(cfg), CFG_FMT_NDJSON);
 
     assert_int_equal(setenv("SCOPE_EVENT_FORMAT", "statsd", 1), 0);
+    cfgProcessEnvironment(cfg);
+    assert_int_equal(cfgEventFormat(cfg), CFG_FMT_NDJSON);
+
+    assert_int_equal(setenv("SCOPE_EVENT_FORMAT", "prometheus", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgEventFormat(cfg), CFG_FMT_NDJSON);
 
@@ -911,9 +919,9 @@ cfgProcessCommandsFromFile(void** state)
     openFileAndExecuteCfgProcessCommands(path, cfg);
     assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_STATSD);
 
-    writeFile(path, "blah\nSCOPE_METRIC_FORMAT=ndjson");
+    writeFile(path, "blah\nSCOPE_METRIC_FORMAT=prometheus");
     openFileAndExecuteCfgProcessCommands(path, cfg);
-    assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_NDJSON);
+    assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_PROMETHEUS);
 
     // just demonstrating that the "last one wins"
     writeFile(path, "SCOPE_METRIC_FORMAT=ndjson\n"
@@ -1230,7 +1238,7 @@ cfgReadGoodYaml(void** state)
         "metric:\n"
         "  enable: false\n"
         "  format:\n"
-        "    type: ndjson                    # statsd, ndjson\n"
+        "    type: prometheus                # statsd, ndjson, prometheus\n"
         "    statsdprefix : 'cribl.scope'    # prepends each statsd metric\n"
         "    statsdmaxlen : 1024             # max size of a formatted statsd string\n"
         "    verbosity: 3                    # 0-9 (0 is least verbose, 9 is most)\n"
@@ -1291,7 +1299,7 @@ cfgReadGoodYaml(void** state)
     config_t* config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcEnable(config), FALSE);
-    assert_int_equal(cfgMtcFormat(config), CFG_FMT_NDJSON);
+    assert_int_equal(cfgMtcFormat(config), CFG_FMT_PROMETHEUS);
     assert_string_equal(cfgMtcStatsDPrefix(config), "cribl.scope.");
     assert_int_equal(cfgMtcStatsDMaxLen(config), 1024);
     assert_int_equal(cfgMtcWatchEnable(config, CFG_MTC_STATSD), FALSE);

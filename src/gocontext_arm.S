@@ -121,6 +121,8 @@
     b.eq 2f
     cmp  x8, #SYS_close
     b.eq 2f
+    cmp  x8, #SYS_mount
+    b.eq 2f
 
     ldr  x17, =\retptr
     ldr  x17, [x17]

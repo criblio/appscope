@@ -216,6 +216,7 @@ typedef struct {
     void *(*__memcpy_chk)(void *, const void *, size_t, size_t);
     int (*__sprintf_chk)(char *, int, size_t, const char *, ...);
     long int (*__fdelt_chk)(long int);
+    int (*mount)(const char *, const char *, const char *, unsigned long, const void *);
 #ifdef __linux__
     // Couldn't easily get struct definitions for these on mac
     int (*statvfs64)(const char *, struct statvfs64 *);

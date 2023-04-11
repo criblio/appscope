@@ -367,7 +367,7 @@ adjustGoStructOffsetsForVersion()
             scopeLogWarn("Architecture not supported. Not adjusting schema offsets.");
             return;
         }
-        tap_entry(tap_syscall)->func_name = "runtime/internal/syscall.Syscall6";
+        tap_entry(tap_syscall)->func_name = "runtime/internal/syscall.Syscall6.abi0";
         tap_entry(tap_rawsyscall)->func_name = "";
         tap_entry(tap_syscall6)->func_name = "";
     }
@@ -793,7 +793,6 @@ patch_addrs(funchook_t *funchook,
             } else if (tap->assembly_fn == go_hook_reg_syscall6) {
                 g_syscall6_return = (uint64_t)tap->return_addr;
             }
-
             break; // Done patching
         }
 
@@ -1242,6 +1241,8 @@ c_syscall(char *sys_stack, char *g_stack)
     uint64_t syscall_num = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_num);
     int64_t rc           = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_rc);
     if(rc < 0) rc = -1; // kernel syscalls can return values < -1
+    static bool once = FALSE;
+    static int count = 0;
 
     switch(syscall_num) {
     case SYS_write:
@@ -1328,6 +1329,73 @@ c_syscall(char *sys_stack, char *g_stack)
 
             funcprint("Scope: close of %ld\n", fd);
             doCloseAndReportFailures(fd, (rc != -1), "go_close"); // If net, deletes a net object
+        }
+        break;
+    case SYS_mount:
+        {
+            char *src = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
+            char *target = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
+            char *fstype = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p3);
+
+            count++;
+            funcprint("Scope: mount of %s %s %s\n", src, target, fstype);
+
+            // scope_strstr(g_proc.procname, "dockerd") &&
+            // (once == FALSE) &&
+            // (count == 3) &&
+            // (scope_strstr(target, "init") == NULL) &&
+            if ((src != NULL) && (target != NULL) &&
+                (count == 3) &&
+                scope_strstr(src, "overlay") &&
+                scope_strstr(target, "merged")) {
+                int ldfd;
+                char *filterdir;
+                size_t targetlen = scope_strlen(target);
+
+                once = TRUE;
+                scopeLogError("Interposed Mount overlay: %s %d %d\n", g_proc.procname, once, count);
+
+                if ((filterdir = scope_malloc(targetlen + 128)) == NULL) break;
+                scope_strcpy(filterdir, target);
+                scope_strcat(filterdir, "/opt/scope");
+
+                // make a dir in the merged dir
+                scopeLogError("%s:%d mkdir %s", __FUNCTION__, __LINE__, filterdir);
+                if (scope_mkdir(filterdir, 0666) != 0) {
+                    scopeLogError("ERROR: mkdir %s:%d", __FUNCTION__, __LINE__);
+                    scope_free(filterdir);
+                    break;
+                }
+
+                // mount the merged dir addition into the host FS
+                scopeLogError("%s:%d mount 1 %s", __FUNCTION__, __LINE__, filterdir);
+                if (g_fn.mount("/opt/scope", filterdir, "overlay", MS_BIND, NULL) != 0) {
+                    scope_free(filterdir);
+                    scopeLogError("ERROR: mount %s:%d", __FUNCTION__, __LINE__);
+                    break;
+                }
+
+                filterdir[targetlen + 1] = '\0';
+                scope_strcat(filterdir, "etc/ld.so.preload");
+                scopeLogError("%s:%d open %s", __FUNCTION__, __LINE__, filterdir);
+                if ((ldfd = scope_open(filterdir, O_RDWR | O_CREAT, 0666)) == -1) {
+                    scopeLogError("ERROR: open %s:%d", __FUNCTION__, __LINE__);
+                    scope_free(filterdir);
+                    break;
+                }
+
+                scope_close(ldfd);
+
+                // mount merged/etc/ld.so.preload from the filter dir
+                scopeLogError("%s:%d mount 2 %s", __FUNCTION__, __LINE__, filterdir);
+                if (g_fn.mount("/opt/scope/ld.so.preload", filterdir, "overlay", MS_BIND, NULL) != 0) {
+                    scope_free(filterdir);
+                    scopeLogError("ERROR: mount %s:%d", __FUNCTION__, __LINE__);
+                    break;
+                }
+                scope_free(filterdir);
+                break;
+            }
         }
         break;
     default:

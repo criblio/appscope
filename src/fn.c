@@ -333,6 +333,7 @@ initFn(void)
     GETADDR(g_fn.closedir, "closedir");
     GETADDR(g_fn.readdir, "readdir");
     GETADDR(g_fn.setrlimit, "setrlimit");
+    GETADDR(g_fn.mount, "mount");
 #ifdef __STATX__
     GETADDR(g_fn.statx, "statx");
 #endif

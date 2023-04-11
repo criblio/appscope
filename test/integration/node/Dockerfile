@@ -7,8 +7,8 @@ RUN npm install hot-shots && \
     apt-get install -y vim gawk gdb emacs lsof tcpdump wget curl netcat && \
     ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
-COPY metriccapture/scope-test /usr/local/scope/
-COPY metriccapture/hotshot.ts /usr/local/scope/
+COPY node/scope-test /usr/local/scope/
+COPY node/hotshot.ts /usr/local/scope/
 
 ENV SCOPE_CRIBL_ENABLE=false
 

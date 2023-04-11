@@ -45,8 +45,8 @@ endtest(){
 }
 
 cd /usr/local/scope
-
-
+# extract the libscope.so
+/usr/local/scope/bin/scope extract /usr/local/scope/lib
 
 starttest "on_by_default"
 LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts

@@ -1,16 +1,20 @@
 FROM node
 
-RUN mkdir -p /usr/local/scope/lib
+RUN mkdir -p /usr/local/scope/lib && \
+    mkdir -p /usr/local/scope/bin
+
 WORKDIR /usr/local/scope/
+
 RUN npm install hot-shots && \
     apt-get -o Acquire::Check-Valid-Until=false update && \
-    apt-get install -y vim gawk gdb emacs lsof tcpdump wget curl netcat && \
-    ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
+    apt-get install -y vim gawk gdb emacs lsof tcpdump wget curl netcat
 
 COPY node/scope-test /usr/local/scope/
 COPY node/hotshot.ts /usr/local/scope/
 
 ENV SCOPE_CRIBL_ENABLE=false
+
+RUN ln -s /opt/appscope/bin/linux/$(uname -m)/scope /usr/local/scope/bin/scope
 
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]

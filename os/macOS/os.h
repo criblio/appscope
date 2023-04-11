@@ -50,3 +50,4 @@ extern const char *osGetGroupName(unsigned);
 extern long long osGetProcCPU(void);
 extern bool osMemPermAllow(void *, size_t, int, int);
 extern bool osMemPermRestore(void *, size_t, int);
+extern bool osGetBaseAddr(uint64_t *);

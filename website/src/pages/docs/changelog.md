@@ -31,6 +31,7 @@ AppScope 1.3.2 introduces support for [Go version 1.20](https://go.dev/doc/go1.2
 - [#1365](https://github.com/criblio/appscope/issues/1365) The `scope k8s` command now calls an up-to-date version of a k8s library needed for obtaining signed certificates from the k8s Certificate Authority. This fixes a problem where running in newer versions of k8s produced `the server doesn't have a resource type "certificatesigningrequests"` errors. 
 - [#1408](https://github.com/criblio/appscope/issues/1408) On older (pre-1.1.24)versions of Alpine and other distributions based on musl libc, the `scope run` command now works as expected, and no longer encounters `secure_getenv: symbol not found` errors.
 - [#1170](https://github.com/criblio/appscope/issues/1170) The way AppScope runs `pcre2` functions internally is improved, fixing various problems including Go crashes under certain conditions.
+- [#1147](https://github.com/criblio/appscope/issues/1147) Docker no longer crashes when scoped. (This bug appears only in pre-1.3 versions of AppScope.)
 
 ## AppScope 1.3.1
 

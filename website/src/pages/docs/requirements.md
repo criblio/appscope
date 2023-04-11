@@ -34,7 +34,7 @@ The distros that AppScope supports all require the use of `/tmp`, `/dev/shm`, an
 
 ### Cross-Compatibility with Cribl Suite
 
-AppScope 1.2, Cribl Stream 4.0, Cribl Edge 4.0, and Cribl Search 1.0 are mutually compatible. If you integrate any of these products with earlier versions of peer products, some or all features will be unavailable.
+AppScope 1.3.2, Cribl Stream 4.1.1, Cribl Edge 4.1.1, and Cribl Search 4.1.1 are mutually compatible. If you integrate any of these products with earlier versions of peer products, some or all features will be unavailable.
 
 ### Known Limitations
 

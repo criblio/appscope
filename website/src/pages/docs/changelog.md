@@ -5,6 +5,54 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.3.2
+
+2023-04-12 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.3.2`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.3.2/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.3.2/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.3.2/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.3.2/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.3.2/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.2/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.3.2/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.2/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.3.2`.
+
+### New Features and Improvements
+
+AppScope 1.3.2 introduces support for [Go version 1.20](https://go.dev/doc/go1.20).
+
+### Fixes
+
+- [#1409](https://github.com/criblio/appscope/issues/1409) The `scope k8s` command now preloads the application image into the k8s cluster, avoiding `failed to call webhook` errors.
+- [#1365](https://github.com/criblio/appscope/issues/1365) The `scope k8s` command now calls an up-to-date version of a k8s library needed for obtaining signed certificates from the k8s Certificate Authority. This fixes a problem where running in newer versions of k8s produced `the server doesn't have a resource type "certificatesigningrequests"` errors. 
+- [#1408](https://github.com/criblio/appscope/issues/1408) On older (pre-1.1.24) versions of Alpine and other distributions based on musl libc, the `scope run` command now works as expected, and no longer encounters `secure_getenv: symbol not found` errors.
+- [#1170](https://github.com/criblio/appscope/issues/1170) The way AppScope runs `pcre2` functions internally is improved, fixing various problems including Go crashes under certain conditions.
+- [#1147](https://github.com/criblio/appscope/issues/1147) Docker no longer crashes when scoped. (This bug appears only in pre-1.3 versions of AppScope.)
+
+## AppScope 1.3.1
+
+2023-03-21 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.3.1`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.3.1/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.3.1/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.3.1/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.3.1/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.3.1/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.1/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.3.1/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.1/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.3.1`.
+
+### Security Fixes
+
+- AppScope 1.3.1 updates dependencies to address concerns about vulnerabilities recently resolved in Go libraries. The relevant vulnerabilities are [CVE-2022-41721](https://nvd.nist.gov/vuln/detail/CVE-2022-41721), [CVE-2022-41723](https://nvd.nist.gov/vuln/detail/CVE-2022-41723), and [CVE-2022-41717](https://nvd.nist.gov/vuln/detail/CVE-2022-41717).
+
 ## AppScope 1.3.0
 
 2023-03-21 - Feature Release
@@ -30,13 +78,11 @@ AppScope 1.3.0 introduces support for:
 - Instrumenting Go executables on ARM.
 - Scoping apps running in [LXC](https://github.com/lxc/lxc) and [LXD](https://linuxcontainers.org/lxd/introduction/) containers.
 
-#### The Crash Analysis, Snapshot, and Daemon Features
+#### The Crash Analysis and Snapshot Features
 
 Whenever a scoped app crashes, AppScope can obtain a core dump, a backtrace (i.e., stack trace), or both, while capturing supplemental information in text files. 
 
 AppScope can generate a **snapshot** file containing debug information about processes that are running normally or crashing, unscoped or scoped.
-
-AppScope now has its own daemon that can detect fatal signals sent to an application, whether scoped or not. This is made possible by AppScope's first-ever use of [eBPF](https://ebpf.io/) technology.
 
 #### Troubleshooting Transports and Dynamically Managing Configs  
 
@@ -62,8 +108,7 @@ The AppScope CLI is enhanced in the following ways:
 - `scope start` can now attach to processes running in rootless and nested containers.
 - `scope detach`, when run with the new `--all` flag, detaches from all processes at once.
 - `scope stop`, a new command, runs `scope detach --all`, removes the filter file from the system, and removes `scope` from service configurations. This undoes the effects of the `scope attach`, `scope start`, and/or `scope service` commands.
-- `scope daemon` runs the AppScope daemon, enabling the eBPF mechanism that detects a fatal signal (i.e., illegal instruction, bus error, segmentation fault, or floating point exception) from the kernel to a scoped app, then runs `scope snapshot` which in turn generates a **snapshot** file.
-- `scope snapshot` obtains debug information about a running or crashing process, regardless of whether or not the process is scoped or the AppScope daemon is running.
+- `scope snapshot` obtains debug information about a running or crashing process, regardless of whether or not the process is scoped.
 - `scope --passthrough` replaces `scope run --passthrough`.
 
 Three commands use IPC, which is new in AppScope 1.3.0. `scope inspect` and `scope update` are completely new, while `scope ps` has new capabilities thanks to IPC.
@@ -110,7 +155,7 @@ AppScope 1.2.2 also updates the [UPX](https://upx.github.io/) executable packer 
 ### Fixes
 
 - [#1258](https://github.com/criblio/appscope/issues/1258) A scoped application no longer crashes when one of its network connections is [closed](/docs/schema-reference#eventnetclose) and then an attempt is made to [send](/docs/schema-reference#eventnettx) or [receive](/docs/schema-reference#eventnetrx) data on the same connection.
-- [#1251](https://github.com/criblio/appscope/issues/1251) A scoped, running process no longer crashes when you [change](/docs/cli-using#dynamic-configuration) configurations and the new configuration defines a protocol that the old configuration also defines.
+- [#1251](https://github.com/criblio/appscope/issues/1251) A scoped, running process no longer crashes when you [change](/docs/troubleshooting#dynamic-configuration) configurations and the new configuration defines a protocol that the old configuration also defines.
 - [#1197](https://github.com/criblio/appscope/issues/1197) When run in a container that is itself inside a container (i.e., Docker in Docker), AppScope now successfully locates the host namespace.
 
 ### Security Fixes

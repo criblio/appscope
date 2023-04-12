@@ -16,7 +16,7 @@
         <span style="margin-top:15px; 
         padding: 6px; 
         border-radius; 2px;
-        background-color: #1890FF"><a href="" id="trim_json" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Trim JSON</a></span> 
+        background-color: #1890FF"><a href="" id="trim_json" class="pipeline-name" target="_blank" rel="noreferrer noopener" style="color: #fff; text-decoration: none">Cribl Pipeline: Trim JSON</a></span> 
         </p>
       <p>One of the most frequent problems we've experienced with modern, structured, logging is over verbosity. From the producer's perspective, it's both easier and better to produce large structured events because they have no idea what may be needed in the future. From the consumer's perspective, this ends up in events which contain duplicative information or information which is simply not needed. Here's an example event taken from a real world log we have from a Lambda function we run along side a trimmed down log. You can see we remove a ton of duplicative information, such as the headers which are actually logged twice, along with field set to null and false because we can easily use something like <code>fillnull</code> to fill in default values. Using this mechanism, we easily trim 50% of data we don't care about.</p>
     </html>

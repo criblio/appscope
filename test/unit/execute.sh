@@ -118,6 +118,9 @@ if [ "${OS}" = "linux" ]; then
 
     test/unit/undefined_sym.sh 2>&1
     ERR+=$?
+
+    test/unit/verboten_sym.sh 2>&1
+    ERR+=$?
 fi
 
 #                ^

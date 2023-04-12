@@ -72,6 +72,7 @@ read scopelibc_read
 readdir scopelibc_readdir
 realloc scopelibc_realloc
 recvfrom scopelibc_recvfrom
+secure_getenv scope_secure_getenv
 select scopelibc_select
 sendto scopelibc_sendto
 setbuf scopelibc_setbuf

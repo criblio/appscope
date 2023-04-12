@@ -42,7 +42,7 @@ spec:
       containers:
       - name: webhook-cert-setup
         # This is a minimal kubectl image based on Alpine Linux that signs certificates using the k8s extension api server
-        image: newrelic/k8s-webhook-cert-manager:latest
+        image: cribl/k8s-webhook-cert-manager:1.0.0
         command: ["./generate_certificate.sh"]
         args:
           - "--service"
@@ -78,7 +78,7 @@ rules:
     verbs: ["get"]
   - apiGroups: ["certificates.k8s.io"]
     resources: ["signers"]
-    resourceNames: ["kubernetes.io/legacy-unknown"]
+    resourceNames: ["kubernetes.io/kubelet-serving"]
     verbs: ["approve"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -172,7 +172,7 @@ spec:
       volumes:
         - name: certs
           secret:
-            secretName: {{ .App }}-secret 
+            secretName: {{ .App }}-secret
 ---
 apiVersion: v1
 kind: Service
@@ -187,7 +187,7 @@ spec:
       port: 443
       targetPort: {{ .Port }}
   selector:
-    app: {{ .App }} 
+    app: {{ .App }}
 ---
 apiVersion: v1
 kind: ConfigMap

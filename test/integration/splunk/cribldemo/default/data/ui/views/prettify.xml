@@ -16,7 +16,7 @@
         <span style="margin-top:15px; 
         padding: 6px; 
         border-radius; 2px;
-        background-color: #1890FF"><a href="" id="masking" class="pipeline-name" target="_blank" style="color: #fff; text-decoration: none">Cribl Pipeline: Prettify</a></span> 
+        background-color: #1890FF"><a href="" id="masking" class="pipeline-name" target="_blank" rel="noreferrer noopener" style="color: #fff; text-decoration: none">Cribl Pipeline: Prettify</a></span> 
         </p>
       <p>
         The data in this example comes from a middleware doing business event processing from a telco, and it's based on an actual log. It works well for Splunk, with Splunk's auto key/value extraction, but, <b>we'd like this data to be well formatted JSON</b> for sending to external systems. Lots of systems speak JSON natively, so we'd like to take this operational log and turn it into something more easily consumed. 

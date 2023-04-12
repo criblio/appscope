@@ -17,6 +17,8 @@ gcc -o gosym ./test/manual/gosym.c
 
 #define GOPCLNTAB_MAGIC_112 0xfffffffb
 #define GOPCLNTAB_MAGIC_116 0xfffffffa
+#define GOPCLNTAB_MAGIC_118 0xfffffff0
+#define GOPCLNTAB_MAGIC_120 0xfffffff1
 
 int printSymbols(const char *fname) 
 {
@@ -129,6 +131,26 @@ int printSymbols(const char *fname)
                     const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
                     printf("0x%lx\t%s\n", sym_addr, func_name);
                     symtab_addr += 16;
+                }
+            } else if ((magic == GOPCLNTAB_MAGIC_118) || (magic == GOPCLNTAB_MAGIC_120)) {
+                uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
+                uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (4 * 8)));
+                uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (8 * 8)));
+                uint64_t text_start = *((const uint64_t *)(pclntab_addr + (3 * 8)));
+
+                const void *symtab_addr = pclntab_addr + pclntab_offset;
+
+                printf("Symbol count = %ld\n", sym_count);
+                printf("Address\t\tSymbol Name\n");
+                printf("---------------------------\n");
+                for (i = 0; i < sym_count; i++) {
+                    uint32_t func_offset = *((uint32_t *)(symtab_addr + 4));
+                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 4));
+                    func_offset = *((uint32_t *)(symtab_addr));
+                    uint64_t sym_addr = (uint64_t)(func_offset + text_start);
+                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
+                    printf("0x%lx\t%s\n", sym_addr, func_name);
+                    symtab_addr += 8;
                 }
             } else {
                 fprintf(stderr, "Invalid header in .gopclntab\n");

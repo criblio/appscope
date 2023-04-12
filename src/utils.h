@@ -28,5 +28,7 @@ int sigSafeNanosleep(const struct timespec *);
 void sigSafeUtoa(unsigned long, char *, int, int *);
 bool sigSafeMkdirRecursive(const char *);
 ssize_t sigSafeWriteNumber(int , long, int);
+const char *libVersion(const char *);
+int makeIntermediateDirs(const char *, mode_t);
 
 #endif // __UTILS_H__

@@ -1718,6 +1718,24 @@ init(void)
     bool scopedFlag = FALSE;
     bool skipReadCfg = FALSE;
 
+    /*
+     * This might be able to merge with the filter file check below.
+     * However, we dont want to check a specific file. We may update
+     * how we define the filter file. So, for now, leaving them
+     * distinct.
+     *
+     * Would be nice to use an env var without the need to access
+     * a file. However, we don't rely on something like SCOPE_LIB_PATH
+     * when LD_PRELOAD alone is used.
+     */
+    if (!scope_access(SCOPE_SYS_PATH, R_OK)) {
+        scope_strncpy(g_libpath, SCOPE_SYS_PATH, sizeof(SCOPE_SYS_PATH));
+    } else if (!scope_access(SCOPE_TMP_PATH, R_OK)) {
+        scope_strncpy(g_libpath, SCOPE_TMP_PATH, sizeof(SCOPE_TMP_PATH));
+    }
+
+    scope_strncat(g_libpath, libVersion(SCOPE_VER), sizeof(SCOPE_VER));
+
     if (attachedFlag) {
         scopedFlag = TRUE;
     } else {

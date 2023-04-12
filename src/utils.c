@@ -494,3 +494,73 @@ sigSafeWriteNumber(int fd, long val, int base) {
     return scope_write(fd, buf ,msgLen);
 }
 
+/*
+ * Returns normalized version string
+ * - "dev" for unofficial release
+ * - "%d.%d.%d" for official release (e.g. "1.3.0" for "v1.3.0")
+ * - "%d.%d.%d-%s%d" for candidate release (e.g. "1.3.0-rc0" for "v1.3.0-rc0")
+ */
+const char *
+libVersion(const char *version) {
+
+    if ((version == NULL) || (*version != 'v')) {
+        return "dev";
+    }
+
+    ++version;
+    size_t versionSize = scope_strlen(version);
+
+    for (int i = 0; i < versionSize; ++i) {
+        // Only digit and "." are accepted
+        if ((scope_isdigit(version[i]) == 0) && version[i] != '.' &&
+            version[i] != '-' && version[i] != 't' && version[i] != 'c' &&
+            version[i] != 'r') {
+            return "dev";
+        }
+        if (i == 0 || i == versionSize) {
+            // First and last character must be number
+            if (scope_isdigit(version[i]) == 0) {
+                return "dev";
+            }
+        }
+    }
+    return version;
+}
+
+/*
+ * The mkdir system call does not support the creation of intermediate dirs.
+ * This will walk the path and create all dirs one at a time.
+ */
+int
+makeIntermediateDirs(const char *path, mode_t mode) {
+    char *dup_path = scope_strdup(path);
+    if (!dup_path) {
+        return -1;
+    }
+
+    char *curr = dup_path;
+    char *slash;
+
+    while ((slash = scope_strrchr(curr, '/'))) {
+        *slash = '\0';
+        if (scope_mkdir(dup_path, mode) == -1) {
+            if (scope_errno != EEXIST) {
+                scope_free(dup_path);
+                return -1;
+            }
+        }
+
+        *slash = '/';
+        curr = slash + 1;
+    }
+
+    if (scope_mkdir(dup_path, mode) == -1) {
+        if (scope_errno != EEXIST) {
+            scope_free(dup_path);
+            return -1;
+        }
+    }
+
+    scope_free(dup_path);
+    return 0;
+}

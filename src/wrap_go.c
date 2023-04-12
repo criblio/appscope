@@ -1241,8 +1241,7 @@ c_syscall(char *sys_stack, char *g_stack)
     uint64_t syscall_num = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_num);
     int64_t rc           = *(int64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_rc);
     if(rc < 0) rc = -1; // kernel syscalls can return values < -1
-    static bool once = FALSE;
-    static int count = 0;
+    static int once = 0;
 
     switch(syscall_num) {
     case SYS_write:
@@ -1337,39 +1336,40 @@ c_syscall(char *sys_stack, char *g_stack)
             char *target = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
             char *fstype = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p3);
 
-            count++;
+            once++;
             funcprint("Scope: mount of %s %s %s\n", src, target, fstype);
 
-            // scope_strstr(g_proc.procname, "dockerd") &&
-            // (once == FALSE) &&
-            // (count == 3) &&
-            // (scope_strstr(target, "init") == NULL) &&
+            /*
+             * Checks:
+             * only applies to the dockerd proc
+             * ensure the constructor populated a path
+             * proceed after container mounts are done
+             */
             if ((src != NULL) && (target != NULL) &&
-                (count == 3) &&
-                scope_strstr(src, "overlay") &&
-                scope_strstr(target, "merged")) {
+                scope_strstr(g_proc.procname, "dockerd") &&
+                (scope_strstr(g_libpath, "/")) &&
+                (once == 3)) {
                 int ldfd;
                 char *filterdir;
                 size_t targetlen = scope_strlen(target);
 
-                once = TRUE;
-                scopeLogError("Interposed Mount overlay: %s %d %d\n", g_proc.procname, once, count);
+                scopeLogError("Interposed Mount overlay: %s %d\n", g_proc.procname, once);
 
                 if ((filterdir = scope_malloc(targetlen + 128)) == NULL) break;
                 scope_strcpy(filterdir, target);
-                scope_strcat(filterdir, "/opt/scope");
+                scope_strcat(filterdir, g_libpath);
 
                 // make a dir in the merged dir
                 scopeLogError("%s:%d mkdir %s", __FUNCTION__, __LINE__, filterdir);
-                if (scope_mkdir(filterdir, 0666) != 0) {
-                    scopeLogError("ERROR: mkdir %s:%d", __FUNCTION__, __LINE__);
+                if (makeIntermediateDirs((const char *)filterdir, 0666) != 0) {
+                    scopeLogError("ERROR: mkdir %s:%d %d", __FUNCTION__, __LINE__, scope_errno);
                     scope_free(filterdir);
                     break;
                 }
 
                 // mount the merged dir addition into the host FS
                 scopeLogError("%s:%d mount 1 %s", __FUNCTION__, __LINE__, filterdir);
-                if (g_fn.mount("/opt/scope", filterdir, "overlay", MS_BIND, NULL) != 0) {
+                if (g_fn.mount(g_libpath, filterdir, "overlay", MS_BIND, NULL) != 0) {
                     scope_free(filterdir);
                     scopeLogError("ERROR: mount %s:%d", __FUNCTION__, __LINE__);
                     break;
@@ -1378,21 +1378,24 @@ c_syscall(char *sys_stack, char *g_stack)
                 filterdir[targetlen + 1] = '\0';
                 scope_strcat(filterdir, "etc/ld.so.preload");
                 scopeLogError("%s:%d open %s", __FUNCTION__, __LINE__, filterdir);
-                if ((ldfd = scope_open(filterdir, O_RDWR | O_CREAT, 0666)) == -1) {
+                if ((ldfd = scope_open(filterdir, O_RDWR | O_CREAT | O_APPEND, 0666)) == -1) {
                     scopeLogError("ERROR: open %s:%d", __FUNCTION__, __LINE__);
                     scope_free(filterdir);
                     break;
                 }
 
-                scope_close(ldfd);
-
-                // mount merged/etc/ld.so.preload from the filter dir
-                scopeLogError("%s:%d mount 2 %s", __FUNCTION__, __LINE__, filterdir);
-                if (g_fn.mount("/opt/scope/ld.so.preload", filterdir, "overlay", MS_BIND, NULL) != 0) {
-                    scope_free(filterdir);
-                    scopeLogError("ERROR: mount %s:%d", __FUNCTION__, __LINE__);
-                    break;
+                size_t liblen = strlen(g_libpath);
+                char libpath[liblen + sizeof("/libscope.so")];
+                scope_memset(libpath, 0, liblen + sizeof("/libscope.so"));
+                scope_strncpy(libpath, g_libpath, liblen);
+                scopeLogError("%s:%d %ld %s %s", __FUNCTION__, __LINE__, liblen, g_libpath, libpath);
+                scope_strcat(libpath, "/libscope.so");
+                scopeLogError("%s:%d %s", __FUNCTION__, __LINE__, libpath);
+                if (scope_write(ldfd, libpath, sizeof(libpath)) <= 0) {
+                    scopeLogError("ERROR: write %s:%d", __FUNCTION__, __LINE__);
                 }
+
+                scope_close(ldfd);
                 scope_free(filterdir);
                 break;
             }

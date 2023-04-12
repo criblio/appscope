@@ -37,7 +37,7 @@ TRIVY := $(GOBIN)/trivy
 # fail if of Go is not meet version requirements
 require-go-version:
 	@if [ $(GO_MAJOR_VERSION) -gt $(MIN_REQ_GO_MAJOR_VERSION) ]; then \
-		exit 0 ;\
+		exit 0; \
 	elif [ $(GO_MAJOR_VERSION) -lt $(MIN_REQ_GO_MAJOR_VERSION) ]; then \
 		echo 'error: minimum supported version of Go is $(MIN_REQ_GO_MAJOR_VERSION).$(MIN_REQ_GO_MINOR_VERSION), detected is $(GO_MAJOR_VERSION).$(GO_MINOR_VERSION)';\
 		exit 1; \
@@ -71,7 +71,7 @@ clean:
 	$(RM) -rf -- .gomod/*/
 	$(RM) -rf -- .gobin/x86_64/go*
 	$(RM) -rf -- .gobin/aarch64/go*
-	$(RM) -rf -- bpf/vmlinux.h
+	$(RM) -rf -- .gobin/riscv64/go*
 
 ## deps: install dependencies
 deps: $(GO_BINDATA) $(GOVVV) $(GOLANGCI_LINT) $(TRIVY)
@@ -83,8 +83,9 @@ $(GOLANGCI_LINT):
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
 		sh -s -- -b $(GOBIN) v1.42.1
 $(TRIVY):
-	curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | \
-		sh -s -- -b $(GOBIN) v0.38.3
+	if [ "riscv64" != "$(ARCH)" ]; then \
+		curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b $(GOBIN) v0.38.3; \
+	fi
 
 rebuild: clean build 
 

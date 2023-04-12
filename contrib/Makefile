@@ -57,15 +57,18 @@ build/funchook/libfunchook.a:
 	@$(RM) -r build/funchook
 	@mkdir build/funchook
 	if [ "x86_64" = "$(ARCH)" ]; then \
-		cd build/funchook && cmake -DCMAKE_BUILD_TYPE=Release -DFUNCHOOK_DISASM=capstone ../../funchook; \
+		cd build/funchook && cmake -DCMAKE_BUILD_TYPE=Release -DFUNCHOOK_DISASM=capstone ../../funchook && $(MAKE) capstone_src funchook-static; \
 	elif [ "aarch64" = "$(ARCH)" ]; then \
-		cd build/funchook && cmake -DCMAKE_BUILD_TYPE=Release ../../funchook; \
+		cd build/funchook && cmake -DCMAKE_BUILD_TYPE=Release ../../funchook && $(MAKE) capstone_src funchook-static; \
+	elif [ "riscv64" = "$(ARCH)" ]; then \
+		cd build/funchook && cmake -DCMAKE_BUILD_TYPE=Release ../../funchook && $(MAKE) capstone_src; \
 	else \
 		echo >&2 "error: unsupported ARCH; \"$(ARCH)\""; \
 		exit 1; \
 	fi
-	cd build/funchook && $(MAKE) capstone_src funchook-static
-	objcopy --redefine-syms redefine_syms.lst build/funchook/libfunchook.a
+	if [ "riscv64" != "$(ARCH)" ]; then \
+		objcopy --redefine-syms redefine_syms.lst build/funchook/libfunchook.a; \
+	fi
 	objcopy --redefine-syms redefine_syms.lst build/funchook/capstone_src-prefix/src/capstone_src-build/libcapstone.a
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
@@ -138,10 +141,10 @@ build/musl/lib/libc.a:
 	cd build/musl && ../../musl/configure --disable-shared --disable-wrapper CFLAGS=$(DISABLE_X28) && $(MAKE)
 	cp build/musl/lib/libc.a build/musl/lib/libc_orig.a
 	objcopy --prefix-symbols=scopelibc_ build/musl/lib/libc.a
-# TODO verify if the code below be done via mfloat-abi=soft not sure if aarch64 support soft though
+# TODO verify if the code below be done via mfloat-abi=soft not sure if aarch64/riscv64 support soft though
 # https://developer.arm.com/documentation/dui0774/b/compiler-command-line-options/-mfloat-abi
 # -mgeneral-regs-only maybe ? https://gcc.gnu.org/onlinedocs/gcc/AArch64-Options.html
-	if [ "aarch64" = "$(ARCH)" ]; then \
-		objcopy --redefine-syms aarch64_musl_syms.lst build/musl/lib/libc.a; \
+	if [ "x86_64" != "$(ARCH)" ]; then \
+		objcopy --redefine-syms soft_float_point_lib_musl_syms.lst build/musl/lib/libc.a; \
 	fi
 	@[ -z "$(CI)" ] || echo "::endgroup::"

@@ -3,9 +3,14 @@ package main
 /*
 #if defined(__aarch64__)
 #cgo LDFLAGS: -L../lib/linux/aarch64 -lloader
-#else
+#elif defined(__riscv) && __riscv_xlen == 64
+#cgo LDFLAGS: -L../lib/linux/riscv64 -lloader
+#elif defined(__x86_64__)
 #cgo LDFLAGS: -L../lib/linux/x86_64 -lloader
+#else
+#error Bad arch defined
 #endif
+
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>

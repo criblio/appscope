@@ -430,6 +430,11 @@ pcre2_match_wrapper(pcre2_code *re, PCRE2_SPTR data, PCRE2_SIZE size,
         : "m"(tstack), "m"(gstack), "m" (re), "m" (data),"m" (size), "m" (startoffset), "m" (options), "m" (match_data), "m" (mcontext)
         :                               // clobbered register
         );
+#elif defined(__riscv) && __riscv_xlen == 64
+    // TODO 
+    (void)(tstack);
+    (void)(gstack);
+    rc = pcre2_match(re, data, size, startoffset, options, match_data, mcontext);
 #else
    #error Bad arch defined
 #endif
@@ -494,6 +499,11 @@ regexec_wrapper(const regex_t *preg, const char *string, size_t nmatch,
         : "m"(tstack), "m"(gstack), "m" (preg), "m" (string),"m" (nmatch), "m" (pmatch), "m" (eflags)
         :                               // clobbered register
         );
+#elif defined(__riscv) && __riscv_xlen == 64
+    // TODO
+    (void)(tstack);
+    (void)(gstack);
+    rc = regexec(preg, string, nmatch, pmatch, eflags);
 #else
    #error Bad arch defined
 #endif

@@ -3,6 +3,13 @@
 #include "coredump.h"
 #include "scopestdlib.h"
 #include "utils.h"
+
+#ifdef DISABLE_COREDUMP
+bool
+coreDumpGenerate(const char *path) {
+    return FALSE;
+}
+#else
 #include "google/coredumper.h"
 
 /*
@@ -19,3 +26,4 @@ bool
 coreDumpGenerate(const char *path) {
     return (WriteCoreDump(path) == 0);
 }
+#endif

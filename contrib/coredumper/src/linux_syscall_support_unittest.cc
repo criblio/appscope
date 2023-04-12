@@ -140,14 +140,14 @@ static void SigAction(int signum, siginfo_t *si, void *arg) {
 
 static void Sigaction() {
   puts("Sigaction...");
-  #if defined(__aarch64__)
+  #if defined(__aarch64__) || defined(__riscv)
   const size_t kSigsetSize = sizeof(struct kernel_sigset_t);
   #endif
   int signum       = SIGPWR;
   for (int info = 0; info < 2; info++) {
     signaled         = 0;
     struct kernel_sigaction sa = ZERO_SIGACT, old, orig;
-    #if defined(__aarch64__)
+    #if defined(__aarch64__) || defined(__riscv)
     CHECK(!sys_rt_sigaction(signum, NULL, &orig, kSigsetSize));
     #else
     CHECK(!sys_sigaction(signum, NULL, &orig));
@@ -159,13 +159,13 @@ static void Sigaction() {
     }
     sa.sa_flags      = SA_RESETHAND | SA_RESTART | (info ? SA_SIGINFO : 0);
     CHECK(!sys_sigemptyset(&sa.sa_mask));
-    #if defined(__aarch64__)
+    #if defined(__aarch64__) || defined(__riscv)
     CHECK(!sys_rt_sigaction(signum, &sa, &old, kSigsetSize));
     #else
     CHECK(!sys_sigaction(signum, &sa, &old));
     #endif
     CHECK(!memcmp(&old, &orig, sizeof(struct kernel_sigaction)));
-    #if defined(__aarch64__)
+    #if defined(__aarch64__) || defined(__riscv)
     CHECK(!sys_rt_sigaction(signum, NULL, &old, kSigsetSize));
     #else
     CHECK(!sys_sigaction(signum, NULL, &old));
@@ -176,7 +176,7 @@ static void Sigaction() {
     #endif
     CHECK(!memcmp(&old, &sa, sizeof(struct kernel_sigaction)));
     struct kernel_sigset_t pending;
-    #if defined(__aarch64__)
+    #if defined(__aarch64__) || defined(__riscv)
     CHECK(!sys_rt_sigpending(&pending, kSigsetSize));
     #else
     CHECK(!sys_sigpending(&pending));
@@ -187,7 +187,7 @@ static void Sigaction() {
     CHECK(!sys_sigaddset(&mask, signum));
     CHECK(!sys_sigprocmask(SIG_BLOCK, &mask, &oldmask));
     CHECK(!sys_kill(sys_getpid(), signum));
-    #if defined(__aarch64__)
+    #if defined(__aarch64__) || defined(__riscv)
     CHECK(!sys_rt_sigpending(&pending, kSigsetSize));
     #else
     CHECK(!sys_sigpending(&pending));
@@ -196,13 +196,13 @@ static void Sigaction() {
     CHECK(!signaled);
     CHECK(!sys_sigfillset(&mask));
     CHECK(!sys_sigdelset(&mask, signum));
-    #if defined(__aarch64__)
+    #if defined(__aarch64__) || defined(__riscv)
     CHECK(sys_rt_sigsuspend(&mask, kSigsetSize) == -1);
     #else
     CHECK(sys_sigsuspend(&mask) == -1);
     #endif
     CHECK(signaled == signum);
-    #if defined(__aarch64__)
+    #if defined(__aarch64__) || defined(__riscv)
     CHECK(!sys_rt_sigaction(signum, &orig, NULL, kSigsetSize));
     #else
     CHECK(!sys_sigaction(signum, &orig, NULL));

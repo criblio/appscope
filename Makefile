@@ -35,15 +35,17 @@ $(shell echo -n $(VERSION) > cli/VERSION)
 GITHUB_REPOSITORY ?= $(shell git config --get remote.origin.url | cut -d: -f2 | sed -e 's/^\/\///' -e 's/\.git$$//')
 
 # architectures we build for
-# `uname -m` values; not Docker platform values like `amd64` or `arm64`
-ARCH_LIST := x86_64 aarch64
+# `uname -m` values; not Docker platform values like `amd64`, `arm64` or `riscv64` 
+ARCH_LIST := x86_64 aarch64 riscv64
 
 # docker architectures for each $ARCH
 PLATFORM_x86_64 := amd64
 PLATFORM_aarch64 := arm64
+PLATFORM_riscv64 := riscv64
 
 FROM_PLATFORM_amd64 := x86_64
 FROM_PLATFORM_arm64 := aarch64
+FROM_PLATFORM_riscv64 := riscv64
 
 # platforms we build for
 _space := $(subst ,, )

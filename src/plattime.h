@@ -56,7 +56,7 @@ getTime(void) {
      *
      * A serializing instruction is used as the order of
      * execution is not guaranteed. It's described as
-     * "Out ofOrder Execution". In some cases the read
+     * "Out of Order Execution". In some cases the read
      * of the TSC can come before the instruction being
      * measured. That scenario is not very likely for us
      * as we tend to measure functions as opposed to
@@ -83,6 +83,10 @@ getTime(void) {
         :                           // clobbered register
         );
 
+    return cnt;
+#elif defined(__riscv) && __riscv_xlen == 64
+    uint64_t cnt;
+    __asm__ volatile ("rdcycle %0" : "=r" (cnt));
     return cnt;
 #else
 #error Architecture is not defined

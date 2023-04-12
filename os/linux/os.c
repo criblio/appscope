@@ -488,6 +488,12 @@ osInitTimer(platform_time_t *cfg)
     } else {
         cfg->gptimer_avail = FALSE;
     }
+#elif defined(__riscv) && __riscv_xlen == 64
+    if (cfg->freq != -1) {
+        cfg->gptimer_avail = TRUE;
+    } else {
+        cfg->gptimer_avail = FALSE;
+    }
 #else
 #error No architecture defined
 #endif

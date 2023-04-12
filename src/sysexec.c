@@ -364,9 +364,9 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr phad
         "mov %2, %%rsp \n"
         "mov %3, %%rdx \n"
         "jmp *%%r11 \n"
-        : "=r"(res)                   //output
+        : "=r"(res)                   // output
         : "r"(start), "r"(sp), "r"(rtld_fini)
-        : "%r11"                      //clobbered register
+        : "%r11"                      // clobbered register
     );
 #elif defined(__aarch64__)
     __asm__ volatile (
@@ -374,9 +374,19 @@ set_go(char *buf, int argc, const char **argv, const char **env, Elf64_Addr phad
         "mov x17, %1 \n"
         "mov x0, xzr \n"              // passing NULL as p1
         "br  x17 \n"
-        : "=r"(res)                   //output
+        : "=r"(res)                   // output
         : "r"(start), "r"(sp)
-        : "x17"                      //clobbered register
+        : "x17"                       // clobbered register
+    );
+#elif defined(__riscv) && __riscv_xlen == 64
+    __asm__ volatile (
+        "mv sp, %2 \n"
+        "mv t1, %1 \n"
+        "mv a0, x0 \n"               // passing NULL as p1
+        "jr  t1 \n"
+        : "=r"(res)                  // output
+        : "r"(start), "r"(sp)
+        : "t1"                       // clobbered register
     );
 #else
    #error Bad arch defined

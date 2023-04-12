@@ -171,6 +171,8 @@ testEachLineInStreamWithActualLibraryData(void** state)
     FILE* f_in = popen("nm ./lib/linux/x86_64/libscope.so", "r");
 #elif defined(__aarch64__)
     FILE* f_in = popen("nm ./lib/linux/aarch64/libscope.so", "r");
+#elif defined(__riscv) && __riscv_xlen == 64
+    FILE* f_in = popen("nm ./lib/linux/riscv64/libscope.so", "r");
 #else
 #error Unknown architecture!
 #endif

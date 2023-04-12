@@ -117,6 +117,7 @@ extern void initGoHook(elf_buf_t*);
 extern void sysprint(const char *, ...) PRINTF_FORMAT(1, 2);
 extern void *getSymbol(const char *, char *);
 
+#ifndef __riscv
 extern void go_hook_reg_syscall(void);
 extern void go_hook_reg_rawsyscall(void);
 extern void go_hook_reg_syscall6(void);
@@ -132,5 +133,6 @@ extern void go_hook_reg_http2_client_write(void);
 extern void go_hook_exit(void);
 extern void go_hook_die(void);
 extern void go_hook_sighandler(void);
+#endif
 
 #endif // __GOTCONTEXT_H__

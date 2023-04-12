@@ -88,7 +88,7 @@ Various aspects of the build system that didn't fit else where are listed below.
 * The top-level `Makefile` detects the local OS and includes `os/linux/Makefile` or `os/macOS/Makefile`. The logic aborts if another OS is detected. It also warns that the MacOS build and Linux builds on anything other than Ubuntu 18.04 are unsupported.
 
   > Note: We only really support building on Linux. The MacOS build support has essentially been abandoned.
-* The `os/linux/Makefile` includes architecture-specific `os/linux/x86_64.mk` or `os/linux/aarch64.mk` files.
+* The `os/linux/Makefile` includes architecture-specific `os/linux/x86_64.mk`, `os/linux/aarch64.mk` or `os/linux/riscv64.mk` files.
 * The top-level `Makefile` has a `cli%` pattern rule and relays to corresponding targets in `cli/Makefile`. It `cd`'s into`/cli` to run those targets. We also have a `scope` target as a shortcut to build the CLI from the top-level directory.
 
 [QEMU]: https://www.qemu.org/

@@ -212,6 +212,8 @@ testNoInterposedSymbolIsUsed(void** state)
     snprintf(cmdbuf, sizeof(cmdbuf), "nm ./lib/%s/x86_64/libscope.so", os);
 #elif defined(__aarch64__)
     snprintf(cmdbuf, sizeof(cmdbuf), "nm ./lib/%s/aarch64/libscope.so", os);
+#elif defined(__riscv) && __riscv_xlen == 64
+    snprintf(cmdbuf, sizeof(cmdbuf), "nm ./lib/%s/riscv64/libscope.so", os);
 #else
 #error Unsupported architecture!
 #endif

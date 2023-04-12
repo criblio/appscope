@@ -40,6 +40,7 @@
 #include "ipc.h"
 #include "snapshot.h"
 #include "scopestdlib.h"
+#include "fhook.h"
 #include "../contrib/libmusl/musl.h"
 
 #define SSL_FUNC_READ "SSL_read"
@@ -1438,7 +1439,7 @@ initHook(int attachedFlag, bool scopedFlag, elf_buf_t *ebuf, char *full_path)
 {
     int rc;
     bool should_we_patch = FALSE;
-    funchook_t *funchook;
+    scope_funchook_t *funchook;
 
     // env vars are not always set as needed, be explicit here
     // this is duplicated if we were started from the scope exec
@@ -1549,51 +1550,51 @@ initHook(int attachedFlag, bool scopedFlag, elf_buf_t *ebuf, char *full_path)
         scope_free(ptr);
 
 
-        funchook = funchook_create();
+        funchook = scope_funchook_create();
 
         if (logLevel(g_log) <= CFG_LOG_TRACE) {
             // TODO: add some mechanism to get the config'd log file path
-            funchook_set_debug_file(DEFAULT_LOG_PATH);
+            scope_funchook_set_debug_file(DEFAULT_LOG_PATH);
         }
 
         if (should_we_patch) {
             g_fn.SSL_read = (ssl_rdfunc_t)load_func(NULL, SSL_FUNC_READ);
 
-            if (g_fn.SSL_read) rc = funchook_prepare(funchook, (void**)&g_fn.SSL_read, ssl_read_hook);
+            if (g_fn.SSL_read) rc = scope_funchook_prepare(funchook, (void**)&g_fn.SSL_read, ssl_read_hook);
 
             g_fn.SSL_write = (ssl_wrfunc_t)load_func(NULL, SSL_FUNC_WRITE);
 
-            if (g_fn.SSL_write) rc = funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
+            if (g_fn.SSL_write) rc = scope_funchook_prepare(funchook, (void**)&g_fn.SSL_write, ssl_write_hook);
         }
 
         // sendmmsg, sendto, recvfrom for internal libc use in DNS queries
         if ((g_ismusl == FALSE) && g_fn.sendmmsg) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.sendmmsg, internal_sendmmsg);
+            rc = scope_funchook_prepare(funchook, (void**)&g_fn.sendmmsg, internal_sendmmsg);
         }
 
         if (g_fn.syscall) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.syscall, wrap_scope_syscall);
+            rc = scope_funchook_prepare(funchook, (void**)&g_fn.syscall, wrap_scope_syscall);
         }
 
         if ((g_ismusl == TRUE) && g_fn.sendto) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.sendto, internal_sendto);
+            rc = scope_funchook_prepare(funchook, (void**)&g_fn.sendto, internal_sendto);
         }
 
         if ((g_ismusl == TRUE) && g_fn.recvfrom) {
-            rc = funchook_prepare(funchook, (void**)&g_fn.recvfrom, internal_recvfrom);
+            rc = scope_funchook_prepare(funchook, (void**)&g_fn.recvfrom, internal_recvfrom);
         }
 
         // Used for mapping SSL IDs to fds with libuv. Must be funchooked since it's internal to libuv
         if (!g_fn.uv_fileno) g_fn.uv_fileno = load_func(NULL, "uv_fileno");
-        if (g_fn.uv__read) rc = funchook_prepare(funchook, (void**)&g_fn.uv__read, uv__read_hook);
+        if (g_fn.uv__read) rc = scope_funchook_prepare(funchook, (void**)&g_fn.uv__read, uv__read_hook);
 
         if (g_ismusl == FALSE) {
             if (g_fn.__write_libc) {
-                rc = funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
+                rc = scope_funchook_prepare(funchook, (void**)&g_fn.__write_libc, __write_libc);
             }
 
             if (g_fn.__write_pthread) {
-                rc = funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
+                rc = scope_funchook_prepare(funchook, (void**)&g_fn.__write_pthread, __write_pthread);
             }
 
             // We want to be able to use g_fn.write without
@@ -1603,11 +1604,11 @@ initHook(int attachedFlag, bool scopedFlag, elf_buf_t *ebuf, char *full_path)
         }
 
         // hook 'em
-        rc = funchook_install(funchook, 0);
+        rc = scope_funchook_install(funchook, 0);
         if (rc != 0) {
             scopeLogError("ERROR: failed to install funchook. (%s)\n",
-                        funchook_error_message(funchook));
-            funchook_destroy(funchook);
+                        scope_funchook_error_message(funchook));
+            scope_funchook_destroy(funchook);
             return;
         }
     }

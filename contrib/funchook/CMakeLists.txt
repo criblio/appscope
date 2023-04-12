@@ -15,9 +15,11 @@ endif ()
 if (FUNCHOOK_CPU STREQUAL aarch64)
     set(FUNCHOOK_CPU arm64)
 endif ()
+if (FUNCHOOK_CPU STREQUAL riscv64)
+    set(FUNCHOOK_CPU riscv64)
+endif ()
 
-
-if (FUNCHOOK_CPU STREQUAL arm64)
+if (FUNCHOOK_CPU STREQUAL arm64 OR FUNCHOOK_CPU STREQUAL riscv64)
   set(FUNCHOOK_DEFAULT_DISASM "capstone")
 else ()
   set(FUNCHOOK_DEFAULT_DISASM "distorm")
@@ -76,6 +78,7 @@ endif ()
 if (DISASM_CAPSTONE)
   set(CAPSTONE_arm64_SUPPORT OFF)
   set(CAPSTONE_x86_SUPPORT OFF)
+  set(CAPSTONE_riscv_SUPPORT OFF)
   set(CAPSTONE_${FUNCHOOK_CPU}_SUPPORT ON)
 
   include(ExternalProject)
@@ -104,6 +107,7 @@ if (DISASM_CAPSTONE)
                       -DCAPSTONE_TMS320C64X_SUPPORT=OFF
                       -DCAPSTONE_XCORE_SUPPORT=OFF
                       -DCAPSTONE_X86_SUPPORT=${CAPSTONE_x86_SUPPORT}
+                      -DCAPSTONE_RISCV_SUPPORT=${CAPSTONE_riscv_SUPPORT}
     INSTALL_COMMAND   ""
   )
   ExternalProject_Get_Property(capstone_src SOURCE_DIR)

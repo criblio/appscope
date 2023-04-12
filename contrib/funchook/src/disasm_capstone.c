@@ -40,6 +40,11 @@
 #define CS_MODE CS_MODE_LITTLE_ENDIAN
 #endif
 
+#ifdef CPU_RISCV64
+#define CS_ARCH CS_ARCH_RISCV
+#define CS_MODE CS_MODE_RISCV64
+#endif
+
 #ifdef CPU_X86_64
 #define CS_ARCH CS_ARCH_X86
 #define CS_MODE CS_MODE_64

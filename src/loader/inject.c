@@ -44,6 +44,7 @@ typedef struct {
 #ifdef __x86_64__
     #define IP_REG regs.rip
     #define FUNC_REG regs.rax
+    #define CALL_FUNC "callq *%rax \n"
     #define FIRST_ARG_REG regs.rdi
     #define SECOND_ARG_REG regs.rsi
     #define RET_REG regs.rax
@@ -51,10 +52,22 @@ typedef struct {
 #elif defined(__aarch64__)
     #define IP_REG regs.pc
     #define FUNC_REG regs.regs[2]
+    #define CALL_FUNC "blr x2 \n"
     #define FIRST_ARG_REG regs.regs[0]
     #define SECOND_ARG_REG regs.regs[1]
     #define RET_REG regs.regs[0]
     #define DBG_TRAP "brk #0 \n"
+#elif defined(__riscv) && __riscv_xlen == 64
+    #include <asm/ptrace.h>
+    #define IP_REG regs.pc
+    #define FUNC_REG regs.t1
+    #define CALL_FUNC "jalr t1 \n"
+    #define FIRST_ARG_REG regs.a0
+    #define SECOND_ARG_REG regs.a1
+    #define RET_REG regs.a0
+    #define DBG_TRAP "ebreak \n"
+#else
+   #error Bad arch defined
 #endif
 
 static int
@@ -147,14 +160,21 @@ call_remfunc(void)
 #ifdef __x86_64__
     asm(
         "andq $0xfffffffffffffff0, %rsp \n" //align stack to 16-byte boundary
-        "callq *%rax \n"
+        CALL_FUNC
         DBG_TRAP
     );
 #elif defined(__aarch64__)
     __asm__ volatile(
-        "blr x2 \n"
+        CALL_FUNC
         DBG_TRAP
     );
+#elif defined(__riscv) && __riscv_xlen == 64
+    __asm__ volatile(
+        CALL_FUNC
+        DBG_TRAP
+    );
+#else
+   #error Bad arch defined
 #endif
 }
 

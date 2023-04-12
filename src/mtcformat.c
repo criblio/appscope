@@ -181,7 +181,7 @@ addStatsdFields(mtc_fmt_t* fmt, event_field_t* fields, char** end, int* bytes, s
 }
 
 static void
-addStatsdCustomFields(mtc_fmt_t* fmt, custom_tag_t** tags, char** end, int* bytes, strset_t *addedFields)
+addStatsdCustomFields(mtc_fmt_t *fmt, custom_tag_t **tags, char **end, int *bytes, strset_t *addedFields)
 {
     if (!fmt || !tags || !*tags || !end || !*end || !bytes) return;
 
@@ -274,7 +274,7 @@ mtcFormatStatsDString(mtc_fmt_t* fmt, event_t* e, regex_t* fieldFilter)
 }
 
 static int
-createPromFieldString(mtc_fmt_t* fmt, event_field_t* f, char* tag, int sizeoftag)
+createPromFieldString(mtc_fmt_t *fmt, event_field_t *f, char *tag, int sizeoftag)
 {
     if (!fmt || !f || !tag || sizeoftag <= 0) return -1;
 
@@ -296,7 +296,7 @@ createPromFieldString(mtc_fmt_t* fmt, event_field_t* f, char* tag, int sizeoftag
 }
 
 static void
-appendPromFieldString(mtc_fmt_t* fmt, char* tag, int sz, char** end, int* bytes, strset_t* addedFields)
+appendPromFieldString(mtc_fmt_t *fmt, char *tag, int sz, char **end, int *bytes, strset_t *addedFields)
 {
     sz += 1; // add space for the '{' or ','
     if ((*bytes + sz) >= fmt->prom.max_len) return;
@@ -313,7 +313,7 @@ appendPromFieldString(mtc_fmt_t* fmt, char* tag, int sz, char** end, int* bytes,
 
 
 static void
-addPromFields(mtc_fmt_t* fmt, event_field_t* fields, char** end, int* bytes, strset_t* addedFields, regex_t* fieldFilter)
+addPromFields(mtc_fmt_t *fmt, event_field_t *fields, char **end, int *bytes, strset_t *addedFields, regex_t *fieldFilter)
 {
     if (!fmt || !fields || ! end || !*end || !bytes) return;
 
@@ -321,7 +321,7 @@ addPromFields(mtc_fmt_t* fmt, event_field_t* fields, char** end, int* bytes, str
     tag[fmt->prom.max_len] = '\0'; // Ensures null termination
     int sz;
 
-    event_field_t* f;
+    event_field_t *f;
     for (f = fields; f->value_type != FMT_END; f++) {
 
         if (fieldFilter && regexec_wrapper(fieldFilter, f->name, 0, NULL, 0)) continue;
@@ -340,7 +340,7 @@ addPromFields(mtc_fmt_t* fmt, event_field_t* fields, char** end, int* bytes, str
 }
 
 static void
-addPromCustomFields(mtc_fmt_t* fmt, custom_tag_t** tags, char** end, int* bytes, strset_t *addedFields)
+addPromCustomFields(mtc_fmt_t *fmt, custom_tag_t **tags, char **end, int *bytes, strset_t *addedFields)
 {
     if (!fmt || !tags || !*tags || !end || !*end || !bytes) return;
 
@@ -348,7 +348,7 @@ addPromCustomFields(mtc_fmt_t* fmt, custom_tag_t** tags, char** end, int* bytes,
     tag[fmt->prom.max_len] = '\0'; // Ensures null termination
     int sz;
 
-    custom_tag_t* t;
+    custom_tag_t *t;
     int i = 0;
     while ((t = tags[i++])) {
 
@@ -385,7 +385,7 @@ mtcFormatPromString(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
     // Copy metric name into a buffer, then convert "." to "_".
     // TBD - may choose to add statsd prefix here...
     char strbuf[512];
-    int strsize = strlen(evt->name);
+    int strsize = scope_strlen(evt->name);
     if (strsize >= sizeof(strbuf)) {
         DBG("Prom name length (%d) exceeded limit of %d", strsize, sizeof(strbuf));
         goto err;
@@ -401,7 +401,7 @@ mtcFormatPromString(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
     bytes += strsize;
     bytes += sizeof(" ");
     const char *type = promTypeStr(evt->type);
-    bytes += strlen(type);
+    bytes += scope_strlen(type);
     bytes += sizeof("\n");
     if (bytes > fmt->prom.max_len) {
         DBG("Prom comment needed %d, but only had %d", bytes, fmt->prom.max_len);

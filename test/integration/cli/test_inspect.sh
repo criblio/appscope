@@ -59,12 +59,35 @@ interface_length_check() {
     fi
 }
 
+# Check expected number of responses, and that they all contain interfaces
+responses_length_check() {
+    local expected_length=$1
+    count=$(jq '[.[] | .interfaces] | length' $INSPECT_FILE)
+    if [ $count -ne $expected_length ]; then
+        echo "responses_length_check, params $expected_length"
+        cat $INSPECT_FILE
+        ERR+=1
+    fi
+}
+
 # Call scope inspect and redirect to file
 inspect_file_redirect_to_file() {
     local pid=$1
     scope inspect $pid > $INSPECT_FILE
     if [ $? != 0 ]; then
         echo "inspect_file_redirect_to_file fails, params $pid"
+        cat $INSPECT_FILE
+        ERR+=1
+    fi
+    # Time to save file
+    sleep 2
+}
+
+# Call scope inspect --all and redirect to file
+inspect_all_file_redirect_to_file() {
+    scope inspect --all > $INSPECT_FILE
+    if [ $? != 0 ]; then
+        echo "inspect_all_file_redirect_to_file fails"
         cat $INSPECT_FILE
         ERR+=1
     fi
@@ -114,6 +137,42 @@ kill -9 $PYTHON_PID 1> /dev/null 2> /dev/null
 kill -9 $NC_PID 1> /dev/null 2> /dev/null
 
 endtest
+
+
+# inspect_all: expected to see log, cribl for each process
+starttest test_inspect_all
+
+# First test that we are not connected
+PRE_SCOPE_CRIBL_ENABLE=$SCOPE_CRIBL_ENABLE
+unset SCOPE_CRIBL_ENABLE
+
+# Start 2 processes
+LD_PRELOAD=/usr/local/scope/lib/libscope.so python3 -m http.server 1> /dev/null 2> /dev/null &
+sleep 2
+export SCOPE_CRIBL_ENABLE=$PRE_SCOPE_CRIBL_ENABLE
+PYTHON_PID=`pidof python3`
+
+LD_PRELOAD=/usr/local/scope/lib/libscope.so sleep 1000 1> /dev/null 2> /dev/null &
+sleep 2
+export SCOPE_CRIBL_ENABLE=$PRE_SCOPE_CRIBL_ENABLE
+SLEEP_PID=`pidof sleep`
+
+inspect_all_file_redirect_to_file
+
+responses_length_check 2
+
+rm $INSPECT_FILE
+
+# Test that we are not connected
+nc -lU $CRIBL_SOCKET 1> /dev/null 2> /dev/null &
+NC_PID=`pidof nc`
+
+kill -9 $PYTHON_PID 1> /dev/null 2> /dev/null
+kill -9 $SLEEP_PID 1> /dev/null 2> /dev/null
+kill -9 $NC_PID 1> /dev/null 2> /dev/null
+
+endtest
+
 
 # disabled cribl expected to see log, events, metrics
 starttest test_inspect_cribl_disable_payload_disable

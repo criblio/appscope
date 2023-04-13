@@ -55,7 +55,7 @@ mtcFormatCreate(cfg_mtc_format_t format)
         unsigned long len;
         scope_errno = 0;
         len = scope_strtoul(prom_max_len, NULL, 10);
-        if (!scope_errno && len) {
+        if (!scope_errno && (len > 0) && (len < PROM_LEN_MAX)) {
             f->prom.max_len = len;
         }
     }
@@ -262,10 +262,12 @@ mtcFormatStatsDString(mtc_fmt_t* fmt, event_t* e, regex_t* fieldFilter)
     // add one that's already in the set, skip it.  In this way precedence
     // is given to capturedFields then custom fields then remaining fields.
     strset_t *addedFields = strSetCreate(DEFAULT_SET_SIZE);
-    addStatsdFields(fmt, e->capturedFields, &end, &bytes, addedFields, NULL);
-    addStatsdCustomFields(fmt, fmt->tags, &end, &bytes, addedFields);
-    addStatsdFields(fmt, e->fields, &end, &bytes, addedFields, fieldFilter);
-    strSetDestroy(&addedFields);
+    if (addedFields) {
+        addStatsdFields(fmt, e->capturedFields, &end, &bytes, addedFields, NULL);
+        addStatsdCustomFields(fmt, fmt->tags, &end, &bytes, addedFields);
+        addStatsdFields(fmt, e->fields, &end, &bytes, addedFields, fieldFilter);
+        strSetDestroy(&addedFields);
+    }
 
     // Now that we're done, we can count the trailing newline
     bytes += 1;
@@ -274,19 +276,19 @@ mtcFormatStatsDString(mtc_fmt_t* fmt, event_t* e, regex_t* fieldFilter)
 }
 
 static int
-createPromFieldString(mtc_fmt_t *fmt, event_field_t *f, char *tag, int sizeoftag)
+createPromFieldString(mtc_fmt_t *fmt, event_field_t *f, char *tag)
 {
-    if (!fmt || !f || !tag || sizeoftag <= 0) return -1;
+    if (!fmt || !f || !tag) return -1;
 
     int sz;
 
     switch (f->value_type) {
         case FMT_NUM:
-            sz = scope_snprintf(tag, sizeoftag, "%s=\"%lli\"", f->name, f->value.num);
+            sz = scope_snprintf(tag, PROM_LEN_MAX, "%s=\"%lli\"", f->name, f->value.num);
             break;
         case FMT_STR:
             if (!f->value.str) return -1;
-            sz = scope_snprintf(tag, sizeoftag, "%s=\"%s\"", f->name, f->value.str);
+            sz = scope_snprintf(tag, PROM_LEN_MAX, "%s=\"%s\"", f->name, f->value.str);
             break;
         default:
             DBG("%d %s", f->value_type, f->name);
@@ -317,8 +319,8 @@ addPromFields(mtc_fmt_t *fmt, event_field_t *fields, char **end, int *bytes, str
 {
     if (!fmt || !fields || ! end || !*end || !bytes) return;
 
-    char tag[fmt->prom.max_len+1];
-    tag[fmt->prom.max_len] = '\0'; // Ensures null termination
+    char tag[PROM_LEN_MAX+1];
+    tag[PROM_LEN_MAX] = '\0'; // Ensures null termination
     int sz;
 
     event_field_t *f;
@@ -332,7 +334,7 @@ addPromFields(mtc_fmt_t *fmt, event_field_t *fields, char **end, int *bytes, str
         // Don't allow duplicate field names
         if (!strSetAdd(addedFields, f->name)) continue;
 
-        sz = createPromFieldString(fmt, f, tag, sizeof(tag));
+        sz = createPromFieldString(fmt, f, tag);
         if (sz < 0) continue;
 
         appendPromFieldString(fmt, tag, sz, end, bytes, addedFields);
@@ -344,8 +346,8 @@ addPromCustomFields(mtc_fmt_t *fmt, custom_tag_t **tags, char **end, int *bytes,
 {
     if (!fmt || !tags || !*tags || !end || !*end || !bytes) return;
 
-    char tag[fmt->prom.max_len+1];
-    tag[fmt->prom.max_len] = '\0'; // Ensures null termination
+    char tag[PROM_LEN_MAX+1];
+    tag[PROM_LEN_MAX] = '\0'; // Ensures null termination
     int sz;
 
     custom_tag_t *t;
@@ -357,7 +359,7 @@ addPromCustomFields(mtc_fmt_t *fmt, custom_tag_t **tags, char **end, int *bytes,
 
         // No verbosity setting exists for custom fields.
 
-        sz = scope_snprintf(tag, sizeof(tag), "%s=\"%s\"", t->name, t->value);
+        sz = scope_snprintf(tag, PROM_LEN_MAX, "%s=\"%s\"", t->name, t->value);
         if (sz < 0) break;
 
         appendPromFieldString(fmt, tag, sz, end, bytes, addedFields);
@@ -446,15 +448,17 @@ mtcFormatPromString(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
     }
 
     // Add fields.  If there isn't space, some may be ommitted.
-    bytes += sizeof("}"); // reserve space for the trailing '}'
     strset_t *addedFields = strSetCreate(DEFAULT_SET_SIZE);
-    addPromFields(fmt, evt->capturedFields, &end, &bytes, addedFields, NULL);
-    addPromCustomFields(fmt, fmt->tags, &end, &bytes, addedFields);
-    addPromFields(fmt, evt->fields, &end, &bytes, addedFields, fieldFilter);
-    if (strSetEntryCount(addedFields) >= 1) {
-        end = scope_stpcpy(end, "}");
+    if (addedFields) {
+        bytes += sizeof("}"); // reserve space for the trailing '}'
+        addPromFields(fmt, evt->capturedFields, &end, &bytes, addedFields, NULL);
+        addPromCustomFields(fmt, fmt->tags, &end, &bytes, addedFields);
+        addPromFields(fmt, evt->fields, &end, &bytes, addedFields, fieldFilter);
+        if (strSetEntryCount(addedFields) >= 1) {
+            end = scope_stpcpy(end, "}");
+        }
+        strSetDestroy(&addedFields);
     }
-    strSetDestroy(&addedFields);
 
     // Finally add the metric value.  We've reserved space for it above.
     end = scope_stpcpy(end, strbuf);

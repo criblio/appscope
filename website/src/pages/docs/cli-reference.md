@@ -359,12 +359,18 @@ Returns information on scoped process identified by PID.
 
 #### Examples
 
-`scope inspect 1000`
+```
+scope inspect
+scope inspect 1000
+scope inspect --all
+```
 
 #### Flags
 
 ```
-  -h, --help            help for inspect
+  -a, --all             Inspect all processes
+  -h, --help            Help for inspect
+  -j, --json            Output as newline delimited JSON
   -p, --prefix string   When running AppScope in a container, and scoping an app that's running outside the container, 
 --prefix is the path to host filesystem of the scoped app
 ```

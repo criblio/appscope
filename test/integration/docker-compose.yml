@@ -96,13 +96,22 @@ services:
       - 27017:27017
     <<: *scope-common
 
-  metriccapture:
-    image: ghcr.io/criblio/appscope-test-metriccapture:${TAG:?Missing TAG environment variable}
+  node-glibc:
+    image: ghcr.io/criblio/appscope-test-node-glibc:${TAG:?Missing TAG environment variable}
     build:
-      cache_from:
-        - ghcr.io/criblio/appscope-test-metriccapture:${TAG:?Missing TAG environment variable}
+      cache_from: 
+        - ghcr.io/criblio/appscope-test-node-glibc:${TAG:?Missing TAG environment variable}
       context: .
-      dockerfile: ./metriccapture/Dockerfile
+      dockerfile: ./node/Dockerfile.glibc
+    <<: *scope-common
+
+  node-musl:
+    image: ghcr.io/criblio/appscope-test-node-musl:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from: 
+        - ghcr.io/criblio/appscope-test-node-musl:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./node/Dockerfile.musl
     <<: *scope-common
 
   metricvariants:

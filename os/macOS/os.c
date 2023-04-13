@@ -203,3 +203,8 @@ bool
 osMemPermRestore(void *addr, size_t len, int flags) {
     return FALSE;
 }
+
+bool
+osGetBaseAddr(uint64_t *addr) {
+    return FALSE;
+}

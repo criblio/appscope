@@ -53,6 +53,8 @@ spec:
           - "{{ .App }}-secret"
           - "--namespace"
           - "{{ .Namespace }}"
+          - "--signer-name"
+          - "{{ .SignerName }}"
       restartPolicy: OnFailure
   backoffLimit: 3
 ---
@@ -78,7 +80,7 @@ rules:
     verbs: ["get"]
   - apiGroups: ["certificates.k8s.io"]
     resources: ["signers"]
-    resourceNames: ["kubernetes.io/kubelet-serving"]
+    resourceNames: ["{{ .SignerName }}"]
     verbs: ["approve"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

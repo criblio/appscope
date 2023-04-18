@@ -404,6 +404,7 @@ kubectl label namespace default scope=enabled
   -n, --nobreaker             Set Cribl Stream to not break streams into events
       --port int              Port to listen on (default 4443)
       --server                Run Webhook server
+      --signername string     Name of the signer used for certificate request (default "kubernetes.io/kubelet-serving")
       --version string        Version of scope to deploy
 
 ```

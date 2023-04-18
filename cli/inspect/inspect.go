@@ -21,7 +21,7 @@ type procDetails struct {
 	MachineId string `mapstructure:"machine_id" json:"machine_id" yaml:"machine_id"`
 }
 
-type inspectOutput struct {
+type InspectOutput struct {
 	Cfg     ipc.ScopeGetCfgResponseCfg `mapstructure:"cfg" json:"cfg" yaml:"cfg"`
 	Desc    ipc.ScopeInterfaceDesc     `mapstructure:"interfaces" json:"interfaces" yaml:"interfaces"`
 	Process procDetails                `mapstructure:"process" json:"process" yaml:"process"`
@@ -66,19 +66,19 @@ func InspectProcess(pidCtx ipc.IpcPidCtx) (InspectOutput, string, error) {
 	cmdGetProcDetails := ipc.CmdGetProcessDetails{}
 	respPd, err := cmdGetProcDetails.Request(pidCtx)
 	if err != nil {
-		return "", err
+		return iout, "", err
 	}
 
 	err = cmdGetProcDetails.UnmarshalResp(respPd.ResponseScopeMsgData)
 	if err != nil {
-		return "", err
+		return iout, "", err
 	}
 
 	if respPd.MetaMsgStatus != ipc.ResponseOK || *cmdGetProcDetails.Response.Status != ipc.ResponseOK {
-		return "", errInspectCfg
+		return iout, "", errInspectCfg
 	}
 
-	summary := inspectOutput{
+	iout = InspectOutput{
 		Cfg:  cmdGetCfg.Response.Cfg,
 		Desc: cmdGetTransportStatus.Response.Interfaces,
 		Process: procDetails{

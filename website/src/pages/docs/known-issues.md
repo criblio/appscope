@@ -10,7 +10,7 @@ title: Known Issues
 
 As of this AppScope release, known issues include:
 
-- [1424](https://github.com/criblio/appscope/issues/1424) _This is placeholder text pending results of John's research._
+- [1424](https://github.com/criblio/appscope/issues/1424) Scoping a Go application that was built without certain [kernel symbols](https://en.wikipedia.org/wiki/System.map) produces limited metrics, but no events. The AppScope team's work on this issue is in an early, exploratory stage. 
 
 - [1412](https://github.com/criblio/appscope/issues/1412) Node.js apps compiled as [Position Independent Executables](https://www.redhat.com/en/blog/position-independent-executables-pie) (PIE) seg fault when scoped.
 
@@ -31,9 +31,11 @@ As of this AppScope release, known issues include:
   - **Fix:** 1.2.2
 
 - [#1153](https://github.com/criblio/appscope/issues/1153) After AppScope detaches from a process, `scope ps` still shows the process as scoped.
+
   - **Fix:** Planned for 1.3 or sooner
 
 - [#1055](https://github.com/criblio/appscope/issues/1055) With certain combinations of mount and PID namespaces, AppScope fails to attach to a process. We have found two scenarios when attach will fail. One is when AppScope is on a host and the target process is in a container, making the mount namespaces different, but the process was started with `pid=host`, making the PID namespaces the same. Another is when both AppScope and the target process are on a host, making the PID namespaces the same, but the process is [configured](https://www.freedesktop.org/software/systemd/man/systemd.exec.html#PrivateTmp=) as a service with `PrivateTmp` set to `true`, making the mount namespaces different.
+
   - **Fix:** 1.2.1
 
 ## AppScope 1.1.0
@@ -43,6 +45,7 @@ As of this AppScope release, known issues include:
 As of this AppScope release, known issues include:
 
 - [#1017](https://github.com/criblio/appscope/issues/1017) **Updated description**: AppScope incorrectly handles the "peek" flag in interposed functions that receive network data. When a server "peeks" at the first byte of data, AppScope counts that byte twice, which breaks protocol detection. AppScope then fails to correctly produce HTTP events.
+
   - **Fix:** 1.1.1, in [#1018](https://github.com/criblio/appscope/issues/1018)
 
 ## AppScope 1.0.3
@@ -52,6 +55,7 @@ As of this AppScope release, known issues include:
 As of this AppScope release, known issues include:
 
 - [#869](https://github.com/criblio/appscope/issues/869) AppScope's ability to avoid outputting binary data in console messages does not work perfectly in all situations. When data is first sent to the console by a scoped app, AppScope can detect whether it is binary, and if so, redact it while emitting an informative message. But when apps switch back and forth between textual and binary data, AppScope does not detect the change, and binary data can appear in console output.
+
   - **Fix:** 1.0.4
   
 - [#831](https://github.com/criblio/appscope/issues/831) When you scope the Microsoft Edge browser, AppScope fails to collect some HTTP events in these situations: (1) When Edge requests the use of HTTP/3; (2) When Edge uses HTTP/1.1 over UDP to request a list of plug-and-play devices from a Microsoft service; and, (3) when Edge uses SSL.  

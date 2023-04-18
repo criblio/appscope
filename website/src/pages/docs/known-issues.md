@@ -10,7 +10,7 @@ title: Known Issues
 
 As of this AppScope release, known issues include:
 
-- [1424](https://github.com/criblio/appscope/issues/1424) Scoping a Go application that was built without certain [kernel symbols](https://en.wikipedia.org/wiki/System.map) produces limited metrics, but no events. The AppScope team's work on this issue is in an early, exploratory stage. 
+- [1424](https://github.com/criblio/appscope/issues/1424) Scoping a Go application that was built without certain symbol names produces limited metrics, but no events. The AppScope team's work on this issue is in an early, exploratory stage. 
 
 - [1412](https://github.com/criblio/appscope/issues/1412) Node.js apps compiled as [Position Independent Executables](https://www.redhat.com/en/blog/position-independent-executables-pie) (PIE) seg fault when scoped.
 

@@ -19,7 +19,10 @@ var k8sCmd = &cobra.Command{
 
 The --*dest flags accept file names like /tmp/scope.log; URLs like file:///tmp/scope.log; or sockets specified with the pattern unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
 	Example: `scope k8s --metricdest tcp://some.host:8125 --eventdest tcp://other.host:10070 | kubectl apply -f -
-kubectl label namespace default scope=enabled`,
+kubectl label namespace default scope=enabled
+
+scope k8s --metricdest tcp://scope-prom-export:9109 --metricformat prometheus --eventdest tcp://other.host:10070 | kubectl apply -f -
+`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		if rc.CriblDest == "" && rc.MetricsDest == "" {
@@ -40,6 +43,8 @@ kubectl label namespace default scope=enabled`,
 		opt.ScopeConfigYaml, err = rc.ScopeConfigYaml()
 		util.CheckErrSprintf(err, "%v", err)
 		server, _ := cmd.Flags().GetBool("server")
+		opt.PromDisable, _ = cmd.Flags().GetBool("noprom")
+
 		if !server {
 			opt.PrintConfig(os.Stdout)
 			os.Exit(0)
@@ -63,5 +68,9 @@ func init() {
 	k8sCmd.Flags().IntVar(&opt.Port, "port", 4443, "Port to listen on")
 	k8sCmd.Flags().Bool("server", false, "Run Webhook server")
 	k8sCmd.Flags().BoolVar(&opt.Debug, "debug", false, "Turn on debug logging in the scope webhook container")
+	k8sCmd.Flags().Bool("noprom", false, "Disable Prometheus Exporter deployment")
+	k8sCmd.Flags().IntVar(&opt.PromMPort, "prommport", 9109, "Specify Prometheus Exporter port for metrics from libscope")
+	k8sCmd.Flags().IntVar(&opt.PromSPort, "promsport", 9090, "Specify Prometheus Exporter port for HTTP metrics requests")
+
 	metricAndEventDestFlags(k8sCmd, rc)
 }

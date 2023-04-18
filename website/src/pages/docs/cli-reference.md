@@ -402,7 +402,10 @@ kubectl label namespace default scope=enabled
       --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
       --namespace string      Name of the namespace in which to install; default is "default"
   -n, --nobreaker             Set Cribl Stream to not break streams into events
+      --noprom                Disable Prometheus Exporter deployment
       --port int              Port to listen on (default 4443)
+      --prommport int         Specify Prometheus Exporter port for metrics from libscope (default 9109)
+      --promsport int         Specify Prometheus Exporter port for HTTP metrics requests (default 9090)
       --server                Run Webhook server
       --version string        Version of scope to deploy
 

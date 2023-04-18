@@ -922,38 +922,6 @@ go_version_numbers(const char *go_runtime_version)
     g_go_maint_ver = maint_val;
 }
 
-int
-getBaseAddress(uint64_t *addr) {
-    uint64_t base_addr = 0;
-    char perms[5];
-    char offset[20];
-    char buf[1024];
-    char pname[1024];
-    FILE *fp;
-
-    if (osGetProcname(pname, sizeof(pname)) == -1) return -1;
-
-    if ((fp = scope_fopen("/proc/self/maps", "r")) == NULL) {
-        return -1;
-    }
-
-    while (scope_fgets(buf, sizeof(buf), fp) != NULL) {
-        uint64_t addr_start;
-        scope_sscanf(buf, "%lx-%*x %s %*s %s %*d", &addr_start, perms, offset);
-        if (scope_strstr(buf, pname) != NULL) {
-            base_addr = addr_start;
-            break;
-        }
-    }
-
-    scope_fclose(fp);
-    if (base_addr) {
-        *addr = base_addr;
-        return 0;
-    }
-    return -1;
-}
-
 void
 initGoHook(elf_buf_t *ebuf)
 {
@@ -987,7 +955,7 @@ initGoHook(elf_buf_t *ebuf)
     // if it's a position independent executable, get the base address from /proc/self/maps
     uint64_t base = 0LL;
     if (ehdr->e_type == ET_DYN && (scopeGetGoAppStateStatic() == FALSE)) {
-        if (getBaseAddress(&base) != 0) {
+        if (osGetBaseAddr(&base) == FALSE) {
             sysprint("ERROR: can't get the base address\n");
             funchook_destroy(funchook);
             return; // don't install our hooks

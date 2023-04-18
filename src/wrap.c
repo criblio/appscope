@@ -1687,6 +1687,19 @@ init(void)
         // The symbol uv__read is not public. Therefore, we don't resolve it with dlsym.
         // So, while we have the exec open, we look to see if we can dig it out.
         g_fn.uv__read = getSymbol(ebuf->buf, "uv__read");
+        if (g_fn.uv__read) {
+            uint64_t base_addr = 0;
+            Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
+            if (ehdr->e_type == ET_DYN && osGetBaseAddr(&base_addr) == TRUE) {
+                /*
+                * If we detect Position-Independent Executable file (ET_DYN)
+                * We neet to adjust the address of uv__read function which we will funchook
+                */
+                Elf64_Shdr* textSec = getElfSection(ebuf->buf, ".text");
+                base_addr = base_addr - (uint64_t)ebuf->text_addr + textSec->sh_offset;
+                g_fn.uv__read = (void*)((uint64_t)(g_fn.uv__read) + base_addr);
+            }
+        }
         scopeLog(CFG_LOG_TRACE, "%s:%d uv__read at %p", __FUNCTION__, __LINE__, g_fn.uv__read);
     }
 

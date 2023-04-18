@@ -166,6 +166,7 @@ printMsgInfo(void) {
     printf("quit - stop sending\n");
     printf("cmds - get information about supported cmd\n");
     printf("status - get information about scope status\n");
+    printf("details - get information about process details\n");
 }
 
 static ipc_msg_t *
@@ -179,6 +180,9 @@ msgPrepareInfo(const char *inputBuf) {
     } else if(strcmp("status\n", inputBuf) == 0) {
         printf("status message\n");
         return createIpcMessage("{\"req\":0,\"uniq\":1234,\"remain\":128}", "{\"req\":1}");
+    } else if(strcmp("details\n", inputBuf) == 0) {
+        printf("details message\n");
+        return createIpcMessage("{\"req\":0,\"uniq\":1234,\"remain\":128}", "{\"req\":5}");
     }
 
     printf("Unknown message %s\n", inputBuf);

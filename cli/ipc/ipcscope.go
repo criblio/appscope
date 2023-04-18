@@ -25,6 +25,7 @@ const (
 	reqCmdGetScopeCfg
 	reqCmdSetScopeCfg
 	reqCmdGetTransportStatus
+	reqCmdGetProcessDetails
 )
 
 // Request which contains only cmd without data
@@ -136,6 +137,20 @@ type scopeGetTransportStatusResponse struct {
 	Interfaces ScopeInterfaceDesc `mapstructure:"interfaces" json:"interfaces" yaml:"interfaces"`
 }
 
+// Must be inline with server, see: ipcRespGetProcessDetails
+type scopeGetProcessDetailsResponse struct {
+	// Response status
+	Status *respStatus `mapstructure:"status" json:"status" yaml:"status"`
+	// Pid
+	Pid int `mapstructure:"pid" json:"pid" yaml:"pid"`
+	// UUID
+	Uuid string `mapstructure:"uuid" json:"uuid" yaml:"uuid"`
+	// Id
+	Id string `mapstructure:"id" json:"id" yaml:"id"`
+	// Machine id
+	MachineId string `mapstructure:"machine_id" json:"machine_id" yaml:"machine_id"`
+}
+
 func (cmd *CmdGetScopeStatus) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
 	req, _ := json.Marshal(scopeRequestOnly{Req: reqCmdGetScopeStatus})
 
@@ -222,6 +237,30 @@ func (cmd *CmdGetTransportStatus) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, er
 }
 
 func (cmd *CmdGetTransportStatus) UnmarshalResp(respData []byte) error {
+	err := yaml.Unmarshal(respData, &cmd.Response)
+	if err != nil {
+		return err
+	}
+
+	if cmd.Response.Status == nil {
+		return fmt.Errorf("%w %v", errMissingMandatoryField, "status")
+	}
+
+	return nil
+}
+
+// CmdGetProcessDetails describes Get Process Details command request and response
+type CmdGetProcessDetails struct {
+	Response scopeGetProcessDetailsResponse
+}
+
+func (cmd *CmdGetProcessDetails) Request(pidCtx IpcPidCtx) (*IpcResponseCtx, error) {
+	req, _ := json.Marshal(scopeRequestOnly{Req: reqCmdGetProcessDetails})
+
+	return ipcDispatcher(req, pidCtx)
+}
+
+func (cmd *CmdGetProcessDetails) UnmarshalResp(respData []byte) error {
 	err := yaml.Unmarshal(respData, &cmd.Response)
 	if err != nil {
 		return err

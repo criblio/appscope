@@ -5,6 +5,7 @@ FAILED_TEST_LIST=""
 FAILED_TEST_COUNT=0
 
 OUTFILE=/usr/local/scope/metric.out
+EVT_FILE=/usr/local/scope/events.out
 
 starttest(){
     CURRENT_TEST=$1
@@ -15,8 +16,9 @@ starttest(){
 }
 
 evaltest(){
+    local appName=$1
     if [ $? -ne 0 ]; then
-        echo "It appears that node hotshot.ts crashed."
+        echo "It appears that node $appName crashed."
         ERR+=1
     fi
     echo "       Evaluating $CURRENT_TEST"
@@ -41,16 +43,27 @@ endtest(){
         cp -f $OUTFILE $OUTFILE.$CURRENT_TEST
     fi
 
+    rm -f $EVT_FILE
     rm -f $OUTFILE
 }
 
+# Check expected property of http communication
+http_msg_property_check() {
+    local http_param=$1
+    count=$(grep '"sourcetype":"http"' $EVT_FILE | grep -c $http_param)
+    if [ $count -ne 2 ]; then
+        echo "http_msg_property_check failed, params: $http_param"
+        ERR+=1
+    fi
+}
+
 cd /usr/local/scope
+# extract the libscope.so
+/usr/local/scope/bin/scope extract /usr/local/scope/lib
 
-
-
-starttest "on_by_default"
+starttest "metric format on_by_default"
 LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
-evaltest
+evaltest hotshot.ts
 COUNT=`grep -c "^my\." $OUTFILE`
 if [ $COUNT != "6" ]; then
     echo "expected 6 captured metrics starting with 'my.' in $OUTFILE, but found $COUNT"
@@ -58,9 +71,9 @@ if [ $COUNT != "6" ]; then
 fi
 endtest
 
-starttest "captured_dimensions_exist"
+starttest "metric format captured_dimensions_exist"
 LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
-evaltest
+evaltest hotshot.ts
 # pick one metric to test
 METRIC=`grep "^my.histogram" $OUTFILE`
 for DIM in "source:hot-shots"; do
@@ -72,9 +85,9 @@ for DIM in "source:hot-shots"; do
 done
 endtest
 
-starttest "custom_dimensions_exist"
+starttest "metric format custom_dimensions_exist"
 SCOPE_TAG_customtag=customvalue LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
-evaltest
+evaltest hotshot.ts
 # pick one metric to test
 METRIC=`grep "^my.histogram" $OUTFILE`
 for DIM in "customtag:customvalue"; do
@@ -86,9 +99,9 @@ for DIM in "customtag:customvalue"; do
 done
 endtest
 
-starttest "builtin_dimensions_exist"
+starttest "metric format builtin_dimensions_exist"
 LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
-evaltest
+evaltest hotshot.ts
 # pick one metric to test
 METRIC=`grep "^my.histogram" $OUTFILE`
 for DIM in pid host proc; do
@@ -109,9 +122,9 @@ endtest
 #   (3) builtin_dimension
 
 # test (1) vs (2) with conflicting "source"
-starttest "captured_tag_priority"
+starttest "metric format captured_tag_priority"
 SCOPE_TAG_source=conflictvalue LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
-evaltest
+evaltest hotshot.ts
 # pick one metric to test
 METRIC=`grep "^my.histogram" $OUTFILE`
 for DIM in "source:hot-shots"; do
@@ -130,9 +143,9 @@ done
 endtest
 
 # test (2) vs (3) with conflicting "proc"
-starttest "custom_tag_priority"
+starttest "metric format custom_tag_priority"
 SCOPE_TAG_proc=myprocval LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE node hotshot.ts
-evaltest
+evaltest hotshot.ts
 # pick one metric to test
 METRIC=`grep "^my.histogram" $OUTFILE`
 for DIM in "proc:myprocval"; do
@@ -151,9 +164,9 @@ done
 endtest
 
 
-starttest "can_be_disabled"
+starttest "metric format can_be_disabled"
 LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_METRIC_DEST=file://$OUTFILE SCOPE_METRIC_STATSD=false node hotshot.ts
-evaltest
+evaltest hotshot.ts
 COUNT=`grep -c "^my\." $OUTFILE`
 if [ $COUNT != "0" ]; then
     echo "expected 0 captured metrics starting with 'my.' in $OUTFILE, but found $COUNT"
@@ -161,6 +174,23 @@ if [ $COUNT != "0" ]; then
 fi
 endtest
 
+starttest "https communication "
+# Start server
+node server.js &
+server_pid=$!
+LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_EVENT_DEST=file://$EVT_FILE node client.js
+evaltest client.js
+
+http_msg_property_check 'net_host_ip'
+http_msg_property_check 'net_host_port'
+http_msg_property_check 'net_peer_ip'
+http_msg_property_check 'net_peer_port'
+http_msg_property_check 'net_transport'
+http_msg_property_check '"http_scheme":"https"'
+
+# Cleanup
+kill -s SIGTERM $server_pid
+endtest
 
 
 if (( $FAILED_TEST_COUNT == 0 )); then

@@ -42,7 +42,7 @@ spec:
       containers:
       - name: webhook-cert-setup
         # This is a minimal kubectl image based on Alpine Linux that signs certificates using the k8s extension api server
-        image: cribl/k8s-webhook-cert-manager:1.0.0
+        image: cribl/k8s-webhook-cert-manager:1.0.1
         command: ["./generate_certificate.sh"]
         args:
           - "--service"

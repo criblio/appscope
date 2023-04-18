@@ -69,4 +69,6 @@ func runCmdFlags(cmd *cobra.Command, rc *run.Config) {
 
 func ipcCmdFlags(cmd *cobra.Command, ipc *ipc.IpcPidCtx) {
 	cmd.Flags().StringVarP(&ipc.PrefixPath, "prefix", "p", "", "Prefix to proc filesystem")
+	cmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
+	cmd.Flags().BoolP("all", "a", false, "Inspect all processes")
 }

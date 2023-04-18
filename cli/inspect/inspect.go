@@ -27,38 +27,39 @@ type inspectOutput struct {
 	Process procDetails                `mapstructure:"process" json:"process" yaml:"process"`
 }
 
-// InspectProcess returns the configuration and status of scoped process
-func InspectProcess(pidCtx ipc.IpcPidCtx) (string, error) {
+// InspectProcess returns the configuratioutn and status of scoped process
+func InspectProcess(pidCtx ipc.IpcPidCtx) (InspectOutput, string, error) {
+	var iout InspectOutput
 
 	// Get configuration
 	cmdGetCfg := ipc.CmdGetScopeCfg{}
 	resp, err := cmdGetCfg.Request(pidCtx)
 	if err != nil {
-		return "", err
+		return iout, "", err
 	}
 
 	err = cmdGetCfg.UnmarshalResp(resp.ResponseScopeMsgData)
 	if err != nil {
-		return "", err
+		return iout, "", err
 	}
 	if resp.MetaMsgStatus != ipc.ResponseOK || *cmdGetCfg.Response.Status != ipc.ResponseOK {
-		return "", errInspectCfg
+		return iout, "", errInspectCfg
 	}
 
 	// Get transport status
 	cmdGetTransportStatus := ipc.CmdGetTransportStatus{}
 	respTr, err := cmdGetTransportStatus.Request(pidCtx)
 	if err != nil {
-		return "", err
+		return iout, "", err
 	}
 
 	err = cmdGetTransportStatus.UnmarshalResp(respTr.ResponseScopeMsgData)
 	if err != nil {
-		return "", err
+		return iout, "", err
 	}
 
 	if respTr.MetaMsgStatus != ipc.ResponseOK || *cmdGetTransportStatus.Response.Status != ipc.ResponseOK {
-		return "", errInspectCfg
+		return iout, "", errInspectCfg
 	}
 
 	// Get process details
@@ -88,10 +89,10 @@ func InspectProcess(pidCtx ipc.IpcPidCtx) (string, error) {
 		},
 	}
 
-	sumPrint, err := json.MarshalIndent(summary, "", "   ")
+	sumPrint, err := json.MarshalIndent(iout, "", "   ")
 	if err != nil {
-		return "", err
+		return iout, "", err
 	}
 
-	return string(sumPrint), nil
+	return iout, string(sumPrint), nil
 }

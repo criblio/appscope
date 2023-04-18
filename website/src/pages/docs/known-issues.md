@@ -4,6 +4,18 @@ title: Known Issues
 
 # Known Issues
 
+## AppScope 1.3.2
+
+2023-04-19 - Maintenance Release
+
+As of this AppScope release, known issues include:
+
+- [1424](https://github.com/criblio/appscope/issues/1424) _This is placeholder text pending results of John's research._
+
+- [1412](https://github.com/criblio/appscope/issues/1412) Node.js apps compiled as [Position Independent Executables](https://www.redhat.com/en/blog/position-independent-executables-pie) (PIE) seg fault when scoped.
+
+  - **Fix:** 1.3.3
+
 ## AppScope 1.2.0
 
 2022-11-09 - Feature Release

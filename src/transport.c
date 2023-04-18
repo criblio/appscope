@@ -21,6 +21,7 @@
 #include "scopestdlib.h"
 #include "fn.h"
 #include "transport.h"
+#include "utils.h"
 
 // Yuck.  Avoids naming conflict between our src/wrap.c and libssl.a
 #define SSL_read SCOPE_SSL_read
@@ -1016,37 +1017,6 @@ out:
     backoffReset(t->backoff);
 
     return 1;
-}
-
-#define EDGE_PATH_DOCKER "/var/run/appscope/appscope.sock"
-#define EDGE_PATH_DEFAULT "/opt/cribl/state/appscope.sock"
-#define READ_AND_WRITE (R_OK|W_OK)
-static char*
-edgePath(void){
-    // 1) If EDGE_PATH_DOCKER can be accessed, return that.
-    if (scope_access(EDGE_PATH_DOCKER, READ_AND_WRITE) == 0) {
-        return scope_strdup(EDGE_PATH_DOCKER);
-    }
-
-    // 2) If CRIBL_HOME is defined and can be accessed,
-    //    return $CRIBL_HOME/state/appscope.sock
-    const char *cribl_home = getenv("CRIBL_HOME");
-    if (cribl_home) {
-        char *new_path = NULL;
-        if (scope_asprintf(&new_path, "%s/%s", cribl_home, "state/appscope.sock") > 0) {
-            if (scope_access(new_path, READ_AND_WRITE) == 0) {
-                return new_path;
-            }
-            scope_free(new_path);
-        }
-    }
-
-    // 3) If EDGE_PATH_DEFAULT can be accessed, return it
-    if (scope_access(EDGE_PATH_DEFAULT, READ_AND_WRITE) == 0) {
-        return scope_strdup(EDGE_PATH_DEFAULT);
-    }
-
-    return NULL;
 }
 
 int

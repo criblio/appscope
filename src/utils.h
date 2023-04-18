@@ -23,12 +23,14 @@ int endsWith(const char *, const char *);
 void setUUID(char *);
 void setMachineID(char *);
 
+char *edgePath(void);
+int makeIntermediateDirs(const char *, mode_t);
+const char *libVersion(const char *);
+
 // Signal Safe API
 int sigSafeNanosleep(const struct timespec *);
 void sigSafeUtoa(unsigned long, char *, int, int *);
 bool sigSafeMkdirRecursive(const char *);
 ssize_t sigSafeWriteNumber(int , long, int);
-const char *libVersion(const char *);
-int makeIntermediateDirs(const char *, mode_t);
 
 #endif // __UTILS_H__

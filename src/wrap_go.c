@@ -1245,7 +1245,7 @@ getFDFromConn(uint64_t tcpConn) {
  * Update ld.so.preload such that all procs load the library.
  * Initailly intended for dockerd.
  */
-bool
+static bool
 mountDirs(char *src, char *target, char *fstype)
 {
     static int once = 0;
@@ -1275,7 +1275,7 @@ mountDirs(char *src, char *target, char *fstype)
         scope_strcat(filterdir, g_libpath);
 
         // make a dir in the merged dir
-        if (makeIntermediateDirs((const char *)filterdir, 0666) != 0) {
+        if (makeIntermediateDirs((const char *)filterdir, 0666) == FALSE) {
             scopeLogWarn("Warn: mkdir of %s from %s:%d", filterdir, __FUNCTION__, __LINE__);
             scope_free(filterdir);
             return FALSE;
@@ -1283,8 +1283,8 @@ mountDirs(char *src, char *target, char *fstype)
 
         // mount the merged dir addition into the host FS
         if (g_fn.mount(g_libpath, filterdir, "overlay", MS_BIND, NULL) != 0) {
-            scope_free(filterdir);
             scopeLogWarn("WARN: mount %s on %s from %s:%d", g_libpath, filterdir, __FUNCTION__, __LINE__);
+            scope_free(filterdir);
             return FALSE;
         }
 
@@ -1296,7 +1296,7 @@ mountDirs(char *src, char *target, char *fstype)
             scope_strcat(filterdir, sockdir);
 
             // make the socket dir in the merged dir
-            if (makeIntermediateDirs((const char *)filterdir, 0666) == 0) {
+            if (makeIntermediateDirs((const char *)filterdir, 0666) == TRUE) {
                 // mount the Edge socket
                 if (g_fn.mount(sockdir, filterdir, "overlay", MS_BIND, NULL) != 0) {
                     scopeLogWarn("WARN: mount %s on %s from %s:%d", sockpath, filterdir, __FUNCTION__, __LINE__);
@@ -1320,7 +1320,7 @@ mountDirs(char *src, char *target, char *fstype)
             return FALSE;
         }
 
-        size_t liblen = strlen(g_libpath);
+        size_t liblen = scope_strlen(g_libpath);
         char libpath[liblen + sizeof("/libscope.so")];
 
         scope_memset(libpath, 0, liblen + sizeof("/libscope.so"));

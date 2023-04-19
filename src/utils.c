@@ -531,11 +531,11 @@ libVersion(const char *version) {
  * The mkdir system call does not support the creation of intermediate dirs.
  * This will walk the path and create all dirs one at a time.
  */
-int
+bool
 makeIntermediateDirs(const char *path, mode_t mode) {
     char *dup_path = scope_strdup(path);
     if (!dup_path) {
-        return -1;
+        return FALSE;
     }
 
     char *curr = dup_path;
@@ -546,7 +546,7 @@ makeIntermediateDirs(const char *path, mode_t mode) {
         if (scope_mkdir(dup_path, mode) == -1) {
             if (scope_errno != EEXIST) {
                 scope_free(dup_path);
-                return -1;
+                return FALSE;
             }
         }
 
@@ -557,12 +557,12 @@ makeIntermediateDirs(const char *path, mode_t mode) {
     if (scope_mkdir(dup_path, mode) == -1) {
         if (scope_errno != EEXIST) {
             scope_free(dup_path);
-            return -1;
+            return FALSE;
         }
     }
 
     scope_free(dup_path);
-    return 0;
+    return TRUE;
 }
 
 #define EDGE_PATH_DOCKER "/var/run/appscope/appscope.sock"

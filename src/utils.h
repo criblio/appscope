@@ -24,7 +24,7 @@ void setUUID(char *);
 void setMachineID(char *);
 
 char *edgePath(void);
-int makeIntermediateDirs(const char *, mode_t);
+bool makeIntermediateDirs(const char *, mode_t);
 const char *libVersion(const char *);
 
 // Signal Safe API

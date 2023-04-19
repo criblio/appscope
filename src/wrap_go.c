@@ -367,7 +367,7 @@ adjustGoStructOffsetsForVersion()
             scopeLogWarn("Architecture not supported. Not adjusting schema offsets.");
             return;
         }
-        tap_entry(tap_syscall)->func_name = "runtime/internal/syscall.Syscall6.abi0";
+        tap_entry(tap_syscall)->func_name = "runtime/internal/syscall.Syscall6";
         tap_entry(tap_rawsyscall)->func_name = "";
         tap_entry(tap_syscall6)->func_name = "";
     }
@@ -922,6 +922,39 @@ go_version_numbers(const char *go_runtime_version)
     g_go_maint_ver = maint_val;
 }
 
+/*
+ * Some Go executables are built such that the .abi0
+ * extension is used for internal runtime symbols. Others
+ * emit symbols without the version extension. So, if we
+ * can't resolve the symbol without a version extension, we
+ * try the symbol with extension.
+ */
+void *
+tryAbi0(const char *buf, char *sname)
+{
+    if (!buf || !sname) return NULL;
+
+    size_t slen = scope_strlen(sname);
+    if (slen == 0) return NULL;
+
+    void *funcaddr = NULL;
+    char abi0name[slen + sizeof(".abi0 ")];
+
+    scope_memset(abi0name, 0, sizeof(abi0name));
+    scope_strncpy(abi0name, sname, slen);
+    scope_strcat(abi0name, ".abi0");
+
+    funcprint("%s:%d %s (%ld) %s\n", __FUNCTION__, __LINE__, sname, slen, abi0name);
+
+    // Look for the symbol in the elf strtab, then meta data; .gopclntab section
+    if (((funcaddr = getSymbol(buf, abi0name)) == 0) &&
+        ((funcaddr = getGoSymbol(buf, abi0name, NULL, NULL)) == 0)) {
+        return NULL;
+    }
+
+    return funcaddr;
+}
+
 void
 initGoHook(elf_buf_t *ebuf)
 {
@@ -1062,8 +1095,10 @@ initGoHook(elf_buf_t *ebuf)
         void *orig_func;
         // Look for the symbol in the ELF symbol table
         if (((orig_func = getSymbol(ebuf->buf, tap->func_name)) == NULL) &&
-        // Otherwise look in the .gopclntab section
-            ((orig_func = getGoSymbol(ebuf->buf, tap->func_name, NULL, NULL)) == NULL)) {
+            // look in the .gopclntab section
+            ((orig_func = getGoSymbol(ebuf->buf, tap->func_name, NULL, NULL)) == NULL) &&
+            // is the symbol defined as an original API; with an abi0 extension
+            ((orig_func = tryAbi0(ebuf->buf, tap->func_name)) == NULL)) {
             sysprint("WARN: can't get the address for %s\n", tap->func_name);
             continue;
         }
@@ -1232,7 +1267,7 @@ mountDirs(char *src, char *target, char *fstype)
         char *filterdir;
         size_t targetlen = scope_strlen(target);
 
-        funcprint("Interposed Mount overlay: %s %d\n", g_proc.procname, once);
+        sysprint("Interposed Mount overlay: %s %d\n", g_proc.procname, once);
         once = 0;
 
         if ((filterdir = scope_malloc(targetlen + 128)) == NULL) return FALSE;

@@ -1282,7 +1282,7 @@ mountDirs(char *src, char *target, char *fstype)
         }
 
         // mount the merged dir addition into the host FS
-        if (g_fn.mount(g_libpath, filterdir, "overlay", MS_BIND, NULL) != 0) {
+        if (scope_mount(g_libpath, filterdir, "overlay", MS_BIND, NULL) != 0) {
             scopeLogWarn("WARN: mount %s on %s from %s:%d", g_libpath, filterdir, __FUNCTION__, __LINE__);
             scope_free(filterdir);
             return FALSE;
@@ -1298,7 +1298,7 @@ mountDirs(char *src, char *target, char *fstype)
             // make the socket dir in the merged dir
             if (makeIntermediateDirs((const char *)filterdir, 0666) == TRUE) {
                 // mount the Edge socket
-                if (g_fn.mount(sockdir, filterdir, "overlay", MS_BIND, NULL) != 0) {
+                if (scope_mount(sockdir, filterdir, "overlay", MS_BIND, NULL) != 0) {
                     scopeLogWarn("WARN: mount %s on %s from %s:%d", sockpath, filterdir, __FUNCTION__, __LINE__);
                 }
             } else {

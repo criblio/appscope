@@ -96,6 +96,8 @@
     je   2f
     cmp  $SYS_close, %eax
     je   2f
+    cmp  $SYS_mount, %eax
+    je   2f
 
     lea  \retptr@GOTPCREL(%rip), %r13
     mov  (%r13), %r13

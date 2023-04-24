@@ -3,7 +3,9 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"net"
 	"net/http"
+	"os"
 
 	"github.com/criblio/scope/promserver"
 	"github.com/spf13/cobra"
@@ -17,6 +19,25 @@ import (
  *
 */
 
+func getMetrics(laddr string) {
+	listen, err := net.Listen("tcp", laddr)
+	if err != nil {
+		log.Fatal("Listen:", err)
+		os.Exit(1)
+	}
+
+	defer listen.Close()
+
+	for {
+		conn, err := listen.Accept()
+		if err != nil {
+			log.Fatal("Accept", err)
+			os.Exit(1)
+		}
+		go promserver.Metrics(conn)
+	}
+}
+
 // promServerCmd represents a Prometheus target
 var promServerCmd = &cobra.Command {
 	Use:   "prom [flags]",
@@ -25,12 +46,15 @@ var promServerCmd = &cobra.Command {
 	Example: `scope prom --port 9100`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		port, _ := cmd.Flags().GetString("port")
-		filesrc, _ := cmd.Flags().GetString("filesrc")
+		sport, _ := cmd.Flags().GetString("sport")
+		mport, _ := cmd.Flags().GetString("mport")
 
-		laddr := fmt.Sprint("0.0.0.0:", port)
-		fmt.Printf("file source %v port %v connection %v\n", filesrc, port, laddr)
+		fmt.Printf("scraper port %v metric port %v\n", sport, mport)
 
+		laddr := fmt.Sprint("0.0.0.0:", mport)
+		go getMetrics(laddr)
+
+		laddr = fmt.Sprint("0.0.0.0:", sport)
 		http.HandleFunc("/metrics", promserver.Handler)
 		err := http.ListenAndServe(laddr, nil)
 		if err != nil {
@@ -40,8 +64,8 @@ var promServerCmd = &cobra.Command {
 }
 
 func init() {
-	promServerCmd.Flags().StringP("port", "p", "9100", "Port number to listen on for HTTP metrics requests")
-	promServerCmd.Flags().StringP("filesrc", "f", "", "Source directory for metrics data from scoped apps")
+	promServerCmd.Flags().StringP("sport", "s", "9090", "Port number to listen on for HTTP metrics requests")
+	promServerCmd.Flags().StringP("mport", "m", "9109", "Port number to listen on for metrics from libscope")
 	RootCmd.AddCommand(promServerCmd)
 }
 

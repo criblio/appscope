@@ -4,8 +4,8 @@ kubectl apply -f exporter.yml
 kubectl run redis --image=redis:alpine
 
 kubectl exec -it redis -- ash
-% mkdir =p /scope/metrics/1
-% mkdir =p /scope/metrics/2
+% mkdir -p /scope/metrics/1
+% mkdir -p /scope/metrics/2
 # copy paste mertrics data
 % vi /scope/metrics/1/metrics.json
 % vi /scope/metrics/2/metrics.json

@@ -19,11 +19,12 @@ import (
 
 // updateCmd represents the info command
 var updateCmd = &cobra.Command{
-	Use:     "update",
-	Short:   "Updates the configuration of a scoped process",
-	Long:    `Updates the configuration of a scoped process identified by PID.`,
-	Example: `scope update 1000 --config test_cfg.yml`,
-	Args:    cobra.ExactArgs(1),
+	Use:   "update",
+	Short: "Updates the configuration of a scoped process",
+	Long:  `Updates the configuration of a scoped process identified by PID.`,
+	Example: `scope update 1000 --config test_cfg.yml
+scope update 1000 < test_cfg.yml`,
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
 		prefix, _ := cmd.Flags().GetString("prefix")

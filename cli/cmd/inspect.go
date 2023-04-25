@@ -14,8 +14,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var pidCtx *ipc.IpcPidCtx = &ipc.IpcPidCtx{}
-
 // inspectCmd represents the inspect command
 var inspectCmd = &cobra.Command{
 	Use:   "inspect",
@@ -28,6 +26,7 @@ scope inspect --all`,
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
 		all, _ := cmd.Flags().GetBool("all")
+		prefix, _ := cmd.Flags().GetString("prefix")
 		// jsonOut, _ := cmd.Flags().GetBool("json")
 
 		// Nice message for non-adminstrators
@@ -37,6 +36,10 @@ scope inspect --all`,
 		}
 		if errors.Is(err, util.ErrMissingAdmPriv) {
 			util.Warn("INFO: Run as root (or via sudo) to get info from all processes")
+		}
+
+		pidCtx := &ipc.IpcPidCtx{
+			PrefixPath: prefix,
 		}
 
 		if all {
@@ -98,6 +101,8 @@ scope inspect --all`,
 }
 
 func init() {
-	ipcCmdFlags(inspectCmd, pidCtx)
+	inspectCmd.Flags().StringP("prefix", "p", "", "Prefix to proc filesystem")
+	inspectCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
+	inspectCmd.Flags().BoolP("all", "a", false, "Inspect all processes")
 	RootCmd.AddCommand(inspectCmd)
 }

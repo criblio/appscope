@@ -16,7 +16,7 @@ spec:
       containers:
       - name: pexport
         image: cribl/prom-exporter:latest
-        command: ["sleep", "infinity"]
+#       command: ["sleep", "infinity"]
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: prom-export

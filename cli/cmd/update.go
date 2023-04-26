@@ -37,7 +37,7 @@ scope update 1000 < test_cfg.yml`,
 			util.ErrAndExit("Unable to get current user: %v", err)
 		}
 		if errors.Is(err, util.ErrMissingAdmPriv) {
-			fmt.Println("INFO: Run as root (or via sudo) to get info from all processes")
+			util.Warn("INFO: Run as root (or via sudo) to get info from all processes")
 		}
 
 		var cfgBytes []byte

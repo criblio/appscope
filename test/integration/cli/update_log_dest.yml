@@ -1,0 +1,45 @@
+cribl:
+  enable: false
+  transport:
+    type: ""
+    tls:
+      enable: false
+      validateserver: false
+      cacertpath: ""
+  authtoken: ""
+event:
+  enable: true
+  format:
+    type: ndjson
+  transport:
+    type: file
+    path: /tmp/top_events.log
+    buffering: line
+    tls:
+      enable: false
+      validateserver: false
+      cacertpath: ""
+  watch:
+  - type: file
+    name: (\/logs?\/)|(\.log$)|(\.log[.\d])
+    value: .*
+  - type: console
+    name: (stdout|stderr)
+    value: .*
+    allowbinary: false
+  - type: net
+    name: .*
+    field: .*
+    value: .*
+  - type: fs
+    name: .*
+    field: .*
+    value: .*
+  - type: dns
+    name: .*
+    field: .*
+    value: .*
+  - type: http
+    name: .*
+    field: .*
+    value: .*

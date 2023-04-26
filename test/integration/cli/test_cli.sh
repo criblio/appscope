@@ -409,6 +409,56 @@ endtest
 #endtest
 
 
+#
+# Scope Update from stdin (same namespace)
+#
+starttest "Scope update from stdin"
+
+top -b -d 1 > /dev/null &
+top_pid=$!
+sleep 2
+
+scope --ldattach $top_pid
+returns 0
+sleep 2
+
+scope update $top_pid < /opt/test/bin/update_log_dest.yml
+returns 0
+sleep 3
+
+kill $top_pid
+sleep 2
+
+is_file /tmp/top_events.log
+
+endtest
+
+
+#
+# Scope Update from file path (same namespace)
+#
+starttest "Scope update from file path"
+
+top -b -d 1 > /dev/null &
+top_pid=$!
+sleep 2
+
+scope --ldattach $top_pid
+returns 0
+sleep 2
+
+scope update $top_pid --config /opt/test/bin/update_log_dest.yml
+returns 0
+sleep 3
+
+kill $top_pid
+sleep 2
+
+is_file /tmp/top_events.log
+
+endtest
+
+
 ################# END TESTS ################# 
 
 #

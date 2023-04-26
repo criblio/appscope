@@ -1,0 +1,14 @@
+version: '3.5'
+
+# cd test/manual/k8s
+# docker-compose build --build-args ARCH=$(uname -m)
+
+services:
+
+  prom-exporter:
+    image: cribl/prom-exporter
+    build:
+      context: ../../..
+      dockerfile: test/manual/k8s/Dockerfile.exporter
+
+# vim: ts=2 sw=2 et :

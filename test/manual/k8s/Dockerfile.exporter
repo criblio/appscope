@@ -1,4 +1,5 @@
 FROM ubuntu:22.04
+ARG ARCH="UNDEFINED_ARCH"
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt update \
@@ -12,3 +13,8 @@ RUN apt update \
       wget \
     && rm -rf /var/lib/apt/lists/*
 
+COPY ./bin/linux/$ARCH/scope /usr/local/bin
+
+# These args of prom are defaults.
+# Just making them explicit so they can be adjusted as needed.
+ENTRYPOINT ["/usr/local/bin/scope", "prom", "--mport", "9109", "--sport", "9090"]

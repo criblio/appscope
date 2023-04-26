@@ -48,16 +48,16 @@ scope update 1000 < test_cfg.yml`,
 			}
 			cfgBytes, err = os.ReadFile(cfgPath)
 			if err != nil {
-				util.ErrAndExit("Unable to read bytes from config path", err)
+				util.ErrAndExit("Unable to read bytes from config path: %v", err)
 			}
 		} else {
 			// User did not specigy a path to a config with --config. Try to read from StdIn
 			var scopeCfg libscope.ScopeConfig
 			if scopeCfg, err = update.GetCfgStdIn(); err != nil {
-				util.ErrAndExit("Unable to parse config from stdin", err)
+				util.ErrAndExit("Unable to parse config from stdin: %v", err)
 			}
 			if cfgBytes, err = yaml.Marshal(scopeCfg); err != nil {
-				util.ErrAndExit("Unable to marshal scope config into byte array", err)
+				util.ErrAndExit("Unable to marshal scope config into byte array: %v", err)
 			}
 		}
 

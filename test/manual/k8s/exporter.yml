@@ -22,6 +22,8 @@ spec:
         - name: prom-export
           mountPath: /hostfs
           readOnly: true
+        ports:
+        - containerPort: 9100
       volumes:
       - name: prom-export
         hostPath:

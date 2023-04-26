@@ -1,0 +1,92 @@
+1) kind create cluster
+   kubectl cluster-info --context kind-kind
+
+2) make build CMD="make all"
+   "make image" to create:
+      cribl/scope:dev
+
+3) Create the self-admission web hook, directing data to /scope/metrics/12345/metrics.json
+   kind load docker-image cribl/scope:dev
+   docker run -it --rm cribl/scope:dev scope k8s  -m file:///scope/metrics/12345/metrics.json -e file:///dev/null --metricformat prometheus | kubectl apply -f -
+
+4) kubectl label namespace default scope=enabled
+
+5) kubectl get pods --all-namespaces
+
+6) Get the prometheus exporter container running
+   docker build -t cribl/prom-exporter -f Dockerfile.exporter .
+   kind load docker-image cribl/prom-exporter:latest
+   kubectl apply -f exporter.yml                                exporter exposes port 9100 within cluster
+   kubectl get pods
+
+7) Get the prometheus exporter running inside that container
+   kubectl cp bin/linux/aarch64/scope default/prom-exporter-deployment-75f4c9c78d-5pfcg:/usr/local/bin/.
+   kubectl exec -it prom-exporter-deployment-75f4c9c78d-5pfcg -- bash
+   scope prom --port 9100
+
+8) Look at our metrics from the host
+   kubectl port-forward prom-exporter-deployment-75f4c9c78d-5pfcg 9100:9100
+   curl http://localhost:9100/metrics
+
+9) -not needed-
+   for comparison, we can see metrics from k8s itself by proxying to the k8s api server
+   kubectl proxy --port 9101
+   curl http://localhost:9101/metrics
+
+10) install an edge node on the host (Add/Update Source script)
+    configure the prometheus scraper:
+       Discovery Type = static
+       Target http://127.0.0.1:9100/metrics
+       Poll Interval to 1 too.
+
+11) create metric data
+   kubectl run -it redis --image=redis:alpine --command=true ash
+   mkdir -p /scope/metrics/12345
+   redis-server --port 6379 &
+
+12) if desired, remove the redis pod
+  kubectl delete -n default pod redis 
+
+
+13) kind delete cluster
+
+
+1) kind create cluster
+
+2) turn off the health pings with local repo
+  git clone git@github.com:criblio/helm-charts.git
+  cd helm-charts
+  edit helm-chart-sources/edge/values.yaml to comment out readinessProbe and livenessProbe
+  helm install -f ~/helm-charts/helm-chart-sources/edge/values.yaml --version "^4.1.1" --create-namespace -n "cribl" --set "cribl.leader=tls://DOKsQuASTQ5cCP4bx6YiNkQlVl9XJ3iX@main-eloquent-meninsky-8bjrhnd.cribl.cloud?group=default_fleet" "cribl-edge" ~/helm-charts/helm-chart-sources/edge
+
+
+2) start edge in that cluster
+  watch kubectl get pods --all-namespaces -o wide
+  Cut/Paste Add/Update Edge Node script from edge->default fleet
+  helm install --repo "https://criblio.github.io/helm-charts/" --version "^4.1.1" --create-namespace -n "cribl" --set "cribl.leader=tls://DOKsQuASTQ5cCP4bx6YiNkQlVl9XJ3iX@main-eloquent-meninsky-8bjrhnd.cribl.cloud?group=default_fleet" --set "cribl.readinessProbe=null" --set "cribl.livenessProbe=null" "cribl-edge" edge
+
+3) start the prometheus exporter in the cluster
+   scope prom --mport 9109 --sport 9100
+
+4) get the address of the prometheus exporter
+  kubectl get pods --all-namepaces -o wide
+
+5) start k8s command, with metrics pointing at the exporter
+  docker run -it --rm cribl/scope:dev scope k8s -m tcp://10.244.0.6:9109 -e file:///dev/null --metricformat prometheus | kubectl apply -f -
+  
+6) in edge, configure a prometheus scraper to hit port 9100 of the prometheus exporter
+
+7) start redis to see what happens.  Duck and cover.
+
+5) 
+  kubectl describe pod cribl-edge-wqplh
+  kubectl get event --namespace cribl
+
+  kubectl delete -n cribl DaemonSet/cribl-edge
+      For anyone else here, if using helm to manage your deployments, 
+      you need to set initialDelaySeconds it in the deployments.yaml template 
+      in the /templates folder under livenessProbe. The livenessProbe will 
+      force restart your pod if the probe cannot connect. 
+
+      helm show values cribl/edge
+      helm upgrade -f /home/ubuntu/helm-charts/helm-chart-sources/edge/values.yaml edge edge

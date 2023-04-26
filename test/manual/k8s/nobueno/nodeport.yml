@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prom-extern
+spec:
+  type: NodePort
+  ports:
+    - port: 9100
+      nodePort: 30000
+  selector:
+    name: prom-extern
+---
+

@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Pod
+
+cribl:
+  home: /opt/cribl
+  # if set, overrides cribl.leader value
+  existingSecretForLeader:
+  # CRIBL_DIST_MASTER_URL
+  leader:
+  # Bootstrap config
+  existingSecretForConfig:
+  config:
+  # cribl/local.yml:
+  #  foo: bar
+  readinessProbe:
+    httpGet:
+      path: /api/v1/health
+      port: 9420
+      scheme: HTTP
+    initialDelaySeconds: 15
+    timeoutSeconds: 1
+  livenessProbe:
+    httpGet:
+      path: /api/v1/health
+      port: 9420
+      scheme: HTTP
+    initialDelaySeconds: 15
+    timeoutSeconds: 1
+

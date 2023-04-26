@@ -1,0 +1,275 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: scope.default.appscope.io
+  labels:
+    app: scope
+webhooks:
+  - name: scope.default.appscope.io
+    sideEffects: None
+    admissionReviewVersions: ["v1", "v1beta1"]
+    matchPolicy: Equivalent
+    failurePolicy: Fail
+    clientConfig:
+      service:
+        name: scope
+        namespace: default
+        path: "/mutate"
+    rules:
+      - operations: [ "CREATE" ]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+        scope: "*"
+    namespaceSelector:
+      matchLabels:
+        scope: enabled
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: webhook-cert-setup
+  namespace: default
+spec:
+  template:
+    spec:
+      serviceAccountName: webhook-cert-sa
+      containers:
+      - name: webhook-cert-setup
+        # This is a minimal kubectl image based on Alpine Linux that signs certificates using the k8s extension api server
+        image: cribl/k8s-webhook-cert-manager:1.0.0
+        command: ["./generate_certificate.sh"]
+        args:
+          - "--service"
+          - "scope"
+          - "--webhook"
+          - "scope.default.appscope.io"
+          - "--secret"
+          - "scope-secret"
+          - "--namespace"
+          - "default"
+      restartPolicy: OnFailure
+  backoffLimit: 3
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: webhook-cert-cluster-role
+rules:
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["mutatingwebhookconfigurations"]
+    verbs: ["get", "create", "patch"]
+  - apiGroups: ["certificates.k8s.io"]
+    resources: ["certificatesigningrequests"]
+    verbs: ["create", "get", "delete"]
+  - apiGroups: ["certificates.k8s.io"]
+    resources: ["certificatesigningrequests/approval"]
+    verbs: ["update"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "get", "patch"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get"]
+  - apiGroups: ["certificates.k8s.io"]
+    resources: ["signers"]
+    resourceNames: ["kubernetes.io/kubelet-serving"]
+    verbs: ["approve"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: webhook-cert-cluster-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: webhook-cert-cluster-role
+subjects:
+  - kind: ServiceAccount
+    name: webhook-cert-sa
+    namespace: default
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: webhook-cert-sa
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: scope-cluster-role
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["scope"]
+    verbs: ["get", "patch", "put", "update"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: scope-cluster-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: scope-cluster-role
+subjects:
+  - kind: ServiceAccount
+    name: scope-cert-sa
+    namespace: default
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: scope-cert-sa
+  namespace: default
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scope
+  namespace: default
+  labels:
+    app: scope
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scope
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: scope
+    spec:
+      serviceAccountName: scope-cert-sa
+      containers:
+        - name: scope
+          image: cribl/scope:dev
+          command: ["/bin/bash"]
+          args:
+          - "-c"
+          - "/usr/local/bin/scope k8s --server --metricdest file:///scope/metrics/12345/metrics.json --metricformat prometheus --eventdest file:///dev/null || sleep 1000"
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: certs
+              mountPath: /etc/certs
+              readOnly: true
+          ports:
+            - containerPort: 4443
+              protocol: TCP
+      volumes:
+        - name: certs
+          secret:
+            secretName: scope-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: scope
+  namespace: default
+spec:
+  type: ClusterIP
+  ports:
+    - name: 4443-tcp
+      protocol: TCP
+      port: 443
+      targetPort: 4443
+  selector:
+    app: scope
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: scope
+  namespace: default
+data:
+  scope.yml: |
+    cribl:
+      enable: false
+      transport:
+        type: ""
+        tls:
+          enable: false
+          validateserver: false
+          cacertpath: ""
+      authtoken: ""
+    metric:
+      enable: true
+      format:
+        type: prometheus
+        verbosity: 4
+      transport:
+        type: file
+        path: /scope/metrics/12345/metrics.json
+        buffering: line
+        tls:
+          enable: false
+          validateserver: false
+          cacertpath: ""
+      watch:
+      - type: fs
+      - type: net
+      - type: http
+      - type: dns
+      - type: process
+      - type: statsd
+    event:
+      enable: true
+      format:
+        type: ndjson
+      transport:
+        type: file
+        path: /dev/null
+        buffering: line
+        tls:
+          enable: false
+          validateserver: false
+          cacertpath: ""
+      watch:
+      - type: file
+        name: (\/logs?\/)|(\.log$)|(\.log[.\d])
+        value: .*
+      - type: console
+        name: (stdout|stderr)
+        value: .*
+        allowbinary: false
+      - type: net
+        name: .*
+        field: .*
+        value: .*
+      - type: fs
+        name: .*
+        field: .*
+        value: .*
+      - type: dns
+        name: .*
+        field: .*
+        value: .*
+      - type: http
+        name: .*
+        field: .*
+        value: .*
+    libscope:
+      configevent: false
+      summaryperiod: 10
+      commanddir: /scope/cmd
+      log:
+        level: warning
+        transport:
+          type: file
+          path: /scope/libscope.log
+          buffering: line
+          tls:
+            enable: false
+            validateserver: false
+            cacertpath: ""
+      snapshot:
+        coredump: false
+        backtrace: false
+    

@@ -51,7 +51,7 @@ scope update 1000 < test_cfg.yml`,
 				util.ErrAndExit("Unable to read bytes from config path: %v", err)
 			}
 		} else {
-			// User did not specigy a path to a config with --config. Try to read from StdIn
+			// User did not specify a path to a config with --config. Try to read from StdIn
 			var scopeCfg libscope.ScopeConfig
 			if scopeCfg, err = update.GetCfgStdIn(); err != nil {
 				util.ErrAndExit("Unable to parse config from stdin: %v", err)

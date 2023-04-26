@@ -14,8 +14,8 @@ cd ~/appscope && make all && make image
 
 cd "${0%/*}"
 
-echo "--- Create a prom exporter container ---"
-docker build -t cribl/prom-exporter -f Dockerfile.exporter .
+echo "--- Create a prom exporter image ---"
+docker-compose build --build-arg ARCH=$(uname -m)
 
 echo "--- Create a new cluster ---"
 kind create cluster
@@ -29,14 +29,6 @@ echo "--- Start a prom exporter pod ---"
 kubectl apply -f exporter.yml #exp.yml
 #kubectl run prom --image=cribl/prom-exporter:latest
 sleep 2
-
-echo "--- Copy a current scope exec to the prom exporter pod ---"
-#prom=`kubectl get pods -o=name | grep prom`
-prom=`kubectl get pods --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}' | grep prom`
-kubectl cp ./bin/linux/aarch64/scope default/$prom:/usr/local/bin/.
-
-echo "--- Start a prom exporter ---"
-kubectl exec $prom -- scope prom &
 
 echo "--- Start Edge in the cluster ---"
 echo "### NOTE: the leader setting needs to be updated for a specific cloud instance ###"

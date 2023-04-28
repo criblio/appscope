@@ -49,7 +49,17 @@ var promServerCmd = &cobra.Command {
 		sport, _ := cmd.Flags().GetString("sport")
 		mport, _ := cmd.Flags().GetString("mport")
 
-		fmt.Printf("scraper port %v metric port %v\n", sport, mport)
+		promserver.Pmsg("scraper port", sport, "metric port", mport)
+
+		mfiles := promserver.GetMfiles()
+		for _, mpath := range mfiles {
+			promserver.Pmsg("Remove ", mpath)
+			err := os.Remove(mpath)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+		}
 
 		laddr := fmt.Sprint("0.0.0.0:", mport)
 		go getMetrics(laddr)

@@ -33,7 +33,7 @@ sleep 2
 echo "--- Copy a current scope exec to the prom exporter pod ---"
 #prom=`kubectl get pods -o=name | grep prom`
 prom=`kubectl get pods --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}' | grep prom`
-kubectl cp ./bin/linux/aarch64/scope default/$prom:/usr/local/bin/.
+kubectl cp ../../../bin/linux/aarch64/scope default/$prom:/usr/local/bin/.
 
 echo "--- Start a prom exporter ---"
 kubectl exec $prom -- scope prom &
@@ -44,10 +44,10 @@ helm install --repo "https://criblio.github.io/helm-charts/" --version "^4.1.1" 
 
 echo "--- Run scope k8s to start webhook and k8s server in cluster ---"
 echo "#### using prom $1 and Edge $2 ###"
-docker run -it --rm cribl/scope:dev scope k8s --metricformat prometheus -m tcp://$1  -e tcp://$2 | kubectl apply -f -
-sleep 2
-kubectl label namespace default scope=enabled
+docker run -it --rm cribl/scope:dev scope k8s --metricformat prometheus -m tcp://10.244.0.5:9109 -e tcp://10.244.0.6:10092 | kubectl apply -f -
 sleep 10
+kubectl label namespace default scope=enabled
+sleep 2
 
 echo "--- Start an app as source of events & metrics ---"
 kubectl run redis --image=redis:alpine

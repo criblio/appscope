@@ -1825,21 +1825,10 @@ init(void)
         reportProcessStart(g_ctl, TRUE, CFG_WHICH_MAX);
         doProcStartMetric();
 
-        if (g_isgo) {
+        if (g_isgo || attachedFlag || g_ismusl) {
             threadNow(0);
-        } else if (g_ismusl == FALSE) {
-            /*
-             * The check here is meant to be temporary.
-             * The behavior of timer_delete() in musl libc
-             * is different than that of gnu libc.
-             * Therefore, until that is investigated we don't
-             * enable a timer/signal.
-             */
-            if (attachedFlag) {
-                threadNow(0);
-            } else {
-                threadInit();
-            }
+        } else {
+            threadInit();
         }
     } else {
         /*

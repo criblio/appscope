@@ -126,7 +126,7 @@ services:
       cache_from:
         - ghcr.io/criblio/appscope-test-go_9:${TAG:?Missing TAG environment variable}
       context: .
-      dockerfile: ./go/Dockerfile
+      dockerfile: ./go/Dockerfile.stretch
       args:
         GO_IMAGE_VER: golang:1.9
     <<: *scope-common
@@ -136,7 +136,7 @@ services:
       cache_from:
         - ghcr.io/criblio/appscope-test-go_10:${TAG:?Missing TAG environment variable}
       context: .
-      dockerfile: ./go/Dockerfile
+      dockerfile: ./go/Dockerfile.stretch
       args:
         GO_IMAGE_VER: golang:1.10
     <<: *scope-common

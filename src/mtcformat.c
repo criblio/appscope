@@ -12,9 +12,6 @@
 #include "com.h"
 #include "scopestdlib.h"
 
-// Is default. SCOPE_PROM_LEN_MAX env var exists for testability, but is
-// not currently documented for end users.
-#define PROM_LEN_MAX 1024
 
 struct _mtc_fmt_t
 {
@@ -23,9 +20,6 @@ struct _mtc_fmt_t
         char* prefix;
         unsigned max_len;       // Max length in bytes of a statsd string
     } statsd;
-    struct {
-        unsigned max_len;
-    } prom;
     unsigned verbosity;
     custom_tag_t** tags;
 };
@@ -45,20 +39,8 @@ mtcFormatCreate(cfg_mtc_format_t format)
     f->format = format;
     f->statsd.prefix = (DEFAULT_STATSD_PREFIX) ? scope_strdup(DEFAULT_STATSD_PREFIX) : NULL;
     f->statsd.max_len = DEFAULT_STATSD_MAX_LEN;
-    f->prom.max_len = PROM_LEN_MAX;
     f->verbosity = DEFAULT_MTC_VERBOSITY;
     f->tags = DEFAULT_CUSTOM_TAGS;
-
-    // Allow override of default prometheus value
-    char *prom_max_len = getenv("SCOPE_PROM_LEN_MAX");
-    if (prom_max_len) {
-        unsigned long len;
-        scope_errno = 0;
-        len = scope_strtoul(prom_max_len, NULL, 10);
-        if (!scope_errno && (len > 0) && (len < PROM_LEN_MAX)) {
-            f->prom.max_len = len;
-        }
-    }
 
     return f;
 }
@@ -275,95 +257,78 @@ mtcFormatStatsDString(mtc_fmt_t* fmt, event_t* e, regex_t* fieldFilter)
     return end_start;
 }
 
-static int
-createPromFieldString(mtc_fmt_t *fmt, event_field_t *f, char *tag)
+static bool
+appendPromField(FILE *stream, mtc_fmt_t *fmt, event_field_t *field, strset_t *addedFields)
 {
-    if (!fmt || !f || !tag) return -1;
+    if (!fmt || !field) return FALSE;
 
-    int sz;
+    char delim;
+    if (strSetEntryCount(addedFields) == 1) {
+        delim= '{';
+    } else {
+        delim= ',';
+    }
 
-    switch (f->value_type) {
+    int retVal = -1;
+    switch (field->value_type) {
         case FMT_NUM:
-            sz = scope_snprintf(tag, PROM_LEN_MAX, "%s=\"%lli\"", f->name, f->value.num);
+            retVal = scope_fprintf(stream, "%c%s=\"%lli\"", delim, field->name, field->value.num);
             break;
         case FMT_STR:
-            if (!f->value.str) return -1;
-            sz = scope_snprintf(tag, PROM_LEN_MAX, "%s=\"%s\"", f->name, f->value.str);
+            retVal = scope_fprintf(stream, "%c%s=\"%s\"", delim, field->name, field->value.str);
             break;
         default:
-            DBG("%d %s", f->value_type, f->name);
-            sz = -1;
+            DBG("%d %s", field->value_type, field->name);
     }
-    return sz;
+    return retVal >= 0;
 }
 
-static void
-appendPromFieldString(mtc_fmt_t *fmt, char *tag, int sz, char **end, int *bytes, strset_t *addedFields)
+static bool
+addPromFields(mtc_fmt_t *fmt, event_field_t *fields, FILE *stream, strset_t *addedFields, regex_t *fieldFilter)
 {
-    sz += 1; // add space for the '{' or ','
-    if ((*bytes + sz) >= fmt->prom.max_len) return;
+    if (!fmt || !stream) return FALSE;
+    if (!fields) return TRUE;            // ok, just no fields to add
 
-    if (strSetEntryCount(addedFields) == 1) {
-        *end = scope_stpcpy(*end, "{");
-    } else {
-        *end = scope_stpcpy(*end, ",");
-    }
+    event_field_t *field;
+    for (field = fields; field->value_type != FMT_END; field++) {
 
-    *end = scope_stpcpy(*end, tag);
-    *bytes += sz;
-}
+        if (fieldFilter && regexec_wrapper(fieldFilter, field->name, 0, NULL, 0)) continue;
 
-
-static void
-addPromFields(mtc_fmt_t *fmt, event_field_t *fields, char **end, int *bytes, strset_t *addedFields, regex_t *fieldFilter)
-{
-    if (!fmt || !fields || ! end || !*end || !bytes) return;
-
-    char tag[PROM_LEN_MAX+1];
-    tag[PROM_LEN_MAX] = '\0'; // Ensures null termination
-    int sz;
-
-    event_field_t *f;
-    for (f = fields; f->value_type != FMT_END; f++) {
-
-        if (fieldFilter && regexec_wrapper(fieldFilter, f->name, 0, NULL, 0)) continue;
+        // Skip empty values
+        if (field->value_type == FMT_STR && !field->value.str) continue;
 
         // Honor Verbosity
-        if (f->cardinality > fmt->verbosity) continue;
+        if (field->cardinality > fmt->verbosity) continue;
 
         // Don't allow duplicate field names
-        if (!strSetAdd(addedFields, f->name)) continue;
+        if (!strSetAdd(addedFields, field->name)) continue;
 
-        sz = createPromFieldString(fmt, f, tag);
-        if (sz < 0) continue;
-
-        appendPromFieldString(fmt, tag, sz, end, bytes, addedFields);
+        if (!appendPromField(stream, fmt, field, addedFields)) return FALSE;
     }
+
+    return TRUE;
 }
 
-static void
-addPromCustomFields(mtc_fmt_t *fmt, custom_tag_t **tags, char **end, int *bytes, strset_t *addedFields)
+static bool
+addPromCustomFields(mtc_fmt_t *fmt, custom_tag_t **tags, FILE *stream, strset_t *addedFields)
 {
-    if (!fmt || !tags || !*tags || !end || !*end || !bytes) return;
+    if (!fmt || !stream) return FALSE;
+    if (!tags || !*tags) return TRUE;    // ok, just no fields to add
 
-    char tag[PROM_LEN_MAX+1];
-    tag[PROM_LEN_MAX] = '\0'; // Ensures null termination
-    int sz;
-
-    custom_tag_t *t;
+    custom_tag_t *tag;
     int i = 0;
-    while ((t = tags[i++])) {
+    while ((tag = tags[i++])) {
 
         // Don't allow duplicate field names
-        if (!strSetAdd(addedFields, t->name)) continue;
+        if (!strSetAdd(addedFields, tag->name)) continue;
 
         // No verbosity setting exists for custom fields.
 
-        sz = scope_snprintf(tag, PROM_LEN_MAX, "%s=\"%s\"", t->name, t->value);
-        if (sz < 0) break;
-
-        appendPromFieldString(fmt, tag, sz, end, bytes, addedFields);
+        event_field_t f = STRFIELD(tag->name, tag->value, 0, TRUE);
+        if (!appendPromField(stream, fmt, &f, addedFields)) return FALSE;
     }
+
+    return TRUE;
 }
 
 static const char *
@@ -380,93 +345,69 @@ mtcFormatPromString(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
 {
     if (!fmt || !evt) return NULL;
 
-    char *p, *end, *start = scope_calloc(1, fmt->prom.max_len);
-    if (!start) goto err;
-    end = start;
+    bool completely_successful = FALSE;
+    char *name = NULL;
+    FILE *stream = NULL;
+    char *prom_str = NULL;
+    size_t size = 0;
+    strset_t *addedFields = NULL;
+
+    // memstream, just to let it manage growth in prom_str as needed.
+    stream = scope_open_memstream(&prom_str, &size);
+    if (!stream || !prom_str) goto out;
 
     // Copy metric name into a buffer, then convert "." to "_".
-    // TBD - may choose to add statsd prefix here...
-    char strbuf[512];
-    int strsize = scope_strlen(evt->name);
-    if (strsize >= sizeof(strbuf)) {
-        DBG("Prom name length (%d) exceeded limit of %d", strsize, sizeof(strbuf));
-        goto err;
+    if (scope_asprintf(&name, "%s%s", fmt->statsd.prefix, evt->name) < 0) {
+        name = NULL;
+        goto out;
     }
-    scope_strcpy(strbuf, evt->name);
-    for (p=strbuf; *p!='\0'; p++) {
-        if (*p=='.') *p='_';
+    char *ptr;
+    for (ptr=name; *ptr!='\0'; ptr++) {
+        if (*ptr=='.') *ptr='_';
     }
 
-    // Make sure the TYPE comment line fits.
-    int bytes = 1;                          // allow for the trailing null.
-    bytes += sizeof("# TYPE ");
-    bytes += strsize;
-    bytes += sizeof(" ");
-    const char *type = promTypeStr(evt->type);
-    bytes += scope_strlen(type);
-    bytes += sizeof("\n");
-    if (bytes > fmt->prom.max_len) {
-        DBG("Prom comment needed %d, but only had %d", bytes, fmt->prom.max_len);
-        goto err;
+    // Add the TYPE comment line
+    if (scope_fprintf(stream, "# TYPE %s %s\n", name, promTypeStr(evt->type) ) < 0) goto out;
+    // Add the metric, start with the name
+    if (scope_fprintf(stream, "%s", name) < 0) goto out;
+
+
+    // Add fields to the metric
+    if (!(addedFields = strSetCreate(DEFAULT_SET_SIZE))) goto out;
+    if (!addPromFields(fmt, evt->capturedFields, stream, addedFields, NULL)) goto out;
+    if (!addPromCustomFields(fmt, fmt->tags, stream, addedFields)) goto out;
+    if (!addPromFields(fmt, evt->fields, stream, addedFields, fieldFilter)) goto out;
+    if (strSetEntryCount(addedFields) >= 1) {
+        if (scope_fprintf(stream, "}") < 0) goto out;
     }
 
-    // The TYPE comment line fits. Add it.
-    end = scope_stpcpy(end, "# TYPE ");
-    end = scope_stpcpy(end, strbuf);
-    end = scope_stpcpy(end, " ");
-    end = scope_stpcpy(end, type);
-    end = scope_stpcpy(end, "\n");
-
-    // Make sure the metric name fits and add it
-    bytes += strsize;
-    if (bytes > fmt->prom.max_len) {
-        DBG("Prom name length (%d) doesn't fit.", strsize);
-        goto err;
-    }
-    end = scope_stpcpy(end, strbuf);
-
-    // Reuse strbuf, this time to store the metric value
+    // Add the value to the metric
     switch ( evt->value.type ) {
         case FMT_INT:
-            strsize = scope_sprintf(strbuf, " %lli\n", evt->value.integer);
+            if (scope_fprintf(stream, " %lli\n", evt->value.integer) < 0) goto out;
             break;
         case FMT_FLT:
-            strsize = scope_sprintf(strbuf, " %.2f\n", evt->value.floating);
+            if (scope_fprintf(stream, " %.2f\n", evt->value.floating) < 0) goto out;
             break;
         default:
             DBG(NULL);
     }
-    if (strsize < 0) {
-        goto err;
+
+    // Prometheus metric timestamps are optional.
+    // If desired, here's the spot to add them.
+
+    completely_successful = TRUE;
+
+out:
+    if (stream) scope_fclose(stream);
+    if (name) scope_free(name);
+    if (!completely_successful) {
+        DBG("%d %s", evt->value.type, evt->name);
+        if (prom_str) scope_free(prom_str);
+        prom_str = NULL;
     }
-
-    // Reserve space for the metric value (before we add any fields)
-    bytes += strsize;
-    if (bytes > fmt->prom.max_len) {
-        DBG("Prom value length (%d) doesn't fit.", strsize);
-        goto err;
-    }
-
-    // Add fields.  If there isn't space, some may be ommitted.
-    strset_t *addedFields = strSetCreate(DEFAULT_SET_SIZE);
-    if (addedFields) {
-        bytes += sizeof("}"); // reserve space for the trailing '}'
-        addPromFields(fmt, evt->capturedFields, &end, &bytes, addedFields, NULL);
-        addPromCustomFields(fmt, fmt->tags, &end, &bytes, addedFields);
-        addPromFields(fmt, evt->fields, &end, &bytes, addedFields, fieldFilter);
-        if (strSetEntryCount(addedFields) >= 1) {
-            end = scope_stpcpy(end, "}");
-        }
-        strSetDestroy(&addedFields);
-    }
-
-    // Finally add the metric value.  We've reserved space for it above.
-    end = scope_stpcpy(end, strbuf);
-
-    return start;
-err:
-    if (start) scope_free(start);
-    return NULL;
+    strSetDestroy(&addedFields);
+    return prom_str;
 }
 
 char *

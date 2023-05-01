@@ -38,7 +38,7 @@ enum go_arch_t {
 };
 
 #if defined (__x86_64__)
-   #define MIN_SUPPORTED_GO_VER (9)
+   #define MIN_SUPPORTED_GO_VER (11)
    #define END_INST "int3"
    #define CALL_INST "call"
    #define SYSCALL_INST "syscall"
@@ -83,7 +83,7 @@ int g_go_maint_ver = UNKNOWN_GO_VER;
 int g_arch = ARCH;
 static char g_go_build_ver[7];
 static char g_ReadFrame_addr[20];
-go_schema_t *g_go_schema = &go_9_schema; // overridden if later version
+go_schema_t *g_go_schema = &go_11_schema; // overridden if later version
 uint64_t g_glibc_guard = 0LL;
 uint64_t go_systemstack_switch;
 uint64_t g_syscall_return = 0;
@@ -109,7 +109,7 @@ tap_t g_tap[] = {
     {tap_end,                  "",                                        NULL,                             NULL, 0},
 };
 
-go_schema_t go_9_schema = {
+go_schema_t go_11_schema = {
     .arg_offsets = {
         .c_syscall_rc=                 0x0,
         .c_syscall_num=                0x60,
@@ -296,20 +296,6 @@ adjustGoStructOffsetsForVersion()
     if (!g_go_minor_ver) {
         sysprint("ERROR: can't determine minor go version\n");
         return;
-    }
-
-    if (g_go_minor_ver == 10) {
-        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
-        g_go_schema->arg_offsets.c_http2_server_read_sc=0x188;
-        g_go_schema->arg_offsets.c_http2_server_preface_callee=0x108;
-        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
-        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
-        g_go_schema->struct_offsets.cc_to_fr=0xd0;
-    }
-
-    if (g_go_minor_ver < 11) {
-        g_go_schema->arg_offsets.c_signal_sig=0x8;
-        g_go_schema->arg_offsets.c_signal_info=0x10;
     }
 
     if (g_go_minor_ver < 12) {

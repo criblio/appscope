@@ -76,7 +76,7 @@ func Metrics(conn net.Conn) {
 
 	fname, err := os.CreateTemp("", "scope-metrics-*")
 	if err != nil {
-		util.ErrAndExit("Open temp file:", err)
+		util.ErrAndExit("Open temp file: %s", err)
 		return
 	}
 
@@ -97,13 +97,13 @@ func Metrics(conn net.Conn) {
 		// Read lines from the connection
 		line, err := reader.ReadString('\n')
 		if err != nil {
-			log.Error().Msgf("Error reading from connection:", err)
+			log.Error().Msgf("Error reading from connection: %s", err)
 			break
 		}
 
 		tfile, err := os.OpenFile(fname.Name(), os.O_RDWR|os.O_APPEND, 0666)
 		if err != nil {
-			log.Error().Msgf("Open temp file:", err)
+			log.Error().Msgf("Open temp file: %s", err)
 			return
 		}
 
@@ -113,7 +113,7 @@ func Metrics(conn net.Conn) {
 		_, err = tfile.WriteString(line)
 		if err != nil {
 			// Continue to read more?
-			log.Error().Msgf("Write:", err)
+			log.Error().Msgf("Write: %s", err)
 		}
 
 		_ = syscall.Flock(fd, syscall.LOCK_UN)

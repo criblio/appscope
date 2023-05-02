@@ -22,7 +22,7 @@ import (
 func getMetrics(laddr string) {
 	listen, err := net.Listen("tcp", laddr)
 	if err != nil {
-		util.ErrAndExit("Listen:", err)
+		util.ErrAndExit("Listen: %s", err)
 		os.Exit(1)
 	}
 
@@ -31,7 +31,7 @@ func getMetrics(laddr string) {
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
-			util.ErrAndExit("Accept", err)
+			util.ErrAndExit("Accept %s", err)
 		}
 		go promserver.Metrics(conn)
 	}
@@ -66,7 +66,7 @@ var promServerCmd = &cobra.Command{
 		http.HandleFunc("/metrics", promserver.Handler)
 		err := http.ListenAndServe(laddr, nil)
 		if err != nil {
-			util.ErrAndExit("ListenAndServe: ", err)
+			util.ErrAndExit("ListenAndServe: %s", err)
 		}
 	},
 }

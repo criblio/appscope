@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/criblio/scope/history"
-	"github.com/criblio/scope/ipc"
 	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
@@ -65,10 +64,4 @@ func runCmdFlags(cmd *cobra.Command, rc *run.Config) {
 	cmd.Flags().BoolVarP(&rc.Coredump, "coredump", "d", false, "Enable core dump file generation when an application crashes.")
 	cmd.Flags().BoolVarP(&rc.Backtrace, "backtrace", "b", false, "Enable backtrace file generation when an application crashes.")
 	metricAndEventDestFlags(cmd, rc)
-}
-
-func ipcCmdFlags(cmd *cobra.Command, ipc *ipc.IpcPidCtx) {
-	cmd.Flags().StringVarP(&ipc.PrefixPath, "prefix", "p", "", "Prefix to proc filesystem")
-	cmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
-	cmd.Flags().BoolP("all", "a", false, "Inspect all processes")
 }

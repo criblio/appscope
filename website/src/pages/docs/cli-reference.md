@@ -667,11 +667,13 @@ Updates configuration of scoped process identified by PID.
 #### Examples
 
 `scope update 1000 --config test_cfg.yml`
+`scope update 1000 < test_cfg.yml`
 
 #### Flags
 
 ```
 Flags:
+  -f, --fetch           Inspect the process after the update is complete
   -c, --config string   Path to configuration file
   -h, --help            help for update
   -p, --prefix string   Prefix to /proc filesystem

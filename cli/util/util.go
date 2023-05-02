@@ -83,6 +83,15 @@ func ErrAndExit(format string, a ...interface{}) {
 	os.Exit(1)
 }
 
+// Warn writes a format string to stderr
+func Warn(format string, a ...interface{}) {
+	out := fmt.Sprintf(format, a...)
+	if out[len(out)-1:] != "\n" {
+		out += "\n"
+	}
+	os.Stderr.WriteString(out)
+}
+
 // CheckFileExists checks if a file exists on the filesystem
 func CheckFileExists(filePath string) bool {
 	if _, err := os.Stat(os.ExpandEnv(filePath)); err == nil { // File exists, no errors

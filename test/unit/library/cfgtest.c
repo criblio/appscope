@@ -9,7 +9,7 @@
 
 
 static void
-verifyDefaults(config_t* config)
+verifyDefaults(config_t *config)
 {
     assert_int_equal       (cfgMtcEnable(config), DEFAULT_MTC_ENABLE);
     assert_int_equal       (cfgMtcFormat(config), DEFAULT_MTC_FORMAT);
@@ -85,10 +85,10 @@ verifyDefaults(config_t* config)
 }
 
 static void
-cfgCreateDefaultReturnsValidPtr(void** state)
+cfgCreateDefaultReturnsValidPtr(void **state)
 {
     // construction returns non-null ptr
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     assert_non_null (config);
 
     // cleanup
@@ -97,10 +97,10 @@ cfgCreateDefaultReturnsValidPtr(void** state)
 }
 
 static void
-accessorValuesForDefaultConfigAreAsExpected(void** state)
+accessorValuesForDefaultConfigAreAsExpected(void **state)
 {
     // defaults via accessors of the config object
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     verifyDefaults(config);
 
     // cleanup
@@ -109,16 +109,16 @@ accessorValuesForDefaultConfigAreAsExpected(void** state)
 }
 
 static void
-accessorsReturnDefaultsWhenConfigIsNull(void** state)
+accessorsReturnDefaultsWhenConfigIsNull(void **state)
 {
     // Implicitly this verifies no crashes when trying to access a null object
     verifyDefaults(NULL);
 }
 
 static void
-cfgMtcEnableSetAndGet(void** state)
+cfgMtcEnableSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgMtcEnableSet(config, TRUE);
     assert_int_equal(cfgMtcEnable(config), TRUE);
     cfgMtcEnableSet(config, FALSE);
@@ -132,22 +132,24 @@ cfgMtcEnableSetAndGet(void** state)
 }
 
 static void
-cfgMtcFormatSetAndGet(void** state)
+cfgMtcFormatSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgMtcFormatSet(config, CFG_FMT_NDJSON);
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_NDJSON);
     cfgMtcFormatSet(config, CFG_FMT_STATSD);
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_STATSD);
+    cfgMtcFormatSet(config, CFG_FMT_PROMETHEUS);
+    assert_int_equal(cfgMtcFormat(config), CFG_FMT_PROMETHEUS);
     cfgMtcFormatSet(config, CFG_FMT_NDJSON);
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_NDJSON);
     cfgDestroy(&config);
 }
 
 static void
-cfgMtcStatsDPrefixSetAndGet(void** state)
+cfgMtcStatsDPrefixSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgMtcStatsDPrefixSet(config, "heywithdot.");
     assert_string_equal(cfgMtcStatsDPrefix(config), "heywithdot.");
     cfgMtcStatsDPrefixSet(config, "heywithoutdot");
@@ -160,9 +162,9 @@ cfgMtcStatsDPrefixSetAndGet(void** state)
 }
 
 static void
-cfgMtcStatsDMaxLenSetAndGet(void** state)
+cfgMtcStatsDMaxLenSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgMtcStatsDMaxLenSet(config, 0);
     assert_int_equal(cfgMtcStatsDMaxLen(config), 0);
     cfgMtcStatsDMaxLenSet(config, UINT_MAX);
@@ -171,9 +173,9 @@ cfgMtcStatsDMaxLenSetAndGet(void** state)
 }
 
 static void
-cfgMtcVerbositySetAndGet(void** state)
+cfgMtcVerbositySetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     int i;
     for (i=0; i<=CFG_MAX_VERBOSITY+1; i++) {
         cfgMtcVerbositySet(config, i);
@@ -188,9 +190,9 @@ cfgMtcVerbositySetAndGet(void** state)
 }
 
 static void
-cfgMtcPeriodSetAndGet(void** state)
+cfgMtcPeriodSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgMtcPeriodSet(config, 0);
     assert_int_equal(cfgMtcPeriod(config), 0);
     cfgMtcPeriodSet(config, UINT_MAX);
@@ -199,7 +201,7 @@ cfgMtcPeriodSetAndGet(void** state)
 }
 
 static void
-cfgMtcWatchEnableSetAndGet(void** state)
+cfgMtcWatchEnableSetAndGet(void **state)
 {
     config_t *config = cfgCreateDefault();
 
@@ -223,9 +225,9 @@ cfgMtcWatchEnableSetAndGet(void** state)
 }
 
 static void
-cfgCmdDirSetAndGet(void** state)
+cfgCmdDirSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgCmdDirSet(config, "/some/path");
     assert_string_equal(cfgCmdDir(config), "/some/path");
     cfgCmdDirSet(config, NULL);
@@ -234,9 +236,9 @@ cfgCmdDirSetAndGet(void** state)
 }
 
 static void
-cfgSendProcessStartMsgSetAndGet(void** state)
+cfgSendProcessStartMsgSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgSendProcessStartMsgSet(config, TRUE);
     assert_int_equal(cfgSendProcessStartMsg(config), TRUE);
 
@@ -251,9 +253,9 @@ cfgSendProcessStartMsgSetAndGet(void** state)
 }
 
 static void
-cfgEvtEnableSetAndGet(void** state)
+cfgEvtEnableSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgEvtEnableSet(config, TRUE);
     assert_int_equal(cfgEvtEnable(config), TRUE);
     cfgEvtEnableSet(config, FALSE);
@@ -267,22 +269,24 @@ cfgEvtEnableSetAndGet(void** state)
 }
 
 static void
-cfgEventFormatSetAndGet(void** state)
+cfgEventFormatSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgEventFormatSet(config, CFG_FMT_STATSD);
     assert_int_equal(cfgEventFormat(config), CFG_FMT_STATSD);
     cfgEventFormatSet(config, CFG_FMT_NDJSON);
     assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
+    cfgEventFormatSet(config, CFG_FMT_PROMETHEUS);
+    assert_int_equal(cfgEventFormat(config), CFG_FMT_PROMETHEUS);
     cfgEventFormatSet(config, CFG_FMT_NDJSON);
     assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
     cfgDestroy(&config);
 }
 
 static void
-cfgEvtRateLimitSetAndGet(void** state)
+cfgEvtRateLimitSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgEvtRateLimitSet(config, 0);
     assert_int_equal(cfgEvtRateLimit(config), 0);
     cfgEvtRateLimitSet(config, 1);
@@ -293,9 +297,9 @@ cfgEvtRateLimitSetAndGet(void** state)
 }
 
 static void
-cfgEnhanceFsSetAndGet(void** state)
+cfgEnhanceFsSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgEnhanceFsSet(config, 0);
     assert_int_equal(cfgEnhanceFs(config), 0);
     cfgEnhanceFsSet(config, 1);
@@ -304,7 +308,7 @@ cfgEnhanceFsSetAndGet(void** state)
 }
 
 static void
-cfgEvtAllowBinaryConsoleSetAndGet(void** state)
+cfgEvtAllowBinaryConsoleSetAndGet(void **state)
 {
     config_t *config = cfgCreateDefault();
     cfgEvtAllowBinaryConsoleSet(config, TRUE);
@@ -323,17 +327,17 @@ cfgEvtAllowBinaryConsoleSetAndGet(void** state)
 typedef struct
 {
     watch_t   src;
-    const char* default_value;
-    const char* default_field;
-    const char* default_name;
+    const char *default_value;
+    const char *default_field;
+    const char *default_name;
 } source_state_t;
 
 static void
-cfgEvtFormatValueFilterSetAndGet(void** state)
+cfgEvtFormatValueFilterSetAndGet(void **state)
 {
-    source_state_t* data = (source_state_t*)state[0];
+    source_state_t *data = (source_state_t*)state[0];
 
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgEvtFormatValueFilterSet(config, data->src, ".*\\.log$");
     assert_string_equal(cfgEvtFormatValueFilter(config, data->src), ".*\\.log$");
     cfgEvtFormatValueFilterSet(config, data->src, "^/var/log/.*");
@@ -344,11 +348,11 @@ cfgEvtFormatValueFilterSetAndGet(void** state)
 }
 
 static void
-cfgEvtFormatFieldFilterSetAndGet(void** state)
+cfgEvtFormatFieldFilterSetAndGet(void **state)
 {
-    source_state_t* data = (source_state_t*)state[0];
+    source_state_t *data = (source_state_t*)state[0];
 
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgEvtFormatFieldFilterSet(config, data->src, ".*\\.log$");
     assert_string_equal(cfgEvtFormatFieldFilter(config, data->src), ".*\\.log$");
     cfgEvtFormatFieldFilterSet(config, data->src, "^/var/log/.*");
@@ -359,11 +363,11 @@ cfgEvtFormatFieldFilterSetAndGet(void** state)
 }
 
 static void
-cfgEvtFormatNameFilterSetAndGet(void** state)
+cfgEvtFormatNameFilterSetAndGet(void **state)
 {
-    source_state_t* data = (source_state_t*)state[0];
+    source_state_t *data = (source_state_t*)state[0];
 
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgEvtFormatNameFilterSet(config, data->src, ".*\\.log$");
     assert_string_equal(cfgEvtFormatNameFilter(config, data->src), ".*\\.log$");
     cfgEvtFormatNameFilterSet(config, data->src, "^/var/log/.*");
@@ -374,9 +378,9 @@ cfgEvtFormatNameFilterSetAndGet(void** state)
 }
 
 static void
-cfgEvtFormatSourceEnabledSetAndGet(void** state)
+cfgEvtFormatSourceEnabledSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
 
     // 2 is outside of allowed range; should be ignored.
     int i, j;
@@ -478,10 +482,10 @@ cfgEvtFormatSourceEnabledSetAndGet(void** state)
 }
 
 static void
-cfgTransportTypeSetAndGet(void** state)
+cfgTransportTypeSetAndGet(void **state)
 {
     which_transport_t t = *(which_transport_t*)state[0];
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgTransportTypeSet(config, t, CFG_UDP);
     assert_int_equal(cfgTransportType(config, t), CFG_UDP);
     cfgTransportTypeSet(config, t, CFG_UNIX);
@@ -494,10 +498,10 @@ cfgTransportTypeSetAndGet(void** state)
 }
 
 static void
-cfgTransportHostSetAndGet(void** state)
+cfgTransportHostSetAndGet(void **state)
 {
     which_transport_t typeMtcCtlLog = *(which_transport_t*)state[0];
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
 
     // You can no longer hardcode host/port
     cfgTransportTypeSet(config, typeMtcCtlLog, CFG_UDP);
@@ -512,10 +516,10 @@ cfgTransportHostSetAndGet(void** state)
 }
 
 static void
-cfgTransportPortSetAndGet(void** state)
+cfgTransportPortSetAndGet(void **state)
 {
     which_transport_t typeMtcCtlLog = *(which_transport_t*)state[0];
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
 
     // You can no longer hardcode host/port
     cfgTransportTypeSet(config, typeMtcCtlLog, CFG_UDP);
@@ -528,10 +532,10 @@ cfgTransportPortSetAndGet(void** state)
 }
 
 static void
-cfgTransportPathSetAndGet(void** state)
+cfgTransportPathSetAndGet(void **state)
 {
     which_transport_t t = *(which_transport_t*)state[0];
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgTransportPathSet(config, t, "/tmp/mysock");
     assert_string_equal(cfgTransportPath(config, t), "/tmp/mysock");
     cfgTransportPathSet(config, t, NULL);
@@ -540,10 +544,10 @@ cfgTransportPathSetAndGet(void** state)
 }
 
 static void
-cfgTransportBufSetAndGet(void** state)
+cfgTransportBufSetAndGet(void **state)
 {
     which_transport_t t = *(which_transport_t*)state[0];
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgTransportBufSet(config, t, CFG_BUFFER_LINE);
     assert_int_equal(cfgTransportBuf(config, t), CFG_BUFFER_LINE);
     cfgTransportBufSet(config, t, CFG_BUFFER_FULLY);
@@ -559,9 +563,9 @@ cfgTransportBufSetAndGet(void** state)
 
 
 static void
-cfgCustomTagsSetAndGet(void** state)
+cfgCustomTagsSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     assert_null(cfgCustomTags(config));
     int i;
     for (i=0; i<10; i++) {
@@ -573,7 +577,7 @@ cfgCustomTagsSetAndGet(void** state)
         assert_false(cfgCustomTagValue(config, name));
         cfgCustomTagAdd(config, name, value);
         assert_string_equal(cfgCustomTagValue(config, name), value);
-        custom_tag_t** tags = cfgCustomTags(config);
+        custom_tag_t **tags = cfgCustomTags(config);
         assert_non_null(tags[i]);
         assert_string_equal(tags[i]->name, name);
         assert_string_equal(tags[i]->value, value);
@@ -594,18 +598,18 @@ cfgCustomTagsSetAndGet(void** state)
 }
 
 static void
-cfgLoggingSetAndGet(void** state)
+cfgLoggingSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgLogLevelSet(config, CFG_LOG_DEBUG);
     assert_int_equal(cfgLogLevel(config), CFG_LOG_DEBUG);
     cfgDestroy(&config);
 }
 
 static void
-cfgLogLevelSetAndGet(void** state)
+cfgLogLevelSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgLogLevelSet(config, CFG_LOG_DEBUG);
     assert_int_equal(cfgLogLevel(config), CFG_LOG_DEBUG);
     cfgLogLevelSet(config, CFG_LOG_INFO);
@@ -620,9 +624,9 @@ cfgLogLevelSetAndGet(void** state)
 }
 
 static void
-cfgPayEnableSetAndGet(void** state)
+cfgPayEnableSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgPayEnableSet(config, TRUE);
     assert_int_equal(cfgPayEnable(config), TRUE);
     cfgPayEnableSet(config, FALSE);
@@ -636,9 +640,9 @@ cfgPayEnableSetAndGet(void** state)
 }
 
 static void
-cfgPayDirSetAndGet(void** state)
+cfgPayDirSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgPayDirSet(config, "/some/path");
     assert_string_equal(cfgPayDir(config), "/some/path");
     cfgPayDirSet(config, NULL);
@@ -647,9 +651,9 @@ cfgPayDirSetAndGet(void** state)
 }
 
 static void
-cfgAuthTokenSetAndGet(void** state)
+cfgAuthTokenSetAndGet(void **state)
 {
-    config_t* config = cfgCreateDefault();
+    config_t *config = cfgCreateDefault();
     cfgAuthTokenSet(config, "sometoken");
     assert_string_equal(cfgAuthToken(config), "sometoken");
     cfgAuthTokenSet(config, NULL);
@@ -658,12 +662,12 @@ cfgAuthTokenSetAndGet(void** state)
 }
 
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("running %s\n", argv[0]);
-    void* mtc_state[] = {(void*)CFG_MTC, NULL};
-    void* evt_state[] = {(void*)CFG_CTL, NULL};
-    void* log_state[] = {(void*)CFG_LOG, NULL};
+    void *mtc_state[] = {(void*)CFG_MTC, NULL};
+    void *evt_state[] = {(void*)CFG_CTL, NULL};
+    void *log_state[] = {(void*)CFG_LOG, NULL};
 
     source_state_t log = {CFG_SRC_FILE, DEFAULT_SRC_FILE_VALUE, DEFAULT_SRC_FILE_FIELD, DEFAULT_SRC_FILE_NAME};
     source_state_t con = {CFG_SRC_CONSOLE, DEFAULT_SRC_CONSOLE_VALUE, DEFAULT_SRC_CONSOLE_FIELD, DEFAULT_SRC_CONSOLE_NAME};

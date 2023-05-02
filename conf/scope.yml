@@ -60,7 +60,7 @@ metric:
 
     # Metric format type
     #   Type:     string
-    #   Values:   statsd, ndjson
+    #   Values:   statsd, ndjson, prometheus
     #   Default:  statsd
     #   Override: $SCOPE_METRIC_FORMAT
     #

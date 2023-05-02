@@ -171,10 +171,39 @@ spec:
           ports:
             - containerPort: {{ .Port }}
               protocol: TCP
+{{- if not .PromDisable }}
+        - name: {{ .App }}-prom-export
+          image: cribl/scope:{{ .Version }}
+          command: ["/bin/bash"]
+          args:
+          - "-c"
+          - "/usr/local/bin/scope prom --mport {{ .PromMPort }} --sport {{ .PromSPort }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: {{ .PromMPort }}
+              protocol: TCP
+{{- end }}
       volumes:
         - name: certs
           secret:
             secretName: {{ .App }}-secret
+{{- if not .PromDisable }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .App }}-prom-export
+  namespace: {{ .Namespace }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: {{ .PromMPort }}-prom-export-tcp
+      protocol: TCP
+      port: {{ .PromMPort }}
+      targetPort: {{ .PromMPort }}
+  selector:
+    app: {{ .App }}
+{{- end }}
 ---
 apiVersion: v1
 kind: Service

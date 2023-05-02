@@ -976,3 +976,41 @@ bool
 osMemPermRestore(void *addr, size_t len, int flags) {
     return scope_mprotect(addr, len, flags) == 0;
 }
+
+/*
+ * Retrieve base address for the process
+ * Returns TRUE in case of operation success, FALSE otherwise
+ */
+bool
+osGetBaseAddr(uint64_t *addr) {
+    uint64_t base_addr = 0;
+    char perms[5];
+    char offset[20];
+    char buf[1024];
+    char pname[1024];
+    FILE *fp;
+
+    if (osGetProcname(pname, sizeof(pname)) == -1) {
+        return FALSE;
+    }
+
+    if ((fp = scope_fopen("/proc/self/maps", "r")) == NULL) {
+        return FALSE;
+    }
+
+    while (scope_fgets(buf, sizeof(buf), fp) != NULL) {
+        uint64_t addr_start;
+        scope_sscanf(buf, "%lx-%*x %s %*s %s %*d", &addr_start, perms, offset);
+        if (scope_strstr(buf, pname) != NULL) {
+            base_addr = addr_start;
+            break;
+        }
+    }
+
+    scope_fclose(fp);
+    if (base_addr) {
+        *addr = base_addr;
+        return TRUE;
+    }
+    return FALSE;
+}

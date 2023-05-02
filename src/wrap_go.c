@@ -38,7 +38,7 @@ enum go_arch_t {
 };
 
 #if defined (__x86_64__)
-   #define MIN_SUPPORTED_GO_VER (9)
+   #define MIN_SUPPORTED_GO_VER (11)
    #define END_INST "int3"
    #define CALL_INST "call"
    #define SYSCALL_INST "syscall"
@@ -83,7 +83,7 @@ int g_go_maint_ver = UNKNOWN_GO_VER;
 int g_arch = ARCH;
 static char g_go_build_ver[7];
 static char g_ReadFrame_addr[20];
-go_schema_t *g_go_schema = &go_9_schema; // overridden if later version
+go_schema_t *g_go_schema = &go_11_schema; // overridden if later version
 uint64_t g_glibc_guard = 0LL;
 uint64_t go_systemstack_switch;
 uint64_t g_syscall_return = 0;
@@ -109,7 +109,7 @@ tap_t g_tap[] = {
     {tap_end,                  "",                                        NULL,                             NULL, 0},
 };
 
-go_schema_t go_9_schema = {
+go_schema_t go_11_schema = {
     .arg_offsets = {
         .c_syscall_rc=                 0x0,
         .c_syscall_num=                0x60,
@@ -296,20 +296,6 @@ adjustGoStructOffsetsForVersion()
     if (!g_go_minor_ver) {
         sysprint("ERROR: can't determine minor go version\n");
         return;
-    }
-
-    if (g_go_minor_ver == 10) {
-        g_go_schema->arg_offsets.c_http2_client_read_cc=0x78;
-        g_go_schema->arg_offsets.c_http2_server_read_sc=0x188;
-        g_go_schema->arg_offsets.c_http2_server_preface_callee=0x108;
-        g_go_schema->arg_offsets.c_http2_server_preface_sc=0x110;
-        g_go_schema->arg_offsets.c_http2_server_preface_rc=0x120;
-        g_go_schema->struct_offsets.cc_to_fr=0xd0;
-    }
-
-    if (g_go_minor_ver < 11) {
-        g_go_schema->arg_offsets.c_signal_sig=0x8;
-        g_go_schema->arg_offsets.c_signal_info=0x10;
     }
 
     if (g_go_minor_ver < 12) {
@@ -923,38 +909,6 @@ go_version_numbers(const char *go_runtime_version)
     g_go_maint_ver = maint_val;
 }
 
-int
-getBaseAddress(uint64_t *addr) {
-    uint64_t base_addr = 0;
-    char perms[5];
-    char offset[20];
-    char buf[1024];
-    char pname[1024];
-    FILE *fp;
-
-    if (osGetProcname(pname, sizeof(pname)) == -1) return -1;
-
-    if ((fp = scope_fopen("/proc/self/maps", "r")) == NULL) {
-        return -1;
-    }
-
-    while (scope_fgets(buf, sizeof(buf), fp) != NULL) {
-        uint64_t addr_start;
-        scope_sscanf(buf, "%lx-%*x %s %*s %s %*d", &addr_start, perms, offset);
-        if (scope_strstr(buf, pname) != NULL) {
-            base_addr = addr_start;
-            break;
-        }
-    }
-
-    scope_fclose(fp);
-    if (base_addr) {
-        *addr = base_addr;
-        return 0;
-    }
-    return -1;
-}
-
 void
 initGoHook(elf_buf_t *ebuf)
 {
@@ -988,7 +942,7 @@ initGoHook(elf_buf_t *ebuf)
     // if it's a position independent executable, get the base address from /proc/self/maps
     uint64_t base = 0LL;
     if (ehdr->e_type == ET_DYN && (scopeGetGoAppStateStatic() == FALSE)) {
-        if (getBaseAddress(&base) != 0) {
+        if (osGetBaseAddr(&base) == FALSE) {
             sysprint("ERROR: can't get the base address\n");
             funchook_destroy(funchook);
             return; // don't install our hooks

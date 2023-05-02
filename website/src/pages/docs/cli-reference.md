@@ -407,6 +407,7 @@ kubectl label namespace default scope=enabled
       --prommport int         Specify Prometheus Exporter port for metrics from libscope (default 9109)
       --promsport int         Specify Prometheus Exporter port for HTTP metrics requests (default 9090)
       --server                Run Webhook server
+      --signername string     Name of the signer used to sign the certificate request for the AppScope Admission Webhook (default "kubernetes.io/kubelet-serving")
       --version string        Version of scope to deploy
 
 ```

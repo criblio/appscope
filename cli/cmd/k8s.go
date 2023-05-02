@@ -62,6 +62,7 @@ func init() {
 	RootCmd.AddCommand(k8sCmd)
 	k8sCmd.Flags().StringVar(&opt.App, "app", "scope", "Name of the app in Kubernetes")
 	k8sCmd.Flags().StringVar(&opt.Namespace, "namespace", "default", "Name of the namespace in which to install")
+	k8sCmd.Flags().StringVar(&opt.SignerName, "signername", "kubernetes.io/kubelet-serving", "Name of the signer used to sign the certificate request for the AppScope Admission Webhook")
 	k8sCmd.Flags().StringVar(&opt.Version, "version", "", "Version of scope to deploy")
 	k8sCmd.Flags().StringVar(&opt.CertFile, "certfile", "/etc/certs/tls.crt", "Certificate file for TLS in the container (mounted secret)")
 	k8sCmd.Flags().StringVar(&opt.KeyFile, "keyfile", "/etc/certs/tls.key", "Private key file for TLS in the container (mounted secret)")

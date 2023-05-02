@@ -42,7 +42,7 @@ spec:
       containers:
       - name: webhook-cert-setup
         # This is a minimal kubectl image based on Alpine Linux that signs certificates using the k8s extension api server
-        image: cribl/k8s-webhook-cert-manager:1.0.0
+        image: cribl/k8s-webhook-cert-manager:1.0.1
         command: ["./generate_certificate.sh"]
         args:
           - "--service"
@@ -53,6 +53,8 @@ spec:
           - "{{ .App }}-secret"
           - "--namespace"
           - "{{ .Namespace }}"
+          - "--signer-name"
+          - "{{ .SignerName }}"
       restartPolicy: OnFailure
   backoffLimit: 3
 ---
@@ -78,7 +80,7 @@ rules:
     verbs: ["get"]
   - apiGroups: ["certificates.k8s.io"]
     resources: ["signers"]
-    resourceNames: ["kubernetes.io/kubelet-serving"]
+    resourceNames: ["{{ .SignerName }}"]
     verbs: ["approve"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

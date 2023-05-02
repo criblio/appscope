@@ -11,6 +11,7 @@ import (
 type Options struct {
 	App             string
 	Namespace       string
+	SignerName      string
 	Version         string
 	CriblDest       string
 	MetricDest      string

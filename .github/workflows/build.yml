@@ -46,7 +46,7 @@ jobs:
       # is one. We'll use the outputs in other places.
       - name: Get Version
         id: version
-        uses: battila7/get-version-action@v2
+        uses: Simply007/get-version-action@v2.3.0
 
       # This is our logic to decide how to tag the results and whether things
       # get published or not.

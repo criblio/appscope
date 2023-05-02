@@ -21,9 +21,9 @@ To obtain the MD5 checksum for any file above, add `.md5` to the file path.
 
 Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.3.3`.
 
-### New Features and Improvements
+### Improvements
 
-AppScope 1.3.3 removes support for the no-longer-supported Go versions [1.9](https://go.dev/doc/go1.9) and [1.10](https://go.dev/doc/go1.10). Related issue: [#1452](https://github.com/criblio/appscope/issues/1452).
+AppScope 1.3.3 removes support for the no-longer-supported Go versions [1.9](https://go.dev/doc/go1.9) and [1.10](https://go.dev/doc/go1.10). Related issue: [#1452](https://github.com/criblio/appscope/issues/1452). This makes the AppScope code less complicated and more robust.
 
 ### Fixes
 

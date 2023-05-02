@@ -88,7 +88,7 @@ if (DISASM_CAPSTONE)
                       -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
                       -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}
                       -DCMAKE_POSITION_INDEPENDENT_CODE=ON
-                      -DCAPSTONE_BUILD_SHARED=OFF
+                      -DBUILD_SHARED_LIBS=OFF
                       -DCAPSTONE_BUILD_STATIC_RUNTIME=OFF
                       -DCAPSTONE_BUILD_TESTS=OFF
                       -DCAPSTONE_BUILD_CSTOOL=OFF

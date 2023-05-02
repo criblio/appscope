@@ -34,8 +34,9 @@ scope inspect --all`,
 		if errors.Is(err, util.ErrGetCurrentUser) {
 			util.ErrAndExit("Unable to get current user: %v", err)
 		}
+		admin := true
 		if errors.Is(err, util.ErrMissingAdmPriv) {
-			util.Warn("INFO: Run as root (or via sudo) to get info from all processes")
+			admin = false
 		}
 
 		pidCtx := &ipc.IpcPidCtx{
@@ -46,6 +47,9 @@ scope inspect --all`,
 			// Get all scoped processes
 			procs, err := util.ProcessesScoped()
 			if err != nil {
+				if !admin {
+					util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
+				}
 				util.ErrAndExit("Unable to retrieve scoped processes: %v", err)
 			}
 
@@ -55,6 +59,9 @@ scope inspect --all`,
 				pidCtx.Pid = proc.Pid
 				iout, _, err := inspect.InspectProcess(*pidCtx)
 				if err != nil {
+					if !admin {
+						util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
+					}
 					util.Warn("Inspect PID fails: %v", err)
 				}
 				iouts = append(iouts, iout)
@@ -74,6 +81,9 @@ scope inspect --all`,
 			// Helper menu to allow the user to select a pid to inspect
 
 			if pid, err = run.HandleInputArg("", false, true, false); err != nil {
+				if !admin {
+					util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
+				}
 				util.ErrAndExit("No scoped processes to inspect")
 			}
 
@@ -87,12 +97,18 @@ scope inspect --all`,
 
 		status, _ := util.PidScopeLibInMaps(pid)
 		if !status {
+			if !admin {
+				util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
+			}
 			util.ErrAndExit("Unable to communicate with %v - process is not scoped", pid)
 		}
 
 		pidCtx.Pid = pid
 		_, cfg, err := inspect.InspectProcess(*pidCtx)
 		if err != nil {
+			if !admin {
+				util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
+			}
 			util.ErrAndExit("Inspect PID fails: %v", err)
 		}
 

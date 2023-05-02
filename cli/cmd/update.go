@@ -36,8 +36,9 @@ scope update 1000 < test_cfg.yml`,
 		if errors.Is(err, util.ErrGetCurrentUser) {
 			util.ErrAndExit("Unable to get current user: %v", err)
 		}
+		admin := true
 		if errors.Is(err, util.ErrMissingAdmPriv) {
-			util.Warn("INFO: Run as root (or via sudo) to get info from all processes")
+			admin = false
 		}
 
 		var cfgBytes []byte
@@ -68,6 +69,9 @@ scope update 1000 < test_cfg.yml`,
 
 		status, _ := util.PidScopeLibInMaps(pid)
 		if !status {
+			if !admin {
+				util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
+			}
 			util.ErrAndExit("Unable to communicate with %v - process is not scoped", pid)
 		}
 
@@ -78,6 +82,9 @@ scope update 1000 < test_cfg.yml`,
 
 		err = update.UpdateScopeCfg(*pidCtx, cfgBytes)
 		if err != nil {
+			if !admin {
+				util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
+			}
 			util.ErrAndExit("Update Scope configuration fails: %v", err)
 		}
 		fmt.Println("Update Scope configuration success.")
@@ -86,6 +93,9 @@ scope update 1000 < test_cfg.yml`,
 			time.Sleep(2 * time.Second)
 			_, cfg, err := inspect.InspectProcess(*pidCtx)
 			if err != nil {
+				if !admin {
+					util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
+				}
 				util.ErrAndExit("Inspect PID fails: %v", err)
 			}
 

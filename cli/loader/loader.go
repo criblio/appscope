@@ -28,6 +28,16 @@ func New() ScopeLoader {
 	}
 }
 
+// - Extract libscope.so to /usr/lib/appscope/<version>/libscope.so /tmp/appscope/<version>/libscope.so locally
+func (sL *ScopeLoader) Install() (string, error) {
+	return sL.RunSubProc([]string{"--install"}, os.Environ())
+}
+
+// - Extract libscope.so to /usr/lib/appscope/<version>/libscope.so /tmp/appscope/<version>/libscope.so in a namespace
+func (sL *ScopeLoader) InstallNamespace(cpid int) (string, error) {
+	return sL.RunSubProc([]string{"--install"}, os.Environ())
+}
+
 // - Setup /etc/profile.d/scope.sh on host
 // - Extract libscope.so to /usr/lib/appscope/<version>/libscope.so /tmp/appscope/<version>/libscope.so on host
 // - Extract filter input to /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter on host

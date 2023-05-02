@@ -3,6 +3,7 @@ package util
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/fatih/structs"
+	"github.com/rs/zerolog/log"
 )
 
 type ReadSeekCloser interface {
@@ -414,4 +416,70 @@ func RemoveEmptyStrings(s []string) []string {
 		}
 	}
 	return ret
+}
+
+// GetContainersPids gets the list of PID(s) related to containers
+func GetContainersPids() []int {
+	cPids := []int{}
+
+	ctrDPids, err := GetContainerDPids()
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("Discover ContainerD containers failed.")
+	}
+	if ctrDPids != nil {
+		cPids = append(cPids, ctrDPids...)
+	}
+
+	podmanPids, err := GetPodmanPids()
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msg("Discover Podman containers failed.")
+	}
+	if podmanPids != nil {
+		cPids = append(cPids, podmanPids...)
+	}
+
+	lxcPids, err := GetLXCPids()
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrLXDSocketNotAvailable):
+			log.Warn().
+				Msgf("Discover LXC containers skipped. LXD is not available")
+		default:
+			log.Error().
+				Err(err).
+				Msg("Discover LXC containers failed.")
+		}
+	}
+	if lxcPids != nil {
+		cPids = append(cPids, lxcPids...)
+	}
+
+	return cPids
+}
+
+// Extract extracts scope to the scope version directory
+func Extract(scopeDirVersion string) error {
+	// Copy scope
+	perms := os.FileMode(0755)
+	exPath, err := os.Executable()
+	if err != nil {
+		log.Error().
+			Err(err).
+			Msgf("Error getting executable path")
+		return err
+	}
+	if _, err := CopyFile(exPath, filepath.Join(scopeDirVersion, "scope"), perms); err != nil {
+		if err != os.ErrExist {
+			log.Error().
+				Err(err).
+				Msgf("Error writing scope to %s.", scopeDirVersion)
+			return err
+		}
+	}
+
+	return nil
 }

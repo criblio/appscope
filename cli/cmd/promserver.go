@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
 
 	"github.com/criblio/scope/promserver"
+	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +22,7 @@ import (
 func getMetrics(laddr string) {
 	listen, err := net.Listen("tcp", laddr)
 	if err != nil {
-		log.Fatal("Listen:", err)
+		util.ErrAndExit("Listen:", err)
 		os.Exit(1)
 	}
 
@@ -31,8 +31,7 @@ func getMetrics(laddr string) {
 	for {
 		conn, err := listen.Accept()
 		if err != nil {
-			log.Fatal("Accept", err)
-			os.Exit(1)
+			util.ErrAndExit("Accept", err)
 		}
 		go promserver.Metrics(conn)
 	}
@@ -54,8 +53,7 @@ var promServerCmd = &cobra.Command{
 		mfiles := promserver.GetMfiles()
 		for _, mpath := range mfiles {
 			promserver.Pmsg("Remove ", mpath)
-			err := os.Remove(mpath)
-			if err != nil {
+			if err := os.Remove(mpath); err != nil {
 				fmt.Println(err)
 				return
 			}
@@ -68,7 +66,7 @@ var promServerCmd = &cobra.Command{
 		http.HandleFunc("/metrics", promserver.Handler)
 		err := http.ListenAndServe(laddr, nil)
 		if err != nil {
-			log.Fatal("ListenAndServe: ", err)
+			util.ErrAndExit("ListenAndServe: ", err)
 		}
 	},
 }

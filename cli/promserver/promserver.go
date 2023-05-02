@@ -5,13 +5,15 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	str "strings"
 	"syscall"
+
+	"github.com/criblio/scope/util"
+	"github.com/rs/zerolog/log"
 )
 
 /*
@@ -58,7 +60,7 @@ func GetMfiles() []string {
 		if mode.IsRegular() && str.HasPrefix(currf, prefix) {
 			mpath := filepath.Join(tpath, currf)
 			mfiles = append(mfiles, mpath)
-			fmt.Println("getMfile adding file: ", mpath)
+			Pmsg("getMfile adding file: ", mpath)
 		}
 	}
 
@@ -74,7 +76,7 @@ func Metrics(conn net.Conn) {
 
 	fname, err := os.CreateTemp("", "scope-metrics-*")
 	if err != nil {
-		log.Fatal("Open temp file:", err)
+		util.ErrAndExit("Open temp file:", err)
 		return
 	}
 
@@ -95,13 +97,13 @@ func Metrics(conn net.Conn) {
 		// Read lines from the connection
 		line, err := reader.ReadString('\n')
 		if err != nil {
-			log.Println("Error reading from connection:", err)
+			log.Error().Msgf("Error reading from connection:", err)
 			break
 		}
 
 		tfile, err := os.OpenFile(fname.Name(), os.O_RDWR|os.O_APPEND, 0666)
 		if err != nil {
-			log.Fatal("Open temp file:", err)
+			log.Error().Msgf("Open temp file:", err)
 			return
 		}
 
@@ -111,7 +113,7 @@ func Metrics(conn net.Conn) {
 		_, err = tfile.WriteString(line)
 		if err != nil {
 			// Continue to read more?
-			log.Println("Write:", err)
+			log.Error().Msgf("Write:", err)
 		}
 
 		_ = syscall.Flock(fd, syscall.LOCK_UN)

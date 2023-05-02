@@ -21,6 +21,14 @@ To obtain the MD5 checksum for any file above, add `.md5` to the file path.
 
 Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.3.3`.
 
+### New Features and Improvements
+
+AppScope 1.3.3 removes support for the no-longer-supported Go versions [1.9](https://go.dev/doc/go1.9) and [1.10](https://go.dev/doc/go1.10). Related issue: [#1452](https://github.com/criblio/appscope/issues/1452).
+
+### Fixes
+
+- [1412](https://github.com/criblio/appscope/issues/1412) Node.js apps compiled as [Position Independent Executables](https://www.redhat.com/en/blog/position-independent-executables-pie) (PIE) no longer seg fault when scoped.
+
 ## AppScope 1.3.2
 
 2023-04-19 - Maintenance Release
@@ -327,7 +335,7 @@ Assets are available via Docker and the Cribl CDN at the links below.
 
 AppScope 1.1.0 introduces improved capabilities for scoping Go applications:
 
-- [#637](https://github.com/criblio/appscope/issues/637) Support for go17 and go18.
+- [#637](https://github.com/criblio/appscope/issues/637) Support for Go versions 17 and 18.
 - [#904](https://github.com/criblio/appscope/issues/904) Support for HTTP2 when scoping Go executables. 
 - [#667](https://github.com/criblio/appscope/issues/667) AppScope's own internal libc, which resolves problems we'd seen when scoping Go apps that handle signals.
 

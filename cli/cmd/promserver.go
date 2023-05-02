@@ -17,7 +17,7 @@ import (
  * port           -
  * filesrc        -
  *
-*/
+ */
 
 func getMetrics(laddr string) {
 	listen, err := net.Listen("tcp", laddr)
@@ -39,12 +39,12 @@ func getMetrics(laddr string) {
 }
 
 // promServerCmd represents a Prometheus target
-var promServerCmd = &cobra.Command {
-	Use:   "prom [flags]",
-	Short: "Run the Prometheus Target",
-	Long:  `Listen and respond to metrics requests from a Prometheus scraper.`,
+var promServerCmd = &cobra.Command{
+	Use:     "prom [flags]",
+	Short:   "Run the Prometheus Target",
+	Long:    `Listen and respond to metrics requests from a Prometheus scraper.`,
 	Example: `scope prom --port 9100`,
-	Args: cobra.NoArgs,
+	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		sport, _ := cmd.Flags().GetString("sport")
 		mport, _ := cmd.Flags().GetString("mport")
@@ -78,4 +78,3 @@ func init() {
 	promServerCmd.Flags().StringP("mport", "m", "9109", "Port number to listen on for metrics from libscope")
 	RootCmd.AddCommand(promServerCmd)
 }
-

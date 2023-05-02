@@ -1,15 +1,17 @@
 package promserver
 
 import (
-	"net/http"
-	"fmt"
-	"path/filepath"
-	"os"
-	"io"
-	"net"
-	"log"
+	"bufio"
 	"bytes"
+	"fmt"
+	"io"
+	"log"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
 	str "strings"
+	"syscall"
 )
 
 /*
@@ -31,18 +33,18 @@ var msgs = 1
 var delList = make(map[string]bool)
 
 func Pmsg(msg ...interface{}) {
-     if msgs != 0 {
-        for _, pvar:= range msg {
-            fmt.Print(pvar, " ")
-        }
-        fmt.Println()
-     }
+	if msgs != 0 {
+		for _, pvar := range msg {
+			fmt.Print(pvar, " ")
+		}
+		fmt.Println()
+	}
 }
 
 func GetMfiles() []string {
-	var mfiles[]string
+	var mfiles []string
 
-	tpath:= os.TempDir()
+	tpath := os.TempDir()
 	dir, err := os.ReadDir(tpath)
 	if err != nil {
 		fmt.Println(err)
@@ -71,27 +73,29 @@ func Metrics(conn net.Conn) {
 	defer conn.Close()
 
 	fname, err := os.CreateTemp("", "scope-metrics-*")
-    if err != nil {
-        log.Fatal("Open temp file:", err)
-        return
-    }
+	if err != nil {
+		log.Fatal("Open temp file:", err)
+		return
+	}
 
 	/*
-     * Note: close this here because we open, write, close
-     * in the loop below. This enables the metric file to
-     * be truncated and the new len written each time new
-     * metric data is received.
-     */
+	 * Note: close this here because we open, write, close
+	 * in the loop below. This enables the metric file to
+	 * be truncated and the new len written each time new
+	 * metric data is received.
+	 */
 	fname.Close()
 
 	Pmsg("Metrics: ", fname.Name())
 
-	metrics := make([]byte, 1024)
+	// A bufio reader supports reading lines from the socket
+	reader := bufio.NewReader(conn)
 
-	for  {
-		_, err := conn.Read(metrics)
-		if err != nil || err == io.EOF || len(metrics) == 0 {
-			log.Println(err)
+	for {
+		// Read lines from the connection
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			log.Println("Error reading from connection:", err)
 			break
 		}
 
@@ -101,12 +105,16 @@ func Metrics(conn net.Conn) {
 			return
 		}
 
-		_, err = tfile.Write(metrics);
+		fd := int(tfile.Fd())
+		_ = syscall.Flock(fd, syscall.LOCK_EX)
+
+		_, err = tfile.WriteString(line)
 		if err != nil {
 			// Continue to read more?
 			log.Println("Write:", err)
 		}
 
+		_ = syscall.Flock(fd, syscall.LOCK_UN)
 		tfile.Close()
 	}
 
@@ -119,7 +127,7 @@ func Metrics(conn net.Conn) {
  */
 func Handler(rwrite http.ResponseWriter, req *http.Request) {
 	// create a new buffer with an initial size of 0
-    buf := new(bytes.Buffer)
+	buf := new(bytes.Buffer)
 
 	mfiles := GetMfiles()
 	for _, mpath := range mfiles {
@@ -129,6 +137,9 @@ func Handler(rwrite http.ResponseWriter, req *http.Request) {
 			continue
 		}
 
+		fd := int(mfile.Fd())
+		_ = syscall.Flock(fd, syscall.LOCK_EX)
+
 		nbytes, err := buf.ReadFrom(mfile)
 		if err != nil {
 			Pmsg("ERROR: read from: ", mpath)
@@ -137,12 +148,14 @@ func Handler(rwrite http.ResponseWriter, req *http.Request) {
 		}
 
 		mfile.Truncate(0)
+		_ = syscall.Flock(fd, syscall.LOCK_UN)
 		mfile.Close()
 	}
 
 	// Send an HTTP response
-	rwrite.Header().Set("Content-Type", "text/plain")
-	rwrite.Write(buf.Bytes())
+	rwrite.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	rwrite.WriteHeader(http.StatusOK)
+	io.WriteString(rwrite, string(buf.Bytes()))
 
 	// Remove any files from processes that have exited
 	for name, enable := range delList {

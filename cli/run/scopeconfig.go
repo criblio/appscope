@@ -107,7 +107,7 @@ func (c *Config) SetDefault() error {
 		Libscope: libscope.ScopeLibscopeConfig{
 			SummaryPeriod: 10,
 			CommandDir:    filepath.Join(c.WorkDir, "cmd"),
-			ConfigEvent:   "false",
+			ConfigEvent:   "true",
 			Log: libscope.ScopeLogConfig{
 				Level: "warning",
 				Transport: libscope.ScopeTransport{

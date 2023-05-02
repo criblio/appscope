@@ -130,7 +130,7 @@ func ParseEvent(b []byte) (libscope.EventBody, error) {
 	if event.Type == "evt" {
 		return event.Body, nil
 	}
-	return event.Body, fmt.Errorf("could not find body in event")
+	return event.Body, fmt.Errorf("config event")
 }
 
 // EventMatch helps retrieve events from events.json

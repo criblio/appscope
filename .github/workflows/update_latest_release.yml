@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Get Version
         id: version
-        uses: battila7/get-version-action@v2
+        uses: Simply007/get-version-action@v2.3.0
 
       - name: Get Tag
         id: tag

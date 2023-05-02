@@ -105,7 +105,7 @@ typedef struct {
 typedef void (*assembly_fn)(void);
 
 extern go_schema_t *g_go_schema;
-extern go_schema_t go_9_schema;
+extern go_schema_t go_11_schema;
 extern go_schema_t go_17_schema_x86;
 extern go_schema_t go_17_schema_arm;
 extern go_arg_offsets_t g_go_arg;

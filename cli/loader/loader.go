@@ -34,8 +34,8 @@ func (sL *ScopeLoader) Install() (string, error) {
 }
 
 // - Extract libscope.so to /usr/lib/appscope/<version>/libscope.so /tmp/appscope/<version>/libscope.so in a namespace
-func (sL *ScopeLoader) InstallNamespace(cpid int) (string, error) {
-	return sL.RunSubProc([]string{"--install"}, os.Environ())
+func (sL *ScopeLoader) InstallNamespace(rootdir string) (string, error) {
+	return sL.RunSubProc([]string{"--install", "--rootdir", rootdir}, os.Environ())
 }
 
 // - Setup /etc/profile.d/scope.sh on host

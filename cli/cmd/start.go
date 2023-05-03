@@ -18,15 +18,15 @@ var startCmd = &cobra.Command{
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
-		prefix, _ := cmd.Flags().GetString("prefix")
+		rootdir, _ := cmd.Flags().GetString("rootdir")
 
-		if err := start.Start(prefix); err != nil {
+		if err := start.Start(rootdir); err != nil {
 			util.ErrAndExit("Exiting due to start failure: %v", err)
 		}
 	},
 }
 
 func init() {
-	startCmd.Flags().StringP("prefix", "p", "", "Prefix to proc filesystem")
+	startCmd.Flags().StringP("rootdir", "p", "", "Path to root filesystem of another namespace")
 	RootCmd.AddCommand(startCmd)
 }

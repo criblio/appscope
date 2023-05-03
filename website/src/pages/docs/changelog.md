@@ -27,6 +27,10 @@ AppScope 1.3.3 removes support for the no-longer-supported Go versions [1.9](htt
 
 ### Fixes
 
+- [1461](https://github.com/criblio/appscope/issues/1461) In libc musl environments, attaching to an already-running but idle process now works normally. (Idle means not producing events at that moment.) 
+
+Before this fix, commands that rely on the IPC mechanism and/or the presence of a running periodic thread (e.g., `scope ps`, `scope inspect`, `scope update`) would not work, because AppScope's periodic thread would not start. For example, attaching AppScope to the Nginx master process running in an Alpine container, you would be unable to use the CLI to interact with the process. (This problem existed only in libc musl environments.)
+
 - [1412](https://github.com/criblio/appscope/issues/1412) Node.js apps compiled as [Position Independent Executables](https://www.redhat.com/en/blog/position-independent-executables-pie) (PIE) no longer seg fault when scoped.
 
 ## AppScope 1.3.2

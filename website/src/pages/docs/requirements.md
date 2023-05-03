@@ -43,8 +43,8 @@ AppScope can instrument static executables only when they are written in Go.
 AppScope cannot:
 
 - Unload the libscope library, once loaded.
-- Instrument Go executables built with go1.8 or earlier.
-- Instrument static stripped Go executables built with go1.12 or earlier.
+- Instrument Go executables built with Go 1.10 or earlier.
+- Instrument static stripped Go executables built with Go 1.12 or earlier.
 - Instrument Java executables that use Open JVM 6 or earlier, or Oracle JVM 6 or earlier.
 - Obtain a core dump either (a) for a Go executable, or (b) in a musl libc environment.
 

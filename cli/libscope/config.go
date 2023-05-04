@@ -103,6 +103,7 @@ type ScopeLogConfig struct {
 type ScopeOutputFormat struct {
 	FormatType   string            `mapstructure:"type" json:"type" yaml:"type"`
 	Statsdmaxlen int               `mapstructure:"statsdmaxlen,omitempty" json:"statsdmaxlen,omitempty" yaml:"statsdmaxlen,omitempty"`
+	StatsdPrefix string            `mapstructure:"statsdprefix,omitempty" json:"statsdprefix,omitempty" yaml:"statsdprefix,omitempty"`
 	Verbosity    int               `mapstructure:"verbosity,omitempty" json:"verbosity,omitempty" yaml:"verbosity,omitempty"`
 	Tags         map[string]string `mapstructure:"tags,omitempty" json:"tags,omitempty" yaml:"tags,omitempty"`
 }

@@ -10,13 +10,18 @@
 # Validate metrics from the scrape; match # & { for valid lines
 # Kill the scoped app then scrape
 # Verify that the metric file has been deleted
+#
+# Start a test app
 # Verify that metrics are being collected; file size
 # Kill the prom exporter
 # kill the second test app
-# start a prom exporter using alternate port numbers
-# Verify that previous metric file are deleted
-# Scope an app and verfiy mtrics are being received using the alternate port
+# Start a prom exporter
+# Verify that previous metric files are deleted
+#
+# Start a prom exporter using alternate port numbers
+# Scope an app and verify metrics are being received using the alternate port
 # Scrape using the alternate port and verify metrics are received
+# Delete the cache file by scraping
 #
 
 
@@ -62,16 +67,29 @@ endtest(){
     rm -f $LOG_FILE
 }
 
+# Does a cache file exist
+get_cache_file(){
+    file_array=`dir /tmp/ | grep $CACHE_BASE`
+    found=0
+
+    for entry in $file_array
+    do
+        if [[ "$entry" = *"$CACHE_BASE"* ]]; then
+            found=1
+            break
+        fi
+    done
+
+    echo $found
+}
+
 # Return the size of the first cache file found
 get_cache_size(){
     file_array=`dir /tmp/ | grep $CACHE_BASE`
 
     for entry in $file_array
     do
-        #echo "$entry"
-        #echo "checking $entry and $CACHE_BASE"
         if [[ "$entry" = *"$CACHE_BASE"* ]]; then
-            #echo "Found $entry"
             break
         fi
     done
@@ -82,14 +100,12 @@ get_cache_size(){
 
 validate_cache_increase(){
     local fsize1=$(get_cache_size)
-    #echo $fsize1
-    echo "Starting V_C_I"
-    # it can take up to 10 secs to emit more metrics
+
+    # It can take up to 10 secs to emit more metrics
+    echo "Sleeping in order to ensure the periodic thread runs and we get metrics...."
     sleep 11
 
     local fsize2=$(get_cache_size)
-    #echo $fsize2
-    echo "VCI"
 
     if [[ $fsize2 > $fsize1 ]]; then
         echo "validate cache increase; all good"
@@ -103,9 +119,6 @@ validate_cache_increase(){
 
 validate_cache_truncate(){
     fsize=$(get_cache_size)
-    #echo $fsize
-    #echo "v_c_t: p1 $1"
-
 
     if [[ $fsize < $1 ]]; then
         echo "validate cache truncate; all good"
@@ -117,7 +130,6 @@ validate_cache_truncate(){
 
 ################# TESTS ################# 
 
-# Init test
 starttest "Prom_Metrics"
 
 # Start a prom exporter
@@ -128,14 +140,10 @@ scope run --metricformat prometheus -m tcp://localhost:9109 -- sleep infinity &
 sleep 2
 
 # Are metrics being added to the cache file
-echo "V_C_I..."
 validate_cache_increase
-#cur_size=$(validate_cache_increase)
-echo "VCI return: $CUR_SIZE"
 
 # Scrape the metrics
-echo "starting: curl -o $SCRAPE_FILE http://localhost:9090/metrics"
-curl -o $SCRAPE_FILE http://localhost:9090/metrics
+curl -s -o $SCRAPE_FILE http://localhost:9090/metrics
 
 # Did we truncate the cache
 validate_cache_truncate "$CUR_SIZE"
@@ -146,10 +154,98 @@ c2=`grep -c \{ $SCRAPE_FILE`
 if [ $c1 != $c2 ]; then
     echo "ERROR: Validation of data format failed"
     ERR+=1
+else
+    echo "validate prom format; all good"
+fi
+
+# Kill the app, then scrape and see if the cache file is removed
+pkill -f sleep
+sleep 1
+curl -s -o $SCRAPE_FILE http://localhost:9090/metrics
+exist=$(get_cache_file)
+
+if [[ $exist == 0 ]]; then
+    echo "validate cache removed on process exit; all good "
+else
+    echo "ERROR: Cache removed on process exit"
+    ERR+=1
 fi
 
 rm $SCRAPE_FILE
 pkill -f scope
 pkill -f sleep
+
+endtest
+
+###############################################
+starttest "Remove_Initial_Cache"
+
+# Start a prom exporter
+scope prom &
+
+# Create a test app
+scope run --metricformat prometheus -m tcp://localhost:9109 -- sleep infinity &
+sleep 2
+
+# Kill the app and the exporter
+pkill -f scope
+pkill -f sleep
+
+# Start a prom exporter and verify that the previous cache has been removed
+scope prom &
+sleep 2
+
+exist=$(get_cache_file)
+
+if [[ $exist == 0 ]]; then
+    echo "validate cache removed on prom start; all good "
+else
+    echo "ERROR: Cache removed on prom start"
+    ERR+=1
+fi
+
+pkill -f scope
+pkill -f sleep
+
+endtest
+
+###############################################
+starttest "Alternate_Ports"
+
+# Start a prom exporter with specific ports
+scope prom --sport 9099 --mport 9110 &
+ERR+=$?
+
+# Create a test app
+scope run --metricformat prometheus -m tcp://localhost:9110 -- sleep infinity &
+sleep 2
+
+# Are metrics being added to the cache file
+validate_cache_increase
+
+# Scrape the metrics
+curl -s -o $SCRAPE_FILE http://localhost:9099/metrics
+ERR+=$?
+
+# Simple form of data validation
+c1=`grep -c \# $SCRAPE_FILE`
+c2=`grep -c \{ $SCRAPE_FILE`
+if [ $c1 != $c2 ]; then
+    echo "ERROR: Validation of data format with alternate ports failed"
+    ERR+=1
+else
+    echo "validate prom format with alternate ports; all good"
+fi
+
+rm $SCRAPE_FILE
+pkill -f sleep
+sleep 1
+
+# Delete the cache file
+curl -s http://localhost:9099/metrics
+ERR+=$?
+sleep 2
+
+pkill -f scope
 
 endtest

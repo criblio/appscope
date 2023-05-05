@@ -27,14 +27,14 @@ func genOpenCloseLoop(f_name string) {
 	}
 }
 
-//func genConsoleOutput() {
-//    for i :=1; i < LoopLimit; i++ {
-//        fmt.Printf(" %d ", i)
-//        if i % 6 == 0 {
-//            fmt.Println("")
-//        }
-//    }
-//}
+func genConsoleOutput() {
+    for i :=1; i < LoopLimit; i++ {
+        fmt.Printf(" %d ", i)
+        if i % 6 == 0 {
+            fmt.Println("")
+        }
+    }
+}
 
 func main() {
 
@@ -73,9 +73,9 @@ func main() {
 		genOpenCloseLoop(tmpfile.Name())
 	}()
 
-//    go func() {
-//        genConsoleOutput();
-//    }()
+    go func() {
+        genConsoleOutput();
+    }()
 
 	<-quit_channel
 	fmt.Println("Exiting")

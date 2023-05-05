@@ -34,7 +34,7 @@ The distros that AppScope supports all require the use of `/tmp`, `/dev/shm`, an
 
 ### Cross-Compatibility with Cribl Suite
 
-AppScope 1.2, Cribl Stream 4.0, Cribl Edge 4.0, and Cribl Search 1.0 are mutually compatible. If you integrate any of these products with earlier versions of peer products, some or all features will be unavailable.
+AppScope 1.3.2, Cribl Stream 4.1.1, Cribl Edge 4.1.1, and Cribl Search 4.1.1 are mutually compatible. If you integrate any of these products with earlier versions of peer products, some or all features will be unavailable.
 
 ### Known Limitations
 
@@ -49,3 +49,5 @@ AppScope cannot:
 - Obtain a core dump either (a) for a Go executable, or (b) in a musl libc environment.
 
 When an executable that's being scoped has been [stripped](https://en.wikipedia.org/wiki/Strip_(Unix)), it is not possible for `libscope.so` to obtain a file descriptor for an SSL session, and in turn, AppScope cannot include IP and port number fields in HTTP events.
+
+If you run AppScope on a system where [AppArmor](https://apparmor.net/) or [SELinux](https://github.com/SELinuxProject/selinux) are in an enforcing mode, it can be necessary to modify your AppArmor or SELinux profiles to allow AppScope (and the system as whole) to work normally.

@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prom-exporter-deployment
+  labels:
+    app: prom-exporter
+spec:
+  selector:
+    matchLabels:
+      app: prom-exporter
+  template:
+    metadata:
+      labels:
+        app: prom-exporter
+    spec:
+      containers:
+      - name: pexport
+        image: cribl/prom-exporter:latest
+        command: ["sleep", "infinity"]
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: prom-export
+          mountPath: /hostfs
+          readOnly: true
+        ports:
+        - containerPort: 9100
+      volumes:
+      - name: prom-export
+        hostPath:
+          path: /

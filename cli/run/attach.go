@@ -30,7 +30,7 @@ var (
 
 // Attach scopes an existing PID
 func (rc *Config) Attach(args []string) error {
-	pid, err := handleInputArg(args[0], true)
+	pid, err := HandleInputArg(args[0], true, false, true)
 	if err != nil {
 		return err
 	}
@@ -176,7 +176,7 @@ func (rc *Config) DetachAll(args []string, prompt bool) error {
 
 // DetachSingle unscopes an existing PID
 func (rc *Config) DetachSingle(args []string) error {
-	pid, err := handleInputArg(args[0], false)
+	pid, err := HandleInputArg(args[0], false, false, true)
 	if err != nil {
 		return err
 	}
@@ -205,8 +205,8 @@ func (rc *Config) detach(args []string, pid int) error {
 	return err
 }
 
-// handleInputArg handles the input argument (process id/name)
-func handleInputArg(InputArg string, toAttach bool) (int, error) {
+// HandleInputArg handles the input argument (process id/name)
+func HandleInputArg(InputArg string, toAttach, singleProcMenu, warn bool) (int, error) {
 	// Get PID by name if non-numeric, otherwise validate/use InputArg
 	var pid int
 	var err error
@@ -235,15 +235,15 @@ func handleInputArg(InputArg string, toAttach bool) (int, error) {
 		if err != nil {
 			return -1, err
 		}
-		if len(procs) == 1 {
+		if len(procs) == 1 && !singleProcMenu {
 			pid = procs[0].Pid
-		} else if len(procs) > 1 {
-			if !adminStatus {
+		} else if len(procs) >= 1 {
+			if !adminStatus && warn {
 				fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
 			}
 
 			// user interface for selecting a PID
-			fmt.Println("Found multiple processes matching that name...")
+			fmt.Println("Select a process...")
 			util.PrintObj([]util.ObjField{
 				{Name: "ID", Field: "id"},
 				{Name: "Pid", Field: "pid"},
@@ -261,7 +261,7 @@ func handleInputArg(InputArg string, toAttach bool) (int, error) {
 			}
 			pid = procs[i].Pid
 		} else {
-			if !adminStatus {
+			if !adminStatus && warn {
 				fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
 			}
 			if toAttach {

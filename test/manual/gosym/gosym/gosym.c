@@ -3,24 +3,89 @@ Utility for listing golang symbols from the .gopclntab section of an ELF file
 
 gcc -o gosym ./test/manual/gosym.c
 */
-#include <stdio.h>
-#include <string.h>
-#include <errno.h>
+
 #include <elf.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <sys/mman.h>
-#include <stdint.h>
-#include <sys/stat.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <linux/limits.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
 
 #define GOPCLNTAB_MAGIC_112 0xfffffffb
 #define GOPCLNTAB_MAGIC_116 0xfffffffa
 #define GOPCLNTAB_MAGIC_118 0xfffffff0
 #define GOPCLNTAB_MAGIC_120 0xfffffff1
 
-int printSymbols(const char *fname) 
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+
+struct sym_status {
+    const char *name;
+    bool present;
+};
+
+// List of the functions used by the AppScope
+static struct sym_status sym_table[] = {
+  {.name = "syscall.Syscall"},
+  {.name = "syscall.RawSyscall"},
+  {.name = "syscall.Syscall6"},
+  {.name = "net/http.(*persistConn).readResponse"},
+  {.name = "net/http.persistConnWriter.Write"},
+  {.name = "net/http.(*connReader).Read"},
+  {.name = "net/http.checkConnErrorWriter.Write"},
+  {.name = "net/http.(*http2clientConnReadLoop).run"},
+  {.name = "net/http.http2stickyErrWriter.Write"},
+  {.name = "net/http.(*http2serverConn).readFrames"},
+  {.name = "net/http.(*http2serverConn).Flush"},
+  {.name = "net/http.(*http2serverConn).readPreface"},
+  {.name = "runtime.exit"},
+  {.name = "runtime.dieFromSignal"},
+  {.name = "runtime.sighandler"},
+  {.name = "runtime/internal/syscall.Syscall6"},
+};
+
+static bool validate = false;
+
+#define printf_info(format,args...) do {\
+        if (validate == false) { \
+            printf(format, ## args); \
+        } \
+    } while(0)
+
+#define printf_validate(format,args...) do {\
+        if (validate == true) { \
+            printf(format, ## args); \
+        } \
+    } while(0)
+
+static void updateSymStatus(const char* funcName) {
+    for (int i = 0; i < ARRAY_SIZE(sym_table); ++i) {
+        if (strcmp(funcName, sym_table[i].name) == 0) {
+            sym_table[i].present = true;
+        }
+    }
+}
+
+static void printSymStatus(void) {
+    bool allKnownSymbols = true;
+    for (int i = 0; i < ARRAY_SIZE(sym_table); ++i) {
+        if (sym_table[i].present == false) {
+            allKnownSymbols = false;
+            printf_validate("[INFO] Missing symbol %s\n", sym_table[i].name);
+        }
+    }
+    if (allKnownSymbols) {
+        printf_validate("[INFO] There are no missing symbols\n");
+    }
+}
+
+int printSymbols(const char *fname)
 {
     int fd;
     struct stat st;
@@ -64,21 +129,24 @@ int printSymbols(const char *fname)
             */
             uint32_t magic = *((const uint32_t *)(pclntab_addr));
             if (magic == GOPCLNTAB_MAGIC_112) {
+                printf_validate("[INFO] gopclntab was recognized\n");
                 uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
                 const void *symtab_addr = pclntab_addr + 16;
-
-                printf("Symbol count = %ld\n", sym_count);
-                printf("Address\t\tSymbol Name\n");
-                printf("---------------------------\n");
+                printf_info("Symbol count = %ld\n", sym_count);
+                printf_info("Address\t\tSymbol Name\n");
+                printf_info("---------------------------\n");
                 for (i = 0; i < sym_count; i++) {
                     uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
                     uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
                     uint32_t name_offset = *((const uint32_t *)(pclntab_addr + func_offset + 8));
                     const char *func_name = (const char *)(pclntab_addr + name_offset);
-                    printf("0x%lx\t%s\n", sym_addr, func_name);
+                    printf_info("0x%lx\t%s\n", sym_addr, func_name);
+
                     symtab_addr += 16;
+                    updateSymStatus(func_name);
                 }
             } else if (magic == GOPCLNTAB_MAGIC_116) {
+                printf_validate("[INFO] gopclntab was recognized\n");
                 // the layout of pclntab:
                 //
                 //  .gopclntab/__gopclntab [elf/macho section]
@@ -118,21 +186,23 @@ int printSymbols(const char *fname)
 
                 uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (3 * 8)));
                 uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (7 * 8)));
-                
-                const void *symtab_addr = pclntab_addr + pclntab_offset;
 
-                printf("Symbol count = %ld\n", sym_count);
-                printf("Address\t\tSymbol Name\n");
-                printf("---------------------------\n");
+                const void *symtab_addr = pclntab_addr + pclntab_offset;
+                printf_info("Symbol count = %ld\n", sym_count);
+                printf_info("Address\t\tSymbol Name\n");
+                printf_info("---------------------------\n");
                 for (i = 0; i < sym_count; i++) {
                     uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
                     uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
                     uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 8));
                     const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
-                    printf("0x%lx\t%s\n", sym_addr, func_name);
+                    printf_info("0x%lx\t%s\n", sym_addr, func_name);
+
                     symtab_addr += 16;
+                    updateSymStatus(func_name);
                 }
             } else if ((magic == GOPCLNTAB_MAGIC_118) || (magic == GOPCLNTAB_MAGIC_120)) {
+                printf_validate("[INFO] gopclntab was recognized\n");
                 uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
                 uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (4 * 8)));
                 uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (8 * 8)));
@@ -140,20 +210,21 @@ int printSymbols(const char *fname)
 
                 const void *symtab_addr = pclntab_addr + pclntab_offset;
 
-                printf("Symbol count = %ld\n", sym_count);
-                printf("Address\t\tSymbol Name\n");
-                printf("---------------------------\n");
+                printf_info("Symbol count = %ld\n", sym_count);
+                printf_info("Address\t\tSymbol Name\n");
+                printf_info("---------------------------\n");
                 for (i = 0; i < sym_count; i++) {
                     uint32_t func_offset = *((uint32_t *)(symtab_addr + 4));
                     uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 4));
                     func_offset = *((uint32_t *)(symtab_addr));
                     uint64_t sym_addr = (uint64_t)(func_offset + text_start);
                     const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
-                    printf("0x%lx\t%s\n", sym_addr, func_name);
+                    printf_info("0x%lx\t%s\n", sym_addr, func_name);
                     symtab_addr += 8;
+                    updateSymStatus(func_name);
                 }
             } else {
-                fprintf(stderr, "Invalid header in .gopclntab\n");
+                fprintf(stderr, "[ERROR] Unknown header in .gopclntab\n");
                 munmap(buf, st.st_size);
                 close(fd);
                 return -1;
@@ -162,17 +233,34 @@ int printSymbols(const char *fname)
         }
     }
 
+    printSymStatus();
+
     munmap(buf, st.st_size);
     close(fd);
     return 0;
 }
 
 int main(int argc, char **argv) {
-    if (argc<2) {
-        printf("Utility for listing golang symbols from the .gopclntab section of an ELF file\n");
-        printf("Usage: gosym elf-file\n");
-        exit(0);
+    int opt;
+    while ((opt = getopt(argc, argv, "v")) != -1) {
+        switch (opt)
+        {
+            case 'v':
+                validate = true;
+                break;
+            default:
+                printf("Usage: %s elf-file [-v]\n", argv[0]);
+                exit(EXIT_FAILURE);
+        }
     }
-    printSymbols(argv[1]);
-    exit(0);
+
+    if (argc < 2) {
+        printf("Utility for listing golang symbols from the .gopclntab section of an ELF file\n");
+        printf("Usage: %s elf-file [-v]\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    printSymbols(argv[optind]);
+
+    exit(EXIT_SUCCESS);
 }

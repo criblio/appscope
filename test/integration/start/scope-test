@@ -224,6 +224,9 @@ if [ $? -ne "0" ]; then
     fail "scope stop failed"
 fi
 
+# Allow scope stop to run
+sleep 3
+
 # Check filter files are removed
 if [ -f /tmp/appscope/scope_filter ]; then
     fail "/tmp/appscope/scope_filter still present"

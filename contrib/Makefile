@@ -94,7 +94,7 @@ build/pcre2/libpcre2-posix.a build/pcre2/libpcre2-8.a:
 	@echo "$${CI:+::group::}Building pcre2"
 	@$(RM) -r build/pcre2
 	@mkdir build/pcre2
-	cd build/pcre2 && cmake ../../pcre2 && $(MAKE)
+	cd build/pcre2 && cmake ../../pcre2 -DCMAKE_C_FLAGS="${CMAKE_C_FLAGS} $(DISABLE_X28)" && $(MAKE)
 #	the pcre2 cmake constants (eg. PCRE2_...) are defined in CMakeLists.txt
 #	cd build/pcre2 && cmake  -DPCRE2_MATCH_LIMIT=500000 -DPCRE2_HEAP_LIMIT=500 -DPCRE2_MATCH_LIMIT_DEPTH=10000 -DPCRE2GREP_SUPPORT_JIT=OFF ../../pcre2 && $(MAKE)
 	objcopy --redefine-syms redefine_syms.lst build/pcre2/libpcre2-posix.a

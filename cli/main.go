@@ -50,6 +50,8 @@ static struct option opts[] = {
     { "ldattach",    required_argument, 0, 'a' },
     { "lddetach",    required_argument, 0, 'd' },
     { "namespace",   required_argument, 0, 'n' },
+    { "install",     no_argument,       0, 'i' },
+    { "rootdir",     required_argument, 0, 'R' },
     { "configure",   required_argument, 0, 'c' },
     { "unconfigure", no_argument,       0, 'w' },
     { "getfile",     required_argument, 0, 'g' },
@@ -91,6 +93,8 @@ __attribute__((constructor)) void cli_constructor() {
 	bool opt_ldattach = false;
 	bool opt_lddetach = false;
 	bool opt_namespace = false;
+	bool opt_install = false;
+	bool opt_rootdir = false;
 	bool opt_configure = false;
 	bool opt_unconfigure = false;
 	bool opt_getfile = false;
@@ -104,6 +108,7 @@ __attribute__((constructor)) void cli_constructor() {
 
 	char *arg_ldattach;
 	char *arg_lddetach;
+	char *arg_rootdir;
 	char *arg_configure;
 	char *arg_getfile;
 	char *arg_service;
@@ -145,7 +150,7 @@ __attribute__((constructor)) void cli_constructor() {
 
     for (;;) {
         index = 0;
-        int opt = getopt_long(arg_c, arg_v, "+:a:d:n:l:p:c:g:s:rxvwz", opts, &index);
+        int opt = getopt_long(arg_c, arg_v, "+:a:d:n:l:p:c:g:s:rxvwziR:", opts, &index);
         if (opt == -1) {
             break;
         }
@@ -157,6 +162,13 @@ __attribute__((constructor)) void cli_constructor() {
 		case 'd':
 			opt_lddetach = true;
 			arg_lddetach = optarg;
+			break;
+	    case 'i':
+			opt_install = true;
+			break;
+	    case 'R':
+			opt_rootdir = true;
+			arg_rootdir = optarg;
 			break;
 		case 'n':
 			opt_namespace = true;
@@ -211,6 +223,17 @@ __attribute__((constructor)) void cli_constructor() {
     }
 
 	// Handle potential argument conflicts
+	// TODO this is getting too long, let's make a function that covers all the bases with easier syntax
+	if (opt_install && (opt_ldattach || opt_lddetach)) {
+        fprintf(stderr, "error: --install and --ldattach/lddetach cannot be used together\n");
+        exit(EXIT_FAILURE);
+	}
+
+	if (opt_rootdir && (!opt_install && !opt_ldattach && !opt_lddetach)) {
+        fprintf(stderr, "error: --rootdir option requires --install or --ldattach/--lddetach option\n");
+        exit(EXIT_FAILURE);
+	}
+
 	if (opt_ldattach && opt_lddetach) {
         fprintf(stderr, "error: --ldattach and --lddetach cannot be used together\n");
         exit(EXIT_FAILURE);
@@ -285,6 +308,7 @@ __attribute__((constructor)) void cli_constructor() {
 
 	if (opt_ldattach) exit(cmdAttach(true, pid));
 	if (opt_lddetach) exit(cmdAttach(false, pid));
+	if (opt_install) exit(cmdInstall(arg_rootdir));
 	if (opt_configure) exit(cmdConfigure(arg_configure, nspid));
 	if (opt_unconfigure) exit(cmdUnconfigure(nspid));
 	if (opt_getfile) exit(cmdGetFile(arg_getfile, nspid));

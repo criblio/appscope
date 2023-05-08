@@ -71,14 +71,22 @@ cleanupDestFd:
 
 /*
  * Reassociate process identified with pid with a specific namespace described by ns.
- *
  * Returns TRUE if operation was success, FALSE otherwise.
  */
 static bool
 setNamespace(pid_t pid, const char *ns) {
+    return setNamespaceRootDir("", pid, ns);
+}
+
+/*
+ * Reassociate process identified with pid with a specific namespace described by ns.
+ * Returns TRUE if operation was success, FALSE otherwise.
+ */
+bool
+setNamespaceRootDir(const char *rootdir, pid_t pid, const char *ns) {
     char nsPath[PATH_MAX] = {0};
     int nsFd;
-    if (snprintf(nsPath, sizeof(nsPath), "/proc/%d/ns/%s", pid, ns) < 0) {
+    if (snprintf(nsPath, sizeof(nsPath), "%s/proc/%d/ns/%s", rootdir, pid, ns) < 0) {
         perror("setNamespace: snprintf failed");
         return FALSE;
     }
@@ -301,6 +309,31 @@ nsUnconfigure(pid_t pid) {
 
     if (setupUnconfigure()) {
         fprintf(stderr, "setup child namespace failed\n");
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+ /*
+ * Install in the mount namespace
+ * - switch the mount namespace
+ * - install the library
+ * Returns status of operation 0 in case of success, other values in case of failure
+ */
+int
+nsInstall(const char *rootdir, pid_t pid) {
+    uid_t nsUid = nsInfoTranslateUidRootDir(rootdir, pid);
+    gid_t nsGid = nsInfoTranslateGidRootDir(rootdir, pid);
+
+    // Switch to mnt namespace
+    if (setNamespaceRootDir(rootdir, pid, "mnt") == FALSE) {
+        fprintf(stderr, "setNamespace mnt failed\n");
+        return EXIT_FAILURE;
+    }
+
+    if (setupInstall(nsUid, nsGid)) {
+        fprintf(stderr, "setup namespace failed\n");
         return EXIT_FAILURE;
     }
 

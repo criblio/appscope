@@ -811,3 +811,31 @@ out:
 
     exit(EXIT_FAILURE);
 }
+
+// Handle the install command
+int
+cmdInstall(char *rootdir)
+{
+    uid_t eUid = geteuid();
+    gid_t eGid = getegid();
+    uid_t nsUid = eUid;
+    uid_t nsGid = eGid;
+    char *scopeLibPath;
+
+    // If rootdir is provided, extract the library into a separate namespace and return
+    if (rootdir) {
+        // Use pid 1 to locate ns fd
+        if (nsInstall(rootdir, 1)) {
+            fprintf(stderr, "error: failed to extract library\n");
+            return EXIT_FAILURE;
+        }
+    // Install the library locally
+    } else {
+        if (setupInstall(nsUid, nsGid)) {
+            fprintf(stderr, "error: failed to extract library\n");
+            return EXIT_FAILURE;
+        }
+    }
+
+    return EXIT_SUCCESS;
+}

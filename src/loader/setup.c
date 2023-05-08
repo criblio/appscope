@@ -842,3 +842,55 @@ setupUnconfigure(void) {
 
     return 0;
 }
+
+/*
+ * Install the library
+ * - extract libscope.so to /usr/lib/appscope/<version>/libscope.so or /tmp/appscope/<version>/libscope.so if it doesn't exist
+ * - created a patched copy of the library for musl
+ * Returns status of operation 0 in case of success, other value otherwise
+ */
+int
+setupInstall(uid_t nsUid, gid_t nsGid) {
+    char path[PATH_MAX] = {0};
+    mode_t mode = 0755;
+
+    // Create destination directory if not exists
+    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+    bool isDevVersion = libverIsNormVersionDev(loaderVersion);
+    bool overwrite = isDevVersion;
+
+    /*
+     * A profile will not be configured with a dev version value.
+     * Force a profile update if the env var is present.
+     */
+    if (getenv("SCOPE_START_FORCE_PROFILE")) isDevVersion = FALSE;
+
+    snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
+    mkdir_status_t res = libdirCreateDirIfMissing(path, mode, nsUid, nsGid);
+    if ((res > MKDIR_STATUS_EXISTS) || isDevVersion) {
+        mode = 0777;
+        memset(path, 0, PATH_MAX);
+        snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
+        mkdir_status_t res = libdirCreateDirIfMissing(path, mode, nsUid, nsGid);
+        if (res > MKDIR_STATUS_EXISTS) {
+            fprintf(stderr, "setupConfigure: libdirCreateDirIfMissing failed\n");
+            return -1;
+        }
+    }
+
+    strncat(path, "libscope.so", sizeof(path) - 1);
+
+    // Extract libscope.so
+    if (libdirSaveLibraryFile(path, overwrite, mode, nsUid, nsGid)) {
+        fprintf(stderr, "setupConfigure: saving %s failed\n", path);
+        return -1;
+    }
+
+    // Patch the library
+    if (patchLibrary(path) == PATCH_FAILED) {
+        fprintf(stderr, "setupConfigure: patch %s failed\n", path);
+        return -1;
+    }
+
+    return 0;
+}

@@ -11,17 +11,26 @@
 #include "nsinfo.h"
 #include "scopetypes.h"
 
+
 /*
  * Return effective uid of current user inside the namespace for specified pid.
  */
 uid_t
 nsInfoTranslateUid(pid_t hostPid) {
+    return nsInfoTranslateUidRootDir("", hostPid);
+}
+
+/*
+ * Return effective uid of current user inside the namespace for specified pid.
+ */
+uid_t
+nsInfoTranslateUidRootDir(const char *rootdir, pid_t hostPid) {
     uid_t eUid = geteuid();
     char uidPath[PATH_MAX] = {0};
     char buffer[4096] = {0};
     FILE *fd;
 
-    if (snprintf(uidPath, sizeof(uidPath), "/proc/%d/uid_map", hostPid) < 0) {
+    if (snprintf(uidPath, sizeof(uidPath), "%s/proc/%d/uid_map", rootdir, hostPid) < 0) {
         perror("snprintf uid_map failed");
         return eUid;
     }
@@ -54,12 +63,20 @@ nsInfoTranslateUid(pid_t hostPid) {
  */
 gid_t
 nsInfoTranslateGid(pid_t hostPid) {
+    return nsInfoTranslateGidRootDir("", hostPid);
+}
+
+/*
+ * Return effective gid of current user inside the namespace for specified pid.
+ */
+gid_t
+nsInfoTranslateGidRootDir(const char *rootdir, pid_t hostPid) {
     gid_t gid = getegid();
     char gidPath[PATH_MAX] = {0};
     char buffer[4096] = {0};
     FILE *fd;
 
-    if (snprintf(gidPath, sizeof(gidPath), "/proc/%d/gid_map", hostPid) < 0) {
+    if (snprintf(gidPath, sizeof(gidPath), "%s/proc/%d/gid_map", rootdir, hostPid) < 0) {
         perror("snprintf gid_map failed");
         return gid;
     }

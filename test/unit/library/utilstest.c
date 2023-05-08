@@ -2,9 +2,10 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/stat.h>
+
 #include "utils.h"
 #include "scopestdlib.h"
-
 #include "fn.h"
 #include "test.h"
 

@@ -29,7 +29,7 @@ import (
 const prefix = "scope-metrics-"
 
 // Set to > 0 to enable console messages
-var msgs = 1
+var msgs = 0
 
 // List of files that can be deleted; the remote socket is closed
 var delList = make(map[string]bool)
@@ -97,7 +97,9 @@ func Metrics(conn net.Conn) {
 		// Read lines from the connection
 		line, err := reader.ReadString('\n')
 		if err != nil {
-			log.Error().Msgf("Error reading from connection: %s", err)
+			if err != io.EOF {
+				log.Error().Msgf("Error reading from connection: %s", err)
+			}
 			break
 		}
 

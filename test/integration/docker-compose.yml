@@ -322,6 +322,15 @@ services:
       dockerfile: ./payload/Dockerfile.musl
     <<: *scope-common
 
+  prometheus:
+    image: ghcr.io/criblio/appscope-test-prometheus:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-prometheus:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./prometheus/Dockerfile
+    <<: *scope-common
+
   go_19:
     image: ghcr.io/criblio/appscope-test-go_19:${TAG:?Missing TAG environment variable}
     build:

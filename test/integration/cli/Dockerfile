@@ -22,6 +22,7 @@ COPY ./cli/test_inspect.sh /opt/test/bin/test_inspect.sh
 COPY ./cli/expected.yml /
 RUN mkdir /opt/test/conf
 COPY ./cli/payload_conf.yml /opt/test/bin/payload_conf.yml
+COPY ./cli/update_log_dest.yml /opt/test/bin/update_log_dest.yml
 
 RUN mkdir /opt/test-runner && \
     mkdir -p /var/run/appscope/ && \

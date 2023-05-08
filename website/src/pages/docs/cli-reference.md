@@ -408,8 +408,12 @@ kubectl label namespace default scope=enabled
       --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
       --namespace string      Name of the namespace in which to install; default is "default"
   -n, --nobreaker             Set Cribl Stream to not break streams into events
+      --noprom                Disable Prometheus Exporter deployment
       --port int              Port to listen on (default 4443)
+      --prommport int         Specify Prometheus Exporter port for metrics from libscope (default 9109)
+      --promsport int         Specify Prometheus Exporter port for HTTP metrics requests (default 9090)
       --server                Run Webhook server
+      --signername string     Name of the signer used to sign the certificate request for the AppScope Admission Webhook (default "kubernetes.io/kubelet-serving")
       --version string        Version of scope to deploy
 
 ```
@@ -666,11 +670,13 @@ Updates configuration of scoped process identified by PID.
 #### Examples
 
 `scope update 1000 --config test_cfg.yml`
+`scope update 1000 < test_cfg.yml`
 
 #### Flags
 
 ```
 Flags:
+  -f, --fetch           Inspect the process after the update is complete
   -c, --config string   Path to configuration file
   -h, --help            help for update
   -p, --prefix string   Prefix to /proc filesystem

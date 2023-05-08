@@ -107,7 +107,7 @@ func (c *Config) SetDefault() error {
 		Libscope: libscope.ScopeLibscopeConfig{
 			SummaryPeriod: 10,
 			CommandDir:    filepath.Join(c.WorkDir, "cmd"),
-			ConfigEvent:   "false",
+			ConfigEvent:   "true",
 			Log: libscope.ScopeLogConfig{
 				Level: "warning",
 				Transport: libscope.ScopeTransport{
@@ -160,7 +160,7 @@ func (c *Config) configFromRunOpts() error {
 	}
 
 	if c.MetricsFormat != "" {
-		if c.MetricsFormat != "ndjson" && c.MetricsFormat != "statsd" {
+		if c.MetricsFormat != "ndjson" && c.MetricsFormat != "statsd" && c.MetricsFormat != "prometheus" {
 			return fmt.Errorf("invalid metrics format %s", c.MetricsFormat)
 		}
 		c.sc.Metric.Format.FormatType = c.MetricsFormat

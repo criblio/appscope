@@ -18,7 +18,6 @@
 
 #define PCRE_STACK_SIZE (32 * 1024)
 
-extern bool g_need_stack_expand;
 extern unsigned g_sendprocessstart;
 extern bool g_exitdone;
 

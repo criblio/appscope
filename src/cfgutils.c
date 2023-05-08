@@ -102,6 +102,7 @@
 enum_map_t formatMap[] = {
     {"statsd",                CFG_FMT_STATSD},
     {"ndjson",                CFG_FMT_NDJSON},
+    {"prometheus",            CFG_FMT_PROMETHEUS},
     {NULL,                    -1}
 };
 

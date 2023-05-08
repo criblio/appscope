@@ -11,6 +11,7 @@ import (
 type Options struct {
 	App             string
 	Namespace       string
+	SignerName      string
 	Version         string
 	CriblDest       string
 	MetricDest      string
@@ -20,6 +21,9 @@ type Options struct {
 	KeyFile         string
 	Port            int
 	Debug           bool
+	PromDisable     bool
+	PromMPort       int
+	PromSPort       int
 	ScopeConfigYaml []byte
 }
 

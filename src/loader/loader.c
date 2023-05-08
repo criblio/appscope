@@ -454,7 +454,7 @@ cmdAttach(bool ldattach, pid_t pid)
 
         scopeLibPath = (char *)libdirGetPath();
 
-        if (patchLibrary(scopeLibPath) == PATCH_FAILED) {
+        if (patchLibrary(scopeLibPath, FALSE) == PATCH_FAILED) {
             fprintf(stderr, "error: failed to patch library\n");
             goto out;
         }
@@ -627,7 +627,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
 
         scopeLibPath = (char *)libdirGetPath();
 
-        if (patchLibrary(scopeLibPath) == PATCH_FAILED) {
+        if (patchLibrary(scopeLibPath, FALSE) == PATCH_FAILED) {
             fprintf(stderr, "error: failed to patch library\n");
             goto out;
         }

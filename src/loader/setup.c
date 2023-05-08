@@ -806,7 +806,7 @@ setupConfigure(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
     }
 
     // Patch the library
-    if (patchLibrary(path) == PATCH_FAILED) {
+    if (patchLibrary(path, FALSE) == PATCH_FAILED) {
         fprintf(stderr, "setupConfigure: patch %s failed\n", path);
         return -1;
     }
@@ -886,8 +886,16 @@ setupInstall(uid_t nsUid, gid_t nsGid) {
         return -1;
     }
 
-    // Patch the library
-    if (patchLibrary(path) == PATCH_FAILED) {
+    strncat(path, ".musl", sizeof(path) - 1);
+
+    // Extract libscope.so for musl
+    if (libdirSaveLibraryFile(path, overwrite, mode, nsUid, nsGid)) {
+        fprintf(stderr, "setupConfigure: saving %s failed\n", path);
+        return -1;
+    }
+
+    // Force Patch the library copy for musl
+    if (patchLibrary(path, TRUE) == PATCH_FAILED) {
         fprintf(stderr, "setupConfigure: patch %s failed\n", path);
         return -1;
     }

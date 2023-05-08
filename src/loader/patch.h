@@ -9,7 +9,7 @@ typedef enum {
     PATCH_NO_OP,    // patch operation was not performed
 } patch_status_t;
 
-patch_status_t patchLibrary(const char*);
+patch_status_t patchLibrary(const char*, bool);
 patch_status_t patchLoader(unsigned char *, uid_t, gid_t);
 
 #endif // __PATCH_H__

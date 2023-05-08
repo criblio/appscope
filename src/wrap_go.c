@@ -31,6 +31,7 @@
 #define PRI_STR_LEN sizeof(PRI_STR)
 #define UNDEF_OFFSET (-1)
 #define EXIT_STACK_SIZE (32 * 1024)
+#define DOCKERD_AFTER_OVERLAY_MOUNTS 3
 
 enum go_arch_t {
     X86_64,
@@ -915,7 +916,7 @@ go_version_numbers(const char *go_runtime_version)
  * can't resolve the symbol without a version extension, we
  * try the symbol with extension.
  */
-void *
+static void *
 tryAbi0(const char *buf, char *sname)
 {
     if (!buf || !sname) return NULL;
@@ -1226,7 +1227,7 @@ getFDFromConn(uint64_t tcpConn) {
  * the Edge Unix socket in a container.
  *
  * Update ld.so.preload such that all procs load the library.
- * Initailly intended for dockerd.
+ * Initially intended for dockerd.
  */
 static bool
 mountDirs(char *src, char *target, char *fstype)
@@ -1241,11 +1242,16 @@ mountDirs(char *src, char *target, char *fstype)
      * only applies to the dockerd proc
      * ensure the constructor populated a path
      * proceed only after container mounts are done
+     *
+     * We need to apply auto mounts after the overlay mounts are performed.
+     * Given that there are 3 mounts that encompass the overlays, we count
+     * the mounts and apply auto mounts at that point. The constant
+     * DOCKERD_AFTER_OVERLAY_MOUNTS defines the overlay activity.
      */
     if ((src != NULL) && (target != NULL) &&
         scope_strstr(g_proc.procname, "dockerd") &&
         (scope_strstr(g_libpath, "/")) &&
-        (once == 3)) {
+        (once == DOCKERD_AFTER_OVERLAY_MOUNTS)) {
         int ldfd;
         char *filterdir;
         size_t targetlen = scope_strlen(target);

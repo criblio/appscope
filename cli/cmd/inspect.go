@@ -27,7 +27,7 @@ scope inspect --all`,
 		internal.InitConfig()
 		all, _ := cmd.Flags().GetBool("all")
 		prefix, _ := cmd.Flags().GetString("prefix")
-		// jsonOut, _ := cmd.Flags().GetBool("json")
+		jsonOut, _ := cmd.Flags().GetBool("json")
 
 		// Nice message for non-adminstrators
 		err := util.UserVerifyRootPerm()
@@ -71,7 +71,16 @@ scope inspect --all`,
 				util.ErrAndExit("Error creating json array: %v", err)
 			}
 
-			fmt.Println(string(cfgs))
+			if jsonOut {
+				// Print each json entry on a newline, without any pretty printing
+				for _, state := range iouts {
+					fmt.Println(state)
+				}
+			} else {
+				// Print the array, in a pretty format
+				fmt.Println(string(cfgs))
+			}
+
 			return
 		}
 

@@ -66,18 +66,22 @@ scope inspect --all`,
 				}
 				iouts = append(iouts, iout)
 			}
-			cfgs, err := json.MarshalIndent(iouts, "", "   ")
-			if err != nil {
-				util.ErrAndExit("Error creating json array: %v", err)
-			}
 
 			if jsonOut {
 				// Print each json entry on a newline, without any pretty printing
-				for _, state := range iouts {
-					fmt.Println(state)
+				for _, iout := range iouts {
+					cfg, err := json.Marshal(iout)
+					if err != nil {
+						util.ErrAndExit("Error creating json object: %v", err)
+					}
+					fmt.Println(string(cfg))
 				}
 			} else {
 				// Print the array, in a pretty format
+				cfgs, err := json.MarshalIndent(iouts, "", "   ")
+				if err != nil {
+					util.ErrAndExit("Error creating json array: %v", err)
+				}
 				fmt.Println(string(cfgs))
 			}
 

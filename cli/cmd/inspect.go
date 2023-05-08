@@ -27,7 +27,7 @@ scope inspect --all`,
 		internal.InitConfig()
 		all, _ := cmd.Flags().GetBool("all")
 		prefix, _ := cmd.Flags().GetString("prefix")
-		// jsonOut, _ := cmd.Flags().GetBool("json")
+		jsonOut, _ := cmd.Flags().GetBool("json")
 
 		// Nice message for non-adminstrators
 		err := util.UserVerifyRootPerm()
@@ -66,12 +66,25 @@ scope inspect --all`,
 				}
 				iouts = append(iouts, iout)
 			}
-			cfgs, err := json.MarshalIndent(iouts, "", "   ")
-			if err != nil {
-				util.ErrAndExit("Error creating json array: %v", err)
+
+			if jsonOut {
+				// Print each json entry on a newline, without any pretty printing
+				for _, iout := range iouts {
+					cfg, err := json.Marshal(iout)
+					if err != nil {
+						util.ErrAndExit("Error creating json object: %v", err)
+					}
+					fmt.Println(string(cfg))
+				}
+			} else {
+				// Print the array, in a pretty format
+				cfgs, err := json.MarshalIndent(iouts, "", "   ")
+				if err != nil {
+					util.ErrAndExit("Error creating json array: %v", err)
+				}
+				fmt.Println(string(cfgs))
 			}
 
-			fmt.Println(string(cfgs))
 			return
 		}
 
@@ -104,7 +117,7 @@ scope inspect --all`,
 		}
 
 		pidCtx.Pid = pid
-		_, cfg, err := inspect.InspectProcess(*pidCtx)
+		iout, _, err := inspect.InspectProcess(*pidCtx)
 		if err != nil {
 			if !admin {
 				util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
@@ -112,7 +125,21 @@ scope inspect --all`,
 			util.ErrAndExit("Inspect PID fails: %v", err)
 		}
 
-		fmt.Println(cfg)
+		if jsonOut {
+			// Print the json object without any pretty printing
+			cfg, err := json.Marshal(iout)
+			if err != nil {
+				util.ErrAndExit("Error creating json object: %v", err)
+			}
+			fmt.Println(string(cfg))
+		} else {
+			// Print the json in a pretty format
+			cfg, err := json.MarshalIndent(iout, "", "   ")
+			if err != nil {
+				util.ErrAndExit("Error creating json array: %v", err)
+			}
+			fmt.Println(string(cfg))
+		}
 	},
 }
 

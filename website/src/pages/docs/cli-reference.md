@@ -370,7 +370,7 @@ scope inspect --all
 ```
   -a, --all             Inspect all processes
   -h, --help            Help for inspect
-  -j, --json            Output as newline delimited JSON
+  -j, --json            Output as newline delimited JSON without pretty printing
   -p, --prefix string   When running AppScope in a container, and scoping an app that's running outside the container, 
 --prefix is the path to host filesystem of the scoped app
 ```
@@ -680,6 +680,7 @@ Flags:
   -c, --config string   Path to configuration file
   -h, --help            help for update
   -p, --prefix string   Prefix to /proc filesystem
+  -j, --json            Output as newline delimited JSON without pretty printing
 ```
 
 ### version

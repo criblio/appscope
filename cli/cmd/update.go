@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -30,6 +31,7 @@ scope update 1000 < test_cfg.yml`,
 		prefix, _ := cmd.Flags().GetString("prefix")
 		fetch, _ := cmd.Flags().GetBool("fetch")
 		cfgPath, _ := cmd.Flags().GetString("config")
+		jsonOut, _ := cmd.Flags().GetBool("json")
 
 		// Nice message for non-adminstrators
 		err := util.UserVerifyRootPerm()
@@ -87,11 +89,11 @@ scope update 1000 < test_cfg.yml`,
 			}
 			util.ErrAndExit("Update Scope configuration fails: %v", err)
 		}
-		fmt.Println("Update Scope configuration success.")
+		util.Warn("Update Scope configuration success.")
 
 		if fetch {
 			time.Sleep(2 * time.Second)
-			_, cfg, err := inspect.InspectProcess(*pidCtx)
+			iout, _, err := inspect.InspectProcess(*pidCtx)
 			if err != nil {
 				if !admin {
 					util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
@@ -99,7 +101,21 @@ scope update 1000 < test_cfg.yml`,
 				util.ErrAndExit("Inspect PID fails: %v", err)
 			}
 
-			fmt.Println(cfg)
+			if jsonOut {
+				// Print the json object without any pretty printing
+				cfg, err := json.Marshal(iout)
+				if err != nil {
+					util.ErrAndExit("Error creating json object: %v", err)
+				}
+				fmt.Println(string(cfg))
+			} else {
+				// Print the json in a pretty format
+				cfg, err := json.MarshalIndent(iout, "", "   ")
+				if err != nil {
+					util.ErrAndExit("Error creating json array: %v", err)
+				}
+				fmt.Println(string(cfg))
+			}
 		}
 	},
 }

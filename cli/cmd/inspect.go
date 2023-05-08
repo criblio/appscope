@@ -117,7 +117,7 @@ scope inspect --all`,
 		}
 
 		pidCtx.Pid = pid
-		_, cfg, err := inspect.InspectProcess(*pidCtx)
+		iout, _, err := inspect.InspectProcess(*pidCtx)
 		if err != nil {
 			if !admin {
 				util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
@@ -125,7 +125,21 @@ scope inspect --all`,
 			util.ErrAndExit("Inspect PID fails: %v", err)
 		}
 
-		fmt.Println(cfg)
+		if jsonOut {
+			// Print the json object without any pretty printing
+			cfg, err := json.Marshal(iout)
+			if err != nil {
+				util.ErrAndExit("Error creating json object: %v", err)
+			}
+			fmt.Println(string(cfg))
+		} else {
+			// Print the json in a pretty format
+			cfg, err := json.MarshalIndent(iout, "", "   ")
+			if err != nil {
+				util.ErrAndExit("Error creating json array: %v", err)
+			}
+			fmt.Println(string(cfg))
+		}
 	},
 }
 

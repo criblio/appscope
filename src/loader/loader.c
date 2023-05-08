@@ -820,7 +820,6 @@ cmdInstall(char *rootdir)
     gid_t eGid = getegid();
     uid_t nsUid = eUid;
     uid_t nsGid = eGid;
-    char *scopeLibPath;
 
     // If rootdir is provided, extract the library into a separate namespace and return
     if (rootdir) {

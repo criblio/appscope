@@ -3,7 +3,7 @@
 #
 # The `contrib/` folder contains a number of external dependencies we keep
 # locally to ensure things don't change under us. The logic here builds them.
-# 
+#
 # To support caching the results, we build most of these into subdirectories of
 # `./build/` and try not to make any changes/additions in the source folders
 # themselves. In CI, we can hash the source folder to get a key for caching the
@@ -82,7 +82,7 @@ build/openssl/libssl.a build/openssl/libcrypto.a:
 	@echo "$${CI:+::group::}Building openssl"
 	@$(RM) -r build/openssl
 	@mkdir build/openssl
-	cd build/openssl && ../../openssl/Configure no-engine no-async no-tests no-unit-test no-threads && make -j$(nproc)
+	cd build/openssl && ../../openssl/Configure no-engine no-async no-tests no-unit-test no-threads no-shared && $(MAKE)
 	# Yuck.  Avoids naming conflict between our wrap.c and libssl.a
 	objcopy --redefine-sym SSL_read=SCOPE_SSL_read build/openssl/libssl.a
 	objcopy --redefine-sym SSL_write=SCOPE_SSL_write build/openssl/libssl.a
@@ -94,9 +94,7 @@ build/pcre2/libpcre2-posix.a build/pcre2/libpcre2-8.a:
 	@echo "$${CI:+::group::}Building pcre2"
 	@$(RM) -r build/pcre2
 	@mkdir build/pcre2
-	cd build/pcre2 && cmake ../../pcre2 && $(MAKE)
-#	the pcre2 cmake constants (eg. PCRE2_...) are defined in CMakeLists.txt
-#	cd build/pcre2 && cmake  -DPCRE2_MATCH_LIMIT=500000 -DPCRE2_HEAP_LIMIT=500 -DPCRE2_MATCH_LIMIT_DEPTH=10000 -DPCRE2GREP_SUPPORT_JIT=OFF ../../pcre2 && $(MAKE)
+	cd build/pcre2 && cmake -DPCRE2_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=OFF ../../pcre2 && $(MAKE)
 	objcopy --redefine-syms redefine_syms.lst build/pcre2/libpcre2-posix.a
 	objcopy --redefine-syms redefine_syms.lst build/pcre2/libpcre2-8.a
 	@[ -z "$(CI)" ] || echo "::endgroup::"

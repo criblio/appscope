@@ -1,12 +1,16 @@
 package start
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"path"
 	"strconv"
+	"strings"
+	"syscall"
 
 	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/loader"
@@ -165,6 +169,70 @@ func startConfigureHost(filename string) error {
 }
 
 // for all containers
+func startAutoMount(cPid int) error {
+	fmt.Println("startAutoMount: ", cPid)
+	mnt, err := os.Open(fmt.Sprintf("/proc/%d/mounts", cPid))
+	if err != nil {
+		log.Warn().
+			Err(err).
+			Str("pid", strconv.Itoa(cPid)).
+			Msgf("Can't read mount file for %v.", cPid)
+		return err
+	}
+	reader := bufio.NewReader(mnt)
+	for {
+		// Read a line per mount
+		mline, err := reader.ReadString('\n')
+		if err != nil {
+			log.Warn().
+				Err(err).
+				Str("pid", strconv.Itoa(cPid)).
+				Msgf("Can't read mount file for %v.", cPid)
+			return err
+		}
+
+		if strings.Contains(mline, "workdir") == true {
+			starti := strings.Index(mline, "workdir=")
+			starti += len("workdir=")
+			fmt.Println(mline[starti:])
+			strstart := mline[starti:]
+			endi := strings.Index(strstart, "/work")
+			overlay := strstart[:endi]
+			fmt.Println(overlay)
+
+			verdir, err := getAppScopeVerDir()
+			if err != nil {
+				log.Warn().
+					Err(err).
+					Msgf("Can't get scope dir")
+				continue
+			}
+
+			mpath := path.Join(overlay, "merged", verdir)
+			fmt.Println(mpath)
+
+			if err = os.MkdirAll(mpath, 0755); err != nil {
+				log.Warn().
+					Err(err).
+					Str("mpath", mpath).
+					Msgf("mkdir failed for %v.", mpath)
+				continue
+			}
+
+			if err = syscall.Mount(verdir, mpath, "", syscall.MS_BIND, ""); err != nil {
+				log.Warn().
+					Err(err).
+					Str("path", mpath).
+					Msgf("Bind mount failed for %v", mpath)
+				continue
+			}
+			break
+		}
+	}
+	return nil
+}
+
+// for all containers
 func startConfigureContainers(filename string, cPids []int) error {
 	// Iterate over all containers
 	for _, cPid := range cPids {
@@ -282,6 +350,13 @@ func Start() error {
 		log.Error().
 			Msg("Scope start requires administrator privileges")
 		return err
+	}
+
+	// ############################
+	cMypids := getContainersPids()
+	for _, cThisPid := range cMypids {
+		startAutoMount(cThisPid)
+		return nil
 	}
 
 	cfgData := getStartData()

@@ -798,6 +798,13 @@ if ! ps -p $SCOPE_PID > /dev/null; then
     ERR+=1
 fi
 
+count=$(grep 'bad g' $ERR_FILE | wc -l)
+if [ $count -ne 0 ] ; then
+    echo "$SCOPE_PID bad g seen in $ERR_FILE before sigkill"
+    cat $ERR_FILE
+    ERR+=1
+fi
+
 while kill -0 ${SCOPE_PID} &> /dev/null; do
   kill -SIGKILL ${SCOPE_PID}
   sleep 1
@@ -805,6 +812,8 @@ done
 
 count=$(grep 'bad g' $ERR_FILE | wc -l)
 if [ $count -ne 0 ] ; then
+    echo "$SCOPE_PID bad g seen in $ERR_FILE after sigkill"
+    cat $ERR_FILE
     ERR+=1
 fi
 

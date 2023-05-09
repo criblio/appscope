@@ -419,7 +419,7 @@ patchLibrary(const char *so_path, bool force) {
     char *ldso_exe = NULL;
       
     ldso_exe = getLoaderFile(EXE_TEST_FILE);
-    if (ldso_exe && ((strstr(ldso_exe, LIBMUSL) != NULL) || force)) {
+    if (force || (ldso_exe && (strstr(ldso_exe, LIBMUSL) != NULL))) {
         if (!setLibraryFile(so_path)) {
             patch_res = PATCH_SUCCESS;
         } else {

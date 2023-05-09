@@ -600,8 +600,8 @@ Create a snapshot for a process. Snapshot file/s will be created in `/tmp/appsco
 ---
 
 Install the AppScope library to:
-/usr/lib/appscope/<version>/ for release builds, or 
-/tmp/appscope/<version>/ for development builds
+/usr/lib/appscope/<version>/ with admin privileges, or 
+/tmp/appscope/<version>/ otherwise
 
 #### Usage
 

@@ -104,6 +104,13 @@ if [ ! -f $LIBSCOPE_PATH ]; then
     fail "missing $LIBSCOPE_PATH"
 fi
 
+LIBSCOPE_PATH=$(find /usr/lib/appscope/ -name libscope.so.musl)
+
+# Check if libscope.so is placed in known location
+if [ ! -f $LIBSCOPE_PATH ]; then
+    fail "missing $LIBSCOPE_PATH"
+fi
+
 cleanupAfterStart
 
 sleep 3

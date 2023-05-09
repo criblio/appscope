@@ -3,7 +3,6 @@ package start
 import (
 	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/run"
-	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
 )
 
@@ -11,13 +10,6 @@ import (
 func Start(rootdir string) error {
 	// Create a history directory for logs
 	run.CreateWorkDirBasic("start")
-
-	// Validate user has root permissions
-	if err := util.UserVerifyRootPerm(); err != nil {
-		log.Error().
-			Msg("Scope start requires administrator privileges")
-		return err
-	}
 
 	// Instantiate the loader
 	ld := loader.New()

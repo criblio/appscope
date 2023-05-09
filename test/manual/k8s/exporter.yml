@@ -15,13 +15,15 @@ spec:
     spec:
       containers:
       - name: pexport
-        image: prom-exporter:latest
+        image: cribl/prom-exporter:latest
         command: ["sleep", "infinity"]
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: prom-export
           mountPath: /hostfs
           readOnly: true
+        ports:
+        - containerPort: 9100
       volumes:
       - name: prom-export
         hostPath:

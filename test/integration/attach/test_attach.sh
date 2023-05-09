@@ -293,6 +293,7 @@ export SCOPE_EVENT_DEST=file://$EVT_FILE
 sleep 10
 
 curl http://localhost:8000
+sleep 1
 
 grep -q http.req $EVENT_DEST_NEW > /dev/null
 ERR+=$?
@@ -358,7 +359,7 @@ sleep 10
 #     ERR+=1
 # fi
 # enable the code after fixing TODO in attachCmd
-# CONF_NEW=" /opt/test_config/scope_test_cfg.yml"
+# CONF_NEW="/opt/test_config/scope_test_cfg.yml"
 # EVENT_DEST_NEW="/opt/test-runner/logs/events_from_cfg.log"
 
 # unset SCOPE_EVENT_DEST
@@ -368,6 +369,7 @@ sleep 10
 # sleep 10
 
 # curl http://localhost:8000
+# sleep 1
 
 # grep -q http.req $EVENT_DEST_NEW > /dev/null
 # ERR+=$?
@@ -375,6 +377,7 @@ sleep 10
 # grep -q http.resp $EVENT_DEST_NEW > /dev/null
 # ERR+=$?
 
+# EVT_FILE_FILESIZE=$(stat -c%s "$EVT_FILE")
 # if [ $EVT_FILE_FILESIZE -ne 0 ]; then
 #     echo "File size should equal 0 after reattach"
 #     ERR+=1

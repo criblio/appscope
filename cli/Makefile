@@ -25,8 +25,6 @@ SCOPE := $(BINDIR)/scope
 SCOPEDYN := $(BINDIR)/scopedyn
 LIBSCOPE := $(LIBDIR)/libscope.so
 LIBLOADER := $(LIBDIR)/libloader.a
-SIGDEL := bpf/sigdel/gen_sigdel_bpfel.go
-SYSHEADER := bpf/vmlinux.h
 CONF_YML := $(CONFDIR)/scope.yml
 LOADER_C_FILES:=$(wildcard $(SRCDIR)/loader/*.c)
 LIBRARY_C_FILES:=$(wildcard $(SRCDIR)/*.c)
@@ -73,8 +71,6 @@ clean:
 	$(RM) -rf -- .gomod/*/
 	$(RM) -rf -- .gobin/x86_64/go*
 	$(RM) -rf -- .gobin/aarch64/go*
-	$(RM) -rf -- bpf/sigdel/gen_sigdel_bpfel.go
-	$(RM) -rf -- bpf/sigdel/*.o
 	$(RM) -rf -- bpf/vmlinux.h
 
 ## deps: install dependencies
@@ -119,12 +115,6 @@ $(SCOPE): $(GOVVV) $(filter-out %_test.go,$(shell find . -type f -name '*.go'))
 		$(BUILD_OPTS) \
 	       	-o $(SCOPE)
 	$(RM) -r $(SCOPEDYN)
-
-$(SIGDEL): bpf/sigdel/sigdel.bpf.c $(SYSHEADER)
-	go generate bpf/sigdel/*.go
-
-$(SYSHEADER):
-	bpftool btf dump file /sys/kernel/btf/vmlinux format c > bpf/vmlinux.h
 
 ## test: run unit tests
 test:

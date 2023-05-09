@@ -160,7 +160,7 @@ event:
     field: .*
     value: .*
 libscope:
-  configevent: false
+  configevent: true
   summaryperiod: 10
   commanddir: CMDDIR
   log:

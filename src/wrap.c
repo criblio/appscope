@@ -1159,7 +1159,7 @@ periodic(void *arg)
 
     pthread_sigmask(SIG_BLOCK, &mask, NULL);
     bool perf;
-    static time_t summaryTime, logReportTime;
+    static time_t summaryTime, logReportTime, ipcPollTime;
 
     struct timeval tv;
     scope_gettimeofday(&tv, NULL);
@@ -1215,7 +1215,11 @@ periodic(void *arg)
             }
         }
         remoteConfig();
-        ipcCommunication();
+
+        if (tv.tv_sec >= ipcPollTime) {
+            ipcCommunication();
+            ipcPollTime = tv.tv_sec + IPC_POLL_INTERVAL_SEC;
+        }
     }
 
     return NULL;

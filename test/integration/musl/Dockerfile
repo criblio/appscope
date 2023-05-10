@@ -27,6 +27,8 @@ ENV SCOPE_EVENT_DEST=file:///opt/test-runner/logs/events.log
 ENV SCOPE_ALLOW_MUSL_ATTACH=true
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+RUN echo "export PATH=/usr/local/scope:/usr/local/scope/bin:${PATH}" >/etc/profile.d/path.sh
+
 COPY scope-profile.sh /etc/profile.d/scope.sh
 COPY gdbinit /root/.gdbinit
 

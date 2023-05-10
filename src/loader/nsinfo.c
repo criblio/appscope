@@ -16,14 +16,6 @@
  * Return effective uid of current user inside the namespace for specified pid.
  */
 uid_t
-nsInfoTranslateUid(pid_t hostPid) {
-    return nsInfoTranslateUidRootDir("", hostPid);
-}
-
-/*
- * Return effective uid of current user inside the namespace for specified pid.
- */
-uid_t
 nsInfoTranslateUidRootDir(const char *rootdir, pid_t hostPid) {
     uid_t eUid = geteuid();
     char uidPath[PATH_MAX] = {0};
@@ -56,14 +48,6 @@ nsInfoTranslateUidRootDir(const char *rootdir, pid_t hostPid) {
     fclose(fd);
 
     return eUid;
-}
-
-/*
- * Return effective gid of current user inside the namespace for specified pid.
- */
-gid_t
-nsInfoTranslateGid(pid_t hostPid) {
-    return nsInfoTranslateGidRootDir("", hostPid);
 }
 
 /*

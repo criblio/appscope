@@ -164,8 +164,8 @@ attachCmd(pid_t pid, bool attach)
     unlink(buf);
 
 
-    uid_t nsUid = nsInfoTranslateUid(pid);
-    gid_t nsGid = nsInfoTranslateGid(pid);
+    uid_t nsUid = nsInfoTranslateUidRootDir("", pid);
+    gid_t nsGid = nsInfoTranslateGidRootDir("", pid);
 
     fd = nsFileOpen(buf, O_WRONLY|O_CREAT, nsUid, nsGid, geteuid(), getegid());
     if (fd == -1) {
@@ -436,8 +436,8 @@ cmdAttach(bool ldattach, pid_t pid)
     elf_buf_t *scope_ebuf = NULL;
     elf_buf_t *ebuf = NULL;
 
-    nsUid = nsInfoTranslateUid(pid);
-    nsGid = nsInfoTranslateGid(pid);
+    nsUid = nsInfoTranslateUidRootDir("", pid);
+    nsGid = nsInfoTranslateGidRootDir("", pid);
 
     scope_ebuf = getElf("/proc/self/exe");
     if (!scope_ebuf) {
@@ -608,8 +608,8 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
     elf_buf_t *ebuf = NULL;
 
     if (nspid != -1) {
-        nsUid = nsInfoTranslateUid(nspid);
-        nsGid = nsInfoTranslateGid(nspid);
+        nsUid = nsInfoTranslateUidRootDir("", nspid);
+        nsGid = nsInfoTranslateGidRootDir("", nspid);
     }
 
     scope_ebuf = getElf("/proc/self/exe");
@@ -814,7 +814,7 @@ out:
 
 // Handle the install command
 int
-cmdInstall(char *rootdir)
+cmdInstall(const char *rootdir)
 {
     uid_t eUid = geteuid();
     gid_t eGid = getegid();

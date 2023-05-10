@@ -47,6 +47,14 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 		shouldModify = false
 	}
 
+	// Use scope-pod-init to see if the pod is already mutated
+	// if so, don't double-mutate it
+	for i := 0; i < len(pod.Spec.InitContainers); i++ {
+		if pod.Spec.InitContainers[i].Name == "scope-pod-init" {
+			shouldModify = false
+		}
+	}
+
 	ver := internal.GetNormalizedVersion()
 
 	patch := []JSONPatchEntry{}

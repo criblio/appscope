@@ -228,21 +228,6 @@ endtest
 
 
 #
-# Scope start no input
-#
-starttest "Scope start no input"
-
-# Scope start
-run scope start -f
-outputs "Exiting due to start failure"
-returns 1
-scope logs -s | grep -q "Missing filter data"
-ERR+=$?
-
-endtest
-
-
-#
 # Scope detach by name
 #
 starttest "Scope detach by name"

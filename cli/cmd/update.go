@@ -28,7 +28,7 @@ scope update 1000 < test_cfg.yml`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
-		prefix, _ := cmd.Flags().GetString("prefix")
+		rootdir, _ := cmd.Flags().GetString("rootdir")
 		fetch, _ := cmd.Flags().GetBool("fetch")
 		cfgPath, _ := cmd.Flags().GetString("config")
 		jsonOut, _ := cmd.Flags().GetBool("json")
@@ -78,7 +78,7 @@ scope update 1000 < test_cfg.yml`,
 		}
 
 		pidCtx := &ipc.IpcPidCtx{
-			PrefixPath: prefix,
+			PrefixPath: rootdir,
 			Pid:        pid,
 		}
 
@@ -122,7 +122,7 @@ scope update 1000 < test_cfg.yml`,
 
 func init() {
 	updateCmd.Flags().BoolP("fetch", "f", false, "Inspect the process after the update is complete")
-	updateCmd.Flags().StringP("prefix", "p", "", "Prefix to proc filesystem")
+	updateCmd.Flags().StringP("rootdir", "p", "", "Path to root filesystem of target namespace")
 	updateCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	updateCmd.Flags().StringP("config", "c", "", "Path to configuration file")
 	RootCmd.AddCommand(updateCmd)

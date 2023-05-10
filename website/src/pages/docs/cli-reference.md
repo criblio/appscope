@@ -371,8 +371,7 @@ scope inspect --all
   -a, --all             Inspect all processes
   -h, --help            Help for inspect
   -j, --json            Output as newline delimited JSON without pretty printing
-  -p, --prefix string   When running AppScope in a container, and scoping an app that's running outside the container, 
---prefix is the path to host filesystem of the scoped app
+  -p, --rootdir string  Path to root filesystem of target namespace
 ```
 
 ### k8s
@@ -618,7 +617,7 @@ scope start --rootdir /hostfs
 
 ```
   -h, --help             help for start
-  -p, --rootdir string   Path to root filesystem of another namespace
+  -p, --rootdir string   Path to root filesystem of target namespace
 ```
 
 ### stop
@@ -667,7 +666,7 @@ Flags:
   -f, --fetch           Inspect the process after the update is complete
   -c, --config string   Path to configuration file
   -h, --help            help for update
-  -p, --prefix string   Prefix to /proc filesystem
+  -p, --rootdir string  Prefix to /proc filesystem
   -j, --json            Output as newline delimited JSON without pretty printing
 ```
 

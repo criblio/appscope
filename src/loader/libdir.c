@@ -153,8 +153,8 @@ getAsset(libdirfile_t objFileType, unsigned char **start)
 /*
  * Getting objects bundled
  */
-static int
-libdirCreateFileIfMissing(const char *path, bool overwrite, mode_t mode, uid_t nsEuid, gid_t nsEgid) {
+int
+libdirCreateFileIfMissing(unsigned char *file, size_t file_len, const char *path, bool overwrite, mode_t mode, uid_t nsEuid, gid_t nsEgid) {
     // Check if file exists
     if (!access(path, R_OK) && !overwrite) {
         return 0; // File exists
@@ -165,8 +165,13 @@ libdirCreateFileIfMissing(const char *path, bool overwrite, mode_t mode, uid_t n
     unsigned char *start;
     size_t len;
 
-    if ((len = getAsset(LIBRARY_FILE, &start)) == -1) {
-        return -1;
+    if (file) {
+        start = file;
+        len = file_len;
+    } else {
+        if ((len = getAsset(LIBRARY_FILE, &start)) == -1) {
+            return -1;
+        }
     }
 
     // Write file
@@ -467,15 +472,6 @@ libdirGetPath(void) {
     return NULL;
 }
 
-/*
-* Save libscope.so with specified permissions and ownership in specified path.
-* Returns 0 if file was successfully created or if file already exists, -1 in case of failure.
-*/
-int
-libdirSaveLibraryFile(const char *libraryPath, bool overwrite, mode_t mode, uid_t uid, gid_t gid) {
-    return libdirCreateFileIfMissing(libraryPath, overwrite, mode, uid, gid);
-}
-
 int
 libdirCreate(char *base, mode_t mode, uid_t uid, gid_t gid, bool isDevVersion, const char *normVer) {
     int pathLen;
@@ -509,7 +505,7 @@ libdirCreate(char *base, mode_t mode, uid_t uid, gid_t gid, bool isDevVersion, c
             return -1;
         }
 
-        if (!libdirCreateFileIfMissing(path, isDevVersion, mode, uid, gid)) {
+        if (!libdirCreateFileIfMissing(NULL, 0, path, isDevVersion, mode, uid, gid)) {
             strncpy(state->binaryPath, path, PATH_MAX);
             strncpy(state->binaryBasepath, base, PATH_MAX);
             return 0;

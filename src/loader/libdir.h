@@ -24,10 +24,10 @@ typedef enum {
 } mkdir_status_t;
 
 mkdir_status_t libdirCreateDirIfMissing(const char *, mode_t, uid_t, gid_t);
+int libdirCreateFileIfMissing(unsigned char *, size_t, const char *, bool, mode_t, uid_t, gid_t);
 int libdirSetLibraryBase(const char *);                                      // Override default library base search dir i.e. /tmp
 int libdirExtract(uid_t, gid_t);                                             // Extracts libscope.so to default path
 const char *libdirGetPath(void);                                             // Get full path to existing libscope.so
-int libdirSaveLibraryFile(const char *, bool, mode_t, uid_t, gid_t);         // Save libscope.so to specified path overwrite
 size_t getAsset(libdirfile_t, unsigned char **);
 
 // Unit Test helper

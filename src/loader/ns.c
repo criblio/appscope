@@ -323,8 +323,17 @@ nsUnconfigure(pid_t pid) {
  */
 int
 nsInstall(const char *rootdir, pid_t pid) {
+    unsigned char *file;
+    size_t file_len;
     uid_t nsUid = nsInfoTranslateUidRootDir(rootdir, pid);
     gid_t nsGid = nsInfoTranslateGidRootDir(rootdir, pid);
+
+    // Extract library from scope binary into memory
+    // while in the origin namespace
+    if ((file_len = getAsset(LIBRARY_FILE, &file)) == -1) {
+        fprintf(stderr, "nsInstall getAsset failed\n");
+        return EXIT_FAILURE;
+    }
 
     // Switch to mnt namespace
     if (setNamespaceRootDir(rootdir, pid, "mnt") == FALSE) {
@@ -332,7 +341,7 @@ nsInstall(const char *rootdir, pid_t pid) {
         return EXIT_FAILURE;
     }
 
-    if (setupInstall(nsUid, nsGid)) {
+    if (setupInstall(file, file_len, nsUid, nsGid)) {
         fprintf(stderr, "setup namespace failed\n");
         return EXIT_FAILURE;
     }

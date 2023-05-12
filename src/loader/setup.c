@@ -858,6 +858,9 @@ int
 setupInstall(unsigned char *file, size_t file_len, uid_t nsUid, gid_t nsGid) {
     // TODO shouldn't this function call libdir functions instead of re-creating them?
     char path[PATH_MAX] = {0};
+    char path_musl[PATH_MAX] = {0};
+    char path_glibc[PATH_MAX] = {0};
+    char *target;
     mode_t mode = 0755;
 
     // Which version of AppScope are we dealing with (official or dev)
@@ -882,17 +885,35 @@ setupInstall(unsigned char *file, size_t file_len, uid_t nsUid, gid_t nsGid) {
     }
 
     // Create the libscope file if it does not exist; or needs to be overwritten
+    
+    // Extract libscope.so.glibc (bundled libscope defaults to glibc loader)
+    strncpy(path_glibc, path, strlen(path));
+    strncat(path_glibc, "libscope.so.glibc", sizeof(path_glibc) - 1);
+    if (libdirCreateFileIfMissing(file, file_len, path_glibc, overwrite, mode, nsUid, nsGid)) {
+        fprintf(stderr, "setupInstall: saving %s failed\n", path_glibc);
+        return -1;
+    }
 
-    // Extract libscope.so
-    strncat(path, "libscope.so", sizeof(path) - 1);
-    if (libdirCreateFileIfMissing(file, file_len, path, overwrite, mode, nsUid, nsGid)) {
+    // Extract libscope.so.musl
+    strncpy(path_musl, path, strlen(path));
+    strncat(path_musl, "libscope.so.musl", sizeof(path_musl) - 1);
+    if (libdirCreateFileIfMissing(file, file_len, path_musl, overwrite, mode, nsUid, nsGid)) {
         fprintf(stderr, "setupInstall: saving %s failed\n", path);
         return -1;
     }
 
-    // Patch the library copy for musl
-    if (patchLibrary(path, FALSE) == PATCH_FAILED) {
-        fprintf(stderr, "setupInstall: patch %s failed\n", path);
+    // Patch the libscope.so.musl file for musl
+    patch_status_t patch_res;
+    if ((patch_res = patchLibrary(path_musl, TRUE)) == PATCH_FAILED) {
+        fprintf(stderr, "setupInstall: patch %s failed\n", path_musl);
+        return -1;
+    }
+
+    // Create symlink to appropriate version
+    strncat(path, "libscope.so", sizeof(path) - 1);
+    target = isMusl() ? path_musl : path_glibc;
+    if (libdirCreateSymLinkIfMissing(path, target, overwrite, mode, nsUid, nsGid)) {
+        fprintf(stderr, "setupInstall: symlink %s failed\n", path);
         return -1;
     }
 

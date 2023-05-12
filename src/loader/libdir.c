@@ -150,6 +150,28 @@ getAsset(libdirfile_t objFileType, unsigned char **start)
     return len;
 }
 
+int
+libdirCreateSymLinkIfMissing(char *path, char *target, bool overwrite, mode_t mode, uid_t nsUid, gid_t nsGid)
+{
+    int *err = NULL;
+    int ret;
+
+    // Check if file exists
+    if (!access(path, R_OK) && !overwrite) {
+        return 0; // File exists
+    }
+
+    uid_t currentEuid = geteuid();
+    gid_t currentEgid = getegid();
+    
+    ret = nsFileSymlink(target, path, nsUid, nsGid, currentEuid, currentEgid, err);
+    if (ret) { 
+        fprintf(stderr, "libdirCreateSymLinkIfMissing: symlink %s failed, errno: %d\n", path, *err);
+    }
+
+    return ret;
+}
+
 /*
  * Getting objects bundled
  */

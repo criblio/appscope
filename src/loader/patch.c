@@ -47,6 +47,7 @@
 
 static int g_debug = 0;
 
+/*
 static int
 get_dir(const char *path, char *fres, size_t len) {
     DIR *dirp;
@@ -82,6 +83,7 @@ get_dir(const char *path, char *fres, size_t len) {
     if (dcopy) free(dcopy);
     return res;
 }
+*/
 
 // modify the loader string in the .interp section of scope
 // return -1 on error
@@ -295,7 +297,8 @@ out:
 
 // modify NEEDED entries in libscope.so to avoid dependencies
 static int
-setLibraryFile(const char *libpath) {
+setLibraryFile(const char *libpath)
+{
     int i, fd, found, name;
     struct stat sbuf;
     char *buf;
@@ -371,7 +374,13 @@ setLibraryFile(const char *libpath) {
                         if (strstr(depstr, "ld-linux")) {
                             char newdep[PATH_MAX];
                             size_t newdep_len;
-                            if (get_dir("/lib/ld-musl", newdep, sizeof(newdep)) == -1) break;
+                            // if (get_dir("/lib/ld-musl", newdep, sizeof(newdep)) == -1) {
+#ifdef __x86_64__
+                            snprintf(newdep, sizeof(newdep), "ld-musl-x86_64.so.1");
+#else
+                            snprintf(newdep, sizeof(newdep), "ld-musl-aarch64.so.1");
+#endif
+                            // };
                             newdep_len = strlen(newdep);
                             if (strlen(depstr) >= newdep_len) {
                                 strncpy(depstr, newdep, newdep_len + 1);
@@ -414,12 +423,11 @@ setLibraryFile(const char *libpath) {
 }
 
 patch_status_t
-patchLibrary(const char *so_path, bool force) {
+patchLibrary(const char *so_path, bool force)
+{
     patch_status_t patch_res = PATCH_NO_OP;
-    char *ldso_exe = NULL;
       
-    ldso_exe = getLoaderFile(EXE_TEST_FILE);
-    if (force || (ldso_exe && (strstr(ldso_exe, LIBMUSL) != NULL))) {
+    if (force || isMusl()) {
         if (!setLibraryFile(so_path)) {
             patch_res = PATCH_SUCCESS;
         } else {
@@ -427,7 +435,20 @@ patchLibrary(const char *so_path, bool force) {
         }
     }
 
-    if (ldso_exe) free(ldso_exe);
     return patch_res;
 }
 
+bool
+isMusl()
+{
+    bool res = false;
+    char *ldso_exe = NULL;
+      
+    ldso_exe = getLoaderFile(EXE_TEST_FILE);
+    if (ldso_exe && (strstr(ldso_exe, LIBMUSL) != NULL)) {
+        res = true;
+    }
+
+    if (ldso_exe) free(ldso_exe);
+    return res;
+}

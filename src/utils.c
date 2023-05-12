@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <sys/types.h>
 
 #include "scopestdlib.h"
 #include "utils.h"
@@ -11,7 +12,10 @@
 #include "dbg.h"
 #include "runtimecfg.h"
 #include "plattime.h"
+#include "scopeelf.h"
 
+#define SYSPRINT_CONSOLE 1
+#define PRINT_BUF_SIZE 1024
 #define MAC_ADDR_LEN 17
 #define ZERO_MACHINE_ID "00000000000000000000000000000000"
 
@@ -28,6 +32,27 @@ static int createMachineID(char *string);
 static int getMacAddr(char *string);
 
 rtconfig g_cfg = {0};
+
+void
+sysprint(const char* fmt, ...)
+{
+    // Create the string
+    char str[PRINT_BUF_SIZE];
+
+    if (fmt) {
+        va_list args;
+        va_start(args, fmt);
+        int rv = scope_vsnprintf(str, PRINT_BUF_SIZE, fmt, args);
+        va_end(args);
+        if (rv == -1) return;
+    }
+
+    // Output the string
+#if SYSPRINT_CONSOLE > 0
+    scope_printf("%s", str);
+#endif
+    scopeLog(CFG_LOG_DEBUG, "%s", str);
+}
 
 unsigned int
 strToVal(enum_map_t map[], const char *str)
@@ -595,4 +620,190 @@ edgePath(void) {
     }
 
     return NULL;
+}
+
+bool
+createLdsoPreload(char *path)
+{
+    int lfd;
+    size_t mlen;
+    elf_buf_t *ebuf = NULL;
+    struct stat fstat;
+    char bpath[PATH_MAX], rpath[PATH_MAX];
+
+    scope_strncpy(bpath, path, strlen(path) + 1);
+    scope_strcat(bpath, "/bin/cat");
+    mlen = scope_strlen(path);
+
+    if (lstat(bpath, &fstat) == -1) {
+        scopeLogWarn("lstat of %s in %s:%d", bpath, __FUNCTION__, __LINE__);
+        return FALSE;
+    }
+
+    if (S_ISLNK(fstat.st_mode)) {
+        // musl based fs is a sym link to busybox
+        if (scope_readlink(bpath, rpath, PATH_MAX - 1) == -1) {
+            scopeLogWarn("sym link of %s in %s:%d", bpath, __FUNCTION__, __LINE__);
+            return FALSE;
+        }
+        bpath[mlen + 1] = '\0';
+        scope_strcat(bpath, rpath);
+    }
+
+    if ((ebuf = getElf(bpath)) == NULL) {
+        scopeLogWarn("get ELF of %s in %s:%d", bpath, __FUNCTION__, __LINE__);
+        return FALSE;
+    }
+
+    // write to /etc/ld.so.preload
+    bpath[mlen + 1] = '\0';
+    scope_strcat(bpath, "/etc/ld.so.preload");
+
+    if ((lfd = scope_open(bpath, O_RDWR | O_CREAT | O_APPEND, 0666)) == -1) {
+        scopeLogWarn("open of %s in %s:%d", bpath, __FUNCTION__, __LINE__);
+        free(ebuf);
+        return FALSE;
+    }
+
+    scope_memset(rpath, 0, PATH_MAX);
+    scope_strncpy(rpath, g_libpath, scope_strlen(g_libpath));
+    if (is_musl(ebuf->buf)) {
+        scope_strcat(rpath, "/libscope.so.musl");
+    } else {
+        scope_strcat(rpath, "/libscope.so.glibc");
+    }
+
+    if (scope_write(lfd, rpath, scope_strlen(rpath) + 1) <= 0) {
+        scopeLogWarn("write to %s in %s:%d", rpath, __FUNCTION__, __LINE__);
+        scope_close(lfd);
+        scope_free(ebuf);
+        return FALSE;
+    }
+
+    scope_close(lfd);
+    scope_free(ebuf);
+    return TRUE;
+}
+
+char *
+getMountPath(pid_t pid)
+{
+    bool candidate = FALSE;
+    size_t len;
+    char *buf = NULL, *mount = NULL;
+    char path[PATH_MAX];
+
+    scope_snprintf(path, sizeof(path), "/proc/%d/mounts", pid);
+    FILE *fstream = scope_fopen(path, "r");
+    if (fstream == NULL) return NULL;
+
+    while (scope_getline(&buf, &len, fstream) != -1) {
+        // if a docker overlay mount and not already mounted; appscope
+        if ((scope_strstr(buf, "overlay")) &&
+            (scope_strstr(buf, "docker"))) {
+            char *start, *end;
+            if (((start = scope_strstr(buf, "workdir="))) &&
+                ((end = scope_strstr(buf, "/work")))) {
+                start += scope_strlen("workdir=");
+                *end = '\0';
+                scope_strcat(start, "/merged");
+                mount = scope_strdup(start);
+                candidate = TRUE;
+            }
+        }
+
+        // no longer a candidate as we've already mounted this proc
+        if (scope_strstr(buf, "appscope")) candidate = FALSE;
+
+        scope_free(buf);
+        buf = NULL;
+        len = 0;
+    }
+
+    if (buf) scope_free(buf);
+    scope_fclose(fstream);
+
+    if (candidate == TRUE) return mount;
+    return NULL;
+}
+
+bool
+mountCDirs(char *target, char *fstype)
+{
+    char *filterdir;
+    size_t targetlen = scope_strlen(target);
+
+    if ((filterdir = scope_malloc(targetlen + 128)) == NULL) return FALSE;
+    scope_strcpy(filterdir, target);
+    scope_strcat(filterdir, g_libpath);
+
+    // make a dir in the merged dir
+    if (makeIntermediateDirs((const char *)filterdir, 0666) == FALSE) {
+        scopeLogWarn("Warn: mkdir of %s from %s:%d", filterdir, __FUNCTION__, __LINE__);
+        scope_free(filterdir);
+        return FALSE;
+    }
+
+    // mount the merged dir addition into the host FS
+    if (scope_mount(g_libpath, filterdir, fstype, MS_BIND, NULL) != 0) {
+        scopeLogWarn("WARN: mount %s on %s from %s:%d", g_libpath, filterdir, __FUNCTION__, __LINE__);
+        scope_free(filterdir);
+        return FALSE;
+    }
+#if 0 // TBD
+    // mount the Edge socket path if it exists
+    char *sockpath = edgePath();
+    if (sockpath) {
+        char *sockdir = scope_dirname(sockpath);
+        filterdir[targetlen + 1] = '\0';
+        scope_strcat(filterdir, sockdir);
+
+        // make the socket dir in the merged dir
+        if (makeIntermediateDirs((const char *)filterdir, 0666) == TRUE) {
+            // mount the Edge socket
+            if (scope_mount(sockdir, filterdir, fstype, MS_BIND, NULL) != 0) {
+                scopeLogWarn("WARN: mount %s on %s from %s:%d", sockpath, filterdir, __FUNCTION__, __LINE__);
+            }
+        } else {
+            scopeLogWarn("WARN: mkdir of %s from %s:%d", filterdir, __FUNCTION__, __LINE__);
+        }
+
+        scope_free(sockpath);
+    } else {
+        scopeLogInfo("Note: can't resolve the Edge socket path %s:%d", __FUNCTION__, __LINE__);
+    }
+#endif
+    return TRUE;
+}
+
+bool
+autoMount()
+{
+    DIR *dirp;
+    struct dirent *entry;
+    char *mpath = NULL;
+
+    dirp = scope_opendir("/proc");
+    if (dirp == NULL) {
+        scopeLogError("opendir");
+        return FALSE;
+    }
+
+    // Iterate all procs
+    while ((entry = scope_readdir(dirp)) != NULL) {
+        // procs/tasks are a dir
+        if (entry->d_type == DT_DIR) {
+            pid_t pid = scope_atoi(entry->d_name);
+            if (pid > 0) {
+                // if pid is in a supported container, get the requisite mount path
+                if ((mpath = getMountPath(pid)) != NULL) {
+                    sysprint("%s:%d mount %s\n", __FUNCTION__, __LINE__, mpath);
+                    mountCDirs(mpath, NULL);
+                    createLdsoPreload(mpath);
+                }
+            }
+        }
+    }
+
+    return TRUE;
 }

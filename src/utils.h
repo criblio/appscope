@@ -26,6 +26,9 @@ void setMachineID(char *);
 char *edgePath(void);
 bool makeIntermediateDirs(const char *, mode_t);
 const char *libVersion(const char *);
+void sysprint(const char *, ...);
+bool mountCDirs(char *, char *);
+bool autoMount(void);
 
 // Signal Safe API
 int sigSafeNanosleep(const struct timespec *);

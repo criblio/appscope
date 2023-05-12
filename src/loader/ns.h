@@ -6,8 +6,6 @@
 
 #include "scopetypes.h"
 
-bool setNamespaceRootDir(const char *, pid_t, const char *);
-
 // Operation performed from host to container
 int nsForkAndExec(pid_t, pid_t, bool);
 int nsConfigure(pid_t, void *, size_t);

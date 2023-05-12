@@ -73,7 +73,7 @@ cleanupDestFd:
  * Reassociate process identified with pid with a specific namespace described by ns.
  * Returns TRUE if operation was success, FALSE otherwise.
  */
-bool
+static bool
 setNamespaceRootDir(const char *rootdir, pid_t pid, const char *ns) {
     char nsPath[PATH_MAX] = {0};
     int nsFd;

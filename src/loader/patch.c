@@ -12,12 +12,21 @@
 #include <unistd.h>
 
 #include "libdir.h"
-#include "patch.h"
-#include "nsfile.h"
 #include "loaderutils.h"
+#include "nsfile.h"
+#include "patch.h"
+#include "scopetypes.h"
 
 #define EXE_TEST_FILE "/bin/cat"
 #define LIBMUSL "musl"
+
+#if defined (__x86_64__)
+#define MUSL_LD_NAME "ld-musl-x86_64.so.1"
+#elif defined (__aarch64__)
+#define MUSL_LD_NAME  "ld-musl-aarch64.so.1"
+#else
+#error Bad arch defined
+#endif
 
 /*
  * This code exists solely to support the ability to
@@ -374,13 +383,7 @@ setLibraryFile(const char *libpath)
                         if (strstr(depstr, "ld-linux")) {
                             char newdep[PATH_MAX];
                             size_t newdep_len;
-                            // if (get_dir("/lib/ld-musl", newdep, sizeof(newdep)) == -1) {
-#ifdef __x86_64__
-                            snprintf(newdep, sizeof(newdep), "ld-musl-x86_64.so.1");
-#else
-                            snprintf(newdep, sizeof(newdep), "ld-musl-aarch64.so.1");
-#endif
-                            // };
+                            snprintf(newdep, sizeof(newdep), MUSL_LD_NAME);
                             newdep_len = strlen(newdep);
                             if (strlen(depstr) >= newdep_len) {
                                 strncpy(depstr, newdep, newdep_len + 1);
@@ -439,14 +442,14 @@ patchLibrary(const char *so_path, bool force)
 }
 
 bool
-isMusl()
+isMusl(void)
 {
-    bool res = false;
+    bool res = FALSE;
     char *ldso_exe = NULL;
       
     ldso_exe = getLoaderFile(EXE_TEST_FILE);
     if (ldso_exe && (strstr(ldso_exe, LIBMUSL) != NULL)) {
-        res = true;
+        res = TRUE;
     }
 
     if (ldso_exe) free(ldso_exe);

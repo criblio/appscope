@@ -860,6 +860,7 @@ setupInstall(unsigned char *file, size_t file_len, uid_t nsUid, gid_t nsGid) {
     char path[PATH_MAX] = {0};
     char path_musl[PATH_MAX] = {0};
     char path_glibc[PATH_MAX] = {0};
+    size_t pathlen = 0;
     char *target;
     mode_t mode = 0755;
 
@@ -886,8 +887,9 @@ setupInstall(unsigned char *file, size_t file_len, uid_t nsUid, gid_t nsGid) {
 
     // Create the libscope file if it does not exist; or needs to be overwritten
     
+    pathlen = strlen(path);
     // Extract libscope.so.glibc (bundled libscope defaults to glibc loader)
-    strncpy(path_glibc, path, strlen(path));
+    strncpy(path_glibc, path, pathlen);
     strncat(path_glibc, "libscope.so.glibc", sizeof(path_glibc) - 1);
     if (libdirCreateFileIfMissing(file, file_len, path_glibc, overwrite, mode, nsUid, nsGid)) {
         fprintf(stderr, "setupInstall: saving %s failed\n", path_glibc);
@@ -895,7 +897,7 @@ setupInstall(unsigned char *file, size_t file_len, uid_t nsUid, gid_t nsGid) {
     }
 
     // Extract libscope.so.musl
-    strncpy(path_musl, path, strlen(path));
+    strncpy(path_musl, path, pathlen);
     strncat(path_musl, "libscope.so.musl", sizeof(path_musl) - 1);
     if (libdirCreateFileIfMissing(file, file_len, path_musl, overwrite, mode, nsUid, nsGid)) {
         fprintf(stderr, "setupInstall: saving %s failed\n", path);

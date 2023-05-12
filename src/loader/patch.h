@@ -1,6 +1,7 @@
 #ifndef __PATCH_H__
 #define __PATCH_H__
 
+#include <stdbool.h>
 #include <unistd.h>
 
 typedef enum {
@@ -9,8 +10,8 @@ typedef enum {
     PATCH_NO_OP,    // patch operation was not performed
 } patch_status_t;
 
-bool isMusl();
-patch_status_t patchLibrary(const char*, bool);
+bool isMusl(void);
+patch_status_t patchLibrary(const char *, bool);
 patch_status_t patchLoader(unsigned char *, uid_t, gid_t);
 
 #endif // __PATCH_H__

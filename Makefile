@@ -105,6 +105,12 @@ else
 $(error error: invalid ARCH; "$(ARCH)")
 endif
 
+ifeq ("riscv64", "$(ARCH)")
+	DIST=ubunturiscv
+else
+	DIST=ubuntu
+endif
+
 # include the CLI targets with "cli" prefix plus "scope" shortcut
 cli%:
 	@$(MAKE) -C cli $(@:cli%=%)
@@ -129,7 +135,6 @@ docker-run-alpine:
 	@$(MAKE) -s build CMD="$(CMD)" DIST="alpine"
 
 # build in our builder container for the given ARCH
-build: DIST ?= ubuntu
 build: CMD ?= make all test
 build: require-docker require-qemu-binfmt
 	@[ -n "$(NOBUILD)" ] || $(MAKE) -s builder DIST="$(DIST)" ARCH="$(ARCH)"
@@ -143,14 +148,12 @@ build: require-docker require-qemu-binfmt
 	       	$(CMD)
 
 # run a shell our builder container without starting a build
-run: DIST ?= ubuntu
 run: CMD ?= /bin/bash --login
 run:
 	@echo Running the AppScope $(DIST)/$(ARCH) Builder Container
 	@$(MAKE) -s build DIST="$(DIST)" ARCH="$(ARCH)" CMD="$(CMD)"
 
 # get another shell in an existing builder container
-exec: DIST ?= ubuntu
 exec: CMD ?= /bin/bash
 exec:
 	@[ -n "$(shell docker ps -q -f "name=appscope-builder-$(DIST)-$(ARCH)")" ] || \
@@ -159,7 +162,6 @@ exec:
 	@docker exec -it $(shell docker ps -q -f "name=appscope-builder-$(DIST)-$(ARCH)") $(CMD)
 
 # build the builder image for the given ARCH
-builder: DIST ?= ubuntu
 builder: TAG := $(BUILD_IMAGE):$(DIST)-$(ARCH)
 builder: require-docker-buildx-builder
 	@[ -z "$(CI)" ] || echo "Update $(DIST)/$(ARCH) Builder Image"

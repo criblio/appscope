@@ -23,13 +23,13 @@ You can override the command setting `CMD` like below.
 make build CMD="make coreall"
 ```
 
-By default, this will build for the local CPU architecture; `uname -m`. We support building for other architectures via [QEMU] and [`binfmt`] by setting `ARCH` like below. Note we only support `x86_64` and `aarch64` currently
+By default, this will build for the local CPU architecture; `uname -m`. We support building for other architectures via [QEMU] and [`binfmt`] by setting `ARCH` like below. Note we only support `x86_64`, `aarch64` and `riscv64` currently
 
 ```text
 make build ARCH=aarch64
 ```
 
-The resulting binaries are listed below. `$ARCH` will be `x86_64` or `aarch64`.
+The resulting binaries are listed below. `$ARCH` will be `x86_64`, `aarch64` or `riscv64`.
 
 * `lib/linux/$ARCH/libscope.so`
 * `bin/linux/$ARCH/scope`

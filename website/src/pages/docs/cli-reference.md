@@ -371,8 +371,7 @@ scope inspect --all
   -a, --all             Inspect all processes
   -h, --help            Help for inspect
   -j, --json            Output as newline delimited JSON without pretty printing
-  -p, --prefix string   When running AppScope in a container, and scoping an app that's running outside the container, 
---prefix is the path to host filesystem of the scoped app
+  -p, --rootdir string  Path to root filesystem of target namespace
 ```
 
 ### k8s
@@ -599,14 +598,9 @@ Create a snapshot for a process. Snapshot file/s will be created in `/tmp/appsco
 ### start
 ---
 
-Start scoping a filtered selection of processes and services on the host and in all relevant containers. See the example [filter file](/docs/filter-file).
-
-`scope start` does the following on the host and in all relevant containers:
-- Extract `libscope.so` to `/usr/lib/appscope/<version>/` when AppScope is run as root; otherwise extract to `/tmp/appscope/<version>/`.
-- Extract the filter input to `/usr/lib/appscope/scope_filter` when AppScope is run as root; otherwise extract to `/tmp/appscope/scope_filter`.
-- Attach to all existing allowed processes defined in the filter file.
-- Install the `etc/profile.d/scope.sh` script, to preload `/usr/lib/appscope/<version>/libscope.so` if it exists.
-- Modify the relevant service configurations to preload `/usr/lib/appscope/<version>/libscope.so` when AppScope is run as root; otherwise preload `/tmp/appscope/<version>/libscope.so`.
+Install the AppScope library to:
+/usr/lib/appscope/<version>/ with admin privileges, or 
+/tmp/appscope/<version>/ otherwise
 
 #### Usage
 
@@ -614,23 +608,16 @@ Start scoping a filtered selection of processes and services on the host and in 
 
 #### Examples
 
-You can use a redirect:
-
 ```
-scope start < example_filter.yml
-```
-
-Alternatively, you can use a pipe:
-
-```
-cat example_filter.json | scope start
+scope start
+scope start --rootdir /hostfs
 ```
 
 #### Flags
 
 ```
-  -f, --force   Use this flag when you're sure you want to run scope start
-  -h, --help    help for start
+  -h, --help             help for start
+  -p, --rootdir string   Path to root filesystem of target namespace
 ```
 
 ### stop
@@ -679,7 +666,7 @@ Flags:
   -f, --fetch           Inspect the process after the update is complete
   -c, --config string   Path to configuration file
   -h, --help            help for update
-  -p, --prefix string   Prefix to /proc filesystem
+  -p, --rootdir string  Prefix to /proc filesystem
   -j, --json            Output as newline delimited JSON without pretty printing
 ```
 

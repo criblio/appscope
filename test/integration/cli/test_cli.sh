@@ -216,59 +216,13 @@ endtest
 
 
 #
-# Scope start no force
+# Scope start
 #
-starttest "Scope start no force"
+starttest "Scope start"
 
 # Scope start
 run scope start
-outputs "If you wish to proceed, run again with the -f flag."
 returns 0
-
-endtest
-
-
-#
-# Scope start no input
-#
-starttest "Scope start no input"
-
-# Scope start
-run scope start -f
-outputs "Exiting due to start failure"
-returns 1
-scope logs -s | grep -q "Missing filter data"
-ERR+=$?
-
-endtest
-
-
-#
-# Scope start empty file pipeline
-#
-starttest "Scope start empty file pipeline"
-
-OUT=$(cat /opt/test-runner/empty_file | scope start -f 2>&1)
-RET=$?
-outputs "Exiting due to start failure"
-returns 1
-scope logs -s | grep -q "Missing filter data"
-ERR+=$?
-
-endtest
-
-
-#
-# Scope start empty file redirect
-#
-starttest "Scope start empty file redirect"
-
-OUT=$(scope start -f < /opt/test-runner/empty_file 2>&1)
-RET=$?
-outputs "Exiting due to start failure"
-scope logs -s | grep -q "Missing filter data"
-ERR+=$?
-returns 1
 
 endtest
 

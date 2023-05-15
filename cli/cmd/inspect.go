@@ -26,7 +26,7 @@ scope inspect --all`,
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
 		all, _ := cmd.Flags().GetBool("all")
-		prefix, _ := cmd.Flags().GetString("prefix")
+		rootdir, _ := cmd.Flags().GetString("rootdir")
 		jsonOut, _ := cmd.Flags().GetBool("json")
 
 		// Nice message for non-adminstrators
@@ -40,7 +40,7 @@ scope inspect --all`,
 		}
 
 		pidCtx := &ipc.IpcPidCtx{
-			PrefixPath: prefix,
+			PrefixPath: rootdir,
 		}
 
 		if all {
@@ -144,7 +144,7 @@ scope inspect --all`,
 }
 
 func init() {
-	inspectCmd.Flags().StringP("prefix", "p", "", "Prefix to proc filesystem")
+	inspectCmd.Flags().StringP("rootdir", "p", "", "Path to root filesystem of target namespace")
 	inspectCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	inspectCmd.Flags().BoolP("all", "a", false, "Inspect all processes")
 	RootCmd.AddCommand(inspectCmd)

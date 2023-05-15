@@ -164,8 +164,8 @@ attachCmd(pid_t pid, bool attach)
     unlink(buf);
 
 
-    uid_t nsUid = nsInfoTranslateUid(pid);
-    gid_t nsGid = nsInfoTranslateGid(pid);
+    uid_t nsUid = nsInfoTranslateUidRootDir("", pid);
+    gid_t nsGid = nsInfoTranslateGidRootDir("", pid);
 
     fd = nsFileOpen(buf, O_WRONLY|O_CREAT, nsUid, nsGid, geteuid(), getegid());
     if (fd == -1) {
@@ -436,8 +436,8 @@ cmdAttach(bool ldattach, pid_t pid)
     elf_buf_t *scope_ebuf = NULL;
     elf_buf_t *ebuf = NULL;
 
-    nsUid = nsInfoTranslateUid(pid);
-    nsGid = nsInfoTranslateGid(pid);
+    nsUid = nsInfoTranslateUidRootDir("", pid);
+    nsGid = nsInfoTranslateGidRootDir("", pid);
 
     scope_ebuf = getElf("/proc/self/exe");
     if (!scope_ebuf) {
@@ -454,7 +454,7 @@ cmdAttach(bool ldattach, pid_t pid)
 
         scopeLibPath = (char *)libdirGetPath();
 
-        if (patchLibrary(scopeLibPath) == PATCH_FAILED) {
+        if (patchLibrary(scopeLibPath, FALSE) == PATCH_FAILED) {
             fprintf(stderr, "error: failed to patch library\n");
             goto out;
         }
@@ -608,8 +608,8 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
     elf_buf_t *ebuf = NULL;
 
     if (nspid != -1) {
-        nsUid = nsInfoTranslateUid(nspid);
-        nsGid = nsInfoTranslateGid(nspid);
+        nsUid = nsInfoTranslateUidRootDir("", nspid);
+        nsGid = nsInfoTranslateGidRootDir("", nspid);
     }
 
     scope_ebuf = getElf("/proc/self/exe");
@@ -627,7 +627,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
 
         scopeLibPath = (char *)libdirGetPath();
 
-        if (patchLibrary(scopeLibPath) == PATCH_FAILED) {
+        if (patchLibrary(scopeLibPath, FALSE) == PATCH_FAILED) {
             fprintf(stderr, "error: failed to patch library\n");
             goto out;
         }
@@ -810,4 +810,31 @@ out:
     }
 
     exit(EXIT_FAILURE);
+}
+
+// Handle the install command
+int
+cmdInstall(const char *rootdir)
+{
+    uid_t eUid = geteuid();
+    gid_t eGid = getegid();
+    uid_t nsUid = eUid;
+    uid_t nsGid = eGid;
+
+    // If rootdir is provided, extract the library into a separate namespace and return
+    if (rootdir) {
+        // Use pid 1 to locate ns fd
+        if (nsInstall(rootdir, 1)) {
+            fprintf(stderr, "error: failed to extract library\n");
+            return EXIT_FAILURE;
+        }
+    // Install the library locally
+    } else {
+        if (setupInstall(NULL, 0, nsUid, nsGid)) {
+            fprintf(stderr, "error: failed to extract library\n");
+            return EXIT_FAILURE;
+        }
+    }
+
+    return EXIT_SUCCESS;
 }

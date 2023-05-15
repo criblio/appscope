@@ -71,25 +71,24 @@ cleanupDestFd:
 
 /*
  * Reassociate process identified with pid with a specific namespace described by ns.
- *
  * Returns TRUE if operation was success, FALSE otherwise.
  */
 static bool
-setNamespace(pid_t pid, const char *ns) {
+setNamespaceRootDir(const char *rootdir, pid_t pid, const char *ns) {
     char nsPath[PATH_MAX] = {0};
     int nsFd;
-    if (snprintf(nsPath, sizeof(nsPath), "/proc/%d/ns/%s", pid, ns) < 0) {
-        perror("setNamespace: snprintf failed");
+    if (snprintf(nsPath, sizeof(nsPath), "%s/proc/%d/ns/%s", rootdir, pid, ns) < 0) {
+        perror("setNamespaceRootDir: snprintf failed");
         return FALSE;
     }
 
     if ((nsFd = open(nsPath, O_RDONLY)) == -1) {
-        perror("setNamespace: open failed");
+        perror("setNamespaceRootDir: open failed");
         return FALSE;
     }
 
     if (setns(nsFd, 0) != 0) {
-        perror("setNamespace: setns failed");
+        perror("setNamespaceRootDir: setns failed");
         close(nsFd);
         return FALSE;
     }
@@ -135,8 +134,8 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
 
     char path[PATH_MAX] = {0};
 
-    uid_t nsUid = nsInfoTranslateUid(hostPid);
-    gid_t nsGid = nsInfoTranslateGid(hostPid);
+    uid_t nsUid = nsInfoTranslateUidRootDir("", hostPid);
+    gid_t nsGid = nsInfoTranslateGidRootDir("", hostPid);
 
     if (readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
         return status;
@@ -158,11 +157,11 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
     *   namespace
     * - mount namespace - allows to copy file(s) into a "child namespace"
     */
-    if (joinPidNs && setNamespace(hostPid, "pid") == FALSE) {
+    if (joinPidNs && setNamespaceRootDir("", hostPid, "pid") == FALSE) {
         goto cleanupMem;
     }
 
-    if (setNamespace(hostPid, "mnt") == FALSE) {
+    if (setNamespaceRootDir("", hostPid, "mnt") == FALSE) {
         goto cleanupMem;
     }
 
@@ -239,10 +238,10 @@ cleanupMem:
 service_status_t
 nsService(pid_t hostPid, const char *serviceName) {
 
-    uid_t nsUid = nsInfoTranslateUid(hostPid);
-    gid_t nsGid = nsInfoTranslateGid(hostPid);
+    uid_t nsUid = nsInfoTranslateUidRootDir("", hostPid);
+    gid_t nsGid = nsInfoTranslateGidRootDir("", hostPid);
 
-    if (setNamespace(hostPid, "mnt") == FALSE) {
+    if (setNamespaceRootDir("", hostPid, "mnt") == FALSE) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
@@ -255,7 +254,7 @@ nsService(pid_t hostPid, const char *serviceName) {
  */
 service_status_t
 nsUnservice(pid_t hostPid) {
-    if (setNamespace(hostPid, "mnt") == FALSE) {
+    if (setNamespaceRootDir("", hostPid, "mnt") == FALSE) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
@@ -270,10 +269,10 @@ nsUnservice(pid_t hostPid) {
  */
 int
 nsConfigure(pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize) {
-    uid_t nsUid = nsInfoTranslateUid(pid);
-    gid_t nsGid = nsInfoTranslateGid(pid);
+    uid_t nsUid = nsInfoTranslateUidRootDir("", pid);
+    gid_t nsGid = nsInfoTranslateGidRootDir("", pid);
 
-    if (setNamespace(pid, "mnt") == FALSE) {
+    if (setNamespaceRootDir("", pid, "mnt") == FALSE) {
         fprintf(stderr, "setNamespace mnt failed\n");
         return EXIT_FAILURE;
     }
@@ -294,13 +293,47 @@ nsConfigure(pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize) {
  */
 int
 nsUnconfigure(pid_t pid) {
-    if (setNamespace(pid, "mnt") == FALSE) {
+    if (setNamespaceRootDir("", pid, "mnt") == FALSE) {
         fprintf(stderr, "setNamespace mnt failed\n");
         return EXIT_FAILURE;
     }
 
     if (setupUnconfigure()) {
         fprintf(stderr, "setup child namespace failed\n");
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+ /*
+ * Install in the mount namespace
+ * - switch the mount namespace
+ * - install the library
+ * Returns status of operation 0 in case of success, other values in case of failure
+ */
+int
+nsInstall(const char *rootdir, pid_t pid) {
+    unsigned char *file;
+    size_t file_len;
+    uid_t nsUid = nsInfoTranslateUidRootDir(rootdir, pid);
+    gid_t nsGid = nsInfoTranslateGidRootDir(rootdir, pid);
+
+    // Extract library from scope binary into memory
+    // while in the origin namespace
+    if ((file_len = getAsset(LIBRARY_FILE, &file)) == -1) {
+        fprintf(stderr, "nsInstall getAsset failed\n");
+        return EXIT_FAILURE;
+    }
+
+    // Switch to mnt namespace
+    if (setNamespaceRootDir(rootdir, pid, "mnt") == FALSE) {
+        fprintf(stderr, "setNamespace mnt failed\n");
+        return EXIT_FAILURE;
+    }
+
+    if (setupInstall(file, file_len, nsUid, nsGid)) {
+        fprintf(stderr, "setup namespace failed\n");
         return EXIT_FAILURE;
     }
 
@@ -333,7 +366,7 @@ nsGetFile(const char *src_path, const char *dest_path, pid_t pid) {
     }
 
     // Change to namespace
-    if (setNamespace(pid, "mnt") == FALSE) {
+    if (setNamespaceRootDir("", pid, "mnt") == FALSE) {
         fprintf(stderr, "error: setNamespace mnt failed\n");
         goto err;
     }

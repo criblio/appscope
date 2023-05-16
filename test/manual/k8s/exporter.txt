@@ -13,7 +13,7 @@ kubectl exec -it redis -- ash
 kubectl cp ./bin/linux/aarch64/scope default/prom-exporter-deployment-75f4c9c78d-5pfcg:/usr/local/bin/.
 
 kubectl exec -it prom-exporter-deployment-75f4c9c78d-5pfcg -- bash
-% scope prom --port 9100
+% scope prom --mport 9100
 
 kubectl exec -i prom-exporter-deployment-75f4c9c78d-5pfcg -- curl localhost:9100/metrics
 

@@ -97,14 +97,11 @@ nsFileFopen(const char *restrict pathname, const char *restrict mode, uid_t nsUi
 }
 
 int
-nsFileSymlink(const char *target, const char *linkpath, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gid_t restoreGid, int *errnoVal) {
+nsFileSymlink(const char *target, const char *linkpath, uid_t nsUid, gid_t nsGid, uid_t restoreUid, gid_t restoreGid) {
     setegid(nsGid);
     seteuid(nsUid);
 
     int res = symlink(target, linkpath);
-    if (res == -1) {
-        *errnoVal = errno;
-    }
 
     seteuid(restoreUid);
     setegid(restoreGid);

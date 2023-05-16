@@ -447,7 +447,7 @@ cmdAttach(bool ldattach, pid_t pid)
 
     // Extract and patch libscope from scope static. Don't attempt to extract from scope dynamic
     if (is_static(scope_ebuf->buf)) {
-        if (libdirExtract(nsUid, nsGid)) {
+        if (libdirExtract(NULL, 0, nsUid, nsGid)) {
             fprintf(stderr, "error: failed to extract library\n");
             goto out;
         }
@@ -620,7 +620,7 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
 
     // Extract and patch libscope from scope static. Don't attempt to extract from scope dynamic
     if (is_static(scope_ebuf->buf)) {
-        if (libdirExtract(nsUid, nsGid)) {
+        if (libdirExtract(NULL, 0, nsUid, nsGid)) {
             fprintf(stderr, "error: failed to extract library\n");
             goto out;
         }

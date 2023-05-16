@@ -42,7 +42,7 @@ var promServerCmd = &cobra.Command{
 	Use:     "prom [flags]",
 	Short:   "Run the Prometheus Target",
 	Long:    `Listen and respond to metrics requests from a Prometheus scraper.`,
-	Example: `scope prom --port 9100`,
+	Example: `scope prom --mport 9100`,
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		sport, _ := cmd.Flags().GetString("sport")

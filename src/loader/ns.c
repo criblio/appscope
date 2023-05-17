@@ -332,7 +332,7 @@ nsInstall(const char *rootdir, pid_t pid) {
         return EXIT_FAILURE;
     }
 
-    if (setupInstall(file, file_len, nsUid, nsGid)) {
+    if (libdirExtract(file, file_len, nsUid, nsGid)) {
         fprintf(stderr, "setup namespace failed\n");
         return EXIT_FAILURE;
     }

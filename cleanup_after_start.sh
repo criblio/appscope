@@ -6,11 +6,14 @@
 PROFILE_SCOPE_SCRIPT="/etc/profile.d/scope.sh"
 USR_APPSCOPE_DIR="/usr/lib/appscope/"
 TMP_APPSCOPE_DIR="/tmp/appscope/"
+CRIBL_APPSCOPE_DIR="$CRIBL_HOME/appscope/"
 
 echo "Following script will try to remove following files:"
 echo "- $PROFILE_SCOPE_SCRIPT"
 echo "- $USR_APPSCOPE_DIR"
 echo "- $TMP_APPSCOPE_DIR"
+echo "- \$CRIBL_HOME/appscope/"
+
 read -p "Continue (y/n)?" choice
 case "$choice" in 
   y|Y ) echo "Yes selected - Continuing";;
@@ -42,4 +45,11 @@ if [ -d "$TMP_APPSCOPE_DIR" ] ; then
     echo "$TMP_APPSCOPE_DIR directory was removed"
 else
     echo "$TMP_APPSCOPE_DIR directory was missing."
+fi
+
+if [ -f $CRIBL_HOME ] && [ -d "$CRIBL_APPSCOPE_DIR" ] ; then
+    rm -r $CRIBL_APPSCOPE_DIR
+    echo "$CRIBL_APPSCOPE_DIR directory was removed"
+else
+    echo "\$CRIBL_HOME was not set or \$CRIBL_HOME/appscope directory was missing."
 fi

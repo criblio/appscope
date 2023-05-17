@@ -21,6 +21,7 @@
 #include "loaderutils.h"
 #include "loader.h"
 #include "nsfile.h"
+#include "patch.h"
 #include "scopetypes.h"
 
 #ifndef SCOPE_VER
@@ -84,7 +85,8 @@ typedef struct
 // ----------------------------------------------------------------------------
 
 static struct scope_obj_state *
-getObjState(libdirfile_t objFileType) {
+getObjState(libdirfile_t objFileType)
+{
     switch (objFileType) {
         case LIBRARY_FILE:
             return &libscopeState;
@@ -150,11 +152,11 @@ getAsset(libdirfile_t objFileType, unsigned char **start)
     return len;
 }
 
-int
+static int
 libdirCreateSymLinkIfMissing(char *path, char *target, bool overwrite, mode_t mode, uid_t nsUid, gid_t nsGid)
 {
-    int *err = NULL;
     int ret;
+    int errnoVal;
 
     // Check if file exists
     if (!access(path, R_OK) && !overwrite) {
@@ -164,19 +166,21 @@ libdirCreateSymLinkIfMissing(char *path, char *target, bool overwrite, mode_t mo
     uid_t currentEuid = geteuid();
     gid_t currentEgid = getegid();
     
-    ret = nsFileSymlink(target, path, nsUid, nsGid, currentEuid, currentEgid, err);
-    if (ret) { 
-        fprintf(stderr, "libdirCreateSymLinkIfMissing: symlink %s failed, errno: %d\n", path, *err);
+    ret = nsFileSymlink(target, path, nsUid, nsGid, currentEuid, currentEgid, &errnoVal);
+    if (ret && (errnoVal != EEXIST)) { 
+        fprintf(stderr, "libdirCreateSymLinkIfMissing: symlink %s failed\n", path);
+        return ret;
     }
 
-    return ret;
+    return 0;
 }
 
 /*
  * Getting objects bundled
  */
 int
-libdirCreateFileIfMissing(unsigned char *file, size_t file_len, const char *path, bool overwrite, mode_t mode, uid_t nsEuid, gid_t nsEgid) {
+libdirCreateFileIfMissing(unsigned char *file, size_t file_len, const char *path, bool overwrite, mode_t mode, uid_t nsEuid, gid_t nsEgid)
+{
     // Check if file exists
     if (!access(path, R_OK) && !overwrite) {
         return 0; // File exists
@@ -268,7 +272,8 @@ libdirCheckIfDirExists(const char *absDirPath, uid_t uid, gid_t gid)
 
 // Override default values (function is used only for unit test)
 int
-libdirInitTest(const char *installBase, const char *tmpBase, const char *rawVersion) {
+libdirInitTest(const char *installBase, const char *tmpBase, const char *rawVersion)
+{
     memset(&g_libdir_info, 0, sizeof(g_libdir_info));
     memset(&libscopeState, 0, sizeof(libscopeState));
     strcpy(libscopeState.binaryName, SCOPE_LIBSCOPE_SO);
@@ -312,7 +317,8 @@ libdirInitTest(const char *installBase, const char *tmpBase, const char *rawVers
 // Create a directory in following absolute path creating any intermediate directories as necessary
 // Returns operation status
 mkdir_status_t
-libdirCreateDirIfMissing(const char *dir, mode_t mode, uid_t nsEuid, gid_t nsEgid) {
+libdirCreateDirIfMissing(const char *dir, mode_t mode, uid_t nsEuid, gid_t nsEgid)
+{
     int mkdirRes = -1;
     /* Operate only on absolute path */
     if (dir == NULL || *dir != '/') {
@@ -394,7 +400,8 @@ end:
 //    - <library_name> - "libscope.so"
 // Returns 0 if the full path to a library is accessible
 int
-libdirSetLibraryBase(const char *base) {
+libdirSetLibraryBase(const char *base)
+{
     const char *normVer = libverNormalizedVersion(g_libdir_info.ver);
     char tmp_path[PATH_MAX] = {0};
 
@@ -423,7 +430,8 @@ libdirSetLibraryBase(const char *base) {
 * Returns path for the specified binary, NULL in case of failure.
 */
 const char *
-libdirGetPath(void) {
+libdirGetPath(void)
+{
     const char *normVer = libverNormalizedVersion(g_libdir_info.ver);
 
     struct scope_obj_state *state = getObjState(LIBRARY_FILE);
@@ -440,11 +448,30 @@ libdirGetPath(void) {
         char tmp_path[PATH_MAX] = {0};
         int pathLen = snprintf(tmp_path, PATH_MAX, "%s/%s/%s", state->binaryBasepath, normVer, state->binaryName);
         if (pathLen < 0) {
-            fprintf(stderr, "error: snprintf() failed.\n");
+            fprintf(stderr, "error: libdirGetPath: custom base snprintf() failed.\n");
             return NULL;
         }
         if (pathLen >= PATH_MAX) {
-            fprintf(stderr, "error: path too long.\n");
+            fprintf(stderr, "error: libdirGetPath: custom base path too long.\n");
+            return NULL;
+        }
+
+        if (!access(tmp_path, R_OK)) {
+            strncpy(state->binaryPath, tmp_path, PATH_MAX);
+            return state->binaryPath;
+        }
+    }
+
+    const char *cribl_home = getenv("CRIBL_HOME");
+    if (cribl_home) {
+        char tmp_path[PATH_MAX] = {0};
+        int pathLen = snprintf(tmp_path, PATH_MAX, "%s/appscope/%s/%s", cribl_home, normVer, state->binaryName);
+        if (pathLen < 0) {
+            fprintf(stderr, "error: libdirGetPath: $CRIBL_HOME/appscope/... snprintf() failed.\n");
+            return NULL;
+        }
+        if (pathLen >= PATH_MAX) {
+            fprintf(stderr, "error: libdirGetPath: $CRIBL_HOME/appscope/... path too long.\n");
             return NULL;
         }
 
@@ -459,11 +486,11 @@ libdirGetPath(void) {
         char tmp_path[PATH_MAX] = {0};
         int pathLen = snprintf(tmp_path, PATH_MAX, "%s/%s/%s", g_libdir_info.install_base, normVer, state->binaryName);
         if (pathLen < 0) {
-            fprintf(stderr, "error: snprintf() failed.\n");
+            fprintf(stderr, "error: libdirGetPath: install base snprintf() failed.\n");
             return NULL;
         }
         if (pathLen >= PATH_MAX) {
-            fprintf(stderr, "error: path too long.\n");
+            fprintf(stderr, "error: libdirGetPath: install base path too long.\n");
             return NULL;
         }
         if (!access(tmp_path, R_OK)) {
@@ -473,15 +500,15 @@ libdirGetPath(void) {
     }
 
     if (g_libdir_info.tmp_base[0]) {
-        // Check temp base next
+        // Check tmp base next
         char tmp_path[PATH_MAX] = {0};
         int pathLen = snprintf(tmp_path, PATH_MAX, "%s/%s/%s", g_libdir_info.tmp_base, normVer, state->binaryName);
         if (pathLen < 0) {
-            fprintf(stderr, "error: snprintf() failed.\n");
+            fprintf(stderr, "error: libdirGetPath: tmp base snprintf() failed.\n");
             return NULL;
         }
         if (pathLen >= PATH_MAX) {
-            fprintf(stderr, "error: path too long.\n");
+            fprintf(stderr, "error: libdirGetPath: tmp base path too long.\n");
             return NULL;
         }
         if (!access(tmp_path, R_OK)) {
@@ -494,49 +521,6 @@ libdirGetPath(void) {
     return NULL;
 }
 
-int
-libdirCreate(char *base, mode_t mode, uid_t uid, gid_t gid, bool isDevVersion, const char *normVer) {
-    int pathLen;
-    char dir[PATH_MAX] = {0};
-    char path[PATH_MAX]= {0};
-    struct scope_obj_state *state;
-
-    state = getObjState(LIBRARY_FILE);
-    if (!state) {
-        return -1;
-    }
-
-    pathLen = snprintf(dir, PATH_MAX, "%s/%s", base, normVer);
-    if (pathLen < 0) {
-        fprintf(stderr, "error: snprintf() failed.\n");
-        return -1;
-    }
-    if (pathLen >= PATH_MAX) {
-        fprintf(stderr, "error: path too long.\n");
-        return -1;
-    }
-
-    if (libdirCreateDirIfMissing(dir, mode, uid, gid) <= MKDIR_STATUS_EXISTS) {
-        int pathLen = snprintf(path, PATH_MAX, "%s/%s", dir, state->binaryName);
-        if (pathLen < 0) {
-            fprintf(stderr, "error: snprintf() failed.\n");
-            return -1;
-        }
-        if (pathLen >= PATH_MAX) {
-            fprintf(stderr, "error: path too long.\n");
-            return -1;
-        }
-
-        if (!libdirCreateFileIfMissing(NULL, 0, path, isDevVersion, mode, uid, gid)) {
-            strncpy(state->binaryPath, path, PATH_MAX);
-            strncpy(state->binaryBasepath, base, PATH_MAX);
-            return 0;
-        }
-    }
-
-    return -1;
-}
-
 /*
 * Extract (physically create) libscope.so to the filesystem.
 * The extraction will not be performed:
@@ -544,24 +528,108 @@ libdirCreate(char *base, mode_t mode, uid_t uid, gid_t gid, bool isDevVersion, c
 * - if the custom path was specified before by `libdirSetLibraryBase`
 * Returns 0 in case of success, other values in case of failure.
 */
-int libdirExtract(uid_t uid, gid_t gid) {
-    const char *normVer = libverNormalizedVersion(g_libdir_info.ver);
-    bool isDevVersion = libverIsNormVersionDev(normVer);
-    const char *existing_path = libdirGetPath();
+int
+libdirExtract(unsigned char *asset_file, size_t asset_file_len, uid_t nsUid, gid_t nsGid)
+{
+    char path[PATH_MAX] = {0};
+    char path_musl[PATH_MAX] = {0};
+    char path_glibc[PATH_MAX] = {0};
+    size_t pathlen = 0;
+    char *target;
+    mode_t mode = 0755;
+    mkdir_status_t res;
 
-    // If we are a dev version, always extract.
-    // If we are a prod version and this version exists, don't extract.
-    if ((existing_path) && (isDevVersion == FALSE)) {
-        return 0;
-    }
+    // Which version of AppScope are we dealing with (official or dev)
+    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+    bool isDevVersion = libverIsNormVersionDev(loaderVersion);
+    bool overwrite = isDevVersion;
 
-    // Try to extract to the install base only for the official version
-    if (isDevVersion == FALSE) {
-        if (!libdirCreate(g_libdir_info.install_base, 0755, uid, gid, isDevVersion, normVer)) {
-            return 0;
+    // Create the destination directory if it does not exist
+    
+    // Try to create $CRIBL_HOME/appscope (if set)
+    const char *cribl_home = getenv("CRIBL_HOME");
+    if (cribl_home) {
+        int pathLen = snprintf(path, PATH_MAX, "/%s/appscope/%s/", cribl_home, loaderVersion);
+        if (pathLen < 0) {
+            fprintf(stderr, "error: libdirExtract: $CRIBL_HOME/appscope/... snprintf() failed.\n");
+            return -1;
         }
+        if (pathLen >= PATH_MAX) {
+            fprintf(stderr, "error: libdirExtract: $CRIBL_HOME/appscope/... path too long.\n");
+            return -1;
+        }
+        res = libdirCreateDirIfMissing(path, mode, nsUid, nsGid);
     }
 
-    // If extraction to the install base fails; or we are the dev version, extract to the tmp base
-    return libdirCreate(g_libdir_info.tmp_base, 0777, uid, gid, isDevVersion, normVer);
+    // If CRIBL_HOME not defined, or there was an error, create usr/lib/appscope
+    if (!cribl_home || res > MKDIR_STATUS_EXISTS) {
+        memset(path, 0, PATH_MAX);
+        int pathLen = snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
+        if (pathLen < 0) {
+            fprintf(stderr, "error: libdirExtract: usr/lib/appscope/... snprintf() failed.\n");
+            return -1;
+        }
+        if (pathLen >= PATH_MAX) {
+            fprintf(stderr, "error: libdirExtract: /usr/lib/appscope/... path too long.\n");
+            return -1;
+        }
+        res = libdirCreateDirIfMissing(path, mode, nsUid, nsGid);
+    }
+
+    // If all else fails, create /tmp/appscope
+    if (res > MKDIR_STATUS_EXISTS) {
+        mode = 0777;
+        memset(path, 0, PATH_MAX);
+        int pathLen = snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
+        if (pathLen < 0) {
+            fprintf(stderr, "error: libdirExtract: /tmp/appscope/... snprintf() failed.\n");
+            return -1;
+        }
+        if (pathLen >= PATH_MAX) {
+            fprintf(stderr, "error: libdirExtract: /tmp/appscope/... path too long.\n");
+            return -1;
+        }
+        res = libdirCreateDirIfMissing(path, mode, nsUid, nsGid);
+    }
+
+    if (res > MKDIR_STATUS_EXISTS) {
+        fprintf(stderr, "setupInstall: libdirCreateDirIfMissing failed\n");
+        return -1;
+    }
+
+    // Create the libscope file if it does not exist; or needs to be overwritten
+    
+    pathlen = strlen(path);
+    // Extract libscope.so.glibc (bundled libscope defaults to glibc loader)
+    strncpy(path_glibc, path, pathlen);
+    strncat(path_glibc, "libscope.so.glibc", sizeof(path_glibc) - 1);
+    if (libdirCreateFileIfMissing(asset_file, asset_file_len, path_glibc, overwrite, mode, nsUid, nsGid)) {
+        fprintf(stderr, "libdirExtract: saving %s failed\n", path_glibc);
+        return -1;
+    }
+
+    // Extract libscope.so.musl
+    strncpy(path_musl, path, pathlen);
+    strncat(path_musl, "libscope.so.musl", sizeof(path_musl) - 1);
+    if (libdirCreateFileIfMissing(asset_file, asset_file_len, path_musl, overwrite, mode, nsUid, nsGid)) {
+        fprintf(stderr, "libdirExtract: saving %s failed\n", path);
+        return -1;
+    }
+
+    // Patch the libscope.so.musl file for musl
+    patch_status_t patch_res;
+    if ((patch_res = patchLibrary(path_musl, TRUE)) == PATCH_FAILED) {
+        fprintf(stderr, "libdirExtract: patch %s failed\n", path_musl);
+        return -1;
+    }
+
+    // Create symlink to appropriate version
+    strncat(path, "libscope.so", sizeof(path) - 1);
+    target = isMusl() ? path_musl : path_glibc;
+    if (libdirCreateSymLinkIfMissing(path, target, overwrite, mode, nsUid, nsGid)) {
+        fprintf(stderr, "libdirExtract: symlink %s failed\n", path);
+        return -1;
+    }
+
+    return 0;
 }

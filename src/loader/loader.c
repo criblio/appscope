@@ -830,7 +830,7 @@ cmdInstall(const char *rootdir)
         }
     // Install the library locally
     } else {
-        if (setupInstall(NULL, 0, nsUid, nsGid)) {
+        if (libdirExtract(NULL, 0, nsUid, nsGid)) {
             fprintf(stderr, "error: failed to extract library\n");
             return EXIT_FAILURE;
         }

@@ -844,11 +844,3 @@ setupUnconfigure(void) {
     return 0;
 }
 
-/*
- * Install the library
- * Returns status of operation 0 in case of success, other value otherwise
- */
-int
-setupInstall(unsigned char *file, size_t file_len, uid_t nsUid, gid_t nsGid) {
-    return libdirExtract(file, file_len, nsUid, nsGid);
-}

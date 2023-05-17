@@ -155,6 +155,7 @@ int
 libdirCreateSymLinkIfMissing(char *path, char *target, bool overwrite, mode_t mode, uid_t nsUid, gid_t nsGid)
 {
     int ret;
+    int errnoVal;
 
     // Check if file exists
     if (!access(path, R_OK) && !overwrite) {
@@ -164,12 +165,13 @@ libdirCreateSymLinkIfMissing(char *path, char *target, bool overwrite, mode_t mo
     uid_t currentEuid = geteuid();
     gid_t currentEgid = getegid();
     
-    ret = nsFileSymlink(target, path, nsUid, nsGid, currentEuid, currentEgid);
-    if (ret) { 
+    ret = nsFileSymlink(target, path, nsUid, nsGid, currentEuid, currentEgid, &errnoVal);
+    if (ret && (errnoVal != EEXIST)) { 
         fprintf(stderr, "libdirCreateSymLinkIfMissing: symlink %s failed\n", path);
+        return ret;
     }
 
-    return ret;
+    return 0;
 }
 
 /*

@@ -1755,6 +1755,8 @@ init(void)
                 res = cfgFilterStatus(g_proc.procname, g_proc.cmd, SCOPE_FILTER_USR_PATH, cfg);
             } else if (!scope_access(SCOPE_FILTER_TMP_PATH, R_OK)) {
                 res = cfgFilterStatus(g_proc.procname, g_proc.cmd, SCOPE_FILTER_TMP_PATH, cfg);
+            } else {
+                res = cfgNoFilter(g_proc.procname, g_proc.cmd);
             }
         }
         switch (res) {

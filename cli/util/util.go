@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -69,6 +70,9 @@ func GetConfigPath() string {
 // CheckErrSprintf writes a format string to stderr and then exits with a status code of 1 if there is an error
 func CheckErrSprintf(err error, format string, a ...interface{}) {
 	if err != nil {
+		buf := make([]byte, 1<<16)
+		stackSize := runtime.Stack(buf, true)
+		fmt.Printf("Stack Trace:\n%s\n", buf[:stackSize])
 		ErrAndExit(format, a...)
 	}
 }

@@ -149,7 +149,7 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 }
 
 func (rc *Config) populateWorkDir(args []string, attach bool) {
-	filePerms := os.FileMode(0644)
+	filePerms := os.FileMode(0777)
 	if attach {
 		filePerms = 0777
 		oldmask := syscall.Umask(0)

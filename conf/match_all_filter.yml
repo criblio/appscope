@@ -1,0 +1,10 @@
+allow:
+- procname: _MatchAll_
+  arg:
+deny:
+- procname:
+  arg: systemd
+- procname:
+  arg: cribl
+- procname:
+  arg: sbin/init

@@ -3326,6 +3326,32 @@ cleanup_filter_file:
 }
 
 /*
+ * Default behavior when filter is not present
+ */
+filter_status_t
+cfgNoFilter(const char *procName, const char *procCmdLine)
+{
+    const char* const deniedFilterCmdLine[] = {
+        "systemd",
+        "cribl",
+        "sbin/init"
+    };
+
+    if ((!procName) || (!procCmdLine)) {
+        DBG(NULL);
+        return FILTER_ERROR;
+    }
+
+    for (int i = 0; i < sizeof(deniedFilterCmdLine)/sizeof(char*); ++i) {
+        if (scope_strstr(procCmdLine, deniedFilterCmdLine[i])) {
+                return FILTER_NOT_SCOPED;
+        }
+    }
+
+    return FILTER_SCOPED;
+}
+
+/*
  * Verify against filter file if specifc process command should be scoped.
  */
 filter_status_t

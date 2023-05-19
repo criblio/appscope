@@ -183,7 +183,7 @@ func createWorkDir(cmd string) {
 
 	// Populate working directory
 	// Create Log file
-	filePerms := os.FileMode(0644)
+	filePerms := os.FileMode(0777)
 	internal.CreateLogFile(filepath.Join(WorkDir, "scope.log"), filePerms)
 	internal.SetDebug()
 }

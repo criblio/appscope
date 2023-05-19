@@ -14,7 +14,7 @@ import (
 func InitConfig() {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	CreateLogFile(filepath.Join(util.ScopeHome(), "scope.log"), 0644)
+	CreateLogFile(filepath.Join(util.ScopeHome(), "scope.log"), 0777)
 }
 
 // GetConfigMap returns configuration as a map
@@ -25,7 +25,7 @@ func InitConfig() {
 
 // CreateLogFile sets log output to a particular file path
 func CreateLogFile(path string, filePerms os.FileMode) {
-	err := os.MkdirAll(filepath.Dir(path), 0755)
+	err := os.MkdirAll(filepath.Dir(path), 0777)
 	util.CheckErrSprintf(err, "could not create path to log file %s: %v", path, err)
 
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, filePerms)

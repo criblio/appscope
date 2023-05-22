@@ -17,7 +17,7 @@
 #include "setup.h"
 #include "scopetypes.h"
 
-#define SCOPE_CRON_ATTACH "* * * * * root /tmp/appscope/scope --ldattach %d\n"
+#define SCOPE_CRON_ATTACH "* * * * * root /usr/lib/appscope/dev/scope --ldattach %d\n"
 #define SCOPE_CRONTAB "* * * * * root /tmp/att.sh\n"
 #define SCOPE_START_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s start -f < %s\nrm -- $0\n"
 #define SCOPE_STOP_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s stop -f\nrm -- $0\n"
@@ -100,7 +100,7 @@ createCronFile(const char *hostPrefixPath, const char *content) {
         return FALSE;
     }
     // crond will detect this file entry and run on its' next cycle
-    if (write(outFd, content, C_STRLEN(content)) == -1) {
+    if (write(outFd, content, strlen(content)) == -1) {
         perror("createCronFile: cron: write failed");
         fprintf(stderr, "path: %s\n", path);
         close(outFd);
@@ -401,11 +401,11 @@ nsAttach(pid_t pid, const char *rootdir)
     }
 
     // Create cron job to perform the attach 
-    if (snprintf(cron_file, sizeof(cron_file), SCOPE_CRON_ATTACH, pid)) {
+    if (snprintf(cron_file, sizeof(cron_file), SCOPE_CRON_ATTACH, pid) < 0) {
         perror("error: nsAttach: sprintf() failed\n");
         return EXIT_FAILURE;
     }
-    if (createCronFile("", cron_file)) {
+    if (createCronFile("", cron_file) == FALSE) {
         perror("error: nsAttach: createCronFile() failed\n");
         return EXIT_FAILURE;
     }

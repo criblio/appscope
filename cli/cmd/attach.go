@@ -70,5 +70,7 @@ scope attach --payloads 2000`,
 
 func init() {
 	runCmdFlags(attachCmd, rc)
+	attachCmd.Flags().String("rootdir", "", "Path to root filesystem of target namespace")
+	attachCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	RootCmd.AddCommand(attachCmd)
 }

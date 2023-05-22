@@ -10,7 +10,8 @@
 int nsForkAndExec(pid_t, pid_t, bool);
 int nsConfigure(pid_t, void *, size_t);
 int nsUnconfigure(pid_t);
-int nsInstall(const char *, pid_t);
+int nsAttach(pid_t, const char *);
+int nsInstall(const char *, pid_t, libdirfile_t);
 int nsGetFile(const char *, const char *, pid_t);
 service_status_t nsService(pid_t, const char *);
 service_status_t nsUnservice(pid_t);

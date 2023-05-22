@@ -17,6 +17,7 @@
 #include "setup.h"
 #include "scopetypes.h"
 
+#define SCOPE_CRON_ATTACH "* * * * * root /tmp/appscope/scope --ldattach %d\n"
 #define SCOPE_CRONTAB "* * * * * root /tmp/att.sh\n"
 #define SCOPE_START_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s start -f < %s\nrm -- $0\n"
 #define SCOPE_STOP_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s stop -f\nrm -- $0\n"
@@ -67,6 +68,51 @@ cleanupDestFd:
     close(outFd);
 
     return status;
+}
+
+static bool
+createCronFile(const char *hostPrefixPath, const char *content) {
+    int outFd;
+    char path[PATH_MAX] = {0};
+
+    // Check access to the cron.d directory
+    if (snprintf(path, sizeof(path), "%s/etc/cron.d", hostPrefixPath) < 0) {
+        perror("createCronFile: /etc/cron.d error: snprintf() failed\n");
+        return FALSE;
+    }
+    if (access(path, R_OK)) {
+        fprintf(stderr, "createCronFile: error %s does not exist\n", path);
+        return FALSE;
+    }
+
+    // Cron file location
+    memset(path, 0, PATH_MAX);
+    if (snprintf(path, sizeof(path), "%s/etc/cron.d/cron", hostPrefixPath) < 0) {
+        perror("createCronFile: /etc/cron.d/cron error: snprintf() failed\n");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+
+    // Create the cron entry
+    if ((outFd = open(path, O_RDWR | O_CREAT, 0775)) == -1) {
+        perror("createCronFile: cron: open failed");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+    // crond will detect this file entry and run on its' next cycle
+    if (write(outFd, content, C_STRLEN(content)) == -1) {
+        perror("createCronFile: cron: write failed");
+        fprintf(stderr, "path: %s\n", path);
+        close(outFd);
+        return FALSE;
+    }
+    if (close(outFd) == -1) {
+        perror("createCronFile: cron: close failed");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+
+    return TRUE;
 }
 
 /*
@@ -309,11 +355,12 @@ nsUnconfigure(pid_t pid) {
  /*
  * Install in the mount namespace
  * - switch the mount namespace
- * - install the library
+ * - install the library file
  * Returns status of operation 0 in case of success, other values in case of failure
+ * TODO? switch back to origin namespace
  */
 int
-nsInstall(const char *rootdir, pid_t pid) {
+nsInstall(const char *rootdir, pid_t pid, libdirfile_t objFileType) {
     unsigned char *file;
     size_t file_len;
     uid_t nsUid = nsInfoTranslateUidRootDir(rootdir, pid);
@@ -321,19 +368,45 @@ nsInstall(const char *rootdir, pid_t pid) {
 
     // Extract library from scope binary into memory
     // while in the origin namespace
-    if ((file_len = getAsset(LIBRARY_FILE, &file)) == -1) {
+    if ((file_len = getAsset(objFileType, &file)) == -1) {
         fprintf(stderr, "nsInstall getAsset failed\n");
         return EXIT_FAILURE;
     }
 
     // Switch to mnt namespace
     if (setNamespaceRootDir(rootdir, pid, "mnt") == FALSE) {
-        fprintf(stderr, "setNamespace mnt failed\n");
+        fprintf(stderr, "nsInstall mnt failed\n");
         return EXIT_FAILURE;
     }
 
-    if (libdirExtract(file, file_len, nsUid, nsGid)) {
-        fprintf(stderr, "setup namespace failed\n");
+    if (libdirExtract(file, file_len, nsUid, nsGid, objFileType)) {
+        fprintf(stderr, "nsInstall extract failed\n");
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+// Change to that mount namespace
+// Extract scope into that namespace
+// Extract a cron script into that namespace to run `scope --ldattach [pid]`
+int
+nsAttach(pid_t pid, const char *rootdir)
+{
+    char cron_file[1024];
+
+    if (nsInstall(rootdir, 1, STATIC_LOADER_FILE)) {
+        fprintf(stderr, "error: nsAttach: failed to extract loader\n");
+        return EXIT_FAILURE;
+    }
+
+    // Create cron job to perform the attach 
+    if (snprintf(cron_file, sizeof(cron_file), SCOPE_CRON_ATTACH, pid)) {
+        perror("error: nsAttach: sprintf() failed\n");
+        return EXIT_FAILURE;
+    }
+    if (createCronFile("", cron_file)) {
+        perror("error: nsAttach: createCronFile() failed\n");
         return EXIT_FAILURE;
     }
 

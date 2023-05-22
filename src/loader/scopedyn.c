@@ -30,7 +30,7 @@ main(int argc, char** argv)
         goto out;
     }
 
-    scopeLibPath = (char *)libdirGetPath();
+    scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
     if (!scopeLibPath) {
         fprintf(stderr, "error: libdirGetPath\n");
         goto out;

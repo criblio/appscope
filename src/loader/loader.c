@@ -424,7 +424,7 @@ cmdGetFile(char *paths, pid_t nspid)
  * Handle attach/detach commands.
  */
 int
-cmdAttach(bool ldattach, pid_t pid)
+cmdAttach(bool ldattach, pid_t pid, const char* rootdir)
 {
     int res = EXIT_FAILURE;
     char *scopeLibPath;
@@ -435,6 +435,11 @@ cmdAttach(bool ldattach, pid_t pid)
     uid_t nsGid = eGid;
     elf_buf_t *scope_ebuf = NULL;
     elf_buf_t *ebuf = NULL;
+
+
+    if (rootdir) {
+        return nsAttach(pid, rootdir);
+    }
 
     nsUid = nsInfoTranslateUidRootDir("", pid);
     nsGid = nsInfoTranslateGidRootDir("", pid);
@@ -447,19 +452,19 @@ cmdAttach(bool ldattach, pid_t pid)
 
     // Extract and patch libscope from scope static. Don't attempt to extract from scope dynamic
     if (is_static(scope_ebuf->buf)) {
-        if (libdirExtract(NULL, 0, nsUid, nsGid)) {
+        if (libdirExtract(NULL, 0, nsUid, nsGid, LIBRARY_FILE)) {
             fprintf(stderr, "error: failed to extract library\n");
             goto out;
         }
 
-        scopeLibPath = (char *)libdirGetPath();
+        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
 
         if (patchLibrary(scopeLibPath, FALSE) == PATCH_FAILED) {
             fprintf(stderr, "error: failed to patch library\n");
             goto out;
         }
     } else {
-        scopeLibPath = (char *)libdirGetPath();
+        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
     }
 
     if (access(scopeLibPath, R_OK|X_OK)) {
@@ -540,7 +545,7 @@ cmdAttach(bool ldattach, pid_t pid)
         }
 
         // add the env vars we want in the library
-        dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetPath());
+        dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetPath(LIBRARY_FILE));
 
         int i;
         for (i = 0; environ[i]; i++) {
@@ -620,19 +625,19 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
 
     // Extract and patch libscope from scope static. Don't attempt to extract from scope dynamic
     if (is_static(scope_ebuf->buf)) {
-        if (libdirExtract(NULL, 0, nsUid, nsGid)) {
+        if (libdirExtract(NULL, 0, nsUid, nsGid, LIBRARY_FILE)) {
             fprintf(stderr, "error: failed to extract library\n");
             goto out;
         }
 
-        scopeLibPath = (char *)libdirGetPath();
+        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
 
         if (patchLibrary(scopeLibPath, FALSE) == PATCH_FAILED) {
             fprintf(stderr, "error: failed to patch library\n");
             goto out;
         }
     } else {
-        scopeLibPath = (char *)libdirGetPath();
+        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
     }
 
     if (access(scopeLibPath, R_OK|X_OK)) {
@@ -824,13 +829,13 @@ cmdInstall(const char *rootdir)
     // If rootdir is provided, extract the library into a separate namespace and return
     if (rootdir) {
         // Use pid 1 to locate ns fd
-        if (nsInstall(rootdir, 1)) {
+        if (nsInstall(rootdir, 1, LIBRARY_FILE)) {
             fprintf(stderr, "error: failed to extract library\n");
             return EXIT_FAILURE;
         }
     // Install the library locally
     } else {
-        if (libdirExtract(NULL, 0, nsUid, nsGid)) {
+        if (libdirExtract(NULL, 0, nsUid, nsGid, LIBRARY_FILE)) {
             fprintf(stderr, "error: failed to extract library\n");
             return EXIT_FAILURE;
         }

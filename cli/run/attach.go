@@ -30,14 +30,14 @@ var (
 
 // Attach scopes an existing PID
 func (rc *Config) Attach(args []string) error {
-	pid, err := HandleInputArg(args[0], true, false, true)
+	pid, err := HandleInputArg(rc.Rootdir, args[0], true, false, true)
 	if err != nil {
 		return err
 	}
 	args[0] = fmt.Sprint(pid)
 	var reattach bool
 	// Check PID is not already being scoped
-	status, err := util.PidScopeStatus("", pid)
+	status, err := util.PidScopeStatus(rc.Rootdir, pid)
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func (rc *Config) Attach(args []string) error {
 	// - create working directory in the attached process mnt namespace
 	// - replace the working directory in the CLI mnt namespace with symbolic
 	//   link to working directory created in previous step
-	refNsPid := util.PidGetRefPidForMntNamespace(pid)
+	refNsPid := util.PidGetRefPidForMntNamespace(rc.Rootdir, pid)
 	if refNsPid != -1 {
 		env = append(env, "SCOPE_HOST_WORKDIR_PATH="+rc.WorkDir)
 	}
@@ -122,7 +122,7 @@ func (rc *Config) Attach(args []string) error {
 }
 
 // DetachAll provides the option to detach from all Scoped processes
-func (rc *Config) DetachAll(args []string, prompt bool) error {
+func (rc *Config) DetachAll(prompt bool) error {
 	adminStatus := true
 	if err := util.UserVerifyRootPerm(); err != nil {
 		if errors.Is(err, util.ErrMissingAdmPriv) {
@@ -135,7 +135,7 @@ func (rc *Config) DetachAll(args []string, prompt bool) error {
 		fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
 	}
 
-	procs, err := util.ProcessesToDetach()
+	procs, err := util.ProcessesToDetach(rc.Rootdir)
 	if err != nil {
 		return err
 	}
@@ -161,8 +161,7 @@ func (rc *Config) DetachAll(args []string, prompt bool) error {
 
 	errorsDetachingMultiple := false
 	for _, proc := range procs {
-		tmpArgs := append([]string{fmt.Sprint(proc.Pid)}, args...)
-		if err := rc.detach(tmpArgs, proc.Pid); err != nil {
+		if err := rc.detach(proc.Pid); err != nil {
 			log.Error().Err(err)
 			errorsDetachingMultiple = true
 		}
@@ -174,26 +173,27 @@ func (rc *Config) DetachAll(args []string, prompt bool) error {
 	return nil
 }
 
-// DetachSingle unscopes an existing PID
-func (rc *Config) DetachSingle(args []string) error {
-	pid, err := HandleInputArg(args[0], false, false, true)
+// DetachSingle unscopes an existing scoped process, identified by name or pid
+func (rc *Config) DetachSingle(id string) error {
+	pid, err := HandleInputArg(rc.Rootdir, id, false, false, true)
 	if err != nil {
 		return err
 	}
-	args[0] = fmt.Sprint(pid)
 
 	// Check PID is already being scoped
-	status, err := util.PidScopeStatus("", pid)
+	status, err := util.PidScopeStatus(rc.Rootdir, pid)
 	if err != nil {
 		return err
 	} else if status != util.Active {
 		return errNotScoped
 	}
 
-	return rc.detach(args, pid)
+	return rc.detach(pid)
 }
 
-func (rc *Config) detach(args []string, pid int) error {
+func (rc *Config) detach(pid int) error {
+	args := make([]string, 0)
+	args = append(args, fmt.Sprint(pid))
 	env := os.Environ()
 	ld := loader.New()
 	if !rc.Subprocess {
@@ -206,7 +206,7 @@ func (rc *Config) detach(args []string, pid int) error {
 }
 
 // HandleInputArg handles the input argument (process id/name)
-func HandleInputArg(InputArg string, toAttach, singleProcMenu, warn bool) (int, error) {
+func HandleInputArg(rootdir, InputArg string, toAttach, singleProcMenu, warn bool) (int, error) {
 	// Get PID by name if non-numeric, otherwise validate/use InputArg
 	var pid int
 	var err error
@@ -227,9 +227,9 @@ func HandleInputArg(InputArg string, toAttach, singleProcMenu, warn bool) (int, 
 		}
 
 		if toAttach {
-			procs, err = util.ProcessesByNameToAttach(InputArg)
+			procs, err = util.ProcessesByNameToAttach(rootdir, InputArg)
 		} else {
-			procs, err = util.ProcessesByNameToDetach(InputArg)
+			procs, err = util.ProcessesByNameToDetach(rootdir, InputArg)
 		}
 
 		if err != nil {
@@ -272,7 +272,7 @@ func HandleInputArg(InputArg string, toAttach, singleProcMenu, warn bool) (int, 
 	}
 
 	// Check PID exists
-	if !util.PidExists(pid) {
+	if !util.PidExists(rootdir, pid) {
 		return -1, errPidMissing
 	}
 

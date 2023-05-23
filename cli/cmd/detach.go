@@ -22,24 +22,25 @@ scope detach --all`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		internal.InitConfig()
 		all, _ := cmd.Flags().GetBool("all")
-
-		// Disallow bad argument combinations (see Arg Matrix at top of file)
-		if !all && len(args) == 0 {
-			helpErrAndExit(cmd, "Must specify a pid, process name, or --all")
-		}
+		rc.Rootdir, _ = cmd.Flags().GetString("rootdir")
 
 		if all {
 			if len(args) != 0 {
 				helpErrAndExit(cmd, "--all flag is mutual exclusive with PID or <process_name>")
 			}
 			rc.Subprocess = true
-			return rc.DetachAll(args, true)
+			return rc.DetachAll(true)
 		}
-		return rc.DetachSingle(args)
+		if len(args) == 0 {
+			return rc.DetachSingle("")
+		}
+
+		return rc.DetachSingle(args[0])
 	},
 }
 
 func init() {
 	detachCmd.Flags().BoolP("all", "a", false, "Detach from all processes")
+	detachCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
 	RootCmd.AddCommand(detachCmd)
 }

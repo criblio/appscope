@@ -20,6 +20,8 @@ var psCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
+		rootdir, _ := cmd.Flags().GetString("rootdir")
+
 		// Nice message for non-adminstrators
 		err := util.UserVerifyRootPerm()
 		if errors.Is(err, util.ErrGetCurrentUser) {
@@ -29,7 +31,7 @@ var psCmd = &cobra.Command{
 			fmt.Println("INFO: Run as root (or via sudo) to see all scoped processes")
 		}
 
-		procs, err := util.ProcessesScoped("")
+		procs, err := util.ProcessesScoped(rootdir)
 		if err != nil {
 			util.ErrAndExit("Unable to retrieve scoped processes: %v", err)
 		}
@@ -43,5 +45,7 @@ var psCmd = &cobra.Command{
 }
 
 func init() {
+	psCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
+	psCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	RootCmd.AddCommand(psCmd)
 }

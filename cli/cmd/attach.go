@@ -36,6 +36,7 @@ scope attach --payloads 2000`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		internal.InitConfig()
+		rc.Rootdir, _ = cmd.Flags().GetString("rootdir")
 
 		// Disallow bad argument combinations (see Arg Matrix at top of file)
 		if rc.CriblDest != "" && rc.MetricsDest != "" {
@@ -70,5 +71,6 @@ scope attach --payloads 2000`,
 
 func init() {
 	runCmdFlags(attachCmd, rc)
+	attachCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
 	RootCmd.AddCommand(attachCmd)
 }

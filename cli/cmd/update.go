@@ -122,7 +122,7 @@ scope update 1000 < test_cfg.yml`,
 
 func init() {
 	updateCmd.Flags().BoolP("fetch", "f", false, "Inspect the process after the update is complete")
-	updateCmd.Flags().StringP("rootdir", "p", "", "Path to root filesystem of target namespace")
+	updateCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
 	updateCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	updateCmd.Flags().StringP("config", "c", "", "Path to configuration file")
 	RootCmd.AddCommand(updateCmd)

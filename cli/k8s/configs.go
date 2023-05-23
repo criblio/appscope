@@ -182,6 +182,8 @@ spec:
           ports:
             - containerPort: {{ .PromMPort }}
               protocol: TCP
+            - containerPort: {{ .PromSPort }}
+              protocol: TCP
 {{- end }}
       volumes:
         - name: certs
@@ -201,6 +203,10 @@ spec:
       protocol: TCP
       port: {{ .PromMPort }}
       targetPort: {{ .PromMPort }}
+    - name: {{ .PromSPort }}-prom-export-http
+      protocol: TCP
+      port: {{ .PromSPort }}
+      targetPort: {{ .PromSPort }}
   selector:
     app: {{ .App }}
 {{- end }}

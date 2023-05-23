@@ -175,7 +175,7 @@ func (rc *Config) DetachAll(prompt bool) error {
 
 // DetachSingle unscopes an existing scoped process, identified by name or pid
 func (rc *Config) DetachSingle(id string) error {
-	pid, err := HandleInputArg(rc.Rootdir, id, false, false, true)
+	pid, err := HandleInputArg(rc.Rootdir, id, false, true, true)
 	if err != nil {
 		return err
 	}

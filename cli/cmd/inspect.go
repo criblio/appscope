@@ -45,7 +45,7 @@ scope inspect --all`,
 
 		if all {
 			// Get all scoped processes
-			procs, err := util.ProcessesScoped()
+			procs, err := util.ProcessesScoped(rootdir)
 			if err != nil {
 				if !admin {
 					util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
@@ -108,7 +108,7 @@ scope inspect --all`,
 			}
 		}
 
-		status, _ := util.PidScopeLibInMaps(pid)
+		status, _ := util.PidScopeLibInMaps(rootdir, pid)
 		if !status {
 			if !admin {
 				util.Warn("INFO: Run as root (or via sudo) to interact with all processes")

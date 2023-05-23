@@ -37,7 +37,7 @@ func (rc *Config) Attach(args []string) error {
 	args[0] = fmt.Sprint(pid)
 	var reattach bool
 	// Check PID is not already being scoped
-	status, err := util.PidScopeStatus(pid)
+	status, err := util.PidScopeStatus("", pid)
 	if err != nil {
 		return err
 	}
@@ -183,7 +183,7 @@ func (rc *Config) DetachSingle(args []string) error {
 	args[0] = fmt.Sprint(pid)
 
 	// Check PID is already being scoped
-	status, err := util.PidScopeStatus(pid)
+	status, err := util.PidScopeStatus("", pid)
 	if err != nil {
 		return err
 	} else if status != util.Active {

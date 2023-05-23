@@ -29,7 +29,7 @@ var psCmd = &cobra.Command{
 			fmt.Println("INFO: Run as root (or via sudo) to see all scoped processes")
 		}
 
-		procs, err := util.ProcessesScoped()
+		procs, err := util.ProcessesScoped("")
 		if err != nil {
 			util.ErrAndExit("Unable to retrieve scoped processes: %v", err)
 		}

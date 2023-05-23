@@ -96,8 +96,8 @@
     je   2f
     cmp  $SYS_close, %eax
     je   2f
-    cmp  $SYS_mount, %eax
-    je   2f
+    //cmp  $SYS_mount, %eax
+    //je   2f
 
     lea  \retptr@GOTPCREL(%rip), %r13
     mov  (%r13), %r13
@@ -221,6 +221,7 @@ c_syscall_handler:
     interpose_system_stack go_hook_exit                      go_exit                 c_handler
     interpose_system_stack go_hook_die                       go_die                  c_handler
     interpose_system_stack go_hook_sighandler                go_sighandler           c_handler
+    interpose_system_stack go_hook_forkExec                  go_forkExec             c_handler
 
     syscall_filter go_hook_reg_syscall    hook_syscall    g_syscall_return
     syscall_filter go_hook_reg_rawsyscall hook_rawsyscall g_rawsyscall_return

@@ -84,6 +84,8 @@ int g_go_maint_ver = UNKNOWN_GO_VER;
 int g_arch = ARCH;
 static char g_go_build_ver[7];
 static char g_ReadFrame_addr[20];
+static bool valid_id = FALSE;
+static char *id = NULL;
 go_schema_t *g_go_schema = &go_11_schema; // overridden if later version
 uint64_t g_glibc_guard = 0LL;
 uint64_t go_systemstack_switch;
@@ -107,6 +109,7 @@ tap_t g_tap[] = {
     {tap_exit,                 "runtime.exit",          /* .abi0 */       go_hook_exit,                     NULL, 0},
     {tap_die,                  "runtime.dieFromSignal", /* .abi0 */       go_hook_die,                      NULL, 0},
     {tap_sighandler,           "runtime.sighandler",    /* .abi0 */       go_hook_sighandler,               NULL, 0},
+    {tap_forkExec,             "syscall.forkExec",                        go_hook_forkExec,                 NULL, 0},
     {tap_end,                  "",                                        NULL,                             NULL, 0},
 };
 
@@ -421,10 +424,11 @@ createGoStructFile(void) {
 // longer needed.
 // Don't use go_str() for byte arrays.
 static char *
-go_str(void *go_str)
+go_str(void *go_str, bool force)
 {
     // Go 17 and higher use "c style" null terminated strings instead of a string and a length
-    if (g_go_minor_ver >= 17) {
+
+    if ((g_go_minor_ver >= 17) && (force == FALSE)) {
        // We need to deference the address first before casting to a char *
        if (!go_str) return NULL;
        return (char *)*(uint64_t *)go_str;
@@ -737,6 +741,7 @@ patch_addrs(funchook_t *funchook,
         // We also patch syscalls at the first (and last) instruction.
         if (i == 0 && ((tap->assembly_fn == go_hook_exit) ||
                        (tap->assembly_fn == go_hook_die) ||
+                       (tap->assembly_fn == go_hook_forkExec) ||
                        (tap->assembly_fn == go_hook_sighandler))) {
 
             // In this case we want to patch the instruction directly
@@ -945,10 +950,14 @@ tryAbi0(const char *buf, char *sname)
 void
 initGoHook(elf_buf_t *ebuf)
 {
+    if (!ebuf || !ebuf->buf) return;
+
     int rc;
     funchook_t *funchook;
     char *go_ver;
     char *go_runtime_version = NULL;
+    uint64_t base = 0LL;
+    //Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
 
     funchook = funchook_create();
 
@@ -957,8 +966,9 @@ initGoHook(elf_buf_t *ebuf)
         funchook_set_debug_file(DEFAULT_LOG_PATH);
     }
 
-    // default to a dynamic app?
-    if (checkEnv("SCOPE_EXEC_TYPE", "static")) {
+    // check ELF type
+    //if (checkEnv("SCOPE_EXEC_TYPE", "static")) {
+    if (is_static(ebuf->buf)) {
         scopeSetGoAppStateStatic(TRUE);
         //patchClone();
         sysprint("This is a static app\n");
@@ -967,11 +977,9 @@ initGoHook(elf_buf_t *ebuf)
         sysprint("This is a dynamic app\n");
     }
 
-    //check ELF type
-    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
     // if it's a position independent executable, get the base address from /proc/self/maps
-    uint64_t base = 0LL;
-    if (ehdr->e_type == ET_DYN && (scopeGetGoAppStateStatic() == FALSE)) {
+    // default to a dynamic app?
+    if (scopeGetGoAppStateStatic() == FALSE) {
         if (osGetBaseAddr(&base) == FALSE) {
             sysprint("ERROR: can't get the base address\n");
             funchook_destroy(funchook);
@@ -992,10 +1000,10 @@ initGoHook(elf_buf_t *ebuf)
         if (g_go_build_ver[0] != '\0') {
             go_ver = (char *)((uint64_t)ver_addr);
         } else {
-            go_ver = go_str((void *)((uint64_t)ver_addr + base));
+            go_ver = go_str((void *)((uint64_t)ver_addr + base), FALSE);
         }
     } else {
-        go_ver = go_str((void *)((uint64_t)go_ver_sym + base));
+        go_ver = go_str((void *)((uint64_t)go_ver_sym + base), FALSE);
     }
 
     if (go_ver && (go_runtime_version = go_ver)) {
@@ -1081,6 +1089,8 @@ initGoHook(elf_buf_t *ebuf)
         if (((orig_func = getSymbol(ebuf->buf, tap->func_name)) == NULL) &&
             // look in the .gopclntab section
             ((orig_func = getGoSymbol(ebuf->buf, tap->func_name, NULL, NULL)) == NULL) &&
+            // check dynamic symbols; exec has been stripped
+            ((orig_func = getDynSymbol(ebuf->buf, tap->func_name)) == NULL) &&
             // is the symbol defined as an original API; with an abi0 extension
             ((orig_func = tryAbi0(ebuf->buf, tap->func_name)) == NULL)) {
             sysprint("WARN: can't get the address for %s\n", tap->func_name);
@@ -1234,8 +1244,8 @@ mountDirs(char *src, char *target, char *fstype)
 {
     static int once = 0;
 
-    if (scope_strstr(fstype, "overlay")) once++;
-    funcprint("Scope: mount(%d) of src: %s target: %s fstype: %s\n", once, src, target, fstype);
+    sysprint("Scope: mount(%d) of src: %s target: %s fstype: %s\n", once, src, target, fstype);
+    if (scope_strstr(fstype, "overlay") && scope_strstr(src, "merged")) once++;
 
     /*
      * Checks:
@@ -1249,7 +1259,7 @@ mountDirs(char *src, char *target, char *fstype)
      * DOCKERD_AFTER_OVERLAY_MOUNTS defines the overlay activity.
      */
     if ((src != NULL) && (target != NULL) &&
-        scope_strstr(g_proc.procname, "dockerd") &&
+        scope_strstr(g_proc.procname, "containerd") &&
         (scope_strstr(g_libpath, "/")) &&
         (once == DOCKERD_AFTER_OVERLAY_MOUNTS)) {
         int ldfd;
@@ -1432,10 +1442,10 @@ c_syscall(char *sys_stack, char *g_stack)
             char *target = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
             char *fstype = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p3);
 
+            sysprint("Scope: mount of %s to %s\n", src, target);
             mountDirs(src, target, fstype);
         break;
         }
-
     default:
         break;
     }
@@ -1873,4 +1883,75 @@ EXPORTON void *
 go_sighandler(char *stackptr)
 {
     return do_cfunc(stackptr, c_sighandler, tap_entry(tap_sighandler)->assembly_fn);
+}
+
+static void
+updateContainerConfig(char *id)
+{
+    /* TODO:
+     * Locate the dir with the passed id
+     * starting in the runc state dir: /run/containerd/
+     * readdir locating the subdir with id.
+     * Open config.json in the id subdir.
+     * Modify the json to add LD_PRELOAD to the
+     * env list and add a mount point for the libdir
+     * directory.
+     * Write the changes and close the file.
+     */
+    return;
+}
+
+static void
+c_forkExec(char *sys_stack, char *g_stack)
+{
+    int i;
+    char *argv0 = (char *)(uint64_t)(sys_stack + 0);
+    uint64_t *argvv = (uint64_t *)*(uint64_t *)(sys_stack + 0x10);
+
+    /*
+     * TBD: in order to call scope_strstr() with a needle longer
+     * than 3-4 chars the stack needs to be aligned on a 16 byte
+     * boundary due to the "movaps %xmm0,0x20(%rsp)' instruction.
+     * Aligning in the stack switch code is likley to affect
+     * current offset values.
+     * Probably should be applied here?
+     * We enter this code from the start of the Go runtime function
+     * before it's stack frame is created. That is unique. Likely
+     * the cause of this issue.
+     * Will look into this directly.
+     */
+
+    char *cmd = go_str(argv0, TRUE);
+    // TBD: add a check for curent proc containerd when stack is aligned
+    if (!scope_strstr(cmd, "runc")) return;
+
+    sysprint("%s execing %s\n", g_proc.procname, cmd);
+    for (i = 0; argvv[i]; i += 2) {
+        char *argv = go_str((char *)(argvv + i), TRUE);
+        if (argv) {
+            sysprint("\t%s:%d %s argv %s\n", __FUNCTION__, __LINE__,
+                     g_proc.procname, argv);
+            if (scope_strstr(argv, "-id") && (char *)(argvv + i + 2)) {
+                sysprint("%s:%d\n", __FUNCTION__, __LINE__);
+                id = scope_strdup(go_str((char *)(argvv + i + 2), TRUE));
+                if (id) sysprint("%s:%d %s\n", __FUNCTION__, __LINE__, id);
+            } else if (scope_strstr(argv, "sta")) { // should be "start"
+                valid_id = TRUE;
+                sysprint("%s:%d\n", __FUNCTION__, __LINE__);
+                break;
+            }
+            scope_free(argv);
+        }
+    }
+
+    if (id && (valid_id == TRUE)) updateContainerConfig(id);
+    scope_free(id);
+    id = NULL;
+    valid_id = FALSE;
+}
+
+EXPORTON void *
+go_forkExec(char *stackptr)
+{
+    return do_cfunc(stackptr, c_forkExec, tap_entry(tap_forkExec)->assembly_fn);
 }

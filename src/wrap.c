@@ -1167,9 +1167,6 @@ periodic(void *arg)
 
     perf = checkEnv(PRESERVE_PERF_REPORTING, "true");
 
-    // TBD: where to run this?
-    autoMount();
-
     while (1) {
         // we are trying to exit, do nothing
         if (g_exitdone == TRUE) {

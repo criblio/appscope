@@ -154,6 +154,11 @@ spec:
       creationTimestamp: null
       labels:
         app: {{ .App }}
+{{- if not .PromDisable }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .PromSPort }}"
+{{- end }}
     spec:
       serviceAccountName: scope-cert-sa
       containers:

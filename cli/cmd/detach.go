@@ -17,7 +17,10 @@ var detachCmd = &cobra.Command{
 	Long:  `Unscopes a currently-running process identified by PID or <process_name>.`,
 	Example: `scope detach 1000
 scope detach firefox
-scope detach --all`,
+scope detach --all
+scope detach 1000 --rootdir /path/to/host/mount
+scope detach --rootdir /path/to/host/mount
+scope detach --all --rootdir /path/to/host/mount/proc/<hostpid>/root`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		internal.InitConfig()

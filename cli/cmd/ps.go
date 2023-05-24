@@ -16,8 +16,12 @@ import (
 var psCmd = &cobra.Command{
 	Use:   "ps",
 	Short: "List processes currently being scoped",
-	Long:  `Lists all processes where the libscope library is injected.`,
-	Args:  cobra.NoArgs,
+	Long:  `List processes currently being scoped.`,
+	Example: `scope ps
+scope ps --json
+scope ps --rootdir /path/to/host/mount
+scope ps --rootdir /path/to/host/mount/proc/<hostpid>/root`,
+	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
 		rootdir, _ := cmd.Flags().GetString("rootdir")

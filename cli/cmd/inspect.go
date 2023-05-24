@@ -21,7 +21,10 @@ var inspectCmd = &cobra.Command{
 	Long:  `Returns information about scoped process identified by PID.`,
 	Example: `scope inspect
 scope inspect 1000
-scope inspect --all`,
+scope inspect --all --json
+scope inspect 1000 --rootdir /path/to/host/mount
+scope inspect --all --rootdir /path/to/host/mount
+scope inspect --all --rootdir /path/to/host/mount/proc/<hostpid>/root`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()

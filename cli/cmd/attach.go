@@ -32,6 +32,8 @@ The --*dest flags accept file names like /tmp/scope.log or URLs like file:///tmp
 be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
 	Example: `scope attach 1000
 scope attach firefox 
+scope attach --rootdir /path/to/host firefox 
+scope attach --rootdir /path/to/host/mount/proc/<hostpid>/root 1000
 scope attach --payloads 2000`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

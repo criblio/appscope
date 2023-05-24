@@ -32,10 +32,13 @@ The --*dest flags accept file names like /tmp/scope.log or URLs like file:///tmp
 be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
 	Example: `scope attach 1000
 scope attach firefox 
+scope attach --rootdir /path/to/host firefox 
+scope attach --rootdir /path/to/host/mount/proc/<hostpid>/root 1000
 scope attach --payloads 2000`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		internal.InitConfig()
+		rc.Rootdir, _ = cmd.Flags().GetString("rootdir")
 
 		// Disallow bad argument combinations (see Arg Matrix at top of file)
 		if rc.CriblDest != "" && rc.MetricsDest != "" {
@@ -70,5 +73,6 @@ scope attach --payloads 2000`,
 
 func init() {
 	runCmdFlags(attachCmd, rc)
+	attachCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
 	RootCmd.AddCommand(attachCmd)
 }

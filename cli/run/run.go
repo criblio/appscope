@@ -29,6 +29,7 @@ type Config struct {
 	CommandDir    string
 	Coredump      bool
 	Backtrace     bool
+	Rootdir       string
 
 	now func() time.Time
 	sc  *libscope.ScopeConfig

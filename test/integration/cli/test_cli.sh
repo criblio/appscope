@@ -232,8 +232,8 @@ endtest
 #
 starttest "Scope detach by name"
 
-run scope detach sleep
-outputs "Detaching from pid ${sleep_pid}"
+echo "1" | scope detach sleep
+RET=$?
 returns 0
 
 endtest

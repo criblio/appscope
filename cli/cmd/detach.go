@@ -17,29 +17,33 @@ var detachCmd = &cobra.Command{
 	Long:  `Unscopes a currently-running process identified by PID or <process_name>.`,
 	Example: `scope detach 1000
 scope detach firefox
-scope detach --all`,
+scope detach --all
+scope detach 1000 --rootdir /path/to/host/mount
+scope detach --rootdir /path/to/host/mount
+scope detach --all --rootdir /path/to/host/mount/proc/<hostpid>/root`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		internal.InitConfig()
 		all, _ := cmd.Flags().GetBool("all")
-
-		// Disallow bad argument combinations (see Arg Matrix at top of file)
-		if !all && len(args) == 0 {
-			helpErrAndExit(cmd, "Must specify a pid, process name, or --all")
-		}
+		rc.Rootdir, _ = cmd.Flags().GetString("rootdir")
 
 		if all {
 			if len(args) != 0 {
 				helpErrAndExit(cmd, "--all flag is mutual exclusive with PID or <process_name>")
 			}
 			rc.Subprocess = true
-			return rc.DetachAll(args, true)
+			return rc.DetachAll(true)
 		}
-		return rc.DetachSingle(args)
+		if len(args) == 0 {
+			return rc.DetachSingle("")
+		}
+
+		return rc.DetachSingle(args[0])
 	},
 }
 
 func init() {
 	detachCmd.Flags().BoolP("all", "a", false, "Detach from all processes")
+	detachCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
 	RootCmd.AddCommand(detachCmd)
 }

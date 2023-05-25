@@ -21,7 +21,10 @@ var inspectCmd = &cobra.Command{
 	Long:  `Returns information about scoped process identified by PID.`,
 	Example: `scope inspect
 scope inspect 1000
-scope inspect --all`,
+scope inspect --all --json
+scope inspect 1000 --rootdir /path/to/host/mount
+scope inspect --all --rootdir /path/to/host/mount
+scope inspect --all --rootdir /path/to/host/mount/proc/<hostpid>/root`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
@@ -45,7 +48,7 @@ scope inspect --all`,
 
 		if all {
 			// Get all scoped processes
-			procs, err := util.ProcessesScoped()
+			procs, err := util.ProcessesScoped(rootdir)
 			if err != nil {
 				if !admin {
 					util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
@@ -93,7 +96,7 @@ scope inspect --all`,
 			// If no pid argument was provided
 			// Helper menu to allow the user to select a pid to inspect
 
-			if pid, err = run.HandleInputArg("", false, true, false); err != nil {
+			if pid, err = run.HandleInputArg(rootdir, "", false, true, false); err != nil {
 				if !admin {
 					util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
 				}
@@ -108,7 +111,7 @@ scope inspect --all`,
 			}
 		}
 
-		status, _ := util.PidScopeLibInMaps(pid)
+		status, _ := util.PidScopeLibInMaps(rootdir, pid)
 		if !status {
 			if !admin {
 				util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
@@ -144,7 +147,7 @@ scope inspect --all`,
 }
 
 func init() {
-	inspectCmd.Flags().StringP("rootdir", "p", "", "Path to root filesystem of target namespace")
+	inspectCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
 	inspectCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	inspectCmd.Flags().BoolP("all", "a", false, "Inspect all processes")
 	RootCmd.AddCommand(inspectCmd)

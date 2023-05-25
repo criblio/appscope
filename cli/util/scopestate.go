@@ -39,9 +39,12 @@ func (state ScopeStatus) String() string {
 var errScopeStatus = errors.New("error scope status")
 
 // getScopeStatus retreives information about Scope status using IPC
-func getScopeStatus(pid int) (ScopeStatus, error) {
+func getScopeStatus(rootdir string, pid int) (ScopeStatus, error) {
 	cmd := ipc.CmdGetScopeStatus{}
-	resp, err := cmd.Request(ipc.IpcPidCtx{Pid: pid})
+	resp, err := cmd.Request(ipc.IpcPidCtx{
+		PrefixPath: rootdir,
+		Pid:        pid,
+	})
 	if err != nil {
 		return Disable, err
 	}

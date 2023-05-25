@@ -37,6 +37,6 @@ scope start --rootdir /hostfs`,
 }
 
 func init() {
-	startCmd.Flags().StringP("rootdir", "p", "", "Path to root filesystem of target namespace")
+	startCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
 	RootCmd.AddCommand(startCmd)
 }

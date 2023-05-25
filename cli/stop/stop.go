@@ -164,7 +164,7 @@ func Stop() error {
 		Subprocess: true,
 		Verbosity:  4, // Default
 	}
-	if err := rc.DetachAll([]string{}, false); err != nil {
+	if err := rc.DetachAll(false); err != nil {
 		log.Error().
 			Err(err).
 			Msg("Error detaching from all Scoped processes")

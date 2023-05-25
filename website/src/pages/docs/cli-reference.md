@@ -89,7 +89,9 @@ be set to sockets with `unix:///var/run/mysock`, `tcp://hostname:port`, `udp://h
 
 ```
 scope attach 1000
-scope attach firefox
+scope attach firefox 
+scope attach --rootdir /path/to/host firefox 
+scope attach --rootdir /path/to/host/mount/proc/<hostpid>/root 1000
 scope attach --payloads 2000
 ```
 
@@ -108,6 +110,7 @@ scope attach --payloads 2000
       --metricformat string   Set format of metrics output (statsd|ndjson) (default "ndjson")
   -n, --nobreaker             Set Cribl to not break streams into events.
   -p, --payloads              Capture payloads of network transactions
+  -R, --rootdir               Path to root filesystem of target namespace
   -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.
   -v, --verbosity int         Set scope metric verbosity (default 4)
 ```
@@ -157,7 +160,7 @@ Displays an interactive dashboard with an overview of what's happening with the 
 ### detach
 ---
 
-Unscopes a currently-running process identified by PID or ProcessName.
+Unscopes a currently-running process identified by PID or process name.
 
 #### Usage
 
@@ -169,6 +172,9 @@ Unscopes a currently-running process identified by PID or ProcessName.
 scope detach 1000
 scope detach firefox
 scope detach --all
+scope detach 1000 --rootdir /path/to/host/mount
+scope detach --rootdir /path/to/host/mount
+scope detach --all --rootdir /path/to/host/mount/proc/<hostpid>/root
 ```
 
 #### Flags
@@ -176,6 +182,7 @@ scope detach --all
 ```
   -a, --all                   Detach from all processes
   -h, --help                  Help for detach
+  -R, --rootdir               Path to root filesystem of target namespace
 
 ```
 
@@ -362,7 +369,10 @@ Returns information on scoped process identified by PID.
 ```
 scope inspect
 scope inspect 1000
-scope inspect --all
+scope inspect --all --json
+scope inspect 1000 --rootdir /path/to/host/mount
+scope inspect --all --rootdir /path/to/host/mount
+scope inspect --all --rootdir /path/to/host/mount/proc/<hostpid>/root
 ```
 
 #### Flags
@@ -371,7 +381,7 @@ scope inspect --all
   -a, --all             Inspect all processes
   -h, --help            Help for inspect
   -j, --json            Output as newline delimited JSON without pretty printing
-  -p, --rootdir string  Path to root filesystem of target namespace
+  -R, --rootdir         Path to root filesystem of target namespace
 ```
 
 ### k8s
@@ -509,6 +519,22 @@ Lists all scoped processes. This means processes whose functions AppScope is int
 
 `scope ps`
 
+#### Examples
+
+```
+scope ps
+scope ps --json
+scope ps --rootdir /path/to/host/mount
+scope ps --rootdir /path/to/host/mount/proc/<hostpid>/root`,
+```
+
+#### Flags
+
+```
+  -j, --json            Output as newline delimited JSON without pretty printing
+  -R, --rootdir         Path to root filesystem of target namespace
+```
+
 ### run
 ----
 
@@ -625,10 +651,10 @@ scope start --rootdir /hostfs
 Stop scoping all processes and services on the host and in all relevant containers.
 
 `scope stop` does the following on the host and in all relevant containers:
-  - Remove filter files `/usr/lib/appscope/scope_filter` and `/tmp/appscope/scope_filter`.
-	- Detach from all existing scoped processes.
-	- Remove the `etc/profile.d/scope.sh` script.
-	- Delete any lines that `LD_PRELOAD` libscope from any relevant service configurations.
+    - Remove filter files `/usr/lib/appscope/scope_filter` and `/tmp/appscope/scope_filter`.
+    - Detach from all existing scoped processes.
+    - Remove the `etc/profile.d/scope.sh` script.
+    - Delete any lines that `LD_PRELOAD` libscope from any relevant service configurations.
 
 #### Usage
 
@@ -656,8 +682,13 @@ Updates configuration of scoped process identified by PID.
 
 #### Examples
 
-`scope update 1000 --config test_cfg.yml`
-`scope update 1000 < test_cfg.yml`
+```
+scope update 1000 --config scope_cfg.yml
+scope update 1000 < scope_cfg.yml
+scope update 1000 --json < scope_cfg.yml
+scope update 1000 --rootdir /path/to/host/mount --config scope_cfg.yml
+scope update 1000 --rootdir /path/to/host/mount/proc/<hostpid>/root < scope_cfg.yml
+```
 
 #### Flags
 
@@ -666,8 +697,8 @@ Flags:
   -f, --fetch           Inspect the process after the update is complete
   -c, --config string   Path to configuration file
   -h, --help            help for update
-  -p, --rootdir string  Prefix to /proc filesystem
   -j, --json            Output as newline delimited JSON without pretty printing
+  -R, --rootdir         Path to root filesystem of target namespace
 ```
 
 ### version

@@ -23,8 +23,11 @@ var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Updates the configuration of a scoped process",
 	Long:  `Updates the configuration of a scoped process identified by PID.`,
-	Example: `scope update 1000 --config test_cfg.yml
-scope update 1000 < test_cfg.yml`,
+	Example: `scope update 1000 --config scope_cfg.yml
+scope update 1000 < scope_cfg.yml
+scope update 1000 --json < scope_cfg.yml
+scope update 1000 --rootdir /path/to/host/mount --config scope_cfg.yml
+scope update 1000 --rootdir /path/to/host/mount/proc/<hostpid>/root < scope_cfg.yml`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
@@ -69,7 +72,7 @@ scope update 1000 < test_cfg.yml`,
 			util.ErrAndExit("error parsing PID argument")
 		}
 
-		status, _ := util.PidScopeLibInMaps(pid)
+		status, _ := util.PidScopeLibInMaps(rootdir, pid)
 		if !status {
 			if !admin {
 				util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
@@ -122,7 +125,7 @@ scope update 1000 < test_cfg.yml`,
 
 func init() {
 	updateCmd.Flags().BoolP("fetch", "f", false, "Inspect the process after the update is complete")
-	updateCmd.Flags().StringP("rootdir", "p", "", "Path to root filesystem of target namespace")
+	updateCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
 	updateCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	updateCmd.Flags().StringP("config", "c", "", "Path to configuration file")
 	RootCmd.AddCommand(updateCmd)

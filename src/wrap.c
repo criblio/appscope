@@ -1659,11 +1659,86 @@ initEnv(int *attachedFlag)
     scope_fclose(fd);
 }
 
-__attribute__((constructor)) void
-init(void)
+
+typedef struct {
+    bool isActive;
+    config_t *cfg;
+} settings_t;
+
+/*
+* We actively scope applications:
+* - when we are attaching
+* - when the filter file does not exist
+* - when process match the allow list
+*/
+static settings_t
+getSettings(bool attachedFlag)
 {
     config_t *cfg = NULL;
     char *path = NULL;
+    bool scopedFlag = FALSE;
+    bool skipReadCfg = FALSE;
+
+    if (attachedFlag) {
+        scopedFlag = TRUE;
+    } else {
+        cfg = cfgCreateDefault();
+        // First try to use env variable
+        char *envFilterVal = getenv("SCOPE_FILTER");
+        filter_status_t res = FILTER_SCOPED;
+        if (envFilterVal) {
+            /*
+            * If filter env was defined and wasn't disabled
+            * the filter handling, try path interpretation
+            */
+            size_t envFilterLen = scope_strlen(envFilterVal);
+            if ((scope_strncmp(envFilterVal, "false", envFilterLen)) && (!scope_access(envFilterVal, R_OK))) {
+                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, envFilterVal, cfg);
+            }
+        } else {
+            /*
+            * Try to use defaults
+            */
+            if (!scope_access(SCOPE_FILTER_USR_PATH, R_OK)) {
+                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, SCOPE_FILTER_USR_PATH, cfg);
+            } else if (!scope_access(SCOPE_FILTER_TMP_PATH, R_OK)) {
+                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, SCOPE_FILTER_TMP_PATH, cfg);
+            }
+        }
+        switch (res) {
+            case FILTER_SCOPED:
+                scopedFlag = TRUE;
+                break;
+            case FILTER_SCOPED_WITH_CFG:
+                scopedFlag = TRUE;
+                skipReadCfg = TRUE;
+                break;
+            case FILTER_NOT_SCOPED:
+                scopedFlag = FALSE;
+                break;
+            case FILTER_ERROR:
+            default:
+                scopedFlag = FALSE;
+                DBG(NULL);
+                break;
+        }
+    }
+    if (skipReadCfg == FALSE) {
+        path = cfgPath();
+        if (cfg) cfgDestroy(&cfg);
+        cfg = cfgRead(path);
+        if (path) scope_free(path);
+    }
+    cfgProcessEnvironment(cfg);
+
+    settings_t settings = {.isActive = scopedFlag,
+                          .cfg = cfg};
+    return settings;
+}
+
+__attribute__((constructor)) void
+init(void)
+{
     scope_init_vdso_ehdr();
     char *full_path = NULL;
     elf_buf_t *ebuf = NULL;
@@ -1722,84 +1797,27 @@ init(void)
     g_nsslist = lstCreate(freeNssEntry);
 
     initTime();
-    /*
-    * We scope application in following cases:
-    * - when we are attaching
-    * - when the filter file does not exists
-    * - when process match the allow list
-    */
-    bool scopedFlag = FALSE;
-    bool skipReadCfg = FALSE;
 
-    if (attachedFlag) {
-        scopedFlag = TRUE;
-    } else {
-        cfg = cfgCreateDefault();
-        // First try to use env variable
-        char *envFilterVal = getenv("SCOPE_FILTER");
-        filter_status_t res = FILTER_SCOPED;
-        if (envFilterVal) {
-            /*
-            * If filter env was defined and wasn't disable 
-            * the filter handling, try path interpretation
-            */
-            size_t envFilterLen = scope_strlen(envFilterVal);
-            if ((scope_strncmp(envFilterVal, "false", envFilterLen)) && (!scope_access(envFilterVal, R_OK))) {
-                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, envFilterVal, cfg);
-            }
-        } else {
-            /*
-            * Try to use defaults
-            */
-            if (!scope_access(SCOPE_FILTER_USR_PATH, R_OK)) {
-                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, SCOPE_FILTER_USR_PATH, cfg);
-            } else if (!scope_access(SCOPE_FILTER_TMP_PATH, R_OK)) {
-                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, SCOPE_FILTER_TMP_PATH, cfg);
-            }
-        }
-        switch (res) {
-            case FILTER_SCOPED:
-                scopedFlag = TRUE;
-                break;
-            case FILTER_SCOPED_WITH_CFG:
-                scopedFlag = TRUE;
-                skipReadCfg = TRUE;
-                break;
-            case FILTER_NOT_SCOPED:
-                scopedFlag = FALSE;
-                break;
-            case FILTER_ERROR:
-            default:
-                scopedFlag = FALSE;
-                DBG(NULL);
-                break;
-        }
-    }
-    if (skipReadCfg == FALSE) {
-        path = cfgPath();
-        if (cfg) cfgDestroy(&cfg);
-        cfg = cfgRead(path);
-    }
+    // settings contain isActive and cfg fields which depend on the existance and
+    // contents of a filter file, env vars, scope.yml, etc.
+    settings_t settings = getSettings(attachedFlag);
 
     // on aarch64, the crypto subsystem installs handlers for SIGILL
     // (contrib/openssl/crypto/armcap.c) to determine which version of
     // ARM processor we're on.  Do this before enableSnapshot() below.
     transportInit();
 
-    cfgProcessEnvironment(cfg);
-
-    doConfig(cfg);
+    doConfig(settings.cfg);
 
     // Currently we enable snapshot feature only in case of constructor
     // TODO: if we update the configuration via IPC it will not be updated
-    enableSnapshot(cfg);
+    enableSnapshot(settings.cfg);
 
-    g_staticfg = cfg;
-    if (path) scope_free(path);
+    g_staticfg = settings.cfg;
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
 
-    g_cfg.funcs_attached = scopedFlag;
+    g_cfg.funcs_attached = settings.isActive;
     g_cfg.staticfg = g_staticfg;
     g_cfg.cfgStr = jsonStringFromCfg(g_staticfg);
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
@@ -1809,7 +1827,7 @@ init(void)
     // of whether TLS is actually configured on any transport.
     transportRegisterForExitNotification(handleExit);
 
-    initHook(attachedFlag, scopedFlag, ebuf, full_path);
+    initHook(attachedFlag, settings.isActive, ebuf, full_path);
     
     /*
      * If we are interposing (scoping) this process, then proceed

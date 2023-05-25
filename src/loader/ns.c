@@ -17,16 +17,101 @@
 #include "setup.h"
 #include "scopetypes.h"
 
-#define SCOPE_CRON_ATTACH "* * * * * root /usr/lib/appscope/dev/scope --ldattach %d\n"
 #define SCOPE_CRONTAB "* * * * * root /tmp/att.sh\n"
 #define SCOPE_START_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s start -f < %s\nrm -- $0\n"
 #define SCOPE_STOP_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s stop -f\nrm -- $0\n"
+#define SCOPE_ATTACH_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s attach %d\nrm -- $0\n"
 
 // NS Action types
 typedef enum {
     START = 0,
     STOP = 1,
 } ns_action_t;
+
+/* Create the cron file
+ *
+ * When the start command is executed within a container we can't
+ * set ns to that of a host process. Therefore, start a process in the
+ * host context using crond. This process will run a script which will
+ * run the start command in the context of the host. It should run once and
+ * then clean up after itself.
+ *
+ * This should be called after the mnt namespace has been switched.
+ */
+static bool
+createCron(const char *hostPrefixPath, const char *script) {
+    int outFd;
+    char buf[1024] = {0};
+    char path[PATH_MAX] = {0};
+
+    // Check access to cron.d directory
+    if (snprintf(path, sizeof(path), "%s/etc/cron.d", hostPrefixPath) < 0) {
+        perror("createCron: /etc/cron.d error: snprintf() failed\n");
+        return FALSE;
+    }
+    if (access(path, R_OK)) {
+        fprintf(stderr, "createCron: error %s does not exist\n", path);
+        return FALSE;
+    }
+
+    // Create the /tmp/att.sh script to be executed by cron
+    // We use a script so it can delete the cron file after it's run
+    memset(path, 0, PATH_MAX);
+    if (snprintf(path, sizeof(path), "%s/tmp/att.sh", hostPrefixPath) < 0) {
+        perror("createCron: /tmp/att.sh error: snprintf() failed\n");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+    if ((outFd = open(path, O_RDWR | O_CREAT, 0775)) == -1) {
+        perror("createCron: script path: open failed");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+    // Write cron action 
+    if (snprintf(buf, sizeof(buf), script) < 0) {
+        perror("createCron: script: error: snprintf() failed\n");
+        close(outFd);
+        return FALSE;
+    }
+    if (write(outFd, buf, strlen(buf)) == -1) {
+        perror("createCron: script: write failed");
+        fprintf(stderr, "path: %s\n", path);
+        close(outFd);
+        return FALSE;
+    }
+    if (close(outFd) == -1) {
+        perror("createCron: script: close failed");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+
+    // Create the /etc/cron.d/cron entry
+    memset(path, 0, PATH_MAX);
+    if (snprintf(path, sizeof(path), "%s/etc/cron.d/cron", hostPrefixPath) < 0) {
+        perror("createCron: /etc/cron.d/cron error: snprintf() failed\n");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+    if ((outFd = open(path, O_RDWR | O_CREAT, 0775)) == -1) {
+        perror("createCron: cron: open failed");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+    // crond will detect this file entry and run on its' next cycle
+    if (write(outFd, SCOPE_CRONTAB, C_STRLEN(SCOPE_CRONTAB)) == -1) {
+        perror("createCron: cron: write failed");
+        fprintf(stderr, "path: %s\n", path);
+        close(outFd);
+        return FALSE;
+    }
+    if (close(outFd) == -1) {
+        perror("createCron: cron: close failed");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+
+    return TRUE;
+}
 
 /*
  * Extract memory to specific output file.
@@ -68,51 +153,6 @@ cleanupDestFd:
     close(outFd);
 
     return status;
-}
-
-static bool
-createCronFile(const char *hostPrefixPath, const char *content) {
-    int outFd;
-    char path[PATH_MAX] = {0};
-
-    // Check access to the cron.d directory
-    if (snprintf(path, sizeof(path), "%s/etc/cron.d", hostPrefixPath) < 0) {
-        perror("createCronFile: /etc/cron.d error: snprintf() failed\n");
-        return FALSE;
-    }
-    if (access(path, R_OK)) {
-        fprintf(stderr, "createCronFile: error %s does not exist\n", path);
-        return FALSE;
-    }
-
-    // Cron file location
-    memset(path, 0, PATH_MAX);
-    if (snprintf(path, sizeof(path), "%s/etc/cron.d/cron", hostPrefixPath) < 0) {
-        perror("createCronFile: /etc/cron.d/cron error: snprintf() failed\n");
-        fprintf(stderr, "path: %s\n", path);
-        return FALSE;
-    }
-
-    // Create the cron entry
-    if ((outFd = open(path, O_RDWR | O_CREAT, 0775)) == -1) {
-        perror("createCronFile: cron: open failed");
-        fprintf(stderr, "path: %s\n", path);
-        return FALSE;
-    }
-    // crond will detect this file entry and run on its' next cycle
-    if (write(outFd, content, strlen(content)) == -1) {
-        perror("createCronFile: cron: write failed");
-        fprintf(stderr, "path: %s\n", path);
-        close(outFd);
-        return FALSE;
-    }
-    if (close(outFd) == -1) {
-        perror("createCronFile: cron: close failed");
-        fprintf(stderr, "path: %s\n", path);
-        return FALSE;
-    }
-
-    return TRUE;
 }
 
 /*
@@ -393,19 +433,26 @@ nsInstall(const char *rootdir, pid_t pid, libdirfile_t objFileType) {
 int
 nsAttach(pid_t pid, const char *rootdir)
 {
-    char cron_file[1024];
+    char script[1024];
+    char *scopeLibPath = NULL;
 
     if (nsInstall(rootdir, 1, STATIC_LOADER_FILE)) {
         fprintf(stderr, "error: nsAttach: failed to extract loader\n");
         return EXIT_FAILURE;
     }
 
-    // Create cron job to perform the attach 
-    if (snprintf(cron_file, sizeof(cron_file), SCOPE_CRON_ATTACH, pid) < 0) {
+    scopeLibPath = (char *)libdirGetPath(STATIC_LOADER_FILE);
+    if (!scopeLibPath) {
+        fprintf(stderr, "error: nsAttach: failed to get loader path\n");
+        return EXIT_FAILURE;
+    }
+
+    // Create script and cron job to perform the attach 
+    if (snprintf(script, sizeof(script), SCOPE_ATTACH_SCRIPT, scopeLibPath, pid) < 0) {
         perror("error: nsAttach: sprintf() failed\n");
         return EXIT_FAILURE;
     }
-    if (createCronFile("", cron_file) == FALSE) {
+    if (createCron("", script) == FALSE) {
         perror("error: nsAttach: createCronFile() failed\n");
         return EXIT_FAILURE;
     }
@@ -628,98 +675,6 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, bool ldattach)
     return EXIT_FAILURE;
 }
 
-/* Create the cron file
- *
- * When the start command is executed within a container we can't
- * set ns to that of a host process. Therefore, start a process in the
- * host context using crond. This process will run a script which will
- * run the start command in the context of the host. It should run once and
- * then clean up after itself.
- *
- * This should be called after the mnt namespace has been switched.
- */
-static bool
-createCron(const char *hostPrefixPath, const char *script) {
-    int outFd;
-    char buf[1024] = {0};
-    char path[PATH_MAX] = {0};
-
-    // Check access to cron.d directory
-    if (snprintf(path, sizeof(path), "%s/etc/cron.d", hostPrefixPath) < 0) {
-        perror("createCron: /etc/cron.d error: snprintf() failed\n");
-        return FALSE;
-    }
-
-    if (access(path, R_OK)) {
-        fprintf(stderr, "createCron: error %s does not exist\n", path);
-        return FALSE;
-    }
-
-    // Create the script to be executed by cron
-    memset(path, 0, PATH_MAX);
-    if (snprintf(path, sizeof(path), "%s/tmp/att.sh", hostPrefixPath) < 0) {
-        perror("createCron: /tmp/att.sh error: snprintf() failed\n");
-        fprintf(stderr, "path: %s\n", path);
-        return FALSE;
-    }
-
-    if ((outFd = open(path, O_RDWR | O_CREAT, 0775)) == -1) {
-        perror("createCron: script path: open failed");
-        fprintf(stderr, "path: %s\n", path);
-        return FALSE;
-    }
-
-    // Write cron action - scope start
-    if (snprintf(buf, sizeof(buf), script) < 0) {
-        perror("createCron: script: error: snprintf() failed\n");
-        close(outFd);
-        return FALSE;
-    }
-
-    if (write(outFd, buf, strlen(buf)) == -1) {
-        perror("createCron: script: write failed");
-        fprintf(stderr, "path: %s\n", path);
-        close(outFd);
-        return FALSE;
-    }
-
-    if (close(outFd) == -1) {
-        perror("createCron: script: close failed");
-        fprintf(stderr, "path: %s\n", path);
-        return FALSE;
-    }
-
-    // Create the cron entry
-    memset(path, 0, PATH_MAX);
-    if (snprintf(path, sizeof(path), "%s/etc/cron.d/cron", hostPrefixPath) < 0) {
-        perror("createCron: /etc/cron.d/cron error: snprintf() failed\n");
-        fprintf(stderr, "path: %s\n", path);
-        return FALSE;
-    }
-
-    if ((outFd = open(path, O_RDWR | O_CREAT, 0775)) == -1) {
-        perror("createCron: cron: open failed");
-        fprintf(stderr, "path: %s\n", path);
-        return FALSE;
-    }
-
-    // crond will detect this file entry and run on its' next cycle
-    if (write(outFd, SCOPE_CRONTAB, C_STRLEN(SCOPE_CRONTAB)) == -1) {
-        perror("createCron: cron: write failed");
-        fprintf(stderr, "path: %s\n", path);
-        close(outFd);
-        return FALSE;
-    }
-
-    if (close(outFd) == -1) {
-        perror("createCron: cron: close failed");
-        fprintf(stderr, "path: %s\n", path);
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
  /*
  * Check if switching mount namespace is required.
  *
@@ -934,6 +889,7 @@ joinHostNamespace(ns_action_t action) {
     } else {
         /*
          * Create a "cron script" on the host
+         * TODO this won't work if the path is readonly and the mnt ns isn't changed
          */
         snprintf(script, sizeof(script), SCOPE_STOP_SCRIPT, hostScopePath);
         status = createCron(hostPrefixPath, script);

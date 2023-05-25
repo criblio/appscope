@@ -37,6 +37,10 @@
 #define SCOPE_DYN_NAME "scopedyn"
 #endif
 
+#ifndef SCOPE_NAME
+#define SCOPE_NAME "scope"
+#endif
+
 #define SCOPE_NAME_SIZE (16)
 #define LIBSCOPE "github.com/criblio/scope/run._buildLibscopeSo"
 #define SCOPEDYN "github.com/criblio/scope/run._buildScopedyn"
@@ -70,6 +74,11 @@ static struct scope_obj_state scopedynState = {
     .binaryName = SCOPE_DYN_NAME,
 };
 
+// internal state for loader
+static struct scope_obj_state scopeState = {
+    .binaryName = SCOPE_NAME,
+};
+
 // Representation of the .note.gnu.build-id ELF segment
 typedef struct
 {
@@ -89,12 +98,15 @@ static struct scope_obj_state *
 getObjState(libdirfile_t objFileType)
 {
     switch (objFileType) {
-        case LIBRARY_FILE:
-            return &libscopeState;
-            break;
-        case LOADER_FILE:
-            return &scopedynState;
-            break;
+    case LIBRARY_FILE:
+        return &libscopeState;
+        break;
+    case STATIC_LOADER_FILE:
+        return &scopeState;
+        break;
+    case LOADER_FILE:
+        return &scopedynState;
+        break;
     }
     // unreachable
     return NULL;

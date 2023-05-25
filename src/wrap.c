@@ -1659,6 +1659,28 @@ initEnv(int *attachedFlag)
     scope_fclose(fd);
 }
 
+static const char *
+getFilterFilePath()
+{
+    char *filterFilePath = NULL;
+    char *envFilterVal = getenv("SCOPE_FILTER");
+    if (envFilterVal && !scope_strcmp(envFilterVal, "false")) {
+        // SCOPE_FILTER is false (use of filter file is disabled)
+        filterFilePath = NULL;
+    } else if (envFilterVal && !scope_access(envFilterVal, R_OK)) {
+        // SCOPE_FILTER contains the path to a filter file.
+        filterFilePath = envFilterVal;
+    } else if (!scope_access(SCOPE_FILTER_USR_PATH, R_OK)) {
+        // filter file was at first default location
+        filterFilePath = SCOPE_FILTER_USR_PATH;
+    } else if (!scope_access(SCOPE_FILTER_TMP_PATH, R_OK)) {
+        // filter file was at second default location
+        filterFilePath = SCOPE_FILTER_TMP_PATH;
+    }
+
+    return filterFilePath;
+}
+
 
 typedef struct {
     bool isActive;
@@ -1675,36 +1697,19 @@ static settings_t
 getSettings(bool attachedFlag)
 {
     config_t *cfg = NULL;
-    char *path = NULL;
+    const char *filterFilePath = NULL;
     bool scopedFlag = FALSE;
     bool skipReadCfg = FALSE;
 
     if (attachedFlag) {
         scopedFlag = TRUE;
+    } else if (!(filterFilePath = getFilterFilePath())){
+        // The filter file does not exist, or shouldn't be used.
+        scopedFlag = TRUE;
     } else {
+        // A filter file exists!  Use it.
         cfg = cfgCreateDefault();
-        // First try to use env variable
-        char *envFilterVal = getenv("SCOPE_FILTER");
-        filter_status_t res = FILTER_SCOPED;
-        if (envFilterVal) {
-            /*
-            * If filter env was defined and wasn't disabled
-            * the filter handling, try path interpretation
-            */
-            size_t envFilterLen = scope_strlen(envFilterVal);
-            if ((scope_strncmp(envFilterVal, "false", envFilterLen)) && (!scope_access(envFilterVal, R_OK))) {
-                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, envFilterVal, cfg);
-            }
-        } else {
-            /*
-            * Try to use defaults
-            */
-            if (!scope_access(SCOPE_FILTER_USR_PATH, R_OK)) {
-                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, SCOPE_FILTER_USR_PATH, cfg);
-            } else if (!scope_access(SCOPE_FILTER_TMP_PATH, R_OK)) {
-                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, SCOPE_FILTER_TMP_PATH, cfg);
-            }
-        }
+        filter_status_t res = cfgFilterStatus(g_proc.procname, g_proc.cmd, filterFilePath, cfg);
         switch (res) {
             case FILTER_SCOPED:
                 scopedFlag = TRUE;
@@ -1723,7 +1728,9 @@ getSettings(bool attachedFlag)
                 break;
         }
     }
+
     if (skipReadCfg == FALSE) {
+        char *path = NULL;
         path = cfgPath();
         if (cfg) cfgDestroy(&cfg);
         cfg = cfgRead(path);

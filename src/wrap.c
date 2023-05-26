@@ -1681,6 +1681,21 @@ getFilterFilePath()
     return filterFilePath;
 }
 
+static const char *doNotScopeList[] = {
+    "systemd",
+    "initd"
+};
+
+static bool
+procCanBeActive(const char *procName)
+{
+    int i;
+    for (i=0; i<ARRAY_SIZE(doNotScopeList); i++) {
+        if (!scope_strcmp(procName, doNotScopeList[i])) return FALSE;
+    }
+    return TRUE;
+}
+
 
 typedef struct {
     bool isActive;
@@ -1705,7 +1720,8 @@ getSettings(bool attachedFlag)
         scopedFlag = TRUE;
     } else if (!(filterFilePath = getFilterFilePath())){
         // The filter file does not exist, or shouldn't be used.
-        scopedFlag = TRUE;
+        // Set scopedFlag true unless it's on our doNotScopeList
+        scopedFlag = procCanBeActive(g_proc.procname);
     } else {
         // A filter file exists!  Use it.
         cfg = cfgCreateDefault();

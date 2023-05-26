@@ -162,21 +162,12 @@ cmdGetFile(char *paths, pid_t nspid)
 }
 
 int
-cmdDetach(pid_t pid, const char *rootdir)
-{
-    if (rootdir) {
-        return nsDetach(pid, rootdir);
-    }
-    
-    return detach(pid);
-}
-
-int
-cmdAttach(bool ldattach, pid_t pid, const char* rootdir)
+cmdAttach(pid_t pid, const char* rootdir)
 {
     int res = EXIT_FAILURE;
     char *scopeLibPath;
     char path[PATH_MAX] = {0};
+    char env_path[PATH_MAX];
     uid_t eUid = geteuid();
     gid_t eGid = getegid();
     uid_t nsUid = eUid;
@@ -184,7 +175,7 @@ cmdAttach(bool ldattach, pid_t pid, const char* rootdir)
     elf_buf_t *scope_ebuf = NULL;
     elf_buf_t *ebuf = NULL;
 
-    if (rootdir && ldattach) {
+    if (rootdir) {
         return nsAttach(pid, rootdir);
     }
 
@@ -262,7 +253,7 @@ cmdAttach(bool ldattach, pid_t pid, const char* rootdir)
             goto out;
         }
 
-        res = nsForkAndExec(pid, nsAttachPid, ldattach);
+        res = nsForkAndExec(pid, nsAttachPid, TRUE);
         goto out;
     /*
     * Process can exists in same PID namespace but in different mnt namespace
@@ -275,64 +266,47 @@ cmdAttach(bool ldattach, pid_t pid, const char* rootdir)
             printf("error: --ldattach requires root\n");
             goto out;
         }
-        res =  nsForkAndExec(pid, pid, ldattach);
+        res =  nsForkAndExec(pid, pid, TRUE);
         goto out;
     }
 
-    if (ldattach) {
-        //uint64_t rc;
-        char path[PATH_MAX];
-
-        // create /dev/shm/${PID}.env when attaching, for the library to load
-        snprintf(path, sizeof(path), "/attach_%d.env", pid);
-        int fd = nsFileShmOpen(path, O_RDWR|O_CREAT, S_IRUSR|S_IRGRP|S_IROTH, nsUid, nsGid, eUid, eGid);
-        if (fd == -1) {
-            fprintf(stderr, "nsFileShmOpen failed\n");
-            goto out;
-        }
-
-        // add the env vars we want in the library
-        dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetPath(LIBRARY_FILE));
-
-        int i;
-        for (i = 0; environ[i]; i++) {
-            if (strlen(environ[i]) > 6 && strncmp(environ[i], "SCOPE_", 6) == 0) {
-                dprintf(fd, "%s\n", environ[i]);
-            }
-        }
-
-        // done
-        close(fd);
-
-        // rc from findLibrary
-        if (rc == -1) {
-            fprintf(stderr, "error: can't get path to executable for pid %d\n", pid);
-            res = EXIT_FAILURE;
-        } else if (rc == 0) {
-            // proc exists, libscope does not exist, a load & attach
-            res = load_and_attach(pid, scopeLibPath);
-        } else {
-            // libscope exists, a first time attach or a reattach
-            res = attach(pid, TRUE);
-        }
-
-        // remove the env var file
-        snprintf(path, sizeof(path), "/attach_%d.env", pid);
-        shm_unlink(path);
+    // create /dev/shm/${PID}.env when attaching, for the library to load
+    snprintf(env_path, sizeof(env_path), "/attach_%d.env", pid);
+    int fd = nsFileShmOpen(env_path, O_RDWR|O_CREAT, S_IRUSR|S_IRGRP|S_IROTH, nsUid, nsGid, eUid, eGid);
+    if (fd == -1) {
+        fprintf(stderr, "nsFileShmOpen failed\n");
         goto out;
+    }
+
+    // add the env vars we want in the library
+    dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetPath(LIBRARY_FILE));
+
+    int i;
+    for (i = 0; environ[i]; i++) {
+        if (strlen(environ[i]) > 6 && strncmp(environ[i], "SCOPE_", 6) == 0) {
+            dprintf(fd, "%s\n", environ[i]);
+        }
+    }
+
+    // done
+    close(fd);
+
+    // rc from findLibrary
+    if (rc == -1) {
+        fprintf(stderr, "error: can't get path to executable for pid %d\n", pid);
+        res = EXIT_FAILURE;
+    } else if (rc == 0) {
+        // proc exists, libscope does not exist, a load & attach
+        res = load_and_attach(pid, scopeLibPath);
     } else {
-        // pid & libscope need to exist before moving forward
-        if (rc == -1) {
-            fprintf(stderr, "error: pid %d does not exist\n", pid);
-            goto out;
-        } else if (rc == 0) {
-            // proc exists, libscope does not exist.
-            fprintf(stderr, "error: pid %d has never been attached\n", pid);
-            goto out;
-        }
-        res = attach(pid, FALSE);
-        goto out;
+        // libscope exists, a first time attach or a reattach
+        res = attach(pid);
     }
+
+    // remove the env var file
+    snprintf(env_path, sizeof(env_path), "/attach_%d.env", pid);
+    shm_unlink(env_path);
+
 out:
     if (ebuf) {
         freeElf(ebuf->buf, ebuf->len);
@@ -348,7 +322,17 @@ out:
 }
 
 int
-cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **argv)
+cmdDetach(pid_t pid, const char *rootdir)
+{
+    if (rootdir) {
+        return nsDetach(pid, rootdir);
+    }
+    
+    return detach(pid);
+}
+
+int
+cmdRun(pid_t pid, pid_t nspid, int argc, char **argv)
 {
     char *scopeLibPath;
     uid_t eUid = geteuid();

@@ -109,9 +109,9 @@ load_and_attach(pid_t pid, char *scopeLibPath)
  * Remove all interpositions and stop scoping.
  */
 int
-attach(pid_t pid, bool attach)
+attach(pid_t pid)
 {
-    int fd, sfd, mfd;
+    int fd, sfd, mfd, i;
     bool first_attach = FALSE;
     export_sm_t *exaddr;
     char buf[PATH_MAX] = {0};
@@ -133,22 +133,10 @@ attach(pid_t pid, bool attach)
     }
 
     /*
-     * On command detach if the SM segment exists, we have never been
-     * attached. Return and do not create the command file as it
-     * will never be deleted until attached and then causes an
-     * unintended detach.
-     */
-    if ((attach == FALSE) && (first_attach == TRUE)) {
-        printf("Already detached from pid %d\n", pid);
-        return EXIT_SUCCESS;
-    }
-
-    /*
      * Before executing any command, create and populate the dyn config file.
      * It is used for all cases:
      *   First attach: no attach command, include env vars, reload command
      *   Reattach: attach command = true, include env vars, reload command
-     *   Detach: attach command = false, no env vars, no reload command
      */
     snprintf(buf, sizeof(buf), "%s/%s.%d",
                    DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, pid);
@@ -200,7 +188,7 @@ attach(pid_t pid, bool attach)
     }
 
     if (first_attach == FALSE) {
-        const char *cmd = (attach == TRUE) ? "SCOPE_CMD_ATTACH=true\n" : "SCOPE_CMD_ATTACH=false\n";
+        const char *cmd = "SCOPE_CMD_ATTACH=true\n";
         if (write(fd, cmd, strlen(cmd)) <= 0) {
             perror("write() failed");
             close(fd);
@@ -208,43 +196,37 @@ attach(pid_t pid, bool attach)
         }
     }
 
-    if (attach == TRUE) {
-        int i;
-
-        if (first_attach == TRUE) {
-            printf("First attach to pid %d\n", pid);
-        } else {
-            printf("Reattaching to pid %d\n", pid);
-        }
-
-        /*
-        * Reload the configuration during first attach & reattach if we want to apply
-        * config from a environment variable
-        * Handle SCOPE_CONF_RELOAD in first order because of "processReloadConfig" logic
-        * is done in two steps:
-        * - first - create a configuration based on path (default one or custom one)
-        * - second - process env variables existing in the process (cfgProcessEnvironment)
-        * We append rest of the SCOPE_ variables after since in this way we ovewrite the ones
-        * which was set by cfgProcessEnvironment in second step.
-        * TODO: Handle the file and env variables
-        */
-        char *scopeConfReload = getenv("SCOPE_CONF_RELOAD");
-        if (!scopeConfReload) {
-            dprintf(fd, "SCOPE_CONF_RELOAD=TRUE\n");
-        } else {
-            dprintf(fd, "SCOPE_CONF_RELOAD=%s\n", scopeConfReload);
-        }
-
-        for (i = 0; environ[i]; ++i) {
-            size_t envLen = strlen(environ[i]);
-            if ((envLen > 6) &&
-                (strncmp(environ[i], "SCOPE_", 6) == 0) &&
-                (!strstr(environ[i], "SCOPE_CONF_RELOAD"))) {
-                    dprintf(fd, "%s\n", environ[i]);
-            }
-        }
+    if (first_attach == TRUE) {
+        printf("First attach to pid %d\n", pid);
     } else {
-        printf("Detaching from pid %d\n", pid);
+        printf("Reattaching to pid %d\n", pid);
+    }
+
+    /*
+    * Reload the configuration during first attach & reattach if we want to apply
+    * config from a environment variable
+    * Handle SCOPE_CONF_RELOAD in first order because of "processReloadConfig" logic
+    * is done in two steps:
+    * - first - create a configuration based on path (default one or custom one)
+    * - second - process env variables existing in the process (cfgProcessEnvironment)
+    * We append rest of the SCOPE_ variables after since in this way we ovewrite the ones
+    * which was set by cfgProcessEnvironment in second step.
+    * TODO: Handle the file and env variables
+    */
+    char *scopeConfReload = getenv("SCOPE_CONF_RELOAD");
+    if (!scopeConfReload) {
+        dprintf(fd, "SCOPE_CONF_RELOAD=TRUE\n");
+    } else {
+        dprintf(fd, "SCOPE_CONF_RELOAD=%s\n", scopeConfReload);
+    }
+
+    for (i = 0; environ[i]; ++i) {
+        size_t envLen = strlen(environ[i]);
+        if ((envLen > 6) &&
+            (strncmp(environ[i], "SCOPE_", 6) == 0) &&
+            (!strstr(environ[i], "SCOPE_CONF_RELOAD"))) {
+                dprintf(fd, "%s\n", environ[i]);
+        }
     }
 
     close(fd);
@@ -273,8 +255,6 @@ attach(pid_t pid, bool attach)
             fprintf(stderr, "error: %s: you must have administrator privileges to run this command\n", __FUNCTION__);
             rc = EXIT_FAILURE;
         }
-
-        //fprintf(stderr, "%s: %s 0x%lx\n", __FUNCTION__, buf, exaddr->cmdAttachAddr);
 
         close(sfd);
         close(mfd);

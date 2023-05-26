@@ -10,9 +10,9 @@ int cmdUnservice(pid_t);
 int cmdConfigure(char *, pid_t);
 int cmdUnconfigure(pid_t);
 int cmdGetFile(char *, pid_t);
-int cmdAttach(bool, pid_t, const char *);
+int cmdAttach(pid_t, const char *);
 int cmdDetach(pid_t, const char *);
-int cmdRun(bool, bool, pid_t, pid_t, int, char **);
+int cmdRun(pid_t, pid_t, int, char **);
 int cmdInstall(const char *);
 
 #endif // __LOADER_H__s

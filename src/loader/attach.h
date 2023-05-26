@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 int load_and_attach(pid_t, char *);
-int attach(pid_t, bool);
+int attach(pid_t);
 int detach(pid_t);
 
 

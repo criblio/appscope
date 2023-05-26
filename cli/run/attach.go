@@ -103,6 +103,10 @@ func (rc *Config) Attach(args []string) error {
 		env = append(env, "SCOPE_CONF_RELOAD="+filepath.Join(rc.WorkDir, "scope.yml"))
 	}
 
+	if rc.Rootdir != "" {
+		args = append(args, []string{"--rootdir", rc.Rootdir}...)
+	}
+
 	ld := loader.New()
 	if !rc.Subprocess {
 		err = ld.Attach(args, env)
@@ -194,6 +198,11 @@ func (rc *Config) DetachSingle(id string) error {
 func (rc *Config) detach(pid int) error {
 	args := make([]string, 0)
 	args = append(args, fmt.Sprint(pid))
+
+	if rc.Rootdir != "" {
+		args = append(args, []string{"--rootdir", rc.Rootdir}...)
+	}
+
 	env := os.Environ()
 	ld := loader.New()
 	if !rc.Subprocess {

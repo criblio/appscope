@@ -1660,16 +1660,18 @@ initEnv(int *attachedFlag)
 }
 
 static const char *
-getFilterFilePath()
+getFilterFilePath(void)
 {
     char *filterFilePath = NULL;
     char *envFilterVal = getenv("SCOPE_FILTER");
-    if (envFilterVal && !scope_strcmp(envFilterVal, "false")) {
-        // SCOPE_FILTER is false (use of filter file is disabled)
-        filterFilePath = NULL;
-    } else if (envFilterVal && !scope_access(envFilterVal, R_OK)) {
-        // SCOPE_FILTER contains the path to a filter file.
-        filterFilePath = envFilterVal;
+    if (envFilterVal) {
+        if (!scope_strcmp(envFilterVal, "false")) {
+            // SCOPE_FILTER is false (use of filter file is disabled)
+            filterFilePath = NULL;
+        } else if (!scope_access(envFilterVal, R_OK)) {
+            // SCOPE_FILTER contains the path to a filter file.
+            filterFilePath = envFilterVal;
+        }
     } else if (!scope_access(SCOPE_FILTER_USR_PATH, R_OK)) {
         // filter file was at first default location
         filterFilePath = SCOPE_FILTER_USR_PATH;
@@ -1681,7 +1683,7 @@ getFilterFilePath()
     return filterFilePath;
 }
 
-static const char *doNotScopeList[] = {
+static const char *const doNotScopeList[] = {
     "systemd",
     "initd"
 };

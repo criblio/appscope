@@ -230,12 +230,10 @@ __attribute__((constructor)) void cli_constructor() {
 		fprintf(stderr, "error: --install and --ldattach/lddetach cannot be used together\n");
 		exit(EXIT_FAILURE);
 	}
-
 	if (opt_rootdir && (!opt_install && !opt_ldattach && !opt_lddetach)) {
 		fprintf(stderr, "error: --rootdir option requires --install or --ldattach/--lddetach option\n");
 		exit(EXIT_FAILURE);
 	}
-
 	if (opt_ldattach && opt_lddetach) {
 		fprintf(stderr, "error: --ldattach and --lddetach cannot be used together\n");
 		exit(EXIT_FAILURE);
@@ -309,7 +307,7 @@ __attribute__((constructor)) void cli_constructor() {
 	cmdArgv = &arg_v[optind]; // argv of the program we want to scope
 
 	if (opt_ldattach) exit(cmdAttach(true, pid, arg_rootdir));
-	if (opt_lddetach) exit(cmdAttach(false, pid, arg_rootdir));
+	if (opt_lddetach) exit(cmdDetach(pid, arg_rootdir));
 	if (opt_install) exit(cmdInstall(arg_rootdir));
 	if (opt_configure) exit(cmdConfigure(arg_configure, nspid));
 	if (opt_unconfigure) exit(cmdUnconfigure(nspid));

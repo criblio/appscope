@@ -9,6 +9,7 @@
 #include <sys/mman.h>
 #include <sys/wait.h>
 
+#include "attach.h"
 #include "libver.h"
 #include "libdir.h"
 #include "ns.h"
@@ -458,6 +459,18 @@ nsAttach(pid_t pid, const char *rootdir)
     }
 
     return EXIT_SUCCESS;
+}
+
+int
+nsDetach(pid_t pid, const char *rootdir)
+{
+    // Switch to target mnt namespace
+    if (setNamespaceRootDir(rootdir, 1, "mnt") == FALSE) {
+        fprintf(stderr, "nsInstall mnt failed\n");
+        return EXIT_FAILURE;
+    }
+
+    return detach(pid);
 }
 
 /*

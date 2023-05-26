@@ -87,17 +87,16 @@ coreclean:
 	$(RM) $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN)
 	$(RM) test/linux/*test
 
-$(LIBLOADER): src/loader/loader.c src/loader/nsinfo.c src/loader/nsfile.c src/loader/loaderutils.c src/loader/inject.c src/loader/libdir.c src/loader/ns.c src/loader/setup.c src/loader/patch.c src/loader/libver.c
+$(LIBLOADER): $(LOADER_C_FILES)
 	@echo "$${CI:+::group::}Building $@"
 	$(CC) -c $(LOADER_CFLAGS) $(YAML_DEFINES) -I./src $(INCLUDES) $^
 	ar rcs $@ *.o
 	$(RM) *.o
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
-$(SCOPEDYN): src/loader/scopedyn.c src/loader/loaderutils.c src/loader/libdir.c src/loader/libver.c src/loader/ns.c src/loader/nsinfo.c src/loader/setup.c src/loader/patch.c src/loader/nsfile.c
+$(SCOPEDYN): $(LOADER_C_FILES)
 	@echo "$${CI:+::group::}Building $@"
-	$(CC) -Wall -g $(LOADER_CFLAGS) \
-	src/loader/scopedyn.c src/loader/loaderutils.c src/loader/libdir.c src/loader/libver.c src/loader/ns.c src/loader/nsinfo.c src/loader/setup.c src/loader/patch.c src/loader/nsfile.c \
+	$(CC) -Wall -g $(LOADER_CFLAGS) $(LOADER_C_FILES) \
 	-ldl -lrt -o $@ -I./os/$(OS) $(INCLUDES)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 

@@ -10,7 +10,6 @@
 #include "loaderutils.h"
 #include "scopetypes.h"
 
-int g_log_level = CFG_LOG_WARN;
 unsigned long g_libscopesz;
 unsigned long g_scopedynsz;
 

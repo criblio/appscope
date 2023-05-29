@@ -301,6 +301,7 @@ rewriteOpenContainersConfigTest(int id) {
     if (memcmp(fdOutMap, jsonStr, stOut.st_size) != 0) {
         assert_non_null(NULL);
     }
+    scope_munmap(fdOutMap, stOut.st_size);
 
     cJSON_free(jsonStr);
     scope_close(fdOut);

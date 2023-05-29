@@ -84,8 +84,6 @@ int g_go_maint_ver = UNKNOWN_GO_VER;
 int g_arch = ARCH;
 static char g_go_build_ver[7];
 static char g_ReadFrame_addr[20];
-static bool valid_id = FALSE;
-static char *id = NULL;
 go_schema_t *g_go_schema = &go_11_schema; // overridden if later version
 uint64_t g_glibc_guard = 0LL;
 uint64_t go_systemstack_switch;
@@ -1885,19 +1883,350 @@ go_sighandler(char *stackptr)
     return do_cfunc(stackptr, c_sighandler, tap_entry(tap_sighandler)->assembly_fn);
 }
 
+/*
+ * Rewrites the container configuration for specific task ID and container namespace name.
+ * Please look into opencontainers Linux runtime-spec for details about the exact JSON struct.
+ * Following changes will be performed:
+ * - Add mount point
+ *   `scope` will be mounted from host  ("/usr/lib/appscope/<version>/scope") into the container ("/opt/scope")
+ * - Extend Environment variable
+ *   `LD_PRELOAD` will contain the following entry `/opt/libscope.so`
+ *   `SCOPE_SETUP_DONE=true` mark that configuration was processed
+ * - Add prestart hook
+ *   execute scope extract operation to ensure using library with proper loader reference (musl/glibc)
+ */
 static void
-updateContainerConfig(char *id)
+rewriteOpenContainersConfig(const char *taskId, const char *nsName)
 {
-    /* TODO:
-     * Locate the dir with the passed id
-     * starting in the runc state dir: /run/containerd/
-     * readdir locating the subdir with id.
-     * Open config.json in the id subdir.
-     * Modify the json to add LD_PRELOAD to the
-     * env list and add a mount point for the libdir
-     * directory.
-     * Write the changes and close the file.
+#ifdef __x86_64__
+    /*
+     * Need to extend the system stack size when calling cJSON_PrintUnformatted().
      */
+    int arc;
+    char *exit_stack, *tstack, *gstack;
+    if ((exit_stack = scope_malloc(SCOPE_STACK_SIZE)) == NULL) {
+        return;
+    }
+
+    tstack = exit_stack + SCOPE_STACK_SIZE;
+
+    // save the original stack, switch to the tstack
+    __asm__ volatile (
+        "mov %%rsp, %2 \n"
+        "mov %1, %%rsp \n"
+        : "=r"(arc)                  // output
+        : "m"(tstack), "m"(gstack)   // input
+        :                            // clobbered register
+        );
+#endif
+
+    char path[PATH_MAX] = {0};
+    if ((!taskId) || (!nsName)) {
+        goto exit;
+    }
+
+    if (scope_snprintf(path, sizeof(path), "/run/containerd/io.containerd.runtime.v2.task/%s/%s/config.json", nsName, taskId) < 0) {
+        goto exit;
+    }
+
+    struct stat fileStat;
+    if (scope_stat(path, &fileStat) == -1) {
+        goto exit;
+    }
+
+    FILE *fp = scope_fopen(path, "r");
+    if (!fp) {
+        goto exit;
+    }
+
+    /*
+    * Read the file contents into a string
+    */
+    char *buf = (char *)scope_malloc(fileStat.st_size);
+    if (!buf) {
+        scope_fclose(fp);
+        goto exit;
+    }
+
+    scope_fread(buf, sizeof(char), fileStat.st_size, fp);
+    scope_fclose(fp);
+
+    cJSON *json = cJSON_Parse(buf);
+    scope_free(buf);
+    if (json == NULL) {
+        goto exit;
+    }
+
+    /*
+    * Handle process environment variables
+    *
+    "env":[
+         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+         "HOSTNAME=6735578591bb",
+         "TERM=xterm",
+         "LD_PRELOAD=/opt/libscope.so",
+         "SCOPE_SETUP_DONE=true"
+      ],
+    */
+    cJSON *procNode = cJSON_GetObjectItemCaseSensitive(json, "process");
+    if (!procNode) {
+        procNode = cJSON_CreateObject();
+        if (!procNode) {
+            cJSON_Delete(json);
+            goto exit;
+        }
+        cJSON_AddItemToObject(json, "process", procNode);
+    }
+
+    cJSON *envNodeArr = cJSON_GetObjectItemCaseSensitive(procNode, "env");
+    if (envNodeArr) {
+        bool ldPreloadPresent = FALSE;
+        // Iterate over environment string array
+        size_t envSize = cJSON_GetArraySize(envNodeArr);
+        for (int i = 0; i < envSize ;++i) {
+            cJSON *item = cJSON_GetArrayItem(envNodeArr, i);
+            char *strItem = cJSON_GetStringValue(item);
+
+            if (scope_strncmp("LD_PRELOAD=", strItem, sizeof("LD_PRELOAD=")-1) == 0) {
+                size_t itemLen = scope_strlen(strItem);
+                size_t newLdprelLen = itemLen + sizeof("/opt/libscope.so:") - 1;
+                char *newLdPreloadLib = scope_calloc(1, newLdprelLen);
+                if (!newLdPreloadLib) {
+                    cJSON_Delete(json);
+                    goto exit;
+                }
+                scope_strncpy(newLdPreloadLib, "LD_PRELOAD=/opt/libscope.so:", sizeof("LD_PRELOAD=/opt/libscope.so:") - 1);
+                scope_strcat(newLdPreloadLib, strItem + sizeof("LD_PRELOAD=") - 1);
+                cJSON *newLdPreloadLibObj = cJSON_CreateString(newLdPreloadLib);
+                if (!newLdPreloadLibObj) {
+                    scope_free(newLdPreloadLib);
+                    cJSON_Delete(json);
+                    goto exit;
+                }
+                cJSON_ReplaceItemInArray(envNodeArr, i, newLdPreloadLibObj);
+                scope_free(newLdPreloadLib);
+
+                cJSON *scopeEnvNode = cJSON_CreateString("SCOPE_SETUP_DONE=true");
+                if (!scopeEnvNode) {
+                    cJSON_Delete(json);
+                    goto exit;
+                }
+                cJSON_AddItemToArray(envNodeArr, scopeEnvNode);
+                ldPreloadPresent = TRUE;
+                break;
+            } else if (scope_strncmp("SCOPE_SETUP_DONE=true", strItem, sizeof("SCOPE_SETUP_DONE=true")-1) == 0) {
+                // we are done here
+                cJSON_Delete(json);
+                goto exit;
+            }
+        }
+
+
+        // There was no LD_PRELOAD in environment variables
+        if (ldPreloadPresent == FALSE) {
+            const char *const envItems[2] =
+            {
+                "LD_PRELOAD=/opt/libscope.so",
+                "SCOPE_SETUP_DONE=true"
+            };
+            for (int i = 0; i < 2 ;++i) {
+                cJSON *scopeEnvNode = cJSON_CreateString(envItems[i]);
+                if (!scopeEnvNode) {
+                    cJSON_Delete(json);
+                    goto exit;
+                }
+                cJSON_AddItemToArray(envNodeArr, scopeEnvNode);
+            }
+        }
+    } else {
+        const char * envItems[2] =
+        {
+            "LD_PRELOAD=/opt/libscope.so",
+            "SCOPE_SETUP_DONE=true"
+        };
+        envNodeArr = cJSON_CreateStringArray(envItems, 2);
+        if (!envNodeArr) {
+            cJSON_Delete(json);
+            goto exit;
+        }
+        cJSON_AddItemToObject(procNode, "env", envNodeArr);
+    }
+
+    /*
+    * Handle process mounts
+    *
+    "mounts":[
+      {
+         "destination":"/proc",
+         "type":"proc",
+         "source":"proc",
+         "options":[
+            "nosuid",
+            "noexec",
+            "nodev"
+         ]
+      },
+      ...
+      {
+         "destination":"/opt/scope",
+         "type":"bind",
+         "source":"/tmp/appscope/dev/scope",
+         "options":[
+            "rbind",
+            "rprivate"
+         ]
+      }
+    */
+    cJSON *mountNodeArr = cJSON_GetObjectItemCaseSensitive(json, "mounts");
+    if (!mountNodeArr) {
+        mountNodeArr = cJSON_CreateArray();
+        if (!mountNodeArr) {
+            cJSON_Delete(json);
+            goto exit;
+        }
+        cJSON_AddItemToObject(json, "mounts", mountNodeArr);
+    }
+
+    cJSON *mountNode = cJSON_CreateObject();
+    if (!mountNode) {
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    if (!cJSON_AddStringToObjLN(mountNode, "destination", "/opt/scope")) {
+        cJSON_Delete(mountNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    if (!cJSON_AddStringToObjLN(mountNode, "type", "bind")) {
+        cJSON_Delete(mountNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    if (!cJSON_AddStringToObjLN(mountNode, "source", "/tmp/appscope/dev/scope")) {
+        cJSON_Delete(mountNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    const char *optItems[2] =
+    {
+        "rbind",
+        "rprivate"
+    };
+
+    cJSON *optNodeArr = cJSON_CreateStringArray(optItems, 2);
+    if (!optNodeArr) {
+        cJSON_Delete(mountNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+    cJSON_AddItemToObject(mountNode, "options", optNodeArr);
+    cJSON_AddItemToArray(mountNodeArr, mountNode);
+
+    /*
+    * Handle startContainer hooks process
+    *
+   "hooks":{
+      "prestart":[
+         {
+            "path":"/proc/1513/exe",
+            "args":[
+               "libnetwork-setkey",
+               "-exec-root=/var/run/docker",
+               "6735578591bb3c5aebc91e5c702470c52d2c10cea52e4836604bf5a4a6c0f2eb",
+               "ec7e49ffc98c"
+            ]
+         }
+      ],
+      "startContainer":[
+         {
+            "path":"/opt/scope"
+            "args":[
+               "/opt/scope",
+               "extract",
+               "/opt/",
+            ]
+         },
+       ]
+    */
+    cJSON *hooksNode = cJSON_GetObjectItemCaseSensitive(json, "hooks");
+    if (!hooksNode) {
+        hooksNode = cJSON_CreateObject();
+        if (!hooksNode) {
+            cJSON_Delete(json);
+            goto exit;
+        }
+        cJSON_AddItemToObject(json, "hooks", hooksNode);
+    }
+
+    cJSON *startContainerNodeArr = cJSON_GetObjectItemCaseSensitive(hooksNode, "startContainer");
+    if (!startContainerNodeArr) {
+        startContainerNodeArr = cJSON_CreateArray();
+        if (!startContainerNodeArr) {
+            cJSON_Delete(json);
+            goto exit;
+        }
+        cJSON_AddItemToObject(hooksNode, "startContainer", startContainerNodeArr);
+    }
+
+    cJSON *startContainerNode = cJSON_CreateObject();
+    if (!startContainerNode) {
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    if (!cJSON_AddStringToObjLN(startContainerNode, "path",  "/opt/scope")) {
+        cJSON_Delete(startContainerNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    const char *argsItems[3] =
+    {
+        "/opt/scope",
+        "extract",
+        "/opt"
+    };
+    cJSON *argsNodeArr = cJSON_CreateStringArray(argsItems, 3);
+    if (!argsNodeArr) {
+        cJSON_Delete(startContainerNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+    cJSON_AddItemToObject(startContainerNode, "args", argsNodeArr);
+    cJSON_AddItemToArray(startContainerNodeArr, startContainerNode);
+
+    char *jsonStr = cJSON_PrintUnformatted(json);
+    cJSON_Delete(json);
+
+    // Overwrite the file
+    fp = scope_fopen(path, "w");
+    if (fp == NULL) {
+        cJSON_free(jsonStr);
+        goto exit;
+    }
+
+    scope_fprintf(fp, "%s\n", jsonStr);
+
+    cJSON_free(jsonStr);
+    scope_fclose(fp);
+
+exit:
+#ifdef __x86_64__
+   // Switch stack back to the original stack
+    __asm__ volatile (
+        "mov %1, %%rsp \n"
+        : "=r"(arc)                       // output
+        : "r"(gstack)                     // inputs
+        :                                 // clobbered register
+        );
+
+    scope_free(exit_stack);
+#endif
+    // to handle aarch64 case
     return;
 }
 
@@ -1923,31 +2252,46 @@ c_forkExec(char *sys_stack, char *g_stack)
 
     char *cmd = go_str(argv0, TRUE);
     // TBD: add a check for curent proc containerd when stack is aligned
-    if (!scope_strstr(cmd, "runc")) return;
-
+    if (!scope_strstr(cmd, "runc")) {
+        scope_free(cmd);
+        return;
+    }
+    bool updateCfg = FALSE;
+    char *taskUniqueId = NULL;
+    char *nsName = NULL;
     sysprint("%s execing %s\n", g_proc.procname, cmd);
+    scope_free(cmd);
     for (i = 0; argvv[i]; i += 2) {
         char *argv = go_str((char *)(argvv + i), TRUE);
         if (argv) {
-            sysprint("\t%s:%d %s argv %s\n", __FUNCTION__, __LINE__,
-                     g_proc.procname, argv);
+            sysprint("\t%s:%d %s argv %s\n", __FUNCTION__, __LINE__, g_proc.procname, argv);
             if (scope_strstr(argv, "-id") && (char *)(argvv + i + 2)) {
-                sysprint("%s:%d\n", __FUNCTION__, __LINE__);
-                id = scope_strdup(go_str((char *)(argvv + i + 2), TRUE));
-                if (id) sysprint("%s:%d %s\n", __FUNCTION__, __LINE__, id);
+                /*
+                * id of the task (container)
+                */
+                taskUniqueId = go_str((char *)(argvv + i + 2), TRUE);
+            } else if (scope_strstr(argv, "-na") && (char *)(argvv + i + 2)) { // should be "namespace"
+                /*
+                * namespace
+                */
+                nsName = go_str((char *)(argvv + i + 2), TRUE);
             } else if (scope_strstr(argv, "sta")) { // should be "start"
-                valid_id = TRUE;
-                sysprint("%s:%d\n", __FUNCTION__, __LINE__);
+                /*
+                * start indicator
+                */
+                updateCfg = TRUE;
                 break;
             }
             scope_free(argv);
         }
     }
 
-    if (id && (valid_id == TRUE)) updateContainerConfig(id);
-    scope_free(id);
-    id = NULL;
-    valid_id = FALSE;
+    // Update task configuration
+    if (updateCfg) {
+        rewriteOpenContainersConfig(taskUniqueId, nsName);
+    }
+    scope_free(nsName);
+    scope_free(taskUniqueId);
 }
 
 EXPORTON void *

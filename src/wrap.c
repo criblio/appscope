@@ -1683,14 +1683,42 @@ getFilterFilePath(void)
     return filterFilePath;
 }
 
+// Used this command on ubuntu 20.04 and 22.04 to derive this list:
+// ps -ef | grep -v "\["
 static const char *const doNotScopeList[] = {
+// systemd
+    "(sd-pam)",
+    "init"
     "systemd",
-    "initd"
+    "systemd-journald",
+    "systemd-logind",
+    "systemd-networkd",
+    "systemd-resolved",
+    "systemd-timesyncd",
+    "systemd-udevd",
+
+// dbus
+    "accounts-daemon",
+    "dbus-daemon",
+    "polkitd",
+    "udisksd",
+
+// misc services
+    "agetty",
+    "bpfilter_umh",
+    "irqbalance",
+    "multipathd",
+
+// cribl
+    "cribl",
 };
 
 static bool
-procCanBeActive(const char *procName)
+thisProcCanBeActive(void)
 {
+    char procName[256] = {0};
+    osGetProcname(procName, sizeof(procName));
+
     int i;
     for (i=0; i<ARRAY_SIZE(doNotScopeList); i++) {
         if (!scope_strcmp(procName, doNotScopeList[i])) return FALSE;
@@ -1723,7 +1751,7 @@ getSettings(bool attachedFlag)
     } else if (!(filterFilePath = getFilterFilePath())){
         // The filter file does not exist, or shouldn't be used.
         // Set scopedFlag true unless it's on our doNotScopeList
-        scopedFlag = procCanBeActive(g_proc.procname);
+        scopedFlag = thisProcCanBeActive();
     } else {
         // A filter file exists!  Use it.
         cfg = cfgCreateDefault();

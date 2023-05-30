@@ -75,6 +75,11 @@ func (rc *Config) Attach(args []string) error {
 		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
 	}
 
+	// Read config from stdin if it exists
+	if err := rc.ConfigFromStdin(); err != nil {
+		return err
+	}
+
 	// Normal operational, create a directory for this run.
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.

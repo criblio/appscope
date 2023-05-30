@@ -90,6 +90,7 @@ be set to sockets with `unix:///var/run/mysock`, `tcp://hostname:port`, `udp://h
 ```
 scope attach 1000
 scope attach firefox 
+scope attach top < scope.yml
 scope attach --rootdir /path/to/host firefox 
 scope attach --rootdir /path/to/host/mount/proc/<hostpid>/root 1000
 scope attach --payloads 2000

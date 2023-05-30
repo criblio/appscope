@@ -2,6 +2,7 @@ package run
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -121,6 +122,31 @@ func (c *Config) SetDefault() error {
 				Backtrace: "false",
 			},
 		},
+	}
+
+	return nil
+}
+
+// ConfigFromStdin loads a configuration from yml passed to stdin
+func (c *Config) ConfigFromStdin() error {
+	var cfgData []byte
+
+	stdinFs, err := os.Stdin.Stat()
+	if err != nil {
+		return nil
+	}
+
+	// Avoid waiting for input from terminal when no data was provided
+	if stdinFs.Mode()&os.ModeCharDevice != 0 && stdinFs.Size() == 0 {
+		return nil
+	}
+
+	cfgData, _ = io.ReadAll(os.Stdin)
+
+	c.sc = &libscope.ScopeConfig{}
+
+	if err := yaml.Unmarshal(cfgData, &c.sc); err != nil {
+		return err
 	}
 
 	return nil

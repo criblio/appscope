@@ -161,6 +161,20 @@ cmdGetFile(char *paths, pid_t nspid)
     return nsGetFile(src_path, dest_path, nspid);
 }
 
+
+/*
+ * If attaching to a process in the current namespace:
+ * - follow regular attach logic to ultimately PTRACE attach
+ * If attaching to a process in a child namespace:
+ * - fork and exec a child scope process in the child PID and MNT namespace (nsForkAndExec)
+ * - write the scope loader and configuration (joinHostNamespace)
+ * - follow regular attach logic to ultimately PTRACE attach
+ * If attaching to a process in a parent/sibling namespace (--rootdir specified)
+ * it is not possible to change PID ns to that of a parent, so:
+ * - change to the target mnt namespace 
+ * - write the scope loader and configuration
+ * - create a shell script, executed by cron, to perform the scope attach
+ */
 int
 cmdAttach(pid_t pid, const char* rootdir)
 {

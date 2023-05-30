@@ -21,7 +21,7 @@
 #define SCOPE_CRONTAB "* * * * * root /tmp/att.sh\n"
 #define SCOPE_START_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s start -f < %s\nrm -- $0\n"
 #define SCOPE_STOP_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s stop -f\nrm -- $0\n"
-#define SCOPE_ATTACH_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s attach %d\nrm -- $0\n"
+#define SCOPE_ATTACH_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s --ldattach %d\nrm -- $0\n"
 
 // NS Action types
 typedef enum {
@@ -428,37 +428,86 @@ nsInstall(const char *rootdir, pid_t pid, libdirfile_t objFileType) {
     return EXIT_SUCCESS;
 }
 
-// Change to that mount namespace
+// Change to the target mount namespace
 // Extract scope into that namespace
 // Extract a cron script into that namespace to run `scope --ldattach [pid]`
+// Optionally copy a config into the target mnt ns
 int
 nsAttach(pid_t pid, const char *rootdir)
 {
+    int ret = EXIT_SUCCESS;
+    size_t cfgSize = 0;
     char script[1024];
-    char *scopeLibPath = NULL;
+    char *scopePath = NULL;
+    char scopeCfgPath[PATH_MAX] = {0};
+    char scopeCmd[PATH_MAX] = {0};
+    uid_t nsUid = nsInfoTranslateUidRootDir(rootdir, pid);
+    gid_t nsGid = nsInfoTranslateGidRootDir(rootdir, pid);
+
+    // Configuration is optionally loaded into memory from origin ns
+    char *scopeCfgMem = setupLoadFileIntoMem(&cfgSize, getenv("SCOPE_CONF_PATH"));
 
     if (nsInstall(rootdir, 1, STATIC_LOADER_FILE)) {
         fprintf(stderr, "error: nsAttach: failed to extract loader\n");
-        return EXIT_FAILURE;
+        ret = EXIT_FAILURE;
+        goto out;
     }
-
-    scopeLibPath = (char *)libdirGetPath(STATIC_LOADER_FILE);
-    if (!scopeLibPath) {
-        fprintf(stderr, "error: nsAttach: failed to get loader path\n");
-        return EXIT_FAILURE;
-    }
+    
+    // Note: After the successful call to nsInstall, we are in the target mnt ns
 
     // Create script and cron job to perform the attach 
-    if (snprintf(script, sizeof(script), SCOPE_ATTACH_SCRIPT, scopeLibPath, pid) < 0) {
-        perror("error: nsAttach: sprintf() failed\n");
-        return EXIT_FAILURE;
-    }
-    if (createCron("", script) == FALSE) {
-        perror("error: nsAttach: createCronFile() failed\n");
-        return EXIT_FAILURE;
+
+    scopePath = (char *)libdirGetPath(STATIC_LOADER_FILE);
+    if (!scopePath) {
+        fprintf(stderr, "error: nsAttach: failed to get loader path\n");
+        ret = EXIT_FAILURE;
+        goto out;
     }
 
-    return EXIT_SUCCESS;
+    if (!strncpy(scopeCmd, scopePath, sizeof(scopeCmd))) {
+        perror("error: nsAttach: strncpy failed\n");
+        ret = EXIT_FAILURE;
+        goto out;
+    }
+
+    // If a config was loaded into memory, extract it into the target ns and update
+    // the scope command to include the config env var
+    if (scopeCfgMem) {
+        if (snprintf(scopeCfgPath, sizeof(scopeCfgPath), "/tmp/scope%d.yml", pid) < 0) {
+            perror("error: nsAttach: snprintf() failed\n");
+            ret = EXIT_FAILURE;
+            goto out;
+        }
+        if (!extractMemToFile(scopeCfgMem, cfgSize, scopeCfgPath, 0664, TRUE, nsUid, nsGid)) {
+            fprintf(stderr, "error: nsAttach: failed to extract config to target ns\n");
+            ret = EXIT_FAILURE;
+            goto out;
+        }
+        if (snprintf(scopeCmd, sizeof(scopeCmd), "SCOPE_CONF_PATH=%s %s", scopeCfgPath, scopePath) < 0) {
+            perror("error: nsAttach: snprintf() failed\n");
+            ret = EXIT_FAILURE;
+            goto out;
+        }
+    }
+
+    if (snprintf(script, sizeof(script), SCOPE_ATTACH_SCRIPT, scopeCmd, pid) < 0) {
+        perror("error: nsAttach: sprintf() failed\n");
+        ret = EXIT_FAILURE;
+        goto out;
+    }
+
+    if (createCron("", script) == FALSE) {
+        perror("error: nsAttach: createCronFile() failed\n");
+        ret = EXIT_FAILURE;
+        goto out;
+    }
+
+out:
+    if (scopeCfgMem) {
+        munmap(scopeCfgMem, cfgSize);
+    }
+
+    return ret;
 }
 
 int
@@ -466,7 +515,7 @@ nsDetach(pid_t pid, const char *rootdir)
 {
     // Switch to target mnt namespace
     if (setNamespaceRootDir(rootdir, 1, "mnt") == FALSE) {
-        fprintf(stderr, "nsInstall mnt failed\n");
+        fprintf(stderr, "nsDetach mnt failed\n");
         return EXIT_FAILURE;
     }
 

@@ -103,10 +103,6 @@ load_and_attach(pid_t pid, char *scopeLibPath)
  * Reattach:
  * libscope is loaded, the process has been attached
  * in one form at least once previously.
- *
- * Detach:
- * libscope is loaded and we are interposing functions.
- * Remove all interpositions and stop scoping.
  */
 int
 attach(pid_t pid)

@@ -243,6 +243,7 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
     *   In other words the calling process will not change it's own PID
     *   namespace
     * - mount namespace - allows to copy file(s) into a "child namespace"
+    * No need to provide a rootdir here. We are in the host and looking at a child pid.
     */
     if (joinPidNs && setNamespaceRootDir("", hostPid, "pid") == FALSE) {
         goto cleanupMem;

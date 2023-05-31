@@ -118,16 +118,41 @@ func (rc *Config) Attach(args []string) error {
 	} else {
 		_, err = ld.AttachSubProc(args, env)
 	}
-
-	// Replace the working directory with symbolic link in case of successful attach
-	if err == nil {
-		if refNsPid != -1 {
-			os.RemoveAll(rc.WorkDir)
-			os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", rc.WorkDir), rc.WorkDir)
-		}
+	if err != nil {
+		return err
 	}
 
-	return err
+	// Replace the working directory files with symbolic links in case of successful attach
+	// where the target ns is different to the origin ns
+
+	eventsFilePath := filepath.Join(rc.WorkDir, "events.json")
+	metricsFilePath := filepath.Join(rc.WorkDir, "metrics.json")
+	logsFilePath := filepath.Join(rc.WorkDir, "libscope.log")
+	payloadsDirPath := filepath.Join(rc.WorkDir, "payloads")
+
+	if rc.Rootdir != "" {
+		os.Remove(eventsFilePath)
+		os.Remove(metricsFilePath)
+		os.Remove(logsFilePath)
+		os.RemoveAll(payloadsDirPath)
+		os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", eventsFilePath), eventsFilePath)
+		os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", metricsFilePath), metricsFilePath)
+		os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", logsFilePath), logsFilePath)
+		os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", payloadsDirPath), payloadsDirPath)
+
+	} else if refNsPid != -1 {
+		// Child namespace
+		os.Remove(eventsFilePath)
+		os.Remove(metricsFilePath)
+		os.Remove(logsFilePath)
+		os.RemoveAll(payloadsDirPath)
+		os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", eventsFilePath), eventsFilePath)
+		os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", metricsFilePath), metricsFilePath)
+		os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", logsFilePath), logsFilePath)
+		os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", payloadsDirPath), payloadsDirPath)
+	}
+
+	return nil
 }
 
 // DetachAll provides the option to detach from all Scoped processes

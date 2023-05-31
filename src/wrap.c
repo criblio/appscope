@@ -1688,7 +1688,7 @@ getFilterFilePath(void)
 static const char *const doNotScopeList[] = {
 // systemd
     "(sd-pam)",
-    "init"
+    "init",
     "systemd",
     "systemd-journald",
     "systemd-logind",

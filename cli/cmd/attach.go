@@ -1,7 +1,14 @@
 package cmd
 
 import (
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/criblio/scope/inspect"
 	"github.com/criblio/scope/internal"
+	"github.com/criblio/scope/ipc"
+	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
 )
 
@@ -40,6 +47,8 @@ scope attach --payloads 2000`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		internal.InitConfig()
 		rc.Rootdir, _ = cmd.Flags().GetString("rootdir")
+		fetch, _ := cmd.Flags().GetBool("fetch")
+		jsonOut, _ := cmd.Flags().GetBool("json")
 
 		// Disallow bad argument combinations (see Arg Matrix at top of file)
 		if rc.CriblDest != "" && rc.MetricsDest != "" {
@@ -68,12 +77,47 @@ scope attach --payloads 2000`,
 			helpErrAndExit(cmd, "Cannot specify --coredump and --userconfig")
 		}
 
-		return rc.Attach(args)
+		pid, err := rc.Attach(args)
+		if err != nil {
+			util.ErrAndExit("Attach failure: %v", err)
+		}
+
+		pidCtx := &ipc.IpcPidCtx{
+			PrefixPath: rc.Rootdir,
+			Pid:        pid,
+		}
+
+		if fetch {
+			time.Sleep(2 * time.Second)
+			iout, _, err := inspect.InspectProcess(*pidCtx)
+			if err != nil {
+				util.ErrAndExit("Inspect PID fails: %v", err)
+			}
+
+			if jsonOut {
+				// Print the json object without any pretty printing
+				cfg, err := json.Marshal(iout)
+				if err != nil {
+					util.ErrAndExit("Error creating json object: %v", err)
+				}
+				fmt.Println(string(cfg))
+			} else {
+				// Print the json in a pretty format
+				cfg, err := json.MarshalIndent(iout, "", "   ")
+				if err != nil {
+					util.ErrAndExit("Error creating json array: %v", err)
+				}
+				fmt.Println(string(cfg))
+			}
+		}
+
+		return nil
 	},
 }
 
 func init() {
 	runCmdFlags(attachCmd, rc)
+	attachCmd.Flags().BoolP("fetch", "f", false, "Inspect the process after the attach is complete")
 	attachCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
 	attachCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	RootCmd.AddCommand(attachCmd)

@@ -29,36 +29,36 @@ var (
 )
 
 // Attach scopes an existing PID
-func (rc *Config) Attach(args []string) error {
+func (rc *Config) Attach(args []string) (int, error) {
 	pid, err := HandleInputArg(rc.Rootdir, args[0], true, false, true)
 	if err != nil {
-		return err
+		return pid, err
 	}
 	args[0] = fmt.Sprint(pid)
 	var reattach bool
 	// Check PID is not already being scoped
 	status, err := util.PidScopeStatus(rc.Rootdir, pid)
 	if err != nil {
-		return err
+		return pid, err
 	}
 
 	if status == util.Disable || status == util.Setup {
 		// Validate user has root permissions
 		if err := util.UserVerifyRootPerm(); err != nil {
-			return err
+			return pid, err
 		}
 		// Validate PTRACE capability
 		c, err := capability.NewPid2(0)
 		if err != nil {
-			return errGetLinuxCap
+			return pid, errGetLinuxCap
 		}
 
 		if err = c.Load(); err != nil {
-			return errLoadLinuxCap
+			return pid, errLoadLinuxCap
 		}
 
 		if !c.Get(capability.EFFECTIVE, capability.CAP_SYS_PTRACE) {
-			return errMissingPtrace
+			return pid, errMissingPtrace
 		}
 	} else {
 		// Reattach because process contains our library
@@ -77,7 +77,7 @@ func (rc *Config) Attach(args []string) error {
 
 	// Read config from stdin if it exists
 	if err := rc.ConfigFromStdin(); err != nil {
-		return err
+		return pid, err
 	}
 
 	// Normal operational, create a directory for this run.
@@ -99,7 +99,7 @@ func (rc *Config) Attach(args []string) error {
 	// Handle custom library path
 	if len(rc.LibraryPath) > 0 {
 		if !util.CheckDirExists(rc.LibraryPath) {
-			return errLibraryNotExist
+			return pid, errLibraryNotExist
 		}
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
@@ -119,7 +119,7 @@ func (rc *Config) Attach(args []string) error {
 		_, err = ld.AttachSubProc(args, env)
 	}
 	if err != nil {
-		return err
+		return pid, err
 	}
 
 	// Replace the working directory files with symbolic links in case of successful attach
@@ -152,7 +152,7 @@ func (rc *Config) Attach(args []string) error {
 		os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", payloadsDirPath), payloadsDirPath)
 	}
 
-	return nil
+	return pid, nil
 }
 
 // DetachAll provides the option to detach from all Scoped processes

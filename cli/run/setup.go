@@ -54,13 +54,15 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 	// Create session directory
 	rc.createWorkDir(args, attach)
 
-	// Build or load config
-	if rc.UserConfig == "" {
-		err := rc.configFromRunOpts()
-		util.CheckErrSprintf(err, "%v", err)
-	} else {
-		err := rc.ConfigFromFile()
-		util.CheckErrSprintf(err, "%v", err)
+	// Build or load config if not already provided (i.e. via stdin on attach)
+	if rc.sc == nil {
+		if rc.UserConfig == "" {
+			err := rc.configFromRunOpts()
+			util.CheckErrSprintf(err, "%v", err)
+		} else {
+			err := rc.ConfigFromFile()
+			util.CheckErrSprintf(err, "%v", err)
+		}
 	}
 
 	// Update paths to absolute for file transports

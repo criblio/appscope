@@ -442,6 +442,7 @@ nsAttach(pid_t pid, const char *rootdir)
     char *scopePath = NULL;
     char scopeCfgPath[PATH_MAX] = {0};
     char scopeCmd[PATH_MAX] = {0};
+    char path[PATH_MAX] = {0};
     uid_t nsUid = nsInfoTranslateUidRootDir(rootdir, pid);
     gid_t nsGid = nsInfoTranslateGidRootDir(rootdir, pid);
 
@@ -471,10 +472,25 @@ nsAttach(pid_t pid, const char *rootdir)
         goto out;
     }
 
+    // Set up the working directory in the target ns, to match the origin ns working directory
+    char *workdirPath = getenv("SCOPE_HOST_WORKDIR_PATH");
+    if (workdirPath) {
+        memset(path, 0, PATH_MAX);
+        libdirCreateDirIfMissing(workdirPath, 0777, nsUid, nsGid);
+        memset(path, 0, PATH_MAX);
+        snprintf(path, PATH_MAX, "%s/%s", workdirPath, "payloads");
+        libdirCreateDirIfMissing(path, 0777, nsUid, nsGid);
+        memset(path, 0, PATH_MAX);
+        snprintf(path, PATH_MAX, "%s/%s", workdirPath, "cmd");
+        libdirCreateDirIfMissing(path, 0777, nsUid, nsGid);
+    } else {
+        workdirPath = "/tmp";
+    }
+
     // If a config was loaded into memory, extract it into the target ns and update
     // the scope command to include the config env var
     if (scopeCfgMem) {
-        if (snprintf(scopeCfgPath, sizeof(scopeCfgPath), "/tmp/scope%d.yml", pid) < 0) {
+        if (snprintf(scopeCfgPath, sizeof(scopeCfgPath), "%s/scope%d.yml", workdirPath, pid) < 0) {
             perror("error: nsAttach: snprintf() failed\n");
             ret = EXIT_FAILURE;
             goto out;

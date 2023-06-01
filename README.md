@@ -35,16 +35,6 @@ graph LR
 
 Before you begin, ensure that your environment meets the AppScope [requirements](https://appscope.dev/docs/requirements).
 
-**With Docker**
-```
-docker run --rm -it -v/:/hostfs:ro --privileged cribl/scope
-scope <some app>
-scope metrics
-scope attach --rootdir /hostfs <process running on host>
-scope events -f
-scope detach --all --rootdir /hostfs
-```
-
 **With the Download**
 ```
 LATEST=$(curl -Ls https://cdn.cribl.io/dl/scope/latest)
@@ -57,6 +47,34 @@ sudo scope attach <already running process>
 scope events -f
 scope detach --all
 ```
+
+**With Docker**
+```
+docker run --rm -it -v/:/hostfs:ro --privileged cribl/scope
+scope <some app>
+scope metrics
+scope attach --rootdir /hostfs <process running on host>
+scope events -f
+scope detach --all --rootdir /hostfs
+```
+
+## ℹ️ Resources
+
+On the [AppScope Website](https://appscope.dev/) you can:
+
+- Learn about the CLI commands [in more depth](https://appscope.dev/docs/cli-using).
+- Get an [overview](https://appscope.dev/docs/how-works/) of AppScope beyond the CLI.
+- Discover what people are [doing](https://appscope.dev/docs/what-do-with-scope) with AppScope.
+- Review advanced [examples](https://appscope.dev/docs/examples-use-cases).
+- View the [Changelog](https://appscope.dev/docs/changelog) and [Known Issues](https://appscope.dev/docs/known-issues).
+- See what happens when you [connect AppScope to Cribl Stream or Cribl Edge](https://appscope.dev/docs/cribl-integration).
+
+_The content on that site is built from the [website/](website/) directory in this project._
+
+Elsewhere, you can:
+
+- Complete the [AppScope Fundamentals sandbox](https://sandbox.cribl.io/course/appscope), a tutorial that takes about 30 minutes.
+- Join the [Cribl Community](https://cribl.io/community/) on Slack. The `#appscope` channel is where you'll find developers who contribute to this project.
 
 ## 🔧 Build From Source
 
@@ -94,24 +112,6 @@ make build
 Either way, the resulting binaries will be in `lib/linux/$(uname -m)/libscope.so` and `bin/linux/$(uname -m)/scope`.
 
 We support building `x86_64` (amd64) or `aarch64` (arm64/v8) binaries by adding `ARCH=x86_64` or `ARCH=aarch64` to the `make build` command. See the [BUILD](docs/BUILD.md) doc for details.
-
-## ℹ️ Resources
-
-On the [AppScope Website](https://appscope.dev/) you can:
-
-- Learn about the CLI commands [in more depth](https://appscope.dev/docs/cli-using).
-- Get an [overview](https://appscope.dev/docs/how-works/) of AppScope beyond the CLI.
-- Discover what people are [doing](https://appscope.dev/docs/what-do-with-scope) with AppScope.
-- Review advanced [examples](https://appscope.dev/docs/examples-use-cases).
-- View the [Changelog](https://appscope.dev/docs/changelog) and [Known Issues](https://appscope.dev/docs/known-issues).
-- See what happens when you [connect AppScope to Cribl Stream or Cribl Edge](https://appscope.dev/docs/cribl-integration).
-
-_The content on that site is built from the [website/](website/) directory in this project._
-
-Elsewhere, you can:
-
-- Complete the [AppScope Fundamentals sandbox](https://sandbox.cribl.io/course/appscope), a tutorial that takes about 30 minutes.
-- Join the [Cribl Community](https://cribl.io/community/) on Slack. The `#appscope` channel is where you'll find developers who contribute to this project.
 
 ## ✏️ Contributing
 

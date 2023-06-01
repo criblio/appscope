@@ -18,10 +18,10 @@
 #include "setup.h"
 #include "scopetypes.h"
 
-#define SCOPE_CRONTAB "* * * * * root /tmp/att.sh\n"
+#define SCOPE_CRONTAB "* * * * * root /tmp/att%d.sh\n"
 #define SCOPE_START_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s start -f < %s\nrm -- $0\n"
 #define SCOPE_STOP_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s stop -f\nrm -- $0\n"
-#define SCOPE_ATTACH_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s --ldattach %d\nrm -- $0\n"
+#define SCOPE_ATTACH_SCRIPT "#! /bin/bash\nrm /etc/cron.d/scope%d\n%s --ldattach %d\nrm -- $0\n"
 
 // NS Action types
 typedef enum {
@@ -40,9 +40,10 @@ typedef enum {
  * This should be called after the mnt namespace has been switched.
  */
 static bool
-createCron(const char *hostPrefixPath, const char *script) {
+createCron(const char *hostPrefixPath, const char *script, pid_t pid) {
     int outFd;
     char buf[1024] = {0};
+    char cronjob[1024] = {0};
     char path[PATH_MAX] = {0};
 
     // Check access to cron.d directory
@@ -58,7 +59,7 @@ createCron(const char *hostPrefixPath, const char *script) {
     // Create the /tmp/att.sh script to be executed by cron
     // We use a script so it can delete the cron file after it's run
     memset(path, 0, PATH_MAX);
-    if (snprintf(path, sizeof(path), "%s/tmp/att.sh", hostPrefixPath) < 0) {
+    if (snprintf(path, sizeof(path), "%s/tmp/att%d.sh", hostPrefixPath, pid) < 0) {
         perror("createCron: /tmp/att.sh error: snprintf() failed\n");
         fprintf(stderr, "path: %s\n", path);
         return FALSE;
@@ -68,7 +69,7 @@ createCron(const char *hostPrefixPath, const char *script) {
         fprintf(stderr, "path: %s\n", path);
         return FALSE;
     }
-    // Write cron action 
+    // Write script contents
     if (snprintf(buf, sizeof(buf), script) < 0) {
         perror("createCron: script: error: snprintf() failed\n");
         close(outFd);
@@ -86,9 +87,9 @@ createCron(const char *hostPrefixPath, const char *script) {
         return FALSE;
     }
 
-    // Create the /etc/cron.d/cron entry
+    // Create and write to the /etc/cron.d/<cronfile> entry
     memset(path, 0, PATH_MAX);
-    if (snprintf(path, sizeof(path), "%s/etc/cron.d/cron", hostPrefixPath) < 0) {
+    if (snprintf(path, sizeof(path), "%s/etc/cron.d/scope%d", hostPrefixPath, pid) < 0) {
         perror("createCron: /etc/cron.d/cron error: snprintf() failed\n");
         fprintf(stderr, "path: %s\n", path);
         return FALSE;
@@ -98,8 +99,12 @@ createCron(const char *hostPrefixPath, const char *script) {
         fprintf(stderr, "path: %s\n", path);
         return FALSE;
     }
-    // crond will detect this file entry and run on its' next cycle
-    if (write(outFd, SCOPE_CRONTAB, C_STRLEN(SCOPE_CRONTAB)) == -1) {
+    // Write cronfile contents
+    if (snprintf(cronjob, sizeof(cronjob), SCOPE_CRONTAB, pid) < 0) {
+        perror("error: nsAttach: sprintf() failed\n");
+        return FALSE;
+    }
+    if (write(outFd, cronjob, strlen(cronjob)) == -1) {
         perror("createCron: cron: write failed");
         fprintf(stderr, "path: %s\n", path);
         close(outFd);
@@ -507,13 +512,13 @@ nsAttach(pid_t pid, const char *rootdir)
         }
     }
 
-    if (snprintf(script, sizeof(script), SCOPE_ATTACH_SCRIPT, scopeCmd, pid) < 0) {
+    if (snprintf(script, sizeof(script), SCOPE_ATTACH_SCRIPT, pid, scopeCmd, pid) < 0) {
         perror("error: nsAttach: sprintf() failed\n");
         ret = EXIT_FAILURE;
         goto out;
     }
 
-    if (createCron("", script) == FALSE) {
+    if (createCron("", script, pid) == FALSE) {
         perror("error: nsAttach: createCronFile() failed\n");
         ret = EXIT_FAILURE;
         goto out;
@@ -818,6 +823,7 @@ setHostMntNs(const char *hostFsPrefix) {
  * TODO: unify it with joinChildNamespace
  * Returns TRUE if operation was success, FALSE otherwise.
  */
+// TODO: Remove?
 static bool
 joinHostNamespace(ns_action_t action) {
     bool status = FALSE;
@@ -964,14 +970,14 @@ joinHostNamespace(ns_action_t action) {
          * Create a "cron script" on the host
          */
         snprintf(script, sizeof(script), SCOPE_START_SCRIPT, hostScopePath, hostFilterPath);
-        status = createCron(hostPrefixPath, script);
+        status = createCron(hostPrefixPath, script, 0);
     } else {
         /*
          * Create a "cron script" on the host
          * TODO this won't work if the path is readonly and the mnt ns isn't changed
          */
         snprintf(script, sizeof(script), SCOPE_STOP_SCRIPT, hostScopePath);
-        status = createCron(hostPrefixPath, script);
+        status = createCron(hostPrefixPath, script, 0);
     }
 
 cleanupMem:

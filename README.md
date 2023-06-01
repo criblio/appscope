@@ -31,27 +31,32 @@ graph LR
     style H fill:#fafafa,stroke:#a6a6a6
 ```
 
-## Get Started
+## 🚀 Try It Out
 
-Before you begin, make sure that your environment meets AppScope [requirements](https://appscope.dev/docs/requirements).
+Before you begin, ensure that your environment meets the AppScope [requirements](https://appscope.dev/docs/requirements).
 
-Next, you can obtain AppScope three ways:
+**With Docker**
+```
+docker run --rm -it -v/:/hostfs:ro --privileged cribl/scope
+scope attach --rootdir /hostfs
+# select a process to scope
+scope events -f
+scope metrics
+```
 
-- Get the [container image](https://hub.docker.com/r/cribl/scope) from Docker Hub and run AppScope in it.
-- Check out the code from this project, then [build](#build) and run AppScope in your Linux environment.
-- Get the binaries from the [CDN](docs/RELEASE.md#cdn), and run them in your Linux environment.  
+**With the Download**
+```
+LATEST=$(curl -Ls https://cdn.cribl.io/dl/scope/latest)
+curl -Lo scope https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope
+curl -Ls https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope.md5 | md5sum -c 
+chmod +x scope
+scope <some app>
+scope events -f
+scope attach <already running process>
+scope metrics
+```
 
-The container image at Docker Hub and binaries at the CDN are updated for each new release of this project.
-
-Once you have downloaded and/or built AppScope, try some simple commands to verify that AppScope is available:
-
-- Scope a new process like `scope ps -ef`. Try substituting `top` or `curl https://google.com` for `ps -ef`.  Run `scope events` to see the results.
-
-- Attach to a process that *is already running*. Run `ps -ef` and find the process ID (PID) of a command or program you would like to scope. Attach to and scope the running process with `scope attach PID`. Run `scope dash` to watch events live.
-
-See the [website docs](https://appscope.dev/docs/overview) for the full story of how to use AppScope.
-
-## Build
+## 🔧 Build From Source
 
 AppScope is not built or distributed like most traditional Linux software.
 
@@ -88,9 +93,9 @@ Either way, the resulting binaries will be in `lib/linux/$(uname -m)/libscope.so
 
 We support building `x86_64` (amd64) or `aarch64` (arm64/v8) binaries by adding `ARCH=x86_64` or `ARCH=aarch64` to the `make build` command. See the [BUILD](docs/BUILD.md) doc for details.
 
-## Keep Going
+## ℹ️ Resources
 
-On the [AppScope Website](https://appscope.dev/):
+On the [AppScope Website](https://appscope.dev/) you can:
 
 - Learn about the CLI commands [in more depth](https://appscope.dev/docs/cli-using).
 - Get an [overview](https://appscope.dev/docs/how-works/) of AppScope beyond the CLI.
@@ -99,20 +104,23 @@ On the [AppScope Website](https://appscope.dev/):
 - View the [Changelog](https://appscope.dev/docs/changelog) and [Known Issues](https://appscope.dev/docs/known-issues).
 - See what happens when you [connect AppScope to Cribl Stream or Cribl Edge](https://appscope.dev/docs/cribl-integration).
 
-The content on that site is built from the [website/](website/) directory in this project.
+_The content on that site is built from the [website/](website/) directory in this project._
 
 Elsewhere, you can:
 
 - Complete the [AppScope Fundamentals sandbox](https://sandbox.cribl.io/course/appscope), a tutorial that takes about 30 minutes.
 - Join the [Cribl Community](https://cribl.io/community/) on Slack. The `#appscope` channel is where you'll find developers who contribute to this project.
 
+## ✏️ Contributing
+
 If you're interested in contributing to the project, you can:
 
 - Take a look at current [discussions](https://github.com/criblio/appscope/discussions) and [issues](https://github.com/criblio/appscope/issues) in GitHub.
 - See our developer guides in the [docs/](./docs/) directory in this repository.
 - Submit any feature requests and defect reports at <https://github.com/criblio/appscope>.
+- Join the [Cribl Community](https://cribl.io/community/) on Slack. The `#appscope` channel is where you'll find developers who contribute to this project.
 
-## License
+## 📄 License
 
 AppScope is licensed under the Apache License, Version 2.0. 
 

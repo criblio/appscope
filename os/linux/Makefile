@@ -141,8 +141,8 @@ loadertest: $(LOADER_C_FILES) $(LOADER_TEST_C_FILES) $(YAML_AR) $(JSON_AR) $(TES
 	@echo "$${CI:+::group::}Building Loader Tests"
 	$(CC) -c $(TEST_CFLAGS) $(LOADER_C_FILES) $(LOADER_INCLUDES) $(LOADER_TEST_C_FILES) $(INCLUDES) $(CMOCKA_INCLUDES) 
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/libvertest libvertest.o libver.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/libdirtest libdirtest.o libdir.o nsfile.o libver.o loaderutils.o loader.o patch.o nsinfo.o ns.o inject.o setup.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/setuptest setuptest.o setup.o patch.o libdir.o nsfile.o libver.o loaderutils.o loader.o nsinfo.o ns.o inject.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/libdirtest attach.o libdirtest.o libdir.o nsfile.o libver.o loaderutils.o loader.o patch.o nsinfo.o ns.o inject.o setup.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/setuptest attach.o setuptest.o setup.o patch.o libdir.o nsfile.o libver.o loaderutils.o loader.o nsinfo.o ns.o inject.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/nsinfotest nsinfotest.o nsinfo.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 

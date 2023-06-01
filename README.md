@@ -1,6 +1,6 @@
 [![Build & Test](https://github.com/criblio/appscope/actions/workflows/build.yml/badge.svg)](https://github.com/criblio/appscope/actions/workflows/build.yml)
 
-# AppScope
+![AppScope](docs/images/logo.png)
 
 AppScope is an open source, runtime-agnostic instrumentation utility for any Linux command or application. It helps users explore, understand, and gain visibility with **no code modification**.
 
@@ -38,10 +38,11 @@ Before you begin, ensure that your environment meets the AppScope [requirements]
 **With Docker**
 ```
 docker run --rm -it -v/:/hostfs:ro --privileged cribl/scope
-scope attach --rootdir /hostfs
-# select a process to scope
-scope events -f
+scope <some app>
 scope metrics
+scope attach --rootdir /hostfs <process running on host>
+scope events -f
+scope detach --all --rootdir /hostfs
 ```
 
 **With the Download**
@@ -51,9 +52,10 @@ curl -Lo scope https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope
 curl -Ls https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope.md5 | md5sum -c 
 chmod +x scope
 scope <some app>
-scope events -f
-scope attach <already running process>
 scope metrics
+sudo scope attach <already running process>
+scope events -f
+scope detach --all
 ```
 
 ## 🔧 Build From Source

@@ -449,6 +449,92 @@ fi
 
 endtest
 
+
+#
+# Processes on the doNotScopeList should not be actively scoped,
+# unless we're explicitly instructed to.  By "explicitly instructed to"
+# we mean 1) injected into or 2) on the allow list of a filter file.
+#
+# This is an integration test for src/wrap.c:getSettings()
+#
+
+#
+# denied_proc_not_scoped_by_default
+#
+starttest denied_proc_not_scoped_by_default
+
+cd /opt/implicit_deny/
+export SCOPE_FILTER=false
+
+# the doNotScopeList is based on process name, this systemd-networkd
+# is not the real thing.
+scope -z ./systemd-networkd &
+PID=$!
+
+scope inspect --all | grep systemd-networkd
+if [ $? -eq "0" ]; then
+    echo "systemd-networkd is actively scoped but shouldn't be"
+    ERR+=1
+fi
+
+kill $PID
+
+endtest
+
+#
+# denied_proc_is_scoped_by_inject
+#
+starttest denied_proc_is_scoped_by_inject
+
+cd /opt/implicit_deny/
+export SCOPE_FILTER=false
+
+# the doNotScopeList is based on process name, this systemd-networkd
+# is not the real thing.
+./systemd-networkd &
+PID=$!
+scope attach $PID
+
+scope inspect --all | grep systemd-networkd
+if [ $? -ne "0" ]; then
+    echo "systemd-networkd is not actively scoped but should be"
+    ERR+=1
+fi
+
+kill $PID
+
+endtest
+
+
+#
+# denied_proc_is_scoped_by_filter_file
+#
+starttest denied_proc_is_scoped_by_filter_file
+
+cd /opt/implicit_deny/
+export SCOPE_FILTER=${DUMMY_FILTER_FILE}2
+echo "allow:" >> $SCOPE_FILTER
+echo "- procname: systemd-networkd" >> $SCOPE_FILTER
+
+# the doNotScopeList is based on process name, this systemd-networkd
+# is not the real thing.
+scope -z ./systemd-networkd &
+PID=$!
+
+scope inspect --all | grep systemd-networkd
+if [ $? -ne "0" ]; then
+    echo "systemd-networkd is not actively scoped but should be"
+    ERR+=1
+fi
+
+kill $PID
+rm $SCOPE_FILTER
+unset SCOPE_FILTER
+
+endtest
+
+
+
 if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""
     echo ""

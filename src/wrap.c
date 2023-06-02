@@ -1683,7 +1683,7 @@ getFilterFilePath(void)
     return filterFilePath;
 }
 
-// Used this command on ubuntu 20.04 and 22.04 to derive this list:
+// Used this command on ubuntu 20.04 and 22.04 as a starting point:
 // ps -ef | grep -v "\["
 static const char *const doNotScopeList[] = {
 // systemd
@@ -1696,6 +1696,13 @@ static const char *const doNotScopeList[] = {
     "systemd-resolved",
     "systemd-timesyncd",
     "systemd-udevd",
+    "systemd-update-utmp",
+    "systemd-detect-virt",
+    "systemd-networkd-wait-online",
+    "systemd-user-sessions",
+    "systemd-user-runtime-dir",
+    "30-systemd-environment-d-generator",
+    "systemd-xdg-autostart-generator",
 
 // dbus
     "accounts-daemon",
@@ -1709,8 +1716,6 @@ static const char *const doNotScopeList[] = {
     "irqbalance",
     "multipathd",
 
-// cribl
-    "cribl",
 };
 
 static bool

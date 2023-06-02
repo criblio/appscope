@@ -94,9 +94,10 @@ $(LIBLOADER): $(LOADER_C_FILES)
 	$(RM) *.o
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
-$(SCOPEDYN): $(LOADER_C_FILES)
+$(SCOPEDYN): src/loader/scopedyn.c src/loader/attach.c src/loader/loaderutils.c src/loader/libdir.c src/loader/libver.c src/loader/ns.c src/loader/nsinfo.c src/loader/setup.c src/loader/patch.c src/loader/nsfile.c src/loader/inject.c
 	@echo "$${CI:+::group::}Building $@"
-	$(CC) -Wall -g $(LOADER_CFLAGS) $(LOADER_C_FILES) \
+	$(CC) -Wall -g $(LOADER_CFLAGS) \
+	src/loader/scopedyn.c src/loader/attach.c src/loader/loaderutils.c src/loader/libdir.c src/loader/libver.c src/loader/ns.c src/loader/nsinfo.c src/loader/setup.c src/loader/patch.c src/loader/nsfile.c src/loader/inject.c \
 	-ldl -lrt -o $@ -I./os/$(OS) $(INCLUDES)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 

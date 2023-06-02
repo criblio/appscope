@@ -29,8 +29,6 @@
 #include "patch.h"
 #include "setup.h"
  
-int g_log_level = CFG_LOG_WARN;
-
 int
 cmdService(char *serviceName, pid_t nspid)
 {

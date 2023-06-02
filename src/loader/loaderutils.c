@@ -17,6 +17,8 @@
 #include "loaderutils.h"
 #include "scopetypes.h"
 
+int g_log_level = CFG_LOG_WARN;
+
 /*********************************************************************
  * Consider updating src/scopeelf.c if you make changes to this file *
  *********************************************************************/

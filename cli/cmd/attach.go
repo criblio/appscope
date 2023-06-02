@@ -82,6 +82,11 @@ scope attach --payloads 2000`,
 			util.ErrAndExit("Attach failure: %v", err)
 		}
 
+		if rc.Rootdir != "" {
+			util.Warn("Attaching to process %d", pid)
+			util.Warn("It can take up to 1 minute to attach to a process in a parent namespace")
+		}
+
 		if inspectFlag {
 			pidCtx := &ipc.IpcPidCtx{
 				PrefixPath: rc.Rootdir,
@@ -92,7 +97,6 @@ scope attach --payloads 2000`,
 			// If we attempt to improve this, we need to wait for attach
 			// even in the case of re-attach
 			if rc.Rootdir != "" {
-				util.Warn("Wait of 1 minute when attaching to a parent namespace with --inspect flag")
 				time.Sleep(60 * time.Second)
 			}
 			time.Sleep(2 * time.Second)

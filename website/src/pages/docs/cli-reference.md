@@ -104,8 +104,8 @@ scope attach --payloads 2000
   -d, --coredump              Enable core dump file generation when an application crashes.
   -c, --cribldest string      Set Cribl destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
-  -f, --fetch                 Inspect the process after the update is complete
   -h, --help                  help for attach
+  -i, --inspect               Inspect the process after attach is complete
   -j, --json                  Output as newline delimited JSON
   -l, --librarypath string    Set path for dynamic libraries
       --loglevel string       Set scope library log level (debug, warning, info, error, none)
@@ -697,7 +697,7 @@ scope update 1000 --rootdir /path/to/host/mount/proc/<hostpid>/root < scope_cfg.
 
 ```
 Flags:
-  -f, --fetch           Inspect the process after the update is complete
+  -i, --inspect         Inspect the process after the update is complete
   -c, --config string   Path to configuration file
   -h, --help            help for update
   -j, --json            Output as newline delimited JSON without pretty printing

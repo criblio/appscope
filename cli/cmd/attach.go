@@ -47,7 +47,7 @@ scope attach --payloads 2000`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		internal.InitConfig()
 		rc.Rootdir, _ = cmd.Flags().GetString("rootdir")
-		fetch, _ := cmd.Flags().GetBool("fetch")
+		inspectFlag, _ := cmd.Flags().GetBool("inspect")
 		jsonOut, _ := cmd.Flags().GetBool("json")
 
 		// Disallow bad argument combinations (see Arg Matrix at top of file)
@@ -82,13 +82,21 @@ scope attach --payloads 2000`,
 			util.ErrAndExit("Attach failure: %v", err)
 		}
 
-		pidCtx := &ipc.IpcPidCtx{
-			PrefixPath: rc.Rootdir,
-			Pid:        pid,
-		}
+		if inspectFlag {
+			pidCtx := &ipc.IpcPidCtx{
+				PrefixPath: rc.Rootdir,
+				Pid:        pid,
+			}
 
-		if fetch {
+			// Simple approach for now
+			// If we attempt to improve this, we need to wait for attach
+			// even in the case of re-attach
+			if rc.Rootdir != "" {
+				util.Warn("Wait of 1 minute when attaching to a parent namespace with --inspect flag")
+				time.Sleep(60 * time.Second)
+			}
 			time.Sleep(2 * time.Second)
+
 			iout, _, err := inspect.InspectProcess(*pidCtx)
 			if err != nil {
 				util.ErrAndExit("Inspect PID fails: %v", err)
@@ -117,7 +125,7 @@ scope attach --payloads 2000`,
 
 func init() {
 	runCmdFlags(attachCmd, rc)
-	attachCmd.Flags().BoolP("fetch", "f", false, "Inspect the process after the attach is complete")
+	attachCmd.Flags().BoolP("inspect", "i", false, "Inspect the process after the attach is complete")
 	attachCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
 	attachCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	RootCmd.AddCommand(attachCmd)

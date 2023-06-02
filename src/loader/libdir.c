@@ -112,6 +112,11 @@ getObjState(libdirfile_t objFileType)
     return NULL;
 }
 
+/*
+ * Update the @start parameter to point to the binary specified by @objFileType
+ * Note: When the @objFileType parameter specifies the STATIC_LOADER_FILE,
+ * the caller should munmap the memory afterwards.
+ */
 size_t
 getAsset(libdirfile_t objFileType, unsigned char **start)
 {
@@ -130,44 +135,49 @@ getAsset(libdirfile_t objFileType, unsigned char **start)
     }
 
     switch (objFileType) {
-        case LIBRARY_FILE:
-            if ((libsym = getSymbol(ebuf->buf, LIBSCOPE))) {
-                libptr = (unsigned char *)*libsym;
-            } else {
-                fprintf(stderr, "%s:%d no addr for _buildLibscopeSo\n", __FUNCTION__, __LINE__);
-                goto out;
-            }
-
-            *start = (unsigned char *)libptr;
-            len =  g_libscopesz;
-            break;
-
-        case LOADER_FILE:
-            if ((libsym = getSymbol(ebuf->buf, SCOPEDYN))) {
-                libptr = (unsigned char *)*libsym;
-            } else {
-                fprintf(stderr, "%s:%d no addr for _buildScopedyn\n", __FUNCTION__, __LINE__);
-                goto out;
-            }
-
-            *start = (unsigned char *)libptr;
-            len =  g_scopedynsz;
-            break;
-
-        case STATIC_LOADER_FILE:
-            if (readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
-                fprintf(stderr, "%s:%d readlink failed\n", __FUNCTION__, __LINE__);
-                goto out;
-            }
-            libptr = (unsigned char *)setupLoadFileIntoMem(&scopeSize, path);
-            if (libptr == NULL) {
-                goto out;
-            }
-
-            *start = libptr;
-            len = scopeSize;
-            break;
+    case LIBRARY_FILE:
+        if ((libsym = getSymbol(ebuf->buf, LIBSCOPE))) {
+            libptr = (unsigned char *)*libsym;
+        } else {
+            fprintf(stderr, "%s:%d no addr for _buildLibscopeSo\n", __FUNCTION__, __LINE__);
+            goto out;
         }
+
+        *start = (unsigned char *)libptr;
+        len =  g_libscopesz;
+        break;
+
+    case LOADER_FILE:
+        if ((libsym = getSymbol(ebuf->buf, SCOPEDYN))) {
+            libptr = (unsigned char *)*libsym;
+        } else {
+            fprintf(stderr, "%s:%d no addr for _buildScopedyn\n", __FUNCTION__, __LINE__);
+            goto out;
+        }
+
+        *start = (unsigned char *)libptr;
+        len =  g_scopedynsz;
+        break;
+
+    case STATIC_LOADER_FILE:
+        if (readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
+            fprintf(stderr, "%s:%d readlink failed\n", __FUNCTION__, __LINE__);
+            goto out;
+        }
+        libptr = (unsigned char *)setupLoadFileIntoMem(&scopeSize, path);
+        if (libptr == NULL) {
+            goto out;
+        }
+
+        *start = libptr;
+        len = scopeSize;
+        break;
+
+    default:
+        fprintf(stderr, "error: invalid objFileType\n");
+        goto out;
+
+    }
 
 out:
     if (ebuf) {
@@ -202,39 +212,47 @@ libdirCreateSymLinkIfMissing(char *path, char *target, bool overwrite, mode_t mo
 }
 
 /*
- * Getting objects bundled
+ * Create a file of type @objFileType if it does not exist yet
+ * Optionally specify @file and @file_len arguments to use an asset that's already 
+ * been retrieved ; otherwise, the asset will be retrieved
  */
 int
 libdirCreateFileIfMissing(unsigned char *file, size_t file_len, libdirfile_t objFileType, const char *path, bool overwrite, mode_t mode, uid_t nsEuid, gid_t nsEgid)
 {
-    // Check if file exists
-    if (!access(path, R_OK) && !overwrite) {
-        return 0; // File exists
-    }
-
+    int ret = 0;
     int fd;
     char temp[PATH_MAX];
-    unsigned char *start;
+    unsigned char *start = NULL;
+    unsigned char *buf;
     size_t len;
 
+    // Check if file exists
+    if (!access(path, R_OK) && !overwrite) {
+        return ret; // File exists
+    }
+
     if (file) {
-        start = file;
+        buf = file;
         len = file_len;
     } else {
         if ((len = getAsset(objFileType, &start)) == -1) {
-            return -1;
+            ret = -1;
+            goto out;
         }
+        buf = start;
     }
 
     // Write file
     int tempLen = snprintf(temp, PATH_MAX, "%s.XXXXXX", path);
     if (tempLen < 0) {
         fprintf(stderr, "error: snprintf failed.\n");
-        return -1;
+        ret = -1;
+        goto out;
     }
     if (tempLen >= PATH_MAX) {
         fprintf(stderr, "error: extract temp too long.\n");
-        return -1;
+        ret = -1;
+        goto out;
     }
 
     uid_t currentEuid = geteuid();
@@ -243,21 +261,24 @@ libdirCreateFileIfMissing(unsigned char *file, size_t file_len, libdirfile_t obj
     if ((fd = nsFileMksTemp(temp, nsEuid, nsEgid, currentEuid, currentEgid)) < 1) {
         // No permission
         unlink(temp);
-        return -1;
+        ret = -1;
+        goto out;
     }
 
-    if (write(fd, start, len) != len) {
+    if (write(fd, buf, len) != len) {
         close(fd);
         unlink(temp);
         perror("libdirCreateFileIfMissing: write() failed");
-        return -1;
+        ret = -1;
+        goto out;
     }
 
     if (fchmod(fd, mode)) {
         close(fd);
         unlink(temp);
         perror("libdirCreateFileIfMissing: fchmod() failed");
-        return -1;
+        ret = -1;
+        goto out;
     }
 
     close(fd);
@@ -265,10 +286,13 @@ libdirCreateFileIfMissing(unsigned char *file, size_t file_len, libdirfile_t obj
     if (nsFileRename(temp, path, nsEuid, nsEgid, currentEuid, currentEgid)) {
         unlink(temp);
         perror("libdirCreateFileIfMissing: rename() failed");
-        return -1;
+        ret = -1;
+        goto out;
     }
 
-    return 0;
+out:
+    if (objFileType == STATIC_LOADER_FILE && start) munmap(start, len);
+    return ret;
 }
 
 // Verify if following absolute path points to directory
@@ -676,6 +700,10 @@ libdirExtract(unsigned char *asset_file, size_t asset_file_len, uid_t nsUid, gid
             return -1;
         }
         break;
+
+    default:
+        fprintf(stderr, "error: invalid objFileType\n");
+        return -1;
 
     }
 

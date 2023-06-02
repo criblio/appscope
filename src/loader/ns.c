@@ -408,7 +408,8 @@ nsUnconfigure(pid_t pid) {
  */
 int
 nsInstall(const char *rootdir, pid_t pid, libdirfile_t objFileType) {
-    unsigned char *file;
+    int ret = EXIT_SUCCESS;
+    unsigned char *file = NULL;
     size_t file_len;
     uid_t nsUid = nsInfoTranslateUidRootDir(rootdir, pid);
     gid_t nsGid = nsInfoTranslateGidRootDir(rootdir, pid);
@@ -417,21 +418,26 @@ nsInstall(const char *rootdir, pid_t pid, libdirfile_t objFileType) {
     // while in the origin namespace
     if ((file_len = getAsset(objFileType, &file)) == -1) {
         fprintf(stderr, "nsInstall getAsset failed\n");
-        return EXIT_FAILURE;
+        ret = EXIT_FAILURE;
+        goto out;
     }
 
     // Switch to mnt namespace
     if (setNamespaceRootDir(rootdir, pid, "mnt") == FALSE) {
         fprintf(stderr, "nsInstall mnt failed\n");
-        return EXIT_FAILURE;
+        ret = EXIT_FAILURE;
+        goto out;
     }
 
     if (libdirExtract(file, file_len, nsUid, nsGid, objFileType)) {
         fprintf(stderr, "nsInstall extract failed\n");
-        return EXIT_FAILURE;
+        ret = EXIT_FAILURE;
+        goto out;
     }
 
-    return EXIT_SUCCESS;
+out:
+    if (objFileType == STATIC_LOADER_FILE && file) munmap(file, file_len);
+    return ret;
 }
 
 // Change to the target mount namespace

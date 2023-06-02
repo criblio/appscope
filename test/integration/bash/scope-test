@@ -1,5 +1,9 @@
 #!/bin/bash
 
+CFG_EVT_FILE="/tmp/event_bash.log"
+CFG_METRICS_FILE="/tmp/metrics_bash.log"
+CFG_LOG_FILE="/tmp/log_bash.log"
+
 # Check that the test was setup correctly
 # (mem/bash is built normally, nomem/bash with --without-bash-malloc)
 echo "Checking to see if /mybin/mem/bash defines malloc as expected."
@@ -54,6 +58,26 @@ if [ $? -ne 0 ]; then
 fi
 echo "/mybin/nomem/bash ./runbashnomem.sh passed"
 echo ""
+
+echo "Executing bash with SCOPE_CONF_PATH"
+# See if bash will respect SCOPE_CONF_PATH environment variable
+LD_PRELOAD=/usr/local/scope/lib/libscope.so SCOPE_CONF_PATH=/opt/scope_bash.yml bash &
+sleep 1
+
+if [ ! -f $CFG_EVT_FILE ]; then
+    echo "$CFG_EVT_FILE not found!"
+    exit 1
+fi
+
+if [ ! -f $CFG_METRICS_FILE ]; then
+    echo "$CFG_METRICS_FILE not found!"
+    exit 1
+fi
+
+if [ ! -f $CFG_LOG_FILE ]; then
+    echo "$CFG_LOG_FILE not found!"
+    exit 1
+fi
 
 echo "All bash tests passed"
 exit 0

@@ -265,7 +265,7 @@ cfgPathSearch(const char* cfgname)
 char *
 cfgPath(void)
 {
-    const char* envPath = getenv("SCOPE_CONF_PATH");
+    const char* envPath = fullGetEnv("SCOPE_CONF_PATH");
 
     // If SCOPE_CONF_PATH is set, and the file can be opened, use it.
     char *path;

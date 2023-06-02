@@ -60,6 +60,22 @@ checkEnv(char *env, char *val)
     return FALSE;
 }
 
+extern char** environ;
+
+char *
+fullGetEnv(char *name) {
+    if (g_fn.getenv) {
+        return g_fn.getenv(name);
+    }
+
+    // if g_fn.getenv was not yet defined try to parse environ
+    size_t l = scope_strchrnul(name, '=') - name;
+    if (l && !name[l] && environ)
+        for (char **e = environ; *e; e++)
+            if (!scope_strncmp(name, *e, l) && l[*e] == '=')
+                return *e + l+1;
+	return NULL;
+}
 
 int
 fullSetenv(const char *key, const char *val, int overwrite)

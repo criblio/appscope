@@ -5717,6 +5717,7 @@ static got_list_t inject_hook_list[] = {
     {"dup3", dup3, &g_fn.dup3},
     {"vsyslog", vsyslog, &g_fn.vsyslog},
     {"fork", fork, &g_fn.fork},
+    {"getenv", getenv, &g_fn.getenv},
     {"socket", socket, &g_fn.socket},
     {"shutdown", shutdown, &g_fn.shutdown},
     {"listen", listen, &g_fn.listen},

@@ -13,6 +13,7 @@ unsigned int strToVal(enum_map_t[], const char *);
 const char* valToStr(enum_map_t[], unsigned int);
 
 int checkEnv(char *, char *);
+char *fullGetEnv(char *);
 int fullSetenv(const char *, const char *, int);
 void setPidEnv(int);
 char *getpath(const char *);

@@ -1,7 +1,8 @@
 #define _GNU_SOURCE
 #include <stdio.h>
-#include <unistd.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "utils.h"
 #include "scopestdlib.h"
 
@@ -68,16 +69,38 @@ testSigSafeUtoa(void **state) {
     assert_int_equal(len, 1);
 }
 
+static void
+testGetEnvNonExisting(void **state) {
+    char *env = fullGetEnv("foo");
+    assert_null(env);
+    int res = setenv("foo", "bar", 1);
+    assert_int_equal(res, 0);
+    env = fullGetEnv("foo");
+    assert_string_equal(env, "bar");
+    res = unsetenv("foo");
+    assert_int_equal(res, 0);
+    env = fullGetEnv("foo");
+    assert_null(env);
+}
+
 int
 main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
+
+    const struct CMUnitTest preInitFnTests[] = {
+        cmocka_unit_test(testGetEnvNonExisting),
+    };
+    int initTestStatus = cmocka_run_group_tests(preInitFnTests, NULL, NULL);
+
     initFn();
 
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(testSetUUID),
         cmocka_unit_test(testSetMachineID),
         cmocka_unit_test(testSigSafeUtoa),
+        cmocka_unit_test(testGetEnvNonExisting),
     };
-    return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
+    int testStatus = cmocka_run_group_tests(tests, groupSetup, groupTeardown);
+    return initTestStatus || testStatus;
 }

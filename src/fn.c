@@ -146,6 +146,7 @@ initFn(void)
 
     GETADDR(g_fn.vsyslog, "vsyslog");
     GETADDR(g_fn.fork, "fork");
+    GETADDR(g_fn.getenv, "getenv");
     GETADDR(g_fn.open, "open");
     GETADDR(g_fn.openat, "openat");
     GETADDR(g_fn.fopen, "fopen");

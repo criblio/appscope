@@ -152,7 +152,7 @@ outputs "Reattaching to pid ${sleep_pid}"
 returns 0
 
 # Wait for reattach to execute
-waitForCmdscopedProcessNumber 1
+sleep 5
 
 # End sleep process
 kill $sleep_pid

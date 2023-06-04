@@ -224,8 +224,8 @@ cfgPathSearch(const char* cfgname)
 
     char path[1024]; // Somewhat arbitrary choice for MAX_PATH
 
-    const char *homedir = getenv("HOME");
-    const char *scope_home = getenv("SCOPE_HOME");
+    const char *homedir = fullGetEnv("HOME");
+    const char *scope_home = fullGetEnv("SCOPE_HOME");
     if (scope_home &&
        (scope_snprintf(path, sizeof(path), "%s/conf/%s", scope_home, cfgname) > 0) &&
         !scope_access(path, R_OK)) {
@@ -371,7 +371,7 @@ doEnvVariableSubstitution(const char* value)
         char env_name[match_size + 1];
         scope_strncpy(env_name, &inptr[match.rm_so], match_size);
         env_name[match_size] = '\0';
-        char* env_value = getenv(&env_name[1]); // offset of 1 skips the $
+        char* env_value = fullGetEnv(&env_name[1]); // offset of 1 skips the $
 
         // Grow outval buffer any time env_value is bigger than env_name
         int size_growth = (!env_value) ? 0 : scope_strlen(env_value) - match_size;
@@ -1946,7 +1946,7 @@ processCustomFilterEnv(config_t* config, yaml_document_t* doc, yaml_node_t* node
         if (equal) *equal = '\0';
         char *envName = valueStr;
         char *envVal = equal ? equal+1 : NULL;
-        char *env = getenv(envName);
+        char *env = fullGetEnv(envName);
         if (env) {
             if (envVal) {
                 if (!scope_strcmp(env, envVal)) {

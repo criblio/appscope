@@ -47,7 +47,6 @@ typedef unsigned int nfds_t;
 typedef struct {
     void (*vsyslog)(int, const char *, va_list);
     pid_t (*fork)(void);
-    char *(*getenv)(const char *);
     int (*open)(const char *, int, ...);
     int (*openat)(int, const char *, int, ...);
     FILE *(*fopen)(const char *, const char *);

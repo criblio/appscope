@@ -88,11 +88,6 @@ main(int argc, char* argv[])
 {
     printf("running %s\n", argv[0]);
 
-    const struct CMUnitTest preInitFnTests[] = {
-        cmocka_unit_test(testGetEnvNonExisting),
-    };
-    int initTestStatus = cmocka_run_group_tests(preInitFnTests, NULL, NULL);
-
     initFn();
 
     const struct CMUnitTest tests[] = {
@@ -101,6 +96,5 @@ main(int argc, char* argv[])
         cmocka_unit_test(testSigSafeUtoa),
         cmocka_unit_test(testGetEnvNonExisting),
     };
-    int testStatus = cmocka_run_group_tests(tests, groupSetup, groupTeardown);
-    return initTestStatus || testStatus;
+    return cmocka_run_group_tests(tests, groupSetup, groupTeardown);
 }

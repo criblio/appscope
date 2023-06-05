@@ -13,6 +13,8 @@ var errInspectCfg = errors.New("error inspect cfg")
 type procDetails struct {
 	// Pid
 	Pid int `mapstructure:"pid" json:"pid" yaml:"pid"`
+	// HostPid
+	HostPid int `mapstructure:"hostPid,omitempty" json:"hostPid,omitempty" yaml:"hostPid,omitempty"`
 	// UUID
 	Uuid string `mapstructure:"uuid" json:"uuid" yaml:"uuid"`
 	// Id
@@ -27,7 +29,7 @@ type InspectOutput struct {
 	Process procDetails                `mapstructure:"process" json:"process" yaml:"process"`
 }
 
-// InspectProcess returns the configuratioutn and status of scoped process
+// InspectProcess returns the configuration and status of scoped process
 func InspectProcess(pidCtx ipc.IpcPidCtx) (InspectOutput, string, error) {
 	var iout InspectOutput
 
@@ -78,15 +80,22 @@ func InspectProcess(pidCtx ipc.IpcPidCtx) (InspectOutput, string, error) {
 		return iout, "", errInspectCfg
 	}
 
+	procDetail := procDetails{
+		Pid:       cmdGetProcDetails.Response.Pid,
+		Uuid:      cmdGetProcDetails.Response.Uuid,
+		Id:        cmdGetProcDetails.Response.Id,
+		MachineId: cmdGetProcDetails.Response.MachineId,
+	}
+
+	// If we pass the hostfs extend the process details with requested PID
+	if pidCtx.PrefixPath != "" {
+		procDetail.HostPid = pidCtx.Pid
+	}
+
 	iout = InspectOutput{
-		Cfg:  cmdGetCfg.Response.Cfg,
-		Desc: cmdGetTransportStatus.Response.Interfaces,
-		Process: procDetails{
-			Pid:       cmdGetProcDetails.Response.Pid,
-			Uuid:      cmdGetProcDetails.Response.Uuid,
-			Id:        cmdGetProcDetails.Response.Id,
-			MachineId: cmdGetProcDetails.Response.MachineId,
-		},
+		Cfg:     cmdGetCfg.Response.Cfg,
+		Desc:    cmdGetTransportStatus.Response.Interfaces,
+		Process: procDetail,
 	}
 
 	sumPrint, err := json.MarshalIndent(iout, "", "   ")

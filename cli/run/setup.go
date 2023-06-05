@@ -45,6 +45,7 @@ func CreateAll(path string) error {
 
 // setupWorkDir sets up a working directory for a given set of args
 func (rc *Config) setupWorkDir(args []string, attach bool) {
+	log.Error().Msg("setupWorkDir started")
 
 	// Override to CriblDest if specified
 	if rc.CriblDest != "" {
@@ -58,9 +59,11 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 	// Build or load config if not already provided (i.e. via stdin on attach)
 	if rc.sc == nil {
 		if rc.UserConfig == "" {
+			log.Error().Msg("setupWorkDir configFromRunOpts")
 			err := rc.configFromRunOpts()
 			util.CheckErrSprintf(err, "%v", err)
 		} else {
+			log.Error().Msg("setupWorkDir ConfigFromFile")
 			err := rc.ConfigFromFile()
 			util.CheckErrSprintf(err, "%v", err)
 		}

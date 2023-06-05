@@ -87,7 +87,13 @@ func (rc *Config) Attach(args []string) (int, error) {
 	env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
 	log.Error().Msgf("Workdir is equal %s", rc.WorkDir)
 	log.Error().Msgf("Environment is equal %s", env)
+	cfRead, rerr := os.ReadFile(filepath.Join(rc.WorkDir, "scope.yml"))
+	if rerr == nil {
+		log.Error().Msgf("Configuration scope.yml %s", string(cfRead))
+	} else {
+		log.Error().Msgf("Configuration ReadFile failed %v", rerr)
 
+	}
 	// Check the attached process mnt namespace.
 	// If it is different from the CLI mnt namespace:
 	// - create working directory in the attached process mnt namespace

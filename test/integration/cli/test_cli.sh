@@ -144,6 +144,8 @@ echo "First attach scope logs"
 scope logs -s
 echo "First attach inspect"
 scope inspect $sleep_pid
+echo "First attach check log"
+cat /tmp/scope.log
 
 # Detach to sleep process by PID
 run scope detach $sleep_pid
@@ -166,6 +168,8 @@ echo "Second attach scope logs"
 scope logs -s
 echo "Second attach inspect"
 scope inspect $sleep_pid
+echo "Second attach check log"
+cat /tmp/scope.log
 
 # End sleep process
 kill $sleep_pid

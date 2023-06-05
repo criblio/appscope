@@ -67,6 +67,8 @@ func (rc *Config) Attach(args []string) (int, error) {
 
 	env := os.Environ()
 
+	log.Error().Msg("Attach append SCOPE_FILTER=false")
+
 	// Disable detection of a scope filter file with this command
 	env = append(env, "SCOPE_FILTER=false")
 
@@ -75,6 +77,7 @@ func (rc *Config) Attach(args []string) (int, error) {
 		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
 	}
 
+	log.Error().Msg("Attach before ConfigFromStdin")
 	// Read config from stdin if it exists
 	if err := rc.ConfigFromStdin(); err != nil {
 		return pid, err

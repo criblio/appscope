@@ -4,6 +4,7 @@ SCOPE_LIB=./lib/linux/$(uname -m)/libscope.so
 
 # List of forbidden symbols
 declare -a verboten_syms=(
+"backtrace"
 "secure_getenv"
 "setenv"
 )

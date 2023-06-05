@@ -67,7 +67,7 @@ func (rc *Config) Attach(args []string) (int, error) {
 
 	env := os.Environ()
 
-	log.Error().Msg("Attach append SCOPE_FILTER=false")
+	fmt.Println("Attach append SCOPE_FILTER=false")
 
 	// Disable detection of a scope filter file with this command
 	env = append(env, "SCOPE_FILTER=false")
@@ -77,11 +77,11 @@ func (rc *Config) Attach(args []string) (int, error) {
 		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
 	}
 
-	log.Error().Msg("Attach before ConfigFromStdin")
+	fmt.Println("Attach before ConfigFromStdin")
 	// Read config from stdin if it exists
-	if err := rc.ConfigFromStdin(); err != nil {
-		return pid, err
-	}
+	// if err := rc.ConfigFromStdin(); err != nil {
+	// 	return pid, err
+	// }
 
 	// Normal operational, create a directory for this run.
 	// Directory contains scope.yml which is configured to output to that
@@ -106,6 +106,7 @@ func (rc *Config) Attach(args []string) (int, error) {
 	if refNsPid != -1 {
 		env = append(env, "SCOPE_HOST_WORKDIR_PATH="+rc.WorkDir)
 	}
+	log.Error().Msgf("refNsPid equal %d", refNsPid)
 
 	// Handle custom library path
 	if len(rc.LibraryPath) > 0 {

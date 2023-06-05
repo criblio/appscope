@@ -138,6 +138,10 @@ returns 0
 # Wait for attach to execute
 waitForCmdscopedProcessNumber 1
 
+# For debug purposes
+echo "First inspect"
+scope inspect $sleep_pid
+
 # Detach to sleep process by PID
 run scope detach $sleep_pid
 outputs "Detaching from pid ${sleep_pid}"
@@ -152,7 +156,11 @@ outputs "Reattaching to pid ${sleep_pid}"
 returns 0
 
 # Wait for reattach to execute
-sleep 5
+waitForCmdscopedProcessNumber 1
+
+# For debug purposes
+echo "Second inspect"
+scope inspect $sleep_pid
 
 # End sleep process
 kill $sleep_pid

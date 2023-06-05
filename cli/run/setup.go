@@ -13,6 +13,7 @@ import (
 
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/util"
+	"github.com/rs/zerolog/log"
 )
 
 func environNoScope() []string {
@@ -83,6 +84,7 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 
 // createWorkDir creates a working directory
 func (rc *Config) createWorkDir(args []string, attach bool) {
+	log.Error().Msg("createWorkDir started")
 	dirPerms := os.FileMode(0755)
 	if attach {
 		dirPerms = 0777
@@ -123,11 +125,11 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 		if !util.CheckDirExists("/tmp") {
 			util.ErrAndExit("/tmp directory does not exist")
 		}
-
 		// Create working directory in /tmp (0777 permissions)
 		rc.WorkDir = filepath.Join("/tmp", tmpDirName)
 		err := os.Mkdir(rc.WorkDir, dirPerms)
 		util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
+		log.Error().Msgf("createWorkDir WorkDir %s tmpDirName %s", rc.WorkDir, tmpDirName)
 
 		// Symbolic link between /tmp/tmpDirName and /history/tmpDirName
 		rootHistDir := filepath.Join(histDir, tmpDirName)

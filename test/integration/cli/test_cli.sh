@@ -130,6 +130,7 @@ sleep 1000 &
 sleep_pid=$!
 
 sleep 1
+printenv
 
 # Attach to sleep process
 run scope attach $sleep_pid
@@ -139,7 +140,9 @@ returns 0
 waitForCmdscopedProcessNumber 1
 
 # For debug purposes
-echo "First inspect"
+echo "First attach scope logs"
+scope logs -s
+echo "First attach inspect"
 scope inspect $sleep_pid
 
 # Detach to sleep process by PID
@@ -159,7 +162,9 @@ returns 0
 waitForCmdscopedProcessNumber 1
 
 # For debug purposes
-echo "Second inspect"
+echo "Second attach scope logs"
+scope logs -s
+echo "Second attach inspect"
 scope inspect $sleep_pid
 
 # End sleep process
@@ -181,6 +186,8 @@ for scopedirpath in /tmp/${sleep_pid}_*; do
     if [ $? -eq 0 ]; then
         echo "PASS: Scope sleep config as expected"
     else
+        echo "Configuration file"
+        cat $scopedirpath/scope.yml
         echo "FAIL: Scope sleep config not as expected"
         ERR+=1
     fi

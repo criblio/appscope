@@ -85,6 +85,8 @@ func (rc *Config) Attach(args []string) (int, error) {
 	// directory and has a command directory configured in that directory.
 	rc.setupWorkDir(args, true)
 	env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
+	log.Error().Msgf("Workdir is equal %s", rc.WorkDir)
+	log.Error().Msgf("Environment is equal %s", env)
 
 	// Check the attached process mnt namespace.
 	// If it is different from the CLI mnt namespace:

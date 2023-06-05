@@ -169,7 +169,7 @@ embedPclntab(uint8_t *buf)
         if (strstr(sec_name, "data.rel.ro") != 0) {
 
             const void *pclntab_addr = buf + sections[i].sh_offset;
-            char *data = (char *)pclntab_addr;
+            unsigned char *data = (char *)pclntab_addr;
             size_t slen = sections[i].sh_size;
             size_t j;
 
@@ -241,10 +241,12 @@ printSymbols(const char *fname)
 
     Elf64_Shdr *sections = (Elf64_Shdr *)(buf + ehdr->e_shoff);
     const char *section_strtab = (char *)buf + sections[ehdr->e_shstrndx].sh_offset;
+    bool found = FALSE;
 
     for (int i = 0; i < ehdr->e_shnum; i++) {
         const char *sec_name = section_strtab + sections[i].sh_name;
         if (strcmp(".gopclntab", sec_name) == 0) {
+            found = TRUE;
             void *pclntab_addr = buf + sections[i].sh_offset;
             /*
             Go symbol table is stored in the .gopclntab section
@@ -252,28 +254,10 @@ printSymbols(const char *fname)
             */
             uint32_t magic = *((const uint32_t *)(pclntab_addr));
             if (magic == GOPCLNTAB_MAGIC_112) {
-                printf_validate("[INFO] gopclntab was recognized\n");
-#if 0
-                uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
-                const void *symtab_addr = pclntab_addr + 16;
-                printf_info("Symbol count = %ld\n", sym_count);
-                printf_info("Address\t\tSymbol Name\n");
-                printf_info("---------------------------\n");
-                for (i = 0; i < sym_count; i++) {
-                    uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
-                    uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
-                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + func_offset + 8));
-                    const char *func_name = (const char *)(pclntab_addr + name_offset);
-                    printf_info("0x%lx\t%s\n", sym_addr, func_name);
-
-                    symtab_addr += 16;
-                    updateSymStatus(func_name);
-                }
-#else
+                printf_validate("[INFO] gopclntab for 12 was recognized\n");
                 getSym12(pclntab_addr);
-#endif
             } else if (magic == GOPCLNTAB_MAGIC_116) {
-                printf_validate("[INFO] gopclntab was recognized\n");
+                printf_validate("[INFO] gopclntab for 16 was recognized\n");
                 // the layout of pclntab:
                 //
                 //  .gopclntab/__gopclntab [elf/macho section]
@@ -309,55 +293,10 @@ printSymbols(const char *fname)
                 //        function table, alternating PC and offset to func struct [each entry thearch.ptrsize bytes]
                 //        end PC [thearch.ptrsize bytes]
                 //        func structures, pcdata offsets, func data.
-#if 0
-                uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
-
-                uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (3 * 8)));
-                uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (7 * 8)));
-
-                const void *symtab_addr = pclntab_addr + pclntab_offset;
-                printf_info("Symbol count = %ld\n", sym_count);
-                printf_info("Address\t\tSymbol Name\n");
-                printf_info("---------------------------\n");
-                for (i = 0; i < sym_count; i++) {
-                    uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
-                    uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
-                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 8));
-                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
-                    printf_info("0x%lx\t%s\n", sym_addr, func_name);
-
-                    symtab_addr += 16;
-                    updateSymStatus(func_name);
-                }
-#else
                 getSym16(pclntab_addr);
-#endif
             } else if ((magic == GOPCLNTAB_MAGIC_118) || (magic == GOPCLNTAB_MAGIC_120)) {
-                printf_validate("[INFO] gopclntab was recognized\n");
-#if 0
-                uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
-                uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (4 * 8)));
-                uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (8 * 8)));
-                uint64_t text_start = *((const uint64_t *)(pclntab_addr + (3 * 8)));
-
-                const void *symtab_addr = pclntab_addr + pclntab_offset;
-
-                printf_info("Symbol count = %ld\n", sym_count);
-                printf_info("Address\t\tSymbol Name\n");
-                printf_info("---------------------------\n");
-                for (i = 0; i < sym_count; i++) {
-                    uint32_t func_offset = *((uint32_t *)(symtab_addr + 4));
-                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 4));
-                    func_offset = *((uint32_t *)(symtab_addr));
-                    uint64_t sym_addr = (uint64_t)(func_offset + text_start);
-                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
-                    printf_info("0x%lx\t%s\n", sym_addr, func_name);
-                    symtab_addr += 8;
-                    updateSymStatus(func_name);
-                }
-#else
+                printf_validate("[INFO] gopclntab for 18/20 was recognized\n");
                 getSym1820(pclntab_addr);
-#endif
             } else {
                 fprintf(stderr, "[ERROR] Unknown header in .gopclntab\n");
                 munmap(buf, st.st_size);
@@ -365,12 +304,15 @@ printSymbols(const char *fname)
                 return -1;
             }
             break;
-        } else if (embedPclntab(buf) == FALSE) {
-            fprintf(stderr, "[ERROR] cannot locate a pclntab\n");
-            munmap(buf, st.st_size);
-            close(fd);
-            return -1;
         }
+    }
+
+    // if no .gopclntab section was found, check embedded
+    if ((found == FALSE) && (embedPclntab(buf) == FALSE)) {
+        fprintf(stderr, "[ERROR] cannot locate a pclntab\n");
+        munmap(buf, st.st_size);
+        close(fd);
+        return -1;
     }
 
     printSymStatus();

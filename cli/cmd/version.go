@@ -16,10 +16,10 @@ var versionCmd = &cobra.Command{
 	Use:   "version [flags]",
 	Short: "Display scope version",
 	Long:  `Outputs version info.`,
-	Example: `scope version
-scope version --date
-scope version --summary
-scope version --tag`,
+	Example: `  scope version
+  scope version --date
+  scope version --summary
+  scope version --tag`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		summary := internal.GetGitSummary()

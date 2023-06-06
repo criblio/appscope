@@ -24,14 +24,14 @@ import (
 var historyCmd = &cobra.Command{
 	Use:   "history [flags]",
 	Short: "List scope session history",
-	Long: `Prints information about sessions. Every time you scope a command, that is called an AppScope session. Each session has a directory which is referenced by a session ID. By default, the AppScope CLI stores all the information it collects during a given session in that session's directory. When you run history, you see a listing of sessions, one session per scoped command, along with information about when the session started, how many events were output during the session, and so on.`,
-	Example: `scope history                    # Displays session history
-scope hist                       # Shortcut for scope history
-scope hist -r                    # Displays running sessions
-scope hist --id 2                # Displays detailed information for session 2
-scope hist -n 50                 # Displays last 50 sessions
-scope hist -d                    # Displays directory for the last session
-cat $(scope hist -d)/args.json   # Outputs contents of args.json in the scope history directory for the current session`,
+	Long:  `Prints information about sessions. Every time you scope a command, that is called an AppScope session. Each session has a directory which is referenced by a session ID. By default, the AppScope CLI stores all the information it collects during a given session in that session's directory. When you run history, you see a listing of sessions, one session per scoped command, along with information about when the session started, how many events were output during the session, and so on.`,
+	Example: `  scope history                    # Displays session history
+  scope hist                       # Shortcut for scope history
+  scope hist -r                    # Displays running sessions
+  scope hist --id 2                # Displays detailed information for session 2
+  scope hist -n 50                 # Displays last 50 sessions
+  scope hist -d                    # Displays directory for the last session
+  cat $(scope hist -d)/args.json   # Outputs contents of args.json in the scope history directory for the current session`,
 	Aliases: []string{"hist"},
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {

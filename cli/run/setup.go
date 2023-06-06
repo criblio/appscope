@@ -42,22 +42,19 @@ func CreateAll(path string) error {
 	return nil
 }
 
-// isConfigPassedByStdin verifies if
+// isConfigPassedByStdin verifies if there is data waiting on input
 func isConfigPassedByStdin() bool {
 	stdinFs, err := os.Stdin.Stat()
 	if err != nil {
-		fmt.Println("isConfigPassedByStdin return false 1")
 		return false
 	}
 
 	// Avoid waiting for input from terminal when no data was provided
 	if stdinFs.Mode()&os.ModeCharDevice != 0 && stdinFs.Size() == 0 {
-		fmt.Println("isConfigPassedByStdin return false 2")
 		return false
 	}
 
-	fmt.Printf("isConfigPassedByStdin return true bytes waiting %v\n", stdinFs.Size())
-	return true
+	return stdinFs.Size() != 0
 }
 
 // setupWorkDir sets up a working directory for a given set of args
@@ -71,7 +68,7 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 	// Create session directory
 	rc.createWorkDir(args, attach)
 
-	// Build or load config if not already provided (i.e. via stdin on attach)
+	// Build or load config
 	if rc.sc == nil {
 		if rc.UserConfig == "" {
 			if isConfigPassedByStdin() {

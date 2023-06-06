@@ -46,14 +46,17 @@ func CreateAll(path string) error {
 func isConfigPassedByStdin() bool {
 	stdinFs, err := os.Stdin.Stat()
 	if err != nil {
+		fmt.Println("isConfigPassedByStdin return false 1")
 		return false
 	}
 
 	// Avoid waiting for input from terminal when no data was provided
 	if stdinFs.Mode()&os.ModeCharDevice != 0 && stdinFs.Size() == 0 {
+		fmt.Println("isConfigPassedByStdin return false 2")
 		return false
 	}
 
+	fmt.Println("isConfigPassedByStdin return true")
 	return true
 }
 

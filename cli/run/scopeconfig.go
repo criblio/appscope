@@ -130,17 +130,23 @@ func (c *Config) SetDefault() error {
 // ConfigFromStdin loads a configuration from yml passed to stdin
 func (c *Config) ConfigFromStdin() error {
 	c.sc = &libscope.ScopeConfig{}
+	fmt.Println("ConfigFromStdin start")
 
 	var cfgData []byte
 	cfgData, err := io.ReadAll(os.Stdin)
 	if err != nil {
-		return nil
-	}
-
-	if err := yaml.Unmarshal(cfgData, c.sc); err != nil {
+		fmt.Printf("ConfigFromStdin ReadAll fails %v \n", err)
 		return err
 	}
 
+	fmt.Println("ConfigFromStdin data in stdin %v \n", cfgData)
+
+	if err := yaml.Unmarshal(cfgData, c.sc); err != nil {
+		fmt.Printf("ConfigFromStdin Unmarshal fails %v \n", err)
+		return err
+	}
+
+	fmt.Println("ConfigFromStdin end success")
 	return nil
 }
 

@@ -18,8 +18,8 @@ var psCmd = &cobra.Command{
 	Long:  `List processes currently being scoped.`,
 	Example: `  scope ps
   scope ps --json
-  scope ps --rootdir /path/to/host/mount
-  scope ps --rootdir /path/to/host/mount/proc/<hostpid>/root`,
+  scope ps --rootdir /path/to/host/root
+  scope ps --rootdir /path/to/host/root/proc/<hostpid>/root`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()

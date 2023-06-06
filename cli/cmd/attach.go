@@ -40,8 +40,8 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 	Example: `  scope attach 1000
   scope attach firefox 
   scope attach top < scope.yml
-  scope attach --rootdir /path/to/host firefox 
-  scope attach --rootdir /path/to/host/mount/proc/<hostpid>/root 1000
+  scope attach --rootdir /path/to/host/root firefox 
+  scope attach --rootdir /path/to/host/root/proc/<hostpid>/root 1000
   scope attach --payloads 2000`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -22,9 +22,9 @@ var inspectCmd = &cobra.Command{
 	Example: `  scope inspect
   scope inspect 1000
   scope inspect --all --json
-  scope inspect 1000 --rootdir /path/to/host/mount
-  scope inspect --all --rootdir /path/to/host/mount
-  scope inspect --all --rootdir /path/to/host/mount/proc/<hostpid>/root`,
+  scope inspect 1000 --rootdir /path/to/host/root
+  scope inspect --all --rootdir /path/to/host/root
+  scope inspect --all --rootdir /path/to/host/root/proc/<hostpid>/root`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()

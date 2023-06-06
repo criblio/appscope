@@ -35,17 +35,31 @@ var filterCmd = &cobra.Command{
 	Short: "Automatically scope a set of processes",
 	Long:  `Automatically scope a set of processes by modifying a system-wide AppScope filter. Overrides all other scope sessions.`,
 	Example: `  scope filter
+  scope filter --rootdir /path/to/host/root --json
   scope filter --add nginx
   scope filter --add nginx < scope.yml
-  scope filter --add firefox --rootdir /path/to/host
+  scope filter --add firefox --rootdir /path/to/host/root
   scope filter --remove chromium`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		internal.InitConfig()
 		rc.Rootdir, _ = cmd.Flags().GetString("rootdir")
 		jsonOut, _ := cmd.Flags().GetBool("json")
+		addProc, _ := cmd.Flags().GetString("add")
+		remProc, _ := cmd.Flags().GetString("remove")
+		// source, _ := cmd.Flags().GetString("source")
 
 		// Disallow bad argument combinations (see Arg Matrix at top of file)
+		if addProc == "" && remProc == "" {
+			if rc.CriblDest != "" || rc.MetricsDest != "" || rc.EventsDest != "" || rc.UserConfig != "" ||
+				cmd.Flags().Lookup("metricformat").Changed || rc.NoBreaker || rc.AuthToken != "" || rc.Payloads ||
+				rc.Backtrace || rc.Loglevel != "" || rc.Coredump || cmd.Flags().Lookup("verbosity").Changed {
+				helpErrAndExit(cmd, "The filter command without --add or --remove options, only supports the --json flag")
+			}
+		}
+		if addProc != "" && remProc != "" {
+			helpErrAndExit(cmd, "Cannot specify --add and --remove")
+		}
 		if rc.CriblDest != "" && rc.MetricsDest != "" {
 			helpErrAndExit(cmd, "Cannot specify --cribldest and --metricdest")
 		} else if rc.CriblDest != "" && rc.EventsDest != "" {
@@ -72,6 +86,29 @@ var filterCmd = &cobra.Command{
 			helpErrAndExit(cmd, "Cannot specify --coredump and --userconfig")
 		}
 
+		// Add a process to the scope filter
+		if addProc != "" {
+
+			return nil
+		}
+
+		// Remove a process from the scope filter
+		if remProc != "" {
+
+			return nil
+		}
+
+		//pid, err := rc.Filter(args)
+		//if err != nil {
+		//	util.ErrAndExit("Filter failure: %v", err)
+		//}
+
+		//if rc.Rootdir != "" {
+		//	util.Warn("Attaching to process %d", pid)
+		//	util.Warn("It can take up to 1 minute to attach to a process in a parent namespace")
+		//}
+
+		// Retrieve an existing filter file
 		filePath := "/usr/lib/appscope/scope_filter"
 		if rc.Rootdir != "" {
 			filePath = rc.Rootdir + filePath
@@ -110,16 +147,6 @@ var filterCmd = &cobra.Command{
 			fmt.Println(content)
 		}
 
-		//pid, err := rc.Filter(args)
-		//if err != nil {
-		//	util.ErrAndExit("Filter failure: %v", err)
-		//}
-
-		//if rc.Rootdir != "" {
-		//	util.Warn("Attaching to process %d", pid)
-		//	util.Warn("It can take up to 1 minute to attach to a process in a parent namespace")
-		//}
-
 		return nil
 	},
 }
@@ -130,5 +157,6 @@ func init() {
 	filterCmd.Flags().String("add", "", "Add an entry to the global filter")
 	filterCmd.Flags().String("remove", "", "Remove an entry from the global filter")
 	filterCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
+	filterCmd.Flags().String("source", "", "Source identifier for a filter entry")
 	RootCmd.AddCommand(filterCmd)
 }

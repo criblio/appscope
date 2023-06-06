@@ -130,7 +130,6 @@ sleep 1000 &
 sleep_pid=$!
 
 sleep 1
-printenv
 
 # Attach to sleep process
 run scope attach $sleep_pid
@@ -138,14 +137,6 @@ returns 0
 
 # Wait for attach to execute
 waitForCmdscopedProcessNumber 1
-
-# For debug purposes
-echo "First attach scope logs"
-scope logs -s
-echo "First attach inspect"
-scope inspect $sleep_pid
-echo "First attach check log"
-cat /tmp/scope.log
 
 # Detach to sleep process by PID
 run scope detach $sleep_pid
@@ -162,14 +153,6 @@ returns 0
 
 # Wait for reattach to execute
 waitForCmdscopedProcessNumber 1
-
-# For debug purposes
-echo "Second attach scope logs"
-scope logs -s
-echo "Second attach inspect"
-scope inspect $sleep_pid
-echo "Second attach check log"
-cat /tmp/scope.log
 
 # End sleep process
 kill $sleep_pid

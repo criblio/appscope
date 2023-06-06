@@ -266,11 +266,6 @@ char *
 cfgPath(void)
 {
     const char* envPath = getenv("SCOPE_CONF_PATH");
-    if (envPath) {
-        scopeLogError("Library getenv(SCOPE_CONF_PATH) failed - envPath is defined");
-    } else {
-        scopeLogError("Library getenv(SCOPE_CONF_PATH) failed - envPath is NULL");
-    }
 
     // If SCOPE_CONF_PATH is set, and the file can be opened, use it.
     char *path;

@@ -67,8 +67,6 @@ func (rc *Config) Attach(args []string) (int, error) {
 
 	env := os.Environ()
 
-	fmt.Println("Attach append SCOPE_FILTER=false")
-
 	// Disable detection of a scope filter file with this command
 	env = append(env, "SCOPE_FILTER=false")
 
@@ -77,26 +75,17 @@ func (rc *Config) Attach(args []string) (int, error) {
 		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
 	}
 
-	fmt.Println("Attach before ConfigFromStdin")
 	// Read config from stdin if it exists
-	// if err := rc.ConfigFromStdin(); err != nil {
-	// 	return pid, err
-	// }
+	if err := rc.ConfigFromStdin(); err != nil {
+		return pid, err
+	}
 
 	// Normal operational, create a directory for this run.
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
 	rc.setupWorkDir(args, true)
 	env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
-	log.Error().Msgf("Workdir is equal %s", rc.WorkDir)
-	log.Error().Msgf("Environment is equal %s", env)
-	cfRead, rerr := os.ReadFile(filepath.Join(rc.WorkDir, "scope.yml"))
-	if rerr == nil {
-		log.Error().Msgf("Configuration scope.yml %s", string(cfRead))
-	} else {
-		log.Error().Msgf("Configuration ReadFile failed %v", rerr)
 
-	}
 	// Check the attached process mnt namespace.
 	// If it is different from the CLI mnt namespace:
 	// - create working directory in the attached process mnt namespace
@@ -106,7 +95,6 @@ func (rc *Config) Attach(args []string) (int, error) {
 	if refNsPid != -1 {
 		env = append(env, "SCOPE_HOST_WORKDIR_PATH="+rc.WorkDir)
 	}
-	log.Error().Msgf("refNsPid equal %d", refNsPid)
 
 	// Handle custom library path
 	if len(rc.LibraryPath) > 0 {

@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/criblio/scope/libscope"
-	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v2"
 )
 
@@ -131,30 +130,27 @@ func (c *Config) SetDefault() error {
 // ConfigFromStdin loads a configuration from yml passed to stdin
 func (c *Config) ConfigFromStdin() error {
 	var cfgData []byte
-	var cfgErr error
 
 	stdinFs, err := os.Stdin.Stat()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ConfigFromStdin os.Stdin.Stat() %v", err)
 		return nil
 	}
 
 	// Avoid waiting for input from terminal when no data was provided
 	if stdinFs.Mode()&os.ModeCharDevice != 0 && stdinFs.Size() == 0 {
-		fmt.Fprintln(os.Stderr, "ConfigFromStdin stdinFs.Mode()&os.ModeCharDevice")
 		return nil
 	}
 
-	cfgData, cfgErr = io.ReadAll(os.Stdin)
+	cfgData, err = io.ReadAll(os.Stdin)
+	if err != nil {
+		return nil
+	}
 
-	fmt.Fprintf(os.Stderr, "ConfigFromStdin io.Readall data %v error %v", cfgData, cfgErr)
 	c.sc = &libscope.ScopeConfig{}
 
 	if err := yaml.Unmarshal(cfgData, &c.sc); err != nil {
-		log.Error().Msgf("ConfigFromStdin Unmarshal %v", err)
 		return err
 	}
-	fmt.Fprintln(os.Stderr, "ConfigFromStdin finish with nil")
 
 	return nil
 }

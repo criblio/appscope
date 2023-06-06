@@ -13,7 +13,6 @@ import (
 
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/util"
-	"github.com/rs/zerolog/log"
 )
 
 func environNoScope() []string {
@@ -45,8 +44,6 @@ func CreateAll(path string) error {
 
 // setupWorkDir sets up a working directory for a given set of args
 func (rc *Config) setupWorkDir(args []string, attach bool) {
-	log.Error().Msg("setupWorkDir started")
-
 	// Override to CriblDest if specified
 	if rc.CriblDest != "" {
 		rc.EventsDest = rc.CriblDest
@@ -59,11 +56,9 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 	// Build or load config if not already provided (i.e. via stdin on attach)
 	if rc.sc == nil {
 		if rc.UserConfig == "" {
-			log.Error().Msg("setupWorkDir configFromRunOpts")
 			err := rc.configFromRunOpts()
 			util.CheckErrSprintf(err, "%v", err)
 		} else {
-			log.Error().Msg("setupWorkDir ConfigFromFile")
 			err := rc.ConfigFromFile()
 			util.CheckErrSprintf(err, "%v", err)
 		}
@@ -87,7 +82,6 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 
 // createWorkDir creates a working directory
 func (rc *Config) createWorkDir(args []string, attach bool) {
-	log.Error().Msg("createWorkDir started")
 	dirPerms := os.FileMode(0755)
 	if attach {
 		dirPerms = 0777
@@ -132,7 +126,6 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 		rc.WorkDir = filepath.Join("/tmp", tmpDirName)
 		err := os.Mkdir(rc.WorkDir, dirPerms)
 		util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
-		log.Error().Msgf("createWorkDir WorkDir %s tmpDirName %s", rc.WorkDir, tmpDirName)
 
 		// Symbolic link between /tmp/tmpDirName and /history/tmpDirName
 		rootHistDir := filepath.Join(histDir, tmpDirName)

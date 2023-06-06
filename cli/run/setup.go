@@ -56,7 +56,7 @@ func isConfigPassedByStdin() bool {
 		return false
 	}
 
-	fmt.Println("isConfigPassedByStdin return true")
+	fmt.Printf("isConfigPassedByStdin return true bytes waiting %v\n", stdinFs.Size())
 	return true
 }
 

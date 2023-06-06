@@ -139,7 +139,7 @@ func (c *Config) ConfigFromStdin() error {
 		return err
 	}
 
-	fmt.Printf("ConfigFromStdin data in stdin %v \n", cfgData)
+	fmt.Printf("ConfigFromStdin data in stdin %v , length %d\n", cfgData, len(cfgData))
 
 	if err := yaml.Unmarshal(cfgData, c.sc); err != nil {
 		fmt.Printf("ConfigFromStdin Unmarshal fails %v \n", err)

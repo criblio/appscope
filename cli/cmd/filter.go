@@ -1,11 +1,15 @@
 package cmd
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/criblio/scope/internal"
-	"github.com/criblio/scope/run"
+	"github.com/criblio/scope/libscope"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v2"
 )
 
 /* Args Matrix (X disallows)
@@ -25,24 +29,21 @@ import (
  * backtrace  																											   X				    -
  */
 
-var rc *run.Config = &run.Config{}
-
-// runCmd represents the run command
-var runCmd = &cobra.Command{
-	Use:   "run [flags] [command]",
-	Short: "Executes a scoped command",
-	Long: `Executes a scoped command. By default, calling scope with no subcommands will run the executables you pass as arguments to scope. However, scope allows for additional arguments to be passed to run to capture payloads or to increase metrics' verbosity. Must be called with the -- flag, e.g., 'scope run -- <command>', to prevent AppScope from attempting to parse flags passed to the executed command.
-
-The --*dest flags accept file names like /tmp/scope.log; URLs like file:///tmp/scope.log; or sockets specified with the pattern unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
-	Example: `  scope run -- /bin/echo "foo"
-  scope run -- perl -e 'print "foo\n"'
-  scope run --payloads -- nc -lp 10001
-  scope run -- curl https://wttr.in/94105
-  scope run -c tcp://127.0.0.1:10091 -- curl https://wttr.in/94105
-  scope run -c edge -- top`,
-	Args: cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+// filterCmd represents the filter command
+var filterCmd = &cobra.Command{
+	Use:   "filter [flags]",
+	Short: "Automatically scope a set of processes",
+	Long:  `Automatically scope a set of processes by modifying a system-wide AppScope filter. Overrides all other scope sessions.`,
+	Example: `  scope filter
+  scope filter --add nginx
+  scope filter --add nginx < scope.yml
+  scope filter --add firefox --rootdir /path/to/host
+  scope filter --remove chromium`,
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
 		internal.InitConfig()
+		rc.Rootdir, _ = cmd.Flags().GetString("rootdir")
+		jsonOut, _ := cmd.Flags().GetBool("json")
 
 		// Disallow bad argument combinations (see Arg Matrix at top of file)
 		if rc.CriblDest != "" && rc.MetricsDest != "" {
@@ -71,17 +72,63 @@ The --*dest flags accept file names like /tmp/scope.log; URLs like file:///tmp/s
 			helpErrAndExit(cmd, "Cannot specify --coredump and --userconfig")
 		}
 
-		rc.Run(args)
+		filePath := "/usr/lib/appscope/scope_filter"
+		if rc.Rootdir != "" {
+			filePath = rc.Rootdir + filePath
+		}
+
+		file, err := os.Open(filePath)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		data, err := ioutil.ReadAll(file)
+		if err != nil {
+			return err
+		}
+
+		if jsonOut {
+			// Read yaml in
+			var filter libscope.Filter
+			err = yaml.Unmarshal(data, &filter)
+			if err != nil {
+				fmt.Println("Error unmarshaling YAML:", err)
+				return err
+			}
+
+			// Convert to json
+			jsonData, err := json.Marshal(filter)
+			if err != nil {
+				fmt.Println("Error marshaling JSON:", err)
+				return err
+			}
+
+			fmt.Println(string(jsonData))
+		} else {
+			content := string(data)
+			fmt.Println(content)
+		}
+
+		//pid, err := rc.Filter(args)
+		//if err != nil {
+		//	util.ErrAndExit("Filter failure: %v", err)
+		//}
+
+		//if rc.Rootdir != "" {
+		//	util.Warn("Attaching to process %d", pid)
+		//	util.Warn("It can take up to 1 minute to attach to a process in a parent namespace")
+		//}
+
+		return nil
 	},
 }
 
 func init() {
-	runCmdFlags(runCmd, rc)
-	// This may be a bad assumption, if we have any args preceding this it might fail
-	runCmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
-		internal.InitConfig()
-		runCmd.Run(cmd, os.Args[2:])
-		return nil
-	})
-	RootCmd.AddCommand(runCmd)
+	runCmdFlags(filterCmd, rc)
+	filterCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
+	filterCmd.Flags().String("add", "", "Add an entry to the global filter")
+	filterCmd.Flags().String("remove", "", "Remove an entry from the global filter")
+	filterCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
+	RootCmd.AddCommand(filterCmd)
 }

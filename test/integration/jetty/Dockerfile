@@ -1,20 +1,6 @@
-FROM alpine:latest
+FROM jetty:jdk17
 
-RUN apk add bash curl gcc gdb musl-dev openjdk11 python3 wget
-
-# Tests
-COPY ./attach/test_attach.sh /opt/test/bin/test_attach.sh
-
-RUN mkdir -p /opt/java_http
-COPY ./java/SimpleHttpServer.java /opt/java_http/SimpleHttpServer.java
-RUN javac -d /opt/java_http/ /opt/java_http/SimpleHttpServer.java
-
-RUN mkdir -p /opt/exec_test
-COPY ./attach/hello_exec.c /opt/exec_test/hello_exec.c
-RUN gcc -O0 -g -o /opt/exec_test/exec_test /opt/exec_test/hello_exec.c
-
-RUN mkdir -p /opt/test_config
-COPY ./attach/scope_test_cfg.yml /opt/test_config/scope_test_cfg.yml
+USER root
 
 ENV SCOPE_CRIBL_ENABLE=false
 ENV SCOPE_LOG_LEVEL=debug
@@ -27,13 +13,11 @@ ENV SCOPE_EVENT_NET=true
 ENV SCOPE_EVENT_FS=true
 ENV SCOPE_LOG_DEST=file:///opt/test-runner/logs/scope.log
 ENV SCOPE_EVENT_DEST=file:///opt/test-runner/logs/events.log
-
+ENV SCOPE_METRIC_DEST=file:///opt/test-runner/logs/metrics.log
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
-RUN echo "export PATH=/usr/local/scope:/usr/local/scope/bin:${PATH}" >/etc/profile.d/path.sh
-
 COPY scope-profile.sh /etc/profile.d/scope.sh
 COPY gdbinit /root/.gdbinit
-
+RUN  mkdir /opt/test/
 RUN  mkdir /usr/local/scope && \
      mkdir /usr/local/scope/bin && \
      mkdir /usr/local/scope/lib && \
@@ -41,8 +25,7 @@ RUN  mkdir /usr/local/scope && \
      ln -s /opt/appscope/bin/linux/$(uname -m)/scope /usr/local/scope/bin/scope && \
      ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
-COPY ./attach/dummy_filter /opt/test-runner/dummy_filter
-COPY attach/scope-test /usr/local/scope/scope-test
+COPY jetty/scope-test /usr/local/scope/scope-test
 
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]

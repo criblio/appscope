@@ -43,9 +43,9 @@ Next, you can obtain AppScope three ways:
 
 The container image at Docker Hub and binaries at the CDN are updated for each new release of this project.
 
-Once you have downloaded and/or built AppScope, try some simple commands to verify that AppScope is available:
+Once you have downloaded and/or built AppScope, try out some simple commands:
 
-- Scope a new process like `scope ps -ef`. Try substituting `top` or `curl https://google.com` for `ps -ef`.  Run `scope events` to see the results.
+- Scope a new process like top with `scope top`. Try substituting `top` for `curl https://google.com` or `nginx`.  Run `scope events` or `scope metrics` to see the results.
 
 - Attach to a process that *is already running*. Run `ps -ef` and find the process ID (PID) of a command or program you would like to scope. Attach to and scope the running process with `scope attach PID`. Run `scope dash` to watch events live.
 
@@ -105,6 +105,7 @@ Elsewhere, you can:
 
 - Complete the [AppScope Fundamentals sandbox](https://sandbox.cribl.io/course/appscope), a tutorial that takes about 30 minutes.
 - Join the [Cribl Community](https://cribl.io/community/) on Slack. The `#appscope` channel is where you'll find developers who contribute to this project.
+- Watch [this video review](https://youtube.com/watch?v=can1dMonRcA) of AppScope to learn about it's capabilities and use cases.
 
 If you're interested in contributing to the project, you can:
 

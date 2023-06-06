@@ -322,6 +322,15 @@ services:
       dockerfile: ./payload/Dockerfile.musl
     <<: *scope-common
 
+  jetty:
+    image: ghcr.io/criblio/appscope-test-jetty:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from:
+        - ghcr.io/criblio/appscope-test-jetty:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./jetty/Dockerfile
+    <<: *scope-common
+
   go_19:
     image: ghcr.io/criblio/appscope-test-go_19:${TAG:?Missing TAG environment variable}
     build:

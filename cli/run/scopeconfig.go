@@ -2,7 +2,6 @@ package run
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -128,14 +127,8 @@ func (c *Config) SetDefault() error {
 }
 
 // ConfigFromStdin loads a configuration from yml passed to stdin
-func (c *Config) ConfigFromStdin() error {
+func (c *Config) ConfigFromStdin(cfgData []byte) error {
 	c.sc = &libscope.ScopeConfig{}
-
-	var cfgData []byte
-	cfgData, err := io.ReadAll(os.Stdin)
-	if err != nil {
-		return err
-	}
 
 	if err := yaml.Unmarshal(cfgData, c.sc); err != nil {
 		return err

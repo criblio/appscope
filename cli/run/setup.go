@@ -3,6 +3,7 @@ package run
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -42,19 +43,23 @@ func CreateAll(path string) error {
 	return nil
 }
 
-// isConfigPassedByStdin verifies if there is data waiting on input
-func isConfigPassedByStdin() bool {
+// readBytesStdIn reads the byte data from stdin
+func readBytesStdIn() []byte {
+	var cfgData []byte
+
 	stdinFs, err := os.Stdin.Stat()
 	if err != nil {
-		return false
+		return cfgData
 	}
 
 	// Avoid waiting for input from terminal when no data was provided
 	if stdinFs.Mode()&os.ModeCharDevice != 0 && stdinFs.Size() == 0 {
-		return false
+		return cfgData
 	}
 
-	return stdinFs.Size() != 0
+	cfgData, _ = io.ReadAll(os.Stdin)
+
+	return cfgData
 }
 
 // setupWorkDir sets up a working directory for a given set of args
@@ -71,13 +76,13 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 	// Build or load config
 	if rc.sc == nil {
 		if rc.UserConfig == "" {
-			if isConfigPassedByStdin() {
-				err := rc.ConfigFromStdin()
+			stdInData := readBytesStdIn()
+			if len(stdInData) > 0 {
+				err := rc.ConfigFromStdin(stdInData)
 				util.CheckErrSprintf(err, "%v", err)
 			} else {
 				err := rc.configFromRunOpts()
 				util.CheckErrSprintf(err, "%v", err)
-
 			}
 		} else {
 			err := rc.ConfigFromFile()

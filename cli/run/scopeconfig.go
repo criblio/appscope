@@ -129,26 +129,15 @@ func (c *Config) SetDefault() error {
 
 // ConfigFromStdin loads a configuration from yml passed to stdin
 func (c *Config) ConfigFromStdin() error {
-	var cfgData []byte
-
-	stdinFs, err := os.Stdin.Stat()
-	if err != nil {
-		return nil
-	}
-
-	// Avoid waiting for input from terminal when no data was provided
-	if stdinFs.Mode()&os.ModeCharDevice != 0 && stdinFs.Size() == 0 {
-		return nil
-	}
-
-	cfgData, err = io.ReadAll(os.Stdin)
-	if err != nil {
-		return nil
-	}
-
 	c.sc = &libscope.ScopeConfig{}
 
-	if err := yaml.Unmarshal(cfgData, &c.sc); err != nil {
+	var cfgData []byte
+	cfgData, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return nil
+	}
+
+	if err := yaml.Unmarshal(cfgData, c.sc); err != nil {
 		return err
 	}
 

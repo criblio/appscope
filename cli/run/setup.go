@@ -42,6 +42,21 @@ func CreateAll(path string) error {
 	return nil
 }
 
+// isConfigPassedByStdin verifies if
+func isConfigPassedByStdin() bool {
+	stdinFs, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+
+	// Avoid waiting for input from terminal when no data was provided
+	if stdinFs.Mode()&os.ModeCharDevice != 0 && stdinFs.Size() == 0 {
+		return false
+	}
+
+	return true
+}
+
 // setupWorkDir sets up a working directory for a given set of args
 func (rc *Config) setupWorkDir(args []string, attach bool) {
 	// Override to CriblDest if specified
@@ -56,8 +71,14 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 	// Build or load config if not already provided (i.e. via stdin on attach)
 	if rc.sc == nil {
 		if rc.UserConfig == "" {
-			err := rc.configFromRunOpts()
-			util.CheckErrSprintf(err, "%v", err)
+			if isConfigPassedByStdin() {
+				err := rc.ConfigFromStdin()
+				util.CheckErrSprintf(err, "%v", err)
+			} else {
+				err := rc.configFromRunOpts()
+				util.CheckErrSprintf(err, "%v", err)
+
+			}
 		} else {
 			err := rc.ConfigFromFile()
 			util.CheckErrSprintf(err, "%v", err)

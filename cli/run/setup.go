@@ -76,7 +76,12 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 	// Build or load config
 	if rc.sc == nil {
 		if rc.UserConfig == "" {
-			stdInData := readBytesStdIn()
+			// Read the data from stdin only during attach
+			var stdInData []byte
+			if attach {
+				stdInData = readBytesStdIn()
+			}
+
 			if len(stdInData) > 0 {
 				err := rc.ConfigFromStdin(stdInData)
 				util.CheckErrSprintf(err, "%v", err)

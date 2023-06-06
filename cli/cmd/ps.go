@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/util"
@@ -32,7 +31,7 @@ scope ps --rootdir /path/to/host/mount/proc/<hostpid>/root`,
 			util.ErrAndExit("Unable to get current user: %v", err)
 		}
 		if errors.Is(err, util.ErrMissingAdmPriv) {
-			fmt.Println("INFO: Run as root (or via sudo) to see all scoped processes")
+			util.Warn("INFO: Run as root (or via sudo) to see all scoped processes")
 		}
 
 		procs, err := util.ProcessesScoped(rootdir)

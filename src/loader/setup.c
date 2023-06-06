@@ -801,7 +801,7 @@ setupConfigure(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
     }
 
     // Extract libscope.so
-    if (libdirCreateFileIfMissing(NULL, 0, path, overwrite, mode, nsUid, nsGid)) {
+    if (libdirCreateFileIfMissing(NULL, 0, LIBRARY_FILE, path, overwrite, mode, nsUid, nsGid)) {
         fprintf(stderr, "setupConfigure: saving %s failed\n", path);
         return -1;
     }

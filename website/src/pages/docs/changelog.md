@@ -5,6 +5,30 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.3.4
+
+2023-06-14 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.3.4`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.3.4/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.3.4/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.3.4/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.3.4/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.3.4/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.4/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.3.4/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.4/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.3.4`.
+
+### Fixes
+
+- [1499](https://github.com/criblio/appscope/issues/1499) AppScope no longer interposes the `backtrace` function. Before this fix, a scoped application calling `backtrace` could cause AppScope to segfault.
+- [1491](https://github.com/criblio/appscope/issues/1491) When you run AppScope in a Kubernetes pod, the pod now starts normally even when the pod definition is missing the `label` section.
+- [1481](https://github.com/criblio/appscope/issues/1481) When scoping a Java app that uses SSL, AppScope memory allocation has been refined to prevent a segfault that had been observed.
+
 ## AppScope 1.3.3
 
 2023-05-17 - Maintenance Release

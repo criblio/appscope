@@ -133,6 +133,5 @@ extern void go_hook_reg_http2_client_write(void);
 extern void go_hook_exit(void);
 extern void go_hook_die(void);
 extern void go_hook_sighandler(void);
-extern void go_hook_forkExec(void);
 
 #endif // __GOTCONTEXT_H__

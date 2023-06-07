@@ -31,7 +31,6 @@
 #define PRI_STR_LEN sizeof(PRI_STR)
 #define UNDEF_OFFSET (-1)
 #define EXIT_STACK_SIZE (32 * 1024)
-#define DOCKERD_AFTER_OVERLAY_MOUNTS 3
 
 enum go_arch_t {
     X86_64,
@@ -107,7 +106,6 @@ tap_t g_tap[] = {
     {tap_exit,                 "runtime.exit",          /* .abi0 */       go_hook_exit,                     NULL, 0},
     {tap_die,                  "runtime.dieFromSignal", /* .abi0 */       go_hook_die,                      NULL, 0},
     {tap_sighandler,           "runtime.sighandler",    /* .abi0 */       go_hook_sighandler,               NULL, 0},
-    {tap_forkExec,             "syscall.forkExec",                        go_hook_forkExec,                 NULL, 0},
     {tap_end,                  "",                                        NULL,                             NULL, 0},
 };
 
@@ -469,29 +467,6 @@ free_go_str(char *str) {
 static void
 rewriteOpenContainersConfig(const char *cWorkDir)
 {
-    //return;
-#ifdef __x86_64__
-    /*
-     * Need to extend the system stack size when calling cJSON_PrintUnformatted().
-     */
-    int arc;
-    char *exit_stack, *tstack, *gstack;
-    if ((exit_stack = scope_malloc(SCOPE_STACK_SIZE)) == NULL) {
-        return;
-    }
-
-    tstack = exit_stack + SCOPE_STACK_SIZE;
-
-    // save the original stack, switch to the tstack
-    __asm__ volatile (
-        "mov %%rsp, %2 \n"
-        "mov %1, %%rsp \n"
-        : "=r"(arc)                  // output
-        : "m"(tstack), "m"(gstack)   // input
-        :                            // clobbered register
-        );
-#endif
-
     char path[PATH_MAX] = {0};
     if (!cWorkDir) {
         goto exit;
@@ -787,17 +762,6 @@ rewriteOpenContainersConfig(const char *cWorkDir)
     scope_fclose(fp);
 
 exit:
-#ifdef __x86_64__
-   // Switch stack back to the original stack
-    __asm__ volatile (
-        "mov %1, %%rsp \n"
-        : "=r"(arc)                       // output
-        : "r"(gstack)                     // inputs
-        :                                 // clobbered register
-        );
-
-    scope_free(exit_stack);
-#endif
     // to handle aarch64 case
     return;
 }
@@ -1201,7 +1165,6 @@ patch_addrs(funchook_t *funchook,
         // We also patch syscalls at the first (and last) instruction.
         if (i == 0 && ((tap->assembly_fn == go_hook_exit) ||
                        (tap->assembly_fn == go_hook_die) ||
-                       (tap->assembly_fn == go_hook_forkExec) ||
                        (tap->assembly_fn == go_hook_sighandler))) {
 
             // In this case we want to patch the instruction directly
@@ -1695,115 +1658,6 @@ getFDFromConn(uint64_t tcpConn) {
     return -1;
 }
 
-/*
- * Create bind mounts in the overlay files within a container.
- * Provides access to the library, filter, config, CLI and
- * the Edge Unix socket in a container.
- *
- * Update ld.so.preload such that all procs load the library.
- * Initially intended for dockerd.
- */
-static bool
-mountDirs(char *src, char *target, char *fstype)
-{
-    static int once = 0;
-
-    sysprint("Scope: mount(%d) of src: %s target: %s fstype: %s\n", once, src, target, fstype);
-    if (scope_strstr(fstype, "overlay") && scope_strstr(src, "merged")) once++;
-
-    /*
-     * Checks:
-     * only applies to the dockerd proc
-     * ensure the constructor populated a path
-     * proceed only after container mounts are done
-     *
-     * We need to apply auto mounts after the overlay mounts are performed.
-     * Given that there are 3 mounts that encompass the overlays, we count
-     * the mounts and apply auto mounts at that point. The constant
-     * DOCKERD_AFTER_OVERLAY_MOUNTS defines the overlay activity.
-     */
-    if ((src != NULL) && (target != NULL) &&
-        scope_strstr(g_proc.procname, "containerd") &&
-        (scope_strstr(g_libpath, "/")) &&
-        (once == DOCKERD_AFTER_OVERLAY_MOUNTS)) {
-        int ldfd;
-        char *filterdir;
-        size_t targetlen = scope_strlen(target);
-
-        sysprint("Interposed Mount overlay: %s %d\n", g_proc.procname, once);
-        once = 0;
-
-        if ((filterdir = scope_malloc(targetlen + 128)) == NULL) return FALSE;
-        scope_strcpy(filterdir, target);
-        scope_strcat(filterdir, g_libpath);
-
-        // make a dir in the merged dir
-        if (makeIntermediateDirs((const char *)filterdir, 0666) == FALSE) {
-            scopeLogWarn("Warn: mkdir of %s from %s:%d", filterdir, __FUNCTION__, __LINE__);
-            scope_free(filterdir);
-            return FALSE;
-        }
-
-        // mount the merged dir addition into the host FS
-        if (scope_mount(g_libpath, filterdir, "overlay", MS_BIND, NULL) != 0) {
-            scopeLogWarn("WARN: mount %s on %s from %s:%d", g_libpath, filterdir, __FUNCTION__, __LINE__);
-            scope_free(filterdir);
-            return FALSE;
-        }
-
-        // mount the Edge socket path if it exists
-        char *sockpath = edgePath();
-        if (sockpath) {
-            char *sockdir = scope_dirname(sockpath);
-            filterdir[targetlen + 1] = '\0';
-            scope_strcat(filterdir, sockdir);
-
-            // make the socket dir in the merged dir
-            if (makeIntermediateDirs((const char *)filterdir, 0666) == TRUE) {
-                // mount the Edge socket
-                if (scope_mount(sockdir, filterdir, "overlay", MS_BIND, NULL) != 0) {
-                    scopeLogWarn("WARN: mount %s on %s from %s:%d", sockpath, filterdir, __FUNCTION__, __LINE__);
-                }
-            } else {
-                scopeLogWarn("WARN: mkdir of %s from %s:%d", filterdir, __FUNCTION__, __LINE__);
-            }
-
-            scope_free(sockpath);
-        } else {
-            scopeLogInfo("Note: can't resolve the Edge socket path %s:%d", __FUNCTION__, __LINE__);
-        }
-
-        // write to /etc/ld.so.preload, not a mount
-        filterdir[targetlen + 1] = '\0';
-        scope_strcat(filterdir, "etc/ld.so.preload");
-
-        if ((ldfd = scope_open(filterdir, O_RDWR | O_CREAT | O_APPEND, 0666)) == -1) {
-            scopeLogWarn("WARN: open %s:%d", __FUNCTION__, __LINE__);
-            scope_free(filterdir);
-            return FALSE;
-        }
-
-        size_t liblen = scope_strlen(g_libpath);
-        char libpath[liblen + sizeof("/libscope.so")];
-
-        scope_memset(libpath, 0, liblen + sizeof("/libscope.so"));
-        scope_strncpy(libpath, g_libpath, liblen);
-        scope_strcat(libpath, "/libscope.so");
-
-        if (scope_write(ldfd, libpath, sizeof(libpath)) <= 0) {
-            scopeLogWarn("WARN: write %s:%d", __FUNCTION__, __LINE__);
-            scope_close(ldfd);
-            scope_free(filterdir);
-            return FALSE;
-        }
-
-        scope_close(ldfd);
-        scope_free(filterdir);
-    }
-
-    return TRUE;
-}
-
 // Extract data from syscalls. Values are available in registers saved on sys_stack.
 static void
 c_syscall(char *sys_stack, char *g_stack)
@@ -1834,10 +1688,6 @@ c_syscall(char *sys_stack, char *g_stack)
             }
 
             funcprint("Scope: open of %ld\n", rc);
-            //if (scope_strstr(g_proc.procname, "runc") != NULL) {
-            //    containerStart();
-            //}
-
             doOpen(rc, path, FD, "open");
         }
         break;
@@ -1903,16 +1753,6 @@ c_syscall(char *sys_stack, char *g_stack)
             doCloseAndReportFailures(fd, (rc != -1), "go_close"); // If net, deletes a net object
         }
         break;
-    case SYS_mount:
-        {
-            char *src = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p1);
-            char *target = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p2);
-            char *fstype = (char *)*(uint64_t *)(sys_stack + g_go_schema->arg_offsets.c_syscall_p3);
-
-            sysprint("Scope: mount of %s to %s\n", src, target);
-            mountDirs(src, target, fstype);
-        break;
-        }
     default:
         break;
     }
@@ -2351,78 +2191,3 @@ go_sighandler(char *stackptr)
 {
     return do_cfunc(stackptr, c_sighandler, tap_entry(tap_sighandler)->assembly_fn);
 }
-
-static void
-c_forkExec(char *sys_stack, char *g_stack)
-{
-    //return;
-    
-    int i;
-    //char *argv0 = (char *)(uint64_t)(sys_stack + 0x0);
-    //uint64_t *argvv = (uint64_t *)*(uint64_t *)(sys_stack + 0x10);
-    char *argv0 = (char *)*(uint64_t *)(g_stack + 0x08);
-    uint64_t *argvv = (uint64_t *)*(uint64_t *)(g_stack + 0x18);
-
-    /*
-     * TBD: in order to call scope_strstr() with a needle longer
-     * than 3-4 chars the stack needs to be aligned on a 16 byte
-     * boundary due to the "movaps %xmm0,0x20(%rsp)' instruction.
-     * Aligning in the stack switch code is likley to affect
-     * current offset values.
-     * Probably should be applied here?
-     * We enter this code from the start of the Go runtime function
-     * before it's stack frame is created. That is unique. Likely
-     * the cause of this issue.
-     * Will look into this directly.
-     */
-    return;
-    char *cmd = go_str(argv0, TRUE);
-    // TBD: add a check for curent proc containerd when stack is aligned
-    if (!scope_strstr(cmd, "runc")) {
-        scope_free(cmd);
-        return;
-    }
-    bool updateCfg = FALSE;
-    char *taskUniqueId = NULL;
-    char *nsName = NULL;
-    sysprint("%s execing %s\n", g_proc.procname, cmd);
-    scope_free(cmd);
-    for (i = 0; argvv[i]; i += 2) {
-        char *argv = go_str((char *)(argvv + i), TRUE);
-        if (argv) {
-            sysprint("\t%s:%d %s argv %s\n", __FUNCTION__, __LINE__, g_proc.procname, argv);
-            if (scope_strstr(argv, "-id") && (char *)(argvv + i + 2)) {
-                /*
-                * id of the task (container)
-                */
-                taskUniqueId = go_str((char *)(argvv + i + 2), TRUE);
-            } else if (scope_strstr(argv, "-na") && (char *)(argvv + i + 2)) { // should be "namespace"
-                /*
-                * namespace
-                */
-                nsName = go_str((char *)(argvv + i + 2), TRUE);
-            } else if (scope_strstr(argv, "sta")) { // should be "start"
-                /*
-                * start indicator
-                */
-                updateCfg = TRUE;
-                break;
-            }
-            scope_free(argv);
-        }
-    }
-
-    // Update task configuration
-    if (updateCfg) {
-        //rewriteOpenContainersConfig(taskUniqueId, nsName);
-    }
-    scope_free(nsName);
-    scope_free(taskUniqueId);
-}
-
-EXPORTON void *
-go_forkExec(char *stackptr)
-{
-    return do_cfunc(stackptr, c_forkExec, tap_entry(tap_forkExec)->assembly_fn);
-}
-

@@ -77,7 +77,6 @@ extern int              scopelibc_rename(const char *, const char *);
 extern int              scopelibc_remove(const char *);
 extern int              scopelibc_pipe2(int [2], int);
 extern void             scopelibc_setbuf(FILE *, char *);
-extern int              scopelibc_mount(const char *, const char *, const char *, unsigned long, const void *);
 
 // String handling operations
 extern char *              scopelibc_realpath(const char *, char *);
@@ -517,13 +516,6 @@ scope_fstat(int fd, struct stat *buf) {
 int
 scope_mkdir(const char *pathname, mode_t mode) {
     return scopelibc_mkdir(pathname, mode);
-}
-
-int
-scope_mount(const char *source, const char *target,
-            const char *fstype, unsigned long flags,
-            const void *data) {
-    return scopelibc_mount(source, target, fstype, flags, data);
 }
 
 int

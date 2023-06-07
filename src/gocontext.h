@@ -76,7 +76,6 @@ enum tap_id {
     tap_exit,
     tap_die,
     tap_sighandler,
-    tap_forkExec,
     tap_end,
 };
 

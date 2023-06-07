@@ -117,4 +117,3 @@ usleep scopelibc_usleep
 vfprintf scopelibc_vfprintf
 vsnprintf scopelibc_vsnprintf
 write scopelibc_write
-mount scopelibc_mount

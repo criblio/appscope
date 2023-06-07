@@ -141,7 +141,7 @@ func (c *Config) ConfigFromStdin(cfgData []byte) error {
 func (c *Config) ConfigFromFile() error {
 	c.sc = &libscope.ScopeConfig{}
 
-	yamlFile, err := ioutil.ReadFile(c.UserConfig)
+	yamlFile, err := os.ReadFile(c.UserConfig)
 	if err != nil {
 		return err
 	}

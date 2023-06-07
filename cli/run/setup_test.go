@@ -3,7 +3,6 @@ package run
 import (
 	"crypto/md5"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,11 +26,11 @@ func TestCreateAll(t *testing.T) {
 		assert.Equal(t, stat.Mode(), perms[i])
 		wb, _ := Asset(fmt.Sprintf("build/%s", f))
 		hash1 := md5.Sum(wb)
-		fb, _ := ioutil.ReadFile(path)
+		fb, _ := os.ReadFile(path)
 		hash2 := md5.Sum(fb)
 		assert.Equal(t, hash1, hash2)
 
-		fb, _ = ioutil.ReadFile(fmt.Sprintf("../build/%s", f))
+		fb, _ = os.ReadFile(fmt.Sprintf("../build/%s", f))
 		hash3 := md5.Sum(fb)
 		assert.Equal(t, hash2, hash3)
 	}
@@ -197,13 +196,13 @@ func TestSetupWorkDir(t *testing.T) {
 	exists := util.CheckFileExists(wd)
 	assert.True(t, exists)
 
-	argsJSONBytes, err := ioutil.ReadFile(filepath.Join(wd, "args.json"))
+	argsJSONBytes, err := os.ReadFile(filepath.Join(wd, "args.json"))
 	assert.NoError(t, err)
 	assert.Equal(t, `["/bin/foo"]`, string(argsJSONBytes))
 
 	expectedYaml := testDefaultScopeConfigYaml(wd, 4)
 
-	scopeYAMLBytes, err := ioutil.ReadFile(filepath.Join(wd, "scope.yml"))
+	scopeYAMLBytes, err := os.ReadFile(filepath.Join(wd, "scope.yml"))
 	assert.NoError(t, err)
 	assert.Equal(t, expectedYaml, string(scopeYAMLBytes))
 
@@ -232,13 +231,13 @@ func TestSetupWorkDirAttach(t *testing.T) {
 	exists := util.CheckFileExists(wd)
 	assert.True(t, exists)
 
-	argsJSONBytes, err := ioutil.ReadFile(filepath.Join(wd, "args.json"))
+	argsJSONBytes, err := os.ReadFile(filepath.Join(wd, "args.json"))
 	assert.NoError(t, err)
 	assert.Equal(t, `["sleep","600"]`, string(argsJSONBytes))
 
 	expectedYaml := testDefaultScopeConfigYaml(wd, 4)
 
-	scopeYAMLBytes, err := ioutil.ReadFile(filepath.Join(wd, "scope.yml"))
+	scopeYAMLBytes, err := os.ReadFile(filepath.Join(wd, "scope.yml"))
 	assert.NoError(t, err)
 	assert.Equal(t, expectedYaml, string(scopeYAMLBytes))
 

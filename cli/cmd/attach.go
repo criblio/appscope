@@ -1,7 +1,14 @@
 package cmd
 
 import (
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/criblio/scope/inspect"
 	"github.com/criblio/scope/internal"
+	"github.com/criblio/scope/ipc"
+	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
 )
 
@@ -32,10 +39,16 @@ The --*dest flags accept file names like /tmp/scope.log or URLs like file:///tmp
 be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
 	Example: `scope attach 1000
 scope attach firefox 
+scope attach top < scope.yml
+scope attach --rootdir /path/to/host firefox 
+scope attach --rootdir /path/to/host/mount/proc/<hostpid>/root 1000
 scope attach --payloads 2000`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		internal.InitConfig()
+		rc.Rootdir, _ = cmd.Flags().GetString("rootdir")
+		inspectFlag, _ := cmd.Flags().GetBool("inspect")
+		jsonOut, _ := cmd.Flags().GetBool("json")
 
 		// Disallow bad argument combinations (see Arg Matrix at top of file)
 		if rc.CriblDest != "" && rc.MetricsDest != "" {
@@ -64,11 +77,60 @@ scope attach --payloads 2000`,
 			helpErrAndExit(cmd, "Cannot specify --coredump and --userconfig")
 		}
 
-		return rc.Attach(args)
+		pid, err := rc.Attach(args)
+		if err != nil {
+			util.ErrAndExit("Attach failure: %v", err)
+		}
+
+		if rc.Rootdir != "" {
+			util.Warn("Attaching to process %d", pid)
+			util.Warn("It can take up to 1 minute to attach to a process in a parent namespace")
+		}
+
+		if inspectFlag {
+			pidCtx := &ipc.IpcPidCtx{
+				PrefixPath: rc.Rootdir,
+				Pid:        pid,
+			}
+
+			// Simple approach for now
+			// If we attempt to improve this, we need to wait for attach
+			// even in the case of re-attach
+			if rc.Rootdir != "" {
+				time.Sleep(60 * time.Second)
+			}
+			time.Sleep(2 * time.Second)
+
+			iout, _, err := inspect.InspectProcess(*pidCtx)
+			if err != nil {
+				util.ErrAndExit("Inspect PID fails: %v", err)
+			}
+
+			if jsonOut {
+				// Print the json object without any pretty printing
+				cfg, err := json.Marshal(iout)
+				if err != nil {
+					util.ErrAndExit("Error creating json object: %v", err)
+				}
+				fmt.Println(string(cfg))
+			} else {
+				// Print the json in a pretty format
+				cfg, err := json.MarshalIndent(iout, "", "   ")
+				if err != nil {
+					util.ErrAndExit("Error creating json array: %v", err)
+				}
+				fmt.Println(string(cfg))
+			}
+		}
+
+		return nil
 	},
 }
 
 func init() {
 	runCmdFlags(attachCmd, rc)
+	attachCmd.Flags().BoolP("inspect", "i", false, "Inspect the process after the attach is complete")
+	attachCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
+	attachCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	RootCmd.AddCommand(attachCmd)
 }

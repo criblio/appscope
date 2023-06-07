@@ -154,6 +154,11 @@ spec:
       creationTimestamp: null
       labels:
         app: {{ .App }}
+{{- if not .PromDisable }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .PromSPort }}"
+{{- end }}
     spec:
       serviceAccountName: scope-cert-sa
       containers:
@@ -182,6 +187,8 @@ spec:
           ports:
             - containerPort: {{ .PromMPort }}
               protocol: TCP
+            - containerPort: {{ .PromSPort }}
+              protocol: TCP
 {{- end }}
       volumes:
         - name: certs
@@ -201,6 +208,10 @@ spec:
       protocol: TCP
       port: {{ .PromMPort }}
       targetPort: {{ .PromMPort }}
+    - name: {{ .PromSPort }}-prom-export-http
+      protocol: TCP
+      port: {{ .PromSPort }}
+      targetPort: {{ .PromSPort }}
   selector:
     app: {{ .App }}
 {{- end }}

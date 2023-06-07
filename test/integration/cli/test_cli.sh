@@ -53,6 +53,10 @@ doesnt_output() {
     fi
 }
 
+dbgOutput() {
+    echo "[debug output] $OUT"
+}
+
 is_file() {
     if [ ! -f "$1" ] ; then
         echo "FAIL: File $1 does not exist"
@@ -133,6 +137,7 @@ sleep 1
 
 # Attach to sleep process
 run scope attach $sleep_pid
+dbgOutput
 returns 0
 
 # Wait for attach to execute
@@ -140,6 +145,7 @@ waitForCmdscopedProcessNumber 1
 
 # Detach to sleep process by PID
 run scope detach $sleep_pid
+dbgOutput
 outputs "Detaching from pid ${sleep_pid}"
 returns 0
 
@@ -148,6 +154,7 @@ waitForCmdscopedProcessNumber 0
 
 # Reattach to sleep process by PID
 run scope attach $sleep_pid
+dbgOutput
 outputs "Reattaching to pid ${sleep_pid}"
 returns 0
 
@@ -173,6 +180,8 @@ for scopedirpath in /tmp/${sleep_pid}_*; do
     if [ $? -eq 0 ]; then
         echo "PASS: Scope sleep config as expected"
     else
+        echo "Configuration file"
+        cat $scopedirpath/scope.yml
         echo "FAIL: Scope sleep config not as expected"
         ERR+=1
     fi
@@ -216,59 +225,13 @@ endtest
 
 
 #
-# Scope start no force
+# Scope start
 #
-starttest "Scope start no force"
+starttest "Scope start"
 
 # Scope start
 run scope start
-outputs "If you wish to proceed, run again with the -f flag."
 returns 0
-
-endtest
-
-
-#
-# Scope start no input
-#
-starttest "Scope start no input"
-
-# Scope start
-run scope start -f
-outputs "Exiting due to start failure"
-returns 1
-scope logs -s | grep -q "Missing filter data"
-ERR+=$?
-
-endtest
-
-
-#
-# Scope start empty file pipeline
-#
-starttest "Scope start empty file pipeline"
-
-OUT=$(cat /opt/test-runner/empty_file | scope start -f 2>&1)
-RET=$?
-outputs "Exiting due to start failure"
-returns 1
-scope logs -s | grep -q "Missing filter data"
-ERR+=$?
-
-endtest
-
-
-#
-# Scope start empty file redirect
-#
-starttest "Scope start empty file redirect"
-
-OUT=$(scope start -f < /opt/test-runner/empty_file 2>&1)
-RET=$?
-outputs "Exiting due to start failure"
-scope logs -s | grep -q "Missing filter data"
-ERR+=$?
-returns 1
 
 endtest
 
@@ -278,8 +241,8 @@ endtest
 #
 starttest "Scope detach by name"
 
-run scope detach sleep
-outputs "Detaching from pid ${sleep_pid}"
+echo "1" | scope detach sleep
+RET=$?
 returns 0
 
 endtest

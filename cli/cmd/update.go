@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -22,14 +23,18 @@ var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Updates the configuration of a scoped process",
 	Long:  `Updates the configuration of a scoped process identified by PID.`,
-	Example: `scope update 1000 --config test_cfg.yml
-scope update 1000 < test_cfg.yml`,
+	Example: `scope update 1000 --config scope_cfg.yml
+scope update 1000 < scope_cfg.yml
+scope update 1000 --json < scope_cfg.yml
+scope update 1000 --rootdir /path/to/host/mount --config scope_cfg.yml
+scope update 1000 --rootdir /path/to/host/mount/proc/<hostpid>/root < scope_cfg.yml`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
-		prefix, _ := cmd.Flags().GetString("prefix")
-		fetch, _ := cmd.Flags().GetBool("fetch")
+		rootdir, _ := cmd.Flags().GetString("rootdir")
+		inspectFlag, _ := cmd.Flags().GetBool("inspect")
 		cfgPath, _ := cmd.Flags().GetString("config")
+		jsonOut, _ := cmd.Flags().GetBool("json")
 
 		// Nice message for non-adminstrators
 		err := util.UserVerifyRootPerm()
@@ -67,7 +72,7 @@ scope update 1000 < test_cfg.yml`,
 			util.ErrAndExit("error parsing PID argument")
 		}
 
-		status, _ := util.PidScopeLibInMaps(pid)
+		status, _ := util.PidScopeLibInMaps(rootdir, pid)
 		if !status {
 			if !admin {
 				util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
@@ -76,7 +81,7 @@ scope update 1000 < test_cfg.yml`,
 		}
 
 		pidCtx := &ipc.IpcPidCtx{
-			PrefixPath: prefix,
+			PrefixPath: rootdir,
 			Pid:        pid,
 		}
 
@@ -87,11 +92,11 @@ scope update 1000 < test_cfg.yml`,
 			}
 			util.ErrAndExit("Update Scope configuration fails: %v", err)
 		}
-		fmt.Println("Update Scope configuration success.")
+		util.Warn("Update Scope configuration success.")
 
-		if fetch {
+		if inspectFlag {
 			time.Sleep(2 * time.Second)
-			_, cfg, err := inspect.InspectProcess(*pidCtx)
+			iout, _, err := inspect.InspectProcess(*pidCtx)
 			if err != nil {
 				if !admin {
 					util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
@@ -99,14 +104,28 @@ scope update 1000 < test_cfg.yml`,
 				util.ErrAndExit("Inspect PID fails: %v", err)
 			}
 
-			fmt.Println(cfg)
+			if jsonOut {
+				// Print the json object without any pretty printing
+				cfg, err := json.Marshal(iout)
+				if err != nil {
+					util.ErrAndExit("Error creating json object: %v", err)
+				}
+				fmt.Println(string(cfg))
+			} else {
+				// Print the json in a pretty format
+				cfg, err := json.MarshalIndent(iout, "", "   ")
+				if err != nil {
+					util.ErrAndExit("Error creating json array: %v", err)
+				}
+				fmt.Println(string(cfg))
+			}
 		}
 	},
 }
 
 func init() {
-	updateCmd.Flags().BoolP("fetch", "f", false, "Inspect the process after the update is complete")
-	updateCmd.Flags().StringP("prefix", "p", "", "Prefix to proc filesystem")
+	updateCmd.Flags().BoolP("inspect", "i", false, "Inspect the process after the update is complete")
+	updateCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
 	updateCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	updateCmd.Flags().StringP("config", "c", "", "Path to configuration file")
 	RootCmd.AddCommand(updateCmd)

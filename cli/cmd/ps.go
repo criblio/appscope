@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/util"
@@ -16,20 +15,26 @@ import (
 var psCmd = &cobra.Command{
 	Use:   "ps",
 	Short: "List processes currently being scoped",
-	Long:  `Lists all processes where the libscope library is injected.`,
-	Args:  cobra.NoArgs,
+	Long:  `List processes currently being scoped.`,
+	Example: `scope ps
+scope ps --json
+scope ps --rootdir /path/to/host/mount
+scope ps --rootdir /path/to/host/mount/proc/<hostpid>/root`,
+	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
+		rootdir, _ := cmd.Flags().GetString("rootdir")
+
 		// Nice message for non-adminstrators
 		err := util.UserVerifyRootPerm()
 		if errors.Is(err, util.ErrGetCurrentUser) {
 			util.ErrAndExit("Unable to get current user: %v", err)
 		}
 		if errors.Is(err, util.ErrMissingAdmPriv) {
-			fmt.Println("INFO: Run as root (or via sudo) to see all scoped processes")
+			util.Warn("INFO: Run as root (or via sudo) to see all scoped processes")
 		}
 
-		procs, err := util.ProcessesScoped()
+		procs, err := util.ProcessesScoped(rootdir)
 		if err != nil {
 			util.ErrAndExit("Unable to retrieve scoped processes: %v", err)
 		}
@@ -43,5 +48,7 @@ var psCmd = &cobra.Command{
 }
 
 func init() {
+	psCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
+	psCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	RootCmd.AddCommand(psCmd)
 }

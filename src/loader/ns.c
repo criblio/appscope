@@ -9,6 +9,7 @@
 #include <sys/mman.h>
 #include <sys/wait.h>
 
+#include "attach.h"
 #include "libver.h"
 #include "libdir.h"
 #include "ns.h"
@@ -17,15 +18,106 @@
 #include "setup.h"
 #include "scopetypes.h"
 
-#define SCOPE_CRONTAB "* * * * * root /tmp/att.sh\n"
+#define SCOPE_CRONTAB "* * * * * root /tmp/att%d.sh\n"
 #define SCOPE_START_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s start -f < %s\nrm -- $0\n"
 #define SCOPE_STOP_SCRIPT "#! /bin/bash\nrm /etc/cron.d/cron\n%s stop -f\nrm -- $0\n"
+#define SCOPE_ATTACH_SCRIPT "#! /bin/bash\nrm /etc/cron.d/scope%d\n%s --ldattach %d\nrm -- $0\n"
 
 // NS Action types
 typedef enum {
     START = 0,
     STOP = 1,
 } ns_action_t;
+
+/* Create the cron file
+ *
+ * When the start command is executed within a container we can't
+ * set ns to that of a host process. Therefore, start a process in the
+ * host context using crond. This process will run a script which will
+ * run the start command in the context of the host. It should run once and
+ * then clean up after itself.
+ *
+ * This should be called after the mnt namespace has been switched.
+ */
+static bool
+createCron(const char *hostPrefixPath, const char *script, pid_t pid) {
+    int outFd;
+    char buf[1024] = {0};
+    char cronjob[1024] = {0};
+    char path[PATH_MAX] = {0};
+
+    // Check access to cron.d directory
+    if (snprintf(path, sizeof(path), "%s/etc/cron.d", hostPrefixPath) < 0) {
+        perror("createCron: /etc/cron.d error: snprintf() failed\n");
+        return FALSE;
+    }
+    if (access(path, R_OK)) {
+        fprintf(stderr, "createCron: error %s does not exist\n", path);
+        return FALSE;
+    }
+
+    // Create the /tmp/att.sh script to be executed by cron
+    // We use a script so it can delete the cron file after it's run
+    memset(path, 0, PATH_MAX);
+    if (snprintf(path, sizeof(path), "%s/tmp/att%d.sh", hostPrefixPath, pid) < 0) {
+        perror("createCron: /tmp/att.sh error: snprintf() failed\n");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+    if ((outFd = open(path, O_RDWR | O_CREAT, 0775)) == -1) {
+        perror("createCron: script path: open failed");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+    // Write script contents
+    if (snprintf(buf, sizeof(buf), script) < 0) {
+        perror("createCron: script: error: snprintf() failed\n");
+        close(outFd);
+        return FALSE;
+    }
+    if (write(outFd, buf, strlen(buf)) == -1) {
+        perror("createCron: script: write failed");
+        fprintf(stderr, "path: %s\n", path);
+        close(outFd);
+        return FALSE;
+    }
+    if (close(outFd) == -1) {
+        perror("createCron: script: close failed");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+
+    // Create and write to the /etc/cron.d/<cronfile> entry
+    memset(path, 0, PATH_MAX);
+    if (snprintf(path, sizeof(path), "%s/etc/cron.d/scope%d", hostPrefixPath, pid) < 0) {
+        perror("createCron: /etc/cron.d/cron error: snprintf() failed\n");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+    if ((outFd = open(path, O_RDWR | O_CREAT, 0775)) == -1) {
+        perror("createCron: cron: open failed");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+    // Write cronfile contents
+    if (snprintf(cronjob, sizeof(cronjob), SCOPE_CRONTAB, pid) < 0) {
+        perror("error: nsAttach: sprintf() failed\n");
+        return FALSE;
+    }
+    if (write(outFd, cronjob, strlen(cronjob)) == -1) {
+        perror("createCron: cron: write failed");
+        fprintf(stderr, "path: %s\n", path);
+        close(outFd);
+        return FALSE;
+    }
+    if (close(outFd) == -1) {
+        perror("createCron: cron: close failed");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+
+    return TRUE;
+}
 
 /*
  * Extract memory to specific output file.
@@ -71,25 +163,24 @@ cleanupDestFd:
 
 /*
  * Reassociate process identified with pid with a specific namespace described by ns.
- *
  * Returns TRUE if operation was success, FALSE otherwise.
  */
 static bool
-setNamespace(pid_t pid, const char *ns) {
+setNamespaceRootDir(const char *rootdir, pid_t pid, const char *ns) {
     char nsPath[PATH_MAX] = {0};
     int nsFd;
-    if (snprintf(nsPath, sizeof(nsPath), "/proc/%d/ns/%s", pid, ns) < 0) {
-        perror("setNamespace: snprintf failed");
+    if (snprintf(nsPath, sizeof(nsPath), "%s/proc/%d/ns/%s", rootdir, pid, ns) < 0) {
+        perror("setNamespaceRootDir: snprintf failed");
         return FALSE;
     }
 
     if ((nsFd = open(nsPath, O_RDONLY)) == -1) {
-        perror("setNamespace: open failed");
+        perror("setNamespaceRootDir: open failed");
         return FALSE;
     }
 
     if (setns(nsFd, 0) != 0) {
-        perror("setNamespace: setns failed");
+        perror("setNamespaceRootDir: setns failed");
         close(nsFd);
         return FALSE;
     }
@@ -135,8 +226,8 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
 
     char path[PATH_MAX] = {0};
 
-    uid_t nsUid = nsInfoTranslateUid(hostPid);
-    gid_t nsGid = nsInfoTranslateGid(hostPid);
+    uid_t nsUid = nsInfoTranslateUidRootDir("", hostPid);
+    gid_t nsGid = nsInfoTranslateGidRootDir("", hostPid);
 
     if (readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
         return status;
@@ -157,12 +248,13 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
     *   In other words the calling process will not change it's own PID
     *   namespace
     * - mount namespace - allows to copy file(s) into a "child namespace"
+    * No need to provide a rootdir here. We are in the host and looking at a child pid.
     */
-    if (joinPidNs && setNamespace(hostPid, "pid") == FALSE) {
+    if (joinPidNs && setNamespaceRootDir("", hostPid, "pid") == FALSE) {
         goto cleanupMem;
     }
 
-    if (setNamespace(hostPid, "mnt") == FALSE) {
+    if (setNamespaceRootDir("", hostPid, "mnt") == FALSE) {
         goto cleanupMem;
     }
 
@@ -239,10 +331,10 @@ cleanupMem:
 service_status_t
 nsService(pid_t hostPid, const char *serviceName) {
 
-    uid_t nsUid = nsInfoTranslateUid(hostPid);
-    gid_t nsGid = nsInfoTranslateGid(hostPid);
+    uid_t nsUid = nsInfoTranslateUidRootDir("", hostPid);
+    gid_t nsGid = nsInfoTranslateGidRootDir("", hostPid);
 
-    if (setNamespace(hostPid, "mnt") == FALSE) {
+    if (setNamespaceRootDir("", hostPid, "mnt") == FALSE) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
@@ -255,7 +347,7 @@ nsService(pid_t hostPid, const char *serviceName) {
  */
 service_status_t
 nsUnservice(pid_t hostPid) {
-    if (setNamespace(hostPid, "mnt") == FALSE) {
+    if (setNamespaceRootDir("", hostPid, "mnt") == FALSE) {
         return SERVICE_STATUS_ERROR_OTHER;
     }
 
@@ -270,10 +362,10 @@ nsUnservice(pid_t hostPid) {
  */
 int
 nsConfigure(pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize) {
-    uid_t nsUid = nsInfoTranslateUid(pid);
-    gid_t nsGid = nsInfoTranslateGid(pid);
+    uid_t nsUid = nsInfoTranslateUidRootDir("", pid);
+    gid_t nsGid = nsInfoTranslateGidRootDir("", pid);
 
-    if (setNamespace(pid, "mnt") == FALSE) {
+    if (setNamespaceRootDir("", pid, "mnt") == FALSE) {
         fprintf(stderr, "setNamespace mnt failed\n");
         return EXIT_FAILURE;
     }
@@ -294,7 +386,7 @@ nsConfigure(pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize) {
  */
 int
 nsUnconfigure(pid_t pid) {
-    if (setNamespace(pid, "mnt") == FALSE) {
+    if (setNamespaceRootDir("", pid, "mnt") == FALSE) {
         fprintf(stderr, "setNamespace mnt failed\n");
         return EXIT_FAILURE;
     }
@@ -305,6 +397,157 @@ nsUnconfigure(pid_t pid) {
     }
 
     return EXIT_SUCCESS;
+}
+
+ /*
+ * Install in the mount namespace
+ * - switch the mount namespace
+ * - install the library file
+ * Returns status of operation 0 in case of success, other values in case of failure
+ * TODO? switch back to origin namespace
+ */
+int
+nsInstall(const char *rootdir, pid_t pid, libdirfile_t objFileType) {
+    int ret = EXIT_SUCCESS;
+    unsigned char *file = NULL;
+    size_t file_len;
+    uid_t nsUid = nsInfoTranslateUidRootDir(rootdir, pid);
+    gid_t nsGid = nsInfoTranslateGidRootDir(rootdir, pid);
+
+    // Extract library from scope binary into memory
+    // while in the origin namespace
+    if ((file_len = getAsset(objFileType, &file)) == -1) {
+        fprintf(stderr, "nsInstall getAsset failed\n");
+        ret = EXIT_FAILURE;
+        goto out;
+    }
+
+    // Switch to mnt namespace
+    if (setNamespaceRootDir(rootdir, pid, "mnt") == FALSE) {
+        fprintf(stderr, "nsInstall mnt failed\n");
+        ret = EXIT_FAILURE;
+        goto out;
+    }
+
+    if (libdirExtract(file, file_len, nsUid, nsGid, objFileType)) {
+        fprintf(stderr, "nsInstall extract failed\n");
+        ret = EXIT_FAILURE;
+        goto out;
+    }
+
+out:
+    if (objFileType == STATIC_LOADER_FILE && file) munmap(file, file_len);
+    return ret;
+}
+
+// Change to the target mount namespace
+// Extract scope into that namespace
+// Extract a cron script into that namespace to run `scope --ldattach [pid]`
+// Optionally copy a config into the target mnt ns
+int
+nsAttach(pid_t pid, const char *rootdir)
+{
+    int ret = EXIT_SUCCESS;
+    size_t cfgSize = 0;
+    char script[1024];
+    char *scopePath = NULL;
+    char scopeCfgPath[PATH_MAX] = {0};
+    char scopeCmd[PATH_MAX] = {0};
+    char path[PATH_MAX] = {0};
+    uid_t nsUid = nsInfoTranslateUidRootDir(rootdir, pid);
+    gid_t nsGid = nsInfoTranslateGidRootDir(rootdir, pid);
+
+    // Configuration is optionally loaded into memory from origin ns
+    char *scopeCfgMem = setupLoadFileIntoMem(&cfgSize, getenv("SCOPE_CONF_PATH"));
+
+    if (nsInstall(rootdir, 1, STATIC_LOADER_FILE)) {
+        fprintf(stderr, "error: nsAttach: failed to extract loader\n");
+        ret = EXIT_FAILURE;
+        goto out;
+    }
+    
+    // Note: After the successful call to nsInstall, we are in the target mnt ns
+
+    // Create script and cron job to perform the attach 
+
+    scopePath = (char *)libdirGetPath(STATIC_LOADER_FILE);
+    if (!scopePath) {
+        fprintf(stderr, "error: nsAttach: failed to get loader path\n");
+        ret = EXIT_FAILURE;
+        goto out;
+    }
+
+    if (!strncpy(scopeCmd, scopePath, sizeof(scopeCmd))) {
+        perror("error: nsAttach: strncpy failed\n");
+        ret = EXIT_FAILURE;
+        goto out;
+    }
+
+    // Set up the working directory in the target ns, to match the origin ns working directory
+    char *workdirPath = getenv("SCOPE_HOST_WORKDIR_PATH");
+    if (workdirPath) {
+        memset(path, 0, PATH_MAX);
+        libdirCreateDirIfMissing(workdirPath, 0777, nsUid, nsGid);
+        memset(path, 0, PATH_MAX);
+        snprintf(path, PATH_MAX, "%s/%s", workdirPath, "payloads");
+        libdirCreateDirIfMissing(path, 0777, nsUid, nsGid);
+        memset(path, 0, PATH_MAX);
+        snprintf(path, PATH_MAX, "%s/%s", workdirPath, "cmd");
+        libdirCreateDirIfMissing(path, 0777, nsUid, nsGid);
+    } else {
+        workdirPath = "/tmp";
+    }
+
+    // If a config was loaded into memory, extract it into the target ns and update
+    // the scope command to include the config env var
+    if (scopeCfgMem) {
+        if (snprintf(scopeCfgPath, sizeof(scopeCfgPath), "%s/scope%d.yml", workdirPath, pid) < 0) {
+            perror("error: nsAttach: snprintf() failed\n");
+            ret = EXIT_FAILURE;
+            goto out;
+        }
+        if (!extractMemToFile(scopeCfgMem, cfgSize, scopeCfgPath, 0664, TRUE, nsUid, nsGid)) {
+            fprintf(stderr, "error: nsAttach: failed to extract config to target ns\n");
+            ret = EXIT_FAILURE;
+            goto out;
+        }
+        if (snprintf(scopeCmd, sizeof(scopeCmd), "SCOPE_CONF_PATH=%s %s", scopeCfgPath, scopePath) < 0) {
+            perror("error: nsAttach: snprintf() failed\n");
+            ret = EXIT_FAILURE;
+            goto out;
+        }
+    }
+
+    if (snprintf(script, sizeof(script), SCOPE_ATTACH_SCRIPT, pid, scopeCmd, pid) < 0) {
+        perror("error: nsAttach: sprintf() failed\n");
+        ret = EXIT_FAILURE;
+        goto out;
+    }
+
+    if (createCron("", script, pid) == FALSE) {
+        perror("error: nsAttach: createCronFile() failed\n");
+        ret = EXIT_FAILURE;
+        goto out;
+    }
+
+out:
+    if (scopeCfgMem) {
+        munmap(scopeCfgMem, cfgSize);
+    }
+
+    return ret;
+}
+
+int
+nsDetach(pid_t pid, const char *rootdir)
+{
+    // Switch to target mnt namespace
+    if (setNamespaceRootDir(rootdir, 1, "mnt") == FALSE) {
+        fprintf(stderr, "nsDetach mnt failed\n");
+        return EXIT_FAILURE;
+    }
+
+    return detach(pid);
 }
 
 /*
@@ -333,7 +576,7 @@ nsGetFile(const char *src_path, const char *dest_path, pid_t pid) {
     }
 
     // Change to namespace
-    if (setNamespace(pid, "mnt") == FALSE) {
+    if (setNamespaceRootDir("", pid, "mnt") == FALSE) {
         fprintf(stderr, "error: setNamespace mnt failed\n");
         goto err;
     }
@@ -522,98 +765,6 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, bool ldattach)
     return EXIT_FAILURE;
 }
 
-/* Create the cron file
- *
- * When the start command is executed within a container we can't
- * set ns to that of a host process. Therefore, start a process in the
- * host context using crond. This process will run a script which will
- * run the start command in the context of the host. It should run once and
- * then clean up after itself.
- *
- * This should be called after the mnt namespace has been switched.
- */
-static bool
-createCron(const char *hostPrefixPath, const char *script) {
-    int outFd;
-    char buf[1024] = {0};
-    char path[PATH_MAX] = {0};
-
-    // Check access to cron.d directory
-    if (snprintf(path, sizeof(path), "%s/etc/cron.d", hostPrefixPath) < 0) {
-        perror("createCron: /etc/cron.d error: snprintf() failed\n");
-        return FALSE;
-    }
-
-    if (access(path, R_OK)) {
-        fprintf(stderr, "createCron: error %s does not exist\n", path);
-        return FALSE;
-    }
-
-    // Create the script to be executed by cron
-    memset(path, 0, PATH_MAX);
-    if (snprintf(path, sizeof(path), "%s/tmp/att.sh", hostPrefixPath) < 0) {
-        perror("createCron: /tmp/att.sh error: snprintf() failed\n");
-        fprintf(stderr, "path: %s\n", path);
-        return FALSE;
-    }
-
-    if ((outFd = open(path, O_RDWR | O_CREAT, 0775)) == -1) {
-        perror("createCron: script path: open failed");
-        fprintf(stderr, "path: %s\n", path);
-        return FALSE;
-    }
-
-    // Write cron action - scope start
-    if (snprintf(buf, sizeof(buf), script) < 0) {
-        perror("createCron: script: error: snprintf() failed\n");
-        close(outFd);
-        return FALSE;
-    }
-
-    if (write(outFd, buf, strlen(buf)) == -1) {
-        perror("createCron: script: write failed");
-        fprintf(stderr, "path: %s\n", path);
-        close(outFd);
-        return FALSE;
-    }
-
-    if (close(outFd) == -1) {
-        perror("createCron: script: close failed");
-        fprintf(stderr, "path: %s\n", path);
-        return FALSE;
-    }
-
-    // Create the cron entry
-    memset(path, 0, PATH_MAX);
-    if (snprintf(path, sizeof(path), "%s/etc/cron.d/cron", hostPrefixPath) < 0) {
-        perror("createCron: /etc/cron.d/cron error: snprintf() failed\n");
-        fprintf(stderr, "path: %s\n", path);
-        return FALSE;
-    }
-
-    if ((outFd = open(path, O_RDWR | O_CREAT, 0775)) == -1) {
-        perror("createCron: cron: open failed");
-        fprintf(stderr, "path: %s\n", path);
-        return FALSE;
-    }
-
-    // crond will detect this file entry and run on its' next cycle
-    if (write(outFd, SCOPE_CRONTAB, C_STRLEN(SCOPE_CRONTAB)) == -1) {
-        perror("createCron: cron: write failed");
-        fprintf(stderr, "path: %s\n", path);
-        close(outFd);
-        return FALSE;
-    }
-
-    if (close(outFd) == -1) {
-        perror("createCron: cron: close failed");
-        fprintf(stderr, "path: %s\n", path);
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
  /*
  * Check if switching mount namespace is required.
  *
@@ -678,6 +829,7 @@ setHostMntNs(const char *hostFsPrefix) {
  * TODO: unify it with joinChildNamespace
  * Returns TRUE if operation was success, FALSE otherwise.
  */
+// TODO: Remove?
 static bool
 joinHostNamespace(ns_action_t action) {
     bool status = FALSE;
@@ -824,13 +976,14 @@ joinHostNamespace(ns_action_t action) {
          * Create a "cron script" on the host
          */
         snprintf(script, sizeof(script), SCOPE_START_SCRIPT, hostScopePath, hostFilterPath);
-        status = createCron(hostPrefixPath, script);
+        status = createCron(hostPrefixPath, script, 0);
     } else {
         /*
          * Create a "cron script" on the host
+         * TODO this won't work if the path is readonly and the mnt ns isn't changed
          */
         snprintf(script, sizeof(script), SCOPE_STOP_SCRIPT, hostScopePath);
-        status = createCron(hostPrefixPath, script);
+        status = createCron(hostPrefixPath, script, 0);
     }
 
 cleanupMem:

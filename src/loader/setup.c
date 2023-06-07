@@ -751,6 +751,7 @@ closeFd:
  */
 int
 setupConfigure(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid) {
+    // TODO shouldn't this function call libdir functions instead of re-creating them?
     char path[PATH_MAX] = {0};
     mode_t mode = 0755;
 
@@ -800,13 +801,13 @@ setupConfigure(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
     }
 
     // Extract libscope.so
-    if (libdirSaveLibraryFile(path, overwrite, mode, nsUid, nsGid)) {
+    if (libdirCreateFileIfMissing(NULL, 0, LIBRARY_FILE, path, overwrite, mode, nsUid, nsGid)) {
         fprintf(stderr, "setupConfigure: saving %s failed\n", path);
         return -1;
     }
 
     // Patch the library
-    if (patchLibrary(path) == PATCH_FAILED) {
+    if (patchLibrary(path, FALSE) == PATCH_FAILED) {
         fprintf(stderr, "setupConfigure: patch %s failed\n", path);
         return -1;
     }
@@ -842,3 +843,4 @@ setupUnconfigure(void) {
 
     return 0;
 }
+

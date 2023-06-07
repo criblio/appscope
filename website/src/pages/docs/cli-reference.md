@@ -89,7 +89,10 @@ be set to sockets with `unix:///var/run/mysock`, `tcp://hostname:port`, `udp://h
 
 ```
 scope attach 1000
-scope attach firefox
+scope attach firefox 
+scope attach top < scope.yml
+scope attach --rootdir /path/to/host firefox 
+scope attach --rootdir /path/to/host/mount/proc/<hostpid>/root 1000
 scope attach --payloads 2000
 ```
 
@@ -102,12 +105,15 @@ scope attach --payloads 2000
   -c, --cribldest string      Set Cribl destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
   -h, --help                  help for attach
+  -i, --inspect               Inspect the process after attach is complete
+  -j, --json                  Output as newline delimited JSON
   -l, --librarypath string    Set path for dynamic libraries
       --loglevel string       Set scope library log level (debug, warning, info, error, none)
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson) (default "ndjson")
   -n, --nobreaker             Set Cribl to not break streams into events.
   -p, --payloads              Capture payloads of network transactions
+  -R, --rootdir               Path to root filesystem of target namespace
   -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.
   -v, --verbosity int         Set scope metric verbosity (default 4)
 ```
@@ -157,7 +163,7 @@ Displays an interactive dashboard with an overview of what's happening with the 
 ### detach
 ---
 
-Unscopes a currently-running process identified by PID or ProcessName.
+Unscopes a currently-running process identified by PID or process name.
 
 #### Usage
 
@@ -169,6 +175,9 @@ Unscopes a currently-running process identified by PID or ProcessName.
 scope detach 1000
 scope detach firefox
 scope detach --all
+scope detach 1000 --rootdir /path/to/host/mount
+scope detach --rootdir /path/to/host/mount
+scope detach --all --rootdir /path/to/host/mount/proc/<hostpid>/root
 ```
 
 #### Flags
@@ -176,6 +185,7 @@ scope detach --all
 ```
   -a, --all                   Detach from all processes
   -h, --help                  Help for detach
+  -R, --rootdir               Path to root filesystem of target namespace
 
 ```
 
@@ -362,7 +372,10 @@ Returns information on scoped process identified by PID.
 ```
 scope inspect
 scope inspect 1000
-scope inspect --all
+scope inspect --all --json
+scope inspect 1000 --rootdir /path/to/host/mount
+scope inspect --all --rootdir /path/to/host/mount
+scope inspect --all --rootdir /path/to/host/mount/proc/<hostpid>/root
 ```
 
 #### Flags
@@ -370,9 +383,8 @@ scope inspect --all
 ```
   -a, --all             Inspect all processes
   -h, --help            Help for inspect
-  -j, --json            Output as newline delimited JSON
-  -p, --prefix string   When running AppScope in a container, and scoping an app that's running outside the container, 
---prefix is the path to host filesystem of the scoped app
+  -j, --json            Output as newline delimited JSON without pretty printing
+  -R, --rootdir         Path to root filesystem of target namespace
 ```
 
 ### k8s
@@ -510,6 +522,22 @@ Lists all scoped processes. This means processes whose functions AppScope is int
 
 `scope ps`
 
+#### Examples
+
+```
+scope ps
+scope ps --json
+scope ps --rootdir /path/to/host/mount
+scope ps --rootdir /path/to/host/mount/proc/<hostpid>/root`,
+```
+
+#### Flags
+
+```
+  -j, --json            Output as newline delimited JSON without pretty printing
+  -R, --rootdir         Path to root filesystem of target namespace
+```
+
 ### run
 ----
 
@@ -599,14 +627,9 @@ Create a snapshot for a process. Snapshot file/s will be created in `/tmp/appsco
 ### start
 ---
 
-Start scoping a filtered selection of processes and services on the host and in all relevant containers. See the example [filter file](/docs/filter-file).
-
-`scope start` does the following on the host and in all relevant containers:
-- Extract `libscope.so` to `/usr/lib/appscope/<version>/` when AppScope is run as root; otherwise extract to `/tmp/appscope/<version>/`.
-- Extract the filter input to `/usr/lib/appscope/scope_filter` when AppScope is run as root; otherwise extract to `/tmp/appscope/scope_filter`.
-- Attach to all existing allowed processes defined in the filter file.
-- Install the `etc/profile.d/scope.sh` script, to preload `/usr/lib/appscope/<version>/libscope.so` if it exists.
-- Modify the relevant service configurations to preload `/usr/lib/appscope/<version>/libscope.so` when AppScope is run as root; otherwise preload `/tmp/appscope/<version>/libscope.so`.
+Install the AppScope library to:
+/usr/lib/appscope/<version>/ with admin privileges, or 
+/tmp/appscope/<version>/ otherwise
 
 #### Usage
 
@@ -614,23 +637,16 @@ Start scoping a filtered selection of processes and services on the host and in 
 
 #### Examples
 
-You can use a redirect:
-
 ```
-scope start < example_filter.yml
-```
-
-Alternatively, you can use a pipe:
-
-```
-cat example_filter.json | scope start
+scope start
+scope start --rootdir /hostfs
 ```
 
 #### Flags
 
 ```
-  -f, --force   Use this flag when you're sure you want to run scope start
-  -h, --help    help for start
+  -h, --help             help for start
+  -p, --rootdir string   Path to root filesystem of target namespace
 ```
 
 ### stop
@@ -638,10 +654,10 @@ cat example_filter.json | scope start
 Stop scoping all processes and services on the host and in all relevant containers.
 
 `scope stop` does the following on the host and in all relevant containers:
-  - Remove filter files `/usr/lib/appscope/scope_filter` and `/tmp/appscope/scope_filter`.
-	- Detach from all existing scoped processes.
-	- Remove the `etc/profile.d/scope.sh` script.
-	- Delete any lines that `LD_PRELOAD` libscope from any relevant service configurations.
+    - Remove filter files `/usr/lib/appscope/scope_filter` and `/tmp/appscope/scope_filter`.
+    - Detach from all existing scoped processes.
+    - Remove the `etc/profile.d/scope.sh` script.
+    - Delete any lines that `LD_PRELOAD` libscope from any relevant service configurations.
 
 #### Usage
 
@@ -669,17 +685,23 @@ Updates configuration of scoped process identified by PID.
 
 #### Examples
 
-`scope update 1000 --config test_cfg.yml`
-`scope update 1000 < test_cfg.yml`
+```
+scope update 1000 --config scope_cfg.yml
+scope update 1000 < scope_cfg.yml
+scope update 1000 --json < scope_cfg.yml
+scope update 1000 --rootdir /path/to/host/mount --config scope_cfg.yml
+scope update 1000 --rootdir /path/to/host/mount/proc/<hostpid>/root < scope_cfg.yml
+```
 
 #### Flags
 
 ```
 Flags:
-  -f, --fetch           Inspect the process after the update is complete
+  -i, --inspect         Inspect the process after the update is complete
   -c, --config string   Path to configuration file
   -h, --help            help for update
-  -p, --prefix string   Prefix to /proc filesystem
+  -j, --json            Output as newline delimited JSON without pretty printing
+  -R, --rootdir         Path to root filesystem of target namespace
 ```
 
 ### version

@@ -76,7 +76,7 @@ if [ $? -eq 0 ]; then
     ERR+=1
 fi
 
-grep "error: pid $TOP_PID has never been attached" $TEMP_OUTPUT_FILE > /dev/null
+grep "error: libscope does not exist in this process" $TEMP_OUTPUT_FILE > /dev/null
 if [ $? -ne 0 ]; then
     ERR+=1
 fi

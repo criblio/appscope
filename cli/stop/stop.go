@@ -1,4 +1,4 @@
-package start
+package stop
 
 import (
 	"errors"
@@ -112,7 +112,7 @@ func stopServiceContainers(cPids []int) error {
 
 func Stop() error {
 	// Create a history directory for logs
-	createWorkDir("stop")
+	run.CreateWorkDirBasic("stop")
 
 	// Validate user has root permissions
 	if err := util.UserVerifyRootPerm(); err != nil {
@@ -121,7 +121,7 @@ func Stop() error {
 		return err
 	}
 
-	scopeDirVersion, err := getAppScopeVerDir()
+	scopeDirVersion, err := run.GetAppScopeVerDir()
 	if err != nil {
 		log.Error().
 			Err(err).
@@ -134,7 +134,7 @@ func Stop() error {
 	// SCOPE_CLI_SKIP_HOST allows to run scope stop in docker environment (integration tests)
 	_, skipHostCfg := os.LookupEnv("SCOPE_CLI_SKIP_HOST")
 	if util.InContainer() && !skipHostCfg {
-		if err := extract(scopeDirVersion); err != nil {
+		if err := util.Extract(scopeDirVersion); err != nil {
 			return err
 		}
 
@@ -164,14 +164,14 @@ func Stop() error {
 		Subprocess: true,
 		Verbosity:  4, // Default
 	}
-	if err := rc.DetachAll([]string{}, false); err != nil {
+	if err := rc.DetachAll(false); err != nil {
 		log.Error().
 			Err(err).
 			Msg("Error detaching from all Scoped processes")
 	}
 
 	// Discover all container PIDs
-	cPids := getContainersPids()
+	cPids := util.GetContainersPids()
 
 	if err := stopConfigureHost(); err != nil {
 		return err

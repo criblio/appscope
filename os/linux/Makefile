@@ -87,17 +87,17 @@ coreclean:
 	$(RM) $(LIBSCOPE) $(LIBLOADER) $(SCOPEDYN)
 	$(RM) test/linux/*test
 
-$(LIBLOADER): src/loader/loader.c src/loader/nsinfo.c src/loader/nsfile.c src/loader/loaderutils.c src/loader/inject.c src/loader/libdir.c src/loader/ns.c src/loader/setup.c src/loader/patch.c src/loader/libver.c
+$(LIBLOADER): $(LOADER_C_FILES)
 	@echo "$${CI:+::group::}Building $@"
 	$(CC) -c $(LOADER_CFLAGS) $(YAML_DEFINES) -I./src $(INCLUDES) $^
 	ar rcs $@ *.o
 	$(RM) *.o
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
-$(SCOPEDYN): src/loader/scopedyn.c src/loader/loaderutils.c src/loader/libdir.c src/loader/libver.c src/loader/ns.c src/loader/nsinfo.c src/loader/setup.c src/loader/patch.c src/loader/nsfile.c
+$(SCOPEDYN): src/loader/scopedyn.c src/loader/attach.c src/loader/loaderutils.c src/loader/libdir.c src/loader/libver.c src/loader/ns.c src/loader/nsinfo.c src/loader/setup.c src/loader/patch.c src/loader/nsfile.c src/loader/inject.c
 	@echo "$${CI:+::group::}Building $@"
 	$(CC) -Wall -g $(LOADER_CFLAGS) \
-	src/loader/scopedyn.c src/loader/loaderutils.c src/loader/libdir.c src/loader/libver.c src/loader/ns.c src/loader/nsinfo.c src/loader/setup.c src/loader/patch.c src/loader/nsfile.c \
+	src/loader/scopedyn.c src/loader/attach.c src/loader/loaderutils.c src/loader/libdir.c src/loader/libver.c src/loader/ns.c src/loader/nsinfo.c src/loader/setup.c src/loader/patch.c src/loader/nsfile.c src/loader/inject.c \
 	-ldl -lrt -o $@ -I./os/$(OS) $(INCLUDES)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
@@ -143,8 +143,8 @@ loadertest: $(LOADER_C_FILES) $(LOADER_TEST_C_FILES) $(YAML_AR) $(JSON_AR) $(TES
 	@echo "$${CI:+::group::}Building Loader Tests"
 	$(CC) -c $(TEST_CFLAGS) $(LOADER_C_FILES) $(LOADER_INCLUDES) $(LOADER_TEST_C_FILES) $(INCLUDES) $(CMOCKA_INCLUDES) 
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/libvertest libvertest.o libver.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/libdirtest libdirtest.o libdir.o nsfile.o libver.o loaderutils.o loader.o patch.o nsinfo.o ns.o inject.o setup.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
-	$(CC) $(TEST_CFLAGS) -o test/$(OS)/setuptest setuptest.o setup.o patch.o libdir.o nsfile.o libver.o loaderutils.o loader.o nsinfo.o ns.o inject.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/libdirtest attach.o libdirtest.o libdir.o nsfile.o libver.o loaderutils.o loader.o patch.o nsinfo.o ns.o inject.o setup.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
+	$(CC) $(TEST_CFLAGS) -o test/$(OS)/setuptest attach.o setuptest.o setup.o patch.o libdir.o nsfile.o libver.o loaderutils.o loader.o nsinfo.o ns.o inject.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	$(CC) $(TEST_CFLAGS) -o test/$(OS)/nsinfotest nsinfotest.o nsinfo.o test.o $(TEST_AR) $(TEST_LD_FLAGS)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 

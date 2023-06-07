@@ -3,6 +3,7 @@ package run
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -42,9 +43,27 @@ func CreateAll(path string) error {
 	return nil
 }
 
+// readBytesStdIn reads the byte data from stdin
+func readBytesStdIn() []byte {
+	var cfgData []byte
+
+	stdinFs, err := os.Stdin.Stat()
+	if err != nil {
+		return cfgData
+	}
+
+	// Avoid waiting for input from terminal when no data was provided
+	if stdinFs.Mode()&os.ModeCharDevice != 0 && stdinFs.Size() == 0 {
+		return cfgData
+	}
+
+	cfgData, _ = io.ReadAll(os.Stdin)
+
+	return cfgData
+}
+
 // setupWorkDir sets up a working directory for a given set of args
 func (rc *Config) setupWorkDir(args []string, attach bool) {
-
 	// Override to CriblDest if specified
 	if rc.CriblDest != "" {
 		rc.EventsDest = rc.CriblDest
@@ -55,12 +74,25 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 	rc.createWorkDir(args, attach)
 
 	// Build or load config
-	if rc.UserConfig == "" {
-		err := rc.configFromRunOpts()
-		util.CheckErrSprintf(err, "%v", err)
-	} else {
-		err := rc.ConfigFromFile()
-		util.CheckErrSprintf(err, "%v", err)
+	if rc.sc == nil {
+		if rc.UserConfig == "" {
+			// Read the data from stdin only during attach
+			var stdInData []byte
+			if attach {
+				stdInData = readBytesStdIn()
+			}
+
+			if len(stdInData) > 0 {
+				err := rc.ConfigFromStdin(stdInData)
+				util.CheckErrSprintf(err, "%v", err)
+			} else {
+				err := rc.configFromRunOpts()
+				util.CheckErrSprintf(err, "%v", err)
+			}
+		} else {
+			err := rc.ConfigFromFile()
+			util.CheckErrSprintf(err, "%v", err)
+		}
 	}
 
 	// Update paths to absolute for file transports
@@ -121,7 +153,6 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 		if !util.CheckDirExists("/tmp") {
 			util.ErrAndExit("/tmp directory does not exist")
 		}
-
 		// Create working directory in /tmp (0777 permissions)
 		rc.WorkDir = filepath.Join("/tmp", tmpDirName)
 		err := os.Mkdir(rc.WorkDir, dirPerms)
@@ -269,4 +300,66 @@ func (rc *Config) buildEventsDest() string {
 		}
 	}
 	return dest
+}
+
+func CreateWorkDirBasic(cmd string) {
+	// Directories named CMD_SESSIONID_PID_TIMESTAMP
+	ts := strconv.FormatInt(time.Now().UTC().UnixNano(), 10)
+	pid := strconv.Itoa(os.Getpid())
+	sessionID := GetSessionID()
+	tmpDirName := path.Base(cmd + "_" + sessionID + "_" + pid + "_" + ts)
+
+	// Create History directory
+	histDir := HistoryDir()
+	err := os.MkdirAll(histDir, 0755)
+	util.CheckErrSprintf(err, "error creating history dir: %v", err)
+
+	// Sudo user warning
+	if _, present := os.LookupEnv("SUDO_USER"); present {
+		fmt.Printf("WARNING: Session logs will be stored in %s and owned by root\n", histDir)
+	}
+
+	// Create working directory in history/
+	WorkDir := filepath.Join(HistoryDir(), tmpDirName)
+	err = os.Mkdir(WorkDir, 0755)
+	util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
+
+	// Populate working directory
+	// Create Log file
+	filePerms := os.FileMode(0644)
+	internal.CreateLogFile(filepath.Join(WorkDir, "scope.log"), filePerms)
+	internal.SetDebug()
+}
+
+// GetAppScopeVerDir returns the directory path which will be used for handling the scope file
+// /usr/lib/appscope/<version>/
+// or
+// /tmp/appscope/<version>/
+func GetAppScopeVerDir() (string, error) {
+	version := internal.GetNormalizedVersion()
+	var appscopeVersionPath string
+
+	// Check /usr/lib/appscope only for official version
+	if !internal.IsVersionDev() {
+		appscopeVersionPath = filepath.Join("/usr/lib/appscope/", version)
+		if _, err := os.Stat(appscopeVersionPath); err != nil {
+			if err := os.MkdirAll(appscopeVersionPath, 0755); err != nil {
+				return appscopeVersionPath, err
+			}
+			err := os.Chmod(appscopeVersionPath, 0755)
+			return appscopeVersionPath, err
+		}
+		return appscopeVersionPath, nil
+	}
+
+	appscopeVersionPath = filepath.Join("/tmp/appscope/", version)
+	if _, err := os.Stat(appscopeVersionPath); err != nil {
+		if err := os.MkdirAll(appscopeVersionPath, 0777); err != nil {
+			return appscopeVersionPath, err
+		}
+		err := os.Chmod(appscopeVersionPath, 0777)
+		return appscopeVersionPath, err
+	}
+	return appscopeVersionPath, nil
+
 }

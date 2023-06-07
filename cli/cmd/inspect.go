@@ -21,13 +21,16 @@ var inspectCmd = &cobra.Command{
 	Long:  `Returns information about scoped process identified by PID.`,
 	Example: `scope inspect
 scope inspect 1000
-scope inspect --all`,
+scope inspect --all --json
+scope inspect 1000 --rootdir /path/to/host/mount
+scope inspect --all --rootdir /path/to/host/mount
+scope inspect --all --rootdir /path/to/host/mount/proc/<hostpid>/root`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
 		all, _ := cmd.Flags().GetBool("all")
-		prefix, _ := cmd.Flags().GetString("prefix")
-		// jsonOut, _ := cmd.Flags().GetBool("json")
+		rootdir, _ := cmd.Flags().GetString("rootdir")
+		jsonOut, _ := cmd.Flags().GetBool("json")
 
 		// Nice message for non-adminstrators
 		err := util.UserVerifyRootPerm()
@@ -40,12 +43,12 @@ scope inspect --all`,
 		}
 
 		pidCtx := &ipc.IpcPidCtx{
-			PrefixPath: prefix,
+			PrefixPath: rootdir,
 		}
 
 		if all {
 			// Get all scoped processes
-			procs, err := util.ProcessesScoped()
+			procs, err := util.ProcessesScoped(rootdir)
 			if err != nil {
 				if !admin {
 					util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
@@ -66,12 +69,25 @@ scope inspect --all`,
 				}
 				iouts = append(iouts, iout)
 			}
-			cfgs, err := json.MarshalIndent(iouts, "", "   ")
-			if err != nil {
-				util.ErrAndExit("Error creating json array: %v", err)
+
+			if jsonOut {
+				// Print each json entry on a newline, without any pretty printing
+				for _, iout := range iouts {
+					cfg, err := json.Marshal(iout)
+					if err != nil {
+						util.ErrAndExit("Error creating json object: %v", err)
+					}
+					fmt.Println(string(cfg))
+				}
+			} else {
+				// Print the array, in a pretty format
+				cfgs, err := json.MarshalIndent(iouts, "", "   ")
+				if err != nil {
+					util.ErrAndExit("Error creating json array: %v", err)
+				}
+				fmt.Println(string(cfgs))
 			}
 
-			fmt.Println(string(cfgs))
 			return
 		}
 
@@ -80,7 +96,7 @@ scope inspect --all`,
 			// If no pid argument was provided
 			// Helper menu to allow the user to select a pid to inspect
 
-			if pid, err = run.HandleInputArg("", false, true, false); err != nil {
+			if pid, err = run.HandleInputArg(rootdir, "", false, true, false); err != nil {
 				if !admin {
 					util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
 				}
@@ -95,7 +111,7 @@ scope inspect --all`,
 			}
 		}
 
-		status, _ := util.PidScopeLibInMaps(pid)
+		status, _ := util.PidScopeLibInMaps(rootdir, pid)
 		if !status {
 			if !admin {
 				util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
@@ -104,7 +120,7 @@ scope inspect --all`,
 		}
 
 		pidCtx.Pid = pid
-		_, cfg, err := inspect.InspectProcess(*pidCtx)
+		iout, _, err := inspect.InspectProcess(*pidCtx)
 		if err != nil {
 			if !admin {
 				util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
@@ -112,12 +128,26 @@ scope inspect --all`,
 			util.ErrAndExit("Inspect PID fails: %v", err)
 		}
 
-		fmt.Println(cfg)
+		if jsonOut {
+			// Print the json object without any pretty printing
+			cfg, err := json.Marshal(iout)
+			if err != nil {
+				util.ErrAndExit("Error creating json object: %v", err)
+			}
+			fmt.Println(string(cfg))
+		} else {
+			// Print the json in a pretty format
+			cfg, err := json.MarshalIndent(iout, "", "   ")
+			if err != nil {
+				util.ErrAndExit("Error creating json array: %v", err)
+			}
+			fmt.Println(string(cfg))
+		}
 	},
 }
 
 func init() {
-	inspectCmd.Flags().StringP("prefix", "p", "", "Prefix to proc filesystem")
+	inspectCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
 	inspectCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	inspectCmd.Flags().BoolP("all", "a", false, "Inspect all processes")
 	RootCmd.AddCommand(inspectCmd)

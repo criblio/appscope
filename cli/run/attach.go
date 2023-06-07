@@ -77,7 +77,7 @@ func (rc *Config) Attach(id string, choose bool) ([]int, error) {
 // If the id provided is a pid, that single pid will be detached
 // If the id provided is a name, all processes matching that name will be detached
 // unless the @choose argument is true, which will allow the user to choose a single process
-func (rc *Config) Detach(id string, choose bool) error {
+func (rc *Config) Detach(id string, choose, confirm bool) error {
 	procs := make(util.Processes, 0)
 	var err error
 	adminStatus := true
@@ -127,7 +127,7 @@ func (rc *Config) Detach(id string, choose bool) error {
 	}
 
 	if len(procs) > 1 {
-		if !util.Confirm("Are your sure you want to detach from all of these processes?") {
+		if confirm && !util.Confirm("Are your sure you want to detach from all of these processes?") {
 			fmt.Println("info: canceled")
 			return nil
 		}

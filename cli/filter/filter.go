@@ -122,7 +122,7 @@ func Remove(filterFile libscope.Filter, remProc, rootdir string, rc *run.Config)
 	*/
 
 	// Perform a scope detach to all matching, scoped processes
-	if err := rc.Detach(remProc, false); err != nil {
+	if err := rc.Detach(remProc, false, false); err != nil {
 		return err
 	}
 

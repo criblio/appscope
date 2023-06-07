@@ -315,18 +315,6 @@ scope filter --remove chromium
   -R, --rootdir string        Path to root filesystem of target namespace
   -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.
   -v, --verbosity int         Set scope metric verbosity (default 4)
-
-  -a, --all           Show all flows
-  -h, --help          Help for flows
-  -i, --id int        Display flows from specific from session ID (default -1)
-      --in            Output contents of the inbound payload. Requires flow ID specified.
-  -j, --json          Output as newline-delimited JSON
-  -n, --last int      Show last <n> flows (default 20)
-      --out           Output contents of the outbound payload. Requires flow ID specified.
-  -p, --peer ipNet    Filter to peers in the given network
-  -r, --reverse       Reverse sort to ascending
-  -s, --sort string   Sort descending by field (look at JSON output for field names)
-  
 ```
 
 ### flows

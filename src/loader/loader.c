@@ -269,7 +269,7 @@ cmdAttach(pid_t pid, const char* rootdir)
         goto out;
     /*
     * Process can exists in same PID namespace but in different mnt namespace
-    * we do a simillar sequecne like above but without switching PID namespace
+    * we do a simillar sequence like above but without switching PID namespace
     * and updating PID.
     */
     } else if (nsInfoIsPidInSameMntNs(pid) == FALSE) {

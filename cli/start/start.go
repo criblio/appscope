@@ -27,7 +27,6 @@ func Start(rootdir string) error {
 		}
 	} else {
 		stdoutStderr, err := ld.InstallNamespace(rootdir)
-
 		if err != nil {
 			log.Warn().
 				Err(err).

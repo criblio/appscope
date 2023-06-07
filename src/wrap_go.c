@@ -454,6 +454,386 @@ free_go_str(char *str) {
 }
 */
 
+/*
+ * Rewrites the container configuration for specific task ID and container namespace name.
+ * Please look into opencontainers Linux runtime-spec for details about the exact JSON struct.
+ * Following changes will be performed:
+ * - Add mount point
+ *   `scope` will be mounted from host  ("/usr/lib/appscope/<version>/scope") into the container ("/opt/scope")
+ * - Extend Environment variable
+ *   `LD_PRELOAD` will contain the following entry `/opt/libscope.so`
+ *   `SCOPE_SETUP_DONE=true` mark that configuration was processed
+ * - Add prestart hook
+ *   execute scope extract operation to ensure using library with proper loader reference (musl/glibc)
+ */
+static void
+rewriteOpenContainersConfig(const char *cWorkDir)
+{
+    //return;
+#ifdef __x86_64__
+    /*
+     * Need to extend the system stack size when calling cJSON_PrintUnformatted().
+     */
+    int arc;
+    char *exit_stack, *tstack, *gstack;
+    if ((exit_stack = scope_malloc(SCOPE_STACK_SIZE)) == NULL) {
+        return;
+    }
+
+    tstack = exit_stack + SCOPE_STACK_SIZE;
+
+    // save the original stack, switch to the tstack
+    __asm__ volatile (
+        "mov %%rsp, %2 \n"
+        "mov %1, %%rsp \n"
+        : "=r"(arc)                  // output
+        : "m"(tstack), "m"(gstack)   // input
+        :                            // clobbered register
+        );
+#endif
+
+    char path[PATH_MAX] = {0};
+    if (!cWorkDir) {
+        goto exit;
+    }
+
+    if (scope_snprintf(path, sizeof(path), "%s/config.json", cWorkDir) < 0) {
+        goto exit;
+    }
+
+    struct stat fileStat;
+    if (scope_stat(path, &fileStat) == -1) {
+        goto exit;
+    }
+
+    FILE *fp = scope_fopen(path, "r");
+    if (!fp) {
+        goto exit;
+    }
+
+    /*
+    * Read the file contents into a string
+    */
+    char *buf = (char *)scope_malloc(fileStat.st_size);
+    if (!buf) {
+        scope_fclose(fp);
+        goto exit;
+    }
+
+    scope_fread(buf, sizeof(char), fileStat.st_size, fp);
+    scope_fclose(fp);
+
+    cJSON *json = cJSON_Parse(buf);
+    scope_free(buf);
+    if (json == NULL) {
+        goto exit;
+    }
+
+    /*
+    * Handle process environment variables
+    *
+    "env":[
+         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+         "HOSTNAME=6735578591bb",
+         "TERM=xterm",
+         "LD_PRELOAD=/opt/libscope.so",
+         "SCOPE_SETUP_DONE=true"
+      ],
+    */
+    cJSON *procNode = cJSON_GetObjectItemCaseSensitive(json, "process");
+    if (!procNode) {
+        procNode = cJSON_CreateObject();
+        if (!procNode) {
+            cJSON_Delete(json);
+            goto exit;
+        }
+        cJSON_AddItemToObject(json, "process", procNode);
+    }
+
+    cJSON *envNodeArr = cJSON_GetObjectItemCaseSensitive(procNode, "env");
+    if (envNodeArr) {
+        bool ldPreloadPresent = FALSE;
+        // Iterate over environment string array
+        size_t envSize = cJSON_GetArraySize(envNodeArr);
+        for (int i = 0; i < envSize ;++i) {
+            cJSON *item = cJSON_GetArrayItem(envNodeArr, i);
+            char *strItem = cJSON_GetStringValue(item);
+
+            if (scope_strncmp("LD_PRELOAD=", strItem, sizeof("LD_PRELOAD=")-1) == 0) {
+                size_t itemLen = scope_strlen(strItem);
+                size_t newLdprelLen = itemLen + sizeof("/opt/libscope.so:") - 1;
+                char *newLdPreloadLib = scope_calloc(1, newLdprelLen);
+                if (!newLdPreloadLib) {
+                    cJSON_Delete(json);
+                    goto exit;
+                }
+                scope_strncpy(newLdPreloadLib, "LD_PRELOAD=/opt/libscope.so:", sizeof("LD_PRELOAD=/opt/libscope.so:") - 1);
+                scope_strcat(newLdPreloadLib, strItem + sizeof("LD_PRELOAD=") - 1);
+                cJSON *newLdPreloadLibObj = cJSON_CreateString(newLdPreloadLib);
+                if (!newLdPreloadLibObj) {
+                    scope_free(newLdPreloadLib);
+                    cJSON_Delete(json);
+                    goto exit;
+                }
+                cJSON_ReplaceItemInArray(envNodeArr, i, newLdPreloadLibObj);
+                scope_free(newLdPreloadLib);
+
+                cJSON *scopeEnvNode = cJSON_CreateString("SCOPE_SETUP_DONE=true");
+                if (!scopeEnvNode) {
+                    cJSON_Delete(json);
+                    goto exit;
+                }
+                cJSON_AddItemToArray(envNodeArr, scopeEnvNode);
+                ldPreloadPresent = TRUE;
+                break;
+            } else if (scope_strncmp("SCOPE_SETUP_DONE=true", strItem, sizeof("SCOPE_SETUP_DONE=true")-1) == 0) {
+                // we are done here
+                cJSON_Delete(json);
+                goto exit;
+            }
+        }
+
+
+        // There was no LD_PRELOAD in environment variables
+        if (ldPreloadPresent == FALSE) {
+            const char *const envItems[2] =
+            {
+                "LD_PRELOAD=/opt/libscope.so",
+                "SCOPE_SETUP_DONE=true"
+            };
+            for (int i = 0; i < 2 ;++i) {
+                cJSON *scopeEnvNode = cJSON_CreateString(envItems[i]);
+                if (!scopeEnvNode) {
+                    cJSON_Delete(json);
+                    goto exit;
+                }
+                cJSON_AddItemToArray(envNodeArr, scopeEnvNode);
+            }
+        }
+    } else {
+        const char * envItems[2] =
+        {
+            "LD_PRELOAD=/opt/libscope.so",
+            "SCOPE_SETUP_DONE=true"
+        };
+        envNodeArr = cJSON_CreateStringArray(envItems, 2);
+        if (!envNodeArr) {
+            cJSON_Delete(json);
+            goto exit;
+        }
+        cJSON_AddItemToObject(procNode, "env", envNodeArr);
+    }
+
+    /*
+    * Handle process mounts
+    *
+    "mounts":[
+      {
+         "destination":"/proc",
+         "type":"proc",
+         "source":"proc",
+         "options":[
+            "nosuid",
+            "noexec",
+            "nodev"
+         ]
+      },
+      ...
+      {
+         "destination":"/opt/scope",
+         "type":"bind",
+         "source":"/tmp/appscope/dev/scope",
+         "options":[
+            "rbind",
+            "rprivate"
+         ]
+      }
+    */
+    cJSON *mountNodeArr = cJSON_GetObjectItemCaseSensitive(json, "mounts");
+    if (!mountNodeArr) {
+        mountNodeArr = cJSON_CreateArray();
+        if (!mountNodeArr) {
+            cJSON_Delete(json);
+            goto exit;
+        }
+        cJSON_AddItemToObject(json, "mounts", mountNodeArr);
+    }
+
+    cJSON *mountNode = cJSON_CreateObject();
+    if (!mountNode) {
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    if (!cJSON_AddStringToObjLN(mountNode, "destination", "/opt/scope")) {
+        cJSON_Delete(mountNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    if (!cJSON_AddStringToObjLN(mountNode, "type", "bind")) {
+        cJSON_Delete(mountNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    if (!cJSON_AddStringToObjLN(mountNode, "source", "/tmp/appscope/dev/scope")) {
+        cJSON_Delete(mountNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    const char *optItems[2] =
+    {
+        "rbind",
+        "rprivate"
+    };
+
+    cJSON *optNodeArr = cJSON_CreateStringArray(optItems, 2);
+    if (!optNodeArr) {
+        cJSON_Delete(mountNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+    cJSON_AddItemToObject(mountNode, "options", optNodeArr);
+    cJSON_AddItemToArray(mountNodeArr, mountNode);
+
+    /*
+    * Handle startContainer hooks process
+    *
+   "hooks":{
+      "prestart":[
+         {
+            "path":"/proc/1513/exe",
+            "args":[
+               "libnetwork-setkey",
+               "-exec-root=/var/run/docker",
+               "6735578591bb3c5aebc91e5c702470c52d2c10cea52e4836604bf5a4a6c0f2eb",
+               "ec7e49ffc98c"
+            ]
+         }
+      ],
+      "startContainer":[
+         {
+            "path":"/opt/scope"
+            "args":[
+               "/opt/scope",
+               "extract",
+               "/opt/",
+            ]
+         },
+       ]
+    */
+    cJSON *hooksNode = cJSON_GetObjectItemCaseSensitive(json, "hooks");
+    if (!hooksNode) {
+        hooksNode = cJSON_CreateObject();
+        if (!hooksNode) {
+            cJSON_Delete(json);
+            goto exit;
+        }
+        cJSON_AddItemToObject(json, "hooks", hooksNode);
+    }
+
+    cJSON *startContainerNodeArr = cJSON_GetObjectItemCaseSensitive(hooksNode, "startContainer");
+    if (!startContainerNodeArr) {
+        startContainerNodeArr = cJSON_CreateArray();
+        if (!startContainerNodeArr) {
+            cJSON_Delete(json);
+            goto exit;
+        }
+        cJSON_AddItemToObject(hooksNode, "startContainer", startContainerNodeArr);
+    }
+
+    cJSON *startContainerNode = cJSON_CreateObject();
+    if (!startContainerNode) {
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    if (!cJSON_AddStringToObjLN(startContainerNode, "path",  "/opt/scope")) {
+        cJSON_Delete(startContainerNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    const char *argsItems[3] =
+    {
+        "/opt/scope",
+        "extract",
+        "/opt"
+    };
+    cJSON *argsNodeArr = cJSON_CreateStringArray(argsItems, 3);
+    if (!argsNodeArr) {
+        cJSON_Delete(startContainerNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+    cJSON_AddItemToObject(startContainerNode, "args", argsNodeArr);
+    cJSON_AddItemToArray(startContainerNodeArr, startContainerNode);
+
+    char *jsonStr = cJSON_PrintUnformatted(json);
+    cJSON_Delete(json);
+
+    // Overwrite the file
+    fp = scope_fopen(path, "w");
+    if (fp == NULL) {
+        cJSON_free(jsonStr);
+        goto exit;
+    }
+
+    scope_fprintf(fp, "%s\n", jsonStr);
+
+    cJSON_free(jsonStr);
+    scope_fclose(fp);
+
+exit:
+#ifdef __x86_64__
+   // Switch stack back to the original stack
+    __asm__ volatile (
+        "mov %1, %%rsp \n"
+        : "=r"(arc)                       // output
+        : "r"(gstack)                     // inputs
+        :                                 // clobbered register
+        );
+
+    scope_free(exit_stack);
+#endif
+    // to handle aarch64 case
+    return;
+}
+
+static void
+containerStart(void)
+{
+    int i, argc;
+    char *buf;
+    const char *cWorkDir;
+
+    if ((buf = scope_calloc(1, NCARGS)) == NULL) return;
+
+    if ((argc = osGetArgv(g_proc.pid, buf, NCARGS)) == 0) return;
+
+    sysprint("Scope: found runc");
+
+    for (i = 0; buf[i]; i += scope_strlen(&buf[i]) + 1) {
+        char *arg = &buf[i];
+
+        if (arg) {
+            sysprint("\t%s:%d %s %d argv %s\n", __FUNCTION__, __LINE__, g_proc.procname, argc, arg);
+
+            if (scope_strstr(arg, "--bundle")) {
+                // work dir for the container
+                cWorkDir = &buf[i + scope_strlen(arg) + 1];
+                if (cWorkDir) sysprint("\t%s:%d container path %s\n", __FUNCTION__, __LINE__, cWorkDir);
+                break;
+            }
+        }
+    }
+
+    if (cWorkDir) rewriteOpenContainersConfig(cWorkDir);
+    scope_free(buf);
+}
+
 static bool
 match_assy_instruction(void *addr, char *mnemonic)
 {
@@ -535,10 +915,155 @@ getGoVersionAddr(const char* buf)
     return go_build_ver_addr;
 }
 
+static Elf64_Addr
+getSym12(const void *pclntab_addr, char *sname)
+{
+    Elf64_Addr symaddr = 0;
+    uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
+    const void *symtab_addr = pclntab_addr + 16;
+
+    for (int i = 0; i < sym_count; i++) {
+        uint64_t func_offset  = *((const uint64_t *)(symtab_addr + 8));
+        uint32_t name_offset  = *((const uint32_t *)(pclntab_addr + func_offset + 8));
+        uint64_t sym_addr     = *((const uint64_t *)(symtab_addr));
+        const char *func_name = (const char *)(pclntab_addr + name_offset);
+
+        if (scope_strcmp(sname, func_name) == 0) {
+            symaddr = sym_addr;
+            scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
+            break;
+        }
+
+        symtab_addr += 16;
+    }
+
+    return symaddr;
+}
+
+static Elf64_Addr
+getSym16(const void *pclntab_addr, char *sname, char *altname, char *mnemonic)
+{
+    Elf64_Addr symaddr = 0;
+    uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
+    const void *symtab_addr = pclntab_addr + 16;
+
+    for (int i = 0; i < sym_count; i++) {
+        uint64_t func_offset  = *((const uint64_t *)(symtab_addr + 8));
+        uint32_t name_offset  = *((const uint32_t *)(pclntab_addr + func_offset + 8));
+        uint64_t sym_addr     = *((const uint64_t *)(symtab_addr));
+        const char *func_name = (const char *)(pclntab_addr + name_offset);
+
+        if (scope_strcmp(sname, func_name) == 0) {
+            symaddr = sym_addr;
+            scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
+            break;
+        }
+
+        // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
+        if (altname && mnemonic &&
+            (scope_strcmp(altname, func_name) == 0) &&
+            (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
+            symaddr = sym_addr;
+            break;
+        }
+
+        symtab_addr += 16;
+    }
+
+    return symaddr;
+}
+
+static Elf64_Addr
+getSym1820(const void *pclntab_addr, char *sname, char *altname, char *mnemonic)
+{
+    Elf64_Addr symaddr = 0;
+    uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
+    // In go 1.18 the funcname table and the pcln table are stored in the text section
+    uint64_t text_start = *((const uint64_t *)(pclntab_addr + (3 * 8)));
+    uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (4 * 8)));
+    //uint64_t funcnametab_addr = (uint64_t)(funcnametab_offset + pclntab_addr);
+    uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (8 * 8)));
+    // A "symbtab" is an entry in the pclntab, probably better known as a pcln
+    const void *symtab_addr = (const void *)(pclntab_addr + pclntab_offset);
+
+    for (int i = 0; i < sym_count; i++) {
+        uint32_t func_offset = *((uint32_t *)(symtab_addr + 4));
+        uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 4));
+        func_offset = *((uint32_t *)(symtab_addr));
+        uint64_t sym_addr = (uint64_t)(func_offset + text_start);
+        const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
+        if (scope_strcmp(sname, func_name) == 0) {
+            symaddr = sym_addr;
+            scopeLog(CFG_LOG_ERROR, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
+            break;
+        }
+
+        // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
+        if (altname && mnemonic &&
+            (scope_strcmp(altname, func_name) == 0) &&
+            (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
+            symaddr = sym_addr;
+            break;
+        }
+
+        symtab_addr += 8;
+    }
+
+    return symaddr;
+}
+
+static Elf64_Addr
+embedPclntab(const char *buf, char *sname, char *altname, char *mnemonic)
+{
+    Elf64_Addr symaddr = 0;
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)buf;
+    Elf64_Shdr *sections = (Elf64_Shdr *)(buf + ehdr->e_shoff);
+    const char *section_strtab = (char *)buf + sections[ehdr->e_shstrndx].sh_offset;
+
+    for (int i = 0; i < ehdr->e_shnum; i++) {
+        const char *sec_name = section_strtab + sections[i].sh_name;
+        if (strstr(sec_name, "data.rel.ro") != 0) {
+
+            const void *pclntab_addr = buf + sections[i].sh_offset;
+            unsigned char *data = (unsigned char *)pclntab_addr;
+            size_t slen = sections[i].sh_size;
+            size_t j;
+
+            // Find the magic number in the pclntab header
+            for (j = 0; j <= slen; j += 4) { //0x3c8c80
+                if (((data[j] == 0xf1) || (data[j] == 0xf0) ||
+                     (data[j] == 0xfa) || (data[j] == 0xfb)) &&
+                    data[j+1] == 0xff &&
+                    data[j+2] == 0xff &&
+                    data[j+3] == 0xff) {
+                        //sysprint("%s:%d pclntab was recognized at %p\n",
+                        //             __FUNCTION__, __LINE__, &data[j]);
+
+                        switch (data[j]) {
+                            // Go 18 and 20
+                        case 0xf1:
+                        case 0xf0:
+                            return getSym1820(&data[j], sname, altname, mnemonic);
+                            // Go 16
+                        case 0xfa:
+                            return getSym16(&data[j], sname, altname, mnemonic);
+                            // Go 12
+                        case 0xfb:
+                            return getSym12(&data[j], sname);
+                        }
+                }
+            }
+        }
+    }
+
+    return symaddr;
+}
+
 static void *
 getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
 {
     int i;
+    bool found = FALSE;
     Elf64_Addr symaddr = 0;
     Elf64_Ehdr *ehdr;
     Elf64_Shdr *sections;
@@ -554,93 +1079,30 @@ getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
     for (i = 0; i < ehdr->e_shnum; i++) {
         sec_name = section_strtab + sections[i].sh_name;
         if (scope_strstr(sec_name, ".gopclntab")) {
+            found = TRUE;
             const void *pclntab_addr = buf + sections[i].sh_offset;
             /*
-            Go symbol table is stored in the .gopclntab section
-            More info: https://docs.google.com/document/d/1lyPIbmsYbXnpNj57a261hgOYVpNRcgydurVQIyZOz_o/pub
-            */
+             * The Go symbol table is stored in the .gopclntab section
+             * More info: https://docs.google.com/document/d/1lyPIbmsYbXnpNj57a261hgOYVpNRcgydurVQIyZOz_o/pub
+             */
             uint32_t magic = *((const uint32_t *)(pclntab_addr));
             if (magic == GOPCLNTAB_MAGIC_112) {
-                uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
-                const void *symtab_addr = pclntab_addr + 16;
-
-                for(i=0; i<sym_count; i++) {
-                    uint64_t func_offset  = *((const uint64_t *)(symtab_addr + 8));
-                    uint32_t name_offset  = *((const uint32_t *)(pclntab_addr + func_offset + 8));
-                    uint64_t sym_addr     = *((const uint64_t *)(symtab_addr));
-                    const char *func_name = (const char *)(pclntab_addr + name_offset);
-
-                    if (scope_strcmp(sname, func_name) == 0) {
-                        symaddr = sym_addr;
-                        scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
-                        break;
-                    }
-
-                    symtab_addr += 16;
-                }
+                symaddr = getSym12(pclntab_addr, sname);
             } else if (magic == GOPCLNTAB_MAGIC_116) {
-                uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
-                uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (3 * 8)));
-                uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (7 * 8)));
-                const void *symtab_addr = pclntab_addr + pclntab_offset;
-                for (i = 0; i < sym_count; i++) {
-                    uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
-                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 8));
-                    uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
-                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
-                    if (scope_strcmp(sname, func_name) == 0) {
-                        symaddr = sym_addr;
-                        scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
-                        break;
-                    }
-
-                    // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
-                    if (altname && mnemonic &&
-                        (scope_strcmp(altname, func_name) == 0) &&
-                        (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
-                        symaddr = sym_addr;
-                        break;
-                    }
-
-                    symtab_addr += 16;
-                }
+                symaddr = getSym16(pclntab_addr, sname, altname, mnemonic);
             } else if ((magic == GOPCLNTAB_MAGIC_118) || (magic == GOPCLNTAB_MAGIC_120)) {
-                uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
-                // In go 1.18 the funcname table and the pcln table are stored in the text section
-                uint64_t text_start = *((const uint64_t *)(pclntab_addr + (3 * 8)));
-                uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (4 * 8)));
-                //uint64_t funcnametab_addr = (uint64_t)(funcnametab_offset + pclntab_addr);
-                uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (8 * 8)));
-                // A "symbtab" is an entry in the pclntab, probably better known as a pcln
-                const void *symtab_addr = (const void *)(pclntab_addr + pclntab_offset);
-                for (i = 0; i < sym_count; i++) {
-                    uint32_t func_offset = *((uint32_t *)(symtab_addr + 4));
-                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 4));
-                    func_offset = *((uint32_t *)(symtab_addr));
-                    uint64_t sym_addr = (uint64_t)(func_offset + text_start);
-                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
-                    if (scope_strcmp(sname, func_name) == 0) {
-                        symaddr = sym_addr;
-                        scopeLog(CFG_LOG_ERROR, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
-                        break;
-                    }
-
-                    // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
-                    if (altname && mnemonic &&
-                        (scope_strcmp(altname, func_name) == 0) &&
-                        (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
-                        symaddr = sym_addr;
-                        break;
-                    }
-
-                    symtab_addr += 8;
-                }
+                symaddr = getSym1820(pclntab_addr, sname, altname, mnemonic);
             } else {
                 scopeLog(CFG_LOG_DEBUG, "Invalid header in .gopclntab");
                 break;
             }
             break;
         }
+    }
+
+    // if no .gopclntab section was found, check embedded
+    if ((found == FALSE) && ((symaddr = embedPclntab(buf, sname, altname, mnemonic)) == 0)) {
+        return NULL;
     }
 
     return (void *)symaddr;
@@ -1028,6 +1490,10 @@ initGoHook(elf_buf_t *ebuf)
         return; // don't install our hooks
     }
 
+    if (scope_strstr(g_proc.procname, "runc") != NULL) {
+        containerStart();
+    }
+
     uint64_t *ReadFrame_addr;
     if (((ReadFrame_addr = getSymbol(ebuf->buf, "net/http.(*http2Framer).ReadFrame")) == 0) &&
         ((ReadFrame_addr = getGoSymbol(ebuf->buf, "net/http.(*http2Framer).ReadFrame", NULL, NULL)) == 0)) {
@@ -1338,7 +1804,6 @@ mountDirs(char *src, char *target, char *fstype)
     return TRUE;
 }
 
-
 // Extract data from syscalls. Values are available in registers saved on sys_stack.
 static void
 c_syscall(char *sys_stack, char *g_stack)
@@ -1369,6 +1834,10 @@ c_syscall(char *sys_stack, char *g_stack)
             }
 
             funcprint("Scope: open of %ld\n", rc);
+            //if (scope_strstr(g_proc.procname, "runc") != NULL) {
+            //    containerStart();
+            //}
+
             doOpen(rc, path, FD, "open");
         }
         break;
@@ -1883,359 +2352,16 @@ go_sighandler(char *stackptr)
     return do_cfunc(stackptr, c_sighandler, tap_entry(tap_sighandler)->assembly_fn);
 }
 
-/*
- * Rewrites the container configuration for specific task ID and container namespace name.
- * Please look into opencontainers Linux runtime-spec for details about the exact JSON struct.
- * Following changes will be performed:
- * - Add mount point
- *   `scope` will be mounted from host  ("/usr/lib/appscope/<version>/scope") into the container ("/opt/scope")
- * - Extend Environment variable
- *   `LD_PRELOAD` will contain the following entry `/opt/libscope.so`
- *   `SCOPE_SETUP_DONE=true` mark that configuration was processed
- * - Add prestart hook
- *   execute scope extract operation to ensure using library with proper loader reference (musl/glibc)
- */
-static void
-rewriteOpenContainersConfig(const char *taskId, const char *nsName)
-{
-#ifdef __x86_64__
-    /*
-     * Need to extend the system stack size when calling cJSON_PrintUnformatted().
-     */
-    int arc;
-    char *exit_stack, *tstack, *gstack;
-    if ((exit_stack = scope_malloc(SCOPE_STACK_SIZE)) == NULL) {
-        return;
-    }
-
-    tstack = exit_stack + SCOPE_STACK_SIZE;
-
-    // save the original stack, switch to the tstack
-    __asm__ volatile (
-        "mov %%rsp, %2 \n"
-        "mov %1, %%rsp \n"
-        : "=r"(arc)                  // output
-        : "m"(tstack), "m"(gstack)   // input
-        :                            // clobbered register
-        );
-#endif
-
-    char path[PATH_MAX] = {0};
-    if ((!taskId) || (!nsName)) {
-        goto exit;
-    }
-
-    if (scope_snprintf(path, sizeof(path), "/run/containerd/io.containerd.runtime.v2.task/%s/%s/config.json", nsName, taskId) < 0) {
-        goto exit;
-    }
-
-    struct stat fileStat;
-    if (scope_stat(path, &fileStat) == -1) {
-        goto exit;
-    }
-
-    FILE *fp = scope_fopen(path, "r");
-    if (!fp) {
-        goto exit;
-    }
-
-    /*
-    * Read the file contents into a string
-    */
-    char *buf = (char *)scope_malloc(fileStat.st_size);
-    if (!buf) {
-        scope_fclose(fp);
-        goto exit;
-    }
-
-    scope_fread(buf, sizeof(char), fileStat.st_size, fp);
-    scope_fclose(fp);
-
-    cJSON *json = cJSON_Parse(buf);
-    scope_free(buf);
-    if (json == NULL) {
-        goto exit;
-    }
-
-    /*
-    * Handle process environment variables
-    *
-    "env":[
-         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
-         "HOSTNAME=6735578591bb",
-         "TERM=xterm",
-         "LD_PRELOAD=/opt/libscope.so",
-         "SCOPE_SETUP_DONE=true"
-      ],
-    */
-    cJSON *procNode = cJSON_GetObjectItemCaseSensitive(json, "process");
-    if (!procNode) {
-        procNode = cJSON_CreateObject();
-        if (!procNode) {
-            cJSON_Delete(json);
-            goto exit;
-        }
-        cJSON_AddItemToObject(json, "process", procNode);
-    }
-
-    cJSON *envNodeArr = cJSON_GetObjectItemCaseSensitive(procNode, "env");
-    if (envNodeArr) {
-        bool ldPreloadPresent = FALSE;
-        // Iterate over environment string array
-        size_t envSize = cJSON_GetArraySize(envNodeArr);
-        for (int i = 0; i < envSize ;++i) {
-            cJSON *item = cJSON_GetArrayItem(envNodeArr, i);
-            char *strItem = cJSON_GetStringValue(item);
-
-            if (scope_strncmp("LD_PRELOAD=", strItem, sizeof("LD_PRELOAD=")-1) == 0) {
-                size_t itemLen = scope_strlen(strItem);
-                size_t newLdprelLen = itemLen + sizeof("/opt/libscope.so:") - 1;
-                char *newLdPreloadLib = scope_calloc(1, newLdprelLen);
-                if (!newLdPreloadLib) {
-                    cJSON_Delete(json);
-                    goto exit;
-                }
-                scope_strncpy(newLdPreloadLib, "LD_PRELOAD=/opt/libscope.so:", sizeof("LD_PRELOAD=/opt/libscope.so:") - 1);
-                scope_strcat(newLdPreloadLib, strItem + sizeof("LD_PRELOAD=") - 1);
-                cJSON *newLdPreloadLibObj = cJSON_CreateString(newLdPreloadLib);
-                if (!newLdPreloadLibObj) {
-                    scope_free(newLdPreloadLib);
-                    cJSON_Delete(json);
-                    goto exit;
-                }
-                cJSON_ReplaceItemInArray(envNodeArr, i, newLdPreloadLibObj);
-                scope_free(newLdPreloadLib);
-
-                cJSON *scopeEnvNode = cJSON_CreateString("SCOPE_SETUP_DONE=true");
-                if (!scopeEnvNode) {
-                    cJSON_Delete(json);
-                    goto exit;
-                }
-                cJSON_AddItemToArray(envNodeArr, scopeEnvNode);
-                ldPreloadPresent = TRUE;
-                break;
-            } else if (scope_strncmp("SCOPE_SETUP_DONE=true", strItem, sizeof("SCOPE_SETUP_DONE=true")-1) == 0) {
-                // we are done here
-                cJSON_Delete(json);
-                goto exit;
-            }
-        }
-
-
-        // There was no LD_PRELOAD in environment variables
-        if (ldPreloadPresent == FALSE) {
-            const char *const envItems[2] =
-            {
-                "LD_PRELOAD=/opt/libscope.so",
-                "SCOPE_SETUP_DONE=true"
-            };
-            for (int i = 0; i < 2 ;++i) {
-                cJSON *scopeEnvNode = cJSON_CreateString(envItems[i]);
-                if (!scopeEnvNode) {
-                    cJSON_Delete(json);
-                    goto exit;
-                }
-                cJSON_AddItemToArray(envNodeArr, scopeEnvNode);
-            }
-        }
-    } else {
-        const char * envItems[2] =
-        {
-            "LD_PRELOAD=/opt/libscope.so",
-            "SCOPE_SETUP_DONE=true"
-        };
-        envNodeArr = cJSON_CreateStringArray(envItems, 2);
-        if (!envNodeArr) {
-            cJSON_Delete(json);
-            goto exit;
-        }
-        cJSON_AddItemToObject(procNode, "env", envNodeArr);
-    }
-
-    /*
-    * Handle process mounts
-    *
-    "mounts":[
-      {
-         "destination":"/proc",
-         "type":"proc",
-         "source":"proc",
-         "options":[
-            "nosuid",
-            "noexec",
-            "nodev"
-         ]
-      },
-      ...
-      {
-         "destination":"/opt/scope",
-         "type":"bind",
-         "source":"/tmp/appscope/dev/scope",
-         "options":[
-            "rbind",
-            "rprivate"
-         ]
-      }
-    */
-    cJSON *mountNodeArr = cJSON_GetObjectItemCaseSensitive(json, "mounts");
-    if (!mountNodeArr) {
-        mountNodeArr = cJSON_CreateArray();
-        if (!mountNodeArr) {
-            cJSON_Delete(json);
-            goto exit;
-        }
-        cJSON_AddItemToObject(json, "mounts", mountNodeArr);
-    }
-
-    cJSON *mountNode = cJSON_CreateObject();
-    if (!mountNode) {
-        cJSON_Delete(json);
-        goto exit;
-    }
-
-    if (!cJSON_AddStringToObjLN(mountNode, "destination", "/opt/scope")) {
-        cJSON_Delete(mountNode);
-        cJSON_Delete(json);
-        goto exit;
-    }
-
-    if (!cJSON_AddStringToObjLN(mountNode, "type", "bind")) {
-        cJSON_Delete(mountNode);
-        cJSON_Delete(json);
-        goto exit;
-    }
-
-    if (!cJSON_AddStringToObjLN(mountNode, "source", "/tmp/appscope/dev/scope")) {
-        cJSON_Delete(mountNode);
-        cJSON_Delete(json);
-        goto exit;
-    }
-
-    const char *optItems[2] =
-    {
-        "rbind",
-        "rprivate"
-    };
-
-    cJSON *optNodeArr = cJSON_CreateStringArray(optItems, 2);
-    if (!optNodeArr) {
-        cJSON_Delete(mountNode);
-        cJSON_Delete(json);
-        goto exit;
-    }
-    cJSON_AddItemToObject(mountNode, "options", optNodeArr);
-    cJSON_AddItemToArray(mountNodeArr, mountNode);
-
-    /*
-    * Handle startContainer hooks process
-    *
-   "hooks":{
-      "prestart":[
-         {
-            "path":"/proc/1513/exe",
-            "args":[
-               "libnetwork-setkey",
-               "-exec-root=/var/run/docker",
-               "6735578591bb3c5aebc91e5c702470c52d2c10cea52e4836604bf5a4a6c0f2eb",
-               "ec7e49ffc98c"
-            ]
-         }
-      ],
-      "startContainer":[
-         {
-            "path":"/opt/scope"
-            "args":[
-               "/opt/scope",
-               "extract",
-               "/opt/",
-            ]
-         },
-       ]
-    */
-    cJSON *hooksNode = cJSON_GetObjectItemCaseSensitive(json, "hooks");
-    if (!hooksNode) {
-        hooksNode = cJSON_CreateObject();
-        if (!hooksNode) {
-            cJSON_Delete(json);
-            goto exit;
-        }
-        cJSON_AddItemToObject(json, "hooks", hooksNode);
-    }
-
-    cJSON *startContainerNodeArr = cJSON_GetObjectItemCaseSensitive(hooksNode, "startContainer");
-    if (!startContainerNodeArr) {
-        startContainerNodeArr = cJSON_CreateArray();
-        if (!startContainerNodeArr) {
-            cJSON_Delete(json);
-            goto exit;
-        }
-        cJSON_AddItemToObject(hooksNode, "startContainer", startContainerNodeArr);
-    }
-
-    cJSON *startContainerNode = cJSON_CreateObject();
-    if (!startContainerNode) {
-        cJSON_Delete(json);
-        goto exit;
-    }
-
-    if (!cJSON_AddStringToObjLN(startContainerNode, "path",  "/opt/scope")) {
-        cJSON_Delete(startContainerNode);
-        cJSON_Delete(json);
-        goto exit;
-    }
-
-    const char *argsItems[3] =
-    {
-        "/opt/scope",
-        "extract",
-        "/opt"
-    };
-    cJSON *argsNodeArr = cJSON_CreateStringArray(argsItems, 3);
-    if (!argsNodeArr) {
-        cJSON_Delete(startContainerNode);
-        cJSON_Delete(json);
-        goto exit;
-    }
-    cJSON_AddItemToObject(startContainerNode, "args", argsNodeArr);
-    cJSON_AddItemToArray(startContainerNodeArr, startContainerNode);
-
-    char *jsonStr = cJSON_PrintUnformatted(json);
-    cJSON_Delete(json);
-
-    // Overwrite the file
-    fp = scope_fopen(path, "w");
-    if (fp == NULL) {
-        cJSON_free(jsonStr);
-        goto exit;
-    }
-
-    scope_fprintf(fp, "%s\n", jsonStr);
-
-    cJSON_free(jsonStr);
-    scope_fclose(fp);
-
-exit:
-#ifdef __x86_64__
-   // Switch stack back to the original stack
-    __asm__ volatile (
-        "mov %1, %%rsp \n"
-        : "=r"(arc)                       // output
-        : "r"(gstack)                     // inputs
-        :                                 // clobbered register
-        );
-
-    scope_free(exit_stack);
-#endif
-    // to handle aarch64 case
-    return;
-}
-
 static void
 c_forkExec(char *sys_stack, char *g_stack)
 {
+    //return;
+    
     int i;
-    char *argv0 = (char *)(uint64_t)(sys_stack + 0);
-    uint64_t *argvv = (uint64_t *)*(uint64_t *)(sys_stack + 0x10);
+    //char *argv0 = (char *)(uint64_t)(sys_stack + 0x0);
+    //uint64_t *argvv = (uint64_t *)*(uint64_t *)(sys_stack + 0x10);
+    char *argv0 = (char *)*(uint64_t *)(g_stack + 0x08);
+    uint64_t *argvv = (uint64_t *)*(uint64_t *)(g_stack + 0x18);
 
     /*
      * TBD: in order to call scope_strstr() with a needle longer
@@ -2249,7 +2375,7 @@ c_forkExec(char *sys_stack, char *g_stack)
      * the cause of this issue.
      * Will look into this directly.
      */
-
+    return;
     char *cmd = go_str(argv0, TRUE);
     // TBD: add a check for curent proc containerd when stack is aligned
     if (!scope_strstr(cmd, "runc")) {
@@ -2288,7 +2414,7 @@ c_forkExec(char *sys_stack, char *g_stack)
 
     // Update task configuration
     if (updateCfg) {
-        rewriteOpenContainersConfig(taskUniqueId, nsName);
+        //rewriteOpenContainersConfig(taskUniqueId, nsName);
     }
     scope_free(nsName);
     scope_free(taskUniqueId);
@@ -2299,3 +2425,4 @@ go_forkExec(char *stackptr)
 {
     return do_cfunc(stackptr, c_forkExec, tap_entry(tap_forkExec)->assembly_fn);
 }
+

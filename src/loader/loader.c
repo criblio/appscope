@@ -339,7 +339,7 @@ cmdDetach(pid_t pid, const char *rootdir)
     if (rootdir) {
         return nsDetach(pid, rootdir);
     }
-    
+
     return detach(pid);
 }
 

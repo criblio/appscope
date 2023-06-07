@@ -130,11 +130,7 @@ func (c *Config) SetDefault() error {
 func (c *Config) ConfigFromStdin(cfgData []byte) error {
 	c.sc = &libscope.ScopeConfig{}
 
-	if err := yaml.Unmarshal(cfgData, c.sc); err != nil {
-		return err
-	}
-
-	return nil
+	return yaml.Unmarshal(cfgData, c.sc)
 }
 
 // ConfigFromFile loads a configuration from a yml file

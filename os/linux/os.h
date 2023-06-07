@@ -71,5 +71,6 @@ extern void osCreateSM(proc_id_t *, unsigned long);
 extern bool osMemPermAllow(void *, size_t, int, int);
 extern bool osMemPermRestore(void *, size_t, int);
 extern bool osGetBaseAddr(uint64_t *);
+extern int osGetArgv(pid_t, char *, size_t);
 
 #endif  //__OS_H__

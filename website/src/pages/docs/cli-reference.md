@@ -35,26 +35,29 @@ Usage:
 
 Available Commands:
   attach      Scope a currently-running process
-  completion  Generate completion code for specified shell
+  completion  Generates completion code for specified shell
+  daemon      Run the scope daemon
   dash        Display scope dashboard for a previous or active session
   detach      Unscope a currently-running process
   events      Outputs events for a session
   extract     Output instrumentary library files to <dir>
+  filter      Automatically scope a set of processes
   flows       Observed flows from the session, potentially including payloads
   help        Help about any command
   history     List scope session history
-  inspect     Return information on scoped process
+  inspect     Returns information about scoped process
   k8s         Install scope in kubernetes
   logs        Display scope logs
   metrics     Outputs metrics for a session
+  prom        Run the Prometheus Target
   prune       Prune deletes session history
   ps          List processes currently being scoped
   run         Executes a scoped command
   service     Configure a systemd/OpenRC service to be scoped
   snapshot    Create a snapshot for a process
-  start       Start scoping a filtered selection of processes and services
+  start       Install the AppScope library
   stop        Stop scoping all scoped processes and services
-  update      Updates configuration of scoped process
+  update      Updates the configuration of a scoped process
   version     Display scope version
   watch       Executes a scoped command on an interval
 
@@ -271,6 +274,61 @@ scope extract --metricdest tcp://some.host:8125 --eventdest tcp://other.host:100
   -n, --nobreaker             Set Cribl to not break streams into events
 ```
 
+### filter
+---
+
+Automatically scope a set of processes by modifying a system-wide AppScope filter. Overrides all other scope sessions.
+
+#### Usage
+
+`scope filter [flags]`
+
+#### Examples
+
+```
+scope filter
+scope filter --rootdir /path/to/host/root --json
+scope filter --add nginx
+scope filter --add nginx < scope.yml
+scope filter --add firefox --rootdir /path/to/host/root
+scope filter --remove chromium
+```
+
+#### Flags
+
+```
+      --add string            Add an entry to the global filter
+  -a, --authtoken string      Set AuthToken for Cribl
+  -b, --backtrace             Enable backtrace file generation when an application crashes.
+  -d, --coredump              Enable core dump file generation when an application crashes.
+  -c, --cribldest string      Set Cribl destination for metrics & events (host:port defaults to tls://)
+  -e, --eventdest string      Set destination for events (host:port defaults to tls://)
+  -h, --help                  help for filter
+  -j, --json                  Output as newline delimited JSON
+  -l, --librarypath string    Set path for dynamic libraries
+      --loglevel string       Set scope library log level (debug, warning, info, error, none)
+  -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
+      --metricformat string   Set format of metrics output (statsd|ndjson|prometheus) (default "ndjson")
+  -n, --nobreaker             Set Cribl to not break streams into events.
+  -p, --payloads              Capture payloads of network transactions
+      --remove string         Remove an entry from the global filter
+  -R, --rootdir string        Path to root filesystem of target namespace
+  -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.
+  -v, --verbosity int         Set scope metric verbosity (default 4)
+
+  -a, --all           Show all flows
+  -h, --help          Help for flows
+  -i, --id int        Display flows from specific from session ID (default -1)
+      --in            Output contents of the inbound payload. Requires flow ID specified.
+  -j, --json          Output as newline-delimited JSON
+  -n, --last int      Show last <n> flows (default 20)
+      --out           Output contents of the outbound payload. Requires flow ID specified.
+  -p, --peer ipNet    Filter to peers in the given network
+  -r, --reverse       Reverse sort to ascending
+  -s, --sort string   Sort descending by field (look at JSON output for field names)
+  
+```
+
 ### flows
 ---
 
@@ -306,7 +364,6 @@ scope flows --sort net_host_port --reverse  # Sort flows by ascending host port
   -p, --peer ipNet    Filter to peers in the given network
   -r, --reverse       Reverse sort to ascending
   -s, --sort string   Sort descending by field (look at JSON output for field names)
-  
 ```
 
 ### help

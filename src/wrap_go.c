@@ -469,29 +469,6 @@ free_go_str(char *str) {
 static void
 rewriteOpenContainersConfig(const char *cWorkDir)
 {
-    //return;
-#ifdef __x86_64__
-    /*
-     * Need to extend the system stack size when calling cJSON_PrintUnformatted().
-     */
-    int arc;
-    char *exit_stack, *tstack, *gstack;
-    if ((exit_stack = scope_malloc(SCOPE_STACK_SIZE)) == NULL) {
-        return;
-    }
-
-    tstack = exit_stack + SCOPE_STACK_SIZE;
-
-    // save the original stack, switch to the tstack
-    __asm__ volatile (
-        "mov %%rsp, %2 \n"
-        "mov %1, %%rsp \n"
-        : "=r"(arc)                  // output
-        : "m"(tstack), "m"(gstack)   // input
-        :                            // clobbered register
-        );
-#endif
-
     char path[PATH_MAX] = {0};
     if (!cWorkDir) {
         goto exit;
@@ -787,17 +764,6 @@ rewriteOpenContainersConfig(const char *cWorkDir)
     scope_fclose(fp);
 
 exit:
-#ifdef __x86_64__
-   // Switch stack back to the original stack
-    __asm__ volatile (
-        "mov %1, %%rsp \n"
-        : "=r"(arc)                       // output
-        : "r"(gstack)                     // inputs
-        :                                 // clobbered register
-        );
-
-    scope_free(exit_stack);
-#endif
     // to handle aarch64 case
     return;
 }
@@ -2355,13 +2321,13 @@ go_sighandler(char *stackptr)
 static void
 c_forkExec(char *sys_stack, char *g_stack)
 {
-    //return;
+    return;
     
     int i;
-    //char *argv0 = (char *)(uint64_t)(sys_stack + 0x0);
-    //uint64_t *argvv = (uint64_t *)*(uint64_t *)(sys_stack + 0x10);
-    char *argv0 = (char *)*(uint64_t *)(g_stack + 0x08);
-    uint64_t *argvv = (uint64_t *)*(uint64_t *)(g_stack + 0x18);
+    char *argv0 = (char *)(uint64_t)(sys_stack + 0x0);
+    uint64_t *argvv = (uint64_t *)*(uint64_t *)(sys_stack + 0x10);
+    //char *argv0 = (char *)*(uint64_t *)(g_stack + 0x08);
+    //uint64_t *argvv = (uint64_t *)*(uint64_t *)(g_stack + 0x18);
 
     /*
      * TBD: in order to call scope_strstr() with a needle longer
@@ -2375,7 +2341,7 @@ c_forkExec(char *sys_stack, char *g_stack)
      * the cause of this issue.
      * Will look into this directly.
      */
-    return;
+    //return;
     char *cmd = go_str(argv0, TRUE);
     // TBD: add a check for curent proc containerd when stack is aligned
     if (!scope_strstr(cmd, "runc")) {
@@ -2387,6 +2353,7 @@ c_forkExec(char *sys_stack, char *g_stack)
     char *nsName = NULL;
     sysprint("%s execing %s\n", g_proc.procname, cmd);
     scope_free(cmd);
+    return;
     for (i = 0; argvv[i]; i += 2) {
         char *argv = go_str((char *)(argvv + i), TRUE);
         if (argv) {

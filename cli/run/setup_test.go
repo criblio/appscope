@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -221,14 +222,19 @@ func TestSetupWorkDirAttach(t *testing.T) {
 	os.Setenv("SCOPE_TEST", "true")
 	rc := Config{}
 	rc.now = func() time.Time { return time.Unix(0, 0) }
-	rc.setupWorkDir([]string{"123"}, true)
-	wd := fmt.Sprintf("%s_%d_%d_%d", "/tmp/123", 1, os.Getpid(), 0)
+	cmd := exec.Command("sleep", "600")
+	err := cmd.Start()
+	assert.Nil(t, err)
+	defer cmd.Process.Kill()
+	pid := cmd.Process.Pid
+	rc.setupWorkDir([]string{strconv.Itoa(pid)}, true)
+	wd := fmt.Sprintf("%s_%d_%d_%d", ".foo/history/sleep", 1, pid, 0)
 	exists := util.CheckFileExists(wd)
 	assert.True(t, exists)
 
 	argsJSONBytes, err := ioutil.ReadFile(filepath.Join(wd, "args.json"))
 	assert.NoError(t, err)
-	assert.Equal(t, `["123"]`, string(argsJSONBytes))
+	assert.Equal(t, `["sleep","600"]`, string(argsJSONBytes))
 
 	expectedYaml := testDefaultScopeConfigYaml(wd, 4)
 

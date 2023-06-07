@@ -48,11 +48,11 @@ var inspectCmd = &cobra.Command{
 
 		if all {
 			// Get all scoped processes
+			if !admin {
+				util.Warn("INFO: Run as root (or via sudo) to inspect all processes")
+			}
 			procs, err := util.ProcessesScoped(rootdir)
 			if err != nil {
-				if !admin {
-					util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
-				}
 				util.ErrAndExit("Unable to retrieve scoped processes: %v", err)
 			}
 
@@ -95,13 +95,17 @@ var inspectCmd = &cobra.Command{
 		if len(args) == 0 {
 			// If no pid argument was provided
 			// Helper menu to allow the user to select a pid to inspect
-
-			if pid, err = run.HandleInputArg(rootdir, "", false, true, false); err != nil {
-				if !admin {
-					util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
-				}
-				util.ErrAndExit("No scoped processes to inspect")
+			if !admin {
+				util.Warn("INFO: Run as root (or via sudo) to see all available processes")
 			}
+			procs, err := run.HandleInputArg(rootdir, "", false, true)
+			if err != nil {
+				util.ErrAndExit("error selecting pid", err)
+			}
+			if len(procs) == 0 {
+				util.ErrAndExit("no scoped processes to inspect")
+			}
+			pid = procs[0].Pid // we told HandleInputArg that we wanted to choose only one proc
 
 		} else {
 			// If a user specified a pid as an argument

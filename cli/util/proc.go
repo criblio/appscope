@@ -34,6 +34,7 @@ var (
 	errGetProcCmdLine  = errors.New("error getting process command line")
 	errGetProcTask     = errors.New("error getting process task")
 	errGetProcChildren = errors.New("error getting process children")
+	errPidMissing      = errors.New("error pid does not exist")
 	errMissingUser     = errors.New("unable to find user")
 )
 
@@ -328,6 +329,10 @@ func PidScopeLibInMaps(rootdir string, pid int) (bool, error) {
 
 // PidScopeStatus checks a Scope Status if a process specified by PID.
 func PidScopeStatus(rootdir string, pid int) (ScopeStatus, error) {
+	if !PidExists(rootdir, pid) {
+		return Disable, errPidMissing
+	}
+
 	pidMapFile, err := os.ReadFile(fmt.Sprintf("%s/proc/%v/maps", rootdir, pid))
 	if err != nil {
 		// Process or do not exist or we do not have permissions to read a map file

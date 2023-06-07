@@ -27,18 +27,18 @@ var detachCmd = &cobra.Command{
 		all, _ := cmd.Flags().GetBool("all")
 		rc.Rootdir, _ = cmd.Flags().GetString("rootdir")
 
+		id := ""
 		if all {
 			if len(args) != 0 {
-				helpErrAndExit(cmd, "--all flag is mutual exclusive with PID or <process_name>")
+				helpErrAndExit(cmd, "--all flag is mutually exclusive with PID or <process_name>")
 			}
-			rc.Subprocess = true
-			return rc.DetachAll(true)
-		}
-		if len(args) == 0 {
-			return rc.DetachSingle("")
+			return rc.Detach(id, false)
 		}
 
-		return rc.DetachSingle(args[0])
+		if len(args) > 0 {
+			id = args[0]
+		}
+		return rc.Detach(id, true)
 	},
 }
 

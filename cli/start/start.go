@@ -21,6 +21,7 @@ func Start(rootdir string) error {
 				Err(err).
 				Str("loaderDetails", stdoutStderr).
 				Msg("Install library failed.")
+			return err
 		} else {
 			log.Info().
 				Msg("Install library success.")
@@ -32,6 +33,7 @@ func Start(rootdir string) error {
 				Err(err).
 				Str("loaderDetails", stdoutStderr).
 				Msgf("Install library in %s namespace failed.", rootdir)
+			return err
 		} else {
 			log.Info().
 				Msg("Install library success.")

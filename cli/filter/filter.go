@@ -6,6 +6,10 @@ import (
 	"os"
 
 	"github.com/criblio/scope/libscope"
+	"github.com/criblio/scope/loader"
+	"github.com/criblio/scope/run"
+	"github.com/criblio/scope/util"
+	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v2"
 )
 
@@ -38,58 +42,73 @@ func Retrieve(rootdir string) ([]byte, libscope.Filter, error) {
 }
 
 // Add a process to the scope filter
-func Add(addProc string) error {
+func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) error {
+
+	// Instantiate the loader
+	ld := loader.New()
+
+	// Install libscope if not already installed
+	if rootdir == "" {
+		stdoutStderr, err := ld.Install()
+		if err != nil {
+			log.Warn().
+				Err(err).
+				Str("loaderDetails", stdoutStderr).
+				Msg("Install library failed.")
+			return err
+		} else {
+			log.Info().
+				Msg("Install library success.")
+		}
+	} else {
+		stdoutStderr, err := ld.InstallNamespace(rootdir)
+		if err != nil {
+			log.Warn().
+				Err(err).
+				Str("loaderDetails", stdoutStderr).
+				Msgf("Install library in %s namespace failed.", rootdir)
+			return err
+		} else {
+			log.Info().
+				Msg("Install library success.")
+		}
+	}
+
 	/*
-		   check the library is installed. if not, install it.
-		   		requires a namespace switch so use existing loader command
-				loader command: scope install
+		TODO
+		add proc to the filter file - create a filter file if it does not exist.
+			new loader command for this: maybe a scope --ldfilter <newfile>
+			add an entry to the filter file. if process is already in the filter list, update the entry.
+			requires a namespace switch so need a loader command
+		    maybe we read it here, manipulate it with the cli yaml library, and then provide a file to write back
 
-		   add proc to the filter file - create a filter file if it does not exist.
-			    new loader command for this: maybe a scope --ldfilter <newfile>
-			    add an entry to the filter file. if process is already in the filter list, update the entry.
-				requires a namespace switch so need a loader command
-		        maybe we read it here, manipulate it with the cli yaml library, and then provide a file to write back
-
-		   set ld.so.preload if it is not already set.
-		   		new loader command for this?
-				scope --ldpreload true (--rootdir x)
-
-		   perform a scope update to all matching processes that are already scoped
-		   perform a scope attach to all matching processes that are not already scoped
-		   perform a scope detach to all processes that do not match anything in the filter file.
-				read in the filter file, read all process names to a list
-				perform a scope ps, read all process names to a list
-				create a list of everything in scope ps thats not in filter file list
-					perform a detach for each of these (pass rootdir)
-				create a list of everything that matches addProc that is already scoped
-					perform an update for each of these (pass rootdir)
-				create a list of everything that matches addProc that is not already scoped
-					perform an attach for each of these (pass rootdir)
-
-
+		set ld.so.preload if it is not already set.
+		   	new loader command for this?
+			scope --ldpreload true (--rootdir x)
 	*/
+
+	// Perform a scope attach to all matching processes that are not already scoped (will re-attach to update existing procs)
+	if rootdir != "" {
+		util.Warn("It can take up to 1 minute to attach to a process in a parent namespace")
+	}
+	if _, err := rc.Attach(addProc, false); err != nil {
+		return err
+	}
+
+	// TBC ? TODO perform a scope detach to all processes that do not match anything in the filter file
+
 	return nil
 }
 
 // Remove a process from the scope filter
-func Remove(remProc string) error {
+func Remove(filterFile libscope.Filter, remProc, rootdir string, rc *run.Config) error {
 
 	/*
+		TODO
 		remove proc from the filter file
 		    new loader command for this: maybe a scope --ldfilter <newfile>
 			requires a namespace switch so need a loader command to modify this file
 			maybe we read it here, manipulate it with the cli yaml library, and then provide a file to write back
-
-		--- cli work ---
-		detach from all matching procs
-			rc.Detach (remProc) // ensure you catch all of them
-
-		perform a scope detach to all processes that do not match anything in the filter file.
-			read in the filter file, read all process names to a list
-				if no matches, err
-			perform a scope ps, read all process names to a list
-			create a list of everything in scope ps thats not in filter file list
-			perform a detach for each of these
 
 		if it's the last entry in the filter file
 			unset ld.so.preload
@@ -102,10 +121,10 @@ func Remove(remProc string) error {
 
 	*/
 
+	// Perform a scope detach to all matching, scoped processes
+	if err := rc.Detach(remProc, false); err != nil {
+		return err
+	}
+
 	return nil
 }
-
-//if rc.Rootdir != "" {
-//	util.Warn("Attaching to process %d", pid)
-//	util.Warn("It can take up to 1 minute to attach to a process in a parent namespace")
-//}

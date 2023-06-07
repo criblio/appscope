@@ -28,9 +28,13 @@ var (
 	errDetachingMultiple = errors.New("at least one error found when detaching from all. See logs")
 )
 
-// Attach scopes an existing PID
-func (rc *Config) Attach(args []string) (int, error) {
-	pid, err := HandleInputArg(rc.Rootdir, args[0], true, false, true)
+// Attach attaches scope to a process or processes
+// If the id provided is a pid, that single pid will be attached
+// If the id provided is a name, all processes matching that name will be attached
+// unless the @choose argument is true, which will allow the user to choose a single process
+func (rc *Config) Attach(id string, choose bool) ([]int, error) {
+
+	procs, err := HandleInputArg(rc.Rootdir, id, true, choose)
 	if err != nil {
 		return pid, err
 	}
@@ -65,7 +69,93 @@ func (rc *Config) Attach(args []string) (int, error) {
 		reattach = true
 	}
 
+	// TODO call rc.attach
+
+}
+
+// Detach detaches scope from a process or processes
+// If the id provided is a pid, that single pid will be detached
+// If the id provided is a name, all processes matching that name will be detached
+// unless the @choose argument is true, which will allow the user to choose a single process
+func (rc *Config) Detach(id string, choose bool) error {
+	procs := make(util.Processes, 0)
+	var err error
+	adminStatus := true
+	if err := util.UserVerifyRootPerm(); err != nil {
+		if errors.Is(err, util.ErrMissingAdmPriv) {
+			adminStatus = false
+		} else {
+			return err
+		}
+	}
+
+	if util.IsNumeric(id) {
+		// If the id provided is an integer, interpret it as a pid and detach from that pid only
+
+		pid, err := strconv.Atoi(id)
+		if err != nil {
+			return errPidInvalid
+		}
+
+		status, err := util.PidScopeStatus(rc.Rootdir, pid)
+		if err != nil {
+			if !adminStatus {
+				fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
+			}
+			return err
+		} else if status != util.Active {
+			return errNotScoped
+		}
+
+		procs = append(procs, util.Process{Pid: pid})
+
+	} else {
+		// If the id provided is a name, detach from one or more procs
+
+		if !adminStatus {
+			fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
+		}
+
+		procs, err = HandleInputArg(rc.Rootdir, id, false, choose)
+		if err != nil {
+			return err
+		}
+
+		if len(procs) == 0 {
+			return errNoScopedProcs
+		}
+	}
+
+	if len(procs) > 1 {
+		if !util.Confirm("Are your sure you want to detach from all of these processes?") {
+			fmt.Println("info: canceled")
+			return nil
+		}
+	}
+
+	errorsDetachingMultiple := false
+	for _, proc := range procs {
+		if err = rc.detach(proc.Pid); err != nil {
+			log.Error().Err(err)
+			errorsDetachingMultiple = true
+		}
+	}
+	if errorsDetachingMultiple {
+		return errDetachingMultiple
+	}
+
+	return nil
+}
+
+func (rc *Config) attach(pid int) error {
 	env := os.Environ()
+	ld := loader.New()
+
+	args := []string{fmt.Sprint(pid)}
+
+	if rc.Rootdir != "" {
+		args = append(args, []string{"--rootdir", rc.Rootdir}...)
+	}
 
 	// Disable detection of a scope filter file with this command
 	env = append(env, "SCOPE_FILTER=false")
@@ -108,19 +198,13 @@ func (rc *Config) Attach(args []string) (int, error) {
 		env = append(env, "SCOPE_CONF_RELOAD="+filepath.Join(rc.WorkDir, "scope.yml"))
 	}
 
-	if rc.Rootdir != "" {
-		args = append(args, []string{"--rootdir", rc.Rootdir}...)
+	if rc.Subprocess {
+		out, err := ld.AttachSubProc(args, env)
+		fmt.Print(out)
+		return err
 	}
 
-	ld := loader.New()
-	if !rc.Subprocess {
-		err = ld.Attach(args, env)
-	} else {
-		_, err = ld.AttachSubProc(args, env)
-	}
-	if err != nil {
-		return pid, err
-	}
+	return ld.Attach(args, env)
 
 	// Replace the working directory files with symbolic links in case of successful attach
 	// where the target ns is different to the origin ns
@@ -152,168 +236,64 @@ func (rc *Config) Attach(args []string) (int, error) {
 		os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", payloadsDirPath), payloadsDirPath)
 	}
 
-	return pid, nil
-}
-
-// DetachAll provides the option to detach from all Scoped processes
-func (rc *Config) DetachAll(prompt bool) error {
-	adminStatus := true
-	if err := util.UserVerifyRootPerm(); err != nil {
-		if errors.Is(err, util.ErrMissingAdmPriv) {
-			adminStatus = false
-		} else {
-			return err
-		}
-	}
-	if !adminStatus {
-		fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
-	}
-
-	procs, err := util.ProcessesToDetach(rc.Rootdir)
-	if err != nil {
-		return err
-	}
-
-	if len(procs) > 0 {
-		if prompt {
-			// user interface for selecting a PID
-			util.PrintObj([]util.ObjField{
-				{Name: "ID", Field: "id"},
-				{Name: "Pid", Field: "pid"},
-				{Name: "User", Field: "user"},
-				{Name: "Command", Field: "command"},
-			}, procs)
-
-			if !util.Confirm("Are your sure you want to detach from all of these processes?") {
-				fmt.Println("info: canceled")
-				return nil
-			}
-		}
-	} else {
-		return errNoScopedProcs
-	}
-
-	errorsDetachingMultiple := false
-	for _, proc := range procs {
-		if err := rc.detach(proc.Pid); err != nil {
-			log.Error().Err(err)
-			errorsDetachingMultiple = true
-		}
-	}
-	if errorsDetachingMultiple {
-		return errDetachingMultiple
-	}
-
 	return nil
 }
 
-// DetachSingle unscopes an existing scoped process, identified by name or pid
-func (rc *Config) DetachSingle(id string) error {
-	pid, err := HandleInputArg(rc.Rootdir, id, false, true, true)
-	if err != nil {
-		return err
-	}
-
-	// Check PID is already being scoped
-	status, err := util.PidScopeStatus(rc.Rootdir, pid)
-	if err != nil {
-		return err
-	} else if status != util.Active {
-		return errNotScoped
-	}
-
-	return rc.detach(pid)
-}
-
 func (rc *Config) detach(pid int) error {
-	args := make([]string, 0)
-	args = append(args, fmt.Sprint(pid))
+	env := os.Environ()
+	ld := loader.New()
+
+	args := []string{fmt.Sprint(pid)}
 
 	if rc.Rootdir != "" {
 		args = append(args, []string{"--rootdir", rc.Rootdir}...)
 	}
 
-	env := os.Environ()
-	ld := loader.New()
-	if !rc.Subprocess {
-		return ld.Detach(args, env)
+	if rc.Subprocess {
+		out, err := ld.DetachSubProc(args, env)
+		fmt.Print(out)
+		return err
 	}
-	out, err := ld.DetachSubProc(args, env)
-	fmt.Print(out)
 
-	return err
+	return ld.Detach(args, env)
 }
 
-// HandleInputArg handles the input argument (process id/name)
-func HandleInputArg(rootdir, InputArg string, toAttach, singleProcMenu, warn bool) (int, error) {
-	// Get PID by name if non-numeric, otherwise validate/use InputArg
-	var pid int
+// HandleInputArg handles the input argument (process name) and returns an array of processes
+func HandleInputArg(rootdir, inputArg string, toAttach, choose bool) (util.Processes, error) {
 	var err error
 	var procs util.Processes
-	if util.IsNumeric(InputArg) {
-		pid, err = strconv.Atoi(InputArg)
-		if err != nil {
-			return -1, errPidInvalid
+
+	// Get a list of all processes that match the name to attach to; or detach from
+	if toAttach {
+		if procs, err = util.ProcessesByNameToAttach(rootdir, inputArg); err != nil {
+			return nil, err
 		}
 	} else {
-		adminStatus := true
-		if err := util.UserVerifyRootPerm(); err != nil {
-			if errors.Is(err, util.ErrMissingAdmPriv) {
-				adminStatus = false
-			} else {
-				return -1, err
-			}
-		}
-
-		if toAttach {
-			procs, err = util.ProcessesByNameToAttach(rootdir, InputArg)
-		} else {
-			procs, err = util.ProcessesByNameToDetach(rootdir, InputArg)
-		}
-
-		if err != nil {
-			return -1, err
-		}
-		if len(procs) == 1 && !singleProcMenu {
-			pid = procs[0].Pid
-		} else if len(procs) >= 1 {
-			if !adminStatus && warn {
-				fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
-			}
-
-			// user interface for selecting a PID
-			fmt.Println("Select a process...")
-			util.PrintObj([]util.ObjField{
-				{Name: "ID", Field: "id"},
-				{Name: "Pid", Field: "pid"},
-				{Name: "User", Field: "user"},
-				{Name: "Scoped", Field: "scoped"},
-				{Name: "Command", Field: "command"},
-			}, procs)
-			fmt.Println("Select an ID from the list:")
-			var selection string
-			fmt.Scanln(&selection)
-			i, err := strconv.ParseUint(selection, 10, 32)
-			i--
-			if err != nil || i >= uint64(len(procs)) {
-				return -1, errInvalidSelection
-			}
-			pid = procs[i].Pid
-		} else {
-			if !adminStatus && warn {
-				fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
-			}
-			if toAttach {
-				return -1, errMissingProc
-			}
-			return -1, errMissingScopedProc
+		if procs, err = util.ProcessesByNameToDetach(rootdir, inputArg); err != nil {
+			return nil, err
 		}
 	}
 
-	// Check PID exists
-	if !util.PidExists(rootdir, pid) {
-		return -1, errPidMissing
+	if len(procs) > 1 && choose {
+		// User interface for selecting a PID
+		fmt.Println("Select a process...")
+		util.PrintObj([]util.ObjField{
+			{Name: "ID", Field: "id"},
+			{Name: "Pid", Field: "pid"},
+			{Name: "User", Field: "user"},
+			{Name: "Scoped", Field: "scoped"},
+			{Name: "Command", Field: "command"},
+		}, procs)
+		fmt.Println("Select an ID from the list:")
+		var selection string
+		fmt.Scanln(&selection)
+		i, err := strconv.ParseUint(selection, 10, 32)
+		i--
+		if err != nil || i >= uint64(len(procs)) {
+			return nil, errInvalidSelection
+		}
+		return util.Processes{procs[i]}, nil
 	}
 
-	return pid, nil
+	return procs, nil
 }

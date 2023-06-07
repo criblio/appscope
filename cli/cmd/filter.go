@@ -122,9 +122,9 @@ var filterCmd = &cobra.Command{
 
 		// Add a process to; or remove a process from the scope filter
 		if addProc != "" {
-			return filter.Add(addProc)
+			return filter.Add(filterFile, addProc, rc.Rootdir, rc)
 		} else if remProc != "" {
-			return filter.Remove(remProc)
+			return filter.Remove(filterFile, remProc, rc.Rootdir, rc)
 
 		}
 

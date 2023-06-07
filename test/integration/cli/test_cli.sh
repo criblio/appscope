@@ -167,14 +167,8 @@ kill $sleep_pid
 # Assert .scope directory exists
 is_dir /root/.scope
 
-# Assert sleep session directory exists (in /tmp)
-is_dir /tmp/${sleep_pid}*
-
-# Assert sleep config file exists
-is_file /tmp/${sleep_pid}*/scope.yml
-
 # Compare sleep config.yml files (attach and reattach) with expected.yml
-for scopedirpath in /tmp/${sleep_pid}_*; do
+for scopedirpath in /root/.scope/history/sleep_*; do
     scopedir=$(basename "$scopedirpath")
     cat $scopedirpath/scope.yml | sed -e "s/$scopedir/SESSIONPATH/" | diff - /expected.yml
     if [ $? -eq 0 ]; then

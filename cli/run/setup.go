@@ -159,26 +159,10 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 		fmt.Printf("WARNING: Session history will be stored in %s and owned by root\n", histDir)
 	}
 
-	// Create Working directory
-	if attach {
-		// Validate /tmp exists
-		if !util.CheckDirExists("/tmp") {
-			util.ErrAndExit("/tmp directory does not exist")
-		}
-		// Create working directory in /tmp (0777 permissions)
-		rc.WorkDir = filepath.Join("/tmp", tmpDirName)
-		err := os.Mkdir(rc.WorkDir, dirPerms)
-		util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
-
-		// Symbolic link between /tmp/tmpDirName and /history/tmpDirName
-		rootHistDir := filepath.Join(histDir, tmpDirName)
-		os.Symlink(rc.WorkDir, rootHistDir)
-	} else {
-		// Create working directory in history/
-		rc.WorkDir = filepath.Join(HistoryDir(), tmpDirName)
-		err = os.Mkdir(rc.WorkDir, 0755)
-		util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
-	}
+	// Create working directory
+	rc.WorkDir = filepath.Join(HistoryDir(), tmpDirName)
+	err = os.Mkdir(rc.WorkDir, 0755)
+	util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
 
 	// Create Cmd directory
 	cmdDir := filepath.Join(rc.WorkDir, "cmd")

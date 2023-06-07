@@ -14,7 +14,7 @@ metric:
     verbosity: 4
   transport:
     type: file
-    path: /tmp/SESSIONPATH/metrics.json
+    path: /root/.scope/history/SESSIONPATH/metrics.json
     buffering: line
     tls:
       enable: false
@@ -33,7 +33,7 @@ event:
     type: ndjson
   transport:
     type: file
-    path: /tmp/SESSIONPATH/events.json
+    path: /root/.scope/history/SESSIONPATH/events.json
     buffering: line
     tls:
       enable: false
@@ -66,12 +66,12 @@ event:
 libscope:
   configevent: true
   summaryperiod: 10
-  commanddir: /tmp/SESSIONPATH/cmd
+  commanddir: /root/.scope/history/SESSIONPATH/cmd
   log:
     level: warning
     transport:
       type: file
-      path: /tmp/SESSIONPATH/libscope.log
+      path: /root/.scope/history/SESSIONPATH/libscope.log
       buffering: line
       tls:
         enable: false

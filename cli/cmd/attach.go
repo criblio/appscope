@@ -82,10 +82,12 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 			return err
 		}
 
-		pid, err := rc.Attach(args)
+		procs, err := rc.AttachDetachMultiple(args[0], true, true, true)
 		if err != nil {
 			util.ErrAndExit("Attach failure: %v", err)
 		}
+
+		pid := procs[0].Pid // we told AttachDetachMultiple that we wanted to choose only one proc
 
 		if rc.Rootdir != "" {
 			util.Warn("Attaching to process %d", pid)

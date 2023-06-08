@@ -32,13 +32,15 @@ var detachCmd = &cobra.Command{
 			if len(args) != 0 {
 				helpErrAndExit(cmd, "--all flag is mutually exclusive with PID or <process_name>")
 			}
-			return rc.Detach(id, false, true)
+			_, err := rc.AttachDetachMultiple(id, false, true, false)
+			return err
 		}
 
 		if len(args) > 0 {
 			id = args[0]
 		}
-		return rc.Detach(id, true, true)
+		_, err := rc.AttachDetachMultiple(id, true, true, false)
+		return err
 	},
 }
 

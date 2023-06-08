@@ -29,13 +29,25 @@ var (
 	errDetachingMultiple = errors.New("at least one error found when detaching from more than 1 process. See logs")
 )
 
-// Attach attaches scope to a process or processes
-// If the id provided is a pid, that single pid will be attached
-// If the id provided is a name, all processes matching that name will be attached
+// AttachDetachMultiple allows a user to attach to or detach from one or more processes by name or pid
+// If the id provided is a pid, that single pid will be attached/detached
+// If the id provided is a name, all processes matching that name will be attached/detached
 // unless the @choose argument is true, which will allow the user to choose a single process
-// NOTE: The responsibility of this function is not to check if its possible to attach
-// It's only to prepare a list of procs and let attach handle the rest
-func (rc *Config) Attach(id string, choose, confirm bool) (util.Processes, error) {
+// NOTE: The responsibility of this function is not to check if its possible to attach/detach
+// It's only to prepare a list of procs and let attach/detach handle the rest
+func (rc *Config) AttachDetachMultiple(id string, choose, confirm, attach bool) (util.Processes, error) {
+	// Differentiate between attach and detach actions
+	function := rc.attach
+	actionString := "attach to"
+	noProcsErr := errMissingProc
+	multipleErr := errAttachingMultiple
+	if !attach {
+		function = rc.detach
+		actionString = "detach from"
+		noProcsErr = errNoScopedProcs
+		multipleErr = errDetachingMultiple
+	}
+
 	procs := make(util.Processes, 0)
 	var err error
 	adminStatus := true
@@ -71,95 +83,27 @@ func (rc *Config) Attach(id string, choose, confirm bool) (util.Processes, error
 	}
 
 	if len(procs) == 0 {
-		return procs, errMissingProc
+		return procs, noProcsErr
 	}
 	if len(procs) == 1 {
-		return procs, rc.attach(procs[0].Pid)
+		return procs, function(procs[0].Pid)
 	}
 
 	// len(procs) is > 1
-	if confirm && !util.Confirm("Are your sure you want to attach to all of these processes?") {
+	if confirm && !util.Confirm(fmt.Sprintf("Are your sure you want to %s all of these processes?", actionString)) {
 		fmt.Println("info: canceled")
 		return procs, nil
 	}
 
 	errors := false
 	for _, proc := range procs {
-		if err = rc.attach(proc.Pid); err != nil {
+		if err = function(proc.Pid); err != nil {
 			log.Error().Err(err)
 			errors = true
 		}
 	}
 	if errors {
-		return procs, errAttachingMultiple
-	}
-
-	return procs, nil
-}
-
-// Detach detaches scope from a process or processes
-// If the id provided is a pid, that single pid will be detached
-// If the id provided is a name, all processes matching that name will be detached
-// unless the @choose argument is true, which will allow the user to choose a single process
-// NOTE: The responsibility of this function is not to check if its possible to detach
-// It's only to prepare a list of procs and let detach handle the rest
-func (rc *Config) Detach(id string, choose, confirm bool) (util.Processes, error) {
-	procs := make(util.Processes, 0)
-	var err error
-	adminStatus := true
-	if err := util.UserVerifyRootPerm(); err != nil {
-		if errors.Is(err, util.ErrMissingAdmPriv) {
-			adminStatus = false
-		} else {
-			return procs, err
-		}
-	}
-
-	if util.IsNumeric(id) {
-		// If the id provided is an integer, interpret it as a pid and use that pid only
-
-		pid, err := strconv.Atoi(id)
-		if err != nil {
-			return procs, errPidInvalid
-		}
-
-		procs = append(procs, util.Process{Pid: pid})
-
-	} else {
-		// If the id provided is a name, find one or more matching procs
-
-		if !adminStatus {
-			fmt.Println("INFO: Run as root (or via sudo) to find all matching processes")
-		}
-
-		procs, err = HandleInputArg(rc.Rootdir, id, false, choose)
-		if err != nil {
-			return procs, err
-		}
-	}
-
-	if len(procs) == 0 {
-		return procs, errNoScopedProcs
-	}
-	if len(procs) == 1 {
-		return procs, rc.detach(procs[0].Pid)
-	}
-
-	// len(procs) is > 1
-	if confirm && !util.Confirm("Are your sure you want to detach from all of these processes?") {
-		fmt.Println("info: canceled")
-		return procs, nil
-	}
-
-	errors := false
-	for _, proc := range procs {
-		if err = rc.detach(proc.Pid); err != nil {
-			log.Error().Err(err)
-			errors = true
-		}
-	}
-	if errors {
-		return procs, errDetachingMultiple
+		return procs, multipleErr
 	}
 
 	return procs, nil

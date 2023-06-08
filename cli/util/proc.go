@@ -115,11 +115,13 @@ func pidProcDirsNames(rootdir string) ([]string, error) {
 	return procDir.Readdirnames(0)
 }
 
+// Returns all processes that match the name, only if scope is attached
 // ProcessesByNameToDetach returns an array of processes to detach that match a given name
 func ProcessesByNameToDetach(rootdir, name string) (Processes, error) {
 	return processesByName(rootdir, name, true)
 }
 
+// Returns all processes that match the name, regardless of their state (attached, detached, loaded, unloaded)
 // ProcessesByNameToAttach returns an array of processes to attach that match a given name
 func ProcessesByNameToAttach(rootdir, name string) (Processes, error) {
 	return processesByName(rootdir, name, false)

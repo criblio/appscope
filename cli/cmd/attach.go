@@ -77,6 +77,11 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 			helpErrAndExit(cmd, "Cannot specify --coredump and --userconfig")
 		}
 
+		// Read config from stdin if it exists
+		if err := rc.ConfigFromStdin(); err != nil {
+			return err
+		}
+
 		pid, err := rc.Attach(args)
 		if err != nil {
 			util.ErrAndExit("Attach failure: %v", err)

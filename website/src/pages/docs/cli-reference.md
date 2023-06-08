@@ -313,6 +313,7 @@ scope filter --remove chromium
   -p, --payloads              Capture payloads of network transactions
       --remove string         Remove an entry from the global filter
   -R, --rootdir string        Path to root filesystem of target namespace
+      --source string         Source identifier for a filter entry
   -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.
   -v, --verbosity int         Set scope metric verbosity (default 4)
 ```

@@ -25,59 +25,17 @@ var (
 	errLibraryNotExist   = errors.New("library Path does not exist")
 	errInvalidSelection  = errors.New("invalid Selection")
 	errNoScopedProcs     = errors.New("no scoped processes found")
-	errDetachingMultiple = errors.New("at least one error found when detaching from all. See logs")
+	errAttachingMultiple = errors.New("at least one error found when attaching to more than 1 process. See logs")
+	errDetachingMultiple = errors.New("at least one error found when detaching from more than 1 process. See logs")
 )
 
 // Attach attaches scope to a process or processes
 // If the id provided is a pid, that single pid will be attached
 // If the id provided is a name, all processes matching that name will be attached
 // unless the @choose argument is true, which will allow the user to choose a single process
-func (rc *Config) Attach(id string, choose bool) ([]int, error) {
-
-	procs, err := HandleInputArg(rc.Rootdir, id, true, choose)
-	if err != nil {
-		return pid, err
-	}
-	args[0] = fmt.Sprint(pid)
-	var reattach bool
-	// Check PID is not already being scoped
-	status, err := util.PidScopeStatus(rc.Rootdir, pid)
-	if err != nil {
-		return pid, err
-	}
-
-	if status == util.Disable || status == util.Setup {
-		// Validate user has root permissions
-		if err := util.UserVerifyRootPerm(); err != nil {
-			return pid, err
-		}
-		// Validate PTRACE capability
-		c, err := capability.NewPid2(0)
-		if err != nil {
-			return pid, errGetLinuxCap
-		}
-
-		if err = c.Load(); err != nil {
-			return pid, errLoadLinuxCap
-		}
-
-		if !c.Get(capability.EFFECTIVE, capability.CAP_SYS_PTRACE) {
-			return pid, errMissingPtrace
-		}
-	} else {
-		// Reattach because process contains our library
-		reattach = true
-	}
-
-	// TODO call rc.attach
-
-}
-
-// Detach detaches scope from a process or processes
-// If the id provided is a pid, that single pid will be detached
-// If the id provided is a name, all processes matching that name will be detached
-// unless the @choose argument is true, which will allow the user to choose a single process
-func (rc *Config) Detach(id string, choose, confirm bool) error {
+// NOTE: The responsibility of this function is not to check if its possible to attach
+// It's only to prepare a list of procs and let attach handle the rest
+func (rc *Config) Attach(id string, choose, confirm bool) (util.Processes, error) {
 	procs := make(util.Processes, 0)
 	var err error
 	adminStatus := true
@@ -85,71 +43,161 @@ func (rc *Config) Detach(id string, choose, confirm bool) error {
 		if errors.Is(err, util.ErrMissingAdmPriv) {
 			adminStatus = false
 		} else {
-			return err
+			return procs, err
 		}
 	}
 
 	if util.IsNumeric(id) {
-		// If the id provided is an integer, interpret it as a pid and detach from that pid only
+		// If the id provided is an integer, interpret it as a pid and use that pid only
 
 		pid, err := strconv.Atoi(id)
 		if err != nil {
-			return errPidInvalid
-		}
-
-		status, err := util.PidScopeStatus(rc.Rootdir, pid)
-		if err != nil {
-			if !adminStatus {
-				fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
-			}
-			return err
-		} else if status != util.Active {
-			return errNotScoped
+			return procs, errPidInvalid
 		}
 
 		procs = append(procs, util.Process{Pid: pid})
 
 	} else {
-		// If the id provided is a name, detach from one or more procs
+		// If the id provided is a name, find one or more matching procs
 
 		if !adminStatus {
-			fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
+			fmt.Println("INFO: Run as root (or via sudo) to find all matching processes")
 		}
 
 		procs, err = HandleInputArg(rc.Rootdir, id, false, choose)
 		if err != nil {
-			return err
-		}
-
-		if len(procs) == 0 {
-			return errNoScopedProcs
+			return procs, err
 		}
 	}
 
-	if len(procs) > 1 {
-		if confirm && !util.Confirm("Are your sure you want to detach from all of these processes?") {
-			fmt.Println("info: canceled")
-			return nil
+	if len(procs) == 0 {
+		return procs, errMissingProc
+	}
+	if len(procs) == 1 {
+		return procs, rc.attach(procs[0].Pid)
+	}
+
+	// len(procs) is > 1
+	if confirm && !util.Confirm("Are your sure you want to attach to all of these processes?") {
+		fmt.Println("info: canceled")
+		return procs, nil
+	}
+
+	errors := false
+	for _, proc := range procs {
+		if err = rc.attach(proc.Pid); err != nil {
+			log.Error().Err(err)
+			errors = true
+		}
+	}
+	if errors {
+		return procs, errAttachingMultiple
+	}
+
+	return procs, nil
+}
+
+// Detach detaches scope from a process or processes
+// If the id provided is a pid, that single pid will be detached
+// If the id provided is a name, all processes matching that name will be detached
+// unless the @choose argument is true, which will allow the user to choose a single process
+// NOTE: The responsibility of this function is not to check if its possible to detach
+// It's only to prepare a list of procs and let detach handle the rest
+func (rc *Config) Detach(id string, choose, confirm bool) (util.Processes, error) {
+	procs := make(util.Processes, 0)
+	var err error
+	adminStatus := true
+	if err := util.UserVerifyRootPerm(); err != nil {
+		if errors.Is(err, util.ErrMissingAdmPriv) {
+			adminStatus = false
+		} else {
+			return procs, err
 		}
 	}
 
-	errorsDetachingMultiple := false
+	if util.IsNumeric(id) {
+		// If the id provided is an integer, interpret it as a pid and use that pid only
+
+		pid, err := strconv.Atoi(id)
+		if err != nil {
+			return procs, errPidInvalid
+		}
+
+		procs = append(procs, util.Process{Pid: pid})
+
+	} else {
+		// If the id provided is a name, find one or more matching procs
+
+		if !adminStatus {
+			fmt.Println("INFO: Run as root (or via sudo) to find all matching processes")
+		}
+
+		procs, err = HandleInputArg(rc.Rootdir, id, false, choose)
+		if err != nil {
+			return procs, err
+		}
+	}
+
+	if len(procs) == 0 {
+		return procs, errNoScopedProcs
+	}
+	if len(procs) == 1 {
+		return procs, rc.detach(procs[0].Pid)
+	}
+
+	// len(procs) is > 1
+	if confirm && !util.Confirm("Are your sure you want to detach from all of these processes?") {
+		fmt.Println("info: canceled")
+		return procs, nil
+	}
+
+	errors := false
 	for _, proc := range procs {
 		if err = rc.detach(proc.Pid); err != nil {
 			log.Error().Err(err)
-			errorsDetachingMultiple = true
+			errors = true
 		}
 	}
-	if errorsDetachingMultiple {
-		return errDetachingMultiple
+	if errors {
+		return procs, errDetachingMultiple
 	}
 
-	return nil
+	return procs, nil
 }
 
+// NOTE: The responsibility of this function is to check if its possible to attach
+// and then perform the attach if so
 func (rc *Config) attach(pid int) error {
 	env := os.Environ()
 	ld := loader.New()
+
+	var reattach bool
+
+	status, err := util.PidScopeStatus(rc.Rootdir, pid)
+	if err != nil {
+		return err
+	}
+	if status == util.Disable || status == util.Setup {
+		if err := util.UserVerifyRootPerm(); err != nil {
+			return err
+		}
+		// Validate PTRACE capability
+		c, err := capability.NewPid2(0)
+		if err != nil {
+			return errGetLinuxCap
+		}
+
+		if err = c.Load(); err != nil {
+			return errLoadLinuxCap
+		}
+
+		if !c.Get(capability.EFFECTIVE, capability.CAP_SYS_PTRACE) {
+			return errMissingPtrace
+		}
+	} else {
+		// Reattach because process contains our library
+		reattach = true
+	}
 
 	args := []string{fmt.Sprint(pid)}
 
@@ -163,11 +211,6 @@ func (rc *Config) attach(pid int) error {
 	// Disable cribl event breaker with this command
 	if rc.NoBreaker {
 		env = append(env, "SCOPE_CRIBL_NO_BREAKER=true")
-	}
-
-	// Read config from stdin if it exists
-	if err := rc.ConfigFromStdin(); err != nil {
-		return pid, err
 	}
 
 	// Normal operational, create a directory for this run.
@@ -189,7 +232,7 @@ func (rc *Config) attach(pid int) error {
 	// Handle custom library path
 	if len(rc.LibraryPath) > 0 {
 		if !util.CheckDirExists(rc.LibraryPath) {
-			return pid, errLibraryNotExist
+			return errLibraryNotExist
 		}
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
@@ -200,11 +243,15 @@ func (rc *Config) attach(pid int) error {
 
 	if rc.Subprocess {
 		out, err := ld.AttachSubProc(args, env)
+		if err != nil {
+			return err
+		}
 		fmt.Print(out)
-		return err
+	} else {
+		if err = ld.Attach(args, env); err != nil {
+			return err
+		}
 	}
-
-	return ld.Attach(args, env)
 
 	// Replace the working directory files with symbolic links in case of successful attach
 	// where the target ns is different to the origin ns
@@ -239,9 +286,19 @@ func (rc *Config) attach(pid int) error {
 	return nil
 }
 
+// NOTE: The responsibility of this function is to check if its possible to detach
+// and then perform the detach if so
 func (rc *Config) detach(pid int) error {
 	env := os.Environ()
 	ld := loader.New()
+
+	status, err := util.PidScopeStatus(rc.Rootdir, pid)
+	if err != nil {
+		return err
+	}
+	if status != util.Active {
+		return errNotScoped
+	}
 
 	args := []string{fmt.Sprint(pid)}
 
@@ -254,7 +311,6 @@ func (rc *Config) detach(pid int) error {
 		fmt.Print(out)
 		return err
 	}
-
 	return ld.Detach(args, env)
 }
 
@@ -263,12 +319,13 @@ func HandleInputArg(rootdir, inputArg string, toAttach, choose bool) (util.Proce
 	var err error
 	var procs util.Processes
 
-	// Get a list of all processes that match the name to attach to; or detach from
 	if toAttach {
+		// Get a list of all process that match the name, regardless of status
 		if procs, err = util.ProcessesByNameToAttach(rootdir, inputArg); err != nil {
 			return nil, err
 		}
 	} else {
+		// Get a list of all processes that match the name and scope is actively attached
 		if procs, err = util.ProcessesByNameToDetach(rootdir, inputArg); err != nil {
 			return nil, err
 		}

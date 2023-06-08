@@ -122,10 +122,14 @@ var filterCmd = &cobra.Command{
 
 		// Add a process to; or remove a process from the scope filter
 		if addProc != "" {
+			// Read config from stdin if it exists
+			if err := rc.ConfigFromStdin(); err != nil {
+				return err
+			}
+
 			return filter.Add(filterFile, addProc, rc.Rootdir, rc)
 		} else if remProc != "" {
 			return filter.Remove(filterFile, remProc, rc.Rootdir, rc)
-
 		}
 
 		return nil

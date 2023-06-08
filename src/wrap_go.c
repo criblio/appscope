@@ -415,15 +415,23 @@ createGoStructFile(void) {
     }
 }
 
-// Use go_str() whenever a "go string" type needs to be interpreted.
-// The resulting go_str will need to be passed to free_go_str() when it is no
-// longer needed.
-// Don't use go_str() for byte arrays.
+/*
+ * Use go_str() whenever a "go string" type needs to be interpreted.
+ * The resulting go_str will need to be passed to free_go_str() when it is no
+ * longer needed.
+ * Don't use go_str() for byte arrays.
+ *
+ * Go 17 and higher use "c style" null terminated strings instead of a string
+ * and a length. Therfore, we do nothing here for Go >= 17.
+ * However, there is a case where argv values are passed as go strings.
+ * In that case we we need to force a conversion even when we are >= Go 17.
+ * We are no longer interposing a function that references argv, however, the
+ * force param is left in place expecting that since it has been needed, it
+ * will be needed.
+ */
 static char *
 go_str(void *go_str, bool force)
 {
-    // Go 17 and higher use "c style" null terminated strings instead of a string and a length
-
     if ((g_go_minor_ver >= 17) && (force == FALSE)) {
        // We need to deference the address first before casting to a char *
        if (!go_str) return NULL;
@@ -453,12 +461,14 @@ free_go_str(char *str) {
 */
 
 /*
- * Rewrites the container configuration for specific task ID and container namespace name.
+ * Rewrite the container configuration for the given container.
+ * A path to the container specific work dir defines the location of the configuration file.
+ *
  * Please look into opencontainers Linux runtime-spec for details about the exact JSON struct.
- * Following changes will be performed:
- * - Add mount point
- *   `scope` will be mounted from host  ("/usr/lib/appscope/<version>/scope") into the container ("/opt/scope")
- * - Extend Environment variable
+ * The following changes will be performed:
+ * - Add a mount point
+ *   `scope` will be mounted from the host ("ex: /usr/lib/appscope/<version>/scope") into the container ("ex: /opt/scope")
+ * - Extend Environment variables
  *   `LD_PRELOAD` will contain the following entry `/opt/libscope.so`
  *   `SCOPE_SETUP_DONE=true` mark that configuration was processed
  * - Add prestart hook
@@ -762,7 +772,6 @@ rewriteOpenContainersConfig(const char *cWorkDir)
     scope_fclose(fp);
 
 exit:
-    // to handle aarch64 case
     return;
 }
 
@@ -882,6 +891,8 @@ getGoVersionAddr(const char* buf)
 static Elf64_Addr
 getSym12(const void *pclntab_addr, char *sname)
 {
+    if ((!pclntab_addr) || (!sname)) return 0;
+
     Elf64_Addr symaddr = 0;
     uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
     const void *symtab_addr = pclntab_addr + 16;
@@ -907,15 +918,19 @@ getSym12(const void *pclntab_addr, char *sname)
 static Elf64_Addr
 getSym16(const void *pclntab_addr, char *sname, char *altname, char *mnemonic)
 {
+    if ((!pclntab_addr) || (!sname)) return 0;
+
     Elf64_Addr symaddr = 0;
-    uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
-    const void *symtab_addr = pclntab_addr + 16;
+    uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
+    uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (3 * 8)));
+    uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (7 * 8)));
+    const void *symtab_addr = pclntab_addr + pclntab_offset;
 
     for (int i = 0; i < sym_count; i++) {
-        uint64_t func_offset  = *((const uint64_t *)(symtab_addr + 8));
-        uint32_t name_offset  = *((const uint32_t *)(pclntab_addr + func_offset + 8));
-        uint64_t sym_addr     = *((const uint64_t *)(symtab_addr));
-        const char *func_name = (const char *)(pclntab_addr + name_offset);
+        uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
+        uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 8));
+        uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
+        const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
 
         if (scope_strcmp(sname, func_name) == 0) {
             symaddr = sym_addr;
@@ -940,6 +955,8 @@ getSym16(const void *pclntab_addr, char *sname, char *altname, char *mnemonic)
 static Elf64_Addr
 getSym1820(const void *pclntab_addr, char *sname, char *altname, char *mnemonic)
 {
+    if ((!pclntab_addr) || (!sname)) return 0;
+
     Elf64_Addr symaddr = 0;
     uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
     // In go 1.18 the funcname table and the pcln table are stored in the text section
@@ -986,7 +1003,7 @@ embedPclntab(const char *buf, char *sname, char *altname, char *mnemonic)
 
     for (int i = 0; i < ehdr->e_shnum; i++) {
         const char *sec_name = section_strtab + sections[i].sh_name;
-        if (strstr(sec_name, "data.rel.ro") != 0) {
+        if (scope_strstr(sec_name, "data.rel.ro") != 0) {
 
             const void *pclntab_addr = buf + sections[i].sh_offset;
             unsigned char *data = (unsigned char *)pclntab_addr;

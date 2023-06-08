@@ -98,7 +98,7 @@ var inspectCmd = &cobra.Command{
 			if !admin {
 				util.Warn("INFO: Run as root (or via sudo) to see all available processes")
 			}
-			procs, err := run.HandleInputArg(rootdir, "", false, true)
+			procs, err := run.HandleInputArg(rootdir, "", false, false, true, false)
 			if err != nil {
 				util.ErrAndExit("error selecting pid", err)
 			}

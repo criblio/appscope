@@ -117,18 +117,18 @@ func pidProcDirsNames(rootdir string) ([]string, error) {
 
 // Returns all processes that match the name, only if scope is attached
 // ProcessesByNameToDetach returns an array of processes to detach that match a given name
-func ProcessesByNameToDetach(rootdir, name string) (Processes, error) {
-	return processesByName(rootdir, name, true)
+func ProcessesByNameToDetach(rootdir, name string, exactMatch bool) (Processes, error) {
+	return processesByName(rootdir, name, true, exactMatch)
 }
 
 // Returns all processes that match the name, regardless of their state (attached, detached, loaded, unloaded)
 // ProcessesByNameToAttach returns an array of processes to attach that match a given name
-func ProcessesByNameToAttach(rootdir, name string) (Processes, error) {
-	return processesByName(rootdir, name, false)
+func ProcessesByNameToAttach(rootdir, name string, exactMatch bool) (Processes, error) {
+	return processesByName(rootdir, name, false, exactMatch)
 }
 
 // processesByName returns an array of processes that match a given name
-func processesByName(rootdir, name string, activeOnly bool) (Processes, error) {
+func processesByName(rootdir, name string, activeOnly, exactMatch bool) (Processes, error) {
 	processes := make([]Process, 0)
 
 	procs, err := pidProcDirsNames(rootdir)
@@ -179,7 +179,7 @@ func processesByName(rootdir, name string, activeOnly bool) (Processes, error) {
 		}
 
 		// Add process if there is a name match
-		if strings.Contains(command, name) {
+		if (exactMatch && command == name) || strings.Contains(command, name) {
 			if !activeOnly || (activeOnly && status == Active) {
 				processes = append(processes, Process{
 					ID:      i,

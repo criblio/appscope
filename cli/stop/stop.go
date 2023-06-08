@@ -164,7 +164,7 @@ func Stop() error {
 		Subprocess: true,
 		Verbosity:  4, // Default
 	}
-	if _, err := rc.AttachDetachMultiple("", false, false, false); err != nil {
+	if _, err := rc.AttachDetachMultiple("", false, false, false, false); err != nil {
 		log.Error().
 			Err(err).
 			Msg("Error detaching from all Scoped processes")

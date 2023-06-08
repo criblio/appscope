@@ -82,7 +82,7 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 			return err
 		}
 
-		procs, err := rc.AttachDetachMultiple(args[0], true, true, true)
+		procs, err := rc.AttachDetachMultiple(args[0], true, true, true, false)
 		if err != nil {
 			util.ErrAndExit("Attach failure: %v", err)
 		}

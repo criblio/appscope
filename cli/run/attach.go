@@ -35,7 +35,13 @@ var (
 // unless the @choose argument is true, which will allow the user to choose a single process
 // NOTE: The responsibility of this function is not to check if its possible to attach/detach
 // It's only to prepare a list of procs and let attach/detach handle the rest
-func (rc *Config) AttachDetachMultiple(id string, choose, confirm, attach bool) (util.Processes, error) {
+// Args:
+// @id name or pid
+// @choose require a user to choose a single proc from a list
+// @confirm require a user to confirm their choice
+// @attach attach or detach
+// @exactMatch require an exact match when id is a name
+func (rc *Config) AttachDetachMultiple(id string, choose, confirm, attach, exactMatch bool) (util.Processes, error) {
 	// Differentiate between attach and detach actions
 	function := rc.attach
 	actionString := "attach to"
@@ -71,12 +77,13 @@ func (rc *Config) AttachDetachMultiple(id string, choose, confirm, attach bool) 
 
 	} else {
 		// If the id provided is a name, find one or more matching procs
+		// Note: An empty string is supported to pick up all procs
 
 		if !adminStatus {
 			fmt.Println("INFO: Run as root (or via sudo) to find all matching processes")
 		}
 
-		procs, err = HandleInputArg(rc.Rootdir, id, false, choose)
+		procs, err = HandleInputArg(rc.Rootdir, id, attach, choose, confirm, exactMatch)
 		if err != nil {
 			return procs, err
 		}
@@ -95,6 +102,7 @@ func (rc *Config) AttachDetachMultiple(id string, choose, confirm, attach bool) 
 		return procs, nil
 	}
 
+	rc.Subprocess = true
 	errors := false
 	for _, proc := range procs {
 		if err = function(proc.Pid); err != nil {
@@ -259,41 +267,43 @@ func (rc *Config) detach(pid int) error {
 }
 
 // HandleInputArg handles the input argument (process name) and returns an array of processes
-func HandleInputArg(rootdir, inputArg string, toAttach, choose bool) (util.Processes, error) {
+func HandleInputArg(rootdir, inputArg string, toAttach, choose, confirm, exactMatch bool) (util.Processes, error) {
 	var err error
 	var procs util.Processes
 
 	if toAttach {
 		// Get a list of all process that match the name, regardless of status
-		if procs, err = util.ProcessesByNameToAttach(rootdir, inputArg); err != nil {
+		if procs, err = util.ProcessesByNameToAttach(rootdir, inputArg, exactMatch); err != nil {
 			return nil, err
 		}
 	} else {
 		// Get a list of all processes that match the name and scope is actively attached
-		if procs, err = util.ProcessesByNameToDetach(rootdir, inputArg); err != nil {
+		if procs, err = util.ProcessesByNameToDetach(rootdir, inputArg, exactMatch); err != nil {
 			return nil, err
 		}
 	}
 
-	if len(procs) > 1 && choose {
-		// User interface for selecting a PID
-		fmt.Println("Select a process...")
-		util.PrintObj([]util.ObjField{
-			{Name: "ID", Field: "id"},
-			{Name: "Pid", Field: "pid"},
-			{Name: "User", Field: "user"},
-			{Name: "Scoped", Field: "scoped"},
-			{Name: "Command", Field: "command"},
-		}, procs)
-		fmt.Println("Select an ID from the list:")
-		var selection string
-		fmt.Scanln(&selection)
-		i, err := strconv.ParseUint(selection, 10, 32)
-		i--
-		if err != nil || i >= uint64(len(procs)) {
-			return nil, errInvalidSelection
+	if len(procs) > 1 {
+		if confirm || choose {
+			util.PrintObj([]util.ObjField{
+				{Name: "ID", Field: "id"},
+				{Name: "Pid", Field: "pid"},
+				{Name: "User", Field: "user"},
+				{Name: "Scoped", Field: "scoped"},
+				{Name: "Command", Field: "command"},
+			}, procs)
 		}
-		return util.Processes{procs[i]}, nil
+		if choose {
+			fmt.Println("Select an ID from the list:")
+			var selection string
+			fmt.Scanln(&selection)
+			i, err := strconv.ParseUint(selection, 10, 32)
+			i--
+			if err != nil || i >= uint64(len(procs)) {
+				return nil, errInvalidSelection
+			}
+			return util.Processes{procs[i]}, nil
+		}
 	}
 
 	return procs, nil

@@ -91,7 +91,7 @@ func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) er
 	if rootdir != "" {
 		util.Warn("It can take up to 1 minute to attach to a process in a parent namespace")
 	}
-	if _, err := rc.AttachDetachMultiple(addProc, false, false, true); err != nil {
+	if _, err := rc.AttachDetachMultiple(addProc, false, false, true, true); err != nil {
 		return err
 	}
 
@@ -122,7 +122,7 @@ func Remove(filterFile libscope.Filter, remProc, rootdir string, rc *run.Config)
 	*/
 
 	// Perform a scope detach to all matching, scoped processes
-	if _, err := rc.AttachDetachMultiple(remProc, false, false, false); err != nil {
+	if _, err := rc.AttachDetachMultiple(remProc, false, false, false, true); err != nil {
 		return err
 	}
 

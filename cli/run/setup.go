@@ -3,6 +3,7 @@ package run
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -42,9 +43,27 @@ func CreateAll(path string) error {
 	return nil
 }
 
+// readBytesStdIn reads the byte data from stdin
+func readBytesStdIn() []byte {
+	var cfgData []byte
+
+	stdinFs, err := os.Stdin.Stat()
+	if err != nil {
+		return cfgData
+	}
+
+	// Avoid waiting for input from terminal when no data was provided
+	if stdinFs.Mode()&os.ModeCharDevice != 0 && stdinFs.Size() == 0 {
+		return cfgData
+	}
+
+	cfgData, _ = io.ReadAll(os.Stdin)
+
+	return cfgData
+}
+
 // setupWorkDir sets up a working directory for a given set of args
 func (rc *Config) setupWorkDir(args []string, attach bool) {
-
 	// Override to CriblDest if specified
 	if rc.CriblDest != "" {
 		rc.EventsDest = rc.CriblDest
@@ -54,11 +73,22 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 	// Create session directory
 	rc.createWorkDir(args, attach)
 
-	// Build or load config if not already provided (i.e. via stdin on attach)
+	// Build or load config
 	if rc.sc == nil {
 		if rc.UserConfig == "" {
-			err := rc.configFromRunOpts()
-			util.CheckErrSprintf(err, "%v", err)
+			// Read the data from stdin only during attach
+			var stdInData []byte
+			if attach {
+				stdInData = readBytesStdIn()
+			}
+
+			if len(stdInData) > 0 {
+				err := rc.ConfigFromStdin(stdInData)
+				util.CheckErrSprintf(err, "%v", err)
+			} else {
+				err := rc.configFromRunOpts()
+				util.CheckErrSprintf(err, "%v", err)
+			}
 		} else {
 			err := rc.ConfigFromFile()
 			util.CheckErrSprintf(err, "%v", err)
@@ -123,7 +153,6 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 		if !util.CheckDirExists("/tmp") {
 			util.ErrAndExit("/tmp directory does not exist")
 		}
-
 		// Create working directory in /tmp (0777 permissions)
 		rc.WorkDir = filepath.Join("/tmp", tmpDirName)
 		err := os.Mkdir(rc.WorkDir, dirPerms)

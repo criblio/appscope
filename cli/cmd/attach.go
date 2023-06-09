@@ -8,6 +8,7 @@ import (
 	"github.com/criblio/scope/inspect"
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/ipc"
+	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
 )
@@ -82,12 +83,25 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 			return err
 		}
 
-		procs, err := rc.AttachDetachMultiple(args[0], true, true, true, false)
+		var procs util.Processes
+		var err error
+
+		id := args[0] // The attach command ensures we have an argument
+
+		procs, err = run.Handler(id, rc.Rootdir, true, true, true, false)
 		if err != nil {
-			util.ErrAndExit("Attach failure: %v", err)
+			return err
 		}
 
-		pid := procs[0].Pid // we told AttachDetachMultiple that we wanted to choose only one proc
+		if len(procs) == 0 {
+			return errNoScopedProcs
+		}
+
+		pid := procs[0].Pid // we told Handler that we wanted to choose only one proc
+
+		if err = rc.Attach(procs[0].Pid); err != nil {
+			util.ErrAndExit("Attach failure: %v", err)
+		}
 
 		if rc.Rootdir != "" {
 			util.Warn("Attaching to process %d", pid)

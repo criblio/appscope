@@ -1,8 +1,19 @@
 package cmd
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/criblio/scope/internal"
+	"github.com/criblio/scope/run"
+	"github.com/criblio/scope/util"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+)
+
+var (
+	errNoScopedProcs     = errors.New("no scoped processes found")
+	errDetachingMultiple = errors.New("at least one error found when detaching from more than 1 process. See logs")
 )
 
 /* Args Matrix (X disallows)
@@ -27,20 +38,49 @@ var detachCmd = &cobra.Command{
 		all, _ := cmd.Flags().GetBool("all")
 		rc.Rootdir, _ = cmd.Flags().GetString("rootdir")
 
-		id := ""
-		if all {
-			if len(args) != 0 {
-				helpErrAndExit(cmd, "--all flag is mutually exclusive with PID or <process_name>")
-			}
-			_, err := rc.AttachDetachMultiple(id, false, true, false, false)
-			return err
+		if all && len(args) > 0 {
+			helpErrAndExit(cmd, "--all flag is mutually exclusive with PID or <process_name>")
 		}
 
+		var procs util.Processes
+		var err error
+
+		id := ""
 		if len(args) > 0 {
 			id = args[0]
 		}
-		_, err := rc.AttachDetachMultiple(id, true, true, false, false)
-		return err
+
+		procs, err = run.Handler(id, rc.Rootdir, !all, true, false, false)
+		if err != nil {
+			return err
+		}
+
+		if len(procs) == 0 {
+			return errNoScopedProcs
+		}
+		if len(procs) == 1 {
+			return rc.Detach(procs[0].Pid)
+		}
+
+		// len(procs) is > 1
+		if !util.Confirm(fmt.Sprintf("Are your sure you want to detach from all of these processes?")) {
+			fmt.Println("info: canceled")
+			return nil
+		}
+
+		rc.Subprocess = true
+		errors := false
+		for _, proc := range procs {
+			if err = rc.Detach(proc.Pid); err != nil {
+				log.Error().Err(err)
+				errors = true
+			}
+		}
+		if errors {
+			return errDetachingMultiple
+		}
+
+		return nil
 	},
 }
 

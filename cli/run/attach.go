@@ -43,12 +43,12 @@ var (
 // @exactMatch require an exact match when id is a name
 func (rc *Config) AttachDetachMultiple(id string, choose, confirm, attach, exactMatch bool) (util.Processes, error) {
 	// Differentiate between attach and detach actions
-	function := rc.attach
+	function := rc.Attach
 	actionString := "attach to"
 	noProcsErr := errMissingProc
 	multipleErr := errAttachingMultiple
 	if !attach {
-		function = rc.detach
+		function = rc.Detach
 		actionString = "detach from"
 		noProcsErr = errNoScopedProcs
 		multipleErr = errDetachingMultiple
@@ -119,7 +119,7 @@ func (rc *Config) AttachDetachMultiple(id string, choose, confirm, attach, exact
 
 // NOTE: The responsibility of this function is to check if its possible to attach
 // and then perform the attach if so
-func (rc *Config) attach(pid int) error {
+func (rc *Config) Attach(pid int) error {
 	env := os.Environ()
 	ld := loader.New()
 
@@ -240,7 +240,7 @@ func (rc *Config) attach(pid int) error {
 
 // NOTE: The responsibility of this function is to check if its possible to detach
 // and then perform the detach if so
-func (rc *Config) detach(pid int) error {
+func (rc *Config) Detach(pid int) error {
 	env := os.Environ()
 	ld := loader.New()
 
@@ -264,6 +264,59 @@ func (rc *Config) detach(pid int) error {
 		return err
 	}
 	return ld.Detach(args, env)
+}
+
+// AttachDetachMultiple allows a user to attach to or detach from one or more processes by name or pid
+// If the id provided is a pid, that single pid will be attached/detached
+// If the id provided is a name, all processes matching that name will be attached/detached
+// unless the @choose argument is true, which will allow the user to choose a single process
+// NOTE: The responsibility of this function is not to check if its possible to attach/detach
+// It's only to prepare a list of procs and let attach/detach handle the rest
+// Args:
+// @id name or pid
+// @choose require a user to choose a single proc from a list
+// @confirm require a user to confirm their choice
+// @attach attach or detach
+// @exactMatch require an exact match when id is a name
+func Handler(id, rootdir string, choose, confirm, attach, exactMatch bool) (util.Processes, error) {
+
+	procs := make(util.Processes, 0)
+	var err error
+	adminStatus := true
+	if err := util.UserVerifyRootPerm(); err != nil {
+		if errors.Is(err, util.ErrMissingAdmPriv) {
+			adminStatus = false
+		} else {
+			return procs, err
+		}
+	}
+
+	if util.IsNumeric(id) {
+		// If the id provided is an integer, interpret it as a pid and use that pid only
+
+		pid, err := strconv.Atoi(id)
+		if err != nil {
+			return procs, errPidInvalid
+		}
+
+		procs = append(procs, util.Process{Pid: pid})
+
+	} else {
+		// If the id provided is a name, find one or more matching procs
+		// Note: An empty string is supported to pick up all procs
+
+		if !adminStatus {
+			fmt.Println("INFO: Run as root (or via sudo) to find all matching processes")
+		}
+
+		procs, err = HandleInputArg(rootdir, id, attach, choose, confirm, exactMatch)
+		if err != nil {
+			return procs, err
+		}
+	}
+
+	return procs, nil
+
 }
 
 // HandleInputArg handles the input argument (process name) and returns an array of processes

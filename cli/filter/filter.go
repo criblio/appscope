@@ -82,9 +82,13 @@ func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) er
 			requires a namespace switch so need a loader command
 		    maybe we read it here, manipulate it with the cli yaml library, and then provide a file to write back
 
+			ld.UpdateFilter
+
 		set ld.so.preload if it is not already set.
 		   	new loader command for this?
 			scope --ldpreload true (--rootdir x)
+
+			ld.SetPreload
 	*/
 
 	// Perform a scope attach to all matching processes that are not already scoped (will re-attach to update existing procs)
@@ -110,15 +114,19 @@ func Remove(filterFile libscope.Filter, remProc, rootdir string, rc *run.Config)
 			requires a namespace switch so need a loader command to modify this file
 			maybe we read it here, manipulate it with the cli yaml library, and then provide a file to write back
 
+			ld.UpdateFilter()
+
 		if it's the last entry in the filter file
 			unset ld.so.preload
 				new loader command for this?
 				scope --ldpreload false (--rootdir x)
 
-			remove the empty filter file
-				requires change namespace so use loader command:
-				loader command: scope stop --rootdir hostfs
+			ld.SetPreload()
 
+			// dont need to do this since we are adding logic to ignore an empty filter file
+			// remove the empty filter file
+			// 	requires change namespace so use loader command:
+			// 	loader command: scope stop --rootdir hostfs
 	*/
 
 	// Perform a scope detach to all matching, scoped processes

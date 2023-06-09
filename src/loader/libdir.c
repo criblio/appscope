@@ -23,6 +23,7 @@
 #include "nsfile.h"
 #include "patch.h"
 #include "scopetypes.h"
+#include "setup.h"
 
 #ifndef SCOPE_VER
 #error "Missing SCOPE_VER"
@@ -34,6 +35,10 @@
 
 #ifndef SCOPE_DYN_NAME
 #define SCOPE_DYN_NAME "scopedyn"
+#endif
+
+#ifndef SCOPE_NAME
+#define SCOPE_NAME "scope"
 #endif
 
 #define SCOPE_NAME_SIZE (16)
@@ -69,6 +74,11 @@ static struct scope_obj_state scopedynState = {
     .binaryName = SCOPE_DYN_NAME,
 };
 
+// internal state for loader
+static struct scope_obj_state scopeState = {
+    .binaryName = SCOPE_NAME,
+};
+
 // Representation of the .note.gnu.build-id ELF segment
 typedef struct
 {
@@ -88,17 +98,25 @@ static struct scope_obj_state *
 getObjState(libdirfile_t objFileType)
 {
     switch (objFileType) {
-        case LIBRARY_FILE:
-            return &libscopeState;
-            break;
-        case LOADER_FILE:
-            return &scopedynState;
-            break;
+    case LIBRARY_FILE:
+        return &libscopeState;
+        break;
+    case STATIC_LOADER_FILE:
+        return &scopeState;
+        break;
+    case LOADER_FILE:
+        return &scopedynState;
+        break;
     }
     // unreachable
     return NULL;
 }
 
+/*
+ * Update the @start parameter to point to the binary specified by @objFileType
+ * Note: When the @objFileType parameter specifies the STATIC_LOADER_FILE,
+ * the caller should munmap the memory afterwards.
+ */
 size_t
 getAsset(libdirfile_t objFileType, unsigned char **start)
 {
@@ -108,6 +126,8 @@ getAsset(libdirfile_t objFileType, unsigned char **start)
     uint64_t *libsym;
     unsigned char *libptr;
     elf_buf_t *ebuf = NULL;
+    size_t scopeSize;
+    char path[PATH_MAX] = {0};
 
     if ((ebuf = getElf("/proc/self/exe")) == NULL) {
         fprintf(stderr, "error: can't read /proc/self/exe\n");
@@ -115,35 +135,51 @@ getAsset(libdirfile_t objFileType, unsigned char **start)
     }
 
     switch (objFileType) {
-        case LIBRARY_FILE:
-            if ((libsym = getSymbol(ebuf->buf, LIBSCOPE))) {
-                libptr = (unsigned char *)*libsym;
-            } else {
-                fprintf(stderr, "%s:%d no addr for _buildLibscopeSo\n", __FUNCTION__, __LINE__);
-                goto out;
-            }
+    case LIBRARY_FILE:
+        if ((libsym = getSymbol(ebuf->buf, LIBSCOPE))) {
+            libptr = (unsigned char *)*libsym;
+        } else {
+            fprintf(stderr, "%s:%d no addr for _buildLibscopeSo\n", __FUNCTION__, __LINE__);
+            goto out;
+        }
 
-            *start = (unsigned char *)libptr;
-            len =  g_libscopesz;
-            break;
+        *start = (unsigned char *)libptr;
+        len =  g_libscopesz;
+        break;
 
-        case LOADER_FILE:
-            if ((libsym = getSymbol(ebuf->buf, SCOPEDYN))) {
-                libptr = (unsigned char *)*libsym;
-            } else {
-                fprintf(stderr, "%s:%d no addr for _buildScopedyn\n", __FUNCTION__, __LINE__);
-                goto out;
-            }
+    case LOADER_FILE:
+        if ((libsym = getSymbol(ebuf->buf, SCOPEDYN))) {
+            libptr = (unsigned char *)*libsym;
+        } else {
+            fprintf(stderr, "%s:%d no addr for _buildScopedyn\n", __FUNCTION__, __LINE__);
+            goto out;
+        }
 
-            *start = (unsigned char *)libptr;
-            len =  g_scopedynsz;
-            break;
+        *start = (unsigned char *)libptr;
+        len =  g_scopedynsz;
+        break;
 
-        default:
-            break;
+    case STATIC_LOADER_FILE:
+        if (readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
+            fprintf(stderr, "%s:%d readlink failed\n", __FUNCTION__, __LINE__);
+            goto out;
+        }
+        libptr = (unsigned char *)setupLoadFileIntoMem(&scopeSize, path);
+        if (libptr == NULL) {
+            goto out;
+        }
+
+        *start = libptr;
+        len = scopeSize;
+        break;
+
+    default:
+        fprintf(stderr, "error: invalid objFileType\n");
+        goto out;
+
     }
 
-  out:
+out:
     if (ebuf) {
         freeElf(ebuf->buf, ebuf->len);
         free(ebuf);
@@ -176,39 +212,47 @@ libdirCreateSymLinkIfMissing(char *path, char *target, bool overwrite, mode_t mo
 }
 
 /*
- * Getting objects bundled
+ * Create a file of type @objFileType if it does not exist yet
+ * Optionally specify @file and @file_len arguments to use an asset that's already 
+ * been retrieved ; otherwise, the asset will be retrieved
  */
 int
-libdirCreateFileIfMissing(unsigned char *file, size_t file_len, const char *path, bool overwrite, mode_t mode, uid_t nsEuid, gid_t nsEgid)
+libdirCreateFileIfMissing(unsigned char *file, size_t file_len, libdirfile_t objFileType, const char *path, bool overwrite, mode_t mode, uid_t nsEuid, gid_t nsEgid)
 {
-    // Check if file exists
-    if (!access(path, R_OK) && !overwrite) {
-        return 0; // File exists
-    }
-
+    int ret = 0;
     int fd;
     char temp[PATH_MAX];
-    unsigned char *start;
+    unsigned char *start = NULL;
+    unsigned char *buf;
     size_t len;
 
+    // Check if file exists
+    if (!access(path, R_OK) && !overwrite) {
+        return ret; // File exists
+    }
+
     if (file) {
-        start = file;
+        buf = file;
         len = file_len;
     } else {
-        if ((len = getAsset(LIBRARY_FILE, &start)) == -1) {
-            return -1;
+        if ((len = getAsset(objFileType, &start)) == -1) {
+            ret = -1;
+            goto out;
         }
+        buf = start;
     }
 
     // Write file
     int tempLen = snprintf(temp, PATH_MAX, "%s.XXXXXX", path);
     if (tempLen < 0) {
         fprintf(stderr, "error: snprintf failed.\n");
-        return -1;
+        ret = -1;
+        goto out;
     }
     if (tempLen >= PATH_MAX) {
         fprintf(stderr, "error: extract temp too long.\n");
-        return -1;
+        ret = -1;
+        goto out;
     }
 
     uid_t currentEuid = geteuid();
@@ -217,21 +261,24 @@ libdirCreateFileIfMissing(unsigned char *file, size_t file_len, const char *path
     if ((fd = nsFileMksTemp(temp, nsEuid, nsEgid, currentEuid, currentEgid)) < 1) {
         // No permission
         unlink(temp);
-        return -1;
+        ret = -1;
+        goto out;
     }
 
-    if (write(fd, start, len) != len) {
+    if (write(fd, buf, len) != len) {
         close(fd);
         unlink(temp);
         perror("libdirCreateFileIfMissing: write() failed");
-        return -1;
+        ret = -1;
+        goto out;
     }
 
     if (fchmod(fd, mode)) {
         close(fd);
         unlink(temp);
         perror("libdirCreateFileIfMissing: fchmod() failed");
-        return -1;
+        ret = -1;
+        goto out;
     }
 
     close(fd);
@@ -239,10 +286,13 @@ libdirCreateFileIfMissing(unsigned char *file, size_t file_len, const char *path
     if (nsFileRename(temp, path, nsEuid, nsEgid, currentEuid, currentEgid)) {
         unlink(temp);
         perror("libdirCreateFileIfMissing: rename() failed");
-        return -1;
+        ret = -1;
+        goto out;
     }
 
-    return 0;
+out:
+    if (objFileType == STATIC_LOADER_FILE && start) munmap(start, len);
+    return ret;
 }
 
 // Verify if following absolute path points to directory
@@ -424,17 +474,16 @@ libdirSetLibraryBase(const char *base)
     return -1;
 }
 
-
 /*
 * Retrieve the full absolute path of the specified binary libscope.so.
 * Returns path for the specified binary, NULL in case of failure.
 */
 const char *
-libdirGetPath(void)
+libdirGetPath(libdirfile_t objFileType)
 {
     const char *normVer = libverNormalizedVersion(g_libdir_info.ver);
 
-    struct scope_obj_state *state = getObjState(LIBRARY_FILE);
+    struct scope_obj_state *state = getObjState(objFileType);
     if (!state) {
         return NULL;
     }
@@ -517,7 +566,6 @@ libdirGetPath(void)
         }
     }
 
-
     return NULL;
 }
 
@@ -529,7 +577,7 @@ libdirGetPath(void)
 * Returns 0 in case of success, other values in case of failure.
 */
 int
-libdirExtract(unsigned char *asset_file, size_t asset_file_len, uid_t nsUid, gid_t nsGid)
+libdirExtract(unsigned char *asset_file, size_t asset_file_len, uid_t nsUid, gid_t nsGid, libdirfile_t objFileType)
 {
     char path[PATH_MAX] = {0};
     char path_musl[PATH_MAX] = {0};
@@ -597,38 +645,66 @@ libdirExtract(unsigned char *asset_file, size_t asset_file_len, uid_t nsUid, gid
         return -1;
     }
 
-    // Create the libscope file if it does not exist; or needs to be overwritten
-    
-    pathlen = strlen(path);
-    // Extract libscope.so.glibc (bundled libscope defaults to glibc loader)
-    strncpy(path_glibc, path, pathlen);
-    strncat(path_glibc, "libscope.so.glibc", sizeof(path_glibc) - 1);
-    if (libdirCreateFileIfMissing(asset_file, asset_file_len, path_glibc, overwrite, mode, nsUid, nsGid)) {
-        fprintf(stderr, "libdirExtract: saving %s failed\n", path_glibc);
-        return -1;
-    }
+    // Create the file if it does not exist or needs to be overwritten
 
-    // Extract libscope.so.musl
-    strncpy(path_musl, path, pathlen);
-    strncat(path_musl, "libscope.so.musl", sizeof(path_musl) - 1);
-    if (libdirCreateFileIfMissing(asset_file, asset_file_len, path_musl, overwrite, mode, nsUid, nsGid)) {
-        fprintf(stderr, "libdirExtract: saving %s failed\n", path);
-        return -1;
-    }
+    switch (objFileType) {
+    case LIBRARY_FILE:
+        pathlen = strlen(path);
 
-    // Patch the libscope.so.musl file for musl
-    patch_status_t patch_res;
-    if ((patch_res = patchLibrary(path_musl, TRUE)) == PATCH_FAILED) {
-        fprintf(stderr, "libdirExtract: patch %s failed\n", path_musl);
-        return -1;
-    }
+        // Extract libscope.so.glibc (bundled libscope defaults to glibc loader)
+        strncpy(path_glibc, path, pathlen);
+        strncat(path_glibc, "libscope.so.glibc", sizeof(path_glibc) - 1);
+        if (libdirCreateFileIfMissing(asset_file, asset_file_len, objFileType, path_glibc, overwrite, mode, nsUid, nsGid)) {
+            fprintf(stderr, "libdirExtract: saving %s failed\n", path_glibc);
+            return -1;
+        }
 
-    // Create symlink to appropriate version
-    strncat(path, "libscope.so", sizeof(path) - 1);
-    target = isMusl() ? path_musl : path_glibc;
-    if (libdirCreateSymLinkIfMissing(path, target, overwrite, mode, nsUid, nsGid)) {
-        fprintf(stderr, "libdirExtract: symlink %s failed\n", path);
+        // Extract libscope.so.musl
+        strncpy(path_musl, path, pathlen);
+        strncat(path_musl, "libscope.so.musl", sizeof(path_musl) - 1);
+        if (libdirCreateFileIfMissing(asset_file, asset_file_len, objFileType, path_musl, overwrite, mode, nsUid, nsGid)) {
+            fprintf(stderr, "libdirExtract: saving %s failed\n", path);
+            return -1;
+        }
+
+        // Patch the libscope.so.musl file for musl
+        patch_status_t patch_res;
+        if ((patch_res = patchLibrary(path_musl, TRUE)) == PATCH_FAILED) {
+            fprintf(stderr, "libdirExtract: patch %s failed\n", path_musl);
+            return -1;
+        }
+
+        // Create symlink to appropriate version
+        strncat(path, "libscope.so", sizeof(path) - 1);
+        target = isMusl() ? path_musl : path_glibc;
+        if (libdirCreateSymLinkIfMissing(path, target, overwrite, mode, nsUid, nsGid)) {
+            fprintf(stderr, "libdirExtract: symlink %s failed\n", path);
+            return -1;
+        }
+        break;
+
+    case LOADER_FILE:
+        // Create the dynamic loader file if it does not exist; or needs to be overwritten
+        strncat(path, "scopedyn", sizeof(path) - 1);
+        if (libdirCreateFileIfMissing(asset_file, asset_file_len, objFileType, path, overwrite, mode, nsUid, nsGid)) {
+            fprintf(stderr, "libdirExtract: saving %s failed\n", path);
+            return -1;
+        }
+        break;
+
+    case STATIC_LOADER_FILE:
+        // Create the loader file if it does not exist; or needs to be overwritten
+        strncat(path, "scope", sizeof(path) - 1);
+        if (libdirCreateFileIfMissing(asset_file, asset_file_len, objFileType, path, overwrite, mode, nsUid, nsGid)) {
+            fprintf(stderr, "libdirExtract: saving %s failed\n", path);
+            return -1;
+        }
+        break;
+
+    default:
+        fprintf(stderr, "error: invalid objFileType\n");
         return -1;
+
     }
 
     return 0;

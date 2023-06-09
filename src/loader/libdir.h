@@ -11,8 +11,9 @@ extern unsigned long g_scopedynsz;
 
 // File types
 typedef enum {
-    LIBRARY_FILE, // libscope.so
-    LOADER_FILE,  // scopedyn
+    LIBRARY_FILE,       // libscope.so
+    LOADER_FILE,        // scopedyn
+    STATIC_LOADER_FILE  // scope
 } libdirfile_t;
 
 typedef enum {
@@ -24,10 +25,10 @@ typedef enum {
 } mkdir_status_t;
 
 mkdir_status_t libdirCreateDirIfMissing(const char *, mode_t, uid_t, gid_t);
-int libdirCreateFileIfMissing(unsigned char *, size_t, const char *, bool, mode_t, uid_t, gid_t);
+int libdirCreateFileIfMissing(unsigned char *, size_t, libdirfile_t, const char *, bool, mode_t, uid_t, gid_t);
 int libdirSetLibraryBase(const char *);                                      // Override default library base search dir
-int libdirExtract(unsigned char *, size_t, uid_t, gid_t);                    // Extracts libscope.so to default path
-const char *libdirGetPath(void);                                             // Get full path to existing libscope.so
+int libdirExtract(unsigned char *, size_t, uid_t, gid_t, libdirfile_t);                    // Extracts library file to default path
+const char *libdirGetPath(libdirfile_t);                                     // Get full path to existing library file
 size_t getAsset(libdirfile_t, unsigned char **);
 
 // Unit Test helper

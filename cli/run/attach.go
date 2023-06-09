@@ -29,36 +29,36 @@ var (
 )
 
 // Attach scopes an existing PID
-func (rc *Config) Attach(args []string) error {
+func (rc *Config) Attach(args []string) (int, error) {
 	pid, err := HandleInputArg(rc.Rootdir, args[0], true, false, true)
 	if err != nil {
-		return err
+		return pid, err
 	}
 	args[0] = fmt.Sprint(pid)
 	var reattach bool
 	// Check PID is not already being scoped
 	status, err := util.PidScopeStatus(rc.Rootdir, pid)
 	if err != nil {
-		return err
+		return pid, err
 	}
 
 	if status == util.Disable || status == util.Setup {
 		// Validate user has root permissions
 		if err := util.UserVerifyRootPerm(); err != nil {
-			return err
+			return pid, err
 		}
 		// Validate PTRACE capability
 		c, err := capability.NewPid2(0)
 		if err != nil {
-			return errGetLinuxCap
+			return pid, errGetLinuxCap
 		}
 
 		if err = c.Load(); err != nil {
-			return errLoadLinuxCap
+			return pid, errLoadLinuxCap
 		}
 
 		if !c.Get(capability.EFFECTIVE, capability.CAP_SYS_PTRACE) {
-			return errMissingPtrace
+			return pid, errMissingPtrace
 		}
 	} else {
 		// Reattach because process contains our library
@@ -94,7 +94,7 @@ func (rc *Config) Attach(args []string) error {
 	// Handle custom library path
 	if len(rc.LibraryPath) > 0 {
 		if !util.CheckDirExists(rc.LibraryPath) {
-			return errLibraryNotExist
+			return pid, errLibraryNotExist
 		}
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
@@ -103,22 +103,51 @@ func (rc *Config) Attach(args []string) error {
 		env = append(env, "SCOPE_CONF_RELOAD="+filepath.Join(rc.WorkDir, "scope.yml"))
 	}
 
+	if rc.Rootdir != "" {
+		args = append(args, []string{"--rootdir", rc.Rootdir}...)
+	}
+
 	ld := loader.New()
 	if !rc.Subprocess {
 		err = ld.Attach(args, env)
 	} else {
 		_, err = ld.AttachSubProc(args, env)
 	}
-
-	// Replace the working directory with symbolic link in case of successful attach
-	if err == nil {
-		if refNsPid != -1 {
-			os.RemoveAll(rc.WorkDir)
-			os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", rc.WorkDir), rc.WorkDir)
-		}
+	if err != nil {
+		return pid, err
 	}
 
-	return err
+	// Replace the working directory files with symbolic links in case of successful attach
+	// where the target ns is different to the origin ns
+
+	eventsFilePath := filepath.Join(rc.WorkDir, "events.json")
+	metricsFilePath := filepath.Join(rc.WorkDir, "metrics.json")
+	logsFilePath := filepath.Join(rc.WorkDir, "libscope.log")
+	payloadsDirPath := filepath.Join(rc.WorkDir, "payloads")
+
+	if rc.Rootdir != "" {
+		os.Remove(eventsFilePath)
+		os.Remove(metricsFilePath)
+		os.Remove(logsFilePath)
+		os.RemoveAll(payloadsDirPath)
+		os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", eventsFilePath), eventsFilePath)
+		os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", metricsFilePath), metricsFilePath)
+		os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", logsFilePath), logsFilePath)
+		os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", payloadsDirPath), payloadsDirPath)
+
+	} else if refNsPid != -1 {
+		// Child namespace
+		os.Remove(eventsFilePath)
+		os.Remove(metricsFilePath)
+		os.Remove(logsFilePath)
+		os.RemoveAll(payloadsDirPath)
+		os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", eventsFilePath), eventsFilePath)
+		os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", metricsFilePath), metricsFilePath)
+		os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", logsFilePath), logsFilePath)
+		os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", payloadsDirPath), payloadsDirPath)
+	}
+
+	return pid, nil
 }
 
 // DetachAll provides the option to detach from all Scoped processes
@@ -194,6 +223,11 @@ func (rc *Config) DetachSingle(id string) error {
 func (rc *Config) detach(pid int) error {
 	args := make([]string, 0)
 	args = append(args, fmt.Sprint(pid))
+
+	if rc.Rootdir != "" {
+		args = append(args, []string{"--rootdir", rc.Rootdir}...)
+	}
+
 	env := os.Environ()
 	ld := loader.New()
 	if !rc.Subprocess {

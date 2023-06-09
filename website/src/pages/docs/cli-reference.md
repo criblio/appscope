@@ -90,6 +90,7 @@ be set to sockets with `unix:///var/run/mysock`, `tcp://hostname:port`, `udp://h
 ```
 scope attach 1000
 scope attach firefox 
+scope attach top < scope.yml
 scope attach --rootdir /path/to/host firefox 
 scope attach --rootdir /path/to/host/mount/proc/<hostpid>/root 1000
 scope attach --payloads 2000
@@ -104,6 +105,8 @@ scope attach --payloads 2000
   -c, --cribldest string      Set Cribl destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
   -h, --help                  help for attach
+  -i, --inspect               Inspect the process after attach is complete
+  -j, --json                  Output as newline delimited JSON
   -l, --librarypath string    Set path for dynamic libraries
       --loglevel string       Set scope library log level (debug, warning, info, error, none)
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
@@ -694,7 +697,7 @@ scope update 1000 --rootdir /path/to/host/mount/proc/<hostpid>/root < scope_cfg.
 
 ```
 Flags:
-  -f, --fetch           Inspect the process after the update is complete
+  -i, --inspect         Inspect the process after the update is complete
   -c, --config string   Path to configuration file
   -h, --help            help for update
   -j, --json            Output as newline delimited JSON without pretty printing

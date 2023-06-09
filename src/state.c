@@ -303,7 +303,7 @@ initState()
     {
         // g_http_guard_enable is always false unless
         // SCOPE_HTTP_SERIALIZE_ENABLE is defined and is "true"
-        char *spin_env = getenv("SCOPE_HTTP_SERIALIZE_ENABLE");
+        char *spin_env = fullGetEnv("SCOPE_HTTP_SERIALIZE_ENABLE");
         g_http_guard_enabled = (spin_env && !scope_strcmp(spin_env, "true"));
     }
 

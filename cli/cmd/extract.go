@@ -21,8 +21,8 @@ var excreteCmd = &cobra.Command{
 
 The --*dest flags accept file names like /tmp/scope.log or URLs like file:///tmp/scope.log. They may also
 be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
-	Example: `scope extract /opt/libscope
-scope extract --metricdest tcp://some.host:8125 --eventdest tcp://other.host:10070 .
+	Example: `  scope extract /opt/libscope
+  scope extract --metricdest tcp://some.host:8125 --eventdest tcp://other.host:10070 .
 `,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {

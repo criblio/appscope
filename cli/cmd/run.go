@@ -34,12 +34,12 @@ var runCmd = &cobra.Command{
 	Long: `Executes a scoped command. By default, calling scope with no subcommands will run the executables you pass as arguments to scope. However, scope allows for additional arguments to be passed to run to capture payloads or to increase metrics' verbosity. Must be called with the -- flag, e.g., 'scope run -- <command>', to prevent AppScope from attempting to parse flags passed to the executed command.
 
 The --*dest flags accept file names like /tmp/scope.log; URLs like file:///tmp/scope.log; or sockets specified with the pattern unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
-	Example: `scope run -- /bin/echo "foo"
-scope run -- perl -e 'print "foo\n"'
-scope run --payloads -- nc -lp 10001
-scope run -- curl https://wttr.in/94105
-scope run -c tcp://127.0.0.1:10091 -- curl https://wttr.in/94105
-scope run -c edge -- top`,
+	Example: `  scope run -- /bin/echo "foo"
+  scope run -- perl -e 'print "foo\n"'
+  scope run --payloads -- nc -lp 10001
+  scope run -- curl https://wttr.in/94105
+  scope run -c tcp://127.0.0.1:10091 -- curl https://wttr.in/94105
+  scope run -c edge -- top`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()

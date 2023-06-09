@@ -15,8 +15,8 @@ var startCmd = &cobra.Command{
 	Long: `Install the AppScope library to:
 /usr/lib/appscope/<version>/ with admin privileges, or 
 /tmp/appscope/<version>/ otherwise`,
-	Example: `scope start
-scope start --rootdir /hostfs`,
+	Example: `  scope start
+  scope start --rootdir /hostfs`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()

@@ -1,6 +1,7 @@
 package filter
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -11,6 +12,12 @@ import (
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v2"
+)
+
+var (
+	errNoScopedProcs     = errors.New("no scoped processes found")
+	errDetachingMultiple = errors.New("at least one error found when detaching from more than 1 process. See logs")
+	errAttachingMultiple = errors.New("at least one error found when attaching to more than 1 process. See logs")
 )
 
 func Retrieve(rootdir string) ([]byte, libscope.Filter, error) {
@@ -93,10 +100,30 @@ func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) er
 
 	// Perform a scope attach to all matching processes that are not already scoped (will re-attach to update existing procs)
 	if rootdir != "" {
-		util.Warn("It can take up to 1 minute to attach to a process in a parent namespace")
+		util.Warn("It can take up to 1 minute to attach to processes in a parent namespace")
 	}
-	if _, err := rc.AttachDetachMultiple(addProc, false, false, true, true); err != nil {
+
+	rc.Subprocess = true
+	procs, err := util.HandleInputArg(addProc, rc.Rootdir, false, false, true, true)
+	if err != nil {
 		return err
+	}
+	// Note: if len(procs) == 0 do nothing
+	if len(procs) == 1 {
+		if err = rc.Attach(procs[0].Pid); err != nil {
+			return err
+		}
+	} else if len(procs) > 1 {
+		errors := false
+		for _, proc := range procs {
+			if err = rc.Attach(proc.Pid); err != nil {
+				log.Error().Err(err)
+				errors = true
+			}
+		}
+		if errors {
+			return errAttachingMultiple
+		}
 	}
 
 	// TBC ? TODO perform a scope detach to all processes that do not match anything in the filter file
@@ -130,8 +157,27 @@ func Remove(filterFile libscope.Filter, remProc, rootdir string, rc *run.Config)
 	*/
 
 	// Perform a scope detach to all matching, scoped processes
-	if _, err := rc.AttachDetachMultiple(remProc, false, false, false, true); err != nil {
+	rc.Subprocess = true
+	procs, err := util.HandleInputArg(remProc, rc.Rootdir, false, false, false, true)
+	if err != nil {
 		return err
+	}
+	// Note: if len(procs) == 0 do nothing
+	if len(procs) == 1 {
+		if err = rc.Detach(procs[0].Pid); err != nil {
+			return err
+		}
+	} else if len(procs) > 1 {
+		errors := false
+		for _, proc := range procs {
+			if err = rc.Detach(proc.Pid); err != nil {
+				log.Error().Err(err)
+				errors = true
+			}
+		}
+		if errors {
+			return errDetachingMultiple
+		}
 	}
 
 	return nil

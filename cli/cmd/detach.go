@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/criblio/scope/internal"
-	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -42,15 +41,12 @@ var detachCmd = &cobra.Command{
 			helpErrAndExit(cmd, "--all flag is mutually exclusive with PID or <process_name>")
 		}
 
-		var procs util.Processes
-		var err error
-
 		id := ""
 		if len(args) > 0 {
 			id = args[0]
 		}
 
-		procs, err = run.Handler(id, rc.Rootdir, !all, true, false, false)
+		procs, err := util.HandleInputArg(id, rc.Rootdir, !all, true, false, false)
 		if err != nil {
 			return err
 		}
@@ -61,7 +57,6 @@ var detachCmd = &cobra.Command{
 		if len(procs) == 1 {
 			return rc.Detach(procs[0].Pid)
 		}
-
 		// len(procs) is > 1
 		if !util.Confirm(fmt.Sprintf("Are your sure you want to detach from all of these processes?")) {
 			fmt.Println("info: canceled")

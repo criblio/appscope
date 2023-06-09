@@ -8,7 +8,6 @@ import (
 	"github.com/criblio/scope/inspect"
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/ipc"
-	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
 	"github.com/spf13/cobra"
 )
@@ -83,12 +82,9 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 			return err
 		}
 
-		var procs util.Processes
-		var err error
-
 		id := args[0] // The attach command ensures we have an argument
 
-		procs, err = run.Handler(id, rc.Rootdir, true, true, true, false)
+		procs, err := util.HandleInputArg(id, rc.Rootdir, true, true, true, false)
 		if err != nil {
 			return err
 		}

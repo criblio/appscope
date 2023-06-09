@@ -29,13 +29,15 @@ type PidScopeMapState map[int]bool
 type Processes []Process
 
 var (
-	errOpenProc        = errors.New("cannot open proc directory")
-	errGetProcStatus   = errors.New("error getting process status")
-	errGetProcCmdLine  = errors.New("error getting process command line")
-	errGetProcTask     = errors.New("error getting process task")
-	errGetProcChildren = errors.New("error getting process children")
-	errPidMissing      = errors.New("error pid does not exist")
-	errMissingUser     = errors.New("unable to find user")
+	errOpenProc         = errors.New("cannot open proc directory")
+	errGetProcStatus    = errors.New("error getting process status")
+	errGetProcCmdLine   = errors.New("error getting process command line")
+	errGetProcTask      = errors.New("error getting process task")
+	errGetProcChildren  = errors.New("error getting process children")
+	errPidMissing       = errors.New("error pid does not exist")
+	errMissingUser      = errors.New("unable to find user")
+	errPidInvalid       = errors.New("invalid PID")
+	errInvalidSelection = errors.New("invalid Selection")
 )
 
 // searchPidByProcName check if specified inputProcName fully match the pid's process name
@@ -519,4 +521,82 @@ func PidGetRefPidForMntNamespace(rootdir string, targetPid int) int {
 
 	// Assume that target process do not exists in the container but have seperated mount namespace
 	return targetPid
+}
+
+// HandleInputArg handles the input argument (process name or pid) and returns an array of processes
+// If the id provided is a pid, that single pid will be returned as a proc
+// If the id provided is a name, all processes matching that name will be returned in procs
+// Args:
+// @id name or pid
+// @choose require a user to choose a single proc from a list
+// @confirm require a user to confirm their choice
+// @attach attach or detach operation
+// @exactMatch require an exact match when id is a name
+func HandleInputArg(id, rootdir string, choose, confirm, attach, exactMatch bool) (Processes, error) {
+	procs := make(Processes, 0)
+	var err error
+	adminStatus := true
+	if err := UserVerifyRootPerm(); err != nil {
+		if errors.Is(err, ErrMissingAdmPriv) {
+			adminStatus = false
+		} else {
+			return procs, err
+		}
+	}
+
+	if IsNumeric(id) {
+		// If the id provided is an integer, interpret it as a pid and use that pid only
+
+		pid, err := strconv.Atoi(id)
+		if err != nil {
+			return procs, errPidInvalid
+		}
+
+		procs = append(procs, Process{Pid: pid})
+
+	} else {
+		// If the id provided is a name, find one or more matching procs
+		// Note: An empty string is supported to pick up all procs
+
+		if !adminStatus {
+			fmt.Println("INFO: Run as root (or via sudo) to find all matching processes")
+		}
+
+		if attach {
+			// Get a list of all process that match the name, regardless of status
+			if procs, err = ProcessesByNameToAttach(rootdir, id, exactMatch); err != nil {
+				return nil, err
+			}
+		} else {
+			// Get a list of all processes that match the name and scope is actively attached
+			if procs, err = ProcessesByNameToDetach(rootdir, id, exactMatch); err != nil {
+				return nil, err
+			}
+		}
+
+		if len(procs) > 1 {
+			if confirm || choose {
+				PrintObj([]ObjField{
+					{Name: "ID", Field: "id"},
+					{Name: "Pid", Field: "pid"},
+					{Name: "User", Field: "user"},
+					{Name: "Scoped", Field: "scoped"},
+					{Name: "Command", Field: "command"},
+				}, procs)
+			}
+			if choose {
+				fmt.Println("Select an ID from the list:")
+				var selection string
+				fmt.Scanln(&selection)
+				i, err := strconv.ParseUint(selection, 10, 32)
+				i--
+				if err != nil || i >= uint64(len(procs)) {
+					return nil, errInvalidSelection
+				}
+				return Processes{procs[i]}, nil
+			}
+		}
+	}
+
+	return procs, nil
 }

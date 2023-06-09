@@ -13,6 +13,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+var (
+	errNoScopedProcs     = errors.New("no scoped processes found")
+	errDetachingMultiple = errors.New("at least one error found when detaching from more than 1 process. See logs")
+)
+
 // for the host
 func stopConfigureHost() error {
 	ld := loader.New()
@@ -164,10 +169,29 @@ func Stop() error {
 		Subprocess: true,
 		Verbosity:  4, // Default
 	}
-	if _, err := rc.AttachDetachMultiple("", false, false, false, false); err != nil {
-		log.Error().
-			Err(err).
-			Msg("Error detaching from all Scoped processes")
+
+	// Perform a scope detach to all scoped processes
+	rc.Subprocess = true
+	procs, err := util.HandleInputArg("", rc.Rootdir, false, false, false, true)
+	if err != nil {
+		return err
+	}
+	// Note: if len(procs) == 0 do nothing
+	if len(procs) == 1 {
+		if err = rc.Detach(procs[0].Pid); err != nil {
+			return err
+		}
+	} else if len(procs) > 1 {
+		errors := false
+		for _, proc := range procs {
+			if err = rc.Detach(proc.Pid); err != nil {
+				log.Error().Err(err)
+				errors = true
+			}
+		}
+		if errors {
+			return errDetachingMultiple
+		}
 	}
 
 	// Discover all container PIDs

@@ -14,30 +14,16 @@ func Start(rootdir string) error {
 	// Instantiate the loader
 	ld := loader.New()
 
-	if rootdir == "" {
-		stdoutStderr, err := ld.Install()
-		if err != nil {
-			log.Warn().
-				Err(err).
-				Str("loaderDetails", stdoutStderr).
-				Msg("Install library failed.")
-			return err
-		} else {
-			log.Info().
-				Msg("Install library success.")
-		}
+	stdoutStderr, err := ld.Install(rootdir)
+	if err != nil {
+		log.Warn().
+			Err(err).
+			Str("loaderDetails", stdoutStderr).
+			Msg("Install library failed.")
+		return err
 	} else {
-		stdoutStderr, err := ld.InstallNamespace(rootdir)
-		if err != nil {
-			log.Warn().
-				Err(err).
-				Str("loaderDetails", stdoutStderr).
-				Msgf("Install library in %s namespace failed.", rootdir)
-			return err
-		} else {
-			log.Info().
-				Msg("Install library success.")
-		}
+		log.Info().
+			Msg("Install library success.")
 	}
 
 	return nil

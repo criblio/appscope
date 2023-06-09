@@ -28,14 +28,52 @@ func New() ScopeLoader {
 	}
 }
 
-// - Extract libscope.so to /usr/lib/appscope/<version>/libscope.so /tmp/appscope/<version>/libscope.so locally
-func (sL *ScopeLoader) Install() (string, error) {
-	return sL.RunSubProc([]string{"--install"}, os.Environ())
+// Filter Command
+func (sL *ScopeLoader) Filter(tmpPath, rootdir string) (string, error) {
+	args := make([]string, 0)
+	args = append(args, "--filter")
+	args = append(args, tmpPath)
+	if rootdir != "" {
+		args = append(args, "--rootdir")
+		args = append(args, rootdir)
+	}
+	return sL.RunSubProc(args, os.Environ())
 }
 
-// - Extract libscope.so to /usr/lib/appscope/<version>/libscope.so /tmp/appscope/<version>/libscope.so in a namespace
-func (sL *ScopeLoader) InstallNamespace(rootdir string) (string, error) {
-	return sL.RunSubProc([]string{"--install", "--rootdir", rootdir}, os.Environ())
+// SetPreload Command
+func (sL *ScopeLoader) SetPreload(set bool, rootdir string) (string, error) {
+	args := make([]string, 0)
+	args = append(args, "--setpreload")
+	args = append(args, strconv.FormatBool(set))
+	if rootdir != "" {
+		args = append(args, "--rootdir")
+		args = append(args, rootdir)
+	}
+	return sL.RunSubProc(args, os.Environ())
+}
+
+// Mount Command
+func (sL *ScopeLoader) Mount(source, dest, rootdir string) (string, error) {
+	args := make([]string, 0)
+	args = append(args, "--mount")
+	args = append(args, source+","+dest)
+	if rootdir != "" {
+		args = append(args, "--rootdir")
+		args = append(args, rootdir)
+	}
+	return sL.RunSubProc(args, os.Environ())
+}
+
+// Install Command
+// - Extract libscope.so to /usr/lib/appscope/<version>/libscope.so /tmp/appscope/<version>/libscope.so locally
+func (sL *ScopeLoader) Install(rootdir string) (string, error) {
+	args := make([]string, 0)
+	args = append(args, "--install")
+	if rootdir != "" {
+		args = append(args, "--rootdir")
+		args = append(args, rootdir)
+	}
+	return sL.RunSubProc(args, os.Environ())
 }
 
 // - Setup /etc/profile.d/scope.sh on host

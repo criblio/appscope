@@ -55,48 +55,47 @@ func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) er
 	ld := loader.New()
 
 	// Install libscope if not already installed
-	if rootdir == "" {
-		stdoutStderr, err := ld.Install()
-		if err != nil {
-			log.Warn().
-				Err(err).
-				Str("loaderDetails", stdoutStderr).
-				Msg("Install library failed.")
-			return err
-		} else {
-			log.Info().
-				Msg("Install library success.")
-		}
+	stdoutStderr, err := ld.Install(rootdir)
+	if err != nil {
+		log.Warn().
+			Err(err).
+			Str("loaderDetails", stdoutStderr).
+			Msg("Install library failed.")
+		return err
 	} else {
-		stdoutStderr, err := ld.InstallNamespace(rootdir)
-		if err != nil {
-			log.Warn().
-				Err(err).
-				Str("loaderDetails", stdoutStderr).
-				Msgf("Install library in %s namespace failed.", rootdir)
-			return err
-		} else {
-			log.Info().
-				Msg("Install library success.")
-		}
+		log.Info().
+			Msg("Install library success.")
 	}
 
-	/*
-		TODO
-		add proc to the filter file - create a filter file if it does not exist.
-			new loader command for this: maybe a scope --ldfilter <newfile>
-			add an entry to the filter file. if process is already in the filter list, update the entry.
-			requires a namespace switch so need a loader command
-		    maybe we read it here, manipulate it with the cli yaml library, and then provide a file to write back
+	// Modify the filter contents
+	newEntry := libscope.Entry{
+		ProcName: addProc,
+		ProcArg:  "",
+		// TODO Configuration:
+	}
+	filterFile["allow"] = append(filterFile["allow"], newEntry)
 
-			ld.UpdateFilter
+	// Write the filter contents to a temporary path
+	// TODO write to a temporary file. give it a unique id
+	filterFilePath := "/tmp/filter"
 
-		set ld.so.preload if it is not already set.
-		   	new loader command for this?
-			scope --ldpreload true (--rootdir x)
+	// Update the global filter file
+	if stdoutStderr, err := ld.Filter(filterFilePath, rc.Rootdir); err != nil {
+		log.Warn().
+			Err(err).
+			Str("loaderDetails", stdoutStderr).
+			Msgf("Install library in %s namespace failed.", rootdir)
+		return err
+	}
 
-			ld.SetPreload
-	*/
+	// Set ld.so.preload if it is not already set.
+	if stdoutStderr, err := ld.SetPreload(true, rc.Rootdir); err != nil {
+		log.Warn().
+			Err(err).
+			Str("loaderDetails", stdoutStderr).
+			Msgf("Install library in %s namespace failed.", rootdir)
+		return err
+	}
 
 	// Perform a scope attach to all matching processes that are not already scoped (will re-attach to update existing procs)
 	if rootdir != "" {
@@ -126,7 +125,7 @@ func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) er
 		}
 	}
 
-	// TBC ? TODO perform a scope detach to all processes that do not match anything in the filter file
+	// TBC ? perform a scope detach to all processes that do not match anything in the filter file
 
 	return nil
 }
@@ -134,27 +133,33 @@ func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) er
 // Remove a process from the scope filter
 func Remove(filterFile libscope.Filter, remProc, rootdir string, rc *run.Config) error {
 
-	/*
-		TODO
-		remove proc from the filter file
-		    new loader command for this: maybe a scope --ldfilter <newfile>
-			requires a namespace switch so need a loader command to modify this file
-			maybe we read it here, manipulate it with the cli yaml library, and then provide a file to write back
+	// Instantiate the loader
+	ld := loader.New()
 
-			ld.UpdateFilter()
+	// Modify the filter contents
+	// TODO remove the entry from the filterFile slice
 
-		if it's the last entry in the filter file
-			unset ld.so.preload
-				new loader command for this?
-				scope --ldpreload false (--rootdir x)
+	// Write the filter contents to a temporary path
+	// TODO write to a temporary file. give it a unique id
+	filterFilePath := "/tmp/filter"
 
-			ld.SetPreload()
+	// Update the global filter file
+	if stdoutStderr, err := ld.Filter(filterFilePath, rc.Rootdir); err != nil {
+		log.Warn().
+			Err(err).
+			Str("loaderDetails", stdoutStderr).
+			Msgf("Install library in %s namespace failed.", rootdir)
+		return err
+	}
 
-			// dont need to do this since we are adding logic to ignore an empty filter file
-			// remove the empty filter file
-			// 	requires change namespace so use loader command:
-			// 	loader command: scope stop --rootdir hostfs
-	*/
+	// Unset ld.so.preload if it is already set.
+	if stdoutStderr, err := ld.SetPreload(false, rc.Rootdir); err != nil {
+		log.Warn().
+			Err(err).
+			Str("loaderDetails", stdoutStderr).
+			Msgf("Install library in %s namespace failed.", rootdir)
+		return err
+	}
 
 	// Perform a scope detach to all matching, scoped processes
 	rc.Subprocess = true

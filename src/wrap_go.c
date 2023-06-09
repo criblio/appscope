@@ -390,7 +390,7 @@ void
 createGoStructFile(void) {
     char* debug_file;
     int fd;
-    if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
+    if ((debug_file = fullGetEnv("SCOPE_GO_STRUCT_PATH")) &&
         ((fd = scope_open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
         scope_dprintf(fd, "runtime.g|m=%d|\n", g_go_schema->struct_offsets.g_to_m);
         scope_dprintf(fd, "runtime.m|tls=%d|\n", g_go_schema->struct_offsets.m_to_tls);

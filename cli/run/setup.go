@@ -3,6 +3,7 @@ package run
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -42,9 +43,27 @@ func CreateAll(path string) error {
 	return nil
 }
 
+// readBytesStdIn reads the byte data from stdin
+func readBytesStdIn() []byte {
+	var cfgData []byte
+
+	stdinFs, err := os.Stdin.Stat()
+	if err != nil {
+		return cfgData
+	}
+
+	// Avoid waiting for input from terminal when no data was provided
+	if stdinFs.Mode()&os.ModeCharDevice != 0 && stdinFs.Size() == 0 {
+		return cfgData
+	}
+
+	cfgData, _ = io.ReadAll(os.Stdin)
+
+	return cfgData
+}
+
 // setupWorkDir sets up a working directory for a given set of args
 func (rc *Config) setupWorkDir(args []string, attach bool) {
-
 	// Override to CriblDest if specified
 	if rc.CriblDest != "" {
 		rc.EventsDest = rc.CriblDest
@@ -55,12 +74,25 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 	rc.createWorkDir(args, attach)
 
 	// Build or load config
-	if rc.UserConfig == "" {
-		err := rc.configFromRunOpts()
-		util.CheckErrSprintf(err, "%v", err)
-	} else {
-		err := rc.ConfigFromFile()
-		util.CheckErrSprintf(err, "%v", err)
+	if rc.sc == nil {
+		if rc.UserConfig == "" {
+			// Read the data from stdin only during attach
+			var stdInData []byte
+			if attach {
+				stdInData = readBytesStdIn()
+			}
+
+			if len(stdInData) > 0 {
+				err := rc.ConfigFromStdin(stdInData)
+				util.CheckErrSprintf(err, "%v", err)
+			} else {
+				err := rc.configFromRunOpts()
+				util.CheckErrSprintf(err, "%v", err)
+			}
+		} else {
+			err := rc.ConfigFromFile()
+			util.CheckErrSprintf(err, "%v", err)
+		}
 	}
 
 	// Update paths to absolute for file transports
@@ -81,6 +113,9 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 
 // createWorkDir creates a working directory
 func (rc *Config) createWorkDir(args []string, attach bool) {
+	var pid string
+	var cmd string
+
 	dirPerms := os.FileMode(0755)
 	if attach {
 		dirPerms = 0777
@@ -101,9 +136,18 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 
 	// Directories named CMD_SESSIONID_PID_TIMESTAMP
 	ts := strconv.FormatInt(rc.now().UTC().UnixNano(), 10)
-	pid := strconv.Itoa(os.Getpid())
 	sessionID := GetSessionID()
-	tmpDirName := path.Base(args[0]) + "_" + sessionID + "_" + pid + "_" + ts
+	if attach {
+		// When we attach args[0] points to pid of desired process
+		pid = args[0]
+		pidInt, _ := strconv.Atoi(args[0])
+		cmd, _ = util.PidCommand(rc.Rootdir, pidInt)
+	} else {
+		pid = strconv.Itoa(os.Getpid())
+		cmd = path.Base(args[0])
+	}
+
+	tmpDirName := cmd + "_" + sessionID + "_" + pid + "_" + ts
 
 	// Create History directory
 	histDir := HistoryDir()
@@ -121,7 +165,6 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 		if !util.CheckDirExists("/tmp") {
 			util.ErrAndExit("/tmp directory does not exist")
 		}
-
 		// Create working directory in /tmp (0777 permissions)
 		rc.WorkDir = filepath.Join("/tmp", tmpDirName)
 		err := os.Mkdir(rc.WorkDir, dirPerms)
@@ -208,6 +251,12 @@ func (rc *Config) populateWorkDir(args []string, attach bool) {
 
 	// Create args.json file
 	argsJSONPath := filepath.Join(rc.WorkDir, "args.json")
+	if attach {
+		// When we attach args[0] points to pid of desired process
+		pid, _ := strconv.Atoi(args[0])
+		cmdLine, _ := util.PidCmdline(rc.Rootdir, pid)
+		args = strings.Split(cmdLine, " ")
+	}
 	argsBytes, err := json.Marshal(args)
 	util.CheckErrSprintf(err, "error marshaling JSON: %v", err)
 	err = os.WriteFile(argsJSONPath, argsBytes, filePerms)

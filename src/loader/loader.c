@@ -18,6 +18,7 @@
 #include <sys/utsname.h>
 #include <unistd.h>
 
+#include "attach.h"
 #include "inject.h"
 #include "loader.h"
 #include "libdir.h"
@@ -28,267 +29,6 @@
 #include "patch.h"
 #include "setup.h"
  
-int g_log_level = CFG_LOG_WARN;
-
-/* 
- * This avoids a segfault when code using shm_open() is compiled statically.
- * For some reason, compiling the code statically causes the __shm_directory()
- * function calls in librt.a to not reach the implementation in libpthread.a.
- * Implementing the function ourselves fixes this issue.
- *
- * See https://stackoverflow.com/a/47914897
- */
-#ifndef  SHM_MOUNT
-#define  SHM_MOUNT "/dev/shm/"
-#endif
-static const char  shm_mount[] = SHM_MOUNT;
-const char *__shm_directory(size_t *len)
-{
-    if (len)
-        *len = strlen(shm_mount);
-    return shm_mount;
-}
-
-static int
-attach(pid_t pid, char *scopeLibPath)
-{
-    char *exe_path = NULL;
-    elf_buf_t *ebuf;
-
-    if (geteuid()) {
-        printf("error: --ldattach requires root\n");
-        return EXIT_FAILURE;
-    }
-
-    if (getExePath(pid, &exe_path) == -1) {
-        fprintf(stderr, "error: can't get path to executable for pid %d\n", pid);
-        return EXIT_FAILURE;
-    }
-
-    if ((ebuf = getElf(exe_path)) == NULL) {
-        free(exe_path);
-        fprintf(stderr, "error: can't read the executable %s\n", exe_path);
-        return EXIT_FAILURE;
-    }
-
-    if (is_static(ebuf->buf) == TRUE) {
-        fprintf(stderr, "error: can't attach to the static executable: %s\nNote that the executable can be 'scoped' using the command 'scope run -- %s'\n", exe_path, exe_path);
-        free(exe_path);
-        freeElf(ebuf->buf, ebuf->len);
-        return EXIT_FAILURE;
-    }
-
-    free(exe_path);
-    freeElf(ebuf->buf, ebuf->len);
-
-    printf("Attaching to process %d\n", pid);
-    int ret = injectScope(pid, scopeLibPath);
-
-    // done
-    return ret;
-}
-
-/*
- * Given the ability to separate lib load and interposition
- * we enable a detach capability as well as 3 types
- * of attach cases. 4 commands in all.
- *
- * Load and attach:
- * libscope is not loaded. This case is
- * handled in function attach().
- *
- * First attach:
- * libscope is loaded and we are not interposing
- * functions, not scoped. This is the first time
- * libscope will have been attached.
- *
- * Reattach:
- * libscope is loaded, the process has been attached
- * in one form at least once previously.
- *
- * Detach:
- * libscope is loaded and we are interposing functions.
- * Remove all interpositions and stop scoping.
- */
-static int
-attachCmd(pid_t pid, bool attach)
-{
-    int fd, sfd, mfd;
-    bool first_attach = FALSE;
-    export_sm_t *exaddr;
-    char buf[PATH_MAX] = {0};
-
-    /*
-     * The SM segment is used in the first attach case where
-     * we've never been attached before. The segment is
-     * populated with state including the address of the
-     * reattach command in the lib. The segment is read
-     * only and the size of the segment can't be modified.
-     *
-     * We use the presence of the segment to identify the
-     * state of the lib. The segment is deleted when a
-     * first attach is performed.
-     */
-    sfd = findFd(pid, SM_NAME);   // e.g. memfd:anon
-    if (sfd > 0) {
-        first_attach = TRUE;
-    }
-
-    /*
-     * On command detach if the SM segment exists, we have never been
-     * attached. Return and do not create the command file as it
-     * will never be deleted until attached and then causes an
-     * unintended detach.
-     */
-    if ((attach == FALSE) && (first_attach == TRUE)) {
-        printf("Already detached from pid %d\n", pid);
-        return EXIT_SUCCESS;
-    }
-
-    /*
-     * Before executing any command, create and populate the dyn config file.
-     * It is used for all cases:
-     *   First attach: no attach command, include env vars, reload command
-     *   Reattach: attach command = true, include env vars, reload command
-     *   Detach: attach command = false, no env vars, no reload command
-     */
-    snprintf(buf, sizeof(buf), "%s/%s.%d",
-                   DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, pid);
-
-    /*
-     * Unlink a possible existing file before creating a new one
-     * due to a fact that open will fail if the file is
-     * sealed (still processed on library side).
-     * File sealing is supported on tmpfs - /dev/shm (DYN_CONFIG_CLI_DIR).
-     */
-    unlink(buf);
-
-
-    uid_t nsUid = nsInfoTranslateUidRootDir("", pid);
-    gid_t nsGid = nsInfoTranslateGidRootDir("", pid);
-
-    fd = nsFileOpen(buf, O_WRONLY|O_CREAT, nsUid, nsGid, geteuid(), getegid());
-    if (fd == -1) {
-        return EXIT_FAILURE;
-    }
-
-    if (fchmod(fd, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH) == -1) {
-        perror("fchmod() failed");
-        return EXIT_FAILURE;
-    }
-
-    /*
-     * Ensuring that the process being operated on can remove
-     * the dyn config file being created here.
-     * In the case where a root user executes the command,
-     * we need to change ownership of dyn config file.
-     */
-
-    if (geteuid() == 0) {
-        uid_t euid = -1;
-        gid_t egid = -1;
-
-        if (getProcUidGid(pid, &euid, &egid) == -1) {
-            fprintf(stderr, "error: osGetProcUidGid() failed\n");
-            close(fd);
-            return EXIT_FAILURE;
-        }
-
-        if (fchown(fd, euid, egid) == -1) {
-            perror("fchown() failed");
-            close(fd);
-            return EXIT_FAILURE;
-        }
-    }
-
-    if (first_attach == FALSE) {
-        const char *cmd = (attach == TRUE) ? "SCOPE_CMD_ATTACH=true\n" : "SCOPE_CMD_ATTACH=false\n";
-        if (write(fd, cmd, strlen(cmd)) <= 0) {
-            perror("write() failed");
-            close(fd);
-            return EXIT_FAILURE;
-        }
-    }
-
-    if (attach == TRUE) {
-        int i;
-
-        if (first_attach == TRUE) {
-            printf("First attach to pid %d\n", pid);
-        } else {
-            printf("Reattaching to pid %d\n", pid);
-        }
-
-        /*
-        * Reload the configuration during first attach & reattach if we want to apply
-        * config from a environment variable
-        * Handle SCOPE_CONF_RELOAD in first order because of "processReloadConfig" logic
-        * is done in two steps:
-        * - first - create a configuration based on path (default one or custom one)
-        * - second - process env variables existing in the process (cfgProcessEnvironment)
-        * We append rest of the SCOPE_ variables after since in this way we ovewrite the ones
-        * which was set by cfgProcessEnvironment in second step.
-        * TODO: Handle the file and env variables
-        */
-        char *scopeConfReload = getenv("SCOPE_CONF_RELOAD");
-        if (!scopeConfReload) {
-            dprintf(fd, "SCOPE_CONF_RELOAD=TRUE\n");
-        } else {
-            dprintf(fd, "SCOPE_CONF_RELOAD=%s\n", scopeConfReload);
-        }
-
-        for (i = 0; environ[i]; ++i) {
-            size_t envLen = strlen(environ[i]);
-            if ((envLen > 6) &&
-                (strncmp(environ[i], "SCOPE_", 6) == 0) &&
-                (!strstr(environ[i], "SCOPE_CONF_RELOAD"))) {
-                    dprintf(fd, "%s\n", environ[i]);
-            }
-        }
-    } else {
-        printf("Detaching from pid %d\n", pid);
-    }
-
-    close(fd);
-
-    int rc = EXIT_SUCCESS;
-
-    if (first_attach == TRUE) {
-        memset(buf, 0, PATH_MAX);
-        // the only command we do in this case is first attach
-        snprintf(buf, sizeof(buf), "/proc/%d/fd/%d", pid, sfd);
-        if ((mfd = open(buf, O_RDONLY)) == -1) {
-            close(sfd);
-            perror("open");
-            return EXIT_FAILURE;
-        }
-
-        if ((exaddr = mmap(NULL, sizeof(export_sm_t), PROT_READ,
-                                 MAP_SHARED, mfd, 0)) == MAP_FAILED) {
-            close(sfd);
-            close(mfd);
-            perror("mmap");
-            return EXIT_FAILURE;
-        }
-
-        if (injectFirstAttach(pid, exaddr->cmdAttachAddr) == EXIT_FAILURE) {
-            fprintf(stderr, "error: %s: you must have administrator privileges to run this command\n", __FUNCTION__);
-            rc = EXIT_FAILURE;
-        }
-
-        //fprintf(stderr, "%s: %s 0x%lx\n", __FUNCTION__, buf, exaddr->cmdAttachAddr);
-
-        close(sfd);
-        close(mfd);
-
-        if (munmap(exaddr, sizeof(export_sm_t))) {
-            fprintf(stderr, "error: %s: unmapping in the the reattach command failed\n", __FUNCTION__);
-            rc = EXIT_FAILURE;
-        }
-    }
-        return rc;
-}
-
 int
 cmdService(char *serviceName, pid_t nspid)
 {
@@ -389,7 +129,6 @@ cmdUnconfigure(pid_t nspid)
     return status;
 }
 
-// Handle getfile command
 int
 cmdGetFile(char *paths, pid_t nspid)
 {
@@ -420,21 +159,37 @@ cmdGetFile(char *paths, pid_t nspid)
     return nsGetFile(src_path, dest_path, nspid);
 }
 
+
 /*
- * Handle attach/detach commands.
+ * If attaching to a process in the current namespace:
+ * - follow regular attach logic to ultimately PTRACE attach
+ * If attaching to a process in a child namespace:
+ * - fork and exec a child scope process in the child PID and MNT namespace (nsForkAndExec)
+ * - write the scope loader and configuration (joinChildNamespace)
+ * - follow regular attach logic to ultimately PTRACE attach
+ * If attaching to a process in a parent/sibling namespace (--rootdir specified)
+ * it is not possible to change PID ns to that of a parent, so:
+ * - change to the target mnt namespace (nsAttach)
+ * - write the scope loader and configuration
+ * - create a shell script, executed by cron, to perform the scope attach
  */
 int
-cmdAttach(bool ldattach, pid_t pid)
+cmdAttach(pid_t pid, const char* rootdir)
 {
     int res = EXIT_FAILURE;
     char *scopeLibPath;
     char path[PATH_MAX] = {0};
+    char env_path[PATH_MAX];
     uid_t eUid = geteuid();
     gid_t eGid = getegid();
     uid_t nsUid = eUid;
     uid_t nsGid = eGid;
     elf_buf_t *scope_ebuf = NULL;
     elf_buf_t *ebuf = NULL;
+
+    if (rootdir) {
+        return nsAttach(pid, rootdir);
+    }
 
     nsUid = nsInfoTranslateUidRootDir("", pid);
     nsGid = nsInfoTranslateGidRootDir("", pid);
@@ -447,19 +202,19 @@ cmdAttach(bool ldattach, pid_t pid)
 
     // Extract and patch libscope from scope static. Don't attempt to extract from scope dynamic
     if (is_static(scope_ebuf->buf)) {
-        if (libdirExtract(NULL, 0, nsUid, nsGid)) {
+        if (libdirExtract(NULL, 0, nsUid, nsGid, LIBRARY_FILE)) {
             fprintf(stderr, "error: failed to extract library\n");
             goto out;
         }
 
-        scopeLibPath = (char *)libdirGetPath();
+        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
 
         if (patchLibrary(scopeLibPath, FALSE) == PATCH_FAILED) {
             fprintf(stderr, "error: failed to patch library\n");
             goto out;
         }
     } else {
-        scopeLibPath = (char *)libdirGetPath();
+        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
     }
 
     if (access(scopeLibPath, R_OK|X_OK)) {
@@ -510,11 +265,11 @@ cmdAttach(bool ldattach, pid_t pid)
             goto out;
         }
 
-        res = nsForkAndExec(pid, nsAttachPid, ldattach);
+        res = nsForkAndExec(pid, nsAttachPid, TRUE);
         goto out;
     /*
     * Process can exists in same PID namespace but in different mnt namespace
-    * we do a simillar sequecne like above but without switching PID namespace
+    * we do a simillar sequence like above but without switching PID namespace
     * and updating PID.
     */
     } else if (nsInfoIsPidInSameMntNs(pid) == FALSE) {
@@ -523,64 +278,47 @@ cmdAttach(bool ldattach, pid_t pid)
             printf("error: --ldattach requires root\n");
             goto out;
         }
-        res =  nsForkAndExec(pid, pid, ldattach);
+        res =  nsForkAndExec(pid, pid, TRUE);
         goto out;
     }
 
-    if (ldattach) {
-        //uint64_t rc;
-        char path[PATH_MAX];
-
-        // create /dev/shm/${PID}.env when attaching, for the library to load
-        snprintf(path, sizeof(path), "/attach_%d.env", pid);
-        int fd = nsFileShmOpen(path, O_RDWR|O_CREAT, S_IRUSR|S_IRGRP|S_IROTH, nsUid, nsGid, eUid, eGid);
-        if (fd == -1) {
-            fprintf(stderr, "nsFileShmOpen failed\n");
-            goto out;
-        }
-
-        // add the env vars we want in the library
-        dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetPath());
-
-        int i;
-        for (i = 0; environ[i]; i++) {
-            if (strlen(environ[i]) > 6 && strncmp(environ[i], "SCOPE_", 6) == 0) {
-                dprintf(fd, "%s\n", environ[i]);
-            }
-        }
-
-        // done
-        close(fd);
-
-        // rc from findLibrary
-        if (rc == -1) {
-            fprintf(stderr, "error: can't get path to executable for pid %d\n", pid);
-            res = EXIT_FAILURE;
-        } else if (rc == 0) {
-            // proc exists, libscope does not exist, a load & attach
-            res = attach(pid, scopeLibPath);
-        } else {
-            // libscope exists, a first time attach or a reattach
-            res = attachCmd(pid, TRUE);
-        }
-
-        // remove the env var file
-        snprintf(path, sizeof(path), "/attach_%d.env", pid);
-        shm_unlink(path);
+    // create /dev/shm/${PID}.env when attaching, for the library to load
+    snprintf(env_path, sizeof(env_path), "/attach_%d.env", pid);
+    int fd = nsFileShmOpen(env_path, O_RDWR|O_CREAT, S_IRUSR|S_IRGRP|S_IROTH, nsUid, nsGid, eUid, eGid);
+    if (fd == -1) {
+        fprintf(stderr, "nsFileShmOpen failed\n");
         goto out;
+    }
+
+    // add the env vars we want in the library
+    dprintf(fd, "SCOPE_LIB_PATH=%s\n", libdirGetPath(LIBRARY_FILE));
+
+    int i;
+    for (i = 0; environ[i]; i++) {
+        if (strlen(environ[i]) > 6 && strncmp(environ[i], "SCOPE_", 6) == 0) {
+            dprintf(fd, "%s\n", environ[i]);
+        }
+    }
+
+    // done
+    close(fd);
+
+    // rc from findLibrary
+    if (rc == -1) {
+        fprintf(stderr, "error: can't get path to executable for pid %d\n", pid);
+        res = EXIT_FAILURE;
+    } else if (rc == 0) {
+        // proc exists, libscope does not exist, a load & attach
+        res = load_and_attach(pid, scopeLibPath);
     } else {
-        // pid & libscope need to exist before moving forward
-        if (rc == -1) {
-            fprintf(stderr, "error: pid %d does not exist\n", pid);
-            goto out;
-        } else if (rc == 0) {
-            // proc exists, libscope does not exist.
-            fprintf(stderr, "error: pid %d has never been attached\n", pid);
-            goto out;
-        }
-        res =  attachCmd(pid, FALSE);
-        goto out;
+        // libscope exists, a first time attach or a reattach
+        res = attach(pid);
     }
+
+    // remove the env var file
+    snprintf(env_path, sizeof(env_path), "/attach_%d.env", pid);
+    shm_unlink(env_path);
+
 out:
     if (ebuf) {
         freeElf(ebuf->buf, ebuf->len);
@@ -595,9 +333,18 @@ out:
     exit(res);
 }
 
-// Handle the run command
 int
-cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **argv)
+cmdDetach(pid_t pid, const char *rootdir)
+{
+    if (rootdir) {
+        return nsDetach(pid, rootdir);
+    }
+
+    return detach(pid);
+}
+
+int
+cmdRun(pid_t pid, pid_t nspid, int argc, char **argv)
 {
     char *scopeLibPath;
     uid_t eUid = geteuid();
@@ -620,19 +367,19 @@ cmdRun(bool ldattach, bool lddetach, pid_t pid, pid_t nspid, int argc, char **ar
 
     // Extract and patch libscope from scope static. Don't attempt to extract from scope dynamic
     if (is_static(scope_ebuf->buf)) {
-        if (libdirExtract(NULL, 0, nsUid, nsGid)) {
+        if (libdirExtract(NULL, 0, nsUid, nsGid, LIBRARY_FILE)) {
             fprintf(stderr, "error: failed to extract library\n");
             goto out;
         }
 
-        scopeLibPath = (char *)libdirGetPath();
+        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
 
         if (patchLibrary(scopeLibPath, FALSE) == PATCH_FAILED) {
             fprintf(stderr, "error: failed to patch library\n");
             goto out;
         }
     } else {
-        scopeLibPath = (char *)libdirGetPath();
+        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
     }
 
     if (access(scopeLibPath, R_OK|X_OK)) {
@@ -824,13 +571,13 @@ cmdInstall(const char *rootdir)
     // If rootdir is provided, extract the library into a separate namespace and return
     if (rootdir) {
         // Use pid 1 to locate ns fd
-        if (nsInstall(rootdir, 1)) {
+        if (nsInstall(rootdir, 1, LIBRARY_FILE)) {
             fprintf(stderr, "error: failed to extract library\n");
             return EXIT_FAILURE;
         }
     // Install the library locally
     } else {
-        if (libdirExtract(NULL, 0, nsUid, nsGid)) {
+        if (libdirExtract(NULL, 0, nsUid, nsGid, LIBRARY_FILE)) {
             fprintf(stderr, "error: failed to extract library\n");
             return EXIT_FAILURE;
         }

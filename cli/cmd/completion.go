@@ -14,8 +14,8 @@ var completionCmd = &cobra.Command{
 	Use:   "completion [flags] [bash|zsh]",
 	Short: "Generates completion code for specified shell",
 	Long:  "Generates completion code for specified shell.",
-	Example: `scope completion bash > /etc/bash_completion.d/scope # Generate and install scope autocompletion for bash
-source <(scope completion bash)                      # Generates and load scope autocompletion for bash
+	Example: `  scope completion bash > /etc/bash_completion.d/scope # Generate and install scope autocompletion for bash
+  source <(scope completion bash)                      # Generates and load scope autocompletion for bash
 `,
 	ValidArgs: []string{"bash", "zsh"},
 	Args:      cobra.ExactValidArgs(1),

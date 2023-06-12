@@ -53,6 +53,10 @@ doesnt_output() {
     fi
 }
 
+dbgOutput() {
+    echo "[debug output] $OUT"
+}
+
 is_file() {
     if [ ! -f "$1" ] ; then
         echo "FAIL: File $1 does not exist"
@@ -133,6 +137,7 @@ sleep 1
 
 # Attach to sleep process
 run scope attach $sleep_pid
+dbgOutput
 returns 0
 
 # Wait for attach to execute
@@ -140,6 +145,7 @@ waitForCmdscopedProcessNumber 1
 
 # Detach to sleep process by PID
 run scope detach $sleep_pid
+dbgOutput
 outputs "Detaching from pid ${sleep_pid}"
 returns 0
 
@@ -148,6 +154,7 @@ waitForCmdscopedProcessNumber 0
 
 # Reattach to sleep process by PID
 run scope attach $sleep_pid
+dbgOutput
 outputs "Reattaching to pid ${sleep_pid}"
 returns 0
 
@@ -161,18 +168,20 @@ kill $sleep_pid
 is_dir /root/.scope
 
 # Assert sleep session directory exists (in /tmp)
-is_dir /tmp/${sleep_pid}*
+is_dir /tmp/sleep_*${sleep_pid}*
 
 # Assert sleep config file exists
-is_file /tmp/${sleep_pid}*/scope.yml
+is_file /tmp/sleep_*${sleep_pid}*/scope.yml
 
 # Compare sleep config.yml files (attach and reattach) with expected.yml
-for scopedirpath in /tmp/${sleep_pid}_*; do
+for scopedirpath in /tmp/sleep_*${sleep_pid}_*; do
     scopedir=$(basename "$scopedirpath")
     cat $scopedirpath/scope.yml | sed -e "s/$scopedir/SESSIONPATH/" | diff - /expected.yml
     if [ $? -eq 0 ]; then
         echo "PASS: Scope sleep config as expected"
     else
+        echo "Configuration file"
+        cat $scopedirpath/scope.yml
         echo "FAIL: Scope sleep config not as expected"
         ERR+=1
     fi

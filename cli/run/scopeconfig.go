@@ -126,11 +126,18 @@ func (c *Config) SetDefault() error {
 	return nil
 }
 
+// ConfigFromStdin loads a configuration from yml passed to stdin
+func (c *Config) ConfigFromStdin(cfgData []byte) error {
+	c.sc = &libscope.ScopeConfig{}
+
+	return yaml.Unmarshal(cfgData, c.sc)
+}
+
 // ConfigFromFile loads a configuration from a yml file
 func (c *Config) ConfigFromFile() error {
 	c.sc = &libscope.ScopeConfig{}
 
-	yamlFile, err := ioutil.ReadFile(c.UserConfig)
+	yamlFile, err := os.ReadFile(c.UserConfig)
 	if err != nil {
 		return err
 	}

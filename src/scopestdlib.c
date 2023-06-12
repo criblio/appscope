@@ -103,6 +103,7 @@ extern int                 scopelibc_vsscanf(const char *, const char *, va_list
 extern int                 scopelibc_strcmp(const char *, const char *);
 extern int                 scopelibc_strncmp(const char *, const char *, size_t);
 extern int                 scopelibc_strcasecmp(const char *, const char *);
+extern char *              scopelibc_strchrnul(const char *, int );
 extern char *              scopelibc_strcpy(char *, const char *);
 extern char *              scopelibc_strncpy(char *, const char *, size_t);
 extern char *              scopelibc_stpcpy(char *, const char *);
@@ -704,6 +705,11 @@ scope_strncmp(const char *s1, const char *s2, size_t n) {
 int
 scope_strcasecmp(const char *s1, const char *s2) {
     return scopelibc_strcasecmp(s1, s2);
+}
+
+char *
+scope_strchrnul(const char *s, int c) {
+    return scopelibc_strchrnul(s, c);
 }
 
 size_t

@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: distroless-deploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: distroless-app
+  template:
+    metadata:
+      labels:
+        app: distroless-app
+    spec:
+      containers:
+      - name: distroless-container
+        image: distrolesstest:latest
+        imagePullPolicy: IfNotPresent
+        args: ["./hello_server"]
+        ports:
+        - containerPort: 8080

@@ -33,9 +33,9 @@ var metricsCmd = &cobra.Command{
 	Use:   "metrics [flags]",
 	Short: "Outputs metrics for a session",
 	Long:  `Outputs metrics for a session.`,
-	Example: `scope metrics
-scope metrics -m net.error,fs.error
-scope metrics -m net.tx -g
+	Example: `  scope metrics
+  scope metrics -m net.error,fs.error
+  scope metrics -m net.tx -g
 	`,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {

@@ -230,12 +230,10 @@ __attribute__((constructor)) void cli_constructor() {
 		fprintf(stderr, "error: --install and --ldattach/lddetach cannot be used together\n");
 		exit(EXIT_FAILURE);
 	}
-
 	if (opt_rootdir && (!opt_install && !opt_ldattach && !opt_lddetach)) {
 		fprintf(stderr, "error: --rootdir option requires --install or --ldattach/--lddetach option\n");
 		exit(EXIT_FAILURE);
 	}
-
 	if (opt_ldattach && opt_lddetach) {
 		fprintf(stderr, "error: --ldattach and --lddetach cannot be used together\n");
 		exit(EXIT_FAILURE);
@@ -308,8 +306,8 @@ __attribute__((constructor)) void cli_constructor() {
 	cmdArgc = arg_c-optind; // argc of the program we want to scope
 	cmdArgv = &arg_v[optind]; // argv of the program we want to scope
 
-	if (opt_ldattach) exit(cmdAttach(true, pid));
-	if (opt_lddetach) exit(cmdAttach(false, pid));
+	if (opt_ldattach) exit(cmdAttach(pid, arg_rootdir));
+	if (opt_lddetach) exit(cmdDetach(pid, arg_rootdir));
 	if (opt_install) exit(cmdInstall(arg_rootdir));
 	if (opt_configure) exit(cmdConfigure(arg_configure, nspid));
 	if (opt_unconfigure) exit(cmdUnconfigure(nspid));
@@ -319,7 +317,7 @@ __attribute__((constructor)) void cli_constructor() {
 	if (opt_patch) exit(patchLibrary(arg_patch, FALSE) == PATCH_FAILED);
 	if (opt_starthost) exit(nsHostStart());
 	if (opt_stophost) exit(nsHostStop());
-	if (opt_passthrough) exit(cmdRun(false, false, pid, nspid, cmdArgc, cmdArgv));
+	if (opt_passthrough) exit(cmdRun(pid, nspid, cmdArgc, cmdArgv));
 
 	// No constructor command executed.
 	// Continue to regular CLI usage.

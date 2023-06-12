@@ -152,23 +152,17 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			// scope-pod-extract container(s) will extract the scope files (library and config files)
 			scopeDirPath := fmt.Sprintf("/scope/%d", i)
 			cmd := []string{
-				"/bin/sh",
-				"-c",
-			}
-			cmdStr := []string{
-				"mkdir",
-				scopeDirPath,
-				"&&",
 				"/scope/scope",
 				"excrete",
+				"--parents",
 			}
 			if len(app.CriblDest) > 0 {
-				cmdStr = append(cmdStr,
+				cmd = append(cmd,
 					"--cribldest",
 					app.CriblDest,
 				)
 			} else {
-				cmdStr = append(cmdStr,
+				cmd = append(cmd,
 					"--metricdest",
 					app.MetricDest,
 					"--metricformat",
@@ -178,8 +172,7 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 				)
 			}
 
-			cmdStr = append(cmdStr, scopeDirPath)
-			cmd = append(cmd, strings.Join(cmdStr, " "))
+			cmd = append(cmd, scopeDirPath)
 			pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
 				Name:            fmt.Sprintf("scope-pod-extract-%d", i),
 				Image:           pod.Spec.Containers[i].Image,

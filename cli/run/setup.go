@@ -113,6 +113,9 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 
 // createWorkDir creates a working directory
 func (rc *Config) createWorkDir(args []string, attach bool) {
+	var pid string
+	var cmd string
+
 	dirPerms := os.FileMode(0755)
 	if attach {
 		dirPerms = 0777
@@ -133,9 +136,18 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 
 	// Directories named CMD_SESSIONID_PID_TIMESTAMP
 	ts := strconv.FormatInt(rc.now().UTC().UnixNano(), 10)
-	pid := strconv.Itoa(os.Getpid())
 	sessionID := GetSessionID()
-	tmpDirName := path.Base(args[0]) + "_" + sessionID + "_" + pid + "_" + ts
+	if attach {
+		// When we attach args[0] points to pid of desired process
+		pid = args[0]
+		pidInt, _ := strconv.Atoi(args[0])
+		cmd, _ = util.PidCommand(rc.Rootdir, pidInt)
+	} else {
+		pid = strconv.Itoa(os.Getpid())
+		cmd = path.Base(args[0])
+	}
+
+	tmpDirName := cmd + "_" + sessionID + "_" + pid + "_" + ts
 
 	// Create History directory
 	histDir := HistoryDir()
@@ -239,6 +251,12 @@ func (rc *Config) populateWorkDir(args []string, attach bool) {
 
 	// Create args.json file
 	argsJSONPath := filepath.Join(rc.WorkDir, "args.json")
+	if attach {
+		// When we attach args[0] points to pid of desired process
+		pid, _ := strconv.Atoi(args[0])
+		cmdLine, _ := util.PidCmdline(rc.Rootdir, pid)
+		args = strings.Split(cmdLine, " ")
+	}
 	argsBytes, err := json.Marshal(args)
 	util.CheckErrSprintf(err, "error marshaling JSON: %v", err)
 	err = os.WriteFile(argsJSONPath, argsBytes, filePerms)

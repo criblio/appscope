@@ -205,6 +205,7 @@ setNamespaceRootDir(const char *rootdir, pid_t pid, const char *ns) {
     return TRUE;
 }
 
+#if 0
 /*
  * Get the namespace file descriptor for the namespace you are currently in
  */
@@ -224,6 +225,7 @@ getSelfNamespace(const char *ns) {
 
     return nsFd;
 }
+#endif
 
 /*
  * Joins the namespaces:
@@ -256,7 +258,7 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
     // Configuration is optional
     char *scopeCfgMem = setupLoadFileIntoMem(&cfgSize, getenv("SCOPE_CONF_PATH"));
 
-    /*
+   /*
     * Reassociate current process to the "child namespace"
     * - PID namespace - allows to "child process" of the calling process 
     *   be created in separate namespace
@@ -329,7 +331,6 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
     }   
 
 cleanupMem:
-
     munmap(scopeMem, scopeSize);
 
     if (scopeCfgMem) {
@@ -338,6 +339,132 @@ cleanupMem:
 
     return status;
 }
+
+/*
+ * Check if libscope.so is loaded in specified PID
+ * Returns TRUE if library is loaded, FALSE otherwise.
+ */
+static bool
+isLibScopeLoaded(pid_t pid)
+{
+    char mapsPath[PATH_MAX] = {0};
+    char buffer[9076];
+    FILE *fd;
+    bool status = FALSE;
+
+    if (snprintf(mapsPath, sizeof(mapsPath), "/proc/%d/maps", pid) < 0) {
+        return status;
+    }
+
+    if ((fd = fopen(mapsPath, "r")) == NULL) {
+        return status;
+    }
+
+    while (fgets(buffer, sizeof(buffer), fd)) {
+        if (strstr(buffer, "libscope.so")) {
+            status = TRUE;
+            break;
+        }
+    }
+
+    fclose(fd);
+    return status;
+}
+ 
+/*
+ * Perform fork and exec which cause that direct children
+ * effectively will join a new PID namespace(optionally) and mount namespace.
+ *
+ * Note:
+ * Reassociating the PID namespace (setns CLONE_NEWPID) has somewhat different from 
+ * other namespace types. Reassociating the calling thread with a PID namespace
+ * changes only the PID namespace that subsequently created child processes of
+ * the caller will be placed in. It does not change the PID namespace of the caller itself.
+ *
+ * Returns status of operation
+ */
+int
+nsForkAndExec(pid_t parentPid, pid_t nsPid, bool ldattach)
+{
+    char *opStatus = "Detach";
+    char *childOp = "-d";
+    bool libLoaded = isLibScopeLoaded(parentPid);
+
+    if (ldattach) {
+        childOp = "-a";
+        opStatus = (libLoaded == FALSE) ? "Attach" : "Reattach";
+    } else if (libLoaded == FALSE) {
+        fprintf(stderr, "error: PID: %d has never been attached\n", parentPid);
+        return EXIT_FAILURE; 
+    }
+    /*
+    * TODO In case of Reattach/Detach - when libLoaded = TRUE
+    * We only need the mount namespace to /dev/shm but currently scope
+    * also check the pid namespace
+    */
+
+    if (joinChildNamespace(parentPid, parentPid != nsPid) == FALSE) {
+        fprintf(stderr, "error: joinChildNamespace failed\n");
+        return EXIT_FAILURE; 
+    }
+
+    pid_t child = fork();
+    if (child < 0) {
+        fprintf(stderr, "error: fork() failed\n");
+        return EXIT_FAILURE;
+    } else if (child == 0) {
+        char loaderInChildPath[PATH_MAX] = {0};
+
+        // Child
+        char *nsAttachPidStr = NULL;
+        if (asprintf(&nsAttachPidStr, "%d", nsPid) <= 0) {
+            perror("error: asprintf() failed\n");
+            return EXIT_FAILURE;
+        }
+        int execArgc = 0;
+        char **execArgv = calloc(4, sizeof(char *));
+        if (!execArgv) {
+            fprintf(stderr, "error: calloc() failed\n");
+            return EXIT_FAILURE;
+        }
+
+        const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
+        bool isDevVersion = libverIsNormVersionDev(loaderVersion);
+
+        snprintf(loaderInChildPath, PATH_MAX, "/usr/lib/appscope/%s/scope", loaderVersion);
+        if (access(loaderInChildPath, R_OK) || isDevVersion) {
+            memset(loaderInChildPath, 0, PATH_MAX);
+            snprintf(loaderInChildPath, PATH_MAX, "/tmp/appscope/%s/scope", loaderVersion);
+            if (access(loaderInChildPath, R_OK)) {
+                fprintf(stderr, "error: access scope failed\n");
+                return EXIT_FAILURE;
+            }
+        }
+
+        execArgv[execArgc++] = loaderInChildPath;
+        execArgv[execArgc++] = childOp;
+        execArgv[execArgc++] = nsAttachPidStr;
+
+        return execve(loaderInChildPath, execArgv, environ);
+    }
+    // Parent
+    int status;
+    waitpid(child, &status, 0);
+    if (WIFEXITED(status)) {
+        int exitChildStatus = WEXITSTATUS(status);
+        if (exitChildStatus == 0) {
+            fprintf(stderr, "%s to process %d in child process succeeded\n", opStatus, parentPid);
+        } else {
+            fprintf(stderr, "%s to process %d in child process failed\n", opStatus, parentPid);
+        }
+        return exitChildStatus;
+    }
+    fprintf(stderr, "error: %s failed() failed\n", opStatus);
+    return EXIT_FAILURE;
+}
+
+
+// Namespace support for Commands
 
 /*
  * Setup the service for specified child process
@@ -379,7 +506,7 @@ nsFilter(const char *rootdir, pid_t pid, void *scopeCfgFilterMem, size_t filterF
         return EXIT_FAILURE;
     }
 
-    if (setupConfigure(scopeCfgFilterMem, filterFileSize, nsUid, nsGid)) {
+    if (setupFilter(scopeCfgFilterMem, filterFileSize, nsUid, nsGid)) {
         fprintf(stderr, "setup child namespace failed\n");
         return EXIT_FAILURE;
     }
@@ -611,416 +738,3 @@ nsDetach(pid_t pid, const char *rootdir)
     return detach(pid);
 }
 
- /*
- * Check if libscope.so is loaded in specified PID
- * Returns TRUE if library is loaded, FALSE otherwise.
- */
-static bool
-isLibScopeLoaded(pid_t pid)
-{
-    char mapsPath[PATH_MAX] = {0};
-    char buffer[9076];
-    FILE *fd;
-    bool status = FALSE;
-
-    if (snprintf(mapsPath, sizeof(mapsPath), "/proc/%d/maps", pid) < 0) {
-        return status;
-    }
-
-    if ((fd = fopen(mapsPath, "r")) == NULL) {
-        return status;
-    }
-
-    while (fgets(buffer, sizeof(buffer), fd)) {
-        if (strstr(buffer, "libscope.so")) {
-            status = TRUE;
-            break;
-        }
-    }
-
-    fclose(fd);
-    return status;
-}
- 
- /*
- * Perform fork and exec which cause that direct children
- * effectively will join a new PID namespace(optionally) and mount namespace.
- *
- * Note:
- * Reassociating the PID namespace (setns CLONE_NEWPID) has somewhat different from 
- * other namespace types. Reassociating the calling thread with a PID namespace
- * changes only the PID namespace that subsequently created child processes of
- * the caller will be placed in. It does not change the PID namespace of the caller itself.
- *
- * Returns status of operation
- */
-int
-nsForkAndExec(pid_t parentPid, pid_t nsPid, bool ldattach)
-{
-    char *opStatus = "Detach";
-    char *childOp = "-d";
-    bool libLoaded = isLibScopeLoaded(parentPid);
-
-    if (ldattach) {
-        childOp = "-a";
-        opStatus = (libLoaded == FALSE) ? "Attach" : "Reattach";
-    } else if (libLoaded == FALSE) {
-        fprintf(stderr, "error: PID: %d has never been attached\n", parentPid);
-        return EXIT_FAILURE; 
-    }
-    /*
-    * TODO In case of Reattach/Detach - when libLoaded = TRUE
-    * We only need the mount namespace to /dev/shm but currently scope
-    * also check the pid namespace
-    */
-
-    if (joinChildNamespace(parentPid, parentPid != nsPid) == FALSE) {
-        fprintf(stderr, "error: joinChildNamespace failed\n");
-        return EXIT_FAILURE; 
-    }
-
-    pid_t child = fork();
-    if (child < 0) {
-        fprintf(stderr, "error: fork() failed\n");
-        return EXIT_FAILURE;
-    } else if (child == 0) {
-        char loaderInChildPath[PATH_MAX] = {0};
-
-        // Child
-        char *nsAttachPidStr = NULL;
-        if (asprintf(&nsAttachPidStr, "%d", nsPid) <= 0) {
-            perror("error: asprintf() failed\n");
-            return EXIT_FAILURE;
-        }
-        int execArgc = 0;
-        char **execArgv = calloc(4, sizeof(char *));
-        if (!execArgv) {
-            fprintf(stderr, "error: calloc() failed\n");
-            return EXIT_FAILURE;
-        }
-
-        const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
-        bool isDevVersion = libverIsNormVersionDev(loaderVersion);
-
-        snprintf(loaderInChildPath, PATH_MAX, "/usr/lib/appscope/%s/scope", loaderVersion);
-        if (access(loaderInChildPath, R_OK) || isDevVersion) {
-            memset(loaderInChildPath, 0, PATH_MAX);
-            snprintf(loaderInChildPath, PATH_MAX, "/tmp/appscope/%s/scope", loaderVersion);
-            if (access(loaderInChildPath, R_OK)) {
-                fprintf(stderr, "error: access scope failed\n");
-                return EXIT_FAILURE;
-            }
-        }
-
-        execArgv[execArgc++] = loaderInChildPath;
-        execArgv[execArgc++] = childOp;
-        execArgv[execArgc++] = nsAttachPidStr;
-
-        return execve(loaderInChildPath, execArgv, environ);
-    }
-    // Parent
-    int status;
-    waitpid(child, &status, 0);
-    if (WIFEXITED(status)) {
-        int exitChildStatus = WEXITSTATUS(status);
-        if (exitChildStatus == 0) {
-            fprintf(stderr, "%s to process %d in child process succeeded\n", opStatus, parentPid);
-        } else {
-            fprintf(stderr, "%s to process %d in child process failed\n", opStatus, parentPid);
-        }
-        return exitChildStatus;
-    }
-    fprintf(stderr, "error: %s failed() failed\n", opStatus);
-    return EXIT_FAILURE;
-}
-
- /*
- * Check if switching mount namespace is required.
- *
- * Returns status of operation, TRUE if switching is required, FALSE if not.
- */
-static bool
-switchMntNsRequired(const char *hostFsPrefix) {
-    const char* const hostDir[] = {
-        "/etc/cron.d/",
-        "/usr/lib/",
-        "/tmp/",
-    };
-
-    for (int i = 0; i < ARRAY_SIZE(hostDir); ++i) {
-        char path[PATH_MAX] = {0};
-        if (snprintf(path, sizeof(path), "%s%s", hostFsPrefix, hostDir[i]) < 0) {
-            perror("switchMntNsRequired: snprintf failed");
-            return TRUE;
-        }
-        if (access(path, W_OK)) {
-            return TRUE;
-        }
-    }
-    return FALSE;
-}
-
- /*
- * Performs switching to host mount namespace operation.
- *
- * Returns status of operation, TRUE in case of success, FALSE in case of failure.
- */
-static bool
-setHostMntNs(const char *hostFsPrefix) {
-    int nsFd;
-    char nsPath[PATH_MAX] = {0};
-
-    if (snprintf(nsPath, sizeof(nsPath), "%s/proc/1/ns/mnt", hostFsPrefix) < 0) {
-        perror("setHostMntNs: snprintf CRIBL_EDGE_FS_ROOT failed");
-        return FALSE;
-    }
-
-    if ((nsFd = open(nsPath, O_RDONLY)) == -1) {
-        perror("setHostMntNs: open failed: host fs is not mounted");
-        return FALSE;
-    }
-
-    if (setns(nsFd, CLONE_NEWNS) != 0) {
-        perror("setHostMntNs: setns failed");
-        return FALSE;
-    }
-
-    close(nsFd);
-
-    return TRUE;
-}
-
-/*
- * Joins the host mount namespace to perform a Start or Stop action.
- * Required conditions:
- * - scope_filter must exist (if action is Start)
- * - scope must exist
- * TODO: unify it with joinChildNamespace
- * Returns TRUE if operation was success, FALSE otherwise.
- */
-// TODO: Remove?
-static bool
-joinHostNamespace(ns_action_t action) {
-    bool status = FALSE;
-    size_t scopeSize = 0;
-    size_t cfgSize = 0;
-    char path[PATH_MAX] = {0};
-    char hostPrefixPath[PATH_MAX] = {0};
-    char hostFilterPath[PATH_MAX] = {0};
-    char hostScopePath[PATH_MAX] = {0};
-    char *scopeFilterCfgMem = NULL;
-    char *scopeMem = NULL;
-    char script[1024];
-
-    if (readlink("/proc/self/exe", path, sizeof(path) - 1) == -1) {
-        return status;
-    }
-
-    // Load "scope" into memory
-    scopeMem = setupLoadFileIntoMem(&scopeSize, path);
-    if (scopeMem == NULL) {
-        return status;
-    }
-
-    // Load "scope" into memory
-    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
-    bool isDevVersion = libverIsNormVersionDev(loaderVersion);
-    memset(path, 0, PATH_MAX);
-    snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/scope", loaderVersion);
-    if ((access(path, R_OK)) || (isDevVersion)) {
-        memset(path, 0, PATH_MAX);
-        snprintf(path, PATH_MAX, "/tmp/appscope/%s/scope", loaderVersion);
-        if (access(path, R_OK)) {
-            goto cleanupMem;
-        }
-    }
-    scopeMem = setupLoadFileIntoMem(&scopeSize, path);
-    if (scopeMem == NULL) {
-        goto cleanupMem;
-    }
-
-    if (action == START) {
-        // Load "filter file" into memory
-        // First try to use env variable
-        char *envFilterVal = getenv("SCOPE_FILTER");
-        if (envFilterVal) {
-            /*
-            * If filter env was defined and wasn't disable 
-            * the filter handling, try path interpretation
-            */
-            size_t envFilterLen = strlen(envFilterVal);
-            if (strncmp(envFilterVal, "false", envFilterLen) && (!access(envFilterVal, R_OK))) {
-                scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, envFilterVal);
-            }
-        } else {
-            /*
-            * Try to use defaults
-            */
-            if (!access(SCOPE_FILTER_USR_PATH, R_OK)) {
-                scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, SCOPE_FILTER_USR_PATH);
-            } else if (!access(SCOPE_FILTER_TMP_PATH, R_OK)) {
-                scopeFilterCfgMem = setupLoadFileIntoMem(&cfgSize, SCOPE_FILTER_TMP_PATH);
-            }
-        }
-        if (scopeFilterCfgMem == NULL) {
-            goto cleanupMem;
-        }
-    }
-
-    // Get root fs path
-    char *envFsRootVal = getenv("CRIBL_EDGE_FS_ROOT");
-    if (envFsRootVal) {
-        snprintf(hostPrefixPath, PATH_MAX, "%s", envFsRootVal);
-    } else {
-        strncpy(hostPrefixPath, "/hostfs", sizeof(hostPrefixPath));
-    }
-
-    // Verify access to host filesystem inside the container
-    if (access(hostPrefixPath, R_OK)) {
-        goto cleanupMem;
-    }
-
-    /*
-     * Reassociate current process to the host mount namespace
-     * - allows to copy file(s) into the host fs
-    */
-    if (switchMntNsRequired(hostPrefixPath) == TRUE) {
-        if (setHostMntNs(hostPrefixPath) == FALSE) {
-            goto cleanupMem;
-        }
-        // if we switch mount namespace we do not use hostfs prefix
-        strcpy(hostPrefixPath, "");
-    }
-
-    // At this point we are using the host fs
-    
-    uid_t eUid = geteuid();
-    gid_t eGid = getegid();
-
-    /*
-     * Ensure that we have the correct dest dir
-     */
-    memset(path, 0, PATH_MAX);
-    snprintf(path, PATH_MAX, "%s/usr/lib/appscope/%s/", hostPrefixPath, loaderVersion);
-    mkdir_status_t res = libdirCreateDirIfMissing(path, 0755, eUid, eGid);
-    if ((res > MKDIR_STATUS_EXISTS) || (isDevVersion)) {
-        memset(path, 0, PATH_MAX);
-        snprintf(path, PATH_MAX, "%s/tmp/appscope/%s/", hostPrefixPath, loaderVersion);
-        mkdir_status_t res = libdirCreateDirIfMissing(path, 0777, eUid, eGid);
-        if (res > MKDIR_STATUS_EXISTS) {
-            goto cleanupMem;
-        }
-        snprintf(hostScopePath, PATH_MAX, "/tmp/appscope/%s/scope", loaderVersion);
-    } else {
-        snprintf(hostScopePath, PATH_MAX, "/usr/lib/appscope/%s/scope", loaderVersion);
-    }
-
-    /*
-     * Create a "scope" on the host
-     */
-    memset(path, 0, PATH_MAX);
-    snprintf(path, PATH_MAX, "%s%s", hostPrefixPath, hostScopePath);
-    if (extractMemToFile(scopeMem, scopeSize, path, 0775, isDevVersion, eUid, eGid) == FALSE) {
-        goto cleanupMem;
-    }
-
-    if (action == START) {
-        /*
-         * Create a "filter file" on the host
-         */
-        memset(path, 0, PATH_MAX);
-        snprintf(path, PATH_MAX, "%s/usr/lib/appscope/scope_filter", hostPrefixPath);
-        if ((status == extractMemToFile(scopeFilterCfgMem, cfgSize, path, 0664, TRUE, eUid, eGid)) == FALSE) {
-            memset(path, 0, PATH_MAX);
-            snprintf(path, PATH_MAX, "%s/tmp/appscope/scope_filter", hostPrefixPath);
-            if ((status == extractMemToFile(scopeFilterCfgMem, cfgSize, hostFilterPath, 0664, TRUE, eUid, eGid)) == FALSE) {
-                goto cleanupMem;
-            }
-            strcpy(hostFilterPath, "/tmp/appscope/scope_filter");
-        } else {
-            strcpy(hostFilterPath, "/usr/lib/appscope/scope_filter");
-        }
-
-        /*
-         * Create a "cron script" on the host
-         */
-        snprintf(script, sizeof(script), SCOPE_START_SCRIPT, hostScopePath, hostFilterPath);
-        status = createCron(hostPrefixPath, script, 0);
-    } else {
-        /*
-         * Create a "cron script" on the host
-         * TODO this won't work if the path is readonly and the mnt ns isn't changed
-         */
-        snprintf(script, sizeof(script), SCOPE_STOP_SCRIPT, hostScopePath);
-        status = createCron(hostPrefixPath, script, 0);
-    }
-
-cleanupMem:
-    if (scopeFilterCfgMem) {
-        munmap(scopeFilterCfgMem, cfgSize);
-    }
-
-    if (scopeMem) {
-        munmap(scopeMem, scopeSize);
-    }
-
-    return status;
-}
-
- /*
- * Verify if current running process runs in the container.
- * Returns TRUE if process runs in the container FALSE otherwise
- */
-static bool
-isRunningInContainer(void) {
-    struct stat st = {0};
-    return (stat("/proc/2/comm", &st) != 0) ? TRUE : FALSE;
-}
-
- /*
- * Perform scope host start operation - this operation begins from container namespace.
- *
- * - switch namespace to host
- * - create cron entry with filter file
- *
- * Returns exit code of operation
- */
-int
-nsHostStart(void) {
-    if (isRunningInContainer() == FALSE) {
-        fprintf(stderr, "error: nsHostStart failed process is running on host\n");
-        return EXIT_FAILURE;
-    }
-    fprintf(stdout, "Executing from a container, running the start command from the host\n");
-
-    if (joinHostNamespace(START) == FALSE) {
-        fprintf(stderr, "error: joinHostNamespace failed\n");
-        return EXIT_FAILURE;
-    }
-
-    return EXIT_SUCCESS;
-}
-
- /*
- * Perform scope host stop operation - this operation begins from container namespace.
- *
- * - switch namespace to host
- * - create cron entry with filter file
- *
- * Returns exit code of operation
- */
-int
-nsHostStop(void) {
-     if (isRunningInContainer() == FALSE) {
-        fprintf(stderr, "error: nsHostStop failed process is running on host\n");
-        return EXIT_FAILURE;
-    }
-    fprintf(stdout, "Executing from a container, running the stop command from the host\n");
-
-    if (joinHostNamespace(STOP) == FALSE) {
-        fprintf(stderr, "error: joinHostNamespace failed\n");
-        return EXIT_FAILURE;
-    }
-
-    return EXIT_SUCCESS;
-}

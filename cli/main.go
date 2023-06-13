@@ -41,7 +41,6 @@ package main
 // -v, --unservice                   remove scope from all service configurations
 // -n  --namespace PID               perform operation on specified container PID
 // -p, --patch SO_FILE               patch specified libscope.so
-// -x, --stop                        execute the scope stop command
 // -z, --passthrough                 scope a command, bypassing all cli set up
 
 // Long aliases for short options
@@ -60,7 +59,6 @@ static struct option opts[] = {
 	{ "rootdir",     required_argument, 0, 'R' },
 	{ "service",     required_argument, 0, 's' },
 	{ "unservice",   no_argument,       0, 'v' },
-	{ "stop",        no_argument,       0, 'x' },
 	{ "passthrough", no_argument,       0, 'z' },
 	{ 0, 0, 0, 0 }
 };
@@ -102,7 +100,6 @@ __attribute__((constructor)) void cli_constructor() {
 	bool opt_unservice = false;
 	bool opt_libbasedir = false;
 	bool opt_patch = false;
-	bool opt_stop = false;
 	bool opt_passthrough = false;
 
 	char *arg_ldattach;
@@ -149,7 +146,7 @@ __attribute__((constructor)) void cli_constructor() {
 
 	for (;;) {
 		index = 0;
-		int opt = getopt_long(arg_c, arg_v, "+:a:d:n:m:l:e:f:p:s:R:xvzi", opts, &index);
+		int opt = getopt_long(arg_c, arg_v, "+:a:d:n:m:l:e:f:p:s:R:vzi", opts, &index);
 		if (opt == -1) {
 			break;
 		}
@@ -198,9 +195,6 @@ __attribute__((constructor)) void cli_constructor() {
 		case 'p':
 			opt_patch = true;
 			arg_patch = optarg;
-			break;
-		case 'x':
-			opt_stop = true;
 			break;
 		case 'z':
 			opt_passthrough = true;
@@ -304,7 +298,6 @@ __attribute__((constructor)) void cli_constructor() {
 	if (opt_service) exit(cmdService(arg_service, nspid));
 	if (opt_unservice) exit(cmdUnservice(nspid));
 	if (opt_patch) exit(patchLibrary(arg_patch, FALSE) == PATCH_FAILED);
-	if (opt_stop) exit(nsHostStop());
 	if (opt_passthrough) exit(cmdRun(pid, nspid, cmdArgc, cmdArgv));
 
 	// No constructor command executed.

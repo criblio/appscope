@@ -569,7 +569,7 @@ cmdMount(const char *mountDest, const char *rootdir)
     // If rootdir is provided, set up the mount in a separate namespace
     if (rootdir) {
         // Use pid 1 to locate ns fd
-        if (nsMount(rootdir, 1)) {
+        if (nsMount(rootdir, 1, mountDest)) {
             fprintf(stderr, "error: failed to set ld.so.preload in %s\n", rootdir);
             return EXIT_FAILURE;
         }

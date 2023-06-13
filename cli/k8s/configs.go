@@ -178,12 +178,11 @@ spec:
               protocol: TCP
 {{- if not .PromDisable }}
         - name: {{ .App }}-prom-export
-          image: cribl/scope:{{ .Version }}
-          command: ["/bin/bash"]
+          image: prom/statsd-exporter:v0.24.0
           args:
-          - "-c"
-          - "/usr/local/bin/scope prom --mport {{ .PromMPort }} --sport {{ .PromSPort }}"
-          imagePullPolicy: IfNotPresent
+          - --statsd.listen-tcp=:{{ .PromMPort }}
+          - --web.listen-address=:{{ .PromSPort }}
+          imagePullPolicy: Always
           ports:
             - containerPort: {{ .PromMPort }}
               protocol: TCP
@@ -204,11 +203,11 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - name: {{ .PromMPort }}-prom-export-tcp
+    - name: {{ .PromMPort }}-prom-export-statsd-listen
       protocol: TCP
       port: {{ .PromMPort }}
       targetPort: {{ .PromMPort }}
-    - name: {{ .PromSPort }}-prom-export-http
+    - name: {{ .PromSPort }}-prom-export-prometheus-http
       protocol: TCP
       port: {{ .PromSPort }}
       targetPort: {{ .PromSPort }}

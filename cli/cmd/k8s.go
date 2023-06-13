@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"strings"
 
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/k8s"
@@ -45,6 +46,13 @@ kubectl label namespace default scope=enabled
 		util.CheckErrSprintf(err, "%v", err)
 		server, _ := cmd.Flags().GetBool("server")
 		opt.PromDisable, _ = cmd.Flags().GetBool("noprom")
+
+		// Recognize the protocol used for statsd data listener
+		if strings.HasPrefix(opt.MetricDest, "tcp://") {
+			opt.PromType = "tcp"
+		} else if strings.HasPrefix(opt.MetricDest, "udp://") {
+			opt.PromType = "udp"
+		}
 
 		if !server {
 			opt.PrintConfig(os.Stdout)

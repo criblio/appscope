@@ -23,6 +23,7 @@ type Options struct {
 	Port            int
 	Debug           bool
 	PromDisable     bool
+	PromType        string
 	PromMPort       int
 	PromSPort       int
 	ScopeConfigYaml []byte

@@ -180,12 +180,21 @@ spec:
         - name: {{ .App }}-prom-export
           image: prom/statsd-exporter:v0.24.0
           args:
+          {{- if eq .PromType "tcp" }}
           - --statsd.listen-tcp=:{{ .PromMPort }}
+          {{- else if eq .PromType "udp" }}
+          - --statsd.listen-udp=:{{ .PromMPort }}
+          {{- end }}
           - --web.listen-address=:{{ .PromSPort }}
           imagePullPolicy: Always
           ports:
+            {{- if eq .PromType "tcp" }}
             - containerPort: {{ .PromMPort }}
               protocol: TCP
+            {{- else if eq .PromType "udp" }}
+            - containerPort: {{ .PromMPort }}
+              protocol: UDP
+            {{- end }}
             - containerPort: {{ .PromSPort }}
               protocol: TCP
 {{- end }}
@@ -203,10 +212,17 @@ metadata:
 spec:
   type: ClusterIP
   ports:
+    {{- if eq .PromType "tcp" }}
     - name: {{ .PromMPort }}-prom-export-statsd-listen
       protocol: TCP
       port: {{ .PromMPort }}
       targetPort: {{ .PromMPort }}
+    {{- else if eq .PromType "udp" }}
+    - name: {{ .PromMPort }}-prom-export-statsd-listen
+      protocol: UDP
+      port: {{ .PromMPort }}
+      targetPort: {{ .PromMPort }}
+    {{- end }}
     - name: {{ .PromSPort }}-prom-export-prometheus-http
       protocol: TCP
       port: {{ .PromSPort }}

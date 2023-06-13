@@ -18,6 +18,7 @@ type Config struct {
 	MetricsDest   string
 	EventsDest    string
 	MetricsFormat string
+	MetricsPrefix string
 	CriblDest     string
 	Subprocess    bool
 	Loglevel      string

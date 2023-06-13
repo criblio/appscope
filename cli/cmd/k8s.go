@@ -21,7 +21,7 @@ The --*dest flags accept file names like /tmp/scope.log; URLs like file:///tmp/s
 	Example: `  scope k8s --metricdest tcp://some.host:8125 --eventdest tcp://other.host:10070 | kubectl apply -f -
 kubectl label namespace default scope=enabled
 
-  scope k8s --metricdest tcp://scope-prom-export:9109 --metricformat statsd --eventdest tcp://other.host:10070 | kubectl apply -f -
+  scope k8s --metricdest tcp://scope-prom-export:9109 --metricformat statsd --metricprefix appscope --eventdest tcp://other.host:10070 | kubectl apply -f -
 `,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -36,6 +36,7 @@ kubectl label namespace default scope=enabled
 		}
 		opt.MetricDest = rc.MetricsDest
 		opt.MetricFormat = rc.MetricsFormat
+		opt.MetricPrefix = rc.MetricsPrefix
 		opt.EventDest = rc.EventsDest
 		opt.CriblDest = rc.CriblDest
 		rc.WorkDir = "/scope"

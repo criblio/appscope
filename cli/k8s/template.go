@@ -16,6 +16,7 @@ type Options struct {
 	CriblDest       string
 	MetricDest      string
 	MetricFormat    string
+	MetricPrefix    string
 	EventDest       string
 	CertFile        string
 	KeyFile         string

@@ -167,6 +167,8 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 					app.MetricDest,
 					"--metricformat",
 					app.MetricFormat,
+					"--metricprefix",
+					app.MetricPrefix,
 					"--eventdest",
 					app.EventDest,
 				)

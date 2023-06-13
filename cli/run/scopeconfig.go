@@ -173,6 +173,10 @@ func (c *Config) configFromRunOpts() error {
 		c.sc.Metric.Format.FormatType = c.MetricsFormat
 	}
 
+	if c.MetricsPrefix != "" {
+		c.sc.Metric.Format.StatsdPrefix = c.MetricsPrefix
+	}
+
 	parseDest := func(t *libscope.ScopeTransport, dest string) error {
 		//
 		// The regexp matches "proto://something:port" where the leading

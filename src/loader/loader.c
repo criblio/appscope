@@ -72,37 +72,6 @@ cmdUnservice(pid_t nspid)
     return EXIT_FAILURE;
 }
 
-int
-cmdGetFile(char *paths, pid_t nspid)
-{
-    char *src_path;
-    char *dest_path;
-    pid_t nsContainerPid = 0;
-
-    if ((src_path = strtok(paths, ",")) == NULL) {
-        fprintf(stderr, "error: no source file path\n");
-        return EXIT_FAILURE;
-    }
-    if ((dest_path = strtok(NULL, ",")) == NULL) {
-        fprintf(stderr, "error: no destination file path\n");
-        return EXIT_FAILURE;
-    }
-
-    if (nspid == -1) {
-        fprintf(stderr, "error: getfile requires a namespace pid\n");
-        return EXIT_FAILURE;
-    }
-
-    if ((nsInfoGetPidNs(nspid, &nsContainerPid) == FALSE) ||
-        (nsInfoIsPidInSameMntNs(nspid) == TRUE)) {
-        fprintf(stderr, "error: invalid namespace\n");
-        return EXIT_FAILURE;
-    }
-
-    return nsGetFile(src_path, dest_path, nspid);
-}
-
-
 /*
  * If attaching to a process in the current namespace:
  * - follow regular attach logic to ultimately PTRACE attach
@@ -508,8 +477,6 @@ cmdInstall(const char *rootdir)
 {
     uid_t eUid = geteuid();
     gid_t eGid = getegid();
-    uid_t nsUid = eUid;
-    uid_t nsGid = eGid;
 
     // If rootdir is provided, extract the library into a separate namespace
     if (rootdir) {
@@ -520,7 +487,7 @@ cmdInstall(const char *rootdir)
         }
     // Extract the library locally
     } else {
-        if (libdirExtract(NULL, 0, nsUid, nsGid, LIBRARY_FILE)) {
+        if (libdirExtract(NULL, 0, eUid, eGid, LIBRARY_FILE)) {
             fprintf(stderr, "error: failed to extract library\n");
             return EXIT_FAILURE;
         }
@@ -535,9 +502,6 @@ cmdFilter(const char *configFilterPath, const char *rootdir)
 {
     uid_t eUid = geteuid();
     gid_t eGid = getegid();
-    uid_t nsUid = eUid;
-    uid_t nsGid = eGid;
-    int status = EXIT_FAILURE;
 
     if (!configFilterPath) {
         return EXIT_FAILURE;
@@ -560,7 +524,7 @@ cmdFilter(const char *configFilterPath, const char *rootdir)
         }
     // Install filter file
     } else {
-        if (Filter(configFilterMem, configFilterSize)) {
+        if (setupFilter(configFilterMem, configFilterSize, eUid, eGid)) {
             fprintf(stderr, "error: failed to install filter file\n");
             return EXIT_FAILURE;
         }
@@ -573,25 +537,23 @@ cmdFilter(const char *configFilterPath, const char *rootdir)
     return EXIT_SUCCESS;
 }
 
-// Handle the setpreload command
+// Handle the preload command
 int
-cmdSetPreload(const char *rootdir)
+cmdPreload(const char *rootdir)
 {
     uid_t eUid = geteuid();
     gid_t eGid = getegid();
-    uid_t nsUid = eUid;
-    uid_t nsGid = eGid;
 
     // If rootdir is provided, set ld.so.preload in a separate namespace
     if (rootdir) {
         // Use pid 1 to locate ns fd
-        if (nsSetPreload(rootdir, 1)) {
+        if (nsPreload(rootdir, 1)) {
             fprintf(stderr, "error: failed to set ld.so.preload in %s\n", rootdir);
             return EXIT_FAILURE;
         }
     // Set ld.so.preload
     } else {
-        if (setPreload()) {
+        if (setupPreload(eUid, eGid)) {
             fprintf(stderr, "error: failed to set ld.so.preload\n");
             return EXIT_FAILURE;
         }
@@ -604,12 +566,6 @@ cmdSetPreload(const char *rootdir)
 int
 cmdMount(const char *mountDest, const char *rootdir)
 {
-
-    uid_t eUid = geteuid();
-    gid_t eGid = getegid();
-    uid_t nsUid = eUid;
-    uid_t nsGid = eGid;
-
     // If rootdir is provided, set up the mount in a separate namespace
     if (rootdir) {
         // Use pid 1 to locate ns fd
@@ -619,7 +575,7 @@ cmdMount(const char *mountDest, const char *rootdir)
         }
     // Set up the mount
     } else {
-        if (Mount()) {
+        if (setupMount(mountDest)) {
             fprintf(stderr, "error: failed to set ld.so.preload\n");
             return EXIT_FAILURE;
         }

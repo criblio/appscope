@@ -7,10 +7,20 @@
  * Consider updating src/loader/scopetypes.h if you make changes to this file *
  ******************************************************************************/
 
+// Libscope Prometheus support
+#define SCOPE_PROM_SUPPORT 0
+
+#if SCOPE_PROM_SUPPORT != 0
 typedef enum {CFG_FMT_STATSD,
               CFG_FMT_NDJSON,
               CFG_FMT_PROMETHEUS,
               CFG_FORMAT_MAX} cfg_mtc_format_t;
+#else
+typedef enum {CFG_FMT_STATSD,
+              CFG_FMT_NDJSON,
+              CFG_FORMAT_MAX} cfg_mtc_format_t;
+#endif
+
 typedef enum {CFG_UDP, CFG_UNIX, CFG_FILE, CFG_TCP, CFG_EDGE} cfg_transport_t;
 typedef enum {CFG_MTC, CFG_CTL, CFG_LOG, CFG_LS, CFG_WHICH_MAX} which_transport_t;
 typedef enum {CFG_LOG_TRACE,

@@ -139,8 +139,6 @@ cfgMtcFormatSetAndGet(void **state)
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_NDJSON);
     cfgMtcFormatSet(config, CFG_FMT_STATSD);
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_STATSD);
-    cfgMtcFormatSet(config, CFG_FMT_PROMETHEUS);
-    assert_int_equal(cfgMtcFormat(config), CFG_FMT_PROMETHEUS);
     cfgMtcFormatSet(config, CFG_FMT_NDJSON);
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_NDJSON);
     cfgDestroy(&config);
@@ -276,8 +274,6 @@ cfgEventFormatSetAndGet(void **state)
     assert_int_equal(cfgEventFormat(config), CFG_FMT_STATSD);
     cfgEventFormatSet(config, CFG_FMT_NDJSON);
     assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
-    cfgEventFormatSet(config, CFG_FMT_PROMETHEUS);
-    assert_int_equal(cfgEventFormat(config), CFG_FMT_PROMETHEUS);
     cfgEventFormatSet(config, CFG_FMT_NDJSON);
     assert_int_equal(cfgEventFormat(config), CFG_FMT_NDJSON);
     cfgDestroy(&config);

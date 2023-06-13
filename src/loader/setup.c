@@ -669,7 +669,7 @@ closeFd:
 
 // Mount the scope filter and unix socket into mountDest/usr/lib/appscope/*
 int
-setupMount(const char *mountDest)
+setupMount(const char *mountDest, uid_t nsUid, gid_t nsGid)
 {
     // TODO implement
 

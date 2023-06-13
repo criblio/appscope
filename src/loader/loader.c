@@ -566,6 +566,9 @@ cmdPreload(const char *rootdir)
 int
 cmdMount(const char *mountDest, const char *rootdir)
 {
+    uid_t eUid = geteuid();
+    gid_t eGid = getegid();
+
     // If rootdir is provided, set up the mount in a separate namespace
     if (rootdir) {
         // Use pid 1 to locate ns fd
@@ -575,7 +578,7 @@ cmdMount(const char *mountDest, const char *rootdir)
         }
     // Set up the mount
     } else {
-        if (setupMount(mountDest)) {
+        if (setupMount(mountDest, eUid, eGid)) {
             fprintf(stderr, "error: failed to set ld.so.preload\n");
             return EXIT_FAILURE;
         }

@@ -3036,6 +3036,8 @@ getScopeExec(const char *pathname)
     if ((ebuf = getElf((char *)pathname))) {
         isstat = is_static(ebuf->buf);
         isgo = is_go(ebuf->buf);
+    } else {
+        return NULL;
     }
 
     // not really necessary since we're gonna exec
@@ -3079,15 +3081,16 @@ execv(const char *pathname, char *const argv[])
     while ((argv[nargs] != NULL)) nargs++;
 
     size_t plen = sizeof(char *);
-    if ((nargs == 0) || (nargv = scope_calloc(1, ((nargs * plen) + (plen * 2)))) == NULL) {
+    if ((nargs == 0) || (nargv = scope_calloc(1, ((nargs * plen) + (plen * 3)))) == NULL) {
         return g_fn.execv(pathname, argv);
     }
 
     nargv[0] = scopexec;
-    nargv[1] = (char *)pathname;
+    nargv[1] = "-z";
+    nargv[2] = (char *)pathname;
 
-    for (i = 2; i <= nargs; i++) {
-        nargv[i] = argv[i - 1];
+    for (i = 3; i <= nargs; i++) {
+        nargv[i] = argv[i - 2];
     }
 
     g_fn.execv(nargv[0], nargv);
@@ -3115,15 +3118,16 @@ execve(const char *pathname, char *const argv[], char *const envp[])
     while ((argv[nargs] != NULL)) nargs++;
 
     size_t plen = sizeof(char *);
-    if ((nargs == 0) || (nargv = scope_calloc(1, ((nargs * plen) + (plen * 2)))) == NULL) {
+    if ((nargs == 0) || (nargv = scope_calloc(1, ((nargs * plen) + (plen * 3)))) == NULL) {
         return g_fn.execve(pathname, argv, envp);
     }
 
     nargv[0] = scopexec;
-    nargv[1] = (char *)pathname;
+    nargv[1] = "-z";
+    nargv[2] = (char *)pathname;
 
-    for (i = 2; i <= nargs; i++) {
-        nargv[i] = argv[i - 1];
+    for (i = 3; i <= nargs; i++) {
+        nargv[i] = argv[i - 2];
     }
 
     g_fn.execve(nargv[0], nargv, environ);

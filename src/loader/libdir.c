@@ -597,47 +597,64 @@ libdirExtract(unsigned char *asset_file, size_t asset_file_len, uid_t nsUid, gid
     // Try to create $CRIBL_HOME/appscope (if set)
     const char *cribl_home = getenv("CRIBL_HOME");
     if (cribl_home) {
-        int pathLen = snprintf(path, PATH_MAX, "/%s/appscope/%s/", cribl_home, loaderVersion);
-        if (pathLen < 0) {
+        int pathLen = snprintf(path_glibc, PATH_MAX, "/%s/appscope/%s/glibc/", cribl_home, loaderVersion);
+        if (pathLen < 0 || pathlen >= PATH_MAX) {
             fprintf(stderr, "error: libdirExtract: $CRIBL_HOME/appscope/... snprintf() failed.\n");
             return -1;
         }
-        if (pathLen >= PATH_MAX) {
-            fprintf(stderr, "error: libdirExtract: $CRIBL_HOME/appscope/... path too long.\n");
+        res = libdirCreateDirIfMissing(path_glibc, mode, nsUid, nsGid);
+
+        pathLen = snprintf(path_musl, PATH_MAX, "/%s/appscope/%s/musl/", cribl_home, loaderVersion);
+        if (pathLen < 0 || pathlen >= PATH_MAX) {
+            fprintf(stderr, "error: libdirExtract: $CRIBL_HOME/appscope/... snprintf() failed.\n");
             return -1;
         }
-        res = libdirCreateDirIfMissing(path, mode, nsUid, nsGid);
+        res = libdirCreateDirIfMissing(path_musl, mode, nsUid, nsGid);
+
+        snprintf(path, PATH_MAX, "/%s/appscope/%s/", cribl_home, loaderVersion);
     }
 
-    // If CRIBL_HOME not defined, or there was an error, create usr/lib/appscope
+    // If CRIBL_HOME not defined, or there was an error, create /usr/lib/appscope
     if (!cribl_home || res > MKDIR_STATUS_EXISTS) {
-        memset(path, 0, PATH_MAX);
-        int pathLen = snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
-        if (pathLen < 0) {
-            fprintf(stderr, "error: libdirExtract: usr/lib/appscope/... snprintf() failed.\n");
+        memset(path_glibc, 0, PATH_MAX);
+        int pathLen = snprintf(path_glibc, PATH_MAX, "/usr/lib/appscope/%s/glibc/", loaderVersion);
+        if (pathLen < 0 || pathlen >= PATH_MAX) {
+            fprintf(stderr, "error: libdirExtract: /usr/lib/appscope/... snprintf() failed.\n");
             return -1;
         }
-        if (pathLen >= PATH_MAX) {
-            fprintf(stderr, "error: libdirExtract: /usr/lib/appscope/... path too long.\n");
+        res = libdirCreateDirIfMissing(path_glibc, mode, nsUid, nsGid);
+
+        memset(path_musl, 0, PATH_MAX);
+        pathLen = snprintf(path_musl, PATH_MAX, "/usr/lib/appscope/%s/musl/", loaderVersion);
+        if (pathLen < 0 || pathlen >= PATH_MAX) {
+            fprintf(stderr, "error: libdirExtract: /usr/lib/appscope/... snprintf() failed.\n");
             return -1;
         }
-        res = libdirCreateDirIfMissing(path, mode, nsUid, nsGid);
+        res = libdirCreateDirIfMissing(path_musl, mode, nsUid, nsGid);
+
+        pathLen = snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
     }
 
     // If all else fails, create /tmp/appscope
     if (res > MKDIR_STATUS_EXISTS) {
         mode = 0777;
-        memset(path, 0, PATH_MAX);
-        int pathLen = snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
-        if (pathLen < 0) {
+        memset(path_glibc, 0, PATH_MAX);
+        int pathLen = snprintf(path_glibc, PATH_MAX, "/tmp/appscope/%s/glibc/", loaderVersion);
+        if (pathLen < 0 || pathlen >= PATH_MAX) {
             fprintf(stderr, "error: libdirExtract: /tmp/appscope/... snprintf() failed.\n");
             return -1;
         }
-        if (pathLen >= PATH_MAX) {
-            fprintf(stderr, "error: libdirExtract: /tmp/appscope/... path too long.\n");
+        res = libdirCreateDirIfMissing(path_glibc, mode, nsUid, nsGid);
+
+        memset(path_musl, 0, PATH_MAX);
+        pathLen = snprintf(path_musl, PATH_MAX, "/tmp/appscope/%s/musl/", loaderVersion);
+        if (pathLen < 0 || pathlen >= PATH_MAX) {
+            fprintf(stderr, "error: libdirExtract: /tmp/appscope/... snprintf() failed.\n");
             return -1;
         }
-        res = libdirCreateDirIfMissing(path, mode, nsUid, nsGid);
+        res = libdirCreateDirIfMissing(path_musl, mode, nsUid, nsGid);
+
+        pathLen = snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
     }
 
     if (res > MKDIR_STATUS_EXISTS) {
@@ -653,7 +670,7 @@ libdirExtract(unsigned char *asset_file, size_t asset_file_len, uid_t nsUid, gid
 
         // Extract libscope.so.glibc (bundled libscope defaults to glibc loader)
         strncpy(path_glibc, path, pathlen);
-        strncat(path_glibc, "libscope.so.glibc", sizeof(path_glibc) - 1);
+        strncat(path_glibc, "libscope.so", sizeof(path_glibc) - 1);
         if (libdirCreateFileIfMissing(asset_file, asset_file_len, objFileType, path_glibc, overwrite, mode, nsUid, nsGid)) {
             fprintf(stderr, "libdirExtract: saving %s failed\n", path_glibc);
             return -1;
@@ -661,7 +678,7 @@ libdirExtract(unsigned char *asset_file, size_t asset_file_len, uid_t nsUid, gid
 
         // Extract libscope.so.musl
         strncpy(path_musl, path, pathlen);
-        strncat(path_musl, "libscope.so.musl", sizeof(path_musl) - 1);
+        strncat(path_musl, "libscope.so", sizeof(path_musl) - 1);
         if (libdirCreateFileIfMissing(asset_file, asset_file_len, objFileType, path_musl, overwrite, mode, nsUid, nsGid)) {
             fprintf(stderr, "libdirExtract: saving %s failed\n", path);
             return -1;

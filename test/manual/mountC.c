@@ -81,7 +81,7 @@ nsInfoGetPidNs(pid_t pid, pid_t *lastNsPid) {
 }
 
 bool
-makeIntermediateDirs(const char *rootdir, pid_t pid, const char *filterdir, const char *file, mode_t mode)
+makeDirs(const char *rootdir, pid_t pid, const char *filterdir, const char *file, mode_t mode)
 {
     char path[PATH_MAX] = {0};
 
@@ -177,7 +177,7 @@ doDir(pid_t pid, char *rootdir, char *filterdir, char *file, char *fstype)
     }
 
     // make the filter file in the merged dir
-    if (makeIntermediateDirs(rootdir, pid, (const char *)mountdir, file, 0666) == FALSE) {
+    if (makeDirs(rootdir, pid, (const char *)mountdir, file, 0666) == FALSE) {
         fprintf(stderr, "Warn: mkdir of %s from %s:%d\n", filterdir, __FUNCTION__, __LINE__);
         free(mountdir);
         return FALSE;

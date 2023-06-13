@@ -186,7 +186,11 @@ spec:
           - --statsd.listen-udp=:{{ .PromMPort }}
           {{- end }}
           - --web.listen-address=:{{ .PromSPort }}
+          - --statsd.mapping-config=/tmp/mapping.conf
           imagePullPolicy: Always
+          volumeMounts:
+            - name: prom-export-mapping-config-file
+              mountPath: /tmp
           ports:
             {{- if eq .PromType "tcp" }}
             - containerPort: {{ .PromMPort }}
@@ -203,6 +207,9 @@ spec:
           secret:
             secretName: {{ .App }}-secret
 {{- if not .PromDisable }}
+        - name: prom-export-mapping-config-file
+          configMap:
+            name: prom-export-mapping-config
 ---
 apiVersion: v1
 kind: Service
@@ -229,6 +236,25 @@ spec:
       targetPort: {{ .PromSPort }}
   selector:
     app: {{ .App }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prom-export-mapping-config
+data:
+  mapping.conf: |-
+    mappings:
+    - match: ".+"
+      match_type: regex
+      name: "appscope_${0}"
+    - match: "http.duration.server"
+      help: "Total duration of http response"
+      observer_type: histogram
+      histogram_options:
+        buckets: [ 0.01, 0.025, 0.05, 0.1 ]
+        native_histogram_bucket_factor: 1.1
+        native_histogram_max_buckets: 256
+      name: "appscope_http_duration_server"
 {{- end }}
 ---
 apiVersion: v1

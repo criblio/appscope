@@ -1,6 +1,0 @@
-#!/bin/bash
-
-ERR=0
-/opt/test/bin/test_prom.sh
-ERR+=$?
-exit ${ERR}

@@ -167,13 +167,10 @@ func (c *Config) configFromRunOpts() error {
 	}
 
 	if c.MetricsFormat != "" {
-		if c.MetricsFormat != "ndjson" && c.MetricsFormat != "statsd" && c.MetricsFormat != "prometheus" {
+		if c.MetricsFormat != "ndjson" && c.MetricsFormat != "statsd" {
 			return fmt.Errorf("invalid metrics format %s", c.MetricsFormat)
 		}
 		c.sc.Metric.Format.FormatType = c.MetricsFormat
-		if c.MetricsFormat == "prometheus" {
-			c.sc.Metric.Format.StatsdPrefix = "appscope"
-		}
 	}
 
 	parseDest := func(t *libscope.ScopeTransport, dest string) error {

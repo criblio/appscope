@@ -11,6 +11,7 @@
 #include "ctl.h"
 #include "dbg.h"
 #include "com.h"
+#include "evtutils.h"
 #include "fn.h"
 #include "state.h"
 #include "scopestdlib.h"
@@ -807,14 +808,14 @@ ctlPostEvent(ctl_t *ctl, char *event)
 {
     if (!event) return -1;
     if (!ctl) {
-        scope_free(event);
+        evtDelete((evt_type *)event);
         return -1;
     }
 
     if (cbufPut(ctl->events, (uint64_t)event) == -1) {
         // Full; drop and ignore
         DBG(NULL);
-        scope_free(event);
+        evtDelete((evt_type *)event);
         return -1;
     }
     return 0;

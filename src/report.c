@@ -13,6 +13,7 @@
 #include "atomic.h"
 #include "com.h"
 #include "dbg.h"
+#include "evtutils.h"
 #include "fn.h"
 #include "httpagg.h"
 #include "metriccapture.h"
@@ -219,27 +220,6 @@ sendEvent(mtc_t *mtc, event_t *event)
 
     if (cmdSendMetric(mtc, event) == -1) {
         scopeLogDebug("sendEvent:cmdSendMetric");
-    }
-}
-
-static void
-destroyProto(protocol_info *proto)
-{
-    if (!proto) return;
-
-    /*
-     * for future reference;
-     * proto is freed as event in doEvent().
-     * post->data is the http header and is freed in destroyHttpMap()
-     * when the list entry is deleted.
-     */
-    if (proto->data) {
-        // comment above doesn't apply to HTTP/2 protocol events
-        if (proto->ptype == EVT_H2FRAME) {
-            http_post *post = (http_post *)proto->data;
-            scope_free(post->hdr);
-        }
-        scope_free(proto->data);
     }
 }
 
@@ -537,7 +517,7 @@ static void
 doHttp1Header(protocol_info *proto)
 {
     if (!proto || !proto->data) {
-        destroyProto(proto);
+        DBG(NULL);
         return;
     }
 
@@ -550,13 +530,13 @@ doHttp1Header(protocol_info *proto)
     if ((map = lstFind(g_maplist, post->id)) == NULL) {
         // lazy open
         if ((map = scope_calloc(1, sizeof(http_map))) == NULL) {
-            destroyProto(proto);
+            DBG(NULL);
             return;
         }
 
         if (lstInsert(g_maplist, post->id, map) == FALSE) {
             destroyHttpMap(map);
-            destroyProto(proto);
+            DBG(NULL);
             return;
         }
 
@@ -585,6 +565,7 @@ doHttp1Header(protocol_info *proto)
     if (proto->ptype == EVT_HREQ) {
         map->start_time = post->start_duration;
         map->req = (char *)post->hdr;
+        post->hdr = NULL;  // we're transferring ownership, map will free it
         map->req_len = proto->len;
     }
 
@@ -680,6 +661,7 @@ doHttp1Header(protocol_info *proto)
         scope_gettimeofday(&tv, NULL);
 
         map->resp = (char *)post->hdr;
+        post->hdr = NULL;  // we're transferring ownership, map will free it
 
         if (!map->req) {
             map->duration = 0;
@@ -774,7 +756,6 @@ doHttp1Header(protocol_info *proto)
 
     if (hreport.hreq) scope_free(hreport.hreq);
     if (hreport.hres) scope_free(hreport.hres);
-    destroyProto(proto);
 }
 
 static const char *
@@ -970,7 +951,7 @@ doHttp2Frame(protocol_info *proto)
     // require the protocol object and it's data pointer to be set
     if (!proto || !proto->data) {
         scopeLogError("ERROR: null proto or proto->data");
-        destroyProto(proto);
+        DBG(NULL);
         return;
     }
 
@@ -978,7 +959,7 @@ doHttp2Frame(protocol_info *proto)
     http_post *post = (http_post *)proto->data;
     if (!post->hdr) {
         scopeLogError("ERROR: null post->hdr");
-        destroyProto(proto);
+        DBG(NULL);
         return;
     }
 
@@ -988,7 +969,7 @@ doHttp2Frame(protocol_info *proto)
         scopeLogHexError(frame, proto->len,
                 "ERROR: runt HTTP/2 frame; only %ld bytes long", proto->len);
         DBG(NULL);
-        goto cleanup;
+        return;
     }
     uint32_t fLen    = (frame[0]<<16) + (frame[1]<<8) + (frame[2]);
     uint8_t  fType   = frame[3];
@@ -998,7 +979,7 @@ doHttp2Frame(protocol_info *proto)
         scopeLogHexError(frame, proto->len,
                 "ERROR: bad HTTP/2 frame size; got %ld/%d bytes", proto->len, 9+fLen);
         DBG(NULL);
-        goto cleanup;
+        return;
     }
 
     //scopeLogHexDebug(frame, proto->len,
@@ -1053,7 +1034,7 @@ doHttp2Frame(protocol_info *proto)
             if (!channel) {
                 scopeLogError("ERROR: failed to create channel info");
                 DBG(NULL);
-                goto cleanup;
+                return;
             }
 
             lshpack_dec_init(&channel->decoder);
@@ -1064,7 +1045,7 @@ doHttp2Frame(protocol_info *proto)
                 destroyHttp2Channel(channel);
                 scopeLogError("ERROR: failed to insert channel");
                 DBG(NULL);
-                goto cleanup;
+                return;
             }
         }
 
@@ -1075,14 +1056,14 @@ doHttp2Frame(protocol_info *proto)
             if (!stream) {
                 scopeLogError("ERROR: failed to create http2Stream");
                 DBG(NULL);
-                goto cleanup;
+                return;
             }
 
             if (lstInsert(channel->streams, fStream, stream) != TRUE) {
                 destroyHttp2Stream(stream);
                 scopeLogError("ERROR: failed to insert decoder");
                 DBG(NULL);
-                goto cleanup;
+                return;
             }
         }
 
@@ -1097,7 +1078,7 @@ doHttp2Frame(protocol_info *proto)
             if (!stream->jsonData) {
                 scopeLogError("ERROR: failed to create jsonData");
                 DBG(NULL);
-                goto cleanup;
+                return;
             }
 
             // Hard coding 2.0 for now
@@ -1377,9 +1358,6 @@ doHttp2Frame(protocol_info *proto)
         scopeLogError("ERROR: HTTP/2 unexpected frame type; type=0x%02d", fType);
         DBG(NULL);
     }
-
-cleanup:
-    destroyProto(proto);
 }
 
 static void
@@ -1391,7 +1369,7 @@ doDetection(protocol_info *proto)
 
     protname = (char *)proto->data;
     if (!protname) {
-        destroyProto(proto);
+        DBG(NULL);
         return;
     }
 
@@ -1407,7 +1385,6 @@ doDetection(protocol_info *proto)
     event_t evt = INT_EVENT("net.app", proto->fd, SET, fields);
     evt.src = CFG_SRC_NET;
     cmdSendEvent(g_ctl, &evt, proto->uid, &g_proc);
-    destroyProto(proto);
 }
 
 void
@@ -3472,10 +3449,10 @@ doEvent()
                 doProtocolMetric(proto);
             } else {
                 DBG(NULL);
-                return;
             }
 
-            scope_free(event);
+            evtDelete(event);
+
         }
     }
     reportAllCapturedMetrics();

@@ -179,7 +179,7 @@ cleanupDestFd:
  * Reassociate process identified with pid with a specific namespace described by ns.
  * Returns TRUE if operation was success, FALSE otherwise.
  */
-static bool
+bool
 setNamespaceRootDir(const char *rootdir, pid_t pid, const char *ns) {
     char nsPath[PATH_MAX] = {0};
     int nsFd;
@@ -462,126 +462,7 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, bool ldattach)
     return EXIT_FAILURE;
 }
 
-
-// Namespace support for Commands
-
-/*
- * Setup the service for specified child process
- * Returns status of operation SERVICE_STATUS_SUCCESS in case of success, other values in case of failure
- */
-service_status_t
-nsService(pid_t hostPid, const char *serviceName) {
-    uid_t nsUid = nsInfoTranslateUidRootDir("", hostPid);
-    gid_t nsGid = nsInfoTranslateGidRootDir("", hostPid);
-
-    if (setNamespaceRootDir("", hostPid, "mnt") == FALSE) {
-        return SERVICE_STATUS_ERROR_OTHER;
-    }
-
-    return setupService(serviceName, nsUid, nsGid);
-}
-
-/*
- * Remove scope from all services in a given namespace
- * Returns status of operation SERVICE_STATUS_SUCCESS in case of success, other values in case of failure
- */
-service_status_t
-nsUnservice(pid_t hostPid) {
-    if (setNamespaceRootDir("", hostPid, "mnt") == FALSE) {
-        return SERVICE_STATUS_ERROR_OTHER;
-    }
-
-    return setupUnservice();
-}
-
-int
-nsFilter(const char *rootdir, pid_t pid, void *scopeCfgFilterMem, size_t filterFileSize) {
-    uid_t nsUid = nsInfoTranslateUidRootDir(rootdir, pid);
-    gid_t nsGid = nsInfoTranslateGidRootDir(rootdir, pid);
-
-    if (setNamespaceRootDir(rootdir, pid, "mnt") == FALSE) {
-        fprintf(stderr, "setNamespace mnt failed\n");
-        return EXIT_FAILURE;
-    }
-
-    if (setupFilter(scopeCfgFilterMem, filterFileSize, nsUid, nsGid)) {
-        fprintf(stderr, "setup child namespace failed\n");
-        return EXIT_FAILURE;
-    }
-
-    return EXIT_SUCCESS;
-}
-
-int
-nsPreload(const char *rootdir, pid_t pid) {
-    uid_t nsUid = nsInfoTranslateUidRootDir(rootdir, pid);
-    gid_t nsGid = nsInfoTranslateGidRootDir(rootdir, pid);
-
-    if (setNamespaceRootDir(rootdir, pid, "mnt") == FALSE) {
-        fprintf(stderr, "setNamespace mnt failed\n");
-        return EXIT_FAILURE;
-    }
-
-    if (setupPreload(nsUid, nsGid)) {
-        fprintf(stderr, "setup child namespace failed\n");
-        return EXIT_FAILURE;
-    }
-
-    return EXIT_SUCCESS;
-}
-
-int
-nsMount(const char *rootdir, pid_t pid, const char *mountDest) {
-    uid_t nsUid = nsInfoTranslateUidRootDir(rootdir, pid);
-    gid_t nsGid = nsInfoTranslateGidRootDir(rootdir, pid);
-
-    if (setNamespaceRootDir(rootdir, pid, "mnt") == FALSE) {
-        fprintf(stderr, "setNamespace mnt failed\n");
-        return EXIT_FAILURE;
-    }
-
-    if (setupMount(mountDest, nsUid, nsGid)) {
-        fprintf(stderr, "setup child namespace failed\n");
-        return EXIT_FAILURE;
-    }
-
-    return EXIT_SUCCESS;
-}
-
-int
-nsInstall(const char *rootdir, pid_t pid, libdirfile_t objFileType) {
-    int ret = EXIT_SUCCESS;
-    unsigned char *file = NULL;
-    size_t file_len;
-    uid_t nsUid = nsInfoTranslateUidRootDir(rootdir, pid);
-    gid_t nsGid = nsInfoTranslateGidRootDir(rootdir, pid);
-
-    // Extract library from scope binary into memory
-    // while in the origin namespace
-    if ((file_len = getAsset(objFileType, &file)) == -1) {
-        fprintf(stderr, "nsInstall getAsset failed\n");
-        ret = EXIT_FAILURE;
-        goto out;
-    }
-
-    // Switch to mnt namespace
-    if (setNamespaceRootDir(rootdir, pid, "mnt") == FALSE) {
-        fprintf(stderr, "nsInstall mnt failed\n");
-        ret = EXIT_FAILURE;
-        goto out;
-    }
-
-    if (libdirExtract(file, file_len, nsUid, nsGid, objFileType)) {
-        fprintf(stderr, "nsInstall extract failed\n");
-        ret = EXIT_FAILURE;
-        goto out;
-    }
-
-out:
-    if (objFileType == STATIC_LOADER_FILE && file) munmap(file, file_len);
-    return ret;
-}
-
+// TODO migrate to cmdAttach
 // Change to the target mount namespace
 // Extract scope into that namespace
 // Extract a cron script into that namespace to run `scope --ldattach [pid]`
@@ -717,15 +598,37 @@ out:
     return ret;
 }
 
+// TODO migrate to cmdInstall
 int
-nsDetach(pid_t pid, const char *rootdir)
-{
-    // Switch to target mnt namespace
-    if (setNamespaceRootDir(rootdir, 1, "mnt") == FALSE) {
-        fprintf(stderr, "nsDetach mnt failed\n");
-        return EXIT_FAILURE;
+nsInstall(const char *rootdir, pid_t pid, libdirfile_t objFileType) {
+    int ret = EXIT_SUCCESS;
+    unsigned char *file = NULL;
+    size_t file_len;
+    uid_t nsUid = nsInfoTranslateUidRootDir(rootdir, pid);
+    gid_t nsGid = nsInfoTranslateGidRootDir(rootdir, pid);
+
+    // Extract library from scope binary into memory
+    // while in the origin namespace
+    if ((file_len = getAsset(objFileType, &file)) == -1) {
+        fprintf(stderr, "nsInstall getAsset failed\n");
+        ret = EXIT_FAILURE;
+        goto out;
     }
 
-    return detach(pid);
-}
+    // Switch to mnt namespace
+    if (setNamespaceRootDir(rootdir, pid, "mnt") == FALSE) {
+        fprintf(stderr, "nsInstall mnt failed\n");
+        ret = EXIT_FAILURE;
+        goto out;
+    }
 
+    if (libdirExtract(file, file_len, nsUid, nsGid, objFileType)) {
+        fprintf(stderr, "nsInstall extract failed\n");
+        ret = EXIT_FAILURE;
+        goto out;
+    }
+
+out:
+    if (objFileType == STATIC_LOADER_FILE && file) munmap(file, file_len);
+    return ret;
+}

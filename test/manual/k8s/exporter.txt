@@ -40,7 +40,7 @@ kubectl exec -it prom-exporter-deployment-XXX-YYY -- bash
 
 ###docker run -it --rm cribl/scope:dev scope k8s -c tcp://in.main-default-practical-leavitt.cribl.cloud:10091 | kubectl apply -f -
 ##docker run -it --rm cribl/scope:dev scope k8s -m tcp://10.244.0.5:9109  -e tcp://10.244.0.6:10092 | kubectl apply -f -
-docker run -it --rm cribl/scope:dev scope k8s --metricformat prometheus -m tcp://10.244.0.5:9109  -e tcp://10.244.0.6:10092 | kubectl apply -f -
+docker run -it --rm cribl/scope:dev scope k8s -metricformat statsd --metricprefix appscope -m tcp://10.244.0.5:9109  -e tcp://10.244.0.6:10092 | kubectl apply -f -
 kubectl label namespace default scope=enabled
 
 kubectl run redis --image=redis:alpine

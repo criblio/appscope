@@ -34,9 +34,9 @@ helm install --repo "https://criblio.github.io/helm-charts/" --version "^4.1.2" 
 #
 
 
-echo -e "\n--- Run scope k8s to start webhook and k8s server in cluster ---\n"
+echo -e "\n--- Run scope k8s to start webhook and prometheus exporter in cluster ---\n"
 # arg 1 example: 10.244.0.6:10092
-docker run -it --rm cribl/scope:dev scope k8s --metricformat prometheus -m tcp://scope-prom-export:9109 -e tcp://$1 | kubectl apply -f -
+docker run -it --rm cribl/scope:dev scope k8s --metricformat statsd --metricprefix appscope -m tcp://scope-prom-export:9109 -e tcp://$1 | kubectl apply -f -
 sleep 10
 kubectl label namespace default scope=enabled
 sleep 10

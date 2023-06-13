@@ -844,3 +844,44 @@ setupUnconfigure(void) {
     return 0;
 }
 
+
+int
+setPreload(void)
+{
+    int outFd;
+    char buf[1024] = {0};
+    char cronjob[1024] = {0};
+    char path[PATH_MAX] = {0};
+
+        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
+
+    // Create the /tmp/att.sh script to be executed by cron
+    // We use a script so it can delete the cron file after it's run
+    if (snprintf(path, sizeof(path), "%s/tmp/att%d.sh", hostPrefixPath, pid) < 0) {
+        perror("createCron: /tmp/att.sh error: snprintf() failed\n");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+    if ((outFd = open(path, O_RDWR | O_CREAT, 0775)) == -1) {
+        perror("createCron: script path: open failed");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+    // Write script contents
+    if (snprintf(buf, sizeof(buf), script) < 0) {
+        perror("createCron: script: error: snprintf() failed\n");
+        close(outFd);
+        return FALSE;
+    }
+    if (write(outFd, buf, strlen(buf)) == -1) {
+        perror("createCron: script: write failed");
+        fprintf(stderr, "path: %s\n", path);
+        close(outFd);
+        return FALSE;
+    }
+    if (close(outFd) == -1) {
+        perror("createCron: script: close failed");
+        fprintf(stderr, "path: %s\n", path);
+        return FALSE;
+    }
+}

@@ -55,7 +55,7 @@ var inspectCmd = &cobra.Command{
 			id = args[0]
 		}
 
-		procs, err := util.HandleInputArg(id, rc.Rootdir, !all, false, false, false)
+		procs, err := util.HandleInputArg(id, rootdir, !all, false, false, false)
 		if err != nil {
 			return err
 		}

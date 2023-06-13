@@ -73,63 +73,6 @@ cmdUnservice(pid_t nspid)
 }
 
 int
-cmdConfigure(char *configFilterPath, pid_t nspid)
-{
-    uid_t eUid = geteuid();
-    gid_t eGid = getegid();
-    int status = EXIT_FAILURE;
-
-    if (!configFilterPath) {
-        return EXIT_FAILURE;
-    }
-
-    size_t configFilterSize = 0;
-    void *confgFilterMem = setupLoadFileIntoMem(&configFilterSize, configFilterPath);
-    if (confgFilterMem == NULL) {
-        fprintf(stderr, "error: Load filter file into memory %s\n", configFilterPath);
-        return EXIT_FAILURE;
-    }
-
-    if (nspid == -1) {
-        // Configure on Host
-        status = setupConfigure(confgFilterMem, configFilterSize, eUid, eGid);
-    } else {
-        // Configure on Container
-        pid_t nsContainerPid = 0;
-        if ((nsInfoGetPidNs(nspid, &nsContainerPid) == TRUE) ||
-            (nsInfoIsPidInSameMntNs(nspid) == FALSE)) {
-            status = nsConfigure(nspid, confgFilterMem, configFilterSize);
-        }
-    }
-
-    if (confgFilterMem) {
-        munmap(confgFilterMem, configFilterSize);
-    }
-
-    return status;
-}
-
-int
-cmdUnconfigure(pid_t nspid)
-{
-    int status = EXIT_FAILURE;
-
-    if (nspid == -1) {
-        // Configure on Host
-        status = setupUnconfigure();
-    } else {
-        // Configure on Container
-        pid_t nsContainerPid = 0;
-        if ((nsInfoGetPidNs(nspid, &nsContainerPid) == TRUE) ||
-            (nsInfoIsPidInSameMntNs(nspid) == FALSE)) {
-            status = nsUnconfigure(nspid);
-        }
-    }
-
-    return status;
-}
-
-int
 cmdGetFile(char *paths, pid_t nspid)
 {
     char *src_path;
@@ -568,14 +511,14 @@ cmdInstall(const char *rootdir)
     uid_t nsUid = eUid;
     uid_t nsGid = eGid;
 
-    // If rootdir is provided, extract the library into a separate namespace and return
+    // If rootdir is provided, extract the library into a separate namespace
     if (rootdir) {
         // Use pid 1 to locate ns fd
         if (nsInstall(rootdir, 1, LIBRARY_FILE)) {
             fprintf(stderr, "error: failed to extract library\n");
             return EXIT_FAILURE;
         }
-    // Install the library locally
+    // Extract the library locally
     } else {
         if (libdirExtract(NULL, 0, nsUid, nsGid, LIBRARY_FILE)) {
             fprintf(stderr, "error: failed to extract library\n");
@@ -585,3 +528,103 @@ cmdInstall(const char *rootdir)
 
     return EXIT_SUCCESS;
 }
+
+// Handle the filter command
+int
+cmdFilter(const char *configFilterPath, const char *rootdir)
+{
+    uid_t eUid = geteuid();
+    gid_t eGid = getegid();
+    uid_t nsUid = eUid;
+    uid_t nsGid = eGid;
+    int status = EXIT_FAILURE;
+
+    if (!configFilterPath) {
+        return EXIT_FAILURE;
+    }
+
+    // Read filter file in
+    size_t configFilterSize = 0;
+    void *configFilterMem = setupLoadFileIntoMem(&configFilterSize, configFilterPath);
+    if (configFilterMem == NULL) {
+        fprintf(stderr, "error: Load filter file into memory %s\n", configFilterPath);
+        return EXIT_FAILURE;
+    }
+
+    // If rootdir is provided, install the filter file in a separate namespace
+    if (rootdir) {
+        // Use pid 1 to locate ns fd
+        if (nsFilter(rootdir, 1, configFilterMem, configFilterSize)) {
+            fprintf(stderr, "error: failed to install filter file in %s\n", rootdir);
+            return EXIT_FAILURE;
+        }
+    // Install filter file
+    } else {
+        if (Filter(configFilterMem, configFilterSize)) {
+            fprintf(stderr, "error: failed to install filter file\n");
+            return EXIT_FAILURE;
+        }
+    }
+
+    if (configFilterMem) {
+        munmap(configFilterMem, configFilterSize);
+    }
+
+    return EXIT_SUCCESS;
+}
+
+// Handle the setpreload command
+int
+cmdSetPreload(const char *rootdir)
+{
+    uid_t eUid = geteuid();
+    gid_t eGid = getegid();
+    uid_t nsUid = eUid;
+    uid_t nsGid = eGid;
+
+    // If rootdir is provided, set ld.so.preload in a separate namespace
+    if (rootdir) {
+        // Use pid 1 to locate ns fd
+        if (nsSetPreload(rootdir, 1)) {
+            fprintf(stderr, "error: failed to set ld.so.preload in %s\n", rootdir);
+            return EXIT_FAILURE;
+        }
+    // Set ld.so.preload
+    } else {
+        if (setPreload()) {
+            fprintf(stderr, "error: failed to set ld.so.preload\n");
+            return EXIT_FAILURE;
+        }
+    }
+
+    return EXIT_SUCCESS;
+}
+
+// Handle the mount command
+int
+cmdMount(const char *mountDest, const char *rootdir)
+{
+
+    uid_t eUid = geteuid();
+    gid_t eGid = getegid();
+    uid_t nsUid = eUid;
+    uid_t nsGid = eGid;
+
+    // If rootdir is provided, set up the mount in a separate namespace
+    if (rootdir) {
+        // Use pid 1 to locate ns fd
+        if (nsMount(rootdir, 1)) {
+            fprintf(stderr, "error: failed to set ld.so.preload in %s\n", rootdir);
+            return EXIT_FAILURE;
+        }
+    // Set up the mount
+    } else {
+        if (Mount()) {
+            fprintf(stderr, "error: failed to set ld.so.preload\n");
+            return EXIT_FAILURE;
+        }
+    }
+
+    return EXIT_SUCCESS;
+}
+

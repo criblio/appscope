@@ -1024,7 +1024,7 @@ embedPclntab(const char *buf, char *sname, char *altname, char *mnemonic)
                         //             __FUNCTION__, __LINE__, &data[j]);
 
                         switch (data[j]) {
-                            // Go 18 and 20
+                            // Go 18 - 20
                         case 0xf1:
                         case 0xf0:
                             return getSym1820(&data[j], sname, altname, mnemonic);

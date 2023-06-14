@@ -14,7 +14,7 @@
 #include "plattime.h"
 #include "scopeelf.h"
 
-#define SYSPRINT_CONSOLE 1
+#define SYSPRINT_CONSOLE 0
 #define PRINT_BUF_SIZE 1024
 #define MAC_ADDR_LEN 17
 #define ZERO_MACHINE_ID "00000000000000000000000000000000"

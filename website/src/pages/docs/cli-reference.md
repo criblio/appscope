@@ -426,7 +426,6 @@ kubectl label namespace default scope=enabled
   -n, --nobreaker             Set Cribl Stream to not break streams into events
       --noprom                Disable Prometheus Exporter deployment
       --port int              Port to listen on (default 4443)
-      --prommport int         Specify Prometheus Exporter port for metrics from libscope (default 9109)
       --promsport int         Specify Prometheus Exporter port for HTTP metrics requests (default 9090)
       --server                Run Webhook server
       --signername string     Name of the signer used to sign the certificate request for the AppScope Admission Webhook (default "kubernetes.io/kubelet-serving")

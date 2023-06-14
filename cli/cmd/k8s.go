@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/criblio/scope/internal"
@@ -48,10 +49,20 @@ kubectl label namespace default scope=enabled
 		opt.PromDisable, _ = cmd.Flags().GetBool("noprom")
 
 		// Recognize the protocol used for statsd data listener
-		if strings.HasPrefix(opt.MetricDest, "tcp://") {
-			opt.PromType = "tcp"
-		} else if strings.HasPrefix(opt.MetricDest, "udp://") {
-			opt.PromType = "udp"
+		exporterDest := strings.ToLower(opt.MetricDest)
+		i := strings.LastIndex(exporterDest, ":")
+		// If there is no port skip the setup PromType
+		if i != -1 {
+			port, err := strconv.Atoi(exporterDest[i+1:])
+			// If converstion fails skip setup PromType
+			if err == nil {
+				opt.PromMPort = port
+				if strings.HasPrefix(exporterDest, "tcp://") {
+					opt.PromType = "tcp"
+				} else if strings.HasPrefix(exporterDest, "udp://") {
+					opt.PromType = "udp"
+				}
+			}
 		}
 
 		if !server {
@@ -79,7 +90,6 @@ func init() {
 	k8sCmd.Flags().Bool("server", false, "Run Webhook server")
 	k8sCmd.Flags().BoolVar(&opt.Debug, "debug", false, "Turn on debug logging in the scope webhook container")
 	k8sCmd.Flags().Bool("noprom", false, "Disable Prometheus Exporter deployment")
-	k8sCmd.Flags().IntVar(&opt.PromMPort, "prommport", 9109, "Specify Prometheus Exporter port for metrics from libscope")
 	k8sCmd.Flags().IntVar(&opt.PromSPort, "promsport", 9090, "Specify Prometheus Exporter port for HTTP metrics requests")
 
 	metricAndEventDestFlags(k8sCmd, rc)

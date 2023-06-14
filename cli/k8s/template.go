@@ -9,24 +9,24 @@ import (
 
 // Options represent the configurable parameters of a k8s deployment
 type Options struct {
-	App             string
-	Namespace       string
-	SignerName      string
-	Version         string
-	CriblDest       string
-	MetricDest      string
-	MetricFormat    string
-	MetricPrefix    string
-	EventDest       string
-	CertFile        string
-	KeyFile         string
-	Port            int
-	Debug           bool
-	PromDisable     bool
-	PromType        string
-	PromMPort       int
-	PromSPort       int
-	ScopeConfigYaml []byte
+	App                    string
+	Namespace              string
+	SignerName             string
+	Version                string
+	CriblDest              string
+	MetricDest             string
+	MetricFormat           string
+	MetricPrefix           string
+	EventDest              string
+	CertFile               string
+	KeyFile                string
+	Port                   int
+	Debug                  bool
+	ExporterDisable        bool
+	ExporterPromPort       int
+	ExporterStatsDPort     int
+	ExporterStatsDProtocol string
+	ScopeConfigYaml        []byte
 }
 
 // PrintConfig will output a k8s config to the specified writer

@@ -154,10 +154,10 @@ spec:
       creationTimestamp: null
       labels:
         app: {{ .App }}
-{{- if not .PromDisable }}
+{{- if not .ExporterDisable }}
       annotations:
         prometheus.io/scrape: "true"
-        prometheus.io/port: "{{ .PromSPort }}"
+        prometheus.io/port: "{{ .ExporterPromPort }}"
 {{- end }}
     spec:
       serviceAccountName: scope-cert-sa
@@ -176,71 +176,72 @@ spec:
           ports:
             - containerPort: {{ .Port }}
               protocol: TCP
-{{- if not .PromDisable }}
-        - name: {{ .App }}-prom-export
+{{- if not .ExporterDisable }}
+        - name: {{ .App }}-stats-exporter
           image: prom/statsd-exporter:v0.24.0
           args:
-          {{- if eq .PromType "tcp" }}
-          - --statsd.listen-tcp=:{{ .PromMPort }}
-          {{- else if eq .PromType "udp" }}
-          - --statsd.listen-udp=:{{ .PromMPort }}
+          {{- if eq .ExporterStatsDProtocol "tcp" }}
+          - --statsd.listen-tcp=:{{ .ExporterStatsDPort }}
+          {{- else if eq .ExporterStatsDProtocol "udp" }}
+          - --statsd.listen-udp=:{{ .ExporterStatsDPort }}
           {{- end }}
-          - --web.listen-address=:{{ .PromSPort }}
+          - --web.listen-address=:{{ .ExporterPromPort }}
           - --statsd.mapping-config=/tmp/mapping.conf
           imagePullPolicy: Always
           volumeMounts:
-            - name: prom-export-mapping-config-file
+            - name: {{ .App }}-stats-exporter-mapping-config-file
               mountPath: /tmp
           ports:
-            {{- if eq .PromType "tcp" }}
-            - containerPort: {{ .PromMPort }}
+            {{- if eq .ExporterStatsDProtocol "tcp" }}
+            - containerPort: {{ .ExporterStatsDPort }}
               protocol: TCP
-            {{- else if eq .PromType "udp" }}
-            - containerPort: {{ .PromMPort }}
+            {{- else if eq .ExporterStatsDProtocol "udp" }}
+            - containerPort: {{ .ExporterStatsDPort }}
               protocol: UDP
             {{- end }}
-            - containerPort: {{ .PromSPort }}
+            - containerPort: {{ .ExporterPromPort }}
               protocol: TCP
 {{- end }}
       volumes:
         - name: certs
           secret:
             secretName: {{ .App }}-secret
-{{- if not .PromDisable }}
-        - name: prom-export-mapping-config-file
+{{- if not .ExporterDisable }}
+        - name: {{ .App }}-stats-exporter-mapping-config-file
           configMap:
-            name: prom-export-mapping-config
+            name: {{ .App }}-stats-exporter-mapping-config
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .App }}-prom-export
+  name: {{ .App }}-stats-exporter
   namespace: {{ .Namespace }}
 spec:
   type: ClusterIP
   ports:
-    {{- if eq .PromType "tcp" }}
-    - name: {{ .PromMPort }}-prom-export-statsd-listen
+    {{- if eq .ExporterStatsDProtocol "tcp" }}
+    - name: {{ .ExporterStatsDPort }}-stats-exporter-statsd-listen
       protocol: TCP
-      port: {{ .PromMPort }}
-      targetPort: {{ .PromMPort }}
-    {{- else if eq .PromType "udp" }}
-    - name: {{ .PromMPort }}-prom-export-statsd-listen
+      port: {{ .ExporterStatsDPort }}
+      targetPort: {{ .ExporterStatsDPort }}
+    {{- else if eq .ExporterStatsDProtocol "udp" }}
+    - name: {{ .ExporterStatsDPort }}-stats-exporter-statsd-listen
       protocol: UDP
-      port: {{ .PromMPort }}
-      targetPort: {{ .PromMPort }}
+      port: {{ .ExporterStatsDPort }}
+      targetPort: {{ .ExporterStatsDPort }}
     {{- end }}
-    - name: {{ .PromSPort }}-prom-export-prometheus-http
+    - name: {{ .ExporterPromPort }}-stats-exporter-prometheus-http
       protocol: TCP
-      port: {{ .PromSPort }}
-      targetPort: {{ .PromSPort }}
+      port: {{ .ExporterPromPort }}
+      targetPort: {{ .ExporterPromPort }}
   selector:
     app: {{ .App }}
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: prom-export-mapping-config
+  name: {{ .App }}-stats-exporter-mapping-config
+  namespace: {{ .Namespace }}
 data:
   mapping.conf: |-
     mappings:

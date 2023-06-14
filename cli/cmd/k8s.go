@@ -23,7 +23,7 @@ The --*dest flags accept file names like /tmp/scope.log; URLs like file:///tmp/s
 	Example: `  scope k8s --metricdest tcp://some.host:8125 --eventdest tcp://other.host:10070 | kubectl apply -f -
 kubectl label namespace default scope=enabled
 
-  scope k8s --metricdest tcp://scope-prom-export:9109 --metricformat statsd --metricprefix appscope --eventdest tcp://other.host:10070 | kubectl apply -f -
+  scope k8s --metricdest tcp://scope-stats-exporter:9109 --metricformat statsd --metricprefix appscope --eventdest tcp://other.host:10070 | kubectl apply -f -
 `,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -46,21 +46,21 @@ kubectl label namespace default scope=enabled
 		opt.ScopeConfigYaml, err = rc.ScopeConfigYaml()
 		util.CheckErrSprintf(err, "%v", err)
 		server, _ := cmd.Flags().GetBool("server")
-		opt.PromDisable, _ = cmd.Flags().GetBool("noprom")
+		opt.ExporterDisable, _ = cmd.Flags().GetBool("noexporter")
 
-		// Recognize the protocol used for statsd data listener
+		// Recognize the port and protocol used for statsD data listener
 		exporterDest := strings.ToLower(opt.MetricDest)
 		i := strings.LastIndex(exporterDest, ":")
-		// If there is no port skip the setup PromType
+		// If there is no port skip the setup protocol
 		if i != -1 {
 			port, err := strconv.Atoi(exporterDest[i+1:])
-			// If converstion fails skip setup PromType
+			// If converstion fails skip setup protocol
 			if err == nil {
-				opt.PromMPort = port
+				opt.ExporterStatsDPort = port
 				if strings.HasPrefix(exporterDest, "tcp://") {
-					opt.PromType = "tcp"
+					opt.ExporterStatsDProtocol = "tcp"
 				} else if strings.HasPrefix(exporterDest, "udp://") {
-					opt.PromType = "udp"
+					opt.ExporterStatsDProtocol = "udp"
 				}
 			}
 		}
@@ -89,8 +89,8 @@ func init() {
 	k8sCmd.Flags().IntVar(&opt.Port, "port", 4443, "Port to listen on")
 	k8sCmd.Flags().Bool("server", false, "Run Webhook server")
 	k8sCmd.Flags().BoolVar(&opt.Debug, "debug", false, "Turn on debug logging in the scope webhook container")
-	k8sCmd.Flags().Bool("noprom", false, "Disable Prometheus Exporter deployment")
-	k8sCmd.Flags().IntVar(&opt.PromSPort, "promsport", 9090, "Specify Prometheus Exporter port for HTTP metrics requests")
+	k8sCmd.Flags().Bool("noexporter", false, "Disable StatsD to Prometheus Exporter deployment")
+	k8sCmd.Flags().IntVar(&opt.ExporterPromPort, "promport", 9090, "Specify StatsD to Prometheus Exporter port for HTTP metrics requests")
 
 	metricAndEventDestFlags(k8sCmd, rc)
 }

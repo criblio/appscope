@@ -244,9 +244,6 @@ metadata:
 data:
   mapping.conf: |-
     mappings:
-    - match: ".+"
-      match_type: regex
-      name: "appscope_${0}"
     - match: "http.duration.server"
       help: "Total duration of http response"
       observer_type: histogram

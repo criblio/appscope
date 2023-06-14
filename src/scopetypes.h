@@ -51,6 +51,8 @@ typedef enum {CFG_MTC_FS,
 #define SM_NAME "scope_anon"
 #define SCOPE_FILTER_USR_PATH ("/usr/lib/appscope/scope_filter")
 #define SCOPE_FILTER_TMP_PATH ("/tmp/appscope/scope_filter")
+#define SCOPE_SYS_PATH "/usr/lib/appscope/"
+#define SCOPE_TMP_PATH "/tmp/appscope/"
 
 typedef unsigned int bool;
 #define TRUE 1

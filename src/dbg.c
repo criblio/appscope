@@ -39,6 +39,7 @@ bool g_ismusl = FALSE;
 bool g_isstatic = FALSE;
 bool g_isgo = FALSE;
 bool g_issighandler = FALSE;
+char g_libpath[PATH_MAX] = {};
 
 void
 dbgInit()

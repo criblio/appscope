@@ -2587,7 +2587,7 @@ cfgReadCustomAnchorExtend(void **state)
 static void
 filterEmptyProcName(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus(NULL, "foo", testAccessFilterPath(path), cfg);
@@ -2601,7 +2601,7 @@ filterEmptyProcName(void **state) {
 static void
 filterEmptyProcCmdLine(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("foo", NULL, testAccessFilterPath(path), cfg);
@@ -2633,7 +2633,7 @@ filterNullFilterPath(void **state) {
 static void
 filterNullCfg(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
     filter_status_t res = cfgFilterStatus("foo", "foo", testAccessFilterPath(path), NULL);
     assert_int_equal(res, FILTER_ERROR);
     dbgInit(); // reset dbg for the rest of the tests
@@ -2644,7 +2644,7 @@ filterNullCfg(void **state) {
 static void
 filterNonExistingFilterFile(void **state) {
     char path[PATH_MAX] = {0};    
-    scope_snprintf(path, sizeof(path), "%s/data/filter_non_existing.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_non_existing.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("foo", "foo", testAccessFilterPath(path), cfg);
@@ -2657,7 +2657,7 @@ filterNonExistingFilterFile(void **state) {
 static void
 filterProcNameAllowListPresent(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("redis", "", testAccessFilterPath(path), cfg);
@@ -2670,7 +2670,7 @@ filterProcNameAllowListPresent(void **state) {
 static void
 filterProcNameDenyListPresent(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("git", "", testAccessFilterPath(path), cfg);
@@ -2683,7 +2683,7 @@ filterProcNameDenyListPresent(void **state) {
 static void
 filterArgAllowListPresent(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_1.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_1.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("", "redis arg1", testAccessFilterPath(path), cfg);
@@ -2696,7 +2696,7 @@ filterArgAllowListPresent(void **state) {
 static void
 filterArgDenyListPresent(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_1.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_1.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("", "git arg1", testAccessFilterPath(path), cfg);
@@ -2709,13 +2709,13 @@ filterArgDenyListPresent(void **state) {
 static void
 filterArgAllowListPartFindPresent(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("redis-server", "redis-server", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_NOT_SCOPED);
     scope_memset(path, 0, sizeof(path));
-    scope_snprintf(path, sizeof(path), "%s/data/filter_1.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_1.yml", dirPath);
     res = cfgFilterStatus("redis-server", "redis-server", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
     // cleanup
@@ -2726,7 +2726,7 @@ filterArgAllowListPartFindPresent(void **state) {
 static void
 filterArgAllowListEmptyProcMissing(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
@@ -2740,7 +2740,7 @@ filterArgAllowListEmptyProcMissing(void **state) {
 static void
 filterArgAllowListNotEmptyProcMissing(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_2.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_2.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("memcached", "memcached", testAccessFilterPath(path), cfg);
@@ -2748,7 +2748,7 @@ filterArgAllowListNotEmptyProcMissing(void **state) {
 
     scope_memset(path, 0, PATH_MAX);
 
-    scope_snprintf(path, sizeof(path), "%s/data/filter_3.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_3.yml", dirPath);
     res = cfgFilterStatus("memcached", "memcached", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_NOT_SCOPED);
     // cleanup
@@ -2759,7 +2759,7 @@ filterArgAllowListNotEmptyProcMissing(void **state) {
 static void
 filterVerifyCfg(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("redis", "redis", testAccessFilterPath(path), cfg);
@@ -2791,7 +2791,7 @@ filterDenyIsProcessedAfterAllow(void **state)
     // redis is in both the allow list and deny list.
     // verify that "deny" wins.  (is processed after allow)
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_4.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_4.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("redis", "", testAccessFilterPath(path), cfg);
@@ -2807,7 +2807,7 @@ filterConfigIsProcessedAfterProcName(void **state)
     // cfg should be changed if procname or arg matches
     // make sure we process these fields before config.
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_4.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_4.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
@@ -2830,7 +2830,7 @@ filterMatchAllInAllow(void **state)
 {
     // Verify that _MatchAll_ in allow matches all processes
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_5.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_5.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("blue", "", testAccessFilterPath(path), cfg);
@@ -2851,7 +2851,7 @@ filterMatchAllInAllowCanBeDenied(void **state)
 {
     // Verify that _MatchAll_ in allow is overriden by a match in deny
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_5.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_5.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("redis", "", testAccessFilterPath(path), cfg);
@@ -2867,7 +2867,7 @@ filterVerifyMatchAllMergedConfig(void **state)
     // Verify that matches (including _MatchAll_) are applied in order
     // And that matches can be "merged" w.r.t. configuration
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_5.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_5.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
@@ -2898,7 +2898,7 @@ filterMatchAllInDeny(void **state)
 {
     // Verify that _MatchAll_ in deny denies all processes
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_6.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_6.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("blue", "", testAccessFilterPath(path), cfg);

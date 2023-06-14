@@ -1,6 +1,6 @@
  /*
  * Sample code for adding mounts in existing containers
- * gcc -g -o mc test/manual/mountC.c 
+ * gcc -g -o mc test/manual/mountC.c
  */
 
 #include <stdio.h>
@@ -14,9 +14,7 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
-#define FILTER_FILE "scope_filter"
-#define SOCK_FILE "appscope.sock"
+#include <getopt.h>
 
 // copied from the loader
 #define FALSE 0
@@ -24,14 +22,6 @@
 
 // copied from the loader
 typedef unsigned int bool;
-typedef unsigned long libdirfile_t;
-
-// copied from the loader
-const char *
-libdirGetPath(libdirfile_t objFileType)
-{
-    return strdup("/tmp/appscope/");
-}
 
 // copied from the loader
 bool
@@ -80,38 +70,118 @@ nsInfoGetPidNs(pid_t pid, pid_t *lastNsPid) {
     return status;
 }
 
-bool
-makeDirs(const char *rootdir, pid_t pid, const char *filterdir, const char *file, mode_t mode)
+/*
+ * The mkdir system call does not support the creation of intermediate dirs.
+ * This will walk the path and create all dirs one at a time.
+ */
+static bool
+makeDirs(pid_t pid, const char *rootdir, const char *targetdir, mode_t mode)
 {
     char path[PATH_MAX] = {0};
 
     if (rootdir) {
         snprintf(path, sizeof(path), "%s/proc/%d/root/%s/",
-                 rootdir, pid, filterdir);
+                 rootdir, pid, targetdir);
     } else {
-        snprintf(path, sizeof(path), "/proc/%d/root/%s/", pid, filterdir);
+        snprintf(path, sizeof(path), "/proc/%d/root/%s/", pid, targetdir);
     }
 
-    if ((mkdir(path, mode) == -1) && (errno != EEXIST)) {
-        perror("mkdir");
+    char *slash;
+    char *dup_path = strdup(path);
+    if (!dup_path) {
         return FALSE;
     }
 
-    if (file) {
-        mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+    char *curr = strstr(dup_path, "root/");
+    if (!curr) return FALSE;
+    curr += strlen("root/");
 
-        strcat(path, "/");
-        strcat(path, file);
-        if ((creat(path, mode) == -1) && (errno != EEXIST)) {
-            perror("creat");
+    while ((slash = strchr(curr, '/'))) {
+        *slash = '\0';
+        if (mkdir(dup_path, mode) == -1) {
+            if (errno != EEXIST) {
+                free(dup_path);
+                return FALSE;
+            }
+        }
+
+        *slash = '/';
+        curr = slash + 1;
+    }
+
+    if (mkdir(dup_path, mode) == -1) {
+        if (errno != EEXIST) {
+            free(dup_path);
             return FALSE;
         }
     }
-    
+
+    free(dup_path);
+
     return TRUE;
 }
 
-char *
+static bool
+doDir(pid_t pid, char *rootdir, char *overlaydir, size_t olen, char *dest, size_t dlen, char *fstype)
+{
+    char mountdir[olen + dlen + 2];
+
+    if (!overlaydir || !dest) return FALSE;
+
+    strcpy(mountdir, overlaydir);
+    strcat(mountdir, dest);
+
+    // make the overlay file in the merged dir
+    if (makeDirs(pid, rootdir, (const char *)dest, 0666) == FALSE) {
+        fprintf(stderr, "Warn: mkdir of %s from %s:%d\n", overlaydir, __FUNCTION__, __LINE__);
+        return FALSE;
+    }
+
+    // mount the overlay file into the container
+    if (mount(dest, mountdir, fstype, MS_BIND, NULL) != 0) {
+        perror("mount");
+        fprintf(stderr, "WARN: mount %s on %s from %s:%d\n", dest, overlaydir, __FUNCTION__, __LINE__);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static bool
+mountCDirs(pid_t pid, char *target, const char *rootdir,
+           const char *filterdir, const char *sockdir, char *fstype)
+{
+    if (!target || !filterdir) return FALSE;
+    
+    pid_t nsPid;
+    char *overlaydir = NULL;
+    size_t tlen = strlen(target);
+    size_t flen = strlen(filterdir);
+
+    if ((overlaydir = malloc(tlen + 1)) == NULL) return FALSE;
+    strcpy(overlaydir, target);
+
+    if (doDir(pid, (char *)rootdir, overlaydir, tlen, (char *)filterdir, flen, fstype) == FALSE) {
+        fprintf(stderr, "Can't mount %s in the container\n", filterdir);
+        free(overlaydir);
+        return FALSE;
+    }
+
+    if (sockdir) {
+        size_t slen = strlen(sockdir);
+
+        if (doDir(pid, (char *)rootdir, overlaydir, tlen, (char *)sockdir, slen, fstype) == FALSE) {
+            fprintf(stderr, "Can't mount %s in the container\n", sockdir);
+            free(overlaydir);
+            return FALSE;
+        }
+    }
+
+    free(overlaydir);
+    return TRUE;
+}
+
+static char *
 getMountPath(pid_t pid)
 {
     bool candidate = FALSE;
@@ -165,73 +235,56 @@ getMountPath(pid_t pid)
     return NULL;
 }
 
-bool
-doDir(pid_t pid, char *rootdir, char *filterdir, char *file, char *fstype)
-{
-    char *mountdir;
-    libdirfile_t objfile;
-
-    mountdir = (char *)libdirGetPath(objfile);
-    if (!mountdir) {
-        return FALSE;
-    }
-
-    // make the filter file in the merged dir
-    if (makeDirs(rootdir, pid, (const char *)mountdir, file, 0666) == FALSE) {
-        fprintf(stderr, "Warn: mkdir of %s from %s:%d\n", filterdir, __FUNCTION__, __LINE__);
-        free(mountdir);
-        return FALSE;
-    }
-
-    strcat(mountdir, file);
-    strcat(filterdir, mountdir);
-
-    // mount the filter file into the container
-    if (mount(mountdir, filterdir, fstype, MS_BIND, NULL) != 0) {
-        perror("mount");
-        fprintf(stderr, "WARN: mount %s on %s from %s:%d\n", mountdir, filterdir, __FUNCTION__, __LINE__);
-        free(mountdir);
-        return FALSE;
-    }
-
-    free(mountdir);
-    return TRUE;
-}
-
-bool
-mountCDirs(pid_t pid, const char *rootdir, char *target, char *fstype)
-{
-    pid_t nsPid;
-    char *filterdir = NULL;
-    size_t targetlen = strlen(target);
-
-    if ((filterdir = malloc(targetlen + 128)) == NULL) return FALSE;
-
-    strcpy(filterdir, target);
-    if (doDir(pid, (char *)rootdir, filterdir, FILTER_FILE, fstype) == FALSE) {
-        fprintf(stderr, "Can't mount a dir in the container");
-        free(filterdir);
-        return FALSE;
-    }
-
-    strcpy(filterdir, target);
-    if (doDir(pid, (char *)rootdir, filterdir, SOCK_FILE, fstype) == FALSE) {
-        fprintf(stderr, "Can't mount a dir in the container");
-        free(filterdir);
-        return FALSE;
-    }
-
-    free(filterdir);
-    return TRUE;
-}
+static struct option opts[] = {
+	{ "rootdir",    required_argument, 0, 'r' },
+	{ "filterdir",  required_argument, 0, 'f' },
+	{ "sockdir",    required_argument, 0, 's' },
+	{ 0, 0, 0, 0 }
+};
 
 int main(int argc, char **argv)
 {
     printf("Adding mounts\n");
 
+    int index;
     DIR *dirp;
     struct dirent *entry;
-    char *mpath = NULL, *rootdir = NULL;
+    char *mpath = NULL, *rootdir = NULL, *filterdir = NULL, *sockdir = NULL;
+
+    for (;;) {
+		index = 0;
+        int opt = getopt_long(argc, argv, "+:f:r:s:", opts, &index); // "+:rf:s"
+		if (opt == -1) break;
+
+		switch (opt) {
+		case 'r':
+			rootdir = optarg;
+			break;
+		case 'f':
+			filterdir = optarg;
+			break;
+		case 's':
+			sockdir = optarg;
+			break;
+		case ':': // Handle options missing their arg value
+			switch (optopt) {
+			default:
+				fprintf(stderr, "error: missing required value for -%c option\n", optopt);
+				exit(EXIT_FAILURE);
+			}
+			break;
+		default:
+            fprintf(stderr, "error: need at least a filter dir.\n");
+            exit(EXIT_FAILURE);
+		}
+	}
+
+    if (!filterdir) {
+        fprintf(stderr, "error: a filter dir is required.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("%s:%d %s %s %s\n", __FUNCTION__, __LINE__, rootdir, filterdir, sockdir);
 
     dirp = opendir("/proc");
     if (dirp == NULL) {
@@ -248,7 +301,7 @@ int main(int argc, char **argv)
                 // if pid is in a supported container, get the requisite mount path
                 if ((mpath = getMountPath(pid)) != NULL) {
                     printf("%s:%d pid %d mount %s\n", __FUNCTION__, __LINE__, pid, mpath);
-                    mountCDirs(pid, rootdir, mpath, NULL);
+                    mountCDirs(pid, mpath, rootdir, filterdir, sockdir, NULL);
                     free(mpath);
                 }
             }

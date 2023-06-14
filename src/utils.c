@@ -78,13 +78,30 @@ int
 checkEnv(char *env, char *val)
 {
     char *estr;
-    if (((estr = getenv(env)) != NULL) &&
+    if (((estr = fullGetEnv(env)) != NULL) &&
        (scope_strncmp(estr, val, scope_strlen(estr)) == 0)) {
         return TRUE;
     }
     return FALSE;
 }
 
+extern char** environ;
+
+/*
+ * fullGetEnv allows to get an environment variable directly from environ
+ * Note:
+ * The implementation of fullGetEnv is corresponding to the getenv defined in
+ * our internal library
+ */
+char *
+fullGetEnv(char *name) {
+    size_t l = scope_strchrnul(name, '=') - name;
+    if (l && !name[l] && environ)
+        for (char **e = environ; *e; e++)
+            if (!scope_strncmp(name, *e, l) && l[*e] == '=')
+                return *e + l+1;
+    return NULL;
+}
 
 int
 fullSetenv(const char *key, const char *val, int overwrite)
@@ -180,7 +197,7 @@ getpath(const char *cmd)
     }
 
     // try to resolve the cmd from PATH env variable
-    char *path_env_ptr = getenv("PATH");
+    char *path_env_ptr = fullGetEnv("PATH");
     if (!path_env_ptr) goto out;
     path_env = scope_strdup(path_env_ptr); // create a copy for strtok below
     if (!path_env) goto out;

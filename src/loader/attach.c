@@ -28,7 +28,7 @@
 #include "patch.h"
 #include "setup.h"
 
-/* 
+/*
  * This avoids a segfault when code using shm_open() is compiled statically.
  * For some reason, compiling the code statically causes the __shm_directory()
  * function calls in librt.a to not reach the implementation in libpthread.a.
@@ -45,6 +45,50 @@ const char *__shm_directory(size_t *len)
     if (len)
         *len = strlen(shm_mount);
     return shm_mount;
+}
+
+/*
+ * createDynConfigFile creates dynamic configuration file used to
+ * followin operations:
+ * - first attach
+ * - detach
+ * - reattach
+ * Returns the file descriptor of the dynamic configuration file
+ */
+static int
+createDynConfigFile(pid_t pid) {
+    char buf[PATH_MAX] = {0};
+
+    /*
+     * Before executing any command, create and populate the dyn config file.
+     * It is used for all cases:
+     *   First attach: no attach command, include env vars, reload command
+     *   Reattach: attach command = true, include env vars, reload command
+     *   Detach: attach command = false, no env vars, no reload command
+     */
+    if (nsInfoIsPidInSameMntNs(pid) == FALSE) {
+        pid_t nsPid = 0;
+        nsInfoGetPidNs(pid, &nsPid);
+        snprintf(buf, sizeof(buf), "/proc/%d/root/%s/%s.%d", pid, 
+                DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, nsPid);
+    } else {
+        snprintf(buf, sizeof(buf), "%s/%s.%d",
+                DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, pid);
+    }
+    
+    /*
+     * Unlink a possible existing file before creating a new one
+     * due to a fact that open will fail if the file is
+     * sealed (still processed on library side).
+     * File sealing is supported on tmpfs - /dev/shm (DYN_CONFIG_CLI_DIR).
+     */
+
+    unlink(buf);
+
+    uid_t nsUid = nsInfoTranslateUidRootDir("", pid);
+    gid_t nsGid = nsInfoTranslateGidRootDir("", pid);
+
+    return nsFileOpen(buf, O_WRONLY|O_CREAT, nsUid, nsGid, geteuid(), getegid());
 }
 
 int
@@ -110,7 +154,6 @@ attach(pid_t pid)
     int fd, sfd, mfd, i;
     bool first_attach = FALSE;
     export_sm_t *exaddr;
-    char buf[PATH_MAX] = {0};
 
     /*
      * The SM segment is used in the first attach case where
@@ -128,28 +171,7 @@ attach(pid_t pid)
         first_attach = TRUE;
     }
 
-    /*
-     * Before executing any command, create and populate the dyn config file.
-     * It is used for all cases:
-     *   First attach: no attach command, include env vars, reload command
-     *   Reattach: attach command = true, include env vars, reload command
-     */
-    snprintf(buf, sizeof(buf), "%s/%s.%d",
-                   DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, pid);
-
-    /*
-     * Unlink a possible existing file before creating a new one
-     * due to a fact that open will fail if the file is
-     * sealed (still processed on library side).
-     * File sealing is supported on tmpfs - /dev/shm (DYN_CONFIG_CLI_DIR).
-     */
-    unlink(buf);
-
-
-    uid_t nsUid = nsInfoTranslateUidRootDir("", pid);
-    gid_t nsGid = nsInfoTranslateGidRootDir("", pid);
-
-    fd = nsFileOpen(buf, O_WRONLY|O_CREAT, nsUid, nsGid, geteuid(), getegid());
+    fd = createDynConfigFile(pid);
     if (fd == -1) {
         return EXIT_FAILURE;
     }
@@ -230,7 +252,7 @@ attach(pid_t pid)
     int rc = EXIT_SUCCESS;
 
     if (first_attach == TRUE) {
-        memset(buf, 0, PATH_MAX);
+        char buf[PATH_MAX] = {0};
         // the only command we do in this case is first attach
         snprintf(buf, sizeof(buf), "/proc/%d/fd/%d", pid, sfd);
         if ((mfd = open(buf, O_RDONLY)) == -1) {
@@ -268,7 +290,6 @@ detach(pid_t pid)
 {
     int fd, sfd;
     bool first_attach = FALSE;
-    char buf[PATH_MAX] = {0};
     uint64_t rc;
 
     // Check process exists and that the libscope library exists in the process
@@ -309,29 +330,7 @@ detach(pid_t pid)
         return EXIT_SUCCESS; // TODO is this a success?
     }
 
-    /*
-     * Before executing any command, create and populate the dyn config file.
-     * It is used for all cases:
-     *   First attach: no attach command, include env vars, reload command
-     *   Reattach: attach command = true, include env vars, reload command
-     *   Detach: attach command = false, no env vars, no reload command
-     */
-    snprintf(buf, sizeof(buf), "%s/%s.%d",
-                   DYN_CONFIG_CLI_DIR, DYN_CONFIG_CLI_PREFIX, pid);
-
-    /*
-     * Unlink a possible existing file before creating a new one
-     * due to a fact that open will fail if the file is
-     * sealed (still processed on library side).
-     * File sealing is supported on tmpfs - /dev/shm (DYN_CONFIG_CLI_DIR).
-     */
-    unlink(buf);
-
-    // Note: No need to pass rootdir here, we should already be in the target mnt ns
-    uid_t nsUid = nsInfoTranslateUidRootDir("", pid);
-    gid_t nsGid = nsInfoTranslateGidRootDir("", pid);
-
-    fd = nsFileOpen(buf, O_WRONLY|O_CREAT, nsUid, nsGid, geteuid(), getegid());
+    fd = createDynConfigFile(pid);
     if (fd == -1) {
         perror("open() failed");
         return EXIT_FAILURE;

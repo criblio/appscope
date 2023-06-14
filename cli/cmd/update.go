@@ -23,11 +23,11 @@ var updateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Updates the configuration of a scoped process",
 	Long:  `Updates the configuration of a scoped process identified by PID.`,
-	Example: `scope update 1000 --config scope_cfg.yml
-scope update 1000 < scope_cfg.yml
-scope update 1000 --json < scope_cfg.yml
-scope update 1000 --rootdir /path/to/host/mount --config scope_cfg.yml
-scope update 1000 --rootdir /path/to/host/mount/proc/<hostpid>/root < scope_cfg.yml`,
+	Example: `  scope update 1000 --config scope_cfg.yml
+  scope update 1000 < scope_cfg.yml
+  scope update 1000 --json < scope_cfg.yml
+  scope update 1000 --rootdir /path/to/host/root --config scope_cfg.yml
+  scope update 1000 --rootdir /path/to/host/root/proc/<hostpid>/root < scope_cfg.yml`,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()

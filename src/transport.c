@@ -20,6 +20,7 @@
 #include "os.h"
 #include "scopestdlib.h"
 #include "fn.h"
+#include "utils.h"
 #include "transport.h"
 #include "utils.h"
 

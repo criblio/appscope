@@ -18,10 +18,10 @@ var k8sCmd = &cobra.Command{
 	Long: `Prints configurations to pass to kubectl, which then automatically instruments newly-launched containers. This installs a mutating admission webhook, which adds an initContainer to each pod. The webhook also sets environment variables that install AppScope for all processes in that container.
 
 The --*dest flags accept file names like /tmp/scope.log; URLs like file:///tmp/scope.log; or sockets specified with the pattern unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
-	Example: `scope k8s --metricdest tcp://some.host:8125 --eventdest tcp://other.host:10070 | kubectl apply -f -
+	Example: `  scope k8s --metricdest tcp://some.host:8125 --eventdest tcp://other.host:10070 | kubectl apply -f -
 kubectl label namespace default scope=enabled
 
-scope k8s --metricdest tcp://scope-prom-export:9109 --metricformat prometheus --eventdest tcp://other.host:10070 | kubectl apply -f -
+  scope k8s --metricdest tcp://scope-prom-export:9109 --metricformat prometheus --eventdest tcp://other.host:10070 | kubectl apply -f -
 `,
 	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {

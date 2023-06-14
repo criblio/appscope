@@ -791,6 +791,7 @@ nsForkAndExec(pid_t parentPid, pid_t nsPid, bool ldattach)
             snprintf(loaderInChildPath, PATH_MAX, "/tmp/appscope/%s/scope", loaderVersion);
             if (access(loaderInChildPath, R_OK)) {
                 fprintf(stderr, "error: access scope failed\n");
+                free(execArgv);
                 return EXIT_FAILURE;
             }
         }

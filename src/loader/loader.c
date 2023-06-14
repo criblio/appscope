@@ -255,6 +255,10 @@ out:
 int
 cmdDetach(pid_t pid, const char *rootdir)
 {
+    if (pid < 1) {
+        return EXIT_FAILURE;
+    }
+
     // Change mnt namespace if rootdir is provided
     if (rootdir) {
         if (setNamespaceRootDir(rootdir, 1, "mnt") == FALSE) {
@@ -494,20 +498,33 @@ cmdInstall(const char *rootdir)
 {
     uid_t eUid = geteuid();
     gid_t eGid = getegid();
+    uid_t nsUid = eUid;
+    uid_t nsGid = eGid;
+    unsigned char *file = NULL;
+    size_t file_len;
 
-    // If rootdir is provided, extract the library into a separate namespace
+    // Extract library from scope binary into memory while in origin namespace
+    if ((file_len = getAsset(LIBRARY_FILE, &file)) == -1) {
+        fprintf(stderr, "cmdInstall getAsset failed\n");
+        return EXIT_FAILURE;
+    }
+
+    // Change mnt namespace if rootdir is provided
     if (rootdir) {
+        nsUid = nsInfoTranslateUidRootDir(rootdir, pid);
+        nsGid = nsInfoTranslateGidRootDir(rootdir, pid);
+
         // Use pid 1 to locate ns fd
-        if (nsInstall(rootdir, 1, LIBRARY_FILE)) {
-            fprintf(stderr, "error: failed to install library\n");
+        if (setNamespaceRootDir(rootdir, 1, "mnt") == FALSE) {
+            fprintf(stderr, "cmdInstall mnt failed\n");
             return EXIT_FAILURE;
         }
-    // Extract the library locally
-    } else {
-        if (libdirExtract(NULL, 0, eUid, eGid, LIBRARY_FILE)) {
-            fprintf(stderr, "error: failed to install library\n");
-            return EXIT_FAILURE;
-        }
+    }
+
+    // Extract the library
+    if (libdirExtract(file, file_len, nsUid, nsGid, LIBRARY_FILE)) {
+        fprintf(stderr, "cmdInstall extract failed\n");
+        return EXIT_FAILURE;
     }
 
     return EXIT_SUCCESS;
@@ -521,16 +538,16 @@ cmdFilter(const char *configFilterPath, const char *rootdir)
     gid_t eGid = getegid();
     uid_t nsUid = eUid;
     uid_t nsGid = eGid;
+    size_t configFilterSize = 0;
 
     if (!configFilterPath) {
         return EXIT_FAILURE;
     }
 
     // Read filter file in while in origin namespace
-    size_t configFilterSize = 0;
     void *configFilterMem = setupLoadFileIntoMem(&configFilterSize, configFilterPath);
     if (configFilterMem == NULL) {
-        fprintf(stderr, "error: Load filter file into memory %s\n", configFilterPath);
+        fprintf(stderr, "error: Loading filter file into memory %s\n", configFilterPath);
         return EXIT_FAILURE;
     }
 
@@ -552,9 +569,7 @@ cmdFilter(const char *configFilterPath, const char *rootdir)
         return EXIT_FAILURE;
     }
 
-    if (configFilterMem) {
-        munmap(configFilterMem, configFilterSize);
-    }
+    if (configFilterMem) munmap(configFilterMem, configFilterSize);
 
     return EXIT_SUCCESS;
 }
@@ -597,6 +612,10 @@ cmdMount(const char *mountDest, const char *rootdir)
     gid_t eGid = getegid();
     uid_t nsUid = eUid;
     uid_t nsGid = eGid;
+
+    if (!mountDest) {
+        return EXIT_FAILURE;
+    }
 
     // Change mnt namespace if rootdir is provided
     if (rootdir) {

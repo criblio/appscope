@@ -478,6 +478,8 @@ nsAttach(pid_t pid, const char *rootDir)
     char scopeCfgPath[PATH_MAX] = {0};
     char scopeCmd[PATH_MAX] = {0};
     char path[PATH_MAX] = {0};
+    unsigned char *file = NULL;
+    size_t file_len;
 
     snprintf(path, PATH_MAX, "%s", rootDir);
 
@@ -517,16 +519,29 @@ nsAttach(pid_t pid, const char *rootDir)
     uid_t nsUid = nsInfoTranslateUidRootDir(path, hostPid);
     gid_t nsGid = nsInfoTranslateGidRootDir(path, hostPid);
 
-    // Configuration is optionally loaded into memory from origin ns
+    // Configuration is optionally loaded into memory while in the origin namespace
     char *scopeCfgMem = setupLoadFileIntoMem(&cfgSize, getenv("SCOPE_CONF_PATH"));
 
-    if (nsInstall(path, 1, STATIC_LOADER_FILE)) {
-        fprintf(stderr, "error: nsAttach: failed to extract loader\n");
+    // Extract library from scope binary into memory while in the origin namespace
+    if ((file_len = getAsset(STATIC_LOADER_FILE, &file)) == -1) {
+        fprintf(stderr, "nsAttach getAsset failed\n");
         ret = EXIT_FAILURE;
         goto out;
     }
 
-    // Note: After the successful call to nsInstall, we are in the target mnt ns
+    // Switch to rootdir mnt namespace
+    if (setNamespaceRootDir(rootdir, pid, "mnt") == FALSE) {
+        fprintf(stderr, "nsAttach setNamespaceRootDir mnt failed\n");
+        ret = EXIT_FAILURE;
+        goto out;
+    }
+
+    // Extract the scope loader
+    if (libdirExtract(file, file_len, nsUid, nsGid, objFileType)) {
+        fprintf(stderr, "nsAttach extract failed\n");
+        ret = EXIT_FAILURE;
+        goto out;
+    }
 
     // Create script and cron job to perform the attach 
 
@@ -591,44 +606,9 @@ nsAttach(pid_t pid, const char *rootDir)
     }
 
 out:
-    if (scopeCfgMem) {
-        munmap(scopeCfgMem, cfgSize);
-    }
+    if (file) munmap(file, file_len);
+    if (scopeCfgMem) munmap(scopeCfgMem, cfgSize);
 
     return ret;
 }
 
-// TODO migrate to cmdInstall
-int
-nsInstall(const char *rootdir, pid_t pid, libdirfile_t objFileType) {
-    int ret = EXIT_SUCCESS;
-    unsigned char *file = NULL;
-    size_t file_len;
-    uid_t nsUid = nsInfoTranslateUidRootDir(rootdir, pid);
-    gid_t nsGid = nsInfoTranslateGidRootDir(rootdir, pid);
-
-    // Extract library from scope binary into memory
-    // while in the origin namespace
-    if ((file_len = getAsset(objFileType, &file)) == -1) {
-        fprintf(stderr, "nsInstall getAsset failed\n");
-        ret = EXIT_FAILURE;
-        goto out;
-    }
-
-    // Switch to mnt namespace
-    if (setNamespaceRootDir(rootdir, pid, "mnt") == FALSE) {
-        fprintf(stderr, "nsInstall mnt failed\n");
-        ret = EXIT_FAILURE;
-        goto out;
-    }
-
-    if (libdirExtract(file, file_len, nsUid, nsGid, objFileType)) {
-        fprintf(stderr, "nsInstall extract failed\n");
-        ret = EXIT_FAILURE;
-        goto out;
-    }
-
-out:
-    if (objFileType == STATIC_LOADER_FILE && file) munmap(file, file_len);
-    return ret;
-}

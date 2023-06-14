@@ -511,8 +511,8 @@ cmdInstall(const char *rootdir)
 
     // Change mnt namespace if rootdir is provided
     if (rootdir) {
-        nsUid = nsInfoTranslateUidRootDir(rootdir, pid);
-        nsGid = nsInfoTranslateGidRootDir(rootdir, pid);
+        nsUid = nsInfoTranslateUidRootDir(rootdir, 1);
+        nsGid = nsInfoTranslateGidRootDir(rootdir, 1);
 
         // Use pid 1 to locate ns fd
         if (setNamespaceRootDir(rootdir, 1, "mnt") == FALSE) {
@@ -564,7 +564,7 @@ cmdFilter(const char *configFilterPath, const char *rootdir)
     }
 
     // Install filter file
-    if (setupFilter(configFilterMem, configFilterSize, nsUid, nsGid)) {
+    if (!setupFilter(configFilterMem, configFilterSize, nsUid, nsGid)) {
         fprintf(stderr, "error: failed to install filter file\n");
         return EXIT_FAILURE;
     }
@@ -596,7 +596,7 @@ cmdPreload(const char *rootdir)
     }
 
     // Set ld.so.preload
-    if (setupPreload(nsUid, nsGid)) {
+    if (!setupPreload(nsUid, nsGid)) {
         fprintf(stderr, "error: failed to set ld.so.preload\n");
         return EXIT_FAILURE;
     }

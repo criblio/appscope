@@ -530,14 +530,14 @@ nsAttach(pid_t pid, const char *rootDir)
     }
 
     // Switch to rootdir mnt namespace
-    if (setNamespaceRootDir(rootdir, pid, "mnt") == FALSE) {
+    if (setNamespaceRootDir(rootDir, pid, "mnt") == FALSE) {
         fprintf(stderr, "nsAttach setNamespaceRootDir mnt failed\n");
         ret = EXIT_FAILURE;
         goto out;
     }
 
     // Extract the scope loader
-    if (libdirExtract(file, file_len, nsUid, nsGid, objFileType)) {
+    if (libdirExtract(file, file_len, nsUid, nsGid, STATIC_LOADER_FILE)) {
         fprintf(stderr, "nsAttach extract failed\n");
         ret = EXIT_FAILURE;
         goto out;

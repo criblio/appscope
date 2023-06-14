@@ -49,7 +49,7 @@ package main
 static struct option opts[] = {
 	{ "ldattach",    required_argument, 0, 'a' },
 	{ "lddetach",    required_argument, 0, 'd' },
-	{ "preload",     required_argument, 0, 'e' },
+	{ "preload",     no_argument,       0, 'e' },
 	{ "filter",      required_argument, 0, 'f' },
 	{ "mount",       required_argument, 0, 'm' },
 	{ "install",     no_argument,       0, 'i' },
@@ -146,7 +146,7 @@ __attribute__((constructor)) void cli_constructor() {
 
 	for (;;) {
 		index = 0;
-		int opt = getopt_long(arg_c, arg_v, "+:a:d:n:m:l:e:f:p:s:R:vzi", opts, &index);
+		int opt = getopt_long(arg_c, arg_v, "+:a:d:n:m:l:f:p:s:R:vzei", opts, &index);
 		if (opt == -1) {
 			break;
 		}
@@ -215,10 +215,6 @@ __attribute__((constructor)) void cli_constructor() {
 	// TODO this is getting too long, let's make a function that covers all the bases with easier syntax
 	if (opt_install && (opt_ldattach || opt_lddetach)) {
 		fprintf(stderr, "error: --install and --ldattach/lddetach cannot be used together\n");
-		exit(EXIT_FAILURE);
-	}
-	if (opt_rootdir && (!opt_install && !opt_ldattach && !opt_lddetach)) {
-		fprintf(stderr, "error: --rootdir option requires --install or --ldattach/--lddetach option\n");
 		exit(EXIT_FAILURE);
 	}
 	if (opt_ldattach && opt_lddetach) {

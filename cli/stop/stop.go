@@ -1,5 +1,6 @@
 package stop
 
+/*
 import (
 	"errors"
 	"fmt"
@@ -215,3 +216,4 @@ func Stop() error {
 
 	return nil
 }
+*/

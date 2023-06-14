@@ -683,6 +683,11 @@ setupFilter(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
     int filterFd;
     bool status = FALSE;
 
+    if (libdirCreateDirIfMissing(SCOPE_USR_PATH, 0664, nsUid, nsGid) > MKDIR_STATUS_EXISTS) {
+        fprintf(stderr, "error: setupFilter: failed to create directory\n");
+        return status;
+    }
+
     if ((filterFd = nsFileOpenWithMode(SCOPE_FILTER_USR_PATH, O_RDWR | O_CREAT, 0664, nsUid, nsGid, geteuid(), getegid())) == -1) {
         return status;
     }

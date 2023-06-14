@@ -784,7 +784,10 @@ containerStart(void)
 
     if ((buf = scope_calloc(1, NCARGS)) == NULL) return;
 
-    if ((argc = osGetArgv(g_proc.pid, buf, NCARGS)) == 0) return;
+    if ((argc = osGetArgv(g_proc.pid, buf, NCARGS)) == 0) {
+        scope_free(buf);
+        return;
+    }
 
     sysprint("Scope: found runc");
 

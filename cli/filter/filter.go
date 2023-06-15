@@ -55,6 +55,9 @@ func Retrieve(rootdir string) ([]byte, libscope.Filter, error) {
 // Add a process to the scope filter
 func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) error {
 
+	// Create a history directory for logs
+	run.CreateWorkDirBasic("filter")
+
 	// Instantiate the loader
 	ld := loader.New()
 
@@ -78,7 +81,7 @@ func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) er
 	// Update the global filter file
 	////////////////////////////////////////////
 
-	// Modify the filter file contents
+	// Add the entry to the filter
 	newEntry := libscope.Entry{
 		ProcName: addProc,
 		ProcArg:  "",
@@ -168,39 +171,74 @@ func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) er
 // Remove a process from the scope filter
 func Remove(filterFile libscope.Filter, remProc, rootdir string, rc *run.Config) error {
 
+	// Create a history directory for logs
+	run.CreateWorkDirBasic("filter")
+
 	// Instantiate the loader
 	ld := loader.New()
 
 	////////////////////////////////////////////
-	// Modify the filter contents
+	// Update the global filter file
 	////////////////////////////////////////////
 
-	// TODO remove the entry from the filterFile slice
+	// Remove the entry from the filter
+	// (only the last instance matching the name)
+	// (only if there are changes)
+	if allowList, ok := filterFile["allow"]; ok {
+		remove := -1
+		for i, entry := range allowList {
+			if entry.ProcName == remProc {
+				remove = i
+			}
+		}
+		if remove > -1 {
+			allowList = append(allowList[:remove], allowList[remove+1:]...)
+			filterFile["allow"] = allowList // copy back the allowList
 
-	// Write the filter contents to a temporary path
-	// TODO write to a temporary file. give it a unique id
-	filterFilePath := "/tmp/filter"
+			// Write the filter contents to a temporary path
+			filterFilePath := "/tmp/scope_filter"
+			file, err := os.OpenFile(filterFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+			if err != nil {
+				log.Warn().Err(err).Msgf("Error creating/opening %s", filterFilePath)
+				return err
+			}
+			defer file.Close()
 
-	// Update the global filter file
-	if stdoutStderr, err := ld.Filter(filterFilePath, rc.Rootdir); err != nil {
-		log.Warn().
-			Err(err).
-			Str("loaderDetails", stdoutStderr).
-			Msgf("Install library in %s namespace failed.", rootdir)
-		return err
+			data, err := yaml.Marshal(&filterFile)
+			if err != nil {
+				util.Warn("Error marshaling YAML:", err)
+				return err
+			}
+
+			_, err = file.Write(data)
+			if err != nil {
+				util.Warn("Error writing to file:", err)
+				return err
+			}
+
+			// Ask the loader to update the filter file
+			if stdoutStderr, err := ld.Filter(filterFilePath, rc.Rootdir); err != nil {
+				log.Warn().
+					Err(err).
+					Str("loaderDetails", stdoutStderr).
+					Msgf("Install library in %s namespace failed.", rootdir)
+				return err
+			}
+		}
 	}
 
 	////////////////////////////////////////////
 	// Unset ld.so.preload if it is already set.
 	////////////////////////////////////////////
 
-	if stdoutStderr, err := ld.Preload(false, rc.Rootdir); err != nil {
-		log.Warn().
-			Err(err).
-			Str("loaderDetails", stdoutStderr).
-			Msgf("Install library in %s namespace failed.", rootdir)
-		return err
-	}
+	// TODO loader command to unset ld preload
+	//	if stdoutStderr, err := ld.Preload(false, rc.Rootdir); err != nil {
+	//		log.Warn().
+	//			Err(err).
+	//			Str("loaderDetails", stdoutStderr).
+	//			Msgf("Install library in %s namespace failed.", rootdir)
+	//		return err
+	//	}
 
 	////////////////////////////////////////////
 	// Detach from all matching, scoped processes

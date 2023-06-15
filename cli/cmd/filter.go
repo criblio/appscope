@@ -117,7 +117,7 @@ var filterCmd = &cobra.Command{
 		// Validate user has root permissions
 		if err := util.UserVerifyRootPerm(); err != nil {
 			log.Error().Err(err)
-			util.ErrAndExit("the scope filter command requires administrator privileges")
+			util.ErrAndExit("modifying the scope filter requires administrator privileges")
 		}
 
 		// Add a process to; or remove a process from the scope filter

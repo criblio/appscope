@@ -29,6 +29,7 @@
 #include "patch.h"
 #include "setup.h"
  
+// TODO use rootdir instead of nspid for Service and Unservice. Deprecate --namespace?
 int
 cmdService(char *serviceName, pid_t nspid)
 {

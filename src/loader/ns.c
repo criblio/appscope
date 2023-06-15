@@ -516,8 +516,6 @@ nsAttach(pid_t pid, const char *rootDir)
         }
     }
 
-    uid_t nsUid = nsInfoTranslateUidRootDir(path, hostPid);
-    gid_t nsGid = nsInfoTranslateGidRootDir(path, hostPid);
 
     // Configuration is optionally loaded into memory while in the origin namespace
     char *scopeCfgMem = setupLoadFileIntoMem(&cfgSize, getenv("SCOPE_CONF_PATH"));
@@ -530,7 +528,11 @@ nsAttach(pid_t pid, const char *rootDir)
     }
 
     // Switch to rootdir mnt namespace
-    if (setNamespaceRootDir(rootDir, pid, "mnt") == FALSE) {
+    uid_t nsUid = nsInfoTranslateUidRootDir(path, 1);
+    gid_t nsGid = nsInfoTranslateGidRootDir(path, 1);
+
+    // Use pid 1 to locate ns fd
+    if (setNamespaceRootDir(rootDir, 1, "mnt") == FALSE) {
         fprintf(stderr, "nsAttach setNamespaceRootDir mnt failed\n");
         ret = EXIT_FAILURE;
         goto out;

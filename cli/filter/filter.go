@@ -2,7 +2,6 @@ package filter
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"os"
 
@@ -21,6 +20,8 @@ var (
 )
 
 func Retrieve(rootdir string) ([]byte, libscope.Filter, error) {
+	filterFile := make(libscope.Filter, 0)
+
 	filePath := "/usr/lib/appscope/scope_filter"
 	if rootdir != "" {
 		filePath = rootdir + filePath
@@ -28,6 +29,10 @@ func Retrieve(rootdir string) ([]byte, libscope.Filter, error) {
 
 	file, err := os.Open(filePath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			// Return an empty filter file if it does not exist
+			return []byte{}, filterFile, nil
+		}
 		return nil, nil, err
 	}
 	defer file.Close()
@@ -38,10 +43,9 @@ func Retrieve(rootdir string) ([]byte, libscope.Filter, error) {
 	}
 
 	// Read yaml in
-	var filterFile libscope.Filter
 	err = yaml.Unmarshal(data, &filterFile)
 	if err != nil {
-		fmt.Println("Error unmarshaling YAML:", err)
+		util.Warn("Error unmarshaling YAML:", err)
 		return nil, nil, err
 	}
 
@@ -54,7 +58,10 @@ func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) er
 	// Instantiate the loader
 	ld := loader.New()
 
+	////////////////////////////////////////////
 	// Install libscope if not already installed
+	////////////////////////////////////////////
+
 	stdoutStderr, err := ld.Install(rootdir)
 	if err != nil {
 		log.Warn().
@@ -67,7 +74,11 @@ func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) er
 			Msg("Install library success.")
 	}
 
-	// Modify the filter contents
+	////////////////////////////////////////////
+	// Update the global filter file
+	////////////////////////////////////////////
+
+	// Modify the filter file contents
 	newEntry := libscope.Entry{
 		ProcName: addProc,
 		ProcArg:  "",
@@ -76,10 +87,27 @@ func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) er
 	filterFile["allow"] = append(filterFile["allow"], newEntry)
 
 	// Write the filter contents to a temporary path
-	// TODO write to a temporary file. give it a unique id
-	filterFilePath := "/tmp/filter"
+	filterFilePath := "/tmp/scope_filter"
+	file, err := os.OpenFile(filterFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		log.Warn().Err(err).Msgf("Error creating/opening %s", filterFilePath)
+		return err
+	}
+	defer file.Close()
 
-	// Update the global filter file
+	data, err := yaml.Marshal(&filterFile)
+	if err != nil {
+		util.Warn("Error marshaling YAML:", err)
+		return err
+	}
+
+	_, err = file.Write(data)
+	if err != nil {
+		util.Warn("Error writing to file:", err)
+		return err
+	}
+
+	// Ask the loader to update the filter file
 	if stdoutStderr, err := ld.Filter(filterFilePath, rc.Rootdir); err != nil {
 		log.Warn().
 			Err(err).
@@ -88,8 +116,11 @@ func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) er
 		return err
 	}
 
+	////////////////////////////////////////////
 	// Set ld.so.preload if it is not already set.
-	if stdoutStderr, err := ld.SetPreload(true, rc.Rootdir); err != nil {
+	////////////////////////////////////////////
+
+	if stdoutStderr, err := ld.Preload(true, rc.Rootdir); err != nil {
 		log.Warn().
 			Err(err).
 			Str("loaderDetails", stdoutStderr).
@@ -97,7 +128,11 @@ func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) er
 		return err
 	}
 
-	// Perform a scope attach to all matching processes that are not already scoped (will re-attach to update existing procs)
+	////////////////////////////////////////////
+	// Attach to all matching processes that are not already scoped
+	// (will re-attach to update existing procs)
+	////////////////////////////////////////////
+
 	if rootdir != "" {
 		util.Warn("It can take up to 1 minute to attach to processes in a parent namespace")
 	}
@@ -136,7 +171,10 @@ func Remove(filterFile libscope.Filter, remProc, rootdir string, rc *run.Config)
 	// Instantiate the loader
 	ld := loader.New()
 
+	////////////////////////////////////////////
 	// Modify the filter contents
+	////////////////////////////////////////////
+
 	// TODO remove the entry from the filterFile slice
 
 	// Write the filter contents to a temporary path
@@ -152,8 +190,11 @@ func Remove(filterFile libscope.Filter, remProc, rootdir string, rc *run.Config)
 		return err
 	}
 
+	////////////////////////////////////////////
 	// Unset ld.so.preload if it is already set.
-	if stdoutStderr, err := ld.SetPreload(false, rc.Rootdir); err != nil {
+	////////////////////////////////////////////
+
+	if stdoutStderr, err := ld.Preload(false, rc.Rootdir); err != nil {
 		log.Warn().
 			Err(err).
 			Str("loaderDetails", stdoutStderr).
@@ -161,7 +202,10 @@ func Remove(filterFile libscope.Filter, remProc, rootdir string, rc *run.Config)
 		return err
 	}
 
-	// Perform a scope detach to all matching, scoped processes
+	////////////////////////////////////////////
+	// Detach from all matching, scoped processes
+	////////////////////////////////////////////
+
 	rc.Subprocess = true
 	procs, err := util.HandleInputArg(remProc, rc.Rootdir, false, false, false, true)
 	if err != nil {

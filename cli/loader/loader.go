@@ -39,11 +39,11 @@ func (sL *ScopeLoader) Filter(tmpPath, rootdir string) (string, error) {
 	return sL.RunSubProc(args, os.Environ())
 }
 
-// SetPreload Command
-func (sL *ScopeLoader) SetPreload(set bool, rootdir string) (string, error) {
+// Preload Command
+func (sL *ScopeLoader) Preload(set bool, rootdir string) (string, error) {
 	args := make([]string, 0)
-	args = append(args, "--setpreload")
-	args = append(args, strconv.FormatBool(set))
+	args = append(args, "--preload")
+	//	args = append(args, strconv.FormatBool(set))
 	if rootdir != "" {
 		args = append(args, "--rootdir")
 		args = append(args, rootdir)

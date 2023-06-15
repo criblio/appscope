@@ -181,7 +181,7 @@ func processesByName(rootdir, name string, activeOnly, exactMatch bool) (Process
 		}
 
 		// Add process if there is a name match
-		if (exactMatch && command == name) || strings.Contains(command, name) {
+		if (exactMatch && command == name) || (!exactMatch && strings.Contains(command, name)) {
 			if !activeOnly || (activeOnly && status == Active) {
 				processes = append(processes, Process{
 					ID:      i,

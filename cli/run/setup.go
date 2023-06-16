@@ -62,26 +62,18 @@ func readBytesStdIn() []byte {
 	return cfgData
 }
 
-// setupWorkDir sets up a working directory for a given set of args
-func (rc *Config) setupWorkDir(args []string, attach bool) {
-	// Override to CriblDest if specified
-	if rc.CriblDest != "" {
-		rc.EventsDest = rc.CriblDest
-		rc.MetricsDest = rc.CriblDest
-	}
-
-	// Create session directory
-	rc.createWorkDir(args, attach)
-
-	// Build or load config
+// LoadConfig loads a config if not yet defined
+// Config will be loaded from (first of):
+// - File via --userconfig option
+// - StdIn if @tryStdIn is true
+// - Run options
+func (rc *Config) LoadConfig(tryStdIn bool) {
 	if rc.sc == nil {
 		if rc.UserConfig == "" {
-			// Read the data from stdin only during attach
 			var stdInData []byte
-			if attach {
+			if tryStdIn {
 				stdInData = readBytesStdIn()
 			}
-
 			if len(stdInData) > 0 {
 				err := rc.ConfigFromStdin(stdInData)
 				util.CheckErrSprintf(err, "%v", err)
@@ -94,18 +86,23 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 			util.CheckErrSprintf(err, "%v", err)
 		}
 	}
+}
 
-	// Update paths to absolute for file transports
-	if rc.sc.Metric.Transport.TransportType == "file" {
-		newPath, err := filepath.Abs(rc.sc.Metric.Transport.Path)
-		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", rc.sc.Metric.Transport.Path, err)
-		rc.sc.Metric.Transport.Path = newPath
+// setupWorkDir sets up a working directory for a given set of args
+func (rc *Config) setupWorkDir(args []string, attach bool) {
+	// Override to CriblDest if specified
+	// TODO still needed?
+	if rc.CriblDest != "" {
+		rc.EventsDest = rc.CriblDest
+		rc.MetricsDest = rc.CriblDest
 	}
-	if rc.sc.Event.Transport.TransportType == "file" {
-		newPath, err := filepath.Abs(rc.sc.Event.Transport.Path)
-		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", rc.sc.Event.Transport.Path, err)
-		rc.sc.Event.Transport.Path = newPath
-	}
+
+	// Create session directory
+	rc.createWorkDir(args, attach)
+
+	// Build or load config
+	// Note: Read the data from stdin only during attach
+	rc.LoadConfig(attach)
 
 	// Populate session directory
 	rc.populateWorkDir(args, attach)
@@ -320,7 +317,7 @@ func (rc *Config) buildEventsDest() string {
 	return dest
 }
 
-func CreateWorkDirBasic(cmd string) {
+func (rc *Config) CreateWorkDirBasic(cmd string) {
 	// Directories named CMD_SESSIONID_PID_TIMESTAMP
 	ts := strconv.FormatInt(time.Now().UTC().UnixNano(), 10)
 	pid := strconv.Itoa(os.Getpid())
@@ -338,14 +335,14 @@ func CreateWorkDirBasic(cmd string) {
 	}
 
 	// Create working directory in history/
-	WorkDir := filepath.Join(HistoryDir(), tmpDirName)
-	err = os.Mkdir(WorkDir, 0755)
+	rc.WorkDir = filepath.Join(HistoryDir(), tmpDirName)
+	err = os.Mkdir(rc.WorkDir, 0755)
 	util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
 
 	// Populate working directory
 	// Create Log file
 	filePerms := os.FileMode(0644)
-	internal.CreateLogFile(filepath.Join(WorkDir, "scope.log"), filePerms)
+	internal.CreateLogFile(filepath.Join(rc.WorkDir, "scope.log"), filePerms)
 	internal.SetDebug()
 }
 

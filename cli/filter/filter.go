@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/loader"
@@ -56,7 +57,7 @@ func Retrieve(rootdir string) ([]byte, libscope.Filter, error) {
 func Add(filterFile libscope.Filter, addProc, sourceid, rootdir string, rc *run.Config) error {
 
 	// Create a history directory for logs
-	run.CreateWorkDirBasic("filter")
+	rc.CreateWorkDirBasic("filter")
 
 	// Instantiate the loader
 	ld := loader.New()
@@ -81,12 +82,15 @@ func Add(filterFile libscope.Filter, addProc, sourceid, rootdir string, rc *run.
 	// Update the global filter file
 	////////////////////////////////////////////
 
+	// Build the config
+	rc.LoadConfig(true)
+
 	// Add the entry to the filter
 	newEntry := libscope.Entry{
-		ProcName: addProc,
-		ProcArg:  "",
-		SourceId: sourceid,
-		// TODO Configuration:
+		ProcName:      addProc,
+		ProcArg:       "",
+		SourceId:      sourceid,
+		Configuration: rc.GetScopeConfig(),
 	}
 	filterFile["allow"] = append(filterFile["allow"], newEntry)
 
@@ -137,6 +141,12 @@ func Add(filterFile libscope.Filter, addProc, sourceid, rootdir string, rc *run.
 	// (will re-attach to update existing procs)
 	////////////////////////////////////////////
 
+	// Create config file in the filter workdir for all processes to be attached
+	scYamlPath := filepath.Join(rc.WorkDir, "scope.yml")
+	if err := rc.WriteScopeConfig(scYamlPath, 0644); err != nil {
+		return err
+	}
+
 	if rootdir != "" {
 		util.Warn("It can take up to 1 minute to attach to processes in a parent namespace")
 	}
@@ -147,13 +157,13 @@ func Add(filterFile libscope.Filter, addProc, sourceid, rootdir string, rc *run.
 	}
 	// Note: if len(procs) == 0 do nothing
 	if len(procs) == 1 {
-		if err = rc.Attach(procs[0].Pid); err != nil {
+		if err = rc.Attach(procs[0].Pid, false); err != nil {
 			return err
 		}
 	} else if len(procs) > 1 {
 		errors := false
 		for _, proc := range procs {
-			if err = rc.Attach(proc.Pid); err != nil {
+			if err = rc.Attach(proc.Pid, false); err != nil {
 				log.Error().Err(err)
 				errors = true
 			}
@@ -172,7 +182,7 @@ func Add(filterFile libscope.Filter, addProc, sourceid, rootdir string, rc *run.
 func Remove(filterFile libscope.Filter, remProc, sourceid, rootdir string, rc *run.Config) error {
 
 	// Create a history directory for logs
-	run.CreateWorkDirBasic("filter")
+	rc.CreateWorkDirBasic("filter")
 
 	// Instantiate the loader
 	ld := loader.New()

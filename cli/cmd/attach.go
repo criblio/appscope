@@ -90,7 +90,7 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 
 		pid := procs[0].Pid // we told Handler that we wanted to choose only one proc
 
-		if err = rc.Attach(procs[0].Pid); err != nil {
+		if err = rc.Attach(procs[0].Pid, true); err != nil {
 			util.ErrAndExit("Attach failure: %v", err)
 		}
 

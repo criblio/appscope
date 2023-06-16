@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/criblio/scope/libscope"
+	"github.com/criblio/scope/util"
 	"gopkg.in/yaml.v2"
 )
 
@@ -130,7 +131,23 @@ func (c *Config) SetDefault() error {
 func (c *Config) ConfigFromStdin(cfgData []byte) error {
 	c.sc = &libscope.ScopeConfig{}
 
-	return yaml.Unmarshal(cfgData, c.sc)
+	if err := yaml.Unmarshal(cfgData, c.sc); err != nil {
+		return err
+	}
+
+	// Update paths to absolute for file transports
+	if c.sc.Metric.Transport.TransportType == "file" {
+		newPath, err := filepath.Abs(c.sc.Metric.Transport.Path)
+		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", c.sc.Metric.Transport.Path, err)
+		c.sc.Metric.Transport.Path = newPath
+	}
+	if c.sc.Event.Transport.TransportType == "file" {
+		newPath, err := filepath.Abs(c.sc.Event.Transport.Path)
+		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", c.sc.Event.Transport.Path, err)
+		c.sc.Event.Transport.Path = newPath
+	}
+
+	return nil
 }
 
 // ConfigFromFile loads a configuration from a yml file
@@ -143,6 +160,18 @@ func (c *Config) ConfigFromFile() error {
 	}
 	if err = yaml.Unmarshal(yamlFile, c.sc); err != nil {
 		return err
+	}
+
+	// Update paths to absolute for file transports
+	if c.sc.Metric.Transport.TransportType == "file" {
+		newPath, err := filepath.Abs(c.sc.Metric.Transport.Path)
+		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", c.sc.Metric.Transport.Path, err)
+		c.sc.Metric.Transport.Path = newPath
+	}
+	if c.sc.Event.Transport.TransportType == "file" {
+		newPath, err := filepath.Abs(c.sc.Event.Transport.Path)
+		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", c.sc.Event.Transport.Path, err)
+		c.sc.Event.Transport.Path = newPath
 	}
 
 	return nil
@@ -316,6 +345,19 @@ func (c *Config) configFromRunOpts() error {
 		}
 		c.sc.Libscope.Log.Level = c.Loglevel
 	}
+
+	// Update paths to absolute for file transports
+	if c.sc.Metric.Transport.TransportType == "file" {
+		newPath, err := filepath.Abs(c.sc.Metric.Transport.Path)
+		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", c.sc.Metric.Transport.Path, err)
+		c.sc.Metric.Transport.Path = newPath
+	}
+	if c.sc.Event.Transport.TransportType == "file" {
+		newPath, err := filepath.Abs(c.sc.Event.Transport.Path)
+		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", c.sc.Event.Transport.Path, err)
+		c.sc.Event.Transport.Path = newPath
+	}
+
 	return nil
 }
 
@@ -345,6 +387,14 @@ func (c *Config) WriteScopeConfig(path string, filePerms os.FileMode) error {
 		return fmt.Errorf("error writing ScopeConfig to file %s: %v", path, err)
 	}
 	return nil
+}
+
+// GetScopeConfig returns a copy of the current configuration
+func (c *Config) GetScopeConfig() libscope.ScopeConfig {
+	if c.sc == nil {
+		return libscope.ScopeConfig{}
+	}
+	return *c.sc
 }
 
 func scopeLogRegex() string {

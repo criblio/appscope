@@ -9,7 +9,8 @@ import (
 // Start installs libscope
 func Start(rootdir string) error {
 	// Create a history directory for logs
-	run.CreateWorkDirBasic("start")
+	rc := run.Config{}
+	rc.CreateWorkDirBasic("start")
 
 	// Instantiate the loader
 	ld := loader.New()

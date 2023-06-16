@@ -22,7 +22,7 @@ var (
 
 // NOTE: The responsibility of this function is to check if its possible to attach
 // and then perform the attach if so
-func (rc *Config) Attach(pid int) error {
+func (rc *Config) Attach(pid int, setupWorkDir bool) error {
 	env := os.Environ()
 	ld := loader.New()
 
@@ -71,7 +71,9 @@ func (rc *Config) Attach(pid int) error {
 	// Normal operational, create a directory for this run.
 	// Directory contains scope.yml which is configured to output to that
 	// directory and has a command directory configured in that directory.
-	rc.setupWorkDir(args, true)
+	if setupWorkDir {
+		rc.setupWorkDir(args, true)
+	}
 	env = append(env, "SCOPE_CONF_PATH="+filepath.Join(rc.WorkDir, "scope.yml"))
 
 	// Check the attached process mnt namespace.
@@ -105,31 +107,33 @@ func (rc *Config) Attach(pid int) error {
 	// Replace the working directory files with symbolic links in case of successful attach
 	// where the target ns is different to the origin ns
 
-	eventsFilePath := filepath.Join(rc.WorkDir, "events.json")
-	metricsFilePath := filepath.Join(rc.WorkDir, "metrics.json")
-	logsFilePath := filepath.Join(rc.WorkDir, "libscope.log")
-	payloadsDirPath := filepath.Join(rc.WorkDir, "payloads")
+	if setupWorkDir {
+		eventsFilePath := filepath.Join(rc.WorkDir, "events.json")
+		metricsFilePath := filepath.Join(rc.WorkDir, "metrics.json")
+		logsFilePath := filepath.Join(rc.WorkDir, "libscope.log")
+		payloadsDirPath := filepath.Join(rc.WorkDir, "payloads")
 
-	if rc.Rootdir != "" {
-		os.Remove(eventsFilePath)
-		os.Remove(metricsFilePath)
-		os.Remove(logsFilePath)
-		os.RemoveAll(payloadsDirPath)
-		os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", eventsFilePath), eventsFilePath)
-		os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", metricsFilePath), metricsFilePath)
-		os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", logsFilePath), logsFilePath)
-		os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", payloadsDirPath), payloadsDirPath)
+		if rc.Rootdir != "" {
+			os.Remove(eventsFilePath)
+			os.Remove(metricsFilePath)
+			os.Remove(logsFilePath)
+			os.RemoveAll(payloadsDirPath)
+			os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", eventsFilePath), eventsFilePath)
+			os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", metricsFilePath), metricsFilePath)
+			os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", logsFilePath), logsFilePath)
+			os.Symlink(filepath.Join(rc.Rootdir, "/proc", fmt.Sprint(pid), "root", payloadsDirPath), payloadsDirPath)
 
-	} else if refNsPid != -1 {
-		// Child namespace
-		os.Remove(eventsFilePath)
-		os.Remove(metricsFilePath)
-		os.Remove(logsFilePath)
-		os.RemoveAll(payloadsDirPath)
-		os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", eventsFilePath), eventsFilePath)
-		os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", metricsFilePath), metricsFilePath)
-		os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", logsFilePath), logsFilePath)
-		os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", payloadsDirPath), payloadsDirPath)
+		} else if refNsPid != -1 {
+			// Child namespace
+			os.Remove(eventsFilePath)
+			os.Remove(metricsFilePath)
+			os.Remove(logsFilePath)
+			os.RemoveAll(payloadsDirPath)
+			os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", eventsFilePath), eventsFilePath)
+			os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", metricsFilePath), metricsFilePath)
+			os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", logsFilePath), logsFilePath)
+			os.Symlink(filepath.Join("/proc", fmt.Sprint(refNsPid), "root", payloadsDirPath), payloadsDirPath)
+		}
 	}
 
 	return nil

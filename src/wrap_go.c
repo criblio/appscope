@@ -469,7 +469,7 @@ free_go_str(char *str) {
  * - Add a mount point
  *   `scope` will be mounted from the host ("ex: /usr/lib/appscope/<version>/scope") into the container ("ex: /opt/scope")
  * - Extend Environment variables
- *   `LD_PRELOAD` will contain the following entry `/opt/libscope.so`
+ *   `LD_PRELOAD` will contain the following entry `/opt/appscope/libscope.so`
  *   `SCOPE_SETUP_DONE=true` mark that configuration was processed
  * - Add prestart hook
  *   execute scope extract operation to ensure using library with proper loader reference (musl/glibc)
@@ -521,7 +521,7 @@ rewriteOpenContainersConfig(const char *cWorkDir)
          "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
          "HOSTNAME=6735578591bb",
          "TERM=xterm",
-         "LD_PRELOAD=/opt/libscope.so",
+         "LD_PRELOAD=/opt/appscope/libscope.so",
          "SCOPE_SETUP_DONE=true"
       ],
     */
@@ -546,13 +546,13 @@ rewriteOpenContainersConfig(const char *cWorkDir)
 
             if (scope_strncmp("LD_PRELOAD=", strItem, C_STRLEN("LD_PRELOAD=")) == 0) {
                 size_t itemLen = scope_strlen(strItem);
-                size_t newLdprelLen = itemLen + C_STRLEN("/opt/libscope.so:");
+                size_t newLdprelLen = itemLen + C_STRLEN("/opt/appscope/libscope.so:");
                 char *newLdPreloadLib = scope_calloc(1, newLdprelLen);
                 if (!newLdPreloadLib) {
                     cJSON_Delete(json);
                     goto exit;
                 }
-                scope_strncpy(newLdPreloadLib, "LD_PRELOAD=/opt/libscope.so:", C_STRLEN("LD_PRELOAD=/opt/libscope.so:"));
+                scope_strncpy(newLdPreloadLib, "LD_PRELOAD=/opt/appscope/libscope.so:", C_STRLEN("LD_PRELOAD=/opt/appscope/libscope.so:"));
                 scope_strcat(newLdPreloadLib, strItem + C_STRLEN("LD_PRELOAD="));
                 cJSON *newLdPreloadLibObj = cJSON_CreateString(newLdPreloadLib);
                 if (!newLdPreloadLibObj) {
@@ -583,7 +583,7 @@ rewriteOpenContainersConfig(const char *cWorkDir)
         if (ldPreloadPresent == FALSE) {
             const char *const envItems[2] =
             {
-                "LD_PRELOAD=/opt/libscope.so",
+                "LD_PRELOAD=/opt/appscope/libscope.so",
                 "SCOPE_SETUP_DONE=true"
             };
             for (int i = 0; i < 2 ;++i) {
@@ -598,7 +598,7 @@ rewriteOpenContainersConfig(const char *cWorkDir)
     } else {
         const char * envItems[2] =
         {
-            "LD_PRELOAD=/opt/libscope.so",
+            "LD_PRELOAD=/opt/appscope/libscope.so",
             "SCOPE_SETUP_DONE=true"
         };
         envNodeArr = cJSON_CreateStringArray(envItems, 2);
@@ -704,7 +704,8 @@ rewriteOpenContainersConfig(const char *cWorkDir)
             "args":[
                "/opt/scope",
                "extract",
-               "/opt/",
+               "-p",
+               "/opt/appscope",
             ]
          },
        ]
@@ -741,13 +742,14 @@ rewriteOpenContainersConfig(const char *cWorkDir)
         goto exit;
     }
 
-    const char *argsItems[3] =
+    const char *argsItems[4] =
     {
         "/opt/scope",
         "extract",
-        "/opt"
+        "-p",
+        "/opt/appscope"
     };
-    cJSON *argsNodeArr = cJSON_CreateStringArray(argsItems, 3);
+    cJSON *argsNodeArr = cJSON_CreateStringArray(argsItems, 4);
     if (!argsNodeArr) {
         cJSON_Delete(startContainerNode);
         cJSON_Delete(json);

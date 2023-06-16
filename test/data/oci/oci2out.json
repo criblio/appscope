@@ -1,6 +1,6 @@
 {
 	"process":	{
-		"env":	["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LD_PRELOAD=/opt/libscope.so:/usr/test.so", "SCOPE_SETUP_DONE=true"]
+		"env":	["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LD_PRELOAD=/opt/appscope/libscope.so:/usr/test.so", "SCOPE_SETUP_DONE=true"]
 	},
 	"mounts":	[{
 			"destination":	"/opt/scope",
@@ -11,7 +11,7 @@
 	"hooks":	{
 		"startContainer":	[{
 				"path":	"/opt/scope",
-				"args":	["/opt/scope", "extract", "/opt"]
+				"args":	["/opt/scope", "extract", "-p", "/opt/appscope"]
 			}]
 	}
 }

@@ -108,11 +108,8 @@ func (rc *Config) Attach(args []string) (int, error) {
 	}
 
 	ld := loader.New()
-	if !rc.Subprocess {
-		err = ld.Attach(args, env)
-	} else {
-		_, err = ld.AttachSubProc(args, env)
-	}
+	stdoutStderr, err := ld.AttachSubProc(args, env)
+	util.Warn(stdoutStderr)
 	if err != nil {
 		return pid, err
 	}
@@ -230,13 +227,13 @@ func (rc *Config) detach(pid int) error {
 
 	env := os.Environ()
 	ld := loader.New()
-	if !rc.Subprocess {
-		return ld.Detach(args, env)
+	stdoutStderr, err := ld.DetachSubProc(args, env)
+	util.Warn(stdoutStderr)
+	if err != nil {
+		return err
 	}
-	out, err := ld.DetachSubProc(args, env)
-	util.Warn(out)
 
-	return err
+	return nil
 }
 
 // HandleInputArg handles the input argument (process id/name)

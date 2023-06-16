@@ -31,7 +31,6 @@ scope detach --all --rootdir /path/to/host/mount/proc/<hostpid>/root`,
 			if len(args) != 0 {
 				helpErrAndExit(cmd, "--all flag is mutual exclusive with PID or <process_name>")
 			}
-			rc.Subprocess = true
 			return rc.DetachAll(true)
 		}
 		if len(args) == 0 {

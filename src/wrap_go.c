@@ -466,11 +466,16 @@ free_go_str(char *str) {
  *
  * Please look into opencontainers Linux runtime-spec for details about the exact JSON struct.
  * The following changes will be performed:
- * - Add a mount point
+ * - Add a mount points
  *   `appscope` directory will be mounted from the host "/usr/lib/appscope/" into the container: "/usr/lib/appscope/"
+ *   
+ *   UNIX socket directory will be mounted from the host into the container the path to UNIX socket will be read from
+ *   host based on value in the filter file
+ *
  * - Extend Environment variables
  *   `LD_PRELOAD` will contain the following entry `/opt/appscope/libscope.so`
  *   `SCOPE_SETUP_DONE=true` mark that configuration was processed
+ *
  * - Add prestart hook
  *   execute scope extract operation to ensure using library with proper loader reference (musl/glibc)
  */
@@ -628,7 +633,7 @@ rewriteOpenContainersConfig(const char *cWorkDir)
     }
 
     /*
-    * Handle process mounts
+    * Handle process mounts for library and filter file and socket
     *
     "mounts":[
       {
@@ -650,56 +655,74 @@ rewriteOpenContainersConfig(const char *cWorkDir)
             "rbind",
             "rprivate"
          ]
+      },
+      {
+         "destination":"/var/run/appscope/",
+         "type":"bind",
+         "source":"/var/run/appscope/",
+         "options":[
+            "rbind",
+            "rprivate"
+         ]
       }
     */
-    cJSON *mountNodeArr = cJSON_GetObjectItemCaseSensitive(json, "mounts");
-    if (!mountNodeArr) {
-        mountNodeArr = cJSON_CreateArray();
+
+    const char *mountPath[2] =
+    {
+        "/usr/lib/appscope/",
+        "/var/run/appscope/"
+    };
+
+    for (int i = 0; i < ARRAY_SIZE(mountPath); ++i ) {
+        cJSON *mountNodeArr = cJSON_GetObjectItemCaseSensitive(json, "mounts");
         if (!mountNodeArr) {
+            mountNodeArr = cJSON_CreateArray();
+            if (!mountNodeArr) {
+                cJSON_Delete(json);
+                goto exit;
+            }
+            cJSON_AddItemToObject(json, "mounts", mountNodeArr);
+        }
+
+        cJSON *mountNode = cJSON_CreateObject();
+        if (!mountNode) {
             cJSON_Delete(json);
             goto exit;
         }
-        cJSON_AddItemToObject(json, "mounts", mountNodeArr);
-    }
 
-    cJSON *mountNode = cJSON_CreateObject();
-    if (!mountNode) {
-        cJSON_Delete(json);
-        goto exit;
-    }
+        if (!cJSON_AddStringToObjLN(mountNode, "destination", mountPath[i])) {
+            cJSON_Delete(mountNode);
+            cJSON_Delete(json);
+            goto exit;
+        }
 
-    if (!cJSON_AddStringToObjLN(mountNode, "destination", "/usr/lib/appscope/")) {
-        cJSON_Delete(mountNode);
-        cJSON_Delete(json);
-        goto exit;
-    }
+        if (!cJSON_AddStringToObjLN(mountNode, "type", "bind")) {
+            cJSON_Delete(mountNode);
+            cJSON_Delete(json);
+            goto exit;
+        }
 
-    if (!cJSON_AddStringToObjLN(mountNode, "type", "bind")) {
-        cJSON_Delete(mountNode);
-        cJSON_Delete(json);
-        goto exit;
-    }
+        if (!cJSON_AddStringToObjLN(mountNode, "source", mountPath[i])) {
+            cJSON_Delete(mountNode);
+            cJSON_Delete(json);
+            goto exit;
+        }
 
-    if (!cJSON_AddStringToObjLN(mountNode, "source", "/usr/lib/appscope/")) {
-        cJSON_Delete(mountNode);
-        cJSON_Delete(json);
-        goto exit;
-    }
+        const char *optItems[2] =
+        {
+            "rbind",
+            "rprivate"
+        };
 
-    const char *optItems[2] =
-    {
-        "rbind",
-        "rprivate"
-    };
-
-    cJSON *optNodeArr = cJSON_CreateStringArray(optItems, ARRAY_SIZE(optItems));
-    if (!optNodeArr) {
-        cJSON_Delete(mountNode);
-        cJSON_Delete(json);
-        goto exit;
+        cJSON *optNodeArr = cJSON_CreateStringArray(optItems, ARRAY_SIZE(optItems));
+        if (!optNodeArr) {
+            cJSON_Delete(mountNode);
+            cJSON_Delete(json);
+            goto exit;
+        }
+        cJSON_AddItemToObject(mountNode, "options", optNodeArr);
+        cJSON_AddItemToArray(mountNodeArr, mountNode);
     }
-    cJSON_AddItemToObject(mountNode, "options", optNodeArr);
-    cJSON_AddItemToArray(mountNodeArr, mountNode);
 
     /*
     * Handle startContainer hooks process

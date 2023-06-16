@@ -179,54 +179,62 @@ rewriteOpenContainersConfigTest(int id) {
         cJSON_AddItemToObject(procNode, "env", envNodeArr);
     }
 
-    cJSON *mountNodeArr = cJSON_GetObjectItemCaseSensitive(json, "mounts");
-    if (!mountNodeArr) {
-        mountNodeArr = cJSON_CreateArray();
+    const char *mountPath[2] =
+    {
+        "/usr/lib/appscope/",
+        "/var/run/appscope/"
+    };
+
+    for (int i = 0; i < 2; ++i ) {
+        cJSON *mountNodeArr = cJSON_GetObjectItemCaseSensitive(json, "mounts");
         if (!mountNodeArr) {
+            mountNodeArr = cJSON_CreateArray();
+            if (!mountNodeArr) {
+                assert_non_null(NULL);
+                goto exit;
+            }
+            cJSON_AddItemToObject(json, "mounts", mountNodeArr);
+        }
+
+        cJSON *mountNode = cJSON_CreateObject();
+        if (!mountNode) {
             assert_non_null(NULL);
             goto exit;
         }
-        cJSON_AddItemToObject(json, "mounts", mountNodeArr);
-    }
 
-    cJSON *mountNode = cJSON_CreateObject();
-    if (!mountNode) {
-        assert_non_null(NULL);
-        goto exit;
-    }
+        if (!cJSON_AddStringToObjLN(mountNode, "destination", mountPath[i])) {
+            cJSON_Delete(mountNode);
+            assert_non_null(NULL);
+            goto exit;
+        }
 
-    if (!cJSON_AddStringToObjLN(mountNode, "destination", "/usr/lib/appscope/")) {
-        cJSON_Delete(mountNode);
-        assert_non_null(NULL);
-        goto exit;
-    }
+        if (!cJSON_AddStringToObjLN(mountNode, "type", "bind")) {
+            cJSON_Delete(mountNode);
+            assert_non_null(NULL);
+            goto exit;
+        }
 
-    if (!cJSON_AddStringToObjLN(mountNode, "type", "bind")) {
-        cJSON_Delete(mountNode);
-        assert_non_null(NULL);
-        goto exit;
-    }
+        if (!cJSON_AddStringToObjLN(mountNode, "source", mountPath[i])) {
+            cJSON_Delete(mountNode);
+            assert_non_null(NULL);
+            goto exit;
+        }
 
-    if (!cJSON_AddStringToObjLN(mountNode, "source", "/usr/lib/appscope/")) {
-        cJSON_Delete(mountNode);
-        assert_non_null(NULL);
-        goto exit;
-    }
+        const char *optItems[2] =
+        {
+            "rbind",
+            "rprivate"
+        };
 
-    const char *optItems[2] =
-    {
-        "rbind",
-        "rprivate"
-    };
-
-    cJSON *optNodeArr = cJSON_CreateStringArray(optItems, ARRAY_SIZE(optItems));
-    if (!optNodeArr) {
-        cJSON_Delete(mountNode);
-        assert_non_null(NULL);
-        goto exit;
+        cJSON *optNodeArr = cJSON_CreateStringArray(optItems, ARRAY_SIZE(optItems));
+        if (!optNodeArr) {
+            cJSON_Delete(mountNode);
+            assert_non_null(NULL);
+            goto exit;
+        }
+        cJSON_AddItemToObject(mountNode, "options", optNodeArr);
+        cJSON_AddItemToArray(mountNodeArr, mountNode);
     }
-    cJSON_AddItemToObject(mountNode, "options", optNodeArr);
-    cJSON_AddItemToArray(mountNodeArr, mountNode);
 
     cJSON *hooksNode = cJSON_GetObjectItemCaseSensitive(json, "hooks");
     if (!hooksNode) {

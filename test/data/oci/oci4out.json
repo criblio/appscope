@@ -12,6 +12,11 @@
 			"type":	"bind",
 			"source":	"/usr/lib/appscope/",
 			"options":	["rbind", "rprivate"]
+		}, {
+			"destination":	"/var/run/appscope/",
+			"type":	"bind",
+			"source":	"/var/run/appscope/",
+			"options":	["rbind", "rprivate"]
 		}],
 	"hooks":	{
 		"startContainer":	[{

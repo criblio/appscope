@@ -161,7 +161,7 @@ func (rc *Config) DetachAll(prompt bool) error {
 		}
 	}
 	if !adminStatus {
-		fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
+		util.Warn("INFO: Run as root (or via sudo) to see all matching processes")
 	}
 
 	procs, err := util.ProcessesToDetach(rc.Rootdir)
@@ -234,7 +234,7 @@ func (rc *Config) detach(pid int) error {
 		return ld.Detach(args, env)
 	}
 	out, err := ld.DetachSubProc(args, env)
-	fmt.Print(out)
+	util.Warn(out)
 
 	return err
 }
@@ -273,7 +273,7 @@ func HandleInputArg(rootdir, InputArg string, toAttach, singleProcMenu, warn boo
 			pid = procs[0].Pid
 		} else if len(procs) >= 1 {
 			if !adminStatus && warn {
-				fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
+				util.Warn("INFO: Run as root (or via sudo) to see all matching processes")
 			}
 
 			// user interface for selecting a PID
@@ -296,7 +296,7 @@ func HandleInputArg(rootdir, InputArg string, toAttach, singleProcMenu, warn boo
 			pid = procs[i].Pid
 		} else {
 			if !adminStatus && warn {
-				fmt.Println("INFO: Run as root (or via sudo) to see all matching processes")
+				util.Warn("INFO: Run as root (or via sudo) to see all matching processes")
 			}
 			if toAttach {
 				return -1, errMissingProc

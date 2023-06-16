@@ -79,6 +79,7 @@ extern bool g_ismusl;
 extern bool g_isstatic;
 extern bool g_isgo;
 extern bool g_issighandler;
+extern char g_libpath[];
 
 void scopeLog(cfg_log_level_t, const char *, ...) PRINTF_FORMAT(2,3);
 void scopeLogHex(cfg_log_level_t, const void *, size_t, const char *, ...) PRINTF_FORMAT(4,5);

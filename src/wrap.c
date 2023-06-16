@@ -1797,16 +1797,26 @@ static const char *const doNotScopeList[] = {
 
 };
 
+static const char *const allowList[] = {
+    "runc",
+};
+
 static bool
 thisProcCanBeActive(void)
 {
-    char procName[256] = {0};
+    char procName[PATH_MAX] = {0};
     osGetProcname(procName, sizeof(procName));
 
     int i;
-    for (i=0; i<ARRAY_SIZE(doNotScopeList); i++) {
+
+    for (i=0; i < ARRAY_SIZE(allowList); i++) {
+        if (!scope_strcmp(procName, allowList[i])) return TRUE;
+    }
+
+    for (i=0; i < ARRAY_SIZE(doNotScopeList); i++) {
         if (!scope_strcmp(procName, doNotScopeList[i])) return FALSE;
     }
+
     return TRUE;
 }
 

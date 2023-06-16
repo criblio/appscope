@@ -12,7 +12,7 @@ int cmdDetach(pid_t, const char *);
 int cmdRun(pid_t, pid_t, int, char **);
 int cmdInstall(const char *);
 int cmdFilter(const char *, const char *);
-int cmdPreload(const char *);
+int cmdPreload(const char *, const char *);
 int cmdMount(const char *, const char *);
 
 #endif // __LOADER_H__s

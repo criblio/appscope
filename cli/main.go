@@ -33,7 +33,7 @@ package main
 // -a, --ldattach PID                attach to the specified process ID
 // -d, --lddetach PID                detach from the specified process ID
 // -i, --install                     install libscope.so
-// -e, --preload                     set ld.so.preload to point to the library
+// -e, --preload PATH                set ld.so.preload to PATH. "auto" = auto detect libpath; "off" = disable
 // -f, --filter FILTER_PATH          install the filter file specified in FILTER_PATH
 // -m, --mount MOUNT_DEST            mount filter file and unix socket into MOUNT_DEST
 // -R, --rootdir PATH                specify root directory of the target namespace
@@ -49,7 +49,7 @@ package main
 static struct option opts[] = {
 	{ "ldattach",    required_argument, 0, 'a' },
 	{ "lddetach",    required_argument, 0, 'd' },
-	{ "preload",     no_argument,       0, 'e' },
+	{ "preload",     required_argument, 0, 'e' },
 	{ "filter",      required_argument, 0, 'f' },
 	{ "mount",       required_argument, 0, 'm' },
 	{ "install",     no_argument,       0, 'i' },
@@ -105,6 +105,7 @@ __attribute__((constructor)) void cli_constructor() {
 	char *arg_ldattach;
 	char *arg_lddetach;
 	char *arg_rootdir;
+	char *arg_preload;
 	char *arg_filter;
 	char *arg_mount;
 	char *arg_service;
@@ -146,7 +147,7 @@ __attribute__((constructor)) void cli_constructor() {
 
 	for (;;) {
 		index = 0;
-		int opt = getopt_long(arg_c, arg_v, "+:a:d:n:m:l:f:p:s:R:vzei", opts, &index);
+		int opt = getopt_long(arg_c, arg_v, "+:a:d:n:m:l:f:p:e:s:R:vzi", opts, &index);
 		if (opt == -1) {
 			break;
 		}
@@ -179,6 +180,7 @@ __attribute__((constructor)) void cli_constructor() {
 			break;
 		case 'e':
 			opt_preload = true;
+			arg_preload = optarg;
 			break;
 		case 'f':
 			opt_filter = true;
@@ -289,7 +291,7 @@ __attribute__((constructor)) void cli_constructor() {
 	if (opt_lddetach) exit(cmdDetach(pid, arg_rootdir));
 	if (opt_install) exit(cmdInstall(arg_rootdir));
 	if (opt_filter) exit(cmdFilter(arg_filter, arg_rootdir));
-	if (opt_preload) exit(cmdPreload(arg_rootdir));
+	if (opt_preload) exit(cmdPreload(arg_preload, arg_rootdir));
 	if (opt_mount) exit(cmdMount(arg_mount, arg_rootdir));
 	if (opt_service) exit(cmdService(arg_service, nspid));
 	if (opt_unservice) exit(cmdUnservice(nspid));

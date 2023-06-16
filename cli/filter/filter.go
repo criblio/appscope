@@ -123,7 +123,7 @@ func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) er
 	// Set ld.so.preload if it is not already set.
 	////////////////////////////////////////////
 
-	if stdoutStderr, err := ld.Preload(true, rc.Rootdir); err != nil {
+	if stdoutStderr, err := ld.Preload("auto", rc.Rootdir); err != nil {
 		log.Warn().
 			Err(err).
 			Str("loaderDetails", stdoutStderr).
@@ -231,14 +231,13 @@ func Remove(filterFile libscope.Filter, remProc, rootdir string, rc *run.Config)
 	// Unset ld.so.preload if it is already set.
 	////////////////////////////////////////////
 
-	// TODO loader command to unset ld preload
-	//	if stdoutStderr, err := ld.Preload(false, rc.Rootdir); err != nil {
-	//		log.Warn().
-	//			Err(err).
-	//			Str("loaderDetails", stdoutStderr).
-	//			Msgf("Install library in %s namespace failed.", rootdir)
-	//		return err
-	//	}
+	if stdoutStderr, err := ld.Preload("off", rc.Rootdir); err != nil {
+		log.Warn().
+			Err(err).
+			Str("loaderDetails", stdoutStderr).
+			Msgf("Install library in %s namespace failed.", rootdir)
+		return err
+	}
 
 	////////////////////////////////////////////
 	// Detach from all matching, scoped processes

@@ -577,7 +577,7 @@ cmdFilter(const char *configFilterPath, const char *rootdir)
 
 // Handle the preload command
 int
-cmdPreload(const char *rootdir)
+cmdPreload(const char *path, const char *rootdir)
 {
     uid_t eUid = geteuid();
     gid_t eGid = getegid();
@@ -597,7 +597,7 @@ cmdPreload(const char *rootdir)
     }
 
     // Set ld.so.preload
-    if (!setupPreload(nsUid, nsGid)) {
+    if (!setupPreload(path, nsUid, nsGid)) {
         fprintf(stderr, "error: failed to set ld.so.preload\n");
         return EXIT_FAILURE;
     }

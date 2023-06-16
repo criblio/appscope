@@ -40,10 +40,10 @@ func (sL *ScopeLoader) Filter(tmpPath, rootdir string) (string, error) {
 }
 
 // Preload Command
-func (sL *ScopeLoader) Preload(set bool, rootdir string) (string, error) {
+func (sL *ScopeLoader) Preload(path, rootdir string) (string, error) {
 	args := make([]string, 0)
 	args = append(args, "--preload")
-	//	args = append(args, strconv.FormatBool(set))
+	args = append(args, path)
 	if rootdir != "" {
 		args = append(args, "--rootdir")
 		args = append(args, rootdir)

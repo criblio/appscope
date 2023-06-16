@@ -711,18 +711,36 @@ cleanupDestFd:
     return status;
 }
 
-// Set ld.so.preload to point to libscope
+// Set ld.so.preload to point to a path
+// If "auto" is specified in @path, the library location will be detected automatically
+// Note: an empty string specifies that path will be set to nothing
 int
-setupPreload(uid_t nsUid, gid_t nsGid)
+setupPreload(const char *path, uid_t nsUid, gid_t nsGid)
 {
     char *scopeLibPath;
     char buf[PATH_MAX] = {0};
+    size_t len;
 
-    scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
+    if (!strcmp(path, "auto")) {
+        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
 
-    if (access(scopeLibPath, R_OK|X_OK)) {
-        fprintf(stderr, "error: library %s is missing, not readable, or not executable\n", scopeLibPath);
-        return FALSE;
+        if ((len = snprintf(buf, sizeof(buf), scopeLibPath)) == -1 ) {
+            perror("snprintf failed");
+            return FALSE;
+        }
+    } else if (strcmp(path, "off")) { // if "off", leave buf as null
+        if ((len = snprintf(buf, sizeof(buf), path)) == -1) {
+            perror("snprintf failed");
+            return FALSE;
+        }
+    }
+
+    if (len > 0) {
+        // Check file in path exists if a path is specified
+        if (access(buf, R_OK|X_OK)) {
+            fprintf(stderr, "error: library %s is missing, not readable, or not executable\n", buf);
+            return FALSE;
+        }
     }
 
     int fd = nsFileOpenWithMode("/etc/ld.so.preload", O_CREAT | O_RDWR | O_TRUNC, 0644, nsUid, nsGid, geteuid(), getegid());
@@ -731,7 +749,6 @@ setupPreload(uid_t nsUid, gid_t nsGid)
         return FALSE;
     }
 
-    size_t len = snprintf(buf, sizeof(buf), scopeLibPath);
     if (write(fd, buf, len) != len) {
         perror("write failed");
         close(fd);

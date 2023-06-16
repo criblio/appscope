@@ -586,7 +586,7 @@ rewriteOpenContainersConfig(const char *cWorkDir)
                 "LD_PRELOAD=/opt/appscope/libscope.so",
                 "SCOPE_SETUP_DONE=true"
             };
-            for (int i = 0; i < 2 ;++i) {
+            for (int i = 0; i < ARRAY_SIZE(envItems) ;++i) {
                 cJSON *scopeEnvNode = cJSON_CreateString(envItems[i]);
                 if (!scopeEnvNode) {
                     cJSON_Delete(json);
@@ -601,7 +601,7 @@ rewriteOpenContainersConfig(const char *cWorkDir)
             "LD_PRELOAD=/opt/appscope/libscope.so",
             "SCOPE_SETUP_DONE=true"
         };
-        envNodeArr = cJSON_CreateStringArray(envItems, 2);
+        envNodeArr = cJSON_CreateStringArray(envItems, ARRAY_SIZE(envItems));
         if (!envNodeArr) {
             cJSON_Delete(json);
             goto exit;
@@ -674,7 +674,7 @@ rewriteOpenContainersConfig(const char *cWorkDir)
         "rprivate"
     };
 
-    cJSON *optNodeArr = cJSON_CreateStringArray(optItems, 2);
+    cJSON *optNodeArr = cJSON_CreateStringArray(optItems, ARRAY_SIZE(optItems));
     if (!optNodeArr) {
         cJSON_Delete(mountNode);
         cJSON_Delete(json);
@@ -749,7 +749,7 @@ rewriteOpenContainersConfig(const char *cWorkDir)
         "-p",
         "/opt/appscope"
     };
-    cJSON *argsNodeArr = cJSON_CreateStringArray(argsItems, 4);
+    cJSON *argsNodeArr = cJSON_CreateStringArray(argsItems, ARRAY_SIZE(argsItems));
     if (!argsNodeArr) {
         cJSON_Delete(startContainerNode);
         cJSON_Delete(json);

@@ -141,7 +141,6 @@ func Add(filterFile libscope.Filter, addProc, sourceid, rootdir string, rc *run.
 		util.Warn("It can take up to 1 minute to attach to processes in a parent namespace")
 	}
 
-	rc.Subprocess = true
 	procs, err := util.HandleInputArg(addProc, rc.Rootdir, false, false, true, true)
 	if err != nil {
 		return err
@@ -244,7 +243,6 @@ func Remove(filterFile libscope.Filter, remProc, sourceid, rootdir string, rc *r
 	// Detach from all matching, scoped processes
 	////////////////////////////////////////////
 
-	rc.Subprocess = true
 	procs, err := util.HandleInputArg(remProc, rc.Rootdir, false, false, false, true)
 	if err != nil {
 		return err

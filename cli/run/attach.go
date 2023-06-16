@@ -96,16 +96,10 @@ func (rc *Config) Attach(pid int) error {
 		env = append(env, "SCOPE_CONF_RELOAD="+filepath.Join(rc.WorkDir, "scope.yml"))
 	}
 
-	if rc.Subprocess {
-		out, err := ld.AttachSubProc(args, env)
-		if err != nil {
-			return err
-		}
-		fmt.Print(out)
-	} else {
-		if err = ld.Attach(args, env); err != nil {
-			return err
-		}
+	stdoutStderr, err := ld.AttachSubProc(args, env)
+	util.Warn(stdoutStderr)
+	if err != nil {
+		return err
 	}
 
 	// Replace the working directory files with symbolic links in case of successful attach
@@ -161,10 +155,11 @@ func (rc *Config) Detach(pid int) error {
 		args = append(args, []string{"--rootdir", rc.Rootdir}...)
 	}
 
-	if rc.Subprocess {
-		out, err := ld.DetachSubProc(args, env)
-		fmt.Print(out)
+	stdoutStderr, err := ld.DetachSubProc(args, env)
+	util.Warn(stdoutStderr)
+	if err != nil {
 		return err
 	}
-	return ld.Detach(args, env)
+
+	return nil
 }

@@ -63,7 +63,6 @@ var detachCmd = &cobra.Command{
 			return nil
 		}
 
-		rc.Subprocess = true
 		errors := false
 		for _, proc := range procs {
 			if err = rc.Detach(proc.Pid); err != nil {

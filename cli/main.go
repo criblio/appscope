@@ -32,7 +32,7 @@ package main
 // -l, --libbasedir DIR              specify parent for the library directory (default: /tmp)
 // -a, --ldattach PID                attach to the specified process ID
 // -d, --lddetach PID                detach from the specified process ID
-// -i, --install                     install libscope.so
+// -i, --install                     install libscope.so and scope
 // -e, --preload PATH                set ld.so.preload to PATH. "auto" = auto detect libpath; "off" = disable
 // -f, --filter FILTER_PATH          install the filter file specified in FILTER_PATH
 // -m, --mount MOUNT_DEST            mount filter file and unix socket into MOUNT_DEST

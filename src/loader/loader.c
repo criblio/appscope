@@ -501,12 +501,20 @@ cmdInstall(const char *rootdir)
     gid_t eGid = getegid();
     uid_t nsUid = eUid;
     uid_t nsGid = eGid;
-    unsigned char *file = NULL;
-    size_t file_len;
+    unsigned char *library_file = NULL;
+    size_t library_file_len;
+    unsigned char *loader_file = NULL;
+    size_t loader_file_len;
 
     // Extract library from scope binary into memory while in origin namespace
-    if ((file_len = getAsset(LIBRARY_FILE, &file)) == -1) {
-        fprintf(stderr, "cmdInstall getAsset failed\n");
+    if ((library_file_len = getAsset(LIBRARY_FILE, &library_file)) == -1) {
+        fprintf(stderr, "cmdInstall getAsset library failed\n");
+        return EXIT_FAILURE;
+    }
+
+    // Extract loader from scope binary into memory while in origin namespace
+    if ((loader_file_len = getAsset(STATIC_LOADER_FILE, &loader_file)) == -1) {
+        fprintf(stderr, "cmdInstall getAsset loader failed\n");
         return EXIT_FAILURE;
     }
 
@@ -523,8 +531,14 @@ cmdInstall(const char *rootdir)
     }
 
     // Extract the library
-    if (libdirExtract(file, file_len, nsUid, nsGid, LIBRARY_FILE)) {
-        fprintf(stderr, "cmdInstall extract failed\n");
+    if (libdirExtract(library_file, library_file_len, nsUid, nsGid, LIBRARY_FILE)) {
+        fprintf(stderr, "cmdInstall library extract failed\n");
+        return EXIT_FAILURE;
+    }
+
+    // Extract the loader
+    if (libdirExtract(loader_file, loader_file_len, nsUid, nsGid, STATIC_LOADER_FILE)) {
+        fprintf(stderr, "cmdInstall loader extract failed\n");
         return EXIT_FAILURE;
     }
 

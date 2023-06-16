@@ -498,11 +498,11 @@ rewriteOpenContainersConfig(const char *cWorkDir)
         goto exit;
     }
 
-    // Filter file must exists
-    if (scope_stat("/usr/lib/appscope/scope_filter", &fileStat) == -1) {
-        scope_fclose(fp);
-        goto exit;
-    }
+    // TODO: enable this
+    // if (scope_stat("/usr/lib/appscope/scope_filter", &fileStat) == -1) {
+    //     scope_fclose(fp);
+    //     goto exit;
+    // }
 
     // Scope executable must exists
     if (scope_snprintf(scopePath, sizeof(scopePath), "/usr/lib/appscope/%s/scope", libVersion(SCOPE_VER)) < 0) {

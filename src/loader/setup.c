@@ -719,7 +719,7 @@ setupPreload(const char *path, uid_t nsUid, gid_t nsGid)
 {
     char *scopeLibPath;
     char buf[PATH_MAX] = {0};
-    size_t len;
+    size_t len = 0;
 
     if (!strcmp(path, "auto")) {
         scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);

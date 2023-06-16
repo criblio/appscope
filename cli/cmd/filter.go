@@ -46,7 +46,7 @@ var filterCmd = &cobra.Command{
 		jsonOut, _ := cmd.Flags().GetBool("json")
 		addProc, _ := cmd.Flags().GetString("add")
 		remProc, _ := cmd.Flags().GetString("remove")
-		// source, _ := cmd.Flags().GetString("source")
+		sourceid, _ := cmd.Flags().GetString("sourceid")
 
 		// Disallow bad argument combinations (see Arg Matrix at top of file)
 		if addProc == "" && remProc == "" {
@@ -127,9 +127,9 @@ var filterCmd = &cobra.Command{
 			//	return err
 			//}
 
-			return filter.Add(filterFile, addProc, rc.Rootdir, rc)
+			return filter.Add(filterFile, addProc, sourceid, rc.Rootdir, rc)
 		} else if remProc != "" {
-			return filter.Remove(filterFile, remProc, rc.Rootdir, rc)
+			return filter.Remove(filterFile, remProc, sourceid, rc.Rootdir, rc)
 		}
 
 		return nil
@@ -142,6 +142,6 @@ func init() {
 	filterCmd.Flags().String("add", "", "Add an entry to the global filter")
 	filterCmd.Flags().String("remove", "", "Remove an entry from the global filter")
 	filterCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
-	filterCmd.Flags().String("source", "", "Source identifier for a filter entry")
+	filterCmd.Flags().String("sourceid", "", "Source identifier for a filter entry")
 	RootCmd.AddCommand(filterCmd)
 }

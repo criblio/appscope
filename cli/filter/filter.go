@@ -53,7 +53,7 @@ func Retrieve(rootdir string) ([]byte, libscope.Filter, error) {
 }
 
 // Add a process to the scope filter
-func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) error {
+func Add(filterFile libscope.Filter, addProc, sourceid, rootdir string, rc *run.Config) error {
 
 	// Create a history directory for logs
 	run.CreateWorkDirBasic("filter")
@@ -85,6 +85,7 @@ func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) er
 	newEntry := libscope.Entry{
 		ProcName: addProc,
 		ProcArg:  "",
+		SourceId: sourceid,
 		// TODO Configuration:
 	}
 	filterFile["allow"] = append(filterFile["allow"], newEntry)
@@ -169,7 +170,7 @@ func Add(filterFile libscope.Filter, addProc, rootdir string, rc *run.Config) er
 }
 
 // Remove a process from the scope filter
-func Remove(filterFile libscope.Filter, remProc, rootdir string, rc *run.Config) error {
+func Remove(filterFile libscope.Filter, remProc, sourceid, rootdir string, rc *run.Config) error {
 
 	// Create a history directory for logs
 	run.CreateWorkDirBasic("filter")
@@ -187,7 +188,7 @@ func Remove(filterFile libscope.Filter, remProc, rootdir string, rc *run.Config)
 	if allowList, ok := filterFile["allow"]; ok {
 		remove := -1
 		for i, entry := range allowList {
-			if entry.ProcName == remProc {
+			if entry.ProcName == remProc && entry.SourceId == sourceid {
 				remove = i
 			}
 		}

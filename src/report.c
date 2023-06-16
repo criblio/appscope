@@ -164,7 +164,6 @@ destroyHttpMap(void *data)
     http_map *map = (http_map *)data;
 
     if (map->req) scope_free(map->req);
-    if (map->resp) scope_free(map->resp);
     if (map) scope_free(map);
 }
 
@@ -475,6 +474,17 @@ httpFields(event_field_t *fields, http_report *hreport, char *hdr,
         }
     }
 
+    if (hreport->clen != -1) {
+        char *length_str = "content_length";
+        if (hreport->ptype == EVT_HREQ) {
+            length_str = "http_request_content_length";
+        } else if (hreport->ptype == EVT_HRES) {
+            length_str = "http_response_content_length";
+        }
+        H_VALUE(fields[hreport->ix], length_str, hreport->clen, EVENT_ONLY_ATTR);
+        HTTP_NEXT_FLD(hreport->ix);
+    }
+
     return TRUE;
 }
 
@@ -525,10 +535,17 @@ doHttp1Header(protocol_info *proto)
     event_field_t fields[HTTP_MAX_FIELDS];
     http_report hreport;
     http_post *post = (http_post *)proto->data;
-    http_map *map;
+    http_map *map = lstFind(g_maplist, post->id);
 
-    if ((map = lstFind(g_maplist, post->id)) == NULL) {
-        // lazy open
+    // When requests come in, save them in a map to be paired
+    // with responses later.
+    if (proto->ptype == EVT_HREQ) {
+
+        if (map) {
+            DBG("Duplicate http1 request");
+            return;
+        }
+
         if ((map = scope_calloc(1, sizeof(http_map))) == NULL) {
             DBG(NULL);
             return;
@@ -545,8 +562,10 @@ doHttp1Header(protocol_info *proto)
 
         map->id = post->id;
         map->first_time = tv.tv_sec;
-        map->req = NULL;
-        map->req_len = 0;
+        map->start_time = post->start_duration;
+        map->req = (char *)post->hdr;
+        post->hdr = NULL;  // we're transferring ownership, map will free it
+        map->req_len = proto->len;
     }
 
     ssl = (post->ssl) ? "https" : "http";
@@ -562,29 +581,24 @@ doHttp1Header(protocol_info *proto)
      *
      *  Request-Line   = Method SP Request-URI SP HTTP-Version CRLF
      */
-    if (proto->ptype == EVT_HREQ) {
-        map->start_time = post->start_duration;
-        map->req = (char *)post->hdr;
-        post->hdr = NULL;  // we're transferring ownership, map will free it
-        map->req_len = proto->len;
-    }
 
-    char header[map->req_len];
     // we're either building a new req or we have a previous req
-    if (map->req) {
-        if ((hreport.hreq = scope_calloc(1, map->req_len)) == NULL) {
+    char *tokenized_hreq = NULL;
+    if (map && map->req) {
+        tokenized_hreq = scope_calloc(1, map->req_len);
+        hreport.hreq = scope_calloc(1, map->req_len);
+        if (!tokenized_hreq || !hreport.hreq) {
             scopeLogError("fd:%d ERROR: doHttp1Header: hreq memory allocation failure", proto->fd);
-            return;
+            goto out;
         }
 
         char *savea = NULL;
-        scope_strncpy(header, map->req, map->req_len);
+        scope_strncpy(tokenized_hreq, map->req, map->req_len);
 
-        char *headertok = scope_strtok_r(header, "\r\n", &savea);
+        char *headertok = scope_strtok_r(tokenized_hreq, "\r\n", &savea);
         if (!headertok) {
-            scope_free(hreport.hreq);
             scopeLogWarn("fd:%d WARN: doHttp1Header: parse an http request header", proto->fd);
-            return;
+            goto out;
         }
 
         // The request specific values from Request-Line
@@ -625,16 +639,10 @@ doHttp1Header(protocol_info *proto)
             httpFields(fields, &hreport, map->req, map->req_len, proto, g_cfg.staticfg);
             httpFieldsInternal(fields, &hreport, proto);
 
-            if (hreport.clen != -1) {
-                H_VALUE(fields[hreport.ix], "http_request_content_length", hreport.clen, EVENT_ONLY_ATTR);
-                HTTP_NEXT_FLD(hreport.ix);
-            }
-            map->clen = hreport.clen;
-
             httpFieldEnd(fields, hreport.ix);
 
             event_t sendEvent = INT_EVENT("http.req", proto->len, SET, fields);
-            cmdSendHttp(g_ctl, &sendEvent, map->id, &g_proc);
+            cmdSendHttp(g_ctl, &sendEvent, post->id, &g_proc);
         }
     }
 
@@ -651,34 +659,32 @@ doHttp1Header(protocol_info *proto)
     *
     * Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
     */
+    char *tokenized_hres = NULL;
     if (proto->ptype == EVT_HRES) {
-        if ((hreport.hres = scope_calloc(1, proto->len)) == NULL) {
+
+        tokenized_hres = scope_calloc(1, proto->len);
+        hreport.hres = scope_calloc(1, proto->len);
+        if (!tokenized_hres || !hreport.hres) {
             scopeLogError("fd:%d ERROR: doHttp1Header: hres memory allocation failure", proto->fd);
-            return;
+            goto out;
         }
 
-        struct timeval tv;
-        scope_gettimeofday(&tv, NULL);
-
-        map->resp = (char *)post->hdr;
-        post->hdr = NULL;  // we're transferring ownership, map will free it
-
-        if (!map->req) {
-            map->duration = 0;
-        } else {
-            map->duration = getDurationNow(post->start_duration, map->start_time);
-            map->duration = map->duration / 1000000;
+        size_t request_clen = -1;
+        size_t response_clen = -1;
+        uint64_t duration = 0;
+        if (map) {
+            duration = getDurationNow(post->start_duration, map->start_time);
+            duration = duration / 1000000;
         }
 
         char *stext;
-        size_t status = getHttpStatus((char *)map->resp, proto->len, &stext);
+        size_t status = getHttpStatus((char *)post->hdr, proto->len, &stext);
 
         // The response specific values from Status-Line
         char *savea;
-        char reqheader[proto->len];
-        scope_strncpy(reqheader, map->resp, proto->len);
+        scope_strncpy(tokenized_hres, post->hdr, proto->len);
 
-        char *headertok = scope_strtok_r(reqheader, "\r\n", &savea);
+        char *headertok = scope_strtok_r(tokenized_hres, "\r\n", &savea);
         char *flavor_str = scope_strtok_r(headertok, " ", &savea);
         if (flavor_str &&
             ((flavor_str = scope_strtok_r(flavor_str, "/", &savea))) &&
@@ -701,40 +707,34 @@ doHttp1Header(protocol_info *proto)
         H_ATTRIB(fields[hreport.ix], "http_status_text", status_str, 1);
         HTTP_NEXT_FLD(hreport.ix);
 
-        H_VALUE(fields[hreport.ix], "http_server_duration", map->duration, EVENT_ONLY_ATTR);
+        H_VALUE(fields[hreport.ix], "http_server_duration", duration, EVENT_ONLY_ATTR);
         HTTP_NEXT_FLD(hreport.ix);
 
         // Fields common to request & response
-        if (map->req) {
+        if (map && map->req) {
             hreport.ptype = EVT_HREQ;
             httpFields(fields, &hreport, map->req, map->req_len, proto, g_cfg.staticfg);
-            if (hreport.clen != -1) {
-                H_VALUE(fields[hreport.ix], "http_request_content_length", hreport.clen, EVENT_ONLY_ATTR);
-                HTTP_NEXT_FLD(hreport.ix);
-            }
-            map->clen = hreport.clen;
+            request_clen = hreport.clen;
+
         }
 
         hreport.ptype = EVT_HRES;
-        httpFields(fields, &hreport, map->resp, proto->len, proto, g_cfg.staticfg);
-        httpFieldsInternal(fields, &hreport, proto);
-        if (hreport.clen != -1) {
-            H_VALUE(fields[hreport.ix], "http_response_content_length", hreport.clen, EVENT_ONLY_ATTR);
-            HTTP_NEXT_FLD(hreport.ix);
-        }
+        httpFields(fields, &hreport, post->hdr, proto->len, proto, g_cfg.staticfg);
+        response_clen = hreport.clen;
 
+        httpFieldsInternal(fields, &hreport, proto);
         httpFieldEnd(fields, hreport.ix);
 
         event_t hevent = INT_EVENT("http.resp", proto->len, SET, fields);
-        cmdSendHttp(g_ctl, &hevent, map->id, &g_proc);
+        cmdSendHttp(g_ctl, &hevent, post->id, &g_proc);
 
         // emit statsd metrics, if enabled.
         if ((mtcEnabled(g_mtc)) && (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_HTTP))) {
 
             char *mtx_name = (proto->isServer) ? "http_server_duration" : "http_client_duration";
-            event_t http_dur = INT_EVENT(mtx_name, map->duration, DELTA_MS, fields);
+            event_t http_dur = INT_EVENT(mtx_name, duration, DELTA_MS, fields);
             // TBD AGG Only cmdSendMetric(g_mtc, &http_dur);
-            httpAggAddMetric(g_http_agg, &http_dur, map->clen, hreport.clen);
+            httpAggAddMetric(g_http_agg, &http_dur, request_clen, response_clen);
 
             /* TBD AGG Only
             if (map->clen != -1) {
@@ -751,9 +751,14 @@ doHttp1Header(protocol_info *proto)
         }
 
         // Done; we remove the list entry; complete when reported
-        if (lstDelete(g_maplist, post->id) == FALSE) DBG(NULL);
+        if (map && (lstDelete(g_maplist, post->id) == FALSE)) {
+            DBG("Error deleting from g_maplist");
+        }
     }
 
+out:
+    if (tokenized_hreq) scope_free(tokenized_hreq);
+    if (tokenized_hres) scope_free(tokenized_hres);
     if (hreport.hreq) scope_free(hreport.hreq);
     if (hreport.hres) scope_free(hreport.hres);
 }

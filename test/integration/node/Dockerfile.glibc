@@ -7,7 +7,7 @@ WORKDIR /usr/local/scope/
 
 RUN npm install hot-shots && \
     apt-get -o Acquire::Check-Valid-Until=false update && \
-    apt-get install -y vim gawk gdb emacs lsof tcpdump wget curl netcat
+    apt-get install -y vim gawk gdb emacs lsof tcpdump wget curl netcat-openbsd
 
 COPY node/scope-test /usr/local/scope/
 COPY node/hotshot.ts /usr/local/scope/

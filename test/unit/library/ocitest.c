@@ -59,6 +59,7 @@ rewriteOpenContainersConfigTest(int id) {
     scope_snprintf(inPath, PATH_MAX, "%s/data/oci/oci%din.json", dirPath, id);
     scope_snprintf(outPath, PATH_MAX, "%s/data/oci/oci%dout.json", dirPath, id);
 
+    const char * scopeWithVersion = "/usr/lib/appscope/1.2.3/scope";
     bool res = FALSE;
     struct stat fileStat;
     if (scope_stat(inPath, &fileStat) == -1) {
@@ -194,7 +195,7 @@ rewriteOpenContainersConfigTest(int id) {
         goto exit;
     }
 
-    if (!cJSON_AddStringToObjLN(mountNode, "destination", "/opt/scope")) {
+    if (!cJSON_AddStringToObjLN(mountNode, "destination", "/usr/lib/appscope/")) {
         cJSON_Delete(mountNode);
         assert_non_null(NULL);
         goto exit;
@@ -206,7 +207,7 @@ rewriteOpenContainersConfigTest(int id) {
         goto exit;
     }
 
-    if (!cJSON_AddStringToObjLN(mountNode, "source", "/tmp/appscope/dev/scope")) {
+    if (!cJSON_AddStringToObjLN(mountNode, "source", "/usr/lib/appscope/")) {
         cJSON_Delete(mountNode);
         assert_non_null(NULL);
         goto exit;
@@ -253,7 +254,7 @@ rewriteOpenContainersConfigTest(int id) {
         goto exit;
     }
 
-    if (!cJSON_AddStringToObjLN(startContainerNode, "path",  "/opt/scope")) {
+    if (!cJSON_AddStringToObjLN(startContainerNode, "path",  scopeWithVersion)) {
         cJSON_Delete(startContainerNode);
         assert_non_null(NULL);
         goto exit;
@@ -261,7 +262,7 @@ rewriteOpenContainersConfigTest(int id) {
 
     const char *argsItems[4] =
     {
-        "/opt/scope",
+        scopeWithVersion,
         "extract",
         "-p",
         "/opt/appscope"
@@ -300,6 +301,7 @@ rewriteOpenContainersConfigTest(int id) {
     }
 
     if (memcmp(fdOutMap, jsonStr, stOut.st_size) != 0) {
+        scope_fprintf(scope_stderr, jsonStr);
         assert_non_null(NULL);
     }
     scope_munmap(fdOutMap, stOut.st_size);

@@ -3,15 +3,15 @@
 		"env":	["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LD_PRELOAD=/opt/appscope/libscope.so", "SCOPE_SETUP_DONE=true"]
 	},
 	"mounts":	[{
-			"destination":	"/opt/scope",
+			"destination":	"/usr/lib/appscope/",
 			"type":	"bind",
-			"source":	"/tmp/appscope/dev/scope",
+			"source":	"/usr/lib/appscope/",
 			"options":	["rbind", "rprivate"]
 		}],
 	"hooks":	{
 		"startContainer":	[{
-				"path":	"/opt/scope",
-				"args":	["/opt/scope", "extract", "-p", "/opt/appscope"]
+				"path":	"/usr/lib/appscope/1.2.3/scope",
+				"args":	["/usr/lib/appscope/1.2.3/scope", "extract", "-p", "/opt/appscope"]
 			}]
 	}
 }

@@ -348,7 +348,7 @@ services:
       context: .
       dockerfile: ./go/Dockerfile
       args:
-        GO_IMAGE_VER: golang:1.19
+        GO_IMAGE_VER: golang:1.19.9
     <<: *scope-common
 
   go_20:
@@ -359,7 +359,7 @@ services:
       context: .
       dockerfile: ./go/Dockerfile
       args:
-        GO_IMAGE_VER: golang:1.20
+        GO_IMAGE_VER: golang:1.20.4
     <<: *scope-common
 
 # vim: ts=2 sw=2 et :

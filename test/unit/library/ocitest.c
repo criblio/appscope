@@ -113,16 +113,16 @@ rewriteOpenContainersConfigTest(int id) {
             cJSON *item = cJSON_GetArrayItem(envNodeArr, i);
             char *strItem = cJSON_GetStringValue(item);
 
-            if (scope_strncmp("LD_PRELOAD=", strItem, sizeof("LD_PRELOAD=")-1) == 0) {
+            if (scope_strncmp("LD_PRELOAD=", strItem, C_STRLEN("LD_PRELOAD=")) == 0) {
                 size_t itemLen = scope_strlen(strItem);
-                size_t newLdprelLen = itemLen + sizeof("/opt/libscope.so:") - 1;
+                size_t newLdprelLen = itemLen + C_STRLEN("/opt/libscope.so:");
                 char *newLdPreloadLib = scope_calloc(1, newLdprelLen);
                 if (!newLdPreloadLib) {
                     assert_non_null(NULL);
                     goto exit;
                 }
-                scope_strncpy(newLdPreloadLib, "LD_PRELOAD=/opt/libscope.so:", sizeof("LD_PRELOAD=/opt/libscope.so:") - 1);
-                scope_strcat(newLdPreloadLib, strItem + sizeof("LD_PRELOAD=") - 1);
+                scope_strncpy(newLdPreloadLib, "LD_PRELOAD=/opt/libscope.so:", C_STRLEN("LD_PRELOAD=/opt/libscope.so:"));
+                scope_strcat(newLdPreloadLib, strItem + C_STRLEN("LD_PRELOAD="));
                 cJSON *newLdPreloadLibObj = cJSON_CreateString(newLdPreloadLib);
                 if (!newLdPreloadLibObj) {
                     scope_free(newLdPreloadLib);
@@ -140,7 +140,7 @@ rewriteOpenContainersConfigTest(int id) {
                 cJSON_AddItemToArray(envNodeArr, scopeEnvNode);
                 ldPreloadPresent = TRUE;
                 break;
-            } else if (scope_strncmp("SCOPE_SETUP_DONE=true", strItem, sizeof("SCOPE_SETUP_DONE=true")-1) == 0) {
+            } else if (scope_strncmp("SCOPE_SETUP_DONE=true", strItem, C_STRLEN("SCOPE_SETUP_DONE=true")) == 0) {
                 // we are done here
                 res = TRUE;
                 goto exit;

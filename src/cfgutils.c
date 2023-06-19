@@ -3070,13 +3070,15 @@ allow:
         level: error
 */
 
-#define ALLOW_NODE          "allow"
-#define PROCNAME_NODE         "procname"
-#define ARG_NODE              "arg"
-#define ALLOW_CONFIG_NODE     "config"
-#define DENY_NODE           "deny"
-#define PROCNAME_NODE         "procname"
-#define ARG_NODE              "arg"
+#define ALLOW_NODE             "allow"
+#define PROCNAME_NODE            "procname"
+#define ARG_NODE                 "arg"
+#define ALLOW_CONFIG_NODE        "config"
+#define DENY_NODE              "deny"
+#define PROCNAME_NODE            "procname"
+#define ARG_NODE                 "arg"
+#define SOURCE_NODE            "source"
+#define UNIX_SOCKET_PATH_NODE    "unixSocketPath"
 
 #define MATCH_ALL_VAL       "_MatchAll_"
 
@@ -3102,6 +3104,15 @@ typedef struct {
     node_filter_fn fn;
 } parse_filter_table_t;
 
+
+typedef void (*node_filter_meta_fn)(yaml_document_t *, yaml_node_t *, char **);
+
+typedef struct {
+    yaml_node_type_t type;
+    const char *key;
+    node_filter_meta_fn fn;
+} parse_filter_meta_t;
+
 /*
 * Process key value pair filter
 */
@@ -3120,6 +3131,28 @@ processKeyValuePairFilter(yaml_document_t *doc, yaml_node_pair_t *pair, const pa
             (!scope_strcmp((char*)nodeKey->data.scalar.value, fEntry[i].key))) {
             fEntry[i].fn(doc, nodeValue, extData);
             break;
+        }
+    }
+}
+
+/*
+* Process key value pair filter metadata
+*/
+static void
+processKeyValuePairFilterMetaData(yaml_document_t *doc, yaml_node_pair_t *pair, const parse_filter_meta_t *fEntry, char **unixPath) {
+    yaml_node_t *nodeKey = yaml_document_get_node(doc, pair->key);
+    yaml_node_t *nodeValue = yaml_document_get_node(doc, pair->value);
+
+    if (nodeKey->type != YAML_SCALAR_NODE) return;
+
+    /*
+    * Check if specific Node value is present and call proper function if exists
+    */
+    for (int i = 0; fEntry[i].type != YAML_NO_NODE; ++i) {
+        if ((nodeValue->type == fEntry[i].type) &&
+            (!scope_strcmp((char*)nodeKey->data.scalar.value, fEntry[i].key))) {
+                fEntry[i].fn(doc, nodeValue, unixPath);
+                break;
         }
     }
 }
@@ -3309,6 +3342,38 @@ processDenySeq(yaml_document_t *doc, yaml_node_t *node, void *extData) {
 }
 
 /*
+* Process Unix Socket Path metadata Node
+*/
+static void
+processUnixSocketPathNode(yaml_document_t* doc, yaml_node_t* node, char **unixPath) {
+    if (!node || (node->type != YAML_SCALAR_NODE)) return;
+
+    const char *unixCfgPath = (const char *)node->data.scalar.value;
+
+    if (scope_strlen(unixCfgPath) > 0) {
+        *unixPath = scope_strdup(unixCfgPath);
+    }
+}
+
+/*
+* Process source metadata Node
+*/
+static void
+processSourceNode(yaml_document_t *doc, yaml_node_t *node, char **unixPath) {
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    parse_filter_meta_t sourcNodes[] = {
+        {YAML_SCALAR_NODE,    UNIX_SOCKET_PATH_NODE, processUnixSocketPathNode},
+        {YAML_NO_NODE,        NULL,                  NULL}
+    };
+
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairFilterMetaData(doc, pair, sourcNodes, unixPath);
+    }
+}
+
+/*
 * Process Filter Root node (starting point)
 */
 static void
@@ -3362,6 +3427,28 @@ processFilterValidRootNode(yaml_document_t *doc, void *extData) {
     };
     foreach(pair, node->data.mapping.pairs) {
         processKeyValuePairFilter(doc, pair, deny, extData);
+    }
+}
+
+/*
+* Process Filter Root node for metadata (starting point)
+*/
+static void
+processFilterRootMetadata(yaml_document_t *doc, char **unixPath) {
+    yaml_node_t *node = yaml_document_get_root_node(doc);
+
+    if ((node == NULL) || (node->type != YAML_MAPPING_NODE)) {
+        return;
+    }
+    yaml_node_pair_t *pair;
+
+    parse_filter_meta_t meta[] = {
+        {YAML_MAPPING_NODE,  SOURCE_NODE,  processSourceNode},
+        {YAML_NO_NODE,       NULL,         NULL}
+    };
+
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairFilterMetaData(doc, pair, meta, unixPath);
     }
 }
 
@@ -3446,6 +3533,60 @@ cfgFilterStatus(const char *procName, const char *procCmdLine, const char *filte
 
     DBG(NULL);
     return FILTER_ERROR;
+}
+
+/*
+ * Returns the UNIX path defined in filter file metadata - in case of success data should be freed with scope_free, in case of failure returns NULL
+ */
+char *
+cfgFilterUnixPath(const char *filterPath) {
+    char *unixPath = NULL;
+    FILE *fp = scope_fopen(filterPath, "rb");
+    if (!fp) {
+        return unixPath;
+    }
+    yaml_parser_t parser;
+    yaml_document_t doc;
+
+    int res = yaml_parser_initialize(&parser);
+    if (!res) {
+        goto cleanup_filter_file;
+    }
+
+    yaml_parser_set_input_file(&parser, fp);
+
+    res = yaml_parser_load(&parser, &doc);
+    if (!res) {
+        goto cleanup_parser;
+    }
+
+    /*
+    * Extract the unixSocketPath from filter file
+    *
+    "source": {
+      "id": "in_appscope",
+      "enableUnixPath": true,
+      "unixSocketPath": "/opt/cribl/state/appscope.sock",
+      "tls": {
+        "disabled": true
+      },
+      "host": "0.0.0.0",
+      "port": 10090,
+      "authToken": ""
+    }
+    */
+
+    processFilterRootMetadata(&doc, &unixPath);
+
+    yaml_document_delete(&doc);
+
+cleanup_parser:
+    yaml_parser_delete(&parser);
+
+cleanup_filter_file:
+    scope_fclose(fp);
+
+    return unixPath;
 }
 
 /*

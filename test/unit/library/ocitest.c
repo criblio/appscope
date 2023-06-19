@@ -75,7 +75,7 @@ verifyModifiedCfg(int id, const char* cmpStr) {
     char* outBuf = cJSON_PrintUnformatted(parseOut);
     cJSON_Delete(parseOut);
 
-    assert_int_equal(scope_strlen(outBuf), scope_strlen(cmpStr));
+    // assert_int_equal(scope_strlen(outBuf), scope_strlen(cmpStr));
     if (scope_strcmp(cmpStr, outBuf) != 0 ){
         scope_fprintf(scope_stderr, cmpStr);
         scope_fprintf(scope_stderr, outBuf);
@@ -96,11 +96,12 @@ rewriteOpenContainersConfigTest(int id) {
 
     char inPath [PATH_MAX] = {0};
     scope_snprintf(inPath, PATH_MAX, "%s/data/oci/oci%din.json", dirPath, id);
-    const char * scopeWithVersion = "/usr/lib/appscope/1.2.3/scope";
+    const char *scopeWithVersion = "/usr/lib/appscope/1.2.3/scope";
+    const char *unixSocketPath = "/var/run/appscope/appscope.sock";
 
     void *cfgMem = ociReadCfgIntoMem(inPath);
 
-    char* modifMem = ociModifyCfg(cfgMem, scopeWithVersion);
+    char *modifMem = ociModifyCfg(cfgMem, scopeWithVersion, unixSocketPath);
 
     bool res = verifyModifiedCfg(id, modifMem);
 

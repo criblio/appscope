@@ -8,9 +8,9 @@
 			"source":	"/usr/lib/appscope/",
 			"options":	["rbind", "rprivate"]
 		}, {
-			"destination":	"/var/run/appscope/",
+			"destination":	"/var/run/appscope/appscope.sock",
 			"type":	"bind",
-			"source":	"/var/run/appscope/",
+			"source":	"/var/run/appscope/appscope.sock",
 			"options":	["rbind", "rprivate"]
 		}],
 	"hooks":	{

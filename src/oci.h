@@ -5,10 +5,10 @@
 #include "scopetypes.h"
 
 /*
- *  Manage OCI configuration files
+ *  API to manage OCI configuration file
  */
 void *ociReadCfgIntoMem(const char*);
-char *ociModifyCfg(const void *, const char *);
+char *ociModifyCfg(const void *, const char *, const char*);
 bool ociWriteConfig(const char *, const char *);
 
 #endif // __OCI_H__

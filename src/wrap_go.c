@@ -511,20 +511,28 @@ containerStart(void)
             goto exit;
         }
 
+        char *unixSocketPath = cfgFilterUnixPath(SCOPE_FILTER_USR_PATH);
+
+        if (!unixSocketPath) {
+            sysprint("\t%s: missing unix path in /usr/lib/appscope/scope_filter \n", __FUNCTION__);
+            goto exit;
+        }
+
         void *cfgMem = ociReadCfgIntoMem(cfgPath);
         if (!cfgMem) {
             goto exit;
         }
 
-        char *modCfgMem = ociModifyCfg(cfgMem, scopePath);
+        char *modCfgMem = ociModifyCfg(cfgMem, scopePath, unixSocketPath);
         scope_free(cfgMem);
 
         if (modCfgMem) {
             ociWriteConfig(cfgPath, modCfgMem);
             scope_free(modCfgMem);
         } else {
-            sysprint("\t%s: Modify OCI config fails config: %s, scope: %s,  \n", __FUNCTION__, cfgPath, scopePath);
+            sysprint("\t%s: Modify OCI config fails config: %s, scope: %s, UNIX socket: %s \n", __FUNCTION__, cfgPath, scopePath, unixSocketPath);
         }
+        scope_free(unixSocketPath);
     }
 
 exit:

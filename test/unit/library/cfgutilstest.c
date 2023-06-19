@@ -2947,9 +2947,26 @@ filterMatchAllInDeny(void **state)
     // cleanup
     cfgDestroy(&cfg);
     assert_null(cfg);
-
 }
 
+static void
+filterUnixPathMissing(void **state)
+{
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_6.yml", dirPath);
+    char *unixPath = cfgFilterUnixPath(path);
+    assert_null(unixPath);
+}
+
+static void
+filterUnixPathPresent(void **state)
+{
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_edge.yml", dirPath);
+    char *unixPath = cfgFilterUnixPath(path);
+    assert_string_equal(unixPath, "/opt/cribl/state/appscope.sock");
+    scope_free(unixPath);
+}
 
 // Defined in src/cfgutils.c
 // This is not a proper test, it just exists to make valgrind output
@@ -3056,6 +3073,8 @@ main(int argc, char *argv[])
         cmocka_unit_test(filterMatchAllInAllowCanBeDenied),
         cmocka_unit_test(filterVerifyMatchAllMergedConfig),
         cmocka_unit_test(filterMatchAllInDeny),
+        cmocka_unit_test(filterUnixPathMissing),
+        cmocka_unit_test(filterUnixPathPresent),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
         cmocka_unit_test(cfgReadProtocol),
         cmocka_unit_test(cfgReadCustomEmptyFilter),

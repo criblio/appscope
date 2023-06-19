@@ -63,7 +63,7 @@ close_file:
  * Returns the modified data which should be freed with scope_free, in case of failure returns NULL
  */
 char *
-ociModifyCfg(const void *cfgMem, const char *scopePath) {
+ociModifyCfg(const void *cfgMem, const char *scopePath, const char *unixSocketPath) {
 
     cJSON *json = cJSON_Parse(cfgMem);
     if (json == NULL) {
@@ -203,7 +203,7 @@ ociModifyCfg(const void *cfgMem, const char *scopePath) {
     const char *mountPath[2] =
     {
         "/usr/lib/appscope/",
-        "/var/run/appscope/"
+        unixSocketPath
     };
 
     for (int i = 0; i < ARRAY_SIZE(mountPath); ++i ) {

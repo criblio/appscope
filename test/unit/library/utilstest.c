@@ -11,12 +11,38 @@
 #include "test.h"
 
 static void
+testEndWithNegative(void **state)
+{
+    bool res = endsWith(NULL, NULL);
+    assert_false(res);
+    res = endsWith("hello", NULL);
+    assert_false(res);
+    res = endsWith(NULL, "hello");
+    assert_false(res);
+    res = endsWith("hello", "hell");
+    assert_false(res);
+    res = endsWith("hello", "hello1");
+    assert_false(res);
+}
+
+static void
+testEndWithPositive(void **state)
+{
+    bool res = endsWith("hello", "hello");
+    assert_true(res);
+    res = endsWith("hello", "o");
+    assert_true(res);
+    res = endsWith("hello", "llo");
+    assert_true(res);
+}
+
+static void
 testSetUUID(void **state)
 {
     char uuid[37];
     setUUID(uuid);
 
-    assert_int_equal(strlen(uuid), 36);
+    assert_int_equal(scope_strlen(uuid), 36);
 
     // UUID version is 4
     assert_int_equal(uuid[14] - '0', 4);
@@ -30,7 +56,7 @@ testSetUUID(void **state)
     char uuid_2[37];
     setUUID(uuid_2);
 
-    assert_true(strcmp(uuid, uuid_2));
+    assert_true(scope_strcmp(uuid, uuid_2));
 }
 
 static void
@@ -39,13 +65,13 @@ testSetMachineID(void **state)
     char mach_id[33];
     setMachineID(mach_id);
 
-    assert_int_equal(strlen(mach_id), 32);
+    assert_int_equal(scope_strlen(mach_id), 32);
 
     char mach_id_2[33];
     setMachineID(mach_id_2);
 
     // Machine ID is consistent across calls
-    assert_true(!strcmp(mach_id, mach_id_2));
+    assert_true(!scope_strcmp(mach_id, mach_id_2));
 }
 
 static void
@@ -92,6 +118,8 @@ main(int argc, char* argv[])
     initFn();
 
     const struct CMUnitTest tests[] = {
+        cmocka_unit_test(testEndWithPositive),
+        cmocka_unit_test(testEndWithNegative),
         cmocka_unit_test(testSetUUID),
         cmocka_unit_test(testSetMachineID),
         cmocka_unit_test(testSigSafeUtoa),

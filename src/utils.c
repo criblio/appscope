@@ -239,14 +239,18 @@ startsWith(const char *string, const char *substring)
     return (scope_strncmp(string, substring, scope_strlen(substring)) == 0);
 }
 
-int
-endsWith(const char *string, const char *substring)
-{
-    if (!string || !substring) return FALSE;
+bool
+endsWith(const char *string, const char *substring) {
+    if (!string || !substring) {
+        return FALSE;
+    }
     int stringlen = scope_strlen(string);
     int sublen = scope_strlen(substring);
-    return (sublen <= stringlen) &&
-       ((scope_strncmp(&string[stringlen-sublen], substring, sublen)) == 0);
+    if ((sublen <= stringlen) &&
+       ((scope_strncmp(&string[stringlen-sublen], substring, sublen)) == 0)) {
+        return TRUE;
+    }
+    return FALSE;
 }
 
 int

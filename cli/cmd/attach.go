@@ -79,7 +79,7 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 
 		id := args[0] // The attach command ensures we have an argument
 
-		procs, err := util.HandleInputArg(id, rc.Rootdir, true, true, true, false)
+		procs, err := util.HandleInputArg(id, "", rc.Rootdir, true, true, true, false)
 		if err != nil {
 			return err
 		}

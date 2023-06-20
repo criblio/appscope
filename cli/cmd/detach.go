@@ -46,7 +46,7 @@ var detachCmd = &cobra.Command{
 			id = args[0]
 		}
 
-		procs, err := util.HandleInputArg(id, rc.Rootdir, !all, true, false, false)
+		procs, err := util.HandleInputArg(id, "", rc.Rootdir, !all, true, false, false)
 		if err != nil {
 			return err
 		}

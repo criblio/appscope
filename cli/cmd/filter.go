@@ -37,6 +37,7 @@ var filterCmd = &cobra.Command{
   scope filter --rootdir /path/to/host/root --json
   scope filter --add nginx
   scope filter --add nginx < scope.yml
+  scope filter --add java --arg myServer
   scope filter --add firefox --rootdir /path/to/host/root
   scope filter --remove chromium`,
 	Args: cobra.NoArgs,
@@ -47,6 +48,7 @@ var filterCmd = &cobra.Command{
 		addProc, _ := cmd.Flags().GetString("add")
 		remProc, _ := cmd.Flags().GetString("remove")
 		sourceid, _ := cmd.Flags().GetString("sourceid")
+		procArg, _ := cmd.Flags().GetString("arg")
 
 		// Disallow bad argument combinations (see Arg Matrix at top of file)
 		if addProc == "" && remProc == "" {
@@ -122,7 +124,7 @@ var filterCmd = &cobra.Command{
 
 		// Add a process to; or remove a process from the scope filter
 		if addProc != "" {
-			return filter.Add(filterFile, addProc, sourceid, rc.Rootdir, rc)
+			return filter.Add(filterFile, addProc, procArg, sourceid, rc.Rootdir, rc)
 		} else if remProc != "" {
 			return filter.Remove(filterFile, remProc, sourceid, rc.Rootdir, rc)
 		}
@@ -138,5 +140,6 @@ func init() {
 	filterCmd.Flags().String("remove", "", "Remove an entry from the global filter")
 	filterCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	filterCmd.Flags().String("sourceid", "", "Source identifier for a filter entry")
+	filterCmd.Flags().String("arg", "", "Argument to the command to be added to the filter")
 	RootCmd.AddCommand(filterCmd)
 }

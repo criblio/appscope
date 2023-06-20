@@ -82,7 +82,7 @@ func Stop(rc *run.Config) error {
 	// Detach from all scoped processes
 	////////////////////////////////////////////
 
-	procs, err := util.HandleInputArg("", rc.Rootdir, false, false, false, false)
+	procs, err := util.HandleInputArg("", "", rc.Rootdir, false, false, false, false)
 	if err != nil {
 		return err
 	}

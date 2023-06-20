@@ -54,7 +54,7 @@ func Retrieve(rootdir string) ([]byte, libscope.Filter, error) {
 }
 
 // Add a process to the scope filter
-func Add(filterFile libscope.Filter, addProc, sourceid, rootdir string, rc *run.Config) error {
+func Add(filterFile libscope.Filter, addProc, procArg, sourceid, rootdir string, rc *run.Config) error {
 
 	// Create a history directory for logs
 	rc.CreateWorkDirBasic("filter")
@@ -88,7 +88,7 @@ func Add(filterFile libscope.Filter, addProc, sourceid, rootdir string, rc *run.
 	// Add the entry to the filter
 	newEntry := libscope.Entry{
 		ProcName:      addProc,
-		ProcArg:       "",
+		ProcArg:       procArg,
 		SourceId:      sourceid,
 		Configuration: rc.GetScopeConfig(),
 	}
@@ -151,7 +151,7 @@ func Add(filterFile libscope.Filter, addProc, sourceid, rootdir string, rc *run.
 		util.Warn("It can take up to 1 minute to attach to processes in a parent namespace")
 	}
 
-	procs, err := util.HandleInputArg(addProc, rc.Rootdir, false, false, true, true)
+	procs, err := util.HandleInputArg(addProc, procArg, rc.Rootdir, false, false, true, true)
 	if err != nil {
 		return err
 	}
@@ -179,6 +179,7 @@ func Add(filterFile libscope.Filter, addProc, sourceid, rootdir string, rc *run.
 }
 
 // Remove a process from the scope filter
+// Note: No matching of the 'arg' field intended for removal.
 func Remove(filterFile libscope.Filter, remProc, sourceid, rootdir string, rc *run.Config) error {
 
 	// Create a history directory for logs
@@ -256,7 +257,7 @@ func Remove(filterFile libscope.Filter, remProc, sourceid, rootdir string, rc *r
 	// Detach from all matching, scoped processes
 	////////////////////////////////////////////
 
-	procs, err := util.HandleInputArg(remProc, rc.Rootdir, false, false, false, true)
+	procs, err := util.HandleInputArg(remProc, "", rc.Rootdir, false, false, false, true)
 	if err != nil {
 		return err
 	}

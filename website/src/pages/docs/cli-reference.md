@@ -290,6 +290,7 @@ scope filter
 scope filter --rootdir /path/to/host/root --json
 scope filter --add nginx
 scope filter --add nginx < scope.yml
+scope filter --add java --arg myServer 
 scope filter --add firefox --rootdir /path/to/host/root
 scope filter --remove chromium
 ```
@@ -298,6 +299,7 @@ scope filter --remove chromium
 
 ```
       --add string            Add an entry to the global filter
+      --arg string            Argument to the command to be added to the filter
   -a, --authtoken string      Set AuthToken for Cribl
   -b, --backtrace             Enable backtrace file generation when an application crashes.
   -d, --coredump              Enable core dump file generation when an application crashes.
@@ -697,13 +699,13 @@ scope start --rootdir /hostfs
 
 ### stop
 ---
-Stop scoping all processes and services on the host and in all relevant containers.
+Performs the following actions:
+	- Removal of /etc/ld.so.preload contents
+	- Removal of the filter file from /usr/lib/appscope/scope_filter
+	- Detach from all currently scoped processes
 
-`scope stop` does the following on the host and in all relevant containers:
-    - Remove filter files `/usr/lib/appscope/scope_filter` and `/tmp/appscope/scope_filter`.
-    - Detach from all existing scoped processes.
-    - Remove the `etc/profile.d/scope.sh` script.
-    - Delete any lines that `LD_PRELOAD` libscope from any relevant service configurations.
+The command does not uninstall scope or libscope from /usr/lib/appscope or /tmp/appscope
+or remove any service configurations.
 
 #### Usage
 
@@ -716,8 +718,9 @@ Stop scoping all processes and services on the host and in all relevant containe
 #### Flags
 
 ```
-  -f, --force   Use this flag when you're sure you want to run scope stop
-  -h, --help    help for start
+  -f, --force      Use this flag when you're sure you want to run scope stop
+  -R, --rootdir    Path to root filesystem of target namespace
+  -h, --help       help for stop
 ```
 
 ### update

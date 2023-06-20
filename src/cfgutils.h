@@ -39,6 +39,7 @@ typedef enum {
 // Filter Handling
 // parse filter file nd optionally reads a cfg from filter file
 filter_status_t cfgFilterStatus(const char *, const char *, const char *, config_t *);
+bool cfgFilterFileIsValid(const char*);
 
 log_t * initLog(config_t *);
 mtc_t * initMtc(config_t *);

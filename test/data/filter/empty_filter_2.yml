@@ -1,0 +1,5 @@
+allow:
+- arg:
+- procname: ""
+deny:
+- procname:

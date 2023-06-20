@@ -24,6 +24,10 @@ int endsWith(const char *, const char *);
 void setUUID(char *);
 void setMachineID(char *);
 
+char *edgePath(void);
+const char *libVersion(const char *);
+void sysprint(const char *, ...);
+
 // Signal Safe API
 int sigSafeNanosleep(const struct timespec *);
 void sigSafeUtoa(unsigned long, char *, int, int *);

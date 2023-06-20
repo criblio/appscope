@@ -272,6 +272,7 @@ scope extract --metricdest tcp://some.host:8125 --eventdest tcp://other.host:100
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
   -n, --nobreaker             Set Cribl to not break streams into events
+  -p, --parents               Create any missing intermediate pathname components in provided directory parameter
 ```
 
 ### filter

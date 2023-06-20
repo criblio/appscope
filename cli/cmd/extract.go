@@ -26,8 +26,12 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 `,
 	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		createDirFlag, _ := cmd.Flags().GetBool("parents")
 		outPath := "./"
 		if len(args) > 0 {
+			if createDirFlag {
+				os.MkdirAll(args[0], 0755)
+			}
 			if !util.CheckDirExists(args[0]) {
 				util.ErrAndExit("%s does not exist or is not a directory", args[0])
 			}
@@ -54,5 +58,6 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 
 func init() {
 	metricAndEventDestFlags(excreteCmd, rc)
+	excreteCmd.Flags().BoolP("parents", "p", false, "Create any missing intermediate pathname components in provided directory parameter")
 	RootCmd.AddCommand(excreteCmd)
 }

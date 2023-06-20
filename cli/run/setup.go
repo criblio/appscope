@@ -153,7 +153,7 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 
 	// Sudo user warning
 	if _, present := os.LookupEnv("SUDO_USER"); present {
-		fmt.Printf("WARNING: Session history will be stored in %s and owned by root\n", histDir)
+		util.Warn("WARNING: Session history will be stored in %s and owned by root\n", histDir)
 	}
 
 	// Create Working directory
@@ -331,7 +331,7 @@ func (rc *Config) CreateWorkDirBasic(cmd string) {
 
 	// Sudo user warning
 	if _, present := os.LookupEnv("SUDO_USER"); present {
-		fmt.Printf("WARNING: Session logs will be stored in %s and owned by root\n", histDir)
+		util.Warn("WARNING: Session logs will be stored in %s and owned by root\n", histDir)
 	}
 
 	// Create working directory in history/

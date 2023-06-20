@@ -290,7 +290,20 @@ hookAll(struct dl_phdr_info *info, size_t size, void *data)
     scopeLog(CFG_LOG_DEBUG, "%s: shared obj: %s", __FUNCTION__, info->dlpi_name);
 
     // don't hook funcs from libscope or ld.so
-    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) return 0;
+    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) {
+        return 0;
+    }
+
+    /*
+    * Don't hook the main program. 
+    * In dl_iterate_phdr the main program is passed as:
+    * - on musl as an absolute path into the binary
+    * - on glibc as an empty string in the binary
+    * We do not want to use dlopen for the absolute path to avoid the static initialization order problem.
+    */
+    if (endsWith(info->dlpi_name, g_proc.procname) == TRUE) {
+        return 0;
+    }
 
     void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
     if (handle == NULL) return FALSE;

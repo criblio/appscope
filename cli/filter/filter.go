@@ -239,14 +239,17 @@ func Remove(filterFile libscope.Filter, remProc, sourceid, rootdir string, rc *r
 
 	////////////////////////////////////////////
 	// Unset ld.so.preload if it is already set.
+	// Only if this is the last entry in the file
 	////////////////////////////////////////////
 
-	if stdoutStderr, err := ld.Preload("off", rc.Rootdir); err != nil {
-		log.Warn().
-			Err(err).
-			Str("loaderDetails", stdoutStderr).
-			Msgf("Install library in %s namespace failed.", rootdir)
-		return err
+	if len(filterFile["allow"]) == 0 {
+		if stdoutStderr, err := ld.Preload("off", rc.Rootdir); err != nil {
+			log.Warn().
+				Err(err).
+				Str("loaderDetails", stdoutStderr).
+				Msgf("Install library in %s namespace failed.", rootdir)
+			return err
+		}
 	}
 
 	////////////////////////////////////////////

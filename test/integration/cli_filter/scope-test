@@ -206,18 +206,18 @@ LIBSCOPE_PATH=$(find /usr/lib/appscope/ -name libscope.so)
 if [ ! -f $LIBSCOPE_PATH ]; then
     fail "missing $LIBSCOPE_PATH"
 fi
-
+cat /usr/lib/appscope/scope_filter
 # Check filter file contains processes
 count=$(grep "memcached" "/usr/lib/appscope/scope_filter" | wc -l)
-if [ $count -gt 0 ] ; then
+if [ $count -ne 1 ] ; then
     fail "/usr/lib/appscope/scope_filter does not contain process memcached"
 fi
 count=$(grep "redis-server" "/usr/lib/appscope/scope_filter" | wc -l)
-if [ $count -gt 0 ] ; then
+if [ $count -ne 1 ] ; then
     fail "/usr/lib/appscope/scope_filter does not contain process redis-server"
 fi
 count=$(grep "nginx" "/usr/lib/appscope/scope_filter" | wc -l)
-if [ $count -gt 0 ] ; then
+if [ $count -ne 1 ] ; then
     fail "/usr/lib/appscope/scope_filter does not contain process nginx"
 fi
 
@@ -227,8 +227,9 @@ if [ $count -lt 1 ] ; then
     fail "ld.so.preload not set"
 fi
 
-# Check scope ps shows 3 processes scoped
-waitForCmdscopedProcessNumber 3
+# Check scope ps shows 27 processes scoped
+# nginx(25) memcached(1) redis-server(1)
+waitForCmdscopedProcessNumber 27
 
 cleanupAfterStart
 pkill -9 memcached

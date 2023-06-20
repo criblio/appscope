@@ -102,16 +102,16 @@ __attribute__((constructor)) void cli_constructor() {
 	bool opt_patch = false;
 	bool opt_passthrough = false;
 
-	char *arg_ldattach;
-	char *arg_lddetach;
-	char *arg_rootdir;
-	char *arg_preload;
-	char *arg_filter;
-	char *arg_mount;
-	char *arg_service;
-	char *arg_namespace;
-	char *arg_libbasedir;
-	char *arg_patch;
+	char *arg_ldattach = NULL;
+	char *arg_lddetach = NULL;
+	char *arg_rootdir = NULL;
+	char *arg_preload = NULL;
+	char *arg_filter = NULL;
+	char *arg_mount = NULL;
+	char *arg_service = NULL;
+	char *arg_namespace = NULL;
+	char *arg_libbasedir = NULL;
+	char *arg_patch = NULL;
 
 	if ((g_libscopesz = strtoul(LIBSCOPE_SO_SIZE, NULL, 10)) == ULONG_MAX) {
 	   perror("strtoul");

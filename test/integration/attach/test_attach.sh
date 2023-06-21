@@ -533,8 +533,43 @@ unset SCOPE_FILTER
 
 endtest
 
+#
+# Implicit allow proc is run in the presence of a filter file
+#
+# Only run on glibc because musl does not support ld.so.preload
+printenv LIB_IS_GLIBC
+if [ $? -eq "0" ]; then
+    starttest implicit_allow
 
+    # create ld.so.preload
+    touch /etc/ld.so.preload
+    chmod ga+w /etc/ld.so.preload
+    echo /opt/appscope/lib/linux/$(uname -m)/libscope.so > /etc/ld.so.preload
 
+    # create a filter file
+    cd /opt/implicit_allow
+    export SCOPE_FILTER=${DUMMY_FILTER_FILE}2
+    echo "allow:" >> $SCOPE_FILTER
+    echo "- procname: foo" >> $SCOPE_FILTER
+
+    # 1) ld.so.preload enables libscope to be loaded in all procs
+    # 2) the filter file allows only the process foo to be scoped
+    # 3) the implicit allow list overrides the filter and allows runc to be scoped
+    ./runc &
+
+    scope inspect --all | grep runc
+    if [ $? -ne "0" ]; then
+        echo "runc is not actively scoped but should be"
+        ERR+=1
+    fi
+
+    kill `pidof runc`
+    rm /etc/ld.so.preload
+    rm $SCOPE_FILTER
+    unset SCOPE_FILTER
+
+    endtest
+fi
 if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""
     echo ""

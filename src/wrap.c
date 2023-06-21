@@ -1802,16 +1802,12 @@ static const char *const allowList[] = {
 };
 
 static bool
-thisProcCanBeActive(void)
+doImplicitDeny(void)
 {
     char procName[PATH_MAX] = {0};
     osGetProcname(procName, sizeof(procName));
 
     int i;
-
-    for (i=0; i < ARRAY_SIZE(allowList); i++) {
-        if (!scope_strcmp(procName, allowList[i])) return TRUE;
-    }
 
     for (i=0; i < ARRAY_SIZE(doNotScopeList); i++) {
         if (!scope_strcmp(procName, doNotScopeList[i])) return FALSE;
@@ -1820,6 +1816,19 @@ thisProcCanBeActive(void)
     return TRUE;
 }
 
+static bool
+doImplicitAllow(void)
+{
+    char procName[PATH_MAX] = {0};
+    osGetProcname(procName, sizeof(procName));
+    int i;
+
+    for (i=0; i < ARRAY_SIZE(allowList); i++) {
+        if (!scope_strcmp(procName, allowList[i])) return TRUE;
+    }
+
+    return FALSE;
+}
 
 typedef struct {
     bool isActive;
@@ -1838,25 +1847,29 @@ getSettings(bool attachedFlag)
     config_t *cfg = NULL;
     const char *filterFilePath = NULL;
     bool scopedFlag = FALSE;
-    bool skipReadCfg = FALSE;
+    bool readCfgFile = TRUE;
 
     if (attachedFlag) {
         scopedFlag = TRUE;
     } else if (!(filterFilePath = getFilterFilePath())){
         // The filter file does not exist, or shouldn't be used.
         // Set scopedFlag true unless it's on our doNotScopeList
-        scopedFlag = thisProcCanBeActive();
+        scopedFlag = doImplicitDeny();
     } else {
-        // A filter file exists!  Use it.
-        cfg = cfgCreateDefault();
-        filter_status_t res = cfgFilterStatus(g_proc.procname, g_proc.cmd, filterFilePath, cfg);
-        switch (res) {
+        // A filter file exists. Before using it, check for an implicit allow
+        if (doImplicitAllow() == TRUE) {
+            scopedFlag = TRUE;
+        } else {
+            // A filter file exists!  Use it.
+            cfg = cfgCreateDefault();
+            filter_status_t res = cfgFilterStatus(g_proc.procname, g_proc.cmd, filterFilePath, cfg);
+            switch (res) {
             case FILTER_SCOPED:
                 scopedFlag = TRUE;
                 break;
             case FILTER_SCOPED_WITH_CFG:
                 scopedFlag = TRUE;
-                skipReadCfg = TRUE;
+                readCfgFile = FALSE;
                 break;
             case FILTER_NOT_SCOPED:
                 scopedFlag = FALSE;
@@ -1866,10 +1879,11 @@ getSettings(bool attachedFlag)
                 scopedFlag = FALSE;
                 DBG(NULL);
                 break;
+            }
         }
     }
 
-    if (skipReadCfg == FALSE) {
+    if (readCfgFile == TRUE) {
         char *path = NULL;
         path = cfgPath();
         if (cfg) cfgDestroy(&cfg);

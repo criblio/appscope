@@ -51,7 +51,7 @@ close_file:
  * - Add a mount points
  *   * `appscope` directory will be mounted from the host "/usr/lib/appscope/" into the container: "/usr/lib/appscope/"
  *   * UNIX socket directory will be mounted from the host into the container the path to UNIX socket will be read from
- *   host based on value in the filter file
+ *   host based on value in the filter file [optionally]
  *
  * - Extend Environment variables
  *   * `LD_PRELOAD` will contain the following entry `/opt/appscope/libscope.so`
@@ -166,7 +166,7 @@ ociModifyCfg(const void *cfgMem, const char *scopePath, const char *unixSocketPa
     }
 
     /*
-    * Handle process mounts for library and filter file and socket
+    * Handle process mounts for library and filter file and optionally for UNIX socket
     *
     "mounts":[
       {
@@ -206,7 +206,13 @@ ociModifyCfg(const void *cfgMem, const char *scopePath, const char *unixSocketPa
         unixSocketPath
     };
 
-    for (int i = 0; i < ARRAY_SIZE(mountPath); ++i ) {
+    // Skip the Unix mounting point if it is not present
+    size_t mountPoints = ARRAY_SIZE(mountPath);
+    if (!unixSocketPath) {
+        mountPoints -= 1;
+    }
+
+    for (int i = 0; i < mountPoints; ++i ) {
         cJSON *mountNodeArr = cJSON_GetObjectItemCaseSensitive(json, "mounts");
         if (!mountNodeArr) {
             mountNodeArr = cJSON_CreateArray();

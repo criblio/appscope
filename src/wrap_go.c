@@ -515,7 +515,6 @@ containerStart(void)
 
         if (!unixSocketPath) {
             sysprint("\t%s: missing unix path in /usr/lib/appscope/scope_filter \n", __FUNCTION__);
-            goto exit;
         }
 
         void *cfgMem = ociReadCfgIntoMem(cfgPath);

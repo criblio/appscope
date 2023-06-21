@@ -9,6 +9,16 @@
 
 static char dirPath[PATH_MAX];
 
+static const char *testTypeJson[] = {
+    "EmptyJson",
+    "ProcessOnlyJson",
+    "ProcessEnvPresentLDPreload",
+    "ProcessEnvEmptyLDPreload",
+    "MissingHooks",
+    "IncompleteHooks",
+    "CompleteHooks"
+};
+
 static int
 testDirPath(char *path, const char *argv0) {
     char buf[PATH_MAX];
@@ -46,10 +56,7 @@ testDirPath(char *path, const char *argv0) {
 }
 
 static bool
-verifyModifiedCfg(int id, const char* cmpStr) {
-    char outPath [PATH_MAX] = {0};
-    scope_snprintf(outPath, PATH_MAX, "%s/data/oci/oci%dout.json", dirPath, id);
-
+verifyModifiedCfg(int id, const char *cmpStr, const char *outPath) {
     int fdOut = scope_open(outPath, O_RDONLY);
     if (fdOut == -1) {
         assert_non_null(NULL);
@@ -90,20 +97,26 @@ verifyModifiedCfg(int id, const char* cmpStr) {
     return TRUE;
 }
 
-// This function reflects the logic provided by rewriteOpenContainersConfig
 static bool
-rewriteOpenContainersConfigTest(int id) {
+rewriteOpenContainersConfigTest(int id, const char* unixSocketPath) {
 
     char inPath [PATH_MAX] = {0};
     scope_snprintf(inPath, PATH_MAX, "%s/data/oci/oci%din.json", dirPath, id);
     const char *scopeWithVersion = "/usr/lib/appscope/1.2.3/scope";
-    const char *unixSocketPath = "/var/run/appscope/appscope.sock";
 
     void *cfgMem = ociReadCfgIntoMem(inPath);
 
     char *modifMem = ociModifyCfg(cfgMem, scopeWithVersion, unixSocketPath);
 
-    bool res = verifyModifiedCfg(id, modifMem);
+    char outPath [PATH_MAX] = {0};
+
+    if (unixSocketPath) {
+        scope_snprintf(outPath, PATH_MAX, "%s/data/oci/oci%doutfull.json", dirPath, id);
+    } else {
+        scope_snprintf(outPath, PATH_MAX, "%s/data/oci/oci%doutpartial.json", dirPath, id);
+    }
+
+    bool res = verifyModifiedCfg(id, modifMem, outPath);
 
     scope_free(cfgMem);
     scope_free(modifMem);
@@ -112,52 +125,25 @@ rewriteOpenContainersConfigTest(int id) {
 }
 
 static void
-ocitest_empty_json(void **state)
-{
-    bool res = rewriteOpenContainersConfigTest(0);
-    assert_int_equal(res, TRUE);
+ocitest_with_unix_path(void **state) {
+    for (int i = 0; i < ARRAY_SIZE(testTypeJson); ++i) {
+        bool res = rewriteOpenContainersConfigTest(i, "/var/run/appscope/appscope.sock");
+        if (res != TRUE) {
+            scope_fprintf(scope_stderr, "Error with test: id=%d name=%s\n", i, testTypeJson[i]);
+        }
+        assert_int_equal(res, TRUE);
+    }
 }
 
 static void
-ocitest_process_only_json(void **state)
-{
-    bool res = rewriteOpenContainersConfigTest(1);
-    assert_int_equal(res, TRUE);
-}
-
-static void
-ocitest_process_env_present_preload(void **state)
-{
-    bool res = rewriteOpenContainersConfigTest(2);
-    assert_int_equal(res, TRUE);
-}
-
-static void
-ocitest_process_env_empty_preload(void **state)
-{
-    bool res = rewriteOpenContainersConfigTest(3);
-    assert_int_equal(res, TRUE);
-}
-
-static void
-ocitest_missing_hooks(void **state)
-{
-    bool res = rewriteOpenContainersConfigTest(4);
-    assert_int_equal(res, TRUE);
-}
-
-static void
-ocitest_hooks_incomplete(void **state)
-{
-    bool res = rewriteOpenContainersConfigTest(5);
-    assert_int_equal(res, TRUE);
-}
-
-static void
-ocitest_hooks_complete(void **state)
-{
-    bool res = rewriteOpenContainersConfigTest(6);
-    assert_int_equal(res, TRUE);
+ocitest_without_unix_path(void **state) {
+    for (int i = 0; i < ARRAY_SIZE(testTypeJson); ++i) {
+        bool res = rewriteOpenContainersConfigTest(i, NULL);
+        if (res != TRUE) {
+            scope_fprintf(scope_stderr, "Error with test: id=%d name=%s\n", i, testTypeJson[i]);
+        }
+        assert_int_equal(res, TRUE);
+    }
 }
 
 int
@@ -169,13 +155,8 @@ main(int argc, char* argv[])
     }
 
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(ocitest_empty_json),
-        cmocka_unit_test(ocitest_process_only_json),
-        cmocka_unit_test(ocitest_process_env_present_preload),
-        cmocka_unit_test(ocitest_process_env_empty_preload),
-        cmocka_unit_test(ocitest_missing_hooks),
-        cmocka_unit_test(ocitest_hooks_incomplete),
-        cmocka_unit_test(ocitest_hooks_complete),
+        cmocka_unit_test(ocitest_with_unix_path),
+        cmocka_unit_test(ocitest_without_unix_path),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

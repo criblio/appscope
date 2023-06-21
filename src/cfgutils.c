@@ -3541,6 +3541,10 @@ cfgFilterStatus(const char *procName, const char *procCmdLine, const char *filte
 char *
 cfgFilterUnixPath(const char *filterPath) {
     char *unixPath = NULL;
+    if (!filterPath) {
+        return unixPath;
+    }
+
     FILE *fp = scope_fopen(filterPath, "rb");
     if (!fp) {
         return unixPath;

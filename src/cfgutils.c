@@ -3064,12 +3064,12 @@ allow:
 */
 
 #define ALLOW_NODE          "allow"
-#define ALLOW_PROCNAME_NODE   "procname"
-#define ALLOW_ARG_NODE        "arg"
+#define PROCNAME_NODE         "procname"
+#define ARG_NODE              "arg"
 #define ALLOW_CONFIG_NODE     "config"
 #define DENY_NODE           "deny"
-#define DENY_PROCNAME_NODE    "procname"
-#define DENY_ARG_NODE         "arg"
+#define PROCNAME_NODE         "procname"
+#define ARG_NODE              "arg"
 
 #define MATCH_ALL_VAL       "_MatchAll_"
 
@@ -3087,7 +3087,7 @@ typedef struct {
     bool filterMatch;        // flag indicate that cfg should be parsed for the process
 } filter_cfg_t;
 
-typedef void (*node_filter_fn)(yaml_document_t *, yaml_node_t *, filter_cfg_t *);
+typedef void (*node_filter_fn)(yaml_document_t *, yaml_node_t *, void *);
 
 typedef struct {
     yaml_node_type_t type;
@@ -3099,7 +3099,7 @@ typedef struct {
 * Process key value pair filter
 */
 static void
-processKeyValuePairFilter(yaml_document_t *doc, yaml_node_pair_t *pair, const parse_filter_table_t *fEntry, filter_cfg_t *fCfg) {
+processKeyValuePairFilter(yaml_document_t *doc, yaml_node_pair_t *pair, const parse_filter_table_t *fEntry, void *extData) {
     yaml_node_t *nodeKey = yaml_document_get_node(doc, pair->key);
     yaml_node_t *nodeValue = yaml_document_get_node(doc, pair->value);
 
@@ -3111,7 +3111,7 @@ processKeyValuePairFilter(yaml_document_t *doc, yaml_node_pair_t *pair, const pa
     for (int i = 0; fEntry[i].type != YAML_NO_NODE; ++i) {
         if ((nodeValue->type == fEntry[i].type) &&
             (!scope_strcmp((char*)nodeKey->data.scalar.value, fEntry[i].key))) {
-            fEntry[i].fn(doc, nodeValue, fCfg);
+            fEntry[i].fn(doc, nodeValue, extData);
             break;
         }
     }
@@ -3121,8 +3121,10 @@ processKeyValuePairFilter(yaml_document_t *doc, yaml_node_pair_t *pair, const pa
 * Process allow process name Scalar Node
 */
 static void
-processAllowProcNameScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+processAllowProcNameScalar(yaml_document_t *doc, yaml_node_t *node, void *extData) {
     if (node->type != YAML_SCALAR_NODE) return;
+
+    filter_cfg_t *fCfg = (filter_cfg_t *)extData;
 
     const char *procname = (const char *)node->data.scalar.value;
     if (!scope_strcmp(fCfg->procName, procname) ||
@@ -3133,12 +3135,27 @@ processAllowProcNameScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t
 }
 
 /*
+* Verifies if entry is not empty
+*/
+static void
+processEntryIsNotEmpty(yaml_document_t *doc, yaml_node_t *node, void *extData) {
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    const char *value = (const char *)node->data.scalar.value;
+    bool *status = (bool *)extData;
+    if (scope_strlen(value) > 0) {
+        *status = TRUE;
+    }
+}
+
+/*
 * Process allow process command line Scalar Node
 */
 static void
-processAllowProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+processAllowProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, void *extData) {
     if (node->type != YAML_SCALAR_NODE) return;
 
+    filter_cfg_t *fCfg = (filter_cfg_t *)extData;
     const char *cmdline = (const char *)node->data.scalar.value;
     if ((scope_strlen(cmdline) > 0) &&
         (scope_strstr(fCfg->procCmdLine, cmdline)
@@ -3152,8 +3169,10 @@ processAllowProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cf
 * Process allow configuration Node
 */
 static void
-processAllowConfig(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+processAllowConfig(yaml_document_t *doc, yaml_node_t *node, void *extData) {
     if (node->type != YAML_MAPPING_NODE) return;
+
+    filter_cfg_t *fCfg = (filter_cfg_t *)extData;
 
     if (fCfg->filterMatch) {
         processRoot(fCfg->cfg, doc, node);
@@ -3162,16 +3181,43 @@ processAllowConfig(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) 
 }
 
 /*
-* Process allow sequence list
+* Process allow/deny sequence list (validation)
 */
 static void
-processAllowSeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+processValidAllowDenySeq(yaml_document_t *doc, yaml_node_t *node, void *extData) {
     if (node->type != YAML_SEQUENCE_NODE) return;
 
     parse_filter_table_t filters[] = {
-        {YAML_SCALAR_NODE,  ALLOW_PROCNAME_NODE, processAllowProcNameScalar},
-        {YAML_SCALAR_NODE,  ALLOW_ARG_NODE,      processAllowProcCmdLineScalar},
-        {YAML_NO_NODE,      NULL,                NULL}
+        {YAML_SCALAR_NODE,  PROCNAME_NODE, processEntryIsNotEmpty},
+        {YAML_SCALAR_NODE,  ARG_NODE,      processEntryIsNotEmpty},
+        {YAML_NO_NODE,      NULL,          NULL}
+    };
+
+    yaml_node_item_t *seqItem;
+    foreach(seqItem, node->data.sequence.items) {
+        yaml_node_t *nodeMap = yaml_document_get_node(doc, *seqItem);
+
+        if (nodeMap->type != YAML_MAPPING_NODE) return;
+
+        yaml_node_pair_t *pair;
+        // processs the filters first (before the config)
+        foreach(pair, nodeMap->data.mapping.pairs) {
+            processKeyValuePairFilter(doc, pair, filters, extData);
+        }
+    }
+}
+
+/*
+* Process allow sequence list
+*/
+static void
+processAllowSeq(yaml_document_t *doc, yaml_node_t *node, void *extData) {
+    if (node->type != YAML_SEQUENCE_NODE) return;
+
+    parse_filter_table_t filters[] = {
+        {YAML_SCALAR_NODE,  PROCNAME_NODE, processAllowProcNameScalar},
+        {YAML_SCALAR_NODE,  ARG_NODE,      processAllowProcCmdLineScalar},
+        {YAML_NO_NODE,      NULL,          NULL}
     };
     parse_filter_table_t config[] = {
         {YAML_MAPPING_NODE, ALLOW_CONFIG_NODE,   processAllowConfig},
@@ -3188,21 +3234,22 @@ processAllowSeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
         yaml_node_pair_t *pair;
         // processs the filters first (before the config)
         foreach(pair, nodeMap->data.mapping.pairs) {
-            processKeyValuePairFilter(doc, pair, filters, fCfg);
+            processKeyValuePairFilter(doc, pair, filters, extData);
         }
         foreach(pair, nodeMap->data.mapping.pairs) {
-            processKeyValuePairFilter(doc, pair, config, fCfg);
+            processKeyValuePairFilter(doc, pair, config, extData);
         }
     }
-
 }
 
 /*
 * Process deny process name Scalar Node
 */
 static void
-processDenyProcNameScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+processDenyProcNameScalar(yaml_document_t *doc, yaml_node_t *node, void *extData) {
     if (node->type != YAML_SCALAR_NODE) return;
+
+    filter_cfg_t *fCfg = (filter_cfg_t *)extData;
 
     const char *procname = (const char *)node->data.scalar.value;
     if (!scope_strcmp(fCfg->procName, procname) ||
@@ -3215,8 +3262,10 @@ processDenyProcNameScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t 
 * Process deny process command line Scalar Node
 */
 static void
-processDenyProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+processDenyProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, void *extData) {
     if (node->type != YAML_SCALAR_NODE) return;
+
+    filter_cfg_t *fCfg = (filter_cfg_t *)extData;
 
     const char *cmdline = (const char *)node->data.scalar.value;
     if ((scope_strlen(cmdline) > 0) &&
@@ -3230,13 +3279,13 @@ processDenyProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg
 * Process deny sequence list
 */
 static void
-processDenySeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+processDenySeq(yaml_document_t *doc, yaml_node_t *node, void *extData) {
     if (node->type != YAML_SEQUENCE_NODE) return;
 
     parse_filter_table_t t[] = {
-        {YAML_SCALAR_NODE, DENY_PROCNAME_NODE, processDenyProcNameScalar},
-        {YAML_SCALAR_NODE, DENY_ARG_NODE,      processDenyProcCmdLineScalar},
-        {YAML_NO_NODE,     NULL,               NULL}
+        {YAML_SCALAR_NODE, PROCNAME_NODE, processDenyProcNameScalar},
+        {YAML_SCALAR_NODE, ARG_NODE,      processDenyProcCmdLineScalar},
+        {YAML_NO_NODE,     NULL,          NULL}
     };
 
     yaml_node_item_t *seqItem;
@@ -3247,7 +3296,7 @@ processDenySeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
 
         yaml_node_pair_t *pair;
         foreach(pair, nodeMap->data.mapping.pairs) {
-            processKeyValuePairFilter(doc, pair, t, fCfg);
+            processKeyValuePairFilter(doc, pair, t, extData);
         }
     }
 }
@@ -3256,7 +3305,7 @@ processDenySeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
 * Process Filter Root node (starting point)
 */
 static void
-processFilterRootNode(yaml_document_t *doc, filter_cfg_t *fCfg) {
+processFilterRootNode(yaml_document_t *doc, void *extData) {
     yaml_node_t *node = yaml_document_get_root_node(doc);
 
     if ((node == NULL) || (node->type != YAML_MAPPING_NODE)) {
@@ -3271,7 +3320,7 @@ processFilterRootNode(yaml_document_t *doc, filter_cfg_t *fCfg) {
         {YAML_NO_NODE,       NULL,       NULL}
     };
     foreach(pair, node->data.mapping.pairs) {
-        processKeyValuePairFilter(doc, pair, allow, fCfg);
+        processKeyValuePairFilter(doc, pair, allow, extData);
     }
 
     parse_filter_table_t deny[] = {
@@ -3279,7 +3328,33 @@ processFilterRootNode(yaml_document_t *doc, filter_cfg_t *fCfg) {
         {YAML_NO_NODE,       NULL,       NULL}
     };
     foreach(pair, node->data.mapping.pairs) {
-        processKeyValuePairFilter(doc, pair, deny, fCfg);
+        processKeyValuePairFilter(doc, pair, deny, extData);
+    }
+}
+
+static void
+processFilterValidRootNode(yaml_document_t *doc, void *extData) {
+    yaml_node_t *node = yaml_document_get_root_node(doc);
+
+    if ((node == NULL) || (node->type != YAML_MAPPING_NODE)) {
+        return;
+    }
+
+    yaml_node_pair_t *pair;
+    parse_filter_table_t allow[] = {
+        {YAML_SEQUENCE_NODE, ALLOW_NODE, processValidAllowDenySeq},
+        {YAML_NO_NODE,       NULL,       NULL}
+    };
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairFilter(doc, pair, allow, extData);
+    }
+
+    parse_filter_table_t deny[] = {
+        {YAML_SEQUENCE_NODE, DENY_NODE,  processValidAllowDenySeq},
+        {YAML_NO_NODE,       NULL,       NULL}
+    };
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairFilter(doc, pair, deny, extData);
     }
 }
 
@@ -3364,4 +3439,45 @@ cfgFilterStatus(const char *procName, const char *procCmdLine, const char *filte
 
     DBG(NULL);
     return FILTER_ERROR;
+}
+
+/*
+ * Check if filter file specified by Path is valid:
+ * - contains at least deny or allow section
+ */
+bool
+cfgFilterFileIsValid(const char *filterPath) {
+    FILE *fs;
+    yaml_parser_t parser;
+    yaml_document_t doc;
+    bool status = FALSE;
+    bool res;
+
+    if ((fs = scope_fopen(filterPath, "rb")) == NULL) {
+        return status;
+    }
+
+    res = yaml_parser_initialize(&parser);
+    if (!res) {
+        goto cleanup_filter_file;
+    }
+
+    yaml_parser_set_input_file(&parser, fs);
+
+    res = yaml_parser_load(&parser, &doc);
+    if (!res) {
+        goto cleanup_parser;
+    }
+
+    processFilterValidRootNode(&doc, &status);
+
+    yaml_document_delete(&doc);
+
+cleanup_parser:
+    yaml_parser_delete(&parser);
+
+cleanup_filter_file:
+    scope_fclose(fs);
+
+    return status;
 }

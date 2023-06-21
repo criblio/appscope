@@ -181,7 +181,7 @@
       "title": "type",
       "description": "Specifies the format of metric data. See `scope.yml`. ",
       "type": "string",
-      "enum": ["statsd", "ndjson", "prometheus"]
+      "enum": ["statsd", "ndjson"]
     },
     "host": {
       "title": "host",

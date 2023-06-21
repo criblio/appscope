@@ -321,15 +321,6 @@ services:
       context: .
       dockerfile: ./payload/Dockerfile.musl
     <<: *scope-common
-
-  prometheus:
-    image: ghcr.io/criblio/appscope-test-prometheus:${TAG:?Missing TAG environment variable}
-    build:
-      cache_from:
-        - ghcr.io/criblio/appscope-test-prometheus:${TAG:?Missing TAG environment variable}
-      context: .
-      dockerfile: ./prometheus/Dockerfile
-    <<: *scope-common
   
   jetty:
     image: ghcr.io/criblio/appscope-test-jetty:${TAG:?Missing TAG environment variable}

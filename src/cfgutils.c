@@ -99,13 +99,20 @@
 #define ANCESTOR_NODE                "ancestor"
 #define CONFIG_NODE              "config"
 
+#if SCOPE_PROM_SUPPORT != 0
 enum_map_t formatMap[] = {
     {"statsd",                CFG_FMT_STATSD},
     {"ndjson",                CFG_FMT_NDJSON},
     {"prometheus",            CFG_FMT_PROMETHEUS},
     {NULL,                    -1}
 };
-
+#else 
+enum_map_t formatMap[] = {
+    {"statsd",                CFG_FMT_STATSD},
+    {"ndjson",                CFG_FMT_NDJSON},
+    {NULL,                    -1}
+};
+#endif
 enum_map_t transportTypeMap[] = {
     {"udp",                   CFG_UDP},
     {"tcp",                   CFG_TCP},

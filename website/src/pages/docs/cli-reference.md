@@ -111,6 +111,7 @@ scope attach --payloads 2000
       --loglevel string       Set scope library log level (debug, warning, info, error, none)
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson) (default "ndjson")
+      --metricprefix string   Set prefix for StatsD metrics, ignored if metric format isn't statsd
   -n, --nobreaker             Set Cribl to not break streams into events.
   -p, --payloads              Capture payloads of network transactions
   -R, --rootdir               Path to root filesystem of target namespace
@@ -268,6 +269,7 @@ scope extract --metricdest tcp://some.host:8125 --eventdest tcp://other.host:100
   -h, --help                  Help for extract
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
+      --metricprefix string   Set prefix for StatsD metrics, ignored if metric format isn't statsd
   -n, --nobreaker             Set Cribl to not break streams into events
   -p, --parents               Create any missing intermediate pathname components in provided directory parameter
 ```
@@ -419,12 +421,12 @@ kubectl label namespace default scope=enabled
       --keyfile string        Private key file for TLS in the container (mounted secret) (default "/etc/certs/tls.key")
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
+      --metricprefix string   Set prefix for StatsD metrics, ignored if metric format isn't statsd
       --namespace string      Name of the namespace in which to install; default is "default"
   -n, --nobreaker             Set Cribl Stream to not break streams into events
-      --noprom                Disable Prometheus Exporter deployment
+      --noexporter            Disable StatsD to Prometheus Exporter deployment
       --port int              Port to listen on (default 4443)
-      --prommport int         Specify Prometheus Exporter port for metrics from libscope (default 9109)
-      --promsport int         Specify Prometheus Exporter port for HTTP metrics requests (default 9090)
+      --promport int          Specify StatsD to Prometheus Exporter port for Prometheus HTTP metrics requests (default 9090)
       --server                Run Webhook server
       --signername string     Name of the signer used to sign the certificate request for the AppScope Admission Webhook (default "kubernetes.io/kubelet-serving")
       --version string        Version of scope to deploy
@@ -576,6 +578,7 @@ scope run -c edge -- top
       --loglevel string       Set scope library log level (debug, warning, info, error, none)
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson) (default "ndjson")
+      --metricprefix string   Set prefix for StatsD metrics, ignored if metric format isn't statsd
   -n, --nobreaker             Set Cribl to not break streams into events.
   -p, --payloads              Capture payloads of network transactions
   -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.
@@ -607,6 +610,7 @@ scope service cribl -c tls://in.my-instance.cribl.cloud:10090
   -h, --help                  Help for service
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
+      --metricprefix string   Set prefix for StatsD metrics, ignored if metric format isn't statsd
   -n, --nobreaker             Set Cribl Stream to not break streams into events
   -u, --user string           Specify owner username
   
@@ -765,6 +769,7 @@ scope watch --interval=10s -- curl https://wttr.in/94105
       --loglevel string       Set scope library log level (debug, warning, info, error, none)
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson) (default "ndjson")
+      --metricprefix string   Set prefix for StatsD metrics, ignored if metric format isn't statsd
   -n, --nobreaker             Set Cribl to not break streams into events.
   -p, --payloads              Capture payloads of network transactions
   -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.

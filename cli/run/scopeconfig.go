@@ -136,12 +136,12 @@ func (c *Config) ConfigFromStdin(cfgData []byte) error {
 	}
 
 	// Update paths to absolute for file transports
-	if c.sc.Metric.Transport.TransportType == "file" {
+	if c.sc.Metric.Transport.TransportType == "file" && c.sc.Metric.Transport.Path != "stdout" && c.sc.Metric.Transport.Path != "stderr" {
 		newPath, err := filepath.Abs(c.sc.Metric.Transport.Path)
 		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", c.sc.Metric.Transport.Path, err)
 		c.sc.Metric.Transport.Path = newPath
 	}
-	if c.sc.Event.Transport.TransportType == "file" {
+	if c.sc.Event.Transport.TransportType == "file" && c.sc.Event.Transport.Path != "stdout" && c.sc.Event.Transport.Path != "stderr" {
 		newPath, err := filepath.Abs(c.sc.Event.Transport.Path)
 		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", c.sc.Event.Transport.Path, err)
 		c.sc.Event.Transport.Path = newPath
@@ -163,12 +163,12 @@ func (c *Config) ConfigFromFile() error {
 	}
 
 	// Update paths to absolute for file transports
-	if c.sc.Metric.Transport.TransportType == "file" {
+	if c.sc.Metric.Transport.TransportType == "file" && c.sc.Metric.Transport.Path != "stdout" && c.sc.Metric.Transport.Path != "stderr" {
 		newPath, err := filepath.Abs(c.sc.Metric.Transport.Path)
 		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", c.sc.Metric.Transport.Path, err)
 		c.sc.Metric.Transport.Path = newPath
 	}
-	if c.sc.Event.Transport.TransportType == "file" {
+	if c.sc.Event.Transport.TransportType == "file" && c.sc.Event.Transport.Path != "stdout" && c.sc.Event.Transport.Path != "stderr" {
 		newPath, err := filepath.Abs(c.sc.Event.Transport.Path)
 		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", c.sc.Event.Transport.Path, err)
 		c.sc.Event.Transport.Path = newPath
@@ -347,12 +347,12 @@ func (c *Config) configFromRunOpts() error {
 	}
 
 	// Update paths to absolute for file transports
-	if c.sc.Metric.Transport.TransportType == "file" {
+	if c.sc.Metric.Transport.TransportType == "file" && c.sc.Metric.Transport.Path != "stdout" && c.sc.Metric.Transport.Path != "stderr" {
 		newPath, err := filepath.Abs(c.sc.Metric.Transport.Path)
 		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", c.sc.Metric.Transport.Path, err)
 		c.sc.Metric.Transport.Path = newPath
 	}
-	if c.sc.Event.Transport.TransportType == "file" {
+	if c.sc.Event.Transport.TransportType == "file" && c.sc.Event.Transport.Path != "stdout" && c.sc.Event.Transport.Path != "stderr" {
 		newPath, err := filepath.Abs(c.sc.Event.Transport.Path)
 		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", c.sc.Event.Transport.Path, err)
 		c.sc.Event.Transport.Path = newPath

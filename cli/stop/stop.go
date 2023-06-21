@@ -47,13 +47,13 @@ func Stop(rc *run.Config) error {
 
 	data, err := yaml.Marshal(&filterFile)
 	if err != nil {
-		util.Warn("Error marshaling YAML:", err)
+		util.Warn("Error marshaling YAML:%v", err)
 		return err
 	}
 
 	_, err = file.Write(data)
 	if err != nil {
-		util.Warn("Error writing to file:", err)
+		util.Warn("Error writing to file:%v", err)
 		return err
 	}
 

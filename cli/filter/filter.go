@@ -46,7 +46,7 @@ func Retrieve(rootdir string) ([]byte, libscope.Filter, error) {
 	// Read yaml in
 	err = yaml.Unmarshal(data, &filterFile)
 	if err != nil {
-		util.Warn("Error unmarshaling YAML:", err)
+		util.Warn("Error unmarshaling YAML:%v", err)
 		return nil, nil, err
 	}
 
@@ -105,13 +105,13 @@ func Add(filterFile libscope.Filter, addProc, procArg, sourceid, rootdir string,
 
 	data, err := yaml.Marshal(&filterFile)
 	if err != nil {
-		util.Warn("Error marshaling YAML:", err)
+		util.Warn("Error marshaling YAML:%v", err)
 		return err
 	}
 
 	_, err = file.Write(data)
 	if err != nil {
-		util.Warn("Error writing to file:", err)
+		util.Warn("Error writing to file:%v", err)
 		return err
 	}
 
@@ -217,13 +217,13 @@ func Remove(filterFile libscope.Filter, remProc, sourceid, rootdir string, rc *r
 
 			data, err := yaml.Marshal(&filterFile)
 			if err != nil {
-				util.Warn("Error marshaling YAML:", err)
+				util.Warn("Error marshaling YAML:%v", err)
 				return err
 			}
 
 			_, err = file.Write(data)
 			if err != nil {
-				util.Warn("Error writing to file:", err)
+				util.Warn("Error writing to file:%v", err)
 				return err
 			}
 

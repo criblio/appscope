@@ -103,7 +103,7 @@ var filterCmd = &cobra.Command{
 				// Marshal to json
 				jsonData, err := json.Marshal(filterFile)
 				if err != nil {
-					util.Warn("Error marshaling JSON:", err)
+					util.Warn("Error marshaling JSON:%v", err)
 					return err
 				}
 				fmt.Println(string(jsonData))

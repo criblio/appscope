@@ -59,15 +59,17 @@ func TestSetDefault(t *testing.T) {
 }
 
 func TestConfigFromRunOpts(t *testing.T) {
+	cwd, _ := os.Getwd()
+	cwd += "/"
 	c := Config{WorkDir: ".foo"}
 	err := c.configFromRunOpts()
 
 	assert.NoError(t, err)
 	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
-	assert.Equal(t, ".foo/metrics.json", c.sc.Metric.Transport.Path)
+	assert.Equal(t, cwd+".foo/metrics.json", c.sc.Metric.Transport.Path)
 	assert.Equal(t, 4, c.sc.Metric.Format.Verbosity)
 	assert.Equal(t, "file", c.sc.Event.Transport.TransportType)
-	assert.Equal(t, ".foo/events.json", c.sc.Event.Transport.Path)
+	assert.Equal(t, cwd+".foo/events.json", c.sc.Event.Transport.Path)
 
 	c.Verbosity = 5
 	err = c.configFromRunOpts()
@@ -93,7 +95,7 @@ func TestConfigFromRunOpts(t *testing.T) {
 	c.MetricsDest = ""
 	err = c.configFromRunOpts()
 	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
-	assert.Equal(t, ".foo/metrics.json", c.sc.Metric.Transport.Path)
+	assert.Equal(t, cwd+".foo/metrics.json", c.sc.Metric.Transport.Path)
 
 	// invalid proto
 	c.MetricsDest = "foo://bar"
@@ -127,12 +129,12 @@ func TestConfigFromRunOpts(t *testing.T) {
 	err = c.configFromRunOpts()
 	assert.NoError(t, err)
 	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
-	assert.Equal(t, "foo", c.sc.Metric.Transport.Path)
+	assert.Equal(t, cwd+"foo", c.sc.Metric.Transport.Path)
 	c.MetricsDest = "foo"
 	err = c.configFromRunOpts()
 	assert.NoError(t, err)
 	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
-	assert.Equal(t, "foo", c.sc.Metric.Transport.Path)
+	assert.Equal(t, cwd+"foo", c.sc.Metric.Transport.Path)
 	c.MetricsDest = "file:///foo/bar"
 	err = c.configFromRunOpts()
 	assert.NoError(t, err)
@@ -147,7 +149,7 @@ func TestConfigFromRunOpts(t *testing.T) {
 	err = c.configFromRunOpts()
 	assert.NoError(t, err)
 	assert.Equal(t, "file", c.sc.Metric.Transport.TransportType)
-	assert.Equal(t, "foo", c.sc.Metric.Transport.Path)
+	assert.Equal(t, cwd+"foo", c.sc.Metric.Transport.Path)
 	c.MetricsDest = "file://stdout" // stdout is valid
 	err = c.configFromRunOpts()
 	assert.NoError(t, err)

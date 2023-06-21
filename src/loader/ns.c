@@ -180,21 +180,21 @@ cleanupDestFd:
  * Returns TRUE if operation was success, FALSE otherwise.
  */
 bool
-setNamespaceRootDir(const char *rootdir, pid_t pid, const char *ns) {
+nsSetNsRootDir(const char *rootdir, pid_t pid, const char *ns) {
     char nsPath[PATH_MAX] = {0};
     int nsFd;
     if (snprintf(nsPath, sizeof(nsPath), "%s/proc/%d/ns/%s", rootdir, pid, ns) < 0) {
-        perror("setNamespaceRootDir: snprintf failed");
+        perror("nsSetNsRootDir: snprintf failed");
         return FALSE;
     }
 
     if ((nsFd = open(nsPath, O_RDONLY)) == -1) {
-        perror("setNamespaceRootDir: open failed");
+        perror("nsSetNsRootDir: open failed");
         return FALSE;
     }
 
     if (setns(nsFd, 0) != 0) {
-        perror("setNamespaceRootDir: setns failed");
+        perror("nsSetNsRootDir: setns failed");
         close(nsFd);
         return FALSE;
     }
@@ -266,11 +266,11 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
     * - mount namespace - allows to copy file(s) into a "child namespace"
     * No need to provide a rootdir here. We are in the host and looking at a child pid.
     */
-    if (joinPidNs && setNamespaceRootDir("", hostPid, "pid") == FALSE) {
+    if (joinPidNs && nsSetNsRootDir("", hostPid, "pid") == FALSE) {
         goto cleanupMem;
     }
 
-    if (setNamespaceRootDir("", hostPid, "mnt") == FALSE) {
+    if (nsSetNsRootDir("", hostPid, "mnt") == FALSE) {
         goto cleanupMem;
     }
 
@@ -533,8 +533,8 @@ nsAttach(pid_t pid, const char *rootDir)
     gid_t nsGid = nsInfoTranslateGidRootDir(path, 1);
 
     // Use pid 1 to locate ns fd
-    if (setNamespaceRootDir(rootDir, 1, "mnt") == FALSE) {
-        fprintf(stderr, "nsAttach setNamespaceRootDir mnt failed\n");
+    if (nsSetNsRootDir(rootDir, 1, "mnt") == FALSE) {
+        fprintf(stderr, "nsAttach nsSetNsRootDir mnt failed\n");
         ret = EXIT_FAILURE;
         goto out;
     }

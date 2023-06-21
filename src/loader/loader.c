@@ -47,7 +47,7 @@ cmdService(char *serviceName, pid_t nspid)
         nsUid = nsInfoTranslateUidRootDir("", nspid);
         nsGid = nsInfoTranslateGidRootDir("", nspid);
 
-        if (setNamespaceRootDir("", nspid, "mnt") == FALSE) {
+        if (nsSetNsRootDir("", nspid, "mnt") == FALSE) {
             return EXIT_FAILURE;
         }
     }
@@ -66,7 +66,7 @@ cmdUnservice(pid_t nspid)
 {
     // Change mnt namespace if nspid is provided
     if (nspid != -1) {
-        if (setNamespaceRootDir("", nspid, "mnt") == FALSE) {
+        if (nsSetNsRootDir("", nspid, "mnt") == FALSE) {
             return EXIT_FAILURE;
         }
     }
@@ -262,7 +262,7 @@ cmdDetach(pid_t pid, const char *rootdir)
 
     // Change mnt namespace if rootdir is provided
     if (rootdir) {
-        if (setNamespaceRootDir(rootdir, 1, "mnt") == FALSE) {
+        if (nsSetNsRootDir(rootdir, 1, "mnt") == FALSE) {
             fprintf(stderr, "nsDetach mnt failed\n");
             return EXIT_FAILURE;
         }
@@ -524,7 +524,7 @@ cmdInstall(const char *rootdir)
         nsGid = nsInfoTranslateGidRootDir(rootdir, 1);
 
         // Use pid 1 to locate ns fd
-        if (setNamespaceRootDir(rootdir, 1, "mnt") == FALSE) {
+        if (nsSetNsRootDir(rootdir, 1, "mnt") == FALSE) {
             fprintf(stderr, "cmdInstall mnt failed\n");
             return EXIT_FAILURE;
         }
@@ -572,8 +572,8 @@ cmdFilter(const char *configFilterPath, const char *rootdir)
         nsGid = nsInfoTranslateGidRootDir(rootdir, 1);
 
         // Use pid 1 to locate ns fd
-        if (setNamespaceRootDir(rootdir, 1, "mnt") == FALSE) {
-            fprintf(stderr, "setNamespace mnt failed\n");
+        if (nsSetNsRootDir(rootdir, 1, "mnt") == FALSE) {
+            fprintf(stderr, "nsSetNsRootDir mnt failed\n");
             return EXIT_FAILURE;
         }
     }
@@ -604,8 +604,8 @@ cmdPreload(const char *path, const char *rootdir)
         nsGid = nsInfoTranslateGidRootDir(rootdir, 1);
 
         // Use pid 1 to locate ns fd
-        if (setNamespaceRootDir(rootdir, 1, "mnt") == FALSE) {
-            fprintf(stderr, "setNamespace mnt failed\n");
+        if (nsSetNsRootDir(rootdir, 1, "mnt") == FALSE) {
+            fprintf(stderr, "nsSetNsRootDir mnt failed\n");
             return EXIT_FAILURE;
         }
     }
@@ -638,8 +638,8 @@ cmdMount(const char *mountDest, const char *rootdir)
         nsGid = nsInfoTranslateGidRootDir(rootdir, 1);
 
         // Use pid 1 to locate ns fd
-        if (setNamespaceRootDir(rootdir, 1, "mnt") == FALSE) {
-            fprintf(stderr, "setNamespace mnt failed\n");
+        if (nsSetNsRootDir(rootdir, 1, "mnt") == FALSE) {
+            fprintf(stderr, "nsSetNsRootDir mnt failed\n");
             return EXIT_FAILURE;
         }
     }

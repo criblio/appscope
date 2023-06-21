@@ -2,7 +2,7 @@ package filter
 
 import (
 	"errors"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -20,6 +20,7 @@ var (
 	errAttachingMultiple = errors.New("at least one error found when attaching to more than 1 process. See logs")
 )
 
+// Retrieve the filter file from the global location
 func Retrieve(rootdir string) ([]byte, libscope.Filter, error) {
 	filterFile := make(libscope.Filter, 0)
 
@@ -38,7 +39,7 @@ func Retrieve(rootdir string) ([]byte, libscope.Filter, error) {
 	}
 	defer file.Close()
 
-	data, err := ioutil.ReadAll(file)
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return nil, nil, err
 	}

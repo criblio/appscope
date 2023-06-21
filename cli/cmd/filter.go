@@ -12,7 +12,7 @@ import (
 )
 
 /* Args Matrix (X disallows)
- *                 cribldest metricformat metricdest eventdest nobreaker authtoken verbosity payloads loglevel librarypath userconfig coredump backtrace
+ *                 cribldest metricformat metricdest eventdest nobreaker authtoken verbosity payloads loglevel librarypath userconfig coredump backtrace rootdir add remove json sourceid arg
  * cribldest       -                      X          X                                                                     X
  * metricformat              -                                                                                             X
  * metricdest      X                      -                                                                                X
@@ -26,13 +26,19 @@ import (
  * userconfig      X         X            X          X         X         X         X         X        X                    -          X         X
  * coredump     																										   X		  -
  * backtrace  																											   X				    -
+ * rootdir                                                                                                                                               -
+ * add                                                                                                                                                           -   X
+ * remove                                                                                                                                                        X   -
+ * json                                                                                                                                                                      -
+ * sourceid                                                                                                                                                                      -
+ * arg                                                                                                                                                                                    -
  */
 
 // filterCmd represents the filter command
 var filterCmd = &cobra.Command{
 	Use:   "filter [flags]",
-	Short: "Automatically scope a set of processes",
-	Long:  `Automatically scope a set of processes by modifying a system-wide AppScope filter. Overrides all other scope sessions.`,
+	Short: "View or modify a system-wide AppScope filter",
+	Long:  `View or modify a system-wide AppScope filter that automatically scopes a set of processes. You can add or remove a single process at a time.`,
 	Example: `  scope filter
   scope filter --rootdir /path/to/host/root --json
   scope filter --add nginx
@@ -93,7 +99,8 @@ var filterCmd = &cobra.Command{
 			return err
 		}
 
-		// Print the filter file
+		// In the case that no --add argument or --remove argument was provided
+		// just print the filter file
 		if addProc == "" && remProc == "" {
 			if len(raw) == 0 {
 				util.ErrAndExit("Empty filter file")

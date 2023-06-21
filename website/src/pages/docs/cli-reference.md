@@ -278,7 +278,7 @@ scope extract --metricdest tcp://some.host:8125 --eventdest tcp://other.host:100
 ### filter
 ---
 
-Automatically scope a set of processes by modifying a system-wide AppScope filter. Overrides all other scope sessions.
+View or modify a system-wide AppScope filter that automatically scopes a set of processes. You can add or remove a single process at a time.
 
 #### Usage
 

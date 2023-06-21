@@ -668,16 +668,16 @@ closeFd:
 }
 
 // Mount the scope filter and unix socket into mountDest/usr/lib/appscope/*
-int
+bool
 setupMount(const char *mountDest, uid_t nsUid, gid_t nsGid)
 {
     // TODO implement
 
-    return 0;
+    return TRUE;
 }
 
 // Install a filter file in /usr/lib/appscope/
-int
+bool
 setupFilter(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
 {
     int filterFd;
@@ -703,6 +703,8 @@ setupFilter(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
 
     memcpy(dest, filterFileMem, filterSize);
 
+    munmap(dest, filterSize);
+
     status = TRUE;
 
 cleanupDestFd:
@@ -713,8 +715,9 @@ cleanupDestFd:
 
 // Set ld.so.preload to point to a path
 // If "auto" is specified in @path, the library location will be detected automatically
+// If "off" is specified in @path, ld.so.preload will be cleared
 // Note: an empty string specifies that path will be set to nothing
-int
+bool
 setupPreload(const char *path, uid_t nsUid, gid_t nsGid)
 {
     char *scopeLibPath;

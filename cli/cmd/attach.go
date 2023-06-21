@@ -88,9 +88,9 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 			return errNoScopedProcs
 		}
 
-		pid := procs[0].Pid // we told Handler that we wanted to choose only one proc
+		pid := procs[0].Pid // we told HandleInputArg above that we wanted to choose only one proc
 
-		if err = rc.Attach(procs[0].Pid, true); err != nil {
+		if err = rc.Attach(pid, true); err != nil {
 			util.ErrAndExit("Attach failure: %v", err)
 		}
 

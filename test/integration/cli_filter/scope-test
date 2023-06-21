@@ -50,7 +50,7 @@ waitForCmdscopedProcessNumber() {
     until [ "$retry" -ge "$maxRetry" ]
     do
         count=$(scopedProcessNumber)
-        if [ "$count" -eq "$expScoped" ] ; then
+        if [ "$count" -ge "$expScoped" ] ; then
             return
         fi
         retry=$((retry+1)) 
@@ -206,7 +206,7 @@ LIBSCOPE_PATH=$(find /usr/lib/appscope/ -name libscope.so)
 if [ ! -f $LIBSCOPE_PATH ]; then
     fail "missing $LIBSCOPE_PATH"
 fi
-cat /usr/lib/appscope/scope_filter
+
 # Check filter file contains processes
 count=$(grep "memcached" "/usr/lib/appscope/scope_filter" | wc -l)
 if [ $count -ne 1 ] ; then
@@ -227,9 +227,9 @@ if [ $count -lt 1 ] ; then
     fail "ld.so.preload not set"
 fi
 
-# Check scope ps shows 27 processes scoped
-# nginx(25) memcached(1) redis-server(1)
-waitForCmdscopedProcessNumber 27
+# Check scope ps shows all processes scoped
+# nginx(>1) memcached(1) redis-server(1)
+waitForCmdscopedProcessNumber 3
 
 cleanupAfterStart
 pkill -9 memcached

@@ -96,8 +96,14 @@ var inspectCmd = &cobra.Command{
 				fmt.Println(string(cfg))
 			}
 		} else {
+			var cfgs []byte
 			// Print the array, in a pretty format
-			cfgs, err := json.MarshalIndent(iouts, "", "   ")
+			if len(iouts) == 1 {
+				// No need to create an array
+				cfgs, err = json.MarshalIndent(iouts[0], "", "   ")
+			} else {
+				cfgs, err = json.MarshalIndent(iouts, "", "   ")
+			}
 			if err != nil {
 				util.ErrAndExit("Error creating json array: %v", err)
 			}

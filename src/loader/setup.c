@@ -727,21 +727,23 @@ setupPreload(const char *path, uid_t nsUid, gid_t nsGid)
     if (!strcmp(path, "auto")) {
         scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
 
+        if (access(scopeLibPath, R_OK|X_OK)) {
+            fprintf(stderr, "error: library %s is missing, not readable, or not executable\n", scopeLibPath);
+            return FALSE;
+        }
+
         if ((len = snprintf(buf, sizeof(buf), scopeLibPath)) == -1 ) {
             perror("snprintf failed");
             return FALSE;
         }
     } else if (strcmp(path, "off")) { // if "off", leave buf as null
-        if ((len = snprintf(buf, sizeof(buf), path)) == -1) {
-            perror("snprintf failed");
+        if (access(path, R_OK|X_OK)) {
+            fprintf(stderr, "error: library %s is missing, not readable, or not executable\n", path);
             return FALSE;
         }
-    }
 
-    if (len > 0) {
-        // Check file in path exists if a path is specified
-        if (access(buf, R_OK|X_OK)) {
-            fprintf(stderr, "error: library %s is missing, not readable, or not executable\n", buf);
+        if ((len = snprintf(buf, sizeof(buf), path)) == -1) {
+            perror("snprintf failed");
             return FALSE;
         }
     }

@@ -1,0 +1,259 @@
+#! /bin/bash
+DEBUG=0  # set this to 1 to capture the EVT_FILE for each test
+
+FAILED_TEST_LIST=""
+FAILED_TEST_COUNT=0
+
+SCOPE_VERSION_TYPE="dev"
+
+fail() { ERR+=1; echo >&2 "fail:" $@; }
+
+starttest(){
+    CURRENT_TEST=$1
+    echo "==============================================="
+    echo "             Testing $CURRENT_TEST             "
+    echo "==============================================="
+    ERR=0
+}
+
+evaltest(){
+    echo "             Evaluating $CURRENT_TEST"
+}
+
+endtest(){
+    if [ $ERR -eq "0" ]; then
+        RESULT=PASSED
+    else
+        RESULT=FAILED
+        FAILED_TEST_LIST+=$CURRENT_TEST
+        FAILED_TEST_LIST+=" "
+        FAILED_TEST_COUNT=$(($FAILED_TEST_COUNT + 1))
+    fi
+
+    echo "*************** $CURRENT_TEST $RESULT ***************"
+    echo ""
+    echo ""
+}
+
+scopedProcessNumber() {
+    local procFound=$(($(scope ps | wc -l) - 1 ))
+
+    echo $procFound
+}
+
+# wait maximum 30 seconds
+waitForCmdscopedProcessNumber() {
+    local expScoped=$1
+    local retry=0
+    local maxRetry=30
+    local delay=1
+    until [ "$retry" -ge "$maxRetry" ]
+    do
+        count=$(scopedProcessNumber)
+        if [ "$count" -ge "$expScoped" ] ; then
+            return
+        fi
+        retry=$((retry+1)) 
+        sleep "$delay"
+    done
+    echo "FAIL: waiting for the number $expScoped scoped process $count"
+    ERR+=1
+}
+
+cleanupAfterStart() {
+    if [ -f "/etc/profile.d/scope.sh" ] ; then
+        rm "/etc/profile.d/scope.sh"
+    fi
+
+    if [ -d "/usr/lib/appscope" ] ; then
+        rm -r "/usr/lib/appscope"
+    fi
+
+    if [ -d "/tmp/appscope" ] ; then
+        rm -r "/tmp/appscope"
+    fi
+}
+
+# Identify if version used in this test is official or not
+# based on IsVersionDev method -> version.go
+SCOPE_VERSION=$(scope version --summary)
+SCOPE_TAG=$(scope version --tag)
+if [ "${SCOPE_VERSION:1}" = "$SCOPE_TAG" ]; then
+    SCOPE_VERSION_TYPE="official"
+    echo "INFO: Scope version $SCOPE_VERSION will be tested as an official version."
+else
+    echo "INFO: Scope version $SCOPE_VERSION will be tested as a developer version."
+fi
+
+
+########## Tests Begin ########## 
+
+#
+# scope start
+#
+starttest scope_start
+
+scope start
+if [ $? -ne "0" ]; then
+    fail "scope start failed"
+fi
+
+# Check libscope.so is installed
+LIBSCOPE_PATH=$(find /usr/lib/appscope/ -name libscope.so)
+if [ ! -f $LIBSCOPE_PATH ]; then
+    fail "missing $LIBSCOPE_PATH"
+fi
+# Check libscope.so.musl is installed
+LIBSCOPE_PATH=$(find /usr/lib/appscope/ -name libscope.so.musl)
+if [ ! -f $LIBSCOPE_PATH ]; then
+    fail "missing $LIBSCOPE_PATH"
+fi
+# Check libscope.so.glibc is installed
+LIBSCOPE_PATH=$(find /usr/lib/appscope/ -name libscope.so.glibc)
+if [ ! -f $LIBSCOPE_PATH ]; then
+    fail "missing $LIBSCOPE_PATH"
+fi
+
+cleanupAfterStart
+
+sleep 3
+
+endtest
+
+
+#
+# scope stop
+#
+starttest scope_stop
+
+# Start processes
+memcached -u root &
+redis-server &
+
+sleep 2
+
+cd /opt/
+scope filter --add memcached
+scope filter --add redis-server
+scope filter --add nginx
+
+# Start one more process
+nginx &
+
+sleep 2
+
+scope stop -f
+if [ $? -ne "0" ]; then
+    fail "scope stop failed"
+fi
+
+sleep 5
+
+# Check filter file is empty
+count=$(grep "allow" "/usr/lib/appscope/scope_filter" | wc -l)
+if [ $count -gt 0 ] ; then
+    fail "/usr/lib/appscope/scope_filter not empty"
+fi
+
+# Check ld.so.preload file is empty
+count=$(grep "libscope" "/etc/ld.so.preload" | wc -l)
+if [ $count -gt 0 ] ; then
+    fail "ld.so.preload not empty"
+fi
+
+# Check scope ps shows no processes scoped
+waitForCmdscopedProcessNumber 0
+
+cleanupAfterStart
+pkill -9 memcached
+pkill -9 redis-server
+pkill -9 nginx
+
+sleep 2
+
+endtest
+
+
+#
+# scope filter
+#
+starttest scope_filter
+
+# Start processes
+memcached -u root &
+redis-server &
+
+sleep 2
+
+cd /opt/
+scope filter --add memcached
+scope filter --add redis-server
+scope filter --add nginx
+
+# Start one more process
+nginx &
+
+sleep 2
+
+# Compare the filter file
+#cmp -s /usr/lib/appscope/scope_filter /opt/test-runner/scope_filter1.yml
+#if [ $? -ne "0" ]; then
+#    fail "mismatch /usr/lib/appscope/scope_filter and scope_filter1.yml"
+#fi
+
+# Check libscope.so is installed
+LIBSCOPE_PATH=$(find /usr/lib/appscope/ -name libscope.so)
+if [ ! -f $LIBSCOPE_PATH ]; then
+    fail "missing $LIBSCOPE_PATH"
+fi
+
+# Check filter file contains processes
+count=$(grep "memcached" "/usr/lib/appscope/scope_filter" | wc -l)
+if [ $count -ne 1 ] ; then
+    fail "/usr/lib/appscope/scope_filter does not contain process memcached"
+fi
+count=$(grep "redis-server" "/usr/lib/appscope/scope_filter" | wc -l)
+if [ $count -ne 1 ] ; then
+    fail "/usr/lib/appscope/scope_filter does not contain process redis-server"
+fi
+count=$(grep "nginx" "/usr/lib/appscope/scope_filter" | wc -l)
+if [ $count -ne 1 ] ; then
+    fail "/usr/lib/appscope/scope_filter does not contain process nginx"
+fi
+
+# Check ld.so.preload file is set
+count=$(grep "libscope" "/etc/ld.so.preload" | wc -l)
+if [ $count -lt 1 ] ; then
+    fail "ld.so.preload not set"
+fi
+
+# Check scope ps shows all processes scoped
+# nginx(>1) memcached(1) redis-server(1)
+waitForCmdscopedProcessNumber 3
+
+cleanupAfterStart
+pkill -9 memcached
+pkill -9 redis-server
+pkill -9 nginx
+
+sleep 2
+
+endtest
+
+
+########## Tests Finish ########## 
+
+if (( $FAILED_TEST_COUNT == 0 )); then
+    echo ""
+    echo ""
+    echo "*************** ALL TESTS PASSED ***************"
+else
+    echo "*************** SOME TESTS FAILED ***************"
+    echo "Failed tests: $FAILED_TEST_LIST"
+    echo "Refer to these files for more info:"
+    for FAILED_TEST in $FAILED_TEST_LIST; do
+        echo "  $EVT_FILE.$FAILED_TEST"
+    done
+fi
+
+exit ${FAILED_TEST_COUNT}

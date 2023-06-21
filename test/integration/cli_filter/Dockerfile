@@ -1,12 +1,19 @@
-FROM alpine:latest
+FROM ubuntu:22.04
 
-RUN apk add bash curl htop memcached nginx redis
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt update \
+    && apt install -y \
+      curl \
+      git \
+      htop \
+      netcat \
+      nginx \
+      memcached \
+      redis \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
-RUN echo "export PATH=/usr/local/scope:/usr/local/scope/bin:${PATH}" >/etc/profile.d/path.sh
-
 ENV SCOPE_CLI_SKIP_HOST=true
-
 COPY scope-profile.sh /etc/profile.d/scope_profile.sh
 COPY gdbinit /root/.gdbinit
 
@@ -17,9 +24,9 @@ RUN  mkdir /usr/local/scope && \
      ln -s /opt/appscope/bin/linux/$(uname -m)/scope /usr/local/scope/bin/scope && \
      ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
-COPY start/scope-test /usr/local/scope/scope-test
-COPY start/scope_filter1.yml /opt/test-runner/scope_filter1.yml
-COPY start/scope_filter2.yml /opt/test-runner/scope_filter2.yml
+COPY cli_filter/scope-test /usr/local/scope/scope-test
+COPY cli_filter/scope_filter1.yml /opt/test-runner/scope_filter1.yml
+COPY cli_filter/scope_filter2.yml /opt/test-runner/scope_filter2.yml
 
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]

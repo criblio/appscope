@@ -88,8 +88,10 @@ func ErrAndExit(format string, a ...interface{}) {
 // Warn writes a format string to stderr
 func Warn(format string, a ...interface{}) {
 	out := fmt.Sprintf(format, a...)
-	if out[len(out)-1:] != "\n" {
-		out += "\n"
+	if len(out) > 0 {
+		if out[len(out)-1:] != "\n" {
+			out += "\n"
+		}
 	}
 	os.Stderr.WriteString(out)
 }

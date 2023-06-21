@@ -9,33 +9,22 @@ import (
 // Start installs libscope
 func Start(rootdir string) error {
 	// Create a history directory for logs
-	run.CreateWorkDirBasic("start")
+	rc := run.Config{}
+	rc.CreateWorkDirBasic("start")
 
 	// Instantiate the loader
 	ld := loader.New()
 
-	if rootdir == "" {
-		stdoutStderr, err := ld.Install()
-		if err != nil {
-			log.Warn().
-				Err(err).
-				Str("loaderDetails", stdoutStderr).
-				Msg("Install library failed.")
-		} else {
-			log.Info().
-				Msg("Install library success.")
-		}
+	stdoutStderr, err := ld.Install(rootdir)
+	if err != nil {
+		log.Warn().
+			Err(err).
+			Str("loaderDetails", stdoutStderr).
+			Msg("Install library failed.")
+		return err
 	} else {
-		stdoutStderr, err := ld.InstallNamespace(rootdir)
-		if err != nil {
-			log.Warn().
-				Err(err).
-				Str("loaderDetails", stdoutStderr).
-				Msgf("Install library in %s namespace failed.", rootdir)
-		} else {
-			log.Info().
-				Msg("Install library success.")
-		}
+		log.Info().
+			Msg("Install library success.")
 	}
 
 	return nil

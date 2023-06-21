@@ -15,6 +15,8 @@
 
 #define SCOPE_FILTER_USR_PATH ("/usr/lib/appscope/scope_filter")
 #define SCOPE_FILTER_TMP_PATH ("/tmp/appscope/scope_filter")
+#define SCOPE_USR_PATH "/usr/lib/appscope/"
+#define SCOPE_TMP_PATH "/tmp/appscope/"
 
 #define DYN_CONFIG_CLI_DIR "/dev/shm"
 #define DYN_CONFIG_CLI_PREFIX "scope_dconf"

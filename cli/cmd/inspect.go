@@ -4,14 +4,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/criblio/scope/inspect"
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/ipc"
-	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
+)
+
+var (
+	errInspectingMultiple = errors.New("at least one error found when inspecting more than 1 process. See logs")
 )
 
 // inspectCmd represents the inspect command
@@ -19,14 +22,14 @@ var inspectCmd = &cobra.Command{
 	Use:   "inspect",
 	Short: "Returns information about scoped process",
 	Long:  `Returns information about scoped process identified by PID.`,
-	Example: `scope inspect
-scope inspect 1000
-scope inspect --all --json
-scope inspect 1000 --rootdir /path/to/host/mount
-scope inspect --all --rootdir /path/to/host/mount
-scope inspect --all --rootdir /path/to/host/mount/proc/<hostpid>/root`,
+	Example: `  scope inspect
+  scope inspect 1000
+  scope inspect --all --json
+  scope inspect 1000 --rootdir /path/to/host/root
+  scope inspect --all --rootdir /path/to/host/root
+  scope inspect --all --rootdir /path/to/host/root/proc/<hostpid>/root`,
 	Args: cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		internal.InitConfig()
 		all, _ := cmd.Flags().GetBool("all")
 		rootdir, _ := cmd.Flags().GetString("rootdir")
@@ -37,112 +40,77 @@ scope inspect --all --rootdir /path/to/host/mount/proc/<hostpid>/root`,
 		if errors.Is(err, util.ErrGetCurrentUser) {
 			util.ErrAndExit("Unable to get current user: %v", err)
 		}
-		admin := true
-		if errors.Is(err, util.ErrMissingAdmPriv) {
-			admin = false
+
+		if all && len(args) > 0 {
+			helpErrAndExit(cmd, "--all flag is mutually exclusive with PID or <process_name>")
 		}
 
 		pidCtx := &ipc.IpcPidCtx{
 			PrefixPath: rootdir,
 		}
+		iouts := make([]inspect.InspectOutput, 0)
 
-		if all {
-			// Get all scoped processes
-			procs, err := util.ProcessesScoped(rootdir)
+		id := ""
+		if len(args) > 0 {
+			id = args[0]
+		}
+
+		procs, err := util.HandleInputArg(id, "", rootdir, !all, false, false, false)
+		if err != nil {
+			return err
+		}
+
+		if len(procs) == 0 {
+			return errNoScopedProcs
+		}
+		if len(procs) == 1 {
+			pidCtx.Pid = procs[0].Pid
+			iout, _, err := inspect.InspectProcess(*pidCtx)
 			if err != nil {
-				if !admin {
-					util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
-				}
-				util.ErrAndExit("Unable to retrieve scoped processes: %v", err)
+				return err
 			}
-
-			// Inspect each of them and store output in an array
-			iouts := make([]inspect.InspectOutput, 0)
+			iouts = append(iouts, iout)
+		} else { // len(procs) > 1
+			errors := false
 			for _, proc := range procs {
 				pidCtx.Pid = proc.Pid
 				iout, _, err := inspect.InspectProcess(*pidCtx)
 				if err != nil {
-					if !admin {
-						util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
-					}
-					util.Warn("Inspect PID fails: %v", err)
+					log.Error().Err(err)
+					errors = true
 				}
 				iouts = append(iouts, iout)
 			}
-
-			if jsonOut {
-				// Print each json entry on a newline, without any pretty printing
-				for _, iout := range iouts {
-					cfg, err := json.Marshal(iout)
-					if err != nil {
-						util.ErrAndExit("Error creating json object: %v", err)
-					}
-					fmt.Println(string(cfg))
-				}
-			} else {
-				// Print the array, in a pretty format
-				cfgs, err := json.MarshalIndent(iouts, "", "   ")
-				if err != nil {
-					util.ErrAndExit("Error creating json array: %v", err)
-				}
-				fmt.Println(string(cfgs))
+			if errors {
+				return errInspectingMultiple
 			}
-
-			return
-		}
-
-		var pid int
-		if len(args) == 0 {
-			// If no pid argument was provided
-			// Helper menu to allow the user to select a pid to inspect
-
-			if pid, err = run.HandleInputArg(rootdir, "", false, true, false); err != nil {
-				if !admin {
-					util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
-				}
-				util.ErrAndExit("No scoped processes to inspect")
-			}
-
-		} else {
-			// If a user specified a pid as an argument
-			pid, err = strconv.Atoi(args[0])
-			if err != nil {
-				util.ErrAndExit("error parsing PID argument")
-			}
-		}
-
-		status, _ := util.PidScopeLibInMaps(rootdir, pid)
-		if !status {
-			if !admin {
-				util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
-			}
-			util.ErrAndExit("Unable to communicate with %v - process is not scoped", pid)
-		}
-
-		pidCtx.Pid = pid
-		iout, _, err := inspect.InspectProcess(*pidCtx)
-		if err != nil {
-			if !admin {
-				util.Warn("INFO: Run as root (or via sudo) to interact with all processes")
-			}
-			util.ErrAndExit("Inspect PID fails: %v", err)
 		}
 
 		if jsonOut {
-			// Print the json object without any pretty printing
-			cfg, err := json.Marshal(iout)
-			if err != nil {
-				util.ErrAndExit("Error creating json object: %v", err)
+			// Print each json entry on a newline, without any pretty printing
+			for _, iout := range iouts {
+				cfg, err := json.Marshal(iout)
+				if err != nil {
+					util.ErrAndExit("Error creating json object: %v", err)
+				}
+				fmt.Println(string(cfg))
 			}
-			fmt.Println(string(cfg))
 		} else {
-			// Print the json in a pretty format
-			cfg, err := json.MarshalIndent(iout, "", "   ")
+			var cfgs []byte
+			// Print the array, in a pretty format
+			if len(iouts) == 1 {
+				// No need to create an array
+				cfgs, err = json.MarshalIndent(iouts[0], "", "   ")
+			} else {
+				cfgs, err = json.MarshalIndent(iouts, "", "   ")
+			}
 			if err != nil {
 				util.ErrAndExit("Error creating json array: %v", err)
 			}
-			fmt.Println(string(cfg))
+			fmt.Println(string(cfgs))
 		}
+
+		return nil
 	},
 }
 

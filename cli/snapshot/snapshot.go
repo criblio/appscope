@@ -195,10 +195,10 @@ func GenFiles(sig, errno, pid, uid, gid uint32, sigHandler uint64, procName, pro
 	// If process is in a parallel container or a host above (i.e. in an above / parallel namespace) // proc/pid not visible unless hostfs
 	//		(pid provided must be of the hosts perspective)
 	//		(requires --privileged flag? or mounted hostfs?)
-	//		get crash files - use /proc/pid/root or --getfiles
-	//		get hostname file - use /proc/pid/root or --getfiles
+	//		get crash files - use /proc/pid/root
+	//		get hostname file - use /proc/pid/root
 	//		generate snapshot - call gensnapshot
-	//			get process username,environ - from /proc using --getfiles
+	//			get process username,environ - from /proc
 
 	// Unsupported at this time.
 

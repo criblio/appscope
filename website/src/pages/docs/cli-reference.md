@@ -35,26 +35,29 @@ Usage:
 
 Available Commands:
   attach      Scope a currently-running process
-  completion  Generate completion code for specified shell
+  completion  Generates completion code for specified shell
+  daemon      Run the scope daemon
   dash        Display scope dashboard for a previous or active session
   detach      Unscope a currently-running process
   events      Outputs events for a session
   extract     Output instrumentary library files to <dir>
+  filter      Automatically scope a set of processes
   flows       Observed flows from the session, potentially including payloads
   help        Help about any command
   history     List scope session history
-  inspect     Return information on scoped process
+  inspect     Returns information about scoped process
   k8s         Install scope in kubernetes
   logs        Display scope logs
   metrics     Outputs metrics for a session
+  prom        Run the Prometheus Target
   prune       Prune deletes session history
   ps          List processes currently being scoped
   run         Executes a scoped command
   service     Configure a systemd/OpenRC service to be scoped
   snapshot    Create a snapshot for a process
-  start       Start scoping a filtered selection of processes and services
+  start       Install the AppScope library
   stop        Stop scoping all scoped processes and services
-  update      Updates configuration of scoped process
+  update      Updates the configuration of a scoped process
   version     Display scope version
   watch       Executes a scoped command on an interval
 
@@ -111,6 +114,7 @@ scope attach --payloads 2000
       --loglevel string       Set scope library log level (debug, warning, info, error, none)
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson) (default "ndjson")
+      --metricprefix string   Set prefix for StatsD metrics, ignored if metric format isn't statsd
   -n, --nobreaker             Set Cribl to not break streams into events.
   -p, --payloads              Capture payloads of network transactions
   -R, --rootdir               Path to root filesystem of target namespace
@@ -268,8 +272,55 @@ scope extract --metricdest tcp://some.host:8125 --eventdest tcp://other.host:100
   -h, --help                  Help for extract
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
+      --metricprefix string   Set prefix for StatsD metrics, ignored if metric format isn't statsd
   -n, --nobreaker             Set Cribl to not break streams into events
   -p, --parents               Create any missing intermediate pathname components in provided directory parameter
+```
+
+### filter
+---
+
+View or modify a system-wide AppScope filter that automatically scopes a set of processes. You can add or remove a single process at a time.
+
+#### Usage
+
+`scope filter [flags]`
+
+#### Examples
+
+```
+scope filter
+scope filter --rootdir /path/to/host/root --json
+scope filter --add nginx
+scope filter --add nginx < scope.yml
+scope filter --add java --arg myServer 
+scope filter --add firefox --rootdir /path/to/host/root
+scope filter --remove chromium
+```
+
+#### Flags
+
+```
+      --add string            Add an entry to the global filter
+      --arg string            Argument to the command to be added to the filter
+  -a, --authtoken string      Set AuthToken for Cribl
+  -b, --backtrace             Enable backtrace file generation when an application crashes.
+  -d, --coredump              Enable core dump file generation when an application crashes.
+  -c, --cribldest string      Set Cribl destination for metrics & events (host:port defaults to tls://)
+  -e, --eventdest string      Set destination for events (host:port defaults to tls://)
+  -h, --help                  help for filter
+  -j, --json                  Output as newline delimited JSON
+  -l, --librarypath string    Set path for dynamic libraries
+      --loglevel string       Set scope library log level (debug, warning, info, error, none)
+  -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
+      --metricformat string   Set format of metrics output (statsd|ndjson|prometheus) (default "ndjson")
+  -n, --nobreaker             Set Cribl to not break streams into events.
+  -p, --payloads              Capture payloads of network transactions
+      --remove string         Remove an entry from the global filter
+  -R, --rootdir string        Path to root filesystem of target namespace
+      --source string         Source identifier for a filter entry
+  -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.
+  -v, --verbosity int         Set scope metric verbosity (default 4)
 ```
 
 ### flows
@@ -307,7 +358,6 @@ scope flows --sort net_host_port --reverse  # Sort flows by ascending host port
   -p, --peer ipNet    Filter to peers in the given network
   -r, --reverse       Reverse sort to ascending
   -s, --sort string   Sort descending by field (look at JSON output for field names)
-  
 ```
 
 ### help
@@ -419,12 +469,12 @@ kubectl label namespace default scope=enabled
       --keyfile string        Private key file for TLS in the container (mounted secret) (default "/etc/certs/tls.key")
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
+      --metricprefix string   Set prefix for StatsD metrics, ignored if metric format isn't statsd
       --namespace string      Name of the namespace in which to install; default is "default"
   -n, --nobreaker             Set Cribl Stream to not break streams into events
-      --noprom                Disable Prometheus Exporter deployment
+      --noexporter            Disable StatsD to Prometheus Exporter deployment
       --port int              Port to listen on (default 4443)
-      --prommport int         Specify Prometheus Exporter port for metrics from libscope (default 9109)
-      --promsport int         Specify Prometheus Exporter port for HTTP metrics requests (default 9090)
+      --promport int          Specify StatsD to Prometheus Exporter port for Prometheus HTTP metrics requests (default 9090)
       --server                Run Webhook server
       --signername string     Name of the signer used to sign the certificate request for the AppScope Admission Webhook (default "kubernetes.io/kubelet-serving")
       --version string        Version of scope to deploy
@@ -576,6 +626,7 @@ scope run -c edge -- top
       --loglevel string       Set scope library log level (debug, warning, info, error, none)
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson) (default "ndjson")
+      --metricprefix string   Set prefix for StatsD metrics, ignored if metric format isn't statsd
   -n, --nobreaker             Set Cribl to not break streams into events.
   -p, --payloads              Capture payloads of network transactions
   -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.
@@ -607,6 +658,7 @@ scope service cribl -c tls://in.my-instance.cribl.cloud:10090
   -h, --help                  Help for service
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson); default is "ndjson"
+      --metricprefix string   Set prefix for StatsD metrics, ignored if metric format isn't statsd
   -n, --nobreaker             Set Cribl Stream to not break streams into events
   -u, --user string           Specify owner username
   
@@ -652,13 +704,13 @@ scope start --rootdir /hostfs
 
 ### stop
 ---
-Stop scoping all processes and services on the host and in all relevant containers.
+Performs the following actions:
+	- Removal of /etc/ld.so.preload contents
+	- Removal of the filter file from /usr/lib/appscope/scope_filter
+	- Detach from all currently scoped processes
 
-`scope stop` does the following on the host and in all relevant containers:
-    - Remove filter files `/usr/lib/appscope/scope_filter` and `/tmp/appscope/scope_filter`.
-    - Detach from all existing scoped processes.
-    - Remove the `etc/profile.d/scope.sh` script.
-    - Delete any lines that `LD_PRELOAD` libscope from any relevant service configurations.
+The command does not uninstall scope or libscope from /usr/lib/appscope or /tmp/appscope
+or remove any service configurations.
 
 #### Usage
 
@@ -671,8 +723,9 @@ Stop scoping all processes and services on the host and in all relevant containe
 #### Flags
 
 ```
-  -f, --force   Use this flag when you're sure you want to run scope stop
-  -h, --help    help for start
+  -f, --force      Use this flag when you're sure you want to run scope stop
+  -R, --rootdir    Path to root filesystem of target namespace
+  -h, --help       help for stop
 ```
 
 ### update
@@ -765,6 +818,7 @@ scope watch --interval=10s -- curl https://wttr.in/94105
       --loglevel string       Set scope library log level (debug, warning, info, error, none)
   -m, --metricdest string     Set destination for metrics (host:port defaults to tls://)
       --metricformat string   Set format of metrics output (statsd|ndjson) (default "ndjson")
+      --metricprefix string   Set prefix for StatsD metrics, ignored if metric format isn't statsd
   -n, --nobreaker             Set Cribl to not break streams into events.
   -p, --payloads              Capture payloads of network transactions
   -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.

@@ -628,81 +628,8 @@ setupUnservice(void) {
     return res;
 }
 
- /*
- * Setup the /etc/profile scope startup script
- * Returns status of operation TRUE in case of success, FALSE otherwise
- */
-static bool
-setupProfile(const char *libscopePath, const char *loaderVersion, uid_t nsUid, gid_t nsGid) {
-
-    /*
-     * If the env var is set to anything, return.
-     * Should use the utils func for this. However, it
-     * requires libscope specifics that we don't want here.
-     * Should fix that.
-     */
-    if (getenv("SCOPE_START_NOPROFILE")) {
-        return TRUE;
-    }
-
-    char buf[PATH_MAX] = {0};
-    int fd = nsFileOpenWithMode("/etc/profile.d/scope.sh", O_CREAT | O_RDWR | O_TRUNC, 0644, nsUid, nsGid, geteuid(), getegid());
-    if (fd < 0) {
-        return FALSE;
-    }
-
-    size_t len = snprintf(buf, sizeof(buf), PROFILE_SCRIPT, loaderVersion, libscopePath, libscopePath);
-    if (write(fd, buf, len) != len) {
-        perror("write failed");
-        close(fd);
-        return FALSE;
-    }
-
-    if (close(fd) != 0) {
-        perror("fopen failed");
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
- /*
- * Extract memory to specific filter path file
- *
- * Returns status of operation TRUE in case of success, FALSE otherwise
- */
-static bool
-setupExtractFilterFile(void *filterFileMem, size_t filterSize, const char *outputFilterPath, uid_t nsUid, gid_t nsGid) {
-    int filterFd;
-    bool status = FALSE;
-
-    if ((filterFd = nsFileOpenWithMode(outputFilterPath, O_RDWR | O_CREAT, 0664, nsUid, nsGid, geteuid(), getegid())) == -1) {
-        return status;
-    }
-
-    if (ftruncate(filterFd, filterSize) != 0) {
-        goto cleanupDestFd;
-    }
-
-    char *dest = mmap(NULL, filterSize, PROT_READ | PROT_WRITE, MAP_SHARED, filterFd, 0);
-    if (dest == MAP_FAILED) {
-        goto cleanupDestFd;
-    }
-
-    memcpy(dest, filterFileMem, filterSize);
-
-    status = TRUE;
-
-cleanupDestFd:
-
-    close(filterFd);
-
-    return status;
-}
-
 /*
  * Load File into memory.
- *
  * Returns memory address in case of success, NULL otherwise.
  */
 char *
@@ -735,112 +662,109 @@ setupLoadFileIntoMem(size_t *size, const char *path)
     }
 
 closeFd:
-
     close(fd);
 
     return resMem;
 }
 
-/*
- * Configure the environment
- * - setup /etc/profile.d/scope.sh
- * - extract memory to filter file /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter
- * - extract libscope.so to /usr/lib/appscope/<version>/libscope.so or /tmp/appscope/<version>/libscope.so if it doesn't exists
- * - patch the library
- * Returns status of operation 0 in case of success, other value otherwise
- */
-int
-setupConfigure(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid) {
-    // TODO shouldn't this function call libdir functions instead of re-creating them?
-    char path[PATH_MAX] = {0};
-    mode_t mode = 0755;
+// Mount the scope filter and unix socket into mountDest/usr/lib/appscope/*
+bool
+setupMount(const char *mountDest, uid_t nsUid, gid_t nsGid)
+{
+    // TODO implement
 
-    // Create destination directory if not exists
-    const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
-    bool isDevVersion = libverIsNormVersionDev(loaderVersion);
-    bool overwrite = isDevVersion;
-
-    /*
-     * A profile will not be configured with a dev version value.
-     * Force a profile update if the env var is present.
-     */
-    if (getenv("SCOPE_START_FORCE_PROFILE")) isDevVersion = FALSE;
-
-    snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
-    mkdir_status_t res = libdirCreateDirIfMissing(path, mode, nsUid, nsGid);
-    if ((res > MKDIR_STATUS_EXISTS) || isDevVersion) {
-        mode = 0777;
-        memset(path, 0, PATH_MAX);
-        snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
-        mkdir_status_t res = libdirCreateDirIfMissing(path, mode, nsUid, nsGid);
-        if (res > MKDIR_STATUS_EXISTS) {
-            fprintf(stderr, "setupConfigure: libdirCreateDirIfMissing failed\n");
-            return -1;
-        }
-    }
-
-    strncat(path, "libscope.so", sizeof(path) - 1);
-
-    // Extract[create] the filter file to filter location
-    if (setupExtractFilterFile(filterFileMem, filterSize, SCOPE_FILTER_USR_PATH, nsUid, nsGid) == FALSE) {
-        if (setupExtractFilterFile(filterFileMem, filterSize, SCOPE_FILTER_TMP_PATH, nsUid, nsGid) == FALSE) {
-            fprintf(stderr, "setupConfigure: setup filter file failed\n");
-            return -1;
-        }
-    }
-
-    /*
-     * Setup /etc/profile.d/scope.sh
-     * Only update the profile if we are using the system dir.
-     */
-    if (strstr(path, "/usr/lib")) {
-        if (setupProfile(path, loaderVersion, nsUid, nsGid) == FALSE) {
-            fprintf(stderr, "setupConfigure: setupProfile failed\n");
-            return -1;
-        }
-    }
-
-    // Extract libscope.so
-    if (libdirCreateFileIfMissing(NULL, 0, LIBRARY_FILE, path, overwrite, mode, nsUid, nsGid)) {
-        fprintf(stderr, "setupConfigure: saving %s failed\n", path);
-        return -1;
-    }
-
-    // Patch the library
-    if (patchLibrary(path, FALSE) == PATCH_FAILED) {
-        fprintf(stderr, "setupConfigure: patch %s failed\n", path);
-        return -1;
-    }
-
-    return 0;
+    return TRUE;
 }
 
-/*
- * Unconfigure the environment
- * - remove /etc/profile.d/scope.sh
- * - remove filter file/s from /usr/lib/appscope/scope_filter and /tmp/appscope/scope_filter
- * Returns status of operation 0 in case of success, other value otherwise
- * If files do not exist, no error will be reported
- */
-int
-setupUnconfigure(void) {
-    const char* const fileRemoveList[] = {
-        "/etc/profile.d/scope.sh",
-        SCOPE_FILTER_USR_PATH,
-        SCOPE_FILTER_TMP_PATH,
-    };
+// Install a filter file in /usr/lib/appscope/
+bool
+setupFilter(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
+{
+    int filterFd;
+    bool status = FALSE;
 
-    for (int i=0; i<sizeof(fileRemoveList)/sizeof(char*); ++i) {
-        if (remove(fileRemoveList[i])) {
-            if (errno != ENOENT) {
-                fprintf(stderr, "setupUnconfigure: remove %s failed\n", fileRemoveList[i]);
-                return -1;
-            }
-        } else {
-            fprintf(stderr, "info: Removed file %s\n", fileRemoveList[i]);
+    if (libdirCreateDirIfMissing(SCOPE_USR_PATH, 0664, nsUid, nsGid) > MKDIR_STATUS_EXISTS) {
+        fprintf(stderr, "error: setupFilter: failed to create directory\n");
+        return status;
+    }
+
+    if ((filterFd = nsFileOpenWithMode(SCOPE_FILTER_USR_PATH, O_RDWR | O_CREAT, 0664, nsUid, nsGid, geteuid(), getegid())) == -1) {
+        return status;
+    }
+
+    if (ftruncate(filterFd, filterSize) != 0) {
+        goto cleanupDestFd;
+    }
+
+    char *dest = mmap(NULL, filterSize, PROT_READ | PROT_WRITE, MAP_SHARED, filterFd, 0);
+    if (dest == MAP_FAILED) {
+        goto cleanupDestFd;
+    }
+
+    memcpy(dest, filterFileMem, filterSize);
+
+    munmap(dest, filterSize);
+
+    status = TRUE;
+
+cleanupDestFd:
+    close(filterFd);
+
+    return status;
+}
+
+// Set ld.so.preload to point to a path
+// If "auto" is specified in @path, the library location will be detected automatically
+// If "off" is specified in @path, ld.so.preload will be cleared
+// Note: an empty string specifies that path will be set to nothing
+bool
+setupPreload(const char *path, uid_t nsUid, gid_t nsGid)
+{
+    char *scopeLibPath;
+    char buf[PATH_MAX] = {0};
+    size_t len = 0;
+
+    if (!strcmp(path, "auto")) {
+        scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
+
+        if (access(scopeLibPath, R_OK|X_OK)) {
+            fprintf(stderr, "error: library %s is missing, not readable, or not executable\n", scopeLibPath);
+            return FALSE;
+        }
+
+        if ((len = snprintf(buf, sizeof(buf), scopeLibPath)) == -1 ) {
+            perror("snprintf failed");
+            return FALSE;
+        }
+    } else if (strcmp(path, "off")) { // if "off", leave buf as null
+        if (access(path, R_OK|X_OK)) {
+            fprintf(stderr, "error: library %s is missing, not readable, or not executable\n", path);
+            return FALSE;
+        }
+
+        if ((len = snprintf(buf, sizeof(buf), path)) == -1) {
+            perror("snprintf failed");
+            return FALSE;
         }
     }
 
-    return 0;
+    int fd = nsFileOpenWithMode("/etc/ld.so.preload", O_CREAT | O_RDWR | O_TRUNC, 0644, nsUid, nsGid, geteuid(), getegid());
+    if (fd < 0) {
+        perror("fopen failed");
+        return FALSE;
+    }
+
+    if (write(fd, buf, len) != len) {
+        perror("write failed");
+        close(fd);
+        return FALSE;
+    }
+
+    if (close(fd) != 0) {
+        perror("close failed");
+        return FALSE;
+    }
+
+    return TRUE;
 }
 

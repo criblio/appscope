@@ -257,6 +257,8 @@ mtcFormatStatsDString(mtc_fmt_t* fmt, event_t* e, regex_t* fieldFilter)
     return end_start;
 }
 
+#if SCOPE_PROM_SUPPORT != 0
+
 static bool
 appendPromField(FILE *stream, mtc_fmt_t *fmt, event_field_t *field, strset_t *addedFields)
 {
@@ -410,6 +412,8 @@ out:
     return prom_str;
 }
 
+#endif
+
 char *
 mtcFormatEventForOutput(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
 {
@@ -452,8 +456,10 @@ mtcFormatEventForOutput(mtc_fmt_t *fmt, event_t *evt, regex_t *fieldFilter)
                 msg[strsize+1] = '\0';
             }
         }
+#if SCOPE_PROM_SUPPORT != 0
     } else if (fmt->format == CFG_FMT_PROMETHEUS) {
         msg = mtcFormatPromString(fmt, evt, fieldFilter);
+#endif
     }
 
 out:

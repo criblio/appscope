@@ -251,10 +251,6 @@ cfgProcessEnvironmentMtcFormat(void **state)
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_STATSD);
 
-    assert_int_equal(setenv("SCOPE_METRIC_FORMAT", "prometheus", 1), 0);
-    cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_PROMETHEUS);
-
     assert_int_equal(setenv("SCOPE_METRIC_FORMAT", "ndjson", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_NDJSON);
@@ -507,10 +503,6 @@ cfgProcessEnvironmentEventFormat(void **state)
     assert_int_equal(cfgEventFormat(cfg), CFG_FMT_NDJSON);
 
     assert_int_equal(setenv("SCOPE_EVENT_FORMAT", "statsd", 1), 0);
-    cfgProcessEnvironment(cfg);
-    assert_int_equal(cfgEventFormat(cfg), CFG_FMT_NDJSON);
-
-    assert_int_equal(setenv("SCOPE_EVENT_FORMAT", "prometheus", 1), 0);
     cfgProcessEnvironment(cfg);
     assert_int_equal(cfgEventFormat(cfg), CFG_FMT_NDJSON);
 
@@ -919,10 +911,6 @@ cfgProcessCommandsFromFile(void **state)
     openFileAndExecuteCfgProcessCommands(path, cfg);
     assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_STATSD);
 
-    writeFile(path, "blah\nSCOPE_METRIC_FORMAT=prometheus");
-    openFileAndExecuteCfgProcessCommands(path, cfg);
-    assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_PROMETHEUS);
-
     // just demonstrating that the "last one wins"
     writeFile(path, "SCOPE_METRIC_FORMAT=ndjson\n"
                     "SCOPE_METRIC_FORMAT=statsd");
@@ -1238,7 +1226,7 @@ cfgReadGoodYaml(void **state)
         "metric:\n"
         "  enable: false\n"
         "  format:\n"
-        "    type: prometheus                # statsd, ndjson, prometheus\n"
+        "    type: statsd                # statsd, ndjson\n"
         "    statsdprefix : 'cribl.scope'    # prepends each statsd metric\n"
         "    statsdmaxlen : 1024             # max size of a formatted statsd string\n"
         "    verbosity: 3                    # 0-9 (0 is least verbose, 9 is most)\n"
@@ -1299,7 +1287,6 @@ cfgReadGoodYaml(void **state)
     config_t *config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcEnable(config), FALSE);
-    assert_int_equal(cfgMtcFormat(config), CFG_FMT_PROMETHEUS);
     assert_string_equal(cfgMtcStatsDPrefix(config), "cribl.scope.");
     assert_int_equal(cfgMtcStatsDMaxLen(config), 1024);
     assert_int_equal(cfgMtcWatchEnable(config, CFG_MTC_STATSD), FALSE);
@@ -2585,9 +2572,43 @@ cfgReadCustomAnchorExtend(void **state)
 }
 
 static void
+filterEmptyFilterFileVar1(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter/empty_filter_0.yml", dirPath);
+    bool res = cfgFilterFileIsValid(path);
+    assert_int_equal(res, FALSE);
+}
+
+static void
+filterEmptyFilterFileVar2(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter/empty_filter_1.yml", dirPath);
+    bool res = cfgFilterFileIsValid(path);
+    assert_int_equal(res, FALSE);
+}
+
+static void
+filterEmptyFilterFileVar3(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter/empty_filter_2.yml", dirPath);
+    bool res = cfgFilterFileIsValid(path);
+    assert_int_equal(res, FALSE);
+}
+
+static void
+filterInvalidFilterFile(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter/corrupted_filter.yml", dirPath);
+    bool res = cfgFilterFileIsValid(path);
+    assert_int_equal(res, FALSE);
+}
+
+static void
 filterEmptyProcName(void **state) {
     char path[PATH_MAX] = {0};
     scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
+    bool validRes = cfgFilterFileIsValid(path);
+    assert_int_equal(validRes, TRUE);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus(NULL, "foo", testAccessFilterPath(path), cfg);
@@ -2645,6 +2666,8 @@ static void
 filterNonExistingFilterFile(void **state) {
     char path[PATH_MAX] = {0};    
     scope_snprintf(path, sizeof(path), "%s/data/filter/filter_non_existing.yml", dirPath);
+    bool validRes = cfgFilterFileIsValid(path);
+    assert_int_equal(validRes, FALSE);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("foo", "foo", testAccessFilterPath(path), cfg);
@@ -2684,6 +2707,8 @@ static void
 filterArgAllowListPresent(void **state) {
     char path[PATH_MAX] = {0};
     scope_snprintf(path, sizeof(path), "%s/data/filter/filter_1.yml", dirPath);
+    bool validRes = cfgFilterFileIsValid(path);
+    assert_int_equal(validRes, TRUE);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("", "redis arg1", testAccessFilterPath(path), cfg);
@@ -2741,6 +2766,8 @@ static void
 filterArgAllowListNotEmptyProcMissing(void **state) {
     char path[PATH_MAX] = {0};
     scope_snprintf(path, sizeof(path), "%s/data/filter/filter_2.yml", dirPath);
+    bool validRes = cfgFilterFileIsValid(path);
+    assert_int_equal(validRes, TRUE);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("memcached", "memcached", testAccessFilterPath(path), cfg);
@@ -2749,6 +2776,8 @@ filterArgAllowListNotEmptyProcMissing(void **state) {
     scope_memset(path, 0, PATH_MAX);
 
     scope_snprintf(path, sizeof(path), "%s/data/filter/filter_3.yml", dirPath);
+    validRes = cfgFilterFileIsValid(path);
+    assert_int_equal(validRes, TRUE);
     res = cfgFilterStatus("memcached", "memcached", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_NOT_SCOPED);
     // cleanup
@@ -2792,6 +2821,8 @@ filterDenyIsProcessedAfterAllow(void **state)
     // verify that "deny" wins.  (is processed after allow)
     char path[PATH_MAX] = {0};
     scope_snprintf(path, sizeof(path), "%s/data/filter/filter_4.yml", dirPath);
+    bool validRes = cfgFilterFileIsValid(path);
+    assert_int_equal(validRes, TRUE);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("redis", "", testAccessFilterPath(path), cfg);
@@ -2831,6 +2862,8 @@ filterMatchAllInAllow(void **state)
     // Verify that _MatchAll_ in allow matches all processes
     char path[PATH_MAX] = {0};
     scope_snprintf(path, sizeof(path), "%s/data/filter/filter_5.yml", dirPath);
+    bool validRes = cfgFilterFileIsValid(path);
+    assert_int_equal(validRes, TRUE);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("blue", "", testAccessFilterPath(path), cfg);
@@ -2899,6 +2932,8 @@ filterMatchAllInDeny(void **state)
     // Verify that _MatchAll_ in deny denies all processes
     char path[PATH_MAX] = {0};
     scope_snprintf(path, sizeof(path), "%s/data/filter/filter_6.yml", dirPath);
+    bool validRes = cfgFilterFileIsValid(path);
+    assert_int_equal(validRes, TRUE);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("blue", "", testAccessFilterPath(path), cfg);
@@ -2998,6 +3033,10 @@ main(int argc, char *argv[])
         cmocka_unit_test(initMtcReturnsPtr),
         cmocka_unit_test(initEvtFormatReturnsPtr),
         cmocka_unit_test(initCtlReturnsPtr),
+        cmocka_unit_test(filterEmptyFilterFileVar1),
+        cmocka_unit_test(filterEmptyFilterFileVar2),
+        cmocka_unit_test(filterEmptyFilterFileVar3),
+        cmocka_unit_test(filterInvalidFilterFile),
         cmocka_unit_test(filterEmptyProcName),
         cmocka_unit_test(filterEmptyProcCmdLine),
         cmocka_unit_test(filterNullFilterPath),

@@ -16,7 +16,7 @@ import (
 func TestProcessesByNameToAttach(t *testing.T) {
 	// Current process
 	name := "util.test"
-	result, err := ProcessesByNameToAttach("", name)
+	result, err := ProcessesByNameToAttach("", name, "", true)
 	user, _ := user.Current()
 	exp := Processes{
 		Process{

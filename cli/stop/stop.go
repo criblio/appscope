@@ -2,117 +2,23 @@ package stop
 
 import (
 	"errors"
-	"fmt"
 	"os"
-	"os/exec"
-	"strconv"
 
+	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/loader"
 	"github.com/criblio/scope/run"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
+	"gopkg.in/yaml.v2"
 )
 
-// for the host
-func stopConfigureHost() error {
-	ld := loader.New()
+var (
+	errDetachingMultiple = errors.New("at least one error found when detaching from more than 1 process. See logs")
+)
 
-	stdoutStderr, err := ld.UnconfigureHost()
-	if err != nil {
-		log.Warn().
-			Err(err).
-			Str("loaderDetails", stdoutStderr).
-			Msg("Unconfigure host failed.")
-	} else {
-		fmt.Print(stdoutStderr)
-		log.Info().
-			Msg("Unconfigure host success.")
-	}
-
-	return nil
-}
-
-// for all containers
-func stopConfigureContainers(cPids []int) error {
-	ld := loader.New()
-
-	// Iterate over all containers
-	for _, cPid := range cPids {
-		stdoutStderr, err := ld.UnconfigureContainer(cPid)
-		if err != nil {
-			log.Warn().
-				Err(err).
-				Str("pid", strconv.Itoa(cPid)).
-				Str("loaderDetails", stdoutStderr).
-				Msgf("Unconfigure containers failed. Container %v failed.", cPid)
-		} else {
-			fmt.Print(stdoutStderr)
-			log.Info().
-				Str("pid", strconv.Itoa(cPid)).
-				Msgf("Unconfigure containers success. Container %v success.", cPid)
-		}
-	}
-
-	return nil
-}
-
-// for the host
-func stopServiceHost() error {
-	ld := loader.New()
-
-	stdoutStderr, err := ld.UnserviceHost()
-	if err == nil {
-		fmt.Print(stdoutStderr)
-		log.Info().
-			Msgf("Unservice host success.")
-	} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
-		if ee.ExitCode() == 1 {
-			log.Warn().
-				Err(err).
-				Str("loaderDetails", stdoutStderr).
-				Msgf("Unservice host failed.")
-		} else {
-			log.Warn().
-				Str("loaderDetails", stdoutStderr).
-				Msgf("Unservice host failed.")
-		}
-	}
-	return nil
-}
-
-// for all containers
-func stopServiceContainers(cPids []int) error {
-	ld := loader.New()
-
-	// Iterate over all containers
-	for _, cPid := range cPids {
-		stdoutStderr, err := ld.UnserviceContainer(cPid)
-		if err == nil {
-			fmt.Print(stdoutStderr)
-			log.Info().
-				Str("pid", strconv.Itoa(cPid)).
-				Msgf("Unservice container %v success.", cPid)
-		} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
-			if ee.ExitCode() == 1 {
-				log.Warn().
-					Err(err).
-					Str("pid", strconv.Itoa(cPid)).
-					Str("loaderDetails", stdoutStderr).
-					Msgf("Unservice container %v failed.", cPid)
-			} else {
-				log.Warn().
-					Str("pid", strconv.Itoa(cPid)).
-					Str("loaderDetails", stdoutStderr).
-					Msgf("Unservice container %v failed", cPid)
-			}
-		}
-	}
-	return nil
-}
-
-func Stop() error {
+func Stop(rc *run.Config) error {
 	// Create a history directory for logs
-	run.CreateWorkDirBasic("stop")
+	rc.CreateWorkDirBasic("stop")
 
 	// Validate user has root permissions
 	if err := util.UserVerifyRootPerm(); err != nil {
@@ -121,72 +27,81 @@ func Stop() error {
 		return err
 	}
 
-	scopeDirVersion, err := run.GetAppScopeVerDir()
+	// Instantiate the loader
+	ld := loader.New()
+
+	////////////////////////////////////////////
+	// Empty the global filter file
+	////////////////////////////////////////////
+
+	filterFile := make(libscope.Filter, 0)
+
+	// Write the filter contents to a temporary path
+	filterFilePath := "/tmp/scope_filter"
+	file, err := os.OpenFile(filterFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
-		log.Error().
-			Err(err).
-			Msg("Error accessing AppScope version directory")
+		log.Warn().Err(err).Msgf("Error creating/opening %s", filterFilePath)
+		return err
+	}
+	defer file.Close()
+
+	data, err := yaml.Marshal(&filterFile)
+	if err != nil {
+		util.Warn("Error marshaling YAML:%v", err)
 		return err
 	}
 
-	// If the `scope stop` command is run inside a container, we should call `scope -z --stophost`
-	// which will also run `scope stop` on the host
-	// SCOPE_CLI_SKIP_HOST allows to run scope stop in docker environment (integration tests)
-	_, skipHostCfg := os.LookupEnv("SCOPE_CLI_SKIP_HOST")
-	if util.InContainer() && !skipHostCfg {
-		if err := util.Extract(scopeDirVersion); err != nil {
+	_, err = file.Write(data)
+	if err != nil {
+		util.Warn("Error writing to file:%v", err)
+		return err
+	}
+
+	// Ask the loader to update the filter file
+	if stdoutStderr, err := ld.Filter(filterFilePath, rc.Rootdir); err != nil {
+		log.Warn().
+			Err(err).
+			Str("loaderDetails", stdoutStderr).
+			Msgf("Install library in %s namespace failed.", rc.Rootdir)
+		return err
+	}
+
+	////////////////////////////////////////////
+	// Unset ld.so.preload if it is set.
+	////////////////////////////////////////////
+
+	if stdoutStderr, err := ld.Preload("off", rc.Rootdir); err != nil {
+		log.Warn().
+			Err(err).
+			Str("loaderDetails", stdoutStderr).
+			Msgf("Install library in %s namespace failed.", rc.Rootdir)
+		return err
+	}
+
+	////////////////////////////////////////////
+	// Detach from all scoped processes
+	////////////////////////////////////////////
+
+	procs, err := util.HandleInputArg("", "", rc.Rootdir, false, false, false, false)
+	if err != nil {
+		return err
+	}
+	// Note: if len(procs) == 0 do nothing
+	if len(procs) == 1 {
+		if err = rc.Detach(procs[0].Pid); err != nil {
 			return err
 		}
-
-		ld := loader.New()
-		stdoutStderr, err := ld.StopHost()
-		if err == nil {
-			log.Info().
-				Msgf("Stop host success.")
-		} else if ee := (&exec.ExitError{}); errors.As(err, &ee) {
-			if ee.ExitCode() == 1 {
-				log.Error().
-					Err(err).
-					Str("loaderDetails", stdoutStderr).
-					Msgf("Stop host failed.")
-				return err
-			} else {
-				log.Error().
-					Str("loaderDetails", stdoutStderr).
-					Msgf("Stop host failed.")
-				return err
+	} else if len(procs) > 1 {
+		errors := false
+		for _, proc := range procs {
+			if err = rc.Detach(proc.Pid); err != nil {
+				log.Error().Err(err)
+				errors = true
 			}
 		}
-		return nil
-	}
-
-	rc := run.Config{
-		Subprocess: true,
-		Verbosity:  4, // Default
-	}
-	if err := rc.DetachAll(false); err != nil {
-		log.Error().
-			Err(err).
-			Msg("Error detaching from all Scoped processes")
-	}
-
-	// Discover all container PIDs
-	cPids := util.GetContainersPids()
-
-	if err := stopConfigureHost(); err != nil {
-		return err
-	}
-
-	if err := stopConfigureContainers(cPids); err != nil {
-		return err
-	}
-
-	if err := stopServiceHost(); err != nil {
-		return err
-	}
-
-	if err := stopServiceContainers(cPids); err != nil {
-		return err
+		if errors {
+			return errDetachingMultiple
+		}
 	}
 
 	return nil

@@ -102,7 +102,7 @@ Environment Variables:
         PEM format. Default is an empty string. For a description of what
         this means, see Certificate Authority Resolution below.
     SCOPE_METRIC_FORMAT
-        statsd, ndjson, prometheus
+        statsd, ndjson
         Default is statsd.
     SCOPE_STATSD_PREFIX
         Specify a string to be prepended to every scope metric.

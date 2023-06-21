@@ -1680,6 +1680,11 @@ getFilterFilePath(void)
         filterFilePath = SCOPE_FILTER_TMP_PATH;
     }
 
+    // check if filter file can actually be used
+    if ((filterFilePath) && (cfgFilterFileIsValid(filterFilePath) == FALSE)) {
+        filterFilePath = NULL;
+    }
+
     return filterFilePath;
 }
 
@@ -1838,7 +1843,8 @@ typedef struct {
 /*
 * We actively scope applications:
 * - when we are attaching
-* - when the filter file does not exist
+* - when the filter file is not valid or does not exist and 
+*   process does not match `doNotScopeList`
 * - when process match the allow list
 */
 static settings_t

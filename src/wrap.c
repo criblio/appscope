@@ -1968,6 +1968,20 @@ getSettings(bool attachedFlag)
     return settings;
 }
 
+/*
+* This is a helper function designed to facilitate the debugging process
+* of the constructor. To utilize this function, place a call to dbgConstructorFn()
+* in the code section that needs to be debugged. By running the code with a debugger,
+* you can modify the value of dbgConstructor to break out of the initialization loop.
+*/
+// static void
+// dbgConstructorFn(void) {
+//     static int dbgConstructor = 1;
+//     while (dbgConstructor) {
+//         sleep(1);
+//     }
+// }
+
 __attribute__((constructor)) void
 init(void)
 {

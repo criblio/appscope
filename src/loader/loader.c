@@ -545,24 +545,24 @@ cmdInstall(const char *rootdir)
     return EXIT_SUCCESS;
 }
 
-// Handle the filter command
+// Handle the rules command
 int
-cmdFilter(const char *configFilterPath, const char *rootdir)
+cmdRules(const char *configRulesPath, const char *rootdir)
 {
     uid_t eUid = geteuid();
     gid_t eGid = getegid();
     uid_t nsUid = eUid;
     uid_t nsGid = eGid;
-    size_t configFilterSize = 0;
+    size_t configRulesSize = 0;
 
-    if (!configFilterPath) {
+    if (!configRulesPath) {
         return EXIT_FAILURE;
     }
 
-    // Read filter file in while in origin namespace
-    void *configFilterMem = setupLoadFileIntoMem(&configFilterSize, configFilterPath);
-    if (configFilterMem == NULL) {
-        fprintf(stderr, "error: Loading filter file into memory %s\n", configFilterPath);
+    // Read rules file in while in origin namespace
+    void *configRulesMem = setupLoadFileIntoMem(&configRulesSize, configRulesPath);
+    if (configRulesMem == NULL) {
+        fprintf(stderr, "error: Loading rules file into memory %s\n", configRulesPath);
         return EXIT_FAILURE;
     }
 
@@ -578,13 +578,13 @@ cmdFilter(const char *configFilterPath, const char *rootdir)
         }
     }
 
-    // Install filter file
-    if (!setupFilter(configFilterMem, configFilterSize, nsUid, nsGid)) {
-        fprintf(stderr, "error: failed to install filter file\n");
+    // Install rules file
+    if (!setupRules(configRulesMem, configRulesSize, nsUid, nsGid)) {
+        fprintf(stderr, "error: failed to install rules file\n");
         return EXIT_FAILURE;
     }
 
-    if (configFilterMem) munmap(configFilterMem, configFilterSize);
+    if (configRulesMem) munmap(configRulesMem, configRulesSize);
 
     return EXIT_SUCCESS;
 }

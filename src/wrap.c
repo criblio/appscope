@@ -271,9 +271,9 @@ fileModTime(const char *path)
 
 /*
  * Iterate all shared objects and GOT hook as necessary.
- * Filter the process from an external filter list.
- * If the filter fails only hook execve.
- * If the filter passes hook all interposed functions.
+ * Rules the process from an external rules list.
+ * If the rules fails only hook execve.
+ * If the rules passes hook all interposed functions.
  */
 static int
 hookAll(struct dl_phdr_info *info, size_t size, void *data)
@@ -285,7 +285,7 @@ hookAll(struct dl_phdr_info *info, size_t size, void *data)
     Elf64_Rela *rel = NULL;
     char *str = NULL;
     int rsz = 0;
-    bool *filter = data;
+    bool *rules = data;
 
     scopeLog(CFG_LOG_DEBUG, "%s: shared obj: %s", __FUNCTION__, info->dlpi_name);
 
@@ -298,9 +298,9 @@ hookAll(struct dl_phdr_info *info, size_t size, void *data)
     // Get the link map and ELF sections in advance of something matching
     if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
         for (int i=0; inject_hook_list[i].symbol; i++) {
-            // if the proc passes the filter then GOT hook all else only hook execve
+            // if the proc passes the rules then GOT hook all else only hook execve
             // TODO; all execv?
-            if (((*filter == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
+            if (((*rules == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
                 dlsym(handle, inject_hook_list[i].symbol)) {
                 if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1) {
                     scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from shared obj %s",
@@ -315,7 +315,7 @@ hookAll(struct dl_phdr_info *info, size_t size, void *data)
 }
 
 static int
-hookMain(bool filter)
+hookMain(bool rules)
 {
     struct link_map *lm;
     Elf64_Sym *sym = NULL;
@@ -329,9 +329,9 @@ hookMain(bool filter)
     // Get the link map and ELF sections in advance of something matching
     if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
         for (int i=0; inject_hook_list[i].symbol; i++) {
-            // if the proc passes the filter then GOT hook all else only hook execve
+            // if the proc passes the rules then GOT hook all else only hook execve
             // TODO; all execv?
-            if (((filter == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
+            if (((rules == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
                 dlsym(handle, inject_hook_list[i].symbol)) {
                 if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1) {
                     scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from main", inject_hook_list[i].symbol);
@@ -396,11 +396,11 @@ cmdAttach(void)
 {
     if (g_cfg.funcs_attached) return TRUE;
 
-    bool filter = TRUE;
+    bool rules = TRUE;
     scopeLog(CFG_LOG_DEBUG, "%s:%d", __FUNCTION__, __LINE__);
 
-    dl_iterate_phdr(hookAll, &filter);
-    hookMain(filter);
+    dl_iterate_phdr(hookAll, &rules);
+    hookMain(rules);
 
     g_cfg.funcs_attached = TRUE;
 
@@ -1660,32 +1660,32 @@ initEnv(int *attachedFlag)
 }
 
 static const char *
-getFilterFilePath(void)
+getRulesFilePath(void)
 {
-    char *filterFilePath = NULL;
-    char *envFilterVal = getenv("SCOPE_FILTER");
-    if (envFilterVal) {
-        if (!scope_strcmp(envFilterVal, "false")) {
-            // SCOPE_FILTER is false (use of filter file is disabled)
-            filterFilePath = NULL;
-        } else if (!scope_access(envFilterVal, R_OK)) {
-            // SCOPE_FILTER contains the path to a filter file.
-            filterFilePath = envFilterVal;
+    char *rulesFilePath = NULL;
+    char *envRulesVal = getenv("SCOPE_RULES");
+    if (envRulesVal) {
+        if (!scope_strcmp(envRulesVal, "false")) {
+            // SCOPE_RULES is false (use of rules file is disabled)
+            rulesFilePath = NULL;
+        } else if (!scope_access(envRulesVal, R_OK)) {
+            // SCOPE_RULES contains the path to a rules file.
+            rulesFilePath = envRulesVal;
         }
-    } else if (!scope_access(SCOPE_FILTER_USR_PATH, R_OK)) {
-        // filter file was at first default location
-        filterFilePath = SCOPE_FILTER_USR_PATH;
-    } else if (!scope_access(SCOPE_FILTER_TMP_PATH, R_OK)) {
-        // filter file was at second default location
-        filterFilePath = SCOPE_FILTER_TMP_PATH;
+    } else if (!scope_access(SCOPE_RULES_USR_PATH, R_OK)) {
+        // rules file was at first default location
+        rulesFilePath = SCOPE_RULES_USR_PATH;
+    } else if (!scope_access(SCOPE_RULES_TMP_PATH, R_OK)) {
+        // rules file was at second default location
+        rulesFilePath = SCOPE_RULES_TMP_PATH;
     }
 
-    // check if filter file can actually be used
-    if ((filterFilePath) && (cfgFilterFileIsValid(filterFilePath) == FALSE)) {
-        filterFilePath = NULL;
+    // check if rules file can actually be used
+    if ((rulesFilePath) && (cfgRulesFileIsValid(rulesFilePath) == FALSE)) {
+        rulesFilePath = NULL;
     }
 
-    return filterFilePath;
+    return rulesFilePath;
 }
 
 // Used this command on ubuntu 20.04 and 22.04 as a starting point:
@@ -1824,7 +1824,7 @@ typedef struct {
 /*
 * We actively scope applications:
 * - when we are attaching
-* - when the filter file is not valid or does not exist and 
+* - when the rules file is not valid or does not exist and 
 *   process does not match `doNotScopeList`
 * - when process match the allow list
 */
@@ -1832,32 +1832,32 @@ static settings_t
 getSettings(bool attachedFlag)
 {
     config_t *cfg = NULL;
-    const char *filterFilePath = NULL;
+    const char *rulesFilePath = NULL;
     bool scopedFlag = FALSE;
     bool skipReadCfg = FALSE;
 
     if (attachedFlag) {
         scopedFlag = TRUE;
-    } else if (!(filterFilePath = getFilterFilePath())){
-        // The filter file does not exist, or shouldn't be used.
+    } else if (!(rulesFilePath = getRulesFilePath())){
+        // The rules file does not exist, or shouldn't be used.
         // Set scopedFlag true unless it's on our doNotScopeList
         scopedFlag = thisProcCanBeActive();
     } else {
-        // A filter file exists!  Use it.
+        // A rules file exists!  Use it.
         cfg = cfgCreateDefault();
-        filter_status_t res = cfgFilterStatus(g_proc.procname, g_proc.cmd, filterFilePath, cfg);
+        rules_status_t res = cfgRulesStatus(g_proc.procname, g_proc.cmd, rulesFilePath, cfg);
         switch (res) {
-            case FILTER_SCOPED:
+            case RULES_SCOPED:
                 scopedFlag = TRUE;
                 break;
-            case FILTER_SCOPED_WITH_CFG:
+            case RULES_SCOPED_WITH_CFG:
                 scopedFlag = TRUE;
                 skipReadCfg = TRUE;
                 break;
-            case FILTER_NOT_SCOPED:
+            case RULES_NOT_SCOPED:
                 scopedFlag = FALSE;
                 break;
-            case FILTER_ERROR:
+            case RULES_ERROR:
             default:
                 scopedFlag = FALSE;
                 DBG(NULL);
@@ -1942,7 +1942,7 @@ init(void)
     initTime();
 
     // settings contain isActive and cfg fields which depend on the existance and
-    // contents of a filter file, env vars, scope.yml, etc.
+    // contents of a rules file, env vars, scope.yml, etc.
     settings_t settings = getSettings(attachedFlag);
 
     // on aarch64, the crypto subsystem installs handlers for SIGILL

@@ -27,10 +27,10 @@ func New() ScopeLoader {
 	}
 }
 
-// Filter Command
-func (sL *ScopeLoader) Filter(tmpPath, rootdir string) (string, error) {
+// Rules Command
+func (sL *ScopeLoader) Rules(tmpPath, rootdir string) (string, error) {
 	args := make([]string, 0)
-	args = append(args, "--filter")
+	args = append(args, "--rules")
 	args = append(args, tmpPath)
 	if rootdir != "" {
 		args = append(args, "--rootdir")

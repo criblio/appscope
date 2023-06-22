@@ -1,7 +1,7 @@
 package libscope
 
-// Filter represents a libscope filter
-type Filter map[string][]Entry
+// Rules represents a libscope rules
+type Rules map[string][]Entry
 
 type Entry struct {
 	ProcName      string      `json:"procname,omitempty" yaml:"procname,omitempty"`

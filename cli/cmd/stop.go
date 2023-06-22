@@ -18,7 +18,7 @@ import (
 func getStopUsage() string {
 	return `The following actions will be performed:
 	- Removal of /etc/ld.so.preload contents
-	- Removal of the filter file from /usr/lib/appscope/scope_filter
+	- Removal of the rules file from /usr/lib/appscope/scope_rules
 	- Detach from all currently scoped processes
 
 The command does not uninstall scope or libscope from /usr/lib/appscope or /tmp/appscope

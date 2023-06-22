@@ -1,4 +1,4 @@
-# same file as filter_5.yml, except:
+# same file as rules_5.yml, except:
 # 1) in deny:, arg: _MatchAll_ replaces procname: redis
 deny:
 - arg: _MatchAll_

@@ -133,9 +133,9 @@ redis-server &
 sleep 2
 
 cd /opt/
-scope filter --add memcached
-scope filter --add redis-server
-scope filter --add nginx
+scope rules --add memcached
+scope rules --add redis-server
+scope rules --add nginx
 
 # Start one more process
 nginx &
@@ -149,10 +149,10 @@ fi
 
 sleep 5
 
-# Check filter file is empty
-count=$(grep "allow" "/usr/lib/appscope/scope_filter" | wc -l)
+# Check rules file is empty
+count=$(grep "allow" "/usr/lib/appscope/scope_rules" | wc -l)
 if [ $count -gt 0 ] ; then
-    fail "/usr/lib/appscope/scope_filter not empty"
+    fail "/usr/lib/appscope/scope_rules not empty"
 fi
 
 # Check ld.so.preload file is empty
@@ -175,9 +175,9 @@ endtest
 
 
 #
-# scope filter
+# scope rules
 #
-starttest scope_filter
+starttest scope_rules
 
 # Start processes
 memcached -u root &
@@ -186,19 +186,19 @@ redis-server &
 sleep 2
 
 cd /opt/
-scope filter --add memcached
-scope filter --add redis-server
-scope filter --add nginx
+scope rules --add memcached
+scope rules --add redis-server
+scope rules --add nginx
 
 # Start one more process
 nginx &
 
 sleep 2
 
-# Compare the filter file
-#cmp -s /usr/lib/appscope/scope_filter /opt/test-runner/scope_filter1.yml
+# Compare the rules file
+#cmp -s /usr/lib/appscope/scope_rules /opt/test-runner/scope_rules1.yml
 #if [ $? -ne "0" ]; then
-#    fail "mismatch /usr/lib/appscope/scope_filter and scope_filter1.yml"
+#    fail "mismatch /usr/lib/appscope/scope_rules and scope_rules1.yml"
 #fi
 
 # Check libscope.so is installed
@@ -207,18 +207,18 @@ if [ ! -f $LIBSCOPE_PATH ]; then
     fail "missing $LIBSCOPE_PATH"
 fi
 
-# Check filter file contains processes
-count=$(grep "memcached" "/usr/lib/appscope/scope_filter" | wc -l)
+# Check rules file contains processes
+count=$(grep "memcached" "/usr/lib/appscope/scope_rules" | wc -l)
 if [ $count -ne 1 ] ; then
-    fail "/usr/lib/appscope/scope_filter does not contain process memcached"
+    fail "/usr/lib/appscope/scope_rules does not contain process memcached"
 fi
-count=$(grep "redis-server" "/usr/lib/appscope/scope_filter" | wc -l)
+count=$(grep "redis-server" "/usr/lib/appscope/scope_rules" | wc -l)
 if [ $count -ne 1 ] ; then
-    fail "/usr/lib/appscope/scope_filter does not contain process redis-server"
+    fail "/usr/lib/appscope/scope_rules does not contain process redis-server"
 fi
-count=$(grep "nginx" "/usr/lib/appscope/scope_filter" | wc -l)
+count=$(grep "nginx" "/usr/lib/appscope/scope_rules" | wc -l)
 if [ $count -ne 1 ] ; then
-    fail "/usr/lib/appscope/scope_filter does not contain process nginx"
+    fail "/usr/lib/appscope/scope_rules does not contain process nginx"
 fi
 
 # Check ld.so.preload file is set

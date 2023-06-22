@@ -7,7 +7,7 @@ FAILED_TEST_COUNT=0
 
 EVT_FILE="/opt/test-runner/logs/events.log"
 TEMP_OUTPUT_FILE="/opt/test-runner/temp_output"
-DUMMY_FILTER_FILE="/opt/test-runner/dummy_filter"
+DUMMY_RULES_FILE="/opt/test-runner/dummy_rules"
 touch $EVT_FILE
 touch $TEMP_OUTPUT_FILE
 
@@ -91,7 +91,7 @@ endtest
 
 starttest detachNotScopedProcessLibLoaded
 
-SCOPE_FILTER=$DUMMY_FILTER_FILE scope -z top -b -d 1 > /dev/null &
+SCOPE_RULES=$DUMMY_RULES_FILE scope -z top -b -d 1 > /dev/null &
 sleep 1
 TOP_PID=`pidof top`
 
@@ -139,7 +139,7 @@ endtest
 
 starttest attachNotScopedProcessFirstAttach
 
-SCOPE_FILTER=$DUMMY_FILTER_FILE scope -z top -b -d 1 > /dev/null &
+SCOPE_RULES=$DUMMY_RULES_FILE scope -z top -b -d 1 > /dev/null &
 sleep 1
 TOP_PID=`pidof top`
 
@@ -453,7 +453,7 @@ endtest
 #
 # Processes on the doNotScopeList should not be actively scoped,
 # unless we're explicitly instructed to.  By "explicitly instructed to"
-# we mean 1) injected into or 2) on the allow list of a filter file.
+# we mean 1) injected into or 2) on the allow list of a rules file.
 #
 # This is an integration test for src/wrap.c:getSettings()
 #
@@ -464,7 +464,7 @@ endtest
 starttest denied_proc_not_scoped_by_default
 
 cd /opt/implicit_deny/
-export SCOPE_FILTER=false
+export SCOPE_RULES=false
 
 # the doNotScopeList is based on process name, this systemd-networkd
 # is not the real thing.
@@ -487,7 +487,7 @@ endtest
 starttest denied_proc_is_scoped_by_inject
 
 cd /opt/implicit_deny/
-export SCOPE_FILTER=false
+export SCOPE_RULES=false
 
 # the doNotScopeList is based on process name, this systemd-networkd
 # is not the real thing.
@@ -507,14 +507,14 @@ endtest
 
 
 #
-# denied_proc_is_scoped_by_filter_file
+# denied_proc_is_scoped_by_rules_file
 #
-starttest denied_proc_is_scoped_by_filter_file
+starttest denied_proc_is_scoped_by_rules_file
 
 cd /opt/implicit_deny/
-export SCOPE_FILTER=${DUMMY_FILTER_FILE}2
-echo "allow:" >> $SCOPE_FILTER
-echo "- procname: systemd-networkd" >> $SCOPE_FILTER
+export SCOPE_RULES=${DUMMY_RULES_FILE}2
+echo "allow:" >> $SCOPE_RULES
+echo "- procname: systemd-networkd" >> $SCOPE_RULES
 
 # the doNotScopeList is based on process name, this systemd-networkd
 # is not the real thing.
@@ -528,8 +528,8 @@ if [ $? -ne "0" ]; then
 fi
 
 kill $PID
-rm $SCOPE_FILTER
-unset SCOPE_FILTER
+rm $SCOPE_RULES
+unset SCOPE_RULES
 
 endtest
 

@@ -1,4 +1,4 @@
-# same file as filter_0.yml, except:
+# same file as rules_0.yml, except:
 # 1) deny: appears before allow:
 # 2) 'procname: redis' is in both allow and deny
 # 3) for 'procname: htop', config: comes before procname:

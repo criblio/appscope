@@ -1,4 +1,4 @@
-# same file as filter_4.yml, except:
+# same file as rules_4.yml, except:
 # 1) in allow:, procname: _MatchAll_ replaces procname: redis
 # 2) in procname: _MatchAll_ the log transport path is /tmp/match.log
 # 3) for procname: htop, commented out log level

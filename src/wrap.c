@@ -1806,6 +1806,13 @@ static const char *const allowList[] = {
     "runc",
 };
 
+/*
+ * When a filter/rules file has not been found, all processes have the
+ * potential to be interposed. This function prohibits a process in the
+ * doNotScopeList list from being interposed as it otherwise would.
+ *
+ * It returns FALSE if the current process, by name, should not be interposed.
+ */
 static bool
 doImplicitDeny(void)
 {
@@ -1821,6 +1828,13 @@ doImplicitDeny(void)
     return TRUE;
 }
 
+/*
+ * When a filter/rules file is found, the processes defined by the rules
+ * are the only ones interposed. This function allows a process in the
+ * allowList to override the rules and be interposed.
+ *
+ * It returns TRUE if the current process, by name, is to be allowed.
+ */
 static bool
 doImplicitAllow(void)
 {

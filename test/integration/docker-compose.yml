@@ -237,6 +237,15 @@ services:
       dockerfile: ./musl/Dockerfile
     <<: *scope-common
 
+  opentelemetry:
+    image: ghcr.io/criblio/appscope-test-opentelemetry:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from: 
+        - ghcr.io/criblio/appscope-test-opentelemetry:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./opentelemetry/Dockerfile
+    <<: *scope-common
+
   glibc:
     image: ghcr.io/criblio/appscope-test-glibc:${TAG:?Missing TAG environment variable}
     build:

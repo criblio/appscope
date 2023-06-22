@@ -12,7 +12,6 @@
 
 // want to put this list in an obvious place
 //static char thread_delay_list[] = "chrome:nacl_helper";
-static timer_t g_timerid = 0;
 
 static int
 sendNL(int sd, ino_t node)
@@ -597,55 +596,6 @@ osGetArgv(pid_t pid, char *buf, size_t blen)
 out:
     if (fd != -1) scope_close(fd);
     return argc;
-}
-
-bool
-osTimerStop(void)
-{
-
-    if (g_timerid) {
-        timer_delete(g_timerid);
-        g_timerid = 0;
-        return TRUE;
-    }
-
-    return FALSE;
-}
-
-bool
-osThreadInit(void(*handler)(int), unsigned interval)
-{
-    struct sigaction sact;
-    struct sigevent sevent = {0};
-    struct itimerspec tspec;
-    sigemptyset(&sact.sa_mask);
-    sact.sa_handler = handler;
-    sact.sa_flags = SA_RESTART;
-
-    if (!g_fn.sigaction) return FALSE;
-
-    if (g_fn.sigaction(SIGUSR2, &sact, NULL) == -1) {
-        DBG("errno %d", errno);
-        return FALSE;
-    }
-
-    sevent.sigev_notify = SIGEV_SIGNAL;
-    sevent.sigev_signo = SIGUSR2;
-
-    if (timer_create(CLOCK_MONOTONIC, &sevent, &g_timerid) == -1) {
-        DBG("errno %d", errno);
-        return FALSE;
-    }
-
-    tspec.it_interval.tv_sec = 0;
-    tspec.it_interval.tv_nsec = 0;
-    tspec.it_value.tv_sec = interval;
-    tspec.it_value.tv_nsec = 0;
-    if (timer_settime(g_timerid, 0, &tspec, NULL) == -1) {
-        DBG("errno %d", errno);
-        return FALSE;
-    }
-    return TRUE;
 }
 
 // In linux, this is declared weak so it can be overridden by the strong

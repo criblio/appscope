@@ -112,20 +112,6 @@ osGetCmdline(pid_t pid, char **cmd)
 }
 
 /*
- * TBD:
- * Note that this is incomplete.
- * In Linux we create a timer that delivers a
- * signal on expiry. The signal handler starts
- * the periodic thread. Need the equivalent
- * for OSX.
- */
-bool
-osThreadInit(void(*handler)(int), unsigned interval)
-{
-    return TRUE;
-}
-
-/*
  * In Linux we use Netlink socket capabilities
  * in order to extract the peer inode for
  * a given socket inode. There is no 
@@ -151,12 +137,6 @@ int
 osGetPageProt(uint64_t addr)
 {
     return -1;
-}
-
-bool
-osTimerStop(void)
-{
-    return TRUE;
 }
 
 char *

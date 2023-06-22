@@ -3105,13 +3105,13 @@ typedef struct {
 } parse_filter_table_t;
 
 
-typedef void (*node_filter_meta_fn)(yaml_document_t *, yaml_node_t *, char **);
+typedef void (*node_filter_unix_path_fn)(yaml_document_t *, yaml_node_t *, char **);
 
 typedef struct {
     yaml_node_type_t type;
     const char *key;
-    node_filter_meta_fn fn;
-} parse_filter_meta_t;
+    node_filter_unix_path_fn fn;
+} parse_filter_unix_path_t;
 
 /*
 * Process key value pair filter
@@ -3136,10 +3136,10 @@ processKeyValuePairFilter(yaml_document_t *doc, yaml_node_pair_t *pair, const pa
 }
 
 /*
-* Process key value pair filter metadata
+* Process key value pair filter for finding the Unix Path
 */
 static void
-processKeyValuePairFilterMetaData(yaml_document_t *doc, yaml_node_pair_t *pair, const parse_filter_meta_t *fEntry, char **unixPath) {
+processKeyValuePairFilterUnixPathData(yaml_document_t *doc, yaml_node_pair_t *pair, const parse_filter_unix_path_t *fEntry, char **unixPath) {
     yaml_node_t *nodeKey = yaml_document_get_node(doc, pair->key);
     yaml_node_t *nodeValue = yaml_document_get_node(doc, pair->value);
 
@@ -3342,7 +3342,7 @@ processDenySeq(yaml_document_t *doc, yaml_node_t *node, void *extData) {
 }
 
 /*
-* Process Unix Socket Path metadata Node
+* Process Unix Socket Path Node
 */
 static void
 processUnixSocketPathNode(yaml_document_t* doc, yaml_node_t* node, char **unixPath) {
@@ -3356,20 +3356,20 @@ processUnixSocketPathNode(yaml_document_t* doc, yaml_node_t* node, char **unixPa
 }
 
 /*
-* Process source metadata Node
+* Process source Node
 */
 static void
 processSourceNode(yaml_document_t *doc, yaml_node_t *node, char **unixPath) {
     if (node->type != YAML_MAPPING_NODE) return;
 
-    parse_filter_meta_t sourcNodes[] = {
+    parse_filter_unix_path_t sourcNodes[] = {
         {YAML_SCALAR_NODE,    UNIX_SOCKET_PATH_NODE, processUnixSocketPathNode},
         {YAML_NO_NODE,        NULL,                  NULL}
     };
 
     yaml_node_pair_t* pair;
     foreach(pair, node->data.mapping.pairs) {
-        processKeyValuePairFilterMetaData(doc, pair, sourcNodes, unixPath);
+        processKeyValuePairFilterUnixPathData(doc, pair, sourcNodes, unixPath);
     }
 }
 
@@ -3431,10 +3431,10 @@ processFilterValidRootNode(yaml_document_t *doc, void *extData) {
 }
 
 /*
-* Process Filter Root node for metadata (starting point)
+* Process Filter Source node (starting point)
 */
 static void
-processFilterRootMetadata(yaml_document_t *doc, char **unixPath) {
+processFilterSourceSection(yaml_document_t *doc, char **unixPath) {
     yaml_node_t *node = yaml_document_get_root_node(doc);
 
     if ((node == NULL) || (node->type != YAML_MAPPING_NODE)) {
@@ -3442,13 +3442,13 @@ processFilterRootMetadata(yaml_document_t *doc, char **unixPath) {
     }
     yaml_node_pair_t *pair;
 
-    parse_filter_meta_t meta[] = {
+    parse_filter_unix_path_t meta[] = {
         {YAML_MAPPING_NODE,  SOURCE_NODE,  processSourceNode},
         {YAML_NO_NODE,       NULL,         NULL}
     };
 
     foreach(pair, node->data.mapping.pairs) {
-        processKeyValuePairFilterMetaData(doc, pair, meta, unixPath);
+        processKeyValuePairFilterUnixPathData(doc, pair, meta, unixPath);
     }
 }
 
@@ -3536,8 +3536,17 @@ cfgFilterStatus(const char *procName, const char *procCmdLine, const char *filte
 }
 
 /*
- * Returns the UNIX path defined in filter file metadata - in case of success data should be freed with scope_free, in case of failure returns NULL
- */
+ * Returns the UNIX socket path defined in the filter file's "source" section.
+ * The "source" section is an optional section that contains additional
+ * information. AppScope utilizes it to retrieve information about the
+ * UNIX path ("unixSocketPath"), which can be used as the receiver point for
+ * AppScope data.
+ * One example of an application that generates the filter file with proper
+ * "source" data is Edge (https://cribl.io/edge/).
+ * 
+ * Memory for the UNIX socket path is obtained with scope_strdup and can
+ * be freed with scope_free.
+*/
 char *
 cfgFilterUnixPath(const char *filterPath) {
     char *unixPath = NULL;
@@ -3580,7 +3589,7 @@ cfgFilterUnixPath(const char *filterPath) {
     }
     */
 
-    processFilterRootMetadata(&doc, &unixPath);
+    processFilterSourceSection(&doc, &unixPath);
 
     yaml_document_delete(&doc);
 

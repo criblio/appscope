@@ -15,12 +15,12 @@ ociReadCfgIntoMem(const char *cfgPath) {
     struct stat fileStat;
 
     if (scope_stat(cfgPath, &fileStat) == -1) {
-        return buf;
+        return NULL;
     }
 
     FILE *fp = scope_fopen(cfgPath, "r");
     if (!fp) {
-        return buf;
+        return NULL;
     }
 
     buf = (char *)scope_malloc(fileStat.st_size);
@@ -46,24 +46,28 @@ close_file:
  * Modify the OCI configuration for the given container.
  * A path to the container specific the location of the configuration file.
  *
- * Please look into opencontainers Linux runtime-spec for details about the exact JSON struct.
+ * Refer to the opencontainers Linux runtime-spec for details about the exact JSON struct.
  * The following changes will be performed:
- * - Add a mount points
+ * - Add a mount point(s)
  *   * `appscope` directory will be mounted from the host "/usr/lib/appscope/" into the container: "/usr/lib/appscope/"
- *   * UNIX socket directory will be mounted from the host into the container the path to UNIX socket will be read from
- *   host based on value in the filter file [optionally]
+ *   * A UNIX socket directory will be mounted from the host into the container. The path to UNIX socket
+ *   will be read from host based on value in the filter file [optionally]
  *
  * - Extend Environment variables
  *   * `LD_PRELOAD` will contain the following entry `/opt/appscope/libscope.so`
  *   * `SCOPE_SETUP_DONE=true` mark that configuration was processed
  *
  * - Add prestart hook
- *   execute scope extract operation to ensure using library with proper loader reference (musl/glibc)
+ *   execute a scope extract operation to ensure that the proper library is used in the specific loader context; musl or glibc.
  * 
  * Returns the modified data which should be freed with scope_free, in case of failure returns NULL
  */
 char *
 ociModifyCfg(const void *cfgMem, const char *scopePath, const char *unixSocketPath) {
+
+    if (!cfgMem || !scopePath ) {
+        return NULL;
+    }
 
     cJSON *json = cJSON_Parse(cfgMem);
     if (json == NULL) {

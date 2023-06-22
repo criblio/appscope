@@ -22,32 +22,32 @@ var (
 
 // NOTE: The responsibility of this function is to check if its possible to attach
 // and then perform the attach if so
-func (rc *Config) Attach(pid int, setupWorkDir bool) error {
+func (rc *Config) Attach(pid int, setupWorkDir bool) (bool, error) {
 	env := os.Environ()
 	ld := loader.New()
 
-	var reattach bool
+	reattach := false
 
 	status, err := util.PidScopeStatus(rc.Rootdir, pid)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if status == util.Disable || status == util.Setup {
 		if err := util.UserVerifyRootPerm(); err != nil {
-			return err
+			return false, err
 		}
 		// Validate PTRACE capability
 		c, err := capability.NewPid2(0)
 		if err != nil {
-			return errGetLinuxCap
+			return false, errGetLinuxCap
 		}
 
 		if err = c.Load(); err != nil {
-			return errLoadLinuxCap
+			return false, errLoadLinuxCap
 		}
 
 		if !c.Get(capability.EFFECTIVE, capability.CAP_SYS_PTRACE) {
-			return errMissingPtrace
+			return false, errMissingPtrace
 		}
 	} else {
 		// Reattach because process contains our library
@@ -89,7 +89,7 @@ func (rc *Config) Attach(pid int, setupWorkDir bool) error {
 	// Handle custom library path
 	if len(rc.LibraryPath) > 0 {
 		if !util.CheckDirExists(rc.LibraryPath) {
-			return errLibraryNotExist
+			return reattach, errLibraryNotExist
 		}
 		args = append([]string{"-f", rc.LibraryPath}, args...)
 	}
@@ -101,7 +101,7 @@ func (rc *Config) Attach(pid int, setupWorkDir bool) error {
 	stdoutStderr, err := ld.AttachSubProc(args, env)
 	util.Warn(stdoutStderr)
 	if err != nil {
-		return err
+		return reattach, err
 	}
 
 	// Replace the working directory files with symbolic links in case of successful attach
@@ -136,7 +136,7 @@ func (rc *Config) Attach(pid int, setupWorkDir bool) error {
 		}
 	}
 
-	return nil
+	return reattach, nil
 }
 
 // NOTE: The responsibility of this function is to check if its possible to detach

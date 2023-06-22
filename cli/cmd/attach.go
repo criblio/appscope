@@ -90,7 +90,8 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 
 		pid := procs[0].Pid // we told HandleInputArg above that we wanted to choose only one proc
 
-		if err = rc.Attach(pid, true); err != nil {
+		reattach, err := rc.Attach(pid, true)
+		if err != nil {
 			util.ErrAndExit("Attach failure: %v", err)
 		}
 
@@ -106,12 +107,14 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 			}
 
 			// Simple approach for now
-			// If we attempt to improve this, we need to wait for attach
-			// even in the case of re-attach
+			// Later: check for attach then resume
 			if rc.Rootdir != "" {
-				time.Sleep(60 * time.Second)
+				time.Sleep(60 * time.Second) // parent attach uses cron (<60s)
 			}
-			time.Sleep(2 * time.Second)
+			if reattach {
+				time.Sleep(10 * time.Second) // reattach uses dynamic config (<10s)
+			}
+			time.Sleep(2 * time.Second) // give the command time to run
 
 			iout, _, err := inspect.InspectProcess(*pidCtx)
 			if err != nil {

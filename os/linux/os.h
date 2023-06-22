@@ -8,6 +8,7 @@
 #include <dlfcn.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <signal.h>
 #include <stdint.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -53,10 +54,16 @@ extern int osInitTimer(platform_time_t *);
 extern int osGetProcMemory(pid_t);
 extern int osIsFilePresent(const char *);
 extern int osGetCmdline(pid_t, char **);
+extern bool osThreadInit(void(*handler)(int, siginfo_t *, void *), unsigned);
 extern int osUnixSockPeer(ino_t);
 extern void osInitJavaAgent(void);
 extern int osGetPageProt(unsigned long);
 extern int osGetExePath(pid_t, char **);
+extern bool osTimerStop(void);
+extern bool osIsScopeHandlerActive(void);
+extern void osSetAppSigaction(const struct sigaction *);
+extern void osGetAppSigaction(struct sigaction *const);
+extern bool osCallAppSigaction(int, siginfo_t *, void *);
 extern bool osGetCgroup(pid_t, char *, size_t);
 extern char *osGetFileMode(mode_t);
 extern int osNeedsConnect(int);

@@ -38,7 +38,6 @@
 #include "runtimecfg.h"
 #include "javaagent.h"
 #include "ipc.h"
-#include "sig.h"
 #include "snapshot.h"
 #include "scopestdlib.h"
 #include "../contrib/libmusl/musl.h"
@@ -832,9 +831,8 @@ threadNow(int sig, siginfo_t *info, void *secret)
     * The code below will call the application's handler if the signal
     * is not recognized as one created by the AppScope library.
     */
-    if ((sig == SIGUSR2) && (sigIsAppActionInstalled() == TRUE)) {
-        if (sigIsSigFromAppscopeTimer(info) == FALSE) {
-            sigCallAppAction(sig, info, secret);
+    if (sig == SIGUSR2) {
+        if (osCallAppSigaction(sig, info, secret) == TRUE) {
             return;
         }
     }
@@ -847,7 +845,7 @@ threadNow(int sig, siginfo_t *info, void *secret)
         return;
     }
 
-    sigTimerStop();
+    osTimerStop();
 
     if (g_fn.pthread_create &&
         (g_fn.pthread_create(&g_thread.periodicTID, NULL, periodic, NULL) != 0)) {
@@ -912,13 +910,8 @@ threadInit(void)
     if (fullGetEnv("SCOPE_NO_SIGNAL")) return;
     if (!g_ctl) return;
 
-    if (sigHandlerRegister(SIGUSR2, threadNow) == FALSE) {
-        scopeLogError("ERROR: threadInit:sigRegister");
-        return;
-    }
-
-    if (sigTimerStart(SIGUSR2, g_thread.interval) == FALSE) {
-        scopeLogError("ERROR: threadInit:sigTimerStart");
+    if (osThreadInit(threadNow, g_thread.interval) == FALSE) {
+        scopeLogError("ERROR: threadInit:osThreadInit");
     }
 }
 
@@ -956,7 +949,7 @@ stopTimer(void)
     // if we are in the constructor, do nothing
     if (!g_ctl) return;
 
-    sigTimerStop();
+    osTimerStop();
     threadNow(0, NULL, NULL);
 }
 
@@ -2124,14 +2117,16 @@ signal(int signum, sighandler_t handler) {
 
     if (signum == SIGUSR2) {
         // Our handler was already installed
-        if (sigIsAppcopeActionActive() == TRUE) {
-            // Extract & save the handler from signal API
+        if (osIsScopeHandlerActive() == TRUE) {
+            // grab the old
+            struct sigaction oldact = { 0 };
+            osGetAppSigaction(&oldact);
+
+            // save the new
             struct sigaction newact = { 0 };
             newact.sa_handler = handler;
-            sigSaveAppAction(&newact);
-            // Call the old handler
-            struct sigaction old = { 0 };
-            return old.sa_handler;
+            osSetAppSigaction(&newact);
+            return oldact.sa_handler;
         }
         return g_fn.signal(signum, handler);
     }
@@ -2169,10 +2164,20 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
     WRAP_CHECK(sigaction, -1);
 
     if (signum == SIGUSR2) {
-        // Our handler was already installed
-        if (sigIsAppcopeActionActive() == TRUE) {
+        if (osIsScopeHandlerActive() == TRUE) {
+            /*
+            * If scope handler was already installed installed, just save the incoming one.
+            * If no handler, they may just be checking for the current handler.
+            */
+            if (act == NULL) {
+                struct sigaction old = { 0 };
+                osGetAppSigaction(&old);
+                *oldact = old;
+                return 0;
+            }
             struct sigaction old = { 0 };
-            sigSaveAppAction(act);
+            osGetAppSigaction(&old);
+            osSetAppSigaction(act);
             if (oldact) {
                 *oldact = old;
             }
@@ -2195,7 +2200,6 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
             snapshotRetrieveAppSignalHandler(signum, &old);
             *oldact = old;
             return 0;
-
         }
 
         // if signum is part of the snapshotErrorsSignals, save the handler

@@ -47,6 +47,14 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 		shouldModify = false
 	}
 
+	// Use scope-pod-init to see if the pod is already mutated
+	// if so, don't double-mutate it
+	for i := 0; i < len(pod.Spec.InitContainers); i++ {
+		if pod.Spec.InitContainers[i].Name == "scope-pod-init" {
+			shouldModify = false
+		}
+	}
+
 	ver := internal.GetNormalizedVersion()
 
 	patch := []JSONPatchEntry{}
@@ -144,34 +152,29 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			// scope-pod-extract container(s) will extract the scope files (library and config files)
 			scopeDirPath := fmt.Sprintf("/scope/%d", i)
 			cmd := []string{
-				"/bin/sh",
-				"-c",
-			}
-			cmdStr := []string{
-				"mkdir",
-				scopeDirPath,
-				"&&",
 				"/scope/scope",
 				"excrete",
+				"--parents",
 			}
 			if len(app.CriblDest) > 0 {
-				cmdStr = append(cmdStr,
+				cmd = append(cmd,
 					"--cribldest",
 					app.CriblDest,
 				)
 			} else {
-				cmdStr = append(cmdStr,
+				cmd = append(cmd,
 					"--metricdest",
 					app.MetricDest,
 					"--metricformat",
 					app.MetricFormat,
+					"--metricprefix",
+					app.MetricPrefix,
 					"--eventdest",
 					app.EventDest,
 				)
 			}
 
-			cmdStr = append(cmdStr, scopeDirPath)
-			cmd = append(cmd, strings.Join(cmdStr, " "))
+			cmd = append(cmd, scopeDirPath)
 			pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
 				Name:            fmt.Sprintf("scope-pod-extract-%d", i),
 				Image:           pod.Spec.Containers[i].Image,

@@ -1,11 +1,11 @@
 package cmd
 
-/*
+// /*
 import (
 	"fmt"
 	"time"
 
-	"github.com/criblio/scope/bpf/sigdel"
+	"github.com/criblio/scope/bpf"
 	"github.com/criblio/scope/daemon"
 	"github.com/criblio/scope/snapshot"
 	"github.com/criblio/scope/util"
@@ -13,11 +13,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
- * Args Matrix (X disallows)
+/* Args Matrix (X disallows)
  *                 filedest 	sendcore
  * filedest        -
  * sendcore                     -
- *
+ */
 
 // daemonCmd represents the daemon command
 var daemonCmd = &cobra.Command{
@@ -40,17 +40,35 @@ var daemonCmd = &cobra.Command{
 			util.ErrAndExit("scope daemon requires administrator privileges")
 		}
 
-		// Buffered Channel (non-blocking until full)
-		sigEventChan := make(chan sigdel.SigEvent, 128)
-		go sigdel.Sigdel(sigEventChan)
+		loader, err := bpf.NewLoader("scope-ebpf")
+		if err != nil {
+			log.Error().Err(err)
+			util.ErrAndExit("scope-ebpf loader was not found. scope daemon requires that scope-ebpf loader need to run.")
+		}
 
+		sigdel, err := loader.NewSigdel()
+		if err != nil {
+			log.Error().Err(err)
+			util.ErrAndExit("scope-ebpf loader cannot create sigdel object")
+		}
+
+		// Buffered Channel (non-blocking until full)
+		sigDataChan := make(chan bpf.SigDelData, 128)
+
+		go sigdel.ReadData(sigDataChan)
+
+		// Terminate Loader
+		if err := loader.Terminate(); err != nil {
+			log.Error().Err(err)
+			util.ErrAndExit("scope daemon was not able to terminate ebpf loader")
+		}
 		d := daemon.New(filedest)
 		for {
 			select {
-			case sigEvent := <-sigEventChan:
+			case sigEvent := <-sigDataChan:
 				// Signal received
-				log.Info().Msgf("Signal CPU: %02d signal %d errno %d handler 0x%x pid: %d nspid: %d uid: %d gid: %d app %s\n",
-					sigEvent.CPU, sigEvent.Sig, sigEvent.Errno, sigEvent.Handler,
+				log.Info().Msgf("Signal signal: %d errno: %d handler: 0x%x pid: %d nspid: %d uid: %d gid: %d app %s\n",
+					sigEvent.Sig, sigEvent.Errno, sigEvent.Handler,
 					sigEvent.Pid, sigEvent.NsPid, sigEvent.Uid, sigEvent.Gid, sigEvent.Comm)
 
 				// TODO Filter out expected signals from libscope
@@ -94,4 +112,3 @@ func init() {
 	daemonCmd.Flags().BoolP("sendcore", "s", false, "Include core file when sending files to network destination")
 	RootCmd.AddCommand(daemonCmd)
 }
-*/

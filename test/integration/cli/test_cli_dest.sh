@@ -81,7 +81,9 @@ ERR+=$?
 scope run --eventdest=unix://$FILE_SOCKET ls
 ERR+=$?
 
-count=$(grep '"type":"metric"' $DEST_FILE | wc -l)
+# "type":"metric" appears in the proc start event 
+# the ,"body" in the grep statement ensures we only pick up real metrics
+count=$(grep '"type":"metric","body"' $DEST_FILE | wc -l)
 if [ $count -ne 0 ] ; then
     ERR+=1
 fi

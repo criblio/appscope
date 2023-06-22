@@ -154,6 +154,11 @@ spec:
       creationTimestamp: null
       labels:
         app: {{ .App }}
+{{- if not .ExporterDisable }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .ExporterPromPort }}"
+{{- end }}
     spec:
       serviceAccountName: scope-cert-sa
       containers:
@@ -162,7 +167,7 @@ spec:
           command: ["/bin/bash"]
           args:
           - "-c"
-          - "/usr/local/bin/scope k8s --server{{if .Debug}} --debug{{end}}{{if gt (len .MetricDest) 0}} --metricdest {{ .MetricDest }}{{end}}{{if and (gt (len .MetricFormat) 0) (eq (len .CriblDest) 0)}} --metricformat {{ .MetricFormat }}{{end}}{{if gt (len .EventDest) 0}} --eventdest {{ .EventDest }}{{end}}{{if gt (len .CriblDest) 0}} --cribldest {{ .CriblDest}}{{end}} || sleep 1000"
+          - "/usr/local/bin/scope k8s --server{{if .Debug}} --debug{{end}}{{if gt (len .MetricDest) 0}} --metricdest {{ .MetricDest }}{{end}}{{if and (gt (len .MetricFormat) 0) (eq (len .CriblDest) 0)}} --metricformat {{ .MetricFormat }} --metricprefix {{ .MetricPrefix }}{{end}}{{if gt (len .EventDest) 0}} --eventdest {{ .EventDest }}{{end}}{{if gt (len .CriblDest) 0}} --cribldest {{ .CriblDest}}{{end}} || sleep 1000"
           imagePullPolicy: IfNotPresent
           volumeMounts:
             - name: certs
@@ -171,10 +176,84 @@ spec:
           ports:
             - containerPort: {{ .Port }}
               protocol: TCP
+{{- if not .ExporterDisable }}
+        - name: {{ .App }}-stats-exporter
+          image: prom/statsd-exporter:v0.24.0
+          args:
+          {{- if eq .ExporterStatsDProtocol "tcp" }}
+          - --statsd.listen-tcp=:{{ .ExporterStatsDPort }}
+          {{- else if eq .ExporterStatsDProtocol "udp" }}
+          - --statsd.listen-udp=:{{ .ExporterStatsDPort }}
+          {{- end }}
+          - --web.listen-address=:{{ .ExporterPromPort }}
+          - --statsd.mapping-config=/tmp/mapping.conf
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: {{ .App }}-stats-exporter-mapping-config-file
+              mountPath: /tmp
+          ports:
+            {{- if eq .ExporterStatsDProtocol "tcp" }}
+            - containerPort: {{ .ExporterStatsDPort }}
+              protocol: TCP
+            {{- else if eq .ExporterStatsDProtocol "udp" }}
+            - containerPort: {{ .ExporterStatsDPort }}
+              protocol: UDP
+            {{- end }}
+            - containerPort: {{ .ExporterPromPort }}
+              protocol: TCP
+{{- end }}
       volumes:
         - name: certs
           secret:
             secretName: {{ .App }}-secret
+{{- if not .ExporterDisable }}
+        - name: {{ .App }}-stats-exporter-mapping-config-file
+          configMap:
+            name: {{ .App }}-stats-exporter-mapping-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .App }}-stats-exporter
+  namespace: {{ .Namespace }}
+spec:
+  type: ClusterIP
+  ports:
+    {{- if eq .ExporterStatsDProtocol "tcp" }}
+    - name: {{ .ExporterStatsDPort }}-stats-exporter-statsd-listen
+      protocol: TCP
+      port: {{ .ExporterStatsDPort }}
+      targetPort: {{ .ExporterStatsDPort }}
+    {{- else if eq .ExporterStatsDProtocol "udp" }}
+    - name: {{ .ExporterStatsDPort }}-stats-exporter-statsd-listen
+      protocol: UDP
+      port: {{ .ExporterStatsDPort }}
+      targetPort: {{ .ExporterStatsDPort }}
+    {{- end }}
+    - name: {{ .ExporterPromPort }}-stats-exporter-prometheus-http
+      protocol: TCP
+      port: {{ .ExporterPromPort }}
+      targetPort: {{ .ExporterPromPort }}
+  selector:
+    app: {{ .App }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .App }}-stats-exporter-mapping-config
+  namespace: {{ .Namespace }}
+data:
+  mapping.conf: |-
+    mappings:
+    - match: "http.duration.server"
+      help: "Total duration of http response"
+      observer_type: histogram
+      histogram_options:
+        buckets: [ 0.01, 0.025, 0.05, 0.1 ]
+        native_histogram_bucket_factor: 1.1
+        native_histogram_max_buckets: 256
+      name: "appscope_http_duration_server"
+{{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -207,5 +286,7 @@ data:
 // - "{{ .MetricDest }}"
 // - "--metricformat"
 // - "{{ .MetricFormat }}"
+// - "--metricprefix"
+// - "{{ .MetricPrefix }}"
 // - "--eventdest"
 // - "{{ .EventDest }}"

@@ -61,21 +61,21 @@ func GetPodmanPids() ([]int, error) {
 
 // Get the List of PID(s) related to specific container runtime
 func getContainerRuntimePids(runtimeProc string) ([]int, error) {
-	runtimeContPids, err := PidScopeMapByProcessName(runtimeProc)
+	runtimeContPids, err := PidScopeMapByProcessName("", runtimeProc)
 	if err != nil {
 		return nil, err
 	}
 	pids := make([]int, 0, len(runtimeContPids))
 
 	for runtimeContPid := range runtimeContPids {
-		childrenPids, err := PidChildren(runtimeContPid)
+		childrenPids, err := PidChildren("", runtimeContPid)
 		if err != nil {
 			return nil, err
 		}
 
 		// Iterate over all the children to found container init process
 		for _, childPid := range childrenPids {
-			status, _ := PidInitContainer(childPid)
+			status, _ := PidInitContainer("", childPid)
 			if status {
 				pids = append(pids, childPid)
 			}

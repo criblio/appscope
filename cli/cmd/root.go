@@ -13,7 +13,14 @@ import (
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
 	Use:   "scope",
-	Short: "Cribl AppScope Command Line Interface\n\nAppScope is a general-purpose observable application telemetry system.\n\nRunning `scope` with no subcommands will execute the `scope run` command.",
+	Short: "Cribl AppScope\n\nGain observability into any Linux command or application with no code modification.\n\nRunning `scope` with no subcommands will execute the `scope run` command.",
+	Example: `  scope curl wttr.in
+  scope events
+  scope metrics
+  scope flows
+  scope run -- git pull
+  scope attach top
+  scope filter --add nginx`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

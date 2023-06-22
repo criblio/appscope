@@ -43,7 +43,7 @@ var dashCmd = &cobra.Command{
 	Use:     "dash [flags]",
 	Short:   "Display scope dashboard for a previous or active session",
 	Long:    `Displays an interactive dashboard with an overview of what's happening with the selected session.`,
-	Example: `scope dash`,
+	Example: `  scope dash`,
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		id, _ := cmd.Flags().GetInt("id")

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <sys/types.h>
 
 #include "scopestdlib.h"
 #include "utils.h"
@@ -11,7 +12,10 @@
 #include "dbg.h"
 #include "runtimecfg.h"
 #include "plattime.h"
+#include "scopeelf.h"
 
+#define SYSPRINT_CONSOLE 0
+#define PRINT_BUF_SIZE 1024
 #define MAC_ADDR_LEN 17
 #define ZERO_MACHINE_ID "00000000000000000000000000000000"
 
@@ -28,6 +32,27 @@ static int createMachineID(char *string);
 static int getMacAddr(char *string);
 
 rtconfig g_cfg = {0};
+
+void
+sysprint(const char* fmt, ...)
+{
+    // Create the string
+    char str[PRINT_BUF_SIZE];
+
+    if (fmt) {
+        va_list args;
+        va_start(args, fmt);
+        int rv = scope_vsnprintf(str, PRINT_BUF_SIZE, fmt, args);
+        va_end(args);
+        if (rv == -1) return;
+    }
+
+    // Output the string
+#if SYSPRINT_CONSOLE > 0
+    scope_printf("%s", str);
+#endif
+    scopeLog(CFG_LOG_DEBUG, "%s", str);
+}
 
 unsigned int
 strToVal(enum_map_t map[], const char *str)
@@ -53,13 +78,30 @@ int
 checkEnv(char *env, char *val)
 {
     char *estr;
-    if (((estr = getenv(env)) != NULL) &&
+    if (((estr = fullGetEnv(env)) != NULL) &&
        (scope_strncmp(estr, val, scope_strlen(estr)) == 0)) {
         return TRUE;
     }
     return FALSE;
 }
 
+extern char** environ;
+
+/*
+ * fullGetEnv allows to get an environment variable directly from environ
+ * Note:
+ * The implementation of fullGetEnv is corresponding to the getenv defined in
+ * our internal library
+ */
+char *
+fullGetEnv(char *name) {
+    size_t l = scope_strchrnul(name, '=') - name;
+    if (l && !name[l] && environ)
+        for (char **e = environ; *e; e++)
+            if (!scope_strncmp(name, *e, l) && l[*e] == '=')
+                return *e + l+1;
+    return NULL;
+}
 
 int
 fullSetenv(const char *key, const char *val, int overwrite)
@@ -155,7 +197,7 @@ getpath(const char *cmd)
     }
 
     // try to resolve the cmd from PATH env variable
-    char *path_env_ptr = getenv("PATH");
+    char *path_env_ptr = fullGetEnv("PATH");
     if (!path_env_ptr) goto out;
     path_env = scope_strdup(path_env_ptr); // create a copy for strtok below
     if (!path_env) goto out;
@@ -494,3 +536,67 @@ sigSafeWriteNumber(int fd, long val, int base) {
     return scope_write(fd, buf ,msgLen);
 }
 
+/*
+ * Returns normalized version string
+ * - "dev" for unofficial release
+ * - "%d.%d.%d" for official release (e.g. "1.3.0" for "v1.3.0")
+ * - "%d.%d.%d-%s%d" for candidate release (e.g. "1.3.0-rc0" for "v1.3.0-rc0")
+ */
+const char *
+libVersion(const char *version) {
+
+    if ((version == NULL) || (*version != 'v')) {
+        return "dev";
+    }
+
+    ++version;
+    size_t versionSize = scope_strlen(version);
+
+    for (int i = 0; i < versionSize; ++i) {
+        // Only digit and "." are accepted
+        if ((scope_isdigit(version[i]) == 0) && version[i] != '.' &&
+            version[i] != '-' && version[i] != 't' && version[i] != 'c' &&
+            version[i] != 'r') {
+            return "dev";
+        }
+        if (i == 0 || i == versionSize) {
+            // First and last character must be number
+            if (scope_isdigit(version[i]) == 0) {
+                return "dev";
+            }
+        }
+    }
+    return version;
+}
+
+#define EDGE_PATH_DOCKER "/var/run/appscope/appscope.sock"
+#define EDGE_PATH_DEFAULT "/opt/cribl/state/appscope.sock"
+#define READ_AND_WRITE (R_OK|W_OK)
+
+char *
+edgePath(void) {
+    // 1) If EDGE_PATH_DOCKER can be accessed, return that.
+    if (scope_access(EDGE_PATH_DOCKER, READ_AND_WRITE) == 0) {
+        return scope_strdup(EDGE_PATH_DOCKER);
+    }
+
+    // 2) If CRIBL_HOME is defined and can be accessed,
+    //    return $CRIBL_HOME/state/appscope.sock
+    const char *cribl_home = getenv("CRIBL_HOME");
+    if (cribl_home) {
+        char *new_path = NULL;
+        if (scope_asprintf(&new_path, "%s/%s", cribl_home, "state/appscope.sock") > 0) {
+            if (scope_access(new_path, READ_AND_WRITE) == 0) {
+                return new_path;
+            }
+            scope_free(new_path);
+        }
+    }
+
+    // 3) If EDGE_PATH_DEFAULT can be accessed, return it
+    if (scope_access(EDGE_PATH_DEFAULT, READ_AND_WRITE) == 0) {
+        return scope_strdup(EDGE_PATH_DEFAULT);
+    }
+
+    return NULL;
+}

@@ -1,0 +1,17 @@
+{
+	"process":	{
+		"env":	["PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LD_PRELOAD=/opt/libscope.so:/usr/test.so", "SCOPE_SETUP_DONE=true"]
+	},
+	"mounts":	[{
+			"destination":	"/opt/scope",
+			"type":	"bind",
+			"source":	"/tmp/appscope/dev/scope",
+			"options":	["rbind", "rprivate"]
+		}],
+	"hooks":	{
+		"startContainer":	[{
+				"path":	"/opt/scope",
+				"args":	["/opt/scope", "extract", "/opt"]
+			}]
+	}
+}

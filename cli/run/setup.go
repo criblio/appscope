@@ -3,6 +3,7 @@ package run
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -42,10 +43,55 @@ func CreateAll(path string) error {
 	return nil
 }
 
+// readBytesStdIn reads the byte data from stdin
+func readBytesStdIn() []byte {
+	var cfgData []byte
+
+	stdinFs, err := os.Stdin.Stat()
+	if err != nil {
+		return cfgData
+	}
+
+	// Avoid waiting for input from terminal when no data was provided
+	if stdinFs.Mode()&os.ModeCharDevice != 0 && stdinFs.Size() == 0 {
+		return cfgData
+	}
+
+	cfgData, _ = io.ReadAll(os.Stdin)
+
+	return cfgData
+}
+
+// LoadConfig loads a config if not yet defined
+// Config will be loaded from (first of):
+// - File via --userconfig option
+// - StdIn if @tryStdIn is true
+// - Run options
+func (rc *Config) LoadConfig(tryStdIn bool) {
+	if rc.sc == nil {
+		if rc.UserConfig == "" {
+			var stdInData []byte
+			if tryStdIn {
+				stdInData = readBytesStdIn()
+			}
+			if len(stdInData) > 0 {
+				err := rc.ConfigFromStdin(stdInData)
+				util.CheckErrSprintf(err, "%v", err)
+			} else {
+				err := rc.configFromRunOpts()
+				util.CheckErrSprintf(err, "%v", err)
+			}
+		} else {
+			err := rc.ConfigFromFile()
+			util.CheckErrSprintf(err, "%v", err)
+		}
+	}
+}
+
 // setupWorkDir sets up a working directory for a given set of args
 func (rc *Config) setupWorkDir(args []string, attach bool) {
-
 	// Override to CriblDest if specified
+	// TODO still needed?
 	if rc.CriblDest != "" {
 		rc.EventsDest = rc.CriblDest
 		rc.MetricsDest = rc.CriblDest
@@ -55,25 +101,8 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 	rc.createWorkDir(args, attach)
 
 	// Build or load config
-	if rc.UserConfig == "" {
-		err := rc.configFromRunOpts()
-		util.CheckErrSprintf(err, "%v", err)
-	} else {
-		err := rc.ConfigFromFile()
-		util.CheckErrSprintf(err, "%v", err)
-	}
-
-	// Update paths to absolute for file transports
-	if rc.sc.Metric.Transport.TransportType == "file" {
-		newPath, err := filepath.Abs(rc.sc.Metric.Transport.Path)
-		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", rc.sc.Metric.Transport.Path, err)
-		rc.sc.Metric.Transport.Path = newPath
-	}
-	if rc.sc.Event.Transport.TransportType == "file" {
-		newPath, err := filepath.Abs(rc.sc.Event.Transport.Path)
-		util.CheckErrSprintf(err, "error getting absolute path for %s: %v", rc.sc.Event.Transport.Path, err)
-		rc.sc.Event.Transport.Path = newPath
-	}
+	// Note: Read the data from stdin only during attach
+	rc.LoadConfig(attach)
 
 	// Populate session directory
 	rc.populateWorkDir(args, attach)
@@ -81,6 +110,9 @@ func (rc *Config) setupWorkDir(args []string, attach bool) {
 
 // createWorkDir creates a working directory
 func (rc *Config) createWorkDir(args []string, attach bool) {
+	var pid string
+	var cmd string
+
 	dirPerms := os.FileMode(0755)
 	if attach {
 		dirPerms = 0777
@@ -101,9 +133,18 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 
 	// Directories named CMD_SESSIONID_PID_TIMESTAMP
 	ts := strconv.FormatInt(rc.now().UTC().UnixNano(), 10)
-	pid := strconv.Itoa(os.Getpid())
 	sessionID := GetSessionID()
-	tmpDirName := path.Base(args[0]) + "_" + sessionID + "_" + pid + "_" + ts
+	if attach {
+		// When we attach args[0] points to pid of desired process
+		pid = args[0]
+		pidInt, _ := strconv.Atoi(args[0])
+		cmd, _ = util.PidCommand(rc.Rootdir, pidInt)
+	} else {
+		pid = strconv.Itoa(os.Getpid())
+		cmd = path.Base(args[0])
+	}
+
+	tmpDirName := cmd + "_" + sessionID + "_" + pid + "_" + ts
 
 	// Create History directory
 	histDir := HistoryDir()
@@ -112,7 +153,7 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 
 	// Sudo user warning
 	if _, present := os.LookupEnv("SUDO_USER"); present {
-		fmt.Printf("WARNING: Session history will be stored in %s and owned by root\n", histDir)
+		util.Warn("WARNING: Session history will be stored in %s and owned by root\n", histDir)
 	}
 
 	// Create Working directory
@@ -121,7 +162,6 @@ func (rc *Config) createWorkDir(args []string, attach bool) {
 		if !util.CheckDirExists("/tmp") {
 			util.ErrAndExit("/tmp directory does not exist")
 		}
-
 		// Create working directory in /tmp (0777 permissions)
 		rc.WorkDir = filepath.Join("/tmp", tmpDirName)
 		err := os.Mkdir(rc.WorkDir, dirPerms)
@@ -208,6 +248,12 @@ func (rc *Config) populateWorkDir(args []string, attach bool) {
 
 	// Create args.json file
 	argsJSONPath := filepath.Join(rc.WorkDir, "args.json")
+	if attach {
+		// When we attach args[0] points to pid of desired process
+		pid, _ := strconv.Atoi(args[0])
+		cmdLine, _ := util.PidCmdline(rc.Rootdir, pid)
+		args = strings.Split(cmdLine, " ")
+	}
 	argsBytes, err := json.Marshal(args)
 	util.CheckErrSprintf(err, "error marshaling JSON: %v", err)
 	err = os.WriteFile(argsJSONPath, argsBytes, filePerms)
@@ -269,4 +315,66 @@ func (rc *Config) buildEventsDest() string {
 		}
 	}
 	return dest
+}
+
+func (rc *Config) CreateWorkDirBasic(cmd string) {
+	// Directories named CMD_SESSIONID_PID_TIMESTAMP
+	ts := strconv.FormatInt(time.Now().UTC().UnixNano(), 10)
+	pid := strconv.Itoa(os.Getpid())
+	sessionID := GetSessionID()
+	tmpDirName := path.Base(cmd + "_" + sessionID + "_" + pid + "_" + ts)
+
+	// Create History directory
+	histDir := HistoryDir()
+	err := os.MkdirAll(histDir, 0755)
+	util.CheckErrSprintf(err, "error creating history dir: %v", err)
+
+	// Sudo user warning
+	if _, present := os.LookupEnv("SUDO_USER"); present {
+		util.Warn("WARNING: Session logs will be stored in %s and owned by root\n", histDir)
+	}
+
+	// Create working directory in history/
+	rc.WorkDir = filepath.Join(HistoryDir(), tmpDirName)
+	err = os.Mkdir(rc.WorkDir, 0755)
+	util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
+
+	// Populate working directory
+	// Create Log file
+	filePerms := os.FileMode(0644)
+	internal.CreateLogFile(filepath.Join(rc.WorkDir, "scope.log"), filePerms)
+	internal.SetDebug()
+}
+
+// GetAppScopeVerDir returns the directory path which will be used for handling the scope file
+// /usr/lib/appscope/<version>/
+// or
+// /tmp/appscope/<version>/
+func GetAppScopeVerDir() (string, error) {
+	version := internal.GetNormalizedVersion()
+	var appscopeVersionPath string
+
+	// Check /usr/lib/appscope only for official version
+	if !internal.IsVersionDev() {
+		appscopeVersionPath = filepath.Join("/usr/lib/appscope/", version)
+		if _, err := os.Stat(appscopeVersionPath); err != nil {
+			if err := os.MkdirAll(appscopeVersionPath, 0755); err != nil {
+				return appscopeVersionPath, err
+			}
+			err := os.Chmod(appscopeVersionPath, 0755)
+			return appscopeVersionPath, err
+		}
+		return appscopeVersionPath, nil
+	}
+
+	appscopeVersionPath = filepath.Join("/tmp/appscope/", version)
+	if _, err := os.Stat(appscopeVersionPath); err != nil {
+		if err := os.MkdirAll(appscopeVersionPath, 0777); err != nil {
+			return appscopeVersionPath, err
+		}
+		err := os.Chmod(appscopeVersionPath, 0777)
+		return appscopeVersionPath, err
+	}
+	return appscopeVersionPath, nil
+
 }

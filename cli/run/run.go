@@ -18,6 +18,7 @@ type Config struct {
 	MetricsDest   string
 	EventsDest    string
 	MetricsFormat string
+	MetricsPrefix string
 	CriblDest     string
 	Subprocess    bool
 	Loglevel      string
@@ -29,6 +30,7 @@ type Config struct {
 	CommandDir    string
 	Coredump      bool
 	Backtrace     bool
+	Rootdir       string
 
 	now func() time.Time
 	sc  *libscope.ScopeConfig

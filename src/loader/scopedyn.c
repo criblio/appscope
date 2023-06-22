@@ -10,7 +10,6 @@
 #include "loaderutils.h"
 #include "scopetypes.h"
 
-int g_log_level = CFG_LOG_WARN;
 unsigned long g_libscopesz;
 unsigned long g_scopedynsz;
 
@@ -30,7 +29,7 @@ main(int argc, char** argv)
         goto out;
     }
 
-    scopeLibPath = (char *)libdirGetPath();
+    scopeLibPath = (char *)libdirGetPath(LIBRARY_FILE);
     if (!scopeLibPath) {
         fprintf(stderr, "error: libdirGetPath\n");
         goto out;

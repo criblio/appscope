@@ -57,23 +57,23 @@ testDirPath(char *path, const char *argv0) {
 }
 
 // mimics behavior of retrieving the default filter path
-static const char*
+static const char *
 testAccessFilterPath(const char *filterPath) {
     return (scope_access(filterPath, R_OK) == 0) ? filterPath : NULL;
 }
 
 static void
-openFileAndExecuteCfgProcessCommands(const char* path, config_t* cfg)
+openFileAndExecuteCfgProcessCommands(const char *path, config_t *cfg)
 {
-    FILE* f = scope_fopen(path, "r");
+    FILE *f = scope_fopen(path, "r");
     cfgProcessCommands(cfg, f);
     scope_fclose(f);
 }
 
 static void
-cfgPathHonorsEnvVar(void** state)
+cfgPathHonorsEnvVar(void **state)
 {
-    const char* file_path = "/tmp/myfile.yml";
+    const char *file_path = "/tmp/myfile.yml";
 
     // grab the current working directory
     char origdir[MAX_PATH];
@@ -99,7 +99,7 @@ cfgPathHonorsEnvVar(void** state)
     // Verify that if there is an env variable, and a file, cfgPath is defined
     int fd = scope_open(file_path, O_RDWR | O_CREAT, S_IRUSR | S_IRGRP | S_IROTH);
     assert_return_code(fd, scope_errno);
-    char* path = cfgPath();
+    char *path = cfgPath();
     assert_non_null(path);
     assert_string_equal(path, file_path);
 
@@ -116,25 +116,25 @@ cfgPathHonorsEnvVar(void** state)
 
 /*
 static void
-cfgPathHonorsPriorityOrder(void** state)
+cfgPathHonorsPriorityOrder(void **state)
 {
     // there is something amiss with creating the newdir[] entries in this test
     // when running in a CI environment so we're skipping it for now.
-    const char* CI = getenv("CI");
+    const char *CI = getenv("CI");
     if (CI) {
         skip();
         return;
     }
 
     // Get HOME env variable
-    const char* home = getenv("HOME");
+    const char *home = getenv("HOME");
     assert_non_null(home);
     char homeConfDir[MAX_PATH];
     int rv = snprintf(homeConfDir, sizeof(homeConfDir), "%s/conf", home);
     assert_int_not_equal(rv, -1);
 
     // Create temp directories
-    const char* newdir[] = {"testtempdir1", "testtempdir2", 
+    const char *newdir[] = {"testtempdir1", "testtempdir2", 
                       "testtempdir1/conf", "testtempdir2/conf", 
                       homeConfDir};
     int i;
@@ -185,7 +185,7 @@ cfgPathHonorsPriorityOrder(void** state)
         int fd = creat(path[i], 0777);
         assert_int_not_equal(fd, -1);
         assert_int_equal(close(fd), 0);
-        char* result = cfgPath();
+        char *result = cfgPath();
         assert_non_null(result);
 	if (strcmp(result, path[i])) {
             fail_msg("Expected %s but found %s for i=%d", path[i], result, i);
@@ -209,9 +209,9 @@ cfgPathHonorsPriorityOrder(void** state)
 */
 
 static void
-cfgProcessEnvironmentMtcEnable(void** state)
+cfgProcessEnvironmentMtcEnable(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgMtcEnableSet(cfg, FALSE);
     assert_int_equal(cfgMtcEnable(cfg), FALSE);
 
@@ -240,9 +240,9 @@ cfgProcessEnvironmentMtcEnable(void** state)
 }
 
 static void
-cfgProcessEnvironmentMtcFormat(void** state)
+cfgProcessEnvironmentMtcFormat(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgMtcFormatSet(cfg, CFG_FMT_NDJSON);
     assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_NDJSON);
 
@@ -271,9 +271,9 @@ cfgProcessEnvironmentMtcFormat(void** state)
 }
 
 static void
-cfgProcessEnvironmentStatsDPrefix(void** state)
+cfgProcessEnvironmentStatsDPrefix(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgMtcStatsDPrefixSet(cfg, "something");
     assert_string_equal(cfgMtcStatsDPrefix(cfg), "something.");
 
@@ -302,9 +302,9 @@ cfgProcessEnvironmentStatsDPrefix(void** state)
 }
 
 static void
-cfgProcessEnvironmentStatsDMaxLen(void** state)
+cfgProcessEnvironmentStatsDMaxLen(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgMtcStatsDMaxLenSet(cfg, 0);
     assert_int_equal(cfgMtcStatsDMaxLen(cfg), 0);
 
@@ -366,9 +366,9 @@ cfgProcessEnvironmentWatchStatsdEnable(void **state)
 
 
 static void
-cfgProcessEnvironmentMtcPeriod(void** state)
+cfgProcessEnvironmentMtcPeriod(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgMtcPeriodSet(cfg, 0);
     assert_int_equal(cfgMtcPeriod(cfg), 0);
 
@@ -397,9 +397,9 @@ cfgProcessEnvironmentMtcPeriod(void** state)
 }
 
 static void
-cfgProcessEnvironmentCommandDir(void** state)
+cfgProcessEnvironmentCommandDir(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgCmdDirSet(cfg, "/my/favorite/directory");
     assert_string_equal(cfgCmdDir(cfg), "/my/favorite/directory");
 
@@ -428,9 +428,9 @@ cfgProcessEnvironmentCommandDir(void** state)
 }
 
 static void
-cfgProcessEnvironmentConfigEvent(void** state)
+cfgProcessEnvironmentConfigEvent(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgSendProcessStartMsgSet(cfg, FALSE);
     assert_int_equal(cfgSendProcessStartMsg(cfg), FALSE);
 
@@ -460,9 +460,9 @@ cfgProcessEnvironmentConfigEvent(void** state)
 }
 
 static void
-cfgProcessEnvironmentEvtEnable(void** state)
+cfgProcessEnvironmentEvtEnable(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgEvtEnableSet(cfg, FALSE);
     assert_int_equal(cfgEvtEnable(cfg), FALSE);
 
@@ -491,9 +491,9 @@ cfgProcessEnvironmentEvtEnable(void** state)
 }
 
 static void
-cfgProcessEnvironmentEventFormat(void** state)
+cfgProcessEnvironmentEventFormat(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgEventFormatSet(cfg, CFG_FMT_NDJSON);
     assert_int_equal(cfgEventFormat(cfg), CFG_FMT_NDJSON);
 
@@ -522,9 +522,9 @@ cfgProcessEnvironmentEventFormat(void** state)
 }
 
 static void
-cfgProcessEnvironmentMaxEps(void** state)
+cfgProcessEnvironmentMaxEps(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgEvtRateLimitSet(cfg, 0);
     assert_int_equal(cfgEvtRateLimit(cfg), 0);
 
@@ -553,9 +553,9 @@ cfgProcessEnvironmentMaxEps(void** state)
 }
 
 static void
-cfgProcessEnvironmentEnhanceFs(void** state)
+cfgProcessEnvironmentEnhanceFs(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgEnhanceFsSet(cfg, FALSE);
     assert_int_equal(cfgEnhanceFs(cfg), FALSE);
 
@@ -585,17 +585,17 @@ cfgProcessEnvironmentEnhanceFs(void** state)
 
 typedef struct
 {
-    const char* env_name;
+    const char *env_name;
     watch_t   src;
     unsigned    default_val;
 } source_state_t;
 
 static void
-cfgProcessEnvironmentEventSource(void** state)
+cfgProcessEnvironmentEventSource(void **state)
 {
-    source_state_t* data = (source_state_t*)state[0];
+    source_state_t *data = (source_state_t*)state[0];
 
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     assert_int_equal(cfgEvtFormatSourceEnabled(cfg, data->src), data->default_val);
 
     cfgEvtFormatSourceEnabledSet(cfg, data->src, 0);
@@ -627,9 +627,9 @@ cfgProcessEnvironmentEventSource(void** state)
 
 
 static void
-cfgProcessEnvironmentMtcVerbosity(void** state)
+cfgProcessEnvironmentMtcVerbosity(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgMtcVerbositySet(cfg, 0);
     assert_int_equal(cfgMtcVerbosity(cfg), 0);
 
@@ -658,9 +658,9 @@ cfgProcessEnvironmentMtcVerbosity(void** state)
 }
 
 static void
-cfgProcessEnvironmentLogLevel(void** state)
+cfgProcessEnvironmentLogLevel(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgLogLevelSet(cfg, CFG_LOG_DEBUG);
     assert_int_equal(cfgLogLevel(cfg), CFG_LOG_DEBUG);
 
@@ -690,16 +690,16 @@ cfgProcessEnvironmentLogLevel(void** state)
 
 typedef struct
 {
-    const char* env_name;
+    const char *env_name;
     which_transport_t transport;
 } dest_state_t;
 
 static void
-cfgProcessEnvironmentTransport(void** state)
+cfgProcessEnvironmentTransport(void **state)
 {
-    dest_state_t* data = (dest_state_t*)state[0];
+    dest_state_t *data = (dest_state_t*)state[0];
 
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
 
     // should override current cfg
     assert_int_equal(setenv(data->env_name, "udp://host:234", 1), 0);
@@ -746,9 +746,9 @@ cfgProcessEnvironmentTransport(void** state)
 }
 
 static void
-cfgProcessEnvironmentStatsdTags(void** state)
+cfgProcessEnvironmentStatsdTags(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgCustomTagAdd(cfg, "NAME1", "val1");
     assert_non_null(cfgCustomTags(cfg));
     assert_string_equal(cfgCustomTagValue(cfg, "NAME1"), "val1");
@@ -787,7 +787,7 @@ cfgProcessEnvironmentStatsdTags(void** state)
 static void
 cfgProcessEnvironmentPayEnable(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgPayEnableSet(cfg, FALSE);
     assert_int_equal(cfgPayEnable(cfg), FALSE);
 
@@ -818,7 +818,7 @@ cfgProcessEnvironmentPayEnable(void **state)
 static void
 cfgProcessEnvironmentPayDir(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgPayDirSet(cfg, "/my/favorite/directory");
     assert_string_equal(cfgPayDir(cfg), "/my/favorite/directory");
 
@@ -847,14 +847,14 @@ cfgProcessEnvironmentPayDir(void **state)
 }
 
 static void
-cfgProcessEnvironmentCmdDebugIsIgnored(void** state)
+cfgProcessEnvironmentCmdDebugIsIgnored(void **state)
 {
-    const char* path = "/tmp/dbgoutfile.txt";
+    const char *path = "/tmp/dbgoutfile.txt";
     assert_int_equal(setenv("SCOPE_CMD_DBG_PATH", path, 1), 0);
 
     long file_pos_before = fileEndPosition(path);
 
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     cfgProcessEnvironment(cfg);
     cfgDestroy(&cfg);
 
@@ -868,14 +868,14 @@ cfgProcessEnvironmentCmdDebugIsIgnored(void** state)
 }
 
 static void
-cfgProcessCommandsCmdDebugIsProcessed(void** state)
+cfgProcessCommandsCmdDebugIsProcessed(void **state)
 {
-    const char* outpath = "/tmp/dbgoutfile.txt";
-    const char* inpath = "/tmp/dbginfile.txt";
+    const char *outpath = "/tmp/dbgoutfile.txt";
+    const char *inpath = "/tmp/dbginfile.txt";
 
     long file_pos_before = fileEndPosition(outpath);
 
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     writeFile(inpath, "SCOPE_CMD_DBG_PATH=/tmp/dbgoutfile.txt");
     openFileAndExecuteCfgProcessCommands(inpath, cfg);
     cfgDestroy(&cfg);
@@ -890,12 +890,12 @@ cfgProcessCommandsCmdDebugIsProcessed(void** state)
 }
 
 static void
-cfgProcessCommandsFromFile(void** state)
+cfgProcessCommandsFromFile(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
-    const char* path = "/tmp/test.file";
+    const char *path = "/tmp/test.file";
 
     // Just making sure these don't crash us.
     cfgProcessCommands(NULL, NULL);
@@ -910,10 +910,6 @@ cfgProcessCommandsFromFile(void** state)
     writeFile(path, "\nSCOPE_METRIC_FORMAT=statsd\r\nblah");
     openFileAndExecuteCfgProcessCommands(path, cfg);
     assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_STATSD);
-
-    writeFile(path, "blah\nSCOPE_METRIC_FORMAT=ndjson");
-    openFileAndExecuteCfgProcessCommands(path, cfg);
-    assert_int_equal(cfgMtcFormat(cfg), CFG_FMT_NDJSON);
 
     // just demonstrating that the "last one wins"
     writeFile(path, "SCOPE_METRIC_FORMAT=ndjson\n"
@@ -1044,12 +1040,12 @@ cfgProcessCommandsFromFile(void** state)
 }
 
 static void
-cfgProcessCommandsEnvSubstitution(void** state)
+cfgProcessCommandsEnvSubstitution(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
-    const char* path = "/tmp/test.file";
+    const char *path = "/tmp/test.file";
 
     // test everything else once
     writeFile(path,
@@ -1143,7 +1139,7 @@ cfgProcessCommandsEnvSubstitution(void** state)
 }
 
 static void
-verifyDefaults(config_t* config)
+verifyDefaults(config_t *config)
 {
     assert_int_equal       (cfgMtcEnable(config), DEFAULT_MTC_ENABLE);
     assert_int_equal       (cfgMtcFormat(config), DEFAULT_MTC_FORMAT);
@@ -1222,15 +1218,15 @@ verifyDefaults(config_t* config)
 }
 
 static void
-cfgReadGoodYaml(void** state)
+cfgReadGoodYaml(void **state)
 {
     // Test file config (yaml)
-    const char* yamlText =
+    const char *yamlText =
         "---\n"
         "metric:\n"
         "  enable: false\n"
         "  format:\n"
-        "    type: ndjson                    # statsd, ndjson\n"
+        "    type: statsd                # statsd, ndjson\n"
         "    statsdprefix : 'cribl.scope'    # prepends each statsd metric\n"
         "    statsdmaxlen : 1024             # max size of a formatted statsd string\n"
         "    verbosity: 3                    # 0-9 (0 is least verbose, 9 is most)\n"
@@ -1284,14 +1280,13 @@ cfgReadGoodYaml(void** state)
         "    path: '@abstractsock'\n"
         "  authtoken: ''\n"
         "...\n";
-    const char* path = CFG_FILE_NAME;
+    const char *path = CFG_FILE_NAME;
     writeFile(path, yamlText);
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* config = cfgRead(path);
+    config_t *config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcEnable(config), FALSE);
-    assert_int_equal(cfgMtcFormat(config), CFG_FMT_NDJSON);
     assert_string_equal(cfgMtcStatsDPrefix(config), "cribl.scope.");
     assert_int_equal(cfgMtcStatsDMaxLen(config), 1024);
     assert_int_equal(cfgMtcWatchEnable(config, CFG_MTC_STATSD), FALSE);
@@ -1346,12 +1341,12 @@ cfgReadGoodYaml(void** state)
 }
 
 static void
-cfgReadStockYaml(void** state)
+cfgReadStockYaml(void **state)
 {
     // The stock scope.yml file up in ../conf/ should parse to the defaults.
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* config = cfgRead("./conf/scope.yml");
+    config_t *config = cfgRead("./conf/scope.yml");
     verifyDefaults(config);
     cfgDestroy(&config);
     lstDestroy(&g_protlist);
@@ -1359,7 +1354,7 @@ cfgReadStockYaml(void** state)
 }
 
 static void
-writeFileWithSubstitution(const char* path, const char* base, const char* variable)
+writeFileWithSubstitution(const char *path, const char *base, const char *variable)
 {
     char buf[4096];
     int n = snprintf(buf, sizeof(buf), base, variable);
@@ -1372,30 +1367,30 @@ writeFileWithSubstitution(const char* path, const char* base, const char* variab
 }
 
 static void
-cfgReadEveryTransportType(void** state)
+cfgReadEveryTransportType(void **state)
 {
-    const char* yamlText =
+    const char *yamlText =
         "---\n"
         "metric:\n"
         "  transport:\n"
         "%s"
         "...\n";
 
-    const char* udp_str =
+    const char *udp_str =
         "    type: udp\n"
         "    host: 'labmachine8235'\n"
         "    port: 'ntp'\n";
-    const char* unix_str =
+    const char *unix_str =
         "    type: unix\n"
         "    path: '@scope.sock'\n";
-    const char* file_str =
+    const char *file_str =
         "    type: file\n"
         "    path: '/var/log/scope.log'\n";
-    const char* edge_str =
+    const char *edge_str =
         "    type: edge\n";
-    const char* transport_lines[] = {udp_str, unix_str, file_str, edge_str};
+    const char *transport_lines[] = {udp_str, unix_str, file_str, edge_str};
 
-    const char* path = CFG_FILE_NAME;
+    const char *path = CFG_FILE_NAME;
 
     int i;
     for (i = 0; i<sizeof(transport_lines) / sizeof(transport_lines[0]); i++) {
@@ -1403,7 +1398,7 @@ cfgReadEveryTransportType(void** state)
         writeFileWithSubstitution(path, yamlText, transport_lines[i]);
         g_protlist = lstCreate(destroyProtEntry);
         assert_non_null(g_protlist);
-        config_t* config = cfgRead(path);
+        config_t *config = cfgRead(path);
 
         if (transport_lines[i] == udp_str) {
                 assert_int_equal(cfgTransportType(config, CFG_MTC), CFG_UDP);
@@ -1428,24 +1423,24 @@ cfgReadEveryTransportType(void** state)
 }
 
 static void
-cfgReadEveryProcessLevel(void** state)
+cfgReadEveryProcessLevel(void **state)
 {
-    const char* yamlText =
+    const char *yamlText =
         "---\n"
         "libscope:\n"
         "  log:\n"
         "    level: %s\n"
         "...\n";
 
-    const char* path = CFG_FILE_NAME;
-    const char* level[] = { "trace", "debug", "info", "warning", "error", "none"};
+    const char *path = CFG_FILE_NAME;
+    const char *level[] = { "trace", "debug", "info", "warning", "error", "none"};
     cfg_log_level_t value[] = {CFG_LOG_TRACE, CFG_LOG_DEBUG, CFG_LOG_INFO, CFG_LOG_WARN, CFG_LOG_ERROR, CFG_LOG_NONE};
     int i;
     for (i = 0; i< sizeof(level)/sizeof(level[0]); i++) {
         writeFileWithSubstitution(path, yamlText, level[i]);
         g_protlist = lstCreate(destroyProtEntry);
         assert_non_null(g_protlist);
-        config_t* config = cfgRead(path);
+        config_t *config = cfgRead(path);
         assert_int_equal(cfgLogLevel(config), value[i]);
         deleteFile(path);
         cfgDestroy(&config);
@@ -1455,7 +1450,7 @@ cfgReadEveryProcessLevel(void** state)
 }
 
 // Test file config (json)
-const char* jsonText =
+const char *jsonText =
     "{\n"
     "  'metric': {\n"
     "    'enable': 'true',\n"
@@ -1527,13 +1522,13 @@ const char* jsonText =
     "}\n";
 
 static void
-cfgReadGoodJson(void** state)
+cfgReadGoodJson(void **state)
 {
-    const char* path = CFG_FILE_NAME;
+    const char *path = CFG_FILE_NAME;
     writeFile(path, jsonText);
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* config = cfgRead(path);
+    config_t *config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcEnable(config), TRUE);
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_NDJSON);
@@ -1595,11 +1590,11 @@ cfgReadGoodJson(void** state)
 }
 
 static void
-cfgReadNonExistentFileReturnsDefaults(void** state)
+cfgReadNonExistentFileReturnsDefaults(void **state)
 {
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* config = cfgRead("../thisFileNameWontBeFoundAnywhere.txt");
+    config_t *config = cfgRead("../thisFileNameWontBeFoundAnywhere.txt");
     verifyDefaults(config);
     cfgDestroy(&config);
     lstDestroy(&g_protlist);
@@ -1607,9 +1602,9 @@ cfgReadNonExistentFileReturnsDefaults(void** state)
 }
 
 static void
-cfgReadBadYamlReturnsDefaults(void** state)
+cfgReadBadYamlReturnsDefaults(void **state)
 {
-    const char* yamlText =
+    const char *yamlText =
         "---\n"
         "metric:\n"
         "  format: ndjson\n"
@@ -1623,12 +1618,12 @@ cfgReadBadYamlReturnsDefaults(void** state)
         "    transport:\n"
         "      type: syslog\n"
         "...\n";
-    const char* path = CFG_FILE_NAME;
+    const char *path = CFG_FILE_NAME;
     writeFile(path, yamlText);
 
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* config = cfgRead(path);
+    config_t *config = cfgRead(path);
     verifyDefaults(config);
 
     cfgDestroy(&config);
@@ -1638,9 +1633,9 @@ cfgReadBadYamlReturnsDefaults(void** state)
 }
 
 static void
-cfgReadExtraFieldsAreHarmless(void** state)
+cfgReadExtraFieldsAreHarmless(void **state)
 {
-    const char* yamlText =
+    const char *yamlText =
         "---\n"
         "momsApplePieRecipe:                # has possibilities...\n"
         "  [apples,sugar,flour,dirt]        # dirt mom?  Really?\n"
@@ -1659,12 +1654,12 @@ cfgReadExtraFieldsAreHarmless(void** state)
         "tags:\n"
         "  brainfarts: 135\n"
         "...\n";
-    const char* path = CFG_FILE_NAME;
+    const char *path = CFG_FILE_NAME;
     writeFile(path, yamlText);
 
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* config = cfgRead(path);
+    config_t *config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_STATSD);
     assert_string_equal(cfgMtcStatsDPrefix(config), DEFAULT_STATSD_PREFIX);
@@ -1681,9 +1676,9 @@ cfgReadExtraFieldsAreHarmless(void** state)
 }
 
 static void
-cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
+cfgReadYamlOrderWithinStructureDoesntMatter(void **state)
 {
-    const char* yamlText =
+    const char *yamlText =
         "---\n"
         "payload:\n"
         "  dir: /favorite\n"
@@ -1729,12 +1724,12 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
         "tags:\n"
         "  135: kittens\n"
         "...\n";
-    const char* path = CFG_FILE_NAME;
+    const char *path = CFG_FILE_NAME;
     writeFile(path, yamlText);
 
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* config = cfgRead(path);
+    config_t *config = cfgRead(path);
     assert_non_null(config);
     assert_int_equal(cfgMtcEnable(config), FALSE);
     assert_int_equal(cfgMtcFormat(config), CFG_FMT_STATSD);
@@ -1774,7 +1769,7 @@ cfgReadYamlOrderWithinStructureDoesntMatter(void** state)
 }
 
 static void
-cfgReadEnvSubstitution(void** state)
+cfgReadEnvSubstitution(void **state)
 {
 
     // Set env variables to test indirect substitution
@@ -1792,7 +1787,7 @@ cfgReadEnvSubstitution(void** state)
     assert_int_equal(setenv("SOURCE", "syslog", 1), 0);
     assert_int_equal(setenv("EPS", "987654321", 1), 0);
 
-    const char* yamlText =
+    const char *yamlText =
         "---\n"
         "metric:\n"
         "  enable: $MASTER_ENABLE\n"
@@ -1840,11 +1835,11 @@ cfgReadEnvSubstitution(void** state)
         "  whyyoumadbro: 'Bill owes me $5.00'\n"
         "  undefined: $UNDEFINEDENV\n"
         "...\n";
-    const char* path = CFG_FILE_NAME;
+    const char *path = CFG_FILE_NAME;
     writeFile(path, yamlText);
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* cfg = cfgRead(path);
+    config_t *cfg = cfgRead(path);
     assert_non_null(cfg);
 
     // test substitute env values that are longer and shorter than they env name
@@ -1895,19 +1890,19 @@ cfgReadEnvSubstitution(void** state)
 }
 
 static void
-jsonObjectFromCfgAndjsonStringFromCfgRoundTrip(void** state)
+jsonObjectFromCfgAndjsonStringFromCfgRoundTrip(void **state)
 {
     // Start with a string, just since it's already defined for another test
     g_protlist = lstCreate(destroyProtEntry);
     assert_non_null(g_protlist);
-    config_t* cfg = cfgFromString(jsonText);
+    config_t *cfg = cfgFromString(jsonText);
     assert_non_null(cfg);
 
     // Now from the cfg object above, we should be able to create a
     // new string and json object with the same content
-    char* stringified_json1 = jsonStringFromCfg(cfg);
+    char *stringified_json1 = jsonStringFromCfg(cfg);
     assert_non_null(stringified_json1);
-    cJSON* json1 = jsonObjectFromCfg(cfg);
+    cJSON *json1 = jsonObjectFromCfg(cfg);
     assert_non_null(json1);
 
     // Do this again with the new string we output this time
@@ -1919,9 +1914,9 @@ jsonObjectFromCfgAndjsonStringFromCfgRoundTrip(void** state)
     cfg = cfgFromString(stringified_json1);
     assert_non_null(cfg);
 
-    char* stringified_json2 = jsonStringFromCfg(cfg);
+    char *stringified_json2 = jsonStringFromCfg(cfg);
     assert_non_null(stringified_json2);
-    cJSON* json2 = jsonObjectFromCfg(cfg);
+    cJSON *json2 = jsonObjectFromCfg(cfg);
     assert_non_null(json2);
 
     // now the diff to make sure the strings and json object trees are identical
@@ -1941,9 +1936,9 @@ jsonObjectFromCfgAndjsonStringFromCfgRoundTrip(void** state)
 
 
 static void
-initLogReturnsPtr(void** state)
+initLogReturnsPtr(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
     cfg_transport_t t;
@@ -1965,7 +1960,7 @@ initLogReturnsPtr(void** state)
                 break;
 	    }
         cfgTransportTypeSet(cfg, CFG_LOG, t);
-        log_t* log = initLog(cfg);
+        log_t *log = initLog(cfg);
         assert_non_null(log);
         logDestroy(&log);
     }
@@ -1973,9 +1968,9 @@ initLogReturnsPtr(void** state)
 }
 
 static void
-initMtcReturnsPtr(void** state)
+initMtcReturnsPtr(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
     cfg_transport_t t;
@@ -1986,7 +1981,7 @@ initMtcReturnsPtr(void** state)
         } else if (t == CFG_FILE) {
             cfgTransportPathSet(cfg, CFG_MTC, "/tmp/scope.log");
         }
-        mtc_t* mtc = initMtc(cfg);
+        mtc_t *mtc = initMtc(cfg);
         assert_non_null(mtc);
         mtcDestroy(&mtc);
     }
@@ -1994,12 +1989,12 @@ initMtcReturnsPtr(void** state)
 }
 
 static void
-initEvtFormatReturnsPtr(void** state)
+initEvtFormatReturnsPtr(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
-    evt_fmt_t* evt = initEvtFormat(cfg);
+    evt_fmt_t *evt = initEvtFormat(cfg);
     assert_non_null(evt);
     evtFormatDestroy(&evt);
 
@@ -2007,12 +2002,12 @@ initEvtFormatReturnsPtr(void** state)
 }
 
 static void
-initCtlReturnsPtr(void** state)
+initCtlReturnsPtr(void **state)
 {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
-    ctl_t* ctl = initCtl(cfg);
+    ctl_t *ctl = initCtl(cfg);
     assert_non_null(ctl);
     ctlDestroy(&ctl);
 
@@ -2070,7 +2065,7 @@ cfgReadProtocol(void **state)
 
     writeFile(ppath, yamlText);
     
-    config_t* config = cfgRead(ppath);
+    config_t *config = cfgRead(ppath);
     assert_non_null(config);
     assert_int_equal(g_prot_sequence, 3);
 
@@ -2133,7 +2128,7 @@ cfgReadCustomEmptyFilter(void **state)
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2174,7 +2169,7 @@ cfgReadCustomProcnameFilter(void **state)
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2216,7 +2211,7 @@ cfgReadCustomArgFilter(void **state)
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2258,7 +2253,7 @@ cfgReadCustomHostnameFilter(void **state)
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2300,7 +2295,7 @@ cfgReadCustomUsernameFilter(void **state)
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2349,7 +2344,7 @@ cfgReadCustomEnvFilter(void **state)
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2386,7 +2381,7 @@ cfgReadCustomAncestorFilter(void **state)
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2432,7 +2427,7 @@ cfgReadCustomMultipleFilters(void **state)
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2473,7 +2468,7 @@ cfgReadCustomOverride(void **state)
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2505,7 +2500,7 @@ cfgReadCustomOrder(void **state)
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2532,7 +2527,7 @@ cfgReadCustomAnchor(void **state)
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2566,7 +2561,7 @@ cfgReadCustomAnchorExtend(void **state)
     const char *yamlFilename = "/tmp/eg-scope.yml";
     writeFile(yamlFilename, yamlText);
     initProc("test", "test --with args", "myhost");
-    config_t* config = cfgRead(yamlFilename);
+    config_t *config = cfgRead(yamlFilename);
     deleteFile(yamlFilename);
     assert_non_null(config);
 
@@ -2577,10 +2572,44 @@ cfgReadCustomAnchorExtend(void **state)
 }
 
 static void
+filterEmptyFilterFileVar1(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter/empty_filter_0.yml", dirPath);
+    bool res = cfgFilterFileIsValid(path);
+    assert_int_equal(res, FALSE);
+}
+
+static void
+filterEmptyFilterFileVar2(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter/empty_filter_1.yml", dirPath);
+    bool res = cfgFilterFileIsValid(path);
+    assert_int_equal(res, FALSE);
+}
+
+static void
+filterEmptyFilterFileVar3(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter/empty_filter_2.yml", dirPath);
+    bool res = cfgFilterFileIsValid(path);
+    assert_int_equal(res, FALSE);
+}
+
+static void
+filterInvalidFilterFile(void **state) {
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter/corrupted_filter.yml", dirPath);
+    bool res = cfgFilterFileIsValid(path);
+    assert_int_equal(res, FALSE);
+}
+
+static void
 filterEmptyProcName(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
-    config_t* cfg = cfgCreateDefault();
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
+    bool validRes = cfgFilterFileIsValid(path);
+    assert_int_equal(validRes, TRUE);
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus(NULL, "foo", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_ERROR);
@@ -2593,8 +2622,8 @@ filterEmptyProcName(void **state) {
 static void
 filterEmptyProcCmdLine(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
-    config_t* cfg = cfgCreateDefault();
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("foo", NULL, testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_ERROR);
@@ -2612,7 +2641,7 @@ filterEmptyProcCmdLine(void **state) {
  */
 static void
 filterNullFilterPath(void **state) {
-    config_t* cfg = cfgCreateDefault();
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("foo", "foo", NULL, cfg);
     assert_int_equal(res, FILTER_SCOPED);
@@ -2625,7 +2654,7 @@ filterNullFilterPath(void **state) {
 static void
 filterNullCfg(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
     filter_status_t res = cfgFilterStatus("foo", "foo", testAccessFilterPath(path), NULL);
     assert_int_equal(res, FILTER_ERROR);
     dbgInit(); // reset dbg for the rest of the tests
@@ -2636,8 +2665,10 @@ filterNullCfg(void **state) {
 static void
 filterNonExistingFilterFile(void **state) {
     char path[PATH_MAX] = {0};    
-    scope_snprintf(path, sizeof(path), "%s/data/filter_non_existing.yml", dirPath);
-    config_t* cfg = cfgCreateDefault();
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_non_existing.yml", dirPath);
+    bool validRes = cfgFilterFileIsValid(path);
+    assert_int_equal(validRes, FALSE);
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("foo", "foo", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_SCOPED);
@@ -2649,8 +2680,8 @@ filterNonExistingFilterFile(void **state) {
 static void
 filterProcNameAllowListPresent(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
-    config_t* cfg = cfgCreateDefault();
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("redis", "", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
@@ -2662,8 +2693,8 @@ filterProcNameAllowListPresent(void **state) {
 static void
 filterProcNameDenyListPresent(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
-    config_t* cfg = cfgCreateDefault();
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("git", "", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_NOT_SCOPED);
@@ -2675,8 +2706,10 @@ filterProcNameDenyListPresent(void **state) {
 static void
 filterArgAllowListPresent(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_1.yml", dirPath);
-    config_t* cfg = cfgCreateDefault();
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_1.yml", dirPath);
+    bool validRes = cfgFilterFileIsValid(path);
+    assert_int_equal(validRes, TRUE);
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("", "redis arg1", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
@@ -2688,8 +2721,8 @@ filterArgAllowListPresent(void **state) {
 static void
 filterArgDenyListPresent(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_1.yml", dirPath);
-    config_t* cfg = cfgCreateDefault();
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_1.yml", dirPath);
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("", "git arg1", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_NOT_SCOPED);
@@ -2701,13 +2734,13 @@ filterArgDenyListPresent(void **state) {
 static void
 filterArgAllowListPartFindPresent(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
-    config_t* cfg = cfgCreateDefault();
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("redis-server", "redis-server", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_NOT_SCOPED);
     scope_memset(path, 0, sizeof(path));
-    scope_snprintf(path, sizeof(path), "%s/data/filter_1.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_1.yml", dirPath);
     res = cfgFilterStatus("redis-server", "redis-server", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
     // cleanup
@@ -2718,8 +2751,8 @@ filterArgAllowListPartFindPresent(void **state) {
 static void
 filterArgAllowListEmptyProcMissing(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
-    config_t* cfg = cfgCreateDefault();
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
     filter_status_t res = cfgFilterStatus("memcached", "memcached", testAccessFilterPath(path), cfg);
@@ -2732,15 +2765,19 @@ filterArgAllowListEmptyProcMissing(void **state) {
 static void
 filterArgAllowListNotEmptyProcMissing(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_2.yml", dirPath);
-    config_t* cfg = cfgCreateDefault();
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_2.yml", dirPath);
+    bool validRes = cfgFilterFileIsValid(path);
+    assert_int_equal(validRes, TRUE);
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("memcached", "memcached", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_NOT_SCOPED);
 
     scope_memset(path, 0, PATH_MAX);
 
-    scope_snprintf(path, sizeof(path), "%s/data/filter_3.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_3.yml", dirPath);
+    validRes = cfgFilterFileIsValid(path);
+    assert_int_equal(validRes, TRUE);
     res = cfgFilterStatus("memcached", "memcached", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_NOT_SCOPED);
     // cleanup
@@ -2751,8 +2788,8 @@ filterArgAllowListNotEmptyProcMissing(void **state) {
 static void
 filterVerifyCfg(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_0.yml", dirPath);
-    config_t* cfg = cfgCreateDefault();
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("redis", "redis", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
@@ -2783,8 +2820,10 @@ filterDenyIsProcessedAfterAllow(void **state)
     // redis is in both the allow list and deny list.
     // verify that "deny" wins.  (is processed after allow)
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_4.yml", dirPath);
-    config_t* cfg = cfgCreateDefault();
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_4.yml", dirPath);
+    bool validRes = cfgFilterFileIsValid(path);
+    assert_int_equal(validRes, TRUE);
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("redis", "", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_NOT_SCOPED);
@@ -2799,8 +2838,8 @@ filterConfigIsProcessedAfterProcName(void **state)
     // cfg should be changed if procname or arg matches
     // make sure we process these fields before config.
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_4.yml", dirPath);
-    config_t* cfg = cfgCreateDefault();
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_4.yml", dirPath);
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
     // test the default log path before
@@ -2822,8 +2861,10 @@ filterMatchAllInAllow(void **state)
 {
     // Verify that _MatchAll_ in allow matches all processes
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_5.yml", dirPath);
-    config_t* cfg = cfgCreateDefault();
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_5.yml", dirPath);
+    bool validRes = cfgFilterFileIsValid(path);
+    assert_int_equal(validRes, TRUE);
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("blue", "", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
@@ -2843,8 +2884,8 @@ filterMatchAllInAllowCanBeDenied(void **state)
 {
     // Verify that _MatchAll_ in allow is overriden by a match in deny
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_5.yml", dirPath);
-    config_t* cfg = cfgCreateDefault();
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_5.yml", dirPath);
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("redis", "", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_NOT_SCOPED);
@@ -2859,8 +2900,8 @@ filterVerifyMatchAllMergedConfig(void **state)
     // Verify that matches (including _MatchAll_) are applied in order
     // And that matches can be "merged" w.r.t. configuration
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_5.yml", dirPath);
-    config_t* cfg = cfgCreateDefault();
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_5.yml", dirPath);
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
     // green only matches _MatchAll_
@@ -2890,8 +2931,10 @@ filterMatchAllInDeny(void **state)
 {
     // Verify that _MatchAll_ in deny denies all processes
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter_6.yml", dirPath);
-    config_t* cfg = cfgCreateDefault();
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_6.yml", dirPath);
+    bool validRes = cfgFilterFileIsValid(path);
+    assert_int_equal(validRes, TRUE);
+    config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
     filter_status_t res = cfgFilterStatus("blue", "", testAccessFilterPath(path), cfg);
     assert_int_equal(res, FILTER_NOT_SCOPED);
@@ -2912,11 +2955,11 @@ filterMatchAllInDeny(void **state)
 // This is not a proper test, it just exists to make valgrind output
 // more readable when analyzing this test, by deallocating the compiled
 // regex in src/cfgutils.c.
-extern void envRegexFree(void** state);
+extern void envRegexFree(void **state);
 
 
 int
-main(int argc, char* argv[])
+main(int argc, char *argv[])
 {
     printf("running %s\n", argv[0]);
     if (testDirPath(dirPath, argv[0])) {
@@ -2990,6 +3033,10 @@ main(int argc, char* argv[])
         cmocka_unit_test(initMtcReturnsPtr),
         cmocka_unit_test(initEvtFormatReturnsPtr),
         cmocka_unit_test(initCtlReturnsPtr),
+        cmocka_unit_test(filterEmptyFilterFileVar1),
+        cmocka_unit_test(filterEmptyFilterFileVar2),
+        cmocka_unit_test(filterEmptyFilterFileVar3),
+        cmocka_unit_test(filterInvalidFilterFile),
         cmocka_unit_test(filterEmptyProcName),
         cmocka_unit_test(filterEmptyProcCmdLine),
         cmocka_unit_test(filterNullFilterPath),

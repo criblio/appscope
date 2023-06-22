@@ -173,5 +173,3 @@ allow:
           cacertpath: ''
           enable: false
           validateserver: true
-deny:
-- procname: git

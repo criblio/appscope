@@ -29,18 +29,21 @@ type PidScopeMapState map[int]bool
 type Processes []Process
 
 var (
-	errOpenProc        = errors.New("cannot open proc directory")
-	errGetProcStatus   = errors.New("error getting process status")
-	errGetProcCmdLine  = errors.New("error getting process command line")
-	errGetProcTask     = errors.New("error getting process task")
-	errGetProcChildren = errors.New("error getting process children")
-	errMissingUser     = errors.New("unable to find user")
+	errOpenProc         = errors.New("cannot open proc directory")
+	errGetProcStatus    = errors.New("error getting process status")
+	errGetProcCmdLine   = errors.New("error getting process command line")
+	errGetProcTask      = errors.New("error getting process task")
+	errGetProcChildren  = errors.New("error getting process children")
+	errPidMissing       = errors.New("error pid does not exist")
+	errMissingUser      = errors.New("unable to find user")
+	errPidInvalid       = errors.New("invalid PID")
+	errInvalidSelection = errors.New("invalid Selection")
 )
 
 // searchPidByProcName check if specified inputProcName fully match the pid's process name
-func searchPidByProcName(pid int, inputProcName string) bool {
+func searchPidByProcName(rootdir string, pid int, inputProcName string) bool {
 
-	procName, err := PidCommand(pid)
+	procName, err := PidCommand(rootdir, pid)
 	if err != nil {
 		return false
 	}
@@ -48,22 +51,22 @@ func searchPidByProcName(pid int, inputProcName string) bool {
 }
 
 // searchPidByCmdLine check if specified inputArg submatch the pid's command line
-func searchPidByCmdLine(pid int, inputArg string) bool {
+func searchPidByCmdLine(rootdir string, pid int, inputArg string) bool {
 
-	cmdLine, err := PidCmdline(pid)
+	cmdLine, err := PidCmdline(rootdir, pid)
 	if err != nil {
 		return false
 	}
 	return strings.Contains(cmdLine, inputArg)
 }
 
-type searchFunc func(int, string) bool
+type searchFunc func(string, int, string) bool
 
 // pidScopeMapSearch returns an map of processes that met conditions in searchFunc
-func pidScopeMapSearch(inputArg string, sF searchFunc) (PidScopeMapState, error) {
+func pidScopeMapSearch(rootdir, inputArg string, sF searchFunc) (PidScopeMapState, error) {
 	pidMap := make(PidScopeMapState)
 
-	procs, err := pidProcDirsNames()
+	procs, err := pidProcDirsNames(rootdir)
 	if err != nil {
 		return pidMap, err
 	}
@@ -80,8 +83,8 @@ func pidScopeMapSearch(inputArg string, sF searchFunc) (PidScopeMapState, error)
 			continue
 		}
 
-		if sF(pid, inputArg) {
-			status, err := PidScopeStatus(pid)
+		if sF(rootdir, pid, inputArg) {
+			status, err := PidScopeStatus(rootdir, pid)
 			if err != nil {
 				continue
 			}
@@ -93,18 +96,19 @@ func pidScopeMapSearch(inputArg string, sF searchFunc) (PidScopeMapState, error)
 }
 
 // PidScopeMapByProcessName returns an map of processes name that are found by process name match
-func PidScopeMapByProcessName(procname string) (PidScopeMapState, error) {
-	return pidScopeMapSearch(procname, searchPidByProcName)
+func PidScopeMapByProcessName(rootdir, procname string) (PidScopeMapState, error) {
+	return pidScopeMapSearch(rootdir, procname, searchPidByProcName)
 }
 
 // PidScopeMapByCmdLine returns an map of processes that are found by cmdLine submatch
-func PidScopeMapByCmdLine(cmdLine string) (PidScopeMapState, error) {
-	return pidScopeMapSearch(cmdLine, searchPidByCmdLine)
+func PidScopeMapByCmdLine(rootdir, cmdLine string) (PidScopeMapState, error) {
+	return pidScopeMapSearch(rootdir, cmdLine, searchPidByCmdLine)
 }
 
-// pidProcDirsNames returns a list wiht process directory names
-func pidProcDirsNames() ([]string, error) {
-	procDir, err := os.Open("/proc")
+// pidProcDirsNames returns a list with process directory names
+func pidProcDirsNames(rootdir string) ([]string, error) {
+	procPath := fmt.Sprintf("%s/proc", rootdir)
+	procDir, err := os.Open(procPath)
 	if err != nil {
 		return nil, errOpenProc
 	}
@@ -113,21 +117,23 @@ func pidProcDirsNames() ([]string, error) {
 	return procDir.Readdirnames(0)
 }
 
+// Returns all processes that match the name, only if scope is attached
 // ProcessesByNameToDetach returns an array of processes to detach that match a given name
-func ProcessesByNameToDetach(name string) (Processes, error) {
-	return processesByName(name, true)
+func ProcessesByNameToDetach(rootdir, name, procArg string, exactMatch bool) (Processes, error) {
+	return processesByName(rootdir, name, procArg, true, exactMatch)
 }
 
+// Returns all processes that match the name, regardless of their state (attached, detached, loaded, unloaded)
 // ProcessesByNameToAttach returns an array of processes to attach that match a given name
-func ProcessesByNameToAttach(name string) (Processes, error) {
-	return processesByName(name, false)
+func ProcessesByNameToAttach(rootdir, name, procArg string, exactMatch bool) (Processes, error) {
+	return processesByName(rootdir, name, procArg, false, exactMatch)
 }
 
 // processesByName returns an array of processes that match a given name
-func processesByName(name string, activeOnly bool) (Processes, error) {
+func processesByName(rootdir, name, procArg string, activeOnly, exactMatch bool) (Processes, error) {
 	processes := make([]Process, 0)
 
-	procs, err := pidProcDirsNames()
+	procs, err := pidProcDirsNames(rootdir)
 	if err != nil {
 		return processes, err
 	}
@@ -140,7 +146,8 @@ func processesByName(name string, activeOnly bool) (Processes, error) {
 		}
 
 		// Skip if no permission to read the fd directory
-		procFdDir, err := os.Open("/proc/" + p + "/fd")
+		filePath := fmt.Sprintf("%s/proc/%v/fd", rootdir, p)
+		procFdDir, err := os.Open(filePath)
 		if err != nil {
 			continue
 		}
@@ -152,38 +159,40 @@ func processesByName(name string, activeOnly bool) (Processes, error) {
 			continue
 		}
 
-		command, err := PidCommand(pid)
+		command, err := PidCommand(rootdir, pid)
 		if err != nil {
 			continue
 		}
 
-		cmdLine, err := PidCmdline(pid)
+		cmdLine, err := PidCmdline(rootdir, pid)
 		if err != nil {
 			continue
 		}
 
 		// TODO in container namespace we cannot depend on following info
-		userName, err := PidUser(pid)
+		userName, err := PidUser(rootdir, pid)
 		if err != nil && !errors.Is(err, errMissingUser) {
 			continue
 		}
 
-		status, err := PidScopeStatus(pid)
+		status, err := PidScopeStatus(rootdir, pid)
 		if err != nil {
 			continue
 		}
 
 		// Add process if there is a name match
-		if strings.Contains(command, name) {
-			if !activeOnly || (activeOnly && status == Active) {
-				processes = append(processes, Process{
-					ID:      i,
-					Pid:     pid,
-					User:    userName,
-					Scoped:  status == Active,
-					Command: cmdLine,
-				})
-				i++
+		if (exactMatch && command == name) || (!exactMatch && strings.Contains(command, name)) {
+			if strings.Contains(cmdLine, procArg) {
+				if !activeOnly || (activeOnly && status == Active) {
+					processes = append(processes, Process{
+						ID:      i,
+						Pid:     pid,
+						User:    userName,
+						Scoped:  status == Active,
+						Command: cmdLine,
+					})
+					i++
+				}
 			}
 		}
 	}
@@ -191,10 +200,10 @@ func processesByName(name string, activeOnly bool) (Processes, error) {
 }
 
 // ProcessesScoped returns an array of processes that are currently being scoped
-func ProcessesScoped() (Processes, error) {
+func ProcessesScoped(rootdir string) (Processes, error) {
 	processes := make([]Process, 0)
 
-	procs, err := pidProcDirsNames()
+	procs, err := pidProcDirsNames(rootdir)
 	if err != nil {
 		return processes, err
 	}
@@ -212,19 +221,18 @@ func ProcessesScoped() (Processes, error) {
 			continue
 		}
 
-		cmdLine, err := PidCmdline(pid)
+		cmdLine, err := PidCmdline(rootdir, pid)
 		if err != nil {
 			continue
 		}
 
-		// TODO in container namespace we cannot depend on following info
-		userName, err := PidUser(pid)
+		userName, err := PidUser(rootdir, pid)
 		if err != nil && !errors.Is(err, errMissingUser) {
 			continue
 		}
 
 		// Add process if is is scoped
-		status, err := PidScopeStatus(pid)
+		status, err := PidScopeStatus(rootdir, pid)
 		if err != nil {
 			continue
 		}
@@ -243,10 +251,10 @@ func ProcessesScoped() (Processes, error) {
 }
 
 // ProcessesToDetach returns an array of processes that can be detached
-func ProcessesToDetach() (Processes, error) {
+func ProcessesToDetach(rootdir string) (Processes, error) {
 	processes := make([]Process, 0)
 
-	procs, err := pidProcDirsNames()
+	procs, err := pidProcDirsNames(rootdir)
 	if err != nil {
 		return processes, err
 	}
@@ -264,19 +272,18 @@ func ProcessesToDetach() (Processes, error) {
 			continue
 		}
 
-		cmdLine, err := PidCmdline(pid)
+		cmdLine, err := PidCmdline(rootdir, pid)
 		if err != nil {
 			continue
 		}
 
-		// TODO in container namespace we cannot depend on following info
-		userName, err := PidUser(pid)
+		userName, err := PidUser(rootdir, pid)
 		if err != nil && !errors.Is(err, errMissingUser) {
 			continue
 		}
 
 		// Detach the process in case the situation we are not able to retrieve the info
-		status, err := PidScopeStatus(pid)
+		status, err := PidScopeStatus(rootdir, pid)
 		if err != nil && !errors.Is(err, ipc.ErrConsumerTimeout) {
 			continue
 		}
@@ -296,14 +303,15 @@ func ProcessesToDetach() (Processes, error) {
 }
 
 // PidUser returns the user owning the process specified by PID
-func PidUser(pid int) (string, error) {
+func PidUser(rootdir string, pid int) (string, error) {
 
 	// Get uid from status
-	pStat, err := linuxproc.ReadProcessStatus(fmt.Sprintf("/proc/%v/status", pid))
+	pStat, err := linuxproc.ReadProcessStatus(fmt.Sprintf("%s/proc/%v/status", rootdir, pid))
 	if err != nil {
 		return "", errGetProcStatus
 	}
 
+	// TODO add support for foreign container
 	// Lookup username by uid
 	user, err := user.LookupId(fmt.Sprint(pStat.RealUid))
 	if err != nil {
@@ -314,8 +322,8 @@ func PidUser(pid int) (string, error) {
 }
 
 // PidScopeLibInMaps checks if a process specified by PID contains libscope in memory mappings.
-func PidScopeLibInMaps(pid int) (bool, error) {
-	pidMapFile, err := os.ReadFile(fmt.Sprintf("/proc/%v/maps", pid))
+func PidScopeLibInMaps(rootdir string, pid int) (bool, error) {
+	pidMapFile, err := os.ReadFile(fmt.Sprintf("%s/proc/%v/maps", rootdir, pid))
 	if err != nil {
 		// Process or do not exist or we do not have permissions to read a map file
 		return false, err
@@ -326,8 +334,12 @@ func PidScopeLibInMaps(pid int) (bool, error) {
 }
 
 // PidScopeStatus checks a Scope Status if a process specified by PID.
-func PidScopeStatus(pid int) (ScopeStatus, error) {
-	pidMapFile, err := os.ReadFile(fmt.Sprintf("/proc/%v/maps", pid))
+func PidScopeStatus(rootdir string, pid int) (ScopeStatus, error) {
+	if !PidExists(rootdir, pid) {
+		return Disable, errPidMissing
+	}
+
+	pidMapFile, err := os.ReadFile(fmt.Sprintf("%s/proc/%v/maps", rootdir, pid))
 	if err != nil {
 		// Process or do not exist or we do not have permissions to read a map file
 		return Disable, err
@@ -339,8 +351,9 @@ func PidScopeStatus(pid int) (ScopeStatus, error) {
 		return Disable, nil
 	}
 
-	// Ignore scope process // TODO: Still Needed?
-	command, err := PidCommand(pid)
+	// Ignore scopedyn processes
+	// TODO: Still intended?
+	command, err := PidCommand(rootdir, pid)
 	if err != nil {
 		return Disable, nil
 	}
@@ -349,14 +362,14 @@ func PidScopeStatus(pid int) (ScopeStatus, error) {
 	}
 
 	// Check shmem does not exist (if scope_anon does not exist the proc is scoped)
-	files, err := os.ReadDir(fmt.Sprintf("/proc/%v/fd", pid))
+	files, err := os.ReadDir(fmt.Sprintf("%s/proc/%v/fd", rootdir, pid))
 	if err != nil {
 		// Process or do not exist or we do not have permissions to read a fd file
 		return Disable, err
 	}
 
 	for _, file := range files {
-		filePath := fmt.Sprintf("/proc/%v/fd/%s", pid, file.Name())
+		filePath := fmt.Sprintf("%s/proc/%v/fd/%s", rootdir, pid, file.Name())
 		resolvedFileName, err := os.Readlink(filePath)
 		if err != nil {
 			continue
@@ -367,13 +380,13 @@ func PidScopeStatus(pid int) (ScopeStatus, error) {
 	}
 
 	// Retrieve information from IPC
-	return getScopeStatus(pid)
+	return getScopeStatus(rootdir, pid)
 }
 
 // PidCommand gets the command used to start the process specified by PID
-func PidCommand(pid int) (string, error) {
+func PidCommand(rootdir string, pid int) (string, error) {
 	// Get command from status
-	pStat, err := linuxproc.ReadProcessStatus(fmt.Sprintf("/proc/%v/status", pid))
+	pStat, err := linuxproc.ReadProcessStatus(fmt.Sprintf("%s/proc/%v/status", rootdir, pid))
 	if err != nil {
 		return "", errGetProcStatus
 	}
@@ -382,9 +395,9 @@ func PidCommand(pid int) (string, error) {
 }
 
 // PidCmdline gets the cmdline used to start the process specified by PID
-func PidCmdline(pid int) (string, error) {
+func PidCmdline(rootdir string, pid int) (string, error) {
 	// Get cmdline
-	cmdline, err := linuxproc.ReadProcessCmdline(fmt.Sprintf("/proc/%v/cmdline", pid))
+	cmdline, err := linuxproc.ReadProcessCmdline(fmt.Sprintf("%s/proc/%v/cmdline", rootdir, pid))
 	if err != nil {
 		return "", errGetProcCmdLine
 	}
@@ -393,10 +406,10 @@ func PidCmdline(pid int) (string, error) {
 }
 
 // PidInitContainer verify if specific PID is the init PID in the container
-func PidInitContainer(pid int) (bool, error) {
+func PidInitContainer(rootdir string, pid int) (bool, error) {
 	// TODO: goprocinfo does not support all the status parameters (NsPid)
 	// handle procfs by ourselves ?
-	file, err := os.Open(fmt.Sprintf("/proc/%v/status", pid))
+	file, err := os.Open(fmt.Sprintf("%s/proc/%v/status", rootdir, pid))
 	if err != nil {
 		return false, errGetProcStatus
 	}
@@ -418,8 +431,8 @@ func PidInitContainer(pid int) (bool, error) {
 }
 
 // PidChildren retrieves the children PID's for the main process specified by the PID
-func PidChildren(pid int) ([]int, error) {
-	file, err := os.Open(fmt.Sprintf("/proc/%v/task/%v/children", pid, pid))
+func PidChildren(rootdir string, pid int) ([]int, error) {
+	file, err := os.Open(fmt.Sprintf("%s/proc/%v/task/%v/children", rootdir, pid, pid))
 	if err != nil {
 		return nil, errGetProcChildren
 	}
@@ -439,8 +452,8 @@ func PidChildren(pid int) ([]int, error) {
 }
 
 // PidThreadsPids gets the all the thread PIDs specified by PID
-func PidThreadsPids(pid int) ([]int, error) {
-	files, err := os.ReadDir(fmt.Sprintf("/proc/%v/task", pid))
+func PidThreadsPids(rootdir string, pid int) ([]int, error) {
+	files, err := os.ReadDir(fmt.Sprintf("%s/proc/%v/task", rootdir, pid))
 	if err != nil {
 		return nil, errGetProcTask
 	}
@@ -456,8 +469,8 @@ func PidThreadsPids(pid int) ([]int, error) {
 }
 
 // PidExists checks if a PID is valid
-func PidExists(pid int) bool {
-	pidPath := fmt.Sprintf("/proc/%v", pid)
+func PidExists(rootdir string, pid int) bool {
+	pidPath := fmt.Sprintf("%s/proc/%v", rootdir, pid)
 	return CheckDirExists(pidPath)
 }
 
@@ -479,14 +492,14 @@ func containerPids() []int {
 
 // PidGetRefPidForMntNamespace returns reference PID of mnt namespace,
 // Returns -1 if the refrence PID is the same as the scope client PID
-func PidGetRefPidForMntNamespace(targetPid int) int {
-	targetInfo, err := os.Readlink(fmt.Sprintf("/proc/%d/ns/mnt", targetPid))
+func PidGetRefPidForMntNamespace(rootdir string, targetPid int) int {
+	targetInfo, err := os.Readlink(fmt.Sprintf("%s/proc/%d/ns/mnt", rootdir, targetPid))
 	if err != nil {
 		return -1
 	}
 
 	// First check if the namespace used by process is the same namespace as CLI
-	nsInfo, err := os.Readlink("/proc/self/ns/mnt")
+	nsInfo, err := os.Readlink(fmt.Sprintf("%s/proc/self/ns/mnt", rootdir))
 	if err != nil {
 		return -1
 	}
@@ -498,7 +511,7 @@ func PidGetRefPidForMntNamespace(targetPid int) int {
 	// Check if the namespace used by process belongs to one of the detected containers
 	ctrPids := containerPids()
 	for _, nsPid := range ctrPids {
-		nsInfo, err := os.Readlink(fmt.Sprintf("/proc/%d/ns/mnt", nsPid))
+		nsInfo, err := os.Readlink(fmt.Sprintf("%s/proc/%d/ns/mnt", rootdir, nsPid))
 		if err != nil {
 			continue
 		}
@@ -510,4 +523,83 @@ func PidGetRefPidForMntNamespace(targetPid int) int {
 
 	// Assume that target process do not exists in the container but have seperated mount namespace
 	return targetPid
+}
+
+// HandleInputArg handles the input argument (process name or pid) and returns an array of processes
+// If the id provided is a pid, that single pid will be returned as a proc
+// If the id provided is a name, all processes matching that name will be returned in procs
+// Args:
+// @id name or pid
+// @procArg argument to process
+// @choose require a user to choose a single proc from a list
+// @confirm require a user to confirm their choice
+// @attach attach or detach operation
+// @exactMatch require an exact match (of the name only) when id is a name
+func HandleInputArg(id, procArg, rootdir string, choose, confirm, attach, exactMatch bool) (Processes, error) {
+	procs := make(Processes, 0)
+	var err error
+	adminStatus := true
+	if err := UserVerifyRootPerm(); err != nil {
+		if errors.Is(err, ErrMissingAdmPriv) {
+			adminStatus = false
+		} else {
+			return procs, err
+		}
+	}
+
+	if IsNumeric(id) {
+		// If the id provided is an integer, interpret it as a pid and use that pid only
+
+		pid, err := strconv.Atoi(id)
+		if err != nil {
+			return procs, errPidInvalid
+		}
+
+		procs = append(procs, Process{Pid: pid})
+
+	} else {
+		// If the id provided is a name, find one or more matching procs
+		// Note: An empty string is supported to pick up all procs
+
+		if !adminStatus {
+			fmt.Println("INFO: Run as root (or via sudo) to find all matching processes")
+		}
+
+		if attach {
+			// Get a list of all process that match the name, regardless of status
+			if procs, err = ProcessesByNameToAttach(rootdir, id, procArg, exactMatch); err != nil {
+				return nil, err
+			}
+		} else {
+			// Get a list of all processes that match the name and scope is actively attached
+			if procs, err = ProcessesByNameToDetach(rootdir, id, procArg, exactMatch); err != nil {
+				return nil, err
+			}
+		}
+
+		if len(procs) > 1 {
+			if confirm || choose {
+				PrintObj([]ObjField{
+					{Name: "ID", Field: "id"},
+					{Name: "Pid", Field: "pid"},
+					{Name: "User", Field: "user"},
+					{Name: "Scoped", Field: "scoped"},
+					{Name: "Command", Field: "command"},
+				}, procs)
+			}
+			if choose {
+				fmt.Println("Select an ID from the list:")
+				var selection string
+				fmt.Scanln(&selection)
+				i, err := strconv.ParseUint(selection, 10, 32)
+				i--
+				if err != nil || i >= uint64(len(procs)) {
+					return nil, errInvalidSelection
+				}
+				return Processes{procs[i]}, nil
+			}
+		}
+	}
+
+	return procs, nil
 }

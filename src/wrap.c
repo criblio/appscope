@@ -851,7 +851,7 @@ threadInit()
 {
     // for debugging... if SCOPE_NO_SIGNAL is defined, then don't create
     // a signal handler, nor a timer to send a signal.
-    if (getenv("SCOPE_NO_SIGNAL")) return;
+    if (fullGetEnv("SCOPE_NO_SIGNAL")) return;
     if (!g_ctl) return;
 
     if (osThreadInit(threadNow, g_thread.interval) == FALSE) {
@@ -1053,7 +1053,7 @@ handleExit(void)
     struct timespec ts = {.tv_sec = 1, .tv_nsec = 0}; // 1 s
 
     char *wait;
-    if ((wait = getenv("SCOPE_CONNECT_TIMEOUT_SECS")) != NULL) {
+    if ((wait = fullGetEnv("SCOPE_CONNECT_TIMEOUT_SECS")) != NULL) {
         // wait for a connection to be established 
         // before we emit data
         int wait_time;
@@ -1659,11 +1659,229 @@ initEnv(int *attachedFlag)
     scope_fclose(fd);
 }
 
+static const char *
+getFilterFilePath(void)
+{
+    char *filterFilePath = NULL;
+    char *envFilterVal = getenv("SCOPE_FILTER");
+    if (envFilterVal) {
+        if (!scope_strcmp(envFilterVal, "false")) {
+            // SCOPE_FILTER is false (use of filter file is disabled)
+            filterFilePath = NULL;
+        } else if (!scope_access(envFilterVal, R_OK)) {
+            // SCOPE_FILTER contains the path to a filter file.
+            filterFilePath = envFilterVal;
+        }
+    } else if (!scope_access(SCOPE_FILTER_USR_PATH, R_OK)) {
+        // filter file was at first default location
+        filterFilePath = SCOPE_FILTER_USR_PATH;
+    } else if (!scope_access(SCOPE_FILTER_TMP_PATH, R_OK)) {
+        // filter file was at second default location
+        filterFilePath = SCOPE_FILTER_TMP_PATH;
+    }
+
+    // check if filter file can actually be used
+    if ((filterFilePath) && (cfgFilterFileIsValid(filterFilePath) == FALSE)) {
+        filterFilePath = NULL;
+    }
+
+    return filterFilePath;
+}
+
+// Used this command on ubuntu 20.04 and 22.04 as a starting point:
+// ps -ef | grep -v "\["
+static const char *const doNotScopeList[] = {
+// systemd
+    "30-systemd-environment-d-generator",
+    "init",
+    "(sd-pam)",
+    "systemd",
+    "systemd-detect-virt",
+    "systemd-journald",
+    "systemd-logind",
+    "systemd-machined",
+    "systemd-networkd",
+    "systemd-networkd-wait-online",
+    "systemd-oomd",
+    "systemd-resolved",
+    "systemd-timesyncd",
+    "systemd-udevd",
+    "systemd-update-utmp",
+    "systemd-userdbd",
+    "systemd-user-runtime-dir",
+    "systemd-user-sessions",
+    "systemd-userwork",
+    "systemd-xdg-autostart-generator",
+
+// misc services
+    "abrtd",
+    "abrt-dump-journal-core",
+    "abrt-dump-journal-oops",
+    "abrt-dump-journal-xorg",
+    "acpid",
+    "agetty",
+    "avahi-daemon",
+    "bpfilter_umh",
+    "colord",
+    "cups-browsed",
+    "cupsd",
+    "dbus-broker",
+    "dbus-broker-launch",
+    "dbus-daemon",
+    "dbus-run-session",
+    "irqbalance",
+    "ModemManager",
+    "multipathd",
+    "NetworkManager",
+    "polkitd",
+    "power-profiles-daemon",
+    "sshd",
+    "udisksd",
+    "upowerd",
+    "wpa_supplicant",
+
+// desktop graphical/audio/etc
+    "accounts-daemon",
+    "at-spi2-registryd",
+    "at-spi-bus-launcher",
+    "colord",
+    "gdm",
+    "gdm3",
+    "gdm-launch-environment",
+    "gdm-wayland-session",
+    "gjs",
+    "gnome-session-binary",
+    "gnome-shell",
+    "goa-daemon",
+    "goa-identity-service",
+    "gsd-a11y-settings",
+    "gsd-color",
+    "gsd-datetime",
+    "gsd-housekeeping",
+    "gsd-keyboard",
+    "gsd-media-keys",
+    "gsd-power",
+    "gsd-printer",
+    "gsd-print-notifications",
+    "gsd-rfkill",
+    "gsd-screensaver-proxy",
+    "gsd-sharing",
+    "gsd-smartcard",
+    "gsd-sound",
+    "gsd-wacom",
+    "gssproxy",
+    "gvfs-afc-volume-monitor",
+    "gvfsd",
+    "gvfsd-fuse",
+    "gvfs-goa-volume-monitor",
+    "gvfs-gphoto2-volume-monitor",
+    "gvfs-mtp-volume-monitor",
+    "gvfs-udisks2-volume-monitor",
+    "ibus-daemon",
+    "ibus-dconf",
+    "ibus-engine-simple",
+    "ibus-portal",
+    "ibus-x11",
+    "low-memory-monitor",
+    "mutter-x11-frames",
+    "packagekitd",
+    "pipewire",
+    "pipewire-media-session",
+    "pipewire-pulse",
+    "power-profiles-daemon",
+    "pulseaudio",
+    "rtkit-daemon",
+    "switcheroo-control",
+    "tracker-miner-fs-3",
+    "upowerd",
+    "uresourced",
+    "wireplumber",
+    "xdg-document-portal",
+    "xdg-permission-store",
+    "Xwayland",
+
+};
+
+static bool
+thisProcCanBeActive(void)
+{
+    char procName[256] = {0};
+    osGetProcname(procName, sizeof(procName));
+
+    int i;
+    for (i=0; i<ARRAY_SIZE(doNotScopeList); i++) {
+        if (!scope_strcmp(procName, doNotScopeList[i])) return FALSE;
+    }
+    return TRUE;
+}
+
+
+typedef struct {
+    bool isActive;
+    config_t *cfg;
+} settings_t;
+
+/*
+* We actively scope applications:
+* - when we are attaching
+* - when the filter file is not valid or does not exist and 
+*   process does not match `doNotScopeList`
+* - when process match the allow list
+*/
+static settings_t
+getSettings(bool attachedFlag)
+{
+    config_t *cfg = NULL;
+    const char *filterFilePath = NULL;
+    bool scopedFlag = FALSE;
+    bool skipReadCfg = FALSE;
+
+    if (attachedFlag) {
+        scopedFlag = TRUE;
+    } else if (!(filterFilePath = getFilterFilePath())){
+        // The filter file does not exist, or shouldn't be used.
+        // Set scopedFlag true unless it's on our doNotScopeList
+        scopedFlag = thisProcCanBeActive();
+    } else {
+        // A filter file exists!  Use it.
+        cfg = cfgCreateDefault();
+        filter_status_t res = cfgFilterStatus(g_proc.procname, g_proc.cmd, filterFilePath, cfg);
+        switch (res) {
+            case FILTER_SCOPED:
+                scopedFlag = TRUE;
+                break;
+            case FILTER_SCOPED_WITH_CFG:
+                scopedFlag = TRUE;
+                skipReadCfg = TRUE;
+                break;
+            case FILTER_NOT_SCOPED:
+                scopedFlag = FALSE;
+                break;
+            case FILTER_ERROR:
+            default:
+                scopedFlag = FALSE;
+                DBG(NULL);
+                break;
+        }
+    }
+
+    if (skipReadCfg == FALSE) {
+        char *path = NULL;
+        path = cfgPath();
+        if (cfg) cfgDestroy(&cfg);
+        cfg = cfgRead(path);
+        if (path) scope_free(path);
+    }
+    cfgProcessEnvironment(cfg);
+
+    settings_t settings = {.isActive = scopedFlag,
+                          .cfg = cfg};
+    return settings;
+}
+
 __attribute__((constructor)) void
 init(void)
 {
-    config_t *cfg = NULL;
-    char *path = NULL;
     scope_init_vdso_ehdr();
     char *full_path = NULL;
     elf_buf_t *ebuf = NULL;
@@ -1722,84 +1940,27 @@ init(void)
     g_nsslist = lstCreate(freeNssEntry);
 
     initTime();
-    /*
-    * We scope application in following cases:
-    * - when we are attaching
-    * - when the filter file does not exists
-    * - when process match the allow list
-    */
-    bool scopedFlag = FALSE;
-    bool skipReadCfg = FALSE;
 
-    if (attachedFlag) {
-        scopedFlag = TRUE;
-    } else {
-        cfg = cfgCreateDefault();
-        // First try to use env variable
-        char *envFilterVal = getenv("SCOPE_FILTER");
-        filter_status_t res = FILTER_SCOPED;
-        if (envFilterVal) {
-            /*
-            * If filter env was defined and wasn't disable 
-            * the filter handling, try path interpretation
-            */
-            size_t envFilterLen = scope_strlen(envFilterVal);
-            if ((scope_strncmp(envFilterVal, "false", envFilterLen)) && (!scope_access(envFilterVal, R_OK))) {
-                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, envFilterVal, cfg);
-            }
-        } else {
-            /*
-            * Try to use defaults
-            */
-            if (!scope_access(SCOPE_FILTER_USR_PATH, R_OK)) {
-                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, SCOPE_FILTER_USR_PATH, cfg);
-            } else if (!scope_access(SCOPE_FILTER_TMP_PATH, R_OK)) {
-                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, SCOPE_FILTER_TMP_PATH, cfg);
-            }
-        }
-        switch (res) {
-            case FILTER_SCOPED:
-                scopedFlag = TRUE;
-                break;
-            case FILTER_SCOPED_WITH_CFG:
-                scopedFlag = TRUE;
-                skipReadCfg = TRUE;
-                break;
-            case FILTER_NOT_SCOPED:
-                scopedFlag = FALSE;
-                break;
-            case FILTER_ERROR:
-            default:
-                scopedFlag = FALSE;
-                DBG(NULL);
-                break;
-        }
-    }
-    if (skipReadCfg == FALSE) {
-        path = cfgPath();
-        if (cfg) cfgDestroy(&cfg);
-        cfg = cfgRead(path);
-    }
+    // settings contain isActive and cfg fields which depend on the existance and
+    // contents of a filter file, env vars, scope.yml, etc.
+    settings_t settings = getSettings(attachedFlag);
 
     // on aarch64, the crypto subsystem installs handlers for SIGILL
     // (contrib/openssl/crypto/armcap.c) to determine which version of
     // ARM processor we're on.  Do this before enableSnapshot() below.
     transportInit();
 
-    cfgProcessEnvironment(cfg);
-
-    doConfig(cfg);
+    doConfig(settings.cfg);
 
     // Currently we enable snapshot feature only in case of constructor
     // TODO: if we update the configuration via IPC it will not be updated
-    enableSnapshot(cfg);
+    enableSnapshot(settings.cfg);
 
-    g_staticfg = cfg;
-    if (path) scope_free(path);
+    g_staticfg = settings.cfg;
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
 
-    g_cfg.funcs_attached = scopedFlag;
+    g_cfg.funcs_attached = settings.isActive;
     g_cfg.staticfg = g_staticfg;
     g_cfg.cfgStr = jsonStringFromCfg(g_staticfg);
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
@@ -1809,7 +1970,7 @@ init(void)
     // of whether TLS is actually configured on any transport.
     transportRegisterForExitNotification(handleExit);
 
-    initHook(attachedFlag, scopedFlag, ebuf, full_path);
+    initHook(attachedFlag, settings.isActive, ebuf, full_path);
     
     /*
      * If we are interposing (scoping) this process, then proceed
@@ -2890,11 +3051,11 @@ getScopeExec(const char *pathname)
      * Note: the isgo check is strictly for Go dynamic execs.
      * In this case we use scope only to force the use of HTTP 1.1.
      */
-    if (getenv("LD_PRELOAD") && (isstat == FALSE) && (isgo == FALSE)) {
+    if (fullGetEnv("LD_PRELOAD") && (isstat == FALSE) && (isgo == FALSE)) {
         return NULL;
     }
 
-    scopexec = getenv("SCOPE_EXEC_PATH");
+    scopexec = fullGetEnv("SCOPE_EXEC_PATH");
     if (((scopexec = getpath(scopexec)) == NULL) &&
         ((scopexec = getpath("scope")) == NULL)) {
 

@@ -11,11 +11,12 @@ import (
 
 // logsCmd represents the logs command
 var logsCmd = &cobra.Command{
-	Use:     "logs",
-	Short:   "Display scope logs",
-	Long:    `Displays internal AppScope logs for troubleshooting AppScope itself.`,
-	Example: `scope logs`,
-	Args:    cobra.NoArgs,
+	Use:   "logs",
+	Short: "Display scope logs",
+	Long:  `Displays internal AppScope logs for troubleshooting AppScope itself.`,
+	Example: `  scope logs
+  scope logs -s`,
+	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		id, _ := cmd.Flags().GetInt("id")
 		lastN, _ := cmd.Flags().GetInt("last")

@@ -815,26 +815,37 @@ endtest
 #
 starttest signalHandlerStatic
 cd /go/signals
-scope -z ./signalHandlerStatic 2>${ERR_FILE}&
+scope -z ./signalHandlerStatic &>${ERR_FILE}&
 SCOPE_PID=$!
 ERR+=$?
+sleep 0.1
 
+kill -SIGCHLD ${SCOPE_PID}
 sleep 1
-kill -SIGCHLD ${SCOPE_PID} &
 
 # verify that process still exists
-if ! ps -p ${SCOPE_PID} > /dev/null; then
+if ! ps -p ${SCOPE_PID}; then
     echo "$SCOPE_PID ps first fail signalHandlerStatic"
     ERR+=1
 fi
 
-while kill -0 ${SCOPE_PID} &> /dev/null; do
+count=$(grep 'bad g' $ERR_FILE | wc -l)
+if [ $count -ne 0 ] ; then
+    echo "$SCOPE_PID bad g seen in $ERR_FILE before sigkill"
+    cat $ERR_FILE
+    ERR+=1
+fi
+
+while kill -0 ${SCOPE_PID}; do
+  echo "sending SIGKILL"
   kill -SIGKILL ${SCOPE_PID}
   sleep 1
 done
 
 count=$(grep 'bad g' $ERR_FILE | wc -l)
 if [ $count -ne 0 ] ; then
+    echo "$SCOPE_PID bad g seen in $ERR_FILE after sigkill"
+    cat $ERR_FILE
     ERR+=1
 fi
 
@@ -845,26 +856,37 @@ endtest
 #
 starttest signalHandlerStaticStripped
 cd /go/signals
-scope -z ./signalHandlerStatic 2>${ERR_FILE}&
+scope -z ./signalHandlerStaticStripped &>${ERR_FILE}&
 SCOPE_PID=$!
 ERR+=$?
+sleep 0.1
 
+kill -SIGCHLD ${SCOPE_PID}
 sleep 1
-kill -SIGCHLD ${SCOPE_PID} &
 
 # verify that process still exists
-if ! ps -p ${SCOPE_PID} > /dev/null; then
+if ! ps -p ${SCOPE_PID}; then
     echo "$SCOPE_PID ps first fail signalHandlerStaticStripped"
     ERR+=1
 fi
 
-while kill -0 ${SCOPE_PID} &> /dev/null; do
+count=$(grep 'bad g' $ERR_FILE | wc -l)
+if [ $count -ne 0 ] ; then
+    echo "$SCOPE_PID bad g seen in $ERR_FILE before sigkill"
+    cat $ERR_FILE
+    ERR+=1
+fi
+
+while kill -0 ${SCOPE_PID}; do
+  echo "sending SIGKILL"
   kill -SIGKILL ${SCOPE_PID}
   sleep 1
 done
 
 count=$(grep 'bad g' $ERR_FILE | wc -l)
 if [ $count -ne 0 ] ; then
+    echo "$SCOPE_PID bad g seen in $ERR_FILE after sigkill"
+    cat $ERR_FILE
     ERR+=1
 fi
 

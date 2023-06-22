@@ -17,6 +17,7 @@ static const char* cmdScopeName[] = {
     [IPC_CMD_GET_SCOPE_CFG]        = "getScopeCfg",
     [IPC_CMD_SET_SCOPE_CFG]        = "setScopeCfg",
     [IPC_CMD_GET_TRANSPORT_STATUS] = "getTransportStatus",
+    [IPC_CMD_GET_PROC_DETAILS]     = "getProcessDetails",
 };
 
 #define CMD_SCOPE_SIZE  (ARRAY_SIZE(cmdScopeName))
@@ -475,6 +476,47 @@ allocFail:
     return NULL; 
 }
 
+/*
+ * Creates the wrapper for response to IPC_CMD_GET_PROC_DETAILS
+ * TODO: use unused attribute later
+ */
+scopeRespWrapper *
+ipcRespGetProcessDetails(const cJSON *unused) {
+    scopeRespWrapper *wrap = respWrapperCreate();
+    if (!wrap) {
+        return NULL;
+    }
+    cJSON *resp = cJSON_CreateObject();
+    if (!resp) {
+        goto allocFail;
+    }
+    wrap->resp = resp;
+    if (!cJSON_AddNumberToObjLN(resp, "status", IPC_RESP_OK)) {
+        goto allocFail;
+    }
+
+    if (!cJSON_AddNumberToObjLN(resp, "pid", g_proc.pid)) {
+        goto allocFail;
+    }
+
+    if (!cJSON_AddStringToObject(resp, "uuid", g_proc.uuid)) {
+        goto allocFail;
+    }
+
+    if (!cJSON_AddStringToObject(resp, "id", g_proc.id)) {
+        goto allocFail;
+    }
+
+    if (!cJSON_AddStringToObject(resp, "machine_id", g_proc.machine_id)) {
+        goto allocFail;
+    }
+
+    return wrap;
+
+allocFail:
+    ipcRespWrapperDestroy(wrap);
+    return NULL; 
+}
 /*
  * Creates the wrapper for failed case in processing scope msg
  */

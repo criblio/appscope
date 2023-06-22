@@ -287,6 +287,9 @@ Environment Variables:
     SCOPE_CONFIG_EVENT
         Sends a single process-identifying event, when a transport
         connection is established.  true,false  Default is true.
+    CRIBL_HOME
+        Defines the prefix to the path where the library 
+        will installed to, or retrieved from.
 
 Dynamic Configuration:
     Dynamic Configuration allows configuration settings to be

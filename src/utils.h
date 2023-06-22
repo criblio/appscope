@@ -13,6 +13,7 @@ unsigned int strToVal(enum_map_t[], const char *);
 const char* valToStr(enum_map_t[], unsigned int);
 
 int checkEnv(char *, char *);
+char *fullGetEnv(char *);
 int fullSetenv(const char *, const char *, int);
 void setPidEnv(int);
 char *getpath(const char *);
@@ -22,6 +23,10 @@ int endsWith(const char *, const char *);
 
 void setUUID(char *);
 void setMachineID(char *);
+
+char *edgePath(void);
+const char *libVersion(const char *);
+void sysprint(const char *, ...);
 
 // Signal Safe API
 int sigSafeNanosleep(const struct timespec *);

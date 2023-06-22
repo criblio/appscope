@@ -16,7 +16,7 @@ import (
 func TestProcessesByNameToAttach(t *testing.T) {
 	// Current process
 	name := "util.test"
-	result, err := ProcessesByNameToAttach(name)
+	result, err := ProcessesByNameToAttach("", name, "", true)
 	user, _ := user.Current()
 	exp := Processes{
 		Process{
@@ -36,9 +36,9 @@ func TestProcessesByNameToAttach(t *testing.T) {
 // - The process map with single entry is returned
 // - No error is returned
 func TestPidScopeMapByProcessName(t *testing.T) {
-	currentProcessName, err := PidCommand(os.Getpid())
+	currentProcessName, err := PidCommand("", os.Getpid())
 	assert.NoError(t, err)
-	pidMap, err := PidScopeMapByProcessName(currentProcessName)
+	pidMap, err := PidScopeMapByProcessName("", currentProcessName)
 	assert.NoError(t, err)
 	assert.Len(t, pidMap, 1)
 	assert.Contains(t, pidMap, os.Getpid())
@@ -50,11 +50,11 @@ func TestPidScopeMapByProcessName(t *testing.T) {
 // - Empty Map is returned
 // - No error is returned
 func TestPidScopeMapByProcessNameCharShorter(t *testing.T) {
-	currentProcName, err := PidCommand(os.Getpid())
+	currentProcName, err := PidCommand("", os.Getpid())
 	assert.NoError(t, err)
 	modProcName := currentProcName[:len(currentProcName)-1]
 
-	pidMap, err := PidScopeMapByProcessName(modProcName)
+	pidMap, err := PidScopeMapByProcessName("", modProcName)
 	assert.NoError(t, err)
 	assert.Len(t, pidMap, 0)
 }
@@ -64,9 +64,9 @@ func TestPidScopeMapByProcessNameCharShorter(t *testing.T) {
 // - The expected process map is returned
 // - No error is returned
 func TestPidScopeMapByCmdLine(t *testing.T) {
-	currentProcCmdLine, err := PidCmdline(os.Getpid())
+	currentProcCmdLine, err := PidCmdline("", os.Getpid())
 	assert.NoError(t, err)
-	pidMap, err := PidScopeMapByCmdLine(currentProcCmdLine)
+	pidMap, err := PidScopeMapByCmdLine("", currentProcCmdLine)
 	assert.NoError(t, err)
 	assert.Len(t, pidMap, 1)
 	assert.Contains(t, pidMap, os.Getpid())
@@ -78,11 +78,11 @@ func TestPidScopeMapByCmdLine(t *testing.T) {
 // - The expected process map is returned
 // - No error is returned
 func TestPidScopeMapByCmdLineCharShorter(t *testing.T) {
-	currentProcCmdLine, err := PidCmdline(os.Getpid())
+	currentProcCmdLine, err := PidCmdline("", os.Getpid())
 	assert.NoError(t, err)
 	modProcCmdLine := currentProcCmdLine[:len(currentProcCmdLine)-1]
 
-	pidMap, err := PidScopeMapByCmdLine(modProcCmdLine)
+	pidMap, err := PidScopeMapByCmdLine("", modProcCmdLine)
 	assert.NoError(t, err)
 	assert.Len(t, pidMap, 1)
 	assert.Contains(t, pidMap, os.Getpid())
@@ -110,7 +110,7 @@ func TestPidUser(t *testing.T) {
 	}
 	username := currentUser.Username
 	pid := os.Getpid()
-	result, err := PidUser(pid)
+	result, err := PidUser("", pid)
 	assert.Equal(t, username, result)
 	assert.NoError(t, err)
 }
@@ -122,7 +122,7 @@ func TestPidUser(t *testing.T) {
 func TestPidCommand(t *testing.T) {
 	// Current process command
 	pid := os.Getpid()
-	result, err := PidCommand(pid)
+	result, err := PidCommand("", pid)
 	assert.Equal(t, "util.test", result)
 	assert.NoError(t, err)
 }
@@ -134,7 +134,7 @@ func TestPidCommand(t *testing.T) {
 func TestPidCmdline(t *testing.T) {
 	// Current process command
 	pid := os.Getpid()
-	result, err := PidCmdline(pid)
+	result, err := PidCmdline("", pid)
 	assert.Equal(t, strings.Join(os.Args[:], " "), result)
 	assert.NoError(t, err)
 }
@@ -146,7 +146,7 @@ func TestPidCmdline(t *testing.T) {
 func TestPidThreadsPids(t *testing.T) {
 	// Current process command
 	pid := os.Getpid()
-	threadPids, err := PidThreadsPids(pid)
+	threadPids, err := PidThreadsPids("", pid)
 	assert.Contains(t, threadPids, pid)
 	assert.NoError(t, err)
 }
@@ -157,12 +157,12 @@ func TestPidThreadsPids(t *testing.T) {
 func TestPidExists(t *testing.T) {
 	// Current process PID
 	pid := os.Getpid()
-	result := PidExists(pid)
+	result := PidExists("", pid)
 	assert.Equal(t, true, result)
 
 	// PID 0
 	pid = 0
-	result = PidExists(pid)
+	result = PidExists("", pid)
 	assert.Equal(t, false, result)
 }
 
@@ -172,6 +172,6 @@ func TestPidExists(t *testing.T) {
 // - No error is returned
 func TestPidGetRefPidForMntNamespace(t *testing.T) {
 	pid := os.Getpid()
-	result := PidGetRefPidForMntNamespace(pid)
+	result := PidGetRefPidForMntNamespace("", pid)
 	assert.Equal(t, -1, result)
 }

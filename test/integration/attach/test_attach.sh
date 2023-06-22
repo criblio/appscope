@@ -76,7 +76,7 @@ if [ $? -eq 0 ]; then
     ERR+=1
 fi
 
-grep "error: pid $TOP_PID has never been attached" $TEMP_OUTPUT_FILE > /dev/null
+grep "error: libscope does not exist in this process" $TEMP_OUTPUT_FILE > /dev/null
 if [ $? -ne 0 ]; then
     ERR+=1
 fi
@@ -293,6 +293,7 @@ export SCOPE_EVENT_DEST=file://$EVT_FILE
 sleep 10
 
 curl http://localhost:8000
+sleep 1
 
 grep -q http.req $EVENT_DEST_NEW > /dev/null
 ERR+=$?
@@ -358,7 +359,7 @@ sleep 10
 #     ERR+=1
 # fi
 # enable the code after fixing TODO in attachCmd
-# CONF_NEW=" /opt/test_config/scope_test_cfg.yml"
+# CONF_NEW="/opt/test_config/scope_test_cfg.yml"
 # EVENT_DEST_NEW="/opt/test-runner/logs/events_from_cfg.log"
 
 # unset SCOPE_EVENT_DEST
@@ -368,6 +369,7 @@ sleep 10
 # sleep 10
 
 # curl http://localhost:8000
+# sleep 1
 
 # grep -q http.req $EVENT_DEST_NEW > /dev/null
 # ERR+=$?
@@ -375,6 +377,7 @@ sleep 10
 # grep -q http.resp $EVENT_DEST_NEW > /dev/null
 # ERR+=$?
 
+# EVT_FILE_FILESIZE=$(stat -c%s "$EVT_FILE")
 # if [ $EVT_FILE_FILESIZE -ne 0 ]; then
 #     echo "File size should equal 0 after reattach"
 #     ERR+=1
@@ -445,6 +448,92 @@ if [ $? -ne 0 ]; then
 fi
 
 endtest
+
+
+#
+# Processes on the doNotScopeList should not be actively scoped,
+# unless we're explicitly instructed to.  By "explicitly instructed to"
+# we mean 1) injected into or 2) on the allow list of a filter file.
+#
+# This is an integration test for src/wrap.c:getSettings()
+#
+
+#
+# denied_proc_not_scoped_by_default
+#
+starttest denied_proc_not_scoped_by_default
+
+cd /opt/implicit_deny/
+export SCOPE_FILTER=false
+
+# the doNotScopeList is based on process name, this systemd-networkd
+# is not the real thing.
+scope -z ./systemd-networkd &
+PID=$!
+
+scope inspect --all | grep systemd-networkd
+if [ $? -eq "0" ]; then
+    echo "systemd-networkd is actively scoped but shouldn't be"
+    ERR+=1
+fi
+
+kill $PID
+
+endtest
+
+#
+# denied_proc_is_scoped_by_inject
+#
+starttest denied_proc_is_scoped_by_inject
+
+cd /opt/implicit_deny/
+export SCOPE_FILTER=false
+
+# the doNotScopeList is based on process name, this systemd-networkd
+# is not the real thing.
+./systemd-networkd &
+PID=$!
+scope attach $PID
+
+scope inspect --all | grep systemd-networkd
+if [ $? -ne "0" ]; then
+    echo "systemd-networkd is not actively scoped but should be"
+    ERR+=1
+fi
+
+kill $PID
+
+endtest
+
+
+#
+# denied_proc_is_scoped_by_filter_file
+#
+starttest denied_proc_is_scoped_by_filter_file
+
+cd /opt/implicit_deny/
+export SCOPE_FILTER=${DUMMY_FILTER_FILE}2
+echo "allow:" >> $SCOPE_FILTER
+echo "- procname: systemd-networkd" >> $SCOPE_FILTER
+
+# the doNotScopeList is based on process name, this systemd-networkd
+# is not the real thing.
+scope -z ./systemd-networkd &
+PID=$!
+
+scope inspect --all | grep systemd-networkd
+if [ $? -ne "0" ]; then
+    echo "systemd-networkd is not actively scoped but should be"
+    ERR+=1
+fi
+
+kill $PID
+rm $SCOPE_FILTER
+unset SCOPE_FILTER
+
+endtest
+
+
 
 if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""

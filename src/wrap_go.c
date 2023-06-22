@@ -390,7 +390,7 @@ void
 createGoStructFile(void) {
     char* debug_file;
     int fd;
-    if ((debug_file = getenv("SCOPE_GO_STRUCT_PATH")) &&
+    if ((debug_file = fullGetEnv("SCOPE_GO_STRUCT_PATH")) &&
         ((fd = scope_open(debug_file, O_CREAT|O_WRONLY|O_CLOEXEC, 0666)) != -1)) {
         scope_dprintf(fd, "runtime.g|m=%d|\n", g_go_schema->struct_offsets.g_to_m);
         scope_dprintf(fd, "runtime.m|tls=%d|\n", g_go_schema->struct_offsets.m_to_tls);
@@ -415,15 +415,24 @@ createGoStructFile(void) {
     }
 }
 
-// Use go_str() whenever a "go string" type needs to be interpreted.
-// The resulting go_str will need to be passed to free_go_str() when it is no
-// longer needed.
-// Don't use go_str() for byte arrays.
+/*
+ * Use go_str() whenever a "go string" type needs to be interpreted.
+ * The resulting go_str will need to be passed to free_go_str() when it is no
+ * longer needed.
+ * Don't use go_str() for byte arrays.
+ *
+ * Go 17 and higher use "c style" null terminated strings instead of a string
+ * and a length. Therfore, we do nothing here for Go >= 17.
+ * However, there is a case where argv values are passed as go strings.
+ * In that case we we need to force a conversion even when we are >= Go 17.
+ * We are no longer interposing a function that references argv, however, the
+ * force param is left in place expecting that since it has been needed, it
+ * will be needed.
+ */
 static char *
-go_str(void *go_str)
+go_str(void *go_str, bool force)
 {
-    // Go 17 and higher use "c style" null terminated strings instead of a string and a length
-    if (g_go_minor_ver >= 17) {
+    if ((g_go_minor_ver >= 17) && (force == FALSE)) {
        // We need to deference the address first before casting to a char *
        if (!go_str) return NULL;
        return (char *)*(uint64_t *)go_str;
@@ -450,6 +459,356 @@ free_go_str(char *str) {
     if(str) scope_free(str);
 }
 */
+
+/*
+ * Rewrite the container configuration for the given container.
+ * A path to the container specific work dir defines the location of the configuration file.
+ *
+ * Please look into opencontainers Linux runtime-spec for details about the exact JSON struct.
+ * The following changes will be performed:
+ * - Add a mount point
+ *   `scope` will be mounted from the host ("ex: /usr/lib/appscope/<version>/scope") into the container ("ex: /opt/scope")
+ * - Extend Environment variables
+ *   `LD_PRELOAD` will contain the following entry `/opt/libscope.so`
+ *   `SCOPE_SETUP_DONE=true` mark that configuration was processed
+ * - Add prestart hook
+ *   execute scope extract operation to ensure using library with proper loader reference (musl/glibc)
+ */
+static void
+rewriteOpenContainersConfig(const char *cWorkDir)
+{
+    char path[PATH_MAX] = {0};
+    if (!cWorkDir) {
+        goto exit;
+    }
+
+    if (scope_snprintf(path, sizeof(path), "%s/config.json", cWorkDir) < 0) {
+        goto exit;
+    }
+
+    struct stat fileStat;
+    if (scope_stat(path, &fileStat) == -1) {
+        goto exit;
+    }
+
+    FILE *fp = scope_fopen(path, "r");
+    if (!fp) {
+        goto exit;
+    }
+
+    /*
+    * Read the file contents into a string
+    */
+    char *buf = (char *)scope_malloc(fileStat.st_size);
+    if (!buf) {
+        scope_fclose(fp);
+        goto exit;
+    }
+
+    scope_fread(buf, sizeof(char), fileStat.st_size, fp);
+    scope_fclose(fp);
+
+    cJSON *json = cJSON_Parse(buf);
+    scope_free(buf);
+    if (json == NULL) {
+        goto exit;
+    }
+
+    /*
+    * Handle process environment variables
+    *
+    "env":[
+         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+         "HOSTNAME=6735578591bb",
+         "TERM=xterm",
+         "LD_PRELOAD=/opt/libscope.so",
+         "SCOPE_SETUP_DONE=true"
+      ],
+    */
+    cJSON *procNode = cJSON_GetObjectItemCaseSensitive(json, "process");
+    if (!procNode) {
+        procNode = cJSON_CreateObject();
+        if (!procNode) {
+            cJSON_Delete(json);
+            goto exit;
+        }
+        cJSON_AddItemToObject(json, "process", procNode);
+    }
+
+    cJSON *envNodeArr = cJSON_GetObjectItemCaseSensitive(procNode, "env");
+    if (envNodeArr) {
+        bool ldPreloadPresent = FALSE;
+        // Iterate over environment string array
+        size_t envSize = cJSON_GetArraySize(envNodeArr);
+        for (int i = 0; i < envSize ;++i) {
+            cJSON *item = cJSON_GetArrayItem(envNodeArr, i);
+            char *strItem = cJSON_GetStringValue(item);
+
+            if (scope_strncmp("LD_PRELOAD=", strItem, sizeof("LD_PRELOAD=")-1) == 0) {
+                size_t itemLen = scope_strlen(strItem);
+                size_t newLdprelLen = itemLen + sizeof("/opt/libscope.so:") - 1;
+                char *newLdPreloadLib = scope_calloc(1, newLdprelLen);
+                if (!newLdPreloadLib) {
+                    cJSON_Delete(json);
+                    goto exit;
+                }
+                scope_strncpy(newLdPreloadLib, "LD_PRELOAD=/opt/libscope.so:", sizeof("LD_PRELOAD=/opt/libscope.so:") - 1);
+                scope_strcat(newLdPreloadLib, strItem + sizeof("LD_PRELOAD=") - 1);
+                cJSON *newLdPreloadLibObj = cJSON_CreateString(newLdPreloadLib);
+                if (!newLdPreloadLibObj) {
+                    scope_free(newLdPreloadLib);
+                    cJSON_Delete(json);
+                    goto exit;
+                }
+                cJSON_ReplaceItemInArray(envNodeArr, i, newLdPreloadLibObj);
+                scope_free(newLdPreloadLib);
+
+                cJSON *scopeEnvNode = cJSON_CreateString("SCOPE_SETUP_DONE=true");
+                if (!scopeEnvNode) {
+                    cJSON_Delete(json);
+                    goto exit;
+                }
+                cJSON_AddItemToArray(envNodeArr, scopeEnvNode);
+                ldPreloadPresent = TRUE;
+                break;
+            } else if (scope_strncmp("SCOPE_SETUP_DONE=true", strItem, sizeof("SCOPE_SETUP_DONE=true")-1) == 0) {
+                // we are done here
+                cJSON_Delete(json);
+                goto exit;
+            }
+        }
+
+
+        // There was no LD_PRELOAD in environment variables
+        if (ldPreloadPresent == FALSE) {
+            const char *const envItems[2] =
+            {
+                "LD_PRELOAD=/opt/libscope.so",
+                "SCOPE_SETUP_DONE=true"
+            };
+            for (int i = 0; i < 2 ;++i) {
+                cJSON *scopeEnvNode = cJSON_CreateString(envItems[i]);
+                if (!scopeEnvNode) {
+                    cJSON_Delete(json);
+                    goto exit;
+                }
+                cJSON_AddItemToArray(envNodeArr, scopeEnvNode);
+            }
+        }
+    } else {
+        const char * envItems[2] =
+        {
+            "LD_PRELOAD=/opt/libscope.so",
+            "SCOPE_SETUP_DONE=true"
+        };
+        envNodeArr = cJSON_CreateStringArray(envItems, 2);
+        if (!envNodeArr) {
+            cJSON_Delete(json);
+            goto exit;
+        }
+        cJSON_AddItemToObject(procNode, "env", envNodeArr);
+    }
+
+    /*
+    * Handle process mounts
+    *
+    "mounts":[
+      {
+         "destination":"/proc",
+         "type":"proc",
+         "source":"proc",
+         "options":[
+            "nosuid",
+            "noexec",
+            "nodev"
+         ]
+      },
+      ...
+      {
+         "destination":"/opt/scope",
+         "type":"bind",
+         "source":"/tmp/appscope/dev/scope",
+         "options":[
+            "rbind",
+            "rprivate"
+         ]
+      }
+    */
+    cJSON *mountNodeArr = cJSON_GetObjectItemCaseSensitive(json, "mounts");
+    if (!mountNodeArr) {
+        mountNodeArr = cJSON_CreateArray();
+        if (!mountNodeArr) {
+            cJSON_Delete(json);
+            goto exit;
+        }
+        cJSON_AddItemToObject(json, "mounts", mountNodeArr);
+    }
+
+    cJSON *mountNode = cJSON_CreateObject();
+    if (!mountNode) {
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    if (!cJSON_AddStringToObjLN(mountNode, "destination", "/opt/scope")) {
+        cJSON_Delete(mountNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    if (!cJSON_AddStringToObjLN(mountNode, "type", "bind")) {
+        cJSON_Delete(mountNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    if (!cJSON_AddStringToObjLN(mountNode, "source", "/tmp/appscope/dev/scope")) {
+        cJSON_Delete(mountNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    const char *optItems[2] =
+    {
+        "rbind",
+        "rprivate"
+    };
+
+    cJSON *optNodeArr = cJSON_CreateStringArray(optItems, 2);
+    if (!optNodeArr) {
+        cJSON_Delete(mountNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+    cJSON_AddItemToObject(mountNode, "options", optNodeArr);
+    cJSON_AddItemToArray(mountNodeArr, mountNode);
+
+    /*
+    * Handle startContainer hooks process
+    *
+   "hooks":{
+      "prestart":[
+         {
+            "path":"/proc/1513/exe",
+            "args":[
+               "libnetwork-setkey",
+               "-exec-root=/var/run/docker",
+               "6735578591bb3c5aebc91e5c702470c52d2c10cea52e4836604bf5a4a6c0f2eb",
+               "ec7e49ffc98c"
+            ]
+         }
+      ],
+      "startContainer":[
+         {
+            "path":"/opt/scope"
+            "args":[
+               "/opt/scope",
+               "extract",
+               "/opt/",
+            ]
+         },
+       ]
+    */
+    cJSON *hooksNode = cJSON_GetObjectItemCaseSensitive(json, "hooks");
+    if (!hooksNode) {
+        hooksNode = cJSON_CreateObject();
+        if (!hooksNode) {
+            cJSON_Delete(json);
+            goto exit;
+        }
+        cJSON_AddItemToObject(json, "hooks", hooksNode);
+    }
+
+    cJSON *startContainerNodeArr = cJSON_GetObjectItemCaseSensitive(hooksNode, "startContainer");
+    if (!startContainerNodeArr) {
+        startContainerNodeArr = cJSON_CreateArray();
+        if (!startContainerNodeArr) {
+            cJSON_Delete(json);
+            goto exit;
+        }
+        cJSON_AddItemToObject(hooksNode, "startContainer", startContainerNodeArr);
+    }
+
+    cJSON *startContainerNode = cJSON_CreateObject();
+    if (!startContainerNode) {
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    if (!cJSON_AddStringToObjLN(startContainerNode, "path",  "/opt/scope")) {
+        cJSON_Delete(startContainerNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+
+    const char *argsItems[3] =
+    {
+        "/opt/scope",
+        "extract",
+        "/opt"
+    };
+    cJSON *argsNodeArr = cJSON_CreateStringArray(argsItems, 3);
+    if (!argsNodeArr) {
+        cJSON_Delete(startContainerNode);
+        cJSON_Delete(json);
+        goto exit;
+    }
+    cJSON_AddItemToObject(startContainerNode, "args", argsNodeArr);
+    cJSON_AddItemToArray(startContainerNodeArr, startContainerNode);
+
+    char *jsonStr = cJSON_PrintUnformatted(json);
+    cJSON_Delete(json);
+
+    // Overwrite the file
+    fp = scope_fopen(path, "w");
+    if (fp == NULL) {
+        cJSON_free(jsonStr);
+        goto exit;
+    }
+
+    scope_fprintf(fp, "%s\n", jsonStr);
+
+    cJSON_free(jsonStr);
+    scope_fclose(fp);
+
+exit:
+    return;
+}
+
+static void
+containerStart(void)
+{
+    int i, argc;
+    char *buf;
+    const char *cWorkDir;
+
+    if ((buf = scope_calloc(1, NCARGS)) == NULL) return;
+
+    if ((argc = osGetArgv(g_proc.pid, buf, NCARGS)) == 0) {
+        scope_free(buf);
+        return;
+    }
+
+    sysprint("Scope: found runc");
+
+    for (i = 0; buf[i]; i += scope_strlen(&buf[i]) + 1) {
+        char *arg = &buf[i];
+
+        if (arg) {
+            sysprint("\t%s:%d %s %d argv %s\n", __FUNCTION__, __LINE__, g_proc.procname, argc, arg);
+
+            if (scope_strstr(arg, "--bundle")) {
+                // work dir for the container
+                cWorkDir = &buf[i + scope_strlen(arg) + 1];
+                if (cWorkDir) sysprint("\t%s:%d container path %s\n", __FUNCTION__, __LINE__, cWorkDir);
+                break;
+            }
+        }
+    }
+
+    if (cWorkDir) rewriteOpenContainersConfig(cWorkDir);
+    scope_free(buf);
+}
 
 static bool
 match_assy_instruction(void *addr, char *mnemonic)
@@ -532,10 +891,163 @@ getGoVersionAddr(const char* buf)
     return go_build_ver_addr;
 }
 
+static Elf64_Addr
+getSym12(const void *pclntab_addr, char *sname)
+{
+    if ((!pclntab_addr) || (!sname)) return 0;
+
+    Elf64_Addr symaddr = 0;
+    uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
+    const void *symtab_addr = pclntab_addr + 16;
+
+    for (int i = 0; i < sym_count; i++) {
+        uint64_t func_offset  = *((const uint64_t *)(symtab_addr + 8));
+        uint32_t name_offset  = *((const uint32_t *)(pclntab_addr + func_offset + 8));
+        uint64_t sym_addr     = *((const uint64_t *)(symtab_addr));
+        const char *func_name = (const char *)(pclntab_addr + name_offset);
+
+        if (scope_strcmp(sname, func_name) == 0) {
+            symaddr = sym_addr;
+            scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
+            break;
+        }
+
+        symtab_addr += 16;
+    }
+
+    return symaddr;
+}
+
+static Elf64_Addr
+getSym16(const void *pclntab_addr, char *sname, char *altname, char *mnemonic)
+{
+    if ((!pclntab_addr) || (!sname)) return 0;
+
+    Elf64_Addr symaddr = 0;
+    uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
+    uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (3 * 8)));
+    uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (7 * 8)));
+    const void *symtab_addr = pclntab_addr + pclntab_offset;
+
+    for (int i = 0; i < sym_count; i++) {
+        uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
+        uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 8));
+        uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
+        const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
+
+        if (scope_strcmp(sname, func_name) == 0) {
+            symaddr = sym_addr;
+            scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
+            break;
+        }
+
+        // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
+        if (altname && mnemonic &&
+            (scope_strcmp(altname, func_name) == 0) &&
+            (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
+            symaddr = sym_addr;
+            break;
+        }
+
+        symtab_addr += 16;
+    }
+
+    return symaddr;
+}
+
+static Elf64_Addr
+getSym1820(const void *pclntab_addr, char *sname, char *altname, char *mnemonic)
+{
+    if ((!pclntab_addr) || (!sname)) return 0;
+
+    Elf64_Addr symaddr = 0;
+    uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
+    // In go 1.18 the funcname table and the pcln table are stored in the text section
+    uint64_t text_start = *((const uint64_t *)(pclntab_addr + (3 * 8)));
+    uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (4 * 8)));
+    //uint64_t funcnametab_addr = (uint64_t)(funcnametab_offset + pclntab_addr);
+    uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (8 * 8)));
+    // A "symbtab" is an entry in the pclntab, probably better known as a pcln
+    const void *symtab_addr = (const void *)(pclntab_addr + pclntab_offset);
+
+    for (int i = 0; i < sym_count; i++) {
+        uint32_t func_offset = *((uint32_t *)(symtab_addr + 4));
+        uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 4));
+        func_offset = *((uint32_t *)(symtab_addr));
+        uint64_t sym_addr = (uint64_t)(func_offset + text_start);
+        const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
+        if (scope_strcmp(sname, func_name) == 0) {
+            symaddr = sym_addr;
+            scopeLog(CFG_LOG_ERROR, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
+            break;
+        }
+
+        // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
+        if (altname && mnemonic &&
+            (scope_strcmp(altname, func_name) == 0) &&
+            (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
+            symaddr = sym_addr;
+            break;
+        }
+
+        symtab_addr += 8;
+    }
+
+    return symaddr;
+}
+
+static Elf64_Addr
+embedPclntab(const char *buf, char *sname, char *altname, char *mnemonic)
+{
+    Elf64_Addr symaddr = 0;
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)buf;
+    Elf64_Shdr *sections = (Elf64_Shdr *)(buf + ehdr->e_shoff);
+    const char *section_strtab = (char *)buf + sections[ehdr->e_shstrndx].sh_offset;
+
+    for (int i = 0; i < ehdr->e_shnum; i++) {
+        const char *sec_name = section_strtab + sections[i].sh_name;
+        if (scope_strstr(sec_name, "data.rel.ro") != 0) {
+
+            const void *pclntab_addr = buf + sections[i].sh_offset;
+            unsigned char *data = (unsigned char *)pclntab_addr;
+            size_t slen = sections[i].sh_size;
+            size_t j;
+
+            // Find the magic number in the pclntab header
+            for (j = 0; j <= slen; j += 4) { //0x3c8c80
+                if (((data[j] == 0xf1) || (data[j] == 0xf0) ||
+                     (data[j] == 0xfa) || (data[j] == 0xfb)) &&
+                    data[j+1] == 0xff &&
+                    data[j+2] == 0xff &&
+                    data[j+3] == 0xff) {
+                        //sysprint("%s:%d pclntab was recognized at %p\n",
+                        //             __FUNCTION__, __LINE__, &data[j]);
+
+                        switch (data[j]) {
+                            // Go 18 - 20
+                        case 0xf1:
+                        case 0xf0:
+                            return getSym1820(&data[j], sname, altname, mnemonic);
+                            // Go 16
+                        case 0xfa:
+                            return getSym16(&data[j], sname, altname, mnemonic);
+                            // Go 12
+                        case 0xfb:
+                            return getSym12(&data[j], sname);
+                        }
+                }
+            }
+        }
+    }
+
+    return symaddr;
+}
+
 static void *
 getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
 {
     int i;
+    bool found = FALSE;
     Elf64_Addr symaddr = 0;
     Elf64_Ehdr *ehdr;
     Elf64_Shdr *sections;
@@ -551,93 +1063,30 @@ getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
     for (i = 0; i < ehdr->e_shnum; i++) {
         sec_name = section_strtab + sections[i].sh_name;
         if (scope_strstr(sec_name, ".gopclntab")) {
+            found = TRUE;
             const void *pclntab_addr = buf + sections[i].sh_offset;
             /*
-            Go symbol table is stored in the .gopclntab section
-            More info: https://docs.google.com/document/d/1lyPIbmsYbXnpNj57a261hgOYVpNRcgydurVQIyZOz_o/pub
-            */
+             * The Go symbol table is stored in the .gopclntab section
+             * More info: https://docs.google.com/document/d/1lyPIbmsYbXnpNj57a261hgOYVpNRcgydurVQIyZOz_o/pub
+             */
             uint32_t magic = *((const uint32_t *)(pclntab_addr));
             if (magic == GOPCLNTAB_MAGIC_112) {
-                uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
-                const void *symtab_addr = pclntab_addr + 16;
-
-                for(i=0; i<sym_count; i++) {
-                    uint64_t func_offset  = *((const uint64_t *)(symtab_addr + 8));
-                    uint32_t name_offset  = *((const uint32_t *)(pclntab_addr + func_offset + 8));
-                    uint64_t sym_addr     = *((const uint64_t *)(symtab_addr));
-                    const char *func_name = (const char *)(pclntab_addr + name_offset);
-
-                    if (scope_strcmp(sname, func_name) == 0) {
-                        symaddr = sym_addr;
-                        scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
-                        break;
-                    }
-
-                    symtab_addr += 16;
-                }
+                symaddr = getSym12(pclntab_addr, sname);
             } else if (magic == GOPCLNTAB_MAGIC_116) {
-                uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
-                uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (3 * 8)));
-                uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (7 * 8)));
-                const void *symtab_addr = pclntab_addr + pclntab_offset;
-                for (i = 0; i < sym_count; i++) {
-                    uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
-                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 8));
-                    uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
-                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
-                    if (scope_strcmp(sname, func_name) == 0) {
-                        symaddr = sym_addr;
-                        scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
-                        break;
-                    }
-
-                    // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
-                    if (altname && mnemonic &&
-                        (scope_strcmp(altname, func_name) == 0) &&
-                        (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
-                        symaddr = sym_addr;
-                        break;
-                    }
-
-                    symtab_addr += 16;
-                }
+                symaddr = getSym16(pclntab_addr, sname, altname, mnemonic);
             } else if ((magic == GOPCLNTAB_MAGIC_118) || (magic == GOPCLNTAB_MAGIC_120)) {
-                uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
-                // In go 1.18 the funcname table and the pcln table are stored in the text section
-                uint64_t text_start = *((const uint64_t *)(pclntab_addr + (3 * 8)));
-                uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (4 * 8)));
-                //uint64_t funcnametab_addr = (uint64_t)(funcnametab_offset + pclntab_addr);
-                uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (8 * 8)));
-                // A "symbtab" is an entry in the pclntab, probably better known as a pcln
-                const void *symtab_addr = (const void *)(pclntab_addr + pclntab_offset);
-                for (i = 0; i < sym_count; i++) {
-                    uint32_t func_offset = *((uint32_t *)(symtab_addr + 4));
-                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 4));
-                    func_offset = *((uint32_t *)(symtab_addr));
-                    uint64_t sym_addr = (uint64_t)(func_offset + text_start);
-                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
-                    if (scope_strcmp(sname, func_name) == 0) {
-                        symaddr = sym_addr;
-                        scopeLog(CFG_LOG_ERROR, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
-                        break;
-                    }
-
-                    // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
-                    if (altname && mnemonic &&
-                        (scope_strcmp(altname, func_name) == 0) &&
-                        (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
-                        symaddr = sym_addr;
-                        break;
-                    }
-
-                    symtab_addr += 8;
-                }
+                symaddr = getSym1820(pclntab_addr, sname, altname, mnemonic);
             } else {
                 scopeLog(CFG_LOG_DEBUG, "Invalid header in .gopclntab");
                 break;
             }
             break;
         }
+    }
+
+    // if no .gopclntab section was found, check embedded
+    if ((found == FALSE) && ((symaddr = embedPclntab(buf, sname, altname, mnemonic)) == 0)) {
+        return NULL;
     }
 
     return (void *)symaddr;
@@ -779,7 +1228,6 @@ patch_addrs(funchook_t *funchook,
             } else if (tap->assembly_fn == go_hook_reg_syscall6) {
                 g_syscall6_return = (uint64_t)tap->return_addr;
             }
-
             break; // Done patching
         }
 
@@ -909,16 +1357,50 @@ go_version_numbers(const char *go_runtime_version)
     g_go_maint_ver = maint_val;
 }
 
+/*
+ * Some Go executables are built such that the .abi0
+ * extension is used for internal runtime symbols. Others
+ * emit symbols without the version extension. So, if we
+ * can't resolve the symbol without a version extension, we
+ * try the symbol with extension.
+ */
+static void *
+tryAbi0(const char *buf, char *sname)
+{
+    if (!buf || !sname) return NULL;
+
+    size_t slen = scope_strlen(sname);
+    if (slen == 0) return NULL;
+
+    void *funcaddr = NULL;
+    char abi0name[slen + sizeof(".abi0 ")];
+
+    scope_memset(abi0name, 0, sizeof(abi0name));
+    scope_strncpy(abi0name, sname, slen);
+    scope_strcat(abi0name, ".abi0");
+
+    funcprint("%s:%d %s (%ld) %s\n", __FUNCTION__, __LINE__, sname, slen, abi0name);
+
+    // Look for the symbol in the elf strtab, then meta data; .gopclntab section
+    if (((funcaddr = getSymbol(buf, abi0name)) == 0) &&
+        ((funcaddr = getGoSymbol(buf, abi0name, NULL, NULL)) == 0)) {
+        return NULL;
+    }
+
+    return funcaddr;
+}
+
 void
 initGoHook(elf_buf_t *ebuf)
 {
+    if (!ebuf || !ebuf->buf) return;
+
     int rc;
     funchook_t *funchook;
     char *go_ver;
     char *go_runtime_version = NULL;
-
-    // A go app may need to expand stacks for some C functions
-    g_need_stack_expand = TRUE;
+    uint64_t base = 0LL;
+    //Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
 
     funchook = funchook_create();
 
@@ -927,8 +1409,9 @@ initGoHook(elf_buf_t *ebuf)
         funchook_set_debug_file(DEFAULT_LOG_PATH);
     }
 
-    // default to a dynamic app?
-    if (checkEnv("SCOPE_EXEC_TYPE", "static")) {
+    // check ELF type
+    //if (checkEnv("SCOPE_EXEC_TYPE", "static")) {
+    if (is_static(ebuf->buf)) {
         scopeSetGoAppStateStatic(TRUE);
         //patchClone();
         sysprint("This is a static app\n");
@@ -937,11 +1420,9 @@ initGoHook(elf_buf_t *ebuf)
         sysprint("This is a dynamic app\n");
     }
 
-    //check ELF type
-    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
     // if it's a position independent executable, get the base address from /proc/self/maps
-    uint64_t base = 0LL;
-    if (ehdr->e_type == ET_DYN && (scopeGetGoAppStateStatic() == FALSE)) {
+    // default to a dynamic app?
+    if (scopeGetGoAppStateStatic() == FALSE) {
         if (osGetBaseAddr(&base) == FALSE) {
             sysprint("ERROR: can't get the base address\n");
             funchook_destroy(funchook);
@@ -962,10 +1443,10 @@ initGoHook(elf_buf_t *ebuf)
         if (g_go_build_ver[0] != '\0') {
             go_ver = (char *)((uint64_t)ver_addr);
         } else {
-            go_ver = go_str((void *)((uint64_t)ver_addr + base));
+            go_ver = go_str((void *)((uint64_t)ver_addr + base), FALSE);
         }
     } else {
-        go_ver = go_str((void *)((uint64_t)go_ver_sym + base));
+        go_ver = go_str((void *)((uint64_t)go_ver_sym + base), FALSE);
     }
 
     if (go_ver && (go_runtime_version = go_ver)) {
@@ -990,6 +1471,10 @@ initGoHook(elf_buf_t *ebuf)
         scopeLogWarn("%s was compiled with go version `%s`. Versions newer than Go 1.%d are not yet supported. Continuing without AppScope.", ebuf->cmd, go_runtime_version, MAX_SUPPORTED_GO_VER);
         funchook_destroy(funchook);
         return; // don't install our hooks
+    }
+
+    if (scope_strstr(g_proc.procname, "runc") != NULL) {
+        containerStart();
     }
 
     uint64_t *ReadFrame_addr;
@@ -1049,8 +1534,12 @@ initGoHook(elf_buf_t *ebuf)
         void *orig_func;
         // Look for the symbol in the ELF symbol table
         if (((orig_func = getSymbol(ebuf->buf, tap->func_name)) == NULL) &&
-        // Otherwise look in the .gopclntab section
-            ((orig_func = getGoSymbol(ebuf->buf, tap->func_name, NULL, NULL)) == NULL)) {
+            // look in the .gopclntab section
+            ((orig_func = getGoSymbol(ebuf->buf, tap->func_name, NULL, NULL)) == NULL) &&
+            // check dynamic symbols; exec has been stripped
+            ((orig_func = getDynSymbol(ebuf->buf, tap->func_name)) == NULL) &&
+            // is the symbol defined as an original API; with an abi0 extension
+            ((orig_func = tryAbi0(ebuf->buf, tap->func_name)) == NULL)) {
             sysprint("WARN: can't get the address for %s\n", tap->func_name);
             continue;
         }

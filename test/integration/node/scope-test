@@ -192,6 +192,7 @@ http_msg_property_check '"http_scheme":"https"'
 kill -s SIGTERM $server_pid
 endtest
 
+###########################################################################
 
 if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""

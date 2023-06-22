@@ -4,8 +4,8 @@ kubectl apply -f exporter.yml
 kubectl run redis --image=redis:alpine
 
 kubectl exec -it redis -- ash
-% mkdir =p /scope/metrics/1
-% mkdir =p /scope/metrics/2
+% mkdir -p /scope/metrics/1
+% mkdir -p /scope/metrics/2
 # copy paste mertrics data
 % vi /scope/metrics/1/metrics.json
 % vi /scope/metrics/2/metrics.json
@@ -13,10 +13,40 @@ kubectl exec -it redis -- ash
 kubectl cp ./bin/linux/aarch64/scope default/prom-exporter-deployment-75f4c9c78d-5pfcg:/usr/local/bin/.
 
 kubectl exec -it prom-exporter-deployment-75f4c9c78d-5pfcg -- bash
-% scope prom --port 9100
+% scope prom --mport 9100
 
 kubectl exec -i prom-exporter-deployment-75f4c9c78d-5pfcg -- curl localhost:9100/metrics
 
 
  *export*
 Dockerfile.exporter exporter.txt  exporter.yml 
+
+
+#### With Edge in the cluster ###
+
+kind create cluster
+
+kind load docker-image cribl/scope:dev
+kind load docker-image cribl/prom-exporter:latest
+
+kubectl apply -f exp.yml
+
+kubectl cp ./bin/linux/aarch64/scope default/prom-exporter-deployment-XXX-YYY:/usr/local/bin/.
+
+kubectl exec -it prom-exporter-deployment-XXX-YYY -- bash
+% scope prom
+
+./k8ed.sh
+
+###docker run -it --rm cribl/scope:dev scope k8s -c tcp://in.main-default-practical-leavitt.cribl.cloud:10091 | kubectl apply -f -
+##docker run -it --rm cribl/scope:dev scope k8s -m tcp://10.244.0.5:9109  -e tcp://10.244.0.6:10092 | kubectl apply -f -
+docker run -it --rm cribl/scope:dev scope k8s -metricformat statsd --metricprefix appscope -m tcp://10.244.0.5:9109  -e tcp://10.244.0.6:10092 | kubectl apply -f -
+kubectl label namespace default scope=enabled
+
+kubectl run redis --image=redis:alpine
+kubectl exec -it redis -- ash
+% cd /scope
+
+
+
+helm install --repo "https://criblio.github.io/helm-charts/" --version "^4.1.1" --create-namespace -n "cribl" --set "cribl.leader=tls://3Qlq8wAbKH7njR4LQHuZzqlt4bdCY2yl@main-practical-leavitt.cribl.cloud?group=default_fleet" --set "cribl.readinessProbe=null" --set "cribl.livenessProbe=null" "cribl-edge" edge

@@ -1,6 +1,6 @@
 [![Build & Test](https://github.com/criblio/appscope/actions/workflows/build.yml/badge.svg)](https://github.com/criblio/appscope/actions/workflows/build.yml)
 
-# AppScope
+![AppScope](docs/images/logo.png)
 
 AppScope is an open source, runtime-agnostic instrumentation utility for any Linux command or application. It helps users explore, understand, and gain visibility with **no code modification**.
 
@@ -31,27 +31,53 @@ graph LR
     style H fill:#fafafa,stroke:#a6a6a6
 ```
 
-## Get Started
+## 🚀 Try It Out
 
-Before you begin, make sure that your environment meets AppScope [requirements](https://appscope.dev/docs/requirements).
+Before you begin, ensure that your environment meets the AppScope [requirements](https://appscope.dev/docs/requirements).
 
-Next, you can obtain AppScope three ways:
+**With the Download**
+```
+LATEST=$(curl -Ls https://cdn.cribl.io/dl/scope/latest)
+curl -Lo scope https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope
+curl -Ls https://cdn.cribl.io/dl/scope/$LATEST/linux/$(uname -m)/scope.md5 | md5sum -c 
+chmod +x scope
+scope <some app>
+scope metrics
+sudo scope attach <already running process>
+scope events -f
+scope detach --all
+```
 
-- Get the [container image](https://hub.docker.com/r/cribl/scope) from Docker Hub and run AppScope in it.
-- Check out the code from this project, then [build](#build) and run AppScope in your Linux environment.
-- Get the binaries from the [CDN](docs/RELEASE.md#cdn), and run them in your Linux environment.  
+**With Docker**
+```
+docker run --rm -it -v/:/hostfs:ro --privileged cribl/scope
+scope <some app>
+scope metrics
+scope events
+scope attach --rootdir /hostfs <process running on host>
+scope events -f
+scope detach --all --rootdir /hostfs
+```
 
-The container image at Docker Hub and binaries at the CDN are updated for each new release of this project.
+## ℹ️ Resources
 
-Once you have downloaded and/or built AppScope, try out some simple commands:
+On the [AppScope Website](https://appscope.dev/) you can:
 
-- Scope a new process like top with `scope top`. Try substituting `top` for `curl https://google.com` or `nginx`.  Run `scope events` or `scope metrics` to see the results.
+- Learn about the CLI commands [in more depth](https://appscope.dev/docs/cli-using).
+- Get an [overview](https://appscope.dev/docs/how-works/) of AppScope beyond the CLI.
+- Discover what people are [doing](https://appscope.dev/docs/what-do-with-scope) with AppScope.
+- Review advanced [examples](https://appscope.dev/docs/examples-use-cases).
+- View the [Changelog](https://appscope.dev/docs/changelog) and [Known Issues](https://appscope.dev/docs/known-issues).
+- See what happens when you [connect AppScope to Cribl Stream or Cribl Edge](https://appscope.dev/docs/cribl-integration).
 
-- Attach to a process that *is already running*. Run `ps -ef` and find the process ID (PID) of a command or program you would like to scope. Attach to and scope the running process with `scope attach PID`. Run `scope dash` to watch events live.
+_The content on that site is built from the [website/](website/) directory in this project._
 
-See the [website docs](https://appscope.dev/docs/overview) for the full story of how to use AppScope.
+Elsewhere, you can:
 
-## Build
+- Complete the [AppScope Fundamentals sandbox](https://sandbox.cribl.io/course/appscope), a tutorial that takes about 30 minutes.
+- Join the [Cribl Community](https://cribl.io/community/) on Slack. The `#appscope` channel is where you'll find developers who contribute to this project.
+
+## 🔧 Build From Source
 
 AppScope is not built or distributed like most traditional Linux software.
 
@@ -88,32 +114,16 @@ Either way, the resulting binaries will be in `lib/linux/$(uname -m)/libscope.so
 
 We support building `x86_64` (amd64) or `aarch64` (arm64/v8) binaries by adding `ARCH=x86_64` or `ARCH=aarch64` to the `make build` command. See the [BUILD](docs/BUILD.md) doc for details.
 
-## Keep Going
-
-On the [AppScope Website](https://appscope.dev/):
-
-- Learn about the CLI commands [in more depth](https://appscope.dev/docs/cli-using).
-- Get an [overview](https://appscope.dev/docs/how-works/) of AppScope beyond the CLI.
-- Discover what people are [doing](https://appscope.dev/docs/what-do-with-scope) with AppScope.
-- Review advanced [examples](https://appscope.dev/docs/examples-use-cases).
-- View the [Changelog](https://appscope.dev/docs/changelog) and [Known Issues](https://appscope.dev/docs/known-issues).
-- See what happens when you [connect AppScope to Cribl Stream or Cribl Edge](https://appscope.dev/docs/cribl-integration).
-
-The content on that site is built from the [website/](website/) directory in this project.
-
-Elsewhere, you can:
-
-- Complete the [AppScope Fundamentals sandbox](https://sandbox.cribl.io/course/appscope), a tutorial that takes about 30 minutes.
-- Join the [Cribl Community](https://cribl.io/community/) on Slack. The `#appscope` channel is where you'll find developers who contribute to this project.
-- Watch [this video review](https://youtube.com/watch?v=can1dMonRcA) of AppScope to learn about it's capabilities and use cases.
+## ✏️ Contributing
 
 If you're interested in contributing to the project, you can:
 
 - Take a look at current [discussions](https://github.com/criblio/appscope/discussions) and [issues](https://github.com/criblio/appscope/issues) in GitHub.
 - See our developer guides in the [docs/](./docs/) directory in this repository.
 - Submit any feature requests and defect reports at <https://github.com/criblio/appscope>.
+- Join the [Cribl Community](https://cribl.io/community/) on Slack. The `#appscope` channel is where you'll find developers who contribute to this project.
 
-## License
+## 📄 License
 
 AppScope is licensed under the Apache License, Version 2.0. 
 

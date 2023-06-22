@@ -53,6 +53,7 @@ scope detach --all
 docker run --rm -it -v/:/hostfs:ro --privileged cribl/scope
 scope <some app>
 scope metrics
+scope events
 scope attach --rootdir /hostfs <process running on host>
 scope events -f
 scope detach --all --rootdir /hostfs

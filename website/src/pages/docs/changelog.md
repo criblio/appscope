@@ -5,6 +5,56 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.3.4
+
+2023-06-14 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.3.4`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.3.4/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.3.4/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.3.4/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.3.4/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.3.4/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.4/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.3.4/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.4/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.3.4`.
+
+### Fixes
+
+- [1499](https://github.com/criblio/appscope/issues/1499) AppScope no longer exposes the `backtrace` symbol. Before this fix, certain scoped applications would segfault when they called `backtrace`.
+- [1491](https://github.com/criblio/appscope/issues/1491) When you run AppScope in a Kubernetes pod, the pod now starts normally even when the pod definition is missing the `label` section.
+- [1481](https://github.com/criblio/appscope/issues/1481) When scoping Java apps that use SSL and that are run on certain JREs, AppScope no longer causes the scoped app to segfault.
+
+## AppScope 1.3.3
+
+2023-05-17 - Maintenance Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.3.3`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.3.3/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.3.3/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.3.3/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.3.3/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.3.3/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.3/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.3.3/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.3.3/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.3.3`.
+
+### Improvements
+
+AppScope 1.3.3 removes our support for two Go versions that the Go project no longer supports: [1.9](https://go.dev/doc/go1.9) and [1.10](https://go.dev/doc/go1.10). This makes the AppScope code less complicated and more robust. Related issue: [#1452](https://github.com/criblio/appscope/issues/1452).
+
+### Fixes
+
+- [1461](https://github.com/criblio/appscope/issues/1461) In libc musl environments, attaching to an already-running but idle process now works normally. (Idle means not producing events at that moment.) 
+
+  - Before this fix, commands that rely on the IPC mechanism and/or the presence of a running periodic thread (e.g., `scope ps`, `scope inspect`, `scope update`) would not work, because AppScope's periodic thread would not start. For example, attaching AppScope to the Nginx master process running in an Alpine container, you would be unable to use the CLI to interact with the process. (This problem existed only in libc musl environments.)
+
+- [1412](https://github.com/criblio/appscope/issues/1412) Node.js apps compiled as [Position Independent Executables](https://www.redhat.com/en/blog/position-independent-executables-pie) (PIE) no longer seg fault when scoped.
+
 ## AppScope 1.3.2
 
 2023-04-19 - Maintenance Release
@@ -311,7 +361,7 @@ Assets are available via Docker and the Cribl CDN at the links below.
 
 AppScope 1.1.0 introduces improved capabilities for scoping Go applications:
 
-- [#637](https://github.com/criblio/appscope/issues/637) Support for go17 and go18.
+- [#637](https://github.com/criblio/appscope/issues/637) Support for Go versions 17 and 18.
 - [#904](https://github.com/criblio/appscope/issues/904) Support for HTTP2 when scoping Go executables. 
 - [#667](https://github.com/criblio/appscope/issues/667) AppScope's own internal libc, which resolves problems we'd seen when scoping Go apps that handle signals.
 

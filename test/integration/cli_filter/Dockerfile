@@ -13,6 +13,8 @@ RUN apt update \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PATH="/usr/local/scope:/usr/local/scope/bin:${PATH}"
+RUN echo "export PATH=/usr/local/scope:/usr/local/scope/bin:${PATH}" >/etc/profile.d/path.sh
+
 ENV SCOPE_CLI_SKIP_HOST=true
 COPY scope-profile.sh /etc/profile.d/scope_profile.sh
 COPY gdbinit /root/.gdbinit

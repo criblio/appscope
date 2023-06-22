@@ -190,7 +190,7 @@ scope detach --all --rootdir /path/to/host/mount/proc/<hostpid>/root
   -a, --all                   Detach from all processes
   -h, --help                  Help for detach
   -R, --rootdir               Path to root filesystem of target namespace
-
+  -w, --wait                  Wait for detach to complete
 ```
 
 ### events

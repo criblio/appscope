@@ -158,13 +158,13 @@ func Add(filterFile libscope.Filter, addProc, procArg, sourceid, rootdir string,
 	}
 	// Note: if len(procs) == 0 do nothing
 	if len(procs) == 1 {
-		if err = rc.Attach(procs[0].Pid, false); err != nil {
+		if _, err = rc.Attach(procs[0].Pid, false); err != nil {
 			return err
 		}
 	} else if len(procs) > 1 {
 		errors := false
 		for _, proc := range procs {
-			if err = rc.Attach(proc.Pid, false); err != nil {
+			if _, err = rc.Attach(proc.Pid, false); err != nil {
 				log.Error().Err(err)
 				errors = true
 			}

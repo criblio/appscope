@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/criblio/scope/internal"
 	"github.com/criblio/scope/util"
@@ -35,6 +36,7 @@ var detachCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		internal.InitConfig()
 		all, _ := cmd.Flags().GetBool("all")
+		wait, _ := cmd.Flags().GetBool("wait")
 		rc.Rootdir, _ = cmd.Flags().GetString("rootdir")
 
 		if all && len(args) > 0 {
@@ -55,7 +57,13 @@ var detachCmd = &cobra.Command{
 			return errNoScopedProcs
 		}
 		if len(procs) == 1 {
-			return rc.Detach(procs[0].Pid)
+			err = rc.Detach(procs[0].Pid)
+			// Simple approach for now
+			// Later: check for detach then resume
+			if wait {
+				time.Sleep(11 * time.Second) // detach uses dynamic config (<10s)
+			}
+			return err
 		}
 		// len(procs) is > 1
 		if !util.Confirm(fmt.Sprintf("Are your sure you want to detach from all of these processes?")) {
@@ -74,12 +82,19 @@ var detachCmd = &cobra.Command{
 			return errDetachingMultiple
 		}
 
+		// Simple approach for now
+		// Later: check for detach then resume
+		if wait {
+			time.Sleep(11 * time.Second) // detach uses dynamic config (<10s)
+		}
+
 		return nil
 	},
 }
 
 func init() {
 	detachCmd.Flags().BoolP("all", "a", false, "Detach from all processes")
+	detachCmd.Flags().BoolP("wait", "w", false, "Wait for detach to complete")
 	detachCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
 	RootCmd.AddCommand(detachCmd)
 }

@@ -24,7 +24,7 @@ struct sigUserStruct {
 */
 #define SIG_ORIGIN_SCOPE_ID (123456789)
 
-static struct sigUserStruct sigUsrState = {
+static struct sigUserStruct g_sigUsrState = {
     .timerId = 0,
     .appAction = {{0}},
     .scopeHandlerActive = FALSE,
@@ -620,9 +620,9 @@ out:
 */
 bool
 osTimerStop(void) {
-    if (sigUsrState.timerId) {
-        timer_delete(sigUsrState.timerId);
-        sigUsrState.timerId = 0;
+    if (g_sigUsrState.timerId) {
+        timer_delete(g_sigUsrState.timerId);
+        g_sigUsrState.timerId = 0;
         return TRUE;
     }
 
@@ -635,7 +635,7 @@ osTimerStop(void) {
 */
 bool
 osIsScopeHandlerActive(void) {
-    return sigUsrState.scopeHandlerActive;
+    return g_sigUsrState.scopeHandlerActive;
 }
 
 /*
@@ -643,13 +643,13 @@ osIsScopeHandlerActive(void) {
 */
 void
 osSetAppSigaction(const struct sigaction *act) {
-    sigUsrState.appAction.sa_flags = act->sa_flags;
-    if (sigUsrState.appAction.sa_flags & SA_SIGINFO) {
-        sigUsrState.appAction.sa_sigaction = act->sa_sigaction;
+    g_sigUsrState.appAction.sa_flags = act->sa_flags;
+    if (g_sigUsrState.appAction.sa_flags & SA_SIGINFO) {
+        g_sigUsrState.appAction.sa_sigaction = act->sa_sigaction;
     } else {
-        sigUsrState.appAction.sa_handler = act->sa_handler;
+        g_sigUsrState.appAction.sa_handler = act->sa_handler;
     }
-    sigUsrState.appAction.sa_mask = act->sa_mask;
+    g_sigUsrState.appAction.sa_mask = act->sa_mask;
 }
 
 /*
@@ -657,7 +657,7 @@ osSetAppSigaction(const struct sigaction *act) {
 */
 void
 osGetAppSigaction(struct sigaction *const act) {
-    *act = sigUsrState.appAction;
+    *act = g_sigUsrState.appAction;
 }
 
 /*
@@ -690,10 +690,10 @@ osCallAppSigaction(int sig, siginfo_t *info, void *secret) {
     return FALSE;
 
 callAppaction:
-    if (sigUsrState.appAction.sa_flags & SA_SIGINFO) {
-        sigUsrState.appAction.sa_sigaction(sig, info, secret);
+    if (g_sigUsrState.appAction.sa_flags & SA_SIGINFO) {
+        g_sigUsrState.appAction.sa_sigaction(sig, info, secret);
     } else {
-        sigUsrState.appAction.sa_handler(sig);
+        g_sigUsrState.appAction.sa_handler(sig);
     }
     return TRUE;
 }
@@ -723,9 +723,9 @@ osThreadInit(void(*handler)(int, siginfo_t *, void *), unsigned interval) {
     sevent.sigev_notify = SIGEV_SIGNAL;
     sevent.sigev_signo = SIGUSR2;
     sevent.sigev_value.sival_int = SIG_ORIGIN_SCOPE_ID;
-    sigUsrState.scopeHandlerActive = TRUE;
+    g_sigUsrState.scopeHandlerActive = TRUE;
 
-    if (timer_create(CLOCK_MONOTONIC, &sevent, &sigUsrState.timerId) == -1) {
+    if (timer_create(CLOCK_MONOTONIC, &sevent, &g_sigUsrState.timerId) == -1) {
         DBG("errno %d", errno);
         return FALSE;
     }
@@ -734,7 +734,7 @@ osThreadInit(void(*handler)(int, siginfo_t *, void *), unsigned interval) {
     tspec.it_interval.tv_nsec = 0;
     tspec.it_value.tv_sec = interval;
     tspec.it_value.tv_nsec = 0;
-    if (timer_settime(sigUsrState.timerId, 0, &tspec, NULL) == -1) {
+    if (timer_settime(g_sigUsrState.timerId, 0, &tspec, NULL) == -1) {
         DBG("errno %d", errno);
         return FALSE;
     }

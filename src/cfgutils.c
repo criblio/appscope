@@ -3070,13 +3070,15 @@ allow:
         level: error
 */
 
-#define ALLOW_NODE          "allow"
-#define PROCNAME_NODE         "procname"
-#define ARG_NODE              "arg"
-#define ALLOW_CONFIG_NODE     "config"
-#define DENY_NODE           "deny"
-#define PROCNAME_NODE         "procname"
-#define ARG_NODE              "arg"
+#define ALLOW_NODE             "allow"
+#define PROCNAME_NODE            "procname"
+#define ARG_NODE                 "arg"
+#define ALLOW_CONFIG_NODE        "config"
+#define DENY_NODE              "deny"
+#define PROCNAME_NODE            "procname"
+#define ARG_NODE                 "arg"
+#define SOURCE_NODE            "source"
+#define UNIX_SOCKET_PATH_NODE    "unixSocketPath"
 
 #define MATCH_ALL_VAL       "_MatchAll_"
 
@@ -3102,6 +3104,15 @@ typedef struct {
     node_rules_fn fn;
 } parse_rules_table_t;
 
+
+typedef void (*node_filter_unix_path_fn)(yaml_document_t *, yaml_node_t *, char **);
+
+typedef struct {
+    yaml_node_type_t type;
+    const char *key;
+    node_filter_unix_path_fn fn;
+} parse_filter_unix_path_t;
+
 /*
 * Process key value pair rules
 */
@@ -3120,6 +3131,28 @@ processKeyValuePairRules(yaml_document_t *doc, yaml_node_pair_t *pair, const par
             (!scope_strcmp((char*)nodeKey->data.scalar.value, fEntry[i].key))) {
             fEntry[i].fn(doc, nodeValue, extData);
             break;
+        }
+    }
+}
+
+/*
+* Process key value pair filter for finding the Unix Path
+*/
+static void
+processKeyValuePairFilterUnixPathData(yaml_document_t *doc, yaml_node_pair_t *pair, const parse_filter_unix_path_t *fEntry, char **unixPath) {
+    yaml_node_t *nodeKey = yaml_document_get_node(doc, pair->key);
+    yaml_node_t *nodeValue = yaml_document_get_node(doc, pair->value);
+
+    if (nodeKey->type != YAML_SCALAR_NODE) return;
+
+    /*
+    * Check if specific Node value is present and call proper function if exists
+    */
+    for (int i = 0; fEntry[i].type != YAML_NO_NODE; ++i) {
+        if ((nodeValue->type == fEntry[i].type) &&
+            (!scope_strcmp((char*)nodeKey->data.scalar.value, fEntry[i].key))) {
+                fEntry[i].fn(doc, nodeValue, unixPath);
+                break;
         }
     }
 }
@@ -3309,6 +3342,38 @@ processDenySeq(yaml_document_t *doc, yaml_node_t *node, void *extData) {
 }
 
 /*
+* Process Unix Socket Path Node
+*/
+static void
+processUnixSocketPathNode(yaml_document_t* doc, yaml_node_t* node, char **unixPath) {
+    if (!node || (node->type != YAML_SCALAR_NODE)) return;
+
+    const char *unixCfgPath = (const char *)node->data.scalar.value;
+
+    if (scope_strlen(unixCfgPath) > 0) {
+        *unixPath = scope_strdup(unixCfgPath);
+    }
+}
+
+/*
+* Process source Node
+*/
+static void
+processSourceNode(yaml_document_t *doc, yaml_node_t *node, char **unixPath) {
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    parse_rules_unix_path_t sourceNodes[] = {
+        {YAML_SCALAR_NODE,    UNIX_SOCKET_PATH_NODE, processUnixSocketPathNode},
+        {YAML_NO_NODE,        NULL,                  NULL}
+    };
+
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairRulesUnixPathData(doc, pair, sourceNodes, unixPath);
+    }
+}
+
+/*
 * Process Rules Root node (starting point)
 */
 static void
@@ -3362,6 +3427,28 @@ processRulesValidRootNode(yaml_document_t *doc, void *extData) {
     };
     foreach(pair, node->data.mapping.pairs) {
         processKeyValuePairRules(doc, pair, deny, extData);
+    }
+}
+
+/*
+* Process Rules Source node (starting point)
+*/
+static void
+processRulesSourceSection(yaml_document_t *doc, char **unixPath) {
+    yaml_node_t *node = yaml_document_get_root_node(doc);
+
+    if ((node == NULL) || (node->type != YAML_MAPPING_NODE)) {
+        return;
+    }
+    yaml_node_pair_t *pair;
+
+    parse_rules_unix_path_t meta[] = {
+        {YAML_MAPPING_NODE,  SOURCE_NODE,  processSourceNode},
+        {YAML_NO_NODE,       NULL,         NULL}
+    };
+
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairRulesUnixPathData(doc, pair, meta, unixPath);
     }
 }
 
@@ -3446,6 +3533,73 @@ cfgRulesStatus(const char *procName, const char *procCmdLine, const char *rulesP
 
     DBG(NULL);
     return RULES_ERROR;
+}
+
+/*
+ * Returns the UNIX socket path defined in the rules file's "source" section.
+ * The "source" section is an optional section that contains additional
+ * information. AppScope utilizes it to retrieve information about the
+ * UNIX path ("unixSocketPath"), which can be used as the receiver point for
+ * AppScope data.
+ * One example of an application that generates the rules file with proper
+ * "source" data is Edge (https://cribl.io/edge/).
+ * 
+ * Memory for the UNIX socket path is obtained with scope_strdup and can
+ * be freed with scope_free.
+*/
+char *
+cfgRulesUnixPath(const char *rulesPath) {
+    char *unixPath = NULL;
+    if (!rulesPath) {
+        return unixPath;
+    }
+
+    FILE *fp = scope_fopen(rulesPath, "rb");
+    if (!fp) {
+        return unixPath;
+    }
+    yaml_parser_t parser;
+    yaml_document_t doc;
+
+    int res = yaml_parser_initialize(&parser);
+    if (!res) {
+        goto cleanup_rules_file;
+    }
+
+    yaml_parser_set_input_file(&parser, fp);
+
+    res = yaml_parser_load(&parser, &doc);
+    if (!res) {
+        goto cleanup_parser;
+    }
+
+    /*
+    * Extract the unixSocketPath from rules file
+    *
+    "source": {
+      "id": "in_appscope",
+      "enableUnixPath": true,
+      "unixSocketPath": "/opt/cribl/state/appscope.sock",
+      "tls": {
+        "disabled": true
+      },
+      "host": "0.0.0.0",
+      "port": 10090,
+      "authToken": ""
+    }
+    */
+
+    processRulesSourceSection(&doc, &unixPath);
+
+    yaml_document_delete(&doc);
+
+cleanup_parser:
+    yaml_parser_delete(&parser);
+
+cleanup_rules_file:
+    scope_fclose(fp);
+
+    return unixPath;
 }
 
 /*

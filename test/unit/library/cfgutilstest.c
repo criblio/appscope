@@ -2947,9 +2947,26 @@ rulesMatchAllInDeny(void **state)
     // cleanup
     cfgDestroy(&cfg);
     assert_null(cfg);
-
 }
 
+static void
+filterUnixPathMissing(void **state)
+{
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_6.yml", dirPath);
+    char *unixPath = cfgFilterUnixPath(path);
+    assert_null(unixPath);
+}
+
+static void
+filterUnixPathPresent(void **state)
+{
+    char path[PATH_MAX] = {0};
+    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_edge.yml", dirPath);
+    char *unixPath = cfgFilterUnixPath(path);
+    assert_string_equal(unixPath, "/opt/cribl/state/appscope.sock");
+    scope_free(unixPath);
+}
 
 // Defined in src/cfgutils.c
 // This is not a proper test, it just exists to make valgrind output
@@ -3033,15 +3050,15 @@ main(int argc, char *argv[])
         cmocka_unit_test(initMtcReturnsPtr),
         cmocka_unit_test(initEvtFormatReturnsPtr),
         cmocka_unit_test(initCtlReturnsPtr),
-        cmocka_unit_test(rulesEmptyRulesFileVar1),
-        cmocka_unit_test(rulesEmptyRulesFileVar2),
-        cmocka_unit_test(rulesEmptyRulesFileVar3),
-        cmocka_unit_test(rulesInvalidRulesFile),
+        cmocka_unit_test(rulesEmptyFilterFileVar1),
+        cmocka_unit_test(rulesEmptyFilterFileVar2),
+        cmocka_unit_test(rulesEmptyFilterFileVar3),
+        cmocka_unit_test(rulesInvalidFilterFile),
         cmocka_unit_test(rulesEmptyProcName),
         cmocka_unit_test(rulesEmptyProcCmdLine),
-        cmocka_unit_test(rulesNullRulesPath),
+        cmocka_unit_test(rulesNullFilterPath),
         cmocka_unit_test(rulesNullCfg),
-        cmocka_unit_test(rulesNonExistingRulesFile),
+        cmocka_unit_test(rulesNonExistingFilterFile),
         cmocka_unit_test(rulesProcNameAllowListPresent),
         cmocka_unit_test(rulesProcNameDenyListPresent),
         cmocka_unit_test(rulesArgAllowListPresent),
@@ -3056,6 +3073,8 @@ main(int argc, char *argv[])
         cmocka_unit_test(rulesMatchAllInAllowCanBeDenied),
         cmocka_unit_test(rulesVerifyMatchAllMergedConfig),
         cmocka_unit_test(rulesMatchAllInDeny),
+        cmocka_unit_test(rulesUnixPathMissing),
+        cmocka_unit_test(rulesUnixPathPresent),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
         cmocka_unit_test(cfgReadProtocol),
         cmocka_unit_test(cfgReadCustomEmptyFilter),

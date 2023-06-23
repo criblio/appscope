@@ -1,0 +1,142 @@
+{
+  "allow": [
+    {
+      "procname": "redis",
+      "config": {
+        "metric": {
+          "enable": true,
+          "format": {
+            "type": "statsd",
+            "statsdmaxlen": 512,
+            "verbosity": 4
+          },
+          "watch": [
+            {
+              "type": "statsd"
+            },
+            {
+              "type": "fs"
+            },
+            {
+              "type": "net"
+            },
+            {
+              "type": "http"
+            },
+            {
+              "type": "dns"
+            },
+            {
+              "type": "process"
+            }
+          ],
+          "transport": {
+            "type": "udp",
+            "host": "127.0.0.1",
+            "port": 8125,
+            "tls": {
+              "enable": false,
+              "validateserver": true,
+              "cacertpath": ""
+            }
+          }
+        },
+        "event": {
+          "enable": true,
+          "format": {
+            "type": "ndjson",
+            "maxeventpersec": 10000,
+            "enhancefs": true
+          },
+          "watch": [
+            {
+              "type": "file",
+              "name": "(\\/logs?\\/)|(\\.log$)|(\\.log[.\\d])",
+              "value": ".*"
+            },
+            {
+              "type": "console",
+              "name": "(stdout)|(stderr)",
+              "value": ".*"
+            },
+            {
+              "type": "net",
+              "name": ".*",
+              "field": ".*",
+              "value": ".*"
+            },
+            {
+              "type": "fs",
+              "name": ".*",
+              "field": ".*",
+              "value": ".*"
+            },
+            {
+              "type": "dns",
+              "name": ".*",
+              "field": ".*",
+              "value": ".*"
+            },
+            {
+              "type": "http",
+              "name": ".*",
+              "field": ".*",
+              "value": ".*",
+              "headers": null
+            }
+          ],
+          "transport": {
+            "type": "tcp",
+            "host": "127.0.0.1",
+            "port": 9109,
+            "tls": {
+              "enable": false,
+              "validateserver": true,
+              "cacertpath": ""
+            }
+          }
+        },
+        "libscope": {
+          "configevent": true,
+          "summaryperiod": 10,
+          "commanddir": "/tmp",
+          "log": {
+            "level": "warning",
+            "transport": {
+              "type": "file",
+              "buffer": "line",
+              "path": "/tmp/scope.log"
+            }
+          }
+        },
+        "cribl": {
+          "enable": true,
+          "authtoken": "",
+          "transport": {
+            "type": "unix",
+            "path": "/opt/cribl/state/appscope.sock",
+            "tls": {
+              "enable": false
+            }
+          }
+        },
+        "payload": {
+          "enable": false,
+          "dir": "/tmp"
+        }
+      }
+    }
+  ],
+  "deny": [],
+  "source": {
+    "id": "in_appscope",
+    "enableUnixPath": true,
+    "unixSocketPath": "/opt/cribl/state/appscope.sock",
+    "tls": {
+      "disabled": true
+    },
+    "host": "0.0.0.0",
+    "port": 10090,
+    "authToken": ""
+  }
+}

@@ -290,7 +290,20 @@ hookAll(struct dl_phdr_info *info, size_t size, void *data)
     scopeLog(CFG_LOG_DEBUG, "%s: shared obj: %s", __FUNCTION__, info->dlpi_name);
 
     // don't hook funcs from libscope or ld.so
-    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) return 0;
+    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) {
+        return FALSE;
+    }
+
+    /*
+    * Don't hook the main program. 
+    * In dl_iterate_phdr the main program is passed as:
+    * - on musl as an absolute path into the binary
+    * - on glibc as an empty string in the binary
+    * We do not want to use dlopen for the absolute path to avoid the static initialization order problem.
+    */
+    if (endsWith(info->dlpi_name, g_proc.procname) == TRUE) {
+        return FALSE;
+    }
 
     void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
     if (handle == NULL) return FALSE;
@@ -311,7 +324,48 @@ hookAll(struct dl_phdr_info *info, size_t size, void *data)
     }
 
     dlclose(handle);
-    return 0;
+    return FALSE;
+}
+
+static int
+hookAllAttach(struct dl_phdr_info *info, size_t size, void *data)
+{
+    if (!info || !info->dlpi_name || !data) return FALSE;
+
+    struct link_map *lm;
+    Elf64_Sym *sym = NULL;
+    Elf64_Rela *rel = NULL;
+    char *str = NULL;
+    int rsz = 0;
+    bool *rules = data;
+
+    scopeLog(CFG_LOG_DEBUG, "%s: shared obj: %s", __FUNCTION__, info->dlpi_name);
+
+    // don't hook funcs from libscope or ld.so
+    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) {
+        return FALSE;
+    }
+
+    void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
+    if (handle == NULL) return FALSE;
+
+    // Get the link map and ELF sections in advance of something matching
+    if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+        for (int i=0; inject_hook_list[i].symbol; i++) {
+            // if the proc passes the rules then GOT hook all else only hook execve
+            // TODO; all execv?
+            if (((*rules == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
+                dlsym(handle, inject_hook_list[i].symbol)) {
+                if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1) {
+                    scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from shared obj %s",
+                             inject_hook_list[i].symbol, info->dlpi_name);
+                }
+            }
+        }
+    }
+
+    dlclose(handle);
+    return FALSE;
 }
 
 static int
@@ -399,7 +453,7 @@ cmdAttach(void)
     bool rules = TRUE;
     scopeLog(CFG_LOG_DEBUG, "%s:%d", __FUNCTION__, __LINE__);
 
-    dl_iterate_phdr(hookAll, &rules);
+    dl_iterate_phdr(hookAllAttach, &rules);
     hookMain(rules);
 
     g_cfg.funcs_attached = TRUE;
@@ -1802,19 +1856,52 @@ static const char *const doNotScopeList[] = {
 
 };
 
+static const char *const allowList[] = {
+    "runc",
+};
+
+/*
+ * When a rules file has not been found, all processes have the
+ * potential to be interposed. This function prohibits a process in the
+ * doNotScopeList list from being interposed as it otherwise would.
+ *
+ * It returns FALSE if the current process, by name, should not be interposed.
+ */
 static bool
-thisProcCanBeActive(void)
+doImplicitDeny(void)
 {
-    char procName[256] = {0};
+    char procName[PATH_MAX] = {0};
     osGetProcname(procName, sizeof(procName));
 
     int i;
-    for (i=0; i<ARRAY_SIZE(doNotScopeList); i++) {
+
+    for (i=0; i < ARRAY_SIZE(doNotScopeList); i++) {
         if (!scope_strcmp(procName, doNotScopeList[i])) return FALSE;
     }
+
     return TRUE;
 }
 
+/*
+ * When a rules file is found, the processes defined by the rules
+ * are the only ones interposed. This function allows a process in the
+ * allowList to override the rules and be interposed.
+ *
+ * It returns TRUE if the current process, by name, is to be allowed.
+ */
+static bool
+doImplicitAllow(void)
+{
+    char procName[PATH_MAX] = {0};
+    osGetProcname(procName, sizeof(procName));
+    int i;
+
+    for (i=0; i < ARRAY_SIZE(allowList); i++) {
+        if (!scope_strcmp(procName, allowList[i])) return TRUE;
+    }
+
+    return FALSE;
+}
 
 typedef struct {
     bool isActive;
@@ -1834,25 +1921,29 @@ getSettings(bool attachedFlag)
     config_t *cfg = NULL;
     const char *rulesFilePath = NULL;
     bool scopedFlag = FALSE;
-    bool skipReadCfg = FALSE;
+    bool readCfgFile = TRUE;
 
     if (attachedFlag) {
         scopedFlag = TRUE;
     } else if (!(rulesFilePath = getRulesFilePath())){
         // The rules file does not exist, or shouldn't be used.
         // Set scopedFlag true unless it's on our doNotScopeList
-        scopedFlag = thisProcCanBeActive();
+        scopedFlag = doImplicitDeny();
     } else {
-        // A rules file exists!  Use it.
-        cfg = cfgCreateDefault();
-        rules_status_t res = cfgRulesStatus(g_proc.procname, g_proc.cmd, rulesFilePath, cfg);
-        switch (res) {
+        // A rules file exists. Before using it, check for an implicit allow
+        if (doImplicitAllow() == TRUE) {
+            scopedFlag = TRUE;
+        } else {
+            // A rules file exists!  Use it.
+            cfg = cfgCreateDefault();
+            rules_status_t res = cfgRulesStatus(g_proc.procname, g_proc.cmd, rulesFilePath, cfg);
+            switch (res) {
             case RULES_SCOPED:
                 scopedFlag = TRUE;
                 break;
             case RULES_SCOPED_WITH_CFG:
                 scopedFlag = TRUE;
-                skipReadCfg = TRUE;
+                readCfgFile = FALSE;
                 break;
             case RULES_NOT_SCOPED:
                 scopedFlag = FALSE;
@@ -1862,10 +1953,11 @@ getSettings(bool attachedFlag)
                 scopedFlag = FALSE;
                 DBG(NULL);
                 break;
+            }
         }
     }
 
-    if (skipReadCfg == FALSE) {
+    if (readCfgFile == TRUE) {
         char *path = NULL;
         path = cfgPath();
         if (cfg) cfgDestroy(&cfg);

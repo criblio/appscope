@@ -37,9 +37,10 @@ typedef enum {
 } rules_status_t;
 
 // Rules Handling
-// parse rules file nd optionally reads a cfg from rules file
+// Parse rules file and optionally reads a cfg from rules file
 rules_status_t cfgRulesStatus(const char *, const char *, const char *, config_t *);
 bool cfgRulesFileIsValid(const char*);
+char *cfgRulesUnixPath(const char *);
 
 log_t * initLog(config_t *);
 mtc_t * initMtc(config_t *);

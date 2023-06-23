@@ -237,6 +237,15 @@ services:
       dockerfile: ./musl/Dockerfile
     <<: *scope-common
 
+  opentelemetry:
+    image: ghcr.io/criblio/appscope-test-opentelemetry:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from: 
+        - ghcr.io/criblio/appscope-test-opentelemetry:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./opentelemetry/Dockerfile
+    <<: *scope-common
+
   glibc:
     image: ghcr.io/criblio/appscope-test-glibc:${TAG:?Missing TAG environment variable}
     build:
@@ -277,6 +286,15 @@ services:
       - ../..:/opt/appscope
     <<: *scope-common
 
+  cli_rules:
+    image: ghcr.io/criblio/appscope-test-cli_rules:${TAG:?Missing TAG environment variable}
+    build:
+      cache_from: 
+        - ghcr.io/criblio/appscope-test-cli_rules:${TAG:?Missing TAG environment variable}
+      context: .
+      dockerfile: ./cli_rules/Dockerfile
+    <<: *scope-common
+
   sshd:
     image: ghcr.io/criblio/appscope-test-sshd:${TAG:?Missing TAG environment variable}
     build:
@@ -284,24 +302,6 @@ services:
         - ghcr.io/criblio/appscope-test-sshd:${TAG:?Missing TAG environment variable}
       context: .
       dockerfile: ./sshd/Dockerfile
-    <<: *scope-common
-
-  start-glibc:
-    image: ghcr.io/criblio/appscope-test-start-glibc:${TAG:?Missing TAG environment variable}
-    build:
-      cache_from: 
-        - ghcr.io/criblio/appscope-test-start-glibc:${TAG:?Missing TAG environment variable}
-      context: .
-      dockerfile: ./start/Dockerfile.glibc
-    <<: *scope-common
-
-  start-musl:
-    image: ghcr.io/criblio/appscope-test-start-musl:${TAG:?Missing TAG environment variable}
-    build:
-      cache_from: 
-        - ghcr.io/criblio/appscope-test-start-musl:${TAG:?Missing TAG environment variable}
-      context: .
-      dockerfile: ./start/Dockerfile.musl
     <<: *scope-common
 
   payload-glibc:
@@ -321,16 +321,16 @@ services:
       context: .
       dockerfile: ./payload/Dockerfile.musl
     <<: *scope-common
-
-  prometheus:
-    image: ghcr.io/criblio/appscope-test-prometheus:${TAG:?Missing TAG environment variable}
+  
+  jetty:
+    image: ghcr.io/criblio/appscope-test-jetty:${TAG:?Missing TAG environment variable}
     build:
       cache_from:
-        - ghcr.io/criblio/appscope-test-prometheus:${TAG:?Missing TAG environment variable}
+        - ghcr.io/criblio/appscope-test-jetty:${TAG:?Missing TAG environment variable}
       context: .
-      dockerfile: ./prometheus/Dockerfile
+      dockerfile: ./jetty/Dockerfile
     <<: *scope-common
-  
+
   jetty:
     image: ghcr.io/criblio/appscope-test-jetty:${TAG:?Missing TAG environment variable}
     build:
@@ -348,7 +348,7 @@ services:
       context: .
       dockerfile: ./go/Dockerfile
       args:
-        GO_IMAGE_VER: golang:1.19
+        GO_IMAGE_VER: golang:1.19.9
     <<: *scope-common
 
   go_20:
@@ -359,7 +359,7 @@ services:
       context: .
       dockerfile: ./go/Dockerfile
       args:
-        GO_IMAGE_VER: golang:1.20
+        GO_IMAGE_VER: golang:1.20.4
     <<: *scope-common
 
 # vim: ts=2 sw=2 et :

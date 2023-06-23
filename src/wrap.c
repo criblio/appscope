@@ -271,9 +271,9 @@ fileModTime(const char *path)
 
 /*
  * Iterate all shared objects and GOT hook as necessary.
- * Filter the process from an external filter list.
- * If the filter fails only hook execve.
- * If the filter passes hook all interposed functions.
+ * Rules the process from an external rules list.
+ * If the rules fails only hook execve.
+ * If the rules passes hook all interposed functions.
  */
 static int
 hookAll(struct dl_phdr_info *info, size_t size, void *data)
@@ -285,12 +285,25 @@ hookAll(struct dl_phdr_info *info, size_t size, void *data)
     Elf64_Rela *rel = NULL;
     char *str = NULL;
     int rsz = 0;
-    bool *filter = data;
+    bool *rules = data;
 
     scopeLog(CFG_LOG_DEBUG, "%s: shared obj: %s", __FUNCTION__, info->dlpi_name);
 
     // don't hook funcs from libscope or ld.so
-    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) return 0;
+    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) {
+        return FALSE;
+    }
+
+    /*
+    * Don't hook the main program. 
+    * In dl_iterate_phdr the main program is passed as:
+    * - on musl as an absolute path into the binary
+    * - on glibc as an empty string in the binary
+    * We do not want to use dlopen for the absolute path to avoid the static initialization order problem.
+    */
+    if (endsWith(info->dlpi_name, g_proc.procname) == TRUE) {
+        return FALSE;
+    }
 
     void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
     if (handle == NULL) return FALSE;
@@ -298,9 +311,9 @@ hookAll(struct dl_phdr_info *info, size_t size, void *data)
     // Get the link map and ELF sections in advance of something matching
     if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
         for (int i=0; inject_hook_list[i].symbol; i++) {
-            // if the proc passes the filter then GOT hook all else only hook execve
+            // if the proc passes the rules then GOT hook all else only hook execve
             // TODO; all execv?
-            if (((*filter == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
+            if (((*rules == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
                 dlsym(handle, inject_hook_list[i].symbol)) {
                 if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1) {
                     scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from shared obj %s",
@@ -311,11 +324,52 @@ hookAll(struct dl_phdr_info *info, size_t size, void *data)
     }
 
     dlclose(handle);
-    return 0;
+    return FALSE;
 }
 
 static int
-hookMain(bool filter)
+hookAllAttach(struct dl_phdr_info *info, size_t size, void *data)
+{
+    if (!info || !info->dlpi_name || !data) return FALSE;
+
+    struct link_map *lm;
+    Elf64_Sym *sym = NULL;
+    Elf64_Rela *rel = NULL;
+    char *str = NULL;
+    int rsz = 0;
+    bool *rules = data;
+
+    scopeLog(CFG_LOG_DEBUG, "%s: shared obj: %s", __FUNCTION__, info->dlpi_name);
+
+    // don't hook funcs from libscope or ld.so
+    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) {
+        return FALSE;
+    }
+
+    void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
+    if (handle == NULL) return FALSE;
+
+    // Get the link map and ELF sections in advance of something matching
+    if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+        for (int i=0; inject_hook_list[i].symbol; i++) {
+            // if the proc passes the rules then GOT hook all else only hook execve
+            // TODO; all execv?
+            if (((*rules == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
+                dlsym(handle, inject_hook_list[i].symbol)) {
+                if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1) {
+                    scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from shared obj %s",
+                             inject_hook_list[i].symbol, info->dlpi_name);
+                }
+            }
+        }
+    }
+
+    dlclose(handle);
+    return FALSE;
+}
+
+static int
+hookMain(bool rules)
 {
     struct link_map *lm;
     Elf64_Sym *sym = NULL;
@@ -329,9 +383,9 @@ hookMain(bool filter)
     // Get the link map and ELF sections in advance of something matching
     if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
         for (int i=0; inject_hook_list[i].symbol; i++) {
-            // if the proc passes the filter then GOT hook all else only hook execve
+            // if the proc passes the rules then GOT hook all else only hook execve
             // TODO; all execv?
-            if (((filter == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
+            if (((rules == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
                 dlsym(handle, inject_hook_list[i].symbol)) {
                 if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1) {
                     scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from main", inject_hook_list[i].symbol);
@@ -396,11 +450,11 @@ cmdAttach(void)
 {
     if (g_cfg.funcs_attached) return TRUE;
 
-    bool filter = TRUE;
+    bool rules = TRUE;
     scopeLog(CFG_LOG_DEBUG, "%s:%d", __FUNCTION__, __LINE__);
 
-    dl_iterate_phdr(hookAll, &filter);
-    hookMain(filter);
+    dl_iterate_phdr(hookAllAttach, &rules);
+    hookMain(rules);
 
     g_cfg.funcs_attached = TRUE;
 
@@ -1659,11 +1713,264 @@ initEnv(int *attachedFlag)
     scope_fclose(fd);
 }
 
+static const char *
+getRulesFilePath(void)
+{
+    char *rulesFilePath = NULL;
+    char *envRulesVal = getenv("SCOPE_RULES");
+    if (envRulesVal) {
+        if (!scope_strcmp(envRulesVal, "false")) {
+            // SCOPE_RULES is false (use of rules file is disabled)
+            rulesFilePath = NULL;
+        } else if (!scope_access(envRulesVal, R_OK)) {
+            // SCOPE_RULES contains the path to a rules file.
+            rulesFilePath = envRulesVal;
+        }
+    } else if (!scope_access(SCOPE_RULES_USR_PATH, R_OK)) {
+        // rules file was at first default location
+        rulesFilePath = SCOPE_RULES_USR_PATH;
+    }
+
+    // check if rules file can actually be used
+    if ((rulesFilePath) && (cfgRulesFileIsValid(rulesFilePath) == FALSE)) {
+        rulesFilePath = NULL;
+    }
+
+    return rulesFilePath;
+}
+
+// Used this command on ubuntu 20.04 and 22.04 as a starting point:
+// ps -ef | grep -v "\["
+static const char *const doNotScopeList[] = {
+// systemd
+    "30-systemd-environment-d-generator",
+    "init",
+    "(sd-pam)",
+    "systemd",
+    "systemd-detect-virt",
+    "systemd-journald",
+    "systemd-logind",
+    "systemd-machined",
+    "systemd-networkd",
+    "systemd-networkd-wait-online",
+    "systemd-oomd",
+    "systemd-resolved",
+    "systemd-timesyncd",
+    "systemd-udevd",
+    "systemd-update-utmp",
+    "systemd-userdbd",
+    "systemd-user-runtime-dir",
+    "systemd-user-sessions",
+    "systemd-userwork",
+    "systemd-xdg-autostart-generator",
+
+// misc services
+    "abrtd",
+    "abrt-dump-journal-core",
+    "abrt-dump-journal-oops",
+    "abrt-dump-journal-xorg",
+    "acpid",
+    "agetty",
+    "avahi-daemon",
+    "bpfilter_umh",
+    "colord",
+    "cups-browsed",
+    "cupsd",
+    "dbus-broker",
+    "dbus-broker-launch",
+    "dbus-daemon",
+    "dbus-run-session",
+    "irqbalance",
+    "ModemManager",
+    "multipathd",
+    "NetworkManager",
+    "polkitd",
+    "power-profiles-daemon",
+    "sshd",
+    "udisksd",
+    "upowerd",
+    "wpa_supplicant",
+
+// desktop graphical/audio/etc
+    "accounts-daemon",
+    "at-spi2-registryd",
+    "at-spi-bus-launcher",
+    "colord",
+    "gdm",
+    "gdm3",
+    "gdm-launch-environment",
+    "gdm-wayland-session",
+    "gjs",
+    "gnome-session-binary",
+    "gnome-shell",
+    "goa-daemon",
+    "goa-identity-service",
+    "gsd-a11y-settings",
+    "gsd-color",
+    "gsd-datetime",
+    "gsd-housekeeping",
+    "gsd-keyboard",
+    "gsd-media-keys",
+    "gsd-power",
+    "gsd-printer",
+    "gsd-print-notifications",
+    "gsd-rfkill",
+    "gsd-screensaver-proxy",
+    "gsd-sharing",
+    "gsd-smartcard",
+    "gsd-sound",
+    "gsd-wacom",
+    "gssproxy",
+    "gvfs-afc-volume-monitor",
+    "gvfsd",
+    "gvfsd-fuse",
+    "gvfs-goa-volume-monitor",
+    "gvfs-gphoto2-volume-monitor",
+    "gvfs-mtp-volume-monitor",
+    "gvfs-udisks2-volume-monitor",
+    "ibus-daemon",
+    "ibus-dconf",
+    "ibus-engine-simple",
+    "ibus-portal",
+    "ibus-x11",
+    "low-memory-monitor",
+    "mutter-x11-frames",
+    "packagekitd",
+    "pipewire",
+    "pipewire-media-session",
+    "pipewire-pulse",
+    "power-profiles-daemon",
+    "pulseaudio",
+    "rtkit-daemon",
+    "switcheroo-control",
+    "tracker-miner-fs-3",
+    "upowerd",
+    "uresourced",
+    "wireplumber",
+    "xdg-document-portal",
+    "xdg-permission-store",
+    "Xwayland",
+
+};
+
+static const char *const allowList[] = {
+    "runc",
+};
+
+/*
+ * When a rules file has not been found, all processes have the
+ * potential to be interposed. This function prohibits a process in the
+ * doNotScopeList list from being interposed as it otherwise would.
+ *
+ * It returns FALSE if the current process, by name, should not be interposed.
+ */
+static bool
+doImplicitDeny(void)
+{
+    char procName[PATH_MAX] = {0};
+    osGetProcname(procName, sizeof(procName));
+
+    int i;
+
+    for (i=0; i < ARRAY_SIZE(doNotScopeList); i++) {
+        if (!scope_strcmp(procName, doNotScopeList[i])) return FALSE;
+    }
+
+    return TRUE;
+}
+
+/*
+ * When a rules file is found, the processes defined by the rules
+ * are the only ones interposed. This function allows a process in the
+ * allowList to override the rules and be interposed.
+ *
+ * It returns TRUE if the current process, by name, is to be allowed.
+ */
+static bool
+doImplicitAllow(void)
+{
+    char procName[PATH_MAX] = {0};
+    osGetProcname(procName, sizeof(procName));
+    int i;
+
+    for (i=0; i < ARRAY_SIZE(allowList); i++) {
+        if (!scope_strcmp(procName, allowList[i])) return TRUE;
+    }
+
+    return FALSE;
+}
+
+typedef struct {
+    bool isActive;
+    config_t *cfg;
+} settings_t;
+
+/*
+* We actively scope applications:
+* - when we are attaching
+* - when the rules file is not valid or does not exist and 
+*   process does not match `doNotScopeList`
+* - when process match the allow list
+*/
+static settings_t
+getSettings(bool attachedFlag)
+{
+    config_t *cfg = NULL;
+    const char *rulesFilePath = NULL;
+    bool scopedFlag = FALSE;
+    bool readCfgFile = TRUE;
+
+    if (attachedFlag) {
+        scopedFlag = TRUE;
+    } else if (!(rulesFilePath = getRulesFilePath())){
+        // The rules file does not exist, or shouldn't be used.
+        // Set scopedFlag true unless it's on our doNotScopeList
+        scopedFlag = doImplicitDeny();
+    } else {
+        // A rules file exists. Before using it, check for an implicit allow
+        if (doImplicitAllow() == TRUE) {
+            scopedFlag = TRUE;
+        } else {
+            // A rules file exists!  Use it.
+            cfg = cfgCreateDefault();
+            rules_status_t res = cfgRulesStatus(g_proc.procname, g_proc.cmd, rulesFilePath, cfg);
+            switch (res) {
+            case RULES_SCOPED:
+                scopedFlag = TRUE;
+                break;
+            case RULES_SCOPED_WITH_CFG:
+                scopedFlag = TRUE;
+                readCfgFile = FALSE;
+                break;
+            case RULES_NOT_SCOPED:
+                scopedFlag = FALSE;
+                break;
+            case RULES_ERROR:
+            default:
+                scopedFlag = FALSE;
+                DBG(NULL);
+                break;
+            }
+        }
+    }
+
+    if (readCfgFile == TRUE) {
+        char *path = NULL;
+        path = cfgPath();
+        if (cfg) cfgDestroy(&cfg);
+        cfg = cfgRead(path);
+        if (path) scope_free(path);
+    }
+    cfgProcessEnvironment(cfg);
+
+    settings_t settings = {.isActive = scopedFlag,
+                          .cfg = cfg};
+    return settings;
+}
+
 __attribute__((constructor)) void
 init(void)
 {
-    config_t *cfg = NULL;
-    char *path = NULL;
     scope_init_vdso_ehdr();
     char *full_path = NULL;
     elf_buf_t *ebuf = NULL;
@@ -1722,84 +2029,27 @@ init(void)
     g_nsslist = lstCreate(freeNssEntry);
 
     initTime();
-    /*
-    * We scope application in following cases:
-    * - when we are attaching
-    * - when the filter file does not exists
-    * - when process match the allow list
-    */
-    bool scopedFlag = FALSE;
-    bool skipReadCfg = FALSE;
 
-    if (attachedFlag) {
-        scopedFlag = TRUE;
-    } else {
-        cfg = cfgCreateDefault();
-        // First try to use env variable
-        char *envFilterVal = fullGetEnv("SCOPE_FILTER");
-        filter_status_t res = FILTER_SCOPED;
-        if (envFilterVal) {
-            /*
-            * If filter env was defined and wasn't disable 
-            * the filter handling, try path interpretation
-            */
-            size_t envFilterLen = scope_strlen(envFilterVal);
-            if ((scope_strncmp(envFilterVal, "false", envFilterLen)) && (!scope_access(envFilterVal, R_OK))) {
-                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, envFilterVal, cfg);
-            }
-        } else {
-            /*
-            * Try to use defaults
-            */
-            if (!scope_access(SCOPE_FILTER_USR_PATH, R_OK)) {
-                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, SCOPE_FILTER_USR_PATH, cfg);
-            } else if (!scope_access(SCOPE_FILTER_TMP_PATH, R_OK)) {
-                res = cfgFilterStatus(g_proc.procname, g_proc.cmd, SCOPE_FILTER_TMP_PATH, cfg);
-            }
-        }
-        switch (res) {
-            case FILTER_SCOPED:
-                scopedFlag = TRUE;
-                break;
-            case FILTER_SCOPED_WITH_CFG:
-                scopedFlag = TRUE;
-                skipReadCfg = TRUE;
-                break;
-            case FILTER_NOT_SCOPED:
-                scopedFlag = FALSE;
-                break;
-            case FILTER_ERROR:
-            default:
-                scopedFlag = FALSE;
-                DBG(NULL);
-                break;
-        }
-    }
-    if (skipReadCfg == FALSE) {
-        path = cfgPath();
-        if (cfg) cfgDestroy(&cfg);
-        cfg = cfgRead(path);
-    }
+    // settings contain isActive and cfg fields which depend on the existance and
+    // contents of a rules file, env vars, scope.yml, etc.
+    settings_t settings = getSettings(attachedFlag);
 
     // on aarch64, the crypto subsystem installs handlers for SIGILL
     // (contrib/openssl/crypto/armcap.c) to determine which version of
     // ARM processor we're on.  Do this before enableSnapshot() below.
     transportInit();
 
-    cfgProcessEnvironment(cfg);
-
-    doConfig(cfg);
+    doConfig(settings.cfg);
 
     // Currently we enable snapshot feature only in case of constructor
     // TODO: if we update the configuration via IPC it will not be updated
-    enableSnapshot(cfg);
+    enableSnapshot(settings.cfg);
 
-    g_staticfg = cfg;
-    if (path) scope_free(path);
+    g_staticfg = settings.cfg;
     if (!g_dbg) dbgInit();
     g_getdelim = 0;
 
-    g_cfg.funcs_attached = scopedFlag;
+    g_cfg.funcs_attached = settings.isActive;
     g_cfg.staticfg = g_staticfg;
     g_cfg.cfgStr = jsonStringFromCfg(g_staticfg);
     g_cfg.blockconn = DEFAULT_PORTBLOCK;
@@ -1809,7 +2059,7 @@ init(void)
     // of whether TLS is actually configured on any transport.
     transportRegisterForExitNotification(handleExit);
 
-    initHook(attachedFlag, scopedFlag, ebuf, full_path);
+    initHook(attachedFlag, settings.isActive, ebuf, full_path);
     
     /*
      * If we are interposing (scoping) this process, then proceed

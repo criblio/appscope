@@ -1,7 +1,6 @@
 package loader
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
@@ -28,40 +27,52 @@ func New() ScopeLoader {
 	}
 }
 
+// Rules Command
+func (sL *ScopeLoader) Rules(tmpPath, rootdir string) (string, error) {
+	args := make([]string, 0)
+	args = append(args, "--rules")
+	args = append(args, tmpPath)
+	if rootdir != "" {
+		args = append(args, "--rootdir")
+		args = append(args, rootdir)
+	}
+	return sL.RunSubProc(args, os.Environ())
+}
+
+// Preload Command
+func (sL *ScopeLoader) Preload(path, rootdir string) (string, error) {
+	args := make([]string, 0)
+	args = append(args, "--preload")
+	args = append(args, path)
+	if rootdir != "" {
+		args = append(args, "--rootdir")
+		args = append(args, rootdir)
+	}
+	return sL.RunSubProc(args, os.Environ())
+}
+
+// Mount Command
+func (sL *ScopeLoader) Mount(source, dest, rootdir string) (string, error) {
+	args := make([]string, 0)
+	args = append(args, "--mount")
+	args = append(args, source+","+dest)
+	if rootdir != "" {
+		args = append(args, "--rootdir")
+		args = append(args, rootdir)
+	}
+	return sL.RunSubProc(args, os.Environ())
+}
+
+// Install Command
 // - Extract libscope.so to /usr/lib/appscope/<version>/libscope.so /tmp/appscope/<version>/libscope.so locally
-func (sL *ScopeLoader) Install() (string, error) {
-	return sL.RunSubProc([]string{"--install"}, os.Environ())
-}
-
-// - Extract libscope.so to /usr/lib/appscope/<version>/libscope.so /tmp/appscope/<version>/libscope.so in a namespace
-func (sL *ScopeLoader) InstallNamespace(rootdir string) (string, error) {
-	return sL.RunSubProc([]string{"--install", "--rootdir", rootdir}, os.Environ())
-}
-
-// - Setup /etc/profile.d/scope.sh on host
-// - Extract libscope.so to /usr/lib/appscope/<version>/libscope.so /tmp/appscope/<version>/libscope.so on host
-// - Extract filter input to /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter on host
-func (sL *ScopeLoader) ConfigureHost(filterFilePath string) (string, error) {
-	return sL.RunSubProc([]string{"--configure", filterFilePath}, os.Environ())
-}
-
-// - Setup /etc/profile.d/scope.sh in containers
-// - Extract libscope.so to /usr/lib/appscope/<version>/libscope.so or /tmp/appscope/<version>/libscope.so in containers
-// - Extract filter input to /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter in containers
-func (sL *ScopeLoader) ConfigureContainer(filterFilePath string, cpid int) (string, error) {
-	return sL.RunSubProc([]string{"--configure", filterFilePath, "--namespace", strconv.Itoa(cpid)}, os.Environ())
-}
-
-// - Remove /etc/profile.d/scope.sh on host
-// - Remove filter input from /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter on host
-func (sL *ScopeLoader) UnconfigureHost() (string, error) {
-	return sL.RunSubProc([]string{"--unconfigure"}, os.Environ())
-}
-
-// - Remove /etc/profile.d/scope.sh in containers
-// - Remove filter input from /usr/lib/appscope/scope_filter or /tmp/appscope/scope_filter in containers
-func (sL *ScopeLoader) UnconfigureContainer(cpid int) (string, error) {
-	return sL.RunSubProc([]string{"--unconfigure", "--namespace", strconv.Itoa(cpid)}, os.Environ())
+func (sL *ScopeLoader) Install(rootdir string) (string, error) {
+	args := make([]string, 0)
+	args = append(args, "--install")
+	if rootdir != "" {
+		args = append(args, "--rootdir")
+		args = append(args, rootdir)
+	}
+	return sL.RunSubProc(args, os.Environ())
 }
 
 // - Modify the relevant service configurations to preload /usr/lib/appscope/<version>/libscope.so or /tmp/appscope/<version>/libscope.so on the host
@@ -96,18 +107,6 @@ func (sL *ScopeLoader) AttachSubProc(args []string, env []string) (string, error
 	return sL.RunSubProc(args, env)
 }
 
-// Used when scope has detected that we are running the `scope start` command inside a container
-// Tell scope to run the `scope start` command on the host instead
-func (sL *ScopeLoader) StartHost() (string, error) {
-	return sL.RunSubProc([]string{"--starthost"}, os.Environ())
-}
-
-// Used when scope has detected that we are running the `scope stop` command inside a container
-// Tell scope to run the `scope stop` command on the host instead
-func (sL *ScopeLoader) StopHost() (string, error) {
-	return sL.RunSubProc([]string{"--stophost"}, os.Environ())
-}
-
 func (sL *ScopeLoader) Patch(libraryPath string) (string, error) {
 	return sL.RunSubProc([]string{"--patch", libraryPath}, os.Environ())
 }
@@ -122,12 +121,6 @@ func (sL *ScopeLoader) Detach(args []string, env []string) error {
 func (sL *ScopeLoader) DetachSubProc(args []string, env []string) (string, error) {
 	args = append([]string{"--lddetach"}, args...)
 	return sL.RunSubProc(args, env)
-}
-
-// GetFile gets a file from a remote container and stores it
-func (sL *ScopeLoader) GetFile(source, dest string, cpid int) (string, error) {
-	srcdest := fmt.Sprintf("%s,%s", source, dest)
-	return sL.RunSubProc([]string{"--getfile", srcdest, "--namespace", strconv.Itoa(cpid)}, os.Environ())
 }
 
 // Passthrough scopes a process

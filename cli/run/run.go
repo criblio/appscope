@@ -18,6 +18,7 @@ type Config struct {
 	MetricsDest   string
 	EventsDest    string
 	MetricsFormat string
+	MetricsPrefix string
 	CriblDest     string
 	Subprocess    bool
 	Loglevel      string
@@ -39,8 +40,8 @@ type Config struct {
 func (rc *Config) Run(args []string) {
 	env := os.Environ()
 
-	// Disable detection of a scope filter file with this command
-	env = append(env, "SCOPE_FILTER=false")
+	// Disable detection of a scope rules file with this command
+	env = append(env, "SCOPE_RULES=false")
 
 	// Disable cribl event breaker with this command
 	if rc.NoBreaker {

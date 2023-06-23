@@ -555,15 +555,48 @@ out:
         buf = scope_strdup("none");
     } else {
         // buf is big; try to scope_strdup what we've used and scope_free the rest
-        char* tmp = scope_strdup(buf);
+        char *tmp = scope_strdup(buf);
         if (tmp) {
             scope_free(buf);
             buf = tmp;
         }
     }
+
     if (fd != -1) scope_close(fd);
     *cmd = buf;
     return (*cmd != NULL);
+}
+
+int
+osGetArgv(pid_t pid, char *buf, size_t blen)
+{
+    int i, fd = -1, argc = 0, bytesRead = 0;
+    char path[64];
+
+    if (!buf) return 0;
+
+    if (scope_snprintf(path, sizeof(path), "/proc/%d/cmdline", pid) < 0) {
+        goto out;
+    }
+
+    if ((fd = scope_open(path, O_RDONLY)) == -1) {
+        DBG(NULL);
+        goto out;
+    }
+
+    if ((bytesRead = scope_read(fd, buf, blen)) <= 0) {
+        DBG(NULL);
+        goto out;
+    }
+
+    // Replace all but the last null with spaces
+    for (i=0; i < (bytesRead - 1); i++) {
+        if (buf[i] == '\0') argc++;
+    }
+
+out:
+    if (fd != -1) scope_close(fd);
+    return argc;
 }
 
 bool
@@ -864,7 +897,7 @@ osCreateSM(proc_id_t *proc, unsigned long addr)
     if (!proc) return;
 
     // Create the anonymous sm
-    if ((proc->smfd = scope_memfd_create(SM_NAME, MFD_ALLOW_SEALING)) == -1) {
+    if ((proc->smfd = scope_memfd_create(SM_NAME, MFD_ALLOW_SEALING | MFD_CLOEXEC)) == -1) {
         proc->smfd = -1;
         return;
     }

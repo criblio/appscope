@@ -29,136 +29,56 @@
 #include "patch.h"
 #include "setup.h"
  
+// TODO use rootdir instead of nspid for Service and Unservice. Deprecate --namespace?
 int
 cmdService(char *serviceName, pid_t nspid)
 {
     uid_t eUid = geteuid();
     gid_t eGid = getegid();
+    uid_t nsUid = eUid;
+    uid_t nsGid = eGid;
 
     if (!serviceName) {
         return EXIT_FAILURE;
     }
 
-    if (nspid == -1) {
-        // Service on Host
-        return setupService(serviceName, eUid, eGid);
-    } else {
-        // Service on Container
-        pid_t nsContainerPid = 0;
-        if ((nsInfoGetPidNs(nspid, &nsContainerPid) == TRUE) ||
-            (nsInfoIsPidInSameMntNs(nspid) == FALSE)) {
-            return nsService(nspid, serviceName);
+    // Change mnt namespace if nspid is provided
+    if (nspid != -1) {
+        nsUid = nsInfoTranslateUidRootDir("", nspid);
+        nsGid = nsInfoTranslateGidRootDir("", nspid);
+
+        if (nsSetNsRootDir("", nspid, "mnt") == FALSE) {
+            return EXIT_FAILURE;
         }
     }
 
-    return EXIT_FAILURE;
+    // Set up the service
+    if (setupService(serviceName, nsUid, nsGid)) {
+        fprintf(stderr, "error: failed to setup service\n");
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
 }
 
 int
 cmdUnservice(pid_t nspid)
 {
-    if (nspid == -1) {
-        // Service on Host
-        return setupUnservice();
-    } else {
-        // Service on Container
-        pid_t nsContainerPid = 0;
-        if ((nsInfoGetPidNs(nspid, &nsContainerPid) == TRUE) ||
-            (nsInfoIsPidInSameMntNs(nspid) == FALSE)) {
-            return nsUnservice(nspid);
+    // Change mnt namespace if nspid is provided
+    if (nspid != -1) {
+        if (nsSetNsRootDir("", nspid, "mnt") == FALSE) {
+            return EXIT_FAILURE;
         }
     }
 
-    return EXIT_FAILURE;
+    // Unservice
+    if (setupUnservice()) {
+        fprintf(stderr, "error: failed to setup unservice\n");
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
 }
-
-int
-cmdConfigure(char *configFilterPath, pid_t nspid)
-{
-    uid_t eUid = geteuid();
-    gid_t eGid = getegid();
-    int status = EXIT_FAILURE;
-
-    if (!configFilterPath) {
-        return EXIT_FAILURE;
-    }
-
-    size_t configFilterSize = 0;
-    void *confgFilterMem = setupLoadFileIntoMem(&configFilterSize, configFilterPath);
-    if (confgFilterMem == NULL) {
-        fprintf(stderr, "error: Load filter file into memory %s\n", configFilterPath);
-        return EXIT_FAILURE;
-    }
-
-    if (nspid == -1) {
-        // Configure on Host
-        status = setupConfigure(confgFilterMem, configFilterSize, eUid, eGid);
-    } else {
-        // Configure on Container
-        pid_t nsContainerPid = 0;
-        if ((nsInfoGetPidNs(nspid, &nsContainerPid) == TRUE) ||
-            (nsInfoIsPidInSameMntNs(nspid) == FALSE)) {
-            status = nsConfigure(nspid, confgFilterMem, configFilterSize);
-        }
-    }
-
-    if (confgFilterMem) {
-        munmap(confgFilterMem, configFilterSize);
-    }
-
-    return status;
-}
-
-int
-cmdUnconfigure(pid_t nspid)
-{
-    int status = EXIT_FAILURE;
-
-    if (nspid == -1) {
-        // Configure on Host
-        status = setupUnconfigure();
-    } else {
-        // Configure on Container
-        pid_t nsContainerPid = 0;
-        if ((nsInfoGetPidNs(nspid, &nsContainerPid) == TRUE) ||
-            (nsInfoIsPidInSameMntNs(nspid) == FALSE)) {
-            status = nsUnconfigure(nspid);
-        }
-    }
-
-    return status;
-}
-
-int
-cmdGetFile(char *paths, pid_t nspid)
-{
-    char *src_path;
-    char *dest_path;
-    pid_t nsContainerPid = 0;
-
-    if ((src_path = strtok(paths, ",")) == NULL) {
-        fprintf(stderr, "error: no source file path\n");
-        return EXIT_FAILURE;
-    }
-    if ((dest_path = strtok(NULL, ",")) == NULL) {
-        fprintf(stderr, "error: no destination file path\n");
-        return EXIT_FAILURE;
-    }
-
-    if (nspid == -1) {
-        fprintf(stderr, "error: getfile requires a namespace pid\n");
-        return EXIT_FAILURE;
-    }
-
-    if ((nsInfoGetPidNs(nspid, &nsContainerPid) == FALSE) ||
-        (nsInfoIsPidInSameMntNs(nspid) == TRUE)) {
-        fprintf(stderr, "error: invalid namespace\n");
-        return EXIT_FAILURE;
-    }
-
-    return nsGetFile(src_path, dest_path, nspid);
-}
-
 
 /*
  * If attaching to a process in the current namespace:
@@ -336,11 +256,25 @@ out:
 int
 cmdDetach(pid_t pid, const char *rootdir)
 {
-    if (rootdir) {
-        return nsDetach(pid, rootdir);
+    if (pid < 1) {
+        return EXIT_FAILURE;
     }
 
-    return detach(pid);
+    // Change mnt namespace if rootdir is provided
+    if (rootdir) {
+        if (nsSetNsRootDir(rootdir, 1, "mnt") == FALSE) {
+            fprintf(stderr, "nsDetach mnt failed\n");
+            return EXIT_FAILURE;
+        }
+    }
+
+    // Detach
+    if (detach(pid)) {
+        fprintf(stderr, "error: failed to detach\n");
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
 }
 
 int
@@ -567,21 +501,155 @@ cmdInstall(const char *rootdir)
     gid_t eGid = getegid();
     uid_t nsUid = eUid;
     uid_t nsGid = eGid;
+    unsigned char *library_file = NULL;
+    size_t library_file_len;
+    unsigned char *loader_file = NULL;
+    size_t loader_file_len;
 
-    // If rootdir is provided, extract the library into a separate namespace and return
+    // Extract library from scope binary into memory while in origin namespace
+    if ((library_file_len = getAsset(LIBRARY_FILE, &library_file)) == -1) {
+        fprintf(stderr, "cmdInstall getAsset library failed\n");
+        return EXIT_FAILURE;
+    }
+
+    // Extract loader from scope binary into memory while in origin namespace
+    if ((loader_file_len = getAsset(STATIC_LOADER_FILE, &loader_file)) == -1) {
+        fprintf(stderr, "cmdInstall getAsset loader failed\n");
+        return EXIT_FAILURE;
+    }
+
+    // Change mnt namespace if rootdir is provided
     if (rootdir) {
+        nsUid = nsInfoTranslateUidRootDir(rootdir, 1);
+        nsGid = nsInfoTranslateGidRootDir(rootdir, 1);
+
         // Use pid 1 to locate ns fd
-        if (nsInstall(rootdir, 1, LIBRARY_FILE)) {
-            fprintf(stderr, "error: failed to extract library\n");
-            return EXIT_FAILURE;
-        }
-    // Install the library locally
-    } else {
-        if (libdirExtract(NULL, 0, nsUid, nsGid, LIBRARY_FILE)) {
-            fprintf(stderr, "error: failed to extract library\n");
+        if (nsSetNsRootDir(rootdir, 1, "mnt") == FALSE) {
+            fprintf(stderr, "cmdInstall mnt failed\n");
             return EXIT_FAILURE;
         }
     }
 
+    // Extract the library
+    if (libdirExtract(library_file, library_file_len, nsUid, nsGid, LIBRARY_FILE)) {
+        fprintf(stderr, "cmdInstall library extract failed\n");
+        return EXIT_FAILURE;
+    }
+
+    // Extract the loader
+    if (libdirExtract(loader_file, loader_file_len, nsUid, nsGid, STATIC_LOADER_FILE)) {
+        fprintf(stderr, "cmdInstall loader extract failed\n");
+        return EXIT_FAILURE;
+    }
+
     return EXIT_SUCCESS;
 }
+
+// Handle the rules command
+int
+cmdRules(const char *configRulesPath, const char *rootdir)
+{
+    uid_t eUid = geteuid();
+    gid_t eGid = getegid();
+    uid_t nsUid = eUid;
+    uid_t nsGid = eGid;
+    size_t configRulesSize = 0;
+
+    if (!configRulesPath) {
+        return EXIT_FAILURE;
+    }
+
+    // Read rules file in while in origin namespace
+    void *configRulesMem = setupLoadFileIntoMem(&configRulesSize, configRulesPath);
+    if (configRulesMem == NULL) {
+        fprintf(stderr, "error: Loading rules file into memory %s\n", configRulesPath);
+        return EXIT_FAILURE;
+    }
+
+    // Change mnt namespace if rootdir is provided
+    if (rootdir) {
+        nsUid = nsInfoTranslateUidRootDir(rootdir, 1);
+        nsGid = nsInfoTranslateGidRootDir(rootdir, 1);
+
+        // Use pid 1 to locate ns fd
+        if (nsSetNsRootDir(rootdir, 1, "mnt") == FALSE) {
+            fprintf(stderr, "nsSetNsRootDir mnt failed\n");
+            return EXIT_FAILURE;
+        }
+    }
+
+    // Install rules file
+    if (!setupRules(configRulesMem, configRulesSize, nsUid, nsGid)) {
+        fprintf(stderr, "error: failed to install rules file\n");
+        return EXIT_FAILURE;
+    }
+
+    if (configRulesMem) munmap(configRulesMem, configRulesSize);
+
+    return EXIT_SUCCESS;
+}
+
+// Handle the preload command
+int
+cmdPreload(const char *path, const char *rootdir)
+{
+    uid_t eUid = geteuid();
+    gid_t eGid = getegid();
+    uid_t nsUid = eUid;
+    uid_t nsGid = eGid;
+
+    // Change mnt namespace if rootdir is provided
+    if (rootdir) {
+        nsUid = nsInfoTranslateUidRootDir(rootdir, 1);
+        nsGid = nsInfoTranslateGidRootDir(rootdir, 1);
+
+        // Use pid 1 to locate ns fd
+        if (nsSetNsRootDir(rootdir, 1, "mnt") == FALSE) {
+            fprintf(stderr, "nsSetNsRootDir mnt failed\n");
+            return EXIT_FAILURE;
+        }
+    }
+
+    // Set ld.so.preload
+    if (!setupPreload(path, nsUid, nsGid)) {
+        fprintf(stderr, "error: failed to set ld.so.preload\n");
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+// Handle the mount command
+int
+cmdMount(const char *mountDest, const char *rootdir)
+{
+    uid_t eUid = geteuid();
+    gid_t eGid = getegid();
+    uid_t nsUid = eUid;
+    uid_t nsGid = eGid;
+
+    if (!mountDest) {
+        return EXIT_FAILURE;
+    }
+
+    // Change mnt namespace if rootdir is provided
+    if (rootdir) {
+        nsUid = nsInfoTranslateUidRootDir(rootdir, 1);
+        nsGid = nsInfoTranslateGidRootDir(rootdir, 1);
+
+        // Use pid 1 to locate ns fd
+        if (nsSetNsRootDir(rootdir, 1, "mnt") == FALSE) {
+            fprintf(stderr, "nsSetNsRootDir mnt failed\n");
+            return EXIT_FAILURE;
+        }
+    }
+
+    // Set up the mount
+    if (setupMount(mountDest, nsUid, nsGid)) {
+        fprintf(stderr, "error: failed to mount\n");
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+

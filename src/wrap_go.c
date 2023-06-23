@@ -15,6 +15,7 @@
 #include "state.h"
 #include "utils.h"
 #include "fn.h"
+#include "oci.h"
 #include "capstone/capstone.h"
 #include "scopestdlib.h"
 #include "snapshot.h"
@@ -415,15 +416,24 @@ createGoStructFile(void) {
     }
 }
 
-// Use go_str() whenever a "go string" type needs to be interpreted.
-// The resulting go_str will need to be passed to free_go_str() when it is no
-// longer needed.
-// Don't use go_str() for byte arrays.
+/*
+ * Use go_str() whenever a "go string" type needs to be interpreted.
+ * The resulting go_str will need to be passed to free_go_str() when it is no
+ * longer needed.
+ * Don't use go_str() for byte arrays.
+ *
+ * Go 17 and higher use "c style" null terminated strings instead of a string
+ * and a length. Therfore, we do nothing here for Go >= 17.
+ * However, there is a case where argv values are passed as go strings.
+ * In that case we we need to force a conversion even when we are >= Go 17.
+ * We are no longer interposing a function that references argv, however, the
+ * force param is left in place expecting that since it has been needed, it
+ * will be needed.
+ */
 static char *
-go_str(void *go_str)
+go_str(void *go_str, bool force)
 {
-    // Go 17 and higher use "c style" null terminated strings instead of a string and a length
-    if (g_go_minor_ver >= 17) {
+    if ((g_go_minor_ver >= 17) && (force == FALSE)) {
        // We need to deference the address first before casting to a char *
        if (!go_str) return NULL;
        return (char *)*(uint64_t *)go_str;
@@ -450,6 +460,83 @@ free_go_str(char *str) {
     if(str) scope_free(str);
 }
 */
+
+
+static void
+containerStart(void)
+{
+    int i, argc;
+    char *buf;
+    const char *cWorkDir;
+
+    if ((buf = scope_calloc(1, NCARGS)) == NULL) return;
+
+    if ((argc = osGetArgv(g_proc.pid, buf, NCARGS)) == 0) {
+        scope_free(buf);
+        return;
+    }
+
+    sysprint("Scope: found runc");
+
+    for (i = 0; buf[i]; i += scope_strlen(&buf[i]) + 1) {
+        char *arg = &buf[i];
+
+        if (arg) {
+            sysprint("\t%s:%d %s %d argv %s\n", __FUNCTION__, __LINE__, g_proc.procname, argc, arg);
+
+            if (scope_strstr(arg, "--bundle")) {
+                // work dir for the container
+                cWorkDir = &buf[i + scope_strlen(arg) + 1];
+                if (cWorkDir) sysprint("\t%s:%d container path %s\n", __FUNCTION__, __LINE__, cWorkDir);
+                break;
+            }
+        }
+    }
+
+    if (cWorkDir) {
+        char cfgPath[PATH_MAX] = {0};
+        char scopePath[PATH_MAX] = {0};
+        struct stat fileStat;
+
+        if (scope_snprintf(scopePath, sizeof(scopePath), "/usr/lib/appscope/%s/scope", libVersion(SCOPE_VER)) < 0) {
+            goto exit;
+        }
+
+        if (scope_stat(scopePath, &fileStat) == -1) {
+            sysprint("\t%s: scope is not accessible %s\n", __FUNCTION__, scopePath);
+            goto exit;
+        }
+
+        if (scope_snprintf(cfgPath, sizeof(cfgPath), "%s/config.json", cWorkDir) < 0) {
+            goto exit;
+        }
+
+        char *unixSocketPath = cfgRulesUnixPath(SCOPE_RULES_USR_PATH);
+
+        if (!unixSocketPath) {
+            sysprint("\t%s: missing unix path in /usr/lib/appscope/scope_rules \n", __FUNCTION__);
+        }
+
+        void *cfgMem = ociReadCfgIntoMem(cfgPath);
+        if (!cfgMem) {
+            goto exit;
+        }
+
+        char *modCfgMem = ociModifyCfg(cfgMem, scopePath, unixSocketPath);
+        scope_free(cfgMem);
+
+        if (modCfgMem) {
+            ociWriteConfig(cfgPath, modCfgMem);
+            scope_free(modCfgMem);
+        } else {
+            sysprint("\t%s: Modify OCI config fails config: %s, scope: %s, UNIX socket: %s \n", __FUNCTION__, cfgPath, scopePath, unixSocketPath);
+        }
+        scope_free(unixSocketPath);
+    }
+
+exit:
+    scope_free(buf);
+}
 
 static bool
 match_assy_instruction(void *addr, char *mnemonic)
@@ -532,10 +619,163 @@ getGoVersionAddr(const char* buf)
     return go_build_ver_addr;
 }
 
+static Elf64_Addr
+getSym12(const void *pclntab_addr, char *sname)
+{
+    if ((!pclntab_addr) || (!sname)) return 0;
+
+    Elf64_Addr symaddr = 0;
+    uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
+    const void *symtab_addr = pclntab_addr + 16;
+
+    for (int i = 0; i < sym_count; i++) {
+        uint64_t func_offset  = *((const uint64_t *)(symtab_addr + 8));
+        uint32_t name_offset  = *((const uint32_t *)(pclntab_addr + func_offset + 8));
+        uint64_t sym_addr     = *((const uint64_t *)(symtab_addr));
+        const char *func_name = (const char *)(pclntab_addr + name_offset);
+
+        if (scope_strcmp(sname, func_name) == 0) {
+            symaddr = sym_addr;
+            scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
+            break;
+        }
+
+        symtab_addr += 16;
+    }
+
+    return symaddr;
+}
+
+static Elf64_Addr
+getSym16(const void *pclntab_addr, char *sname, char *altname, char *mnemonic)
+{
+    if ((!pclntab_addr) || (!sname)) return 0;
+
+    Elf64_Addr symaddr = 0;
+    uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
+    uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (3 * 8)));
+    uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (7 * 8)));
+    const void *symtab_addr = pclntab_addr + pclntab_offset;
+
+    for (int i = 0; i < sym_count; i++) {
+        uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
+        uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 8));
+        uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
+        const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
+
+        if (scope_strcmp(sname, func_name) == 0) {
+            symaddr = sym_addr;
+            scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
+            break;
+        }
+
+        // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
+        if (altname && mnemonic &&
+            (scope_strcmp(altname, func_name) == 0) &&
+            (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
+            symaddr = sym_addr;
+            break;
+        }
+
+        symtab_addr += 16;
+    }
+
+    return symaddr;
+}
+
+static Elf64_Addr
+getSym1820(const void *pclntab_addr, char *sname, char *altname, char *mnemonic)
+{
+    if ((!pclntab_addr) || (!sname)) return 0;
+
+    Elf64_Addr symaddr = 0;
+    uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
+    // In go 1.18 the funcname table and the pcln table are stored in the text section
+    uint64_t text_start = *((const uint64_t *)(pclntab_addr + (3 * 8)));
+    uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (4 * 8)));
+    //uint64_t funcnametab_addr = (uint64_t)(funcnametab_offset + pclntab_addr);
+    uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (8 * 8)));
+    // A "symbtab" is an entry in the pclntab, probably better known as a pcln
+    const void *symtab_addr = (const void *)(pclntab_addr + pclntab_offset);
+
+    for (int i = 0; i < sym_count; i++) {
+        uint32_t func_offset = *((uint32_t *)(symtab_addr + 4));
+        uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 4));
+        func_offset = *((uint32_t *)(symtab_addr));
+        uint64_t sym_addr = (uint64_t)(func_offset + text_start);
+        const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
+        if (scope_strcmp(sname, func_name) == 0) {
+            symaddr = sym_addr;
+            scopeLog(CFG_LOG_ERROR, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
+            break;
+        }
+
+        // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
+        if (altname && mnemonic &&
+            (scope_strcmp(altname, func_name) == 0) &&
+            (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
+            symaddr = sym_addr;
+            break;
+        }
+
+        symtab_addr += 8;
+    }
+
+    return symaddr;
+}
+
+static Elf64_Addr
+embedPclntab(const char *buf, char *sname, char *altname, char *mnemonic)
+{
+    Elf64_Addr symaddr = 0;
+    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)buf;
+    Elf64_Shdr *sections = (Elf64_Shdr *)(buf + ehdr->e_shoff);
+    const char *section_strtab = (char *)buf + sections[ehdr->e_shstrndx].sh_offset;
+
+    for (int i = 0; i < ehdr->e_shnum; i++) {
+        const char *sec_name = section_strtab + sections[i].sh_name;
+        if (scope_strstr(sec_name, "data.rel.ro") != 0) {
+
+            const void *pclntab_addr = buf + sections[i].sh_offset;
+            unsigned char *data = (unsigned char *)pclntab_addr;
+            size_t slen = sections[i].sh_size;
+            size_t j;
+
+            // Find the magic number in the pclntab header
+            for (j = 0; j <= slen; j += 4) { //0x3c8c80
+                if (((data[j] == 0xf1) || (data[j] == 0xf0) ||
+                     (data[j] == 0xfa) || (data[j] == 0xfb)) &&
+                    data[j+1] == 0xff &&
+                    data[j+2] == 0xff &&
+                    data[j+3] == 0xff) {
+                        //sysprint("%s:%d pclntab was recognized at %p\n",
+                        //             __FUNCTION__, __LINE__, &data[j]);
+
+                        switch (data[j]) {
+                            // Go 18 - 20
+                        case 0xf1:
+                        case 0xf0:
+                            return getSym1820(&data[j], sname, altname, mnemonic);
+                            // Go 16
+                        case 0xfa:
+                            return getSym16(&data[j], sname, altname, mnemonic);
+                            // Go 12
+                        case 0xfb:
+                            return getSym12(&data[j], sname);
+                        }
+                }
+            }
+        }
+    }
+
+    return symaddr;
+}
+
 static void *
 getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
 {
     int i;
+    bool found = FALSE;
     Elf64_Addr symaddr = 0;
     Elf64_Ehdr *ehdr;
     Elf64_Shdr *sections;
@@ -551,93 +791,30 @@ getGoSymbol(const char *buf, char *sname, char *altname, char *mnemonic)
     for (i = 0; i < ehdr->e_shnum; i++) {
         sec_name = section_strtab + sections[i].sh_name;
         if (scope_strstr(sec_name, ".gopclntab")) {
+            found = TRUE;
             const void *pclntab_addr = buf + sections[i].sh_offset;
             /*
-            Go symbol table is stored in the .gopclntab section
-            More info: https://docs.google.com/document/d/1lyPIbmsYbXnpNj57a261hgOYVpNRcgydurVQIyZOz_o/pub
-            */
+             * The Go symbol table is stored in the .gopclntab section
+             * More info: https://docs.google.com/document/d/1lyPIbmsYbXnpNj57a261hgOYVpNRcgydurVQIyZOz_o/pub
+             */
             uint32_t magic = *((const uint32_t *)(pclntab_addr));
             if (magic == GOPCLNTAB_MAGIC_112) {
-                uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
-                const void *symtab_addr = pclntab_addr + 16;
-
-                for(i=0; i<sym_count; i++) {
-                    uint64_t func_offset  = *((const uint64_t *)(symtab_addr + 8));
-                    uint32_t name_offset  = *((const uint32_t *)(pclntab_addr + func_offset + 8));
-                    uint64_t sym_addr     = *((const uint64_t *)(symtab_addr));
-                    const char *func_name = (const char *)(pclntab_addr + name_offset);
-
-                    if (scope_strcmp(sname, func_name) == 0) {
-                        symaddr = sym_addr;
-                        scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
-                        break;
-                    }
-
-                    symtab_addr += 16;
-                }
+                symaddr = getSym12(pclntab_addr, sname);
             } else if (magic == GOPCLNTAB_MAGIC_116) {
-                uint64_t sym_count      = *((const uint64_t *)(pclntab_addr + 8));
-                uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (3 * 8)));
-                uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (7 * 8)));
-                const void *symtab_addr = pclntab_addr + pclntab_offset;
-                for (i = 0; i < sym_count; i++) {
-                    uint64_t func_offset = *((const uint64_t *)(symtab_addr + 8));
-                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 8));
-                    uint64_t sym_addr = *((const uint64_t *)(symtab_addr));
-                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
-                    if (scope_strcmp(sname, func_name) == 0) {
-                        symaddr = sym_addr;
-                        scopeLog(CFG_LOG_TRACE, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
-                        break;
-                    }
-
-                    // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
-                    if (altname && mnemonic &&
-                        (scope_strcmp(altname, func_name) == 0) &&
-                        (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
-                        symaddr = sym_addr;
-                        break;
-                    }
-
-                    symtab_addr += 16;
-                }
+                symaddr = getSym16(pclntab_addr, sname, altname, mnemonic);
             } else if ((magic == GOPCLNTAB_MAGIC_118) || (magic == GOPCLNTAB_MAGIC_120)) {
-                uint64_t sym_count = *((const uint64_t *)(pclntab_addr + 8));
-                // In go 1.18 the funcname table and the pcln table are stored in the text section
-                uint64_t text_start = *((const uint64_t *)(pclntab_addr + (3 * 8)));
-                uint64_t funcnametab_offset = *((const uint64_t *)(pclntab_addr + (4 * 8)));
-                //uint64_t funcnametab_addr = (uint64_t)(funcnametab_offset + pclntab_addr);
-                uint64_t pclntab_offset = *((const uint64_t *)(pclntab_addr + (8 * 8)));
-                // A "symbtab" is an entry in the pclntab, probably better known as a pcln
-                const void *symtab_addr = (const void *)(pclntab_addr + pclntab_offset);
-                for (i = 0; i < sym_count; i++) {
-                    uint32_t func_offset = *((uint32_t *)(symtab_addr + 4));
-                    uint32_t name_offset = *((const uint32_t *)(pclntab_addr + pclntab_offset + func_offset + 4));
-                    func_offset = *((uint32_t *)(symtab_addr));
-                    uint64_t sym_addr = (uint64_t)(func_offset + text_start);
-                    const char *func_name = (const char *)(pclntab_addr + funcnametab_offset + name_offset);
-                    if (scope_strcmp(sname, func_name) == 0) {
-                        symaddr = sym_addr;
-                        scopeLog(CFG_LOG_ERROR, "symbol found %s = 0x%08lx\n", func_name, sym_addr);
-                        break;
-                    }
-
-                    // In go 1.17+ we need to ensure we find the correct symbol in the case of ambiguity
-                    if (altname && mnemonic &&
-                        (scope_strcmp(altname, func_name) == 0) &&
-                        (match_assy_instruction((void *)sym_addr, mnemonic) == TRUE)) {
-                        symaddr = sym_addr;
-                        break;
-                    }
-
-                    symtab_addr += 8;
-                }
+                symaddr = getSym1820(pclntab_addr, sname, altname, mnemonic);
             } else {
                 scopeLog(CFG_LOG_DEBUG, "Invalid header in .gopclntab");
                 break;
             }
             break;
         }
+    }
+
+    // if no .gopclntab section was found, check embedded
+    if ((found == FALSE) && ((symaddr = embedPclntab(buf, sname, altname, mnemonic)) == 0)) {
+        return NULL;
     }
 
     return (void *)symaddr;
@@ -779,7 +956,6 @@ patch_addrs(funchook_t *funchook,
             } else if (tap->assembly_fn == go_hook_reg_syscall6) {
                 g_syscall6_return = (uint64_t)tap->return_addr;
             }
-
             break; // Done patching
         }
 
@@ -909,13 +1085,50 @@ go_version_numbers(const char *go_runtime_version)
     g_go_maint_ver = maint_val;
 }
 
+/*
+ * Some Go executables are built such that the .abi0
+ * extension is used for internal runtime symbols. Others
+ * emit symbols without the version extension. So, if we
+ * can't resolve the symbol without a version extension, we
+ * try the symbol with extension.
+ */
+static void *
+tryAbi0(const char *buf, char *sname)
+{
+    if (!buf || !sname) return NULL;
+
+    size_t slen = scope_strlen(sname);
+    if (slen == 0) return NULL;
+
+    void *funcaddr = NULL;
+    char abi0name[slen + sizeof(".abi0 ")];
+
+    scope_memset(abi0name, 0, sizeof(abi0name));
+    scope_strncpy(abi0name, sname, slen);
+    scope_strcat(abi0name, ".abi0");
+
+    funcprint("%s:%d %s (%ld) %s\n", __FUNCTION__, __LINE__, sname, slen, abi0name);
+
+    // Look for the symbol in the elf strtab, then meta data; .gopclntab section
+    if (((funcaddr = getSymbol(buf, abi0name)) == 0) &&
+        ((funcaddr = getGoSymbol(buf, abi0name, NULL, NULL)) == 0)) {
+        return NULL;
+    }
+
+    return funcaddr;
+}
+
 void
 initGoHook(elf_buf_t *ebuf)
 {
+    if (!ebuf || !ebuf->buf) return;
+
     int rc;
     funchook_t *funchook;
     char *go_ver;
     char *go_runtime_version = NULL;
+    uint64_t base = 0LL;
+    //Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
 
     funchook = funchook_create();
 
@@ -924,8 +1137,9 @@ initGoHook(elf_buf_t *ebuf)
         funchook_set_debug_file(DEFAULT_LOG_PATH);
     }
 
-    // default to a dynamic app?
-    if (checkEnv("SCOPE_EXEC_TYPE", "static")) {
+    // check ELF type
+    //if (checkEnv("SCOPE_EXEC_TYPE", "static")) {
+    if (is_static(ebuf->buf)) {
         scopeSetGoAppStateStatic(TRUE);
         //patchClone();
         sysprint("This is a static app\n");
@@ -934,11 +1148,9 @@ initGoHook(elf_buf_t *ebuf)
         sysprint("This is a dynamic app\n");
     }
 
-    //check ELF type
-    Elf64_Ehdr *ehdr = (Elf64_Ehdr *)ebuf->buf;
     // if it's a position independent executable, get the base address from /proc/self/maps
-    uint64_t base = 0LL;
-    if (ehdr->e_type == ET_DYN && (scopeGetGoAppStateStatic() == FALSE)) {
+    // default to a dynamic app?
+    if (scopeGetGoAppStateStatic() == FALSE) {
         if (osGetBaseAddr(&base) == FALSE) {
             sysprint("ERROR: can't get the base address\n");
             funchook_destroy(funchook);
@@ -959,10 +1171,10 @@ initGoHook(elf_buf_t *ebuf)
         if (g_go_build_ver[0] != '\0') {
             go_ver = (char *)((uint64_t)ver_addr);
         } else {
-            go_ver = go_str((void *)((uint64_t)ver_addr + base));
+            go_ver = go_str((void *)((uint64_t)ver_addr + base), FALSE);
         }
     } else {
-        go_ver = go_str((void *)((uint64_t)go_ver_sym + base));
+        go_ver = go_str((void *)((uint64_t)go_ver_sym + base), FALSE);
     }
 
     if (go_ver && (go_runtime_version = go_ver)) {
@@ -987,6 +1199,10 @@ initGoHook(elf_buf_t *ebuf)
         scopeLogWarn("%s was compiled with go version `%s`. Versions newer than Go 1.%d are not yet supported. Continuing without AppScope.", ebuf->cmd, go_runtime_version, MAX_SUPPORTED_GO_VER);
         funchook_destroy(funchook);
         return; // don't install our hooks
+    }
+
+    if (scope_strstr(g_proc.procname, "runc") != NULL) {
+        containerStart();
     }
 
     uint64_t *ReadFrame_addr;
@@ -1046,8 +1262,12 @@ initGoHook(elf_buf_t *ebuf)
         void *orig_func;
         // Look for the symbol in the ELF symbol table
         if (((orig_func = getSymbol(ebuf->buf, tap->func_name)) == NULL) &&
-        // Otherwise look in the .gopclntab section
-            ((orig_func = getGoSymbol(ebuf->buf, tap->func_name, NULL, NULL)) == NULL)) {
+            // look in the .gopclntab section
+            ((orig_func = getGoSymbol(ebuf->buf, tap->func_name, NULL, NULL)) == NULL) &&
+            // check dynamic symbols; exec has been stripped
+            ((orig_func = getDynSymbol(ebuf->buf, tap->func_name)) == NULL) &&
+            // is the symbol defined as an original API; with an abi0 extension
+            ((orig_func = tryAbi0(ebuf->buf, tap->func_name)) == NULL)) {
             sysprint("WARN: can't get the address for %s\n", tap->func_name);
             continue;
         }

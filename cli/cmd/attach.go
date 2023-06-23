@@ -37,12 +37,12 @@ var attachCmd = &cobra.Command{
 
 The --*dest flags accept file names like /tmp/scope.log or URLs like file:///tmp/scope.log. They may also
 be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostname:port, or tls://hostname:port.`,
-	Example: `scope attach 1000
-scope attach firefox 
-scope attach top < scope.yml
-scope attach --rootdir /path/to/host firefox 
-scope attach --rootdir /path/to/host/mount/proc/<hostpid>/root 1000
-scope attach --payloads 2000`,
+	Example: `  scope attach 1000
+  scope attach firefox 
+  scope attach top < scope.yml
+  scope attach --rootdir /path/to/host/root firefox 
+  scope attach --rootdir /path/to/host/root/proc/<hostpid>/root 1000
+  scope attach --payloads 2000`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		internal.InitConfig()
@@ -77,7 +77,20 @@ scope attach --payloads 2000`,
 			helpErrAndExit(cmd, "Cannot specify --coredump and --userconfig")
 		}
 
-		pid, err := rc.Attach(args)
+		id := args[0] // The attach command ensures we have an argument
+
+		procs, err := util.HandleInputArg(id, "", rc.Rootdir, true, true, true, false)
+		if err != nil {
+			return err
+		}
+
+		if len(procs) == 0 {
+			return errNoScopedProcs
+		}
+
+		pid := procs[0].Pid // we told HandleInputArg above that we wanted to choose only one proc
+
+		reattach, err := rc.Attach(pid, true)
 		if err != nil {
 			util.ErrAndExit("Attach failure: %v", err)
 		}
@@ -94,12 +107,14 @@ scope attach --payloads 2000`,
 			}
 
 			// Simple approach for now
-			// If we attempt to improve this, we need to wait for attach
-			// even in the case of re-attach
+			// Later: check for attach then resume
 			if rc.Rootdir != "" {
-				time.Sleep(60 * time.Second)
+				time.Sleep(60 * time.Second) // parent attach uses cron (<60s)
 			}
-			time.Sleep(2 * time.Second)
+			if reattach {
+				time.Sleep(10 * time.Second) // reattach uses dynamic config (<10s)
+			}
+			time.Sleep(2 * time.Second) // give the command time to run
 
 			iout, _, err := inspect.InspectProcess(*pidCtx)
 			if err != nil {

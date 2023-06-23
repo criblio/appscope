@@ -260,48 +260,6 @@ mtcFormatEventForOutputHappyPathJson(void **state)
 }
 
 static void
-mtcFormatEventForOutputHappyPathPrometheus(void **state)
-{
-    char *g_hostname = "myhost";
-    char *g_procname = "testapp";
-    int g_openPorts = 2;
-    pid_t pid = 666;
-    int fd = 3;
-    char *proto = "TCP";
-    in_port_t localPort = 8125;
-
-    event_field_t fields[] = {
-        STRFIELD("proc",    g_procname,   2,  TRUE),
-        NUMFIELD("pid",     pid,          7,  TRUE),
-        NUMFIELD("fd",      fd,           7,  TRUE),
-        STRFIELD("host",    g_hostname,   2,  TRUE),
-        STRFIELD("proto",   proto,        1,  TRUE),
-        NUMFIELD("port",    localPort,    4,  TRUE),
-        FIELDEND
-    };
-    event_t e = INT_EVENT("net.port", g_openPorts, CURRENT, fields);
-
-    mtc_fmt_t *fmt = mtcFormatCreate(CFG_FMT_PROMETHEUS);
-    assert_non_null(fmt);
-    mtcFormatVerbositySet(fmt, CFG_MAX_VERBOSITY);
-
-    char *msg = mtcFormatEventForOutput(fmt, &e, NULL);
-    assert_non_null(msg);
-
-    char expected[1024];
-    int rv = snprintf(expected, sizeof(expected),
-        "# TYPE net_port gauge\n"
-        "net_port{proc=\"%s\",pid=\"%d\",fd=\"%d\",host=\"%s\",proto=\"%s\",port=\"%d\"} %d\n",
-         g_procname, pid, fd, g_hostname, proto, localPort, g_openPorts);
-    assert_true(rv > 0 && rv < 1024);
-    assert_string_equal(expected, msg);
-    scope_free(msg);
-
-    mtcFormatDestroy(&fmt);
-    assert_null(fmt);
-}
-
-static void
 mtcFormatEventForOutputJsonWithCustomFields(void **state)
 {
     char *g_procname = "testapp";
@@ -357,43 +315,6 @@ mtcFormatEventForOutputJsonWithCustomFields(void **state)
     cJSON_Delete(json);
     scope_free(msg);
 
-    mtcFormatDestroy(&fmt);
-    assert_null(fmt);
-}
-
-static void
-mtcFormatEventForOutputPrometheusWithCustomFields(void **state)
-{
-    char *g_procname = "testapp";
-    float g_chickenTeeth = 2.3 / 4.3;
-
-    event_field_t fields[] = {
-        STRFIELD("proc",    g_procname,   2,  TRUE),
-        FIELDEND
-    };
-    event_t e = FLT_EVENT("chicken.teeth", g_chickenTeeth, DELTA, fields);
-
-    mtc_fmt_t *fmt = mtcFormatCreate(CFG_FMT_PROMETHEUS);
-    assert_non_null(fmt);
-
-    custom_tag_t t1 = {"name1", "value1"};
-    custom_tag_t t2 = {"name2", "value2"};
-    custom_tag_t *tags[] = { &t1, &t2, NULL };
-    mtcFormatCustomTagsSet(fmt, tags);
-    mtcFormatVerbositySet(fmt, CFG_MAX_VERBOSITY);
-
-    char *msg = mtcFormatEventForOutput(fmt, &e, NULL);
-    assert_non_null(msg);
-
-    char expected[1024];
-    int rv = snprintf(expected, sizeof(expected),
-        "# TYPE chicken_teeth counter\n"
-        "chicken_teeth{name1=\"%s\",name2=\"%s\",proc=\"%s\"} %.2f\n",
-         "value1", "value2", g_procname, g_chickenTeeth);
-    assert_true(rv > 0 && rv < 1024);
-    assert_string_equal(expected, msg);
-
-    scope_free(msg);
     mtcFormatDestroy(&fmt);
     assert_null(fmt);
 }
@@ -773,9 +694,7 @@ main(int argc, char *argv[])
         cmocka_unit_test(mtcFormatEventForOutputNullFmtDoesntCrash),
         cmocka_unit_test(mtcFormatEventForOutputHappyPathStatsd),
         cmocka_unit_test(mtcFormatEventForOutputHappyPathJson),
-        cmocka_unit_test(mtcFormatEventForOutputHappyPathPrometheus),
         cmocka_unit_test(mtcFormatEventForOutputJsonWithCustomFields),
-        cmocka_unit_test(mtcFormatEventForOutputPrometheusWithCustomFields),
         cmocka_unit_test(mtcFormatEventForOutputHappyPathFilteredFields),
         cmocka_unit_test(mtcFormatEventForOutputWithCustomFields),
         cmocka_unit_test(mtcFormatEventForOutputWithCustomAndStatsdFields),

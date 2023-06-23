@@ -24,8 +24,6 @@
 #include "state.h"
 #include "gocontext.h"
 
-#define SYSPRINT_CONSOLE 0
-#define PRINT_BUF_SIZE 1024
 #define HEAP_SIZE (size_t)(500 * 1024)
 // 1Mb + an 8kb guard
 #define STACK_SIZE (size_t)(1024 * 1024) + (8 * 1024)
@@ -39,27 +37,6 @@
 	} while (0)
 
 #define EXPORTON __attribute__((visibility("default")))
-
-void
-sysprint(const char* fmt, ...)
-{
-    // Create the string
-    char str[PRINT_BUF_SIZE];
-
-    if (fmt) {
-        va_list args;
-        va_start(args, fmt);
-        int rv = scope_vsnprintf(str, PRINT_BUF_SIZE, fmt, args);
-        va_end(args);
-        if (rv == -1) return;
-    }
-
-    // Output the string
-#if SYSPRINT_CONSOLE > 0
-    scope_printf("%s", str);
-#endif
-    scopeLog(CFG_LOG_DEBUG, "%s", str);
-}
 
 static int
 get_file_size(const char *path)

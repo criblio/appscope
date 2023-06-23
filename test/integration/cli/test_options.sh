@@ -65,22 +65,6 @@ run ./bin/linux/${ARCH}/scope --namespace
 outputs "error: missing required value for -n option"
 returns 1
 
-run ./bin/linux/${ARCH}/scope -c
-outputs "error: missing required value for -c option"
-returns 1
-
-run ./bin/linux/${ARCH}/scope --configure
-outputs "error: missing required value for -c option"
-returns 1
-
-run ./bin/linux/${ARCH}/scope -g
-outputs "error: missing required value for -g option"
-returns 1
-
-run ./bin/linux/${ARCH}/scope --getfile
-outputs "error: missing required value for -g option"
-returns 1
-
 run ./bin/linux/${ARCH}/scope -s
 outputs "error: missing required value for -s option"
 returns 1
@@ -137,28 +121,16 @@ run ./bin/linux/${ARCH}/scope -s nginx -v nginx
 outputs "error: --service and --unservice cannot be used together"
 returns 1
 
-run ./bin/linux/${ARCH}/scope -c conf/example_filter.json -w
-outputs "error: --configure and --unconfigure cannot be used together"
-returns 1
-
 run ./bin/linux/${ARCH}/scope -a 1 -z echo
-outputs "error: --passthrough cannot be used with --ldattach/--lddetach or --namespace or --service/--unservice or --configure/--unconfigure"
+outputs "error: --passthrough cannot be used with --ldattach/--lddetach or --namespace or --service/--unservice"
 returns 1
 
 run ./bin/linux/${ARCH}/scope -n 1 ls
-outputs "error: --namespace option requires --configure/--unconfigure or --service/--unservice or --getfile option"
-returns 1
-
-run ./bin/linux/${ARCH}/scope -s dummy_service_value -c dummy_filter_value
-outputs "error: --configure/--unconfigure and --service/--unservice cannot be used together"
+outputs "error: --namespace option requires --service/--unservice option"
 returns 1
 
 run ./bin/linux/${ARCH}/scope -a dummy_service_value -s 1
 outputs "error: --ldattach/--lddetach and --service/--unservice cannot be used together"
-returns 1
-
-run ./bin/linux/${ARCH}/scope -c dummy_filter_value -a 1
-outputs "error: --ldattach/--lddetach and --configure/--unconfigure cannot be used together"
 returns 1
 
 run ./bin/linux/${ARCH}/scope -l /does_not_exist echo 
@@ -178,10 +150,6 @@ run ./bin/linux/${ARCH}/scope -d not_a_pid
 outputs "invalid --lddetach PID: not_a_pid"
 returns 1
 
-run ./bin/linux/${ARCH}/scope -c conf/example_filter.json -n not_a_pid
-outputs "invalid --namespace PID: not_a_pid"
-returns 1
-
 run ./bin/linux/${ARCH}/scope -a -999
 outputs "invalid --ldattach PID: -999"
 returns 1
@@ -190,24 +158,8 @@ run ./bin/linux/${ARCH}/scope -d -999
 outputs "invalid --lddetach PID: -999"
 returns 1
 
-run ./bin/linux/${ARCH}/scope -c conf/example_filter.json -n -999
-outputs "invalid --namespace PID: -999"
-returns 1
-
 run ./bin/linux/${ARCH}/scope -a 999999999
 outputs "error: --ldattach, --lddetach PID not a current process"
-returns 1
-
-run ./bin/linux/${ARCH}/scope -g ,
-outputs "error: no source file path"
-returns 1
-
-run ./bin/linux/${ARCH}/scope -g somefile
-outputs "error: no destination file path"
-returns 1
-
-run ./bin/linux/${ARCH}/scope -g somefile,
-outputs "error: no destination file path"
 returns 1
 
 export SCOPE_LIB_PATH=./lib/linux/${ARCH}/libscope.so

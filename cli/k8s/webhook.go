@@ -167,6 +167,8 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 					app.MetricDest,
 					"--metricformat",
 					app.MetricFormat,
+					"--metricprefix",
+					app.MetricPrefix,
 					"--eventdest",
 					app.EventDest,
 				)
@@ -246,7 +248,13 @@ func (app *App) HandleMutate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		pod.ObjectMeta.Labels["appscope.dev/scope"] = "true"
+		if pod.ObjectMeta.Labels != nil {
+			pod.ObjectMeta.Labels["appscope.dev/scope"] = "true"
+		} else {
+			pod.ObjectMeta.Labels = map[string]string{
+				"appscope.dev/scope": "true",
+			}
+		}
 
 		initContainersBytes, err := json.Marshal(&pod.Spec.InitContainers)
 		if err != nil {

@@ -20,7 +20,7 @@ var RootCmd = &cobra.Command{
   scope flows
   scope run -- git pull
   scope attach top
-  scope filter --add nginx`,
+  scope rules --add nginx`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

@@ -108,8 +108,8 @@ load_and_attach(pid_t pid, char *scopeLibPath)
     }
 
     if ((ebuf = getElf(exe_path)) == NULL) {
-        free(exe_path);
         fprintf(stderr, "error: can't read the executable %s\n", exe_path);
+        free(exe_path);
         return EXIT_FAILURE;
     }
 

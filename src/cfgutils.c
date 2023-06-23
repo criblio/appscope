@@ -99,13 +99,20 @@
 #define ANCESTOR_NODE                "ancestor"
 #define CONFIG_NODE              "config"
 
+#if SCOPE_PROM_SUPPORT != 0
 enum_map_t formatMap[] = {
     {"statsd",                CFG_FMT_STATSD},
     {"ndjson",                CFG_FMT_NDJSON},
     {"prometheus",            CFG_FMT_PROMETHEUS},
     {NULL,                    -1}
 };
-
+#else 
+enum_map_t formatMap[] = {
+    {"statsd",                CFG_FMT_STATSD},
+    {"ndjson",                CFG_FMT_NDJSON},
+    {NULL,                    -1}
+};
+#endif
 enum_map_t transportTypeMap[] = {
     {"udp",                   CFG_UDP},
     {"tcp",                   CFG_TCP},
@@ -2900,7 +2907,7 @@ initCtl(config_t *cfg)
  * - increase log level to warning if set to none or error
  * - set configevent (SCOPE_CONFIG_EVENT) to true
  *
- * all else reflects the filter file, config file, and env vars
+ * all else reflects the rules file, config file, and env vars
  */
 int
 cfgLogStreamDefault(config_t *cfg)
@@ -2991,33 +2998,32 @@ destroyProtEntry(void *data)
     scope_free(pre);
 }
 
-// Filter Configuration
+// Rules Configuration
 
 /*
-These rules describe which (if any) filter file is used.
+These rules describe which (if any) rules file is used.
 In order described here, the first true statement wins.
-- If the env variable SCOPE_FILTER exists, and it's value is a path to a
+- If the env variable SCOPE_RULES exists, and it's value is a path to a
     file that can be read
-- If the file /usr/lib/appscope/scope_filter exists and can be read
-- If /the file tmp/appscope/scope_filter exists and can be read
+- If the file /usr/lib/appscope/scope_rules exists and can be read
 
-Rules regarding the filter file:
-o) If the filter file exists, but contains any invalid (unparseable) yaml,
-   no processes will be scoped by the filter feature
-o) if the env variable SCOPE_FILTER exists with a value of "false",
-   no processes will be scoped by the filter feature
-o) If a filter file is not found,
-   no processes will be scoped by the filter feature
+Rules regarding the rules file:
+o) If the rules file exists, but contains any invalid (unparseable) yaml,
+   no processes will be scoped by the rules feature
+o) if the env variable SCOPE_RULES exists with a value of "false",
+   no processes will be scoped by the rules feature
+o) If a rules file is not found,
+   no processes will be scoped by the rules feature
 
-Rules regarding some of the content of the filter file:
-o) The allow list and deny list are made of a ordered sequence of filters
-o) For the allow list, each filter has these fields: procname, arg, and config
-o) For the deny list, each filter has a procname and arg field
-o) Extra valid (parseable) yaml is allowed anywhere in the filter file,
+Rules regarding some of the content of the rules file:
+o) The allow list and deny list are made of a ordered sequence of rules
+o) For the allow list, each rules has these fields: procname, arg, and config
+o) For the deny list, each rules has a procname and arg field
+o) Extra valid (parseable) yaml is allowed anywhere in the rules file,
    but will be ignored by AppScope
 
-Definition of what it means to match a filter:
-o) By “the process matches the filter", we mean that the one or more
+Definition of what it means to match a rule:
+o) By “the process matches the rules", we mean that the one or more
    of these conditions is true:
 - the value of the procname field is an exact match of the process name
   (is case-sensitive)
@@ -3026,32 +3032,32 @@ o) By “the process matches the filter", we mean that the one or more
 - the value of the procname or arg field is the literal string _MatchAll_
   (See "Example of _MatchAll_ syntax" comment below)
 
-When a valid, parseable filter file is found, it controls which processes
+When a valid, parseable rules file is found, it controls which processes
 will be scoped:
-o) If a process does not match any allow list filter,
-   it will not be scoped by the filter feature
-o) If a process matches any filter in the deny list,
-   it will not be scoped by the filter feature
-o) If a process matches any filter in the allow list, and
-   does not match any filter in the deny list,
-   it will be scoped by the filter feature.
+o) If a process does not match any allow list rules,
+   it will not be scoped by the rules feature
+o) If a process matches any rules in the deny list,
+   it will not be scoped by the rules feature
+o) If a process matches any rules in the allow list, and
+   does not match any rules in the deny list,
+   it will be scoped by the rules feature.
 o) For clarity, if a process matches both the allow list and deny list,
-   it will not be scoped by the filter feature.
+   it will not be scoped by the rules feature.
 
 How configuration is determined:
 o) Default values are used for initial values of the configuration
-o) Filters of an allow list are processed in order. The process always
-   evaluates all filters.
-o) For each filter that matches, the config fields are applied to the process.
+o) Rules of an allow list are processed in order. The process always
+   evaluates all rules.
+o) For each rules that matches, the config fields are applied to the process.
 o) A config field can have any number of child elements. Empty configurations,
    partial configurations, and complete configurations are all allowed.
-o) For clarity, when filters match, all config fields defined by that filter
+o) For clarity, when rules match, all config fields defined by that rules
    overwrite any earlier config values whether the value is a default value
-   or from an earlier matching filter.
+   or from an earlier matching rules.
 */
 
 /*
-Example of _MatchAll_ syntax.  If the filter file contains this content,
+Example of _MatchAll_ syntax.  If the rules file contains this content,
 all processes will match, and the configuration will all be default values
 except that log level will be set to error.
 
@@ -3063,13 +3069,15 @@ allow:
         level: error
 */
 
-#define ALLOW_NODE          "allow"
-#define ALLOW_PROCNAME_NODE   "procname"
-#define ALLOW_ARG_NODE        "arg"
-#define ALLOW_CONFIG_NODE     "config"
-#define DENY_NODE           "deny"
-#define DENY_PROCNAME_NODE    "procname"
-#define DENY_ARG_NODE         "arg"
+#define ALLOW_NODE             "allow"
+#define PROCNAME_NODE            "procname"
+#define ARG_NODE                 "arg"
+#define ALLOW_CONFIG_NODE        "config"
+#define DENY_NODE              "deny"
+#define PROCNAME_NODE            "procname"
+#define ARG_NODE                 "arg"
+#define SOURCE_NODE            "source"
+#define UNIX_SOCKET_PATH_NODE    "unixSocketPath"
 
 #define MATCH_ALL_VAL       "_MatchAll_"
 
@@ -3080,26 +3088,35 @@ typedef enum {
 } proc_status;
 
 typedef struct {
-    const char *procName;    // process name which be searched in the filter file
-    const char *procCmdLine; // process command line which be searched in the filter file
+    const char *procName;    // process name which be searched in the rules file
+    const char *procCmdLine; // process command line which be searched in the rules file
     proc_status  status;     // status describes the presence of the process on list
     config_t *cfg;           // configuration for the scope list
-    bool filterMatch;        // flag indicate that cfg should be parsed for the process
-} filter_cfg_t;
+    bool rulesMatch;        // flag indicate that cfg should be parsed for the process
+} rules_cfg_t;
 
-typedef void (*node_filter_fn)(yaml_document_t *, yaml_node_t *, filter_cfg_t *);
+typedef void (*node_rules_fn)(yaml_document_t *, yaml_node_t *, void *);
 
 typedef struct {
     yaml_node_type_t type;
     const char *key;
-    node_filter_fn fn;
-} parse_filter_table_t;
+    node_rules_fn fn;
+} parse_rules_table_t;
+
+
+typedef void (*node_rules_unix_path_fn)(yaml_document_t *, yaml_node_t *, char **);
+
+typedef struct {
+    yaml_node_type_t type;
+    const char *key;
+    node_rules_unix_path_fn fn;
+} parse_rules_unix_path_t;
 
 /*
-* Process key value pair filter
+* Process key value pair rules
 */
 static void
-processKeyValuePairFilter(yaml_document_t *doc, yaml_node_pair_t *pair, const parse_filter_table_t *fEntry, filter_cfg_t *fCfg) {
+processKeyValuePairRules(yaml_document_t *doc, yaml_node_pair_t *pair, const parse_rules_table_t *fEntry, void *extData) {
     yaml_node_t *nodeKey = yaml_document_get_node(doc, pair->key);
     yaml_node_t *nodeValue = yaml_document_get_node(doc, pair->value);
 
@@ -3111,8 +3128,30 @@ processKeyValuePairFilter(yaml_document_t *doc, yaml_node_pair_t *pair, const pa
     for (int i = 0; fEntry[i].type != YAML_NO_NODE; ++i) {
         if ((nodeValue->type == fEntry[i].type) &&
             (!scope_strcmp((char*)nodeKey->data.scalar.value, fEntry[i].key))) {
-            fEntry[i].fn(doc, nodeValue, fCfg);
+            fEntry[i].fn(doc, nodeValue, extData);
             break;
+        }
+    }
+}
+
+/*
+* Process key value pair filter for finding the Unix Path
+*/
+static void
+processKeyValuePairRulesUnixPathData(yaml_document_t *doc, yaml_node_pair_t *pair, const parse_rules_unix_path_t *fEntry, char **unixPath) {
+    yaml_node_t *nodeKey = yaml_document_get_node(doc, pair->key);
+    yaml_node_t *nodeValue = yaml_document_get_node(doc, pair->value);
+
+    if (nodeKey->type != YAML_SCALAR_NODE) return;
+
+    /*
+    * Check if specific Node value is present and call proper function if exists
+    */
+    for (int i = 0; fEntry[i].type != YAML_NO_NODE; ++i) {
+        if ((nodeValue->type == fEntry[i].type) &&
+            (!scope_strcmp((char*)nodeKey->data.scalar.value, fEntry[i].key))) {
+                fEntry[i].fn(doc, nodeValue, unixPath);
+                break;
         }
     }
 }
@@ -3121,14 +3160,30 @@ processKeyValuePairFilter(yaml_document_t *doc, yaml_node_pair_t *pair, const pa
 * Process allow process name Scalar Node
 */
 static void
-processAllowProcNameScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+processAllowProcNameScalar(yaml_document_t *doc, yaml_node_t *node, void *extData) {
     if (node->type != YAML_SCALAR_NODE) return;
+
+    rules_cfg_t *fCfg = (rules_cfg_t *)extData;
 
     const char *procname = (const char *)node->data.scalar.value;
     if (!scope_strcmp(fCfg->procName, procname) ||
         !scope_strcmp(MATCH_ALL_VAL, procname)) {
         fCfg->status = PROC_ALLOWED;
-        fCfg->filterMatch = TRUE;
+        fCfg->rulesMatch = TRUE;
+    }
+}
+
+/*
+* Verifies if entry is not empty
+*/
+static void
+processEntryIsNotEmpty(yaml_document_t *doc, yaml_node_t *node, void *extData) {
+    if (node->type != YAML_SCALAR_NODE) return;
+
+    const char *value = (const char *)node->data.scalar.value;
+    bool *status = (bool *)extData;
+    if (scope_strlen(value) > 0) {
+        *status = TRUE;
     }
 }
 
@@ -3136,15 +3191,16 @@ processAllowProcNameScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t
 * Process allow process command line Scalar Node
 */
 static void
-processAllowProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+processAllowProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, void *extData) {
     if (node->type != YAML_SCALAR_NODE) return;
 
+    rules_cfg_t *fCfg = (rules_cfg_t *)extData;
     const char *cmdline = (const char *)node->data.scalar.value;
     if ((scope_strlen(cmdline) > 0) &&
         (scope_strstr(fCfg->procCmdLine, cmdline)
          || !scope_strcmp(MATCH_ALL_VAL, cmdline))) {
         fCfg->status = PROC_ALLOWED;
-        fCfg->filterMatch = TRUE;
+        fCfg->rulesMatch = TRUE;
     }
 }
 
@@ -3152,12 +3208,41 @@ processAllowProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cf
 * Process allow configuration Node
 */
 static void
-processAllowConfig(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+processAllowConfig(yaml_document_t *doc, yaml_node_t *node, void *extData) {
     if (node->type != YAML_MAPPING_NODE) return;
 
-    if (fCfg->filterMatch) {
+    rules_cfg_t *fCfg = (rules_cfg_t *)extData;
+
+    if (fCfg->rulesMatch) {
         processRoot(fCfg->cfg, doc, node);
-        fCfg->filterMatch = FALSE;
+        fCfg->rulesMatch = FALSE;
+    }
+}
+
+/*
+* Process allow/deny sequence list (validation)
+*/
+static void
+processValidAllowDenySeq(yaml_document_t *doc, yaml_node_t *node, void *extData) {
+    if (node->type != YAML_SEQUENCE_NODE) return;
+
+    parse_rules_table_t rules[] = {
+        {YAML_SCALAR_NODE,  PROCNAME_NODE, processEntryIsNotEmpty},
+        {YAML_SCALAR_NODE,  ARG_NODE,      processEntryIsNotEmpty},
+        {YAML_NO_NODE,      NULL,          NULL}
+    };
+
+    yaml_node_item_t *seqItem;
+    foreach(seqItem, node->data.sequence.items) {
+        yaml_node_t *nodeMap = yaml_document_get_node(doc, *seqItem);
+
+        if (nodeMap->type != YAML_MAPPING_NODE) return;
+
+        yaml_node_pair_t *pair;
+        // processs the rules first (before the config)
+        foreach(pair, nodeMap->data.mapping.pairs) {
+            processKeyValuePairRules(doc, pair, rules, extData);
+        }
     }
 }
 
@@ -3165,15 +3250,15 @@ processAllowConfig(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) 
 * Process allow sequence list
 */
 static void
-processAllowSeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+processAllowSeq(yaml_document_t *doc, yaml_node_t *node, void *extData) {
     if (node->type != YAML_SEQUENCE_NODE) return;
 
-    parse_filter_table_t filters[] = {
-        {YAML_SCALAR_NODE,  ALLOW_PROCNAME_NODE, processAllowProcNameScalar},
-        {YAML_SCALAR_NODE,  ALLOW_ARG_NODE,      processAllowProcCmdLineScalar},
-        {YAML_NO_NODE,      NULL,                NULL}
+    parse_rules_table_t rules[] = {
+        {YAML_SCALAR_NODE,  PROCNAME_NODE, processAllowProcNameScalar},
+        {YAML_SCALAR_NODE,  ARG_NODE,      processAllowProcCmdLineScalar},
+        {YAML_NO_NODE,      NULL,          NULL}
     };
-    parse_filter_table_t config[] = {
+    parse_rules_table_t config[] = {
         {YAML_MAPPING_NODE, ALLOW_CONFIG_NODE,   processAllowConfig},
         {YAML_NO_NODE,      NULL,                NULL}
     };
@@ -3186,23 +3271,24 @@ processAllowSeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
         if (nodeMap->type != YAML_MAPPING_NODE) return;
 
         yaml_node_pair_t *pair;
-        // processs the filters first (before the config)
+        // processs the rules first (before the config)
         foreach(pair, nodeMap->data.mapping.pairs) {
-            processKeyValuePairFilter(doc, pair, filters, fCfg);
+            processKeyValuePairRules(doc, pair, rules, extData);
         }
         foreach(pair, nodeMap->data.mapping.pairs) {
-            processKeyValuePairFilter(doc, pair, config, fCfg);
+            processKeyValuePairRules(doc, pair, config, extData);
         }
     }
-
 }
 
 /*
 * Process deny process name Scalar Node
 */
 static void
-processDenyProcNameScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+processDenyProcNameScalar(yaml_document_t *doc, yaml_node_t *node, void *extData) {
     if (node->type != YAML_SCALAR_NODE) return;
+
+    rules_cfg_t *fCfg = (rules_cfg_t *)extData;
 
     const char *procname = (const char *)node->data.scalar.value;
     if (!scope_strcmp(fCfg->procName, procname) ||
@@ -3215,8 +3301,10 @@ processDenyProcNameScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t 
 * Process deny process command line Scalar Node
 */
 static void
-processDenyProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+processDenyProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, void *extData) {
     if (node->type != YAML_SCALAR_NODE) return;
+
+    rules_cfg_t *fCfg = (rules_cfg_t *)extData;
 
     const char *cmdline = (const char *)node->data.scalar.value;
     if ((scope_strlen(cmdline) > 0) &&
@@ -3230,13 +3318,13 @@ processDenyProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, filter_cfg
 * Process deny sequence list
 */
 static void
-processDenySeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
+processDenySeq(yaml_document_t *doc, yaml_node_t *node, void *extData) {
     if (node->type != YAML_SEQUENCE_NODE) return;
 
-    parse_filter_table_t t[] = {
-        {YAML_SCALAR_NODE, DENY_PROCNAME_NODE, processDenyProcNameScalar},
-        {YAML_SCALAR_NODE, DENY_ARG_NODE,      processDenyProcCmdLineScalar},
-        {YAML_NO_NODE,     NULL,               NULL}
+    parse_rules_table_t t[] = {
+        {YAML_SCALAR_NODE, PROCNAME_NODE, processDenyProcNameScalar},
+        {YAML_SCALAR_NODE, ARG_NODE,      processDenyProcCmdLineScalar},
+        {YAML_NO_NODE,     NULL,          NULL}
     };
 
     yaml_node_item_t *seqItem;
@@ -3247,16 +3335,48 @@ processDenySeq(yaml_document_t *doc, yaml_node_t *node, filter_cfg_t *fCfg) {
 
         yaml_node_pair_t *pair;
         foreach(pair, nodeMap->data.mapping.pairs) {
-            processKeyValuePairFilter(doc, pair, t, fCfg);
+            processKeyValuePairRules(doc, pair, t, extData);
         }
     }
 }
 
 /*
-* Process Filter Root node (starting point)
+* Process Unix Socket Path Node
 */
 static void
-processFilterRootNode(yaml_document_t *doc, filter_cfg_t *fCfg) {
+processUnixSocketPathNode(yaml_document_t* doc, yaml_node_t* node, char **unixPath) {
+    if (!node || (node->type != YAML_SCALAR_NODE)) return;
+
+    const char *unixCfgPath = (const char *)node->data.scalar.value;
+
+    if (scope_strlen(unixCfgPath) > 0) {
+        *unixPath = scope_strdup(unixCfgPath);
+    }
+}
+
+/*
+* Process source Node
+*/
+static void
+processSourceNode(yaml_document_t *doc, yaml_node_t *node, char **unixPath) {
+    if (node->type != YAML_MAPPING_NODE) return;
+
+    parse_rules_unix_path_t sourceNodes[] = {
+        {YAML_SCALAR_NODE,    UNIX_SOCKET_PATH_NODE, processUnixSocketPathNode},
+        {YAML_NO_NODE,        NULL,                  NULL}
+    };
+
+    yaml_node_pair_t* pair;
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairRulesUnixPathData(doc, pair, sourceNodes, unixPath);
+    }
+}
+
+/*
+* Process Rules Root node (starting point)
+*/
+static void
+processRulesRootNode(yaml_document_t *doc, void *extData) {
     yaml_node_t *node = yaml_document_get_root_node(doc);
 
     if ((node == NULL) || (node->type != YAML_MAPPING_NODE)) {
@@ -3266,42 +3386,90 @@ processFilterRootNode(yaml_document_t *doc, filter_cfg_t *fCfg) {
     yaml_node_pair_t *pair;
     // process allow before deny so deny "overrides" allow
     // if a process appears in both, it should not be scoped
-    parse_filter_table_t allow[] = {
+    parse_rules_table_t allow[] = {
         {YAML_SEQUENCE_NODE, ALLOW_NODE, processAllowSeq},
         {YAML_NO_NODE,       NULL,       NULL}
     };
     foreach(pair, node->data.mapping.pairs) {
-        processKeyValuePairFilter(doc, pair, allow, fCfg);
+        processKeyValuePairRules(doc, pair, allow, extData);
     }
 
-    parse_filter_table_t deny[] = {
+    parse_rules_table_t deny[] = {
         {YAML_SEQUENCE_NODE, DENY_NODE,  processDenySeq},
         {YAML_NO_NODE,       NULL,       NULL}
     };
     foreach(pair, node->data.mapping.pairs) {
-        processKeyValuePairFilter(doc, pair, deny, fCfg);
+        processKeyValuePairRules(doc, pair, deny, extData);
+    }
+}
+
+static void
+processRulesValidRootNode(yaml_document_t *doc, void *extData) {
+    yaml_node_t *node = yaml_document_get_root_node(doc);
+
+    if ((node == NULL) || (node->type != YAML_MAPPING_NODE)) {
+        return;
+    }
+
+    yaml_node_pair_t *pair;
+    parse_rules_table_t allow[] = {
+        {YAML_SEQUENCE_NODE, ALLOW_NODE, processValidAllowDenySeq},
+        {YAML_NO_NODE,       NULL,       NULL}
+    };
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairRules(doc, pair, allow, extData);
+    }
+
+    parse_rules_table_t deny[] = {
+        {YAML_SEQUENCE_NODE, DENY_NODE,  processValidAllowDenySeq},
+        {YAML_NO_NODE,       NULL,       NULL}
+    };
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairRules(doc, pair, deny, extData);
     }
 }
 
 /*
- * Parse scope filter file
+* Process Rules Source node (starting point)
+*/
+static void
+processRulesSourceSection(yaml_document_t *doc, char **unixPath) {
+    yaml_node_t *node = yaml_document_get_root_node(doc);
+
+    if ((node == NULL) || (node->type != YAML_MAPPING_NODE)) {
+        return;
+    }
+    yaml_node_pair_t *pair;
+
+    parse_rules_unix_path_t meta[] = {
+        {YAML_MAPPING_NODE,  SOURCE_NODE,  processSourceNode},
+        {YAML_NO_NODE,       NULL,         NULL}
+    };
+
+    foreach(pair, node->data.mapping.pairs) {
+        processKeyValuePairRulesUnixPathData(doc, pair, meta, unixPath);
+    }
+}
+
+/*
+ * Parse scope rules file
  *
- * Returns TRUE if filter file was successfully parsed, FALSE otherwise
+ * Returns TRUE if rules file was successfully parsed, FALSE otherwise
  */
 static bool
-filterParseFile(const char* filterPath, filter_cfg_t *fCfg) {
+rulesParseFile(const char* rulesPath, rules_cfg_t *fCfg) {
     FILE *fs;
     bool status = FALSE;
     yaml_parser_t parser;
     yaml_document_t doc;
 
-    if ((fs = scope_fopen(filterPath, "rb")) == NULL) {
+    if ((fs = scope_fopen(rulesPath, "rb")) == NULL) {
         return status;
     }
 
     int res = yaml_parser_initialize(&parser);
     if (!res) {
-        goto cleanup_filter_file;
+        goto cleanup_rules_file;
     }
 
     yaml_parser_set_input_file(&parser, fs);
@@ -3311,7 +3479,7 @@ filterParseFile(const char* filterPath, filter_cfg_t *fCfg) {
         goto cleanup_parser;
     }
 
-    processFilterRootNode(&doc, fCfg);
+    processRulesRootNode(&doc, fCfg);
 
     status = TRUE;
 
@@ -3320,48 +3488,156 @@ filterParseFile(const char* filterPath, filter_cfg_t *fCfg) {
 cleanup_parser:
     yaml_parser_delete(&parser);
 
-cleanup_filter_file:
+cleanup_rules_file:
     scope_fclose(fs);
 
     return status;
 }
 
 /*
- * Verify against filter file if specifc process command should be scoped.
+ * Verify against rules file if specifc process command should be scoped.
  */
-filter_status_t
-cfgFilterStatus(const char *procName, const char *procCmdLine, const char *filterPath, config_t *cfg)
+rules_status_t
+cfgRulesStatus(const char *procName, const char *procCmdLine, const char *rulesPath, config_t *cfg)
 {
     if ((!procName) || (!procCmdLine) || (!cfg)) {
         DBG(NULL);
-        return FILTER_ERROR;
+        return RULES_ERROR;
     }
 
     /*
-    *  If the filter file is missing (NULL) we scope every process
+    *  If the rules file is missing (NULL) we scope every process
     */
-    if (filterPath == NULL) {
-        return FILTER_SCOPED;
+    if (rulesPath == NULL) {
+        return RULES_SCOPED;
     }
 
-    filter_cfg_t fCfg = {.procName = procName,
+    rules_cfg_t fCfg = {.procName = procName,
                          .procCmdLine = procCmdLine,
                          .status = PROC_NOT_FOUND,
-                         .filterMatch = FALSE,
+                         .rulesMatch = FALSE,
                          .cfg = cfg};
-    bool res = filterParseFile(filterPath, &fCfg);
+    bool res = rulesParseFile(rulesPath, &fCfg);
     if (res == FALSE) {
-        return FILTER_ERROR;
+        return RULES_ERROR;
     }
 
     switch (fCfg.status) {
         case PROC_NOT_FOUND:
         case PROC_DENIED:
-            return FILTER_NOT_SCOPED;
+            return RULES_NOT_SCOPED;
         case PROC_ALLOWED:
-            return FILTER_SCOPED_WITH_CFG;
+            return RULES_SCOPED_WITH_CFG;
     }
 
     DBG(NULL);
-    return FILTER_ERROR;
+    return RULES_ERROR;
+}
+
+/*
+ * Returns the UNIX socket path defined in the rules file's "source" section.
+ * The "source" section is an optional section that contains additional
+ * information. AppScope utilizes it to retrieve information about the
+ * UNIX path ("unixSocketPath"), which can be used as the receiver point for
+ * AppScope data.
+ * One example of an application that generates the rules file with proper
+ * "source" data is Edge (https://cribl.io/edge/).
+ * 
+ * Memory for the UNIX socket path is obtained with scope_strdup and can
+ * be freed with scope_free.
+*/
+char *
+cfgRulesUnixPath(const char *rulesPath) {
+    char *unixPath = NULL;
+    if (!rulesPath) {
+        return unixPath;
+    }
+
+    FILE *fp = scope_fopen(rulesPath, "rb");
+    if (!fp) {
+        return unixPath;
+    }
+    yaml_parser_t parser;
+    yaml_document_t doc;
+
+    int res = yaml_parser_initialize(&parser);
+    if (!res) {
+        goto cleanup_rules_file;
+    }
+
+    yaml_parser_set_input_file(&parser, fp);
+
+    res = yaml_parser_load(&parser, &doc);
+    if (!res) {
+        goto cleanup_parser;
+    }
+
+    /*
+    * Extract the unixSocketPath from rules file
+    *
+    "source": {
+      "id": "in_appscope",
+      "enableUnixPath": true,
+      "unixSocketPath": "/opt/cribl/state/appscope.sock",
+      "tls": {
+        "disabled": true
+      },
+      "host": "0.0.0.0",
+      "port": 10090,
+      "authToken": ""
+    }
+    */
+
+    processRulesSourceSection(&doc, &unixPath);
+
+    yaml_document_delete(&doc);
+
+cleanup_parser:
+    yaml_parser_delete(&parser);
+
+cleanup_rules_file:
+    scope_fclose(fp);
+
+    return unixPath;
+}
+
+/*
+ * Check if rules file specified by Path is valid:
+ * - contains at least deny or allow section
+ */
+bool
+cfgRulesFileIsValid(const char *rulesPath) {
+    FILE *fs;
+    yaml_parser_t parser;
+    yaml_document_t doc;
+    bool status = FALSE;
+    bool res;
+
+    if ((fs = scope_fopen(rulesPath, "rb")) == NULL) {
+        return status;
+    }
+
+    res = yaml_parser_initialize(&parser);
+    if (!res) {
+        goto cleanup_rules_file;
+    }
+
+    yaml_parser_set_input_file(&parser, fs);
+
+    res = yaml_parser_load(&parser, &doc);
+    if (!res) {
+        goto cleanup_parser;
+    }
+
+    processRulesValidRootNode(&doc, &status);
+
+    yaml_document_delete(&doc);
+
+cleanup_parser:
+    yaml_parser_delete(&parser);
+
+cleanup_rules_file:
+    scope_fclose(fs);
+
+    return status;
 }

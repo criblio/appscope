@@ -177,6 +177,36 @@ func Add(rulesFile libscope.Rules, addProc, procArg, sourceid, rootdir string, r
 
 	// TBC ? perform a scope detach to all processes that do not match anything in the rules file
 
+	////////////////////////////////////////////
+	// Apply rules to existing containers
+	////////////////////////////////////////////
+
+	/* TODO
+
+	find all existing containers
+
+	for each container:
+
+		// Mount `scope_rules` into the container
+		// TODO support CRIBL_HOME
+		ld.Mount()
+			scope --mount (/usr/lib/appscope/, <container root>/usr/lib/appscope) --rootdir /hostfs
+
+		// Mount unix socket into the container
+		determine <unix_socket_dir> by looking in the filter for the unix socket path
+		ld.Mount()
+			scope --mount (<unix_socket_dir>, <container root>/<unix_socket_dir>) --rootdir /hostfs
+
+		// Extract the library to /opt/appscope/libscope.so
+		scope extract /opt/appscope --rootdir <container root>
+
+		// Set ld.preload.so to point to /opt/appscope/libscope.so
+		ld.Preload()
+			scope --preload /opt/appscope --rootdir <container root>                        #
+
+		// Attach is already taken care of, we attached to everything in rootdir and children
+	*/
+
 	return nil
 }
 

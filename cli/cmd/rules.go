@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/criblio/scope/rules"
 	"github.com/criblio/scope/internal"
+	"github.com/criblio/scope/rules"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -37,8 +37,8 @@ import (
 // rulesCmd represents the rules command
 var rulesCmd = &cobra.Command{
 	Use:   "rules [flags]",
-	Short: "View or modify a system-wide AppScope rules",
-	Long:  `View or modify a system-wide AppScope rules that automatically scopes a set of processes. You can add or remove a single process at a time.`,
+	Short: "View or modify system-wide AppScope rules",
+	Long:  `View or modify system-wide AppScope rules to automatically scope a set of processes. You can add or remove a single process at a time.`,
 	Example: `  scope rules
   scope rules --rootdir /path/to/host/root --json
   scope rules --add nginx

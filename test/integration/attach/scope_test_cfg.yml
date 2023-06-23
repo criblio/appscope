@@ -50,7 +50,7 @@ event:
       name: .*         # event name; http.req or http.resp
       field: .*        # matches field names; duration, http_status, etc
       value: .*        # matches field values
-      headers:         # list of ruless matched against header names
+      headers:         # list of filters matched against header names
   transport:
     type: file
     path: '/opt/test-runner/logs/events_from_cfg.log'

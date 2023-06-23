@@ -29,7 +29,7 @@ or remove any service configurations`
 var stopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Stop scoping all scoped processes and services",
-	Long: `Stop scoping all processes and services on the host and in all relevant containers.
+	Long: `Stop scoping all processes and services in the current or target namespace.
 
 ` + getStopUsage(),
 	Example: `  scope stop`,

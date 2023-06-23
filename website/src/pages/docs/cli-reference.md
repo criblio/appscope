@@ -41,7 +41,7 @@ Available Commands:
   detach      Unscope a currently-running process
   events      Outputs events for a session
   extract     Output instrumentary library files to <dir>
-  rules       Automatically scope a set of processes
+  rules       View or modify system-wide AppScope rules
   flows       Observed flows from the session, potentially including payloads
   help        Help about any command
   history     List scope session history

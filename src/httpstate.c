@@ -235,7 +235,7 @@ reportHttp1(http_state_t *httpstate)
 
     protocol_info *proto = evtProtoCreate();
     if (!proto) {
-        // Bummer!  We're losing info.  At least make sure we clean up.
+        // Bummer!  We're losing info.
         DBG(NULL);
         return -1;
     }
@@ -299,7 +299,7 @@ reportHttp2(http_state_t *state, net_info *net, http_buf_t *stash,
 
     protocol_info *proto = evtProtoCreate();
     char *frame = scope_malloc(frameLen);
-    if (!proto | !frame) {
+    if (!proto || !frame) {
         scopeLogError("ERROR: failed to allocate protocol object");
         if (proto) evtProtoDelete(proto);
         if (frame) scope_free(frame);

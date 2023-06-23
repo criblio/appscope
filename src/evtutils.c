@@ -35,8 +35,8 @@ evtProtoDelete(protocol_info *proto)
             scope_free(post);
         }
     } else if (proto->ptype == EVT_DETECT) {
-        // proto->data is a pointer to a constant string
-        // nothing to free here...
+        // proto->data is a pointer to a strdup'd string
+        if (proto->data) scope_free(proto->data);
     }
     scope_free(proto);
     return TRUE;
@@ -50,37 +50,44 @@ evtDelete(evt_type *event)
     switch(event->evtype) {
         case EVT_NET:
         {
-            net_info *net = (net_info *)event;
+            // Alloc'd in postNetState. There are no nested allocations.
+            // net_info *net = (net_info *)event;
             scope_free(event);
             break;
         }
         case EVT_FS:
         {
-            fs_info *fs = (fs_info *)event;
+            // Alloc'd in postFSState. There are no nested allocations.
+            // fs_info *fs = (fs_info *)event;
             scope_free(event);
             break;
         }
         case EVT_ERR:
         {
-            stat_err_info *staterr = (stat_err_info *)event;
+            // Alloc'd in postStatErrState. There are no nested allocations.
+            // stat_err_info *staterr = (stat_err_info *)event;
             scope_free(event);
             break;
         }
         case EVT_STAT:
         {
-            stat_err_info *staterr = (stat_err_info *)event;
+            // Alloc'd in postStatErrState. There are no nested allocations.
+            // stat_err_info *staterr = (stat_err_info *)event;
             scope_free(event);
             break;
         }
         case EVT_DNS:
         {
-            net_info *net = (net_info *)event;
+            // Alloc'd in postDNSState. There are no nested allocations.
+            // net_info *net = (net_info *)event;
             scope_free(event);
             break;
         }
         case EVT_PROTO:
         {
             protocol_info *proto = (protocol_info *)event;
+            // Alloc'd in evtProtoCreate (http 1&2) or
+            // setProtocol (protocolDetection)
             evtProtoDelete(proto);
             break;
         }

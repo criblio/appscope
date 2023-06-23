@@ -3419,10 +3419,15 @@ doHttpAgg()
     httpAggReset(g_http_agg);
 }
 
+// Somewhat arbitrary value. Heuristically, on one machine,
+// this seemed adequate for our ipc to remain responsive.
+#define MAX_EVT_COUNT ( DEFAULT_MAXEVENTSPERSEC / 20 )
+
 void
 doEvent()
 {
     uint64_t data;
+    uint64_t eventCount = 0;
 
     if (doConnection() == FALSE) return;
 
@@ -3459,6 +3464,12 @@ doEvent()
             evtDelete(event);
 
         }
+
+        // If the datapath adds messages faster than we can consume them,
+        // we can starve other processing we need to do on this thread:
+        // payloads, logfiles/console, metrics, ipc, etc.  Don't allow
+        // this loop to go forever.
+        if (eventCount++ >= MAX_EVT_COUNT) break;
     }
     reportAllCapturedMetrics();
     ctlFlushLog(g_ctl);

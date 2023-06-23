@@ -2950,20 +2950,20 @@ rulesMatchAllInDeny(void **state)
 }
 
 static void
-filterUnixPathMissing(void **state)
+rulesUnixPathMissing(void **state)
 {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_6.yml", dirPath);
-    char *unixPath = cfgFilterUnixPath(path);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_6.yml", dirPath);
+    char *unixPath = cfgRulesUnixPath(path);
     assert_null(unixPath);
 }
 
 static void
-filterUnixPathPresent(void **state)
+rulesUnixPathPresent(void **state)
 {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_edge.yml", dirPath);
-    char *unixPath = cfgFilterUnixPath(path);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_edge.yml", dirPath);
+    char *unixPath = cfgRulesUnixPath(path);
     assert_string_equal(unixPath, "/opt/cribl/state/appscope.sock");
     scope_free(unixPath);
 }
@@ -3050,15 +3050,15 @@ main(int argc, char *argv[])
         cmocka_unit_test(initMtcReturnsPtr),
         cmocka_unit_test(initEvtFormatReturnsPtr),
         cmocka_unit_test(initCtlReturnsPtr),
-        cmocka_unit_test(rulesEmptyFilterFileVar1),
-        cmocka_unit_test(rulesEmptyFilterFileVar2),
-        cmocka_unit_test(rulesEmptyFilterFileVar3),
-        cmocka_unit_test(rulesInvalidFilterFile),
+        cmocka_unit_test(rulesEmptyRulesFileVar1),
+        cmocka_unit_test(rulesEmptyRulesFileVar2),
+        cmocka_unit_test(rulesEmptyRulesFileVar3),
+        cmocka_unit_test(rulesInvalidRulesFile),
         cmocka_unit_test(rulesEmptyProcName),
         cmocka_unit_test(rulesEmptyProcCmdLine),
-        cmocka_unit_test(rulesNullFilterPath),
+        cmocka_unit_test(rulesNullRulesPath),
         cmocka_unit_test(rulesNullCfg),
-        cmocka_unit_test(rulesNonExistingFilterFile),
+        cmocka_unit_test(rulesNonExistingRulesFile),
         cmocka_unit_test(rulesProcNameAllowListPresent),
         cmocka_unit_test(rulesProcNameDenyListPresent),
         cmocka_unit_test(rulesArgAllowListPresent),

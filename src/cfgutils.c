@@ -3105,13 +3105,13 @@ typedef struct {
 } parse_rules_table_t;
 
 
-typedef void (*node_filter_unix_path_fn)(yaml_document_t *, yaml_node_t *, char **);
+typedef void (*node_rules_unix_path_fn)(yaml_document_t *, yaml_node_t *, char **);
 
 typedef struct {
     yaml_node_type_t type;
     const char *key;
-    node_filter_unix_path_fn fn;
-} parse_filter_unix_path_t;
+    node_rules_unix_path_fn fn;
+} parse_rules_unix_path_t;
 
 /*
 * Process key value pair rules
@@ -3139,7 +3139,7 @@ processKeyValuePairRules(yaml_document_t *doc, yaml_node_pair_t *pair, const par
 * Process key value pair filter for finding the Unix Path
 */
 static void
-processKeyValuePairFilterUnixPathData(yaml_document_t *doc, yaml_node_pair_t *pair, const parse_filter_unix_path_t *fEntry, char **unixPath) {
+processKeyValuePairRulesUnixPathData(yaml_document_t *doc, yaml_node_pair_t *pair, const parse_rules_unix_path_t *fEntry, char **unixPath) {
     yaml_node_t *nodeKey = yaml_document_get_node(doc, pair->key);
     yaml_node_t *nodeValue = yaml_document_get_node(doc, pair->value);
 

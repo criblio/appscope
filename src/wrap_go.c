@@ -511,10 +511,10 @@ containerStart(void)
             goto exit;
         }
 
-        char *unixSocketPath = cfgFilterUnixPath(SCOPE_FILTER_USR_PATH);
+        char *unixSocketPath = cfgRulesUnixPath(SCOPE_RULES_USR_PATH);
 
         if (!unixSocketPath) {
-            sysprint("\t%s: missing unix path in /usr/lib/appscope/scope_filter \n", __FUNCTION__);
+            sysprint("\t%s: missing unix path in /usr/lib/appscope/scope_rules \n", __FUNCTION__);
         }
 
         void *cfgMem = ociReadCfgIntoMem(cfgPath);

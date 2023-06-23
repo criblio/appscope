@@ -41,7 +41,7 @@ testDirPath(char *path, const char *argv0) {
     /*
     * Retrieve the test directory path.
     * From:
-    * /<dir>/appscope/test/linux/cfgutilsfiltertest
+    * /<dir>/appscope/test/linux/cfgutilsrulestest
     * To:
     * /<dir>/appscope/test/
     */

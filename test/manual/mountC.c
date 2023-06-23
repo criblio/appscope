@@ -149,20 +149,20 @@ doDir(pid_t pid, char *rootdir, char *overlaydir, size_t olen, char *dest, size_
 
 static bool
 mountCDirs(pid_t pid, char *target, const char *rootdir,
-           const char *filterdir, const char *sockdir, char *fstype)
+           const char *rulesdir, const char *sockdir, char *fstype)
 {
-    if (!target || !filterdir) return FALSE;
+    if (!target || !rulesdir) return FALSE;
     
     pid_t nsPid;
     char *overlaydir = NULL;
     size_t tlen = strlen(target);
-    size_t flen = strlen(filterdir);
+    size_t flen = strlen(rulesdir);
 
     if ((overlaydir = malloc(tlen + 1)) == NULL) return FALSE;
     strcpy(overlaydir, target);
 
-    if (doDir(pid, (char *)rootdir, overlaydir, tlen, (char *)filterdir, flen, fstype) == FALSE) {
-        fprintf(stderr, "Can't mount %s in the container\n", filterdir);
+    if (doDir(pid, (char *)rootdir, overlaydir, tlen, (char *)rulesdir, flen, fstype) == FALSE) {
+        fprintf(stderr, "Can't mount %s in the container\n", rulesdir);
         free(overlaydir);
         return FALSE;
     }
@@ -237,7 +237,7 @@ getMountPath(pid_t pid)
 
 static struct option opts[] = {
 	{ "rootdir",    required_argument, 0, 'r' },
-	{ "filterdir",  required_argument, 0, 'f' },
+	{ "rulesdir",  required_argument, 0, 'f' },
 	{ "sockdir",    required_argument, 0, 's' },
 	{ 0, 0, 0, 0 }
 };
@@ -249,7 +249,7 @@ int main(int argc, char **argv)
     int index;
     DIR *dirp;
     struct dirent *entry;
-    char *mpath = NULL, *rootdir = NULL, *filterdir = NULL, *sockdir = NULL;
+    char *mpath = NULL, *rootdir = NULL, *rulesdir = NULL, *sockdir = NULL;
 
     for (;;) {
 		index = 0;
@@ -261,7 +261,7 @@ int main(int argc, char **argv)
 			rootdir = optarg;
 			break;
 		case 'f':
-			filterdir = optarg;
+			rulesdir = optarg;
 			break;
 		case 's':
 			sockdir = optarg;
@@ -274,17 +274,17 @@ int main(int argc, char **argv)
 			}
 			break;
 		default:
-            fprintf(stderr, "error: need at least a filter dir.\n");
+            fprintf(stderr, "error: need at least a rules dir.\n");
             exit(EXIT_FAILURE);
 		}
 	}
 
-    if (!filterdir) {
-        fprintf(stderr, "error: a filter dir is required.\n");
+    if (!rulesdir) {
+        fprintf(stderr, "error: a rules dir is required.\n");
         exit(EXIT_FAILURE);
     }
 
-    printf("%s:%d %s %s %s\n", __FUNCTION__, __LINE__, rootdir, filterdir, sockdir);
+    printf("%s:%d %s %s %s\n", __FUNCTION__, __LINE__, rootdir, rulesdir, sockdir);
 
     dirp = opendir("/proc");
     if (dirp == NULL) {
@@ -301,7 +301,7 @@ int main(int argc, char **argv)
                 // if pid is in a supported container, get the requisite mount path
                 if ((mpath = getMountPath(pid)) != NULL) {
                     printf("%s:%d pid %d mount %s\n", __FUNCTION__, __LINE__, pid, mpath);
-                    mountCDirs(pid, mpath, rootdir, filterdir, sockdir, NULL);
+                    mountCDirs(pid, mpath, rootdir, rulesdir, sockdir, NULL);
                     free(mpath);
                 }
             }

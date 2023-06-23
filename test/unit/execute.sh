@@ -106,7 +106,7 @@ run_test test/${OS}/nsinfotest
 
 if [ "${OS}" = "linux" ]; then
     SAVEVARS=$ENVARS
-    ENVVARS=$ENVVARS"LD_PRELOAD=./lib/linux/$(uname -m)/libscope.so ""SCOPE_FILTER=false ""SCOPE_CRIBL_ENABLE=false ""SCOPE_METRIC_DEST=file:///tmp/dnstest.log ""SCOPE_METRIC_VERBOSITY=9 ""SCOPE_SUMMARY_PERIOD=1 "
+    ENVVARS=$ENVVARS"LD_PRELOAD=./lib/linux/$(uname -m)/libscope.so ""SCOPE_RULES=false ""SCOPE_CRIBL_ENABLE=false ""SCOPE_METRIC_DEST=file:///tmp/dnstest.log ""SCOPE_METRIC_VERBOSITY=9 ""SCOPE_SUMMARY_PERIOD=1 "
     run_test test/${OS}/dnstest
     ENVARS=$SAVEVARS
     rm -f "/tmp/dnstest.log"

@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/criblio/scope/filter"
 	"github.com/criblio/scope/internal"
+	"github.com/criblio/scope/rules"
 	"github.com/criblio/scope/util"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
@@ -34,18 +34,18 @@ import (
  * arg                                                                                                                                                                                    -
  */
 
-// filterCmd represents the filter command
-var filterCmd = &cobra.Command{
-	Use:   "filter [flags]",
-	Short: "View or modify a system-wide AppScope filter",
-	Long:  `View or modify a system-wide AppScope filter that automatically scopes a set of processes. You can add or remove a single process at a time.`,
-	Example: `  scope filter
-  scope filter --rootdir /path/to/host/root --json
-  scope filter --add nginx
-  scope filter --add nginx < scope.yml
-  scope filter --add java --arg myServer
-  scope filter --add firefox --rootdir /path/to/host/root
-  scope filter --remove chromium`,
+// rulesCmd represents the rules command
+var rulesCmd = &cobra.Command{
+	Use:   "rules [flags]",
+	Short: "View or modify system-wide AppScope rules",
+	Long:  `View or modify system-wide AppScope rules to automatically scope a set of processes. You can add or remove a single process at a time.`,
+	Example: `  scope rules
+  scope rules --rootdir /path/to/host/root --json
+  scope rules --add nginx
+  scope rules --add nginx < scope.yml
+  scope rules --add java --arg myServer
+  scope rules --add firefox --rootdir /path/to/host/root
+  scope rules --remove chromium`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		internal.InitConfig()
@@ -61,7 +61,7 @@ var filterCmd = &cobra.Command{
 			if rc.CriblDest != "" || rc.MetricsDest != "" || rc.EventsDest != "" || rc.UserConfig != "" ||
 				cmd.Flags().Lookup("metricformat").Changed || rc.NoBreaker || rc.AuthToken != "" || rc.Payloads ||
 				rc.Backtrace || rc.Loglevel != "" || rc.Coredump || cmd.Flags().Lookup("verbosity").Changed {
-				helpErrAndExit(cmd, "The filter command without --add or --remove options, only supports the --json flag")
+				helpErrAndExit(cmd, "The rules command without --add or --remove options, only supports the --json flag")
 			}
 		}
 		if addProc != "" && remProc != "" {
@@ -93,22 +93,22 @@ var filterCmd = &cobra.Command{
 			helpErrAndExit(cmd, "Cannot specify --coredump and --userconfig")
 		}
 
-		// Retrieve an existing filter file
-		raw, filterFile, err := filter.Retrieve(rc.Rootdir)
+		// Retrieve an existing rules file
+		raw, rulesFile, err := rules.Retrieve(rc.Rootdir)
 		if err != nil {
 			return err
 		}
 
 		// In the case that no --add argument or --remove argument was provided
-		// just print the filter file
+		// just print the rules file
 		if addProc == "" && remProc == "" {
 			if len(raw) == 0 {
-				util.ErrAndExit("Empty filter file")
+				util.ErrAndExit("Empty rules file")
 			}
 
 			if jsonOut {
 				// Marshal to json
-				jsonData, err := json.Marshal(filterFile)
+				jsonData, err := json.Marshal(rulesFile)
 				if err != nil {
 					util.Warn("Error marshaling JSON:%v", err)
 					return err
@@ -126,14 +126,14 @@ var filterCmd = &cobra.Command{
 		// Validate user has root permissions
 		if err := util.UserVerifyRootPerm(); err != nil {
 			log.Error().Err(err)
-			util.ErrAndExit("modifying the scope filter requires administrator privileges")
+			util.ErrAndExit("modifying the scope rules requires administrator privileges")
 		}
 
-		// Add a process to; or remove a process from the scope filter
+		// Add a process to; or remove a process from the scope rules
 		if addProc != "" {
-			return filter.Add(filterFile, addProc, procArg, sourceid, rc.Rootdir, rc)
+			return rules.Add(rulesFile, addProc, procArg, sourceid, rc.Rootdir, rc)
 		} else if remProc != "" {
-			return filter.Remove(filterFile, remProc, sourceid, rc.Rootdir, rc)
+			return rules.Remove(rulesFile, remProc, sourceid, rc.Rootdir, rc)
 		}
 
 		return nil
@@ -141,12 +141,12 @@ var filterCmd = &cobra.Command{
 }
 
 func init() {
-	runCmdFlags(filterCmd, rc)
-	filterCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
-	filterCmd.Flags().String("add", "", "Add an entry to the global filter")
-	filterCmd.Flags().String("remove", "", "Remove an entry from the global filter")
-	filterCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
-	filterCmd.Flags().String("sourceid", "", "Source identifier for a filter entry")
-	filterCmd.Flags().String("arg", "", "Argument to the command to be added to the filter")
-	RootCmd.AddCommand(filterCmd)
+	runCmdFlags(rulesCmd, rc)
+	rulesCmd.Flags().StringP("rootdir", "R", "", "Path to root filesystem of target namespace")
+	rulesCmd.Flags().String("add", "", "Add an entry to the global rules")
+	rulesCmd.Flags().String("remove", "", "Remove an entry from the global rules")
+	rulesCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
+	rulesCmd.Flags().String("sourceid", "", "Source identifier for a rules entry")
+	rulesCmd.Flags().String("arg", "", "Argument to the command to be added to the rules")
+	RootCmd.AddCommand(rulesCmd)
 }

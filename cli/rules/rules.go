@@ -1,4 +1,4 @@
-package filter
+package rules
 
 import (
 	"errors"
@@ -20,11 +20,11 @@ var (
 	errAttachingMultiple = errors.New("at least one error found when attaching to more than 1 process. See logs")
 )
 
-// Retrieve the filter file from the global location
-func Retrieve(rootdir string) ([]byte, libscope.Filter, error) {
-	filterFile := make(libscope.Filter, 0)
+// Retrieve the rules file from the global location
+func Retrieve(rootdir string) ([]byte, libscope.Rules, error) {
+	rulesFile := make(libscope.Rules, 0)
 
-	filePath := "/usr/lib/appscope/scope_filter"
+	filePath := "/usr/lib/appscope/scope_rules"
 	if rootdir != "" {
 		filePath = rootdir + filePath
 	}
@@ -32,8 +32,8 @@ func Retrieve(rootdir string) ([]byte, libscope.Filter, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Return an empty filter file if it does not exist
-			return []byte{}, filterFile, nil
+			// Return an empty rules file if it does not exist
+			return []byte{}, rulesFile, nil
 		}
 		return nil, nil, err
 	}
@@ -45,20 +45,20 @@ func Retrieve(rootdir string) ([]byte, libscope.Filter, error) {
 	}
 
 	// Read yaml in
-	err = yaml.Unmarshal(data, &filterFile)
+	err = yaml.Unmarshal(data, &rulesFile)
 	if err != nil {
 		util.Warn("Error unmarshaling YAML:%v", err)
 		return nil, nil, err
 	}
 
-	return data, filterFile, nil
+	return data, rulesFile, nil
 }
 
-// Add a process to the scope filter
-func Add(filterFile libscope.Filter, addProc, procArg, sourceid, rootdir string, rc *run.Config) error {
+// Add a process to the scope rules
+func Add(rulesFile libscope.Rules, addProc, procArg, sourceid, rootdir string, rc *run.Config) error {
 
 	// Create a history directory for logs
-	rc.CreateWorkDirBasic("filter")
+	rc.CreateWorkDirBasic("rules")
 
 	// Instantiate the loader
 	ld := loader.New()
@@ -80,31 +80,31 @@ func Add(filterFile libscope.Filter, addProc, procArg, sourceid, rootdir string,
 	}
 
 	////////////////////////////////////////////
-	// Update the global filter file
+	// Update the global rules file
 	////////////////////////////////////////////
 
 	// Build the config
 	rc.LoadConfig(true)
 
-	// Add the entry to the filter
+	// Add the entry to the rules
 	newEntry := libscope.Entry{
 		ProcName:      addProc,
 		ProcArg:       procArg,
 		SourceId:      sourceid,
 		Configuration: rc.GetScopeConfig(),
 	}
-	filterFile["allow"] = append(filterFile["allow"], newEntry)
+	rulesFile["allow"] = append(rulesFile["allow"], newEntry)
 
-	// Write the filter contents to a temporary path
-	filterFilePath := "/tmp/scope_filter"
-	file, err := os.OpenFile(filterFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	// Write the rules contents to a temporary path
+	rulesFilePath := "/tmp/scope_rules"
+	file, err := os.OpenFile(rulesFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
-		log.Warn().Err(err).Msgf("Error creating/opening %s", filterFilePath)
+		log.Warn().Err(err).Msgf("Error creating/opening %s", rulesFilePath)
 		return err
 	}
 	defer file.Close()
 
-	data, err := yaml.Marshal(&filterFile)
+	data, err := yaml.Marshal(&rulesFile)
 	if err != nil {
 		util.Warn("Error marshaling YAML:%v", err)
 		return err
@@ -116,8 +116,8 @@ func Add(filterFile libscope.Filter, addProc, procArg, sourceid, rootdir string,
 		return err
 	}
 
-	// Ask the loader to update the filter file
-	if stdoutStderr, err := ld.Filter(filterFilePath, rc.Rootdir); err != nil {
+	// Ask the loader to update the rules file
+	if stdoutStderr, err := ld.Rules(rulesFilePath, rc.Rootdir); err != nil {
 		log.Warn().
 			Err(err).
 			Str("loaderDetails", stdoutStderr).
@@ -142,7 +142,7 @@ func Add(filterFile libscope.Filter, addProc, procArg, sourceid, rootdir string,
 	// (will re-attach to update existing procs)
 	////////////////////////////////////////////
 
-	// Create config file in the filter workdir for all processes to be attached
+	// Create config file in the rules workdir for all processes to be attached
 	scYamlPath := filepath.Join(rc.WorkDir, "scope.yml")
 	if err := rc.WriteScopeConfig(scYamlPath, 0644); err != nil {
 		return err
@@ -174,29 +174,29 @@ func Add(filterFile libscope.Filter, addProc, procArg, sourceid, rootdir string,
 		}
 	}
 
-	// TBC ? perform a scope detach to all processes that do not match anything in the filter file
+	// TBC ? perform a scope detach to all processes that do not match anything in the rules file
 
 	return nil
 }
 
-// Remove a process from the scope filter
+// Remove a process from the scope rules
 // Note: No matching of the 'arg' field intended for removal.
-func Remove(filterFile libscope.Filter, remProc, sourceid, rootdir string, rc *run.Config) error {
+func Remove(rulesFile libscope.Rules, remProc, sourceid, rootdir string, rc *run.Config) error {
 
 	// Create a history directory for logs
-	rc.CreateWorkDirBasic("filter")
+	rc.CreateWorkDirBasic("rules")
 
 	// Instantiate the loader
 	ld := loader.New()
 
 	////////////////////////////////////////////
-	// Update the global filter file
+	// Update the global rules file
 	////////////////////////////////////////////
 
-	// Remove the entry from the filter
+	// Remove the entry from the rules
 	// (only the last instance matching the name)
 	// (only if there are changes)
-	if allowList, ok := filterFile["allow"]; ok {
+	if allowList, ok := rulesFile["allow"]; ok {
 		remove := -1
 		for i, entry := range allowList {
 			if entry.ProcName == remProc && entry.SourceId == sourceid {
@@ -205,18 +205,18 @@ func Remove(filterFile libscope.Filter, remProc, sourceid, rootdir string, rc *r
 		}
 		if remove > -1 {
 			allowList = append(allowList[:remove], allowList[remove+1:]...)
-			filterFile["allow"] = allowList // copy back the allowList
+			rulesFile["allow"] = allowList // copy back the allowList
 
-			// Write the filter contents to a temporary path
-			filterFilePath := "/tmp/scope_filter"
-			file, err := os.OpenFile(filterFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+			// Write the rules contents to a temporary path
+			rulesFilePath := "/tmp/scope_rules"
+			file, err := os.OpenFile(rulesFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 			if err != nil {
-				log.Warn().Err(err).Msgf("Error creating/opening %s", filterFilePath)
+				log.Warn().Err(err).Msgf("Error creating/opening %s", rulesFilePath)
 				return err
 			}
 			defer file.Close()
 
-			data, err := yaml.Marshal(&filterFile)
+			data, err := yaml.Marshal(&rulesFile)
 			if err != nil {
 				util.Warn("Error marshaling YAML:%v", err)
 				return err
@@ -228,8 +228,8 @@ func Remove(filterFile libscope.Filter, remProc, sourceid, rootdir string, rc *r
 				return err
 			}
 
-			// Ask the loader to update the filter file
-			if stdoutStderr, err := ld.Filter(filterFilePath, rc.Rootdir); err != nil {
+			// Ask the loader to update the rules file
+			if stdoutStderr, err := ld.Rules(rulesFilePath, rc.Rootdir); err != nil {
 				log.Warn().
 					Err(err).
 					Str("loaderDetails", stdoutStderr).
@@ -244,7 +244,7 @@ func Remove(filterFile libscope.Filter, remProc, sourceid, rootdir string, rc *r
 	// Only if this is the last entry in the file
 	////////////////////////////////////////////
 
-	if len(filterFile["allow"]) == 0 {
+	if len(rulesFile["allow"]) == 0 {
 		if stdoutStderr, err := ld.Preload("off", rc.Rootdir); err != nil {
 			log.Warn().
 				Err(err).

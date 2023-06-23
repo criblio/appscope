@@ -60,8 +60,8 @@ func (rc *Config) Attach(pid int, setupWorkDir bool) (bool, error) {
 		args = append(args, []string{"--rootdir", rc.Rootdir}...)
 	}
 
-	// Disable detection of a scope filter file with this command
-	env = append(env, "SCOPE_FILTER=false")
+	// Disable detection of a scope rules file with this command
+	env = append(env, "SCOPE_RULES=false")
 
 	// Disable cribl event breaker with this command
 	if rc.NoBreaker {

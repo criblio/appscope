@@ -42,7 +42,7 @@ testDirPath(char *path, const char *argv0) {
     /*
     * Retrieve the test directory path.
     * From:
-    * /<dir>/appscope/test/linux/cfgutilsfiltertest
+    * /<dir>/appscope/test/linux/cfgutilsrulestest
     * To:
     * /<dir>/appscope/test/
     */
@@ -56,10 +56,10 @@ testDirPath(char *path, const char *argv0) {
     return 0;
 }
 
-// mimics behavior of retrieving the default filter path
+// mimics behavior of retrieving the default rules path
 static const char *
-testAccessFilterPath(const char *filterPath) {
-    return (scope_access(filterPath, R_OK) == 0) ? filterPath : NULL;
+testAccessRulesPath(const char *rulesPath) {
+    return (scope_access(rulesPath, R_OK) == 0) ? rulesPath : NULL;
 }
 
 static void
@@ -2572,47 +2572,47 @@ cfgReadCustomAnchorExtend(void **state)
 }
 
 static void
-filterEmptyFilterFileVar1(void **state) {
+rulesEmptyRulesFileVar1(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/empty_filter_0.yml", dirPath);
-    bool res = cfgFilterFileIsValid(path);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/empty_rules_0.yml", dirPath);
+    bool res = cfgRulesFileIsValid(path);
     assert_int_equal(res, FALSE);
 }
 
 static void
-filterEmptyFilterFileVar2(void **state) {
+rulesEmptyRulesFileVar2(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/empty_filter_1.yml", dirPath);
-    bool res = cfgFilterFileIsValid(path);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/empty_rules_1.yml", dirPath);
+    bool res = cfgRulesFileIsValid(path);
     assert_int_equal(res, FALSE);
 }
 
 static void
-filterEmptyFilterFileVar3(void **state) {
+rulesEmptyRulesFileVar3(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/empty_filter_2.yml", dirPath);
-    bool res = cfgFilterFileIsValid(path);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/empty_rules_2.yml", dirPath);
+    bool res = cfgRulesFileIsValid(path);
     assert_int_equal(res, FALSE);
 }
 
 static void
-filterInvalidFilterFile(void **state) {
+rulesInvalidRulesFile(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/corrupted_filter.yml", dirPath);
-    bool res = cfgFilterFileIsValid(path);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/corrupted_rules.yml", dirPath);
+    bool res = cfgRulesFileIsValid(path);
     assert_int_equal(res, FALSE);
 }
 
 static void
-filterEmptyProcName(void **state) {
+rulesEmptyProcName(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
-    bool validRes = cfgFilterFileIsValid(path);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_0.yml", dirPath);
+    bool validRes = cfgRulesFileIsValid(path);
     assert_int_equal(validRes, TRUE);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus(NULL, "foo", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_ERROR);
+    rules_status_t res = cfgRulesStatus(NULL, "foo", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_ERROR);
     dbgInit(); // reset dbg for the rest of the tests
     // cleanup
     cfgDestroy(&cfg);
@@ -2620,13 +2620,13 @@ filterEmptyProcName(void **state) {
 }
 
 static void
-filterEmptyProcCmdLine(void **state) {
+rulesEmptyProcCmdLine(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_0.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("foo", NULL, testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_ERROR);
+    rules_status_t res = cfgRulesStatus("foo", NULL, testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_ERROR);
     dbgInit(); // reset dbg for the rest of the tests
     // cleanup
     cfgDestroy(&cfg);
@@ -2634,17 +2634,17 @@ filterEmptyProcCmdLine(void **state) {
 }
 
 /*
- * Note: a NULL filter path implies use default paths.
+ * Note: a NULL rules path implies use default paths.
  * We have not configured defaults. So, there is no
- * filter file found. With no filter file we assume
+ * rules file found. With no rules file we assume
  * all files are to be scoped. Look for a SCOPED return value.
  */
 static void
-filterNullFilterPath(void **state) {
+rulesNullRulesPath(void **state) {
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("foo", "foo", NULL, cfg);
-    assert_int_equal(res, FILTER_SCOPED);
+    rules_status_t res = cfgRulesStatus("foo", "foo", NULL, cfg);
+    assert_int_equal(res, RULES_SCOPED);
     dbgInit(); // reset dbg for the rest of the tests
     // cleanup
     cfgDestroy(&cfg);
@@ -2652,147 +2652,147 @@ filterNullFilterPath(void **state) {
 }
 
 static void
-filterNullCfg(void **state) {
+rulesNullCfg(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
-    filter_status_t res = cfgFilterStatus("foo", "foo", testAccessFilterPath(path), NULL);
-    assert_int_equal(res, FILTER_ERROR);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_0.yml", dirPath);
+    rules_status_t res = cfgRulesStatus("foo", "foo", testAccessRulesPath(path), NULL);
+    assert_int_equal(res, RULES_ERROR);
     dbgInit(); // reset dbg for the rest of the tests
 }
 
-// This is really testing testAccessFilterPath(), but it still captures
+// This is really testing testAccessRulesPath(), but it still captures
 // what the desired system behavior is...
 static void
-filterNonExistingFilterFile(void **state) {
+rulesNonExistingRulesFile(void **state) {
     char path[PATH_MAX] = {0};    
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_non_existing.yml", dirPath);
-    bool validRes = cfgFilterFileIsValid(path);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_non_existing.yml", dirPath);
+    bool validRes = cfgRulesFileIsValid(path);
     assert_int_equal(validRes, FALSE);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("foo", "foo", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_SCOPED);
+    rules_status_t res = cfgRulesStatus("foo", "foo", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_SCOPED);
     // cleanup
     cfgDestroy(&cfg);
     assert_null(cfg);
 }
 
 static void
-filterProcNameAllowListPresent(void **state) {
+rulesProcNameAllowListPresent(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_0.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("redis", "", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    rules_status_t res = cfgRulesStatus("redis", "", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_SCOPED_WITH_CFG);
     // cleanup
     cfgDestroy(&cfg);
     assert_null(cfg);
 }
 
 static void
-filterProcNameDenyListPresent(void **state) {
+rulesProcNameDenyListPresent(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_0.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("git", "", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_NOT_SCOPED);
+    rules_status_t res = cfgRulesStatus("git", "", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_NOT_SCOPED);
     // cleanup
     cfgDestroy(&cfg);
     assert_null(cfg);
 }
 
 static void
-filterArgAllowListPresent(void **state) {
+rulesArgAllowListPresent(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_1.yml", dirPath);
-    bool validRes = cfgFilterFileIsValid(path);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_1.yml", dirPath);
+    bool validRes = cfgRulesFileIsValid(path);
     assert_int_equal(validRes, TRUE);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("", "redis arg1", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    rules_status_t res = cfgRulesStatus("", "redis arg1", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_SCOPED_WITH_CFG);
     // cleanup
     cfgDestroy(&cfg);
     assert_null(cfg);
 }
 
 static void
-filterArgDenyListPresent(void **state) {
+rulesArgDenyListPresent(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_1.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_1.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("", "git arg1", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_NOT_SCOPED);
+    rules_status_t res = cfgRulesStatus("", "git arg1", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_NOT_SCOPED);
     // cleanup
     cfgDestroy(&cfg);
     assert_null(cfg);
 }
 
 static void
-filterArgAllowListPartFindPresent(void **state) {
+rulesArgAllowListPartFindPresent(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_0.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("redis-server", "redis-server", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_NOT_SCOPED);
+    rules_status_t res = cfgRulesStatus("redis-server", "redis-server", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_NOT_SCOPED);
     scope_memset(path, 0, sizeof(path));
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_1.yml", dirPath);
-    res = cfgFilterStatus("redis-server", "redis-server", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_1.yml", dirPath);
+    res = cfgRulesStatus("redis-server", "redis-server", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_SCOPED_WITH_CFG);
     // cleanup
     cfgDestroy(&cfg);
     assert_null(cfg);
 }
 
 static void
-filterArgAllowListEmptyProcMissing(void **state) {
+rulesArgAllowListEmptyProcMissing(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_0.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
-    filter_status_t res = cfgFilterStatus("memcached", "memcached", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_NOT_SCOPED);
+    rules_status_t res = cfgRulesStatus("memcached", "memcached", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_NOT_SCOPED);
     // cleanup
     cfgDestroy(&cfg);
     assert_null(cfg);
 }
 
 static void
-filterArgAllowListNotEmptyProcMissing(void **state) {
+rulesArgAllowListNotEmptyProcMissing(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_2.yml", dirPath);
-    bool validRes = cfgFilterFileIsValid(path);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_2.yml", dirPath);
+    bool validRes = cfgRulesFileIsValid(path);
     assert_int_equal(validRes, TRUE);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("memcached", "memcached", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_NOT_SCOPED);
+    rules_status_t res = cfgRulesStatus("memcached", "memcached", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_NOT_SCOPED);
 
     scope_memset(path, 0, PATH_MAX);
 
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_3.yml", dirPath);
-    validRes = cfgFilterFileIsValid(path);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_3.yml", dirPath);
+    validRes = cfgRulesFileIsValid(path);
     assert_int_equal(validRes, TRUE);
-    res = cfgFilterStatus("memcached", "memcached", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_NOT_SCOPED);
+    res = cfgRulesStatus("memcached", "memcached", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_NOT_SCOPED);
     // cleanup
     cfgDestroy(&cfg);
     assert_null(cfg);
 }
 
 static void
-filterVerifyCfg(void **state) {
+rulesVerifyCfg(void **state) {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_0.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_0.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("redis", "redis", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    rules_status_t res = cfgRulesStatus("redis", "redis", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_SCOPED_WITH_CFG);
     // redis: cribl disable error log level /tmp/redis.log
     assert_int_equal(cfgLogStreamEnable(cfg), FALSE);
     assert_int_equal(cfgLogLevel(cfg), CFG_LOG_ERROR);
@@ -2803,8 +2803,8 @@ filterVerifyCfg(void **state) {
 
     cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    res = cfgFilterStatus("htop", "htop", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    res = cfgRulesStatus("htop", "htop", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_SCOPED_WITH_CFG);
     // htop: cribl enable info log level /tmp/htop.log
     assert_int_equal(cfgLogStreamEnable(cfg), TRUE);
     assert_int_equal(cfgLogLevel(cfg), CFG_LOG_INFO);
@@ -2815,38 +2815,38 @@ filterVerifyCfg(void **state) {
 }
 
 static void
-filterDenyIsProcessedAfterAllow(void **state)
+rulesDenyIsProcessedAfterAllow(void **state)
 {
     // redis is in both the allow list and deny list.
     // verify that "deny" wins.  (is processed after allow)
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_4.yml", dirPath);
-    bool validRes = cfgFilterFileIsValid(path);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_4.yml", dirPath);
+    bool validRes = cfgRulesFileIsValid(path);
     assert_int_equal(validRes, TRUE);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("redis", "", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_NOT_SCOPED);
+    rules_status_t res = cfgRulesStatus("redis", "", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_NOT_SCOPED);
     // cleanup
     cfgDestroy(&cfg);
     assert_null(cfg);
 }
 
 static void
-filterConfigIsProcessedAfterProcName(void **state)
+rulesConfigIsProcessedAfterProcName(void **state)
 {
     // cfg should be changed if procname or arg matches
     // make sure we process these fields before config.
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_4.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_4.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
     // test the default log path before
     assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/scope.log");
 
-    filter_status_t res = cfgFilterStatus("htop", "htop", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    rules_status_t res = cfgRulesStatus("htop", "htop", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_SCOPED_WITH_CFG);
 
     // verify that log path was changed
     assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/htop.log");
@@ -2857,57 +2857,57 @@ filterConfigIsProcessedAfterProcName(void **state)
 }
 
 static void
-filterMatchAllInAllow(void **state)
+rulesMatchAllInAllow(void **state)
 {
     // Verify that _MatchAll_ in allow matches all processes
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_5.yml", dirPath);
-    bool validRes = cfgFilterFileIsValid(path);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_5.yml", dirPath);
+    bool validRes = cfgRulesFileIsValid(path);
     assert_int_equal(validRes, TRUE);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("blue", "", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
-    res = cfgFilterStatus("red", "", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
-    res = cfgFilterStatus("green", "", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
-    res = cfgFilterStatus("htop", "", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    rules_status_t res = cfgRulesStatus("blue", "", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_SCOPED_WITH_CFG);
+    res = cfgRulesStatus("red", "", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_SCOPED_WITH_CFG);
+    res = cfgRulesStatus("green", "", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_SCOPED_WITH_CFG);
+    res = cfgRulesStatus("htop", "", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_SCOPED_WITH_CFG);
     // cleanup
     cfgDestroy(&cfg);
     assert_null(cfg);
 }
 
 static void
-filterMatchAllInAllowCanBeDenied(void **state)
+rulesMatchAllInAllowCanBeDenied(void **state)
 {
     // Verify that _MatchAll_ in allow is overriden by a match in deny
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_5.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_5.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("redis", "", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_NOT_SCOPED);
+    rules_status_t res = cfgRulesStatus("redis", "", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_NOT_SCOPED);
     // cleanup
     cfgDestroy(&cfg);
     assert_null(cfg);
 }
 
 static void
-filterVerifyMatchAllMergedConfig(void **state)
+rulesVerifyMatchAllMergedConfig(void **state)
 {
     // Verify that matches (including _MatchAll_) are applied in order
     // And that matches can be "merged" w.r.t. configuration
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_5.yml", dirPath);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_5.yml", dirPath);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
 
     // green only matches _MatchAll_
     // verify that the log level and log path agree with _MatchAll_
-    filter_status_t res = cfgFilterStatus("green", "", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    rules_status_t res = cfgRulesStatus("green", "", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_SCOPED_WITH_CFG);
     assert_int_equal(cfgLogLevel(cfg), CFG_LOG_ERROR);
     assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/match.log");
     cfgDestroy(&cfg);
@@ -2916,8 +2916,8 @@ filterVerifyMatchAllMergedConfig(void **state)
     // verify that the log level is specified by _MatchAll_
     //   and that log path is specified by htop
     cfg = cfgCreateDefault();
-    res = cfgFilterStatus("htop", "", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_SCOPED_WITH_CFG);
+    res = cfgRulesStatus("htop", "", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_SCOPED_WITH_CFG);
     assert_int_equal(cfgLogLevel(cfg), CFG_LOG_ERROR);
     assert_string_equal(cfgTransportPath(cfg, CFG_LOG), "/tmp/htop.log");
 
@@ -2927,43 +2927,43 @@ filterVerifyMatchAllMergedConfig(void **state)
 }
 
 static void
-filterMatchAllInDeny(void **state)
+rulesMatchAllInDeny(void **state)
 {
     // Verify that _MatchAll_ in deny denies all processes
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_6.yml", dirPath);
-    bool validRes = cfgFilterFileIsValid(path);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_6.yml", dirPath);
+    bool validRes = cfgRulesFileIsValid(path);
     assert_int_equal(validRes, TRUE);
     config_t *cfg = cfgCreateDefault();
     assert_non_null(cfg);
-    filter_status_t res = cfgFilterStatus("blue", "", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_NOT_SCOPED);
-    res = cfgFilterStatus("red", "", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_NOT_SCOPED);
-    res = cfgFilterStatus("green", "", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_NOT_SCOPED);
-    res = cfgFilterStatus("htop", "", testAccessFilterPath(path), cfg);
-    assert_int_equal(res, FILTER_NOT_SCOPED);
+    rules_status_t res = cfgRulesStatus("blue", "", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_NOT_SCOPED);
+    res = cfgRulesStatus("red", "", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_NOT_SCOPED);
+    res = cfgRulesStatus("green", "", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_NOT_SCOPED);
+    res = cfgRulesStatus("htop", "", testAccessRulesPath(path), cfg);
+    assert_int_equal(res, RULES_NOT_SCOPED);
     // cleanup
     cfgDestroy(&cfg);
     assert_null(cfg);
 }
 
 static void
-filterUnixPathMissing(void **state)
+rulesUnixPathMissing(void **state)
 {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_6.yml", dirPath);
-    char *unixPath = cfgFilterUnixPath(path);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_6.yml", dirPath);
+    char *unixPath = cfgRulesUnixPath(path);
     assert_null(unixPath);
 }
 
 static void
-filterUnixPathPresent(void **state)
+rulesUnixPathPresent(void **state)
 {
     char path[PATH_MAX] = {0};
-    scope_snprintf(path, sizeof(path), "%s/data/filter/filter_edge.yml", dirPath);
-    char *unixPath = cfgFilterUnixPath(path);
+    scope_snprintf(path, sizeof(path), "%s/data/rules/rules_edge.yml", dirPath);
+    char *unixPath = cfgRulesUnixPath(path);
     assert_string_equal(unixPath, "/opt/cribl/state/appscope.sock");
     scope_free(unixPath);
 }
@@ -3050,31 +3050,31 @@ main(int argc, char *argv[])
         cmocka_unit_test(initMtcReturnsPtr),
         cmocka_unit_test(initEvtFormatReturnsPtr),
         cmocka_unit_test(initCtlReturnsPtr),
-        cmocka_unit_test(filterEmptyFilterFileVar1),
-        cmocka_unit_test(filterEmptyFilterFileVar2),
-        cmocka_unit_test(filterEmptyFilterFileVar3),
-        cmocka_unit_test(filterInvalidFilterFile),
-        cmocka_unit_test(filterEmptyProcName),
-        cmocka_unit_test(filterEmptyProcCmdLine),
-        cmocka_unit_test(filterNullFilterPath),
-        cmocka_unit_test(filterNullCfg),
-        cmocka_unit_test(filterNonExistingFilterFile),
-        cmocka_unit_test(filterProcNameAllowListPresent),
-        cmocka_unit_test(filterProcNameDenyListPresent),
-        cmocka_unit_test(filterArgAllowListPresent),
-        cmocka_unit_test(filterArgDenyListPresent),
-        cmocka_unit_test(filterArgAllowListPartFindPresent),
-        cmocka_unit_test(filterArgAllowListEmptyProcMissing),
-        cmocka_unit_test(filterArgAllowListNotEmptyProcMissing),
-        cmocka_unit_test(filterVerifyCfg),
-        cmocka_unit_test(filterDenyIsProcessedAfterAllow),
-        cmocka_unit_test(filterConfigIsProcessedAfterProcName),
-        cmocka_unit_test(filterMatchAllInAllow),
-        cmocka_unit_test(filterMatchAllInAllowCanBeDenied),
-        cmocka_unit_test(filterVerifyMatchAllMergedConfig),
-        cmocka_unit_test(filterMatchAllInDeny),
-        cmocka_unit_test(filterUnixPathMissing),
-        cmocka_unit_test(filterUnixPathPresent),
+        cmocka_unit_test(rulesEmptyRulesFileVar1),
+        cmocka_unit_test(rulesEmptyRulesFileVar2),
+        cmocka_unit_test(rulesEmptyRulesFileVar3),
+        cmocka_unit_test(rulesInvalidRulesFile),
+        cmocka_unit_test(rulesEmptyProcName),
+        cmocka_unit_test(rulesEmptyProcCmdLine),
+        cmocka_unit_test(rulesNullRulesPath),
+        cmocka_unit_test(rulesNullCfg),
+        cmocka_unit_test(rulesNonExistingRulesFile),
+        cmocka_unit_test(rulesProcNameAllowListPresent),
+        cmocka_unit_test(rulesProcNameDenyListPresent),
+        cmocka_unit_test(rulesArgAllowListPresent),
+        cmocka_unit_test(rulesArgDenyListPresent),
+        cmocka_unit_test(rulesArgAllowListPartFindPresent),
+        cmocka_unit_test(rulesArgAllowListEmptyProcMissing),
+        cmocka_unit_test(rulesArgAllowListNotEmptyProcMissing),
+        cmocka_unit_test(rulesVerifyCfg),
+        cmocka_unit_test(rulesDenyIsProcessedAfterAllow),
+        cmocka_unit_test(rulesConfigIsProcessedAfterProcName),
+        cmocka_unit_test(rulesMatchAllInAllow),
+        cmocka_unit_test(rulesMatchAllInAllowCanBeDenied),
+        cmocka_unit_test(rulesVerifyMatchAllMergedConfig),
+        cmocka_unit_test(rulesMatchAllInDeny),
+        cmocka_unit_test(rulesUnixPathMissing),
+        cmocka_unit_test(rulesUnixPathPresent),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
         cmocka_unit_test(cfgReadProtocol),
         cmocka_unit_test(cfgReadCustomEmptyFilter),

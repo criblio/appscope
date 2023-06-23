@@ -51,7 +51,7 @@ close_file:
  * - Add a mount point(s)
  *   * `appscope` directory will be mounted from the host "/usr/lib/appscope/" into the container: "/usr/lib/appscope/"
  *   * A UNIX socket directory will be mounted from the host into the container. The path to UNIX socket
- *   will be read from host based on value in the filter file [optionally]
+ *   will be read from host based on value in the rules file [optionally]
  *
  * - Extend Environment variables
  *   * `LD_PRELOAD` will contain the following entry `/opt/appscope/libscope.so`
@@ -170,7 +170,7 @@ ociModifyCfg(const void *cfgMem, const char *scopePath, const char *unixSocketPa
     }
 
     /*
-    * Handle process mounts for library and filter file and optionally for UNIX socket
+    * Handle process mounts for library and rules file and optionally for UNIX socket
     *
     "mounts":[
       {

@@ -286,13 +286,13 @@ services:
       - ../..:/opt/appscope
     <<: *scope-common
 
-  cli_filter:
-    image: ghcr.io/criblio/appscope-test-cli_filter:${TAG:?Missing TAG environment variable}
+  cli_rules:
+    image: ghcr.io/criblio/appscope-test-cli_rules:${TAG:?Missing TAG environment variable}
     build:
       cache_from: 
-        - ghcr.io/criblio/appscope-test-cli_filter:${TAG:?Missing TAG environment variable}
+        - ghcr.io/criblio/appscope-test-cli_rules:${TAG:?Missing TAG environment variable}
       context: .
-      dockerfile: ./cli_filter/Dockerfile
+      dockerfile: ./cli_rules/Dockerfile
     <<: *scope-common
 
   sshd:

@@ -21,7 +21,7 @@
 #define OPENRC_DIR "/etc/rc.conf"
 #define SYSTEMD_DIR "/etc/systemd"
 #define INITD_DIR "/etc/init.d"
-#define PROFILE_SCRIPT "#! /bin/bash\nlib_found=0\nfilter_found=0\nldpreload=`printenv LD_PRELOAD`\nif test -f /usr/lib/appscope/%s/libscope.so; then\n    lib_found=1\nfi\nif test -f /usr/lib/appscope/scope_filter; then\n    filter_found=1\nelif test -f /tmp/appscope/scope_filter; then\n    filter_found=1\nfi\nif [ $lib_found == 1 ] && [ $filter_found == 1 ]; then\n    if [ -n \"$ldpreload\" ]; then\n        if [[ $ldpreload == *\"libscope.so\"* ]]; then\n            if [[ $ldpreload == *\":\"* ]]; then\n                delim=\":\"\n                libscope=`echo  $ldpreload | awk -F':' '{for(i=1;i<=NF;i++) if($i~\"libscope.so\") print substr($i, 1, length($i))}'`\n            else\n                delim=\" \"\n                libscope=`echo $ldpreload | awk -F' ' '{for(i=1;i<=NF;i++) if($i~\"libscope.so\") print substr($i, 1, length($i))}'`\n            fi\n            nolibscope=${ldpreload//$libscope}\n            export LD_PRELOAD=\"%s$delim$nolibscope\"\n        fi\n    else\n        export LD_PRELOAD=\"%s\"\n    fi\nfi\n"
+#define PROFILE_SCRIPT "#! /bin/bash\nlib_found=0\nrules_found=0\nldpreload=`printenv LD_PRELOAD`\nif test -f /usr/lib/appscope/%s/libscope.so; then\n    lib_found=1\nfi\nif test -f /usr/lib/appscope/scope_rules; then\n    rules_found=1\nelif test -f /tmp/appscope/scope_rules; then\n    rules_found=1\nfi\nif [ $lib_found == 1 ] && [ $rules_found == 1 ]; then\n    if [ -n \"$ldpreload\" ]; then\n        if [[ $ldpreload == *\"libscope.so\"* ]]; then\n            if [[ $ldpreload == *\":\"* ]]; then\n                delim=\":\"\n                libscope=`echo  $ldpreload | awk -F':' '{for(i=1;i<=NF;i++) if($i~\"libscope.so\") print substr($i, 1, length($i))}'`\n            else\n                delim=\" \"\n                libscope=`echo $ldpreload | awk -F' ' '{for(i=1;i<=NF;i++) if($i~\"libscope.so\") print substr($i, 1, length($i))}'`\n            fi\n            nolibscope=${ldpreload//$libscope}\n            export LD_PRELOAD=\"%s$delim$nolibscope\"\n        fi\n    else\n        export LD_PRELOAD=\"%s\"\n    fi\nfi\n"
 
 typedef enum {
     SERVICE_CFG_ERROR,
@@ -667,7 +667,7 @@ closeFd:
     return resMem;
 }
 
-// Mount the scope filter and unix socket into mountDest/usr/lib/appscope/*
+// Mount the scope rules and unix socket into mountDest/usr/lib/appscope/*
 bool
 setupMount(const char *mountDest, uid_t nsUid, gid_t nsGid)
 {
@@ -676,39 +676,39 @@ setupMount(const char *mountDest, uid_t nsUid, gid_t nsGid)
     return TRUE;
 }
 
-// Install a filter file in /usr/lib/appscope/
+// Install a rules file in /usr/lib/appscope/
 bool
-setupFilter(void *filterFileMem, size_t filterSize, uid_t nsUid, gid_t nsGid)
+setupRules(void *rulesFileMem, size_t rulesSize, uid_t nsUid, gid_t nsGid)
 {
-    int filterFd;
+    int rulesFd;
     bool status = FALSE;
 
     if (libdirCreateDirIfMissing(SCOPE_USR_PATH, 0664, nsUid, nsGid) > MKDIR_STATUS_EXISTS) {
-        fprintf(stderr, "error: setupFilter: failed to create directory\n");
+        fprintf(stderr, "error: setupRules: failed to create directory\n");
         return status;
     }
 
-    if ((filterFd = nsFileOpenWithMode(SCOPE_FILTER_USR_PATH, O_RDWR | O_CREAT, 0664, nsUid, nsGid, geteuid(), getegid())) == -1) {
+    if ((rulesFd = nsFileOpenWithMode(SCOPE_RULES_USR_PATH, O_RDWR | O_CREAT, 0664, nsUid, nsGid, geteuid(), getegid())) == -1) {
         return status;
     }
 
-    if (ftruncate(filterFd, filterSize) != 0) {
+    if (ftruncate(rulesFd, rulesSize) != 0) {
         goto cleanupDestFd;
     }
 
-    char *dest = mmap(NULL, filterSize, PROT_READ | PROT_WRITE, MAP_SHARED, filterFd, 0);
+    char *dest = mmap(NULL, rulesSize, PROT_READ | PROT_WRITE, MAP_SHARED, rulesFd, 0);
     if (dest == MAP_FAILED) {
         goto cleanupDestFd;
     }
 
-    memcpy(dest, filterFileMem, filterSize);
+    memcpy(dest, rulesFileMem, rulesSize);
 
-    munmap(dest, filterSize);
+    munmap(dest, rulesSize);
 
     status = TRUE;
 
 cleanupDestFd:
-    close(filterFd);
+    close(rulesFd);
 
     return status;
 }

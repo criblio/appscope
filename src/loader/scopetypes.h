@@ -13,8 +13,8 @@
 #define FALSE 0
 #define TRUE 1
 
-#define SCOPE_FILTER_USR_PATH ("/usr/lib/appscope/scope_filter")
-#define SCOPE_FILTER_TMP_PATH ("/tmp/appscope/scope_filter")
+#define SCOPE_RULES_USR_PATH ("/usr/lib/appscope/scope_rules")
+#define SCOPE_RULES_TMP_PATH ("/tmp/appscope/scope_rules")
 #define SCOPE_USR_PATH "/usr/lib/appscope/"
 #define SCOPE_TMP_PATH "/tmp/appscope/"
 

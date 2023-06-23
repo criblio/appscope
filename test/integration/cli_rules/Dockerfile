@@ -26,9 +26,9 @@ RUN  mkdir /usr/local/scope && \
      ln -s /opt/appscope/bin/linux/$(uname -m)/scope /usr/local/scope/bin/scope && \
      ln -s /opt/appscope/lib/linux/$(uname -m)/libscope.so /usr/local/scope/lib/libscope.so
 
-COPY cli_filter/scope-test /usr/local/scope/scope-test
-COPY cli_filter/scope_filter1.yml /opt/test-runner/scope_filter1.yml
-COPY cli_filter/scope_filter2.yml /opt/test-runner/scope_filter2.yml
+COPY cli_rules/scope-test /usr/local/scope/scope-test
+COPY cli_rules/scope_rules1.yml /opt/test-runner/scope_rules1.yml
+COPY cli_rules/scope_rules2.yml /opt/test-runner/scope_rules2.yml
 
 COPY docker-entrypoint.sh /
 ENTRYPOINT ["/docker-entrypoint.sh"]

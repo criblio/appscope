@@ -1729,9 +1729,6 @@ getRulesFilePath(void)
     } else if (!scope_access(SCOPE_RULES_USR_PATH, R_OK)) {
         // rules file was at first default location
         rulesFilePath = SCOPE_RULES_USR_PATH;
-    } else if (!scope_access(SCOPE_RULES_TMP_PATH, R_OK)) {
-        // rules file was at second default location
-        rulesFilePath = SCOPE_RULES_TMP_PATH;
     }
 
     // check if rules file can actually be used

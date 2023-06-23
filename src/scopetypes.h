@@ -60,7 +60,6 @@ typedef enum {CFG_MTC_FS,
 #define MODE_STR 16
 #define SM_NAME "scope_anon"
 #define SCOPE_RULES_USR_PATH ("/usr/lib/appscope/scope_rules")
-#define SCOPE_RULES_TMP_PATH ("/tmp/appscope/scope_rules")
 #define SCOPE_SYS_PATH "/usr/lib/appscope/"
 #define SCOPE_TMP_PATH "/tmp/appscope/"
 

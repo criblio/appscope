@@ -3006,7 +3006,6 @@ In order described here, the first true statement wins.
 - If the env variable SCOPE_RULES exists, and it's value is a path to a
     file that can be read
 - If the file /usr/lib/appscope/scope_rules exists and can be read
-- If /the file tmp/appscope/scope_rules exists and can be read
 
 Rules regarding the rules file:
 o) If the rules file exists, but contains any invalid (unparseable) yaml,

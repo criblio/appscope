@@ -14,7 +14,6 @@
 #define TRUE 1
 
 #define SCOPE_RULES_USR_PATH ("/usr/lib/appscope/scope_rules")
-#define SCOPE_RULES_TMP_PATH ("/tmp/appscope/scope_rules")
 #define SCOPE_USR_PATH "/usr/lib/appscope/"
 #define SCOPE_TMP_PATH "/tmp/appscope/"
 

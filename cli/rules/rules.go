@@ -24,6 +24,7 @@ var (
 func Retrieve(rootdir string) ([]byte, libscope.Rules, error) {
 	rulesFile := make(libscope.Rules, 0)
 
+	// TODO support for $CRIBL_HOME
 	filePath := "/usr/lib/appscope/scope_rules"
 	if rootdir != "" {
 		filePath = rootdir + filePath

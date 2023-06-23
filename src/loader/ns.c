@@ -289,6 +289,7 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
     bool isDevVersion = libverIsNormVersionDev(loaderVersion);
 
     /* For official version try to use /usr/lib/appscope */
+    // TODO this seems wrong? write to /usr/lib only if root (not if dev==true)
     if (isDevVersion == FALSE) {
         memset(path, 0, PATH_MAX);
         snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
@@ -300,6 +301,7 @@ joinChildNamespace(pid_t hostPid, bool joinPidNs) {
     }
 
     /* For dev version or if extract for official version try to use /tmp/appscope path */
+    // TODO this seems wrong? write to /tmp only if nonroot (not if dev==false)
     if (status == FALSE) {
         memset(path, 0, PATH_MAX);
         snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);

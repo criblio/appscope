@@ -897,7 +897,7 @@ osCreateSM(proc_id_t *proc, unsigned long addr)
     if (!proc) return;
 
     // Create the anonymous sm
-    if ((proc->smfd = scope_memfd_create(SM_NAME, MFD_ALLOW_SEALING)) == -1) {
+    if ((proc->smfd = scope_memfd_create(SM_NAME, MFD_ALLOW_SEALING | MFD_CLOEXEC)) == -1) {
         proc->smfd = -1;
         return;
     }

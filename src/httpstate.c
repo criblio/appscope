@@ -233,7 +233,7 @@ reportHttp1(http_state_t *httpstate)
 {
     if (!httpstate || !httpstate->hdr || !httpstate->hdrlen) return -1;
 
-    protocol_info *proto = evtProtoCreateHttp1(httpstate->isResponse);
+    protocol_info *proto = evtProtoAllocHttp1(httpstate->isResponse);
     if (!proto) {
         // Bummer!  We're losing info.
         DBG(NULL);
@@ -296,7 +296,7 @@ reportHttp2(http_state_t *state, net_info *net, http_buf_t *stash,
         return FALSE;
     }
 
-    protocol_info *proto = evtProtoCreateHttp2Frame(frameLen);
+    protocol_info *proto = evtProtoAllocHttp2Frame(frameLen);
     if (!proto) {
         scopeLogError("ERROR: failed to allocate protocol object");
         DBG(NULL);

@@ -808,14 +808,14 @@ ctlPostEvent(ctl_t *ctl, char *event)
 {
     if (!event) return -1;
     if (!ctl) {
-        evtDelete((evt_type *)event);
+        evtFree((evt_type *)event);
         return -1;
     }
 
     if (cbufPut(ctl->events, (uint64_t)event) == -1) {
         // Full; drop and ignore
         DBG(NULL);
-        evtDelete((evt_type *)event);
+        evtFree((evt_type *)event);
         return -1;
     }
     return 0;

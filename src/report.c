@@ -3461,7 +3461,7 @@ doEvent()
                 DBG(NULL);
             }
 
-            evtDelete(event);
+            evtFree(event);
 
         }
 

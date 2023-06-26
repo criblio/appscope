@@ -985,7 +985,7 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
         }
 
         if (protoDef->detect && ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) {
-            if ((proto = evtProtoCreateDetect(protoDef->protname)) == NULL)
+            if ((proto = evtProtoAllocDetect(protoDef->protname)) == NULL)
             {
                 if (cpdata)
                     scope_free(cpdata);

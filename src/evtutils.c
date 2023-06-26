@@ -8,7 +8,7 @@
 
 
 static protocol_info *
-evtProtoCreateHttpBase(void)
+evtProtoAllocHttpBase(void)
 {
     protocol_info *proto = scope_calloc(1, sizeof(protocol_info));
     http_post *post = scope_calloc(1, sizeof(http_post));
@@ -25,9 +25,9 @@ evtProtoCreateHttpBase(void)
 }
 
 protocol_info *
-evtProtoCreateHttp1(bool isResponse)
+evtProtoAllocHttp1(bool isResponse)
 {
-    protocol_info * proto = evtProtoCreateHttpBase();
+    protocol_info * proto = evtProtoAllocHttpBase();
     if (!proto) {
         DBG(NULL);
         return NULL;
@@ -39,13 +39,13 @@ evtProtoCreateHttp1(bool isResponse)
 }
 
 protocol_info *
-evtProtoCreateHttp2Frame(uint32_t frameLen)
+evtProtoAllocHttp2Frame(uint32_t frameLen)
 {
-    protocol_info *proto = evtProtoCreateHttpBase();
+    protocol_info *proto = evtProtoAllocHttpBase();
     char *frame = scope_malloc(frameLen);
     if (!proto || !frame) {
         DBG(NULL);
-        if (proto) evtProtoDelete(proto);
+        if (proto) evtProtoFree(proto);
         if (frame) scope_free(frame);
         return NULL;
     }
@@ -58,8 +58,10 @@ evtProtoCreateHttp2Frame(uint32_t frameLen)
 }
 
 protocol_info *
-evtProtoCreateDetect(const char * const protocolName)
+evtProtoAllocDetect(const char * const protocolName)
 {
+    if (!protocolName) return NULL;
+
     protocol_info *proto = scope_calloc(1, sizeof(protocol_info));
     char *protname = scope_strdup(protocolName);
     if (!proto || !protname) {
@@ -77,7 +79,7 @@ evtProtoCreateDetect(const char * const protocolName)
 }
 
 bool
-evtProtoDelete(protocol_info *proto)
+evtProtoFree(protocol_info *proto)
 {
     if (!proto) return FALSE;
 
@@ -96,7 +98,7 @@ evtProtoDelete(protocol_info *proto)
 }
 
 bool
-evtDelete(evt_type *event)
+evtFree(evt_type *event)
 {
     if (!event) return FALSE;
 
@@ -139,9 +141,9 @@ evtDelete(evt_type *event)
         case EVT_PROTO:
         {
             protocol_info *proto = (protocol_info *)event;
-            // Alloc'd in evtProtoCreateHttp1, evtProtoCreateHttp2Frame, or
-            // evtProtoCreateDetect
-            evtProtoDelete(proto);
+            // Alloc'd in evtProtoAllocHttp1, evtProtoAllocHttp2Frame, or
+            // evtProtoAllocDetect
+            evtProtoFree(proto);
             break;
         }
         default:

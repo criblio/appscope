@@ -2954,7 +2954,18 @@ rulesUnixPathMissing(void **state)
 {
     char path[PATH_MAX] = {0};
     scope_snprintf(path, sizeof(path), "%s/data/rules/rules_6.yml", dirPath);
-    char *unixPath = cfgRulesUnixPath(path);
+
+    const char *origRulesEnv = getenv("SCOPE_RULES");
+    assert_int_equal(setenv("SCOPE_RULES", path, 1), 0);
+
+    char *unixPath = cfgRulesUnixPath();
+
+    if (origRulesEnv) {
+        assert_int_equal(setenv("SCOPE_RULES", origRulesEnv, 1), 0);
+    } else {
+        assert_int_equal(unsetenv("SCOPE_RULES"), 0);
+    }
+
     assert_null(unixPath);
 }
 
@@ -2963,7 +2974,13 @@ rulesUnixPathPresent(void **state)
 {
     char path[PATH_MAX] = {0};
     scope_snprintf(path, sizeof(path), "%s/data/rules/rules_edge.yml", dirPath);
-    char *unixPath = cfgRulesUnixPath(path);
+
+    assert_int_equal(setenv("SCOPE_RULES", path, 1), 0);
+
+    char *unixPath = cfgRulesUnixPath();
+
+    assert_int_equal(unsetenv("SCOPE_RULES"), 0);
+
     assert_string_equal(unixPath, "/opt/cribl/state/appscope.sock");
     scope_free(unixPath);
 }

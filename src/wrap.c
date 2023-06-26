@@ -1786,6 +1786,7 @@ static const char *const doNotScopeList[] = {
     "NetworkManager",
     "polkitd",
     "power-profiles-daemon",
+    "snapd",
     "sshd",
     "udisksd",
     "upowerd",

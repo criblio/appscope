@@ -3005,12 +3005,17 @@ These rules describe which (if any) rules file is used.
 In order described here, the first true statement wins.
 - If the env variable SCOPE_RULES exists, and it's value is a path to a
     file that can be read
+- If the env variable CRIBL_HOME exists, and $CRIBL_HOME/appscope/scope_rules 
+    is a path to a file that can be read
 - If the file /usr/lib/appscope/scope_rules exists and can be read
 
 Rules regarding the rules file:
 o) If the rules file exists, but contains any invalid (unparseable) yaml,
    no processes will be scoped by the rules feature
-o) if the env variable SCOPE_RULES exists with a value of "false",
+o) If the env variable SCOPE_RULES exists with a value of "false",
+   no processes will be scoped by the rules feature
+o) If the env variable CRIBL_HOME exists but no rules file is found in
+   $CRIBL_HOME/appscope/scope_rules,
    no processes will be scoped by the rules feature
 o) If a rules file is not found,
    no processes will be scoped by the rules feature
@@ -3534,6 +3539,43 @@ cfgRulesStatus(const char *procName, const char *procCmdLine, const char *rulesP
     return RULES_ERROR;
 }
 
+const char *
+cfgRulesFilePath(void)
+{
+    char *rulesFilePath = NULL;
+    char *envRulesVal = getenv("SCOPE_RULES");
+    const char *criblHome = getenv("CRIBL_HOME");
+    char criblRulesPath[PATH_MAX];
+
+    if (envRulesVal) {
+        if (!scope_strcmp(envRulesVal, "false")) {
+            // SCOPE_RULES is false (use of rules file is disabled)
+            rulesFilePath = NULL;
+        } else if (!scope_access(envRulesVal, R_OK)) {
+            // SCOPE_RULES contains the path to a rules file.
+            rulesFilePath = envRulesVal;
+        }
+    } else if (criblHome) {
+        // If $CRIBL_HOME is set, only look for a rules file there instead
+        if (scope_snprintf(criblRulesPath, sizeof(criblRulesPath), "%s/appscope/scope_rules", criblHome) == -1) {
+            scopeLogError("snprintf");
+        }
+        if (!scope_access(criblRulesPath, R_OK)) {
+            rulesFilePath = criblRulesPath;
+        }
+    } else if (!scope_access(SCOPE_RULES_USR_PATH, R_OK)) {
+        // rules file was at first default location
+        rulesFilePath = SCOPE_RULES_USR_PATH;
+    }
+
+    // check if rules file can actually be used
+    if ((rulesFilePath) && (cfgRulesFileIsValid(rulesFilePath) == FALSE)) {
+        rulesFilePath = NULL;
+    }
+
+    return rulesFilePath;
+}
+
 /*
  * Returns the UNIX socket path defined in the rules file's "source" section.
  * The "source" section is an optional section that contains additional
@@ -3547,8 +3589,10 @@ cfgRulesStatus(const char *procName, const char *procCmdLine, const char *rulesP
  * be freed with scope_free.
 */
 char *
-cfgRulesUnixPath(const char *rulesPath) {
+cfgRulesUnixPath() {
     char *unixPath = NULL;
+
+    const char *rulesPath = cfgRulesFilePath();
     if (!rulesPath) {
         return unixPath;
     }

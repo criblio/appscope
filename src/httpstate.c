@@ -233,7 +233,7 @@ reportHttp1(http_state_t *httpstate)
 {
     if (!httpstate || !httpstate->hdr || !httpstate->hdrlen) return -1;
 
-    protocol_info *proto = evtProtoCreate();
+    protocol_info *proto = evtProtoCreateHttp1(httpstate->isResponse);
     if (!proto) {
         // Bummer!  We're losing info.
         DBG(NULL);
@@ -245,7 +245,6 @@ reportHttp1(http_state_t *httpstate)
     int isSend = (httpstate->id.src == NETTX) || (httpstate->id.src == TLSTX);
 
     // Set proto info
-    proto->ptype = (httpstate->isResponse) ? EVT_HRES : EVT_HREQ;
     // We're a server if we 1) sent a response or 2) received a request
     proto->isServer = (isSend && httpstate->isResponse) || (!isSend && !httpstate->isResponse);
     proto->len = httpstate->hdrlen;
@@ -297,12 +296,9 @@ reportHttp2(http_state_t *state, net_info *net, http_buf_t *stash,
         return FALSE;
     }
 
-    protocol_info *proto = evtProtoCreate();
-    char *frame = scope_malloc(frameLen);
-    if (!proto || !frame) {
+    protocol_info *proto = evtProtoCreateHttp2Frame(frameLen);
+    if (!proto) {
         scopeLogError("ERROR: failed to allocate protocol object");
-        if (proto) evtProtoDelete(proto);
-        if (frame) scope_free(frame);
         DBG(NULL);
         return FALSE;
     }
@@ -311,7 +307,6 @@ reportHttp2(http_state_t *state, net_info *net, http_buf_t *stash,
     post->ssl            = state->id.isSsl;
     post->start_duration = getTime();
     post->id             = state->id.uid;
-    post->hdr            = frame;
     if (stash->len) {
         scope_memcpy(post->hdr, stash->buf, stash->len);
         scope_memcpy(post->hdr + stash->len, buf, frameLen - stash->len);
@@ -319,8 +314,6 @@ reportHttp2(http_state_t *state, net_info *net, http_buf_t *stash,
         scope_memcpy(post->hdr, buf, frameLen);
     }
 
-
-    proto->ptype    = EVT_H2FRAME;
     // Unlike in the HTTP/1 case, we're sending TRUE here if the frame was
     // sent, not if we're the server. We haven't parsed the frame to know if
     // it's a request or response yet so we're sending half of the isServer

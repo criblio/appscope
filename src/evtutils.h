@@ -33,7 +33,9 @@
 // At this time, we're just starting with events, but hope to migrate
 // code here for logs/console and payloads over time.
 
-protocol_info * evtProtoCreate(void);
+protocol_info * evtProtoCreateHttp1(bool);
+protocol_info * evtProtoCreateHttp2Frame(uint32_t);
+protocol_info * evtProtoCreateDetect(const char * const);
 bool evtProtoDelete(protocol_info *proto);
 
 bool evtDelete(evt_type *event);

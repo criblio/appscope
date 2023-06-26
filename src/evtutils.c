@@ -6,11 +6,12 @@
 #include "scopestdlib.h"
 #include "state_private.h"
 
-protocol_info *
-evtProtoCreate(void)
+
+static protocol_info *
+evtProtoCreateHttpBase(void)
 {
-    protocol_info *proto = scope_calloc(1, sizeof(struct protocol_info_t));
-    http_post *post = scope_calloc(1, sizeof(struct http_post_t));
+    protocol_info *proto = scope_calloc(1, sizeof(protocol_info));
+    http_post *post = scope_calloc(1, sizeof(http_post));
     if (!proto || !post) {
         if (post) scope_free(post);
         if (proto) scope_free(proto);
@@ -19,6 +20,58 @@ evtProtoCreate(void)
 
     proto->evtype = EVT_PROTO;
     proto->data = (char *)post;
+
+    return proto;
+}
+
+protocol_info *
+evtProtoCreateHttp1(bool isResponse)
+{
+    protocol_info * proto = evtProtoCreateHttpBase();
+    if (!proto) {
+        DBG(NULL);
+        return NULL;
+    }
+
+    proto->ptype = (isResponse) ? EVT_HRES : EVT_HREQ;
+
+    return proto;
+}
+
+protocol_info *
+evtProtoCreateHttp2Frame(uint32_t frameLen)
+{
+    protocol_info *proto = evtProtoCreateHttpBase();
+    char *frame = scope_malloc(frameLen);
+    if (!proto || !frame) {
+        DBG(NULL);
+        if (proto) evtProtoDelete(proto);
+        if (frame) scope_free(frame);
+        return NULL;
+    }
+
+    proto->ptype = EVT_H2FRAME;
+    http_post *post = (http_post *)proto->data;
+    post->hdr = frame;
+
+    return proto;
+}
+
+protocol_info *
+evtProtoCreateDetect(const char * const protocolName)
+{
+    protocol_info *proto = scope_calloc(1, sizeof(protocol_info));
+    char *protname = scope_strdup(protocolName);
+    if (!proto || !protname) {
+        DBG(NULL);
+        if (protname) scope_free(protname);
+        if (proto) scope_free(proto);
+        return NULL;
+    }
+
+    proto->evtype = EVT_PROTO;
+    proto->ptype = EVT_DETECT;
+    proto->data = protname;
 
     return proto;
 }
@@ -86,8 +139,8 @@ evtDelete(evt_type *event)
         case EVT_PROTO:
         {
             protocol_info *proto = (protocol_info *)event;
-            // Alloc'd in evtProtoCreate (http 1&2) or
-            // setProtocol (protocolDetection)
+            // Alloc'd in evtProtoCreateHttp1, evtProtoCreateHttp2Frame, or
+            // evtProtoCreateDetect
             evtProtoDelete(proto);
             break;
         }

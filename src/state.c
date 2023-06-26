@@ -15,6 +15,7 @@
 #include "com.h"
 #include "dbg.h"
 #include "dns.h"
+#include "evtutils.h"
 #include "httpstate.h"
 #include "metriccapture.h"
 #include "mtcformat.h"
@@ -984,7 +985,7 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
         }
 
         if (protoDef->detect && ctlEvtSourceEnabled(g_ctl, CFG_SRC_NET)) {
-            if ((proto = scope_calloc(1, sizeof(struct protocol_info_t))) == NULL)
+            if ((proto = evtProtoCreateDetect(protoDef->protname)) == NULL)
             {
                 if (cpdata)
                     scope_free(cpdata);
@@ -992,12 +993,9 @@ setProtocol(int sockfd, protocol_def_t *protoDef, net_info *net, char *buf, size
                     pcre2_match_data_free(match_data);
                 return FALSE;
             }
-            proto->evtype = EVT_PROTO;
-            proto->ptype = EVT_DETECT;
             proto->len = sizeof(protocol_def_t);
             proto->fd = sockfd;
             if (net) proto->uid = net->uid;
-            proto->data = (char *)scope_strdup(protoDef->protname);
             cmdPostEvent(g_ctl, (char *)proto);
         }
 

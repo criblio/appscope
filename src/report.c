@@ -3469,7 +3469,10 @@ doEvent()
         // we can starve other processing we need to do on this thread:
         // payloads, logfiles/console, metrics, ipc, etc.  Don't allow
         // this loop to go forever.
-        if (eventCount++ >= MAX_EVT_COUNT) break;
+        if (!ctlProcessAllQueuedEventsNow(g_ctl) &&
+            (eventCount++ >= MAX_EVT_COUNT)) {
+            break;
+        }
     }
     reportAllCapturedMetrics();
     ctlFlushLog(g_ctl);

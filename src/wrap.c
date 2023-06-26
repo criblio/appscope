@@ -1120,11 +1120,12 @@ handleExit(void)
         }
     }
 
+    ctlStopAggregating(g_ctl); // Ensures all queued events are processed and
+                               // that we try to send all aggregated data.
     reportPeriodicStuff();
 
     mtcFlush(g_mtc);
     mtcDisconnect(g_mtc);
-    ctlStopAggregating(g_ctl);
     ctlFlush(g_ctl);
     ctlDisconnect(g_ctl, CFG_LS);
     ctlDisconnect(g_ctl, CFG_CTL);

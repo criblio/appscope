@@ -1713,32 +1713,6 @@ initEnv(int *attachedFlag)
     scope_fclose(fd);
 }
 
-static const char *
-getRulesFilePath(void)
-{
-    char *rulesFilePath = NULL;
-    char *envRulesVal = getenv("SCOPE_RULES");
-    if (envRulesVal) {
-        if (!scope_strcmp(envRulesVal, "false")) {
-            // SCOPE_RULES is false (use of rules file is disabled)
-            rulesFilePath = NULL;
-        } else if (!scope_access(envRulesVal, R_OK)) {
-            // SCOPE_RULES contains the path to a rules file.
-            rulesFilePath = envRulesVal;
-        }
-    } else if (!scope_access(SCOPE_RULES_USR_PATH, R_OK)) {
-        // rules file was at first default location
-        rulesFilePath = SCOPE_RULES_USR_PATH;
-    }
-
-    // check if rules file can actually be used
-    if ((rulesFilePath) && (cfgRulesFileIsValid(rulesFilePath) == FALSE)) {
-        rulesFilePath = NULL;
-    }
-
-    return rulesFilePath;
-}
-
 // Used this command on ubuntu 20.04 and 22.04 as a starting point:
 // ps -ef | grep -v "\["
 static const char *const doNotScopeList[] = {
@@ -1922,7 +1896,7 @@ getSettings(bool attachedFlag)
 
     if (attachedFlag) {
         scopedFlag = TRUE;
-    } else if (!(rulesFilePath = getRulesFilePath())){
+    } else if (!(rulesFilePath = cfgRulesFilePath())){
         // The rules file does not exist, or shouldn't be used.
         // Set scopedFlag true unless it's on our doNotScopeList
         scopedFlag = doImplicitDeny();

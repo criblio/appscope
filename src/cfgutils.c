@@ -3589,7 +3589,7 @@ cfgRulesFilePath(void)
  * be freed with scope_free.
 */
 char *
-cfgRulesUnixPath() {
+cfgRulesUnixPath(void) {
     char *unixPath = NULL;
 
     const char *rulesPath = cfgRulesFilePath();

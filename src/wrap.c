@@ -50,7 +50,6 @@ static config_t *g_staticfg = NULL;
 static log_t *g_prevlog = NULL;
 static mtc_t *g_prevmtc = NULL;
 static ctl_t *g_prevctl = NULL;
-static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
 static list_t *g_nsslist;
 static uint64_t reentrancy_guard = 0ULL;
@@ -65,7 +64,7 @@ __thread int g_ssl_fd = -1;
 // Forward declaration
 static void *periodic(void *);
 static void doConfig(config_t *);
-static void threadNow(int);
+static void threadNow(int, siginfo_t *, void *);
 static void uv__read_hook(void *);
 static got_list_t inject_hook_list[];
 
@@ -472,7 +471,7 @@ cmdAttach(void)
         g_proc.smfd = 0;
 
         if (g_thread.once == FALSE) {
-            threadNow(0);
+            threadNow(0, NULL, NULL);
         }
     }
 
@@ -822,9 +821,21 @@ dynConfig(void)
 }
 
 static void
-threadNow(int sig)
+threadNow(int sig, siginfo_t *info, void *secret)
 {
     static uint64_t serialize;
+
+    /*
+    * Verify the origin of the SIGUSR2 signal:
+    * Applications can use the SIGUSR2 signal for their own purposes.
+    * The code below will call the application's handler if the signal
+    * is not recognized as one created by the AppScope library.
+    */
+    if (sig == SIGUSR2) {
+        if (osCallAppSigaction(sig, info, secret) == TRUE) {
+            return;
+        }
+    }
 
     if (!atomicCasU64(&serialize, 0ULL, 1ULL)) return;
 
@@ -844,15 +855,6 @@ threadNow(int sig)
     }
 
     g_thread.once = TRUE;
-
-    // Restore a handler if one exists
-    if ((g_replacehandler == TRUE) && (g_thread.act != NULL)) {
-        struct sigaction oldact;
-        if (g_fn.sigaction) {
-            g_fn.sigaction(SIGUSR2, g_thread.act, &oldact);
-            g_thread.act = NULL;
-        }
-    }
 
     if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
 }
@@ -901,7 +903,7 @@ threadNow(int sig)
  * an issue of some sort.
  */
 static void
-threadInit()
+threadInit(void)
 {
     // for debugging... if SCOPE_NO_SIGNAL is defined, then don't create
     // a signal handler, nor a timer to send a signal.
@@ -937,7 +939,7 @@ doThread()
     struct timeval tv;
     scope_gettimeofday(&tv, NULL);
     if (tv.tv_sec >= g_thread.startTime) {
-        threadNow(0);
+        threadNow(0, NULL, NULL);
     }
 }
 
@@ -948,7 +950,7 @@ stopTimer(void)
     if (!g_ctl) return;
 
     osTimerStop();
-    threadNow(0);
+    threadNow(0, NULL, NULL);
 }
 
 static void
@@ -1504,7 +1506,7 @@ initHook(int attachedFlag, bool scopedFlag, elf_buf_t *ebuf, char *full_path)
         if (full_path && (scope_strstr(full_path, "scopedyn") == NULL) && (scope_strstr(full_path, "memfd") == NULL)) {
             if (!ebuf) return;
             initGoHook(ebuf);
-            threadNow(0);
+            threadNow(0, NULL, NULL);
         }
         return;
     }
@@ -1942,6 +1944,20 @@ getSettings(bool attachedFlag)
     return settings;
 }
 
+/*
+* This is a helper function designed to facilitate the debugging process
+* of the constructor. To utilize this function, place a call to dbgConstructorFn()
+* in the code section that needs to be debugged. By running the code with a debugger,
+* you can modify the value of dbgConstructor to break out of the initialization loop.
+*/
+// static void
+// dbgConstructorFn(void) {
+//     static int dbgConstructor = 1;
+//     while (dbgConstructor) {
+//         sleep(1);
+//     }
+// }
+
 __attribute__((constructor)) void
 init(void)
 {
@@ -2050,7 +2066,7 @@ init(void)
         doProcStartMetric();
 
         if (g_isgo || attachedFlag || g_ismusl) {
-            threadNow(0);
+            threadNow(0, NULL, NULL);
         } else {
             threadInit();
         }
@@ -2072,6 +2088,22 @@ init(void)
 EXPORTOFF sighandler_t
 signal(int signum, sighandler_t handler) {
     WRAP_CHECK(signal, NULL);
+
+    if (signum == SIGUSR2) {
+        // Our handler was already installed
+        if (osIsScopeHandlerActive() == TRUE) {
+            // grab the old
+            struct sigaction oldact = { 0 };
+            osGetAppSigaction(&oldact);
+
+            // save the new
+            struct sigaction newact = { 0 };
+            newact.sa_handler = handler;
+            osSetAppSigaction(&newact);
+            return oldact.sa_handler;
+        }
+        return g_fn.signal(signum, handler);
+    }
 
     /*
      * Prevent the situation to override our handler when it is enabled.
@@ -2104,13 +2136,28 @@ EXPORTOFF int
 sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 {
     WRAP_CHECK(sigaction, -1);
-    /*
-     * If there is a handler being installed, just save it.
-     * If no handler, they may just be checking for the current handler.
-     */
-    if ((signum == SIGUSR2) && (act != NULL)) {
-        g_thread.act = act; 
-        return 0;
+
+    if (signum == SIGUSR2) {
+        if (osIsScopeHandlerActive() == TRUE) {
+            /*
+            * If scope handler was already installed installed, just save the incoming one.
+            * If no handler, they may just be checking for the current handler.
+            */
+            if (act == NULL) {
+                struct sigaction old = { 0 };
+                osGetAppSigaction(&old);
+                *oldact = old;
+                return 0;
+            }
+            struct sigaction old = { 0 };
+            osGetAppSigaction(&old);
+            osSetAppSigaction(act);
+            if (oldact) {
+                *oldact = old;
+            }
+            return 0;
+        }
+        return g_fn.sigaction(signum, act, oldact);
     }
 
     /*
@@ -2127,7 +2174,6 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
             snapshotRetrieveAppSignalHandler(signum, &old);
             *oldact = old;
             return 0;
-
         }
 
         // if signum is part of the snapshotErrorsSignals, save the handler

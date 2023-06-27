@@ -11,6 +11,7 @@
 #include "ctl.h"
 #include "dbg.h"
 #include "com.h"
+#include "evtutils.h"
 #include "fn.h"
 #include "state.h"
 #include "scopestdlib.h"
@@ -51,6 +52,7 @@ struct _ctl_t
     cbuf_handle_t events;
     unsigned enhancefs;
     bool allow_binary_console;
+    bool stop_aggregating;
 
     // Used to buffer (aggregate) log and console data
     struct {
@@ -58,7 +60,6 @@ struct _ctl_t
         cbuf_handle_t ringbuf;
 
         // storage for aggregating log and console data
-        int stop_aggregating;
         streambuf_t streamAgg[FS_ENTRIES];
 
         // limits for how much raw data to aggregate
@@ -612,6 +613,7 @@ ctlCreate()
 
     ctl->enhancefs = DEFAULT_ENHANCE_FS;
     ctl->allow_binary_console = DEFAULT_ALLOW_BINARY_CONSOLE;
+    ctl->stop_aggregating = FALSE;
 
     ctl->payload.status = PAYLOAD_STATUS_DISABLE;
     ctl->payload.dir = (DEFAULT_PAYLOAD_DIR) ? scope_strdup(DEFAULT_PAYLOAD_DIR) : NULL;
@@ -807,14 +809,14 @@ ctlPostEvent(ctl_t *ctl, char *event)
 {
     if (!event) return -1;
     if (!ctl) {
-        scope_free(event);
+        evtFree((evt_type *)event);
         return -1;
     }
 
     if (cbufPut(ctl->events, (uint64_t)event) == -1) {
         // Full; drop and ignore
         DBG(NULL);
-        scope_free(event);
+        evtFree((evt_type *)event);
         return -1;
     }
     return 0;
@@ -1037,7 +1039,7 @@ ctlSendAllAggregatedLogData(ctl_t *ctl)
     // If our process is exiting or this ctl is going away, report all now.
     // Otherwise, send the data once out of every flush_period_in_ms.
     // (Note that this code assumes it's called once per ms.)
-    int report_now = ctl->log.stop_aggregating;
+    int report_now = ctlProcessAllQueuedEventsNow(ctl);
     report_now |= !(count++ % ctl->log.flush_period_in_ms);
     if (!report_now) return;
 
@@ -1121,7 +1123,14 @@ void
 ctlStopAggregating(ctl_t *ctl)
 {
     if (!ctl) return;
-    ctl->log.stop_aggregating = TRUE;
+    ctl->stop_aggregating = TRUE;
+}
+
+bool
+ctlProcessAllQueuedEventsNow(ctl_t *ctl)
+{
+    if (!ctl) return FALSE;
+    return ctl->stop_aggregating;
 }
 
 void

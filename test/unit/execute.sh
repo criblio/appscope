@@ -70,6 +70,7 @@ run_test test/${OS}/ipctest
 run_test test/${OS}/snapshottest
 run_test test/${OS}/ostest
 run_test test/${OS}/ocitest
+run_test test/${OS}/evtutilstest
 run_test test/${OS}/strsettest
 run_test test/${OS}/cfgutilstest
 run_test test/${OS}/cfgtest

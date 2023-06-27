@@ -55,6 +55,7 @@ var rulesCmd = &cobra.Command{
 		remProc, _ := cmd.Flags().GetString("remove")
 		sourceid, _ := cmd.Flags().GetString("sourceid")
 		procArg, _ := cmd.Flags().GetString("arg")
+		unixPath, _ := cmd.Flags().GetString("unixpath")
 
 		// Disallow bad argument combinations (see Arg Matrix at top of file)
 		if addProc == "" && remProc == "" {
@@ -102,7 +103,7 @@ var rulesCmd = &cobra.Command{
 		// In the case that no --add argument or --remove argument was provided
 		// just print the rules file
 		if addProc == "" && remProc == "" {
-			if len(raw) == 0 {
+			if len(raw) == 0 || len(rulesFile.Allow) == 0 {
 				util.ErrAndExit("Empty rules file")
 			}
 
@@ -131,7 +132,7 @@ var rulesCmd = &cobra.Command{
 
 		// Add a process to; or remove a process from the scope rules
 		if addProc != "" {
-			return rules.Add(rulesFile, addProc, procArg, sourceid, rc.Rootdir, rc)
+			return rules.Add(rulesFile, addProc, procArg, sourceid, rc.Rootdir, rc, unixPath)
 		} else if remProc != "" {
 			return rules.Remove(rulesFile, remProc, sourceid, rc.Rootdir, rc)
 		}
@@ -148,5 +149,6 @@ func init() {
 	rulesCmd.Flags().BoolP("json", "j", false, "Output as newline delimited JSON")
 	rulesCmd.Flags().String("sourceid", "", "Source identifier for a rules entry")
 	rulesCmd.Flags().String("arg", "", "Argument to the command to be added to the rules")
+	rulesCmd.Flags().String("unixpath", "", "Path to the Unix socket")
 	RootCmd.AddCommand(rulesCmd)
 }

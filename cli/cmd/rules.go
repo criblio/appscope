@@ -133,7 +133,7 @@ var rulesCmd = &cobra.Command{
 		if addProc != "" {
 			return rules.Add(rulesFile, addProc, procArg, sourceid, rc.Rootdir, rc)
 		} else if remProc != "" {
-			return rules.Remove(rulesFile, remProc, sourceid, rc.Rootdir, rc)
+			return rules.Remove(rulesFile, remProc, procArg, sourceid, rc.Rootdir, rc)
 		}
 
 		return nil

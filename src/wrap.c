@@ -3145,6 +3145,7 @@ getScopeExec(const char *pathname)
     elf_buf_t *ebuf;
 
     if (scope_strstr(g_proc.procname, "scope") ||
+        scope_strstr(pathname, "scope") ||
         checkEnv("SCOPE_EXECVE", "false")) {
         return NULL;
     }
@@ -3152,6 +3153,8 @@ getScopeExec(const char *pathname)
     if ((ebuf = getElf((char *)pathname))) {
         isstat = is_static(ebuf->buf);
         isgo = is_go(ebuf->buf);
+    } else {
+        return NULL;
     }
 
     // not really necessary since we're gonna exec
@@ -3161,7 +3164,7 @@ getScopeExec(const char *pathname)
      * Note: the isgo check is strictly for Go dynamic execs.
      * In this case we use scope only to force the use of HTTP 1.1.
      */
-    if (fullGetEnv("LD_PRELOAD") && (isstat == FALSE) && (isgo == FALSE)) {
+    if ((isstat == FALSE) && (isgo == FALSE)) {
         return NULL;
     }
 

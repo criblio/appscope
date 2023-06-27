@@ -25,10 +25,10 @@ func Retrieve(rootdir string) ([]byte, libscope.Rules, error) {
 	rulesFile := make(libscope.Rules, 0)
 
 	filePath := "/usr/lib/appscope/scope_rules"
-	// If $CRIBL_HOME is set, only look for a rules file there instead
-	if criblHome, present := os.LookupEnv("CRIBL_HOME"); present {
-		filePath = criblHome + "/appscope/scope_rules"
-	}
+	//	// If $CRIBL_HOME is set, only look for a rules file there instead
+	//	if criblHome, present := os.LookupEnv("CRIBL_HOME"); present {
+	//		filePath = criblHome + "/appscope/scope_rules"
+	//	}
 
 	if rootdir != "" {
 		filePath = rootdir + filePath

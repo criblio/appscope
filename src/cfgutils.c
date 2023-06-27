@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <libgen.h>
 
 #include "cfgutils.h"
 #include "dbg.h"
@@ -3634,6 +3635,8 @@ cfgRulesUnixPath(void) {
 
     processRulesSourceSection(&doc, &unixPath);
 
+    // Do we want a log message if there's an issue here?
+    unixPath = dirname(unixPath);
     yaml_document_delete(&doc);
 
 cleanup_parser:

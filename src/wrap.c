@@ -3138,16 +3138,67 @@ prctl(int option, ...)
 }
 
 static char *
-getScopeExec(const char *pathname)
+copyArgv(char **argv)
 {
-    char *scopexec = NULL;
+    int i, nargs = 0;
+    char *args;
+
+    while ((argv[nargs] != NULL)) nargs++;
+
+    // Total length of all args
+    int total_length = 0;
+    for (i = 0; i < nargs; i++) {
+        total_length += scope_strlen(argv[i]) + 1;
+    }
+
+    if ((args = scope_calloc(1, total_length)) == NULL) return NULL;
+
+    // Copy argv arguments
+    for (i = 0; i < nargs; i++) {
+        scope_strcat(args, argv[i]);
+        if (i != nargs - 1) {
+            scope_strcat(args, " ");  // Add a space between arguments
+        }
+    }
+
+    return args;
+}
+
+static char *
+getScopeExec(const char *pathname, char **argv)
+{
     bool isstat = FALSE, isgo = FALSE;
+    char *scopexec = NULL, *path = NULL;
+    const char *rulesFilePath = NULL;
     elf_buf_t *ebuf;
+    config_t *cfg;
 
     if (scope_strstr(g_proc.procname, "scope") ||
         scope_strstr(pathname, "scope") ||
         checkEnv("SCOPE_EXECVE", "false")) {
         return NULL;
+    }
+
+    // if we have a rules file and the proc to be exec'd is not allowed, done.
+    if (pathname &&
+        ((rulesFilePath = cfgRulesFilePath())) &&
+        ((path = scope_strdup(pathname)))) {
+        char *args = NULL;
+
+        if ((args = copyArgv(argv)) == NULL) {
+            // TODO; we should be able to pass a null arg list, deal with cfg later
+            args = "";
+        }
+
+        cfg = cfgCreateDefault();
+        if (cfgRulesStatus(scope_basename(path), args,
+                           rulesFilePath, cfg) == RULES_NOT_SCOPED) {
+            scope_free(path);
+            if (strlen(args) > 1) scope_free(args);
+            return NULL;
+        }
+        scope_free(path);
+        if (strlen(args) > 1) scope_free(args);
     }
 
     if ((ebuf = getElf((char *)pathname))) {
@@ -3189,7 +3240,7 @@ execv(const char *pathname, char *const argv[])
 
     WRAP_CHECK(execv, -1);
 
-    scopexec = getScopeExec(pathname);
+    scopexec = getScopeExec(pathname, (char **)argv);
     if (scopexec == NULL) {
         return g_fn.execv(pathname, argv);
     }
@@ -3225,7 +3276,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 
     WRAP_CHECK(execve, -1);
 
-    scopexec = getScopeExec(pathname);
+    scopexec = getScopeExec(pathname, (char **)argv);
     if (scopexec == NULL) {
         return g_fn.execve(pathname, argv, envp);
     }

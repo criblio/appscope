@@ -3144,6 +3144,7 @@ copyArgv(char **argv)
     char *args;
 
     while ((argv[nargs] != NULL)) nargs++;
+    if (nargs <= 1) return NULL;
 
     // Total length of all args
     int total_length = 0;
@@ -3174,15 +3175,14 @@ getScopeExec(const char *pathname, char **argv)
     config_t *cfg;
 
     if (scope_strstr(g_proc.procname, "scope") ||
-        scope_strstr(pathname, "scope") ||
+        ((pathname != NULL) && scope_strstr(pathname, "scope")) ||
         checkEnv("SCOPE_EXECVE", "false")) {
         return NULL;
     }
 
     // if we have a rules file and the proc to be exec'd is not allowed, done.
-    if (pathname &&
-        ((rulesFilePath = cfgRulesFilePath())) &&
-        ((path = scope_strdup(pathname)))) {
+    if (((rulesFilePath = cfgRulesFilePath())) &&
+        (pathname != NULL) && ((path = scope_strdup(pathname)))) {
         char *args = NULL;
 
         if ((args = copyArgv(argv)) == NULL) {

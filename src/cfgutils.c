@@ -3636,7 +3636,10 @@ cfgRulesUnixPath(void) {
     processRulesSourceSection(&doc, &unixPath);
 
     // Do we want a log message if there's an issue here?
-    unixPath = dirname(unixPath);
+    if (unixPath) {
+        unixPath = scope_dirname(unixPath);
+    }
+
     yaml_document_delete(&doc);
 
 cleanup_parser:

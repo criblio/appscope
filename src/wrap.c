@@ -1413,10 +1413,12 @@ findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
     int len = scope_strlen(info->dlpi_name);
     int libscope_so_len = 11;
 
-    if(len > libscope_so_len && !scope_strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
+    if (len > libscope_so_len &&
+        !scope_strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
         *(char **)data = (char *) info->dlpi_name;
         return 1;
     }
+
     return 0;
 }
 
@@ -1485,6 +1487,7 @@ hookInject()
 
         dl_iterate_phdr(hookSharedObjs, libscopeHandle);
         dlclose(libscopeHandle);
+
         return TRUE;
     }
     return FALSE;
@@ -2070,6 +2073,16 @@ init(void)
             threadNow(0, NULL, NULL);
         } else {
             threadInit();
+        }
+
+        char *lib_path;
+        if (dl_iterate_phdr(findLibscopePath, &lib_path)) {
+            /*
+             * LD_PRELOAD is not set if we are attached,
+             * or if we got here from ld.so.preload.
+             * This is needed for subsequent exec's by this process
+             */
+            fullSetenv("LD_PRELOAD", lib_path, 1);
         }
     } else {
         /*
@@ -3165,6 +3178,13 @@ copyArgv(char **argv)
     return args;
 }
 
+/*
+ * There is a single purpose for interposed execs
+ * If the proc to be exec'd is Go static then,
+ * exec using the CLI. Else, do nothing.
+ * It is presumed that LD_PRELOAD is set when
+ * an exec is interposed.
+ */
 static char *
 getScopeExec(const char *pathname, char **argv)
 {
@@ -3174,6 +3194,12 @@ getScopeExec(const char *pathname, char **argv)
     elf_buf_t *ebuf;
     config_t *cfg;
 
+    /*
+     * If the current proc is the CLI
+     * or the proc to be exec'd is the CLI
+     * or the env var disables exec behavior
+     * then done.
+     */
     if (scope_strstr(g_proc.procname, "scope") ||
         ((pathname != NULL) && scope_strstr(pathname, "scope")) ||
         checkEnv("SCOPE_EXECVE", "false")) {
@@ -3205,16 +3231,14 @@ getScopeExec(const char *pathname, char **argv)
         isstat = is_static(ebuf->buf);
         isgo = is_go(ebuf->buf);
     } else {
+        // example; a shell is not an Elf exec
         return NULL;
     }
 
     // not really necessary since we're gonna exec
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
-    /*
-     * Note: the isgo check is strictly for Go dynamic execs.
-     * In this case we use scope only to force the use of HTTP 1.1.
-     */
+    // If this proc is Go static, then start with the CLI
     if ((isstat == FALSE) && (isgo == FALSE)) {
         return NULL;
     }

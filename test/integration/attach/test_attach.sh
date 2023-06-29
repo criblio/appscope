@@ -520,7 +520,7 @@ echo "- procname: systemd-networkd" >> $SCOPE_RULES
 # is not the real thing.
 scope -z ./systemd-networkd &
 PID=$!
-
+sleep 1
 scope inspect --all | grep systemd-networkd
 if [ $? -ne "0" ]; then
     echo "systemd-networkd is not actively scoped but should be"
@@ -569,7 +569,49 @@ if [ $? -eq "0" ]; then
     unset SCOPE_FILTER
 
     endtest
+
+    starttest exec_preload
+
+    # create ld.so.preload
+    touch /etc/ld.so.preload
+    chmod ga+w /etc/ld.so.preload
+    echo /opt/appscope/lib/linux/$(uname -m)/libscope.so > /etc/ld.so.preload
+
+    # create a filter file
+    cd /opt/exec_test
+    export SCOPE_FILTER=${DUMMY_FILTER_FILE}2
+    echo "allow:" >> $SCOPE_FILTER
+    echo "- procname: exec_test" >> $SCOPE_FILTER
+
+    echo "using filter file: $SCOPE_FILTER"
+    cat $SCOPE_FILTER
+
+    # libscope loaded due to ld.so.preload, interposed due to rules file
+    ./exec_test 0 &
+
+    wait_for_proc_start "exec_test"
+    EXEC_TEST_PID=`pidof exec_test`
+
+
+    wait ${EXEC_TEST_PID}
+    sleep 2
+
+    egrep '"cmd":"/usr/bin/curl -I https://cribl.io"' $EVT_FILE > /dev/null
+    if [ $? -ne 0 ]; then
+        echo "Curl event not found"
+        cat $EVT_FILE
+        ERR+=1
+    fi
+
+    rm /etc/ld.so.preload
+    rm $SCOPE_FILTER
+    unset SCOPE_FILTER
+
+    endtest
+
+# finish LIB_IS_GLIBC
 fi
+
 if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""
     echo ""

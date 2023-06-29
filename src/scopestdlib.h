@@ -22,6 +22,7 @@
 #include <poll.h>
 #include <pthread.h>
 #include <pwd.h>
+#include <search.h>
 #include <signal.h>
 #include <stdio.h>
 #include <termios.h>
@@ -316,5 +317,10 @@ ssize_t       scope_mq_receive(mqd_t, char *, size_t, unsigned int *);
 int           scope_mq_unlink(const char *);
 int           scope_mq_getattr(mqd_t, struct mq_attr *);
 
+// Search
+void *        scope_tsearch(const void *key, void **rootp, int (*compar)(const void *, const void *));
+void *        scope_tfind(const void *key, void *const *rootp, int (*compar)(const void *, const void *));
+void *        scope_tdelete(const void *restrict key, void **restrict rootp, int (*compar)(const void *, const void *));
+void          scope_twalk(const void *root, void (*action)(const void *nodep, VISIT which, int depth));
 
 #endif // __SCOPE_STDLIB_H__

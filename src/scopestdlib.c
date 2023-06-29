@@ -223,6 +223,12 @@ extern ssize_t         scopelibc_mq_receive(mqd_t, char *, size_t, unsigned int 
 extern int             scopelibc_mq_unlink(const char *);
 extern int             scopelibc_mq_getattr(mqd_t, struct mq_attr *);
 
+// Search
+extern void *          scopelibc_tsearch(const void *key, void **rootp, int (*compar)(const void *, const void *));
+extern void *          scopelibc_tfind(const void *key, void *const *rootp, int (*compar)(const void *, const void *));
+extern void *          scopelibc_tdelete(const void *restrict key, void **restrict rootp, int (*compar)(const void *, const void *));
+extern void            scopelibc_twalk(const void *root, void (*action)(const void *nodep, VISIT which, int depth));
+
 static int g_go_static;
 
 // TODO consider moving GOAppState API somewhere else
@@ -1315,3 +1321,29 @@ char *
 scope_secure_getenv(const char *name) {
     return getenv(name);
 }
+
+// Search
+void *
+scope_tsearch(const void *key, void **rootp, int (*compar)(const void *, const void *))
+{
+    return scopelibc_tsearch(key, rootp, compar);
+}
+
+void *
+scope_tfind(const void *key, void *const *rootp, int (*compar)(const void *, const void *))
+{
+    return scopelibc_tfind(key, rootp, compar);
+}
+
+void *
+scope_tdelete(const void *restrict key, void **restrict rootp, int (*compar)(const void *, const void *))
+{
+    return scopelibc_tdelete(key, rootp, compar);
+}
+
+void
+scope_twalk(const void *root, void (*action)(const void *nodep, VISIT which, int depth))
+{
+    scopelibc_twalk(root, action);
+}
+

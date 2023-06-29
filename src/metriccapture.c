@@ -120,7 +120,7 @@ reportAllCapturedMetrics(void)
 }
 
 static bool
-doMetricBuffer(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t src)
+doMetricBuffer(int sockfd, net_info *net, char *buf, size_t len, metric_t src)
 {
     bool is_successful = FALSE;
     pcre2_match_data *matches = NULL;
@@ -178,13 +178,13 @@ out:
 }
 
 bool
-doMetricCapture(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t src, src_data_t dtype)
+doMetricCapture(int sockfd, net_info *net, char *buf, size_t len, metric_t src, src_data_t dtype)
 {
     bool ret = FALSE;
 
     if (dtype == BUF) {
         // simple buffer, pass it through
-        ret = doMetricBuffer(id, sockfd, net, buf, len, src);
+        ret = doMetricBuffer(sockfd, net, buf, len, src);
     } else if (dtype == MSG) {
         // buffer is a msghdr for sendmsg/recvmsg
         int i;
@@ -193,7 +193,7 @@ doMetricCapture(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, m
         for (i = 0; i < msg->msg_iovlen; i++) {
             iov = &msg->msg_iov[i];
             if (iov && iov->iov_base && (iov->iov_len > 0)) {
-                ret = ret || doMetricBuffer(id, sockfd, net, iov->iov_base, iov->iov_len, src);
+                ret = ret || doMetricBuffer(sockfd, net, iov->iov_base, iov->iov_len, src);
             }
         }
     } else if (dtype == IOV) {
@@ -203,7 +203,7 @@ doMetricCapture(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, m
         struct iovec *iov = (struct iovec *)buf;
         for (i = 0; i < iovcnt; i++) {
             if (iov[i].iov_base && (iov[i].iov_len > 0)) {
-                ret = ret || doMetricBuffer(id, sockfd, net, iov[i].iov_base, iov[i].iov_len, src);
+                ret = ret || doMetricBuffer(sockfd, net, iov[i].iov_base, iov[i].iov_len, src);
             }
         }
     } else {

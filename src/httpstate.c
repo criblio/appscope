@@ -34,7 +34,7 @@ static void setHttpState(http_state_t *httpstate, http_enum_t toState);
 static void appendHeader(http_state_t *httpstate, char* buf, size_t len);
 static size_t getContentLength(char *header, size_t len);
 static size_t bytesToSkipForContentLength(http_state_t *httpstate, size_t len);
-static bool setHttpId(httpId_t *httpId, net_info *net, int sockfd, uint64_t id, metric_t src);
+static bool setHttpId(httpId_t *httpId, net_info *net, int sockfd, metric_t src);
 static int reportHttp1(http_state_t *httpstate);
 static bool parseHttp1(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId);
 
@@ -201,22 +201,11 @@ bytesToSkipForContentLength(http_state_t *httpstate, size_t len)
 }
 
 static bool
-setHttpId(httpId_t *httpId, net_info *net, int sockfd, uint64_t id, metric_t src)
+setHttpId(httpId_t *httpId, net_info *net, int sockfd, metric_t src)
 {
-    if (!httpId) return FALSE;
+    if (!httpId || !net) return FALSE;
 
-    /*
-     * If we have an fd, use the uid/channel value as it's unique
-     * else we are likely using TLS, so default to the session ID
-     */
-    if (net) {
-        httpId->uid = net->uid;
-    } else if (id != -1) {
-        httpId->uid = id;
-    } else {
-        DBG(NULL);
-        return FALSE;
-    }
+    httpId->uid = net->uid;
 
     httpId->isSsl = (src == TLSTX) || (src == TLSRX);
 
@@ -791,7 +780,7 @@ doHttpBuffer(http_state_t states[HTTP_NUM], net_info *net, char *buf, size_t len
 }
 
 bool
-doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t src, src_data_t dtype)
+doHttp(int sockfd, net_info *net, char *buf, size_t len, metric_t src, src_data_t dtype)
 {
     if (!buf || !len) {
         scopeLogWarn("WARN: doHttp() got no buffer");
@@ -799,13 +788,13 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
     }
 
     // If we know we're not looking at a stream, bail.
-    if (net && net->type != SOCK_STREAM) {
+    if (!net || net->type != SOCK_STREAM) {
         scopeLogWarn("WARN: doHttp() not on SOCK_STREAM");
         return FALSE;
     }
 
     httpId_t httpId = {0};
-    if (!setHttpId(&httpId, net, sockfd, id, src)) return FALSE;
+    if (!setHttpId(&httpId, net, sockfd, src)) return FALSE;
 
     int guard_enabled = g_http_guard_enabled && net;
     if (guard_enabled) while (!atomicCasU64(&g_http_guard[sockfd], 0ULL, 1ULL));

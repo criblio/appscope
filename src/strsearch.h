@@ -1,5 +1,5 @@
-#ifndef __SEARCH_H__
-#define __SEARCH_H__
+#ifndef __STRSEARCH_H__
+#define __STRSEARCH_H__
 
 
 //
@@ -27,4 +27,4 @@ int           searchLen(search_t*);
 
 int           searchExec(search_t*, char *, int);
 
-#endif // __SEARCH_H__
+#endif // __STRSEARCH_H__

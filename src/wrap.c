@@ -2074,16 +2074,6 @@ init(void)
         } else {
             threadInit();
         }
-
-        char *lib_path;
-        if (dl_iterate_phdr(findLibscopePath, &lib_path)) {
-            /*
-             * LD_PRELOAD is not set if we are attached,
-             * or if we got here from ld.so.preload.
-             * This is needed for subsequent exec's by this process
-             */
-            fullSetenv("LD_PRELOAD", lib_path, 1);
-        }
     } else {
         /*
          * When libscope is loaded and we are not interposing
@@ -3150,6 +3140,79 @@ prctl(int option, ...)
     return g_fn.prctl(option, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2], fArgs.arg[3]);
 }
 
+static bool
+getPreload(char **envp)
+{
+    if (!envp) {
+        if (fullGetEnv("LD_PRELOAD")) {
+            return TRUE;
+        }
+
+        return FALSE;
+    }
+
+    size_t i;
+    char **envinst;
+
+    for (envinst = envp, i = 0; envinst[i]; i++) {
+        if (scope_strstr(envinst[i], "LD_PRELOAD")) {
+            // LD_PRELOAD exists, done.
+            return TRUE;
+        }
+	}
+
+    return FALSE;
+}
+
+static bool
+setPreload(char **envp)
+{
+    char *lib_path;
+
+    if (dl_iterate_phdr(findLibscopePath, &lib_path) == 0) {
+        return FALSE;
+    }
+
+    if (!envp) {
+        fullSetenv("LD_PRELOAD", lib_path, 1);
+        return TRUE;
+    }
+
+    char *ldp, **newenvp;
+    size_t i, plen;
+    size_t ldplen = scope_strlen("LD_PRELOAD");
+    char **envinst;
+
+    for (envinst = envp, i = 0; envinst[i]; i++) {
+        if (scope_strstr(envinst[i], "LD_PRELOAD")) {
+            // LD_PRELOAD exists, done.
+            return TRUE;
+        }
+	}
+
+    plen = scope_strlen(lib_path) + ldplen + 2;
+    if ((ldp = scope_calloc(1, plen)) == NULL) {
+        return FALSE;
+    }
+
+    scope_snprintf(ldp, plen, "LD_PRELOAD=%s", lib_path);
+
+    // why does scope_realloc fail?
+    if ((newenvp = realloc(envp, sizeof(char *) * (i+2))) == NULL) {
+        scope_free(ldp);
+        return FALSE;
+    }
+
+    for (envinst = envp, i = 0; envinst[i]; i++) {
+        newenvp[i] = envinst[i];
+        //sysprint("%s:%d %s\n", __FUNCTION__, __LINE__, newenvp[i]);
+    }
+
+    newenvp[i] = ldp;
+    *envp = *newenvp;
+    return TRUE;
+}
+
 static char *
 copyArgv(char **argv)
 {
@@ -3186,7 +3249,7 @@ copyArgv(char **argv)
  * an exec is interposed.
  */
 static char *
-getScopeExec(const char *pathname, char **argv)
+getScopeExec(const char *pathname, char **argv, char **envp)
 {
     bool isstat = FALSE, isgo = FALSE;
     char *scopexec = NULL, *path = NULL;
@@ -3238,18 +3301,20 @@ getScopeExec(const char *pathname, char **argv)
     // not really necessary since we're gonna exec
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
-    // If this proc is Go static, then start with the CLI
-    if ((isstat == FALSE) && (isgo == FALSE)) {
-        return NULL;
+    // need to get/set preload in envp and not environ
+    if ((getPreload(envp) == FALSE) && (setPreload(envp) == FALSE)) {
+        sysprint("%s: can't set preload in envp\n", __FUNCTION__);
     }
 
-    scopexec = fullGetEnv("SCOPE_EXEC_PATH");
-    if (((scopexec = getpath(scopexec)) == NULL) &&
-        ((scopexec = getpath("scope")) == NULL)) {
-
-        // can't find the scope executable
-        scopeLogWarn("can't find a scope executable for %s", pathname);
-        return NULL;
+    // If the exec to be started is Go static, then start with the CLI
+    if ((isstat == TRUE) && (isgo == TRUE)) {
+        scopexec = fullGetEnv("SCOPE_EXEC_PATH");
+        if (((scopexec = getpath(scopexec)) == NULL) &&
+            ((scopexec = getpath("scope")) == NULL)) {
+            // can't find the scope executable
+            scopeLogWarn("can't find a scope executable for %s", pathname);
+            return NULL;
+        }
     }
 
     return scopexec;
@@ -3264,7 +3329,7 @@ execv(const char *pathname, char *const argv[])
 
     WRAP_CHECK(execv, -1);
 
-    scopexec = getScopeExec(pathname, (char **)argv);
+    scopexec = getScopeExec(pathname, (char **)argv, NULL);
     if (scopexec == NULL) {
         return g_fn.execv(pathname, argv);
     }
@@ -3300,7 +3365,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 
     WRAP_CHECK(execve, -1);
 
-    scopexec = getScopeExec(pathname, (char **)argv);
+    scopexec = getScopeExec(pathname, (char **)argv, (char **)envp);
     if (scopexec == NULL) {
         return g_fn.execve(pathname, argv, envp);
     }
@@ -3320,7 +3385,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
         nargv[i] = argv[i - 1];
     }
 
-    g_fn.execve(nargv[0], nargv, environ);
+    g_fn.execve(nargv[0], nargv, environ); // envp??
     if (nargv) scope_free(nargv);
     scope_free(scopexec);
     return -1;

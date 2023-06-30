@@ -592,14 +592,12 @@ if [ $? -eq "0" ]; then
     wait_for_proc_start "exec_test"
     EXEC_TEST_PID=`pidof exec_test`
 
-
     wait ${EXEC_TEST_PID}
     sleep 2
 
     egrep '"cmd":"/usr/bin/curl -I https://cribl.io"' $EVT_FILE > /dev/null
     if [ $? -ne 0 ]; then
         echo "Curl event not found"
-        cat $EVT_FILE
         ERR+=1
     fi
 

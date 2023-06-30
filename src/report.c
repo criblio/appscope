@@ -16,6 +16,7 @@
 #include "evtutils.h"
 #include "fn.h"
 #include "httpagg.h"
+#include "httpmatch.h"
 #include "metriccapture.h"
 #include "mtcformat.h"
 #include "plattime.h"
@@ -119,6 +120,7 @@ typedef struct http_report_t {
 // and could be more accurate.
 int g_interval = DEFAULT_SUMMARY_PERIOD;
 static list_t *g_maplist;
+static httpmatch_t *g_httpmatch;
 static search_t *g_http_status = NULL;
 static http_agg_t *g_http_agg;
 
@@ -167,6 +169,13 @@ destroyHttpMap(void *data)
     if (map) scope_free(map);
 }
 
+// Dumb (temporary) adapter to silence complaint about type missmatch
+static void
+freeMap(http_map *map)
+{
+    destroyHttpMap((void *)map);
+}
+
 static void
 destroyHttp2Channel(void *data)
 {
@@ -204,6 +213,7 @@ initReporting()
     g_http2_channels = lstCreate(destroyHttp2Channel);
     g_http_status = searchComp(HTTP_STATUS);
     g_http_agg = httpAggCreate();
+    g_httpmatch = httpMatchCreate(g_netinfo, g_extra_net_info_list, freeMap);
 }
 
 void
@@ -533,7 +543,7 @@ doHttp1Header(protocol_info *proto)
 
     char *ssl;
     event_field_t fields[HTTP_MAX_FIELDS];
-    http_report hreport;
+    http_report hreport = {0};
     http_post *post = (http_post *)proto->data;
     http_map *map = lstFind(g_maplist, post->id);
 

@@ -56,7 +56,7 @@ static protocol_def_t *g_statsd_protocol_def = NULL;
 
 // Linked list, indexed by channel ID, of net_info pointers used in
 // doProtocol() when it's not provided with a valid file descriptor.
-static list_t *g_extra_net_info_list = NULL;
+list_t *g_extra_net_info_list = NULL;
 
 #define DATA_FIELD(val)         STRFIELD("data",           (val),        1)
 #define UNIT_FIELD(val)         STRFIELD("unit",           (val),        1)

@@ -294,6 +294,8 @@ cfgDestroy(config_t **cfg)
         }
         scope_free(c->tags);
     }
+    if (c->authtoken) scope_free(c->authtoken);
+
     scope_free(c);
     *cfg = NULL;
 }

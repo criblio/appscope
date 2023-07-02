@@ -468,6 +468,15 @@ initHttpState(void)
     }
 }
 
+void
+destroyHttpState(void) {
+    pcre2_code_free(g_http_connect);
+    pcre2_code_free(g_http_upgrade);
+    pcre2_code_free(g_http_clength);
+    searchFree(&g_http_end);
+    searchFree(&g_http_start);
+}
+
 static void
 http2StashFrame(http_buf_t *stash, const uint8_t *buf, size_t len)
 {

@@ -37,6 +37,7 @@ typedef enum {
 
 void initState(void);
 void resetState(void);
+void destroyState(void);
 
 bool payloadToDiskForced(void);
 void setVerbosity(unsigned);

@@ -52,6 +52,13 @@ needleTestSetup(void** state)
     return groupSetup(state);
 }
 
+static int
+needleTestTeardown(void** state)
+{
+    destroyHttpState();
+    return groupTeardown(state);
+}
+
 static void
 doHttpWithSingleBufferWithNet(void** state)
 {
@@ -289,6 +296,6 @@ main(int argc, char* argv[])
         cmocka_unit_test(doHttpWhichExceedsReallocSize),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
-    return cmocka_run_group_tests(tests, needleTestSetup, groupTeardown);
+    return cmocka_run_group_tests(tests, needleTestSetup, needleTestTeardown);
 }
 

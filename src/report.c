@@ -196,7 +196,7 @@ destroyHttp2Stream(void *data)
 }
 
 void
-initReporting()
+initReporting(void)
 {
     // NB: Each of these does a dynamic allocation that we are not releasing.
     //     They don't grow and would ideally be released when the reporting
@@ -205,6 +205,14 @@ initReporting()
     g_http_agg = httpAggCreate();
     g_httpmatch = httpMatchCreate(g_netinfo, g_extra_net_info_list, destroyHttpMap);
     g_http2_channels = channelStoreCreate(g_netinfo, g_extra_net_info_list, destroyHttp2Channel);
+}
+
+void
+destroyReporting(void) {
+    channelStoreDestroy(&g_http2_channels);
+    httpMatchDestroy(&g_httpmatch);
+    httpAggDestroy(&g_http_agg);
+    searchFree(&g_http_status);
 }
 
 void

@@ -166,11 +166,11 @@ countTestSetup(void** state)
 static int
 countTestTeardown(void** state)
 {
-    logDestroy(&g_log);
-    mtcDestroy(&g_mtc);
+    destroyState();
     ctlDestroy(&g_ctl);
+    mtcDestroy(&g_mtc);
+    logDestroy(&g_log);
 
-    // Call the general groupTeardown() too.
     return groupTeardown(state);
 }
 
@@ -229,6 +229,7 @@ initStateDoesNotCrash(void** state)
 {
     initState();
     clearTestData();
+    destroyState();
 }
 
 static void
@@ -1675,12 +1676,12 @@ main(int argc, char* argv[])
     // is initialized (before constructor).
     const struct CMUnitTest preInitTests[] = {
         cmocka_unit_test(nothingCrashesBeforeAnyInit),
+        cmocka_unit_test(initStateDoesNotCrash),
     };
     int pre_init_errors = cmocka_run_group_tests(preInitTests, NULL, NULL);
 
     // Run tests
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(initStateDoesNotCrash),
         cmocka_unit_test(doReadFileNoSummarization),
         cmocka_unit_test(doReadFileSummarizedOpenCloseNotSummarized),
         cmocka_unit_test(doReadFileFullSummarization),

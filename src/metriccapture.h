@@ -7,6 +7,7 @@
 
 void initMetricCapture(void);
 bool doMetricCapture(int, net_info*, char*, size_t, metric_t, src_data_t);
+void destroyMetricCapture(void);
 void reportAllCapturedMetrics(void);
 
 typedef struct {

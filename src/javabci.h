@@ -87,6 +87,6 @@ uint16_t        javaAddMethodRefTag(java_class_t *info, uint16_t classIndex, uin
 char*           javaGetUtf8String(java_class_t *info, int tagIndex);
 uint16_t        javaGetTagLength(unsigned char *addr);
 uint32_t        javaGetMethodLength(unsigned char *addr);
-void            javaConvertMethodToNative(java_class_t *info, int methodIndex);
+void*           javaConvertMethodToNative(java_class_t *info, int methodIndex);
 
 #endif // __JAVABCI_H__

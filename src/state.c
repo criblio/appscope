@@ -275,6 +275,25 @@ error:
     g_statsd_protocol_def = NULL;
 }
 
+static void
+destroyPayloadDetect(void) {
+    if (g_statsd_protocol_def) {
+        pcre2_code_free(g_statsd_protocol_def->re);
+        pcre2_match_data_free(g_statsd_protocol_def->match_data);
+        scope_free(g_statsd_protocol_def);
+    }
+    if (g_http_protocol_def) {
+        pcre2_code_free(g_http_protocol_def->re);
+        pcre2_match_data_free(g_http_protocol_def->match_data);
+        scope_free(g_http_protocol_def);
+    }
+    if (g_tls_protocol_def) {
+        pcre2_code_free(g_tls_protocol_def->re);
+        pcre2_match_data_free(g_tls_protocol_def->match_data);
+        scope_free(g_tls_protocol_def);
+    }
+}
+
 void
 initState(void)
 {
@@ -318,6 +337,18 @@ void
 resetState(void)
 {
     scope_memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
+}
+
+void
+destroyState(void) {
+    destroyReporting();
+    lstDestroy(&g_extra_net_info_list);
+    destroyPayloadDetect();
+    lstDestroy(&g_protlist);
+    destroyMetricCapture();
+    destroyHttpState();
+    scope_free(g_fsinfo);
+    scope_free(g_netinfo);
 }
 
 // DEBUG

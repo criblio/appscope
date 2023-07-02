@@ -239,7 +239,7 @@ javaCopyMethod(java_class_t *info, unsigned char *method, const char *newName)
     info->length += len;
 }
 
-void 
+void *
 javaConvertMethodToNative(java_class_t *info, int methodIndex) 
 {
     unsigned char *methodAddr = info->methods[methodIndex];
@@ -257,6 +257,7 @@ javaConvertMethodToNative(java_class_t *info, int methodIndex)
     *((uint16_t *)(addr + 6)) = htobe16(attributesCount);
 
     info->length += bufsize - len;
+    return addr;
 }
 
 void 

@@ -57,6 +57,15 @@ initMetricCapture(void)
     }
 }
 
+void
+destroyMetricCapture(void) {
+    cbufFree(g_metric_buf);
+    pcre2_code_free(g_statsd_ext_regex);
+    g_statsd_ext_regex = NULL;
+    pcre2_code_free(g_statsd_regex);
+    g_statsd_regex = NULL;
+}
+
 static captured_metric_t *
 createCapturedMetric(unsigned char *name, unsigned char *value,
                      unsigned char *type, unsigned char *dims)

@@ -5748,7 +5748,7 @@ __sprintf_chk(char *str, int flag, size_t strlen, const char *format, ...)
     int rc;
 
     va_start(ap, format);
-    rc = vsnprintf(str, strlen, format, ap);
+    rc = vsprintf(str, format, ap);
     va_end(ap);
     return rc;
 }

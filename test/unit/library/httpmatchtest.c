@@ -36,11 +36,11 @@ teardown(void **state)
 }
 
 static http_map *
-newReq(uint64_t id)
+newReq(uint64_t id, int fd)
 {
     http_map *map = scope_calloc(1, sizeof(http_map));
     assert_non_null(map);
-    map->id = id;
+    map->id.uid = id;
     return map;
 }
 
@@ -81,7 +81,7 @@ static void
 httpReqSaveReturnsFalseWithNullParams(void **state)
 {
     httpmatch_t *match = httpMatchCreate(g_netinfo, g_extra_net_info_list, freeReq);
-    http_map *reqToAdd = newReq(531);
+    http_map *reqToAdd = newReq(531, 3);
 
     assert_false(httpReqSave(NULL, reqToAdd));
     assert_false(httpReqSave(match, NULL));
@@ -94,8 +94,8 @@ static void
 httpReqSaveAddOfDuplicateFails(void **state)
 {
     httpmatch_t *match = httpMatchCreate(g_netinfo, g_extra_net_info_list, freeReq);
-    http_map *reqToAdd1 = newReq(531);
-    http_map *reqToAdd2 = newReq(531);
+    http_map *reqToAdd1 = newReq(531, 3);
+    http_map *reqToAdd2 = newReq(531, 3);
     assert_true(httpReqSave(match, reqToAdd1));
 
     assert_false(httpReqSave(match, reqToAdd2));
@@ -115,7 +115,7 @@ httpReqSaveDoesNotCrash(void **state)
     httpmatch_t *match = httpMatchCreate(g_netinfo, g_extra_net_info_list, freeReq);
     assert_non_null(match);
 
-    http_map *reqToAdd = newReq(531);
+    http_map *reqToAdd = newReq(531, 3);
     httpReqSave(match, reqToAdd);
 
     http_map *reqRetrieved = httpReqGet(match, 531);
@@ -129,7 +129,7 @@ static void
 httpReqExpireWithoutAnyRequests(void **state)
 {
     httpmatch_t *match = httpMatchCreate(g_netinfo, g_extra_net_info_list, freeReq);
-    httpReqExpire(match, 123456789);
+    httpReqExpire(match, 123456789, FALSE);
     httpMatchDestroy(&match);
 }
 

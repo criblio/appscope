@@ -39,8 +39,8 @@ void         httpMatchDestroy(httpmatch_t **);
 
 bool         httpReqSave(httpmatch_t *, http_map *);
 http_map *   httpReqGet(httpmatch_t *, uint64_t);
-void         httpReqDelete(httpmatch_t *, uint64_t);
-bool         httpReqExpire(httpmatch_t *, uint64_t);
+bool         httpReqDelete(httpmatch_t *, uint64_t);
+bool         httpReqExpire(httpmatch_t *, uint64_t, bool);
 
 
 

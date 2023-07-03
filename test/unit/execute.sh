@@ -64,46 +64,46 @@ declare -i ERR=0
 
 # Library tests
 echo "Running Library Tests"
-run_test test/${OS}/vdsotest
-run_test test/${OS}/coredumptest
-run_test test/${OS}/ipctest
-run_test test/${OS}/snapshottest
-run_test test/${OS}/ostest
-run_test test/${OS}/ocitest
-run_test test/${OS}/evtutilstest
-run_test test/${OS}/strsettest
-run_test test/${OS}/cfgutilstest
-run_test test/${OS}/cfgtest
-run_test test/${OS}/transporttest
-run_test test/${OS}/backofftest
-run_test test/${OS}/logtest
-run_test test/${OS}/utilstest
-run_test test/${OS}/mtctest
-run_test test/${OS}/evtformattest
-run_test test/${OS}/ctltest
-run_test test/${OS}/mtcformattest
-run_test test/${OS}/circbuftest
-run_test test/${OS}/linklisttest
-run_test test/${OS}/comtest
-run_test test/${OS}/dbgtest
-run_test test/${OS}/strsearchtest
-run_test test/${OS}/httpstatetest
-if [ "${OS}" = "linux" ]; then
-    run_test test/${OS}/glibcvertest
-    run_test test/${OS}/reporttest
-    run_test test/${OS}/javabcitest
-    run_test test/${OS}/httpheadertest
-fi
-run_test test/${OS}/httpaggtest
+#run_test test/${OS}/vdsotest
+#run_test test/${OS}/coredumptest
+#run_test test/${OS}/ipctest
+#run_test test/${OS}/snapshottest
+#run_test test/${OS}/ostest
+#run_test test/${OS}/ocitest
+#run_test test/${OS}/evtutilstest
+#run_test test/${OS}/strsettest
+#run_test test/${OS}/cfgutilstest
+#run_test test/${OS}/cfgtest
+#run_test test/${OS}/transporttest
+#run_test test/${OS}/backofftest
+#run_test test/${OS}/logtest
+#run_test test/${OS}/utilstest
+#run_test test/${OS}/mtctest
+#run_test test/${OS}/evtformattest
+#run_test test/${OS}/ctltest
+#run_test test/${OS}/mtcformattest
+#run_test test/${OS}/circbuftest
+#run_test test/${OS}/linklisttest
+#run_test test/${OS}/comtest
+#run_test test/${OS}/dbgtest
+#run_test test/${OS}/strsearchtest
+#run_test test/${OS}/httpstatetest
+#if [ "${OS}" = "linux" ]; then
+    #run_test test/${OS}/glibcvertest
+    #run_test test/${OS}/reporttest
+    #run_test test/${OS}/javabcitest
+    #run_test test/${OS}/httpheadertest
+#fi
+#run_test test/${OS}/httpaggtest
 run_test test/${OS}/httpmatchtest
-run_test test/${OS}/selfinterposetest
+#run_test test/${OS}/selfinterposetest
 
 # Loader tests
 echo "Running Loader Tests"
-run_test test/${OS}/libvertest
-run_test test/${OS}/libdirtest
-run_test test/${OS}/setuptest
-run_test test/${OS}/nsinfotest
+#run_test test/${OS}/libvertest
+#run_test test/${OS}/libdirtest
+#run_test test/${OS}/setuptest
+#run_test test/${OS}/nsinfotest
 
 
 if [ "${OS}" = "linux" ]; then

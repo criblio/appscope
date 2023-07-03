@@ -29,8 +29,6 @@
 #include "utils.h"
 #include "scopestdlib.h"
 
-#define NET_ENTRIES 1024
-#define FS_ENTRIES 1024
 #define NUM_ATTEMPTS 100
 #define MAX_CONVERT (size_t)256
 

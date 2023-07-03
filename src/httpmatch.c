@@ -24,6 +24,7 @@ compare(const void *itema, const void *itemb)
 // They're used to get info from httpReqExpire to markAndDeleteOld
 httpmatch_t *g_match = NULL;
 uint64_t g_circBufCountNow = 0;
+bool g_circBufWasEmptied = FALSE;
 
 // forward declaration
 static void deleteAllReqsFromTree(httpmatch_t *match);
@@ -32,8 +33,8 @@ static void deleteAllReqsFromTree(httpmatch_t *match);
 
 struct _httpmatch_t {
     void *treeRoot;
-    net_info const *netInfo; // NET_ENTRIES array of pointers to net_info
-    list_t const *extraNetInfo; // list of pointers to net_info
+    net_info *netInfo;    // NET_ENTRIES array of pointers to net_info
+    list_t *extraNetInfo; // list of pointers to net_info
     freeReq_fn freeReq;
     size_t cbufSize;
 };
@@ -50,8 +51,8 @@ httpMatchCreate(net_info const * const netInfo,
         DBG(NULL);
     }
 
-    match->netInfo = netInfo;
-    match->extraNetInfo = extraNetInfo;
+    match->netInfo = (net_info *) netInfo;
+    match->extraNetInfo = (list_t *)extraNetInfo;
     match->freeReq = freeReq;
 
     // Not great, but duplicated from ctlCreate()
@@ -88,7 +89,7 @@ createTreeItem(http_map *req)
 {
     tree_node_t *item = scope_calloc(1, sizeof(*item));
     if (!item) return NULL;
-    item->id = req->id;
+    item->id = req->id.uid;
     item->map = req;
     item->circBufCount = 0;
 
@@ -105,11 +106,11 @@ httpReqSave(httpmatch_t *match, http_map *req)
 
     tree_node_t **ptr = scope_tsearch(item, &match->treeRoot, compare);
     if (!ptr) {
-        DBG("failed to add id " PRIu64 ". (insufficient mem)", item->id);
+        DBG("failed to add id %" PRIu64 ". (insufficient mem)", item->id);
         goto err;
     }
     if (item != *ptr) {
-        DBG("failed to add id " PRIu64 ". (duplicate exists)", item->id);
+        DBG("failed to add id %" PRIu64 ". (duplicate exists)", item->id);
         goto err;
     }
     return  TRUE;
@@ -140,24 +141,29 @@ deleteTreeNode(httpmatch_t *match, tree_node_t ** itemptr)
 
     tree_node_t *item = *itemptr;
     http_map *req = item->map;
-    scope_tdelete(item, &match->treeRoot, compare);
+    tree_node_t **ptr = scope_tdelete(item, &match->treeRoot, compare);
+    if (!ptr) {
+        DBG("failed to delete tree node");
+        return;
+    }
     match->freeReq(req);
     scope_free(item);
 }
 
-void
+bool
 httpReqDelete(httpmatch_t *match, uint64_t id)
 {
-    if (!match) return;
+    if (!match) return FALSE;
 
     tree_node_t key = {.id = id, .map = NULL, .circBufCount = 0};
     tree_node_t **ptr = scope_tfind(&key, &match->treeRoot, compare);
     if (!ptr) {
-        DBG("failed to delete id " PRIu64 ". (not found)");
-        return;
+        // nothing to delete
+        return TRUE;
     }
 
     deleteTreeNode(match,ptr);
+    return TRUE;
 }
 
 static void
@@ -169,35 +175,97 @@ deleteAllReqsFromTree(httpmatch_t *match)
 }
 
 
-static void
-markAndDeleteOld(const void *nodep, VISIT which, int depth)
-{
-    tree_node_t *item = *(tree_node_t **)nodep;
+// Behavior is undefined if we delete nodes while walking the tree.
+// Sooo... we store a list of things to delete while walking the tree
+// and delete them when we're done.
+typedef struct _nodelist_t {
+    tree_node_t **ptr;
+    struct _nodelist_t *next;
+} nodelist_t;
+nodelist_t *g_rememberedTreeNodes = NULL;
 
-    // if item is more than CircBufDepth old we can delete it.
-    if (item->circBufCount + g_match->cbufSize > g_circBufCountNow) {
-        deleteTreeNode(g_match, (tree_node_t **)nodep);
+static void
+rememberTreeNodeToDelete(tree_node_t **ptr)
+{
+    nodelist_t *newNode = scope_calloc (1, sizeof (*newNode));
+    newNode->ptr = ptr;
+    newNode->next = NULL;
+
+    // add to end
+    if (!g_rememberedTreeNodes) {
+        g_rememberedTreeNodes = newNode;
+        return;
     }
 
-/*
-    // Look for new candidates to mark for future deletion
-    if request.fd is 0..1023, look at g_netlist[request.fd].uid
-        if request.uid != g_netlist[request.uid].uid, add curcBufCount
-    else // we don't have an fd.  Look in g_extra_net_info_list
-        if uid is not in g_extra_net_info_list add curcBufCount
-*/
+    nodelist_t *end = g_rememberedTreeNodes;
+    while (end->next) {
+        end = end->next;
+    }
+    end->next = newNode;
 
 }
 
+static void
+deleteRememberedTreeNodes(void)
+{
+    while (g_rememberedTreeNodes) {
+        nodelist_t *next = g_rememberedTreeNodes->next;
+        deleteTreeNode(g_match, g_rememberedTreeNodes->ptr);
+        scope_free(g_rememberedTreeNodes);
+        g_rememberedTreeNodes = next;
+    }
+}
+
+static void
+markAndDeleteOld(const void *nodep, VISIT which, int depth)
+{
+    // look at each node in the tree once
+    if (which != leaf && which != endorder) return;
+
+    // item is one tree_node as we walk all nodes of the tree.
+    tree_node_t *item = *(tree_node_t **)nodep;
+
+    // if this has been marked for deletion (circBufCount != 0)
+    // and the circbufWasEmptied or this is more than cbufSize events old,
+    // we can safely delete it.
+    bool circBufHasWrapped =
+        (item->circBufCount + g_match->cbufSize) < g_circBufCountNow;
+    if (item->circBufCount &&
+          (g_circBufWasEmptied || circBufHasWrapped)) {
+        rememberTreeNodeToDelete((tree_node_t **)nodep);
+    }
+
+    // netinfo and extraNetInfo are references to what sockets
+    // are currently active on the datapath side of things.
+    // If the socket descriptor is not in the range of the netInfo
+    // then we'll have to look in extraNetInfo
+    int sd = item->map->id.sockfd;
+    net_info *net = NULL;
+    if (sd < 0 || sd >= NET_ENTRIES) {
+        net = lstFind(g_match->extraNetInfo, item->id);
+    } else {
+        net = &g_match->netInfo[sd];
+    }
+
+    // If the UID is not currently in use by the datapath, mark it for
+    // deletion by saving the circBufCount at this time.
+    if ((!net || net->uid != item->id) && !item->circBufCount) {
+        item->circBufCount = g_circBufCountNow;
+    }
+}
+
 bool
-httpReqExpire(httpmatch_t *match, uint64_t circBufCount)
+httpReqExpire(httpmatch_t *match, uint64_t circBufCount, bool circBufWasEmptied)
 {
     if (!match) return FALSE;
 
     g_match = match;
     g_circBufCountNow = circBufCount;
+    g_circBufWasEmptied = circBufWasEmptied;
+
+    g_rememberedTreeNodes = NULL;
     twalk(match->treeRoot, markAndDeleteOld);
+    deleteRememberedTreeNodes();
     return TRUE;
 }
-
 

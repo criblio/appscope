@@ -179,16 +179,16 @@ deleteAllReqsFromTree(httpmatch_t *match)
 // Sooo... we store a list of things to delete while walking the tree
 // and delete them when we're done.
 typedef struct _nodelist_t {
-    tree_node_t **ptr;
+    uint64_t uid;
     struct _nodelist_t *next;
 } nodelist_t;
 nodelist_t *g_rememberedTreeNodes = NULL;
 
 static void
-rememberTreeNodeToDelete(tree_node_t **ptr)
+rememberTreeNodeToDelete(uint64_t uid)
 {
     nodelist_t *newNode = scope_calloc (1, sizeof (*newNode));
-    newNode->ptr = ptr;
+    newNode->uid = uid;
     newNode->next = NULL;
 
     // add to end
@@ -210,7 +210,7 @@ deleteRememberedTreeNodes(void)
 {
     while (g_rememberedTreeNodes) {
         nodelist_t *next = g_rememberedTreeNodes->next;
-        deleteTreeNode(g_match, g_rememberedTreeNodes->ptr);
+        httpReqDelete(g_match, g_rememberedTreeNodes->uid);
         scope_free(g_rememberedTreeNodes);
         g_rememberedTreeNodes = next;
     }
@@ -232,7 +232,7 @@ markAndDeleteOld(const void *nodep, VISIT which, int depth)
         (item->circBufCount + g_match->cbufSize) < g_circBufCountNow;
     if (item->circBufCount &&
           (g_circBufWasEmptied || circBufHasWrapped)) {
-        rememberTreeNodeToDelete((tree_node_t **)nodep);
+        rememberTreeNodeToDelete(item->id);
     }
 
     // netinfo and extraNetInfo are references to what sockets

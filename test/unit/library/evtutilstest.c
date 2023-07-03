@@ -6,18 +6,6 @@
 #include "test.h"
 #include "scopestdlib.h"
 
-// There isn't a lot of logic to test here unless we want to inject errors
-// in malloc/calloc.  I don't think this is super useful at this time.
-//
-// What *is* super useful is running this test with memory leak analysis
-// compiled in:
-//   make FSAN=1 libtest
-//   LD_LIBRARY_PATH=contrib/build/cmocka/src/ test/linux/evtutilstest
-//
-// Hopefully it goes without saying that there should never be any leaks
-// with this test.
-
-
 static void
 evtProtoAllocHttp1AndFree(void **state) {
     protocol_info *proto = evtProtoAllocHttp1(TRUE);

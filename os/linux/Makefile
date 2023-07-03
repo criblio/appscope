@@ -132,6 +132,9 @@ libtestfsan: $(LIBRARY_C_FILES) $(LIBRARY_TEST_C_FILES) $(YAML_AR) $(JSON_AR) $(
 	$(CC) $(TEST_CFLAGS) $(TEST_FSAN_CFLAGS) -o test/$(OS)/strsearchtest strsearchtest.o strsearch.o scopestdlib.o dbg.o test.o $(TEST_AR) $(TEST_LD_FLAGS) $(TEST_FSAN_LD_FLAGS)
 	@[ -z "$(CI)" ] || echo "::endgroup::"
 
+# Important note:
+# Please extend these tests only as an exception. By default, newly added tests should
+# be placed in 'libtestfsan' where they will be checked against memory leaks.
 libtestnofsan: $(LIBRARY_C_FILES) $(LIBRARY_TEST_C_FILES) $(YAML_AR) $(JSON_AR) $(TEST_LIB)
 	@echo "$${CI:+::group::}Building Library Tests without memory sanitizer"
 	$(CC) -c $(TEST_CFLAGS) $(LIBRARY_C_FILES) $(LIBRARY_INCLUDES) $(LIBRARY_TEST_C_FILES) $(INCLUDES) $(CMOCKA_INCLUDES) $(OS_C_FILES)

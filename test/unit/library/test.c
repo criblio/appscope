@@ -12,8 +12,6 @@
 * See details in:
 * https://github.com/google/sanitizers/wiki/AddressSanitizerIncompatiblity
 *
-*   make FSAN=1 libtest allows to instrument library unit test code
-*
 * The memory leak instrumentation is done by "-fsanitize=address"
 */
 

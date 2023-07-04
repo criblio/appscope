@@ -8,7 +8,7 @@
 #include "evtutils.h"
 #include "httpstate.h"
 #include "plattime.h"
-#include "search.h"
+#include "strsearch.h"
 #include "atomic.h"
 #include "scopestdlib.h"
 

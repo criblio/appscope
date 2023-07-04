@@ -20,7 +20,7 @@
 #include "mtcformat.h"
 #include "plattime.h"
 #include "report.h"
-#include "search.h"
+#include "strsearch.h"
 #include "state.h"
 #include "state_private.h"
 #include "linklist.h"

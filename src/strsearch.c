@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "scopetypes.h"
-#include "search.h"
+#include "strsearch.h"
 #include "scopestdlib.h"
 
 #define ASIZE 256

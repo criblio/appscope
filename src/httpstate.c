@@ -262,7 +262,7 @@ reportHttp1(http_state_t *httpstate)
     // Set post info
     post->ssl = httpstate->id.isSsl;
     post->start_duration = getTime();
-    post->id = httpstate->id.uid;
+    post->id = httpstate->id;
 
     // "transfer ownership" of dynamically allocated header from
     // httpstate object to post object
@@ -295,7 +295,7 @@ reportHttp2(http_state_t *state, net_info *net, http_buf_t *stash,
     http_post *post = (http_post *)proto->data;
     post->ssl            = state->id.isSsl;
     post->start_duration = getTime();
-    post->id             = state->id.uid;
+    post->id             = state->id;
     if (stash->len) {
         scope_memcpy(post->hdr, stash->buf, stash->len);
         scope_memcpy(post->hdr + stash->len, buf, frameLen - stash->len);

@@ -535,7 +535,7 @@ doHttp1Header(protocol_info *proto)
     event_field_t fields[HTTP_MAX_FIELDS];
     http_report hreport;
     http_post *post = (http_post *)proto->data;
-    http_map *map = lstFind(g_maplist, post->id);
+    http_map *map = lstFind(g_maplist, post->id.uid);
 
     // When requests come in, save them in a map to be paired
     // with responses later.
@@ -551,7 +551,7 @@ doHttp1Header(protocol_info *proto)
             return;
         }
 
-        if (lstInsert(g_maplist, post->id, map) == FALSE) {
+        if (lstInsert(g_maplist, post->id.uid, map) == FALSE) {
             destroyHttpMap(map);
             DBG(NULL);
             return;
@@ -642,7 +642,7 @@ doHttp1Header(protocol_info *proto)
             httpFieldEnd(fields, hreport.ix);
 
             event_t sendEvent = INT_EVENT("http.req", proto->len, SET, fields);
-            cmdSendHttp(g_ctl, &sendEvent, post->id, &g_proc);
+            cmdSendHttp(g_ctl, &sendEvent, post->id.uid, &g_proc);
         }
     }
 
@@ -726,7 +726,7 @@ doHttp1Header(protocol_info *proto)
         httpFieldEnd(fields, hreport.ix);
 
         event_t hevent = INT_EVENT("http.resp", proto->len, SET, fields);
-        cmdSendHttp(g_ctl, &hevent, post->id, &g_proc);
+        cmdSendHttp(g_ctl, &hevent, post->id.uid, &g_proc);
 
         // emit statsd metrics, if enabled.
         if ((mtcEnabled(g_mtc)) && (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_HTTP))) {
@@ -751,7 +751,7 @@ doHttp1Header(protocol_info *proto)
         }
 
         // Done; we remove the list entry; complete when reported
-        if (map && (lstDelete(g_maplist, post->id) == FALSE)) {
+        if (map && (lstDelete(g_maplist, post->id.uid) == FALSE)) {
             DBG("Error deleting from g_maplist");
         }
     }
@@ -1282,7 +1282,7 @@ doHttp2Frame(protocol_info *proto)
             // if it's a response message...
             else if (stream->msgType == 2) {
                 // we may need the HTTP/1 state 
-                http_map *map = lstFind(g_maplist, post->id);
+                http_map *map = lstFind(g_maplist, post->id.uid);
 
                 // add duration from request
                 unsigned duration; // msecs

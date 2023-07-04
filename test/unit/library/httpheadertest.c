@@ -123,7 +123,7 @@ headerBasicRequest(void **state)
     net.fd = 0;
     net.type = SOCK_STREAM;
 
-    assert_true(doHttp(0x12345, 0, &net, request, buflen, TLSRX, BUF));
+    assert_true(doHttp(0, &net, request, buflen, TLSRX, BUF));
     //printf("%s: %s\n", __FUNCTION__, header_event);
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
@@ -148,7 +148,7 @@ headerBasicResponse(void **state)
     net.fd = 3;
     net.type = SOCK_STREAM;
 
-    assert_true(doHttp(0x12345, 3, &net, response, strlen(response), TLSRX, BUF));
+    assert_true(doHttp(3, &net, response, strlen(response), TLSRX, BUF));
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
@@ -180,7 +180,7 @@ headerRequestIP(void **state)
 
     net_info *net = getNet(3);
     assert_non_null(net);
-    assert_true(doHttp(0x12345, 3, net, request, strlen(request), TLSRX, BUF));
+    assert_true(doHttp(3, net, request, strlen(request), TLSRX, BUF));
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
@@ -209,7 +209,7 @@ headerResponseIP(void **state)
 
     net_info *net = getNet(3);
     assert_non_null(net);
-    assert_true(doHttp(0x12345, 3, net, response, strlen(response), TLSRX, BUF));
+    assert_true(doHttp(3, net, response, strlen(response), TLSRX, BUF));
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
@@ -237,7 +237,7 @@ headerRequestUnix(void **state)
 
     net_info *net = getUnix(3);
     assert_non_null(net);
-    assert_true(doHttp(0x12345, 3, net, request, strlen(request), TLSRX, BUF));
+    assert_true(doHttp(3, net, request, strlen(request), TLSRX, BUF));
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
@@ -277,7 +277,7 @@ userDefinedHeaderExtract(void **state)
 
     net_info *net = getNet(3);
     assert_non_null(net);
-    assert_true(doHttp(0x12345, 3, net, request, strlen(request), TLSRX, BUF));
+    assert_true(doHttp(3, net, request, strlen(request), TLSRX, BUF));
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {
@@ -314,7 +314,7 @@ xAppScopeHeaderExtract(void **state)
 
     net_info *net = getNet(3);
     assert_non_null(net);
-    assert_true(doHttp(0x12345, 3, net, request, strlen(request), TLSRX, BUF));
+    assert_true(doHttp(3, net, request, strlen(request), TLSRX, BUF));
     //printf("%s: %s\n\n\n", __FUNCTION__, header_event);
     int i;
     for (i=0; i<sizeof(result)/sizeof(result[0]); i++) {

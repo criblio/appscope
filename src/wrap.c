@@ -3203,7 +3203,7 @@ setPreload(char **envp)
         sysprint("%s:%d WARN: calloc\n", __FUNCTION__, __LINE__);
         return NULL;
     }
-    memmove(newenvp, envp, sizeof(char *) * (i+2));
+    scope_memmove(newenvp, envp, sizeof(char *) * (i+2));
 
     newenvp[i] = ldp;
     newenvp[i + 1] = NULL;

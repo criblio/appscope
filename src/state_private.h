@@ -262,6 +262,7 @@ void subFromInterfaceCounts(counters_element_t *, uint64_t);
 // Data that lives in state.c, but is used in report.c too.
 extern summary_t g_summary;
 extern net_info *g_netinfo;
+extern list_t *g_extra_net_info_list;
 extern fs_info *g_fsinfo;
 extern metric_counters g_ctrs;
 

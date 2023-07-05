@@ -94,6 +94,7 @@ if [ "${OS}" = "linux" ]; then
     run_test test/${OS}/javabcitest
     run_test test/${OS}/httpheadertest
 fi
+run_test test/${OS}/httpmatchtest
 run_test test/${OS}/httpaggtest
 run_test test/${OS}/selfinterposetest
 

@@ -682,26 +682,26 @@ setupRules(void *rulesFileMem, size_t rulesSize, uid_t nsUid, gid_t nsGid)
 {
     int rulesFd;
     bool status = FALSE;
-    char criblRulesPath[PATH_MAX];
-    char criblRulesDir[PATH_MAX];
+//    char criblRulesPath[PATH_MAX];
+//    char criblRulesDir[PATH_MAX];
 
     char *rulesPath = SCOPE_RULES_USR_PATH;
     char *rulesDir = SCOPE_USR_PATH;
 
-	// If $CRIBL_HOME is set, only place a rules file there instead
-    const char *criblHome = getenv("CRIBL_HOME");
-    if (criblHome) {
-        if (snprintf(criblRulesPath, sizeof(criblRulesPath), "%s/appscope/scope_rules", criblHome) == -1) {
-            perror("snprintf cribl rules path");
-            return status;
-        }
-        if (snprintf(criblRulesDir, sizeof(criblRulesDir), "%s/appscope", criblHome) == -1) {
-            perror("snprintf cribl rules dir");
-            return status;
-        }
-        rulesPath = criblRulesPath;
-        rulesDir = criblRulesDir;
-    }
+//	// If $CRIBL_HOME is set, only place a rules file there instead
+//    const char *criblHome = getenv("CRIBL_HOME");
+//    if (criblHome) {
+//        if (snprintf(criblRulesPath, sizeof(criblRulesPath), "%s/appscope/scope_rules", criblHome) == -1) {
+//            perror("snprintf cribl rules path");
+//            return status;
+//        }
+//        if (snprintf(criblRulesDir, sizeof(criblRulesDir), "%s/appscope", criblHome) == -1) {
+//            perror("snprintf cribl rules dir");
+//            return status;
+//        }
+//        rulesPath = criblRulesPath;
+//        rulesDir = criblRulesDir;
+//    }
 
     // Create the directory if it does not exist yet
     if (libdirCreateDirIfMissing(rulesDir, 0664, nsUid, nsGid) > MKDIR_STATUS_EXISTS) {

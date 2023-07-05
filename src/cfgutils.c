@@ -3545,8 +3545,8 @@ cfgRulesFilePath(void)
 {
     char *rulesFilePath = NULL;
     char *envRulesVal = getenv("SCOPE_RULES");
-    const char *criblHome = getenv("CRIBL_HOME");
-    char criblRulesPath[PATH_MAX];
+//    const char *criblHome = getenv("CRIBL_HOME");
+//    char criblRulesPath[PATH_MAX];
 
     if (envRulesVal) {
         if (!scope_strcmp(envRulesVal, "false")) {
@@ -3556,14 +3556,14 @@ cfgRulesFilePath(void)
             // SCOPE_RULES contains the path to a rules file.
             rulesFilePath = envRulesVal;
         }
-    } else if (criblHome) {
-        // If $CRIBL_HOME is set, only look for a rules file there instead
-        if (scope_snprintf(criblRulesPath, sizeof(criblRulesPath), "%s/appscope/scope_rules", criblHome) == -1) {
-            scopeLogError("snprintf");
-        }
-        if (!scope_access(criblRulesPath, R_OK)) {
-            rulesFilePath = criblRulesPath;
-        }
+//    } else if (criblHome) {
+//        // If $CRIBL_HOME is set, only look for a rules file there instead
+//        if (scope_snprintf(criblRulesPath, sizeof(criblRulesPath), "%s/appscope/scope_rules", criblHome) == -1) {
+//            scopeLogError("snprintf");
+//        }
+//        if (!scope_access(criblRulesPath, R_OK)) {
+//            rulesFilePath = criblRulesPath;
+//        }
     } else if (!scope_access(SCOPE_RULES_USR_PATH, R_OK)) {
         // rules file was at first default location
         rulesFilePath = SCOPE_RULES_USR_PATH;

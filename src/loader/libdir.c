@@ -511,24 +511,24 @@ libdirGetPath(libdirfile_t objFileType)
         }
     }
 
-    const char *cribl_home = getenv("CRIBL_HOME");
-    if (cribl_home) {
-        char tmp_path[PATH_MAX] = {0};
-        int pathLen = snprintf(tmp_path, PATH_MAX, "%s/appscope/%s/%s", cribl_home, normVer, state->binaryName);
-        if (pathLen < 0) {
-            fprintf(stderr, "error: libdirGetPath: $CRIBL_HOME/appscope/... snprintf() failed.\n");
-            return NULL;
-        }
-        if (pathLen >= PATH_MAX) {
-            fprintf(stderr, "error: libdirGetPath: $CRIBL_HOME/appscope/... path too long.\n");
-            return NULL;
-        }
-
-        if (!access(tmp_path, R_OK)) {
-            strncpy(state->binaryPath, tmp_path, PATH_MAX);
-            return state->binaryPath;
-        }
-    }
+//    const char *cribl_home = getenv("CRIBL_HOME");
+//    if (cribl_home) {
+//        char tmp_path[PATH_MAX] = {0};
+//        int pathLen = snprintf(tmp_path, PATH_MAX, "%s/appscope/%s/%s", cribl_home, normVer, state->binaryName);
+//        if (pathLen < 0) {
+//            fprintf(stderr, "error: libdirGetPath: $CRIBL_HOME/appscope/... snprintf() failed.\n");
+//            return NULL;
+//        }
+//        if (pathLen >= PATH_MAX) {
+//            fprintf(stderr, "error: libdirGetPath: $CRIBL_HOME/appscope/... path too long.\n");
+//            return NULL;
+//        }
+//
+//        if (!access(tmp_path, R_OK)) {
+//            strncpy(state->binaryPath, tmp_path, PATH_MAX);
+//            return state->binaryPath;
+//        }
+//    }
 
     if (g_libdir_info.install_base[0]) {
         // Check install base next
@@ -594,23 +594,23 @@ libdirExtract(unsigned char *asset_file, size_t asset_file_len, uid_t nsUid, gid
 
     // Create the destination directory if it does not exist
     
-    // Try to create $CRIBL_HOME/appscope (if set)
-    const char *cribl_home = getenv("CRIBL_HOME");
-    if (cribl_home) {
-        int pathLen = snprintf(path, PATH_MAX, "/%s/appscope/%s/", cribl_home, loaderVersion);
-        if (pathLen < 0) {
-            fprintf(stderr, "error: libdirExtract: $CRIBL_HOME/appscope/... snprintf() failed.\n");
-            return -1;
-        }
-        if (pathLen >= PATH_MAX) {
-            fprintf(stderr, "error: libdirExtract: $CRIBL_HOME/appscope/... path too long.\n");
-            return -1;
-        }
-        res = libdirCreateDirIfMissing(path, mode, nsUid, nsGid);
-    }
+//    // Try to create $CRIBL_HOME/appscope (if set)
+//    const char *cribl_home = getenv("CRIBL_HOME");
+//    if (cribl_home) {
+//        int pathLen = snprintf(path, PATH_MAX, "/%s/appscope/%s/", cribl_home, loaderVersion);
+//        if (pathLen < 0) {
+//            fprintf(stderr, "error: libdirExtract: $CRIBL_HOME/appscope/... snprintf() failed.\n");
+//            return -1;
+//        }
+//        if (pathLen >= PATH_MAX) {
+//            fprintf(stderr, "error: libdirExtract: $CRIBL_HOME/appscope/... path too long.\n");
+//            return -1;
+//        }
+//        res = libdirCreateDirIfMissing(path, mode, nsUid, nsGid);
+//    }
 
     // If CRIBL_HOME not defined, or there was an error, create usr/lib/appscope
-    if (!cribl_home || res > MKDIR_STATUS_EXISTS) {
+//    if (!cribl_home || res > MKDIR_STATUS_EXISTS) {
         memset(path, 0, PATH_MAX);
         int pathLen = snprintf(path, PATH_MAX, "/usr/lib/appscope/%s/", loaderVersion);
         if (pathLen < 0) {
@@ -622,7 +622,7 @@ libdirExtract(unsigned char *asset_file, size_t asset_file_len, uid_t nsUid, gid
             return -1;
         }
         res = libdirCreateDirIfMissing(path, mode, nsUid, nsGid);
-    }
+//    }
 
     // If all else fails, create /tmp/appscope
     if (res > MKDIR_STATUS_EXISTS) {

@@ -47,7 +47,7 @@ var rulesCmd = &cobra.Command{
   scope rules --add firefox --rootdir /path/to/host/root
   scope rules --remove chromium`,
 	Args: cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
 		rc.Rootdir, _ = cmd.Flags().GetString("rootdir")
 		jsonOut, _ := cmd.Flags().GetBool("json")
@@ -97,7 +97,7 @@ var rulesCmd = &cobra.Command{
 		// Retrieve an existing rules file
 		raw, rulesFile, err := rules.Retrieve(rc.Rootdir)
 		if err != nil {
-			return err
+			util.ErrAndExit("Rules failure: %v", err)
 		}
 
 		// In the case that no --add argument or --remove argument was provided
@@ -111,8 +111,7 @@ var rulesCmd = &cobra.Command{
 				// Marshal to json
 				jsonData, err := json.Marshal(rulesFile)
 				if err != nil {
-					util.Warn("Error marshaling JSON:%v", err)
-					return err
+					util.ErrAndExit("Error marshaling JSON: %v", err)
 				}
 				fmt.Println(string(jsonData))
 			} else {
@@ -120,7 +119,7 @@ var rulesCmd = &cobra.Command{
 				fmt.Println(content)
 			}
 
-			return nil
+			return
 		}
 
 		// Below operations require root
@@ -132,12 +131,16 @@ var rulesCmd = &cobra.Command{
 
 		// Add a process to; or remove a process from the scope rules
 		if addProc != "" {
-			return rules.Add(rulesFile, addProc, procArg, sourceid, rc.Rootdir, rc, unixPath)
+			if err = rules.Add(rulesFile, addProc, procArg, sourceid, rc.Rootdir, rc, unixPath); err != nil {
+				util.ErrAndExit("Rules failure: %v", err)
+			}
 		} else if remProc != "" {
-			return rules.Remove(rulesFile, remProc, sourceid, rc.Rootdir, rc)
+			if err = rules.Remove(rulesFile, remProc, sourceid, rc.Rootdir, rc); err != nil {
+				util.ErrAndExit("Rules failure: %v", err)
+			}
 		}
 
-		return nil
+		return
 	},
 }
 

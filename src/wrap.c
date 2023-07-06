@@ -3285,6 +3285,7 @@ getScopeExec(const char *pathname, char **argv, char **envp)
         }
         scope_free(path);
         if (strlen(args) > 1) scope_free(args);
+        if (cfg) cfgDestroy(&cfg);
     }
 
     if ((ebuf = getElf((char *)pathname))) {

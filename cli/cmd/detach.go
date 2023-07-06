@@ -57,7 +57,9 @@ var detachCmd = &cobra.Command{
 			util.ErrAndExit("Detach failure: %v", errNoScopedProcs)
 		}
 		if len(procs) == 1 {
-			err = rc.Detach(procs[0].Pid)
+			if err = rc.Detach(procs[0].Pid); err != nil {
+				util.ErrAndExit("Detach failure: %v", err)
+			}
 			// Simple approach for now
 			// Later: check for detach then resume
 			if wait {

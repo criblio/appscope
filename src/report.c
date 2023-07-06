@@ -572,6 +572,7 @@ doHttp1Header(protocol_info *proto)
         map->req_len = proto->len;
 
         if (!httpReqSave(g_httpmatch, map)) {
+            // httpReqSave will free map on failure
             DBG("httpReqSave failed for http1 request for fd %d id %" PRIu64, proto->fd, post->id.uid);
             return;
         }

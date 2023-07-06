@@ -1269,13 +1269,13 @@ getChannelNetEntry(uint64_t id)
     return net;
 }
 
-int
+bool
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
     // Find the net_info for the channel
     net_info *net = getNetEntry(sockfd);    // first try by descriptor
     if (!net) net = getChannelNetEntry(id); // fallback to using channel ID
-    if (!net) return 0;
+    if (!net) return FALSE;
 
     scopeLogHexDebug(buf, len > 64 ? 64 : len, // limit hexdump to 64
             "DEBUG: doProtocol(id=%ld, fd=%d, len=%ld, src=%s, dtyp=%s) TLS=%s PROTO=%s",
@@ -1301,7 +1301,7 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
     // Ignore empty payloads that should have been blocked by our interpositions
     if (!len) {
         scopeLogDebug("DEBUG: fd:%d ignoring empty payload", sockfd);
-        return 0;
+        return FALSE;
     }
 
     // Do TLS detection if not already done
@@ -1339,7 +1339,7 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
         }
     }
 
-    return 0;
+    return TRUE;
 }
 
 void

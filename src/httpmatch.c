@@ -38,6 +38,7 @@ httpMatchCreate(net_info const * const netInfo,
     httpmatch_t *match = scope_calloc(1, sizeof(httpmatch_t));
     if (!match) {
         DBG(NULL);
+        return NULL;
     }
 
     match->netInfo = (net_info *) netInfo;

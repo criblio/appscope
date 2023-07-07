@@ -1971,7 +1971,7 @@ init(void)
 
     // Bootstrapping...  we need to know if we're in musl so we can
     // call the right initFn function...
-    
+
     if (osGetExePath(scope_getpid(), &full_path) != -1) {
         if ((ebuf = getElf(full_path))) {
             // SCOPE_APP_TYPE will be set by scopedyn
@@ -2054,7 +2054,7 @@ init(void)
     transportRegisterForExitNotification(handleExit);
 
     initHook(attachedFlag, settings.isActive, ebuf, full_path);
-    
+
     /*
      * If we are interposing (scoping) this process, then proceed
      * with start messages. Else, we need the periodic thread to
@@ -3159,7 +3159,7 @@ getPreload(char **envp)
             // LD_PRELOAD exists, done.
             return TRUE;
         }
-	}
+    }
 
     return FALSE;
 }
@@ -3188,7 +3188,7 @@ setPreload(char **envp)
             // LD_PRELOAD exists, done.
             return NULL;
         }
-	}
+    }
 
     plen = scope_strlen(lib_path) + ldplen + 2;
     if ((ldp = scope_calloc(1, plen)) == NULL) {

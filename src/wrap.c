@@ -3277,15 +3277,14 @@ getScopeExec(const char *pathname, char **argv, char **envp)
         }
 
         cfg = cfgCreateDefault();
-        if (cfgRulesStatus(scope_basename(path), args,
-                           rulesFilePath, cfg) == RULES_NOT_SCOPED) {
-            scope_free(path);
-            if (strlen(args) > 1) scope_free(args);
-            return NULL;
-        }
+        rules_status_t res = cfgRulesStatus(scope_basename(path), args, rulesFilePath, cfg);
+
         scope_free(path);
         if (strlen(args) > 1) scope_free(args);
         if (cfg) cfgDestroy(&cfg);
+        if (res == RULES_NOT_SCOPED) {
+            return NULL;
+        }
     }
 
     if ((ebuf = getElf((char *)pathname))) {

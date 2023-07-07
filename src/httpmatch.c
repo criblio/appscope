@@ -8,17 +8,22 @@
 #define HASH_TABLE_SIZE 257
 //#define HASH_TABLE_SIZE 1
 
+
 typedef struct _hashTable_t {
-    http_map *req;
+    uint64_t sockid;              // Unique for each instance of a socket.
+    int sockfd;                   // socket descriptor.  -1 == "unknown socket"
+    void *data;
     struct _hashTable_t *next;
-    uint64_t circBufCount;
+    uint64_t circBufCount;        // non-zero means we're going to expire this
 } hashTable_t;
 
-struct _httpmatch_t {
+typedef void (*freeData_fn)(void *);
+
+typedef struct _store_t {
     hashTable_t *hashTable[HASH_TABLE_SIZE];
     net_info *netInfo;    // NET_ENTRIES array of pointers to net_info
     list_t *extraNetInfo; // list of pointers to net_info
-    freeReq_fn freeReq;
+    freeData_fn freeData;
     size_t cbufSize;
     struct {
         uint64_t totalSaves;
@@ -26,16 +31,16 @@ struct _httpmatch_t {
         uint64_t totalExpires;
         uint64_t maxListLen;
     } stats;
-};
+} store_t;
 
-httpmatch_t *
-httpMatchCreate(net_info const * const netInfo,
+static store_t *
+storeCreate(net_info const * const netInfo,
                 list_t const * const extraNetInfo,
-                freeReq_fn freeReq)
+                freeData_fn freeData)
 {
-    if (!netInfo || !extraNetInfo || !freeReq) return NULL;
+    if (!netInfo || !extraNetInfo || !freeData) return NULL;
 
-    httpmatch_t *match = scope_calloc(1, sizeof(httpmatch_t));
+    store_t *match = scope_calloc(1, sizeof(store_t));
     if (!match) {
         DBG(NULL);
         return NULL;
@@ -43,7 +48,7 @@ httpMatchCreate(net_info const * const netInfo,
 
     match->netInfo = (net_info *) netInfo;
     match->extraNetInfo = (list_t *)extraNetInfo;
-    match->freeReq = freeReq;
+    match->freeData = freeData;
 
     // Not great, but duplicated from ctlCreate()
     match->cbufSize = DEFAULT_CBUF_SIZE;
@@ -58,11 +63,6 @@ httpMatchCreate(net_info const * const netInfo,
     }
 
     return match;
-}
-
-static uint64_t
-keyOfReq(http_map *req) {
-    return req->id.uid;
 }
 
 static int
@@ -83,7 +83,7 @@ deleteHashTableItem(httpmatch_t *match, hashTable_t **itemptr)
 {
     if (!itemptr || !*itemptr) return;
     hashTable_t *item = *itemptr;
-    if (match->freeReq && item->req) match->freeReq(item->req);
+    if (match->freeData && item->data) match->freeData(item->data);
     scope_free(item);
     *itemptr = NULL;
 }
@@ -110,25 +110,27 @@ deleteAllLists(httpmatch_t *match)
     }
 }
 
-void
-httpMatchDestroy(httpmatch_t **matchptr)
+static void
+storeDestroy(store_t **storeptr)
 {
-    if (!matchptr || !*matchptr) return;
-    httpmatch_t *match = *matchptr;
+    if (!storeptr || !*storeptr) return;
+    store_t *store = *storeptr;
 
-    deleteAllLists(match);
+    deleteAllLists(store);
 
-    scope_free(match);
-    *matchptr = NULL;
+    scope_free(store);
+    *storeptr = NULL;
 }
 
 static hashTable_t *
-createHashTableItem(http_map *req)
+createHashTableItem(void *data, uint64_t sockid, int sockfd)
 {
-    if (!req) return NULL;
+    if (!data) return NULL;
     hashTable_t *item = scope_calloc(1, sizeof(*item));
     if (!item) return NULL;
-    item->req = req;
+    item->sockid = sockid;
+    item->sockfd = sockfd;
+    item->data = data;
     item->next = NULL;
     item->circBufCount = 0;
     return item;
@@ -138,12 +140,10 @@ static bool
 addHashTableItemToList(hashTable_t **listptr, hashTable_t *item)
 {
     if (!listptr || !item) return FALSE;
-    uint64_t itemKey = keyOfReq(item->req);
     hashTable_t *previous = NULL;
     hashTable_t *current = *listptr;
     while (current) {
-        uint64_t currentKey = keyOfReq(current->req);
-        if (currentKey == itemKey) return FALSE;
+        if (current->sockid == item->sockid) return FALSE;
         previous = current;
         current = current->next;
     }
@@ -157,67 +157,64 @@ addHashTableItemToList(hashTable_t **listptr, hashTable_t *item)
     return TRUE;
 }
 
-bool
-httpReqSave(httpmatch_t *match, http_map *req)
+static bool
+storeSave(store_t *store, void *data, uint64_t sockid, int sockfd)
 {
-    if (!match || !req ) return FALSE;
+    if (!store || !data ) return FALSE;
 
-    uint64_t key = keyOfReq(req);
-    hashTable_t **listptr = hashListForKey(match, key);
+    hashTable_t **listptr = hashListForKey(store, sockid);
 
-    hashTable_t *item = createHashTableItem(req);
+    hashTable_t *item = createHashTableItem(data, sockid, sockfd);
     if (!item) {
-        DBG("failed to add id %" PRIu64 ". (insufficient mem)", key);
-        match->freeReq(req);
+        DBG("failed to add id %" PRIu64 ". (insufficient mem)", sockid);
+        store->freeData(data);
         return FALSE;
     }
 
     if (!addHashTableItemToList(listptr, item)) {
-        DBG("Found duplicate req.  Deleting new req.");
-        deleteHashTableItem(match, &item);
+        DBG("Found duplicate data.  Deleting new data.");
+        deleteHashTableItem(store, &item);
         return FALSE;
     }
 
-    match->stats.totalSaves++;
+    store->stats.totalSaves++;
     return TRUE;
 }
 
 static hashTable_t *
-findHashTableItemFromList(hashTable_t *head, uint64_t key)
+findHashTableItemFromList(hashTable_t *head, uint64_t sockid)
 {
     if (!head) return NULL;
     hashTable_t *current = head;
     while (current) {
-        uint64_t currentKey = keyOfReq(current->req);
-        if (currentKey == key) return current;
+        if (current->sockid == sockid) return current;
         current = current->next;
     }
     return NULL;
 }
 
-http_map *
-httpReqGet(httpmatch_t *match, uint64_t key)
+static http_map *
+storeGet(httpmatch_t *match, uint64_t sockid)
 {
     if (!match) return NULL;
 
-    hashTable_t *list = *hashListForKey(match, key);
-    hashTable_t *hashTableItem = findHashTableItemFromList(list, key);
+    hashTable_t *list = *hashListForKey(match, sockid);
+    hashTable_t *hashTableItem = findHashTableItemFromList(list, sockid);
     if (!hashTableItem) return NULL;
-    return hashTableItem->req;
+    return hashTableItem->data;
 }
 
-bool
-httpReqDelete(httpmatch_t *match, uint64_t key)
+static bool
+storeDelete(httpmatch_t *match, uint64_t sockid)
 {
     if (!match) return FALSE;
 
-    hashTable_t **listptr = hashListForKey(match, key);
+    hashTable_t **listptr = hashListForKey(match, sockid);
     hashTable_t *previous = NULL;
     hashTable_t *current = *listptr;
     while (current) {
         hashTable_t *next = current->next;
-        uint64_t currentKey = keyOfReq(current->req);
-        if (currentKey == key) {
+        if (current->sockid == sockid) {
             if (!previous) {
                 *listptr = next;
             } else {
@@ -235,8 +232,8 @@ httpReqDelete(httpmatch_t *match, uint64_t key)
     return TRUE;
 }
 
-bool
-httpReqExpire(httpmatch_t *match, uint64_t circBufCount, bool circBufWasEmptied)
+static bool
+storeExpire(httpmatch_t *match, uint64_t circBufCount, bool circBufWasEmptied)
 {
     if (!match) return FALSE;
 
@@ -275,18 +272,18 @@ httpReqExpire(httpmatch_t *match, uint64_t circBufCount, bool circBufWasEmptied)
                 // are currently active on the datapath side of things.
                 // If the socket descriptor is not in the range of the netInfo
                 // then we'll have to look in extraNetInfo
-                int sd = current->req->id.sockfd;
-                uint64_t currentKey = keyOfReq(current->req);
+                int sockfd = current->sockfd;
+                uint64_t sockid = current->sockid;
                 net_info *net = NULL;
-                if (sd < 0 || sd >= NET_ENTRIES) {
-                    net = lstFind(match->extraNetInfo, currentKey);
+                if (sockfd < 0 || sockfd >= NET_ENTRIES) {
+                    net = lstFind(match->extraNetInfo, sockid);
                 } else {
-                    net = &match->netInfo[sd];
+                    net = &match->netInfo[sockfd];
                 }
 
                 // If the UID is not currently in use by the datapath, mark it for
                 // deletion by saving the circBufCount at this time.
-                if ((!net || net->uid != currentKey) && !current->circBufCount) {
+                if ((!net || net->uid != sockid || !net->active) && !current->circBufCount) {
                     current->circBufCount = circBufCount;
                 }
             }
@@ -304,4 +301,84 @@ httpReqExpire(httpmatch_t *match, uint64_t circBufCount, bool circBufWasEmptied)
 
     return TRUE;
 }
+
+//////////////////////
+
+httpmatch_t *
+httpMatchCreate(net_info const * const netInfo, list_t const * const extraNetInfo, freeReq_fn freeReq)
+{
+    return (httpmatch_t *)storeCreate(netInfo, extraNetInfo, (freeData_fn)freeReq);
+}
+
+void
+httpMatchDestroy(httpmatch_t **matchptr)
+{
+    storeDestroy((store_t **)matchptr);
+}
+
+bool
+httpReqSave(httpmatch_t *match, http_map *req)
+{
+    if (!req) return FALSE;
+    uint64_t sockid = req->id.uid;
+    int sockfd = req->id.sockfd;
+    return storeSave((store_t *)match, req, sockid, sockfd);
+}
+
+http_map *
+httpReqGet(httpmatch_t *match, uint64_t sockid)
+{
+    return (http_map *)storeGet((store_t *)match, sockid);
+}
+
+bool
+httpReqDelete(httpmatch_t *match, uint64_t sockid)
+{
+    return storeDelete((store_t *)match, sockid);
+}
+
+bool
+httpReqExpire(httpmatch_t *match, uint64_t circBufCount, bool circBufWasEmptied)
+{
+    return storeExpire((store_t *)match, circBufCount, circBufWasEmptied);
+}
+
+//////////////////////
+
+channelstore_t *
+channelStoreCreate(net_info const * const netInfo, list_t const * const extraNetInfo, freeChannel_fn freeChannel)
+{
+    return (channelstore_t *)storeCreate(netInfo, extraNetInfo, (freeData_fn)freeChannel);
+}
+
+void
+channelStoreDestroy(channelstore_t **chanStore)
+{
+    storeDestroy((store_t **)chanStore);
+}
+
+bool
+channelSave(channelstore_t *chanStore, http2Channel_t *channel, uint64_t sockid, int sockfd)
+{
+    return storeSave((store_t*)chanStore, channel, sockid, sockfd);
+}
+
+http2Channel_t *
+channelGet(channelstore_t *chanStore, uint64_t sockid)
+{
+    return (http2Channel_t *)storeGet((store_t *)chanStore, sockid);
+}
+
+bool
+channelDelete(channelstore_t *chanStore, uint64_t sockid)
+{
+    return storeDelete((store_t *)chanStore, sockid);
+}
+
+bool
+channelExpire(channelstore_t *chanStore, uint64_t circBufCount, bool circBufWasEmptied)
+{
+    return storeExpire((store_t *)chanStore, circBufCount, circBufWasEmptied);
+}
+
 

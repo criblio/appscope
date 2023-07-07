@@ -119,9 +119,10 @@ typedef struct http_report_t {
 // and replace it with a measured value.  It'd be one less dependency
 // and could be more accurate.
 static int g_interval = DEFAULT_SUMMARY_PERIOD;
-static httpmatch_t *g_httpmatch;
+static httpmatch_t *g_httpmatch = NULL;
+static channelstore_t *g_http2_channels = NULL;
 static search_t *g_http_status = NULL;
-static http_agg_t *g_http_agg;
+static http_agg_t *g_http_agg = NULL;
 static uint64_t g_cumulativeEventCount = 0;
 static uint64_t g_numCallsToDoEvent = 0;
 
@@ -155,33 +156,23 @@ typedef struct http2Stream {
     int lastRespLen;
 } http2Stream_t;
 
-// list of http2Channel_t indexed by channel
-static list_t *g_http2_channels = NULL;
 
 #define DEFAULT_MIN_DURATION_TIME (1)
 
 static void
-destroyHttpMap(void *data)
+destroyHttpMap(http_map *map)
 {
-    if (!data) return;
-    http_map *map = (http_map *)data;
+    if (!map) return;
 
     if (map->req) scope_free(map->req);
     if (map) scope_free(map);
 }
 
-// Adapter to silence complaint about type missmatch
-static void
-freeMap(http_map *map)
-{
-    destroyHttpMap((void *)map);
-}
 
 static void
-destroyHttp2Channel(void *data)
+destroyHttp2Channel(http2Channel_t *info)
 {
-    if (!data) return;
-    http2Channel_t *info = (http2Channel_t *)data;
+    if (!info) return;
 
     lshpack_dec_cleanup(&info->decoder);
     if (info->streams) {
@@ -210,10 +201,10 @@ initReporting()
     // NB: Each of these does a dynamic allocation that we are not releasing.
     //     They don't grow and would ideally be released when the reporting
     //     thread exits but we've not gotten to it yet. 
-    g_http2_channels = lstCreate(destroyHttp2Channel);
     g_http_status = searchComp(HTTP_STATUS);
     g_http_agg = httpAggCreate();
-    g_httpmatch = httpMatchCreate(g_netinfo, g_extra_net_info_list, freeMap);
+    g_httpmatch = httpMatchCreate(g_netinfo, g_extra_net_info_list, destroyHttpMap);
+    g_http2_channels = channelStoreCreate(g_netinfo, g_extra_net_info_list, destroyHttp2Channel);
 }
 
 void
@@ -1044,7 +1035,7 @@ doHttp2Frame(protocol_info *proto)
         // the message.
 
         // get/create the channel info
-        http2Channel_t *channel = lstFind(g_http2_channels, proto->uid);
+        http2Channel_t *channel = channelGet(g_http2_channels, proto->uid);
         if (!channel) {
             channel = scope_calloc(1, sizeof(http2Channel_t));
             if (!channel) {
@@ -1057,8 +1048,8 @@ doHttp2Frame(protocol_info *proto)
             lshpack_dec_set_max_capacity(&channel->decoder, 0x4000);
             channel->streams = lstCreate(destroyHttp2Stream);
 
-            if (lstInsert(g_http2_channels, proto->uid, channel) != TRUE) {
-                destroyHttp2Channel(channel);
+            if (channelSave(g_http2_channels, channel, proto->uid, proto->fd) != TRUE) {
+                // channelSave will free channel on failure
                 scopeLogError("ERROR: failed to insert channel");
                 DBG(NULL);
                 return;
@@ -2929,7 +2920,7 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         // for the channel. Instead of searching first and then deleting, just
         // delete and let it fail if it's not there.
         httpReqDelete(g_httpmatch, net->uid);  // HTTP/1 saved state
-        lstDelete(g_http2_channels, net->uid); // HTTP/2 saved state
+        channelDelete(g_http2_channels, net->uid); // HTTP/2 saved state
 
         // Most NET events get blocked on the data side when the watch/source
         // is disabled but logic added in postNetState() will send this one
@@ -3492,6 +3483,7 @@ doEvent()
 
     if ((++g_numCallsToDoEvent % 1000) == 0) {
         httpReqExpire(g_httpmatch, g_cumulativeEventCount, !exitedLoopEarly);
+        channelExpire(g_http2_channels, g_cumulativeEventCount, !exitedLoopEarly);
     }
 
 

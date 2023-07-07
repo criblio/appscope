@@ -165,7 +165,7 @@ destroyHttpMap(http_map *map)
     if (!map) return;
 
     if (map->req) scope_free(map->req);
-    if (map) scope_free(map);
+    scope_free(map);
 }
 
 

@@ -81,7 +81,7 @@ hashListForKey(httpmatch_t *match, uint64_t key)
 static void
 deleteHashTableItem(httpmatch_t *match, hashTable_t **itemptr)
 {
-    if (!itemptr || !*itemptr) return;
+    if (!match || !itemptr || !*itemptr) return;
     hashTable_t *item = *itemptr;
     if (match->freeData && item->data) match->freeData(item->data);
     scope_free(item);
@@ -91,7 +91,7 @@ deleteHashTableItem(httpmatch_t *match, hashTable_t **itemptr)
 static void
 deleteList(httpmatch_t *match, hashTable_t **head)
 {
-    if (!head || !*head) return;
+    if (!match || !head || !*head) return;
     hashTable_t *current = *head;
     while (current) {
         hashTable_t *next = current->next;

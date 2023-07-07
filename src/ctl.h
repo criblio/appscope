@@ -106,7 +106,7 @@ char *        ctlCreateTxMsg(upload_t*);
 typedef struct _ctl_t ctl_t;
 
 // Constructors Destructors
-ctl_t * ctlCreate();
+ctl_t * ctlCreate(void);
 void    ctlDestroy(ctl_t **);
 
 // Raw Send (without messaging protocol)

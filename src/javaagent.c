@@ -784,7 +784,7 @@ Agent_OnLoad(JavaVM *jvm, char *options, void *reserved)
 
 // This overrides a weak definition in src/linux/os.c
 void
-initJavaAgent() {
+initJavaAgent(void) {
     char *var = getenv("LD_PRELOAD");
     if (var != NULL) {
         /*

@@ -174,7 +174,7 @@ static cfg_buffer_t bufDefault[] = {
 // Constructors Destructors
 ///////////////////////////////////
 config_t *
-cfgCreateDefault()
+cfgCreateDefault(void)
 { 
     config_t *c = scope_calloc(1, sizeof(config_t));
     if (!c) {

@@ -492,8 +492,11 @@ typedef jint (JNICALL *jvmtiArrayPrimitiveValueCallback)
 typedef jint (JNICALL *jvmtiStringPrimitiveValueCallback)
     (jlong class_tag, jlong size, jlong* tag_ptr, const jchar* value, jint value_length, void* user_data);
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-prototypes"
 typedef jint (JNICALL *jvmtiReservedCallback)
     ();
+#pragma GCC diagnostic pop
 
 typedef jvmtiIterationControl (JNICALL *jvmtiHeapObjectCallback)
     (jlong class_tag, jlong size, jlong* tag_ptr, void* user_data);

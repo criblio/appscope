@@ -16,7 +16,7 @@ struct _mtc_t
 };
 
 mtc_t *
-mtcCreate()
+mtcCreate(void)
 {
     mtc_t *mtc = scope_calloc(1, sizeof(mtc_t));
     if (!mtc) {

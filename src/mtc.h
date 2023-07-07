@@ -7,7 +7,7 @@
 typedef struct _mtc_t mtc_t;
 
 // Constructors Destructors
-mtc_t*              mtcCreate();
+mtc_t*              mtcCreate(void);
 void                mtcDestroy(mtc_t**);
 
 // Accessors

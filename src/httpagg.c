@@ -60,7 +60,7 @@ struct _http_agg_t {
 
 
 http_agg_t *
-httpAggCreate()
+httpAggCreate(void)
 {
     http_agg_t* agg = scope_calloc(1, sizeof(*agg));
     target_agg_t** target_lst = scope_calloc(1, sizeof(*target_lst) * DEFAULT_TARGET_LEN);

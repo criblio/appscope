@@ -292,7 +292,7 @@ tap_entry(enum tap_id id) {
 }
 
 static void
-adjustGoStructOffsetsForVersion()
+adjustGoStructOffsetsForVersion(void)
 {
     if (!g_go_minor_ver) {
         sysprint("ERROR: can't determine minor go version\n");

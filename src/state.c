@@ -204,7 +204,7 @@ addProtocol(request_t *req)
 }
 
 static void
-initPayloadDetect()
+initPayloadDetect(void)
 {
     int errornumber = 0;
     PCRE2_SIZE erroroffset = 0;
@@ -278,7 +278,7 @@ error:
 }
 
 void
-initState()
+initState(void)
 {
     // Per a Read Update & Change (RUC) model; now that the object is ready assign the global
     if ((g_netinfo = (net_info *)scope_calloc(1, sizeof(struct net_info_t) * NET_ENTRIES)) == NULL) {
@@ -317,7 +317,7 @@ initState()
 }
 
 void
-resetState()
+resetState(void)
 {
     scope_memset(&g_ctrs, 0, sizeof(struct metric_counters_t));
 }
@@ -2453,7 +2453,7 @@ doCloseAndReportFailures(int fd, int success, const char *func)
 }
 
 void
-doCloseAllStreams()
+doCloseAllStreams(void)
 {
     if (!g_fsinfo) return;
     int i;

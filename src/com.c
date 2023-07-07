@@ -203,7 +203,7 @@ err:
 }
 
 static cJSON *
-jsonEnvironmentObject()
+jsonEnvironmentObject(void)
 {
     cJSON* root = NULL;
 

@@ -163,7 +163,7 @@ filterSet(local_re_t *re, const char *str, const char *default_val)
 }
 
 evt_fmt_t *
-evtFormatCreate()
+evtFormatCreate(void)
 {
     evt_fmt_t *evt = scope_calloc(1, sizeof(evt_fmt_t));
     if (!evt) {

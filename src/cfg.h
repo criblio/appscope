@@ -12,7 +12,7 @@ typedef struct {
 } custom_tag_t;
 
 // Constructors Destructors
-config_t*           cfgCreateDefault();
+config_t*           cfgCreateDefault(void);
 void                cfgDestroy(config_t**);
 
 // Accessors

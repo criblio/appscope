@@ -746,7 +746,7 @@ osThreadInit(void(*handler)(int, siginfo_t *, void *), unsigned interval) {
 // This weak definition allows us to not have to define this symbol for
 // unit tests or for the scope executable.
 void __attribute__((weak))
-initJavaAgent() {
+initJavaAgent(void) {
     return;
 }
 

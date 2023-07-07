@@ -167,13 +167,12 @@ storeSave(store_t *store, void *data, uint64_t sockid, int sockfd)
     hashTable_t *item = createHashTableItem(data, sockid, sockfd);
     if (!item) {
         DBG("failed to add id %" PRIu64 ". (insufficient mem)", sockid);
-        store->freeData(data);
         return FALSE;
     }
 
     if (!addHashTableItemToList(listptr, item)) {
         DBG("Found duplicate data.  Deleting new data.");
-        deleteHashTableItem(store, &item);
+        scope_free(item);
         return FALSE;
     }
 

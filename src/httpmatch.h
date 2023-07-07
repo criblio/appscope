@@ -21,7 +21,7 @@
 // When all requests and responses on the datapath side can be added to the
 // event circular buffer, we know we can delete saved requests whenever we
 // pair them with a response.  We'll be able to free memory for requests
-// as reponses are received.
+// as responses are received.
 
 // Things can get ugly for http matching when the circular buffer toggles
 // between being full and being empty.  In this state, on the reporting side,

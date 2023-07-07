@@ -563,7 +563,7 @@ doHttp1Header(protocol_info *proto)
         map->req_len = proto->len;
 
         if (!httpReqSave(g_httpmatch, map)) {
-            // httpReqSave will free map on failure
+            destroyHttpMap(map);
             DBG("httpReqSave failed for http1 request for fd %d id %" PRIu64, proto->fd, post->id.uid);
             return;
         }
@@ -1049,7 +1049,7 @@ doHttp2Frame(protocol_info *proto)
             channel->streams = lstCreate(destroyHttp2Stream);
 
             if (channelSave(g_http2_channels, channel, proto->uid, proto->fd) != TRUE) {
-                // channelSave will free channel on failure
+                destroyHttp2Channel(channel);
                 scopeLogError("ERROR: failed to insert channel");
                 DBG(NULL);
                 return;

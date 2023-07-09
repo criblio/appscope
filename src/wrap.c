@@ -1768,7 +1768,6 @@ static const char *const doNotScopeList[] = {
     "power-profiles-daemon",
     "snap",
     "snapd",
-    "sshd",
     "udisksd",
     "upowerd",
     "wpa_supplicant",

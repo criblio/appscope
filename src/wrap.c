@@ -2029,6 +2029,16 @@ init(void)
     // contents of a rules file, env vars, scope.yml, etc.
     settings_t settings = getSettings(attachedFlag);
 
+    /*
+    * Stop further processing if the process is on the deny list.
+    * We saw the processes that are not able to survive constructor because
+    * of AppArmor settings e.g. snapd. Therefore we opt out from further
+    * constructor logic.
+    */
+    if ((settings.isActive == FALSE) && (doImplicitDeny() == FALSE)) {
+        return;
+    }
+
     // on aarch64, the crypto subsystem installs handlers for SIGILL
     // (contrib/openssl/crypto/armcap.c) to determine which version of
     // ARM processor we're on.  Do this before enableSnapshot() below.

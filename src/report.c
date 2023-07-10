@@ -16,11 +16,12 @@
 #include "evtutils.h"
 #include "fn.h"
 #include "httpagg.h"
+#include "httpmatch.h"
 #include "metriccapture.h"
 #include "mtcformat.h"
 #include "plattime.h"
 #include "report.h"
-#include "search.h"
+#include "strsearch.h"
 #include "state.h"
 #include "state_private.h"
 #include "linklist.h"
@@ -117,10 +118,13 @@ typedef struct http_report_t {
 // TBD - Ideally, we'd remove this dependency on the configured interval
 // and replace it with a measured value.  It'd be one less dependency
 // and could be more accurate.
-int g_interval = DEFAULT_SUMMARY_PERIOD;
-static list_t *g_maplist;
+static int g_interval = DEFAULT_SUMMARY_PERIOD;
+static httpmatch_t *g_httpmatch = NULL;
+static channelstore_t *g_http2_channels = NULL;
 static search_t *g_http_status = NULL;
-static http_agg_t *g_http_agg;
+static http_agg_t *g_http_agg = NULL;
+static uint64_t g_cumulativeEventCount = 0;
+static uint64_t g_numCallsToDoEvent = 0;
 
 // saved state for an HTTP/2 channel
 typedef struct http2Channel {
@@ -152,26 +156,23 @@ typedef struct http2Stream {
     int lastRespLen;
 } http2Stream_t;
 
-// list of http2Channel_t indexed by channel
-static list_t *g_http2_channels = NULL;
 
 #define DEFAULT_MIN_DURATION_TIME (1)
 
 static void
-destroyHttpMap(void *data)
+destroyHttpMap(http_map *map)
 {
-    if (!data) return;
-    http_map *map = (http_map *)data;
+    if (!map) return;
 
     if (map->req) scope_free(map->req);
-    if (map) scope_free(map);
+    scope_free(map);
 }
 
+
 static void
-destroyHttp2Channel(void *data)
+destroyHttp2Channel(http2Channel_t *info)
 {
-    if (!data) return;
-    http2Channel_t *info = (http2Channel_t *)data;
+    if (!info) return;
 
     lshpack_dec_cleanup(&info->decoder);
     if (info->streams) {
@@ -200,10 +201,10 @@ initReporting()
     // NB: Each of these does a dynamic allocation that we are not releasing.
     //     They don't grow and would ideally be released when the reporting
     //     thread exits but we've not gotten to it yet. 
-    g_maplist = lstCreate(destroyHttpMap);
-    g_http2_channels = lstCreate(destroyHttp2Channel);
     g_http_status = searchComp(HTTP_STATUS);
     g_http_agg = httpAggCreate();
+    g_httpmatch = httpMatchCreate(g_netinfo, g_extra_net_info_list, destroyHttpMap);
+    g_http2_channels = channelStoreCreate(g_netinfo, g_extra_net_info_list, destroyHttp2Channel);
 }
 
 void
@@ -533,27 +534,21 @@ doHttp1Header(protocol_info *proto)
 
     char *ssl;
     event_field_t fields[HTTP_MAX_FIELDS];
-    http_report hreport;
+    http_report hreport = {0};
     http_post *post = (http_post *)proto->data;
-    http_map *map = lstFind(g_maplist, post->id);
+    http_map *map = httpReqGet(g_httpmatch, post->id.uid);
 
     // When requests come in, save them in a map to be paired
     // with responses later.
     if (proto->ptype == EVT_HREQ) {
 
         if (map) {
-            DBG("Duplicate http1 request");
+            DBG("Duplicate http1 request for fd %d id %" PRIu64, proto->fd, post->id.uid);
             return;
         }
 
         if ((map = scope_calloc(1, sizeof(http_map))) == NULL) {
-            DBG(NULL);
-            return;
-        }
-
-        if (lstInsert(g_maplist, post->id, map) == FALSE) {
-            destroyHttpMap(map);
-            DBG(NULL);
+            DBG("Memory allocation failure for http1 request for fd %d id %" PRIu64, proto->fd, post->id.uid);
             return;
         }
 
@@ -566,6 +561,13 @@ doHttp1Header(protocol_info *proto)
         map->req = (char *)post->hdr;
         post->hdr = NULL;  // we're transferring ownership, map will free it
         map->req_len = proto->len;
+
+        if (!httpReqSave(g_httpmatch, map)) {
+            destroyHttpMap(map);
+            DBG("httpReqSave failed for http1 request for fd %d id %" PRIu64, proto->fd, post->id.uid);
+            return;
+        }
+
     }
 
     ssl = (post->ssl) ? "https" : "http";
@@ -642,7 +644,7 @@ doHttp1Header(protocol_info *proto)
             httpFieldEnd(fields, hreport.ix);
 
             event_t sendEvent = INT_EVENT("http.req", proto->len, SET, fields);
-            cmdSendHttp(g_ctl, &sendEvent, post->id, &g_proc);
+            cmdSendHttp(g_ctl, &sendEvent, post->id.uid, &g_proc);
         }
     }
 
@@ -726,7 +728,7 @@ doHttp1Header(protocol_info *proto)
         httpFieldEnd(fields, hreport.ix);
 
         event_t hevent = INT_EVENT("http.resp", proto->len, SET, fields);
-        cmdSendHttp(g_ctl, &hevent, post->id, &g_proc);
+        cmdSendHttp(g_ctl, &hevent, post->id.uid, &g_proc);
 
         // emit statsd metrics, if enabled.
         if ((mtcEnabled(g_mtc)) && (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_HTTP))) {
@@ -751,8 +753,8 @@ doHttp1Header(protocol_info *proto)
         }
 
         // Done; we remove the list entry; complete when reported
-        if (map && (lstDelete(g_maplist, post->id) == FALSE)) {
-            DBG("Error deleting from g_maplist");
+        if (map && !httpReqDelete(g_httpmatch, post->id.uid)) {
+            DBG("Error deleting http1 request for fd %d id %" PRIu64, proto->fd, post->id.uid);
         }
     }
 
@@ -1033,7 +1035,7 @@ doHttp2Frame(protocol_info *proto)
         // the message.
 
         // get/create the channel info
-        http2Channel_t *channel = lstFind(g_http2_channels, proto->uid);
+        http2Channel_t *channel = channelGet(g_http2_channels, proto->uid);
         if (!channel) {
             channel = scope_calloc(1, sizeof(http2Channel_t));
             if (!channel) {
@@ -1046,7 +1048,7 @@ doHttp2Frame(protocol_info *proto)
             lshpack_dec_set_max_capacity(&channel->decoder, 0x4000);
             channel->streams = lstCreate(destroyHttp2Stream);
 
-            if (lstInsert(g_http2_channels, proto->uid, channel) != TRUE) {
+            if (channelSave(g_http2_channels, channel, proto->uid, proto->fd) != TRUE) {
                 destroyHttp2Channel(channel);
                 scopeLogError("ERROR: failed to insert channel");
                 DBG(NULL);
@@ -1282,7 +1284,7 @@ doHttp2Frame(protocol_info *proto)
             // if it's a response message...
             else if (stream->msgType == 2) {
                 // we may need the HTTP/1 state 
-                http_map *map = lstFind(g_maplist, post->id);
+                http_map *map = httpReqGet(g_httpmatch, post->id.uid);
 
                 // add duration from request
                 unsigned duration; // msecs
@@ -2917,8 +2919,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         // possible, even likely, these operations will fail to find an entry
         // for the channel. Instead of searching first and then deleting, just
         // delete and let it fail if it's not there.
-        lstDelete(g_maplist, net->uid);        // HTTP/1 saved state
-        lstDelete(g_http2_channels, net->uid); // HTTP/2 saved state
+        httpReqDelete(g_httpmatch, net->uid);  // HTTP/1 saved state
+        channelDelete(g_http2_channels, net->uid); // HTTP/2 saved state
 
         // Most NET events get blocked on the data side when the watch/source
         // is disabled but logic added in postNetState() will send this one
@@ -3423,17 +3425,20 @@ doHttpAgg()
 // this seemed adequate for our ipc to remain responsive.
 #define MAX_EVT_COUNT ( DEFAULT_MAXEVENTSPERSEC / 20 )
 
+
 void
 doEvent()
 {
     uint64_t data;
     uint64_t eventCount = 0;
+    bool exitedLoopEarly = FALSE;
 
     if (doConnection() == FALSE) return;
 
     while ((data = msgEventGet(g_ctl)) != -1) {
         if (data) {
             evt_type *event = (evt_type *)data;
+
             net_info *net;
             fs_info *fs;
             stat_err_info *staterr;
@@ -3462,7 +3467,7 @@ doEvent()
             }
 
             evtFree(event);
-
+            g_cumulativeEventCount++;
         }
 
         // If the datapath adds messages faster than we can consume them,
@@ -3471,9 +3476,17 @@ doEvent()
         // this loop to go forever.
         if (!ctlProcessAllQueuedEventsNow(g_ctl) &&
             (eventCount++ >= MAX_EVT_COUNT)) {
+            exitedLoopEarly = TRUE;
             break;
         }
     }
+
+    if ((++g_numCallsToDoEvent % 1000) == 0) {
+        httpReqExpire(g_httpmatch, g_cumulativeEventCount, !exitedLoopEarly);
+        channelExpire(g_http2_channels, g_cumulativeEventCount, !exitedLoopEarly);
+    }
+
+
     reportAllCapturedMetrics();
     ctlFlushLog(g_ctl);
     ctlFlush(g_ctl);

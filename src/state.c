@@ -20,7 +20,7 @@
 #include "metriccapture.h"
 #include "mtcformat.h"
 #include "plattime.h"
-#include "search.h"
+#include "strsearch.h"
 #include "state.h"
 #include "state_private.h"
 #include "pcre2.h"
@@ -29,8 +29,6 @@
 #include "utils.h"
 #include "scopestdlib.h"
 
-#define NET_ENTRIES 1024
-#define FS_ENTRIES 1024
 #define NUM_ATTEMPTS 100
 #define MAX_CONVERT (size_t)256
 
@@ -56,7 +54,7 @@ static protocol_def_t *g_statsd_protocol_def = NULL;
 
 // Linked list, indexed by channel ID, of net_info pointers used in
 // doProtocol() when it's not provided with a valid file descriptor.
-static list_t *g_extra_net_info_list = NULL;
+list_t *g_extra_net_info_list = NULL;
 
 #define DATA_FIELD(val)         STRFIELD("data",           (val),        1)
 #define UNIT_FIELD(val)         STRFIELD("unit",           (val),        1)
@@ -1271,12 +1269,13 @@ getChannelNetEntry(uint64_t id)
     return net;
 }
 
-int
+bool
 doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_data_t dtype)
 {
     // Find the net_info for the channel
     net_info *net = getNetEntry(sockfd);    // first try by descriptor
     if (!net) net = getChannelNetEntry(id); // fallback to using channel ID
+    if (!net) return FALSE;
 
     scopeLogHexDebug(buf, len > 64 ? 64 : len, // limit hexdump to 64
             "DEBUG: doProtocol(id=%ld, fd=%d, len=%ld, src=%s, dtyp=%s) TLS=%s PROTO=%s",
@@ -1302,7 +1301,7 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
     // Ignore empty payloads that should have been blocked by our interpositions
     if (!len) {
         scopeLogDebug("DEBUG: fd:%d ignoring empty payload", sockfd);
-        return 0;
+        return FALSE;
     }
 
     // Do TLS detection if not already done
@@ -1329,18 +1328,18 @@ doProtocol(uint64_t id, int sockfd, void *buf, size_t len, metric_t src, src_dat
             if ((!scope_strcasecmp(net->protoProtoDef->protname, "HTTP")) &&
                 ((cfgEvtEnable(g_cfg.staticfg) && cfgEvtFormatSourceEnabled(g_cfg.staticfg, CFG_SRC_HTTP)) ||
                  (cfgMtcEnable(g_cfg.staticfg) && (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_HTTP))))) {
-                doHttp(id, sockfd, net, buf, len, src, dtype);
+                doHttp(sockfd, net, buf, len, src, dtype);
             }
 
             if (cfgMtcEnable(g_cfg.staticfg) && cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_STATSD) &&
                 !scope_strcasecmp(net->protoProtoDef->protname, "STATSD")) {
 
-                doMetricCapture(id, sockfd, net, buf, len, src, dtype);
+                doMetricCapture(sockfd, net, buf, len, src, dtype);
             }
         }
     }
 
-    return 0;
+    return TRUE;
 }
 
 void

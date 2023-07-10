@@ -4,6 +4,9 @@
 #include <limits.h>
 #include <sys/socket.h>
 
+#define NET_ENTRIES 1024
+#define FS_ENTRIES 1024
+
 #define PROTOCOL_STR 16
 #define FUNC_MAX 24
 #define HDRTYPE_MAX 16
@@ -87,17 +90,25 @@ typedef struct evt_type_t {
     metric_t evtype;
 } evt_type;
 
+typedef struct
+{
+    uint64_t uid;
+    int sockfd;
+    int isSsl;
+    metric_t src;
+} httpId_t;
+
 typedef struct http_post_t {
     int ssl;
     uint64_t start_duration;
-    uint64_t id;
+    httpId_t id;
     char *hdr;
 } http_post;
 
 typedef struct http_map_t {
     time_t first_time;
     uint64_t start_time;
-    uint64_t id;
+    httpId_t id;
     char *req;          // The whole original request
     size_t req_len;
 } http_map;
@@ -116,14 +127,6 @@ typedef enum {
     HTTP_HDREND,
     HTTP_DATA
 } http_enum_t;
-
-typedef struct
-{
-    uint64_t uid;
-    int sockfd;
-    int isSsl;
-    metric_t src;
-} httpId_t;
 
 // storage for partial HTTP/2 frames
 typedef struct {
@@ -259,6 +262,7 @@ void subFromInterfaceCounts(counters_element_t *, uint64_t);
 // Data that lives in state.c, but is used in report.c too.
 extern summary_t g_summary;
 extern net_info *g_netinfo;
+extern list_t *g_extra_net_info_list;
 extern fs_info *g_fsinfo;
 extern metric_counters g_ctrs;
 

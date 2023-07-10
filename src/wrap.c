@@ -1766,7 +1766,8 @@ static const char *const doNotScopeList[] = {
     "NetworkManager",
     "polkitd",
     "power-profiles-daemon",
-    "sshd",
+    "snap",
+    "snapd",
     "udisksd",
     "upowerd",
     "wpa_supplicant",
@@ -1971,7 +1972,7 @@ init(void)
 
     // Bootstrapping...  we need to know if we're in musl so we can
     // call the right initFn function...
-    
+
     if (osGetExePath(scope_getpid(), &full_path) != -1) {
         if ((ebuf = getElf(full_path))) {
             // SCOPE_APP_TYPE will be set by scopedyn
@@ -2028,6 +2029,16 @@ init(void)
     // contents of a rules file, env vars, scope.yml, etc.
     settings_t settings = getSettings(attachedFlag);
 
+    /*
+    * Stop further processing if the process is on the deny list.
+    * We saw the processes that are not able to survive constructor because
+    * of AppArmor settings e.g. snapd. Therefore we opt out from further
+    * constructor logic.
+    */
+    if ((settings.isActive == FALSE) && (doImplicitDeny() == FALSE)) {
+        return;
+    }
+
     // on aarch64, the crypto subsystem installs handlers for SIGILL
     // (contrib/openssl/crypto/armcap.c) to determine which version of
     // ARM processor we're on.  Do this before enableSnapshot() below.
@@ -2054,7 +2065,7 @@ init(void)
     transportRegisterForExitNotification(handleExit);
 
     initHook(attachedFlag, settings.isActive, ebuf, full_path);
-    
+
     /*
      * If we are interposing (scoping) this process, then proceed
      * with start messages. Else, we need the periodic thread to
@@ -3159,7 +3170,7 @@ getPreload(char **envp)
             // LD_PRELOAD exists, done.
             return TRUE;
         }
-	}
+    }
 
     return FALSE;
 }
@@ -3188,7 +3199,7 @@ setPreload(char **envp)
             // LD_PRELOAD exists, done.
             return NULL;
         }
-	}
+    }
 
     plen = scope_strlen(lib_path) + ldplen + 2;
     if ((ldp = scope_calloc(1, plen)) == NULL) {

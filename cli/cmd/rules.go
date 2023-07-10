@@ -135,7 +135,7 @@ var rulesCmd = &cobra.Command{
 				util.ErrAndExit("Rules failure: %v", err)
 			}
 		} else if remProc != "" {
-			if err = rules.Remove(rulesFile, remProc, sourceid, rc.Rootdir, rc); err != nil {
+			if err = rules.Remove(rulesFile, remProc, procArg, sourceid, rc.Rootdir, rc); err != nil {
 				util.ErrAndExit("Rules failure: %v", err)
 			}
 		}

@@ -3202,11 +3202,14 @@ processAllowProcCmdLineScalar(yaml_document_t *doc, yaml_node_t *node, void *ext
 
     rules_cfg_t *fCfg = (rules_cfg_t *)extData;
     const char *cmdline = (const char *)node->data.scalar.value;
-    if ((scope_strlen(cmdline) > 0) &&
-        (scope_strstr(fCfg->procCmdLine, cmdline)
-         || !scope_strcmp(MATCH_ALL_VAL, cmdline))) {
-        fCfg->status = PROC_ALLOWED;
-        fCfg->rulesMatch = TRUE;
+    if (scope_strlen(cmdline) > 0) { // an arg is specified in the rules file
+        if (scope_strstr(fCfg->procCmdLine, cmdline) || !scope_strcmp(MATCH_ALL_VAL, cmdline)) {
+            fCfg->status = PROC_ALLOWED;
+            fCfg->rulesMatch = TRUE;
+        } else {
+            fCfg->status = PROC_DENIED;
+            fCfg->rulesMatch = FALSE;
+        }
     }
 }
 

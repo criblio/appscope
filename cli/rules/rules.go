@@ -189,7 +189,7 @@ func Add(rulesFile libscope.Rules, addProc, procArg, sourceid, rootdir string, r
 
 // Remove a process from the scope rules
 // Note: No matching of the 'arg' field intended for removal.
-func Remove(rulesFile libscope.Rules, remProc, sourceid, rootdir string, rc *run.Config) error {
+func Remove(rulesFile libscope.Rules, remProc, procArg, sourceid, rootdir string, rc *run.Config) error {
 
 	// Create a history directory for logs
 	rc.CreateWorkDirBasic("rules")
@@ -206,7 +206,7 @@ func Remove(rulesFile libscope.Rules, remProc, sourceid, rootdir string, rc *run
 	// (only if there are changes)
 	remove := -1
 	for i, entry := range rulesFile.Allow {
-		if entry.ProcName == remProc && entry.SourceId == sourceid {
+		if entry.ProcName == remProc && entry.SourceId == sourceid && entry.ProcArg == procArg {
 			remove = i
 		}
 	}

@@ -29,7 +29,7 @@ var inspectCmd = &cobra.Command{
   scope inspect --all --rootdir /path/to/host/root
   scope inspect --all --rootdir /path/to/host/root/proc/<hostpid>/root`,
 	Args: cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
 		all, _ := cmd.Flags().GetBool("all")
 		rootdir, _ := cmd.Flags().GetString("rootdir")
@@ -57,17 +57,17 @@ var inspectCmd = &cobra.Command{
 
 		procs, err := util.HandleInputArg(id, "", rootdir, !all, false, false, false)
 		if err != nil {
-			return err
+			util.ErrAndExit("Inspect failure: %v", err)
 		}
 
 		if len(procs) == 0 {
-			return errNoScopedProcs
+			util.ErrAndExit("Inspect failure: %v", errNoScopedProcs)
 		}
 		if len(procs) == 1 {
 			pidCtx.Pid = procs[0].Pid
 			iout, _, err := inspect.InspectProcess(*pidCtx)
 			if err != nil {
-				return err
+				util.ErrAndExit("Inspect failure: %v", err)
 			}
 			iouts = append(iouts, iout)
 		} else { // len(procs) > 1
@@ -82,7 +82,7 @@ var inspectCmd = &cobra.Command{
 				iouts = append(iouts, iout)
 			}
 			if errors {
-				return errInspectingMultiple
+				util.ErrAndExit("Inspect failure: %v", errInspectingMultiple)
 			}
 		}
 
@@ -109,8 +109,6 @@ var inspectCmd = &cobra.Command{
 			}
 			fmt.Println(string(cfgs))
 		}
-
-		return nil
 	},
 }
 

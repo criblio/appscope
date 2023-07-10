@@ -319,6 +319,7 @@ scope rules --remove chromium
       --remove string         Remove an entry from the global rules
   -R, --rootdir string        Path to root filesystem of target namespace
       --source string         Source identifier for a rules entry
+      --unixpath string       Path to the unix socket
   -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.
   -v, --verbosity int         Set scope metric verbosity (default 4)
 ```

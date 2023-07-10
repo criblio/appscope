@@ -2981,7 +2981,7 @@ rulesUnixPathPresent(void **state)
 
     assert_int_equal(unsetenv("SCOPE_RULES"), 0);
 
-    assert_string_equal(unixPath, "/opt/cribl/state/appscope.sock");
+    assert_string_equal(unixPath, "/opt/cribl/state");
     scope_free(unixPath);
 }
 

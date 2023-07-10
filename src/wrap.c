@@ -1413,10 +1413,12 @@ findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
     int len = scope_strlen(info->dlpi_name);
     int libscope_so_len = 11;
 
-    if(len > libscope_so_len && !scope_strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
+    if (len > libscope_so_len &&
+        !scope_strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
         *(char **)data = (char *) info->dlpi_name;
         return 1;
     }
+
     return 0;
 }
 
@@ -1485,6 +1487,7 @@ hookInject()
 
         dl_iterate_phdr(hookSharedObjs, libscopeHandle);
         dlclose(libscopeHandle);
+
         return TRUE;
     }
     return FALSE;
@@ -3137,41 +3140,173 @@ prctl(int option, ...)
     return g_fn.prctl(option, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2], fArgs.arg[3]);
 }
 
-static char *
-getScopeExec(const char *pathname)
+static bool
+getPreload(char **envp)
 {
-    char *scopexec = NULL;
-    bool isstat = FALSE, isgo = FALSE;
-    elf_buf_t *ebuf;
+    if (!envp) {
+        if (fullGetEnv("LD_PRELOAD")) {
+            return TRUE;
+        }
 
+        return FALSE;
+    }
+
+    size_t i;
+    char **envinst;
+
+    for (envinst = envp, i = 0; envinst[i]; i++) {
+        if (scope_strstr(envinst[i], "LD_PRELOAD")) {
+            // LD_PRELOAD exists, done.
+            return TRUE;
+        }
+	}
+
+    return FALSE;
+}
+
+static char **
+setPreload(char **envp)
+{
+    char *lib_path;
+
+    if (dl_iterate_phdr(findLibscopePath, &lib_path) == 0) {
+        return NULL;
+    }
+
+    if (!envp) {
+        fullSetenv("LD_PRELOAD", lib_path, 1);
+        return NULL;
+    }
+
+    char *ldp, **newenvp;
+    size_t i, plen;
+    size_t ldplen = scope_strlen("LD_PRELOAD");
+    char **envinst;
+
+    for (envinst = envp, i = 0; envinst[i]; i++) {
+        if (scope_strstr(envinst[i], "LD_PRELOAD")) {
+            // LD_PRELOAD exists, done.
+            return NULL;
+        }
+	}
+
+    plen = scope_strlen(lib_path) + ldplen + 2;
+    if ((ldp = scope_calloc(1, plen)) == NULL) {
+        sysprint("%s:%d WARN: calloc\n", __FUNCTION__, __LINE__);
+        return NULL;
+    }
+
+    scope_snprintf(ldp, plen, "LD_PRELOAD=%s", lib_path);
+
+    if ((newenvp = scope_calloc(1, sizeof(char *) * (i+2))) == NULL) {
+        scope_free(ldp);
+        sysprint("%s:%d WARN: calloc\n", __FUNCTION__, __LINE__);
+        return NULL;
+    }
+    scope_memmove(newenvp, envp, sizeof(char *) * (i+2));
+
+    newenvp[i] = ldp;
+    newenvp[i + 1] = NULL;
+    return newenvp;
+}
+
+static char *
+copyArgv(char **argv)
+{
+    int i, nargs = 0;
+    char *args;
+
+    while ((argv[nargs] != NULL)) nargs++;
+    if (nargs <= 1) return NULL;
+
+    // Total length of all args
+    int total_length = 0;
+    for (i = 0; i < nargs; i++) {
+        total_length += scope_strlen(argv[i]) + 1;
+    }
+
+    if ((args = scope_calloc(1, total_length)) == NULL) return NULL;
+
+    // Copy argv arguments
+    for (i = 0; i < nargs; i++) {
+        scope_strcat(args, argv[i]);
+        if (i != nargs - 1) {
+            scope_strcat(args, " ");  // Add a space between arguments
+        }
+    }
+
+    return args;
+}
+
+/*
+ * There is a single purpose for interposed execs
+ * If the proc to be exec'd is Go static then,
+ * exec using the CLI. Else, do nothing.
+ * It is presumed that LD_PRELOAD is set when
+ * an exec is interposed.
+ */
+static char *
+getScopeExec(const char *pathname, char **argv, char **envp)
+{
+    bool isstat = FALSE, isgo = FALSE;
+    char *scopexec = NULL, *path = NULL;
+    const char *rulesFilePath = NULL;
+    elf_buf_t *ebuf;
+    config_t *cfg;
+
+    /*
+     * If the current proc is the CLI
+     * or the proc to be exec'd is the CLI
+     * or the env var disables exec behavior
+     * then done.
+     */
     if (scope_strstr(g_proc.procname, "scope") ||
+        ((pathname != NULL) && scope_strstr(pathname, "scope")) ||
         checkEnv("SCOPE_EXECVE", "false")) {
         return NULL;
+    }
+
+    // if we have a rules file and the proc to be exec'd is not allowed, done.
+    if (((rulesFilePath = cfgRulesFilePath())) &&
+        (pathname != NULL) && ((path = scope_strdup(pathname)))) {
+        char *args = NULL;
+
+        if ((args = copyArgv(argv)) == NULL) {
+            // TODO; we should be able to pass a null arg list, deal with cfg later
+            args = "";
+        }
+
+        cfg = cfgCreateDefault();
+        rules_status_t res = cfgRulesStatus(scope_basename(path), args, rulesFilePath, cfg);
+
+        scope_free(path);
+        if (strlen(args) > 1) scope_free(args);
+        if (cfg) cfgDestroy(&cfg);
+        if (res == RULES_NOT_SCOPED) {
+            return NULL;
+        }
     }
 
     if ((ebuf = getElf((char *)pathname))) {
         isstat = is_static(ebuf->buf);
         isgo = is_go(ebuf->buf);
+    } else {
+        // example; a shell is not an Elf exec
+        return NULL;
     }
 
     // not really necessary since we're gonna exec
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
-    /*
-     * Note: the isgo check is strictly for Go dynamic execs.
-     * In this case we use scope only to force the use of HTTP 1.1.
-     */
-    if (fullGetEnv("LD_PRELOAD") && (isstat == FALSE) && (isgo == FALSE)) {
-        return NULL;
-    }
-
-    scopexec = fullGetEnv("SCOPE_EXEC_PATH");
-    if (((scopexec = getpath(scopexec)) == NULL) &&
-        ((scopexec = getpath("scope")) == NULL)) {
-
-        // can't find the scope executable
-        scopeLogWarn("can't find a scope executable for %s", pathname);
-        return NULL;
+    // If the exec to be started is Go static, then start with the CLI
+    if ((isstat == TRUE) && (isgo == TRUE)) {
+        scopexec = fullGetEnv("SCOPE_EXEC_PATH");
+        if (((scopexec = getpath(scopexec)) == NULL) &&
+            ((scopexec = getpath("scope")) == NULL)) {
+            // can't find the scope executable
+            scopeLogWarn("can't find a scope executable for %s", pathname);
+            return NULL;
+        }
     }
 
     return scopexec;
@@ -3186,8 +3321,17 @@ execv(const char *pathname, char *const argv[])
 
     WRAP_CHECK(execv, -1);
 
-    scopexec = getScopeExec(pathname);
+    scopexec = getScopeExec(pathname, (char **)argv, NULL);
     if (scopexec == NULL) {
+        /*
+         * Note: we enable libscope to be loaded in all procs
+         * because the lib is responsible for determining if
+         * it should interpose.
+         */
+        if ((getPreload(NULL) == FALSE) &&
+            (setPreload(NULL) == NULL)) {
+            sysprint("%s: WARN: can't set preload\n", __FUNCTION__);
+        }
         return g_fn.execv(pathname, argv);
     }
 
@@ -3216,15 +3360,41 @@ execv(const char *pathname, char *const argv[])
 EXPORTOFF int
 execve(const char *pathname, char *const argv[], char *const envp[])
 {
-    int i, nargs;
+    int i, nargs, rc;
     char *scopexec;
     char **nargv;
 
     WRAP_CHECK(execve, -1);
 
-    scopexec = getScopeExec(pathname);
+    scopexec = getScopeExec(pathname, (char **)argv, (char **)envp);
     if (scopexec == NULL) {
-        return g_fn.execve(pathname, argv, envp);
+        char **newenvp = NULL;
+
+        // need to get/set preload in envp and not environ
+        if (getPreload((char **)envp) == FALSE) {
+            /*
+             * Note: we enable libscope to be loaded in all procs
+             * because the lib is responsible for determining if
+             * it should interpose.
+             */
+            if ((newenvp = setPreload((char **)envp)) != NULL) {
+                envp = newenvp;
+            }
+        }
+
+        rc = g_fn.execve(pathname, argv, envp);
+        // If execve returns, it's an error
+        if (newenvp) {
+            for (i = 0; newenvp[i]; i++) {
+                if (scope_strstr(newenvp[i], "LD_PRELOAD")) {
+                    scope_free(newenvp[i]);
+                    break;
+                }
+            }
+
+            scope_free(newenvp);
+        }
+        return rc;
     }
 
     nargs = 0;
@@ -3232,6 +3402,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 
     size_t plen = sizeof(char *);
     if ((nargs == 0) || (nargv = scope_calloc(1, ((nargs * plen) + (plen * 2)))) == NULL) {
+        // we're not adjusting envp here, given an error condition
         return g_fn.execve(pathname, argv, envp);
     }
 
@@ -5748,7 +5919,7 @@ __sprintf_chk(char *str, int flag, size_t strlen, const char *format, ...)
     int rc;
 
     va_start(ap, format);
-    rc = vsnprintf(str, strlen, format, ap);
+    rc = vsprintf(str, format, ap);
     va_end(ap);
     return rc;
 }

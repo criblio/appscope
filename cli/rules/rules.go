@@ -22,13 +22,13 @@ var (
 
 // Retrieve the rules file from the global location
 func Retrieve(rootdir string) ([]byte, libscope.Rules, error) {
-	rulesFile := make(libscope.Rules, 0)
+	var rulesFile libscope.Rules
 
 	filePath := "/usr/lib/appscope/scope_rules"
-	// If $CRIBL_HOME is set, only look for a rules file there instead
-	if criblHome, present := os.LookupEnv("CRIBL_HOME"); present {
-		filePath = criblHome + "/appscope/scope_rules"
-	}
+	//	// If $CRIBL_HOME is set, only look for a rules file there instead
+	//	if criblHome, present := os.LookupEnv("CRIBL_HOME"); present {
+	//		filePath = criblHome + "/appscope/scope_rules"
+	//	}
 
 	if rootdir != "" {
 		filePath = rootdir + filePath
@@ -40,27 +40,27 @@ func Retrieve(rootdir string) ([]byte, libscope.Rules, error) {
 			// Return an empty rules file if it does not exist
 			return []byte{}, rulesFile, nil
 		}
-		return nil, nil, err
+		return nil, rulesFile, err
 	}
 	defer file.Close()
 
 	data, err := io.ReadAll(file)
 	if err != nil {
-		return nil, nil, err
+		return nil, rulesFile, err
 	}
 
 	// Read yaml in
 	err = yaml.Unmarshal(data, &rulesFile)
 	if err != nil {
 		util.Warn("Error unmarshaling YAML:%v", err)
-		return nil, nil, err
+		return nil, rulesFile, err
 	}
 
 	return data, rulesFile, nil
 }
 
 // Add a process to the scope rules
-func Add(rulesFile libscope.Rules, addProc, procArg, sourceid, rootdir string, rc *run.Config) error {
+func Add(rulesFile libscope.Rules, addProc, procArg, sourceid, rootdir string, rc *run.Config, unixPath string) error {
 
 	// Create a history directory for logs
 	rc.CreateWorkDirBasic("rules")
@@ -98,7 +98,10 @@ func Add(rulesFile libscope.Rules, addProc, procArg, sourceid, rootdir string, r
 		SourceId:      sourceid,
 		Configuration: rc.GetScopeConfig(),
 	}
-	rulesFile["allow"] = append(rulesFile["allow"], newEntry)
+	rulesFile.Allow = append(rulesFile.Allow, newEntry)
+	if unixPath != "" {
+		rulesFile.Source.UnixSocketPath = unixPath
+	}
 
 	// Write the rules contents to a temporary path
 	rulesFilePath := "/tmp/scope_rules"
@@ -201,46 +204,43 @@ func Remove(rulesFile libscope.Rules, remProc, procArg, sourceid, rootdir string
 	// Remove the entry from the rules
 	// (only the last instance matching the name)
 	// (only if there are changes)
-	if allowList, ok := rulesFile["allow"]; ok {
-		remove := -1
-		for i, entry := range allowList {
-			if entry.ProcName == remProc && entry.SourceId == sourceid && entry.ProcArg == procArg {
-				remove = i
-			}
+	remove := -1
+	for i, entry := range rulesFile.Allow {
+		if entry.ProcName == remProc && entry.SourceId == sourceid && entry.ProcArg == procArg {
+			remove = i
 		}
-		if remove > -1 {
-			allowList = append(allowList[:remove], allowList[remove+1:]...)
-			rulesFile["allow"] = allowList // copy back the allowList
+	}
+	if remove > -1 {
+		rulesFile.Allow = append(rulesFile.Allow[:remove], rulesFile.Allow[remove+1:]...)
 
-			// Write the rules contents to a temporary path
-			rulesFilePath := "/tmp/scope_rules"
-			file, err := os.OpenFile(rulesFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-			if err != nil {
-				log.Warn().Err(err).Msgf("Error creating/opening %s", rulesFilePath)
-				return err
-			}
-			defer file.Close()
+		// Write the rules contents to a temporary path
+		rulesFilePath := "/tmp/scope_rules"
+		file, err := os.OpenFile(rulesFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+		if err != nil {
+			log.Warn().Err(err).Msgf("Error creating/opening %s", rulesFilePath)
+			return err
+		}
+		defer file.Close()
 
-			data, err := yaml.Marshal(&rulesFile)
-			if err != nil {
-				util.Warn("Error marshaling YAML:%v", err)
-				return err
-			}
+		data, err := yaml.Marshal(&rulesFile)
+		if err != nil {
+			util.Warn("Error marshaling YAML:%v", err)
+			return err
+		}
 
-			_, err = file.Write(data)
-			if err != nil {
-				util.Warn("Error writing to file:%v", err)
-				return err
-			}
+		_, err = file.Write(data)
+		if err != nil {
+			util.Warn("Error writing to file:%v", err)
+			return err
+		}
 
-			// Ask the loader to update the rules file
-			if stdoutStderr, err := ld.Rules(rulesFilePath, rc.Rootdir); err != nil {
-				log.Warn().
-					Err(err).
-					Str("loaderDetails", stdoutStderr).
-					Msgf("Install library in %s namespace failed.", rootdir)
-				return err
-			}
+		// Ask the loader to update the rules file
+		if stdoutStderr, err := ld.Rules(rulesFilePath, rc.Rootdir); err != nil {
+			log.Warn().
+				Err(err).
+				Str("loaderDetails", stdoutStderr).
+				Msgf("Install library in %s namespace failed.", rootdir)
+			return err
 		}
 	}
 
@@ -249,7 +249,7 @@ func Remove(rulesFile libscope.Rules, remProc, procArg, sourceid, rootdir string
 	// Only if this is the last entry in the file
 	////////////////////////////////////////////
 
-	if len(rulesFile["allow"]) == 0 {
+	if len(rulesFile.Allow) == 0 {
 		if stdoutStderr, err := ld.Preload("off", rc.Rootdir); err != nil {
 			log.Warn().
 				Err(err).

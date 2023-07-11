@@ -21,6 +21,8 @@
       path: /docs/edgescope-host
     - name: Edge Mode in a Container 
       path: /docs/edgescope-container
+    - name: Edge Mode in Kubernetes
+      path: /docs/edgescope-k8s
 
 - name: Getting AppScope for Standalone Mode
   child: 

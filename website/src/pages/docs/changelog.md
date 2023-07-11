@@ -7,7 +7,7 @@ See the AppScope repo to view [all issues](https://github.com/criblio/appscope/i
 
 ## AppScope 1.4.0
 
-2023-07-19 - Maintenance Release
+2023-07-19 - Feature Release
 
 Assets are available via Docker and the Cribl CDN at the links below.
 
@@ -20,6 +20,14 @@ Assets are available via Docker and the Cribl CDN at the links below.
 To obtain the MD5 checksum for any file above, add `.md5` to the file path.
 
 Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.4.0`.
+
+### New Features and Improvements
+
+AppScope 1.4.0 introduces support for foo bar baz
+
+### Fixes
+
+- [XXX](https://github.com/criblio/appscope/issues/XXXX) here we go foo bar
 
 ## AppScope 1.3.4
 

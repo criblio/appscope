@@ -17,9 +17,9 @@
 
 - name: Using AppScope in Edge Mode
   child: 
-    - name: AppScope & Cribl Edge in a Host 
+    - name: Edge Mode on a Host
       path: /docs/edgescope-host
-    - name: AppScope & Cribl Edge in a Container 
+    - name: Edge Mode in a Container 
       path: /docs/edgescope-container
 
 - name: Getting AppScope for Standalone Mode

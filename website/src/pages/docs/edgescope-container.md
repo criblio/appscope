@@ -1,8 +1,8 @@
 ---
-title: AppScope & Cribl Edge in a Container
+title: Edge Mode in a Container
 ---
 
-# Using AppScope & Cribl Edge in a Container
+# Running AppScope in Edge Mode in a Container
 
 **Assumptions**
 

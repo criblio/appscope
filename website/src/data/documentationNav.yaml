@@ -15,7 +15,14 @@
     - name: Cool, but What Can I Do with It?
       path: /docs/what-do-with-scope
 
-- name: Getting AppScope
+- name: Using AppScope in Edge Mode
+  child: 
+    - name: AppScope & Cribl Edge in a Host 
+      path: /docs/edgescope-host
+    - name: AppScope & Cribl Edge in a Container 
+      path: /docs/edgescope-container
+
+- name: Getting AppScope for Standalone Mode
   child: 
     - name: Requirements 
       path: /docs/requirements
@@ -29,7 +36,7 @@
     - name: Removing
       path: /docs/removing
 
-- name: Using AppScope
+- name: Using AppScope in Standalone Mode
   child: 
     - name: Using the CLI
       path: /docs/cli-using

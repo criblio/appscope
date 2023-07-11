@@ -4,7 +4,7 @@ title: Cribl Edge on a Host
 
 # Running AppScope With Cribl Edge on a Host
 
-"Edge Mode" means "driving" AppScope from Cribl Edge. This topic walks you through a setup procedure, and then through the two basic AppScope techniques:
+This topic walks you through a setup procedure, and then through the two basic AppScope techniques:
 
 1. **Scope by PID** – Instrumenting one process on one host.
 1. **Scope by Rule** – Instrumenting multiple processes on an entire Edge Fleet.

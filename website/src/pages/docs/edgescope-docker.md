@@ -4,9 +4,9 @@ title: Cribl Edge in Docker
 
 # Running AppScope With Cribl Edge in a Docker Container
 
-"Edge Mode" means "driving" AppScope from Cribl Edge. This topic walks you through a setup procedure, and then through the two basic AppScope techniques:
+This topic walks you through a setup procedure, and then through the two basic AppScope techniques:
 
-1. **Scope by PID** – Instrumenting one process on one host.
+1. **Scope by PID** – Instrumenting one process on one host or container.
 2. **Scope by Rule** – Instrumenting multiple processes on an entire Edge Fleet.
 
 We assume that you have an Edge Leader running in Cribl.Cloud, you want to add a new Edge Node to its Fleet – and that that Edge Node will be in a Docker container (or another type of container that's also [Open Container Initiative](https://opencontainers.org/)-compliant).

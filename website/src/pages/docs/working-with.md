@@ -2,20 +2,37 @@
 title: Working With AppScope
 ---
 
-# Working With AppScope
+## Working With AppScope 
 
-The way these docs are organized follows from two-modes concept:
-- When using AppScope with Cribl Edge, there are sections about working on a Linux host or virtual machine, in a Docker or similar container, or on Kubernetes.
-    - These sections are complementary to Cribl's documentation about the [AppScope Source](https://docs.cribl.io/stream/sources-appscope) and the [AppScope Config Editor](https://docs.cribl.io/stream/4.0/appscope-configs).
-    - AppScope comes bundled with Cribl Edge, so there's no need to discuss how to obtain AppScope. 
-- When using AppScope on its own, there are sections for obtaining AppScope, and then using AppScope, starting with the CLI.
-- The Reference sections apply to both modes (although the [CLI Reference](/docs/cli-reference) is most relevant for using AppScope on its own or with other open-source tools).
+These docs explain two ways to work with AppScope: together with [Cribl Edge](https://docs.cribl.io/edge/), and on its own. Cribl Edge provides a means to manage AppScope at scale. The concluding Reference topics generally apply for both approaches, although the [CLI Reference](/docs/cli-reference) is most relevant for using AppScope on its own or with other open-source tools.
 
-There are three main things to know to work effectively with AppScope:
+### Using AppScope with Cribl Edge
+
+Here we'll cover working on a Linux host or virtual machine, in a Docker or similar container, or on Kubernetes.
+
+These topics are complementary to Cribl's documentation about the [AppScope Source](https://docs.cribl.io/stream/sources-appscope) and the [AppScope Config Editor](https://docs.cribl.io/stream/4.0/appscope-configs).
+
+AppScope comes bundled with Cribl Edge, so there's no need to discuss how to obtain AppScope. 
+
+### Using AppScope On its Own
+
+Here we'll cover obtaining, and then using AppScope, starting with the CLI.
+
+## Fundamental Concepts {#fundamentals}
+
+To work effectively with AppScope, start with these fundamental points:
 
 * Your overall approach can be either spontaneous or more planned-out.
 * You can [control](#config-file-etc) AppScope by means of the config file, environment variables, or a combination of the two.
 * The results you get from AppScope will be in the form of [events and metrics](/docs/events-and-metrics). When you scope HTTP applications, you can get payloads, too.
+
+## Scoping By PID and Scoping By Rule {#pid-vs-rule}
+
+Another important distinction to understand when working with AppScope is that between "scope by PID" and "scope by Rule."
+
+* Scope by PID instruments one process on one host or container.
+* Scope by Rule instruments one or more processes, not only on one host, but, when using AppScope together with Cribl Edge, an entire Edge Fleet.
+    * The principle is that AppScope will instrument whatever processes match a given Rule.
 
 ## The Config File, Env Vars, and Flags {#config-file-etc}
 

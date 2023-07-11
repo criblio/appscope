@@ -41,7 +41,7 @@ Available Commands:
   detach      Unscope a currently-running process
   events      Outputs events for a session
   extract     Output instrumentary library files to <dir>
-  filter      Automatically scope a set of processes
+  rules       View or modify system-wide AppScope rules
   flows       Observed flows from the session, potentially including payloads
   help        Help about any command
   history     List scope session history
@@ -190,7 +190,7 @@ scope detach --all --rootdir /path/to/host/mount/proc/<hostpid>/root
   -a, --all                   Detach from all processes
   -h, --help                  Help for detach
   -R, --rootdir               Path to root filesystem of target namespace
-
+  -w, --wait                  Wait for detach to complete
 ```
 
 ### events
@@ -277,38 +277,38 @@ scope extract --metricdest tcp://some.host:8125 --eventdest tcp://other.host:100
   -p, --parents               Create any missing intermediate pathname components in provided directory parameter
 ```
 
-### filter
+### rules
 ---
 
-View or modify a system-wide AppScope filter that automatically scopes a set of processes. You can add or remove a single process at a time.
+View or modify system-wide AppScope rules to automatically scope a set of processes. You can add or remove a single process at a time.
 
 #### Usage
 
-`scope filter [flags]`
+`scope rules [flags]`
 
 #### Examples
 
 ```
-scope filter
-scope filter --rootdir /path/to/host/root --json
-scope filter --add nginx
-scope filter --add nginx < scope.yml
-scope filter --add java --arg myServer 
-scope filter --add firefox --rootdir /path/to/host/root
-scope filter --remove chromium
+scope rules
+scope rules --rootdir /path/to/host/root --json
+scope rules --add nginx
+scope rules --add nginx < scope.yml
+scope rules --add java --arg myServer 
+scope rules --add firefox --rootdir /path/to/host/root
+scope rules --remove chromium
 ```
 
 #### Flags
 
 ```
-      --add string            Add an entry to the global filter
-      --arg string            Argument to the command to be added to the filter
+      --add string            Add an entry to the global rules
+      --arg string            Argument to the command to be added to the rules
   -a, --authtoken string      Set AuthToken for Cribl
   -b, --backtrace             Enable backtrace file generation when an application crashes.
   -d, --coredump              Enable core dump file generation when an application crashes.
   -c, --cribldest string      Set Cribl destination for metrics & events (host:port defaults to tls://)
   -e, --eventdest string      Set destination for events (host:port defaults to tls://)
-  -h, --help                  help for filter
+  -h, --help                  help for rules
   -j, --json                  Output as newline delimited JSON
   -l, --librarypath string    Set path for dynamic libraries
       --loglevel string       Set scope library log level (debug, warning, info, error, none)
@@ -316,9 +316,10 @@ scope filter --remove chromium
       --metricformat string   Set format of metrics output (statsd|ndjson|prometheus) (default "ndjson")
   -n, --nobreaker             Set Cribl to not break streams into events.
   -p, --payloads              Capture payloads of network transactions
-      --remove string         Remove an entry from the global filter
+      --remove string         Remove an entry from the global rules
   -R, --rootdir string        Path to root filesystem of target namespace
-      --source string         Source identifier for a filter entry
+      --source string         Source identifier for a rules entry
+      --unixpath string       Path to the unix socket
   -u, --userconfig string     Scope an application with a user specified config file; overrides all other settings.
   -v, --verbosity int         Set scope metric verbosity (default 4)
 ```
@@ -706,7 +707,7 @@ scope start --rootdir /hostfs
 ---
 Performs the following actions:
 	- Removal of /etc/ld.so.preload contents
-	- Removal of the filter file from /usr/lib/appscope/scope_filter
+	- Removal of the rules file from /usr/lib/appscope/scope_rules
 	- Detach from all currently scoped processes
 
 The command does not uninstall scope or libscope from /usr/lib/appscope or /tmp/appscope

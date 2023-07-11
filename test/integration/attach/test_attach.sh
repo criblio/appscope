@@ -7,7 +7,7 @@ FAILED_TEST_COUNT=0
 
 EVT_FILE="/opt/test-runner/logs/events.log"
 TEMP_OUTPUT_FILE="/opt/test-runner/temp_output"
-DUMMY_FILTER_FILE="/opt/test-runner/dummy_filter"
+DUMMY_RULES_FILE="/opt/test-runner/dummy_rules"
 touch $EVT_FILE
 touch $TEMP_OUTPUT_FILE
 
@@ -91,7 +91,7 @@ endtest
 
 starttest detachNotScopedProcessLibLoaded
 
-SCOPE_FILTER=$DUMMY_FILTER_FILE scope -z top -b -d 1 > /dev/null &
+SCOPE_RULES=$DUMMY_RULES_FILE scope -z top -b -d 1 > /dev/null &
 sleep 1
 TOP_PID=`pidof top`
 
@@ -139,7 +139,7 @@ endtest
 
 starttest attachNotScopedProcessFirstAttach
 
-SCOPE_FILTER=$DUMMY_FILTER_FILE scope -z top -b -d 1 > /dev/null &
+SCOPE_RULES=$DUMMY_RULES_FILE scope -z top -b -d 1 > /dev/null &
 sleep 1
 TOP_PID=`pidof top`
 
@@ -453,7 +453,7 @@ endtest
 #
 # Processes on the doNotScopeList should not be actively scoped,
 # unless we're explicitly instructed to.  By "explicitly instructed to"
-# we mean 1) injected into or 2) on the allow list of a filter file.
+# we mean 1) injected into or 2) on the allow list of a rules file.
 #
 # This is an integration test for src/wrap.c:getSettings()
 #
@@ -464,7 +464,7 @@ endtest
 starttest denied_proc_not_scoped_by_default
 
 cd /opt/implicit_deny/
-export SCOPE_FILTER=false
+export SCOPE_RULES=false
 
 # the doNotScopeList is based on process name, this systemd-networkd
 # is not the real thing.
@@ -487,7 +487,7 @@ endtest
 starttest denied_proc_is_scoped_by_inject
 
 cd /opt/implicit_deny/
-export SCOPE_FILTER=false
+export SCOPE_RULES=false
 
 # the doNotScopeList is based on process name, this systemd-networkd
 # is not the real thing.
@@ -507,20 +507,20 @@ endtest
 
 
 #
-# denied_proc_is_scoped_by_filter_file
+# denied_proc_is_scoped_by_rules_file
 #
-starttest denied_proc_is_scoped_by_filter_file
+starttest denied_proc_is_scoped_by_rules_file
 
 cd /opt/implicit_deny/
-export SCOPE_FILTER=${DUMMY_FILTER_FILE}2
-echo "allow:" >> $SCOPE_FILTER
-echo "- procname: systemd-networkd" >> $SCOPE_FILTER
+export SCOPE_RULES=${DUMMY_RULES_FILE}2
+echo "allow:" >> $SCOPE_RULES
+echo "- procname: systemd-networkd" >> $SCOPE_RULES
 
 # the doNotScopeList is based on process name, this systemd-networkd
 # is not the real thing.
 scope -z ./systemd-networkd &
 PID=$!
-
+sleep 1
 scope inspect --all | grep systemd-networkd
 if [ $? -ne "0" ]; then
     echo "systemd-networkd is not actively scoped but should be"
@@ -528,12 +528,87 @@ if [ $? -ne "0" ]; then
 fi
 
 kill $PID
-rm $SCOPE_FILTER
-unset SCOPE_FILTER
+rm $SCOPE_RULES
+unset SCOPE_RULES
 
 endtest
 
+#
+# Implicit allow proc is run in the presence of a filter file
+#
+# Only run on glibc because musl does not support ld.so.preload
+printenv LIB_IS_GLIBC
+if [ $? -eq "0" ]; then
+    starttest implicit_allow
 
+    # create ld.so.preload
+    touch /etc/ld.so.preload
+    chmod ga+w /etc/ld.so.preload
+    echo /opt/appscope/lib/linux/$(uname -m)/libscope.so > /etc/ld.so.preload
+
+    # create a filter file
+    cd /opt/implicit_allow
+    export SCOPE_FILTER=${DUMMY_FILTER_FILE}2
+    echo "allow:" >> $SCOPE_FILTER
+    echo "- procname: foo" >> $SCOPE_FILTER
+
+    # 1) ld.so.preload enables libscope to be loaded in all procs
+    # 2) the filter file allows only the process foo to be scoped
+    # 3) the implicit allow list overrides the filter and allows runc to be scoped
+    ./runc &
+
+    scope inspect --all | grep runc
+    if [ $? -ne "0" ]; then
+        echo "runc is not actively scoped but should be"
+        ERR+=1
+    fi
+
+    kill `pidof runc`
+    rm /etc/ld.so.preload
+    rm $SCOPE_FILTER
+    unset SCOPE_FILTER
+
+    endtest
+
+    starttest exec_preload
+
+    # create ld.so.preload
+    touch /etc/ld.so.preload
+    chmod ga+w /etc/ld.so.preload
+    echo /opt/appscope/lib/linux/$(uname -m)/libscope.so > /etc/ld.so.preload
+
+    # create a filter file
+    cd /opt/exec_test
+    export SCOPE_FILTER=${DUMMY_FILTER_FILE}2
+    echo "allow:" >> $SCOPE_FILTER
+    echo "- procname: exec_test" >> $SCOPE_FILTER
+
+    echo "using filter file: $SCOPE_FILTER"
+    cat $SCOPE_FILTER
+
+    # libscope loaded due to ld.so.preload, interposed due to rules file
+    ./exec_test 0 &
+
+    wait_for_proc_start "exec_test"
+    EXEC_TEST_PID=`pidof exec_test`
+
+    wait ${EXEC_TEST_PID}
+    sleep 2
+
+    egrep '"cmd":"/usr/bin/curl -I https://cribl.io"' $EVT_FILE > /dev/null
+    if [ $? -ne 0 ]; then
+        echo "Curl event not found"
+        ERR+=1
+    fi
+
+    rm /etc/ld.so.preload
+    rm $SCOPE_FILTER
+    unset SCOPE_FILTER
+
+    endtest
+
+# finish LIB_IS_GLIBC
+fi
 
 if (( $FAILED_TEST_COUNT == 0 )); then
     echo ""

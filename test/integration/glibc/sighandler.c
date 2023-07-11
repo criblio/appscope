@@ -50,7 +50,6 @@ void handleIll(int signum) {handleit("SIGILL");}
 void handleBus(int signum) {handleit("SIGBUS");}
 void handleFpe(int signum) {handleit("SIGFPE");}
 void handleSegv(int signum) {handleit("SIGSEGV");}
-void handleUsr2(int signum) {handleit("SIGUSR2");}
 
 typedef struct {
     int num;
@@ -65,7 +64,6 @@ sigList_t sigList[] = {
     {.num = SIGBUS, .str = "SIGBUS", .fn = handleBus},
     {.num = SIGFPE, .str = "SIGFPE", .fn = handleFpe},
     {.num = SIGSEGV, .str = "SIGSEGV", .fn = handleSegv},
-    {.num = SIGUSR2, .str = "SIGUSR2", .fn = handleUsr2},
 };
 #define SIG_COUNT (sizeof(sigList)/sizeof(sigList[0]))
 

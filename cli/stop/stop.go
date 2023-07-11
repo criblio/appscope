@@ -31,21 +31,21 @@ func Stop(rc *run.Config) error {
 	ld := loader.New()
 
 	////////////////////////////////////////////
-	// Empty the global filter file
+	// Empty the global rules file
 	////////////////////////////////////////////
 
-	filterFile := make(libscope.Filter, 0)
+	var rulesFile libscope.Rules
 
-	// Write the filter contents to a temporary path
-	filterFilePath := "/tmp/scope_filter"
-	file, err := os.OpenFile(filterFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	// Write the rules contents to a temporary path
+	rulesFilePath := "/tmp/scope_rules"
+	file, err := os.OpenFile(rulesFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
-		log.Warn().Err(err).Msgf("Error creating/opening %s", filterFilePath)
+		log.Warn().Err(err).Msgf("Error creating/opening %s", rulesFilePath)
 		return err
 	}
 	defer file.Close()
 
-	data, err := yaml.Marshal(&filterFile)
+	data, err := yaml.Marshal(&rulesFile)
 	if err != nil {
 		util.Warn("Error marshaling YAML:%v", err)
 		return err
@@ -57,8 +57,8 @@ func Stop(rc *run.Config) error {
 		return err
 	}
 
-	// Ask the loader to update the filter file
-	if stdoutStderr, err := ld.Filter(filterFilePath, rc.Rootdir); err != nil {
+	// Ask the loader to update the rules file
+	if stdoutStderr, err := ld.Rules(rulesFilePath, rc.Rootdir); err != nil {
 		log.Warn().
 			Err(err).
 			Str("loaderDetails", stdoutStderr).

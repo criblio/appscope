@@ -23,7 +23,7 @@ package main
 // Example Usage:
 // scope [OPTIONS] --ldattach PID
 // scope [OPTIONS] --lddetach PID
-// scope [OPTIONS] --filter FILTER_PATH --rootdir /hostfs
+// scope [OPTIONS] --rules RULES_PATH --rootdir /hostfs
 // scope [OPTIONS] --service SERVICE --namespace PID
 // scope [OPTIONS] --passthrough EXECUTABLE [ARGS...]
 // scope [OPTIONS] --patch SO_FILE
@@ -34,8 +34,8 @@ package main
 // -d, --lddetach PID                detach from the specified process ID
 // -i, --install                     install libscope.so and scope
 // -e, --preload PATH                set ld.so.preload to PATH. "auto" = auto detect libpath; "off" = disable
-// -f, --filter FILTER_PATH          install the filter file specified in FILTER_PATH
-// -m, --mount MOUNT_DEST            mount filter file and unix socket into MOUNT_DEST
+// -f, --rules RULES_PATH            install the rules file specified in RULES_PATH
+// -m, --mount MOUNT_DEST            mount rules file and unix socket into MOUNT_DEST
 // -R, --rootdir PATH                specify root directory of the target namespace
 // -s, --service SERVICE             setup specified service NAME
 // -v, --unservice                   remove scope from all service configurations
@@ -50,7 +50,7 @@ static struct option opts[] = {
 	{ "ldattach",    required_argument, 0, 'a' },
 	{ "lddetach",    required_argument, 0, 'd' },
 	{ "preload",     required_argument, 0, 'e' },
-	{ "filter",      required_argument, 0, 'f' },
+	{ "rules",       required_argument, 0, 'f' },
 	{ "mount",       required_argument, 0, 'm' },
 	{ "install",     no_argument,       0, 'i' },
 	{ "libbasedir",  required_argument, 0, 'l' },
@@ -93,7 +93,7 @@ __attribute__((constructor)) void cli_constructor() {
 	bool opt_namespace = false;
 	bool opt_install = false;
 	bool opt_preload = false;
-	bool opt_filter = false;
+	bool opt_rules = false;
 	bool opt_mount = false;
 	bool opt_rootdir = false;
 	bool opt_service = false;
@@ -106,7 +106,7 @@ __attribute__((constructor)) void cli_constructor() {
 	char *arg_lddetach = NULL;
 	char *arg_rootdir = NULL;
 	char *arg_preload = NULL;
-	char *arg_filter = NULL;
+	char *arg_rules = NULL;
 	char *arg_mount = NULL;
 	char *arg_service = NULL;
 	char *arg_namespace = NULL;
@@ -183,8 +183,8 @@ __attribute__((constructor)) void cli_constructor() {
 			arg_preload = optarg;
 			break;
 		case 'f':
-			opt_filter = true;
-			arg_filter = optarg;
+			opt_rules = true;
+			arg_rules = optarg;
 			break;
 		case 'm':
 			opt_mount = true;
@@ -231,12 +231,12 @@ __attribute__((constructor)) void cli_constructor() {
 		fprintf(stderr, "error: --ldattach/--lddetach and --service/--unservice cannot be used together\n");
 		exit(EXIT_FAILURE);
 	}
-	if ((opt_ldattach || opt_lddetach) && (opt_filter)) {
-		fprintf(stderr, "error: --ldattach/--lddetach and --filter cannot be used together\n");
+	if ((opt_ldattach || opt_lddetach) && (opt_rules)) {
+		fprintf(stderr, "error: --ldattach/--lddetach and --rules cannot be used together\n");
 		exit(EXIT_FAILURE);
 	}
-	if ((opt_filter) && (opt_service || opt_unservice)) {
-		fprintf(stderr, "error: --filter and --service/--unservice cannot be used together\n");
+	if ((opt_rules) && (opt_service || opt_unservice)) {
+		fprintf(stderr, "error: --rules and --service/--unservice cannot be used together\n");
 		exit(EXIT_FAILURE);
 	}
 	if (opt_namespace && (!opt_service && !opt_unservice)) {
@@ -244,8 +244,8 @@ __attribute__((constructor)) void cli_constructor() {
 		exit(EXIT_FAILURE);
 	}
 	if (opt_passthrough && (opt_ldattach || opt_lddetach || opt_namespace ||
-		opt_service || opt_unservice || opt_filter || opt_preload)) {
-		fprintf(stderr, "error: --passthrough cannot be used with --ldattach/--lddetach or --namespace or --service/--unservice or --filter or --preload\n");
+		opt_service || opt_unservice || opt_rules || opt_preload)) {
+		fprintf(stderr, "error: --passthrough cannot be used with --ldattach/--lddetach or --namespace or --service/--unservice or --rules or --preload\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -290,7 +290,7 @@ __attribute__((constructor)) void cli_constructor() {
 	if (opt_ldattach) exit(cmdAttach(pid, arg_rootdir));
 	if (opt_lddetach) exit(cmdDetach(pid, arg_rootdir));
 	if (opt_install) exit(cmdInstall(arg_rootdir));
-	if (opt_filter) exit(cmdFilter(arg_filter, arg_rootdir));
+	if (opt_rules) exit(cmdRules(arg_rules, arg_rootdir));
 	if (opt_preload) exit(cmdPreload(arg_preload, arg_rootdir));
 	if (opt_mount) exit(cmdMount(arg_mount, arg_rootdir));
 	if (opt_service) exit(cmdService(arg_service, nspid));

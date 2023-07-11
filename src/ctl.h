@@ -119,6 +119,7 @@ int     ctlSendEvent(ctl_t *, event_t *, uint64_t, proc_id_t *);
 int     ctlSendHttp(ctl_t *, event_t *, uint64_t, proc_id_t *);
 int     ctlSendLog(ctl_t *, int, const char *, const void *, size_t, uint64_t, proc_id_t *);
 void    ctlStopAggregating(ctl_t *);
+bool    ctlProcessAllQueuedEventsNow(ctl_t *);
 void    ctlFlush(ctl_t *);
 int     ctlPostEvent(ctl_t *, char *);
 

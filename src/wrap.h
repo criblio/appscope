@@ -21,7 +21,6 @@ typedef struct thread_timing_t {
     time_t startTime; 
     bool once;
     pthread_t periodicTID;
-    const struct sigaction *act;
 } thread_timing;
 
 typedef struct {

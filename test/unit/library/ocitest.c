@@ -2,18 +2,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "oci.h"
 #include "cJSON.h"
 #include "test.h"
 #include "scopestdlib.h"
 
-#ifndef FALSE
-#define FALSE   0
-#endif
-#ifndef TRUE
-#define TRUE   1
-#endif
-
 static char dirPath[PATH_MAX];
+
+static const char *testTypeJson[] = {
+    "EmptyJson",
+    "ProcessOnlyJson",
+    "ProcessEnvPresentLDPreload",
+    "ProcessEnvEmptyLDPreload",
+    "MissingHooks",
+    "IncompleteHooks",
+    "CompleteHooks"
+};
 
 static int
 testDirPath(char *path, const char *argv0) {
@@ -37,7 +41,7 @@ testDirPath(char *path, const char *argv0) {
     /*
     * Retrieve the test directory path.
     * From:
-    * /<dir>/appscope/test/linux/cfgutilsfiltertest
+    * /<dir>/appscope/test/linux/cfgutilsrulestest
     * To:
     * /<dir>/appscope/test/
     */
@@ -51,332 +55,108 @@ testDirPath(char *path, const char *argv0) {
     return 0;
 }
 
-// This function reflects the logic provided by rewriteOpenContainersConfig
 static bool
-rewriteOpenContainersConfigTest(int id) {
-    char inPath [PATH_MAX] = {0};
-    char outPath [PATH_MAX] = {0};
-    scope_snprintf(inPath, PATH_MAX, "%s/data/oci/oci%din.json", dirPath, id);
-    scope_snprintf(outPath, PATH_MAX, "%s/data/oci/oci%dout.json", dirPath, id);
-
-    bool res = FALSE;
-    struct stat fileStat;
-    if (scope_stat(inPath, &fileStat) == -1) {
-        assert_non_null(NULL);
-        return res;
-    }
-
-    FILE *fp = scope_fopen(inPath, "r");
-    if (!fp) {
-        assert_non_null(NULL);
-        return res;
-    }
-
-    /*
-    * Read the file contents into a string
-    */
-    char *buf = (char *)scope_malloc(fileStat.st_size);
-    if (!buf) {
-        scope_fclose(fp);
-        assert_non_null(NULL);
-        return res;
-    }
-
-    scope_fread(buf, sizeof(char), fileStat.st_size, fp);
-    scope_fclose(fp);
-
-
-    cJSON *json = cJSON_Parse(buf);
-    if (!json) {
-        assert_non_null(NULL);
-        return res;
-    }
-    scope_free(buf);
-    char *jsonStr = NULL;
-
-    // Handle the process
-    cJSON *procNode = cJSON_GetObjectItemCaseSensitive(json, "process");
-    if (!procNode) {
-        procNode = cJSON_CreateObject();
-        if (!procNode) {
-            assert_non_null(NULL);
-            goto exit;
-        }
-        cJSON_AddItemToObject(json, "process", procNode);
-    }
-    cJSON *envNodeArr = cJSON_GetObjectItemCaseSensitive(procNode, "env");
-    if (envNodeArr) {
-        bool ldPreloadPresent = FALSE;
-        // Iterate over environment string array
-        size_t envSize = cJSON_GetArraySize(envNodeArr);
-        for (int i = 0; i < envSize ;++i) {
-            cJSON *item = cJSON_GetArrayItem(envNodeArr, i);
-            char *strItem = cJSON_GetStringValue(item);
-
-            if (scope_strncmp("LD_PRELOAD=", strItem, sizeof("LD_PRELOAD=")-1) == 0) {
-                size_t itemLen = scope_strlen(strItem);
-                size_t newLdprelLen = itemLen + sizeof("/opt/libscope.so:") - 1;
-                char *newLdPreloadLib = scope_calloc(1, newLdprelLen);
-                if (!newLdPreloadLib) {
-                    assert_non_null(NULL);
-                    goto exit;
-                }
-                scope_strncpy(newLdPreloadLib, "LD_PRELOAD=/opt/libscope.so:", sizeof("LD_PRELOAD=/opt/libscope.so:") - 1);
-                scope_strcat(newLdPreloadLib, strItem + sizeof("LD_PRELOAD=") - 1);
-                cJSON *newLdPreloadLibObj = cJSON_CreateString(newLdPreloadLib);
-                if (!newLdPreloadLibObj) {
-                    scope_free(newLdPreloadLib);
-                    assert_non_null(NULL);
-                    goto exit;
-                }
-                cJSON_ReplaceItemInArray(envNodeArr, i, newLdPreloadLibObj);
-                scope_free(newLdPreloadLib);
-
-                cJSON *scopeEnvNode = cJSON_CreateString("SCOPE_SETUP_DONE=true");
-                if (!scopeEnvNode) {
-                    assert_non_null(NULL);
-                    goto exit;
-                }
-                cJSON_AddItemToArray(envNodeArr, scopeEnvNode);
-                ldPreloadPresent = TRUE;
-                break;
-            } else if (scope_strncmp("SCOPE_SETUP_DONE=true", strItem, sizeof("SCOPE_SETUP_DONE=true")-1) == 0) {
-                // we are done here
-                res = TRUE;
-                goto exit;
-            }
-        }
-
-
-        // There was no LD_PRELOAD in environment variables
-        if (ldPreloadPresent == FALSE) {
-            const char *const envItems[2] =
-            {
-                "LD_PRELOAD=/opt/libscope.so",
-                "SCOPE_SETUP_DONE=true"
-            };
-            for (int i = 0; i < 2 ;++i) {
-                cJSON *scopeEnvNode = cJSON_CreateString(envItems[i]);
-                if (!scopeEnvNode) {
-                    assert_non_null(NULL);
-                    goto exit;
-                }
-                cJSON_AddItemToArray(envNodeArr, scopeEnvNode);
-            }
-        }
-    } else {
-        const char * envItems[2] =
-        {
-            "LD_PRELOAD=/opt/libscope.so",
-            "SCOPE_SETUP_DONE=true"
-        };
-        envNodeArr = cJSON_CreateStringArray(envItems, 2);
-        if (!envNodeArr) {
-            assert_non_null(NULL);
-            goto exit;
-        }
-        cJSON_AddItemToObject(procNode, "env", envNodeArr);
-    }
-
-    cJSON *mountNodeArr = cJSON_GetObjectItemCaseSensitive(json, "mounts");
-    if (!mountNodeArr) {
-        mountNodeArr = cJSON_CreateArray();
-        if (!mountNodeArr) {
-            assert_non_null(NULL);
-            goto exit;
-        }
-        cJSON_AddItemToObject(json, "mounts", mountNodeArr);
-    }
-
-    cJSON *mountNode = cJSON_CreateObject();
-    if (!mountNode) {
-        assert_non_null(NULL);
-        goto exit;
-    }
-
-    if (!cJSON_AddStringToObjLN(mountNode, "destination", "/opt/scope")) {
-        cJSON_Delete(mountNode);
-        assert_non_null(NULL);
-        goto exit;
-    }
-
-    if (!cJSON_AddStringToObjLN(mountNode, "type", "bind")) {
-        cJSON_Delete(mountNode);
-        assert_non_null(NULL);
-        goto exit;
-    }
-
-    if (!cJSON_AddStringToObjLN(mountNode, "source", "/tmp/appscope/dev/scope")) {
-        cJSON_Delete(mountNode);
-        assert_non_null(NULL);
-        goto exit;
-    }
-
-    const char *optItems[2] =
-    {
-        "rbind",
-        "rprivate"
-    };
-
-    cJSON *optNodeArr = cJSON_CreateStringArray(optItems, 2);
-    if (!optNodeArr) {
-        cJSON_Delete(mountNode);
-        assert_non_null(NULL);
-        goto exit;
-    }
-    cJSON_AddItemToObject(mountNode, "options", optNodeArr);
-    cJSON_AddItemToArray(mountNodeArr, mountNode);
-
-    cJSON *hooksNode = cJSON_GetObjectItemCaseSensitive(json, "hooks");
-    if (!hooksNode) {
-        hooksNode = cJSON_CreateObject();
-        if (!hooksNode) {
-            assert_non_null(NULL);
-            goto exit;
-        }
-        cJSON_AddItemToObject(json, "hooks", hooksNode);
-    }
-
-    cJSON *startContainerNodeArr = cJSON_GetObjectItemCaseSensitive(hooksNode, "startContainer");
-    if (!startContainerNodeArr) {
-        startContainerNodeArr = cJSON_CreateArray();
-        if (!startContainerNodeArr) {
-            assert_non_null(NULL);
-            goto exit;
-        }
-        cJSON_AddItemToObject(hooksNode, "startContainer", startContainerNodeArr);
-    }
-
-    cJSON *startContainerNode = cJSON_CreateObject();
-    if (!startContainerNode) {
-        assert_non_null(NULL);
-        goto exit;
-    }
-
-    if (!cJSON_AddStringToObjLN(startContainerNode, "path",  "/opt/scope")) {
-        cJSON_Delete(startContainerNode);
-        assert_non_null(NULL);
-        goto exit;
-    }
-
-    const char *argsItems[3] =
-    {
-        "/opt/scope",
-        "extract",
-        "/opt"
-    };
-    cJSON *argsNodeArr = cJSON_CreateStringArray(argsItems, 3);
-    if (!argsNodeArr) {
-        cJSON_Delete(startContainerNode);
-        assert_non_null(NULL);
-        goto exit;
-    }
-    cJSON_AddItemToObject(startContainerNode, "args", argsNodeArr);
-    cJSON_AddItemToArray(startContainerNodeArr, startContainerNode);
-
-    jsonStr = cJSON_Print(json);
-
-    // Overwrite the file
+verifyModifiedCfg(int id, const char *cmpStr, const char *outPath) {
     int fdOut = scope_open(outPath, O_RDONLY);
     if (fdOut == -1) {
-        cJSON_free(jsonStr);
-        goto exit;
+        assert_non_null(NULL);
+        return FALSE;
     }
 
     struct stat stOut;
     if (scope_fstat(fdOut, &stOut) == -1) {
-        cJSON_free(jsonStr);
+        assert_non_null(NULL);
         scope_close(fdOut);
-        goto exit;
+        return FALSE;
     }
-
 
     void *fdOutMap = scope_mmap(NULL, stOut.st_size, PROT_READ, MAP_PRIVATE, fdOut, 0);
     if (fdOutMap == MAP_FAILED) {
-        cJSON_free(jsonStr);
-        scope_close(fdOut);
-        goto exit;
-    }
-
-    if (memcmp(fdOutMap, jsonStr, stOut.st_size) != 0) {
         assert_non_null(NULL);
+        scope_close(fdOut);
+        return FALSE;
     }
-    scope_munmap(fdOutMap, stOut.st_size);
-
-    cJSON_free(jsonStr);
     scope_close(fdOut);
 
-    res = TRUE;
-exit:
-    cJSON_Delete(json);
+    cJSON* parseOut = cJSON_Parse(fdOutMap);
+    char* outBuf = cJSON_PrintUnformatted(parseOut);
+    cJSON_Delete(parseOut);
+
+    // assert_int_equal(scope_strlen(outBuf), scope_strlen(cmpStr));
+    if (scope_strcmp(cmpStr, outBuf) != 0 ){
+        scope_fprintf(scope_stderr, cmpStr);
+        scope_fprintf(scope_stderr, outBuf);
+        assert_non_null(NULL);
+        scope_munmap(fdOutMap, stOut.st_size);
+        return FALSE;
+    }
+
+    scope_free(outBuf);
+    scope_munmap(fdOutMap, stOut.st_size);
+
+    return TRUE;
+}
+
+static bool
+rewriteOpenContainersConfigTest(int id, const char* unixSocketPath) {
+
+    char inPath [PATH_MAX] = {0};
+    scope_snprintf(inPath, PATH_MAX, "%s/data/oci/oci%din.json", dirPath, id);
+    const char *scopeWithVersion = "/usr/lib/appscope/1.2.3/scope";
+
+    void *cfgMem = ociReadCfgIntoMem(inPath);
+
+    char *modifMem = ociModifyCfg(cfgMem, scopeWithVersion, unixSocketPath);
+
+    char outPath [PATH_MAX] = {0};
+
+    if (unixSocketPath) {
+        scope_snprintf(outPath, PATH_MAX, "%s/data/oci/oci%doutfull.json", dirPath, id);
+    } else {
+        scope_snprintf(outPath, PATH_MAX, "%s/data/oci/oci%doutpartial.json", dirPath, id);
+    }
+
+    bool res = verifyModifiedCfg(id, modifMem, outPath);
+
+    scope_free(cfgMem);
+    scope_free(modifMem);
+
     return res;
 }
 
 static void
-ocitest_empty_json(void **state)
-{
-    bool res = rewriteOpenContainersConfigTest(0);
-    assert_int_equal(res, TRUE);
+ocitest_with_unix_path(void **state) {
+    for (int i = 0; i < ARRAY_SIZE(testTypeJson); ++i) {
+        bool res = rewriteOpenContainersConfigTest(i, "/var/run/appscope/appscope.sock");
+        if (res != TRUE) {
+            scope_fprintf(scope_stderr, "Error with test: id=%d name=%s\n", i, testTypeJson[i]);
+        }
+        assert_int_equal(res, TRUE);
+    }
 }
 
 static void
-ocitest_process_only_json(void **state)
-{
-    bool res = rewriteOpenContainersConfigTest(1);
-    assert_int_equal(res, TRUE);
-}
-
-static void
-ocitest_process_env_present_preload(void **state)
-{
-    bool res = rewriteOpenContainersConfigTest(2);
-    assert_int_equal(res, TRUE);
-}
-
-static void
-ocitest_process_env_empty_preload(void **state)
-{
-    bool res = rewriteOpenContainersConfigTest(3);
-    assert_int_equal(res, TRUE);
-}
-
-static void
-ocitest_missing_hooks(void **state)
-{
-    bool res = rewriteOpenContainersConfigTest(4);
-    assert_int_equal(res, TRUE);
-}
-
-static void
-ocitest_hooks_incomplete(void **state)
-{
-    bool res = rewriteOpenContainersConfigTest(5);
-    assert_int_equal(res, TRUE);
-}
-
-static void
-ocitest_hooks_complete(void **state)
-{
-    bool res = rewriteOpenContainersConfigTest(6);
-    assert_int_equal(res, TRUE);
+ocitest_without_unix_path(void **state) {
+    for (int i = 0; i < ARRAY_SIZE(testTypeJson); ++i) {
+        bool res = rewriteOpenContainersConfigTest(i, NULL);
+        if (res != TRUE) {
+            scope_fprintf(scope_stderr, "Error with test: id=%d name=%s\n", i, testTypeJson[i]);
+        }
+        assert_int_equal(res, TRUE);
+    }
 }
 
 int
 main(int argc, char* argv[])
 {
-    printf("running %s\n", argv[0]);
+    scope_printf("running %s\n", argv[0]);
     if (testDirPath(dirPath, argv[0])) {
         return EXIT_FAILURE;
     }
 
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(ocitest_empty_json),
-        cmocka_unit_test(ocitest_process_only_json),
-        cmocka_unit_test(ocitest_process_env_present_preload),
-        cmocka_unit_test(ocitest_process_env_empty_preload),
-        cmocka_unit_test(ocitest_missing_hooks),
-        cmocka_unit_test(ocitest_hooks_incomplete),
-        cmocka_unit_test(ocitest_hooks_complete),
+        cmocka_unit_test(ocitest_with_unix_path),
+        cmocka_unit_test(ocitest_without_unix_path),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),
     };
     return cmocka_run_group_tests(tests, groupSetup, groupTeardown);

@@ -59,8 +59,7 @@ typedef enum {CFG_MTC_FS,
 #define MAX_CGROUP 512
 #define MODE_STR 16
 #define SM_NAME "scope_anon"
-#define SCOPE_FILTER_USR_PATH ("/usr/lib/appscope/scope_filter")
-#define SCOPE_FILTER_TMP_PATH ("/tmp/appscope/scope_filter")
+#define SCOPE_RULES_USR_PATH ("/usr/lib/appscope/scope_rules")
 #define SCOPE_SYS_PATH "/usr/lib/appscope/"
 #define SCOPE_TMP_PATH "/tmp/appscope/"
 
@@ -209,8 +208,8 @@ typedef struct
 //    SCOPE_EXEC_TYPE                internal use only
 //    SCOPE_HOST_WORKDIR_PATH        internal use - informs the attached process in container to create working directory
 //                                   in container mnt namespace, which allows to access data during attach operation initialized from host
-//    SCOPE_FILTER                   "false" disables handling the filter file
-//                                   other values are interpreted a path to a filter file
+//    SCOPE_RULES                   "false" disables handling the rules file
+//                                   other values are interpreted a path to a rules file
 //    SCOPE_EXECVE                   "false" disables scope of child procs
 //    SCOPE_EXEC_PATH                specifies path to scope executable
 //    SCOPE_CRIBL_NO_BREAKER         adds breaker property to process start message

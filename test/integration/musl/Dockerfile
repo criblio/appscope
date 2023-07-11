@@ -10,6 +10,10 @@ RUN mkdir -p /opt/fault_test
 COPY ./musl/hello_fault.c /opt/fault_test/hello_fault.c
 RUN gcc -O0 -g -o /opt/fault_test/fault_test /opt/fault_test/hello_fault.c -lrt
 
+RUN mkdir -p /opt/sig_test
+COPY ./musl/sigusrhandler.c /opt/sig_test/sigusrhandler.c
+RUN gcc -g -o /opt/sig_test/sigusrhandler /opt/sig_test/sigusrhandler.c
+
 RUN mkdir -p /opt/extract_scope && \
     mkdir -p /opt/patch_libscope
 

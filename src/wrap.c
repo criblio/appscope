@@ -50,7 +50,6 @@ static config_t *g_staticfg = NULL;
 static log_t *g_prevlog = NULL;
 static mtc_t *g_prevmtc = NULL;
 static ctl_t *g_prevctl = NULL;
-static bool g_replacehandler = FALSE;
 static const char *g_cmddir;
 static list_t *g_nsslist;
 static uint64_t reentrancy_guard = 0ULL;
@@ -65,7 +64,7 @@ __thread int g_ssl_fd = -1;
 // Forward declaration
 static void *periodic(void *);
 static void doConfig(config_t *);
-static void threadNow(int);
+static void threadNow(int, siginfo_t *, void *);
 static void uv__read_hook(void *);
 static got_list_t inject_hook_list[];
 
@@ -271,9 +270,9 @@ fileModTime(const char *path)
 
 /*
  * Iterate all shared objects and GOT hook as necessary.
- * Filter the process from an external filter list.
- * If the filter fails only hook execve.
- * If the filter passes hook all interposed functions.
+ * Rules the process from an external rules list.
+ * If the rules fails only hook execve.
+ * If the rules passes hook all interposed functions.
  */
 static int
 hookAll(struct dl_phdr_info *info, size_t size, void *data)
@@ -285,12 +284,25 @@ hookAll(struct dl_phdr_info *info, size_t size, void *data)
     Elf64_Rela *rel = NULL;
     char *str = NULL;
     int rsz = 0;
-    bool *filter = data;
+    bool *rules = data;
 
     scopeLog(CFG_LOG_DEBUG, "%s: shared obj: %s", __FUNCTION__, info->dlpi_name);
 
     // don't hook funcs from libscope or ld.so
-    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) return 0;
+    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) {
+        return FALSE;
+    }
+
+    /*
+    * Don't hook the main program. 
+    * In dl_iterate_phdr the main program is passed as:
+    * - on musl as an absolute path into the binary
+    * - on glibc as an empty string in the binary
+    * We do not want to use dlopen for the absolute path to avoid the static initialization order problem.
+    */
+    if (endsWith(info->dlpi_name, g_proc.procname) == TRUE) {
+        return FALSE;
+    }
 
     void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
     if (handle == NULL) return FALSE;
@@ -298,9 +310,9 @@ hookAll(struct dl_phdr_info *info, size_t size, void *data)
     // Get the link map and ELF sections in advance of something matching
     if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
         for (int i=0; inject_hook_list[i].symbol; i++) {
-            // if the proc passes the filter then GOT hook all else only hook execve
+            // if the proc passes the rules then GOT hook all else only hook execve
             // TODO; all execv?
-            if (((*filter == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
+            if (((*rules == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
                 dlsym(handle, inject_hook_list[i].symbol)) {
                 if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1) {
                     scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from shared obj %s",
@@ -311,11 +323,52 @@ hookAll(struct dl_phdr_info *info, size_t size, void *data)
     }
 
     dlclose(handle);
-    return 0;
+    return FALSE;
 }
 
 static int
-hookMain(bool filter)
+hookAllAttach(struct dl_phdr_info *info, size_t size, void *data)
+{
+    if (!info || !info->dlpi_name || !data) return FALSE;
+
+    struct link_map *lm;
+    Elf64_Sym *sym = NULL;
+    Elf64_Rela *rel = NULL;
+    char *str = NULL;
+    int rsz = 0;
+    bool *rules = data;
+
+    scopeLog(CFG_LOG_DEBUG, "%s: shared obj: %s", __FUNCTION__, info->dlpi_name);
+
+    // don't hook funcs from libscope or ld.so
+    if (scope_strstr(info->dlpi_name, "libscope") || scope_strstr(info->dlpi_name, "ld-")) {
+        return FALSE;
+    }
+
+    void *handle = g_fn.dlopen(info->dlpi_name, RTLD_NOW);
+    if (handle == NULL) return FALSE;
+
+    // Get the link map and ELF sections in advance of something matching
+    if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
+        for (int i=0; inject_hook_list[i].symbol; i++) {
+            // if the proc passes the rules then GOT hook all else only hook execve
+            // TODO; all execv?
+            if (((*rules == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
+                dlsym(handle, inject_hook_list[i].symbol)) {
+                if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1) {
+                    scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from shared obj %s",
+                             inject_hook_list[i].symbol, info->dlpi_name);
+                }
+            }
+        }
+    }
+
+    dlclose(handle);
+    return FALSE;
+}
+
+static int
+hookMain(bool rules)
 {
     struct link_map *lm;
     Elf64_Sym *sym = NULL;
@@ -329,9 +382,9 @@ hookMain(bool filter)
     // Get the link map and ELF sections in advance of something matching
     if ((dlinfo(handle, RTLD_DI_LINKMAP, (void *)&lm) != -1) && (getElfEntries(lm, &rel, &sym, &str, &rsz) != -1)) {
         for (int i=0; inject_hook_list[i].symbol; i++) {
-            // if the proc passes the filter then GOT hook all else only hook execve
+            // if the proc passes the rules then GOT hook all else only hook execve
             // TODO; all execv?
-            if (((filter == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
+            if (((rules == TRUE) || scope_strstr(inject_hook_list[i].symbol, "execve")) &&
                 dlsym(handle, inject_hook_list[i].symbol)) {
                 if (doGotcha(lm, (got_list_t *)&inject_hook_list[i], rel, sym, str, rsz, TRUE) != -1) {
                     scopeLog(CFG_LOG_DEBUG, "\tGOT patched %s from main", inject_hook_list[i].symbol);
@@ -396,11 +449,11 @@ cmdAttach(void)
 {
     if (g_cfg.funcs_attached) return TRUE;
 
-    bool filter = TRUE;
+    bool rules = TRUE;
     scopeLog(CFG_LOG_DEBUG, "%s:%d", __FUNCTION__, __LINE__);
 
-    dl_iterate_phdr(hookAll, &filter);
-    hookMain(filter);
+    dl_iterate_phdr(hookAllAttach, &rules);
+    hookMain(rules);
 
     g_cfg.funcs_attached = TRUE;
 
@@ -418,7 +471,7 @@ cmdAttach(void)
         g_proc.smfd = 0;
 
         if (g_thread.once == FALSE) {
-            threadNow(0);
+            threadNow(0, NULL, NULL);
         }
     }
 
@@ -768,9 +821,21 @@ dynConfig(void)
 }
 
 static void
-threadNow(int sig)
+threadNow(int sig, siginfo_t *info, void *secret)
 {
     static uint64_t serialize;
+
+    /*
+    * Verify the origin of the SIGUSR2 signal:
+    * Applications can use the SIGUSR2 signal for their own purposes.
+    * The code below will call the application's handler if the signal
+    * is not recognized as one created by the AppScope library.
+    */
+    if (sig == SIGUSR2) {
+        if (osCallAppSigaction(sig, info, secret) == TRUE) {
+            return;
+        }
+    }
 
     if (!atomicCasU64(&serialize, 0ULL, 1ULL)) return;
 
@@ -790,15 +855,6 @@ threadNow(int sig)
     }
 
     g_thread.once = TRUE;
-
-    // Restore a handler if one exists
-    if ((g_replacehandler == TRUE) && (g_thread.act != NULL)) {
-        struct sigaction oldact;
-        if (g_fn.sigaction) {
-            g_fn.sigaction(SIGUSR2, g_thread.act, &oldact);
-            g_thread.act = NULL;
-        }
-    }
 
     if (!atomicCasU64(&serialize, 1ULL, 0ULL)) DBG(NULL);
 }
@@ -847,7 +903,7 @@ threadNow(int sig)
  * an issue of some sort.
  */
 static void
-threadInit()
+threadInit(void)
 {
     // for debugging... if SCOPE_NO_SIGNAL is defined, then don't create
     // a signal handler, nor a timer to send a signal.
@@ -883,7 +939,7 @@ doThread()
     struct timeval tv;
     scope_gettimeofday(&tv, NULL);
     if (tv.tv_sec >= g_thread.startTime) {
-        threadNow(0);
+        threadNow(0, NULL, NULL);
     }
 }
 
@@ -894,7 +950,7 @@ stopTimer(void)
     if (!g_ctl) return;
 
     osTimerStop();
-    threadNow(0);
+    threadNow(0, NULL, NULL);
 }
 
 static void
@@ -1066,11 +1122,12 @@ handleExit(void)
         }
     }
 
+    ctlStopAggregating(g_ctl); // Ensures all queued events are processed and
+                               // that we try to send all aggregated data.
     reportPeriodicStuff();
 
     mtcFlush(g_mtc);
     mtcDisconnect(g_mtc);
-    ctlStopAggregating(g_ctl);
     ctlFlush(g_ctl);
     ctlDisconnect(g_ctl, CFG_LS);
     ctlDisconnect(g_ctl, CFG_CTL);
@@ -1356,10 +1413,12 @@ findLibscopePath(struct dl_phdr_info *info, size_t size, void *data)
     int len = scope_strlen(info->dlpi_name);
     int libscope_so_len = 11;
 
-    if(len > libscope_so_len && !scope_strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
+    if (len > libscope_so_len &&
+        !scope_strcmp(info->dlpi_name + len - libscope_so_len, "libscope.so")) {
         *(char **)data = (char *) info->dlpi_name;
         return 1;
     }
+
     return 0;
 }
 
@@ -1428,6 +1487,7 @@ hookInject()
 
         dl_iterate_phdr(hookSharedObjs, libscopeHandle);
         dlclose(libscopeHandle);
+
         return TRUE;
     }
     return FALSE;
@@ -1450,7 +1510,7 @@ initHook(int attachedFlag, bool scopedFlag, elf_buf_t *ebuf, char *full_path)
         if (full_path && (scope_strstr(full_path, "scopedyn") == NULL) && (scope_strstr(full_path, "memfd") == NULL)) {
             if (!ebuf) return;
             initGoHook(ebuf);
-            threadNow(0);
+            threadNow(0, NULL, NULL);
         }
         return;
     }
@@ -1659,35 +1719,6 @@ initEnv(int *attachedFlag)
     scope_fclose(fd);
 }
 
-static const char *
-getFilterFilePath(void)
-{
-    char *filterFilePath = NULL;
-    char *envFilterVal = getenv("SCOPE_FILTER");
-    if (envFilterVal) {
-        if (!scope_strcmp(envFilterVal, "false")) {
-            // SCOPE_FILTER is false (use of filter file is disabled)
-            filterFilePath = NULL;
-        } else if (!scope_access(envFilterVal, R_OK)) {
-            // SCOPE_FILTER contains the path to a filter file.
-            filterFilePath = envFilterVal;
-        }
-    } else if (!scope_access(SCOPE_FILTER_USR_PATH, R_OK)) {
-        // filter file was at first default location
-        filterFilePath = SCOPE_FILTER_USR_PATH;
-    } else if (!scope_access(SCOPE_FILTER_TMP_PATH, R_OK)) {
-        // filter file was at second default location
-        filterFilePath = SCOPE_FILTER_TMP_PATH;
-    }
-
-    // check if filter file can actually be used
-    if ((filterFilePath) && (cfgFilterFileIsValid(filterFilePath) == FALSE)) {
-        filterFilePath = NULL;
-    }
-
-    return filterFilePath;
-}
-
 // Used this command on ubuntu 20.04 and 22.04 as a starting point:
 // ps -ef | grep -v "\["
 static const char *const doNotScopeList[] = {
@@ -1735,7 +1766,8 @@ static const char *const doNotScopeList[] = {
     "NetworkManager",
     "polkitd",
     "power-profiles-daemon",
-    "sshd",
+    "snap",
+    "snapd",
     "udisksd",
     "upowerd",
     "wpa_supplicant",
@@ -1802,19 +1834,52 @@ static const char *const doNotScopeList[] = {
 
 };
 
+static const char *const allowList[] = {
+    "runc",
+};
+
+/*
+ * When a rules file has not been found, all processes have the
+ * potential to be interposed. This function prohibits a process in the
+ * doNotScopeList list from being interposed as it otherwise would.
+ *
+ * It returns FALSE if the current process, by name, should not be interposed.
+ */
 static bool
-thisProcCanBeActive(void)
+doImplicitDeny(void)
 {
-    char procName[256] = {0};
+    char procName[PATH_MAX] = {0};
     osGetProcname(procName, sizeof(procName));
 
     int i;
-    for (i=0; i<ARRAY_SIZE(doNotScopeList); i++) {
+
+    for (i=0; i < ARRAY_SIZE(doNotScopeList); i++) {
         if (!scope_strcmp(procName, doNotScopeList[i])) return FALSE;
     }
+
     return TRUE;
 }
 
+/*
+ * When a rules file is found, the processes defined by the rules
+ * are the only ones interposed. This function allows a process in the
+ * allowList to override the rules and be interposed.
+ *
+ * It returns TRUE if the current process, by name, is to be allowed.
+ */
+static bool
+doImplicitAllow(void)
+{
+    char procName[PATH_MAX] = {0};
+    osGetProcname(procName, sizeof(procName));
+    int i;
+
+    for (i=0; i < ARRAY_SIZE(allowList); i++) {
+        if (!scope_strcmp(procName, allowList[i])) return TRUE;
+    }
+
+    return FALSE;
+}
 
 typedef struct {
     bool isActive;
@@ -1824,7 +1889,7 @@ typedef struct {
 /*
 * We actively scope applications:
 * - when we are attaching
-* - when the filter file is not valid or does not exist and 
+* - when the rules file is not valid or does not exist and 
 *   process does not match `doNotScopeList`
 * - when process match the allow list
 */
@@ -1832,40 +1897,45 @@ static settings_t
 getSettings(bool attachedFlag)
 {
     config_t *cfg = NULL;
-    const char *filterFilePath = NULL;
+    const char *rulesFilePath = NULL;
     bool scopedFlag = FALSE;
-    bool skipReadCfg = FALSE;
+    bool readCfgFile = TRUE;
 
     if (attachedFlag) {
         scopedFlag = TRUE;
-    } else if (!(filterFilePath = getFilterFilePath())){
-        // The filter file does not exist, or shouldn't be used.
+    } else if (!(rulesFilePath = cfgRulesFilePath())){
+        // The rules file does not exist, or shouldn't be used.
         // Set scopedFlag true unless it's on our doNotScopeList
-        scopedFlag = thisProcCanBeActive();
+        scopedFlag = doImplicitDeny();
     } else {
-        // A filter file exists!  Use it.
-        cfg = cfgCreateDefault();
-        filter_status_t res = cfgFilterStatus(g_proc.procname, g_proc.cmd, filterFilePath, cfg);
-        switch (res) {
-            case FILTER_SCOPED:
+        // A rules file exists. Before using it, check for an implicit allow
+        if (doImplicitAllow() == TRUE) {
+            scopedFlag = TRUE;
+        } else {
+            // A rules file exists!  Use it.
+            cfg = cfgCreateDefault();
+            rules_status_t res = cfgRulesStatus(g_proc.procname, g_proc.cmd, rulesFilePath, cfg);
+            switch (res) {
+            case RULES_SCOPED:
                 scopedFlag = TRUE;
                 break;
-            case FILTER_SCOPED_WITH_CFG:
+            case RULES_SCOPED_WITH_CFG:
                 scopedFlag = TRUE;
-                skipReadCfg = TRUE;
+                readCfgFile = FALSE;
                 break;
-            case FILTER_NOT_SCOPED:
+            case RULES_NOT_SCOPED:
                 scopedFlag = FALSE;
                 break;
-            case FILTER_ERROR:
+            case RULES_ERROR:
             default:
                 scopedFlag = FALSE;
                 DBG(NULL);
                 break;
+            }
         }
     }
 
-    if (skipReadCfg == FALSE) {
+    if (readCfgFile == TRUE) {
         char *path = NULL;
         path = cfgPath();
         if (cfg) cfgDestroy(&cfg);
@@ -1879,6 +1949,20 @@ getSettings(bool attachedFlag)
     return settings;
 }
 
+/*
+* This is a helper function designed to facilitate the debugging process
+* of the constructor. To utilize this function, place a call to dbgConstructorFn()
+* in the code section that needs to be debugged. By running the code with a debugger,
+* you can modify the value of dbgConstructor to break out of the initialization loop.
+*/
+// static void
+// dbgConstructorFn(void) {
+//     static int dbgConstructor = 1;
+//     while (dbgConstructor) {
+//         sleep(1);
+//     }
+// }
+
 __attribute__((constructor)) void
 init(void)
 {
@@ -1888,7 +1972,7 @@ init(void)
 
     // Bootstrapping...  we need to know if we're in musl so we can
     // call the right initFn function...
-    
+
     if (osGetExePath(scope_getpid(), &full_path) != -1) {
         if ((ebuf = getElf(full_path))) {
             // SCOPE_APP_TYPE will be set by scopedyn
@@ -1942,8 +2026,18 @@ init(void)
     initTime();
 
     // settings contain isActive and cfg fields which depend on the existance and
-    // contents of a filter file, env vars, scope.yml, etc.
+    // contents of a rules file, env vars, scope.yml, etc.
     settings_t settings = getSettings(attachedFlag);
+
+    /*
+    * Stop further processing if the process is on the deny list.
+    * We saw the processes that are not able to survive constructor because
+    * of AppArmor settings e.g. snapd. Therefore we opt out from further
+    * constructor logic.
+    */
+    if ((settings.isActive == FALSE) && (doImplicitDeny() == FALSE)) {
+        return;
+    }
 
     // on aarch64, the crypto subsystem installs handlers for SIGILL
     // (contrib/openssl/crypto/armcap.c) to determine which version of
@@ -1971,7 +2065,7 @@ init(void)
     transportRegisterForExitNotification(handleExit);
 
     initHook(attachedFlag, settings.isActive, ebuf, full_path);
-    
+
     /*
      * If we are interposing (scoping) this process, then proceed
      * with start messages. Else, we need the periodic thread to
@@ -1987,7 +2081,7 @@ init(void)
         doProcStartMetric();
 
         if (g_isgo || attachedFlag || g_ismusl) {
-            threadNow(0);
+            threadNow(0, NULL, NULL);
         } else {
             threadInit();
         }
@@ -2009,6 +2103,22 @@ init(void)
 EXPORTOFF sighandler_t
 signal(int signum, sighandler_t handler) {
     WRAP_CHECK(signal, NULL);
+
+    if (signum == SIGUSR2) {
+        // Our handler was already installed
+        if (osIsScopeHandlerActive() == TRUE) {
+            // grab the old
+            struct sigaction oldact = { 0 };
+            osGetAppSigaction(&oldact);
+
+            // save the new
+            struct sigaction newact = { 0 };
+            newact.sa_handler = handler;
+            osSetAppSigaction(&newact);
+            return oldact.sa_handler;
+        }
+        return g_fn.signal(signum, handler);
+    }
 
     /*
      * Prevent the situation to override our handler when it is enabled.
@@ -2041,13 +2151,28 @@ EXPORTOFF int
 sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 {
     WRAP_CHECK(sigaction, -1);
-    /*
-     * If there is a handler being installed, just save it.
-     * If no handler, they may just be checking for the current handler.
-     */
-    if ((signum == SIGUSR2) && (act != NULL)) {
-        g_thread.act = act; 
-        return 0;
+
+    if (signum == SIGUSR2) {
+        if (osIsScopeHandlerActive() == TRUE) {
+            /*
+            * If scope handler was already installed installed, just save the incoming one.
+            * If no handler, they may just be checking for the current handler.
+            */
+            if (act == NULL) {
+                struct sigaction old = { 0 };
+                osGetAppSigaction(&old);
+                *oldact = old;
+                return 0;
+            }
+            struct sigaction old = { 0 };
+            osGetAppSigaction(&old);
+            osSetAppSigaction(act);
+            if (oldact) {
+                *oldact = old;
+            }
+            return 0;
+        }
+        return g_fn.sigaction(signum, act, oldact);
     }
 
     /*
@@ -2064,7 +2189,6 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
             snapshotRetrieveAppSignalHandler(signum, &old);
             *oldact = old;
             return 0;
-
         }
 
         // if signum is part of the snapshotErrorsSignals, save the handler
@@ -3027,41 +3151,173 @@ prctl(int option, ...)
     return g_fn.prctl(option, fArgs.arg[0], fArgs.arg[1], fArgs.arg[2], fArgs.arg[3]);
 }
 
-static char *
-getScopeExec(const char *pathname)
+static bool
+getPreload(char **envp)
 {
-    char *scopexec = NULL;
-    bool isstat = FALSE, isgo = FALSE;
-    elf_buf_t *ebuf;
+    if (!envp) {
+        if (fullGetEnv("LD_PRELOAD")) {
+            return TRUE;
+        }
 
+        return FALSE;
+    }
+
+    size_t i;
+    char **envinst;
+
+    for (envinst = envp, i = 0; envinst[i]; i++) {
+        if (scope_strstr(envinst[i], "LD_PRELOAD")) {
+            // LD_PRELOAD exists, done.
+            return TRUE;
+        }
+    }
+
+    return FALSE;
+}
+
+static char **
+setPreload(char **envp)
+{
+    char *lib_path;
+
+    if (dl_iterate_phdr(findLibscopePath, &lib_path) == 0) {
+        return NULL;
+    }
+
+    if (!envp) {
+        fullSetenv("LD_PRELOAD", lib_path, 1);
+        return NULL;
+    }
+
+    char *ldp, **newenvp;
+    size_t i, plen;
+    size_t ldplen = scope_strlen("LD_PRELOAD");
+    char **envinst;
+
+    for (envinst = envp, i = 0; envinst[i]; i++) {
+        if (scope_strstr(envinst[i], "LD_PRELOAD")) {
+            // LD_PRELOAD exists, done.
+            return NULL;
+        }
+    }
+
+    plen = scope_strlen(lib_path) + ldplen + 2;
+    if ((ldp = scope_calloc(1, plen)) == NULL) {
+        sysprint("%s:%d WARN: calloc\n", __FUNCTION__, __LINE__);
+        return NULL;
+    }
+
+    scope_snprintf(ldp, plen, "LD_PRELOAD=%s", lib_path);
+
+    if ((newenvp = scope_calloc(1, sizeof(char *) * (i+2))) == NULL) {
+        scope_free(ldp);
+        sysprint("%s:%d WARN: calloc\n", __FUNCTION__, __LINE__);
+        return NULL;
+    }
+    scope_memmove(newenvp, envp, sizeof(char *) * (i+2));
+
+    newenvp[i] = ldp;
+    newenvp[i + 1] = NULL;
+    return newenvp;
+}
+
+static char *
+copyArgv(char **argv)
+{
+    int i, nargs = 0;
+    char *args;
+
+    while ((argv[nargs] != NULL)) nargs++;
+    if (nargs <= 1) return NULL;
+
+    // Total length of all args
+    int total_length = 0;
+    for (i = 0; i < nargs; i++) {
+        total_length += scope_strlen(argv[i]) + 1;
+    }
+
+    if ((args = scope_calloc(1, total_length)) == NULL) return NULL;
+
+    // Copy argv arguments
+    for (i = 0; i < nargs; i++) {
+        scope_strcat(args, argv[i]);
+        if (i != nargs - 1) {
+            scope_strcat(args, " ");  // Add a space between arguments
+        }
+    }
+
+    return args;
+}
+
+/*
+ * There is a single purpose for interposed execs
+ * If the proc to be exec'd is Go static then,
+ * exec using the CLI. Else, do nothing.
+ * It is presumed that LD_PRELOAD is set when
+ * an exec is interposed.
+ */
+static char *
+getScopeExec(const char *pathname, char **argv, char **envp)
+{
+    bool isstat = FALSE, isgo = FALSE;
+    char *scopexec = NULL, *path = NULL;
+    const char *rulesFilePath = NULL;
+    elf_buf_t *ebuf;
+    config_t *cfg;
+
+    /*
+     * If the current proc is the CLI
+     * or the proc to be exec'd is the CLI
+     * or the env var disables exec behavior
+     * then done.
+     */
     if (scope_strstr(g_proc.procname, "scope") ||
+        ((pathname != NULL) && scope_strstr(pathname, "scope")) ||
         checkEnv("SCOPE_EXECVE", "false")) {
         return NULL;
+    }
+
+    // if we have a rules file and the proc to be exec'd is not allowed, done.
+    if (((rulesFilePath = cfgRulesFilePath())) &&
+        (pathname != NULL) && ((path = scope_strdup(pathname)))) {
+        char *args = NULL;
+
+        if ((args = copyArgv(argv)) == NULL) {
+            // TODO; we should be able to pass a null arg list, deal with cfg later
+            args = "";
+        }
+
+        cfg = cfgCreateDefault();
+        rules_status_t res = cfgRulesStatus(scope_basename(path), args, rulesFilePath, cfg);
+
+        scope_free(path);
+        if (strlen(args) > 1) scope_free(args);
+        if (cfg) cfgDestroy(&cfg);
+        if (res == RULES_NOT_SCOPED) {
+            return NULL;
+        }
     }
 
     if ((ebuf = getElf((char *)pathname))) {
         isstat = is_static(ebuf->buf);
         isgo = is_go(ebuf->buf);
+    } else {
+        // example; a shell is not an Elf exec
+        return NULL;
     }
 
     // not really necessary since we're gonna exec
     if (ebuf) freeElf(ebuf->buf, ebuf->len);
 
-    /*
-     * Note: the isgo check is strictly for Go dynamic execs.
-     * In this case we use scope only to force the use of HTTP 1.1.
-     */
-    if (fullGetEnv("LD_PRELOAD") && (isstat == FALSE) && (isgo == FALSE)) {
-        return NULL;
-    }
-
-    scopexec = fullGetEnv("SCOPE_EXEC_PATH");
-    if (((scopexec = getpath(scopexec)) == NULL) &&
-        ((scopexec = getpath("scope")) == NULL)) {
-
-        // can't find the scope executable
-        scopeLogWarn("can't find a scope executable for %s", pathname);
-        return NULL;
+    // If the exec to be started is Go static, then start with the CLI
+    if ((isstat == TRUE) && (isgo == TRUE)) {
+        scopexec = fullGetEnv("SCOPE_EXEC_PATH");
+        if (((scopexec = getpath(scopexec)) == NULL) &&
+            ((scopexec = getpath("scope")) == NULL)) {
+            // can't find the scope executable
+            scopeLogWarn("can't find a scope executable for %s", pathname);
+            return NULL;
+        }
     }
 
     return scopexec;
@@ -3076,8 +3332,17 @@ execv(const char *pathname, char *const argv[])
 
     WRAP_CHECK(execv, -1);
 
-    scopexec = getScopeExec(pathname);
+    scopexec = getScopeExec(pathname, (char **)argv, NULL);
     if (scopexec == NULL) {
+        /*
+         * Note: we enable libscope to be loaded in all procs
+         * because the lib is responsible for determining if
+         * it should interpose.
+         */
+        if ((getPreload(NULL) == FALSE) &&
+            (setPreload(NULL) == NULL)) {
+            sysprint("%s: WARN: can't set preload\n", __FUNCTION__);
+        }
         return g_fn.execv(pathname, argv);
     }
 
@@ -3106,15 +3371,41 @@ execv(const char *pathname, char *const argv[])
 EXPORTOFF int
 execve(const char *pathname, char *const argv[], char *const envp[])
 {
-    int i, nargs;
+    int i, nargs, rc;
     char *scopexec;
     char **nargv;
 
     WRAP_CHECK(execve, -1);
 
-    scopexec = getScopeExec(pathname);
+    scopexec = getScopeExec(pathname, (char **)argv, (char **)envp);
     if (scopexec == NULL) {
-        return g_fn.execve(pathname, argv, envp);
+        char **newenvp = NULL;
+
+        // need to get/set preload in envp and not environ
+        if (getPreload((char **)envp) == FALSE) {
+            /*
+             * Note: we enable libscope to be loaded in all procs
+             * because the lib is responsible for determining if
+             * it should interpose.
+             */
+            if ((newenvp = setPreload((char **)envp)) != NULL) {
+                envp = newenvp;
+            }
+        }
+
+        rc = g_fn.execve(pathname, argv, envp);
+        // If execve returns, it's an error
+        if (newenvp) {
+            for (i = 0; newenvp[i]; i++) {
+                if (scope_strstr(newenvp[i], "LD_PRELOAD")) {
+                    scope_free(newenvp[i]);
+                    break;
+                }
+            }
+
+            scope_free(newenvp);
+        }
+        return rc;
     }
 
     nargs = 0;
@@ -3122,6 +3413,7 @@ execve(const char *pathname, char *const argv[], char *const envp[])
 
     size_t plen = sizeof(char *);
     if ((nargs == 0) || (nargv = scope_calloc(1, ((nargs * plen) + (plen * 2)))) == NULL) {
+        // we're not adjusting envp here, given an error condition
         return g_fn.execve(pathname, argv, envp);
     }
 
@@ -5638,7 +5930,7 @@ __sprintf_chk(char *str, int flag, size_t strlen, const char *format, ...)
     int rc;
 
     va_start(ap, format);
-    rc = vsnprintf(str, strlen, format, ap);
+    rc = vsprintf(str, format, ap);
     va_end(ap);
     return rc;
 }

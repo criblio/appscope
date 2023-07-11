@@ -133,7 +133,7 @@ Attaching to process 1838
 
 You can also [detach](/docs/cli-reference#detach) AppScope from a process.
 
-Furthermore, if you want to undo the effects of the `scope attach`, `scope start`, and/or `scope service` commands, run the `scope stop` [command](/docs/cli-reference#stop). This runs `scope detach --all`, removes the filter file from the system, and removes `scope` from service configurations.
+Furthermore, if you want to undo the effects of the `scope attach`, `scope start`, and/or `scope service` commands, run the `scope stop` [command](/docs/cli-reference#stop). This runs `scope detach --all`, removes the rules file from the system, and removes `scope` from service configurations.
 
 When you detach from a process, AppScope:
 

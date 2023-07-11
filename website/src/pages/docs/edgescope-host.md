@@ -29,7 +29,7 @@ On the Linux host we want to observe with Edge:
 1. Open a shell. 
 2. Paste the script into the shell. 
 3. Edit the script so that it runs as root, by adding `sudo` to the bash command at the end.
-    - For example, `curl 'https://...%2Fcribl' | bash - ` should be edited as follows:
+    - For example, `curl 'https://...%2Fcribl' | bash - ` ... should be edited as follows:
     - `curl 'https://... %2Fcribl' | sudo bash - `
 1. Execute the script, and give it a minute or so to complete.
 

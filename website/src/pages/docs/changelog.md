@@ -34,7 +34,7 @@ AppScope 1.4.0 can instrument a defined app whenever and in whatever context it 
 
 ### Fixes
 
-- [1424](https://github.com/criblio/appscope/issues/1424) Scoping a Go application that was built without certain symbol names now produces both metrics and events. See [1416](https://github.com/criblio/appscope/issues/1416) for details.
+TBD
 
 ## AppScope 1.3.4
 

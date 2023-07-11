@@ -23,11 +23,18 @@ Assets other than AWS Lambda Layers are available in the [Docker container](http
 
 ### New Features and Improvements
 
-AppScope 1.4.0 introduces support for foo bar baz
+AppScope 1.4.0 integrates more deeply with Cribl Edge:
+
+- Using [Cribl Edge](https://docs.cribl.io/edge/) to "drive," you can now scope individual processes by PID on an Edge Node, and/or scope multiple processes by Rule, on an entire Edge Fleet.
+- Using Cribl Edge's [Prometheus Scraper Source](https://docs.cribl.io/edge/sources-prometheus/), you can now obtain metrics in [OpenMetrics](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md) format from processes running in Kubernetes containers.
+
+In general, AppScope 1.4.0 expands support for Kubernetes.
+
+AppScope 1.4.0 can instrument a defined app whenever and in whatever context it starts, including in Docker and other [Open Container Initiative](https://opencontainers.org/)-compliant containers. This was already true for host-based apps and Kubernetes pods in AppScope 1.3.2. Related issue: [1416](https://github.com/criblio/appscope/issues/1416).
 
 ### Fixes
 
-- [XXX](https://github.com/criblio/appscope/issues/XXXX) here we go foo bar
+- [1424](https://github.com/criblio/appscope/issues/1424) Scoping a Go application that was built without certain symbol names now produces both metrics and events. See [1416](https://github.com/criblio/appscope/issues/1416) for details.
 
 ## AppScope 1.3.4
 

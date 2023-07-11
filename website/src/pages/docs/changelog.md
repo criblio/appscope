@@ -27,6 +27,7 @@ AppScope 1.4.0 integrates more deeply with Cribl Edge:
 
 - Using [Cribl Edge](https://docs.cribl.io/edge/) to "drive," you can now scope individual processes by PID on an Edge Node, and/or scope multiple processes by Rule, on an entire Edge Fleet.
 - Using Cribl Edge's [Prometheus Scraper Source](https://docs.cribl.io/edge/sources-prometheus/), you can now obtain metrics in [OpenMetrics](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md) format from processes running in Kubernetes containers.
+- The AppScope CLI has new functionality to support the Cribl Edge integration. This includes the new `rules` command (superseding the `filter` command) along with improvements in the `start`, `attach`, `detach`, `update`, and `inspect` commands. See the AppScope [CLI Reference](/docs/cli-reference).
 
 In general, AppScope 1.4.0 expands support for Kubernetes.
 

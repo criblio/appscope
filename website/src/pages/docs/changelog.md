@@ -27,15 +27,20 @@ AppScope 1.4.0 integrates more deeply with Cribl Edge:
 
 - Using [Cribl Edge](https://docs.cribl.io/edge/) to "drive," you can now scope individual processes by PID on an Edge Node, and/or scope multiple processes by Rule, on an entire Edge Fleet.
 - Using Cribl Edge's [Prometheus Scraper Source](https://docs.cribl.io/edge/sources-prometheus/), you can now obtain metrics in [OpenMetrics](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md) format from processes running in Kubernetes containers.
-- The AppScope CLI has new functionality to support the Cribl Edge integration. This includes the new `rules` command (superseding the `filter` command) along with improvements in the `start`, `attach`, `detach`, `update`, and `inspect` commands. See the AppScope [CLI Reference](/docs/cli-reference).
+- The [AppScope CLI](/docs/cli-reference) has new functionality to support the Cribl Edge integration, including: 
+    - A new `rules` command that specifies processes to scope, along with configs to apply to those processes.
+    - Improvements to the `start`, `stop`, `attach`, `detach`, `update`, and `inspect` commands.
 
 In general, AppScope 1.4.0 expands support for Kubernetes.
 
-AppScope 1.4.0 can instrument a defined app whenever and in whatever context it starts, including in Docker and other [Open Container Initiative](https://opencontainers.org/)-compliant containers. This was already true for host-based apps and Kubernetes pods in AppScope 1.3.2. Related issue: [1416](https://github.com/criblio/appscope/issues/1416).
-
 ### Fixes
 
-TBD
+- [1567](https://github.com/criblio/appscope/issues/1567) Scoping top on Fedora no longer produces an `unknown terminal type` error.
+- [1521](https://github.com/criblio/appscope/issues/1521), [1557](https://github.com/criblio/appscope/issues/1557) Memory leaks are fixed.
+- [1547](https://github.com/criblio/appscope/issues/1547) `scope ps` no longer fails to shows child processes.
+- [1529](https://github.com/criblio/appscope/issues/1529) It is now possible to scope postgres using the `LD_PRELOAD` mechanism.
+- [1515](https://github.com/criblio/appscope/issues/1515) When AppScope is in the user's `$PATH`` and the scoped application performs a fork and exec, AppScope no longer crashes the application.
+- [1502](https://github.com/criblio/appscope/issues/1502) Scoping bash no longer uses an (incorrect) configuration that is other than the one specified.
 
 ## AppScope 1.3.4
 

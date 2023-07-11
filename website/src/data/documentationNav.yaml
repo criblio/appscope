@@ -66,9 +66,6 @@
     - name: Config File
       path: /docs/config-file
 
-    - name: Rules File
-      path: /docs/rules-file
-
     - name: CLI Reference
       path: /docs/cli-reference
 

@@ -12,7 +12,7 @@ As of this AppScope release, known issues include:
 
 - [1580](https://github.com/criblio/appscope/issues/1580) Applications with the `s` bit set cannot be scoped. The system loader will emit a warning that the AppScope library cannot be preloaded; there will be no effect on the application beyond that.
 
-  - **Fix:** 1.4.1
+  - **Fix:** Version TBD
 
 - [1424](https://github.com/criblio/appscope/issues/1424) remains a Known Issue; see entry below.
 

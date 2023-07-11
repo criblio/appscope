@@ -4,22 +4,22 @@ title: "Rules File"
 
 ## Rules File
 
-The `scope start` command requires a rules file, whose purpose is to specify processes to scope along with configs to apply to those processes, and, optionally, processes **not** to scope.
+The `scope start` command requires a Rules file, whose purpose is to specify processes to scope along with configs to apply to those processes.
 
-The AppScope repo provides both a JSON and a YAML version of an example rules file in the `conf` directory. The YAML version is reproduced below.
+The AppScope repo provides both a JSON and a YAML version of an example Rules file in the `conf` directory. The YAML version is reproduced below.
 
-In Cribl Edge and Cribl Scope, instead of editing files, you create rules in the AppScope Source UI.
+In Cribl Edge and Cribl Scope, instead of editing files, you create Rules in the **Process Monitoring** tab of the AppScope Source UI.
 
 ### How Rules Files Work
 
-The allowlist is under the `allow` heading. To scope anything, AppScope requires the allowlist to include a `procname`, an `arg`, or both.
+The Rules file begins with a top-level `allow` heading. Each Rule must provide a value for either the `procname` or the `arg` element, and leave the other element empty.
 
 - Use `procname` to match an actual process name, e.g., `redis-server`.
 - Use `arg` to perform a substring match on the entire command that starts a process. For example, `redis` will match all processes whose starting command includes `redis`, even if the process name itself does not.
 
-The allowlist allows all processes which match **either** a `procname` or an `arg`.
+After the `procname` and `arg` element comes the `config` element, which contains the same elements as a freestanding AppScope [config file](config-file). 
 
-Denylists also use `procname` and `arg`. Only allowlists have `config` elements. When a process matches an allowlist, AppScope applies the specified `config` when scoping that process.
+When a process matches a Rule, AppScope applies the specified `config` when scoping that process.
 
 ### Example Rules File
 
@@ -201,6 +201,4 @@ allow:
           cacertpath: ''
           enable: false
           validateserver: true
-deny:
-- procname: git
 ```

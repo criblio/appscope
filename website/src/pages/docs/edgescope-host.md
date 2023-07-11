@@ -4,6 +4,8 @@ title: Cribl Edge on a Host
 
 # Running AppScope With Cribl Edge on a Host
 
+Host, in this context, means a standalone Linux host or Virtual Machine.
+
 This topic walks you through a setup procedure, and then through the two basic AppScope techniques:
 
 1. **Scope by PID** – Instrumenting one process on one host.

@@ -10,11 +10,11 @@ You can operate AppScope in two "modes:"
 - In Standalone mode, you "drive" AppScope from the command line. Optionally, you can use AppScope send data to Cribl Edge, Cribl Stream, or any other suitable application or platform.
 
 The way these docs are organized follows from two-modes concept:
-- For Edge mode, there are sections about working on a Linux host, in a Docker or similar container, or on Kubernetes.
+- When using AppScope with Cribl Edge, there are sections about working on a Linux host or virtual machine, in a Docker or similar container, or on Kubernetes.
     - These sections are complementary to Cribl's documentation about the [AppScope Source](https://docs.cribl.io/stream/sources-appscope) and the [AppScope Config Editor](https://docs.cribl.io/stream/4.0/appscope-configs).
     - AppScope comes bundled with Cribl Edge, so there's no need to discuss how to obtain AppScope. 
-- For Standalone mode, there are sections for obtaining AppScope, and then using AppScope, starting with the CLI.
-- The Reference sections apply to both modes (although the [CLI Reference](/docs/cli-reference) is most relevant for Standalone mode).
+- When using AppScope on its own, there are sections for obtaining AppScope, and then using AppScope, starting with the CLI.
+- The Reference sections apply to both modes (although the [CLI Reference](/docs/cli-reference) is most relevant for using AppScope on its own or with other open-source tools).
 
 There are three main things to know to work effectively with AppScope:
 
@@ -24,7 +24,7 @@ There are three main things to know to work effectively with AppScope:
 
 ## The Config File, Env Vars, and Flags {#config-file-etc}
 
-AppScope's ease of use stems from its flexible set of controls (this mostly applies in Standalone mode):
+AppScope's ease of use stems from its flexible set of controls:
 
 * AppScope's configuration file, `scope.yml`, can be invoked from either the CLI or the library.
 

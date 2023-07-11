@@ -20,7 +20,7 @@
     - name: Cribl Edge on a Host
       path: /docs/edgescope-host
     - name: Cribl Edge in Docker 
-      path: /docs/edgescope-container
+      path: /docs/edgescope-docker
     - name: Cribl Edge in Kubernetes
       path: /docs/edgescope-k8s
 

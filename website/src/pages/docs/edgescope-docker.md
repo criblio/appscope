@@ -1,8 +1,8 @@
 ---
-title: Edge Mode in a Container
+title: Cribl Edge in Docker
 ---
 
-# Running AppScope in Edge Mode in a Container
+# Running AppScope With Cribl Edge in a Docker Container
 
 "Edge Mode" means "driving" AppScope from Cribl Edge. This topic walks you through a setup procedure, and then through the two basic AppScope techniques:
 

@@ -4,11 +4,6 @@ title: Working With AppScope
 
 # Working With AppScope
 
-You can operate AppScope in two "modes:" 
-
-- In Edge mode, you "drive" AppScope from Cribl Edge.
-- In Standalone mode, you "drive" AppScope from the command line. Optionally, you can use AppScope send data to Cribl Edge, Cribl Stream, or any other suitable application or platform.
-
 The way these docs are organized follows from two-modes concept:
 - When using AppScope with Cribl Edge, there are sections about working on a Linux host or virtual machine, in a Docker or similar container, or on Kubernetes.
     - These sections are complementary to Cribl's documentation about the [AppScope Source](https://docs.cribl.io/stream/sources-appscope) and the [AppScope Config Editor](https://docs.cribl.io/stream/4.0/appscope-configs).

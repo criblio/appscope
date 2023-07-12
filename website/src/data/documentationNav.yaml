@@ -15,6 +15,11 @@
     - name: Cool, but What Can I Do with It?
       path: /docs/what-do-with-scope
 
+- name: Solving Problems with AppScope
+  child: 
+    - name: Application Crash Analysis with AppScope
+      path: /docs/crash-analysis
+
 - name: Using AppScope With Cribl Edge
   child: 
     - name: Cribl Edge on a Host

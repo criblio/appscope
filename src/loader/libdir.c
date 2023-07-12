@@ -531,10 +531,28 @@ libdirGetPath(libdirfile_t objFileType)
 
     if (g_libdir_info.install_base[0]) {
         // Check install base next
-        // Check symlink to the library exists and is valid, and if so, return it
-        if (!access(SCOPE_LIBSCOPE_PATH, R_OK)) {
-            strncpy(state->binaryPath, SCOPE_LIBSCOPE_PATH, PATH_MAX);
-            return state->binaryPath;
+        if (objFileType == LIBRARY_FILE) {
+            // Special case for the library when we're dealing with the install path. It exists at /usr/lib/libscope.so.
+            // Check symlink to the library exists and is valid, and if so, return it
+            if (!access(SCOPE_LIBSCOPE_PATH, R_OK)) {
+                strncpy(state->binaryPath, SCOPE_LIBSCOPE_PATH, PATH_MAX);
+                return state->binaryPath;
+            }
+        } else {
+            char tmp_path[PATH_MAX] = {0};
+            int pathLen = snprintf(tmp_path, PATH_MAX, "%s/%s/%s", g_libdir_info.install_base, normVer, state->binaryName);
+            if (pathLen < 0) {
+                fprintf(stderr, "error: libdirGetPath: install base snprintf() failed.\n");
+                return NULL;
+            }
+            if (pathLen >= PATH_MAX) {
+                fprintf(stderr, "error: libdirGetPath: install base path too long.\n");
+                return NULL;
+            }
+            if (!access(tmp_path, R_OK)) {
+                strncpy(state->binaryPath, tmp_path, PATH_MAX);
+                return state->binaryPath;
+            }
         }
     }
 
@@ -690,10 +708,7 @@ libdirExtract(unsigned char *asset_file, size_t asset_file_len, uid_t nsUid, gid
         }
 
         // Always remove old symlink (in case it points to an older lib)
-        if (remove(path)) {
-            fprintf(stderr, "error: libdirExtract: removing original symbolic link from %s\n", path);
-            return -1;
-        }
+        remove(path);
 
         // Create new symlink
         if (libdirCreateSymLinkIfMissing(path, target, overwrite, mode, nsUid, nsGid)) {

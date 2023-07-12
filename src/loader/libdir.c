@@ -532,6 +532,7 @@ libdirGetPath(libdirfile_t objFileType)
 
     if (g_libdir_info.install_base[0]) {
         // Check install base next
+    /*
         char tmp_path[PATH_MAX] = {0};
         int pathLen = snprintf(tmp_path, PATH_MAX, "%s/%s/%s", g_libdir_info.install_base, normVer, state->binaryName);
         if (pathLen < 0) {
@@ -544,6 +545,11 @@ libdirGetPath(libdirfile_t objFileType)
         }
         if (!access(tmp_path, R_OK)) {
             strncpy(state->binaryPath, tmp_path, PATH_MAX);
+            return state->binaryPath;
+        }
+    */
+        if (!access(SCOPE_LIBSCOPE_PATH, R_OK)) {
+            strncpy(state->binaryPath, SCOPE_LIBSCOPE_PATH, PATH_MAX);
             return state->binaryPath;
         }
     }
@@ -677,7 +683,7 @@ libdirExtract(unsigned char *asset_file, size_t asset_file_len, uid_t nsUid, gid
         // Create symlink to appropriate version
         strncat(path, "libscope.so", sizeof(path) - 1);
         target = isMusl() ? path_musl : path_glibc;
-        if (libdirCreateSymLinkIfMissing(path, target, overwrite, mode, nsUid, nsGid)) {
+        if (libdirCreateSymLinkIfMissing(SCOPE_LIBSCOPE_PATH, target, overwrite, mode, nsUid, nsGid)) {
             fprintf(stderr, "libdirExtract: symlink %s failed\n", path);
             return -1;
         }

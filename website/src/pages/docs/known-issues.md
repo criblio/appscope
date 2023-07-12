@@ -4,9 +4,9 @@ title: Known Issues
 
 # Known Issues
 
-## AppScope 1.4.0
+## AppScope 1.4.1
 
-2023-07-19 - Feature Release
+2023-07-19 - Update to Feature Release
 
 As of this AppScope release, known issues include:
 

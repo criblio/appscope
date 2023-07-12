@@ -24,8 +24,8 @@
  * See details in: https://man7.org/linux/man-pages/man7/mq_overview.7.html
  */
 
-// Send message retry count
-#define RETRY_COUNT 50
+// IPC message (send/receive) retry count
+#define RETRY_COUNT 500
 #define INPUT_MSG_ALLOC_LIMIT (1024*1024) // 1 MB
 
 /*

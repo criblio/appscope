@@ -4,6 +4,7 @@
 #
 
 PRELOAD_PATH="/etc/ld.so.preload"
+LIBSCOPE_PATH="/usr/lib/libscope.so"
 PROFILE_SCOPE_SCRIPT="/etc/profile.d/scope.sh"
 USR_APPSCOPE_DIR="/usr/lib/appscope/"
 TMP_APPSCOPE_DIR="/tmp/appscope/"
@@ -11,6 +12,7 @@ CRIBL_APPSCOPE_DIR="$CRIBL_HOME/appscope/"
 
 echo "Following script will try to remove following files:"
 echo "- $PRELOAD_PATH"
+echo "- $LIBSCOPE_PATH"
 echo "- $PROFILE_SCOPE_SCRIPT"
 echo "- $USR_APPSCOPE_DIR"
 echo "- $TMP_APPSCOPE_DIR"
@@ -33,6 +35,14 @@ if [ -f $PRELOAD_PATH ] ; then
     echo "$PRELOAD_PATH file was removed"
 else
     echo "$PRELOAD_PATH file was missing. Continue..."
+fi
+
+# This one is a symbolic link
+if [ -L $LIBSCOPE_PATH ] ; then
+    rm $LIBSCOPE_PATH
+    echo "$LIBSCOPE_PATH file was removed"
+else
+    echo "$LIBSCOPE_PATH file was missing. Continue..."
 fi
 
 if [ -f $PROFILE_SCOPE_SCRIPT ] ; then

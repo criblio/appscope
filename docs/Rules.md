@@ -2,9 +2,9 @@
 
 ## Scenarios we intend to support
 
-### Scenario: Edge running in a container
+### Scenario: Rules deployed from a container (i.e. Cribl Edge running in a container)
 
-Start edge (as defined in cribl documentation):
+Start Cribl Edge Container (as defined in Cribl Edge documentation):
 ```
 docker run -it --rm -e CRIBL_EDGE=1  -p 9420:9420 -v /<path_to_code>/appscope:/opt/appscope  -v /var/run/appscope:/var/run/appscope  -v /var/run/docker.sock:/var/run/docker.sock  -v /:/hostfs:ro  --privileged  --name cribl-edge cribl/cribl:latest bash
 /opt/cribl/bin/cribl start
@@ -45,9 +45,9 @@ source:
 the result is that /var/run/appscope is mounted in new containers.
 ```
 
-### Scenario: Edge running on the host
+### Scenario: Rules deployed from a host (i.e. Cribl Edge running on the host)
 
-Start edge (as defined in cribl documentation):
+Start Cribl Edge (as defined in Cribl documentation):
 ```
 <switch the user to root>
 curl https://cdn.cribl.io/dl/4.1.3/cribl-4.1.3-15457782-linux-x64.tgz -o ~/Downloads/cribl.tgz

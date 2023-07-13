@@ -1,8 +1,15 @@
 #define _GNU_SOURCE
 
+#include "fn.h"
 #include "os.h"
 #include "scopestdlib.h"
 #include "test.h"
+
+static void
+osTestTimerStopNotInit(void **state) {
+    bool res = osTimerStop();
+    assert_false(res);
+}
 
 static void
 osWritePermSuccess(void **state) {
@@ -36,7 +43,10 @@ int
 main(int argc, char* argv[]) {
     printf("running %s\n", argv[0]);
 
+    initFn();
+
     const struct CMUnitTest tests[] = {
+        cmocka_unit_test(osTestTimerStopNotInit),
         cmocka_unit_test(osWritePermSuccess),
         cmocka_unit_test(osWritePermFailure),
         cmocka_unit_test(dbgHasNoUnexpectedFailures),

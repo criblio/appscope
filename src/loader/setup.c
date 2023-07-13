@@ -577,7 +577,7 @@ setupService(const char *serviceName, uid_t nsUid, gid_t nsGid) {
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
     bool isDevVersion = libverIsNormVersionDev(loaderVersion);
 
-    snprintf(libscopePath, PATH_MAX, "/usr/lib/appscope/%s/libscope.so", loaderVersion);
+    snprintf(libscopePath, PATH_MAX, SCOPE_LIBSCOPE_PATH);
     if (access(libscopePath, R_OK) || isDevVersion) {
         memset(libscopePath, 0, PATH_MAX);
         snprintf(libscopePath, PATH_MAX, "/tmp/appscope/%s/libscope.so", loaderVersion);
@@ -792,19 +792,40 @@ setupMount(pid_t pid, const char *mountDest, const char *rootdir, uid_t nsUid, g
 }
 
 // Install a rules file in /usr/lib/appscope/
+// or, if defined, $CRIBL_HOME/appscope
 bool
 setupRules(void *rulesFileMem, size_t rulesSize, uid_t nsUid, gid_t nsGid)
 {
     int rulesFd;
     bool status = FALSE;
+//    char criblRulesPath[PATH_MAX];
+//    char criblRulesDir[PATH_MAX];
 
-    if (libdirCreateDirIfMissing(SCOPE_USR_PATH, 0664, nsUid, nsGid) > MKDIR_STATUS_EXISTS) {
+    char *rulesPath = SCOPE_RULES_USR_PATH;
+    char *rulesDir = SCOPE_USR_PATH;
+
+//	// If $CRIBL_HOME is set, only place a rules file there instead
+//    const char *criblHome = getenv("CRIBL_HOME");
+//    if (criblHome) {
+//        if (snprintf(criblRulesPath, sizeof(criblRulesPath), "%s/appscope/scope_rules", criblHome) == -1) {
+//            perror("snprintf cribl rules path");
+//            return status;
+//        }
+//        if (snprintf(criblRulesDir, sizeof(criblRulesDir), "%s/appscope", criblHome) == -1) {
+//            perror("snprintf cribl rules dir");
+//            return status;
+//        }
+//        rulesPath = criblRulesPath;
+//        rulesDir = criblRulesDir;
+//    }
+
+    // Create the directory if it does not exist yet
+    if (libdirCreateDirIfMissing(rulesDir, 0664, nsUid, nsGid) > MKDIR_STATUS_EXISTS) {
         fprintf(stderr, "error: setupRules: failed to create directory\n");
         return status;
     }
 
-    // TODO support for CRIBL_HOME
-    if ((rulesFd = nsFileOpenWithMode(SCOPE_RULES_USR_PATH, O_RDWR | O_CREAT, 0664, nsUid, nsGid, geteuid(), getegid())) == -1) {
+    if ((rulesFd = nsFileOpenWithMode(rulesPath, O_RDWR | O_CREAT, 0664, nsUid, nsGid, geteuid(), getegid())) == -1) {
         return status;
     }
 

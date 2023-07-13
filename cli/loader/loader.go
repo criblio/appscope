@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
@@ -52,10 +53,12 @@ func (sL *ScopeLoader) Preload(path, rootdir string) (string, error) {
 }
 
 // Mount Command
-func (sL *ScopeLoader) Mount(source, dest, rootdir string) (string, error) {
+func (sL *ScopeLoader) Mount(path string, cPid int, rootdir string) (string, error) {
 	args := make([]string, 0)
 	args = append(args, "--mount")
-	args = append(args, source+","+dest)
+	args = append(args, path)
+	args = append(args, "--namespace")
+	args = append(args, fmt.Sprint(cPid))
 	if rootdir != "" {
 		args = append(args, "--rootdir")
 		args = append(args, rootdir)

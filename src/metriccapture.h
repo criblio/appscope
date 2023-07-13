@@ -6,8 +6,7 @@
 #include "state_private.h"
 
 void initMetricCapture(void);
-bool doMetricCapture(uint64_t, int, net_info*, char*, size_t,
-                     metric_t, src_data_t);
+bool doMetricCapture(int, net_info*, char*, size_t, metric_t, src_data_t);
 void reportAllCapturedMetrics(void);
 
 typedef struct {

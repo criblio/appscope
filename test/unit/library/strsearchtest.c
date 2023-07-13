@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-#include "search.h"
+#include "strsearch.h"
 #include "test.h"
 
 static void

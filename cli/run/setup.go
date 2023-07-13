@@ -318,6 +318,13 @@ func (rc *Config) buildEventsDest() string {
 }
 
 func (rc *Config) CreateWorkDirBasic(cmd string) {
+	dirPerms := os.FileMode(0755)
+	if cmd == "rules" {
+		dirPerms = 0777
+		oldmask := syscall.Umask(0)
+		defer syscall.Umask(oldmask)
+	}
+
 	// Directories named CMD_SESSIONID_PID_TIMESTAMP
 	ts := strconv.FormatInt(time.Now().UTC().UnixNano(), 10)
 	pid := strconv.Itoa(os.Getpid())
@@ -334,10 +341,26 @@ func (rc *Config) CreateWorkDirBasic(cmd string) {
 		util.Warn("WARNING: Session logs will be stored in %s and owned by root\n", histDir)
 	}
 
-	// Create working directory in history/
-	rc.WorkDir = filepath.Join(HistoryDir(), tmpDirName)
-	err = os.Mkdir(rc.WorkDir, 0755)
-	util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
+	// Create Working directory
+	if cmd == "rules" {
+		// Validate /tmp exists
+		if !util.CheckDirExists("/tmp") {
+			util.ErrAndExit("/tmp directory does not exist")
+		}
+		// Create working directory in /tmp (0777 permissions)
+		rc.WorkDir = filepath.Join("/tmp", tmpDirName)
+		err := os.Mkdir(rc.WorkDir, dirPerms)
+		util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
+
+		// Symbolic link between /tmp/tmpDirName and /history/tmpDirName
+		rootHistDir := filepath.Join(histDir, tmpDirName)
+		os.Symlink(rc.WorkDir, rootHistDir)
+	} else {
+		// Create working directory in history/
+		rc.WorkDir = filepath.Join(HistoryDir(), tmpDirName)
+		err = os.Mkdir(rc.WorkDir, 0755)
+		util.CheckErrSprintf(err, "error creating workdir dir: %v", err)
+	}
 
 	// Populate working directory
 	// Create Log file

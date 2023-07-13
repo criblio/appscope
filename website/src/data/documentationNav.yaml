@@ -15,6 +15,15 @@
     - name: Cool, but What Can I Do with It?
       path: /docs/what-do-with-scope
 
+- name: Using AppScope With Cribl Edge
+  child: 
+    - name: Cribl Edge on a Host
+      path: /docs/edgescope-host
+    - name: Cribl Edge in Docker 
+      path: /docs/edgescope-docker
+    - name: Cribl Edge in Kubernetes
+      path: /docs/edgescope-k8s
+
 - name: Getting AppScope
   child: 
     - name: Requirements 
@@ -56,9 +65,6 @@
   child: 
     - name: Config File
       path: /docs/config-file
-
-    - name: Rules File
-      path: /docs/rules-file
 
     - name: CLI Reference
       path: /docs/cli-reference

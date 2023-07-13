@@ -2,7 +2,9 @@
 title: Other Resources
 ---
 
-To learn more about AppScope, see these resources from Cribl.
+The deep integration of AppScope 1.4.0 and Cribl Edge 4.2 offers optimal power and convenience in many use cases; but since those versions are the newest available, the resources in this section all describe earlier versions of AppScope.
+
+Keeping that caveat in mind, you should find abundant useful information in the resources listed here.
 
 ## Videos
 

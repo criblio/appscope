@@ -5,9 +5,10 @@
 
 #include "com.h"
 #include "dbg.h"
+#include "evtutils.h"
 #include "httpstate.h"
 #include "plattime.h"
-#include "search.h"
+#include "strsearch.h"
 #include "atomic.h"
 #include "scopestdlib.h"
 
@@ -33,7 +34,7 @@ static void setHttpState(http_state_t *httpstate, http_enum_t toState);
 static void appendHeader(http_state_t *httpstate, char* buf, size_t len);
 static size_t getContentLength(char *header, size_t len);
 static size_t bytesToSkipForContentLength(http_state_t *httpstate, size_t len);
-static bool setHttpId(httpId_t *httpId, net_info *net, int sockfd, uint64_t id, metric_t src);
+static bool setHttpId(httpId_t *httpId, net_info *net, int sockfd, metric_t src);
 static int reportHttp1(http_state_t *httpstate);
 static bool parseHttp1(http_state_t *httpstate, char *buf, size_t len, httpId_t *httpId);
 
@@ -200,22 +201,11 @@ bytesToSkipForContentLength(http_state_t *httpstate, size_t len)
 }
 
 static bool
-setHttpId(httpId_t *httpId, net_info *net, int sockfd, uint64_t id, metric_t src)
+setHttpId(httpId_t *httpId, net_info *net, int sockfd, metric_t src)
 {
-    if (!httpId) return FALSE;
+    if (!httpId || !net) return FALSE;
 
-    /*
-     * If we have an fd, use the uid/channel value as it's unique
-     * else we are likely using TLS, so default to the session ID
-     */
-    if (net) {
-        httpId->uid = net->uid;
-    } else if (id != -1) {
-        httpId->uid = id;
-    } else {
-        DBG(NULL);
-        return FALSE;
-    }
+    httpId->uid = net->uid;
 
     httpId->isSsl = (src == TLSTX) || (src == TLSRX);
 
@@ -232,22 +222,18 @@ reportHttp1(http_state_t *httpstate)
 {
     if (!httpstate || !httpstate->hdr || !httpstate->hdrlen) return -1;
 
-    protocol_info *proto = scope_calloc(1, sizeof(struct protocol_info_t));
-    http_post *post = scope_calloc(1, sizeof(struct http_post_t));
-    if (!proto || !post) {
-        // Bummer!  We're losing info.  At least make sure we clean up.
+    protocol_info *proto = evtProtoAllocHttp1(httpstate->isResponse);
+    if (!proto) {
+        // Bummer!  We're losing info.
         DBG(NULL);
-        if (post) scope_free(post);
-        if (proto) scope_free(proto);
         return -1;
     }
+    http_post *post = (http_post *)proto->data;
 
     // If the first 5 chars are HTTP/, it's a response header
     int isSend = (httpstate->id.src == NETTX) || (httpstate->id.src == TLSTX);
 
     // Set proto info
-    proto->evtype = EVT_PROTO;
-    proto->ptype = (httpstate->isResponse) ? EVT_HRES : EVT_HREQ;
     // We're a server if we 1) sent a response or 2) received a request
     proto->isServer = (isSend && httpstate->isResponse) || (!isSend && !httpstate->isResponse);
     proto->len = httpstate->hdrlen;
@@ -274,10 +260,9 @@ reportHttp1(http_state_t *httpstate)
     }
 
     // Set post info
-    proto->data = (char *)post;
     post->ssl = httpstate->id.isSsl;
     post->start_duration = getTime();
-    post->id = httpstate->id.uid;
+    post->id = httpstate->id;
 
     // "transfer ownership" of dynamically allocated header from
     // httpstate object to post object
@@ -300,22 +285,17 @@ reportHttp2(http_state_t *state, net_info *net, http_buf_t *stash,
         return FALSE;
     }
 
-    http_post *post = scope_calloc(1, sizeof(struct http_post_t));
-    if (!post) {
-        scopeLogError("ERROR: failed to allocate post object");
+    protocol_info *proto = evtProtoAllocHttp2Frame(frameLen);
+    if (!proto) {
+        scopeLogError("ERROR: failed to allocate protocol object");
         DBG(NULL);
         return FALSE;
     }
+
+    http_post *post = (http_post *)proto->data;
     post->ssl            = state->id.isSsl;
     post->start_duration = getTime();
-    post->id             = state->id.uid;
-    post->hdr            = scope_malloc(frameLen);
-    if (!post->hdr) {
-        scope_free(post);
-        scopeLogError("ERROR: failed to allocate post data");
-        DBG(NULL);
-        return FALSE;
-    }
+    post->id             = state->id;
     if (stash->len) {
         scope_memcpy(post->hdr, stash->buf, stash->len);
         scope_memcpy(post->hdr + stash->len, buf, frameLen - stash->len);
@@ -323,17 +303,6 @@ reportHttp2(http_state_t *state, net_info *net, http_buf_t *stash,
         scope_memcpy(post->hdr, buf, frameLen);
     }
 
-    protocol_info *proto = scope_calloc(1, sizeof(struct protocol_info_t));
-    if (!proto) {
-        scope_free(post->hdr);
-        scope_free(post);
-        scopeLogError("ERROR: failed to allocate protocol object");
-        DBG(NULL);
-        return FALSE;
-    }
-
-    proto->evtype   = EVT_PROTO;
-    proto->ptype    = EVT_H2FRAME;
     // Unlike in the HTTP/1 case, we're sending TRUE here if the frame was
     // sent, not if we're the server. We haven't parsed the frame to know if
     // it's a request or response yet so we're sending half of the isServer
@@ -342,7 +311,6 @@ reportHttp2(http_state_t *state, net_info *net, http_buf_t *stash,
     proto->len      = frameLen;
     proto->fd       = httpId->sockfd;
     proto->uid      = httpId->uid;
-    proto->data     = (char *)post;
     if (net) {
         proto->sock_type = net->type;
         if (net->addrSetLocal) {
@@ -812,7 +780,7 @@ doHttpBuffer(http_state_t states[HTTP_NUM], net_info *net, char *buf, size_t len
 }
 
 bool
-doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t src, src_data_t dtype)
+doHttp(int sockfd, net_info *net, char *buf, size_t len, metric_t src, src_data_t dtype)
 {
     if (!buf || !len) {
         scopeLogWarn("WARN: doHttp() got no buffer");
@@ -820,13 +788,13 @@ doHttp(uint64_t id, int sockfd, net_info *net, char *buf, size_t len, metric_t s
     }
 
     // If we know we're not looking at a stream, bail.
-    if (net && net->type != SOCK_STREAM) {
+    if (!net || net->type != SOCK_STREAM) {
         scopeLogWarn("WARN: doHttp() not on SOCK_STREAM");
         return FALSE;
     }
 
     httpId_t httpId = {0};
-    if (!setHttpId(&httpId, net, sockfd, id, src)) return FALSE;
+    if (!setHttpId(&httpId, net, sockfd, src)) return FALSE;
 
     int guard_enabled = g_http_guard_enabled && net;
     if (guard_enabled) while (!atomicCasU64(&g_http_guard[sockfd], 0ULL, 1ULL));

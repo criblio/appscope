@@ -44,7 +44,7 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
   scope attach --rootdir /path/to/host/root/proc/<hostpid>/root 1000
   scope attach --payloads 2000`,
 	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
 		rc.Rootdir, _ = cmd.Flags().GetString("rootdir")
 		inspectFlag, _ := cmd.Flags().GetBool("inspect")
@@ -81,11 +81,11 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 
 		procs, err := util.HandleInputArg(id, "", rc.Rootdir, true, true, true, false)
 		if err != nil {
-			return err
+			util.ErrAndExit("Attach failure: %v", err)
 		}
 
 		if len(procs) == 0 {
-			return errNoScopedProcs
+			util.ErrAndExit("Attach failure: no matching processes found")
 		}
 
 		pid := procs[0].Pid // we told HandleInputArg above that we wanted to choose only one proc
@@ -137,8 +137,6 @@ be set to sockets with unix:///var/run/mysock, tcp://hostname:port, udp://hostna
 				fmt.Println(string(cfg))
 			}
 		}
-
-		return nil
 	},
 }
 

@@ -33,7 +33,7 @@ var detachCmd = &cobra.Command{
   scope detach --rootdir /path/to/host/root
   scope detach --all --rootdir /path/to/host/root/proc/<hostpid>/root`,
 	Args: cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	Run: func(cmd *cobra.Command, args []string) {
 		internal.InitConfig()
 		all, _ := cmd.Flags().GetBool("all")
 		wait, _ := cmd.Flags().GetBool("wait")
@@ -50,25 +50,27 @@ var detachCmd = &cobra.Command{
 
 		procs, err := util.HandleInputArg(id, "", rc.Rootdir, !all, true, false, false)
 		if err != nil {
-			return err
+			util.ErrAndExit("Detach failure: %v", err)
 		}
 
 		if len(procs) == 0 {
-			return errNoScopedProcs
+			util.ErrAndExit("Detach failure: %v", errNoScopedProcs)
 		}
 		if len(procs) == 1 {
-			err = rc.Detach(procs[0].Pid)
+			if err = rc.Detach(procs[0].Pid); err != nil {
+				util.ErrAndExit("Detach failure: %v", err)
+			}
 			// Simple approach for now
 			// Later: check for detach then resume
 			if wait {
 				time.Sleep(11 * time.Second) // detach uses dynamic config (<10s)
 			}
-			return err
+			return
 		}
 		// len(procs) is > 1
 		if !util.Confirm(fmt.Sprintf("Are your sure you want to detach from all of these processes?")) {
 			fmt.Println("info: canceled")
-			return nil
+			return
 		}
 
 		errors := false
@@ -79,7 +81,7 @@ var detachCmd = &cobra.Command{
 			}
 		}
 		if errors {
-			return errDetachingMultiple
+			util.ErrAndExit("Detach failure: %v", errDetachingMultiple)
 		}
 
 		// Simple approach for now
@@ -87,8 +89,6 @@ var detachCmd = &cobra.Command{
 		if wait {
 			time.Sleep(11 * time.Second) // detach uses dynamic config (<10s)
 		}
-
-		return nil
 	},
 }
 

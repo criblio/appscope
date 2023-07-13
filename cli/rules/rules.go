@@ -189,54 +189,59 @@ func Add(rulesFile libscope.Rules, addProc, procArg, sourceid, rootdir string, r
 	// Apply rules to existing containers
 	////////////////////////////////////////////
 
-	if rootdir != "" {
-		// For each existing container
-		cPids := util.GetContainersPids()
-		for _, cPid := range cPids {
-			containerRootdir := fmt.Sprintf("%s/proc/%d/root", rootdir, cPid)
+	// TODO: Don't do the below if (not on host AND no rootdir provided)
 
-			// Mount `scope_rules` from the host into the container
-			// ? support CRIBL_HOME
-			stdoutStderr, err := ld.Mount("/usr/lib/appscope", cPid, rootdir)
-			if err != nil {
-				log.Warn().
-					Err(err).
-					Str("loaderDetails", stdoutStderr).
-					Msgf("Mount /usr/lib/appscope in %d namespace failed.", cPid)
-				return err
-			}
+	// For each existing container
+	cPids := util.GetContainersPids()
+	for _, cPid := range cPids {
+		containerRootdir := fmt.Sprintf("%s/proc/%d/root", rootdir, cPid)
 
-			// Mount unix socket from the host into the container
-			stdoutStderr, err = ld.Mount(unixPath, cPid, rootdir)
-			if err != nil {
-				log.Warn().
-					Err(err).
-					Str("loaderDetails", stdoutStderr).
-					Msgf("Mount /usr/lib/appscope in %d namespace failed.", cPid)
-				return err
-			}
+		// Note: Install must be first so we don't trample on the host's files
+		// The install is required even though we are mounting /usr/lib/appscope
+		// because we need the /usr/lib/libscope.so link to be created AND we need
+		// it to point to the correct version (glibc/musl)
 
-			// Extract the library to /opt/appscope/libscope.so
-			stdoutStderr, err = ld.Install(containerRootdir)
-			if err != nil {
-				log.Warn().
-					Err(err).
-					Str("loaderDetails", stdoutStderr).
-					Msg("Install library failed.")
-				return err
-			}
-
-			// Set ld.preload.so to point to /opt/appscope/libscope.so
-			if stdoutStderr, err := ld.Preload("auto", containerRootdir); err != nil {
-				log.Warn().
-					Err(err).
-					Str("loaderDetails", stdoutStderr).
-					Msgf("Install library in %s namespace failed.", rootdir)
-				return err
-			}
-
-			// Attach is already taken care of, we attached to everything in rootdir and children
+		// Install the library
+		stdoutStderr, err = ld.Install(containerRootdir)
+		if err != nil {
+			log.Warn().
+				Err(err).
+				Str("loaderDetails", stdoutStderr).
+				Msg("Install library failed.")
+			return err
 		}
+
+		// Set ld.preload.so to point to the library
+		if stdoutStderr, err := ld.Preload("auto", containerRootdir); err != nil {
+			log.Warn().
+				Err(err).
+				Str("loaderDetails", stdoutStderr).
+				Msgf("Install library in %s namespace failed.", rootdir)
+			return err
+		}
+
+		// Mount `scope_rules` from the host into the container
+		// ? support CRIBL_HOME
+		stdoutStderr, err := ld.Mount("/usr/lib/appscope", cPid, rootdir)
+		if err != nil {
+			log.Warn().
+				Err(err).
+				Str("loaderDetails", stdoutStderr).
+				Msgf("Mount /usr/lib/appscope in %d namespace failed.", cPid)
+			return err
+		}
+
+		// Mount unix socket from the host into the container
+		stdoutStderr, err = ld.Mount(unixPath, cPid, rootdir)
+		if err != nil {
+			log.Warn().
+				Err(err).
+				Str("loaderDetails", stdoutStderr).
+				Msgf("Mount /usr/lib/appscope in %d namespace failed.", cPid)
+			return err
+		}
+
+		// Attach is already taken care of, we attached to everything in rootdir and children
 	}
 
 	return nil

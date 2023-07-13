@@ -239,8 +239,8 @@ __attribute__((constructor)) void cli_constructor() {
 		fprintf(stderr, "error: --rules and --service/--unservice cannot be used together\n");
 		exit(EXIT_FAILURE);
 	}
-	if (opt_namespace && (!opt_service && !opt_unservice)) {
-		fprintf(stderr, "error: --namespace option requires --service/--unservice option\n");
+	if (opt_namespace && (!opt_service && !opt_unservice && !opt_mount)) {
+		fprintf(stderr, "error: --namespace option requires --service/--unservice or --mount option\n");
 		exit(EXIT_FAILURE);
 	}
 	if (opt_passthrough && (opt_ldattach || opt_lddetach || opt_namespace ||

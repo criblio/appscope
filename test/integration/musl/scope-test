@@ -274,6 +274,24 @@ endtest
 # cleanup socat, since we're done with it now
 kill `pidof socat`
 
+# Test SIGUSR2
+cd /opt/sig_test
+for FUNCTION in signal sigaction
+do
+  for TRIGGER in raise timer
+  do
+    starttest preloaded_sigusr2_using_${FUNCTION}_${TRIGGER}
+    scope run --passthrough -- ./sigusrhandler $FUNCTION $TRIGGER > stdout.txt
+    sleep 2
+    grep "Handling SIGUSR2" stdout.txt
+    ERR+=$?
+    grep "dummy_file.txt" $EVT_FILE
+    ERR+=$?
+    rm stdout.txt
+    endtest
+  done
+done
+
 
 
 if (( $FAILED_TEST_COUNT == 0 )); then

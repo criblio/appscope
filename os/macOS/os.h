@@ -37,7 +37,7 @@ extern int osInitTSC(platform_time_t *);
 extern int osGetProcMemory(pid_t);
 extern int osIsFilePresent(const char *);
 extern int osGetCmdline(pid_t, char **);
-extern bool osThreadInit(void(*handler)(int), unsigned);
+extern bool osThreadInit(void(*handler)(int, siginfo_t *, void *), unsigned);
 extern int osUnixSockPeer(ino_t);
 extern void osInitJavaAgent(void);
 extern int osGetPageProt(uint64_t);

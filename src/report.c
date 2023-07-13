@@ -13,13 +13,15 @@
 #include "atomic.h"
 #include "com.h"
 #include "dbg.h"
+#include "evtutils.h"
 #include "fn.h"
 #include "httpagg.h"
+#include "httpmatch.h"
 #include "metriccapture.h"
 #include "mtcformat.h"
 #include "plattime.h"
 #include "report.h"
-#include "search.h"
+#include "strsearch.h"
 #include "state.h"
 #include "state_private.h"
 #include "linklist.h"
@@ -116,10 +118,13 @@ typedef struct http_report_t {
 // TBD - Ideally, we'd remove this dependency on the configured interval
 // and replace it with a measured value.  It'd be one less dependency
 // and could be more accurate.
-int g_interval = DEFAULT_SUMMARY_PERIOD;
-static list_t *g_maplist;
+static int g_interval = DEFAULT_SUMMARY_PERIOD;
+static httpmatch_t *g_httpmatch = NULL;
+static channelstore_t *g_http2_channels = NULL;
 static search_t *g_http_status = NULL;
-static http_agg_t *g_http_agg;
+static http_agg_t *g_http_agg = NULL;
+static uint64_t g_cumulativeEventCount = 0;
+static uint64_t g_numCallsToDoEvent = 0;
 
 // saved state for an HTTP/2 channel
 typedef struct http2Channel {
@@ -151,27 +156,23 @@ typedef struct http2Stream {
     int lastRespLen;
 } http2Stream_t;
 
-// list of http2Channel_t indexed by channel
-static list_t *g_http2_channels = NULL;
 
 #define DEFAULT_MIN_DURATION_TIME (1)
 
 static void
-destroyHttpMap(void *data)
+destroyHttpMap(http_map *map)
 {
-    if (!data) return;
-    http_map *map = (http_map *)data;
+    if (!map) return;
 
     if (map->req) scope_free(map->req);
-    if (map->resp) scope_free(map->resp);
-    if (map) scope_free(map);
+    scope_free(map);
 }
 
+
 static void
-destroyHttp2Channel(void *data)
+destroyHttp2Channel(http2Channel_t *info)
 {
-    if (!data) return;
-    http2Channel_t *info = (http2Channel_t *)data;
+    if (!info) return;
 
     lshpack_dec_cleanup(&info->decoder);
     if (info->streams) {
@@ -200,10 +201,10 @@ initReporting()
     // NB: Each of these does a dynamic allocation that we are not releasing.
     //     They don't grow and would ideally be released when the reporting
     //     thread exits but we've not gotten to it yet. 
-    g_maplist = lstCreate(destroyHttpMap);
-    g_http2_channels = lstCreate(destroyHttp2Channel);
     g_http_status = searchComp(HTTP_STATUS);
     g_http_agg = httpAggCreate();
+    g_httpmatch = httpMatchCreate(g_netinfo, g_extra_net_info_list, destroyHttpMap);
+    g_http2_channels = channelStoreCreate(g_netinfo, g_extra_net_info_list, destroyHttp2Channel);
 }
 
 void
@@ -219,27 +220,6 @@ sendEvent(mtc_t *mtc, event_t *event)
 
     if (cmdSendMetric(mtc, event) == -1) {
         scopeLogDebug("sendEvent:cmdSendMetric");
-    }
-}
-
-static void
-destroyProto(protocol_info *proto)
-{
-    if (!proto) return;
-
-    /*
-     * for future reference;
-     * proto is freed as event in doEvent().
-     * post->data is the http header and is freed in destroyHttpMap()
-     * when the list entry is deleted.
-     */
-    if (proto->data) {
-        // comment above doesn't apply to HTTP/2 protocol events
-        if (proto->ptype == EVT_H2FRAME) {
-            http_post *post = (http_post *)proto->data;
-            scope_free(post->hdr);
-        }
-        scope_free(proto->data);
     }
 }
 
@@ -495,6 +475,17 @@ httpFields(event_field_t *fields, http_report *hreport, char *hdr,
         }
     }
 
+    if (hreport->clen != -1) {
+        char *length_str = "content_length";
+        if (hreport->ptype == EVT_HREQ) {
+            length_str = "http_request_content_length";
+        } else if (hreport->ptype == EVT_HRES) {
+            length_str = "http_response_content_length";
+        }
+        H_VALUE(fields[hreport->ix], length_str, hreport->clen, EVENT_ONLY_ATTR);
+        HTTP_NEXT_FLD(hreport->ix);
+    }
+
     return TRUE;
 }
 
@@ -537,26 +528,27 @@ static void
 doHttp1Header(protocol_info *proto)
 {
     if (!proto || !proto->data) {
-        destroyProto(proto);
+        DBG(NULL);
         return;
     }
 
     char *ssl;
     event_field_t fields[HTTP_MAX_FIELDS];
-    http_report hreport;
+    http_report hreport = {0};
     http_post *post = (http_post *)proto->data;
-    http_map *map;
+    http_map *map = httpReqGet(g_httpmatch, post->id.uid);
 
-    if ((map = lstFind(g_maplist, post->id)) == NULL) {
-        // lazy open
-        if ((map = scope_calloc(1, sizeof(http_map))) == NULL) {
-            destroyProto(proto);
+    // When requests come in, save them in a map to be paired
+    // with responses later.
+    if (proto->ptype == EVT_HREQ) {
+
+        if (map) {
+            DBG("Duplicate http1 request for fd %d id %" PRIu64, proto->fd, post->id.uid);
             return;
         }
 
-        if (lstInsert(g_maplist, post->id, map) == FALSE) {
-            destroyHttpMap(map);
-            destroyProto(proto);
+        if ((map = scope_calloc(1, sizeof(http_map))) == NULL) {
+            DBG("Memory allocation failure for http1 request for fd %d id %" PRIu64, proto->fd, post->id.uid);
             return;
         }
 
@@ -565,8 +557,17 @@ doHttp1Header(protocol_info *proto)
 
         map->id = post->id;
         map->first_time = tv.tv_sec;
-        map->req = NULL;
-        map->req_len = 0;
+        map->start_time = post->start_duration;
+        map->req = (char *)post->hdr;
+        post->hdr = NULL;  // we're transferring ownership, map will free it
+        map->req_len = proto->len;
+
+        if (!httpReqSave(g_httpmatch, map)) {
+            destroyHttpMap(map);
+            DBG("httpReqSave failed for http1 request for fd %d id %" PRIu64, proto->fd, post->id.uid);
+            return;
+        }
+
     }
 
     ssl = (post->ssl) ? "https" : "http";
@@ -582,28 +583,24 @@ doHttp1Header(protocol_info *proto)
      *
      *  Request-Line   = Method SP Request-URI SP HTTP-Version CRLF
      */
-    if (proto->ptype == EVT_HREQ) {
-        map->start_time = post->start_duration;
-        map->req = (char *)post->hdr;
-        map->req_len = proto->len;
-    }
 
-    char header[map->req_len];
     // we're either building a new req or we have a previous req
-    if (map->req) {
-        if ((hreport.hreq = scope_calloc(1, map->req_len)) == NULL) {
+    char *tokenized_hreq = NULL;
+    if (map && map->req) {
+        tokenized_hreq = scope_calloc(1, map->req_len);
+        hreport.hreq = scope_calloc(1, map->req_len);
+        if (!tokenized_hreq || !hreport.hreq) {
             scopeLogError("fd:%d ERROR: doHttp1Header: hreq memory allocation failure", proto->fd);
-            return;
+            goto out;
         }
 
         char *savea = NULL;
-        scope_strncpy(header, map->req, map->req_len);
+        scope_strncpy(tokenized_hreq, map->req, map->req_len);
 
-        char *headertok = scope_strtok_r(header, "\r\n", &savea);
+        char *headertok = scope_strtok_r(tokenized_hreq, "\r\n", &savea);
         if (!headertok) {
-            scope_free(hreport.hreq);
             scopeLogWarn("fd:%d WARN: doHttp1Header: parse an http request header", proto->fd);
-            return;
+            goto out;
         }
 
         // The request specific values from Request-Line
@@ -644,16 +641,10 @@ doHttp1Header(protocol_info *proto)
             httpFields(fields, &hreport, map->req, map->req_len, proto, g_cfg.staticfg);
             httpFieldsInternal(fields, &hreport, proto);
 
-            if (hreport.clen != -1) {
-                H_VALUE(fields[hreport.ix], "http_request_content_length", hreport.clen, EVENT_ONLY_ATTR);
-                HTTP_NEXT_FLD(hreport.ix);
-            }
-            map->clen = hreport.clen;
-
             httpFieldEnd(fields, hreport.ix);
 
             event_t sendEvent = INT_EVENT("http.req", proto->len, SET, fields);
-            cmdSendHttp(g_ctl, &sendEvent, map->id, &g_proc);
+            cmdSendHttp(g_ctl, &sendEvent, post->id.uid, &g_proc);
         }
     }
 
@@ -670,33 +661,32 @@ doHttp1Header(protocol_info *proto)
     *
     * Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
     */
+    char *tokenized_hres = NULL;
     if (proto->ptype == EVT_HRES) {
-        if ((hreport.hres = scope_calloc(1, proto->len)) == NULL) {
+
+        tokenized_hres = scope_calloc(1, proto->len);
+        hreport.hres = scope_calloc(1, proto->len);
+        if (!tokenized_hres || !hreport.hres) {
             scopeLogError("fd:%d ERROR: doHttp1Header: hres memory allocation failure", proto->fd);
-            return;
+            goto out;
         }
 
-        struct timeval tv;
-        scope_gettimeofday(&tv, NULL);
-
-        map->resp = (char *)post->hdr;
-
-        if (!map->req) {
-            map->duration = 0;
-        } else {
-            map->duration = getDurationNow(post->start_duration, map->start_time);
-            map->duration = map->duration / 1000000;
+        size_t request_clen = -1;
+        size_t response_clen = -1;
+        uint64_t duration = 0;
+        if (map) {
+            duration = getDurationNow(post->start_duration, map->start_time);
+            duration = duration / 1000000;
         }
 
         char *stext;
-        size_t status = getHttpStatus((char *)map->resp, proto->len, &stext);
+        size_t status = getHttpStatus((char *)post->hdr, proto->len, &stext);
 
         // The response specific values from Status-Line
         char *savea;
-        char reqheader[proto->len];
-        scope_strncpy(reqheader, map->resp, proto->len);
+        scope_strncpy(tokenized_hres, post->hdr, proto->len);
 
-        char *headertok = scope_strtok_r(reqheader, "\r\n", &savea);
+        char *headertok = scope_strtok_r(tokenized_hres, "\r\n", &savea);
         char *flavor_str = scope_strtok_r(headertok, " ", &savea);
         if (flavor_str &&
             ((flavor_str = scope_strtok_r(flavor_str, "/", &savea))) &&
@@ -719,40 +709,34 @@ doHttp1Header(protocol_info *proto)
         H_ATTRIB(fields[hreport.ix], "http_status_text", status_str, 1);
         HTTP_NEXT_FLD(hreport.ix);
 
-        H_VALUE(fields[hreport.ix], "http_server_duration", map->duration, EVENT_ONLY_ATTR);
+        H_VALUE(fields[hreport.ix], "http_server_duration", duration, EVENT_ONLY_ATTR);
         HTTP_NEXT_FLD(hreport.ix);
 
         // Fields common to request & response
-        if (map->req) {
+        if (map && map->req) {
             hreport.ptype = EVT_HREQ;
             httpFields(fields, &hreport, map->req, map->req_len, proto, g_cfg.staticfg);
-            if (hreport.clen != -1) {
-                H_VALUE(fields[hreport.ix], "http_request_content_length", hreport.clen, EVENT_ONLY_ATTR);
-                HTTP_NEXT_FLD(hreport.ix);
-            }
-            map->clen = hreport.clen;
+            request_clen = hreport.clen;
+
         }
 
         hreport.ptype = EVT_HRES;
-        httpFields(fields, &hreport, map->resp, proto->len, proto, g_cfg.staticfg);
-        httpFieldsInternal(fields, &hreport, proto);
-        if (hreport.clen != -1) {
-            H_VALUE(fields[hreport.ix], "http_response_content_length", hreport.clen, EVENT_ONLY_ATTR);
-            HTTP_NEXT_FLD(hreport.ix);
-        }
+        httpFields(fields, &hreport, post->hdr, proto->len, proto, g_cfg.staticfg);
+        response_clen = hreport.clen;
 
+        httpFieldsInternal(fields, &hreport, proto);
         httpFieldEnd(fields, hreport.ix);
 
         event_t hevent = INT_EVENT("http.resp", proto->len, SET, fields);
-        cmdSendHttp(g_ctl, &hevent, map->id, &g_proc);
+        cmdSendHttp(g_ctl, &hevent, post->id.uid, &g_proc);
 
         // emit statsd metrics, if enabled.
         if ((mtcEnabled(g_mtc)) && (cfgMtcWatchEnable(g_cfg.staticfg, CFG_MTC_HTTP))) {
 
             char *mtx_name = (proto->isServer) ? "http_server_duration" : "http_client_duration";
-            event_t http_dur = INT_EVENT(mtx_name, map->duration, DELTA_MS, fields);
+            event_t http_dur = INT_EVENT(mtx_name, duration, DELTA_MS, fields);
             // TBD AGG Only cmdSendMetric(g_mtc, &http_dur);
-            httpAggAddMetric(g_http_agg, &http_dur, map->clen, hreport.clen);
+            httpAggAddMetric(g_http_agg, &http_dur, request_clen, response_clen);
 
             /* TBD AGG Only
             if (map->clen != -1) {
@@ -769,12 +753,16 @@ doHttp1Header(protocol_info *proto)
         }
 
         // Done; we remove the list entry; complete when reported
-        if (lstDelete(g_maplist, post->id) == FALSE) DBG(NULL);
+        if (map && !httpReqDelete(g_httpmatch, post->id.uid)) {
+            DBG("Error deleting http1 request for fd %d id %" PRIu64, proto->fd, post->id.uid);
+        }
     }
 
+out:
+    if (tokenized_hreq) scope_free(tokenized_hreq);
+    if (tokenized_hres) scope_free(tokenized_hres);
     if (hreport.hreq) scope_free(hreport.hreq);
     if (hreport.hres) scope_free(hreport.hres);
-    destroyProto(proto);
 }
 
 static const char *
@@ -970,7 +958,7 @@ doHttp2Frame(protocol_info *proto)
     // require the protocol object and it's data pointer to be set
     if (!proto || !proto->data) {
         scopeLogError("ERROR: null proto or proto->data");
-        destroyProto(proto);
+        DBG(NULL);
         return;
     }
 
@@ -978,7 +966,7 @@ doHttp2Frame(protocol_info *proto)
     http_post *post = (http_post *)proto->data;
     if (!post->hdr) {
         scopeLogError("ERROR: null post->hdr");
-        destroyProto(proto);
+        DBG(NULL);
         return;
     }
 
@@ -988,7 +976,7 @@ doHttp2Frame(protocol_info *proto)
         scopeLogHexError(frame, proto->len,
                 "ERROR: runt HTTP/2 frame; only %ld bytes long", proto->len);
         DBG(NULL);
-        goto cleanup;
+        return;
     }
     uint32_t fLen    = (frame[0]<<16) + (frame[1]<<8) + (frame[2]);
     uint8_t  fType   = frame[3];
@@ -998,7 +986,7 @@ doHttp2Frame(protocol_info *proto)
         scopeLogHexError(frame, proto->len,
                 "ERROR: bad HTTP/2 frame size; got %ld/%d bytes", proto->len, 9+fLen);
         DBG(NULL);
-        goto cleanup;
+        return;
     }
 
     //scopeLogHexDebug(frame, proto->len,
@@ -1047,24 +1035,24 @@ doHttp2Frame(protocol_info *proto)
         // the message.
 
         // get/create the channel info
-        http2Channel_t *channel = lstFind(g_http2_channels, proto->uid);
+        http2Channel_t *channel = channelGet(g_http2_channels, proto->uid);
         if (!channel) {
             channel = scope_calloc(1, sizeof(http2Channel_t));
             if (!channel) {
                 scopeLogError("ERROR: failed to create channel info");
                 DBG(NULL);
-                goto cleanup;
+                return;
             }
 
             lshpack_dec_init(&channel->decoder);
             lshpack_dec_set_max_capacity(&channel->decoder, 0x4000);
             channel->streams = lstCreate(destroyHttp2Stream);
 
-            if (lstInsert(g_http2_channels, proto->uid, channel) != TRUE) {
+            if (channelSave(g_http2_channels, channel, proto->uid, proto->fd) != TRUE) {
                 destroyHttp2Channel(channel);
                 scopeLogError("ERROR: failed to insert channel");
                 DBG(NULL);
-                goto cleanup;
+                return;
             }
         }
 
@@ -1075,14 +1063,14 @@ doHttp2Frame(protocol_info *proto)
             if (!stream) {
                 scopeLogError("ERROR: failed to create http2Stream");
                 DBG(NULL);
-                goto cleanup;
+                return;
             }
 
             if (lstInsert(channel->streams, fStream, stream) != TRUE) {
                 destroyHttp2Stream(stream);
                 scopeLogError("ERROR: failed to insert decoder");
                 DBG(NULL);
-                goto cleanup;
+                return;
             }
         }
 
@@ -1097,7 +1085,7 @@ doHttp2Frame(protocol_info *proto)
             if (!stream->jsonData) {
                 scopeLogError("ERROR: failed to create jsonData");
                 DBG(NULL);
-                goto cleanup;
+                return;
             }
 
             // Hard coding 2.0 for now
@@ -1296,7 +1284,7 @@ doHttp2Frame(protocol_info *proto)
             // if it's a response message...
             else if (stream->msgType == 2) {
                 // we may need the HTTP/1 state 
-                http_map *map = lstFind(g_maplist, post->id);
+                http_map *map = httpReqGet(g_httpmatch, post->id.uid);
 
                 // add duration from request
                 unsigned duration; // msecs
@@ -1377,9 +1365,6 @@ doHttp2Frame(protocol_info *proto)
         scopeLogError("ERROR: HTTP/2 unexpected frame type; type=0x%02d", fType);
         DBG(NULL);
     }
-
-cleanup:
-    destroyProto(proto);
 }
 
 static void
@@ -1391,7 +1376,7 @@ doDetection(protocol_info *proto)
 
     protname = (char *)proto->data;
     if (!protname) {
-        destroyProto(proto);
+        DBG(NULL);
         return;
     }
 
@@ -1407,7 +1392,6 @@ doDetection(protocol_info *proto)
     event_t evt = INT_EVENT("net.app", proto->fd, SET, fields);
     evt.src = CFG_SRC_NET;
     cmdSendEvent(g_ctl, &evt, proto->uid, &g_proc);
-    destroyProto(proto);
 }
 
 void
@@ -2935,8 +2919,8 @@ doNetMetric(metric_t type, net_info *net, control_type_t source, ssize_t size)
         // possible, even likely, these operations will fail to find an entry
         // for the channel. Instead of searching first and then deleting, just
         // delete and let it fail if it's not there.
-        lstDelete(g_maplist, net->uid);        // HTTP/1 saved state
-        lstDelete(g_http2_channels, net->uid); // HTTP/2 saved state
+        httpReqDelete(g_httpmatch, net->uid);  // HTTP/1 saved state
+        channelDelete(g_http2_channels, net->uid); // HTTP/2 saved state
 
         // Most NET events get blocked on the data side when the watch/source
         // is disabled but logic added in postNetState() will send this one
@@ -3437,16 +3421,24 @@ doHttpAgg()
     httpAggReset(g_http_agg);
 }
 
+// Somewhat arbitrary value. Heuristically, on one machine,
+// this seemed adequate for our ipc to remain responsive.
+#define MAX_EVT_COUNT ( DEFAULT_MAXEVENTSPERSEC / 20 )
+
+
 void
 doEvent()
 {
     uint64_t data;
+    uint64_t eventCount = 0;
+    bool exitedLoopEarly = FALSE;
 
     if (doConnection() == FALSE) return;
 
     while ((data = msgEventGet(g_ctl)) != -1) {
         if (data) {
             evt_type *event = (evt_type *)data;
+
             net_info *net;
             fs_info *fs;
             stat_err_info *staterr;
@@ -3472,12 +3464,29 @@ doEvent()
                 doProtocolMetric(proto);
             } else {
                 DBG(NULL);
-                return;
             }
 
-            scope_free(event);
+            evtFree(event);
+            g_cumulativeEventCount++;
+        }
+
+        // If the datapath adds messages faster than we can consume them,
+        // we can starve other processing we need to do on this thread:
+        // payloads, logfiles/console, metrics, ipc, etc.  Don't allow
+        // this loop to go forever.
+        if (!ctlProcessAllQueuedEventsNow(g_ctl) &&
+            (eventCount++ >= MAX_EVT_COUNT)) {
+            exitedLoopEarly = TRUE;
+            break;
         }
     }
+
+    if ((++g_numCallsToDoEvent % 1000) == 0) {
+        httpReqExpire(g_httpmatch, g_cumulativeEventCount, !exitedLoopEarly);
+        channelExpire(g_http2_channels, g_cumulativeEventCount, !exitedLoopEarly);
+    }
+
+
     reportAllCapturedMetrics();
     ctlFlushLog(g_ctl);
     ctlFlush(g_ctl);

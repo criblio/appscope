@@ -70,6 +70,7 @@ run_test test/${OS}/ipctest
 run_test test/${OS}/snapshottest
 run_test test/${OS}/ostest
 run_test test/${OS}/ocitest
+run_test test/${OS}/evtutilstest
 run_test test/${OS}/strsettest
 run_test test/${OS}/cfgutilstest
 run_test test/${OS}/cfgtest
@@ -85,7 +86,7 @@ run_test test/${OS}/circbuftest
 run_test test/${OS}/linklisttest
 run_test test/${OS}/comtest
 run_test test/${OS}/dbgtest
-run_test test/${OS}/searchtest
+run_test test/${OS}/strsearchtest
 run_test test/${OS}/httpstatetest
 if [ "${OS}" = "linux" ]; then
     run_test test/${OS}/glibcvertest
@@ -93,6 +94,7 @@ if [ "${OS}" = "linux" ]; then
     run_test test/${OS}/javabcitest
     run_test test/${OS}/httpheadertest
 fi
+run_test test/${OS}/httpmatchtest
 run_test test/${OS}/httpaggtest
 run_test test/${OS}/selfinterposetest
 

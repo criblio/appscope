@@ -34,7 +34,7 @@ func Stop(rc *run.Config) error {
 	// Empty the global rules file
 	////////////////////////////////////////////
 
-	rulesFile := make(libscope.Rules, 0)
+	var rulesFile libscope.Rules
 
 	// Write the rules contents to a temporary path
 	rulesFilePath := "/tmp/scope_rules"

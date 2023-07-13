@@ -120,7 +120,7 @@ osGetCmdline(pid_t pid, char **cmd)
  * for OSX.
  */
 bool
-osThreadInit(void(*handler)(int), unsigned interval)
+osThreadInit(void(*handler)(int, siginfo_t *, void *), unsigned interval)
 {
     return TRUE;
 }

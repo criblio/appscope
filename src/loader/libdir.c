@@ -708,7 +708,10 @@ libdirExtract(unsigned char *asset_file, size_t asset_file_len, uid_t nsUid, gid
         }
 
         // Always remove old symlink (in case it points to an older lib)
-        remove(path);
+        if ((remove(path) < 0) && (errno != ENOENT)) {
+            fprintf(stderr, "error: libdirExtract: remove failed %d.\n", errno);
+            return -1;
+        }
 
         // Create new symlink
         if (libdirCreateSymLinkIfMissing(path, target, overwrite, mode, nsUid, nsGid)) {

@@ -236,13 +236,15 @@ func Add(rulesFile libscope.Rules, addProc, procArg, sourceid, rootdir string, r
 			}
 
 			// Mount unix socket from the host into the container
-			stdoutStderr, err = ld.Mount(unixPath, cPid, rootdir)
-			if err != nil {
-				log.Warn().
-					Err(err).
-					Str("loaderDetails", stdoutStderr).
-					Msgf("Mount /usr/lib/appscope in %d namespace failed.", cPid)
-				return err
+			if unixPath != "" {
+				stdoutStderr, err = ld.Mount(unixPath, cPid, rootdir)
+				if err != nil {
+					log.Warn().
+						Err(err).
+						Str("loaderDetails", stdoutStderr).
+						Msgf("Mount /usr/lib/appscope in %d namespace failed.", cPid)
+					return err
+				}
 			}
 
 			// Attach is already taken care of, we attached to everything in rootdir and children

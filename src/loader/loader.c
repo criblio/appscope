@@ -621,7 +621,7 @@ cmdPreload(const char *path, const char *rootdir)
 
 // Handle the mount command
 int
-cmdMount(const char *mountDest, const char *rootdir)
+cmdMount(pid_t pid, const char *mountDest, const char *rootdir)
 {
     uid_t eUid = geteuid();
     gid_t eGid = getegid();
@@ -645,7 +645,7 @@ cmdMount(const char *mountDest, const char *rootdir)
     }
 
     // Set up the mount
-    if (setupMount(mountDest, nsUid, nsGid)) {
+    if (setupMount(pid, mountDest, rootdir, nsUid, nsGid) == FALSE) {
         fprintf(stderr, "error: failed to mount\n");
         return EXIT_FAILURE;
     }

@@ -239,7 +239,7 @@ __attribute__((constructor)) void cli_constructor() {
 		fprintf(stderr, "error: --rules and --service/--unservice cannot be used together\n");
 		exit(EXIT_FAILURE);
 	}
-	if (opt_namespace && (!opt_service && !opt_unservice)) {
+    	if (opt_namespace && (!opt_service && !opt_unservice)) {
 		fprintf(stderr, "error: --namespace option requires --service/--unservice option\n");
 		exit(EXIT_FAILURE);
 	}
@@ -292,7 +292,7 @@ __attribute__((constructor)) void cli_constructor() {
 	if (opt_install) exit(cmdInstall(arg_rootdir));
 	if (opt_rules) exit(cmdRules(arg_rules, arg_rootdir));
 	if (opt_preload) exit(cmdPreload(arg_preload, arg_rootdir));
-	if (opt_mount) exit(cmdMount(arg_mount, arg_rootdir));
+	if (opt_mount) exit(cmdMount(nspid, arg_mount, arg_rootdir));
 	if (opt_service) exit(cmdService(arg_service, nspid));
 	if (opt_unservice) exit(cmdUnservice(nspid));
 	if (opt_patch) exit(patchLibrary(arg_patch, FALSE) == PATCH_FAILED);

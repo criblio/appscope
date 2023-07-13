@@ -191,57 +191,62 @@ func Add(rulesFile libscope.Rules, addProc, procArg, sourceid, rootdir string, r
 
 	// TODO: Don't do the below if (not on host AND no rootdir provided)
 
-	// For each existing container
-	cPids := util.GetContainersPids()
-	for _, cPid := range cPids {
-		containerRootdir := fmt.Sprintf("%s/proc/%d/root", rootdir, cPid)
+	// Only if this is the first entry in the file
+	// Rules will be applied in future containers by another mechanism (runc interposition)
+	if len(rulesFile.Allow) == 1 {
 
-		// Note: Install must be first so we don't trample on the host's files
-		// The install is required even though we are mounting /usr/lib/appscope
-		// because we need the /usr/lib/libscope.so link to be created AND we need
-		// it to point to the correct version (glibc/musl)
+		// For each existing container
+		cPids := util.GetContainersPids()
+		for _, cPid := range cPids {
+			containerRootdir := fmt.Sprintf("%s/proc/%d/root", rootdir, cPid)
 
-		// Install the library
-		stdoutStderr, err = ld.Install(containerRootdir)
-		if err != nil {
-			log.Warn().
-				Err(err).
-				Str("loaderDetails", stdoutStderr).
-				Msg("Install library failed.")
-			return err
+			// Note: Install must be first so we don't trample on the host's files
+			// The install is required even though we are mounting /usr/lib/appscope
+			// because we need the /usr/lib/libscope.so link to be created AND we need
+			// it to point to the correct version (glibc/musl)
+
+			// Install the library
+			stdoutStderr, err = ld.Install(containerRootdir)
+			if err != nil {
+				log.Warn().
+					Err(err).
+					Str("loaderDetails", stdoutStderr).
+					Msgf("Install library in %s namespace failed.", containerRootdir)
+				return err
+			}
+
+			// Set ld.preload.so to point to the library
+			if stdoutStderr, err := ld.Preload("auto", containerRootdir); err != nil {
+				log.Warn().
+					Err(err).
+					Str("loaderDetails", stdoutStderr).
+					Msgf("Set /etc/ld.so.preload in %s namespace failed.", containerRootdir)
+				return err
+			}
+
+			// Mount `scope_rules` from the host into the container
+			// ? support CRIBL_HOME
+			stdoutStderr, err := ld.Mount("/usr/lib/appscope", cPid, rootdir)
+			if err != nil {
+				log.Warn().
+					Err(err).
+					Str("loaderDetails", stdoutStderr).
+					Msgf("Mount /usr/lib/appscope in %d namespace failed.", cPid)
+				return err
+			}
+
+			// Mount unix socket from the host into the container
+			stdoutStderr, err = ld.Mount(unixPath, cPid, rootdir)
+			if err != nil {
+				log.Warn().
+					Err(err).
+					Str("loaderDetails", stdoutStderr).
+					Msgf("Mount /usr/lib/appscope in %d namespace failed.", cPid)
+				return err
+			}
+
+			// Attach is already taken care of, we attached to everything in rootdir and children
 		}
-
-		// Set ld.preload.so to point to the library
-		if stdoutStderr, err := ld.Preload("auto", containerRootdir); err != nil {
-			log.Warn().
-				Err(err).
-				Str("loaderDetails", stdoutStderr).
-				Msgf("Install library in %s namespace failed.", rootdir)
-			return err
-		}
-
-		// Mount `scope_rules` from the host into the container
-		// ? support CRIBL_HOME
-		stdoutStderr, err := ld.Mount("/usr/lib/appscope", cPid, rootdir)
-		if err != nil {
-			log.Warn().
-				Err(err).
-				Str("loaderDetails", stdoutStderr).
-				Msgf("Mount /usr/lib/appscope in %d namespace failed.", cPid)
-			return err
-		}
-
-		// Mount unix socket from the host into the container
-		stdoutStderr, err = ld.Mount(unixPath, cPid, rootdir)
-		if err != nil {
-			log.Warn().
-				Err(err).
-				Str("loaderDetails", stdoutStderr).
-				Msgf("Mount /usr/lib/appscope in %d namespace failed.", cPid)
-			return err
-		}
-
-		// Attach is already taken care of, we attached to everything in rootdir and children
 	}
 
 	return nil
@@ -342,6 +347,33 @@ func Remove(rulesFile libscope.Rules, remProc, procArg, sourceid, rootdir string
 		}
 		if errors {
 			return errDetachingMultiple
+		}
+	}
+
+	////////////////////////////////////////////
+	// Apply rules to existing containers
+	////////////////////////////////////////////
+
+	// TODO: Don't do the below if (not on host AND no rootdir provided)
+
+	// Only if this is the last entry in the file
+	if len(rulesFile.Allow) == 0 {
+
+		// For each existing container
+		cPids := util.GetContainersPids()
+		for _, cPid := range cPids {
+			containerRootdir := fmt.Sprintf("%s/proc/%d/root", rootdir, cPid)
+
+			// Unset ld.preload.so
+			if stdoutStderr, err := ld.Preload("off", containerRootdir); err != nil {
+				log.Warn().
+					Err(err).
+					Str("loaderDetails", stdoutStderr).
+					Msgf("Unset /etc/ld.so.preload in %s namespace failed.", containerRootdir)
+				return err
+			}
+
+			// Detach is already taken care of, we detached from everything in rootdir and children
 		}
 	}
 

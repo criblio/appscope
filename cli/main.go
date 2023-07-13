@@ -66,6 +66,13 @@ static struct option opts[] = {
 unsigned long g_libscopesz;
 unsigned long g_scopedynsz;
 
+#ifndef LIBSCOPE_SO_SIZE
+#define LIBSCOPE_SO_SIZE "11005608"
+#endif
+#ifndef SCOPEDYN_SIZE
+#define SCOPEDYN_SIZE "183448"
+#endif
+
 // This is the constructor for the Go application.
 // Code here executes before the Go Runtime starts.
 // We execute loader-specific commands here, because we can perform namespace switches while meeting

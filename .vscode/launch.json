@@ -15,6 +15,14 @@
             // "args": ["attach", "8896"]
         },
         {
+            "name": "(go) scope listener",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cli/main.go",
+            "args": ["listener", "--addr", "localhost:9999", "--notifytoken", "xoxb-5578866014737-5586094047777-EIY2Ggm5956xOprEpNAoCXj3"]
+        },
+        {
             "name": "(go) sudo scope daemon",
             "type": "go",
             "request": "launch",

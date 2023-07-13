@@ -23,3 +23,7 @@ type EventBody struct {
 	Args       string      `json:"args"`
 	Data       interface{} `json:"data"`
 }
+
+type DnsDomainData struct {
+	Domain string `json:"domain"`
+}

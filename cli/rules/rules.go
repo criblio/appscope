@@ -2,6 +2,7 @@ package rules
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -188,31 +189,55 @@ func Add(rulesFile libscope.Rules, addProc, procArg, sourceid, rootdir string, r
 	// Apply rules to existing containers
 	////////////////////////////////////////////
 
-	/* TODO
+	if rootdir != "" {
+		// For each existing container
+		cPids := util.GetContainersPids()
+		for _, cPid := range cPids {
+			containerRootdir := fmt.Sprintf("%s/proc/%d/root", rootdir, cPid)
 
-	find all existing containers
+			// Mount `scope_rules` from the host into the container
+			// ? support CRIBL_HOME
+			stdoutStderr, err := ld.Mount("/usr/lib/appscope", cPid, rootdir)
+			if err != nil {
+				log.Warn().
+					Err(err).
+					Str("loaderDetails", stdoutStderr).
+					Msgf("Mount /usr/lib/appscope in %d namespace failed.", cPid)
+				return err
+			}
 
-	for each container:
+			// Mount unix socket from the host into the container
+			stdoutStderr, err = ld.Mount(unixPath, cPid, rootdir)
+			if err != nil {
+				log.Warn().
+					Err(err).
+					Str("loaderDetails", stdoutStderr).
+					Msgf("Mount /usr/lib/appscope in %d namespace failed.", cPid)
+				return err
+			}
 
-		// Mount `scope_rules` into the container
-		// TODO support CRIBL_HOME
-		ld.Mount()
-			scope --mount (/usr/lib/appscope/, <container root>/usr/lib/appscope) --rootdir /hostfs
+			// Extract the library to /opt/appscope/libscope.so
+			stdoutStderr, err = ld.Install(containerRootdir)
+			if err != nil {
+				log.Warn().
+					Err(err).
+					Str("loaderDetails", stdoutStderr).
+					Msg("Install library failed.")
+				return err
+			}
 
-		// Mount unix socket into the container
-		determine <unix_socket_dir> by looking in the filter for the unix socket path
-		ld.Mount()
-			scope --mount (<unix_socket_dir>, <container root>/<unix_socket_dir>) --rootdir /hostfs
+			// Set ld.preload.so to point to /opt/appscope/libscope.so
+			if stdoutStderr, err := ld.Preload("auto", containerRootdir); err != nil {
+				log.Warn().
+					Err(err).
+					Str("loaderDetails", stdoutStderr).
+					Msgf("Install library in %s namespace failed.", rootdir)
+				return err
+			}
 
-		// Extract the library to /opt/appscope/libscope.so
-		scope extract /opt/appscope --rootdir <container root>
-
-		// Set ld.preload.so to point to /opt/appscope/libscope.so
-		ld.Preload()
-			scope --preload /opt/appscope --rootdir <container root>                        #
-
-		// Attach is already taken care of, we attached to everything in rootdir and children
-	*/
+			// Attach is already taken care of, we attached to everything in rootdir and children
+		}
+	}
 
 	return nil
 }

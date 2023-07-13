@@ -645,7 +645,7 @@ cmdMount(pid_t pid, const char *mountDest, const char *rootdir)
     }
 
     // Set up the mount
-    if (setupMount(pid, mountDest, rootdir, nsUid, nsGid) == FALSE) {
+    if (setupMount(pid, mountDest, nsUid, nsGid) == FALSE) {
         fprintf(stderr, "error: failed to mount\n");
         return EXIT_FAILURE;
     }

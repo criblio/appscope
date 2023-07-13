@@ -668,7 +668,7 @@ closeFd:
 }
 
 static bool
-doDir(pid_t pid, char *rootdir, char *overlaydir, size_t olen, char *dest, size_t dlen,
+doDir(pid_t pid, char *overlaydir, size_t olen, char *dest, size_t dlen,
       char *fstype, uid_t nsUid, gid_t nsGid)
 {
     char mountdir[olen + dlen + 2];
@@ -679,12 +679,7 @@ doDir(pid_t pid, char *rootdir, char *overlaydir, size_t olen, char *dest, size_
     strcpy(mountdir, overlaydir);
     strcat(mountdir, dest);
 
-    if (rootdir) {
-        snprintf(path, sizeof(path), "%s/proc/%d/root/%s/",
-                 rootdir, pid, dest);
-    } else {
-        snprintf(path, sizeof(path), "/proc/%d/root/%s/", pid, dest);
-    }
+    snprintf(path, sizeof(path), "/proc/%d/root/%s/", pid, dest);
 
     // make the overlay file in the merged dir
     if (libdirCreateDirIfMissing(path, 0777, nsUid, nsGid) > MKDIR_STATUS_EXISTS) {
@@ -703,7 +698,7 @@ doDir(pid_t pid, char *rootdir, char *overlaydir, size_t olen, char *dest, size_
 }
 
 static bool
-mountCDirs(pid_t pid, char *overlay, const char *rootdir, const char *dest,
+mountCDirs(pid_t pid, char *overlay, const char *dest,
            char *fstype, uid_t nsUid, gid_t nsGid)
 {
     if (!overlay || !dest) return FALSE;
@@ -715,8 +710,8 @@ mountCDirs(pid_t pid, char *overlay, const char *rootdir, const char *dest,
     if ((overlaydir = malloc(tlen + 1)) == NULL) return FALSE;
     strcpy(overlaydir, overlay);
 
-    if (doDir(pid, (char *)rootdir, overlaydir, tlen, (char *)dest, flen,
-              fstype, nsUid, nsGid) == FALSE) {
+    if (doDir(pid, overlaydir, tlen, (char *)dest, flen,
+        fstype, nsUid, nsGid) == FALSE) {
         fprintf(stderr, "Can't mount %s in the container\n", dest);
         free(overlaydir);
         return FALSE;
@@ -781,12 +776,12 @@ getMountPath(pid_t pid)
 
 // Mount the scope rules and unix socket into mountDest/usr/lib/appscope/*
 bool
-setupMount(pid_t pid, const char *mountDest, const char *rootdir, uid_t nsUid, gid_t nsGid)
+setupMount(pid_t pid, const char *mountDest, uid_t nsUid, gid_t nsGid)
 {
     char *overlay = NULL;
 
     if ((overlay = getMountPath(pid)) != NULL) {
-        mountCDirs(pid, overlay, rootdir, mountDest, NULL, nsUid, nsGid);
+        mountCDirs(pid, overlay, mountDest, NULL, nsUid, nsGid);
         free(overlay);
     }
 

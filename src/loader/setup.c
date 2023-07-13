@@ -576,7 +576,7 @@ setupService(const char *serviceName, uid_t nsUid, gid_t nsGid) {
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
     bool isDevVersion = libverIsNormVersionDev(loaderVersion);
 
-    snprintf(libscopePath, PATH_MAX, "/usr/lib/appscope/%s/libscope.so", loaderVersion);
+    snprintf(libscopePath, PATH_MAX, SCOPE_LIBSCOPE_PATH);
     if (access(libscopePath, R_OK) || isDevVersion) {
         memset(libscopePath, 0, PATH_MAX);
         snprintf(libscopePath, PATH_MAX, "/tmp/appscope/%s/libscope.so", loaderVersion);

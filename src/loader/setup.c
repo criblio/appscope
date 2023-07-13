@@ -746,6 +746,12 @@ getMountPath(pid_t pid)
         // if a docker overlay mount and not already mounted; appscope
         if ((strstr(buf, "overlay")) &&
             (strstr(buf, "docker"))) {
+            
+            // no longer a candidate as we've already mounted this proc
+            if (strstr(buf, "appscope")) {
+                continue;
+            }
+
             char *start, *end;
             if (((start = strstr(buf, "workdir="))) &&
                 ((end = strstr(buf, "/work")))) {
@@ -754,13 +760,10 @@ getMountPath(pid_t pid)
                 strcat(start, "/merged");
                 mount = strdup(start);
                 candidate = TRUE;
+                break;
             }
         }
 
-        // no longer a candidate as we've already mounted this proc
-        if (strstr(buf, "appscope")) candidate = FALSE;
-
-        free(buf);
         buf = NULL;
         len = 0;
     }
@@ -785,10 +788,9 @@ setupMount(pid_t pid, const char *mountDest, const char *rootdir, uid_t nsUid, g
     if ((overlay = getMountPath(pid)) != NULL) {
         mountCDirs(pid, overlay, rootdir, mountDest, NULL, nsUid, nsGid);
         free(overlay);
-        return TRUE;
     }
 
-    return FALSE;
+    return TRUE;
 }
 
 // Install a rules file in /usr/lib/appscope/

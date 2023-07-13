@@ -12,7 +12,7 @@ var (
 )
 
 // Get the LXD server unix socket
-func getLXDServerSocket() string {
+func getLXDServerSocket(rootdir string) string {
 	socketPaths := []string{"/var/lib/lxd/unix.socket", "/var/snap/lxd/common/lxd/unix.socket"}
 	for _, path := range socketPaths {
 		if _, err := os.Stat(path); err == nil {
@@ -23,8 +23,8 @@ func getLXDServerSocket() string {
 }
 
 // Get the List of PID(s) related to LXC container
-func GetLXCPids() ([]int, error) {
-	lxdUnixPath := getLXDServerSocket()
+func GetLXCPids(rootdir string) ([]int, error) {
+	lxdUnixPath := getLXDServerSocket(rootdir)
 	if lxdUnixPath == "" {
 		return nil, ErrLXDSocketNotAvailable
 	}
@@ -50,32 +50,32 @@ func GetLXCPids() ([]int, error) {
 }
 
 // Get the List of PID(s) related to containerd container
-func GetContainerDPids() ([]int, error) {
-	return getContainerRuntimePids("containerd-shim")
+func GetContainerDPids(rootdir string) ([]int, error) {
+	return getContainerRuntimePids(rootdir, "containerd-shim")
 }
 
 // Get the List of PID(s) related to Podman container
-func GetPodmanPids() ([]int, error) {
-	return getContainerRuntimePids("conmon")
+func GetPodmanPids(rootdir string) ([]int, error) {
+	return getContainerRuntimePids(rootdir, "conmon")
 }
 
 // Get the List of PID(s) related to specific container runtime
-func getContainerRuntimePids(runtimeProc string) ([]int, error) {
-	runtimeContPids, err := PidScopeMapByProcessName("", runtimeProc)
+func getContainerRuntimePids(rootdir, runtimeProc string) ([]int, error) {
+	runtimeContPids, err := PidScopeMapByProcessName(rootdir, runtimeProc)
 	if err != nil {
 		return nil, err
 	}
 	pids := make([]int, 0, len(runtimeContPids))
 
 	for runtimeContPid := range runtimeContPids {
-		childrenPids, err := PidChildren("", runtimeContPid)
+		childrenPids, err := PidChildren(rootdir, runtimeContPid)
 		if err != nil {
 			return nil, err
 		}
 
 		// Iterate over all the children to found container init process
 		for _, childPid := range childrenPids {
-			status, _ := PidInitContainer("", childPid)
+			status, _ := PidInitContainer(rootdir, childPid)
 			if status {
 				pids = append(pids, childPid)
 			}

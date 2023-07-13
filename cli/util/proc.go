@@ -475,12 +475,12 @@ func PidExists(rootdir string, pid int) bool {
 }
 
 // containerPids returns list of PID's of currently running containers
-func containerPids() []int {
+func containerPids(rootdir string) []int {
 	cPids := []int{}
-	ctrFuncs := []func() ([]int, error){GetContainerDPids, GetPodmanPids, GetLXCPids}
+	ctrFuncs := []func(string) ([]int, error){GetContainerDPids, GetPodmanPids, GetLXCPids}
 
 	for _, ctrFunc := range ctrFuncs {
-		ctrPids, err := ctrFunc()
+		ctrPids, err := ctrFunc(rootdir)
 		if err != nil {
 			continue
 		}
@@ -509,7 +509,7 @@ func PidGetRefPidForMntNamespace(rootdir string, targetPid int) int {
 	}
 
 	// Check if the namespace used by process belongs to one of the detected containers
-	ctrPids := containerPids()
+	ctrPids := containerPids(rootdir)
 	for _, nsPid := range ctrPids {
 		nsInfo, err := os.Readlink(fmt.Sprintf("%s/proc/%d/ns/mnt", rootdir, nsPid))
 		if err != nil {

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/criblio/scope/libscope"
 	"github.com/criblio/scope/loader"
@@ -189,14 +190,17 @@ func Add(rulesFile libscope.Rules, addProc, procArg, sourceid, rootdir string, r
 	// Apply rules to existing containers
 	////////////////////////////////////////////
 
-	// TODO: Don't do the below if (not on host AND no rootdir provided)
+	// Don't do the below if (not on host AND no rootdir provided)
+	if util.InContainer() && rootdir == "" {
+		return nil
+	}
 
 	// Only if this is the first entry in the file
 	// Rules will be applied in future containers by another mechanism (runc interposition)
 	if len(rulesFile.Allow) == 1 {
 
 		// For each existing container
-		cPids := util.GetContainersPids()
+		cPids := util.GetContainersPids(rootdir)
 		for _, cPid := range cPids {
 			containerRootdir := fmt.Sprintf("%s/proc/%d/root", rootdir, cPid)
 
@@ -236,6 +240,8 @@ func Add(rulesFile libscope.Rules, addProc, procArg, sourceid, rootdir string, r
 			}
 
 			// Mount unix socket from the host into the container
+			// Hack for now, don't mount /var/run/... - it won't work. Just mount /run/...
+			unixPath = strings.TrimPrefix(unixPath, "/var")
 			if unixPath != "" {
 				stdoutStderr, err = ld.Mount(unixPath, cPid, rootdir)
 				if err != nil {
@@ -356,13 +362,16 @@ func Remove(rulesFile libscope.Rules, remProc, procArg, sourceid, rootdir string
 	// Apply rules to existing containers
 	////////////////////////////////////////////
 
-	// TODO: Don't do the below if (not on host AND no rootdir provided)
+	// Don't do the below if (not on host AND no rootdir provided)
+	if util.InContainer() && rootdir == "" {
+		return nil
+	}
 
 	// Only if this is the last entry in the file
 	if len(rulesFile.Allow) == 0 {
 
 		// For each existing container
-		cPids := util.GetContainersPids()
+		cPids := util.GetContainersPids(rootdir)
 		for _, cPid := range cPids {
 			containerRootdir := fmt.Sprintf("%s/proc/%d/root", rootdir, cPid)
 

@@ -3492,6 +3492,38 @@ isAnAppScopeConnection(int fd)
 }
 
 /*
+ * Process the sedmmmsg depending on return status of operation
+ * and value of msgvec
+ */
+static void
+scopeProcessSendmmsg(int sockfd, struct mmsghdr *msgvec, int rc) {
+    if (rc != -1) {
+        if (msgvec) {
+            scopeLog(CFG_LOG_TRACE, "fd:%d sendmmsg", sockfd);
+
+            // For UDP connections the msg is a remote addr
+            if (!sockIsTCP(sockfd)) {
+                if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in6)) {
+                    doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                    sizeof(struct sockaddr_in6), REMOTE);
+                } else if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in)) {
+                    doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                    sizeof(struct sockaddr_in), REMOTE);
+                }
+            }
+
+            if (remotePortIsDNS(sockfd)) {
+                getDNSName(sockfd, msgvec->msg_hdr.msg_iov->iov_base, msgvec->msg_hdr.msg_iov->iov_len);
+            }
+
+            doSend(sockfd, rc, &msgvec->msg_hdr, rc, MSG);
+        }
+    } else {
+        setRemoteClose(sockfd, errno);
+        doUpdateState(NET_ERR_RX_TX, sockfd, 0, "sendmmsg", "nopath");
+    }
+}
+/*
  * Note:
  * The syscall function in libc is called from the loader for
  * at least mmap, possibly more. The result is that we can not
@@ -3539,6 +3571,18 @@ wrap_scope_syscall(long number, ...)
         }
         return rc;
     }
+    case SYS_sendmmsg:
+    {
+        long rc;
+        rc = g_fn.syscall(number, fArgs.arg[0], fArgs.arg[1],
+                          fArgs.arg[2], fArgs.arg[3]);
+        if ((g_ismusl == FALSE) && (g_cfg.funcs_attached == FALSE)) {
+            return rc;
+        }
+
+        scopeProcessSendmmsg((int)fArgs.arg[0], (struct mmsghdr *) fArgs.arg[1], rc);
+        return rc;
+    }
 
     /*
      * These messages are in place as they represent
@@ -3548,9 +3592,6 @@ wrap_scope_syscall(long number, ...)
      * check to see how many of these are called and therefore
      * what we are missing. So far, we only see accept4/sendmmsg used.
      */
-    case SYS_sendmmsg:
-        //DBG("syscall-sendmsg");
-        break;
 
     case SYS_recvmmsg:
         //DBG("syscall-recvmsg");
@@ -5435,33 +5476,11 @@ internal_sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int fla
     WRAP_CHECK(sendmmsg, -1);
 
     rc = g_fn.sendmmsg(sockfd, msgvec, vlen, flags);
-    if ((g_ismusl == FALSE) && (g_cfg.funcs_attached == FALSE)) return rc;
-
-    if (rc != -1) {
-        scopeLog(CFG_LOG_TRACE, "fd:%d sendmmsg", sockfd);
-
-        // For UDP connections the msg is a remote addr
-        if (!sockIsTCP(sockfd)) {
-            if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in6)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
-                                sizeof(struct sockaddr_in6), REMOTE);
-            } else if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
-                                sizeof(struct sockaddr_in), REMOTE);
-            }
-        }
-
-        if (remotePortIsDNS(sockfd)) {
-            getDNSName(sockfd, msgvec->msg_hdr.msg_iov->iov_base, msgvec->msg_hdr.msg_iov->iov_len);
-        }
-
-        doSend(sockfd, rc, &msgvec->msg_hdr, rc, MSG);
-
-    } else {
-        setRemoteClose(sockfd, errno);
-        doUpdateState(NET_ERR_RX_TX, sockfd, 0, "sendmmsg", "nopath");
+    if ((g_ismusl == FALSE) && (g_cfg.funcs_attached == FALSE)) {
+        return rc;
     }
 
+    scopeProcessSendmmsg(sockfd, msgvec, rc);
     return rc;
 }
 

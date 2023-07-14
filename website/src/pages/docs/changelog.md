@@ -5,6 +5,59 @@ title: Changelog
 
 See the AppScope repo to view [all issues](https://github.com/criblio/appscope/issues).
 
+## AppScope 1.4.1
+
+2023-07-19 - Update to Feature Release
+
+Assets are available via Docker and the Cribl CDN at the links below.
+
+- `Docker`: `cribl/scope:1.4.1`
+- `x86`: [https://cdn.cribl.io/dl/scope/1.4.1/linux/x86_64/scope](https://cdn.cribl.io/dl/scope/1.4.1/linux/x86_64/scope)
+- `ARM`: [https://cdn.cribl.io/dl/scope/1.4.1/linux/aarch64/scope](https://cdn.cribl.io/dl/scope/1.4.1/linux/aarch64/scope)
+- `AWS Lambda Layer for x86`: [https://cdn.cribl.io/dl/scope/1.4.1/linux/x86_64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.4.1/linux/x86_64/aws-lambda-layer.zip)
+- `AWS Lambda Layer for ARM`: [https://cdn.cribl.io/dl/scope/1.4.1/linux/aarch64/aws-lambda-layer.zip](https://cdn.cribl.io/dl/scope/1.4.1/linux/aarch64/aws-lambda-layer.zip)
+
+To obtain the MD5 checksum for any file above, add `.md5` to the file path.
+
+Assets other than AWS Lambda Layers are available in the [Docker container](https://hub.docker.com/r/cribl/scope/tags) tagged `cribl/scope:1.4.1`.
+
+### New Features and Improvements
+
+Beginning in version 1.4.1, AppScope applies Rules to new processes in existing containers. That is, within any container that exists when you start scoping by Rule, AppScope will automatically begin monitoring any **new** process that matches the Rule. 
+
+This holds true whether you are using the `scope rules` CLI command, or the **AppScope Rules** settings in the AppScope Source UI in Cribl Edge or Cribl Stream. Related issue: [1523](https://github.com/criblio/appscope/issues/1523).
+
+### Fixes
+
+- [1584](https://github.com/criblio/appscope/issues/1584) AppScope 1.4.1 fixes a problem introduced in AppScope 1.4.0 where, while upgrading, multiple AppScope libraries were loaded into one process, causing a crash.
+
+## AppScope 1.4.0
+
+2023-07-19 - Feature Release
+
+**This release has been replaced by AppScope 1.4.1.** Therefore, the AppScope recommends against downloading AppScope 1.4.0 assets from Docker or the Cribl CDN.
+
+### New Features and Improvements
+
+AppScope 1.4.0 integrates more deeply with Cribl Edge:
+
+- Using [Cribl Edge](https://docs.cribl.io/edge/) to "drive," you can now scope individual processes by PID on an Edge Node, and/or scope multiple processes by Rule, on an entire Edge Fleet.
+- Using Cribl Edge's [Prometheus Scraper Source](https://docs.cribl.io/edge/sources-prometheus/), you can now obtain metrics in [OpenMetrics](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md) format from processes running in Kubernetes containers.
+- The [AppScope CLI](/docs/cli-reference) has new functionality to support the Cribl Edge integration, including: 
+    - A new `rules` command that specifies processes to scope, along with configs to apply to those processes.
+    - Improvements to the `start`, `stop`, `attach`, `detach`, `update`, and `inspect` commands.
+
+In general, AppScope 1.4.0 expands support for Kubernetes.
+
+### Fixes
+
+- [1567](https://github.com/criblio/appscope/issues/1567) Scoping top on Fedora no longer produces an `unknown terminal type` error.
+- [1521](https://github.com/criblio/appscope/issues/1521), [1557](https://github.com/criblio/appscope/issues/1557) Memory leaks are fixed.
+- [1547](https://github.com/criblio/appscope/issues/1547) `scope ps` no longer fails to shows child processes.
+- [1529](https://github.com/criblio/appscope/issues/1529) It is now possible to scope postgres using the `LD_PRELOAD` mechanism.
+- [1515](https://github.com/criblio/appscope/issues/1515) When AppScope is in the user's `$PATH`` and the scoped application performs a fork and exec, AppScope no longer crashes the application.
+- [1502](https://github.com/criblio/appscope/issues/1502) Scoping bash no longer uses an (incorrect) configuration that is other than the one specified.
+
 ## AppScope 1.3.4
 
 2023-06-14 - Maintenance Release

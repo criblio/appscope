@@ -421,10 +421,11 @@ func RemoveEmptyStrings(s []string) []string {
 }
 
 // GetContainersPids gets the list of PID(s) related to containers
-func GetContainersPids() []int {
+// Only works from a container for detecting non-LXC containers
+func GetContainersPids(rootdir string) []int {
 	cPids := []int{}
 
-	ctrDPids, err := GetContainerDPids()
+	ctrDPids, err := GetContainerDPids(rootdir)
 	if err != nil {
 		log.Error().
 			Err(err).
@@ -434,7 +435,7 @@ func GetContainersPids() []int {
 		cPids = append(cPids, ctrDPids...)
 	}
 
-	podmanPids, err := GetPodmanPids()
+	podmanPids, err := GetPodmanPids(rootdir)
 	if err != nil {
 		log.Error().
 			Err(err).
@@ -444,7 +445,7 @@ func GetContainersPids() []int {
 		cPids = append(cPids, podmanPids...)
 	}
 
-	lxcPids, err := GetLXCPids()
+	lxcPids, err := GetLXCPids(rootdir)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrLXDSocketNotAvailable):

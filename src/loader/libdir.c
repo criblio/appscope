@@ -455,7 +455,6 @@ libdirSetLibraryBase(const char *base)
     const char *normVer = libverNormalizedVersion(g_libdir_info.ver);
     char tmp_path[PATH_MAX] = {0};
 
-
     int pathLen = snprintf(tmp_path, PATH_MAX, "%s/%s/%s", base, normVer, SCOPE_LIBSCOPE_SO);
     if (pathLen < 0) {
         fprintf(stderr, "error: snprintf() failed.\n");
@@ -532,19 +531,28 @@ libdirGetPath(libdirfile_t objFileType)
 
     if (g_libdir_info.install_base[0]) {
         // Check install base next
-        char tmp_path[PATH_MAX] = {0};
-        int pathLen = snprintf(tmp_path, PATH_MAX, "%s/%s/%s", g_libdir_info.install_base, normVer, state->binaryName);
-        if (pathLen < 0) {
-            fprintf(stderr, "error: libdirGetPath: install base snprintf() failed.\n");
-            return NULL;
-        }
-        if (pathLen >= PATH_MAX) {
-            fprintf(stderr, "error: libdirGetPath: install base path too long.\n");
-            return NULL;
-        }
-        if (!access(tmp_path, R_OK)) {
-            strncpy(state->binaryPath, tmp_path, PATH_MAX);
-            return state->binaryPath;
+        if (objFileType == LIBRARY_FILE) {
+            // Special case for the library when we're dealing with the install path. It exists at /usr/lib/libscope.so.
+            // Check symlink to the library exists and is valid, and if so, return it
+            if (!access(SCOPE_LIBSCOPE_PATH, R_OK)) {
+                strncpy(state->binaryPath, SCOPE_LIBSCOPE_PATH, PATH_MAX);
+                return state->binaryPath;
+            }
+        } else {
+            char tmp_path[PATH_MAX] = {0};
+            int pathLen = snprintf(tmp_path, PATH_MAX, "%s/%s/%s", g_libdir_info.install_base, normVer, state->binaryName);
+            if (pathLen < 0) {
+                fprintf(stderr, "error: libdirGetPath: install base snprintf() failed.\n");
+                return NULL;
+            }
+            if (pathLen >= PATH_MAX) {
+                fprintf(stderr, "error: libdirGetPath: install base path too long.\n");
+                return NULL;
+            }
+            if (!access(tmp_path, R_OK)) {
+                strncpy(state->binaryPath, tmp_path, PATH_MAX);
+                return state->binaryPath;
+            }
         }
     }
 
@@ -586,6 +594,7 @@ libdirExtract(unsigned char *asset_file, size_t asset_file_len, uid_t nsUid, gid
     char *target;
     mode_t mode = 0755;
     mkdir_status_t res;
+    bool useTmpPath = FALSE;
 
     // Which version of AppScope are we dealing with (official or dev)
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
@@ -626,6 +635,7 @@ libdirExtract(unsigned char *asset_file, size_t asset_file_len, uid_t nsUid, gid
 
     // If all else fails, create /tmp/appscope
     if (res > MKDIR_STATUS_EXISTS) {
+        useTmpPath = TRUE;
         mode = 0777;
         memset(path, 0, PATH_MAX);
         int pathLen = snprintf(path, PATH_MAX, "/tmp/appscope/%s/", loaderVersion);
@@ -674,9 +684,36 @@ libdirExtract(unsigned char *asset_file, size_t asset_file_len, uid_t nsUid, gid
             return -1;
         }
 
-        // Create symlink to appropriate version
-        strncat(path, "libscope.so", sizeof(path) - 1);
+        // Create symlink
+        
+        // Determine which version it should point to
         target = isMusl() ? path_musl : path_glibc;
+
+        // Determine where it should be created
+        if (useTmpPath) {
+            // Symlink to be created at /tmp/appscope/<ver>/libscope.so
+            strncat(path, "libscope.so", sizeof(path) - 1);
+        } else {
+            // Symlink to be created at /usr/lib/libscope.so
+            memset(path, 0, PATH_MAX);
+            int pathLen = snprintf(path, PATH_MAX, SCOPE_LIBSCOPE_PATH);
+            if (pathLen < 0) {
+                fprintf(stderr, "error: libdirExtract: snprintf() failed.\n");
+                return -1;
+            }
+            if (pathLen >= PATH_MAX) {
+                fprintf(stderr, "error: libdirExtract: path too long.\n");
+                return -1;
+            }
+        }
+
+        // Always remove old symlink (in case it points to an older lib)
+        if ((remove(path) < 0) && (errno != ENOENT)) {
+            fprintf(stderr, "error: libdirExtract: remove failed %d.\n", errno);
+            return -1;
+        }
+
+        // Create new symlink
         if (libdirCreateSymLinkIfMissing(path, target, overwrite, mode, nsUid, nsGid)) {
             fprintf(stderr, "libdirExtract: symlink %s failed\n", path);
             return -1;

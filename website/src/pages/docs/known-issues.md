@@ -4,6 +4,18 @@ title: Known Issues
 
 # Known Issues
 
+## AppScope 1.4.1
+
+2023-07-19 - Update to Feature Release
+
+As of this AppScope release, known issues include:
+
+- [1580](https://github.com/criblio/appscope/issues/1580) Applications with the `s` bit set cannot be scoped. The system loader will emit a warning that the AppScope library cannot be preloaded; there will be no effect on the application beyond that.
+
+  - **Fix:** Version TBD
+
+- [1424](https://github.com/criblio/appscope/issues/1424) remains a Known Issue; see entry below.
+
 ## AppScope 1.3.2
 
 2023-04-19 - Maintenance Release
@@ -12,7 +24,7 @@ As of this AppScope release, known issues include:
 
 - [1424](https://github.com/criblio/appscope/issues/1424) Scoping a Go application that was built without certain symbol names produces limited metrics, but no events. Work on a fix is in issue [1416](https://github.com/criblio/appscope/issues/1416).
 
-  - **Fix:** 1.4
+  - **Fix:** Version TBD (revised; originally 1.4.0)
 
 - [1412](https://github.com/criblio/appscope/issues/1412) Node.js apps compiled as [Position Independent Executables](https://www.redhat.com/en/blog/position-independent-executables-pie) (PIE) seg fault when scoped.
 

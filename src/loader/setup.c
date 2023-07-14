@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <sys/mount.h>
 
 #include "libdir.h"
 #include "libver.h"
@@ -576,7 +577,7 @@ setupService(const char *serviceName, uid_t nsUid, gid_t nsGid) {
     const char *loaderVersion = libverNormalizedVersion(SCOPE_VER);
     bool isDevVersion = libverIsNormVersionDev(loaderVersion);
 
-    snprintf(libscopePath, PATH_MAX, "/usr/lib/appscope/%s/libscope.so", loaderVersion);
+    snprintf(libscopePath, PATH_MAX, SCOPE_LIBSCOPE_PATH);
     if (access(libscopePath, R_OK) || isDevVersion) {
         memset(libscopePath, 0, PATH_MAX);
         snprintf(libscopePath, PATH_MAX, "/tmp/appscope/%s/libscope.so", loaderVersion);
@@ -666,11 +667,127 @@ closeFd:
     return resMem;
 }
 
+// Create a bind mount
+// Create all directories required
+static bool
+doDir(pid_t pid, char *overlaydir, size_t olen, char *dest, size_t dlen,
+      char *fstype, uid_t nsUid, gid_t nsGid)
+{
+    char mountdir[PATH_MAX] = {0};
+    char path[PATH_MAX] = {0};
+
+    if (!overlaydir || !dest) return FALSE;
+
+    strcpy(mountdir, overlaydir);
+    strcat(mountdir, dest);
+
+    snprintf(path, sizeof(path), "/proc/%d/root/%s/", pid, dest);
+
+    // make the overlay file in the merged dir
+    if (libdirCreateDirIfMissing(path, 0777, nsUid, nsGid) > MKDIR_STATUS_EXISTS) {
+        fprintf(stderr, "error: %s: failed to create directory\n", __FUNCTION__);
+        return FALSE;
+    }
+
+    // mount the overlay file into the container
+    if (mount(dest, mountdir, fstype, MS_BIND, NULL) != 0) {
+        perror("mount");
+        fprintf(stderr, "WARN: mount %s on %s from %s:%d\n", dest, overlaydir, __FUNCTION__, __LINE__);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+// Create a mount into a container directory
+static bool
+mountCDirs(pid_t pid, char *overlay, const char *dest,
+           char *fstype, uid_t nsUid, gid_t nsGid)
+{
+    if (!overlay || !dest) return FALSE;
+
+    char *overlaydir = NULL;
+    size_t tlen = strlen(overlay);
+    size_t flen = strlen(dest);
+
+    if ((overlaydir = malloc(tlen + 1)) == NULL) return FALSE;
+    strcpy(overlaydir, overlay);
+
+    if (doDir(pid, overlaydir, tlen, (char *)dest, flen,
+        fstype, nsUid, nsGid) == FALSE) {
+        fprintf(stderr, "Can't mount %s in the container\n", dest);
+        free(overlaydir);
+        return FALSE;
+    }
+
+    free(overlaydir);
+    return TRUE;
+}
+
+// Get the path to a docker container filesystem
+static char *
+getMountPath(pid_t pid)
+{
+    bool candidate = FALSE;
+    size_t len;
+    char *buf = NULL, *mount = NULL;
+    FILE *fstream;
+    char path[PATH_MAX];
+
+    snprintf(path, sizeof(path), "/proc/%d/mounts", pid);
+    fstream = fopen(path, "r");
+    if (fstream == NULL) {
+        perror("fopen");
+        return NULL;
+    }
+
+    while (getline(&buf, &len, fstream) != -1) {
+        // if a docker overlay mount and not already mounted; appscope
+        if ((strstr(buf, "overlay")) &&
+            (strstr(buf, "docker"))) {
+            
+            // no longer a candidate as we've already mounted this proc
+            if (strstr(buf, "appscope")) {
+                continue;
+            }
+
+            char *start, *end;
+            if (((start = strstr(buf, "workdir="))) &&
+                ((end = strstr(buf, "/work")))) {
+                start += strlen("workdir=");
+                *end = '\0';
+                strcat(start, "/merged");
+                mount = strdup(start);
+                candidate = TRUE;
+                break;
+            }
+        }
+
+        buf = NULL;
+        len = 0;
+    }
+
+    if (buf) free(buf);
+    fclose(fstream);
+
+    if (candidate == TRUE) {
+        return mount;
+    } else {
+        free(mount);
+    }
+    return NULL;
+}
+
 // Mount the scope rules and unix socket into mountDest/usr/lib/appscope/*
 bool
-setupMount(const char *mountDest, uid_t nsUid, gid_t nsGid)
+setupMount(pid_t pid, const char *mountDest, uid_t nsUid, gid_t nsGid)
 {
-    // TODO implement
+    char *overlay = NULL;
+
+    if ((overlay = getMountPath(pid)) != NULL) {
+        mountCDirs(pid, overlay, mountDest, NULL, nsUid, nsGid);
+        free(overlay);
+    }
 
     return TRUE;
 }

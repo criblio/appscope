@@ -3546,7 +3546,7 @@ wrap_scope_syscall(long number, ...)
      * These are functions defined in libuv/src/unix/linux-syscalls.c
      * that we are otherwise interposing. The DBG call allows us to
      * check to see how many of these are called and therefore
-     * what we are missing. So far, we only see accept4 used.
+     * what we are missing. So far, we only see accept4/sendmmsg used.
      */
     case SYS_sendmmsg:
         //DBG("syscall-sendmsg");

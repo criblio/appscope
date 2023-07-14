@@ -41,6 +41,25 @@ cleanup(){
     rm -rf $SCOPE_PAYLOAD_DIR/*
 }
 
+get_file_count_with_extension() {
+  directory="$1"
+  extension="$2"
+  count=0
+  
+  if [ -d "$directory" ]; then
+    # Loop through the files in the specified directory
+    for file in "$directory"/*."$extension"; do
+      if [ -f "$file" ]; then
+        count=$((count + 1))
+      fi
+    done
+    
+    echo "$count"
+  else
+    fail "FAILED - expected payload files, but $SCOPE_PAYLOAD_DIR is missing"
+  fi
+}
+
 #
 # This test was written to test that the payload feature creates .in and
 # .out files to disk when we expect them.  Generally, if the payload
@@ -132,9 +151,31 @@ FILE_COUNT=$(compgen -G "$SCOPE_PAYLOAD_DIR/*\.out" | wc -l)
 if (( $FILE_COUNT == 0 )); then
     fail "FAILED - expected payload files, but found $FILE_COUNT"
 fi
+cleanup
 endtest
 
 
+# this test was added to ensure that we are able to scope request and response
+starttest payload_host_app
+SCOPE_PAYLOAD_ENABLE=true \
+SCOPE_CRIBL_ENABLE=false \
+scope run -- host -t a cribl.io
+in_count=$(get_file_count_with_extension $SCOPE_PAYLOAD_DIR "in")
+out_count=$(get_file_count_with_extension $SCOPE_PAYLOAD_DIR "out")
+
+if [ "$in_count" -eq 0 ]; then
+    fail "FAILED - missing *.in files"
+fi
+
+if [ "$out_count" -eq 0 ]; then
+    fail "FAILED - missing *.out files"
+fi
+
+if [ "$in_count" -ne "$out_count" ]; then
+    fail "FAILED - mismatch of in files $in_count and out files $out_count"
+fi
+cleanup
+endtest
 
 
 if (( $FAILED_TEST_COUNT == 0 )); then

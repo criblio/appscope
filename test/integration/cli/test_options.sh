@@ -126,7 +126,7 @@ outputs "error: --passthrough cannot be used with --ldattach/--lddetach or --nam
 returns 1
 
 run ./bin/linux/${ARCH}/scope -n 1 ls
-outputs "error: --namespace option requires --service/--unservice option"
+outputs "error: --namespace option requires --service/--unservice or --mount option"
 returns 1
 
 run ./bin/linux/${ARCH}/scope -a dummy_service_value -s 1

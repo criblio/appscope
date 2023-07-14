@@ -22,9 +22,10 @@ In Cribl.Cloud:
 1. Click **Manage Edge**.
 2. Select the Fleet where you’ll be adding a Linux host – `default_fleet` is fine.
 3. From the **Add/Update Edge Node** drop-down, select **Linux** > **Add** to open the **Add Linux Node** modal.
-4. Click **Copy script** and dismiss the modal.
+4. Change the value of **User** from `cribl` to `root`.
+5. Click **Copy script** and dismiss the modal.
     - Note: Several parameters provided on this modal can alter the contents of the script. Defaults are fine for this example.
-5. Note the value of **Edge Nodes** at upper left.
+6. Note the value of **Edge Nodes** at upper left.
 
 On the Linux host we want to observe with Edge:
 

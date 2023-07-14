@@ -240,6 +240,7 @@ func Add(rulesFile libscope.Rules, addProc, procArg, sourceid, rootdir string, r
 			}
 
 			// Mount unix socket from the host into the container
+			unixPath = filepath.Dir(unixPath) // Strip the filename. We need to mount the dir
 			// Hack for now, don't mount /var/run/... - it won't work. Just mount /run/...
 			unixPath = strings.TrimPrefix(unixPath, "/var")
 			if unixPath != "" {

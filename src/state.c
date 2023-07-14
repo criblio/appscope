@@ -1784,7 +1784,7 @@ getDNSName(int sd, void *pkt, int pktlen)
       directly from that function interposition.
     */
 
-    if ((header->opcode != OPCODE_QUERY) && (header->qr != 1)) {
+    if ((header->opcode != DNS_OPCODE_QUERY) && (header->qr != DNS_QR_RESP)) {
         return 0;
     }
 
@@ -1795,7 +1795,7 @@ getDNSName(int sd, void *pkt, int pktlen)
         // handle one label
 
         int label_len = (int)*dname++;
-        if (label_len > 63) return -1; // labels must be 63 chars or less
+        if (label_len > DNS_MAXLABEL) return -1;
         if (&dname[label_len] >= pkt_end) return -1; // honor packet end
         // Ensure we don't overrun the size of dnsName
         if ((dnsNameBytesUsed + label_len) >= sizeof(dnsName)) return -1;

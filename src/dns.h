@@ -7,7 +7,7 @@
 
 #define DNS_SERVICE 0x7f000035 // 127.0.0.53
 #define DNS_PORT 53
-#define OPCODE_QUERY 0
+#define DNS_MAXLABEL 63  // Maximum size limit of DNS label
 #define QTYPE_QUERY 0x01
 #define QCLASS_IN 0x01
 
@@ -59,6 +59,18 @@ struct dns_header
     unsigned short nscount;  // number of authority entries
     unsigned short arcount;  // number of resource entries
 };
+
+typedef enum {
+    DNS_OPCODE_QUERY = 0,
+    DNS_OPCODE_IQUERY = 1,
+    DNS_OPCODE_STATUS = 2,
+} dns_op_code_t;
+
+typedef enum {
+    DNS_QR_QUERY = 0,
+    DNS_QR_RESP  = 1,
+} dns_qr_t;
+
 
 // DNS query definition
 typedef struct question_t

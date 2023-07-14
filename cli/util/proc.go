@@ -499,7 +499,7 @@ func PidGetRefPidForMntNamespace(rootdir string, targetPid int) int {
 	}
 
 	// First check if the namespace used by process is the same namespace as CLI
-	nsInfo, err := os.Readlink(fmt.Sprintf("%s/proc/self/ns/mnt", rootdir))
+	nsInfo, err := os.Readlink(fmt.Sprintf("/proc/self/ns/mnt"))
 	if err != nil {
 		return -1
 	}

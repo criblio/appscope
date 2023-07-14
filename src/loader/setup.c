@@ -667,11 +667,13 @@ closeFd:
     return resMem;
 }
 
+// Create a bind mount
+// Create all directories required
 static bool
 doDir(pid_t pid, char *overlaydir, size_t olen, char *dest, size_t dlen,
       char *fstype, uid_t nsUid, gid_t nsGid)
 {
-    char mountdir[olen + dlen + 2];
+    char mountdir[PATH_MAX] = {0};
     char path[PATH_MAX] = {0};
 
     if (!overlaydir || !dest) return FALSE;
@@ -697,6 +699,7 @@ doDir(pid_t pid, char *overlaydir, size_t olen, char *dest, size_t dlen,
     return TRUE;
 }
 
+// Create a mount into a container directory
 static bool
 mountCDirs(pid_t pid, char *overlay, const char *dest,
            char *fstype, uid_t nsUid, gid_t nsGid)
@@ -721,6 +724,7 @@ mountCDirs(pid_t pid, char *overlay, const char *dest,
     return TRUE;
 }
 
+// Get the path to a docker container filesystem
 static char *
 getMountPath(pid_t pid)
 {

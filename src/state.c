@@ -1691,7 +1691,7 @@ isLegalLabelChar(char x)
  * See RFC 1035 for details.
  */
 
-int
+bool
 getDNSName(int sd, void *pkt, int pktlen)
 {
     dns_query *query;
@@ -1702,7 +1702,7 @@ getDNSName(int sd, void *pkt, int pktlen)
     struct net_info_t *net = getNetEntry(sd);
 
     if (net == NULL) {
-        return -1;
+        return FALSE;
     }
 
     net->startTime = getTime();
@@ -1710,7 +1710,7 @@ getDNSName(int sd, void *pkt, int pktlen)
     query = (struct dns_query_t *)pkt;
     header = &query->qhead;
     if ((dname = (char *)&query->name) == NULL) {
-        return -1;
+        return FALSE;
     }
 
     /*
@@ -1768,7 +1768,7 @@ getDNSName(int sd, void *pkt, int pktlen)
     */
 
     if ((header->opcode != DNS_OPCODE_QUERY) && (header->qr != DNS_QR_RESP)) {
-        return 0;
+        return TRUE;
     }
 
     // We think we have a direct DNS request
@@ -1778,13 +1778,20 @@ getDNSName(int sd, void *pkt, int pktlen)
         // handle one label
 
         int label_len = (int)*dname++;
-        if (label_len > DNS_MAXLABEL) return -1;
-        if (&dname[label_len] >= pkt_end) return -1; // honor packet end
+        if (label_len > DNS_MAXLABEL) {
+            return FALSE;
+        }
+        if (&dname[label_len] >= pkt_end) {
+            return FALSE; // honor packet end
+        }
         // Ensure we don't overrun the size of dnsName
-        if ((dnsNameBytesUsed + label_len) >= sizeof(dnsName)) return -1;
-
+        if ((dnsNameBytesUsed + label_len) >= sizeof(dnsName)) {
+            return FALSE;
+        }
         for ( ; (label_len > 0); label_len--) {
-            if (!isLegalLabelChar(*dname)) return -1;
+            if (!isLegalLabelChar(*dname)) {
+                return FALSE;
+            }
             dnsName[dnsNameBytesUsed++] = *dname++;
         }
         dnsName[dnsNameBytesUsed++] = '.';
@@ -1800,7 +1807,7 @@ getDNSName(int sd, void *pkt, int pktlen)
         g_netinfo[sd].dnsSend = FALSE;
     }
 
-    return 0;
+    return TRUE;
 }
 
 #define DNSDONE(var1, var2) {if (var1) cJSON_Delete(var1); if (var2) cJSON_Delete(var2); return FALSE;}

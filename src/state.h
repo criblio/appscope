@@ -45,7 +45,7 @@ int doBlockConnection(int, const struct sockaddr *);
 void doSetConnection(int, const struct sockaddr *, socklen_t, control_type_t);
 int doSetAddrs(int);
 int doAddNewSock(int);
-int getDNSName(int, void *, int);
+bool getDNSName(int, void *, int);
 bool getDNSAnswer(int, char *, size_t, src_data_t);
 int doRecv(int, ssize_t, const void *, size_t, src_data_t);
 int doSend(int, ssize_t, const void *, size_t, src_data_t);

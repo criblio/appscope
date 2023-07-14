@@ -23,9 +23,9 @@ Assets other than AWS Lambda Layers are available in the [Docker container](http
 
 ### New Features and Improvements
 
-Beginning in version 1.4.1, AppScope applies Process Monitoring Rules to new processes in existing containers. That is, within any container that exists when you start scoping by Rule, AppScope will automatically begin monitoring any **new** process that matches the Rule. 
+Beginning in version 1.4.1, AppScope applies Rules to new processes in existing containers. That is, within any container that exists when you start scoping by Rule, AppScope will automatically begin monitoring any **new** process that matches the Rule. 
 
-This holds true whether you are using the `scope rules` CLI command, or the **Process Monitoring** settings in the AppScope Source UI in Cribl Edge or Cribl Stream. Related issue: [1523](https://github.com/criblio/appscope/issues/1523).
+This holds true whether you are using the `scope rules` CLI command, or the **AppScope Rules** settings in the AppScope Source UI in Cribl Edge or Cribl Stream. Related issue: [1523](https://github.com/criblio/appscope/issues/1523).
 
 ### Fixes
 

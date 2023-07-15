@@ -5709,25 +5709,25 @@ recvmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen,
     if (flags & MSG_PEEK) return rc;
 
     if (rc != -1) {
-        scopeLog(CFG_LOG_TRACE, "fd:%d recvmmsg", sockfd);
-
-        // For UDP connections the msg is a remote addr
         if (msgvec) {
-            if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in6)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
-                                sizeof(struct sockaddr_in6), REMOTE);
-            } else if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
-                                sizeof(struct sockaddr_in), REMOTE);
+            scopeLog(CFG_LOG_TRACE, "fd:%d recvmmsg", sockfd);
+
+            // For UDP connections the msg is a remote addr
+                if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in6)) {
+                    doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                    sizeof(struct sockaddr_in6), REMOTE);
+                } else if (msgvec->msg_hdr.msg_namelen >= sizeof(struct sockaddr_in)) {
+                    doSetConnection(sockfd, (const struct sockaddr *)msgvec->msg_hdr.msg_name,
+                                    sizeof(struct sockaddr_in), REMOTE);
+                }
+
+            if (remotePortIsDNS(sockfd)) {
+                getDNSAnswer(sockfd, (char *)&msgvec->msg_hdr, rc, MSG);
             }
-        }
 
-        if (remotePortIsDNS(sockfd)) {
-            getDNSAnswer(sockfd, (char *)&msgvec->msg_hdr, rc, MSG);
+            doRecv(sockfd, rc, &msgvec->msg_hdr, rc, MSG);
+            doAccessRights(&msgvec->msg_hdr);
         }
-
-        doRecv(sockfd, rc, &msgvec->msg_hdr, rc, MSG);
-        doAccessRights(&msgvec->msg_hdr);
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, 0, "recvmmsg", "nopath");
     }

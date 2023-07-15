@@ -5425,39 +5425,41 @@ sendmsg(int sockfd, const struct msghdr *msg, int flags)
     WRAP_CHECK(sendmsg, -1);
     rc = g_fn.sendmsg(sockfd, msg, flags);
     if (rc != -1) {
-        size_t msg_iovlen_orig;
-        size_t msg_controllen_orig;
-        struct msghdr *msg_modify = (struct msghdr *)msg;
+        if (msg) {
+            size_t msg_iovlen_orig;
+            size_t msg_controllen_orig;
+            struct msghdr *msg_modify = (struct msghdr *)msg;
 
-        scopeLog(CFG_LOG_TRACE, "fd:%d sendmsg", sockfd);
+            scopeLog(CFG_LOG_TRACE, "fd:%d sendmsg", sockfd);
 
-        // For UDP connections the msg is a remote addr
-        if (msg && !sockIsTCP(sockfd)) {
-            if (msg->msg_namelen >= sizeof(struct sockaddr_in6)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
-                                sizeof(struct sockaddr_in6), REMOTE);
-            } else if (msg->msg_namelen >= sizeof(struct sockaddr_in)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
-                                sizeof(struct sockaddr_in), REMOTE);
+            // For UDP connections the msg is a remote addr
+            if (!sockIsTCP(sockfd)) {
+                if (msg->msg_namelen >= sizeof(struct sockaddr_in6)) {
+                    doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
+                                    sizeof(struct sockaddr_in6), REMOTE);
+                } else if (msg->msg_namelen >= sizeof(struct sockaddr_in)) {
+                    doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
+                                    sizeof(struct sockaddr_in), REMOTE);
+                }
             }
-        }
 
-        if (g_ismusl == TRUE) {
-            msg_iovlen_orig = msg->msg_iovlen;
-            msg_modify->msg_iovlen &= 0xFFFFFFFF;
-            msg_controllen_orig = msg->msg_controllen;
-            msg_modify->msg_controllen &= 0xFFFFFFFF;
-        }
+            if (g_ismusl == TRUE) {
+                msg_iovlen_orig = msg->msg_iovlen;
+                msg_modify->msg_iovlen &= 0xFFFFFFFF;
+                msg_controllen_orig = msg->msg_controllen;
+                msg_modify->msg_controllen &= 0xFFFFFFFF;
+            }
 
-        if (remotePortIsDNS(sockfd)) {
-            getDNSName(sockfd, msg->msg_iov->iov_base, msg->msg_iov->iov_len);
-        }
+            if (remotePortIsDNS(sockfd)) {
+                getDNSName(sockfd, msg->msg_iov->iov_base, msg->msg_iov->iov_len);
+            }
 
-        doSend(sockfd, rc, msg, rc, MSG);
+            doSend(sockfd, rc, msg, rc, MSG);
 
-        if (g_ismusl == TRUE) {
-            msg_modify->msg_iovlen = msg_iovlen_orig;
-            msg_modify->msg_controllen = msg_controllen_orig;
+            if (g_ismusl == TRUE) {
+                msg_modify->msg_iovlen = msg_iovlen_orig;
+                msg_modify->msg_controllen = msg_controllen_orig;
+            }
         }
     } else {
         setRemoteClose(sockfd, errno);
@@ -5654,38 +5656,38 @@ recvmsg(int sockfd, struct msghdr *msg, int flags)
     if (flags & MSG_PEEK) return rc;
 
     if (rc != -1) {
-        size_t msg_iovlen_orig;
-        size_t msg_controllen_orig;
-        scopeLog(CFG_LOG_TRACE, "fd:%d recvmsg", sockfd);
-
-        // For UDP connections the msg is a remote addr
         if (msg) {
-            if (msg->msg_namelen >= sizeof(struct sockaddr_in6)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
-                                sizeof(struct sockaddr_in6), REMOTE);
-            } else if (msg->msg_namelen >= sizeof(struct sockaddr_in)) {
-                doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
-                                sizeof(struct sockaddr_in), REMOTE);
+            size_t msg_iovlen_orig;
+            size_t msg_controllen_orig;
+            scopeLog(CFG_LOG_TRACE, "fd:%d recvmsg", sockfd);
+
+            // For UDP connections the msg is a remote addr
+                if (msg->msg_namelen >= sizeof(struct sockaddr_in6)) {
+                    doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
+                                    sizeof(struct sockaddr_in6), REMOTE);
+                } else if (msg->msg_namelen >= sizeof(struct sockaddr_in)) {
+                    doSetConnection(sockfd, (const struct sockaddr *)msg->msg_name,
+                                    sizeof(struct sockaddr_in), REMOTE);
+                }
+
+            if (g_ismusl == TRUE) {
+                msg_iovlen_orig = msg->msg_iovlen;
+                msg->msg_iovlen &= 0xFFFFFFFF;
+                msg_controllen_orig = msg->msg_controllen;
+                msg->msg_controllen &= 0xFFFFFFFF;
             }
-        }
 
-        if (g_ismusl == TRUE) {
-            msg_iovlen_orig = msg->msg_iovlen;
-            msg->msg_iovlen &= 0xFFFFFFFF;
-            msg_controllen_orig = msg->msg_controllen;
-            msg->msg_controllen &= 0xFFFFFFFF;
-        }
+            if (remotePortIsDNS(sockfd)) {
+                getDNSAnswer(sockfd, (char *)msg, rc, MSG);
+            }
 
-        if (remotePortIsDNS(sockfd)) {
-            getDNSAnswer(sockfd, (char *)msg, rc, MSG);
-        }
+            doRecv(sockfd, rc, msg, rc, MSG);
+            doAccessRights(msg);
 
-        doRecv(sockfd, rc, msg, rc, MSG);
-        doAccessRights(msg);
-
-        if (g_ismusl == TRUE) {
-            msg->msg_iovlen = msg_iovlen_orig;
-            msg->msg_controllen = msg_controllen_orig;
+            if (g_ismusl == TRUE) {
+                msg->msg_iovlen = msg_iovlen_orig;
+                msg->msg_controllen = msg_controllen_orig;
+            }
         }
     } else {
         doUpdateState(NET_ERR_RX_TX, sockfd, 0, "recvmsg", "nopath");

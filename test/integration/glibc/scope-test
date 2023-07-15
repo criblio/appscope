@@ -177,6 +177,21 @@ fi
 endtest
 
 #
+# verify msgtest
+#
+
+starttest msg_test_verify
+cd /opt/msg_test/
+
+scope -z ./msg_test
+
+if [ $? -ne 0 ]; then
+    ERR+=1
+fi
+
+endtest
+
+#
 # verify fault_test_read_only_mem
 #
 

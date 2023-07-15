@@ -21,6 +21,10 @@ RUN gcc -g -o /opt/sig_test/sighandler /opt/sig_test/sighandler.c
 COPY ./glibc/sigusrhandler.c /opt/sig_test/sigusrhandler.c
 RUN gcc -g -o /opt/sig_test/sigusrhandler /opt/sig_test/sigusrhandler.c -lrt
 
+RUN mkdir -p /opt/msg_test
+COPY ./glibc/msgtest.c /opt/msg_test/msgtest.c
+RUN gcc -g -o /opt/msg_test/msg_test /opt/msg_test/msgtest.c
+
 RUN mkdir -p /opt/extract_scope && \
     mkdir -p /opt/patch_libscope
 
